@@ -22,10 +22,6 @@ The rest of the setup is done for you; here is a short description of what they 
    install it if you have a yum or apt-get based system. Otherwise you should install
    distcc and ccache yourself through whatever package manager your system uses.
 1. Configure the remote distcc hosts.
-1. Your local compiler needs to be at the same path as it is on the remote build slaves.
-   That path is /opt/Impala-Toolchain/<gcc-version-folder>/bin/gcc. In other words, make
-   sure the Impala toolchain is available at /opt/Impala-Toolchain. That can be done
-   through a symlink, and that's what the scripts will attempt to setup.
 
 # Usage
 
@@ -82,7 +78,8 @@ source "$IMPALA_HOME"/bin/distcc/distcc_env.sh
    Where num jobs = 2x the number of cores on the machine. (2x is recommended by distcc.)
 1. Start distcc.
 1. Edit distcc_env.sh to include the new host.
-1. Install all gcc and binutils versions from the toolchain into /opt/Impala-Toolchain.
+1. Install all required gcc, clang, binutils, etc, versions from the toolchain into
+   /opt/Impala-Toolchain.
 1. ccache stores its cache in $HOME/.ccache. Assuming distcc is running as a non-root user
    that has no $HOME, you must sudo mkdir /.ccache, then sudo chmod 777 /.ccache.
 1. If distcc runs as "nobody", sudo -u nobody ccache -M 25G. This sets the size of the

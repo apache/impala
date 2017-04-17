@@ -97,8 +97,8 @@ function disable_distcc {
 }
 
 function enable_distcc {
+  export IMPALA_DISTCC_ENABLED=true
   switch_compiler distcc
-  export IMPALA_BUILD_THREADS=$(distcc -j)
   if ! clean_cmake_files; then
     echo Failed to clean cmake files. 1>&2
     return 1

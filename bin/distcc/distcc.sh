@@ -35,26 +35,16 @@ if [[ -z "$DISTCC_HOSTS" || -z "$CXX_COMPILER" ]]; then
   exit 1
 fi
 
-TOOLCHAIN_DIR=/opt/Impala-Toolchain
-if [[ ! -d "$TOOLCHAIN_DIR" ]]; then
-  if [[ -n "$IMPALA_TOOLCHAIN" && -d "$IMPALA_TOOLCHAIN" ]]; then
-    if ! sudo -n -- ln -s "$IMPALA_TOOLCHAIN" "$TOOLCHAIN_DIR" &>/dev/null; then
-      echo The toolchain must be available at $TOOLCHAIN_DIR for distcc. \
-          Try running '"sudo ln -s $IMPALA_TOOLCHAIN $TOOLCHAIN_DIR"'. 1>&2
-      exit 1
-    fi
-  fi
-  echo "The toolchain wasn't found at '$TOOLCHAIN_DIR' and IMPALA_TOOLCHAIN is not set." \
-      Make sure the toolchain is available at $TOOLCHAIN_DIR and try again. 1>&2
-  exit 1
-fi
+REMOTE_TOOLCHAIN_DIR=/opt/Impala-Toolchain
 
-CMD=
-CMD_POST_ARGS=
 if $IMPALA_DISTCC_LOCAL; then
-  CMD="distcc ccache"
+  if [[ "$CXX_COMPILER" == "$IMPALA_TOOLCHAIN"* ]]; then
+    # Remap the local toolchain path to the remote toolchain path.
+    CXX_COMPILER=$REMOTE_TOOLCHAIN_DIR/${CXX_COMPILER#$IMPALA_TOOLCHAIN}
+  fi
+  CMD="distcc ccache $CXX_COMPILER"
+else
+  CMD="$CXX_COMPILER"
 fi
 
-CMD+=" $CXX_COMPILER"
-
-exec $CMD "$@" $CMD_POST_ARGS
+exec $CMD "$@"
