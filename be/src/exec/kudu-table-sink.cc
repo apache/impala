@@ -234,7 +234,7 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
 
       void* value = output_expr_ctxs_[j]->GetValue(current_row);
       if (value == NULL) {
-        if (table_schema.Column(j).is_nullable()) {
+        if (table_schema.Column(col).is_nullable()) {
           KUDU_RETURN_IF_ERROR(write->mutable_row()->SetNull(col),
               "Could not add Kudu WriteOp.");
           continue;

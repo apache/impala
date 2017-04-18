@@ -402,3 +402,31 @@ A, B, C, D, E, F, G, H, I, J
 ---- TYPES
 INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,INT,INT
 ====
+---- QUERY
+# IMPALA-5217: Try to insert NULL to a 'NOT NULL' col with a target col list that leaves
+# out some cols.
+insert into tbl_with_defaults (a, c, f) values (0, null, 1)
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 1
+====
+---- QUERY
+# IMPALA-5217: Insert NULL into a nullable col when a non-nullable col has been left out
+# of the target col list.
+insert into tbl_with_defaults (a, b, d, f) values (0, 0, null, 0)
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+A, B, C, D, E, F, G, H, I, J
+---- DML_RESULTS: tbl_with_defaults
+0,0,100,NULL,NULL,0,'test',true,NULL,10000
+1,10,100,1000,NULL,1,'test',true,NULL,10000
+2,10,100,1000,NULL,2,'test',true,NULL,10000
+3,10,100,1000,NULL,3,'test',true,NULL,10000
+4,10,100,1000,NULL,4,'test',true,NULL,10000
+5,5,5,5,5,5,'row',false,NULL,10000
+6,6,6,6,6,6,'another row',false,6,6
+---- TYPES
+INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,INT,INT
+====
