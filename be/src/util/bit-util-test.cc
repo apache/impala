@@ -23,7 +23,6 @@
 
 #include <boost/utility.hpp>
 
-#include "gutil/bits.h"
 #include "testutil/gtest-util.h"
 #include "util/bit-util.h"
 #include "util/cpu-info.h"

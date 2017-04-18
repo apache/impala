@@ -22,7 +22,6 @@
 #include <boost/bind.hpp>
 
 #include "common/names.h"
-#include "gutil/bits.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/bufferpool/buffer-allocator.h"
 #include "util/bit-util.h"

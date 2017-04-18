@@ -23,9 +23,9 @@
 #include <string.h>
 #include <string>
 #include <sstream>
+
 #include "common/atomic.h"
 #include "common/logging.h"
-#include "gutil/bits.h"
 #include "runtime/mem-pool.h"
 #include "util/bit-util.h"
 
@@ -73,7 +73,7 @@ class FreePool {
     /// MemPool allocations are 8-byte aligned, so making allocations < 8 bytes
     /// doesn't save memory and eliminates opportunities to recycle allocations.
     size = std::max<int64_t>(8, size);
-    int free_list_idx = Bits::Log2Ceiling64(size);
+    int free_list_idx = BitUtil::Log2Ceiling64(size);
     DCHECK_LT(free_list_idx, NUM_LISTS);
     FreeListNode* allocation = lists_[free_list_idx].next;
     if (allocation == NULL) {

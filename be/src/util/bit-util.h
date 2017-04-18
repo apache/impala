@@ -287,9 +287,24 @@ class BitUtil {
     return __builtin_ctzll(v);
   }
 
+  // Wrap the gutil/ version for convenience.
+  static inline int Log2Floor(uint32_t n) {
+    return Bits::Log2Floor(n);
+  }
+
+  // Wrap the gutil/ version for convenience.
+  static inline int Log2Floor64(uint64_t n) {
+    return Bits::Log2Floor64(n);
+  }
+
+  // Wrap the gutil/ version for convenience.
+  static inline int Log2FloorNonZero64(uint64_t n) {
+    return Bits::Log2FloorNonZero64(n);
+  }
+
   /// More efficient version of similar functions found in gutil/
   static inline int Log2Ceiling(uint32 n) {
-    int floor = Bits::Log2Floor(n);
+    int floor = Log2Floor(n);
     // Check if zero or a power of two. This pattern is recognised by gcc and optimised
     // into branch-free code.
     if (0 == (n & (n - 1))) {
@@ -299,8 +314,8 @@ class BitUtil {
     }
   }
 
-  static inline int Log2Ceiling64(uint64 n) {
-    int floor = Bits::Log2Floor64(n);
+  static inline int Log2Ceiling64(uint64_t n) {
+    int floor = Log2Floor64(n);
     // Check if zero or a power of two. This pattern is recognised by gcc and optimised
     // into branch-free code.
     if (0 == (n & (n - 1))) {
@@ -310,8 +325,8 @@ class BitUtil {
     }
   }
 
-  static inline int Log2CeilingNonZero64(uint64 n) {
-    int floor = Bits::Log2FloorNonZero64(n);
+  static inline int Log2CeilingNonZero64(uint64_t n) {
+    int floor = Log2FloorNonZero64(n);
     // Check if zero or a power of two. This pattern is recognised by gcc and optimised
     // into branch-free code.
     if (0 == (n & (n - 1))) {

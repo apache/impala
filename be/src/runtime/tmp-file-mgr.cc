@@ -26,7 +26,6 @@
 #include <gutil/strings/join.h>
 #include <gutil/strings/substitute.h>
 
-#include "gutil/bits.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tmp-file-mgr-internal.h"
 #include "util/bit-util.h"
@@ -299,7 +298,7 @@ Status TmpFileMgr::FileGroup::AllocateSpace(
     int64_t num_bytes, File** tmp_file, int64_t* file_offset) {
   lock_guard<SpinLock> lock(lock_);
   int64_t scratch_range_bytes = max<int64_t>(1L, BitUtil::RoundUpToPowerOfTwo(num_bytes));
-  int free_ranges_idx = Bits::Log2Ceiling64(scratch_range_bytes);
+  int free_ranges_idx = BitUtil::Log2Ceiling64(scratch_range_bytes);
   if (!free_ranges_[free_ranges_idx].empty()) {
     *tmp_file = free_ranges_[free_ranges_idx].back().first;
     *file_offset = free_ranges_[free_ranges_idx].back().second;
@@ -342,7 +341,7 @@ Status TmpFileMgr::FileGroup::AllocateSpace(
 void TmpFileMgr::FileGroup::RecycleFileRange(unique_ptr<WriteHandle> handle) {
   int64_t scratch_range_bytes =
       max<int64_t>(1L, BitUtil::RoundUpToPowerOfTwo(handle->len()));
-  int free_ranges_idx = Bits::Log2Ceiling64(scratch_range_bytes);
+  int free_ranges_idx = BitUtil::Log2Ceiling64(scratch_range_bytes);
   lock_guard<SpinLock> lock(lock_);
   free_ranges_[free_ranges_idx].emplace_back(
       handle->file_, handle->write_range_->offset());

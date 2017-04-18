@@ -22,8 +22,8 @@
 #include <boost/bind.hpp>
 
 #include "common/atomic.h"
-#include "gutil/bits.h"
 #include "runtime/bufferpool/system-allocator.h"
+#include "util/bit-util.h"
 #include "util/cpu-info.h"
 #include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
@@ -122,7 +122,7 @@ class BufferPool::FreeBufferArena : public CacheLineAligned {
   /// Return the lists of buffers for buffers of the given length.
   PerSizeLists* GetListsForSize(int64_t buffer_len) {
     DCHECK(BitUtil::IsPowerOf2(buffer_len));
-    int idx = Bits::Log2Ceiling64(buffer_len) - parent_->log_min_buffer_len_;
+    int idx = BitUtil::Log2Ceiling64(buffer_len) - parent_->log_min_buffer_len_;
     DCHECK_LT(idx, NumBufferSizes());
     return &buffer_sizes_[idx];
   }
@@ -142,7 +142,7 @@ int64_t BufferPool::BufferAllocator::CalcMaxBufferLen(
     int64_t min_buffer_len, int64_t system_bytes_limit) {
   // Find largest power of 2 smaller than 'system_bytes_limit'.
   int64_t upper_bound = system_bytes_limit == 0 ? 1L : 1L
-          << Bits::Log2Floor64(system_bytes_limit);
+          << BitUtil::Log2Floor64(system_bytes_limit);
   upper_bound = min(MAX_BUFFER_BYTES, upper_bound);
   return max(min_buffer_len, upper_bound); // Can't be < min_buffer_len.
 }
@@ -153,8 +153,8 @@ BufferPool::BufferAllocator::BufferAllocator(
     system_allocator_(new SystemAllocator(min_buffer_len)),
     min_buffer_len_(min_buffer_len),
     max_buffer_len_(CalcMaxBufferLen(min_buffer_len, system_bytes_limit)),
-    log_min_buffer_len_(Bits::Log2Ceiling64(min_buffer_len_)),
-    log_max_buffer_len_(Bits::Log2Ceiling64(max_buffer_len_)),
+    log_min_buffer_len_(BitUtil::Log2Ceiling64(min_buffer_len_)),
+    log_max_buffer_len_(BitUtil::Log2Ceiling64(max_buffer_len_)),
     system_bytes_limit_(system_bytes_limit),
     system_bytes_remaining_(system_bytes_limit),
     per_core_arenas_(CpuInfo::GetMaxNumCores()),

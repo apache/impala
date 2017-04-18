@@ -17,9 +17,7 @@
 
 #include "runtime/runtime-filter-bank.h"
 
-#include "common/names.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
-#include "gutil/bits.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/client-cache.h"
 #include "runtime/exec-env.h"
@@ -27,7 +25,10 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/runtime-filter.inline.h"
 #include "service/impala-server.h"
+#include "util/bit-util.h"
 #include "util/bloom-filter.h"
+
+#include "common/names.h"
 
 using namespace impala;
 using namespace boost;
@@ -197,7 +198,7 @@ BloomFilter* RuntimeFilterBank::AllocateScratchBloomFilter(int32_t filter_id) {
   DCHECK(it != produced_filters_.end()) << "Filter ID " << filter_id << " not registered";
 
   // Track required space
-  int64_t log_filter_size = Bits::Log2Ceiling64(it->second->filter_size());
+  int64_t log_filter_size = BitUtil::Log2Ceiling64(it->second->filter_size());
   int64_t required_space = BloomFilter::GetExpectedHeapSpaceUsed(log_filter_size);
   if (!filter_mem_tracker_->TryConsume(required_space)) return NULL;
   BloomFilter* bloom_filter = obj_pool_.Add(new BloomFilter(log_filter_size));
@@ -217,7 +218,7 @@ int64_t RuntimeFilterBank::GetFilterSizeForNdv(int64_t ndv) {
 
 bool RuntimeFilterBank::FpRateTooHigh(int64_t filter_size, int64_t observed_ndv) {
   double fpp =
-      BloomFilter::FalsePositiveProb(observed_ndv, Bits::Log2Ceiling64(filter_size));
+      BloomFilter::FalsePositiveProb(observed_ndv, BitUtil::Log2Ceiling64(filter_size));
   return fpp > FLAGS_max_filter_error_rate;
 }
 

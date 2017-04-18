@@ -27,13 +27,13 @@
 #include "exec/parquet-metadata-utils.h"
 #include "exec/parquet-scratch-tuple-batch.h"
 #include "exec/read-write-util.h"
-#include "gutil/bits.h"
 #include "rpc/thrift-util.h"
 #include "runtime/collection-value-builder.h"
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
 #include "runtime/runtime-state.h"
 #include "runtime/mem-pool.h"
+#include "util/bit-util.h"
 #include "util/codec.h"
 #include "util/debug-util.h"
 #include "util/dict-encoding.h"
@@ -89,7 +89,7 @@ Status ParquetLevelDecoder::Init(const string& filename,
       if (num_bytes < 0) {
         return Status(TErrorCode::PARQUET_CORRUPT_RLE_BYTES, filename, num_bytes);
       }
-      int bit_width = Bits::Log2Ceiling64(max_level + 1);
+      int bit_width = BitUtil::Log2Ceiling64(max_level + 1);
       Reset(*data, num_bytes, bit_width);
       break;
     }
