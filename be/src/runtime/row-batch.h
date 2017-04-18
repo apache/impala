@@ -230,8 +230,8 @@ class RowBatch {
   /// for further explanation).
   /// TODO: IMPALA-4179: after IMPALA-3200, simplify the ownership transfer model and
   /// make it consistent between buffers and I/O buffers.
-  void AddBuffer(
-      BufferPool::ClientHandle* client, BufferPool::BufferHandle buffer, FlushMode flush);
+  void AddBuffer(BufferPool::ClientHandle* client, BufferPool::BufferHandle&& buffer,
+      FlushMode flush);
 
   /// Used by an operator to indicate that it cannot produce more rows until the
   /// resources that it has attached to the row batch are freed or acquired by an

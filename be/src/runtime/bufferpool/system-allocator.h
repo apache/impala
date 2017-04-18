@@ -43,6 +43,9 @@ class SystemAllocator {
   /// Allocate 'len' bytes of memory for a buffer via mmap().
   Status AllocateViaMMap(int64_t len, uint8_t** buffer_mem);
 
+  /// Allocate 'len' bytes of memory for a buffer via our malloc implementation.
+  Status AllocateViaMalloc(int64_t len, uint8_t** buffer_mem);
+
   const int64_t min_buffer_len_;
 };
 }

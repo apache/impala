@@ -43,7 +43,7 @@ class BufferPool::FreeBufferArena : public CacheLineAligned {
 
   /// Add a free buffer to the free lists. May free buffers to the system allocator
   /// if the list becomes full. Caller should not hold 'lock_'
-  void AddFreeBuffer(BufferHandle buffer);
+  void AddFreeBuffer(BufferHandle&& buffer);
 
   /// Try to get a free buffer of 'buffer_len' bytes from this arena. Returns true and
   /// sets 'buffer' if found or false if not found. Caller should not hold 'lock_'.
@@ -406,7 +406,7 @@ BufferPool::FreeBufferArena::~FreeBufferArena() {
   }
 }
 
-void BufferPool::FreeBufferArena::AddFreeBuffer(BufferHandle buffer) {
+void BufferPool::FreeBufferArena::AddFreeBuffer(BufferHandle&& buffer) {
   lock_guard<SpinLock> al(lock_);
   PerSizeLists* lists = GetListsForSize(buffer.len());
   FreeList* list = &lists->free_buffers;

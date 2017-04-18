@@ -182,7 +182,6 @@ int main(int argc, char** argv) {
   int result = 0;
   for (bool mmap : {false, true}) {
     for (bool madvise : {false, true}) {
-      if (madvise && !mmap) continue; // Not an interesting combination.
       std::cerr << "+==================================================" << std::endl
                 << "| Running tests with mmap=" << mmap << " madvise=" << madvise
                 << std::endl

@@ -19,27 +19,40 @@
 
 #include <sys/mman.h>
 
+#include <gperftools/malloc_extension.h>
+
+#include "gutil/strings/substitute.h"
 #include "util/bit-util.h"
+
+#include "common/names.h"
 
 // TODO: IMPALA-5073: this should eventually become the default once we are confident
 // that it is superior to allocating via TCMalloc.
 DEFINE_bool(mmap_buffers, false,
-    "(Advanced) If true, allocate buffers directly from the operating system instead of "
-    "with TCMalloc.");
+    "(Experimental) If true, allocate buffers directly from the operating system "
+    "instead of with TCMalloc.");
 
 DEFINE_bool(madvise_huge_pages, true,
-    "(Advanced) If true and --mmap_buffers is also "
-    "true, advise operating system to back large memory buffers with huge pages");
+    "(Advanced) If true, advise operating system to back large memory buffers with huge "
+    "pages");
 
 namespace impala {
 
-/// This is the huge page size on x86-64. We could parse /proc/meminfo to programmatically
+/// These are the page sizes on x86-64. We could parse /proc/meminfo to programmatically
 /// get this, but it is unlikely to change unless we port to a different architecture.
+static int64_t SMALL_PAGE_SIZE = 4LL * 1024;
 static int64_t HUGE_PAGE_SIZE = 2LL * 1024 * 1024;
 
 SystemAllocator::SystemAllocator(int64_t min_buffer_len)
   : min_buffer_len_(min_buffer_len) {
   DCHECK(BitUtil::IsPowerOf2(min_buffer_len));
+#ifndef ADDRESS_SANITIZER
+  // Free() assumes that aggressive decommit is enabled for TCMalloc.
+  size_t aggressive_decommit_enabled;
+  MallocExtension::instance()->GetNumericProperty(
+      "tcmalloc.aggressive_memory_decommit", &aggressive_decommit_enabled);
+  CHECK_EQ(true, aggressive_decommit_enabled);
+#endif
 }
 
 Status SystemAllocator::Allocate(int64_t len, BufferPool::BufferHandle* buffer) {
@@ -51,13 +64,7 @@ Status SystemAllocator::Allocate(int64_t len, BufferPool::BufferHandle* buffer) 
   if (FLAGS_mmap_buffers) {
     RETURN_IF_ERROR(AllocateViaMMap(len, &buffer_mem));
   } else {
-    // AddressSanitizer does not instrument mmap(). Use malloc() to preserve
-    // instrumentation.
-    buffer_mem = reinterpret_cast<uint8_t*>(malloc(len));
-    if (buffer_mem == nullptr) {
-      return Status(
-          TErrorCode::BUFFER_ALLOCATION_FAILED, len, "malloc() failed under asan");
-    }
+    RETURN_IF_ERROR(AllocateViaMalloc(len, &buffer_mem));
   }
   buffer->Open(buffer_mem, len, CpuInfo::GetCurrentCore());
   return Status::OK();
@@ -107,11 +114,50 @@ Status SystemAllocator::AllocateViaMMap(int64_t len, uint8_t** buffer_mem) {
   return Status::OK();
 }
 
+Status SystemAllocator::AllocateViaMalloc(int64_t len, uint8_t** buffer_mem) {
+  bool use_huge_pages = len % HUGE_PAGE_SIZE == 0 && FLAGS_madvise_huge_pages;
+  // Allocate, aligned to the page size that we expect to back the memory range.
+  // This ensures that it can be backed by a whole pages, rather than parts of pages.
+  size_t alignment = use_huge_pages ? HUGE_PAGE_SIZE : SMALL_PAGE_SIZE;
+  int rc = posix_memalign(reinterpret_cast<void**>(buffer_mem), alignment, len);
+  if (rc != 0) {
+    return Status(TErrorCode::BUFFER_ALLOCATION_FAILED, len,
+        Substitute("posix_memalign() failed to allocate buffer: $0", GetStrErrMsg()));
+  }
+  if (use_huge_pages) {
+#ifdef MADV_HUGEPAGE
+    // According to madvise() docs it may return EAGAIN to signal that we should retry.
+    do {
+      rc = madvise(*buffer_mem, len, MADV_HUGEPAGE);
+    } while (rc == -1 && errno == EAGAIN);
+    DCHECK(rc == 0) << "madvise(MADV_HUGEPAGE) shouldn't fail" << errno;
+#endif
+  }
+  return Status::OK();
+}
+
 void SystemAllocator::Free(BufferPool::BufferHandle&& buffer) {
   if (FLAGS_mmap_buffers) {
     int rc = munmap(buffer.data(), buffer.len());
     DCHECK_EQ(rc, 0) << "Unexpected munmap() error: " << errno;
   } else {
+    bool use_huge_pages = buffer.len() % HUGE_PAGE_SIZE == 0 && FLAGS_madvise_huge_pages;
+    if (use_huge_pages) {
+      // Undo the madvise so that is isn't a candidate to be newly backed by huge pages.
+      // We depend on TCMalloc's "aggressive decommit" mode decommitting the physical
+      // huge pages with madvise(DONTNEED) when we call free(). Otherwise, this huge
+      // page region may be divvied up and subsequently decommitted in smaller chunks,
+      // which may not actually release the physical memory, causing Impala physical
+      // memory usage to exceed the process limit.
+#ifdef MADV_NOHUGEPAGE
+      // According to madvise() docs it may return EAGAIN to signal that we should retry.
+      int rc;
+      do {
+        rc = madvise(buffer.data(), buffer.len(), MADV_NOHUGEPAGE);
+      } while (rc == -1 && errno == EAGAIN);
+      DCHECK(rc == 0) << "madvise(MADV_NOHUGEPAGE) shouldn't fail" << errno;
+#endif
+    }
     free(buffer.data());
   }
   buffer.Reset(); // Avoid DCHECK in ~BufferHandle().

@@ -310,8 +310,8 @@ void RowBatch::AddBlock(BufferedBlockMgr::Block* block, FlushMode flush) {
   if (flush == FlushMode::FLUSH_RESOURCES) MarkFlushResources();
 }
 
-void RowBatch::AddBuffer(
-    BufferPool::ClientHandle* client, BufferPool::BufferHandle buffer, FlushMode flush) {
+void RowBatch::AddBuffer(BufferPool::ClientHandle* client,
+    BufferPool::BufferHandle&& buffer, FlushMode flush) {
   auxiliary_mem_usage_ += buffer.len();
   BufferInfo buffer_info;
   buffer_info.client = client;
