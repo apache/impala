@@ -725,7 +725,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  group by: bool_col, NULL
+|  group by: bool_col, CAST(NULL AS INT)
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B

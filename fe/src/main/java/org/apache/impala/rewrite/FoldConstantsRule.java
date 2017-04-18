@@ -20,6 +20,9 @@ package org.apache.impala.rewrite;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.NullLiteral;
+import org.apache.impala.analysis.CastExpr;
+
 import org.apache.impala.common.AnalysisException;
 
 /**
@@ -47,6 +50,15 @@ public class FoldConstantsRule implements ExprRewriteRule {
     // children should have been folded at this point.
     for (Expr child: expr.getChildren()) if (!child.isLiteral()) return expr;
     if (expr.isLiteral() || !expr.isConstant()) return expr;
+
+    // Do not constant fold cast(null as dataType) because we cannot preserve the
+    // cast-to-types and that can lead to query failures, e.g., CTAS
+    if (expr instanceof CastExpr) {
+      CastExpr castExpr = (CastExpr) expr;
+      if (castExpr.getChild(0) instanceof NullLiteral) {
+        return expr;
+      }
+    }
     // Analyze constant exprs, if necessary. Note that the 'expr' may become non-constant
     // after analysis (e.g., aggregate functions).
     if (!expr.isAnalyzed()) {

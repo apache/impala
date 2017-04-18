@@ -183,3 +183,9 @@ create table $DATABASE.rand_ctas as select rand() from functional.alltypes;
 'Inserted 7300 row(s)'
 ---- ERRORS
 ====
+---- QUERY
+# IMPALA-5145: Do not constant fold null in CastExprs
+create table if not exists cast_null_as_int as (select cast(null as int) c);
+---- RESULTS
+'Inserted 1 row(s)'
+====
