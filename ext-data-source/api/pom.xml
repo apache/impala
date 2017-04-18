@@ -53,13 +53,6 @@
         <enabled>false</enabled>
       </releases>
     </repository>
-    <repository>
-      <id>Codehaus repository</id>
-      <url>http://repository.codehaus.org/</url>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </repository>
   </repositories>
 
   <dependencies>
