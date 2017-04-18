@@ -249,7 +249,7 @@ public class AnalyticEvalNode extends PlanNode {
     long perInstanceMemEstimate = 0;
 
     // Must be kept in sync with MIN_REQUIRED_BUFFERS in AnalyticEvalNode in be.
-    long perInstanceMinBufferBytes = 2 * SPILLABLE_BUFFER_BYTES;
+    long perInstanceMinBufferBytes = 2 * getDefaultSpillableBufferBytes();
     resourceProfile_ = new ResourceProfile(perInstanceMemEstimate, perInstanceMinBufferBytes);
   }
 }

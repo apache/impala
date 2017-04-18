@@ -401,6 +401,18 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testSpillableBufferSizing() {
+    // Tests the resource requirement computation from the planner when it is allowed to
+    // vary the spillable buffer size.
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.EXTENDED);
+    options.setNum_scanner_threads(1); // Required so that output doesn't vary by machine
+    // TODO: IMPALA-3200 - this should become a query option.
+    RuntimeEnv.INSTANCE.setMinSpillableBufferBytes(64 * 1024);
+    runPlannerTestFile("spillable-buffer-sizing", options, false);
+  }
+
+  @Test
   public void testSortExprMaterialization() {
     addTestFunction("TestFn", Lists.newArrayList(Type.DOUBLE), false);
     TQueryOptions options = defaultQueryOptions();

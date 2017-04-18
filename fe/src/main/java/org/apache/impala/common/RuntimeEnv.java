@@ -17,10 +17,7 @@
 
 package org.apache.impala.common;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import org.apache.impala.service.FeSupport;
+import org.apache.impala.service.BackendConfig;
 
 /**
  * Contains runtime-specific parameters such as the number of CPU cores. Currently only
@@ -31,6 +28,13 @@ public class RuntimeEnv {
   public static RuntimeEnv INSTANCE = new RuntimeEnv();
 
   private int numCores_;
+
+  // The minimum size of buffer spilled to disk by spilling nodes. Used in
+  // PlanNode.computeResourceProfile(). Currently the backend only support a single
+  // spillable buffer size, so this is equal to PlanNode.DEFAULT_SPILLABLE_BUFFER_BYTES,
+  // except in planner tests.
+  // TODO: IMPALA-3200: this get from query option
+  private long minSpillableBufferBytes_;
 
   // Indicates whether this is an environment for testing.
   private boolean isTestEnv_;
@@ -44,10 +48,15 @@ public class RuntimeEnv {
    */
   public void reset() {
     numCores_ = Runtime.getRuntime().availableProcessors();
+    minSpillableBufferBytes_ = BackendConfig.INSTANCE.getReadSize();
   }
 
   public int getNumCores() { return numCores_; }
   public void setNumCores(int numCores) { this.numCores_ = numCores; }
+  public long getMinSpillableBufferBytes() { return minSpillableBufferBytes_; }
+  public void setMinSpillableBufferBytes(long minSpillableBufferBytes) {
+    minSpillableBufferBytes_ = minSpillableBufferBytes;
+  }
   public void setTestEnv(boolean v) { isTestEnv_ = v; }
   public boolean isTestEnv() { return isTestEnv_; }
   public boolean isKuduSupported() {

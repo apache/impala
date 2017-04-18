@@ -33,6 +33,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExecStats;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlan;
@@ -64,10 +65,6 @@ import com.google.common.math.LongMath;
  */
 abstract public class PlanNode extends TreeNode<PlanNode> {
   private final static Logger LOG = LoggerFactory.getLogger(PlanNode.class);
-
-  // The size of buffer used in spilling nodes. Used in computeResourceProfile().
-  // TODO: IMPALA-3200: get from query option
-  protected final static long SPILLABLE_BUFFER_BYTES = 8L * 1024L * 1024L;
 
   // String used for this node in getExplainString().
   protected String displayName_;
@@ -625,6 +622,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * data partition.
    */
   public abstract void computeResourceProfile(TQueryOptions queryOptions);
+
+  /**
+   * The default size of buffer used in spilling nodes. Used in computeResourceProfile().
+   */
+  protected final static long getDefaultSpillableBufferBytes() {
+    // BufferedBlockMgr uses --read_size to determine buffer size.
+    // TODO: IMPALA-3200: get from query option
+    return BackendConfig.INSTANCE.getReadSize();
+  }
 
   /**
    * The input cardinality is the sum of output cardinalities of its children.

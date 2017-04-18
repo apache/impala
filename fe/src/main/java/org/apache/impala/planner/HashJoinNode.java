@@ -28,12 +28,15 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.thrift.TEqJoinCondition;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.THashJoinNode;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.util.BitUtil;
+
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -178,23 +181,42 @@ public class HashJoinNode extends JoinNode {
 
   @Override
   public void computeResourceProfile(TQueryOptions queryOptions) {
+    long perInstanceMemEstimate;
+    long perInstanceDataBytes;
+    int numInstances = fragment_.getNumInstances(queryOptions.getMt_dop());
+    if (getChild(1).getCardinality() == -1 || getChild(1).getAvgRowSize() == -1
+        || numInstances <= 0) {
+      perInstanceMemEstimate = DEFAULT_PER_INSTANCE_MEM;
+      perInstanceDataBytes = -1;
+    } else {
+      perInstanceDataBytes = (long) Math.ceil(getChild(1).cardinality_
+          * getChild(1).avgRowSize_);
+      // Assume the rows are evenly divided among instances.
+      // TODO-MT: this estimate is not quite right with parallel plans. Fix it before
+      // we allow executing parallel plans with joins.
+      if (distrMode_ == DistributionMode.PARTITIONED) {
+        perInstanceDataBytes /= numInstances;
+      }
+      perInstanceMemEstimate = (long) Math.ceil(
+          perInstanceDataBytes * PlannerContext.HASH_TBL_SPACE_OVERHEAD);
+    }
+
     // Must be kept in sync with PartitionedHashJoinBuilder::MinRequiredBuffers() in be.
     final int PARTITION_FANOUT = 16;
     long minBuffers = PARTITION_FANOUT + 1
         + (joinOp_ == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN ? 3 : 0);
-    long perInstanceMinBufferBytes = SPILLABLE_BUFFER_BYTES * minBuffers;
 
-    long perInstanceMemEstimate;
-    if (getChild(1).getCardinality() == -1 || getChild(1).getAvgRowSize() == -1
-        || numNodes_ == 0) {
-      perInstanceMemEstimate = DEFAULT_PER_INSTANCE_MEM;
-    } else {
-      perInstanceMemEstimate = (long) Math.ceil(getChild(1).cardinality_
-          * getChild(1).avgRowSize_ * PlannerContext.HASH_TBL_SPACE_OVERHEAD);
-      if (distrMode_ == DistributionMode.PARTITIONED) {
-        perInstanceMemEstimate /= fragment_.getNumInstances(queryOptions.getMt_dop());
-      }
+    long bufferSize = getDefaultSpillableBufferBytes();
+    if (perInstanceDataBytes != -1) {
+      long bytesPerBuffer = perInstanceDataBytes / PARTITION_FANOUT;
+      // Scale down the buffer size if we think there will be excess free space with the
+      // default buffer size, e.g. if the right side is a small dimension table.
+      bufferSize = Math.min(bufferSize, Math.max(
+          RuntimeEnv.INSTANCE.getMinSpillableBufferBytes(),
+          BitUtil.roundUpToPowerOf2(bytesPerBuffer)));
     }
+
+    long perInstanceMinBufferBytes = bufferSize * minBuffers;
     resourceProfile_ = new ResourceProfile(perInstanceMemEstimate, perInstanceMinBufferBytes);
   }
 }

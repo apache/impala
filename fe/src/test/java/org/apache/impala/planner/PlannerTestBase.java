@@ -73,6 +73,7 @@ import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduScanToken;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Before;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -98,10 +99,6 @@ public class PlannerTestBase extends FrontendTestBase {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    // Use 8 cores for resource estimation.
-    RuntimeEnv.INSTANCE.setNumCores(8);
-    // Set test env to control the explain level.
-    RuntimeEnv.INSTANCE.setTestEnv(true);
     // Mimic the 3 node test mini-cluster.
     TUpdateMembershipRequest updateReq = new TUpdateMembershipRequest();
     updateReq.setIp_addresses(Sets.newHashSet("127.0.0.1"));
@@ -112,6 +109,16 @@ public class PlannerTestBase extends FrontendTestBase {
     if (RuntimeEnv.INSTANCE.isKuduSupported()) {
       kuduClient_ = new KuduClient.KuduClientBuilder("127.0.0.1:7051").build();
     }
+  }
+
+  @Before
+  public void setUpTest() throws Exception {
+    // Reset the RuntimeEnv - individual tests may change it.
+    RuntimeEnv.INSTANCE.reset();
+    // Use 8 cores for resource estimation.
+    RuntimeEnv.INSTANCE.setNumCores(8);
+    // Set test env to control the explain level.
+    RuntimeEnv.INSTANCE.setTestEnv(true);
   }
 
   @AfterClass

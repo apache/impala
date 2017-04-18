@@ -30,12 +30,15 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.thrift.TAggregationNode;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.util.BitUtil;
+
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -281,6 +284,22 @@ public class AggregationNode extends PlanNode {
   public void computeResourceProfile(TQueryOptions queryOptions) {
     Preconditions.checkNotNull(
         fragment_, "PlanNode must be placed into a fragment before calling this method.");
+    long perInstanceCardinality = fragment_.getPerInstanceNdv(
+        queryOptions.getMt_dop(), aggInfo_.getGroupingExprs());
+    long perInstanceMemEstimate;
+    long perInstanceDataBytes = -1;
+    if (perInstanceCardinality == -1) {
+      perInstanceMemEstimate = DEFAULT_PER_INSTANCE_MEM;
+    } else {
+      // Per-instance cardinality cannot be greater than the total output cardinality.
+      if (cardinality_ != -1) {
+        perInstanceCardinality = Math.min(perInstanceCardinality, cardinality_);
+      }
+      perInstanceDataBytes = (long)Math.ceil(perInstanceCardinality * avgRowSize_);
+      perInstanceMemEstimate = (long)Math.max(perInstanceDataBytes *
+          PlannerContext.HASH_TBL_SPACE_OVERHEAD, MIN_HASH_TBL_MEM);
+    }
+
     // Must be kept in sync with PartitionedAggregationNode::MinRequiredBuffers() in be.
     long perInstanceMinBuffers;
     if (aggInfo_.getGroupingExprs().isEmpty() || useStreamingPreagg_) {
@@ -288,22 +307,18 @@ public class AggregationNode extends PlanNode {
     } else {
       final int PARTITION_FANOUT = 16;
       long minBuffers = 2 * PARTITION_FANOUT + 1 + (aggInfo_.needsSerialize() ? 1 : 0);
-      perInstanceMinBuffers = SPILLABLE_BUFFER_BYTES * minBuffers;
+      long bufferSize = getDefaultSpillableBufferBytes();
+      if (perInstanceDataBytes != -1) {
+        long bytesPerBuffer = perInstanceDataBytes / PARTITION_FANOUT;
+        // Scale down the buffer size if we think there will be excess free space with the
+        // default buffer size, e.g. with small dimension tables.
+        bufferSize = Math.min(bufferSize, Math.max(
+            RuntimeEnv.INSTANCE.getMinSpillableBufferBytes(),
+            BitUtil.roundUpToPowerOf2(bytesPerBuffer)));
+      }
+      perInstanceMinBuffers = bufferSize * minBuffers;
     }
 
-    long perInstanceCardinality = fragment_.getPerInstanceNdv(
-        queryOptions.getMt_dop(), aggInfo_.getGroupingExprs());
-    if (perInstanceCardinality == -1) {
-      resourceProfile_ =
-          new ResourceProfile(DEFAULT_PER_INSTANCE_MEM, perInstanceMinBuffers);
-      return;
-    }
-    // Per-instance cardinality cannot be greater than the total output cardinality.
-    if (cardinality_ != -1) {
-      perInstanceCardinality = Math.min(perInstanceCardinality, cardinality_);
-    }
-    long perInstanceMemEstimate = (long)Math.max(perInstanceCardinality * avgRowSize_ *
-        PlannerContext.HASH_TBL_SPACE_OVERHEAD, MIN_HASH_TBL_MEM);
     resourceProfile_ =
         new ResourceProfile(perInstanceMemEstimate, perInstanceMinBuffers);
   }

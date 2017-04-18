@@ -249,7 +249,7 @@ public class SortNode extends PlanNode {
     long perInstanceMemEstimate = blockSize * (long) Math.ceil(Math.sqrt(numInputBlocks));
 
     // Must be kept in sync with min_buffers_required in Sorter in be.
-    long perInstanceMinReservation = 3 * SPILLABLE_BUFFER_BYTES;
+    long perInstanceMinReservation = 3 * getDefaultSpillableBufferBytes();
     if (info_.getSortTupleDescriptor().hasVarLenSlots()) {
       perInstanceMinReservation *= 2;
     }

@@ -1,0 +1,842 @@
+# Join with tiny build side - should use smallest possible buffers.
+select straight_join *
+from tpch_parquet.customer
+    inner join tpch_parquet.nation on c_nationkey = n_nationkey
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=1.06MB
+Per-Host Resource Estimates: Memory=24.00MB
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0,1 row-size=355B cardinality=150000
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: c_nationkey = n_nationkey
+|  runtime filters: RF000 <- n_nationkey
+|  mem-estimate=3.15KB mem-reservation=1.06MB
+|  tuple-ids=0,1 row-size=355B cardinality=150000
+|
+|--03:EXCHANGE [BROADCAST]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1 row-size=117B cardinality=25
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  01:SCAN HDFS [tpch_parquet.nation, RANDOM]
+|     partitions=1/1 files=1 size=2.94KB
+|     stats-rows=25 extrapolated-rows=disabled
+|     table stats: rows=25 size=2.94KB
+|     column stats: all
+|     mem-estimate=16.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=117B cardinality=25
+|
+00:SCAN HDFS [tpch_parquet.customer, RANDOM]
+   partitions=1/1 files=1 size=12.34MB
+   runtime filters: RF000 -> c_nationkey
+   stats-rows=150000 extrapolated-rows=disabled
+   table stats: rows=150000 size=12.34MB
+   column stats: all
+   mem-estimate=24.00MB mem-reservation=0B
+   tuple-ids=0 row-size=238B cardinality=150000
+---- PARALLELPLANS
+Per-Host Resource Reservation: Memory=2.12MB
+Per-Host Resource Estimates: Memory=80.01MB
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0,1 row-size=355B cardinality=150000
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=00
+|  hash predicates: c_nationkey = n_nationkey
+|  runtime filters: RF000 <- n_nationkey
+|  mem-estimate=3.15KB mem-reservation=1.06MB
+|  tuple-ids=0,1 row-size=355B cardinality=150000
+|
+|--F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: n_nationkey
+|  |  mem-estimate=0B mem-reservation=0B
+|  |
+|  03:EXCHANGE [BROADCAST]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1 row-size=117B cardinality=25
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
+|  01:SCAN HDFS [tpch_parquet.nation, RANDOM]
+|     partitions=1/1 files=1 size=2.94KB
+|     stats-rows=25 extrapolated-rows=disabled
+|     table stats: rows=25 size=2.94KB
+|     column stats: all
+|     mem-estimate=16.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=117B cardinality=25
+|
+00:SCAN HDFS [tpch_parquet.customer, RANDOM]
+   partitions=1/1 files=1 size=12.34MB
+   runtime filters: RF000 -> c_nationkey
+   stats-rows=150000 extrapolated-rows=disabled
+   table stats: rows=150000 size=12.34MB
+   column stats: all
+   mem-estimate=24.00MB mem-reservation=0B
+   tuple-ids=0 row-size=238B cardinality=150000
+====
+# Join with large build side - should use default-sized buffers.
+select straight_join *
+from tpch_parquet.lineitem
+    left join tpch_parquet.orders on l_orderkey = o_orderkey
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=136.00MB
+Per-Host Resource Estimates: Memory=380.41MB
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0,1N row-size=454B cardinality=6001215
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+02:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: l_orderkey = o_orderkey
+|  mem-estimate=300.41MB mem-reservation=136.00MB
+|  tuple-ids=0,1N row-size=454B cardinality=6001215
+|
+|--03:EXCHANGE [BROADCAST]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1 row-size=191B cardinality=1500000
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|     partitions=1/1 files=2 size=54.20MB
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=54.20MB
+|     column stats: all
+|     mem-estimate=40.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=191B cardinality=1500000
+|
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   partitions=1/1 files=3 size=193.92MB
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.92MB
+   column stats: all
+   mem-estimate=80.00MB mem-reservation=0B
+   tuple-ids=0 row-size=263B cardinality=6001215
+---- PARALLELPLANS
+Per-Host Resource Reservation: Memory=272.00MB
+Per-Host Resource Estimates: Memory=840.83MB
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0,1N row-size=454B cardinality=6001215
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+02:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash-table-id=00
+|  hash predicates: l_orderkey = o_orderkey
+|  mem-estimate=300.41MB mem-reservation=136.00MB
+|  tuple-ids=0,1N row-size=454B cardinality=6001215
+|
+|--F03:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: o_orderkey
+|  |  mem-estimate=0B mem-reservation=0B
+|  |
+|  03:EXCHANGE [BROADCAST]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1 row-size=191B cardinality=1500000
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+|  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|     partitions=1/1 files=2 size=54.20MB
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=54.20MB
+|     column stats: all
+|     mem-estimate=40.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=191B cardinality=1500000
+|
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   partitions=1/1 files=3 size=193.92MB
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.92MB
+   column stats: all
+   mem-estimate=80.00MB mem-reservation=0B
+   tuple-ids=0 row-size=263B cardinality=6001215
+====
+# Shuffle join with mid-sized input.
+select straight_join *
+from tpch_parquet.orders
+    join /*+shuffle*/ tpch_parquet.customer on o_custkey = c_custkey
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=34.00MB
+Per-Host Resource Estimates: Memory=58.69MB
+
+F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+05:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0,1 row-size=428B cardinality=1500000
+|
+F02:PLAN FRAGMENT [HASH(o_custkey)] hosts=2 instances=2
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: o_custkey = c_custkey
+|  runtime filters: RF000 <- c_custkey
+|  mem-estimate=18.69MB mem-reservation=34.00MB
+|  tuple-ids=0,1 row-size=428B cardinality=1500000
+|
+|--04:EXCHANGE [HASH(c_custkey)]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1 row-size=238B cardinality=150000
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  01:SCAN HDFS [tpch_parquet.customer, RANDOM]
+|     partitions=1/1 files=1 size=12.34MB
+|     stats-rows=150000 extrapolated-rows=disabled
+|     table stats: rows=150000 size=12.34MB
+|     column stats: all
+|     mem-estimate=24.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=238B cardinality=150000
+|
+03:EXCHANGE [HASH(o_custkey)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0 row-size=191B cardinality=1500000
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+00:SCAN HDFS [tpch_parquet.orders, RANDOM]
+   partitions=1/1 files=2 size=54.20MB
+   runtime filters: RF000 -> o_custkey
+   stats-rows=1500000 extrapolated-rows=disabled
+   table stats: rows=1500000 size=54.20MB
+   column stats: all
+   mem-estimate=40.00MB mem-reservation=0B
+   tuple-ids=0 row-size=191B cardinality=1500000
+---- PARALLELPLANS
+Per-Host Resource Reservation: Memory=34.00MB
+Per-Host Resource Estimates: Memory=146.69MB
+
+F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+05:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0,1 row-size=428B cardinality=1500000
+|
+F02:PLAN FRAGMENT [HASH(o_custkey)] hosts=2 instances=4
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash-table-id=00
+|  hash predicates: o_custkey = c_custkey
+|  runtime filters: RF000 <- c_custkey
+|  mem-estimate=9.35MB mem-reservation=17.00MB
+|  tuple-ids=0,1 row-size=428B cardinality=1500000
+|
+|--F04:PLAN FRAGMENT [HASH(o_custkey)] hosts=1 instances=2
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: c_custkey
+|  |  mem-estimate=0B mem-reservation=0B
+|  |
+|  04:EXCHANGE [HASH(c_custkey)]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1 row-size=238B cardinality=150000
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
+|  01:SCAN HDFS [tpch_parquet.customer, RANDOM]
+|     partitions=1/1 files=1 size=12.34MB
+|     stats-rows=150000 extrapolated-rows=disabled
+|     table stats: rows=150000 size=12.34MB
+|     column stats: all
+|     mem-estimate=24.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=238B cardinality=150000
+|
+03:EXCHANGE [HASH(o_custkey)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0 row-size=191B cardinality=1500000
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+00:SCAN HDFS [tpch_parquet.orders, RANDOM]
+   partitions=1/1 files=2 size=54.20MB
+   runtime filters: RF000 -> o_custkey
+   stats-rows=1500000 extrapolated-rows=disabled
+   table stats: rows=1500000 size=54.20MB
+   column stats: all
+   mem-estimate=40.00MB mem-reservation=0B
+   tuple-ids=0 row-size=191B cardinality=1500000
+====
+# Broadcast join with mid-sized input - should use larger buffers than shuffle join.
+select straight_join *
+from tpch_parquet.orders
+    join /*+broadcast*/ tpch_parquet.customer on o_custkey = c_custkey
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=68.00MB
+Per-Host Resource Estimates: Memory=77.38MB
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0,1 row-size=428B cardinality=1500000
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: o_custkey = c_custkey
+|  runtime filters: RF000 <- c_custkey
+|  mem-estimate=37.38MB mem-reservation=68.00MB
+|  tuple-ids=0,1 row-size=428B cardinality=1500000
+|
+|--03:EXCHANGE [BROADCAST]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1 row-size=238B cardinality=150000
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  01:SCAN HDFS [tpch_parquet.customer, RANDOM]
+|     partitions=1/1 files=1 size=12.34MB
+|     stats-rows=150000 extrapolated-rows=disabled
+|     table stats: rows=150000 size=12.34MB
+|     column stats: all
+|     mem-estimate=24.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=238B cardinality=150000
+|
+00:SCAN HDFS [tpch_parquet.orders, RANDOM]
+   partitions=1/1 files=2 size=54.20MB
+   runtime filters: RF000 -> o_custkey
+   stats-rows=1500000 extrapolated-rows=disabled
+   table stats: rows=1500000 size=54.20MB
+   column stats: all
+   mem-estimate=40.00MB mem-reservation=0B
+   tuple-ids=0 row-size=191B cardinality=1500000
+---- PARALLELPLANS
+Per-Host Resource Reservation: Memory=136.00MB
+Per-Host Resource Estimates: Memory=202.76MB
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0,1 row-size=428B cardinality=1500000
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=00
+|  hash predicates: o_custkey = c_custkey
+|  runtime filters: RF000 <- c_custkey
+|  mem-estimate=37.38MB mem-reservation=68.00MB
+|  tuple-ids=0,1 row-size=428B cardinality=1500000
+|
+|--F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: c_custkey
+|  |  mem-estimate=0B mem-reservation=0B
+|  |
+|  03:EXCHANGE [BROADCAST]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1 row-size=238B cardinality=150000
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
+|  01:SCAN HDFS [tpch_parquet.customer, RANDOM]
+|     partitions=1/1 files=1 size=12.34MB
+|     stats-rows=150000 extrapolated-rows=disabled
+|     table stats: rows=150000 size=12.34MB
+|     column stats: all
+|     mem-estimate=24.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=238B cardinality=150000
+|
+00:SCAN HDFS [tpch_parquet.orders, RANDOM]
+   partitions=1/1 files=2 size=54.20MB
+   runtime filters: RF000 -> o_custkey
+   stats-rows=1500000 extrapolated-rows=disabled
+   table stats: rows=1500000 size=54.20MB
+   column stats: all
+   mem-estimate=40.00MB mem-reservation=0B
+   tuple-ids=0 row-size=191B cardinality=1500000
+====
+# Join with no stats for right input - should use default buffers.
+select straight_join *
+from functional_parquet.alltypes
+    left join functional_parquet.alltypestiny on alltypes.id = alltypestiny.id
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=136.00MB
+Per-Host Resource Estimates: Memory=2.02GB
+WARNING: The following tables are missing relevant table and/or column statistics.
+functional_parquet.alltypes, functional_parquet.alltypestiny
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0,1N row-size=176B cardinality=unavailable
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+02:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: alltypes.id = alltypestiny.id
+|  mem-estimate=2.00GB mem-reservation=136.00MB
+|  tuple-ids=0,1N row-size=176B cardinality=unavailable
+|
+|--03:EXCHANGE [BROADCAST]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1 row-size=88B cardinality=unavailable
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  01:SCAN HDFS [functional_parquet.alltypestiny, RANDOM]
+|     partitions=4/4 files=4 size=10.48KB
+|     stats-rows=unavailable extrapolated-rows=disabled
+|     table stats: rows=unavailable size=unavailable
+|     column stats: unavailable
+|     mem-estimate=16.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=88B cardinality=unavailable
+|
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   partitions=24/24 files=24 size=178.13KB
+   stats-rows=unavailable extrapolated-rows=disabled
+   table stats: rows=unavailable size=unavailable
+   columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   mem-estimate=16.00MB mem-reservation=0B
+   tuple-ids=0 row-size=88B cardinality=unavailable
+---- PARALLELPLANS
+Per-Host Resource Reservation: Memory=272.00MB
+Per-Host Resource Estimates: Memory=4.06GB
+WARNING: The following tables are missing relevant table and/or column statistics.
+functional_parquet.alltypestiny
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0,1N row-size=176B cardinality=unavailable
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+02:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash-table-id=00
+|  hash predicates: alltypes.id = alltypestiny.id
+|  mem-estimate=2.00GB mem-reservation=136.00MB
+|  tuple-ids=0,1N row-size=176B cardinality=unavailable
+|
+|--F03:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: alltypestiny.id
+|  |  mem-estimate=0B mem-reservation=0B
+|  |
+|  03:EXCHANGE [BROADCAST]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1 row-size=88B cardinality=unavailable
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+|  01:SCAN HDFS [functional_parquet.alltypestiny, RANDOM]
+|     partitions=4/4 files=4 size=10.48KB
+|     stats-rows=unavailable extrapolated-rows=disabled
+|     table stats: rows=unavailable size=unavailable
+|     column stats: unavailable
+|     mem-estimate=16.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=88B cardinality=unavailable
+|
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   partitions=24/24 files=24 size=178.13KB
+   stats-rows=unavailable extrapolated-rows=disabled
+   table stats: rows=unavailable size=unavailable
+   columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   mem-estimate=16.00MB mem-reservation=0B
+   tuple-ids=0 row-size=88B cardinality=unavailable
+====
+# Low NDV aggregation - should scale down buffers to minimum.
+select c_nationkey, avg(c_acctbal)
+from tpch_parquet.customer
+group by c_nationkey
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=2.12MB
+Per-Host Resource Estimates: Memory=44.00MB
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=2 row-size=10B cardinality=25
+|
+F01:PLAN FRAGMENT [HASH(c_nationkey)] hosts=1 instances=1
+03:AGGREGATE [FINALIZE]
+|  output: avg:merge(c_acctbal)
+|  group by: c_nationkey
+|  mem-estimate=10.00MB mem-reservation=2.12MB
+|  tuple-ids=2 row-size=10B cardinality=25
+|
+02:EXCHANGE [HASH(c_nationkey)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=1 row-size=10B cardinality=25
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+01:AGGREGATE [STREAMING]
+|  output: avg(c_acctbal)
+|  group by: c_nationkey
+|  mem-estimate=10.00MB mem-reservation=0B
+|  tuple-ids=1 row-size=10B cardinality=25
+|
+00:SCAN HDFS [tpch_parquet.customer, RANDOM]
+   partitions=1/1 files=1 size=12.34MB
+   stats-rows=150000 extrapolated-rows=disabled
+   table stats: rows=150000 size=12.34MB
+   column stats: all
+   mem-estimate=24.00MB mem-reservation=0B
+   tuple-ids=0 row-size=10B cardinality=150000
+---- PARALLELPLANS
+Per-Host Resource Reservation: Memory=4.25MB
+Per-Host Resource Estimates: Memory=88.00MB
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=2 row-size=10B cardinality=25
+|
+F01:PLAN FRAGMENT [HASH(c_nationkey)] hosts=1 instances=2
+03:AGGREGATE [FINALIZE]
+|  output: avg:merge(c_acctbal)
+|  group by: c_nationkey
+|  mem-estimate=10.00MB mem-reservation=2.12MB
+|  tuple-ids=2 row-size=10B cardinality=25
+|
+02:EXCHANGE [HASH(c_nationkey)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=1 row-size=10B cardinality=25
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
+01:AGGREGATE [STREAMING]
+|  output: avg(c_acctbal)
+|  group by: c_nationkey
+|  mem-estimate=10.00MB mem-reservation=0B
+|  tuple-ids=1 row-size=10B cardinality=25
+|
+00:SCAN HDFS [tpch_parquet.customer, RANDOM]
+   partitions=1/1 files=1 size=12.34MB
+   stats-rows=150000 extrapolated-rows=disabled
+   table stats: rows=150000 size=12.34MB
+   column stats: all
+   mem-estimate=24.00MB mem-reservation=0B
+   tuple-ids=0 row-size=10B cardinality=150000
+====
+# Mid NDV aggregation - should scale down buffers to intermediate size.
+select straight_join l_orderkey, o_orderstatus, count(*)
+from tpch_parquet.lineitem
+    join tpch_parquet.orders on o_orderkey = l_orderkey
+group by 1, 2
+having count(*) = 1
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=83.00MB
+Per-Host Resource Estimates: Memory=165.28MB
+
+F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+08:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=2 row-size=33B cardinality=4690314
+|
+F03:PLAN FRAGMENT [HASH(l_orderkey,o_orderstatus)] hosts=3 instances=3
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: l_orderkey, o_orderstatus
+|  having: count(*) = 1
+|  mem-estimate=18.04MB mem-reservation=66.00MB
+|  tuple-ids=2 row-size=33B cardinality=4690314
+|
+06:EXCHANGE [HASH(l_orderkey,o_orderstatus)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=2 row-size=33B cardinality=4690314
+|
+F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
+03:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: l_orderkey, o_orderstatus
+|  mem-estimate=54.12MB mem-reservation=0B
+|  tuple-ids=2 row-size=33B cardinality=4690314
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: l_orderkey = o_orderkey
+|  runtime filters: RF000 <- o_orderkey
+|  mem-estimate=13.11MB mem-reservation=17.00MB
+|  tuple-ids=0,1 row-size=33B cardinality=5757710
+|
+|--05:EXCHANGE [HASH(o_orderkey)]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1 row-size=25B cardinality=1500000
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|     partitions=1/1 files=2 size=54.20MB
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=54.20MB
+|     column stats: all
+|     mem-estimate=40.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=25B cardinality=1500000
+|
+04:EXCHANGE [HASH(l_orderkey)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0 row-size=8B cardinality=6001215
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   partitions=1/1 files=3 size=193.92MB
+   runtime filters: RF000 -> l_orderkey
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.92MB
+   column stats: all
+   mem-estimate=80.00MB mem-reservation=0B
+   tuple-ids=0 row-size=8B cardinality=6001215
+---- PARALLELPLANS
+Per-Host Resource Reservation: Memory=83.00MB
+Per-Host Resource Estimates: Memory=327.24MB
+
+F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+08:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=2 row-size=33B cardinality=4690314
+|
+F03:PLAN FRAGMENT [HASH(l_orderkey,o_orderstatus)] hosts=3 instances=6
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: l_orderkey, o_orderstatus
+|  having: count(*) = 1
+|  mem-estimate=10.00MB mem-reservation=33.00MB
+|  tuple-ids=2 row-size=33B cardinality=4690314
+|
+06:EXCHANGE [HASH(l_orderkey,o_orderstatus)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=2 row-size=33B cardinality=4690314
+|
+F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
+03:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: l_orderkey, o_orderstatus
+|  mem-estimate=27.06MB mem-reservation=0B
+|  tuple-ids=2 row-size=33B cardinality=4690314
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash-table-id=00
+|  hash predicates: l_orderkey = o_orderkey
+|  runtime filters: RF000 <- o_orderkey
+|  mem-estimate=6.56MB mem-reservation=8.50MB
+|  tuple-ids=0,1 row-size=33B cardinality=5757710
+|
+|--F05:PLAN FRAGMENT [HASH(l_orderkey)] hosts=2 instances=4
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: o_orderkey
+|  |  mem-estimate=0B mem-reservation=0B
+|  |
+|  05:EXCHANGE [HASH(o_orderkey)]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1 row-size=25B cardinality=1500000
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+|  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|     partitions=1/1 files=2 size=54.20MB
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=54.20MB
+|     column stats: all
+|     mem-estimate=40.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=25B cardinality=1500000
+|
+04:EXCHANGE [HASH(l_orderkey)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0 row-size=8B cardinality=6001215
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   partitions=1/1 files=3 size=193.92MB
+   runtime filters: RF000 -> l_orderkey
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.92MB
+   column stats: all
+   mem-estimate=80.00MB mem-reservation=0B
+   tuple-ids=0 row-size=8B cardinality=6001215
+====
+# High NDV aggregation - should use default buffer size.
+select distinct *
+from tpch_parquet.lineitem
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=264.00MB
+Per-Host Resource Estimates: Memory=3.31GB
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=1 row-size=263B cardinality=6001215
+|
+F01:PLAN FRAGMENT [HASH(tpch_parquet.lineitem.l_orderkey,tpch_parquet.lineitem.l_partkey,tpch_parquet.lineitem.l_suppkey,tpch_parquet.lineitem.l_linenumber,tpch_parquet.lineitem.l_quantity,tpch_parquet.lineitem.l_extendedprice,tpch_parquet.lineitem.l_discount,tpch_parquet.lineitem.l_tax,tpch_parquet.lineitem.l_returnflag,tpch_parquet.lineitem.l_linestatus,tpch_parquet.lineitem.l_shipdate,tpch_parquet.lineitem.l_commitdate,tpch_parquet.lineitem.l_receiptdate,tpch_parquet.lineitem.l_shipinstruct,tpch_parquet.lineitem.l_shipmode,tpch_parquet.lineitem.l_comment)] hosts=3 instances=3
+03:AGGREGATE [FINALIZE]
+|  group by: tpch_parquet.lineitem.l_orderkey, tpch_parquet.lineitem.l_partkey, tpch_parquet.lineitem.l_suppkey, tpch_parquet.lineitem.l_linenumber, tpch_parquet.lineitem.l_quantity, tpch_parquet.lineitem.l_extendedprice, tpch_parquet.lineitem.l_discount, tpch_parquet.lineitem.l_tax, tpch_parquet.lineitem.l_returnflag, tpch_parquet.lineitem.l_linestatus, tpch_parquet.lineitem.l_shipdate, tpch_parquet.lineitem.l_commitdate, tpch_parquet.lineitem.l_receiptdate, tpch_parquet.lineitem.l_shipinstruct, tpch_parquet.lineitem.l_shipmode, tpch_parquet.lineitem.l_comment
+|  mem-estimate=1.62GB mem-reservation=264.00MB
+|  tuple-ids=1 row-size=263B cardinality=6001215
+|
+02:EXCHANGE [HASH(tpch_parquet.lineitem.l_orderkey,tpch_parquet.lineitem.l_partkey,tpch_parquet.lineitem.l_suppkey,tpch_parquet.lineitem.l_linenumber,tpch_parquet.lineitem.l_quantity,tpch_parquet.lineitem.l_extendedprice,tpch_parquet.lineitem.l_discount,tpch_parquet.lineitem.l_tax,tpch_parquet.lineitem.l_returnflag,tpch_parquet.lineitem.l_linestatus,tpch_parquet.lineitem.l_shipdate,tpch_parquet.lineitem.l_commitdate,tpch_parquet.lineitem.l_receiptdate,tpch_parquet.lineitem.l_shipinstruct,tpch_parquet.lineitem.l_shipmode,tpch_parquet.lineitem.l_comment)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=1 row-size=263B cardinality=6001215
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+01:AGGREGATE [STREAMING]
+|  group by: tpch_parquet.lineitem.l_orderkey, tpch_parquet.lineitem.l_partkey, tpch_parquet.lineitem.l_suppkey, tpch_parquet.lineitem.l_linenumber, tpch_parquet.lineitem.l_quantity, tpch_parquet.lineitem.l_extendedprice, tpch_parquet.lineitem.l_discount, tpch_parquet.lineitem.l_tax, tpch_parquet.lineitem.l_returnflag, tpch_parquet.lineitem.l_linestatus, tpch_parquet.lineitem.l_shipdate, tpch_parquet.lineitem.l_commitdate, tpch_parquet.lineitem.l_receiptdate, tpch_parquet.lineitem.l_shipinstruct, tpch_parquet.lineitem.l_shipmode, tpch_parquet.lineitem.l_comment
+|  mem-estimate=1.62GB mem-reservation=0B
+|  tuple-ids=1 row-size=263B cardinality=6001215
+|
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   partitions=1/1 files=3 size=193.92MB
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.92MB
+   column stats: all
+   mem-estimate=80.00MB mem-reservation=0B
+   tuple-ids=0 row-size=263B cardinality=6001215
+---- PARALLELPLANS
+Per-Host Resource Reservation: Memory=528.00MB
+Per-Host Resource Estimates: Memory=6.62GB
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=1 row-size=263B cardinality=6001215
+|
+F01:PLAN FRAGMENT [HASH(tpch_parquet.lineitem.l_orderkey,tpch_parquet.lineitem.l_partkey,tpch_parquet.lineitem.l_suppkey,tpch_parquet.lineitem.l_linenumber,tpch_parquet.lineitem.l_quantity,tpch_parquet.lineitem.l_extendedprice,tpch_parquet.lineitem.l_discount,tpch_parquet.lineitem.l_tax,tpch_parquet.lineitem.l_returnflag,tpch_parquet.lineitem.l_linestatus,tpch_parquet.lineitem.l_shipdate,tpch_parquet.lineitem.l_commitdate,tpch_parquet.lineitem.l_receiptdate,tpch_parquet.lineitem.l_shipinstruct,tpch_parquet.lineitem.l_shipmode,tpch_parquet.lineitem.l_comment)] hosts=3 instances=6
+03:AGGREGATE [FINALIZE]
+|  group by: tpch_parquet.lineitem.l_orderkey, tpch_parquet.lineitem.l_partkey, tpch_parquet.lineitem.l_suppkey, tpch_parquet.lineitem.l_linenumber, tpch_parquet.lineitem.l_quantity, tpch_parquet.lineitem.l_extendedprice, tpch_parquet.lineitem.l_discount, tpch_parquet.lineitem.l_tax, tpch_parquet.lineitem.l_returnflag, tpch_parquet.lineitem.l_linestatus, tpch_parquet.lineitem.l_shipdate, tpch_parquet.lineitem.l_commitdate, tpch_parquet.lineitem.l_receiptdate, tpch_parquet.lineitem.l_shipinstruct, tpch_parquet.lineitem.l_shipmode, tpch_parquet.lineitem.l_comment
+|  mem-estimate=1.62GB mem-reservation=264.00MB
+|  tuple-ids=1 row-size=263B cardinality=6001215
+|
+02:EXCHANGE [HASH(tpch_parquet.lineitem.l_orderkey,tpch_parquet.lineitem.l_partkey,tpch_parquet.lineitem.l_suppkey,tpch_parquet.lineitem.l_linenumber,tpch_parquet.lineitem.l_quantity,tpch_parquet.lineitem.l_extendedprice,tpch_parquet.lineitem.l_discount,tpch_parquet.lineitem.l_tax,tpch_parquet.lineitem.l_returnflag,tpch_parquet.lineitem.l_linestatus,tpch_parquet.lineitem.l_shipdate,tpch_parquet.lineitem.l_commitdate,tpch_parquet.lineitem.l_receiptdate,tpch_parquet.lineitem.l_shipinstruct,tpch_parquet.lineitem.l_shipmode,tpch_parquet.lineitem.l_comment)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=1 row-size=263B cardinality=6001215
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+01:AGGREGATE [STREAMING]
+|  group by: tpch_parquet.lineitem.l_orderkey, tpch_parquet.lineitem.l_partkey, tpch_parquet.lineitem.l_suppkey, tpch_parquet.lineitem.l_linenumber, tpch_parquet.lineitem.l_quantity, tpch_parquet.lineitem.l_extendedprice, tpch_parquet.lineitem.l_discount, tpch_parquet.lineitem.l_tax, tpch_parquet.lineitem.l_returnflag, tpch_parquet.lineitem.l_linestatus, tpch_parquet.lineitem.l_shipdate, tpch_parquet.lineitem.l_commitdate, tpch_parquet.lineitem.l_receiptdate, tpch_parquet.lineitem.l_shipinstruct, tpch_parquet.lineitem.l_shipmode, tpch_parquet.lineitem.l_comment
+|  mem-estimate=1.62GB mem-reservation=0B
+|  tuple-ids=1 row-size=263B cardinality=6001215
+|
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   partitions=1/1 files=3 size=193.92MB
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.92MB
+   column stats: all
+   mem-estimate=80.00MB mem-reservation=0B
+   tuple-ids=0 row-size=263B cardinality=6001215
+====
+# Aggregation with unknown input - should use default buffer size.
+select string_col, count(*)
+from functional_parquet.alltypestiny
+group by string_col
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=264.00MB
+Per-Host Resource Estimates: Memory=272.00MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+functional_parquet.alltypestiny
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=1 row-size=24B cardinality=unavailable
+|
+F01:PLAN FRAGMENT [HASH(string_col)] hosts=3 instances=3
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: string_col
+|  mem-estimate=128.00MB mem-reservation=264.00MB
+|  tuple-ids=1 row-size=24B cardinality=unavailable
+|
+02:EXCHANGE [HASH(string_col)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=1 row-size=24B cardinality=unavailable
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+01:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: string_col
+|  mem-estimate=128.00MB mem-reservation=0B
+|  tuple-ids=1 row-size=24B cardinality=unavailable
+|
+00:SCAN HDFS [functional_parquet.alltypestiny, RANDOM]
+   partitions=4/4 files=4 size=10.48KB
+   stats-rows=unavailable extrapolated-rows=disabled
+   table stats: rows=unavailable size=unavailable
+   column stats: unavailable
+   mem-estimate=16.00MB mem-reservation=0B
+   tuple-ids=0 row-size=16B cardinality=unavailable
+---- PARALLELPLANS
+Per-Host Resource Reservation: Memory=528.00MB
+Per-Host Resource Estimates: Memory=544.00MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+functional_parquet.alltypestiny
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=1 row-size=24B cardinality=unavailable
+|
+F01:PLAN FRAGMENT [HASH(string_col)] hosts=3 instances=6
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: string_col
+|  mem-estimate=128.00MB mem-reservation=264.00MB
+|  tuple-ids=1 row-size=24B cardinality=unavailable
+|
+02:EXCHANGE [HASH(string_col)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=1 row-size=24B cardinality=unavailable
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+01:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: string_col
+|  mem-estimate=128.00MB mem-reservation=0B
+|  tuple-ids=1 row-size=24B cardinality=unavailable
+|
+00:SCAN HDFS [functional_parquet.alltypestiny, RANDOM]
+   partitions=4/4 files=4 size=10.48KB
+   stats-rows=unavailable extrapolated-rows=disabled
+   table stats: rows=unavailable size=unavailable
+   column stats: unavailable
+   mem-estimate=16.00MB mem-reservation=0B
+   tuple-ids=0 row-size=16B cardinality=unavailable
+====
