@@ -41,7 +41,6 @@
 
 #include "common/names.h"
 
-using boost::adopt_lock_t;
 using namespace apache::thrift;
 using namespace beeswax;
 using namespace impala;
@@ -231,7 +230,6 @@ void ImpalaHttpHandler::QueryProfileEncodedHandler(const Webserver::ArgumentMap&
       ss.str(Substitute("Could not obtain runtime profile: $0", status.GetDetail()));
     }
   }
-
   document->AddMember(Webserver::ENABLE_RAW_JSON_KEY, true, document->GetAllocator());
   Value profile(ss.str().c_str(), document->GetAllocator());
   document->AddMember("contents", profile, document->GetAllocator());
@@ -696,6 +694,8 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
     const Webserver::ArgumentMap& args, Document* document) {
   TUniqueId query_id;
   Status status = ParseIdFromArguments(args, &query_id, "query_id");
+  Value query_id_val(PrintId(query_id).c_str(), document->GetAllocator());
+  document->AddMember("query_id", query_id_val, document->GetAllocator());
   if (!status.ok()) {
     // Redact the error message, it may contain part or all of the query.
     Value json_error(RedactCopy(status.GetDetail()).c_str(), document->GetAllocator());
@@ -713,10 +713,19 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
   // Search the in-flight queries first, followed by the archived ones.
   {
     shared_ptr<ClientRequestState> request_state =
-        server_->GetClientRequestState(query_id, true);
+        server_->GetClientRequestState(query_id);
     if (request_state != NULL) {
       found = true;
-      lock_guard<mutex> l(*request_state->lock(), adopt_lock_t());
+      // If the query plan isn't generated, avoid waiting for the request
+      // state lock to be acquired, since it could potentially be an expensive
+      // call, if the table Catalog metadata loading is in progress. Instead
+      // update the caller that the plan information is unavailable.
+      if (request_state->query_state() == beeswax::QueryState::CREATED) {
+        document->AddMember(
+            "plan_metadata_unavailable", "true", document->GetAllocator());
+        return;
+      }
+      lock_guard<mutex> l(*request_state->lock());
       if (request_state->coord() == NULL) {
         const string& err = Substitute("Invalid query id: $0", PrintId(query_id));
         Value json_error(err.c_str(), document->GetAllocator());
@@ -780,8 +789,6 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
   Value json_status(query_status.ok() ? "OK" :
       RedactCopy(query_status.GetDetail()).c_str(), document->GetAllocator());
   document->AddMember("status", json_status, document->GetAllocator());
-  Value json_id(PrintId(query_id).c_str(), document->GetAllocator());
-  document->AddMember("query_id", json_id, document->GetAllocator());
 }
 
 void ImpalaHttpHandler::BackendsHandler(const Webserver::ArgumentMap& args,

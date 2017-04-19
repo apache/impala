@@ -95,7 +95,7 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
   RAISE_IF_ERROR(QueryToTQueryContext(query, &query_ctx), SQLSTATE_GENERAL_ERROR);
 
   shared_ptr<ClientRequestState> request_state;
-  DCHECK(session != NULL);  // The session should exist.
+  DCHECK(session != nullptr);  // The session should exist.
   {
     // The session is created when the client connects. Depending on the underlying
     // transport, the username may be known at that time. If the username hasn't been set
@@ -188,15 +188,14 @@ void ImpalaServer::get_results_metadata(ResultsMetadata& results_metadata,
   TUniqueId query_id;
   QueryHandleToTUniqueId(handle, &query_id);
   VLOG_QUERY << "get_results_metadata(): query_id=" << PrintId(query_id);
-  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, true);
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state.get() == nullptr)) {
     RaiseBeeswaxException(Substitute("Invalid query handle: $0", PrintId(query_id)),
       SQLSTATE_GENERAL_ERROR);
   }
 
   {
-    // make sure we release the lock on request_state if we see any error
-    lock_guard<mutex> l(*request_state->lock(), adopt_lock_t());
+    lock_guard<mutex> l(*request_state->lock());
 
     // Convert TResultSetMetadata to Beeswax.ResultsMetadata
     const TResultSetMetadata* result_set_md = request_state->result_metadata();
@@ -277,8 +276,8 @@ void ImpalaServer::get_log(string& log, const LogContextId& context) {
   TUniqueId query_id;
   QueryHandleToTUniqueId(handle, &query_id);
 
-  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, false);
-  if (request_state.get() == NULL) {
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
+  if (request_state.get() == nullptr) {
     stringstream str;
     str << "unknown query id: " << query_id;
     LOG(ERROR) << str.str();
@@ -294,7 +293,7 @@ void ImpalaServer::get_log(string& log, const LogContextId& context) {
   error_log_ss << join(request_state->GetAnalysisWarnings(), "\n");
 
   // Add warnings from execution
-  if (request_state->coord() != NULL) {
+  if (request_state->coord() != nullptr) {
     if (!request_state->query_status().ok()) error_log_ss << "\n\n";
     error_log_ss << request_state->coord()->GetErrorLog();
   }
@@ -404,7 +403,7 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
     shared_ptr<SessionState> session;
     const TUniqueId& session_id = ThriftServer::GetThreadConnectionId();
     RETURN_IF_ERROR(GetSessionState(session_id, &session));
-    DCHECK(session != NULL);
+    DCHECK(session != nullptr);
     {
       // The session is created when the client connects. Depending on the underlying
       // transport, the username may be known at that time. If the username hasn't been
@@ -455,7 +454,7 @@ inline void ImpalaServer::QueryHandleToTUniqueId(const QueryHandle& handle,
 
 Status ImpalaServer::FetchInternal(const TUniqueId& query_id,
     const bool start_over, const int32_t fetch_size, beeswax::Results* query_results) {
-  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, false);
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state == nullptr)) {
     return Status(Substitute("Invalid query handle: $0", PrintId(query_id)));
   }
@@ -516,14 +515,14 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id,
 
 Status ImpalaServer::CloseInsertInternal(const TUniqueId& query_id,
     TInsertResult* insert_result) {
-  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, true);
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state == nullptr)) {
     return Status(Substitute("Invalid query handle: $0", PrintId(query_id)));
   }
 
   Status query_status;
   {
-    lock_guard<mutex> l(*request_state->lock(), adopt_lock_t());
+    lock_guard<mutex> l(*request_state->lock());
     query_status = request_state->query_status();
     if (query_status.ok()) {
       // Coord may be NULL for a SELECT with LIMIT 0.
@@ -532,7 +531,7 @@ Status ImpalaServer::CloseInsertInternal(const TUniqueId& query_id,
       // coordinator, depending on how we choose to drive the table sink.
       int64_t num_row_errors = 0;
       bool has_kudu_stats = false;
-      if (request_state->coord() != NULL) {
+      if (request_state->coord() != nullptr) {
         for (const PartitionStatusMap::value_type& v:
              request_state->coord()->per_partition_status()) {
           const pair<string, TInsertPartitionStatus> partition_status = v;

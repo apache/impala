@@ -185,6 +185,12 @@ DEFINE_bool(is_coordinator, true, "If true, this Impala daemon can accept and co
 DEFINE_bool(is_executor, true, "If true, this Impala daemon will execute query "
     "fragments.");
 
+#ifndef NDEBUG
+  DEFINE_int64(stress_metadata_loading_pause_injection_ms, 0, "Simulates metadata loading"
+      "for a given query by injecting a sleep equivalent to this configuration in "
+      "milliseconds. Only used for testing.");
+#endif
+
 // TODO: Remove for Impala 3.0.
 DEFINE_string(local_nodemanager_url, "", "Deprecated");
 
@@ -591,8 +597,12 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
   DCHECK(output != nullptr);
   // Search for the query id in the active query map
   {
-    shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, false);
+    shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
     if (request_state.get() != nullptr) {
+      // For queries in CREATED state, the profile information isn't populated yet.
+      if (request_state->query_state() == beeswax::QueryState::CREATED) {
+        return Status("Query plan is not ready.");
+      }
       lock_guard<mutex> l(*request_state->lock());
       if (base64_encoded) {
         request_state->profile().SerializeToArchiveString(output);
@@ -624,12 +634,11 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
 Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, TExecSummary* result) {
   // Search for the query id in the active query map.
   {
-    shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, true);
+    shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
     if (request_state != nullptr) {
-      lock_guard<mutex> l(*request_state->lock(), adopt_lock_t());
+      lock_guard<mutex> l(*request_state->lock());
       if (request_state->coord() != nullptr) {
         request_state->coord()->GetTExecSummary(result);
-
         TExecProgress progress;
         progress.__set_num_completed_scan_ranges(
             request_state->coord()->progress().num_complete());
@@ -803,15 +812,6 @@ Status ImpalaServer::ExecuteInternal(
   {
     // Keep a lock on request_state so that registration and setting
     // result_metadata are atomic.
-    //
-    // Note: this acquires the request_state lock *before* the
-    // client_request_state_map_ lock. This is the opposite of
-    // GetClientRequestState(..., true), and therefore looks like a
-    // candidate for deadlock. The reason this works here is that
-    // GetClientRequestState cannot find request_state (under the exec state
-    // map lock) and take it's lock until RegisterQuery has
-    // finished. By that point, the exec state map lock will have been
-    // given up, so the classic deadlock interleaving is not possible.
     lock_guard<mutex> l(*(*request_state)->lock());
 
     // register exec state as early as possible so that queries that
@@ -820,8 +820,18 @@ Status ImpalaServer::ExecuteInternal(
     RETURN_IF_ERROR(RegisterQuery(session_state, *request_state));
     *registered_request_state = true;
 
+
+#ifndef NDEBUG
+    // Inject a sleep to simulate metadata loading pauses for tables. This
+    // is only used for testing.
+    if (FLAGS_stress_metadata_loading_pause_injection_ms > 0) {
+      SleepForMs(FLAGS_stress_metadata_loading_pause_injection_ms);
+    }
+#endif
+
     RETURN_IF_ERROR((*request_state)->UpdateQueryStatus(
         exec_env_->frontend()->GetExecRequest(query_ctx, &result)));
+
     (*request_state)->query_events()->MarkEvent("Planning finished");
     (*request_state)->summary_profile()->AddEventSequence(
         result.timeline.name, result.timeline);
@@ -1010,7 +1020,7 @@ Status ImpalaServer::UpdateCatalogMetrics() {
 Status ImpalaServer::CancelInternal(const TUniqueId& query_id, bool check_inflight,
     const Status* cause) {
   VLOG_QUERY << "Cancel(): query_id=" << PrintId(query_id);
-  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, false);
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (request_state == nullptr) return Status("Invalid or unknown query handle");
   RETURN_IF_ERROR(request_state->Cancel(check_inflight, cause));
   return Status::OK();
@@ -1100,7 +1110,7 @@ void ImpalaServer::ReportExecStatus(
   // every report (assign each query a local int32_t id and use that to index into a
   // vector of ClientRequestStates, w/o lookup or locking?)
   shared_ptr<ClientRequestState> request_state =
-      GetClientRequestState(params.query_id, false);
+      GetClientRequestState(params.query_id);
   if (request_state.get() == nullptr) {
     // This is expected occasionally (since a report RPC might be in flight while
     // cancellation is happening). Return an error to the caller to get it to stop.
@@ -1830,7 +1840,7 @@ void ImpalaServer::RegisterSessionTimeout(int32_t session_timeout) {
         // break here and sleep.
         if (expiration_event->first > now) break;
         shared_ptr<ClientRequestState> query_state =
-            GetClientRequestState(expiration_event->second, false);
+            GetClientRequestState(expiration_event->second);
         if (query_state.get() == nullptr) {
           // Query was deleted some other way.
           queries_by_timestamp_.erase(expiration_event++);
@@ -1992,13 +2002,12 @@ bool ImpalaServer::GetSessionIdForQuery(const TUniqueId& query_id,
 }
 
 shared_ptr<ClientRequestState> ImpalaServer::GetClientRequestState(
-    const TUniqueId& query_id, bool lock) {
+    const TUniqueId& query_id) {
   lock_guard<mutex> l(client_request_state_map_lock_);
   ClientRequestStateMap::iterator i = client_request_state_map_.find(query_id);
   if (i == client_request_state_map_.end()) {
     return shared_ptr<ClientRequestState>();
   } else {
-    if (lock) i->second->lock()->lock();
     return i->second;
   }
 }
@@ -2008,7 +2017,7 @@ void ImpalaServer::UpdateFilter(TUpdateFilterResult& result,
   DCHECK(params.__isset.query_id);
   DCHECK(params.__isset.filter_id);
   shared_ptr<ClientRequestState> client_request_state =
-      GetClientRequestState(params.query_id, false);
+      GetClientRequestState(params.query_id);
   if (client_request_state.get() == nullptr) {
     LOG(INFO) << "Could not find client request state: " << params.query_id;
     return;

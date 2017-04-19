@@ -83,11 +83,10 @@ class ClientRequestState;
 /// 1. session_state_map_lock_
 /// 2. SessionState::lock
 /// 3. query_expiration_lock_
-/// 4. client_request_state_map_lock_
-/// 5. ClientRequestState::fetch_rows_lock
-/// 6. ClientRequestState::lock
-/// 7. ClientRequestState::expiration_data_lock_
-/// 8. Coordinator::exec_summary_lock
+/// 4. ClientRequestState::fetch_rows_lock
+/// 5. ClientRequestState::lock
+/// 6. ClientRequestState::expiration_data_lock_
+/// 7. Coordinator::exec_summary_lock
 ///
 /// Coordinator::lock_ should not be acquired at the same time as the
 /// ImpalaServer/SessionState/ClientRequestState locks. Aside from
@@ -101,6 +100,7 @@ class ClientRequestState;
 /// * uuid_lock_
 /// * catalog_version_lock_
 /// * connection_to_sessions_map_lock_
+/// * client_request_state_map_lock_
 ///
 /// TODO: The state of a running query is currently not cleaned up if the
 /// query doesn't experience any errors at runtime and close() doesn't get called.
@@ -397,10 +397,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   static const char* SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED;
 
   /// Return exec state for given query_id, or NULL if not found.
-  /// If 'lock' is true, the returned exec state's lock() will be acquired before
-  /// the client_request_state_map_lock_ is released.
   std::shared_ptr<ClientRequestState> GetClientRequestState(
-      const TUniqueId& query_id, bool lock);
+      const TUniqueId& query_id);
 
   /// Writes the session id, if found, for the given query to the output
   /// parameter. Returns false if no query with the given ID is found.

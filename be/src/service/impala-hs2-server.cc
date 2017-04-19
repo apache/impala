@@ -179,7 +179,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
 
 Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size,
     bool fetch_first, TFetchResultsResp* fetch_results) {
-  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, false);
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state == nullptr)) {
     return Status(Substitute("Invalid query handle: $0", PrintId(query_id)));
   }
@@ -634,7 +634,7 @@ void ImpalaServer::GetOperationStatus(TGetOperationStatusResp& return_val,
       request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
   VLOG_ROW << "GetOperationStatus(): query_id=" << PrintId(query_id);
 
-  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, false);
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state.get() == nullptr)) {
     // No handle was found
     HS2_RETURN_ERROR(return_val,
@@ -670,7 +670,7 @@ void ImpalaServer::CancelOperation(TCancelOperationResp& return_val,
       request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
   VLOG_QUERY << "CancelOperation(): query_id=" << PrintId(query_id);
 
-  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, false);
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state.get() == nullptr)) {
     // No handle was found
     HS2_RETURN_ERROR(return_val,
@@ -692,7 +692,7 @@ void ImpalaServer::CloseOperation(TCloseOperationResp& return_val,
       request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
   VLOG_QUERY << "CloseOperation(): query_id=" << PrintId(query_id);
 
-  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, false);
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state.get() == nullptr)) {
     // No handle was found
     HS2_RETURN_ERROR(return_val,
@@ -731,7 +731,7 @@ void ImpalaServer::GetResultSetMetadata(TGetResultSetMetadataResp& return_val,
   HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id),
       SQLSTATE_GENERAL_ERROR);
 
-  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, true);
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state.get() == nullptr)) {
     VLOG_QUERY << "GetResultSetMetadata(): invalid query handle";
     // No handle was found
@@ -739,8 +739,7 @@ void ImpalaServer::GetResultSetMetadata(TGetResultSetMetadataResp& return_val,
       Substitute("Invalid query handle: $0", PrintId(query_id)), SQLSTATE_GENERAL_ERROR);
   }
   {
-    // make sure we release the lock on request_state if we see any error
-    lock_guard<mutex> l(*request_state->lock(), adopt_lock_t());
+    lock_guard<mutex> l(*request_state->lock());
 
     // Convert TResultSetMetadata to TGetResultSetMetadataResp
     const TResultSetMetadata* result_set_md = request_state->result_metadata();
@@ -807,7 +806,7 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
   HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
       request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
 
-  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id, false);
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state.get() == nullptr)) {
     // No handle was found
     HS2_RETURN_ERROR(return_val,

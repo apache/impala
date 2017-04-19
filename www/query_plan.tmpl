@@ -38,8 +38,13 @@ under the License.
 
 {{> www/query_detail_tabs.tmpl }}
 
-<h3>Plan</h3>
 
+{{?plan_metadata_unavailable}}
+<h3>Plan not yet available. Page will update when query planning completes.</h3>
+{{/plan_metadata_unavailable}}
+
+{{^plan_metadata_unavailable}}
+<h3>Plan</h3>
 <div>
   <label>
   <input type="checkbox" checked="true" id="colour_scheme"/>
@@ -48,6 +53,7 @@ under the License.
 </div>
 
 <svg style="border: 1px solid darkgray" width=1200 height=600 class="panel"><g/></svg>
+{{/plan_metadata_unavailable}}
 
 {{> www/common-footer.tmpl }}
 
