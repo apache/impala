@@ -73,7 +73,6 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
   TcmallocMetric::PHYSICAL_BYTES_RESERVED =
       metrics->RegisterMetric(new TcmallocMetric::PhysicalBytesMetric(
           MetricDefs::Get("tcmalloc.physical-bytes-reserved")));
-#endif
 
   // Add compound metrics that track totals across TCMalloc and the buffer pool.
   // total-used should track the total physical memory in use.
@@ -86,6 +85,7 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
 
   AggregateMemoryMetric::TOTAL_USED = metrics->RegisterMetric(
       new SumGauge<uint64_t>(MetricDefs::Get("memory.total-used"), used_metrics));
+#endif
   if (register_jvm_metrics) {
     RETURN_IF_ERROR(JvmMetric::InitMetrics(metrics->GetOrCreateChildGroup("jvm")));
   }
