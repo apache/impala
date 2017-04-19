@@ -141,13 +141,7 @@ TEST_F(ReservationTrackerTest, BasicTwoLevel) {
   child.ReleaseTo(1);
   ASSERT_EQ(0, child.GetUsedReservation());
 
-  // Child reservation should be returned all the way up the tree.
-  child.DecreaseReservation(1);
-  ASSERT_EQ(child_reservation, root_.GetReservation());
-  ASSERT_EQ(child_reservation - 1, child.GetReservation());
-  ASSERT_EQ(child_reservation - 1, root_.GetChildReservations());
-
-  // Closing the child should release its reservation.
+  // Closing the child should release its reservation all the way up the tree.
   child.Close();
   ASSERT_EQ(1, root_.GetReservation());
   ASSERT_EQ(0, root_.GetChildReservations());
@@ -284,15 +278,12 @@ TEST_F(ReservationTrackerTest, MemTrackerIntegrationTwoLevel) {
   ASSERT_EQ(2 * MIN_BUFFER_LEN, root_.GetChildReservations());
 
   // Check that released memory is decremented from all trackers correctly.
-  child_reservations1.DecreaseReservation(MIN_BUFFER_LEN);
-  child_reservations2.DecreaseReservation(MIN_BUFFER_LEN);
-  ASSERT_EQ(0, child_reservations2.GetReservation());
+  child_reservations1.Close();
+  child_reservations2.Close();
+  ASSERT_EQ(0, child_mem_tracker1.consumption());
   ASSERT_EQ(0, child_mem_tracker2.consumption());
   ASSERT_EQ(0, root_mem_tracker.consumption());
   ASSERT_EQ(0, root_.GetUsedReservation());
-
-  child_reservations1.Close();
-  child_reservations2.Close();
   child_mem_tracker1.UnregisterFromParent();
   child_mem_tracker2.UnregisterFromParent();
 }
@@ -315,8 +306,6 @@ TEST_F(ReservationTrackerTest, MemTrackerIntegrationMultiLevel) {
   for (int i = 1; i < HIERARCHY_DEPTH; ++i) {
     mem_trackers[i].reset(new MemTracker(
         mem_limits[i], Substitute("Child $0", i), mem_trackers[i - 1].get()));
-    reservations[i].InitChildTracker(
-        NewProfile(), &reservations[i - 1], mem_trackers[i].get(), 500);
   }
 
   vector<int> interesting_amounts({LIMIT - 1, LIMIT, LIMIT + 1});
@@ -326,6 +315,10 @@ TEST_F(ReservationTrackerTest, MemTrackerIntegrationMultiLevel) {
   for (int level = 1; level < HIERARCHY_DEPTH; ++level) {
     int64_t lowest_limit = mem_trackers[level]->lowest_limit();
     for (int amount : interesting_amounts) {
+      // Initialize the tracker, increase reservation, then release reservation by closing
+      // the tracker.
+      reservations[level].InitChildTracker(
+          NewProfile(), &reservations[level - 1], mem_trackers[level].get(), 500);
       bool increased = reservations[level].IncreaseReservation(amount);
       if (lowest_limit == -1 || amount <= lowest_limit) {
         // The increase should go through.
@@ -338,12 +331,12 @@ TEST_F(ReservationTrackerTest, MemTrackerIntegrationMultiLevel) {
         }
 
         LOG(INFO) << "\n" << mem_trackers[0]->LogUsage();
-        reservations[level].DecreaseReservation(amount);
+        reservations[level].Close();
       } else {
         ASSERT_FALSE(increased);
       }
-      // We should be back in the original state.
-      for (int i = 0; i < HIERARCHY_DEPTH; ++i) {
+      // Reservations should be released on all ancestors.
+      for (int i = 0; i < level; ++i) {
         ASSERT_EQ(0, reservations[i].GetReservation()) << i << ": "
                                                        << reservations[i].DebugString();
         ASSERT_EQ(0, reservations[i].GetChildReservations());
@@ -365,13 +358,123 @@ TEST_F(ReservationTrackerTest, MemTrackerIntegrationMultiLevel) {
       ASSERT_EQ(amount, reservations[ancestor].GetChildReservations());
       ASSERT_EQ(amount, mem_trackers[ancestor]->consumption());
     }
-    reservations[level].DecreaseReservation(amount);
+    // Return the reservation to the root before the next iteration.
+    reservations[level].TransferReservationTo(&reservations[0], amount);
   }
 
   for (int i = HIERARCHY_DEPTH - 1; i >= 0; --i) {
     reservations[i].Close();
     if (i != 0) mem_trackers[i]->UnregisterFromParent();
   }
+}
+
+// Test TransferReservation().
+TEST_F(ReservationTrackerTest, TransferReservation) {
+  Status status;
+  // Set up this hierarchy, to test transfers between different levels and
+  // different cases:
+  //    (root) limit = 4
+  //      ^
+  //      |
+  //  (grandparent) limit = 3
+  //   ^         ^
+  //   |         |
+  //  (parent) (aunt) limit =2
+  //   ^
+  //   |
+  //  (child)
+  const int64_t TOTAL_MEM = MIN_BUFFER_LEN * 4;
+  const int64_t GRANDPARENT_LIMIT = MIN_BUFFER_LEN * 3;
+  const int64_t AUNT_LIMIT = MIN_BUFFER_LEN * 2;
+
+  root_.InitRootTracker(nullptr, TOTAL_MEM);
+  MemTracker* root_mem_tracker = obj_pool_.Add(new MemTracker);
+  ReservationTracker* grandparent = obj_pool_.Add(new ReservationTracker());
+  MemTracker* grandparent_mem_tracker =
+      obj_pool_.Add(new MemTracker(TOTAL_MEM, "grandparent", root_mem_tracker));
+  ReservationTracker* parent = obj_pool_.Add(new ReservationTracker());
+  MemTracker* parent_mem_tracker =
+      obj_pool_.Add(new MemTracker(-1, "parent", grandparent_mem_tracker));
+  ReservationTracker* aunt = obj_pool_.Add(new ReservationTracker());
+  ReservationTracker* child = obj_pool_.Add(new ReservationTracker());
+  MemTracker* child_mem_tracker =
+      obj_pool_.Add(new MemTracker(-1, "child", parent_mem_tracker));
+  grandparent->InitChildTracker(nullptr, &root_, grandparent_mem_tracker, TOTAL_MEM);
+  parent->InitChildTracker(
+      nullptr, grandparent, parent_mem_tracker, numeric_limits<int64_t>::max());
+  aunt->InitChildTracker(nullptr, grandparent, nullptr, AUNT_LIMIT);
+  child->InitChildTracker(
+      nullptr, parent, child_mem_tracker, numeric_limits<int64_t>::max());
+
+  ASSERT_TRUE(child->IncreaseReservation(GRANDPARENT_LIMIT));
+  // Transfer from child to self (no-op).
+  ASSERT_TRUE(child->TransferReservationTo(child, GRANDPARENT_LIMIT));
+  EXPECT_EQ(GRANDPARENT_LIMIT, child->GetReservation());
+
+  // Transfer from child to parent.
+  ASSERT_TRUE(child->TransferReservationTo(parent, GRANDPARENT_LIMIT));
+  EXPECT_EQ(0, child->GetReservation());
+  EXPECT_EQ(0, child_mem_tracker->consumption());
+  EXPECT_EQ(0, parent->GetChildReservations());
+  EXPECT_EQ(GRANDPARENT_LIMIT, parent->GetReservation());
+  EXPECT_EQ(GRANDPARENT_LIMIT, parent_mem_tracker->consumption());
+  EXPECT_EQ(GRANDPARENT_LIMIT, grandparent->GetChildReservations());
+  EXPECT_EQ(GRANDPARENT_LIMIT, grandparent->GetReservation());
+  EXPECT_EQ(GRANDPARENT_LIMIT, grandparent_mem_tracker->consumption());
+  EXPECT_EQ(GRANDPARENT_LIMIT, root_.GetReservation());
+
+  // Transfer from parent to aunt, up to aunt's limit.
+  ASSERT_TRUE(parent->TransferReservationTo(aunt, AUNT_LIMIT));
+  EXPECT_EQ(GRANDPARENT_LIMIT - AUNT_LIMIT, parent->GetReservation());
+  EXPECT_EQ(GRANDPARENT_LIMIT - AUNT_LIMIT, parent_mem_tracker->consumption());
+  EXPECT_EQ(AUNT_LIMIT, aunt->GetReservation());
+  EXPECT_EQ(GRANDPARENT_LIMIT, grandparent->GetChildReservations());
+  EXPECT_EQ(GRANDPARENT_LIMIT, grandparent->GetReservation());
+  EXPECT_EQ(GRANDPARENT_LIMIT, grandparent_mem_tracker->consumption());
+  EXPECT_EQ(GRANDPARENT_LIMIT, root_.GetReservation());
+  // Cannot exceed aunt's limit by transferring.
+  ASSERT_FALSE(parent->TransferReservationTo(aunt, parent->GetReservation()));
+
+  // Transfer from parent to child.
+  ASSERT_TRUE(parent->TransferReservationTo(child, parent->GetReservation()));
+  EXPECT_EQ(GRANDPARENT_LIMIT - AUNT_LIMIT, child->GetReservation());
+  EXPECT_EQ(GRANDPARENT_LIMIT - AUNT_LIMIT, child_mem_tracker->consumption());
+  EXPECT_EQ(GRANDPARENT_LIMIT - AUNT_LIMIT, parent->GetReservation());
+  EXPECT_EQ(GRANDPARENT_LIMIT - AUNT_LIMIT, parent_mem_tracker->consumption());
+  EXPECT_EQ(GRANDPARENT_LIMIT, grandparent->GetChildReservations());
+  EXPECT_EQ(GRANDPARENT_LIMIT, grandparent->GetReservation());
+  EXPECT_EQ(GRANDPARENT_LIMIT, grandparent_mem_tracker->consumption());
+
+  // Transfer from aunt to child.
+  ASSERT_TRUE(aunt->TransferReservationTo(child, AUNT_LIMIT));
+  EXPECT_EQ(GRANDPARENT_LIMIT, child->GetReservation());
+  EXPECT_EQ(GRANDPARENT_LIMIT, child_mem_tracker->consumption());
+  EXPECT_EQ(GRANDPARENT_LIMIT, parent->GetReservation());
+  EXPECT_EQ(GRANDPARENT_LIMIT, parent_mem_tracker->consumption());
+  EXPECT_EQ(0, aunt->GetReservation());
+  EXPECT_EQ(GRANDPARENT_LIMIT, grandparent->GetChildReservations());
+  EXPECT_EQ(GRANDPARENT_LIMIT, grandparent->GetReservation());
+  EXPECT_EQ(GRANDPARENT_LIMIT, grandparent_mem_tracker->consumption());
+
+  // Transfer from child to grandparent.
+  ASSERT_TRUE(child->TransferReservationTo(grandparent, GRANDPARENT_LIMIT));
+  EXPECT_EQ(0, child->GetReservation());
+  EXPECT_EQ(0, child_mem_tracker->consumption());
+  EXPECT_EQ(0, parent->GetReservation());
+  EXPECT_EQ(0, parent_mem_tracker->consumption());
+  EXPECT_EQ(0, aunt->GetReservation());
+  EXPECT_EQ(0, grandparent->GetChildReservations());
+  EXPECT_EQ(GRANDPARENT_LIMIT, grandparent->GetReservation());
+  EXPECT_EQ(GRANDPARENT_LIMIT, grandparent_mem_tracker->consumption());
+  EXPECT_EQ(GRANDPARENT_LIMIT, root_.GetReservation());
+
+  child->Close();
+  child_mem_tracker->UnregisterFromParent();
+  aunt->Close();
+  parent->Close();
+  parent_mem_tracker->UnregisterFromParent();
+  grandparent->Close();
+  grandparent_mem_tracker->UnregisterFromParent();
 }
 }
 

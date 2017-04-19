@@ -29,7 +29,7 @@
 
 namespace impala {
 
-ReservationTracker::ReservationTracker() : initialized_(false), mem_tracker_(NULL) {}
+ReservationTracker::ReservationTracker() : initialized_(false), mem_tracker_(nullptr) {}
 
 ReservationTracker::~ReservationTracker() {
   DCHECK(!initialized_);
@@ -39,8 +39,8 @@ void ReservationTracker::InitRootTracker(
     RuntimeProfile* profile, int64_t reservation_limit) {
   lock_guard<SpinLock> l(lock_);
   DCHECK(!initialized_);
-  parent_ = NULL;
-  mem_tracker_ = NULL;
+  parent_ = nullptr;
+  mem_tracker_ = nullptr;
   reservation_limit_ = reservation_limit;
   reservation_ = 0;
   used_reservation_ = 0;
@@ -55,7 +55,7 @@ void ReservationTracker::InitRootTracker(
 
 void ReservationTracker::InitChildTracker(RuntimeProfile* profile,
     ReservationTracker* parent, MemTracker* mem_tracker, int64_t reservation_limit) {
-  DCHECK(parent != NULL);
+  DCHECK(parent != nullptr);
   DCHECK_GE(reservation_limit, 0);
 
   lock_guard<SpinLock> l(lock_);
@@ -69,9 +69,9 @@ void ReservationTracker::InitChildTracker(RuntimeProfile* profile,
   child_reservations_ = 0;
   initialized_ = true;
 
-  if (mem_tracker_ != NULL) {
+  if (mem_tracker_ != nullptr) {
     MemTracker* parent_mem_tracker = GetParentMemTracker();
-    if (parent_mem_tracker != NULL) {
+    if (parent_mem_tracker != nullptr) {
       // Make sure the parent links of the MemTrackers correspond to our parent links.
       DCHECK_EQ(parent_mem_tracker, mem_tracker_->parent());
       // Make sure we don't have a lower limit than the ancestor, since we don't enforce
@@ -81,8 +81,8 @@ void ReservationTracker::InitChildTracker(RuntimeProfile* profile,
       // Make sure we didn't leave a gap in the links. E.g. this tracker's grandparent
       // shouldn't have a MemTracker.
       ReservationTracker* ancestor = parent_;
-      while (ancestor != NULL) {
-        DCHECK(ancestor->mem_tracker_ == NULL);
+      while (ancestor != nullptr) {
+        DCHECK(ancestor->mem_tracker_ == nullptr);
         ancestor = ancestor->parent_;
       }
     }
@@ -95,14 +95,13 @@ void ReservationTracker::InitChildTracker(RuntimeProfile* profile,
 
 void ReservationTracker::InitCounters(
     RuntimeProfile* profile, int64_t reservation_limit) {
-  bool profile_provided = profile != NULL;
-  if (profile == NULL) {
+  if (profile == nullptr) {
     dummy_profile_.reset(new DummyProfile);
     profile = dummy_profile_->profile();
   }
 
   // Check that another tracker's counters aren't already registered in the profile.
-  DCHECK(profile->GetCounter("BufferPoolInitialReservation") == NULL);
+  DCHECK(profile->GetCounter("BufferPoolInitialReservation") == nullptr);
   counters_.reservation_limit =
       ADD_COUNTER(profile, "BufferPoolReservationLimit", TUnit::BYTES);
   counters_.peak_reservation =
@@ -112,9 +111,7 @@ void ReservationTracker::InitCounters(
 
   COUNTER_SET(counters_.reservation_limit, reservation_limit);
 
-  if (mem_tracker_ != NULL && profile_provided) {
-    mem_tracker_->EnableReservationReporting(counters_);
-  }
+  if (mem_tracker_ != nullptr) mem_tracker_->EnableReservationReporting(counters_);
 }
 
 void ReservationTracker::Close() {
@@ -124,9 +121,9 @@ void ReservationTracker::Close() {
   DCHECK_EQ(used_reservation_, 0);
   DCHECK_EQ(child_reservations_, 0);
   // Release any reservation to parent.
-  if (parent_ != NULL) DecreaseReservationInternalLocked(reservation_, false);
-  mem_tracker_ = NULL;
-  parent_ = NULL;
+  if (parent_ != nullptr) DecreaseReservationLocked(reservation_, false);
+  mem_tracker_ = nullptr;
+  parent_ = nullptr;
   initialized_ = false;
 }
 
@@ -154,17 +151,17 @@ bool ReservationTracker::IncreaseReservationInternalLocked(
   } else if (reservation_increase == 0) {
     granted = true;
   } else {
-    if (parent_ == NULL) {
+    if (parent_ == nullptr) {
       granted = true;
     } else {
       lock_guard<SpinLock> l(parent_->lock_);
       granted =
           parent_->IncreaseReservationInternalLocked(reservation_increase, true, true);
     }
-    if (granted && !TryUpdateMemTracker(reservation_increase)) {
+    if (granted && !TryConsumeFromMemTracker(reservation_increase)) {
       granted = false;
       // Roll back changes to ancestors if MemTracker update fails.
-      parent_->DecreaseReservationInternal(reservation_increase, true);
+      parent_->DecreaseReservation(reservation_increase, true);
     }
   }
 
@@ -179,9 +176,10 @@ bool ReservationTracker::IncreaseReservationInternalLocked(
   return granted;
 }
 
-bool ReservationTracker::TryUpdateMemTracker(int64_t reservation_increase) {
-  if (mem_tracker_ == NULL) return true;
-  if (GetParentMemTracker() == NULL) {
+bool ReservationTracker::TryConsumeFromMemTracker(int64_t reservation_increase) {
+  DCHECK_GE(reservation_increase, 0);
+  if (mem_tracker_ == nullptr) return true;
+  if (GetParentMemTracker() == nullptr) {
     // At the topmost link, which may be a MemTracker with a limit, we need to use
     // TryConsume() to check the limit.
     return mem_tracker_->TryConsume(reservation_increase);
@@ -194,33 +192,123 @@ bool ReservationTracker::TryUpdateMemTracker(int64_t reservation_increase) {
   }
 }
 
-void ReservationTracker::DecreaseReservation(int64_t bytes) {
-  DecreaseReservationInternal(bytes, false);
+void ReservationTracker::ReleaseToMemTracker(int64_t reservation_decrease) {
+  DCHECK_GE(reservation_decrease, 0);
+  if (mem_tracker_ == nullptr) return;
+  if (GetParentMemTracker() == nullptr) {
+    mem_tracker_->Release(reservation_decrease);
+  } else {
+    mem_tracker_->ReleaseLocal(reservation_decrease, GetParentMemTracker());
+  }
 }
 
-void ReservationTracker::DecreaseReservationInternal(
-    int64_t bytes, bool is_child_reservation) {
+void ReservationTracker::DecreaseReservation(int64_t bytes, bool is_child_reservation) {
   lock_guard<SpinLock> l(lock_);
-  DecreaseReservationInternalLocked(bytes, is_child_reservation);
+  DecreaseReservationLocked(bytes, is_child_reservation);
 }
 
-void ReservationTracker::DecreaseReservationInternalLocked(
+void ReservationTracker::DecreaseReservationLocked(
     int64_t bytes, bool is_child_reservation) {
   DCHECK(initialized_);
   DCHECK_GE(reservation_, bytes);
   if (bytes == 0) return;
   if (is_child_reservation) child_reservations_ -= bytes;
   UpdateReservation(-bytes);
+  ReleaseToMemTracker(bytes);
   // The reservation should be returned up the tree.
-  if (mem_tracker_ != NULL) {
-    if (GetParentMemTracker() == NULL) {
-      mem_tracker_->Release(bytes);
-    } else {
-      mem_tracker_->ReleaseLocal(bytes, GetParentMemTracker());
-    }
-  }
-  if (parent_ != NULL) parent_->DecreaseReservationInternal(bytes, true);
+  if (parent_ != nullptr) parent_->DecreaseReservation(bytes, true);
   CheckConsistency();
+}
+
+bool ReservationTracker::TransferReservationTo(ReservationTracker* other, int64_t bytes) {
+  if (other == this) return true;
+  // Find the path to the root from both. The root is guaranteed to be a common ancestor.
+  vector<ReservationTracker*> path_to_common = FindPathToRoot();
+  vector<ReservationTracker*> other_path_to_common = other->FindPathToRoot();
+  DCHECK_EQ(path_to_common.back(), other_path_to_common.back());
+  ReservationTracker* common_ancestor = path_to_common.back();
+  // Remove any common ancestors - they do not need to be updated for this transfer.
+  while (!path_to_common.empty() && !other_path_to_common.empty()
+      && path_to_common.back() == other_path_to_common.back()) {
+    common_ancestor = path_to_common.back();
+    path_to_common.pop_back();
+    other_path_to_common.pop_back();
+  }
+
+  // At this point, we have three cases:
+  // 1. 'common_ancestor' == 'other'. 'other_path_to_common' is empty because 'other' is
+  //    the lowest common ancestor. To transfer, we decrease the reservation on the
+  //    trackers under 'other', down to 'this'.
+  // 2. 'common_ancestor' == 'this'. 'path_to_common' is empty because 'this' is the
+  //    lowest common ancestor. To transfer, we increase the reservation on the trackers
+  //    under 'this', down to 'other'.
+  // 3. Neither is an ancestor of the other. Both 'other_path_to_common' and
+  //    'path_to_common' are non-empty. We increase the reservation on trackers from
+  //    'other' up to one below the common ancestor (checking limits as needed) and if
+  //    successful, decrease reservations on trackers from 'this' up to one below the
+  //    common ancestor.
+
+  // Lock all of the trackers so we can do the update atomically. Need to be careful to
+  // lock subtrees in the correct order.
+  vector<unique_lock<SpinLock>> locks;
+  bool lock_first = path_to_common.empty() || other_path_to_common.empty()
+      || lock_sibling_subtree_first(path_to_common.back(), other_path_to_common.back());
+  if (lock_first) {
+    for (ReservationTracker* tracker : path_to_common) locks.emplace_back(tracker->lock_);
+  }
+  for (ReservationTracker* tracker : other_path_to_common) {
+    locks.emplace_back(tracker->lock_);
+  }
+  if (!lock_first) {
+    for (ReservationTracker* tracker : path_to_common) locks.emplace_back(tracker->lock_);
+  }
+
+  // Check reservation limits will not be violated before applying any updates.
+  for (ReservationTracker* tracker : other_path_to_common) {
+    if (tracker->reservation_ + bytes > tracker->reservation_limit_) return false;
+  }
+
+  // Do the updates now that we have checked the limits. We're holding all the locks
+  // so this is all atomic.
+  for (ReservationTracker* tracker : other_path_to_common) {
+    tracker->UpdateReservation(bytes);
+    // We don't handle MemTrackers with limit in this function - this should always
+    // succeed.
+    DCHECK(tracker->mem_tracker_ == nullptr || !tracker->mem_tracker_->has_limit());
+    bool success = tracker->TryConsumeFromMemTracker(bytes);
+    DCHECK(success);
+    if (tracker != other_path_to_common[0]) tracker->child_reservations_ += bytes;
+  }
+  for (ReservationTracker* tracker : path_to_common) {
+    if (tracker != path_to_common[0]) tracker->child_reservations_ -= bytes;
+    tracker->UpdateReservation(-bytes);
+    tracker->ReleaseToMemTracker(bytes);
+  }
+
+  // Update the 'child_reservations_' on the common ancestor if needed.
+  // Case 1: reservation was pushed up to 'other'.
+  if (common_ancestor == other) {
+    lock_guard<SpinLock> l(other->lock_);
+    other->child_reservations_ -= bytes;
+    other->CheckConsistency();
+  }
+  // Case 2: reservation was pushed down below 'this'.
+  if (common_ancestor == this) {
+    lock_guard<SpinLock> l(lock_);
+    child_reservations_ += bytes;
+    CheckConsistency();
+  }
+  return true;
+}
+
+vector<ReservationTracker*> ReservationTracker::FindPathToRoot() {
+  vector<ReservationTracker*> path_to_root;
+  ReservationTracker* curr = this;
+  do {
+    path_to_root.push_back(curr);
+    curr = curr->parent_;
+  } while (curr != nullptr);
+  return path_to_root;
 }
 
 void ReservationTracker::AllocateFrom(int64_t bytes) {
@@ -296,7 +384,7 @@ string ReservationTracker::DebugString() {
   lock_guard<SpinLock> l(lock_);
   if (!initialized_) return "<ReservationTracker>: uninitialized";
 
-  string parent_debug_string = parent_ == NULL ? "NULL" : parent_->DebugString();
+  string parent_debug_string = parent_ == nullptr ? "NULL" : parent_->DebugString();
   return Substitute(
       "<ReservationTracker>: reservation_limit $0 reservation $1 used_reservation $2 "
       "child_reservations $3 parent:\n$4",
