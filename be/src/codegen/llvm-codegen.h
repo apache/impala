@@ -495,9 +495,10 @@ class LlvmCodeGen {
   void CodegenClearNullBits(LlvmBuilder* builder, llvm::Value* tuple_ptr,
       const TupleDescriptor& tuple_desc);
 
-  /// Codegen to call pool->Allocate(size).
-  llvm::Value* CodegenAllocate(LlvmBuilder* builder, MemPool* pool, llvm::Value* size,
-      const char* name = "");
+  /// Codegen to call pool_val->Allocate(size_val).
+  /// 'pool_val' has to be of type MemPool*.
+  llvm::Value* CodegenMemPoolAllocate(LlvmBuilder* builder, llvm::Value* pool_val,
+      llvm::Value* size_val, const char* name = "");
 
   /// Codegens IR to load array[idx] and returns the loaded value. 'array' should be a
   /// C-style array (e.g. i32*) or an IR array (e.g. [10 x i32]). This function does not

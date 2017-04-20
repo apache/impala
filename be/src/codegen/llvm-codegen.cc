@@ -1381,20 +1381,19 @@ void LlvmCodeGen::CodegenClearNullBits(LlvmBuilder* builder, Value* tuple_ptr,
   CodegenMemset(builder, null_bytes_ptr, 0, tuple_desc.num_null_bytes());
 }
 
-Value* LlvmCodeGen::CodegenAllocate(LlvmBuilder* builder, MemPool* pool, Value* size,
-    const char* name) {
-  DCHECK(pool != NULL);
-  DCHECK(size->getType()->isIntegerTy());
-  DCHECK_LE(size->getType()->getIntegerBitWidth(), 64);
-  // Extend 'size' to i64 if necessary
-  if (size->getType()->getIntegerBitWidth() < 64) {
-    size = builder->CreateSExt(size, bigint_type());
+Value* LlvmCodeGen::CodegenMemPoolAllocate(LlvmBuilder* builder, Value* pool_val,
+    Value* size_val, const char* name) {
+  DCHECK(pool_val != nullptr);
+  DCHECK(size_val->getType()->isIntegerTy());
+  DCHECK_LE(size_val->getType()->getIntegerBitWidth(), 64);
+  DCHECK_EQ(pool_val->getType(), GetPtrType(MemPool::LLVM_CLASS_NAME));
+  // Extend 'size_val' to i64 if necessary
+  if (size_val->getType()->getIntegerBitWidth() < 64) {
+    size_val = builder->CreateSExt(size_val, bigint_type());
   }
   Function* allocate_fn = GetFunction(IRFunction::MEMPOOL_ALLOCATE, false);
-  PointerType* pool_type = GetPtrType(MemPool::LLVM_CLASS_NAME);
-  Value* pool_val = CastPtrToLlvmPtr(pool_type, pool);
   Value* alignment = GetIntConstant(TYPE_INT, MemPool::DEFAULT_ALIGNMENT);
-  Value* fn_args[] = {pool_val, size, alignment};
+  Value* fn_args[] = {pool_val, size_val, alignment};
   return builder->CreateCall(allocate_fn, fn_args, name);
 }
 

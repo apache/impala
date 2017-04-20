@@ -105,12 +105,12 @@ void TopNNode::Codegen(RuntimeState* state) {
 
     codegen_status = Tuple::CodegenMaterializeExprs(codegen, false,
         *materialized_tuple_desc_, sort_exec_exprs_.sort_tuple_slot_expr_ctxs(),
-        tuple_pool_.get(), &materialize_exprs_tuple_pool_fn);
+        true, &materialize_exprs_tuple_pool_fn);
 
     if (codegen_status.ok()) {
       codegen_status = Tuple::CodegenMaterializeExprs(codegen, false,
           *materialized_tuple_desc_, sort_exec_exprs_.sort_tuple_slot_expr_ctxs(),
-          NULL, &materialize_exprs_no_pool_fn);
+          false, &materialize_exprs_no_pool_fn);
 
       if (codegen_status.ok()) {
         int replaced = codegen->ReplaceCallSites(insert_batch_fn,

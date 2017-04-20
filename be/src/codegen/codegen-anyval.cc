@@ -511,7 +511,7 @@ void CodegenAnyVal::SetFromRawValue(Value* raw_val) {
   }
 }
 
-Value* CodegenAnyVal::ToNativeValue(MemPool* pool) {
+Value* CodegenAnyVal::ToNativeValue(Value* pool_val) {
   Type* raw_type = codegen_->GetType(type_);
   Value* raw_val = Constant::getNullValue(raw_type);
   switch (type_.type) {
@@ -520,12 +520,13 @@ Value* CodegenAnyVal::ToNativeValue(MemPool* pool) {
       // Convert StringVal to StringValue
       Value* len = GetLen();
       raw_val = builder_->CreateInsertValue(raw_val, len, 1);
-      if (pool == NULL) {
+      if (pool_val == nullptr) {
         // Set raw_val.ptr from this->ptr
         raw_val = builder_->CreateInsertValue(raw_val, GetPtr(), 0);
       } else {
-        // Allocate raw_val.ptr from 'pool' and copy this->ptr
-        Value* new_ptr = codegen_->CodegenAllocate(builder_, pool, len, "new_ptr");
+        // Allocate raw_val.ptr from 'pool_val' and copy this->ptr
+        Value* new_ptr =
+            codegen_->CodegenMemPoolAllocate(builder_, pool_val, len, "new_ptr");
         codegen_->CodegenMemcpy(builder_, new_ptr, GetPtr(), len);
         raw_val = builder_->CreateInsertValue(raw_val, new_ptr, 0);
       }
@@ -560,9 +561,9 @@ Value* CodegenAnyVal::ToNativeValue(MemPool* pool) {
   return raw_val;
 }
 
-Value* CodegenAnyVal::ToNativePtr(Value* native_ptr, MemPool* pool) {
-  Value* v = ToNativeValue(pool);
-  if (native_ptr == NULL) {
+Value* CodegenAnyVal::ToNativePtr(Value* native_ptr, Value* pool_val) {
+  Value* v = ToNativeValue(pool_val);
+  if (native_ptr == nullptr) {
     native_ptr = codegen_->CreateEntryBlockAlloca(*builder_, v->getType());
   }
   builder_->CreateStore(v, native_ptr);
@@ -589,15 +590,17 @@ Value* CodegenAnyVal::ToNativePtr(Value* native_ptr, MemPool* pool) {
 //
 // end_write:                                        ; preds = %null, %non_null
 //   ; [insert point ends here]
-void CodegenAnyVal::WriteToSlot(const SlotDescriptor& slot_desc, Value* tuple,
-    MemPool* pool, BasicBlock* insert_before) {
-  DCHECK(tuple->getType()->isPointerTy());
-  DCHECK(tuple->getType()->getPointerElementType()->isStructTy());
+void CodegenAnyVal::WriteToSlot(const SlotDescriptor& slot_desc, Value* tuple_val,
+    Value* pool_val, BasicBlock* insert_before) {
+  DCHECK(tuple_val->getType()->isPointerTy());
+  DCHECK(tuple_val->getType()->getPointerElementType()->isStructTy());
   LLVMContext& context = codegen_->context();
   Function* fn = builder_->GetInsertBlock()->getParent();
 
   // Create new block that will come after conditional blocks if necessary
-  if (insert_before == NULL) insert_before = BasicBlock::Create(context, "end_write", fn);
+  if (insert_before == nullptr) {
+    insert_before = BasicBlock::Create(context, "end_write", fn);
+  }
 
   // Create new basic blocks and br instruction
   BasicBlock* non_null_block = BasicBlock::Create(context, "non_null", fn, insert_before);
@@ -606,14 +609,15 @@ void CodegenAnyVal::WriteToSlot(const SlotDescriptor& slot_desc, Value* tuple,
 
   // Non-null block: write slot
   builder_->SetInsertPoint(non_null_block);
-  Value* slot = builder_->CreateStructGEP(NULL, tuple, slot_desc.llvm_field_idx(),
-      "slot");
-  ToNativePtr(slot, pool);
+  Value* slot =
+      builder_->CreateStructGEP(nullptr, tuple_val, slot_desc.llvm_field_idx(), "slot");
+  ToNativePtr(slot, pool_val);
   builder_->CreateBr(insert_before);
 
   // Null block: set null bit
   builder_->SetInsertPoint(null_block);
-  slot_desc.CodegenSetNullIndicator(codegen_, builder_, tuple, codegen_->true_value());
+  slot_desc.CodegenSetNullIndicator(
+      codegen_, builder_, tuple_val, codegen_->true_value());
   builder_->CreateBr(insert_before);
 
   // Leave builder_ after conditional blocks

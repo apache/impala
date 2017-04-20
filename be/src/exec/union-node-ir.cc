@@ -25,7 +25,8 @@ void IR_ALWAYS_INLINE UnionNode::MaterializeExprs(const std::vector<ExprContext*
   DCHECK(!dst_batch->AtCapacity());
   Tuple* dst_tuple = reinterpret_cast<Tuple*>(tuple_buf);
   TupleRow* dst_row = dst_batch->GetRow(dst_batch->AddRow());
-  dst_tuple->MaterializeExprs<false, false>(row, *tuple_desc_, exprs, tuple_pool_.get());
+  dst_tuple->MaterializeExprs<false, false>(row, *tuple_desc_, exprs,
+      dst_batch->tuple_data_pool());
   dst_row->SetTuple(0, dst_tuple);
   dst_batch->CommitLastRow();
 }

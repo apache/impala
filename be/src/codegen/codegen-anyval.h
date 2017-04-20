@@ -82,7 +82,7 @@ class CodegenAnyVal {
   /// 'name' optionally specifies the name of the returned value.
   static llvm::Value* CreateCall(LlvmCodeGen* cg, LlvmBuilder* builder,
       llvm::Function* fn, llvm::ArrayRef<llvm::Value*> args, const char* name = "",
-      llvm::Value* result_ptr = NULL);
+      llvm::Value* result_ptr = nullptr);
 
   /// Same as above but wraps the result in a CodegenAnyVal.
   static CodegenAnyVal CreateCallWrapped(LlvmCodeGen* cg, LlvmBuilder* builder,
@@ -135,7 +135,7 @@ class CodegenAnyVal {
   //
   /// If 'name' is specified, it will be used when generated instructions that set value_.
   CodegenAnyVal(LlvmCodeGen* codegen, LlvmBuilder* builder, const ColumnType& type,
-      llvm::Value* value = NULL, const char* name = "");
+      llvm::Value* value = nullptr, const char* name = "");
 
   /// Returns the current type-lowered value.
   llvm::Value* GetLoweredValue() const { return value_; }
@@ -197,16 +197,19 @@ class CodegenAnyVal {
   /// Converts this *Val's value to a native type, StringValue, TimestampValue, etc.
   /// This should only be used if this *Val is not null.
   ///
-  /// If 'pool' is non-NULL, var-len data will be copied into 'pool'.
-  llvm::Value* ToNativeValue(MemPool* pool = NULL);
+  /// If 'pool_val' is non-NULL, var-len data will be copied into 'pool_val'.
+  /// 'pool_val' has to be of type MemPool*.
+  llvm::Value* ToNativeValue(llvm::Value* pool_val = nullptr);
 
   /// Sets 'native_ptr' to this *Val's value. If non-NULL, 'native_ptr' should be a
   /// pointer to a native type, StringValue, TimestampValue, etc. If NULL, a pointer is
   /// alloca'd. In either case the pointer is returned. This should only be used if this
   /// *Val is not null.
   ///
-  /// If 'pool' is non-NULL, var-len data will be copied into 'pool'.
-  llvm::Value* ToNativePtr(llvm::Value* native_ptr = NULL, MemPool* pool = NULL);
+  /// If 'pool_val' is non-NULL, var-len data will be copied into 'pool_val'.
+  /// 'pool_val' has to be of type MemPool*.
+  llvm::Value* ToNativePtr(
+      llvm::Value* native_ptr = nullptr, llvm::Value* pool_val = nullptr);
 
   /// Writes this *Val's value to the appropriate slot in 'tuple' if non-null, or sets the
   /// appropriate null bit if null. This assumes null bits are initialized to 0. Analogous
@@ -218,9 +221,10 @@ class CodegenAnyVal {
   /// 'insert_before' if specified, or a new basic block created at the end of the
   /// function if 'insert_before' is NULL.
   ///
-  /// If 'pool' is non-NULL, var-len data will be copied into 'pool'.
+  /// If 'pool_val' is non-NULL, var-len data will be copied into 'pool_val'.
+  /// 'pool_val' has to be of type MemPool*.
   void WriteToSlot(const SlotDescriptor& slot_desc, llvm::Value* tuple,
-      MemPool* pool = NULL, llvm::BasicBlock* insert_before = NULL);
+      llvm::Value* pool_val, llvm::BasicBlock* insert_before = nullptr);
 
   /// Returns the i1 result of this == other. this and other must be non-null.
   llvm::Value* Eq(CodegenAnyVal* other);
@@ -252,7 +256,8 @@ class CodegenAnyVal {
 
   /// Ctor for created an uninitialized CodegenAnYVal that can be assigned to later.
   CodegenAnyVal()
-    : type_(INVALID_TYPE), value_(NULL), name_(NULL), codegen_(NULL), builder_(NULL) {}
+    : type_(INVALID_TYPE), value_(nullptr), name_(nullptr),
+      codegen_(nullptr), builder_(nullptr) {}
 
  private:
   ColumnType type_;

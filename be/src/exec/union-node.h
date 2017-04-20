@@ -65,13 +65,6 @@ class UnionNode : public ExecNode {
   /// materialized.
   const int first_materialized_child_idx_;
 
-  /// Used by MaterializeExprs() to materialize var-len slots. The ownership of the memory
-  /// in this pool should be transferred to the row batch at the end of each GetNext()
-  /// call. The memory can't be attached to the row batch in MaterializeExprs() because
-  /// the pointer to the mem pool is hard coded in the codegen'ed MaterializeExprs().
-  /// TODO (IMPALA-5192): Remove this when no longer necessary in the future.
-  boost::scoped_ptr<MemPool> tuple_pool_;
-
   /// Const exprs materialized by this node. These exprs don't refer to any children.
   /// Only materialized by the first fragment instance to avoid duplication.
   std::vector<std::vector<ExprContext*>> const_expr_lists_;

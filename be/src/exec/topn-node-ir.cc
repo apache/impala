@@ -27,7 +27,7 @@ void TopNNode::InsertBatch(RowBatch* batch) {
 
 // Insert if either not at the limit or it's a new TopN tuple_row
 void TopNNode::InsertTupleRow(TupleRow* input_row) {
-  Tuple* insert_tuple = NULL;
+  Tuple* insert_tuple = nullptr;
 
   if (priority_queue_->size() < limit_ + offset_) {
     insert_tuple = reinterpret_cast<Tuple*>(
@@ -38,7 +38,7 @@ void TopNNode::InsertTupleRow(TupleRow* input_row) {
     DCHECK(!priority_queue_->empty());
     Tuple* top_tuple = priority_queue_->top();
     tmp_tuple_->MaterializeExprs<false, true>(input_row, *materialized_tuple_desc_,
-        sort_exec_exprs_.sort_tuple_slot_expr_ctxs(), NULL);
+        sort_exec_exprs_.sort_tuple_slot_expr_ctxs(), nullptr);
     if (tuple_row_less_than_->Less(tmp_tuple_, top_tuple)) {
       // TODO: DeepCopy() will allocate new buffers for the string data. This needs
       // to be fixed to use a freelist
@@ -48,5 +48,5 @@ void TopNNode::InsertTupleRow(TupleRow* input_row) {
     }
   }
 
-  if (insert_tuple != NULL) priority_queue_->push(insert_tuple);
+  if (insert_tuple != nullptr) priority_queue_->push(insert_tuple);
 }

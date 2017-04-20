@@ -37,7 +37,6 @@ UnionNode::UnionNode(ObjectPool* pool, const TPlanNode& tnode,
       tuple_id_(tnode.union_node.tuple_id),
       tuple_desc_(nullptr),
       first_materialized_child_idx_(tnode.union_node.first_materialized_child_idx),
-      tuple_pool_(nullptr),
       child_idx_(0),
       child_batch_(nullptr),
       child_row_idx_(0),
@@ -71,7 +70,6 @@ Status UnionNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   DCHECK(tuple_desc_ != nullptr);
-  tuple_pool_.reset(new MemPool(mem_tracker()));
   codegend_union_materialize_batch_fns_.resize(child_expr_lists_.size());
 
   // Prepare const expr lists.
@@ -105,7 +103,7 @@ void UnionNode::Codegen(RuntimeState* state) {
 
     llvm::Function* tuple_materialize_exprs_fn;
     codegen_status = Tuple::CodegenMaterializeExprs(codegen, false, *tuple_desc_,
-        child_expr_lists_[i], tuple_pool_.get(), &tuple_materialize_exprs_fn);
+        child_expr_lists_[i], true, &tuple_materialize_exprs_fn);
     if (!codegen_status.ok()) {
       // Codegen may fail in some corner cases (e.g. we don't handle TYPE_CHAR). If this
       // happens, abort codegen for this and the remaining children.
@@ -272,8 +270,6 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
-  // The tuple pool should be empty between GetNext() calls.
-  DCHECK_EQ(tuple_pool_.get()->GetTotalChunkSizes(), 0);
 
   if (to_close_child_idx_ != -1) {
     // The previous child needs to be closed if passthrough was enabled for it. In the non
@@ -309,8 +305,6 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   *eos = ReachedLimit() ||
       (!HasMorePassthrough() && !HasMoreMaterialized() && !HasMoreConst(state));
 
-  // Attach the memory in the tuple pool (if any) to the row batch.
-  row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), false);
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   return Status::OK();
 }
@@ -336,6 +330,5 @@ void UnionNode::Close(RuntimeState* state) {
   for (const vector<ExprContext*>& exprs : child_expr_lists_) {
     Expr::Close(exprs, state);
   }
-  if (tuple_pool_.get() != nullptr) tuple_pool_->FreeAll();
   ExecNode::Close(state);
 }
