@@ -21,7 +21,7 @@ import pytest
 import re
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfLocal
+from tests.common.skip import SkipIfLocal, SkipIfNotHdfsMinicluster
 from tests.util.filesystem_utils import WAREHOUSE
 
 # Tests the different explain levels [0-3] on a few queries.
@@ -46,29 +46,25 @@ class TestExplain(ImpalaTestSuite):
         v.get_value('exec_option')['disable_codegen'] == False and\
         v.get_value('exec_option')['num_nodes'] != 1)
 
-  @pytest.mark.skip_if(pytest.config.option.testing_remote_cluster,
-                     reason='Resource profile depends on number of nodes')
+  @SkipIfNotHdfsMinicluster.plans
   def test_explain_level0(self, vector):
     vector.get_value('exec_option')['num_scanner_threads'] = self.NUM_SCANNER_THREADS
     vector.get_value('exec_option')['explain_level'] = 0
     self.run_test_case('QueryTest/explain-level0', vector)
 
-  @pytest.mark.skip_if(pytest.config.option.testing_remote_cluster,
-                     reason='Resource profile depends on number of nodes')
+  @SkipIfNotHdfsMinicluster.plans
   def test_explain_level1(self, vector):
     vector.get_value('exec_option')['num_scanner_threads'] = self.NUM_SCANNER_THREADS
     vector.get_value('exec_option')['explain_level'] = 1
     self.run_test_case('QueryTest/explain-level1', vector)
 
-  @pytest.mark.skip_if(pytest.config.option.testing_remote_cluster,
-                     reason='Resource profile depends on number of nodes')
+  @SkipIfNotHdfsMinicluster.plans
   def test_explain_level2(self, vector):
     vector.get_value('exec_option')['num_scanner_threads'] = self.NUM_SCANNER_THREADS
     vector.get_value('exec_option')['explain_level'] = 2
     self.run_test_case('QueryTest/explain-level2', vector)
 
-  @pytest.mark.skip_if(pytest.config.option.testing_remote_cluster,
-                     reason='Resource profile depends on number of nodes')
+  @SkipIfNotHdfsMinicluster.plans
   def test_explain_level3(self, vector):
     vector.get_value('exec_option')['num_scanner_threads'] = self.NUM_SCANNER_THREADS
     vector.get_value('exec_option')['explain_level'] = 3
