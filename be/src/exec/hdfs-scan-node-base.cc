@@ -680,7 +680,7 @@ Status HdfsScanNodeBase::CreateAndOpenScanner(HdfsPartitionDescriptor* partition
           partition->file_format()));
   }
   DCHECK(scanner->get() != NULL);
-  Status status = ExecDebugAction(TExecNodePhase::PREPARE_SCANNER, runtime_state_);
+  Status status = ScanNodeDebugAction(TExecNodePhase::PREPARE_SCANNER);
   if (status.ok()) {
     status = scanner->get()->Open(context);
     if (!status.ok()) {
@@ -904,6 +904,6 @@ void HdfsScanNodeBase::StopAndFinalizeCounters() {
   }
 }
 
-Status HdfsScanNodeBase::TriggerDebugAction() {
-  return ExecDebugAction(TExecNodePhase::GETNEXT, runtime_state_);
+Status HdfsScanNodeBase::ScanNodeDebugAction(TExecNodePhase::type phase) {
+  return ExecDebugAction(phase, runtime_state_);
 }

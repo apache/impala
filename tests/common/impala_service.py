@@ -126,7 +126,6 @@ class ImpaladService(BaseImpalaService):
         (num_in_flight_queries, expected_val))
     return False
 
-
   def wait_for_num_known_live_backends(self, expected_value, timeout=30, interval=1):
     start_time = time()
     while (time() - start_time < timeout):

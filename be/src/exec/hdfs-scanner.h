@@ -403,7 +403,9 @@ class HdfsScanner {
   /// Triggers debug action of the scan node. This is currently used by parquet column
   /// readers to exercise various failure paths in parquet scanner. Returns the status
   /// returned by the scan node's TriggerDebugAction().
-  Status TriggerDebugAction() { return scan_node_->TriggerDebugAction(); }
+  Status ScannerDebugAction() {
+    return scan_node_->ScanNodeDebugAction(TExecNodePhase::GETNEXT_SCANNER);
+  }
 
   /// Utility function to append an error message for an invalid row.
   void LogRowParseError();

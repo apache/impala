@@ -494,9 +494,9 @@ class HdfsScanNodeBase : public ScanNode {
   /// Scan nodes with a RowBatch queue may have to synchronize calls to this function.
   void StopAndFinalizeCounters();
 
-  /// Calls ExecDebugAction(). Returns the status based on the debug action specified
-  /// for the query.
-  Status TriggerDebugAction();
+  /// Calls ExecNode::ExecDebugAction() with 'phase'. Returns the status based on the
+  /// debug action specified for the query.
+  Status ScanNodeDebugAction(TExecNodePhase::type phase);
 };
 
 }

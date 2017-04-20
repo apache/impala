@@ -288,10 +288,13 @@ class ParquetColumnReader {
     if (max_rep_level() == 0) rep_level_ = 0;
   }
 
-  /// Trigger debug action. Returns false if the debug action deems that the
-  /// parquet column reader should halt execution. In which case, 'parse_status_'
-  /// is also updated.
-  bool TriggerDebugAction();
+  /// Called in the middle of creating a scratch tuple batch to simulate failures
+  /// such as exceeding memory limit or cancellation. Returns false if the debug
+  /// action deems that the parquet column reader should halt execution. 'val_count'
+  /// is the counter which the column reader uses to track the number of tuples
+  /// produced so far. If the column reader should halt execution, 'parse_status_'
+  /// is updated with the error status and 'val_count' is set to 0.
+  bool ColReaderDebugAction(int* val_count);
 };
 
 /// Reader for a single column from the parquet file.  It's associated with a

@@ -53,11 +53,15 @@ DEFINE_bool(convert_legacy_hive_parquet_utc_timestamps, false,
 // Also, this limit is in place to prevent impala from reading corrupt parquet files.
 DEFINE_int32(max_page_header_size, 8*1024*1024, "max parquet page header size in bytes");
 
-// Trigger debug action on every 128 tuples produced. This is useful in exercising the
-// failure or cancellation path.
+// Trigger debug action on every other call of Read*ValueBatch() once at least 128
+// tuples have been produced to simulate failure such as exceeding memory limit.
+// Triggering it every other call so as not to always fail on the first column reader
+// when materializing multiple columns. Failing on non-empty row batch tests proper
+// resources freeing by the Parquet scanner.
 #ifndef NDEBUG
-#define DEBUG_ACTION_TRIGGER (127)
-#define SHOULD_TRIGGER_DEBUG_ACTION(x) ((x & DEBUG_ACTION_TRIGGER) == 0)
+static int debug_count = 0;
+#define SHOULD_TRIGGER_DEBUG_ACTION(num_tuples) \
+    ((debug_count++ % 2) == 1 && num_tuples >= 128)
 #else
 #define SHOULD_TRIGGER_DEBUG_ACTION(x) (false)
 #endif
@@ -361,7 +365,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
       val_count += ret_val_count;
       num_buffered_values_ -= (def_levels_.CacheCurrIdx() - cache_start_idx);
       if (SHOULD_TRIGGER_DEBUG_ACTION(val_count)) {
-        continue_execution &= TriggerDebugAction();
+        continue_execution &= ColReaderDebugAction(&val_count);
       }
     }
     *num_values = val_count;
@@ -765,12 +769,17 @@ class BoolColumnReader : public BaseScalarColumnReader {
   BitReader bool_values_;
 };
 
-bool ParquetColumnReader::TriggerDebugAction() {
-  Status status = parent_->TriggerDebugAction();
+// Change 'val_count' to zero to exercise IMPALA-5197. This verifies the error handling
+// path doesn't falsely report that the file is corrupted.
+bool ParquetColumnReader::ColReaderDebugAction(int* val_count) {
+#ifndef NDEBUG
+  Status status = parent_->ScannerDebugAction();
   if (!status.ok()) {
     if (!status.IsCancelled()) parent_->parse_status_.MergeStatus(status);
+    *val_count = 0;
     return false;
   }
+#endif
   return true;
 }
 
@@ -790,7 +799,7 @@ bool ParquetColumnReader::ReadValueBatch(MemPool* pool, int max_values,
     continue_execution = ReadValue(pool, tuple);
     ++val_count;
     if (SHOULD_TRIGGER_DEBUG_ACTION(val_count)) {
-      continue_execution &= TriggerDebugAction();
+      continue_execution &= ColReaderDebugAction(&val_count);
     }
   }
   *num_values = val_count;
@@ -806,7 +815,7 @@ bool ParquetColumnReader::ReadNonRepeatedValueBatch(MemPool* pool,
     continue_execution = ReadNonRepeatedValue(pool, tuple);
     ++val_count;
     if (SHOULD_TRIGGER_DEBUG_ACTION(val_count)) {
-      continue_execution &= TriggerDebugAction();
+      continue_execution &= ColReaderDebugAction(&val_count);
     }
   }
   *num_values = val_count;

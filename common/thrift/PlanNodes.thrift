@@ -56,6 +56,7 @@ enum TExecNodePhase {
   PREPARE_SCANNER,
   OPEN,
   GETNEXT,
+  GETNEXT_SCANNER,
   CLOSE,
   INVALID
 }
