@@ -376,7 +376,7 @@ Coordinator::~Coordinator() {
 }
 
 PlanFragmentExecutor* Coordinator::executor() {
-  return coord_instance_->executor();
+  return (coord_instance_ == nullptr) ? nullptr : coord_instance_->executor();
 }
 
 TExecNodePhase::type GetExecNodePhase(const string& key) {
