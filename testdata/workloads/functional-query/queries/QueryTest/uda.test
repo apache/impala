@@ -88,3 +88,55 @@ from functional.decimal_tbl
 NULL,5
 ---- TYPES
 decimal,bigint
+====
+---- QUERY
+# Test that all types are exposed via the FunctionContext correctly.
+# This includes distinct aggregate expression to test IMPALA-5251.
+# It also relies on asserts in the UDA funciton.
+select
+   agg_string_intermediate(cast(c1 as decimal(20,10)), 1000, "foobar"),
+   agg_decimal_intermediate(cast(c3 as decimal(2,1)), 2),
+   agg_intermediate(int_col),
+   avg(c2),
+   min(c3-c1),
+   max(c1+c3),
+   count(distinct int_col),
+   sum(distinct int_col)
+from
+   functional.alltypesagg,
+   functional.decimal_tiny
+---- RESULTS
+100,NULL,NULL,160.49989,-10.0989,11.8989,999,499500
+---- TYPES
+decimal,decimal,bigint,decimal,decimal,decimal,bigint,bigint
+====
+---- QUERY
+# Test that all types are exposed via the FunctionContext correctly.
+# This includes distinct aggregate expression to test IMPALA-5251.
+# It also relies on asserts in the UDA funciton.
+select
+   agg_string_intermediate(cast(c1 as decimal(20,10)), 1000, "foobar"),
+   agg_decimal_intermediate(cast(c3 as decimal(2,1)), 2),
+   agg_intermediate(int_col),
+   ndv(c2),
+   sum(distinct c1)/count(distinct c1)
+from
+   functional.alltypesagg,
+   functional.decimal_tiny
+group by
+   year,month,day
+---- RESULTS
+100,NULL,NULL,99,5.4994
+100,NULL,NULL,99,5.4994
+100,NULL,NULL,99,5.4994
+100,NULL,NULL,99,5.4994
+100,NULL,NULL,99,5.4994
+100,NULL,NULL,99,5.4994
+100,NULL,NULL,99,5.4994
+100,NULL,NULL,99,5.4994
+100,NULL,NULL,99,5.4994
+100,NULL,NULL,99,5.4994
+100,NULL,NULL,99,5.4994
+---- TYPES
+decimal,decimal,bigint,bigint,decimal
+====

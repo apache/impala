@@ -103,6 +103,11 @@ create aggregate function {database}.agg_decimal_intermediate(decimal(2,1), int)
 returns decimal(6,5) intermediate decimal(4,3) location '{location}'
 init_fn='AggDecimalIntermediateInit' update_fn='AggDecimalIntermediateUpdate'
 merge_fn='AggDecimalIntermediateMerge' finalize_fn='AggDecimalIntermediateFinalize';
+
+create aggregate function {database}.agg_string_intermediate(decimal(20,10), bigint, string)
+returns decimal(20,0) intermediate string location '{location}'
+init_fn='AggStringIntermediateInit' update_fn='AggStringIntermediateUpdate'
+merge_fn='AggStringIntermediateMerge' finalize_fn='AggStringIntermediateFinalize';
 """
 
   # Create test UDF functions in {database} from library {location}

@@ -102,8 +102,12 @@ public class FunctionCallExpr extends Expr {
       FunctionCallExpr agg, List<Expr> params) {
     Preconditions.checkState(agg.isAnalyzed());
     Preconditions.checkState(agg.isAggregateFunction());
+    // If the input aggregate function is already a merge aggregate function (due to
+    // 2-phase aggregation), its input types will be the intermediate value types. The
+    // original input argument exprs are in 'agg.mergeAggInputFn_' so use it instead.
+    FunctionCallExpr mergeAggInputFn = agg.isMergeAggFn() ? agg.mergeAggInputFn_ : agg;
     FunctionCallExpr result = new FunctionCallExpr(
-        agg.fnName_, new FunctionParams(false, params), agg);
+        agg.fnName_, new FunctionParams(false, params), mergeAggInputFn);
     // Inherit the function object from 'agg'.
     result.fn_ = agg.fn_;
     result.type_ = agg.type_;
@@ -127,8 +131,8 @@ public class FunctionCallExpr extends Expr {
     fnName_ = other.fnName_;
     isAnalyticFnCall_ = other.isAnalyticFnCall_;
     isInternalFnCall_ = other.isInternalFnCall_;
-    mergeAggInputFn_ =
-        other.mergeAggInputFn_ == null ? null : (FunctionCallExpr)other.mergeAggInputFn_.clone();
+    mergeAggInputFn_ = other.mergeAggInputFn_ == null ?
+        null : (FunctionCallExpr)other.mergeAggInputFn_.clone();
     // Clone the params in a way that keeps the children_ and the params.exprs()
     // in sync. The children have already been cloned in the super c'tor.
     if (other.params_.isStar()) {
@@ -574,7 +578,8 @@ public class FunctionCallExpr extends Expr {
   void validateMergeAggFn(FunctionCallExpr inputAggFn) {
     Preconditions.checkState(isMergeAggFn());
     List<Expr> copiedInputExprs = mergeAggInputFn_.getChildren();
-    List<Expr> inputExprs = inputAggFn.getChildren();
+    List<Expr> inputExprs = inputAggFn.isMergeAggFn() ?
+        inputAggFn.mergeAggInputFn_.getChildren() : inputAggFn.getChildren();
     Preconditions.checkState(copiedInputExprs.size() == inputExprs.size());
     for (int i = 0; i < inputExprs.size(); ++i) {
       Type copiedInputType = copiedInputExprs.get(i).getType();

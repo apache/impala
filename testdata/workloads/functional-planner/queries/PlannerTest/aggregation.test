@@ -554,6 +554,46 @@ PLAN-ROOT SINK
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ====
+# Mixed distinct and non-distinct agg with intermediate type different from input type
+# Regression test for IMPALA-5251 to exercise validateMergeAggFn() in FunctionCallExpr.
+select avg(l_quantity), ndv(l_discount), count(distinct l_partkey)
+from tpch_parquet.lineitem;
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(l_partkey), avg:merge(l_quantity), ndv:merge(l_discount)
+|
+01:AGGREGATE
+|  output: avg(l_quantity), ndv(l_discount)
+|  group by: l_partkey
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   partitions=1/1 files=3 size=193.74MB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(l_partkey), avg:merge(l_quantity), ndv:merge(l_discount)
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  output: count(l_partkey), avg:merge(l_quantity), ndv:merge(l_discount)
+|
+04:AGGREGATE
+|  output: avg:merge(l_quantity), ndv:merge(l_discount)
+|  group by: l_partkey
+|
+03:EXCHANGE [HASH(l_partkey)]
+|
+01:AGGREGATE [STREAMING]
+|  output: avg(l_quantity), ndv(l_discount)
+|  group by: l_partkey
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   partitions=1/1 files=3 size=193.74MB
+====
 # test that aggregations are not placed below an unpartitioned exchange with a limit
 select count(*) from (select * from functional.alltypes limit 10) t
 ---- PLAN
