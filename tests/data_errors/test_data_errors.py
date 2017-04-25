@@ -24,7 +24,7 @@ import random
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3, SkipIfLocal
+from tests.common.skip import SkipIf, SkipIfS3, SkipIfLocal
 from tests.common.test_dimensions import create_exec_option_dimension
 
 class TestDataErrors(ImpalaTestSuite):
@@ -42,7 +42,8 @@ class TestDataErrors(ImpalaTestSuite):
   def get_workload(self):
     return 'functional-query'
 
-# Regression test for IMP-633. Added as a part of IMPALA-5198
+# Regression test for IMP-633. Added as a part of IMPALA-5198.
+@SkipIf.not_hdfs
 class TestHdfsFileOpenFailErrors(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_hdfs_file_open_fail(self):
