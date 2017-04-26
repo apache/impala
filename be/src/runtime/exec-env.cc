@@ -22,8 +22,10 @@
 #include <boost/algorithm/string.hpp>
 #include <gflags/gflags.h>
 #include <gutil/strings/substitute.h>
+#include <kudu/client/client.h>
 
 #include "common/logging.h"
+#include "exec/kudu-util.h"
 #include "gen-cpp/CatalogService.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "runtime/backend-client.h"
@@ -64,6 +66,7 @@
 #include "common/names.h"
 
 using boost::algorithm::is_any_of;
+using boost::algorithm::join;
 using boost::algorithm::split;
 using boost::algorithm::to_lower;
 using boost::algorithm::token_compress_on;
@@ -126,6 +129,10 @@ DEFINE_int32(catalog_client_rpc_timeout_ms, 0, "(Advanced) The underlying TSocke
 const static string DEFAULT_FS = "fs.defaultFS";
 
 namespace impala {
+
+struct ExecEnv::KuduClientPtr {
+  kudu::client::sp::shared_ptr<kudu::client::KuduClient> kudu_client;
+};
 
 ExecEnv* ExecEnv::exec_env_ = nullptr;
 
@@ -384,5 +391,23 @@ void ExecEnv::InitBufferPool(int64_t min_page_size, int64_t capacity) {
   buffer_pool_.reset(new BufferPool(min_page_size, capacity));
   buffer_reservation_.reset(new ReservationTracker());
   buffer_reservation_->InitRootTracker(nullptr, capacity);
+}
+
+Status ExecEnv::GetKuduClient(
+    const vector<string>& master_addresses, kudu::client::KuduClient** client) {
+  string master_addr_concat = join(master_addresses, ",");
+  lock_guard<SpinLock> l(kudu_client_map_lock_);
+  auto kudu_client_map_it = kudu_client_map_.find(master_addr_concat);
+  if (kudu_client_map_it == kudu_client_map_.end()) {
+    // KuduClient doesn't exist, create it
+    KuduClientPtr* kudu_client_ptr = new KuduClientPtr;
+    RETURN_IF_ERROR(CreateKuduClient(master_addresses, &kudu_client_ptr->kudu_client));
+    kudu_client_map_[master_addr_concat].reset(kudu_client_ptr);
+    *client = kudu_client_ptr->kudu_client.get();
+  } else {
+    // Return existing KuduClient
+    *client = kudu_client_map_it->second->kudu_client.get();
+  }
+  return Status::OK();
 }
 }

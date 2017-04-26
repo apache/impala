@@ -31,8 +31,6 @@
 #include "util/uid-util.h"
 #include "util/promise.h"
 
-namespace kudu { namespace client { class KuduClient; } }
-
 namespace impala {
 
 class FragmentInstanceState;
@@ -151,14 +149,6 @@ class QueryState {
   /// Not idempotent, not thread-safe.
   void ReleaseResources();
 
-  /// Gets a KuduClient for this list of master addresses. It will lookup and share
-  /// an existing KuduClient if possible. Otherwise, it will create a new KuduClient
-  /// internally and return a pointer to it. All KuduClients accessed through this
-  /// interface are owned by the QueryState. Thread safe.
-  Status GetKuduClient(
-      const std::vector<std::string>& master_addrs, kudu::client::KuduClient** client)
-      WARN_UNUSED_RESULT;
-
   /// Sends a ReportExecStatus rpc to the coordinator. If fis == nullptr, the
   /// status must be an error. If fis is given, expects that fis finished its Prepare
   /// phase; it then sends a report for that instance, including its profile.
@@ -223,22 +213,6 @@ class QueryState {
 
   /// True if and only if ReleaseResources() has been called.
   bool released_resources_ = false;
-
-  SpinLock kudu_client_map_lock_; // protects kudu_client_map_
-
-  /// Opaque type for storing the pointer to the KuduClient. This allows us
-  /// to avoid including Kudu header files.
-  struct KuduClientPtr;
-
-  /// Map from the master addresses string for a Kudu table to the KuduClientPtr for
-  /// accessing that table. The master address string is constructed by joining
-  /// the master address list entries with a comma separator.
-  typedef std::unordered_map<std::string, std::unique_ptr<KuduClientPtr>> KuduClientMap;
-
-  /// Map for sharing KuduClients between fragment instances. Each Kudu table has
-  /// a list of master addresses stored in the Hive Metastore. This map requires
-  /// that the master address lists be identical in order to share a KuduClient.
-  KuduClientMap kudu_client_map_;
 
   /// Create QueryState w/ refcnt of 0.
   /// The query is associated with the resource pool query_ctx.request_pool or

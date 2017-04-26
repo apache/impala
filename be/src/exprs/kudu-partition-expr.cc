@@ -21,6 +21,7 @@
 
 #include "exec/kudu-util.h"
 #include "exprs/expr-context.h"
+#include "runtime/exec-env.h"
 #include "runtime/query-state.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple-row.h"
@@ -45,8 +46,8 @@ Status KuduPartitionExpr::Prepare(
       << "Target table for KuduPartitioner must be a Kudu table.";
   table_desc_ = static_cast<KuduTableDescriptor*>(table_desc);
   kudu::client::KuduClient* client;
-  RETURN_IF_ERROR(
-      state->query_state()->GetKuduClient(table_desc_->kudu_master_addresses(), &client));
+  RETURN_IF_ERROR(ExecEnv::GetInstance()->GetKuduClient(
+      table_desc_->kudu_master_addresses(), &client));
   kudu::client::sp::shared_ptr<kudu::client::KuduTable> table;
   KUDU_RETURN_IF_ERROR(
       client->OpenTable(table_desc_->table_name(), &table), "Failed to open Kudu table.");

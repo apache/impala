@@ -25,6 +25,7 @@
 #include "exprs/expr-context.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "gutil/gscoped_ptr.h"
+#include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "util/runtime-profile-counters.h"
@@ -77,10 +78,7 @@ KuduTableSink::KuduTableSink(const RowDescriptor& row_desc,
       table_id_(tsink.table_sink.target_table_id),
       select_list_texprs_(select_list_texprs),
       sink_action_(tsink.table_sink.action),
-      kudu_table_sink_(tsink.table_sink.kudu_table_sink),
-      total_rows_(NULL),
-      num_row_errors_(NULL),
-      rows_processed_rate_(NULL) {
+      kudu_table_sink_(tsink.table_sink.kudu_table_sink) {
   DCHECK(KuduIsAvailable());
 }
 
@@ -101,7 +99,7 @@ Status KuduTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracke
 
   // Get the kudu table descriptor.
   TableDescriptor* table_desc = state->desc_tbl().GetTableDescriptor(table_id_);
-  DCHECK(table_desc != NULL);
+  DCHECK(table_desc != nullptr);
 
   // In debug mode try a dynamic cast. If it fails it means that the
   // TableDescriptor is not an instance of KuduTableDescriptor.
@@ -140,11 +138,12 @@ Status KuduTableSink::Open(RuntimeState* state) {
         "Could not allocate memory for KuduTableSink", required_mem);
   }
 
-  Status s = CreateKuduClient(table_desc_->kudu_master_addresses(), &client_);
+  Status s =
+      state->exec_env()->GetKuduClient(table_desc_->kudu_master_addresses(), &client_);
   if (!s.ok()) {
     // Close() releases memory if client_ is not NULL, but since the memory was consumed
     // and the client failed to be created, it must be released.
-    DCHECK(client_.get() == NULL);
+    DCHECK(client_ == nullptr);
     mem_tracker_->Release(required_mem);
     return s;
   }
@@ -233,7 +232,7 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
           j : kudu_table_sink_.referenced_columns[j];
 
       void* value = output_expr_ctxs_[j]->GetValue(current_row);
-      if (value == NULL) {
+      if (value == nullptr) {
         if (table_schema.Column(col).is_nullable()) {
           KUDU_RETURN_IF_ERROR(write->mutable_row()->SetNull(col),
               "Could not add Kudu WriteOp.");
@@ -335,9 +334,9 @@ Status KuduTableSink::FlushFinal(RuntimeState* state) {
 
 void KuduTableSink::Close(RuntimeState* state) {
   if (closed_) return;
-  if (client_.get() != NULL) {
+  if (client_ != nullptr) {
     mem_tracker_->Release(FLAGS_kudu_sink_mem_required);
-    client_.reset();
+    client_ = nullptr;
   }
   SCOPED_TIMER(profile()->total_time_counter());
   Expr::Close(output_expr_ctxs_, state);

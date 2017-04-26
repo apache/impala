@@ -27,6 +27,7 @@
 #include "exec/kudu-scanner.h"
 #include "exec/kudu-util.h"
 #include "exprs/expr.h"
+#include "runtime/exec-env.h"
 #include "runtime/mem-pool.h"
 #include "runtime/query-state.h"
 #include "runtime/runtime-state.h"
@@ -94,7 +95,7 @@ Status KuduScanNodeBase::Open(RuntimeState* state) {
   const KuduTableDescriptor* table_desc =
       static_cast<const KuduTableDescriptor*>(tuple_desc_->table_desc());
 
-  RETURN_IF_ERROR(runtime_state_->query_state()->GetKuduClient(
+  RETURN_IF_ERROR(runtime_state_->exec_env()->GetKuduClient(
       table_desc->kudu_master_addresses(), &client_));
 
   uint64_t latest_ts = static_cast<uint64_t>(

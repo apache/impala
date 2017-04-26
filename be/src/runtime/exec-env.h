@@ -19,12 +19,17 @@
 #ifndef IMPALA_RUNTIME_EXEC_ENV_H
 #define IMPALA_RUNTIME_EXEC_ENV_H
 
+#include <unordered_map>
+
 #include <boost/scoped_ptr.hpp>
 
 // NOTE: try not to add more headers here: exec-env.h is included in many many files.
 #include "common/status.h"
 #include "runtime/client-cache-types.h"
 #include "util/hdfs-bulk-ops-defs.h" // For declaration of HdfsOpThreadPool
+#include "util/spinlock.h"
+
+namespace kudu { namespace client { class KuduClient; } }
 
 namespace impala {
 
@@ -48,6 +53,7 @@ class ReservationTracker;
 class Scheduler;
 class StatestoreSubscriber;
 class TestExecEnv;
+
 class ThreadResourceMgr;
 class TmpFileMgr;
 class Webserver;
@@ -120,6 +126,13 @@ class ExecEnv {
   /// Returns the configured defaultFs set in core-site.xml
   string default_fs() { return default_fs_; }
 
+  /// Gets a KuduClient for this list of master addresses. It will look up and share
+  /// an existing KuduClient if possible. Otherwise, it will create a new KuduClient
+  /// internally and return a pointer to it. All KuduClients accessed through this
+  /// interface are owned by the ExecEnv. Thread safe.
+  Status GetKuduClient(
+      const std::vector<std::string>& master_addrs, kudu::client::KuduClient** client);
+
  protected:
   /// Leave protected so that subclasses can override
   boost::scoped_ptr<MetricGroup> metrics_;
@@ -165,6 +178,21 @@ class ExecEnv {
 
   /// fs.defaultFs value set in core-site.xml
   std::string default_fs_;
+
+  SpinLock kudu_client_map_lock_; // protects kudu_client_map_
+
+  /// Opaque type for storing the pointer to the KuduClient. This allows us
+  /// to avoid including Kudu header files.
+  struct KuduClientPtr;
+
+  /// Map from the master addresses string for a Kudu table to the KuduClientPtr for
+  /// accessing that table. The master address string is constructed by joining
+  /// the sorted master address list entries with a comma separator.
+  typedef std::unordered_map<std::string, std::unique_ptr<KuduClientPtr>> KuduClientMap;
+
+  /// Map for sharing KuduClients across the ExecEnv. This map requires that the master
+  /// address lists be identical in order to share a KuduClient.
+  KuduClientMap kudu_client_map_;
 
   /// Initialise 'buffer_pool_' and 'buffer_reservation_' with given capacity.
   void InitBufferPool(int64_t min_page_len, int64_t capacity);

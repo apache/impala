@@ -99,8 +99,9 @@ class KuduTableSink : public DataSink {
   const std::vector<TExpr>& select_list_texprs_;
   std::vector<ExprContext*> output_expr_ctxs_;
 
-  /// The Kudu client, table and session.
-  kudu::client::sp::shared_ptr<kudu::client::KuduClient> client_;
+  /// The Kudu client, owned by the ExecEnv.
+  kudu::client::KuduClient* client_ = nullptr;
+  /// The Kudu table and session.
   kudu::client::sp::shared_ptr<kudu::client::KuduTable> table_;
   kudu::client::sp::shared_ptr<kudu::client::KuduSession> session_;
 
@@ -118,14 +119,14 @@ class KuduTableSink : public DataSink {
 
   /// Total number of rows processed, i.e. rows written to Kudu and also rows with
   /// errors.
-  RuntimeProfile::Counter* total_rows_;
+  RuntimeProfile::Counter* total_rows_ = nullptr;
 
   /// The number of rows with errors.
-  RuntimeProfile::Counter* num_row_errors_;
+  RuntimeProfile::Counter* num_row_errors_ = nullptr;
 
   /// Rate at which the sink consumes and processes rows, i.e. writing rows to Kudu or
   /// skipping rows that are known to violate nullability constraints.
-  RuntimeProfile::Counter* rows_processed_rate_;
+  RuntimeProfile::Counter* rows_processed_rate_ = nullptr;
 };
 
 }  // namespace impala
