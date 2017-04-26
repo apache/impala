@@ -115,8 +115,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   protected int numNodes_;
 
   // resource requirements and estimates for this plan node.
-  // set in computeResourceProfile().
-  protected ResourceProfile resourceProfile_ = null;
+  // Initialized with a dummy value. Gets set correctly in
+  // computeResourceProfile().
+  protected ResourceProfile resourceProfile_ = ResourceProfile.invalid();
 
   // sum of tupleIds_' avgSerializedSizes; set in computeStats()
   protected float avgRowSize_;
