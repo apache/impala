@@ -147,6 +147,9 @@ class TestTableWriters(ImpalaTestSuite):
   def test_seq_writer(self, vector, unique_database):
     self.run_test_case('QueryTest/seq-writer', vector, unique_database)
 
+  @SkipIfS3.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
   def test_seq_writer_hive_compatibility(self, vector, unique_database):
     self.client.execute('set ALLOW_UNSUPPORTED_FORMATS=1')
     # Write sequence files with different compression codec/compression mode and then read
