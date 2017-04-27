@@ -139,8 +139,7 @@ void MinMerge(FunctionContext* context, const BufferVal& src, BufferVal* dst) {
 StringVal MinFinalize(FunctionContext* context, const BufferVal& val) {
   const MinState* state = reinterpret_cast<const MinState*>(val);
   if (state->value == NULL) return StringVal::null();
-  StringVal result = StringVal(context, state->len);
-  memcpy(result.ptr, state->value, state->len);
+  StringVal result = StringVal::CopyFrom(context, state->value, state->len);
   context->Free(state->value);
   return result;
 }

@@ -87,14 +87,15 @@ void StringConcatUpdate(FunctionContext* context, const StringVal& arg1,
     const StringVal& arg2, StringVal* val) {
   if (val->is_null) {
     val->is_null = false;
-    *val = StringVal(context, arg1.len);
-    memcpy(val->ptr, arg1.ptr, arg1.len);
+    *val = StringVal::CopyFrom(context, arg1.ptr, arg1.len);
   } else {
     int new_len = val->len + arg1.len + arg2.len;
     StringVal new_val(context, new_len);
-    memcpy(new_val.ptr, val->ptr, val->len);
-    memcpy(new_val.ptr + val->len, arg2.ptr, arg2.len);
-    memcpy(new_val.ptr + val->len + arg2.len, arg1.ptr, arg1.len);
+    if (!new_val.is_null) {
+      memcpy(new_val.ptr, val->ptr, val->len);
+      memcpy(new_val.ptr + val->len, arg2.ptr, arg2.len);
+      memcpy(new_val.ptr + val->len + arg2.len, arg1.ptr, arg1.len);
+    }
     *val = new_val;
   }
 }

@@ -509,10 +509,8 @@ StringVal UdfBuiltins::PrintVector(FunctionContext* context, const StringVal& ar
   }
   ss << ">";
   const string& str = ss.str();
-  StringVal result(context, str.size());
-  if (UNLIKELY(result.is_null)) return StringVal::null();
-  memcpy(result.ptr, str.c_str(), str.size());
-  return result;
+  return StringVal::CopyFrom(context, reinterpret_cast<const uint8_t*>(str.c_str()),
+      str.size());
 }
 
 DoubleVal UdfBuiltins::VectorGet(FunctionContext* context, const BigIntVal& index,

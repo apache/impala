@@ -1291,10 +1291,8 @@ StringVal AggregateFunctions::ReservoirSampleFinalize(FunctionContext* ctx,
     if (i < (src_state->num_samples() - 1)) out << ", ";
   }
   const string& out_str = out.str();
-  StringVal result_str(ctx, out_str.size());
-  if (LIKELY(!result_str.is_null)) {
-    memcpy(result_str.ptr, out_str.c_str(), result_str.len);
-  }
+  StringVal result_str = StringVal::CopyFrom(ctx,
+      reinterpret_cast<const uint8_t*>(out_str.c_str()), out_str.size());
   src_state->Delete(ctx);
   return result_str;
 }

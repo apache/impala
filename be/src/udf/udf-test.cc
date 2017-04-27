@@ -47,6 +47,7 @@ StringVal UpperUdf(FunctionContext* context, const StringVal& input) {
   if (input.is_null) return StringVal::null();
   // Create a new StringVal object that's the same length as the input
   StringVal result = StringVal(context, input.len);
+  if (result.is_null) return StringVal::null();
   for (int i = 0; i < input.len; ++i) {
     result.ptr[i] = toupper(input.ptr[i]);
   }

@@ -33,14 +33,14 @@ class TestAllocFail(CustomClusterTestSuite):
   def test_alloc_fail_init(self, vector):
     self.run_test_case('QueryTest/alloc-fail-init', vector)
 
+  # TODO: Rewrite or remove the non-deterministic test.
+  @pytest.mark.xfail(run=True, reason="IMPALA-2925: the execution is not deterministic "
+                     "so some tests sometimes don't fail as expected")
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--stress_free_pool_alloc=3")
-  def test_alloc_fail_update(self, vector):
-    # TODO: Rewrite or remove the non-deterministic test.
-    pytest.xfail("IMPALA-2925: the execution is not deterministic so some "
-                 "tests sometimes don't fail as expected")
+  def test_alloc_fail_update(self, vector, unique_database):
     # Note that this test relies on pre-aggregation to exercise the Serialize() path so
     # query option 'num_nodes' must not be 1. CustomClusterTestSuite.add_test_dimensions()
     # already filters out vectors with 'num_nodes' != 0 so just assert it here.
     assert vector.get_value('exec_option')['num_nodes'] == 0
-    self.run_test_case('QueryTest/alloc-fail-update', vector)
+    self.run_test_case('QueryTest/alloc-fail-update', vector, use_db=unique_database)

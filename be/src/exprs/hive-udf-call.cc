@@ -323,15 +323,11 @@ DoubleVal HiveUdfCall::GetDoubleVal(ExprContext* ctx, const TupleRow* row) {
 StringVal HiveUdfCall::GetStringVal(ExprContext* ctx, const TupleRow* row) {
   DCHECK_EQ(type_.type, TYPE_STRING);
   StringVal result = *reinterpret_cast<StringVal*>(Evaluate(ctx, row));
-
   // Copy the string into a local allocation with the usual lifetime for expr results.
   // Needed because the UDF output buffer is owned by the Java UDF executor and may be
   // freed or reused by the next call into the Java UDF executor.
   FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
-  uint8_t* local_alloc = fn_ctx->impl()->AllocateLocal(result.len);
-  memcpy(local_alloc, result.ptr, result.len);
-  result.ptr = local_alloc;
-  return result;
+  return StringVal::CopyFrom(fn_ctx, result.ptr, result.len);
 }
 
 TimestampVal HiveUdfCall::GetTimestampVal(ExprContext* ctx, const TupleRow* row) {

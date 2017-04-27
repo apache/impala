@@ -50,3 +50,12 @@ select ndv(l_partkey), distinctpc(l_suppkey) from tpch.lineitem
 ---- CATCH
 failed to allocate
 ====
+---- QUERY
+# IMPALA-5252: Verify HiveUdfCall allocations are checked.
+create function replace_string(string) returns string
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.ReplaceStringUdf';
+select replace_string(l_comment) from tpch.lineitem limit 10;
+---- CATCH
+failed to allocate
+====
