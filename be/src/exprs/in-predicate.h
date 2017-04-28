@@ -367,6 +367,7 @@ void InPredicate::SetLookupClose(
   SetLookupState<SetType>* state =
       reinterpret_cast<SetLookupState<SetType>*>(ctx->GetFunctionState(scope));
   delete state;
+  ctx->SetFunctionState(scope, nullptr);
 }
 
 template <typename T, typename SetType>

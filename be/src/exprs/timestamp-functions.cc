@@ -193,6 +193,7 @@ void TimestampFunctions::UnixAndFromUnixClose(FunctionContext* context,
     DateTimeFormatContext* dt_ctx =
         reinterpret_cast<DateTimeFormatContext*>(context->GetFunctionState(scope));
     delete dt_ctx;
+    context->SetFunctionState(scope, nullptr);
   }
 }
 

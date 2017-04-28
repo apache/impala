@@ -110,9 +110,10 @@ void LikePredicate::LikePrepareInternal(FunctionContext* context,
 void LikePredicate::LikeClose(FunctionContext* context,
     FunctionContext::FunctionStateScope scope) {
   if (scope == FunctionContext::THREAD_LOCAL) {
-  LikePredicateState* state = reinterpret_cast<LikePredicateState*>(
-      context->GetFunctionState(FunctionContext::THREAD_LOCAL));
+    LikePredicateState* state = reinterpret_cast<LikePredicateState*>(
+        context->GetFunctionState(FunctionContext::THREAD_LOCAL));
     delete state;
+    context->SetFunctionState(FunctionContext::THREAD_LOCAL, nullptr);
   }
 }
 
@@ -240,6 +241,7 @@ void LikePredicate::RegexClose(FunctionContext* context,
     LikePredicateState* state = reinterpret_cast<LikePredicateState*>(
         context->GetFunctionState(FunctionContext::THREAD_LOCAL));
     delete state;
+    context->SetFunctionState(FunctionContext::THREAD_LOCAL, nullptr);
   }
 }
 

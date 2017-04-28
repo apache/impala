@@ -172,7 +172,7 @@ void ValidateSharedStateClose(
   if (scope == FunctionContext::THREAD_LOCAL) {
     void* state = context->GetFunctionState(scope);
     context->Free(reinterpret_cast<uint8_t*>(state));
-    context->SetFunctionState(scope, NULL);
+    context->SetFunctionState(scope, nullptr);
   }
 }
 

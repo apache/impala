@@ -330,10 +330,8 @@ void UdfBuiltins::TruncPrepare(FunctionContext* ctx,
 void UdfBuiltins::TruncClose(FunctionContext* ctx,
     FunctionContext::FunctionStateScope scope) {
   void* state = ctx->GetFunctionState(scope);
-  if (state != NULL) {
-    ctx->Free(reinterpret_cast<uint8_t*>(state));
-    ctx->SetFunctionState(scope, NULL);
-  }
+  ctx->Free(reinterpret_cast<uint8_t*>(state));
+  ctx->SetFunctionState(scope, nullptr);
 }
 
 // Maps the user facing name of a unit to a TExtractField
@@ -464,10 +462,8 @@ void UdfBuiltins::SwappedExtractPrepare(FunctionContext* ctx,
 void UdfBuiltins::ExtractClose(FunctionContext* ctx,
     FunctionContext::FunctionStateScope scope) {
   void* state = ctx->GetFunctionState(scope);
-  if (state != NULL) {
-    ctx->Free(reinterpret_cast<uint8_t*>(state));
-    ctx->SetFunctionState(scope, NULL);
-  }
+  ctx->Free(reinterpret_cast<uint8_t*>(state));
+  ctx->SetFunctionState(scope, nullptr);
 }
 
 bool ValidateMADlibVector(FunctionContext* context, const StringVal& arr) {

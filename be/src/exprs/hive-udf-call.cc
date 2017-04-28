@@ -237,7 +237,7 @@ Status HiveUdfCall::Open(RuntimeState* state, ExprContext* ctx,
 }
 
 void HiveUdfCall::Close(RuntimeState* state, ExprContext* ctx,
-                        FunctionContext::FunctionStateScope scope) {
+    FunctionContext::FunctionStateScope scope) {
   if (fn_context_index_ != -1) {
     FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
     JniContext* jni_ctx = reinterpret_cast<JniContext*>(
@@ -265,6 +265,7 @@ void HiveUdfCall::Close(RuntimeState* state, ExprContext* ctx,
       }
       jni_ctx->output_anyval = NULL;
       delete jni_ctx;
+      fn_ctx->SetFunctionState(FunctionContext::THREAD_LOCAL, nullptr);
     } else {
       DCHECK(!ctx->opened_);
     }

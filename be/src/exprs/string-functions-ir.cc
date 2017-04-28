@@ -236,7 +236,8 @@ void StringFunctions::ReplaceClose(FunctionContext* context,
   if (scope != FunctionContext::FRAGMENT_LOCAL) return;
   ReplaceContext* rptr = reinterpret_cast<ReplaceContext*>
       (context->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
-  if (rptr != nullptr) context->Free(reinterpret_cast<uint8_t*>(rptr));
+  context->Free(reinterpret_cast<uint8_t*>(rptr));
+  context->SetFunctionState(scope, nullptr);
 }
 
 StringVal StringFunctions::Replace(FunctionContext* context, const StringVal& str,
@@ -612,6 +613,7 @@ void StringFunctions::RegexpClose(
   if (scope != FunctionContext::FRAGMENT_LOCAL) return;
   re2::RE2* re = reinterpret_cast<re2::RE2*>(context->GetFunctionState(scope));
   delete re;
+  context->SetFunctionState(scope, nullptr);
 }
 
 StringVal StringFunctions::RegexpExtract(FunctionContext* context, const StringVal& str,
@@ -879,8 +881,8 @@ void StringFunctions::ParseUrlClose(
   if (scope != FunctionContext::FRAGMENT_LOCAL) return;
   UrlParser::UrlPart* url_part =
       reinterpret_cast<UrlParser::UrlPart*>(ctx->GetFunctionState(scope));
-  if (url_part == NULL) return;
   delete url_part;
+  ctx->SetFunctionState(scope, nullptr);
 }
 
 StringVal StringFunctions::ParseUrlKey(FunctionContext* ctx, const StringVal& url,
@@ -941,7 +943,8 @@ void StringFunctions::BTrimClose(
   if (scope != FunctionContext::THREAD_LOCAL) return;
   bitset<256>* unique_chars = reinterpret_cast<bitset<256>*>(
       context->GetFunctionState(scope));
-  if (unique_chars != NULL) delete unique_chars;
+  delete unique_chars;
+  context->SetFunctionState(scope, nullptr);
 }
 
 StringVal StringFunctions::BTrimString(FunctionContext* ctx,

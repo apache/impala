@@ -180,6 +180,7 @@ void MathFunctions::RandClose(FunctionContext* ctx,
     uint8_t* seed = reinterpret_cast<uint8_t*>(
         ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
     ctx->Free(seed);
+    ctx->SetFunctionState(FunctionContext::THREAD_LOCAL, nullptr);
   }
 }
 

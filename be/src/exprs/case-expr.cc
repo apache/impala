@@ -80,6 +80,7 @@ void CaseExpr::Close(RuntimeState* state, ExprContext* ctx,
     FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
     void* case_state = fn_ctx->GetFunctionState(FunctionContext::THREAD_LOCAL);
     fn_ctx->Free(reinterpret_cast<uint8_t*>(case_state));
+    fn_ctx->SetFunctionState(FunctionContext::THREAD_LOCAL, nullptr);
   }
   Expr::Close(state, ctx, scope);
 }

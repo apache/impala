@@ -277,7 +277,7 @@ void CountClose(FunctionContext* context, FunctionContext::FunctionStateScope sc
   if (scope == FunctionContext::THREAD_LOCAL) {
     void* state = context->GetFunctionState(scope);
     context->Free(reinterpret_cast<uint8_t*>(state));
-    context->SetFunctionState(scope, NULL);
+    context->SetFunctionState(scope, nullptr);
   }
 }
 
@@ -306,7 +306,7 @@ void ConstantArgClose(
   if (scope == FunctionContext::THREAD_LOCAL) {
     void* state = context->GetFunctionState(scope);
     context->Free(reinterpret_cast<uint8_t*>(state));
-    context->SetFunctionState(scope, NULL);
+    context->SetFunctionState(scope, nullptr);
   }
 }
 
@@ -330,7 +330,7 @@ void ValidateOpenClose(
   if (scope == FunctionContext::THREAD_LOCAL) {
     void* state = context->GetFunctionState(scope);
     context->Free(reinterpret_cast<uint8_t*>(state));
-    context->SetFunctionState(scope, NULL);
+    context->SetFunctionState(scope, nullptr);
   }
 }
 
@@ -356,9 +356,11 @@ void MemTestClose(FunctionContext* context, FunctionContext::FunctionStateScope 
   if (scope == FunctionContext::THREAD_LOCAL) {
     int64_t* total = reinterpret_cast<int64_t*>(
         context->GetFunctionState(FunctionContext::THREAD_LOCAL));
+    // Initialization could have failed. Prepare() may not have been called.
+    if (total == nullptr) return;
     context->Free(*total);
     context->Free(reinterpret_cast<uint8_t*>(total));
-    context->SetFunctionState(scope, NULL);
+    context->SetFunctionState(scope, nullptr);
   }
 }
 

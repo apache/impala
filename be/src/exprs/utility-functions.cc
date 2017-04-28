@@ -56,8 +56,8 @@ void UtilityFunctions::UuidClose(FunctionContext* ctx,
     boost::uuids::random_generator* uuid_gen =
         reinterpret_cast<boost::uuids::random_generator*>(
             ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
-    DCHECK(uuid_gen != NULL);
     delete uuid_gen;
+    ctx->SetFunctionState(FunctionContext::THREAD_LOCAL, nullptr);
   }
 }
 
