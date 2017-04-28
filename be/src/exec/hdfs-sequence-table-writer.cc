@@ -284,13 +284,13 @@ inline Status HdfsSequenceTableWriter::ConsumeRow(TupleRow* row) {
 
   const uint8_t* value_bytes;
   int64_t value_length;
+  string text = row_buf_.String();
   if (compress_flag_) {
     // apply compression to row_buf_
     // the length of the buffer must be prefixed to the buffer prior to compression
     //
     // TODO this incurs copy overhead to place the length in front of the
     // buffer prior to compression. We may want to rewrite to avoid copying.
-    string text = row_buf_.String();
     row_buf_.Clear();
     // encoding as "Text" writes the length before the text
     row_buf_.WriteText(text.size(), reinterpret_cast<const uint8_t*>(&text.data()[0]));
@@ -303,8 +303,9 @@ inline Status HdfsSequenceTableWriter::ConsumeRow(TupleRow* row) {
     }
     value_bytes = tmp;
   } else {
-    value_length = row_buf_.Size();
-    value_bytes = reinterpret_cast<const uint8_t*>(row_buf_.String().data());
+    value_length = text.size();
+    DCHECK_EQ(value_length, row_buf_.Size());
+    value_bytes = reinterpret_cast<const uint8_t*>(text.data());
   }
 
   int rec_len = value_length;
