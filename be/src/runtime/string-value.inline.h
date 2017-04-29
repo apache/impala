@@ -27,37 +27,17 @@
 
 namespace impala {
 
-/// Compare two strings using sse4.2 intrinsics if they are available. This code assumes
-/// that the trivial cases are already handled (i.e. one string is empty).
-/// Returns:
+/// Compare two strings. Returns:
 ///   < 0 if s1 < s2
 ///   0 if s1 == s2
 ///   > 0 if s1 > s2
-/// The SSE code path is just under 2x faster than the non-sse code path.
+///
 ///   - s1/n1: ptr/len for the first string
 ///   - s2/n2: ptr/len for the second string
 ///   - len: min(n1, n2) - this can be more cheaply passed in by the caller
 static inline int StringCompare(const char* s1, int n1, const char* s2, int n2, int len) {
-  DCHECK_EQ(len, std::min(n1, n2));
-  if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
-    while (len >= SSEUtil::CHARS_PER_128_BIT_REGISTER) {
-      __m128i xmm0 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s1));
-      __m128i xmm1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s2));
-      int chars_match = SSE4_cmpestri<SSEUtil::STRCMP_MODE>(xmm0,
-          SSEUtil::CHARS_PER_128_BIT_REGISTER, xmm1,
-          SSEUtil::CHARS_PER_128_BIT_REGISTER);
-      if (chars_match != SSEUtil::CHARS_PER_128_BIT_REGISTER) {
-        // Match strncmp() behavior, which interprets characters as unsigned char.
-        return static_cast<unsigned char>(s1[chars_match]) -
-            static_cast<unsigned char>(s2[chars_match]);
-      }
-      len -= SSEUtil::CHARS_PER_128_BIT_REGISTER;
-      s1 += SSEUtil::CHARS_PER_128_BIT_REGISTER;
-      s2 += SSEUtil::CHARS_PER_128_BIT_REGISTER;
-    }
-  }
-  // TODO: for some reason memcmp is way slower than strncmp (2.5x)  why?
-  int result = strncmp(s1, s2, len);
+  // memcmp has undefined behavior when called on nullptr for either pointer
+  const int result = (len == 0) ? 0 : memcmp(s1, s2, len);
   if (result != 0) return result;
   return n1 - n2;
 }
