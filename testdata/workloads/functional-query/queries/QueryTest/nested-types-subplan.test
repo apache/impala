@@ -627,7 +627,7 @@ select count(*) FROM tpch_nested_parquet.customer c, (SELECT ca.o_orderkey okey,
 ca.o_orderpriority opriority FROM c.c_orders ca, c.c_orders cb
 WHERE ca.o_orderkey = cb.o_orderkey limit 2) v limit 51
 ---- RESULTS
-1500000
+199975
 ---- TYPES
 bigint
 ====

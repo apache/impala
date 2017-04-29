@@ -1,0 +1,45 @@
+====
+---- QUERY
+# IMPALA-4866: Hash join node does not apply limits correctly
+# Test that a join query applies the limits correctly when output_batch gets
+# populated in OutputNullAwareProbe. If the output_batch is full after invoking
+# this function, the ReachedLimit check wont be be correctly applied without this
+# change
+set batch_size=6;
+select id, int_col, bigint_col from functional.alltypesagg a
+where int_col not in (select int_col from functional.alltypestiny t
+where a.id = t.id) limit 10995;
+---- RUNTIME_PROFILE
+row_regex: .*RowsProduced: 10.99..\W10995\W
+====
+---- QUERY
+# Test to verify that is limit_ is correctly enforced when
+# output_batch is at AtCapacity.
+set batch_size=6;
+set max_block_mgr_memory=180m;
+select * from tpch.lineitem t1 full outer join tpch.lineitem t2 on
+t1.l_orderkey = t2.l_orderkey limit 10;
+---- RUNTIME_PROFILE
+row_regex: .*RowsProduced: 10 .
+====
+---- QUERY
+# IMPALA-4866: Hash join node does not apply limits correctly
+# Test to ensure that the limit is correctly applied on a right
+# join. Without this change this query returns 10 rows(batch_size)
+set batch_size=10;
+select straight_join t1.id, t2.id from functional.alltypes t1
+right join functional.alltypes t2 on t1.id = t2.int_col + 100000
+limit 5;
+---- RUNTIME_PROFILE
+row_regex: .*RowsProduced: 5 .
+====
+---- QUERY
+# IMPALA-4866: Hash join node does not apply limits correctly
+# Test to ensure that the limit is correctly applied on a inner
+# join. Without this change this query returns 10 rows(batch_size)
+set batch_size=10;
+select straight_join t1.id, t2.id from functional.alltypes t1
+inner join functional.alltypes t2 on t1.id = t2.id limit 5;
+---- RUNTIME_PROFILE
+row_regex: .*RowsProduced: 5 .
+====

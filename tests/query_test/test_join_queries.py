@@ -56,6 +56,12 @@ class TestJoinQueries(ImpalaTestSuite):
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('QueryTest/joins', new_vector)
 
+  def test_single_node_joins_with_limits_exhaustive(self, vector):
+    if self.exploration_strategy() != 'exhaustive': pytest.skip()
+    new_vector = copy(vector)
+    new_vector.get_value('exec_option')['num_nodes'] = 1
+    self.run_test_case('QueryTest/single-node-joins-with-limits-exhaustive', new_vector)
+
   @SkipIfOldAggsJoins.unsupported
   def test_partitioned_joins(self, vector):
     self.run_test_case('QueryTest/joins-partitioned', vector)
