@@ -188,10 +188,8 @@ class TestRandomSort(ImpalaTestSuite):
 
   def test_analytic_order_by_random(self):
     """Tests that a window function over 'order by random()' works as expected."""
-    # Since we use the same random seed and a very small table, the following queries
-    # should be equivalent.
-    results = transpose_results(self.execute_query("select id from "
-        "functional.alltypestiny order by random(2)").data)
-    analytic_results = transpose_results(self.execute_query("select last_value(id) over "
-        "(order by random(2)) from functional.alltypestiny").data)
-    assert results == analytic_results
+    # Since we use the same random seed, the results should be returned in order.
+    query = """select last_value(rand(2)) over (order by rand(2)) from
+      functional.alltypestiny"""
+    results = transpose_results(self.execute_query(query).data, lambda x: float(x))
+    assert (results == sorted(results))
