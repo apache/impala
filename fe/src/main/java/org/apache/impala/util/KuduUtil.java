@@ -22,15 +22,22 @@ import static java.lang.String.format;
 import java.util.HashSet;
 import java.util.List;
 
+import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnEncoding;
+import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
@@ -187,6 +194,20 @@ public class KuduUtil {
         throw new ImpalaRuntimeException("Unsupported value for column type: " +
             type.toString());
     }
+  }
+
+  public static Long timestampToUnixTimeMicros(Analyzer analyzer, Expr timestampExpr)
+      throws AnalysisException, InternalException {
+    Preconditions.checkArgument(timestampExpr.isAnalyzed());
+    Preconditions.checkArgument(timestampExpr.isConstant());
+    Preconditions.checkArgument(timestampExpr.getType() == Type.TIMESTAMP);
+    Expr toUnixTimeExpr = new FunctionCallExpr("utc_to_unix_micros",
+        Lists.newArrayList(timestampExpr));
+    toUnixTimeExpr.analyze(analyzer);
+    TColumnValue result = FeSupport.EvalExprWithoutRow(toUnixTimeExpr,
+        analyzer.getQueryCtx());
+    Preconditions.checkArgument(result.isSetLong_val());
+    return result.getLong_val();
   }
 
   public static Encoding fromThrift(TColumnEncoding encoding)

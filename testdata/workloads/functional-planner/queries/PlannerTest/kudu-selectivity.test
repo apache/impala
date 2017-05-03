@@ -146,15 +146,44 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 select * from functional_kudu.alltypes where
 tinyint_col is not null and
 smallint_col is null and
-cast(date_string_col as tinyint) is null
+cast(date_string_col as tinyint) is null and
+timestamp_col > (nanoseconds_add(cast('1987-05-19 00:00:00' as timestamp), 10)) and
+timestamp_col < (seconds_add(cast('9999-12-31 24:59:59' as timestamp), 10))
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
   PLAN-ROOT SINK
   |  mem-estimate=0B mem-reservation=0B
   |
   00:SCAN KUDU [functional_kudu.alltypes]
-     predicates: CAST(date_string_col AS TINYINT) IS NULL
-     kudu predicates: smallint_col IS NULL, tinyint_col IS NOT NULL
+     predicates: CAST(date_string_col AS TINYINT) IS NULL, timestamp_col < NULL
+     kudu predicates: smallint_col IS NULL, tinyint_col IS NOT NULL, timestamp_col > TIMESTAMP '1987-05-19 00:00:00.000000010'
      mem-estimate=0B mem-reservation=0B
      tuple-ids=0 row-size=126B cardinality=730
+====
+select * from functional_kudu.alltypes where
+timestamp_col in (cast('2010-03-01 00:00:00' as timestamp),
+                  cast('2010-03-01 00:01:00' as timestamp))
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+  PLAN-ROOT SINK
+  |  mem-estimate=0B mem-reservation=0B
+  |
+  00:SCAN KUDU [functional_kudu.alltypes]
+     kudu predicates: timestamp_col IN (TIMESTAMP '2010-03-01 00:00:00', TIMESTAMP '2010-03-01 00:01:00')
+     mem-estimate=0B mem-reservation=0B
+     tuple-ids=0 row-size=97B cardinality=1
+====
+select * from functional_kudu.alltypes where
+timestamp_col in (cast('2010-03-01 00:00:00' as timestamp),
+                  null,
+                  cast('2010-03-01 00:01:00' as timestamp))
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+  PLAN-ROOT SINK
+  |  mem-estimate=0B mem-reservation=0B
+  |
+  00:SCAN KUDU [functional_kudu.alltypes]
+     predicates: timestamp_col IN (TIMESTAMP '2010-03-01 00:00:00', NULL, TIMESTAMP '2010-03-01 00:01:00')
+     mem-estimate=0B mem-reservation=0B
+     tuple-ids=0 row-size=97B cardinality=3
 ====

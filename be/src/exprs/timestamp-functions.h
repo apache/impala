@@ -61,12 +61,26 @@ class TimestampFunctions {
       FunctionContext::FunctionStateScope scope);
 
   /// Parses 'string_val' based on the format 'fmt'.
+  /// The time zone interpretation of the parsed timestamp is determined by
+  /// FLAGS_use_local_tz_for_unix_timestamp_conversions. If the flag is true, the
+  /// instance is interpreted as a local value. If the flag is false, UTC is assumed.
   static BigIntVal Unix(FunctionContext* context, const StringVal& string_val,
       const StringVal& fmt);
-  /// Converts 'tv_val' to a unix time_t
+
+  /// Converts 'tv_val' to a unix time_t.
+  /// The time zone interpretation of the specified timestamp is determined by
+  /// FLAGS_use_local_tz_for_unix_timestamp_conversions. If the flag is true, the
+  /// instance is interpreted as a local value. If the flag is false, UTC is assumed.
   static BigIntVal Unix(FunctionContext* context, const TimestampVal& tv_val);
+
   /// Returns the current time.
+  /// The time zone interpretation of the current time is determined by
+  /// FLAGS_use_local_tz_for_unix_timestamp_conversions. If the flag is true, the
+  /// instance is interpreted as a local value. If the flag is false, UTC is assumed.
   static BigIntVal Unix(FunctionContext* context);
+
+  /// Interpret 'tv_val' as a timestamp in UTC and convert to unix time in microseconds.
+  static BigIntVal UtcToUnixMicros(FunctionContext* context, const TimestampVal& tv_val);
 
   // Functions to convert to and from TimestampVal type
   static TimestampVal ToTimestamp(FunctionContext* context, const BigIntVal& bigint_val);

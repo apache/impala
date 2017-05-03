@@ -37,7 +37,9 @@ import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TKuduScanNode;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -388,6 +390,16 @@ public class KuduScanNode extends ScanNode {
             ((StringLiteral)literal).getStringValue());
         break;
       }
+      case TIMESTAMP: {
+        try {
+          kuduPredicate = KuduPredicate.newComparisonPredicate(column, op,
+              KuduUtil.timestampToUnixTimeMicros(analyzer, literal));
+        } catch (Exception e) {
+          LOG.info("Exception converting Kudu timestamp predicate: " + expr.toSql(), e);
+          return false;
+        }
+        break;
+      }
       default: break;
     }
     if (kuduPredicate == null) return false;
@@ -422,8 +434,8 @@ public class KuduScanNode extends ScanNode {
       // Cannot push predicates with null literal values (KUDU-1595).
       if (literal instanceof NullLiteral) return false;
 
-      Object value = getKuduInListValue(literal);
-      Preconditions.checkNotNull(value);
+      Object value = getKuduInListValue(analyzer, literal);
+      if (value == null) return false;
       values.add(value);
     }
 
@@ -468,7 +480,7 @@ public class KuduScanNode extends ScanNode {
    * added to a KuduPredicate. If the Expr is not supported by Kudu or the type doesn't
    * match the expected PrimitiveType 'type', null is returned.
    */
-  private static Object getKuduInListValue(LiteralExpr e) {
+  private static Object getKuduInListValue(Analyzer analyzer, LiteralExpr e) {
     switch (e.getType().getPrimitiveType()) {
       case BOOLEAN: return ((BoolLiteral) e).getValue();
       case TINYINT: return (byte) ((NumericLiteral) e).getLongValue();
@@ -478,6 +490,14 @@ public class KuduScanNode extends ScanNode {
       case FLOAT: return (float) ((NumericLiteral) e).getDoubleValue();
       case DOUBLE: return ((NumericLiteral) e).getDoubleValue();
       case STRING: return ((StringLiteral) e).getValue();
+      case TIMESTAMP: {
+        try {
+          return KuduUtil.timestampToUnixTimeMicros(analyzer, e);
+        } catch (Exception ex) {
+          LOG.info("Exception converting Kudu timestamp expr: " + e.toSql(), ex);
+        }
+        break;
+      }
       default:
         Preconditions.checkState(false,
             "Unsupported Kudu type considered for predicate: %s", e.getType().toSql());

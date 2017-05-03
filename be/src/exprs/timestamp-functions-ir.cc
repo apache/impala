@@ -120,6 +120,14 @@ BigIntVal TimestampFunctions::Unix(FunctionContext* context) {
   }
 }
 
+BigIntVal TimestampFunctions::UtcToUnixMicros(FunctionContext* context,
+    const TimestampVal& ts_val) {
+  if (ts_val.is_null) return BigIntVal::null();
+  const TimestampValue& tv = TimestampValue::FromTimestampVal(ts_val);
+  int64_t result;
+  return (tv.UtcToUnixTimeMicros(&result)) ? BigIntVal(result) : BigIntVal::null();
+}
+
 TimestampVal TimestampFunctions::ToTimestamp(FunctionContext* context,
     const BigIntVal& bigint_val) {
   if (bigint_val.is_null) return TimestampVal::null();
