@@ -458,7 +458,8 @@ public class DistributedPlanner {
     // repartition: both left- and rightChildFragment are partitioned on the
     // join exprs, and a hash table is built with the rightChildFragment's output.
     PlanNode lhsTree = leftChildFragment.getPlanRoot();
-    long partitionCost = Long.MAX_VALUE;
+    // Subtract 1 here so that if stats are missing we default to partitioned.
+    long partitionCost = Long.MAX_VALUE - 1;
     List<Expr> lhsJoinExprs = Lists.newArrayList();
     List<Expr> rhsJoinExprs = Lists.newArrayList();
     for (Expr joinConjunct: node.getEqJoinConjuncts()) {
