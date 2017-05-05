@@ -132,6 +132,11 @@ public class HdfsScanNode extends ScanNode {
   private long totalFiles_ = 0;
   private long totalBytes_ = 0;
 
+  // Input cardinality based on the partition row counts or extrapolation.
+  // -1 if invalid.
+  private long statsNumRows_ = -1;
+  private long extrapolatedNumRows_ = -1;
+
   // True if this scan node should use the MT implementation in the backend.
   private boolean useMtScanNode_;
 
@@ -649,8 +654,21 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Also computes totalBytes_, totalFiles_, numPartitionsMissingStats_,
-   * and sets hasCorruptTableStats_.
+   * Computes and sets the following members.
+   * inputCardinality_, cardinality_, numHosts_, statsNumRows_, extrapolatedNumRows_,
+   * numPartitionsMissingStats_, and hasCorruptTableStats_.
+   *
+   * Row count extrapolation
+   * If available, table-level row count and file bytes statistics are used for
+   * extrapolating the input cardinality (before conjuncts). The extrapolation is based
+   * on the total number of bytes to be scanned and is intended to address the following
+   * scenarios: (1) new partitions that have no stats, and (2) existing partitions which
+   * have changed since the last stats collection. When extrapolating, the per-partition
+   * row counts are ignored because we cannot determine whether the partition has changed
+   * since the last stats collection.
+   * Otherwise, the input cardinality is based on the per-partition row count stats
+   * and/or the table-level row count stats, depending on which of those are available.
+   * Partitions without stats are ignored.
    */
   @Override
   public void computeStats(Analyzer analyzer) {
@@ -659,20 +677,16 @@ public class HdfsScanNode extends ScanNode {
       LOG.trace("collecting partitions for table " + tbl_.getName());
     }
     numPartitionsMissingStats_ = 0;
+    statsNumRows_ = -1;
     if (tbl_.getNumClusteringCols() == 0) {
-      cardinality_ = tbl_.getNumRows();
-      if (cardinality_ < -1 || (cardinality_ == 0 && tbl_.getTotalHdfsBytes() > 0)) {
+      statsNumRows_ = tbl_.getNumRows();
+      if (statsNumRows_ < -1 || (statsNumRows_ == 0 && tbl_.getTotalHdfsBytes() > 0)) {
         hasCorruptTableStats_ = true;
       }
-      if (partitions_.isEmpty()) {
-        // Nothing to scan. Definitely a cardinality of 0 even if we have no stats.
-        cardinality_ = 0;
-      } else {
+      if (!partitions_.isEmpty()) {
         Preconditions.checkState(partitions_.size() == 1);
       }
     } else {
-      cardinality_ = 0;
-      boolean hasValidPartitionCardinality = false;
       for (HdfsPartition p: partitions_) {
         // Check for corrupt table stats
         if (p.getNumRows() < -1  || (p.getNumRows() == 0 && p.getSize() > 0))  {
@@ -681,24 +695,56 @@ public class HdfsScanNode extends ScanNode {
         // ignore partitions with missing stats in the hope they don't matter
         // enough to change the planning outcome
         if (p.getNumRows() > -1) {
-          cardinality_ = addCardinalities(cardinality_, p.getNumRows());
-          hasValidPartitionCardinality = true;
+          if (statsNumRows_ == -1) statsNumRows_ = 0;
+          statsNumRows_ = addCardinalities(statsNumRows_, p.getNumRows());
         } else {
           ++numPartitionsMissingStats_;
         }
       }
-      if (!partitions_.isEmpty() && !hasValidPartitionCardinality) {
-        // if none of the partitions knew its number of rows, we fall back on
-        // the table stats
-        cardinality_ = tbl_.getNumRows();
-      }
+    }
+    extrapolatedNumRows_ = tbl_.getExtrapolatedNumRows(totalBytes_);
+    computeCardinalities();
+    computeNumNodes(analyzer, cardinality_);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("computeStats HdfsScan: #nodes=" + Integer.toString(numNodes_));
+    }
+  }
+
+  /**
+   * Computes and sets the input and output cardinalities, choosing between the
+   * 'extrapolatedNumRows_' and 'statsNumRows_'.
+   * Adjusts the output cardinality based on the scan conjuncts and table sampling.
+   */
+  private void computeCardinalities() {
+    Preconditions.checkState(statsNumRows_ >= -1 || hasCorruptTableStats_);
+    Preconditions.checkState(extrapolatedNumRows_ >= -1);
+
+    if (totalBytes_ == 0) {
+      // Nothing to scan. Definitely a cardinality of 0.
+      inputCardinality_ = 0;
+      cardinality_ = 0;
+      return;
     }
 
-    // Adjust the cardinality based on table sampling.
-    if (sampleParams_ != null && cardinality_ != -1) {
-      double fracPercBytes = (double) sampleParams_.getPercentBytes() / 100;
-      cardinality_ = Math.round(cardinality_ * fracPercBytes);
-      cardinality_ = Math.max(cardinality_, 1);
+    // Choose between the extrapolated row count and the one based on stored stats.
+    if (extrapolatedNumRows_ != -1) {
+      // The extrapolated row count is based on the 'totalBytes_' which already accounts
+      // for table sampling, so no additional adjustment for sampling is necessary.
+      cardinality_ = extrapolatedNumRows_;
+    } else {
+      if (!partitions_.isEmpty() && numPartitionsMissingStats_ == partitions_.size()) {
+        // if none of the partitions knew its number of rows, and extrapolation was
+        // not possible, we fall back on the table stats
+        cardinality_ = tbl_.getNumRows();
+      } else {
+        cardinality_ = statsNumRows_;
+      }
+      // Adjust the cardinality based on table sampling.
+      if (sampleParams_ != null && cardinality_ != -1) {
+        double fracPercBytes = (double) sampleParams_.getPercentBytes() / 100;
+        cardinality_ = Math.round(cardinality_ * fracPercBytes);
+        cardinality_ = Math.max(cardinality_, 1);
+      }
     }
 
     // Adjust cardinality for all collections referenced along the tuple's path.
@@ -726,12 +772,7 @@ public class HdfsScanNode extends ScanNode {
     }
     cardinality_ = capAtLimit(cardinality_);
     if (LOG.isTraceEnabled()) {
-      LOG.trace("computeStats HdfsScan: cardinality_=" + Long.toString(cardinality_));
-    }
-
-    computeNumNodes(analyzer, cardinality_);
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("computeStats HdfsScan: #nodes=" + Integer.toString(numNodes_));
+      LOG.trace("HdfsScan: cardinality_=" + Long.toString(cardinality_));
     }
   }
 
@@ -859,6 +900,17 @@ public class HdfsScanNode extends ScanNode {
       }
     }
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+      String extrapRows = String.valueOf(extrapolatedNumRows_);
+      if (!BackendConfig.INSTANCE.enableStatsExtrapolation()) {
+        extrapRows = "disabled";
+      } else if (extrapolatedNumRows_ == -1) {
+        extrapRows = "unavailable";
+      }
+      String statsRows = String.valueOf(statsNumRows_);
+      if (statsNumRows_ == -1) statsRows = "unavailable";
+      output.append(String.format(
+          "%sstats-rows=%s extrapolated-rows=%s", detailPrefix, statsRows, extrapRows));
+      output.append("\n");
       output.append(getStatsExplainString(detailPrefix, detailLevel));
       output.append("\n");
       if (numScanRangesNoDiskIds_ > 0) {
@@ -961,6 +1013,12 @@ public class HdfsScanNode extends ScanNode {
     // MAX_IO_BUFFERS_PER_THREAD * read_size bytes.
     return (long) RuntimeEnv.INSTANCE.getNumCores() * (long) MAX_THREAD_TOKENS_PER_CORE *
         MAX_IO_BUFFERS_PER_THREAD * BackendConfig.INSTANCE.getReadSize();
+  }
+
+  @Override
+  public boolean isTableMissingTableStats() {
+    if (extrapolatedNumRows_ >= 0) return false;
+    return super.isTableMissingTableStats();
   }
 
   @Override

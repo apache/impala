@@ -280,6 +280,7 @@ public class ComputeStatsStmt extends StatementBase {
         partitionSet_.setPartitionShouldExist();
         partitionSet_.analyze(analyzer);
       }
+
       // For incremental stats, estimate the size of intermediate stats and report an
       // error if the estimate is greater than --inc_stats_size_limit_bytes in bytes
       if (isIncremental_) {
@@ -580,6 +581,9 @@ public class ComputeStatsStmt extends StatementBase {
     if (!expectAllPartitions_) params.setExpected_partitions(expectedPartitions_);
     if (isIncremental_) {
       params.setNum_partition_cols(((HdfsTable)table_).getNumClusteringCols());
+    }
+    if (table_ instanceof HdfsTable && !isIncremental_) {
+      params.setTotal_file_bytes(((HdfsTable)table_).getTotalHdfsBytes());
     }
     return params;
   }

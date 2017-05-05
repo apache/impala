@@ -135,7 +135,10 @@ struct TTableName {
 
 struct TTableStats {
   // Estimated number of rows in the table or -1 if unknown
-  1: required i64 num_rows;
+  1: required i64 num_rows
+
+  // Sum of file sizes in the table. Only set for tables of type HDFS_TABLE.
+  2: optional i64 total_file_bytes
 }
 
 // Column stats data that Impala uses.

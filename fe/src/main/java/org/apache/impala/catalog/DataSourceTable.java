@@ -186,7 +186,7 @@ public class DataSourceTable extends Table {
       loadColumns(fieldSchemas, client);
 
       // Set table stats.
-      numRows_ = getRowCount(super.getMetaStoreTable().getParameters());
+      setTableStats(msTable_);
     } catch (Exception e) {
       throw new TableLoadingException("Failed to load metadata for data source table: " +
           name_, e);
@@ -216,7 +216,7 @@ public class DataSourceTable extends Table {
     resultSchema.addToColumns(new TColumn("#Rows", Type.BIGINT.toThrift()));
     result.setSchema(resultSchema);
     TResultRowBuilder rowBuilder = new TResultRowBuilder();
-    rowBuilder.add(numRows_);
+    rowBuilder.add(tableStats_.num_rows);
     result.addToRows(rowBuilder.get());
     return result;
   }

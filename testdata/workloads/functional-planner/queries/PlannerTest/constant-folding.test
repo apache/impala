@@ -49,7 +49,8 @@ PLAN-ROOT SINK
    predicates: c_custkey > 10, !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey = 4
    predicates on o_lineitems: 20 + l_linenumber < 0
-   table stats: 150000 rows total
+   stats-rows=150000 extrapolated-rows=disabled
+   table stats: rows=150000 size=292.36MB
    columns missing stats: c_orders
    parquet statistics predicates: c_custkey > 10
    parquet dictionary predicates: c_custkey > 10
@@ -70,7 +71,7 @@ PLAN-ROOT SINK
    stop key: 20\0
    hbase filters: d:string_col EQUAL '4'
    predicates: tinyint_col = 5, string_col = '4'
-   table stats: 10000 rows total
+   table stats: rows=10000
    column stats: all
    mem-estimate=1.00GB mem-reservation=0B
    tuple-ids=0 row-size=119B cardinality=1
@@ -110,7 +111,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   table stats: 7300 rows total
+   stats-rows=7300 extrapolated-rows=disabled
+   table stats: rows=7300 size=478.45KB
    column stats: all
    mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=20B cardinality=7300
@@ -136,7 +138,8 @@ PLAN-ROOT SINK
 |--01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
 |     predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
-|     table stats: 7300 rows total
+|     stats-rows=7300 extrapolated-rows=disabled
+|     table stats: rows=7300 size=478.45KB
 |     column stats: all
 |     parquet dictionary predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
 |     mem-estimate=128.00MB mem-reservation=0B
@@ -144,7 +147,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
-   table stats: 7300 rows total
+   stats-rows=7300 extrapolated-rows=disabled
+   table stats: rows=7300 size=478.45KB
    column stats: all
    mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=8B cardinality=7300
@@ -170,7 +174,8 @@ PLAN-ROOT SINK
 |--01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
 |     predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
-|     table stats: 7300 rows total
+|     stats-rows=7300 extrapolated-rows=disabled
+|     table stats: rows=7300 size=478.45KB
 |     column stats: all
 |     parquet dictionary predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
 |     mem-estimate=128.00MB mem-reservation=0B
@@ -178,7 +183,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
-   table stats: 7300 rows total
+   stats-rows=7300 extrapolated-rows=disabled
+   table stats: rows=7300 size=478.45KB
    column stats: all
    mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=8B cardinality=7300
@@ -208,7 +214,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   table stats: 7300 rows total
+   stats-rows=7300 extrapolated-rows=disabled
+   table stats: rows=7300 size=478.45KB
    column stats: all
    mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=20B cardinality=7300
@@ -236,7 +243,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   table stats: 7300 rows total
+   stats-rows=7300 extrapolated-rows=disabled
+   table stats: rows=7300 size=478.45KB
    column stats: all
    mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=4B cardinality=7300
@@ -257,17 +265,18 @@ PLAN-ROOT SINK
 |  order by: greatest(20, bigint_col) ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  mem-estimate=0B mem-reservation=16.00MB
-|  tuple-ids=3,2 row-size=37B cardinality=7300
+|  tuple-ids=3,2 row-size=61B cardinality=7300
 |
 01:SORT
 |  order by: concat('ab', string_col) ASC NULLS FIRST, greatest(20, bigint_col) ASC
 |  materialized: concat('ab', string_col), greatest(20, bigint_col)
 |  mem-estimate=16.00MB mem-reservation=48.00MB
-|  tuple-ids=3 row-size=29B cardinality=7300
+|  tuple-ids=3 row-size=53B cardinality=7300
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   table stats: 7300 rows total
+   stats-rows=7300 extrapolated-rows=disabled
+   table stats: rows=7300 size=478.45KB
    column stats: all
    mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=29B cardinality=7300
@@ -287,7 +296,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   table stats: 7300 rows total
+   stats-rows=7300 extrapolated-rows=disabled
+   table stats: rows=7300 size=478.45KB
    column stats: all
    mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=8B cardinality=7300
@@ -304,7 +314,8 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(CAST(3 + ye
 |
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
-   table stats: 100 rows total
+   stats-rows=100 extrapolated-rows=disabled
+   table stats: rows=100 size=6.32KB
    column stats: all
    mem-estimate=32.00MB mem-reservation=0B
    tuple-ids=0 row-size=16B cardinality=100
@@ -328,7 +339,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   table stats: 7300 rows total
+   stats-rows=7300 extrapolated-rows=disabled
+   table stats: rows=7300 size=478.45KB
    column stats: all
    limit: 2
    mem-estimate=128.00MB mem-reservation=0B

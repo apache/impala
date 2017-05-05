@@ -55,9 +55,10 @@ PLAN-ROOT SINK
 |  tuple-ids=1 row-size=16B cardinality=unavailable
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=24/24 files=24 size=156.57KB
+   partitions=24/24 files=24 size=178.13KB
    predicates: id < 10
-   table stats: unavailable
+   stats-rows=unavailable extrapolated-rows=disabled
+   table stats: rows=unavailable size=unavailable
    column stats: unavailable
    parquet statistics predicates: id < 10
    parquet dictionary predicates: id < 10
@@ -98,9 +99,10 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
 |  tuple-ids=1 row-size=16B cardinality=unavailable
 |
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   partitions=24/24 files=24 size=156.57KB
+   partitions=24/24 files=24 size=178.13KB
    predicates: id < 10
-   table stats: unavailable
+   stats-rows=unavailable extrapolated-rows=disabled
+   table stats: rows=unavailable size=unavailable
    column stats: unavailable
    parquet statistics predicates: id < 10
    parquet dictionary predicates: id < 10
@@ -130,9 +132,10 @@ PLAN-ROOT SINK
 |  tuple-ids=4 row-size=8B cardinality=unavailable
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=24/24 files=24 size=156.57KB
+   partitions=24/24 files=24 size=178.13KB
    predicates: id < 10
-   table stats: unavailable
+   stats-rows=unavailable extrapolated-rows=disabled
+   table stats: rows=unavailable size=unavailable
    column stats: unavailable
    parquet statistics predicates: id < 10
    parquet dictionary predicates: id < 10
@@ -167,9 +170,10 @@ F01:PLAN FRAGMENT [HASH(int_col)] hosts=3 instances=9
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   partitions=24/24 files=24 size=156.57KB
+   partitions=24/24 files=24 size=178.13KB
    predicates: id < 10
-   table stats: unavailable
+   stats-rows=unavailable extrapolated-rows=disabled
+   table stats: rows=unavailable size=unavailable
    column stats: unavailable
    parquet statistics predicates: id < 10
    parquet dictionary predicates: id < 10
@@ -226,7 +230,8 @@ PLAN-ROOT SINK
    predicates: c_custkey < 10, !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey < 5
    predicates on o_lineitems: l_linenumber < 3
-   table stats: 150000 rows total
+   stats-rows=150000 extrapolated-rows=disabled
+   table stats: rows=150000 size=292.36MB
    columns missing stats: c_orders
    parquet statistics predicates: c_custkey < 10
    parquet dictionary predicates: c_custkey < 10
@@ -283,7 +288,8 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
    predicates: c_custkey < 10, !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey < 5
    predicates on o_lineitems: l_linenumber < 3
-   table stats: 150000 rows total
+   stats-rows=150000 extrapolated-rows=disabled
+   table stats: rows=150000 size=292.36MB
    columns missing stats: c_orders
    parquet statistics predicates: c_custkey < 10
    parquet dictionary predicates: c_custkey < 10
@@ -331,7 +337,8 @@ PLAN-ROOT SINK
    partitions=1/1 files=4 size=292.36MB
    predicates: !empty(c.c_orders), !empty(c.c_orders)
    predicates on o1: o1.o_orderkey < 5
-   table stats: 150000 rows total
+   stats-rows=150000 extrapolated-rows=disabled
+   table stats: rows=150000 size=292.36MB
    columns missing stats: c_orders, c_orders
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=270B cardinality=150000
@@ -377,7 +384,8 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
    partitions=1/1 files=4 size=292.36MB
    predicates: !empty(c.c_orders), !empty(c.c_orders)
    predicates on o1: o1.o_orderkey < 5
-   table stats: 150000 rows total
+   stats-rows=150000 extrapolated-rows=disabled
+   table stats: rows=150000 size=292.36MB
    columns missing stats: c_orders, c_orders
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=270B cardinality=150000

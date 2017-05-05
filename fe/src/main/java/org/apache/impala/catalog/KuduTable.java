@@ -201,7 +201,7 @@ public class KuduTable extends Table {
     kuduMasters_ = msTable_.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
     Preconditions.checkNotNull(kuduMasters_);
     org.apache.kudu.client.KuduTable kuduTable = null;
-    numRows_ = getRowCount(msTable_.getParameters());
+    setTableStats(msTable_);
 
     // Connect to Kudu to retrieve table metadata
     try (KuduClient kuduClient = KuduUtil.createKuduClient(getKuduMasterHosts())) {

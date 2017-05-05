@@ -1,0 +1,148 @@
+====
+---- QUERY
+create table alltypes like functional_parquet.alltypes;
+insert into alltypes partition(year, month)
+select * from functional_parquet.alltypes where year = 2009;
+====
+---- QUERY
+# No stats are available.
+explain select id from alltypes;
+---- RESULTS: VERIFY_IS_SUBSET
+'   stats-rows=unavailable extrapolated-rows=unavailable'
+'   table stats: rows=unavailable size=unavailable'
+'   column stats: unavailable'
+'   mem-estimate=16.00MB mem-reservation=0B'
+'   tuple-ids=0 row-size=4B cardinality=unavailable'
+---- TYPES
+STRING
+====
+---- QUERY
+compute stats alltypes
+---- RESULTS
+'Updated 12 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+# Stats are available now.
+explain select id from alltypes;
+---- RESULTS: VERIFY_IS_EQUAL
+'Per-Host Resource Reservation: Memory=0B'
+'Per-Host Resource Estimates: Memory=16.00MB'
+''
+'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
+'PLAN-ROOT SINK'
+'|  mem-estimate=0B mem-reservation=0B'
+'|'
+'00:SCAN HDFS [$DATABASE.alltypes]'
+row_regex:.*partitions=12/12 files=12 size=.*
+'   stats-rows=3650 extrapolated-rows=3650'
+row_regex:.*table stats: rows=3650 size=.*
+'   column stats: all'
+'   mem-estimate=16.00MB mem-reservation=0B'
+'   tuple-ids=0 row-size=4B cardinality=3650'
+---- TYPES
+STRING
+====
+---- QUERY
+# Select a subset of partitions.
+explain select id from alltypes where month in (1, 2, 3);
+---- RESULTS: VERIFY_IS_EQUAL
+'Per-Host Resource Reservation: Memory=0B'
+'Per-Host Resource Estimates: Memory=16.00MB'
+''
+'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
+'PLAN-ROOT SINK'
+'|  mem-estimate=0B mem-reservation=0B'
+'|'
+'00:SCAN HDFS [$DATABASE.alltypes]'
+row_regex:.*partitions=3/12 files=3 size=.*
+'   stats-rows=900 extrapolated-rows=904'
+row_regex:.*table stats: rows=3650 size=.*
+'   column stats: all'
+'   mem-estimate=16.00MB mem-reservation=0B'
+'   tuple-ids=0 row-size=4B cardinality=904'
+---- TYPES
+STRING
+====
+---- QUERY
+# Double the data in existing partitions.
+insert into alltypes partition(year, month)
+select * from functional_parquet.alltypes where year = 2009;
+explain select id from alltypes;
+---- RESULTS: VERIFY_IS_EQUAL
+'Per-Host Resource Reservation: Memory=0B'
+'Per-Host Resource Estimates: Memory=16.00MB'
+''
+'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
+'PLAN-ROOT SINK'
+'|  mem-estimate=0B mem-reservation=0B'
+'|'
+'00:SCAN HDFS [$DATABASE.alltypes]'
+row_regex:.*partitions=12/12 files=24 size=.*
+'   stats-rows=3650 extrapolated-rows=7300'
+row_regex:.*table stats: rows=3650 size=.*
+'   column stats: all'
+'   mem-estimate=16.00MB mem-reservation=0B'
+'   tuple-ids=0 row-size=4B cardinality=7300'
+---- TYPES
+STRING
+====
+---- QUERY
+# Create new partitions and extrapolate their row count.
+insert into alltypes partition(year, month)
+select * from functional_parquet.alltypes where year = 2010;
+explain select id from alltypes where year = 2010;
+---- RESULTS: VERIFY_IS_EQUAL
+'Per-Host Resource Reservation: Memory=0B'
+'Per-Host Resource Estimates: Memory=16.00MB'
+''
+'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
+'PLAN-ROOT SINK'
+'|  mem-estimate=0B mem-reservation=0B'
+'|'
+'00:SCAN HDFS [$DATABASE.alltypes]'
+row_regex:.*partitions=12/24 files=12 size=.*
+'   stats-rows=unavailable extrapolated-rows=3651'
+row_regex:.*table stats: rows=3650 size=.*
+'   column stats: all'
+'   mem-estimate=16.00MB mem-reservation=0B'
+'   tuple-ids=0 row-size=4B cardinality=3651'
+---- TYPES
+STRING
+====
+---- QUERY
+# Compute stats and run the same query again.
+compute stats alltypes;
+explain select id from alltypes where year = 2010;
+---- RESULTS: VERIFY_IS_EQUAL
+'Per-Host Resource Reservation: Memory=0B'
+'Per-Host Resource Estimates: Memory=16.00MB'
+''
+'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
+'PLAN-ROOT SINK'
+'|  mem-estimate=0B mem-reservation=0B'
+'|'
+'00:SCAN HDFS [$DATABASE.alltypes]'
+row_regex:.*partitions=12/24 files=12 size=.*
+'   stats-rows=3650 extrapolated-rows=3651'
+row_regex:.*table stats: rows=10950 size=.*
+'   column stats: all'
+'   mem-estimate=16.00MB mem-reservation=0B'
+'   tuple-ids=0 row-size=4B cardinality=3651'
+---- TYPES
+STRING
+====
+---- QUERY
+# Test that dropping stats resets everything.
+drop stats alltypes;
+explain select id from alltypes;
+---- RESULTS: VERIFY_IS_SUBSET
+'   stats-rows=unavailable extrapolated-rows=unavailable'
+'   table stats: rows=unavailable size=unavailable'
+'   column stats: unavailable'
+'   mem-estimate=16.00MB mem-reservation=0B'
+'   tuple-ids=0 row-size=4B cardinality=unavailable'
+---- TYPES
+STRING
+====

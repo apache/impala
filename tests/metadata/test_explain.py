@@ -70,7 +70,7 @@ class TestExplain(ImpalaTestSuite):
     vector.get_value('exec_option')['explain_level'] = 3
     self.run_test_case('QueryTest/explain-level3', vector)
 
-  def test_explain_validate_cardinality_estimates(self, vector):
+  def test_explain_validate_cardinality_estimates(self, vector, unique_database):
     # Tests that the cardinality estimates are correct for partitioned tables.
     # TODO Cardinality estimation tests should eventually be part of the planner tests.
     # TODO Remove this test
@@ -100,6 +100,37 @@ class TestExplain(ImpalaTestSuite):
     result = self.execute_query("explain select * from %s.%s" % (db_name, tbl_name),
         query_options={'explain_level':3})
     check_cardinality(result.data, '7300')
+
+    # Create a partitioned table with a mixed set of available stats,
+    mixed_tbl = unique_database + ".t"
+    self.execute_query(
+      "create table %s (c int) partitioned by (p int)" % mixed_tbl)
+    self.execute_query(
+      "insert into table %s partition (p) values(1,1),(2,2),(3,3)" % mixed_tbl)
+    # Set the number of rows at the table level.
+    self.execute_query(
+      "alter table %s set tblproperties('numRows'='100')" % mixed_tbl)
+    # Should fall back to table-level cardinality when partitions lack stats.
+    result = self.execute_query("explain select * from %s" % mixed_tbl,
+        query_options={'explain_level':3})
+    check_cardinality(result.data, '100')
+    # Should fall back to table-level cardinality, even for a subset of partitions,
+    result = self.execute_query("explain select * from %s where p = 1" % mixed_tbl,
+        query_options={'explain_level':3})
+    check_cardinality(result.data, '100')
+    # Set the number of rows for a single partition.
+    self.execute_query(
+      "alter table %s partition(p=1) set tblproperties('numRows'='50')" % mixed_tbl)
+    # Use partition stats when availabe. Partitions without stats are ignored.
+    result = self.execute_query("explain select * from %s" % mixed_tbl,
+        query_options={'explain_level':3})
+    check_cardinality(result.data, '50')
+    # Fall back to table-level stats when no selected partitions have stats.
+    result = self.execute_query("explain select * from %s where p = 2" % mixed_tbl,
+        query_options={'explain_level':3})
+    check_cardinality(result.data, '100')  
+
+
 
 class TestExplainEmptyPartition(ImpalaTestSuite):
   TEST_DB_NAME = "imp_1708"

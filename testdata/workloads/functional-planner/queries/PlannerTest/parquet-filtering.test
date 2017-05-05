@@ -17,9 +17,10 @@ PLAN-ROOT SINK
 |  tuple-ids=1 row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=24/24 files=24 size=156.57KB
+   partitions=24/24 files=24 size=178.13KB
    predicates: int_col IS NULL, int_col > 1, int_col > tinyint_col, int_col * rand() > 50
-   table stats: unavailable
+   stats-rows=unavailable extrapolated-rows=disabled
+   table stats: rows=unavailable size=unavailable
    column stats: unavailable
    parquet statistics predicates: int_col > 1
    parquet dictionary predicates: int_col > 1
@@ -45,9 +46,10 @@ PLAN-ROOT SINK
 |  tuple-ids=1 row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=22/24 files=22 size=143.36KB
+   partitions=22/24 files=22 size=163.12KB
    predicates: bool_col, bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, tinyint_col < 50, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), mod(int_col, 2) = 1, timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = 1, date_string_col > '1993-10-01'
-   table stats: unavailable
+   stats-rows=unavailable extrapolated-rows=disabled
+   table stats: rows=unavailable size=unavailable
    columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
    parquet statistics predicates: bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, tinyint_col < 50, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), date_string_col > '1993-10-01'
    parquet dictionary predicates: bool_col, bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, tinyint_col < 50, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), mod(int_col, 2) = 1, timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = 1, date_string_col > '1993-10-01'
@@ -65,20 +67,21 @@ and mod(int_col,50) IN (0,1)
 and id IN (int_col);
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-  PLAN-ROOT SINK
-  |  mem-estimate=0B mem-reservation=0B
-  |
-  01:AGGREGATE [FINALIZE]
-  |  output: count(*)
-  |  mem-estimate=10.00MB mem-reservation=0B
-  |  tuple-ids=1 row-size=8B cardinality=1
-  |
-  00:SCAN HDFS [functional_parquet.alltypes]
-     partitions=24/24 files=24 size=173.09KB
-     predicates: id IN (int_col), id NOT IN (0, 1, 2), string_col IN ('aaaa', 'bbbb', 'cccc', NULL), mod(int_col, 50) IN (0, 1)
-     table stats: unavailable
-     column stats: unavailable
-     parquet dictionary predicates: id NOT IN (0, 1, 2), string_col IN ('aaaa', 'bbbb', 'cccc', NULL), mod(int_col, 50) IN (0, 1)
-     mem-estimate=48.00MB mem-reservation=0B
-     tuple-ids=0 row-size=24B cardinality=unavailable
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  mem-estimate=10.00MB mem-reservation=0B
+|  tuple-ids=1 row-size=8B cardinality=1
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=178.13KB
+   predicates: id IN (int_col), id NOT IN (0, 1, 2), string_col IN ('aaaa', 'bbbb', 'cccc', NULL), mod(int_col, 50) IN (0, 1)
+   stats-rows=unavailable extrapolated-rows=disabled
+   table stats: rows=unavailable size=unavailable
+   column stats: unavailable
+   parquet dictionary predicates: id NOT IN (0, 1, 2), string_col IN ('aaaa', 'bbbb', 'cccc', NULL), mod(int_col, 50) IN (0, 1)
+   mem-estimate=48.00MB mem-reservation=0B
+   tuple-ids=0 row-size=24B cardinality=unavailable
 ====

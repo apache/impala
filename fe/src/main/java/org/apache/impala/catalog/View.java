@@ -31,6 +31,7 @@ import org.apache.impala.analysis.SqlScanner;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
+import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.thrift.TTableType;
 import com.google.common.collect.Lists;
 
@@ -114,7 +115,8 @@ public class View extends Table {
       }
       // These fields are irrelevant for views.
       numClusteringCols_ = 0;
-      numRows_ = -1;
+      tableStats_ = new TTableStats(-1);
+      tableStats_.setTotal_file_bytes(-1);
       init();
     } catch (TableLoadingException e) {
       throw e;

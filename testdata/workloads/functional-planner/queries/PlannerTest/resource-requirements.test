@@ -15,7 +15,8 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.61MB
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.61MB
    column stats: all
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
@@ -34,7 +35,8 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.61MB
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.61MB
    column stats: all
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
@@ -56,7 +58,8 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
    column stats: all
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
@@ -75,7 +78,8 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
    column stats: all
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
@@ -98,7 +102,7 @@ PLAN-ROOT SINK
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=100 instances=100
 00:SCAN HBASE [functional_hbase.alltypes]
-   table stats: unavailable
+   table stats: rows=unavailable
    column stats: unavailable
    mem-estimate=1.00GB mem-reservation=0B
    tuple-ids=0 row-size=88B cardinality=14298
@@ -118,7 +122,7 @@ PLAN-ROOT SINK
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=100 instances=200
 00:SCAN HBASE [functional_hbase.alltypes]
-   table stats: unavailable
+   table stats: rows=unavailable
    column stats: unavailable
    mem-estimate=1.00GB mem-reservation=0B
    tuple-ids=0 row-size=88B cardinality=14298
@@ -186,14 +190,16 @@ F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 |
 |--02:SCAN HDFS [tpch.lineitem, RANDOM]
 |     partitions=1/1 files=1 size=718.94MB
-|     table stats: 6001215 rows total
+|     stats-rows=6001215 extrapolated-rows=disabled
+|     table stats: rows=6001215 size=718.94MB
 |     column stats: all
 |     mem-estimate=88.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=263B cardinality=6001215
 |
 01:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
    column stats: all
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
@@ -217,14 +223,16 @@ F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 |
 |--02:SCAN HDFS [tpch.lineitem, RANDOM]
 |     partitions=1/1 files=1 size=718.94MB
-|     table stats: 6001215 rows total
+|     stats-rows=6001215 extrapolated-rows=disabled
+|     table stats: rows=6001215 size=718.94MB
 |     column stats: all
 |     mem-estimate=88.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=263B cardinality=6001215
 |
 01:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
    column stats: all
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
@@ -265,7 +273,8 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.61MB
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.61MB
    column stats: all
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=8B cardinality=6001215
@@ -301,7 +310,8 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.61MB
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.61MB
    column stats: all
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=8B cardinality=6001215
@@ -333,7 +343,8 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.61MB
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.61MB
    column stats: all
    mem-estimate=0B mem-reservation=0B
    tuple-ids=0 row-size=0B cardinality=6001215
@@ -362,7 +373,8 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.61MB
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.61MB
    column stats: all
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=0B cardinality=6001215
@@ -392,7 +404,8 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.61MB
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.61MB
    column stats: all
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
@@ -417,7 +430,8 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.61MB
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.61MB
    column stats: all
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
@@ -449,7 +463,8 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.61MB
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.61MB
    column stats: all
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
@@ -475,7 +490,8 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.61MB
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.61MB
    column stats: all
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
@@ -509,7 +525,8 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
 |  01:SCAN HDFS [tpch.orders, RANDOM]
 |     partitions=1/1 files=1 size=162.56MB
-|     table stats: 1500000 rows total
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=162.56MB
 |     column stats: all
 |     mem-estimate=88.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=191B cardinality=1500000
@@ -517,7 +534,8 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    runtime filters: RF000 -> l_orderkey
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
    column stats: all
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
@@ -554,7 +572,8 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
 |  01:SCAN HDFS [tpch.orders, RANDOM]
 |     partitions=1/1 files=1 size=162.56MB
-|     table stats: 1500000 rows total
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=162.56MB
 |     column stats: all
 |     mem-estimate=88.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=191B cardinality=1500000
@@ -562,7 +581,8 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    runtime filters: RF000 -> l_orderkey
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
    column stats: all
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
@@ -594,14 +614,16 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
 |  01:SCAN HDFS [tpch.orders, RANDOM]
 |     partitions=1/1 files=1 size=162.56MB
-|     table stats: 1500000 rows total
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=162.56MB
 |     column stats: all
 |     mem-estimate=88.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=191B cardinality=1500000
 |
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
    column stats: all
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
@@ -635,14 +657,16 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
 |  01:SCAN HDFS [tpch.orders, RANDOM]
 |     partitions=1/1 files=1 size=162.56MB
-|     table stats: 1500000 rows total
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=162.56MB
 |     column stats: all
 |     mem-estimate=88.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=191B cardinality=1500000
 |
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
    column stats: all
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
@@ -706,7 +730,8 @@ F01:PLAN FRAGMENT [HASH(int_col)] hosts=3 instances=3
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 00:SCAN HDFS [functional.alltypes, RANDOM]
    partitions=24/24 files=24 size=478.45KB
-   table stats: 7300 rows total
+   stats-rows=7300 extrapolated-rows=disabled
+   table stats: rows=7300 size=478.45KB
    column stats: all
    mem-estimate=16.00MB mem-reservation=0B
    tuple-ids=0 row-size=5B cardinality=7300
@@ -741,7 +766,8 @@ F01:PLAN FRAGMENT [HASH(int_col)] hosts=3 instances=6
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 00:SCAN HDFS [functional.alltypes, RANDOM]
    partitions=24/24 files=24 size=478.45KB
-   table stats: 7300 rows total
+   stats-rows=7300 extrapolated-rows=disabled
+   table stats: rows=7300 size=478.45KB
    column stats: all
    mem-estimate=16.00MB mem-reservation=0B
    tuple-ids=0 row-size=5B cardinality=7300
@@ -844,7 +870,8 @@ F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
 |  |
 |  03:SCAN HDFS [tpch.lineitem, RANDOM]
 |     partitions=1/1 files=1 size=718.94MB
-|     table stats: 6001215 rows total
+|     stats-rows=6001215 extrapolated-rows=disabled
+|     table stats: rows=6001215 size=718.94MB
 |     column stats: all
 |     mem-estimate=88.00MB mem-reservation=0B
 |     tuple-ids=3 row-size=16B cardinality=6001215
@@ -862,7 +889,8 @@ F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
 |  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  00:SCAN HDFS [tpch.customer, RANDOM]
 |     partitions=1/1 files=1 size=23.08MB
-|     table stats: 150000 rows total
+|     stats-rows=150000 extrapolated-rows=disabled
+|     table stats: rows=150000 size=23.08MB
 |     column stats: all
 |     mem-estimate=32.00MB mem-reservation=0B
 |     tuple-ids=0 row-size=42B cardinality=150000
@@ -881,7 +909,8 @@ F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
 |  01:SCAN HDFS [tpch.orders, RANDOM]
 |     partitions=1/1 files=1 size=162.56MB
 |     runtime filters: RF000 -> o_orderkey, RF001 -> o_custkey
-|     table stats: 1500000 rows total
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=162.56MB
 |     column stats: all
 |     mem-estimate=88.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=50B cardinality=1500000
@@ -894,7 +923,8 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 02:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    runtime filters: RF000 -> tpch.lineitem.l_orderkey, RF002 -> l_orderkey
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
    column stats: all
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=2 row-size=16B cardinality=6001215
@@ -968,7 +998,8 @@ F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
 |  |
 |  03:SCAN HDFS [tpch.lineitem, RANDOM]
 |     partitions=1/1 files=1 size=718.94MB
-|     table stats: 6001215 rows total
+|     stats-rows=6001215 extrapolated-rows=disabled
+|     table stats: rows=6001215 size=718.94MB
 |     column stats: all
 |     mem-estimate=88.00MB mem-reservation=0B
 |     tuple-ids=3 row-size=16B cardinality=6001215
@@ -993,7 +1024,8 @@ F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
 |  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
 |  00:SCAN HDFS [tpch.customer, RANDOM]
 |     partitions=1/1 files=1 size=23.08MB
-|     table stats: 150000 rows total
+|     stats-rows=150000 extrapolated-rows=disabled
+|     table stats: rows=150000 size=23.08MB
 |     column stats: all
 |     mem-estimate=32.00MB mem-reservation=0B
 |     tuple-ids=0 row-size=42B cardinality=150000
@@ -1019,7 +1051,8 @@ F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
 |  01:SCAN HDFS [tpch.orders, RANDOM]
 |     partitions=1/1 files=1 size=162.56MB
 |     runtime filters: RF000 -> o_orderkey, RF001 -> o_custkey
-|     table stats: 1500000 rows total
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=162.56MB
 |     column stats: all
 |     mem-estimate=88.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=50B cardinality=1500000
@@ -1032,7 +1065,8 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 02:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    runtime filters: RF000 -> tpch.lineitem.l_orderkey, RF002 -> l_orderkey
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
    column stats: all
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=2 row-size=16B cardinality=6001215
@@ -1054,7 +1088,8 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |
 00:SCAN HDFS [functional.alltypes, RANDOM]
    partitions=1/24 files=1 size=20.36KB
-   table stats: 7300 rows total
+   stats-rows=310 extrapolated-rows=disabled
+   table stats: rows=7300 size=478.45KB
    column stats: all
    mem-estimate=16.00MB mem-reservation=0B
    tuple-ids=0 row-size=89B cardinality=310
@@ -1069,7 +1104,8 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |
 00:SCAN HDFS [functional.alltypes, RANDOM]
    partitions=1/24 files=1 size=20.36KB
-   table stats: 7300 rows total
+   stats-rows=310 extrapolated-rows=disabled
+   table stats: rows=7300 size=478.45KB
    column stats: all
    mem-estimate=16.00MB mem-reservation=0B
    tuple-ids=0 row-size=89B cardinality=310
@@ -1094,7 +1130,8 @@ WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
    column stats: all
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=50B cardinality=6001215
@@ -1114,7 +1151,8 @@ WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
-   table stats: 6001215 rows total
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
    column stats: all
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=50B cardinality=6001215

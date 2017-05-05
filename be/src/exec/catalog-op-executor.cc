@@ -112,6 +112,10 @@ Status CatalogOpExecutor::ExecComputeStats(
   // Fill the alteration request based on the child-query results.
   SetTableStats(tbl_stats_schema, tbl_stats_data,
       compute_stats_params.existing_part_stats, &update_stats_params);
+  if (compute_stats_params.__isset.total_file_bytes) {
+    update_stats_params.table_stats.__set_total_file_bytes(
+        compute_stats_params.total_file_bytes);
+  }
   // col_stats_schema and col_stats_data will be empty if there was no column stats query.
   if (!col_stats_schema.columns.empty()) {
     if (compute_stats_params.is_incremental) {

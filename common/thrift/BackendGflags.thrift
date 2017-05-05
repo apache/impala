@@ -31,6 +31,8 @@ struct TBackendGflags {
 
   5: required i64 inc_stats_size_limit_bytes
 
+ 19: required bool enable_stats_extrapolation
+
   6: required string lineage_event_log_dir
 
   7: required bool load_catalog_in_background

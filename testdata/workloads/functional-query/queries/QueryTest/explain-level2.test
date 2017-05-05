@@ -30,7 +30,8 @@ from tpch.lineitem join tpch.orders on l_orderkey = o_orderkey;
 '|  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2'
 '|  01:SCAN HDFS [tpch.orders, RANDOM]'
 row_regex:.*partitions=1/1 files=1 size=.*
-'|     table stats: 1500000 rows total'
+'|     stats-rows=1500000 extrapolated-rows=disabled'
+'|     table stats: rows=1500000 size=162.56MB'
 '|     column stats: all'
 '|     mem-estimate=88.00MB mem-reservation=0B'
 '|     tuple-ids=1 row-size=191B cardinality=1500000'
@@ -38,7 +39,8 @@ row_regex:.*partitions=1/1 files=1 size=.*
 '00:SCAN HDFS [tpch.lineitem, RANDOM]'
 row_regex:.*partitions=1/1 files=1 size=.*
 '   runtime filters: RF000 -> l_orderkey'
-'   table stats: 6001215 rows total'
+'   stats-rows=6001215 extrapolated-rows=disabled'
+'   table stats: rows=6001215 size=718.94MB'
 '   column stats: all'
 '   mem-estimate=88.00MB mem-reservation=0B'
 '   tuple-ids=0 row-size=263B cardinality=6001215'

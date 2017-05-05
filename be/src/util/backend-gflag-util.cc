@@ -26,6 +26,7 @@
 // Configs for the Frontend and the Catalog.
 DECLARE_bool(load_catalog_in_background);
 DECLARE_bool(load_auth_to_local_rules);
+DECLARE_bool(enable_stats_extrapolation);
 DECLARE_int32(non_impala_java_vlog);
 DECLARE_int32(read_size);
 DECLARE_int32(num_metadata_loading_threads);
@@ -42,7 +43,6 @@ DECLARE_string(authorization_policy_provider_class);
 DECLARE_string(authorized_proxy_user_config);
 DECLARE_string(authorized_proxy_user_config_delimiter);
 DECLARE_string(kudu_master_hosts);
-DECLARE_string(sentry_config);
 DECLARE_string(sentry_config);
 
 namespace impala {
@@ -67,6 +67,7 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_impala_log_lvl(FlagToTLogLevel(FLAGS_v));
   cfg.__set_non_impala_java_vlog(FlagToTLogLevel(FLAGS_non_impala_java_vlog));
   cfg.__set_inc_stats_size_limit_bytes(FLAGS_inc_stats_size_limit_bytes);
+  cfg.__set_enable_stats_extrapolation(FLAGS_enable_stats_extrapolation);
   cfg.__set_lineage_event_log_dir(FLAGS_lineage_event_log_dir);
   cfg.__set_local_library_path(FLAGS_local_library_dir);
   cfg.__set_kudu_operation_timeout_ms(FLAGS_kudu_operation_timeout_ms);

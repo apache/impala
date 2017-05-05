@@ -73,8 +73,9 @@ public abstract class Table implements CatalogObject {
   // Number of clustering columns.
   protected int numClusteringCols_;
 
-  // estimated number of rows in table; -1: unknown.
-  protected long numRows_ = -1;
+  // Contains the estimated number of rows and optional file bytes. Non-null. Member
+  // values of -1 indicate an unknown statistic.
+  protected TTableStats tableStats_;
 
   // colsByPos[i] refers to the ith column in the table. The first numClusteringCols are
   // the clustering columns.
@@ -100,6 +101,8 @@ public abstract class Table implements CatalogObject {
     owner_ = owner;
     lastDdlTime_ = (msTable_ != null) ?
         CatalogServiceCatalog.getLastDdlTime(msTable_) : -1;
+    tableStats_ = new TTableStats(-1);
+    tableStats_.setTotal_file_bytes(-1);
   }
 
   public ReentrantLock getLock() { return tableLock_; }
@@ -120,6 +123,14 @@ public abstract class Table implements CatalogObject {
    */
   public abstract void load(boolean reuseMetadata, IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException;
+
+  /**
+   * Sets 'tableStats_' by extracting the table statistics from the given HMS table.
+   */
+  public void setTableStats(org.apache.hadoop.hive.metastore.api.Table msTbl) {
+    tableStats_ = new TTableStats(getRowCount(msTbl.getParameters()));
+    tableStats_.setTotal_file_bytes(getRawDataSize(msTbl.getParameters()));
+  }
 
   public void addColumn(Column col) {
     colsByPos_.add(col);
@@ -199,11 +210,19 @@ public abstract class Table implements CatalogObject {
    * Returns the value of the ROW_COUNT constant, or -1 if not found.
    */
   protected static long getRowCount(Map<String, String> parameters) {
+    return getLongParam(StatsSetupConst.ROW_COUNT, parameters);
+  }
+
+  protected static long getRawDataSize(Map<String, String> parameters) {
+    return getLongParam(StatsSetupConst.RAW_DATA_SIZE, parameters);
+  }
+
+  private static long getLongParam(String key, Map<String, String> parameters) {
     if (parameters == null) return -1;
-    String numRowsStr = parameters.get(StatsSetupConst.ROW_COUNT);
-    if (numRowsStr == null) return -1;
+    String value = parameters.get(key);
+    if (value == null) return -1;
     try {
-      return Long.valueOf(numRowsStr);
+      return Long.valueOf(value);
     } catch (NumberFormatException exc) {
       // ignore
     }
@@ -279,10 +298,7 @@ public abstract class Table implements CatalogObject {
     }
 
     numClusteringCols_ = thriftTable.getClustering_columns().size();
-
-    // Estimated number of rows
-    numRows_ = thriftTable.isSetTable_stats() ?
-        thriftTable.getTable_stats().getNum_rows() : -1;
+    if (thriftTable.isSetTable_stats()) tableStats_ = thriftTable.getTable_stats();
 
     // Default to READ_WRITE access if the field is not set.
     accessLevel_ = thriftTable.isSetAccess_level() ? thriftTable.getAccess_level() :
@@ -337,10 +353,7 @@ public abstract class Table implements CatalogObject {
     }
 
     table.setMetastore_table(getMetaStoreTable());
-    if (numRows_ != -1) {
-      table.setTable_stats(new TTableStats());
-      table.getTable_stats().setNum_rows(numRows_);
-    }
+    table.setTable_stats(tableStats_);
     return table;
   }
 
@@ -473,7 +486,8 @@ public abstract class Table implements CatalogObject {
     numClusteringCols_ = n;
   }
 
-  public long getNumRows() { return numRows_; }
+  public long getNumRows() { return tableStats_.num_rows; }
+  public TTableStats getTTableStats() { return tableStats_; }
   public ArrayType getType() { return type_; }
 
   @Override

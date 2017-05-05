@@ -497,6 +497,10 @@ struct TComputeStatsParams {
   // The number of partition columns for the target table. Only set if this is_incremental
   // is true.
   8: optional i32 num_partition_cols
+
+  // Sum of file sizes in the table. Only set for tables of type HDFS_TABLE and if
+  // is_incremental is false.
+  9: optional i64 total_file_bytes
 }
 
 // Parameters for CREATE/DROP ROLE

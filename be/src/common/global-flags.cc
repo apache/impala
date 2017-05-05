@@ -131,3 +131,7 @@ DEFINE_int64(inc_stats_size_limit_bytes, 200 * (1LL<<20), "Maximum size of "
     "This limit is set as a safety check, to prevent the JVM from "
     "hitting a maximum array limit of 1GB (or OOM) while building "
     "the thrift objects to send to impalads. By default, it's set to 200MB");
+
+DEFINE_bool(enable_stats_extrapolation, false,
+    "If true, uses table statistics computed with COMPUTE STATS "
+    "to extrapolate the row counts of partitions.");

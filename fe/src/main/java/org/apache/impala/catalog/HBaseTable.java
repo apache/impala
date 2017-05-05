@@ -408,7 +408,7 @@ public class HBaseTable extends Table {
       }
 
       // Set table stats.
-      numRows_ = getRowCount(super.getMetaStoreTable().getParameters());
+      setTableStats(msTable_);
 
       // since we don't support composite hbase rowkeys yet, all hbase tables have a
       // single clustering col

@@ -49,6 +49,9 @@ public class BackendConfig {
     return !Strings.isNullOrEmpty(backendCfg_.lineage_event_log_dir);
   }
   public long getIncStatsMaxSize() { return backendCfg_.inc_stats_size_limit_bytes; }
+  public boolean enableStatsExtrapolation() {
+    return backendCfg_.enable_stats_extrapolation;
+  }
   public boolean isAuthToLocalEnabled() {
     return backendCfg_.load_auth_to_local_rules &&
         !Strings.isNullOrEmpty(backendCfg_.principal);

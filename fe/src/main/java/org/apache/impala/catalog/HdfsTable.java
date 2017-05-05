@@ -1057,7 +1057,7 @@ public class HdfsTable extends Table {
         // This is the special case of CTAS that creates a 'temp' table that does not
         // actually exist in the Hive Metastore.
         initializePartitionMetadata(msTbl);
-        updateStatsFromHmsTable(msTbl);
+        setTableStats(msTbl);
         return;
       }
       // Load partition and file metadata
@@ -1082,7 +1082,7 @@ public class HdfsTable extends Table {
         loadAllPartitions(msPartitions, msTbl);
       }
       if (loadTableSchema) setAvroSchema(client, msTbl);
-      updateStatsFromHmsTable(msTbl);
+      setTableStats(msTbl);
       numHdfsFiles_ = -1;
       totalHdfsBytes_ = -1;
     } catch (TableLoadingException e) {
@@ -1232,13 +1232,8 @@ public class HdfsTable extends Table {
     return partitions;
   }
 
-  /**
-   * Updates the cardinality of this table from an HMS table. Sets the cardinalities of
-   * dummy/default partitions for the case of unpartitioned tables.
-   */
-  private void updateStatsFromHmsTable(
-      org.apache.hadoop.hive.metastore.api.Table msTbl) {
-    numRows_ = getRowCount(msTbl.getParameters());
+  public void setTableStats(org.apache.hadoop.hive.metastore.api.Table msTbl) {
+    super.setTableStats(msTbl);
     // For unpartitioned tables set the numRows in its partitions
     // to the table's numRows.
     if (numClusteringCols_ == 0 && !partitionMap_.isEmpty()) {
@@ -1246,7 +1241,7 @@ public class HdfsTable extends Table {
       // Temp tables used in CTAS statements have one partition.
       Preconditions.checkState(partitionMap_.size() == 2 || partitionMap_.size() == 1);
       for (HdfsPartition p: partitionMap_.values()) {
-        p.setNumRows(numRows_);
+        p.setNumRows(getNumRows());
       }
     }
   }
@@ -1765,6 +1760,29 @@ public class HdfsTable extends Table {
   }
 
   /**
+   * Returns an estimated row count for the given number of file bytes. The row count is
+   * extrapolated using the table-level row count and file bytes statistics.
+   * Returns zero only if the given file bytes is zero.
+   * Returns -1 if:
+   * - stats extrapolation has been disabled
+   * - the given file bytes statistic is negative
+   * - the row count or the file byte statistic is missing
+   * - the file bytes statistic is zero or negative
+   * - the row count statistic is zero and the file bytes is non-zero
+   * Otherwise, returns a value >= 1.
+   */
+  public long getExtrapolatedNumRows(long fileBytes) {
+    if (!BackendConfig.INSTANCE.enableStatsExtrapolation()) return -1;
+    if (fileBytes == 0) return 0;
+    if (fileBytes < 0) return -1;
+    if (tableStats_.num_rows < 0 || tableStats_.total_file_bytes <= 0) return -1;
+    if (tableStats_.num_rows == 0 && tableStats_.total_file_bytes != 0) return -1;
+    double rowsPerByte = tableStats_.num_rows / (double) tableStats_.total_file_bytes;
+    double extrapolatedNumRows = fileBytes * rowsPerByte;
+    return (long) Math.max(1, Math.round(extrapolatedNumRows));
+  }
+
+  /**
    * Returns statistics on this table as a tabular result set. Used for the
    * SHOW TABLE STATS statement. The schema of the returned TResultSet is set
    * inside this method.
@@ -1781,7 +1799,12 @@ public class HdfsTable extends Table {
       resultSchema.addToColumns(colDesc);
     }
 
+    boolean statsExtrap = BackendConfig.INSTANCE.enableStatsExtrapolation();
+
     resultSchema.addToColumns(new TColumn("#Rows", Type.BIGINT.toThrift()));
+    if (statsExtrap) {
+      resultSchema.addToColumns(new TColumn("Extrap #Rows", Type.BIGINT.toThrift()));
+    }
     resultSchema.addToColumns(new TColumn("#Files", Type.BIGINT.toThrift()));
     resultSchema.addToColumns(new TColumn("Size", Type.STRING.toThrift()));
     resultSchema.addToColumns(new TColumn("Bytes Cached", Type.STRING.toThrift()));
@@ -1806,9 +1829,13 @@ public class HdfsTable extends Table {
         rowBuilder.add(expr.getStringValue());
       }
 
-      // Add number of rows, files, bytes, cache stats, and file format.
-      rowBuilder.add(p.getNumRows()).add(p.getFileDescriptors().size())
-          .addBytes(p.getSize());
+      // Add rows, extrapolated rows, files, bytes, cache stats, and file format.
+      rowBuilder.add(p.getNumRows());
+      // Compute and report the extrapolated row count because the set of files could
+      // have changed since we last computed stats for this partition. We also follow
+      // this policy during scan-cardinality estimation.
+      if (statsExtrap) rowBuilder.add(getExtrapolatedNumRows(p.getSize()));
+      rowBuilder.add(p.getFileDescriptors().size()).addBytes(p.getSize());
       if (!p.isMarkedCached()) {
         // Helps to differentiate partitions that have 0B cached versus partitions
         // that are not marked as cached.
@@ -1853,8 +1880,14 @@ public class HdfsTable extends Table {
         rowBuilder.add("");
       }
 
-      // Total num rows, files, and bytes (leave format empty).
-      rowBuilder.add(numRows_).add(numHdfsFiles_).addBytes(totalHdfsBytes_)
+      // Total rows, extrapolated rows, files, bytes, cache stats.
+      // Leave format empty.
+      rowBuilder.add(getNumRows());
+      // Compute and report the extrapolated row count because the set of files could
+      // have changed since we last computed stats for this partition. We also follow
+      // this policy during scan-cardinality estimation.
+      if (statsExtrap) rowBuilder.add(getExtrapolatedNumRows(totalHdfsBytes_));
+      rowBuilder.add(numHdfsFiles_).addBytes(totalHdfsBytes_)
           .addBytes(totalCachedBytes).add("").add("").add("").add("");
       result.addToRows(rowBuilder.get());
     }
