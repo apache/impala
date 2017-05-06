@@ -359,7 +359,8 @@ def build_insert_into_statement(insert, db_name, db_suffix, table_name, file_for
   insert_statement = insert.format(db_name=db_name,
                                    db_suffix=db_suffix,
                                    table_name=table_name,
-                                   hdfs_location=hdfs_path)
+                                   hdfs_location=hdfs_path,
+                                   impala_home = os.getenv("IMPALA_HOME"))
 
   # Kudu tables are managed and don't support OVERWRITE, so we replace OVERWRITE
   # with INTO to make this a regular INSERT.

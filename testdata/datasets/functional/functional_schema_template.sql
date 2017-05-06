@@ -2088,6 +2088,8 @@ delimited fields terminated by ','  escaped by '\\'
 ALTER TABLE {table_name} SET TBLPROPERTIES('skip.header.line.count'='1');
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- DEPENDENT_LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header.gz' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -2102,6 +2104,8 @@ delimited fields terminated by ','  escaped by '\\'
 ALTER TABLE {table_name} SET TBLPROPERTIES('skip.header.line.count'='2');
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header_2.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- DEPENDENT_LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header_2.gz' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional

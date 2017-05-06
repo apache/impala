@@ -189,6 +189,10 @@ table_name:nullescapedtable, constraint:only, table_format:kudu/none/none
 table_name:table_with_header, constraint:restrict_to, table_format:text/none/none
 table_name:table_with_header_2, constraint:restrict_to, table_format:text/none/none
 table_name:table_with_header_insert, constraint:restrict_to, table_format:text/none/none
+# We also test that skipping header lines works on compressed tables (IMPALA-5287)
+table_name:table_with_header, constraint:restrict_to, table_format:text/gzip/block
+table_name:table_with_header_2, constraint:restrict_to, table_format:text/gzip/block
+table_name:table_with_header_insert, constraint:restrict_to, table_format:text/gzip/block
 # Inserting into parquet tables should not be affected by the 'skip.header.line.count'
 # property, so we test parquet format as well.
 table_name:table_with_header_insert, constraint:restrict_to, table_format:parquet/none/none

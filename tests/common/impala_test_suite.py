@@ -274,7 +274,7 @@ class ImpalaTestSuite(BaseTestSuite):
 
 
   def run_test_case(self, test_file_name, vector, use_db=None, multiple_impalad=False,
-      encoding=None):
+      encoding=None, test_file_vars=None):
     """
     Runs the queries in the specified test based on the vector values
 
@@ -285,6 +285,9 @@ class ImpalaTestSuite(BaseTestSuite):
     Additionally, the encoding for all test data can be specified using the 'encoding'
     parameter. This is useful when data is ingested in a different encoding (ex.
     latin). If not set, the default system encoding will be used.
+    If a dict 'test_file_vars' is provided, then all keys will be replaced with their
+    values in queries before they are executed. Callers need to avoid using reserved key
+    names, see 'reserved_keywords' below.
     """
     table_format_info = vector.get_value('table_format')
     exec_options = vector.get_value('exec_option')
@@ -335,6 +338,15 @@ class ImpalaTestSuite(BaseTestSuite):
           .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX)
           .replace('$SECONDARY_FILESYSTEM', os.getenv("SECONDARY_FILESYSTEM") or str()))
       if use_db: query = query.replace('$DATABASE', use_db)
+
+      reserved_keywords = ["$DATABASE", "$FILESYSTEM_PREFIX", "$GROUP_NAME",
+                           "$IMPALA_HOME", "$NAMENODE", "$QUERY", "$SECONDARY_FILESYSTEM"]
+
+      if test_file_vars:
+        for key, value in test_file_vars.iteritems():
+          if key in reserved_keywords:
+            raise RuntimeError("Key {0} is reserved".format(key))
+          query = query.replace(key, value)
 
       if 'QUERY_NAME' in test_section:
         LOG.info('Query Name: \n%s\n' % test_section['QUERY_NAME'])
