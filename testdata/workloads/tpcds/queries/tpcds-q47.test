@@ -18,18 +18,18 @@ with v1 as (
        ss_sold_date_sk = d_date_sk and
        ss_store_sk = s_store_sk and
        (
-         d_year = 2000 or
-         ( d_year = 2000-1 and d_moy =12) or
-         ( d_year = 2000+1 and d_moy =1)
+         d_year = 1999 or
+         ( d_year = 1999-1 and d_moy =12) or
+         ( d_year = 1999+1 and d_moy =1)
        )
  group by i_category, i_brand,
           s_store_name, s_company_name,
           d_year, d_moy),
  v2 as(
- select v1.i_category, v1.i_brand
-        ,v1.d_year
-        ,v1.avg_monthly_sales
-        ,v1.sum_sales, v1_lag.sum_sales psum, v1_lead.sum_sales nsum
+ select v1.i_category, v1.i_brand, v1.s_store_name, v1.s_company_name,
+        v1.d_year, v1.d_moy,
+        v1.avg_monthly_sales,
+        v1.sum_sales, v1_lag.sum_sales psum, v1_lead.sum_sales nsum
  from v1, v1 v1_lag, v1 v1_lead
  where v1.i_category = v1_lag.i_category and
        v1.i_category = v1_lead.i_category and
@@ -41,115 +41,114 @@ with v1 as (
        v1.s_company_name = v1_lead.s_company_name and
        v1.rn = v1_lag.rn + 1 and
        v1.rn = v1_lead.rn - 1)
- select * from ( select  *
- from v2
- where  d_year = 2000 and
-        avg_monthly_sales > 0 and
-        case when avg_monthly_sales > 0 then abs(sum_sales - avg_monthly_sales) / avg_monthly_sales else null end > 0.1
- order by sum_sales - avg_monthly_sales, d_year
- limit 100
- ) as v3;
+select  *
+from v2
+where  d_year = 1999 and
+       avg_monthly_sales > 0 and
+       case when avg_monthly_sales > 0 then abs(sum_sales - avg_monthly_sales) / avg_monthly_sales else null end > 0.1
+order by sum_sales - avg_monthly_sales, 3
+limit 100;
 ---- RESULTS
-'Music','exportischolar #2',2000,361.19,13.04,106.77,409.30
-'Children','edu packexporti #2',2000,362.04,16.51,244.81,332.70
-'Children','amalgexporti #2',2000,359.25,17.80,119.79,402.04
-'Men','exportiimporto #2',2000,360.29,24.07,146.16,311.11
-'Shoes','edu packedu pack #2',2000,435.23,99.52,117.61,342.76
-'Shoes','edu packedu pack #2',2000,367.25,33.69,183.52,248.83
-'Music','importoscholar #2',2000,356.14,25.73,467.16,446.34
-'Music','importoscholar #2',2000,349.97,21.94,158.75,189.86
-'Women','importoamalg #2',2000,339.12,13.02,362.77,64.19
-'Music','exportischolar #2',2000,395.42,70.06,176.36,100.96
-'Shoes','amalgedu pack #2',2000,373.16,49.95,506.85,391.35
-'Children','amalgexporti #2',2000,359.25,37.88,385.03,162.10
-'Children','edu packexporti #2',2000,370.88,49.92,572.50,170.68
-'Men','importoimporto #2',2000,386.15,67.23,219.86,262.57
-'Shoes','edu packedu pack #2',2000,435.23,117.61,240.82,99.52
-'Music','exportischolar #2',2000,361.19,46.12,409.30,265.88
-'Children','amalgexporti #2',2000,359.25,44.62,402.04,579.27
-'Shoes','amalgedu pack #2',2000,381.90,71.30,153.69,174.69
-'Shoes','edu packedu pack #2',2000,347.34,38.61,100.06,583.75
-'Children','importoexporti #2',2000,329.89,25.04,175.20,331.63
-'Shoes','importoedu pack #2',2000,324.17,22.89,207.71,293.57
-'Shoes','edu packedu pack #2',2000,435.23,134.15,348.95,240.82
-'Children','importoexporti #2',2000,302.23,2.18,399.83,387.33
-'Children','importoexporti #2',2000,329.89,33.47,192.64,241.84
-'Shoes','importoedu pack #2',2000,377.75,81.52,162.18,261.97
-'Music','exportischolar #2',2000,369.79,74.38,89.31,558.77
-'Music','exportischolar #2',2000,395.42,100.96,70.06,314.94
-'Women','amalgamalg #2',2000,336.94,43.31,171.61,308.07
-'Shoes','exportiedu pack #2',2000,297.03,5.41,136.96,163.28
-'Music','exportischolar #2',2000,395.42,103.98,209.35,735.08
-'Men','exportiimporto #2',2000,297.08,8.54,164.76,440.19
-'Women','edu packamalg #2',2000,297.48,9.18,86.30,205.52
-'Music','importoscholar #2',2000,356.14,68.53,731.67,467.16
-'Music','importoscholar #2',2000,354.33,66.79,540.56,337.62
-'Women','edu packamalg #2',2000,387.24,101.42,312.67,319.73
-'Men','importoimporto #2',2000,295.69,10.42,147.56,208.51
-'Men','importoimporto #2',2000,299.57,14.43,122.98,189.73
-'Shoes','importoedu pack #2',2000,324.17,39.68,293.57,282.13
-'Women','edu packamalg #2',2000,387.24,102.88,238.97,312.67
-'Men','importoimporto #2',2000,284.22,1.16,235.46,195.91
-'Music','importoscholar #2',2000,350.94,67.98,177.70,180.42
-'Music','exportischolar #2',2000,369.79,89.31,458.60,74.38
-'Men','edu packimporto #2',2000,311.30,31.70,241.11,63.42
-'Women','importoamalg #2',2000,297.16,18.02,300.59,51.18
-'Shoes','importoedu pack #2',2000,354.37,75.24,362.69,186.63
-'Music','edu packscholar #2',2000,305.20,28.38,77.11,147.96
-'Children','edu packexporti #2',2000,351.05,76.01,180.52,141.75
-'Women','importoamalg #2',2000,339.12,64.19,13.02,254.39
-'Men','exportiimporto #2',2000,297.08,24.11,242.76,248.58
-'Women','edu packamalg #2',2000,288.12,16.55,274.43,347.53
-'Music','importoscholar #2',2000,354.33,84.08,114.57,183.08
-'Children','importoexporti #2',2000,359.26,90.06,209.99,127.84
-'Music','edu packscholar #2',2000,357.13,88.56,219.38,126.28
-'Women','edu packamalg #2',2000,309.34,41.33,236.30,86.68
-'Women','edu packamalg #2',2000,387.24,120.03,164.15,315.35
-'Women','amalgamalg #2',2000,336.94,72.42,308.07,212.67
-'Music','edu packscholar #2',2000,303.17,38.66,174.79,40.61
-'Children','exportiexporti #2',2000,269.23,4.78,164.15,361.87
-'Women','amalgamalg #2',2000,288.29,24.72,92.24,38.35
-'Children','importoexporti #2',2000,296.51,33.44,338.99,305.21
-'Women','edu packamalg #2',2000,321.60,58.71,246.93,111.44
-'Music','edu packscholar #2',2000,303.17,40.61,38.66,381.59
-'Shoes','importoedu pack #2',2000,303.60,41.77,476.55,152.55
-'Shoes','amalgedu pack #2',2000,262.91,1.76,199.71,232.04
-'Women','exportiamalg #2',2000,312.08,52.17,181.79,604.07
-'Men','importoimporto #1',2000,264.92,6.09,51.74,324.71
-'Men','importoimporto #2',2000,299.61,42.73,312.20,302.03
-'Music','edu packscholar #2',2000,364.77,108.75,264.08,233.09
-'Shoes','edu packedu pack #2',2000,356.72,100.87,404.12,151.68
-'Men','edu packimporto #2',2000,260.32,4.82,153.07,52.59
-'Men','importoimporto #2',2000,299.57,44.48,186.44,115.44
-'Music','exportischolar #2',2000,361.19,106.77,586.37,13.04
-'Women','edu packamalg #2',2000,297.48,44.57,110.27,86.30
-'Shoes','exportiedu pack #2',2000,257.65,5.06,179.25,171.34
-'Men','edu packimporto #2',2000,260.32,8.01,392.05,153.07
-'Men','exportiimporto #2',2000,276.31,24.40,175.44,121.21
-'Men','edu packimporto #2',2000,259.77,7.97,361.69,271.30
-'Music','exportischolar #1',2000,265.85,14.47,111.80,143.69
-'Children','importoexporti #2',2000,296.51,45.30,305.21,509.36
-'Women','amalgamalg #2',2000,288.29,38.35,24.72,167.12
-'Children','amalgexporti #2',2000,258.19,8.51,284.62,174.93
-'Men','amalgimporto #2',2000,269.19,19.52,283.80,149.64
-'Men','exportiimporto #2',2000,263.88,14.25,144.04,79.18
-'Women','importoamalg #2',2000,297.16,48.06,51.18,161.10
-'Children','edu packexporti #2',2000,351.05,102.51,141.75,329.38
-'Shoes','exportiedu pack #2',2000,257.65,9.16,122.20,172.63
-'Men','edu packimporto #2',2000,311.30,63.42,31.70,250.44
-'Women','amalgamalg #2',2000,296.20,48.54,300.19,68.95
-'Shoes','edu packedu pack #2',2000,347.34,100.06,114.45,38.61
-'Women','importoamalg #2',2000,297.16,51.18,18.02,48.06
-'Shoes','importoedu pack #2',2000,366.10,120.48,485.39,NULL
-'Women','exportiamalg #2',2000,303.16,57.72,163.35,244.09
-'Children','edu packexporti #2',2000,362.04,117.20,240.88,251.77
-'Men','edu packimporto #2',2000,311.30,68.07,336.53,888.77
-'Women','exportiamalg #2',2000,252.16,10.20,245.51,37.14
-'Music','exportischolar #1',2000,268.64,27.05,362.79,162.28
-'Shoes','edu packedu pack #2',2000,347.34,106.81,454.54,487.93
-'Music','importoscholar #2',2000,354.33,114.57,171.28,84.08
-'Children','amalgexporti #2',2000,250.37,10.75,210.60,63.72
-'Men','importoimporto #2',2000,299.61,60.11,216.51,312.20
+'Men','importoimporto #1','ese','Unknown',1999,3,5492.81,2070.65,3307.78,2784.11
+'Music','exportischolar #1','eing','Unknown',1999,2,5134.23,1740.21,4401.89,2721.61
+'Music','edu packscholar #1','ese','Unknown',1999,4,5463.70,2091.07,3391.39,3095.31
+'Music','edu packscholar #1','ought','Unknown',1999,7,5552.30,2226.34,4081.99,7573.33
+'Music','edu packscholar #1','ese','Unknown',1999,2,5463.70,2268.27,4139.47,3391.39
+'Men','edu packimporto #1','ought','Unknown',1999,7,5176.25,1993.73,3542.54,5764.35
+'Children','exportiexporti #1','ese','Unknown',1999,3,5185.89,2019.69,3479.21,2982.05
+'Shoes','amalgedu pack #1','ation','Unknown',1999,6,5152.09,2077.67,3123.43,2368.73
+'Men','edu packimporto #1','eing','Unknown',1999,3,5501.18,2453.88,2683.70,2615.32
+'Children','exportiexporti #1','ation','Unknown',1999,4,5238.35,2232.03,3221.70,3649.52
+'Shoes','importoedu pack #1','eing','Unknown',1999,5,4698.61,1703.27,2687.15,2757.83
+'Music','exportischolar #1','bar','Unknown',1999,7,5318.14,2346.06,3483.88,7658.62
+'Music','edu packscholar #1','ation','Unknown',1999,2,5622.22,2657.68,4207.03,3543.82
+'Children','exportiexporti #1','bar','Unknown',1999,7,5280.66,2324.79,3003.61,5961.39
+'Children','importoexporti #1','eing','Unknown',1999,2,4650.43,1734.45,2341.19,2720.78
+'Shoes','importoedu pack #1','ought','Unknown',1999,4,4537.63,1623.33,2928.34,1905.23
+'Women','edu packamalg #1','ation','Unknown',1999,4,4507.41,1596.92,2865.38,2665.75
+'Men','importoimporto #1','ought','Unknown',1999,6,5045.75,2152.15,2834.94,2667.92
+'Men','edu packimporto #1','eing','Unknown',1999,4,5501.18,2615.32,2453.88,2874.96
+'Shoes','exportiedu pack #1','bar','Unknown',1999,3,5296.08,2410.44,2685.85,3821.39
+'Men','importoimporto #1','able','Unknown',1999,2,5194.81,2333.43,2765.75,2674.91
+'Music','amalgscholar #1','ought','Unknown',1999,2,4565.60,1727.16,3895.09,2606.58
+'Music','edu packscholar #1','eing','Unknown',1999,5,5539.30,2704.16,3862.34,3960.90
+'Shoes','importoedu pack #1','ation','Unknown',1999,4,4690.57,1855.85,3524.69,3050.34
+'Men','edu packimporto #1','eing','Unknown',1999,2,5501.18,2683.70,4304.21,2453.88
+'Women','exportiamalg #1','able','Unknown',1999,2,4123.60,1306.40,2876.61,2238.71
+'Music','exportischolar #1','able','Unknown',1999,5,5090.10,2281.80,2488.24,3304.75
+'Shoes','exportiedu pack #1','ought','Unknown',1999,2,4755.53,1951.00,3949.06,2767.05
+'Men','importoimporto #1','ese','Unknown',1999,6,5492.81,2691.33,3210.74,3754.33
+'Men','amalgimporto #1','ation','Unknown',1999,2,4909.46,2116.43,3187.20,3356.64
+'Men','importoimporto #1','ought','Unknown',1999,2,5045.75,2253.70,4158.86,3467.09
+'Shoes','amalgedu pack #1','ation','Unknown',1999,7,5152.09,2368.73,2077.67,7543.60
+'Men','edu packimporto #1','ese','Unknown',1999,3,4979.36,2201.00,3110.55,3118.30
+'Children','exportiexporti #1','ation','Unknown',1999,2,5238.35,2462.96,3808.48,3221.70
+'Men','amalgimporto #1','ation','Unknown',1999,4,4909.46,2136.23,3356.64,3046.51
+'Children','importoexporti #1','able','Unknown',1999,7,4586.29,1814.46,2643.58,6423.18
+'Men','edu packimporto #1','ation','Unknown',1999,4,5170.36,2407.58,3086.77,2492.73
+'Shoes','amalgedu pack #1','ese','Unknown',1999,7,4392.18,1630.14,2755.91,6185.73
+'Shoes','amalgedu pack #1','able','Unknown',1999,5,4940.22,2187.55,2894.91,3018.65
+'Men','edu packimporto #1','ought','Unknown',1999,4,5176.25,2424.94,4285.78,3286.20
+'Women','amalgamalg #1','able','Unknown',1999,6,4507.24,1761.81,2891.95,2302.21
+'Men','importoimporto #1','ation','Unknown',1999,3,5410.91,2672.68,3591.65,2988.08
+'Men','importoimporto #1','ation','Unknown',1999,5,5410.91,2677.81,2988.08,2881.34
+'Men','edu packimporto #1','bar','Unknown',1999,4,5632.73,2901.64,3202.87,3447.78
+'Children','exportiexporti #1','able','Unknown',1999,5,4955.24,2230.80,2395.57,3003.89
+'Men','importoimporto #1','eing','Unknown',1999,5,5074.07,2356.88,2833.40,2854.62
+'Men','edu packimporto #1','bar','Unknown',1999,2,5632.73,2916.43,3847.05,3202.87
+'Shoes','exportiedu pack #1','ese','Unknown',1999,3,4865.28,2151.76,3212.91,3768.25
+'Men','importoimporto #1','ese','Unknown',1999,4,5492.81,2784.11,2070.65,3210.74
+'Shoes','exportiedu pack #1','bar','Unknown',1999,7,5296.08,2591.12,3012.98,6254.36
+'Shoes','exportiedu pack #1','ation','Unknown',1999,5,4873.51,2170.98,2302.76,3236.50
+'Shoes','amalgedu pack #1','able','Unknown',1999,2,4940.22,2239.16,3495.29,2563.93
+'Children','exportiexporti #1','eing','Unknown',1999,7,5109.65,2410.24,2916.46,6558.23
+'Women','importoamalg #1','able','Unknown',1999,7,4574.74,1881.03,2345.66,6036.28
+'Women','amalgamalg #1','ought','Unknown',1999,7,4619.70,1926.67,3528.98,5162.15
+'Children','importoexporti #1','bar','Unknown',1999,7,4566.77,1879.57,3400.62,6244.92
+'Music','edu packscholar #1','ation','Unknown',1999,6,5622.22,2943.26,3643.42,3847.77
+'Music','exportischolar #1','ation','Unknown',1999,4,4962.65,2283.77,3210.01,2539.84
+'Music','exportischolar #1','ation','Unknown',1999,2,4962.65,2284.23,3250.69,3210.01
+'Men','edu packimporto #1','ation','Unknown',1999,5,5170.36,2492.73,2407.58,3288.94
+'Men','edu packimporto #1','able','Unknown',1999,3,4989.30,2318.98,2618.89,3315.77
+'Music','exportischolar #1','bar','Unknown',1999,4,5318.14,2651.96,2989.10,3649.76
+'Music','exportischolar #1','bar','Unknown',1999,2,5318.14,2656.31,3419.77,2989.10
+'Shoes','amalgedu pack #1','bar','Unknown',1999,6,4805.40,2149.56,2686.70,3098.25
+'Children','exportiexporti #1','bar','Unknown',1999,4,5280.66,2625.99,3301.62,4331.44
+'Music','amalgscholar #1','ation','Unknown',1999,4,4934.50,2280.93,2322.89,2421.13
+'Music','edu packscholar #1','able','Unknown',1999,7,5335.90,2684.15,3543.33,7540.94
+'Shoes','importoedu pack #1','eing','Unknown',1999,2,4698.61,2058.86,3191.74,2812.15
+'Shoes','edu packedu pack #1','ought','Unknown',1999,5,4745.29,2109.27,3203.82,2737.82
+'Shoes','importoedu pack #1','ought','Unknown',1999,5,4537.63,1905.23,1623.33,3170.58
+'Men','edu packimporto #1','able','Unknown',1999,6,4989.30,2357.82,3363.58,3142.81
+'Children','exportiexporti #1','able','Unknown',1999,2,4955.24,2326.67,2746.99,3097.63
+'Men','edu packimporto #1','eing','Unknown',1999,5,5501.18,2874.96,2615.32,3714.00
+'Shoes','exportiedu pack #1','ation','Unknown',1999,7,4873.51,2256.56,3236.50,6245.37
+'Shoes','importoedu pack #1','ese','Unknown',1999,3,4676.74,2060.29,3273.67,2610.86
+'Men','amalgimporto #1','ese','Unknown',1999,6,4764.59,2150.16,3284.27,3475.17
+'Music','amalgscholar #1','ation','Unknown',1999,3,4934.50,2322.89,3197.76,2280.93
+'Shoes','exportiedu pack #1','bar','Unknown',1999,2,5296.08,2685.85,4235.44,2410.44
+'Children','importoexporti #1','able','Unknown',1999,5,4586.29,1982.77,2837.74,2643.58
+'Music','exportischolar #1','able','Unknown',1999,4,5090.10,2488.24,2966.36,2281.80
+'Shoes','importoedu pack #1','able','Unknown',1999,7,4700.91,2100.12,2533.01,5888.57
+'Music','edu packscholar #1','bar','Unknown',1999,2,5484.78,2903.45,3410.13,3024.86
+'Shoes','exportiedu pack #1','ation','Unknown',1999,3,4873.51,2300.45,2797.30,2302.76
+'Shoes','exportiedu pack #1','ation','Unknown',1999,4,4873.51,2302.76,2300.45,2170.98
+'Shoes','importoedu pack #1','bar','Unknown',1999,3,4794.67,2225.70,2756.97,2413.76
+'Music','edu packscholar #1','ought','Unknown',1999,5,5552.30,2985.49,3241.69,4081.99
+'Music','edu packscholar #1','eing','Unknown',1999,3,5539.30,2973.01,3069.18,3862.34
+'Shoes','amalgedu pack #1','eing','Unknown',1999,7,4706.54,2143.18,2458.07,5967.73
+'Children','exportiexporti #1','ought','Unknown',1999,5,5018.27,2458.03,3467.53,2683.61
+'Children','exportiexporti #1','able','Unknown',1999,4,4955.24,2395.57,3097.63,2230.80
+'Children','exportiexporti #1','eing','Unknown',1999,2,5109.65,2550.30,4039.10,2685.10
+'Music','exportischolar #1','ought','Unknown',1999,4,5079.18,2520.64,3233.50,3079.89
+'Women','edu packamalg #1','ation','Unknown',1999,2,4507.41,1951.42,4166.02,2865.38
+'Women','amalgamalg #1','ought','Unknown',1999,1,4619.70,2065.94,9639.59,2521.70
+'Music','importoscholar #1','ought','Unknown',1999,3,4004.44,1456.84,2438.63,2790.03
+'Shoes','edu packedu pack #1','eing','Unknown',1999,5,4664.86,2122.71,3131.02,2852.96
+'Women','importoamalg #1','bar','Unknown',1999,3,4437.21,1895.27,2678.48,2999.04
+'Music','exportischolar #1','able','Unknown',1999,2,5090.10,2550.48,3702.29,2966.36
+'Music','edu packscholar #1','able','Unknown',1999,1,5335.90,2796.97,13360.68,3413.22
+'Children','exportiexporti #1','eing','Unknown',1999,4,5109.65,2574.12,2685.10,2672.73
 ---- TYPES
-STRING, STRING, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL
+STRING, STRING, STRING, STRING, INT, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL
 ====

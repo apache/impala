@@ -1722,10 +1722,11 @@ public class AuthorizationTest {
     }
 
     // Get all tables of tpcds
+    final int numTpcdsTables = 24;
     req.get_tables_req.setSchemaName("tpcds");
     req.get_tables_req.setTableName("%");
     resp = fe_.execHiveServer2MetadataOp(req);
-    assertEquals(11, resp.rows.size());
+    assertEquals(numTpcdsTables, resp.rows.size());
   }
 
   @Test

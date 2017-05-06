@@ -1,21 +1,21 @@
 ====
 ---- QUERY: TPCDS-Q96
-SELECT
-  COUNT(*) AS total
-FROM store_sales ss
-JOIN time_dim td
-  ON (ss.ss_sold_time_sk = td.t_time_sk)
-JOIN household_demographics hd
-  ON (ss.ss_hdemo_sk = hd.hd_demo_sk)
-JOIN store s
-  ON (ss.ss_store_sk = s.s_store_sk)
-WHERE
-  td.t_hour = 8
-  AND td.t_minute >= 30
-  AND hd.hd_dep_count = 5
-  AND s.s_store_name = 'ese';
+select count(*) as total
+from store_sales,
+     household_demographics,
+     time_dim,
+     store
+where ss_sold_time_sk = time_dim.t_time_sk
+    and ss_hdemo_sk = household_demographics.hd_demo_sk
+    and ss_store_sk = s_store_sk
+    and time_dim.t_hour = 20
+    and time_dim.t_minute >= 30
+    and household_demographics.hd_dep_count = 7
+    and store.s_store_name = 'ese'
+order by total
+limit 100;
 ---- RESULTS
-81
+870
 ---- TYPES
 BIGINT
 ====

@@ -17,11 +17,11 @@ from
    and   ca_address_sk = c_current_addr_sk
    and   ss_item_sk = i_item_sk
    and   ca_gmt_offset = -5
-   and   i_category = 'Books'
+   and   i_category = 'Jewelry'
    and   (p_channel_dmail = 'Y' or p_channel_email = 'Y' or p_channel_tv = 'Y')
    and   s_gmt_offset = -5
-   and   d_year = 2000
-   and   d_moy  = 11) promotional_sales,
+   and   d_year = 1998
+   and   d_moy  = 1) promotional_sales,
   (select sum(ss_ext_sales_price) total
    from  store_sales
         ,store
@@ -35,13 +35,13 @@ from
    and   ca_address_sk = c_current_addr_sk
    and   ss_item_sk = i_item_sk
    and   ca_gmt_offset = -5
-   and   i_category = 'Books'
+   and   i_category = 'Jewelry'
    and   s_gmt_offset = -5
-   and   d_year = 2000
-   and   d_moy  = 11) all_sales
+   and   d_year = 1998
+   and   d_moy  = 1) all_sales
 order by promotions, total
 ---- RESULTS
-141055.32,285703.76,49.37118083430193568300
+969445.96,1772143.56,54.70470800909605765700
 ---- TYPES
 DECIMAL, DECIMAL, DECIMAL
 ====

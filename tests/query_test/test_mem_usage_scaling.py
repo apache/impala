@@ -202,11 +202,11 @@ class TestTpchMemLimitError(TestLowMemoryLimits):
 
 class TestTpcdsMemLimitError(TestLowMemoryLimits):
   # The mem limits that will be used.
-  MEM_IN_MB = [20, 100, 110, 150]
+  MEM_IN_MB = [20, 100, 116, 150]
 
   # Different values of mem limits and minimum mem limit (in MBs) each query is expected
   # to run without problem. Those values were determined by manual testing.
-  MIN_MEM_FOR_TPCDS = { 'q53' : 110}
+  MIN_MEM_FOR_TPCDS = { 'q53' : 116}
 
   @classmethod
   def get_workload(self):

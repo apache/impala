@@ -1,9 +1,7 @@
 ====
 ---- QUERY: TPCDS-Q89
-/* Modifications: Added Partition Key filter because Impala does not do dynamic partition
-   pruning.*/
-select * from (select  *
-from (
+select *
+from(
 select i_category, i_class, i_brand,
        s_store_name, s_company_name,
        d_moy,
@@ -15,120 +13,119 @@ from item, store_sales, date_dim, store
 where ss_item_sk = i_item_sk and
       ss_sold_date_sk = d_date_sk and
       ss_store_sk = s_store_sk and
-      d_year in (2000) and
-        ((i_category in ('Children','Music','Home') and
-          i_class in ('toddlers','pop','lighting')
+      d_year in (1999) and
+        ((i_category in ('Books','Electronics','Sports') and
+          i_class in ('computers','stereo','football')
          )
-      or (i_category in ('Jewelry','Books','Sports') and
-          i_class in ('costume','travel','football')
+      or (i_category in ('Men','Jewelry','Women') and
+          i_class in ('shirts','birdal','dresses')
         ))
-      and ss_sold_date_sk between 2451545 and 2451910  -- partition key filter
 group by i_category, i_class, i_brand,
          s_store_name, s_company_name, d_moy) tmp1
 where case when (avg_monthly_sales <> 0) then (abs(sum_sales - avg_monthly_sales) / avg_monthly_sales) else null end > 0.1
 order by sum_sales - avg_monthly_sales, s_store_name
-limit 100) tmp2;
+limit 100;
 ---- RESULTS
-'Music','pop','exportischolar #2','ation','Unknown',2,13.04,361.19
-'Music','pop','exportischolar #2','ought','Unknown',3,70.06,395.42
-'Music','pop','exportischolar #2','ation','Unknown',4,46.12,361.19
-'Music','pop','exportischolar #2','ese','Unknown',7,74.38,369.79
-'Music','pop','exportischolar #2','ought','Unknown',4,100.96,395.42
-'Music','pop','exportischolar #2','ought','Unknown',8,103.98,395.42
-'Music','pop','exportischolar #2','ese','Unknown',6,89.31,369.79
-'Children','toddlers','exportiexporti #2','ese','Unknown',6,4.78,269.23
-'Music','pop','exportischolar #2','ation','Unknown',1,106.77,361.19
-'Music','pop','exportischolar #1','ought','Unknown',5,14.47,265.85
-'Music','pop','exportischolar #1','able','Unknown',2,27.05,268.64
-'Music','pop','exportischolar #1','ought','Unknown',7,40.29,265.85
-'Children','toddlers','exportiexporti #2','able','Unknown',7,95.25,319.70
-'Children','toddlers','exportiexporti #2','eing','Unknown',3,23.47,247.92
-'Music','pop','exportischolar #2','ought','Unknown',2,176.36,395.42
-'Children','toddlers','exportiexporti #2','ought','Unknown',4,60.92,275.42
-'Children','toddlers','exportiexporti #1','ese','Unknown',7,4.54,218.23
-'Music','pop','exportischolar #2','bar','Unknown',4,52.93,261.16
-'Children','toddlers','exportiexporti #2','ation','Unknown',1,53.76,258.95
-'Children','toddlers','exportiexporti #1','ation','Unknown',5,31.71,235.07
-'Music','pop','exportischolar #2','bar','Unknown',6,58.25,261.16
-'Music','pop','exportischolar #2','able','Unknown',3,102.74,304.35
-'Children','toddlers','exportiexporti #1','ation','Unknown',2,41.38,235.07
-'Music','pop','exportischolar #1','able','Unknown',7,77.64,268.64
-'Children','toddlers','exportiexporti #2','ought','Unknown',6,86.89,275.42
-'Children','toddlers','exportiexporti #1','able','Unknown',6,31.31,218.77
-'Music','pop','exportischolar #1','bar','Unknown',4,63.03,250.45
-'Music','pop','exportischolar #2','ought','Unknown',7,209.35,395.42
-'Music','pop','exportischolar #2','eing','Unknown',6,133.69,317.78
-'Children','toddlers','exportiexporti #2','ese','Unknown',2,90.28,269.23
-'Children','toddlers','exportiexporti #1','bar','Unknown',5,19.05,197.74
-'Children','toddlers','exportiexporti #2','ought','Unknown',1,98.27,275.42
-'Children','toddlers','exportiexporti #2','bar','Unknown',6,72.12,249.00
-'Music','pop','exportischolar #1','eing','Unknown',7,13.19,187.60
-'Music','pop','exportischolar #2','eing','Unknown',7,143.53,317.78
-'Music','pop','exportischolar #2','ese','Unknown',12,197.89,369.79
-'Children','toddlers','exportiexporti #2','eing','Unknown',1,76.20,247.92
-'Music','pop','exportischolar #2','bar','Unknown',2,90.53,261.16
-'Music','pop','exportischolar #1','eing','Unknown',6,19.40,187.60
-'Music','pop','exportischolar #2','able','Unknown',5,136.19,304.35
-'Children','toddlers','exportiexporti #2','ation','Unknown',2,92.75,258.95
-'Music','pop','exportischolar #1','bar','Unknown',2,85.54,250.45
-'Children','toddlers','exportiexporti #2','bar','Unknown',4,85.58,249.00
-'Music','pop','exportischolar #2','able','Unknown',2,141.06,304.35
-'Children','toddlers','exportiexporti #2','ought','Unknown',3,114.37,275.42
-'Children','toddlers','exportiexporti #2','ese','Unknown',1,110.17,269.23
-'Music','pop','exportischolar #1','bar','Unknown',7,95.15,250.45
-'Music','pop','exportischolar #1','ought','Unknown',4,111.80,265.85
-'Music','pop','exportischolar #1','bar','Unknown',10,96.64,250.45
-'Children','toddlers','exportiexporti #1','able','Unknown',5,65.59,218.77
-'Children','toddlers','exportiexporti #1','able','Unknown',7,68.59,218.77
-'Music','pop','exportischolar #2','eing','Unknown',3,169.52,317.78
-'Music','pop','exportischolar #1','ought','Unknown',3,119.17,265.85
-'Music','pop','exportischolar #1','bar','Unknown',3,104.70,250.45
-'Music','pop','exportischolar #1','ese','Unknown',6,4.02,148.86
-'Children','toddlers','exportiexporti #1','able','Unknown',4,74.71,218.77
-'Music','pop','exportischolar #2','ought','Unknown',10,253.23,395.42
-'Children','toddlers','exportiexporti #1','ation','Unknown',7,92.93,235.07
-'Music','pop','exportischolar #2','eing','Unknown',4,175.79,317.78
-'Children','toddlers','exportiexporti #1','ought','Unknown',9,54.35,195.40
-'Children','toddlers','exportiexporti #2','bar','Unknown',5,108.39,249.00
-'Music','pop','exportischolar #2','ese','Unknown',3,230.34,369.79
-'Children','toddlers','exportiexporti #2','bar','Unknown',3,112.70,249.00
-'Children','toddlers','exportiexporti #2','ation','Unknown',3,124.76,258.95
-'Children','toddlers','exportiexporti #1','ese','Unknown',3,84.61,218.23
-'Children','toddlers','exportiexporti #1','ese','Unknown',5,88.62,218.23
-'Children','toddlers','exportiexporti #2','bar','Unknown',2,122.20,249.00
-'Children','toddlers','exportiexporti #2','bar','Unknown',1,122.23,249.00
-'Music','pop','exportischolar #2','bar','Unknown',3,134.61,261.16
-'Children','toddlers','exportiexporti #1','bar','Unknown',2,72.55,197.74
-'Music','pop','exportischolar #1','ought','Unknown',6,143.69,265.85
-'Music','pop','exportischolar #2','able','Unknown',1,182.70,304.35
-'Music','pop','exportischolar #1','ought','Unknown',8,145.06,265.85
-'Children','toddlers','exportiexporti #1','bar','Unknown',3,77.30,197.74
-'Children','toddlers','exportiexporti #1','ese','Unknown',6,98.33,218.23
-'Children','toddlers','exportiexporti #1','eing','Unknown',4,34.63,153.97
-'Children','toddlers','exportiexporti #2','eing','Unknown',7,129.87,247.92
-'Music','pop','exportischolar #1','able','Unknown',8,151.26,268.64
-'Books','travel','univunivamalg #3','able','Unknown',11,8.21,121.26
-'Music','pop','exportischolar #1','ese','Unknown',4,37.44,148.86
-'Music','pop','exportischolar #1','ese','Unknown',7,38.67,148.86
-'Children','toddlers','exportiexporti #1','bar','Unknown',6,87.68,197.74
-'Music','pop','exportischolar #1','ation','Unknown',2,13.36,122.75
-'Children','toddlers','exportiexporti #1','ought','Unknown',2,86.36,195.40
-'Music','pop','exportischolar #1','ation','Unknown',7,14.25,122.75
-'Music','pop','exportischolar #2','bar','Unknown',7,152.68,261.16
-'Children','toddlers','exportiexporti #2','ation','Unknown',6,150.97,258.95
-'Music','pop','exportischolar #1','ation','Unknown',3,14.87,122.75
-'Children','toddlers','exportiexporti #1','ought','Unknown',4,87.97,195.40
-'Music','pop','exportischolar #1','able','Unknown',4,162.28,268.64
-'Children','toddlers','exportiexporti #1','eing','Unknown',3,48.40,153.97
-'Children','toddlers','exportiexporti #2','ese','Unknown',4,163.79,269.23
-'Children','toddlers','exportiexporti #2','ese','Unknown',5,164.15,269.23
-'Music','pop','exportischolar #2','able','Unknown',7,199.42,304.35
-'Children','toddlers','exportiexporti #2','ought','Unknown',9,170.94,275.42
-'Music','pop','exportischolar #1','eing','Unknown',5,87.55,187.60
-'Children','toddlers','exportiexporti #2','able','Unknown',6,219.68,319.70
-'Children','toddlers','exportiexporti #2','eing','Unknown',4,149.85,247.92
-'Music','pop','exportischolar #1','ese','Unknown',3,51.01,148.86
-'Children','toddlers','exportiexporti #1','eing','Unknown',6,56.66,153.97
+'Men','shirts','importoimporto #1','ese','Unknown',3,2070.65,5492.81
+'Men','shirts','importoimporto #1','ought','Unknown',6,2152.15,5045.75
+'Men','shirts','importoimporto #1','able','Unknown',2,2333.43,5194.81
+'Men','shirts','importoimporto #1','ese','Unknown',6,2691.33,5492.81
+'Men','shirts','importoimporto #1','ought','Unknown',2,2253.70,5045.75
+'Women','dresses','amalgamalg #1','able','Unknown',6,1761.81,4507.24
+'Men','shirts','importoimporto #1','ation','Unknown',3,2672.68,5410.91
+'Men','shirts','importoimporto #1','ation','Unknown',5,2677.81,5410.91
+'Men','shirts','importoimporto #1','eing','Unknown',5,2356.88,5074.07
+'Men','shirts','importoimporto #1','ese','Unknown',4,2784.11,5492.81
+'Women','dresses','amalgamalg #1','ought','Unknown',7,1926.67,4619.70
+'Women','dresses','amalgamalg #1','ought','Unknown',1,2065.94,4619.70
+'Men','shirts','importoimporto #1','ation','Unknown',6,2881.34,5410.91
+'Men','shirts','importoimporto #1','able','Unknown',3,2674.91,5194.81
+'Women','dresses','amalgamalg #1','ation','Unknown',2,2192.31,4690.89
+'Men','shirts','importoimporto #1','bar','Unknown',5,2475.90,4973.50
+'Women','dresses','amalgamalg #1','ese','Unknown',2,2146.52,4642.99
+'Men','shirts','importoimporto #1','eing','Unknown',2,2588.02,5074.07
+'Women','dresses','amalgamalg #1','bar','Unknown',7,2428.75,4914.11
+'Women','dresses','amalgamalg #1','bar','Unknown',3,2451.51,4914.11
+'Men','shirts','importoimporto #1','ation','Unknown',7,2951.67,5410.91
+'Men','shirts','importoimporto #1','able','Unknown',1,2765.75,5194.81
+'Women','dresses','amalgamalg #1','able','Unknown',2,2082.54,4507.24
+'Men','shirts','importoimporto #1','ation','Unknown',4,2988.08,5410.91
+'Men','shirts','importoimporto #1','ought','Unknown',7,2667.92,5045.75
+'Women','dresses','amalgamalg #1','bar','Unknown',4,2549.27,4914.11
+'Women','dresses','amalgamalg #1','ese','Unknown',7,2307.00,4642.99
+'Women','dresses','amalgamalg #1','eing','Unknown',4,2204.15,4528.82
+'Men','shirts','importoimporto #1','able','Unknown',7,2880.34,5194.81
+'Men','shirts','importoimporto #1','ese','Unknown',5,3210.74,5492.81
+'Women','dresses','amalgamalg #1','ation','Unknown',4,2418.39,4690.89
+'Men','shirts','importoimporto #1','eing','Unknown',4,2833.40,5074.07
+'Women','dresses','amalgamalg #1','bar','Unknown',2,2692.79,4914.11
+'Men','shirts','importoimporto #1','eing','Unknown',6,2854.62,5074.07
+'Women','dresses','amalgamalg #1','eing','Unknown',6,2314.71,4528.82
+'Men','shirts','importoimporto #1','ought','Unknown',5,2834.94,5045.75
+'Women','dresses','amalgamalg #1','ation','Unknown',5,2480.25,4690.89
+'Women','dresses','amalgamalg #1','able','Unknown',7,2302.21,4507.24
+'Women','dresses','amalgamalg #1','ation','Unknown',6,2501.15,4690.89
+'Men','shirts','importoimporto #1','ese','Unknown',2,3307.78,5492.81
+'Men','shirts','importoimporto #1','able','Unknown',5,3016.43,5194.81
+'Men','shirts','importoimporto #1','able','Unknown',4,3040.23,5194.81
+'Women','dresses','amalgamalg #1','eing','Unknown',5,2420.31,4528.82
+'Women','dresses','amalgamalg #1','ese','Unknown',5,2535.80,4642.99
+'Women','dresses','amalgamalg #1','ought','Unknown',2,2521.70,4619.70
+'Men','shirts','importoimporto #1','bar','Unknown',3,2877.96,4973.50
+'Women','dresses','amalgamalg #1','ese','Unknown',3,2577.15,4642.99
+'Women','dresses','amalgamalg #1','ation','Unknown',7,2637.27,4690.89
+'Men','shirts','importoimporto #1','ation','Unknown',1,3380.16,5410.91
+'Women','dresses','amalgamalg #1','eing','Unknown',7,2524.32,4528.82
+'Men','shirts','importoimporto #1','bar','Unknown',4,2986.70,4973.50
+'Women','dresses','amalgamalg #1','ought','Unknown',4,2648.80,4619.70
+'Men','shirts','importoimporto #1','bar','Unknown',7,3026.41,4973.50
+'Women','dresses','amalgamalg #1','ation','Unknown',3,2751.11,4690.89
+'Men','shirts','importoimporto #1','bar','Unknown',2,3073.45,4973.50
+'Men','shirts','importoimporto #1','eing','Unknown',3,3179.96,5074.07
+'Women','dresses','amalgamalg #1','ation','Unknown',1,2797.07,4690.89
+'Women','dresses','amalgamalg #1','able','Unknown',1,2621.05,4507.24
+'Women','dresses','amalgamalg #1','ese','Unknown',4,2808.36,4642.99
+'Women','dresses','amalgamalg #2','bar','Unknown',6,680.47,2506.96
+'Men','shirts','importoimporto #1','ation','Unknown',2,3591.65,5410.91
+'Women','dresses','amalgamalg #1','able','Unknown',3,2706.15,4507.24
+'Women','dresses','amalgamalg #2','eing','Unknown',2,773.08,2569.34
+'Men','shirts','importoimporto #1','bar','Unknown',6,3199.08,4973.50
+'Men','shirts','importoimporto #1','ese','Unknown',7,3754.33,5492.81
+'Women','dresses','amalgamalg #1','bar','Unknown',5,3190.77,4914.11
+'Women','dresses','amalgamalg #1','eing','Unknown',2,2841.88,4528.82
+'Men','shirts','importoimporto #1','able','Unknown',6,3538.25,5194.81
+'Women','dresses','amalgamalg #1','ese','Unknown',6,3006.94,4642.99
+'Women','dresses','amalgamalg #1','bar','Unknown',1,3284.93,4914.11
+'Women','dresses','amalgamalg #2','bar','Unknown',5,878.42,2506.96
+'Women','dresses','amalgamalg #1','able','Unknown',5,2891.95,4507.24
+'Men','shirts','importoimporto #1','eing','Unknown',7,3465.77,5074.07
+'Women','dresses','amalgamalg #2','eing','Unknown',3,964.29,2569.34
+'Women','dresses','amalgamalg #1','bar','Unknown',6,3324.49,4914.11
+'Men','shirts','importoimporto #1','ought','Unknown',3,3467.09,5045.75
+'Women','dresses','amalgamalg #1','ought','Unknown',5,3049.25,4619.70
+'Women','dresses','amalgamalg #1','eing','Unknown',3,2978.07,4528.82
+'Men','shirts','importoimporto #1','ought','Unknown',4,3544.97,5045.75
+'Men','shirts','importoimporto #1','bar','Unknown',1,3490.62,4973.50
+'Men','shirts','importoimporto #2','able','Unknown',2,628.63,2095.47
+'Men','shirts','importoimporto #1','eing','Unknown',1,3628.21,5074.07
+'Women','dresses','amalgamalg #1','able','Unknown',4,3082.17,4507.24
+'Men','shirts','importoimporto #2','eing','Unknown',5,765.86,2137.65
+'Women','dresses','amalgamalg #2','ation','Unknown',4,1064.70,2431.22
+'Women','dresses','amalgamalg #2','ought','Unknown',3,991.89,2355.44
+'Women','dresses','amalgamalg #2','eing','Unknown',5,1211.13,2569.34
+'Women','dresses','amalgamalg #2','ation','Unknown',7,1078.41,2431.22
+'Men','shirts','importoimporto #2','ation','Unknown',4,807.67,2141.06
+'Women','dresses','amalgamalg #2','ation','Unknown',2,1102.89,2431.22
+'Women','dresses','amalgamalg #2','eing','Unknown',6,1247.86,2569.34
+'Women','dresses','amalgamalg #2','able','Unknown',4,1020.39,2337.27
+'Men','shirts','importoimporto #2','able','Unknown',7,780.91,2095.47
+'Women','dresses','amalgamalg #2','ese','Unknown',2,904.34,2200.82
+'Women','dresses','amalgamalg #2','ought','Unknown',7,1061.87,2355.44
+'Women','dresses','amalgamalg #2','able','Unknown',3,1054.94,2337.27
+'Men','shirts','importoimporto #2','ought','Unknown',6,633.96,1908.05
+'Men','shirts','importoimporto #2','ese','Unknown',6,853.37,2113.57
+'Women','dresses','amalgamalg #2','able','Unknown',5,1084.94,2337.27
+'Women','dresses','amalgamalg #2','eing','Unknown',4,1317.08,2569.34
 ---- TYPES
 STRING, STRING, STRING, STRING, STRING, INT, DECIMAL, DECIMAL
 ====

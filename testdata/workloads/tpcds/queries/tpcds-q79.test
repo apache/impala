@@ -23,26 +23,11 @@ from
     store_sales.ss_sold_date_sk = date_dim.d_date_sk
     and store_sales.ss_store_sk = store.s_store_sk
     and store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
-    and (household_demographics.hd_dep_count = 8
-      or household_demographics.hd_vehicle_count > 0)
-    -- and date_dim.d_dow = 1
-    -- and date_dim.d_year in (1998, 1998 + 1, 1998 + 2)
+    and (household_demographics.hd_dep_count = 6
+      or household_demographics.hd_vehicle_count > 2)
+    and date_dim.d_dow = 1
+    and date_dim.d_year in (1999, 1999 + 1, 1999 + 2)
     and store.s_number_employees between 200 and 295
-    -- partition key filter
-    -- and ss_sold_date_sk in (2450819, 2450826, 2450833, 2450840, 2450847, 2450854, 2450861, 2450868, 2450875, 2450882, 2450889,
-    -- 2450896, 2450903, 2450910, 2450917, 2450924, 2450931, 2450938, 2450945, 2450952, 2450959, 2450966, 2450973, 2450980, 2450987,
-    -- 2450994, 2451001, 2451008, 2451015, 2451022, 2451029, 2451036, 2451043, 2451050, 2451057, 2451064, 2451071, 2451078, 2451085,
-    -- 2451092, 2451099, 2451106, 2451113, 2451120, 2451127, 2451134, 2451141, 2451148, 2451155, 2451162, 2451169, 2451176, 2451183,
-    -- 2451190, 2451197, 2451204, 2451211, 2451218, 2451225, 2451232, 2451239, 2451246, 2451253, 2451260, 2451267, 2451274, 2451281,
-    -- 2451288, 2451295, 2451302, 2451309, 2451316, 2451323, 2451330, 2451337, 2451344, 2451351, 2451358, 2451365, 2451372, 2451379,
-    -- 2451386, 2451393, 2451400, 2451407, 2451414, 2451421, 2451428, 2451435, 2451442, 2451449, 2451456, 2451463, 2451470, 2451477,
-    -- 2451484, 2451491, 2451498, 2451505, 2451512, 2451519, 2451526, 2451533, 2451540, 2451547, 2451554, 2451561, 2451568, 2451575,
-    -- 2451582, 2451589, 2451596, 2451603, 2451610, 2451617, 2451624, 2451631, 2451638, 2451645, 2451652, 2451659, 2451666, 2451673,
-    -- 2451680, 2451687, 2451694, 2451701, 2451708, 2451715, 2451722, 2451729, 2451736, 2451743, 2451750, 2451757, 2451764, 2451771,
-    -- 2451778, 2451785, 2451792, 2451799, 2451806, 2451813, 2451820, 2451827, 2451834, 2451841, 2451848, 2451855, 2451862, 2451869,
-    -- 2451876, 2451883, 2451890, 2451897, 2451904)    
-    and d_date between '1999-01-01' and '1999-03-31'
-    and ss_sold_date_sk between 2451180 and 2451269  -- partition key filter
   group by
     ss_ticket_number,
     ss_customer_sk,
@@ -59,106 +44,106 @@ order by
   profit
 limit 100;
 ---- RESULTS
-'','','Midway',9315,6637.96,-19053.01
-'','','Midway',185660,3594.46,-13505.77
-'','','Midway',82061,1343.62,-9218.88
-'','','Midway',78302,2371.41,-7625.25
-'','','Midway',110272,1671.17,-5792.10
-'','','Midway',100922,405.35,-3542.16
-'','','Midway',147115,1123.63,-2803.73
-'','','Midway',36631,15.24,5080.83
-'','','Midway',185660,0.00,NULL
-'','Aisha','Midway',105333,227.30,1235.42
-'','David','Midway',108460,3969.16,-17644.12
-'','Edward','Midway',62697,463.39,-3857.54
-'','John','Midway',145005,438.09,-2708.17
-'','Laura','Midway',42843,231.60,2662.77
-'','Lawrence','Midway',46950,32.63,1456.90
-'','Linda','Fairview',208936,0.00,-15585.85
-'','Malinda','Midway',55959,7606.17,-9597.49
-'','Marilyn','Fairview',31190,191.94,-7049.74
-'','Nydia','Midway',88008,1084.71,-1912.17
-'','Nydia','Midway',88008,0.00,NULL
-'','Randy','Midway',200913,0.00,-14249.78
-'','Robert','Midway',227572,0.00,-13903.87
-'','Wallace','Midway',6920,0.00,-4356.03
-'Acevedo','Grace','Midway',138006,167.17,-1954.45
-'Adair','David','Midway',99374,10343.38,-17501.58
+'Aaron','Guy','Midway',30633,8423.48,-7612.67
+'Abbott','James','Midway',19069,11829.58,-14596.44
+'Abbott','Robert','Midway',108183,2094.22,-11543.20
+'Abell','Tonya','Midway',11487,17.71,-7179.35
+'Abernathy','Verda','Midway',91981,2187.38,-6913.16
+'Abner','Eula','Midway',120315,1123.14,-10293.09
+'Abney','Anthony','Fairview',211863,299.87,-5224.94
+'Abraham','Michael','Fairview',101213,2759.54,-14160.33
+'Abraham','Robert','Midway',172751,122.64,-4104.67
+'Abraham','Travis','Midway',68579,1803.49,-10272.59
+'Abrams','Fannie','Midway',177397,222.18,-2529.63
+'Abreu','Jeffrey','Midway',188029,349.62,-8170.17
+'Acevedo','David','Midway',124592,550.41,-18324.80
+'Acevedo','Ellen','Midway',48390,0.00,-8873.13
+'Acevedo','Grace','Midway',103952,4245.63,-10161.12
+'Ackerman','Jeffrey','Midway',198943,977.78,-6460.69
+'Ackerman','Jeffrey','Midway',19260,3865.35,-1451.04
+'Adair','Evan','Fairview',117449,543.02,-2845.37
+'Adam','Paul','Fairview',161844,100.48,-13979.58
+'Adam','Paul','Fairview',161844,0.00,75.25
 'Adams','Beth','Midway',73934,2148.45,-9147.51
-'Aguilar','Douglas','Midway',79385,0.00,-8233.53
+'Adams','Betty','Midway',83966,3471.23,-11418.81
+'Adams','Dan','Midway',57271,4235.99,-9850.80
+'Adams','George','Midway',162011,7111.36,-23409.35
+'Adams','John','Midway',229336,342.06,-3441.34
+'Adams','Michael','Midway',37967,1645.84,-8363.98
+'Adams','Roy','Midway',164196,0.00,-10557.40
+'Adams','Tony','Midway',184799,0.00,-10143.02
+'Adkins','Evelyn','Midway',210368,14.36,-5619.27
+'Adkins','Kathleen','Midway',58726,8710.56,-16195.45
+'Adler','Charles','Midway',22973,0.00,-14430.54
+'Adler','Julian','Midway',221567,0.00,-7158.29
+'Agee','Anthony','Midway',90993,2119.00,-25648.52
+'Agee','Dora','Midway',217452,2097.93,-7874.59
+'Agnew','Elizabeth','Midway',92724,0.00,-585.34
+'Aguayo','Edwin','Midway',45528,0.00,-12991.97
+'Aguayo','John','Fairview',156381,538.39,444.42
+'Aguilar','Roxane','Midway',6855,2276.72,-8075.22
+'Aguilera','Gladys','Midway',30412,638.21,-3212.77
+'Ahern','Christine','Midway',872,2513.29,-18806.37
+'Ainsworth','John','Midway',12751,31.00,-16667.57
+'Akin','Sharon','Midway',11249,147.14,-6157.31
+'Alarcon','George','Midway',166192,1807.82,-678.04
+'Alarcon','Hazel','Midway',124475,31.54,-1761.42
+'Alarcon','Victoria','Midway',228661,459.41,-3937.68
+'Albert','Jaime','Midway',152168,2869.09,-7283.22
+'Albert','Jeffrey','Midway',238250,1927.20,-9322.37
+'Albright','Helen','Midway',59549,86.16,-6275.12
+'Aldrich','Evelyn','Midway',91580,1806.08,-5265.75
+'Aldridge','Nathanial','Midway',20206,154.62,-4794.76
 'Alexander','Annie','Midway',72228,798.98,-7804.33
-'Allen','Jack','Midway',58268,0.00,-3681.16
-'Allison','Elsie','Midway',201869,132.96,-3760.83
+'Alexander','Eddie','Midway',69977,0.00,-9618.25
+'Alexander','Kristen','Midway',55155,1034.24,-8816.85
+'Alexander','Victor','Midway',184075,4566.50,-16164.13
+'Alfonso','Paul','Midway',224079,2598.57,-3747.90
+'Alford','Roberta','Midway',15770,5271.15,-7286.77
+'Ali','Henry','Midway',72418,231.31,-6663.34
+'Alicea','Ramona','Midway',142193,601.85,-10567.32
+'Allard','John','Midway',20098,1.45,-16478.51
+'Allen','Anna','Midway',175145,21.61,-9271.32
+'Allen','Bill','Fairview',144210,351.66,-5655.63
+'Allen','Colleen','Midway',33031,4941.91,-7217.35
+'Allen','David','Fairview',46354,2987.79,-8400.65
+'Allen','Dianna','Midway',72135,3000.83,-5229.79
+'Allen','Earnestine','Midway',159660,1533.49,-16606.99
+'Allen','Earnestine','Midway',159660,NULL,NULL
+'Allen','Florence','Midway',6542,5405.58,-10287.74
+'Allen','Fred','Midway',122737,1188.63,-92.29
+'Allen','Janice','Midway',199800,11.54,-7276.73
+'Allen','Jason','Midway',111015,1074.54,-14891.59
+'Allen','John','Fairview',207020,3598.03,-13469.52
+'Allen','Lena','Midway',187155,10857.02,-12205.46
+'Allen','Leslie','Midway',11150,0.00,-10958.34
+'Allen','Marcia','Midway',190763,1661.52,-14020.72
+'Allen','Michael','Midway',143187,2446.13,-6376.82
+'Allen','Michael','Midway',43014,1774.16,-5814.87
+'Allen','Rocky','Midway',33844,2417.09,-7084.09
+'Allen','Ronald','Midway',80879,1836.27,-9603.40
+'Allen','Sarah','Midway',148147,3530.75,-17432.64
+'Allen','Teresita','Midway',2008,628.35,-5026.60
+'Allen','Teresita','Midway',2008,447.93,-2761.02
+'Allen','NULL','Midway',43827,844.35,-7012.34
+'Allison','Norma','Midway',82553,1922.94,-9307.16
+'Allison','Peggie','Midway',146780,6966.19,-7455.22
+'Allred','Deborah','Midway',193501,1832.66,-11177.35
+'Almeida','David','Fairview',168589,1172.09,-9778.60
+'Alonso','Anthony','Midway',208514,4090.00,-20066.44
+'Alonzo','Troy','Fairview',54936,0.00,-3939.58
+'Alston','Jenny','Midway',127544,3431.78,-6602.81
+'Alston','Ryan','Midway',214797,297.62,-5349.93
+'Altman','Alfred','Fairview',140764,7591.92,-12948.64
+'Alvarado','Richard','Fairview',81704,1547.83,-8473.98
+'Alvarez','Ana','Midway',225521,0.00,-8431.41
+'Alvarez','Eric','Midway',226554,0.00,-3912.23
+'Alvarez','Jennifer','Midway',119831,7409.63,-10587.25
+'Amador','Wilbur','Midway',225632,1355.65,-4691.06
+'Amaya','Christina','Midway',27102,290.84,-10993.57
+'Ambrose','Robert','Midway',91578,247.07,-6173.40
+'Ames','Perry','Fairview',5862,3975.41,-1347.02
 'Amundson','Ernest','Midway',228272,8218.46,-4039.62
-'Anderson','Alan','Midway',31774,3141.00,-3937.23
-'Anderson','Anabel','Fairview',173521,0.00,-8390.18
-'Anderson','Gerald','Midway',161201,0.00,-12656.37
-'Anderson','Louis','Midway',2413,2478.75,-15660.79
-'Andrews','Katrina','Midway',141027,949.61,-13883.30
-'Arnold','Sueann','Midway',236454,934.61,-9877.86
-'Ashby','Cody','Fairview',227058,2495.04,-14773.02
-'Atkins','Margaret','Midway',55771,2935.95,-14653.78
-'Austin','Jane','Midway',85459,0.00,-11628.79
-'Bailey','Noble','Fairview',166211,233.62,-8209.44
-'Bailey','Robert','Midway',234709,3214.38,-17040.31
-'Baker','Cynthia','Midway',211345,22.74,-358.84
-'Baker','Cynthia','Midway',211345,NULL,NULL
-'Banks','Bobby','Midway',89949,1314.29,-601.36
-'Banks','Max','Midway',219523,0.00,2428.84
-'Barnett','Ramiro','Midway',160660,0.00,-2120.12
-'Barrett','','Midway',209036,2318.80,-9957.73
-'Belcher','Kristina','Midway',185205,8.13,-6758.13
-'Bell','Allen','Midway',192379,413.91,-5402.12
-'Bell','Judith','Midway',214325,1703.86,-12327.70
-'Beltran','Scott','Midway',65875,6418.03,-25914.46
-'Bennett','Marvin','Midway',127326,0.00,-4824.98
-'Bernal','Nilda','Midway',163603,2896.71,-351.77
-'Bilodeau','Angela','Midway',140268,1334.34,-9793.02
-'Bishop','Gregg','Midway',214893,415.07,-15794.60
-'Boudreaux','John','Midway',99169,2028.15,-17410.67
-'Bradford','Joseph','Fairview',43264,495.19,-11751.05
-'Bradley','Eric','Fairview',43135,5818.09,-5982.45
-'Brill','Christina','Midway',232415,633.12,-11858.00
-'Brooks','Jeannie','Fairview',7310,1083.55,-7109.82
-'Brown','Dorothy','Midway',40763,4618.29,-3641.15
-'Brown','Many','Fairview',227538,4310.77,-9102.14
-'Brown','Terry','Midway',40734,0.00,-237.24
-'Bruce','Edward','Midway',57609,3006.20,-15319.86
-'Bullock','Kathryn','Midway',128851,0.00,201.86
-'Burger','Don','Midway',237223,2047.83,-859.12
-'Burgess','Andrew','Midway',24111,2946.86,2954.26
-'Burke','Molly','Fairview',128688,1935.13,-14460.08
-'Burns','Betsy','Midway',39637,209.56,-3769.66
-'Burns','Michell','Midway',31432,2705.13,-13436.18
-'Butler','Karen','Midway',204442,0.00,-2323.93
-'Byrd','Jason','Midway',81091,878.28,-8828.84
-'Byrne','Tamara','Midway',67601,2392.91,-8827.79
-'Calhoun','George','Midway',91645,3083.25,-18583.68
-'Call','Edward','Midway',116662,2367.80,-11636.17
-'Camp','Nancy','Midway',183894,2207.30,-7435.10
-'Cannon','Richard','Midway',118336,3498.36,-9718.32
-'Carr','Celeste','Midway',25783,1139.64,-2973.51
-'Chambers','Jerry','Midway',145476,613.96,-12989.09
-'Chapman','Daniel','Midway',206705,5262.84,-19608.12
-'Chavez','William','Midway',10161,5569.48,-10971.40
-'Chavez','William','Midway',10161,0.00,-2472.87
-'Chavis','Erik','Midway',141627,2261.49,-7108.67
-'Child','Emily','Midway',50297,1619.52,-15503.68
-'Clark','Melissa','Midway',27844,2832.50,-21105.37
-'Clay','Sally','Fairview',87955,2545.88,-19810.06
-'Clemons','Cesar','Midway',207603,6.29,1394.18
-'Clifford','Bessie','Midway',61376,6625.75,-11595.61
-'Collins','Virgie','Midway',124655,2334.07,-7378.08
-'Corona','Jose','Fairview',119316,223.26,-8779.22
-'Cortez','Stanley','Midway',82125,6180.70,-15051.41
-'Cox','Glenn','Midway',178104,3702.44,-16194.96
-'Crawford','Ralph','Fairview',184125,6848.91,-11875.36
-'Crouch','Vivian','Fairview',100177,8274.53,-15809.71
-'Cruz','Judy','Midway',158242,460.42,-21659.87
-'Culpepper','Karl','Midway',102332,2867.11,-4059.47
-'Curtis','Lori','Midway',11896,0.00,-9689.09
-'Damico','Zachary','Midway',77549,4091.29,-8512.92
-'Daniel','Denise','Midway',38236,7390.88,-18976.98
 ---- TYPES
-STRING, STRING, STRING, INT, DECIMAL, DECIMAL
+STRING, STRING, STRING, BIGINT, DECIMAL, DECIMAL
 ====

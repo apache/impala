@@ -20,9 +20,241 @@
 ---- DATASET
 tpcds
 ---- BASE_TABLE_NAME
+call_center
+---- COLUMNS
+cc_call_center_sk         int
+cc_call_center_id         string
+cc_rec_start_date         string
+cc_rec_end_date           string
+cc_closed_date_sk         int
+cc_open_date_sk           int
+cc_name                   string
+cc_class                  string
+cc_employees              int
+cc_sq_ft                  int
+cc_hours                  string
+cc_manager                string
+cc_mkt_id                 int
+cc_mkt_class              string
+cc_mkt_desc               string
+cc_market_manager         string
+cc_division               int
+cc_division_name          string
+cc_company                int
+cc_company_name           string
+cc_street_number          string
+cc_street_name            string
+cc_street_type            string
+cc_suite_number           string
+cc_city                   string
+cc_county                 string
+cc_state                  string
+cc_zip                    string
+cc_country                string
+cc_gmt_offset             decimal(5,2)
+cc_tax_percentage         decimal(5,2)
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH
+'{impala_home}/testdata/impala-data/{db_name}/call_center/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
+catalog_page
+---- COLUMNS
+cp_catalog_page_sk        int
+cp_catalog_page_id        string
+cp_start_date_sk          int
+cp_end_date_sk            int
+cp_department             string
+cp_catalog_number         int
+cp_catalog_page_number    int
+cp_description            string
+cp_type                   string
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH
+'{impala_home}/testdata/impala-data/{db_name}/catalog_page/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
+catalog_returns
+---- COLUMNS
+cr_returned_date_sk       int
+cr_returned_time_sk       int
+cr_item_sk                bigint
+cr_refunded_customer_sk   int
+cr_refunded_cdemo_sk      int
+cr_refunded_hdemo_sk      int
+cr_refunded_addr_sk       int
+cr_returning_customer_sk  int
+cr_returning_cdemo_sk     int
+cr_returning_hdemo_sk     int
+cr_returning_addr_sk      int
+cr_call_center_sk         int
+cr_catalog_page_sk        int
+cr_ship_mode_sk           int
+cr_warehouse_sk           int
+cr_reason_sk              int
+cr_order_number           bigint
+cr_return_quantity        int
+cr_return_amount          decimal(7,2)
+cr_return_tax             decimal(7,2)
+cr_return_amt_inc_tax     decimal(7,2)
+cr_fee                    decimal(7,2)
+cr_return_ship_cost       decimal(7,2)
+cr_refunded_cash          decimal(7,2)
+cr_reversed_charge        decimal(7,2)
+cr_store_credit           decimal(7,2)
+cr_net_loss               decimal(7,2)
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH
+'{impala_home}/testdata/impala-data/{db_name}/catalog_returns/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
+catalog_sales
+---- COLUMNS
+cs_sold_date_sk           int
+cs_sold_time_sk           int
+cs_ship_date_sk           int
+cs_bill_customer_sk       int
+cs_bill_cdemo_sk          int
+cs_bill_hdemo_sk          int
+cs_bill_addr_sk           int
+cs_ship_customer_sk       int
+cs_ship_cdemo_sk          int
+cs_ship_hdemo_sk          int
+cs_ship_addr_sk           int
+cs_call_center_sk         int
+cs_catalog_page_sk        int
+cs_ship_mode_sk           int
+cs_warehouse_sk           int
+cs_item_sk                bigint
+cs_promo_sk               int
+cs_order_number           bigint
+cs_quantity               int
+cs_wholesale_cost         decimal(7,2)
+cs_list_price             decimal(7,2)
+cs_sales_price            decimal(7,2)
+cs_ext_discount_amt       decimal(7,2)
+cs_ext_sales_price        decimal(7,2)
+cs_ext_wholesale_cost     decimal(7,2)
+cs_ext_list_price         decimal(7,2)
+cs_ext_tax                decimal(7,2)
+cs_coupon_amt             decimal(7,2)
+cs_ext_ship_cost          decimal(7,2)
+cs_net_paid               decimal(7,2)
+cs_net_paid_inc_tax       decimal(7,2)
+cs_net_paid_inc_ship      decimal(7,2)
+cs_net_paid_inc_ship_tax  decimal(7,2)
+cs_net_profit             decimal(7,2)
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH
+'{impala_home}/testdata/impala-data/{db_name}/catalog_sales/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
+customer
+---- COLUMNS
+c_customer_sk             int
+c_customer_id             string
+c_current_cdemo_sk        int
+c_current_hdemo_sk        int
+c_current_addr_sk         int
+c_first_shipto_date_sk    int
+c_first_sales_date_sk     int
+c_salutation              string
+c_first_name              string
+c_last_name               string
+c_preferred_cust_flag     string
+c_birth_day               int
+c_birth_month             int
+c_birth_year              int
+c_birth_country           string
+c_login                   string
+c_email_address           string
+c_last_review_date        string
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/customer/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
+customer_address
+---- COLUMNS
+ca_address_sk             int
+ca_address_id             string
+ca_street_number          string
+ca_street_name            string
+ca_street_type            string
+ca_suite_number           string
+ca_city                   string
+ca_county                 string
+ca_state                  string
+ca_zip                    string
+ca_country                string
+ca_gmt_offset             decimal(5,2)
+ca_location_type          string
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/customer_address/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
 customer_demographics
 ---- COLUMNS
-cd_demo_sk                bigint
+cd_demo_sk                int
 cd_gender                 string
 cd_marital_status         string
 cd_education_status       string
@@ -33,6 +265,8 @@ cd_dep_employed_count     int
 cd_dep_college_count      int
 ---- ROW_FORMAT
 delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
@@ -46,7 +280,7 @@ tpcds
 ---- BASE_TABLE_NAME
 date_dim
 ---- COLUMNS
-d_date_sk                 bigint
+d_date_sk                 int
 d_date_id                 string
 d_date                    string
 d_month_seq               int
@@ -76,6 +310,8 @@ d_current_quarter         string
 d_current_year            string
 ---- ROW_FORMAT
 delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
@@ -86,25 +322,62 @@ OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- DATASET
 tpcds
 ---- BASE_TABLE_NAME
-time_dim
+household_demographics
 ---- COLUMNS
-t_time_sk                 bigint
-t_time_id                 string
-t_time                    int
-t_hour                    int
-t_minute                  int
-t_second                  int
-t_am_pm                   string
-t_shift                   string
-t_sub_shift               string
-t_meal_time               string
+hd_demo_sk                int
+hd_income_band_sk         int
+hd_buy_potential          string
+hd_dep_count              int
+hd_vehicle_count          int
 ---- ROW_FORMAT
 delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/time_dim/'
+LOAD DATA LOCAL INPATH
+'{impala_home}/testdata/impala-data/{db_name}/household_demographics/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
+income_band
+---- COLUMNS
+ib_income_band_sk         int
+ib_lower_bound            int
+ib_upper_bound            int
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/income_band/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
+inventory
+---- COLUMNS
+inv_date_sk                int
+inv_item_sk                bigint
+inv_warehouse_sk           int
+inv_quantity_on_hand       int
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/inventory/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -136,6 +409,8 @@ i_manager_id              int
 i_product_name            string
 ---- ROW_FORMAT
 delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
@@ -146,9 +421,66 @@ OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- DATASET
 tpcds
 ---- BASE_TABLE_NAME
+promotion
+---- COLUMNS
+p_promo_sk                int
+p_promo_id                string
+p_start_date_sk           int
+p_end_date_sk             int
+p_item_sk                 bigint
+p_cost                    decimal(15,2)
+p_response_target         int
+p_promo_name              string
+p_channel_dmail           string
+p_channel_email           string
+p_channel_catalog         string
+p_channel_tv              string
+p_channel_radio           string
+p_channel_press           string
+p_channel_event           string
+p_channel_demo            string
+p_channel_details         string
+p_purpose                 string
+p_discount_active         string
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/promotion/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
+ship_mode
+---- COLUMNS
+sm_ship_mode_sk           int
+sm_ship_mode_id           string
+sm_type                   string
+sm_code                   string
+sm_carrier                string
+sm_contract               string
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/ship_mode/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
 store
 ---- COLUMNS
-s_store_sk                bigint
+s_store_sk                int
 s_store_id                string
 s_rec_start_date          string
 s_rec_end_date            string
@@ -179,6 +511,8 @@ s_gmt_offset              decimal(5,2)
 s_tax_precentage          decimal(5,2)
 ---- ROW_FORMAT
 delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
@@ -189,113 +523,37 @@ OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- DATASET
 tpcds
 ---- BASE_TABLE_NAME
-customer
+store_returns
 ---- COLUMNS
-c_customer_sk             bigint
-c_customer_id             string
-c_current_cdemo_sk        int
-c_current_hdemo_sk        int
-c_current_addr_sk         int
-c_first_shipto_date_sk    int
-c_first_sales_date_sk     int
-c_salutation              string
-c_first_name              string
-c_last_name               string
-c_preferred_cust_flag     string
-c_birth_day               int
-c_birth_month             int
-c_birth_year              int
-c_birth_country           string
-c_login                   string
-c_email_address           string
-c_last_review_date        string
+sr_returned_date_sk       int
+sr_return_time_sk         int
+sr_item_sk                bigint
+sr_customer_sk            int
+sr_cdemo_sk               int
+sr_hdemo_sk               int
+sr_addr_sk                int
+sr_store_sk               int
+sr_reason_sk              int
+sr_ticket_number          bigint
+sr_return_quantity        int
+sr_return_amt             decimal(7,2)
+sr_return_tax             decimal(7,2)
+sr_return_amt_inc_tax     decimal(7,2)
+sr_fee                    decimal(7,2)
+sr_return_ship_cost       decimal(7,2)
+sr_refunded_cash          decimal(7,2)
+sr_reversed_charge        decimal(7,2)
+sr_store_credit           decimal(7,2)
+sr_net_loss               decimal(7,2)
 ---- ROW_FORMAT
 delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/customer/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
-====
----- DATASET
-tpcds
----- BASE_TABLE_NAME
-promotion
----- COLUMNS
-p_promo_sk                bigint
-p_promo_id                string
-p_start_date_sk           int
-p_end_date_sk             int
-p_item_sk                 int
-p_cost                    decimal(15,2)
-p_response_target         int
-p_promo_name              string
-p_channel_dmail           string
-p_channel_email           string
-p_channel_catalog         string
-p_channel_tv              string
-p_channel_radio           string
-p_channel_press           string
-p_channel_event           string
-p_channel_demo            string
-p_channel_details         string
-p_purpose                 string
-p_discount_active         string
----- ROW_FORMAT
-delimited fields terminated by '|'
----- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/promotion/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
-====
----- DATASET
-tpcds
----- BASE_TABLE_NAME
-household_demographics
----- COLUMNS
-hd_demo_sk                bigint
-hd_income_band_sk         int
-hd_buy_potential          string
-hd_dep_count              int
-hd_vehicle_count          int
----- ROW_FORMAT
-delimited fields terminated by '|'
----- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH
-'{impala_home}/testdata/impala-data/{db_name}/household_demographics/'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
-====
----- DATASET
-tpcds
----- BASE_TABLE_NAME
-customer_address
----- COLUMNS
-ca_address_sk             bigint
-ca_address_id             string
-ca_street_number          string
-ca_street_name            string
-ca_street_type            string
-ca_suite_number           string
-ca_city                   string
-ca_county                 string
-ca_state                  string
-ca_zip                    string
-ca_country                string
-ca_gmt_offset             decimal(5,2)
-ca_location_type          string
----- ROW_FORMAT
-delimited fields terminated by '|'
----- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
-SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/customer_address/'
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/store_returns/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -303,16 +561,16 @@ tpcds
 ---- BASE_TABLE_NAME
 store_sales_unpartitioned
 ---- COLUMNS
-ss_sold_date_sk           bigint
-ss_sold_time_sk           bigint
+ss_sold_date_sk           int
+ss_sold_time_sk           int
 ss_item_sk                bigint
-ss_customer_sk            bigint
-ss_cdemo_sk               bigint
-ss_hdemo_sk               bigint
-ss_addr_sk                bigint
-ss_store_sk               bigint
-ss_promo_sk               bigint
-ss_ticket_number          int
+ss_customer_sk            int
+ss_cdemo_sk               int
+ss_hdemo_sk               int
+ss_addr_sk                int
+ss_store_sk               int
+ss_promo_sk               int
+ss_ticket_number          bigint
 ss_quantity               int
 ss_wholesale_cost         decimal(7,2)
 ss_list_price             decimal(7,2)
@@ -328,6 +586,8 @@ ss_net_paid_inc_tax       decimal(7,2)
 ss_net_profit             decimal(7,2)
 ---- ROW_FORMAT
 delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
@@ -340,15 +600,15 @@ tpcds
 ---- BASE_TABLE_NAME
 store_sales
 ---- COLUMNS
-ss_sold_time_sk           bigint
+ss_sold_time_sk           int
 ss_item_sk                bigint
-ss_customer_sk            bigint
-ss_cdemo_sk               bigint
-ss_hdemo_sk               bigint
-ss_addr_sk                bigint
-ss_store_sk               bigint
-ss_promo_sk               bigint
-ss_ticket_number          int
+ss_customer_sk            int
+ss_cdemo_sk               int
+ss_hdemo_sk               int
+ss_addr_sk                int
+ss_store_sk               int
+ss_promo_sk               int
+ss_ticket_number          bigint
 ss_quantity               int
 ss_wholesale_cost         decimal(7,2)
 ss_list_price             decimal(7,2)
@@ -363,14 +623,43 @@ ss_net_paid               decimal(7,2)
 ss_net_paid_inc_tax       decimal(7,2)
 ss_net_profit             decimal(7,2)
 ---- PARTITION_COLUMNS
-ss_sold_date_sk bigint
+ss_sold_date_sk int
 ---- ROW_FORMAT
 delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
 ---- DEPENDENT_LOAD
 -- Split the load into multiple steps to reduce total memory usage for larger
 -- scale factors. TODO: Dynamically scale this based on the scale factor?
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_sold_date_sk)
-SELECT ss_sold_time_sk,
+{hint} SELECT ss_sold_time_sk,
+  ss_item_sk,
+  ss_customer_sk,
+  ss_cdemo_sk,
+  ss_hdemo_sk,
+  ss_addr_sk,
+  ss_store_sk,
+  ss_promo_sk,
+  ss_ticket_number,
+  ss_quantity,
+  ss_wholesale_cost,
+  ss_list_price,
+  ss_sales_price,
+  ss_ext_discount_amt,
+  ss_ext_sales_price,
+  ss_ext_wholesale_cost,
+  ss_ext_list_price,
+  ss_ext_tax,
+  ss_coupon_amt,
+  ss_net_paid,
+  ss_net_paid_inc_tax,
+  ss_net_profit,
+  ss_sold_date_sk
+FROM {db_name}.{table_name}
+WHERE ss_sold_date_sk IS NULL;
+
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_sold_date_sk)
+{hint} SELECT ss_sold_time_sk,
   ss_item_sk,
   ss_customer_sk,
   ss_cdemo_sk,
@@ -397,7 +686,7 @@ FROM {db_name}.{table_name}
 WHERE ss_sold_date_sk < 2451272;
 
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_sold_date_sk)
-SELECT ss_sold_time_sk,
+{hint} SELECT ss_sold_time_sk,
   ss_item_sk,
   ss_customer_sk,
   ss_cdemo_sk,
@@ -424,7 +713,7 @@ FROM {db_name}.{table_name}
 WHERE 2451272 <= ss_sold_date_sk and ss_sold_date_sk < 2451728;
 
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_sold_date_sk)
-SELECT ss_sold_time_sk,
+{hint} SELECT ss_sold_time_sk,
   ss_item_sk,
   ss_customer_sk,
   ss_cdemo_sk,
@@ -451,7 +740,7 @@ FROM {db_name}.{table_name}
 WHERE 2451728 <= ss_sold_date_sk and ss_sold_date_sk < 2452184;
 
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (ss_sold_date_sk)
-SELECT ss_sold_time_sk,
+{hint} SELECT ss_sold_time_sk,
   ss_item_sk,
   ss_customer_sk,
   ss_cdemo_sk,
@@ -509,46 +798,336 @@ select ss_sold_time_sk,
   ss_net_profit,
   ss_sold_date_sk
 from store_sales_unpartitioned
+WHERE ss_sold_date_sk IS NULL
 distribute by ss_sold_date_sk;
----- LOAD_LOCAL
-USE {db_name};
 
-set hive.exec.max.dynamic.partitions.pernode=10000;
-set hive.exec.max.dynamic.partitions=10000;
-set hive.exec.dynamic.partition.mode=nonstrict;
-set hive.exec.dynamic.partition=true;
-
-insert overwrite table store_sales partition(ss_sold_date_sk)
-select ss.ss_sold_time_sk,
-  ss.ss_item_sk,
-  ss.ss_customer_sk,
-  ss.ss_cdemo_sk,
-  ss.ss_hdemo_sk,
-  ss.ss_addr_sk,
-  ss.ss_store_sk,
-  ss.ss_promo_sk,
-  ss.ss_ticket_number,
-  ss.ss_quantity,
-  ss.ss_wholesale_cost,
-  ss.ss_list_price,
-  ss.ss_sales_price,
-  ss.ss_ext_discount_amt,
-  ss.ss_ext_sales_price,
-  ss.ss_ext_wholesale_cost,
-  ss.ss_ext_list_price,
-  ss.ss_ext_tax,
-  ss.ss_coupon_amt,
-  ss.ss_net_paid,
-  ss.ss_net_paid_inc_tax,
-  ss.ss_net_profit,
-  ss.ss_sold_date_sk
-from date_dim d
-join store_sales_unpartitioned ss
-  on (ss.ss_sold_date_sk = d.d_date_sk)
--- The filter below reduced the number of partitions generated for local testing. This
--- filter reduces the number of partitions from ~1800 to 120. We are doing a join with
--- date_dim in order to select the 1st and 15th days of the month. No data in date_dim
--- ends up in store_sales.
-where (d.d_date like '%-01' or d.d_date like '%-15')
+insert overwrite table {table_name} partition(ss_sold_date_sk)
+select ss_sold_time_sk,
+  ss_item_sk,
+  ss_customer_sk,
+  ss_cdemo_sk,
+  ss_hdemo_sk,
+  ss_addr_sk,
+  ss_store_sk,
+  ss_promo_sk,
+  ss_ticket_number,
+  ss_quantity,
+  ss_wholesale_cost,
+  ss_list_price,
+  ss_sales_price,
+  ss_ext_discount_amt,
+  ss_ext_sales_price,
+  ss_ext_wholesale_cost,
+  ss_ext_list_price,
+  ss_ext_tax,
+  ss_coupon_amt,
+  ss_net_paid,
+  ss_net_paid_inc_tax,
+  ss_net_profit,
+  ss_sold_date_sk
+from store_sales_unpartitioned
+WHERE ss_sold_date_sk < 2451272
 distribute by ss_sold_date_sk;
+
+insert overwrite table {table_name} partition(ss_sold_date_sk)
+select ss_sold_time_sk,
+  ss_item_sk,
+  ss_customer_sk,
+  ss_cdemo_sk,
+  ss_hdemo_sk,
+  ss_addr_sk,
+  ss_store_sk,
+  ss_promo_sk,
+  ss_ticket_number,
+  ss_quantity,
+  ss_wholesale_cost,
+  ss_list_price,
+  ss_sales_price,
+  ss_ext_discount_amt,
+  ss_ext_sales_price,
+  ss_ext_wholesale_cost,
+  ss_ext_list_price,
+  ss_ext_tax,
+  ss_coupon_amt,
+  ss_net_paid,
+  ss_net_paid_inc_tax,
+  ss_net_profit,
+  ss_sold_date_sk
+from store_sales_unpartitioned
+WHERE 2451272 <= ss_sold_date_sk and ss_sold_date_sk < 2451728
+distribute by ss_sold_date_sk;
+
+insert overwrite table {table_name} partition(ss_sold_date_sk)
+select ss_sold_time_sk,
+  ss_item_sk,
+  ss_customer_sk,
+  ss_cdemo_sk,
+  ss_hdemo_sk,
+  ss_addr_sk,
+  ss_store_sk,
+  ss_promo_sk,
+  ss_ticket_number,
+  ss_quantity,
+  ss_wholesale_cost,
+  ss_list_price,
+  ss_sales_price,
+  ss_ext_discount_amt,
+  ss_ext_sales_price,
+  ss_ext_wholesale_cost,
+  ss_ext_list_price,
+  ss_ext_tax,
+  ss_coupon_amt,
+  ss_net_paid,
+  ss_net_paid_inc_tax,
+  ss_net_profit,
+  ss_sold_date_sk
+from store_sales_unpartitioned
+WHERE 2451728 <= ss_sold_date_sk and ss_sold_date_sk < 2452184
+distribute by ss_sold_date_sk;
+
+insert overwrite table {table_name} partition(ss_sold_date_sk)
+select ss_sold_time_sk,
+  ss_item_sk,
+  ss_customer_sk,
+  ss_cdemo_sk,
+  ss_hdemo_sk,
+  ss_addr_sk,
+  ss_store_sk,
+  ss_promo_sk,
+  ss_ticket_number,
+  ss_quantity,
+  ss_wholesale_cost,
+  ss_list_price,
+  ss_sales_price,
+  ss_ext_discount_amt,
+  ss_ext_sales_price,
+  ss_ext_wholesale_cost,
+  ss_ext_list_price,
+  ss_ext_tax,
+  ss_coupon_amt,
+  ss_net_paid,
+  ss_net_paid_inc_tax,
+  ss_net_profit,
+  ss_sold_date_sk
+from store_sales_unpartitioned
+WHERE 2452184 <= ss_sold_date_sk
+distribute by ss_sold_date_sk;
+====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
+time_dim
+---- COLUMNS
+t_time_sk                 int
+t_time_id                 string
+t_time                    int
+t_hour                    int
+t_minute                  int
+t_second                  int
+t_am_pm                   string
+t_shift                   string
+t_sub_shift               string
+t_meal_time               string
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/time_dim/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
+warehouse
+---- COLUMNS
+w_warehouse_sk            int
+w_warehouse_id            string
+w_warehouse_name          string
+w_warehouse_sq_ft         int
+w_street_number           string
+w_street_name             string
+w_street_type             string
+w_suite_number            string
+w_city                    string
+w_county                  string
+w_state                   string
+w_zip                     string
+w_country                 string
+w_gmt_offset              decimal(5,2)
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/warehouse/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
+web_page
+---- COLUMNS
+wp_web_page_sk            int
+wp_web_page_id            string
+wp_rec_start_date         string
+wp_rec_end_date           string
+wp_creation_date_sk       int
+wp_access_date_sk         int
+wp_autogen_flag           string
+wp_customer_sk            int
+wp_url                    string
+wp_type                   string
+wp_char_count             int
+wp_link_count             int
+wp_image_count            int
+wp_max_ad_count           int
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/web_page/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
+web_returns
+---- COLUMNS
+wr_returned_date_sk       int
+wr_returned_time_sk       int
+wr_item_sk                bigint
+wr_refunded_customer_sk   int
+wr_refunded_cdemo_sk      int
+wr_refunded_hdemo_sk      int
+wr_refunded_addr_sk       int
+wr_returning_customer_sk  int
+wr_returning_cdemo_sk     int
+wr_returning_hdemo_sk     int
+wr_returning_addr_sk      int
+wr_web_page_sk            int
+wr_reason_sk              int
+wr_order_number           bigint
+wr_return_quantity        int
+wr_return_amt             decimal(7,2)
+wr_return_tax             decimal(7,2)
+wr_return_amt_inc_tax     decimal(7,2)
+wr_fee                    decimal(7,2)
+wr_return_ship_cost       decimal(7,2)
+wr_refunded_cash          decimal(7,2)
+wr_reversed_charge        decimal(7,2)
+wr_account_credit         decimal(7,2)
+wr_net_loss               decimal(7,2)
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/web_returns/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
+web_sales
+---- COLUMNS
+ws_sold_date_sk           int
+ws_sold_time_sk           int
+ws_ship_date_sk           int
+ws_item_sk                bigint
+ws_bill_customer_sk       int
+ws_bill_cdemo_sk          int
+ws_bill_hdemo_sk          int
+ws_bill_addr_sk           int
+ws_ship_customer_sk       int
+ws_ship_cdemo_sk          int
+ws_ship_hdemo_sk          int
+ws_ship_addr_sk           int
+ws_web_page_sk            int
+ws_web_site_sk            int
+ws_ship_mode_sk           int
+ws_warehouse_sk           int
+ws_promo_sk               int
+ws_order_number           bigint
+ws_quantity               int
+ws_wholesale_cost         decimal(7,2)
+ws_list_price             decimal(7,2)
+ws_sales_price            decimal(7,2)
+ws_ext_discount_amt       decimal(7,2)
+ws_ext_sales_price        decimal(7,2)
+ws_ext_wholesale_cost     decimal(7,2)
+ws_ext_list_price         decimal(7,2)
+ws_ext_tax                decimal(7,2)
+ws_coupon_amt             decimal(7,2)
+ws_ext_ship_cost          decimal(7,2)
+ws_net_paid               decimal(7,2)
+ws_net_paid_inc_tax       decimal(7,2)
+ws_net_paid_inc_ship      decimal(7,2)
+ws_net_paid_inc_ship_tax  decimal(7,2)
+ws_net_profit             decimal(7,2)
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/web_sales/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
+web_site
+---- COLUMNS
+web_site_sk           int
+web_site_id           string
+web_rec_start_date    string
+web_rec_end_date      string
+web_name              string
+web_open_date_sk      int
+web_close_date_sk     int
+web_class             string
+web_manager           string
+web_mkt_id            int
+web_mkt_class         string
+web_mkt_desc          string
+web_market_manager    string
+web_company_id        int
+web_company_name      string
+web_street_number     string
+web_street_name       string
+web_street_type       string
+web_suite_number      string
+web_city              string
+web_county            string
+web_state             string
+web_zip               string
+web_country           string
+web_gmt_offset        decimal(5,2)
+web_tax_percentage    decimal(5,2)
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/web_site/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====

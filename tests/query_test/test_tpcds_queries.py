@@ -51,8 +51,20 @@ class TestTpcdsQuery(ImpalaTestSuite):
   def test_tpcds_count(self, vector):
     self.run_test_case('count', vector)
 
+  def test_tpcds_q1(self, vector):
+    self.run_test_case('tpcds-q1', vector)
+
+  def test_tpcds_q2(self, vector):
+    self.run_test_case('tpcds-q2', vector)
+
   def test_tpcds_q3(self, vector):
     self.run_test_case('tpcds-q3', vector)
+
+  def test_tpcds_q4(self, vector):
+    self.run_test_case('tpcds-q4', vector)
+
+  def test_tpcds_q6(self, vector):
+    self.run_test_case('tpcds-q6', vector)
 
   def test_tpcds_q7(self, vector):
     self.run_test_case('tpcds-q7', vector)
@@ -63,8 +75,16 @@ class TestTpcdsQuery(ImpalaTestSuite):
   def test_tpcds_q19(self, vector):
     self.run_test_case('tpcds-q19', vector)
 
+  def test_tpcds_q23(self, vector):
+    self.run_test_case('tpcds-q23-1', vector)
+    self.run_test_case('tpcds-q23-2', vector)
+
   def test_tpcds_q27(self, vector):
     self.run_test_case('tpcds-q27', vector)
+    self.run_test_case('tpcds-q27a', vector)
+
+  def test_tpcds_q28(self, vector):
+    self.run_test_case('tpcds-q28', vector)
 
   def test_tpcds_q34(self, vector):
     self.run_test_case('tpcds-q34', vector)
@@ -77,6 +97,9 @@ class TestTpcdsQuery(ImpalaTestSuite):
 
   def test_tpcds_q46(self, vector):
     self.run_test_case('tpcds-q46', vector)
+
+  def test_tpcds_q47(self, vector):
+    self.run_test_case('tpcds-q47', vector)
 
   def test_tpcds_q52(self, vector):
     self.run_test_case('tpcds-q52', vector)
@@ -119,13 +142,6 @@ class TestTpcdsQuery(ImpalaTestSuite):
 
   def test_tpcds_q98(self, vector):
     self.run_test_case('tpcds-q98', vector)
-
-  def test_tpcds_q47(self, vector):
-    self.run_test_case('tpcds-q47', vector)
-
-  def test_tpcds_q6(self, vector):
-    self.run_test_case('tpcds-q6', vector)
-
 
 class TestTpcdsInsert(ImpalaTestSuite):
   @classmethod

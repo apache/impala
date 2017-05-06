@@ -98,12 +98,13 @@ create table store_sales_seq_none_rec like tpcds_parquet.store_sales
 stored as SEQUENCEFILE;
 insert into store_sales_seq_none_rec partition(ss_sold_date_sk)
 select * from tpcds_parquet.store_sales
-where ss_sold_date_sk between 2450816 and 2451200;
+where (ss_sold_date_sk between 2451175 and 2451200) or
+      (ss_sold_date_sk is null and ss_sold_time_sk > 60000);
 ====
 ---- QUERY
 select count(*) from store_sales_seq_none_rec;
 ---- RESULTS
-37999
+60091
 ---- TYPES
 BIGINT
 ====
@@ -117,12 +118,13 @@ create table store_sales_seq_def_rec like tpcds_parquet.store_sales
 stored as SEQUENCEFILE;
 insert into store_sales_seq_def_rec partition(ss_sold_date_sk)
 select * from tpcds_parquet.store_sales
-where ss_sold_date_sk between 2450816 and 2451200;
+where (ss_sold_date_sk between 2451175 and 2451200) or
+      (ss_sold_date_sk is null and ss_sold_time_sk > 60000);
 ====
 ---- QUERY
 select count(*) from store_sales_seq_def_rec;
 ---- RESULTS
-37999
+60091
 ---- TYPES
 BIGINT
 ====
@@ -136,12 +138,13 @@ create table store_sales_seq_snapb_rec like tpcds_parquet.store_sales
 stored as SEQUENCEFILE;
 insert into store_sales_seq_snapb_rec partition(ss_sold_date_sk)
 select * from tpcds_parquet.store_sales
-where ss_sold_date_sk between 2450816 and 2451200;
+where (ss_sold_date_sk between 2451175 and 2451200) or
+      (ss_sold_date_sk is null and ss_sold_time_sk > 60000);
 ====
 ---- QUERY
 select count(*) from store_sales_seq_snapb_rec;
 ---- RESULTS
-37999
+60091
 ---- TYPES
 BIGINT
 ====
@@ -155,12 +158,13 @@ create table store_sales_seq_snap_rec like tpcds_parquet.store_sales
 stored as SEQUENCEFILE;
 insert into store_sales_seq_snap_rec partition(ss_sold_date_sk)
 select * from tpcds_parquet.store_sales
-where ss_sold_date_sk between 2450816 and 2451200;
+where (ss_sold_date_sk between 2451175 and 2451200) or
+      (ss_sold_date_sk is null and ss_sold_time_sk > 60000);
 ====
 ---- QUERY
 select count(*) from store_sales_seq_snap_rec;
 ---- RESULTS
-37999
+60091
 ---- TYPES
 BIGINT
 ====
@@ -174,12 +178,13 @@ create table store_sales_seq_gzip_rec like tpcds_parquet.store_sales
 stored as SEQUENCEFILE;
 insert into store_sales_seq_gzip_rec partition(ss_sold_date_sk)
 select * from tpcds_parquet.store_sales
-where ss_sold_date_sk between 2450816 and 2451200;
+where (ss_sold_date_sk between 2451175 and 2451200) or
+      (ss_sold_date_sk is null and ss_sold_time_sk > 60000);
 ====
 ---- QUERY
 select count(*) from store_sales_seq_gzip_rec;
 ---- RESULTS
-37999
+60091
 ---- TYPES
 BIGINT
 ====
@@ -193,12 +198,13 @@ create table store_sales_seq_none_block like tpcds_parquet.store_sales
 stored as SEQUENCEFILE;
 insert into store_sales_seq_none_block partition(ss_sold_date_sk)
 select * from tpcds_parquet.store_sales
-where ss_sold_date_sk between 2450816 and 2451200;
+where (ss_sold_date_sk between 2451175 and 2451200) or
+      (ss_sold_date_sk is null and ss_sold_time_sk > 60000);
 ====
 ---- QUERY
 select count(*) from store_sales_seq_none_block;
 ---- RESULTS
-37999
+60091
 ---- TYPES
 BIGINT
 ====
@@ -212,12 +218,13 @@ create table store_sales_seq_def_block like tpcds_parquet.store_sales
 stored as SEQUENCEFILE;
 insert into store_sales_seq_def_block partition(ss_sold_date_sk)
 select * from tpcds_parquet.store_sales
-where ss_sold_date_sk between 2450816 and 2451200;
+where (ss_sold_date_sk between 2451175 and 2451200) or
+      (ss_sold_date_sk is null and ss_sold_time_sk > 60000);
 ====
 ---- QUERY
 select count(*) from store_sales_seq_def_block;
 ---- RESULTS
-37999
+60091
 ---- TYPES
 BIGINT
 ====
@@ -231,12 +238,13 @@ create table store_sales_seq_snapb_block like tpcds_parquet.store_sales
 stored as SEQUENCEFILE;
 insert into store_sales_seq_snapb_block partition(ss_sold_date_sk)
 select * from tpcds_parquet.store_sales
-where ss_sold_date_sk between 2450816 and 2451200;
+where (ss_sold_date_sk between 2451175 and 2451200) or
+      (ss_sold_date_sk is null and ss_sold_time_sk > 60000);
 ====
 ---- QUERY
 select count(*) from store_sales_seq_snapb_block;
 ---- RESULTS
-37999
+60091
 ---- TYPES
 BIGINT
 ====
@@ -250,12 +258,13 @@ create table store_sales_seq_snap_block like tpcds_parquet.store_sales
 stored as SEQUENCEFILE;
 insert into store_sales_seq_snap_block partition(ss_sold_date_sk)
 select * from tpcds_parquet.store_sales
-where ss_sold_date_sk between 2450816 and 2451200;
+where (ss_sold_date_sk between 2451175 and 2451200) or
+      (ss_sold_date_sk is null and ss_sold_time_sk > 60000);
 ====
 ---- QUERY
 select count(*) from store_sales_seq_snap_block;
 ---- RESULTS
-37999
+60091
 ---- TYPES
 BIGINT
 ====
@@ -269,12 +278,13 @@ create table store_sales_seq_gzip_block like tpcds_parquet.store_sales
 stored as SEQUENCEFILE;
 insert into store_sales_seq_gzip_block partition(ss_sold_date_sk)
 select * from tpcds_parquet.store_sales
-where ss_sold_date_sk between 2450816 and 2451200;
+where (ss_sold_date_sk between 2451175 and 2451200) or
+      (ss_sold_date_sk is null and ss_sold_time_sk > 60000);
 ====
 ---- QUERY
 select count(*) from store_sales_seq_gzip_block;
 ---- RESULTS
-37999
+60091
 ---- TYPES
 BIGINT
 ====
