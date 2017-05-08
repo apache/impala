@@ -25,6 +25,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TAggregateFunction;
+import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TFunction;
@@ -309,6 +310,14 @@ public class Function implements CatalogObject {
 
   // Child classes must override this function.
   public String toSql(boolean ifNotExists) { return ""; }
+
+  public TCatalogObject toTCatalogObject () {
+    TCatalogObject result = new TCatalogObject();
+    result.setType(TCatalogObjectType.FUNCTION);
+    result.setFn(toThrift());
+    result.setCatalog_version(catalogVersion_);
+    return result;
+  }
 
   public TFunction toThrift() {
     TFunction fn = new TFunction();

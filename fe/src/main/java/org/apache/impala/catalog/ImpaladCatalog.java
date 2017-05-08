@@ -253,6 +253,9 @@ public class ImpaladCatalog extends Catalog {
         addTable(catalogObject.getTable(), catalogObject.getCatalog_version());
         break;
       case FUNCTION:
+        // Remove the function first, in case there is an existing function with the same
+        // name and signature.
+        removeFunction(catalogObject.getFn(), catalogObject.getCatalog_version());
         addFunction(catalogObject.getFn(), catalogObject.getCatalog_version());
         break;
       case DATA_SOURCE:

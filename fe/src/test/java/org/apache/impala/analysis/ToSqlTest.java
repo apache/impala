@@ -1308,4 +1308,25 @@ public class ToSqlTest extends FrontendTestBase {
         "WITH t AS (SELECT * FROM functional.alltypes TABLESAMPLE SYSTEM(5)) " +
         "SELECT * FROM t");
   }
+
+  /**
+   * Tests invalidate statements are output correctly.
+   */
+  @Test
+  public void testInvalidate() {
+    testToSql("INVALIDATE METADATA", "INVALIDATE METADATA");
+    testToSql("INVALIDATE METADATA functional.alltypes",
+        "INVALIDATE METADATA functional.alltypes");
+  }
+
+  /**
+   * Tests refresh statements are output correctly.
+   */
+  @Test
+  public void testRefresh() {
+    testToSql("REFRESH functional.alltypes", "REFRESH functional.alltypes");
+    testToSql("REFRESH functional.alltypes PARTITION (year=2009, month=1)",
+        "REFRESH functional.alltypes PARTITION (year=2009, month=1)");
+    testToSql("REFRESH FUNCTIONS functional", "REFRESH FUNCTIONS functional");
+  }
 }

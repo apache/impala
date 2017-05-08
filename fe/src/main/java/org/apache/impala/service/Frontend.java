@@ -222,20 +222,20 @@ public class Frontend {
       TUpdateCatalogCacheRequest req) throws CatalogException {
     ImpaladCatalog catalog = impaladCatalog_;
 
+    if (req.is_delta) return catalog.updateCatalog(req);
+
     // If this is not a delta, this update should replace the current
     // Catalog contents so create a new catalog and populate it.
-    if (!req.is_delta) catalog = new ImpaladCatalog(defaultKuduMasterHosts_);
+    catalog = new ImpaladCatalog(defaultKuduMasterHosts_);
 
     TUpdateCatalogCacheResponse response = catalog.updateCatalog(req);
 
-    if (!req.is_delta) {
-      // This was not a delta update. Now that the catalog has been updated,
-      // replace the references to impaladCatalog_/authzChecker_ ensure
-      // clients continue don't see the catalog disappear.
-      impaladCatalog_ = catalog;
-      authzChecker_.set(new AuthorizationChecker(authzConfig_,
-          impaladCatalog_.getAuthPolicy()));
-    }
+    // Now that the catalog has been updated, replace the references to
+    // impaladCatalog_/authzChecker_. This ensures that clients don't see
+    // the catalog disappear.
+    impaladCatalog_ = catalog;
+    authzChecker_.set(new AuthorizationChecker(authzConfig_,
+        impaladCatalog_.getAuthPolicy()));
     return response;
   }
 

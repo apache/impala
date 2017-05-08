@@ -45,6 +45,7 @@ import org.apache.hadoop.hive.metastore.api.ResourceType;
 import org.apache.hadoop.hive.metastore.api.ResourceUri;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.hive.ql.exec.FunctionUtils;
+import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.authorization.SentryConfig;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.FileSystemUtil;
@@ -601,6 +602,68 @@ public class CatalogServiceCatalog extends Catalog {
       }
     }
     LOG.info("Loaded Java functions for database: " + db.getName());
+  }
+
+  /**
+   * Reloads function metadata for 'dbName' database. Populates the 'addedFuncs' list
+   * with functions that were added as a result of this operation. Populates the
+   * 'removedFuncs' list with functions that were removed.
+   */
+  public void refreshFunctions(MetaStoreClient msClient, String dbName,
+      List<TCatalogObject> addedFuncs, List<TCatalogObject> removedFuncs)
+      throws CatalogException {
+    // Create a temporary database that will contain all the functions from the HMS.
+    Db tmpDb;
+    try {
+      List<org.apache.hadoop.hive.metastore.api.Function> javaFns =
+          Lists.newArrayList();
+      for (String javaFn : msClient.getHiveClient().getFunctions(dbName, "*")) {
+        javaFns.add(msClient.getHiveClient().getFunction(dbName, javaFn));
+      }
+      // Contains native functions in it's params map.
+      org.apache.hadoop.hive.metastore.api.Database msDb =
+          msClient.getHiveClient().getDatabase(dbName);
+      tmpDb = new Db(dbName, this, null);
+      // Load native UDFs into the temporary db.
+      loadFunctionsFromDbParams(tmpDb, msDb);
+      // Load Java UDFs from HMS into the temporary db.
+      loadJavaFunctions(tmpDb, javaFns);
+
+      Db db = dbCache_.get().get(dbName);
+      if (db == null) {
+        throw new DatabaseNotFoundException("Database does not exist: " + dbName);
+      }
+      // Load transient functions into the temporary db.
+      for (Function fn: db.getTransientFunctions()) tmpDb.addFunction(fn);
+
+      // Compute the removed functions and remove them from the db.
+      for (Map.Entry<String, List<Function>> e: db.getAllFunctions().entrySet()) {
+        for (Function fn: e.getValue()) {
+          if (tmpDb.getFunction(
+              fn, Function.CompareMode.IS_INDISTINGUISHABLE) == null) {
+            fn.setCatalogVersion(incrementAndGetCatalogVersion());
+            removedFuncs.add(fn.toTCatalogObject());
+          }
+        }
+      }
+
+      // We will re-add all the functions to the db because it's possible that a
+      // function was dropped and a different function (for example, the binary is
+      // different) with the same name and signature was re-added in Hive.
+      db.removeAllFunctions();
+      for (Map.Entry<String, List<Function>> e: tmpDb.getAllFunctions().entrySet()) {
+        for (Function fn: e.getValue()) {
+          // We do not need to increment and acquire a new catalog version for this
+          // function here because this already happens when the functions are loaded
+          // into tmpDb.
+          db.addFunction(fn);
+          addedFuncs.add(fn.toTCatalogObject());
+        }
+      }
+
+    } catch (Exception e) {
+      throw new CatalogException("Error refreshing functions in " + dbName + ": ", e);
+    }
   }
 
   /**

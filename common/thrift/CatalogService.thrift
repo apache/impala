@@ -193,6 +193,9 @@ struct TResetMetadataRequest {
   // If set, refreshes the specified partition, otherwise
   // refreshes the whole table
   5: optional list<CatalogObjects.TPartitionKeyValue> partition_spec
+
+  // If set, refreshes functions in the specified database.
+  6: optional string db_name
 }
 
 // Response from TResetMetadataRequest

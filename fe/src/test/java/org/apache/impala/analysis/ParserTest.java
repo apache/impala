@@ -3076,6 +3076,7 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("refresh Foo partition (col=2)");
     ParsesOk("refresh Foo.S partition (col=2)");
     ParsesOk("refresh Foo.S partition (col1 = 2, col2 = 3)");
+    ParsesOk("refresh functions Foo");
 
     ParserError("invalidate");
     ParserError("invalidate metadata Foo.S.S");
@@ -3085,6 +3086,7 @@ public class ParserTest extends FrontendTestBase {
     ParserError("refresh");
     ParserError("refresh Foo.S partition (col1 = 2, col2)");
     ParserError("refresh Foo.S partition ()");
+    ParserError("refresh functions Foo.S");
   }
 
   @Test

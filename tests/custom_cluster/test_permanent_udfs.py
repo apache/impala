@@ -18,6 +18,7 @@
 import glob
 import os
 import pytest
+import re
 import shutil
 import subprocess
 
@@ -28,8 +29,9 @@ from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.util.filesystem_utils import get_fs_path
 
 class TestUdfPersistence(CustomClusterTestSuite):
-  """ Tests the behavior of UDFs and UDAs between catalog restarts. With IMPALA-1748, these
-  functions are persisted to the metastore and are loaded again during catalog startup"""
+  """ Tests the behavior of UDFs and UDAs between catalog restarts. With IMPALA-1748,
+  these functions are persisted to the metastore and are loaded again during catalog
+  startup"""
 
   DATABASE = 'udf_permanent_test'
   JAVA_FN_TEST_DB = 'java_permanent_test'
@@ -183,7 +185,7 @@ class TestUdfPersistence(CustomClusterTestSuite):
   @SkipIfLocal.hive
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-     catalogd_args= "--local_library_dir=%s" % LOCAL_LIBRARY_DIR)
+     catalogd_args= "--local_library_dir={0}".format(LOCAL_LIBRARY_DIR))
   def test_java_udfs_hive_integration(self):
     ''' This test checks the integration between Hive and Impala on
     CREATE FUNCTION and DROP FUNCTION statements for persistent Java UDFs.
@@ -215,24 +217,140 @@ class TestUdfPersistence(CustomClusterTestSuite):
       assert "does not exist" in hive_stdout
 
     # Create the same set of functions from Hive and make sure they are visible
-    # in Impala.
-    for (fn, fn_symbol) in self.SAMPLE_JAVA_UDFS:
-      self.run_stmt_in_hive(self.CREATE_HIVE_UDF_TEMPLATE.format(
-          db=self.HIVE_IMPALA_INTEGRATION_DB, function=fn,
-          location=self.HIVE_UDF_JAR, symbol=fn_symbol))
-    self.client.execute("INVALIDATE METADATA")
-    for (fn, fn_symbol) in self.SAMPLE_JAVA_UDFS:
-      result = self.client.execute("SHOW FUNCTIONS IN %s" %
-          self.HIVE_IMPALA_INTEGRATION_DB)
-      assert result is not None and len(result.data) > 0 and\
-          fn in str(result.data)
-      self.__verify_udf_in_impala(fn)
-      # Drop the function in Hive and make sure it reflects in Impala.
-      self.run_stmt_in_hive(self.DROP_JAVA_UDF_TEMPLATE.format(
-          db=self.HIVE_IMPALA_INTEGRATION_DB, function=fn))
-    self.client.execute("INVALIDATE METADATA")
-    self.verify_function_count(
-            "SHOW FUNCTIONS in {0}".format(self.HIVE_IMPALA_INTEGRATION_DB), 0)
+    # in Impala. There are two ways to make functions visible in Impala: invalidate
+    # metadata and refresh functions <db>.
+    REFRESH_COMMANDS = ["INVALIDATE METADATA",
+        "REFRESH FUNCTIONS {0}".format(self.HIVE_IMPALA_INTEGRATION_DB)]
+    for refresh_command in REFRESH_COMMANDS:
+      for (fn, fn_symbol) in self.SAMPLE_JAVA_UDFS:
+        self.run_stmt_in_hive(self.CREATE_HIVE_UDF_TEMPLATE.format(
+            db=self.HIVE_IMPALA_INTEGRATION_DB, function=fn,
+            location=self.HIVE_UDF_JAR, symbol=fn_symbol))
+      self.client.execute(refresh_command)
+      for (fn, fn_symbol) in self.SAMPLE_JAVA_UDFS:
+        result = self.client.execute("SHOW FUNCTIONS IN {0}".format(
+            self.HIVE_IMPALA_INTEGRATION_DB))
+        assert result is not None and len(result.data) > 0 and\
+            fn in str(result.data)
+        self.__verify_udf_in_impala(fn)
+        # Drop the function in Hive and make sure it reflects in Impala.
+        self.run_stmt_in_hive(self.DROP_JAVA_UDF_TEMPLATE.format(
+            db=self.HIVE_IMPALA_INTEGRATION_DB, function=fn))
+      self.client.execute(refresh_command)
+      self.verify_function_count(
+          "SHOW FUNCTIONS in {0}".format(self.HIVE_IMPALA_INTEGRATION_DB), 0)
+      # Make sure we deleted all the temporary jars we copied to the local fs
+      assert len(glob.glob(self.LOCAL_LIBRARY_DIR + "/*.jar")) == 0
+
+  @SkipIfIsilon.hive
+  @SkipIfS3.hive
+  @SkipIfLocal.hive
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+     catalogd_args= "--local_library_dir={0}".format(LOCAL_LIBRARY_DIR))
+  def test_refresh_native(self):
+    ''' This test checks that a native function is visible in Impala after a
+    REFRESH FUNCTIONS command. We will add the native function through Hive
+    by setting DBPROPERTIES of a database.'''
+    # First we create the function in Impala.
+    create_func_impala = ("create function {database}.identity_tmp(bigint) "
+        "returns bigint location '{location}' symbol='Identity'")
+    self.client.execute(create_func_impala.format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB,
+        location=get_fs_path('/test-warehouse/libTestUdfs.so')))
+
+    # Impala puts the native function into a database property table. We extract the key
+    # value pair that represents the function from the table.
+    describe_db_hive = "DESCRIBE DATABASE EXTENDED {database}".format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB)
+    result = self.run_stmt_in_hive(describe_db_hive)
+    regex = r"{(.*?)=(.*?)}"
+    match = re.search(regex, result)
+    func_name = match.group(1)
+    func_contents = match.group(2)
+
+    # Recreate the database, this deletes the function.
+    self.client.execute("DROP DATABASE {database} CASCADE".format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB))
+    self.client.execute("CREATE DATABASE {database}".format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB))
+    result = self.client.execute("SHOW FUNCTIONS IN {database}".format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB))
+    assert result is not None and len(result.data) == 0
+
+    # Place the function into the recreated database by modifying it's properties.
+    alter_db_hive = "ALTER DATABASE {database} SET DBPROPERTIES ('{fn_name}'='{fn_val}')"
+    self.run_stmt_in_hive(alter_db_hive.format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB,
+        fn_name=func_name,
+        fn_val=func_contents))
+    result = self.client.execute("SHOW FUNCTIONS IN {database}".format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB))
+    assert result is not None and len(result.data) == 0
+
+    # The function should be visible in Impala after a REFRESH FUNCTIONS.
+    self.client.execute("REFRESH FUNCTIONS {database}".format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB))
+    result = self.client.execute("SHOW FUNCTIONS IN {database}".format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB))
+    assert result is not None and len(result.data) > 0 and\
+        "identity_tmp" in str(result.data)
+
+    # Verify that the function returns a correct result.
+    result = self.client.execute("SELECT {database}.identity_tmp(10)".format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB))
+    assert result.data[0] == "10"
+    # Make sure we deleted all the temporary jars we copied to the local fs
+    assert len(glob.glob(self.LOCAL_LIBRARY_DIR + "/*.jar")) == 0
+
+  @SkipIfIsilon.hive
+  @SkipIfS3.hive
+  @SkipIfLocal.hive
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+     catalogd_args= "--local_library_dir={0}".format(LOCAL_LIBRARY_DIR))
+  def test_refresh_replace(self):
+    ''' This test checks that if we drop a function and then create a
+    different function with the same name in Hive, the new function will
+    be visible in Impala after REFRESH FUNCTIONS.'''
+    # Create an original function.
+    create_orig_func_hive = ("create function {database}.test_func as "
+        "'org.apache.hadoop.hive.ql.udf.UDFHex' using jar '{jar}'")
+    self.run_stmt_in_hive(create_orig_func_hive.format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB, jar=self.JAVA_UDF_JAR))
+    result = self.client.execute("SHOW FUNCTIONS IN {database}".format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB))
+    assert result is not None and len(result.data) == 0
+    # Verify the function becomes visible in Impala after REFRESH FUNCTIONS.
+    self.client.execute("REFRESH FUNCTIONS {database}".format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB))
+    result = self.client.execute("SHOW FUNCTIONS IN {database}".format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB))
+    assert (result is not None and len(result.data) == 3 and
+        "test_func" in str(result.data))
+    result = self.client.execute("SELECT {database}.test_func(123)".format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB))
+    assert result.data[0] == "7B"
+
+    # Drop the original function and create a different function with the same name as
+    # the original, but a different JAR.
+    drop_orig_func_hive = "DROP FUNCTION {database}.test_func"
+    self.run_stmt_in_hive(drop_orig_func_hive.format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB))
+    create_replacement_func_hive = ("create function {database}.test_func as "
+        "'org.apache.hadoop.hive.ql.udf.UDFBin' using jar '{jar}'")
+    self.run_stmt_in_hive(create_replacement_func_hive.format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB, jar=self.JAVA_UDF_JAR))
+    self.client.execute("REFRESH FUNCTIONS {database}".format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB))
+    result = self.client.execute("SHOW FUNCTIONS IN {database}".format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB))
+    assert (result is not None and len(result.data) == 1 and
+        "test_func" in str(result.data))
+    # Verify that the function has actually been updated.
+    result = self.client.execute("SELECT {database}.test_func(123)".format(
+        database=self.HIVE_IMPALA_INTEGRATION_DB))
+    assert result.data[0] == "1111011"
     # Make sure we deleted all the temporary jars we copied to the local fs
     assert len(glob.glob(self.LOCAL_LIBRARY_DIR + "/*.jar")) == 0
 

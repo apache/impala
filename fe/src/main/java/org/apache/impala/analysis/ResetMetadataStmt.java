@@ -27,10 +27,16 @@ import org.apache.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
 
 /**
- * Representation of a REFRESH/INVALIDATE METADATA statement.
+ * Representation of the following statements:
+ * INVALIDATE METADATA
+ * INVALIDATE METADATA <table>
+ * REFRESH <table>
+ * REFRESH <table> PARTITION <partition>
+ * REFRESH FUNCTIONS <database>
  */
 public class ResetMetadataStmt extends StatementBase {
-  // Updated during analysis. Null if invalidating the entire catalog.
+  // Updated during analysis. Null if invalidating the entire catalog or refreshing
+  // database functions.
   private TableName tableName_;
 
   // true if it is a REFRESH statement.
@@ -39,14 +45,34 @@ public class ResetMetadataStmt extends StatementBase {
   // not null when refreshing a single partition
   private final PartitionSpec partitionSpec_;
 
-  public ResetMetadataStmt(TableName name, boolean isRefresh,
-      PartitionSpec partitionSpec) {
-    Preconditions.checkArgument(!isRefresh || name != null);
-    Preconditions.checkArgument(isRefresh || partitionSpec == null);
-    this.tableName_ = name;
+  // not null when refreshing functions in a database.
+  private final String database_;
+
+  private ResetMetadataStmt(TableName tableName, boolean isRefresh,
+      PartitionSpec partitionSpec, String db) {
+    Preconditions.checkArgument(!isRefresh || (tableName != null || db != null));
+    Preconditions.checkArgument(isRefresh || (partitionSpec == null && db == null));
+    Preconditions.checkArgument(db == null || (
+        tableName == null && isRefresh && partitionSpec == null));
+
+    this.database_ = db;
+    this.tableName_ = tableName;
     this.isRefresh_ = isRefresh;
     this.partitionSpec_ = partitionSpec;
     if (partitionSpec_ != null) partitionSpec_.setTableName(tableName_);
+  }
+
+  public static ResetMetadataStmt createInvalidateStmt(TableName tableName) {
+    return new ResetMetadataStmt(tableName, false, null, null);
+  }
+
+  public static ResetMetadataStmt createRefreshTableStmt(TableName tableName,
+      PartitionSpec partitionSpec) {
+    return new ResetMetadataStmt(tableName, true, partitionSpec, null);
+  }
+
+  public static ResetMetadataStmt createRefreshFunctionsStmt(String database) {
+    return new ResetMetadataStmt(null, true, null, database);
   }
 
   public TableName getTableName() { return tableName_; }
@@ -85,25 +111,28 @@ public class ResetMetadataStmt extends StatementBase {
   public String toSql() {
     StringBuilder result = new StringBuilder();
     if (isRefresh_) {
-      result.append("INVALIDATE METADATA");
-    } else {
       result.append("REFRESH");
+      if (database_ == null) {
+        result.append(" ").append(tableName_);
+        if (partitionSpec_ != null) result.append(" " + partitionSpec_.toSql());
+      } else {
+        result.append(" FUNCTIONS ").append(database_);
+      }
+    } else {
+      result.append("INVALIDATE METADATA");
+      if (tableName_ != null) result.append(" ").append(tableName_);
     }
-
-    if (tableName_ != null) result.append(" ").append(tableName_);
-    if (partitionSpec_ != null) result.append(" " + partitionSpec_.toSql());
     return result.toString();
   }
 
   public TResetMetadataRequest toThrift() {
-    TResetMetadataRequest  params = new TResetMetadataRequest();
+    TResetMetadataRequest params = new TResetMetadataRequest();
     params.setIs_refresh(isRefresh_);
     if (tableName_ != null) {
       params.setTable_name(new TTableName(tableName_.getDb(), tableName_.getTbl()));
     }
-    if (partitionSpec_ != null) {
-      params.setPartition_spec(partitionSpec_.toThrift());
-    }
+    if (partitionSpec_ != null) params.setPartition_spec(partitionSpec_.toThrift());
+    if (database_ != null) params.setDb_name(database_);
     return params;
   }
 }

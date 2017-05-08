@@ -661,13 +661,15 @@ overwrite_val ::=
 
 reset_metadata_stmt ::=
   KW_INVALIDATE KW_METADATA
-  {: RESULT = new ResetMetadataStmt(null, false, null); :}
+  {: RESULT = ResetMetadataStmt.createInvalidateStmt(null); :}
   | KW_INVALIDATE KW_METADATA table_name:table
-  {: RESULT = new ResetMetadataStmt(table, false, null); :}
+  {: RESULT = ResetMetadataStmt.createInvalidateStmt(table); :}
   | KW_REFRESH table_name:table
-  {: RESULT = new ResetMetadataStmt(table, true, null); :}
+  {: RESULT = ResetMetadataStmt.createRefreshTableStmt(table, null); :}
   | KW_REFRESH table_name:table partition_spec:partition
-  {: RESULT = new ResetMetadataStmt(table, true, partition); :}
+  {: RESULT = ResetMetadataStmt.createRefreshTableStmt(table, partition); :}
+  | KW_REFRESH KW_FUNCTIONS ident_or_default:db
+  {: RESULT = ResetMetadataStmt.createRefreshFunctionsStmt(db); :}
   ;
 
 explain_stmt ::=

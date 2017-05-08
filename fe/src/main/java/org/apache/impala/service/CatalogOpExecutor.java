@@ -987,14 +987,6 @@ public class CatalogOpExecutor {
         resp.result.getUpdated_catalog_object_DEPRECATED().getCatalog_version());
   }
 
-  private TCatalogObject buildTCatalogFnObject(Function fn) {
-    TCatalogObject result = new TCatalogObject();
-    result.setType(TCatalogObjectType.FUNCTION);
-    result.setFn(fn.toThrift());
-    result.setCatalog_version(fn.getCatalogVersion());
-    return result;
-  }
-
  private void createFunction(TCreateFunctionParams params, TDdlExecResponse resp)
       throws ImpalaException {
     Function fn = Function.fromThrift(params.getFn());
@@ -1042,14 +1034,14 @@ public class CatalogOpExecutor {
                   addedFn.signatureString()));
             }
             Preconditions.checkState(catalog_.addFunction(addedFn));
-            addedFunctions.add(buildTCatalogFnObject(addedFn));
+            addedFunctions.add(addedFn.toTCatalogObject());
           }
         }
       } else {
         if (catalog_.addFunction(fn)) {
           // Flush DB changes to metastore
           applyAlterDatabase(catalog_.getDb(fn.dbName()));
-          addedFunctions.add(buildTCatalogFnObject(fn));
+          addedFunctions.add(fn.toTCatalogObject());
         }
       }
 
@@ -1514,7 +1506,7 @@ public class CatalogOpExecutor {
             continue;
           }
           Preconditions.checkNotNull(catalog_.removeFunction(fn));
-          removedFunctions.add(buildTCatalogFnObject(fn));
+          removedFunctions.add(fn.toTCatalogObject());
         }
       } else {
         ArrayList<Type> argTypes = Lists.newArrayList();
@@ -1531,7 +1523,7 @@ public class CatalogOpExecutor {
         } else {
           // Flush DB changes to metastore
           applyAlterDatabase(catalog_.getDb(fn.dbName()));
-          removedFunctions.add(buildTCatalogFnObject(fn));
+          removedFunctions.add(fn.toTCatalogObject());
         }
       }
 
@@ -3099,7 +3091,19 @@ public class CatalogOpExecutor {
     resp.setResult(new TCatalogUpdateResult());
     resp.getResult().setCatalog_service_id(JniCatalog.getServiceId());
 
-    if (req.isSetTable_name()) {
+    if (req.isSetDb_name()) {
+      // This is a "refresh functions" operation.
+      synchronized (metastoreDdlLock_) {
+        try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+          List<TCatalogObject> addedFuncs = Lists.newArrayList();
+          List<TCatalogObject> removedFuncs = Lists.newArrayList();
+          catalog_.refreshFunctions(msClient, req.getDb_name(), addedFuncs, removedFuncs);
+          resp.result.setUpdated_catalog_objects(addedFuncs);
+          resp.result.setRemoved_catalog_objects(removedFuncs);
+          resp.result.setVersion(catalog_.getCatalogVersion());
+        }
+      }
+    } else if (req.isSetTable_name()) {
       // Results of an invalidate operation, indicating whether the table was removed
       // from the Metastore, and whether a new database was added to Impala as a result
       // of the invalidate operation. Always false for refresh.
