@@ -36,6 +36,7 @@ inline uint8_t* AllocateAligned(size_t size) {
   if (posix_memalign(&ptr, 64, size) != 0) {
     LOG(FATAL) << "Failed to allocate " << size;
   }
+  DCHECK(ptr != nullptr);
   return reinterpret_cast<uint8_t*>(ptr);
 }
 

@@ -49,6 +49,7 @@ BloomFilter::BloomFilter(const int log_heap_space)
   DCHECK_EQ(malloc_failed, 0) << "Malloc failed. log_heap_space: " << log_heap_space
                               << " log_num_buckets_: " << log_num_buckets_
                               << " alloc_size: " << alloc_size;
+  DCHECK(directory_ != nullptr);
   memset(directory_, 0, alloc_size);
 }
 

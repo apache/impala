@@ -46,6 +46,7 @@ struct alignas(ALIGNMENT) AlignedNew {
       LOG(ERROR) << "Failed to allocate aligned memory; return code " << alloc_failed;
       throw std::bad_alloc();
     }
+    DCHECK(result != nullptr);
     return result;
   }
 };

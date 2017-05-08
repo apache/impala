@@ -103,7 +103,7 @@ if ${CLUSTER_DIR}/admin is_kerberized; then
 fi
 
 . ${IMPALA_HOME}/bin/set-classpath.sh
-export ASAN_OPTIONS="handle_segv=0 detect_leaks=0"
+export ASAN_OPTIONS="handle_segv=0 detect_leaks=0 allocator_may_return_null=1"
 export UBSAN_OPTIONS="print_stacktrace=1"
 UBSAN_OPTIONS="${UBSAN_OPTIONS} suppressions=${IMPALA_HOME}/bin/ubsan-suppressions.txt"
 export PATH="${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_VERSION}/bin:${PATH}"

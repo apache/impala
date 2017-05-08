@@ -177,12 +177,6 @@ TEST_F(SystemAllocatorTest, LargeAllocFailure) {
 }
 
 int main(int argc, char** argv) {
-#ifdef ADDRESS_SANITIZER
-  // These tests are disabled for address sanitizer builds.
-  // TODO: fix IMPALA-5245 and re-enable.
-  cerr << "Buffer Allocator Test Skipped (IMPALA-5245)" << endl;
-  return 0;
-#endif
   ::testing::InitGoogleTest(&argc, argv);
   impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   int result = 0;
