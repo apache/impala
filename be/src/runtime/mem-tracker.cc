@@ -131,15 +131,14 @@ int64_t MemTracker::GetPoolMemReserved() const {
 
   int64_t mem_reserved = 0L;
   lock_guard<SpinLock> l(child_trackers_lock_);
-  for (list<MemTracker*>::const_iterator it = child_trackers_.begin();
-       it != child_trackers_.end(); ++it) {
-    int64_t child_limit = (*it)->limit();
+  for (MemTracker* child : child_trackers_) {
+    int64_t child_limit = child->limit();
     if (child_limit > 0) {
       // Make sure we don't overflow if the query limits are set to ridiculous values.
       mem_reserved += std::min(child_limit, MemInfo::physical_mem());
     } else {
-      DCHECK_EQ(child_limit, -1) << (*it)->LogUsage("");
-      mem_reserved += (*it)->consumption();
+      DCHECK_EQ(child_limit, -1) << child->LogUsage("");
+      mem_reserved += child->consumption();
     }
   }
   return mem_reserved;
@@ -237,16 +236,17 @@ void MemTracker::RefreshConsumptionFromMetric() {
 //   TrackerName: Limit=5.00 MB BufferPoolUsed/Reservation=0/5.00 MB OtherMemory=1.04 MB
 //                Total=6.04 MB Peak=6.45 MB
 //
-string MemTracker::LogUsage(const string& prefix) const {
-  if (!log_usage_if_zero_ && consumption() == 0) return "";
+string MemTracker::LogUsage(const string& prefix, int64_t* logged_consumption) const {
+  int64_t curr_consumption = consumption();
+  int64_t peak_consumption = consumption_->value();
+  if (logged_consumption != nullptr) *logged_consumption = curr_consumption;
+
+  if (!log_usage_if_zero_ && curr_consumption == 0) return "";
 
   stringstream ss;
   ss << prefix << label_ << ":";
   if (CheckLimitExceeded()) ss << " memory limit exceeded.";
   if (limit_ > 0) ss << " Limit=" << PrettyPrinter::Print(limit_, TUnit::BYTES);
-
-  int64_t total = consumption();
-  int64_t peak = consumption_->value();
 
   ReservationTrackerCounters* reservation_counters = reservation_counters_.Load();
   if (reservation_counters != nullptr) {
@@ -260,26 +260,44 @@ string MemTracker::LogUsage(const string& prefix) const {
     if (reservation_limit != numeric_limits<int64_t>::max()) {
       ss << " BufferPoolLimit=" << PrettyPrinter::Print(reservation_limit, TUnit::BYTES);
     }
-    ss << " OtherMemory=" << PrettyPrinter::Print(total - reservation, TUnit::BYTES);
+    ss << " OtherMemory="
+       << PrettyPrinter::Print(curr_consumption - reservation, TUnit::BYTES);
   }
-  ss << " Total=" << PrettyPrinter::Print(total, TUnit::BYTES)
-     << " Peak=" << PrettyPrinter::Print(peak, TUnit::BYTES);
+  ss << " Total=" << PrettyPrinter::Print(curr_consumption, TUnit::BYTES)
+     << " Peak=" << PrettyPrinter::Print(peak_consumption, TUnit::BYTES);
 
-  stringstream prefix_ss;
-  prefix_ss << prefix << "  ";
-  string new_prefix = prefix_ss.str();
-  lock_guard<SpinLock> l(child_trackers_lock_);
-  string child_trackers_usage = LogUsage(new_prefix, child_trackers_);
+  string new_prefix = Substitute("  $0", prefix);
+  int64_t child_consumption;
+  string child_trackers_usage;
+  {
+    lock_guard<SpinLock> l(child_trackers_lock_);
+    child_trackers_usage = LogUsage(new_prefix, child_trackers_, &child_consumption);
+  }
   if (!child_trackers_usage.empty()) ss << "\n" << child_trackers_usage;
+
+  if (consumption_metric_ != nullptr) {
+    // Log the difference between the metric value and children as "untracked" memory so
+    // that the values always add up. This value is not always completely accurate because
+    // we did not necessarily get a consistent snapshot of the consumption values for all
+    // children at a single moment in time, but is good enough for our purposes.
+    int64_t untracked_bytes = curr_consumption - child_consumption;
+    ss << "\n"
+       << new_prefix << "Untracked Memory: Total="
+       << PrettyPrinter::Print(untracked_bytes, TUnit::BYTES);
+  }
+
   return ss.str();
 }
 
-string MemTracker::LogUsage(const string& prefix, const list<MemTracker*>& trackers) {
+string MemTracker::LogUsage(const string& prefix, const list<MemTracker*>& trackers,
+    int64_t* logged_consumption) {
+  *logged_consumption = 0;
   vector<string> usage_strings;
-  for (list<MemTracker*>::const_iterator it = trackers.begin();
-      it != trackers.end(); ++it) {
-    string usage_string = (*it)->LogUsage(prefix);
+  for (MemTracker* tracker : trackers) {
+    int64_t tracker_consumption;
+    string usage_string = tracker->LogUsage(prefix, &tracker_consumption);
     if (!usage_string.empty()) usage_strings.push_back(usage_string);
+    *logged_consumption += tracker_consumption;
   }
   return join(usage_strings, "\n");
 }

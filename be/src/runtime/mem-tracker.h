@@ -311,9 +311,11 @@ class MemTracker {
   void RegisterMetrics(MetricGroup* metrics, const std::string& prefix);
 
   /// Logs the usage of this tracker and all of its children (recursively).
+  /// If 'logged_consumption' is non-NULL, sets the consumption value logged.
   /// TODO: once all memory is accounted in ReservationTracker hierarchy, move
   /// reporting there.
-  std::string LogUsage(const std::string& prefix = "") const;
+  std::string LogUsage(
+      const std::string& prefix = "", int64_t* logged_consumption = nullptr) const;
 
   /// Log the memory usage when memory limit is exceeded and return a status object with
   /// details of the allocation which caused the limit to be exceeded.
@@ -347,8 +349,10 @@ class MemTracker {
   /// Adds tracker to child_trackers_
   void AddChildTracker(MemTracker* tracker);
 
+  /// Log consumption of all the trackers provided. Returns the sum of consumption in
+  /// 'logged_consumption'.
   static std::string LogUsage(const std::string& prefix,
-      const std::list<MemTracker*>& trackers);
+      const std::list<MemTracker*>& trackers, int64_t* logged_consumption);
 
   /// Size, in bytes, that is considered a large value for Release() (or Consume() with
   /// a negative value). If tcmalloc is used, this can trigger it to GC.
