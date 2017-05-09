@@ -50,3 +50,26 @@ class TestObservability(ImpalaTestSuite):
     assert result.exec_summary[5]['operator'] == '04:EXCHANGE'
     assert result.exec_summary[5]['num_rows'] == 25
     assert result.exec_summary[5]['est_num_rows'] == 25
+
+  def test_scan_summary(self):
+    """IMPALA-4499: Checks that the exec summary for scans show the table name."""
+    # HDFS table
+    query = "select count(*) from functional.alltypestiny"
+    result = self.execute_query(query)
+    scan_idx = len(result.exec_summary) - 1
+    assert result.exec_summary[scan_idx]['operator'] == '00:SCAN HDFS'
+    assert result.exec_summary[scan_idx]['detail'] == 'functional.alltypestiny'
+
+    # KUDU table
+    query = "select count(*) from functional_kudu.alltypestiny"
+    result = self.execute_query(query)
+    scan_idx = len(result.exec_summary) - 1
+    assert result.exec_summary[scan_idx]['operator'] == '00:SCAN KUDU'
+    assert result.exec_summary[scan_idx]['detail'] == 'functional_kudu.alltypestiny'
+
+    # HBASE table
+    query = "select count(*) from functional_hbase.alltypestiny"
+    result = self.execute_query(query)
+    scan_idx = len(result.exec_summary) - 1
+    assert result.exec_summary[scan_idx]['operator'] == '00:SCAN HBASE'
+    assert result.exec_summary[scan_idx]['detail'] == 'functional_hbase.alltypestiny'

@@ -781,20 +781,6 @@ public class HdfsScanNode extends ScanNode {
   }
 
   @Override
-  protected String getDisplayLabelDetail() {
-    HdfsTable table = (HdfsTable) desc_.getTable();
-    List<String> path = Lists.newArrayList();
-    path.add(table.getDb().getName());
-    path.add(table.getName());
-    Preconditions.checkNotNull(desc_.getPath());
-    if (desc_.hasExplicitAlias()) {
-      return desc_.getPath().toString() + " " + desc_.getAlias();
-    } else {
-      return desc_.getPath().toString();
-    }
-  }
-
-  @Override
   protected String getNodeExplainString(String prefix, String detailPrefix,
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
