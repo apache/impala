@@ -246,8 +246,13 @@ public class DistributedPlanner {
     if (partitionExprs.isEmpty()) {
       partition = DataPartition.UNPARTITIONED;
     } else if (insertStmt.getTargetTable() instanceof KuduTable) {
+      // IMPALA-5294: Don't use 'partitionExpr' here because the constants were removed.
+      // We need all of the partition exprs to fill in the partition column values for
+      // each row to send to Kudu to determine the partition number.
       Expr kuduPartitionExpr = new KuduPartitionExpr(DescriptorTable.TABLE_SINK_ID,
-          partitionExprs, insertStmt.getPartitionColPos());
+          (KuduTable) insertStmt.getTargetTable(),
+          Lists.newArrayList(insertStmt.getPartitionKeyExprs()),
+          insertStmt.getPartitionColPos());
       kuduPartitionExpr.analyze(ctx_.getRootAnalyzer());
       partition = DataPartition.kuduPartitioned(kuduPartitionExpr);
     } else {

@@ -394,3 +394,32 @@ A, B, C, D, E, F, G, H, I, J
 ---- TYPES
 INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,INT,INT
 ====
+---- QUERY
+create table multiple_partition_cols (x bigint, y bigint, z string, primary key(x, y))
+partition by hash(x, y) partitions 8 stored as kudu
+---- RESULTS
+====
+---- QUERY
+# SELECT with constant
+insert into multiple_partition_cols select 0, bigint_col, string_col
+  from functional.alltypes where id = 0
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+X,Y,Z
+---- DML_RESULTS: multiple_partition_cols
+0,0,'0'
+---- TYPES
+BIGINT,BIGINT,STRING
+====
+---- QUERY
+# SELECT with constant NULL
+insert into multiple_partition_cols select bigint_col, null, string_col
+  from functional.alltypes where id = 1
+---- RESULTS
+: 0
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 1
+====

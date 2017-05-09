@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExprNode;
@@ -42,14 +43,16 @@ public class KuduPartitionExpr extends Expr {
 
   // The table to use the partitioning scheme from.
   private final int targetTableId_;
+  private final KuduTable targetTable_;
   // Maps from this Epxrs children to column positions in the table, i.e. children_[i]
   // produces the value for column partitionColPos_[i].
   private List<Integer> partitionColPos_;
 
-  public KuduPartitionExpr(
-      int targetTableId, List<Expr> partitionKeyExprs, List<Integer> partitionKeyIdxs) {
+  public KuduPartitionExpr(int targetTableId, KuduTable targetTable,
+      List<Expr> partitionKeyExprs, List<Integer> partitionKeyIdxs) {
     Preconditions.checkState(partitionKeyExprs.size() == partitionKeyIdxs.size());
     targetTableId_ = targetTableId;
+    targetTable_ = targetTable;
     partitionColPos_ = partitionKeyIdxs;
     children_.addAll(Expr.cloneList(partitionKeyExprs));
   }
@@ -60,12 +63,19 @@ public class KuduPartitionExpr extends Expr {
   protected KuduPartitionExpr(KuduPartitionExpr other) {
     super(other);
     targetTableId_ = other.targetTableId_;
+    targetTable_ = other.targetTable_;
     partitionColPos_ = other.partitionColPos_;
   }
 
   @Override
   protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     type_ = Type.INT;
+    // IMPALA-5294: If one of the children is a NullLiteral, it has to be cast to a type
+    // to be passed to the BE.
+    for (int i = 0; i < children_.size(); ++i) {
+      children_.get(i).castTo(
+          targetTable_.getColumns().get(partitionColPos_.get(i)).getType());
+    }
   }
 
   @Override
