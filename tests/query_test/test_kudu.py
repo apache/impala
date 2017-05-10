@@ -789,54 +789,15 @@ class TestImpalaKuduIntegration(KuduTestSuite):
 
 class TestKuduMemLimits(KuduTestSuite):
 
-  QUERIES = ["select * from lineitem where l_orderkey = -1",
-             "select * from lineitem where l_commitdate like '%cheese'",
-             "select * from lineitem limit 90"]
+  QUERIES = ["select * from tpch_kudu.lineitem where l_orderkey = -1",
+             "select * from tpch_kudu.lineitem where l_commitdate like '%cheese'",
+             "select * from tpch_kudu.lineitem limit 90"]
 
   # The value indicates the minimum memory requirements for the queries above, the first
   # memory limit corresponds to the first query
   QUERY_MEM_LIMITS = [1, 1, 10]
 
-  CREATE = """
-    CREATE TABLE lineitem (
-    l_orderkey BIGINT,
-    l_linenumber INT,
-    l_partkey BIGINT,
-    l_suppkey BIGINT,
-    l_quantity double,
-    l_extendedprice double,
-    l_discount double,
-    l_tax double,
-    l_returnflag STRING,
-    l_linestatus STRING,
-    l_shipdate STRING,
-    l_commitdate STRING,
-    l_receiptdate STRING,
-    l_shipinstruct STRING,
-    l_shipmode STRING,
-    l_comment STRING,
-    PRIMARY KEY (l_orderkey, l_linenumber))
-  PARTITION BY HASH (l_orderkey, l_linenumber) PARTITIONS 3
-  STORED AS KUDU"""
-
-  LOAD = """
-  insert into lineitem
-  select l_orderkey, l_linenumber, l_partkey, l_suppkey, cast(l_quantity as double),
-  cast(l_extendedprice as double), cast(l_discount as double), cast(l_tax as double),
-  l_returnflag, l_linestatus, l_shipdate, l_commitdate, l_receiptdate, l_shipinstruct,
-  l_shipmode, l_comment from tpch_parquet.lineitem"""
-
-  @classmethod
-  def auto_create_db(cls):
-    return True
-
-  @pytest.fixture(scope='class')
-  def test_data(cls, cls_cursor):
-    cls_cursor.execute(cls.CREATE)
-    cls_cursor.execute(cls.LOAD)
-
   @pytest.mark.execute_serially
-  @pytest.mark.usefixtures("test_data")
   @pytest.mark.parametrize("mem_limit", [1, 10, 0])
   def test_low_mem_limit_low_selectivity_scan(self, cursor, mem_limit, vector):
     """Tests that the queries specified in this test suite run under the given

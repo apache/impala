@@ -41,6 +41,8 @@ KUDU_COMMON_ARGS=("-webserver_doc_root=$KUDU_WWW_DIR")
 # Add a dummy flag with value IBelongToTheMiniCluster so the process is easily
 # identifiable in case the pid file is removed.
 KUDU_COMMON_ARGS+=("-vmodule=IBelongToTheMiniCluster")
+KUDU_COMMON_ARGS+=("-memory_limit_hard_bytes=2147483648") # 2gb
+KUDU_COMMON_ARGS+=("-block_cache_capacity_mb=256")
 
 HOLE_PUNCH_TEST_FILE=${NODE_DIR}/var/lib/kudu/hole_punch_test
 if ! fallocate -p -o 1 -l 1 "$HOLE_PUNCH_TEST_FILE" &>/dev/null; then
