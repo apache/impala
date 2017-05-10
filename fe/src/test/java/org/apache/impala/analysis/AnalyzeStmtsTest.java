@@ -27,11 +27,10 @@ import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.RuntimeEnv;
 import org.junit.Assert;
 import org.junit.Test;
 
-import org.apache.impala.common.RuntimeEnv;
-import org.apache.impala.testutil.TestUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -314,6 +313,51 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "on (alltypes.id = functional.alltypes.id)",
         createAnalyzer("functional"),
         "Duplicate table alias: 'functional.alltypes'");
+  }
+
+  @Test
+  public void TestTableSampleClause() {
+    long bytesPercVals[] = new long[] { 0, 10, 50, 100 };
+    long randomSeedVals[] = new long[] { 0, 10, 100, Integer.MAX_VALUE, Long.MAX_VALUE };
+    for (long bytesPerc: bytesPercVals) {
+      String tblSmpl = String.format("tablesample system (%s)", bytesPerc);
+      AnalyzesOk("select * from functional.alltypes  " + tblSmpl);
+      for (long randomSeed: randomSeedVals) {
+        String repTblSmpl = String.format("%s repeatable (%s)", tblSmpl, randomSeed);
+        AnalyzesOk("select * from functional.alltypes  " + repTblSmpl);
+      }
+    }
+
+    // Invalid bytes percent. Negative values do not parse.
+    AnalysisError("select * from functional.alltypes tablesample system (101)",
+        "Invalid percent of bytes value '101'. " +
+        "The percent of bytes to sample must be between 0 and 100.");
+    AnalysisError("select * from functional.alltypes tablesample system (1000)",
+        "Invalid percent of bytes value '1000'. " +
+        "The percent of bytes to sample must be between 0 and 100.");
+
+    // Only applicable to HDFS base table refs.
+    AnalysisError("select * from functional_kudu.alltypes tablesample system (10)",
+        "TABLESAMPLE is only supported on HDFS base tables: functional_kudu.alltypes");
+    AnalysisError("select * from functional_hbase.alltypes tablesample system (10)",
+        "TABLESAMPLE is only supported on HDFS base tables: functional_hbase.alltypes");
+    AnalysisError("select * from functional.alltypes_datasource tablesample system (10)",
+        "TABLESAMPLE is only supported on HDFS base tables: " +
+        "functional.alltypes_datasource");
+    AnalysisError("select * from (select * from functional.alltypes) v " +
+        "tablesample system (10)",
+        "TABLESAMPLE is only supported on HDFS base tables: v");
+    AnalysisError("with v as (select * from functional.alltypes) " +
+        "select * from v tablesample system (10)",
+        "TABLESAMPLE is only supported on HDFS base tables: v");
+    AnalysisError("select * from functional.alltypes_view tablesample system (10)",
+        "TABLESAMPLE is only supported on HDFS base tables: functional.alltypes_view");
+    AnalysisError("select * from functional.allcomplextypes.int_array_col " +
+        "tablesample system (10)",
+        "TABLESAMPLE is only supported on HDFS base tables: int_array_col");
+    AnalysisError("select * from functional.allcomplextypes a, a.int_array_col " +
+        "tablesample system (10)",
+        "TABLESAMPLE is only supported on HDFS base tables: int_array_col");
   }
 
   /**
@@ -3495,7 +3539,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     testNumberOfMembers(ValuesStmt.class, 0);
 
     // Also check TableRefs.
-    testNumberOfMembers(TableRef.class, 19);
+    testNumberOfMembers(TableRef.class, 20);
     testNumberOfMembers(BaseTableRef.class, 0);
     testNumberOfMembers(InlineViewRef.class, 8);
   }

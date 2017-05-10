@@ -30,7 +30,6 @@ import org.apache.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.compat.MetastoreShim;
-import org.apache.impala.testutil.TestUtils;
 import org.junit.Test;
 
 import com.google.common.base.Preconditions;
@@ -584,6 +583,58 @@ public class ParserTest extends FrontendTestBase {
     // Cross joins do not accept on/using
     ParserError("select * from a cross join b on (a.id = b.id)");
     ParserError("select * from a cross join b using (id)");
+  }
+
+  @Test
+  public void TestTableSampleClause() {
+    String tblRefs[] = new String[] { "tbl", "db.tbl", "db.tbl.col", "db.tbl.col.fld" };
+    String tblAliases[] = new String[] { "", "t" };
+    String tblSampleClauses[] = new String[] {
+        "", "tablesample system(10)", "tablesample system(100) repeatable(20)" };
+    String tblHints[] = new String[] {
+        "", "/* +schedule_remote */", "[schedule_random_replica]"
+    };
+    for (String tbl: tblRefs) {
+      for (String alias: tblAliases) {
+        for (String smp: tblSampleClauses) {
+          for (String hint: tblHints) {
+            // Single table.
+            ParsesOk(String.format("select * from %s %s %s %s", tbl, alias, smp, hint));
+            // Multi table.
+            ParsesOk(String.format(
+                "select a.* from %s %s %s %s join %s %s %s %s using (id)",
+                tbl, alias, smp, hint, tbl, alias, smp, hint));
+            ParsesOk(String.format(
+                "select a.* from %s %s %s %s, %s %s %s %s",
+                tbl, alias, smp, hint, tbl, alias, smp, hint));
+            // Inline view.
+            ParsesOk(String.format("select * from (select 1 from %s %s) v %s %s",
+                tbl, alias, smp, hint));
+
+          }
+        }
+      }
+    }
+
+    // Table alias most come before TABLESAMPLE.
+    ParserError("select * from t tablesample (10) a");
+    // Hints must come after TABLESAMPLE.
+    ParserError("select * from t [schedule_remote] tablesample (10)");
+    ParserError("select * from t /* +schedule_remote */ tablesample (10)");
+    // Missing SYSTEM.
+    ParserError("select * from t tablesample (10)");
+    // Missing parenthesis.
+    ParserError("select * from t tablesample system 10");
+    // Percent must be int literal.
+    ParserError("select * from t tablesample system (10 + 10");
+    // Missing random seed.
+    ParserError("select * from t tablesample system (10) repeatable");
+    // Random seed must be an int literal.
+    ParserError("select * from t tablesample system (10) repeatable (10 + 10)");
+    // Negative precent.
+    ParserError("select * from t tablesample system (-10)");
+    // Negative random seed.
+    ParserError("select * from t tablesample system (10) repeatable(-10)");
   }
 
   @Test
@@ -3156,7 +3207,7 @@ public class ParserTest extends FrontendTestBase {
         "                             ^\n" +
         "Encountered: IDENTIFIER\n" +
         "Expected: CROSS, FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, OFFSET, " +
-        "ON, ORDER, RIGHT, STRAIGHT_JOIN, UNION, USING, WHERE, COMMA\n");
+        "ON, ORDER, RIGHT, STRAIGHT_JOIN, TABLESAMPLE, UNION, USING, WHERE, COMMA\n");
 
     // Long line: error close to the start
     ParserError("select a a a, b, c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,cd,c,d,d,,c, from t",
@@ -3165,7 +3216,7 @@ public class ParserTest extends FrontendTestBase {
         "           ^\n" +
         "Encountered: IDENTIFIER\n" +
         "Expected: CROSS, FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, OFFSET, " +
-        "ON, ORDER, RIGHT, STRAIGHT_JOIN, UNION, USING, WHERE, COMMA\n");
+        "ON, ORDER, RIGHT, STRAIGHT_JOIN, TABLESAMPLE, UNION, USING, WHERE, COMMA\n");
 
     // Long line: error close to the end
     ParserError("select a, b, c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,cd,c,d,d, ,c, from t",

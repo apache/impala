@@ -34,6 +34,7 @@ public class SingularRowSrcTableRef extends TableRef {
   public SingularRowSrcTableRef(PlanNode subplanInput) {
     super(null, "singular-row-src-tblref");
     Preconditions.checkNotNull(subplanInput);
+    Preconditions.checkState(sampleParams_ == null);
     desc_ = null;
     isAnalyzed_ = true;
     tblRefIds_ = Lists.newArrayList(subplanInput.getTblRefIds());

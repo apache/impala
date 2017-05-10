@@ -75,8 +75,9 @@ public class InlineViewRef extends TableRef {
   /**
    * C'tor for creating inline views parsed directly from the a query string.
    */
-  public InlineViewRef(String alias, QueryStmt queryStmt) {
-    super(null, alias);
+  public InlineViewRef(String alias, QueryStmt queryStmt,
+      TableSampleClause sampleParams) {
+    super(null, alias, sampleParams);
     Preconditions.checkNotNull(queryStmt);
     queryStmt_ = queryStmt;
     view_ = null;
@@ -85,7 +86,7 @@ public class InlineViewRef extends TableRef {
   }
 
   public InlineViewRef(String alias, QueryStmt queryStmt, List<String> colLabels) {
-    this(alias, queryStmt);
+    this(alias, queryStmt, (TableSampleClause) null);
     explicitColLabels_ = Lists.newArrayList(colLabels);
   }
 
@@ -108,6 +109,7 @@ public class InlineViewRef extends TableRef {
     aliases_ = new String[] {
         view_.getTableName().toString().toLowerCase(), view_.getName().toLowerCase()
     };
+    sampleParams_ = origTblRef.getSampleParams();
   }
 
   /**
@@ -213,6 +215,7 @@ public class InlineViewRef extends TableRef {
           baseTblSmap_.debugString());
     }
 
+    analyzeTableSample(analyzer);
     analyzeHints(analyzer);
     // Now do the remaining join analysis
     analyzeJoin(analyzer);

@@ -406,4 +406,11 @@ public class PlannerTest extends PlannerTestBase {
     options.setExplain_level(TExplainLevel.EXTENDED);
     runPlannerTestFile("sort-expr-materialization", options);
   }
+
+  @Test
+  public void testTableSample() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.EXTENDED);
+    runPlannerTestFile("tablesample", options);
+  }
 }

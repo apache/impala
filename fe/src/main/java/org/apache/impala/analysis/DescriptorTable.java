@@ -124,7 +124,7 @@ public class DescriptorTable {
    * given table.
    */
   public void addReferencedPartition(Table table, long partitionId) {
-    getReferencedPartitions(table).add(partitionId);
+    getReferencedPartitions(table).add(Long.valueOf(partitionId));
   }
 
   /**

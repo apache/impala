@@ -33,6 +33,7 @@ import org.apache.impala.analysis.ColumnDef.Option;
 import org.apache.impala.analysis.UnionStmt.Qualifier;
 import org.apache.impala.analysis.UnionStmt.UnionOperand;
 import org.apache.impala.analysis.RangePartition;
+import org.apache.impala.analysis.TableSampleClause;
 import org.apache.impala.analysis.AlterTableAddDropRangePartitionStmt.Operation;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.MapType;
@@ -261,15 +262,15 @@ terminal
   KW_MERGE_FN, KW_METADATA, KW_NOT, KW_NULL, KW_NULLS, KW_OFFSET, KW_ON, KW_OR, KW_ORDER,
   KW_OUTER, KW_OVER, KW_OVERWRITE, KW_PARQUET, KW_PARQUETFILE, KW_PARTITION,
   KW_PARTITIONED, KW_PARTITIONS, KW_PRECEDING, KW_PREPARE_FN, KW_PRIMARY, KW_PRODUCED,
-  KW_PURGE, KW_RANGE, KW_RCFILE, KW_RECOVER, KW_REFRESH, KW_REGEXP, KW_RENAME, KW_REPLACE,
-  KW_REPLICATION, KW_RESTRICT, KW_RETURNS, KW_REVOKE, KW_RIGHT, KW_RLIKE, KW_ROLE,
-  KW_ROLES, KW_ROW, KW_ROWS, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE,
-  KW_SERDEPROPERTIES, KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_SORT, KW_STORED,
-  KW_STRAIGHT_JOIN, KW_STRING, KW_STRUCT, KW_SYMBOL, KW_TABLE, KW_TABLES,
-  KW_TBLPROPERTIES, KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT,
-  KW_TRUNCATE, KW_STATS, KW_TO, KW_TRUE, KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UPDATE,
-  KW_UPDATE_FN, KW_UPSERT, KW_USE, KW_USING, KW_VALUES, KW_VARCHAR, KW_VIEW, KW_WHEN,
-  KW_WHERE, KW_WITH;
+  KW_PURGE, KW_RANGE, KW_RCFILE, KW_RECOVER, KW_REFRESH, KW_REGEXP, KW_RENAME,
+  KW_REPEATABLE, KW_REPLACE, KW_REPLICATION, KW_RESTRICT, KW_RETURNS, KW_REVOKE,
+  KW_RIGHT, KW_RLIKE, KW_ROLE, KW_ROLES, KW_ROW, KW_ROWS, KW_SCHEMA, KW_SCHEMAS,
+  KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES, KW_SERIALIZE_FN, KW_SET,
+  KW_SHOW, KW_SMALLINT, KW_SORT, KW_STORED, KW_STRAIGHT_JOIN, KW_STRING, KW_STRUCT,
+  KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TABLESAMPLE, KW_TBLPROPERTIES, KW_TERMINATED,
+  KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TRUNCATE, KW_STATS, KW_TO, KW_TRUE,
+  KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UPDATE, KW_UPDATE_FN, KW_UPSERT, KW_USE,
+  KW_USING, KW_VALUES, KW_VARCHAR, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
 
 terminal COLON, SEMICOLON, COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET,
   RBRACKET, DIVIDE, MOD, ADD, SUBTRACT;
@@ -361,6 +362,7 @@ nonterminal ArrayList<String> dotted_path;
 nonterminal SlotRef slot_ref;
 nonterminal FromClause from_clause;
 nonterminal ArrayList<TableRef> table_ref_list;
+nonterminal TableSampleClause opt_tablesample;
 nonterminal WithClause opt_with_clause;
 nonterminal ArrayList<View> with_view_def_list;
 nonterminal View with_view_def;
@@ -483,6 +485,7 @@ nonterminal Boolean opt_kw_role;
 // identifiers rather than keywords. Throws a parse exception if the identifier does not
 // match the expected string.
 nonterminal key_ident;
+nonterminal system_ident;
 nonterminal Boolean option_ident;
 nonterminal Boolean server_ident;
 nonterminal Boolean source_ident;
@@ -1603,6 +1606,15 @@ key_ident ::=
   :}
   ;
 
+system_ident ::=
+  IDENT:ident
+  {:
+    if (!ident.toUpperCase().equals("SYSTEM")) {
+      parser.parseError("identifier", SqlParserSymbols.IDENT, "SYSTEM");
+    }
+  :}
+  ;
+
 source_ident ::=
   IDENT:ident
   {:
@@ -2385,12 +2397,12 @@ table_ref_list ::=
   ;
 
 table_ref ::=
-  dotted_path:path
-  {: RESULT = new TableRef(path, null); :}
-  | dotted_path:path alias_clause:alias
-  {: RESULT = new TableRef(path, alias); :}
-  | LPAREN query_stmt:query RPAREN alias_clause:alias
-  {: RESULT = new InlineViewRef(alias, query); :}
+  dotted_path:path opt_tablesample:tblsmpl
+  {: RESULT = new TableRef(path, null, tblsmpl); :}
+  | dotted_path:path alias_clause:alias opt_tablesample:tblsmpl
+  {: RESULT = new TableRef(path, alias, tblsmpl); :}
+  | LPAREN query_stmt:query RPAREN alias_clause:alias opt_tablesample:tblsmpl
+  {: RESULT = new InlineViewRef(alias, query, tblsmpl); :}
   ;
 
 join_operator ::=
@@ -2457,6 +2469,16 @@ plan_hint_list ::=
     if (hint != null) hints.add(hint);
     RESULT = hints;
   :}
+  ;
+
+opt_tablesample ::=
+  KW_TABLESAMPLE system_ident LPAREN INTEGER_LITERAL:p RPAREN
+  {: RESULT = new TableSampleClause(p.longValue(), null); :}
+  | KW_TABLESAMPLE system_ident LPAREN INTEGER_LITERAL:p RPAREN
+    KW_REPEATABLE LPAREN INTEGER_LITERAL:s RPAREN
+  {: RESULT = new TableSampleClause(p.longValue(), Long.valueOf(s.longValue())); :}
+  | /* empty */
+  {: RESULT = null; :}
   ;
 
 ident_list ::=
@@ -3352,6 +3374,8 @@ ident_or_keyword ::=
   {: RESULT = r.toString(); :}
   | KW_RENAME:r
   {: RESULT = r.toString(); :}
+  | KW_REPEATABLE:r
+  {: RESULT = r.toString(); :}
   | KW_REPLACE:r
   {: RESULT = r.toString(); :}
   | KW_REPLICATION:r
@@ -3409,6 +3433,8 @@ ident_or_keyword ::=
   | KW_TABLE:r
   {: RESULT = r.toString(); :}
   | KW_TABLES:r
+  {: RESULT = r.toString(); :}
+  | KW_TABLESAMPLE:r
   {: RESULT = r.toString(); :}
   | KW_TBLPROPERTIES:r
   {: RESULT = r.toString(); :}

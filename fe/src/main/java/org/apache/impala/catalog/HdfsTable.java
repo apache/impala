@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -902,7 +903,7 @@ public class HdfsTable extends Table {
         if (nullPartitionIds_.get(i).isEmpty()) {
           stats.setNumDistinctValues(stats.getNumDistinctValues() + 1);
         }
-        nullPartitionIds_.get(i).add(partition.getId());
+        nullPartitionIds_.get(i).add(Long.valueOf(partition.getId()));
         continue;
       }
       HashSet<Long> partitionIds = partitionValuesMap_.get(i).get(literal);
@@ -911,7 +912,7 @@ public class HdfsTable extends Table {
         partitionValuesMap_.get(i).put(literal, partitionIds);
         stats.setNumDistinctValues(stats.getNumDistinctValues() + 1);
       }
-      partitionIds.add(partition.getId());
+      partitionIds.add(Long.valueOf(partition.getId()));
     }
   }
 
@@ -1912,5 +1913,86 @@ public class HdfsTable extends Table {
         || oldPartition.compareTo(refreshedPartition) == 0);
     dropPartition(oldPartition);
     addPartition(refreshedPartition);
+  }
+
+  /**
+   * Selects a random sample of files from the given list of partitions such that the sum
+   * of file sizes is at least 'percentBytes' percent of the total number of bytes in
+   * those partitions. The sample is returned as a map from partition id to a list of
+   * file descriptors selected from that partition.
+   * This function allocates memory proportional to the number of files in 'inputParts'.
+   * Its implementation tries to minimize the constant factor and object generation.
+   * The given 'randomSeed' is used for random number generation.
+   * The 'percentBytes' parameter must be between 0 and 100.
+   */
+  public Map<Long, List<FileDescriptor>> getFilesSample(List<HdfsPartition> inputParts,
+      long percentBytes, long randomSeed) {
+    Preconditions.checkState(percentBytes >= 0 && percentBytes <= 100);
+
+    // Conservative max size for Java arrays. The actual maximum varies
+    // from JVM version and sometimes between configurations.
+    final long JVM_MAX_ARRAY_SIZE = Integer.MAX_VALUE - 10;
+    if (numHdfsFiles_ > JVM_MAX_ARRAY_SIZE) {
+      throw new IllegalStateException(String.format(
+          "Too many files to generate a table sample. " +
+          "Table '%s' has %s files, but a maximum of %s files are supported.",
+          getTableName().toString(), numHdfsFiles_, JVM_MAX_ARRAY_SIZE));
+    }
+    int totalNumFiles = (int) numHdfsFiles_;
+
+    // Ensure a consistent ordering of files for repeatable runs. The files within a
+    // partition are already ordered based on how they are loaded in the catalog.
+    List<HdfsPartition> orderedParts = Lists.newArrayList(inputParts);
+    Collections.sort(orderedParts);
+
+    // fileIdxs contains indexes into the file descriptor lists of all inputParts
+    // parts[i] contains the partition corresponding to fileIdxs[i]
+    // fileIdxs[i] is an index into the file descriptor list of the partition parts[i]
+    // Use max size to avoid looping over inputParts for the exact size.
+    // The purpose of these arrays is to efficiently avoid selecting the same file
+    // multiple times during the sampling, regardless of the sample percent. We purposely
+    // avoid generating objects proportional to the number of files.
+    int[] fileIdxs = new int[totalNumFiles];
+    HdfsPartition[] parts = new HdfsPartition[totalNumFiles];
+    int idx = 0;
+    long totalBytes = 0;
+    for (HdfsPartition part: inputParts) {
+      totalBytes += part.getSize();
+      int numFds = part.getNumFileDescriptors();
+      for (int fileIdx = 0; fileIdx < numFds; ++fileIdx) {
+        fileIdxs[idx] = fileIdx;
+        parts[idx] = part;
+        ++idx;
+      }
+    }
+
+    int numFilesRemaining = idx;
+    double fracPercentBytes = (double) percentBytes / 100;
+    long targetBytes = (long) Math.round(totalBytes * fracPercentBytes);
+
+    // Randomly select files until targetBytes has been reached or all files have been
+    // selected.
+    Random rnd = new Random(randomSeed);
+    long selectedBytes = 0;
+    Map<Long, List<FileDescriptor>> result = Maps.newHashMap();
+    while (selectedBytes < targetBytes && numFilesRemaining > 0) {
+      int selectedIdx = Math.abs(rnd.nextInt()) % numFilesRemaining;
+      HdfsPartition part = parts[selectedIdx];
+      Long partId = Long.valueOf(part.getId());
+      List<FileDescriptor> sampleFileIdxs = result.get(partId);
+      if (sampleFileIdxs == null) {
+        sampleFileIdxs = Lists.newArrayList();
+        result.put(partId, sampleFileIdxs);
+      }
+      FileDescriptor fd = part.getFileDescriptors().get(fileIdxs[selectedIdx]);
+      sampleFileIdxs.add(fd);
+      selectedBytes += fd.getFileLength();
+      // Avoid selecting the same file multiple times.
+      fileIdxs[selectedIdx] = fileIdxs[numFilesRemaining - 1];
+      parts[selectedIdx] = parts[numFilesRemaining - 1];
+      --numFilesRemaining;
+    }
+
+    return result;
   }
 }

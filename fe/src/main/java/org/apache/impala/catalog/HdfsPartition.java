@@ -26,9 +26,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
@@ -41,10 +42,6 @@ import org.apache.impala.common.Reference;
 import org.apache.impala.fb.FbCompression;
 import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.fb.FbFileDesc;
-import org.apache.hadoop.fs.BlockLocation;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.impala.thrift.ImpalaInternalServiceConstants;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TExpr;
@@ -56,8 +53,9 @@ import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.ListMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import com.google.flatbuffers.FlatBufferBuilder;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
@@ -71,6 +69,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Shorts;
+import com.google.flatbuffers.FlatBufferBuilder;
 
 /**
  * Query-relevant information for one table partition. Partitions are comparable
@@ -646,7 +645,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
   public void setFileDescriptors(List<FileDescriptor> descriptors) {
     fileDescriptors_ = descriptors;
   }
-  public long getNumFileDescriptors() {
+  public int getNumFileDescriptors() {
     return fileDescriptors_ == null ? 0 : fileDescriptors_.size();
   }
 
@@ -707,7 +706,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     }
   }
 
-  private final CachedHmsPartitionDescriptor cachedMsPartitionDescriptor_;
+  private CachedHmsPartitionDescriptor cachedMsPartitionDescriptor_;
 
   public CachedHmsPartitionDescriptor getCachedMsPartitionDescriptor() {
     return cachedMsPartitionDescriptor_;

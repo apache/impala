@@ -64,6 +64,11 @@ import com.google.common.collect.Sets;
  * on applicable conjuncts. It returns a list of partitions left after applying all
  * the conjuncts and also removes the conjuncts which have been fully evaluated with
  * the partition columns.
+ *
+ * The pruner does not update referenced partitions in the DescriptorTable because
+ * not all users of this class require the resulting partitions to be serialized, e.g.,
+ * DDL commands.
+ * It is up to the user of this class to mark referenced partitions as needed.
  */
 public class HdfsPartitionPruner {
 
@@ -154,10 +159,7 @@ public class HdfsPartitionPruner {
     for (Long id: matchingPartitionIds) {
       HdfsPartition partition = partitionMap.get(id);
       Preconditions.checkNotNull(partition);
-      if (partition.hasFileDescriptors() || allowEmpty) {
-        results.add(partition);
-        analyzer.getDescTbl().addReferencedPartition(tbl_, partition.getId());
-      }
+      if (partition.hasFileDescriptors() || allowEmpty) results.add(partition);
     }
     return results;
   }

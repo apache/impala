@@ -27,12 +27,10 @@ import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
-import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
@@ -40,17 +38,19 @@ import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TableRef;
+import org.apache.impala.analysis.TableSampleClause;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
+import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.FileSystemUtil;
-import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
@@ -81,12 +81,16 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 /**
- * Scan of a single table. Currently limited to full-table scans.
+ * Scan of a single table.
  *
  * It's expected that the creator of this object has already done any necessary
  * partition pruning before creating this object. In other words, the 'conjuncts'
  * passed to the constructors are conjuncts not fully evaluated by partition pruning
  * and 'partitions' are the remaining partitions after pruning.
+ *
+ * Supports scanning a random sample of files based on the parameters from a
+ * TABLESAMPLE clause. Scan predicates and the sampling are independent, so we first
+ * prune partitions and then randomly select files from those partitions.
  *
  * For scans of tables with Parquet files the class creates an additional list of
  * conjuncts that are passed to the backend and will be evaluated against the
@@ -113,16 +117,19 @@ public class HdfsScanNode extends ScanNode {
 
   private final HdfsTable tbl_;
 
-  // Partitions that are filtered in for scanning by the key ranges
+  // List of partitions to be scanned. Partitions have been pruned.
   private final List<HdfsPartition> partitions_;
+
+  // Parameters for table sampling. Null if not sampling.
+  private final TableSampleClause sampleParams_;
 
   private final TReplicaPreference replicaPreference_;
   private final boolean randomReplica_;
 
-  // Total number of files from partitions_
+  // Number of partitions, files and bytes scanned. Set in computeScanRangeLocations().
+  // Might not match 'partitions_' due to table sampling.
+  private int numPartitions_ = 0;
   private long totalFiles_ = 0;
-
-  // Total number of bytes from partitions_
   private long totalBytes_ = 0;
 
   // True if this scan node should use the MT implementation in the backend.
@@ -183,6 +190,7 @@ public class HdfsScanNode extends ScanNode {
     tbl_ = (HdfsTable)desc.getTable();
     conjuncts_ = conjuncts;
     partitions_ = partitions;
+    sampleParams_ = hdfsTblRef.getSampleParams();
     replicaPreference_ = hdfsTblRef.getReplicaPreference();
     randomReplica_ = hdfsTblRef.getRandomReplica();
     HdfsTable hdfsTable = (HdfsTable)hdfsTblRef.getTable();
@@ -216,7 +224,7 @@ public class HdfsScanNode extends ScanNode {
     computeDictionaryFilterConjuncts(analyzer);
     computeMemLayout(analyzer);
 
-    // compute scan range locations
+    // compute scan range locations with optional sampling
     Set<HdfsFileFormat> fileFormats = computeScanRangeLocations(analyzer);
 
     // Determine backend scan node implementation to use. The optimized MT implementation
@@ -519,15 +527,47 @@ public class HdfsScanNode extends ScanNode {
   /**
    * Computes scan ranges (hdfs splits) plus their storage locations, including volume
    * ids, based on the given maximum number of bytes each scan range should scan.
+   * If 'sampleParams_' is not null, generates a sample and computes the scan ranges
+   * based on the sample.
    * Returns the set of file formats being scanned.
    */
   private Set<HdfsFileFormat> computeScanRangeLocations(Analyzer analyzer)
       throws ImpalaRuntimeException {
+    List<HdfsPartition> partitions = partitions_;
+    Map<Long, List<FileDescriptor>> sampledFiles = null;
+    if (sampleParams_ != null) {
+      long percentBytes = sampleParams_.getPercentBytes();
+      long randomSeed;
+      if (sampleParams_.hasRandomSeed()) {
+        randomSeed = sampleParams_.getRandomSeed();
+      } else {
+        randomSeed = System.currentTimeMillis();
+      }
+      sampledFiles = tbl_.getFilesSample(partitions_, percentBytes, randomSeed);
+      if (sampledFiles.size() != partitions_.size()) {
+        partitions = Lists.newArrayListWithCapacity(sampledFiles.size());
+        for (Long partId: sampledFiles.keySet()) {
+          partitions.add(tbl_.getPartitionMap().get(partId));
+        }
+      }
+    }
+
     long maxScanRangeLength = analyzer.getQueryCtx().client_request.getQuery_options()
         .getMax_scan_range_length();
     scanRanges_ = Lists.newArrayList();
+    numPartitions_ = partitions.size();
+    totalFiles_ = 0;
+    totalBytes_ = 0;
     Set<HdfsFileFormat> fileFormats = Sets.newHashSet();
     for (HdfsPartition partition: partitions_) {
+      List<FileDescriptor> fileDescs = partition.getFileDescriptors();
+      if (sampledFiles != null) {
+        // If we are sampling, check whether this partition is included in the sample.
+        fileDescs = sampledFiles.get(Long.valueOf(partition.getId()));
+        if (fileDescs == null) continue;
+      }
+
+      analyzer.getDescTbl().addReferencedPartition(tbl_, partition.getId());
       fileFormats.add(partition.getFileFormat());
       Preconditions.checkState(partition.getId() >= 0);
       // Missing disk id accounting is only done for file systems that support the notion
@@ -540,7 +580,10 @@ public class HdfsScanNode extends ScanNode {
       }
       boolean checkMissingDiskIds = FileSystemUtil.supportsStorageIds(partitionFs);
       boolean partitionMissingDiskIds = false;
-      for (HdfsPartition.FileDescriptor fileDesc: partition.getFileDescriptors()) {
+
+      totalFiles_ += fileDescs.size();
+      for (FileDescriptor fileDesc: fileDescs) {
+        totalBytes_ += fileDesc.getFileLength();
         boolean fileDescMissingDiskIds = false;
         for (int j = 0; j < fileDesc.getNumFileBlocks(); ++j) {
           FbFileBlock block = fileDesc.getFbFileBlock(j);
@@ -616,8 +659,6 @@ public class HdfsScanNode extends ScanNode {
       LOG.trace("collecting partitions for table " + tbl_.getName());
     }
     numPartitionsMissingStats_ = 0;
-    totalFiles_ = 0;
-    totalBytes_ = 0;
     if (tbl_.getNumClusteringCols() == 0) {
       cardinality_ = tbl_.getNumRows();
       if (cardinality_ < -1 || (cardinality_ == 0 && tbl_.getTotalHdfsBytes() > 0)) {
@@ -628,8 +669,6 @@ public class HdfsScanNode extends ScanNode {
         cardinality_ = 0;
       } else {
         Preconditions.checkState(partitions_.size() == 1);
-        totalFiles_ += partitions_.get(0).getFileDescriptors().size();
-        totalBytes_ += partitions_.get(0).getSize();
       }
     } else {
       cardinality_ = 0;
@@ -647,8 +686,6 @@ public class HdfsScanNode extends ScanNode {
         } else {
           ++numPartitionsMissingStats_;
         }
-        totalFiles_ += p.getFileDescriptors().size();
-        totalBytes_ += p.getSize();
       }
       if (!partitions_.isEmpty() && !hasValidPartitionCardinality) {
         // if none of the partitions knew its number of rows, we fall back on
@@ -656,6 +693,14 @@ public class HdfsScanNode extends ScanNode {
         cardinality_ = tbl_.getNumRows();
       }
     }
+
+    // Adjust the cardinality based on table sampling.
+    if (sampleParams_ != null && cardinality_ != -1) {
+      double fracPercBytes = (double) sampleParams_.getPercentBytes() / 100;
+      cardinality_ = Math.round(cardinality_ * fracPercBytes);
+      cardinality_ = Math.max(cardinality_, 1);
+    }
+
     // Adjust cardinality for all collections referenced along the tuple's path.
     if (cardinality_ != -1) {
       for (Type t: desc_.getPath().getMatchedTypes()) {
@@ -785,16 +830,15 @@ public class HdfsScanNode extends ScanNode {
     HdfsTable table = (HdfsTable) desc_.getTable();
     output.append(String.format("%s%s [%s", prefix, getDisplayLabel(),
         getDisplayLabelDetail()));
-    int numPartitions = partitions_.size();
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal() &&
         fragment_.isPartitioned()) {
       output.append(", " + fragment_.getDataPartition().getExplainString());
     }
     output.append("]\n");
     if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
-      if (tbl_.getNumClusteringCols() == 0) numPartitions = 1;
+      if (tbl_.getNumClusteringCols() == 0) numPartitions_ = 1;
       output.append(String.format("%spartitions=%s/%s files=%s size=%s", detailPrefix,
-          numPartitions, table.getPartitions().size() - 1, totalFiles_,
+          numPartitions_, table.getPartitions().size() - 1, totalFiles_,
           PrintUtils.printBytes(totalBytes_)));
       output.append("\n");
       if (!conjuncts_.isEmpty()) {
@@ -820,7 +864,7 @@ public class HdfsScanNode extends ScanNode {
       if (numScanRangesNoDiskIds_ > 0) {
         output.append(String.format("%smissing disk ids: " +
             "partitions=%s/%s files=%s/%s scan ranges %s/%s\n", detailPrefix,
-            numPartitionsNoDiskIds_, numPartitions, numFilesNoDiskIds_,
+            numPartitionsNoDiskIds_, numPartitions_, numFilesNoDiskIds_,
             totalFiles_, numScanRangesNoDiskIds_, scanRanges_.size()));
       }
       if (!minMaxOriginalConjuncts_.isEmpty()) {

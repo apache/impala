@@ -110,6 +110,7 @@ public class CollectionTableRef extends TableRef {
           .toRequest());
     }
     isAnalyzed_ = true;
+    analyzeTableSample(analyzer);
     analyzeHints(analyzer);
 
     // TODO: For joins on nested collections some join ops can be simplified

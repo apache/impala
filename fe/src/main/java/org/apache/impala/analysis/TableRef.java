@@ -17,7 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -81,6 +80,9 @@ public class TableRef implements ParseNode {
   // Analysis registers privilege and/or audit requests based on this privilege.
   protected final Privilege priv_;
 
+  // Optional TABLESAMPLE clause. Null if not specified.
+  protected TableSampleClause sampleParams_;
+
   protected JoinOperator joinOp_;
   protected List<PlanHint> joinHints_ = Lists.newArrayList();
   protected List<String> usingColNames_;
@@ -132,7 +134,16 @@ public class TableRef implements ParseNode {
     this(path, alias, Privilege.SELECT);
   }
 
+  public TableRef(List<String> path, String alias, TableSampleClause tableSample) {
+    this(path, alias, tableSample, Privilege.SELECT);
+  }
+
   public TableRef(List<String> path, String alias, Privilege priv) {
+    this(path, alias, null, priv);
+  }
+
+  public TableRef(List<String> path, String alias, TableSampleClause sampleParams,
+      Privilege priv) {
     rawPath_ = path;
     if (alias != null) {
       aliases_ = new String[] { alias.toLowerCase() };
@@ -140,6 +151,7 @@ public class TableRef implements ParseNode {
     } else {
       hasExplicitAlias_ = false;
     }
+    sampleParams_ = sampleParams;
     priv_ = priv;
     isAnalyzed_ = false;
     replicaPreference_ = null;
@@ -154,6 +166,7 @@ public class TableRef implements ParseNode {
     resolvedPath_ = other.resolvedPath_;
     aliases_ = other.aliases_;
     hasExplicitAlias_ = other.hasExplicitAlias_;
+    sampleParams_ = other.sampleParams_;
     priv_ = other.priv_;
     joinOp_ = other.joinOp_;
     joinHints_ = Lists.newArrayList(other.joinHints_);
@@ -259,6 +272,7 @@ public class TableRef implements ParseNode {
     Preconditions.checkNotNull(resolvedPath_);
     return resolvedPath_.getRootTable();
   }
+  public TableSampleClause getSampleParams() { return sampleParams_; }
   public Privilege getPrivilege() { return priv_; }
   public List<PlanHint> getJoinHints() { return joinHints_; }
   public List<PlanHint> getTableHints() { return tableHints_; }
@@ -333,6 +347,16 @@ public class TableRef implements ParseNode {
   public List<TupleId> getAllTableRefIds() {
     Preconditions.checkState(isAnalyzed_);
     return allTableRefIds_;
+  }
+
+  protected void analyzeTableSample(Analyzer analyzer) throws AnalysisException {
+    if (sampleParams_ == null) return;
+    sampleParams_.analyze(analyzer);
+    if (!(this instanceof BaseTableRef)
+        || !(resolvedPath_.destTable() instanceof HdfsTable)) {
+      throw new AnalysisException(
+          "TABLESAMPLE is only supported on HDFS base tables: " + getUniqueAlias());
+    }
   }
 
   protected void analyzeHints(Analyzer analyzer) throws AnalysisException {

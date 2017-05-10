@@ -524,20 +524,20 @@ public class ToSqlTest extends FrontendTestBase {
       testToSql(String.format(
           "select * from functional.alltypes at %sschedule_random_replica%s", prefix,
           suffix),
-          "SELECT * FROM functional.alltypes at \n-- +schedule_random_replica\n");
+          "SELECT * FROM functional.alltypes at\n-- +schedule_random_replica\n");
       testToSql(String.format(
           "select * from functional.alltypes %sschedule_random_replica%s", prefix,
           suffix),
-          "SELECT * FROM functional.alltypes \n-- +schedule_random_replica\n");
+          "SELECT * FROM functional.alltypes\n-- +schedule_random_replica\n");
       testToSql(String.format(
           "select * from functional.alltypes %sschedule_random_replica," +
           "schedule_disk_local%s", prefix, suffix),
-          "SELECT * FROM functional.alltypes \n-- +schedule_random_replica," +
+          "SELECT * FROM functional.alltypes\n-- +schedule_random_replica," +
           "schedule_disk_local\n");
       testToSql(String.format(
           "select c1 from (select at.tinyint_col as c1 from functional.alltypes at " +
           "%sschedule_random_replica%s) s1", prefix, suffix),
-          "SELECT c1 FROM (SELECT at.tinyint_col c1 FROM functional.alltypes at \n-- +" +
+          "SELECT c1 FROM (SELECT at.tinyint_col c1 FROM functional.alltypes at\n-- +" +
           "schedule_random_replica\n) s1");
 
       // Select-list hint. The legacy-style hint has no prefix and suffix.
@@ -1288,5 +1288,24 @@ public class ToSqlTest extends FrontendTestBase {
     testToSql("set a = 1", "SET a='1'");
     testToSql("set `a b` = \"x y\"", "SET `a b`='x y'");
     testToSql("set", "SET");
+  }
+
+  @Test
+  public void testTableSample() {
+    testToSql("select * from functional.alltypes tablesample system(10)",
+        "SELECT * FROM functional.alltypes TABLESAMPLE SYSTEM(10)");
+    testToSql(
+        "select * from functional.alltypes tablesample system(10) repeatable(20)",
+        "SELECT * FROM functional.alltypes TABLESAMPLE SYSTEM(10) REPEATABLE(20)");
+    testToSql(
+        "select * from functional.alltypes a " +
+        "tablesample system(10) /* +schedule_random */",
+        "SELECT * FROM functional.alltypes a " +
+        "TABLESAMPLE SYSTEM(10)\n-- +schedule_random\n");
+    testToSql(
+        "with t as (select * from functional.alltypes tablesample system(5)) " +
+        "select * from t",
+        "WITH t AS (SELECT * FROM functional.alltypes TABLESAMPLE SYSTEM(5)) " +
+        "SELECT * FROM t");
   }
 }
