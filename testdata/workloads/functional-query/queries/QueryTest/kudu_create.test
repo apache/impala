@@ -144,3 +144,75 @@ X, I1, I2, I3, I4, VALS, VALF, VALD, VALB
 ---- TYPES
 INT,TINYINT,SMALLINT,INT,BIGINT,STRING,FLOAT,DOUBLE,BOOLEAN
 ====
+---- QUERY
+# Overlapping ranges are rejected by the Kudu client
+create table ts_ranges (ts timestamp primary key, i int)
+partition by range (
+  partition cast('2009-01-02 00:00:00' as timestamp) <= VALUES <
+            cast('2009-01-03 00:00:00' as timestamp),
+  partition cast('2009-01-02 10:00:00' as timestamp) <= VALUES
+) stored as kudu
+---- CATCH
+NonRecoverableException: overlapping range partitions: first range partition: 2009-01-02T00:00:00.000000Z <= VALUES < 2009-01-03T00:00:00.000000Z, second range partition: VALUES >= 2009-01-02T10:00:00.000000Z
+====
+---- QUERY
+# Creates a range partitioned Kudu table with a timestamp PK. Note that nanoseconds
+# are rounded (same behavior as when writing timestamp values to Kudu).
+create table ts_ranges (ts timestamp primary key, i int)
+partition by range (
+  partition nanoseconds_add(cast('2009-01-01 00:00:00' as timestamp), 999) <= VALUES <
+            nanoseconds_add(cast('2009-01-02 00:00:00' as timestamp), 1),
+  partition cast('2009-01-02 00:00:00' as timestamp) <= VALUES <
+            cast('2009-01-03 00:00:00' as timestamp),
+  partition '2009-01-03 00:00:00' <= VALUES
+) stored as kudu
+---- RESULTS
+====
+---- QUERY
+show range partitions ts_ranges
+---- RESULTS
+'2009-01-01T00:00:00.000001Z <= VALUES < 2009-01-02T00:00:00.000000Z'
+'2009-01-02T00:00:00.000000Z <= VALUES < 2009-01-03T00:00:00.000000Z'
+'VALUES >= 2009-01-03T00:00:00.000000Z'
+---- TYPES
+STRING
+====
+---- QUERY
+create table ts_ranges_ctas
+primary key (ts)
+partition by range (
+  partition VALUES < '2009-01-02 00:00:00',
+  partition '2009-01-02 00:00:00' <= VALUES <
+            '2009-01-03 00:00:00',
+  partition '2009-01-03 00:00:00' < VALUES,
+  partition VALUE = ('2009-01-03 00:00:00')
+)
+stored as kudu
+as select timestamp_col ts, id from functional.alltypestiny;
+---- RESULTS
+'Inserted 8 row(s)'
+====
+---- QUERY
+show range partitions ts_ranges_ctas
+---- RESULTS
+'VALUES < 2009-01-02T00:00:00.000000Z'
+'2009-01-02T00:00:00.000000Z <= VALUES < 2009-01-03T00:00:00.000000Z'
+'VALUE = 2009-01-03T00:00:00.000000Z'
+'VALUES >= 2009-01-03T00:00:00.000001Z'
+---- TYPES
+STRING
+====
+---- QUERY
+select * from ts_ranges_ctas order by id
+---- RESULTS
+2009-01-01 00:00:00,0
+2009-01-01 00:01:00,1
+2009-02-01 00:00:00,2
+2009-02-01 00:01:00,3
+2009-03-01 00:00:00,4
+2009-03-01 00:01:00,5
+2009-04-01 00:00:00,6
+2009-04-01 00:01:00,7
+---- TYPES
+TIMESTAMP,INT
+====

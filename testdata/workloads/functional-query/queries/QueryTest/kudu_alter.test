@@ -413,3 +413,45 @@ select count(*) from external_tbl
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+create table ts_ranges (ts timestamp primary key, i int)
+partition by range (
+  partition cast('2009-01-01 00:00:00' as timestamp) <= VALUES <
+            cast('2009-01-02 00:00:00' as timestamp)
+) stored as kudu
+---- RESULTS
+====
+---- QUERY
+show range partitions ts_ranges
+---- RESULTS
+'2009-01-01T00:00:00.000000Z <= VALUES < 2009-01-02T00:00:00.000000Z'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table ts_ranges add range partition
+cast('2009-01-02 00:00:00' as timestamp) <= VALUES <
+cast('2009-01-03 00:00:00' as timestamp)
+---- RESULTS
+====
+---- QUERY
+show range partitions ts_ranges
+---- RESULTS
+'2009-01-01T00:00:00.000000Z <= VALUES < 2009-01-02T00:00:00.000000Z'
+'2009-01-02T00:00:00.000000Z <= VALUES < 2009-01-03T00:00:00.000000Z'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table ts_ranges drop range partition
+cast('2009-01-02 00:00:00' as timestamp) <= VALUES <
+cast('2009-01-03 00:00:00' as timestamp)
+---- RESULTS
+====
+---- QUERY
+show range partitions ts_ranges
+---- RESULTS
+'2009-01-01T00:00:00.000000Z <= VALUES < 2009-01-02T00:00:00.000000Z'
+---- TYPES
+STRING
+====

@@ -17,17 +17,19 @@
 
 package org.apache.impala.analysis;
 
+import java.math.BigInteger;
 import java.util.List;
+
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.thrift.TRangePartition;
+import org.apache.impala.util.KuduUtil;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-
-import org.apache.impala.common.AnalysisException;
-import org.apache.impala.util.KuduUtil;
-import org.apache.impala.thrift.TRangePartition;
 
 /**
  * Represents a range partition of a Kudu table.
@@ -50,11 +52,17 @@ import org.apache.impala.thrift.TRangePartition;
  * are inclusive (true) or exclusive (false).
  */
 public class RangePartition implements ParseNode {
+
+  // Upper and lower bound exprs contain literals of the target column type post-analysis.
+  // For TIMESTAMPs those are Kudu UNIXTIME_MICROS, i.e. int64s.
   private final List<Expr> lowerBound_;
-  private final boolean lowerBoundInclusive_;
   private final List<Expr> upperBound_;
+  private final boolean lowerBoundInclusive_;
   private final boolean upperBoundInclusive_;
   private final boolean isSingletonRange_;
+
+  // Set true when this partition has been analyzed.
+  private boolean isAnalyzed_ = false;
 
   private RangePartition(List<Expr> lowerBoundValues, boolean lowerBoundInclusive,
       List<Expr> upperBoundValues, boolean upperBoundInclusive) {
@@ -112,10 +120,14 @@ public class RangePartition implements ParseNode {
 
   public void analyze(Analyzer analyzer, List<ColumnDef> partColDefs)
       throws AnalysisException {
+    // Reanalyzing not supported because TIMESTAMPs are converted to BIGINT (unixtime
+    // micros) in place.
+    Preconditions.checkArgument(!isAnalyzed_);
     analyzeBoundaryValues(lowerBound_, partColDefs, analyzer);
     if (!isSingletonRange_) {
       analyzeBoundaryValues(upperBound_, partColDefs, analyzer);
     }
+    isAnalyzed_ = true;
   }
 
   private void analyzeBoundaryValues(List<Expr> boundaryValues,
@@ -158,6 +170,20 @@ public class RangePartition implements ParseNode {
     }
     org.apache.impala.catalog.Type colType = pkColumn.getType();
     Preconditions.checkState(KuduUtil.isSupportedKeyType(colType));
+
+    // Special case string literals in timestamp columns for convenience.
+    if (literal.getType().isStringType() && colType.isTimestamp()) {
+      // Add an explicit cast to TIMESTAMP
+      Expr e = new CastExpr(new TypeDef(Type.TIMESTAMP), literal);
+      e.analyze(analyzer);
+      literal = LiteralExpr.create(e, analyzer.getQueryCtx());
+      Preconditions.checkNotNull(literal);
+      if (literal.isNullLiteral()) {
+        throw new AnalysisException(String.format("Range partition value %s cannot be " +
+            "cast to target TIMESTAMP partitioning column.", value.toSql()));
+      }
+    }
+
     org.apache.impala.catalog.Type literalType = literal.getType();
     if (!org.apache.impala.catalog.Type.isImplicitlyCastable(literalType, colType,
         true)) {
@@ -171,6 +197,16 @@ public class RangePartition implements ParseNode {
       literal = LiteralExpr.create(castLiteral, analyzer.getQueryCtx());
     }
     Preconditions.checkNotNull(literal);
+
+    if (colType.isTimestamp()) {
+      try {
+        long unixTimeMicros = KuduUtil.timestampToUnixTimeMicros(analyzer, literal);
+        literal = new NumericLiteral(BigInteger.valueOf(unixTimeMicros), Type.BIGINT);
+      } catch (InternalException e) {
+        throw new AnalysisException(
+            "Error converting timestamp in range definition: " + toSql(), e);
+      }
+    }
     return literal;
   }
 

@@ -154,6 +154,10 @@ public class KuduUtil {
         checkCorrectType(literal.isSetString_literal(), type, colName, literal);
         key.addString(pos, literal.getString_literal().getValue());
         break;
+      case UNIXTIME_MICROS:
+        checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
+        key.addLong(pos, literal.getInt_literal().getValue());
+        break;
       default:
         throw new ImpalaRuntimeException("Key columns not supported for type: "
             + type.toString());
@@ -196,7 +200,7 @@ public class KuduUtil {
     }
   }
 
-  public static Long timestampToUnixTimeMicros(Analyzer analyzer, Expr timestampExpr)
+  public static long timestampToUnixTimeMicros(Analyzer analyzer, Expr timestampExpr)
       throws AnalysisException, InternalException {
     Preconditions.checkArgument(timestampExpr.isAnalyzed());
     Preconditions.checkArgument(timestampExpr.isConstant());
@@ -330,7 +334,7 @@ public class KuduUtil {
   }
 
   public static boolean isSupportedKeyType(org.apache.impala.catalog.Type type) {
-    return type.isIntegerType() || type.isStringType();
+    return type.isIntegerType() || type.isStringType() || type.isTimestamp();
   }
 
   /**

@@ -2366,6 +2366,32 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table tab (i int, x int primary key) partition by hash(x) " +
         "partitions 8 sort by(i) stored as kudu", "SORT BY is not supported for Kudu " +
         "tables.");
+
+    // Range partitions with TIMESTAMP
+    AnalyzesOk("create table ts_ranges (ts timestamp primary key) " +
+        "partition by range (partition cast('2009-01-01 00:00:00' as timestamp) " +
+        "<= VALUES < '2009-01-02 00:00:00') stored as kudu");
+    AnalyzesOk("create table ts_ranges (ts timestamp primary key) " +
+        "partition by range (partition value = cast('2009-01-01 00:00:00' as timestamp" +
+        ")) stored as kudu");
+    AnalyzesOk("create table ts_ranges (ts timestamp primary key) " +
+        "partition by range (partition value = '2009-01-01 00:00:00') " +
+        "stored as kudu");
+    AnalyzesOk("create table ts_ranges (id int, ts timestamp, primary key(id, ts))" +
+        "partition by range (partition value = (9, cast('2009-01-01 00:00:00' as " +
+        "timestamp))) stored as kudu");
+    AnalyzesOk("create table ts_ranges (id int, ts timestamp, primary key(id, ts))" +
+        "partition by range (partition value = (9, '2009-01-01 00:00:00')) " +
+        "stored as kudu");
+    AnalysisError("create table ts_ranges (ts timestamp primary key, i int)" +
+        "partition by range (partition '2009-01-01 00:00:00' <= VALUES < " +
+        "'NOT A TIMESTAMP') stored as kudu",
+        "Range partition value 'NOT A TIMESTAMP' cannot be cast to target TIMESTAMP " +
+        "partitioning column.");
+    AnalysisError("create table ts_ranges (ts timestamp primary key, i int)" +
+        "partition by range (partition 100 <= VALUES < 200) stored as kudu",
+        "Range partition value 100 (type: TINYINT) is not type " +
+        "compatible with partitioning column 'ts' (type: TIMESTAMP).");
   }
 
   @Test
