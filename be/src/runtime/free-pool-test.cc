@@ -135,8 +135,9 @@ TEST(FreePoolTest, Loop) {
     EXPECT_TRUE(p1 != NULL);
     EXPECT_TRUE(p2 != NULL);
     EXPECT_TRUE(p1 != p2);
-    memset(p1, 1, size); // Scribble the expected value (used below).
-    memset(p2, 1, size);
+    // Scribble the expected value (used below).
+    *p1 = 1;
+    *p2 = 1;
     primed_allocations[size] = make_pair(p1, p2);
     pool.Free(p1);
     pool.Free(p2);
