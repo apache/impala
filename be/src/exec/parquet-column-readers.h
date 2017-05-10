@@ -315,7 +315,7 @@ class BaseScalarColumnReader : public ParquetColumnReader {
       num_values_read_(0),
       metadata_(NULL),
       stream_(NULL),
-      decompressed_data_pool_(new MemPool(parent->scan_node_->mem_tracker())) {
+      data_page_pool_(new MemPool(parent->scan_node_->mem_tracker())) {
     DCHECK_GE(node_.col_idx, 0) << node_.DebugString();
   }
 
@@ -346,10 +346,10 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   }
 
   virtual void Close(RowBatch* row_batch) {
-    if (row_batch != nullptr && CurrentPageContainsTupleData()) {
-      row_batch->tuple_data_pool()->AcquireData(decompressed_data_pool_.get(), false);
+    if (row_batch != nullptr && PageContainsTupleData(page_encoding_)) {
+      row_batch->tuple_data_pool()->AcquireData(data_page_pool_.get(), false);
     } else {
-      decompressed_data_pool_->FreeAll();
+      data_page_pool_->FreeAll();
     }
     if (decompressor_ != nullptr) decompressor_->Close();
   }
@@ -406,7 +406,8 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// Decoder for repetition levels.
   ParquetLevelDecoder rep_levels_;
 
-  /// Page encoding for values. Cached here for perf.
+  /// Page encoding for values of the current data page. Cached here for perf. Set in
+  /// InitDataPage().
   parquet::Encoding::type page_encoding_;
 
   /// Num values remaining in the current data page
@@ -422,8 +423,10 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   boost::scoped_ptr<Codec> decompressor_;
   ScannerContext::Stream* stream_;
 
-  /// Pool to allocate decompression buffers from.
-  boost::scoped_ptr<MemPool> decompressed_data_pool_;
+  /// Pool to allocate storage for data pages from - either decompression buffers for
+  /// compressed data pages or copies of the data page with var-len data to attach to
+  /// batches.
+  boost::scoped_ptr<MemPool> data_page_pool_;
 
   /// Header for current data page.
   parquet::PageHeader current_page_header_;
@@ -467,13 +470,19 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// 'size' bytes remaining.
   virtual Status InitDataPage(uint8_t* data, int size) = 0;
 
-  /// Returns true if the current data page may contain strings referenced by returned
-  /// batches. Cases where this is not true are:
+  /// Allocate memory for the uncompressed contents of a data page of 'size' bytes from
+  /// 'data_page_pool_'. 'err_ctx' provides context for error messages. On success, 'buffer'
+  /// points to the allocated memory. Otherwise an error status is returned.
+  Status AllocateUncompressedDataPage(
+      int64_t size, const char* err_ctx, uint8_t** buffer);
+
+  /// Returns true if a data page for this column with the specified 'encoding' may
+  /// contain strings referenced by returned batches. Cases where this is not true are:
   /// * Dictionary-compressed pages, where any string data lives in 'dictionary_pool_'.
   /// * Fixed-length slots, where there is no string data.
-  bool CurrentPageContainsTupleData() {
-    return page_encoding_ != parquet::Encoding::PLAIN_DICTIONARY
-        && slot_desc_ != nullptr && slot_desc_->type().IsStringType();
+  bool PageContainsTupleData(parquet::Encoding::type page_encoding) {
+    return page_encoding != parquet::Encoding::PLAIN_DICTIONARY
+        && slot_desc_ != nullptr && slot_desc_->type().IsVarLenStringType();
   }
 };
 

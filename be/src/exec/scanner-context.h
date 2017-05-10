@@ -175,6 +175,14 @@ class ScannerContext {
     /// Skip this text object.
     bool SkipText(Status*);
 
+    /// If 'batch' is not NULL and 'contains_tuple_data_' is true, attaches all completed
+    /// io buffers and the boundary mem pool to 'batch'. If 'done' is set, all in-flight
+    /// resources are also attached or released.
+    /// If 'batch' is NULL then 'done' must be true or 'contains_tuple_data_' false. Such
+    /// a call will release all completed resources. If 'done' is true all in-flight
+    /// resources are also freed.
+    void ReleaseCompletedResources(RowBatch* batch, bool done);
+
    private:
     friend class ScannerContext;
     ScannerContext* parent_;
@@ -256,14 +264,6 @@ class ScannerContext {
     /// 'io_buffer_bytes_left_' will be set to 0. In the non-error case, 'io_buffer_' is
     /// never set to NULL, even if it contains 0 bytes.
     Status GetNextBuffer(int64_t read_past_size = 0);
-
-    /// If 'batch' is not NULL and 'contains_tuple_data_' is true, attaches all completed
-    /// io buffers and the boundary mem pool to 'batch'. If 'done' is set, all in-flight
-    /// resources are also attached or released.
-    /// If 'batch' is NULL then 'done' must be true or 'contains_tuple_data_' false. Such
-    /// a call will release all completed resources. If 'done' is true all in-flight
-    /// resources are also freed.
-    void ReleaseCompletedResources(RowBatch* batch, bool done);
 
     /// Validates that the output buffer pointers point to the correct buffer.
     bool ValidateBufferPointers() const;

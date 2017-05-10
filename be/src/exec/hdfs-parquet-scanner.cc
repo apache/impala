@@ -228,7 +228,7 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
 
   // Release I/O buffers immediately to make sure they are cleaned up
   // in case we return a non-OK status anywhere below.
-  context_->ReleaseCompletedResources(NULL, true);
+  context_->ReleaseCompletedResources(nullptr, true);
   RETURN_IF_ERROR(footer_status);
 
   // Parse the file schema into an internal representation for schema resolution.
@@ -728,10 +728,10 @@ Status HdfsParquetScanner::NextRowGroup() {
 }
 
 void HdfsParquetScanner::FlushRowGroupResources(RowBatch* row_batch) {
-  DCHECK(row_batch != NULL);
+  DCHECK(row_batch != nullptr);
   row_batch->tuple_data_pool()->AcquireData(dictionary_pool_.get(), false);
   scratch_batch_->ReleaseResources(row_batch->tuple_data_pool());
-  context_->ReleaseCompletedResources(row_batch, true);
+  context_->ReleaseCompletedResources(nullptr, true);
   for (ParquetColumnReader* col_reader : column_readers_) {
     col_reader->Close(row_batch);
   }
@@ -1018,15 +1018,6 @@ Status HdfsParquetScanner::CommitRows(RowBatch* dst_batch, int num_rows) {
   DCHECK(dst_batch != NULL);
   dst_batch->CommitRows(num_rows);
 
-  // We need to pass the row batch to the scan node if there is too much memory attached,
-  // which can happen if the query is very selective. We need to release memory even
-  // if no rows passed predicates. We should only do this when all rows have been copied
-  // from the scratch batch, since those rows may reference completed I/O buffers in
-  // 'context_'.
-  if (scratch_batch_->AtEnd()
-      && (dst_batch->AtCapacity() || context_->num_completed_io_buffers() > 0)) {
-    context_->ReleaseCompletedResources(dst_batch, /* done */ false);
-  }
   if (context_->cancelled()) return Status::CANCELLED;
   // TODO: It's a really bad idea to propagate UDF error via the global RuntimeState.
   // Store UDF error in thread local storage or make UDF return status so it can merge
@@ -1682,15 +1673,8 @@ Status HdfsParquetScanner::InitColumns(
     DCHECK(stream != NULL);
 
     RETURN_IF_ERROR(scalar_reader->Reset(&col_chunk.meta_data, stream));
-
-    const SlotDescriptor* slot_desc = scalar_reader->slot_desc();
-    if (slot_desc == NULL || !slot_desc->type().IsStringType() ||
-        col_chunk.meta_data.codec != parquet::CompressionCodec::UNCOMPRESSED) {
-      // Non-string types are always compact.  Compressed columns don't reference data in
-      // the io buffers after tuple materialization.  In both cases, we can set compact to
-      // true and recycle buffers more promptly.
-      stream->set_contains_tuple_data(false);
-    }
+    // Parquet column readers never return tuple data with pointers into I/O buffers.
+    stream->set_contains_tuple_data(false);
   }
   DCHECK_EQ(col_ranges.size(), num_scalar_readers);
 

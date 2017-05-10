@@ -974,12 +974,14 @@ Status BaseScalarColumnReader::ReadDataPage() {
   // We're about to move to the next data page.  The previous data page is
   // now complete, free up any memory allocated for it. If the data page contained
   // strings we need to attach it to the returned batch.
-  if (CurrentPageContainsTupleData()) {
-    parent_->scratch_batch_->aux_mem_pool.AcquireData(
-        decompressed_data_pool_.get(), false);
+  if (PageContainsTupleData(page_encoding_)) {
+    parent_->scratch_batch_->aux_mem_pool.AcquireData(data_page_pool_.get(), false);
   } else {
-    decompressed_data_pool_->FreeAll();
+    data_page_pool_->FreeAll();
   }
+  // We don't hold any pointers to earlier pages in the stream - we can safely free
+  // any accumulated I/O or boundary buffers.
+  stream_->ReleaseCompletedResources(nullptr, false);
 
   // Read the next data page, skipping page types we don't care about.
   // We break out of this loop on the non-error case (a data page was found or we read all
@@ -1043,14 +1045,9 @@ Status BaseScalarColumnReader::ReadDataPage() {
     int uncompressed_size = current_page_header_.uncompressed_page_size;
     if (decompressor_.get() != NULL) {
       SCOPED_TIMER(parent_->decompress_timer_);
-      uint8_t* decompressed_buffer =
-          decompressed_data_pool_->TryAllocate(uncompressed_size);
-      if (UNLIKELY(decompressed_buffer == NULL)) {
-        string details = Substitute(PARQUET_COL_MEM_LIMIT_EXCEEDED, "ReadDataPage",
-            uncompressed_size, "decompressed data");
-        return decompressed_data_pool_->mem_tracker()->MemLimitExceeded(
-            parent_->state_, details, uncompressed_size);
-      }
+      uint8_t* decompressed_buffer;
+      RETURN_IF_ERROR(AllocateUncompressedDataPage(
+            uncompressed_size, "decompressed data", &decompressed_buffer));
       RETURN_IF_ERROR(decompressor_->ProcessBlock32(true,
           current_page_header_.compressed_page_size, data_, &uncompressed_size,
           &decompressed_buffer));
@@ -1070,6 +1067,17 @@ Status BaseScalarColumnReader::ReadDataPage() {
         return Status(Substitute("Error reading data page in file '$0'. "
             "Expected $1 bytes but got $2", filename(),
             current_page_header_.compressed_page_size, uncompressed_size));
+      }
+      if (PageContainsTupleData(current_page_header_.data_page_header.encoding)) {
+        // In this case returned batches will have pointers into the data page itself.
+        // We don't transfer disk I/O buffers out of the scanner so we need to copy
+        // the page data so that it can be attached to output batches.
+        uint8_t* copy_buffer;
+        RETURN_IF_ERROR(AllocateUncompressedDataPage(
+              uncompressed_size, "uncompressed variable-length data", &copy_buffer));
+        memcpy(copy_buffer, data_, uncompressed_size);
+        data_ = copy_buffer;
+        data_end_ = data_ + uncompressed_size;
       }
     }
 
@@ -1091,6 +1099,18 @@ Status BaseScalarColumnReader::ReadDataPage() {
     break;
   }
 
+  return Status::OK();
+}
+
+Status BaseScalarColumnReader::AllocateUncompressedDataPage(int64_t size,
+    const char* err_ctx, uint8_t** buffer) {
+  *buffer = data_page_pool_->TryAllocate(size);
+  if (*buffer == nullptr) {
+    string details =
+        Substitute(PARQUET_COL_MEM_LIMIT_EXCEEDED, "ReadDataPage", size, err_ctx);
+    return data_page_pool_->mem_tracker()->MemLimitExceeded(
+        parent_->state_, details, size);
+  }
   return Status::OK();
 }
 
