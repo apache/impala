@@ -212,6 +212,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
       const SlotDescriptor* slot_desc)
     : BaseScalarColumnReader(parent, node, slot_desc),
       dict_decoder_init_(false),
+      needs_conversion_(false),
       timezone_(NULL),
       is_timestamp_dependent_timezone_(false) {
     if (!MATERIALIZED) {
@@ -1027,8 +1028,14 @@ Status BaseScalarColumnReader::InitDictionary() {
 
 Status BaseScalarColumnReader::ReadDataPage() {
   // We're about to move to the next data page.  The previous data page is
-  // now complete, pass along the memory allocated for it.
-  parent_->scratch_batch_->mem_pool()->AcquireData(decompressed_data_pool_.get(), false);
+  // now complete, free up any memory allocated for it. If the data page contained
+  // strings we need to attach it to the returned batch.
+  if (CurrentPageContainsTupleData()) {
+    parent_->scratch_batch_->mem_pool()->AcquireData(
+        decompressed_data_pool_.get(), false);
+  } else {
+    decompressed_data_pool_->FreeAll();
+  }
 
   // Read the next data page, skipping page types we don't care about.
   // We break out of this loop on the non-error case (a data page was found or we read all

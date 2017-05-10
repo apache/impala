@@ -346,7 +346,7 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   }
 
   virtual void Close(RowBatch* row_batch) {
-    if (row_batch != nullptr) {
+    if (row_batch != nullptr && CurrentPageContainsTupleData()) {
       row_batch->tuple_data_pool()->AcquireData(decompressed_data_pool_.get(), false);
     } else {
       decompressed_data_pool_->FreeAll();
@@ -360,7 +360,6 @@ class BaseScalarColumnReader : public ParquetColumnReader {
     if (metadata_ == NULL) return THdfsCompression::NONE;
     return PARQUET_TO_IMPALA_CODEC[metadata_->codec];
   }
-  MemPool* decompressed_data_pool() const { return decompressed_data_pool_.get(); }
 
   /// Reads the next definition and repetition levels for this column. Initializes the
   /// next data page if necessary.
@@ -468,6 +467,14 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// 'size' bytes remaining.
   virtual Status InitDataPage(uint8_t* data, int size) = 0;
 
+  /// Returns true if the current data page may contain strings referenced by returned
+  /// batches. Cases where this is not true are:
+  /// * Dictionary-compressed pages, where any string data lives in 'dictionary_pool_'.
+  /// * Fixed-length slots, where there is no string data.
+  bool CurrentPageContainsTupleData() {
+    return page_encoding_ != parquet::Encoding::PLAIN_DICTIONARY
+        && slot_desc_ != nullptr && slot_desc_->type().IsStringType();
+  }
 };
 
 /// Collections are not materialized directly in parquet files; only scalar values appear
