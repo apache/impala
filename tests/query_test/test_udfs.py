@@ -30,6 +30,7 @@ from tests.common.test_dimensions import (
     create_uncompressed_text_dimension)
 from tests.util.calculation_util import get_random_id
 from tests.util.filesystem_utils import get_fs_path, IS_S3
+from tests.verifiers.metric_verifier import MetricVerifier
 
 class TestUdfBase(ImpalaTestSuite):
   """
@@ -340,6 +341,14 @@ class TestUdfExecution(TestUdfBase):
       assert False, "Query was expected to fail"
     except ImpalaBeeswaxException, e:
       self._check_exception(e)
+
+    # It takes a long time for Impala to free up memory after this test, especially if
+    # ASAN is enabled. Verify that all fragments finish executing before moving on to the
+    # next test to make sure that the next test is not affected.
+    for impalad in ImpalaCluster().impalads:
+      verifier = MetricVerifier(impalad.service)
+      verifier.wait_for_metric("impala-server.num-fragments-in-flight", 0)
+      verifier.verify_num_unused_buffers()
 
   def test_udf_constant_folding(self, vector, unique_database):
     """Test that constant folding of UDFs is handled correctly. Uses count_rows(),
