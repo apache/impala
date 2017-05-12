@@ -550,6 +550,26 @@
     "key": "impala-server.scan-ranges.total"
   },
   {
+    "description": "The total number of hedged reads attempted over the life of the process",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Hedged Read Operations",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.hedged-read-ops"
+  },
+  {
+    "description": "The total number of times hedged reads were faster than regular read operations",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Hedged Read Operations Won",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.hedged-read-ops-win"
+  },
+  {
     "description": "The local start time of the Impala Server.",
     "contexts": [
       "IMPALAD"

@@ -139,9 +139,17 @@ class ImpaladMetricKeys {
   /// Total bytes consumed for rows cached to support HS2 FETCH_FIRST.
   static const char* RESULTSET_CACHE_TOTAL_BYTES;
 
-  // Distribution of execution times for queries and DDL statements, in ms.
+  /// Distribution of execution times for queries and DDL statements, in ms.
   static const char* QUERY_DURATIONS;
   static const char* DDL_DURATIONS;
+
+  /// Total number of attempted hedged reads operations.
+  static const char* HEDGED_READ_OPS;
+
+  /// Total number of hedged reads operations that won
+  /// (i.e. returned faster than original read).
+  static const char* HEDGED_READ_OPS_WIN;
+
 };
 
 /// Global impalad-wide metrics.  This is useful for objects that want to update metrics
@@ -165,6 +173,8 @@ class ImpaladMetrics {
   static IntCounter* IO_MGR_CACHED_BYTES_READ;
   static IntCounter* IO_MGR_SHORT_CIRCUIT_BYTES_READ;
   static IntCounter* IO_MGR_BYTES_WRITTEN;
+  static IntCounter* HEDGED_READ_OPS;
+  static IntCounter* HEDGED_READ_OPS_WIN;
 
   // Gauges
   static IntGauge* CATALOG_NUM_DBS;

@@ -345,6 +345,20 @@ void DiskIoMgr::ScanRange::Close() {
         }
         hdfsFileFreeReadStatistics(stats);
       }
+
+      if (FLAGS_use_hdfs_pread) {
+        // Update Hedged Read Metrics.
+        // We call it only if the --use_hdfs_pread flag is set, to avoid having the
+        // libhdfs client malloc and free a hdfsHedgedReadMetrics object unnecessarily
+        // otherwise.
+        struct hdfsHedgedReadMetrics* hedged_metrics;
+        success = hdfsGetHedgedReadMetrics(fs_, &hedged_metrics);
+        if (success == 0) {
+          ImpaladMetrics::HEDGED_READ_OPS->set_value(hedged_metrics->hedgedReadOps);
+          ImpaladMetrics::HEDGED_READ_OPS_WIN->set_value(hedged_metrics->hedgedReadOpsWin);
+        }
+        hdfsFreeHedgedReadMetrics(hedged_metrics);
+      }
     }
     if (external_buffer_tag_ == ExternalBufferTag::CACHED_BUFFER) {
       hadoopRzBufferFree(hdfs_file_->file(), cached_buffer_);
