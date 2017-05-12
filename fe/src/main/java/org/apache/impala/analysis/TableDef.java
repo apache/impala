@@ -202,7 +202,7 @@ class TableDef {
       throw new AnalysisException(Analyzer.TBL_ALREADY_EXISTS_ERROR_MSG + getTblName());
     }
 
-    analyzer.addAccessEvent(new TAccessEvent(getTblName().toString(),
+    analyzer.addAccessEvent(new TAccessEvent(fqTableName_.toString(),
         TCatalogObjectType.TABLE, Privilege.CREATE.toString()));
 
     Preconditions.checkNotNull(options_);

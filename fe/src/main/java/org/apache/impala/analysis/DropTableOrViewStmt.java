@@ -105,7 +105,8 @@ public class DropTableOrViewStmt extends StatementBase {
       // we set it as TABLE as VIEW loading is unlikely to fail and even if it does
       // TABLE -> VIEW is a small difference.
       analyzer.addAccessEvent(new TAccessEvent(
-          tableName_.toString(), TCatalogObjectType.TABLE, Privilege.DROP.toString()));
+          analyzer.getFqTableName(tableName_).toString(), TCatalogObjectType.TABLE,
+          Privilege.DROP.toString()));
     } catch (AnalysisException e) {
       if (ifExists_ && analyzer.getMissingTbls().isEmpty()) return;
       throw e;

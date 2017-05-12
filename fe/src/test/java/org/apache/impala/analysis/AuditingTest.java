@@ -229,6 +229,13 @@ public class AuditingTest extends AnalyzerTest {
         "drop table functional.unsupported_partition_types");
     Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
         "functional.unsupported_partition_types", TCatalogObjectType.TABLE, "DROP")));
+
+    // Dropping a table without using a fully qualified path should generate the correct
+    // access event (see IMPALA-5318).
+    accessEvents = AnalyzeAccessEvents(
+        "drop table unsupported_partition_types", "functional");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
+        "functional.unsupported_partition_types", TCatalogObjectType.TABLE, "DROP")));
   }
 
   @Test
@@ -456,7 +463,12 @@ public class AuditingTest extends AnalyzerTest {
    */
   private Set<TAccessEvent> AnalyzeAccessEvents(String stmt)
       throws AuthorizationException, AnalysisException {
-    Analyzer analyzer = createAnalyzer(Catalog.DEFAULT_DB);
+    return AnalyzeAccessEvents(stmt, Catalog.DEFAULT_DB);
+  }
+
+  private Set<TAccessEvent> AnalyzeAccessEvents(String stmt, String db)
+      throws AuthorizationException, AnalysisException {
+    Analyzer analyzer = createAnalyzer(db);
     AnalyzesOk(stmt, analyzer);
     return analyzer.getAccessEvents();
   }
