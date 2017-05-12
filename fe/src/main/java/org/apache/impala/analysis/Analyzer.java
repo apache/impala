@@ -955,6 +955,8 @@ public class Analyzer {
     // SlotRefs with a scalar type are registered against the slot's
     // fully-qualified lowercase path.
     String key = slotPath.toString();
+    Preconditions.checkState(key.equals(key.toLowerCase()),
+        "Slot paths should be lower case: " + key);
     SlotDescriptor existingSlotDesc = slotPathMap_.get(key);
     if (existingSlotDesc != null) return existingSlotDesc;
     SlotDescriptor result = addSlotDescriptor(slotPath.getRootDesc());

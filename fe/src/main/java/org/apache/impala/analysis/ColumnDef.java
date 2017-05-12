@@ -353,7 +353,7 @@ public class ColumnDef {
     Integer blockSize =
         blockSize_ == null ? null : (int) ((NumericLiteral) blockSize_).getIntValue();
     KuduUtil.setColumnOptions(col, isPrimaryKey_, isNullable_, encoding_,
-        compression_, outputDefaultValue_, blockSize);
+        compression_, outputDefaultValue_, blockSize, colName_);
     if (comment_ != null) col.setComment(comment_);
     return col;
   }

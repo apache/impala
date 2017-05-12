@@ -35,6 +35,7 @@ import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -149,7 +150,7 @@ public class KuduScanNode extends ScanNode {
       throws ImpalaRuntimeException {
     Schema tableSchema = rpcTable.getSchema();
     for (SlotDescriptor desc: getTupleDesc().getSlots()) {
-      String colName = desc.getColumn().getName();
+      String colName = ((KuduColumn) desc.getColumn()).getKuduName();
       Type colType = desc.getColumn().getType();
       ColumnSchema kuduCol = null;
       try {
@@ -235,7 +236,7 @@ public class KuduScanNode extends ScanNode {
       org.apache.kudu.client.KuduTable rpcTable) {
     List<String> projectedCols = Lists.newArrayList();
     for (SlotDescriptor desc: getTupleDesc().getSlotsOrderedByOffset()) {
-      projectedCols.add(desc.getColumn().getName());
+      projectedCols.add(((KuduColumn) desc.getColumn()).getKuduName());
     }
     KuduScanTokenBuilder tokenBuilder = client.newScanTokenBuilder(rpcTable);
     tokenBuilder.setProjectedColumnNames(projectedCols);
@@ -350,7 +351,7 @@ public class KuduScanNode extends ScanNode {
     // Cannot push predicates with null literal values (KUDU-1595).
     if (literal instanceof NullLiteral) return false;
 
-    String colName = ref.getDesc().getColumn().getName();
+    String colName = ((KuduColumn) ref.getDesc().getColumn()).getKuduName();
     ColumnSchema column = table.getSchema().getColumn(colName);
     KuduPredicate kuduPredicate = null;
     switch (literal.getType().getPrimitiveType()) {
@@ -438,7 +439,7 @@ public class KuduScanNode extends ScanNode {
       values.add(value);
     }
 
-    String colName = ref.getDesc().getColumn().getName();
+    String colName = ((KuduColumn) ref.getDesc().getColumn()).getKuduName();
     ColumnSchema column = table.getSchema().getColumn(colName);
     kuduPredicates_.add(KuduPredicate.newInListPredicate(column, values));
     kuduConjuncts_.add(predicate);
@@ -461,7 +462,7 @@ public class KuduScanNode extends ScanNode {
     if (!(predicate.getChild(0) instanceof SlotRef)) return false;
     SlotRef ref = (SlotRef) predicate.getChild(0);
 
-    String colName = ref.getDesc().getColumn().getName();
+    String colName = ((KuduColumn) ref.getDesc().getColumn()).getKuduName();
     ColumnSchema column = table.getSchema().getColumn(colName);
     KuduPredicate kuduPredicate = null;
     if (predicate.isNotNull()) {

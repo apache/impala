@@ -40,6 +40,8 @@ import org.apache.kudu.ColumnSchema;
  *  - desired block size
  */
 public class KuduColumn extends Column {
+  // The name of the column as it appears in Kudu, i.e. not converted to lower case.
+  private final String kuduName_;
   private final boolean isKey_;
   private final boolean isNullable_;
   private final Encoding encoding_;
@@ -56,9 +58,10 @@ public class KuduColumn extends Column {
   private KuduColumn(String name, Type type, boolean isKey, boolean isNullable,
       Encoding encoding, CompressionAlgorithm compression, LiteralExpr defaultValue,
       int blockSize, String comment, int position) {
-    super(name, type, comment, position);
+    super(name.toLowerCase(), type, comment, position);
     Preconditions.checkArgument(defaultValue == null || type == defaultValue.getType()
         || (type.isTimestamp() && defaultValue.getType().isIntegerType()));
+    kuduName_ = name;
     isKey_ = isKey;
     isNullable_ = isNullable;
     encoding_ = encoding;
@@ -108,11 +111,12 @@ public class KuduColumn extends Column {
     }
     int blockSize = 0;
     if (column.isSetBlock_size()) blockSize = column.getBlock_size();
-    return new KuduColumn(column.getColumnName(), columnType, column.isIs_key(),
+    return new KuduColumn(column.getKudu_column_name(), columnType, column.isIs_key(),
         column.isIs_nullable(), encoding, compression, defaultValue, blockSize, null,
         position);
   }
 
+  public String getKuduName() { return kuduName_; }
   public boolean isKey() { return isKey_; }
   public boolean isNullable() { return isNullable_; }
   public Encoding getEncoding() { return encoding_; }
@@ -147,7 +151,7 @@ public class KuduColumn extends Column {
   public TColumn toThrift() {
     TColumn colDesc = new TColumn(name_, type_.toThrift());
     KuduUtil.setColumnOptions(colDesc, isKey_, isNullable_, encoding_, compression_,
-        defaultValue_, blockSize_);
+        defaultValue_, blockSize_, kuduName_);
     if (comment_ != null) colDesc.setComment(comment_);
     colDesc.setCol_stats(getStats().toThrift());
     colDesc.setPosition(position_);

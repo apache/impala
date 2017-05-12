@@ -190,6 +190,7 @@ struct TPartitionStats {
 }
 
 struct TColumn {
+  // The column name, in lower case.
   1: required string columnName
   2: required Types.TColumnType columnType
   3: optional string comment
@@ -213,6 +214,8 @@ struct TColumn {
   14: optional THdfsCompression compression
   15: optional Exprs.TExpr default_value
   16: optional i32 block_size
+  // The column name, in the case that it appears in Kudu.
+  17: optional string kudu_column_name
 }
 
 // Represents an HDFS file in a partition.

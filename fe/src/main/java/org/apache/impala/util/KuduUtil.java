@@ -83,6 +83,7 @@ public class KuduUtil {
 
   /**
    * Creates a PartialRow from a list of range partition boundary values.
+   * 'rangePartitionColumns' must be specified in Kudu case.
    */
   private static PartialRow parseRangePartitionBoundaryValues(Schema schema,
       List<String> rangePartitionColumns, List<TExpr> boundaryValues)
@@ -104,7 +105,7 @@ public class KuduUtil {
    * table. The range-partition bound consists of a PartialRow with the boundary
    * values and a RangePartitionBound indicating if the bound is inclusive or exclusive.
    * Throws an ImpalaRuntimeException if an error occurs while parsing the boundary
-   * values.
+   * values. 'rangePartitionColumns' must be specified in Kudu case.
    */
   public static Pair<PartialRow, RangePartitionBound> buildRangePartitionBound(
       Schema schema, List<String> rangePartitionColumns, List<TExpr> boundaryValues,
@@ -312,7 +313,7 @@ public class KuduUtil {
 
   public static TColumn setColumnOptions(TColumn column, boolean isKey,
       Boolean isNullable, Encoding encoding, CompressionAlgorithm compression,
-      Expr defaultValue, Integer blockSize) {
+      Expr defaultValue, Integer blockSize, String kuduName) {
     column.setIs_key(isKey);
     if (isNullable != null) column.setIs_nullable(isNullable);
     try {
@@ -330,6 +331,8 @@ public class KuduUtil {
       column.setDefault_value(defaultValue.treeToThrift());
     }
     if (blockSize != null) column.setBlock_size(blockSize);
+    Preconditions.checkNotNull(kuduName);
+    column.setKudu_column_name(kuduName);
     return column;
   }
 

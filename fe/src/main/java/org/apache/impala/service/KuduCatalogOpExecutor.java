@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.TableNotFoundException;
@@ -52,6 +53,7 @@ import org.apache.log4j.Logger;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * This is a helper for the CatalogOpExecutor to provide Kudu related DDL functionality
@@ -251,7 +253,13 @@ public class KuduCatalogOpExecutor {
       // Replace the columns in the Metastore table with the columns from the recently
       // accessed Kudu schema.
       cols.clear();
+      Set<String> lowerCaseColNames = Sets.newHashSet();
       for (ColumnSchema colSchema : kuduTable.getSchema().getColumns()) {
+        if (!lowerCaseColNames.add(colSchema.getName().toLowerCase())) {
+          throw new ImpalaRuntimeException(String.format(
+              "Error loading Kudu table: Impala does not support column names that " +
+              "differ only in casing '%s'", colSchema.getName()));
+        }
         Type type = KuduUtil.toImpalaType(colSchema.getType());
         cols.add(new FieldSchema(colSchema.getName(), type.toSql().toLowerCase(), null));
       }
@@ -339,13 +347,20 @@ public class KuduCatalogOpExecutor {
 
   private static List<Pair<PartialRow, RangePartitionBound>> getRangePartitionBounds(
       TRangePartition rangePartition, KuduTable tbl) throws ImpalaRuntimeException {
+    List<String> rangePartitioningColNames = tbl.getRangePartitioningColNames();
+    List<String> rangePartitioningKuduColNames =
+      Lists.newArrayListWithCapacity(rangePartitioningColNames.size());
+    for (String colName : rangePartitioningColNames) {
+      rangePartitioningKuduColNames.add(((KuduColumn)tbl.getColumn(colName)).getKuduName());
+    }
     return getRangePartitionBounds(rangePartition, tbl.getKuduSchema(),
-        tbl.getRangePartitioningColNames());
+        rangePartitioningKuduColNames);
   }
 
   /**
    * Returns the bounds of a range partition in two <PartialRow, RangePartitionBound>
    * pairs to be used in Kudu API calls for ALTER and CREATE TABLE statements.
+   * 'rangePartitioningColNames' must be specified in Kudu case.
    */
   private static List<Pair<PartialRow, RangePartitionBound>> getRangePartitionBounds(
       TRangePartition rangePartition, Schema schema,
@@ -388,8 +403,9 @@ public class KuduCatalogOpExecutor {
   public static void dropColumn(KuduTable tbl, String colName)
       throws ImpalaRuntimeException {
     Preconditions.checkState(!Strings.isNullOrEmpty(colName));
+    KuduColumn col = (KuduColumn) tbl.getColumn(colName);
     AlterTableOptions alterTableOptions = new AlterTableOptions();
-    alterTableOptions.dropColumn(colName);
+    alterTableOptions.dropColumn(col.getKuduName());
     String errMsg = String.format("Error dropping column %s from " +
         "Kudu table %s", colName, tbl.getName());
     alterKuduTable(tbl, alterTableOptions, errMsg);
@@ -402,8 +418,9 @@ public class KuduCatalogOpExecutor {
       throws ImpalaRuntimeException {
     Preconditions.checkState(!Strings.isNullOrEmpty(oldName));
     Preconditions.checkNotNull(newCol);
+    KuduColumn col = (KuduColumn) tbl.getColumn(oldName);
     AlterTableOptions alterTableOptions = new AlterTableOptions();
-    alterTableOptions.renameColumn(oldName, newCol.getColumnName());
+    alterTableOptions.renameColumn(col.getKuduName(), newCol.getColumnName());
     String errMsg = String.format("Error renaming column %s to %s " +
         "for Kudu table %s", oldName, newCol.getColumnName(), tbl.getName());
     alterKuduTable(tbl, alterTableOptions, errMsg);

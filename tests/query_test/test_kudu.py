@@ -555,6 +555,83 @@ class TestCreateExternalTable(KuduTestSuite):
       if kudu_client.table_exists(name):
         kudu_client.delete_table(name)
 
+  def test_column_name_case(self, cursor, kudu_client, unique_database):
+    """IMPALA-5286: Tests that an external Kudu table that was created with a column name
+       containing upper case letters is handled correctly."""
+    table_name = '%s.kudu_external_test' % unique_database
+    if kudu_client.table_exists(table_name):
+      kudu_client.delete_table(table_name)
+
+    schema_builder = SchemaBuilder()
+    key_col = 'Key'
+    schema_builder.add_column(key_col, INT64).nullable(False).primary_key()
+    schema = schema_builder.build()
+    partitioning = Partitioning().set_range_partition_columns([key_col])\
+        .add_range_partition([1], [10])
+
+    try:
+      kudu_client.create_table(table_name, schema, partitioning)
+
+      props = "tblproperties('kudu.table_name' = '%s')" % table_name
+      cursor.execute("create external table %s stored as kudu %s" % (table_name, props))
+
+      # Perform a variety of operations on the table.
+      cursor.execute("insert into %s (kEy) values (5), (1), (4)" % table_name)
+      cursor.execute("select keY from %s where KeY %% 2 = 0" % table_name)
+      assert cursor.fetchall() == [(4, )]
+      cursor.execute("select * from %s order by kEY" % (table_name))
+      assert cursor.fetchall() == [(1, ), (4, ), (5, )]
+      cursor.execute("alter table %s add range partition 11 < values < 20" % table_name)
+
+      new_key = "KEY2"
+      cursor.execute("alter table %s change KEy %s bigint" % (table_name, new_key))
+      val_col = "vaL"
+      cursor.execute("alter table %s add columns (%s bigint)" % (table_name, val_col))
+
+      cursor.execute("describe %s" % table_name)
+      results = cursor.fetchall()
+      # 'describe' should print the column name in lower case.
+      assert new_key.lower() in results[0]
+      assert val_col.lower() in results[1]
+
+      cursor.execute("alter table %s drop column Val" % table_name);
+      cursor.execute("describe %s" % table_name)
+      assert len(cursor.fetchall()) == 1
+
+      cursor.execute("alter table %s drop range partition 11 < values < 20" % table_name)
+    finally:
+      if kudu_client.table_exists(table_name):
+        kudu_client.delete_table(table_name)
+
+  def test_conflicting_column_name(self, cursor, kudu_client, unique_database):
+    """IMPALA-5283: Tests that loading an external Kudu table that was created with column
+       names that differ only in case results in an error."""
+    table_name = '%s.kudu_external_test' % unique_database
+    if kudu_client.table_exists(table_name):
+      kudu_client.delete_table(table_name)
+
+    schema_builder = SchemaBuilder()
+    col0 = 'col'
+    schema_builder.add_column(col0, INT64).nullable(False).primary_key()
+    col1 = 'COL'
+    schema_builder.add_column(col1, INT64)
+    schema = schema_builder.build()
+    partitioning = Partitioning().set_range_partition_columns([col0])\
+        .add_range_partition([1], [10])
+
+    try:
+      kudu_client.create_table(table_name, schema, partitioning)
+
+      props = "tblproperties('kudu.table_name' = '%s')" % table_name
+      cursor.execute("create external table %s stored as kudu %s" % (table_name, props))
+      assert False, 'create table should have resulted in an exception'
+    except Exception as e:
+      assert 'Error loading Kudu table: Impala does not support column names that ' \
+          + 'differ only in casing' in str(e)
+    finally:
+      if kudu_client.table_exists(table_name):
+        kudu_client.delete_table(table_name)
+
 class TestShowCreateTable(KuduTestSuite):
 
   def assert_show_create_equals(self, cursor, create_sql, show_create_sql):
