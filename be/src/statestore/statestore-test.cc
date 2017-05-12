@@ -94,4 +94,12 @@ TEST(StatestoreSslTest, SmokeTest) {
 
 }
 
-IMPALA_TEST_MAIN();
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
+  int rc = RUN_ALL_TESTS();
+  // IMPALA-5291: statestore services and subscribers may still be running at this point
+  // and accessing global state. Exit without running global destructors to avoid
+  // races with other threads when tearing down the proces.
+  _exit(rc);
+}
