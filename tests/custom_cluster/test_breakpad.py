@@ -143,14 +143,9 @@ class TestBreakpad(CustomClusterTestSuite):
   def count_all_minidumps(self, base_dir=None):
     return sum((self.count_minidumps(daemon, base_dir) for daemon in DAEMONS))
 
-  def assert_num_minidumps_for_all_daemons(self, base_dir=None):
+  def assert_num_minidumps_for_all_daemons(self, cluster_size, base_dir=None):
     self.assert_num_logfile_entries(1)
-    # IMPALA-3794 / Breakpad-681: Weak minidump ID generation can lead to name conflicts,
-    # so that one process overwrites the minidump of others. See IMPALA-3794 for more
-    # information.
-    # TODO: Change this here and elsewhere in this file to expect 'cluster_size' minidumps
-    # once Breakpad-681 has been fixed.
-    assert self.count_minidumps('impalad', base_dir) >= 1
+    assert self.count_minidumps('impalad', base_dir) == cluster_size
     assert self.count_minidumps('statestored', base_dir) == 1
     assert self.count_minidumps('catalogd', base_dir) == 1
 
@@ -169,7 +164,7 @@ class TestBreakpad(CustomClusterTestSuite):
     assert self.count_all_minidumps() == 0
     cluster_size = self.get_num_processes('impalad')
     self.kill_cluster(SIGSEGV)
-    self.assert_num_minidumps_for_all_daemons()
+    self.assert_num_minidumps_for_all_daemons(cluster_size)
 
   @pytest.mark.execute_serially
   def test_sigusr1_writes_minidump(self):
@@ -188,7 +183,7 @@ class TestBreakpad(CustomClusterTestSuite):
     self.execute_query_expect_success(client, "SELECT COUNT(*) FROM functional.alltypes")
     # Kill the cluster. Sending SIGKILL will not trigger minidumps to be written.
     self.kill_cluster(SIGKILL)
-    self.assert_num_minidumps_for_all_daemons()
+    self.assert_num_minidumps_for_all_daemons(cluster_size)
 
   @pytest.mark.execute_serially
   def test_minidump_relative_path(self):
@@ -203,7 +198,7 @@ class TestBreakpad(CustomClusterTestSuite):
     assert self.count_all_minidumps(minidump_base_dir) == 0
     cluster_size = self.get_num_processes('impalad')
     self.kill_cluster(SIGSEGV)
-    self.assert_num_minidumps_for_all_daemons(minidump_base_dir)
+    self.assert_num_minidumps_for_all_daemons(cluster_size, minidump_base_dir)
     shutil.rmtree(minidump_base_dir)
 
   @pytest.mark.execute_serially
