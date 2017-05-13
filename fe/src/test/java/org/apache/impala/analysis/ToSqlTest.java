@@ -505,11 +505,19 @@ public class ToSqlTest extends FrontendTestBase {
       // Insert hint.
       testToSql(String.format(
           "insert into functional.alltypes(int_col, bool_col) " +
-          "partition(year, month) %snoshuffle,sortby(int_col)%s " +
+          "partition(year, month) %snoshuffle%s " +
           "select int_col, bool_col, year, month from functional.alltypes",
           prefix, suffix),
           "INSERT INTO TABLE functional.alltypes(int_col, bool_col) " +
-              "PARTITION (year, month) \n-- +noshuffle,sortby(int_col)\n " +
+              "PARTITION (year, month) \n-- +noshuffle\n " +
+          "SELECT int_col, bool_col, year, month FROM functional.alltypes");
+      testToSql(String.format(
+          "insert into functional.alltypes(int_col, bool_col) " +
+          "partition(year, month) %sshuffle,clustered%s " +
+          "select int_col, bool_col, year, month from functional.alltypes",
+          prefix, suffix),
+          "INSERT INTO TABLE functional.alltypes(int_col, bool_col) " +
+              "PARTITION (year, month) \n-- +shuffle,clustered\n " +
           "SELECT int_col, bool_col, year, month FROM functional.alltypes");
 
       // Table hint

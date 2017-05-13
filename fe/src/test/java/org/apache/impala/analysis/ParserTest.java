@@ -209,13 +209,14 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("/* select 1; */ select 1");
     ParsesOk("/** select 1; */ select 1");
     ParsesOk("/* select */ select 1 /* 1 */");
-    ParsesOk("select 1 /* sortby(() */");
-    // Empty columns list in sortby hint
-    ParserError("select 1 /*+ sortby() */");
+    // Test hint with arguments
+    ParsesOk("select 1 /* hint_with_args(() */");
+    // Empty argument list in hint_with_args hint is not allowed
+    ParserError("select 1 /*+ hint_with_args() */");
     // Mismatching parentheses
-    ParserError("select 1 /*+ sortby(() */");
-    ParserError("select 1 /*+ sortby(a) \n");
-    ParserError("select 1 --+ sortby(a) */\n from t");
+    ParserError("select 1 /*+ hint_with_args(() */");
+    ParserError("select 1 /*+ hint_with_args(a) \n");
+    ParserError("select 1 --+ hint_with_args(a) */\n from t");
   }
 
   /**
@@ -237,9 +238,10 @@ public class ParserTest extends FrontendTestBase {
     ParserError("-- baz /*\nselect 1*/");
     ParsesOk("select -- blah\n 1");
     ParsesOk("select -- select 1\n 1");
-    ParsesOk("select 1 -- sortby(()");
+    // Test hint with arguments
+    ParsesOk("select 1 -- hint_with_args(()");
     // Mismatching parentheses
-    ParserError("select 1 -- +sortby(()\n");
+    ParserError("select 1 -- +hint_with_args(()\n");
   }
 
   /**
@@ -460,19 +462,20 @@ public class ParserTest extends FrontendTestBase {
 
       // Tests for hints with arguments.
       TestInsertHints(String.format(
-          "insert into t %ssortby(a)%s select * from t", prefix, suffix),
-          "sortby(a)");
+          "insert into t %shint_with_args(a)%s select * from t", prefix, suffix),
+          "hint_with_args(a)");
       TestInsertHints(String.format(
-          "insert into t %sclustered,shuffle,sortby(a)%s select * from t", prefix,
-          suffix), "clustered", "shuffle", "sortby(a)");
+          "insert into t %sclustered,shuffle,hint_with_args(a)%s select * from t", prefix,
+          suffix), "clustered", "shuffle", "hint_with_args(a)");
       TestInsertHints(String.format(
-          "insert into t %ssortby(a,b)%s select * from t", prefix, suffix),
-          "sortby(a,b)");
+          "insert into t %shint_with_args(a,b)%s select * from t", prefix, suffix),
+          "hint_with_args(a,b)");
       TestInsertHints(String.format(
-          "insert into t %ssortby(a  , b)%s select * from t", prefix, suffix),
-          "sortby(a,b)");
+          "insert into t %shint_with_args(a  , b)%s select * from t", prefix, suffix),
+          "hint_with_args(a,b)");
       ParserError(String.format(
-          "insert into t %ssortby(  a  ,  , ,,, b  )%s select * from t", prefix, suffix));
+          "insert into t %shint_with_args(  a  ,  , ,,, b  )%s select * from t",
+          prefix, suffix));
     }
     // No "+" at the beginning so the comment is not recognized as a hint.
     TestJoinHints("select * from functional.alltypes a join /* comment */" +

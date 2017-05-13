@@ -276,8 +276,8 @@ class HdfsTableSink : public DataSink {
   bool input_is_clustered_;
 
   // Stores the indices into the list of non-clustering columns of the target table that
-  // are mentioned in the 'sortby()' hint. This is used in the backend to populate the
-  // RowGroup::sorting_columns list in parquet files.
+  // are stored in the 'sort.columns' table property. This is used in the backend to
+  // populate the RowGroup::sorting_columns list in parquet files.
   const std::vector<int32_t>& sort_columns_;
 
   /// Stores the current partition during clustered inserts across subsequent row batches.

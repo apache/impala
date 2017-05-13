@@ -1952,14 +1952,14 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "tblproperties ('sort.columns'='i')", "Table definition must not contain the " +
         "sort.columns table property. Use SORT BY (...) instead.");
 
-    // Column in sortby hint must exist.
+    // Column in sort by list must exist.
     AnalysisError("create table functional.new_table (i int) sort by (j)", "Could not " +
         "find SORT BY column 'j' in table.");
 
     // Partitioned HDFS table
     AnalyzesOk("create table functional.new_table (i int) PARTITIONED BY (d decimal)" +
         "SORT BY (i)");
-    // Column in sortby hint must not be a Hdfs partition column.
+    // Column in sort by list must not be a Hdfs partition column.
     AnalysisError("create table functional.new_table (i int) PARTITIONED BY (d decimal)" +
         "SORT BY (d)", "SORT BY column list must not contain partition column: 'd'");
   }

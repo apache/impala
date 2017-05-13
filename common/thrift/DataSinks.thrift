@@ -72,8 +72,8 @@ struct THdfsTableSink {
   4: required bool input_is_clustered
 
   // Stores the indices into the list of non-clustering columns of the target table that
-  // are mentioned in the 'sortby()' hint. This is used in the backend to populate the
-  // RowGroup::sorting_columns list in parquet files.
+  // are stored in the 'sort.columns' table property. This is used in the backend to
+  // populate the RowGroup::sorting_columns list in parquet files.
   5: optional list<i32> sort_columns
 }
 

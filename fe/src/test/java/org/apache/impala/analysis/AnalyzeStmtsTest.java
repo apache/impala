@@ -1779,39 +1779,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "functional.alltypes", prefix, suffix),
           "Insert statement has 'noclustered' hint, but table has 'sort.columns' " +
           "property. The 'noclustered' hint will be ignored.");
-
-
-      // Below are tests for hints that are not supported by the legacy syntax.
-      if (prefix == "[") continue;
-
-      // Tests for sortby hint
-      AnalyzesOk(String.format("insert into functional.alltypessmall " +
-          "partition (year, month) %ssortby(int_col)%s select * from functional.alltypes",
-          prefix, suffix));
-      AnalyzesOk(String.format("insert into functional.alltypessmall " +
-          "partition (year, month) %sshuffle,clustered,sortby(int_col)%s select * from " +
-          "functional.alltypes", prefix, suffix));
-      AnalyzesOk(String.format("insert into functional.alltypessmall " +
-          "partition (year, month) %ssortby(int_col, bool_col)%s select * from " +
-          "functional.alltypes", prefix, suffix));
-      AnalyzesOk(String.format("insert into functional.alltypessmall " +
-          "partition (year, month) %sshuffle,clustered,sortby(int_col,bool_col)%s " +
-          "select * from functional.alltypes", prefix, suffix));
-      AnalyzesOk(String.format("insert into functional.alltypessmall " +
-          "partition (year, month) %sshuffle,sortby(int_col,bool_col),clustered%s " +
-          "select * from functional.alltypes", prefix, suffix));
-      AnalyzesOk(String.format("insert into functional.alltypessmall " +
-          "partition (year, month) %ssortby(int_col,bool_col),shuffle,clustered%s " +
-          "select * from functional.alltypes", prefix, suffix));
-      // Column in sortby hint must exist.
-      AnalysisError(String.format("insert into functional.alltypessmall " +
-          "partition (year, month) %ssortby(foo)%s select * from functional.alltypes",
-          prefix, suffix), "Could not find SORTBY hint column 'foo' in table.");
-      // Column in sortby hint must not be a Hdfs partition column.
-      AnalysisError(String.format("insert into functional.alltypessmall " +
-          "partition (year, month) %ssortby(year)%s select * from " +
-          "functional.alltypes", prefix, suffix),
-          "SORTBY hint column list must not contain Hdfs partition column: 'year'");
     }
 
     // Multiple non-conflicting hints and case insensitivity of hints.

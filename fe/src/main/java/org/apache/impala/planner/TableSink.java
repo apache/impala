@@ -88,7 +88,7 @@ public abstract class TableSink extends DataSink {
    * All parameters must be non-null, the lists in particular need to be empty if they
    * don't make sense for a certain table type.
    * For HDFS tables 'sortColumns' specifies the indices into the list of non-clustering
-   * columns of the target table that are mentioned in the 'sortby()' hint.
+   * columns of the target table that are stored in the 'sort.columns' table property.
    */
   public static TableSink create(Table table, Op sinkAction,
       List<Expr> partitionKeyExprs,  List<Integer> referencedColumns,
@@ -112,14 +112,14 @@ public abstract class TableSink extends DataSink {
       Preconditions.checkState(overwrite == false);
       // Referenced columns don't make sense for an HBase table.
       Preconditions.checkState(referencedColumns.isEmpty());
-      // sortby() hint is not supported for HBase tables.
+      // Sort columns are not supported for HBase tables.
       Preconditions.checkState(sortColumns.isEmpty());
       // Create the HBaseTableSink and return it.
       return new HBaseTableSink(table);
     } else if (table instanceof KuduTable) {
       // Kudu doesn't have a way to perform INSERT OVERWRITE.
       Preconditions.checkState(overwrite == false);
-      // sortby() hint is not supported for Kudu tables.
+      // Sort columns are not supported for Kudu tables.
       Preconditions.checkState(sortColumns.isEmpty());
       return new KuduTableSink(table, sinkAction, referencedColumns);
     } else {

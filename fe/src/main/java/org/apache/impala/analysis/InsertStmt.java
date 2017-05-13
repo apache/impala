@@ -136,7 +136,7 @@ public class InsertStmt extends StatementBase {
   private boolean hasNoClusteredHint_ = false;
 
   // For every column of the target table that is referenced in the optional
-  // 'sort.columns' table property or in the optional 'sortby()' hint, this list will
+  // 'sort.columns' table property, this list will
   // contain the corresponding result expr from 'resultExprs_'. Before insertion, all rows
   // will be sorted by these exprs. If the list is empty, no additional sorting by
   // non-partitioning columns will be performed. The column list must not contain
@@ -144,11 +144,8 @@ public class InsertStmt extends StatementBase {
   private List<Expr> sortExprs_ = Lists.newArrayList();
 
   // Stores the indices into the list of non-clustering columns of the target table that
-  // are mentioned in the 'sort.columns' table property or the 'sortby()' hint. This is
+  // are mentioned in the 'sort.columns' table property. This is
   // sent to the backend to populate the RowGroup::sorting_columns list in parquet files.
-  // Sort columns supersede the sortby() hint, which we will remove in a subsequent change
-  // (IMPALA-5144). Until then, it is possible to specify sort columns using both ways at
-  // the same time and the column lists will be concatenated.
   private List<Integer> sortColumns_ = Lists.newArrayList();
 
   // Output expressions that produce the final results to write to the target table. May
@@ -820,9 +817,6 @@ public class InsertStmt extends StatementBase {
       } else if (hint.is("NOCLUSTERED")) {
         hasNoClusteredHint_ = true;
         analyzer.setHasPlanHints();
-      } else if (hint.is("SORTBY")) {
-        analyzeSortByHint(hint);
-        analyzer.setHasPlanHints();
       } else {
         analyzer.addWarning("INSERT hint not recognized: " + hint);
       }
@@ -833,45 +827,6 @@ public class InsertStmt extends StatementBase {
     }
     if (hasClusteredHint_ && hasNoClusteredHint_) {
       throw new AnalysisException("Conflicting INSERT hints: clustered and noclustered");
-    }
-  }
-
-  private void analyzeSortByHint(PlanHint hint) throws AnalysisException {
-    // HBase and Kudu tables don't support insert hints at all (must be enforced by the caller).
-    Preconditions.checkState(!(table_ instanceof HBaseTable || table_ instanceof KuduTable));
-
-    List<String> columnNames = hint.getArgs();
-    Preconditions.checkState(!columnNames.isEmpty());
-    for (String columnName: columnNames) {
-      // Make sure it's not an Hdfs partition column.
-      for (Column tableColumn: table_.getClusteringColumns()) {
-        if (tableColumn.getName().equals(columnName)) {
-          throw new AnalysisException(String.format("SORTBY hint column list must " +
-              "not contain Hdfs partition column: '%s'", columnName));
-        }
-      }
-
-      // Find the matching column in the target table's column list (by name) and store
-      // the corresponding result expr in sortExprs_.
-      boolean foundColumn = false;
-      List<Column> columns = table_.getNonClusteringColumns();
-      if (!columns.isEmpty()) {
-        // We need to make a copy to make the sortColumns_ list mutable.
-        // TODO: Remove this when removing the sortby() hint (IMPALA-5157).
-        sortColumns_ = Lists.newArrayList(sortColumns_);
-      }
-      for (int i = 0; i < columns.size(); ++i) {
-        if (columns.get(i).getName().equals(columnName)) {
-          sortExprs_.add(resultExprs_.get(i));
-          sortColumns_.add(i);
-          foundColumn = true;
-          break;
-        }
-      }
-      if (!foundColumn) {
-        throw new AnalysisException(String.format("Could not find SORTBY hint column " +
-            "'%s' in table.", columnName));
-      }
     }
   }
 

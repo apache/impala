@@ -484,14 +484,15 @@ public class Planner {
   }
 
   /**
-   * Insert a sort node on top of the plan, depending on the clustered/noclustered/sortby
-   * plan hint. If clustering is enabled in insertStmt or additional columns are specified
-   * in the 'sort.columns' table property, then the ordering columns will start with the
-   * clustering columns (key columns for Kudu tables), so that partitions can be written
-   * sequentially in the table sink. Any additional non-clustering columns specified by
-   * the 'sort.columns' property will be added to the ordering columns and after any
-   * clustering columns. If no clustering is requested and the table does not contain
-   * columns in the 'sort.columns' property, then no sort node will be added to the plan.
+   * Insert a sort node on top of the plan, depending on the clustered/noclustered
+   * plan hint and on the 'sort.columns' table property. If clustering is enabled in
+   * insertStmt or additional columns are specified in the 'sort.columns' table property,
+   * then the ordering columns will start with the clustering columns (key columns for
+   * Kudu tables), so that partitions can be written sequentially in the table sink. Any
+   * additional non-clustering columns specified by the 'sort.columns' property will be
+   * added to the ordering columns and after any clustering columns. If no clustering is
+   * requested and the table does not contain columns in the 'sort.columns' property, then
+   * no sort node will be added to the plan.
    */
   public void createPreInsertSort(InsertStmt insertStmt, PlanFragment inputFragment,
        Analyzer analyzer) throws ImpalaException {

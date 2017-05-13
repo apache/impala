@@ -53,8 +53,8 @@ public class HdfsTableSink extends TableSink {
   protected final boolean inputIsClustered_;
 
   // Stores the indices into the list of non-clustering columns of the target table that
-  // are mentioned in the 'sortby()' hint. This is sent to the backend to populate the
-  // RowGroup::sorting_columns list in parquet files.
+  // are stored in the 'sort.columns' table property. This is sent to the backend to
+  // populate the RowGroup::sorting_columns list in parquet files.
   private List<Integer> sortColumns_ = Lists.newArrayList();
 
   public HdfsTableSink(Table targetTable, List<Expr> partitionKeyExprs,

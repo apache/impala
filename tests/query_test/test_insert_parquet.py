@@ -232,8 +232,8 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
       rmtree(tmp_dir)
 
   def test_sorting_columns(self, vector, unique_database, tmpdir):
-    """Tests that RowGroup::sorting_columns gets populated when specifying a sortby()
-    insert hint."""
+    """Tests that RowGroup::sorting_columns gets populated when the table has SORT BY
+    columns."""
     source_table = "functional_parquet.alltypessmall"
     target_table = "test_write_sorting_columns"
     qualified_target_table = "{0}.{1}".format(unique_database, target_table)
@@ -241,14 +241,13 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
         target_table))
 
     # Create table
-    # TODO: Simplify once IMPALA-4167 (insert hints in CTAS) has been fixed.
-    query = "create table {0} like {1} stored as parquet".format(qualified_target_table,
-        source_table)
+    query = "create table {0} sort by (int_col, id) like {1} stored as parquet".format(
+        qualified_target_table, source_table)
     self.execute_query(query)
 
     # Insert data
-    query = ("insert into {0} partition(year, month) /* +sortby(int_col, id) */ "
-        "select * from {1}").format(qualified_target_table, source_table)
+    query = ("insert into {0} partition(year, month) select * from {1}").format(
+        qualified_target_table, source_table)
     self.execute_query(query)
 
     # Download hdfs files and extract rowgroup metadata
@@ -540,7 +539,7 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
 
   def test_write_statistics_multiple_row_groups(self, vector, unique_database):
     """Test that writing multiple row groups works as expected. This is done by inserting
-    into a table using the sortby() hint and then making sure that the min and max values
+    into a table using the SORT BY clause and then making sure that the min and max values
     of row groups don't overlap."""
     source_table = "tpch_parquet.orders"
     target_table = "test_hdfs_parquet_table_writer"
@@ -551,10 +550,10 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     # Insert a large amount of data on a single backend with a limited parquet file size.
     # This will result in several files being written, exercising code that tracks
     # statistics for row groups.
-    query = "create table {0} like {1} stored as parquet".format(qualified_target_table,
-                                                                 source_table)
+    query = "create table {0} sort by (o_orderkey) like {1} stored as parquet".format(
+        qualified_target_table, source_table)
     self.execute_query(query, vector.get_value('exec_option'))
-    query = ("insert into {0} /* +sortby(o_orderkey) */ select * from {1}").format(
+    query = ("insert into {0} select * from {1}").format(
         qualified_target_table, source_table)
     vector.get_value('exec_option')['num_nodes'] = 1
     vector.get_value('exec_option')['parquet_file_size'] = 8 * 1024 * 1024
