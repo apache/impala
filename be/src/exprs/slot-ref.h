@@ -18,13 +18,24 @@
 #ifndef IMPALA_EXPRS_SLOTREF_H
 #define IMPALA_EXPRS_SLOTREF_H
 
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
 #include "runtime/descriptors.h"
 
 namespace impala {
 
+using impala_udf::BooleanVal;
+using impala_udf::TinyIntVal;
+using impala_udf::SmallIntVal;
+using impala_udf::IntVal;
+using impala_udf::BigIntVal;
+using impala_udf::FloatVal;
+using impala_udf::DoubleVal;
+using impala_udf::TimestampVal;
+using impala_udf::StringVal;
+using impala_udf::DecimalVal;
+
 /// Reference to a single slot of a tuple.
-class SlotRef : public Expr {
+class SlotRef : public ScalarExpr {
  public:
   SlotRef(const TExprNode& node);
   SlotRef(const SlotDescriptor* desc);
@@ -36,27 +47,36 @@ class SlotRef : public Expr {
   /// Used for testing.  GetValue will return tuple + offset interpreted as 'type'
   SlotRef(const ColumnType& type, int offset, const bool nullable = false);
 
-  virtual Status Prepare(
-      RuntimeState* state, const RowDescriptor& row_desc, ExprContext* context);
-  virtual std::string DebugString() const;
-  virtual int GetSlotIds(std::vector<SlotId>* slot_ids) const;
+  /// Exposed as public so AGG node can initialize its build expressions.
+  virtual Status Init(const RowDescriptor& row_desc, RuntimeState* state)
+      override WARN_UNUSED_RESULT;
+  virtual std::string DebugString() const override;
+  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn)
+      override WARN_UNUSED_RESULT;
+  virtual bool IsSlotRef() const override { return true; }
+  virtual int GetSlotIds(std::vector<SlotId>* slot_ids) const override;
   const SlotId& slot_id() const { return slot_id_; }
 
-  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn);
-
-  virtual impala_udf::BooleanVal GetBooleanVal(ExprContext* context, const TupleRow*);
-  virtual impala_udf::TinyIntVal GetTinyIntVal(ExprContext* context, const TupleRow*);
-  virtual impala_udf::SmallIntVal GetSmallIntVal(ExprContext* context, const TupleRow*);
-  virtual impala_udf::IntVal GetIntVal(ExprContext* context, const TupleRow*);
-  virtual impala_udf::BigIntVal GetBigIntVal(ExprContext* context, const TupleRow*);
-  virtual impala_udf::FloatVal GetFloatVal(ExprContext* context, const TupleRow*);
-  virtual impala_udf::DoubleVal GetDoubleVal(ExprContext* context, const TupleRow*);
-  virtual impala_udf::StringVal GetStringVal(ExprContext* context, const TupleRow*);
-  virtual impala_udf::TimestampVal GetTimestampVal(ExprContext* context, const TupleRow*);
-  virtual impala_udf::DecimalVal GetDecimalVal(ExprContext* context, const TupleRow*);
-  virtual impala_udf::CollectionVal GetCollectionVal(ExprContext* context, const TupleRow*);
-
  protected:
+  friend class ScalarExpr;
+  friend class ScalarExprEvaluator;
+
+  virtual BooleanVal GetBooleanVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual TinyIntVal GetTinyIntVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual SmallIntVal GetSmallIntVal(
+      ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual IntVal GetIntVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual BigIntVal GetBigIntVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual FloatVal GetFloatVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual DoubleVal GetDoubleVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual StringVal GetStringVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual TimestampVal GetTimestampVal(
+      ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual CollectionVal GetCollectionVal(
+      ScalarExprEvaluator*, const TupleRow*) const override;
+
+ private:
   int tuple_idx_;  // within row
   int slot_offset_;  // within tuple
   NullIndicatorOffset null_indicator_offset_;  // within tuple

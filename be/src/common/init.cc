@@ -23,7 +23,7 @@
 #include "common/logging.h"
 #include "common/status.h"
 #include "exec/kudu-util.h"
-#include "exprs/expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "gutil/atomicops.h"
 #include "rpc/authentication.h"
 #include "rpc/thrift-util.h"
@@ -235,7 +235,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     // Should not be called. We need BuiltinsInit() so the builtin symbols are
     // not stripped.
     DCHECK(false);
-    Expr::InitBuiltinsDummy();
+    ScalarExprEvaluator::InitBuiltinsDummy();
   }
 
   if (impala::KuduIsAvailable()) impala::InitKuduLogging();

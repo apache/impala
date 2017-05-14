@@ -587,7 +587,8 @@ Status Coordinator::FinalizeSuccessfulInsert() {
   // TODO: add DescriptorTbl::CreateTableDescriptor() so we can create a
   // descriptor for just the output table, calling Create() can be very
   // expensive.
-  DescriptorTbl::Create(obj_pool(), query_ctx_.desc_tbl, nullptr, &descriptor_table);
+  RETURN_IF_ERROR(
+      DescriptorTbl::Create(obj_pool(), query_ctx_.desc_tbl, &descriptor_table));
   HdfsTableDescriptor* hdfs_table = static_cast<HdfsTableDescriptor*>(
       descriptor_table->GetTableDescriptor(finalize_params_.table_id));
   DCHECK(hdfs_table != nullptr)
@@ -696,6 +697,11 @@ Status Coordinator::FinalizeSuccessfulInsert() {
       }
     }
   }
+
+  // Release resources on the descriptor table.
+  descriptor_table->ReleaseResources();
+  descriptor_table = nullptr;
+  hdfs_table = nullptr;
 
   {
     SCOPED_TIMER(ADD_CHILD_TIMER(query_profile_, "Overwrite/PartitionCreationTimer",

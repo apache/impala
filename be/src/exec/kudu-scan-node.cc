@@ -21,6 +21,7 @@
 
 #include "exec/kudu-scanner.h"
 #include "exec/kudu-util.h"
+#include "exprs/scalar-expr.h"
 #include "gutil/gscoped_ptr.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/mem-pool.h"

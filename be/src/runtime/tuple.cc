@@ -22,8 +22,8 @@
 
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
-#include "exprs/expr.h"
-#include "exprs/expr-context.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/collection-value.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
@@ -203,20 +203,20 @@ void Tuple::ConvertOffsetsToPointers(const TupleDescriptor& desc, uint8_t* tuple
 }
 
 template <bool COLLECT_STRING_VALS, bool NO_POOL>
-void Tuple::MaterializeExprs(
-    TupleRow* row, const TupleDescriptor& desc, ExprContext* const* materialize_expr_ctxs,
-    MemPool* pool, StringValue** non_null_string_values, int* total_string_lengths,
+void Tuple::MaterializeExprs(TupleRow* row, const TupleDescriptor& desc,
+    ScalarExprEvaluator* const* evals, MemPool* pool,
+    StringValue** non_null_string_values, int* total_string_lengths,
     int* num_non_null_string_values) {
   ClearNullBits(desc);
-  // Evaluate the materialize_expr_ctxs and place the results in the tuple.
+  // Evaluate the materialize_expr_evals and place the results in the tuple.
   for (int i = 0; i < desc.slots().size(); ++i) {
     SlotDescriptor* slot_desc = desc.slots()[i];
     // The FE ensures we don't get any TYPE_NULL expressions by picking an arbitrary type
     // when necessary, but does not do this for slot descs.
     // TODO: revisit this logic in the FE
     DCHECK(slot_desc->type().type == TYPE_NULL ||
-           slot_desc->type() == materialize_expr_ctxs[i]->root()->type());
-    void* src = materialize_expr_ctxs[i]->GetValue(row);
+        slot_desc->type() == evals[i]->root().type());
+    void* src = evals[i]->GetValue(row);
     if (src != NULL) {
       void* dst = GetSlot(slot_desc->tuple_offset());
       RawValue::Write(src, dst, slot_desc->type(), pool);
@@ -241,7 +241,7 @@ void Tuple::MaterializeExprs(
 // ; Function Attrs: alwaysinline
 // define void @MaterializeExprs(%"class.impala::Tuple"* %opaque_tuple,
 //     %"class.impala::TupleRow"* %row, %"class.impala::TupleDescriptor"* %desc,
-//     %"class.impala::ExprContext"** %materialize_expr_ctxs,
+//     %"class.impala::ScalarExprEvaluator"** %materialize_expr_evals,
 //     %"class.impala::MemPool"* %pool,
 //     %"struct.impala::StringValue"** %non_null_string_values,
 //     i32* %total_string_lengths, i32* %num_non_null_string_values) #34 {
@@ -291,7 +291,7 @@ void Tuple::MaterializeExprs(
 //   ret void
 // }
 Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_vals,
-    const TupleDescriptor& desc, const vector<ExprContext*>& materialize_expr_ctxs,
+    const TupleDescriptor& desc, const vector<ScalarExpr*>& slot_materialize_exprs,
     bool use_mem_pool, Function** fn) {
   // Only support 'collect_string_vals' == false for now.
   if (collect_string_vals) {
@@ -300,10 +300,10 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_
   SCOPED_TIMER(codegen->codegen_timer());
   LLVMContext& context = codegen->context();
 
-  // Codegen each compute function from materialize_expr_ctxs
-  Function* materialize_expr_fns[materialize_expr_ctxs.size()];
-  for (int i = 0; i < materialize_expr_ctxs.size(); ++i) {
-    Status status = materialize_expr_ctxs[i]->root()->GetCodegendComputeFn(codegen,
+  // Codegen each compute function from slot_materialize_exprs
+  Function* materialize_expr_fns[slot_materialize_exprs.size()];
+  for (int i = 0; i < slot_materialize_exprs.size(); ++i) {
+    Status status = slot_materialize_exprs[i]->GetCodegendComputeFn(codegen,
         &materialize_expr_fns[i]);
     if (!status.ok()) {
       stringstream ss;
@@ -315,13 +315,13 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_
   // Construct function signature (this must exactly match the actual signature since it's
   // used in xcompiled IR). With 'pool':
   // void MaterializeExprs(Tuple* tuple, TupleRow* row, TupleDescriptor* desc,
-  //     ExprContext** materialize_expr_ctxs, MemPool* pool,
+  //     ScalarExprEvaluator** slot_materialize_exprs, MemPool* pool,
   //     StringValue** non_null_string_values, int* total_string_lengths)
   PointerType* opaque_tuple_type = codegen->GetPtrType(Tuple::LLVM_CLASS_NAME);
   PointerType* row_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
   PointerType* desc_type = codegen->GetPtrType(TupleDescriptor::LLVM_CLASS_NAME);
-  PointerType* expr_ctxs_type =
-      codegen->GetPtrType(codegen->GetPtrType(ExprContext::LLVM_CLASS_NAME));
+  PointerType* expr_evals_type =
+      codegen->GetPtrType(codegen->GetPtrType(ScalarExprEvaluator::LLVM_CLASS_NAME));
   PointerType* pool_type = codegen->GetPtrType(MemPool::LLVM_CLASS_NAME);
   PointerType* string_values_type =
       codegen->GetPtrType(codegen->GetPtrType(StringValue::LLVM_CLASS_NAME));
@@ -330,7 +330,7 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_
   prototype.AddArgument("opaque_tuple", opaque_tuple_type);
   prototype.AddArgument("row", row_type);
   prototype.AddArgument("desc", desc_type);
-  prototype.AddArgument("materialize_expr_ctxs", expr_ctxs_type);
+  prototype.AddArgument("slot_materialize_exprs", expr_evals_type);
   prototype.AddArgument("pool", pool_type);
   prototype.AddArgument("non_null_string_values", string_values_type);
   prototype.AddArgument("total_string_lengths", int_ptr_type);
@@ -342,7 +342,7 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_
   Value* opaque_tuple_arg = args[0];
   Value* row_arg = args[1];
   // Value* desc_arg = args[2]; // unused
-  Value* expr_ctxs_arg = args[3];
+  Value* expr_evals_arg = args[3];
   Value* pool_arg = args[4];
   // The followings arguments are unused as 'collect_string_vals' is false.
   // Value* non_null_string_values_arg = args[5]; // unused
@@ -360,18 +360,18 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_
   // Clear tuple's null bytes
   codegen->CodegenClearNullBits(&builder, tuple, desc);
 
-  // Evaluate the materialize_expr_ctxs and place the results in the tuple.
+  // Evaluate the slot_materialize_exprs and place the results in the tuple.
   for (int i = 0; i < desc.slots().size(); ++i) {
     SlotDescriptor* slot_desc = desc.slots()[i];
     DCHECK(slot_desc->type().type == TYPE_NULL ||
-        slot_desc->type() == materialize_expr_ctxs[i]->root()->type());
+        slot_desc->type() == slot_materialize_exprs[i]->type());
 
-    // Call materialize_expr_fns[i](materialize_expr_ctxs[i], row)
-    Value* expr_ctx = codegen->CodegenArrayAt(&builder, expr_ctxs_arg, i, "expr_ctx");
-    Value* expr_args[] = { expr_ctx, row_arg };
+    // Call materialize_expr_fns[i](slot_materialize_exprs[i], row)
+    Value* expr_eval =
+        codegen->CodegenArrayAt(&builder, expr_evals_arg, i, "expr_eval");
+    Value* expr_args[] = { expr_eval, row_arg };
     CodegenAnyVal src = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
-        materialize_expr_ctxs[i]->root()->type(),
-        materialize_expr_fns[i], expr_args, "src");
+        slot_materialize_exprs[i]->type(), materialize_expr_fns[i], expr_args, "src");
 
     // Write expr result 'src' to slot
     src.WriteToSlot(*slot_desc, tuple, use_mem_pool ? pool_arg : nullptr);
@@ -384,11 +384,11 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_
 }
 
 template void Tuple::MaterializeExprs<false, false>(TupleRow*, const TupleDescriptor&,
-    ExprContext* const*, MemPool*, StringValue**, int*, int*);
+    ScalarExprEvaluator* const*, MemPool*, StringValue**, int*, int*);
 template void Tuple::MaterializeExprs<false, true>(TupleRow*, const TupleDescriptor&,
-    ExprContext* const*, MemPool*, StringValue**, int*, int*);
+    ScalarExprEvaluator* const*, MemPool*, StringValue**, int*, int*);
 template void Tuple::MaterializeExprs<true, false>(TupleRow*, const TupleDescriptor&,
-    ExprContext* const*, MemPool*, StringValue**, int*, int*);
+    ScalarExprEvaluator* const*, MemPool*, StringValue**, int*, int*);
 template void Tuple::MaterializeExprs<true, true>(TupleRow*, const TupleDescriptor&,
-    ExprContext* const*, MemPool*, StringValue**, int*, int*);
+    ScalarExprEvaluator* const*, MemPool*, StringValue**, int*, int*);
 }

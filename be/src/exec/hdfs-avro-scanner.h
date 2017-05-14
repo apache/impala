@@ -96,7 +96,7 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// Codegen DecodeAvroData(). Stores the resulting function in 'decode_avro_data_fn' if
   /// codegen was successful or NULL otherwise.
   static Status Codegen(HdfsScanNodeBase* node,
-      const std::vector<ExprContext*>& conjunct_ctxs,
+      const std::vector<ScalarExpr*>& conjuncts,
       llvm::Function** decode_avro_data_fn);
 
  protected:
@@ -199,7 +199,7 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// successful or returns an error.
   static Status CodegenDecodeAvroData(LlvmCodeGen* codegen,
       llvm::Function* materialize_tuple_fn,
-      const std::vector<ExprContext*>& conjunct_ctxs,
+      const std::vector<ScalarExpr*>& conjuncts,
       llvm::Function** decode_avro_data_fn);
 
   /// Codegens a version of MaterializeTuple() that reads records based on the table

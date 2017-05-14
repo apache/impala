@@ -20,29 +20,33 @@
 
 #include <kudu/client/client.h>
 
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
 
 namespace impala {
 
 class KuduTableDescriptor;
+class ScalarExprEvaluator;
 class TExprNode;
 class TKuduPartitionExpr;
 
 /// Expr that calls into the Kudu client to determine the partition index for rows.
 /// Returns -1 if the row doesn't have a partition or if an error is encountered.
 /// The children of this Expr produce the values for the partition columns.
-class KuduPartitionExpr : public Expr {
+class KuduPartitionExpr : public ScalarExpr {
  protected:
-  friend class Expr;
+  friend class ScalarExpr;
+  friend class ScalarExprEvaluator;
 
   KuduPartitionExpr(const TExprNode& node);
 
-  virtual Status Prepare(
-      RuntimeState* state, const RowDescriptor& row_desc, ExprContext* ctx);
+  virtual Status Init(const RowDescriptor& row_desc, RuntimeState* state)
+      override WARN_UNUSED_RESULT;
 
-  virtual IntVal GetIntVal(ExprContext* ctx, const TupleRow* row);
+  virtual IntVal GetIntVal(ScalarExprEvaluator* eval, const TupleRow* row)
+      const override;
 
-  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn);
+  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn)
+      override WARN_UNUSED_RESULT;
 
  private:
   TKuduPartitionExpr tkudu_partition_expr_;

@@ -143,8 +143,8 @@ class HdfsScanNodeBase : public ScanNode {
 
   int min_max_tuple_id() const { return min_max_tuple_id_; }
 
-  const std::vector<ExprContext*> min_max_conjunct_ctxs() const {
-    return min_max_conjunct_ctxs_;
+  const std::vector<ScalarExprEvaluator*>& min_max_conjunct_evals() const {
+    return min_max_conjunct_evals_;
   }
 
   const TupleDescriptor* min_max_tuple_desc() const { return min_max_tuple_desc_; }
@@ -155,13 +155,13 @@ class HdfsScanNodeBase : public ScanNode {
   int skip_header_line_count() const { return skip_header_line_count_; }
   DiskIoRequestContext* reader_context() { return reader_context_; }
 
-  typedef std::map<TupleId, std::vector<ExprContext*>> ConjunctsMap;
-  const ConjunctsMap& conjuncts_map() const { return conjuncts_map_; }
+  typedef std::map<TupleId, std::vector<ScalarExprEvaluator*>> ConjunctEvaluatorsMap;
+  const ConjunctEvaluatorsMap& conjuncts_map() const { return conjunct_evals_map_; }
 
   /// Slot Id => Dictionary Filter eligible conjuncts for that slot
-  typedef std::map<SlotId, std::vector<ExprContext*>> DictFilterConjunctsMap;
-  const DictFilterConjunctsMap& dict_filter_conjuncts_map() const {
-    return dict_filter_conjuncts_map_;
+  typedef std::map<TSlotId, std::vector<int32_t>> TDictFilterConjunctsMap;
+  const TDictFilterConjunctsMap* thrift_dict_filter_conjuncts_map() const {
+    return thrift_dict_filter_conjuncts_map_;
   }
 
   RuntimeProfile::HighWaterMarkCounter* max_compressed_text_file_length() {
@@ -227,7 +227,7 @@ class HdfsScanNodeBase : public ScanNode {
   /// Allocates and initializes a new template tuple allocated from pool with values
   /// from the partition columns for the current scan range, if any,
   /// Returns NULL if there are no partition keys slots.
-  Tuple* InitTemplateTuple(const std::vector<ExprContext*>& value_ctxs,
+  Tuple* InitTemplateTuple(const std::vector<ScalarExprEvaluator*>& value_evals,
       MemPool* pool, RuntimeState* state) const;
 
   /// Returns the file desc for 'filename'.  Returns NULL if filename is invalid.
@@ -293,6 +293,8 @@ class HdfsScanNodeBase : public ScanNode {
   bool PartitionPassesFilters(int32_t partition_id, const std::string& stats_name,
       const std::vector<FilterContext>& filter_ctxs);
 
+  const std::vector<ScalarExpr*>& filter_exprs() const { return filter_exprs_; }
+
   const std::vector<FilterContext>& filter_ctxs() const { return filter_ctxs_; }
 
  protected:
@@ -305,7 +307,8 @@ class HdfsScanNodeBase : public ScanNode {
   const int min_max_tuple_id_;
 
   /// Conjuncts to evaluate on parquet::Statistics.
-  vector<ExprContext*> min_max_conjunct_ctxs_;
+  vector<ScalarExpr*> min_max_conjuncts_;
+  vector<ScalarExprEvaluator*> min_max_conjunct_evals_;
 
   /// Descriptor for the tuple used to evaluate conjuncts on parquet::Statistics.
   TupleDescriptor* min_max_tuple_desc_ = nullptr;
@@ -353,10 +356,12 @@ class HdfsScanNodeBase : public ScanNode {
 
   /// Conjuncts for each materialized tuple (top-level row batch tuples and collection
   /// item tuples). Includes a copy of ExecNode.conjuncts_.
+  typedef std::map<TupleId, std::vector<ScalarExpr*>> ConjunctsMap;
   ConjunctsMap conjuncts_map_;
+  ConjunctEvaluatorsMap conjunct_evals_map_;
 
-  /// Dictionary filtering eligible conjuncts for each slot
-  DictFilterConjunctsMap dict_filter_conjuncts_map_;
+  /// Dictionary filtering eligible conjuncts for each slot.
+  const TDictFilterConjunctsMap* thrift_dict_filter_conjuncts_map_;
 
   /// Set to true when the initial scan ranges are issued to the IoMgr. This happens on
   /// the first call to GetNext(). The token manager, in a different thread, will read
@@ -374,9 +379,12 @@ class HdfsScanNodeBase : public ScanNode {
   typedef boost::unordered_map<std::vector<int>, int> PathToSlotIdxMap;
   PathToSlotIdxMap path_to_materialized_slot_idx_;
 
+  /// Expressions to evaluate the input rows for filtering against runtime filters.
+  std::vector<ScalarExpr*> filter_exprs_;
+
   /// List of contexts for expected runtime filters for this scan node. These contexts are
   /// cloned by individual scanners to be used in multi-threaded contexts, passed through
-  /// the per-scanner ScannerContext..
+  /// the per-scanner ScannerContext. Correspond to exprs in 'filter_exprs_'.
   std::vector<FilterContext> filter_ctxs_;
 
   /// is_materialized_col_[i] = <true i-th column should be materialized, false otherwise>

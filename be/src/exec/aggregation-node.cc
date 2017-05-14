@@ -28,8 +28,8 @@
 #include "codegen/llvm-codegen.h"
 #include "exec/old-hash-table.inline.h"
 #include "exprs/agg-fn-evaluator.h"
-#include "exprs/expr.h"
-#include "exprs/expr-context.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "exprs/slot-ref.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
@@ -57,42 +57,51 @@ const char* AggregationNode::LLVM_CLASS_NAME = "class.impala::AggregationNode";
 
 // TODO: pass in maximum size; enforce by setting limit in mempool
 AggregationNode::AggregationNode(ObjectPool* pool, const TPlanNode& tnode,
-                                 const DescriptorTbl& descs)
+    const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
     intermediate_tuple_id_(tnode.agg_node.intermediate_tuple_id),
-    intermediate_tuple_desc_(NULL),
+    intermediate_tuple_desc_(descs.GetTupleDescriptor(intermediate_tuple_id_)),
+    intermediate_row_desc_(pool->Add(new RowDescriptor(intermediate_tuple_desc_, false))),
     output_tuple_id_(tnode.agg_node.output_tuple_id),
-    output_tuple_desc_(NULL),
-    singleton_intermediate_tuple_(NULL),
-    codegen_process_row_batch_fn_(NULL),
-    process_row_batch_fn_(NULL),
+    output_tuple_desc_(descs.GetTupleDescriptor(output_tuple_id_)),
+    singleton_intermediate_tuple_(nullptr),
+    codegen_process_row_batch_fn_(nullptr),
+    process_row_batch_fn_(nullptr),
     needs_finalize_(tnode.agg_node.need_finalize),
-    build_timer_(NULL),
-    get_results_timer_(NULL),
-    hash_table_buckets_counter_(NULL) {
+    build_timer_(nullptr),
+    get_results_timer_(nullptr),
+    hash_table_buckets_counter_(nullptr) {
+  DCHECK_EQ(intermediate_tuple_desc_->slots().size(), output_tuple_desc_->slots().size());
 }
 
 Status AggregationNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  DCHECK(intermediate_tuple_desc_ != nullptr);
+  DCHECK(output_tuple_desc_ != nullptr);
   RETURN_IF_ERROR(ExecNode::Init(tnode, state));
-  RETURN_IF_ERROR(
-      Expr::CreateExprTrees(pool_, tnode.agg_node.grouping_exprs, &probe_expr_ctxs_));
-  for (int i = 0; i < tnode.agg_node.aggregate_functions.size(); ++i) {
-    AggFnEvaluator* evaluator;
-    RETURN_IF_ERROR(AggFnEvaluator::Create(
-        pool_, tnode.agg_node.aggregate_functions[i], &evaluator));
-    aggregate_evaluators_.push_back(evaluator);
-    ExprContext* agg_expr_ctx;
-    if (evaluator->input_expr_ctxs().size() == 1) {
-      agg_expr_ctx = evaluator->input_expr_ctxs()[0];
-    } else {
-      // CodegenUpdateSlot() can only support aggregate operator with only one ExprContext
-      // so it doesn't support operator such as group_concat. There are also aggregate
-      // operators with no ExprContext (e.g. count(*)). In cases above, 'agg_expr_ctxs_'
-      // will contain NULL for that entry.
-      DCHECK(evaluator->agg_op() == AggFnEvaluator::OTHER || evaluator->is_count_star());
-      agg_expr_ctx = NULL;
-    }
-    agg_expr_ctxs_.push_back(agg_expr_ctx);
+
+  const RowDescriptor& row_desc = child(0)->row_desc();
+  RETURN_IF_ERROR(ScalarExpr::Create(tnode.agg_node.grouping_exprs, row_desc, state,
+      &grouping_exprs_));
+  for (int i = 0; i < grouping_exprs_.size(); ++i) {
+    SlotDescriptor* desc = intermediate_tuple_desc_->slots()[i];
+    DCHECK(desc->type().type == TYPE_NULL ||
+        desc->type() == grouping_exprs_[i]->type());
+    // TODO: Generate the build exprs in the FE such that the existing logic
+    // for handling NULL_TYPE works.
+    SlotRef* build_expr = pool_->Add(desc->type().type != TYPE_NULL ?
+        new SlotRef(desc) : new SlotRef(desc, TYPE_BOOLEAN));
+    build_exprs_.push_back(build_expr);
+    RETURN_IF_ERROR(build_expr->Init(*intermediate_row_desc_, state));
+  }
+
+  int j = grouping_exprs_.size();
+  for (int i = 0; i < tnode.agg_node.aggregate_functions.size(); ++i, ++j) {
+    SlotDescriptor* intermediate_slot_desc = intermediate_tuple_desc_->slots()[j];
+    SlotDescriptor* output_slot_desc = output_tuple_desc_->slots()[j];
+    AggFn* agg_fn;
+    RETURN_IF_ERROR(AggFn::Create(tnode.agg_node.aggregate_functions[i], row_desc,
+        *intermediate_slot_desc, *output_slot_desc, state, &agg_fn));
+    agg_fns_.push_back(agg_fn);
   }
   return Status::OK();
 }
@@ -110,54 +119,15 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   hash_table_load_factor_counter_ =
       ADD_COUNTER(runtime_profile(), "LoadFactor", TUnit::DOUBLE_VALUE);
 
-  intermediate_tuple_desc_ =
-      state->desc_tbl().GetTupleDescriptor(intermediate_tuple_id_);
-  output_tuple_desc_ = state->desc_tbl().GetTupleDescriptor(output_tuple_id_);
-  DCHECK_EQ(intermediate_tuple_desc_->slots().size(),
-      output_tuple_desc_->slots().size());
-  RETURN_IF_ERROR(
-      Expr::Prepare(probe_expr_ctxs_, state, child(0)->row_desc(), expr_mem_tracker()));
-  AddExprCtxsToFree(probe_expr_ctxs_);
+  RETURN_IF_ERROR(AggFnEvaluator::Create(agg_fns_, state, pool_, agg_fn_pool_.get(),
+      &agg_fn_evals_));
+  DCHECK_EQ(agg_fns_.size(), agg_fn_evals_.size());
 
-  // Construct build exprs from intermediate_agg_tuple_desc_
-  for (int i = 0; i < probe_expr_ctxs_.size(); ++i) {
-    SlotDescriptor* desc = intermediate_tuple_desc_->slots()[i];
-    DCHECK(desc->type().type == TYPE_NULL ||
-           desc->type() == probe_expr_ctxs_[i]->root()->type());
-    // TODO: Generate the build exprs in the FE such that the existing logic
-    // for handling NULL_TYPE works.
-    // Hack to avoid TYPE_NULL SlotRefs.
-    Expr* expr = desc->type().type != TYPE_NULL ?
-        new SlotRef(desc) : new SlotRef(desc, TYPE_BOOLEAN);
-    state->obj_pool()->Add(expr);
-    build_expr_ctxs_.push_back(new ExprContext(expr));
-    state->obj_pool()->Add(build_expr_ctxs_.back());
-  }
-  // Construct a new row desc for preparing the build exprs because neither the child's
-  // nor this node's output row desc may contain the intermediate tuple, e.g.,
-  // in a single-node plan with an intermediate tuple different from the output tuple.
-  RowDescriptor build_row_desc(intermediate_tuple_desc_, false);
-  RETURN_IF_ERROR(
-      Expr::Prepare(build_expr_ctxs_, state, build_row_desc, expr_mem_tracker()));
-  AddExprCtxsToFree(build_expr_ctxs_);
-
-  int j = probe_expr_ctxs_.size();
-  for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
-    SlotDescriptor* intermediate_slot_desc = intermediate_tuple_desc_->slots()[j];
-    SlotDescriptor* output_slot_desc = output_tuple_desc_->slots()[j];
-    FunctionContext* agg_fn_ctx;
-    RETURN_IF_ERROR(aggregate_evaluators_[i]->Prepare(state, child(0)->row_desc(),
-        intermediate_slot_desc, output_slot_desc, agg_fn_pool_.get(), &agg_fn_ctx));
-    agg_fn_ctxs_.push_back(agg_fn_ctx);
-    state->obj_pool()->Add(agg_fn_ctx);
-  }
-
-  DCHECK_EQ(agg_fn_ctxs_.size(), aggregate_evaluators_.size());
   // TODO: how many buckets?
-  hash_tbl_.reset(new OldHashTable(state, build_expr_ctxs_, probe_expr_ctxs_,
-      vector<ExprContext*>(), 1, true,  vector<bool>(build_expr_ctxs_.size(), true), id(),
-      mem_tracker(), vector<RuntimeFilter*>(), true));
-
+  vector<ScalarExpr*>* filter_exprs = pool_->Add(new vector<ScalarExpr*>());
+  RETURN_IF_ERROR(OldHashTable::Create(pool_, state, build_exprs_, grouping_exprs_,
+      *filter_exprs, 1, true, vector<bool>(build_exprs_.size(), true),
+      id(), mem_tracker(), vector<RuntimeFilter*>(), &hash_tbl_, true));
   AddCodegenDisabledMessage(state);
   return Status::OK();
 }
@@ -169,11 +139,11 @@ void AggregationNode::Codegen(RuntimeState* state) {
 
   bool codegen_enabled = false;
   LlvmCodeGen* codegen = state->codegen();
-  DCHECK(codegen != NULL);
+  DCHECK(codegen != nullptr);
   Function* update_tuple_fn = CodegenUpdateTuple(codegen);
-  if (update_tuple_fn != NULL) {
+  if (update_tuple_fn != nullptr) {
     codegen_process_row_batch_fn_ = CodegenProcessRowBatch(codegen, update_tuple_fn);
-    if (codegen_process_row_batch_fn_ != NULL) {
+    if (codegen_process_row_batch_fn_ != nullptr) {
       // Update to using codegen'd process row batch.
       codegen->AddFunctionToJit(codegen_process_row_batch_fn_,
           reinterpret_cast<void**>(&process_row_batch_fn_));
@@ -186,16 +156,10 @@ void AggregationNode::Codegen(RuntimeState* state) {
 Status AggregationNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Open(state));
+  RETURN_IF_ERROR(hash_tbl_->Open(state));
+  RETURN_IF_ERROR(AggFnEvaluator::Open(agg_fn_evals_, state));
 
-  RETURN_IF_ERROR(Expr::Open(probe_expr_ctxs_, state));
-  RETURN_IF_ERROR(Expr::Open(build_expr_ctxs_, state));
-
-  DCHECK_EQ(aggregate_evaluators_.size(), agg_fn_ctxs_.size());
-  for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
-    RETURN_IF_ERROR(aggregate_evaluators_[i]->Open(state, agg_fn_ctxs_[i]));
-  }
-
-  if (probe_expr_ctxs_.empty()) {
+  if (grouping_exprs_.empty()) {
     // Create single intermediate tuple. This must happen after
     // opening the aggregate evaluators.
     singleton_intermediate_tuple_ = ConstructIntermediateTuple();
@@ -221,9 +185,9 @@ Status AggregationNode::Open(RuntimeState* state) {
         VLOG_ROW << "input row: " << PrintRow(row, children_[0]->row_desc());
       }
     }
-    if (process_row_batch_fn_ != NULL) {
+    if (process_row_batch_fn_ != nullptr) {
       process_row_batch_fn_(this, &batch);
-    } else if (probe_expr_ctxs_.empty()) {
+    } else if (grouping_exprs_.empty()) {
       ProcessRowBatchNoGrouping(&batch);
     } else {
       ProcessRowBatchWithGrouping(&batch);
@@ -260,8 +224,9 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
     return Status::OK();
   }
   *eos = false;
-  ExprContext** ctxs = &conjunct_ctxs_[0];
-  int num_ctxs = conjunct_ctxs_.size();
+  ScalarExprEvaluator* const* evals = conjunct_evals_.data();
+  int num_conjuncts = conjuncts_.size();
+  DCHECK_EQ(num_conjuncts, conjunct_evals_.size());
 
   int count = 0;
   const int N = state->batch_size();
@@ -275,11 +240,10 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
     int row_idx = row_batch->AddRow();
     TupleRow* row = row_batch->GetRow(row_idx);
     Tuple* intermediate_tuple = output_iterator_.GetTuple();
-    Tuple* output_tuple =
-        FinalizeTuple(intermediate_tuple, row_batch->tuple_data_pool());
+    Tuple* output_tuple = FinalizeTuple(intermediate_tuple, row_batch->tuple_data_pool());
     output_iterator_.Next<false>();
     row->SetTuple(0, output_tuple);
-    if (ExecNode::EvalConjuncts(ctxs, num_ctxs, row)) {
+    if (ExecNode::EvalConjuncts(evals, num_conjuncts, row)) {
       VLOG_ROW << "output row: " << PrintRow(row, row_desc());
       row_batch->CommitLastRow();
       ++num_rows_returned_;
@@ -303,35 +267,36 @@ void AggregationNode::Close(RuntimeState* state) {
   // them in order to free any memory allocated by UDAs. Finalize() requires a dst tuple
   // but we don't actually need the result, so allocate a single dummy tuple to avoid
   // accumulating memory.
-  Tuple* dummy_dst = NULL;
-  if (needs_finalize_ && output_tuple_desc_ != NULL) {
+  Tuple* dummy_dst = nullptr;
+  if (needs_finalize_ && output_tuple_desc_ != nullptr) {
     dummy_dst = Tuple::Create(output_tuple_desc_->byte_size(), tuple_pool_.get());
   }
   while (!output_iterator_.AtEnd()) {
     Tuple* tuple = output_iterator_.GetTuple();
     if (needs_finalize_) {
-      AggFnEvaluator::Finalize(aggregate_evaluators_, agg_fn_ctxs_, tuple, dummy_dst);
+      AggFnEvaluator::Finalize(agg_fn_evals_, tuple, dummy_dst);
     } else {
-      AggFnEvaluator::Serialize(aggregate_evaluators_, agg_fn_ctxs_, tuple);
+      AggFnEvaluator::Serialize(agg_fn_evals_, tuple);
     }
     output_iterator_.Next<false>();
   }
 
-  if (tuple_pool_.get() != NULL) tuple_pool_->FreeAll();
-  if (hash_tbl_.get() != NULL) hash_tbl_->Close();
+  if (tuple_pool_.get() != nullptr) tuple_pool_->FreeAll();
+  if (hash_tbl_.get() != nullptr) hash_tbl_->Close(state);
 
-  agg_expr_ctxs_.clear();
-  for (AggFnEvaluator* aggregate_evaluator : aggregate_evaluators_) {
-    aggregate_evaluator->Close(state);
-  }
-  for (FunctionContext* agg_fn_ctx : agg_fn_ctxs_) {
-    agg_fn_ctx->impl()->Close();
-  }
-  if (agg_fn_pool_.get() != NULL) agg_fn_pool_->FreeAll();
+  AggFnEvaluator::Close(agg_fn_evals_, state);
+  agg_fn_evals_.clear();
+  AggFn::Close(agg_fns_);
+  if (agg_fn_pool_.get() != nullptr) agg_fn_pool_->FreeAll();
 
-  Expr::Close(probe_expr_ctxs_, state);
-  Expr::Close(build_expr_ctxs_, state);
+  ScalarExpr::Close(grouping_exprs_);
+  ScalarExpr::Close(build_exprs_);
   ExecNode::Close(state);
+}
+
+Status AggregationNode::QueryMaintenance(RuntimeState* state) {
+  if (hash_tbl_.get() != nullptr) hash_tbl_->FreeLocalAllocations();
+  return ExecNode::QueryMaintenance(state);
 }
 
 Tuple* AggregationNode::ConstructIntermediateTuple() {
@@ -341,7 +306,7 @@ Tuple* AggregationNode::ConstructIntermediateTuple() {
       intermediate_tuple_desc_->slots().begin();
 
   // copy grouping values
-  for (int i = 0; i < probe_expr_ctxs_.size(); ++i, ++slot_desc) {
+  for (int i = 0; i < grouping_exprs_.size(); ++i, ++slot_desc) {
     if (hash_tbl_->last_expr_value_null(i)) {
       intermediate_tuple->SetNull((*slot_desc)->null_indicator_offset());
     } else {
@@ -352,9 +317,10 @@ Tuple* AggregationNode::ConstructIntermediateTuple() {
   }
 
   // Initialize aggregate output.
-  for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++slot_desc) {
-    AggFnEvaluator* evaluator = aggregate_evaluators_[i];
-    evaluator->Init(agg_fn_ctxs_[i], intermediate_tuple);
+  DCHECK_EQ(agg_fns_.size(), agg_fn_evals_.size());
+  for (int i = 0; i < agg_fns_.size(); ++i, ++slot_desc) {
+    AggFnEvaluator* eval = agg_fn_evals_[i];
+    eval->Init(intermediate_tuple);
     // Codegen specific path.
     // To minimize branching on the UpdateTuple path, initialize the result value
     // so that UpdateTuple doesn't have to check if the aggregation
@@ -370,15 +336,15 @@ Tuple* AggregationNode::ConstructIntermediateTuple() {
         (*slot_desc)->type().type != TYPE_CHAR &&
         (*slot_desc)->type().type != TYPE_DECIMAL) {
       ExprValue default_value;
-      void* default_value_ptr = NULL;
-      switch (evaluator->agg_op()) {
-        case AggFnEvaluator::MIN:
+      void* default_value_ptr = nullptr;
+      switch (agg_fns_[i]->agg_op()) {
+        case AggFn::MIN:
           default_value_ptr = default_value.SetToMax((*slot_desc)->type());
-          RawValue::Write(default_value_ptr, intermediate_tuple, *slot_desc, NULL);
+          RawValue::Write(default_value_ptr, intermediate_tuple, *slot_desc, nullptr);
           break;
-        case AggFnEvaluator::MAX:
+        case AggFn::MAX:
           default_value_ptr = default_value.SetToMin((*slot_desc)->type());
-          RawValue::Write(default_value_ptr, intermediate_tuple, *slot_desc, NULL);
+          RawValue::Write(default_value_ptr, intermediate_tuple, *slot_desc, nullptr);
           break;
         default:
           break;
@@ -389,34 +355,34 @@ Tuple* AggregationNode::ConstructIntermediateTuple() {
 }
 
 void AggregationNode::UpdateTuple(Tuple* tuple, TupleRow* row) {
-  DCHECK(tuple != NULL || aggregate_evaluators_.empty());
-  AggFnEvaluator::Add(aggregate_evaluators_, agg_fn_ctxs_, row, tuple);
+  DCHECK(tuple != nullptr || agg_fn_evals_.empty());
+  AggFnEvaluator::Add(agg_fn_evals_, row, tuple);
 }
 
 Tuple* AggregationNode::FinalizeTuple(Tuple* tuple, MemPool* pool) {
-  DCHECK(tuple != NULL || aggregate_evaluators_.empty());
-  DCHECK(output_tuple_desc_ != NULL);
+  DCHECK(tuple != nullptr || agg_fn_evals_.empty());
+  DCHECK(output_tuple_desc_ != nullptr);
 
   Tuple* dst = tuple;
   if (needs_finalize_ && intermediate_tuple_id_ != output_tuple_id_) {
     dst = Tuple::Create(output_tuple_desc_->byte_size(), pool);
   }
   if (needs_finalize_) {
-    AggFnEvaluator::Finalize(aggregate_evaluators_, agg_fn_ctxs_, tuple, dst);
+    AggFnEvaluator::Finalize(agg_fn_evals_, tuple, dst);
   } else {
-    AggFnEvaluator::Serialize(aggregate_evaluators_, agg_fn_ctxs_, tuple);
+    AggFnEvaluator::Serialize(agg_fn_evals_, tuple);
   }
   // Copy grouping values from tuple to dst.
   // TODO: Codegen this.
   if (dst != tuple) {
-    int num_grouping_slots = probe_expr_ctxs_.size();
+    int num_grouping_slots = grouping_exprs_.size();
     for (int i = 0; i < num_grouping_slots; ++i) {
       SlotDescriptor* src_slot_desc = intermediate_tuple_desc_->slots()[i];
       SlotDescriptor* dst_slot_desc = output_tuple_desc_->slots()[i];
       bool src_slot_null = tuple->IsNull(src_slot_desc->null_indicator_offset());
-      void* src_slot = NULL;
+      void* src_slot = nullptr;
       if (!src_slot_null) src_slot = tuple->GetSlot(src_slot_desc->tuple_offset());
-      RawValue::Write(src_slot, dst, dst_slot_desc, NULL);
+      RawValue::Write(src_slot, dst, dst_slot_desc, nullptr);
     }
   }
   return dst;
@@ -428,8 +394,8 @@ void AggregationNode::DebugString(int indentation_level, stringstream* out) cons
        << "intermediate_tuple_id=" << intermediate_tuple_id_
        << " output_tuple_id=" << output_tuple_id_
        << " needs_finalize=" << needs_finalize_
-       << " probe_exprs=" << Expr::DebugString(probe_expr_ctxs_)
-       << " agg_exprs=" << AggFnEvaluator::DebugString(aggregate_evaluators_);
+       << " grouping_exprs=" << ScalarExpr::DebugString(grouping_exprs_)
+       << " agg_exprs=" << AggFn::DebugString(agg_fns_);
   ExecNode::DebugString(indentation_level, out);
   *out << ")";
 }
@@ -452,29 +418,40 @@ IRFunction::Type GetHllUpdateFunction2(const ColumnType& type) {
 }
 
 // IR Generation for updating a single aggregation slot. Signature is:
-// void UpdateSlot(FunctionContext* fn_ctx, ExprContext* expr_ctx,
+// void UpdateSlot(FunctionContext* fn_ctx, ScalarExprEvaluator* expr_eval,
 //     AggTuple* agg_tuple, char** row)
 //
 // The IR for sum(double_col) is:
-// define void @UpdateSlot(%"class.impala_udf::FunctionContext"* %fn_ctx,
-//                         %"class.impala::ExprContext"* %expr_ctx,
-//                         { i8, [7 x i8], double }* %agg_tuple,
-//                         %"class.impala::TupleRow"* %row) #34 {
+//
+// define void @UpdateSlot(%"class.impala::AggFnEvaluator"* %agg_fn_eval,
+//     <{ double, i8 }>* %agg_tuple, %"class.impala::TupleRow"* %row) #32 {
 // entry:
-//   %src = call { i8, double } @GetSlotRef(%"class.impala::ExprContext"* %expr_ctx,
-//                                          %"class.impala::TupleRow"* %row)
-//   %0 = extractvalue { i8, double } %src, 0
-//   %is_null = trunc i8 %0 to i1
+//   %input_evals_vector = call %"class.impala::ScalarExprEvaluator"**
+//       @_ZNK6impala14AggFnEvaluator11input_evalsEv(
+//           %"class.impala::AggFnEvaluator"* %agg_fn_eval)
+//   %0 = getelementptr %"class.impala::ScalarExprEvaluator"*,
+//       %"class.impala::ScalarExprEvaluator"** %input_evals_vector, i32 0
+//   %input_eval = load %"class.impala::ScalarExprEvaluator"*,
+//       %"class.impala::ScalarExprEvaluator"** %0
+//   %src = call { i8, double } @GetSlotRef(
+//       %"class.impala::ScalarExprEvaluator"* %input_eval,
+//       %"class.impala::TupleRow"* %row)
+//   %1 = extractvalue { i8, double } %src, 0
+//   %is_null = trunc i8 %1 to i1
 //   br i1 %is_null, label %ret, label %src_not_null
 //
 // src_not_null:                                     ; preds = %entry
-//   %dst_slot_ptr = getelementptr inbounds { i8, [7 x i8], double },
-//       { i8, [7 x i8], double }* %agg_tuple, i32 0, i32 2
-//   call void @SetNotNull({ i8, [7 x i8], double }* %agg_tuple)
+//   %dst_slot_ptr = getelementptr inbounds <{ double, i8 }>,
+//       <{ double, i8 }>* %agg_tuple, i32 0, i32 0
+//   %2 = bitcast <{ double, i8 }>* %agg_tuple to i8*
+//   %null_byte_ptr = getelementptr inbounds i8, i8* %2, i32 8
+//   %null_byte = load i8, i8* %null_byte_ptr
+//   %null_bit_cleared = and i8 %null_byte, -2
+//   store i8 %null_bit_cleared, i8* %null_byte_ptr
 //   %dst_val = load double, double* %dst_slot_ptr
 //   %val = extractvalue { i8, double } %src, 1
-//   %1 = fadd double %dst_val, %val
-//   store double %1, double* %dst_slot_ptr
+//   %3 = fadd double %dst_val, %val
+//   store double %3, double* %dst_slot_ptr
 //   br label %ret
 //
 // ret:                                              ; preds = %src_not_null, %entry
@@ -482,156 +459,176 @@ IRFunction::Type GetHllUpdateFunction2(const ColumnType& type) {
 // }
 //
 // The IR for ndv(double_col) is:
-// define void @UpdateSlot(%"class.impala_udf::FunctionContext"* %fn_ctx,
-//                         %"class.impala::ExprContext"* %expr_ctx,
-//                         { i8, [7 x i8], %"struct.impala::StringValue" }* %agg_tuple,
-//                         %"class.impala::TupleRow"* %row) #34 {
+//
+// define void @UpdateSlot(%"class.impala::AggFnEvaluator"* %agg_fn_eval,
+//     <{ %"struct.impala::StringValue" }>* %agg_tuple,
+//     %"class.impala::TupleRow"* %row) #32 {
 // entry:
 //   %dst_lowered_ptr = alloca { i64, i8* }
-//   %src_lowered_ptr = alloca { i64, i8* }
-//   %src = call { i64, i8* } @GetSlotRef(%"class.impala::ExprContext"* %expr_ctx,
-//                                        %"class.impala::TupleRow"* %row)
-//   %0 = extractvalue { i64, i8* } %src, 0
-//   %is_null = trunc i64 %0 to i1
+//   %0 = alloca { i8, double }
+//   %input_evals_vector = call %"class.impala::ScalarExprEvaluator"**
+//       @_ZNK6impala14AggFnEvaluator11input_evalsEv(
+//           %"class.impala::AggFnEvaluator"* %agg_fn_eval)
+//   %1 = getelementptr %"class.impala::ScalarExprEvaluator"*,
+//       %"class.impala::ScalarExprEvaluator"** %input_evals_vector, i32 0
+//   %input_eval = load %"class.impala::ScalarExprEvaluator"*,
+//       %"class.impala::ScalarExprEvaluator"** %1
+//   %src = call { i8, double } @GetSlotRef(
+//       %"class.impala::ScalarExprEvaluator"* %input_eval,
+//           %"class.impala::TupleRow"* %row)
+//   %2 = extractvalue { i8, double } %src, 0
+//   %is_null = trunc i8 %2 to i1
 //   br i1 %is_null, label %ret, label %src_not_null
 //
 // src_not_null:                                     ; preds = %entry
-//   %dst_slot_ptr = getelementptr inbounds { i8, [7 x i8], %"struct.impala::StringValue" },
-//       { i8, [7 x i8], %"struct.impala::StringValue" }* %agg_tuple, i32 0, i32 2
-//   call void @SetNotNull({ i8, [7 x i8], %"struct.impala::StringValue" }* %agg_tuple)
+//   %dst_slot_ptr = getelementptr inbounds <{ %"struct.impala::StringValue" }>,
+//       <{ %"struct.impala::StringValue" }>* %agg_tuple, i32 0, i32 0
 //   %dst_val =
 //       load %"struct.impala::StringValue", %"struct.impala::StringValue"* %dst_slot_ptr
-//   store { i64, i8* } %src, { i64, i8* }* %src_lowered_ptr
-//   %src_unlowered_ptr =
-//       bitcast { i64, i8* }* %src_lowered_ptr to %"struct.impala_udf::StringVal"*
+//   store { i8, double } %src, { i8, double }* %0
+//   %src_unlowered_ptr = bitcast { i8, double }* %0 to %"struct.impala_udf::DoubleVal"*
 //   %ptr = extractvalue %"struct.impala::StringValue" %dst_val, 0
 //   %dst_stringval = insertvalue { i64, i8* } zeroinitializer, i8* %ptr, 1
 //   %len = extractvalue %"struct.impala::StringValue" %dst_val, 1
-//   %1 = extractvalue { i64, i8* } %dst_stringval, 0
-//   %2 = zext i32 %len to i64
-//   %3 = shl i64 %2, 32
-//   %4 = and i64 %1, 4294967295
-//   %5 = or i64 %4, %3
-//   %dst_stringval1 = insertvalue { i64, i8* } %dst_stringval, i64 %5, 0
+//   %3 = extractvalue { i64, i8* } %dst_stringval, 0
+//   %4 = zext i32 %len to i64
+//   %5 = shl i64 %4, 32
+//   %6 = and i64 %3, 4294967295
+//   %7 = or i64 %6, %5
+//   %dst_stringval1 = insertvalue { i64, i8* } %dst_stringval, i64 %7, 0
 //   store { i64, i8* } %dst_stringval1, { i64, i8* }* %dst_lowered_ptr
 //   %dst_unlowered_ptr =
 //       bitcast { i64, i8* }* %dst_lowered_ptr to %"struct.impala_udf::StringVal"*
-//   call void @HllMerge(%"class.impala_udf::FunctionContext"* %fn_ctx,
-//                       %"struct.impala_udf::StringVal"* %src_unlowered_ptr,
-//                       %"struct.impala_udf::StringVal"* %dst_unlowered_ptr)
+//   %agg_fn_ctx_arg = call %"class.impala_udf::FunctionContext"*
+//       @_ZNK6impala14AggFnEvaluator10agg_fn_ctxEv(
+//            %"class.impala::AggFnEvaluator"* %agg_fn_eval)
+//   call void
+//       @_ZN6impala18AggregateFunctions9HllUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE(
+//           %"class.impala_udf::FunctionContext"* %agg_fn_ctx_arg,
+//           %"struct.impala_udf::DoubleVal"* %src_unlowered_ptr,
+//           %"struct.impala_udf::StringVal"* %dst_unlowered_ptr)
 //   %anyval_result = load { i64, i8* }, { i64, i8* }* %dst_lowered_ptr
-//   %6 = extractvalue { i64, i8* } %anyval_result, 0
-//   %7 = ashr i64 %6, 32
-//   %8 = trunc i64 %7 to i32
-//   %9 = insertvalue %"struct.impala::StringValue" zeroinitializer, i32 %8, 1
-//   %10 = extractvalue { i64, i8* } %anyval_result, 1
-//   %11 = insertvalue %"struct.impala::StringValue" %9, i8* %10, 0
-//   store %"struct.impala::StringValue" %11, %"struct.impala::StringValue"* %dst_slot_ptr
+//   %8 = extractvalue { i64, i8* } %anyval_result, 0
+//   %9 = ashr i64 %8, 32
+//   %10 = trunc i64 %9 to i32
+//   %11 = insertvalue %"struct.impala::StringValue" zeroinitializer, i32 %10, 1
+//   %12 = extractvalue { i64, i8* } %anyval_result, 1
+//   %13 = insertvalue %"struct.impala::StringValue" %11, i8* %12, 0
+//   store %"struct.impala::StringValue" %13, %"struct.impala::StringValue"* %dst_slot_ptr
 //   br label %ret
 //
 // ret:                                              ; preds = %src_not_null, %entry
 //   ret void
 // }
+//
 llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
-    AggFnEvaluator* evaluator, SlotDescriptor* slot_desc) {
+    int agg_fn_idx, SlotDescriptor* slot_desc) {
+  AggFn* agg_fn = agg_fns_[agg_fn_idx];
+  ScalarExpr* input_expr = agg_fn->GetChild(0);
   // TODO: Fix this DCHECK and Init() once CodegenUpdateSlot() can handle AggFnEvaluator
   // with multiple input expressions (e.g. group_concat).
-  DCHECK_EQ(evaluator->input_expr_ctxs().size(), 1);
-  ExprContext* input_expr_ctx = evaluator->input_expr_ctxs()[0];
-  Expr* input_expr = input_expr_ctx->root();
+  DCHECK_EQ(agg_fn->GetNumChildren(), 1);
   // TODO: implement timestamp
-  if (input_expr->type().type == TYPE_TIMESTAMP) return NULL;
-  Function* agg_expr_fn;
-  Status status = input_expr->GetCodegendComputeFn(codegen, &agg_expr_fn);
+  if (input_expr->type().type == TYPE_TIMESTAMP) return nullptr;
+
+  // Codegen the input expression's GetValue() function.
+  llvm::Function* input_expr_fn;
+  Status status = input_expr->GetCodegendComputeFn(codegen, &input_expr_fn);
   if (!status.ok()) {
     VLOG_QUERY << "Could not codegen UpdateSlot(): " << status.GetDetail();
-    return NULL;
+    return nullptr;
   }
-  DCHECK(agg_expr_fn != NULL);
+  DCHECK(input_expr_fn != nullptr);
 
-  PointerType* fn_ctx_ptr_type =
-      codegen->GetPtrType(FunctionContextImpl::LLVM_FUNCTIONCONTEXT_NAME);
-  PointerType* expr_ctx_ptr_type = codegen->GetPtrType(ExprContext::LLVM_CLASS_NAME);
+  // Create the types of the UpdateSlot()'s arguments.
+  PointerType* agg_fn_eval_type =
+      codegen->GetPtrType(AggFnEvaluator::LLVM_CLASS_NAME);
   StructType* tuple_struct = intermediate_tuple_desc_->GetLlvmStruct(codegen);
-  if (tuple_struct == NULL) {
+  if (tuple_struct == nullptr) {
     VLOG_QUERY << "Could not codegen UpdateSlot(): could not generate tuple struct.";
-    return NULL;
+    return nullptr;
   }
   PointerType* tuple_ptr_type = codegen->GetPtrType(tuple_struct);
   PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
 
-  // Create UpdateSlot prototype
+  // Create UpdateSlot() prototype
   LlvmCodeGen::FnPrototype prototype(codegen, "UpdateSlot", codegen->void_type());
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("fn_ctx", fn_ctx_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("expr_ctx", expr_ctx_ptr_type));
+  prototype.AddArgument(
+      LlvmCodeGen::NamedVariable("agg_fn_eval", agg_fn_eval_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("agg_tuple", tuple_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
 
   LlvmBuilder builder(codegen->context());
-  Value* args[4];
+  Value* args[3];
   Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
-  Value* fn_ctx_arg = args[0];
-  Value* expr_ctx_arg = args[1];
-  Value* agg_tuple_arg = args[2];
-  Value* row_arg = args[3];
+  Value* agg_fn_eval_arg = args[0];
+  Value* agg_tuple_arg = args[1];
+  Value* row_arg = args[2];
 
   BasicBlock* src_not_null_block =
       BasicBlock::Create(codegen->context(), "src_not_null", fn);
   BasicBlock* ret_block = BasicBlock::Create(codegen->context(), "ret", fn);
 
+  // Get the first input expression's evaluator. This assumes there is only one
+  // input to the agg_fn. See DCHECK at the beginning of this function for it.
+  Value* input_evals_vector = codegen->CodegenCallFunction(&builder,
+      IRFunction::AGG_FN_EVALUATOR_INPUT_EVALUATORS, agg_fn_eval_arg,
+      "input_evals_vector");
+  Value* input_eval =
+      codegen->CodegenArrayAt(&builder, input_evals_vector, 0, "input_eval");
+
   // Call expr function to get src slot value
-  Value* agg_expr_fn_args[] = { expr_ctx_arg, row_arg };
-  CodegenAnyVal src = CodegenAnyVal::CreateCallWrapped(
-      codegen, &builder, input_expr->type(), agg_expr_fn, agg_expr_fn_args, "src");
+  CodegenAnyVal src = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
+      input_expr->type(), input_expr_fn, {input_eval, row_arg}, "src");
 
   Value* src_is_null = src.GetIsNull();
   builder.CreateCondBr(src_is_null, ret_block, src_not_null_block);
 
   // Src slot is not null, update dst_slot
   builder.SetInsertPoint(src_not_null_block);
-  Value* dst_ptr = builder.CreateStructGEP(NULL, agg_tuple_arg,
+  Value* dst_ptr = builder.CreateStructGEP(nullptr, agg_tuple_arg,
       slot_desc->llvm_field_idx(), "dst_slot_ptr");
-  Value* result = NULL;
+  Value* result = nullptr;
 
   if (slot_desc->is_nullable()) {
-    // Dst is NULL, just update dst slot to src slot and clear null bit
+    // Dst is nullptr, just update dst slot to src slot and clear null bit
     slot_desc->CodegenSetNullIndicator(
         codegen, &builder, agg_tuple_arg, codegen->false_value());
   }
 
   // Update the slot
   Value* dst_value = builder.CreateLoad(dst_ptr, "dst_val");
-  switch (evaluator->agg_op()) {
-    case AggFnEvaluator::COUNT:
-      if (evaluator->is_merge()) {
+  switch (agg_fn->agg_op()) {
+    case AggFn::COUNT:
+      if (agg_fn->is_merge()) {
         result = builder.CreateAdd(dst_value, src.GetVal(), "count_sum");
       } else {
         result = builder.CreateAdd(dst_value,
             codegen->GetIntConstant(TYPE_BIGINT, 1), "count_inc");
       }
       break;
-    case AggFnEvaluator::MIN: {
+    case AggFn::MIN: {
       Function* min_fn = codegen->CodegenMinMax(slot_desc->type(), true);
       Value* min_args[] = { dst_value, src.GetVal() };
       result = builder.CreateCall(min_fn, min_args, "min_value");
       break;
     }
-    case AggFnEvaluator::MAX: {
+    case AggFn::MAX: {
       Function* max_fn = codegen->CodegenMinMax(slot_desc->type(), false);
       Value* max_args[] = { dst_value, src.GetVal() };
       result = builder.CreateCall(max_fn, max_args, "max_value");
       break;
     }
-    case AggFnEvaluator::SUM:
+    case AggFn::SUM:
       if (slot_desc->type().type == TYPE_FLOAT || slot_desc->type().type == TYPE_DOUBLE) {
         result = builder.CreateFAdd(dst_value, src.GetVal());
       } else {
         result = builder.CreateAdd(dst_value, src.GetVal());
       }
       break;
-    case AggFnEvaluator::NDV: {
+    case AggFn::NDV: {
       DCHECK_EQ(slot_desc->type().type, TYPE_STRING);
-      IRFunction::Type ir_function_type = evaluator->is_merge() ? IRFunction::HLL_MERGE
+      IRFunction::Type ir_function_type = agg_fn->is_merge() ? IRFunction::HLL_MERGE
                                           : GetHllUpdateFunction2(input_expr->type());
       Function* hll_fn = codegen->GetFunction(ir_function_type, false);
 
@@ -643,6 +640,7 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
       CodegenAnyVal dst_stringval =
           CodegenAnyVal::GetNonNullVal(codegen, &builder, TYPE_STRING, "dst_stringval");
       dst_stringval.SetFromRawValue(dst_value);
+
       // Create pointer to dst_stringval to pass to HllUpdate() function. We must use
       // the unlowered type.
       Value* dst_lowered_ptr = dst_stringval.GetLoweredPtr("dst_lowered_ptr");
@@ -651,9 +649,13 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
       Value* dst_unlowered_ptr = builder.CreateBitCast(
           dst_lowered_ptr, dst_unlowered_ptr_type, "dst_unlowered_ptr");
 
+      // Get the FunctionContext object for the AggFnEvaluator.
+      Value* agg_fn_ctx_arg = codegen->CodegenCallFunction(&builder,
+          IRFunction::AGG_FN_EVALUATOR_AGG_FN_CTX, agg_fn_eval_arg,
+          "agg_fn_ctx_arg");
+
       // Call 'hll_fn'
-      builder.CreateCall(
-          hll_fn, ArrayRef<Value*>({fn_ctx_arg, src_unlowered_ptr, dst_unlowered_ptr}));
+      builder.CreateCall(hll_fn, {agg_fn_ctx_arg, src_unlowered_ptr, dst_unlowered_ptr});
 
       // Convert StringVal intermediate 'dst_arg' back to StringValue
       Value* anyval_result = builder.CreateLoad(dst_lowered_ptr, "anyval_result");
@@ -662,7 +664,7 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
       break;
     }
     default:
-      DCHECK(false) << "bad aggregate operator: " << evaluator->agg_op();
+      DCHECK(false) << "bad aggregate operator: " << agg_fn->agg_op();
   }
 
   builder.CreateStore(result, dst_ptr);
@@ -680,69 +682,62 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
 // For the query:
 // select count(*), count(int_col), sum(double_col) the IR looks like:
 //
-// ; Function Attrs: alwaysinline
 // define void @UpdateTuple(%"class.impala::AggregationNode"* %this_ptr,
-//                          %"class.impala::Tuple"* %agg_tuple,
-//                          %"class.impala::TupleRow"* %tuple_row) #34 {
+//     %"class.impala::Tuple"* %agg_tuple, %"class.impala::TupleRow"* %tuple_row) #32 {
 // entry:
-//   %tuple =
-//       bitcast %"class.impala::Tuple"* %agg_tuple to { i8, [7 x i8], i64, i64, double }*
-//   %src_slot = getelementptr inbounds { i8, [7 x i8], i64, i64, double },
-//       { i8, [7 x i8], i64, i64, double }* %tuple, i32 0, i32 2
+//   %tuple = bitcast %"class.impala::Tuple"* %agg_tuple to <{ i64, i64, double, i8 }>*
+//   %agg_fn_evals = call %"class.impala::AggFnEvaluator"**
+//       @_ZNK6impala15AggregationNode12agg_fn_evalsEv(
+//           %"class.impala::AggregationNode"* %this_ptr)
+//   %src_slot = getelementptr inbounds <{ i64, i64, double, i8 }>,
+//       <{ i64, i64, double, i8 }>* %tuple, i32 0, i32 0
 //   %count_star_val = load i64, i64* %src_slot
 //   %count_star_inc = add i64 %count_star_val, 1
 //   store i64 %count_star_inc, i64* %src_slot
-//   %0 = call %"class.impala_udf::FunctionContext"*
-//       @_ZNK6impala15AggregationNode11GetAggFnCtxEi(
-//           %"class.impala::AggregationNode"* %this_ptr, i32 1)
-//   %1 = call %"class.impala::ExprContext"*
-//       @_ZNK6impala15AggregationNode13GetAggExprCtxEi(
-//           %"class.impala::AggregationNode"* %this_ptr, i32 1)
-//   call void @UpdateSlot(%"class.impala_udf::FunctionContext"* %0,
-//                         %"class.impala::ExprContext"* %1,
-//                         { i8, [7 x i8], i64, i64, double }* %tuple,
-//                         %"class.impala::TupleRow"* %tuple_row)
-//   %2 = call %"class.impala_udf::FunctionContext"*
-//       @_ZNK6impala15AggregationNode11GetAggFnCtxEi(
-//           %"class.impala::AggregationNode"* %this_ptr, i32 2)
-//   %3 = call %"class.impala::ExprContext"*
-//       @_ZNK6impala15AggregationNode13GetAggExprCtxEi(
-//           %"class.impala::AggregationNode"* %this_ptr, i32 2)
-//   call void @UpdateSlot.3(%"class.impala_udf::FunctionContext"* %2,
-//                           %"class.impala::ExprContext"* %3,
-//                           { i8, [7 x i8], i64, i64, double }* %tuple,
-//                           %"class.impala::TupleRow"* %tuple_row)
+//   %0 = getelementptr %"class.impala::AggFnEvaluator"*,
+//       %"class.impala::AggFnEvaluator"** %agg_fn_evals, i32 1
+//   %agg_fn_eval =
+//       load %"class.impala::AggFnEvaluator"*, %"class.impala::AggFnEvaluator"** %0
+//   call void @UpdateSlot(%"class.impala::AggFnEvaluator"* %agg_fn_eval,
+//       <{ i64, i64, double, i8 }>* %tuple, %"class.impala::TupleRow"* %tuple_row)
+//   %1 = getelementptr %"class.impala::AggFnEvaluator"*,
+//       %"class.impala::AggFnEvaluator"** %agg_fn_evals, i32 2
+//   %agg_fn_eval1 =
+//       load %"class.impala::AggFnEvaluator"*, %"class.impala::AggFnEvaluator"** %1
+//   call void @UpdateSlot.3(%"class.impala::AggFnEvaluator"* %agg_fn_eval1,
+//       <{ i64, i64, double, i8 }>* %tuple, %"class.impala::TupleRow"* %tuple_row)
 //   ret void
 // }
+//
 Function* AggregationNode::CodegenUpdateTuple(LlvmCodeGen* codegen) {
   SCOPED_TIMER(codegen->codegen_timer());
 
-  int j = probe_expr_ctxs_.size();
-  for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
+  int j = grouping_exprs_.size();
+  for (int i = 0; i < agg_fns_.size(); ++i, ++j) {
     SlotDescriptor* slot_desc = intermediate_tuple_desc_->slots()[j];
-    AggFnEvaluator* evaluator = aggregate_evaluators_[i];
+    AggFn* agg_fn = agg_fns_[i];
 
     // Timestamp and char are never supported. NDV supports decimal and string but no
     // other functions.
     // TODO: the other aggregate functions might work with decimal as-is
     if (slot_desc->type().type == TYPE_TIMESTAMP || slot_desc->type().type == TYPE_CHAR ||
-        (evaluator->agg_op() != AggFnEvaluator::NDV &&
+        (agg_fn->agg_op() != AggFn::NDV &&
          (slot_desc->type().type == TYPE_DECIMAL ||
           slot_desc->type().type == TYPE_STRING ||
           slot_desc->type().type == TYPE_VARCHAR))) {
       VLOG_QUERY << "Could not codegen UpdateIntermediateTuple because "
                  << "string, char, timestamp and decimal are not yet supported.";
-      return NULL;
+      return nullptr;
     }
 
     // Don't codegen things that aren't builtins (for now)
-    if (!evaluator->is_builtin()) return NULL;
+    if (!agg_fn->is_builtin()) return nullptr;
   }
 
-  if (intermediate_tuple_desc_->GetLlvmStruct(codegen) == NULL) {
+  if (intermediate_tuple_desc_->GetLlvmStruct(codegen) == nullptr) {
     VLOG_QUERY << "Could not codegen UpdateTuple because we could"
                << "not generate a matching llvm struct for the intermediate tuple.";
-    return NULL;
+    return nullptr;
   }
 
   // Get the types to match the UpdateTuple signature
@@ -750,9 +745,9 @@ Function* AggregationNode::CodegenUpdateTuple(LlvmCodeGen* codegen) {
   Type* agg_tuple_type = codegen->GetType(Tuple::LLVM_CLASS_NAME);
   Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
 
-  DCHECK(agg_node_type != NULL);
-  DCHECK(agg_tuple_type != NULL);
-  DCHECK(tuple_row_type != NULL);
+  DCHECK(agg_node_type != nullptr);
+  DCHECK(agg_tuple_type != nullptr);
+  DCHECK(tuple_row_type != nullptr);
 
   PointerType* agg_node_ptr_type = codegen->GetPtrType(agg_node_type);
   PointerType* agg_tuple_ptr_type = codegen->GetPtrType(agg_tuple_type);
@@ -760,12 +755,12 @@ Function* AggregationNode::CodegenUpdateTuple(LlvmCodeGen* codegen) {
 
   // Signature for UpdateTuple is
   // void UpdateTuple(AggregationNode* this, FunctionContext** fn_ctx,
-  //     ExprContext** expr_ctx, Tuple* tuple, TupleRow* row)
+  //     ScalarExprEvaluator** expr_eval, Tuple* tuple, TupleRow* row)
   // This signature needs to match the non-codegen'd signature exactly.
   StructType* tuple_struct = intermediate_tuple_desc_->GetLlvmStruct(codegen);
-  if (tuple_struct == NULL) {
+  if (tuple_struct == nullptr) {
     VLOG_QUERY << "Could not codegen UpdateSlot(): could not generate tuple struct.";
-    return NULL;
+    return nullptr;
   }
   PointerType* tuple_ptr = PointerType::get(tuple_struct, 0);
   LlvmCodeGen::FnPrototype prototype(codegen, "UpdateTuple", codegen->void_type());
@@ -783,40 +778,35 @@ Function* AggregationNode::CodegenUpdateTuple(LlvmCodeGen* codegen) {
   Value* agg_tuple_arg = builder.CreateBitCast(args[1], tuple_ptr, "tuple");
   Value* row_arg = args[2];
 
-  Function* get_fn_ctx_fn = codegen->GetFunction(IRFunction::AGG_NODE_GET_FN_CTX, false);
-  DCHECK(get_fn_ctx_fn != NULL);
-  Function* get_expr_ctx_fn =
-      codegen->GetFunction(IRFunction::AGG_NODE_GET_EXPR_CTX, false);
-  DCHECK(get_expr_ctx_fn != NULL);
+  // Load &agg_fn_evals_[0]
+  Value* agg_fn_evals_vector = codegen->CodegenCallFunction(&builder,
+      IRFunction::AGG_NODE_GET_AGG_FN_EVALUATORS, this_arg, "agg_fn_evals");
 
-  // Loop over each expr and generate the IR for that slot.  If the expr is not
+  // Loop over each expr and generate the IR for that slot. If the expr is not
   // count(*), generate a helper IR function to update the slot and call that.
-  j = probe_expr_ctxs_.size();
-  for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
+  j = grouping_exprs_.size();
+  for (int i = 0; i < agg_fns_.size(); ++i, ++j) {
     SlotDescriptor* slot_desc = intermediate_tuple_desc_->slots()[j];
-    AggFnEvaluator* evaluator = aggregate_evaluators_[i];
-    if (evaluator->is_count_star()) {
+    AggFn* agg_fn = agg_fns_[i];
+    if (agg_fn->is_count_star()) {
       // TODO: we should be able to hoist this up to the loop over the batch and just
       // increment the slot by the number of rows in the batch.
       int field_idx = slot_desc->llvm_field_idx();
       Value* const_one = codegen->GetIntConstant(TYPE_BIGINT, 1);
-      Value* slot_ptr = builder.CreateStructGEP(NULL, agg_tuple_arg, field_idx,
+      Value* slot_ptr = builder.CreateStructGEP(nullptr, agg_tuple_arg, field_idx,
           "src_slot");
       Value* slot_loaded = builder.CreateLoad(slot_ptr, "count_star_val");
       Value* count_inc = builder.CreateAdd(slot_loaded, const_one, "count_star_inc");
       builder.CreateStore(count_inc, slot_ptr);
     } else {
-      Function* update_slot_fn = CodegenUpdateSlot(codegen, evaluator, slot_desc);
-      if (update_slot_fn == NULL) return NULL;
-      // Call GetAggFnCtx() to get the function context.
-      Value* get_fn_ctx_args[] = { this_arg, codegen->GetIntConstant(TYPE_INT, i) };
-      Value* fn_ctx = builder.CreateCall(get_fn_ctx_fn, get_fn_ctx_args);
-      // Call GetAggExprCtx() to get the expression context.
-      DCHECK(agg_expr_ctxs_[i] != NULL);
-      Value* get_expr_ctx_args[] = { this_arg, codegen->GetIntConstant(TYPE_INT, i) };
-      Value* expr_ctx = builder.CreateCall(get_expr_ctx_fn, get_expr_ctx_args);
-      Value* update_slot_args[] = { fn_ctx, expr_ctx, agg_tuple_arg, row_arg };
-      builder.CreateCall(update_slot_fn, update_slot_args);
+      Function* update_slot_fn = CodegenUpdateSlot(codegen, i, slot_desc);
+      if (update_slot_fn == nullptr) return nullptr;
+
+      // Load agg_fn_evals_[i]
+      DCHECK(agg_fn_evals_[i] != nullptr);
+      Value* agg_fn_eval_arg = codegen->CodegenArrayAt(
+          &builder, agg_fn_evals_vector, i, "agg_fn_eval");
+      builder.CreateCall(update_slot_fn, {agg_fn_eval_arg, agg_tuple_arg, row_arg});
     }
   }
   builder.CreateRetVoid();
@@ -828,38 +818,38 @@ Function* AggregationNode::CodegenUpdateTuple(LlvmCodeGen* codegen) {
 Function* AggregationNode::CodegenProcessRowBatch(LlvmCodeGen* codegen,
     Function* update_tuple_fn) {
   SCOPED_TIMER(codegen->codegen_timer());
-  DCHECK(update_tuple_fn != NULL);
+  DCHECK(update_tuple_fn != nullptr);
 
   // Get the cross compiled update row batch function
-  IRFunction::Type ir_fn = (!probe_expr_ctxs_.empty() ?
+  IRFunction::Type ir_fn = (!grouping_exprs_.empty() ?
       IRFunction::AGG_NODE_PROCESS_ROW_BATCH_WITH_GROUPING :
       IRFunction::AGG_NODE_PROCESS_ROW_BATCH_NO_GROUPING);
   Function* process_batch_fn = codegen->GetFunction(ir_fn, true);
 
-  if (process_batch_fn == NULL) {
+  if (process_batch_fn == nullptr) {
     LOG(ERROR) << "Could not find AggregationNode::ProcessRowBatch in module.";
-    return NULL;
+    return nullptr;
   }
 
   int replaced;
-  if (!probe_expr_ctxs_.empty()) {
+  if (!grouping_exprs_.empty()) {
     // Aggregation w/o grouping does not use a hash table.
 
     // Codegen for hash
     Function* hash_fn = hash_tbl_->CodegenHashCurrentRow(codegen);
-    if (hash_fn == NULL) return NULL;
+    if (hash_fn == nullptr) return nullptr;
 
     // Codegen HashTable::Equals
     Function* equals_fn = hash_tbl_->CodegenEquals(codegen);
-    if (equals_fn == NULL) return NULL;
+    if (equals_fn == nullptr) return nullptr;
 
     // Codegen for evaluating build rows
     Function* eval_build_row_fn = hash_tbl_->CodegenEvalTupleRow(codegen, true);
-    if (eval_build_row_fn == NULL) return NULL;
+    if (eval_build_row_fn == nullptr) return nullptr;
 
     // Codegen for evaluating probe rows
     Function* eval_probe_row_fn = hash_tbl_->CodegenEvalTupleRow(codegen, false);
-    if (eval_probe_row_fn == NULL) return NULL;
+    if (eval_probe_row_fn == nullptr) return nullptr;
 
     // Replace call sites
     replaced =

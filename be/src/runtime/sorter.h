@@ -37,7 +37,7 @@ class RowBatch;
 /// The client API for Sorter is as follows:
 /// AddBatch() is used to add input rows to be sorted. Multiple tuples in an input row are
 /// materialized into a row with a single tuple (the sort tuple) using the materialization
-/// exprs in sort_tuple_slot_expr_ctxs_. The sort tuples are sorted according to the sort
+/// exprs in sort_tuple_exprs_. The sort tuples are sorted according to the sort
 /// parameters and output by the sorter.
 /// AddBatch() can be called multiple times.
 //
@@ -89,22 +89,24 @@ class RowBatch;
 /// tuples in place.
 class Sorter {
  public:
-  /// sort_tuple_slot_exprs are the slot exprs used to materialize the tuple to be sorted.
-  /// compare_less_than is a comparator for the sort tuples (returns true if lhs < rhs).
-  /// merge_batch_size_ is the size of the batches created to provide rows to the merger
-  /// and retrieve rows from an intermediate merger.
+  /// 'sort_tuple_exprs' are the slot exprs used to materialize the tuples to be
+  /// sorted. 'compare_less_than' is a comparator for the sort tuples (returns true if
+  /// lhs < rhs). 'merge_batch_size_' is the size of the batches created to provide rows
+  /// to the merger and retrieve rows from an intermediate merger.
   Sorter(const TupleRowComparator& compare_less_than,
-      const std::vector<ExprContext*>& sort_tuple_slot_expr_ctxs,
+      const std::vector<ScalarExpr*>& sort_tuple_exprs,
       RowDescriptor* output_row_desc, MemTracker* mem_tracker,
       RuntimeProfile* profile, RuntimeState* state);
 
   ~Sorter();
 
   /// Initial set-up of the sorter for execution. Registers with the block mgr.
-  Status Prepare() WARN_UNUSED_RESULT;
+  /// The evaluators for 'sort_tuple_exprs_' will be created and stored in 'obj_pool'.
+  /// All allocation from the evaluators will be from 'expr_mem_pool'.
+  Status Prepare(ObjectPool* obj_pool, MemPool* expr_mem_pool) WARN_UNUSED_RESULT;
 
-  /// Open the sorter for adding rows. Must be called after Prepare() or Reset() and
-  /// before calling AddBatch().
+  /// Opens the sorter for adding rows and initializes the evaluators for materializing
+  /// the tuples. Must be called after Prepare() or Reset() and before calling AddBatch().
   Status Open() WARN_UNUSED_RESULT;
 
   /// Adds a batch of input rows to the current unsorted run.
@@ -117,13 +119,16 @@ class Sorter {
   /// Get the next batch of sorted output rows from the sorter.
   Status GetNext(RowBatch* batch, bool* eos) WARN_UNUSED_RESULT;
 
+  /// Free any local allocations made when materializing and sorting the tuples.
+  void FreeLocalAllocations();
+
   /// Resets all internal state like ExecNode::Reset().
   /// Init() must have been called, AddBatch()/GetNext()/InputDone()
   /// may or may not have been called.
   void Reset();
 
   /// Close the Sorter and free resources.
-  void Close();
+  void Close(RuntimeState* state);
 
  private:
   class Run;
@@ -175,9 +180,9 @@ class Sorter {
   /// True if the tuples to be sorted have var-length slots.
   bool has_var_len_slots_;
 
-  /// Expressions used to materialize the sort tuple. Contains one expr per slot in the
-  /// tuple.
-  std::vector<ExprContext*> sort_tuple_slot_expr_ctxs_;
+  /// Expressions used to materialize the sort tuple. One expr per slot in the tuple.
+  const std::vector<ScalarExpr*>& sort_tuple_exprs_;
+  std::vector<ScalarExprEvaluator*> sort_tuple_expr_evals_;
 
   /// Mem tracker for batches created during merge. Not owned by Sorter.
   MemTracker* mem_tracker_;

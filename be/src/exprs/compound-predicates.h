@@ -23,9 +23,10 @@
 #include "exprs/predicate.h"
 #include "gen-cpp/Exprs_types.h"
 
-using namespace impala_udf;
-
 namespace impala {
+
+using impala_udf::FunctionContext;
+using impala_udf::BooleanVal;
 
 class CompoundPredicate: public Predicate {
  public:
@@ -40,14 +41,14 @@ class CompoundPredicate: public Predicate {
 /// Expr for evaluating and (&&) operators
 class AndPredicate: public CompoundPredicate {
  public:
-  virtual impala_udf::BooleanVal GetBooleanVal(ExprContext* context, const TupleRow*);
+  virtual BooleanVal GetBooleanVal(ScalarExprEvaluator*, const TupleRow*) const;
 
   virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
     return CompoundPredicate::CodegenComputeFn(true, codegen, fn);
   }
 
  protected:
-  friend class Expr;
+  friend class ScalarExpr;
   AndPredicate(const TExprNode& node) : CompoundPredicate(node) { }
 
   virtual std::string DebugString() const;
@@ -59,14 +60,14 @@ class AndPredicate: public CompoundPredicate {
 /// Expr for evaluating or (||) operators
 class OrPredicate: public CompoundPredicate {
  public:
-  virtual impala_udf::BooleanVal GetBooleanVal(ExprContext* context, const TupleRow*);
+  virtual BooleanVal GetBooleanVal(ScalarExprEvaluator*, const TupleRow*) const;
 
   virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
     return CompoundPredicate::CodegenComputeFn(false, codegen, fn);
   }
 
  protected:
-  friend class Expr;
+  friend class ScalarExpr;
   OrPredicate(const TExprNode& node) : CompoundPredicate(node) { }
 
   virtual std::string DebugString() const;

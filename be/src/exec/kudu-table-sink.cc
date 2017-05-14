@@ -21,8 +21,8 @@
 #include <thrift/protocol/TDebugProtocol.h>
 
 #include "exec/kudu-util.h"
-#include "exprs/expr.h"
-#include "exprs/expr-context.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "gutil/gscoped_ptr.h"
 #include "runtime/exec-env.h"
@@ -71,31 +71,18 @@ const static string& ROOT_PARTITION_KEY =
 // Send 7MB buffers to Kudu, matching a hard-coded size in Kudu (KUDU-1693).
 const static int INDIVIDUAL_BUFFER_SIZE = 7 * 1024 * 1024;
 
-KuduTableSink::KuduTableSink(const RowDescriptor& row_desc,
-    const vector<TExpr>& select_list_texprs,
-    const TDataSink& tsink)
+KuduTableSink::KuduTableSink(const RowDescriptor& row_desc, const TDataSink& tsink)
     : DataSink(row_desc),
       table_id_(tsink.table_sink.target_table_id),
-      select_list_texprs_(select_list_texprs),
       sink_action_(tsink.table_sink.action),
       kudu_table_sink_(tsink.table_sink.kudu_table_sink) {
+  DCHECK(tsink.__isset.table_sink);
   DCHECK(KuduIsAvailable());
-}
-
-Status KuduTableSink::PrepareExprs(RuntimeState* state) {
-  // From the thrift expressions create the real exprs.
-  RETURN_IF_ERROR(Expr::CreateExprTrees(state->obj_pool(), select_list_texprs_,
-                                        &output_expr_ctxs_));
-  // Prepare the exprs to run.
-  RETURN_IF_ERROR(
-      Expr::Prepare(output_expr_ctxs_, state, row_desc_, expr_mem_tracker_.get()));
-  return Status::OK();
 }
 
 Status KuduTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
   SCOPED_TIMER(profile()->total_time_counter());
-  RETURN_IF_ERROR(PrepareExprs(state));
 
   // Get the kudu table descriptor.
   TableDescriptor* table_desc = state->desc_tbl().GetTableDescriptor(table_id_);
@@ -130,7 +117,7 @@ Status KuduTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracke
 }
 
 Status KuduTableSink::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(Expr::Open(output_expr_ctxs_, state));
+  RETURN_IF_ERROR(DataSink::Open(state));
 
   int64_t required_mem = FLAGS_kudu_sink_mem_required;
   if (!mem_tracker_->TryConsume(required_mem)) {
@@ -206,7 +193,7 @@ kudu::client::KuduWriteOperation* KuduTableSink::NewWriteOp() {
 
 Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
   SCOPED_TIMER(profile()->total_time_counter());
-  ExprContext::FreeLocalAllocations(output_expr_ctxs_);
+  ScalarExprEvaluator::FreeLocalAllocations(output_expr_evals_);
   RETURN_IF_ERROR(state->CheckQueryState());
   const KuduSchema& table_schema = table_->schema();
 
@@ -224,14 +211,14 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
     unique_ptr<kudu::client::KuduWriteOperation> write(NewWriteOp());
     bool add_row = true;
 
-    for (int j = 0; j < output_expr_ctxs_.size(); ++j) {
-      // output_expr_ctxs_ only contains the columns that the op
+    for (int j = 0; j < output_expr_evals_.size(); ++j) {
+      // output_expr_evals_ only contains the columns that the op
       // applies to, i.e. columns explicitly mentioned in the query, and
       // referenced_columns is then used to map to actual column positions.
       int col = kudu_table_sink_.referenced_columns.empty() ?
           j : kudu_table_sink_.referenced_columns[j];
 
-      void* value = output_expr_ctxs_[j]->GetValue(current_row);
+      void* value = output_expr_evals_[j]->GetValue(current_row);
       if (value == nullptr) {
         if (table_schema.Column(col).is_nullable()) {
           KUDU_RETURN_IF_ERROR(write->mutable_row()->SetNull(col),
@@ -249,7 +236,7 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
         }
       }
 
-      PrimitiveType type = output_expr_ctxs_[j]->root()->type().type;
+      PrimitiveType type = output_expr_evals_[j]->root().type().type;
       WriteKuduValue(col, type, value, true, write->mutable_row());
     }
     if (add_row) write_ops.push_back(move(write));
@@ -339,7 +326,6 @@ void KuduTableSink::Close(RuntimeState* state) {
     client_ = nullptr;
   }
   SCOPED_TIMER(profile()->total_time_counter());
-  Expr::Close(output_expr_ctxs_, state);
   DataSink::Close(state);
   closed_ = true;
 }

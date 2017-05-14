@@ -83,7 +83,8 @@ class NestedLoopJoinNode : public BlockingJoinNode {
   /////////////////////////////////////////
 
   /// Join conjuncts
-  std::vector<ExprContext*> join_conjunct_ctxs_;
+  std::vector<ScalarExpr*> join_conjuncts_;
+  std::vector<ScalarExprEvaluator*> join_conjunct_evals_;
 
   /// Optimized build for the case where the right child is a SingularRowSrcNode.
   Status ConstructSingularBuildSide(RuntimeState* state);

@@ -26,16 +26,19 @@
 #include "common/logging.h"
 #include "common/status.h"
 #include "exec/catalog-op-executor.h"
-#include "exprs/expr-context.h"
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "gen-cpp/Data_types.h"
 #include "gen-cpp/Frontend_types.h"
 #include "rpc/jni-thrift-util.h"
 #include "rpc/thrift-server.h"
 #include "runtime/client-cache.h"
+#include "runtime/decimal-value.inline.h"
 #include "runtime/exec-env.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
+#include "runtime/mem-pool.h"
+#include "runtime/raw-value.h"
 #include "runtime/runtime-state.h"
 #include "service/impala-server.h"
 #include "util/cpu-info.h"
@@ -69,6 +72,81 @@ Java_org_apache_impala_service_FeSupport_NativeFeTestInit(
   LlvmCodeGen::InitializeLlvm(true);
   ExecEnv* exec_env = new ExecEnv(); // This also caches it from the process.
   exec_env->InitForFeTests();
+}
+
+// Serializes expression value 'value' to thrift structure TColumnValue 'col_val'.
+// 'type' indicates the type of the expression value.
+static void SetTColumnValue(
+    const void* value, const ColumnType& type, TColumnValue* col_val) {
+  if (value == nullptr) return;
+  DCHECK(col_val != nullptr);
+
+  string tmp;
+  switch (type.type) {
+    case TYPE_BOOLEAN:
+      col_val->__set_bool_val(*reinterpret_cast<const bool*>(value));
+      break;
+    case TYPE_TINYINT:
+      col_val->__set_byte_val(*reinterpret_cast<const int8_t*>(value));
+      break;
+    case TYPE_SMALLINT:
+      col_val->__set_short_val(*reinterpret_cast<const int16_t*>(value));
+      break;
+    case TYPE_INT:
+      col_val->__set_int_val(*reinterpret_cast<const int32_t*>(value));
+      break;
+    case TYPE_BIGINT:
+      col_val->__set_long_val(*reinterpret_cast<const int64_t*>(value));
+      break;
+    case TYPE_FLOAT:
+      col_val->__set_double_val(*reinterpret_cast<const float*>(value));
+      break;
+    case TYPE_DOUBLE:
+      col_val->__set_double_val(*reinterpret_cast<const double*>(value));
+      break;
+    case TYPE_DECIMAL:
+      switch (type.GetByteSize()) {
+        case 4:
+          col_val->string_val =
+              reinterpret_cast<const Decimal4Value*>(value)->ToString(type);
+          break;
+        case 8:
+          col_val->string_val =
+              reinterpret_cast<const Decimal8Value*>(value)->ToString(type);
+          break;
+        case 16:
+          col_val->string_val =
+              reinterpret_cast<const Decimal16Value*>(value)->ToString(type);
+          break;
+        default:
+          DCHECK(false) << "Bad Type: " << type;
+      }
+      col_val->__isset.string_val = true;
+      break;
+    case TYPE_STRING:
+    case TYPE_VARCHAR: {
+      const StringValue* string_val = reinterpret_cast<const StringValue*>(value);
+      tmp.assign(static_cast<char*>(string_val->ptr), string_val->len);
+      col_val->binary_val.swap(tmp);
+      col_val->__isset.binary_val = true;
+      break;
+    }
+    case TYPE_CHAR:
+      tmp.assign(StringValue::CharSlotToPtr(value, type), type.len);
+      col_val->binary_val.swap(tmp);
+      col_val->__isset.binary_val = true;
+      break;
+    case TYPE_TIMESTAMP: {
+      const uint8_t* uint8_val = reinterpret_cast<const uint8_t*>(value);
+      col_val->binary_val.assign(uint8_val, uint8_val + type.GetSlotSize());
+      col_val->__isset.binary_val = true;
+      RawValue::PrintValue(value, type, -1, &col_val->string_val);
+      col_val->__isset.string_val = true;
+      break;
+    }
+    default:
+      DCHECK(false) << "bad GetValue() type: " << type.DebugString();
+  }
 }
 
 // Evaluates a batch of const exprs and returns the results in a serialized
@@ -111,16 +189,20 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
   THROW_IF_ERROR_RET(
       jni_frame.push(env), env, JniUtil::internal_exc_class(), result_bytes);
 
-  // Prepare() the exprs. Always Close() the exprs even in case of errors.
-  vector<ExprContext*> expr_ctxs;
-  for (const TExpr& texpr : texprs) {
-    ExprContext* ctx;
-    status = Expr::CreateExprTree(&obj_pool, texpr, &ctx);
-    if (!status.ok()) goto error;
+  MemPool expr_mem_pool(state.query_mem_tracker());
 
-    // Add 'ctx' to vector so it will be closed if Prepare() fails.
-    expr_ctxs.push_back(ctx);
-    status = ctx->Prepare(&state, RowDescriptor(), state.query_mem_tracker());
+  // Prepare() the exprs. Always Close() the exprs even in case of errors.
+  vector<ScalarExpr*> exprs;
+  vector<ScalarExprEvaluator*> evals;
+  for (const TExpr& texpr : texprs) {
+    ScalarExpr* expr;
+    status = ScalarExpr::Create(texpr, RowDescriptor(), &state, &expr);
+    if (!status.ok()) goto error;
+    exprs.push_back(expr);
+    ScalarExprEvaluator* eval;
+    status = ScalarExprEvaluator::Create(*expr, &state, &obj_pool, &expr_mem_pool,
+        &eval);
+    evals.push_back(eval);
     if (!status.ok()) goto error;
   }
 
@@ -138,14 +220,20 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
   }
 
   // Open() and evaluate the exprs. Always Close() the exprs even in case of errors.
-  for (ExprContext* expr_ctx : expr_ctxs) {
-    status = expr_ctx->Open(&state);
+  for (int i = 0; i < evals.size(); ++i) {
+    ScalarExprEvaluator* eval = evals[i];
+    status = eval->Open(&state);
     if (!status.ok()) goto error;
 
-    TColumnValue val;
-    expr_ctx->EvaluateWithoutRow(&val);
-    status = expr_ctx->root()->GetFnContextError(expr_ctx);
+    void* result = eval->GetValue(nullptr);
+    status = eval->GetError();
     if (!status.ok()) goto error;
+    // 'output_scale' should only be set for MathFunctions::RoundUpTo()
+    // with return type double.
+    const ColumnType& type = eval->root().type();
+    DCHECK(eval->output_scale() == -1 || type.type == TYPE_DOUBLE);
+    TColumnValue val;
+    SetTColumnValue(result, type, &val);
 
     // Check for mem limit exceeded.
     status = state.CheckQueryState();
@@ -156,11 +244,13 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
       goto error;
     }
 
-    expr_ctx->Close(&state);
+    eval->Close(&state);
+    exprs[i]->Close();
     results.push_back(val);
   }
 
   expr_results.__set_colVals(results);
+  expr_mem_pool.FreeAll();
   status = SerializeThriftMsg(env, &expr_results, &result_bytes);
   if (!status.ok()) goto error;
   return result_bytes;
@@ -168,7 +258,9 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
 error:
   DCHECK(!status.ok());
   // Convert status to exception. Close all remaining expr contexts.
-  for (ExprContext* expr_ctx : expr_ctxs) expr_ctx->Close(&state);
+  for (ScalarExprEvaluator* eval: evals) eval->Close(&state);
+  for (ScalarExpr* expr : exprs) expr->Close();
+  expr_mem_pool.FreeAll();
   (env)->ThrowNew(JniUtil::internal_exc_class(), status.GetDetail().c_str());
   return result_bytes;
 }

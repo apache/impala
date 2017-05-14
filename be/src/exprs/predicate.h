@@ -19,17 +19,17 @@
 #ifndef IMPALA_EXPRS_PREDICATE_H_
 #define IMPALA_EXPRS_PREDICATE_H_
 
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
 
 namespace impala {
 
 class TExprNode;
 
-class Predicate: public Expr {
+class Predicate: public ScalarExpr {
  protected:
-  friend class Expr;
+  friend class ScalarExpr;
 
-  Predicate(const TExprNode& node) : Expr(node) {}
+  Predicate(const TExprNode& node) : ScalarExpr(node) {}
 };
 
 }

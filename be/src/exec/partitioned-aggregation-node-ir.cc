@@ -19,21 +19,18 @@
 
 #include "exec/hash-table.inline.h"
 #include "exprs/agg-fn-evaluator.h"
-#include "exprs/expr-context.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
 
 using namespace impala;
 
-ExprContext* const* PartitionedAggregationNode::GetAggExprContexts(int i) const {
-  return agg_expr_ctxs_[i];
-}
-
 Status PartitionedAggregationNode::ProcessBatchNoGrouping(RowBatch* batch) {
   Tuple* output_tuple = singleton_output_tuple_;
   FOREACH_ROW(batch, 0, batch_iter) {
-    UpdateTuple(&agg_fn_ctxs_[0], output_tuple, batch_iter.Get());
+    UpdateTuple(agg_fn_evals_.data(), output_tuple, batch_iter.Get());
   }
   return Status::OK();
 }
@@ -130,7 +127,7 @@ Status PartitionedAggregationNode::ProcessRow(TupleRow* __restrict__ row,
     DCHECK(!found);
   } else if (found) {
     // Row is already in hash table. Do the aggregation and we're done.
-    UpdateTuple(&dst_partition->agg_fn_ctxs[0], it.GetTuple(), row);
+    UpdateTuple(dst_partition->agg_fn_evals.data(), it.GetTuple(), row);
     return Status::OK();
   }
 
@@ -144,11 +141,12 @@ Status PartitionedAggregationNode::AddIntermediateTuple(Partition* __restrict__ 
     TupleRow* __restrict__ row, uint32_t hash, HashTable::Iterator insert_it) {
   while (true) {
     DCHECK(partition->aggregated_row_stream->is_pinned());
-    Tuple* intermediate_tuple = ConstructIntermediateTuple(partition->agg_fn_ctxs,
+    Tuple* intermediate_tuple = ConstructIntermediateTuple(partition->agg_fn_evals,
         partition->aggregated_row_stream.get(), &process_batch_status_);
 
     if (LIKELY(intermediate_tuple != NULL)) {
-      UpdateTuple(&partition->agg_fn_ctxs[0], intermediate_tuple, row, AGGREGATED_ROWS);
+      UpdateTuple(partition->agg_fn_evals.data(), intermediate_tuple,
+          row, AGGREGATED_ROWS);
       // After copying and initializing the tuple, insert it into the hash table.
       insert_it.SetTuple(intermediate_tuple, hash);
       return Status::OK();
@@ -200,13 +198,13 @@ Status PartitionedAggregationNode::ProcessBatchStreaming(bool needs_serialize,
             &process_batch_status_)) {
         RETURN_IF_ERROR(std::move(process_batch_status_));
         // Tuple is not going into hash table, add it to the output batch.
-        Tuple* intermediate_tuple = ConstructIntermediateTuple(agg_fn_ctxs_,
+        Tuple* intermediate_tuple = ConstructIntermediateTuple(agg_fn_evals_,
             out_batch->tuple_data_pool(), &process_batch_status_);
         if (UNLIKELY(intermediate_tuple == NULL)) {
           DCHECK(!process_batch_status_.ok());
           return std::move(process_batch_status_);
         }
-        UpdateTuple(&agg_fn_ctxs_[0], intermediate_tuple, in_row);
+        UpdateTuple(agg_fn_evals_.data(), intermediate_tuple, in_row);
         out_batch_iterator.Get()->SetTuple(0, intermediate_tuple);
         out_batch_iterator.Next();
         out_batch->CommitLastRow();
@@ -218,8 +216,7 @@ Status PartitionedAggregationNode::ProcessBatchStreaming(bool needs_serialize,
   }
   if (needs_serialize) {
     FOREACH_ROW(out_batch, 0, out_batch_iter) {
-      AggFnEvaluator::Serialize(aggregate_evaluators_, agg_fn_ctxs_,
-          out_batch_iter.Get()->GetTuple(0));
+      AggFnEvaluator::Serialize(agg_fn_evals_, out_batch_iter.Get()->GetTuple(0));
     }
   }
 
@@ -242,7 +239,7 @@ bool PartitionedAggregationNode::TryAddToHashTable(
   } else if (*remaining_capacity == 0) {
     return false;
   } else {
-    intermediate_tuple = ConstructIntermediateTuple(partition->agg_fn_ctxs,
+    intermediate_tuple = ConstructIntermediateTuple(partition->agg_fn_evals,
         partition->aggregated_row_stream.get(), status);
     if (LIKELY(intermediate_tuple != NULL)) {
       it.SetTuple(intermediate_tuple, hash);
@@ -254,7 +251,7 @@ bool PartitionedAggregationNode::TryAddToHashTable(
     }
   }
 
-  UpdateTuple(&partition->agg_fn_ctxs[0], intermediate_tuple, in_row);
+  UpdateTuple(partition->agg_fn_evals.data(), intermediate_tuple, in_row);
   return true;
 }
 

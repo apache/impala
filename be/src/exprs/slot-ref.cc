@@ -22,6 +22,7 @@
 
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "gen-cpp/Exprs_types.h"
 #include "runtime/collection-value.h"
 #include "runtime/decimal-value.h"
@@ -39,7 +40,7 @@ using namespace llvm;
 namespace impala {
 
 SlotRef::SlotRef(const TExprNode& node)
-  : Expr(node, true),
+  : ScalarExpr(node),
     slot_offset_(-1),  // invalid
     null_indicator_offset_(0, 0),
     slot_id_(node.slot_ref.slot_id) {
@@ -47,7 +48,7 @@ SlotRef::SlotRef(const TExprNode& node)
 }
 
 SlotRef::SlotRef(const SlotDescriptor* desc)
-  : Expr(desc->type(), false, true),
+  : ScalarExpr(desc->type(), false),
     slot_offset_(-1),
     null_indicator_offset_(0, 0),
     slot_id_(desc->id()) {
@@ -55,48 +56,48 @@ SlotRef::SlotRef(const SlotDescriptor* desc)
 }
 
 SlotRef::SlotRef(const SlotDescriptor* desc, const ColumnType& type)
-  : Expr(type, false, true),
+  : ScalarExpr(type, false),
     slot_offset_(-1),
     null_indicator_offset_(0, 0),
     slot_id_(desc->id()) {
     // slot_/null_indicator_offset_ are set in Prepare()
 }
 
-  SlotRef::SlotRef(const ColumnType& type, int offset, const bool nullable /* = false */)
-  : Expr(type, false, true),
+SlotRef::SlotRef(const ColumnType& type, int offset, const bool nullable /* = false */)
+  : ScalarExpr(type, false),
     tuple_idx_(0),
     slot_offset_(offset),
     null_indicator_offset_(0, nullable ? offset : -1),
     slot_id_(-1) {
 }
 
-Status SlotRef::Prepare(RuntimeState* state, const RowDescriptor& row_desc,
-                        ExprContext* context) {
+Status SlotRef::Init(const RowDescriptor& row_desc, RuntimeState* state) {
   DCHECK_EQ(children_.size(), 0);
-  if (slot_id_ == -1) return Status::OK();
-
-  const SlotDescriptor* slot_desc  = state->desc_tbl().GetSlotDescriptor(slot_id_);
-  if (slot_desc == NULL) {
-    // TODO: create macro MAKE_ERROR() that returns a stream
-    stringstream error;
-    error << "couldn't resolve slot descriptor " << slot_id_;
-    LOG(INFO) << error.str();
-    return Status(error.str());
+  if (slot_id_ != -1) {
+    const SlotDescriptor* slot_desc = state->desc_tbl().GetSlotDescriptor(slot_id_);
+    if (slot_desc == NULL) {
+      // TODO: create macro MAKE_ERROR() that returns a stream
+      stringstream error;
+      error << "couldn't resolve slot descriptor " << slot_id_;
+      LOG(INFO) << error.str();
+      return Status(error.str());
+    }
+    tuple_idx_ = row_desc.GetTupleIdx(slot_desc->parent()->id());
+    if (tuple_idx_ == RowDescriptor::INVALID_IDX) {
+      TupleDescriptor* d =
+          state->desc_tbl().GetTupleDescriptor(slot_desc->parent()->id());
+      LOG(INFO) << "invalid idx: " << slot_desc->DebugString()
+                << "\nparent=" << d->DebugString()
+                << "\nrow=" << row_desc.DebugString();
+      stringstream error;
+      error << "invalid tuple_idx";
+      return Status(error.str());
+    }
+    DCHECK(tuple_idx_ != RowDescriptor::INVALID_IDX);
+    tuple_is_nullable_ = row_desc.TupleIsNullable(tuple_idx_);
+    slot_offset_ = slot_desc->tuple_offset();
+    null_indicator_offset_ = slot_desc->null_indicator_offset();
   }
-  tuple_idx_ = row_desc.GetTupleIdx(slot_desc->parent()->id());
-  if (tuple_idx_ == RowDescriptor::INVALID_IDX) {
-    TupleDescriptor* d = state->desc_tbl().GetTupleDescriptor(slot_desc->parent()->id());
-    LOG(INFO) << "invalid idx: " << slot_desc->DebugString()
-              << "\nparent=" << d->DebugString()
-              << "\nrow=" << row_desc.DebugString();
-    stringstream error;
-    error << "invalid tuple_idx";
-    return Status(error.str());
-  }
-  DCHECK(tuple_idx_ != RowDescriptor::INVALID_IDX);
-  tuple_is_nullable_ = row_desc.TupleIsNullable(tuple_idx_);
-  slot_offset_ = slot_desc->tuple_offset();
-  null_indicator_offset_ = slot_desc->null_indicator_offset();
   return Status::OK();
 }
 
@@ -111,7 +112,7 @@ string SlotRef::DebugString() const {
       << " tuple_idx=" << tuple_idx_ << " slot_offset=" << slot_offset_
       << " tuple_is_nullable=" << tuple_is_nullable_
       << " null_indicator=" << null_indicator_offset_
-      << Expr::DebugString() << ")";
+      << ScalarExpr::DebugString() << ")";
   return out.str();
 }
 
@@ -185,7 +186,7 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
 
   LLVMContext& context = codegen->context();
   Value* args[2];
-  *fn = CreateIrFunctionPrototype(codegen, "GetSlotRef", &args);
+  *fn = CreateIrFunctionPrototype("GetSlotRef", codegen, &args);
   Value* row_ptr = args[1];
 
   Value* tuple_offset = ConstantInt::get(codegen->int_type(), tuple_idx_);
@@ -358,61 +359,70 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   }
 
   *fn = codegen->FinalizeFunction(*fn);
-  codegen->RegisterExprFn(unique_slot_id, *fn);
+  if (UNLIKELY(*fn == NULL)) return Status(TErrorCode::IR_VERIFY_FAILED, "SlotRef");
   ir_compute_fn_ = *fn;
+  codegen->RegisterExprFn(unique_slot_id, *fn);
   return Status::OK();
 }
 
-BooleanVal SlotRef::GetBooleanVal(ExprContext* context, const TupleRow* row) {
+BooleanVal SlotRef::GetBooleanVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_BOOLEAN);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return BooleanVal::null();
   return BooleanVal(*reinterpret_cast<bool*>(t->GetSlot(slot_offset_)));
 }
 
-TinyIntVal SlotRef::GetTinyIntVal(ExprContext* context, const TupleRow* row) {
+TinyIntVal SlotRef::GetTinyIntVal(
+   ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_TINYINT);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return TinyIntVal::null();
   return TinyIntVal(*reinterpret_cast<int8_t*>(t->GetSlot(slot_offset_)));
 }
 
-SmallIntVal SlotRef::GetSmallIntVal(ExprContext* context, const TupleRow* row) {
+SmallIntVal SlotRef::GetSmallIntVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_SMALLINT);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return SmallIntVal::null();
   return SmallIntVal(*reinterpret_cast<int16_t*>(t->GetSlot(slot_offset_)));
 }
 
-IntVal SlotRef::GetIntVal(ExprContext* context, const TupleRow* row) {
+IntVal SlotRef::GetIntVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_INT);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return IntVal::null();
   return IntVal(*reinterpret_cast<int32_t*>(t->GetSlot(slot_offset_)));
 }
 
-BigIntVal SlotRef::GetBigIntVal(ExprContext* context, const TupleRow* row) {
+BigIntVal SlotRef::GetBigIntVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_BIGINT);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return BigIntVal::null();
   return BigIntVal(*reinterpret_cast<int64_t*>(t->GetSlot(slot_offset_)));
 }
 
-FloatVal SlotRef::GetFloatVal(ExprContext* context, const TupleRow* row) {
+FloatVal SlotRef::GetFloatVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_FLOAT);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return FloatVal::null();
   return FloatVal(*reinterpret_cast<float*>(t->GetSlot(slot_offset_)));
 }
 
-DoubleVal SlotRef::GetDoubleVal(ExprContext* context, const TupleRow* row) {
+DoubleVal SlotRef::GetDoubleVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DOUBLE);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return DoubleVal::null();
   return DoubleVal(*reinterpret_cast<double*>(t->GetSlot(slot_offset_)));
 }
 
-StringVal SlotRef::GetStringVal(ExprContext* context, const TupleRow* row) {
+StringVal SlotRef::GetStringVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK(type_.IsStringType());
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return StringVal::null();
@@ -428,7 +438,8 @@ StringVal SlotRef::GetStringVal(ExprContext* context, const TupleRow* row) {
   return result;
 }
 
-TimestampVal SlotRef::GetTimestampVal(ExprContext* context, const TupleRow* row) {
+TimestampVal SlotRef::GetTimestampVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_TIMESTAMP);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return TimestampVal::null();
@@ -438,7 +449,8 @@ TimestampVal SlotRef::GetTimestampVal(ExprContext* context, const TupleRow* row)
   return result;
 }
 
-DecimalVal SlotRef::GetDecimalVal(ExprContext* context, const TupleRow* row) {
+DecimalVal SlotRef::GetDecimalVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DECIMAL);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return DecimalVal::null();
@@ -455,7 +467,8 @@ DecimalVal SlotRef::GetDecimalVal(ExprContext* context, const TupleRow* row) {
   }
 }
 
-CollectionVal SlotRef::GetCollectionVal(ExprContext* context, const TupleRow* row) {
+CollectionVal SlotRef::GetCollectionVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK(type_.IsCollectionType());
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return CollectionVal::null();

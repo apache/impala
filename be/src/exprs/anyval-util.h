@@ -27,9 +27,20 @@
 #include "util/decimal-util.h"
 #include "util/hash-util.h"
 
-using namespace impala_udf;
-
 namespace impala {
+
+using impala_udf::FunctionContext;
+using impala_udf::AnyVal;
+using impala_udf::BooleanVal;
+using impala_udf::TinyIntVal;
+using impala_udf::SmallIntVal;
+using impala_udf::IntVal;
+using impala_udf::BigIntVal;
+using impala_udf::FloatVal;
+using impala_udf::DoubleVal;
+using impala_udf::TimestampVal;
+using impala_udf::StringVal;
+using impala_udf::DecimalVal;
 
 class ObjectPool;
 
@@ -274,7 +285,7 @@ class AnyValUtil {
               reinterpret_cast<StringVal*>(dst));
           if (type.type == TYPE_VARCHAR) {
             StringVal* sv = reinterpret_cast<StringVal*>(dst);
-            DCHECK(type.len >= 0);
+            DCHECK_GE(type.len, 0);
             DCHECK_LE(sv->len, type.len);
           }
         } else {

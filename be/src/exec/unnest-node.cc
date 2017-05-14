@@ -18,7 +18,7 @@
 #include "common/status.h"
 #include "exec/unnest-node.h"
 #include "exec/subplan-node.h"
-#include "exprs/expr-context.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "exprs/slot-ref.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -33,31 +33,40 @@ UnnestNode::UnnestNode(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
     item_byte_size_(0),
-    coll_expr_ctx_(NULL),
-    coll_slot_desc_(NULL),
+    thrift_coll_expr_(tnode.unnest_node.collection_expr),
+    coll_expr_(nullptr),
+    coll_expr_eval_(nullptr),
+    coll_slot_desc_(nullptr),
     coll_tuple_idx_(-1),
-    coll_value_(NULL),
+    coll_value_(nullptr),
     item_idx_(0),
     num_collections_(0),
     total_collection_size_(0),
     max_collection_size_(-1),
     min_collection_size_(-1),
-    avg_collection_size_counter_(NULL),
-    max_collection_size_counter_(NULL),
-    min_collection_size_counter_(NULL),
-    num_collections_counter_(NULL) {
+    avg_collection_size_counter_(nullptr),
+    max_collection_size_counter_(nullptr),
+    min_collection_size_counter_(nullptr),
+    num_collections_counter_(nullptr) {
 }
 
 Status UnnestNode::Init(const TPlanNode& tnode, RuntimeState* state) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
   DCHECK(tnode.__isset.unnest_node);
-  Expr::CreateExprTree(pool_, tnode.unnest_node.collection_expr, &coll_expr_ctx_);
+  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
+  return Status::OK();
+}
+
+Status UnnestNode::InitCollExpr(RuntimeState* state) {
+  DCHECK(containing_subplan_ != nullptr)
+      << "set_containing_subplan() must have been called";
+  const RowDescriptor& row_desc = containing_subplan_->child(0)->row_desc();
+  RETURN_IF_ERROR(ScalarExpr::Create(thrift_coll_expr_, row_desc, state, &coll_expr_));
+  DCHECK(coll_expr_->IsSlotRef());
   return Status::OK();
 }
 
 Status UnnestNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
-  DCHECK(containing_subplan_ != NULL) << "set_containing_subplan() must be called";
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
   avg_collection_size_counter_ =
@@ -71,17 +80,18 @@ Status UnnestNode::Prepare(RuntimeState* state) {
 
   DCHECK_EQ(1, row_desc().tuple_descriptors().size());
   const TupleDescriptor* item_tuple_desc = row_desc().tuple_descriptors()[0];
-  DCHECK(item_tuple_desc != NULL);
+  DCHECK(item_tuple_desc != nullptr);
   item_byte_size_ = item_tuple_desc->byte_size();
-  RETURN_IF_ERROR(coll_expr_ctx_->Prepare(
-      state, containing_subplan_->child(0)->row_desc(), expr_mem_tracker()));
+
+  RETURN_IF_ERROR(ScalarExprEvaluator::Create(*coll_expr_, state, pool_,
+      expr_mem_pool(), &coll_expr_eval_));
 
   // Set the coll_slot_desc_ and the corresponding tuple index used for manually
   // evaluating the collection SlotRef and for projection.
-  DCHECK(coll_expr_ctx_->root()->is_slotref());
-  const SlotRef* slot_ref = static_cast<SlotRef*>(coll_expr_ctx_->root());
+  DCHECK(coll_expr_->IsSlotRef());
+  const SlotRef* slot_ref = static_cast<SlotRef*>(coll_expr_);
   coll_slot_desc_ = state->desc_tbl().GetSlotDescriptor(slot_ref->slot_id());
-  DCHECK(coll_slot_desc_ != NULL);
+  DCHECK(coll_slot_desc_ != nullptr);
   const RowDescriptor& row_desc = containing_subplan_->child(0)->row_desc();
   coll_tuple_idx_ = row_desc.GetTupleIdx(coll_slot_desc_->parent()->id());
 
@@ -91,17 +101,17 @@ Status UnnestNode::Prepare(RuntimeState* state) {
 Status UnnestNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Open(state));
-  RETURN_IF_ERROR(coll_expr_ctx_->Open(state));
+  RETURN_IF_ERROR(coll_expr_eval_->Open(state));
 
-  DCHECK(containing_subplan_->current_row() != NULL);
+  DCHECK(containing_subplan_->current_row() != nullptr);
   Tuple* tuple = containing_subplan_->current_input_row_->GetTuple(coll_tuple_idx_);
-  if (tuple != NULL) {
+  if (tuple != nullptr) {
     // Retrieve the collection value to be unnested directly from the tuple. We purposely
     // ignore the null bit of the slot because we may have set it in a previous Open() of
     // this same unnest node for projection.
     coll_value_ = reinterpret_cast<const CollectionValue*>(
         tuple->GetSlot(coll_slot_desc_->tuple_offset()));
-    // Projection: Set the slot containing the collection value to NULL.
+    // Projection: Set the slot containing the collection value to nullptr.
     tuple->SetNull(coll_slot_desc_->null_indicator_offset());
   } else {
     coll_value_ = &EMPTY_COLLECTION_VALUE;
@@ -134,7 +144,7 @@ Status UnnestNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) 
   *eos = false;
 
   // Populate the output row_batch with tuples from the collection.
-  DCHECK(coll_value_ != NULL);
+  DCHECK(coll_value_ != nullptr);
   DCHECK_GE(coll_value_->num_tuples, 0);
   while (item_idx_ < coll_value_->num_tuples) {
     Tuple* item =
@@ -144,7 +154,8 @@ Status UnnestNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) 
     TupleRow* row = row_batch->GetRow(row_idx);
     row->SetTuple(0, item);
     // TODO: Ideally these should be evaluated by the parent scan node.
-    if (EvalConjuncts(&conjunct_ctxs_[0], conjunct_ctxs_.size(), row)) {
+    DCHECK_EQ(conjuncts_.size(), conjunct_evals_.size());
+    if (EvalConjuncts(conjunct_evals_.data(), conjuncts_.size(), row)) {
       row_batch->CommitLastRow();
       // The limit is handled outside of this loop.
       if (row_batch->AtCapacity()) break;
@@ -171,8 +182,8 @@ Status UnnestNode::Reset(RuntimeState* state) {
 
 void UnnestNode::Close(RuntimeState* state) {
   if (is_closed()) return;
-  DCHECK(coll_expr_ctx_ != NULL);
-  coll_expr_ctx_->Close(state);
+  if (coll_expr_eval_ != nullptr) coll_expr_eval_->Close(state);
+  if (coll_expr_ != nullptr) coll_expr_->Close();
   ExecNode::Close(state);
 }
 

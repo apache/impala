@@ -78,7 +78,7 @@ Status HdfsAvroScanner::Open(ScannerContext* context) {
 }
 
 Status HdfsAvroScanner::Codegen(HdfsScanNodeBase* node,
-    const vector<ExprContext*>& conjunct_ctxs, Function** decode_avro_data_fn) {
+    const vector<ScalarExpr*>& conjuncts, Function** decode_avro_data_fn) {
   *decode_avro_data_fn = NULL;
   DCHECK(node->runtime_state()->ShouldCodegen());
   LlvmCodeGen* codegen = node->runtime_state()->codegen();
@@ -86,8 +86,8 @@ Status HdfsAvroScanner::Codegen(HdfsScanNodeBase* node,
   Function* materialize_tuple_fn = NULL;
   RETURN_IF_ERROR(CodegenMaterializeTuple(node, codegen, &materialize_tuple_fn));
   DCHECK(materialize_tuple_fn != NULL);
-  RETURN_IF_ERROR(CodegenDecodeAvroData(codegen, materialize_tuple_fn,
-      conjunct_ctxs, decode_avro_data_fn));
+  RETURN_IF_ERROR(CodegenDecodeAvroData(codegen, materialize_tuple_fn, conjuncts,
+      decode_avro_data_fn));
   DCHECK(*decode_avro_data_fn != NULL);
   return Status::OK();
 }
@@ -1018,7 +1018,7 @@ Status HdfsAvroScanner::CodegenReadScalar(const AvroSchemaElement& element,
 }
 
 Status HdfsAvroScanner::CodegenDecodeAvroData(LlvmCodeGen* codegen,
-    Function* materialize_tuple_fn, const vector<ExprContext*>& conjunct_ctxs,
+    Function* materialize_tuple_fn, const vector<ScalarExpr*>& conjuncts,
     Function** decode_avro_data_fn) {
   SCOPED_TIMER(codegen->codegen_timer());
   DCHECK(materialize_tuple_fn != NULL);
@@ -1029,8 +1029,7 @@ Status HdfsAvroScanner::CodegenDecodeAvroData(LlvmCodeGen* codegen,
   DCHECK_EQ(replaced, 1);
 
   Function* eval_conjuncts_fn;
-  RETURN_IF_ERROR(ExecNode::CodegenEvalConjuncts(codegen, conjunct_ctxs,
-      &eval_conjuncts_fn));
+  RETURN_IF_ERROR(ExecNode::CodegenEvalConjuncts(codegen, conjuncts, &eval_conjuncts_fn));
 
   replaced = codegen->ReplaceCallSites(fn, eval_conjuncts_fn, "EvalConjuncts");
   DCHECK_EQ(replaced, 1);

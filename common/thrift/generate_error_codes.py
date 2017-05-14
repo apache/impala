@@ -323,6 +323,9 @@ error_codes = (
   # TODO: IMPALA-3200: make sure that this references the correct query option.
   ("MAX_ROW_SIZE", 104, "Row of size $0 could not be materialized in plan node with "
     "id $1. Limit is $2, which can be increased with query option max_row_size"),
+
+  ("IR_VERIFY_FAILED", 105,
+   "Failed to verify generated IR function $0, see log for more details."),
 )
 
 import sys

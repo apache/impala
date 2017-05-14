@@ -161,7 +161,7 @@ public class SortNode extends PlanNode {
         info_.getIsAscOrder(), info_.getNullsFirst());
     Preconditions.checkState(tupleIds_.size() == 1,
         "Incorrect size for tupleIds_ in SortNode");
-    sort_info.sort_tuple_slot_exprs = Expr.treesToThrift(resolvedTupleExprs_);
+    sort_info.setSort_tuple_slot_exprs(Expr.treesToThrift(resolvedTupleExprs_));
     TSortNode sort_node = new TSortNode(sort_info, useTopN_);
     sort_node.setOffset(offset_);
     msg.sort_node = sort_node;

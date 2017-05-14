@@ -90,8 +90,8 @@ class RuntimeFilter {
   /// compact way of representing a full Bloom filter that contains every element.
   BloomFilter* bloom_filter_;
 
-  /// Descriptor of the filter.
-  TRuntimeFilterDesc filter_desc_;
+  /// Reference to the filter's thrift descriptor in the thrift Plan tree.
+  const TRuntimeFilterDesc& filter_desc_;
 
   /// Time, in ms, that the filter was registered.
   int64_t registration_time_;

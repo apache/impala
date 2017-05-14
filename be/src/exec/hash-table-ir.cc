@@ -23,12 +23,12 @@ using namespace impala;
 
 uint32_t HashTableCtx::GetHashSeed() const { return seeds_[level_]; }
 
-ExprContext* const* HashTableCtx::GetBuildExprCtxs() const {
-  return build_expr_ctxs_.data();
+ScalarExprEvaluator* const* HashTableCtx::build_expr_evals() const {
+  return build_expr_evals_.data();
 }
 
-ExprContext* const* HashTableCtx::GetProbeExprCtxs() const {
-  return probe_expr_ctxs_.data();
+ScalarExprEvaluator* const* HashTableCtx::probe_expr_evals() const {
+  return probe_expr_evals_.data();
 }
 
 #endif

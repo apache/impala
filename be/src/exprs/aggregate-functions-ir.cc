@@ -34,7 +34,6 @@
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "exprs/anyval-util.h"
-#include "exprs/expr.h"
 #include "exprs/hll-bias.h"
 
 #include "common/names.h"

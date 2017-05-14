@@ -21,9 +21,6 @@
 
 #include "exec/hash-table.h"
 
-#include "exprs/expr.h"
-#include "exprs/expr-context.h"
-
 namespace impala {
 
 inline bool HashTableCtx::EvalAndHashBuild(const TupleRow* row) {

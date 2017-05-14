@@ -25,6 +25,7 @@ import org.apache.impala.analysis.HdfsUri;
 import org.apache.impala.thrift.TAggregateFunction;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TFunctionBinaryType;
+import com.google.common.base.Preconditions;
 
 /**
  * Internal representation of an aggregate function.
@@ -123,6 +124,9 @@ public class AggregateFunction extends Function {
       String serializeFnSymbol, String getValueFnSymbol, String removeFnSymbol,
       String finalizeFnSymbol, boolean ignoresDistinct, boolean isAnalyticFn,
       boolean returnsNonNullOnEmpty) {
+    Preconditions.checkState(initFnSymbol != null);
+    Preconditions.checkState(updateFnSymbol != null);
+    Preconditions.checkState(mergeFnSymbol != null);
     AggregateFunction fn = new AggregateFunction(new FunctionName(db.getName(), name),
         argTypes, retType, intermediateType, null, updateFnSymbol, initFnSymbol,
         serializeFnSymbol, mergeFnSymbol, getValueFnSymbol, removeFnSymbol,
@@ -216,6 +220,7 @@ public class AggregateFunction extends Function {
   public TFunction toThrift() {
     TFunction fn = super.toThrift();
     TAggregateFunction agg_fn = new TAggregateFunction();
+    agg_fn.setIs_analytic_only_fn(isAnalyticFn_ && !isAggregateFn_);
     agg_fn.setUpdate_fn_symbol(updateFnSymbol_);
     agg_fn.setInit_fn_symbol(initFnSymbol_);
     if (serializeFnSymbol_ != null) agg_fn.setSerialize_fn_symbol(serializeFnSymbol_);

@@ -16,7 +16,6 @@
 // under the License.
 
 #include "exec/sort-node.h"
-#include "exec/sort-exec-exprs.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/sorted-run-merger.h"
@@ -37,8 +36,13 @@ SortNode::~SortNode() {
 }
 
 Status SortNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  const TSortInfo& tsort_info = tnode.sort_node.sort_info;
   RETURN_IF_ERROR(ExecNode::Init(tnode, state));
-  RETURN_IF_ERROR(sort_exec_exprs_.Init(tnode.sort_node.sort_info, pool_));
+  RETURN_IF_ERROR(ScalarExpr::Create(tsort_info.ordering_exprs, row_descriptor_,
+      state, &ordering_exprs_));
+  DCHECK(tsort_info.__isset.sort_tuple_slot_exprs);
+  RETURN_IF_ERROR(ScalarExpr::Create(tsort_info.sort_tuple_slot_exprs,
+      child(0)->row_desc(), state, &sort_tuple_exprs_));
   is_asc_order_ = tnode.sort_node.sort_info.is_asc_order;
   nulls_first_ = tnode.sort_node.sort_info.nulls_first;
   return Status::OK();
@@ -47,14 +51,10 @@ Status SortNode::Init(const TPlanNode& tnode, RuntimeState* state) {
 Status SortNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
-  RETURN_IF_ERROR(sort_exec_exprs_.Prepare(
-      state, child(0)->row_desc(), row_descriptor_, expr_mem_tracker()));
-  AddExprCtxsToFree(sort_exec_exprs_);
-  less_than_.reset(new TupleRowComparator(sort_exec_exprs_, is_asc_order_, nulls_first_));
-  sorter_.reset(
-      new Sorter(*less_than_.get(), sort_exec_exprs_.sort_tuple_slot_expr_ctxs(),
-          &row_descriptor_, mem_tracker(), runtime_profile(), state));
-  RETURN_IF_ERROR(sorter_->Prepare());
+  less_than_.reset(new TupleRowComparator(ordering_exprs_, is_asc_order_, nulls_first_));
+  sorter_.reset(new Sorter(*less_than_, sort_tuple_exprs_,
+      &row_descriptor_, mem_tracker(), runtime_profile(), state));
+  RETURN_IF_ERROR(sorter_->Prepare(pool_, expr_mem_pool()));
   AddCodegenDisabledMessage(state);
   return Status::OK();
 }
@@ -63,7 +63,6 @@ void SortNode::Codegen(RuntimeState* state) {
   DCHECK(state->ShouldCodegen());
   ExecNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
-
   Status codegen_status = less_than_->Codegen(state);
   runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
 }
@@ -71,11 +70,11 @@ void SortNode::Codegen(RuntimeState* state) {
 Status SortNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Open(state));
-  RETURN_IF_ERROR(sort_exec_exprs_.Open(state));
+  RETURN_IF_ERROR(less_than_->Open(pool_, state, expr_mem_pool()));
+  RETURN_IF_ERROR(sorter_->Open());
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
   RETURN_IF_ERROR(child(0)->Open(state));
-  RETURN_IF_ERROR(sorter_->Open());
 
   // The child has been opened and the sorter created. Sort the input.
   // The final merge is done on-demand as rows are requested in GetNext().
@@ -135,16 +134,22 @@ Status SortNode::Reset(RuntimeState* state) {
 
 void SortNode::Close(RuntimeState* state) {
   if (is_closed()) return;
-  sort_exec_exprs_.Close(state);
-  if (sorter_ != NULL) sorter_->Close();
+  if (less_than_.get() != nullptr) less_than_->Close(state);
+  if (sorter_ != nullptr) sorter_->Close(state);
   sorter_.reset();
+  ScalarExpr::Close(ordering_exprs_);
+  ScalarExpr::Close(sort_tuple_exprs_);
   ExecNode::Close(state);
+}
+
+Status SortNode::QueryMaintenance(RuntimeState* state) {
+  sorter_->FreeLocalAllocations();
+  return ExecNode::QueryMaintenance(state);
 }
 
 void SortNode::DebugString(int indentation_level, stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
-  *out << "SortNode("
-       << Expr::DebugString(sort_exec_exprs_.lhs_ordering_expr_ctxs());
+  *out << "SortNode(" << ScalarExpr::DebugString(ordering_exprs_);
   for (int i = 0; i < is_asc_order_.size(); ++i) {
     *out << (i > 0 ? " " : "")
          << (is_asc_order_[i] ? "asc" : "desc")

@@ -19,7 +19,8 @@
 #define IMPALA_EXEC_UNNEST_NODE_H_
 
 #include "exec/exec-node.h"
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
+#include "runtime/collection-value.h"
 
 namespace impala {
 
@@ -61,6 +62,10 @@ class UnnestNode : public ExecNode {
   virtual Status Reset(RuntimeState* state);
   virtual void Close(RuntimeState* state);
 
+  /// Initializes the expression which produces the collection to be unnested.
+  /// Called by the containing subplan node.
+  Status InitCollExpr(RuntimeState* state);
+
  private:
   friend class SubplanNode;
 
@@ -72,9 +77,11 @@ class UnnestNode : public ExecNode {
   /// Expr that produces the collection to be unnested. Currently always a SlotRef into an
   /// collection-typed slot. We do not evaluate this expr for setting coll_value_, but
   /// instead manually retrieve the slot value to support projection (see class comment).
-  ExprContext* coll_expr_ctx_;
+  const TExpr& thrift_coll_expr_;
+  ScalarExpr* coll_expr_;
+  ScalarExprEvaluator* coll_expr_eval_;
 
-  /// Descriptor of the collection-typed slot referenced by coll_expr_ctx_. Set in
+  /// Descriptor of the collection-typed slot referenced by coll_expr_eval_. Set in
   /// Prepare().  This slot is always set to NULL in Open() as a simple projection.
   const SlotDescriptor* coll_slot_desc_;
 

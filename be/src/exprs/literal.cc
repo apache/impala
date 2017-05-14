@@ -22,11 +22,11 @@
 
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "gen-cpp/Exprs_types.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-parse-util.h"
-#include "gen-cpp/Exprs_types.h"
 
 #include "common/names.h"
 
@@ -36,7 +36,7 @@ using namespace impala_udf;
 namespace impala {
 
 Literal::Literal(const TExprNode& node)
-  : Expr(node) {
+  : ScalarExpr(node) {
   switch (type_.type) {
     case TYPE_BOOLEAN:
       DCHECK_EQ(node.node_type, TExprNodeType::BOOL_LITERAL);
@@ -134,46 +134,47 @@ Literal::Literal(const TExprNode& node)
     default:
       DCHECK(false) << "Invalid type: " << TypeToString(type_.type);
   }
+  DCHECK(cache_entry_ == nullptr);
 }
 
 Literal::Literal(ColumnType type, bool v)
-  : Expr(type, true, false) {
+  : ScalarExpr(type, true) {
   DCHECK_EQ(type.type, TYPE_BOOLEAN) << type;
   value_.bool_val = v;
 }
 
 Literal::Literal(ColumnType type, int8_t v)
-  : Expr(type, true, false) {
+  : ScalarExpr(type, true) {
   DCHECK_EQ(type.type, TYPE_TINYINT) << type;
   value_.tinyint_val = v;
 }
 
 Literal::Literal(ColumnType type, int16_t v)
-  : Expr(type, true, false) {
+  : ScalarExpr(type, true) {
   DCHECK_EQ(type.type, TYPE_SMALLINT) << type;
   value_.smallint_val = v;
 }
 
 Literal::Literal(ColumnType type, int32_t v)
-  : Expr(type, true, false) {
+  : ScalarExpr(type, true) {
   DCHECK_EQ(type.type, TYPE_INT) << type;
   value_.int_val = v;
 }
 
 Literal::Literal(ColumnType type, int64_t v)
-  : Expr(type, true, false) {
+  : ScalarExpr(type, true) {
   DCHECK_EQ(type.type, TYPE_BIGINT) << type;
   value_.bigint_val = v;
 }
 
 Literal::Literal(ColumnType type, float v)
-  : Expr(type, true, false) {
+  : ScalarExpr(type, true) {
   DCHECK_EQ(type.type, TYPE_FLOAT) << type;
   value_.float_val = v;
 }
 
 Literal::Literal(ColumnType type, double v)
-  : Expr(type, true, false) {
+  : ScalarExpr(type, true) {
   if (type.type == TYPE_DOUBLE) {
     value_.double_val = v;
   } else if (type.type == TYPE_TIMESTAMP) {
@@ -197,25 +198,23 @@ Literal::Literal(ColumnType type, double v)
   }
 }
 
-Literal::Literal(ColumnType type, const string& v) : Expr(type, true, false) {
+Literal::Literal(ColumnType type, const string& v)
+  : ScalarExpr(type, true) {
   value_.Init(v);
   DCHECK(type.type == TYPE_STRING || type.type == TYPE_CHAR || type.type == TYPE_VARCHAR)
       << type;
 }
 
-Literal::Literal(ColumnType type, const StringValue& v) : Expr(type, true, false) {
+Literal::Literal(ColumnType type, const StringValue& v)
+  : ScalarExpr(type, true) {
   value_.Init(v.DebugString());
   DCHECK(type.type == TYPE_STRING || type.type == TYPE_CHAR) << type;
 }
 
 Literal::Literal(ColumnType type, const TimestampValue& v)
-  : Expr(type, true, false) {
+  : ScalarExpr(type, true) {
   DCHECK_EQ(type.type, TYPE_TIMESTAMP) << type;
   value_.timestamp_val = v;
-}
-
-bool Literal::IsLiteral() const {
-  return true;
 }
 
 template<class T>
@@ -288,53 +287,62 @@ Literal* Literal::CreateLiteral(const ColumnType& type, const string& str) {
     }
     default:
       DCHECK(false) << "Invalid type: " << type.DebugString();
-      return NULL;
+      return nullptr;
   }
 }
 
-BooleanVal Literal::GetBooleanVal(ExprContext* context, const TupleRow* row) {
+BooleanVal Literal::GetBooleanVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_BOOLEAN) << type_;
   return BooleanVal(value_.bool_val);
 }
 
-TinyIntVal Literal::GetTinyIntVal(ExprContext* context, const TupleRow* row) {
+TinyIntVal Literal::GetTinyIntVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_TINYINT) << type_;
   return TinyIntVal(value_.tinyint_val);
 }
 
-SmallIntVal Literal::GetSmallIntVal(ExprContext* context, const TupleRow* row) {
+SmallIntVal Literal::GetSmallIntVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_SMALLINT) << type_;
   return SmallIntVal(value_.smallint_val);
 }
 
-IntVal Literal::GetIntVal(ExprContext* context, const TupleRow* row) {
+IntVal Literal::GetIntVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_INT) << type_;
   return IntVal(value_.int_val);
 }
 
-BigIntVal Literal::GetBigIntVal(ExprContext* context, const TupleRow* row) {
+BigIntVal Literal::GetBigIntVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_BIGINT) << type_;
   return BigIntVal(value_.bigint_val);
 }
 
-FloatVal Literal::GetFloatVal(ExprContext* context, const TupleRow* row) {
+FloatVal Literal::GetFloatVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_FLOAT) << type_;
   return FloatVal(value_.float_val);
 }
 
-DoubleVal Literal::GetDoubleVal(ExprContext* context, const TupleRow* row) {
+DoubleVal Literal::GetDoubleVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DOUBLE) << type_;
   return DoubleVal(value_.double_val);
 }
 
-StringVal Literal::GetStringVal(ExprContext* context, const TupleRow* row) {
+StringVal Literal::GetStringVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK(type_.IsStringType()) << type_;
   StringVal result;
   value_.string_val.ToStringVal(&result);
   return result;
 }
 
-DecimalVal Literal::GetDecimalVal(ExprContext* context, const TupleRow* row) {
+DecimalVal Literal::GetDecimalVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DECIMAL) << type_;
   switch (type().GetByteSize()) {
     case 4:
@@ -350,7 +358,8 @@ DecimalVal Literal::GetDecimalVal(ExprContext* context, const TupleRow* row) {
   return DecimalVal();
 }
 
-TimestampVal Literal::GetTimestampVal(ExprContext* context, const TupleRow* row) {
+TimestampVal Literal::GetTimestampVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_TIMESTAMP) << type_;
   TimestampVal result;
   value_.timestamp_val.ToTimestampVal(&result);
@@ -406,7 +415,7 @@ string Literal::DebugString() const {
     default:
       out << "[bad type! " << type_ << "]";
   }
-  out << Expr::DebugString() << ")";
+  out << ScalarExpr::DebugString() << ")";
   return out.str();
 }
 
@@ -417,14 +426,14 @@ string Literal::DebugString() const {
 //   ret { i8, i64 } { i8 0, i64 10 }
 // }
 Status Literal::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
-  if (ir_compute_fn_ != NULL) {
+  if (ir_compute_fn_ != nullptr) {
     *fn = ir_compute_fn_;
     return Status::OK();
   }
 
   DCHECK_EQ(GetNumChildren(), 0);
   Value* args[2];
-  *fn = CreateIrFunctionPrototype(codegen, "Literal", &args);
+  *fn = CreateIrFunctionPrototype("Literal", codegen, &args);
   BasicBlock* entry_block = BasicBlock::Create(codegen->context(), "entry", *fn);
   LlvmBuilder builder(entry_block);
 
@@ -488,6 +497,7 @@ Status Literal::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
 
   builder.CreateRet(v.GetLoweredValue());
   *fn = codegen->FinalizeFunction(*fn);
+  if (UNLIKELY(*fn == nullptr)) return Status(TErrorCode::IR_VERIFY_FAILED, "Literal");
   ir_compute_fn_ = *fn;
   return Status::OK();
 }

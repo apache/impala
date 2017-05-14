@@ -29,7 +29,7 @@
 #include "exec/hdfs-scan-node-mt.h"
 #include "exec/read-write-util.h"
 #include "exec/text-converter.inline.h"
-#include "exprs/expr-context.h"
+#include "exprs/scalar-expr.h"
 #include "runtime/collection-value-builder.h"
 #include "runtime/descriptors.h"
 #include "runtime/hdfs-fs-cache.h"
@@ -64,7 +64,8 @@ HdfsScanner::HdfsScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
       stream_(NULL),
       eos_(false),
       is_closed_(false),
-      scanner_conjunct_ctxs_(NULL),
+      expr_mem_pool_(new MemPool(scan_node->expr_mem_tracker())),
+      conjunct_evals_(NULL),
       template_tuple_pool_(new MemPool(scan_node->mem_tracker())),
       template_tuple_(NULL),
       tuple_byte_size_(scan_node->tuple_desc()->byte_size()),
@@ -85,7 +86,7 @@ HdfsScanner::HdfsScanner()
       stream_(NULL),
       eos_(false),
       is_closed_(false),
-      scanner_conjunct_ctxs_(NULL),
+      conjunct_evals_(NULL),
       template_tuple_pool_(NULL),
       template_tuple_(NULL),
       tuple_byte_size_(-1),
@@ -107,25 +108,33 @@ Status HdfsScanner::Open(ScannerContext* context) {
   context_ = context;
   stream_ = context->GetStream();
 
-  // Clone the scan node's conjuncts map. The cloned contexts must be closed by the
+  // Clone the scan node's conjuncts map. The cloned evaluators must be closed by the
   // caller.
   for (const auto& entry: scan_node_->conjuncts_map()) {
-    RETURN_IF_ERROR(Expr::CloneIfNotExists(entry.second,
-        scan_node_->runtime_state(), &scanner_conjuncts_map_[entry.first]));
+    RETURN_IF_ERROR(ScalarExprEvaluator::Clone(&obj_pool_, scan_node_->runtime_state(),
+        expr_mem_pool_.get(), entry.second,
+        &conjunct_evals_map_[entry.first]));
   }
-  DCHECK(scanner_conjuncts_map_.find(scan_node_->tuple_desc()->id()) !=
-         scanner_conjuncts_map_.end());
-  scanner_conjunct_ctxs_ = &scanner_conjuncts_map_[scan_node_->tuple_desc()->id()];
+  DCHECK(conjunct_evals_map_.find(scan_node_->tuple_desc()->id()) !=
+         conjunct_evals_map_.end());
+  conjunct_evals_ = &conjunct_evals_map_[scan_node_->tuple_desc()->id()];
 
-  // Clone the scan node's dictionary filtering conjuncts map.
-  for (const auto& entry: scan_node_->dict_filter_conjuncts_map()) {
-    RETURN_IF_ERROR(Expr::CloneIfNotExists(entry.second,
-        scan_node_->runtime_state(), &scanner_dict_filter_map_[entry.first]));
+  // Set up the scan node's dictionary filtering conjuncts map.
+  if (scan_node_->thrift_dict_filter_conjuncts_map() != nullptr) {
+    for (auto& entry : *(scan_node_->thrift_dict_filter_conjuncts_map())) {
+      // Convert this slot's list of conjunct indices into a list of pointers
+      // into conjunct_evals_.
+      for (int conjunct_idx : entry.second) {
+        DCHECK_LT(conjunct_idx, conjunct_evals_->size());
+        DCHECK((*conjunct_evals_)[conjunct_idx] != nullptr);
+        dict_filter_map_[entry.first].push_back((*conjunct_evals_)[conjunct_idx]);
+      }
+    }
   }
 
   // Initialize the template_tuple_.
   template_tuple_ = scan_node_->InitTemplateTuple(
-      context_->partition_descriptor()->partition_key_value_ctxs(),
+      context_->partition_descriptor()->partition_key_value_evals(),
       template_tuple_pool_.get(), state_);
   template_tuple_map_[scan_node_->tuple_desc()] = template_tuple_;
 
@@ -139,8 +148,10 @@ void HdfsScanner::Close(RowBatch* row_batch) {
     decompressor_->Close();
     decompressor_.reset();
   }
-  for (const auto& entry: scanner_conjuncts_map_) Expr::Close(entry.second, state_);
-  for (const auto& entry: scanner_dict_filter_map_) Expr::Close(entry.second, state_);
+  for (auto& entry : conjunct_evals_map_) {
+    ScalarExprEvaluator::Close(entry.second, state_);
+  }
+  expr_mem_pool_->FreeAll();
   obj_pool_.Clear();
   stream_ = NULL;
   context_->ClearStreams();
@@ -223,8 +234,8 @@ Status HdfsScanner::CommitRows(int num_rows, bool enqueue_if_full, RowBatch* row
   RETURN_IF_ERROR(state_->GetQueryStatus());
   // Free local expr allocations for this thread to avoid accumulating too much
   // memory from evaluating the scanner conjuncts.
-  for (const auto& entry: scanner_conjuncts_map_) {
-    ExprContext::FreeLocalAllocations(entry.second);
+  for (const auto& entry: conjunct_evals_map_) {
+    ScalarExprEvaluator::FreeLocalAllocations(entry.second);
   }
   return Status::OK();
 }
@@ -232,7 +243,7 @@ Status HdfsScanner::CommitRows(int num_rows, bool enqueue_if_full, RowBatch* row
 int HdfsScanner::WriteTemplateTuples(TupleRow* row, int num_tuples) {
   DCHECK_GE(num_tuples, 0);
   DCHECK_EQ(scan_node_->tuple_idx(), 0);
-  DCHECK_EQ(scanner_conjunct_ctxs_->size(), 0);
+  DCHECK_EQ(conjunct_evals_->size(), 0);
   if (num_tuples == 0 || template_tuple_ == NULL) return num_tuples;
 
   Tuple** row_tuple = reinterpret_cast<Tuple**>(row);
@@ -306,10 +317,10 @@ bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,
 //  %error_in_row2 = or i1 false, %slot_parse_error
 //  %3 = zext i1 %slot_parse_error to i8
 //  store i8 %3, i8* %slot_error_ptr
-//  %4 = call %"class.impala::ExprContext"* @GetConjunctCtx(
+//  %4 = call %"class.impala::ScalarExprEvaluator"* @GetConjunctCtx(
 //    %"class.impala::HdfsScanner"* %this, i32 0)
 //  %conjunct_eval = call i16 @"impala::Operators::Eq_StringVal_StringValWrapper"(
-//    %"class.impala::ExprContext"* %4, %"class.impala::TupleRow"* %tuple_row)
+//    %"class.impala::ScalarExprEvaluator"* %4, %"class.impala::TupleRow"* %tuple_row)
 //  %5 = ashr i16 %conjunct_eval, 8
 //  %6 = trunc i16 %5 to i8
 //  %val = trunc i8 %6 to i1
@@ -324,7 +335,7 @@ bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,
 //   ret i1 false
 // }
 Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
-    LlvmCodeGen* codegen, const vector<ExprContext*>& conjunct_ctxs,
+    LlvmCodeGen* codegen, const vector<ScalarExpr*>& conjuncts,
     Function** write_complete_tuple_fn) {
   *write_complete_tuple_fn = NULL;
   SCOPED_TIMER(codegen->codegen_timer());
@@ -436,7 +447,7 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
   builder.CreateBr(parse_block);
 
   // Loop through all the conjuncts in order and materialize slots as necessary to
-  // evaluate the conjuncts (e.g. conjunct_ctxs[0] will have the slots it references
+  // evaluate the conjuncts (e.g. conjuncts[0] will have the slots it references
   // first).
   // materialized_order[slot_idx] represents the first conjunct which needs that slot.
   // Slots are only materialized if its order matches the current conjunct being
@@ -444,7 +455,7 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
   // needed and that at the end of the materialize loop, the conjunct has everything
   // it needs (either from this iteration or previous iterations).
   builder.SetInsertPoint(parse_block);
-  for (int conjunct_idx = 0; conjunct_idx <= conjunct_ctxs.size(); ++conjunct_idx) {
+  for (int conjunct_idx = 0; conjunct_idx <= conjuncts.size(); ++conjunct_idx) {
     for (int slot_idx = 0; slot_idx < materialize_order.size(); ++slot_idx) {
       // If they don't match, it means either the slot has already been
       // materialized for a previous conjunct or will be materialized later for
@@ -452,7 +463,7 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
       // yet.
       if (materialize_order[slot_idx] != conjunct_idx) continue;
 
-      // Materialize slots[slot_idx] to evaluate conjunct_ctxs[conjunct_idx]
+      // Materialize slots[slot_idx] to evaluate conjuncts[conjunct_idx]
       // All slots[i] with materialized_order[i] < conjunct_idx have already been
       // materialized by prior iterations through the outer loop
 
@@ -500,7 +511,7 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
       builder.CreateStore(slot_error, error_ptr);
     }
 
-    if (conjunct_idx == conjunct_ctxs.size()) {
+    if (conjunct_idx == conjuncts.size()) {
       // In this branch, we've just materialized slots not referenced by any conjunct.
       // This slots are the last to get materialized.  If we are in this branch, the
       // tuple passed all conjuncts and should be added to the row batch.
@@ -508,12 +519,12 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
       builder.CreateStore(error_ret, error_in_row_arg);
       builder.CreateRet(codegen->true_value());
     } else {
-      // All slots for conjunct_ctxs[conjunct_idx] are materialized, evaluate the partial
+      // All slots for conjuncts[conjunct_idx] are materialized, evaluate the partial
       // tuple against that conjunct and start a new parse_block for the next conjunct
       parse_block = BasicBlock::Create(context, "parse", fn, eval_fail_block);
       Function* conjunct_fn;
       Status status =
-          conjunct_ctxs[conjunct_idx]->root()->GetCodegendComputeFn(codegen, &conjunct_fn);
+          conjuncts[conjunct_idx]->GetCodegendComputeFn(codegen, &conjunct_fn);
       if (!status.ok()) {
         stringstream ss;
         ss << "Failed to codegen conjunct: " << status.GetDetail();
@@ -526,12 +537,12 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
         codegen->SetNoInline(conjunct_fn);
       }
 
-      Function* get_ctx_fn =
-          codegen->GetFunction(IRFunction::HDFS_SCANNER_GET_CONJUNCT_CTX, false);
-      Value* ctx = builder.CreateCall(get_ctx_fn,
+      Function* get_eval_fn =
+          codegen->GetFunction(IRFunction::HDFS_SCANNER_GET_CONJUNCT_EVALUATOR, false);
+      Value* eval = builder.CreateCall(get_eval_fn,
           ArrayRef<Value*>({this_arg, codegen->GetIntConstant(TYPE_INT, conjunct_idx)}));
 
-      Value* conjunct_args[] = {ctx, tuple_row_arg};
+      Value* conjunct_args[] = {eval, tuple_row_arg};
       CodegenAnyVal result = CodegenAnyVal::CreateCallWrapped(
           codegen, &builder, TYPE_BOOLEAN, conjunct_fn, conjunct_args, "conjunct_eval");
       builder.CreateCondBr(result.GetVal(), parse_block, eval_fail_block);
@@ -543,7 +554,7 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
   builder.SetInsertPoint(eval_fail_block);
   builder.CreateRet(codegen->false_value());
 
-  if (node->materialized_slots().size() + conjunct_ctxs.size()
+  if (node->materialized_slots().size() + conjuncts.size()
       > LlvmCodeGen::CODEGEN_INLINE_EXPR_BATCH_THRESHOLD) {
     codegen->SetNoInline(fn);
   }

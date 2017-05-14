@@ -30,93 +30,104 @@ using namespace llvm;
 
 namespace impala {
 
-BooleanVal NullLiteral::GetBooleanVal(ExprContext* context, const TupleRow* row) {
+BooleanVal NullLiteral::GetBooleanVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_BOOLEAN) << type_;
   return BooleanVal::null();
 }
 
-TinyIntVal NullLiteral::GetTinyIntVal(ExprContext* context, const TupleRow* row) {
+TinyIntVal NullLiteral::GetTinyIntVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_TINYINT) << type_;
   return TinyIntVal::null();
 }
 
-SmallIntVal NullLiteral::GetSmallIntVal(ExprContext* context, const TupleRow* row) {
+SmallIntVal NullLiteral::GetSmallIntVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_SMALLINT) << type_;
   return SmallIntVal::null();
 }
 
-IntVal NullLiteral::GetIntVal(ExprContext* context, const TupleRow* row) {
+IntVal NullLiteral::GetIntVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_INT) << type_;
   return IntVal::null();
 }
 
-BigIntVal NullLiteral::GetBigIntVal(ExprContext* context, const TupleRow* row) {
+BigIntVal NullLiteral::GetBigIntVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_BIGINT) << type_;
   return BigIntVal::null();
 }
 
-FloatVal NullLiteral::GetFloatVal(ExprContext* context, const TupleRow* row) {
+FloatVal NullLiteral::GetFloatVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_FLOAT) << type_;
   return FloatVal::null();
 }
 
-DoubleVal NullLiteral::GetDoubleVal(ExprContext* context, const TupleRow* row) {
+DoubleVal NullLiteral::GetDoubleVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DOUBLE) << type_;
   return DoubleVal::null();
 }
 
-StringVal NullLiteral::GetStringVal(ExprContext* context, const TupleRow* row) {
+StringVal NullLiteral::GetStringVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK(type_.IsStringType()) << type_;
   return StringVal::null();
 }
 
-TimestampVal NullLiteral::GetTimestampVal(ExprContext* context, const TupleRow* row) {
+TimestampVal NullLiteral::GetTimestampVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_TIMESTAMP) << type_;
   return TimestampVal::null();
 }
 
-DecimalVal NullLiteral::GetDecimalVal(ExprContext* context, const TupleRow* row) {
+DecimalVal NullLiteral::GetDecimalVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DECIMAL) << type_;
   return DecimalVal::null();
 }
 
-CollectionVal NullLiteral::GetCollectionVal(ExprContext* context, const TupleRow* row) {
+CollectionVal NullLiteral::GetCollectionVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK(type_.IsCollectionType());
   return CollectionVal::null();
 }
 
-bool NullLiteral::IsLiteral() const {
-  return true;
-}
-
 // Generated IR for a bigint NULL literal:
 //
-// define { i8, i64 } @NullLiteral(i8* %context, %"class.impala::TupleRow"* %row) {
+// define { i8, i64 } @NullLiteral(
+//     %"class.impala::ScalarExprEvaluator"* %eval, %"class.impala::TupleRow"* %row) {
 // entry:
 //   ret { i8, i64 } { i8 1, i64 0 }
 // }
 Status NullLiteral::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
-  if (ir_compute_fn_ != NULL) {
+  if (ir_compute_fn_ != nullptr) {
     *fn = ir_compute_fn_;
     return Status::OK();
   }
 
   DCHECK_EQ(GetNumChildren(), 0);
   Value* args[2];
-  *fn = CreateIrFunctionPrototype(codegen, "NullLiteral", &args);
+  *fn = CreateIrFunctionPrototype("NullLiteral", codegen, &args);
   BasicBlock* entry_block = BasicBlock::Create(codegen->context(), "entry", *fn);
   LlvmBuilder builder(entry_block);
 
   Value* v = CodegenAnyVal::GetNullVal(codegen, type());
   builder.CreateRet(v);
   *fn = codegen->FinalizeFunction(*fn);
+  if (UNLIKELY(*fn == nullptr)) {
+    return Status(TErrorCode::IR_VERIFY_FAILED, "NullLiteral");
+  }
   ir_compute_fn_ = *fn;
   return Status::OK();
 }
 
 string NullLiteral::DebugString() const {
   stringstream out;
-  out << "NullLiteral(" << Expr::DebugString() << ")";
+  out << "NullLiteral(" << ScalarExpr::DebugString() << ")";
   return out.str();
 }
 

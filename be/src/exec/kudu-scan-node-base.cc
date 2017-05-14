@@ -137,8 +137,4 @@ void KuduScanNodeBase::StopAndFinalizeCounters() {
   PeriodicCounterUpdater::StopTimeSeriesCounter(bytes_read_timeseries_counter_);
 }
 
-Status KuduScanNodeBase::GetConjunctCtxs(vector<ExprContext*>* ctxs) {
-  return Expr::CloneIfNotExists(conjunct_ctxs_, runtime_state_, ctxs);
-}
-
 }  // namespace impala

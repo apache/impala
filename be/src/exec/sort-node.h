@@ -19,7 +19,6 @@
 #define IMPALA_EXEC_SORT_NODE_H
 
 #include "exec/exec-node.h"
-#include "exec/sort-exec-exprs.h"
 #include "runtime/sorter.h"
 #include "runtime/buffered-block-mgr.h"
 
@@ -29,7 +28,7 @@ namespace impala {
 /// to disk if the input is larger than available memory.
 /// Uses Sorter and BufferedBlockMgr for the external sort implementation.
 /// Input rows to SortNode are materialized by the Sorter into a single tuple
-/// using the expressions specified in sort_exec_exprs_.
+/// using the expressions specified in sort_tuple_exprs_.
 /// In GetNext(), SortNode passes in the output batch to the sorter instance created
 /// in Open() to fill it with sorted rows.
 /// If a merge phase was performed in the sort, sorted rows are deep copied into
@@ -48,6 +47,7 @@ class SortNode : public ExecNode {
   virtual void Close(RuntimeState* state);
 
  protected:
+  virtual Status QueryMaintenance(RuntimeState* state);
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
@@ -61,7 +61,12 @@ class SortNode : public ExecNode {
   boost::scoped_ptr<TupleRowComparator> less_than_;
 
   /// Expressions and parameters used for tuple materialization and tuple comparison.
-  SortExecExprs sort_exec_exprs_;
+  std::vector<ScalarExpr*> ordering_exprs_;
+
+  /// Expressions used to materialize slots in the tuples to be sorted.
+  /// One expr per slot in the materialized tuple.
+  std::vector<ScalarExpr*> sort_tuple_exprs_;
+
   std::vector<bool> is_asc_order_;
   std::vector<bool> nulls_first_;
 

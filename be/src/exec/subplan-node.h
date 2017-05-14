@@ -19,7 +19,7 @@
 #define IMPALA_EXEC_SUBPLAN_NODE_H_
 
 #include "exec/exec-node.h"
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
 
 namespace impala {
 
@@ -62,9 +62,10 @@ class SubplanNode : public ExecNode {
   friend class UnnestNode;
 
   /// Sets 'ancestor' as the containing Subplan in all exec nodes inside the exec-node
-  /// tree rooted at 'node'.
-  /// Does not traverse the second child of SubplanNodes within 'node'
-  void SetContainingSubplan(SubplanNode* ancestor, ExecNode* node);
+  /// tree rooted at 'node' and does any initialization that is required as a result of
+  /// setting the subplan. Doesn't traverse the second child of SubplanNodes within
+  /// 'node'.
+  Status SetContainingSubplan(RuntimeState* state, SubplanNode* ancestor, ExecNode* node);
 
   /// Returns the current row from child(0) or NULL if no rows from child(0) have been
   /// retrieved yet (GetNext() has not yet been called). This function is called by

@@ -98,10 +98,6 @@ class KuduScanNodeBase : public ScanNode {
   static const std::string KUDU_ROUND_TRIPS;
   static const std::string KUDU_REMOTE_TOKENS;
 
-  /// Returns a cloned copy of the scan node's conjuncts. Requires that the expressions
-  /// have been open previously.
-  Status GetConjunctCtxs(vector<ExprContext*>* ctxs);
-
   const TupleDescriptor* tuple_desc() const { return tuple_desc_; }
   kudu::client::KuduClient* kudu_client() { return client_; }
   RuntimeProfile::Counter* kudu_round_trips() const { return kudu_round_trips_; }

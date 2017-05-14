@@ -67,7 +67,7 @@ int ImpaladMain(int argc, char** argv) {
   ABORT_IF_ERROR(HBaseTableScanner::Init());
   ABORT_IF_ERROR(HBaseTable::InitJNI());
   ABORT_IF_ERROR(HBaseTableWriter::InitJNI());
-  ABORT_IF_ERROR(HiveUdfCall::Init());
+  ABORT_IF_ERROR(HiveUdfCall::InitEnv());
   InitFeSupport();
 
   if (FLAGS_enable_rm) {

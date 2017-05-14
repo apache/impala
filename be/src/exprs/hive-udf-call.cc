@@ -23,7 +23,7 @@
 
 #include "codegen/llvm-codegen.h"
 #include "exprs/anyval-util.h"
-#include "exprs/expr-context.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "rpc/jni-thrift-util.h"
 #include "runtime/lib-cache.h"
 #include "runtime/runtime-state.h"
@@ -67,14 +67,15 @@ struct JniContext {
       output_anyval(NULL) {}
 };
 
-HiveUdfCall::HiveUdfCall(const TExprNode& node) : Expr(node), input_buffer_size_(0) {
+HiveUdfCall::HiveUdfCall(const TExprNode& node)
+  : ScalarExpr(node), input_buffer_size_(0) {
   DCHECK_EQ(node.node_type, TExprNodeType::FUNCTION_CALL);
   DCHECK_EQ(node.fn.binary_type, TFunctionBinaryType::JAVA);
   DCHECK(executor_cl_ != NULL) << "Init() was not called!";
 }
 
-AnyVal* HiveUdfCall::Evaluate(ExprContext* ctx, const TupleRow* row) {
-  FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
+AnyVal* HiveUdfCall::Evaluate(ScalarExprEvaluator* eval, const TupleRow* row) const {
+  FunctionContext* fn_ctx = eval->fn_context(fn_ctx_idx_);
   JniContext* jni_ctx = reinterpret_cast<JniContext*>(
       fn_ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
   DCHECK(jni_ctx != NULL);
@@ -91,7 +92,7 @@ AnyVal* HiveUdfCall::Evaluate(ExprContext* ctx, const TupleRow* row) {
 
   // Evaluate all the children values and put the results in input_values_buffer
   for (int i = 0; i < GetNumChildren(); ++i) {
-    void* v = ctx->GetValue(GetChild(i), row);
+    void* v = eval->GetValue(*GetChild(i), row);
 
     if (v == NULL) {
       jni_ctx->input_nulls_buffer[i] = 1;
@@ -152,7 +153,7 @@ AnyVal* HiveUdfCall::Evaluate(ExprContext* ctx, const TupleRow* row) {
   return jni_ctx->output_anyval;
 }
 
-Status HiveUdfCall::Init() {
+Status HiveUdfCall::InitEnv() {
   DCHECK(executor_cl_ == NULL) << "Init() already called!";
   JNIEnv* env = getJNIEnv();
   if (env == NULL) return Status("Failed to get/create JVM");
@@ -169,9 +170,9 @@ Status HiveUdfCall::Init() {
   return Status::OK();
 }
 
-Status HiveUdfCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc,
-                            ExprContext* ctx) {
-  RETURN_IF_ERROR(Expr::Prepare(state, row_desc, ctx));
+Status HiveUdfCall::Init(const RowDescriptor& row_desc, RuntimeState* state) {
+  // Initialize children first.
+  RETURN_IF_ERROR(ScalarExpr::Init(row_desc, state));
 
   // Copy the Hive Jar from hdfs to local file system.
   RETURN_IF_ERROR(LibCache::instance()->GetLocalLibPath(
@@ -185,19 +186,16 @@ Status HiveUdfCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc,
     // one buffer for all rows and we never copy the entire buffer.
     input_buffer_size_ = BitUtil::RoundUpNumBytes(input_buffer_size_) * 8;
   }
-
-  // Register FunctionContext in ExprContext
-  RegisterFunctionContext(ctx, state);
-
   return Status::OK();
 }
 
-Status HiveUdfCall::Open(RuntimeState* state, ExprContext* ctx,
-                         FunctionContext::FunctionStateScope scope) {
-  RETURN_IF_ERROR(Expr::Open(state, ctx, scope));
+Status HiveUdfCall::OpenEvaluator(FunctionContext::FunctionStateScope scope,
+    RuntimeState* state, ScalarExprEvaluator* eval) const {
+  RETURN_IF_ERROR(ScalarExpr::OpenEvaluator(scope, state, eval));
 
-  // Create a JniContext in this thread's FunctionContext
-  FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
+  // Create a JniContext in this thread's FunctionContext.
+  DCHECK_GE(fn_ctx_idx_, 0);
+  FunctionContext* fn_ctx = eval->fn_context(fn_ctx_idx_);
   JniContext* jni_ctx = new JniContext;
   fn_ctx->SetFunctionState(FunctionContext::THREAD_LOCAL, jni_ctx);
 
@@ -231,15 +229,15 @@ Status HiveUdfCall::Open(RuntimeState* state, ExprContext* ctx,
   RETURN_ERROR_IF_EXC(env);
   RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, jni_ctx->executor, &jni_ctx->executor));
 
-  RETURN_IF_ERROR(AllocateAnyVal(state, ctx->pool_.get(), type_,
+  RETURN_IF_ERROR(AllocateAnyVal(state, eval->mem_pool(), type_,
       "Could not allocate JNI output value", &jni_ctx->output_anyval));
   return Status::OK();
 }
 
-void HiveUdfCall::Close(RuntimeState* state, ExprContext* ctx,
-    FunctionContext::FunctionStateScope scope) {
-  if (fn_context_index_ != -1) {
-    FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
+void HiveUdfCall::CloseEvaluator(FunctionContext::FunctionStateScope scope,
+    RuntimeState* state, ScalarExprEvaluator* eval) const {
+  if (eval->opened()) {
+    FunctionContext* fn_ctx = eval->fn_context(fn_ctx_idx_);
     JniContext* jni_ctx = reinterpret_cast<JniContext*>(
         fn_ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
 
@@ -266,12 +264,9 @@ void HiveUdfCall::Close(RuntimeState* state, ExprContext* ctx,
       jni_ctx->output_anyval = NULL;
       delete jni_ctx;
       fn_ctx->SetFunctionState(FunctionContext::THREAD_LOCAL, nullptr);
-    } else {
-      DCHECK(!ctx->opened_);
     }
   }
-
-  Expr::Close(state, ctx, scope);
+  ScalarExpr::CloseEvaluator(scope, state, eval);
 }
 
 Status HiveUdfCall::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
@@ -282,63 +277,73 @@ string HiveUdfCall::DebugString() const {
   stringstream out;
   out << "HiveUdfCall(hdfs_location=" << fn_.hdfs_location
       << " classname=" << fn_.scalar_fn.symbol << " "
-      << Expr::DebugString() << ")";
+      << ScalarExpr::DebugString() << ")";
   return out.str();
 }
 
-BooleanVal HiveUdfCall::GetBooleanVal(ExprContext* ctx, const TupleRow* row) {
+BooleanVal HiveUdfCall::GetBooleanVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_BOOLEAN);
-  return *reinterpret_cast<BooleanVal*>(Evaluate(ctx, row));
+  return *reinterpret_cast<BooleanVal*>(Evaluate(eval, row));
 }
 
-TinyIntVal HiveUdfCall::GetTinyIntVal(ExprContext* ctx, const TupleRow* row) {
+TinyIntVal HiveUdfCall::GetTinyIntVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_TINYINT);
-  return *reinterpret_cast<TinyIntVal*>(Evaluate(ctx, row));
+  return *reinterpret_cast<TinyIntVal*>(Evaluate(eval, row));
 }
 
-SmallIntVal HiveUdfCall::GetSmallIntVal(ExprContext* ctx, const TupleRow* row) {
+SmallIntVal HiveUdfCall::GetSmallIntVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_SMALLINT);
-  return * reinterpret_cast<SmallIntVal*>(Evaluate(ctx, row));
+  return * reinterpret_cast<SmallIntVal*>(Evaluate(eval, row));
 }
 
-IntVal HiveUdfCall::GetIntVal(ExprContext* ctx, const TupleRow* row) {
+IntVal HiveUdfCall::GetIntVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_INT);
-  return *reinterpret_cast<IntVal*>(Evaluate(ctx, row));
+  return *reinterpret_cast<IntVal*>(Evaluate(eval, row));
 }
 
-BigIntVal HiveUdfCall::GetBigIntVal(ExprContext* ctx, const TupleRow* row) {
+BigIntVal HiveUdfCall::GetBigIntVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_BIGINT);
-  return *reinterpret_cast<BigIntVal*>(Evaluate(ctx, row));
+  return *reinterpret_cast<BigIntVal*>(Evaluate(eval, row));
 }
 
-FloatVal HiveUdfCall::GetFloatVal(ExprContext* ctx, const TupleRow* row) {
+FloatVal HiveUdfCall::GetFloatVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_FLOAT);
-  return *reinterpret_cast<FloatVal*>(Evaluate(ctx, row));
+  return *reinterpret_cast<FloatVal*>(Evaluate(eval, row));
 }
 
-DoubleVal HiveUdfCall::GetDoubleVal(ExprContext* ctx, const TupleRow* row) {
+DoubleVal HiveUdfCall::GetDoubleVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DOUBLE);
-  return *reinterpret_cast<DoubleVal*>(Evaluate(ctx, row));
+  return *reinterpret_cast<DoubleVal*>(Evaluate(eval, row));
 }
 
-StringVal HiveUdfCall::GetStringVal(ExprContext* ctx, const TupleRow* row) {
+StringVal HiveUdfCall::GetStringVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_STRING);
-  StringVal result = *reinterpret_cast<StringVal*>(Evaluate(ctx, row));
+  StringVal result = *reinterpret_cast<StringVal*>(Evaluate(eval, row));
   // Copy the string into a local allocation with the usual lifetime for expr results.
   // Needed because the UDF output buffer is owned by the Java UDF executor and may be
   // freed or reused by the next call into the Java UDF executor.
-  FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
+  FunctionContext* fn_ctx = eval->fn_context(fn_ctx_idx_);
   return StringVal::CopyFrom(fn_ctx, result.ptr, result.len);
 }
 
-TimestampVal HiveUdfCall::GetTimestampVal(ExprContext* ctx, const TupleRow* row) {
+TimestampVal HiveUdfCall::GetTimestampVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_TIMESTAMP);
-  return *reinterpret_cast<TimestampVal*>(Evaluate(ctx, row));
+  return *reinterpret_cast<TimestampVal*>(Evaluate(eval, row));
 }
 
-DecimalVal HiveUdfCall::GetDecimalVal(ExprContext* ctx, const TupleRow* row) {
+DecimalVal HiveUdfCall::GetDecimalVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DECIMAL);
-  return *reinterpret_cast<DecimalVal*>(Evaluate(ctx, row));
+  return *reinterpret_cast<DecimalVal*>(Evaluate(eval, row));
 }
 
 }

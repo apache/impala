@@ -16,7 +16,8 @@
 // under the License.
 
 #include "exec/select-node.h"
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/raw-value.h"
@@ -93,8 +94,9 @@ Status SelectNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) 
 }
 
 bool SelectNode::CopyRows(RowBatch* output_batch) {
-  ExprContext** conjunct_ctxs = &conjunct_ctxs_[0];
-  int num_conjunct_ctxs = conjunct_ctxs_.size();
+  ScalarExprEvaluator* const* conjunct_evals = conjunct_evals_.data();
+  int num_conjuncts = conjuncts_.size();
+  DCHECK_EQ(num_conjuncts, conjunct_evals_.size());
 
   while (child_row_idx_ < child_row_batch_->num_rows()) {
     // Add a new row to output_batch
@@ -104,7 +106,7 @@ bool SelectNode::CopyRows(RowBatch* output_batch) {
     // Make sure to increment row idx before returning.
     ++child_row_idx_;
 
-    if (EvalConjuncts(conjunct_ctxs, num_conjunct_ctxs, src_row)) {
+    if (EvalConjuncts(conjunct_evals, num_conjuncts, src_row)) {
       output_batch->CopyRow(src_row, dst_row);
       output_batch->CommitLastRow();
       ++num_rows_returned_;

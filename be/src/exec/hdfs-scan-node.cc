@@ -362,12 +362,15 @@ void HdfsScanNode::ScannerThread() {
   SCOPED_THREAD_COUNTER_MEASUREMENT(runtime_state_->total_thread_statistics());
 
   // Make thread-local copy of filter contexts to prune scan ranges, and to pass to the
-  // scanner for finer-grained filtering.
+  // scanner for finer-grained filtering. Use a thread-local MemPool for the filter
+  // contexts as the embedded expression evaluators may allocate from it and MemPool
+  // is not thread safe.
+  MemPool filter_mem_pool(expr_mem_tracker());
   vector<FilterContext> filter_ctxs;
   Status filter_status = Status::OK();
   for (auto& filter_ctx: filter_ctxs_) {
     FilterContext filter;
-    filter_status = filter.CloneFrom(filter_ctx, runtime_state_);
+    filter_status = filter.CloneFrom(filter_ctx, pool_, runtime_state_, &filter_mem_pool);
     if (!filter_status.ok()) break;
     filter_ctxs.push_back(filter);
   }
@@ -386,14 +389,7 @@ void HdfsScanNode::ScannerThread() {
           // Unlock before releasing the thread token to avoid deadlock in
           // ThreadTokenAvailableCb().
           l.unlock();
-          runtime_state_->resource_pool()->ReleaseThreadToken(false);
-          if (filter_status.ok()) {
-            for (auto& ctx: filter_ctxs) {
-              ctx.expr_ctx->FreeLocalAllocations();
-              ctx.expr_ctx->Close(runtime_state_);
-            }
-          }
-          return;
+          goto exit;
         }
       } else {
         // If this is the only scanner thread, it should keep running regardless
@@ -458,16 +454,17 @@ void HdfsScanNode::ScannerThread() {
       break;
     }
   }
+  COUNTER_ADD(&active_scanner_thread_counter_, -1);
 
+exit:
+  runtime_state_->resource_pool()->ReleaseThreadToken(false);
   if (filter_status.ok()) {
     for (auto& ctx: filter_ctxs) {
-      ctx.expr_ctx->FreeLocalAllocations();
-      ctx.expr_ctx->Close(runtime_state_);
+      ctx.expr_eval->FreeLocalAllocations();
+      ctx.expr_eval->Close(runtime_state_);
     }
   }
-
-  COUNTER_ADD(&active_scanner_thread_counter_, -1);
-  runtime_state_->resource_pool()->ReleaseThreadToken(false);
+  filter_mem_pool.FreeAll();
 }
 
 namespace {

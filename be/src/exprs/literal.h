@@ -20,16 +20,46 @@
 #define IMPALA_EXPRS_LITERAL_H_
 
 #include <string>
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
 #include "exprs/expr-value.h"
 #include "runtime/string-value.h"
+#include "udf/udf.h"
 
 namespace impala {
 
+using impala_udf::FunctionContext;
+using impala_udf::AnyVal;
+using impala_udf::BooleanVal;
+using impala_udf::TinyIntVal;
+using impala_udf::SmallIntVal;
+using impala_udf::IntVal;
+using impala_udf::BigIntVal;
+using impala_udf::FloatVal;
+using impala_udf::DoubleVal;
+using impala_udf::TimestampVal;
+using impala_udf::StringVal;
+using impala_udf::DecimalVal;
+
+class ScalarExprEvaluator;
 class TExprNode;
 
-class Literal: public Expr {
+class Literal: public ScalarExpr {
  public:
+  virtual bool IsLiteral() const override { return true; }
+  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn)
+      override WARN_UNUSED_RESULT;
+  virtual std::string DebugString() const override;
+
+  /// Test function that parses 'str' according to 'type'. The caller owns the returned
+  /// Literal.
+  static Literal* CreateLiteral(const ColumnType& type, const std::string& str);
+
+ protected:
+  friend class ScalarExpr;
+  friend class ScalarExprEvaluator;
+
+  Literal(const TExprNode& node);
+
   /// Test ctors
   Literal(ColumnType type, bool v);
   Literal(ColumnType type, int8_t v);
@@ -42,31 +72,18 @@ class Literal: public Expr {
   Literal(ColumnType type, const StringValue& v);
   Literal(ColumnType type, const TimestampValue& v);
 
-  /// Test function that parses 'str' according to 'type'. The caller owns the returned
-  /// Literal.
-  static Literal* CreateLiteral(const ColumnType& type, const std::string& str);
-
-  virtual bool IsLiteral() const;
-
-  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn);
-
-  virtual impala_udf::BooleanVal GetBooleanVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::TinyIntVal GetTinyIntVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::SmallIntVal GetSmallIntVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::IntVal GetIntVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::BigIntVal GetBigIntVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::FloatVal GetFloatVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::DoubleVal GetDoubleVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::StringVal GetStringVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::DecimalVal GetDecimalVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::TimestampVal GetTimestampVal(ExprContext*, const TupleRow*);
-
- protected:
-  friend class Expr;
-
-  Literal(const TExprNode& node);
-
-  virtual std::string DebugString() const;
+  virtual BooleanVal GetBooleanVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual TinyIntVal GetTinyIntVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual SmallIntVal GetSmallIntVal(
+      ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual IntVal GetIntVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual BigIntVal GetBigIntVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual FloatVal GetFloatVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual DoubleVal GetDoubleVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual StringVal GetStringVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual TimestampVal GetTimestampVal(
+      ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const override;
 
  private:
   ExprValue value_;

@@ -23,7 +23,7 @@
 
 #include "codegen/llvm-codegen.h"
 #include "exec/old-hash-table.inline.h"
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
@@ -62,10 +62,10 @@ HashJoinNode::HashJoinNode(
   DCHECK_NE(join_op_, TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN);
 
   match_all_probe_ =
-    (join_op_ == TJoinOp::LEFT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN);
-  match_one_build_ = (join_op_ == TJoinOp::LEFT_SEMI_JOIN);
+      join_op_ == TJoinOp::LEFT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN;
+  match_one_build_ = join_op_ == TJoinOp::LEFT_SEMI_JOIN;
   match_all_build_ =
-    (join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN);
+      join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN;
 }
 
 Status HashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
@@ -73,17 +73,25 @@ Status HashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   DCHECK(tnode.__isset.hash_join_node);
   const vector<TEqJoinCondition>& eq_join_conjuncts =
       tnode.hash_join_node.eq_join_conjuncts;
+
   for (int i = 0; i < eq_join_conjuncts.size(); ++i) {
-    ExprContext* ctx;
-    RETURN_IF_ERROR(Expr::CreateExprTree(pool_, eq_join_conjuncts[i].left, &ctx));
-    probe_expr_ctxs_.push_back(ctx);
-    RETURN_IF_ERROR(Expr::CreateExprTree(pool_, eq_join_conjuncts[i].right, &ctx));
-    build_expr_ctxs_.push_back(ctx);
+    ScalarExpr* probe_expr;
+    RETURN_IF_ERROR(ScalarExpr::Create(eq_join_conjuncts[i].left, child(0)->row_desc(),
+        state, &probe_expr));
+    probe_exprs_.push_back(probe_expr);
+    ScalarExpr* build_expr;
+    RETURN_IF_ERROR(ScalarExpr::Create(eq_join_conjuncts[i].right, child(1)->row_desc(),
+        state, &build_expr));
+    build_exprs_.push_back(build_expr);
     is_not_distinct_from_.push_back(eq_join_conjuncts[i].is_not_distinct_from);
   }
-  RETURN_IF_ERROR(
-      Expr::CreateExprTrees(pool_, tnode.hash_join_node.other_join_conjuncts,
-                            &other_join_conjunct_ctxs_));
+
+  // other_join_conjunct_evals_ are evaluated in the context of rows assembled from
+  // all build and probe tuples; full_row_desc is not necessarily the same as the output
+  // row desc, e.g., because semi joins only return the build xor probe tuples
+  RowDescriptor full_row_desc(child(0)->row_desc(), child(1)->row_desc());
+  RETURN_IF_ERROR(ScalarExpr::Create(tnode.hash_join_node.other_join_conjuncts,
+      full_row_desc, state, &other_join_conjuncts_));
 
   for (const TRuntimeFilterDesc& tfilter: tnode.runtime_filters) {
     // If filter propagation not enabled, only consider building broadcast joins (that may
@@ -92,14 +100,15 @@ Status HashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
         !tfilter.is_broadcast_join) {
       continue;
     }
-    if (state->query_options().disable_row_runtime_filtering
-        && !tfilter.applied_on_partition_columns) {
+    if (state->query_options().disable_row_runtime_filtering &&
+        !tfilter.applied_on_partition_columns) {
       continue;
     }
     filters_.push_back(state->filter_bank()->RegisterFilter(tfilter, true));
-    ExprContext* ctx;
-    RETURN_IF_ERROR(Expr::CreateExprTree(pool_, tfilter.src_expr, &ctx));
-    filter_expr_ctxs_.push_back(ctx);
+    ScalarExpr* filter_expr;
+    RETURN_IF_ERROR(
+        ScalarExpr::Create(tfilter.src_expr, child(1)->row_desc(), state, &filter_expr));
+    filter_exprs_.push_back(filter_expr);
   }
   return Status::OK();
 }
@@ -115,32 +124,20 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
 
   // build and probe exprs are evaluated in the context of the rows produced by our
   // right and left children, respectively
-  RETURN_IF_ERROR(
-      Expr::Prepare(build_expr_ctxs_, state, child(1)->row_desc(), expr_mem_tracker()));
-  AddExprCtxsToFree(build_expr_ctxs_);
-  RETURN_IF_ERROR(
-      Expr::Prepare(probe_expr_ctxs_, state, child(0)->row_desc(), expr_mem_tracker()));
-  AddExprCtxsToFree(probe_expr_ctxs_);
-  RETURN_IF_ERROR(
-      Expr::Prepare(filter_expr_ctxs_, state, child(1)->row_desc(), expr_mem_tracker()));
-  AddExprCtxsToFree(filter_expr_ctxs_);
-
-  // other_join_conjunct_ctxs_ are evaluated in the context of rows assembled from all
-  // build and probe tuples; full_row_desc is not necessarily the same as the output row
-  // desc, e.g., because semi joins only return the build xor probe tuples
-  RowDescriptor full_row_desc(child(0)->row_desc(), child(1)->row_desc());
-  RETURN_IF_ERROR(Expr::Prepare(
-      other_join_conjunct_ctxs_, state, full_row_desc, expr_mem_tracker()));
-  AddExprCtxsToFree(other_join_conjunct_ctxs_);
+  RETURN_IF_ERROR(ScalarExprEvaluator::Create(other_join_conjuncts_, state, pool_,
+      expr_mem_pool(), &other_join_conjunct_evals_));
+  AddEvaluatorsToFree(other_join_conjunct_evals_);
 
   // TODO: default buckets
   const bool stores_nulls = join_op_ == TJoinOp::RIGHT_OUTER_JOIN
       || join_op_ == TJoinOp::FULL_OUTER_JOIN
       || std::accumulate(is_not_distinct_from_.begin(), is_not_distinct_from_.end(),
                                 false, std::logical_or<bool>());
-  hash_tbl_.reset(new OldHashTable(state, build_expr_ctxs_, probe_expr_ctxs_,
-      filter_expr_ctxs_, child(1)->row_desc().tuple_descriptors().size(), stores_nulls,
-      is_not_distinct_from_, state->fragment_hash_seed(), mem_tracker(), filters_));
+
+  RETURN_IF_ERROR(OldHashTable::Create(pool_, state, build_exprs_, probe_exprs_,
+      filter_exprs_, child(1)->row_desc().tuple_descriptors().size(), stores_nulls,
+      is_not_distinct_from_, state->fragment_hash_seed(), mem_tracker(), filters_,
+      &hash_tbl_));
   build_pool_.reset(new MemPool(mem_tracker()));
   AddCodegenDisabledMessage(state);
   return Status::OK();
@@ -189,22 +186,21 @@ Status HashJoinNode::Reset(RuntimeState* state) {
 
 void HashJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
-  if (hash_tbl_.get() != NULL) hash_tbl_->Close();
+  if (hash_tbl_.get() != NULL) hash_tbl_->Close(state);
   if (build_pool_.get() != NULL) build_pool_->FreeAll();
-  Expr::Close(build_expr_ctxs_, state);
-  Expr::Close(probe_expr_ctxs_, state);
-  Expr::Close(filter_expr_ctxs_, state);
-  Expr::Close(other_join_conjunct_ctxs_, state);
+  ScalarExprEvaluator::Close(other_join_conjunct_evals_, state);
+  ScalarExpr::Close(probe_exprs_);
+  ScalarExpr::Close(build_exprs_);
+  ScalarExpr::Close(other_join_conjuncts_);
+  ScalarExpr::Close(filter_exprs_);
   BlockingJoinNode::Close(state);
 }
 
 Status HashJoinNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(BlockingJoinNode::Open(state));
-  RETURN_IF_ERROR(Expr::Open(build_expr_ctxs_, state));
-  RETURN_IF_ERROR(Expr::Open(probe_expr_ctxs_, state));
-  RETURN_IF_ERROR(Expr::Open(filter_expr_ctxs_, state));
-  RETURN_IF_ERROR(Expr::Open(other_join_conjunct_ctxs_, state));
+  RETURN_IF_ERROR(hash_tbl_->Open(state));
+  RETURN_IF_ERROR(ScalarExprEvaluator::Open(other_join_conjunct_evals_, state));
 
   // Check for errors and free local allocations before opening children.
   RETURN_IF_CANCELLED(state);
@@ -214,6 +210,11 @@ Status HashJoinNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(BlockingJoinNode::GetFirstProbeRow(state));
   InitGetNext();
   return Status::OK();
+}
+
+Status HashJoinNode::QueryMaintenance(RuntimeState* state) {
+  if (hash_tbl_.get() != nullptr) hash_tbl_->FreeLocalAllocations();
+  return ExecNode::QueryMaintenance(state);
 }
 
 Status HashJoinNode::ProcessBuildInput(RuntimeState* state) {
@@ -301,11 +302,11 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
     return LeftJoinGetNext(state, out_batch, eos);
   }
 
-  ExprContext* const* other_conjunct_ctxs = &other_join_conjunct_ctxs_[0];
-  int num_other_conjunct_ctxs = other_join_conjunct_ctxs_.size();
+  const int num_other_conjuncts = other_join_conjuncts_.size();
+  DCHECK_EQ(num_other_conjuncts, other_join_conjunct_evals_.size());
 
-  ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
-  int num_conjunct_ctxs = conjunct_ctxs_.size();
+  const int num_conjuncts = conjuncts_.size();
+  DCHECK_EQ(num_conjuncts, conjunct_evals_.size());
 
   // Explicitly manage the timer counter to avoid measuring time in the child
   // GetNext call.
@@ -322,7 +323,8 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
 
       TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
       CreateOutputRow(out_row, current_probe_row_, matched_build_row);
-      if (!EvalConjuncts(other_conjunct_ctxs, num_other_conjunct_ctxs, out_row)) {
+      if (!EvalConjuncts(other_join_conjunct_evals_.data(),
+              num_other_conjuncts, out_row)) {
         hash_tbl_iterator_.Next<true>();
         continue;
       }
@@ -336,7 +338,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
       }
 
       hash_tbl_iterator_.Next<true>();
-      if (EvalConjuncts(conjunct_ctxs, num_conjunct_ctxs, out_row)) {
+      if (EvalConjuncts(conjunct_evals_.data(), num_conjuncts, out_row)) {
         out_batch->CommitLastRow();
         VLOG_ROW << "match row: " << PrintRow(out_row, row_desc());
         ++num_rows_returned_;
@@ -355,7 +357,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
       int row_idx = out_batch->AddRow();
       TupleRow* out_row = out_batch->GetRow(row_idx);
       CreateOutputRow(out_row, current_probe_row_, NULL);
-      if (EvalConjuncts(conjunct_ctxs, num_conjunct_ctxs, out_row)) {
+      if (EvalConjuncts(conjunct_evals_.data(), num_conjuncts, out_row)) {
         out_batch->CommitLastRow();
         VLOG_ROW << "match row: " << PrintRow(out_row, row_desc());
         ++num_rows_returned_;
@@ -425,7 +427,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
       int row_idx = out_batch->AddRow();
       TupleRow* out_row = out_batch->GetRow(row_idx);
       CreateOutputRow(out_row, NULL, build_row);
-      if (EvalConjuncts(conjunct_ctxs, num_conjunct_ctxs, out_row)) {
+      if (EvalConjuncts(conjunct_evals_.data(), num_conjuncts, out_row)) {
         out_batch->CommitLastRow();
         VLOG_ROW << "match row: " << PrintRow(out_row, row_desc());
         ++num_rows_returned_;
@@ -492,8 +494,8 @@ void HashJoinNode::AddToDebugString(int indentation_level, stringstream* out) co
   *out << " hash_tbl=";
   *out << string(indentation_level * 2, ' ');
   *out << "HashTbl("
-       << " build_exprs=" << Expr::DebugString(build_expr_ctxs_)
-       << " probe_exprs=" << Expr::DebugString(probe_expr_ctxs_);
+       << " build_exprs=" << ScalarExpr::DebugString(build_exprs_)
+       << " probe_exprs=" << ScalarExpr::DebugString(probe_exprs_);
   *out << ")";
 }
 
@@ -638,13 +640,13 @@ Function* HashJoinNode::CodegenProcessProbeBatch(LlvmCodeGen* codegen,
 
   // Codegen evaluating other join conjuncts
   Function* eval_other_conjuncts_fn;
-  Status status = ExecNode::CodegenEvalConjuncts(codegen, other_join_conjunct_ctxs_,
+  Status status = ExecNode::CodegenEvalConjuncts(codegen, other_join_conjuncts_,
       &eval_other_conjuncts_fn, "EvalOtherConjuncts");
   if (!status.ok()) return NULL;
 
   // Codegen evaluating conjuncts
   Function* eval_conjuncts_fn;
-  status = ExecNode::CodegenEvalConjuncts(codegen, conjunct_ctxs_, &eval_conjuncts_fn);
+  status = ExecNode::CodegenEvalConjuncts(codegen, conjuncts_, &eval_conjuncts_fn);
   if (!status.ok()) return NULL;
 
   // Replace all call sites with codegen version

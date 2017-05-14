@@ -20,7 +20,7 @@
 #include <sstream>
 
 #include "exec/data-sink.h"
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
@@ -55,7 +55,7 @@ Status BlockingJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Init(tnode, state));
   DCHECK((join_op_ != TJoinOp::LEFT_SEMI_JOIN && join_op_ != TJoinOp::LEFT_ANTI_JOIN &&
       join_op_ != TJoinOp::RIGHT_SEMI_JOIN && join_op_ != TJoinOp::RIGHT_ANTI_JOIN &&
-      join_op_ != TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) || conjunct_ctxs_.size() == 0);
+      join_op_ != TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) || conjuncts_.size() == 0);
   runtime_profile_->AddLocalTimeCounter(
       bind<int64_t>(&BlockingJoinNode::LocalTimeCounterFn,
       runtime_profile_->total_time_counter(),

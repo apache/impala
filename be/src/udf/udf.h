@@ -108,7 +108,7 @@ class FunctionContext {
     /// concurrently on a single host if the UDF will be evaluated in multiple plan
     /// fragments on that host. In general, read-only state that doesn't need to be
     /// recomputed for every UDF call should be fragment-local.
-    /// TODO: not yet implemented
+    /// TODO: Move FRAGMENT_LOCAL states to query_state for multi-threading.
     FRAGMENT_LOCAL,
 
     /// Indicates that the function state is local to the execution thread. This state

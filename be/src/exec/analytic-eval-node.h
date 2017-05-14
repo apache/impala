@@ -19,15 +19,16 @@
 #define IMPALA_EXEC_ANALYTIC_EVAL_NODE_H
 
 #include "exec/exec-node.h"
-#include "exprs/expr.h"
-#include "exprs/expr-context.h"
 #include "runtime/buffered-block-mgr.h"
 #include "runtime/buffered-tuple-stream.h"
 #include "runtime/tuple.h"
 
 namespace impala {
 
+class AggFn;
 class AggFnEvaluator;
+class ScalarExpr;
+class ScalarExprEvaluator;
 
 /// Evaluates analytic functions with a single pass over input rows. It is assumed
 /// that the input has already been sorted on all of the partition exprs and then the
@@ -71,7 +72,7 @@ class AnalyticEvalNode : public ExecNode {
   virtual void Close(RuntimeState* state);
 
  protected:
-  /// Frees local allocations from evaluators_
+  /// Frees local allocations from analytic_fn_evals_
   virtual Status QueryMaintenance(RuntimeState* state);
 
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
@@ -162,7 +163,7 @@ class AnalyticEvalNode : public ExecNode {
   Status InitNextPartition(RuntimeState* state, int64_t stream_idx);
 
   /// Produces a result tuple with analytic function results by calling GetValue() or
-  /// Finalize() for 'curr_tuple_' on the 'evaluators_'. The result tuple is stored in
+  /// Finalize() for 'curr_tuple_' on the 'evaluators'. The result tuple is stored in
   /// 'result_tuples_' with the index into 'input_stream_' specified by 'stream_idx'.
   /// Returns an error when memory limit is exceeded.
   Status AddResultTuple(int64_t stream_idx);
@@ -175,9 +176,10 @@ class AnalyticEvalNode : public ExecNode {
   /// This is necessary to produce the default value (set by Init()).
   void ResetLeadFnSlots();
 
-  /// Evaluates the predicate pred_ctx over child_tuple_cmp_row_, which is a TupleRow*
-  /// containing the previous row and the current row set during ProcessChildBatch().
-  bool PrevRowCompare(ExprContext* pred_ctx);
+  /// Evaluates the predicate pred_eval over child_tuple_cmp_row_, which is
+  /// a TupleRow* containing the previous row and the current row set during
+  /// ProcessChildBatch().
+  bool PrevRowCompare(ScalarExprEvaluator* pred_eval);
 
   /// Debug string containing current state. If 'detailed', per-row state is included.
   std::string DebugStateString(bool detailed) const;
@@ -193,23 +195,25 @@ class AnalyticEvalNode : public ExecNode {
   const TAnalyticWindow window_;
 
   /// Tuple descriptor for storing intermediate values of analytic fn evaluation.
-  const TupleDescriptor* intermediate_tuple_desc_;
+  const TupleDescriptor* intermediate_tuple_desc_ = nullptr;
 
   /// Tuple descriptor for storing results of analytic fn evaluation.
-  const TupleDescriptor* result_tuple_desc_;
+  const TupleDescriptor* result_tuple_desc_ = nullptr;
 
   /// Tuple descriptor of the buffered tuple (identical to the input child tuple, which is
   /// assumed to come from a single SortNode). NULL if both partition_exprs and
   /// order_by_exprs are empty.
-  TupleDescriptor* buffered_tuple_desc_;
+  TupleDescriptor* buffered_tuple_desc_ = nullptr;
 
-  /// Expr context for a predicate that checks if child tuple '<' buffered tuple for
-  /// partitioning exprs.
-  ExprContext* partition_by_eq_expr_ctx_;
+  /// A predicate that checks if child tuple '<' buffered tuple for partitioning exprs
+  /// and its evaluator.
+  ScalarExpr* partition_by_eq_expr_ = nullptr;
+  ScalarExprEvaluator* partition_by_eq_expr_eval_ = nullptr;
 
-  /// Expr context for a predicate that checks if child tuple '<' buffered tuple for
-  /// order by exprs.
-  ExprContext* order_by_eq_expr_ctx_;
+  /// A predicate that checks if child tuple '<' buffered tuple for order by exprs and
+  /// its evaluator.
+  ScalarExpr* order_by_eq_expr_ = nullptr;
+  ScalarExprEvaluator* order_by_eq_expr_eval_ = nullptr;
 
   /// The scope over which analytic functions are evaluated.
   /// TODO: Consider adding additional state to capture whether different kinds of window
@@ -222,8 +226,10 @@ class AnalyticEvalNode : public ExecNode {
   int64_t rows_start_offset_;
   int64_t rows_end_offset_;
 
-  /// Analytic function evaluators.
-  std::vector<AggFnEvaluator*> evaluators_;
+  /// Analytic functions and their evaluators. 'analytic_fns_' live in the query-state's
+  /// objpool while the evaluators live in the exec node's objpool.
+  std::vector<AggFn*> analytic_fns_;
+  std::vector<AggFnEvaluator*> analytic_fn_evals_;
 
   /// Indicates if each evaluator is the lead() fn. Used by ResetLeadFnSlots() to
   /// determine which slots need to be reset.
@@ -233,10 +239,6 @@ class AnalyticEvalNode : public ExecNode {
   /// partitions determined by the offset. Set in Open() by inspecting the agg fns.
   bool has_first_val_null_offset_;
   long first_val_null_offset_;
-
-  /// FunctionContext for each analytic function. String data returned by the analytic
-  /// functions is allocated via these contexts.
-  std::vector<impala_udf::FunctionContext*> fn_ctxs_;
 
   /// Mem pool backing allocations from fn_ctxs_. This pool must not be Reset() because
   /// the memory is managed by the FreePools of the function contexts which do their own
@@ -253,15 +255,15 @@ class AnalyticEvalNode : public ExecNode {
   boost::scoped_ptr<MemPool> prev_tuple_pool_;
 
   /// Block manager client used by input_stream_. Not owned.
-  BufferedBlockMgr::Client* client_;
+  BufferedBlockMgr::Client* client_ = nullptr;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
 
   /// TupleRow* composed of the first child tuple and the buffered tuple, used by
-  /// partition_by_eq_expr_ctx_ and order_by_eq_expr_ctx_. Set in Open() if
+  /// partition_by_eq_expr_eval_ and order_by_eq_expr_eval_. Set in Open() if
   /// buffered_tuple_desc_ is not NULL, allocated from mem_pool_.
-  TupleRow* child_tuple_cmp_row_;
+  TupleRow* child_tuple_cmp_row_ = nullptr;
 
   /// Queue of tuples which are ready to be set in output rows, with the index into
   /// the input_stream_ stream of the last TupleRow that gets the Tuple, i.e. this is a
@@ -300,23 +302,23 @@ class AnalyticEvalNode : public ExecNode {
   int64_t prev_pool_last_window_idx_;
 
   /// The tuple described by intermediate_tuple_desc_ storing intermediate state for the
-  /// evaluators_. When enough input rows have been consumed to produce the analytic
-  /// function results, a result tuple (described by result_tuple_desc_) is created and
-  /// the agg fn results are written to that tuple by calling Finalize()/GetValue()
-  /// on the evaluators with curr_tuple_ as the source tuple.
-  Tuple* curr_tuple_;
+  /// analytic_eval_fns_. When enough input rows have been consumed to produce the
+  /// analytic function results, a result tuple (described by result_tuple_desc_) is
+  /// created and the agg fn results are written to that tuple by calling Finalize()/
+  /// GetValue() on the evaluators with curr_tuple_ as the source tuple.
+  Tuple* curr_tuple_ = nullptr;
 
   /// A tuple described by result_tuple_desc_ used when calling Finalize() on the
-  /// evaluators_ to release resources between partitions; the value is never used.
+  /// analytic_fn_evals_ to release resources between partitions; the value is never used.
   /// TODO: Remove when agg fns implement a separate Close() method to release resources.
-  Tuple* dummy_result_tuple_;
+  Tuple* dummy_result_tuple_ = nullptr;
 
   /// Index of the row in input_stream_ at which the current partition started.
   int64_t curr_partition_idx_;
 
   /// Previous input row used to compare partition boundaries and to determine when the
   /// order-by expressions change.
-  TupleRow* prev_input_row_;
+  TupleRow* prev_input_row_ = nullptr;
 
   /// Current and previous input row batches from the child. RowBatches are allocated
   /// once and reused. Previous input row batch owns prev_input_row_ between calls to

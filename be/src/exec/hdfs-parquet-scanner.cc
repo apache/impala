@@ -31,7 +31,7 @@
 #include "exec/parquet-column-readers.h"
 #include "exec/parquet-column-stats.h"
 #include "exec/scanner-context.inline.h"
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
 #include "runtime/collection-value-builder.h"
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
@@ -191,8 +191,7 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
   num_dict_filtered_row_groups_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumDictFilteredRowGroups", TUnit::UNIT);
   process_footer_timer_stats_ =
-      ADD_SUMMARY_STATS_TIMER(
-          scan_node_->runtime_profile(), "FooterProcessingTime");
+      ADD_SUMMARY_STATS_TIMER(scan_node_->runtime_profile(), "FooterProcessingTime");
 
   codegend_process_scratch_batch_fn_ = reinterpret_cast<ProcessScratchBatchFn>(
       scan_node_->GetCodegenFn(THdfsFileFormat::PARQUET));
@@ -209,15 +208,16 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
   if (min_max_tuple_desc != nullptr) {
     int64_t tuple_size = min_max_tuple_desc->byte_size();
     if (!min_max_tuple_buffer_.TryAllocate(tuple_size)) {
-      return Status(Substitute("Could not allocate buffer of $0 bytes for Parquet "
-            "statistics tuple for file '$1'.", tuple_size, filename()));
+      string details = Substitute("Could not allocate buffer of $0 bytes for Parquet "
+          "statistics tuple for file '$1'.", tuple_size, filename());
+      return scan_node_->mem_tracker()->MemLimitExceeded(state_, details, tuple_size);
     }
   }
 
   // Clone the min/max statistics conjuncts.
-  RETURN_IF_ERROR(Expr::CloneIfNotExists(scan_node_->min_max_conjunct_ctxs(),
-      state_, &min_max_conjuncts_ctxs_));
-  min_max_conjuncts_ctxs_to_eval_.reserve(min_max_conjuncts_ctxs_.size());
+  RETURN_IF_ERROR(ScalarExprEvaluator::Clone(&obj_pool_, state_,
+      expr_mem_pool_.get(), scan_node_->min_max_conjunct_evals(),
+      &min_max_conjunct_evals_));
 
   for (int i = 0; i < context->filter_ctxs().size(); ++i) {
     const FilterContext* ctx = &context->filter_ctxs()[i];
@@ -318,7 +318,7 @@ void HdfsParquetScanner::Close(RowBatch* row_batch) {
 
   if (schema_resolver_.get() != nullptr) schema_resolver_.reset();
 
-  Expr::Close(min_max_conjuncts_ctxs_, state_);
+  ScalarExprEvaluator::Close(min_max_conjunct_evals_, state_);
 
   for (int i = 0; i < filter_ctxs_.size(); ++i) {
     const FilterStats* stats = filter_ctxs_[i]->stats;
@@ -505,12 +505,10 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
   Tuple* min_max_tuple = reinterpret_cast<Tuple*>(min_max_tuple_buffer_.buffer());
   min_max_tuple->Init(tuple_size);
 
-  DCHECK_EQ(min_max_tuple_desc->slots().size(), min_max_conjuncts_ctxs_.size());
-
-  min_max_conjuncts_ctxs_to_eval_.clear();
-  for (int i = 0; i < min_max_conjuncts_ctxs_.size(); ++i) {
+  DCHECK_EQ(min_max_tuple_desc->slots().size(), min_max_conjunct_evals_.size());
+  for (int i = 0; i < min_max_conjunct_evals_.size(); ++i) {
     SlotDescriptor* slot_desc = min_max_tuple_desc->slots()[i];
-    ExprContext* conjunct = min_max_conjuncts_ctxs_[i];
+    ScalarExprEvaluator* eval = min_max_conjunct_evals_[i];
 
     // Resolve column path to determine col idx.
     SchemaNode* node = nullptr;
@@ -548,7 +546,7 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
     const ColumnType& col_type = slot_desc->type();
     bool stats_read = false;
     void* slot = min_max_tuple->GetSlot(slot_desc->tuple_offset());
-    const string& fn_name = conjunct->root()->function_name();
+    const string& fn_name = eval->root().function_name();
     if (fn_name == "lt" || fn_name == "le") {
       // We need to get min stats.
       stats_read = ColumnStatsBase::ReadFromThrift(
@@ -561,18 +559,15 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
       DCHECK(false) << "Unsupported function name for statistics evaluation: " << fn_name;
     }
 
-    if (stats_read) min_max_conjuncts_ctxs_to_eval_.push_back(conjunct);
-  }
-
-  if (!min_max_conjuncts_ctxs_to_eval_.empty()) {
-    TupleRow row;
-    row.SetTuple(0, min_max_tuple);
-    if (!ExecNode::EvalConjuncts(&min_max_conjuncts_ctxs_to_eval_[0],
-          min_max_conjuncts_ctxs_to_eval_.size(), &row)) {
-      *skip_row_group = true;
+    if (stats_read) {
+      TupleRow row;
+      row.SetTuple(0, min_max_tuple);
+      if (!ExecNode::EvalPredicate(eval, &row)) {
+        *skip_row_group = true;
+        return Status::OK();
+      }
     }
   }
-
   return Status::OK();
 }
 
@@ -724,8 +719,8 @@ bool HdfsParquetScanner::IsDictFilterable(ParquetColumnReader* col_reader) {
   // rather than materializing the values.
   if (!slot_desc) return false;
   // Does this column reader have any dictionary filter conjuncts?
-  auto dict_filter_it = scanner_dict_filter_map_.find(slot_desc->id());
-  if (dict_filter_it == scanner_dict_filter_map_.end()) return false;
+  auto dict_filter_it = dict_filter_map_.find(slot_desc->id());
+  if (dict_filter_it == dict_filter_map_.end()) return false;
 
   // Certain datatypes (chars, timestamps) do not have the appropriate value in the
   // file format and must be converted before return. This is true for the
@@ -875,9 +870,10 @@ Status HdfsParquetScanner::EvalDictionaryFilters(const parquet::RowGroup& row_gr
         dictionary->num_entries() >= LEGACY_IMPALA_MAX_DICT_ENTRIES) continue;
 
     const SlotDescriptor* slot_desc = scalar_reader->slot_desc();
-    auto dict_filter_it = scanner_dict_filter_map_.find(slot_desc->id());
-    DCHECK(dict_filter_it != scanner_dict_filter_map_.end());
-    vector<ExprContext*>& dict_filter_conjunct_ctxs = dict_filter_it->second;
+    auto dict_filter_it = dict_filter_map_.find(slot_desc->id());
+    DCHECK(dict_filter_it != dict_filter_map_.end());
+    const vector<ScalarExprEvaluator*>& dict_filter_conjunct_evals =
+        dict_filter_it->second;
     void* slot = dict_filter_tuple->GetSlot(slot_desc->tuple_offset());
     bool column_has_match = false;
     for (int dict_idx = 0; dict_idx < dictionary->num_entries(); ++dict_idx) {
@@ -887,8 +883,8 @@ Status HdfsParquetScanner::EvalDictionaryFilters(const parquet::RowGroup& row_gr
       // If any dictionary value passes the conjuncts, then move on to the next column.
       TupleRow row;
       row.SetTuple(0, dict_filter_tuple);
-      if (ExecNode::EvalConjuncts(dict_filter_conjunct_ctxs.data(),
-          dict_filter_conjunct_ctxs.size(), &row)) {
+      if (ExecNode::EvalConjuncts(dict_filter_conjunct_evals.data(),
+              dict_filter_conjunct_evals.size(), &row)) {
         column_has_match = true;
         break;
       }
@@ -998,8 +994,8 @@ Status HdfsParquetScanner::CommitRows(RowBatch* dst_batch, int num_rows) {
   // with parse_status_.
   RETURN_IF_ERROR(state_->GetQueryStatus());
   // Free local expr allocations for this thread
-  for (const auto& kv: scanner_conjuncts_map_) {
-    ExprContext::FreeLocalAllocations(kv.second);
+  for (const auto& kv: conjunct_evals_map_) {
+    ScalarExprEvaluator::FreeLocalAllocations(kv.second);
   }
   return Status::OK();
 }
@@ -1018,7 +1014,7 @@ int HdfsParquetScanner::TransferScratchTuples(RowBatch* dst_batch) {
     // output batch per remaining scratch tuple and return. No need to evaluate
     // filters/conjuncts.
     DCHECK(filter_ctxs_.empty());
-    DCHECK(scanner_conjunct_ctxs_->empty());
+    DCHECK(conjunct_evals_->empty());
     int num_tuples = min(dst_batch->capacity() - dst_batch->num_rows(),
         scratch_batch_->num_tuples - scratch_batch_->tuple_idx);
     memset(output_row, 0, num_tuples * sizeof(Tuple*));
@@ -1040,8 +1036,7 @@ int HdfsParquetScanner::TransferScratchTuples(RowBatch* dst_batch) {
 }
 
 Status HdfsParquetScanner::Codegen(HdfsScanNodeBase* node,
-    const vector<ExprContext*>& conjunct_ctxs, const vector<FilterContext>& filter_ctxs,
-    Function** process_scratch_batch_fn) {
+    const vector<ScalarExpr*>& conjuncts, Function** process_scratch_batch_fn) {
   DCHECK(node->runtime_state()->ShouldCodegen());
   *process_scratch_batch_fn = NULL;
   LlvmCodeGen* codegen = node->runtime_state()->codegen();
@@ -1052,8 +1047,7 @@ Status HdfsParquetScanner::Codegen(HdfsScanNodeBase* node,
   DCHECK(fn != NULL);
 
   Function* eval_conjuncts_fn;
-  RETURN_IF_ERROR(ExecNode::CodegenEvalConjuncts(codegen, conjunct_ctxs,
-      &eval_conjuncts_fn));
+  RETURN_IF_ERROR(ExecNode::CodegenEvalConjuncts(codegen, conjuncts, &eval_conjuncts_fn));
   DCHECK(eval_conjuncts_fn != NULL);
 
   int replaced = codegen->ReplaceCallSites(fn, eval_conjuncts_fn, "EvalConjuncts");
@@ -1061,7 +1055,7 @@ Status HdfsParquetScanner::Codegen(HdfsScanNodeBase* node,
 
   Function* eval_runtime_filters_fn;
   RETURN_IF_ERROR(CodegenEvalRuntimeFilters(
-      codegen, filter_ctxs, &eval_runtime_filters_fn));
+      codegen, node->filter_exprs(), &eval_runtime_filters_fn));
   DCHECK(eval_runtime_filters_fn != NULL);
 
   replaced = codegen->ReplaceCallSites(fn, eval_runtime_filters_fn, "EvalRuntimeFilters");
@@ -1101,11 +1095,11 @@ bool HdfsParquetScanner::EvalRuntimeFilters(TupleRow* row) {
 // EvalRuntimeFilter() is the same as the cross-compiled version except EvalOneFilter()
 // is replaced with the one generated by CodegenEvalOneFilter().
 Status HdfsParquetScanner::CodegenEvalRuntimeFilters(LlvmCodeGen* codegen,
-    const vector<FilterContext>& filter_ctxs, Function** fn) {
+    const vector<ScalarExpr*>& filter_exprs, Function** fn) {
   LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
 
-  *fn = NULL;
+  *fn = nullptr;
   Type* this_type = codegen->GetPtrType(HdfsParquetScanner::LLVM_CLASS_NAME);
   PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
   LlvmCodeGen::FnPrototype prototype(codegen, "EvalRuntimeFilters",
@@ -1118,7 +1112,7 @@ Status HdfsParquetScanner::CodegenEvalRuntimeFilters(LlvmCodeGen* codegen,
   Value* this_arg = args[0];
   Value* row_arg = args[1];
 
-  int num_filters = filter_ctxs.size();
+  int num_filters = filter_exprs.size();
   if (num_filters == 0) {
     builder.CreateRet(codegen->true_value());
   } else {
@@ -1130,13 +1124,15 @@ Status HdfsParquetScanner::CodegenEvalRuntimeFilters(LlvmCodeGen* codegen,
     for (int i = 0; i < num_filters; ++i) {
       Function* eval_runtime_filter_fn =
           codegen->GetFunction(IRFunction::PARQUET_SCANNER_EVAL_RUNTIME_FILTER, true);
-      DCHECK(eval_runtime_filter_fn != NULL);
+      DCHECK(eval_runtime_filter_fn != nullptr);
 
       // Codegen function for inlining filter's expression evaluation and constant fold
       // the type of the expression into the hashing function to avoid branches.
       Function* eval_one_filter_fn;
-      RETURN_IF_ERROR(filter_ctxs[i].CodegenEval(codegen, &eval_one_filter_fn));
-      DCHECK(eval_one_filter_fn != NULL);
+      DCHECK(filter_exprs[i] != nullptr);
+      RETURN_IF_ERROR(FilterContext::CodegenEval(codegen, filter_exprs[i],
+          &eval_one_filter_fn));
+      DCHECK(eval_one_filter_fn != nullptr);
 
       int replaced = codegen->ReplaceCallSites(eval_runtime_filter_fn, eval_one_filter_fn,
           "FilterContext4Eval");
@@ -1163,7 +1159,7 @@ Status HdfsParquetScanner::CodegenEvalRuntimeFilters(LlvmCodeGen* codegen,
   }
 
   *fn = codegen->FinalizeFunction(eval_runtime_filters_fn);
-  if (*fn == NULL) {
+  if (*fn == nullptr) {
     return Status("Codegen'd HdfsParquetScanner::EvalRuntimeFilters() failed "
         "verification, see log");
   }
@@ -1179,7 +1175,8 @@ bool HdfsParquetScanner::AssembleCollection(
 
   const TupleDescriptor* tuple_desc = &coll_value_builder->tuple_desc();
   Tuple* template_tuple = template_tuple_map_[tuple_desc];
-  const vector<ExprContext*> conjunct_ctxs = scanner_conjuncts_map_[tuple_desc->id()];
+  const vector<ScalarExprEvaluator*> evals =
+      conjunct_evals_map_[tuple_desc->id()];
 
   int64_t rows_read = 0;
   bool continue_execution = !scan_node_->ReachedLimit() && !context_->cancelled();
@@ -1227,7 +1224,7 @@ bool HdfsParquetScanner::AssembleCollection(
       end_of_collection = column_readers[0]->rep_level() <= new_collection_rep_level;
 
       if (materialize_tuple) {
-        if (ExecNode::EvalConjuncts(&conjunct_ctxs[0], conjunct_ctxs.size(), row)) {
+        if (ExecNode::EvalConjuncts(&evals[0], evals.size(), row)) {
           tuple = next_tuple(tuple_desc->byte_size(), tuple);
           ++num_to_commit;
         }
@@ -1345,8 +1342,9 @@ Status HdfsParquetScanner::ProcessFooter() {
     }
 
     if (!metadata_buffer.TryAllocate(metadata_size)) {
-      return Status(Substitute("Could not allocate buffer of $0 bytes for Parquet "
-          "metadata for file '$1'.", metadata_size, filename()));
+      string details = Substitute("Could not allocate buffer of $0 bytes for Parquet "
+          "metadata for file '$1'.", metadata_size, filename());
+      return scan_node_->mem_tracker()->MemLimitExceeded(state_, details, metadata_size);
     }
     metadata_ptr = metadata_buffer.buffer();
     DiskIoMgr* io_mgr = scan_node_->runtime_state()->io_mgr();

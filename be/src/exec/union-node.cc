@@ -17,8 +17,8 @@
 
 #include "codegen/llvm-codegen.h"
 #include "exec/union-node.h"
-#include "exprs/expr.h"
-#include "exprs/expr-context.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple.h"
@@ -35,32 +35,37 @@ UnionNode::UnionNode(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
     : ExecNode(pool, tnode, descs),
       tuple_id_(tnode.union_node.tuple_id),
-      tuple_desc_(nullptr),
+      tuple_desc_(descs.GetTupleDescriptor(tuple_id_)),
       first_materialized_child_idx_(tnode.union_node.first_materialized_child_idx),
       child_idx_(0),
       child_batch_(nullptr),
       child_row_idx_(0),
       child_eos_(false),
-      const_expr_list_idx_(0),
+      const_exprs_lists_idx_(0),
       to_close_child_idx_(-1) { }
 
 Status UnionNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Init(tnode, state));
   DCHECK(tnode.__isset.union_node);
-  DCHECK_EQ(conjunct_ctxs_.size(), 0);
-  // Create const_expr_ctx_lists_ from thrift exprs.
+  DCHECK_EQ(conjuncts_.size(), 0);
+  DCHECK(tuple_desc_ != nullptr);
+  // Create const_exprs_lists_ from thrift exprs.
   const vector<vector<TExpr>>& const_texpr_lists = tnode.union_node.const_expr_lists;
   for (const vector<TExpr>& texprs : const_texpr_lists) {
-    vector<ExprContext*> ctxs;
-    RETURN_IF_ERROR(Expr::CreateExprTrees(pool_, texprs, &ctxs));
-    const_expr_lists_.push_back(ctxs);
+    vector<ScalarExpr*> const_exprs;
+    RETURN_IF_ERROR(ScalarExpr::Create(texprs, row_desc(), state, &const_exprs));
+    DCHECK_EQ(const_exprs.size(), tuple_desc_->slots().size());
+    const_exprs_lists_.push_back(const_exprs);
   }
-  // Create result_expr_ctx_lists_ from thrift exprs.
-  const vector<vector<TExpr>>& result_texpr_lists = tnode.union_node.result_expr_lists;
-  for (const vector<TExpr>& texprs : result_texpr_lists) {
-    vector<ExprContext*> ctxs;
-    RETURN_IF_ERROR(Expr::CreateExprTrees(pool_, texprs, &ctxs));
-    child_expr_lists_.push_back(ctxs);
+  // Create child_exprs_lists_ from thrift exprs.
+  const vector<vector<TExpr>>& thrift_result_exprs = tnode.union_node.result_expr_lists;
+  for (int i = 0; i < thrift_result_exprs.size(); ++i) {
+    const vector<TExpr>& texprs = thrift_result_exprs[i];
+    vector<ScalarExpr*> child_exprs;
+    RETURN_IF_ERROR(
+        ScalarExpr::Create(texprs, child(i)->row_desc(), state, &child_exprs));
+    child_exprs_lists_.push_back(child_exprs);
+    DCHECK_EQ(child_exprs.size(), tuple_desc_->slots().size());
   }
   return Status::OK();
 }
@@ -68,23 +73,25 @@ Status UnionNode::Init(const TPlanNode& tnode, RuntimeState* state) {
 Status UnionNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
-  tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   DCHECK(tuple_desc_ != nullptr);
-  codegend_union_materialize_batch_fns_.resize(child_expr_lists_.size());
+  codegend_union_materialize_batch_fns_.resize(child_exprs_lists_.size());
 
   // Prepare const expr lists.
-  for (const vector<ExprContext*>& exprs : const_expr_lists_) {
-    RETURN_IF_ERROR(Expr::Prepare(exprs, state, row_desc(), expr_mem_tracker()));
-    AddExprCtxsToFree(exprs);
-    DCHECK_EQ(exprs.size(), tuple_desc_->slots().size());
+  for (const vector<ScalarExpr*>& const_exprs : const_exprs_lists_) {
+    vector<ScalarExprEvaluator*> const_expr_evals;
+    RETURN_IF_ERROR(ScalarExprEvaluator::Create(const_exprs, state, pool_,
+        expr_mem_pool(), &const_expr_evals));
+    AddEvaluatorsToFree(const_expr_evals);
+    const_expr_evals_lists_.push_back(const_expr_evals);
   }
 
   // Prepare result expr lists.
-  for (int i = 0; i < child_expr_lists_.size(); ++i) {
-    RETURN_IF_ERROR(Expr::Prepare(
-        child_expr_lists_[i], state, child(i)->row_desc(), expr_mem_tracker()));
-    AddExprCtxsToFree(child_expr_lists_[i]);
-    DCHECK_EQ(child_expr_lists_[i].size(), tuple_desc_->slots().size());
+  for (const vector<ScalarExpr*>& child_exprs : child_exprs_lists_) {
+    vector<ScalarExprEvaluator*> child_expr_evals;
+    RETURN_IF_ERROR(ScalarExprEvaluator::Create(child_exprs, state, pool_,
+        expr_mem_pool(), &child_expr_evals));
+    AddEvaluatorsToFree(child_expr_evals);
+    child_expr_evals_lists_.push_back(child_expr_evals);
   }
   return Status::OK();
 }
@@ -98,12 +105,12 @@ void UnionNode::Codegen(RuntimeState* state) {
   DCHECK(codegen != nullptr);
   std::stringstream codegen_message;
   Status codegen_status;
-  for (int i = 0; i < child_expr_lists_.size(); ++i) {
+  for (int i = 0; i < child_exprs_lists_.size(); ++i) {
     if (IsChildPassthrough(i)) continue;
 
     llvm::Function* tuple_materialize_exprs_fn;
     codegen_status = Tuple::CodegenMaterializeExprs(codegen, false, *tuple_desc_,
-        child_expr_lists_[i], true, &tuple_materialize_exprs_fn);
+        child_exprs_lists_[i], true, &tuple_materialize_exprs_fn);
     if (!codegen_status.ok()) {
       // Codegen may fail in some corner cases (e.g. we don't handle TYPE_CHAR). If this
       // happens, abort codegen for this and the remaining children.
@@ -137,12 +144,12 @@ Status UnionNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Open(state));
   // Open const expr lists.
-  for (const vector<ExprContext*>& exprs : const_expr_lists_) {
-    RETURN_IF_ERROR(Expr::Open(exprs, state));
+  for (const vector<ScalarExprEvaluator*>& evals : const_expr_evals_lists_) {
+    RETURN_IF_ERROR(ScalarExprEvaluator::Open(evals, state));
   }
   // Open result expr lists.
-  for (const vector<ExprContext*>& exprs : child_expr_lists_) {
-    RETURN_IF_ERROR(Expr::Open(exprs, state));
+  for (const vector<ScalarExprEvaluator*>& evals : child_expr_evals_lists_) {
+    RETURN_IF_ERROR(ScalarExprEvaluator::Open(evals, state));
   }
 
   // Ensures that rows are available for clients to fetch after this Open() has
@@ -247,7 +254,7 @@ Status UnionNode::GetNextMaterialized(RuntimeState* state, RowBatch* row_batch) 
 
 Status UnionNode::GetNextConst(RuntimeState* state, RowBatch* row_batch) {
   DCHECK(state->instance_ctx().per_fragment_instance_idx == 0 || IsInSubplan());
-  DCHECK_LT(const_expr_list_idx_, const_expr_lists_.size());
+  DCHECK_LT(const_exprs_lists_idx_, const_expr_evals_lists_.size());
   // Create new tuple buffer for row_batch.
   int64_t tuple_buf_size;
   uint8_t* tuple_buf;
@@ -255,11 +262,11 @@ Status UnionNode::GetNextConst(RuntimeState* state, RowBatch* row_batch) {
       row_batch->ResizeAndAllocateTupleBuffer(state, &tuple_buf_size, &tuple_buf));
   memset(tuple_buf, 0, tuple_buf_size);
 
-  while (const_expr_list_idx_ < const_expr_lists_.size() && !row_batch->AtCapacity()) {
+  while (const_exprs_lists_idx_ < const_exprs_lists_.size() && !row_batch->AtCapacity()) {
     MaterializeExprs(
-        const_expr_lists_[const_expr_list_idx_], nullptr, tuple_buf, row_batch);
+        const_expr_evals_lists_[const_exprs_lists_idx_], nullptr, tuple_buf, row_batch);
     tuple_buf += tuple_desc_->byte_size();
-    ++const_expr_list_idx_;
+    ++const_exprs_lists_idx_;
   }
 
   return Status::OK();
@@ -314,7 +321,7 @@ Status UnionNode::Reset(RuntimeState* state) {
   child_batch_.reset();
   child_row_idx_ = 0;
   child_eos_ = false;
-  const_expr_list_idx_ = 0;
+  const_exprs_lists_idx_ = 0;
   // Since passthrough is disabled in subplans, verify that there is no passthrough child
   // that needs to be closed.
   DCHECK_EQ(to_close_child_idx_, -1);
@@ -324,11 +331,17 @@ Status UnionNode::Reset(RuntimeState* state) {
 void UnionNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   child_batch_.reset();
-  for (const vector<ExprContext*>& exprs : const_expr_lists_) {
-    Expr::Close(exprs, state);
+  for (const vector<ScalarExprEvaluator*>& evals : const_expr_evals_lists_) {
+    ScalarExprEvaluator::Close(evals, state);
   }
-  for (const vector<ExprContext*>& exprs : child_expr_lists_) {
-    Expr::Close(exprs, state);
+  for (const vector<ScalarExprEvaluator*>& evals : child_expr_evals_lists_) {
+    ScalarExprEvaluator::Close(evals, state);
+  }
+  for (const vector<ScalarExpr*>& const_exprs : const_exprs_lists_) {
+    ScalarExpr::Close(const_exprs);
+  }
+  for (const vector<ScalarExpr*>& child_exprs : child_exprs_lists_) {
+    ScalarExpr::Close(child_exprs);
   }
   ExecNode::Close(state);
 }

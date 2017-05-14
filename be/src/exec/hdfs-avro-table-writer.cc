@@ -28,8 +28,8 @@
 #include "util/compress.h"
 #include "util/hdfs-util.h"
 #include "util/uid-util.h"
-#include "exprs/expr.h"
-#include "exprs/expr-context.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
@@ -55,10 +55,9 @@ const int DEFAULT_AVRO_BLOCK_SIZE = 64 * 1024;
 
 HdfsAvroTableWriter::HdfsAvroTableWriter(HdfsTableSink* parent,
     RuntimeState* state, OutputPartition* output,
-    const HdfsPartitionDescriptor* partition, const HdfsTableDescriptor* table_desc,
-    const vector<ExprContext*>& output_exprs) :
-      HdfsTableWriter(parent, state, output, partition, table_desc, output_exprs),
-      unflushed_rows_(0) {
+    const HdfsPartitionDescriptor* partition, const HdfsTableDescriptor* table_desc)
+  : HdfsTableWriter(parent, state, output, partition, table_desc),
+    unflushed_rows_(0) {
   mem_pool_.reset(new MemPool(parent->mem_tracker()));
 }
 
@@ -67,8 +66,8 @@ void HdfsAvroTableWriter::ConsumeRow(TupleRow* row) {
   int num_non_partition_cols =
       table_desc_->num_cols() - table_desc_->num_clustering_cols();
   for (int j = 0; j < num_non_partition_cols; ++j) {
-    void* value = output_expr_ctxs_[j]->GetValue(row);
-    AppendField(output_expr_ctxs_[j]->root()->type(), value);
+    void* value = output_expr_evals_[j]->GetValue(row);
+    AppendField(output_expr_evals_[j]->root().type(), value);
   }
 }
 

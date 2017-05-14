@@ -27,13 +27,13 @@
 
 namespace impala {
 
-class RuntimeState;
-class OutputPartition;
-class ExprContext;
-class RowBatch;
 class HdfsPartitionDescriptor;
 class HdfsTableDescriptor;
 class HdfsTableSink;
+class OutputPartition;
+class RowBatch;
+class RuntimeState;
+class ScalarExprEvaluator;
 
 /// Pure virtual class for writing to hdfs table partition files.
 /// Subclasses implement the code needed to write to a specific file type.
@@ -46,12 +46,10 @@ class HdfsTableWriter {
   /// output_partition -- Information on the output partition file.
   /// partition -- the descriptor for the partition being written
   /// table_desc -- the descriptor for the table being written.
-  /// output_exprs -- expressions which generate the output values.
   HdfsTableWriter(HdfsTableSink* parent,
                   RuntimeState* state, OutputPartition* output_partition,
                   const HdfsPartitionDescriptor* partition_desc,
-                  const HdfsTableDescriptor* table_desc,
-                  const std::vector<ExprContext*>& output_expr_ctxs);
+                  const HdfsTableDescriptor* table_desc);
 
   virtual ~HdfsTableWriter() { }
 
@@ -129,8 +127,9 @@ class HdfsTableWriter {
   /// Table descriptor of table to be written.
   const HdfsTableDescriptor* table_desc_;
 
-  /// Expressions that materialize output values.
-  std::vector<ExprContext*> output_expr_ctxs_;
+  /// Reference to the evaluators of expressions which generate the output value.
+  /// The evaluators are owned by sink which owns this table writer.
+  const std::vector<ScalarExprEvaluator*>& output_expr_evals_;
 
   /// Subclass should populate any file format specific stats.
   TInsertStats stats_;

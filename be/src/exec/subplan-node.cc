@@ -39,22 +39,28 @@ SubplanNode::SubplanNode(ObjectPool* pool, const TPlanNode& tnode,
 Status SubplanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Init(tnode, state));
   DCHECK_EQ(children_.size(), 2);
-  SetContainingSubplan(this, child(1));
+  RETURN_IF_ERROR(SetContainingSubplan(state, this, child(1)));
   return Status::OK();
 }
 
-void SubplanNode::SetContainingSubplan(SubplanNode* ancestor, ExecNode* node) {
+Status SubplanNode::SetContainingSubplan(
+    RuntimeState* state, SubplanNode* ancestor, ExecNode* node) {
   node->set_containing_subplan(ancestor);
   if (node->type() == TPlanNodeType::SUBPLAN_NODE) {
     // Only traverse the first child and not the second one, because the Subplan
     // parent of nodes inside it should be 'node' and not 'ancestor'.
-    SetContainingSubplan(ancestor, node->child(0));
+    RETURN_IF_ERROR(SetContainingSubplan(state, ancestor, node->child(0)));
   } else {
+    if (node->type() == TPlanNodeType::UNNEST_NODE) {
+      UnnestNode* unnest_node = reinterpret_cast<UnnestNode*>(node);
+      RETURN_IF_ERROR(unnest_node->InitCollExpr(state));
+    }
     int num_children = node->num_children();
     for (int i = 0; i < num_children; ++i) {
-      SetContainingSubplan(ancestor, node->child(i));
+      RETURN_IF_ERROR(SetContainingSubplan(state, ancestor, node->child(i)));
     }
   }
+  return Status::OK();
 }
 
 Status SubplanNode::Prepare(RuntimeState* state) {

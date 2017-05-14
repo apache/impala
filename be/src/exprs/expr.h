@@ -16,75 +16,6 @@
 // under the License.
 
 
-/// --- Terminology:
-//
-/// Compute function: The function that, given a row, performs the computation of an expr
-/// and produces a scalar result. This function evaluates the necessary child arguments by
-/// calling their compute functions, then performs whatever computation is necessary on
-/// the arguments (e.g. calling a UDF with the child arguments). All compute functions
-/// take arguments (ExprContext*, const TupleRow*). The return type is a *Val (i.e. a subclass
-/// of AnyVal). Thus, a single expression will implement a compute function for every
-/// return type it supports.
-///
-/// UDX: user-defined X. E.g., user-defined function, user-defined aggregate. Something
-/// that is written by an external user.
-///
-/// Scalar function call: An expr that returns a single scalar value and can be
-/// implemented using the UDF interface. Note that this includes builtins, which although
-/// not being user-defined still use the same interface as UDFs (i.e., they are
-/// implemented as functions with signature "*Val (FunctionContext*, *Val, *Val...)").
-///
-/// Aggregate function call: a UDA or builtin aggregate function.
-///
-/// --- Expr overview:
-///
-/// The Expr superclass defines a virtual Get*Val() compute function for each possible
-/// return type (GetBooleanVal(), GetStringVal(), etc). Expr subclasses implement the
-/// Get*Val() functions associated with their possible return types; for many Exprs this
-/// will be a single function. These functions are generally cross-compiled to both native
-/// and IR libraries. In the interpreted path, the native compute functions are run as-is.
-///
-/// For the codegen path, Expr defines a virtual method GetCodegendComputeFn() that
-/// returns the Function* of the expr's compute function. Note that we do not need a
-/// separate GetCodegendComputeFn() for each type.
-///
-/// Only short-circuited operators (e.g. &&, ||) and other special functions like literals
-/// must implement custom Get*Val() compute functions. Scalar function calls use the
-/// generic compute functions implemented by ScalarFnCall(). For cross-compiled compute
-/// functions, GetCodegendComputeFn() can use ReplaceChildCallsComputeFn(), which takes a
-/// cross-compiled IR Get*Val() function, pulls out any calls to the children's Get*Val()
-/// functions (which we identify via the Get*Val() static wrappers), and replaces them
-/// with the codegen'd version of that function. This allows us to write a single function
-/// for both the interpreted and codegen paths.
-///
-/// Only short-circuited operators (e.g. &&, ||) and other special functions like
-/// literals must implement custom Get*Val() compute functions. Scalar function calls
-/// use the generic compute functions implemented by ScalarFnCall(). For cross-compiled
-/// compute functions, GetCodegendComputeFn() can use ReplaceChildCallsComputeFn(), which
-/// takes a cross-compiled IR Get*Val() function, pulls out any calls to the children's
-/// Get*Val() functions (which we identify via the Get*Val() static wrappers), and
-/// replaces them with the codegen'd version of that function. This allows us to write a
-/// single function for both the interpreted and codegen paths.
-///
-/// --- Expr users (e.g. exec nodes):
-///
-/// A typical usage pattern will look something like:
-/// 1. Expr::CreateExprTrees()
-/// 2. Expr::Prepare()
-/// 3. Expr::Open()
-/// 4. Expr::CloneIfNotExists() [for multi-threaded execution]
-/// 5. Evaluate exprs via Get*Val() calls
-/// 6. Expr::Close() [called once per ExprContext, including clones]
-///
-/// Expr users should use the static Get*Val() wrapper functions to evaluate exprs,
-/// cross-compile the resulting function, and use ReplaceGetValCalls() to create the
-/// codegen'd function. See the comments on these functions for more details. This is a
-/// similar pattern to that used by the cross-compiled compute functions.
-///
-/// TODO:
-/// - Fix codegen compile time
-/// - Fix perf regressions via extra optimization passes + patching LLVM
-
 #ifndef IMPALA_EXPRS_EXPR_H
 #define IMPALA_EXPRS_EXPR_H
 
@@ -97,21 +28,9 @@
 #include "common/status.h"
 #include "impala-ir/impala-ir-functions.h"
 #include "runtime/types.h"
-#include "udf/udf-internal.h" // for CollectionVal
-#include "udf/udf.h"
-
-using namespace impala_udf;
-
-namespace llvm {
-  class BasicBlock;
-  class Function;
-  class Type;
-  class Value;
-};
 
 namespace impala {
 
-class ExprContext;
 class IsNullExpr;
 class LibCacheEntry;
 class LlvmCodeGen;
@@ -119,279 +38,102 @@ class MemTracker;
 class ObjectPool;
 class RowDescriptor;
 class RuntimeState;
+class ScalarExpr;
+class SlotDescriptor;
 class TColumnValue;
 class TExpr;
 class TExprNode;
 class Tuple;
 class TupleRow;
 
-/// This is the superclass of all expr evaluation nodes.
+/// --- Expr overview
+///
+/// Expr class represents expression embedded in various operators in a query plan
+/// fragment in the backend. For example, it can be the join expressions in a PHJ
+/// node, predicates in a scan node or the aggregate functions in a PAGG node.
+///
+/// There are two subclasses of Expr: ScalarExpr for scalar expressions and AggFn for
+/// aggregate functions; A scalar expression computes a value over a single row while
+/// an aggregate function computes a value over a set of rows. ScalarExpr is further
+/// subclassed into various expressions such as Literal and ScalarFnCall to name two
+/// examples.
+///
+/// Expr is internally represented as a tree of nodes. The root node can be either a
+/// ScalarExpr or an AggFn node and all descendants are ScalarExpr nodes. Exprs and their
+/// subclasses contain query compile-time information and the code to evaluate the exprs
+/// (represented by the specific class). ScalarExprEvaluator and AggFnEvluator are the
+/// evaluators for ScalarExpr and AggFn respectively. They contain the general runtime
+/// state needed for the actual evaluation. They don't need to be subclassed because the
+/// expr-specific code sits in the expr subclasses. An Expr can be shared by multiple
+/// evaluators.
+///
+/// Please see the headers of ScalarExpr and AggFn for further details.
+///
 class Expr {
  public:
-  virtual ~Expr();
-
-  /// Virtual compute functions for each *Val type. Each Expr subclass should implement
-  /// the functions for the return type(s) it supports. For example, a boolean function
-  /// will only implement GetBooleanVal(). Some Exprs, like Literal, have many possible
-  /// return types and will implement multiple Get*Val() functions.
-  virtual BooleanVal GetBooleanVal(ExprContext* context, const TupleRow*);
-  virtual TinyIntVal GetTinyIntVal(ExprContext* context, const TupleRow*);
-  virtual SmallIntVal GetSmallIntVal(ExprContext* context, const TupleRow*);
-  virtual IntVal GetIntVal(ExprContext* context, const TupleRow*);
-  virtual BigIntVal GetBigIntVal(ExprContext* context, const TupleRow*);
-  virtual FloatVal GetFloatVal(ExprContext* context, const TupleRow*);
-  virtual DoubleVal GetDoubleVal(ExprContext* context, const TupleRow*);
-  virtual StringVal GetStringVal(ExprContext* context, const TupleRow*);
-  virtual CollectionVal GetCollectionVal(ExprContext* context, const TupleRow*);
-  virtual TimestampVal GetTimestampVal(ExprContext* context, const TupleRow*);
-  virtual DecimalVal GetDecimalVal(ExprContext* context, const TupleRow*);
-
   const std::string& function_name() const { return fn_.name.function_name; }
 
-  /// Get the number of digits after the decimal that should be displayed for this value.
-  /// Returns -1 if no scale has been specified (currently the scale is only set for
-  /// doubles set by RoundUpTo). GetValue() must have already been called.
-  /// TODO: is this still necessary?
-  int output_scale() const { return output_scale_; }
+  virtual ~Expr();
 
-  void AddChild(Expr* expr) { children_.push_back(expr); }
-  Expr* GetChild(int i) const { return children_[i]; }
+  /// Returns true if the given Expr is an AggFn. Overridden by AggFn.
+  virtual bool IsAggFn() const { return false; }
+
+  ScalarExpr* GetChild(int i) const { return children_[i]; }
   int GetNumChildren() const { return children_.size(); }
 
   const ColumnType& type() const { return type_; }
-  bool is_slotref() const { return is_slotref_; }
-  bool is_constant() const { return is_constant_; }
+  const std::vector<ScalarExpr*>& children() const { return children_; }
 
-  const std::vector<Expr*>& children() const { return children_; }
+  /// Releases cache entries to LibCache in all nodes of the Expr tree.
+  virtual void Close();
 
-  /// Returns an error status if the function context associated with the
-  /// expr has an error set.
-  Status GetFnContextError(ExprContext* ctx);
-
-  /// Returns true if this is a literal expression.
-  virtual bool IsLiteral() const;
-
-  /// Returns the number of SlotRef nodes in the expr tree. If this returns 0, it means it
-  /// is valid to call GetValue(nullptr) on the expr tree.
-  /// If 'slot_ids' is non-null, add the slot ids to it.
-  virtual int GetSlotIds(std::vector<SlotId>* slot_ids = nullptr) const;
-
-  /// Returns true iff the expression 'texpr' contains UDF available only as LLVM IR. In
-  /// which case, it's impossible to interpret this expression and codegen must be used.
-  static bool NeedCodegen(const TExpr& texpr);
-
-  /// Create expression tree from the list of nodes contained in texpr within 'pool'.
-  /// Returns the root of expression tree in 'expr' and the corresponding ExprContext in
-  /// 'ctx'.
-  static Status CreateExprTree(ObjectPool* pool, const TExpr& texpr, ExprContext** ctx);
-
-  /// Creates vector of ExprContexts containing exprs from the given vector of
-  /// TExprs within 'pool'.  Returns an error if any of the individual conversions caused
-  /// an error, otherwise OK.
-  static Status CreateExprTrees(ObjectPool* pool, const std::vector<TExpr>& texprs,
-      std::vector<ExprContext*>* ctxs);
-
-  /// Convenience function for preparing multiple expr trees.
-  /// Allocations from 'ctxs' will be counted against 'tracker'.
-  static Status Prepare(const std::vector<ExprContext*>& ctxs, RuntimeState* state,
-                        const RowDescriptor& row_desc, MemTracker* tracker);
-
-  /// Convenience function for opening multiple expr trees.
-  static Status Open(const std::vector<ExprContext*>& ctxs, RuntimeState* state);
-
-  /// Clones each ExprContext for multiple expr trees. 'new_ctxs' must be non-NULL.
-  /// Idempotent: if '*new_ctxs' is empty, a clone of each context in 'ctxs' will be added
-  /// to it, and if non-empty, it is assumed CloneIfNotExists() was already called and the
-  /// call is a no-op. The new ExprContexts are created in state->obj_pool().
-  static Status CloneIfNotExists(const std::vector<ExprContext*>& ctxs,
-      RuntimeState* state, std::vector<ExprContext*>* new_ctxs);
-
-  /// Convenience function for closing multiple expr trees.
-  static void Close(const std::vector<ExprContext*>& ctxs, RuntimeState* state);
-
-  /// Computes a memory efficient layout for storing the results of evaluating
-  /// 'exprs'. The results are assumed to be void* slot types (vs AnyVal types). Varlen
-  /// data is not included (e.g. there will be space for a StringValue, but not the data
-  /// referenced by it).
-  ///
-  /// Returns the number of bytes necessary to store all the results and offsets
-  /// where the result for each expr should be stored.
-  ///
-  /// Variable length types are guaranteed to be at the end and 'var_result_begin'
-  /// will be set the beginning byte offset where variable length results begin.
-  /// 'var_result_begin' will be set to -1 if there are no variable len types.
-  static int ComputeResultsLayout(const std::vector<Expr*>& exprs,
-      std::vector<int>* offsets, int* var_result_begin);
-  static int ComputeResultsLayout(const std::vector<ExprContext*>& ctxs,
-      std::vector<int>* offsets, int* var_result_begin);
-
-  /// Returns an llvm::Function* with signature:
-  /// <subclass of AnyVal> ComputeFn(ExprContext* context, const TupleRow* row)
-  //
-  /// The function should evaluate this expr over 'row' and return the result as the
-  /// appropriate type of AnyVal.
-  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) = 0;
-
-  /// If this expr is constant according to is_constant(), evaluates the expr with no
-  /// input row argument and returns the result in 'const_val'. Otherwise sets
-  /// 'const_val' to nullptr. The returned AnyVal and associated varlen data is owned by
-  /// 'context'. This should only be called after Open() has been called on this expr.
-  /// Returns an error if there was an error evaluating the expression or if memory could
-  /// not be allocated for the expression result.
-  virtual Status GetConstVal(
-      RuntimeState* state, ExprContext* context, AnyVal** const_val);
-
-  virtual std::string DebugString() const;
-  static std::string DebugString(const std::vector<Expr*>& exprs);
-  static std::string DebugString(const std::vector<ExprContext*>& ctxs);
-
-  /// The builtin functions are not called from anywhere in the code and the
-  /// symbols are therefore not included in the binary. We call these functions
-  /// by using dlsym. The compiler must think this function is callable to
-  /// not strip these symbols.
-  static void InitBuiltinsDummy();
+  /// Implemeneted by subclasses to provide debug string information about the expr.
+  virtual std::string DebugString() const = 0;
 
   static const char* LLVM_CLASS_NAME;
 
  protected:
-  friend class AggFnEvaluator;
-  friend class DecimalFunctions;
-  friend class DecimalOperators;
-  friend class MathFunctions;
-  friend class StringFunctions;
-  friend class TimestampFunctions;
-  friend class ConditionalFunctions;
-  friend class UtilityFunctions;
-  friend class CaseExpr;
-  friend class InPredicate;
-  friend class ScalarFnCall;
+  /// Constructs an Expr tree from the thrift Expr 'texpr'. 'root' is the root of the
+  /// Expr tree created from texpr.nodes[0] by the caller (either ScalarExpr or AggFn).
+  /// The newly created Expr nodes are added to 'pool'. Returns error status on failure.
+  static Status CreateTree(const TExpr& texpr, ObjectPool* pool, Expr* root);
 
-  Expr(const ColumnType& type, bool is_constant, bool is_slotref);
-  Expr(const TExprNode& node, bool is_slotref = false);
+  Expr(const ColumnType& type);
+  Expr(const TExprNode& node);
 
-  /// Initializes this expr instance for execution. This does not include initializing
-  /// state in the ExprContext; 'context' should only be used to register a
-  /// FunctionContext via RegisterFunctionContext(). Any IR functions must be generated
-  /// here.
-  ///
-  /// Subclasses overriding this function should call Expr::Prepare() to recursively call
-  /// Prepare() on the expr tree.
-  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc,
-                         ExprContext* context);
+  /// Cache entry for the UDF or UDAF loaded from the library. Used by AggFn and
+  /// some ScalarExpr such as ScalarFnCall. NULL if it's not used.
+  LibCacheEntry* cache_entry_ = nullptr;
 
-  /// Initializes 'context' for execution. If scope if FRAGMENT_LOCAL, both fragment- and
-  /// thread-local state should be initialized. Otherwise, if scope is THREAD_LOCAL, only
-  /// thread-local state should be initialized.
-  //
-  /// Subclasses overriding this function should call Expr::Open() to recursively call
-  /// Open() on the expr tree.
-  virtual Status Open(RuntimeState* state, ExprContext* context,
-      FunctionContext::FunctionStateScope scope = FunctionContext::FRAGMENT_LOCAL);
-
-  /// Subclasses overriding this function should call Expr::Close().
-  //
-  /// If scope if FRAGMENT_LOCAL, both fragment- and thread-local state should be torn
-  /// down. Otherwise, if scope is THREAD_LOCAL, only thread-local state should be torn
-  /// down.
-  virtual void Close(RuntimeState* state, ExprContext* context,
-      FunctionContext::FunctionStateScope scope = FunctionContext::FRAGMENT_LOCAL);
-
-  /// Cache entry for the library implementing this function.
-  LibCacheEntry* cache_entry_;
-
-  /// Function description.
+  /// The thrift function. Set only for AggFn and some ScalarExpr such as ScalarFnCall.
   TFunction fn_;
 
-  /// True if this expr should be treated as a constant expression. True if either:
-  /// * This expr was sent from the frontend and Expr.isConstant() was true.
-  /// * This expr is a constant literal created in the backend.
-  const bool is_constant_;
-
-  /// recognize if this node is a slotref in order to speed up GetValue()
-  const bool is_slotref_;
-
-  /// analysis is done, types are fixed at this point
+  /// Return type of the expression.
   const ColumnType type_;
-  std::vector<Expr*> children_;
-  int output_scale_;
 
-  /// Index to pass to ExprContext::fn_context() to retrieve this expr's FunctionContext.
-  /// Set in RegisterFunctionContext(). -1 if this expr does not need a FunctionContext and
-  /// doesn't call RegisterFunctionContext().
-  int fn_context_index_;
-
-  /// Cached codegened compute function. Exprs should set this in GetCodegendComputeFn().
-  llvm::Function* ir_compute_fn_;
-
-  /// Helper function that calls ctx->Register(), sets fn_context_index_, and returns the
-  /// registered FunctionContext.
-  FunctionContext* RegisterFunctionContext(
-      ExprContext* ctx, RuntimeState* state, int varargs_buffer_size = 0);
-
-  /// Helper function to create an empty Function* with the appropriate signature to be
-  /// returned by GetCodegendComputeFn(). 'name' is the name of the returned Function*.
-  /// The arguments to the function are returned in 'args'.
-  llvm::Function* CreateIrFunctionPrototype(LlvmCodeGen* codegen, const std::string& name,
-                                            llvm::Value* (*args)[2]);
-
-  /// Generates an IR compute function that calls the appropriate interpreted Get*Val()
-  /// compute function.
-  //
-  /// This is useful for builtins that can't be implemented with the UDF interface
-  /// (e.g. functions that need short-circuiting) and that don't have custom codegen
-  /// functions that use the IRBuilder. It doesn't provide any performance benefit over
-  /// the interpreted path.
-  /// TODO: this should be replaced with fancier xcompiling infrastructure
-  Status GetCodegendComputeFnWrapper(LlvmCodeGen* codegen, llvm::Function** fn);
-
-  /// Returns the IR version of the static Get*Val() wrapper function corresponding to
-  /// 'type'. This is used for calling interpreted Get*Val() functions from codegen'd
-  /// functions (e.g. in ScalarFnCall() when codegen is disabled).
-  llvm::Function* GetStaticGetValWrapper(ColumnType type, LlvmCodeGen* codegen);
-
-  /// Simple debug string that provides no expr subclass-specific information
-  std::string DebugString(const std::string& expr_name) const;
+  /// Sub-expressions of this expression tree.
+  std::vector<ScalarExpr*> children_;
 
  private:
-  friend class ExprContext;
   friend class ExprTest;
   friend class ExprCodegenTest;
 
-  /// Create a new Expr based on texpr_node.node_type within 'pool'.
-  static Status CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** expr);
-
-  /// Creates an expr tree for the node rooted at 'node_idx' via depth-first traversal.
-  /// parameters
-  ///   nodes: vector of thrift expression nodes to be translated
-  ///   parent: parent of node at node_idx (or NULL for node_idx == 0)
-  ///   node_idx:
-  ///     in: root of TExprNode tree
-  ///     out: next node in 'nodes' that isn't part of tree
-  ///   root_expr: out: root of constructed expr tree
-  ///   ctx: out: context of constructed expr tree
+  /// Creates an expression tree rooted at 'root' via depth-first traversal.
+  /// Called recursively to create children expr trees for sub-expressions.
+  ///
+  /// parameters:
+  ///   nodes: vector of thrift expression nodes to be unpacked.
+  ///          It is essentially an Expr tree encoded in a depth-first manner.
+  ///   pool: Object pool in which Expr created from nodes are stored.
+  ///   root: root of the new tree. Created and initialized by the caller.
+  ///   child_node_idx: index into 'nodes' to be unpacked. It's the root of the next child
+  ///                   child Expr tree to be added to 'root'. Updated as 'nodes' are
+  ///                   consumed to construct the tree.
   /// return
   ///   status.ok() if successful
   ///   !status.ok() if tree is inconsistent or corrupt
-  static Status CreateTreeFromThrift(ObjectPool* pool,
-      const std::vector<TExprNode>& nodes, Expr* parent, int* node_idx,
-      Expr** root_expr, ExprContext** ctx);
-
-  /// Static wrappers around the virtual Get*Val() functions. Calls the appropriate
-  /// Get*Val() function on expr, passing it the context and row arguments.
-  //
-  /// These are used to call Get*Val() functions from generated functions, since I don't
-  /// know how to call virtual functions directly. GetStaticGetValWrapper() returns the
-  /// IR function of the appropriate wrapper function.
-  static BooleanVal GetBooleanVal(Expr* expr, ExprContext* context, const TupleRow* row);
-  static TinyIntVal GetTinyIntVal(Expr* expr, ExprContext* context, const TupleRow* row);
-  static SmallIntVal GetSmallIntVal(Expr* expr, ExprContext* context, const TupleRow* row);
-  static IntVal GetIntVal(Expr* expr, ExprContext* context, const TupleRow* row);
-  static BigIntVal GetBigIntVal(Expr* expr, ExprContext* context, const TupleRow* row);
-  static FloatVal GetFloatVal(Expr* expr, ExprContext* context, const TupleRow* row);
-  static DoubleVal GetDoubleVal(Expr* expr, ExprContext* context, const TupleRow* row);
-  static StringVal GetStringVal(Expr* expr, ExprContext* context, const TupleRow* row);
-  static TimestampVal GetTimestampVal(Expr* expr, ExprContext* context, const TupleRow* row);
-  static DecimalVal GetDecimalVal(Expr* expr, ExprContext* context, const TupleRow* row);
+  static Status CreateTreeInternal(const std::vector<TExprNode>& nodes,
+      ObjectPool* pool, Expr* parent, int* child_node_idx);
 };
 
 }

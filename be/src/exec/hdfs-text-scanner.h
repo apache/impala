@@ -62,7 +62,7 @@ class HdfsTextScanner : public HdfsScanner {
   /// Codegen WriteAlignedTuples(). Stores the resulting function in
   /// 'write_aligned_tuples_fn' if codegen was successful or nullptr otherwise.
   static Status Codegen(HdfsScanNodeBase* node,
-      const std::vector<ExprContext*>& conjunct_ctxs,
+      const std::vector<ScalarExpr*>& conjuncts,
       llvm::Function** write_aligned_tuples_fn);
 
   /// Suffix for lzo index files.

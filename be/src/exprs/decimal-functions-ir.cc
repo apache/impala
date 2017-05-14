@@ -19,7 +19,6 @@
 
 #include "codegen/impala-ir.h"
 #include "exprs/anyval-util.h"
-#include "exprs/expr.h"
 
 #include <ctype.h>
 #include <math.h>

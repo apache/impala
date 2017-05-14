@@ -17,8 +17,8 @@
 
 #include "exec/hdfs-text-table-writer.h"
 #include "exec/exec-node.h"
-#include "exprs/expr.h"
-#include "exprs/expr-context.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
@@ -45,12 +45,10 @@ static const int64_t COMPRESSED_BUFFERED_SIZE = 60 * 1024 * 1024;
 namespace impala {
 
 HdfsTextTableWriter::HdfsTextTableWriter(HdfsTableSink* parent,
-                                         RuntimeState* state, OutputPartition* output,
-                                         const HdfsPartitionDescriptor* partition,
-                                         const HdfsTableDescriptor* table_desc,
-                                         const vector<ExprContext*>& output_expr_ctxs)
-    : HdfsTableWriter(
-        parent, state, output, partition, table_desc, output_expr_ctxs) {
+    RuntimeState* state, OutputPartition* output,
+    const HdfsPartitionDescriptor* partition,
+    const HdfsTableDescriptor* table_desc)
+  : HdfsTableWriter(parent, state, output, partition, table_desc) {
   tuple_delim_ = partition->line_delim();
   field_delim_ = partition->field_delim();
   escape_char_ = partition->escape_char();
@@ -112,7 +110,7 @@ Status HdfsTextTableWriter::AppendRows(
   bool all_rows = row_group_indices.empty();
   int num_non_partition_cols =
       table_desc_->num_cols() - table_desc_->num_clustering_cols();
-  DCHECK_GE(output_expr_ctxs_.size(), num_non_partition_cols) << parent_->DebugString();
+  DCHECK_GE(output_expr_evals_.size(), num_non_partition_cols) << parent_->DebugString();
 
   {
     SCOPED_TIMER(parent_->encode_timer());
@@ -126,9 +124,9 @@ Status HdfsTextTableWriter::AppendRows(
       // partition col exprs are the last in output exprs, it's ok to just write
       // the first num_non_partition_cols values.
       for (int j = 0; j < num_non_partition_cols; ++j) {
-        void* value = output_expr_ctxs_[j]->GetValue(current_row);
+        void* value = output_expr_evals_[j]->GetValue(current_row);
         if (value != NULL) {
-          const ColumnType& type = output_expr_ctxs_[j]->root()->type();
+          const ColumnType& type = output_expr_evals_[j]->root().type();
           if (type.type == TYPE_CHAR) {
             char* val_ptr = StringValue::CharSlotToPtr(value, type);
             StringValue sv(val_ptr, StringValue::UnpaddedCharLength(val_ptr, type.len));
@@ -136,7 +134,7 @@ Status HdfsTextTableWriter::AppendRows(
           } else if (type.IsVarLenStringType()) {
             PrintEscaped(reinterpret_cast<const StringValue*>(value));
           } else {
-            output_expr_ctxs_[j]->PrintValue(value, &rowbatch_stringstream_);
+            output_expr_evals_[j]->PrintValue(value, &rowbatch_stringstream_);
           }
         } else {
           // NULLs in hive are encoded based on the 'serialization.null.format' property.

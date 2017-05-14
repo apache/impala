@@ -21,8 +21,8 @@
 #include <thrift/protocol/TDebugProtocol.h>
 
 #include "common/logging.h"
-#include "exprs/expr.h"
-#include "exprs/expr-context.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/descriptors.h"
 #include "runtime/tuple-row.h"
@@ -325,7 +325,7 @@ void DataStreamSender::Channel::Teardown(RuntimeState* state) {
   batch_.reset();
 }
 
-DataStreamSender::DataStreamSender(ObjectPool* pool, int sender_id,
+DataStreamSender::DataStreamSender(int sender_id,
     const RowDescriptor& row_desc, const TDataStreamSink& sink,
     const vector<TPlanFragmentDestination>& destinations,
     int per_channel_buffer_size)
@@ -351,8 +351,8 @@ DataStreamSender::DataStreamSender(ObjectPool* pool, int sender_id,
   for (int i = 0; i < destinations.size(); ++i) {
     channels_.push_back(
         new Channel(this, row_desc, destinations[i].server,
-                    destinations[i].fragment_instance_id,
-                    sink.dest_node_id, per_channel_buffer_size));
+            destinations[i].fragment_instance_id, sink.dest_node_id,
+            per_channel_buffer_size));
   }
 
   if (partition_type_ == TPartitionType::UNPARTITIONED
@@ -360,14 +360,6 @@ DataStreamSender::DataStreamSender(ObjectPool* pool, int sender_id,
     // Randomize the order we open/transmit to channels to avoid thundering herd problems.
     srand(reinterpret_cast<uint64_t>(this));
     random_shuffle(channels_.begin(), channels_.end());
-  }
-
-  if (partition_type_ == TPartitionType::HASH_PARTITIONED
-      || partition_type_ == TPartitionType::KUDU) {
-    // TODO: move this to Init()? would need to save 'sink' somewhere
-    Status status = Expr::CreateExprTrees(
-        pool, sink.output_partition.partition_exprs, &partition_expr_ctxs_);
-    DCHECK(status.ok());
   }
 }
 
@@ -383,14 +375,23 @@ DataStreamSender::~DataStreamSender() {
   }
 }
 
+Status DataStreamSender::Init(const vector<TExpr>& thrift_output_exprs,
+    const TDataSink& tsink, RuntimeState* state) {
+  DCHECK(tsink.__isset.stream_sink);
+  if (partition_type_ == TPartitionType::HASH_PARTITIONED ||
+      partition_type_ == TPartitionType::KUDU) {
+    RETURN_IF_ERROR(ScalarExpr::Create(tsink.stream_sink.output_partition.partition_exprs,
+        row_desc_, state, &partition_exprs_));
+  }
+  return Status::OK();
+}
+
 Status DataStreamSender::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
   state_ = state;
   SCOPED_TIMER(profile_->total_time_counter());
-
-  RETURN_IF_ERROR(
-      Expr::Prepare(partition_expr_ctxs_, state, row_desc_, mem_tracker_.get()));
-
+  RETURN_IF_ERROR(ScalarExprEvaluator::Create(partition_exprs_, state,
+      state->obj_pool(), expr_mem_pool(), &partition_expr_evals_));
   bytes_sent_counter_ = ADD_COUNTER(profile(), "BytesSent", TUnit::BYTES);
   uncompressed_bytes_counter_ =
       ADD_COUNTER(profile(), "UncompressedRowBatchSize", TUnit::BYTES);
@@ -414,7 +415,7 @@ Status DataStreamSender::Prepare(RuntimeState* state, MemTracker* parent_mem_tra
 }
 
 Status DataStreamSender::Open(RuntimeState* state) {
-  return Expr::Open(partition_expr_ctxs_, state);
+  return ScalarExprEvaluator::Open(partition_expr_evals_, state);
 }
 
 Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
@@ -422,8 +423,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
   DCHECK(!flushed_);
 
   if (batch->num_rows() == 0) return Status::OK();
-  if (partition_type_ == TPartitionType::UNPARTITIONED
-      || channels_.size() == 1) {
+  if (partition_type_ == TPartitionType::UNPARTITIONED || channels_.size() == 1) {
     // current_thrift_batch_ is *not* the one that was written by the last call
     // to Serialize()
     RETURN_IF_ERROR(SerializeBatch(batch, current_thrift_batch_, channels_.size()));
@@ -443,12 +443,12 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
     RETURN_IF_ERROR(current_channel->SendBatch(current_channel->thrift_batch()));
     current_channel_idx_ = (current_channel_idx_ + 1) % channels_.size();
   } else if (partition_type_ == TPartitionType::KUDU) {
-    DCHECK_EQ(partition_expr_ctxs_.size(), 1);
+    DCHECK_EQ(partition_expr_evals_.size(), 1);
     int num_channels = channels_.size();
     for (int i = 0; i < batch->num_rows(); ++i) {
       TupleRow* row = batch->GetRow(i);
       int32_t partition =
-          *reinterpret_cast<int32_t*>(partition_expr_ctxs_[0]->GetValue(row));
+          *reinterpret_cast<int32_t*>(partition_expr_evals_[0]->GetValue(row));
       if (partition < 0) {
         // This row doesn't coorespond to a partition, e.g. it's outside the given ranges.
         partition = next_unknown_partition_;
@@ -465,17 +465,18 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
     for (int i = 0; i < batch->num_rows(); ++i) {
       TupleRow* row = batch->GetRow(i);
       uint32_t hash_val = HashUtil::FNV_SEED;
-      for (int i = 0; i < partition_expr_ctxs_.size(); ++i) {
-        ExprContext* ctx = partition_expr_ctxs_[i];
-        void* partition_val = ctx->GetValue(row);
+      for (int i = 0; i < partition_exprs_.size(); ++i) {
+        ScalarExprEvaluator* eval = partition_expr_evals_[i];
+        void* partition_val = eval->GetValue(row);
         // We can't use the crc hash function here because it does not result
         // in uncorrelated hashes with different seeds.  Instead we must use
         // fnv hash.
         // TODO: fix crc hash/GetHashValue()
-        hash_val =
-            RawValue::GetHashValueFnv(partition_val, ctx->root()->type(), hash_val);
+        DCHECK(&partition_expr_evals_[i]->root() == partition_exprs_[i]);
+        hash_val = RawValue::GetHashValueFnv(
+            partition_val, partition_exprs_[i]->type(), hash_val);
       }
-      ExprContext::FreeLocalAllocations(partition_expr_ctxs_);
+      ScalarExprEvaluator::FreeLocalAllocations(partition_expr_evals_);
       RETURN_IF_ERROR(channels_[hash_val % num_channels]->AddRow(row));
     }
   }
@@ -502,7 +503,8 @@ void DataStreamSender::Close(RuntimeState* state) {
   for (int i = 0; i < channels_.size(); ++i) {
     channels_[i]->Teardown(state);
   }
-  Expr::Close(partition_expr_ctxs_, state);
+  ScalarExprEvaluator::Close(partition_expr_evals_, state);
+  ScalarExpr::Close(partition_exprs_);
   DataSink::Close(state);
   closed_ = true;
 }

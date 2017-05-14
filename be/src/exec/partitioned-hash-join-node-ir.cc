@@ -33,14 +33,14 @@ namespace impala {
 // TODO: explicitly set the calling convention?
 // TODO: investigate using fastcc for all codegen internal functions?
 bool IR_NO_INLINE EvalOtherJoinConjuncts(
-    ExprContext* const* ctxs, int num_ctxs, TupleRow* row) {
-  return ExecNode::EvalConjuncts(ctxs, num_ctxs, row);
+    ScalarExprEvaluator* const* evals, int num_evals, TupleRow* row) {
+  return ExecNode::EvalConjuncts(evals, num_evals, row);
 }
 
 bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowInnerJoin(
-    ExprContext* const* other_join_conjunct_ctxs, int num_other_join_conjuncts,
-    ExprContext* const* conjunct_ctxs, int num_conjuncts,
-    RowBatch::Iterator* out_batch_iterator, int* remaining_capacity) {
+    ScalarExprEvaluator* const* other_join_conjunct_evals,
+    int num_other_join_conjuncts, ScalarExprEvaluator* const* conjunct_evals,
+    int num_conjuncts, RowBatch::Iterator* out_batch_iterator, int* remaining_capacity) {
   DCHECK(current_probe_row_ != NULL);
   TupleRow* out_row = out_batch_iterator->Get();
   for (; !hash_tbl_iterator_.AtEnd(); hash_tbl_iterator_.NextDuplicate()) {
@@ -50,11 +50,11 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowInnerJoin(
     // Create an output row with all probe/build tuples and evaluate the
     // non-equi-join conjuncts.
     CreateOutputRow(out_row, current_probe_row_, matched_build_row);
-    if (!EvalOtherJoinConjuncts(other_join_conjunct_ctxs, num_other_join_conjuncts,
+    if (!EvalOtherJoinConjuncts(other_join_conjunct_evals, num_other_join_conjuncts,
         out_row)) {
       continue;
     }
-    if (ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
+    if (ExecNode::EvalConjuncts(conjunct_evals, num_conjuncts, out_row)) {
       --(*remaining_capacity);
       if (*remaining_capacity == 0) {
         hash_tbl_iterator_.NextDuplicate();
@@ -68,9 +68,9 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowInnerJoin(
 
 template<int const JoinOp>
 bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowRightSemiJoins(
-    ExprContext* const* other_join_conjunct_ctxs, int num_other_join_conjuncts,
-    ExprContext* const* conjunct_ctxs, int num_conjuncts,
-    RowBatch::Iterator* out_batch_iterator, int* remaining_capacity) {
+    ScalarExprEvaluator* const* other_join_conjunct_evals,
+    int num_other_join_conjuncts, ScalarExprEvaluator* const* conjunct_evals,
+    int num_conjuncts, RowBatch::Iterator* out_batch_iterator, int* remaining_capacity) {
   DCHECK(current_probe_row_ != NULL);
   DCHECK(JoinOp == TJoinOp::RIGHT_SEMI_JOIN || JoinOp == TJoinOp::RIGHT_ANTI_JOIN);
   TupleRow* out_row = out_batch_iterator->Get();
@@ -83,7 +83,7 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowRightSemiJoins(
     // build and probe tuples.
     if (num_other_join_conjuncts > 0) {
       CreateOutputRow(semi_join_staging_row_, current_probe_row_, matched_build_row);
-      if (!EvalOtherJoinConjuncts(other_join_conjunct_ctxs,
+      if (!EvalOtherJoinConjuncts(other_join_conjunct_evals,
           num_other_join_conjuncts, semi_join_staging_row_)) {
         continue;
       }
@@ -93,7 +93,7 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowRightSemiJoins(
     // Update the hash table to indicate that this entry has been matched.
     hash_tbl_iterator_.SetMatched();
     if (JoinOp == TJoinOp::RIGHT_SEMI_JOIN &&
-        ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
+        ExecNode::EvalConjuncts(conjunct_evals, num_conjuncts, out_row)) {
       --(*remaining_capacity);
       if (*remaining_capacity == 0) {
         hash_tbl_iterator_.NextDuplicate();
@@ -107,9 +107,10 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowRightSemiJoins(
 
 template<int const JoinOp>
 bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowLeftSemiJoins(
-    ExprContext* const* other_join_conjunct_ctxs, int num_other_join_conjuncts,
-    ExprContext* const* conjunct_ctxs, int num_conjuncts,
-    RowBatch::Iterator* out_batch_iterator, int* remaining_capacity, Status* status) {
+    ScalarExprEvaluator* const* other_join_conjunct_evals,
+    int num_other_join_conjuncts, ScalarExprEvaluator* const* conjunct_evals,
+    int num_conjuncts, RowBatch::Iterator* out_batch_iterator, int* remaining_capacity,
+    Status* status) {
   DCHECK(current_probe_row_ != NULL);
   DCHECK(JoinOp == TJoinOp::LEFT_ANTI_JOIN || JoinOp == TJoinOp::LEFT_SEMI_JOIN ||
       JoinOp == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN);
@@ -121,7 +122,7 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowLeftSemiJoins(
     // build and probe tuples.
     if (num_other_join_conjuncts > 0) {
       CreateOutputRow(semi_join_staging_row_, current_probe_row_, matched_build_row);
-      if (!EvalOtherJoinConjuncts(other_join_conjunct_ctxs,
+      if (!EvalOtherJoinConjuncts(other_join_conjunct_evals,
           num_other_join_conjuncts, semi_join_staging_row_)) {
         continue;
       }
@@ -133,7 +134,7 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowLeftSemiJoins(
     hash_tbl_iterator_.SetAtEnd();
     // Append to output batch for left semi joins if the conjuncts are satisfied.
     if (JoinOp == TJoinOp::LEFT_SEMI_JOIN &&
-        ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
+        ExecNode::EvalConjuncts(conjunct_evals, num_conjuncts, out_row)) {
       --(*remaining_capacity);
       if (*remaining_capacity == 0) return false;
       out_row = out_batch_iterator->Next();
@@ -159,7 +160,7 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowLeftSemiJoins(
       }
     }
     // No match for this current_probe_row_, we need to output it. No need to
-    // evaluate the conjunct_ctxs since anti joins cannot have any.
+    // evaluate the conjunct_evals since anti joins cannot have any.
     out_batch_iterator->parent()->CopyRow(current_probe_row_, out_row);
     matched_probe_ = true;
     --(*remaining_capacity);
@@ -171,9 +172,9 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowLeftSemiJoins(
 
 template<int const JoinOp>
 bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowOuterJoins(
-    ExprContext* const* other_join_conjunct_ctxs, int num_other_join_conjuncts,
-    ExprContext* const* conjunct_ctxs, int num_conjuncts,
-    RowBatch::Iterator* out_batch_iterator, int* remaining_capacity) {
+    ScalarExprEvaluator* const* other_join_conjunct_evals,
+    int num_other_join_conjuncts, ScalarExprEvaluator* const* conjunct_evals,
+    int num_conjuncts, RowBatch::Iterator* out_batch_iterator, int* remaining_capacity) {
   DCHECK(JoinOp == TJoinOp::LEFT_OUTER_JOIN || JoinOp == TJoinOp::RIGHT_OUTER_JOIN ||
       JoinOp == TJoinOp::FULL_OUTER_JOIN);
   DCHECK(current_probe_row_ != NULL);
@@ -184,7 +185,7 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowOuterJoins(
     // Create an output row with all probe/build tuples and evaluate the
     // non-equi-join conjuncts.
     CreateOutputRow(out_row, current_probe_row_, matched_build_row);
-    if (!EvalOtherJoinConjuncts(other_join_conjunct_ctxs, num_other_join_conjuncts,
+    if (!EvalOtherJoinConjuncts(other_join_conjunct_evals, num_other_join_conjuncts,
         out_row)) {
       continue;
     }
@@ -195,7 +196,7 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowOuterJoins(
       // as matched for right/full outer joins.
       hash_tbl_iterator_.SetMatched();
     }
-    if (ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
+    if (ExecNode::EvalConjuncts(conjunct_evals, num_conjuncts, out_row)) {
       --(*remaining_capacity);
       if (*remaining_capacity == 0) {
         hash_tbl_iterator_.NextDuplicate();
@@ -208,7 +209,7 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowOuterJoins(
   if (JoinOp != TJoinOp::RIGHT_OUTER_JOIN && !matched_probe_) {
     // No match for this row, we need to output it if it's a left/full outer join.
     CreateOutputRow(out_row, current_probe_row_, NULL);
-    if (ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
+    if (ExecNode::EvalConjuncts(conjunct_evals, num_conjuncts, out_row)) {
       matched_probe_ = true;
       --(*remaining_capacity);
       if (*remaining_capacity == 0) return false;
@@ -220,28 +221,30 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowOuterJoins(
 
 template <int const JoinOp>
 bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRow(
-    ExprContext* const* other_join_conjunct_ctxs, int num_other_join_conjuncts,
-    ExprContext* const* conjunct_ctxs, int num_conjuncts,
-    RowBatch::Iterator* out_batch_iterator, int* remaining_capacity, Status* status) {
+    ScalarExprEvaluator* const* other_join_conjunct_evals,
+    int num_other_join_conjuncts, ScalarExprEvaluator* const* conjunct_evals,
+    int num_conjuncts, RowBatch::Iterator* out_batch_iterator, int* remaining_capacity,
+    Status* status) {
   if (JoinOp == TJoinOp::INNER_JOIN) {
-    return ProcessProbeRowInnerJoin(other_join_conjunct_ctxs, num_other_join_conjuncts,
-        conjunct_ctxs, num_conjuncts, out_batch_iterator, remaining_capacity);
+    return ProcessProbeRowInnerJoin(other_join_conjunct_evals,
+        num_other_join_conjuncts, conjunct_evals, num_conjuncts, out_batch_iterator,
+        remaining_capacity);
   } else if (JoinOp == TJoinOp::RIGHT_SEMI_JOIN ||
              JoinOp == TJoinOp::RIGHT_ANTI_JOIN) {
-    return ProcessProbeRowRightSemiJoins<JoinOp>(other_join_conjunct_ctxs,
-        num_other_join_conjuncts, conjunct_ctxs, num_conjuncts, out_batch_iterator,
+    return ProcessProbeRowRightSemiJoins<JoinOp>(other_join_conjunct_evals,
+        num_other_join_conjuncts, conjunct_evals, num_conjuncts, out_batch_iterator,
         remaining_capacity);
   } else if (JoinOp == TJoinOp::LEFT_SEMI_JOIN ||
              JoinOp == TJoinOp::LEFT_ANTI_JOIN ||
              JoinOp == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
-    return ProcessProbeRowLeftSemiJoins<JoinOp>(other_join_conjunct_ctxs,
-        num_other_join_conjuncts, conjunct_ctxs, num_conjuncts, out_batch_iterator,
+    return ProcessProbeRowLeftSemiJoins<JoinOp>(other_join_conjunct_evals,
+        num_other_join_conjuncts, conjunct_evals, num_conjuncts, out_batch_iterator,
         remaining_capacity, status);
   } else {
     DCHECK(JoinOp == TJoinOp::RIGHT_OUTER_JOIN ||
            JoinOp == TJoinOp::LEFT_OUTER_JOIN || TJoinOp::FULL_OUTER_JOIN);
-    return ProcessProbeRowOuterJoins<JoinOp>(other_join_conjunct_ctxs,
-        num_other_join_conjuncts, conjunct_ctxs, num_conjuncts, out_batch_iterator,
+    return ProcessProbeRowOuterJoins<JoinOp>(other_join_conjunct_evals,
+        num_other_join_conjuncts, conjunct_evals, num_conjuncts, out_batch_iterator,
         remaining_capacity);
   }
 }
@@ -269,7 +272,7 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::NextProbeRow(
     // Fetch the hash and expr values' nullness for this row.
     if (expr_vals_cache->IsRowNull()) {
       if (JoinOp == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN && builder_->non_empty_build()) {
-        const int num_other_join_conjuncts = other_join_conjunct_ctxs_.size();
+        const int num_other_join_conjuncts = other_join_conjunct_evals_.size();
         // For NAAJ, we need to treat NULLs on the probe carefully. The logic is:
         // 1. No build rows -> Return this row. The check for 'non_empty_build_'
         //    is for this case.
@@ -363,10 +366,11 @@ int PartitionedHashJoinNode::ProcessProbeBatch(TPrefetchMode::type prefetch_mode
     RowBatch* out_batch, HashTableCtx* __restrict__ ht_ctx, Status* __restrict__ status) {
   DCHECK(state_ == PARTITIONING_PROBE || state_ == PROBING_SPILLED_PARTITION
       || state_ == REPARTITIONING_PROBE);
-  ExprContext* const* other_join_conjunct_ctxs = &other_join_conjunct_ctxs_[0];
-  const int num_other_join_conjuncts = other_join_conjunct_ctxs_.size();
-  ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
-  const int num_conjuncts = conjunct_ctxs_.size();
+  ScalarExprEvaluator* const* other_join_conjunct_evals =
+      other_join_conjunct_evals_.data();
+  const int num_other_join_conjuncts = other_join_conjunct_evals_.size();
+  ScalarExprEvaluator* const* conjunct_evals = conjunct_evals_.data();
+  const int num_conjuncts = conjunct_evals_.size();
 
   DCHECK(!out_batch->AtCapacity());
   DCHECK_GE(probe_batch_pos_, 0);
@@ -399,9 +403,9 @@ int PartitionedHashJoinNode::ProcessProbeBatch(TPrefetchMode::type prefetch_mode
     do {
       // 'current_probe_row_' can be NULL on the first iteration through this loop.
       if (current_probe_row_ != NULL) {
-        if (!ProcessProbeRow<JoinOp>(other_join_conjunct_ctxs, num_other_join_conjuncts,
-            conjunct_ctxs, num_conjuncts, &out_batch_iterator, &remaining_capacity,
-            status)) {
+        if (!ProcessProbeRow<JoinOp>(other_join_conjunct_evals,
+                num_other_join_conjuncts, conjunct_evals, num_conjuncts,
+                &out_batch_iterator, &remaining_capacity, status)) {
           if (status->ok()) DCHECK_EQ(remaining_capacity, 0);
           break;
         }

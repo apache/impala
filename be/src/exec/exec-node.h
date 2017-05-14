@@ -23,7 +23,7 @@
 #include <vector>
 
 #include "common/status.h"
-#include "exprs/expr-context.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "gen-cpp/PlanNodes_types.h"
 #include "runtime/descriptors.h" // for RowDescriptor
 #include "util/blocking-queue.h"
@@ -31,24 +31,25 @@
 
 namespace impala {
 
-class Expr;
-class ExprContext;
+class DataSink;
+class MemPool;
+class MemTracker;
 class ObjectPool;
-class Counters;
-class SortExecExprs;
 class RowBatch;
 class RuntimeState;
+class ScalarExpr;
+class SubplanNode;
 class TPlan;
 class TupleRow;
-class DataSink;
-class MemTracker;
-class SubplanNode;
 class TDebugOptions;
 
 /// Superclass of all executor nodes.
 /// All subclasses need to make sure to check RuntimeState::is_cancelled()
 /// periodically in order to ensure timely termination after the cancellation
 /// flag gets set.
+/// TODO: Move static state of ExecNode into PlanNode, of which there is one instance
+/// per fragment. ExecNode contains only runtime state and there can be up to MT_DOP
+/// instances of it per fragment.
 class ExecNode {
  public:
   /// Init conjuncts.
@@ -144,15 +145,18 @@ class ExecNode {
   /// Collect all scan node types.
   void CollectScanNodes(std::vector<ExecNode*>* nodes);
 
-  /// Evaluate ExprContexts over row.  Returns true if all exprs return true.
-  /// TODO: This doesn't use the vector<Expr*> signature because I haven't figured
-  /// out how to deal with declaring a templated std:vector type in IR
-  static bool EvalConjuncts(ExprContext* const* ctxs, int num_ctxs, TupleRow* row);
+  /// Evaluates the predicate in 'eval' over 'row' and returns the result.
+  static bool EvalPredicate(ScalarExprEvaluator* eval, TupleRow* row);
+
+  /// Evaluate the conjuncts in 'evaluators' over 'row'.
+  /// Returns true if all exprs return true.
+  static bool EvalConjuncts(
+      ScalarExprEvaluator* const* evals, int num_conjuncts, TupleRow* row);
 
   /// Codegen EvalConjuncts(). Returns a non-OK status if the function couldn't be
   /// codegen'd. The codegen'd version uses inlined, codegen'd GetBooleanVal() functions.
   static Status CodegenEvalConjuncts(LlvmCodeGen* codegen,
-      const std::vector<ExprContext*>& conjunct_ctxs, llvm::Function** fn,
+      const std::vector<ScalarExpr*>& conjuncts, llvm::Function** fn,
       const char* name = "EvalConjuncts") WARN_UNUSED_RESULT;
 
   /// Returns a string representation in DFS order of the plan rooted at this.
@@ -166,7 +170,12 @@ class ExecNode {
   ///   out: Stream to accumulate debug string.
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
-  const std::vector<ExprContext*>& conjunct_ctxs() const { return conjunct_ctxs_; }
+  const std::vector<ScalarExpr*>& conjuncts() const { return conjuncts_; }
+
+  const std::vector<ScalarExprEvaluator*>& conjunct_evals() const {
+    return conjunct_evals_;
+  }
+
   int id() const { return id_; }
   TPlanNodeType::type type() const { return type_; }
   const RowDescriptor& row_desc() const { return row_descriptor_; }
@@ -184,6 +193,7 @@ class ExecNode {
   RuntimeProfile* runtime_profile() { return runtime_profile_.get(); }
   MemTracker* mem_tracker() { return mem_tracker_.get(); }
   MemTracker* expr_mem_tracker() { return expr_mem_tracker_.get(); }
+  MemPool* expr_mem_pool() { return expr_mem_pool_.get(); }
 
   /// Return true if codegen was disabled by the planner for this ExecNode. Does not
   /// check to see if codegen was enabled for the enclosing fragment.
@@ -245,10 +255,14 @@ class ExecNode {
 
   /// Unique within a single plan tree.
   int id_;
-
   TPlanNodeType::type type_;
   ObjectPool* pool_;
-  std::vector<ExprContext*> conjunct_ctxs_;
+
+  /// Conjuncts and their evaluators in this node. 'conjuncts_' live in the
+  /// query-state's object pool while the evaluators live in this exec node's
+  /// object pool.
+  std::vector<ScalarExpr*> conjuncts_;
+  std::vector<ScalarExprEvaluator*> conjunct_evals_;
 
   std::vector<ExecNode*> children_;
   RowDescriptor row_descriptor_;
@@ -268,8 +282,12 @@ class ExecNode {
   /// Account for peak memory used by this node
   boost::scoped_ptr<MemTracker> mem_tracker_;
 
-  /// MemTracker that should be used for ExprContexts.
+  /// MemTracker used by 'expr_mem_pool_'.
   boost::scoped_ptr<MemTracker> expr_mem_tracker_;
+
+  /// MemPool for allocating data structures used by expression evaluators in this node.
+  /// Created in Prepare().
+  boost::scoped_ptr<MemPool> expr_mem_pool_;
 
   bool is_closed() const { return is_closed_; }
 
@@ -302,7 +320,7 @@ class ExecNode {
   Status ExecDebugAction(
       TExecNodePhase::type phase, RuntimeState* state) WARN_UNUSED_RESULT;
 
-  /// Frees any local allocations made by expr_ctxs_to_free_ and returns the result of
+  /// Frees any local allocations made by evals_to_free_ and returns the result of
   /// state->CheckQueryState(). Nodes should call this periodically, e.g. once per input
   /// row batch. This should not be called outside the main execution thread.
   //
@@ -311,26 +329,29 @@ class ExecNode {
   /// ExecNode::QueryMaintenance().
   virtual Status QueryMaintenance(RuntimeState* state) WARN_UNUSED_RESULT;
 
-  /// Add an ExprContext to have its local allocations freed by QueryMaintenance().
+  /// Add an expr evaluator to have its local allocations freed by QueryMaintenance().
   /// Exprs that are evaluated in the main execution thread should be added. Exprs
   /// evaluated in a separate thread are generally not safe to add, since a local
   /// allocation may be freed while it's being used. Rather than using this mechanism,
-  /// threads should call FreeLocalAllocations() on local ExprContexts periodically.
-  void AddExprCtxToFree(ExprContext* ctx) { expr_ctxs_to_free_.push_back(ctx); }
-  void AddExprCtxsToFree(const std::vector<ExprContext*>& ctxs);
-  void AddExprCtxsToFree(const SortExecExprs& sort_exec_exprs);
-
-  /// Free any local allocations made by expr_ctxs_to_free_.
-  void FreeLocalAllocations() { ExprContext::FreeLocalAllocations(expr_ctxs_to_free_); }
+  /// threads should call FreeLocalAllocations() on local evaluators periodically.
+  void AddEvaluatorToFree(ScalarExprEvaluator* eval);
+  void AddEvaluatorsToFree(const std::vector<ScalarExprEvaluator*>& evals);
 
  private:
   /// Set in ExecNode::Close(). Used to make Close() idempotent. This is not protected
   /// by a lock, it assumes all calls to Close() are made by the same thread.
   bool is_closed_;
 
-  /// Expr contexts whose local allocations are safe to free in the main execution thread.
-  std::vector<ExprContext*> expr_ctxs_to_free_;
+  /// Expr evaluators whose local allocations are safe to free in the main execution
+  /// thread.
+  std::vector<ScalarExprEvaluator*> evals_to_free_;
 };
+
+inline bool ExecNode::EvalPredicate(ScalarExprEvaluator* eval, TupleRow* row) {
+  BooleanVal v = eval->GetBooleanVal(row);
+  if (v.is_null || !v.val) return false;
+  return true;
+}
 
 }
 #endif

@@ -23,7 +23,9 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exprs")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exprs")
 
 add_library(Exprs
+  agg-fn.cc
   agg-fn-evaluator.cc
+  agg-fn-evaluator-ir.cc
   aggregate-functions-ir.cc
   anyval-util.cc
   bit-byte-functions-ir.cc
@@ -36,8 +38,6 @@ add_library(Exprs
   decimal-functions-ir.cc
   decimal-operators-ir.cc
   expr.cc
-  expr-context.cc
-  expr-ir.cc
   hive-udf-call.cc
   in-predicate-ir.cc
   is-not-empty-predicate.cc
@@ -49,6 +49,9 @@ add_library(Exprs
   math-functions-ir.cc
   null-literal.cc
   operators-ir.cc
+  scalar-expr.cc
+  scalar-expr-evaluator.cc
+  scalar-expr-ir.cc
   slot-ref.cc
   string-functions-ir.cc
   timestamp-functions.cc

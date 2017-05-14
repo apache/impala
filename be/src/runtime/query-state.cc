@@ -266,8 +266,7 @@ void QueryState::StartFInstances() {
 
   // set up desc tbl
   DCHECK(query_ctx().__isset.desc_tbl);
-  Status status = DescriptorTbl::Create(
-      &obj_pool_, query_ctx().desc_tbl, query_mem_tracker_, &desc_tbl_);
+  Status status = DescriptorTbl::Create(&obj_pool_, query_ctx().desc_tbl, &desc_tbl_);
   if (!status.ok()) {
     instances_prepared_promise_.Set(status);
     ReportExecStatusAux(true, status, nullptr, false);

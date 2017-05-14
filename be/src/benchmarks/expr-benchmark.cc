@@ -25,8 +25,8 @@
 #include "runtime/exec-env.h"
 #include "runtime/runtime-state.h"
 
-#include "exprs/expr.h"
-#include "exprs/expr-context.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "util/backend-gflag-util.h"
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
@@ -50,6 +50,7 @@
 #include "common/init.h"
 #include "common/object-pool.h"
 #include "common/status.h"
+#include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "service/fe-support.h"
 #include "service/impala-server.h"
@@ -93,22 +94,26 @@ class Planner {
 };
 
 struct TestData {
-  ExprContext* ctx;
+  ScalarExprEvaluator* eval;
   int64_t dummy_result;
 };
 
 Planner* planner;
 ObjectPool pool;
 MemTracker tracker;
+MemPool mem_pool(&tracker);
 
 // Utility function to get prepare select list for exprs.  Assumes this is a
-// constant query
-static Status PrepareSelectList(const TExecRequest& request, ExprContext** ctx) {
+// constant query.
+static Status PrepareSelectList(
+    const TExecRequest& request, ScalarExprEvaluator** eval) {
   const TQueryExecRequest& query_request = request.query_exec_request;
   vector<TExpr> texprs = query_request.plan_exec_info[0].fragments[0].output_exprs;
   DCHECK_EQ(texprs.size(), 1);
-  RETURN_IF_ERROR(Expr::CreateExprTree(&pool, texprs[0], ctx));
-  RETURN_IF_ERROR((*ctx)->Prepare(planner->GetRuntimeState(), RowDescriptor(), &tracker));
+  RuntimeState* state = planner->GetRuntimeState();
+  ScalarExpr* expr;
+  RETURN_IF_ERROR(ScalarExpr::Create(texprs[0], RowDescriptor(), state, &expr));
+  RETURN_IF_ERROR(ScalarExprEvaluator::Create(*expr, state, &pool, &mem_pool, eval));
   return Status::OK();
 }
 
@@ -119,7 +124,7 @@ static TestData* GenerateBenchmarkExprs(const string& query, bool codegen) {
   TestData* test_data = new TestData;
   TExecRequest request;
   ABORT_IF_ERROR(planner->GeneratePlan(ss.str(), &request));
-  ABORT_IF_ERROR(PrepareSelectList(request, &test_data->ctx));
+  ABORT_IF_ERROR(PrepareSelectList(request, &test_data->eval));
   return test_data;
 }
 
@@ -130,7 +135,7 @@ void BenchmarkQueryFn(int batch_size, void* d) {
   TestData* data = reinterpret_cast<TestData*>(d);
   for (int i = 0; i < batch_size; ++i) {
     for (int n = 0; n < ITERATIONS; ++n) {
-      void* value = data->ctx->GetValue(NULL);
+      void* value = data->eval->GetValue(NULL);
       // Dummy result to prevent this from being optimized away
       data->dummy_result += reinterpret_cast<int64_t>(value);
     }

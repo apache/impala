@@ -91,7 +91,6 @@ add_library(Exec
   scanner-context.cc
   select-node.cc
   singular-row-src-node.cc
-  sort-exec-exprs.cc
   sort-node.cc
   subplan-node.cc
   text-converter.cc

@@ -17,8 +17,8 @@
 
 #include "exec/plan-root-sink.h"
 
-#include "exprs/expr-context.h"
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
 #include "service/query-result-set.h"
@@ -34,24 +34,8 @@ namespace impala {
 
 const string PlanRootSink::NAME = "PLAN_ROOT_SINK";
 
-PlanRootSink::PlanRootSink(const RowDescriptor& row_desc,
-    const std::vector<TExpr>& output_exprs, const TDataSink& thrift_sink)
-  : DataSink(row_desc), thrift_output_exprs_(output_exprs) {}
-
-Status PlanRootSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
-  RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
-  RETURN_IF_ERROR(
-      Expr::CreateExprTrees(state->obj_pool(), thrift_output_exprs_, &output_expr_ctxs_));
-  RETURN_IF_ERROR(
-      Expr::Prepare(output_expr_ctxs_, state, row_desc_, expr_mem_tracker_.get()));
-
-  return Status::OK();
-}
-
-Status PlanRootSink::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(Expr::Open(output_expr_ctxs_, state));
-  return Status::OK();
-}
+PlanRootSink::PlanRootSink(const RowDescriptor& row_desc)
+  : DataSink(row_desc) { }
 
 namespace {
 
@@ -100,7 +84,7 @@ Status PlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
     DCHECK(results_ != nullptr);
     // List of expr values to hold evaluated rows from the query
     vector<void*> result_row;
-    result_row.resize(output_expr_ctxs_.size());
+    result_row.resize(output_exprs_.size());
 
     // List of scales for floating point values in result_row
     vector<int> scales;
@@ -116,7 +100,7 @@ Status PlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
     }
     // Signal the consumer.
     results_ = nullptr;
-    ExprContext::FreeLocalAllocations(output_expr_ctxs_);
+    ScalarExprEvaluator::FreeLocalAllocations(output_expr_evals_);
     consumer_cv_.notify_all();
   }
   return Status::OK();
@@ -139,7 +123,6 @@ void PlanRootSink::Close(RuntimeState* state) {
   // Wait for consumer to be done, in case sender tries to tear-down this sink while the
   // sender is still reading from it.
   while (!consumer_done_) sender_cv_.wait(l);
-  Expr::Close(output_expr_ctxs_, state);
   DataSink::Close(state);
 }
 
@@ -165,10 +148,10 @@ Status PlanRootSink::GetNext(
 
 void PlanRootSink::GetRowValue(
     TupleRow* row, vector<void*>* result, vector<int>* scales) {
-  DCHECK(result->size() >= output_expr_ctxs_.size());
-  for (int i = 0; i < output_expr_ctxs_.size(); ++i) {
-    (*result)[i] = output_expr_ctxs_[i]->GetValue(row);
-    (*scales)[i] = output_expr_ctxs_[i]->root()->output_scale();
+  DCHECK(result->size() >= output_expr_evals_.size());
+  for (int i = 0; i < output_expr_evals_.size(); ++i) {
+    (*result)[i] = output_expr_evals_[i]->GetValue(row);
+    (*scales)[i] = output_expr_evals_[i]->output_scale();
   }
 }
 }

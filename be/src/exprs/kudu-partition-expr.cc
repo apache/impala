@@ -20,7 +20,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "exec/kudu-util.h"
-#include "exprs/expr-context.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/exec-env.h"
 #include "runtime/query-state.h"
 #include "runtime/runtime-state.h"
@@ -31,11 +31,10 @@
 namespace impala {
 
 KuduPartitionExpr::KuduPartitionExpr(const TExprNode& node)
-  : Expr(node), tkudu_partition_expr_(node.kudu_partition_expr) {}
+  : ScalarExpr(node), tkudu_partition_expr_(node.kudu_partition_expr) {}
 
-Status KuduPartitionExpr::Prepare(
-    RuntimeState* state, const RowDescriptor& row_desc, ExprContext* ctx) {
-  RETURN_IF_ERROR(Expr::Prepare(state, row_desc, ctx));
+Status KuduPartitionExpr::Init(const RowDescriptor& row_desc, RuntimeState* state) {
+  RETURN_IF_ERROR(ScalarExpr::Init(row_desc, state));
   DCHECK_EQ(tkudu_partition_expr_.referenced_columns.size(), children_.size());
 
   // Create the KuduPartitioner we'll use to get the partition index for each row.
@@ -60,9 +59,10 @@ Status KuduPartitionExpr::Prepare(
   return Status::OK();
 }
 
-IntVal KuduPartitionExpr::GetIntVal(ExprContext* ctx, const TupleRow* row) {
+IntVal KuduPartitionExpr::GetIntVal(ScalarExprEvaluator* eval,
+    const TupleRow* row) const {
   for (int i = 0; i < children_.size(); ++i) {
-    void* val = ctx->GetValue(GetChild(i), row);
+    void* val = eval->GetValue(*GetChild(i), row);
     if (val == NULL) {
       // We don't currently support nullable partition columns, but pass it along and let
       // the KuduTableSink generate the error message.

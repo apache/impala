@@ -31,18 +31,18 @@ void TopNNode::InsertTupleRow(TupleRow* input_row) {
 
   if (priority_queue_->size() < limit_ + offset_) {
     insert_tuple = reinterpret_cast<Tuple*>(
-        tuple_pool_->Allocate(materialized_tuple_desc_->byte_size()));
-    insert_tuple->MaterializeExprs<false, false>(input_row, *materialized_tuple_desc_,
-        sort_exec_exprs_.sort_tuple_slot_expr_ctxs(), tuple_pool_.get());
+        tuple_pool_->Allocate(output_tuple_desc_->byte_size()));
+    insert_tuple->MaterializeExprs<false, false>(input_row, *output_tuple_desc_,
+        output_tuple_expr_evals_, tuple_pool_.get());
   } else {
     DCHECK(!priority_queue_->empty());
     Tuple* top_tuple = priority_queue_->top();
-    tmp_tuple_->MaterializeExprs<false, true>(input_row, *materialized_tuple_desc_,
-        sort_exec_exprs_.sort_tuple_slot_expr_ctxs(), nullptr);
+    tmp_tuple_->MaterializeExprs<false, true>(input_row, *output_tuple_desc_,
+        output_tuple_expr_evals_, nullptr);
     if (tuple_row_less_than_->Less(tmp_tuple_, top_tuple)) {
       // TODO: DeepCopy() will allocate new buffers for the string data. This needs
       // to be fixed to use a freelist
-      tmp_tuple_->DeepCopy(top_tuple, *materialized_tuple_desc_, tuple_pool_.get());
+      tmp_tuple_->DeepCopy(top_tuple, *output_tuple_desc_, tuple_pool_.get());
       insert_tuple = top_tuple;
       priority_queue_->pop();
     }

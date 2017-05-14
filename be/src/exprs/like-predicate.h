@@ -40,7 +40,7 @@ class LikePredicate: public Predicate {
   ~LikePredicate() { }
 
  protected:
-  friend class Expr;
+  friend class ScalarExprEvaluator;
 
   LikePredicate(const TExprNode& node)
       : Predicate(node) { }

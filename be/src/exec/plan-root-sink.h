@@ -27,7 +27,7 @@ namespace impala {
 class TupleRow;
 class RowBatch;
 class QueryResultSet;
-class ExprContext;
+class ScalarExprEvaluator;
 
 /// Sink which manages the handoff between a 'sender' (a fragment instance) that produces
 /// batches by calling Send(), and a 'consumer' (e.g. the coordinator) which consumes rows
@@ -57,14 +57,9 @@ class ExprContext;
 /// and consumer. See IMPALA-4268.
 class PlanRootSink : public DataSink {
  public:
-  PlanRootSink(const RowDescriptor& row_desc, const std::vector<TExpr>& output_exprs,
-      const TDataSink& thrift_sink);
+  PlanRootSink(const RowDescriptor& row_desc);
 
   virtual std::string GetName() { return NAME; }
-
-  virtual Status Prepare(RuntimeState* state, MemTracker* tracker);
-
-  virtual Status Open(RuntimeState* state);
 
   /// Sends a new batch. Ownership of 'batch' remains with the sender. Blocks until the
   /// consumer has consumed 'batch' by calling GetNext().
@@ -125,12 +120,8 @@ class PlanRootSink : public DataSink {
   /// Set to true in Send() and FlushFinal() when the Sink() has finished producing rows.
   bool eos_ = false;
 
-  /// Output expressions to map plan row batches onto result set rows.
-  std::vector<TExpr> thrift_output_exprs_;
-  std::vector<ExprContext*> output_expr_ctxs_;
-
-  /// Writes a single row into 'result' and 'scales' by evaluating output_expr_ctxs_ over
-  /// 'row'.
+  /// Writes a single row into 'result' and 'scales' by evaluating
+  /// output_expr_evals_ over 'row'.
   void GetRowValue(TupleRow* row, std::vector<void*>* result, std::vector<int>* scales);
 };
 }

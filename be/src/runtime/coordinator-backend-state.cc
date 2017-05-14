@@ -18,6 +18,8 @@
 #include "runtime/coordinator-backend-state.h"
 
 #include <sstream>
+#include <string>
+#include <boost/lexical_cast.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/lock_guard.hpp>
 #include <boost/accumulators/accumulators.hpp>
@@ -41,6 +43,7 @@
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
+
 #include "common/names.h"
 
 using namespace impala;

@@ -20,8 +20,9 @@
 #include <vector>
 
 #include "common/logging.h"
-#include "exprs/expr.h"
-#include "exprs/expr-context.h"
+#include "common/status.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "runtime/mem-tracker.h"
 #include "util/runtime-profile-counters.h"
@@ -33,40 +34,26 @@ namespace impala {
 const static string& ROOT_PARTITION_KEY =
     g_ImpalaInternalService_constants.ROOT_PARTITION_KEY;
 
-HBaseTableSink::HBaseTableSink(const RowDescriptor& row_desc,
-                               const vector<TExpr>& select_list_texprs,
-                               const TDataSink& tsink)
-    : DataSink(row_desc),
-      table_id_(tsink.table_sink.target_table_id),
-      table_desc_(NULL),
-      hbase_table_writer_(NULL),
-      select_list_texprs_(select_list_texprs) {
-}
-
-Status HBaseTableSink::PrepareExprs(RuntimeState* state) {
-  // From the thrift expressions create the real exprs.
-  RETURN_IF_ERROR(Expr::CreateExprTrees(state->obj_pool(), select_list_texprs_,
-                                        &output_expr_ctxs_));
-  // Prepare the exprs to run.
-  RETURN_IF_ERROR(
-      Expr::Prepare(output_expr_ctxs_, state, row_desc_, expr_mem_tracker_.get()));
-  return Status::OK();
+HBaseTableSink::HBaseTableSink(const RowDescriptor& row_desc, const TDataSink& tsink)
+  : DataSink(row_desc),
+    table_id_(tsink.table_sink.target_table_id),
+    table_desc_(NULL),
+    hbase_table_writer_(NULL) {
+  DCHECK(tsink.__isset.table_sink);
 }
 
 Status HBaseTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
   SCOPED_TIMER(profile()->total_time_counter());
 
-  // Get the hbase table descriptor.  The table name will be used.
+  // Get the hbase table descriptor. The table name will be used.
   table_desc_ = static_cast<HBaseTableDescriptor*>(
       state->desc_tbl().GetTableDescriptor(table_id_));
-  // Prepare the expressions.
-  RETURN_IF_ERROR(PrepareExprs(state));
   // Now that expressions are ready to materialize tuples, create the writer.
   hbase_table_writer_.reset(
-      new HBaseTableWriter(table_desc_, output_expr_ctxs_, profile()));
+      new HBaseTableWriter(table_desc_, output_expr_evals_, profile()));
 
-  // Try and init the table writer.  This can create connections to HBase and
+  // Try and init the table writer. This can create connections to HBase and
   // to zookeeper.
   RETURN_IF_ERROR(hbase_table_writer_->Init(state));
 
@@ -80,13 +67,9 @@ Status HBaseTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_track
   return Status::OK();
 }
 
-Status HBaseTableSink::Open(RuntimeState* state) {
-  return Expr::Open(output_expr_ctxs_, state);
-}
-
 Status HBaseTableSink::Send(RuntimeState* state, RowBatch* batch) {
   SCOPED_TIMER(profile()->total_time_counter());
-  ExprContext::FreeLocalAllocations(output_expr_ctxs_);
+  ScalarExprEvaluator::FreeLocalAllocations(output_expr_evals_);
   RETURN_IF_ERROR(state->CheckQueryState());
   // Since everything is set up just forward everything to the writer.
   RETURN_IF_ERROR(hbase_table_writer_->AppendRows(batch));
@@ -108,7 +91,6 @@ void HBaseTableSink::Close(RuntimeState* state) {
     hbase_table_writer_->Close(state);
     hbase_table_writer_.reset(NULL);
   }
-  Expr::Close(output_expr_ctxs_, state);
   DataSink::Close(state);
   closed_ = true;
 }

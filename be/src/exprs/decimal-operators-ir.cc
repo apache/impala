@@ -23,10 +23,8 @@
 
 #include "codegen/impala-ir.h"
 #include "exprs/anyval-util.h"
-#include "exprs/case-expr.h"
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
 #include "runtime/decimal-value.inline.h"
-#include "runtime/tuple-row.h"
 #include "util/decimal-util.h"
 #include "util/string-parser.h"
 

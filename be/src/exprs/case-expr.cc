@@ -20,8 +20,8 @@
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "exprs/anyval-util.h"
-#include "exprs/expr-context.h"
 #include "exprs/conditional-functions.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/runtime-state.h"
 
 #include "gen-cpp/Exprs_types.h"
@@ -35,75 +35,68 @@ namespace impala {
 struct CaseExprState {
   // Space to store the values being compared in the interpreted path. This makes it
   // easier to pass around AnyVal subclasses. Allocated from the runtime state's object
-  // pool in Prepare().
+  // pool in OpenEvaluator().
   AnyVal* case_val;
   AnyVal* when_val;
 };
 
 CaseExpr::CaseExpr(const TExprNode& node)
-  : Expr(node),
+  : ScalarExpr(node),
     has_case_expr_(node.case_expr.has_case_expr),
     has_else_expr_(node.case_expr.has_else_expr) {
 }
 
-Status CaseExpr::Prepare(RuntimeState* state, const RowDescriptor& desc,
-                         ExprContext* ctx) {
-  RETURN_IF_ERROR(Expr::Prepare(state, desc, ctx));
-  RegisterFunctionContext(ctx, state);
-  return Status::OK();
-}
-
-Status CaseExpr::Open(RuntimeState* state, ExprContext* ctx,
-                      FunctionContext::FunctionStateScope scope) {
-  RETURN_IF_ERROR(Expr::Open(state, ctx, scope));
-  FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
+Status CaseExpr::OpenEvaluator(FunctionContext::FunctionStateScope scope,
+    RuntimeState* state, ScalarExprEvaluator* eval) const {
+  RETURN_IF_ERROR(ScalarExpr::OpenEvaluator(scope, state, eval));
+  DCHECK_GE(fn_ctx_idx_, 0);
+  FunctionContext* fn_ctx = eval->fn_context(fn_ctx_idx_);
   CaseExprState* case_state = fn_ctx->Allocate<CaseExprState>();
-  if (UNLIKELY(case_state == NULL)) {
+  if (UNLIKELY(case_state == nullptr)) {
     DCHECK(!fn_ctx->impl()->state()->GetQueryStatus().ok());
     return fn_ctx->impl()->state()->GetQueryStatus();
   }
   fn_ctx->SetFunctionState(FunctionContext::THREAD_LOCAL, case_state);
 
-  const ColumnType& case_val_type = has_case_expr_ ? children_[0]->type() : TYPE_BOOLEAN;
-  RETURN_IF_ERROR(AllocateAnyVal(state, ctx->pool_.get(), case_val_type,
+  const ColumnType& case_val_type = has_case_expr_ ? GetChild(0)->type() : TYPE_BOOLEAN;
+  RETURN_IF_ERROR(AllocateAnyVal(state, eval->mem_pool(), case_val_type,
       "Could not allocate expression value", &case_state->case_val));
   const ColumnType& when_val_type =
-      has_case_expr_ ? children_[1]->type() : children_[0]->type();
-  RETURN_IF_ERROR(AllocateAnyVal(state, ctx->pool_.get(), when_val_type,
+      has_case_expr_ ? GetChild(1)->type() : GetChild(0)->type();
+  RETURN_IF_ERROR(AllocateAnyVal(state, eval->mem_pool(), when_val_type,
       "Could not allocate expression value", &case_state->when_val));
   return Status::OK();
 }
 
-void CaseExpr::Close(RuntimeState* state, ExprContext* ctx,
-                     FunctionContext::FunctionStateScope scope) {
-  if (fn_context_index_ != -1) {
-    FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
-    void* case_state = fn_ctx->GetFunctionState(FunctionContext::THREAD_LOCAL);
-    fn_ctx->Free(reinterpret_cast<uint8_t*>(case_state));
-    fn_ctx->SetFunctionState(FunctionContext::THREAD_LOCAL, nullptr);
-  }
-  Expr::Close(state, ctx, scope);
+void CaseExpr::CloseEvaluator(FunctionContext::FunctionStateScope scope,
+    RuntimeState* state, ScalarExprEvaluator* eval) const {
+  DCHECK_GE(fn_ctx_idx_, 0);
+  FunctionContext* fn_ctx = eval->fn_context(fn_ctx_idx_);
+  void* case_state = fn_ctx->GetFunctionState(FunctionContext::THREAD_LOCAL);
+  fn_ctx->Free(reinterpret_cast<uint8_t*>(case_state));
+  fn_ctx->SetFunctionState(FunctionContext::THREAD_LOCAL, nullptr);
+  ScalarExpr::CloseEvaluator(scope, state, eval);
 }
 
 string CaseExpr::DebugString() const {
   stringstream out;
   out << "CaseExpr(has_case_expr=" << has_case_expr_
       << " has_else_expr=" << has_else_expr_
-      << " " << Expr::DebugString() << ")";
+      << " " << ScalarExpr::DebugString() << ")";
   return out.str();
 }
 
 // Sample IR output when there is a case expression and else expression
-// define i16 @CaseExpr(%"class.impala::ExprContext"* %context,
+// define i16 @CaseExpr(%"class.impala::ScalarExprEvaluator"* %context,
 //                      %"class.impala::TupleRow"* %row) #20 {
 // eval_case_expr:
-//   %case_val = call i64 @GetSlotRef(%"class.impala::ExprContext"* %context,
+//   %case_val = call i64 @GetSlotRef(%"class.impala::ScalarExprEvaluator"* %context,
 //                                    %"class.impala::TupleRow"* %row)
 //   %is_null = trunc i64 %case_val to i1
 //   br i1 %is_null, label %return_else_expr, label %eval_first_when_expr
 //
 // eval_first_when_expr:                             ; preds = %eval_case_expr
-//   %when_val = call i64 @Literal(%"class.impala::ExprContext"* %context,
+//   %when_val = call i64 @Literal(%"class.impala::ScalarExprEvaluator"* %context,
 //                                 %"class.impala::TupleRow"* %row)
 //   %is_null1 = trunc i64 %when_val to i1
 //   br i1 %is_null1, label %return_else_expr, label %check_when_expr_block
@@ -117,27 +110,27 @@ string CaseExpr::DebugString() const {
 //   br i1 %eq, label %return_then_expr, label %return_else_expr
 //
 // return_then_expr:                                 ; preds = %check_when_expr_block
-//   %then_val = call i16 @Literal12(%"class.impala::ExprContext"* %context,
+//   %then_val = call i16 @Literal12(%"class.impala::ScalarExprEvaluator"* %context,
 //                                   %"class.impala::TupleRow"* %row)
 //   ret i16 %then_val
 //
 // return_else_expr:                                 ; preds = %check_when_expr_block, %eval_first_when_expr, %eval_case_expr
-//   %else_val = call i16 @Literal13(%"class.impala::ExprContext"* %context,
+//   %else_val = call i16 @Literal13(%"class.impala::ScalarExprEvaluator"* %context,
 //                                   %"class.impala::TupleRow"* %row)
 //   ret i16 %else_val
 // }
 //
 // Sample IR output when there is case expression and no else expression
-// define i16 @CaseExpr(%"class.impala::ExprContext"* %context,
+// define i16 @CaseExpr(%"class.impala::ScalarExprEvaluator"* %context,
 //                      %"class.impala::TupleRow"* %row) #20 {
 // eval_case_expr:
-//   %case_val = call i64 @GetSlotRef(%"class.impala::ExprContext"* %context,
+//   %case_val = call i64 @GetSlotRef(%"class.impala::ScalarExprEvaluator"* %context,
 //                                    %"class.impala::TupleRow"* %row)
 //   %is_null = trunc i64 %case_val to i1
 //   br i1 %is_null, label %return_null, label %eval_first_when_expr
 //
 // eval_first_when_expr:                             ; preds = %eval_case_expr
-//   %when_val = call i64 @Literal(%"class.impala::ExprContext"* %context,
+//   %when_val = call i64 @Literal(%"class.impala::ScalarExprEvaluator"* %context,
 //                                 %"class.impala::TupleRow"* %row)
 //   %is_null1 = trunc i64 %when_val to i1
 //   br i1 %is_null1, label %return_null, label %check_when_expr_block
@@ -151,7 +144,7 @@ string CaseExpr::DebugString() const {
 //   br i1 %eq, label %return_then_expr, label %return_null
 //
 // return_then_expr:                                 ; preds = %check_when_expr_block
-//   %then_val = call i16 @Literal12(%"class.impala::ExprContext"* %context,
+//   %then_val = call i16 @Literal12(%"class.impala::ScalarExprEvaluator"* %context,
 //                                   %"class.impala::TupleRow"* %row)
 //   ret i16 %then_val
 //
@@ -160,11 +153,11 @@ string CaseExpr::DebugString() const {
 // }
 //
 // Sample IR output when there is no case expr and else expression
-// define i16 @CaseExpr(%"class.impala::ExprContext"* %context,
+// define i16 @CaseExpr(%"class.impala::ScalarExprEvaluator"* %context,
 //                      %"class.impala::TupleRow"* %row) #20 {
 // eval_first_when_expr:
 //   %when_val = call i16 @Eq_IntVal_IntValWrapper1(
-//       %"class.impala::ExprContext"* %context, %"class.impala::TupleRow"* %row)
+//       %"class.impala::ScalarExprEvaluator"* %context, %"class.impala::TupleRow"* %row)
 //   %is_null = trunc i16 %when_val to i1
 //   br i1 %is_null, label %return_else_expr, label %check_when_expr_block
 //
@@ -175,17 +168,17 @@ string CaseExpr::DebugString() const {
 //   br i1 %val, label %return_then_expr, label %return_else_expr
 //
 // return_then_expr:                                 ; preds = %check_when_expr_block
-//   %then_val = call i16 @Literal14(%"class.impala::ExprContext"* %context,
+//   %then_val = call i16 @Literal14(%"class.impala::ScalarExprEvaluator"* %context,
 //                                   %"class.impala::TupleRow"* %row)
 //   ret i16 %then_val
 //
 // return_else_expr:                                 ; preds = %check_when_expr_block, %eval_first_when_expr
-//   %else_val = call i16 @Literal15(%"class.impala::ExprContext"* %context,
+//   %else_val = call i16 @Literal15(%"class.impala::ScalarExprEvaluator"* %context,
 //                                   %"class.impala::TupleRow"* %row)
 //   ret i16 %else_val
 // }
 Status CaseExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
-  if (ir_compute_fn_ != NULL) {
+  if (ir_compute_fn_ != nullptr) {
     *fn = ir_compute_fn_;
     return Status::OK();
   }
@@ -193,15 +186,15 @@ Status CaseExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
   const int num_children = GetNumChildren();
   Function* child_fns[num_children];
   for (int i = 0; i < num_children; ++i) {
-    RETURN_IF_ERROR(children()[i]->GetCodegendComputeFn(codegen, &child_fns[i]));
+    RETURN_IF_ERROR(GetChild(i)->GetCodegendComputeFn(codegen, &child_fns[i]));
   }
 
   LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
 
   Value* args[2];
-  Function* function = CreateIrFunctionPrototype(codegen, "CaseExpr", &args);
-  BasicBlock* eval_case_expr_block = NULL;
+  Function* function = CreateIrFunctionPrototype("CaseExpr", codegen, &args);
+  BasicBlock* eval_case_expr_block = nullptr;
 
   // This is the block immediately after the when/then exprs. It will either point to a
   // block which returns the else expr, or returns NULL if no else expr is specified.
@@ -215,7 +208,7 @@ Status CaseExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
   BasicBlock* current_when_expr_block = eval_first_when_expr_block;
   if (has_case_expr()) {
     // Need at least case, when and then expr, and optionally an else expr
-    DCHECK_GE(num_children, (has_else_expr()) ? 4 : 3);
+    DCHECK_GE(num_children, has_else_expr() ? 4 : 3);
     // If there is a case expr, create block eval_case_expr to evaluate the
     // case expr. Place this block before eval_first_when_expr_block
     eval_case_expr_block = BasicBlock::Create(context, "eval_case_expr",
@@ -226,15 +219,15 @@ Status CaseExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
     builder.CreateCondBr(
         case_val.GetIsNull(), default_value_block, eval_first_when_expr_block);
   } else {
-    DCHECK_GE(num_children, (has_else_expr()) ? 3 : 2);
+    DCHECK_GE(num_children, has_else_expr() ? 3 : 2);
   }
 
-  const int loop_end = (has_else_expr()) ? num_children - 1 : num_children;
+  const int loop_end = has_else_expr() ? num_children - 1 : num_children;
   const int last_loop_iter = loop_end - 2;
   // The loop increments by two each time, because each iteration handles one when/then
   // pair. Both when and then subexpressions are single children. If there is a case expr
-  // start loop at index 1. (case expr is children()[0] and has already be evaluated.
-  for (int i = (has_case_expr()) ? 1 : 0; i < loop_end; i += 2) {
+  // start loop at index 1. (case expr is GetChild(0) and has already be evaluated.
+  for (int i = has_case_expr() ? 1 : 0; i < loop_end; i += 2) {
     BasicBlock* check_when_expr_block = BasicBlock::Create(
         context, "check_when_expr_block", function, default_value_block);
     BasicBlock* return_then_expr_block =
@@ -242,7 +235,7 @@ Status CaseExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
 
     // continue_or_exit_block either points to the next eval_next_when_expr block,
     // or points to the defaut_value_block if there are no more when/then expressions.
-    BasicBlock* continue_or_exit_block = NULL;
+    BasicBlock* continue_or_exit_block = nullptr;
     if (i == last_loop_iter) {
       continue_or_exit_block = default_value_block;
     } else {
@@ -254,7 +247,7 @@ Status CaseExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
     // statement
     builder.SetInsertPoint(current_when_expr_block);
     CodegenAnyVal when_val = CodegenAnyVal::CreateCallWrapped(
-        codegen, &builder, children()[i]->type(), child_fns[i], args, "when_val");
+        codegen, &builder, GetChild(i)->type(), child_fns[i], args, "when_val");
     builder.CreateCondBr(
         when_val.GetIsNull(), continue_or_exit_block, check_when_expr_block);
 
@@ -286,53 +279,53 @@ Status CaseExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
   } else {
     builder.CreateRet(CodegenAnyVal::GetNullVal(codegen, type()));
   }
-
   *fn = codegen->FinalizeFunction(function);
-  DCHECK(*fn != NULL);
+  if (UNLIKELY(*fn == nullptr)) return Status(TErrorCode::IR_VERIFY_FAILED, "CaseExpr");
   ir_compute_fn_ = *fn;
   return Status::OK();
 }
 
-void CaseExpr::GetChildVal(int child_idx, ExprContext* ctx, const TupleRow* row, AnyVal* dst) {
-  switch (children()[child_idx]->type().type) {
+void CaseExpr::GetChildVal(int child_idx, ScalarExprEvaluator* eval,
+    const TupleRow* row, AnyVal* dst) const {
+  ScalarExpr* child = GetChild(child_idx);
+  switch (child->type().type) {
     case TYPE_BOOLEAN:
-      *reinterpret_cast<BooleanVal*>(dst) = children()[child_idx]->GetBooleanVal(ctx, row);
+      *reinterpret_cast<BooleanVal*>(dst) = child->GetBooleanVal(eval, row);
       break;
     case TYPE_TINYINT:
-      *reinterpret_cast<TinyIntVal*>(dst) = children()[child_idx]->GetTinyIntVal(ctx, row);
+      *reinterpret_cast<TinyIntVal*>(dst) = child->GetTinyIntVal(eval, row);
       break;
     case TYPE_SMALLINT:
-      *reinterpret_cast<SmallIntVal*>(dst) =
-          children()[child_idx]->GetSmallIntVal(ctx, row);
+      *reinterpret_cast<SmallIntVal*>(dst) = child->GetSmallIntVal(eval, row);
       break;
     case TYPE_INT:
-      *reinterpret_cast<IntVal*>(dst) = children()[child_idx]->GetIntVal(ctx, row);
+      *reinterpret_cast<IntVal*>(dst) = child->GetIntVal(eval, row);
       break;
     case TYPE_BIGINT:
-      *reinterpret_cast<BigIntVal*>(dst) = children()[child_idx]->GetBigIntVal(ctx, row);
+      *reinterpret_cast<BigIntVal*>(dst) = child->GetBigIntVal(eval, row);
       break;
     case TYPE_FLOAT:
-      *reinterpret_cast<FloatVal*>(dst) = children()[child_idx]->GetFloatVal(ctx, row);
+      *reinterpret_cast<FloatVal*>(dst) = child->GetFloatVal(eval, row);
       break;
     case TYPE_DOUBLE:
-      *reinterpret_cast<DoubleVal*>(dst) = children()[child_idx]->GetDoubleVal(ctx, row);
+      *reinterpret_cast<DoubleVal*>(dst) = child->GetDoubleVal(eval, row);
       break;
     case TYPE_TIMESTAMP:
-      *reinterpret_cast<TimestampVal*>(dst) =
-          children()[child_idx]->GetTimestampVal(ctx, row);
+      *reinterpret_cast<TimestampVal*>(dst) = child->GetTimestampVal(eval, row);
       break;
     case TYPE_STRING:
-      *reinterpret_cast<StringVal*>(dst) = children()[child_idx]->GetStringVal(ctx, row);
+      *reinterpret_cast<StringVal*>(dst) = child->GetStringVal(eval, row);
       break;
     case TYPE_DECIMAL:
-      *reinterpret_cast<DecimalVal*>(dst) = children()[child_idx]->GetDecimalVal(ctx, row);
+      *reinterpret_cast<DecimalVal*>(dst) = child->GetDecimalVal(eval, row);
       break;
     default:
-      DCHECK(false) << children()[child_idx]->type();
+      DCHECK(false) << child->type();
   }
 }
 
-bool CaseExpr::AnyValEq(const ColumnType& type, const AnyVal* v1, const AnyVal* v2) {
+bool CaseExpr::AnyValEq(
+    const ColumnType& type, const AnyVal* v1, const AnyVal* v2) const {
   switch (type.type) {
     case TYPE_BOOLEAN:
       return AnyValUtil::Equals(type, *reinterpret_cast<const BooleanVal*>(v1),
@@ -371,17 +364,19 @@ bool CaseExpr::AnyValEq(const ColumnType& type, const AnyVal* v1, const AnyVal* 
 }
 
 #define CASE_COMPUTE_FN(THEN_TYPE) \
-  THEN_TYPE CaseExpr::Get##THEN_TYPE(ExprContext* ctx, const TupleRow* row) { \
-    FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_); \
+  THEN_TYPE CaseExpr::Get##THEN_TYPE( \
+      ScalarExprEvaluator* eval, const TupleRow* row) const { \
+    DCHECK(eval->opened()); \
+    FunctionContext* fn_ctx = eval->fn_context(fn_ctx_idx_); \
     CaseExprState* state = reinterpret_cast<CaseExprState*>( \
         fn_ctx->GetFunctionState(FunctionContext::THREAD_LOCAL)); \
-    DCHECK(state->case_val != NULL); \
-    DCHECK(state->when_val != NULL); \
+    DCHECK(state->case_val != nullptr); \
+    DCHECK(state->when_val != nullptr); \
     int num_children = GetNumChildren(); \
     if (has_case_expr()) {                               \
       /* All case and when exprs return the same type */ \
       /* (we guaranteed that during analysis). */ \
-      GetChildVal(0, ctx, row, state->case_val); \
+      GetChildVal(0, eval, row, state->case_val); \
     } else { \
       /* If there's no case expression, compare the when values to "true". */ \
       *reinterpret_cast<BooleanVal*>(state->case_val) = BooleanVal(true); \
@@ -389,7 +384,7 @@ bool CaseExpr::AnyValEq(const ColumnType& type, const AnyVal* v1, const AnyVal* 
     if (state->case_val->is_null) { \
       if (has_else_expr()) { \
         /* Return else value. */ \
-        return children()[num_children - 1]->Get##THEN_TYPE(ctx, row); \
+        return children()[num_children - 1]->Get##THEN_TYPE(eval, row); \
       } else { \
         return THEN_TYPE::null(); \
       } \
@@ -397,16 +392,16 @@ bool CaseExpr::AnyValEq(const ColumnType& type, const AnyVal* v1, const AnyVal* 
     int loop_start = has_case_expr() ? 1 : 0; \
     int loop_end = (has_else_expr()) ? num_children - 1 : num_children; \
     for (int i = loop_start; i < loop_end; i += 2) { \
-      GetChildVal(i, ctx, row, state->when_val); \
+      GetChildVal(i, eval, row, state->when_val); \
       if (state->when_val->is_null) continue; \
-      if (AnyValEq(children()[0]->type(), state->case_val, state->when_val)) {  \
+      if (AnyValEq(children()[0]->type(), state->case_val, state->when_val)) { \
         /* Return then value. */ \
-        return children()[i + 1]->Get##THEN_TYPE(ctx, row); \
+        return GetChild(i + 1)->Get##THEN_TYPE(eval, row); \
       } \
     } \
     if (has_else_expr()) { \
       /* Return else value. */ \
-      return children()[num_children - 1]->Get##THEN_TYPE(ctx, row); \
+      return GetChild(num_children - 1)->Get##THEN_TYPE(eval, row); \
     } \
     return THEN_TYPE::null(); \
   }

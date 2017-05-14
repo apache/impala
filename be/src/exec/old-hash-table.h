@@ -34,13 +34,13 @@ namespace llvm {
 
 namespace impala {
 
-class Expr;
-class ExprContext;
 class LlvmCodeGen;
 class MemTracker;
 class RuntimeFilter;
 class RowDescriptor;
 class RuntimeState;
+class ScalarExpr;
+class ScalarExprEvaluator;
 class Tuple;
 class TupleRow;
 
@@ -95,7 +95,7 @@ class OldHashTable {
   /// Create a hash table.
   ///  - build_exprs are the exprs that should be used to evaluate rows during Insert().
   ///  - probe_exprs are used during Find()
-  ///  - filter_expr_ctxs are used to build runtime filters.
+  ///  - filter_exprs are used to build runtime filters.
   ///  - num_build_tuples: number of Tuples in the build tuple row
   ///  - stores_nulls: if false, TupleRows with nulls are ignored during Insert
   ///  - finds_nulls: if finds_nulls[i] is false, Find() returns End() for TupleRows with
@@ -110,15 +110,24 @@ class OldHashTable {
   ///       with '<=>' and others with '=', stores_nulls could distinguish between columns
   ///       in which nulls are stored and columns in which they are not, which could save
   ///       space by not storing some rows we know will never match.
-  OldHashTable(RuntimeState* state, const std::vector<ExprContext*>& build_expr_ctxs,
-      const std::vector<ExprContext*>& probe_expr_ctxs,
-      const std::vector<ExprContext*>& filter_expr_ctxs, int num_build_tuples,
-      bool stores_nulls, const std::vector<bool>& finds_nulls, int32_t initial_seed,
-      MemTracker* mem_tracker, const std::vector<RuntimeFilter*>& filters,
-      bool stores_tuples = false, int64_t num_buckets = 1024);
+  static Status Create(ObjectPool* pool, RuntimeState* state,
+      const std::vector<ScalarExpr*>& build_exprs,
+      const std::vector<ScalarExpr*>& probe_exprs,
+      const std::vector<ScalarExpr*>& filter_exprs,
+      int num_build_tuples, bool stores_nulls,
+      const std::vector<bool>& finds_nulls, int32_t initial_seed,
+      MemTracker* mem_tracker, const std::vector<RuntimeFilter*>& runtime_filters,
+      boost::scoped_ptr<OldHashTable>* hash_tbl_, bool stores_tuples = false,
+      int64_t num_buckets = 1024);
+
+  /// Initializes the evaluators for build, probe and filter expressions.
+  Status Open(RuntimeState* state);
 
   /// Call to cleanup any resources. Must be called once.
-  void Close();
+  void Close(RuntimeState* state);
+
+  /// Frees local allocations made by expression evaluators.
+  void FreeLocalAllocations();
 
   /// Insert row into the hash table.  Row will be evaluated over build exprs.
   /// This will grow the hash table if necessary.
@@ -351,13 +360,23 @@ class OldHashTable {
     Bucket() : node(NULL) { }
   };
 
-  /// Simple wrappers to return various fields in this class. They are done to avoid
-  /// the need to make assumption about the order of declaration of these fields when
-  /// generating the handcrafted IR.
+  /// Use Create() instead.
+  OldHashTable(RuntimeState* state, const std::vector<ScalarExpr*>& build_exprs,
+      const std::vector<ScalarExpr*>& probe_exprs,
+      const std::vector<ScalarExpr*>& filter_exprs, int num_build_tuples,
+      bool stores_nulls, const std::vector<bool>& finds_nulls, int32_t initial_seed,
+      MemTracker* mem_tracker, const std::vector<RuntimeFilter*>& filters,
+      bool stores_tuples, int64_t num_buckets);
+
+  Status Init(ObjectPool* pool, RuntimeState* state);
+
+  /// Simple wrappers to return various fields in this class. These functions are
+  /// cross-compiled and they exist to avoid the need to make assumption about the
+  /// order of declaration of these fields when generating the handcrafted IR.
   uint8_t* IR_ALWAYS_INLINE expr_values_buffer() const;
   uint8_t* IR_ALWAYS_INLINE expr_value_null_bits() const;
-  ExprContext* const* IR_ALWAYS_INLINE build_expr_ctxs() const;
-  ExprContext* const* IR_ALWAYS_INLINE probe_expr_ctxs() const;
+  ScalarExprEvaluator* const* IR_ALWAYS_INLINE build_expr_evals() const;
+  ScalarExprEvaluator* const* IR_ALWAYS_INLINE probe_expr_evals() const;
 
   /// Returns the next non-empty bucket and updates idx to be the index of that bucket.
   /// If there are no more buckets, returns NULL and sets idx to -1
@@ -381,20 +400,20 @@ class OldHashTable {
   /// Evaluate the exprs over row and cache the results in 'expr_values_buffer_'.
   /// Returns whether any expr evaluated to NULL
   /// This will be replaced by codegen
-  bool EvalRow(TupleRow* row, const std::vector<ExprContext*>& ctxs);
+  bool EvalRow(TupleRow* row, const std::vector<ScalarExprEvaluator*>& evals);
 
   /// Evaluate 'row' over build exprs caching the results in 'expr_values_buffer_' This
   /// will be replaced by codegen.  We do not want this function inlined when cross
   /// compiled because we need to be able to differentiate between EvalBuildRow and
   /// EvalProbeRow by name and the build/probe exprs are baked into the codegen'd function.
   bool IR_NO_INLINE EvalBuildRow(TupleRow* row) {
-    return EvalRow(row, build_expr_ctxs_);
+    return EvalRow(row, build_expr_evals_);
   }
 
   /// Evaluate 'row' over probe exprs caching the results in 'expr_values_buffer_'
   /// This will be replaced by codegen.
   bool IR_NO_INLINE EvalProbeRow(TupleRow* row) {
-    return EvalRow(row, probe_expr_ctxs_);
+    return EvalRow(row, probe_expr_evals_);
   }
 
   /// Compute the hash of the values in expr_values_buffer_.
@@ -441,12 +460,18 @@ class OldHashTable {
 
   RuntimeState* state_;
 
-  const std::vector<ExprContext*>& build_expr_ctxs_;
-  const std::vector<ExprContext*>& probe_expr_ctxs_;
+  /// References to the build expressions evaluated on each build-row during insertion
+  /// and lookup, the probe expressions used during lookup and the filter expression,
+  /// one per filter in filters_, evaluated on per-build row to produce the value with
+  /// which to update the corresponding filter.
+  const std::vector<ScalarExpr*>& build_exprs_;
+  const std::vector<ScalarExpr*>& probe_exprs_;
+  const std::vector<ScalarExpr*>& filter_exprs_;
 
-  /// Expression, one per filter in filters_, to evaluate per-build row which produces the
-  /// value with which to update the corresponding filter.
-  std::vector<ExprContext*> filter_expr_ctxs_;
+  /// Evaluators for the expressions above.
+  std::vector<ScalarExprEvaluator*> build_expr_evals_;
+  std::vector<ScalarExprEvaluator*> probe_expr_evals_;
+  std::vector<ScalarExprEvaluator*> filter_expr_evals_;
 
   /// List of filters to build during build phase.
   std::vector<RuntimeFilter*> filters_;

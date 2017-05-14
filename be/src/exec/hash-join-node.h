@@ -26,6 +26,8 @@
 #include "exec/exec-node.h"
 #include "exec/old-hash-table.h"
 #include "exec/blocking-join-node.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "util/promise.h"
 
 #include "gen-cpp/PlanNodes_types.h"  // for TJoinOp
@@ -34,6 +36,8 @@ namespace impala {
 
 class MemPool;
 class RowBatch;
+class ScalarExpr;
+class ScalarExprEvaluator;
 class TupleRow;
 
 /// Node for in-memory hash joins:
@@ -63,6 +67,7 @@ class HashJoinNode : public BlockingJoinNode {
   static const char* LLVM_CLASS_NAME;
 
  protected:
+  virtual Status QueryMaintenance(RuntimeState* state);
   virtual void AddToDebugString(int indentation_level, std::stringstream* out) const;
   virtual Status ProcessBuildInput(RuntimeState* state);
 
@@ -75,18 +80,19 @@ class HashJoinNode : public BlockingJoinNode {
 
   /// our equi-join predicates "<lhs> = <rhs>" are separated into
   /// build_exprs_ (over child(1)) and probe_exprs_ (over child(0))
-  std::vector<ExprContext*> probe_expr_ctxs_;
-  std::vector<ExprContext*> build_expr_ctxs_;
+  std::vector<ScalarExpr*> probe_exprs_;
+  std::vector<ScalarExpr*> build_exprs_;
 
   /// Expressions used to build runtime filters, one per entry in filters_.
-  std::vector<ExprContext*> filter_expr_ctxs_;
+  std::vector<ScalarExpr*> filter_exprs_;
 
   /// is_not_distinct_from_[i] is true if and only if the ith equi-join predicate is IS
   /// NOT DISTINCT FROM, rather than equality.
   std::vector<bool> is_not_distinct_from_;
 
   /// non-equi-join conjuncts from the JOIN clause
-  std::vector<ExprContext*> other_join_conjunct_ctxs_;
+  std::vector<ScalarExpr*> other_join_conjuncts_;
+  std::vector<ScalarExprEvaluator*> other_join_conjunct_evals_;
 
   /// Derived from join_op_
   /// Output all rows coming from the probe input. Used in LEFT_OUTER_JOIN and

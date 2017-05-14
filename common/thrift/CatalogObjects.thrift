@@ -244,6 +244,7 @@ struct THdfsPartition {
   4: required byte mapKeyDelim
   5: required byte escapeChar
   6: required THdfsFileFormat fileFormat
+  // These are Literal expressions
   7: list<Exprs.TExpr> partitionKeyExprs
   8: required i32 blockSize
   9: optional list<THdfsFileDesc> file_desc

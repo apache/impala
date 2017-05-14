@@ -28,12 +28,13 @@ using namespace impala;
 using namespace llvm;
 
 // (<> && false) is false, (true && NULL) is NULL
-BooleanVal AndPredicate::GetBooleanVal(ExprContext* context, const TupleRow* row) {
+BooleanVal AndPredicate::GetBooleanVal(ScalarExprEvaluator* eval,
+    const TupleRow* row) const {
   DCHECK_EQ(children_.size(), 2);
-  BooleanVal val1 = children_[0]->GetBooleanVal(context, row);
+  BooleanVal val1 = children_[0]->GetBooleanVal(eval, row);
   if (!val1.is_null && !val1.val) return BooleanVal(false); // short-circuit
 
-  BooleanVal val2 = children_[1]->GetBooleanVal(context, row);
+  BooleanVal val2 = children_[1]->GetBooleanVal(eval, row);
   if (!val2.is_null && !val2.val) return BooleanVal(false);
 
   if (val1.is_null || val2.is_null) return BooleanVal::null();
@@ -42,17 +43,18 @@ BooleanVal AndPredicate::GetBooleanVal(ExprContext* context, const TupleRow* row
 
 string AndPredicate::DebugString() const {
   stringstream out;
-  out << "AndPredicate(" << Expr::DebugString() << ")";
+  out << "AndPredicate(" << ScalarExpr::DebugString() << ")";
   return out.str();
 }
 
 // (<> || true) is true, (false || NULL) is NULL
-BooleanVal OrPredicate::GetBooleanVal(ExprContext* context, const TupleRow* row) {
+BooleanVal OrPredicate::GetBooleanVal(ScalarExprEvaluator* eval,
+    const TupleRow* row) const {
   DCHECK_EQ(children_.size(), 2);
-  BooleanVal val1 = children_[0]->GetBooleanVal(context, row);
+  BooleanVal val1 = children_[0]->GetBooleanVal(eval, row);
   if (!val1.is_null && val1.val) return BooleanVal(true); // short-circuit
 
-  BooleanVal val2 = children_[1]->GetBooleanVal(context, row);
+  BooleanVal val2 = children_[1]->GetBooleanVal(eval, row);
   if (!val2.is_null && val2.val) return BooleanVal(true);
 
   if (val1.is_null || val2.is_null) return BooleanVal::null();
@@ -61,7 +63,7 @@ BooleanVal OrPredicate::GetBooleanVal(ExprContext* context, const TupleRow* row)
 
 string OrPredicate::DebugString() const {
   stringstream out;
-  out << "OrPredicate(" << Expr::DebugString() << ")";
+  out << "OrPredicate(" << ScalarExpr::DebugString() << ")";
   return out.str();
 }
 
@@ -69,13 +71,14 @@ string OrPredicate::DebugString() const {
 // null handling as well as many branches so this is pretty complicated.  The IR
 // for x && y is:
 //
-// define i16 @CompoundPredicate(%"class.impala::ExprContext"* %context,
+// define i16 @CompoundPredicate(%"class.impala::ScalarExprEvaluator"* %eval,
 //                               %"class.impala::TupleRow"* %row) #20 {
 // entry:
-//   %lhs_call = call i16 @GetSlotRef1(%"class.impala::ExprContext"* %context,
+//   %lhs_call = call i16 @GetSlotRef1(%"class.impala::ScalarExprEvaluator"* %eval,
 //                                     %"class.impala::TupleRow"* %row)
-//   %rhs_call = call i16 @Eq_IntVal_IntValWrapper(%"class.impala::ExprContext"* %context,
-//                                                 %"class.impala::TupleRow"* %row)
+//   %rhs_call = call i16 @Eq_IntVal_IntValWrapper(
+//                                %"class.impala::ScalarExprEvaluator"* %eval,
+//                                %"class.impala::TupleRow"* %row)
 //   %is_null = trunc i16 %lhs_call to i1
 //   %is_null1 = trunc i16 %rhs_call to i1
 //   %0 = ashr i16 %lhs_call, 8
@@ -133,7 +136,7 @@ Status CompoundPredicate::CodegenComputeFn(
   LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
   Value* args[2];
-  Function* function = CreateIrFunctionPrototype(codegen, "CompoundPredicate", &args);
+  Function* function = CreateIrFunctionPrototype("CompoundPredicate", codegen, &args);
 
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
   builder.SetInsertPoint(entry_block);

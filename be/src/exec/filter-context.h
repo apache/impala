@@ -20,9 +20,7 @@
 #define IMPALA_EXEC_FILTER_CONTEXT_H
 
 #include <boost/unordered_map.hpp>
-#include <gutil/strings/substitute.h>
-
-#include "exprs/expr-context.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "util/runtime-profile.h"
 
 namespace impala {
@@ -30,6 +28,7 @@ namespace impala {
 class BloomFilter;
 class LlvmCodeGen;
 class RuntimeFilter;
+class ScalarExpr;
 class TupleRow;
 
 /// Container struct for per-filter statistics, with statistics for each granularity of
@@ -80,45 +79,43 @@ class FilterStats {
 /// FilterContext contains all metadata for a single runtime filter, and allows the filter
 /// to be applied in the context of a single thread.
 struct FilterContext {
-  /// Expression which produces a value to test against the runtime filter.
-  /// This field is referenced in generated code so if the order of it changes
-  /// inside this struct, please update CodegenEval().
-  ExprContext* expr_ctx;
+  /// Evaluator for 'expr'. This field is referenced in generated code so if the order
+  /// of it changes inside this struct, please update CodegenEval().
+  ScalarExprEvaluator* expr_eval = nullptr;
 
   /// Cache of filter from runtime filter bank.
   /// The field is referenced in generated code so if the order of it changes
   /// inside this struct, please update CodegenEval().
-  const RuntimeFilter* filter;
+  const RuntimeFilter* filter = nullptr;
 
   /// Statistics for this filter, owned by object pool.
-  FilterStats* stats;
+  FilterStats* stats = nullptr;
 
   /// Working copy of local bloom filter
-  BloomFilter* local_bloom_filter;
+  BloomFilter* local_bloom_filter = nullptr;
 
   /// Struct name in LLVM IR.
   static const char* LLVM_CLASS_NAME;
 
   /// Clones this FilterContext for use in a multi-threaded context (i.e. by scanner
   /// threads).
-  Status CloneFrom(const FilterContext& from, RuntimeState* state);
+  Status CloneFrom(const FilterContext& from, ObjectPool* pool, RuntimeState* state,
+      MemPool* mem_pool);
 
-  /// Evaluates 'row' on the expression in 'expr_ctx' with the resulting value being
-  /// checked against runtime filter 'filter' for matches. Returns true if 'row' finds
+  /// Evaluates 'row' with 'expr_eval' with the resulting value being checked
+  /// against runtime filter 'filter' for matches. Returns true if 'row' finds
   /// a match in 'filter'. Returns false otherwise.
   bool Eval(TupleRow* row) const noexcept;
 
-  /// Evaluates 'row' on the expression in 'expr_ctx' and hashes the resulting value.
+  /// Evaluates 'row' with 'expr_eval' and hashes the resulting value.
   /// The hash value is then used for setting some bits in 'local_bloom_filter'.
   void Insert(TupleRow* row) const noexcept;
 
-  /// Codegen Eval() by codegen'ing the expression evaluations and replacing the type
+  /// Codegen Eval() by codegen'ing the expression 'filter_expr' and replacing the type
   /// argument to RuntimeFilter::Eval() with a constant. On success, 'fn' is set to
   /// the generated function. On failure, an error status is returned.
-  Status CodegenEval(LlvmCodeGen* codegen, llvm::Function** fn) const;
-
-  FilterContext()
-      : expr_ctx(NULL), filter(NULL), local_bloom_filter(NULL) { }
+  static Status CodegenEval(LlvmCodeGen* codegen, ScalarExpr* filter_expr,
+     llvm::Function** fn) WARN_UNUSED_RESULT;
 };
 
 }

@@ -25,8 +25,8 @@
 #include "common/status.h"
 #include "exec/kudu-util.h"
 #include "exec/data-sink.h"
-#include "exprs/expr-context.h"
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 
 namespace impala {
 
@@ -53,8 +53,7 @@ namespace impala {
 /// status. All reported errors (ignored or not) will be logged via the RuntimeState.
 class KuduTableSink : public DataSink {
  public:
-  KuduTableSink(const RowDescriptor& row_desc,
-      const std::vector<TExpr>& select_list_texprs, const TDataSink& tsink);
+  KuduTableSink(const RowDescriptor& row_desc, const TDataSink& tsink);
 
   virtual std::string GetName() { return "KuduTableSink"; }
 
@@ -76,9 +75,6 @@ class KuduTableSink : public DataSink {
   virtual void Close(RuntimeState* state);
 
  private:
-  /// Turn thrift TExpr into Expr and prepare them to run
-  Status PrepareExprs(RuntimeState* state);
-
   /// Create a new write operation according to the sink type.
   kudu::client::KuduWriteOperation* NewWriteOp();
 
@@ -93,11 +89,6 @@ class KuduTableSink : public DataSink {
 
   /// The descriptor of the KuduTable being written to. Set on Prepare().
   const KuduTableDescriptor* table_desc_;
-
-  /// The expression descriptors and the prepared expressions. The latter are built
-  /// on Prepare().
-  const std::vector<TExpr>& select_list_texprs_;
-  std::vector<ExprContext*> output_expr_ctxs_;
 
   /// The Kudu client, owned by the ExecEnv.
   kudu::client::KuduClient* client_ = nullptr;

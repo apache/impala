@@ -37,7 +37,7 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/raw_ostream.h>
 
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
 #include "impala-ir/impala-ir-functions.h"
 #include "runtime/types.h"
 #include "util/runtime-profile.h"
@@ -230,6 +230,9 @@ class LlvmCodeGen {
 
   /// Return a pointer to pointer type to 'type'.
   llvm::PointerType* GetPtrPtrType(llvm::Type* type);
+
+  /// Return a pointer to pointer type for 'name' type.
+  llvm::PointerType* GetPtrPtrType(const std::string& name);
 
   /// Returns llvm type for the column type
   llvm::Type* GetType(const ColumnType& type);

@@ -17,7 +17,7 @@
 
 // The following is cross-compiled to native code and IR, and used in the test below
 #include "exprs/decimal-operators.h"
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
 #include "udf/udf.h"
 
 using namespace impala;
@@ -36,7 +36,7 @@ struct FnAttr {
 #endif
 
 DecimalVal TestGetFnAttrs(
-    FunctionContext* ctx, const DecimalVal& arg0, StringVal arg1, StringVal arg2) {
+    FunctionContext* ctx, const DecimalVal& arg0, BooleanVal& arg1, StringVal& arg2) {
   FnAttr* state = reinterpret_cast<FnAttr*>(
       ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
   state->return_type_size =
@@ -58,7 +58,8 @@ DecimalVal TestGetFnAttrs(
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
 #include "exprs/anyval-util.h"
-#include "exprs/expr-context.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/runtime-state.h"
@@ -76,7 +77,7 @@ using namespace llvm;
 namespace impala {
 
 const char* TEST_GET_FN_ATTR_SYMBOL =
-    "_Z14TestGetFnAttrsPN10impala_udf15FunctionContextERKNS_10DecimalValENS_9StringValES5_";
+    "_Z14TestGetFnAttrsPN10impala_udf15FunctionContextERKNS_10DecimalValERNS_10BooleanValERNS_9StringValE";
 
 const int ARG0_PRECISION = 10;
 const int ARG0_SCALE = 2;
@@ -91,7 +92,7 @@ class ExprCodegenTest : public ::testing::Test {
   FunctionContext* fn_ctx_;
   FnAttr fn_type_attr_;
 
-  int InlineConstFnAttrs(Expr* expr, LlvmCodeGen* codegen, llvm::Function* fn) {
+  int InlineConstFnAttrs(const Expr* expr, LlvmCodeGen* codegen, llvm::Function* fn) {
     FunctionContext::TypeDesc ret_type = AnyValUtil::ColumnTypeToTypeDesc(expr->type());
     vector<FunctionContext::TypeDesc> arg_types;
     for (const Expr* child : expr->children()) {
@@ -108,6 +109,7 @@ class ExprCodegenTest : public ::testing::Test {
 
   virtual void SetUp() {
     TQueryOptions query_options;
+    query_options.__set_disable_codegen(false);
     query_options.__set_decimal_v2(true);
     test_env_.reset(new TestEnv());
     ASSERT_OK(test_env_->Init());
@@ -124,8 +126,7 @@ class ExprCodegenTest : public ::testing::Test {
     arg0_type.scale = ARG0_SCALE;
 
     FunctionContext::TypeDesc arg1_type;
-    arg1_type.type = FunctionContext::TYPE_FIXED_BUFFER;
-    arg1_type.len = ARG1_LEN;
+    arg1_type.type = FunctionContext::TYPE_BOOLEAN;
 
     FunctionContext::TypeDesc arg2_type;
     arg2_type.type = FunctionContext::TYPE_STRING;
@@ -165,6 +166,28 @@ class ExprCodegenTest : public ::testing::Test {
   }
 };
 
+TExprNode CreateBooleanLiteral() {
+  TScalarType scalar_type;
+  scalar_type.type = TPrimitiveType::BOOLEAN;
+
+  TTypeNode type;
+  type.type = TTypeNodeType::SCALAR;
+  type.__set_scalar_type(scalar_type);
+
+  TColumnType col_type;
+  col_type.__set_types(vector<TTypeNode>(1, type));
+
+  TBoolLiteral bool_literal;
+  bool_literal.__set_value(true);
+
+  TExprNode expr;
+  expr.node_type = TExprNodeType::BOOL_LITERAL;
+  expr.type = col_type;
+  expr.num_children = 0;
+  expr.__set_bool_literal(bool_literal);
+  return expr;
+}
+
 TExprNode CreateDecimalLiteral(int precision, int scale) {
   TScalarType scalar_type;
   scalar_type.type = TPrimitiveType::DECIMAL;
@@ -192,7 +215,7 @@ TExprNode CreateDecimalLiteral(int precision, int scale) {
 // len > 0 => char
 TExprNode CreateStringLiteral(int len = -1) {
   TScalarType scalar_type;
-  scalar_type.type = len > 0 ? TPrimitiveType::CHAR : TPrimitiveType::STRING;
+  scalar_type.type = len > 0 ? TPrimitiveType::VARCHAR : TPrimitiveType::STRING;
   if (len > 0) scalar_type.__set_len(len);
 
   TTypeNode type;
@@ -257,7 +280,7 @@ TEST_F(ExprCodegenTest, TestGetConstFnAttrsInterpreted) {
   // and return types are encoded above (ARG0_*, RET_*);
   int64_t v = 1000025;
   DecimalVal arg0_val(v);
-  StringVal arg1_val;
+  BooleanVal arg1_val;
   StringVal arg2_val;
   DecimalVal result = TestGetFnAttrs(fn_ctx_, arg0_val, arg1_val, arg2_val);
   // sanity check result
@@ -269,7 +292,7 @@ TEST_F(ExprCodegenTest, TestGetConstFnAttrsInterpreted) {
 TEST_F(ExprCodegenTest, TestInlineConstFnAttrs) {
   // Setup thrift descriptors
   TExprNode arg0 = CreateDecimalLiteral(ARG0_PRECISION, ARG0_SCALE);
-  TExprNode arg1 = CreateStringLiteral(ARG1_LEN);
+  TExprNode arg1 = CreateBooleanLiteral();
   TExprNode arg2 = CreateStringLiteral();
 
   vector<TExprNode> exprs;
@@ -284,10 +307,9 @@ TEST_F(ExprCodegenTest, TestInlineConstFnAttrs) {
   texpr.__set_nodes(exprs);
 
   // Create Expr
-  ObjectPool pool;
   MemTracker tracker;
-  ExprContext* ctx;
-  ASSERT_OK(Expr::CreateExprTree(&pool, texpr, &ctx));
+  ScalarExpr* expr;
+  ASSERT_OK(ScalarExpr::Create(texpr, RowDescriptor(), runtime_state_, &expr));
 
   // Get TestGetFnAttrs() IR function
   stringstream test_udf_file;
@@ -302,7 +324,7 @@ TEST_F(ExprCodegenTest, TestInlineConstFnAttrs) {
   EXPECT_FALSE(verification_succeeded);
 
   // Call InlineConstFnAttrs() and rerun verification
-  int replaced = InlineConstFnAttrs(ctx->root(), codegen.get(), fn);
+  int replaced = InlineConstFnAttrs(expr, codegen.get(), fn);
   EXPECT_EQ(replaced, 9);
   ResetVerification(codegen.get());
   verification_succeeded = VerifyFunction(codegen.get(), fn);

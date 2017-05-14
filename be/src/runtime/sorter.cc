@@ -77,7 +77,7 @@ static int NumNonNullBlocks(const vector<BufferedBlockMgr::Block*>& blocks) {
 /// an optional sequence of var-length blocks containing the var-length data.
 ///
 /// Runs are either "initial runs" constructed from the sorter's input by evaluating
-/// the expressions in 'sort_tuple_slot_expr_ctxs_' or "intermediate runs" constructed
+/// the expressions in 'sort_tuple_exprs_' or "intermediate runs" constructed
 /// by merging already-sorted runs. Initial runs are sorted in-place in memory. Once
 /// sorted, runs can be spilled to disk to free up memory. Sorted runs are merged by
 /// SortedRunMerger, either to produce the final sorted output or to produce another
@@ -113,7 +113,7 @@ class Sorter::Run {
   /// number of rows actually added in 'num_processed'. If the run is full (no more blocks
   /// can be allocated), 'num_processed' may be less than the number of remaining rows in
   /// the batch. AddInputBatch() materializes the input rows using the expressions in
-  /// sorter_->sort_tuple_slot_expr_ctxs_, while AddIntermediateBatch() just copies rows.
+  /// sorter_->sort_tuple_expr_evals_, while AddIntermediateBatch() just copies rows.
   Status AddInputBatch(RowBatch* batch, int start_index, int* num_processed) {
     DCHECK(initial_run_);
     if (has_var_len_slots_) {
@@ -568,8 +568,9 @@ Status Sorter::Run::AddBatchInternal(RowBatch* batch, int start_index, int* num_
       TupleRow* input_row = batch->GetRow(cur_input_index);
       Tuple* new_tuple = cur_fixed_len_block->Allocate<Tuple>(sort_tuple_size_);
       if (INITIAL_RUN) {
-        new_tuple->MaterializeExprs<HAS_VAR_LEN_SLOTS, true>(input_row, *sort_tuple_desc_,
-            sorter_->sort_tuple_slot_expr_ctxs_, NULL, &string_values, &total_var_len);
+        new_tuple->MaterializeExprs<HAS_VAR_LEN_SLOTS, true>(input_row,
+            *sort_tuple_desc_, sorter_->sort_tuple_expr_evals_, NULL,
+            &string_values, &total_var_len);
         if (total_var_len > sorter_->block_mgr_->max_block_size()) {
           return Status(ErrorMsg(TErrorCode::INTERNAL_ERROR, Substitute(
               "Variable length data in a single tuple larger than block size $0 > $1",
@@ -1334,7 +1335,7 @@ inline void Sorter::TupleSorter::Swap(Tuple* left, Tuple* right, Tuple* swap_tup
 }
 
 Sorter::Sorter(const TupleRowComparator& compare_less_than,
-    const vector<ExprContext*>& slot_materialize_expr_ctxs,
+    const vector<ScalarExpr*>& sort_tuple_exprs,
     RowDescriptor* output_row_desc, MemTracker* mem_tracker,
     RuntimeProfile* profile, RuntimeState* state)
   : state_(state),
@@ -1343,7 +1344,7 @@ Sorter::Sorter(const TupleRowComparator& compare_less_than,
     block_mgr_(state->block_mgr()),
     block_mgr_client_(NULL),
     has_var_len_slots_(false),
-    sort_tuple_slot_expr_ctxs_(slot_materialize_expr_ctxs),
+    sort_tuple_exprs_(sort_tuple_exprs),
     mem_tracker_(mem_tracker),
     output_row_desc_(output_row_desc),
     unsorted_run_(NULL),
@@ -1362,7 +1363,7 @@ Sorter::~Sorter() {
   DCHECK(merge_output_run_ == NULL);
 }
 
-Status Sorter::Prepare() {
+Status Sorter::Prepare(ObjectPool* obj_pool, MemPool* expr_mem_pool) {
   DCHECK(in_mem_tuple_sorter_ == NULL) << "Already prepared";
   TupleDescriptor* sort_tuple_desc = output_row_desc_->tuple_descriptors()[0];
   has_var_len_slots_ = sort_tuple_desc->HasVarlenSlots();
@@ -1383,6 +1384,9 @@ Status Sorter::Prepare() {
 
   RETURN_IF_ERROR(block_mgr_->RegisterClient(Substitute("Sorter ptr=$0", this),
       min_buffers_required, false, mem_tracker_, state_, &block_mgr_client_));
+
+  RETURN_IF_ERROR(ScalarExprEvaluator::Create(sort_tuple_exprs_, state_, obj_pool,
+      expr_mem_pool, &sort_tuple_expr_evals_));
   return Status::OK();
 }
 
@@ -1392,7 +1396,13 @@ Status Sorter::Open() {
   TupleDescriptor* sort_tuple_desc = output_row_desc_->tuple_descriptors()[0];
   unsorted_run_ = obj_pool_.Add(new Run(this, sort_tuple_desc, true));
   RETURN_IF_ERROR(unsorted_run_->Init());
+  RETURN_IF_ERROR(ScalarExprEvaluator::Open(sort_tuple_expr_evals_, state_));
   return Status::OK();
+}
+
+void Sorter::FreeLocalAllocations() {
+  compare_less_than_.FreeLocalAllocations();
+  ScalarExprEvaluator::FreeLocalAllocations(sort_tuple_expr_evals_);
 }
 
 Status Sorter::AddBatch(RowBatch* batch) {
@@ -1459,10 +1469,11 @@ void Sorter::Reset() {
   obj_pool_.Clear();
 }
 
-void Sorter::Close() {
+void Sorter::Close(RuntimeState* state) {
   CleanupAllRuns();
   block_mgr_->ClearReservations(block_mgr_client_);
   obj_pool_.Clear();
+  ScalarExprEvaluator::Close(sort_tuple_expr_evals_, state);
 }
 
 void Sorter::CleanupAllRuns() {
@@ -1574,7 +1585,6 @@ Status Sorter::CreateMerger(int max_num_runs) {
   num_merges_counter_->Add(1);
   return Status::OK();
 }
-
 
 Status Sorter::ExecuteIntermediateMerge(Sorter::Run* merged_run) {
   RowBatch intermediate_merge_batch(*output_row_desc_, state_->batch_size(),

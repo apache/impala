@@ -35,19 +35,14 @@ namespace impala {
 /// eventually be written into an HBase table.
 class HBaseTableSink : public DataSink {
  public:
-  HBaseTableSink(const RowDescriptor& row_desc,
-      const std::vector<TExpr>& select_list_texprs, const TDataSink& tsink);
+  HBaseTableSink(const RowDescriptor& row_desc, const TDataSink& tsink);
   virtual std::string GetName() { return "HBaseTableSink"; }
   virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker);
-  virtual Status Open(RuntimeState* state);
   virtual Status Send(RuntimeState* state, RowBatch* batch);
   virtual Status FlushFinal(RuntimeState* state);
   virtual void Close(RuntimeState* state);
 
  private:
-  /// Turn thrift TExpr into Expr and prepare them to run
-  Status PrepareExprs(RuntimeState* state);
-
   /// Used to get the HBaseTableDescriptor from the RuntimeState
   TableId table_id_;
 
@@ -58,10 +53,6 @@ class HBaseTableSink : public DataSink {
   /// hbase_table_writer is owned by this sink and should be closed
   /// when this is Close'd.
   boost::scoped_ptr<HBaseTableWriter> hbase_table_writer_;
-
-  /// Owned by the RuntimeState.
-  const std::vector<TExpr>& select_list_texprs_;
-  std::vector<ExprContext*> output_expr_ctxs_;
 };
 
 }  // namespace impala

@@ -17,17 +17,19 @@
 
 #include "exprs/anyval-util.h"
 #include "exprs/conditional-functions.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "udf/udf.h"
 
 using namespace impala;
 using namespace impala_udf;
 
 #define IS_NULL_COMPUTE_FUNCTION(type) \
-  type IsNullExpr::Get##type(ExprContext* ctx, const TupleRow* row) { \
+  type IsNullExpr::Get##type( \
+      ScalarExprEvaluator* eval, const TupleRow* row) const { \
     DCHECK_EQ(children_.size(), 2); \
-    type val = children_[0]->Get##type(ctx, row); \
+    type val = GetChild(0)->Get##type(eval, row);  \
     if (!val.is_null) return val; /* short-circuit */ \
-    return children_[1]->Get##type(ctx, row); \
+    return GetChild(1)->Get##type(eval, row); \
   }
 
 IS_NULL_COMPUTE_FUNCTION(BooleanVal);
@@ -42,16 +44,17 @@ IS_NULL_COMPUTE_FUNCTION(TimestampVal);
 IS_NULL_COMPUTE_FUNCTION(DecimalVal);
 
 #define NULL_IF_COMPUTE_FUNCTION(AnyValType) \
-  AnyValType NullIfExpr::Get##AnyValType(ExprContext* ctx, const TupleRow* row) { \
+  AnyValType NullIfExpr::Get##AnyValType(ScalarExprEvaluator* eval, \
+      const TupleRow* row) const { \
     DCHECK_EQ(children_.size(), 2); \
-    AnyValType lhs_val = children_[0]->Get##AnyValType(ctx, row); \
+    AnyValType lhs_val = GetChild(0)->Get##AnyValType(eval, row); \
     /* Short-circuit in case lhs_val is NULL. Can never be equal to RHS. */ \
     if (lhs_val.is_null) return AnyValType::null(); \
     /* Get rhs and return NULL if lhs == rhs, lhs otherwise */ \
-    AnyValType rhs_val = children_[1]->Get##AnyValType(ctx, row); \
+    AnyValType rhs_val = GetChild(1)->Get##AnyValType(eval, row); \
     if (!rhs_val.is_null && \
-        AnyValUtil::Equals(children_[0]->type(), lhs_val, rhs_val)) { \
-       return AnyValType::null(); \
+        AnyValUtil::Equals(GetChild(0)->type(), lhs_val, rhs_val)) { \
+      return AnyValType::null(); \
     } \
     return lhs_val; \
   }
@@ -114,13 +117,13 @@ ZERO_IF_NULL_COMPUTE_FUNCTION(DoubleVal);
 ZERO_IF_NULL_COMPUTE_FUNCTION(DecimalVal);
 
 #define IF_COMPUTE_FUNCTION(type) \
-  type IfExpr::Get##type(ExprContext* ctx, const TupleRow* row) { \
+  type IfExpr::Get##type(ScalarExprEvaluator* eval, const TupleRow* row) const { \
     DCHECK_EQ(children_.size(), 3); \
-    BooleanVal cond = children_[0]->GetBooleanVal(ctx, row); \
+    BooleanVal cond = GetChild(0)->GetBooleanVal(eval, row); \
     if (cond.is_null || !cond.val) { \
-      return children_[2]->Get##type(ctx, row); \
+      return GetChild(2)->Get##type(eval, row); \
     } \
-    return children_[1]->Get##type(ctx, row); \
+    return GetChild(1)->Get##type(eval, row); \
   }
 
 IF_COMPUTE_FUNCTION(BooleanVal);
@@ -135,10 +138,11 @@ IF_COMPUTE_FUNCTION(TimestampVal);
 IF_COMPUTE_FUNCTION(DecimalVal);
 
 #define COALESCE_COMPUTE_FUNCTION(type) \
-  type CoalesceExpr::Get##type(ExprContext* ctx, const TupleRow* row) { \
+  type CoalesceExpr::Get##type( \
+      ScalarExprEvaluator* eval, const TupleRow* row) const { \
     DCHECK_GE(children_.size(), 1); \
-    for (int i = 0; i < children_.size(); ++i) {                  \
-      type val = children_[i]->Get##type(ctx, row); \
+    for (int i = 0; i < children_.size(); ++i) { \
+      type val = GetChild(i)->Get##type(eval, row); \
       if (!val.is_null) return val; \
     } \
     return type::null(); \

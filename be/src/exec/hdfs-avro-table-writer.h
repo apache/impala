@@ -30,14 +30,14 @@
 
 namespace impala {
 
-class Expr;
 struct ColumnType;
+class HdfsTableSink;
+class RuntimeState;
+class ScalarExprEvaluator;
 class TupleDescriptor;
 class TupleRow;
-class RuntimeState;
-class HdfsTableSink;
-struct StringValue;
 struct OutputPartition;
+struct StringValue;
 
 /// Consumes rows and outputs the rows into an Avro file in HDFS
 /// Each Avro file contains a block of records (rows). The file metadata specifies the
@@ -64,8 +64,7 @@ class HdfsAvroTableWriter : public HdfsTableWriter {
   HdfsAvroTableWriter(HdfsTableSink* parent,
                       RuntimeState* state, OutputPartition* output,
                       const HdfsPartitionDescriptor* partition,
-                      const HdfsTableDescriptor* table_desc,
-                      const std::vector<ExprContext*>& output_exprs);
+                      const HdfsTableDescriptor* table_desc);
 
   virtual ~HdfsAvroTableWriter() { }
 

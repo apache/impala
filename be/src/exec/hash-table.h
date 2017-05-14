@@ -38,12 +38,12 @@ namespace llvm {
 
 namespace impala {
 
-class Expr;
-class ExprContext;
 class LlvmCodeGen;
 class MemTracker;
 class RowDescriptor;
 class RuntimeState;
+class ScalarExpr;
+class ScalarExprEvaluator;
 class Tuple;
 class TupleRow;
 class HashTable;
@@ -108,39 +108,29 @@ class HashTable;
 /// needed by a thread to operate on a hash table.
 class HashTableCtx {
  public:
-  /// Create a hash table context.
-  ///  - build_exprs are the exprs that should be used to evaluate rows during Insert().
-  ///  - probe_exprs are used during FindProbeRow()
-  ///  - stores_nulls: if false, TupleRows with nulls are ignored during Insert
-  ///  - finds_nulls: if finds_nulls[i] is false, FindProbeRow() returns End() for
-  ///        TupleRows with nulls in position i even if stores_nulls is true.
-  ///  - initial_seed: initial seed value to use when computing hashes for rows with
-  ///    level 0. Other levels have their seeds derived from this seed.
-  ///  - max_levels: the max levels we will hash with.
-  ///  - tracker: the memory tracker of the exec node which owns this hash table context.
-  ///        Memory usage of expression values cache is charged against it.
-  /// TODO: stores_nulls is too coarse: for a hash table in which some columns are joined
-  ///       with '<=>' and others with '=', stores_nulls could distinguish between columns
-  ///       in which nulls are stored and columns in which they are not, which could save
-  ///       space by not storing some rows we know will never match.
-  HashTableCtx(const std::vector<ExprContext*>& build_expr_ctxs,
-      const std::vector<ExprContext*>& probe_expr_ctxs, bool stores_nulls,
-      const std::vector<bool>& finds_nulls, int32_t initial_seed,
-      int max_levels, MemTracker* tracker);
-
   /// Create a hash table context with the specified parameters, invoke Init() to
-  /// initialize the new hash table context and return it in 'ht_ctx'. Please see header
-  /// comments of HashTableCtx constructor for details of the parameters.
-  /// 'num_build_tuples' is the number of tuples of a row in the build side, used for
-  /// computing the size of a scratch row.
-  static Status Create(RuntimeState* state,
-      const std::vector<ExprContext*>& build_expr_ctxs,
-      const std::vector<ExprContext*>& probe_expr_ctxs, bool stores_nulls,
+  /// initialize the new hash table context and return it in 'ht_ctx'. Expression
+  /// evaluators for the build and probe expressions will also be allocated.
+  /// Please see the comments of HashTableCtx constructor and Init() for details
+  /// of other parameters.
+  static Status Create(ObjectPool* pool, RuntimeState* state,
+      const std::vector<ScalarExpr*>& build_exprs,
+      const std::vector<ScalarExpr*>& probe_exprs, bool stores_nulls,
       const std::vector<bool>& finds_nulls, int32_t initial_seed, int max_levels,
-      int num_build_tuples, MemTracker* tracker, boost::scoped_ptr<HashTableCtx>* ht_ctx);
+      int num_build_tuples, MemPool* mem_pool, boost::scoped_ptr<HashTableCtx>* ht_ctx);
 
-  /// Call to cleanup any resources.
-  void Close();
+  /// Initialize the build and probe expression evaluators.
+  Status Open(RuntimeState* state);
+
+  /// Call to cleanup any resources allocated by the expression evaluators.
+  void Close(RuntimeState* state);
+
+  /// Free local allocations made by build and probe expression evaluators respectively.
+  void FreeBuildLocalAllocations();
+  void FreeProbeLocalAllocations();
+
+  /// Free local allocations of both build and probe expression evaluators.
+  void FreeLocalAllocations();
 
   void set_level(int level);
 
@@ -249,7 +239,7 @@ class HashTableCtx {
     /// if memory allocation leads to the memory limits of the exec node to be exceeded.
     /// 'tracker' is the memory tracker of the exec node which owns this HashTableCtx.
     Status Init(RuntimeState* state, MemTracker* tracker,
-        const std::vector<ExprContext*>& build_expr_ctxs);
+        const std::vector<ScalarExpr*>& build_exprs);
 
     /// Frees up various resources and updates memory tracker with proper accounting.
     /// 'tracker' should be the same memory tracker which was passed in for Init().
@@ -398,9 +388,34 @@ class HashTableCtx {
   friend class HashTable;
   friend class HashTableTest_HashEmpty_Test;
 
+  /// Construct a hash table context.
+  ///  - build_exprs are the exprs that should be used to evaluate rows during Insert().
+  ///  - probe_exprs are used during FindProbeRow()
+  ///  - stores_nulls: if false, TupleRows with nulls are ignored during Insert
+  ///  - finds_nulls: if finds_nulls[i] is false, FindProbeRow() returns End() for
+  ///        TupleRows with nulls in position i even if stores_nulls is true.
+  ///  - initial_seed: initial seed value to use when computing hashes for rows with
+  ///        level 0. Other levels have their seeds derived from this seed.
+  ///  - max_levels: the max lhashevels we will hash with.
+  ///  - mem_pool: the MemPool which the expression evaluators allocate from. Owned by the
+  ///        exec node which owns this hash table context. Memory usage of the expression
+  ///        value cache is charged against its MemTracker.
+  ///
+  /// TODO: stores_nulls is too coarse: for a hash table in which some columns are joined
+  ///       with '<=>' and others with '=', stores_nulls could distinguish between columns
+  ///       in which nulls are stored and columns in which they are not, which could save
+  ///       space by not storing some rows we know will never match.
+  HashTableCtx(const std::vector<ScalarExpr*>& build_exprs,
+      const std::vector<ScalarExpr*>& probe_exprs, bool stores_nulls,
+      const std::vector<bool>& finds_nulls, int32_t initial_seed,
+      int max_levels, MemPool* mem_pool);
+
   /// Allocate various buffers for storing expression evaluation results, hash values,
-  /// null bits etc. Returns error if allocation causes query memory limit to be exceeded.
-  Status Init(RuntimeState* state, int num_build_tuples);
+  /// null bits etc. Also allocate evaluators for the build and probe expressions and
+  /// store them in 'pool'. Returns error if allocation causes query memory limit to
+  /// be exceeded or the evaluators fail to initialize. 'num_build_tuples' is the number
+  /// of tuples of a row in the build side, used for computing the size of a scratch row.
+  Status Init(ObjectPool* pool, RuntimeState* state, int num_build_tuples);
 
   /// Compute the hash of the values in 'expr_values' with nullness 'expr_values_null'.
   /// This will be replaced by codegen.  We don't want this inlined for replacing
@@ -418,14 +433,14 @@ class HashTableCtx {
   /// codegen'd function.
   bool IR_NO_INLINE EvalBuildRow(
       const TupleRow* row, uint8_t* expr_values, uint8_t* expr_values_null) noexcept {
-    return EvalRow(row, build_expr_ctxs_, expr_values, expr_values_null);
+    return EvalRow(row, build_expr_evals_, expr_values, expr_values_null);
   }
 
   /// Evaluate 'row' over probe exprs, storing the values into 'expr_values' and nullness
   /// into 'expr_values_null'. This will be replaced by codegen.
   bool IR_NO_INLINE EvalProbeRow(
       const TupleRow* row, uint8_t* expr_values, uint8_t* expr_values_null) noexcept {
-    return EvalRow(row, probe_expr_ctxs_, expr_values, expr_values_null);
+    return EvalRow(row, probe_expr_evals_, expr_values, expr_values_null);
   }
 
   /// Compute the hash of the values in 'expr_values' with nullness 'expr_values_null'
@@ -436,7 +451,7 @@ class HashTableCtx {
   /// Evaluate the exprs over row, storing the values into 'expr_values' and nullness into
   /// 'expr_values_null'. Returns whether any expr evaluated to NULL. This will be
   /// replaced by codegen.
-  bool EvalRow(const TupleRow* row, const std::vector<ExprContext*>& ctxs,
+  bool EvalRow(const TupleRow* row, const std::vector<ScalarExprEvaluator*>& evaluators,
       uint8_t* expr_values, uint8_t* expr_values_null) noexcept;
 
   /// Returns true if the values of build_exprs evaluated over 'build_row' equal the
@@ -462,13 +477,18 @@ class HashTableCtx {
   bool IR_NO_INLINE stores_nulls() const { return stores_nulls_; }
   bool IR_NO_INLINE finds_some_nulls() const { return finds_some_nulls_; }
 
-  /// Cross-compiled function to access the build/probe expression context.
-  /// Called by generated LLVM IR functions such as Equals() and EvalRow().
-  ExprContext* const* IR_ALWAYS_INLINE GetBuildExprCtxs() const;
-  ExprContext* const* IR_ALWAYS_INLINE GetProbeExprCtxs() const;
+  /// Cross-compiled function to access the build/probe expression evaluators.
+  ScalarExprEvaluator* const* IR_ALWAYS_INLINE build_expr_evals() const;
+  ScalarExprEvaluator* const* IR_ALWAYS_INLINE probe_expr_evals() const;
 
-  const std::vector<ExprContext*>& build_expr_ctxs_;
-  const std::vector<ExprContext*>& probe_expr_ctxs_;
+  /// The exprs used to evaluate rows for inserting rows into hash table.
+  /// Also used when matching hash table entries against probe rows.
+  const std::vector<ScalarExpr*>& build_exprs_;
+  std::vector<ScalarExprEvaluator*> build_expr_evals_;
+
+  /// The exprs used to evaluate rows for look-up in the hash table.
+  const std::vector<ScalarExpr*>& probe_exprs_;
+  std::vector<ScalarExprEvaluator*> probe_expr_evals_;
 
   /// Constants on how the hash table should behave. Joins and aggs have slightly
   /// different behavior.
@@ -492,9 +512,9 @@ class HashTableCtx {
   /// Scratch buffer to generate rows on the fly.
   TupleRow* scratch_row_;
 
-  /// Memory tracker of the exec node which owns this hash table context. Account the
-  /// memory usage of expression values cache towards it.
-  MemTracker* tracker_;
+  /// MemPool for 'build_expr_evals_' and 'probe_expr_evals_' to allocate from.
+  /// Not owned.
+  MemPool* mem_pool_;
 };
 
 /// The hash table consists of a contiguous array of buckets that contain a pointer to the

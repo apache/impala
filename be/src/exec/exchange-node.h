@@ -21,12 +21,12 @@
 
 #include <boost/scoped_ptr.hpp>
 #include "exec/exec-node.h"
-#include "exec/sort-exec-exprs.h"
 
 namespace impala {
 
-class RowBatch;
 class DataStreamRecvr;
+class RowBatch;
+class ScalarExpr;
 class TupleRowComparator;
 
 /// Receiver node for data streams. The data stream receiver is created in Prepare()
@@ -58,6 +58,7 @@ class ExchangeNode : public ExecNode {
   void set_num_senders(int num_senders) { num_senders_ = num_senders; }
 
  protected:
+  virtual Status QueryMaintenance(RuntimeState* state);
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
@@ -100,7 +101,7 @@ class ExchangeNode : public ExecNode {
   boost::scoped_ptr<TupleRowComparator> less_than_;
 
   /// Sort expressions and parameters passed to the merging receiver..
-  SortExecExprs sort_exec_exprs_;
+  std::vector<ScalarExpr*> ordering_exprs_;
   std::vector<bool> is_asc_order_;
   std::vector<bool> nulls_first_;
 

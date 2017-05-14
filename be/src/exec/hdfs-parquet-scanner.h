@@ -337,8 +337,7 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Codegen ProcessScratchBatch(). Stores the resulting function in
   /// 'process_scratch_batch_fn' if codegen was successful or NULL otherwise.
   static Status Codegen(HdfsScanNodeBase* node,
-      const std::vector<ExprContext*>& conjunct_ctxs,
-      const std::vector<FilterContext>& filter_ctxs,
+      const std::vector<ScalarExpr*>& conjuncts,
       llvm::Function** process_scratch_batch_fn);
 
   /// The repetition level is set to this value to indicate the end of a row group.
@@ -379,13 +378,9 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Buffer to back tuples when reading parquet::Statistics.
   ScopedBuffer min_max_tuple_buffer_;
 
-  /// Min/max statistics contexts, owned by HdfsScanner::state_->obj_pool_.
-  vector<ExprContext*> min_max_conjuncts_ctxs_;
-
-  /// Used in EvaluateRowGroupStats() to store non-owning copies of conjunct pointers from
-  /// 'min_max_conjunct_ctxs_'. It is declared here to avoid the dynamic allocation
-  /// overhead.
-  vector<ExprContext*> min_max_conjuncts_ctxs_to_eval_;
+  /// Clone of Min/max statistics conjunct evaluators. Has the same life time as
+  /// the scanner. Stored in 'obj_pool_'.
+  vector<ScalarExprEvaluator*> min_max_conjunct_evals_;
 
   /// Cached runtime filter contexts, one for each filter that applies to this column,
   /// owned by instances of this class.
@@ -544,7 +539,7 @@ class HdfsParquetScanner : public HdfsScanner {
   /// 'filter_ctxs'. Return error status on failure. The generated function is returned
   /// via 'fn'.
   static Status CodegenEvalRuntimeFilters(LlvmCodeGen* codegen,
-      const std::vector<FilterContext>& filter_ctxs, llvm::Function** fn);
+      const std::vector<ScalarExpr*>& filter_exprs, llvm::Function** fn);
 
   /// Reads data using 'column_readers' to materialize the tuples of a CollectionValue
   /// allocated from 'coll_value_builder'.

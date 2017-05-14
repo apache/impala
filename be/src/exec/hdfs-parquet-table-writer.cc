@@ -20,8 +20,8 @@
 #include "common/version.h"
 #include "exec/hdfs-table-sink.h"
 #include "exec/parquet-column-stats.inline.h"
-#include "exprs/expr-context.h"
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "rpc/thrift-util.h"
 #include "runtime/decimal-value.h"
 #include "runtime/mem-tracker.h"
@@ -88,10 +88,10 @@ namespace impala {
 class HdfsParquetTableWriter::BaseColumnWriter {
  public:
   // expr - the expression to generate output values for this column.
-  BaseColumnWriter(HdfsParquetTableWriter* parent, ExprContext* expr_ctx,
+  BaseColumnWriter(HdfsParquetTableWriter* parent, ScalarExprEvaluator* expr_eval,
       const THdfsCompression::type& codec)
     : parent_(parent),
-      expr_ctx_(expr_ctx),
+      expr_eval_(expr_eval),
       codec_(codec),
       page_size_(DEFAULT_DATA_PAGE_SIZE),
       current_page_(nullptr),
@@ -172,7 +172,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
     if (dict_encoder_base_ != nullptr) dict_encoder_base_->ClearIndices();
   }
 
-  const ColumnType& type() const { return expr_ctx_->root()->type(); }
+  const ColumnType& type() const { return expr_eval_->root().type(); }
   uint64_t num_values() const { return num_values_; }
   uint64_t total_compressed_size() const { return total_compressed_byte_size_; }
   uint64_t total_uncompressed_size() const { return total_uncompressed_byte_size_; }
@@ -222,7 +222,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   };
 
   HdfsParquetTableWriter* parent_;
-  ExprContext* expr_ctx_;
+  ScalarExprEvaluator* expr_eval_;
 
   THdfsCompression::type codec_;
 
@@ -285,13 +285,13 @@ template<typename T>
 class HdfsParquetTableWriter::ColumnWriter :
     public HdfsParquetTableWriter::BaseColumnWriter {
  public:
-  ColumnWriter(HdfsParquetTableWriter* parent, ExprContext* ctx,
+  ColumnWriter(HdfsParquetTableWriter* parent, ScalarExprEvaluator* eval,
       const THdfsCompression::type& codec)
-    : BaseColumnWriter(parent, ctx, codec),
+    : BaseColumnWriter(parent, eval, codec),
       num_values_since_dict_size_check_(0),
       plain_encoded_value_size_(
-          ParquetPlainEncoder::EncodedByteSize(ctx->root()->type())) {
-    DCHECK_NE(ctx->root()->type().type, TYPE_BOOLEAN);
+          ParquetPlainEncoder::EncodedByteSize(eval->root().type())) {
+    DCHECK_NE(eval->root().type().type, TYPE_BOOLEAN);
   }
 
   virtual void Reset() {
@@ -398,12 +398,12 @@ inline StringValue* HdfsParquetTableWriter::ColumnWriter<StringValue>::CastValue
 class HdfsParquetTableWriter::BoolColumnWriter :
     public HdfsParquetTableWriter::BaseColumnWriter {
  public:
-  BoolColumnWriter(HdfsParquetTableWriter* parent, ExprContext* ctx,
+  BoolColumnWriter(HdfsParquetTableWriter* parent, ScalarExprEvaluator* eval,
       const THdfsCompression::type& codec)
-    : BaseColumnWriter(parent, ctx, codec),
+    : BaseColumnWriter(parent, eval, codec),
       page_stats_(parent_->reusable_col_mem_pool_.get(), -1),
       row_group_stats_(parent_->reusable_col_mem_pool_.get(), -1) {
-    DCHECK_EQ(ctx->root()->type().type, TYPE_BOOLEAN);
+    DCHECK_EQ(eval->root().type().type, TYPE_BOOLEAN);
     bool_values_ = parent_->state_->obj_pool()->Add(
         new BitWriter(values_buffer_, values_buffer_len_));
     // Dictionary encoding doesn't make sense for bools and is not allowed by
@@ -449,7 +449,7 @@ class HdfsParquetTableWriter::BoolColumnWriter :
 
 inline Status HdfsParquetTableWriter::BaseColumnWriter::AppendRow(TupleRow* row) {
   ++num_values_;
-  void* value = expr_ctx_->GetValue(row);
+  void* value = expr_eval_->GetValue(row);
   if (current_page_ == nullptr) NewPage();
 
   // Ensure that we have enough space for the definition level, but don't write it yet in
@@ -731,8 +731,8 @@ void HdfsParquetTableWriter::BaseColumnWriter::NewPage() {
 
 HdfsParquetTableWriter::HdfsParquetTableWriter(HdfsTableSink* parent, RuntimeState* state,
     OutputPartition* output, const HdfsPartitionDescriptor* part_desc,
-    const HdfsTableDescriptor* table_desc, const vector<ExprContext*>& output_expr_ctxs)
-  : HdfsTableWriter(parent, state, output, part_desc, table_desc, output_expr_ctxs),
+    const HdfsTableDescriptor* table_desc)
+  : HdfsTableWriter(parent, state, output, part_desc, table_desc),
     thrift_serializer_(new ThriftSerializer(true)),
     current_row_group_(nullptr),
     row_count_(0),
@@ -774,59 +774,51 @@ Status HdfsParquetTableWriter::Init() {
   // Initialize each column structure.
   for (int i = 0; i < columns_.size(); ++i) {
     BaseColumnWriter* writer = nullptr;
-    const ColumnType& type = output_expr_ctxs_[i]->root()->type();
+    const ColumnType& type = output_expr_evals_[i]->root().type();
     switch (type.type) {
       case TYPE_BOOLEAN:
-        writer = new BoolColumnWriter(
-            this, output_expr_ctxs_[i], codec);
+        writer = new BoolColumnWriter(this, output_expr_evals_[i], codec);
         break;
       case TYPE_TINYINT:
-        writer = new ColumnWriter<int8_t>(
-            this, output_expr_ctxs_[i], codec);
+        writer = new ColumnWriter<int8_t>(this, output_expr_evals_[i], codec);
         break;
       case TYPE_SMALLINT:
-        writer = new ColumnWriter<int16_t>(
-            this, output_expr_ctxs_[i], codec);
+        writer = new ColumnWriter<int16_t>(this, output_expr_evals_[i], codec);
         break;
       case TYPE_INT:
-        writer = new ColumnWriter<int32_t>(
-            this, output_expr_ctxs_[i], codec);
+        writer = new ColumnWriter<int32_t>(this, output_expr_evals_[i], codec);
         break;
       case TYPE_BIGINT:
-        writer = new ColumnWriter<int64_t>(
-            this, output_expr_ctxs_[i], codec);
+        writer = new ColumnWriter<int64_t>(this, output_expr_evals_[i], codec);
         break;
       case TYPE_FLOAT:
-        writer = new ColumnWriter<float>(
-            this, output_expr_ctxs_[i], codec);
+        writer = new ColumnWriter<float>(this, output_expr_evals_[i], codec);
         break;
       case TYPE_DOUBLE:
-        writer = new ColumnWriter<double>(
-            this, output_expr_ctxs_[i], codec);
+        writer = new ColumnWriter<double>(this, output_expr_evals_[i], codec);
         break;
       case TYPE_TIMESTAMP:
         writer = new ColumnWriter<TimestampValue>(
-            this, output_expr_ctxs_[i], codec);
+            this, output_expr_evals_[i], codec);
         break;
       case TYPE_VARCHAR:
       case TYPE_STRING:
       case TYPE_CHAR:
-        writer = new ColumnWriter<StringValue>(
-            this, output_expr_ctxs_[i], codec);
+        writer = new ColumnWriter<StringValue>(this, output_expr_evals_[i], codec);
         break;
       case TYPE_DECIMAL:
-        switch (output_expr_ctxs_[i]->root()->type().GetByteSize()) {
+        switch (output_expr_evals_[i]->root().type().GetByteSize()) {
           case 4:
             writer = new ColumnWriter<Decimal4Value>(
-                this, output_expr_ctxs_[i], codec);
+                this, output_expr_evals_[i], codec);
             break;
           case 8:
             writer = new ColumnWriter<Decimal8Value>(
-                this, output_expr_ctxs_[i], codec);
+                this, output_expr_evals_[i], codec);
             break;
           case 16:
             writer = new ColumnWriter<Decimal16Value>(
-                this, output_expr_ctxs_[i], codec);
+                this, output_expr_evals_[i], codec);
             break;
           default:
             DCHECK(false);
@@ -852,10 +844,10 @@ Status HdfsParquetTableWriter::CreateSchema() {
 
   for (int i = 0; i < columns_.size(); ++i) {
     parquet::SchemaElement& node = file_metadata_.schema[i + 1];
+    const ColumnType& type = output_expr_evals_[i]->root().type();
     node.name = table_desc_->col_descs()[i + num_clustering_cols].name();
-    node.__set_type(IMPALA_TO_PARQUET_TYPES[output_expr_ctxs_[i]->root()->type().type]);
+    node.__set_type(IMPALA_TO_PARQUET_TYPES[type.type]);
     node.__set_repetition_type(FieldRepetitionType::OPTIONAL);
-    const ColumnType& type = output_expr_ctxs_[i]->root()->type();
     if (type.type == TYPE_DECIMAL) {
       // This column is type decimal. Update the file metadata to include the
       // additional fields:
@@ -864,9 +856,9 @@ Status HdfsParquetTableWriter::CreateSchema() {
       //  3) precision/scale
       node.__set_converted_type(ConvertedType::DECIMAL);
       node.__set_type_length(
-          ParquetPlainEncoder::DecimalSize(output_expr_ctxs_[i]->root()->type()));
-      node.__set_scale(output_expr_ctxs_[i]->root()->type().scale);
-      node.__set_precision(output_expr_ctxs_[i]->root()->type().precision);
+          ParquetPlainEncoder::DecimalSize(output_expr_evals_[i]->root().type()));
+      node.__set_scale(output_expr_evals_[i]->root().type().scale);
+      node.__set_precision(output_expr_evals_[i]->root().type().precision);
     } else if (type.type == TYPE_VARCHAR || type.type == TYPE_CHAR ||
         (type.type == TYPE_STRING &&
          state_->query_options().parquet_annotate_strings_utf8)) {
@@ -887,7 +879,7 @@ Status HdfsParquetTableWriter::AddRowGroup() {
   current_row_group_->columns.resize(columns_.size());
   for (int i = 0; i < columns_.size(); ++i) {
     ColumnMetaData metadata;
-    metadata.type = IMPALA_TO_PARQUET_TYPES[columns_[i]->expr_ctx_->root()->type().type];
+    metadata.type = IMPALA_TO_PARQUET_TYPES[columns_[i]->type().type];
     metadata.path_in_schema.push_back(
         table_desc_->col_descs()[i + num_clustering_cols].name());
     metadata.codec = columns_[i]->codec();

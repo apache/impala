@@ -18,6 +18,7 @@
 #include "codegen/impala-ir.h"
 #include "exec/hash-join-node.h"
 #include "exec/old-hash-table.inline.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/row-batch.h"
 
 #include "common/names.h"
@@ -34,8 +35,8 @@ using namespace impala;
 // TODO: explicitly set the calling convention?
 // TODO: investigate using fastcc for all codegen internal functions?
 bool IR_NO_INLINE EvalOtherJoinConjuncts2(
-    ExprContext* const* ctxs, int num_ctxs, TupleRow* row) {
-  return ExecNode::EvalConjuncts(ctxs, num_ctxs, row);
+    ScalarExprEvaluator* const* evals, int num_evals, TupleRow* row) {
+  return ExecNode::EvalConjuncts(evals, num_evals, row);
 }
 
 // CreateOutputRow, EvalOtherJoinConjuncts, and EvalConjuncts are replaced by
@@ -52,11 +53,14 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
   int rows_returned = 0;
   int probe_rows = probe_batch->num_rows();
 
-  ExprContext* const* other_conjunct_ctxs = &other_join_conjunct_ctxs_[0];
-  const int num_other_conjunct_ctxs = other_join_conjunct_ctxs_.size();
+  ScalarExprEvaluator* const* other_conjunct_evals =
+      other_join_conjunct_evals_.data();
+  const int num_other_conjuncts = other_join_conjuncts_.size();
+  DCHECK_EQ(num_other_conjuncts, other_join_conjunct_evals_.size());
 
-  ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
-  const int num_conjunct_ctxs = conjunct_ctxs_.size();
+  ScalarExprEvaluator* const* conjunct_evals = conjunct_evals_.data();
+  const int num_conjuncts = conjuncts_.size();
+  DCHECK_EQ(num_conjuncts, conjunct_evals_.size());
 
   while (true) {
     // Create output row for each matching build row
@@ -67,10 +71,10 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
       if (join_op_ == TJoinOp::LEFT_SEMI_JOIN) {
         // Evaluate the non-equi-join conjuncts against a temp row assembled from all
         // build and probe tuples.
-        if (num_other_conjunct_ctxs > 0) {
+        if (num_other_conjuncts > 0) {
           CreateOutputRow(semi_join_staging_row_, current_probe_row_, matched_build_row);
-          if (!EvalOtherJoinConjuncts2(other_conjunct_ctxs, num_other_conjunct_ctxs,
-                semi_join_staging_row_)) {
+          if (!EvalOtherJoinConjuncts2(other_conjunct_evals, num_other_conjuncts,
+                  semi_join_staging_row_)) {
             continue;
           }
         }
@@ -78,13 +82,13 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
       } else {
         CreateOutputRow(out_row, current_probe_row_, matched_build_row);
         if (!EvalOtherJoinConjuncts2(
-              other_conjunct_ctxs, num_other_conjunct_ctxs, out_row)) {
+                other_conjunct_evals, num_other_conjuncts, out_row)) {
           continue;
         }
       }
       matched_probe_ = true;
 
-      if (EvalConjuncts(conjunct_ctxs, num_conjunct_ctxs, out_row)) {
+      if (EvalConjuncts(conjunct_evals, num_conjuncts, out_row)) {
         ++rows_returned;
         // Filled up out batch or hit limit
         if (UNLIKELY(rows_returned == max_added_rows)) goto end;
@@ -104,7 +108,7 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
     if (!matched_probe_ && match_all_probe_) {
       CreateOutputRow(out_row, current_probe_row_, NULL);
       matched_probe_ = true;
-      if (EvalConjuncts(conjunct_ctxs, num_conjunct_ctxs, out_row)) {
+      if (EvalConjuncts(conjunct_evals, num_conjuncts, out_row)) {
         ++rows_returned;
         if (UNLIKELY(rows_returned == max_added_rows)) goto end;
         // Advance to next out row

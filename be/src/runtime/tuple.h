@@ -135,11 +135,11 @@ class Tuple {
   /// TODO: this function does not collect other var-len types such as collections.
   template <bool COLLECT_STRING_VALS, bool NULL_POOL>
   inline void IR_ALWAYS_INLINE MaterializeExprs(TupleRow* row,
-      const TupleDescriptor& desc, const std::vector<ExprContext*>& materialize_expr_ctxs,
+      const TupleDescriptor& desc, const std::vector<ScalarExprEvaluator*>& evals,
       MemPool* pool, std::vector<StringValue*>* non_null_string_values = NULL,
       int* total_string_lengths = NULL) {
     DCHECK_EQ(NULL_POOL, pool == NULL);
-    DCHECK_EQ(materialize_expr_ctxs.size(), desc.slots().size());
+    DCHECK_EQ(evals.size(), desc.slots().size());
     StringValue** non_null_string_values_array = NULL;
     int num_non_null_string_values = 0;
     if (COLLECT_STRING_VALS) {
@@ -153,7 +153,7 @@ class Tuple {
       *total_string_lengths = 0;
     }
     MaterializeExprs<COLLECT_STRING_VALS, NULL_POOL>(row, desc,
-        materialize_expr_ctxs.data(), pool, non_null_string_values_array,
+        evals.data(), pool, non_null_string_values_array,
         total_string_lengths, &num_non_null_string_values);
     if (COLLECT_STRING_VALS) non_null_string_values->resize(num_non_null_string_values);
   }
@@ -173,7 +173,7 @@ class Tuple {
   /// these cases when we replace the function calls during codegen. Please see comment
   /// of MaterializeExprs() for details.
   static Status CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_vals,
-      const TupleDescriptor& desc, const vector<ExprContext*>& materialize_expr_ctxs,
+      const TupleDescriptor& desc, const vector<ScalarExpr*>& slot_materialize_exprs,
       bool use_mem_pool, llvm::Function** fn);
 
   /// Turn null indicator bit on. For non-nullable slots, the mask will be 0 and
@@ -247,7 +247,7 @@ class Tuple {
   /// codegen. 'num_non_null_string_values' must be initialized by the caller.
   template <bool COLLECT_STRING_VALS, bool NULL_POOL>
   void IR_NO_INLINE MaterializeExprs(TupleRow* row, const TupleDescriptor& desc,
-      ExprContext* const* materialize_expr_ctxs, MemPool* pool,
+      ScalarExprEvaluator* const* evals, MemPool* pool,
       StringValue** non_null_string_values, int* total_string_lengths,
       int* num_non_null_string_values);
 };

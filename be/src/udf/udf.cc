@@ -413,7 +413,6 @@ bool FunctionContext::AddWarning(const char* warning_msg) {
     // In case of the SDK build, we simply, forward this call to a dummy method
     return impl_->state_->LogError(ss.str());
 #endif
-
   } else {
     cerr << ss.str() << endl;
     return true;
@@ -494,8 +493,7 @@ void FunctionContextImpl::SetConstantArgs(vector<AnyVal*>&& constant_args) {
   constant_args_ = constant_args;
 }
 
-void FunctionContextImpl::SetNonConstantArgs(
-    vector<pair<Expr*, AnyVal*>>&& non_constant_args) {
+void FunctionContextImpl::SetNonConstantArgs(NonConstantArgsVector&& non_constant_args) {
   non_constant_args_ = non_constant_args;
 }
 

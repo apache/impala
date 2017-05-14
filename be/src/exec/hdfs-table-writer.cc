@@ -27,18 +27,17 @@
 namespace impala {
 
 HdfsTableWriter::HdfsTableWriter(HdfsTableSink* parent,
-                                 RuntimeState* state, OutputPartition* output,
-                                 const HdfsPartitionDescriptor* partition_desc,
-                                 const HdfsTableDescriptor* table_desc,
-                                 const vector<ExprContext*>& output_expr_ctxs)
+    RuntimeState* state, OutputPartition* output,
+    const HdfsPartitionDescriptor* partition_desc, const HdfsTableDescriptor* table_desc)
   : parent_(parent),
     state_(state),
     output_(output),
     table_desc_(table_desc),
-    output_expr_ctxs_(output_expr_ctxs) {
+    output_expr_evals_(parent->output_expr_evals()) {
   int num_non_partition_cols =
       table_desc_->num_cols() - table_desc_->num_clustering_cols();
-  DCHECK_GE(output_expr_ctxs_.size(), num_non_partition_cols) << parent_->DebugString();
+  DCHECK_GE(output_expr_evals_.size(), num_non_partition_cols)
+      << parent_->DebugString();
 }
 
 Status HdfsTableWriter::Write(const uint8_t* data, int32_t len) {

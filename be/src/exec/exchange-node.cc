@@ -59,7 +59,8 @@ Status ExchangeNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Init(tnode, state));
   if (!is_merging_) return Status::OK();
 
-  RETURN_IF_ERROR(sort_exec_exprs_.Init(tnode.exchange_node.sort_info, pool_));
+  RETURN_IF_ERROR(ScalarExpr::Create(tnode.exchange_node.sort_info.ordering_exprs,
+      row_descriptor_, state, &ordering_exprs_));
   is_asc_order_ = tnode.exchange_node.sort_info.is_asc_order;
   nulls_first_ = tnode.exchange_node.sort_info.nulls_first;
   return Status::OK();
@@ -81,11 +82,8 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
       input_row_desc_, state->fragment_instance_id(), id_, num_senders_,
       FLAGS_exchg_node_buffer_size_bytes, runtime_profile(), is_merging_);
   if (is_merging_) {
-    RETURN_IF_ERROR(sort_exec_exprs_.Prepare(
-        state, row_descriptor_, row_descriptor_, expr_mem_tracker()));
-    AddExprCtxsToFree(sort_exec_exprs_);
     less_than_.reset(
-        new TupleRowComparator(sort_exec_exprs_, is_asc_order_, nulls_first_));
+        new TupleRowComparator(ordering_exprs_, is_asc_order_, nulls_first_));
     AddCodegenDisabledMessage(state);
   }
   return Status::OK();
@@ -106,9 +104,9 @@ Status ExchangeNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Open(state));
   if (is_merging_) {
-    RETURN_IF_ERROR(sort_exec_exprs_.Open(state));
     // CreateMerger() will populate its merging heap with batches from the stream_recvr_,
     // so it is not necessary to call FillInputRowBatch().
+    RETURN_IF_ERROR(less_than_->Open(pool_, state, expr_mem_pool()));
     RETURN_IF_ERROR(stream_recvr_->CreateMerger(*less_than_.get()));
   } else {
     RETURN_IF_ERROR(FillInputRowBatch(state));
@@ -123,10 +121,16 @@ Status ExchangeNode::Reset(RuntimeState* state) {
 
 void ExchangeNode::Close(RuntimeState* state) {
   if (is_closed()) return;
-  if (is_merging_) sort_exec_exprs_.Close(state);
-  if (stream_recvr_ != NULL) stream_recvr_->Close();
+  if (less_than_.get() != nullptr) less_than_->Close(state);
+  if (stream_recvr_ != nullptr) stream_recvr_->Close();
   stream_recvr_.reset();
+  ScalarExpr::Close(ordering_exprs_);
   ExecNode::Close(state);
+}
+
+Status ExchangeNode::QueryMaintenance(RuntimeState* state) {
+  if (less_than_.get() != nullptr) less_than_->FreeLocalAllocations();
+  return ExecNode::QueryMaintenance(state);
 }
 
 Status ExchangeNode::FillInputRowBatch(RuntimeState* state) {
@@ -204,7 +208,7 @@ Status ExchangeNode::GetNextMerging(RuntimeState* state, RowBatch* output_batch,
   RETURN_IF_ERROR(QueryMaintenance(state));
   RETURN_IF_ERROR(stream_recvr_->GetNext(output_batch, eos));
 
-  while ((num_rows_skipped_ < offset_)) {
+  while (num_rows_skipped_ < offset_) {
     num_rows_skipped_ += output_batch->num_rows();
     // Throw away rows in the output batch until the offset is skipped.
     int rows_to_keep = num_rows_skipped_ - offset_;

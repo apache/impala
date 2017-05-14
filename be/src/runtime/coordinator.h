@@ -53,8 +53,6 @@ class RowBatch;
 class RowDescriptor;
 class ObjectPool;
 class RuntimeState;
-class Expr;
-class ExprContext;
 class ExecEnv;
 class TUpdateCatalogRequest;
 class TQueryExecRequest;

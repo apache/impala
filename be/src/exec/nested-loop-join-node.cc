@@ -20,7 +20,8 @@
 #include <sstream>
 #include <gutil/strings/substitute.h>
 
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
@@ -50,18 +51,20 @@ NestedLoopJoinNode::~NestedLoopJoinNode() {
 Status NestedLoopJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(BlockingJoinNode::Init(tnode, state));
   DCHECK(tnode.__isset.nested_loop_join_node);
-  RETURN_IF_ERROR(Expr::CreateExprTrees(pool_, tnode.nested_loop_join_node.join_conjuncts,
-      &join_conjunct_ctxs_));
-
+  // join_conjunct_evals_ are evaluated in the context of rows assembled from
+  // all inner and outer tuples.
+  RowDescriptor full_row_desc(child(0)->row_desc(), child(1)->row_desc());
+  RETURN_IF_ERROR(ScalarExpr::Create(tnode.nested_loop_join_node.join_conjuncts,
+      full_row_desc, state, &join_conjuncts_));
   DCHECK(tnode.nested_loop_join_node.join_op != TJoinOp::CROSS_JOIN ||
-      join_conjunct_ctxs_.size() == 0) << "Join conjuncts in a cross join";
+      join_conjuncts_.size() == 0) << "Join conjuncts in a cross join";
   return Status::OK();
 }
 
 Status NestedLoopJoinNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(BlockingJoinNode::Open(state));
-  RETURN_IF_ERROR(Expr::Open(join_conjunct_ctxs_, state));
+  RETURN_IF_ERROR(ScalarExprEvaluator::Open(join_conjunct_evals_, state));
 
   // Check for errors and free local allocations before opening children.
   RETURN_IF_CANCELLED(state);
@@ -95,13 +98,8 @@ Status NestedLoopJoinNode::Open(RuntimeState* state) {
 Status NestedLoopJoinNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
-
-  // join_conjunct_ctxs_ are evaluated in the context of rows assembled from
-  // all inner and outer tuples.
-  RowDescriptor full_row_desc(child(0)->row_desc(), child(1)->row_desc());
-  RETURN_IF_ERROR(
-      Expr::Prepare(join_conjunct_ctxs_, state, full_row_desc, expr_mem_tracker()));
-
+  RETURN_IF_ERROR(ScalarExprEvaluator::Create(join_conjuncts_, state,
+      pool_, expr_mem_pool(), &join_conjunct_evals_));
   builder_.reset(new NljBuilder(child(1)->row_desc(), state));
   RETURN_IF_ERROR(builder_->Prepare(state, mem_tracker()));
   runtime_profile()->PrependChild(builder_->profile());
@@ -138,7 +136,8 @@ Status NestedLoopJoinNode::Reset(RuntimeState* state) {
 
 void NestedLoopJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
-  Expr::Close(join_conjunct_ctxs_, state);
+  ScalarExprEvaluator::Close(join_conjunct_evals_, state);
+  ScalarExpr::Close(join_conjuncts_);
   if (builder_ != NULL) {
     builder_->Close(state);
     builder_.reset();
@@ -291,8 +290,9 @@ Status NestedLoopJoinNode::GetNextLeftOuterJoin(RuntimeState* state,
 
 Status NestedLoopJoinNode::GetNextLeftSemiJoin(RuntimeState* state,
     RowBatch* output_batch) {
-  ExprContext* const* join_conjunct_ctxs = &join_conjunct_ctxs_[0];
-  size_t num_join_ctxs = join_conjunct_ctxs_.size();
+  ScalarExprEvaluator* const* join_conjunct_evals = join_conjunct_evals_.data();
+  size_t num_join_conjuncts = join_conjuncts_.size();
+  DCHECK_EQ(num_join_conjuncts, join_conjunct_evals_.size());
   const int N = BitUtil::RoundUpToPowerOfTwo(state->batch_size());
 
   while (!eos_) {
@@ -309,7 +309,8 @@ Status NestedLoopJoinNode::GetNextLeftSemiJoin(RuntimeState* state,
         RETURN_IF_CANCELLED(state);
         RETURN_IF_ERROR(QueryMaintenance(state));
       }
-      if (!EvalConjuncts(join_conjunct_ctxs, num_join_ctxs, semi_join_staging_row_)) {
+      if (!EvalConjuncts(
+              join_conjunct_evals, num_join_conjuncts, semi_join_staging_row_)) {
         continue;
       }
       // A match is found. Create the output row from the probe row.
@@ -336,8 +337,9 @@ Status NestedLoopJoinNode::GetNextLeftSemiJoin(RuntimeState* state,
 
 Status NestedLoopJoinNode::GetNextLeftAntiJoin(RuntimeState* state,
     RowBatch* output_batch) {
-  ExprContext* const* join_conjunct_ctxs = &join_conjunct_ctxs_[0];
-  size_t num_join_ctxs = join_conjunct_ctxs_.size();
+  ScalarExprEvaluator* const* join_conjunct_evals = join_conjunct_evals_.data();
+  size_t num_join_conjuncts = join_conjuncts_.size();
+  DCHECK_EQ(num_join_conjuncts, join_conjunct_evals_.size());
   const int N = BitUtil::RoundUpToPowerOfTwo(state->batch_size());
 
   while (!eos_) {
@@ -354,7 +356,8 @@ Status NestedLoopJoinNode::GetNextLeftAntiJoin(RuntimeState* state,
         RETURN_IF_CANCELLED(state);
         RETURN_IF_ERROR(QueryMaintenance(state));
       }
-      if (EvalConjuncts(join_conjunct_ctxs, num_join_ctxs, semi_join_staging_row_)) {
+      if (EvalConjuncts(
+              join_conjunct_evals, num_join_conjuncts, semi_join_staging_row_)) {
         // Found a match for the probe row. This row will not be in the result.
         matched_probe_ = true;
         break;
@@ -388,8 +391,9 @@ Status NestedLoopJoinNode::GetNextRightOuterJoin(RuntimeState* state,
 
 Status NestedLoopJoinNode::GetNextRightSemiJoin(RuntimeState* state,
     RowBatch* output_batch) {
-  ExprContext* const* join_conjunct_ctxs = &join_conjunct_ctxs_[0];
-  size_t num_join_ctxs = join_conjunct_ctxs_.size();
+  ScalarExprEvaluator* const* join_conjunct_evals = join_conjunct_evals_.data();
+  size_t num_join_conjuncts = join_conjuncts_.size();
+  DCHECK_EQ(num_join_conjuncts, join_conjunct_evals_.size());
   DCHECK(matching_build_rows_ != NULL);
   const int N = BitUtil::RoundUpToPowerOfTwo(state->batch_size());
 
@@ -397,8 +401,8 @@ Status NestedLoopJoinNode::GetNextRightSemiJoin(RuntimeState* state,
     DCHECK(HasValidProbeRow());
     while (!build_row_iterator_.AtEnd()) {
       DCHECK(HasValidProbeRow());
-      // This loop can go on for a long time if the conjuncts are very selective. Do
-      // query maintenance every N iterations.
+      // This loop can go on for a long time if the conjuncts are very selective.
+      // Do query maintenance every N iterations.
       if ((current_build_row_idx_ & (N - 1)) == 0) {
         if (ReachedLimit()) {
           eos_ = true;
@@ -418,7 +422,8 @@ Status NestedLoopJoinNode::GetNextRightSemiJoin(RuntimeState* state,
       CreateOutputRow(semi_join_staging_row_, current_probe_row_,
           build_row_iterator_.GetRow());
       // Evaluate the join conjuncts on the semi-join staging row.
-      if (!EvalConjuncts(join_conjunct_ctxs, num_join_ctxs, semi_join_staging_row_)) {
+      if (!EvalConjuncts(
+              join_conjunct_evals, num_join_conjuncts, semi_join_staging_row_)) {
         build_row_iterator_.Next();
         ++current_build_row_idx_;
         continue;
@@ -445,8 +450,9 @@ Status NestedLoopJoinNode::GetNextRightSemiJoin(RuntimeState* state,
 
 Status NestedLoopJoinNode::GetNextRightAntiJoin(RuntimeState* state,
     RowBatch* output_batch) {
-  ExprContext* const* join_conjunct_ctxs = &join_conjunct_ctxs_[0];
-  size_t num_join_ctxs = join_conjunct_ctxs_.size();
+  ScalarExprEvaluator* const* join_conjunct_evals = join_conjunct_evals_.data();
+  size_t num_join_conjuncts = join_conjuncts_.size();
+  DCHECK_EQ(num_join_conjuncts, join_conjunct_evals_.size());
   DCHECK(matching_build_rows_ != NULL);
   const int N = BitUtil::RoundUpToPowerOfTwo(state->batch_size());
 
@@ -468,7 +474,8 @@ Status NestedLoopJoinNode::GetNextRightAntiJoin(RuntimeState* state,
       }
       CreateOutputRow(semi_join_staging_row_, current_probe_row_,
           build_row_iterator_.GetRow());
-      if (EvalConjuncts(join_conjunct_ctxs, num_join_ctxs, semi_join_staging_row_)) {
+      if (EvalConjuncts(
+              join_conjunct_evals, num_join_conjuncts, semi_join_staging_row_)) {
         matching_build_rows_->Set(current_build_row_idx_, true);
       }
       build_row_iterator_.Next();
@@ -501,8 +508,9 @@ Status NestedLoopJoinNode::ProcessUnmatchedProbeRow(RuntimeState* state,
     RowBatch* output_batch) {
   DCHECK(!matched_probe_);
   DCHECK(current_probe_row_ != NULL);
-  ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
-  size_t num_ctxs = conjunct_ctxs_.size();
+  ScalarExprEvaluator* const* conjunct_evals = conjunct_evals_.data();
+  size_t num_conjuncts = conjuncts_.size();
+  DCHECK_EQ(num_conjuncts, conjunct_evals_.size());
   TupleRow* output_row = output_batch->GetRow(output_batch->AddRow());
   if (join_op_ == TJoinOp::LEFT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN) {
     CreateOutputRow(output_row, current_probe_row_, NULL);
@@ -512,7 +520,7 @@ Status NestedLoopJoinNode::ProcessUnmatchedProbeRow(RuntimeState* state,
     output_batch->CopyRow(current_probe_row_, output_row);
   }
   // Evaluate all the other (non-join) conjuncts.
-  if (EvalConjuncts(conjunct_ctxs, num_ctxs, output_row)) {
+  if (EvalConjuncts(conjunct_evals, num_conjuncts, output_row)) {
     VLOG_ROW << "match row:" << PrintRow(output_row, row_desc());
     output_batch->CommitLastRow();
     ++num_rows_returned_;
@@ -530,8 +538,9 @@ Status NestedLoopJoinNode::ProcessUnmatchedBuildRows(
     current_build_row_idx_ = 0;
     process_unmatched_build_rows_ = true;
   }
-  ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
-  size_t num_ctxs = conjunct_ctxs_.size();
+  ScalarExprEvaluator* const* conjunct_evals = conjunct_evals_.data();
+  size_t num_conjuncts = conjuncts_.size();
+  DCHECK_EQ(num_conjuncts, conjunct_evals_.size());
   DCHECK(matching_build_rows_ != NULL);
 
   const int N = BitUtil::RoundUpToPowerOfTwo(state->batch_size());
@@ -566,7 +575,7 @@ Status NestedLoopJoinNode::ProcessUnmatchedBuildRows(
     ++current_build_row_idx_;
     // Evaluate conjuncts that don't affect the matching rows of the join on the
     // result row.
-    if (EvalConjuncts(conjunct_ctxs, num_ctxs, output_row)) {
+    if (EvalConjuncts(conjunct_evals, num_conjuncts, output_row)) {
       VLOG_ROW << "match row: " << PrintRow(output_row, row_desc());
       output_batch->CommitLastRow();
       ++num_rows_returned_;
@@ -584,10 +593,12 @@ Status NestedLoopJoinNode::ProcessUnmatchedBuildRows(
 Status NestedLoopJoinNode::FindBuildMatches(
     RuntimeState* state, RowBatch* output_batch, bool* return_output_batch) {
   *return_output_batch = false;
-  ExprContext* const* join_conjunct_ctxs = &join_conjunct_ctxs_[0];
-  size_t num_join_ctxs = join_conjunct_ctxs_.size();
-  ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
-  size_t num_ctxs = conjunct_ctxs_.size();
+  ScalarExprEvaluator* const* join_conjunct_evals = join_conjunct_evals_.data();
+  size_t num_join_conjuncts = join_conjuncts_.size();
+  DCHECK_EQ(num_join_conjuncts, join_conjunct_evals_.size());
+  ScalarExprEvaluator* const* conjunct_evals = conjunct_evals_.data();
+  size_t num_conjuncts = conjuncts_.size();
+  DCHECK_EQ(num_conjuncts, conjunct_evals_.size());
 
   const int N = BitUtil::RoundUpToPowerOfTwo(state->batch_size());
   while (!build_row_iterator_.AtEnd()) {
@@ -609,12 +620,14 @@ Status NestedLoopJoinNode::FindBuildMatches(
       RETURN_IF_CANCELLED(state);
       RETURN_IF_ERROR(QueryMaintenance(state));
     }
-    if (!EvalConjuncts(join_conjunct_ctxs, num_join_ctxs, output_row)) continue;
+    if (!EvalConjuncts(join_conjunct_evals, num_join_conjuncts, output_row)) {
+      continue;
+    }
     matched_probe_ = true;
     if (matching_build_rows_ != NULL) {
       matching_build_rows_->Set(current_build_row_idx_ - 1, true);
     }
-    if (!EvalConjuncts(conjunct_ctxs, num_ctxs, output_row)) continue;
+    if (!EvalConjuncts(conjunct_evals, num_conjuncts, output_row)) continue;
     VLOG_ROW << "match row: " << PrintRow(output_row, row_desc());
     output_batch->CommitLastRow();
     ++num_rows_returned_;

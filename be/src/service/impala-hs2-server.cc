@@ -33,7 +33,6 @@
 
 #include "common/logging.h"
 #include "common/version.h"
-#include "exprs/expr.h"
 #include "rpc/thrift-util.h"
 #include "runtime/raw-value.h"
 #include "runtime/exec-env.h"

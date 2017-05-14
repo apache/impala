@@ -19,38 +19,54 @@
 #ifndef IMPALA_EXPRS_NULL_LITERAL_H_
 #define IMPALA_EXPRS_NULL_LITERAL_H_
 
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
 
 namespace impala {
 
+using impala_udf::FunctionContext;
+using impala_udf::BooleanVal;
+using impala_udf::TinyIntVal;
+using impala_udf::SmallIntVal;
+using impala_udf::IntVal;
+using impala_udf::BigIntVal;
+using impala_udf::FloatVal;
+using impala_udf::DoubleVal;
+using impala_udf::TimestampVal;
+using impala_udf::StringVal;
+using impala_udf::DecimalVal;
+
 class TExprNode;
 
-class NullLiteral: public Expr {
+class NullLiteral: public ScalarExpr {
  public:
-  NullLiteral(PrimitiveType type) : Expr(type, true, false) { }
+  virtual bool IsLiteral() const override { return true; }
+  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn)
+      override WARN_UNUSED_RESULT;
+  virtual std::string DebugString() const override;
 
-  virtual bool IsLiteral() const;
-
-  virtual Status GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn);
-
-  virtual impala_udf::BooleanVal GetBooleanVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::TinyIntVal GetTinyIntVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::SmallIntVal GetSmallIntVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::IntVal GetIntVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::BigIntVal GetBigIntVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::FloatVal GetFloatVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::DoubleVal GetDoubleVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::StringVal GetStringVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::TimestampVal GetTimestampVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::DecimalVal GetDecimalVal(ExprContext*, const TupleRow*);
-  virtual impala_udf::CollectionVal GetCollectionVal(ExprContext*, const TupleRow*);
-
-  virtual std::string DebugString() const;
+  /// Constructor for test.
+  NullLiteral(PrimitiveType type) : ScalarExpr(type, true) { }
 
  protected:
-  friend class Expr;
+  friend class ScalarExpr;
+  friend class ScalarExprEvaluator;
 
-  NullLiteral(const TExprNode& node) : Expr(node) { }
+  NullLiteral(const TExprNode& node) : ScalarExpr(node) { }
+
+  virtual BooleanVal GetBooleanVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual TinyIntVal GetTinyIntVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual SmallIntVal GetSmallIntVal(
+      ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual IntVal GetIntVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual BigIntVal GetBigIntVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual FloatVal GetFloatVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual DoubleVal GetDoubleVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual StringVal GetStringVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual TimestampVal GetTimestampVal(
+      ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual CollectionVal GetCollectionVal(
+      ScalarExprEvaluator*, const TupleRow*) const override;
 };
 
 }

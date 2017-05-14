@@ -12,7 +12,7 @@
 // limitations under the License.
 
 #include "runtime/sorted-run-merger.h"
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
 #include "runtime/descriptors.h"
 #include "runtime/row-batch.h"
 #include "runtime/sorter.h"

@@ -20,8 +20,8 @@
 #include "exec/exec-node.h"
 #include "util/hdfs-util.h"
 #include "util/uid-util.h"
-#include "exprs/expr.h"
-#include "exprs/expr-context.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
@@ -44,13 +44,11 @@ const char* HdfsSequenceTableWriter::KEY_CLASS_NAME =
     "org.apache.hadoop.io.BytesWritable";
 
 HdfsSequenceTableWriter::HdfsSequenceTableWriter(HdfsTableSink* parent,
-                        RuntimeState* state, OutputPartition* output,
-                        const HdfsPartitionDescriptor* partition,
-                        const HdfsTableDescriptor* table_desc,
-                        const vector<ExprContext*>& output_exprs)
-    : HdfsTableWriter(parent, state, output, partition, table_desc, output_exprs),
-      mem_pool_(new MemPool(parent->mem_tracker())), compress_flag_(false),
-      unflushed_rows_(0), record_compression_(false) {
+    RuntimeState* state, OutputPartition* output,
+    const HdfsPartitionDescriptor* partition, const HdfsTableDescriptor* table_desc)
+  : HdfsTableWriter(parent, state, output, partition, table_desc),
+    mem_pool_(new MemPool(parent->mem_tracker())), compress_flag_(false),
+    unflushed_rows_(0), record_compression_(false) {
   approx_block_size_ = 64 * 1024 * 1024;
   parent->mem_tracker()->Consume(approx_block_size_);
   field_delim_ = partition->field_delim();
@@ -106,7 +104,8 @@ Status HdfsSequenceTableWriter::AppendRows(
   bool all_rows = row_group_indices.empty();
   int num_non_partition_cols =
       table_desc_->num_cols() - table_desc_->num_clustering_cols();
-  DCHECK_GE(output_expr_ctxs_.size(), num_non_partition_cols) << parent_->DebugString();
+  DCHECK_GE(output_expr_evals_.size(), num_non_partition_cols)
+      << parent_->DebugString();
 
   {
     SCOPED_TIMER(parent_->encode_timer());
@@ -241,15 +240,16 @@ void HdfsSequenceTableWriter::EncodeRow(TupleRow* row, WriteStream* buf) {
   // TODO Unify with text table writer
   int num_non_partition_cols =
       table_desc_->num_cols() - table_desc_->num_clustering_cols();
-  DCHECK_GE(output_expr_ctxs_.size(), num_non_partition_cols) << parent_->DebugString();
+  DCHECK_GE(output_expr_evals_.size(), num_non_partition_cols)
+      << parent_->DebugString();
   for (int j = 0; j < num_non_partition_cols; ++j) {
-    void* value = output_expr_ctxs_[j]->GetValue(row);
+    void* value = output_expr_evals_[j]->GetValue(row);
     if (value != NULL) {
-      if (output_expr_ctxs_[j]->root()->type().type == TYPE_STRING) {
+      if (output_expr_evals_[j]->root().type().type == TYPE_STRING) {
         WriteEscapedString(reinterpret_cast<const StringValue*>(value), &row_buf_);
       } else {
         string str;
-        output_expr_ctxs_[j]->PrintValue(value, &str);
+        output_expr_evals_[j]->PrintValue(value, &str);
         buf->WriteBytes(str.size(), str.data());
       }
     } else {

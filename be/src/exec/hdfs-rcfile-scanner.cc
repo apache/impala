@@ -23,7 +23,6 @@
 #include "exec/hdfs-sequence-scanner.h"
 #include "exec/scanner-context.inline.h"
 #include "exec/text-converter.inline.h"
-#include "exprs/expr.h"
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
 #include "runtime/mem-pool.h"

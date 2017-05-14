@@ -100,11 +100,9 @@ struct OutputPartition;
 /// Output is buffered to fill sequence file blocks.
 class HdfsSequenceTableWriter : public HdfsTableWriter {
  public:
-  HdfsSequenceTableWriter(HdfsTableSink* parent,
-                          RuntimeState* state, OutputPartition* output,
-                          const HdfsPartitionDescriptor* partition,
-                          const HdfsTableDescriptor* table_desc,
-                          const std::vector<ExprContext*>& output_exprs);
+  HdfsSequenceTableWriter(HdfsTableSink* parent, RuntimeState* state,
+      OutputPartition* output, const HdfsPartitionDescriptor* partition,
+      const HdfsTableDescriptor* table_desc);
 
   ~HdfsSequenceTableWriter() { }
 

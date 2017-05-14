@@ -117,6 +117,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   virtual void Close(RuntimeState* state);
 
  protected:
+  virtual Status QueryMaintenance(RuntimeState* state);
   virtual void AddToDebugString(int indentation_level, std::stringstream* out) const;
   virtual Status ProcessBuildInput(RuntimeState* state);
 
@@ -182,9 +183,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// Using a separate variable is probably faster than calling
   /// 'out_batch_iterator->parent()->AtCapacity()' as it avoids unnecessary memory load.
   bool inline ProcessProbeRowInnerJoin(
-      ExprContext* const* other_join_conjunct_ctxs, int num_other_join_conjuncts,
-      ExprContext* const* conjunct_ctxs, int num_conjuncts,
-      RowBatch::Iterator* out_batch_iterator, int* remaining_capacity);
+      ScalarExprEvaluator* const* other_join_conjunct_evals,
+      int num_other_join_conjuncts, ScalarExprEvaluator* const* conjunct_evals,
+      int num_conjuncts, RowBatch::Iterator* out_batch_iterator, int* remaining_capacity);
 
   /// Probes and updates the hash table for the current probe row for either
   /// RIGHT_SEMI_JOIN or RIGHT_ANTI_JOIN. For RIGHT_SEMI_JOIN, all matching build
@@ -200,9 +201,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// 'out_batch_iterator->parent()->AtCapacity()' as it avoids unnecessary memory load.
   template<int const JoinOp>
   bool inline ProcessProbeRowRightSemiJoins(
-      ExprContext* const* other_join_conjunct_ctxs, int num_other_join_conjuncts,
-      ExprContext* const* conjunct_ctxs, int num_conjuncts,
-      RowBatch::Iterator* out_batch_iterator, int* remaining_capacity);
+      ScalarExprEvaluator* const* other_join_conjunct_evals,
+      int num_other_join_conjuncts, ScalarExprEvaluator* const* conjunct_evals,
+      int num_conjuncts, RowBatch::Iterator* out_batch_iterator, int* remaining_capacity);
 
   /// Probes the hash table for the current probe row for LEFT_SEMI_JOIN,
   /// LEFT_ANTI_JOIN or NULL_AWARE_LEFT_ANTI_JOIN. The probe row will be appended
@@ -217,9 +218,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// 'out_batch_iterator->parent()->AtCapacity()' as it avoids unnecessary memory load.
   template<int const JoinOp>
   bool inline ProcessProbeRowLeftSemiJoins(
-      ExprContext* const* other_join_conjunct_ctxs, int num_other_join_conjuncts,
-      ExprContext* const* conjunct_ctxs, int num_conjuncts,
-      RowBatch::Iterator* out_batch_iterator, int* remaining_capacity, Status* status);
+      ScalarExprEvaluator* const* other_join_conjunct_evals,
+      int num_other_join_conjuncts, ScalarExprEvaluator* const* conjunct_evals,
+      int num_conjuncts, RowBatch::Iterator* out_batch_iterator, int* remaining_capacity,
+      Status* status);
 
   /// Probes the hash table for the current probe row for LEFT_OUTER_JOIN,
   /// RIGHT_OUTER_JOIN or FULL_OUTER_JOIN. The matching build and/or probe row
@@ -235,18 +237,19 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// 'status' may be updated if appending to null aware BTS fails.
   template<int const JoinOp>
   bool inline ProcessProbeRowOuterJoins(
-      ExprContext* const* other_join_conjunct_ctxs, int num_other_join_conjuncts,
-      ExprContext* const* conjunct_ctxs, int num_conjuncts,
-      RowBatch::Iterator* out_batch_iterator, int* remaining_capacity);
+      ScalarExprEvaluator* const* other_join_conjunct_evals,
+      int num_other_join_conjuncts, ScalarExprEvaluator* const* conjunct_evals,
+      int num_conjuncts, RowBatch::Iterator* out_batch_iterator, int* remaining_capacity);
 
   /// Probes 'current_probe_row_' against the the hash tables and append outputs
   /// to output batch. Wrapper around the join-type specific probe row functions
   /// declared above.
   template<int const JoinOp>
   bool inline ProcessProbeRow(
-      ExprContext* const* other_join_conjunct_ctxs, int num_other_join_conjuncts,
-      ExprContext* const* conjunct_ctxs, int num_conjuncts,
-      RowBatch::Iterator* out_batch_iterator, int* remaining_capacity, Status* status);
+      ScalarExprEvaluator* const* other_join_conjunct_evals,
+      int num_other_join_conjuncts, ScalarExprEvaluator* const* conjunct_evals,
+      int num_conjuncts, RowBatch::Iterator* out_batch_iterator, int* remaining_capacity,
+      Status* status);
 
   /// Evaluates some number of rows in 'probe_batch_' against the probe expressions
   /// and hashes the results to 32-bit hash values. The evaluation results and the hash
@@ -389,14 +392,17 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   RuntimeState* runtime_state_;
 
   /// Our equi-join predicates "<lhs> = <rhs>" are separated into
-  /// build_expr_ctxs_ (over child(1)) and probe_expr_ctxs_ (over child(0))
-  std::vector<ExprContext*> build_expr_ctxs_;
-  std::vector<ExprContext*> probe_expr_ctxs_;
+  /// build_exprs_ (over child(1)) and probe_exprs_ (over child(0))
+  std::vector<ScalarExpr*> build_exprs_;
+  std::vector<ScalarExpr*> probe_exprs_;
 
   /// Non-equi-join conjuncts from the ON clause.
-  std::vector<ExprContext*> other_join_conjunct_ctxs_;
+  std::vector<ScalarExpr*> other_join_conjuncts_;
+  std::vector<ScalarExprEvaluator*> other_join_conjunct_evals_;
 
   /// Used for hash-related functionality, such as evaluating rows and calculating hashes.
+  /// This owns the evaluators for the build and probe expressions used during insertion
+  /// and probing of the hash tables.
   boost::scoped_ptr<HashTableCtx> ht_ctx_;
 
   /// The iterator that corresponds to the look up of current_probe_row_.

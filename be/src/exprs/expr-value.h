@@ -26,7 +26,7 @@
 
 namespace impala {
 
-/// The materialized value returned by ExprContext::GetValue().
+/// The materialized value returned by ScalarExprEvaluator::GetValue().
 struct ExprValue {
   bool bool_val;
   int8_t tinyint_val;

@@ -19,7 +19,7 @@
 
 #include "exec/filter-context.h"
 #include "exec/parquet-scratch-tuple-batch.h"
-#include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
 #include "runtime/runtime-filter.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/tuple-row.h"
@@ -27,8 +27,8 @@
 using namespace impala;
 
 int HdfsParquetScanner::ProcessScratchBatch(RowBatch* dst_batch) {
-  ExprContext* const* conjunct_ctxs = &(*scanner_conjunct_ctxs_)[0];
-  const int num_conjuncts = scanner_conjunct_ctxs_->size();
+  ScalarExprEvaluator* const* conjunct_evals = &(*conjunct_evals_)[0];
+  const int num_conjuncts = conjunct_evals_->size();
 
   // Start/end/current iterators over the output rows.
   Tuple** output_row_start =
@@ -54,7 +54,7 @@ int HdfsParquetScanner::ProcessScratchBatch(RowBatch* dst_batch) {
     if (!EvalRuntimeFilters(reinterpret_cast<TupleRow*>(output_row))) {
       continue;
     }
-    if (!ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts,
+    if (!ExecNode::EvalConjuncts(conjunct_evals, num_conjuncts,
         reinterpret_cast<TupleRow*>(output_row))) {
       continue;
     }

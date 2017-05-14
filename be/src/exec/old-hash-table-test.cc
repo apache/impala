@@ -22,8 +22,8 @@
 
 #include "common/compiler-util.h"
 #include "exec/old-hash-table.inline.h"
-#include "exprs/expr.h"
-#include "exprs/expr-context.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "exprs/slot-ref.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
@@ -45,30 +45,37 @@ class OldHashTableTest : public testing::Test {
   ObjectPool pool_;
   MemTracker tracker_;
   MemPool mem_pool_;
-  vector<ExprContext*> build_expr_ctxs_;
-  vector<ExprContext*> probe_expr_ctxs_;
+
+  vector<ScalarExpr*> build_exprs_;
+  vector<ScalarExprEvaluator*> build_expr_evals_;
+  vector<ScalarExpr*> probe_exprs_;
+  vector<ScalarExprEvaluator*> probe_expr_evals_;
 
   virtual void SetUp() {
     RowDescriptor desc;
-    Status status;
-
     // Not very easy to test complex tuple layouts so this test will use the
     // simplest.  The purpose of these tests is to exercise the hash map
     // internals so a simple build/probe expr is fine.
-    Expr* expr = pool_.Add(new SlotRef(TYPE_INT, 0));
-    build_expr_ctxs_.push_back(pool_.Add(new ExprContext(expr)));
-    ASSERT_OK(Expr::Prepare(build_expr_ctxs_, NULL, desc, &tracker_));
-    ASSERT_OK(Expr::Open(build_expr_ctxs_, NULL));
+    ScalarExpr* build_expr = pool_.Add(new SlotRef(TYPE_INT, 0));
+    ASSERT_OK(build_expr->Init(desc, nullptr));
+    build_exprs_.push_back(build_expr);
+    ASSERT_OK(ScalarExprEvaluator::Create(build_exprs_, nullptr, &pool_, &mem_pool_,
+        &build_expr_evals_));
+    ASSERT_OK(ScalarExprEvaluator::Open(build_expr_evals_, nullptr));
 
-    expr = pool_.Add(new SlotRef(TYPE_INT, 0));
-    probe_expr_ctxs_.push_back(pool_.Add(new ExprContext(expr)));
-    ASSERT_OK(Expr::Prepare(probe_expr_ctxs_, NULL, desc, &tracker_));
-    ASSERT_OK(Expr::Open(probe_expr_ctxs_, NULL));
+    ScalarExpr* probe_expr = pool_.Add(new SlotRef(TYPE_INT, 0));
+    ASSERT_OK(probe_expr->Init(desc, nullptr));
+    probe_exprs_.push_back(probe_expr);
+    ASSERT_OK(ScalarExprEvaluator::Create(probe_exprs_, nullptr, &pool_, &mem_pool_,
+        &probe_expr_evals_));
+    ASSERT_OK(ScalarExprEvaluator::Open(probe_expr_evals_, nullptr));
   }
 
   virtual void TearDown() {
-    Expr::Close(build_expr_ctxs_, NULL);
-    Expr::Close(probe_expr_ctxs_, NULL);
+    ScalarExprEvaluator::Close(build_expr_evals_, nullptr);
+    ScalarExprEvaluator::Close(probe_expr_evals_, nullptr);
+    ScalarExpr::Close(build_exprs_);
+    ScalarExpr::Close(probe_exprs_);
   }
 
   TupleRow* CreateTupleRow(int32_t val) {
@@ -95,10 +102,10 @@ class OldHashTableTest : public testing::Test {
     OldHashTable::Iterator iter = table->Begin();
     while (iter != table->End()) {
       TupleRow* row = iter.GetRow();
-      int32_t val = *reinterpret_cast<int32_t*>(build_expr_ctxs_[0]->GetValue(row));
+      int32_t val = *reinterpret_cast<int32_t*>(build_expr_evals_[0]->GetValue(row));
       EXPECT_GE(val, min);
       EXPECT_LT(val, max);
-      if (all_unique) EXPECT_TRUE(results[val] == NULL);
+      if (all_unique) EXPECT_TRUE(results[val] == nullptr);
       EXPECT_EQ(row->GetTuple(0), expected[val]->GetTuple(0));
       results[val] = row;
       iter.Next<false>();
@@ -110,9 +117,9 @@ class OldHashTableTest : public testing::Test {
   void ValidateMatch(TupleRow* probe_row, TupleRow* build_row) {
     EXPECT_TRUE(probe_row != build_row);
     int32_t build_val =
-        *reinterpret_cast<int32_t*>(build_expr_ctxs_[0]->GetValue(probe_row));
+        *reinterpret_cast<int32_t*>(build_expr_evals_[0]->GetValue(probe_row));
     int32_t probe_val =
-        *reinterpret_cast<int32_t*>(probe_expr_ctxs_[0]->GetValue(build_row));
+        *reinterpret_cast<int32_t*>(probe_expr_evals_[0]->GetValue(build_row));
     EXPECT_EQ(build_val, probe_val);
   }
 
@@ -160,16 +167,16 @@ TEST_F(OldHashTableTest, SetupTest) {
   TupleRow* probe_row4 = CreateTupleRow(4);
 
   int32_t* val_row1 =
-      reinterpret_cast<int32_t*>(build_expr_ctxs_[0]->GetValue(build_row1));
+      reinterpret_cast<int32_t*>(build_expr_evals_[0]->GetValue(build_row1));
   EXPECT_EQ(*val_row1, 1);
   int32_t* val_row2 =
-      reinterpret_cast<int32_t*>(build_expr_ctxs_[0]->GetValue(build_row2));
+      reinterpret_cast<int32_t*>(build_expr_evals_[0]->GetValue(build_row2));
   EXPECT_EQ(*val_row2, 2);
   int32_t* val_row3 =
-      reinterpret_cast<int32_t*>(probe_expr_ctxs_[0]->GetValue(probe_row3));
+      reinterpret_cast<int32_t*>(probe_expr_evals_[0]->GetValue(probe_row3));
   EXPECT_EQ(*val_row3, 3);
   int32_t* val_row4 =
-      reinterpret_cast<int32_t*>(probe_expr_ctxs_[0]->GetValue(probe_row4));
+      reinterpret_cast<int32_t*>(probe_expr_evals_[0]->GetValue(probe_row4));
   EXPECT_EQ(*val_row4, 4);
 
   mem_pool_.FreeAll();
@@ -196,53 +203,56 @@ TEST_F(OldHashTableTest, BasicTest) {
 
   // Create the hash table and insert the build rows
   MemTracker tracker;
-  OldHashTable hash_table(NULL, build_expr_ctxs_, probe_expr_ctxs_,
-      vector<ExprContext*>(), 1, false, std::vector<bool>(build_expr_ctxs_.size(), false),
-      0, &tracker, vector<RuntimeFilter*>());
+  scoped_ptr<OldHashTable> hash_table;
+  EXPECT_OK(OldHashTable::Create(&pool_, nullptr, build_exprs_, probe_exprs_,
+      vector<ScalarExpr*>(), 1, false, std::vector<bool>(build_exprs_.size(), false),
+      0, &tracker, vector<RuntimeFilter*>(), &hash_table));
+  EXPECT_OK(hash_table->Open(nullptr));
   for (int i = 0; i < 5; ++i) {
-    hash_table.Insert(build_rows[i]);
+    hash_table->Insert(build_rows[i]);
   }
-  EXPECT_EQ(hash_table.size(), 5);
+  EXPECT_EQ(hash_table->size(), 5);
 
   // Do a full table scan and validate returned pointers
-  FullScan(&hash_table, 0, 5, true, scan_rows, build_rows);
-  ProbeTest(&hash_table, probe_rows, 10, false);
+  FullScan(hash_table.get(), 0, 5, true, scan_rows, build_rows);
+  ProbeTest(hash_table.get(), probe_rows, 10, false);
 
   // Resize and scan again
-  ResizeTable(&hash_table, 64);
-  EXPECT_EQ(hash_table.num_buckets(), 64);
-  EXPECT_EQ(hash_table.size(), 5);
+  ResizeTable(hash_table.get(), 64);
+  EXPECT_EQ(hash_table->num_buckets(), 64);
+  EXPECT_EQ(hash_table->size(), 5);
   memset(scan_rows, 0, sizeof(scan_rows));
-  FullScan(&hash_table, 0, 5, true, scan_rows, build_rows);
-  ProbeTest(&hash_table, probe_rows, 10, false);
+  FullScan(hash_table.get(), 0, 5, true, scan_rows, build_rows);
+  ProbeTest(hash_table.get(), probe_rows, 10, false);
 
   // Resize to two and cause some collisions
-  ResizeTable(&hash_table, 2);
-  EXPECT_EQ(hash_table.num_buckets(), 2);
-  EXPECT_EQ(hash_table.size(), 5);
+  ResizeTable(hash_table.get(), 2);
+  EXPECT_EQ(hash_table->num_buckets(), 2);
+  EXPECT_EQ(hash_table->size(), 5);
   memset(scan_rows, 0, sizeof(scan_rows));
-  FullScan(&hash_table, 0, 5, true, scan_rows, build_rows);
-  ProbeTest(&hash_table, probe_rows, 10, false);
+  FullScan(hash_table.get(), 0, 5, true, scan_rows, build_rows);
+  ProbeTest(hash_table.get(), probe_rows, 10, false);
 
   // Resize to one and turn it into a linked list
-  ResizeTable(&hash_table, 1);
-  EXPECT_EQ(hash_table.num_buckets(), 1);
-  EXPECT_EQ(hash_table.size(), 5);
+  ResizeTable(hash_table.get(), 1);
+  EXPECT_EQ(hash_table->num_buckets(), 1);
+  EXPECT_EQ(hash_table->size(), 5);
   memset(scan_rows, 0, sizeof(scan_rows));
-  FullScan(&hash_table, 0, 5, true, scan_rows, build_rows);
-  ProbeTest(&hash_table, probe_rows, 10, false);
+  FullScan(hash_table.get(), 0, 5, true, scan_rows, build_rows);
+  ProbeTest(hash_table.get(), probe_rows, 10, false);
 
-  hash_table.Close();
+  hash_table->Close(nullptr);
   mem_pool_.FreeAll();
 }
 
 // This tests makes sure we can scan ranges of buckets
 TEST_F(OldHashTableTest, ScanTest) {
   MemTracker tracker;
-  OldHashTable hash_table(NULL, build_expr_ctxs_, probe_expr_ctxs_,
-      vector<ExprContext*>(), 1, false,
-      std::vector<bool>(build_expr_ctxs_.size(), false), 0, &tracker,
-      vector<RuntimeFilter*>());
+  scoped_ptr<OldHashTable> hash_table;
+  EXPECT_OK(OldHashTable::Create(&pool_, nullptr, build_exprs_, probe_exprs_,
+      vector<ScalarExpr*>(), 1, false, std::vector<bool>(build_exprs_.size(), false),
+      0, &tracker, vector<RuntimeFilter*>(), &hash_table));
+  EXPECT_OK(hash_table->Open(nullptr));
   // Add 1 row with val 1, 2 with val 2, etc
   vector<TupleRow*> build_rows;
   ProbeTestData probe_rows[15];
@@ -251,7 +261,7 @@ TEST_F(OldHashTableTest, ScanTest) {
     probe_rows[val].probe_row = CreateTupleRow(val);
     for (int i = 0; i < val; ++i) {
       TupleRow* row = CreateTupleRow(val);
-      hash_table.Insert(row);
+      hash_table->Insert(row);
       build_rows.push_back(row);
       probe_rows[val].expected_build_rows.push_back(row);
     }
@@ -263,22 +273,22 @@ TEST_F(OldHashTableTest, ScanTest) {
   }
 
   // Test that all the builds were found
-  ProbeTest(&hash_table, probe_rows, 15, true);
+  ProbeTest(hash_table.get(), probe_rows, 15, true);
 
   // Resize and try again
-  ResizeTable(&hash_table, 128);
-  EXPECT_EQ(hash_table.num_buckets(), 128);
-  ProbeTest(&hash_table, probe_rows, 15, true);
+  ResizeTable(hash_table.get(), 128);
+  EXPECT_EQ(hash_table->num_buckets(), 128);
+  ProbeTest(hash_table.get(), probe_rows, 15, true);
 
-  ResizeTable(&hash_table, 16);
-  EXPECT_EQ(hash_table.num_buckets(), 16);
-  ProbeTest(&hash_table, probe_rows, 15, true);
+  ResizeTable(hash_table.get(), 16);
+  EXPECT_EQ(hash_table->num_buckets(), 16);
+  ProbeTest(hash_table.get(), probe_rows, 15, true);
 
-  ResizeTable(&hash_table, 2);
-  EXPECT_EQ(hash_table.num_buckets(), 2);
-  ProbeTest(&hash_table, probe_rows, 15, true);
+  ResizeTable(hash_table.get(), 2);
+  EXPECT_EQ(hash_table->num_buckets(), 2);
+  ProbeTest(hash_table.get(), probe_rows, 15, true);
 
-  hash_table.Close();
+  hash_table->Close(nullptr);
   mem_pool_.FreeAll();
 }
 
@@ -287,37 +297,38 @@ TEST_F(OldHashTableTest, GrowTableTest) {
   int num_to_add = 4;
   int expected_size = 0;
   MemTracker tracker(100 * 1024 * 1024);
-  OldHashTable hash_table(NULL, build_expr_ctxs_, probe_expr_ctxs_,
-      vector<ExprContext*>(), 1, false,
-      std::vector<bool>(build_expr_ctxs_.size(), false), 0, &tracker,
-      vector<RuntimeFilter*>(), false, num_to_add);
-  EXPECT_FALSE(hash_table.mem_limit_exceeded());
+  scoped_ptr<OldHashTable> hash_table;
+  EXPECT_OK(OldHashTable::Create(&pool_, nullptr, build_exprs_, probe_exprs_,
+      vector<ScalarExpr*>(), 1, false, std::vector<bool>(build_exprs_.size(), false),
+      0, &tracker, vector<RuntimeFilter*>(), &hash_table, false, num_to_add));
+  EXPECT_OK(hash_table->Open(nullptr));
+  EXPECT_FALSE(hash_table->mem_limit_exceeded());
   EXPECT_TRUE(!tracker.LimitExceeded());
 
   // This inserts about 5M entries
   int build_row_val = 0;
   for (int i = 0; i < 20; ++i) {
     for (int j = 0; j < num_to_add; ++build_row_val, ++j) {
-      hash_table.Insert(CreateTupleRow(build_row_val));
+      hash_table->Insert(CreateTupleRow(build_row_val));
     }
     expected_size += num_to_add;
     num_to_add *= 2;
   }
-  EXPECT_TRUE(hash_table.mem_limit_exceeded());
+  EXPECT_TRUE(hash_table->mem_limit_exceeded());
   EXPECT_TRUE(tracker.LimitExceeded());
 
   // Validate that we can find the entries before we went over the limit
   for (int i = 0; i < expected_size * 5; i += 100000) {
     TupleRow* probe_row = CreateTupleRow(i);
-    OldHashTable::Iterator iter = hash_table.Find(probe_row);
-    if (i < hash_table.size()) {
-      EXPECT_TRUE(iter != hash_table.End());
+    OldHashTable::Iterator iter = hash_table->Find(probe_row);
+    if (i < hash_table->size()) {
+      EXPECT_TRUE(iter != hash_table->End());
       ValidateMatch(probe_row, iter.GetRow());
     } else {
-      EXPECT_TRUE(iter == hash_table.End());
+      EXPECT_TRUE(iter == hash_table->End());
     }
   }
-  hash_table.Close();
+  hash_table->Close(nullptr);
   mem_pool_.FreeAll();
 }
 

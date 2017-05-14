@@ -378,12 +378,6 @@ class ClientRequestState {
   Status FetchRowsInternal(const int32_t max_rows, QueryResultSet* fetched_rows)
       WARN_UNUSED_RESULT;
 
-  /// Evaluates 'output_expr_ctxs_' against 'row' and output the evaluated row in
-  /// 'result'. The values' scales (# of digits after decimal) are stored in 'scales'.
-  /// result and scales must have been resized to the number of columns before call.
-  Status GetRowValue(TupleRow* row, std::vector<void*>* result, std::vector<int>* scales)
-      WARN_UNUSED_RESULT;
-
   /// Gather and publish all required updates to the metastore
   Status UpdateCatalog() WARN_UNUSED_RESULT;
 

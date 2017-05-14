@@ -67,22 +67,23 @@ void FilterStats::RegisterCounterGroup(const string& key) {
   counters[key] = counter;
 }
 
-Status FilterContext::CloneFrom(const FilterContext& from, RuntimeState* state) {
+Status FilterContext::CloneFrom(const FilterContext& from, ObjectPool* pool,
+    RuntimeState* state, MemPool* mem_pool) {
   filter = from.filter;
   stats = from.stats;
-  return from.expr_ctx->Clone(state, &expr_ctx);
+  return from.expr_eval->Clone(pool, state, mem_pool, &expr_eval);
 }
 
 bool FilterContext::Eval(TupleRow* row) const noexcept {
-  void* e = expr_ctx->GetValue(row);
-  return filter->Eval(e, expr_ctx->root()->type());
+  void* val = expr_eval->GetValue(row);
+  return filter->Eval(val, expr_eval->root().type());
 }
 
 void FilterContext::Insert(TupleRow* row) const noexcept {
   if (local_bloom_filter == NULL) return;
-  void* e = expr_ctx->GetValue(row);
+  void* val = expr_eval->GetValue(row);
   uint32_t filter_hash = RawValue::GetHashValue(
-      e, expr_ctx->root()->type(), RuntimeFilterBank::DefaultHashSeed());
+      val, expr_eval->root().type(), RuntimeFilterBank::DefaultHashSeed());
   local_bloom_filter->Insert(filter_hash);
 }
 
@@ -97,11 +98,11 @@ void FilterContext::Insert(TupleRow* row) const noexcept {
 //                              %"class.impala::TupleRow"* %row) #34 {
 // entry:
 //   %0 = alloca i16
-//   %expr_ctx_ptr = getelementptr inbounds %"struct.impala::FilterContext",
+//   %expr_eval_ptr = getelementptr inbounds %"struct.impala::FilterContext",
 //       %"struct.impala::FilterContext"* %this, i32 0, i32 0
-//   %expr_ctx_arg = load %"class.impala::ExprContext"*,
-//       %"class.impala::ExprContext"** %expr_ctx_ptr
-//   %result = call i32 @GetSlotRef(%"class.impala::ExprContext"* %expr_ctx_arg,
+//   %expr_eval_arg = load %"class.impala::ExprContext"*,
+//       %"class.impala::ExprContext"** %expr_eval_ptr
+//   %result = call i32 @GetSlotRef(%"class.impala::ExprContext"* %expr_eval_arg,
 //       %"class.impala::TupleRow"* %row)
 //   %is_null1 = trunc i32 %result to i1
 //   br i1 %is_null1, label %is_null, label %not_null
@@ -127,11 +128,12 @@ void FilterContext::Insert(TupleRow* row) const noexcept {
 //       %"struct.impala::ColumnType"* @expr_type_arg)
 //   ret i1 %passed_filter
 // }
-Status FilterContext::CodegenEval(LlvmCodeGen* codegen, Function** fn) const {
+Status FilterContext::CodegenEval(LlvmCodeGen* codegen, ScalarExpr* filter_expr,
+    Function** fn) {
   LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
 
-  *fn = NULL;
+  *fn = nullptr;
   PointerType* this_type = codegen->GetPtrType(FilterContext::LLVM_CLASS_NAME);
   PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
   LlvmCodeGen::FnPrototype prototype(codegen, "FilterContextEval",
@@ -149,24 +151,25 @@ Status FilterContext::CodegenEval(LlvmCodeGen* codegen, Function** fn) const {
   BasicBlock* eval_filter_block =
       BasicBlock::Create(context, "eval_filter", eval_filter_fn);
 
-  Expr* expr = expr_ctx->root();
   Function* compute_fn;
-  RETURN_IF_ERROR(expr->GetCodegendComputeFn(codegen, &compute_fn));
-  DCHECK(compute_fn != NULL);
+  RETURN_IF_ERROR(filter_expr->GetCodegendComputeFn(codegen, &compute_fn));
+  DCHECK(compute_fn != nullptr);
 
   // The function for checking against the bloom filter for match.
   Function* runtime_filter_fn =
       codegen->GetFunction(IRFunction::RUNTIME_FILTER_EVAL, false);
-  DCHECK(runtime_filter_fn != NULL);
+  DCHECK(runtime_filter_fn != nullptr);
 
-  // Load 'expr_ctx' from 'this_arg' FilterContext object.
-  Value* expr_ctx_ptr = builder.CreateStructGEP(NULL, this_arg, 0, "expr_ctx_ptr");
-  Value* expr_ctx_arg = builder.CreateLoad(expr_ctx_ptr, "expr_ctx_arg");
+  // Load 'expr_eval' from 'this_arg' FilterContext object.
+  Value* expr_eval_ptr =
+      builder.CreateStructGEP(nullptr, this_arg, 0, "expr_eval_ptr");
+  Value* expr_eval_arg =
+      builder.CreateLoad(expr_eval_ptr, "expr_eval_arg");
 
   // Evaluate the row against the filter's expression.
-  Value* compute_fn_args[] = {expr_ctx_arg, row_arg};
+  Value* compute_fn_args[] = {expr_eval_arg, row_arg};
   CodegenAnyVal result = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
-      expr->type(), compute_fn, compute_fn_args, "result");
+      filter_expr->type(), compute_fn, compute_fn_args, "result");
 
   // Check if the result is NULL
   Value* is_null = result.GetIsNull();
@@ -192,11 +195,11 @@ Status FilterContext::CodegenEval(LlvmCodeGen* codegen, Function** fn) const {
   // Create a global constant of the filter expression's ColumnType. It needs to be a
   // constant for constant propagation and dead code elimination in 'runtime_filter_fn'.
   Type* col_type = codegen->GetType(ColumnType::LLVM_CLASS_NAME);
-  Constant* expr_type_arg = codegen->ConstantToGVPtr(col_type, expr->type().ToIR(codegen),
-      "expr_type_arg");
+  Constant* expr_type_arg = codegen->ConstantToGVPtr(col_type,
+      filter_expr->type().ToIR(codegen), "expr_type_arg");
 
   // Load 'filter' from 'this_arg' FilterContext object.
-  Value* filter_ptr = builder.CreateStructGEP(NULL, this_arg, 1, "filter_ptr");
+  Value* filter_ptr = builder.CreateStructGEP(nullptr, this_arg, 1, "filter_ptr");
   Value* filter_arg = builder.CreateLoad(filter_ptr, "filter_arg");
 
   Value* run_filter_args[] = {filter_arg, val_ptr_phi, expr_type_arg};

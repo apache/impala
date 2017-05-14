@@ -21,6 +21,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <kudu/client/client.h>
 
+#include "common/object-pool.h"
 #include "exec/kudu-scan-node-base.h"
 #include "runtime/descriptors.h"
 
@@ -86,6 +87,13 @@ class KuduScanner {
   KuduScanNodeBase* scan_node_;
   RuntimeState* state_;
 
+  /// For objects which have the same life time as the scanner.
+  ObjectPool obj_pool_;
+
+  /// MemPool used for expression evaluators in this scanner. Need to be local
+  /// to each scanner as MemPool is not thread safe.
+  boost::scoped_ptr<MemPool> expr_mem_pool_;
+
   /// The kudu::client::KuduScanner for the current scan token. A new KuduScanner is
   /// created for each scan token using KuduScanToken::DeserializeIntoScanner().
   boost::scoped_ptr<kudu::client::KuduScanner> scanner_;
@@ -100,7 +108,7 @@ class KuduScanner {
   int64_t last_alive_time_micros_;
 
   /// The scanner's cloned copy of the conjuncts to apply.
-  vector<ExprContext*> conjunct_ctxs_;
+  vector<ScalarExprEvaluator*> conjunct_evals_;
 
   /// Timestamp slots in the tuple descriptor of the scan node. Used to convert Kudu
   /// UNIXTIME_MICRO values inline.

@@ -30,8 +30,6 @@
 
 namespace impala {
 
-class MemPool;
-class MemTracker;
 class RowBatch;
 class TupleRow;
 
