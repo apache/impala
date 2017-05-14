@@ -69,6 +69,7 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
 BaseSequenceScanner::BaseSequenceScanner(HdfsScanNodeBase* node, RuntimeState* state)
   : HdfsScanner(node, state),
     header_(NULL),
+    only_parsing_header_(false),
     block_start_(0),
     total_block_size_(0),
     num_syncs_(0) {
@@ -77,6 +78,7 @@ BaseSequenceScanner::BaseSequenceScanner(HdfsScanNodeBase* node, RuntimeState* s
 BaseSequenceScanner::BaseSequenceScanner()
   : HdfsScanner(),
     header_(NULL),
+    only_parsing_header_(false),
     block_start_(0),
     total_block_size_(0),
     num_syncs_(0) {
