@@ -319,7 +319,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}_tmp (
   double_col STRING,
   date_string_col STRING,
   string_col STRING,
-  timestamp_col TIMESTAMP)
+  timestamp_col STRING)
 PARTITIONED BY (year INT, month INT)
 ROW FORMAT DELIMITED
   FIELDS TERMINATED BY ','
@@ -443,7 +443,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}_tmp (
   double_col STRING,
   date_string_col STRING,
   string_col STRING,
-  timestamp_col TIMESTAMP)
+  timestamp_col STRING)
 PARTITIONED BY (year INT, month INT)
 ROW FORMAT DELIMITED
   FIELDS TERMINATED BY ','
