@@ -75,7 +75,10 @@ class QueryState;
 /// Query coordinator: handles execution of fragment instances on remote nodes, given a
 /// TQueryExecRequest. As part of that, it handles all interactions with the executing
 /// backends; it is also responsible for implementing all client requests regarding the
-/// query, including cancellation.
+/// query, including cancellation. Once a query ends, either through cancellation or
+/// by returning eos, the coordinator releases resources. (Note that DML requests
+/// always end with cancellation, via ImpalaServer::UnregisterQuery()/
+/// ImpalaServer::CancelInternal()/ClientRequestState::Cancel().)
 ///
 /// The coordinator monitors the execution status of fragment instances and aborts the
 /// entire query if an error is reported by any of them.
@@ -84,10 +87,7 @@ class QueryState;
 /// rows are produced by a fragment instance that always executes on the same machine as
 /// the coordinator.
 ///
-/// Once a query has finished executing and all results have been returned either to the
-/// caller of GetNext() or a data sink, execution_completed() will return true. If the
-/// query is aborted, execution_completed should also be set to true. Coordinator is
-/// thread-safe, with the exception of GetNext().
+/// Thread-safe, with the exception of GetNext().
 //
 /// A typical sequence of calls for a single query (calls under the same numbered
 /// item can happen concurrently):
@@ -98,9 +98,6 @@ class QueryState;
 /// The implementation ensures that setting an overall error status and initiating
 /// cancellation of all fragment instances is atomic.
 ///
-/// TODO: remove TearDown() and replace with ReleaseResources(); TearDown() currently
-/// also disassembles the control structures (such as the local reference to the
-/// coordinator's FragmentInstanceState)
 /// TODO: move into separate subdirectory and move nested classes into separate files
 /// and unnest them
 /// TODO: clean up locking behavior; in particular, clarify dependency on lock_
@@ -143,7 +140,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// if any, as well as all plan fragments on remote nodes. Sets query_status_ to the
   /// given cause if non-NULL. Otherwise, sets query_status_ to Status::CANCELLED.
   /// Idempotent.
-  void Cancel(const Status* cause = NULL);
+  void Cancel(const Status* cause = nullptr);
 
   /// Updates execution status of a particular backend as well as Insert-related
   /// status (per_partition_status_ and files_to_move_). Also updates
@@ -151,13 +148,8 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   Status UpdateBackendExecStatus(const TReportExecStatusParams& params)
       WARN_UNUSED_RESULT;
 
-  /// Returns the query state.
-  /// Only valid to call after Exec() and before TearDown(). The returned
-  /// reference only remains valid until TearDown() is called.
-  QueryState* query_state() const {
-    DCHECK(!torn_down_);
-    return query_state_;
-  }
+  /// Only valid to call after Exec().
+  QueryState* query_state() const { return query_state_; }
 
   /// Only valid *after* calling Exec(). Return nullptr if the running query does not
   /// produce any rows.
@@ -206,10 +198,6 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// filter ID have been received (may be 1 or more per filter), broadcast the global
   /// filter to fragment instances.
   void UpdateFilter(const TUpdateFilterParams& params);
-
-  /// Called once query execution is complete to tear down any remaining state.
-  /// TODO: change to ReleaseResources() and don't tear down control structures.
-  void TearDown();
 
  private:
   class BackendState;
@@ -368,8 +356,8 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// safe to concurrently read from filter_routing_table_.
   bool filter_routing_table_complete_ = false;
 
-  /// True if and only if TearDown() has been called.
-  bool torn_down_ = false;
+  /// True if and only if ReleaseResources() has been called.
+  bool released_resources_ = false;
 
   /// Returns a local object pool.
   ObjectPool* obj_pool() { return obj_pool_.get(); }
@@ -447,6 +435,10 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// Build the filter routing table by iterating over all plan nodes and collecting the
   /// filters that they either produce or consume.
   void InitFilterRoutingTable();
+
+  /// Releases filter resources, unregisters the filter mem tracker, and calls
+  /// CloseConsumer() on coord_sink_. Requires lock_ to be held. Idempotent.
+  void ReleaseResources();
 };
 
 }

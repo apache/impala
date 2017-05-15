@@ -446,8 +446,6 @@ Status ClientRequestState::ExecQueryOrDmlRequest(
     lock_guard<mutex> l(lock_);
     // Don't start executing the query if Cancel() was called concurrently with Exec().
     if (is_cancelled_) return Status::CANCELLED;
-    // TODO: make schedule local to coordinator and move schedule_->Release() into
-    // Coordinator::TearDown()
     schedule_.reset(new QuerySchedule(query_id(), query_exec_request,
         exec_request_.query_options, &summary_profile_, query_events_));
   }
@@ -585,7 +583,6 @@ void ClientRequestState::Done() {
                      << " because of error: " << status.GetDetail();
       }
     }
-    coord_->TearDown();
   }
 }
 

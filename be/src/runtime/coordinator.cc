@@ -108,7 +108,11 @@ Coordinator::Coordinator(
     query_events_(events) {}
 
 Coordinator::~Coordinator() {
-  DCHECK(torn_down_) << "TearDown() must be called before Coordinator is destroyed";
+  DCHECK(released_resources_)
+      << "ReleaseResources() must be called before Coordinator is destroyed";
+  if (query_state_ != nullptr) {
+    ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(query_state_);
+  }
 }
 
 Status Coordinator::Exec() {
@@ -416,8 +420,6 @@ Status Coordinator::FinishBackendStartup() {
       "Backend startup latencies", latencies.ToHumanReadable());
 
   if (!status.ok()) {
-    // TODO: do not allow cancellation via the debug page until Exec() has returned
-    //DCHECK(query_status_.ok()); // nobody should have been able to cancel
     query_status_ = status;
     CancelInternal();
   }
@@ -881,19 +883,14 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos) {
 
   if (*eos) {
     returned_all_results_ = true;
-    // Trigger tear-down of coordinator fragment by closing the consumer. Must do before
-    // WaitForBackendCompletion().
-    coord_sink_->CloseConsumer();
-    coord_sink_ = nullptr;
+    // release resources here, since we won't be fetching more result rows
+    {
+      lock_guard<mutex> l(lock_);
+      ReleaseResources();
+    }
 
-    // Don't return final NULL until all instances have completed.  GetNext must wait for
-    // all instances to complete before ultimately signalling the end of execution via a
-    // NULL batch. After NULL is returned, the coordinator may tear down query state, and
-    // perform post-query finalization which might depend on the reports from all
-    // backends.
-    //
-    // TODO: Waiting should happen in TearDown() (and then we wouldn't need to call
-    // CloseConsumer() here). See IMPALA-4275 for details.
+    // wait for all backends to complete before computing the summary
+    // TODO: relocate this so GetNext() won't have to wait for backends to complete?
     RETURN_IF_ERROR(WaitForBackendCompletion());
     // if the query completed successfully, compute the summary
     if (query_status_.ok()) ComputeQuerySummary();
@@ -912,12 +909,15 @@ void Coordinator::Cancel(const Status* cause) {
   // should explicitly pass Status::OK()). Fragment instances may be cancelled at the end
   // of a successful query. Need to clean up relationship between query_status_ here and
   // in QueryExecState. See IMPALA-4279.
-  query_status_ = (cause != NULL && !cause->ok()) ? *cause : Status::CANCELLED;
+  query_status_ = (cause != nullptr && !cause->ok()) ? *cause : Status::CANCELLED;
   CancelInternal();
 }
 
 void Coordinator::CancelInternal() {
   VLOG_QUERY << "Cancel() query_id=" << query_id();
+  // TODO: remove when restructuring cancellation, which should happen automatically
+  // as soon as the coordinator knows that the query is finished
+  DCHECK(!query_status_.ok());
 
   int num_cancelled = 0;
   for (BackendState* backend_state: backend_states_) {
@@ -931,6 +931,8 @@ void Coordinator::CancelInternal() {
 
   // Report the summary with whatever progress the query made before being cancelled.
   ComputeQuerySummary();
+
+  ReleaseResources();
 }
 
 Status Coordinator::UpdateBackendExecStatus(const TReportExecStatusParams& params) {
@@ -1076,11 +1078,9 @@ string Coordinator::GetErrorLog() {
   return PrintErrorMapToString(merged);
 }
 
-// TODO: call this as soon as it's clear that we won't reference the state
-// anymore, ie, in CancelInternal() and when GetNext() hits eos
-void Coordinator::TearDown() {
-  DCHECK(!torn_down_) << "Coordinator::TearDown() must not be called twice";
-  torn_down_ = true;
+void Coordinator::ReleaseResources() {
+  if (released_resources_) return;
+  released_resources_ = true;
   if (filter_routing_table_.size() > 0) {
     query_profile_->AddInfoString("Final filter table", FilterDebugString());
   }
@@ -1094,20 +1094,13 @@ void Coordinator::TearDown() {
   }
   // This may be NULL while executing UDFs.
   if (filter_mem_tracker_.get() != nullptr) {
+    // TODO: move this elsewhere, this isn't releasing resources (it's dismantling
+    // control structures)
     filter_mem_tracker_->UnregisterFromParent();
-    filter_mem_tracker_.reset();
   }
   // Need to protect against failed Prepare(), where root_sink() would not be set.
   if (coord_sink_ != nullptr) {
     coord_sink_->CloseConsumer();
-    coord_sink_ = nullptr;
-  }
-  coord_instance_ = nullptr;
-  if (query_state_ != nullptr) {
-    // Tear down the query state last - other members like 'filter_mem_tracker_'
-    // may reference objects with query lifetime, like the query MemTracker.
-    ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(query_state_);
-    query_state_ = nullptr;
   }
 }
 
