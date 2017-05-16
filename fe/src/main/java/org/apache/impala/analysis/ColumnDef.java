@@ -41,18 +41,19 @@ import org.apache.kudu.ColumnSchema.CompressionAlgorithm;
 import org.apache.kudu.ColumnSchema.Encoding;
 
 /**
- * Represents a column definition in a CREATE/ALTER TABLE/VIEW statement.
+ * Represents a column definition in a CREATE/ALTER TABLE/VIEW/COLUMN statement.
  * Column definitions in CREATE/ALTER TABLE statements require a column type,
  * whereas column definitions in CREATE/ALTER VIEW statements infer the column type from
- * the corresponding view definition. All column definitions have an optional comment.
+ * the corresponding view definition, and ALTER COLUMN statements take the existing type
+ * of the target column. All column definitions have an optional comment.
  * Since a column definition refers a column stored in the Metastore, the column name
  * must be valid according to the Metastore's rules (see @MetaStoreUtils). A number of
  * additional column options may be specified for Kudu tables.
  */
 public class ColumnDef {
   private final String colName_;
-  // Required in CREATE/ALTER TABLE stmts. Set to NULL in CREATE/ALTER VIEW stmts,
-  // for which we setType() after analyzing the defining view definition stmt.
+  // Required in CREATE/ALTER TABLE stmts. Set to NULL in CREATE/ALTER VIEW/ALTER COLUMN
+  // stmts, for which we setType() during analysis.
   private final TypeDef typeDef_;
   private Type type_;
   private String comment_;
@@ -182,6 +183,7 @@ public class ColumnDef {
   public boolean isExplicitNotNullable() { return isNullabilitySet() && !isNullable_; }
 
   public boolean hasDefaultValue() { return defaultValue_ != null; }
+  public Expr getDefaultValue() { return defaultValue_; }
 
   public void analyze(Analyzer analyzer) throws AnalysisException {
     // Check whether the column name meets the Metastore's requirements.

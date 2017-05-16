@@ -358,6 +358,43 @@ class TestKuduOperations(KuduTestSuite):
         kudu_client.delete_table(name)
 
 
+  def test_column_storage_attributes(self, cursor, unique_database):
+    """Tests that for every valid combination of column type, encoding, and compression,
+       we can insert a value and scan it back from Kudu."""
+    # This test takes about 2min and is unlikely to break, so only run it in exhaustive.
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip("Only runs in exhaustive to reduce core time.")
+    table_name = "%s.storage_attrs" % unique_database
+    types = ['boolean', 'tinyint', 'smallint', 'int', 'bigint', 'float', 'double', \
+        'string', 'timestamp']
+
+    create_query = "create table %s (id int primary key" % table_name
+    for t in types:
+      create_query += ", %s_col %s" % (t, t)
+    create_query += ") partition by hash(id) partitions 16 stored as kudu"
+    cursor.execute(create_query)
+
+    encodings = ['AUTO_ENCODING', 'PLAIN_ENCODING', 'PREFIX_ENCODING', 'GROUP_VARINT', \
+        'RLE', 'DICT_ENCODING', 'BIT_SHUFFLE']
+    compressions = ['DEFAULT_COMPRESSION', 'NO_COMPRESSION', 'SNAPPY', 'LZ4', 'ZLIB']
+    i = 0
+    for e in encodings:
+      for c in compressions:
+        for t in types:
+          try:
+            cursor.execute("""alter table %s alter column %s_col
+                set encoding %s compression %s""" % (table_name, t, e, c))
+          except Exception as err:
+            assert "encoding %s not supported for type" % e in str(err)
+        cursor.execute("""insert into %s values (%s, true, 0, 0, 0, 0, 0, 0, '0',
+            cast('2009-01-01' as timestamp))""" % (table_name, i))
+        cursor.execute("select * from %s where id = %s" % (table_name, i))
+        assert cursor.fetchall() == \
+            [(i, True, 0, 0, 0, 0, 0.0, 0.0, '0', datetime(2009, 1, 1, 0, 0))]
+        i += 1
+    cursor.execute("select count(*) from %s" % table_name)
+    print cursor.fetchall() == [(i, )]
+
 class TestCreateExternalTable(KuduTestSuite):
 
   def test_external_timestamp_default_value(self, cursor, kudu_client, unique_database):

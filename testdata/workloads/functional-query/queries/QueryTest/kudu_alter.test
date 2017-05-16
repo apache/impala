@@ -455,3 +455,95 @@ show range partitions ts_ranges
 ---- TYPES
 STRING
 ====
+---- QUERY
+# add a default to a row that didn't already have one
+alter table kudu_tbl_to_alter alter column name set default 'name_default';
+# change a column's default
+alter table kudu_tbl_to_alter alter column new_col1 set default 10 + 5;
+====
+---- QUERY
+# check that the above defaults are applied
+insert into kudu_tbl_to_alter (id, last_name, new_col4)
+values (7, 'test', 8)
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- DML_RESULTS: kudu_tbl_to_alter
+2,'test',1,100,'NULL',-1
+3,'test',10,1000,'NULL',-1
+4,'test',1,100,'NULL',NULL
+5,'test',2,200,'names',1
+6,'test',3,300,'NULL',-1
+7,'name_default',15,1000,'test',8
+---- LABELS
+ID,NAME,NEW_COL1,NEW_COL2,LAST_NAME,NEW_COL4
+---- TYPES
+INT,STRING,INT,BIGINT,STRING,INT
+====
+---- QUERY
+# remove a default
+alter table kudu_tbl_to_alter alter column new_col2 drop default
+====
+---- QUERY
+# now that new_col2 doesn't have a default, it must have a value specified
+insert into kudu_tbl_to_alter (id) values (0)
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 1
+---- CATCH
+Missing values for column that is not nullable and has no default value new_col2
+====
+---- QUERY
+# set a non-nullable column's default to null, which is equivalent to 'drop default'
+# this is consistent with the behavior of Postgres
+alter table kudu_tbl_to_alter alter column new_col1 set default null
+====
+---- QUERY
+# since new_col1 can't take its default of null, it must have a value specified
+insert into kudu_tbl_to_alter (id, new_col2) values (0, 0)
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 1
+---- CATCH
+Missing values for column that is not nullable and has no default value new_col1
+====
+---- QUERY
+# set storage attributes for a key column
+alter table kudu_tbl_to_alter alter column id
+  set encoding rle compression snappy block_size 100;
+# set storage attributes for a non-key column
+alter table kudu_tbl_to_alter alter column new_col4
+  set encoding plain_encoding compression lz4 block_size 1000;
+describe kudu_tbl_to_alter;
+---- LABELS
+NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+---- RESULTS
+'id','int','','true','false','','RLE','SNAPPY','100'
+'last_name','string','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'name','string','','false','true','name_default','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'new_col1','int','','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'new_col2','bigint','','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'new_col4','int','','false','true','-1','PLAIN_ENCODING','LZ4','1000'
+---- TYPES
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+# check that we can insert and scan after the storage attribute changes
+insert into kudu_tbl_to_alter (id, name, new_col1, new_col2, last_name, new_col4)
+values (8, 'nine', 10, 11, 'twelve', 13)
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- DML_RESULTS: kudu_tbl_to_alter
+2,'test',1,100,'NULL',-1
+3,'test',10,1000,'NULL',-1
+4,'test',1,100,'NULL',NULL
+5,'test',2,200,'names',1
+6,'test',3,300,'NULL',-1
+7,'name_default',15,1000,'test',8
+8,'nine',10,11,'twelve',13
+---- LABELS
+ID,NAME,NEW_COL1,NEW_COL2,LAST_NAME,NEW_COL4
+---- TYPES
+INT,STRING,INT,BIGINT,STRING,INT
+====

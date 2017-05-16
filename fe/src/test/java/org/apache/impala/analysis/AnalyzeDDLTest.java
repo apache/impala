@@ -478,7 +478,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // Cannot ALTER TABLE CHANGE COLUMN on an HBase table.
     AnalysisError("alter table functional_hbase.alltypes CHANGE COLUMN int_col i int",
-        "ALTER TABLE CHANGE COLUMN not currently supported on HBase tables.");
+        "ALTER TABLE CHANGE/ALTER COLUMN not currently supported on HBase tables.");
   }
 
   @Test
@@ -1127,6 +1127,35 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Cannot ALTER VIEW a able.
     AnalysisError("alter view functional.alltypes rename to new_alltypes",
         "ALTER VIEW not allowed on a table: functional.alltypes");
+  }
+
+  @Test
+  public void TestAlterTableAlterColumn() throws AnalysisException {
+    AnalyzesOk("alter table functional_kudu.alltypes alter int_col set default 0");
+    AnalyzesOk("alter table functional_kudu.alltypes alter int_col set " +
+        "compression LZ4 encoding RLE");
+    AnalyzesOk("alter table functional.alltypes alter int_col set comment 'a'");
+    AnalyzesOk("alter table functional_kudu.alltypes alter int_col drop default");
+
+    AnalysisError("alter table functional_kudu.alltypes alter id set default 0",
+        "Cannot set default value for primary key column 'id'");
+    AnalysisError("alter table functional_kudu.alltypes alter id drop default",
+        "Cannot drop default value for primary key column 'id'");
+    AnalysisError("alter table functional_kudu.alltypes alter int_col set default 'a'",
+        "Default value 'a' (type: STRING) is not compatible with column 'int_col' " +
+        "(type: INT)");
+    AnalysisError("alter table functional_kudu.alltypes alter int_col set " +
+        "encoding rle compression error", "Unsupported compression algorithm 'ERROR'");
+    AnalysisError("alter table functional_kudu.alltypes alter int_col set primary key",
+        "Altering a column to be a primary key is not supported.");
+    AnalysisError("alter table functional_kudu.alltypes alter int_col set not null",
+        "Altering the nullability of a column is not supported.");
+    AnalysisError("alter table functional_kudu.alltypes alter int_col set comment 'a'",
+        "Kudu does not support column comments.");
+    AnalysisError("alter table functional.alltypes alter int_col set compression lz4",
+        "Unsupported column options for non-Kudu table: 'int_col INT COMPRESSION LZ4'");
+    AnalysisError("alter table functional.alltypes alter int_col drop default",
+        "Unsupported column option for non-Kudu table: DROP DEFAULT");
   }
 
   void checkComputeStatsStmt(String stmt) throws AnalysisException {
@@ -1981,8 +2010,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Unsupported column options
     AnalysisError("alter table functional_kudu.testtbl change column zip zip_code int " +
         "encoding rle compression lz4 default 90000", "Unsupported column options in " +
-        "ALTER TABLE CHANGE COLUMN statement: zip_code INT ENCODING RLE COMPRESSION " +
-        "LZ4 DEFAULT 90000");
+        "ALTER TABLE CHANGE COLUMN statement: 'zip_code INT ENCODING RLE COMPRESSION " +
+        "LZ4 DEFAULT 90000'. Use ALTER TABLE ALTER COLUMN instead.");
+    AnalysisError(
+        "alter table functional_kudu.testtbl change column zip zip int comment 'comment'",
+        "Kudu does not support column comments.");
     // Changing the column type is not supported for Kudu tables
     AnalysisError("alter table functional_kudu.testtbl change column zip zip bigint",
         "Cannot change the type of a Kudu column using an ALTER TABLE CHANGE COLUMN " +

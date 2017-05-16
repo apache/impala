@@ -412,17 +412,59 @@ public class KuduCatalogOpExecutor {
   }
 
   /**
-   * Changes the name of column.
+   * Updates the column matching 'colName' to have the name and options specified in
+   * 'newCol'. Setting comments or updating the type, primary key status, or nullability
+   * are not currently supported by Kudu.
+   *
+   * For the storage attrbiutes - encoding, compression, and block size - Kudu does not
+   * rewrite old rowsets to have these attributes during the alter. They are applied to
+   * new rowsets as they are written out, and possibly to old rowsets if they are
+   * compacted into new rowsets depending on cost based decisions Kudu makes.
    */
-  public static void renameColumn(KuduTable tbl, String oldName, TColumn newCol)
+  public static void alterColumn(KuduTable tbl, String colName, TColumn newCol)
       throws ImpalaRuntimeException {
-    Preconditions.checkState(!Strings.isNullOrEmpty(oldName));
+    Preconditions.checkState(!Strings.isNullOrEmpty(colName));
     Preconditions.checkNotNull(newCol);
-    KuduColumn col = (KuduColumn) tbl.getColumn(oldName);
+    Preconditions.checkState(!newCol.isSetComment());
+    Preconditions.checkState(!newCol.isIs_key());
+    Preconditions.checkState(!newCol.isSetIs_nullable());
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(
+          String.format("Altering column '%s' to '%s'", colName, newCol.toString()));
+    }
+    KuduColumn col = (KuduColumn) tbl.getColumn(colName);
+    String kuduColName = col.getKuduName();
     AlterTableOptions alterTableOptions = new AlterTableOptions();
-    alterTableOptions.renameColumn(col.getKuduName(), newCol.getColumnName());
-    String errMsg = String.format("Error renaming column %s to %s " +
-        "for Kudu table %s", oldName, newCol.getColumnName(), tbl.getName());
+
+    if (newCol.isSetDefault_value()) {
+      org.apache.kudu.Type kuduType =
+          KuduUtil.fromImpalaType(Type.fromThrift(newCol.getColumnType()));
+      Object defaultValue = KuduUtil.getKuduDefaultValue(
+          newCol.getDefault_value(), kuduType, newCol.getColumnName());
+      if (defaultValue == null) {
+        alterTableOptions.removeDefault(kuduColName);
+      } else {
+        alterTableOptions.changeDefault(kuduColName, defaultValue);
+      }
+    }
+    if (newCol.isSetBlock_size()) {
+      alterTableOptions.changeDesiredBlockSize(kuduColName, newCol.getBlock_size());
+    }
+    if (newCol.isSetEncoding()) {
+      alterTableOptions.changeEncoding(
+          kuduColName, KuduUtil.fromThrift(newCol.getEncoding()));
+    }
+    if (newCol.isSetCompression()) {
+      alterTableOptions.changeCompressionAlgorithm(
+          kuduColName, KuduUtil.fromThrift(newCol.getCompression()));
+    }
+    String newColName = newCol.getColumnName();
+    if (!newColName.toLowerCase().equals(colName.toLowerCase())) {
+      alterTableOptions.renameColumn(kuduColName, newColName);
+    }
+
+    String errMsg = String.format(
+        "Error altering column %s in Kudu table %s", colName, tbl.getName());
     alterKuduTable(tbl, alterTableOptions, errMsg);
   }
 

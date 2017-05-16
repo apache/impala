@@ -2355,6 +2355,23 @@ public class ParserTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestAlterTableAlterColumn() {
+    for (String column : Lists.newArrayList("", "COLUMN")) {
+      ParsesOk(String.format("ALTER TABLE foo ALTER %s bar SET default 0", column));
+      ParsesOk(String.format(
+          "ALTER TABLE foo ALTER %s bar SET default 0 block_size 0", column));
+      ParsesOk(String.format("ALTER TABLE foo ALTER %s bar DROP default", column));
+
+      ParserError(String.format("ALTER TABLE foo ALTER %s bar", column));
+      ParserError(String.format("ALTER TABLE foo ALTER %s bar SET default", column));
+      ParserError(String.format("ALTER TABLE foo ALTER %s bar SET error 0", column));
+      ParserError(
+          String.format("ALTER TABLE foo ALTER %s bar SET default 0 error 0", column));
+      ParserError(String.format("ALTER TABLE foo ALTER %s bar DROP comment", column));
+    }
+  }
+
+  @Test
   public void TestCreateTable() {
     // Support unqualified and fully-qualified table names
     ParsesOk("CREATE TABLE Foo (i int)");

@@ -59,7 +59,7 @@ enum TAlterTableType {
   ADD_REPLACE_COLUMNS,
   ADD_PARTITION,
   ADD_DROP_RANGE_PARTITION,
-  CHANGE_COLUMN,
+  ALTER_COLUMN,
   DROP_COLUMN,
   DROP_PARTITION,
   RENAME_TABLE,
@@ -231,8 +231,8 @@ struct TAlterTableDropPartitionParams {
   3: required bool purge
 }
 
-// Parameters for ALTER TABLE CHANGE COLUMN commands
-struct TAlterTableChangeColParams {
+// Parameters for ALTER TABLE ALTER/CHANGE COLUMN commands
+struct TAlterTableAlterColParams {
   // Target column to change.
   1: required string col_name
 
@@ -323,8 +323,8 @@ struct TAlterTableParams {
   // Parameters for ALTER TABLE ADD PARTITION
   5: optional TAlterTableAddPartitionParams add_partition_params
 
-  // Parameters for ALTER TABLE CHANGE COLUMN
-  6: optional TAlterTableChangeColParams change_col_params
+  // Parameters for ALTER TABLE ALTER/CHANGE COLUMN
+  6: optional TAlterTableAlterColParams alter_col_params
 
   // Parameters for ALTER TABLE DROP COLUMN
   7: optional TAlterTableDropColParams drop_col_params

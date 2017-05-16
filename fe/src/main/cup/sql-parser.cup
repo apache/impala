@@ -958,7 +958,7 @@ alter_tbl_stmt ::=
   :}
   | KW_ALTER KW_TABLE table_name:table KW_CHANGE opt_kw_column ident_or_default:col_name
     column_def:col_def
-  {: RESULT = new AlterTableChangeColStmt(table, col_name, col_def); :}
+  {: RESULT = AlterTableAlterColStmt.createChangeColStmt(table, col_name, col_def); :}
   | KW_ALTER KW_TABLE table_name:table KW_DROP if_exists_val:if_exists
     partition_set:partitions purge_val:purge
   {: RESULT = new AlterTableDropPartitionStmt(table, partitions, if_exists, purge); :}
@@ -1005,6 +1005,15 @@ alter_tbl_stmt ::=
   :}
   | KW_ALTER KW_TABLE table_name:table KW_RECOVER KW_PARTITIONS
   {: RESULT = new AlterTableRecoverPartitionsStmt(table); :}
+  | KW_ALTER KW_TABLE table_name:table KW_ALTER opt_kw_column ident_or_default:col_name
+    KW_SET column_options_map:options
+  {:
+    RESULT = new AlterTableAlterColStmt(
+        table, col_name, new ColumnDef(col_name, null, options));
+  :}
+  | KW_ALTER KW_TABLE table_name:table KW_ALTER opt_kw_column ident_or_default:col_name
+    KW_DROP KW_DEFAULT
+  {: RESULT = AlterTableAlterColStmt.createDropDefaultStmt(table, col_name); :}
   ;
 
 table_property_type ::=

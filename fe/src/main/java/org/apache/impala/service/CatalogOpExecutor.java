@@ -92,7 +92,7 @@ import org.apache.impala.thrift.JniCatalogConstants;
 import org.apache.impala.thrift.TAlterTableAddDropRangePartitionParams;
 import org.apache.impala.thrift.TAlterTableAddPartitionParams;
 import org.apache.impala.thrift.TAlterTableAddReplaceColsParams;
-import org.apache.impala.thrift.TAlterTableChangeColParams;
+import org.apache.impala.thrift.TAlterTableAlterColParams;
 import org.apache.impala.thrift.TAlterTableDropColParams;
 import org.apache.impala.thrift.TAlterTableDropPartitionParams;
 import org.apache.impala.thrift.TAlterTableParams;
@@ -406,10 +406,10 @@ public class CatalogOpExecutor {
           alterTableDropCol(tbl, dropColParams.getCol_name());
           reloadTableSchema = true;
           break;
-        case CHANGE_COLUMN:
-          TAlterTableChangeColParams changeColParams = params.getChange_col_params();
-          alterTableChangeCol(tbl, changeColParams.getCol_name(),
-              changeColParams.getNew_col_def());
+        case ALTER_COLUMN:
+          TAlterTableAlterColParams alterColParams = params.getAlter_col_params();
+          alterTableAlterCol(tbl, alterColParams.getCol_name(),
+              alterColParams.getNew_col_def());
           reloadTableSchema = true;
           break;
         case DROP_PARTITION:
@@ -531,7 +531,7 @@ public class CatalogOpExecutor {
   private boolean altersKuduTable(TAlterTableType type) {
     return type == TAlterTableType.ADD_REPLACE_COLUMNS
         || type == TAlterTableType.DROP_COLUMN
-        || type == TAlterTableType.CHANGE_COLUMN
+        || type == TAlterTableType.ALTER_COLUMN
         || type == TAlterTableType.ADD_DROP_RANGE_PARTITION;
   }
 
@@ -553,10 +553,10 @@ public class CatalogOpExecutor {
         KuduCatalogOpExecutor.dropColumn((KuduTable) tbl,
             dropColParams.getCol_name());
         break;
-      case CHANGE_COLUMN:
-        TAlterTableChangeColParams changeColParams = params.getChange_col_params();
-        KuduCatalogOpExecutor.renameColumn((KuduTable) tbl,
-            changeColParams.getCol_name(), changeColParams.getNew_col_def());
+      case ALTER_COLUMN:
+        TAlterTableAlterColParams alterColParams = params.getAlter_col_params();
+        KuduCatalogOpExecutor.alterColumn((KuduTable) tbl, alterColParams.getCol_name(),
+            alterColParams.getNew_col_def());
         break;
       case ADD_DROP_RANGE_PARTITION:
         TAlterTableAddDropRangePartitionParams partParams =
@@ -1862,7 +1862,7 @@ public class CatalogOpExecutor {
    * Changes the column definition of an existing column. This can be used to rename a
    * column, add a comment to a column, or change the datatype of a column.
    */
-  private void alterTableChangeCol(Table tbl, String colName,
+  private void alterTableAlterCol(Table tbl, String colName,
       TColumn newCol) throws ImpalaException {
     Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
     org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable().deepCopy();
