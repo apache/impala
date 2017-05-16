@@ -31,6 +31,10 @@ string GetHdfsErrorMsg(const string& prefix, const string& file) {
   string error_msg = GetStrErrMsg();
   stringstream ss;
   ss << prefix << file << "\n" << error_msg;
+  char* root_cause = hdfsGetLastExceptionRootCause();
+  if (root_cause != nullptr) {
+    ss << "\nRoot cause: " << root_cause;
+  }
   return ss.str();
 }
 

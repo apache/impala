@@ -126,7 +126,7 @@ void HdfsOp::Execute() const {
 
   if (err == -1 || !connection_status.ok()) {
     string error_msg =
-        connection_status.ok() ? GetStrErrMsg() : connection_status.GetDetail();
+        connection_status.ok() ? GetHdfsErrorMsg("", src_) : connection_status.GetDetail();
     AddError(error_msg);
   }
   op_set_->MarkOneOpDone();
