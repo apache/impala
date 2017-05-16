@@ -26,7 +26,6 @@
 #include <gflags/gflags.h>
 #include <string>
 
-#include "common/status.h"
 #include "udf/udf.h"
 #include "util/hash-util.h"
 
@@ -209,16 +208,8 @@ class TimestampValue {
   bool ToSubsecondUnixTime(double* unix_time) const;
 
   /// Converts from UTC to local time in-place. The caller must ensure the TimestampValue
-  /// this function is called upon has both a valid date and time. Returns Status::OK() if
-  /// conversion was successfull and an error Status otherwise. If conversion failed *this
-  /// is set to a ptime object initialized to not_a_date_time.
-  Status UtcToLocal();
-
-  /// Converts from UTC to given timezone in-place. Returns true if conversion was
-  /// successfull and false otherwise. If conversion failed *this is set to a ptime object
-  /// initialized to not_a_date_time.
-  bool FromUtc(const std::string& timezone_str);
-  bool FromUtc(boost::local_time::time_zone_ptr timezone);
+  /// this function is called upon has both a valid date and time.
+  void UtcToLocal();
 
   void set_date(const boost::gregorian::date d) { date_ = d; }
   void set_time(const boost::posix_time::time_duration t) { time_ = t; }

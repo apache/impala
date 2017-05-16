@@ -216,11 +216,6 @@ struct THdfsScanNode {
   // Map from SlotIds to the indices in TPlanNode.conjuncts that are eligible
   // for dictionary filtering.
   9: optional map<Types.TSlotId, list<i32>> dictionary_filter_conjuncts
-
-  // Specifies a time zone for adjusting timestamp values read from Parquet files written
-  // by parquet-mr. The actual value comes from "parquet.mr.int96.write.zone" table
-  // property. This is used for a Hive compatibilty fix.
-  10: optional string parquet_mr_write_zone
 }
 
 struct TDataSourceScanNode {

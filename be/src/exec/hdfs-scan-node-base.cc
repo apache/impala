@@ -88,8 +88,6 @@ HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const TPlanNode& tnode,
       min_max_tuple_desc_(nullptr),
       skip_header_line_count_(tnode.hdfs_scan_node.__isset.skip_header_line_count ?
           tnode.hdfs_scan_node.skip_header_line_count : 0),
-      parquet_mr_write_zone_(tnode.hdfs_scan_node.__isset.parquet_mr_write_zone ?
-          tnode.hdfs_scan_node.parquet_mr_write_zone : ""),
       tuple_id_(tnode.hdfs_scan_node.tuple_id),
       reader_context_(NULL),
       tuple_desc_(NULL),

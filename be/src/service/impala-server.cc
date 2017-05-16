@@ -121,10 +121,6 @@ DEFINE_string(default_query_options, "", "key=value pair of default query option
 DEFINE_int32(query_log_size, 25, "Number of queries to retain in the query log. If -1, "
     "the query log has unbounded size.");
 DEFINE_bool(log_query_to_file, true, "if true, logs completed query profiles to file.");
-DEFINE_bool(set_parquet_mr_int96_write_zone_to_utc_on_new_tables, false, "if true, sets "
-    "the parquet.mr.int96.write.zone table property to UTC for new tables created using "
-    "CREATE TABLE and CREATE TABLE LIKE <file>. You can find details in the "
-    "documentation.");
 
 DEFINE_int64(max_result_cache_size, 100000L, "Maximum number of query results a client "
     "may request to be cached on a per-query basis to support restarting fetches. This "

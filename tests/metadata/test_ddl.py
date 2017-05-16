@@ -368,7 +368,7 @@ class TestDdlStatements(TestDdlBase):
     self.client.execute("""create table {0} (i int)
     with serdeproperties ('s1'='s2', 's3'='s4')
     tblproperties ('p1'='v0', 'p1'='v1')""".format(fq_tbl_name))
-    properties = self.get_table_properties(fq_tbl_name)
+    properties = self._get_tbl_properties(fq_tbl_name)
 
     assert len(properties) == 2
     # The transient_lastDdlTime is variable, so don't verify the value.
@@ -376,19 +376,19 @@ class TestDdlStatements(TestDdlBase):
     del properties['transient_lastDdlTime']
     assert {'p1': 'v1'} == properties
 
-    properties = self.get_serde_properties(fq_tbl_name)
+    properties = self._get_serde_properties(fq_tbl_name)
     assert {'s1': 's2', 's3': 's4'} == properties
 
     # Modify the SERDEPROPERTIES using ALTER TABLE SET.
     self.client.execute("alter table {0} set serdeproperties "
         "('s1'='new', 's5'='s6')".format(fq_tbl_name))
-    properties = self.get_serde_properties(fq_tbl_name)
+    properties = self._get_serde_properties(fq_tbl_name)
     assert {'s1': 'new', 's3': 's4', 's5': 's6'} == properties
 
     # Modify the TBLPROPERTIES using ALTER TABLE SET.
     self.client.execute("alter table {0} set tblproperties "
         "('prop1'='val1', 'p2'='val2', 'p2'='val3', ''='')".format(fq_tbl_name))
-    properties = self.get_table_properties(fq_tbl_name)
+    properties = self._get_tbl_properties(fq_tbl_name)
 
     assert 'transient_lastDdlTime' in properties
     assert properties['p1'] == 'v1'

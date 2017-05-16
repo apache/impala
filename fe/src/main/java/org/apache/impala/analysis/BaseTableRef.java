@@ -20,8 +20,6 @@ package org.apache.impala.analysis;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.service.FeSupport;
-
 import com.google.common.base.Preconditions;
 
 /**
@@ -67,7 +65,6 @@ public class BaseTableRef extends TableRef {
     analyzeHints(analyzer);
     analyzeJoin(analyzer);
     analyzeSkipHeaderLineCount();
-    analyzeParquetMrWriteZone();
   }
 
   @Override
@@ -98,21 +95,5 @@ public class BaseTableRef extends TableRef {
     StringBuilder error = new StringBuilder();
     hdfsTable.parseSkipHeaderLineCount(error);
     if (error.length() > 0) throw new AnalysisException(error.toString());
-  }
-
-  /**
-   * Analyze the 'parquet.mr.int96.write.zone' property.
-   */
-  private void analyzeParquetMrWriteZone() throws AnalysisException {
-    Table table = getTable();
-    if (!(table instanceof HdfsTable)) return;
-    HdfsTable hdfsTable = (HdfsTable)table;
-
-    String timezone = hdfsTable.getParquetMrWriteZone();
-    if (timezone != null && !FeSupport.CheckIsValidTimeZone(timezone)) {
-      throw new AnalysisException(String.format(
-          "Invalid time zone in the '%s' table property: %s",
-          HdfsTable.TBL_PROP_PARQUET_MR_WRITE_ZONE, timezone));
-    }
   }
 }

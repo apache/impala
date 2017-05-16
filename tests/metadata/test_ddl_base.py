@@ -64,3 +64,26 @@ class TestDdlBase(ImpalaTestSuite):
         db_name, comment, WAREHOUSE)
     impala_client.execute(ddl)
     impala_client.close()
+
+  def _get_tbl_properties(self, table_name):
+    """Extracts the table properties mapping from the output of DESCRIBE FORMATTED"""
+    return self._get_properties('Table Parameters:', table_name)
+
+  def _get_serde_properties(self, table_name):
+    """Extracts the serde properties mapping from the output of DESCRIBE FORMATTED"""
+    return self._get_properties('Storage Desc Params:', table_name)
+
+  def _get_properties(self, section_name, table_name):
+    """Extracts the table properties mapping from the output of DESCRIBE FORMATTED"""
+    result = self.client.execute("describe formatted " + table_name)
+    match = False
+    properties = dict();
+    for row in result.data:
+      if section_name in row:
+        match = True
+      elif match:
+        row = row.split('\t')
+        if (row[1] == 'NULL'):
+          break
+        properties[row[1].rstrip()] = row[2].rstrip()
+    return properties

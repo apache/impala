@@ -30,7 +30,6 @@ import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableSetTblPropertiesParams;
 import org.apache.impala.thrift.TAlterTableType;
@@ -105,9 +104,6 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     // Analyze 'skip.header.line.format' property.
     analyzeSkipHeaderLineCount(getTargetTable(), tblProperties_);
 
-    // Analyze 'parquet.mr.int96.write.zone'
-    analyzeParquetMrWriteZone(getTargetTable(), tblProperties_);
-
     // Analyze 'sort.columns' property.
     analyzeSortColumns(getTargetTable(), tblProperties_);
   }
@@ -164,29 +160,6 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
       StringBuilder error = new StringBuilder();
       HdfsTable.parseSkipHeaderLineCount(tblProperties, error);
       if (error.length() > 0) throw new AnalysisException(error.toString());
-    }
-  }
-
-  /**
-   * Analyze the 'parquet.mr.int96.write.zone' property to make sure it is set to a valid
-   * value. It is looked up in 'tblProperties', which must not be null. If 'table' is not
-   * null, then the method ensures that 'parquet.mr.int96.write.zone' is supported for its
-   * table type. If it is null, then this check is omitted.
-   */
-  private static void analyzeParquetMrWriteZone(Table table,
-      Map<String, String> tblProperties) throws AnalysisException {
-    if (tblProperties.containsKey(HdfsTable.TBL_PROP_PARQUET_MR_WRITE_ZONE)) {
-      if (table != null && !(table instanceof HdfsTable)) {
-        throw new AnalysisException(String.format(
-            "Table property '%s' is only supported for HDFS tables.",
-            HdfsTable.TBL_PROP_PARQUET_MR_WRITE_ZONE));
-      }
-      String timezone = tblProperties.get(HdfsTable.TBL_PROP_PARQUET_MR_WRITE_ZONE);
-      if (!FeSupport.CheckIsValidTimeZone(timezone)) {
-        throw new AnalysisException(String.format(
-            "Invalid time zone in the '%s' table property: %s",
-            HdfsTable.TBL_PROP_PARQUET_MR_WRITE_ZONE, timezone));
-      }
     }
   }
 

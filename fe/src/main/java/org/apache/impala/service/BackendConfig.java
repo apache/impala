@@ -54,9 +54,6 @@ public class BackendConfig {
         !Strings.isNullOrEmpty(backendCfg_.principal);
   }
   public int getKuduClientTimeoutMs() { return backendCfg_.kudu_operation_timeout_ms; }
-  public boolean isSetParquetMrWriteZoneToUtcOnNewTables() {
-    return backendCfg_.set_parquet_mr_int96_write_zone_to_utc_on_new_tables;
-  }
 
   public int getImpalaLogLevel() { return backendCfg_.impala_log_lvl; }
   public int getNonImpalaJavaVlogLevel() { return backendCfg_.non_impala_java_vlog; }

@@ -23,13 +23,10 @@ import java.util.Map;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaParseException;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaRuntimeException;
-import org.apache.impala.service.BackendConfig;
-import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TTableName;
@@ -180,24 +177,6 @@ public class CreateTableStmt extends StatementBase {
             "An Avro table requires column definitions or an Avro schema.");
       }
       AvroSchemaUtils.setFromSerdeComment(getColumnDefs());
-    }
-
-    if (getTblProperties().containsKey(HdfsTable.TBL_PROP_PARQUET_MR_WRITE_ZONE)) {
-      if (getFileFormat() == THdfsFileFormat.KUDU) {
-        throw new AnalysisException(String.format(
-            "Table property '%s' is only supported for HDFS tables.",
-            HdfsTable.TBL_PROP_PARQUET_MR_WRITE_ZONE));
-      }
-      String timezone = getTblProperties().get(HdfsTable.TBL_PROP_PARQUET_MR_WRITE_ZONE);
-      if (!FeSupport.CheckIsValidTimeZone(timezone)) {
-        throw new AnalysisException(String.format(
-            "Invalid time zone in the '%s' table property: %s",
-            HdfsTable.TBL_PROP_PARQUET_MR_WRITE_ZONE, timezone));
-      }
-    } else if (BackendConfig.INSTANCE.isSetParquetMrWriteZoneToUtcOnNewTables()) {
-      if (getFileFormat() != THdfsFileFormat.KUDU) {
-        getTblProperties().put(HdfsTable.TBL_PROP_PARQUET_MR_WRITE_ZONE, "UTC");
-      }
     }
   }
 

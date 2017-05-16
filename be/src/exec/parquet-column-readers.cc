@@ -27,7 +27,6 @@
 #include "exec/parquet-metadata-utils.h"
 #include "exec/parquet-scratch-tuple-batch.h"
 #include "exec/read-write-util.h"
-#include "exprs/timezone_db.h"
 #include "rpc/thrift-util.h"
 #include "runtime/collection-value-builder.h"
 #include "runtime/tuple-row.h"
@@ -212,9 +211,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
       const SlotDescriptor* slot_desc)
     : BaseScalarColumnReader(parent, node, slot_desc),
       dict_decoder_init_(false),
-      needs_conversion_(false),
-      timezone_(NULL),
-      is_timestamp_dependent_timezone_(false) {
+      needs_conversion_(false) {
     if (!MATERIALIZED) {
       // We're not materializing any values, just counting them. No need (or ability) to
       // initialize state used to materialize values.
@@ -231,25 +228,12 @@ class ScalarColumnReader : public BaseScalarColumnReader {
     } else {
       fixed_len_size_ = -1;
     }
-    needs_conversion_ = slot_desc_->type().type == TYPE_CHAR || (
-          slot_desc_->type().type == TYPE_TIMESTAMP &&
-          parent->file_version_.application == "parquet-mr" &&
-          parent_->scan_node_->parquet_mr_write_zone() != "UTC" && (
-            !parent_->scan_node_->parquet_mr_write_zone().empty() ||
-            FLAGS_convert_legacy_hive_parquet_utc_timestamps
-          )
-        );
-
-    if (needs_conversion_ && slot_desc_->type().type == TYPE_TIMESTAMP &&
-        !parent_->scan_node_->parquet_mr_write_zone().empty()) {
-      is_timestamp_dependent_timezone_ = TimezoneDatabase::IsTimestampDependentTimezone(
-          parent_->scan_node_->parquet_mr_write_zone());
-      if (!is_timestamp_dependent_timezone_) {
-        timezone_ = TimezoneDatabase::FindTimezone(
-            parent_->scan_node_->parquet_mr_write_zone());
-      }
-      DCHECK_EQ(is_timestamp_dependent_timezone_, (timezone_ == NULL));
-    }
+    needs_conversion_ = slot_desc_->type().type == TYPE_CHAR ||
+        // TODO: Add logic to detect file versions that have unconverted TIMESTAMP
+        // values. Currently all versions have converted values.
+        (FLAGS_convert_legacy_hive_parquet_utc_timestamps &&
+        slot_desc_->type().type == TYPE_TIMESTAMP &&
+        parent->file_version_.application == "parquet-mr");
   }
 
   virtual ~ScalarColumnReader() { }
@@ -557,16 +541,6 @@ class ScalarColumnReader : public BaseScalarColumnReader {
   /// true if decoded values must be converted before being written to an output tuple.
   bool needs_conversion_;
 
-  /// Used to cache the timezone object corresponding to the "parquet.mr.int96.write.zone"
-  /// table property to avoid repeated calls to TimezoneDatabase::FindTimezone(). Set to
-  /// NULL if the table property is not set, or if it is set to UTC or to a timestamp
-  /// dependent timezone.
-  boost::local_time::time_zone_ptr timezone_;
-
-  /// true if "parquet.mr.int96.write.zone" table property is set to a timestamp dependent
-  /// timezone.
-  bool is_timestamp_dependent_timezone_;
-
   /// The size of this column with plain encoding for FIXED_LEN_BYTE_ARRAY, or
   /// the max length for VARCHAR columns. Unused otherwise.
   int fixed_len_size_;
@@ -610,63 +584,13 @@ inline bool ScalarColumnReader<TimestampValue, true>::NeedsConversionInline() co
   return needs_conversion_;
 }
 
-/// Sets timestamp conversion error message in 'scanner_status'. Returns false if the
-/// execution should be aborted, otherwise returns true.
-bool __attribute__((noinline)) SetTimestampConversionError(HdfsScanNodeBase* scan_node,
-    RuntimeState* scanner_state, const TimestampValue* tv, const string& timezone,
-    const string& detail, Status* scanner_status) {
-  ErrorMsg msg(TErrorCode::PARQUET_MR_TIMESTAMP_CONVERSION_FAILED, tv->ToString(),
-      timezone, scan_node->hdfs_table()->fully_qualified_name());
-  if (!detail.empty()) msg.AddDetail(detail);
-  Status status = scanner_state->LogOrReturnError(msg);
-  if (!status.ok()) {
-    *scanner_status = status;
-    return false;
-  }
-  return true;
-}
-
 template<>
 bool ScalarColumnReader<TimestampValue, true>::ConvertSlot(
-const TimestampValue* src, TimestampValue* dst, MemPool* pool) {
-  // Conversion should only happen when "parquet.mr.int96.write.zone" table property is
-  // not set to "UTC"
-  DCHECK_NE(parent_->scan_node_->parquet_mr_write_zone(), "UTC");
-
+    const TimestampValue* src, TimestampValue* dst, MemPool* pool) {
+  // Conversion should only happen when this flag is enabled.
+  DCHECK(FLAGS_convert_legacy_hive_parquet_utc_timestamps);
   *dst = *src;
-  if (LIKELY(dst->HasDateAndTime())) {
-    if (LIKELY(timezone_ != NULL)) {
-      // Not a timestamp specific timezone. Convert timestamp to the timezone object
-      // cached in timezone_.
-      if (UNLIKELY(!dst->FromUtc(timezone_))) {
-        if (!SetTimestampConversionError(parent_->scan_node_, parent_->state_,
-            src, parent_->scan_node_->parquet_mr_write_zone(), "",
-            &parent_->parse_status_)) {
-          return false;
-        }
-      }
-    } else if (UNLIKELY(is_timestamp_dependent_timezone_)) {
-      // Timestamp specific timezone (such as Moscow pre 2011).
-      // Call timestamp conversion function with the timezone string.
-      if (UNLIKELY(!dst->FromUtc(parent_->scan_node_->parquet_mr_write_zone()))) {
-        if (!SetTimestampConversionError(parent_->scan_node_, parent_->state_,
-            src, parent_->scan_node_->parquet_mr_write_zone(), "",
-            &parent_->parse_status_)) {
-          return false;
-        }
-      }
-    } else {
-      DCHECK(parent_->scan_node_->parquet_mr_write_zone().empty());
-      DCHECK(FLAGS_convert_legacy_hive_parquet_utc_timestamps);
-      Status s = dst->UtcToLocal();
-      if (UNLIKELY(!s.ok())) {
-        if (!SetTimestampConversionError(parent_->scan_node_, parent_->state_,
-            src, "localtime", s.GetDetail(), &parent_->parse_status_)) {
-          return false;
-        }
-      }
-    }
-  }
+  if (dst->HasDateAndTime()) dst->UtcToLocal();
   return true;
 }
 

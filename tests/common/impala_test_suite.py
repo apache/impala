@@ -507,29 +507,6 @@ class ImpalaTestSuite(BaseTestSuite):
     assert not result.success, "No failure encountered for query %s" % query
     return result
 
-  def _get_properties(self, section_name, table_name):
-    """Extracts the table properties mapping from the output of DESCRIBE FORMATTED"""
-    result = self.client.execute("describe formatted " + table_name)
-    match = False
-    properties = dict();
-    for row in result.data:
-      if section_name in row:
-        match = True
-      elif match:
-        row = row.split('\t')
-        if (row[1] == 'NULL'):
-          break
-        properties[row[1].rstrip()] = row[2].rstrip()
-    return properties
-
-  def get_table_properties(self, table_name):
-    """Extracts the table properties mapping from the output of DESCRIBE FORMATTED"""
-    return self._get_properties('Table Parameters:', table_name)
-
-  def get_serde_properties(self, table_name):
-    """Extracts the serde properties mapping from the output of DESCRIBE FORMATTED"""
-    return self._get_properties('Storage Desc Params:', table_name)
-
   @execute_wrapper
   def execute_query(self, query, query_options=None):
     return self.__execute_query(self.client, query, query_options)
