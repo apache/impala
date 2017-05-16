@@ -76,7 +76,8 @@ public class KuduCatalogOpExecutor {
       LOG.trace(String.format("Creating table '%s' in master '%s'", kuduTableName,
           masterHosts));
     }
-    try (KuduClient kudu = KuduUtil.createKuduClient(masterHosts)) {
+    KuduClient kudu = KuduUtil.getKuduClient(masterHosts);
+    try {
       // TODO: The IF NOT EXISTS case should be handled by Kudu to ensure atomicity.
       // (see KUDU-1710).
       if (kudu.tableExists(kuduTableName)) {
@@ -213,7 +214,8 @@ public class KuduCatalogOpExecutor {
       LOG.trace(String.format("Dropping table '%s' from master '%s'", tableName,
           masterHosts));
     }
-    try (KuduClient kudu = KuduUtil.createKuduClient(masterHosts)) {
+    KuduClient kudu = KuduUtil.getKuduClient(masterHosts);
+    try {
       Preconditions.checkState(!Strings.isNullOrEmpty(tableName));
       // TODO: The IF EXISTS case should be handled by Kudu to ensure atomicity.
       // (see KUDU-1710).
@@ -244,7 +246,8 @@ public class KuduCatalogOpExecutor {
       LOG.trace(String.format("Loading schema of table '%s' from master '%s'",
           kuduTableName, masterHosts));
     }
-    try (KuduClient kudu = KuduUtil.createKuduClient(masterHosts)) {
+    KuduClient kudu = KuduUtil.getKuduClient(masterHosts);
+    try {
       if (!kudu.tableExists(kuduTableName)) {
         throw new ImpalaRuntimeException(String.format("Table does not exist in Kudu: " +
             "'%s'", kuduTableName));
@@ -286,7 +289,8 @@ public class KuduCatalogOpExecutor {
     Preconditions.checkState(!Strings.isNullOrEmpty(masterHosts));
     String kuduTableName = properties.get(KuduTable.KEY_TABLE_NAME);
     Preconditions.checkState(!Strings.isNullOrEmpty(kuduTableName));
-    try (KuduClient kudu = KuduUtil.createKuduClient(masterHosts)) {
+    KuduClient kudu = KuduUtil.getKuduClient(masterHosts);
+    try {
       kudu.tableExists(kuduTableName);
     } catch (Exception e) {
       // TODO: This is misleading when there are other errors, e.g. timeouts.
@@ -305,7 +309,8 @@ public class KuduCatalogOpExecutor {
     alterTableOptions.renameTable(newName);
     String errMsg = String.format("Error renaming Kudu table " +
         "%s to %s", tbl.getKuduTableName(), newName);
-    try (KuduClient client = KuduUtil.createKuduClient(tbl.getKuduMasterHosts())) {
+    KuduClient client = KuduUtil.getKuduClient(tbl.getKuduMasterHosts());
+    try {
       client.alterTable(tbl.getKuduTableName(), alterTableOptions);
       if (!client.isAlterTableDone(newName)) {
         throw new ImpalaRuntimeException(errMsg + ": Kudu operation timed out");
@@ -475,7 +480,8 @@ public class KuduCatalogOpExecutor {
    */
   public static void alterKuduTable(KuduTable tbl, AlterTableOptions ato, String errMsg)
       throws ImpalaRuntimeException {
-    try (KuduClient client = KuduUtil.createKuduClient(tbl.getKuduMasterHosts())) {
+    KuduClient client = KuduUtil.getKuduClient(tbl.getKuduMasterHosts());
+    try {
       client.alterTable(tbl.getKuduTableName(), ato);
       if (!client.isAlterTableDone(tbl.getKuduTableName())) {
         throw new ImpalaRuntimeException(errMsg + ": Kudu operation timed out");

@@ -111,7 +111,8 @@ public class KuduScanNode extends ScanNode {
   public void init(Analyzer analyzer) throws ImpalaRuntimeException {
     conjuncts_ = orderConjunctsByCost(conjuncts_);
 
-    try (KuduClient client = KuduUtil.createKuduClient(kuduTable_.getKuduMasterHosts())) {
+    KuduClient client = KuduUtil.getKuduClient(kuduTable_.getKuduMasterHosts());
+    try {
       org.apache.kudu.client.KuduTable rpcTable =
           client.openTable(kuduTable_.getKuduTableName());
       validateSchema(rpcTable);

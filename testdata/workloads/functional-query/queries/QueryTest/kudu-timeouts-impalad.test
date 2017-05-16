@@ -1,3 +1,10 @@
+# TODO: enable this once we have a way to invalidate kudu clients (IMPALA-5685)
+#====
+#---- QUERY
+#show table stats functional_kudu.alltypestiny
+#---- CATCH
+#Error accessing Kudu for table stats
+#====
 ====
 ---- QUERY
 # Expected timeout while planning the scan node.
@@ -5,9 +12,4 @@
 select * from functional_kudu.alltypes
 ---- CATCH
 Unable to initialize the Kudu scan node
-====
----- QUERY
-show table stats functional_kudu.alltypes
----- CATCH
-Error accessing Kudu for table stats
 ====

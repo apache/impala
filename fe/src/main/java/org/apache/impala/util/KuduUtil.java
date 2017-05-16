@@ -20,6 +20,7 @@ package org.apache.impala.util;
 import static java.lang.String.format;
 
 import java.util.List;
+import java.util.Map;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.DescriptorTable;
@@ -55,6 +56,7 @@ import org.apache.kudu.client.RangePartitionBound;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 public class KuduUtil {
 
@@ -66,19 +68,27 @@ public class KuduUtil {
   // be sufficient for the Frontend/Catalog use, and has been tested in stress tests.
   private static int KUDU_CLIENT_WORKER_THREAD_COUNT = 5;
 
+  // Maps lists of master addresses to KuduClients, for sharing clients across the FE.
+  private static Map<String, KuduClient> kuduClients_ = Maps.newHashMap();
+
   /**
-   * Creates a KuduClient with the specified Kudu master addresses (as a comma-separated
-   * list of host:port pairs). The 'admin operation timeout' and the 'operation timeout'
-   * are set to BackendConfig.getKuduClientTimeoutMs(). The 'admin operations timeout' is
-   * used for operations like creating/deleting tables. The 'operation timeout' is used
-   * when fetching tablet metadata.
+   * Gets a KuduClient for the specified Kudu master addresses (as a comma-separated
+   * list of host:port pairs). It will look up and share an existing KuduClient, if
+   * possible, or it will create a new one to return.
+   * The 'admin operation timeout' and the 'operation timeout' are set to
+   * BackendConfig.getKuduClientTimeoutMs(). The 'admin operations timeout' is used for
+   * operations like creating/deleting tables. The 'operation timeout' is used when
+   * fetching tablet metadata.
    */
-  public static KuduClient createKuduClient(String kuduMasters) {
-    KuduClientBuilder b = new KuduClient.KuduClientBuilder(kuduMasters);
-    b.defaultAdminOperationTimeoutMs(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
-    b.defaultOperationTimeoutMs(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
-    b.workerCount(KUDU_CLIENT_WORKER_THREAD_COUNT);
-    return b.build();
+  public static KuduClient getKuduClient(String kuduMasters) {
+    if (!kuduClients_.containsKey(kuduMasters)) {
+      KuduClientBuilder b = new KuduClient.KuduClientBuilder(kuduMasters);
+      b.defaultAdminOperationTimeoutMs(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
+      b.defaultOperationTimeoutMs(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
+      b.workerCount(KUDU_CLIENT_WORKER_THREAD_COUNT);
+      kuduClients_.put(kuduMasters, b.build());
+    }
+    return kuduClients_.get(kuduMasters);
   }
 
   /**

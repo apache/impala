@@ -1,12 +1,14 @@
+# TODO: enable this once we have a way to invalidate kudu clients (IMPALA-5685)
+#====
+#---- QUERY
+#show create table functional_kudu.alltypestiny
+#---- CATCH
+#Error opening Kudu table 'impala::functional_kudu.alltypestiny'
+#====
 ====
 ---- QUERY
 # TODO: improve error messages (here and below) when KUDU-1734 is resolved
 describe functional_kudu.alltypes
----- CATCH
-Error opening Kudu table 'impala::functional_kudu.alltypes'
-====
----- QUERY
-show create table functional_kudu.alltypes
 ---- CATCH
 Error opening Kudu table 'impala::functional_kudu.alltypes'
 ====
