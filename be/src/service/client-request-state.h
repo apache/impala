@@ -309,8 +309,9 @@ class ClientRequestState {
 
   bool is_cancelled_; // if true, Cancel() was called.
   bool eos_;  // if true, there are no more rows to return
-  // We enforce the invariant that query_status_ is not OK iff query_state_
-  // is EXCEPTION, given that lock_ is held.
+  /// We enforce the invariant that query_status_ is not OK iff query_state_ is EXCEPTION,
+  /// given that lock_ is held. query_state_ should only be updated using
+  /// UpdateQueryState(), to ensure that the query profile is also updated.
   beeswax::QueryState::type query_state_;
   Status query_status_;
   TExecRequest exec_request_;
@@ -407,6 +408,11 @@ class ClientRequestState {
   /// Sets result_cache_ to NULL and updates its associated metrics and mem consumption.
   /// This function is a no-op if the cache has already been cleared.
   void ClearResultCache();
+
+  /// Update the query state and the "Query State" summary profile string.
+  /// Does not take lock_, but requires it: caller must ensure lock_
+  /// is taken before calling UpdateQueryState.
+  void UpdateQueryState(beeswax::QueryState::type query_state);
 };
 
 }

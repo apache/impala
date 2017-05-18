@@ -77,3 +77,18 @@ class TestObservability(ImpalaTestSuite):
     scan_idx = len(result.exec_summary) - 1
     assert result.exec_summary[scan_idx]['operator'] == '00:SCAN HBASE'
     assert result.exec_summary[scan_idx]['detail'] == 'functional_hbase.alltypestiny'
+
+  def test_get_profile(self):
+    """Tests that the query profile shows expected query states."""
+    query = "select count(*) from functional.alltypes"
+    handle = self.execute_query_async(query, dict())
+    profile = self.client.get_runtime_profile(handle)
+    # If ExecuteStatement() has completed but the results haven't been fetched yet, the
+    # query must have at least reached RUNNING.
+    assert "Query State: RUNNING" in profile or \
+      "Query State: FINISHED" in profile, profile
+
+    results = self.client.fetch(query, handle)
+    profile = self.client.get_runtime_profile(handle)
+    # After fetching the results, the query must be in state FINISHED.
+    assert "Query State: FINISHED" in profile, profile

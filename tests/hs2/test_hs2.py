@@ -181,11 +181,33 @@ class TestHS2(HS2TestSuite):
     get_operation_status_resp = \
         self.get_operation_status(execute_statement_resp.operationHandle)
     TestHS2.check_response(get_operation_status_resp)
-
+    # If ExecuteStatement() has completed but the results haven't been fetched yet, the
+    # query must have at least reached RUNNING.
     assert get_operation_status_resp.operationState in \
-        [TCLIService.TOperationState.INITIALIZED_STATE,
-         TCLIService.TOperationState.RUNNING_STATE,
+        [TCLIService.TOperationState.RUNNING_STATE,
          TCLIService.TOperationState.FINISHED_STATE]
+
+    fetch_results_req = TCLIService.TFetchResultsReq()
+    fetch_results_req.operationHandle = execute_statement_resp.operationHandle
+    fetch_results_req.maxRows = 100
+    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
+
+    get_operation_status_resp = \
+        self.get_operation_status(execute_statement_resp.operationHandle)
+    TestHS2.check_response(get_operation_status_resp)
+    # After fetching the results, the query must be in state FINISHED.
+    assert get_operation_status_resp.operationState == \
+        TCLIService.TOperationState.FINISHED_STATE
+
+    close_operation_req = TCLIService.TCloseOperationReq()
+    close_operation_req.operationHandle = execute_statement_resp.operationHandle
+    TestHS2.check_response(self.hs2_client.CloseOperation(close_operation_req))
+
+    get_operation_status_resp = \
+        self.get_operation_status(execute_statement_resp.operationHandle)
+    # GetOperationState should return 'Invalid query handle' if the query has been closed.
+    TestHS2.check_response(get_operation_status_resp, \
+        TCLIService.TStatusCode.ERROR_STATUS)
 
   @needs_session(conf_overlay={"abort_on_error": "1"})
   def test_get_operation_status_error(self):
@@ -396,6 +418,21 @@ class TestHS2(HS2TestSuite):
     get_profile_resp = self.hs2_client.GetRuntimeProfile(get_profile_req)
     TestHS2.check_response(get_profile_resp)
     assert execute_statement_req.statement in get_profile_resp.profile
+    # If ExecuteStatement() has completed but the results haven't been fetched yet, the
+    # query must have at least reached RUNNING.
+    assert "Query State: RUNNING" in get_profile_resp.profile or \
+        "Query State: FINISHED" in get_profile_resp.profile, get_profile_resp.profile
+
+    fetch_results_req = TCLIService.TFetchResultsReq()
+    fetch_results_req.operationHandle = execute_statement_resp.operationHandle
+    fetch_results_req.maxRows = 100
+    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
+
+    get_profile_resp = self.hs2_client.GetRuntimeProfile(get_profile_req)
+    TestHS2.check_response(get_profile_resp)
+    assert execute_statement_req.statement in get_profile_resp.profile
+    # After fetching the results, we must be in state FINISHED.
+    assert "Query State: FINISHED" in get_profile_resp.profile, get_profile_resp.profile
 
     close_operation_req = TCLIService.TCloseOperationReq()
     close_operation_req.operationHandle = execute_statement_resp.operationHandle
@@ -403,8 +440,8 @@ class TestHS2(HS2TestSuite):
 
     get_profile_resp = self.hs2_client.GetRuntimeProfile(get_profile_req)
     TestHS2.check_response(get_profile_resp)
-
     assert execute_statement_req.statement in get_profile_resp.profile
+    assert "Query State: FINISHED" in get_profile_resp.profile, get_profile_resp.profile
 
   @needs_session(conf_overlay={"use:database": "functional"})
   def test_change_default_database(self):

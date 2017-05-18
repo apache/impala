@@ -148,7 +148,6 @@ Status ClientRequestState::Exec(TExecRequest* exec_request) {
 
   profile_.AddChild(&server_profile_);
   summary_profile_.AddInfoString("Query Type", PrintTStmtType(stmt_type()));
-  summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
   summary_profile_.AddInfoString("Query Options (non default)",
       DebugQueryOptions(query_ctx_.client_request.query_options));
 
@@ -571,7 +570,6 @@ void ClientRequestState::Done() {
   unique_lock<mutex> l(lock_);
   end_time_ = TimestampValue::LocalTime();
   summary_profile_.AddInfoString("End Time", end_time().ToString());
-  summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
   query_events_->MarkEvent("Unregister query");
 
   // Update result set cache metrics, and update mem limit accounting before tearing
@@ -595,7 +593,6 @@ Status ClientRequestState::Exec(const TMetadataOpRequest& exec_request) {
   TResultSet metadata_op_result;
   // Like the other Exec(), fill out as much profile information as we're able to.
   summary_profile_.AddInfoString("Query Type", PrintTStmtType(TStmtType::DDL));
-  summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
   RETURN_IF_ERROR(frontend_->ExecHiveServer2MetadataOp(exec_request,
       &metadata_op_result));
   result_metadata_ = metadata_op_result.schema;
@@ -723,13 +720,13 @@ void ClientRequestState::UpdateNonErrorQueryState(
     beeswax::QueryState::type query_state) {
   lock_guard<mutex> l(lock_);
   DCHECK(query_state != beeswax::QueryState::EXCEPTION);
-  if (query_state_ < query_state) query_state_ = query_state;
+  if (query_state_ < query_state) UpdateQueryState(query_state);
 }
 
 Status ClientRequestState::UpdateQueryStatus(const Status& status) {
   // Preserve the first non-ok status
   if (!status.ok() && query_status_.ok()) {
-    query_state_ = beeswax::QueryState::EXCEPTION;
+    UpdateQueryState(beeswax::QueryState::EXCEPTION);
     query_status_ = status;
     summary_profile_.AddInfoString("Query Status", query_status_.GetDetail());
   }
@@ -744,7 +741,7 @@ Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
   if (eos_) return Status::OK();
 
   if (request_result_set_ != NULL) {
-    query_state_ = beeswax::QueryState::FINISHED;
+    UpdateQueryState(beeswax::QueryState::FINISHED);
     int num_rows = 0;
     const vector<TResultRow>& all_rows = (*(request_result_set_.get()));
     // max_rows <= 0 means no limit
@@ -772,7 +769,8 @@ Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
     if (num_rows_fetched_from_cache >= max_rows) return Status::OK();
   }
 
-  query_state_ = beeswax::QueryState::FINISHED;  // results will be ready after this call
+  // results will be ready after this call
+  UpdateQueryState(beeswax::QueryState::FINISHED);
 
   // Maximum number of rows to be fetched from the coord.
   int32_t max_coord_rows = max_rows;
@@ -1081,5 +1079,11 @@ void ClientRequestState::ClearResultCache() {
     coord_->query_mem_tracker()->Release(total_bytes);
   }
   result_cache_.reset(NULL);
+}
+
+void ClientRequestState::UpdateQueryState(
+    beeswax::QueryState::type query_state) {
+  query_state_ = query_state;
+  summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
 }
 }
