@@ -332,7 +332,7 @@ class TableDef {
       }
     }
     Preconditions.checkState(numColumns == colIdxs.size());
-    return ImmutableList.copyOf(colIdxs);
+    return Lists.newArrayList(colIdxs);
   }
 
   private void analyzeOptions(Analyzer analyzer) throws AnalysisException {

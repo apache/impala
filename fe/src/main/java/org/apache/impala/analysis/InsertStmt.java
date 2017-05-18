@@ -240,6 +240,7 @@ public class InsertStmt extends StatementBase {
     hasClusteredHint_ = false;
     hasNoClusteredHint_ = false;
     sortExprs_.clear();
+    sortColumns_.clear();
     resultExprs_.clear();
     mentionedColumns_.clear();
     primaryKeyExprs_.clear();
@@ -517,9 +518,6 @@ public class InsertStmt extends StatementBase {
             "Partition specifications are not supported for Kudu tables.");
       }
     }
-
-    // Assign sortExprs_ based on sortColumns_.
-    for (Integer colIdx: sortColumns_) sortExprs_.add(resultExprs_.get(colIdx));
 
     if (isHBaseTable && overwrite_) {
       throw new AnalysisException("HBase doesn't have a way to perform INSERT OVERWRITE");

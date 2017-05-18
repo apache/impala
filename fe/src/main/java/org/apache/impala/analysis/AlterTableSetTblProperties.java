@@ -42,7 +42,6 @@ import org.apache.impala.util.MetaStoreUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 /**
@@ -203,7 +202,7 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
       Map<String, String> tblProperties) throws AnalysisException {
     if (!tblProperties.containsKey(
         AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS)) {
-      return ImmutableList.of();
+      return Lists.newArrayList();
     }
 
     // ALTER TABLE SET is not supported on HBase tables at all, see
