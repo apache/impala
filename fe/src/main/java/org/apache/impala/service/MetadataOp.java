@@ -43,6 +43,7 @@ import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.util.PatternMatcher;
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 
 /**
@@ -214,6 +215,9 @@ public class MetadataOp {
     // tableNames[i] are the tables within dbs[i]
     public List<List<String>> tableNames = Lists.newArrayList();
 
+    // comments[i][j] is the comment of tableNames[j] in dbs[i].
+    public List<List<String>> comments = Lists.newArrayList();
+
     // columns[i][j] are the columns of tableNames[j] in dbs[i].
     // If the table is missing (not yet loaded) its column list will be empty.
     public List<List<List<Column>>> columns = Lists.newArrayList();
@@ -266,6 +270,7 @@ public class MetadataOp {
         // Get table metadata
         List<String> tableList = Lists.newArrayList();
         List<List<Column>> tablesColumnsList = Lists.newArrayList();
+        List<String> tableComments = Lists.newArrayList();
         for (String tabName: fe.getTableNames(db.getName(), tablePatternMatcher, user)) {
           tableList.add(tabName);
           Table table = null;
@@ -276,18 +281,22 @@ public class MetadataOp {
           }
           if (table == null) continue;
 
+          String comment = null;
           List<Column> columns = Lists.newArrayList();
           // If the table is not yet loaded, the columns will be unknown. Add it
           // to the set of missing tables.
           if (!table.isLoaded()) {
             result.missingTbls.add(new TableName(db.getName(), tabName));
           } else {
+            comment = table.getMetaStoreTable().getParameters().get("comment");
             columns.addAll(fe.getColumns(table, columnPatternMatcher, user));
           }
           tablesColumnsList.add(columns);
+          tableComments.add(Strings.nullToEmpty(comment));
         }
         result.dbs.add(db.getName());
         result.tableNames.add(tableList);
+        result.comments.add(tableComments);
         result.columns.add(tablesColumnsList);
       }
     }
@@ -478,8 +487,7 @@ public class MetadataOp {
         row.colVals.add(createTColumnValue(dbName));
         row.colVals.add(createTColumnValue(tabName));
         row.colVals.add(TABLE_TYPE_COL_VAL);
-        // TODO: Return table comments when it is available in the Impala catalog.
-        row.colVals.add(EMPTY_COL_VAL);
+        row.colVals.add(createTColumnValue(dbsMetadata.comments.get(i).get(j)));
         result.rows.add(row);
       }
     }

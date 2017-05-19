@@ -18,6 +18,7 @@
 package org.apache.impala.service;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -34,9 +35,12 @@ import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.junit.Test;
 import org.apache.impala.analysis.AuthorizationTest;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.PrimitiveType;
+import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.testutil.TestUtils;
@@ -60,9 +64,7 @@ import com.google.common.collect.Sets;
  * result set.
  *
  */
-public class FrontendTest {
-  private static Frontend fe_ = new Frontend(
-      AuthorizationConfig.createAuthDisabledConfig(), new ImpaladTestCatalog());
+public class FrontendTest extends FrontendTestBase {
 
   @Test
   public void TestCatalogReadiness() throws ImpalaException {
@@ -176,6 +178,38 @@ public class FrontendTest {
   }
 
   @Test
+  public void TestGetTablesWithComments() throws ImpalaException {
+    // Add test db and test tables with comments
+    final String dbName = "tbls_with_comments_test_db";
+    Db testDb = addTestDb(dbName, "Stores tables with comments");
+    assertNotNull(testDb);
+    final String commentStr = "this table has a comment";
+    final String tableWithCommentsStmt = String.format(
+        "create table %s.tbl_with_comments (a int) comment '%s'", dbName, commentStr);
+    Table tbl = addTestTable(tableWithCommentsStmt);
+    assertNotNull(tbl);
+    final String tableWithoutCommentsStmt = String.format(
+        "create table %s.tbl_without_comments (a int)", dbName);
+    tbl = addTestTable(tableWithoutCommentsStmt);
+    assertNotNull(tbl);
+
+    // Prepare and perform the GetTables request
+    TMetadataOpRequest req = new TMetadataOpRequest();
+    req.opcode = TMetadataOpcode.GET_TABLES;
+    req.get_tables_req = new TGetTablesReq();
+    req.get_tables_req.setSchemaName(dbName);
+    TResultSet resp = execMetadataOp(req);
+    assertEquals(2, resp.rows.size());
+    for (TResultRow row: resp.rows) {
+      if (row.colVals.get(2).string_val.toLowerCase().equals("tbl_with_comments")) {
+        assertEquals(commentStr, row.colVals.get(4).string_val.toLowerCase());
+      } else {
+        assertEquals("", row.colVals.get(4).string_val);
+      }
+    }
+  }
+
+  @Test
   public void TestGetColumns() throws ImpalaException {
     // It should return one column: default.alltypes.string_col
     TMetadataOpRequest req = new TMetadataOpRequest();
@@ -255,6 +289,6 @@ public class FrontendTest {
 
   private TResultSet execMetadataOp(TMetadataOpRequest req)
       throws ImpalaException {
-    return fe_.execHiveServer2MetadataOp(req);
+    return frontend_.execHiveServer2MetadataOp(req);
   }
 }
