@@ -91,6 +91,17 @@ public class FunctionCallExpr extends Expr {
             && fnName.getFnNamePath().get(1).equalsIgnoreCase("decode")) {
       return new CaseExpr(functionCallExpr);
     }
+    if (fnName.getFnNamePath().size() == 1
+            && fnName.getFnNamePath().get(0).equalsIgnoreCase("nvl2")
+        || fnName.getFnNamePath().size() == 2
+            && fnName.getFnNamePath().get(0).equalsIgnoreCase(Catalog.BUILTINS_DB)
+            && fnName.getFnNamePath().get(1).equalsIgnoreCase("nvl2")) {
+      List<Expr> plist = Lists.newArrayList(params.exprs());
+      if (!plist.isEmpty()) {
+        plist.set(0, new IsNullPredicate(plist.get(0), true));
+      }
+      return new FunctionCallExpr("if", plist);
+    }
     return functionCallExpr;
   }
 

@@ -1602,6 +1602,24 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // IGNORE NULLS may only be used with first_value/last_value
     AnalysisError("select lower('FOO' ignore nulls)",
         "Function LOWER does not accept the keyword IGNORE NULLS.");
+
+    // NVL2() is converted to IF() before analysis.
+    AnalyzesOk("select nvl2(1, 'not null', 'null')");
+    AnalyzesOk("select nvl2(null, 'not null', 'null')");
+    AnalyzesOk("select nvl2('null', 'not null', 'null')");
+    AnalyzesOk("select nvl2(int_col, 'not null', 'null') from functional.alltypesagg");
+    AnalyzesOk("select nvl2(int_col, extract (year from now()), extract (month from " +
+        "now())) from functional.alltypesagg");
+    AnalyzesOk("select nvl2(nvl2(null, 1, 2), 'not null', 'null')");
+    AnalyzesOk("select nvl2(nvl2(null, null, null), nvl2(null, 'not null', 'null'), " +
+        "nvl2(2, 'not null', 'null'))");
+    AnalyzesOk("select int_col from functional.alltypesagg where nvl2(int_col, true, " +
+        "false)");
+    AnalysisError("select nvl2('null', true, '4')", "No matching function with " +
+        "signature: if(BOOLEAN, BOOLEAN, STRING).");
+    AnalysisError("select nvl2(now(), true)", "No matching function with signature: " +
+        "if(BOOLEAN, BOOLEAN).");
+    AnalysisError("select nvl2()", "No matching function with signature: if().");
   }
 
   @Test
