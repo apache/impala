@@ -449,18 +449,23 @@ int64_t RowBatch::TotalByteSize(DedupMap* distinct_tuples) {
   return result;
 }
 
-Status RowBatch::ResizeAndAllocateTupleBuffer(RuntimeState* state,
-    int64_t* tuple_buffer_size, uint8_t** buffer) {
-  const int row_size = row_desc_.GetRowSize();
+Status RowBatch::ResizeAndAllocateTupleBuffer(
+    RuntimeState* state, int64_t* buffer_size, uint8_t** buffer) {
+  return ResizeAndAllocateTupleBuffer(
+      state, &tuple_data_pool_, row_desc_.GetRowSize(), &capacity_, buffer_size, buffer);
+}
+
+Status RowBatch::ResizeAndAllocateTupleBuffer(RuntimeState* state, MemPool* pool,
+    int row_size, int* capacity, int64_t* buffer_size, uint8_t** buffer) {
   // Avoid divide-by-zero. Don't need to modify capacity for empty rows anyway.
   if (row_size != 0) {
-    capacity_ = max(1, min(capacity_, FIXED_LEN_BUFFER_LIMIT / row_size));
+    *capacity = max(1, min(*capacity, FIXED_LEN_BUFFER_LIMIT / row_size));
   }
-  *tuple_buffer_size = static_cast<int64_t>(row_size) * capacity_;
-  *buffer = tuple_data_pool_.TryAllocate(*tuple_buffer_size);
+  *buffer_size = static_cast<int64_t>(row_size) * *capacity;
+  *buffer = pool->TryAllocate(*buffer_size);
   if (*buffer == NULL) {
-    return mem_tracker_->MemLimitExceeded(state, "Failed to allocate tuple buffer",
-        *tuple_buffer_size);
+    return pool->mem_tracker()->MemLimitExceeded(
+        state, "Failed to allocate tuple buffer", *buffer_size);
   }
   return Status::OK();
 }

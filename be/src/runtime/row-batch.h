@@ -338,8 +338,13 @@ class RowBatch {
   /// Returns Status::MEM_LIMIT_EXCEEDED and sets 'buffer' to NULL if a memory limit would
   /// have been exceeded. 'state' is used to log the error.
   /// On success, sets 'buffer_size' to the size in bytes and 'buffer' to the buffer.
-  Status ResizeAndAllocateTupleBuffer(RuntimeState* state, int64_t* buffer_size,
-       uint8_t** buffer);
+  Status ResizeAndAllocateTupleBuffer(
+      RuntimeState* state, int64_t* buffer_size, uint8_t** buffer);
+
+  /// Same as above except allocates buffer for 'capacity' rows with fixed-length portions
+  /// of 'row_size' bytes each from 'pool', instead of using RowBatch's member variables.
+  static Status ResizeAndAllocateTupleBuffer(RuntimeState* state, MemPool* pool,
+      int row_size, int* capacity, int64_t* buffer_size, uint8_t** buffer);
 
   /// Helper function to log the batch's rows if VLOG_ROW is enabled. 'context' is a
   /// string to prepend to the log message.

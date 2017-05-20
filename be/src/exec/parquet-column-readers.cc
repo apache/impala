@@ -955,7 +955,7 @@ Status BaseScalarColumnReader::ReadDataPage() {
   // now complete, free up any memory allocated for it. If the data page contained
   // strings we need to attach it to the returned batch.
   if (CurrentPageContainsTupleData()) {
-    parent_->scratch_batch_->mem_pool()->AcquireData(
+    parent_->scratch_batch_->aux_mem_pool.AcquireData(
         decompressed_data_pool_.get(), false);
   } else {
     decompressed_data_pool_->FreeAll();
