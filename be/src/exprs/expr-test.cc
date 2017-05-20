@@ -5628,6 +5628,24 @@ TEST_F(ExprTest, ConditionalFunctions) {
   TestTimestampValue("if(FALSE, cast('2011-01-01 09:01:01' as timestamp), "
       "cast('1999-06-14 19:07:25' as timestamp))", else_val);
 
+  // Test nvl2(), which is rewritten to if() before analysis.
+  // Returns 2nd arg if 1st arg is not NULL, otherwise it returns 3rd arg.
+  // Output of nvl2(x,y,z) should be identical to one of if(x is not null,y,z).
+  TestValue("nvl2(now(), FALSE, TRUE)", TYPE_BOOLEAN, false);
+  TestValue("nvl2(NULL, FALSE, TRUE)", TYPE_BOOLEAN, true);
+  TestValue("nvl2(now(), 10, 20)", TYPE_TINYINT, 10);
+  TestValue("nvl2(NULL, 10, 20)", TYPE_TINYINT, 20);
+  TestValue("nvl2(TRUE, cast(5.5 as double), cast(8.8 as double))", TYPE_DOUBLE, 5.5);
+  TestValue("nvl2(NULL, cast(5.5 as double), cast(8.8 as double))", TYPE_DOUBLE, 8.8);
+  TestStringValue("nvl2('some string', 'abc', 'defgh')", "abc");
+  TestStringValue("nvl2(NULL, 'abc', 'defgh')", "defgh");
+  TimestampValue first_val = TimestampValue::FromUnixTime(1293872461);
+  TimestampValue second_val = TimestampValue::FromUnixTime(929387245);
+  TestTimestampValue("nvl2(FALSE, cast('2011-01-01 09:01:01' as timestamp), "
+      "cast('1999-06-14 19:07:25' as timestamp))", first_val);
+  TestTimestampValue("nvl2(NULL, cast('2011-01-01 09:01:01' as timestamp), "
+      "cast('1999-06-14 19:07:25' as timestamp))", second_val);
+
   // Test nullif(). Return NULL if lhs equals rhs, lhs otherwise.
   TestIsNull("nullif(NULL, NULL)", TYPE_BOOLEAN);
   TestIsNull("nullif(TRUE, TRUE)", TYPE_BOOLEAN);
