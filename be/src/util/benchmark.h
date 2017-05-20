@@ -34,7 +34,11 @@ namespace impala {
 class Benchmark {
  public:
   /// Name of the microbenchmark.  This is outputted in the result.
-  Benchmark(const std::string& name);
+  /// micro_heuristics is a bool argument which indicates whether micro benchmark
+  /// style should be used; that is, we look for a set of runs which doesn't context
+  /// switch so that we can measure pure userland code performance, as opposed to a
+  /// more complex benchmark that might issue blocking system calls.
+  Benchmark(const std::string& name, bool micro_heuristics = true);
 
   /// Function to benchmark.  The function should run iters time (to minimize function
   /// call overhead).  The second argument is opaque and is whatever data the test
@@ -65,7 +69,7 @@ class Benchmark {
   /// Benchmarks the 'function' returning the result as invocations per ms.
   /// args is an opaque argument passed as the second argument to the function.
   static double Measure(BenchmarkFunction function, void* args, int max_time,
-      int initial_batch_size);
+      int initial_batch_size, bool micro);
 
   struct BenchmarkResult {
     std::string name;
@@ -77,6 +81,7 @@ class Benchmark {
 
   std::string name_;
   std::vector<BenchmarkResult> benchmarks_;
+  bool micro_heuristics_;
 };
 
 }

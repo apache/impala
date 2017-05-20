@@ -189,7 +189,7 @@ int main(int argc, char **argv) {
   int64_t N = 10000L;
   const int max_producers = 12;
 
-  Benchmark suite("locking");
+  Benchmark suite("locking", /* micro = */ false);
   TestData data[max_producers + 1];
   for (int i = 0; i <= max_producers; i += 2) {
     if (i == 0) {

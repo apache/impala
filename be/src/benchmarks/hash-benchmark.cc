@@ -23,10 +23,12 @@
 #include <boost/functional/hash.hpp>
 
 #include "codegen/llvm-codegen.h"
+#include "common/init.h"
 #include "experiments/data-provider.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/string-value.h"
 #include "runtime/test-env.h"
+#include "service/fe-support.h"
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
 #include "util/hash-util.h"
@@ -416,6 +418,8 @@ Function* CodegenCrcHash(LlvmCodeGen* codegen, bool mixed) {
 int main(int argc, char **argv) {
   CpuInfo::Init();
   cout << Benchmark::GetMachineInfo() << endl;
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  impala::InitFeSupport();
   LlvmCodeGen::InitializeLlvm();
 
   const int NUM_ROWS = 1024;

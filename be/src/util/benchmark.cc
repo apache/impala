@@ -19,6 +19,10 @@
 #include <iostream>
 #include <sstream>
 
+#include <sys/time.h>
+#include <sys/resource.h>
+#include <unistd.h>
+
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
@@ -28,43 +32,89 @@
 
 namespace impala {
 
+// Private measurement function.  This function is a bit unusual in that it
+// throws exceptions; the intention is to abort the measurement when an unreliable
+// result is detected, but to also provide some useful context as to which benchmark
+// was being run.  The method used to determine whether the measurement is unreliable
+// is detecting context switches using getrusage().  Pass micro_heuristics=false to
+// the class constructor if you do not want this behavior.
 double Benchmark::Measure(BenchmarkFunction function, void* args,
-    int max_time, int batch_size) {
+    int max_time, int batch_size, bool micro_heuristics) {
   int64_t target_cycles = CpuInfo::cycles_per_ms() * max_time;
   int64_t iters = 0;
+  struct rusage ru_start;
+  struct rusage ru_stop;
+  StopWatch sw;
+  int64_t lost_time = 0;
 
   // Run it with the default batch size to roughly estimate how many iterations
-  // it will take
-  StopWatch sw;
-  sw.Start();
-  function(batch_size, args);
-  sw.Stop();
-  iters += batch_size;
-
-  if (sw.ElapsedTime() < target_cycles) {
-    int64_t iters_guess = (target_cycles / sw.ElapsedTime()) * batch_size;
-    // Shoot for 110% of the guess. Going a little over is not a big deal.
-    iters_guess *= 1.1;
-    // Modify the batch size based on the guess.  We ran the function a small number
-    // of times to estimate how fast the function is.  Run the remaining iterations at
-    // in 20% increments.
-    // TODO: we can make this more sophisticated if need to be dynamically ramp up and
-    // ramp down the sizes.
-    batch_size = max<int>(1, (iters_guess - iters) / 5);
-  }
-
-  while (sw.ElapsedTime() < target_cycles) {
+  // it will take.
+  for (;;) {
+    int64 begin_time = sw.ElapsedTime();
+    if (micro_heuristics) getrusage(RUSAGE_THREAD, &ru_start);
     sw.Start();
     function(batch_size, args);
     sw.Stop();
-    iters += batch_size;
+    if (micro_heuristics) getrusage(RUSAGE_THREAD, &ru_stop);
+    if (!micro_heuristics || ru_stop.ru_nivcsw == ru_start.ru_nivcsw) {
+      iters = batch_size;
+      break;
+    }
+
+    // Taking too long and we keep getting switched out; either the machine is busy,
+    // or the benchmark takes too long to run and should not be used with this
+    // microbenchmark suite.  Bail.
+    if (sw.ElapsedTime() > target_cycles) {
+      throw std::runtime_error("Benchmark failed to complete due to context switching.");
+    }
+
+    // Divide the batch size by the number of context switches until we find a size
+    // small enough that we don't switch
+    batch_size = max<int>(1, batch_size / (1+(ru_stop.ru_nivcsw - ru_start.ru_nivcsw)));
+    lost_time += sw.ElapsedTime() - begin_time;
   }
 
-  double ms_elapsed = sw.ElapsedTime() / CpuInfo::cycles_per_ms();
+  double iters_guess = (target_cycles / (sw.ElapsedTime() - lost_time)) * batch_size;
+  // Shoot for 110% of the guess. Going a little over is not a big deal.
+  iters_guess *= 1.1;
+  // Modify the batch size based on the guess.  We ran the function a small number
+  // of times to estimate how fast the function is.  Run the remaining iterations at
+  // in 20% increments.
+  batch_size = max<int>(1, (iters_guess - iters) / 5);
+
+  while (sw.ElapsedTime() < target_cycles) {
+    int64 begin_time = sw.ElapsedTime();
+    if (micro_heuristics) getrusage(RUSAGE_THREAD, &ru_start);
+    sw.Start();
+    function(batch_size, args);
+    sw.Stop();
+    if (micro_heuristics) getrusage(RUSAGE_THREAD, &ru_stop);
+    if (!micro_heuristics || ru_stop.ru_nivcsw == ru_start.ru_nivcsw) {
+      iters += batch_size;
+    } else {
+      // We could have a vastly different estimate for batch size now and might have
+      // started context switching again.  Divide down by 1 + the number of context
+      // switches as a guess of the number of iterations to perform with each batch.
+      lost_time += sw.ElapsedTime() - begin_time;
+      batch_size = max<int>(1, batch_size / (1+(ru_stop.ru_nivcsw - ru_start.ru_nivcsw)));
+    }
+  }
+
+  // Arbitrary fudge factor for throwing in the towel - we give up if > 90% of
+  // measurements were dropped.
+  if (lost_time > 10 * sw.ElapsedTime()) {
+    throw std::runtime_error("Benchmark failed to complete due to noisy measurements.");
+  }
+  if (lost_time > sw.ElapsedTime()) {
+    LOG(WARNING) << "More than 50% of benchmark time lost due to context switching.";
+  }
+
+  double ms_elapsed = (sw.ElapsedTime() - lost_time) / CpuInfo::cycles_per_ms();
   return iters / ms_elapsed;
 }
 
-Benchmark::Benchmark(const string& name) : name_(name) {
+Benchmark::Benchmark(const string& name, bool micro_heuristics) : name_(name),
+  micro_heuristics_(micro_heuristics) {
 #ifndef NDEBUG
   LOG(ERROR) << "WARNING: Running benchmark in DEBUG mode.";
 #endif
@@ -114,11 +164,19 @@ string Benchmark::Measure(int max_time, int initial_batch_size) {
       3 * percentile_out_width + padding;
 
   stringstream ss;
-  for (int j = 0; j < NUM_REPS; ++j) {
-    for (int i = 0; i < benchmarks_.size(); ++i) {
-      benchmarks_[i].rates.push_back(
-          Measure(benchmarks_[i].fn, benchmarks_[i].args, max_time, initial_batch_size));
+  try {
+    for (int j = 0; j < NUM_REPS; ++j) {
+      for (int i = 0; i < benchmarks_.size(); ++i) {
+        benchmarks_[i].rates.push_back(
+            Measure(benchmarks_[i].fn, benchmarks_[i].args, max_time, initial_batch_size,
+              micro_heuristics_));
+      }
     }
+  } catch (std::exception& e) {
+    LOG(ERROR) << e.what();
+    LOG(WARNING) << "Exiting silently from " << name_ <<
+      " to avoid spurious test failure.";
+    _exit(0);
   }
 
   ss << name_ << ":"

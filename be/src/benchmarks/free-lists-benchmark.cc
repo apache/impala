@@ -320,7 +320,9 @@ static const int MAX_LIST_ENTRIES = 64;
 static const int ALLOC_OP = 0;
 static const int FREE_OP = 1;
 
-static SystemAllocator allocator(64 * 1024);
+// Not a static allocation because SystemAllocator's constructor uses gperftool's
+// MallocExtension instance, which may not yet be defined due to constructor order
+static SystemAllocator* allocator = nullptr;
 
 // Simulate doing some work with the buffer.
 void DoWork(uint8_t* data, int64_t len) {
@@ -339,7 +341,7 @@ void DoAlloc(const BenchmarkParams& params, LockedList* free_list,
     got_buffer = free_list->list.PopFreeBuffer(&buffer);
   }
   if (!got_buffer) {
-    Status status = allocator.Allocate(params.allocation_size, &buffer);
+    Status status = allocator->Allocate(params.allocation_size, &buffer);
     if (!status.ok()) LOG(FATAL) << "Failed alloc " << status.msg().msg();
   }
   // Do some processing to simulate a vaguely realistic work pattern.
@@ -361,10 +363,10 @@ void DoFree(const BenchmarkParams& params, LockedList* free_list,
         // Discard around 1/4 of the buffers to amortise the cost of sorting.
         vector<BufferHandle> buffers =
             list->GetBuffersToFree(list->Size() - MAX_LIST_ENTRIES * 3 / 4);
-        for (BufferHandle& buffer : buffers) allocator.Free(move(buffer));
+        for (BufferHandle& buffer : buffers) allocator->Free(move(buffer));
       }
     } else {
-      allocator.Free(move(buffers->back()));
+      allocator->Free(move(buffers->back()));
     }
     buffers->pop_back();
   }
@@ -392,7 +394,7 @@ void FreeListBenchmarkThread(int thread_id, int num_operations,
     ops_done += num_ops;
   }
 
-  for (BufferHandle& buffer : buffers) allocator.Free(move(buffer));
+  for (BufferHandle& buffer : buffers) allocator->Free(move(buffer));
 }
 
 /// Execute the benchmark with the BenchmarkParams passed via 'data'.
@@ -421,7 +423,7 @@ void FreeListBenchmark(int batch_size, void* data) {
   for (LockedList* free_list : free_lists) {
     vector<BufferHandle> buffers =
         free_list->list.GetBuffersToFree(free_list->list.Size());
-    for (BufferHandle& buffer : buffers) allocator.Free(move(buffer));
+    for (BufferHandle& buffer : buffers) allocator->Free(move(buffer));
   }
 }
 
@@ -429,6 +431,7 @@ int main(int argc, char** argv) {
   CpuInfo::Init();
   cout << endl << Benchmark::GetMachineInfo() << endl << endl;
 
+  allocator = new SystemAllocator(64 * 1024);
   ObjectPool pool;
 
   for (int work_iterations : {0, 1, 2, 4}) {
