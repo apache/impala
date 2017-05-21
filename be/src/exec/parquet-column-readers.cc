@@ -296,9 +296,14 @@ class ScalarColumnReader : public BaseScalarColumnReader {
   /// caching of rep/def levels. Once a data page and cached levels are available,
   /// it calls into a more specialized MaterializeValueBatch() for doing the actual
   /// value materialization using the level caches.
-  template<bool IN_COLLECTION>
-  bool ReadValueBatch(MemPool* pool, int max_values, int tuple_size,
-      uint8_t* tuple_mem, int* num_values) {
+  /// Use RESTRICT so that the compiler knows that it is safe to cache member
+  /// variables in registers or on the stack (otherwise gcc's alias analysis
+  /// conservatively assumes that buffers like 'tuple_mem', 'num_values' or the
+  /// 'def_levels_' 'rep_levels_' buffers may alias 'this', especially with
+  /// -fno-strict-alias).
+  template <bool IN_COLLECTION>
+  bool ReadValueBatch(MemPool* RESTRICT pool, int max_values, int tuple_size,
+      uint8_t* RESTRICT tuple_mem, int* RESTRICT num_values) RESTRICT {
     // Repetition level is only present if this column is nested in a collection type.
     if (!IN_COLLECTION) DCHECK_EQ(max_rep_level(), 0) << slot_desc()->DebugString();
     if (IN_COLLECTION) DCHECK_GT(max_rep_level(), 0) << slot_desc()->DebugString();
@@ -362,9 +367,14 @@ class ScalarColumnReader : public BaseScalarColumnReader {
   /// level caches have been populated.
   /// For efficiency, the simple special case of !MATERIALIZED && !IN_COLLECTION is not
   /// handled in this function.
-  template<bool IN_COLLECTION, bool IS_DICT_ENCODED>
-  bool MaterializeValueBatch(MemPool* pool, int max_values, int tuple_size,
-      uint8_t* tuple_mem, int* num_values) {
+  /// Use RESTRICT so that the compiler knows that it is safe to cache member
+  /// variables in registers or on the stack (otherwise gcc's alias analysis
+  /// conservatively assumes that buffers like 'tuple_mem', 'num_values' or the
+  /// 'def_levels_' 'rep_levels_' buffers may alias 'this', especially with
+  /// -fno-strict-alias).
+  template <bool IN_COLLECTION, bool IS_DICT_ENCODED>
+  bool MaterializeValueBatch(MemPool* RESTRICT pool, int max_values, int tuple_size,
+      uint8_t* RESTRICT tuple_mem, int* RESTRICT num_values) RESTRICT {
     DCHECK(MATERIALIZED || IN_COLLECTION);
     DCHECK_GT(num_buffered_values_, 0);
     DCHECK(def_levels_.CacheHasNext());
@@ -372,7 +382,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
 
     uint8_t* curr_tuple = tuple_mem;
     int val_count = 0;
-    while (def_levels_.CacheHasNext()) {
+    while (def_levels_.CacheHasNext() && val_count < max_values) {
       Tuple* tuple = reinterpret_cast<Tuple*>(curr_tuple);
       int def_level = def_levels_.CacheGetNext();
 
@@ -400,10 +410,8 @@ class ScalarColumnReader : public BaseScalarColumnReader {
           tuple->SetNull(null_indicator_offset_);
         }
       }
-
       curr_tuple += tuple_size;
       ++val_count;
-      if (UNLIKELY(val_count == max_values)) break;
     }
     *num_values = val_count;
     return true;
@@ -460,11 +468,15 @@ class ScalarColumnReader : public BaseScalarColumnReader {
   /// Returns false if execution should be aborted for some reason, e.g. parse_error_ is
   /// set, the query is cancelled, or the scan node limit was reached. Otherwise returns
   /// true.
-  template<bool IS_DICT_ENCODED>
-  inline bool ReadSlot(Tuple* tuple, MemPool* pool) {
+  ///
+  /// Force inlining - GCC does not always inline this into hot loops.
+  template <bool IS_DICT_ENCODED>
+  ALWAYS_INLINE bool ReadSlot(Tuple* tuple, MemPool* pool) {
     void* slot = tuple->GetSlot(tuple_offset_);
-    T val;
-    T* val_ptr = NeedsConversionInline() ? &val : reinterpret_cast<T*>(slot);
+    // Use an uninitialized stack allocation for temporary value to avoid running
+    // constructors doing work unnecessarily, e.g. if T == StringValue.
+    alignas(T) uint8_t val_buf[sizeof(T)];
+    T* val_ptr = reinterpret_cast<T*>(NeedsConversionInline() ? val_buf : slot);
     if (IS_DICT_ENCODED) {
       DCHECK_EQ(page_encoding_, parquet::Encoding::PLAIN_DICTIONARY);
       if (UNLIKELY(!dict_decoder_.GetNextValue(val_ptr))) {
@@ -485,9 +497,8 @@ class ScalarColumnReader : public BaseScalarColumnReader {
     if (UNLIKELY(NeedsValidationInline() && !ValidateSlot(val_ptr, tuple))) {
       return false;
     }
-    if (UNLIKELY(NeedsConversionInline() &&
-        !tuple->IsNull(null_indicator_offset_) &&
-        !ConvertSlot(&val, reinterpret_cast<T*>(slot), pool))) {
+    if (UNLIKELY(NeedsConversionInline() && !tuple->IsNull(null_indicator_offset_)
+            && !ConvertSlot(val_ptr, reinterpret_cast<T*>(slot), pool))) {
       return false;
     }
     return true;

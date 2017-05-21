@@ -930,12 +930,7 @@ Status HdfsParquetScanner::AssembleRows(
   while (!column_readers[0]->RowGroupAtEnd()) {
     // Start a new scratch batch.
     RETURN_IF_ERROR(scratch_batch_->Reset(state_));
-    int scratch_capacity = scratch_batch_->capacity;
-
-    // Initialize tuple memory.
-    for (int i = 0; i < scratch_capacity; ++i) {
-      InitTuple(template_tuple_, scratch_batch_->GetTuple(i));
-    }
+    InitTupleBuffer(template_tuple_, scratch_batch_->tuple_mem, scratch_batch_->capacity);
 
     // Materialize the top-level slots into the scratch batch column-by-column.
     int last_num_tuples = -1;
@@ -944,12 +939,12 @@ Status HdfsParquetScanner::AssembleRows(
     for (int c = 0; c < num_col_readers; ++c) {
       ParquetColumnReader* col_reader = column_readers[c];
       if (col_reader->max_rep_level() > 0) {
-        continue_execution = col_reader->ReadValueBatch(
-            &scratch_batch_->aux_mem_pool, scratch_capacity,
-            tuple_byte_size_, scratch_batch_->tuple_mem, &scratch_batch_->num_tuples);
+        continue_execution = col_reader->ReadValueBatch(&scratch_batch_->aux_mem_pool,
+            scratch_batch_->capacity, tuple_byte_size_, scratch_batch_->tuple_mem,
+            &scratch_batch_->num_tuples);
       } else {
         continue_execution = col_reader->ReadNonRepeatedValueBatch(
-            &scratch_batch_->aux_mem_pool, scratch_capacity, tuple_byte_size_,
+            &scratch_batch_->aux_mem_pool, scratch_batch_->capacity, tuple_byte_size_,
             scratch_batch_->tuple_mem, &scratch_batch_->num_tuples);
       }
       // Check that all column readers populated the same number of values.

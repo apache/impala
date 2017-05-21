@@ -245,8 +245,10 @@ class RleEncoder {
   uint8_t* literal_indicator_byte_;
 };
 
-template<typename T>
-inline bool RleDecoder::Get(T* val) {
+// Force inlining - this is used in perf-critical loops in Parquet and GCC often
+// doesn't inline it in cases where it's beneficial.
+template <typename T>
+ALWAYS_INLINE inline bool RleDecoder::Get(T* val) {
   DCHECK_GE(bit_width_, 0);
   // Profiling has shown that the quality and performance of the generated code is very
   // sensitive to the exact shape of this check. For example, the version below performs

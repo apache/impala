@@ -15,10 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 #ifndef IMPALA_UTIL_BIT_STREAM_UTILS_INLINE_H
 #define IMPALA_UTIL_BIT_STREAM_UTILS_INLINE_H
 
+#include "common/compiler-util.h"
 #include "util/bit-stream-utils.h"
 
 namespace impala {
@@ -84,14 +84,23 @@ inline bool BitWriter::PutVlqInt(int32_t v) {
   return result;
 }
 
-template<typename T>
-inline bool BitReader::GetValue(int num_bits, T* v) {
+/// Force inlining - this is used in perf-critical loops in Parquet and GCC often doesn't
+/// inline it in cases where it's beneficial.
+template <typename T>
+ALWAYS_INLINE inline bool BitReader::GetValue(int num_bits, T* v) {
   DCHECK(num_bits == 0 || buffer_ != NULL);
   // TODO: revisit this limit if necessary
   DCHECK_LE(num_bits, MAX_BITWIDTH);
   DCHECK_LE(num_bits, sizeof(T) * 8);
 
-  if (UNLIKELY(byte_offset_ * 8 + bit_offset_ + num_bits > max_bytes_ * 8)) return false;
+  // First do a cheap check to see if we may read past the end of the stream, using
+  // constant upper bounds for 'bit_offset_' and 'num_bits'.
+  if (UNLIKELY(byte_offset_ + sizeof(buffered_values_) + MAX_BITWIDTH / 8 > max_bytes_)) {
+    // Now do the precise check.
+    if (UNLIKELY(byte_offset_ * 8 + bit_offset_ + num_bits > max_bytes_ * 8)) {
+      return false;
+    }
+  }
 
   DCHECK_GE(bit_offset_, 0);
   DCHECK_LE(bit_offset_, 64);

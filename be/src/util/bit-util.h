@@ -165,11 +165,10 @@ class BitUtil {
   }
 
   /// Returns the 'num_bits' least-significant bits of 'v'.
-  static inline uint64_t TrailingBits(uint64_t v, int num_bits) {
-    if (UNLIKELY(num_bits == 0)) return 0;
+  /// Force inlining - GCC does not always inline this into hot loops.
+  static ALWAYS_INLINE uint64_t TrailingBits(uint64_t v, int num_bits) {
     if (UNLIKELY(num_bits >= 64)) return v;
-    int n = 64 - num_bits;
-    return (v << n) >> n;
+    return ((1UL << num_bits) - 1) & v;
   }
 
   /// Swaps the byte order (i.e. endianess)

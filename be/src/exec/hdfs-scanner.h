@@ -452,17 +452,51 @@ class HdfsScanner {
 
   /// Initialize a tuple.
   /// TODO: only copy over non-null slots.
-  /// TODO: InitTuple is called frequently, avoid the if, perhaps via templatization.
   void InitTuple(const TupleDescriptor* desc, Tuple* template_tuple, Tuple* tuple) {
     if (template_tuple != NULL) {
-      memcpy(tuple, template_tuple, desc->byte_size());
+      InitTupleFromTemplate(template_tuple, tuple, desc->byte_size());
     } else {
       tuple->ClearNullBits(*desc);
     }
   }
 
-  // TODO: replace this function with above once we can inline constants from
-  // scan_node_->tuple_desc() via codegen
+  /// Initialize 'tuple' with size 'tuple_byte_size' from 'template_tuple'
+  void InitTupleFromTemplate(Tuple* template_tuple, Tuple* tuple, int tuple_byte_size) {
+    memcpy(tuple, template_tuple, tuple_byte_size);
+  }
+
+  /// Initialize a dense array of 'num_tuples' tuples.
+  /// TODO: we could do better here if we inlined the tuple and null indicator byte
+  /// widths with codegen to eliminate all the branches in memcpy()/memset().
+  void InitTupleBuffer(
+      Tuple* template_tuple, uint8_t* __restrict__ tuple_mem, int64_t num_tuples) {
+    const TupleDescriptor* desc = scan_node_->tuple_desc();
+    const int tuple_byte_size = desc->byte_size();
+    // Handle the different template/non-template cases with different loops to avoid
+    // unnecessary branches inside the loop.
+    if (template_tuple != nullptr) {
+      for (int64_t i = 0; i < num_tuples; ++i) {
+        InitTupleFromTemplate(
+            template_tuple, reinterpret_cast<Tuple*>(tuple_mem), tuple_byte_size);
+        tuple_mem += tuple_byte_size;
+      }
+    } else if (tuple_byte_size <= CACHE_LINE_SIZE) {
+      // If each tuple fits in a cache line, it is quicker to zero the whole memory buffer
+      // instead of just the null indicators. This is because we are fetching the cache
+      // line anyway and zeroing a cache line is cheap (a couple of AVX2 instructions)
+      // compared with the overhead of calling memset() row-by-row.
+      memset(tuple_mem, 0, num_tuples * tuple_byte_size);
+    } else {
+      const int null_bytes_offset = desc->null_bytes_offset();
+      const int num_null_bytes = desc->num_null_bytes();
+      for (int64_t i = 0; i < num_tuples; ++i) {
+        reinterpret_cast<Tuple*>(tuple_mem)->ClearNullBits(
+            null_bytes_offset, num_null_bytes);
+        tuple_mem += tuple_byte_size;
+      }
+    }
+  }
+
   void InitTuple(Tuple* template_tuple, Tuple* tuple) {
     InitTuple(scan_node_->tuple_desc(), template_tuple, tuple);
   }

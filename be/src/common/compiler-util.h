@@ -43,6 +43,16 @@
 /// decision, e.g. not inlining a small function on a hot path.
 #define ALWAYS_INLINE __attribute__((always_inline))
 
+/// Clang is pedantic about __restrict__ (e.g. never allows calling a non-__restrict__)
+/// member function from a __restrict__-ed memory function and has some apparent bugs
+/// (e.g. can't convert a __restrict__ reference to a const& __restrict__ reference).
+/// Just disable it.
+#ifdef __clang__
+#define RESTRICT
+#else
+#define RESTRICT __restrict__
+#endif
+
 namespace impala {
 
 /// The size of an L1 cache line in bytes on x86-64.

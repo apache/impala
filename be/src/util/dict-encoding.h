@@ -22,8 +22,9 @@
 
 #include <boost/unordered_map.hpp>
 
-#include "gutil/strings/substitute.h"
+#include "common/compiler-util.h"
 #include "exec/parquet-common.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.h"
 #include "util/bit-util.h"
@@ -285,8 +286,9 @@ inline int DictEncoder<StringValue>::AddToTable(const StringValue& value,
   return bytes_added;
 }
 
-template<typename T>
-inline bool DictDecoder<T>::GetNextValue(T* value) {
+// Force inlining - GCC does not always inline this into hot loops in Parquet scanner.
+template <typename T>
+ALWAYS_INLINE inline bool DictDecoder<T>::GetNextValue(T* value) {
   int index = -1; // Initialize to avoid compiler warning.
   bool result = data_decoder_.Get(&index);
   // Use & to avoid branches.
@@ -297,8 +299,10 @@ inline bool DictDecoder<T>::GetNextValue(T* value) {
   return false;
 }
 
-template<>
-inline bool DictDecoder<Decimal16Value>::GetNextValue(Decimal16Value* value) {
+// Force inlining - GCC does not always inline this into hot loops in Parquet scanner.
+template <>
+ALWAYS_INLINE inline bool DictDecoder<Decimal16Value>::GetNextValue(
+    Decimal16Value* value) {
   int index;
   bool result = data_decoder_.Get(&index);
   if (!result) return false;
