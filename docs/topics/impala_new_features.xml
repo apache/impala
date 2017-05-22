@@ -46,6 +46,30 @@ under the License.
 
   </conbody>
 
+<!-- All 2.9.x new features go under here -->
+
+  <concept rev="2.9.0" id="new_features_290">
+
+    <title>New Features in <keyword keyref="impala29_full"/></title>
+
+    <conbody>
+
+      <p>
+        For the full list of issues closed in this release, including the issues
+        marked as <q>new features</q>, see the
+        <xref keyref="changelog_29">changelog for <keyword keyref="impala29"/></xref>.
+      </p>
+
+<!-- Prose explanations of most important new features - TBD.
+      <ul id="feature_list">
+        <li>
+        </li>
+      </ul>
+-->
+
+    </conbody>
+  </concept>
+
 <!-- All 2.8.x new features go under here -->
 
   <concept rev="2.8.0" id="new_features_280">

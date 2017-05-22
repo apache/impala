@@ -10577,6 +10577,10 @@ under the License.
   <keydef keys="impala14_full"><topicmeta><keywords><keyword>Impala 1.4</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala13_full"><topicmeta><keywords><keyword>Impala 1.3</keyword></keywords></topicmeta></keydef>
 
+<!-- Pointers to changelog pages -->
+  <keydef keys="changelog_29" href="https://impala.incubator.apache.org/docs/changelog-2.9.html" scope="external" format="html"/>
+  <keydef keys="changelog_28" href="https://impala.incubator.apache.org/docs/changelog-2.8.html" scope="external" format="html"/>
+
 <!-- Indirect addresses for all the impala*.xml files. The key is the ID of the first topic within each file. -->
   <keydef href="topics/impala_concepts.xml" keys="concepts"/>
   <keydef href="topics/impala_components.xml" keys="intro_components"/>
