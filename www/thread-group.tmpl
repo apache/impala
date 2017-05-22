@@ -25,6 +25,7 @@ under the License.
   <thead>
     <tr>
       <th>Thread name</th>
+      <th>Id</th>
       <th>Cumulative User CPU(s)</th>
       <th>Cumulative Kernel CPU(s)</th>
       <th>Cumulative IO-wait(s)</th>
@@ -34,6 +35,7 @@ under the License.
     {{#threads}}
     <tr>
       <td>{{name}}</td>
+      <td>{{id}}</td>
       <td>{{user_ns}}</td>
       <td>{{kernel_ns}}</td>
       <td>{{iowait_ns}}</td>
@@ -45,7 +47,7 @@ under the License.
 <script>
     $(document).ready(function() {
         $('#threads-tbl').DataTable({
-            "order": [[ 1, "desc" ]],
+            "order": [[ 2, "desc" ]],
             "pageLength": 100
         });
     });

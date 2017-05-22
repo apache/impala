@@ -21,6 +21,7 @@
 
 #include "exec/data-sink.h"
 #include "exprs/expr.h"
+#include "runtime/fragment-instance-state.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -147,7 +148,7 @@ void BlockingJoinNode::ProcessBuildInputAsync(RuntimeState* state, DataSink* bui
     Status* status) {
   DCHECK(status != nullptr);
   SCOPED_THREAD_COUNTER_MEASUREMENT(state->total_thread_statistics());
-  if  (build_sink == nullptr){
+  if (build_sink == nullptr){
     *status = ProcessBuildInput(state);
   } else {
     *status = SendBuildInputToSink<true>(state, build_sink);
@@ -189,9 +190,12 @@ Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
   if (!IsInSubplan() && state->resource_pool()->TryAcquireThreadToken()) {
     Status build_side_status;
     runtime_profile()->AppendExecOption("Join Build-Side Prepared Asynchronously");
-    Thread build_thread(
-        node_name_, "build thread", bind(&BlockingJoinNode::ProcessBuildInputAsync, this,
-                                        state, build_sink, &build_side_status));
+    string thread_name = Substitute("join-build-thread (finst:$0, plan-node-id:$1)",
+        PrintId(state->fragment_instance_id()), id());
+    Thread build_thread(FragmentInstanceState::FINST_THREAD_GROUP_NAME, thread_name,
+        [this, state, build_sink, status=&build_side_status]() {
+          ProcessBuildInputAsync(state, build_sink, status);
+        });
     // Open the left child so that it may perform any initialisation in parallel.
     // Don't exit even if we see an error, we still need to wait for the build thread
     // to finish.

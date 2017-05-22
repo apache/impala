@@ -23,6 +23,7 @@
 #include "exec/hdfs-scanner.h"
 #include "exec/scanner-context.h"
 #include "runtime/descriptors.h"
+#include "runtime/fragment-instance-state.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
 #include "runtime/mem-tracker.h"
@@ -346,10 +347,13 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
 
     COUNTER_ADD(&active_scanner_thread_counter_, 1);
     COUNTER_ADD(num_scanner_threads_started_counter_, 1);
-    stringstream ss;
-    ss << "scanner-thread(" << num_scanner_threads_started_counter_->value() << ")";
+    string name = Substitute("scanner-thread (finst:$0, plan-node-id:$1, thread-idx:$2)",
+        PrintId(runtime_state_->fragment_instance_id()), id(),
+        num_scanner_threads_started_counter_->value());
+
+    auto fn = [this]() { this->ScannerThread(); };
     scanner_threads_.AddThread(
-        new Thread("hdfs-scan-node", ss.str(), &HdfsScanNode::ScannerThread, this));
+        new Thread(FragmentInstanceState::FINST_THREAD_GROUP_NAME, name, fn));
   }
 }
 

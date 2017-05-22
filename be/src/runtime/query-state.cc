@@ -298,10 +298,10 @@ void QueryState::StartFInstances() {
 
     // start new thread to execute instance
     refcnt_.Add(1);  // decremented in ExecFInstance()
-    Thread t("query-state",
-        Substitute(
-          "exec-query-finstance-$0", PrintId(instance_ctx.fragment_instance_id)),
-        &QueryState::ExecFInstance, this, fis);
+    string thread_name = Substitute(
+        "exec-finstance (finst:$0)", PrintId(instance_ctx.fragment_instance_id));
+    Thread t(FragmentInstanceState::FINST_THREAD_GROUP_NAME, thread_name,
+        [this, fis]() { this->ExecFInstance(fis); });
     t.Detach();
   }
 

@@ -22,6 +22,7 @@
 #include "exec/kudu-scanner.h"
 #include "exec/kudu-util.h"
 #include "gutil/gscoped_ptr.h"
+#include "runtime/fragment-instance-state.h"
 #include "runtime/mem-pool.h"
 #include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"
@@ -152,14 +153,17 @@ void KuduScanNode::ThreadAvailableCb(ThreadResourceMgr::ResourcePool* pool) {
     ++num_active_scanners_;
     COUNTER_ADD(num_scanner_threads_started_counter_, 1);
 
-    // Reserve the first token so no other thread picks it up.
-    const string* token = GetNextScanToken();
-    string name = Substitute("scanner-thread($0)",
+    string name = Substitute(
+        "kudu-scanner-thread (finst:$0, plan-node-id:$1, thread-idx:$2)",
+        PrintId(runtime_state_->fragment_instance_id()), id(),
         num_scanner_threads_started_counter_->value());
 
+    // Reserve the first token so no other thread picks it up.
+    const string* token = GetNextScanToken();
+    auto fn = [this, token, name]() { this->RunScannerThread(name, token); };
     VLOG_RPC << "Thread started: " << name;
-    scanner_threads_.AddThread(new Thread("kudu-scan-node", name,
-        &KuduScanNode::RunScannerThread, this, name, token));
+    scanner_threads_.AddThread(
+        new Thread(FragmentInstanceState::FINST_THREAD_GROUP_NAME, name, fn));
   }
 }
 

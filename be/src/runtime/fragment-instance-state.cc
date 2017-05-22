@@ -54,6 +54,7 @@ using namespace impala;
 using namespace apache::thrift;
 
 const string FragmentInstanceState::PER_HOST_PEAK_MEM_COUNTER = "PerHostPeakMemUsage";
+const string FragmentInstanceState::FINST_THREAD_GROUP_NAME = "fragment-execution";
 
 static const string OPEN_TIMER_NAME = "OpenTime";
 static const string PREPARE_TIMER_NAME = "PrepareTime";
@@ -224,10 +225,11 @@ Status FragmentInstanceState::Prepare() {
   // We need to start the profile-reporting thread before calling Open(),
   // since it may block.
   if (FLAGS_status_report_interval > 0) {
+    string thread_name = Substitute("profile-report (finst:$0)", PrintId(instance_id()));
     unique_lock<mutex> l(report_thread_lock_);
     report_thread_.reset(
-        new Thread("plan-fragment-executor", "report-profile",
-            &FragmentInstanceState::ReportProfileThread, this));
+        new Thread(FragmentInstanceState::FINST_THREAD_GROUP_NAME, thread_name,
+            [this]() { this->ReportProfileThread(); }));
     // Make sure the thread started up, otherwise ReportProfileThread() might get into
     // a race with StopReportThread().
     while (!report_thread_active_) report_thread_started_cv_.wait(l);
@@ -456,4 +458,3 @@ void FragmentInstanceState::PrintVolumeIds() {
       << "Hdfs split stats (<volume id>:<# splits>/<split lengths>) for query="
       << query_id() << ":\n" << str.str();
 }
-

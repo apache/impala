@@ -119,6 +119,8 @@ class FragmentInstanceState {
   const TNetworkAddress& coord_address() const { return query_ctx().coord_address; }
   ObjectPool* obj_pool();
 
+  static const std::string FINST_THREAD_GROUP_NAME;
+
  private:
   QueryState* query_state_;
   const TPlanFragmentCtx& fragment_ctx_;

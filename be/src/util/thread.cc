@@ -259,6 +259,7 @@ void ThreadMgr::ThreadGroupUrlCallback(const Webserver::ArgumentMap& args,
     for (const ThreadCategory::value_type& thread: *category) {
       Value val(kObjectType);
       val.AddMember("name", thread.second.name().c_str(), document->GetAllocator());
+      val.AddMember("id", thread.second.thread_id(), document->GetAllocator());
       ThreadStats stats;
       Status status = GetThreadStats(thread.second.thread_id(), &stats);
       if (!status.ok()) {
@@ -304,13 +305,9 @@ void Thread::SuperviseThread(const string& name, const string& category,
     LOG_EVERY_N(INFO, 100) << "Could not determine thread ID: " << error_msg;
   }
   // Make a copy, since we want to refer to these variables after the unsafe point below.
-  string category_copy = category;
+  string category_copy = category.empty() ? "no-category" : category;;
   shared_ptr<ThreadMgr> thread_mgr_ref = thread_manager;
-  stringstream ss;
-  ss << (name.empty() ? "thread" : name) << "-" << system_tid;
-  string name_copy = ss.str();
-
-  if (category_copy.empty()) category_copy = "no-category";
+  string name_copy = name.empty() ? Substitute("thread-$0", system_tid) : name;
 
   // Use boost's get_id rather than the system thread ID as the unique key for this thread
   // since the latter is more prone to being recycled.
