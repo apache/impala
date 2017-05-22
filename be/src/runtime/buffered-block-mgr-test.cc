@@ -1234,10 +1234,10 @@ TEST_F(BufferedBlockMgrTest, NoDirsAllocationError) {
   ErrorLogMap error_log;
   runtime_state->GetErrors(&error_log);
   ASSERT_TRUE(error_log.empty());
-  for (int i = 0; i < blocks.size(); ++i) {
-    // Writes won't fail until the actual I/O is attempted.
-    ASSERT_OK(blocks[i]->Unpin());
-  }
+  // Unpin the blocks. Unpinning may fail if it hits a write error before this thread is
+  // done unpinning.
+  vector<TErrorCode::type> cancelled_code = {TErrorCode::CANCELLED};
+  UnpinBlocks(blocks, &cancelled_code);
 
   LOG(INFO) << "Waiting for writes.";
   // Write failure should cancel query.
