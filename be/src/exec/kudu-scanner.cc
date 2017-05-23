@@ -31,6 +31,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/string-value.h"
+#include "runtime/timestamp-value.inline.h"
 #include "runtime/tuple-row.h"
 #include "gutil/gscoped_ptr.h"
 #include "gutil/strings/substitute.h"
@@ -207,9 +208,7 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_me
       }
       int64_t ts_micros = *reinterpret_cast<int64_t*>(
           kudu_tuple->GetSlot(slot->tuple_offset()));
-      int64_t ts_seconds = ts_micros / MICROS_PER_SEC;
-      int64_t micros_part = ts_micros - (ts_seconds * MICROS_PER_SEC);
-      TimestampValue tv = TimestampValue::FromUnixTimeMicros(ts_seconds, micros_part);
+      TimestampValue tv = TimestampValue::FromUnixTimeMicros(ts_micros);
       if (tv.HasDateAndTime()) {
         RawValue::Write(&tv, kudu_tuple, slot, NULL);
       } else {

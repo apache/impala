@@ -48,8 +48,7 @@ public class CreateTableStmt extends StatementBase {
 
   @VisibleForTesting
   final static String KUDU_STORAGE_HANDLER_ERROR_MESSAGE = "Kudu tables must be"
-      + " specified using 'STORED AS KUDU' without using the storage handler table"
-      + " property.";
+      + " specified using 'STORED AS KUDU'.";
 
   // Table parameters specified in a CREATE TABLE statement
   private final TableDef tableDef_;
@@ -211,8 +210,11 @@ public class CreateTableStmt extends StatementBase {
    * Kudu tables.
    */
   private void analyzeKuduTableProperties(Analyzer analyzer) throws AnalysisException {
-    if (getTblProperties().containsKey(KuduTable.KEY_STORAGE_HANDLER)) {
-      throw new AnalysisException(KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
+    // Only the Kudu storage handler may be specified for Kudu tables.
+    String handler = getTblProperties().get(KuduTable.KEY_STORAGE_HANDLER);
+    if (handler != null && !handler.equals(KuduTable.KUDU_STORAGE_HANDLER)) {
+      throw new AnalysisException("Invalid storage handler specified for Kudu table: " +
+          handler);
     }
     getTblProperties().put(KuduTable.KEY_STORAGE_HANDLER, KuduTable.KUDU_STORAGE_HANDLER);
 

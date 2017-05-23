@@ -2165,7 +2165,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
     AnalysisError("create table tab (x int primary key) stored as kudu tblproperties (" +
         "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler')",
-        CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
+        "Table partitioning must be specified for managed Kudu tables.");
     // Invalid value for number of replicas
     AnalysisError("create table t (x int primary key) stored as kudu tblproperties (" +
         "'kudu.num_tablet_replicas'='1.1')",
@@ -2340,6 +2340,30 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "partition by range (partition 100 <= VALUES < 200) stored as kudu",
         "Range partition value 100 (type: TINYINT) is not type " +
         "compatible with partitioning column 'ts' (type: TIMESTAMP).");
+
+    // TIMESTAMP columns with default values
+    AnalyzesOk("create table tdefault (id int primary key, ts timestamp default now())" +
+        "partition by hash(id) partitions 3 stored as kudu");
+    AnalyzesOk("create table tdefault (id int primary key, ts timestamp default " +
+        "timestamp_from_unix_micros(1230768000000000)) partition by hash(id) " +
+        "partitions 3 stored as kudu");
+    AnalyzesOk("create table tdefault (id int primary key, " +
+        "ts timestamp not null default '2009-01-01 00:00:00') " +
+        "partition by hash(id) partitions 3 stored as kudu");
+    AnalyzesOk("create table tdefault (id int primary key, " +
+        "ts timestamp not null default cast('2009-01-01 00:00:00' as timestamp)) " +
+        "partition by hash(id) partitions 3 stored as kudu");
+    AnalysisError("create table tdefault (id int primary key, ts timestamp " +
+        "default null) partition by hash(id) partitions 3 stored as kudu",
+        "NULL cannot be cast to a TIMESTAMP literal.");
+    AnalysisError("create table tdefault (id int primary key, " +
+        "ts timestamp not null default cast('00:00:00' as timestamp)) " +
+        "partition by hash(id) partitions 3 stored as kudu",
+        "CAST('00:00:00' AS TIMESTAMP) cannot be cast to a TIMESTAMP literal.");
+    AnalysisError("create table tdefault (id int primary key, " +
+        "ts timestamp not null default '2009-1 foo') " +
+        "partition by hash(id) partitions 3 stored as kudu",
+        "String '2009-1 foo' cannot be cast to a TIMESTAMP literal.");
   }
 
   @Test
@@ -2369,7 +2393,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "'kudu.table_name'='t')", CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
     AnalysisError("create external table t stored as kudu tblproperties (" +
         "'storage_handler'='foo', 'kudu.table_name'='t')",
-        CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
+        "Invalid storage handler specified for Kudu table: foo");
     // Cannot specify the number of replicas for external Kudu tables
     AnalysisError("create external table tab (x int) stored as kudu " +
         "tblproperties ('kudu.num_tablet_replicas' = '1', " +

@@ -274,7 +274,7 @@ public class DescribeResultFactory {
       nullableCol.setString_val(Boolean.toString(kuduColumn.isNullable()));
       TColumnValue defaultValCol = new TColumnValue();
       if (kuduColumn.hasDefaultValue()) {
-        defaultValCol.setString_val(kuduColumn.getDefaultValue().getStringValue());
+        defaultValCol.setString_val(kuduColumn.getDefaultValueString());
       } else {
         defaultValCol.setString_val("");
       }

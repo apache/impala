@@ -37,9 +37,7 @@ import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Type;
-import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaRuntimeException;
-import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TKuduScanNode;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -392,6 +390,7 @@ public class KuduScanNode extends ScanNode {
       }
       case TIMESTAMP: {
         try {
+          // TODO: Simplify when Impala supports a 64-bit TIMESTAMP type.
           kuduPredicate = KuduPredicate.newComparisonPredicate(column, op,
               KuduUtil.timestampToUnixTimeMicros(analyzer, literal));
         } catch (Exception e) {
@@ -492,6 +491,7 @@ public class KuduScanNode extends ScanNode {
       case STRING: return ((StringLiteral) e).getValue();
       case TIMESTAMP: {
         try {
+          // TODO: Simplify when Impala supports a 64-bit TIMESTAMP type.
           return KuduUtil.timestampToUnixTimeMicros(analyzer, e);
         } catch (Exception ex) {
           LOG.info("Exception converting Kudu timestamp expr: " + e.toSql(), ex);

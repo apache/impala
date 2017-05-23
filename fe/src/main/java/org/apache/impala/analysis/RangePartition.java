@@ -198,6 +198,7 @@ public class RangePartition implements ParseNode {
     }
     Preconditions.checkNotNull(literal);
 
+    // TODO: Remove when Impala supports a 64-bit TIMESTAMP type.
     if (colType.isTimestamp()) {
       try {
         long unixTimeMicros = KuduUtil.timestampToUnixTimeMicros(analyzer, literal);

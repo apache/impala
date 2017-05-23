@@ -216,3 +216,35 @@ select * from ts_ranges_ctas order by id
 ---- TYPES
 TIMESTAMP,INT
 ====
+---- QUERY
+# Creates a Kudu table with timestamp column default values.
+create table ts_default (i int primary key, ts1 timestamp,
+                         ts2 timestamp default cast('2009-01-01 00:00:00' as timestamp))
+partition by hash(i) partitions 3 stored as kudu
+---- RESULTS
+====
+---- QUERY
+insert into ts_default (i) values (1);
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+I, TS1, TS2
+---- DML_RESULTS: ts_default
+1,NULL,2009-01-01 00:00:00
+---- TYPES
+INT,TIMESTAMP,TIMESTAMP
+====
+---- QUERY
+insert into ts_default (i, ts1, ts2) values (2, NULL, NULL);
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+I, TS1, TS2
+---- DML_RESULTS: ts_default
+1,NULL,2009-01-01 00:00:00
+2,NULL,NULL
+---- TYPES
+INT,TIMESTAMP,TIMESTAMP
+====

@@ -306,6 +306,16 @@ public class ToSqlTest extends FrontendTestBase {
         "default",
         "CREATE TABLE default.p ( a INT, b INT ) PARTITIONED BY ( day STRING ) " +
         "SORT BY ( a, b ) STORED AS TEXTFILE" , true);
+    // Kudu table with a TIMESTAMP column default value
+    testToSql("create table p (a bigint primary key, b timestamp default '1987-05-19') " +
+        "partition by hash(a) partitions 3 stored as kudu " +
+        "tblproperties ('kudu.master_addresses'='foo')",
+        "default",
+        "CREATE TABLE default.p ( a BIGINT PRIMARY KEY, b TIMESTAMP " +
+        "DEFAULT '1987-05-19' ) PARTITION BY HASH (a) PARTITIONS 3 " +
+        "STORED AS KUDU TBLPROPERTIES ('kudu.master_addresses'='foo', " +
+        "'kudu.table_name'='impala::default.p', " +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler')", true);
   }
 
   @Test
@@ -328,6 +338,17 @@ public class ToSqlTest extends FrontendTestBase {
         "CREATE TABLE default.p PARTITIONED BY ( int_col ) SORT BY ( string_col ) " +
         "STORED AS TEXTFILE AS SELECT double_col, string_col, int_col FROM " +
         "functional.alltypes", true);
+    // Kudu table with multiple partition params
+    testToSql("create table p primary key (a,b) partition by hash(a) partitions 3, " +
+        "range (b) (partition value = 1) stored as kudu " +
+        "tblproperties ('kudu.master_addresses'='foo') as select int_col a, bigint_col " +
+        "b from functional.alltypes",
+        "default",
+        "CREATE TABLE default.p PRIMARY KEY (a, b) PARTITION BY HASH (a) PARTITIONS 3, " +
+        "RANGE (b) (PARTITION VALUE = 1) STORED AS KUDU TBLPROPERTIES " +
+        "('kudu.master_addresses'='foo', 'kudu.table_name'='impala::default.p', " +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler') AS " +
+        "SELECT int_col a, bigint_col b FROM functional.alltypes", true);
   }
 
   @Test

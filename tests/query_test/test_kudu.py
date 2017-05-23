@@ -360,6 +360,38 @@ class TestKuduOperations(KuduTestSuite):
 
 class TestCreateExternalTable(KuduTestSuite):
 
+  def test_external_timestamp_default_value(self, cursor, kudu_client, unique_database):
+    """Checks that a Kudu table created outside Impala with a default value on a
+       UNIXTIME_MICROS column can be loaded by Impala, and validates the DESCRIBE
+       output is correct."""
+    schema_builder = SchemaBuilder()
+    column_spec = schema_builder.add_column("id", INT64)
+    column_spec.nullable(False)
+    column_spec = schema_builder.add_column("ts", UNIXTIME_MICROS)
+    column_spec.default(datetime(2009, 1, 1, 0, 0, tzinfo=utc))
+    schema_builder.set_primary_keys(["id"])
+    schema = schema_builder.build()
+    name = unique_database + ".tsdefault"
+
+    try:
+      kudu_client.create_table(name, schema,
+        partitioning=Partitioning().set_range_partition_columns(["id"]))
+      kudu_table = kudu_client.table(name)
+      impala_table_name = self.get_kudu_table_base_name(kudu_table.name)
+      props = "TBLPROPERTIES('kudu.table_name'='%s')" % kudu_table.name
+      cursor.execute("CREATE EXTERNAL TABLE %s STORED AS KUDU %s" % (impala_table_name,
+        props))
+      with self.drop_impala_table_after_context(cursor, impala_table_name):
+        cursor.execute("DESCRIBE %s" % impala_table_name)
+        table_desc = [[col.strip() if col else col for col in row] for row in cursor]
+        # Pytest shows truncated output on failure, so print the details just in case.
+        LOG.info(table_desc)
+        assert ["ts", "timestamp", "", "false", "true", "1230768000000000", \
+          "AUTO_ENCODING", "DEFAULT_COMPRESSION", "0"] in table_desc
+    finally:
+      if kudu_client.table_exists(name):
+        kudu_client.delete_table(name)
+
   def test_implicit_table_props(self, cursor, kudu_client):
     """Check that table properties added internally during table creation are as
        expected.
@@ -615,6 +647,36 @@ class TestShowCreateTable(KuduTestSuite):
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
 
+  def test_timestamp_default_value(self, cursor):
+    create_sql_fmt = """
+        CREATE TABLE {table} (c INT, d TIMESTAMP,
+        e TIMESTAMP NULL DEFAULT CAST('%s' AS TIMESTAMP),
+        PRIMARY KEY(c, d))
+        PARTITION BY HASH(c) PARTITIONS 3
+        STORED AS KUDU"""
+    # Long lines are unfortunate, but extra newlines will break the test.
+    show_create_sql_fmt = """
+        CREATE TABLE {db}.{{table}} (
+          c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
+          d TIMESTAMP NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
+          e TIMESTAMP NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION DEFAULT timestamp_from_unix_micros(%s),
+          PRIMARY KEY (c, d)
+        )
+        PARTITION BY HASH (c) PARTITIONS 3
+        STORED AS KUDU
+        TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
+            db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS)
+
+    self.assert_show_create_equals(cursor,
+      create_sql_fmt % ("2009-01-01 00:00:00.000001000"),
+      show_create_sql_fmt % ("1230768000000001"))
+    self.assert_show_create_equals(cursor,
+      create_sql_fmt % ("2009-01-01 00:00:00.000001001"),
+      show_create_sql_fmt % ("1230768000000001"))
+    self.assert_show_create_equals(cursor,
+      create_sql_fmt % ("2009-01-01 00:00:00.000000999"),
+      show_create_sql_fmt % ("1230768000000001"))
+
   def test_properties(self, cursor):
     # If an explicit table name is used for the Kudu table and it differs from what
     # would be the default Kudu table name, the name should be shown as a table property.
@@ -771,7 +833,6 @@ class TestImpalaKuduIntegration(KuduTestSuite):
       cursor.execute("DROP TABLE %s" % (impala_table_name))
       cursor.execute("SHOW TABLES")
       assert (impala_table_name,) not in cursor.fetchall()
-
 
   def test_delete_managed_kudu_table(self, cursor, kudu_client, unique_database):
     """Check that dropping a managed Kudu table works even if the underlying Kudu table

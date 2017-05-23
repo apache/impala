@@ -115,6 +115,7 @@ ptime TimestampValue::UnixTimeToPtime(time_t unix_time) {
   /// Unix times are represented internally in boost as 32 bit ints which limits the
   /// range of dates to 1901-2038 (https://svn.boost.org/trac/boost/ticket/3109), so
   /// libc functions will be used instead.
+  // TODO: Conversion using libc is very expensive (IMPALA-5357); find an alternative.
   tm temp_tm;
   if (FLAGS_use_local_tz_for_unix_timestamp_conversions) {
     if (UNLIKELY(localtime_r(&unix_time, &temp_tm) == nullptr)) {

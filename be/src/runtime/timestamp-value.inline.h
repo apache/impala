@@ -28,6 +28,14 @@
 
 namespace impala {
 
+inline TimestampValue TimestampValue::FromUnixTimeMicros(int64_t unix_time_micros) {
+  int64_t ts_seconds = unix_time_micros / MICROS_PER_SEC;
+  int64_t micros_part = unix_time_micros - (ts_seconds * MICROS_PER_SEC);
+  boost::posix_time::ptime temp = UnixTimeToPtime(ts_seconds);
+  temp += boost::posix_time::microseconds(micros_part);
+  return TimestampValue(temp);
+}
+
 /// Interpret 'this' as a timestamp in UTC and convert to unix time.
 /// Returns false if the conversion failed ('unix_time' will be undefined), otherwise
 /// true.
@@ -36,6 +44,7 @@ inline bool TimestampValue::UtcToUnixTime(time_t* unix_time) const {
   if (UNLIKELY(!HasDateAndTime())) return false;
   const boost::posix_time::ptime temp(date_, time_);
   tm temp_tm = boost::posix_time::to_tm(temp);
+  // TODO: Conversion using libc is very expensive (IMPALA-5357); find an alternative.
   *unix_time = timegm(&temp_tm);
   return true;
 }
@@ -75,6 +84,7 @@ inline bool TimestampValue::ToUnixTime(time_t* unix_time) const {
   if (UNLIKELY(!HasDateAndTime())) return false;
   const boost::posix_time::ptime temp(date_, time_);
   tm temp_tm = boost::posix_time::to_tm(temp);
+  // TODO: Conversion using libc is very expensive (IMPALA-5357); find an alternative.
   if (FLAGS_use_local_tz_for_unix_timestamp_conversions) {
     *unix_time = mktime(&temp_tm);
   } else {

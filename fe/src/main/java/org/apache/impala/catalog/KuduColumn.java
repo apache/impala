@@ -44,13 +44,21 @@ public class KuduColumn extends Column {
   private final boolean isNullable_;
   private final Encoding encoding_;
   private final CompressionAlgorithm compression_;
-  private final LiteralExpr defaultValue_;
   private final int blockSize_;
+
+  // Default value for this column. The expr is a literal of the target column type
+  // post-analysis. For TIMESTAMPs those are BIGINT values storing the unix time in
+  // microseconds. Code that references this may need to handle TIMESTAMP specially.
+  // For that reason, this isn't exposed publicly, e.g. getDefaultValueSql() is used
+  // to hide this complexity externally.
+  private final LiteralExpr defaultValue_;
 
   private KuduColumn(String name, Type type, boolean isKey, boolean isNullable,
       Encoding encoding, CompressionAlgorithm compression, LiteralExpr defaultValue,
       int blockSize, String comment, int position) {
     super(name, type, comment, position);
+    Preconditions.checkArgument(defaultValue == null || type == defaultValue.getType()
+        || (type.isTimestamp() && defaultValue.getType().isIntegerType()));
     isKey_ = isKey;
     isNullable_ = isNullable;
     encoding_ = encoding;
@@ -65,8 +73,9 @@ public class KuduColumn extends Column {
     Object defaultValue = colSchema.getDefaultValue();
     LiteralExpr defaultValueExpr = null;
     if (defaultValue != null) {
+      Type defaultValueType = type.isTimestamp() ? Type.BIGINT : type;
       try {
-        defaultValueExpr = LiteralExpr.create(defaultValue.toString(), type);
+        defaultValueExpr = LiteralExpr.create(defaultValue.toString(), defaultValueType);
       } catch (AnalysisException e) {
         throw new ImpalaRuntimeException(String.format("Error parsing default value: " +
             "'%s'", defaultValue), e);
@@ -92,8 +101,10 @@ public class KuduColumn extends Column {
     }
     LiteralExpr defaultValue = null;
     if (column.isSetDefault_value()) {
+      Type defaultValueType = columnType.isTimestamp() ? Type.BIGINT : columnType;
       defaultValue =
-          LiteralExpr.fromThrift(column.getDefault_value().getNodes().get(0), columnType);
+          LiteralExpr.fromThrift(column.getDefault_value().getNodes().get(0),
+              defaultValueType);
     }
     int blockSize = 0;
     if (column.isSetBlock_size()) blockSize = column.getBlock_size();
@@ -106,9 +117,31 @@ public class KuduColumn extends Column {
   public boolean isNullable() { return isNullable_; }
   public Encoding getEncoding() { return encoding_; }
   public CompressionAlgorithm getCompression() { return compression_; }
-  public LiteralExpr getDefaultValue() { return defaultValue_; }
-  public boolean hasDefaultValue() { return defaultValue_ != null; }
   public int getBlockSize() { return blockSize_; }
+  public boolean hasDefaultValue() { return defaultValue_ != null; }
+
+  /**
+   * Returns a SQL string representation of the default value. Similar to calling
+   * LiteralExpr.toSql(), but this handles TIMESTAMPs specially because
+   * TIMESTAMP default values are stored as BIGINTs representing unix time in
+   * microseconds. For TIMESTAMP columns, the returned string is the function to
+   * convert unix times in microseconds to TIMESTAMPs with the value as its parameter.
+   */
+  public String getDefaultValueSql() {
+    if (!hasDefaultValue()) return null;
+    if (!type_.isTimestamp()) return defaultValue_.toSql();
+    return "timestamp_from_unix_micros(" + defaultValue_.getStringValue() + ")";
+  }
+
+  /**
+   * Returns a string representation of the default value. This calls getStringValue()
+   * but is exposed so defaultValue_ can be encapsulated as it has special handling for
+   * TIMESTAMP column types.
+   */
+  public String getDefaultValueString() {
+    if (!hasDefaultValue()) return null;
+    return defaultValue_.getStringValue();
+  }
 
   @Override
   public TColumn toThrift() {

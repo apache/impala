@@ -102,6 +102,10 @@ class TimestampFunctions {
   static StringVal FromUnix(FunctionContext* context, const TIME& unix_time,
       const StringVal& fmt);
 
+  /// Return a timestamp from a unix time in microseconds.
+  static TimestampVal TimestampFromUnixMicros(FunctionContext* context,
+      const BigIntVal& unix_time_micros);
+
   /// Convert a timestamp to or from a particular timezone based time.
   static TimestampVal FromUtc(FunctionContext* context,
     const TimestampVal& ts_val, const StringVal& tz_string_val);

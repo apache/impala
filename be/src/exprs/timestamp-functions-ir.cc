@@ -128,6 +128,15 @@ BigIntVal TimestampFunctions::UtcToUnixMicros(FunctionContext* context,
   return (tv.UtcToUnixTimeMicros(&result)) ? BigIntVal(result) : BigIntVal::null();
 }
 
+TimestampVal TimestampFunctions::TimestampFromUnixMicros(FunctionContext* context,
+    const BigIntVal& unix_time_micros) {
+  if (unix_time_micros.is_null) return TimestampVal::null();
+  TimestampValue tv = TimestampValue::FromUnixTimeMicros(unix_time_micros.val);
+  TimestampVal result;
+  tv.ToTimestampVal(&result);
+  return result;
+}
+
 TimestampVal TimestampFunctions::ToTimestamp(FunctionContext* context,
     const BigIntVal& bigint_val) {
   if (bigint_val.is_null) return TimestampVal::null();

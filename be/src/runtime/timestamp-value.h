@@ -102,13 +102,8 @@ class TimestampValue {
     return TimestampValue(temp);
   }
 
-  /// Same as FromUnixTime() above, but adds the specified number of microseconds to the
-  /// resulting TimestampValue.
-  static TimestampValue FromUnixTimeMicros(time_t unix_time, int64_t micros) {
-    boost::posix_time::ptime temp = UnixTimeToPtime(unix_time);
-    temp += boost::posix_time::microseconds(micros);
-    return TimestampValue(temp);
-  }
+  /// Same as FromUnixTime() above, but the unix time is specified in microseconds.
+  static TimestampValue FromUnixTimeMicros(int64_t unix_time_micros);
 
   /// Returns a TimestampValue where the integer part of the specified 'unix_time'
   /// specifies the number of seconds (see above), and the fractional part is converted

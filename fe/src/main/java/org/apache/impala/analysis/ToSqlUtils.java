@@ -79,6 +79,21 @@ public class ToSqlUtils {
   }
 
   /**
+   * Returns a comma-delimited string of Kudu 'partition by' parameters on a
+   * CreateTableStmt, or null if this isn't a CreateTableStmt for a Kudu table.
+   */
+  private static String getKuduPartitionByParams(CreateTableStmt stmt) {
+    List<KuduPartitionParam> partitionParams = stmt.getKuduPartitionParams();
+    Preconditions.checkNotNull(partitionParams);
+    if (partitionParams.isEmpty()) return null;
+    List<String> paramStrings = Lists.newArrayList();
+    for (KuduPartitionParam p : partitionParams) {
+      paramStrings.add(p.toSql());
+    }
+    return Joiner.on(", ").join(paramStrings);
+  }
+
+  /**
    * Given an unquoted identifier string, returns an identifier lexable by
    * Impala and Hive, possibly by enclosing the original identifier in "`" quotes.
    * For example, Hive cannot parse its own auto-generated column
@@ -146,11 +161,12 @@ public class ToSqlUtils {
     for (ColumnDef col: stmt.getPartitionColumnDefs()) {
       partitionColsSql.add(col.toString());
     }
+    String kuduParamsSql = getKuduPartitionByParams(stmt);
     // TODO: Pass the correct compression, if applicable.
     return getCreateTableSql(stmt.getDb(), stmt.getTbl(), stmt.getComment(), colsSql,
-        partitionColsSql, stmt.getTblPrimaryKeyColumnNames(), null, stmt.getSortColumns(),
-        stmt.getTblProperties(), stmt.getSerdeProperties(), stmt.isExternal(),
-        stmt.getIfNotExists(), stmt.getRowFormat(),
+        partitionColsSql, stmt.getTblPrimaryKeyColumnNames(), kuduParamsSql,
+        stmt.getSortColumns(), stmt.getTblProperties(), stmt.getSerdeProperties(),
+        stmt.isExternal(), stmt.getIfNotExists(), stmt.getRowFormat(),
         HdfsFileFormat.fromThrift(stmt.getFileFormat()), HdfsCompression.NONE, null,
         stmt.getLocation());
   }
@@ -169,11 +185,12 @@ public class ToSqlUtils {
     }
     HashMap<String, String> properties = Maps.newHashMap(innerStmt.getTblProperties());
     removeHiddenTableProperties(properties);
+    String kuduParamsSql = getKuduPartitionByParams(innerStmt);
     // TODO: Pass the correct compression, if applicable.
     String createTableSql = getCreateTableSql(innerStmt.getDb(), innerStmt.getTbl(),
         innerStmt.getComment(), null, partitionColsSql,
-        innerStmt.getTblPrimaryKeyColumnNames(), null, innerStmt.getSortColumns(),
-        properties, innerStmt.getSerdeProperties(),
+        innerStmt.getTblPrimaryKeyColumnNames(), kuduParamsSql,
+        innerStmt.getSortColumns(), properties, innerStmt.getSerdeProperties(),
         innerStmt.isExternal(), innerStmt.getIfNotExists(), innerStmt.getRowFormat(),
         HdfsFileFormat.fromThrift(innerStmt.getFileFormat()), HdfsCompression.NONE, null,
         innerStmt.getLocation());
@@ -282,6 +299,12 @@ public class ToSqlUtils {
         Joiner.on(", ").appendTo(sb, primaryKeysSql).append(")");
       }
       sb.append("\n)");
+    } else {
+      // CTAS for Kudu tables still print the primary key
+      if (primaryKeysSql != null && !primaryKeysSql.isEmpty()) {
+        sb.append("\n PRIMARY KEY (");
+        Joiner.on(", ").appendTo(sb, primaryKeysSql).append(")");
+      }
     }
     sb.append("\n");
 
@@ -384,8 +407,8 @@ public class ToSqlUtils {
       if (kuduCol.getCompression() != null) {
         sb.append(" COMPRESSION " + kuduCol.getCompression());
       }
-      if (kuduCol.getDefaultValue() != null) {
-        sb.append(" DEFAULT " + kuduCol.getDefaultValue().toSql());
+      if (kuduCol.hasDefaultValue()) {
+        sb.append(" DEFAULT " + kuduCol.getDefaultValueSql());
       }
       if (kuduCol.getBlockSize() != 0) {
         sb.append(String.format(" BLOCK_SIZE %d", kuduCol.getBlockSize()));

@@ -19,7 +19,6 @@ package org.apache.impala.util;
 
 import static java.lang.String.format;
 
-import java.util.HashSet;
 import java.util.List;
 
 import org.apache.impala.analysis.Analyzer;
@@ -29,7 +28,6 @@ import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.KuduPartitionExpr;
 import org.apache.impala.analysis.LiteralExpr;
-import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
@@ -56,9 +54,7 @@ import org.apache.kudu.client.PartialRow;
 import org.apache.kudu.client.RangePartitionBound;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 public class KuduUtil {
 
@@ -168,6 +164,12 @@ public class KuduUtil {
     }
   }
 
+  /**
+   * Returns the actual value of the specified defaultValue literal. The returned type is
+   * the value type stored by Kudu for the column. E.g. if 'type' is 'INT8', the returned
+   * value is a Java byte, and if 'type' is 'UNIXTIME_MICROS', the returned value is
+   * a Java long.
+   */
   public static Object getKuduDefaultValue(TExpr defaultValue,
       org.apache.kudu.Type type, String colName) throws ImpalaRuntimeException {
     Preconditions.checkState(defaultValue.getNodes().size() == 1);
@@ -198,6 +200,9 @@ public class KuduUtil {
       case BOOL:
         checkCorrectType(literal.isSetBool_literal(), type, colName, literal);
         return literal.getBool_literal().isValue();
+      case UNIXTIME_MICROS:
+        checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
+        return literal.getInt_literal().getValue();
       default:
         throw new ImpalaRuntimeException("Unsupported value for column type: " +
             type.toString());
@@ -214,7 +219,10 @@ public class KuduUtil {
     toUnixTimeExpr.analyze(analyzer);
     TColumnValue result = FeSupport.EvalExprWithoutRow(toUnixTimeExpr,
         analyzer.getQueryCtx());
-    Preconditions.checkArgument(result.isSetLong_val());
+    if (!result.isSetLong_val()) {
+      throw new InternalException("Error converting timestamp expression: " +
+          timestampExpr.debugString());
+    }
     return result.getLong_val();
   }
 
