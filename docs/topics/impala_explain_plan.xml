@@ -98,8 +98,8 @@ under the License.
       <p rev="1.2">
         The amount of detail displayed in the <codeph>EXPLAIN</codeph> output is controlled by the
         <xref href="impala_explain_level.xml#explain_level">EXPLAIN_LEVEL</xref> query option. You typically
-        increase this setting from <codeph>normal</codeph> to <codeph>verbose</codeph> (or from <codeph>0</codeph>
-        to <codeph>1</codeph>) when doublechecking the presence of table and column statistics during performance
+        increase this setting from <codeph>standard</codeph> to <codeph>extended</codeph> (or from <codeph>1</codeph>
+        to <codeph>2</codeph>) when doublechecking the presence of table and column statistics during performance
         tuning, or when estimating query resource usage in conjunction with the resource management features.
       </p>
 
