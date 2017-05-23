@@ -158,14 +158,6 @@ under the License.
               </p>
             </li>
             <li>
-              <p rev="IMPALA-4163">
-                A new hint, <codeph>SORTBY(<varname>cols</varname>)</codeph>,
-                allows Impala <codeph>INSERT</codeph> operations on a Parquet table
-                to produce optimized output files with better compressibility
-                and a more compact range of min/max values within each data file.
-              </p>
-            </li>
-            <li>
               <p rev="IMPALA-3552">
                 The new configuration setting <codeph>inc_stats_size_limit_bytes</codeph>
                 lets you reduce the load on the catalog server when running the
