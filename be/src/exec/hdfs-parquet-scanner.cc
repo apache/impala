@@ -834,11 +834,10 @@ Status HdfsParquetScanner::EvalDictionaryFilters(const parquet::RowGroup& row_gr
     bool* row_group_eliminated) {
   *row_group_eliminated = false;
 
-  // TODO: Bootstrapping problem: existing 2.9 files don't have the encoding
-  // stats or encodings set properly, but after this goes in, they will.
-  // Change to 2.9 later.
+  // Legacy impala files (< 2.9) require special handling, because they do not encode
+  // information about whether the column is 100% dictionary encoded.
   bool is_legacy_impala = false;
-  if (file_version_.application == "impala" && file_version_.VersionLt(2,10,0)) {
+  if (file_version_.application == "impala" && file_version_.VersionLt(2,9,0)) {
     is_legacy_impala = true;
   }
 
