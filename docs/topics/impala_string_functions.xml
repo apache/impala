@@ -845,6 +845,64 @@ Returned 1 row(s) in 0.12s</codeblock>
 
       </dlentry>
 
+      <dlentry id="replace" rev="2.9.0 IMPALA-4729">
+
+        <dt>
+          <codeph>replace(string initial, string target, string replacement)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="hidden">replace() function</indexterm>
+          <b>Purpose:</b> Returns the initial argument with all occurrences of the target string
+          replaced by the replacement string.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            Because this function does not use any regular expression patterns, it is typically faster
+            than <codeph>regexp_replace()</codeph> for simple string substitutions.
+          </p>
+          <p>
+            If any argument is <codeph>NULL</codeph>, the return value is <codeph>NULL</codeph>.
+          </p>
+          <p>
+            Matching is case-sensitive.
+          </p>
+          <p>
+            If the replacement string contains another instance of the target
+            string, the expansion is only performed once, instead of
+            applying again to the newly constructed string.
+          </p>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+<codeblock>-- Replace one string with another.
+select replace('hello world','world','earth');
++------------------------------------------+
+| replace('hello world', 'world', 'earth') |
++------------------------------------------+
+| hello earth                              |
++------------------------------------------+
+
+-- All occurrences of the target string are replaced.
+select replace('hello world','o','0');
++----------------------------------+
+| replace('hello world', 'o', '0') |
++----------------------------------+
+| hell0 w0rld                      |
++----------------------------------+
+
+-- If no match is found, the original string is returned unchanged.
+select replace('hello world','xyz','abc');
++--------------------------------------+
+| replace('hello world', 'xyz', 'abc') |
++--------------------------------------+
+| hello world                          |
++--------------------------------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
       <dlentry id="reverse">
 
         <dt>

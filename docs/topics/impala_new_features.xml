@@ -60,12 +60,19 @@ under the License.
         <xref keyref="changelog_29">changelog for <keyword keyref="impala29"/></xref>.
       </p>
 
-<!-- Prose explanations of most important new features - TBD.
+      <p>
+        The following are some of the most significant new features in this release:
+      </p>
+
       <ul id="feature_list">
         <li>
+          <p rev="IMPALA-4729">
+            A new function, <codeph>replace()</codeph>, which is faster than
+            <codeph>regexp_replace()</codeph> for simple string substitutions.
+            See <xref keyref="string_functions"/> for details.
+          </p>
         </li>
       </ul>
--->
 
     </conbody>
   </concept>
