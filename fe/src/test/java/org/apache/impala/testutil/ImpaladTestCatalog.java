@@ -24,6 +24,7 @@ import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.util.PatternMatcher;
 import com.google.common.base.Preconditions;
 
@@ -86,6 +87,10 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
     Db db = getDb(dbName);
     Preconditions.checkNotNull(db);
     db.addTable(newTbl);
-    return super.getTable(dbName, tableName);
+    Table resultTable = super.getTable(dbName, tableName);
+    if (resultTable instanceof HdfsTable) {
+      ((HdfsTable) resultTable).computeHdfsStatsForTesting();
+    }
+    return resultTable;
   }
 }

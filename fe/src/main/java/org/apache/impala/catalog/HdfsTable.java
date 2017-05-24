@@ -165,10 +165,12 @@ public class HdfsTable extends Table {
 
   private HdfsPartitionLocationCompressor partitionLocationCompressor_;
 
-  // Total number of Hdfs files in this table. Set in load().
+  // Total number of Hdfs files in this table. Accounted only in the Impalad catalog
+  // cache. Set to -1 on Catalogd.
   private long numHdfsFiles_;
 
-  // Sum of sizes of all Hdfs files in this table. Set in load().
+  // Sum of sizes of all Hdfs files in this table. Accounted only in the Impalad
+  // catalog cache. Set to -1 on Catalogd.
   private long totalHdfsBytes_;
 
   // True iff the table's partitions are located on more than one filesystem.
@@ -228,6 +230,21 @@ public class HdfsTable extends Table {
       }
     }
     return true;
+  }
+
+  /**
+   * Updates numHdfsFiles_ and totalHdfsBytes_ based on the partition information.
+   * This is used only for the frontend tests that do not spawn a separate Catalog
+   * instance.
+   */
+  public void computeHdfsStatsForTesting() {
+    Preconditions.checkState(numHdfsFiles_ == -1 && totalHdfsBytes_ == -1);
+    numHdfsFiles_ = 0;
+    totalHdfsBytes_ = 0;
+    for (HdfsPartition partition: partitionMap_.values()) {
+      numHdfsFiles_ += partition.getNumFileDescriptors();
+      totalHdfsBytes_ += partition.getSize();
+    }
   }
 
   /**
@@ -305,8 +322,6 @@ public class HdfsTable extends Table {
         // Update the partitions' metadata that this file belongs to.
         for (HdfsPartition partition: partitions) {
           partition.getFileDescriptors().add(fd);
-          numHdfsFiles_++;
-          totalHdfsBytes_ += fd.getFileLength();
         }
       }
 
@@ -369,8 +384,6 @@ public class HdfsTable extends Table {
       // Update the partitions' metadata that this file belongs to.
       for (HdfsPartition partition: partitions) {
         partition.getFileDescriptors().add(fd);
-        numHdfsFiles_++;
-        totalHdfsBytes_ += fd.getFileLength();
       }
     }
   }
@@ -726,8 +739,6 @@ public class HdfsTable extends Table {
         newPartSizeBytes += fileStatus.getLen();
       }
       partition.setFileDescriptors(newFileDescs);
-      numHdfsFiles_ += newFileDescs.size();
-      totalHdfsBytes_ += newPartSizeBytes;
     } catch(IOException e) {
       throw new CatalogException("Error loading block metadata for partition " +
           partition.toString(), e);
@@ -1072,6 +1083,8 @@ public class HdfsTable extends Table {
       }
       if (loadTableSchema) setAvroSchema(client, msTbl);
       updateStatsFromHmsTable(msTbl);
+      numHdfsFiles_ = -1;
+      totalHdfsBytes_ = -1;
     } catch (TableLoadingException e) {
       throw e;
     } catch (Exception e) {
@@ -1477,10 +1490,6 @@ public class HdfsTable extends Table {
     Path partDirPath = new Path(storageDescriptor.getLocation());
     FileSystem fs = partDirPath.getFileSystem(CONF);
     if (!fs.exists(partDirPath)) return;
-
-    numHdfsFiles_ -= partition.getNumFileDescriptors();
-    totalHdfsBytes_ -= partition.getSize();
-    Preconditions.checkState(numHdfsFiles_ >= 0 && totalHdfsBytes_ >= 0);
     refreshFileMetadata(partition);
   }
 
