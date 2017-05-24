@@ -109,7 +109,7 @@ Status ParquetLevelDecoder::Init(const string& filename,
   }
   if (UNLIKELY(num_bytes < 0 || num_bytes > *data_size)) {
     return Status(Substitute("Corrupt Parquet file '$0': $1 bytes of encoded levels but "
-        "only $2 bytes left in page", filename, num_bytes, data_size));
+        "only $2 bytes left in page", filename, num_bytes, *data_size));
   }
   *data += num_bytes;
   *data_size -= num_bytes;
