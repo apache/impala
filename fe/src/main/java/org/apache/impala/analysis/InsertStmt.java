@@ -797,12 +797,9 @@ public class InsertStmt extends StatementBase {
 
   private void analyzePlanHints(Analyzer analyzer) throws AnalysisException {
     if (planHints_.isEmpty()) return;
-    if (isUpsert_) {
-      throw new AnalysisException("Hints not supported in UPSERT statements.");
-    }
-    if (table_ instanceof HBaseTable || table_ instanceof KuduTable) {
+    if (table_ instanceof HBaseTable) {
       throw new AnalysisException(String.format("INSERT hints are only supported for " +
-          "inserting into Hdfs tables: %s", getTargetTableName()));
+          "inserting into Hdfs and Kudu tables: %s", getTargetTableName()));
     }
     for (PlanHint hint: planHints_) {
       if (hint.is("SHUFFLE")) {

@@ -60,9 +60,9 @@ public class AnalyzeUpsertStmtTest extends AnalyzerTest {
         "from functional.alltypes a, functional.allcomplextypes b, " +
         "(select item from b.int_array_col) v1 " +
         "where a.id = b.id");
-    // Hint, not supported for Kudu tables.
-    AnalysisError("upsert into table functional_kudu.testtbl [clustered] select * from " +
-        "functional_kudu.testtbl", "Hints not supported in UPSERT statements.");
+    // Hint
+    AnalyzesOk("upsert into table functional_kudu.testtbl [clustered] select * from " +
+        "functional_kudu.testtbl");
 
     // Key columns missing from permutation
     AnalysisError("upsert into functional_kudu.testtbl(zip) values(1)",

@@ -23,17 +23,16 @@ import java.util.List;
 import org.apache.impala.analysis.AggregateInfo;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.Analyzer;
-import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.JoinOperator;
-import org.apache.impala.analysis.KuduPartitionExpr;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
+import org.apache.impala.util.KuduUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -246,15 +245,8 @@ public class DistributedPlanner {
     if (partitionExprs.isEmpty()) {
       partition = DataPartition.UNPARTITIONED;
     } else if (insertStmt.getTargetTable() instanceof KuduTable) {
-      // IMPALA-5294: Don't use 'partitionExpr' here because the constants were removed.
-      // We need all of the partition exprs to fill in the partition column values for
-      // each row to send to Kudu to determine the partition number.
-      Expr kuduPartitionExpr = new KuduPartitionExpr(DescriptorTable.TABLE_SINK_ID,
-          (KuduTable) insertStmt.getTargetTable(),
-          Lists.newArrayList(insertStmt.getPartitionKeyExprs()),
-          insertStmt.getPartitionColPos());
-      kuduPartitionExpr.analyze(ctx_.getRootAnalyzer());
-      partition = DataPartition.kuduPartitioned(kuduPartitionExpr);
+      partition = DataPartition.kuduPartitioned(
+          KuduUtil.createPartitionExpr(insertStmt, ctx_.getRootAnalyzer()));
     } else {
       partition = DataPartition.hashPartitioned(partitionExprs);
     }

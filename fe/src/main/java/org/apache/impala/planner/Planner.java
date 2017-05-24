@@ -24,12 +24,10 @@ import java.util.List;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.ColumnLineageGraph;
-import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.JoinOperator;
-import org.apache.impala.analysis.KuduPartitionExpr;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.catalog.HBaseTable;
@@ -46,6 +44,7 @@ import org.apache.impala.thrift.TQueryExecRequest;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TRuntimeFilterMode;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MaxRowsProcessedVisitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -499,12 +498,9 @@ public class Planner {
     List<Expr> orderingExprs = Lists.newArrayList();
 
     if (insertStmt.getTargetTable() instanceof KuduTable) {
-      if (inputFragment.getDataPartition().getType() == TPartitionType.KUDU) {
-        Preconditions.checkState(
-            inputFragment.getDataPartition().getPartitionExprs().size() == 1);
-        // Only sort for Kudu if we've already partitioned so that we can sort the
-        // partitions separately. This will be true if this is a distributed exec.
-        orderingExprs.add(inputFragment.getDataPartition().getPartitionExprs().get(0));
+      if (!insertStmt.hasNoClusteredHint() && !ctx_.isSingleNodeExec()) {
+        orderingExprs.add(
+            KuduUtil.createPartitionExpr(insertStmt, ctx_.getRootAnalyzer()));
         orderingExprs.addAll(insertStmt.getPrimaryKeyExprs());
       }
     } else if (insertStmt.hasClusteredHint() || !insertStmt.getSortExprs().isEmpty()) {

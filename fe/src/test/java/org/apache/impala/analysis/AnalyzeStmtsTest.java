@@ -1782,18 +1782,16 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       AnalyzesOk(String.format(
           "insert into table functional.alltypesnopart %sshuffle%s " +
           "select * from functional.alltypesnopart", prefix, suffix));
+      // Insert hints are ok for Kudu tables.
+      AnalyzesOk(String.format(
+          "insert into table functional_kudu.alltypes %sshuffle%s " +
+          "select * from functional_kudu.alltypes", prefix, suffix));
       // Plan hints do not make sense for inserting into HBase tables.
       AnalysisError(String.format(
           "insert into table functional_hbase.alltypes %sshuffle%s " +
           "select * from functional_hbase.alltypes", prefix, suffix),
-          "INSERT hints are only supported for inserting into Hdfs tables: " +
+          "INSERT hints are only supported for inserting into Hdfs and Kudu tables: " +
           "functional_hbase.alltypes");
-      // Plan hints do not make sense for inserting into Kudu tables.
-      AnalysisError(String.format(
-          "insert into table functional_kudu.alltypes %sshuffle%s " +
-          "select * from functional_kudu.alltypes", prefix, suffix),
-          "INSERT hints are only supported for inserting into Hdfs tables: " +
-          "functional_kudu.alltypes");
       // Conflicting plan hints.
       AnalysisError("insert into table functional.alltypessmall " +
           "partition (year, month) /* +shuffle,noshuffle */ " +

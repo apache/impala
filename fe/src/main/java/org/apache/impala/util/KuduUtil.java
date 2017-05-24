@@ -23,10 +23,14 @@ import java.util.HashSet;
 import java.util.List;
 
 import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
+import org.apache.impala.analysis.InsertStmt;
+import org.apache.impala.analysis.KuduPartitionExpr;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NumericLiteral;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -398,5 +402,20 @@ public class KuduUtil {
         throw new ImpalaRuntimeException(String.format(
             "Kudu type '%s' is not supported in Impala", t.getName()));
     }
+  }
+
+  /**
+   * Creates and returns an Expr that takes rows being inserted by 'insertStmt' and
+   * returns the partition number for each row.
+   */
+  public static Expr createPartitionExpr(InsertStmt insertStmt, Analyzer analyzer)
+      throws AnalysisException {
+    Preconditions.checkState(insertStmt.getTargetTable() instanceof KuduTable);
+    Expr kuduPartitionExpr = new KuduPartitionExpr(DescriptorTable.TABLE_SINK_ID,
+        (KuduTable) insertStmt.getTargetTable(),
+        Lists.newArrayList(insertStmt.getPartitionKeyExprs()),
+        insertStmt.getPartitionColPos());
+    kuduPartitionExpr.analyze(analyzer);
+    return kuduPartitionExpr;
   }
 }

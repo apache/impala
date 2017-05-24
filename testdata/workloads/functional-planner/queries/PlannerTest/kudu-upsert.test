@@ -190,3 +190,43 @@ UPSERT INTO KUDU [functional_kudu.alltypes]
 |
 00:SCAN KUDU [functional_kudu.alltypes]
 ====
+# Hint - noshuffle should remove the exchange node.
+upsert into functional_kudu.alltypes /* +noshuffle */ select * from functional.alltypes;
+---- DISTRIBUTEDPLAN
+UPSERT INTO KUDU [functional_kudu.alltypes]
+|
+01:SORT
+|  order by: KuduPartition(functional.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Hint - noclustered should remove the sort node.
+upsert into functional_kudu.alltypes /* +noclustered */ select * from functional.alltypes;
+---- DISTRIBUTEDPLAN
+UPSERT INTO KUDU [functional_kudu.alltypes]
+|
+01:EXCHANGE [KUDU(KuduPartition(functional.alltypes.id))]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Hint - noshuffle should remove the exchange node.
+upsert into functional_kudu.alltypes /* +noshuffle */ select * from functional.alltypes;
+---- DISTRIBUTEDPLAN
+UPSERT INTO KUDU [functional_kudu.alltypes]
+|
+01:SORT
+|  order by: KuduPartition(functional.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+upsert into functional_kudu.alltypes /* +noclustered,noshuffle */
+select * from functional.alltypes;
+---- DISTRIBUTEDPLAN
+UPSERT INTO KUDU [functional_kudu.alltypes]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
