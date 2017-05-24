@@ -357,7 +357,7 @@ public class DataSourceScanNode extends ScanNode {
 
     // Add table and column stats in verbose mode.
     if (detailLevel == TExplainLevel.VERBOSE) {
-      output.append(getStatsExplainString(prefix, detailLevel));
+      output.append(getStatsExplainString(prefix));
       output.append("\n");
     }
     return output.toString();

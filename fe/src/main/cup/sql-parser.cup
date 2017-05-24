@@ -1737,12 +1737,12 @@ cascade_val ::=
   ;
 
 compute_stats_stmt ::=
-  KW_COMPUTE KW_STATS table_name:table
-  {: RESULT = new ComputeStatsStmt(table); :}
+  KW_COMPUTE KW_STATS table_name:table opt_tablesample:tblsmpl
+  {: RESULT = ComputeStatsStmt.createStatsStmt(table, tblsmpl); :}
   | KW_COMPUTE KW_INCREMENTAL KW_STATS table_name:table
-  {: RESULT = new ComputeStatsStmt(table, true, null); :}
-  | KW_COMPUTE KW_INCREMENTAL KW_STATS table_name:table partition_set:partitions
-  {: RESULT = new ComputeStatsStmt(table, true, partitions); :}
+  {: RESULT = ComputeStatsStmt.createIncrementalStatsStmt(table, null); :}
+  | KW_COMPUTE KW_INCREMENTAL KW_STATS table_name:table partition_set:parts
+  {: RESULT = ComputeStatsStmt.createIncrementalStatsStmt(table, parts); :}
   ;
 
 drop_stats_stmt ::=

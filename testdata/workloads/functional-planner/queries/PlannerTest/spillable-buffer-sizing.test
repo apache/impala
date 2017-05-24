@@ -31,19 +31,21 @@ Per-Host Resources: mem-estimate=25.94MB mem-reservation=1.94MB
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=16.00MB mem-reservation=0B
 |  01:SCAN HDFS [tpch_parquet.nation, RANDOM]
-|     partitions=1/1 files=1 size=2.94KB
-|     stats-rows=25 extrapolated-rows=disabled
-|     table stats: rows=25 size=2.94KB
-|     column stats: all
+|     partitions=1/1 files=1 size=2.74KB
+|     stored statistics:
+|       table: rows=25 size=2.74KB
+|       columns: all
+|     extrapolated-rows=disabled
 |     mem-estimate=16.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=117B cardinality=25
 |
 00:SCAN HDFS [tpch_parquet.customer, RANDOM]
-   partitions=1/1 files=1 size=12.34MB
+   partitions=1/1 files=1 size=12.31MB
    runtime filters: RF000[bloom] -> c_nationkey
-   stats-rows=150000 extrapolated-rows=disabled
-   table stats: rows=150000 size=12.34MB
-   column stats: all
+   stored statistics:
+     table: rows=150000 size=12.31MB
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=24.00MB mem-reservation=0B
    tuple-ids=0 row-size=238B cardinality=150000
 ---- PARALLELPLANS
@@ -83,19 +85,21 @@ Per-Host Resources: mem-estimate=51.88MB mem-reservation=3.88MB
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
 |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=0B
 |  01:SCAN HDFS [tpch_parquet.nation, RANDOM]
-|     partitions=1/1 files=1 size=2.94KB
-|     stats-rows=25 extrapolated-rows=disabled
-|     table stats: rows=25 size=2.94KB
-|     column stats: all
+|     partitions=1/1 files=1 size=2.74KB
+|     stored statistics:
+|       table: rows=25 size=2.74KB
+|       columns: all
+|     extrapolated-rows=disabled
 |     mem-estimate=16.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=117B cardinality=25
 |
 00:SCAN HDFS [tpch_parquet.customer, RANDOM]
-   partitions=1/1 files=1 size=12.34MB
+   partitions=1/1 files=1 size=12.31MB
    runtime filters: RF000[bloom] -> c_nationkey
-   stats-rows=150000 extrapolated-rows=disabled
-   table stats: rows=150000 size=12.34MB
-   column stats: all
+   stored statistics:
+     table: rows=150000 size=12.31MB
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=24.00MB mem-reservation=0B
    tuple-ids=0 row-size=238B cardinality=150000
 ====
@@ -131,18 +135,20 @@ Per-Host Resources: mem-estimate=380.41MB mem-reservation=34.00MB
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
 |  Per-Host Resources: mem-estimate=40.00MB mem-reservation=0B
 |  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
-|     partitions=1/1 files=2 size=54.20MB
-|     stats-rows=1500000 extrapolated-rows=disabled
-|     table stats: rows=1500000 size=54.20MB
-|     column stats: all
+|     partitions=1/1 files=2 size=54.07MB
+|     stored statistics:
+|       table: rows=1500000 size=54.07MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     mem-estimate=40.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=191B cardinality=1500000
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   partitions=1/1 files=3 size=193.92MB
-   stats-rows=6001215 extrapolated-rows=disabled
-   table stats: rows=6001215 size=193.92MB
-   column stats: all
+   partitions=1/1 files=3 size=193.72MB
+   stored statistics:
+     table: rows=6001215 size=193.72MB
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
 ---- PARALLELPLANS
@@ -181,18 +187,20 @@ Per-Host Resources: mem-estimate=760.83MB mem-reservation=68.00MB
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
 |  Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
 |  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
-|     partitions=1/1 files=2 size=54.20MB
-|     stats-rows=1500000 extrapolated-rows=disabled
-|     table stats: rows=1500000 size=54.20MB
-|     column stats: all
+|     partitions=1/1 files=2 size=54.07MB
+|     stored statistics:
+|       table: rows=1500000 size=54.07MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     mem-estimate=40.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=191B cardinality=1500000
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   partitions=1/1 files=3 size=193.92MB
-   stats-rows=6001215 extrapolated-rows=disabled
-   table stats: rows=6001215 size=193.92MB
-   column stats: all
+   partitions=1/1 files=3 size=193.72MB
+   stored statistics:
+     table: rows=6001215 size=193.72MB
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
 ====
@@ -229,10 +237,11 @@ Per-Host Resources: mem-estimate=34.00MB mem-reservation=34.00MB
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=24.00MB mem-reservation=0B
 |  01:SCAN HDFS [tpch_parquet.customer, RANDOM]
-|     partitions=1/1 files=1 size=12.34MB
-|     stats-rows=150000 extrapolated-rows=disabled
-|     table stats: rows=150000 size=12.34MB
-|     column stats: all
+|     partitions=1/1 files=1 size=12.31MB
+|     stored statistics:
+|       table: rows=150000 size=12.31MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     mem-estimate=24.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=238B cardinality=150000
 |
@@ -243,11 +252,12 @@ Per-Host Resources: mem-estimate=34.00MB mem-reservation=34.00MB
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
 Per-Host Resources: mem-estimate=40.00MB mem-reservation=0B
 00:SCAN HDFS [tpch_parquet.orders, RANDOM]
-   partitions=1/1 files=2 size=54.20MB
+   partitions=1/1 files=2 size=54.07MB
    runtime filters: RF000[bloom] -> o_custkey
-   stats-rows=1500000 extrapolated-rows=disabled
-   table stats: rows=1500000 size=54.20MB
-   column stats: all
+   stored statistics:
+     table: rows=1500000 size=54.07MB
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=40.00MB mem-reservation=0B
    tuple-ids=0 row-size=191B cardinality=1500000
 ---- PARALLELPLANS
@@ -287,10 +297,11 @@ Per-Host Resources: mem-estimate=34.00MB mem-reservation=34.00MB
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
 |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=0B
 |  01:SCAN HDFS [tpch_parquet.customer, RANDOM]
-|     partitions=1/1 files=1 size=12.34MB
-|     stats-rows=150000 extrapolated-rows=disabled
-|     table stats: rows=150000 size=12.34MB
-|     column stats: all
+|     partitions=1/1 files=1 size=12.31MB
+|     stored statistics:
+|       table: rows=150000 size=12.31MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     mem-estimate=24.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=238B cardinality=150000
 |
@@ -301,11 +312,12 @@ Per-Host Resources: mem-estimate=34.00MB mem-reservation=34.00MB
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
 Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
 00:SCAN HDFS [tpch_parquet.orders, RANDOM]
-   partitions=1/1 files=2 size=54.20MB
+   partitions=1/1 files=2 size=54.07MB
    runtime filters: RF000[bloom] -> o_custkey
-   stats-rows=1500000 extrapolated-rows=disabled
-   table stats: rows=1500000 size=54.20MB
-   column stats: all
+   stored statistics:
+     table: rows=1500000 size=54.07MB
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=40.00MB mem-reservation=0B
    tuple-ids=0 row-size=191B cardinality=1500000
 ====
@@ -342,19 +354,21 @@ Per-Host Resources: mem-estimate=77.38MB mem-reservation=34.00MB
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=24.00MB mem-reservation=0B
 |  01:SCAN HDFS [tpch_parquet.customer, RANDOM]
-|     partitions=1/1 files=1 size=12.34MB
-|     stats-rows=150000 extrapolated-rows=disabled
-|     table stats: rows=150000 size=12.34MB
-|     column stats: all
+|     partitions=1/1 files=1 size=12.31MB
+|     stored statistics:
+|       table: rows=150000 size=12.31MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     mem-estimate=24.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=238B cardinality=150000
 |
 00:SCAN HDFS [tpch_parquet.orders, RANDOM]
-   partitions=1/1 files=2 size=54.20MB
+   partitions=1/1 files=2 size=54.07MB
    runtime filters: RF000[bloom] -> o_custkey
-   stats-rows=1500000 extrapolated-rows=disabled
-   table stats: rows=1500000 size=54.20MB
-   column stats: all
+   stored statistics:
+     table: rows=1500000 size=54.07MB
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=40.00MB mem-reservation=0B
    tuple-ids=0 row-size=191B cardinality=1500000
 ---- PARALLELPLANS
@@ -394,19 +408,21 @@ Per-Host Resources: mem-estimate=154.76MB mem-reservation=68.00MB
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
 |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=0B
 |  01:SCAN HDFS [tpch_parquet.customer, RANDOM]
-|     partitions=1/1 files=1 size=12.34MB
-|     stats-rows=150000 extrapolated-rows=disabled
-|     table stats: rows=150000 size=12.34MB
-|     column stats: all
+|     partitions=1/1 files=1 size=12.31MB
+|     stored statistics:
+|       table: rows=150000 size=12.31MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     mem-estimate=24.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=238B cardinality=150000
 |
 00:SCAN HDFS [tpch_parquet.orders, RANDOM]
-   partitions=1/1 files=2 size=54.20MB
+   partitions=1/1 files=2 size=54.07MB
    runtime filters: RF000[bloom] -> o_custkey
-   stats-rows=1500000 extrapolated-rows=disabled
-   table stats: rows=1500000 size=54.20MB
-   column stats: all
+   stored statistics:
+     table: rows=1500000 size=54.07MB
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=40.00MB mem-reservation=0B
    tuple-ids=0 row-size=191B cardinality=1500000
 ====
@@ -444,18 +460,22 @@ Per-Host Resources: mem-estimate=2.02GB mem-reservation=34.00MB
 |  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 |  Per-Host Resources: mem-estimate=16.00MB mem-reservation=0B
 |  01:SCAN HDFS [functional_parquet.alltypestiny, RANDOM]
-|     partitions=4/4 files=4 size=10.48KB
-|     stats-rows=unavailable extrapolated-rows=disabled
-|     table stats: rows=unavailable size=unavailable
-|     column stats: unavailable
+|     partitions=4/4 files=4 size=9.75KB
+|     stored statistics:
+|       table: rows=unavailable size=unavailable
+|       partitions: 0/4 rows=unavailable
+|       columns: unavailable
+|     extrapolated-rows=disabled
 |     mem-estimate=16.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=88B cardinality=unavailable
 |
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   partitions=24/24 files=24 size=178.13KB
-   stats-rows=unavailable extrapolated-rows=disabled
-   table stats: rows=unavailable size=unavailable
-   columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   partitions=24/24 files=24 size=174.39KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled
    mem-estimate=16.00MB mem-reservation=0B
    tuple-ids=0 row-size=88B cardinality=unavailable
 ---- PARALLELPLANS
@@ -496,18 +516,22 @@ Per-Host Resources: mem-estimate=4.03GB mem-reservation=68.00MB
 |  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=0B
 |  01:SCAN HDFS [functional_parquet.alltypestiny, RANDOM]
-|     partitions=4/4 files=4 size=10.48KB
-|     stats-rows=unavailable extrapolated-rows=disabled
-|     table stats: rows=unavailable size=unavailable
-|     column stats: unavailable
+|     partitions=4/4 files=4 size=9.75KB
+|     stored statistics:
+|       table: rows=unavailable size=unavailable
+|       partitions: 0/4 rows=unavailable
+|       columns: unavailable
+|     extrapolated-rows=disabled
 |     mem-estimate=16.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=88B cardinality=unavailable
 |
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   partitions=24/24 files=24 size=178.13KB
-   stats-rows=unavailable extrapolated-rows=disabled
-   table stats: rows=unavailable size=unavailable
-   columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   partitions=24/24 files=24 size=174.39KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled
    mem-estimate=16.00MB mem-reservation=0B
    tuple-ids=0 row-size=88B cardinality=unavailable
 ====
@@ -549,10 +573,11 @@ Per-Host Resources: mem-estimate=34.00MB mem-reservation=2.00MB
 |  tuple-ids=1 row-size=10B cardinality=25
 |
 00:SCAN HDFS [tpch_parquet.customer, RANDOM]
-   partitions=1/1 files=1 size=12.34MB
-   stats-rows=150000 extrapolated-rows=disabled
-   table stats: rows=150000 size=12.34MB
-   column stats: all
+   partitions=1/1 files=1 size=12.31MB
+   stored statistics:
+     table: rows=150000 size=12.31MB
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=24.00MB mem-reservation=0B
    tuple-ids=0 row-size=10B cardinality=150000
 ---- PARALLELPLANS
@@ -589,10 +614,11 @@ Per-Host Resources: mem-estimate=68.00MB mem-reservation=4.00MB
 |  tuple-ids=1 row-size=10B cardinality=25
 |
 00:SCAN HDFS [tpch_parquet.customer, RANDOM]
-   partitions=1/1 files=1 size=12.34MB
-   stats-rows=150000 extrapolated-rows=disabled
-   table stats: rows=150000 size=12.34MB
-   column stats: all
+   partitions=1/1 files=1 size=12.31MB
+   stored statistics:
+     table: rows=150000 size=12.31MB
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=24.00MB mem-reservation=0B
    tuple-ids=0 row-size=10B cardinality=150000
 ====
@@ -650,10 +676,11 @@ Per-Host Resources: mem-estimate=71.12MB mem-reservation=51.00MB
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
 |  Per-Host Resources: mem-estimate=40.00MB mem-reservation=0B
 |  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
-|     partitions=1/1 files=2 size=54.20MB
-|     stats-rows=1500000 extrapolated-rows=disabled
-|     table stats: rows=1500000 size=54.20MB
-|     column stats: all
+|     partitions=1/1 files=2 size=54.07MB
+|     stored statistics:
+|       table: rows=1500000 size=54.07MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     mem-estimate=40.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=25B cardinality=1500000
 |
@@ -664,11 +691,12 @@ Per-Host Resources: mem-estimate=71.12MB mem-reservation=51.00MB
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   partitions=1/1 files=3 size=193.92MB
+   partitions=1/1 files=3 size=193.72MB
    runtime filters: RF000[bloom] -> l_orderkey
-   stats-rows=6001215 extrapolated-rows=disabled
-   table stats: rows=6001215 size=193.92MB
-   column stats: all
+   stored statistics:
+     table: rows=6001215 size=193.72MB
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=8B cardinality=6001215
 ---- PARALLELPLANS
@@ -727,10 +755,11 @@ Per-Host Resources: mem-estimate=85.00MB mem-reservation=85.00MB
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
 |  Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
 |  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
-|     partitions=1/1 files=2 size=54.20MB
-|     stats-rows=1500000 extrapolated-rows=disabled
-|     table stats: rows=1500000 size=54.20MB
-|     column stats: all
+|     partitions=1/1 files=2 size=54.07MB
+|     stored statistics:
+|       table: rows=1500000 size=54.07MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     mem-estimate=40.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=25B cardinality=1500000
 |
@@ -741,11 +770,12 @@ Per-Host Resources: mem-estimate=85.00MB mem-reservation=85.00MB
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 Per-Host Resources: mem-estimate=160.00MB mem-reservation=0B
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   partitions=1/1 files=3 size=193.92MB
+   partitions=1/1 files=3 size=193.72MB
    runtime filters: RF000[bloom] -> l_orderkey
-   stats-rows=6001215 extrapolated-rows=disabled
-   table stats: rows=6001215 size=193.92MB
-   column stats: all
+   stored statistics:
+     table: rows=6001215 size=193.72MB
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=8B cardinality=6001215
 ====
@@ -784,10 +814,11 @@ Per-Host Resources: mem-estimate=1.69GB mem-reservation=34.00MB
 |  tuple-ids=1 row-size=263B cardinality=6001215
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   partitions=1/1 files=3 size=193.92MB
-   stats-rows=6001215 extrapolated-rows=disabled
-   table stats: rows=6001215 size=193.92MB
-   column stats: all
+   partitions=1/1 files=3 size=193.72MB
+   stored statistics:
+     table: rows=6001215 size=193.72MB
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
 ---- PARALLELPLANS
@@ -822,10 +853,11 @@ Per-Host Resources: mem-estimate=3.39GB mem-reservation=68.00MB
 |  tuple-ids=1 row-size=263B cardinality=6001215
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   partitions=1/1 files=3 size=193.92MB
-   stats-rows=6001215 extrapolated-rows=disabled
-   table stats: rows=6001215 size=193.92MB
-   column stats: all
+   partitions=1/1 files=3 size=193.72MB
+   stored statistics:
+     table: rows=6001215 size=193.72MB
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
 ====
@@ -869,10 +901,12 @@ Per-Host Resources: mem-estimate=144.00MB mem-reservation=34.00MB
 |  tuple-ids=1 row-size=24B cardinality=unavailable
 |
 00:SCAN HDFS [functional_parquet.alltypestiny, RANDOM]
-   partitions=4/4 files=4 size=10.48KB
-   stats-rows=unavailable extrapolated-rows=disabled
-   table stats: rows=unavailable size=unavailable
-   column stats: unavailable
+   partitions=4/4 files=4 size=9.75KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/4 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled
    mem-estimate=16.00MB mem-reservation=0B
    tuple-ids=0 row-size=16B cardinality=unavailable
 ---- PARALLELPLANS
@@ -911,10 +945,12 @@ Per-Host Resources: mem-estimate=288.00MB mem-reservation=68.00MB
 |  tuple-ids=1 row-size=24B cardinality=unavailable
 |
 00:SCAN HDFS [functional_parquet.alltypestiny, RANDOM]
-   partitions=4/4 files=4 size=10.48KB
-   stats-rows=unavailable extrapolated-rows=disabled
-   table stats: rows=unavailable size=unavailable
-   column stats: unavailable
+   partitions=4/4 files=4 size=9.75KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/4 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled
    mem-estimate=16.00MB mem-reservation=0B
    tuple-ids=0 row-size=16B cardinality=unavailable
 ====

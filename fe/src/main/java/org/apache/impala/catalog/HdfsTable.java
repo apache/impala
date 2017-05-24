@@ -30,11 +30,10 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
-import java.util.concurrent.Future;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
-
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
@@ -144,23 +143,23 @@ public class HdfsTable extends Table {
   // Array of sorted maps storing the association between partition values and
   // partition ids. There is one sorted map per partition key. It is only populated if
   // this table object is stored in ImpaladCatalog.
-  private ArrayList<TreeMap<LiteralExpr, HashSet<Long>>> partitionValuesMap_ =
+  private final ArrayList<TreeMap<LiteralExpr, HashSet<Long>>> partitionValuesMap_ =
       Lists.newArrayList();
 
   // Array of partition id sets that correspond to partitions with null values
   // in the partition keys; one set per partition key. It is not populated if the table is
   // stored in the catalog server.
-  private ArrayList<HashSet<Long>> nullPartitionIds_ = Lists.newArrayList();
+  private final ArrayList<HashSet<Long>> nullPartitionIds_ = Lists.newArrayList();
 
   // Map of partition ids to HdfsPartitions.
-  private HashMap<Long, HdfsPartition> partitionMap_ = Maps.newHashMap();
+  private final HashMap<Long, HdfsPartition> partitionMap_ = Maps.newHashMap();
 
   // Map of partition name to HdfsPartition object. Used for speeding up
   // table metadata loading.
-  private HashMap<String, HdfsPartition> nameToPartitionMap_ = Maps.newHashMap();
+  private final HashMap<String, HdfsPartition> nameToPartitionMap_ = Maps.newHashMap();
 
   // Store all the partition ids of an HdfsTable.
-  private HashSet<Long> partitionIds_ = Sets.newHashSet();
+  private final HashSet<Long> partitionIds_ = Sets.newHashSet();
 
   // Estimate (in bytes) of the incremental stats size per column per partition
   public static final long STATS_SIZE_PER_COLUMN_BYTES = 400;
@@ -218,7 +217,7 @@ public class HdfsTable extends Table {
   // File/Block metadata loading stats for a single HDFS path.
   private class FileMetadataLoadStats {
     // Path corresponding to this metadata load request.
-    private Path hdfsPath;
+    private final Path hdfsPath;
 
     // Number of files for which the metadata was loaded.
     public int loadedFiles = 0;
@@ -1377,6 +1376,7 @@ public class HdfsTable extends Table {
     return partsByPath;
   }
 
+  @Override
   public void setTableStats(org.apache.hadoop.hive.metastore.api.Table msTbl) {
     super.setTableStats(msTbl);
     // For unpartitioned tables set the numRows in its partitions
@@ -2065,8 +2065,8 @@ public class HdfsTable extends Table {
    * The given 'randomSeed' is used for random number generation.
    * The 'percentBytes' parameter must be between 0 and 100.
    */
-  public Map<Long, List<FileDescriptor>> getFilesSample(List<HdfsPartition> inputParts,
-      long percentBytes, long randomSeed) {
+  public Map<Long, List<FileDescriptor>> getFilesSample(
+      Collection<HdfsPartition> inputParts, long percentBytes, long randomSeed) {
     Preconditions.checkState(percentBytes >= 0 && percentBytes <= 100);
 
     // Conservative max size for Java arrays. The actual maximum varies

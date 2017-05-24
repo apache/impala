@@ -283,7 +283,7 @@ struct TAlterTableUpdateStatsParams {
   2: optional CatalogObjects.TTableStats table_stats
 
   // Partition-level stats. Maps from a list of partition-key values
-  // to its partition stats.
+  // to its partition stats. Only set for partitioned Hdfs tables.
   3: optional map<list<string>, CatalogObjects.TPartitionStats> partition_stats
 
   // Column-level stats. Maps from column name to column stats.
@@ -295,6 +295,10 @@ struct TAlterTableUpdateStatsParams {
 
   // If true, this is the result of an incremental stats computation
   6: optional bool is_incremental
+
+  // Sum of file sizes in the table sample. Only set when TABLESAMPLE was specified.
+  // Only set for tables of type HDFS_TABLE and if is_incremental is false.
+  7: optional i64 sample_file_bytes
 }
 
 // Parameters for ALTER TABLE SET [PARTITION partitionSet] CACHED|UNCACHED
@@ -501,6 +505,10 @@ struct TComputeStatsParams {
   // Sum of file sizes in the table. Only set for tables of type HDFS_TABLE and if
   // is_incremental is false.
   9: optional i64 total_file_bytes
+
+  // Sum of file sizes in the table sample. Only set when TABLESAMPLE was specified.
+  // Only set for tables of type HDFS_TABLE and if is_incremental is false.
+  10: optional i64 sample_file_bytes
 }
 
 // Parameters for CREATE/DROP ROLE

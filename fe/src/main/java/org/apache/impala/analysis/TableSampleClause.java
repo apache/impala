@@ -17,8 +17,9 @@
 
 package org.apache.impala.analysis;
 
-import com.google.common.base.Preconditions;
 import org.apache.impala.common.AnalysisException;
+
+import com.google.common.base.Preconditions;
 
 /**
  * Represents a TABLESAMPLE clause.
@@ -62,10 +63,16 @@ public class TableSampleClause implements ParseNode {
   }
 
   @Override
-  public String toSql() {
+  public String toSql() { return toSql(randomSeed_); }
+
+  /**
+   * Prints the SQL of this TABLESAMPLE clause. The optional REPEATABLE clause is
+   * included if 'randomSeed' is non-NULL.
+   */
+  public String toSql(Long randomSeed) {
     StringBuilder builder = new StringBuilder();
     builder.append("TABLESAMPLE SYSTEM(" + percentBytes_ + ")");
-    if (randomSeed_ != null) builder.append(" REPEATABLE(" + randomSeed_ + ")");
+    if (randomSeed != null) builder.append(" REPEATABLE(" + randomSeed + ")");
     return builder.toString();
   }
 }

@@ -355,7 +355,7 @@ public class TableRef implements ParseNode {
     if (!(this instanceof BaseTableRef)
         || !(resolvedPath_.destTable() instanceof HdfsTable)) {
       throw new AnalysisException(
-          "TABLESAMPLE is only supported on HDFS base tables: " + getUniqueAlias());
+          "TABLESAMPLE is only supported on HDFS tables: " + getUniqueAlias());
     }
   }
 

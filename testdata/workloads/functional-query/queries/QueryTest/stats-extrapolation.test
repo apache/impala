@@ -8,9 +8,11 @@ select * from functional_parquet.alltypes where year = 2009;
 # No stats are available.
 explain select id from alltypes;
 ---- RESULTS: VERIFY_IS_SUBSET
-'   stats-rows=unavailable extrapolated-rows=unavailable'
-'   table stats: rows=unavailable size=unavailable'
-'   column stats: unavailable'
+'   stored statistics:'
+'     table: rows=unavailable size=unavailable'
+'     partitions: 0/12 rows=unavailable'
+'     columns: unavailable'
+'   extrapolated-rows=unavailable'
 '   mem-estimate=16.00MB mem-reservation=0B'
 '   tuple-ids=0 row-size=4B cardinality=unavailable'
 ---- TYPES
@@ -19,9 +21,31 @@ STRING
 ---- QUERY
 compute stats alltypes
 ---- RESULTS
-'Updated 12 partition(s) and 11 column(s).'
+'Updated 1 partition(s) and 11 column(s).'
 ---- TYPES
 STRING
+====
+---- QUERY
+# Only the table-level row count is stored. The partition row counts are extrapolated.
+show table stats alltypes
+---- LABELS
+YEAR, MONTH, #ROWS, EXTRAP #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+'2009','1',-1,308,1,regex:.*B,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/$DATABASE.db/alltypes/year=2009/month=1'
+'2009','2',-1,288,1,regex:.*B,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/$DATABASE.db/alltypes/year=2009/month=2'
+'2009','3',-1,308,1,regex:.*B,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/$DATABASE.db/alltypes/year=2009/month=3'
+'2009','4',-1,302,1,regex:.*B,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/$DATABASE.db/alltypes/year=2009/month=4'
+'2009','5',-1,308,1,regex:.*B,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/$DATABASE.db/alltypes/year=2009/month=5'
+'2009','6',-1,302,1,regex:.*B,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/$DATABASE.db/alltypes/year=2009/month=6'
+'2009','7',-1,308,1,regex:.*B,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/$DATABASE.db/alltypes/year=2009/month=7'
+'2009','8',-1,308,1,regex:.*B,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/$DATABASE.db/alltypes/year=2009/month=8'
+'2009','9',-1,302,1,regex:.*B,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/$DATABASE.db/alltypes/year=2009/month=9'
+'2009','10',-1,308,1,regex:.*B,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/$DATABASE.db/alltypes/year=2009/month=10'
+'2009','11',-1,302,1,regex:.*B,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/$DATABASE.db/alltypes/year=2009/month=11'
+'2009','12',-1,308,1,regex:.*B,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/$DATABASE.db/alltypes/year=2009/month=12'
+'Total','',3650,3650,12,regex:.*B,'0B','','','',''
+---- TYPES
+STRING,STRING,BIGINT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING
 ====
 ---- QUERY
 # Stats are available now.
@@ -38,9 +62,11 @@ explain select id from alltypes;
 '|'
 '00:SCAN HDFS [$DATABASE.alltypes]'
 row_regex:.*partitions=12/12 files=12 size=.*
-'   stats-rows=3650 extrapolated-rows=3650'
-row_regex:.*table stats: rows=3650 size=.*
-'   column stats: all'
+'   stored statistics:'
+row_regex:.*table: rows=3650 size=.*
+'     partitions: 0/12 rows=unavailable'
+'     columns: all'
+'   extrapolated-rows=3650'
 '   mem-estimate=16.00MB mem-reservation=0B'
 '   tuple-ids=0 row-size=4B cardinality=3650'
 ---- TYPES
@@ -61,9 +87,11 @@ explain select id from alltypes where month in (1, 2, 3);
 '|'
 '00:SCAN HDFS [$DATABASE.alltypes]'
 row_regex:.*partitions=3/12 files=3 size=.*
-'   stats-rows=900 extrapolated-rows=904'
-row_regex:.*table stats: rows=3650 size=.*
-'   column stats: all'
+'   stored statistics:'
+row_regex:.*table: rows=3650 size=.*
+'     partitions: 0/3 rows=unavailable'
+'     columns: all'
+'   extrapolated-rows=904'
 '   mem-estimate=16.00MB mem-reservation=0B'
 '   tuple-ids=0 row-size=4B cardinality=904'
 ---- TYPES
@@ -85,9 +113,11 @@ explain select id from alltypes;
 '|'
 '00:SCAN HDFS [$DATABASE.alltypes]'
 row_regex:.*partitions=12/12 files=24 size=.*
-'   stats-rows=3650 extrapolated-rows=7300'
-row_regex:.*table stats: rows=3650 size=.*
-'   column stats: all'
+'   stored statistics:'
+row_regex:.*table: rows=3650 size=.*
+'     partitions: 0/12 rows=unavailable'
+'     columns: all'
+'   extrapolated-rows=7300'
 '   mem-estimate=16.00MB mem-reservation=0B'
 '   tuple-ids=0 row-size=4B cardinality=7300'
 ---- TYPES
@@ -110,9 +140,11 @@ explain select id from alltypes where year = 2010;
 '|'
 '00:SCAN HDFS [$DATABASE.alltypes]'
 row_regex:.*partitions=12/24 files=12 size=.*
-'   stats-rows=unavailable extrapolated-rows=3651'
-row_regex:.*table stats: rows=3650 size=.*
-'   column stats: all'
+'   stored statistics:'
+row_regex:.*table: rows=3650 size=.*
+'     partitions: 0/12 rows=unavailable'
+'     columns: all'
+'   extrapolated-rows=3651'
 '   mem-estimate=16.00MB mem-reservation=0B'
 '   tuple-ids=0 row-size=4B cardinality=3651'
 ---- TYPES
@@ -134,9 +166,11 @@ explain select id from alltypes where year = 2010;
 '|'
 '00:SCAN HDFS [$DATABASE.alltypes]'
 row_regex:.*partitions=12/24 files=12 size=.*
-'   stats-rows=3650 extrapolated-rows=3651'
-row_regex:.*table stats: rows=10950 size=.*
-'   column stats: all'
+'   stored statistics:'
+row_regex:.*table: rows=10950 size=.*
+'     partitions: 0/12 rows=unavailable'
+'     columns: all'
+'   extrapolated-rows=3651'
 '   mem-estimate=16.00MB mem-reservation=0B'
 '   tuple-ids=0 row-size=4B cardinality=3651'
 ---- TYPES
@@ -147,9 +181,11 @@ STRING
 drop stats alltypes;
 explain select id from alltypes;
 ---- RESULTS: VERIFY_IS_SUBSET
-'   stats-rows=unavailable extrapolated-rows=unavailable'
-'   table stats: rows=unavailable size=unavailable'
-'   column stats: unavailable'
+'   stored statistics:'
+'     table: rows=unavailable size=unavailable'
+'     partitions: 0/24 rows=unavailable'
+'     columns: unavailable'
+'   extrapolated-rows=unavailable'
 '   mem-estimate=16.00MB mem-reservation=0B'
 '   tuple-ids=0 row-size=4B cardinality=unavailable'
 ---- TYPES

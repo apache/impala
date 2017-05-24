@@ -338,26 +338,26 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // Only applicable to HDFS base table refs.
     AnalysisError("select * from functional_kudu.alltypes tablesample system (10)",
-        "TABLESAMPLE is only supported on HDFS base tables: functional_kudu.alltypes");
+        "TABLESAMPLE is only supported on HDFS tables: functional_kudu.alltypes");
     AnalysisError("select * from functional_hbase.alltypes tablesample system (10)",
-        "TABLESAMPLE is only supported on HDFS base tables: functional_hbase.alltypes");
+        "TABLESAMPLE is only supported on HDFS tables: functional_hbase.alltypes");
     AnalysisError("select * from functional.alltypes_datasource tablesample system (10)",
-        "TABLESAMPLE is only supported on HDFS base tables: " +
+        "TABLESAMPLE is only supported on HDFS tables: " +
         "functional.alltypes_datasource");
     AnalysisError("select * from (select * from functional.alltypes) v " +
         "tablesample system (10)",
-        "TABLESAMPLE is only supported on HDFS base tables: v");
+        "TABLESAMPLE is only supported on HDFS tables: v");
     AnalysisError("with v as (select * from functional.alltypes) " +
         "select * from v tablesample system (10)",
-        "TABLESAMPLE is only supported on HDFS base tables: v");
+        "TABLESAMPLE is only supported on HDFS tables: v");
     AnalysisError("select * from functional.alltypes_view tablesample system (10)",
-        "TABLESAMPLE is only supported on HDFS base tables: functional.alltypes_view");
+        "TABLESAMPLE is only supported on HDFS tables: functional.alltypes_view");
     AnalysisError("select * from functional.allcomplextypes.int_array_col " +
         "tablesample system (10)",
-        "TABLESAMPLE is only supported on HDFS base tables: int_array_col");
+        "TABLESAMPLE is only supported on HDFS tables: int_array_col");
     AnalysisError("select * from functional.allcomplextypes a, a.int_array_col " +
         "tablesample system (10)",
-        "TABLESAMPLE is only supported on HDFS base tables: int_array_col");
+        "TABLESAMPLE is only supported on HDFS tables: int_array_col");
   }
 
   /**

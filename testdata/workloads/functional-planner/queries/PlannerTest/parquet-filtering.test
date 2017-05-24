@@ -18,11 +18,13 @@ PLAN-ROOT SINK
 |  tuple-ids=1 row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=24/24 files=24 size=178.13KB
+   partitions=24/24 files=24 size=179.19KB
    predicates: int_col IS NULL, int_col > 1, int_col > tinyint_col, int_col * rand() > 50
-   stats-rows=unavailable extrapolated-rows=disabled
-   table stats: rows=unavailable size=unavailable
-   column stats: unavailable
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled
    parquet statistics predicates: int_col > 1
    parquet dictionary predicates: int_col > 1
    mem-estimate=32.00MB mem-reservation=0B
@@ -48,11 +50,13 @@ PLAN-ROOT SINK
 |  tuple-ids=1 row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=22/24 files=22 size=163.12KB
+   partitions=22/24 files=22 size=164.09KB
    predicates: bool_col, bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, tinyint_col < 50, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), mod(int_col, 2) = 1, timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = 1, date_string_col > '1993-10-01'
-   stats-rows=unavailable extrapolated-rows=disabled
-   table stats: rows=unavailable size=unavailable
-   columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/22 rows=unavailable
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled
    parquet statistics predicates: bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, tinyint_col < 50, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), date_string_col > '1993-10-01'
    parquet dictionary predicates: bool_col, bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, tinyint_col < 50, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), mod(int_col, 2) = 1, timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = 1, date_string_col > '1993-10-01'
    mem-estimate=128.00MB mem-reservation=0B
@@ -79,11 +83,13 @@ PLAN-ROOT SINK
 |  tuple-ids=1 row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=24/24 files=24 size=178.13KB
+   partitions=24/24 files=24 size=179.19KB
    predicates: id IN (int_col), id NOT IN (0, 1, 2), string_col IN ('aaaa', 'bbbb', 'cccc', NULL), mod(int_col, 50) IN (0, 1)
-   stats-rows=unavailable extrapolated-rows=disabled
-   table stats: rows=unavailable size=unavailable
-   column stats: unavailable
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled
    parquet dictionary predicates: id NOT IN (0, 1, 2), string_col IN ('aaaa', 'bbbb', 'cccc', NULL), mod(int_col, 50) IN (0, 1)
    mem-estimate=48.00MB mem-reservation=0B
    tuple-ids=0 row-size=24B cardinality=unavailable
@@ -140,9 +146,10 @@ PLAN-ROOT SINK
    predicates: !empty(c.nested_struct.c.d)
    predicates on cn: !empty(cn.item)
    predicates on a: a.item.e < -10
-   stats-rows=unavailable extrapolated-rows=disabled
-   table stats: rows=unavailable size=6.92KB
-   columns missing stats: id
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     columns missing stats: id
+   extrapolated-rows=disabled
    parquet statistics predicates: a.item.e < -10
    mem-estimate=32.00MB mem-reservation=0B
    tuple-ids=0 row-size=24B cardinality=unavailable
@@ -201,9 +208,10 @@ PLAN-ROOT SINK
    partitions=1/1 files=2 size=6.92KB
    predicates: !empty(c.nested_struct.c.d)
    predicates on a: a.item.e < -10
-   stats-rows=unavailable extrapolated-rows=disabled
-   table stats: rows=unavailable size=6.92KB
-   columns missing stats: id
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     columns missing stats: id
+   extrapolated-rows=disabled
    mem-estimate=32.00MB mem-reservation=0B
    tuple-ids=0 row-size=24B cardinality=unavailable
 ====
@@ -257,9 +265,10 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.complextypestbl c]
    partitions=1/1 files=2 size=6.92KB
    predicates on a: a.item.e < -10
-   stats-rows=unavailable extrapolated-rows=disabled
-   table stats: rows=unavailable size=6.92KB
-   columns missing stats: id
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     columns missing stats: id
+   extrapolated-rows=disabled
    mem-estimate=32.00MB mem-reservation=0B
    tuple-ids=0 row-size=24B cardinality=unavailable
 ====
@@ -313,9 +322,10 @@ PLAN-ROOT SINK
    predicates: c_custkey > 0, !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o.o_orderkey > 0
    predicates on l: l.l_partkey > 0
-   stats-rows=150000 extrapolated-rows=disabled
-   table stats: rows=150000 size=292.36MB
-   columns missing stats: c_orders
+   stored statistics:
+     table: rows=150000 size=292.36MB
+     columns missing stats: c_orders
+   extrapolated-rows=disabled
    parquet statistics predicates: c_custkey > 0, o.o_orderkey > 0, l.l_partkey > 0
    parquet dictionary predicates: c_custkey > 0
    mem-estimate=176.00MB mem-reservation=0B
@@ -357,9 +367,10 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.complextypestbl c]
    partitions=1/1 files=2 size=6.92KB
    predicates on int_array: item > 10
-   stats-rows=unavailable extrapolated-rows=disabled
-   table stats: rows=unavailable size=6.92KB
-   column stats: unavailable
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled
    mem-estimate=16.00MB mem-reservation=0B
    tuple-ids=0 row-size=16B cardinality=unavailable
 ====

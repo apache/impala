@@ -61,7 +61,6 @@ import org.apache.impala.catalog.ColumnNotFoundException;
 import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
-import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
@@ -156,6 +155,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.math.LongMath;
 
 /**
  * Class used to execute Catalog Operations, including DDL and refresh/invalidate
@@ -472,7 +472,7 @@ public class CatalogOpExecutor {
         case UPDATE_STATS:
           Preconditions.checkState(params.isSetUpdate_stats_params());
           Reference<Long> numUpdatedColumns = new Reference<>(0L);
-          alterTableUpdateStats(tbl, params.getUpdate_stats_params(), response,
+          alterTableUpdateStats(tbl, params.getUpdate_stats_params(),
               numUpdatedPartitions, numUpdatedColumns);
           reloadTableSchema = true;
           resultColVal.setString_val("Updated " + numUpdatedPartitions.getRef() +
@@ -607,15 +607,6 @@ public class CatalogOpExecutor {
     result.setVersion(updatedCatalogObject.getCatalog_version());
   }
 
-  /**
-   * Creates a new HdfsPartition object and adds it to the corresponding HdfsTable.
-   * Does not create the object in the Hive metastore.
-   */
-  private Table addHdfsPartition(Table tbl, Partition partition)
-      throws CatalogException {
-    return addHdfsPartitions(tbl, Lists.newArrayList(partition));
-  }
-
   private Table addHdfsPartitions(Table tbl, List<Partition> partitions)
       throws CatalogException {
     Preconditions.checkNotNull(tbl);
@@ -684,95 +675,86 @@ public class CatalogOpExecutor {
   /**
    * Alters an existing table's table and/or column statistics. Partitions are updated
    * in batches of size 'MAX_PARTITION_UPDATES_PER_RPC'.
+   * This function is used by COMPUTE STATS, COMPUTE INCREMENTAL STATS and
+   * ALTER TABLE SET COLUMN STATS.
+   * Returns the number of updated partitions and columns in 'numUpdatedPartitions'
+   * and 'numUpdatedColumns', respectively.
    */
   private void alterTableUpdateStats(Table table, TAlterTableUpdateStatsParams params,
-      TDdlExecResponse resp, Reference<Long> numUpdatedPartitions,
-      Reference<Long> numUpdatedColumns) throws ImpalaException {
+      Reference<Long> numUpdatedPartitions, Reference<Long> numUpdatedColumns)
+      throws ImpalaException {
     Preconditions.checkState(table.getLock().isHeldByCurrentThread());
-    if (params.isSetTable_stats()) {
-      // Updating table and column stats via COMPUTE STATS.
-      Preconditions.checkState(
-          params.isSetPartition_stats() && params.isSetTable_stats());
-    } else {
-      // Only changing column stats via ALTER TABLE SET COLUMN STATS.
-      Preconditions.checkState(params.isSetColumn_stats());
-    }
+    Preconditions.checkState(params.isSetTable_stats() || params.isSetColumn_stats());
 
     TableName tableName = table.getTableName();
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
-    if (LOG.isTraceEnabled()) {
-      LOG.trace(String.format("Updating table stats for: %s", tableName));
+    if (LOG.isInfoEnabled()) {
+      int numPartitions =
+          params.isSetPartition_stats() ? params.partition_stats.size() : 0;
+      int numColumns =
+          params.isSetColumn_stats() ? params.column_stats.size() : 0;
+      LOG.info(String.format(
+          "Updating stats for table %s: table-stats=%s partitions=%s column-stats=%s",
+          tableName, params.isSetTable_stats(), numPartitions, numColumns));
     }
 
-    // Deep copy the msTbl to avoid updating our cache before successfully persisting
-    // the results to the metastore.
-    org.apache.hadoop.hive.metastore.api.Table msTbl =
-        table.getMetaStoreTable().deepCopy();
-    List<HdfsPartition> partitions = Lists.newArrayList();
-    if (table instanceof HdfsTable) {
-      // Build a list of non-default partitions to update.
-      HdfsTable hdfsTable = (HdfsTable) table;
-      for (HdfsPartition p: hdfsTable.getPartitions()) {
-        if (!p.isDefaultPartition()) partitions.add(p);
-      }
-    }
-
-    long numTargetedPartitions = 0L;
-    long numTargetedColumns = 0L;
-    try(MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-      // Update the table and partition row counts based on the query results.
-      List<HdfsPartition> modifiedParts = Lists.newArrayList();
-      if (params.isSetTable_stats()) {
-        numTargetedPartitions = updateTableStats(table, params, msTbl, partitions,
-            modifiedParts);
-      }
-
-      ColumnStatistics colStats = null;
-      if (params.isSetColumn_stats()) {
-        // Create Hive column stats from the query results.
-        colStats = createHiveColStats(params.getColumn_stats(), table);
-        numTargetedColumns = colStats.getStatsObjSize();
-      }
-
-      // Update all partitions.
-      bulkAlterPartitions(table.getDb().getName(), table.getName(), modifiedParts);
-      if (numTargetedColumns > 0) {
-        Preconditions.checkNotNull(colStats);
-        // Update column stats.
-        try {
+    // Update column stats.
+    ColumnStatistics colStats = null;
+    numUpdatedColumns.setRef(Long.valueOf(0));
+    if (params.isSetColumn_stats()) {
+      colStats = createHiveColStats(params, table);
+      if (colStats.getStatsObjSize() > 0) {
+        try(MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
           msClient.getHiveClient().updateTableColumnStatistics(colStats);
         } catch (Exception e) {
           throw new ImpalaRuntimeException(String.format(HMS_RPC_ERROR_FORMAT_STR,
               "updateTableColumnStatistics"), e);
         }
       }
-      // Update the table stats. Apply the table alteration last to ensure the
-      // lastDdlTime is as accurate as possible.
-      applyAlterTable(msTbl);
+      numUpdatedColumns.setRef(Long.valueOf(colStats.getStatsObjSize()));
     }
-    numUpdatedPartitions.setRef(numTargetedPartitions);
-    numUpdatedColumns.setRef(numTargetedColumns);
+
+    // Deep copy the msTbl to avoid updating our cache before successfully persisting
+    // the results to the metastore.
+    org.apache.hadoop.hive.metastore.api.Table msTbl =
+        table.getMetaStoreTable().deepCopy();
+
+    // Update partition-level row counts and incremental column stats for
+    // partitioned Hdfs tables.
+    List<HdfsPartition> modifiedParts = null;
+    if (params.isSetPartition_stats() && table.getNumClusteringCols() > 0) {
+      Preconditions.checkState(table instanceof HdfsTable);
+      modifiedParts = updatePartitionStats(params, (HdfsTable) table);
+      bulkAlterPartitions(table.getDb().getName(), table.getName(), modifiedParts);
+    }
+
+    // Update table row count and total file bytes. Apply table alteration to HMS last to
+    // ensure the lastDdlTime is as accurate as possible.
+    if (params.isSetTable_stats()) updateTableStats(params, msTbl);
+    applyAlterTable(msTbl);
+
+    numUpdatedPartitions.setRef(Long.valueOf(0));
+    if (modifiedParts != null) {
+      numUpdatedPartitions.setRef(Long.valueOf(modifiedParts.size()));
+    } else if (params.isSetTable_stats()) {
+      numUpdatedPartitions.setRef(Long.valueOf(1));
+    }
   }
 
   /**
-   * Updates the row counts of the given Hive partitions and the total row count of the
-   * given Hive table based on the given update stats parameters. The partitions whose
-   * row counts have not changed are skipped. The modified partitions are returned
-   * in the modifiedParts parameter.
-   * Row counts for missing or new partitions as a result of concurrent table
-   * alterations are set to 0.
-   * Returns the number of partitions that were targeted for update (includes partitions
-   * whose row counts have not changed).
+   * Updates the row counts and incremental column stats of the partitions in the given
+   * Impala table based on the given update stats parameters. Returns the modified Impala
+   * partitions.
+   * Row counts for missing or new partitions as a result of concurrent table alterations
+   * are set to 0.
    */
-  private int updateTableStats(Table table, TAlterTableUpdateStatsParams params,
-      org.apache.hadoop.hive.metastore.api.Table msTbl,
-      List<HdfsPartition> partitions, List<HdfsPartition> modifiedParts)
-      throws ImpalaException {
+  private List<HdfsPartition> updatePartitionStats(TAlterTableUpdateStatsParams params,
+      HdfsTable table) throws ImpalaException {
     Preconditions.checkState(params.isSetPartition_stats());
-    Preconditions.checkState(params.isSetTable_stats());
-    // Update the partitions' ROW_COUNT parameter.
-    int numTargetedPartitions = 0;
-    for (HdfsPartition partition: partitions) {
+    List<HdfsPartition> modifiedParts = Lists.newArrayList();
+    for (HdfsPartition partition: table.getPartitions()) {
+      if (partition.isDefaultPartition()) continue;
+
       // NULL keys are returned as 'NULL' in the partition_stats map, so don't substitute
       // this partition's keys with Hive's replacement value.
       List<String> partitionValues = partition.getPartitionValuesAsStrings(false);
@@ -806,23 +788,27 @@ public class CatalogOpExecutor {
       partition.putToParameters(StatsSetupConst.ROW_COUNT, String.valueOf(numRows));
       // HMS requires this param for stats changes to take effect.
       partition.putToParameters(MetastoreShim.statsGeneratedViaStatsTaskParam());
-      ++numTargetedPartitions;
       modifiedParts.add(partition);
     }
+    return modifiedParts;
+  }
 
-    // For unpartitioned tables and HBase tables report a single updated partition.
-    if (table.getNumClusteringCols() == 0 || table instanceof HBaseTable) {
-      numTargetedPartitions = 1;
-      if (table instanceof HdfsTable) {
-        Preconditions.checkState(modifiedParts.size() == 1);
-        // Delete stats for this partition as they are included in table stats.
-        PartitionStatsUtil.deletePartStats(modifiedParts.get(0));
-      }
+  /**
+   * Updates the row count and total file bytes of the given HMS table based on the
+   * the update stats parameters.
+   */
+  private void updateTableStats(TAlterTableUpdateStatsParams params,
+      org.apache.hadoop.hive.metastore.api.Table msTbl) throws ImpalaException {
+    Preconditions.checkState(params.isSetTable_stats());
+    long numRows = params.table_stats.num_rows;
+    // Extrapolate based on sampling (if applicable).
+    if (params.isSetSample_file_bytes() && params.table_stats.isSetTotal_file_bytes()) {
+      numRows = getExtrapolatedStatsVal(numRows, params.sample_file_bytes,
+          params.table_stats.total_file_bytes);
     }
 
     // Update the table's ROW_COUNT and TOTAL_SIZE parameters.
-    msTbl.putToParameters(StatsSetupConst.ROW_COUNT,
-        String.valueOf(params.getTable_stats().num_rows));
+    msTbl.putToParameters(StatsSetupConst.ROW_COUNT, String.valueOf(numRows));
     if (params.getTable_stats().isSetTotal_file_bytes()) {
       msTbl.putToParameters(StatsSetupConst.TOTAL_SIZE,
           String.valueOf(params.getTable_stats().total_file_bytes));
@@ -830,28 +816,28 @@ public class CatalogOpExecutor {
     // HMS requires this param for stats changes to take effect.
     Pair<String, String> statsTaskParam = MetastoreShim.statsGeneratedViaStatsTaskParam();
     msTbl.putToParameters(statsTaskParam.first, statsTaskParam.second);
-    return numTargetedPartitions;
   }
 
   /**
-   * Create Hive column statistics for the given table based on the give map from column
+   * Create HMS column statistics for the given table based on the give map from column
    * name to column stats. Missing or new columns as a result of concurrent table
    * alterations are ignored.
    */
   private static ColumnStatistics createHiveColStats(
-      Map<String, TColumnStats> columnStats, Table table) {
+      TAlterTableUpdateStatsParams params, Table table) {
+    Preconditions.checkState(params.isSetColumn_stats());
     // Collection of column statistics objects to be returned.
     ColumnStatistics colStats = new ColumnStatistics();
     colStats.setStatsDesc(
         new ColumnStatisticsDesc(true, table.getDb().getName(), table.getName()));
     // Generate Hive column stats objects from the update stats params.
-    for (Map.Entry<String, TColumnStats> entry: columnStats.entrySet()) {
+    for (Map.Entry<String, TColumnStats> entry: params.getColumn_stats().entrySet()) {
       String colName = entry.getKey();
       Column tableCol = table.getColumn(entry.getKey());
       // Ignore columns that were dropped in the meantime.
       if (tableCol == null) continue;
       ColumnStatisticsData colStatsData =
-          createHiveColStatsData(entry.getValue(), tableCol.getType());
+          createHiveColStatsData(params, entry.getValue(), tableCol.getType());
       if (colStatsData == null) continue;
       if (LOG.isTraceEnabled()) {
         LOG.trace(String.format("Updating column stats for %s: numDVs=%s numNulls=%s " +
@@ -866,31 +852,58 @@ public class CatalogOpExecutor {
     return colStats;
   }
 
-  private static ColumnStatisticsData createHiveColStatsData(TColumnStats colStats,
-      Type colType) {
+  /**
+   * Returns 'val' extrapolated based on the sampled and total file bytes. Uses a basic
+   * linear extrapolation. All parameters must be >= 0.
+   * The returned value is >= 'val' and >= 0. Returns Long.MAX_VALUE if a computation
+   * overflows.
+   */
+  private static long getExtrapolatedStatsVal(long val, long sampleFileBytes,
+      long totalFileBytes) {
+    Preconditions.checkArgument(val >= 0 && sampleFileBytes >= 0 && totalFileBytes >= 0);
+    double mult = 0.0;
+    if (sampleFileBytes > 0) mult = (double) totalFileBytes / sampleFileBytes;
+    // The round() caps the returned value at Long.MAX_VALUE.
+    return Math.round(val * mult);
+  }
+
+  private static ColumnStatisticsData createHiveColStatsData(
+      TAlterTableUpdateStatsParams params, TColumnStats colStats, Type colType) {
     ColumnStatisticsData colStatsData = new ColumnStatisticsData();
-    long ndvs = colStats.getNum_distinct_values();
+    long ndv = colStats.getNum_distinct_values();
+    // Cap NDV at row count if available.
+    if (params.isSetTable_stats()) ndv = Math.min(ndv, params.table_stats.num_rows);
+    // Extrapolate NDV based on sampling if applicable.
+    if (params.isSetSample_file_bytes() && params.isSetTable_stats()
+        && params.table_stats.isSetTotal_file_bytes()) {
+      ndv = getExtrapolatedStatsVal(ndv, params.sample_file_bytes,
+          params.table_stats.total_file_bytes);
+    }
+
     long numNulls = colStats.getNum_nulls();
     switch(colType.getPrimitiveType()) {
       case BOOLEAN:
-        // TODO: Gather and set the numTrues and numFalse stats as well. The planner
-        // currently does not rely on them.
         colStatsData.setBooleanStats(new BooleanColumnStatsData(1, -1, numNulls));
         break;
       case TINYINT:
+        ndv = Math.min(ndv, LongMath.pow(2, Byte.SIZE));
+        colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndv));
+        break;
       case SMALLINT:
+        ndv = Math.min(ndv, LongMath.pow(2, Short.SIZE));
+        colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndv));
+        break;
       case INT:
+        ndv = Math.min(ndv, LongMath.pow(2, Integer.SIZE));
+        colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndv));
+        break;
       case BIGINT:
       case TIMESTAMP: // Hive and Impala use LongColumnStatsData for timestamps.
-        // TODO: Gather and set the min/max values stats as well. The planner
-        // currently does not rely on them.
-        colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndvs));
+        colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndv));
         break;
       case FLOAT:
       case DOUBLE:
-        // TODO: Gather and set the min/max values stats as well. The planner
-        // currently does not rely on them.
-        colStatsData.setDoubleStats(new DoubleColumnStatsData(numNulls, ndvs));
+        colStatsData.setDoubleStats(new DoubleColumnStatsData(numNulls, ndv));
         break;
       case CHAR:
       case VARCHAR:
@@ -898,13 +911,12 @@ public class CatalogOpExecutor {
         long maxStrLen = colStats.getMax_size();
         double avgStrLen = colStats.getAvg_size();
         colStatsData.setStringStats(
-            new StringColumnStatsData(maxStrLen, avgStrLen, numNulls, ndvs));
+            new StringColumnStatsData(maxStrLen, avgStrLen, numNulls, ndv));
         break;
       case DECIMAL:
-        // TODO: Gather and set the min/max values stats as well. The planner
-        // currently does not rely on them.
-        colStatsData.setDecimalStats(
-            new DecimalColumnStatsData(numNulls, ndvs));
+        double decMaxNdv = Math.pow(10, colType.getPrecision());
+        ndv = (long) Math.min(ndv, decMaxNdv);
+        colStatsData.setDecimalStats(new DecimalColumnStatsData(numNulls, ndv));
         break;
       default:
         return null;
@@ -2916,7 +2928,7 @@ public class CatalogOpExecutor {
       org.apache.hadoop.hive.metastore.api.Partition msPart = p.toHmsPartition();
       if (msPart != null) hmsPartitions.add(msPart);
     }
-    if (hmsPartitions.size() == 0) return;
+    if (hmsPartitions.isEmpty()) return;
 
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       // Apply the updates in batches of 'MAX_PARTITION_UPDATES_PER_RPC'.

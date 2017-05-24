@@ -37,17 +37,16 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
-import org.apache.log4j.Logger;
-import org.apache.thrift.protocol.TBinaryProtocol;
-
 import org.apache.impala.catalog.Type;
-import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.JniUtil;
 import org.apache.impala.thrift.THiveUdfExecutorCtorParams;
 import org.apache.impala.thrift.TPrimitiveType;
 import org.apache.impala.util.UnsafeUtil;
+import org.apache.log4j.Logger;
+import org.apache.thrift.protocol.TBinaryProtocol;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

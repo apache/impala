@@ -631,7 +631,7 @@ public class ParserTest extends FrontendTestBase {
     ParserError("select * from t tablesample system (10) repeatable");
     // Random seed must be an int literal.
     ParserError("select * from t tablesample system (10) repeatable (10 + 10)");
-    // Negative precent.
+    // Negative percent.
     ParserError("select * from t tablesample system (-10)");
     // Negative random seed.
     ParserError("select * from t tablesample system (10) repeatable(-10)");
@@ -3587,24 +3587,27 @@ public class ParserTest extends FrontendTestBase {
 
   @Test
   public void TestComputeStats() {
+    ParsesOk("COMPUTE STATS alltypes");
     ParsesOk("COMPUTE STATS functional.alltypes");
+    ParsesOk("COMPUTE STATS alltypes TABLESAMPLE SYSTEM(10)");
+    ParsesOk("COMPUTE STATS alltypes TABLESAMPLE SYSTEM(10) REPEATABLE(10)");
+    ParsesOk("COMPUTE STATS functional.alltypes TABLESAMPLE SYSTEM(10) REPEATABLE(10)");
     ParserError("COMPUTE functional.alltypes");
     ParserError("COMPUTE STATS ON functional.alltypes");
     ParserError("COMPUTE STATS");
   }
 
   @Test
-  public void TestComputeStatsIncremental() {
+  public void TestComputeIncrementalStats() {
     ParsesOk("COMPUTE INCREMENTAL STATS functional.alltypes");
-    ParserError("COMPUTE INCREMENTAL functional.alltypes");
-
     ParsesOk(
         "COMPUTE INCREMENTAL STATS functional.alltypes PARTITION(month=10, year=2010)");
-
+    ParsesOk(
+        "DROP INCREMENTAL STATS functional.alltypes PARTITION(month=10, year=2010)");
     ParserError("COMPUTE INCREMENTAL STATS");
-
-    ParsesOk("DROP INCREMENTAL STATS functional.alltypes PARTITION(month=10, year=2010)");
+    ParserError("COMPUTE INCREMENTAL functional.alltypes");
     ParserError("DROP INCREMENTAL STATS functional.alltypes");
+    ParserError("COMPUTE INCREMENTAL STATS functional.alltypes TABLESAMPLE SYSTEM(10)");
   }
 
   @Test

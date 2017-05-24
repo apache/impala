@@ -443,7 +443,7 @@ public class HBaseScanNode extends ScanNode {
       }
     }
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
-      output.append(getStatsExplainString(detailPrefix, detailLevel));
+      output.append(getStatsExplainString(detailPrefix));
       output.append("\n");
     }
     return output.toString();

@@ -18,9 +18,10 @@
 package org.apache.impala.analysis;
 
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.authorization.Privilege;
@@ -28,12 +29,14 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition;
+import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.TComputeStatsParams;
 import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TTableName;
@@ -45,14 +48,41 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 /**
- * Represents a COMPUTE STATS <table> and COMPUTE INCREMENTAL STATS <table> [PARTITION
- * <part_spec>] statement for statistics collection. The former statement gathers all
- * table and column stats for a given table and stores them in the Metastore via the
- * CatalogService. All existing stats for that table are replaced and no existing stats
- * are reused. The latter, incremental form, similarly computes stats for the whole table
- * but does so by re-using stats from partitions which have 'valid' statistics. Statistics
- * are 'valid' currently if they exist, in the future they may be expired based on recency
- * etc.
+ * Represents the following statements for statistics collection. Which statistics
+ * are computed and stored depends on the statement type (incremental or not), the
+ * clauses used (sampling, partition spec), as well as whether stats extrapolation
+ * is enabled or not (--enable_stats_extrapolation).
+ *
+ * 1. COMPUTE STATS <table> [TABLESAMPLE SYSTEM(<perc>) [REPEATABLE(<seed>)]]
+ * - Stats extrapolation enabled:
+ *   Computes and replaces the table-level row count and total file size, as well as all
+ *   table-level column statistics. Existing partition-objects and their row count are
+ *   not modified at all. The TABLESAMPLE clause can be used to limit the scanned data
+ *   volume to a desired percentage. When sampling, the results of the COMPUTE STATS
+ *   queries are sent to the CatalogServer. There, the stats are extrapolated before
+ *   storing them into the HMS so as not to confuse other engines like Hive/SparkSQL
+ *   which may rely on the shared HMS fields representing to the whole table and not
+ *   a sample. See {@link CatalogOpExecutor#getExtrapolatedStatsVal}.
+ * - Stats extrapolation disabled:
+ *   Computes and replaces the table-level row count and total file size, the row counts
+ *   for all partitions (if applicable), as well as all table-level column statistics.
+ *   The TABLESAMPLE clause is not supported to simplify implementation and testing. In
+ *   particular, we want to avoid implementing and testing code for updating all HMS
+ *   partitions to set the extrapolated numRows statistic. Altering many partitions is
+ *   expensive and so should be avoided in favor of enabling extrapolation.
+ *
+ * 2. COMPUTE INCREMENTAL STATS <table> [PARTITION <part_spec>]
+ * - Stats extrapolation enabled:
+ *   Not supported for now to keep the logic/code simple.
+ * - Stats extrapolation disabled:
+ *   Computes and replaces the table and partition-level row counts. Computes mergeable
+ *   per-partition column statistics (HLL intermediate state) and stores them in the HMS.
+ *   Computes and replaces the table-level column statistics by merging the
+ *   partition-level column statistics.
+ *   Instead of recomputing those statistics for all partitions, this command reuses
+ *   existing statistics from partitions which already have incremental statistics.
+ *   If a set of partitions is specified, then the incremental statistics for those
+ *   partitions are recomputed (then merged into the table-level statistics).
  *
  * TODO: Allow more coarse/fine grained (db, column)
  * TODO: Compute stats on complex types.
@@ -66,9 +96,14 @@ public class ComputeStatsStmt extends StatementBase {
           "column definitions, e.g., using the result of 'SHOW CREATE TABLE'";
 
   protected final TableName tableName_;
+  protected final TableSampleClause sampleParams_;
 
   // Set during analysis.
   protected Table table_;
+
+  // Total number of bytes in the file sample of the target HDFS table. Set to -1 for
+  // non-HDFS tables or when TABLESAMPLE is not specified.
+  protected long sampleFileBytes_ = -1;
 
   // The Null count is not currently being used in optimization or run-time,
   // and compute stats runs 2x faster in many cases when not counting NULLs.
@@ -86,9 +121,10 @@ public class ComputeStatsStmt extends StatementBase {
   private boolean isIncremental_ = false;
 
   // If true, expect the compute stats process to produce output for all partitions in the
-  // target table (only meaningful, therefore, if partitioned). This is always true for
-  // non-incremental computations. If set, expectedPartitions_ will be empty - the point
-  // of this flag is to optimise the case where all partitions are targeted.
+  // target table. In that case, 'expectedPartitions_' will be empty. The point of this
+  // flag is to optimize the case where all partitions are targeted.
+  // False for unpartitioned HDFS tables, non-HDFS tables or when stats extrapolation
+  // is enabled.
   private boolean expectAllPartitions_ = false;
 
   // The list of valid partition statistics that can be used in an incremental computation
@@ -114,26 +150,18 @@ public class ComputeStatsStmt extends StatementBase {
   private static final int MAX_INCREMENTAL_PARTITIONS = 1000;
 
   /**
-   * Constructor for the non-incremental form of COMPUTE STATS.
+   * Should only be constructed via static creation functions.
    */
-  protected ComputeStatsStmt(TableName tableName) {
-    this(tableName, false, null);
-  }
-
-  /**
-   * Constructor for the incremental form of COMPUTE STATS. If isIncremental is true,
-   * statistics will be recomputed incrementally; if false they will be recomputed for the
-   * whole table. The partition set partitionSet can specify a list of partitions whose
-   * stats should be recomputed.
-   */
-  protected ComputeStatsStmt(TableName tableName, boolean isIncremental,
-      PartitionSet partitionSet) {
+  private ComputeStatsStmt(TableName tableName, TableSampleClause sampleParams,
+      boolean isIncremental, PartitionSet partitionSet) {
     Preconditions.checkState(tableName != null && !tableName.isEmpty());
     Preconditions.checkState(isIncremental || partitionSet == null);
-    this.tableName_ = tableName;
-    this.table_ = null;
-    this.isIncremental_ = isIncremental;
-    this.partitionSet_ = partitionSet;
+    Preconditions.checkState(!isIncremental || sampleParams == null);
+    tableName_ = tableName;
+    sampleParams_ = sampleParams;
+    table_ = null;
+    isIncremental_ = isIncremental;
+    partitionSet_ = partitionSet;
     if (partitionSet_ != null) {
       partitionSet_.setTableName(tableName);
       partitionSet_.setPrivilegeRequirement(Privilege.ALTER);
@@ -141,18 +169,21 @@ public class ComputeStatsStmt extends StatementBase {
   }
 
   /**
-   * Utility method for constructing the child queries to add partition columns to both a
-   * select list and a group-by list; the former are wrapped in a cast to a string.
+   * Returns a stmt for COMPUTE STATS. The optional 'sampleParams' indicates whether the
+   * stats should be computed with table sampling.
    */
-  private void addPartitionCols(HdfsTable table, List<String> selectList,
-      List<String> groupByCols) {
-    for (int i = 0; i < table.getNumClusteringCols(); ++i) {
-      String colRefSql = ToSqlUtils.getIdentSql(table.getColumns().get(i).getName());
-      groupByCols.add(colRefSql);
-      // For the select list, wrap the group by columns in a cast to string because
-      // the Metastore stores them as strings.
-      selectList.add(colRefSql);
-    }
+  public static ComputeStatsStmt createStatsStmt(TableName tableName,
+      TableSampleClause sampleParams) {
+    return new ComputeStatsStmt(tableName, sampleParams, false, null);
+  }
+
+  /**
+   * Returns a stmt for COMPUTE INCREMENTAL STATS. The optional 'partitioSet' specifies a
+   * set of partitions whose stats should be computed.
+   */
+  public static ComputeStatsStmt createIncrementalStatsStmt(TableName tableName,
+      PartitionSet partitionSet) {
+    return new ComputeStatsStmt(tableName, null, true, partitionSet);
   }
 
   private List<String> getBaseColumnStatsQuerySelectList(Analyzer analyzer) {
@@ -161,7 +192,6 @@ public class ComputeStatsStmt extends StatementBase {
     // cannot store them as part of the non-partition column stats. For HBase tables,
     // include the single clustering column (the row key).
     int startColIdx = (table_ instanceof HBaseTable) ? 0 : table_.getNumClusteringCols();
-    final String ndvUda = isIncremental_ ? "NDV_NO_FINALIZE" : "NDV";
 
     for (int i = startColIdx; i < table_.getColumns().size(); ++i) {
       Column c = table_.getColumns().get(i);
@@ -170,7 +200,11 @@ public class ComputeStatsStmt extends StatementBase {
       // NDV approximation function. Add explicit alias for later identification when
       // updating the Metastore.
       String colRefSql = ToSqlUtils.getIdentSql(c.getName());
-      columnStatsSelectList.add(ndvUda + "(" + colRefSql + ") AS " + colRefSql);
+      if (isIncremental_) {
+        columnStatsSelectList.add("NDV_NO_FINALIZE(" + colRefSql + ") AS " + colRefSql);
+      } else {
+        columnStatsSelectList.add("NDV(" + colRefSql + ") AS " + colRefSql);
+      }
 
       if (COUNT_NULLS) {
         // Count the number of NULL values.
@@ -266,12 +300,10 @@ public class ComputeStatsStmt extends StatementBase {
       isIncremental_ = false;
     }
 
-    // Ensure that we write an entry for every partition if this isn't incremental
-    if (!isIncremental_) expectAllPartitions_ = true;
-
     HdfsTable hdfsTable = null;
     if (table_ instanceof HdfsTable) {
       hdfsTable = (HdfsTable)table_;
+      if (hdfsTable.isAvroTable()) checkIncompleteAvroSchema(hdfsTable);
       if (isIncremental_ && hdfsTable.getNumClusteringCols() == 0 &&
           partitionSet_ != null) {
         throw new AnalysisException(String.format(
@@ -385,6 +417,10 @@ public class ComputeStatsStmt extends StatementBase {
         analyzer.addWarning("No partitions selected for incremental stats update");
         return;
       }
+    } else {
+      // Not computing incremental stats.
+      expectAllPartitions_ = !(table_ instanceof HdfsTable) ||
+          !BackendConfig.INSTANCE.enableStatsExtrapolation();
     }
 
     if (filterPreds.size() > MAX_INCREMENTAL_PARTITIONS) {
@@ -396,31 +432,31 @@ public class ComputeStatsStmt extends StatementBase {
       validPartStats_.clear();
     }
 
-    List<String> groupByCols = Lists.newArrayList();
-    List<String> partitionColsSelectList = Lists.newArrayList();
-    // Only add group by clause for HdfsTables.
-    if (hdfsTable != null) {
-      if (hdfsTable.isAvroTable()) checkIncompleteAvroSchema(hdfsTable);
-      addPartitionCols(hdfsTable, partitionColsSelectList, groupByCols);
-    }
 
     // Query for getting the per-partition row count and the total row count.
     StringBuilder tableStatsQueryBuilder = new StringBuilder("SELECT ");
-    List<String> tableStatsSelectList = Lists.newArrayList();
-    tableStatsSelectList.add("COUNT(*)");
-
-    tableStatsSelectList.addAll(partitionColsSelectList);
+    List<String> tableStatsSelectList = Lists.newArrayList("COUNT(*)");
+    // Add group by columns for incremental stats or with extrapolation disabled.
+    List<String> groupByCols = Lists.newArrayList();
+    if (!updateTableStatsOnly()) {
+      for (Column partCol: hdfsTable.getClusteringColumns()) {
+        groupByCols.add(ToSqlUtils.getIdentSql(partCol.getName()));
+      }
+      tableStatsSelectList.addAll(groupByCols);
+    }
     tableStatsQueryBuilder.append(Joiner.on(", ").join(tableStatsSelectList));
-    tableStatsQueryBuilder.append(" FROM " + tableName_.toSql());
+    // Tablesample clause to be used for all child queries.
+    String tableSampleSql = analyzeTableSampleClause(analyzer);
+    tableStatsQueryBuilder.append(" FROM " + tableName_.toSql() + tableSampleSql);
 
     // Query for getting the per-column NDVs and number of NULLs.
     List<String> columnStatsSelectList = getBaseColumnStatsQuerySelectList(analyzer);
 
-    if (isIncremental_) columnStatsSelectList.addAll(partitionColsSelectList);
+    if (isIncremental_) columnStatsSelectList.addAll(groupByCols);
 
     StringBuilder columnStatsQueryBuilder = new StringBuilder("SELECT ");
     columnStatsQueryBuilder.append(Joiner.on(", ").join(columnStatsSelectList));
-    columnStatsQueryBuilder.append(" FROM " + tableName_.toSql());
+    columnStatsQueryBuilder.append(" FROM " + tableName_.toSql() + tableSampleSql);
 
     // Add the WHERE clause to filter out partitions that we don't want to compute
     // incremental stats for. While this is a win in most situations, we would like to
@@ -456,6 +492,43 @@ public class ComputeStatsStmt extends StatementBase {
 
     columnStatsQueryStr_ = columnStatsQueryBuilder.toString();
     if (LOG.isTraceEnabled()) LOG.trace("Column stats query: " + columnStatsQueryStr_);
+  }
+
+  /**
+   * Analyzes the TABLESAMPLE clause and computes the sample to set 'sampleFileBytes_'.
+   * Returns the TABLESAMPLE SQL to be used for all child queries or an empty string if
+   * not sampling. If sampling, the returned SQL includes a fixed random seed so all
+   * child queries generate a consistent sample, even if the user did not originally
+   * specify REPEATABLE.
+   * No-op if this statement has no TABLESAMPLE clause.
+   */
+  private String analyzeTableSampleClause(Analyzer analyzer) throws AnalysisException {
+    if (sampleParams_ == null) return "";
+    if (!(table_ instanceof HdfsTable)) {
+      throw new AnalysisException("TABLESAMPLE is only supported on HDFS tables.");
+    }
+    if (!BackendConfig.INSTANCE.enableStatsExtrapolation()) {
+      throw new AnalysisException(
+          "COMPUTE STATS TABLESAMPLE requires --enable_stats_extrapolation=true. " +
+          "Stats extrapolation is currently disabled.");
+    }
+    sampleParams_.analyze(analyzer);
+    long sampleSeed;
+    if (sampleParams_.hasRandomSeed()) {
+      sampleSeed = sampleParams_.getRandomSeed();
+    } else {
+      sampleSeed = System.currentTimeMillis();
+    }
+
+    // Compute the sample of files and set 'sampleFileBytes_'.
+    HdfsTable hdfsTable = (HdfsTable) table_;
+    Map<Long, List<FileDescriptor>> sample = hdfsTable.getFilesSample(
+        hdfsTable.getPartitions(), sampleParams_.getPercentBytes(), sampleSeed);
+    sampleFileBytes_ = 0;
+    for (List<FileDescriptor> fds: sample.values()) {
+      for (FileDescriptor fd: fds) sampleFileBytes_ += fd.getFileLength();
+    }
+    return " " + sampleParams_.toSql(sampleSeed);
   }
 
   /**
@@ -526,6 +599,15 @@ public class ComputeStatsStmt extends StatementBase {
   }
 
   /**
+   * Returns true if we are only updating statistics at the table level and not at
+   * the partition level.
+   */
+  private boolean updateTableStatsOnly() {
+    if (!(table_ instanceof HdfsTable)) return true;
+    return !isIncremental_ && BackendConfig.INSTANCE.enableStatsExtrapolation();
+  }
+
+  /**
    * Returns true if the given column should be ignored for the purpose of computing
    * column stats. Columns with an invalid/unsupported/complex type are ignored.
    * For example, complex types in an HBase-backed table will appear as invalid types.
@@ -559,7 +641,9 @@ public class ComputeStatsStmt extends StatementBase {
   @Override
   public String toSql() {
     if (!isIncremental_) {
-      return "COMPUTE STATS " + tableName_.toSql();
+      String tblsmpl = "";
+      if (sampleParams_ != null) tblsmpl = " " + sampleParams_.toSql();
+      return "COMPUTE STATS " + tableName_.toSql() + tblsmpl;
     } else {
       return "COMPUTE INCREMENTAL STATS " + tableName_.toSql() +
           partitionSet_ == null ? "" : partitionSet_.toSql();
@@ -575,7 +659,6 @@ public class ComputeStatsStmt extends StatementBase {
     } else {
       params.setCol_stats_queryIsSet(false);
     }
-
     params.setIs_incremental(isIncremental_);
     params.setExisting_part_stats(validPartStats_);
     params.setExpect_all_partitions(expectAllPartitions_);
@@ -583,8 +666,13 @@ public class ComputeStatsStmt extends StatementBase {
     if (isIncremental_) {
       params.setNum_partition_cols(((HdfsTable)table_).getNumClusteringCols());
     }
-    if (table_ instanceof HdfsTable && !isIncremental_) {
+
+    if (table_ instanceof HdfsTable) {
       params.setTotal_file_bytes(((HdfsTable)table_).getTotalHdfsBytes());
+      if (sampleParams_ != null) {
+        Preconditions.checkState(sampleFileBytes_ >= 0);
+        if (sampleFileBytes_ != -1) params.setSample_file_bytes(sampleFileBytes_);
+      }
     }
     return params;
   }

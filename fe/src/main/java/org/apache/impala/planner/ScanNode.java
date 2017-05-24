@@ -23,11 +23,8 @@ import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.Table;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.NotImplementedException;
-import org.apache.impala.common.PrintUtils;
-import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TScanRangeLocationList;
 import org.apache.impala.thrift.TTableStats;
@@ -45,9 +42,6 @@ abstract public class ScanNode extends PlanNode {
 
   // Total number of rows this node is expected to process
   protected long inputCardinality_ = -1;
-
-  // Counter indicating if partitions have missing statistics
-  protected int numPartitionsMissingStats_ = 0;
 
   // List of scan-range locations. Populated in init().
   protected List<TScanRangeLocationList> scanRanges_;
@@ -103,29 +97,26 @@ abstract public class ScanNode extends PlanNode {
   }
 
   /**
-   * Returns the explain string for table and columns stats to be included into the
-   * a ScanNode's explain string. The given prefix is prepended to each of the lines.
-   * The prefix is used for proper formatting when the string returned by this method
-   * is embedded in a query's explain plan.
+   * Returns the explain string for table stats to be included into this ScanNode's
+   * explain string. The prefix is prepended to each returned line for proper formatting
+   * when the string returned by this method is embedded in a query's explain plan.
    */
-  protected String getStatsExplainString(String prefix, TExplainLevel detailLevel) {
+  protected String getTableStatsExplainString(String prefix) {
     StringBuilder output = new StringBuilder();
-    // Table stats.
     TTableStats tblStats = desc_.getTable().getTTableStats();
     String numRows = String.valueOf(tblStats.num_rows);
     if (tblStats.num_rows == -1) numRows = "unavailable";
-    output.append(prefix + "table stats: rows=" + numRows);
-    if (desc_.getTable() instanceof HdfsTable) {
-      String totalBytes = PrintUtils.printBytes(tblStats.total_file_bytes);
-      if (tblStats.total_file_bytes == -1) totalBytes = "unavailable";
-      output.append(" size=" + totalBytes);
-    }
-    if (tblStats.num_rows != -1 && numPartitionsMissingStats_ > 0) {
-      output.append(" (" + numPartitionsMissingStats_ + " partition(s) missing stats)");
-    }
-    output.append("\n");
+    output.append(prefix + "table: rows=" + numRows);
+    return output.toString();
+  }
 
-    // Column stats.
+  /**
+   * Returns the explain string for column stats to be included into this ScanNode's
+   * explain string. The prefix is prepended to each returned line for proper formatting
+   * when the string returned by this method is embedded in a query's explain plan.
+   */
+  protected String getColumnStatsExplainString(String prefix) {
+    StringBuilder output = new StringBuilder();
     List<String> columnsMissingStats = Lists.newArrayList();
     for (SlotDescriptor slot: desc_.getSlots()) {
       if (!slot.getStats().hasStats() && slot.getColumn() != null) {
@@ -133,13 +124,26 @@ abstract public class ScanNode extends PlanNode {
       }
     }
     if (columnsMissingStats.isEmpty()) {
-      output.append(prefix + "column stats: all");
+      output.append(prefix + "columns: all");
     } else if (columnsMissingStats.size() == desc_.getSlots().size()) {
-      output.append(prefix + "column stats: unavailable");
+      output.append(prefix + "columns: unavailable");
     } else {
       output.append(String.format("%scolumns missing stats: %s", prefix,
           Joiner.on(", ").join(columnsMissingStats)));
     }
+    return output.toString();
+  }
+
+  /**
+   * Combines the explain string for table and column stats.
+   */
+  protected String getStatsExplainString(String prefix) {
+    StringBuilder output = new StringBuilder(prefix);
+    output.append("stored statistics:\n");
+    prefix = prefix + "  ";
+    output.append(getTableStatsExplainString(prefix));
+    output.append("\n");
+    output.append(getColumnStatsExplainString(prefix));
     return output.toString();
   }
 
@@ -152,8 +156,7 @@ abstract public class ScanNode extends PlanNode {
   }
 
   public boolean isTableMissingTableStats() {
-    if (desc_.getTable().getNumRows() == -1) return true;
-    return numPartitionsMissingStats_ > 0;
+    return desc_.getTable().getNumRows() == -1;
   }
 
   /**

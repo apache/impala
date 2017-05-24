@@ -44,7 +44,9 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.TestUtils;
+import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TDescribeTableParams;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.kudu.ColumnSchema.CompressionAlgorithm;
@@ -1151,9 +1153,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   public void TestComputeStats() throws AnalysisException {
     // Analyze the stmt itself as well as the generated child queries.
     checkComputeStatsStmt("compute stats functional.alltypes");
-
     checkComputeStatsStmt("compute stats functional_hbase.alltypes");
-
     // Test that complex-typed columns are ignored.
     checkComputeStatsStmt("compute stats functional.allcomplextypes");
 
@@ -1185,6 +1185,37 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "column 'col1' of type 'string' does not match the Avro-schema column " +
         "'boolean1' of type 'BOOLEAN' at position '0'.\nPlease re-create the table " +
         "with column definitions, e.g., using the result of 'SHOW CREATE TABLE'");
+
+    // Test tablesample clause with extrapolation enabled/disabled. Replace/restore the
+    // static backend config for this test to control stats extrapolation.
+    BackendConfig origInstance = BackendConfig.INSTANCE;
+    try {
+      TBackendGflags testGflags = new TBackendGflags();
+      testGflags.setEnable_stats_extrapolation(true);
+      BackendConfig.create(testGflags);
+
+      checkComputeStatsStmt("compute stats functional.alltypes tablesample system (10)");
+      checkComputeStatsStmt(
+          "compute stats functional.alltypes tablesample system (55) repeatable(1)");
+      AnalysisError("compute stats functional.alltypes tablesample system (101)",
+          "Invalid percent of bytes value '101'. " +
+          "The percent of bytes to sample must be between 0 and 100.");
+      AnalysisError("compute stats functional_kudu.alltypes tablesample system (1)",
+          "TABLESAMPLE is only supported on HDFS tables.");
+      AnalysisError("compute stats functional_hbase.alltypes tablesample system (2)",
+          "TABLESAMPLE is only supported on HDFS tables.");
+      AnalysisError(
+          "compute stats functional.alltypes_datasource tablesample system (3)",
+          "TABLESAMPLE is only supported on HDFS tables.");
+
+      testGflags.setEnable_stats_extrapolation(false);
+      BackendConfig.create(testGflags);
+      AnalysisError("compute stats functional.alltypes tablesample system (10)",
+          "COMPUTE STATS TABLESAMPLE requires --enable_stats_extrapolation=true. " +
+          "Stats extrapolation is currently disabled.");
+    } finally {
+      BackendConfig.INSTANCE = origInstance;
+    }
   }
 
   @Test

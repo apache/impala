@@ -117,6 +117,9 @@ Status CatalogOpExecutor::ExecComputeStats(
     update_stats_params.table_stats.__set_total_file_bytes(
         compute_stats_params.total_file_bytes);
   }
+  if (compute_stats_params.__isset.sample_file_bytes) {
+    update_stats_params.__set_sample_file_bytes(compute_stats_params.sample_file_bytes);
+  }
   // col_stats_schema and col_stats_data will be empty if there was no column stats query.
   if (!col_stats_schema.columns.empty()) {
     if (compute_stats_params.is_incremental) {
@@ -200,7 +203,15 @@ void CatalogOpExecutor::HandleDropDataSource(const TDropDataSourceParams& reques
 void CatalogOpExecutor::SetTableStats(const TTableSchema& tbl_stats_schema,
     const TRowSet& tbl_stats_data, const vector<TPartitionStats>& existing_part_stats,
     TAlterTableUpdateStatsParams* params) {
-  // Accumulate total number of rows in the table.
+  if (tbl_stats_data.rows.size() == 1 && tbl_stats_data.rows[0].colVals.size() == 1) {
+    // Unpartitioned table. Only set table stats, but no partition stats.
+    // The first column is the COUNT(*) expr of the original query.
+    params->table_stats.__set_num_rows(tbl_stats_data.rows[0].colVals[0].i64Val.value);
+    params->__isset.table_stats = true;
+    return;
+  }
+
+  // Accumulate total number of rows in the partitioned table.
   long total_num_rows = 0;
   // Set per-partition stats.
   for (const TRow& row: tbl_stats_data.rows) {
@@ -219,12 +230,12 @@ void CatalogOpExecutor::SetTableStats(const TTableSchema& tbl_stats_schema,
     params->partition_stats[partition_key_vals].stats.__set_num_rows(num_rows);
     total_num_rows += num_rows;
   }
+  params->__isset.partition_stats = true;
 
+  // Add row counts of existing partitions that are not going to be modified.
   for (const TPartitionStats& existing_stats: existing_part_stats) {
     total_num_rows += existing_stats.stats.num_rows;
   }
-
-  params->__isset.partition_stats = true;
 
   // Set per-table stats.
   params->table_stats.__set_num_rows(total_num_rows);

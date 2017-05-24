@@ -26,12 +26,10 @@ import org.apache.hadoop.hive.metastore.api.DecimalColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.DoubleColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.LongColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.thrift.TColumnStats;
+
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
@@ -157,7 +155,7 @@ public class ColumnStats {
 
   public long getNumDistinctValues() { return numDistinctValues_; }
   public void setNumDistinctValues(long numDistinctValues) {
-    this.numDistinctValues_ = numDistinctValues;
+    numDistinctValues_ = numDistinctValues;
   }
   public void setNumNulls(long numNulls) { numNulls_ = numNulls; }
   public double getAvgSerializedSize() { return avgSerializedSize_; }

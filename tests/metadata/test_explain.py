@@ -128,8 +128,7 @@ class TestExplain(ImpalaTestSuite):
     # Fall back to table-level stats when no selected partitions have stats.
     result = self.execute_query("explain select * from %s where p = 2" % mixed_tbl,
         query_options={'explain_level':3})
-    check_cardinality(result.data, '100')  
-
+    check_cardinality(result.data, '100')
 
 
 class TestExplainEmptyPartition(ImpalaTestSuite):
@@ -176,4 +175,4 @@ class TestExplainEmptyPartition(ImpalaTestSuite):
       self.client.execute("EXPLAIN SELECT * FROM %s.empty_partition" % self.TEST_DB_NAME))
     assert "missing relevant table and/or column statistics" in explain_result
     # Also test IMPALA-1530 - adding the number of partitions missing stats
-    assert "1 partition(s) missing stats" in explain_result
+    assert "partitions: 1/2 " in explain_result

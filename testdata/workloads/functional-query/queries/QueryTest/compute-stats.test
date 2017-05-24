@@ -50,7 +50,7 @@ show column stats alltypes
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
-'id','INT',7505,-1,4,4
+'id','INT',7300,-1,4,4
 'bool_col','BOOLEAN',2,-1,1,1
 'tinyint_col','TINYINT',10,-1,1,1
 'smallint_col','SMALLINT',10,-1,2,2
@@ -60,7 +60,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'double_col','DOUBLE',10,-1,8,8
 'date_string_col','STRING',736,-1,8,8
 'string_col','STRING',10,-1,1,1
-'timestamp_col','TIMESTAMP',7554,-1,16,16
+'timestamp_col','TIMESTAMP',7300,-1,16,16
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
@@ -76,7 +76,7 @@ show column stats alltypes
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
-'id','INT',7505,-1,4,4
+'id','INT',7300,-1,4,4
 'bool_col','BOOLEAN',2,-1,1,1
 'tinyint_col','TINYINT',10,-1,1,1
 'smallint_col','SMALLINT',10,-1,2,2
@@ -86,7 +86,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'double_col','DOUBLE',10,-1,8,8
 'date_string_col','STRING',736,-1,8,8
 'string_col','STRING',10,-1,1,1
-'timestamp_col','TIMESTAMP',7554,-1,16,16
+'timestamp_col','TIMESTAMP',7300,-1,16,16
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 'new_col','INT',-1,-1,4,4
@@ -105,7 +105,7 @@ show column stats alltypes
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
-'id','INT',7505,-1,4,4
+'id','INT',7300,-1,4,4
 'bool_col','BOOLEAN',2,-1,1,1
 'tinyint_col','TINYINT',10,-1,1,1
 'smallint_col','SMALLINT',10,-1,2,2
@@ -115,7 +115,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'double_col','DOUBLE',10,-1,8,8
 'date_string_col','STRING',736,-1,8,8
 'string_col','STRING',10,-1,1,1
-'timestamp_col','TIMESTAMP',7554,-1,16,16
+'timestamp_col','TIMESTAMP',7300,-1,16,16
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 'new_col2','INT',-1,-1,4,4
@@ -132,7 +132,7 @@ show column stats alltypes
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
-'id','INT',7505,-1,4,4
+'id','INT',7300,-1,4,4
 'bool_col','BOOLEAN',2,-1,1,1
 'tinyint_col','TINYINT',10,-1,1,1
 'smallint_col','SMALLINT',10,-1,2,2
@@ -142,7 +142,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'double_col','DOUBLE',10,-1,8,8
 'date_string_col','STRING',736,-1,8,8
 'string_col','STRING',10,-1,1,1
-'timestamp_col','TIMESTAMP',7554,-1,16,16
+'timestamp_col','TIMESTAMP',7300,-1,16,16
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
@@ -354,7 +354,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'double_col','DOUBLE',10,-1,8,8
 'date_string_col','STRING',12,-1,8,8
 'string_col','STRING',10,-1,1,1
-'timestamp_col','TIMESTAMP',101,-1,16,16
+'timestamp_col','TIMESTAMP',100,-1,16,16
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
@@ -423,7 +423,7 @@ show column stats alltypes_parquet
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
-'id','INT',7505,-1,4,4
+'id','INT',7300,-1,4,4
 'bool_col','BOOLEAN',2,-1,1,1
 'tinyint_col','TINYINT',10,-1,1,1
 'smallint_col','SMALLINT',10,-1,2,2
@@ -433,7 +433,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'double_col','DOUBLE',10,-1,8,8
 'date_string_col','STRING',736,-1,8,8
 'string_col','STRING',10,-1,1,1
-'timestamp_col','TIMESTAMP',7554,-1,16,16
+'timestamp_col','TIMESTAMP',7300,-1,16,16
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES

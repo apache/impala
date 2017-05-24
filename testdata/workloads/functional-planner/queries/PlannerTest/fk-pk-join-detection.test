@@ -19,9 +19,10 @@ PLAN-ROOT SINK
 |--01:SCAN HDFS [tpcds.customer]
 |     partitions=1/1 files=1 size=12.60MB
 |     predicates: c_salutation = 'Mrs.'
-|     stats-rows=100000 extrapolated-rows=disabled
-|     table stats: rows=100000 size=12.60MB
-|     column stats: all
+|     stored statistics:
+|       table: rows=100000 size=12.60MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     parquet dictionary predicates: c_salutation = 'Mrs.'
 |     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=255B cardinality=16667
@@ -29,9 +30,11 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpcds.store_sales]
    partitions=1824/1824 files=1824 size=326.32MB
    runtime filters: RF000[bloom] -> ss_customer_sk
-   stats-rows=2880404 extrapolated-rows=disabled
-   table stats: rows=2880404 size=326.32MB
-   column stats: all
+   stored statistics:
+     table: rows=2880404 size=326.32MB
+     partitions: 1824/1824 rows=2880404
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=100B cardinality=2880404
 ====
@@ -57,18 +60,21 @@ PLAN-ROOT SINK
 |--01:SCAN HDFS [tpcds.customer]
 |     partitions=1/1 files=1 size=12.60MB
 |     predicates: c_salutation = 'Mrs.'
-|     stats-rows=100000 extrapolated-rows=disabled
-|     table stats: rows=100000 size=12.60MB
-|     column stats: all
+|     stored statistics:
+|       table: rows=100000 size=12.60MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     parquet dictionary predicates: c_salutation = 'Mrs.'
 |     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=255B cardinality=16667
 |
 00:SCAN HDFS [tpcds.store_sales]
    partitions=1824/1824 files=1824 size=326.32MB
-   stats-rows=2880404 extrapolated-rows=disabled
-   table stats: rows=2880404 size=326.32MB
-   column stats: all
+   stored statistics:
+     table: rows=2880404 size=326.32MB
+     partitions: 1824/1824 rows=2880404
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=100B cardinality=2880404
 ====
@@ -94,9 +100,10 @@ PLAN-ROOT SINK
 |--01:SCAN HDFS [tpcds.customer]
 |     partitions=1/1 files=1 size=12.60MB
 |     predicates: c_salutation = 'Mrs.'
-|     stats-rows=100000 extrapolated-rows=disabled
-|     table stats: rows=100000 size=12.60MB
-|     column stats: all
+|     stored statistics:
+|       table: rows=100000 size=12.60MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     parquet dictionary predicates: c_salutation = 'Mrs.'
 |     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=255B cardinality=16667
@@ -104,9 +111,11 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpcds.store_sales]
    partitions=1824/1824 files=1824 size=326.32MB
    runtime filters: RF000[bloom] -> ss_customer_sk
-   stats-rows=2880404 extrapolated-rows=disabled
-   table stats: rows=2880404 size=326.32MB
-   column stats: all
+   stored statistics:
+     table: rows=2880404 size=326.32MB
+     partitions: 1824/1824 rows=2880404
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=100B cardinality=2880404
 ====
@@ -131,9 +140,10 @@ PLAN-ROOT SINK
 |--01:SCAN HDFS [tpcds.store_returns]
 |     partitions=1/1 files=1 size=31.19MB
 |     predicates: sr_return_quantity < 10
-|     stats-rows=287514 extrapolated-rows=disabled
-|     table stats: rows=287514 size=31.19MB
-|     column stats: all
+|     stored statistics:
+|       table: rows=287514 size=31.19MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     parquet dictionary predicates: sr_return_quantity < 10
 |     mem-estimate=80.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=88B cardinality=28751
@@ -141,9 +151,11 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpcds.store_sales]
    partitions=1824/1824 files=1824 size=326.32MB
    runtime filters: RF000[bloom] -> ss_item_sk, RF001[bloom] -> ss_ticket_number
-   stats-rows=2880404 extrapolated-rows=disabled
-   table stats: rows=2880404 size=326.32MB
-   column stats: all
+   stored statistics:
+     table: rows=2880404 size=326.32MB
+     partitions: 1824/1824 rows=2880404
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=100B cardinality=2880404
 ====
@@ -166,18 +178,21 @@ PLAN-ROOT SINK
 |
 |--01:SCAN HDFS [tpcds.web_sales]
 |     partitions=1/1 files=1 size=140.07MB
-|     stats-rows=719384 extrapolated-rows=disabled
-|     table stats: rows=719384 size=140.07MB
-|     column stats: all
+|     stored statistics:
+|       table: rows=719384 size=140.07MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     mem-estimate=160.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=144B cardinality=719384
 |
 00:SCAN HDFS [tpcds.store_sales]
    partitions=1824/1824 files=1824 size=326.32MB
    runtime filters: RF000[bloom] -> ss_sold_time_sk
-   stats-rows=2880404 extrapolated-rows=disabled
-   table stats: rows=2880404 size=326.32MB
-   column stats: all
+   stored statistics:
+     table: rows=2880404 size=326.32MB
+     partitions: 1824/1824 rows=2880404
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=100B cardinality=2880404
 ====
@@ -202,9 +217,10 @@ PLAN-ROOT SINK
 |--00:SCAN HDFS [tpcds.date_dim a]
 |     partitions=1/1 files=1 size=9.84MB
 |     predicates: a.d_holiday = 'Y'
-|     stats-rows=73049 extrapolated-rows=disabled
-|     table stats: rows=73049 size=9.84MB
-|     column stats: all
+|     stored statistics:
+|       table: rows=73049 size=9.84MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     parquet dictionary predicates: a.d_holiday = 'Y'
 |     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=0 row-size=303B cardinality=36525
@@ -212,9 +228,10 @@ PLAN-ROOT SINK
 01:SCAN HDFS [tpcds.date_dim b]
    partitions=1/1 files=1 size=9.84MB
    runtime filters: RF000[bloom] -> b.d_date_sk
-   stats-rows=73049 extrapolated-rows=disabled
-   table stats: rows=73049 size=9.84MB
-   column stats: all
+   stored statistics:
+     table: rows=73049 size=9.84MB
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=48.00MB mem-reservation=0B
    tuple-ids=1 row-size=303B cardinality=73049
 ====
@@ -242,9 +259,10 @@ PLAN-ROOT SINK
 |
 |--02:SCAN HDFS [tpcds.customer]
 |     partitions=1/1 files=1 size=12.60MB
-|     stats-rows=100000 extrapolated-rows=disabled
-|     table stats: rows=100000 size=12.60MB
-|     column stats: all
+|     stored statistics:
+|       table: rows=100000 size=12.60MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=2 row-size=4B cardinality=100000
 |
@@ -257,9 +275,10 @@ PLAN-ROOT SINK
 |
 |--04:SCAN HDFS [tpcds.date_dim d2]
 |     partitions=1/1 files=1 size=9.84MB
-|     stats-rows=73049 extrapolated-rows=disabled
-|     table stats: rows=73049 size=9.84MB
-|     column stats: all
+|     stored statistics:
+|       table: rows=73049 size=9.84MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=4 row-size=4B cardinality=73049
 |
@@ -280,9 +299,10 @@ PLAN-ROOT SINK
 |  |--03:SCAN HDFS [tpcds.date_dim d1]
 |  |     partitions=1/1 files=1 size=9.84MB
 |  |     predicates: d1.d_fy_week_seq = 1000
-|  |     stats-rows=73049 extrapolated-rows=disabled
-|  |     table stats: rows=73049 size=9.84MB
-|  |     column stats: all
+|  |     stored statistics:
+|  |       table: rows=73049 size=9.84MB
+|  |       columns: all
+|  |     extrapolated-rows=disabled
 |  |     parquet dictionary predicates: d1.d_fy_week_seq = 1000
 |  |     mem-estimate=48.00MB mem-reservation=0B
 |  |     tuple-ids=3 row-size=8B cardinality=7
@@ -290,18 +310,21 @@ PLAN-ROOT SINK
 |  00:SCAN HDFS [tpcds.store_sales]
 |     partitions=1824/1824 files=1824 size=326.32MB
 |     runtime filters: RF000[bloom] -> ss_addr_sk, RF008[bloom] -> ss_sold_date_sk
-|     stats-rows=2880404 extrapolated-rows=disabled
-|     table stats: rows=2880404 size=326.32MB
-|     column stats: all
+|     stored statistics:
+|       table: rows=2880404 size=326.32MB
+|       partitions: 1824/1824 rows=2880404
+|       columns: all
+|     extrapolated-rows=disabled
 |     mem-estimate=128.00MB mem-reservation=0B
 |     tuple-ids=0 row-size=24B cardinality=2880404
 |
 01:SCAN HDFS [tpcds.store_returns]
    partitions=1/1 files=1 size=31.19MB
    runtime filters: RF002[bloom] -> sr_returned_date_sk, RF004[bloom] -> sr_item_sk, RF005[bloom] -> sr_ticket_number
-   stats-rows=287514 extrapolated-rows=disabled
-   table stats: rows=287514 size=31.19MB
-   column stats: all
+   stored statistics:
+     table: rows=287514 size=31.19MB
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=1 row-size=20B cardinality=287514
 ====
@@ -324,18 +347,21 @@ PLAN-ROOT SINK
 |
 |--01:SCAN HDFS [tpcds.customer]
 |     partitions=1/1 files=1 size=12.60MB
-|     stats-rows=100000 extrapolated-rows=disabled
-|     table stats: rows=100000 size=12.60MB
-|     column stats: all
+|     stored statistics:
+|       table: rows=100000 size=12.60MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=255B cardinality=100000
 |
 00:SCAN HDFS [tpcds.store_sales]
    partitions=1824/1824 files=1824 size=326.32MB
    runtime filters: RF000[bloom] -> ss_customer_sk % 10
-   stats-rows=2880404 extrapolated-rows=disabled
-   table stats: rows=2880404 size=326.32MB
-   column stats: all
+   stored statistics:
+     table: rows=2880404 size=326.32MB
+     partitions: 1824/1824 rows=2880404
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=100B cardinality=2880404
 ====
@@ -358,19 +384,22 @@ PLAN-ROOT SINK
 |  tuple-ids=0,1 row-size=8B cardinality=2880404
 |
 |--01:SCAN HDFS [tpcds_seq_snap.customer]
-|     partitions=1/1 files=1 size=8.58MB
-|     stats-rows=unavailable extrapolated-rows=disabled
-|     table stats: rows=unavailable size=8.59MB
-|     column stats: unavailable
+|     partitions=1/1 files=1 size=8.59MB
+|     stored statistics:
+|       table: rows=unavailable size=8.59MB
+|       columns: unavailable
+|     extrapolated-rows=disabled
 |     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=4B cardinality=unavailable
 |
 00:SCAN HDFS [tpcds.store_sales]
    partitions=1824/1824 files=1824 size=326.32MB
    runtime filters: RF000[bloom] -> ss_customer_sk
-   stats-rows=2880404 extrapolated-rows=disabled
-   table stats: rows=2880404 size=326.32MB
-   column stats: all
+   stored statistics:
+     table: rows=2880404 size=326.32MB
+     partitions: 1824/1824 rows=2880404
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=4B cardinality=2880404
 ====
@@ -393,18 +422,21 @@ PLAN-ROOT SINK
 |
 |--01:SCAN HDFS [tpcds.customer]
 |     partitions=1/1 files=1 size=12.60MB
-|     stats-rows=100000 extrapolated-rows=disabled
-|     table stats: rows=100000 size=12.60MB
-|     column stats: all
+|     stored statistics:
+|       table: rows=100000 size=12.60MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=4B cardinality=100000
 |
 00:SCAN HDFS [tpcds_seq_snap.store_sales]
-   partitions=1824/1824 files=1824 size=207.85MB
+   partitions=1824/1824 files=1824 size=207.90MB
    runtime filters: RF000[bloom] -> ss_customer_sk
-   stats-rows=unavailable extrapolated-rows=disabled
-   table stats: rows=unavailable size=unavailable
-   column stats: unavailable
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/1824 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled
    mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=4B cardinality=unavailable
 ====
@@ -434,18 +466,21 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN HDFS [tpcds.web_sales]
 |     partitions=1/1 files=1 size=140.07MB
-|     stats-rows=719384 extrapolated-rows=disabled
-|     table stats: rows=719384 size=140.07MB
-|     column stats: all
+|     stored statistics:
+|       table: rows=719384 size=140.07MB
+|       columns: all
+|     extrapolated-rows=disabled
 |     mem-estimate=160.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=4B cardinality=719384
 |
 00:SCAN HDFS [tpcds.store_sales]
    partitions=1824/1824 files=1824 size=326.32MB
    runtime filters: RF000[bloom] -> ss_sold_time_sk
-   stats-rows=2880404 extrapolated-rows=disabled
-   table stats: rows=2880404 size=326.32MB
-   column stats: all
+   stored statistics:
+     table: rows=2880404 size=326.32MB
+     partitions: 1824/1824 rows=2880404
+     columns: all
+   extrapolated-rows=disabled
    mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=100B cardinality=2880404
 ====
