@@ -38,6 +38,7 @@ using boost::gregorian::max_date_time;
 using boost::gregorian::min_date_time;
 using boost::posix_time::not_a_date_time;
 using boost::posix_time::ptime;
+using boost::posix_time::time_duration;
 using namespace impala_udf;
 using namespace strings;
 
@@ -562,6 +563,17 @@ TimestampVal TimestampFunctions::NextDay(FunctionContext* context,
 
   IntVal delta(delta_days);
   return AddSub<true, IntVal, Days, false>(context, date, delta);
+}
+
+TimestampVal TimestampFunctions::LastDay(FunctionContext* context,
+    const TimestampVal& ts) {
+  if (ts.is_null) return TimestampVal::null();
+  const TimestampValue& timestamp =  TimestampValue::FromTimestampVal(ts);
+  if (!timestamp.HasDate()) return TimestampVal::null();
+  TimestampValue tsv(timestamp.date().end_of_month(), time_duration(0,0,0,0));
+  TimestampVal rt_date;
+  tsv.ToTimestampVal(&rt_date);
+  return rt_date;
 }
 
 IntVal TimestampFunctions::IntMonthsBetween(FunctionContext* context,

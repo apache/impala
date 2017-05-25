@@ -276,6 +276,59 @@ class ExprTest : public testing::Test {
     return results;
   }
 
+  void TestLastDayFunction() {
+    // Test common months (with and without time component).
+    TestTimestampValue("last_day('2003-01-02 04:24:04.1579')",
+      TimestampValue::Parse("2003-01-31 00:00:00", 19));
+    TestTimestampValue("last_day('2003-02-02')",
+      TimestampValue::Parse("2003-02-28 00:00:00"));
+    TestTimestampValue("last_day('2003-03-02 03:21:12.0058')",
+      TimestampValue::Parse("2003-03-31 00:00:00"));
+    TestTimestampValue("last_day('2003-04-02')",
+      TimestampValue::Parse("2003-04-30 00:00:00"));
+    TestTimestampValue("last_day('2003-05-02')",
+      TimestampValue::Parse("2003-05-31 00:00:00"));
+    TestTimestampValue("last_day('2003-06-02')",
+      TimestampValue::Parse("2003-06-30 00:00:00"));
+    TestTimestampValue("last_day('2003-07-02 00:01:01.125')",
+      TimestampValue::Parse("2003-07-31 00:00:00"));
+    TestTimestampValue("last_day('2003-08-02')",
+      TimestampValue::Parse("2003-08-31 00:00:00"));
+    TestTimestampValue("last_day('2003-09-02')",
+      TimestampValue::Parse("2003-09-30 00:00:00"));
+    TestTimestampValue("last_day('2003-10-02')",
+      TimestampValue::Parse("2003-10-31 00:00:00"));
+    TestTimestampValue("last_day('2003-11-02 12:30:16')",
+      TimestampValue::Parse("2003-11-30 00:00:00"));
+    TestTimestampValue("last_day('2003-12-02')",
+      TimestampValue::Parse("2003-12-31 00:00:00"));
+
+    // Test leap years and special cases.
+    TestTimestampValue("last_day('2004-02-13')",
+      TimestampValue::Parse("2004-02-29 00:00:00"));
+    TestTimestampValue("last_day('2008-02-13')",
+      TimestampValue::Parse("2008-02-29 00:00:00"));
+    TestTimestampValue("last_day('2000-02-13')",
+      TimestampValue::Parse("2000-02-29 00:00:00"));
+    TestTimestampValue("last_day('1900-02-13')",
+      TimestampValue::Parse("1900-02-28 00:00:00"));
+    TestTimestampValue("last_day('2100-02-13')",
+      TimestampValue::Parse("2100-02-28 00:00:00"));
+
+    // Test corner cases.
+    TestTimestampValue("last_day('1400-01-01 00:00:00')",
+      TimestampValue::Parse("1400-01-31 00:00:00"));
+    TestTimestampValue("last_day('9999-12-31 23:59:59')",
+      TimestampValue::Parse("9999-12-31 00:00:00"));
+
+    // Test invalid input.
+    TestIsNull("last_day('12202010')", TYPE_TIMESTAMP);
+    TestIsNull("last_day('')", TYPE_TIMESTAMP);
+    TestIsNull("last_day(NULL)", TYPE_TIMESTAMP);
+    TestIsNull("last_day('02-13-2014')", TYPE_TIMESTAMP);
+    TestIsNull("last_day('00:00:00')", TYPE_TIMESTAMP);
+  }
+
   void TestNextDayFunction() {
     // Sequential test cases
     TestTimestampValue("next_day('2016-05-01','Sunday')",

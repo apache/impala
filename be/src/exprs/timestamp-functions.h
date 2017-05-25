@@ -199,6 +199,15 @@ class TimestampFunctions {
   static TimestampVal AddSub(FunctionContext* context, const TimestampVal& timestamp,
       const AnyIntVal& num_interval_units);
 
+  /// Return the last date in the month of a specified input date.
+  /// The TIMESTAMP argument requires a date component,
+  /// it may or may not have a time component.
+  /// The function will return a NULL TimestampVal when:
+  ///   1) The TIMESTAMP argument is missing a date component.
+  ///   2) The TIMESTAMP argument is outside of the supported range:
+  ///         between 1400-01-31 00:00:00 and 9999-12-31 23:59:59
+  static TimestampVal LastDay(FunctionContext* context, const TimestampVal& ts);
+
   /// Helper function to check date/time format strings.
   /// TODO: eventually return format converted from Java to Boost.
   static StringValue* CheckFormat(StringValue* format);
