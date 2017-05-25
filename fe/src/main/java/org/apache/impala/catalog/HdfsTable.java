@@ -1956,7 +1956,7 @@ public class HdfsTable extends Table {
     HdfsPartition[] parts = new HdfsPartition[totalNumFiles];
     int idx = 0;
     long totalBytes = 0;
-    for (HdfsPartition part: inputParts) {
+    for (HdfsPartition part: orderedParts) {
       totalBytes += part.getSize();
       int numFds = part.getNumFileDescriptors();
       for (int fileIdx = 0; fileIdx < numFds; ++fileIdx) {
