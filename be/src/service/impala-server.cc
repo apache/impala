@@ -855,8 +855,8 @@ Status ImpalaServer::ExecuteInternal(
         (*request_state)->schedule()->unique_hosts();
     if (!unique_hosts.empty()) {
       lock_guard<mutex> l(query_locations_lock_);
-      for (const TNetworkAddress& port: unique_hosts) {
-        query_locations_[port].insert((*request_state)->query_id());
+      for (const TNetworkAddress& host: unique_hosts) {
+        query_locations_[host].insert((*request_state)->query_id());
       }
     }
   }
