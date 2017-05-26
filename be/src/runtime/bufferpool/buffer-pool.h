@@ -346,6 +346,9 @@ class BufferPool::ClientHandle {
   /// ReservationTracker::TransferReservationTo().
   bool TransferReservationTo(ReservationTracker* dst, int64_t bytes);
 
+  /// Call SetDebugDenyIncreaseReservation() on this client's ReservationTracker.
+  void SetDebugDenyIncreaseReservation(double probability);
+
   bool is_registered() const { return impl_ != NULL; }
 
   std::string DebugString() const;

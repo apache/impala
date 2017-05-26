@@ -37,22 +37,33 @@ class DebugOptions {
   /// query-wide fragment instance index; -1 if not set
   int instance_idx() const { return instance_idx_; }
 
-  /// -1 if no debug options set
+  /// The node the debug option should be applied to. -1 if it should be applied to all
+  /// nodes.
   int node_id() const { return node_id_; }
+
+  /// True if a debug action is enabled.
+  bool enabled() const { return phase_ != TExecNodePhase::INVALID; }
 
   TDebugAction::type action() const { return action_; }
   TExecNodePhase::type phase() const { return phase_; }
+  std::string action_param() const { return action_param_; }
 
  private:
   int instance_idx_;
   int node_id_;
   TDebugAction::type action_;
-  TExecNodePhase::type phase_;  // INVALID: debug options invalid
+  TExecNodePhase::type phase_; // INVALID: debug options invalid
+  // A string parameter that goes along with 'action_'. The semantics depend on the
+  // specific action.
+  std::string action_param_;
 
   static TExecNodePhase::type GetExecNodePhase(const std::string& key);
-  static TDebugAction::type GetDebugAction(const std::string& key);
+  // Parse a debug action from a string. Either of format "ACTION_TYPE" or
+  // "ACTION_TYPE@<param value>". Returns true when 'action' is a valid debug action
+  // string.
+  static bool GetDebugAction(
+      const std::string& action, TDebugAction::type* type, std::string* action_param);
 };
-
 }
 
 #endif

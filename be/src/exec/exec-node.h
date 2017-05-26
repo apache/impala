@@ -291,6 +291,7 @@ class ExecNode {
   /// debug_phase_
   TExecNodePhase::type debug_phase_;
   TDebugAction::type debug_action_;
+  std::string debug_action_param_;
 
   int64_t limit_;  // -1: no limit
   int64_t num_rows_returned_;
@@ -341,10 +342,15 @@ class ExecNode {
 
   void InitRuntimeProfile(const std::string& name);
 
-  /// Executes debug_action_ if phase matches debug_phase_.
+  /// Executes 'debug_action_' if 'phase' matches 'debug_phase_'.
   /// 'phase' must not be INVALID.
   Status ExecDebugAction(
-      TExecNodePhase::type phase, RuntimeState* state) WARN_UNUSED_RESULT;
+      TExecNodePhase::type phase, RuntimeState* state) WARN_UNUSED_RESULT {
+    DCHECK_NE(phase, TExecNodePhase::INVALID);
+    // Fast path for the common case when an action is not enabled for this phase.
+    if (LIKELY(debug_phase_ != phase)) return Status::OK();
+    return ExecDebugActionImpl(phase, state);
+  }
 
   /// Frees any local allocations made by evals_to_free_ and returns the result of
   /// state->CheckQueryState(). Nodes should call this periodically, e.g. once per input
@@ -364,6 +370,11 @@ class ExecNode {
   void AddEvaluatorsToFree(const std::vector<ScalarExprEvaluator*>& evals);
 
  private:
+  /// Implementation of ExecDebugAction(). This is the slow path we take when there is
+  /// actually a debug action enabled for 'phase'.
+  Status ExecDebugActionImpl(
+      TExecNodePhase::type phase, RuntimeState* state) WARN_UNUSED_RESULT;
+
   /// Set in ExecNode::Close(). Used to make Close() idempotent. This is not protected
   /// by a lock, it assumes all calls to Close() are made by the same thread.
   bool is_closed_;

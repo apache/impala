@@ -62,6 +62,7 @@
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
+#include "util/string-parser.h"
 
 #include "common/names.h"
 
@@ -392,10 +393,10 @@ void ExecNode::SetDebugOptions(const TDebugOptions& debug_options, ExecNode* roo
   DCHECK(debug_options.__isset.node_id);
   DCHECK(debug_options.__isset.phase);
   DCHECK(debug_options.__isset.action);
-  if (root->id_ == debug_options.node_id) {
+  if (debug_options.node_id == -1 || root->id_ == debug_options.node_id) {
     root->debug_phase_ = debug_options.phase;
     root->debug_action_ = debug_options.action;
-    return;
+    root->debug_action_param_ = debug_options.action_param;
   }
   for (int i = 0; i < root->children_.size(); ++i) {
     SetDebugOptions(debug_options, root->children_[i]);
@@ -436,25 +437,35 @@ void ExecNode::InitRuntimeProfile(const string& name) {
   runtime_profile_->set_metadata(id_);
 }
 
-Status ExecNode::ExecDebugAction(TExecNodePhase::type phase, RuntimeState* state) {
-  DCHECK(phase != TExecNodePhase::INVALID);
-  if (debug_phase_ != phase) return Status::OK();
+Status ExecNode::ExecDebugActionImpl(TExecNodePhase::type phase, RuntimeState* state) {
+  DCHECK_EQ(debug_phase_, phase);
   if (debug_action_ == TDebugAction::FAIL) {
     return Status(TErrorCode::INTERNAL_ERROR, "Debug Action: FAIL");
-  }
-  if (debug_action_ == TDebugAction::WAIT) {
+  } else if (debug_action_ == TDebugAction::WAIT) {
     while (!state->is_cancelled()) {
       sleep(1);
     }
     return Status::CANCELLED;
-  }
-  if (debug_action_ == TDebugAction::INJECT_ERROR_LOG) {
+  } else if (debug_action_ == TDebugAction::INJECT_ERROR_LOG) {
     state->LogError(
         ErrorMsg(TErrorCode::INTERNAL_ERROR, "Debug Action: INJECT_ERROR_LOG"));
     return Status::OK();
-  }
-  if (debug_action_ == TDebugAction::MEM_LIMIT_EXCEEDED) {
+  } else if (debug_action_ == TDebugAction::MEM_LIMIT_EXCEEDED) {
     return mem_tracker()->MemLimitExceeded(state, "Debug Action: MEM_LIMIT_EXCEEDED");
+  } else {
+    DCHECK_EQ(debug_action_, TDebugAction::SET_DENY_RESERVATION_PROBABILITY);
+    if (buffer_pool_client_.is_registered()) {
+      // Parse [0.0, 1.0] probability.
+      StringParser::ParseResult parse_result;
+      double probability = StringParser::StringToFloat<double>(
+          debug_action_param_.c_str(), debug_action_param_.size(), &parse_result);
+      if (parse_result != StringParser::PARSE_SUCCESS || probability < 0.0
+          || probability > 1.0) {
+        return Status(Substitute(
+            "Invalid SET_DENY_RESERVATION_PROBABILITY param: '$0'", debug_action_param_));
+      }
+      buffer_pool_client_.SetDebugDenyIncreaseReservation(probability);
+    }
   }
   return Status::OK();
 }

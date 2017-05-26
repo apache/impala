@@ -67,6 +67,9 @@ enum TDebugAction {
   FAIL,
   INJECT_ERROR_LOG,
   MEM_LIMIT_EXCEEDED,
+  // A floating point number in range [0.0, 1.0] that gives the probability of denying
+  // each reservation increase request after the initial reservation.
+  SET_DENY_RESERVATION_PROBABILITY,
 }
 
 // Preference for replica selection

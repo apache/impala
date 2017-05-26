@@ -330,6 +330,10 @@ void BufferPool::ClientHandle::RestoreReservation(SubReservation* src, int64_t b
   DCHECK(success); // Transferring reservation to parent shouldn't fail.
 }
 
+void BufferPool::ClientHandle::SetDebugDenyIncreaseReservation(double probability) {
+  impl_->reservation()->SetDebugDenyIncreaseReservation(probability);
+}
+
 BufferPool::SubReservation::SubReservation(ClientHandle* client) {
   tracker_.reset(new ReservationTracker);
   tracker_->InitChildTracker(

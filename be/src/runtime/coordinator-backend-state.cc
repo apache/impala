@@ -116,7 +116,7 @@ void Coordinator::BackendState::SetRpcParams(
     instance_ctx.__set_per_exch_num_senders(
         params.fragment_exec_params.per_exch_num_senders);
     instance_ctx.__set_sender_id(params.sender_id);
-    if (debug_options.node_id() != -1
+    if (debug_options.enabled()
         && (debug_options.instance_idx() == -1
             || debug_options.instance_idx() == GetInstanceIdx(params.instance_id))) {
       instance_ctx.__set_debug_options(debug_options.ToThrift());

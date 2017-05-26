@@ -21,6 +21,16 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (create_exec_option_dimension_from_dict,
     create_parquet_dimension)
 
+# Test with denial of reservations at varying frequency.
+DEBUG_ACTION_DIMS = [None,
+  '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@0.1',
+  '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@0.5',
+  '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@0.9',
+  '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0']
+
+
+@pytest.mark.xfail(pytest.config.option.testing_remote_cluster,
+                   reason='Queries may not spill on larger clusters')
 class TestSpilling(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -33,7 +43,8 @@ class TestSpilling(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(create_parquet_dimension('tpch'))
     # Tests are calibrated so that they can execute and spill with this page size.
     cls.ImpalaTestMatrix.add_dimension(
-        create_exec_option_dimension_from_dict({'default_spillable_buffer_size' : ['256k']}))
+        create_exec_option_dimension_from_dict({'default_spillable_buffer_size' : ['256k'],
+          'debug_action' : DEBUG_ACTION_DIMS}))
 
   def test_spilling(self, vector):
     self.run_test_case('QueryTest/spilling', vector)

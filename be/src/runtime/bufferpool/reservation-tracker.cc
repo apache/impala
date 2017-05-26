@@ -18,6 +18,7 @@
 #include "runtime/bufferpool/reservation-tracker.h"
 
 #include <algorithm>
+#include <cstdlib>
 
 #include "common/object-pool.h"
 #include "gutil/strings/substitute.h"
@@ -29,7 +30,7 @@
 
 namespace impala {
 
-ReservationTracker::ReservationTracker() : initialized_(false), mem_tracker_(nullptr) {}
+ReservationTracker::ReservationTracker() {}
 
 ReservationTracker::~ReservationTracker() {
   DCHECK(!initialized_);
@@ -147,10 +148,16 @@ bool ReservationTracker::IncreaseReservationInternalLocked(
 
   bool granted;
   // Check if the increase is allowed, starting at the bottom of hierarchy.
-  if (reservation_ + reservation_increase > reservation_limit_) {
-    granted = false;
-  } else if (reservation_increase == 0) {
+  if (reservation_increase == 0) {
     granted = true;
+  } else if (increase_deny_probability_ != 0.0
+      && rand() < increase_deny_probability_ * (RAND_MAX + 1L)) {
+    // Randomly deny reservation if requested. Use rand() to avoid needing to set up a RNG.
+    // Should be good enough. If the probability is 0.0, this never triggers. If it is 1.0
+    // it always triggers.
+    granted = false;
+  } else if (reservation_ + reservation_increase > reservation_limit_) {
+    granted = false;
   } else {
     if (parent_ == nullptr) {
       granted = true;

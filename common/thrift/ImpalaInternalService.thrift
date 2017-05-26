@@ -310,9 +310,13 @@ struct TClientRequest {
 // Debug options: perform some action in a particular phase of a particular node
 // TODO: find a better name
 struct TDebugOptions {
+  // The plan node that this action should be applied to. If -1 it is applied to all plan
+  // nodes.
   1: optional Types.TPlanNodeId node_id
   2: optional PlanNodes.TExecNodePhase phase
   3: optional PlanNodes.TDebugAction action
+  // Optional parameter that goes along with the action.
+  4: optional string action_param
 }
 
 // Context of this query, including the client request, session state and

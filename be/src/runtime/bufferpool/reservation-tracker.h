@@ -163,6 +163,11 @@ class ReservationTracker {
   /// Returns the total reservations of children in bytes.
   int64_t GetChildReservations();
 
+  /// Support for debug actions: deny reservation increase with probability 'probability'.
+  void SetDebugDenyIncreaseReservation(double probability) {
+    increase_deny_probability_ = probability;
+  }
+
   ReservationTracker* parent() const { return parent_; }
 
   std::string DebugString();
@@ -175,7 +180,7 @@ class ReservationTracker {
 
   /// Returns the parent's memtracker if 'parent_' is non-NULL, or NULL otherwise.
   MemTracker* GetParentMemTracker() const {
-    return parent_ == NULL ? NULL : parent_->mem_tracker_;
+    return parent_ == nullptr ? nullptr : parent_->mem_tracker_;
   }
 
   /// Initializes 'counters_', storing the counters in 'profile'.
@@ -236,7 +241,10 @@ class ReservationTracker {
   /// 'lock_' must be held by caller.
   void UpdateReservation(int64_t delta);
 
-  /// lock_ protects all members. The lock order in a tree of ReservationTrackers is
+  /// Support for debug actions: see SetDebugDenyIncreaseReservation() for behaviour.
+  double increase_deny_probability_ = 0.0;
+
+  /// lock_ protects all below members. The lock order in a tree of ReservationTrackers is
   /// based on a post-order traversal of the tree, with children visited in order of the
   /// memory address of the ReservationTracker object. The following rules can be applied
   /// to determine the relative positions of two trackers t1 and t2 in the lock order:
@@ -249,7 +257,7 @@ class ReservationTracker {
   SpinLock lock_;
 
   /// True if the tracker is initialized.
-  bool initialized_;
+  bool initialized_ = false;
 
   /// A dummy profile to hold the counters in 'counters_' in the case that no profile
   /// is provided.
@@ -260,12 +268,12 @@ class ReservationTracker {
   ReservationTrackerCounters counters_;
 
   /// The parent of this tracker in the hierarchy. Does not change after initialization.
-  ReservationTracker* parent_;
+  ReservationTracker* parent_ = nullptr;
 
   /// If non-NULL, reservations are counted as memory consumption against this tracker.
   /// Does not change after initialization. Not owned.
   /// TODO: remove once all memory is accounted via ReservationTrackers.
-  MemTracker* mem_tracker_;
+  MemTracker* mem_tracker_ = nullptr;
 
   /// The maximum reservation in bytes that this tracker can have.
   int64_t reservation_limit_;

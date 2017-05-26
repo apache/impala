@@ -30,6 +30,8 @@
 
 #include "common/names.h"
 
+DECLARE_bool(disable_mem_pools);
+
 namespace impala {
 
 /// An arena containing free buffers and clean pages that are associated with a
@@ -454,6 +456,12 @@ BufferPool::FreeBufferArena::~FreeBufferArena() {
 
 void BufferPool::FreeBufferArena::AddFreeBuffer(BufferHandle&& buffer) {
   lock_guard<SpinLock> al(lock_);
+  if (FLAGS_disable_mem_pools) {
+    int64_t len = buffer.len();
+    parent_->system_allocator_->Free(move(buffer));
+    parent_->system_bytes_remaining_.Add(len);
+    return;
+  }
   PerSizeLists* lists = GetListsForSize(buffer.len());
   FreeList* list = &lists->free_buffers;
   DCHECK_EQ(lists->num_free_buffers.Load(), list->Size());
@@ -586,6 +594,11 @@ pair<int64_t, int64_t> BufferPool::FreeBufferArena::FreeSystemMemory(
 }
 
 void BufferPool::FreeBufferArena::AddCleanPage(Page* page) {
+  if (FLAGS_disable_mem_pools) {
+    // Immediately evict the page.
+    AddFreeBuffer(move(page->buffer));
+    return;
+  }
   lock_guard<SpinLock> al(lock_);
   PerSizeLists* lists = GetListsForSize(page->len);
   DCHECK_EQ(lists->num_clean_pages.Load(), lists->clean_pages.size());
