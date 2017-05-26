@@ -495,6 +495,8 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
     bool* skip_row_group) {
   *skip_row_group = false;
 
+  if (!state_->query_options().parquet_read_statistics) return Status::OK();
+
   const TupleDescriptor* min_max_tuple_desc = scan_node_->min_max_tuple_desc();
   if (!min_max_tuple_desc) return Status::OK();
 

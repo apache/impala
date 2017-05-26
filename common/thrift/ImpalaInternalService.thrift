@@ -236,6 +236,11 @@ struct TQueryOptions {
   // Policy for resolving nested array fields in Parquet files.
   54: optional TParquetArrayResolution parquet_array_resolution =
     TParquetArrayResolution.TWO_LEVEL_THEN_THREE_LEVEL
+
+  // Indicates whether to read statistics from Parquet files and use them during query
+  // processing. This includes skipping data based on the statistics and computing query
+  // results like "select min()".
+  55: optional bool parquet_read_statistics = true
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

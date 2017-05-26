@@ -447,3 +447,14 @@ select count(*) from chars where c <= "aaaa"
 aggregation(SUM, NumRowGroups): 1
 aggregation(SUM, NumStatsFilteredRowGroups): 0
 ====
+---- QUERY
+# IMPALA-4988: Test that stats support can be disabled using the parquet_read_statistics
+# query option.
+set parquet_read_statistics=0;
+select count(*) from functional_parquet.alltypes where id < 0;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+====

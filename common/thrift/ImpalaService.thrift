@@ -266,6 +266,11 @@ enum TImpalaQueryOptions {
   // TODO: Remove the TWO_LEVEL_THEN_THREE_LEVEL mode completely or at least make
   // it non-default in a compatibility breaking release.
   PARQUET_ARRAY_RESOLUTION,
+
+  // Indicates whether to read statistics from Parquet files and use them during query
+  // processing. This includes skipping data based on the statistics and computing query
+  // results like "select min()".
+  PARQUET_READ_STATISTICS,
 }
 
 // The summary of a DML statement.
