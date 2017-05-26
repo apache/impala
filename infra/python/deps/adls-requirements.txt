@@ -18,4 +18,9 @@
 # The following dependencies depend on cffi, so it must be installed after the toolchain
 # is bootstrapped and all requirements in requirements.txt and compiled-requirements.txt
 # are installed into the virtualenv.
+
+pycparser == 2.17
+cffi==1.10.0
+cryptography==1.8.1
+  scandir == 1.5
 azure-datalake-store == 0.0.9
