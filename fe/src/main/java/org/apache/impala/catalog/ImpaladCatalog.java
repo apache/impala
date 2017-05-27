@@ -101,21 +101,33 @@ public class ImpaladCatalog extends Catalog {
   }
 
   /**
+   * Returns true if the given object does not depend on any other object already
+   * existing in the catalog in order to be added.
+   */
+  private boolean isTopLevelCatalogObject(TCatalogObject catalogObject) {
+    return catalogObject.getType() == TCatalogObjectType.DATABASE||
+        catalogObject.getType() == TCatalogObjectType.DATA_SOURCE ||
+        catalogObject.getType() == TCatalogObjectType.HDFS_CACHE_POOL ||
+        catalogObject.getType() == TCatalogObjectType.ROLE;
+  }
+
+  /**
    * Updates the internal Catalog based on the given TCatalogUpdateReq.
    * This method:
-   * 1) Updates all databases in the Catalog
-   * 2) Updates all tables, views, and functions in the Catalog
-   * 3) Removes all dropped tables, views, and functions
-   * 4) Removes all dropped databases
+   * 1) Updates all top level objects (such as databases and roles).
+   * 2) Updates all objects that depend on top level objects (such as functions, tables,
+   *    privileges).
+   * 3) Removes all dropped catalog objects.
    *
    * This method is called once per statestore heartbeat and is guaranteed the same
    * object will not be in both the "updated" list and the "removed" list (it is
    * a detail handled by the statestore).
-   * Catalog updates are ordered by the object type with the dependent objects coming
-   * first. That is, database "foo" will always come before table "foo.bar".
-   * Synchronized because updateCatalog() can be called by during a statestore update or
-   * during a direct-DDL operation and catalogServiceId_ and lastSyncedCatalogVersion_
-   * must be protected.
+   * Catalog objects are ordered by version, which is not necessarily the same as ordering
+   * by dependency. This is handled by doing two passes and first updating the top level
+   * objects, followed by updating the dependent objects. This method is synchronized
+   * because updateCatalog() can be called by during a statestore update or during a
+   * direct-DDL operation and catalogServiceId_ and lastSyncedCatalogVersion_ must be
+   * protected.
    */
   public synchronized TUpdateCatalogCacheResponse updateCatalog(
     TUpdateCatalogCacheRequest req) throws CatalogException {
@@ -130,12 +142,26 @@ public class ImpaladCatalog extends Catalog {
       }
     }
 
-    // First process all updates
+    // Process updates to top level objects first because they don't depend on any other
+    // objects already existing in the catalog.
     long newCatalogVersion = lastSyncedCatalogVersion_;
     for (TCatalogObject catalogObject: req.getUpdated_objects()) {
       if (catalogObject.getType() == TCatalogObjectType.CATALOG) {
         newCatalogVersion = catalogObject.getCatalog_version();
-      } else {
+      } else if (isTopLevelCatalogObject(catalogObject)) {
+        try {
+          addCatalogObject(catalogObject);
+        } catch (Exception e) {
+          LOG.error("Error adding catalog object: " + e.getMessage(), e);
+        }
+      }
+    }
+
+    // Process updates to dependent objects next. Since the top level objects were already
+    // processed, we are guaranteed that the top level objects that the dependent objects
+    // depend on exist in the catalog.
+    for (TCatalogObject catalogObject: req.getUpdated_objects()) {
+      if (!isTopLevelCatalogObject(catalogObject)) {
         try {
           addCatalogObject(catalogObject);
         } catch (Exception e) {

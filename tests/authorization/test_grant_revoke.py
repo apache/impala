@@ -21,10 +21,12 @@ import grp
 import pytest
 from getpass import getuser
 from os import getenv
+from time import sleep
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_uncompressed_text_dimension
+from tests.verifiers.metric_verifier import MetricVerifier
 
 SENTRY_CONFIG_FILE = getenv('IMPALA_HOME') + '/fe/src/test/resources/sentry-site.xml'
 
@@ -71,9 +73,50 @@ class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
     finally:
       self.client.execute("drop role grant_revoke_test_admin")
 
+  @classmethod
+  def restart_first_impalad(cls):
+    impalad = cls.cluster.impalads[0]
+    impalad.restart()
+    cls.client = impalad.service.create_beeswax_client()
+
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--server_name=server1",
       catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE)
   def test_grant_revoke(self, vector):
     self.run_test_case('QueryTest/grant_revoke', vector, use_db="default")
+
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--server_name=server1",
+      catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE,
+      statestored_args=("--statestore_heartbeat_frequency_ms=300 "
+                        "--statestore_update_frequency_ms=300"))
+  def test_role_update(self, vector):
+    """IMPALA-5355: The initial update from the statestore has the privileges and roles in
+    reverse order if a role was modified, but not the associated privilege. Verify that
+    Impala is able to handle this.
+    """
+    self.client.execute("create role test_role")
+    self.client.execute("grant all on server to test_role")
+    # Wait a few seconds to make sure the update propagates to the statestore.
+    sleep(3)
+    # Update the role, increasing its catalog verion.
+    self.client.execute("grant role test_role to group {0}".format(
+        grp.getgrnam(getuser()).gr_name))
+    result = self.client.execute("show tables in functional")
+    assert 'alltypes' in result.data
+    privileges_before = self.client.execute("show grant role test_role")
+    # Wait a few seconds before restarting Impalad to make sure that the Catalog gets
+    # updated.
+    sleep(3)
+    self.restart_first_impalad()
+    verifier = MetricVerifier(self.cluster.impalads[0].service)
+    verifier.wait_for_metric("catalog.ready", True)
+    # Verify that we still have the right privileges after the first impalad was
+    # restarted.
+    result = self.client.execute("show tables in functional");
+    assert 'alltypes' in result.data
+    privileges_after = self.client.execute("show grant role test_role")
+    assert privileges_before.data == privileges_after.data
