@@ -2959,3 +2959,39 @@ from functional.alltypes where id = 7
 ---- TYPES
 BIGINT , BIGINT , BIGINT , BIGINT , BIGINT , BIGINT , BIGINT , BIGINT , BIGINT , BIGINT , BIGINT , BIGINT
 ====
+---- QUERY
+# IMPALA-5315: Test support for non zero-padded date/time strings cast as timestamp
+select cast('2001-1-21 12:5:30' as timestamp)
+---- RESULTS
+2001-01-21 12:05:30
+---- TYPES
+timestamp
+====
+---- QUERY
+select cast('2001-1-2 1:5:3.123' as timestamp)
+---- RESULTS
+2001-01-02 01:05:03.123000000
+---- TYPES
+timestamp
+====
+---- QUERY
+select cast('1:5:3' as timestamp)
+---- RESULTS
+01:05:03
+---- TYPES
+timestamp
+====
+---- QUERY
+select cast('1:5:3.1234567' as timestamp)
+---- RESULTS
+01:05:03.123456700
+---- TYPES
+timestamp
+====
+---- QUERY
+select cast('2001-1-2' as timestamp)
+---- RESULTS
+2001-01-02 00:00:00
+---- TYPES
+timestamp
+====
