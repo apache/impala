@@ -493,15 +493,9 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   DCHECK(!out_batch->AtCapacity());
 
-  if (ReachedLimit()) {
-    *eos = true;
-    return Status::OK();
-  } else {
-    *eos = false;
-  }
-
   Status status = Status::OK();
-  while (true) {
+  *eos = false;
+  while (!ReachedLimit()) {
     DCHECK(!*eos);
     DCHECK(status.ok());
     DCHECK_NE(state_, PARTITIONING_BUILD) << "Should not be in GetNext()";
@@ -638,7 +632,10 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
     break;
   }
 
-  if (ReachedLimit()) *eos = true;
+  if (ReachedLimit()) {
+    probe_batch_->TransferResourceOwnership(out_batch);
+    *eos = true;
+  }
   return Status::OK();
 }
 

@@ -589,3 +589,25 @@ from tpch_nested_parquet.customer c, (
 ---- TYPES
 bigint,bigint
 ====
+---- QUERY
+# IMPALA-5363: Reset probe_batch_ after reaching limit.
+# Query with a partitioned hash join inside a subplan
+select count(*) FROM tpch_nested_parquet.customer c, (SELECT ca.o_orderkey okey,
+ca.o_orderpriority opriority FROM c.c_orders ca, c.c_orders cb
+WHERE ca.o_orderkey = cb.o_orderkey limit 2) v limit 51
+---- RESULTS
+1500000
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-5363: Reset probe_batch_ after reaching limit.
+# Query with a Nested loop join inside a subplan
+select count(*) FROM tpch_nested_parquet.customer c, (SELECT ca.o_orderkey okey,
+ca.o_orderpriority opriority FROM c.c_orders ca, c.c_orders cb
+WHERE ca.o_orderkey < cb.o_orderkey limit 2) v limit 51
+---- RESULTS
+199835
+---- TYPES
+BIGINT
+====
