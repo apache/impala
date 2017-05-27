@@ -75,7 +75,7 @@ class Bitmap {
   }
 
   void SetAllBits(bool b) {
-    memset(&buffer_[0], 255 * b, buffer_.size() * sizeof(uint64_t));
+    memset(buffer_.data(), 255 * b, buffer_.size() * sizeof(uint64_t));
   }
 
   int64_t num_bits() const { return num_bits_; }

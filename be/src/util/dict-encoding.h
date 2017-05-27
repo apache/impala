@@ -309,7 +309,7 @@ ALWAYS_INLINE inline bool DictDecoder<Decimal16Value>::GetNextValue(
   if (index >= dict_.size()) return false;
   // Workaround for IMPALA-959. Use memcpy instead of '=' so addresses
   // do not need to be 16 byte aligned.
-  uint8_t* addr = reinterpret_cast<uint8_t*>(&dict_[0]);
+  uint8_t* addr = reinterpret_cast<uint8_t*>(dict_.data());
   addr = addr + index * sizeof(*value);
   memcpy(value, addr, sizeof(*value));
   return true;

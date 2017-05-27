@@ -494,15 +494,15 @@ class ExprTest : public testing::Test {
     switch (expected_type.GetByteSize()) {
       case 4:
         EXPECT_EQ(expected_result.value(), StringParser::StringToDecimal<int32_t>(
-            &value[0], value.size(), expected_type, &result).value()) << query;
+            value.data(), value.size(), expected_type, &result).value()) << query;
         break;
       case 8:
         EXPECT_EQ(expected_result.value(), StringParser::StringToDecimal<int64_t>(
-            &value[0], value.size(), expected_type, &result).value()) << query;
+            value.data(), value.size(), expected_type, &result).value()) << query;
         break;
       case 16:
         EXPECT_EQ(expected_result.value(), StringParser::StringToDecimal<int128_t>(
-            &value[0], value.size(), expected_type, &result).value()) << query;
+            value.data(), value.size(), expected_type, &result).value()) << query;
         break;
       default:
         EXPECT_TRUE(false) << expected_type << " " << expected_type.GetByteSize();
@@ -1110,30 +1110,30 @@ bool ExprTest::ConvertValue<bool>(const string& value) {
 template <>
 int8_t ExprTest::ConvertValue<int8_t>(const string& value) {
   StringParser::ParseResult result;
-  return StringParser::StringToInt<int8_t>(&value[0], value.size(), &result);
+  return StringParser::StringToInt<int8_t>(value.data(), value.size(), &result);
 }
 
 template <>
 int16_t ExprTest::ConvertValue<int16_t>(const string& value) {
   StringParser::ParseResult result;
-  return StringParser::StringToInt<int16_t>(&value[0], value.size(), &result);
+  return StringParser::StringToInt<int16_t>(value.data(), value.size(), &result);
 }
 
 template <>
 int32_t ExprTest::ConvertValue<int32_t>(const string& value) {
   StringParser::ParseResult result;
-  return StringParser::StringToInt<int32_t>(&value[0], value.size(), &result);
+  return StringParser::StringToInt<int32_t>(value.data(), value.size(), &result);
 }
 
 template <>
 int64_t ExprTest::ConvertValue<int64_t>(const string& value) {
   StringParser::ParseResult result;
-  return StringParser::StringToInt<int64_t>(&value[0], value.size(), &result);
+  return StringParser::StringToInt<int64_t>(value.data(), value.size(), &result);
 }
 
 template <>
 TimestampValue ExprTest::ConvertValue<TimestampValue>(const string& value) {
-  return TimestampValue::Parse(&value[0], value.size());
+  return TimestampValue::Parse(value.data(), value.size());
 }
 
 // We can't put this into TestValue() because GTest can't resolve

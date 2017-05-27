@@ -1224,7 +1224,7 @@ bool HdfsParquetScanner::AssembleCollection(
       end_of_collection = column_readers[0]->rep_level() <= new_collection_rep_level;
 
       if (materialize_tuple) {
-        if (ExecNode::EvalConjuncts(&evals[0], evals.size(), row)) {
+        if (ExecNode::EvalConjuncts(evals.data(), evals.size(), row)) {
           tuple = next_tuple(tuple_desc->byte_size(), tuple);
           ++num_to_commit;
         }

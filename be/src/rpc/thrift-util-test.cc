@@ -51,7 +51,7 @@ TEST(ThriftUtil, SimpleSerializeDeserialize) {
     EXPECT_OK(serializer.Serialize(&counter, &len1, &buffer1));
 
     EXPECT_EQ(len1, msg.size());
-    EXPECT_TRUE(memcmp(buffer1, &msg[0], len1) == 0);
+    EXPECT_TRUE(memcmp(buffer1, msg.data(), len1) == 0);
 
     // Serialize again and ensure the memory buffer is the same and being reused.
     EXPECT_OK(serializer.Serialize(&counter, &len2, &buffer2));

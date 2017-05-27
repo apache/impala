@@ -1313,7 +1313,7 @@ void BufferPoolTest::TestQueryTeardown(bool write_error) {
     // unpinned pages.
     vector<BufferHandle> tmp_buffers;
     AllocateBuffers(pool, &client, TEST_BUFFER_LEN, CLIENT_BUFFERS, &tmp_buffers);
-    string tmp_file_path = TmpFilePath(&pages[0]);
+    string tmp_file_path = TmpFilePath(pages.data());
     FreeBuffers(pool, &client, &tmp_buffers);
 
     PinAll(pool, &client, &pages);
@@ -1382,7 +1382,7 @@ void BufferPoolTest::TestWriteError(int write_delay_ms) {
   error = pool.CreatePage(&client, TEST_BUFFER_LEN, &tmp_page);
   EXPECT_EQ(TErrorCode::SCRATCH_ALLOCATION_FAILED, error.code());
   EXPECT_FALSE(tmp_page.is_open());
-  error = pool.Pin(&client, &pages[0]);
+  error = pool.Pin(&client, pages.data());
   EXPECT_EQ(TErrorCode::SCRATCH_ALLOCATION_FAILED, error.code());
   EXPECT_FALSE(pages[0].is_pinned());
 
@@ -1416,7 +1416,7 @@ TEST_F(BufferPoolTest, TmpFileAllocateError) {
   vector<PageHandle> pages;
   CreatePages(&pool, &client, TEST_BUFFER_LEN, TOTAL_MEM, &pages);
   // Unpin a page, which will trigger a write.
-  pool.Unpin(&client, &pages[0]);
+  pool.Unpin(&client, pages.data());
   WaitForAllWrites(&client);
   // Remove permissions to the temporary files - subsequent operations will fail.
   ASSERT_GT(RemoveScratchPerms(), 0);
@@ -1425,7 +1425,7 @@ TEST_F(BufferPoolTest, TmpFileAllocateError) {
 
   // Write failure causes future operations like Pin() to fail.
   WaitForAllWrites(&client);
-  Status error = pool.Pin(&client, &pages[0]);
+  Status error = pool.Pin(&client, pages.data());
   EXPECT_EQ(TErrorCode::SCRATCH_ALLOCATION_FAILED, error.code());
   EXPECT_FALSE(pages[0].is_pinned());
 
@@ -1676,7 +1676,7 @@ TEST_F(BufferPoolTest, NoTmpDirs) {
   // active scratch devices.
   UnpinAll(&pool, &client, &pages);
   WaitForAllWrites(&client);
-  ASSERT_OK(pool.Pin(&client, &pages[0]));
+  ASSERT_OK(pool.Pin(&client, pages.data()));
 
   // Allocating another buffer will force a write, which will fail.
   BufferHandle tmp_buffer;
@@ -1718,7 +1718,7 @@ TEST_F(BufferPoolTest, ScratchLimitZero) {
 
   // Spilling is disabled by the QueryState when scratch_limit is 0, so trying to unpin
   // will cause a DCHECK.
-  IMPALA_ASSERT_DEBUG_DEATH(pool->Unpin(&client, &pages[0]), "");
+  IMPALA_ASSERT_DEBUG_DEATH(pool->Unpin(&client, pages.data()), "");
 
   DestroyAll(pool, &client, &pages);
   pool->DeregisterClient(&client);

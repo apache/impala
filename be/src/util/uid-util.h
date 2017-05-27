@@ -111,8 +111,8 @@ inline string GenerateUUIDString() {
 inline TUniqueId GenerateUUID() {
   const string& u = GenerateUUIDString();
   TUniqueId uid;
-  memcpy(&uid.hi, &u[0], sizeof(int64_t));
-  memcpy(&uid.lo, &u[0] + sizeof(int64_t), sizeof(int64_t));
+  memcpy(&uid.hi, u.data(), sizeof(int64_t));
+  memcpy(&uid.lo, u.data() + sizeof(int64_t), sizeof(int64_t));
   return uid;
 }
 

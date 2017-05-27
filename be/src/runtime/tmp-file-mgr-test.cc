@@ -470,7 +470,7 @@ TEST_F(TmpFileMgrTest, TestEncryptionDuringCancellation) {
   // Write out a string repeatedly. We don't want to see this written unencypted to disk.
   string plaintext("the quick brown fox jumped over the lazy dog");
   for (int pos = 0; pos + plaintext.size() < DATA_SIZE; pos += plaintext.size()) {
-    memcpy(&data[pos], &plaintext[0], plaintext.size());
+    memcpy(&data[pos], plaintext.data(), plaintext.size());
   }
 
   // Start a write in flight, which should encrypt the data and write it to disk.
@@ -490,7 +490,7 @@ TEST_F(TmpFileMgrTest, TestEncryptionDuringCancellation) {
   FILE* file = fopen(file_path.c_str(), "r");
   ASSERT_EQ(DATA_SIZE, fread(&data[0], 1, DATA_SIZE, file));
   for (int pos = 0; pos + plaintext.size() < DATA_SIZE; pos += plaintext.size()) {
-    ASSERT_NE(0, memcmp(&data[pos], &plaintext[0], plaintext.size()))
+    ASSERT_NE(0, memcmp(&data[pos], plaintext.data(), plaintext.size()))
         << file_path << "@" << pos;
   }
   fclose(file);

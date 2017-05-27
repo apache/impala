@@ -369,8 +369,7 @@ class HdfsScanner {
   /// This must always be inlined so we can correctly replace the call to
   /// ExecNode::EvalConjuncts() during codegen.
   bool IR_ALWAYS_INLINE EvalConjuncts(TupleRow* row)  {
-    return ExecNode::EvalConjuncts(&(*conjunct_evals_)[0],
-        conjunct_evals_->size(), row);
+    return ExecNode::EvalConjuncts(conjunct_evals_->data(), conjunct_evals_->size(), row);
   }
 
   /// Sets 'num_tuples' template tuples in the batch that 'row' points to. Assumes the

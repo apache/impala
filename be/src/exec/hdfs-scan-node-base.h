@@ -182,7 +182,7 @@ class HdfsScanNodeBase : public ScanNode {
   /// The result array is of length hdfs_table_->num_cols(). The i-th element is true iff
   /// column i should be materialized.
   const bool* is_materialized_col() {
-    return reinterpret_cast<const bool*>(&is_materialized_col_[0]);
+    return reinterpret_cast<const bool*>(is_materialized_col_.data());
   }
 
   /// Returns the per format codegen'd function.  Scanners call this to get the

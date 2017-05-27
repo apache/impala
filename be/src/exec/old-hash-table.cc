@@ -347,7 +347,7 @@ Function* OldHashTable::CodegenEvalTupleRow(LlvmCodeGen* codegen, bool build) {
   // Aggregation with no grouping exprs also use the hash table interface for
   // code simplicity. In that case, there are no build exprs.
   if (!exprs.empty()) {
-    // Load &build_expr_evals_[0] / &probe_expr_evals_[0]
+    // Load build_expr_evals_.data() / probe_expr_evals_.data()
     Value* eval_vector = codegen->CodegenCallFunction(&builder, build ?
         IRFunction::OLD_HASH_TABLE_GET_BUILD_EXPR_EVALUATORS :
         IRFunction::OLD_HASH_TABLE_GET_PROBE_EXPR_EVALUATORS,
@@ -690,7 +690,7 @@ Function* OldHashTable::CodegenEquals(LlvmCodeGen* codegen) {
   if (!build_exprs_.empty()) {
     BasicBlock* false_block = BasicBlock::Create(context, "false_block", fn);
 
-    // Load &build_expr_evals_[0]
+    // Load build_expr_evals_.data()
     Value* eval_vector = codegen->CodegenCallFunction(&builder,
         IRFunction::OLD_HASH_TABLE_GET_BUILD_EXPR_EVALUATORS,
         this_ptr, "eval_vector");

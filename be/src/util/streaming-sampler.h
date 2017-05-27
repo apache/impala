@@ -52,7 +52,7 @@ class StreamingSampler {
       current_sample_count_(0),
       current_sample_total_time_(0) {
     DCHECK_LE(samples_collected_, MAX_SAMPLES);
-    memcpy(samples_, &initial_samples[0], sizeof(T) * samples_collected_);
+    memcpy(samples_, initial_samples.data(), sizeof(T) * samples_collected_);
   }
 
   /// Add a sample to the sampler. 'ms' is the time elapsed since the last time this
@@ -107,7 +107,7 @@ class StreamingSampler {
     boost::lock_guard<SpinLock> l(lock_);
     period_ = period;
     samples_collected_ = samples.size();
-    memcpy(samples_, &samples[0], sizeof(T) * samples_collected_);
+    memcpy(samples_, samples.data(), sizeof(T) * samples_collected_);
     current_sample_sum_ = 0;
     current_sample_count_ = 0;
     current_sample_total_time_ = 0;

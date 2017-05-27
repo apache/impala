@@ -329,7 +329,7 @@ Status Webserver::Start() {
   // pointer to this server in the per-server state, and register a static method as the
   // default callback. That method unpacks the pointer to this and calls the real
   // callback.
-  context_ = sq_start(&callbacks, reinterpret_cast<void*>(this), &options[0]);
+  context_ = sq_start(&callbacks, reinterpret_cast<void*>(this), options.data());
 
   // Restore the child signal handler so wait() works properly.
   signal(SIGCHLD, sig_chld);

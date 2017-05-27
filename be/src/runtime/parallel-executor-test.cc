@@ -72,7 +72,7 @@ TEST(ParallelExecutorTest, Basic) {
 
   EXPECT_OK(ParallelExecutor::Exec(
       bind<Status>(mem_fn(&ParallelExecutorTest::UpdateFunction), &test_caller, _1),
-      reinterpret_cast<void**>(&args[0]), args.size()));
+      reinterpret_cast<void**>(args.data()), args.size()));
 
   test_caller.Validate();
 }

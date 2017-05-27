@@ -53,9 +53,9 @@ void Validate(DelimitedTextParser* parser, const string& data,
   int num_tuples = 0;
   int num_fields = 0;
   char* next_column_start;
-  Status status = parser->ParseFieldLocations(
-      100, remaining_len, &data_ptr, &row_end_locs[0], &field_locations[0], &num_tuples,
-      &num_fields, &next_column_start);
+  Status status =
+      parser->ParseFieldLocations(100, remaining_len, &data_ptr, &row_end_locs[0],
+          field_locations.data(), &num_tuples, &num_fields, &next_column_start);
   EXPECT_EQ(num_tuples, expected_num_tuples) << data;
   EXPECT_EQ(num_fields, expected_num_fields) << data;
 }

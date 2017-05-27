@@ -924,7 +924,7 @@ Status SaslAuthProvider::WrapClientTransport(const string& hostname,
   try {
     const string& service = service_name.empty() ? service_name_ : service_name;
     sasl_client.reset(new sasl::TSaslClient(KERBEROS_MECHANISM, auth_id,
-        service, hostname, props, &KERB_INT_CALLBACKS[0]));
+        service, hostname, props, KERB_INT_CALLBACKS.data()));
   } catch (sasl::SaslClientImplException& e) {
     LOG(ERROR) << "Failed to create a GSSAPI/SASL client: " << e.what();
     return Status(e.what());

@@ -450,7 +450,7 @@ void RowBatchSerializeTest::TestDupCorrectness(bool full_dedup) {
   RowBatch* batch = pool_.Add(new RowBatch(&row_desc, num_rows, tracker_.get()));
   vector<vector<Tuple*>> distinct_tuples(2);
   CreateTuples(*row_desc.tuple_descriptors()[0], batch->tuple_data_pool(),
-      distinct_int_tuples, 0, 10, &distinct_tuples[0]);
+      distinct_int_tuples, 0, 10, distinct_tuples.data());
   CreateTuples(*row_desc.tuple_descriptors()[1], batch->tuple_data_pool(),
       distinct_string_tuples, 0, 10, &distinct_tuples[1]);
   AddTuplesToRowBatch(num_rows, distinct_tuples, repeats, batch);

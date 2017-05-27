@@ -67,7 +67,7 @@ void UrlEncode(const vector<uint8_t>& in, string* out, bool hive_compat) {
   if (in.empty()) {
     *out = "";
   } else {
-    UrlEncode(reinterpret_cast<const char*>(&in[0]), in.size(), out, hive_compat);
+    UrlEncode(reinterpret_cast<const char*>(in.data()), in.size(), out, hive_compat);
   }
 }
 
@@ -160,7 +160,7 @@ void Base64Encode(const vector<uint8_t>& in, string* out) {
 void Base64Encode(const vector<uint8_t>& in, stringstream* out) {
   if (!in.empty()) {
     // Boost does not like non-null terminated strings
-    string tmp(reinterpret_cast<const char*>(&in[0]), in.size());
+    string tmp(reinterpret_cast<const char*>(in.data()), in.size());
     Base64Encode(tmp.c_str(), tmp.size(), out);
   }
 }

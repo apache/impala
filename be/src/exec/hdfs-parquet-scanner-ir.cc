@@ -27,7 +27,7 @@
 using namespace impala;
 
 int HdfsParquetScanner::ProcessScratchBatch(RowBatch* dst_batch) {
-  ScalarExprEvaluator* const* conjunct_evals = &(*conjunct_evals_)[0];
+  ScalarExprEvaluator* const* conjunct_evals = conjunct_evals_->data();
   const int num_conjuncts = conjunct_evals_->size();
 
   // Start/end/current iterators over the output rows.

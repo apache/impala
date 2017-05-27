@@ -754,7 +754,7 @@ Status HashTableCtx::CodegenEvalRow(LlvmCodeGen* codegen, bool build, Function**
   Value* expr_values_null = args[3];
   Value* has_null = codegen->false_value();
 
-  // evaluator_vector = &build_expr_evals_[0] / &probe_expr_evals_[0]
+  // evaluator_vector = build_expr_evals_.data() / probe_expr_evals_.data()
   Value* eval_vector = codegen->CodegenCallFunction(&builder, build ?
       IRFunction::HASH_TABLE_GET_BUILD_EXPR_EVALUATORS :
       IRFunction::HASH_TABLE_GET_PROBE_EXPR_EVALUATORS,
@@ -1119,7 +1119,7 @@ Status HashTableCtx::CodegenEquals(LlvmCodeGen* codegen, bool force_null_equalit
   Value* expr_values = args[2];
   Value* expr_values_null = args[3];
 
-  // eval_vector = &build_expr_evals_[0]
+  // eval_vector = build_expr_evals_.data()
   Value* eval_vector = codegen->CodegenCallFunction(&builder,
       IRFunction::HASH_TABLE_GET_BUILD_EXPR_EVALUATORS, this_ptr, "eval_vector");
 

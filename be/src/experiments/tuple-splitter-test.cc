@@ -281,7 +281,7 @@ bool DataPartitioner::Split(const BuildPartition& build_partition) {
   int partition_mask = partitions - 1;
 
   int new_splits = 0;
-  memset(&split_counts_[0], 0, sizeof(split_counts_[0]) * split_counts_.size());
+  memset(split_counts_.data(), 0, sizeof(split_counts_[0]) * split_counts_.size());
 
   for (int i = 0; i < num_blocks; ++i) {
     int tuples = NumTuples(build_partition, i);

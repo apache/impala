@@ -311,7 +311,7 @@ Status HdfsRCFileScanner::ReadRowGroupHeader() {
 
 Status HdfsRCFileScanner::ReadKeyBuffers() {
   if (key_buffer_.size() < key_length_) key_buffer_.resize(key_length_);
-  uint8_t* key_buffer = &key_buffer_[0];
+  uint8_t* key_buffer = key_buffer_.data();
 
   if (header_->is_compressed) {
     uint8_t* compressed_buffer;

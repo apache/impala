@@ -1074,7 +1074,7 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBuffer) {
     int scan_len = min(len, buffer_len);
     DiskIoMgr::ScanRange* range = AllocateRange(1);
     range->Reset(NULL, tmp_file, scan_len, 0, 0, true,
-        DiskIoMgr::BufferOpts::ReadInto(&client_buffer[0], buffer_len));
+        DiskIoMgr::BufferOpts::ReadInto(client_buffer.data(), buffer_len));
     ASSERT_OK(io_mgr->AddScanRange(reader, range, true));
 
     unique_ptr<DiskIoMgr::BufferDescriptor> io_buffer;
@@ -1112,7 +1112,7 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBufferError) {
     io_mgr->RegisterContext(&reader, reader_mem_tracker);
     DiskIoMgr::ScanRange* range = AllocateRange(1);
     range->Reset(NULL, tmp_file, SCAN_LEN, 0, 0, true,
-        DiskIoMgr::BufferOpts::ReadInto(&client_buffer[0], SCAN_LEN));
+        DiskIoMgr::BufferOpts::ReadInto(client_buffer.data(), SCAN_LEN));
     ASSERT_OK(io_mgr->AddScanRange(reader, range, true));
 
     /// Also test the cancellation path. Run multiple iterations since it is racy whether

@@ -169,8 +169,9 @@ class ColumnStats : public ColumnStatsBase {
   virtual void EncodeToThrift(parquet::Statistics* out) const override;
 
  protected:
-  /// Encodes a single value using parquet's plain encoding and stores it into the
-  /// binary string 'out'. String values are stored without additional encoding.
+  /// Encodes a single value using parquet's plain encoding and stores it into the binary
+  /// string 'out'. String values are stored without additional encoding. 'bytes_needed'
+  /// must be positive.
   static void EncodePlainValue(const T& v, int64_t bytes_needed, std::string* out);
 
   /// Decodes the plain encoded stats value from 'buffer' and writes the result into the

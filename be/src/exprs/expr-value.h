@@ -68,8 +68,8 @@ struct ExprValue {
 
   void Init(const std::string& str) {
     string_data = str;
-    string_val.ptr = &string_data[0];
     string_val.len = string_data.size();
+    string_val.ptr = string_val.len > 0 ? &string_data[0] : nullptr;
   }
 
   /// Sets the value for type to '0' and returns a pointer to the data

@@ -71,8 +71,9 @@ inline void ColumnStats<T>::EncodeToThrift(parquet::Statistics* out) const {
 template <typename T>
 inline void ColumnStats<T>::EncodePlainValue(
     const T& v, int64_t bytes_needed, std::string* out) {
+  DCHECK_GT(bytes_needed, 0);
   out->resize(bytes_needed);
-  int64_t bytes_written = ParquetPlainEncoder::Encode(
+  const int64_t bytes_written = ParquetPlainEncoder::Encode(
       v, bytes_needed, reinterpret_cast<uint8_t*>(&(*out)[0]));
   DCHECK_EQ(bytes_needed, bytes_written);
 }
@@ -81,7 +82,7 @@ template <typename T>
 inline bool ColumnStats<T>::DecodePlainValue(const std::string& buffer, void* slot) {
   T* result = reinterpret_cast<T*>(slot);
   int size = buffer.size();
-  const uint8_t* data = reinterpret_cast<const uint8_t*>(&buffer[0]);
+  const uint8_t* data = reinterpret_cast<const uint8_t*>(buffer.data());
   if (ParquetPlainEncoder::Decode(data, data + size, size, result) == -1) return false;
   return true;
 }
@@ -120,7 +121,7 @@ inline bool ColumnStats<TimestampValue>::DecodePlainValue(
     const std::string& buffer, void* slot) {
   TimestampValue* result = reinterpret_cast<TimestampValue*>(slot);
   int size = buffer.size();
-  const uint8_t* data = reinterpret_cast<const uint8_t*>(&buffer[0]);
+  const uint8_t* data = reinterpret_cast<const uint8_t*>(buffer.data());
   if (ParquetPlainEncoder::Decode(data, data + size, size, result) == -1) return false;
   // We don't need to convert the value here, since we don't support reading timestamp
   // statistics written by Hive / old versions of parquet-mr. Should Hive add support for
@@ -140,7 +141,7 @@ template <>
 inline bool ColumnStats<StringValue>::DecodePlainValue(
     const std::string& buffer, void* slot) {
   StringValue* result = reinterpret_cast<StringValue*>(slot);
-  result->ptr = const_cast<char*>(&buffer[0]);
+  result->ptr = const_cast<char*>(buffer.data());
   result->len = buffer.size();
   return true;
 }
