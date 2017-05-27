@@ -177,6 +177,35 @@ class TimestampParser {
   /// Return true if the parse was successful.
   static bool ParseFormatTokens(DateTimeFormatContext* dt_ctx);
 
+  // Parse out the next digit token from the date/time string by checking for contiguous
+  // digit characters and return a pointer to the end of that token.
+  // str -- pointer to the string to be parsed
+  // str_end -- the pointer to the end of the string to be parsed
+  // Returns the pointer within the string to the end of the valid digit token.
+  static const char* ParseDigitToken(const char* str, const char* str_end);
+
+  // Parse out the next separator token from the date/time string against an expected
+  // character.
+  // str -- pointer to the string to be parsed
+  // str_end -- the pointer to the end of the string to be parsed
+  // sep -- the separator char to compare the token to
+  // Returns the pointer within the string to the end of the valid separator token.
+  static const char* ParseSeparatorToken(
+      const char* str, const char* str_end, const char sep);
+
+  /// Parse the date/time string to generate the DateTimeFormatToken required by
+  /// DateTimeFormatContext. Similar to ParseFormatTokens() this function will take the
+  /// string and length, then heuristically determine whether the value contains date
+  //  tokens, time tokens, or both. Unlike ParseFormatTokens, it does not require the
+  //  template format string.
+  /// str -- valid pointer to the string to parse
+  /// len -- length of the string to parse (must be > 0)
+  /// dt_ctx -- date/time format context (must contain valid tokens)
+  /// d -- the date value where the results of the parsing will be placed
+  /// t -- the time value where the results of the parsing will be placed
+  /// Returns true if the date/time was successfully parsed.
+  static bool ParseFormatTokensByStr(DateTimeFormatContext* dt_ctx);
+
   /// Parse a default date/time string. The default timestamp format is:
   /// yyyy-MM-dd HH:mm:ss.SSSSSSSSS or yyyy-MM-ddTHH:mm:ss.SSSSSSSSS. Either just the
   /// date or just the time may be specified. All components are required in either the
