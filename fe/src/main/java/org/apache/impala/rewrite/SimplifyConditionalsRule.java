@@ -30,8 +30,13 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.NullLiteral;
+import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.AnalysisException;
+
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /***
  * This rule simplifies conditional functions with constant conditions. It relies on
@@ -43,6 +48,7 @@ import com.google.common.base.Preconditions;
  * id = 0 OR false -> id = 0
  * false AND id = 1 -> false
  * case when false then 0 when true then 1 end -> 1
+ * coalesce(1, 0) -> 1
  */
 public class SimplifyConditionalsRule implements ExprRewriteRule {
   public static ExprRewriteRule INSTANCE = new SimplifyConditionalsRule();
@@ -76,24 +82,84 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
    * Simplifies IF by returning the corresponding child if the condition has a constant
    * TRUE, FALSE, or NULL (equivalent to FALSE) value.
    */
+  private Expr simplifyIfFunctionCallExpr(FunctionCallExpr expr) {
+    Preconditions.checkState(expr.getChildren().size() == 3);
+    if (expr.getChild(0) instanceof BoolLiteral) {
+      if (((BoolLiteral) expr.getChild(0)).getValue()) {
+        // IF(TRUE)
+        return expr.getChild(1);
+      } else {
+        // IF(FALSE)
+        return expr.getChild(2);
+      }
+    } else if (expr.getChild(0) instanceof NullLiteral) {
+      // IF(NULL)
+      return expr.getChild(2);
+    }
+    return expr;
+  }
+
+  /**
+   * Simplify COALESCE by skipping leading nulls and applying the following transformations:
+   * COALESCE(null, a, b) -> COALESCE(a, b);
+   * COALESCE(<literal>, a, b) -> <literal>, when literal is not NullLiteral;
+   * COALESCE(<partition-slotref>, a, b) -> <partition-slotref>,
+   * when the partition column does not contain NULL.
+   */
+  private Expr simplifyCoalesceFunctionCallExpr(FunctionCallExpr expr) {
+    int numChildren = expr.getChildren().size();
+    Expr result = NullLiteral.create(expr.getType());
+    for (int i = 0; i < numChildren; ++i) {
+      Expr childExpr = expr.getChildren().get(i);
+      // Skip leading nulls.
+      if (childExpr.isNullLiteral()) continue;
+      if ((i == numChildren - 1) || canSimplifyCoalesceUsingChild(childExpr)) {
+        result = childExpr;
+      } else if (i == 0) {
+        result = expr;
+      } else {
+        List<Expr> newChildren = Lists.newArrayList(expr.getChildren().subList(i, numChildren));
+        result = new FunctionCallExpr(expr.getFnName(), newChildren);
+      }
+      break;
+    }
+    return result;
+  }
+
+  /**
+   * Checks if the given child expr is nullable. Returns true if one of the following holds:
+   * child is a non-NULL literal;
+   * child is a possibly cast SlotRef against a non-nullable slot;
+   * child is a possible cast SlotRef against a partition column that does not contain NULL.
+   */
+  private boolean canSimplifyCoalesceUsingChild(Expr child) {
+    if (child.isLiteral() && !child.isNullLiteral()) return true;
+
+    SlotRef slotRef = child.unwrapSlotRef(false);
+    if (slotRef == null) return false;
+    SlotDescriptor slotDesc = slotRef.getDesc();
+    if (!slotDesc.getIsNullable()) return true;
+    // Check partition column using partition metadata.
+    if (slotDesc.getParent().getTable() instanceof HdfsTable
+        && slotDesc.getColumn() != null
+        && slotDesc.getParent().getTable().isClusteringColumn(slotDesc.getColumn())) {
+      HdfsTable table = (HdfsTable) slotDesc.getParent().getTable();
+      // Return true if the partition column does not have a NULL value.
+      if (table.getNullPartitionIds(slotDesc.getColumn().getPosition()).isEmpty()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private Expr simplifyFunctionCallExpr(FunctionCallExpr expr) {
     FunctionName fnName = expr.getFnName();
 
     // TODO: Add the other conditional functions, eg. ifnull, istrue, etc.
     if (fnName.getFunction().equals("if")) {
-      Preconditions.checkState(expr.getChildren().size() == 3);
-      if (expr.getChild(0) instanceof BoolLiteral) {
-        if (((BoolLiteral) expr.getChild(0)).getValue()) {
-          // IF(TRUE)
-          return expr.getChild(1);
-        } else {
-          // IF(FALSE)
-          return expr.getChild(2);
-        }
-      } else if (expr.getChild(0) instanceof NullLiteral) {
-        // IF(NULL)
-        return expr.getChild(2);
-      }
+      return simplifyIfFunctionCallExpr(expr);
+    } else if (fnName.getFunction().equals("coalesce")) {
+      return simplifyCoalesceFunctionCallExpr(expr);
     }
     return expr;
   }

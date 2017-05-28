@@ -42,12 +42,22 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
 
   public Expr RewritesOk(String expr, ExprRewriteRule rule, String expectedExpr)
       throws AnalysisException {
-    return RewritesOk(expr, Lists.newArrayList(rule), expectedExpr);
+    return RewritesOk("functional.alltypessmall", expr, rule, expectedExpr);
+  }
+
+  public Expr RewritesOk(String tableName, String expr, ExprRewriteRule rule, String expectedExpr)
+      throws AnalysisException {
+    return RewritesOk(tableName, expr, Lists.newArrayList(rule), expectedExpr);
   }
 
   public Expr RewritesOk(String expr, List<ExprRewriteRule> rules, String expectedExpr)
       throws AnalysisException {
-    String stmtStr = "select " + expr + " from functional.alltypessmall";
+    return RewritesOk("functional.alltypessmall", expr, rules, expectedExpr);
+  }
+
+  public Expr RewritesOk(String tableName, String expr, List<ExprRewriteRule> rules,
+      String expectedExpr) throws AnalysisException {
+    String stmtStr = "select " + expr + " from " + tableName;
     SelectStmt stmt = (SelectStmt) ParsesOk(stmtStr);
     Analyzer analyzer = createAnalyzer(Catalog.DEFAULT_DB);
     stmt.analyze(analyzer);
@@ -333,6 +343,39 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("case when true then 0 when false then sum(id) end", rule, null);
     RewritesOk(
         "case when true then count(id) when false then sum(id) end", rule, "count(id)");
+
+    // IMPALA-5016: Simplify COALESCE function
+    // Test skipping leading nulls.
+    RewritesOk("coalesce(null, id, year)", rule, "coalesce(id, year)");
+    RewritesOk("coalesce(null, 1, id)", rule, "1");
+    RewritesOk("coalesce(null, null, id)", rule, "id");
+    // If the leading parameter is a non-NULL constant, rewrite to that constant.
+    RewritesOk("coalesce(1, id, year)", rule, "1");
+    // If COALESCE has only one parameter, rewrite to the parameter.
+    RewritesOk("coalesce(id)", rule, "id");
+    // If all parameters are NULL, rewrite to NULL.
+    RewritesOk("coalesce(null, null)", rule, "NULL");
+    // Do not rewrite non-literal constant exprs, rely on constant folding.
+    RewritesOk("coalesce(null is null, id)", rule, null);
+    RewritesOk("coalesce(10 + null, id)", rule, null);
+    // Combine COALESCE rule with FoldConstantsRule.
+    RewritesOk("coalesce(1 + 2, id, year)", rules, "3");
+    RewritesOk("coalesce(null is null, bool_col)", rules, "TRUE");
+    RewritesOk("coalesce(10 + null, id, year)", rules, "coalesce(id, year)");
+    // If the leading parameter is partition column, try to rewrite with partition metadata.
+    RewritesOk("coalesce(year, id)", rule, "year");
+    RewritesOk("coalesce(year, bigint_col)", rule, "year");
+    RewritesOk("coalesce(cast(year as string), string_col)", rule, "CAST(year AS STRING)");
+    RewritesOk("coalesce(id, year)", rule, null);
+    RewritesOk("coalesce(null, year, id)", rule, "year");
+    // If the leading partition column has NULL value, do not rewrite.
+    RewritesOk("functional.alltypesagg", "coalesce(year, id)", rule, "year");
+    RewritesOk("functional.alltypesagg", "coalesce(day, id)", rule, null);
+    // If the leading column is not nullable, rewrite to the column.
+    RewritesOk("functional_kudu.alltypessmall", "coalesce(id, year)", rule, "id");
+    RewritesOk("functional_kudu.alltypessmall", "coalesce(cast(id as string), string_col)", rule,
+        "CAST(id AS STRING)");
+    RewritesOk("functional_kudu.alltypessmall", "coalesce(null, id, year)", rule, "id");
   }
 
   @Test
