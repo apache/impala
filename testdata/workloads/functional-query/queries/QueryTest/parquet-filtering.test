@@ -247,3 +247,15 @@ select count(*) from tpch_nested_parquet.customer where c_mktsegment = 'COMEDY';
 aggregation(SUM, NumRowGroups): 4
 aggregation(SUM, NumDictFilteredRowGroups): 4
 ====
+---- QUERY
+# Verify that parquet_dictionary_filtering=false turns off dictionary filtering
+# This query filters 8/8 row groups when filtering is on. It should now filter
+# zero.
+set parquet_dictionary_filtering=false;
+select count(*) from functional_parquet.alltypes where mod(id,10000) = 7301;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 24
+aggregation(SUM, NumDictFilteredRowGroups): 0
+====
