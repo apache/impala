@@ -51,6 +51,11 @@ DEFINE_int32(num_remote_hdfs_io_threads, 8, "number of remote HDFS I/O threads")
 // open to S3 and use of multiple CPU cores since S3 reads are relatively compute
 // expensive (SSL and JNI buffer overheads).
 DEFINE_int32(num_s3_io_threads, 16, "number of S3 I/O threads");
+// The maximum number of ADLS I/O threads. This number is a good default to have for
+// clusters that may vary widely in size, due to an undocumented concurrency limit
+// enforced by ADLS for a cluster, which spans between 500-700. For smaller clusters
+// (~10 nodes), 64 threads would be more ideal.
+DEFINE_int32(num_adls_io_threads, 16, "number of ADLS I/O threads");
 // The read size is the size of the reads sent to hdfs/os.
 // There is a trade off of latency and throughout, trying to keep disks busy but
 // not introduce seeks.  The literature seems to agree that with 8 MB reads, random
@@ -388,6 +393,8 @@ Status DiskIoMgr::Init(MemTracker* process_mem_tracker) {
       num_threads_per_disk = FLAGS_num_remote_hdfs_io_threads;
     } else if (i == RemoteS3DiskId()) {
       num_threads_per_disk = FLAGS_num_s3_io_threads;
+    } else if (i == RemoteAdlsDiskId()) {
+      num_threads_per_disk = FLAGS_num_adls_io_threads;
     } else if (num_threads_per_disk_ != 0) {
       num_threads_per_disk = num_threads_per_disk_;
     } else if (DiskInfo::is_rotational(i)) {
@@ -1248,9 +1255,11 @@ int DiskIoMgr::AssignQueue(const char* file, int disk_id, bool expected_local) {
       return RemoteDfsDiskId();
     }
     if (IsS3APath(file)) return RemoteS3DiskId();
+    if (IsADLSPath(file)) return RemoteAdlsDiskId();
   }
   // Assign to a local disk queue.
   DCHECK(!IsS3APath(file)); // S3 is always remote.
+  DCHECK(!IsADLSPath(file)); // ADLS is always remote.
   if (disk_id == -1) {
     // disk id is unknown, assign it an arbitrary one.
     disk_id = next_disk_id_.Add(1);

@@ -33,6 +33,13 @@ DEFINE_bool(use_hdfs_pread, false, "Enables using hdfsPread() instead of hdfsRea
     "when performing HDFS read operations. This is necessary to use HDFS hedged reads "
     "(assuming the HDFS client is configured to do so).");
 
+// TODO: Run perf tests and empirically settle on the most optimal default value for the
+// read buffer size. Currently setting it as 128k for the same reason as for S3, i.e.
+// due to JNI array allocation and memcpy overhead, 128k was emperically found to have the
+// least overhead.
+DEFINE_int64(adls_read_chunk_size, 128 * 1024, "The maximum read chunk size to use when "
+    "reading from ADLS.");
+
 // Implementation of the ScanRange functionality. Each ScanRange contains a queue
 // of ready buffers. For each ScanRange, there is only a single producer and
 // consumer thread, i.e. only one disk thread will push to a scan range at
@@ -388,6 +395,10 @@ int64_t DiskIoMgr::ScanRange::MaxReadChunkSize() const {
   if (disk_id_ == io_mgr_->RemoteS3DiskId()) {
     DCHECK(IsS3APath(file()));
     return 128 * 1024;
+  }
+  if (disk_id_ == io_mgr_->RemoteAdlsDiskId()) {
+    DCHECK(IsADLSPath(file()));
+    return FLAGS_adls_read_chunk_size;
   }
   // The length argument of hdfsRead() is an int. Ensure we don't overflow it.
   return numeric_limits<int>::max();
