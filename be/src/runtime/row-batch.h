@@ -214,7 +214,7 @@ class RowBatch {
   void Reset();
 
   /// Add io buffer to this row batch.
-  void AddIoBuffer(DiskIoMgr::BufferDescriptor* buffer);
+  void AddIoBuffer(std::unique_ptr<DiskIoMgr::BufferDescriptor> buffer);
 
   /// Adds a block to this row batch. The block must be pinned. The blocks must be
   /// deleted when freeing resources. The block's memory remains accounted against
@@ -432,7 +432,7 @@ class RowBatch {
   /// IO buffers current owned by this row batch. Ownership of IO buffers transfer
   /// between row batches. Any IO buffer will be owned by at most one row batch
   /// (i.e. they are not ref counted) so most row batches don't own any.
-  std::vector<DiskIoMgr::BufferDescriptor*> io_buffers_;
+  std::vector<std::unique_ptr<DiskIoMgr::BufferDescriptor>> io_buffers_;
 
   /// Blocks attached to this row batch. The underlying memory and block manager client
   /// are owned by the BufferedBlockMgr.

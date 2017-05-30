@@ -113,33 +113,33 @@ class DiskIoMgrTest : public testing::Test {
 
   static void ValidateSyncRead(DiskIoMgr* io_mgr, DiskIoRequestContext* reader,
       DiskIoMgr::ScanRange* range, const char* expected, int expected_len = -1) {
-    DiskIoMgr::BufferDescriptor* buffer;
+    unique_ptr<DiskIoMgr::BufferDescriptor> buffer;
     ASSERT_OK(io_mgr->Read(reader, range, &buffer));
     ASSERT_TRUE(buffer != NULL);
     EXPECT_EQ(buffer->len(), range->len());
     if (expected_len < 0) expected_len = strlen(expected);
     int cmp = memcmp(buffer->buffer(), expected, expected_len);
     EXPECT_TRUE(cmp == 0);
-    buffer->Return();
+    io_mgr->ReturnBuffer(move(buffer));
   }
 
-  static void ValidateScanRange(DiskIoMgr::ScanRange* range, const char* expected,
-      int expected_len, const Status& expected_status) {
+  static void ValidateScanRange(DiskIoMgr* io_mgr, DiskIoMgr::ScanRange* range,
+      const char* expected, int expected_len, const Status& expected_status) {
     char result[expected_len + 1];
     memset(result, 0, expected_len + 1);
 
     while (true) {
-      DiskIoMgr::BufferDescriptor* buffer = NULL;
+      unique_ptr<DiskIoMgr::BufferDescriptor> buffer;
       Status status = range->GetNext(&buffer);
       ASSERT_TRUE(status.ok() || status.code() == expected_status.code());
       if (buffer == NULL || !status.ok()) {
-        if (buffer != NULL) buffer->Return();
+        if (buffer != NULL) io_mgr->ReturnBuffer(move(buffer));
         break;
       }
       ASSERT_LE(buffer->len(), expected_len);
       memcpy(result + range->offset() + buffer->scan_range_offset(),
           buffer->buffer(), buffer->len());
-      buffer->Return();
+      io_mgr->ReturnBuffer(move(buffer));
     }
     ValidateEmptyOrCorrect(expected, result, expected_len);
   }
@@ -155,7 +155,7 @@ class DiskIoMgrTest : public testing::Test {
       Status status = io_mgr->GetNextRange(reader, &range);
       ASSERT_TRUE(status.ok() || status.code() == expected_status.code());
       if (range == NULL) break;
-      ValidateScanRange(range, expected_result, expected_len, expected_status);
+      ValidateScanRange(io_mgr, range, expected_result, expected_len, expected_status);
       num_ranges_processed->Add(1);
       ++num_ranges;
     }
@@ -653,7 +653,7 @@ TEST_F(DiskIoMgrTest, MemLimits) {
     ASSERT_OK(io_mgr.AddScanRanges(reader, ranges));
 
     // Don't return buffers to force memory pressure
-    vector<DiskIoMgr::BufferDescriptor*> buffers;
+    vector<unique_ptr<DiskIoMgr::BufferDescriptor>> buffers;
 
     AtomicInt32 num_ranges_processed;
     ScanRangeThread(&io_mgr, reader, data, strlen(data), Status::MemLimitExceeded(),
@@ -670,19 +670,19 @@ TEST_F(DiskIoMgrTest, MemLimits) {
       if (range == NULL) break;
 
       while (true) {
-        DiskIoMgr::BufferDescriptor* buffer = NULL;
+        unique_ptr<DiskIoMgr::BufferDescriptor> buffer;
         Status status = range->GetNext(&buffer);
         ASSERT_TRUE(status.ok() || status.IsMemLimitExceeded());
         if (buffer == NULL) break;
         memcpy(result + range->offset() + buffer->scan_range_offset(),
             buffer->buffer(), buffer->len());
-        buffers.push_back(buffer);
+        buffers.push_back(move(buffer));
       }
       ValidateEmptyOrCorrect(data, result, strlen(data));
     }
 
     for (int i = 0; i < buffers.size(); ++i) {
-      buffers[i]->Return();
+      io_mgr.ReturnBuffer(move(buffers[i]));
     }
 
     EXPECT_TRUE(io_mgr.context_status(reader).IsMemLimitExceeded());
@@ -964,12 +964,13 @@ TEST_F(DiskIoMgrTest, Buffers) {
 
   // buffer length should be rounded up to min buffer size
   int64_t buffer_len = 1;
-  DiskIoMgr::BufferDescriptor* buffer_desc;
+  unique_ptr<DiskIoMgr::BufferDescriptor> buffer_desc;
   buffer_desc = io_mgr.GetFreeBuffer(reader, dummy_range, buffer_len);
   EXPECT_TRUE(buffer_desc->buffer() != NULL);
   EXPECT_EQ(min_buffer_size, buffer_desc->buffer_len());
   EXPECT_EQ(1, io_mgr.num_allocated_buffers_.Load());
-  io_mgr.FreeBufferMemory(buffer_desc);
+  io_mgr.FreeBufferMemory(buffer_desc.get());
+  io_mgr.ReturnBuffer(move(buffer_desc));
   EXPECT_EQ(min_buffer_size, root_mem_tracker.consumption());
 
   // reuse buffer
@@ -978,7 +979,8 @@ TEST_F(DiskIoMgrTest, Buffers) {
   EXPECT_TRUE(buffer_desc->buffer() != NULL);
   EXPECT_EQ(min_buffer_size, buffer_desc->buffer_len());
   EXPECT_EQ(1, io_mgr.num_allocated_buffers_.Load());
-  io_mgr.FreeBufferMemory(buffer_desc);
+  io_mgr.FreeBufferMemory(buffer_desc.get());
+  io_mgr.ReturnBuffer(move(buffer_desc));
   EXPECT_EQ(min_buffer_size, root_mem_tracker.consumption());
 
   // bump up to next buffer size
@@ -994,7 +996,8 @@ TEST_F(DiskIoMgrTest, Buffers) {
   EXPECT_EQ(1, io_mgr.num_allocated_buffers_.Load());
   EXPECT_EQ(min_buffer_size * 2, root_mem_tracker.consumption());
 
-  io_mgr.FreeBufferMemory(buffer_desc);
+  io_mgr.FreeBufferMemory(buffer_desc.get());
+  io_mgr.ReturnBuffer(move(buffer_desc));
 
   // max buffer size
   buffer_len = max_buffer_size;
@@ -1002,7 +1005,8 @@ TEST_F(DiskIoMgrTest, Buffers) {
   EXPECT_TRUE(buffer_desc->buffer() != NULL);
   EXPECT_EQ(max_buffer_size, buffer_desc->buffer_len());
   EXPECT_EQ(2, io_mgr.num_allocated_buffers_.Load());
-  io_mgr.FreeBufferMemory(buffer_desc);
+  io_mgr.FreeBufferMemory(buffer_desc.get());
+  io_mgr.ReturnBuffer(move(buffer_desc));
   EXPECT_EQ(min_buffer_size * 2 + max_buffer_size, root_mem_tracker.consumption());
 
   // gc buffers
@@ -1034,12 +1038,12 @@ TEST_F(DiskIoMgrTest, PartialRead) {
 
   // We should not read past the end of file.
   DiskIoMgr::ScanRange* range = InitRange(1, tmp_file, 0, read_len, 0, stat_val.st_mtime);
-  DiskIoMgr::BufferDescriptor* buffer;
+  unique_ptr<DiskIoMgr::BufferDescriptor> buffer;
   ASSERT_OK(io_mgr->Read(reader, range, &buffer));
   ASSERT_TRUE(buffer->eosr());
   ASSERT_EQ(len, buffer->len());
   ASSERT_TRUE(memcmp(buffer->buffer(), data, len) == 0);
-  buffer->Return();
+  io_mgr->ReturnBuffer(move(buffer));
 
   io_mgr->UnregisterContext(reader);
   pool_.reset();
@@ -1073,7 +1077,7 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBuffer) {
         DiskIoMgr::BufferOpts::ReadInto(&client_buffer[0], buffer_len));
     ASSERT_OK(io_mgr->AddScanRange(reader, range, true));
 
-    DiskIoMgr::BufferDescriptor* io_buffer;
+    unique_ptr<DiskIoMgr::BufferDescriptor> io_buffer;
     ASSERT_OK(range->GetNext(&io_buffer));
     ASSERT_TRUE(io_buffer->eosr());
     ASSERT_EQ(scan_len, io_buffer->len());
@@ -1082,7 +1086,7 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBuffer) {
 
     // DiskIoMgr should not have allocated memory.
     EXPECT_EQ(mem_tracker.consumption(), 0);
-    io_buffer->Return();
+    io_mgr->ReturnBuffer(move(io_buffer));
   }
 
   io_mgr->UnregisterContext(reader);
@@ -1115,7 +1119,7 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBufferError) {
     /// the read fails before the cancellation.
     if (i >= 1) io_mgr->CancelContext(reader);
 
-    DiskIoMgr::BufferDescriptor* io_buffer;
+    unique_ptr<DiskIoMgr::BufferDescriptor> io_buffer;
     ASSERT_FALSE(range->GetNext(&io_buffer).ok());
 
     // DiskIoMgr should not have allocated memory.

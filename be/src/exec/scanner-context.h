@@ -19,6 +19,8 @@
 #ifndef IMPALA_EXEC_SCANNER_CONTEXT_H
 #define IMPALA_EXEC_SCANNER_CONTEXT_H
 
+#include <deque>
+
 #include <boost/cstdint.hpp>
 #include <boost/scoped_ptr.hpp>
 
@@ -198,7 +200,7 @@ class ScannerContext {
     int64_t next_read_past_size_bytes_;
 
     /// The current io buffer. This starts as NULL before we've read any bytes.
-    DiskIoMgr::BufferDescriptor* io_buffer_;
+    std::unique_ptr<DiskIoMgr::BufferDescriptor> io_buffer_;
 
     /// Next byte to read in io_buffer_
     uint8_t* io_buffer_pos_;
@@ -230,7 +232,7 @@ class ScannerContext {
     /// On the next GetBytes() call, these buffers are released (the caller by calling
     /// GetBytes() signals it is done with its previous bytes).  At this point the
     /// buffers are either returned to the io mgr or attached to the current row batch.
-    std::list<DiskIoMgr::BufferDescriptor*> completed_io_buffers_;
+    std::deque<std::unique_ptr<DiskIoMgr::BufferDescriptor>> completed_io_buffers_;
 
     Stream(ScannerContext* parent);
 

@@ -18,6 +18,7 @@
 #include "runtime/row-batch.h"
 
 #include <stdint.h> // for intptr_t
+#include <memory>
 #include <boost/scoped_ptr.hpp>
 
 #include "gen-cpp/Results_types.h"
@@ -153,7 +154,7 @@ RowBatch::RowBatch(
 RowBatch::~RowBatch() {
   tuple_data_pool_.FreeAll();
   for (int i = 0; i < io_buffers_.size(); ++i) {
-    io_buffers_[i]->Return();
+    ExecEnv::GetInstance()->disk_io_mgr()->ReturnBuffer(move(io_buffers_[i]));
   }
   for (int i = 0; i < blocks_.size(); ++i) {
     blocks_[i]->Delete();
@@ -295,11 +296,11 @@ void RowBatch::SerializeInternal(int64_t size, DedupMap* distinct_tuples,
   DCHECK_EQ(offset, size);
 }
 
-void RowBatch::AddIoBuffer(DiskIoMgr::BufferDescriptor* buffer) {
+void RowBatch::AddIoBuffer(unique_ptr<DiskIoMgr::BufferDescriptor> buffer) {
   DCHECK(buffer != NULL);
-  io_buffers_.push_back(buffer);
   auxiliary_mem_usage_ += buffer->buffer_len();
   buffer->TransferOwnership(mem_tracker_);
+  io_buffers_.emplace_back(move(buffer));
 }
 
 void RowBatch::AddBlock(BufferedBlockMgr::Block* block, FlushMode flush) {
@@ -326,7 +327,7 @@ void RowBatch::Reset() {
   // TODO: Change this to Clear() and investigate the repercussions.
   tuple_data_pool_.FreeAll();
   for (int i = 0; i < io_buffers_.size(); ++i) {
-    io_buffers_[i]->Return();
+    ExecEnv::GetInstance()->disk_io_mgr()->ReturnBuffer(move(io_buffers_[i]));
   }
   io_buffers_.clear();
   for (int i = 0; i < blocks_.size(); ++i) {
@@ -349,7 +350,7 @@ void RowBatch::Reset() {
 void RowBatch::TransferResourceOwnership(RowBatch* dest) {
   dest->tuple_data_pool_.AcquireData(&tuple_data_pool_, false);
   for (int i = 0; i < io_buffers_.size(); ++i) {
-    dest->AddIoBuffer(io_buffers_[i]);
+    dest->AddIoBuffer(move(io_buffers_[i]));
   }
   io_buffers_.clear();
   for (int i = 0; i < blocks_.size(); ++i) {

@@ -47,7 +47,7 @@ DEFINE_int64(adls_read_chunk_size, 128 * 1024, "The maximum read chunk size to u
 // that buffers are queued and read in file order.
 
 // This must be called with the reader lock taken.
-bool DiskIoMgr::ScanRange::EnqueueBuffer(BufferDescriptor* buffer) {
+bool DiskIoMgr::ScanRange::EnqueueBuffer(unique_ptr<BufferDescriptor> buffer) {
   {
     unique_lock<mutex> scan_range_lock(lock_);
     DCHECK(Validate()) << DebugString();
@@ -60,12 +60,12 @@ bool DiskIoMgr::ScanRange::EnqueueBuffer(BufferDescriptor* buffer) {
         reader_->num_buffers_in_reader_.Add(1);
       }
       reader_->num_used_buffers_.Add(-1);
-      buffer->Return();
+      io_mgr_->ReturnBuffer(move(buffer));
       return false;
     }
     reader_->num_ready_buffers_.Add(1);
-    ready_buffers_.push_back(buffer);
     eosr_queued_ = buffer->eosr();
+    ready_buffers_.emplace_back(move(buffer));
 
     blocked_on_queue_ = ready_buffers_.size() >= ready_buffers_capacity_;
     if (blocked_on_queue_ && ready_buffers_capacity_ > MIN_QUEUE_CAPACITY) {
@@ -81,9 +81,8 @@ bool DiskIoMgr::ScanRange::EnqueueBuffer(BufferDescriptor* buffer) {
   return blocked_on_queue_;
 }
 
-Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
-  *buffer = nullptr;
-
+Status DiskIoMgr::ScanRange::GetNext(unique_ptr<BufferDescriptor>* buffer) {
+  DCHECK(*buffer == nullptr);
   {
     unique_lock<mutex> scan_range_lock(lock_);
     if (eosr_returned_) return Status::OK();
@@ -107,7 +106,7 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
 
     // Remove the first ready buffer from the queue and return it
     DCHECK(!ready_buffers_.empty());
-    *buffer = ready_buffers_.front();
+    *buffer = move(ready_buffers_.front());
     ready_buffers_.pop_front();
     eosr_returned_ = (*buffer)->eosr();
   }
@@ -121,8 +120,7 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
 
   Status status = (*buffer)->status_;
   if (!status.ok()) {
-    (*buffer)->Return();
-    *buffer = nullptr;
+    io_mgr_->ReturnBuffer(move(*buffer));
     return status;
   }
 
@@ -138,8 +136,7 @@ Status DiskIoMgr::ScanRange::GetNext(BufferDescriptor** buffer) {
   if (reader_->state_ == DiskIoRequestContext::Cancelled) {
     reader_->blocked_ranges_.Remove(this);
     Cancel(reader_->status_);
-    (*buffer)->Return();
-    *buffer = nullptr;
+    io_mgr_->ReturnBuffer(move(*buffer));
     return status_;
   }
 
@@ -184,8 +181,7 @@ void DiskIoMgr::ScanRange::CleanupQueuedBuffers() {
   reader_->num_ready_buffers_.Add(-ready_buffers_.size());
 
   while (!ready_buffers_.empty()) {
-    BufferDescriptor* buffer = ready_buffers_.front();
-    buffer->Return();
+    io_mgr_->ReturnBuffer(move(ready_buffers_.front()));
     ready_buffers_.pop_front();
   }
 }
@@ -605,13 +601,13 @@ Status DiskIoMgr::ScanRange::ReadFromCache(bool* read_succeeded) {
   // Create a single buffer desc for the entire scan range and enqueue that.
   // 'mem_tracker' is nullptr because the memory is owned by the HDFS java client,
   // not the Impala backend.
-  BufferDescriptor* desc = io_mgr_->GetBufferDesc(reader_, nullptr, this,
-      reinterpret_cast<uint8_t*>(buffer), 0);
+  unique_ptr<BufferDescriptor> desc = unique_ptr<BufferDescriptor>(new BufferDescriptor(
+      io_mgr_, reader_, this, reinterpret_cast<uint8_t*>(buffer), 0, nullptr));
   desc->len_ = bytes_read;
   desc->scan_range_offset_ = 0;
   desc->eosr_ = true;
   bytes_read_ = bytes_read;
-  EnqueueBuffer(desc);
+  EnqueueBuffer(move(desc));
   if (reader_->bytes_read_counter_ != nullptr) {
     COUNTER_ADD(reader_->bytes_read_counter_, bytes_read);
   }
