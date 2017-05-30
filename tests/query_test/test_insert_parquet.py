@@ -161,10 +161,6 @@ class TestInsertParquetVerifySize(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension("compression_codec", *PARQUET_CODECS))
 
-  # ADLS does not have a configurable block size, so the 'PARQUET_FILE_SIZE' option
-  # that's passed as a hint to Hadoop is ignored for AdlFileSystem. So, we skip this
-  # test for ADLS.
-  @SkipIfADLS.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.hdfs_client
   def test_insert_parquet_verify_size(self, vector, unique_database):
