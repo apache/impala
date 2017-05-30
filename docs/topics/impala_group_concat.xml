@@ -45,9 +45,7 @@ under the License.
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
-<!-- Might allow DISTINCT at some point. Check: does it allow ALL now? -->
-
-<codeblock>GROUP_CONCAT([ALL] <varname>expression</varname> [, <varname>separator</varname>])</codeblock>
+<codeblock>GROUP_CONCAT([ALL<ph rev="IMPALA-4730"> | DISTINCT</ph>] <varname>expression</varname> [, <varname>separator</varname>])</codeblock>
 
     <p conref="../shared/impala_common.xml#common/concat_blurb"/>
 
@@ -59,12 +57,6 @@ under the License.
 
     <p>
       <b>Return type:</b> <codeph>STRING</codeph>
-    </p>
-
-    <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
-
-    <p>
-      You cannot apply the <codeph>DISTINCT</codeph> operator to the argument of this function.
     </p>
 
     <p conref="../shared/impala_common.xml#common/analytic_not_allowed_caveat"/>
@@ -98,6 +90,20 @@ under the License.
 +---------------------------------+
 | 1, 3, 2, 1                      |
 +---------------------------------+
+</codeblock>
+
+    <p rev="IMPALA-4730">
+      Specify the <codeph>DISTINCT</codeph> keyword to eliminate duplicate values from
+      the concatenated result:
+    </p>
+
+<codeblock rev="IMPALA-4730">
+[localhost:21000] &gt; select group_concat(distinct s) from t1;
++--------------------------+
+| group_concat(distinct s) |
++--------------------------+
+| three, two, one          |
++--------------------------+
 </codeblock>
 
     <p>
