@@ -73,4 +73,5 @@ class ADLSClient(BaseFilesystem):
   def get_all_file_sizes(self, path):
     """Returns a list of integers which are all the file sizes of files found under
     'path'."""
-    return [self.adlsclient.info(f)['length'] for f in self.ls(path)]
+    return [self.adlsclient.info(f)['length'] for f in self.adlsclient.ls(path) \
+        if self.adlsclient.info(f)['type'] == 'FILE']

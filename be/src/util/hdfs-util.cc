@@ -85,6 +85,13 @@ bool IsS3APath(const char* path) {
   return strncmp(path, "s3a://", 6) == 0;
 }
 
+bool IsADLSPath(const char* path) {
+  if (strstr(path, ":/") == NULL) {
+    return ExecEnv::GetInstance()->default_fs().compare(0, 6, "adl://") == 0;
+  }
+  return strncmp(path, "adl://", 6) == 0;
+}
+
 // Returns the length of the filesystem name in 'path' which is the length of the
 // 'scheme://authority'. Returns 0 if the path is unqualified.
 static int GetFilesystemNameLength(const char* path) {
