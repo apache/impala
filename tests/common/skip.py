@@ -85,6 +85,9 @@ class SkipIf:
   not_hdfs = pytest.mark.skipif(not IS_HDFS, reason="HDFS Filesystem needed")
   no_secondary_fs = pytest.mark.skipif(not SECONDARY_FILESYSTEM,
       reason="Secondary filesystem needed")
+  no_file_handle_caching = pytest.mark.skipif(IS_S3 or IS_ADLS or IS_ISILON or \
+      pytest.config.option.testing_remote_cluster,
+      reason="File handle caching needed")
 
 class SkipIfIsilon:
   caching = pytest.mark.skipif(IS_ISILON, reason="SET CACHED not implemented for Isilon")

@@ -106,6 +106,7 @@ HdfsFileHandle* FileHandleCache<NUM_PARTITIONS>::GetFileHandle(
 template <size_t NUM_PARTITIONS>
 void FileHandleCache<NUM_PARTITIONS>::ReleaseFileHandle(std::string* fname,
     HdfsFileHandle* fh, bool destroy_handle) {
+  DCHECK(fh != nullptr);
   // Hash the key and get appropriate partition
   int index = HashUtil::Hash(fname->data(), fname->size(), 0) % NUM_PARTITIONS;
   FileHandleCachePartition& p = cache_partitions_[index];

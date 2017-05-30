@@ -1279,9 +1279,11 @@ Status DiskIoMgr::ReopenCachedHdfsFileHandle(const hdfsFS& fs, std::string* fnam
     int64_t mtime, HdfsFileHandle** fid) {
   bool dummy;
   file_handle_cache_.ReleaseFileHandle(fname, *fid, true);
-  HdfsFileHandle* fh = file_handle_cache_.GetFileHandle(fs, fname, mtime, true,
+  // The old handle has been destroyed, so *fid must be overwritten before returning.
+  *fid = file_handle_cache_.GetFileHandle(fs, fname, mtime, true,
       &dummy);
-  if (!fh) return Status(GetHdfsErrorMsg("Failed to open HDFS file ", fname->data()));
-  *fid = fh;
+  if (*fid == nullptr) {
+    return Status(GetHdfsErrorMsg("Failed to open HDFS file ", fname->data()));
+  }
   return Status::OK();
 }
