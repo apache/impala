@@ -3418,7 +3418,7 @@ sudo pip-python install ssl</codeblock>
       </p>
 
       <p id="kudu_unsupported_data_type" rev="kudu">
-        Currently, the data types <codeph>DECIMAL</codeph>, <codeph>TIMESTAMP</codeph>, <codeph>CHAR</codeph>, <codeph>VARCHAR</codeph>,
+        Currently, the data types <codeph>DECIMAL</codeph>, <codeph>CHAR</codeph>, <codeph>VARCHAR</codeph>,
         <codeph>ARRAY</codeph>, <codeph>MAP</codeph>, and <codeph>STRUCT</codeph> cannot be used with Kudu tables.
       </p>
 
@@ -3483,6 +3483,49 @@ CREATE EXTERNAL TABLE impala_name STORED AS KUDU
         Because non-SQL APIs can access Kudu data without going through Sentry
         authorization, currently the Sentry support is considered preliminary
         and subject to change.
+      </p>
+
+      <p rev="2.9.0 IMPALA-5137" id="kudu_timestamp_nanoseconds_caveat">
+        The nanosecond portion of an Impala <codeph>TIMESTAMP</codeph> value
+        is rounded to the nearest microsecond when that value is stored in a
+        Kudu table.
+      </p>
+
+      <p rev="2.9.0 IMPALA-5137" id="kudu_timestamp_details">
+        In <keyword keyref="impala29_full"/> and higher, you can include <codeph>TIMESTAMP</codeph>
+        columns in Kudu tables, instead of representing the date and time as a <codeph>BIGINT</codeph>
+        value. The behavior of <codeph>TIMESTAMP</codeph> for Kudu tables has some special considerations:
+
+        <ul>
+          <li>
+            <p>
+              Any nanoseconds in the original 96-bit value produced by Impala are not stored, because
+              Kudu represents date/time columns using 64-bit values. The nanosecond portion of the value
+              is rounded, not truncated. Therefore, a <codeph>TIMESTAMP</codeph> value
+              that you store in a Kudu table might not be bit-for-bit identical to the value returned by a query.
+            </p>
+          </li>
+          <li>
+            <p>
+              The conversion between the Impala 96-bit representation and the Kudu 64-bit representation
+              introduces some performance overhead when reading or writing <codeph>TIMESTAMP</codeph>
+              columns. You can minimize the overhead during writes by performing inserts through the
+              Kudu API. Because the overhead during reads applies to each query, you might continue to
+              use a <codeph>BIGINT</codeph> column to represent date/time values  in performance-critical
+              applications.
+            </p>
+          </li>
+          <li>
+            <p>
+              The Impala <codeph>TIMESTAMP</codeph> type has a narrower range for years than the underlying
+              Kudu data type. Impala can represent years 1400-9999. If year values outside this range
+              are written to a Kudu table by a non-Impala client, Impala returns <codeph>NULL</codeph>
+              by default when reading those <codeph>TIMESTAMP</codeph> values during a query. Or, if the
+              <codeph>ABORT_ON_ERROR</codeph> query option is enabled, the query fails when it encounters
+              a value with an out-of-range year.
+            </p>
+          </li>
+        </ul>
       </p>
 
     </section>

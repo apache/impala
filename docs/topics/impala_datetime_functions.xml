@@ -1618,6 +1618,8 @@ with t1 as (select trunc(now(), 'dd') as today)
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
           </p>
+          <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+          <p conref="../shared/impala_common.xml#common/kudu_timestamp_nanoseconds_caveat"/>
           <p conref="../shared/impala_common.xml#common/example_blurb"/>
 <codeblock>
 select now() as right_now, nanoseconds_add(now(), 1) as 1_nanosecond_later;
@@ -1652,6 +1654,8 @@ select now() as right_now, nanoseconds_add(now(), 1e9) as 1_second_later;
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
           </p>
+          <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+          <p conref="../shared/impala_common.xml#common/kudu_timestamp_nanoseconds_caveat"/>
 <codeblock>
 select now() as right_now, nanoseconds_sub(now(), 1) as 1_nanosecond_earlier;
 +-------------------------------+-------------------------------+

@@ -825,8 +825,7 @@ sales = hdfs://ha-nn-uri/etc/access/sales.ini
 
         <p>
           To enable URIs in per-DB policy files, the Java configuration option <codeph>sentry.allow.uri.db.policyfile</codeph>
-          must be set to <codeph>true</codeph>.
-	  For example:
+          must be set to <codeph>true</codeph>. For example:
         </p>
 
 <codeblock>JAVA_TOOL_OPTIONS="-Dsentry.allow.uri.db.policyfile=true"

@@ -963,9 +963,36 @@ partition by hash (school) partitions 10,
 
       <conbody>
 
+        <p conref="../shared/impala_common.xml#common/kudu_timestamp_details"/>
+
+<codeblock rev="2.9.0 IMPALA-5137"><![CDATA[--- Make a table representing a date/time value as TIMESTAMP.
+-- The strings representing the partition bounds are automatically
+-- cast to TIMESTAMP values.
+create table native_timestamp(id bigint, when_exactly timestamp, event string, primary key (id, when_exactly))
+  partition by hash (id) partitions 20,
+  range (when_exactly)
+  (
+    partition '2015-01-01' <= values < '2016-01-01',
+    partition '2016-01-01' <= values < '2017-01-01',
+    partition '2017-01-01' <= values < '2018-01-01'
+  )
+  stored as kudu;
+
+insert into native_timestamp values (12345, now(), 'Working on doc examples');
+
+select * from native_timestamp;
++-------+-------------------------------+-------------------------+
+| id    | when_exactly                  | event                   |
++-------+-------------------------------+-------------------------+
+| 12345 | 2017-05-31 16:27:42.667542000 | Working on doc examples |
++-------+-------------------------------+-------------------------+
+]]>
+</codeblock>
+
         <p>
-          Because currently a Kudu table cannot have a column with the Impala
-          <codeph>TIMESTAMP</codeph> type, expect to store date/time information as the number
+          Because Kudu tables have some performance overhead to convert <codeph>TIMESTAMP</codeph>
+          columns to the Impala 96-bit internal representation, for performance-critical
+          applications you might store date/time information as the number
           of seconds, milliseconds, or microseconds since the Unix epoch date of January 1,
           1970. Specify the column as <codeph>BIGINT</codeph> in the Impala <codeph>CREATE
           TABLE</codeph> statement, corresponding to an 8-byte integer (an
@@ -1013,14 +1040,14 @@ select unix_timestamp('2017-01-01');
 -- Construct 1 range partition and 20 associated hash partitions for each year.
 -- Use date/time conversion functions to express the ranges as human-readable dates.
 create table time_series(id bigint, when_exactly bigint, event string, primary key (id, when_exactly))
-	partition by hash (id) partitions 20,
-	range (when_exactly)
-	(
-		partition unix_timestamp('2015-01-01') <= values < unix_timestamp('2016-01-01'),
-		partition unix_timestamp('2016-01-01') <= values < unix_timestamp('2017-01-01'),
-		partition unix_timestamp('2017-01-01') <= values < unix_timestamp('2018-01-01')
-	)
-	stored as kudu;
+  partition by hash (id) partitions 20,
+  range (when_exactly)
+  (
+    partition unix_timestamp('2015-01-01') <= values < unix_timestamp('2016-01-01'),
+    partition unix_timestamp('2016-01-01') <= values < unix_timestamp('2017-01-01'),
+    partition unix_timestamp('2017-01-01') <= values < unix_timestamp('2018-01-01')
+  )
+  stored as kudu;
 
 -- On insert, we can transform a human-readable date/time into a numeric value.
 insert into time_series values (12345, unix_timestamp('2017-01-25 23:24:56'), 'Working on doc examples');
