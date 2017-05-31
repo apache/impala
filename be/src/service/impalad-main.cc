@@ -89,13 +89,6 @@ int ImpaladMain(int argc, char** argv) {
   ABORT_IF_ERROR(CreateImpalaServer(&exec_env, FLAGS_beeswax_port, FLAGS_hs2_port,
       FLAGS_be_port, &beeswax_server, &hs2_server, &be_server, &server));
 
-  ABORT_IF_ERROR(be_server->Start());
-
-  if (FLAGS_is_coordinator) {
-    ABORT_IF_ERROR(beeswax_server->Start());
-    ABORT_IF_ERROR(hs2_server->Start());
-  }
-
   Status status = exec_env.StartServices();
   if (!status.ok()) {
     LOG(ERROR) << "Impalad services did not start correctly, exiting.  Error: "
@@ -103,6 +96,16 @@ int ImpaladMain(int argc, char** argv) {
     ShutdownLogging();
     exit(1);
   }
+
+  DCHECK(exec_env.process_mem_tracker() != nullptr)
+      << "ExecEnv::StartServices() must be called before starting RPC services";
+  ABORT_IF_ERROR(be_server->Start());
+
+  if (FLAGS_is_coordinator) {
+    ABORT_IF_ERROR(beeswax_server->Start());
+    ABORT_IF_ERROR(hs2_server->Start());
+  }
+
   ImpaladMetrics::IMPALA_SERVER_READY->set_value(true);
   LOG(INFO) << "Impala has started.";
 
