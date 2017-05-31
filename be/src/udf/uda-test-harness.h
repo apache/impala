@@ -44,7 +44,7 @@ enum UdaExecutionMode {
 template<typename RESULT, typename INTERMEDIATE>
 class UdaTestHarnessBase {
  public:
-  virtual ~UdaTestHarnessBase() = default;
+  virtual ~UdaTestHarnessBase() {}
 
   typedef void (*InitFn)(FunctionContext* context, INTERMEDIATE* result);
 
@@ -147,7 +147,7 @@ class UdaTestHarnessBase {
 template<typename RESULT, typename INTERMEDIATE, typename INPUT>
 class UdaTestHarness : public UdaTestHarnessBase<RESULT, INTERMEDIATE> {
  public:
-  virtual ~UdaTestHarness() = default;
+  virtual ~UdaTestHarness() {}
 
   typedef void (*UpdateFn)(FunctionContext* context, const INPUT& input,
       INTERMEDIATE* result);
