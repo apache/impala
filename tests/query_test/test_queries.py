@@ -109,12 +109,6 @@ class TestQueries(ImpalaTestSuite):
   def test_subquery(self, vector):
     self.run_test_case('QueryTest/subquery', vector)
 
-  def test_subplans(self, vector):
-    pytest.xfail("Disabled due to missing nested types functionality.")
-    if vector.get_value('table_format').file_format != 'parquet':
-      pytest.xfail("Nested TPCH only available in parquet.")
-    self.run_test_case('QueryTest/subplannull_data', vector)
-
   def test_empty(self, vector):
     self.run_test_case('QueryTest/empty', vector)
 

@@ -253,6 +253,23 @@ where c_custkey < 4
 bigint,string,bigint,decimal,decimal,string,string
 ====
 ---- QUERY
+# Test a left outer join inside a subplan.
+select count(okey), opriority
+from tpch_nested_parquet.customer c,
+  (select ca.o_orderkey okey, ca.o_orderpriority opriority
+   from c.c_orders ca left outer join c.c_orders cb
+   on ca.o_orderkey = cb.o_orderkey) v
+group by opriority
+---- TYPES
+bigint, string
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+300091,'2-HIGH'
+300254,'4-NOT SPECIFIED'
+300589,'5-LOW'
+300343,'1-URGENT'
+298723,'3-MEDIUM'
+====
+---- QUERY
 # Test left outer join of a relative table ref.
 select c_custkey, c_mktsegment, o_orderkey, o_orderdate
 from customer c left outer join c.c_orders
@@ -298,6 +315,20 @@ where c_custkey < 4
 3,'AUTOMOBILE',NULL,'NULL'
 ---- TYPES
 bigint,string,bigint,string
+====
+---- QUERY
+# Test a right outer join inside a subplan.
+select count(okey), opriority
+from tpch_nested_parquet.customer c,
+  (select ca.o_orderkey okey, ca.o_orderpriority opriority
+   from c.c_orders ca right outer join c.c_orders cb
+   on ca.o_orderkey = cb.o_orderkey
+   where ca.o_totalprice + cb.o_totalprice < 2
+   and cb.o_orderpriority = '5-LOW') v
+group by opriority
+---- TYPES
+bigint, string
+---- RESULTS:
 ====
 ---- QUERY
 # Test left semi join of a relative table ref.
@@ -574,7 +605,7 @@ where c_custkey = 1
 1,4808192
 1,5133509
 ---- TYPES
-BIGINT,BIGINT
+bigint, bigint
 ====
 ---- QUERY
 # IMPALA-3678: Union in a subplan - passthrough should be disabled.
@@ -598,7 +629,7 @@ WHERE ca.o_orderkey = cb.o_orderkey limit 2) v limit 51
 ---- RESULTS
 1500000
 ---- TYPES
-BIGINT
+bigint
 ====
 ---- QUERY
 # IMPALA-5363: Reset probe_batch_ after reaching limit.
@@ -609,7 +640,7 @@ WHERE ca.o_orderkey < cb.o_orderkey limit 2) v limit 51
 ---- RESULTS
 199835
 ---- TYPES
-BIGINT
+bigint
 ====
 ---- QUERY
 # IMPALA-5438: Union with constant exprs in a subplan. The 'c_custkey % 100' was chosen
