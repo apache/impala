@@ -18,6 +18,7 @@
 #include "rpc/thrift-util.h"
 
 #include <boost/thread.hpp>
+#include <thrift/config.h>
 
 #include "util/hash-util.h"
 #include "util/time.h"
@@ -39,6 +40,7 @@
 // TODO: get thrift to fix this.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wstring-plus-int"
+#include <gutil/strings/substitute.h>
 #include <thrift/Thrift.h>
 #include <thrift/transport/TSocket.h>
 #include <thrift/transport/TServerSocket.h>
@@ -54,6 +56,16 @@ using namespace apache::thrift::transport;
 using namespace apache::thrift::server;
 using namespace apache::thrift::protocol;
 using namespace apache::thrift::concurrency;
+
+// IsRecvTimeoutTException() and IsSendFailTException() make assumption about the
+// implementation of read(), write() and write_partial() in TSocket.cpp and those
+// functions may change between different versions of Thrift.
+static_assert(PACKAGE_VERSION[0] == '0', "");
+static_assert(PACKAGE_VERSION[1] == '.', "");
+static_assert(PACKAGE_VERSION[2] == '9', "");
+static_assert(PACKAGE_VERSION[3] == '.', "");
+static_assert(PACKAGE_VERSION[4] == '0', "");
+static_assert(PACKAGE_VERSION[5] == '\0', "");
 
 // Thrift defines operator< but does not implement it. This is a stub
 // implementation so we can link.
@@ -174,9 +186,26 @@ bool TNetworkAddressComparator(const TNetworkAddress& a, const TNetworkAddress& 
   return false;
 }
 
-bool IsRecvTimeoutTException(const TException& e) {
-  // String taken from Thrift's TSocket.cpp, this only happens in TSocket::read()
-  return strstr(e.what(), "EAGAIN (timed out)") != NULL;
+bool IsRecvTimeoutTException(const TTransportException& e) {
+  // String taken from TSocket::read() Thrift's TSocket.cpp.
+  return e.getType() == TTransportException::TIMED_OUT &&
+      strstr(e.what(), "EAGAIN (timed out)") != nullptr;
+}
+
+// This function implements some heuristics to match against exception details
+// thrown by write_partial() in thrift library. This is not very robust as it's
+// possible that the receiver of the RPC call may have received all the RPC payload
+// but the ACK to the sender may have been dropped somehow. In which case, it's
+// not safe to retry the RPC if it's not idempotent.
+// TODO: end-to-end tracking of RPC calls to detect duplicated calls in the receiver side
+bool IsSendFailTException(const TTransportException& e) {
+  // String taken from TSocket::write_partial() in Thrift's TSocket.cpp
+  return (e.getType() == TTransportException::TIMED_OUT &&
+             strstr(e.what(), "send timeout expired") != nullptr) ||
+         (e.getType() == TTransportException::NOT_OPEN &&
+             (strstr(e.what(), "write() send()") != nullptr ||
+              strstr(e.what(), "Called write on non-open socket") != nullptr ||
+              strstr(e.what(), "Socket send returned 0.") != nullptr));
 }
 
 }

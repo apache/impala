@@ -20,14 +20,12 @@
 
 #include "util/time.h"
 
-#ifndef NDEBUG
-  DECLARE_int32(fault_injection_rpc_delay_ms);
-  DECLARE_int32(fault_injection_rpc_type);
-#endif
-
 namespace impala {
 
 #ifndef NDEBUG
+
+class FaultInjectionUtil {
+ public:
   enum RpcCallType {
     RPC_NULL = 0,
     RPC_EXECQUERYFINSTANCES,
@@ -39,23 +37,44 @@ namespace impala {
     RPC_RANDOM    // This must be last.
   };
 
-  /// Test util function that can inject delay to specified RPC server handling
-  /// function so that RPC caller could hit the RPC recv timeout condition.
-  /// my_type specifies which RPC type the current function is.
-  /// rpc_type specifies which RPC function the delay should be enabled.
-  /// delay_ms specifies how long the delay should be.
-  static void InjectRpcDelay(RpcCallType my_type, int32_t rpc_type, int32_t delay_ms) {
-    std::random_device rd;
-    srand(rd());
-    if (delay_ms == 0) return;
-    if (rpc_type == RPC_RANDOM) rpc_type = rand() % RPC_RANDOM;
-    if (rpc_type == my_type) SleepForMs(delay_ms);
-  }
+  enum RpcExceptionType {
+    RPC_EXCEPTION_NONE = 0,
+    RPC_EXCEPTION_LOST_CONNECTION_SEND,
+    RPC_EXCEPTION_LOST_CONNECTION_RECV,
+    RPC_EXCEPTION_SSL_ERROR_SEND,
+    RPC_EXCEPTION_SSL_ERROR_RECV
+  };
 
-  #define FAULT_INJECTION_RPC_DELAY(type) InjectRpcDelay(type, \
-      FLAGS_fault_injection_rpc_type, FLAGS_fault_injection_rpc_delay_ms)
-#else
-  #define FAULT_INJECTION_RPC_DELAY(type)
+  /// Test util function that injects delays to specified RPC server handling function
+  /// so that RPC caller could hit the RPC recv timeout condition.
+  /// 'my_type' specifies which RPC type of the current function.
+  /// FLAGS_fault_injection_rpc_type specifies which RPC function the delay should
+  /// be enabled. FLAGS_fault_injection_rpc_delay_ms specifies the delay in ms.
+  static void InjectRpcDelay(RpcCallType my_type);
+
+  /// Test util function that injects exceptions to RPC client functions.
+  /// 'my_type' specifies which RPC type of the current function. Currently, only
+  /// TransmitData() is supported.
+  /// 'is_send' indicates whether injected fault is at the send RPC call or recv RPC.
+  ///  It's true if for send RPC call and false for recv RPC call.
+  /// FLAGS_fault_injection_rpc_exception_type specifies the exception to be injected.
+  static void InjectRpcException(RpcCallType my_type, bool is_send);
+
+ private:
+  static int32_t GetTargetRPCType();
+
+};
+
+#define FAULT_INJECTION_RPC_DELAY(type)                         \
+    FaultInjectionUtil::InjectRpcDelay(FaultInjectionUtil::type)
+#define FAULT_INJECTION_RPC_EXCEPTION(type, is_send)            \
+    FaultInjectionUtil::InjectRpcException(FaultInjectionUtil::type, is_send)
+
+#else // NDEBUG
+
+#define FAULT_INJECTION_RPC_DELAY(type)
+#define FAULT_INJECTION_RPC_EXCEPTION(type, is_send)
+
 #endif
 
 }
