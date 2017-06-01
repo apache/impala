@@ -621,7 +621,7 @@ class ImpalaTestSuite(BaseTestSuite):
     # This should never happen.
     assert 0, 'Unable to get location for table: ' + table_name
 
-  def run_stmt_in_hive(self, stmt):
+  def run_stmt_in_hive(self, stmt, username=getuser()):
     """
     Run a statement in Hive, returning stdout if successful and throwing
     RuntimeError(stderr) if not.
@@ -630,7 +630,7 @@ class ImpalaTestSuite(BaseTestSuite):
         ['beeline',
          '--outputformat=csv2',
          '-u', 'jdbc:hive2://' + pytest.config.option.hive_server2,
-         '-n', getuser(),
+         '-n', username,
          '-e', stmt],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE)

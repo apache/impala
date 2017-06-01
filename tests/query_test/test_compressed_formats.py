@@ -172,11 +172,17 @@ class TestTableWriters(ImpalaTestSuite):
       # Write sequence file of size less than 4K
       self.client.execute('insert into %s select * from functional.zipcode_incomes where '
           'zip="00601"' % table_name)
+
+      count_query = 'select count(*) from %s' % table_name
+
       # Read it back in Impala
-      output = self.client.execute('select count(*) from %s' % table_name)
+      output = self.client.execute(count_query)
       assert '16541' == output.get_data()
       # Read it back in Hive
-      output = self.run_stmt_in_hive('select count(*) from %s' % table_name)
+      # Note that username is passed in for the sake of remote cluster tests. The default
+      # HDFS user is typically 'hdfs', and this is needed to run a count() operation using
+      # hive. For local mini clusters, the usename can be anything. See IMPALA-5413.
+      output = self.run_stmt_in_hive(count_query, username='hdfs')
       assert '16541' == output.split('\n')[1]
 
   def test_avro_writer(self, vector):
