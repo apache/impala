@@ -1993,7 +1993,7 @@ Status ImpalaServer::Init(int32_t thrift_be_port, int32_t beeswax_port, int32_t 
     RETURN_IF_ERROR(
         builder.auth_provider(AuthManager::GetInstance()->GetExternalAuthProvider())
             .metrics(exec_env_->metrics())
-            .thread_pool(FLAGS_fe_service_threads)
+            .max_concurrent_connections(FLAGS_fe_service_threads)
             .Build(&server));
     beeswax_server_.reset(server);
     beeswax_server_->SetConnectionHandler(this);
@@ -2020,7 +2020,7 @@ Status ImpalaServer::Init(int32_t thrift_be_port, int32_t beeswax_port, int32_t 
     RETURN_IF_ERROR(
         builder.auth_provider(AuthManager::GetInstance()->GetExternalAuthProvider())
             .metrics(exec_env_->metrics())
-            .thread_pool(FLAGS_fe_service_threads)
+            .max_concurrent_connections(FLAGS_fe_service_threads)
             .Build(&server));
     hs2_server_.reset(server);
     hs2_server_->SetConnectionHandler(this);

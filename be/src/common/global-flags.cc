@@ -153,11 +153,7 @@ DEFINE_int32(kudu_operation_timeout_ms, 3 * 60 * 1000, "Timeout (milliseconds) s
     "all Kudu operations. This must be a positive value, and there is no way to disable "
     "timeouts.");
 
-DEFINE_bool(enable_accept_queue_server, true,
-    "If true, uses a modified version of "
-    "TThreadedServer that accepts connections as quickly as possible and hands them off "
-    "to a thread pool to finish setup, reducing the chances that connections time out "
-    "waiting to be accepted.");
+DEFINE_bool_hidden(enable_accept_queue_server, true, "Deprecated");
 
 DEFINE_int64(inc_stats_size_limit_bytes, 200 * (1LL<<20), "Maximum size of "
     "incremental stats the catalog is allowed to serialize per table. "

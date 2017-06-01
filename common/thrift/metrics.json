@@ -702,6 +702,16 @@
     "key": "impala.thrift-server.beeswax-frontend.total-connections"
   },
   {
+    "description": "The number of Beeswax API connections to this Impala Daemon that have been accepted and are waiting to be setup.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Beeswax API Connections Queued for Setup",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.beeswax-frontend.connection-setup-queue-size"
+  },
+  {
     "description": "The number of active HiveServer2 API connections to this Impala Daemon.",
     "contexts": [
       "IMPALAD"
@@ -720,6 +730,16 @@
     "units": "UNIT",
     "kind": "COUNTER",
     "key": "impala.thrift-server.hiveserver2-frontend.total-connections"
+  },
+  {
+    "description": "The number of HiveServer2 API connections to this Impala Daemon that have been accepted and are waiting to be setup.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HiveServer2 API Connections Queued for Setup",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.hiveserver2-frontend.connection-setup-queue-size"
   },
   {
     "description": "The amount of memory freed by the last memory tracker garbage collection.",

@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <atomic>
 #include <string>
 
 #include "gen-cpp/StatestoreService.h"
@@ -393,6 +394,53 @@ TEST(SslTest, OverlappingMatchedCiphers) {
         ssl_client.iface()->RegisterSubscriber(
             resp, TRegisterSubscriberRequest(), &send_done);
       });
+}
+
+TEST(ConcurrencyTest, MaxConcurrentConnections) {
+  // Tests if max concurrent connections is being enforced by the ThriftServer
+  // implementation. It creates a ThriftServer with max_concurrent_connections set to 2
+  // and a ThreadPool of clients that attempt to connect concurrently and sleep for a
+  // small amount of time. The test fails if the number of concurrently connected clients
+  // exceeds the requested max_concurrent_connections limit. The test will also fail if
+  // the number of concurrently connected clients never reaches the limit of
+  // max_concurrent_connections.
+  int port = GetServerPort();
+  int max_connections = 2;
+  ThriftServer* server;
+  std::atomic<int> num_concurrent_connections{0};
+  std::atomic<bool> did_reach_max{false};
+  EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
+      .max_concurrent_connections(max_connections)
+      .Build(&server));
+  EXPECT_OK(server->Start());
+
+  ThreadPool<int> pool("ConcurrentTest", "MaxConcurrentConnections", 10, 10,
+      [&num_concurrent_connections, &did_reach_max, max_connections, port](int tid,
+            const int& item) {
+        ThriftClient<StatestoreServiceClientWrapper> client("localhost", port, "",
+            nullptr, false);
+        EXPECT_OK(client.Open());
+        bool send_done = false;
+        TRegisterSubscriberResponse resp;
+        EXPECT_NO_THROW({
+            client.iface()->RegisterSubscriber(resp, TRegisterSubscriberRequest(),
+                &send_done);
+          });
+        int connection_count = ++num_concurrent_connections;
+        // Check that we have not exceeded the expected limit
+        EXPECT_TRUE(connection_count <= max_connections);
+        if (connection_count == max_connections) did_reach_max = true;
+        SleepForMs(100);
+        --num_concurrent_connections;
+  });
+  ASSERT_OK(pool.Init());
+
+  for (int i = 0; i < 10; ++i) pool.Offer(i);
+  pool.DrainAndShutdown();
+
+  // If we did not reach the maximum number of concurrent connections, the test was not
+  // effective.
+  EXPECT_TRUE(did_reach_max);
 }
 
 /// Test disabled because requires a high ulimit -n on build machines. Since the test does

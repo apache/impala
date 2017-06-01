@@ -111,9 +111,7 @@ class TAcceptQueueServer::Task : public Runnable {
     {
       Synchronized s(server_.tasksMonitor_);
       server_.tasks_.erase(this);
-      if (server_.tasks_.empty()) {
-        server_.tasksMonitor_.notify();
-      }
+      server_.tasksMonitor_.notify();
     }
   }
 
@@ -167,6 +165,9 @@ void TAcceptQueueServer::SetupConnection(boost::shared_ptr<TTransport> client) {
     // Insert thread into the set of threads
     {
       Synchronized s(tasksMonitor_);
+      while (maxTasks_ > 0 && tasks_.size() >= maxTasks_) {
+        tasksMonitor_.wait();
+      }
       tasks_.insert(task);
     }
 

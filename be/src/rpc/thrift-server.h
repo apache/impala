@@ -35,14 +35,12 @@ namespace impala {
 
 class AuthProvider;
 
-/// Utility class for all Thrift servers. Runs a threaded server by default, or a
-/// TThreadPoolServer with, by default, 2 worker threads, that exposes the interface
+/// Utility class for all Thrift servers. Runs a TAcceptQueueServer server with, by
+/// default, no enforced concurrent connection limit, that exposes the interface
 /// described by a user-supplied TProcessor object.
 ///
 /// Use a ThriftServerBuilder to construct a ThriftServer. ThriftServer's c'tors are
 /// private.
-///
-/// If TThreadPoolServer is used, client must use TSocket as transport.
 /// TODO: shutdown is buggy (which only harms tests)
 class ThriftServer {
  public:
@@ -91,14 +89,6 @@ class ThriftServer {
     virtual ~ConnectionHandlerIf() = default;
   };
 
-  static const int DEFAULT_WORKER_THREADS = 2;
-
-  /// There are 2 servers supported by Thrift with different threading models.
-  /// ThreadPool  -- Allocates a fixed number of threads. A thread is used by a
-  ///                connection until it closes.
-  /// Threaded    -- Allocates 1 thread per connection, as needed.
-  enum ServerType { ThreadPool = 0, Threaded };
-
   int port() const { return port_; }
 
   bool ssl_enabled() const { return ssl_enabled_; }
@@ -106,8 +96,7 @@ class ThriftServer {
   /// Blocks until the server stops and exits its main thread.
   void Join();
 
-  /// FOR TESTING ONLY; stop the server and block until the server is stopped; use it
-  /// only if it is a Threaded server.
+  /// FOR TESTING ONLY; stop the server and block until the server is stopped
   void StopForTesting();
 
   /// Starts the main server thread. Once this call returns, clients
@@ -151,12 +140,12 @@ class ThriftServer {
   ///  - auth_provider: Authentication scheme to use. If nullptr, use the global default
   ///    demon<->demon provider.
   ///  - metrics: if not nullptr, the server will register metrics on this object
-  ///  - num_worker_threads: the number of worker threads to use in any thread pool
-  ///  - server_type: the type of IO strategy this server should employ
+  ///  - max_concurrent_connections: The maximum number of concurrent connections allowed.
+  ///    If 0, there will be no enforced limit on the number of concurrent connections.
   ThriftServer(const std::string& name,
       const boost::shared_ptr<apache::thrift::TProcessor>& processor, int port,
       AuthProvider* auth_provider = nullptr, MetricGroup* metrics = nullptr,
-      int num_worker_threads = DEFAULT_WORKER_THREADS, ServerType server_type = Threaded);
+      int max_concurrent_connections = 0);
 
   /// Enables secure access over SSL. Must be called before Start(). The first three
   /// arguments are the minimum SSL/TLS version, and paths to certificate and private key
@@ -198,12 +187,10 @@ class ThriftServer {
   /// The SSL/TLS protocol client versions that this server will allow to connect.
   apache::thrift::transport::SSLProtocol version_;
 
-  /// How many worker threads to use to serve incoming requests
-  /// (requests are queued if no thread is immediately available)
-  int num_worker_threads_;
-
-  /// ThreadPool or Threaded server
-  ServerType server_type_;
+  /// Maximum number of concurrent connections (connections will block until fewer than
+  /// max_concurrent_connections_ are concurrently active). If 0, there is no enforced
+  /// limit.
+  int max_concurrent_connections_;
 
   /// User-specified identifier that shows up in logs
   const std::string name_;
@@ -271,16 +258,10 @@ class ThriftServerBuilder {
     return *this;
   }
 
-  /// Make this server a thread-pool server with 'num_worker_threads' threads.
-  ThriftServerBuilder& thread_pool(int num_worker_threads) {
-    server_type_ = ThriftServer::ServerType::ThreadPool;
-    num_worker_threads_ = num_worker_threads;
-    return *this;
-  }
-
-  /// Make this server a threaded server (i.e. one thread per connection).
-  ThriftServerBuilder& threaded() {
-    server_type_ = ThriftServer::ServerType::Threaded;
+  /// Sets the maximum concurrent thread count for this server. Default is 0, which means
+  /// there is no enforced limit.
+  ThriftServerBuilder& max_concurrent_connections(int max_concurrent_connections) {
+    max_concurrent_connections_ = max_concurrent_connections;
     return *this;
   }
 
@@ -319,7 +300,7 @@ class ThriftServerBuilder {
   /// '*server'.
   Status Build(ThriftServer** server) {
     std::unique_ptr<ThriftServer> ptr(new ThriftServer(name_, processor_, port_,
-        auth_provider_, metrics_, num_worker_threads_, server_type_));
+        auth_provider_, metrics_, max_concurrent_connections_));
     if (enable_ssl_) {
       RETURN_IF_ERROR(ptr->EnableSsl(
           version_, certificate_, private_key_, pem_password_cmd_, ciphers_));
@@ -329,8 +310,7 @@ class ThriftServerBuilder {
   }
 
  private:
-  ThriftServer::ServerType server_type_ = ThriftServer::ServerType::Threaded;
-  int num_worker_threads_ = ThriftServer::DEFAULT_WORKER_THREADS;
+  int max_concurrent_connections_ = 0;
   std::string name_;
   boost::shared_ptr<apache::thrift::TProcessor> processor_;
   int port_ = 0;
