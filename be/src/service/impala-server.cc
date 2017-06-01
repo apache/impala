@@ -601,7 +601,7 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
     if (request_state.get() != nullptr) {
       // For queries in CREATED state, the profile information isn't populated yet.
       if (request_state->query_state() == beeswax::QueryState::CREATED) {
-        return Status("Query plan is not ready.");
+        return Status::Expected("Query plan is not ready.");
       }
       lock_guard<mutex> l(*request_state->lock());
       if (base64_encoded) {
