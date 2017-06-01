@@ -686,6 +686,7 @@ Status PhjBuilder::Partition::BuildHashTable(bool* built) {
     } else {
       if (UNLIKELY(!InsertBatch(prefetch_mode, ctx, &batch, indices))) goto not_built;
     }
+    RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(state->GetQueryStatus());
     // Free any local allocations made while inserting.
     ExprContext::FreeLocalAllocations(parent_->expr_ctxs_to_free_);
