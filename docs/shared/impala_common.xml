@@ -1206,6 +1206,22 @@ drop database temp;
         Prior to <keyword keyref="impala25_full"/> the requirement to reload functions after a restart applied to both C++ and Java functions.
       </p>
 
+      <p rev="2.9.0 IMPALA-5259" id="refresh_functions_tip">
+        In <keyword keyref="impala29_full"/> and higher, you can refresh the user-defined functions (UDFs)
+        that Impala recognizes, at the database level, by running the <codeph>REFRESH FUNCTIONS</codeph>
+        statement with the database name as an argument. Java-based UDFs can be added to the metastore
+        database through Hive <codeph>CREATE FUNCTION</codeph> statements, and made visible to Impala
+        by subsequently running <codeph>REFRESH FUNCTIONS</codeph>. For example:
+
+<codeblock>CREATE DATABASE shared_udfs;
+USE shared_udfs;
+...use CREATE FUNCTION statements in Hive to create some Java-based UDFs
+   that Impala is not initially aware of...
+REFRESH FUNCTIONS shared_udfs;
+SELECT udf_created_by_hive(c1) FROM ...
+</codeblock>
+      </p>
+
       <p id="current_user_caveat" rev="">
         The Hive <codeph>current_user()</codeph> function cannot be
         called from a Java UDF through Impala.

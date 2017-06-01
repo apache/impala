@@ -270,6 +270,10 @@ select real_words(letters) from word_games;</codeblock>
           </li>
         </ol>
 
+        <note>
+          <p conref="../shared/impala_common.xml#common/refresh_functions_tip"/>
+        </note>
+
         <example>
 
           <title>Java UDF Example: Reusing lower() Function</title>

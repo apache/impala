@@ -50,7 +50,9 @@ under the License.
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
-<codeblock rev="IMPALA-1683">REFRESH [<varname>db_name</varname>.]<varname>table_name</varname> [PARTITION (<varname>key_col1</varname>=<varname>val1</varname> [, <varname>key_col2</varname>=<varname>val2</varname>...])]</codeblock>
+<codeblock rev="IMPALA-1683">REFRESH [<varname>db_name</varname>.]<varname>table_name</varname> [PARTITION (<varname>key_col1</varname>=<varname>val1</varname> [, <varname>key_col2</varname>=<varname>val2</varname>...])]
+<ph rev="2.9.0 IMPALA-5259">REFRESH FUNCTIONS <varname>db_name</varname></ph>
+</codeblock>
 
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
@@ -337,6 +339,9 @@ ERROR: AnalysisException: Items in partition spec must exactly match the partiti
     <p rev="kudu" conref="../shared/impala_common.xml#common/kudu_blurb"/>
     <p conref="../shared/impala_common.xml#common/kudu_metadata_intro"/>
     <p conref="../shared/impala_common.xml#common/kudu_metadata_details"/>
+
+    <p conref="../shared/impala_common.xml#common/udf_blurb"/>
+    <p conref="../shared/impala_common.xml#common/refresh_functions_tip"/>
 
     <p conref="../shared/impala_common.xml#common/related_info"/>
     <p>
