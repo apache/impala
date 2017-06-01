@@ -87,7 +87,10 @@ statsKey ::= numDVs | numNulls | avgSize | maxSize</ph>
 
 <varname>new_name</varname> ::= [<varname>new_database</varname>.]<varname>new_table_name</varname>
 
-<varname>col_spec</varname> ::= <varname>col_name</varname> <varname>type_name</varname>
+<varname>col_spec</varname> ::= <varname>col_name</varname> <varname>type_name</varname> <ph rev="2.9.0 IMPALA-4616">[<varname>kudu_attributes</varname>]</ph>
+
+<ph rev="2.9.0 IMPALA-4616"><varname>kudu_attributes</varname> ::= { [NOT] NULL | ENCODING <varname>codec</varname> | COMPRESSION <varname>algorithm</varname> |
+  DEFAULT <varname>constant</varname> | BLOCK_SIZE <varname>number</varname> }</ph>
 
 <varname>partition_spec</varname> ::= <varname>simple_partition_spec</varname> | <ph rev="IMPALA-1654"><varname>complex_partition_spec</varname></ph>
 
@@ -920,6 +923,12 @@ alter table sales_data add partition (zipcode = cast(9021 * 10 as string));</cod
           </p>
         </li>
         <li>
+          <p rev="2.9.0 IMPALA-4616">
+            In <keyword keyref="impala29_full"/> and higher, you can also specify the <codeph>ENCODING</codeph>,
+            <codeph>COMPRESSION</codeph>, and <codeph>BLOCK_SIZE</codeph> attributes when adding a column.
+          </p>
+        </li>
+        <li>
           <p>
             If you add a column with a <codeph>NOT NULL</codeph> attribute, it must also have a
             <codeph>DEFAULT</codeph> attribute, so the default value can be assigned to that
@@ -936,12 +945,6 @@ alter table sales_data add partition (zipcode = cast(9021 * 10 as string));</cod
           <p>
             Although you can change the name of a column with the <codeph>CHANGE</codeph> clause,
             you cannot change the type of a column in a Kudu table.
-          </p>
-        </li>
-        <li>
-          <p>
-            You cannot assign the <codeph>ENCODING</codeph>, <codeph>COMPRESSION</codeph>,
-            or <codeph>BLOCK_SIZE</codeph> attributes when adding a column.
           </p>
         </li>
         <li>
@@ -966,6 +969,20 @@ alter table sales_data add partition (zipcode = cast(9021 * 10 as string));</cod
         </li>
       </ul>
     </p>
+
+    <p>
+      The following are some examples of using the <codeph>ADD COLUMNS</codeph> clause for a Kudu table:
+    </p>
+
+<codeblock rev="2.9.0 IMPALA-4616">
+CREATE TABLE t1 ( x INT, PRIMARY KEY (x) )
+  PARTITION BY HASH (x) PARTITIONS 16
+  STORED AS KUDU
+
+ALTER TABLE t1 ADD COLUMNS (y STRING ENCODING prefix_encoding);
+ALTER TABLE t1 ADD COLUMNS (z INT DEFAULT 10);
+ALTER TABLE t1 ADD COLUMNS (a STRING NOT NULL DEFAULT '', t TIMESTAMP COMPRESSION default_compression);
+</codeblock>
 
     <p rev="kudu">
       Kudu tables all use an underlying partitioning mechanism. The partition syntax is different than for non-Kudu
