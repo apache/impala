@@ -79,12 +79,7 @@ public class DistributedPlanner {
       Preconditions.checkState(!queryStmt.hasOffset());
       isPartitioned = true;
     }
-    long perNodeMemLimit = ctx_.getQueryOptions().mem_limit;
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("create plan fragments");
-      LOG.trace("memlimit=" + Long.toString(perNodeMemLimit));
-    }
-    createPlanFragments(singleNodePlan, isPartitioned, perNodeMemLimit, fragments);
+    createPlanFragments(singleNodePlan, isPartitioned, fragments);
     return fragments;
   }
 
@@ -98,8 +93,7 @@ public class DistributedPlanner {
    * partitioned; the partition function is derived from the inputs.
    */
   private PlanFragment createPlanFragments(
-      PlanNode root, boolean isPartitioned,
-      long perNodeMemLimit, ArrayList<PlanFragment> fragments)
+      PlanNode root, boolean isPartitioned, ArrayList<PlanFragment> fragments)
       throws ImpalaException {
     ArrayList<PlanFragment> childFragments = Lists.newArrayList();
     for (PlanNode child: root.getChildren()) {
@@ -109,9 +103,7 @@ public class DistributedPlanner {
       boolean childIsPartitioned = !child.hasLimit();
       // Do not fragment the subplan of a SubplanNode since it is executed locally.
       if (root instanceof SubplanNode && child == root.getChild(1)) continue;
-      childFragments.add(
-          createPlanFragments(
-            child, childIsPartitioned, perNodeMemLimit, fragments));
+      childFragments.add(createPlanFragments(child, childIsPartitioned, fragments));
     }
 
     PlanFragment result = null;
@@ -120,14 +112,12 @@ public class DistributedPlanner {
       fragments.add(result);
     } else if (root instanceof HashJoinNode) {
       Preconditions.checkState(childFragments.size() == 2);
-      result = createHashJoinFragment(
-          (HashJoinNode) root, childFragments.get(1), childFragments.get(0),
-          perNodeMemLimit, fragments);
+      result = createHashJoinFragment((HashJoinNode) root,
+          childFragments.get(1), childFragments.get(0), fragments);
     } else if (root instanceof NestedLoopJoinNode) {
       Preconditions.checkState(childFragments.size() == 2);
-      result = createNestedLoopJoinFragment(
-          (NestedLoopJoinNode) root, childFragments.get(1), childFragments.get(0),
-          perNodeMemLimit, fragments);
+      result = createNestedLoopJoinFragment((NestedLoopJoinNode) root,
+          childFragments.get(1), childFragments.get(0), fragments);
     } else if (root instanceof SubplanNode) {
       Preconditions.checkState(childFragments.size() == 1);
       result = createSubplanNodeFragment((SubplanNode) root, childFragments.get(0));
@@ -304,8 +294,7 @@ public class DistributedPlanner {
    */
   private PlanFragment createNestedLoopJoinFragment(NestedLoopJoinNode node,
       PlanFragment rightChildFragment, PlanFragment leftChildFragment,
-      long perNodeMemLimit, ArrayList<PlanFragment> fragments)
-      throws ImpalaException {
+      ArrayList<PlanFragment> fragments) throws ImpalaException {
     node.setDistributionMode(DistributionMode.BROADCAST);
     node.setChild(0, leftChildFragment.getPlanRoot());
     connectChildFragment(node, 1, leftChildFragment, rightChildFragment);
@@ -321,7 +310,7 @@ public class DistributedPlanner {
       PlanFragment leftChildFragment, PlanFragment rightChildFragment,
       List<Expr> lhsJoinExprs, List<Expr> rhsJoinExprs,
       ArrayList<PlanFragment> fragments) throws ImpalaException {
-    node.setDistributionMode(HashJoinNode.DistributionMode.PARTITIONED);
+    Preconditions.checkState(node.getDistributionMode() == DistributionMode.PARTITIONED);
     // The lhs and rhs input fragments are already partitioned on the join exprs.
     // Combine the lhs/rhs input fragments into leftChildFragment by placing the join
     // node into leftChildFragment and setting its lhs/rhs children to the plan root of
@@ -415,20 +404,14 @@ public class DistributedPlanner {
   }
 
   /**
-   * Creates either a broadcast join or a repartitioning join, depending on the
-   * expected cost.
-   * If any of the inputs to the cost computation is unknown, it assumes the cost
-   * will be 0. Costs being equal, it'll favor partitioned over broadcast joins.
-   * If perNodeMemLimit > 0 and the size of the hash table for a broadcast join is
-   * expected to exceed that mem limit, switches to partitioned join instead.
-   * TODO: revisit the choice of broadcast as the default
+   * Creates either a broadcast join or a repartitioning join depending on the expected
+   * cost and various constraints. See computeDistributionMode() for more details.
    * TODO: don't create a broadcast join if we already anticipate that this will
    * exceed the query's memory budget.
    */
   private PlanFragment createHashJoinFragment(
       HashJoinNode node, PlanFragment rightChildFragment,
-      PlanFragment leftChildFragment, long perNodeMemLimit,
-      ArrayList<PlanFragment> fragments)
+      PlanFragment leftChildFragment, ArrayList<PlanFragment> fragments)
       throws ImpalaException {
     // For both join types, the total cost is calculated as the amount of data
     // sent over the network, plus the amount of data inserted into the hash table.
@@ -436,8 +419,8 @@ public class DistributedPlanner {
     // the leftChildFragment, and build a hash table with it on each node.
     Analyzer analyzer = ctx_.getRootAnalyzer();
     PlanNode rhsTree = rightChildFragment.getPlanRoot();
-    long rhsDataSize = 0;
-    long broadcastCost = Long.MAX_VALUE;
+    long rhsDataSize = -1;
+    long broadcastCost = -1;
     if (rhsTree.getCardinality() != -1) {
       rhsDataSize = Math.round(
           rhsTree.getCardinality() * ExchangeNode.getAvgSerializedRowSize(rhsTree));
@@ -455,8 +438,6 @@ public class DistributedPlanner {
     // repartition: both left- and rightChildFragment are partitioned on the
     // join exprs, and a hash table is built with the rightChildFragment's output.
     PlanNode lhsTree = leftChildFragment.getPlanRoot();
-    // Subtract 1 here so that if stats are missing we default to partitioned.
-    long partitionCost = Long.MAX_VALUE - 1;
     List<Expr> lhsJoinExprs = Lists.newArrayList();
     List<Expr> rhsJoinExprs = Lists.newArrayList();
     for (Expr joinConjunct: node.getEqJoinConjuncts()) {
@@ -466,12 +447,14 @@ public class DistributedPlanner {
     }
     boolean lhsHasCompatPartition = false;
     boolean rhsHasCompatPartition = false;
+    long partitionCost = -1;
     if (lhsTree.getCardinality() != -1 && rhsTree.getCardinality() != -1) {
       lhsHasCompatPartition = analyzer.equivSets(lhsJoinExprs,
           leftChildFragment.getDataPartition().getPartitionExprs());
       rhsHasCompatPartition = analyzer.equivSets(rhsJoinExprs,
           rightChildFragment.getDataPartition().getPartitionExprs());
 
+      Preconditions.checkState(rhsDataSize != -1);
       double lhsNetworkCost = (lhsHasCompatPartition) ? 0.0 :
         Math.round(
             lhsTree.getCardinality() * ExchangeNode.getAvgSerializedRowSize(lhsTree));
@@ -487,39 +470,12 @@ public class DistributedPlanner {
       LOG.trace(rhsTree.getExplainString(ctx_.getQueryOptions()));
     }
 
-    boolean doBroadcast = false;
-    // we do a broadcast join if
-    // - we're explicitly told to do so
-    // - or if it's cheaper and we weren't explicitly told to do a partitioned join
-    // - and we're not doing a full outer or right outer/semi join (those require the
-    //   left-hand side to be partitioned for correctness)
-    // - and the expected size of the hash tbl doesn't exceed perNodeMemLimit
-    // - or we are doing a null-aware left anti join (broadcast is required for
-    //   correctness)
-    // we do a "<=" comparison of the costs so that we default to broadcast joins if
-    // we're unable to estimate the cost
-    if ((node.getJoinOp() != JoinOperator.RIGHT_OUTER_JOIN
-        && node.getJoinOp() != JoinOperator.FULL_OUTER_JOIN
-        && node.getJoinOp() != JoinOperator.RIGHT_SEMI_JOIN
-        && node.getJoinOp() != JoinOperator.RIGHT_ANTI_JOIN
-        // a broadcast join hint overides the check to see if the hash table
-        // size is less than the pernode memlimit
-        && (node.getDistributionModeHint() == DistributionMode.BROADCAST
-            || perNodeMemLimit == 0
-            || Math.round(rhsDataSize * PlannerContext.HASH_TBL_SPACE_OVERHEAD)
-                <= perNodeMemLimit)
-        // a broadcast join hint overrides the check to see if performing a broadcast
-        // join is more costly than a partitioned join
-        && (node.getDistributionModeHint() == DistributionMode.BROADCAST
-            || (node.getDistributionModeHint() != DistributionMode.PARTITIONED
-                && broadcastCost <= partitionCost)))
-        || node.getJoinOp().isNullAwareLeftAntiJoin()) {
-      doBroadcast = true;
-    }
+    DistributionMode distrMode = computeJoinDistributionMode(
+        node, broadcastCost, partitionCost, rhsDataSize);
+    node.setDistributionMode(distrMode);
 
     PlanFragment hjFragment = null;
-    if (doBroadcast) {
-      node.setDistributionMode(HashJoinNode.DistributionMode.BROADCAST);
+    if (distrMode == DistributionMode.BROADCAST) {
       // Doesn't create a new fragment, but modifies leftChildFragment to execute
       // the join; the build input is provided by an ExchangeNode, which is the
       // destination of the rightChildFragment's output
@@ -534,7 +490,7 @@ public class DistributedPlanner {
     }
 
     for (RuntimeFilter filter: node.getRuntimeFilters()) {
-      filter.setIsBroadcast(doBroadcast);
+      filter.setIsBroadcast(distrMode == DistributionMode.BROADCAST);
       filter.computeHasLocalTargets();
       // Work around IMPALA-3450, where cardinalities might be wrong in single-node plans
       // with UNION and LIMITs.
@@ -542,6 +498,49 @@ public class DistributedPlanner {
       filter.computeNdvEstimate();
     }
     return hjFragment;
+ }
+
+ /**
+  * Determines and returns the distribution mode for the given join based on the expected
+  * costs and the right-hand size data size. Considers the following:
+  * - Some join types require a specific distribution strategy to run correctly.
+  * - Checks for join hints.
+  * - Uses the default join strategy (query option) when the costs are unknown or tied.
+  * - Returns broadcast if it is cheaper than partitioned and the expected hash table
+  *   size is within the query mem limit.
+  * - Otherwise, returns partitioned.
+  * For 'broadcastCost', 'partitionCost', and 'rhsDataSize' a value of -1 indicates
+  * unknown, e.g., due to missing stats.
+  */
+ private DistributionMode computeJoinDistributionMode(JoinNode node,
+     long broadcastCost, long partitionCost, long rhsDataSize) {
+   // Check join types that require a specific distribution strategy to run correctly.
+   JoinOperator op = node.getJoinOp();
+   if (op == JoinOperator.RIGHT_OUTER_JOIN || op == JoinOperator.RIGHT_SEMI_JOIN
+       || op == JoinOperator.RIGHT_ANTI_JOIN || op == JoinOperator.FULL_OUTER_JOIN) {
+     return DistributionMode.PARTITIONED;
+   }
+   if (op == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN) return DistributionMode.BROADCAST;
+
+   // Check join hints.
+   if (node.getDistributionModeHint() != DistributionMode.NONE) {
+     return node.getDistributionModeHint();
+   }
+
+   // Use the default mode when the costs are unknown or tied.
+   if (broadcastCost == -1 || partitionCost == -1 || broadcastCost == partitionCost) {
+     return DistributionMode.fromThrift(
+         ctx_.getQueryOptions().getDefault_join_distribution_mode());
+   }
+
+   // Decide the distribution mode based on the estimated costs and the mem limit.
+   long htSize = Math.round(rhsDataSize * PlannerContext.HASH_TBL_SPACE_OVERHEAD);
+   long memLimit = ctx_.getQueryOptions().mem_limit;
+   if (broadcastCost <= partitionCost && (memLimit == 0 || htSize <= memLimit)) {
+     return DistributionMode.BROADCAST;
+   }
+   // Partitioned was cheaper or the broadcast HT would not fit within the mem limit.
+   return DistributionMode.PARTITIONED;
  }
 
   /**

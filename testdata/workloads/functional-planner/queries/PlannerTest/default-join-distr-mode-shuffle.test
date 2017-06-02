@@ -1,0 +1,69 @@
+# Both join inputs have an unknown cardinality.
+select /* +straight_join */ * from
+functional.tinytable x inner join functional.tinytable y on x.a = y.a
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: x.a = y.a
+|  runtime filters: RF000 <- y.a
+|
+|--04:EXCHANGE [HASH(y.a)]
+|  |
+|  01:SCAN HDFS [functional.tinytable y]
+|     partitions=1/1 files=1 size=38B
+|
+03:EXCHANGE [HASH(x.a)]
+|
+00:SCAN HDFS [functional.tinytable x]
+   partitions=1/1 files=1 size=38B
+   runtime filters: RF000 -> x.a
+====
+# Left join input has an unknown cardinality.
+select /* +straight_join */ * from
+functional.tinytable x inner join functional.alltypes y on x.a = y.string_col
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: x.a = y.string_col
+|  runtime filters: RF000 <- y.string_col
+|
+|--04:EXCHANGE [HASH(y.string_col)]
+|  |
+|  01:SCAN HDFS [functional.alltypes y]
+|     partitions=24/24 files=24 size=469.90KB
+|
+03:EXCHANGE [HASH(x.a)]
+|
+00:SCAN HDFS [functional.tinytable x]
+   partitions=1/1 files=1 size=38B
+   runtime filters: RF000 -> x.a
+====
+# Right join input has an unknown cardinality.
+select /* +straight_join */ * from
+functional.alltypes x inner join functional.tinytable y on x.string_col = y.a
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: x.string_col = y.a
+|  runtime filters: RF000 <- y.a
+|
+|--04:EXCHANGE [HASH(y.a)]
+|  |
+|  01:SCAN HDFS [functional.tinytable y]
+|     partitions=1/1 files=1 size=38B
+|
+03:EXCHANGE [HASH(x.string_col)]
+|
+00:SCAN HDFS [functional.alltypes x]
+   partitions=24/24 files=24 size=469.90KB
+   runtime filters: RF000 -> x.string_col
+====

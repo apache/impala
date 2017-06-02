@@ -25,6 +25,7 @@ import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TJoinDistributionMode;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TRuntimeFilterMode;
@@ -412,5 +413,15 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = defaultQueryOptions();
     options.setExplain_level(TExplainLevel.EXTENDED);
     runPlannerTestFile("tablesample", options);
+  }
+
+  @Test
+  public void testDefaultJoinDistributionMode() {
+    TQueryOptions options = defaultQueryOptions();
+    Preconditions.checkState(
+        options.getDefault_join_distribution_mode() == TJoinDistributionMode.BROADCAST);
+    runPlannerTestFile("default-join-distr-mode-broadcast", options);
+    options.setDefault_join_distribution_mode(TJoinDistributionMode.SHUFFLE);
+    runPlannerTestFile("default-join-distr-mode-shuffle", options);
   }
 }

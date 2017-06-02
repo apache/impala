@@ -480,6 +480,19 @@ Status impala::SetQueryOption(const string& key, const string& value,
             iequals(value, "true") || iequals(value, "1"));
         break;
       }
+      case TImpalaQueryOptions::DEFAULT_JOIN_DISTRIBUTION_MODE: {
+        if (iequals(value, "BROADCAST") || iequals(value, "0")) {
+          query_options->__set_default_join_distribution_mode(
+              TJoinDistributionMode::BROADCAST);
+        } else if (iequals(value, "SHUFFLE") || iequals(value, "1")) {
+          query_options->__set_default_join_distribution_mode(
+              TJoinDistributionMode::SHUFFLE);
+        } else {
+          return Status(Substitute("Invalid default_join_distribution_mode '$0'. "
+              "Valid values are BROADCAST or SHUFFLE", value));
+        }
+        break;
+      }
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.

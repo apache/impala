@@ -32,6 +32,8 @@ import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.thrift.TJoinDistributionMode;
+
 import com.google.common.base.Preconditions;
 
 /**
@@ -83,6 +85,10 @@ public abstract class JoinNode extends PlanNode {
 
     @Override
     public String toString() { return description_; }
+    public static DistributionMode fromThrift(TJoinDistributionMode distrMode) {
+      if (distrMode == TJoinDistributionMode.BROADCAST) return BROADCAST;
+      return PARTITIONED;
+    }
   }
 
   public JoinNode(PlanNode outer, PlanNode inner, boolean isStraightJoin,

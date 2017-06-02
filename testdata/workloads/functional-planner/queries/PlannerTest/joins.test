@@ -2519,25 +2519,3 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch.customer a]
    partitions=1/1 files=1 size=23.08MB
 ====
-# If stats aren't available, default to partitioned join.
-select * from functional.tinytable x, functional.tinytable y where x.a = y.a
----- DISTRIBUTEDPLAN
-PLAN-ROOT SINK
-|
-05:EXCHANGE [UNPARTITIONED]
-|
-02:HASH JOIN [INNER JOIN, PARTITIONED]
-|  hash predicates: x.a = y.a
-|  runtime filters: RF000 <- y.a
-|
-|--04:EXCHANGE [HASH(y.a)]
-|  |
-|  01:SCAN HDFS [functional.tinytable y]
-|     partitions=1/1 files=1 size=38B
-|
-03:EXCHANGE [HASH(x.a)]
-|
-00:SCAN HDFS [functional.tinytable x]
-   partitions=1/1 files=1 size=38B
-   runtime filters: RF000 -> x.a
-====

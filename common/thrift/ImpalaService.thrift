@@ -271,6 +271,10 @@ enum TImpalaQueryOptions {
   // processing. This includes skipping data based on the statistics and computing query
   // results like "select min()".
   PARQUET_READ_STATISTICS,
+
+  // Join distribution mode that is used when the join inputs have an unknown
+  // cardinality, e.g., because of missing table statistics.
+  DEFAULT_JOIN_DISTRIBUTION_MODE
 }
 
 // The summary of a DML statement.

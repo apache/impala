@@ -57,6 +57,11 @@ enum TParquetArrayResolution {
   TWO_LEVEL_THEN_THREE_LEVEL
 }
 
+enum TJoinDistributionMode {
+  BROADCAST,
+  SHUFFLE
+}
+
 // Query options that correspond to ImpalaService.ImpalaQueryOptions, with their
 // respective defaults. Query options can be set in the following ways:
 //
@@ -241,6 +246,11 @@ struct TQueryOptions {
   // processing. This includes skipping data based on the statistics and computing query
   // results like "select min()".
   55: optional bool parquet_read_statistics = true
+
+  // Join distribution mode that is used when the join inputs have an unknown
+  // cardinality, e.g., because of missing table statistics.
+  56: optional TJoinDistributionMode default_join_distribution_mode =
+    TJoinDistributionMode.BROADCAST
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
