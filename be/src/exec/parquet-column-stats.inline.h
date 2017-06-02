@@ -24,15 +24,20 @@
 
 namespace impala {
 
+inline void ColumnStatsBase::Reset() {
+  has_min_max_values_ = false;
+  null_count_ = 0;
+}
+
 template <typename T>
-inline void ColumnStats<T>::Update(const T& v) {
-  if (!has_values_) {
-    has_values_ = true;
-    min_value_ = v;
-    max_value_ = v;
+inline void ColumnStats<T>::Update(const T& min_value, const T& max_value) {
+  if (!has_min_max_values_) {
+    has_min_max_values_ = true;
+    min_value_ = min_value;
+    max_value_ = max_value;
   } else {
-    min_value_ = std::min(min_value_, v);
-    max_value_ = std::max(max_value_, v);
+    min_value_ = std::min(min_value_, min_value);
+    max_value_ = std::max(max_value_, max_value);
   }
 }
 
@@ -40,31 +45,27 @@ template <typename T>
 inline void ColumnStats<T>::Merge(const ColumnStatsBase& other) {
   DCHECK(dynamic_cast<const ColumnStats<T>*>(&other));
   const ColumnStats<T>* cs = static_cast<const ColumnStats<T>*>(&other);
-  if (!cs->has_values_) return;
-  if (!has_values_) {
-    has_values_ = true;
-    min_value_ = cs->min_value_;
-    max_value_ = cs->max_value_;
-  } else {
-    min_value_ = std::min(min_value_, cs->min_value_);
-    max_value_ = std::max(max_value_, cs->max_value_);
-  }
+  if (cs->has_min_max_values_) Update(cs->min_value_, cs->max_value_);
+  IncrementNullCount(cs->null_count_);
 }
 
 template <typename T>
 inline int64_t ColumnStats<T>::BytesNeeded() const {
-  return BytesNeeded(min_value_) + BytesNeeded(max_value_);
+  return BytesNeeded(min_value_) + BytesNeeded(max_value_)
+      + ParquetPlainEncoder::ByteSize(null_count_);
 }
 
 template <typename T>
 inline void ColumnStats<T>::EncodeToThrift(parquet::Statistics* out) const {
-  DCHECK(has_values_);
-  std::string min_str;
-  EncodePlainValue(min_value_, BytesNeeded(min_value_), &min_str);
-  out->__set_min_value(move(min_str));
-  std::string max_str;
-  EncodePlainValue(max_value_, BytesNeeded(max_value_), &max_str);
-  out->__set_max_value(move(max_str));
+  if (has_min_max_values_) {
+    std::string min_str;
+    EncodePlainValue(min_value_, BytesNeeded(min_value_), &min_str);
+    out->__set_min_value(move(min_str));
+    std::string max_str;
+    EncodePlainValue(max_value_, BytesNeeded(max_value_), &max_str);
+    out->__set_max_value(move(max_str));
+  }
+  out->__set_null_count(null_count_);
 }
 
 template <typename T>
@@ -145,44 +146,21 @@ inline bool ColumnStats<StringValue>::DecodePlainValue(
 }
 
 template <>
-inline void ColumnStats<StringValue>::Update(const StringValue& v) {
-  if (!has_values_) {
-    has_values_ = true;
-    min_value_ = v;
+inline void ColumnStats<StringValue>::Update(
+    const StringValue& min_value, const StringValue& max_value) {
+  if (!has_min_max_values_) {
+    has_min_max_values_ = true;
+    min_value_ = min_value;
     min_buffer_.Clear();
-    max_value_ = v;
+    max_value_ = max_value;
     max_buffer_.Clear();
   } else {
-    if (v < min_value_) {
-      min_value_ = v;
+    if (min_value < min_value_) {
+      min_value_ = min_value;
       min_buffer_.Clear();
     }
-    if (v > max_value_) {
-      max_value_ = v;
-      max_buffer_.Clear();
-    }
-  }
-}
-
-template <>
-inline void ColumnStats<StringValue>::Merge(const ColumnStatsBase& other) {
-  DCHECK(dynamic_cast<const ColumnStats<StringValue>*>(&other));
-  const ColumnStats<StringValue>* cs =
-      static_cast<const ColumnStats<StringValue>*>(&other);
-  if (!cs->has_values_) return;
-  if (!has_values_) {
-    has_values_ = true;
-    min_value_ = cs->min_value_;
-    min_buffer_.Clear();
-    max_value_ = cs->max_value_;
-    max_buffer_.Clear();
-  } else {
-    if (cs->min_value_ < min_value_) {
-      min_value_ = cs->min_value_;
-      min_buffer_.Clear();
-    }
-    if (cs->max_value_ > max_value_) {
-      max_value_ = cs->max_value_;
+    if (max_value > max_value_) {
+      max_value_ = max_value;
       max_buffer_.Clear();
     }
   }

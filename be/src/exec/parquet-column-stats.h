@@ -62,7 +62,7 @@ class ColumnStatsBase {
   /// the minimum or maximum value.
   enum class StatsField { MIN, MAX };
 
-  ColumnStatsBase() : has_values_(false) {}
+  ColumnStatsBase() : has_min_max_values_(false), null_count_(0) {}
   virtual ~ColumnStatsBase() {}
 
   /// Decodes the parquet::Statistics from 'col_chunk' and writes the value selected by
@@ -91,17 +91,22 @@ class ColumnStatsBase {
   virtual void EncodeToThrift(parquet::Statistics* out) const = 0;
 
   /// Resets the state of this object.
-  void Reset() { has_values_ = false; }
+  void Reset();
 
-  bool has_values() const { return has_values_; }
+  /// Update the statistics by incrementing the null_count. It is called each time a null
+  /// value is appended to the column or the statistics are merged.
+  void IncrementNullCount(int64_t count) { null_count_ += count; }
 
  protected:
   // Copies the memory of 'value' into 'buffer' and make 'value' point to 'buffer'.
   // 'buffer' is reset before making the copy.
   static void CopyToBuffer(StringBuffer* buffer, StringValue* value);
 
-  /// Stores whether the current object has been initialized with a set of values.
-  bool has_values_;
+  /// Stores whether the min and max values of the current object have been initialized.
+  bool has_min_max_values_;
+
+  // Number of null values since the last call to Reset().
+  int64_t null_count_;
 
  private:
   /// Returns true if we support reading statistics stored in the fields 'min_value' and
@@ -149,10 +154,13 @@ class ColumnStats : public ColumnStatsBase {
       min_buffer_(mem_pool),
       max_buffer_(mem_pool) {}
 
-  /// Updates the statistics based on the value 'v'. If necessary, initializes the
-  /// statistics. It may keep a reference to 'v' until
+  /// Updates the statistics based on the values min_value and max_value. If necessary,
+  /// initializes the statistics. It may keep a reference to either value until
   /// MaterializeStringValuesToInternalBuffers() gets called.
-  void Update(const T& v);
+  void Update(const T& min_value, const T& max_value);
+
+  /// Wrapper to call the Update function which takes in the min_value and max_value.
+  void Update(const T& v) { Update(v, v); }
 
   virtual void Merge(const ColumnStatsBase& other) override;
   virtual void MaterializeStringValuesToInternalBuffers() override {}

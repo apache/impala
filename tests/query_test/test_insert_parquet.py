@@ -67,7 +67,7 @@ class TimeStamp():
     return self.timetuple == other_timetuple
 
 
-ColumnStats = namedtuple('ColumnStats', ['name', 'min', 'max'])
+ColumnStats = namedtuple('ColumnStats', ['name', 'min', 'max', 'null_count'])
 
 # Test a smaller parquet file size as well
 # TODO: these tests take a while so we don't want to go through too many sizes but
@@ -319,15 +319,17 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
       if stats is None:
         decoded.append(None)
         continue
+      min_value = None
+      max_value = None
 
-      if stats.min_value is None and stats.max_value is None:
-        decoded.append(None)
-        continue
+      if stats.min_value is not None and stats.max_value is not None:
+        min_value = decode_stats_value(schema, stats.min_value)
+        max_value = decode_stats_value(schema, stats.max_value)
 
-      assert stats.min_value is not None and stats.max_value is not None
-      min_value = decode_stats_value(schema, stats.min_value)
-      max_value = decode_stats_value(schema, stats.max_value)
-      decoded.append(ColumnStats(schema.name, min_value, max_value))
+      null_count = stats.null_count
+      assert null_count is not None
+
+      decoded.append(ColumnStats(schema.name, min_value, max_value, null_count))
 
     assert len(decoded) == len(schemas)
     return decoded
@@ -367,7 +369,7 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
 
     return row_group_stats
 
-  def _validate_min_max_stats(self, hdfs_path, expected_values, skip_col_idxs = None):
+  def _validate_parquet_stats(self, hdfs_path, expected_values, skip_col_idxs = None):
     """Validates that 'hdfs_path' contains exactly one parquet file and that the rowgroup
     statistics in that file match the values in 'expected_values'. Columns indexed by
     'skip_col_idx' are excluded from the verification of the expected values.
@@ -408,7 +410,7 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
         qualified_table_name, source_table)
     vector.get_value('exec_option')['num_nodes'] = 1
     self.execute_query(query, vector.get_value('exec_option'))
-    self._validate_min_max_stats(hdfs_path, expected_values)
+    self._validate_parquet_stats(hdfs_path, expected_values)
 
   def test_write_statistics_alltypes(self, vector, unique_database):
     """Test that writing a parquet file populates the rowgroup statistics with the correct
@@ -416,20 +418,20 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     """
     # Expected values for functional.alltypes
     expected_min_max_values = [
-        ColumnStats('id', 0, 7299),
-        ColumnStats('bool_col', False, True),
-        ColumnStats('tinyint_col', 0, 9),
-        ColumnStats('smallint_col', 0, 9),
-        ColumnStats('int_col', 0, 9),
-        ColumnStats('bigint_col', 0, 90),
-        ColumnStats('float_col', 0, RoundFloat(9.9, 1)),
-        ColumnStats('double_col', 0, RoundFloat(90.9, 1)),
-        ColumnStats('date_string_col', '01/01/09', '12/31/10'),
-        ColumnStats('string_col', '0', '9'),
+        ColumnStats('id', 0, 7299, 0),
+        ColumnStats('bool_col', False, True, 0),
+        ColumnStats('tinyint_col', 0, 9, 0),
+        ColumnStats('smallint_col', 0, 9, 0),
+        ColumnStats('int_col', 0, 9, 0),
+        ColumnStats('bigint_col', 0, 90, 0),
+        ColumnStats('float_col', 0, RoundFloat(9.9, 1), 0),
+        ColumnStats('double_col', 0, RoundFloat(90.9, 1), 0),
+        ColumnStats('date_string_col', '01/01/09', '12/31/10', 0),
+        ColumnStats('string_col', '0', '9', 0),
         ColumnStats('timestamp_col', TimeStamp('2009-01-01 00:00:00.0'),
-                    TimeStamp('2010-12-31 05:09:13.860000')),
-        ColumnStats('year', 2009, 2010),
-        ColumnStats('month', 1, 12),
+                    TimeStamp('2010-12-31 05:09:13.860000'), 0),
+        ColumnStats('year', 2009, 2010, 0),
+        ColumnStats('month', 1, 12, 0),
     ]
 
     self._ctas_table_and_verify_stats(vector, unique_database, "functional.alltypes",
@@ -441,12 +443,12 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     """
     # Expected values for functional.decimal_tbl
     expected_min_max_values = [
-      ColumnStats('d1', 1234, 132842),
-      ColumnStats('d2', 111, 2222),
-      ColumnStats('d3', Decimal('1.23456789'), Decimal('12345.6789')),
-      ColumnStats('d4', Decimal('0.123456789'), Decimal('0.123456789')),
-      ColumnStats('d5', Decimal('0.1'), Decimal('12345.789')),
-      ColumnStats('d6', 1, 1)
+      ColumnStats('d1', 1234, 132842, 0),
+      ColumnStats('d2', 111, 2222, 0),
+      ColumnStats('d3', Decimal('1.23456789'), Decimal('12345.6789'), 0),
+      ColumnStats('d4', Decimal('0.123456789'), Decimal('0.123456789'), 0),
+      ColumnStats('d5', Decimal('0.1'), Decimal('12345.789'), 0),
+      ColumnStats('d6', 1, 1, 0)
     ]
 
     self._ctas_table_and_verify_stats(vector, unique_database, "functional.decimal_tbl",
@@ -458,31 +460,32 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     """
     # Expected values for tpch_parquet.customer
     expected_min_max_values = [
-        ColumnStats('c_custkey', 1, 150000),
-        ColumnStats('c_name', 'Customer#000000001', 'Customer#000150000'),
-        ColumnStats('c_address', '   2uZwVhQvwA', 'zzxGktzXTMKS1BxZlgQ9nqQ'),
-        ColumnStats('c_nationkey', 0, 24),
-        ColumnStats('c_phone', '10-100-106-1617', '34-999-618-6881'),
-        ColumnStats('c_acctbal', Decimal('-999.99'), Decimal('9999.99')),
-        ColumnStats('c_mktsegment', 'AUTOMOBILE', 'MACHINERY'),
+        ColumnStats('c_custkey', 1, 150000, 0),
+        ColumnStats('c_name', 'Customer#000000001', 'Customer#000150000', 0),
+        ColumnStats('c_address', '   2uZwVhQvwA', 'zzxGktzXTMKS1BxZlgQ9nqQ', 0),
+        ColumnStats('c_nationkey', 0, 24, 0),
+        ColumnStats('c_phone', '10-100-106-1617', '34-999-618-6881', 0),
+        ColumnStats('c_acctbal', Decimal('-999.99'), Decimal('9999.99'), 0),
+        ColumnStats('c_mktsegment', 'AUTOMOBILE', 'MACHINERY', 0),
         ColumnStats('c_comment', ' Tiresias according to the slyly blithe instructions '
                     'detect quickly at the slyly express courts. express dinos wake ',
-                    'zzle. blithely regular instructions cajol'),
+                    'zzle. blithely regular instructions cajol', 0),
     ]
 
     self._ctas_table_and_verify_stats(vector, unique_database, "tpch_parquet.customer",
                                       expected_min_max_values)
 
   def test_write_statistics_null(self, vector, unique_database):
-    """Test that we don't write min/max statistics for null columns."""
+    """Test that we don't write min/max statistics for null columns. Ensure null_count
+    is set for columns with null values."""
     expected_min_max_values = [
-        ColumnStats('a', 'a', 'a'),
-        ColumnStats('b', '', ''),
-        None,
-        None,
-        None,
-        ColumnStats('f', 'a\x00b', 'a\x00b'),
-        ColumnStats('g', '\x00', '\x00')
+        ColumnStats('a', 'a', 'a', 0),
+        ColumnStats('b', '', '', 0),
+        ColumnStats('c', None, None, 1),
+        ColumnStats('d', None, None, 1),
+        ColumnStats('e', None, None, 1),
+        ColumnStats('f', 'a\x00b', 'a\x00b', 0),
+        ColumnStats('g', '\x00', '\x00', 0)
     ]
 
     self._ctas_table_and_verify_stats(vector, unique_database, "functional.nulltable",
@@ -503,9 +506,9 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
         (cast("xy" as char(3)), "abc banana", "dolor dis amet")""".format(qualified_table_name)
     self.execute_query(insert_stmt)
     expected_min_max_values = [
-        ColumnStats('c3', 'abc', 'xy'),
-        ColumnStats('vc', 'abc banana', 'ghj xyz'),
-        ColumnStats('st', 'abc xyz', 'lorem ipsum')
+        ColumnStats('c3', 'abc', 'xy', 0),
+        ColumnStats('vc', 'abc banana', 'ghj xyz', 0),
+        ColumnStats('st', 'abc xyz', 'lorem ipsum', 0)
     ]
 
     self._ctas_table_and_verify_stats(vector, unique_database, qualified_table_name,
@@ -528,11 +531,11 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     self.execute_query(create_view_stmt)
 
     expected_min_max_values = [
-        ColumnStats('id', -7299, 7298),
-        ColumnStats('int_col', -9, 8),
-        ColumnStats('bigint_col', -90, 80),
-        ColumnStats('float_col', RoundFloat(-9.9, 1), RoundFloat(8.8, 1)),
-        ColumnStats('double_col', RoundFloat(-90.9, 1), RoundFloat(80.8, 1)),
+        ColumnStats('id', -7299, 7298, 0),
+        ColumnStats('int_col', -9, 8, 0),
+        ColumnStats('bigint_col', -90, 80, 0),
+        ColumnStats('float_col', RoundFloat(-9.9, 1), RoundFloat(8.8, 1), 0),
+        ColumnStats('double_col', RoundFloat(-90.9, 1), RoundFloat(80.8, 1), 0),
     ]
 
     self._ctas_table_and_verify_stats(vector, unique_database, qualified_view_name,
@@ -586,9 +589,26 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     self.execute_query(insert_stmt)
 
     expected_min_max_values = [
-        ColumnStats('f', float('-inf'), float('inf')),
-        ColumnStats('d', float('-inf'), float('inf')),
+        ColumnStats('f', float('-inf'), float('inf'), 0),
+        ColumnStats('d', float('-inf'), float('inf'), 0),
     ]
 
     self._ctas_table_and_verify_stats(vector, unique_database, qualified_table_name,
                                       expected_min_max_values)
+
+  def test_write_null_count_statistics(self, vector, unique_database):
+    """Test that writing a parquet file populates the rowgroup statistics with the correct
+    null_count. This test ensures that the null_count is correct for a table with multiple
+    null values."""
+
+    # Expected values for tpch_parquet.customer
+    expected_min_max_values = [
+      ColumnStats('id', '8600000US00601', '8600000US999XX', 0),
+      ColumnStats('zip', '00601', '999XX', 0),
+      ColumnStats('description1', '\"00601 5-Digit ZCTA', '\"999XX 5-Digit ZCTA', 0),
+      ColumnStats('description2', ' 006 3-Digit ZCTA\"', ' 999 3-Digit ZCTA\"', 0),
+      ColumnStats('income', 0, 189570, 29),
+    ]
+
+    self._ctas_table_and_verify_stats(vector, unique_database,
+      "functional_parquet.zipcode_incomes", expected_min_max_values)

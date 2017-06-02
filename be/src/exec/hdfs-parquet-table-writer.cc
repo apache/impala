@@ -141,8 +141,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   // 'meta_data'.
   void EncodeRowGroupStats(ColumnMetaData* meta_data) {
     DCHECK(row_group_stats_base_ != nullptr);
-    if (row_group_stats_base_->has_values()
-        && row_group_stats_base_->BytesNeeded() <= MAX_COLUMN_STATS_SIZE) {
+    if (row_group_stats_base_->BytesNeeded() <= MAX_COLUMN_STATS_SIZE) {
       row_group_stats_base_->EncodeToThrift(&meta_data->statistics);
       meta_data->__isset.statistics = true;
     }
@@ -466,8 +465,12 @@ inline Status HdfsParquetTableWriter::BaseColumnWriter::AppendRow(TupleRow* row)
   // TODO: Have a clearer set of state transitions here, to make it easier to see that
   // this won't loop forever.
   while (true) {
-    // Nulls don't get encoded.
-    if (value == nullptr) break;
+    // Nulls don't get encoded. Increment the null count of the parquet statistics.
+    if (value == nullptr) {
+      DCHECK(page_stats_base_ != nullptr);
+      page_stats_base_->IncrementNullCount(1);
+      break;
+    }
 
     int64_t bytes_needed = 0;
     if (ProcessValue(value, &bytes_needed)) {
@@ -679,8 +682,7 @@ void HdfsParquetTableWriter::BaseColumnWriter::FinalizeCurrentPage() {
 
   // Build page statistics and add them to the header.
   DCHECK(page_stats_base_ != nullptr);
-  if (page_stats_base_->has_values()
-      && page_stats_base_->BytesNeeded() <= MAX_COLUMN_STATS_SIZE) {
+  if (page_stats_base_->BytesNeeded() <= MAX_COLUMN_STATS_SIZE) {
     page_stats_base_->EncodeToThrift(&header.data_page_header.statistics);
     header.data_page_header.__isset.statistics = true;
   }
