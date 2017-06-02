@@ -357,6 +357,25 @@ Add an example here.
 
       <p conref="../shared/impala_common.xml#common/s3_block_splitting"/>
 
+      <p rev="IMPALA-3909">
+        In <keyword keyref="impala29"/> and higher, Parquet files written by Impala include
+        embedded metadata specifying the minimum and maximum values for each column, within
+        each row group and each data page within the row group. Impala-written Parquet files
+        typically contain a single row group; a row group can contain many data pages.
+        Impala uses this information (currently, only the metadata for each row group)
+        when reading each Parquet data file during a query, to quickly determine whether each
+        row group within the file potentially includes any rows that match the conditions in the
+        <codeph>WHERE</codeph> clause. For example, if the column <codeph>X</codeph> within
+        a particular Parquet file has a minimum value of 1 and a maximum value of 100, then
+        a query including the clause <codeph>WHERE x &gt; 200</codeph> can quickly determine
+        that it is safe to skip that particular file, instead of scanning all the associated
+        column values. This optimization technique is especially effective for tables that
+        use the <codeph>SORT BY</codeph> clause for the columns most frequently checked in
+        <codeph>WHERE</codeph> clauses, because any <codeph>INSERT</codeph> operation on
+        such tables produces Parquet data files with relatively narrow ranges of column values
+        within each file.
+      </p>
+
     </conbody>
 
     <concept id="parquet_partitioning">
