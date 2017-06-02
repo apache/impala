@@ -1037,7 +1037,7 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
       if (ignore_if_absent) {
         return Status::OK();
       } else {
-        return Status("Invalid session ID");
+        return Status(Substitute("Invalid session id: $0", PrintId(session_id)));
       }
     }
     session_state = entry->second;
@@ -1082,7 +1082,7 @@ Status ImpalaServer::GetSessionState(const TUniqueId& session_id,
   SessionStateMap::iterator i = session_state_map_.find(session_id);
   if (i == session_state_map_.end()) {
     *session_state = std::shared_ptr<SessionState>();
-    return Status("Invalid session id");
+    return Status(Substitute("Invalid session id: $0", PrintId(session_id)));
   } else {
     if (mark_active) {
       lock_guard<mutex> session_lock(i->second->lock);

@@ -124,7 +124,8 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
 
   if (session == NULL) {
     status->__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
-    status->__set_errorMessage("Invalid session ID");
+    status->__set_errorMessage(Substitute("Invalid session id: $0",
+        PrintId(session_id)));
     status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
     return;
   }
@@ -432,7 +433,8 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
       SQLSTATE_GENERAL_ERROR);
   if (session == NULL) {
     HS2_RETURN_IF_ERROR(
-        return_val, Status("Invalid session ID"), SQLSTATE_GENERAL_ERROR);
+        return_val, Status(Substitute("Invalid session id: $0",
+            PrintId(session_id))), SQLSTATE_GENERAL_ERROR);
   }
 
   // Optionally enable result caching to allow restarting fetches.
