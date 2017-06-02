@@ -919,6 +919,9 @@ class ImpalaShell(cmd.Cmd):
         num_rows = 0
 
         for rows in rows_fetched:
+          # IMPALA-4418: Break out of the loop to prevent printing an unnecessary empty line.
+          if len(rows) == 0:
+            break
           self.output_stream.write(rows)
           num_rows += len(rows)
 
