@@ -191,7 +191,7 @@ class TestBreakpad(CustomClusterTestSuite):
     written to 'log_dir'.
     """
     minidump_base_dir = os.path.join(os.environ.get('LOG_DIR', '/tmp'), 'minidumps')
-    shutil.rmtree(minidump_base_dir)
+    shutil.rmtree(minidump_base_dir, ignore_errors=True)
     # Omitting minidump_path as a parameter to the cluster will choose the default
     # configuration, which is a FLAGS_log_dir/minidumps.
     self.start_cluster_with_args()
