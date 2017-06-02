@@ -253,20 +253,25 @@ EXPLAIN_LEVEL set to extended
       and non-primary key column <codeph>Y</codeph>, you can see that
       some operators in the <codeph>WHERE</codeph> clause are evaluated
       immediately by Kudu and others are evaluated later by Impala:
-<codeblock>
+    </p>
+
+<codeblock rev="2.9.0 IMPALA-4859">
 EXPLAIN SELECT x,y from kudu_table WHERE
-  x = 1 AND x NOT IN (2,3) AND y = 1
-  AND x IS NOT NULL AND x > 0;
+  x = 1 AND y NOT IN (2,3) AND z = 1
+  AND a IS NOT NULL AND b > 0 AND length(s) > 5;
 +----------------
 | Explain String
 +----------------
 ...
-| 00:SCAN KUDU [jrussell.hash_only]
-|    predicates: x IS NOT NULL, x NOT IN (2, 3)
-|    kudu predicates: x = 1, x > 0, y = 1
+| 00:SCAN KUDU [kudu_table]
+|    predicates: y NOT IN (2, 3), length(s) > 5
+|    kudu predicates: a IS NOT NULL, b > 0, x = 1, z = 1
 </codeblock>
-      Only binary predicates and <codeph>IN</codeph> predicates containing
-      literal values that exactly match the types in the Kudu table, and do not
+
+    <p rev="2.9.0 IMPALA-4859">
+      Only binary predicates, <codeph>IS NULL</codeph> and <codeph>IS NOT NULL</codeph>
+      (in <keyword keyref="impala29"/> and higher), and <codeph>IN</codeph> predicates
+      containing literal values that exactly match the types in the Kudu table, and do not
       require any casting, can be pushed to Kudu.
     </p>
 
