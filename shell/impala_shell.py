@@ -511,10 +511,13 @@ class ImpalaShell(cmd.Cmd):
     summary = None
     try:
       summary = self.imp_client.get_summary(self.last_query_handle)
-    except RPCException:
-      pass
-    if summary is None:
-      print_to_stderr("Could not retrieve summary for query.")
+    except RPCException, e:
+      import re
+      error_pattern = re.compile("ERROR: Query id \d+:\d+ not found.")
+      if error_pattern.match(e.value):
+        print_to_stderr("Could not retrieve summary for query.")
+      else:
+        print_to_stderr(e)
       return CmdStatus.ERROR
     if summary.nodes is None:
       print_to_stderr("Summary not available")
@@ -943,9 +946,11 @@ class ImpalaShell(cmd.Cmd):
       if not is_dml:
         self.imp_client.close_query(self.last_query_handle, self.query_handle_closed)
       self.query_handle_closed = True
-
-      profile = self.imp_client.get_runtime_profile(self.last_query_handle)
-      self.print_runtime_profile(profile)
+      try:
+        profile = self.imp_client.get_runtime_profile(self.last_query_handle)
+        self.print_runtime_profile(profile)
+      except RPCException, e:
+        if self.show_profiles: raise e
       return CmdStatus.SUCCESS
     except RPCException, e:
       # could not complete the rpc successfully

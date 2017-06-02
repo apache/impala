@@ -150,13 +150,14 @@ public class InlineViewRef extends TableRef {
         // If the user does not have privileges on the view's definition
         // then we report a masked authorization error so as not to reveal
         // privileged information (e.g., the existence of a table).
-        inlineViewAnalyzer_.setAuthErrMsg(
+        inlineViewAnalyzer_.setMaskPrivChecks(
             String.format("User '%s' does not have privileges to " +
             "EXPLAIN this statement.", analyzer.getUser().getName()));
       } else {
         // If this is not an EXPLAIN statement, auth checks for the view
-        // definition should be disabled.
-        inlineViewAnalyzer_.setEnablePrivChecks(false);
+        // definition are still performed in order to determine if the user has access
+        // to the runtime profile but don't trigger authorization errors.
+        inlineViewAnalyzer_.setMaskPrivChecks(null);
       }
     }
 

@@ -15,8 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "service/client-request-state.h"
 #include "util/auth-util.h"
-
 #include "gen-cpp/ImpalaInternalService_types.h"
 
 using namespace std;
@@ -28,6 +28,19 @@ namespace impala {
       return session.delegated_user;
     }
     return session.connected_user;
+  }
+
+  const std::string& GetEffectiveUser(const ImpalaServer::SessionState& session) {
+    return session.do_as_user.empty() ? session.connected_user : session.do_as_user;
+  }
+
+  Status CheckProfileAccess(const string& user, const string& effective_user,
+      bool has_access) {
+    if (user.empty() || (user == effective_user && has_access)) return Status::OK();
+    stringstream ss;
+    ss << "User " << user << " is not authorized to access the runtime profile or "
+       << "execution summary.";
+    return Status(ss.str());
   }
 
 }

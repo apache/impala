@@ -60,9 +60,9 @@ public class ShowCreateTableStmt extends StatementBase {
       // Only show the view's query if the user has permissions to execute the query, to
       // avoid revealing information, e.g. tables the user does not have access to.
       // Report a masked authorization message if authorization fails.
-      viewAnalyzer.setAuthErrMsg(String.format("User '%s' does not have privileges to " +
-          "see the definition of view '%s'.",
-          analyzer.getUser().getName(), view.getFullName()));
+      viewAnalyzer.setMaskPrivChecks(String.format("User '%s' does not have privileges " +
+          "to see the definition of view '%s'.", analyzer.getUser().getName(),
+          view.getFullName()));
       QueryStmt viewQuery = view.getQueryStmt().clone();
       // Views from the Hive metastore may rely on Hive's column naming if the SQL
       // statement references a column by its implicitly defined column names.

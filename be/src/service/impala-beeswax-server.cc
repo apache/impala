@@ -28,6 +28,7 @@
 #include "service/client-request-state.h"
 #include "service/query-options.h"
 #include "service/query-result-set.h"
+#include "util/auth-util.h"
 #include "util/impalad-metrics.h"
 #include "util/webserver.h"
 #include "util/runtime-profile.h"
@@ -348,14 +349,19 @@ void ImpalaServer::CloseInsert(TInsertResult& insert_result,
 // getting the profile, such as no matching queries found.
 void ImpalaServer::GetRuntimeProfile(string& profile_output, const QueryHandle& handle) {
   ScopedSessionState session_handle(this);
-  RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
+  const TUniqueId& session_id = ThriftServer::GetThreadConnectionId();
+  stringstream ss;
+  shared_ptr<SessionState> session;
+  RAISE_IF_ERROR(session_handle.WithSession(session_id, &session),
       SQLSTATE_GENERAL_ERROR);
-
+  if (session == NULL) {
+    ss << Substitute("Invalid session id: $0", PrintId(session_id));
+    RaiseBeeswaxException(ss.str(), SQLSTATE_GENERAL_ERROR);
+  }
   TUniqueId query_id;
   QueryHandleToTUniqueId(handle, &query_id);
   VLOG_RPC << "GetRuntimeProfile(): query_id=" << PrintId(query_id);
-  stringstream ss;
-  Status status = GetRuntimeProfileStr(query_id, false, &ss);
+  Status status = GetRuntimeProfileStr(query_id, GetEffectiveUser(*session), false, &ss);
   if (!status.ok()) {
     ss << "GetRuntimeProfile error: " << status.GetDetail();
     RaiseBeeswaxException(ss.str(), SQLSTATE_GENERAL_ERROR);
@@ -366,12 +372,19 @@ void ImpalaServer::GetRuntimeProfile(string& profile_output, const QueryHandle& 
 void ImpalaServer::GetExecSummary(impala::TExecSummary& result,
       const beeswax::QueryHandle& handle) {
   ScopedSessionState session_handle(this);
-  RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
+  const TUniqueId& session_id = ThriftServer::GetThreadConnectionId();
+  shared_ptr<SessionState> session;
+  RAISE_IF_ERROR(session_handle.WithSession(session_id, &session),
       SQLSTATE_GENERAL_ERROR);
+  if (session == NULL) {
+    stringstream ss;
+    ss << Substitute("Invalid session id: $0", PrintId(session_id));
+    RaiseBeeswaxException(ss.str(), SQLSTATE_GENERAL_ERROR);
+  }
   TUniqueId query_id;
   QueryHandleToTUniqueId(handle, &query_id);
   VLOG_RPC << "GetExecSummary(): query_id=" << PrintId(query_id);
-  Status status = GetExecSummary(query_id, &result);
+  Status status = GetExecSummary(query_id, GetEffectiveUser(*session), &result);
   if (!status.ok()) RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
 }
 

@@ -24,6 +24,7 @@ import tempfile
 import json
 from time import sleep, time
 from getpass import getuser
+from ImpalaService import ImpalaHiveServer2Service
 from TCLIService import TCLIService
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
@@ -44,7 +45,7 @@ class TestAuthorization(CustomClusterTestSuite):
     self.transport = TBufferedTransport(self.socket)
     self.transport.open()
     self.protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
-    self.hs2_client = TCLIService.Client(self.protocol)
+    self.hs2_client = ImpalaHiveServer2Service.Client(self.protocol)
 
   def teardown(self):
     if self.socket:
@@ -79,6 +80,94 @@ class TestAuthorization(CustomClusterTestSuite):
     execute_statement_req = TCLIService.TExecuteStatementReq()
     execute_statement_req.sessionHandle = self.session_handle
     execute_statement_req.statement = "describe tpch.lineitem"
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    TestHS2.check_response(execute_statement_resp)
+
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--server_name=server1\
+      --authorization_policy_file=%s\
+      --authorized_proxy_user_config=hue=%s" % (AUTH_POLICY_FILE, getuser()))
+  def test_access_runtime_profile(self):
+    from tests.hs2.test_hs2 import TestHS2
+    open_session_req = TCLIService.TOpenSessionReq()
+    open_session_req.username = getuser()
+    open_session_req.configuration = dict()
+    resp = self.hs2_client.OpenSession(open_session_req)
+    TestHS2.check_response(resp)
+
+    # Current user can't access view's underlying tables
+    self.session_handle = resp.sessionHandle
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = "explain select * from functional.complex_view"
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    assert 'User \'%s\' does not have privileges to EXPLAIN' % getuser() in\
+        str(execute_statement_resp)
+    # User should not have access to the runtime profile
+    self.__run_stmt_and_verify_profile_access("select * from functional.complex_view",
+        False, False)
+    self.__run_stmt_and_verify_profile_access("select * from functional.complex_view",
+        False, True)
+
+    # Repeat as a delegated user
+    open_session_req.username = 'hue'
+    open_session_req.configuration = dict()
+    # Delegated user is the current user
+    open_session_req.configuration['impala.doas.user'] = getuser()
+    resp = self.hs2_client.OpenSession(open_session_req)
+    TestHS2.check_response(resp)
+    self.session_handle = resp.sessionHandle
+    # User should not have access to the runtime profile
+    self.__run_stmt_and_verify_profile_access("select * from functional.complex_view",
+        False, False)
+    self.__run_stmt_and_verify_profile_access("select * from functional.complex_view",
+        False, True)
+
+    # Create a view for which the user has access to the underlying tables.
+    open_session_req.username = getuser()
+    open_session_req.configuration = dict()
+    resp = self.hs2_client.OpenSession(open_session_req)
+    TestHS2.check_response(resp)
+    self.session_handle = resp.sessionHandle
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = """create view if not exists tpch.customer_view as
+        select * from tpch.customer limit 1"""
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    TestHS2.check_response(execute_statement_resp)
+
+    # User should be able to run EXPLAIN
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = """explain select * from tpch.customer_view"""
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    TestHS2.check_response(execute_statement_resp)
+
+    # User should have access to the runtime profile and exec summary
+    self.__run_stmt_and_verify_profile_access("select * from tpch.customer_view", True,
+        False)
+    self.__run_stmt_and_verify_profile_access("select * from tpch.customer_view", True,
+        True)
+
+    # Repeat as a delegated user
+    open_session_req.username = 'hue'
+    open_session_req.configuration = dict()
+    # Delegated user is the current user
+    open_session_req.configuration['impala.doas.user'] = getuser()
+    resp = self.hs2_client.OpenSession(open_session_req)
+    TestHS2.check_response(resp)
+    self.session_handle = resp.sessionHandle
+    # User should have access to the runtime profile and exec summary
+    self.__run_stmt_and_verify_profile_access("select * from tpch.customer_view",
+        True, False)
+    self.__run_stmt_and_verify_profile_access("select * from tpch.customer_view",
+        True, True)
+
+    # Clean up
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = "drop view if exists tpch.customer_view"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     TestHS2.check_response(execute_statement_resp)
 
@@ -195,3 +284,44 @@ class TestAuthorization(CustomClusterTestSuite):
               json_dict[min(json_dict)]['impersonator'] == impersonator:
             return True
     return False
+
+  def __run_stmt_and_verify_profile_access(self, stmt, has_access, close_operation):
+    """Runs 'stmt' and retrieves the runtime profile and exec summary. If
+      'has_access' is true, it verifies that no runtime profile or exec summary are
+      returned. If 'close_operation' is true, make sure the operation is closed before
+      retrieving the profile and exec summary."""
+    from tests.hs2.test_hs2 import TestHS2
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = stmt
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    TestHS2.check_response(execute_statement_resp)
+
+    if close_operation:
+      close_operation_req = TCLIService.TCloseOperationReq()
+      close_operation_req.operationHandle = execute_statement_resp.operationHandle
+      TestHS2.check_response(self.hs2_client.CloseOperation(close_operation_req))
+
+    get_profile_req = ImpalaHiveServer2Service.TGetRuntimeProfileReq()
+    get_profile_req.operationHandle = execute_statement_resp.operationHandle
+    get_profile_req.sessionHandle = self.session_handle
+    get_profile_resp = self.hs2_client.GetRuntimeProfile(get_profile_req)
+
+    if has_access:
+      TestHS2.check_response(get_profile_resp)
+      assert "Plan: " in get_profile_resp.profile
+    else:
+      assert "User %s is not authorized to access the runtime profile or "\
+          "execution summary." % (getuser()) in str(get_profile_resp)
+
+    exec_summary_req = ImpalaHiveServer2Service.TGetExecSummaryReq()
+    exec_summary_req.operationHandle = execute_statement_resp.operationHandle
+    exec_summary_req.sessionHandle = self.session_handle
+    exec_summary_resp = self.hs2_client.GetExecSummary(exec_summary_req)
+
+    if has_access:
+      TestHS2.check_response(exec_summary_resp)
+      assert exec_summary_resp.summary.nodes is not None
+    else:
+      assert "User %s is not authorized to access the runtime profile or "\
+          "execution summary." % (getuser()) in str(exec_summary_resp)

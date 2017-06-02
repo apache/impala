@@ -147,6 +147,7 @@ class ClientRequestState {
       return GetEffectiveUser(query_ctx_.session);
   }
   const std::string& connected_user() const { return query_ctx_.session.connected_user; }
+  bool user_has_profile_access() const { return user_has_profile_access_; }
   const std::string& do_as_user() const { return query_ctx_.session.delegated_user; }
   TSessionType::type session_type() const { return query_ctx_.session.session_type; }
   const TUniqueId& session_id() const { return query_ctx_.session.session_id; }
@@ -180,6 +181,9 @@ class ClientRequestState {
   beeswax::QueryState::type query_state() const { return query_state_; }
   const Status& query_status() const { return query_status_; }
   void set_result_metadata(const TResultSetMetadata& md) { result_metadata_ = md; }
+  void set_user_profile_access(bool user_has_profile_access) {
+    user_has_profile_access_ = user_has_profile_access;
+  }
   const RuntimeProfile& profile() const { return profile_; }
   const RuntimeProfile& summary_profile() const { return summary_profile_; }
   const TimestampValue& start_time() const { return start_time_; }
@@ -315,7 +319,9 @@ class ClientRequestState {
   beeswax::QueryState::type query_state_;
   Status query_status_;
   TExecRequest exec_request_;
-
+  /// If true, effective_user() has access to the runtime profile and execution
+  /// summary.
+  bool user_has_profile_access_;
   TResultSetMetadata result_metadata_; // metadata for select query
   RowBatch* current_batch_; // the current row batch; only applicable if coord is set
   int current_batch_row_; // number of rows fetched within the current batch

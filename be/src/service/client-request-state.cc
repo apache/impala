@@ -83,6 +83,7 @@ ClientRequestState::ClientRequestState(
     is_cancelled_(false),
     eos_(false),
     query_state_(beeswax::QueryState::CREATED),
+    user_has_profile_access_(true),
     current_batch_(NULL),
     current_batch_row_(0),
     num_rows_fetched_(0),
@@ -1083,4 +1084,5 @@ void ClientRequestState::UpdateQueryState(
   query_state_ = query_state;
   summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
 }
+
 }

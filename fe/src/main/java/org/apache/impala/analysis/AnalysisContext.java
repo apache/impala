@@ -44,6 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -93,6 +94,7 @@ public class AnalysisContext {
     private StatementBase stmt_;
     private Analyzer analyzer_;
     private EventSequence timeline_;
+    private boolean userHasProfileAccess_ = true;
 
     public boolean isAlterTableStmt() { return stmt_ instanceof AlterTableStmt; }
     public boolean isAlterViewStmt() { return stmt_ instanceof AlterViewStmt; }
@@ -345,6 +347,8 @@ public class AnalysisContext {
     public TLineageGraph getThriftLineageGraph() {
       return analyzer_.getThriftSerializedLineageGraph();
     }
+    public void setUserHasProfileAccess(boolean value) { userHasProfileAccess_ = value; }
+    public boolean userHasProfileAccess() { return userHasProfileAccess_; }
   }
 
   /**
@@ -490,10 +494,18 @@ public class AnalysisContext {
       }
     }
 
-    // Check any masked requests.
+    // Check all masked requests. If a masked request has an associated error message,
+    // an AuthorizationException is thrown if authorization fails. Masked requests with no
+    // error message are used to check if the user can access the runtime profile.
+    // These checks don't result in an AuthorizationException but set the
+    // 'user_has_profile_access' flag in queryCtx_.
     for (Pair<PrivilegeRequest, String> maskedReq: analyzer.getMaskedPrivilegeReqs()) {
       if (!authzChecker.hasAccess(analyzer.getUser(), maskedReq.first)) {
-        throw new AuthorizationException(maskedReq.second);
+        analysisResult_.setUserHasProfileAccess(false);
+        if (!Strings.isNullOrEmpty(maskedReq.second)) {
+          throw new AuthorizationException(maskedReq.second);
+        }
+        break;
       }
     }
   }

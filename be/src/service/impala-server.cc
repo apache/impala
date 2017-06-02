@@ -593,7 +593,7 @@ Status ImpalaServer::InitProfileLogging() {
 }
 
 Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
-    bool base64_encoded, stringstream* output) {
+    const string& user, bool base64_encoded, stringstream* output) {
   DCHECK(output != nullptr);
   // Search for the query id in the active query map
   {
@@ -604,6 +604,8 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
         return Status::Expected("Query plan is not ready.");
       }
       lock_guard<mutex> l(*request_state->lock());
+      RETURN_IF_ERROR(CheckProfileAccess(user, request_state->effective_user(),
+          request_state->user_has_profile_access()));
       if (base64_encoded) {
         request_state->profile().SerializeToArchiveString(output);
       } else {
@@ -622,6 +624,8 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
       ss << "Query id " << PrintId(query_id) << " not found.";
       return Status(ss.str());
     }
+    RETURN_IF_ERROR(CheckProfileAccess(user, query_record->second->effective_user,
+        query_record->second->user_has_profile_access));
     if (base64_encoded) {
       (*output) << query_record->second->encoded_profile_str;
     } else {
@@ -631,12 +635,15 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
   return Status::OK();
 }
 
-Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, TExecSummary* result) {
+Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& user,
+    TExecSummary* result) {
   // Search for the query id in the active query map.
   {
     shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
     if (request_state != nullptr) {
       lock_guard<mutex> l(*request_state->lock());
+      RETURN_IF_ERROR(CheckProfileAccess(user, request_state->effective_user(),
+          request_state->user_has_profile_access()));
       if (request_state->coord() != nullptr) {
         request_state->coord()->GetTExecSummary(result);
         TExecProgress progress;
@@ -659,6 +666,8 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, TExecSummary* res
       ss << "Query id " << PrintId(query_id) << " not found.";
       return Status(ss.str());
     }
+    RETURN_IF_ERROR(CheckProfileAccess(user, query_record->second->effective_user,
+        query_record->second->user_has_profile_access));
     *result = query_record->second->exec_summary;
   }
   return Status::OK();
@@ -833,6 +842,7 @@ Status ImpalaServer::ExecuteInternal(
         exec_env_->frontend()->GetExecRequest(query_ctx, &result)));
 
     (*request_state)->query_events()->MarkEvent("Planning finished");
+    (*request_state)->set_user_profile_access(result.user_has_profile_access);
     (*request_state)->summary_profile()->AddEventSequence(
         result.timeline.name, result.timeline);
     if (result.__isset.result_set_metadata) {
@@ -1677,6 +1687,7 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const ClientRequestState& reque
   all_rows_returned = request_state.eos();
   last_active_time_ms = request_state.last_active_ms();
   request_pool = request_state.request_pool();
+  user_has_profile_access = request_state.user_has_profile_access();
 }
 
 bool ImpalaServer::QueryStateRecordLessThan::operator() (

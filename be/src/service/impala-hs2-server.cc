@@ -41,6 +41,7 @@
 #include "service/client-request-state.h"
 #include "service/query-options.h"
 #include "service/query-result-set.h"
+#include "util/auth-util.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
 #include "util/runtime-profile-counters.h"
@@ -847,13 +848,17 @@ void ImpalaServer::GetExecSummary(TGetExecSummaryResp& return_val,
   shared_ptr<SessionState> session;
   HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id, &session),
       SQLSTATE_GENERAL_ERROR);
+  if (session == NULL) {
+    HS2_RETURN_ERROR(return_val, Substitute("Invalid session id: $0",
+        PrintId(session_id)), SQLSTATE_GENERAL_ERROR);
+  }
 
   TUniqueId query_id;
   HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
       request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
 
   TExecSummary summary;
-  Status status = GetExecSummary(query_id, &summary);
+  Status status = GetExecSummary(query_id, GetEffectiveUser(*session), &summary);
   HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
   return_val.__set_summary(summary);
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
@@ -869,14 +874,18 @@ void ImpalaServer::GetRuntimeProfile(TGetRuntimeProfileResp& return_val,
   shared_ptr<SessionState> session;
   HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id, &session),
       SQLSTATE_GENERAL_ERROR);
+  if (session == NULL) {
+    HS2_RETURN_ERROR(return_val, Substitute("Invalid session id: $0",
+        PrintId(session_id)), SQLSTATE_GENERAL_ERROR);
+  }
 
   TUniqueId query_id;
   HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
       request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
 
   stringstream ss;
-  HS2_RETURN_IF_ERROR(return_val, GetRuntimeProfileStr(query_id, false, &ss),
-      SQLSTATE_GENERAL_ERROR);
+  HS2_RETURN_IF_ERROR(return_val, GetRuntimeProfileStr(query_id,
+      GetEffectiveUser(*session), false, &ss), SQLSTATE_GENERAL_ERROR);
   return_val.__set_profile(ss.str());
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }

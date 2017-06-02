@@ -1057,6 +1057,7 @@ public class Frontend {
     result.setQuery_options(queryCtx.client_request.getQuery_options());
     result.setAccess_events(analysisResult.getAccessEvents());
     result.analysis_warnings = analysisResult.getAnalyzer().getWarnings();
+    result.setUser_has_profile_access(analysisResult.userHasProfileAccess());
 
     TQueryOptions queryOptions = queryCtx.client_request.query_options;
     if (analysisResult.isCatalogOp()) {

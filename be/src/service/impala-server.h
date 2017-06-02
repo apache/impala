@@ -473,12 +473,19 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   /// output stream will not be modified on error.
   /// If base64_encoded, outputs the base64 encoded profile output, otherwise the human
   /// readable string.
-  Status GetRuntimeProfileStr(const TUniqueId& query_id, bool base64_encoded,
-      std::stringstream* output) WARN_UNUSED_RESULT;
+  /// If the user asking for this profile is the same user that runs the query
+  /// and that user has access to the runtime profile, the profile is written to
+  /// the output. Otherwise, nothing is written to output and an error code is
+  /// returned to indicate an authorization error.
+  Status GetRuntimeProfileStr(const TUniqueId& query_id, const std::string& user,
+      bool base64_encoded, std::stringstream* output) WARN_UNUSED_RESULT;
 
-  /// Returns the exec summary for this query.
-  Status GetExecSummary(const TUniqueId& query_id, TExecSummary* result)
-      WARN_UNUSED_RESULT;
+  /// Returns the exec summary for this query if the user asking for the exec
+  /// summary is the same user that run the query and that user has access to the full
+  /// query profile. Otherwise, an error status is returned to indicate an
+  /// authorization error.
+  Status GetExecSummary(const TUniqueId& query_id, const std::string& user,
+      TExecSummary* result) WARN_UNUSED_RESULT;
 
   /// Initialize "default_configs_" to show the default values for ImpalaQueryOptions and
   /// "support_start_over/false" to indicate that Impala does not support start over
@@ -559,6 +566,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     /// If there is no delegated user, this will be the connected user. Otherwise, it
     /// will be set to the delegated user.
     std::string effective_user;
+
+    /// If true, effective_user has access to the runtime profile and execution
+    /// summary.
+    bool user_has_profile_access;
 
     /// default db for this query
     std::string default_db;

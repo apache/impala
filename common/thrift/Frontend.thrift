@@ -564,6 +564,11 @@ struct TExecRequest {
 
   // Timeline of planner's operation, for profiling
   11: optional RuntimeProfile.TEventSequence timeline
+
+  // If false, the user that runs this statement doesn't have access to the runtime
+  // profile. For example, a user can't access the runtime profile of a query
+  // that has a view for which the user doesn't have access to the underlying tables.
+  12: optional bool user_has_profile_access
 }
 
 // Parameters to FeSupport.cacheJar().

@@ -150,12 +150,15 @@ public class Analyzer {
   // Flag indicating whether this analyzer belongs to a WITH clause view.
   private boolean isWithClause_ = false;
 
-  // If set, when privilege requests are registered they will use this error
+  // If set, when masked privilege requests are registered they will use this error
   // error message.
   private String authErrorMsg_;
 
-  // If false, privilege requests will not be registered in the analyzer.
-  // Note: it's not the purpose of this flag to control if security is enabled in general.
+  // If true privilege requests are added in maskedPrivileReqs_. Otherwise, privilege
+  // requests are added to privilegeReqs_.
+  private boolean maskPrivChecks_ = false;
+
+  // If false, privilege requests are not registered.
   private boolean enablePrivChecks_ = true;
 
   // By default, all registered semi-joined tuples are invisible, i.e., their slots
@@ -408,6 +411,7 @@ public class Analyzer {
     user_ = parentAnalyzer.getUser();
     useHiveColLabels_ = parentAnalyzer.useHiveColLabels_;
     authErrorMsg_ = parentAnalyzer.authErrorMsg_;
+    maskPrivChecks_ = parentAnalyzer.maskPrivChecks_;
     enablePrivChecks_ = parentAnalyzer.enablePrivChecks_;
     isWithClause_ = parentAnalyzer.isWithClause_;
   }
@@ -2448,10 +2452,12 @@ public class Analyzer {
     return new TableName(getDefaultDb(), tableName.getTbl());
   }
 
-  public void setEnablePrivChecks(boolean value) {
-    enablePrivChecks_ = value;
+  public void setMaskPrivChecks(String errMsg) {
+    maskPrivChecks_ = true;
+    authErrorMsg_ = errMsg;
   }
-  public void setAuthErrMsg(String errMsg) { authErrorMsg_ = errMsg; }
+
+  public void setEnablePrivChecks(boolean value) { enablePrivChecks_ = value; }
   public void setIsStraightJoin() { isStraightJoin_ = true; }
   public boolean isStraightJoin() { return isStraightJoin_; }
   public void setIsExplain() { globalState_.isExplain = true; }
@@ -2518,22 +2524,15 @@ public class Analyzer {
   }
 
   /**
-   * Registers a new PrivilegeRequest in the analyzer. If authErrorMsg_ is set,
-   * the privilege request will be added to the list of "masked" privilege requests,
-   * using authErrorMsg_ as the auth failure error message. Otherwise it will get
-   * added as a normal privilege request that will use the standard error message
-   * on authorization failure.
-   * If enablePrivChecks_ is false, the registration request will be ignored. This
-   * is used when analyzing catalog views since users should be able to query a view
-   * even if they do not have privileges on the underlying tables.
+   * Registers a new PrivilegeRequest in the analyzer.
    */
   public void registerPrivReq(PrivilegeRequest privReq) {
     if (!enablePrivChecks_) return;
-
-    if (Strings.isNullOrEmpty(authErrorMsg_)) {
-      globalState_.privilegeReqs.add(privReq);
+    if (maskPrivChecks_) {
+      globalState_.maskedPrivilegeReqs.add(
+          Pair.<PrivilegeRequest, String>create(privReq, authErrorMsg_));
     } else {
-      globalState_.maskedPrivilegeReqs.add(Pair.create(privReq, authErrorMsg_));
+      globalState_.privilegeReqs.add(privReq);
     }
   }
 
