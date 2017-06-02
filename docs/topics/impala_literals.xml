@@ -299,7 +299,7 @@ select case bool_col when true then 'yes' when false 'no' else 'null' end from t
 
       <p>
         You can also use <codeph>INTERVAL</codeph> expressions to add or subtract from timestamp literal values,
-        such as <codeph>'1966-07-30' + INTERVAL 5 YEARS + INTERVAL 3 DAYS</codeph>. See
+        such as <codeph>CAST('1966-07-30' AS TIMESTAMP) + INTERVAL 5 YEARS + INTERVAL 3 DAYS</codeph>. See
         <xref href="impala_timestamp.xml#timestamp"/> for details.
       </p>
 
