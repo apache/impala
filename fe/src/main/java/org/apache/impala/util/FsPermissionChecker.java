@@ -284,17 +284,20 @@ public class FsPermissionChecker {
     Preconditions.checkNotNull(fs);
     Preconditions.checkNotNull(path);
     AclStatus aclStatus = null;
-    try {
-      aclStatus = fs.getAclStatus(path);
-    } catch (AclException ex) {
-      if (LOG.isTraceEnabled()) {
-        LOG.trace(
-            "No ACLs retrieved, skipping ACLs check (HDFS will enforce ACLs)", ex);
+    FileStatus fileStatus = fs.getFileStatus(path);
+    if (fileStatus.getPermission().getAclBit()) {
+      try {
+        aclStatus = fs.getAclStatus(path);
+      } catch (AclException ex) {
+        if (LOG.isTraceEnabled()) {
+          LOG.trace(
+              "No ACLs retrieved, skipping ACLs check (HDFS will enforce ACLs)", ex);
+        }
+      } catch (UnsupportedOperationException ex) {
+        if (LOG.isTraceEnabled()) LOG.trace("No ACLs retrieved, unsupported", ex);
       }
-    } catch (UnsupportedOperationException ex) {
-      if (LOG.isTraceEnabled()) LOG.trace("No ACLs retrieved, unsupported", ex);
     }
-    return new Permissions(fs.getFileStatus(path), aclStatus);
+    return new Permissions(fileStatus, aclStatus);
   }
 
   /**
