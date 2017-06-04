@@ -237,7 +237,6 @@ void RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
     LogError(ErrorMsg(TErrorCode::GENERAL,
         GetTablesMissingStatsWarning(query_ctx().tables_missing_stats)));
   }
-  DCHECK(query_status_.IsMemLimitExceeded());
 }
 
 Status RuntimeState::CheckQueryState() {
