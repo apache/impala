@@ -314,8 +314,8 @@ public class ToSqlTest extends FrontendTestBase {
         "CREATE TABLE default.p ( a BIGINT PRIMARY KEY, b TIMESTAMP " +
         "DEFAULT '1987-05-19' ) PARTITION BY HASH (a) PARTITIONS 3 " +
         "STORED AS KUDU TBLPROPERTIES ('kudu.master_addresses'='foo', " +
-        "'kudu.table_name'='impala::default.p', " +
-        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler')", true);
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+        "'kudu.table_name'='impala::default.p')", true);
   }
 
   @Test
@@ -346,8 +346,9 @@ public class ToSqlTest extends FrontendTestBase {
         "default",
         "CREATE TABLE default.p PRIMARY KEY (a, b) PARTITION BY HASH (a) PARTITIONS 3, " +
         "RANGE (b) (PARTITION VALUE = 1) STORED AS KUDU TBLPROPERTIES " +
-        "('kudu.master_addresses'='foo', 'kudu.table_name'='impala::default.p', " +
-        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler') AS " +
+        "('kudu.master_addresses'='foo', " +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+        "'kudu.table_name'='impala::default.p') AS " +
         "SELECT int_col a, bigint_col b FROM functional.alltypes", true);
   }
 

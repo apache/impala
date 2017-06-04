@@ -189,8 +189,9 @@ public class SortInfo {
     sortTupleExprs.addAll(substOrderBy.getLhs());
 
     // Case 2: SlotRefs in the result and ordering exprs after substituting the
-    // materialized ordering exprs.
-    Set<SlotRef> sourceSlots = Sets.newHashSet();
+    // materialized ordering exprs. Using a LinkedHashSet prevents the slots getting
+    // reordered unnecessarily.
+    Set<SlotRef> sourceSlots = Sets.newLinkedHashSet();
     TreeNode.collect(Expr.substituteList(resultExprs, substOrderBy, analyzer, false),
         Predicates.instanceOf(SlotRef.class), sourceSlots);
     TreeNode.collect(Expr.substituteList(orderingExprs_, substOrderBy, analyzer, false),

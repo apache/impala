@@ -20,7 +20,8 @@ package org.apache.impala.planner;
 import org.apache.impala.common.Id;
 import org.apache.impala.common.IdGenerator;
 
-public class RuntimeFilterId extends Id<RuntimeFilterId> {
+public class RuntimeFilterId extends Id<RuntimeFilterId>
+    implements Comparable<Id<RuntimeFilterId>> {
   // Construction only allowed via an IdGenerator.
   protected RuntimeFilterId(int id) {
     super(id);
@@ -42,4 +43,6 @@ public class RuntimeFilterId extends Id<RuntimeFilterId> {
 
   @Override
   public int hashCode() { return id_; }
+
+  public int compareTo(RuntimeFilterId cmp) { return Integer.compare(id_, cmp.id_); }
 }

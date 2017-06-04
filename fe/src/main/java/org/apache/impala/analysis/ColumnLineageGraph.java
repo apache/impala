@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -43,6 +44,7 @@ import org.apache.impala.thrift.TVertex;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -117,8 +119,7 @@ final class Vertex implements Comparable<Vertex> {
     if (obj == null) return false;
     if (obj.getClass() != this.getClass()) return false;
     Vertex vertex = (Vertex) obj;
-    return this.id_.equals(vertex.id_) &&
-        this.label_.equals(vertex.label_);
+    return this.id_.equals(vertex.id_);
   }
 
   public int compareTo(Vertex cmp) { return this.id_.compareTo(cmp.id_); }
@@ -164,32 +165,47 @@ final class MultiEdge {
     edgeType_ = type;
   }
 
+  /**
+   * Return an ordered set of source vertices.
+   */
+  private ImmutableSortedSet<Vertex> getOrderedSources() {
+    return ImmutableSortedSet.copyOf(sources_);
+  }
+
+  /**
+   * Return an ordered set of target vertices.
+   */
+  private ImmutableSortedSet<Vertex> getOrderedTargets() {
+    return ImmutableSortedSet.copyOf(targets_);
+  }
+
   @Override
   public String toString() {
     StringBuilder builder = new StringBuilder();
     Joiner joiner = Joiner.on(",");
     builder.append("Sources: [");
-    builder.append(joiner.join(sources_) + "]\n");
+    builder.append(joiner.join(getOrderedSources()) + "]\n");
     builder.append("Targets: [");
-    builder.append(joiner.join(targets_) + "]\n");
+    builder.append(joiner.join(getOrderedTargets()) + "]\n");
     builder.append("Type: " + edgeType_);
     return builder.toString();
   }
 
   /**
    * Encodes this MultiEdge object to a JSON object represented by a Map.
+   * Returns a LinkedHashMap to guarantee a consistent ordering of elements.
    */
-  public Map toJson() {
-    Map obj = new LinkedHashMap();
+  public LinkedHashMap toJson() {
+    LinkedHashMap obj = new LinkedHashMap();
     // Add sources
     JSONArray sourceIds = new JSONArray();
-    for (Vertex vertex: sources_) {
+    for (Vertex vertex: getOrderedSources()) {
       sourceIds.add(vertex.getVertexId());
     }
     obj.put("sources", sourceIds);
     // Add targets
     JSONArray targetIds = new JSONArray();
-    for (Vertex vertex: targets_) {
+    for (Vertex vertex: getOrderedTargets()) {
       targetIds.add(vertex.getVertexId());
     }
     obj.put("targets", targetIds);
@@ -202,11 +218,11 @@ final class MultiEdge {
    */
   public TMultiEdge toThrift() {
     List<TVertex> sources = Lists.newArrayList();
-    for (Vertex vertex: sources_) {
+    for (Vertex vertex: getOrderedSources()) {
       sources.add(vertex.toThrift());
     }
     List<TVertex> targets = Lists.newArrayList();
-    for (Vertex vertex: targets_) {
+    for (Vertex vertex: getOrderedTargets()) {
       targets.add(vertex.toThrift());
     }
     if (edgeType_ == EdgeType.PROJECTION) {
@@ -216,7 +232,7 @@ final class MultiEdge {
   }
 
   /**
-   * Constructs a MultiEdge object from a thrift object
+   * Constructs a MultiEdge object from a thrift object.
    */
   public static MultiEdge fromThrift(TMultiEdge obj){
     Set<Vertex> sources = Sets.newHashSet();
@@ -324,12 +340,14 @@ public class ColumnLineageGraph {
    */
   private MultiEdge createMultiEdge(Set<String> targets, Set<String> sources,
       MultiEdge.EdgeType type) {
+    // createVertex() generates new IDs; we sort the input sets to make the output
+    // deterministic and independent of the ordering of the input sets.
     Set<Vertex> targetVertices = Sets.newHashSet();
-    for (String target: targets) {
+    for (String target: ImmutableSortedSet.copyOf(targets)) {
       targetVertices.add(createVertex(target));
     }
     Set<Vertex> sourceVertices = Sets.newHashSet();
-    for (String source: sources) {
+    for (String source: ImmutableSortedSet.copyOf(sources)) {
       sourceVertices.add(createVertex(source));
     }
     MultiEdge edge = new MultiEdge(sourceVertices, targetVertices, type);

@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.io.StringReader;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -449,8 +450,10 @@ public class AnalysisContext {
         analysisResult_.isCreateTableAsSelectStmt() ||
         analysisResult_.isCreateViewStmt() || analysisResult_.isAlterViewStmt()) {
       // Map of table name to a list of privilege requests associated with that table.
-      // These include both table-level and column-level privilege requests.
-      Map<String, List<PrivilegeRequest>> tablePrivReqs = Maps.newHashMap();
+      // These include both table-level and column-level privilege requests. We use a
+      // LinkedHashMap to preserve the order in which requests are inserted.
+      LinkedHashMap<String, List<PrivilegeRequest>> tablePrivReqs =
+          Maps.newLinkedHashMap();
       // Privilege requests that are not column or table-level.
       List<PrivilegeRequest> otherPrivReqs = Lists.newArrayList();
       // Group the registered privilege requests based on the table they reference.

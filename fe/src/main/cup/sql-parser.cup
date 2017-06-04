@@ -24,6 +24,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java_cup.runtime.Symbol;
@@ -1477,20 +1478,20 @@ tbl_properties ::=
   KW_TBLPROPERTIES LPAREN properties_map:map RPAREN
   {: RESULT = map; :}
   | /* empty */
-  {: RESULT = new HashMap<String, String>(); :}
+  {: RESULT = new LinkedHashMap<String, String>(); :}
   ;
 
 serde_properties ::=
   KW_WITH KW_SERDEPROPERTIES LPAREN properties_map:map RPAREN
   {: RESULT = map; :}
   | /* empty */
-  {: RESULT = new HashMap<String, String>(); :}
+  {: RESULT = new LinkedHashMap<String, String>(); :}
   ;
 
 properties_map ::=
   STRING_LITERAL:key EQUAL STRING_LITERAL:value
   {:
-    HashMap<String, String> properties = new HashMap<String, String>();
+    LinkedHashMap<String, String> properties = new LinkedHashMap<String, String>();
     properties.put(key, value);
     RESULT = properties;
   :}
@@ -1533,7 +1534,7 @@ column_options_map ::=
   :}
   | column_option:col_option
   {:
-    Map<Option, Object> options = Maps.newHashMap();
+    LinkedHashMap<Option, Object> options = Maps.newLinkedHashMap();
     options.put(col_option.first, col_option.second);
     RESULT = options;
   :}
@@ -1700,7 +1701,7 @@ view_column_def_list ::=
 view_column_def ::=
   ident_or_default:col_name opt_comment_val:comment
   {:
-    Map<Option, Object> options = Maps.newHashMap();
+    Map<Option, Object> options = Maps.newLinkedHashMap();
     if (comment != null) options.put(Option.COMMENT, comment);
     RESULT = new ColumnDef(col_name, null, options);
   :}
@@ -1914,7 +1915,7 @@ function_def_args_map ::=
   function_def_arg_key:key EQUAL STRING_LITERAL:value
   {:
     HashMap<CreateFunctionStmtBase.OptArg, String> args =
-        new HashMap<CreateFunctionStmtBase.OptArg, String>();
+        new LinkedHashMap<CreateFunctionStmtBase.OptArg, String>();
     args.put(key, value);
     RESULT = args;
   :}
@@ -1925,7 +1926,7 @@ function_def_args_map ::=
     RESULT = args;
   :}
   |
-  {: RESULT = new HashMap<CreateFunctionStmtBase.OptArg, String>(); :}
+  {: RESULT = new LinkedHashMap<CreateFunctionStmtBase.OptArg, String>(); :}
   ;
 
 // Any keys added here must also be added to the end of the precedence list.

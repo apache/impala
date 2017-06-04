@@ -2408,7 +2408,7 @@ PLAN-ROOT SINK
 01:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=577.87MB
    predicates: !empty(c.c_orders)
-   predicates on o: o_orderstatus = 'F', !empty(o.o_lineitems)
+   predicates on o: !empty(o.o_lineitems), o_orderstatus = 'F'
    predicates on l1: l1.l_receiptdate > l1.l_commitdate
    predicates on l3: l3.l_receiptdate > l3.l_commitdate
 ---- DISTRIBUTEDPLAN
@@ -2483,7 +2483,7 @@ PLAN-ROOT SINK
 01:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=577.87MB
    predicates: !empty(c.c_orders)
-   predicates on o: o_orderstatus = 'F', !empty(o.o_lineitems)
+   predicates on o: !empty(o.o_lineitems), o_orderstatus = 'F'
    predicates on l1: l1.l_receiptdate > l1.l_commitdate
    predicates on l3: l3.l_receiptdate > l3.l_commitdate
 ====

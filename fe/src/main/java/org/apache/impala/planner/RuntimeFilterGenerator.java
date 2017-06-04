@@ -432,14 +432,21 @@ public final class RuntimeFilterGenerator {
   }
 
   /**
-   * Returns a set of all the registered runtime filters.
+   * Returns a list of all the registered runtime filters, ordered by filter ID.
    */
-  public Set<RuntimeFilter> getRuntimeFilters() {
-    Set<RuntimeFilter> result = Sets.newHashSet();
+  public List<RuntimeFilter> getRuntimeFilters() {
+    Set<RuntimeFilter> resultSet = Sets.newHashSet();
     for (List<RuntimeFilter> filters: runtimeFiltersByTid_.values()) {
-      result.addAll(filters);
+      resultSet.addAll(filters);
     }
-    return result;
+    List<RuntimeFilter> resultList = Lists.newArrayList(resultSet);
+    Collections.sort(resultList, new Comparator<RuntimeFilter>() {
+        public int compare(RuntimeFilter a, RuntimeFilter b) {
+          return a.getFilterId().compareTo(b.getFilterId());
+        }
+      }
+    );
+    return resultList;
   }
 
   /**

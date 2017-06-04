@@ -178,7 +178,9 @@ public class Analyzer {
   public void setIsWithClause() { isWithClause_ = true; }
   public boolean isWithClause() { return isWithClause_; }
 
-  // state shared between all objects of an Analyzer tree
+  // State shared between all objects of an Analyzer tree. We use LinkedHashMap and
+  // LinkedHashSet where applicable to preserve the iteration order and make the class
+  // behave identical across different implementations of the JVM.
   // TODO: Many maps here contain properties about tuples, e.g., whether
   // a tuple is outer/semi joined, etc. Remove the maps in favor of making
   // them properties of the tuple descriptor itself.
@@ -202,8 +204,9 @@ public class Analyzer {
     // True if at least one of the analyzers belongs to a subquery.
     public boolean containsSubquery = false;
 
-    // all registered conjuncts (map from expr id to conjunct)
-    public final Map<ExprId, Expr> conjuncts = Maps.newHashMap();
+    // all registered conjuncts (map from expr id to conjunct). We use a LinkedHashMap to
+    // preserve the order in which conjuncts are added.
+    public final LinkedHashMap<ExprId, Expr> conjuncts = Maps.newLinkedHashMap();
 
     // all registered conjuncts bound by a single tuple id; used in getBoundPredicates()
     public final ArrayList<ExprId> singleTidConjuncts = Lists.newArrayList();

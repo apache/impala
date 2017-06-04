@@ -19,6 +19,7 @@ package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -183,7 +184,9 @@ public class ToSqlUtils {
     for (ColumnDef col: innerStmt.getPartitionColumnDefs()) {
       partitionColsSql.add(col.getColName());
     }
-    HashMap<String, String> properties = Maps.newHashMap(innerStmt.getTblProperties());
+    // Use a LinkedHashMap to preserve the ordering of the table properties.
+    LinkedHashMap<String, String> properties =
+        Maps.newLinkedHashMap(innerStmt.getTblProperties());
     removeHiddenTableProperties(properties);
     String kuduParamsSql = getKuduPartitionByParams(innerStmt);
     // TODO: Pass the correct compression, if applicable.
@@ -205,7 +208,8 @@ public class ToSqlUtils {
     Preconditions.checkNotNull(table);
     if (table instanceof View) return getCreateViewSql((View)table);
     org.apache.hadoop.hive.metastore.api.Table msTable = table.getMetaStoreTable();
-    HashMap<String, String> properties = Maps.newHashMap(msTable.getParameters());
+    // Use a LinkedHashMap to preserve the ordering of the table properties.
+    LinkedHashMap<String, String> properties = Maps.newLinkedHashMap(msTable.getParameters());
     if (properties.containsKey("transient_lastDdlTime")) {
       properties.remove("transient_lastDdlTime");
     }
