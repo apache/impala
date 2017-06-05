@@ -1305,8 +1305,8 @@ select c_first_name, c_last_name from customer where lower(trim(c_last_name)) rl
       <p id="infinity_and_nan" rev="IMPALA-3267">
         Infinity and NaN can be specified in text data files as <codeph>inf</codeph> and <codeph>nan</codeph>
         respectively, and Impala interprets them as these special values. They can also be produced by certain
-        arithmetic expressions; for example, <codeph>pow(-1, 0.5)</codeph> returns <codeph>Infinity</codeph> and
-        <codeph>1/0</codeph> returns <codeph>NaN</codeph>. Or you can cast the literal values, such as <codeph>CAST('nan' AS
+        arithmetic expressions; for example, <codeph>1/0</codeph> returns <codeph>Infinity</codeph> and
+        <codeph>pow(-1, 0.5)</codeph> returns <codeph>NaN</codeph>. Or you can cast the literal values, such as <codeph>CAST('nan' AS
         DOUBLE)</codeph> or <codeph>CAST('inf' AS DOUBLE)</codeph>.
       </p>
 
