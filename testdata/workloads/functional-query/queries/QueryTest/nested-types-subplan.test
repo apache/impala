@@ -577,7 +577,7 @@ where c_custkey = 1
 BIGINT,BIGINT
 ====
 ---- QUERY
-# IMPALA-3678: union in a subplan - passthrough should be disabled.
+# IMPALA-3678: Union in a subplan - passthrough should be disabled.
 select count(c.c_custkey), count(v.tot_price)
 from tpch_nested_parquet.customer c, (
   select sum(o_totalprice) tot_price from c.c_orders
@@ -610,4 +610,19 @@ WHERE ca.o_orderkey < cb.o_orderkey limit 2) v limit 51
 199835
 ---- TYPES
 BIGINT
+====
+---- QUERY
+# IMPALA-5438: Union with constant exprs in a subplan. The 'c_custkey % 100' was chosen
+# to have all impalads produce results to make sure the constant exprs in the union are
+# evaluated regardless of which fragment instance they are in.
+select c_custkey, order_cnt, union_cnt from tpch_nested_parquet.customer c,
+ (select count(o_orderkey) order_cnt from c.c_orders) v,
+ (select count(o_orderkey) union_cnt from (
+  select o_orderkey from c.c_orders
+  union all
+  values(11),(22),(33)) v) v2
+where c_custkey % 100 = 0 and order_cnt != union_cnt - 3;
+---- RESULTS
+---- TYPES
+bigint,bigint,bigint
 ====

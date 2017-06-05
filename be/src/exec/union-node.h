@@ -149,7 +149,7 @@ class UnionNode : public ExecNode {
 
   /// Returns true if there are still rows to be returned from constant expressions.
   bool HasMoreConst(const RuntimeState* state) const {
-    return state->instance_ctx().per_fragment_instance_idx == 0 &&
+    return (state->instance_ctx().per_fragment_instance_idx == 0 || IsInSubplan()) &&
         const_expr_list_idx_ < const_expr_lists_.size();
   }
 

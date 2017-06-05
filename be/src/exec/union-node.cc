@@ -246,7 +246,7 @@ Status UnionNode::GetNextMaterialized(RuntimeState* state, RowBatch* row_batch) 
 }
 
 Status UnionNode::GetNextConst(RuntimeState* state, RowBatch* row_batch) {
-  DCHECK_EQ(state->instance_ctx().per_fragment_instance_idx, 0);
+  DCHECK(state->instance_ctx().per_fragment_instance_idx == 0 || IsInSubplan());
   DCHECK_LT(const_expr_list_idx_, const_expr_lists_.size());
   // Create new tuple buffer for row_batch.
   int64_t tuple_buf_size;
