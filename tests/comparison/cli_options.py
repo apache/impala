@@ -30,6 +30,8 @@ from tests.comparison.cluster import (
     DEFAULT_HIVE_PASSWORD,
     DEFAULT_HIVE_PORT,
     DEFAULT_HIVE_USER,
+    CM_CLEAR_PORT,
+    CM_TLS_PORT,
     MiniCluster,
     MiniHiveCluster,
 )
@@ -142,9 +144,14 @@ def add_cm_options(parser):
   parser.add_argument(
       '--cm-host', metavar='host name',
       help='The host name of the CM server.')
+  # IMPALA-5455: --cm-port defaults to None so that --use-tls can later influence the
+  # default value of --cm-port: it needs to default to 7180, or 7183 if --use-tls is
+  # included.
   parser.add_argument(
-      '--cm-port', default=7180, type=int, metavar='port number',
-      help='The port of the CM server.')
+      '--cm-port', default=None, type=int, metavar='port number',
+      help='Override the CM port. Defaults to {clear}, or {tls} with --use-tls'.format(
+          clear=CM_CLEAR_PORT,
+          tls=CM_TLS_PORT))
   parser.add_argument(
       '--cm-user', default="admin", metavar='user name',
       help='The name of the CM user.')
@@ -154,6 +161,10 @@ def add_cm_options(parser):
   parser.add_argument(
       '--cm-cluster-name', metavar='name',
       help='If CM manages multiple clusters, use this to specify which cluster to use.')
+  parser.add_argument(
+      '--use-tls', action='store_true', default=False,
+      help='Whether to communicate with CM using TLS. This alters the default CM port '
+           'from {clear} to {tls}'.format(clear=CM_CLEAR_PORT, tls=CM_TLS_PORT))
 
 
 def add_ssl_options(parser):
@@ -166,9 +177,9 @@ def add_ssl_options(parser):
 def create_cluster(args):
   if args.cm_host:
     cluster = CmCluster(
-        args.cm_host, user=args.cm_user, password=args.cm_password,
+        args.cm_host, port=args.cm_port, user=args.cm_user, password=args.cm_password,
         cluster_name=args.cm_cluster_name, ssh_user=args.ssh_user, ssh_port=args.ssh_port,
-        ssh_key_file=args.ssh_key_file)
+        ssh_key_file=args.ssh_key_file, use_tls=args.use_tls)
   elif args.use_hive:
     cluster = MiniHiveCluster(args.hive_host, args.hive_port)
   else:

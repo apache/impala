@@ -60,6 +60,10 @@ DEFAULT_HIVE_PASSWORD = 'hive'
 
 DEFAULT_TIMEOUT = 300
 
+CM_CLEAR_PORT = 7180
+CM_TLS_PORT = 7183
+
+
 class Cluster(object):
   """This is a base class for clusters. Cluster classes provide various methods for
      interacting with a cluster. Ideally the various cluster implementations provide
@@ -231,16 +235,25 @@ class MiniHiveCluster(MiniCluster):
   def _get_other_conf_dir(self):
     return os.environ["HIVE_CONF_DIR"]
 
+
 class CmCluster(Cluster):
 
-  def __init__(self, host_name, port=7180, user="admin", password="admin",
-      cluster_name=None, ssh_user=None, ssh_port=None, ssh_key_file=None):
+  def __init__(self, host_name, port=None, user="admin", password="admin",
+               cluster_name=None, ssh_user=None, ssh_port=None, ssh_key_file=None,
+               use_tls=False):
     # Initialize strptime() to workaround https://bugs.python.org/issue7980. Apparently
     # something in the CM API uses strptime().
     strptime("2015", "%Y")
 
     Cluster.__init__(self)
-    self.cm = CmApiResource(host_name, server_port=port, username=user, password=password)
+    # IMPALA-5455: If the caller doesn't specify port, default it based on use_tls
+    if port is None:
+      if use_tls:
+        port = CM_TLS_PORT
+      else:
+        port = CM_CLEAR_PORT
+    self.cm = CmApiResource(host_name, server_port=port, username=user, password=password,
+                            use_tls=use_tls)
     clusters = self.cm.get_all_clusters()
     if not clusters:
       raise Exception("No clusters found in CM at %s" % host_name)
