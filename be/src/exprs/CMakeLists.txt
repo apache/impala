@@ -56,6 +56,7 @@ add_library(Exprs
   timezone_db.cc
   tuple-is-null-predicate.cc
   scalar-fn-call.cc
+  udf-builtins.cc
   udf-builtins-ir.cc
   utility-functions.cc
   utility-functions-ir.cc

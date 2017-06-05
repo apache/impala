@@ -59,10 +59,13 @@ class UdfBuiltins {
   ///    DAY, DY, D : Starting day of the week
   ///    HH, HH12, HH24 : Hour
   ///    MI : Minute
-  //
+  ///
   ///    Reference:
   ///    http://docs.oracle.com/cd/B19306_01/server.102/b14200/functions201.htm
   static TimestampVal Trunc(FunctionContext* context, const TimestampVal& date,
+      const StringVal& unit_str);
+  /// Implementation of Trunc, not cross-compiled.
+  static TimestampVal TruncImpl(FunctionContext* context, const TimestampVal& date,
       const StringVal& unit_str);
   static void TruncPrepare(FunctionContext* context,
       FunctionContext::FunctionStateScope scope);
@@ -74,7 +77,7 @@ class UdfBuiltins {
   ///      YEAR, MONTH, DAY, HOUR, MINUTE, SECOND, MILLISECOND, EPOCH
   ///    Reference:
   ///    http://docs.oracle.com/cd/B19306_01/server.102/b14200/functions050.htm
-  //
+  ///
   /// This is used by the DATE_PART function.
   static IntVal Extract(FunctionContext* context, const StringVal& field_str,
       const TimestampVal& date);
