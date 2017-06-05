@@ -651,7 +651,7 @@ Status Coordinator::FinalizeSuccessfulInsert() {
         // when the directory is empty(HDFS-8407). Need to check errno to make sure
         // the call fails.
         if (existing_files == nullptr && errno != 0) {
-          return GetHdfsErrorMsg("Could not list directory: ", part_path);
+          return Status(GetHdfsErrorMsg("Could not list directory: ", part_path));
         }
         for (int i = 0; i < num_files; ++i) {
           const string filename = path(existing_files[i].mName).filename().string();

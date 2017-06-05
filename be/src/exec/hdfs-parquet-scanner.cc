@@ -958,10 +958,11 @@ Status HdfsParquetScanner::AssembleRows(
         DCHECK(scratch_batch_->AtEnd());
         *skip_row_group = true;
         if (num_tuples_mismatch && continue_execution) {
-          parse_status_.MergeStatus(Substitute("Corrupt Parquet file '$0': column '$1' "
+          Status err(Substitute("Corrupt Parquet file '$0': column '$1' "
               "had $2 remaining values but expected $3", filename(),
               col_reader->schema_element().name, last_num_tuples,
               scratch_batch_->num_tuples));
+          parse_status_.MergeStatus(err);
         }
         return Status::OK();
       }

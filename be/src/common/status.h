@@ -107,7 +107,7 @@ class Status {
 
   /// Status using only the error code as a parameter. This can be used for error messages
   /// that don't take format parameters.
-  Status(TErrorCode::type code);
+  explicit Status(TErrorCode::type code);
 
   /// These constructors are used if the caller wants to indicate a non-successful
   /// execution and supply a client-facing error message. This is the preferred way of
@@ -140,12 +140,20 @@ class Status {
 
   /// Used when the ErrorMsg is created as an intermediate value that is either passed to
   /// the Status or to the RuntimeState.
-  Status(const ErrorMsg& e);
+  explicit Status(const ErrorMsg& e);
 
   /// This constructor creates a Status with a default error code of GENERAL and is not
   /// intended for statuses that might be client-visible.
   /// TODO: deprecate
-  Status(const std::string& error_msg);
+  explicit Status(const std::string& error_msg);
+
+  /// "Copy" c'tor from TStatus.
+  /// Retains the TErrorCode value and the message
+  explicit Status(const TStatus& status);
+
+  /// "Copy c'tor from HS2 TStatus.
+  /// Retains the TErrorCode value and the message
+  explicit Status(const apache::hive::service::cli::thrift::TStatus& hs2_status);
 
   /// Create a status instance that represents an expected error and will not be logged
   static Status Expected(const ErrorMsg& e);
@@ -176,19 +184,9 @@ class Status {
     if (UNLIKELY(msg_ != NULL)) FreeMessage();
   }
 
-  /// "Copy" c'tor from TStatus.
-  /// Retains the TErrorCode value and the message
-  Status(const TStatus& status);
-
-  /// same as previous c'tor
   /// Retains the TErrorCode value and the message
   Status& operator=(const TStatus& status);
 
-  /// "Copy c'tor from HS2 TStatus.
-  /// Retains the TErrorCode value and the message
-  Status(const apache::hive::service::cli::thrift::TStatus& hs2_status);
-
-  /// same as previous c'tor
   /// Retains the TErrorCode value and the message
   Status& operator=(const apache::hive::service::cli::thrift::TStatus& hs2_status);
 

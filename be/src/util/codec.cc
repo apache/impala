@@ -156,7 +156,7 @@ Status Codec::CreateDecompressor(MemPool* mem_pool, bool reuse,
       break;
     default: {
       if (format == THdfsCompression::LZO) return Status(NO_LZO_MSG);
-      return Substitute("Unsupported codec: $0", format);
+      return Status(Substitute("Unsupported codec: $0", format));
     }
   }
 
