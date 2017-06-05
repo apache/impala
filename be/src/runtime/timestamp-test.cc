@@ -667,6 +667,20 @@ TEST(TimestampTest, Basic) {
   EXPECT_EQ("2038-01-19 03:14:09",
       TimestampValue::FromUnixTime(2147483649).ToString());
 
+  // Test FromUnixTime around the boundary of the values that are converted via boost via
+  // gmtime (IMPALA-5357). Tests 1 second before and after the values supported by the
+  // boost conversion logic.
+  const int64_t MIN_BOOST_CONVERT_UNIX_TIME = -9223372036;
+  const int64_t MAX_BOOST_CONVERT_UNIX_TIME = 9223372036;
+  EXPECT_EQ("1677-09-21 00:12:43",
+      TimestampValue::FromUnixTime(MIN_BOOST_CONVERT_UNIX_TIME - 1).ToString());
+  EXPECT_EQ("1677-09-21 00:12:44",
+      TimestampValue::FromUnixTime(MIN_BOOST_CONVERT_UNIX_TIME).ToString());
+  EXPECT_EQ("2262-04-11 23:47:16",
+      TimestampValue::FromUnixTime(MAX_BOOST_CONVERT_UNIX_TIME).ToString());
+  EXPECT_EQ("2262-04-11 23:47:17",
+      TimestampValue::FromUnixTime(MAX_BOOST_CONVERT_UNIX_TIME + 1).ToString());
+
   // Test a leap second in 1998 represented by the UTC time 1998-12-31 23:59:60.
   // Unix time cannot represent the leap second, which repeats 915148800.
   EXPECT_EQ("1998-12-31 23:59:59",

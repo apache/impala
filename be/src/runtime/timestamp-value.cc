@@ -26,6 +26,7 @@
 using boost::date_time::not_a_date_time;
 using boost::gregorian::date;
 using boost::gregorian::date_duration;
+using boost::posix_time::from_time_t;
 using boost::posix_time::nanoseconds;
 using boost::posix_time::ptime;
 using boost::posix_time::ptime_from_tm;
@@ -111,25 +112,63 @@ ostream& operator<<(ostream& os, const TimestampValue& timestamp_value) {
   return os << timestamp_value.ToString();
 }
 
-ptime TimestampValue::UnixTimeToPtime(time_t unix_time) {
-  /// Unix times are represented internally in boost as 32 bit ints which limits the
-  /// range of dates to 1901-2038 (https://svn.boost.org/trac/boost/ticket/3109), so
-  /// libc functions will be used instead.
-  // TODO: Conversion using libc is very expensive (IMPALA-5357); find an alternative.
+/// Return a ptime representation of the given Unix time (seconds since the Unix epoch).
+/// The time zone of the resulting ptime is local time. This is called by
+/// UnixTimeToPtime.
+inline ptime UnixTimeToLocalPtime(time_t unix_time) {
   tm temp_tm;
-  if (FLAGS_use_local_tz_for_unix_timestamp_conversions) {
-    if (UNLIKELY(localtime_r(&unix_time, &temp_tm) == nullptr)) {
-      return ptime(not_a_date_time);
-    }
-  } else {
-    if (UNLIKELY(gmtime_r(&unix_time, &temp_tm) == nullptr)) {
-      return ptime(not_a_date_time);
-    }
+  // TODO: avoid localtime*, which takes a global timezone db lock
+  if (UNLIKELY(localtime_r(&unix_time, &temp_tm) == nullptr)) {
+    return ptime(not_a_date_time);
   }
   try {
     return ptime_from_tm(temp_tm);
   } catch (std::exception&) {
     return ptime(not_a_date_time);
+  }
+}
+
+/// Return a ptime representation of the given Unix time (seconds since the Unix epoch).
+/// The time zone of the resulting ptime is UTC.
+/// In order to avoid a serious performance degredation using libc (IMPALA-5357), this
+/// function uses boost to convert the time_t to a ptime. Unfortunately, because the boost
+/// conversion relies on time_duration to represent the time_t and internally
+/// time_duration stores nanosecond precision ticks, the 'fast path' conversion using
+/// boost can only handle a limited range of dates (appx years 1677-2622, while Impala
+/// supports years 1600-9999). For dates outside this range, the conversion will instead
+/// use the libc function gmtime_r which supports those dates but takes the global lock
+/// for the timezone db (even though technically it is not needed for the conversion,
+/// again see IMPALA-5357). This is called by UnixTimeToPtime.
+inline ptime UnixTimeToUtcPtime(time_t unix_time) {
+  // Minimum Unix time that can be converted with from_time_t: 1677-Sep-21 00:12:44
+  const int64_t MIN_BOOST_CONVERT_UNIX_TIME = -9223372036;
+  // Maximum Unix time that can be converted with from_time_t: 2262-Apr-11 23:47:16
+  const int64_t MAX_BOOST_CONVERT_UNIX_TIME = 9223372036;
+  if (LIKELY(unix_time >= MIN_BOOST_CONVERT_UNIX_TIME &&
+             unix_time <= MAX_BOOST_CONVERT_UNIX_TIME)) {
+    try {
+      return from_time_t(unix_time);
+    } catch (std::exception&) {
+      return ptime(not_a_date_time);
+    }
+  }
+
+  tm temp_tm;
+  if (UNLIKELY(gmtime_r(&unix_time, &temp_tm) == nullptr)) {
+    return ptime(not_a_date_time);
+  }
+  try {
+    return ptime_from_tm(temp_tm);
+  } catch (std::exception&) {
+    return ptime(not_a_date_time);
+  }
+}
+
+ptime TimestampValue::UnixTimeToPtime(time_t unix_time) {
+  if (FLAGS_use_local_tz_for_unix_timestamp_conversions) {
+    return UnixTimeToLocalPtime(unix_time);
+  } else {
+    return UnixTimeToUtcPtime(unix_time);
   }
 }
 
