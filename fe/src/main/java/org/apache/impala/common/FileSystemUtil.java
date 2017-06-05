@@ -29,14 +29,17 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocalFileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.adl.AdlFileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.client.HdfsAdmin;
 import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.impala.catalog.HdfsCompression;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -46,7 +49,7 @@ import com.google.common.base.Preconditions;
  */
 public class FileSystemUtil {
   private static final Configuration CONF = new Configuration();
-  private static final Logger LOG = Logger.getLogger(FileSystemUtil.class);
+  private static final Logger LOG = LoggerFactory.getLogger(FileSystemUtil.class);
 
   /**
    * Performs a non-recursive delete of all visible (non-hidden) files in a given
@@ -482,5 +485,33 @@ public class FileSystemUtil {
         FileSystemUtil.isLocalFileSystem(path) ||
         FileSystemUtil.isS3AFileSystem(path) ||
         FileSystemUtil.isADLFileSystem(path));
+  }
+
+  /**
+   * Wrapper around FileSystem.listStatus() that specifically handles the case when
+   * the path does not exist. This helps simplify the caller code in cases where
+   * the file does not exist and also saves an RPC as the caller need not do a separate
+   * exists check for the path. Returns null if the path does not exist.
+   */
+  public static FileStatus[] listStatus(FileSystem fs, Path p) throws IOException {
+    try {
+      return fs.listStatus(p);
+    } catch (FileNotFoundException e) {
+      if (LOG.isWarnEnabled()) LOG.warn("Path does not exist: " + p.toString(), e);
+      return null;
+    }
+  }
+
+  /**
+   * Wrapper around FileSystem.listFiles(), similar to the listStatus() wrapper above.
+   */
+  public static RemoteIterator<LocatedFileStatus> listFiles(FileSystem fs, Path p,
+      boolean recursive) throws IOException {
+    try {
+      return fs.listFiles(p, recursive);
+    } catch (FileNotFoundException e) {
+      if (LOG.isWarnEnabled()) LOG.warn("Path does not exist: " + p.toString(), e);
+      return null;
+    }
   }
 }

@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -262,9 +263,8 @@ public class HdfsTable extends Table {
   private void loadBlockMetadata(Path dirPath,
       HashMap<Path, List<HdfsPartition>> partsByPath) {
     try {
-      FileSystem fs = dirPath.getFileSystem(CONF);
       // No need to load blocks for empty partitions list.
-      if (partsByPath.size() == 0 || !fs.exists(dirPath)) return;
+      if (partsByPath.size() == 0) return;
       if (LOG.isTraceEnabled()) {
         LOG.trace("Loading block md for " + name_ + " directory " + dirPath.toString());
       }
@@ -291,6 +291,7 @@ public class HdfsTable extends Table {
         }
       }
 
+      FileSystem fs = dirPath.getFileSystem(CONF);
       // For file systems that do not support BlockLocation API, we manually synthesize
       // block location metadata based on file formats.
       if (!FileSystemUtil.supportsStorageIds(fs)) {
@@ -298,8 +299,10 @@ public class HdfsTable extends Table {
         return;
       }
 
+      RemoteIterator<LocatedFileStatus> fileStatusIter =
+          FileSystemUtil.listFiles(fs, dirPath, true);
+      if (fileStatusIter == null) return;
       Reference<Long> numUnknownDiskIds = new Reference<Long>(Long.valueOf(0));
-      RemoteIterator<LocatedFileStatus> fileStatusIter = fs.listFiles(dirPath, true);
       while (fileStatusIter.hasNext()) {
         LocatedFileStatus fileStatus = fileStatusIter.next();
         if (!FileSystemUtil.isValidDataFile(fileStatus)) continue;
@@ -360,7 +363,9 @@ public class HdfsTable extends Table {
    */
   private void synthesizeBlockMetadata(FileSystem fs, Path dirPath, HashMap<Path,
       List<HdfsPartition>> partsByPath) throws IOException {
-    RemoteIterator<LocatedFileStatus> fileStatusIter = fs.listFiles(dirPath, true);
+    RemoteIterator<LocatedFileStatus> fileStatusIter =
+        FileSystemUtil.listFiles(fs, dirPath, true);
+    if (fileStatusIter == null) return;
     while (fileStatusIter.hasNext()) {
       LocatedFileStatus fileStatus = fileStatusIter.next();
       if (!FileSystemUtil.isValidDataFile(fileStatus)) continue;
@@ -644,9 +649,7 @@ public class HdfsTable extends Table {
       if (isMarkedCached_) part.markCached();
       addPartition(part);
       FileSystem fs = tblLocation.getFileSystem(CONF);
-      if (fs.exists(tblLocation)) {
-        accessLevel_ = getAvailableAccessLevel(fs, tblLocation);
-      }
+      accessLevel_ = getAvailableAccessLevel(fs, tblLocation);
     } else {
       for (org.apache.hadoop.hive.metastore.api.Partition msPartition: msPartitions) {
         HdfsPartition partition = createPartition(msPartition.getSd(), msPartition);
@@ -704,10 +707,6 @@ public class HdfsTable extends Table {
     Preconditions.checkNotNull(partDir);
     try {
       FileSystem fs = partDir.getFileSystem(CONF);
-      if (!fs.exists(partDir)) {
-        partition.setFileDescriptors(new ArrayList<FileDescriptor>());
-        return;
-      }
       if (!FileSystemUtil.supportsStorageIds(fs)) {
         synthesizeBlockMetadata(fs, partition);
         return;
@@ -722,21 +721,22 @@ public class HdfsTable extends Table {
       // Iterate through the current snapshot of the partition directory listing to
       // figure out files that were newly added/modified.
       List<FileDescriptor> newFileDescs = Lists.newArrayList();
-      long newPartSizeBytes = 0;
-      for (FileStatus fileStatus : fs.listStatus(partDir)) {
-        if (!FileSystemUtil.isValidDataFile(fileStatus)) continue;
-        String fileName = fileStatus.getPath().getName().toString();
-        FileDescriptor fd = fileDescsByName.get(fileName);
-        if (fd == null || partition.isMarkedCached() ||
-            fd.getFileLength() != fileStatus.getLen() ||
-            fd.getModificationTime() != fileStatus.getModificationTime()) {
-          BlockLocation[] locations =
-              fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
-          fd = FileDescriptor.create(fileStatus, locations, fs, hostIndex_,
-              new Reference<Long>(Long.valueOf(0)));
+      FileStatus[] pathStatus = FileSystemUtil.listStatus(fs, partDir);
+      if (pathStatus != null) {
+        for (FileStatus fileStatus: pathStatus) {
+          if (!FileSystemUtil.isValidDataFile(fileStatus)) continue;
+          String fileName = fileStatus.getPath().getName().toString();
+          FileDescriptor fd = fileDescsByName.get(fileName);
+          if (fd == null || partition.isMarkedCached() ||
+              fd.getFileLength() != fileStatus.getLen() ||
+              fd.getModificationTime() != fileStatus.getModificationTime()) {
+            BlockLocation[] locations =
+                fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
+            fd = FileDescriptor.create(fileStatus, locations, fs, hostIndex_,
+                new Reference<Long>(Long.valueOf(0)));
+          }
+          newFileDescs.add(fd);
         }
-        newFileDescs.add(fd);
-        newPartSizeBytes += fileStatus.getLen();
       }
       partition.setFileDescriptors(newFileDescs);
     } catch(IOException e) {
@@ -800,7 +800,7 @@ public class HdfsTable extends Table {
 
     FsPermissionChecker permissionChecker = FsPermissionChecker.getInstance();
     while (location != null) {
-      if (fs.exists(location)) {
+      try {
         FsPermissionChecker.Permissions perms =
             permissionChecker.getPermissions(fs, location);
         if (perms.canReadAndWrite()) {
@@ -811,8 +811,9 @@ public class HdfsTable extends Table {
           return TAccessLevel.WRITE_ONLY;
         }
         return TAccessLevel.NONE;
+      } catch (FileNotFoundException e) {
+        location = location.getParent();
       }
-      location = location.getParent();
     }
     // Should never get here.
     Preconditions.checkNotNull(location, "Error: no path ancestor exists");
@@ -1105,9 +1106,7 @@ public class HdfsTable extends Table {
     if (msTbl.getPartitionKeysSize() == 0) {
       Path location = new Path(hdfsBaseDir_);
       FileSystem fs = location.getFileSystem(CONF);
-      if (fs.exists(location)) {
-        accessLevel_ = getAvailableAccessLevel(fs, location);
-      }
+      accessLevel_ = getAvailableAccessLevel(fs, location);
     }
     setMetaStoreTable(msTbl);
   }
@@ -1482,9 +1481,6 @@ public class HdfsTable extends Table {
       HdfsPartition partition) throws Exception {
     Preconditions.checkNotNull(storageDescriptor);
     Preconditions.checkNotNull(partition);
-    Path partDirPath = new Path(storageDescriptor.getLocation());
-    FileSystem fs = partDirPath.getFileSystem(CONF);
-    if (!fs.exists(partDirPath)) return;
     refreshFileMetadata(partition);
   }
 
@@ -1661,9 +1657,6 @@ public class HdfsTable extends Table {
       HashSet<List<LiteralExpr>> existingPartitions,
       List<List<String>> partitionsNotInHms) throws IOException {
     FileSystem fs = path.getFileSystem(CONF);
-    // Check whether the base directory exists.
-    if (!fs.exists(path)) return;
-
     List<String> partitionValues = Lists.newArrayList();
     List<LiteralExpr> partitionExprs = Lists.newArrayList();
     getAllPartitionsNotInHms(path, partitionKeys, 0, fs, partitionValues,
@@ -1701,7 +1694,8 @@ public class HdfsTable extends Table {
       return;
     }
 
-    FileStatus[] statuses = fs.listStatus(path);
+    FileStatus[] statuses = FileSystemUtil.listStatus(fs, path);
+    if (statuses == null) return;
     for (FileStatus status: statuses) {
       if (!status.isDirectory()) continue;
       Pair<String, LiteralExpr> keyValues =
