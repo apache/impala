@@ -696,7 +696,7 @@ public class HdfsScanNode extends ScanNode {
         // enough to change the planning outcome
         if (p.getNumRows() > -1) {
           if (statsNumRows_ == -1) statsNumRows_ = 0;
-          statsNumRows_ = addCardinalities(statsNumRows_, p.getNumRows());
+          statsNumRows_ = checkedAdd(statsNumRows_, p.getNumRows());
         } else {
           ++numPartitionsMissingStats_;
         }
@@ -988,7 +988,8 @@ public class HdfsScanNode extends ScanNode {
     long perThreadIoBuffers =
         Math.min((long) Math.ceil(avgScanRangeBytes / (double) readSize),
             MAX_IO_BUFFERS_PER_THREAD) + 1;
-    long perInstanceMemEstimate = maxScannerThreads * perThreadIoBuffers * readSize;
+    long perInstanceMemEstimate = checkedMultiply(
+        checkedMultiply(maxScannerThreads, perThreadIoBuffers), readSize);
 
     // Sanity check: the tighter estimation should not exceed the per-host maximum.
     long perHostUpperBound = getPerHostMemUpperBound();

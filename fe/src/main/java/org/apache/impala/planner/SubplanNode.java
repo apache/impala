@@ -85,7 +85,7 @@ public class SubplanNode extends PlanNode {
     super.computeStats(analyzer);
     if (getChild(0).cardinality_ != -1 && getChild(1).cardinality_ != -1) {
       cardinality_ =
-          multiplyCardinalities(getChild(0).cardinality_, getChild(1).cardinality_);
+          checkedMultiply(getChild(0).cardinality_, getChild(1).cardinality_);
     } else {
       cardinality_ = -1;
     }

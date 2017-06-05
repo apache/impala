@@ -93,7 +93,7 @@ public class ExchangeNode extends PlanNode {
         cardinality_ = -1;
         break;
       }
-      cardinality_ = addCardinalities(cardinality_, child.getCardinality());
+      cardinality_ = checkedAdd(cardinality_, child.getCardinality());
     }
 
     if (hasLimit()) {

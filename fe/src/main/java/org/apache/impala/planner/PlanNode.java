@@ -586,14 +586,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   /**
-   * Computes and returns the sum of two cardinalities. If an overflow occurs,
+   * Computes and returns the sum of two long values. If an overflow occurs,
    * the maximum Long value is returned (Long.MAX_VALUE).
    */
-  public static long addCardinalities(long a, long b) {
+  public static long checkedAdd(long a, long b) {
     try {
       return LongMath.checkedAdd(a, b);
     } catch (ArithmeticException e) {
-      LOG.warn("overflow when adding cardinalities: " + a + ", " + b);
+      LOG.warn("overflow when adding longs: " + a + ", " + b);
       return Long.MAX_VALUE;
     }
   }
@@ -602,11 +602,11 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * Computes and returns the product of two cardinalities. If an overflow
    * occurs, the maximum Long value is returned (Long.MAX_VALUE).
    */
-  public static long multiplyCardinalities(long a, long b) {
+  public static long checkedMultiply(long a, long b) {
     try {
       return LongMath.checkedMultiply(a, b);
     } catch (ArithmeticException e) {
-      LOG.warn("overflow when multiplying cardinalities: " + a + ", " + b);
+      LOG.warn("overflow when multiplying longs: " + a + ", " + b);
       return Long.MAX_VALUE;
     }
   }
@@ -635,7 +635,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     for(PlanNode p : children_) {
       long tmp = p.getCardinality();
       if (tmp == -1) return -1;
-      sum = addCardinalities(sum, tmp);
+      sum = checkedAdd(sum, tmp);
     }
     return sum;
   }

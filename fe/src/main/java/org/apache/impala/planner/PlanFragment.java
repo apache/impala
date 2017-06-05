@@ -265,7 +265,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       if (dataPartition_.getPartitionExprs().contains(expr)) {
         numDistinct = (long)Math.max((double) numDistinct / (double) numInstances, 1L);
       }
-      result = PlanNode.multiplyCardinalities(result, numDistinct);
+      result = PlanNode.checkedMultiply(result, numDistinct);
     }
     return result;
   }

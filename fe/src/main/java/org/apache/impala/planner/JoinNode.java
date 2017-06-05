@@ -419,7 +419,7 @@ public abstract class JoinNode extends PlanNode {
       long leftCard = getChild(0).cardinality_;
       long rightCard = getChild(1).cardinality_;
       if (leftCard != -1 && rightCard != -1) {
-        cardinality_ = multiplyCardinalities(leftCard, rightCard);
+        cardinality_ = checkedMultiply(leftCard, rightCard);
       }
     }
 
@@ -453,7 +453,7 @@ public abstract class JoinNode extends PlanNode {
       }
       case FULL_OUTER_JOIN: {
         if (leftCard != -1 && rightCard != -1) {
-          long cardinalitySum = addCardinalities(leftCard, rightCard);
+          long cardinalitySum = checkedAdd(leftCard, rightCard);
           cardinality_ = Math.max(cardinalitySum, cardinality_);
         }
         break;
@@ -475,7 +475,7 @@ public abstract class JoinNode extends PlanNode {
         if (getChild(0).cardinality_ == -1 || getChild(1).cardinality_ == -1) {
           cardinality_ = -1;
         } else {
-          cardinality_ = multiplyCardinalities(getChild(0).cardinality_,
+          cardinality_ = checkedMultiply(getChild(0).cardinality_,
               getChild(1).cardinality_);
         }
         break;
