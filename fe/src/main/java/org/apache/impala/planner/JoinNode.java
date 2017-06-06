@@ -664,8 +664,7 @@ public abstract class JoinNode extends PlanNode {
         buildSideProfile.postOpenProfile.sum(nodeResourceProfile_));
 
     ResourceProfile finishedBuildProfile = nodeResourceProfile_;
-    if (this instanceof NestedLoopJoinNode
-        || !BackendConfig.INSTANCE.isPartitionedHashJoinEnabled()) {
+    if (this instanceof NestedLoopJoinNode) {
       // These exec node implementations may hold references into the build side, which
       // prevents closing of the build side in a timely manner. This means we have to
       // count the post-open resource consumption of the build side in the same way as

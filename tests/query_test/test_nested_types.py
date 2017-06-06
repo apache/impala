@@ -23,7 +23,6 @@ from subprocess import check_call
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (
-    SkipIfOldAggsJoins,
     SkipIfIsilon,
     SkipIfS3,
     SkipIfADLS,
@@ -31,7 +30,6 @@ from tests.common.skip import (
 
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
 
-@SkipIfOldAggsJoins.nested_types
 class TestNestedTypes(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -88,7 +86,6 @@ class TestNestedTypes(ImpalaTestSuite):
     vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/nested-types-parquet-stats', vector)
 
-@SkipIfOldAggsJoins.nested_types
 class TestParquetArrayEncodings(ImpalaTestSuite):
   TESTFILE_DIR = os.path.join(os.environ['IMPALA_HOME'],
                               "testdata/parquet_nested_types_encodings")
@@ -534,7 +531,6 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
     local_path = self.TESTFILE_DIR + "/" + filename
     check_call(["hadoop", "fs", "-put", local_path, location], shell=False)
 
-@SkipIfOldAggsJoins.nested_types
 class TestMaxNestingDepth(ImpalaTestSuite):
   # Should be kept in sync with the FE's Type.MAX_NESTING_DEPTH
   MAX_NESTING_DEPTH = 100

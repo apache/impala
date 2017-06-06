@@ -120,7 +120,6 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   virtual Status QueryMaintenance(RuntimeState* state) override;
   virtual void AddToDebugString(
       int indentation_level, std::stringstream* out) const override;
-  virtual Status ProcessBuildInput(RuntimeState* state) override;
 
   // Safe to close the build side early because we rematerialize the build rows always.
   virtual bool CanCloseBuildEarly() const override { return true; }

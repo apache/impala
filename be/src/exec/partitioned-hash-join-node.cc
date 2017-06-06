@@ -211,11 +211,6 @@ Status PartitionedHashJoinNode::Reset(RuntimeState* state) {
   return ExecNode::Reset(state);
 }
 
-Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state) {
-  DCHECK(false) << "Should not be called, PHJ uses the BuildSink API";
-  return Status::OK();
-}
-
 void PartitionedHashJoinNode::CloseAndDeletePartitions() {
   // Close all the partitions and clean up all references to them.
   for (unique_ptr<ProbePartition>& partition : probe_hash_partitions_) {

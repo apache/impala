@@ -20,9 +20,7 @@
 import pytest
 
 from testdata.common import widetable
-from tests.common.environ import USING_OLD_AGGS_JOINS
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfOldAggsJoins
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -122,8 +120,6 @@ class TestAggregation(ImpalaTestSuite):
   def test_aggregation(self, vector):
     exec_option = vector.get_value('exec_option')
     disable_codegen = exec_option['disable_codegen']
-    # The old aggregation node does not support codegen for all aggregate functions.
-    check_codegen_enabled = not disable_codegen and not USING_OLD_AGGS_JOINS
     data_type, agg_func = (vector.get_value('data_type'), vector.get_value('agg_func'))
 
     query = 'select %s(%s_col) from alltypesagg where day is not null' % (agg_func,
@@ -133,7 +129,7 @@ class TestAggregation(ImpalaTestSuite):
     assert len(result.data) == 1
     self.verify_agg_result(agg_func, data_type, False, result.data[0]);
 
-    if check_codegen_enabled:
+    if not disable_codegen:
       # Verify codegen was enabled for the preaggregation.
       # It is deliberately disabled for the merge aggregation.
       assert_codegen_enabled(result.runtime_profile, [1])
@@ -144,7 +140,7 @@ class TestAggregation(ImpalaTestSuite):
     assert len(result.data) == 1
     self.verify_agg_result(agg_func, data_type, True, result.data[0]);
 
-    if check_codegen_enabled:
+    if not disable_codegen:
       # Verify codegen was enabled for all stages of the aggregation.
       assert_codegen_enabled(result.runtime_profile, [1, 2, 4, 6])
 
@@ -234,8 +230,7 @@ class TestAggregationQueries(ImpalaTestSuite):
       assert(set(row[i].split(delimiter[i-1])) == set(['1', '2', '3', '4']))
     assert(row[4] == '40')
     assert(row[5] == '4')
-    check_codegen_enabled = not disable_codegen and not USING_OLD_AGGS_JOINS
-    if check_codegen_enabled:
+    if not disable_codegen:
       # Verify codegen was enabled for all three stages of the aggregation.
       assert_codegen_enabled(result.runtime_profile, [1, 2, 4])
 
@@ -267,7 +262,7 @@ class TestAggregationQueries(ImpalaTestSuite):
     where int_col < 10"""
     result = self.execute_query(query, exec_option, table_format=table_format)
     assert(set((result.data)[0].split(" ")) == set(['1','2','3','4','5','6','7','8','9']))
-    if check_codegen_enabled:
+    if not disable_codegen:
       # Verify codegen was enabled for all four stages of the aggregation.
       assert_codegen_enabled(result.runtime_profile, [1, 2, 4, 6])
 
@@ -333,6 +328,5 @@ class TestTPCHAggregationQueries(ImpalaTestSuite):
   def test_tpch_aggregations(self, vector):
     self.run_test_case('tpch-aggregations', vector)
 
-  @SkipIfOldAggsJoins.passthrough_preagg
   def test_tpch_passthrough_aggregations(self, vector):
     self.run_test_case('tpch-passthrough-aggregations', vector)

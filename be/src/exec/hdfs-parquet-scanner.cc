@@ -54,8 +54,6 @@ using namespace llvm;
 
 DEFINE_double(parquet_min_filter_reject_ratio, 0.1, "(Advanced) If the percentage of "
     "rows rejected by a runtime filter drops below this value, the filter is disabled.");
-DECLARE_bool(enable_partitioned_aggregation);
-DECLARE_bool(enable_partitioned_hash_join);
 
 // The number of row batches between checks to see if a filter is effective, and
 // should be disabled. Must be a power of two.

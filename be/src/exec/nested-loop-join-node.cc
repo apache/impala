@@ -186,11 +186,6 @@ Status NestedLoopJoinNode::ResetMatchingBuildRows(RuntimeState* state, int64_t n
   return Status::OK();
 }
 
-Status NestedLoopJoinNode::ProcessBuildInput(RuntimeState* state) {
-  DCHECK(false) << "Should not be called, NLJ uses the BuildSink API";
-  return Status::OK();
-}
-
 void NestedLoopJoinNode::ResetForProbe() {
   DCHECK(build_batches_ != NULL);
   build_row_iterator_ = build_batches_->Iterator();

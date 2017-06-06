@@ -34,10 +34,6 @@
 
 #include "common/names.h"
 
-// Used to determine memory ownership of a RowBatch's tuple pointers.
-DECLARE_bool(enable_partitioned_hash_join);
-DECLARE_bool(enable_partitioned_aggregation);
-
 namespace impala {
 
 const int RowBatch::AT_CAPACITY_MEM_USAGE;
@@ -58,13 +54,9 @@ RowBatch::RowBatch(const RowDescriptor* row_desc, int capacity, MemTracker* mem_
   tuple_ptrs_size_ = capacity * num_tuples_per_row_ * sizeof(Tuple*);
   DCHECK_GT(tuple_ptrs_size_, 0);
   // TODO: switch to Init() pattern so we can check memory limit and return Status.
-  if (FLAGS_enable_partitioned_aggregation && FLAGS_enable_partitioned_hash_join) {
-    mem_tracker_->Consume(tuple_ptrs_size_);
-    tuple_ptrs_ = reinterpret_cast<Tuple**>(malloc(tuple_ptrs_size_));
-    DCHECK(tuple_ptrs_ != NULL);
-  } else {
-    tuple_ptrs_ = reinterpret_cast<Tuple**>(tuple_data_pool_.Allocate(tuple_ptrs_size_));
-  }
+  mem_tracker_->Consume(tuple_ptrs_size_);
+  tuple_ptrs_ = reinterpret_cast<Tuple**>(malloc(tuple_ptrs_size_));
+  DCHECK(tuple_ptrs_ != NULL);
 }
 
 // TODO: we want our input_batch's tuple_data to come from our (not yet implemented)
@@ -89,13 +81,9 @@ RowBatch::RowBatch(
   DCHECK_EQ(input_batch.row_tuples.size(), row_desc->tuple_descriptors().size());
   DCHECK_GT(tuple_ptrs_size_, 0);
   // TODO: switch to Init() pattern so we can check memory limit and return Status.
-  if (FLAGS_enable_partitioned_aggregation && FLAGS_enable_partitioned_hash_join) {
-    mem_tracker_->Consume(tuple_ptrs_size_);
-    tuple_ptrs_ = reinterpret_cast<Tuple**>(malloc(tuple_ptrs_size_));
-    DCHECK(tuple_ptrs_ != NULL);
-  } else {
-    tuple_ptrs_ = reinterpret_cast<Tuple**>(tuple_data_pool_.Allocate(tuple_ptrs_size_));
-  }
+  mem_tracker_->Consume(tuple_ptrs_size_);
+  tuple_ptrs_ = reinterpret_cast<Tuple**>(malloc(tuple_ptrs_size_));
+  DCHECK(tuple_ptrs_ != NULL);
   uint8_t* tuple_data;
   if (input_batch.compression_type != THdfsCompression::NONE) {
     DCHECK_EQ(THdfsCompression::LZ4, input_batch.compression_type)
@@ -166,12 +154,10 @@ RowBatch::~RowBatch() {
     ExecEnv::GetInstance()->buffer_pool()->FreeBuffer(
         buffer_info.client, &buffer_info.buffer);
   }
-  if (FLAGS_enable_partitioned_aggregation && FLAGS_enable_partitioned_hash_join) {
-    DCHECK(tuple_ptrs_ != NULL);
-    free(tuple_ptrs_);
-    mem_tracker_->Release(tuple_ptrs_size_);
-    tuple_ptrs_ = NULL;
-  }
+  DCHECK(tuple_ptrs_ != NULL);
+  free(tuple_ptrs_);
+  mem_tracker_->Release(tuple_ptrs_size_);
+  tuple_ptrs_ = NULL;
 }
 
 Status RowBatch::Serialize(TRowBatch* output_batch) {
@@ -346,9 +332,6 @@ void RowBatch::Reset() {
   }
   buffers_.clear();
   auxiliary_mem_usage_ = 0;
-  if (!FLAGS_enable_partitioned_aggregation || !FLAGS_enable_partitioned_hash_join) {
-    tuple_ptrs_ = reinterpret_cast<Tuple**>(tuple_data_pool_.Allocate(tuple_ptrs_size_));
-  }
   flush_ = FlushMode::NO_FLUSH_RESOURCES;
   needs_deep_copy_ = false;
 }
@@ -373,10 +356,6 @@ void RowBatch::TransferResourceOwnership(RowBatch* dest) {
   } else if (flush_ == FlushMode::FLUSH_RESOURCES) {
     dest->MarkFlushResources();
   }
-  if (!FLAGS_enable_partitioned_aggregation || !FLAGS_enable_partitioned_hash_join) {
-    // Tuple pointers were allocated from tuple_data_pool_ so are transferred.
-    tuple_ptrs_ = NULL;
-  }
   Reset();
 }
 
@@ -399,14 +378,8 @@ void RowBatch::AcquireState(RowBatch* src) {
 
   num_rows_ = src->num_rows_;
   capacity_ = src->capacity_;
-  if (!FLAGS_enable_partitioned_aggregation || !FLAGS_enable_partitioned_hash_join) {
-    // Tuple pointers are allocated from tuple_data_pool_ so are transferred.
-    tuple_ptrs_ = src->tuple_ptrs_;
-    src->tuple_ptrs_ = NULL;
-  } else {
-    // tuple_ptrs_ were allocated with malloc so can be swapped between batches.
-    std::swap(tuple_ptrs_, src->tuple_ptrs_);
-  }
+  // tuple_ptrs_ were allocated with malloc so can be swapped between batches.
+  std::swap(tuple_ptrs_, src->tuple_ptrs_);
   src->TransferResourceOwnership(this);
 }
 

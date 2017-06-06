@@ -25,7 +25,6 @@ from tests.common.skip import (
     SkipIf,
     SkipIfIsilon,
     SkipIfLocal,
-    SkipIfOldAggsJoins,
     SkipIfS3,
     SkipIfADLS)
 from tests.common.test_vector import ImpalaTestDimension
@@ -62,7 +61,6 @@ class TestJoinQueries(ImpalaTestSuite):
     new_vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/single-node-joins-with-limits-exhaustive', new_vector)
 
-  @SkipIfOldAggsJoins.unsupported
   def test_partitioned_joins(self, vector):
     self.run_test_case('QueryTest/joins-partitioned', vector)
 

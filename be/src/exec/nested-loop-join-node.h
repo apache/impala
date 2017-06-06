@@ -51,9 +51,6 @@ class NestedLoopJoinNode : public BlockingJoinNode {
   virtual Status Reset(RuntimeState* state);
   virtual void Close(RuntimeState* state);
 
- protected:
-  virtual Status ProcessBuildInput(RuntimeState* state);
-
  private:
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()

@@ -36,13 +36,7 @@ except ImportError as e:
 LOG = logging.getLogger('tests.common.environ')
 
 
-# See if Impala is running with legacy aggregations and/or hash joins. This is kind of a
-# hack. It would be better to poll Impala whether it is doing so.
 test_start_cluster_args = os.environ.get("TEST_START_CLUSTER_ARGS", "")
-old_agg_regex = "enable_partitioned_aggregation=false"
-old_hash_join_regex = "enable_partitioned_hash_join=false"
-USING_OLD_AGGS_JOINS = re.search(old_agg_regex, test_start_cluster_args) is not None or \
-    re.search(old_hash_join_regex, test_start_cluster_args) is not None
 
 # Find the likely BuildType of the running Impala. Assume it's found through the path
 # $IMPALA_HOME/be/build/latest as a fallback.

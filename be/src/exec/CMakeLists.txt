@@ -25,8 +25,6 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec")
 
 add_library(Exec
-  aggregation-node.cc
-  aggregation-node-ir.cc
   analytic-eval-node.cc
   base-sequence-scanner.cc
   blocking-join-node.cc
@@ -39,10 +37,6 @@ add_library(Exec
   exchange-node.cc
   external-data-source-executor.cc
   filter-context.cc
-  hash-join-node.cc
-  hash-join-node-ir.cc
-  old-hash-table.cc
-  old-hash-table-ir.cc
   hash-table.cc
   hbase-table-sink.cc
   hbase-table-writer.cc
@@ -105,7 +99,6 @@ add_library(Exec
 add_dependencies(Exec thrift-deps)
 
 ADD_BE_TEST(zigzag-test)
-ADD_BE_TEST(old-hash-table-test)
 ADD_BE_TEST(hash-table-test)
 ADD_BE_TEST(delimited-text-parser-test)
 ADD_BE_TEST(read-write-util-test)

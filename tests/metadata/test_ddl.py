@@ -22,7 +22,7 @@ import time
 from test_ddl_base import TestDdlBase
 from tests.common.impala_test_suite import LOG
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import SkipIf, SkipIfADLS, SkipIfLocal, SkipIfOldAggsJoins
+from tests.common.skip import SkipIf, SkipIfADLS, SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import WAREHOUSE, IS_HDFS, IS_LOCAL, IS_S3, IS_ADLS
 
@@ -196,7 +196,6 @@ class TestDdlStatements(TestDdlBase):
   # supported if old joins and aggs are enabled. Since we do not get any meaningful
   # additional coverage by running a DDL test under the old aggs and joins, it can be
   # skipped.
-  @SkipIfOldAggsJoins.nested_types
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_create_table(self, vector, unique_database):
     vector.get_value('exec_option')['abort_on_error'] = False

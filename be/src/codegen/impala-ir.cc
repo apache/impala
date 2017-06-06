@@ -26,13 +26,10 @@
 #pragma clang diagnostic ignored "-Wheader-hygiene"
 
 #include "codegen/codegen-anyval-ir.cc"
-#include "exec/aggregation-node-ir.cc"
-#include "exec/hash-join-node-ir.cc"
 #include "exec/hash-table-ir.cc"
 #include "exec/hdfs-avro-scanner-ir.cc"
 #include "exec/hdfs-parquet-scanner-ir.cc"
 #include "exec/hdfs-scanner-ir.cc"
-#include "exec/old-hash-table-ir.cc"
 #include "exec/partitioned-aggregation-node-ir.cc"
 #include "exec/partitioned-hash-join-builder-ir.cc"
 #include "exec/partitioned-hash-join-node-ir.cc"

@@ -29,12 +29,10 @@
 #include "common/status.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
-#include "exec/aggregation-node.h"
 #include "exec/analytic-eval-node.h"
 #include "exec/data-source-scan-node.h"
 #include "exec/empty-set-node.h"
 #include "exec/exchange-node.h"
-#include "exec/hash-join-node.h"
 #include "exec/hbase-scan-node.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/hdfs-scan-node-mt.h"
@@ -64,9 +62,8 @@
 
 using namespace llvm;
 
-// TODO: remove when we remove hash-join-node.cc and aggregation-node.cc
-DEFINE_bool(enable_partitioned_hash_join, true, "Enable partitioned hash join");
-DEFINE_bool(enable_partitioned_aggregation, true, "Enable partitioned hash agg");
+DEFINE_bool(enable_partitioned_hash_join, true, "Deprecated - has no effect");
+DEFINE_bool(enable_partitioned_aggregation, true, "Deprecated - has no effect");
 
 namespace impala {
 
@@ -299,24 +296,10 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       }
       break;
     case TPlanNodeType::AGGREGATION_NODE:
-      if (FLAGS_enable_partitioned_aggregation) {
-        *node = pool->Add(new PartitionedAggregationNode(pool, tnode, descs));
-      } else {
-        *node = pool->Add(new AggregationNode(pool, tnode, descs));
-      }
+      *node = pool->Add(new PartitionedAggregationNode(pool, tnode, descs));
       break;
     case TPlanNodeType::HASH_JOIN_NODE:
-      // The (old) HashJoinNode does not support left-anti, right-semi, and right-anti
-      // joins.
-      if (tnode.hash_join_node.join_op == TJoinOp::LEFT_ANTI_JOIN ||
-          tnode.hash_join_node.join_op == TJoinOp::RIGHT_SEMI_JOIN ||
-          tnode.hash_join_node.join_op == TJoinOp::RIGHT_ANTI_JOIN ||
-          tnode.hash_join_node.join_op == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN ||
-          FLAGS_enable_partitioned_hash_join) {
-        *node = pool->Add(new PartitionedHashJoinNode(pool, tnode, descs));
-      } else {
-        *node = pool->Add(new HashJoinNode(pool, tnode, descs));
-      }
+      *node = pool->Add(new PartitionedHashJoinNode(pool, tnode, descs));
       break;
     case TPlanNodeType::NESTED_LOOP_JOIN_NODE:
       *node = pool->Add(new NestedLoopJoinNode(pool, tnode, descs));
@@ -350,13 +333,6 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       *node = pool->Add(new SingularRowSrcNode(pool, tnode, descs));
       break;
     case TPlanNodeType::SUBPLAN_NODE:
-      if (!FLAGS_enable_partitioned_hash_join || !FLAGS_enable_partitioned_aggregation) {
-        error_msg << "Query referencing nested types is not supported because the "
-            << "--enable_partitioned_hash_join and/or --enable_partitioned_aggregation "
-            << "Impala Daemon start-up flags are set to false.\nTo enable nested types "
-            << "support please set those flags to true (they are enabled by default).";
-        return Status(error_msg.str());
-      }
       *node = pool->Add(new SubplanNode(pool, tnode, descs));
       break;
     case TPlanNodeType::UNNEST_NODE:

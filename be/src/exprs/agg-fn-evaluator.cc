@@ -21,7 +21,6 @@
 
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
-#include "exec/aggregation-node.h"
 #include "exprs/aggregate-functions.h"
 #include "exprs/anyval-util.h"
 #include "exprs/scalar-expr.h"

@@ -18,10 +18,8 @@
 # Functional tests running the TPCH workload.
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfOldAggsJoins
 from tests.common.test_dimensions import create_single_exec_option_dimension
 
-@SkipIfOldAggsJoins.nested_types
 class TestTpchNestedQuery(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
