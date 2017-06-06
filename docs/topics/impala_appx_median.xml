@@ -74,7 +74,12 @@ under the License.
 
     <p conref="../shared/impala_common.xml#common/analytic_not_allowed_caveat"/>
 
-    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+    <p rev="IMPALA-4107">
+      The <codeph>APPX_MEDIAN</codeph> function returns only the first 10 characters for
+      string values (string, varchar, char). Additional characters are truncated.
+    </p>
+
+     <p conref="../shared/impala_common.xml#common/example_blurb"/>
 
     <p>
       The following example uses a table of a million random floating-point numbers ranging up to approximately
