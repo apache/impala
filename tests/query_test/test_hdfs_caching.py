@@ -22,6 +22,7 @@ import re
 import time
 from subprocess import check_call
 
+from tests.common.environ import specific_build_type_timeout
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
@@ -312,7 +313,8 @@ def get_num_cache_requests():
     assert rc == 0, 'Error executing hdfs cacheadmin: %s %s' % (stdout, stderr)
     return len(stdout.split('\n'))
 
-  wait_time_in_sec = 5
+  # IMPALA-3040: This can take time, especially under slow builds like ASAN.
+  wait_time_in_sec = specific_build_type_timeout(5, slow_build_timeout=20)
   num_stabilization_attempts = 0
   max_num_stabilization_attempts = 10
   new_requests = None
