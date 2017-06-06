@@ -311,6 +311,7 @@ PLAN-ROOT SINK
 |
 |--06:HASH JOIN [INNER JOIN]
 |  |  hash predicates: o1.o_orderkey = o2.o_orderkey + 2
+|  |  fk/pk conjuncts: assumed fk/pk
 |  |  mem-estimate=0B mem-reservation=136.00MB
 |  |  tuple-ids=1,0,2 row-size=286B cardinality=10
 |  |
@@ -358,6 +359,7 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
 |
 |--06:HASH JOIN [INNER JOIN]
 |  |  hash predicates: o1.o_orderkey = o2.o_orderkey + 2
+|  |  fk/pk conjuncts: assumed fk/pk
 |  |  mem-estimate=0B mem-reservation=136.00MB
 |  |  tuple-ids=1,0,2 row-size=286B cardinality=10
 |  |

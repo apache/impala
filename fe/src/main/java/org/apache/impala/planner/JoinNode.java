@@ -19,9 +19,7 @@ package org.apache.impala.planner;
 
 import java.util.Collections;
 import java.util.List;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.Map;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
@@ -29,12 +27,18 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.analysis.TupleId;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TJoinDistributionMode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 /**
  * Logical join operator. Subclasses correspond to implementations of the join operator
@@ -71,6 +75,20 @@ public abstract class JoinNode extends PlanNode {
   // if valid, the rhs input is materialized outside of this node and is assigned
   // joinTableId_
   protected JoinTableId joinTableId_ = JoinTableId.INVALID;
+
+  // List of equi-join conjuncts believed to be involved in a FK/PK relationship.
+  // The conjuncts are grouped by the tuple ids of the joined base table refs. A conjunct
+  // is only included in this list if it is of the form <SlotRef> = <SlotRef> and the
+  // underlying columns and tables on both sides have stats. See getFkPkEqJoinConjuncts()
+  // for more details on the FK/PK detection logic.
+  // The value of this member represents three different states:
+  // - null: There are eligible join conjuncts and we have high confidence that none of
+  //   them represent a FK/PK relationship.
+  // - non-null and empty: There are no eligible join conjuncts. We assume a FK/PK join.
+  // - non-null and non-empty: There are eligible join conjuncts that could represent
+  //   a FK/PK relationship.
+  // Theses conjuncts are printed in the explain plan.
+  protected List<EqJoinConjunctScanSlots> fkPkEqJoinConjuncts_;
 
   public enum DistributionMode {
     NONE("NONE"),
@@ -178,14 +196,16 @@ public abstract class JoinNode extends PlanNode {
    *
    * We estimate the cardinality based on equality join predicates of the form
    * "L.c = R.d", with L being a table from child(0) and R a table from child(1).
-   * For each such join predicate we try to determine whether it is a foreign/primary
-   * key (FK/PK) join condition, and either use a special FK/PK estimation or a generic
-   * estimation method. We maintain the minimum cardinality for each method separately,
-   * and finally return in order of preference:
-   * - the FK/PK estimate, if there was at least one FP/PK predicate
-   * - the generic estimate, if there was at least one predicate with sufficient stats
-   * - otherwise, we optimistically assume a FK/PK join with a join selectivity of 1,
-   *   and return |child(0)|
+   * For each set of such join predicates between two tables, we try to determine whether
+   * the tables might have foreign/primary key (FK/PK) relationship, and either use a
+   * special FK/PK estimation or a generic estimation method. Once the estimation method
+   * has been determined we compute the final cardinality based on the single most
+   * selective join predicate. We do not attempt to estimate the joint selectivity of
+   * multiple join predicates to avoid underestimation.
+   * The FK/PK detection logic is based on the assumption that most joins are FK/PK. We
+   * only use the generic estimation method if we have high confidence that there is no
+   * FK/PK relationship. In the absence of relevant stats, we assume FK/PK with a join
+   * selectivity of 1.
    *
    * FK/PK estimation:
    * cardinality = |child(0)| * (|child(1)| / |R|) * (NDV(R.d) / NDV(L.c))
@@ -208,111 +228,206 @@ public abstract class JoinNode extends PlanNode {
    *   might have reduce the cardinality and NDVs
    */
   private long getJoinCardinality(Analyzer analyzer) {
-    Preconditions.checkState(
-        joinOp_ == JoinOperator.INNER_JOIN || joinOp_.isOuterJoin());
+    Preconditions.checkState(joinOp_.isInnerJoin() || joinOp_.isOuterJoin());
+    fkPkEqJoinConjuncts_ = Collections.emptyList();
 
     long lhsCard = getChild(0).cardinality_;
     long rhsCard = getChild(1).cardinality_;
-    if (lhsCard == -1 || rhsCard == -1) return -1;
-
-    // Minimum of estimated join cardinalities for FK/PK join conditions.
-    long fkPkJoinCard = -1;
-    // Minimum of estimated join cardinalities for other join conditions.
-    long genericJoinCard = -1;
-    for (Expr eqJoinConjunct: eqJoinConjuncts_) {
-      SlotStats lhsStats = SlotStats.create(eqJoinConjunct.getChild(0));
-      SlotStats rhsStats = SlotStats.create(eqJoinConjunct.getChild(1));
-      // Ignore the equi-join conjunct if we have no relevant table or column stats.
-      if (lhsStats == null || rhsStats == null) continue;
-
-      // We assume a FK/PK join based on the following intuitions:
-      // 1. NDV(L.c) <= NDV(R.d)
-      //    The reasoning is that a FK/PK join is unlikely if the foreign key
-      //    side has a higher NDV than the primary key side. We may miss true
-      //    FK/PK joins due to inaccurate and/or stale stats.
-      // 2. R.d is probably a primary key.
-      //    Requires that NDV(R.d) is very close to |R|.
-      // The idea is that, by default, we assume that every join is a FK/PK join unless
-      // we have compelling evidence that suggests otherwise, so by using || we give the
-      // FK/PK assumption more chances to succeed.
-      if (lhsStats.ndv <= rhsStats.ndv * (1.0 + FK_PK_MAX_STATS_DELTA_PERC) ||
-          Math.abs(rhsStats.numRows - rhsStats.ndv) / (double) rhsStats.numRows
-            <= FK_PK_MAX_STATS_DELTA_PERC) {
-        // Adjust the join selectivity based on the NDV ratio to avoid underestimating
-        // the cardinality if the PK side has a higher NDV than the FK side.
-        double ndvRatio = (double) rhsStats.ndv / (double) lhsStats.ndv;
-        double rhsSelectivity = (double) rhsCard / (double) rhsStats.numRows;
-        long joinCard = (long) Math.ceil(lhsCard * rhsSelectivity * ndvRatio);
-        // FK/PK join cardinality must be <= the lhs cardinality.
-        joinCard = Math.min(lhsCard, joinCard);
-        if (fkPkJoinCard == -1) {
-          fkPkJoinCard = joinCard;
-        } else {
-          fkPkJoinCard = Math.min(fkPkJoinCard, joinCard);
-        }
-      } else {
-        // Adjust the NDVs on both sides to account for predicates. Intuitively, the NDVs
-        // should only decrease, so we bail if the adjustment would lead to an increase.
-        // TODO: Adjust the NDVs more systematically throughout the plan tree to
-        // get a more accurate NDV at this plan node.
-        if (lhsCard > lhsStats.numRows || rhsCard > rhsStats.numRows) continue;
-        double lhsAdjNdv = lhsStats.ndv * ((double)lhsCard / lhsStats.numRows);
-        double rhsAdjNdv = rhsStats.ndv * ((double)rhsCard / rhsStats.numRows);
-        // Generic join cardinality estimation.
-        long joinCard = (long) Math.ceil(
-            (lhsCard / Math.max(lhsAdjNdv, rhsAdjNdv)) * rhsCard);
-        if (genericJoinCard == -1) {
-          genericJoinCard = joinCard;
-        } else {
-          genericJoinCard = Math.min(genericJoinCard, joinCard);
-        }
-      }
+    if (lhsCard == -1 || rhsCard == -1) {
+      // Assume FK/PK with a join selectivity of 1.
+      return lhsCard;
     }
 
-    if (fkPkJoinCard != -1) {
-      return fkPkJoinCard;
-    } else if (genericJoinCard != -1) {
-      return genericJoinCard;
-    } else {
-      // Optimistic FK/PK assumption with join selectivity of 1.
+    // Collect join conjuncts that are eligible to participate in cardinality estimation.
+    List<EqJoinConjunctScanSlots> eqJoinConjunctSlots = Lists.newArrayList();
+    for (Expr eqJoinConjunct: eqJoinConjuncts_) {
+      EqJoinConjunctScanSlots slots = EqJoinConjunctScanSlots.create(eqJoinConjunct);
+      if (slots != null) eqJoinConjunctSlots.add(slots);
+    }
+
+    if (eqJoinConjunctSlots.isEmpty()) {
+      // There are no eligible equi-join conjuncts. Optimistically assume FK/PK with a
+      // join selectivity of 1.
       return lhsCard;
+    }
+
+    fkPkEqJoinConjuncts_ = getFkPkEqJoinConjuncts(eqJoinConjunctSlots);
+    if (fkPkEqJoinConjuncts_ != null) {
+      return getFkPkJoinCardinality(fkPkEqJoinConjuncts_, lhsCard, rhsCard);
+    } else {
+      return getGenericJoinCardinality(eqJoinConjunctSlots, lhsCard, rhsCard);
     }
   }
 
   /**
-   * Class combining column and table stats for a particular slot. Contains the NDV
-   * for the slot and the number of rows in the originating table.
+   * Returns a list of equi-join conjuncts believed to have a FK/PK relationship based on
+   * whether the right-hand side might be a PK. The conjuncts are grouped by the tuple
+   * ids of the joined base table refs. We prefer to include the conjuncts in the result
+   * unless we have high confidence that a FK/PK relationship is not present. The
+   * right-hand side columns are unlikely to form a PK if their joint NDV is less than
+   * the right-hand side row count. If the joint NDV is close to or higher than the row
+   * count, then it might be a PK.
+   * The given list of eligible join conjuncts must be non-empty.
    */
-  private static class SlotStats {
-    // Number of distinct values of the slot.
-    public final long ndv;
-    // Number of rows in the originating table.
-    public final long numRows;
+  private List<EqJoinConjunctScanSlots> getFkPkEqJoinConjuncts(
+      List<EqJoinConjunctScanSlots> eqJoinConjunctSlots) {
+    Preconditions.checkState(!eqJoinConjunctSlots.isEmpty());
+    Map<Pair<TupleId, TupleId>, List<EqJoinConjunctScanSlots>> scanSlotsByJoinedTids =
+        EqJoinConjunctScanSlots.groupByJoinedTupleIds(eqJoinConjunctSlots);
 
-    public SlotStats(long ndv, long numRows) {
-      // Cap NDV at num rows of the table.
-      this.ndv = Math.min(ndv, numRows);
-      this.numRows = numRows;
+    List<EqJoinConjunctScanSlots> result = null;
+    // Iterate over all groups of conjuncts that belong to the same joined tuple id pair.
+    // For each group, we compute the join NDV of the rhs slots and compare it to the
+    // number of rows in the rhs table.
+    for (List<EqJoinConjunctScanSlots> fkPkCandidate: scanSlotsByJoinedTids.values()) {
+      double jointNdv = 1.0;
+      for (EqJoinConjunctScanSlots slots: fkPkCandidate) jointNdv *= slots.rhsNdv();
+      double rhsNumRows = fkPkCandidate.get(0).rhsNumRows();
+      if (jointNdv >= Math.round(rhsNumRows * (1.0 - FK_PK_MAX_STATS_DELTA_PERC))) {
+        // We cannot disprove that the RHS is a PK.
+        if (result == null) result = Lists.newArrayList();
+        result.addAll(fkPkCandidate);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Returns the estimated join cardinality of a FK/PK inner or outer join based on the
+   * given list of equi-join conjunct slots and the join input cardinalities.
+   * The returned result is >= 0.
+   * The list of join conjuncts must be non-empty and the cardinalities must be >= 0.
+   */
+  private long getFkPkJoinCardinality(List<EqJoinConjunctScanSlots> eqJoinConjunctSlots,
+      long lhsCard, long rhsCard) {
+    Preconditions.checkState(!eqJoinConjunctSlots.isEmpty());
+    Preconditions.checkState(lhsCard >= 0 && rhsCard >= 0);
+
+    long result = -1;
+    for (EqJoinConjunctScanSlots slots: eqJoinConjunctSlots) {
+      // Adjust the join selectivity based on the NDV ratio to avoid underestimating
+      // the cardinality if the PK side has a higher NDV than the FK side.
+      double ndvRatio = 1.0;
+      if (slots.lhsNdv() > 0) ndvRatio = slots.rhsNdv() / slots.lhsNdv();
+      double rhsSelectivity = Double.MIN_VALUE;
+      if (slots.rhsNumRows() > 0) rhsSelectivity = rhsCard / slots.rhsNumRows();
+      long joinCard = (long) Math.ceil(lhsCard * rhsSelectivity * ndvRatio);
+      if (result == -1) {
+        result = joinCard;
+      } else {
+        result = Math.min(result, joinCard);
+      }
+    }
+    // FK/PK join cardinality must be <= the lhs cardinality.
+    result = Math.min(result, lhsCard);
+    Preconditions.checkState(result >= 0);
+    return result;
+  }
+
+  /**
+   * Returns the estimated join cardinality of a generic N:M inner or outer join based
+   * on the given list of equi-join conjunct slots and the join input cardinalities.
+   * The returned result is >= 0.
+   * The list of join conjuncts must be non-empty and the cardinalities must be >= 0.
+   */
+  private long getGenericJoinCardinality(List<EqJoinConjunctScanSlots> eqJoinConjunctSlots,
+      long lhsCard, long rhsCard) {
+    Preconditions.checkState(joinOp_.isInnerJoin() || joinOp_.isOuterJoin());
+    Preconditions.checkState(!eqJoinConjunctSlots.isEmpty());
+    Preconditions.checkState(lhsCard >= 0 && rhsCard >= 0);
+
+    long result = -1;
+    for (EqJoinConjunctScanSlots slots: eqJoinConjunctSlots) {
+      // Adjust the NDVs on both sides to account for predicates. Intuitively, the NDVs
+      // should only decrease. We ignore adjustments that would lead to an increase.
+      double lhsAdjNdv = slots.lhsNdv();
+      if (slots.lhsNumRows() > lhsCard) lhsAdjNdv *= lhsCard / slots.lhsNumRows();
+      double rhsAdjNdv = slots.rhsNdv();
+      if (slots.rhsNumRows() > rhsCard) rhsAdjNdv *= rhsCard / slots.rhsNumRows();
+      long joinCard = Math.round((lhsCard / Math.max(lhsAdjNdv, rhsAdjNdv)) * rhsCard);
+      if (result == -1) {
+        result = joinCard;
+      } else {
+        result = Math.min(result, joinCard);
+      }
+    }
+    Preconditions.checkState(result >= 0);
+    return result;
+  }
+
+  /**
+   * Holds the source scan slots of a <SlotRef> = <SlotRef> join predicate.
+   * The underlying table and column on both sides have stats.
+   */
+  public static final class EqJoinConjunctScanSlots {
+    private final Expr eqJoinConjunct_;
+    private final SlotDescriptor lhs_;
+    private final SlotDescriptor rhs_;
+
+    private EqJoinConjunctScanSlots(Expr eqJoinConjunct, SlotDescriptor lhs,
+        SlotDescriptor rhs) {
+      eqJoinConjunct_ = eqJoinConjunct;
+      lhs_ = lhs;
+      rhs_ = rhs;
+    }
+
+    // Convenience functions. They return double to avoid excessive casts in callers.
+    public double lhsNdv() {
+      return Math.min(lhs_.getStats().getNumDistinctValues(), lhsNumRows());
+    }
+    public double rhsNdv() {
+      return Math.min(rhs_.getStats().getNumDistinctValues(), rhsNumRows());
+    }
+    public double lhsNumRows() { return lhs_.getParent().getTable().getNumRows(); }
+    public double rhsNumRows() { return rhs_.getParent().getTable().getNumRows(); }
+
+    public TupleId lhsTid() { return lhs_.getParent().getId(); }
+    public TupleId rhsTid() { return rhs_.getParent().getId(); }
+
+    /**
+     * Returns a new EqJoinConjunctScanSlots for the given equi-join conjunct or null if
+     * the given conjunct is not of the form <SlotRef> = <SlotRef> or if the underlying
+     * table/column of at least one side is missing stats.
+     */
+    public static EqJoinConjunctScanSlots create(Expr eqJoinConjunct) {
+      if (!Expr.IS_EQ_BINARY_PREDICATE.apply(eqJoinConjunct)) return null;
+      SlotDescriptor lhsScanSlot = eqJoinConjunct.getChild(0).findSrcScanSlot();
+      if (lhsScanSlot == null || !hasNumRowsAndNdvStats(lhsScanSlot)) return null;
+      SlotDescriptor rhsScanSlot = eqJoinConjunct.getChild(1).findSrcScanSlot();
+      if (rhsScanSlot == null || !hasNumRowsAndNdvStats(rhsScanSlot)) return null;
+      return new EqJoinConjunctScanSlots(eqJoinConjunct, lhsScanSlot, rhsScanSlot);
+    }
+
+    private static boolean hasNumRowsAndNdvStats(SlotDescriptor slotDesc) {
+      if (slotDesc.getColumn() == null) return false;
+      if (!slotDesc.getStats().hasNumDistinctValues()) return false;
+      Table tbl = slotDesc.getParent().getTable();
+      if (tbl == null || tbl.getNumRows() == -1) return false;
+      return true;
     }
 
     /**
-     * Returns a new SlotStats object from the given expr that is guaranteed
-     * to have valid stats.
-     * Returns null if 'e' is not a SlotRef or a cast SlotRef, or if there are no
-     * valid table/column stats for 'e'.
+     * Groups the given EqJoinConjunctScanSlots by the lhs/rhs tuple combination
+     * and returns the result as a map.
      */
-    public static SlotStats create(Expr e) {
-      // We need both the table and column stats, but 'e' might not directly reference
-      // a scan slot, e.g., if 'e' references a grouping slot of an agg. So we look for
-      // that source scan slot, traversing through materialization points if necessary.
-      SlotDescriptor slotDesc = e.findSrcScanSlot();
-      if (slotDesc == null) return null;
-      Table table = slotDesc.getParent().getTable();
-      if (table == null || table.getNumRows() == -1) return null;
-      if (!slotDesc.getStats().hasNumDistinctValues()) return null;
-      return new SlotStats(
-          slotDesc.getStats().getNumDistinctValues(), table.getNumRows());
+    public static Map<Pair<TupleId, TupleId>, List<EqJoinConjunctScanSlots>>
+        groupByJoinedTupleIds(List<EqJoinConjunctScanSlots> eqJoinConjunctSlots) {
+      Map<Pair<TupleId, TupleId>, List<EqJoinConjunctScanSlots>> scanSlotsByJoinedTids =
+          Maps.newLinkedHashMap();
+      for (EqJoinConjunctScanSlots slots: eqJoinConjunctSlots) {
+        Pair<TupleId, TupleId> tids = Pair.create(slots.lhsTid(), slots.rhsTid());
+        List<EqJoinConjunctScanSlots> scanSlots = scanSlotsByJoinedTids.get(tids);
+        if (scanSlots == null) {
+          scanSlots = Lists.newArrayList();
+          scanSlotsByJoinedTids.put(tids, scanSlots);
+        }
+        scanSlots.add(slots);
+      }
+      return scanSlotsByJoinedTids;
     }
+
+    @Override
+    public String toString() { return eqJoinConjunct_.toSql(); }
   }
 
   /**

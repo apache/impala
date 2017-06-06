@@ -830,64 +830,64 @@ on (b.int_col = c.int_col and c.bool_col = b.bool_col)
 PLAN-ROOT SINK
 |
 05:HASH JOIN [INNER JOIN]
-|  hash predicates: b.bool_col = a.bool_col, b.int_col = a.int_col
-|  runtime filters: RF000 <- a.bool_col, RF001 <- a.int_col
+|  hash predicates: a.bool_col = b.bool_col, a.int_col = b.int_col
+|  runtime filters: RF000 <- b.bool_col, RF001 <- b.int_col
 |
-|--04:HASH JOIN [INNER JOIN]
-|  |  hash predicates: a.bool_col = bool_col, a.int_col = int_col
-|  |  runtime filters: RF002 <- bool_col, RF003 <- int_col
-|  |
-|  |--03:AGGREGATE [FINALIZE]
-|  |  |  output: count(*)
-|  |  |  group by: int_col, bool_col
-|  |  |
-|  |  02:SCAN HDFS [functional.alltypes]
-|  |     partitions=24/24 files=24 size=478.45KB
-|  |
-|  00:SCAN HDFS [functional.alltypes a]
+|--01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
-|     runtime filters: RF002 -> a.bool_col, RF003 -> a.int_col
 |
-01:SCAN HDFS [functional.alltypes b]
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.bool_col = bool_col, a.int_col = int_col
+|  runtime filters: RF002 <- bool_col, RF003 <- int_col
+|
+|--03:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |  group by: int_col, bool_col
+|  |
+|  02:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF000 -> functional.alltypes.bool_col, RF001 -> functional.alltypes.int_col
+|
+00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
-   runtime filters: RF000 -> b.bool_col, RF001 -> b.int_col
+   runtime filters: RF000 -> a.bool_col, RF001 -> a.int_col, RF002 -> a.bool_col, RF003 -> a.int_col
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 10:EXCHANGE [UNPARTITIONED]
 |
 05:HASH JOIN [INNER JOIN, PARTITIONED]
-|  hash predicates: b.bool_col = a.bool_col, b.int_col = a.int_col
-|  runtime filters: RF000 <- a.bool_col, RF001 <- a.int_col
+|  hash predicates: a.bool_col = b.bool_col, a.int_col = b.int_col
+|  runtime filters: RF000 <- b.bool_col, RF001 <- b.int_col
 |
-|--04:HASH JOIN [INNER JOIN, PARTITIONED]
-|  |  hash predicates: a.bool_col = bool_col, a.int_col = int_col
-|  |  runtime filters: RF002 <- bool_col, RF003 <- int_col
+|--09:EXCHANGE [HASH(b.int_col,b.bool_col)]
 |  |
-|  |--07:AGGREGATE [FINALIZE]
-|  |  |  output: count:merge(*)
-|  |  |  group by: int_col, bool_col
-|  |  |
-|  |  06:EXCHANGE [HASH(int_col,bool_col)]
-|  |  |
-|  |  03:AGGREGATE [STREAMING]
-|  |  |  output: count(*)
-|  |  |  group by: int_col, bool_col
-|  |  |
-|  |  02:SCAN HDFS [functional.alltypes]
-|  |     partitions=24/24 files=24 size=478.45KB
-|  |
-|  08:EXCHANGE [HASH(a.int_col,a.bool_col)]
-|  |
-|  00:SCAN HDFS [functional.alltypes a]
+|  01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
-|     runtime filters: RF002 -> a.bool_col, RF003 -> a.int_col
 |
-09:EXCHANGE [HASH(b.int_col,b.bool_col)]
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: a.bool_col = bool_col, a.int_col = int_col
+|  runtime filters: RF002 <- bool_col, RF003 <- int_col
 |
-01:SCAN HDFS [functional.alltypes b]
+|--07:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |  group by: int_col, bool_col
+|  |
+|  06:EXCHANGE [HASH(int_col,bool_col)]
+|  |
+|  03:AGGREGATE [STREAMING]
+|  |  output: count(*)
+|  |  group by: int_col, bool_col
+|  |
+|  02:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF000 -> functional.alltypes.bool_col, RF001 -> functional.alltypes.int_col
+|
+08:EXCHANGE [HASH(a.int_col,a.bool_col)]
+|
+00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
-   runtime filters: RF000 -> b.bool_col, RF001 -> b.int_col
+   runtime filters: RF000 -> a.bool_col, RF001 -> a.int_col, RF002 -> a.bool_col, RF003 -> a.int_col
 ====
 # Tests that all predicates from the On-clause are applied (IMPALA-805)
 # and that slot equivalences are enforced at lowest possible plan node.
@@ -987,20 +987,20 @@ where a.id = c.id and b.int_col = c.int_col and b.int_col = c.id
 PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN]
-|  hash predicates: c.id = a.id
-|  runtime filters: RF000 <- a.id
-|
-|--00:SCAN HDFS [functional.alltypestiny a]
-|     partitions=4/4 files=4 size=460B
-|
-03:HASH JOIN [INNER JOIN]
-|  hash predicates: b.int_col = c.int_col
-|  runtime filters: RF001 <- c.int_col
+|  hash predicates: a.id = c.id
+|  runtime filters: RF000 <- c.id
 |
 |--02:SCAN HDFS [functional.alltypessmall c]
 |     partitions=4/4 files=4 size=6.32KB
 |     predicates: c.id = c.int_col
-|     runtime filters: RF000 -> c.id
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: b.int_col = a.id
+|  runtime filters: RF001 <- a.id
+|
+|--00:SCAN HDFS [functional.alltypestiny a]
+|     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> a.id
 |
 01:SCAN HDFS [functional.alltypes b]
    partitions=24/24 files=24 size=478.45KB

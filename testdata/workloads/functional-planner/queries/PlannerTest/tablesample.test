@@ -6,7 +6,7 @@ PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=3/24 files=3 size=60.02KB
+   partitions=3/24 files=3 size=60.68KB
    stats-rows=7300 extrapolated-rows=disabled
    table stats: rows=7300 size=478.45KB
    column stats: all
@@ -21,7 +21,7 @@ PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=12/24 files=12 size=239.44KB
+   partitions=12/24 files=12 size=239.26KB
    stats-rows=7300 extrapolated-rows=disabled
    table stats: rows=7300 size=478.45KB
    column stats: all
@@ -38,7 +38,7 @@ PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=12/24 files=12 size=239.44KB
+   partitions=12/24 files=12 size=239.26KB
    predicates: id < 10
    stats-rows=7300 extrapolated-rows=disabled
    table stats: rows=7300 size=478.45KB
@@ -56,7 +56,7 @@ PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=6/24 files=6 size=120.46KB
+   partitions=6/24 files=6 size=119.70KB
    stats-rows=3650 extrapolated-rows=disabled
    table stats: rows=7300 size=478.45KB
    column stats: all
@@ -132,7 +132,7 @@ PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=3/24 files=3 size=22.05KB
+   partitions=3/24 files=3 size=22.53KB
    stats-rows=unavailable extrapolated-rows=disabled
    table stats: rows=unavailable size=unavailable
    column stats: unavailable
@@ -155,7 +155,7 @@ PLAN-ROOT SINK
 |  tuple-ids=0 row-size=4B cardinality=10
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=1/4 files=1 size=1.58KB
+|     partitions=1/4 files=1 size=1.57KB
 |     stats-rows=100 extrapolated-rows=disabled
 |     table stats: rows=100 size=6.32KB
 |     column stats: all
@@ -180,7 +180,7 @@ PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=3/24 files=3 size=60.02KB
+   partitions=3/24 files=3 size=60.68KB
    stats-rows=7300 extrapolated-rows=disabled
    table stats: rows=7300 size=478.45KB
    column stats: all

@@ -143,6 +143,14 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testFkPkJoinDetection() {
+    TQueryOptions options = defaultQueryOptions();
+    // The FK/PK detection result is included in EXTENDED or higher.
+    options.setExplain_level(TExplainLevel.EXTENDED);
+    runPlannerTestFile("fk-pk-join-detection", options);
+  }
+
+  @Test
   public void testOrder() {
     runPlannerTestFile("order");
   }
