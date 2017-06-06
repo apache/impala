@@ -72,6 +72,15 @@ under the License.
       <ph conref="../shared/impala_common.xml#common/cast_int_to_timestamp"/>
     </p>
 
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <!--Below conref'd content fixes IMPALA-3603-->
+    <p conref="../shared/impala_common.xml#common/how_impala_handles_nan_values"/>
+
+<codeblock>
+SELECT CAST('nan' AS FLOAT)=CAST('nan' AS FLOAT);
+</codeblock>
+
     <p conref="../shared/impala_common.xml#common/example_blurb"/>
 
 <codeblock>CREATE TABLE t1 (x FLOAT);

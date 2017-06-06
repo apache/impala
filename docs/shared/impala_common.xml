@@ -2378,6 +2378,12 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
         <b>Usage notes:</b>
       </p>
 
+      <p id="how_impala_handles_nan_values">
+        Impala does not evaluate NaN (not a number) as equal to any other numeric values,
+        including other NaN values. For example, the following statement, which evaluates equality
+        between two NaN values, returns <codeph>false</codeph>:
+      </p>
+
       <p id="example_blurb">
         <b>Examples:</b>
       </p>

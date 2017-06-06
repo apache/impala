@@ -78,6 +78,13 @@ under the License.
       The data type <codeph>REAL</codeph> is an alias for <codeph>DOUBLE</codeph>.
     </p>
 
+    <!--Below conref'd content fixes IMPALA-3603-->
+    <p conref="../shared/impala_common.xml#common/how_impala_handles_nan_values"/>
+
+<codeblock>
+SELECT CAST('nan' AS DOUBLE)=CAST('nan' AS DOUBLE);
+</codeblock>
+
     <p conref="../shared/impala_common.xml#common/example_blurb"/>
 
 <codeblock>CREATE TABLE t1 (x DOUBLE);
