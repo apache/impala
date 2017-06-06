@@ -18,7 +18,7 @@ row_regex: .*RowsRead: 2.43K .*
 ====
 ---- QUERY
 # Now turn on local filtering: we expect to see a reduction in scan volume.
-SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes p join [BROADCAST] alltypestiny b
 on p.month = b.int_col and b.month = 1 and b.string_col = "1"
@@ -38,7 +38,7 @@ row_regex: .*Files rejected: 7 \(7\).*
 
 # Local mode. Filters won't be propagated to scan, so scans will read all rows.
 # Still give enough time for filters to show up (even if they won't)
-SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes p join [SHUFFLE] alltypestiny b
 on p.month = b.int_col and b.month = 1 and b.string_col = "1"
@@ -49,7 +49,7 @@ row_regex: .*RowsRead: 2.43K .*
 ====
 ---- QUERY
 # Shuffle join, global mode. Expect filters to be propagated.
-SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes p join [SHUFFLE] alltypestiny b
 on p.month = b.int_col and b.month = 1 and b.string_col = "1"
@@ -71,7 +71,7 @@ row_regex: .*Files rejected: 7 \(7\).*
 
 # Local mode. Only the left-most scan will receive its filter, but since the scan of 'b'
 # will not, the lack of predicates means there is no filter effect.
-SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] alltypes b
@@ -85,7 +85,7 @@ row_regex: .*Files rejected: 0 .*
 ---- QUERY
 # Global mode. Scan of 'b' will receive highly effective filter, and will propagate that
 # to left-most scan.
-SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] alltypes b
@@ -105,7 +105,7 @@ row_regex: .*Files rejected: 8 .*
 # With local filtering, expect 0 rows, as all are rejected by partition pruning.
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=10000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] alltypestiny b
@@ -124,7 +124,7 @@ row_regex: .*Files rejected: 8 .*
 ####################################################
 
 # Local mode. Coordinator should report 0 filter updates received.
-SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] alltypestiny b
@@ -136,7 +136,7 @@ row_regex: .*FiltersReceived: 0 .*
 ====
 ---- QUERY
 # Global mode. Coordinator should report 0 filter updates received.
-SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] alltypestiny b
@@ -155,7 +155,7 @@ row_regex: .*Files rejected: 8 .*
 ####################################################
 
 # Local mode. Coordinator should report 0 filter updates received.
-SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [SHUFFLE] alltypestiny b
@@ -167,7 +167,7 @@ row_regex: .*FiltersReceived: 0 .*
 ====
 ---- QUERY
 # Global mode. Coordinator should report 1 filter update per backend.
-SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [SHUFFLE] alltypestiny b
@@ -185,7 +185,7 @@ row_regex: .*FiltersReceived: 3 .*
 # Expect all but one partition to be filtered out by join expr.
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] alltypestiny b
@@ -202,7 +202,7 @@ row_regex: .*Files rejected: 7 .*
 # Test case 8: filters do not pass through LOJ.
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     LEFT OUTER join alltypestiny b
@@ -220,7 +220,7 @@ row_regex: .*RowsReturned: 2.43K .*
 # All partitions will be filtered out by the join condition.
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     RIGHT OUTER join alltypestiny b
@@ -236,7 +236,7 @@ row_regex: .*Files rejected: 8 .*
 # Test case 10: filters do not pass through FOJ.
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     FULL OUTER join alltypestiny b
@@ -257,7 +257,7 @@ row_regex: .*RowsReturned: 2.43K .*
 # but which the planner thinks have relatively high selectivity.
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 SET RUNTIME_FILTER_MAX_SIZE=4K;
 select STRAIGHT_JOIN count(*) from alltypes a
@@ -284,7 +284,7 @@ row_regex: .*Rows rejected: 0 .*
 # per fragment instance, and three files rejected per scan.
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=15000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypesagg a
     join alltypesagg b
@@ -304,7 +304,7 @@ row_regex: .*Files rejected: 3 .*
 # join in its root, which produces filters for the scan of t1.
 ####################################################
 
-set RUNTIME_FILTER_WAIT_TIME_MS=15000;
+set RUNTIME_FILTER_WAIT_TIME_MS=30000;
 set RUNTIME_FILTER_MODE=GLOBAL;
 with t1 as (select month x, bigint_col y from alltypes limit 7300),
      t2 as (select int_col x, bigint_col y from alltypestiny limit 2)
@@ -434,7 +434,7 @@ row_regex: .*Filter 0 \(8.00 KB\).*
 # In this three-way join the filter produced by the top-level
 # join has both a local and a remote target.
 ####################################################
-set RUNTIME_FILTER_WAIT_TIME_MS=15000;
+set RUNTIME_FILTER_WAIT_TIME_MS=30000;
 set RUNTIME_FILTER_MODE=GLOBAL;
 select straight_join count(*)
 from alltypes a join [BROADCAST] alltypessmall c
@@ -449,7 +449,7 @@ from alltypes a join [BROADCAST] alltypessmall c
 ####################################################
 # Test case 18: Runtime filter pushed to all union operands
 ####################################################
-set RUNTIME_FILTER_WAIT_TIME_MS=15000;
+set RUNTIME_FILTER_WAIT_TIME_MS=30000;
 set RUNTIME_FILTER_MODE=GLOBAL;
 select straight_join count(*)
 from (select month, year from alltypes
