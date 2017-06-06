@@ -41,6 +41,13 @@ using boost::algorithm::to_lower;
 
 namespace sasl {
 
+TSasl::TSasl(const string& service, const string& serverFQDN, sasl_callback_t* callbacks)
+    : service(service),
+      serverFQDN(serverFQDN),
+      authComplete(false),
+      callbacks(callbacks),
+      conn(nullptr) { }
+
 uint8_t* TSasl::unwrap(const uint8_t* incoming,
                        const int offset, const uint32_t len, uint32_t* outLen) {
   uint32_t outputlen;
@@ -101,14 +108,28 @@ string TSasl::getUsername() {
 }
 
 TSaslClient::TSaslClient(const string& mechanisms, const string& authenticationId,
-    const string& protocol, const string& serverName, const map<string,string>& props,
-    sasl_callback_t* callbacks) {
-  conn = NULL;
+    const string& service, const string& serverFQDN, const map<string,string>& props,
+    sasl_callback_t* callbacks)
+    : TSasl(service, serverFQDN, callbacks),
+      clientStarted(false),
+      mechList(mechanisms) {
   if (!props.empty()) {
     throw SaslServerImplException("Properties not yet supported");
   }
-  int result = sasl_client_new(protocol.c_str(), serverName.c_str(),
-      NULL, NULL, callbacks, 0, &conn);
+  /*
+  if (!authenticationId.empty()) {
+    // TODO: setup security property
+    sasl_security_properties_t secprops;
+    // populate  secprops
+    result = sasl_setprop(conn, SASL_AUTH_EXTERNAL, authenticationId.c_str());
+  }
+  */
+}
+
+void TSaslClient::setupSaslContext() {
+  DCHECK(conn == nullptr);
+  int result = sasl_client_new(service.c_str(), serverFQDN.c_str(), NULL, NULL, callbacks,
+                               0, &conn);
   if (result != SASL_OK) {
     if (conn) {
       throw SaslServerImplException(sasl_errdetail(conn));
@@ -116,19 +137,12 @@ TSaslClient::TSaslClient(const string& mechanisms, const string& authenticationI
       throw SaslServerImplException(sasl_errstring(result, NULL, NULL));
     }
   }
+}
 
-  if (!authenticationId.empty()) {
-    /* TODO: setup security property */
-    /*
-    sasl_security_properties_t secprops;
-    // populate  secprops
-    result = sasl_setprop(conn, SASL_AUTH_EXTERNAL, authenticationId.c_str());
-    */
-  }
-
-  chosenMech = mechList = mechanisms;
-  authComplete = false;
+void TSaslClient::resetSaslContext() {
   clientStarted = false;
+  authComplete = false;
+  disposeSaslContext();
 }
 
 /* Evaluates the challenge data and generates a response. */
@@ -190,12 +204,16 @@ bool TSaslClient::hasInitialResponse() {
 }
 
 TSaslServer::TSaslServer(const string& service, const string& serverFQDN,
-                         const string& userRealm,
-                         unsigned flags, sasl_callback_t* callbacks) {
-  conn = NULL;
+    const string& userRealm, unsigned flags, sasl_callback_t* callbacks)
+    : TSasl(service, serverFQDN, callbacks),
+      userRealm(userRealm),
+      flags(flags),
+      serverStarted(false) { }
+
+void TSaslServer::setupSaslContext() {
   int result = sasl_server_new(service.c_str(),
       serverFQDN.size() == 0 ? NULL : serverFQDN.c_str(),
-      userRealm.size() == 0 ? NULL :userRealm.c_str(),
+      userRealm.size() == 0 ? NULL : userRealm.c_str(),
       NULL, NULL, callbacks, flags, &conn);
   if (result != SASL_OK) {
     if (conn) {
@@ -204,9 +222,12 @@ TSaslServer::TSaslServer(const string& service, const string& serverFQDN,
       throw SaslServerImplException(sasl_errstring(result, NULL, NULL));
     }
   }
+}
 
-  authComplete = false;
+void TSaslServer::resetSaslContext() {
   serverStarted = false;
+  authComplete = false;
+  disposeSaslContext();
 }
 
 uint8_t* TSaslServer::evaluateChallengeOrResponse(const uint8_t* response,

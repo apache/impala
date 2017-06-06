@@ -48,6 +48,14 @@ class TSaslClientTransport : public TSaslTransport {
                        boost::shared_ptr<TTransport> transport);
 
  protected:
+  /* Set up the Sasl server state for a connection. */
+  virtual void setupSaslNegotiationState();
+
+  /* Reset the Sasl client state. The negotiation will have to start from scratch
+   * after this is called.
+   */
+  virtual void resetSaslNegotiationState();
+
   /// Handle any startup messages.
   virtual void handleSaslStartMessage();
 };

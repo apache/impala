@@ -39,6 +39,7 @@ namespace apache { namespace thrift { namespace transport {
   TSaslTransport::TSaslTransport(boost::shared_ptr<TTransport> transport)
       : transport_(transport),
         memBuf_(new TMemoryBuffer(DEFAULT_MEM_BUF_SIZE)),
+        sasl_(NULL),
         shouldWrap_(false),
         isClient_(false) {
   }
@@ -68,73 +69,74 @@ namespace apache { namespace thrift { namespace transport {
     return sasl_->getUsername();
   }
 
-  void TSaslTransport::sendSaslMessage(const NegotiationStatus status,
-      const uint8_t* payload, const uint32_t length, bool flush) {
-    uint8_t messageHeader[STATUS_BYTES + PAYLOAD_LENGTH_BYTES];
-    uint8_t dummy = 0;
-    if (payload == NULL) {
-      payload = &dummy;
-    }
-    messageHeader[0] = (uint8_t)status;
-    encodeInt(length, messageHeader, STATUS_BYTES);
-    transport_->write(messageHeader, HEADER_LENGTH);
-    transport_->write(payload, length);
-    if (flush) transport_->flush();
-  }
-
-  void TSaslTransport::open() {
+  void TSaslTransport::doSaslNegotiation() {
     NegotiationStatus status = TSASL_INVALID;
     uint32_t resLength;
 
+    try {
+      // Setup Sasl context.
+      setupSaslNegotiationState();
+
+      // Initiate SASL message.
+      handleSaslStartMessage();
+
+      // SASL connection handshake
+      while (!sasl_->isComplete()) {
+        uint8_t* message = receiveSaslMessage(&status, &resLength);
+        if (status == TSASL_COMPLETE) {
+          if (isClient_) {
+            if (!sasl_->isComplete()) {
+              // Server sent COMPLETE out of order.
+              throw TTransportException("Received COMPLETE but no handshake occurred");
+            }
+            break; // handshake complete
+          }
+        } else if (status != TSASL_OK) {
+          stringstream ss;
+          ss << "Expected COMPLETE or OK, got " << status;
+          throw TTransportException(ss.str());
+        }
+        uint32_t challengeLength;
+        uint8_t* challenge = sasl_->evaluateChallengeOrResponse(
+            message, resLength, &challengeLength);
+        sendSaslMessage(sasl_->isComplete() ? TSASL_COMPLETE : TSASL_OK,
+                        challenge, challengeLength);
+      }
+
+      // If the server isn't complete yet, we need to wait for its response.
+      // This will occur with ANONYMOUS auth, for example, where we send an
+      // initial response and are immediately complete.
+      if (isClient_ && (status == TSASL_INVALID || status == TSASL_OK)) {
+        receiveSaslMessage(&status, &resLength);
+        if (status != TSASL_COMPLETE) {
+          stringstream ss;
+          ss << "Expected COMPLETE or OK, got " << status;
+          throw TTransportException(ss.str());
+        }
+      }
+      // TODO : need to set the shouldWrap_ based on QOP
+      /*
+      String qop = (String) sasl.getNegotiatedProperty(Sasl.QOP);
+      if (qop != null && !qop.equalsIgnoreCase("auth"))
+        shouldWrap_ = true;
+      */
+    } catch (const TException& e) {
+      // If we hit an exception, that means the Sasl negotiation failed. We explicitly
+      // reset the negotiation state here since the caller may retry an open() which would
+      // start a new connection negotiation.
+      resetSaslNegotiationState();
+      throw e;
+    }
+  }
+
+  void TSaslTransport::open() {
     // Only client should open the underlying transport.
     if (isClient_ && !transport_->isOpen()) {
       transport_->open();
     }
 
-    // initiate  SASL message
-    handleSaslStartMessage();
-
-    // SASL connection handshake
-    while (!sasl_->isComplete()) {
-      uint8_t* message = receiveSaslMessage(&status, &resLength);
-      if (status == TSASL_COMPLETE) {
-        if (isClient_) {
-          if (!sasl_->isComplete()) {
-            // Server sent COMPLETE out of order.
-            throw TTransportException("Received COMPLETE but no handshake occurred");
-          }
-          break; // handshake complete
-        }
-      } else if (status != TSASL_OK) {
-        stringstream ss;
-        ss << "Expected COMPLETE or OK, got " << status;
-        throw TTransportException(ss.str());
-      }
-      uint32_t challengeLength;
-      uint8_t* challenge = sasl_->evaluateChallengeOrResponse(
-          message, resLength, &challengeLength);
-      sendSaslMessage(sasl_->isComplete() ? TSASL_COMPLETE : TSASL_OK,
-                      challenge, challengeLength);
-    }
-
-    // If the server isn't complete yet, we need to wait for its response.
-    // This will occur with ANONYMOUS auth, for example, where we send an
-    // initial response and are immediately complete.
-    if (isClient_ && (status == TSASL_INVALID || status == TSASL_OK)) {
-      receiveSaslMessage(&status, &resLength);
-      if (status != TSASL_COMPLETE) {
-        stringstream ss;
-        ss << "Expected COMPLETE or OK, got " << status;
-        throw TTransportException(ss.str());
-      }
-    }
-
-    // TODO : need to set the shouldWrap_ based on QOP
-    /*
-    String qop = (String) sasl.getNegotiatedProperty(Sasl.QOP);
-    if (qop != null && !qop.equalsIgnoreCase("auth"))
-      shouldWrap_ = true;
-    */
+    // Start the SASL negotiation protocol.
+    doSaslNegotiation();
   }
 
   void TSaslTransport::close() {
@@ -233,6 +235,20 @@ namespace apache { namespace thrift { namespace transport {
 
   void TSaslTransport::flush() {
     transport_->flush();
+  }
+
+  void TSaslTransport::sendSaslMessage(const NegotiationStatus status,
+      const uint8_t* payload, const uint32_t length, bool flush) {
+    uint8_t messageHeader[STATUS_BYTES + PAYLOAD_LENGTH_BYTES];
+    uint8_t dummy = 0;
+    if (payload == NULL) {
+      payload = &dummy;
+    }
+    messageHeader[0] = (uint8_t)status;
+    encodeInt(length, messageHeader, STATUS_BYTES);
+    transport_->write(messageHeader, HEADER_LENGTH);
+    transport_->write(payload, length);
+    if (flush) transport_->flush();
   }
 
   uint8_t* TSaslTransport::receiveSaslMessage(NegotiationStatus* status,

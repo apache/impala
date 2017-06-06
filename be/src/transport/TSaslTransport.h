@@ -175,6 +175,21 @@ class TSaslTransport : public TVirtualTransport<TSaslTransport> {
   }
 
   /**
+   * Performs the SASL negotiation.
+   */
+  void doSaslNegotiation();
+
+  /**
+   * Create the Sasl context for a server/client connection.
+   */
+  virtual void setupSaslNegotiationState() = 0;
+
+  /**
+   * Reset the negotiation state.
+   */
+  virtual void resetSaslNegotiationState() = 0;
+
+  /**
    * Read a complete Thrift SASL message.
    *
    * @return The SASL status and payload from this message.
@@ -216,6 +231,7 @@ class TSaslTransport : public TVirtualTransport<TSaslTransport> {
   /// If memBuf_ is filled with bytes that are already read, and has crossed a size
   /// threshold (see implementation for exact value), resize the buffer to a default value.
   void shrinkBuffer();
+
 };
 
 }}} // apache::thrift::transport

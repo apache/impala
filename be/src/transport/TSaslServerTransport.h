@@ -41,6 +41,20 @@ namespace apache { namespace thrift { namespace transport {
  */
 class TSaslServerTransport : public TSaslTransport {
  private:
+  /* Set up the Sasl server state for a connection.
+   * The Server negotiation state is setup in handleSaslStartMessage() after
+   * agreeing upon the client's chosen mechanism. So we do nothing here.
+   * The client always sends the first message in the protocol, so there isn't
+   * a case where the TSaslServer state needs to be setup before receiving the
+   * first message (see TSaslClient::hasInitialResponse()).
+   */
+  virtual void setupSaslNegotiationState();
+
+  /* Reset the Sasl server state. The negotiation will have to start from scratch
+   * after this is called.
+   */
+  virtual void resetSaslNegotiationState();
+
   /* Handle the initial message from the client. */
   virtual void handleSaslStartMessage();
 

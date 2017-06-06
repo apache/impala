@@ -37,6 +37,22 @@ TSaslClientTransport::TSaslClientTransport(boost::shared_ptr<sasl::TSasl> saslCl
    : TSaslTransport(saslClient, transport) {
 }
 
+void TSaslClientTransport::setupSaslNegotiationState() {
+  if (!sasl_) {
+    throw SaslClientImplException(
+        "Invalid state: setupSaslNegotiationState() failed. TSaslClient not created");
+  }
+  sasl_->setupSaslContext();
+}
+
+void TSaslClientTransport::resetSaslNegotiationState() {
+  if (!sasl_) {
+    throw SaslClientImplException(
+        "Invalid state: resetSaslNegotiationState() failed. TSaslClient not created");
+  }
+  sasl_->resetSaslContext();
+}
+
 void TSaslClientTransport::handleSaslStartMessage() {
 
   uint32_t resLength = 0;

@@ -74,6 +74,17 @@ void TSaslServerTransport::setSaslServer(sasl::TSasl* saslServer) {
   sasl_.reset(saslServer);
 }
 
+void TSaslServerTransport::setupSaslNegotiationState() {
+  // Do nothing, as explained in header comment.
+}
+
+void TSaslServerTransport::resetSaslNegotiationState() {
+  // Sometimes we may fail negotiation before creating the TSaslServer negotitation
+  // state if the client's first message is invalid. So we don't assume that TSaslServer
+  // will have been created.
+  if (sasl_) sasl_->resetSaslContext();
+}
+
 void TSaslServerTransport::handleSaslStartMessage() {
   uint32_t resLength;
   NegotiationStatus status;
@@ -106,6 +117,7 @@ void TSaslServerTransport::handleSaslStartMessage() {
                               serverDefinition->realm_,
                               serverDefinition->flags_,
                               &serverDefinition->callbacks_[0]));
+  sasl_->setupSaslContext();
   // First argument is interpreted as C-string
   sasl_->evaluateChallengeOrResponse(
       reinterpret_cast<const uint8_t*>(message_str.c_str()), resLength, &resLength);
