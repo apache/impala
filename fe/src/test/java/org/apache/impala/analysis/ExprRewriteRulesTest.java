@@ -23,6 +23,7 @@ import org.apache.impala.catalog.Catalog;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
+import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -40,41 +41,75 @@ import com.google.common.collect.Lists;
  */
 public class ExprRewriteRulesTest extends FrontendTestBase {
 
-  public Expr RewritesOk(String expr, ExprRewriteRule rule, String expectedExpr)
+  public Expr RewritesOk(String exprStr, ExprRewriteRule rule, String expectedExprStr)
       throws AnalysisException {
-    return RewritesOk("functional.alltypessmall", expr, rule, expectedExpr);
+    return RewritesOk("functional.alltypessmall", exprStr, rule, expectedExprStr);
   }
 
-  public Expr RewritesOk(String tableName, String expr, ExprRewriteRule rule, String expectedExpr)
+  public Expr RewritesOk(String tableName, String exprStr, ExprRewriteRule rule, String expectedExprStr)
       throws AnalysisException {
-    return RewritesOk(tableName, expr, Lists.newArrayList(rule), expectedExpr);
+    return RewritesOk(tableName, exprStr, Lists.newArrayList(rule), expectedExprStr);
   }
 
-  public Expr RewritesOk(String expr, List<ExprRewriteRule> rules, String expectedExpr)
+  public Expr RewritesOk(String exprStr, List<ExprRewriteRule> rules, String expectedExprStr)
       throws AnalysisException {
-    return RewritesOk("functional.alltypessmall", expr, rules, expectedExpr);
+    return RewritesOk("functional.alltypessmall", exprStr, rules, expectedExprStr);
   }
 
-  public Expr RewritesOk(String tableName, String expr, List<ExprRewriteRule> rules,
-      String expectedExpr) throws AnalysisException {
-    String stmtStr = "select " + expr + " from " + tableName;
+  public Expr RewritesOk(String tableName, String exprStr, List<ExprRewriteRule> rules,
+      String expectedExprStr) throws AnalysisException {
+    String stmtStr = "select " + exprStr + " from " + tableName;
     SelectStmt stmt = (SelectStmt) ParsesOk(stmtStr);
     Analyzer analyzer = createAnalyzer(Catalog.DEFAULT_DB);
     stmt.analyze(analyzer);
     Expr origExpr = stmt.getSelectList().getItems().get(0).getExpr();
+    Expr rewrittenExpr = verifyExprEquivalence(origExpr, expectedExprStr, rules, analyzer);
+    return rewrittenExpr;
+  }
+
+  public Expr RewritesOkWhereExpr(String exprStr, ExprRewriteRule rule, String expectedExprStr)
+      throws AnalysisException {
+    return RewritesOkWhereExpr("functional.alltypessmall", exprStr, rule, expectedExprStr);
+  }
+
+  public Expr RewritesOkWhereExpr(String tableName, String exprStr, ExprRewriteRule rule, String expectedExprStr)
+      throws AnalysisException {
+    return RewritesOkWhereExpr(tableName, exprStr, Lists.newArrayList(rule), expectedExprStr);
+  }
+
+  public Expr RewritesOkWhereExpr(String exprStr, List<ExprRewriteRule> rules, String expectedExprStr)
+      throws AnalysisException {
+    return RewritesOkWhereExpr("functional.alltypessmall", exprStr, rules, expectedExprStr);
+  }
+
+  public Expr RewritesOkWhereExpr(String tableName, String exprStr, List<ExprRewriteRule> rules,
+      String expectedExprStr) throws AnalysisException {
+    String stmtStr = "select count(1)  from " + tableName + " where " + exprStr;
+    System.out.println(stmtStr);
+    SelectStmt stmt = (SelectStmt) ParsesOk(stmtStr);
+    Analyzer analyzer = createAnalyzer(Catalog.DEFAULT_DB);
+    stmt.analyze(analyzer);
+    Expr origExpr = stmt.getWhereClause();
+    Expr rewrittenExpr = verifyExprEquivalence(origExpr, expectedExprStr, rules, analyzer);
+    return rewrittenExpr;
+  }
+
+  private Expr verifyExprEquivalence(Expr origExpr, String expectedExprStr,
+      List<ExprRewriteRule> rules, Analyzer analyzer) throws AnalysisException {
     String origSql = origExpr.toSql();
     ExprRewriter rewriter = new ExprRewriter(rules);
     Expr rewrittenExpr = rewriter.rewrite(origExpr, analyzer);
     String rewrittenSql = rewrittenExpr.toSql();
-    boolean expectChange = expectedExpr != null;
-    if (expectedExpr != null) {
-      assertEquals(expectedExpr, rewrittenSql);
+    boolean expectChange = expectedExprStr != null;
+    if (expectedExprStr != null) {
+      assertEquals(expectedExprStr, rewrittenSql);
     } else {
       assertEquals(origSql, rewrittenSql);
     }
     Assert.assertEquals(expectChange, rewriter.changed());
     return rewrittenExpr;
   }
+
 
   /**
    * Helper for prettier error messages than what JUnit.Assert provides.
@@ -398,13 +433,81 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("0 = id", rule, "id = 0");
     RewritesOk("cast(0 as double) = id", rule, "id = CAST(0 AS DOUBLE)");
     RewritesOk("1 + 1 = cast(id as int)", rule, "CAST(id AS INT) = 1 + 1");
+    RewritesOk("5 = id + 2", rule, "id + 2 = 5");
+    RewritesOk("5 + 3 = id", rule, "id = 5 + 3");
+    RewritesOk("tinyint_col + smallint_col = int_col", rule,
+        "int_col = tinyint_col + smallint_col");
+
 
     // Verify that these don't get rewritten.
+    RewritesOk("5 = 6", rule, null);
     RewritesOk("id = 5", rule, null);
-    RewritesOk("5 = id + 2", rule, null);
     RewritesOk("cast(id as int) = int_col", rule, null);
     RewritesOk("int_col = cast(id as int)", rule, null);
     RewritesOk("int_col = tinyint_col", rule, null);
     RewritesOk("tinyint_col = int_col", rule, null);
+  }
+
+  @Test
+  public void TestEqualityDisjunctsToInRule() throws AnalysisException {
+    ExprRewriteRule edToInrule = EqualityDisjunctsToInRule.INSTANCE;
+    ExprRewriteRule normalizeRule = NormalizeBinaryPredicatesRule.INSTANCE;
+    List<ExprRewriteRule> comboRules = Lists.newArrayList(normalizeRule,
+        edToInrule);
+
+    RewritesOk("int_col = 1 or int_col = 2", edToInrule, "int_col IN (1, 2)");
+    RewritesOk("int_col = 1 or int_col = 2 or int_col = 3", edToInrule,
+        "int_col IN (1, 2, 3)");
+    RewritesOk("(int_col = 1 or int_col = 2) or (int_col = 3 or int_col = 4)", edToInrule,
+        "int_col IN (1, 2, 3, 4)");
+    RewritesOk("float_col = 1.1 or float_col = 2.2 or float_col = 3.3",
+        edToInrule, "float_col IN (1.1, 2.2, 3.3)");
+    RewritesOk("string_col = '1' or string_col = '2' or string_col = '3'",
+        edToInrule, "string_col IN ('1', '2', '3')");
+    RewritesOk("bool_col = true or bool_col = false or bool_col = true", edToInrule,
+        "bool_col IN (TRUE, FALSE, TRUE)");
+    RewritesOk("bool_col = null or bool_col = null or bool_col is null", edToInrule,
+        "bool_col IN (NULL, NULL) OR bool_col IS NULL");
+    RewritesOk("int_col * 3 = 6 or int_col * 3 = 9 or int_col * 3 = 12",
+        edToInrule, "int_col * 3 IN (6, 9, 12)");
+
+    // cases where rewrite should happen partially
+    RewritesOk("(int_col = 1 or int_col = 2) or (int_col = 3 and int_col = 4)",
+        edToInrule, "int_col IN (1, 2) OR (int_col = 3 AND int_col = 4)");
+    RewritesOk(
+        "1 = int_col or 2 = int_col or 3 = int_col AND (float_col = 5 or float_col = 6)",
+        edToInrule,
+        "1 = int_col OR 2 = int_col OR 3 = int_col AND float_col IN (5, 6)");
+    RewritesOk("int_col * 3 = 6 or int_col * 3 = 9 or int_col * 3 <= 12",
+        edToInrule, "int_col * 3 IN (6, 9) OR int_col * 3 <= 12");
+
+    // combo rules
+    RewritesOk(
+        "1 = int_col or 2 = int_col or 3 = int_col AND (float_col = 5 or float_col = 6)",
+        comboRules, "int_col IN (1, 2) OR int_col = 3 AND float_col IN (5, 6)");
+
+    // existing in predicate
+    RewritesOk("int_col in (1,2) or int_col = 3", edToInrule,
+        "int_col IN (1, 2, 3)");
+    RewritesOk("int_col = 1 or int_col in (2, 3)", edToInrule,
+        "int_col IN (2, 3, 1)");
+    RewritesOk("int_col in (1, 2) or int_col in (3, 4)", edToInrule,
+        "int_col IN (1, 2, 3, 4)");
+
+    // no rewrite
+    RewritesOk("int_col = smallint_col or int_col = bigint_col ", edToInrule, null);
+    RewritesOk("int_col = 1 or int_col = int_col ", edToInrule, null);
+    RewritesOk("int_col = 1 or int_col = int_col + 3 ", edToInrule, null);
+    RewritesOk("int_col in (1, 2) or int_col = int_col + 3 ", edToInrule, null);
+    RewritesOk("int_col not in (1,2) or int_col = 3", edToInrule, null);
+    RewritesOk("int_col = 3 or int_col not in (1,2)", edToInrule, null);
+    RewritesOk("int_col not in (1,2) or int_col not in (3, 4)", edToInrule, null);
+    RewritesOk("int_col in (1,2) or int_col not in (3, 4)", edToInrule, null);
+
+    // TODO if subqueries are supported in OR clause in future, add tests to cover the same.
+    RewritesOkWhereExpr(
+        "int_col = 1 and int_col in "
+            + "(select smallint_col from functional.alltypessmall where smallint_col<10)",
+        edToInrule, null);
   }
 }

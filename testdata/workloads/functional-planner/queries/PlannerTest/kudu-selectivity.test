@@ -82,16 +82,16 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
      mem-estimate=0B mem-reservation=0B
      tuple-ids=0 row-size=124B cardinality=3317
 ====
-select * from functional_kudu.zipcode_incomes where id = '1' or id = '2'
+select * from functional_kudu.zipcode_incomes where id = '1' or id = '2' or zip = '3'
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
   PLAN-ROOT SINK
   |  mem-estimate=0B mem-reservation=0B
   |
   00:SCAN KUDU [functional_kudu.zipcode_incomes]
-     predicates: id = '1' OR id = '2'
+     predicates: id IN ('1', '2') OR zip = '3'
      mem-estimate=0B mem-reservation=0B
-     tuple-ids=0 row-size=124B cardinality=2
+     tuple-ids=0 row-size=124B cardinality=3
 ---- DISTRIBUTEDPLAN
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
   PLAN-ROOT SINK
@@ -99,15 +99,15 @@ F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
   |
   01:EXCHANGE [UNPARTITIONED]
      mem-estimate=0B mem-reservation=0B
-     tuple-ids=0 row-size=124B cardinality=2
+     tuple-ids=0 row-size=124B cardinality=3
 
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
   DATASTREAM SINK [FRAGMENT=F01, EXCHANGE=01, UNPARTITIONED]
   |  mem-estimate=0B mem-reservation=0B
   00:SCAN KUDU [functional_kudu.zipcode_incomes]
-     predicates: id = '1' OR id = '2'
+     predicates: id IN ('1', '2') OR zip = '3'
      mem-estimate=0B mem-reservation=0B
-     tuple-ids=0 row-size=124B cardinality=2
+     tuple-ids=0 row-size=124B cardinality=3
 ====
 select * from functional_kudu.alltypes where
 -- predicates that can be pushed

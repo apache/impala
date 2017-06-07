@@ -52,7 +52,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.widetable_250_cols a]
    partitions=1/1 files=1 size=28.69KB
-   predicates: a.int_col1 = 10, a.int_col2 = 11, a.int_col3 = 55, 55 = a.int_col4 / 10
+   predicates: a.int_col1 = 10, a.int_col2 = 11, a.int_col3 = 55, a.int_col4 / 10 = 55
 ====
 # Another impossibility (a.int_col3 = a.int_col2 * 5 = a.int_col2 * -7)
 select * from functional.widetable_250_cols a

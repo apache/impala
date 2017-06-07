@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Set;
 
+import org.apache.impala.analysis.BinaryPredicate.Operator;
 import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Function;
@@ -175,6 +176,16 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         @Override
         public boolean apply(Expr arg) { return arg instanceof BinaryPredicate; }
       };
+
+  public final static com.google.common.base.Predicate<Expr> IS_EXPR_EQ_LITERAL_PREDICATE =
+      new com.google.common.base.Predicate<Expr>() {
+    @Override
+    public boolean apply(Expr arg) {
+      return arg instanceof BinaryPredicate
+          && ((BinaryPredicate) arg).getOp() == Operator.EQ
+          && (((BinaryPredicate) arg).getChild(1).isLiteral());
+    }
+  };
 
   public final static com.google.common.base.Predicate<Expr>
       IS_NONDETERMINISTIC_BUILTIN_FN_PREDICATE =

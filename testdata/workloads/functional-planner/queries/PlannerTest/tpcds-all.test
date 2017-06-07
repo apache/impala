@@ -1205,7 +1205,7 @@ PLAN-ROOT SINK
 |  |
 |  |--03:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=141.07KB
-|  |     predicates: household_demographics.hd_vehicle_count > 0, (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2, (household_demographics.hd_buy_potential = '>10000' OR household_demographics.hd_buy_potential = 'unknown')
+|  |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
 |     partitions=1824/1824 files=1824 size=326.32MB
@@ -1269,7 +1269,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  03:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=141.07KB
-|  |     predicates: household_demographics.hd_vehicle_count > 0, (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2, (household_demographics.hd_buy_potential = '>10000' OR household_demographics.hd_buy_potential = 'unknown')
+|  |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
 |     partitions=1824/1824 files=1824 size=326.32MB
@@ -1349,7 +1349,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  03:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=141.07KB
-|  |     predicates: household_demographics.hd_vehicle_count > 0, (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2, (household_demographics.hd_buy_potential = '>10000' OR household_demographics.hd_buy_potential = 'unknown')
+|  |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
 |     partitions=1824/1824 files=1824 size=326.32MB
@@ -3761,7 +3761,7 @@ PLAN-ROOT SINK
 |  |
 |  |--03:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=141.07KB
-|  |     predicates: household_demographics.hd_vehicle_count > 0, CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END > 1, (household_demographics.hd_buy_potential = '>10000' OR household_demographics.hd_buy_potential = 'unknown')
+|  |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END > 1
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
 |     partitions=1824/1824 files=1824 size=326.32MB
@@ -3824,7 +3824,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  03:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=141.07KB
-|  |     predicates: household_demographics.hd_vehicle_count > 0, CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END > 1, (household_demographics.hd_buy_potential = '>10000' OR household_demographics.hd_buy_potential = 'unknown')
+|  |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END > 1
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
 |     partitions=1824/1824 files=1824 size=326.32MB
@@ -3903,7 +3903,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  03:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=141.07KB
-|  |     predicates: household_demographics.hd_vehicle_count > 0, CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END > 1, (household_demographics.hd_buy_potential = '>10000' OR household_demographics.hd_buy_potential = 'unknown')
+|  |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END > 1
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
 |     partitions=1824/1824 files=1824 size=326.32MB

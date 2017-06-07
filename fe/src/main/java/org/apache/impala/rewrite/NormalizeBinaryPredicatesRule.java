@@ -19,19 +19,20 @@ package org.apache.impala.rewrite;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
-import org.apache.impala.analysis.BoolLiteral;
-import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
-import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.common.AnalysisException;
 
 /**
-   * Normalizes binary predicates of the form <expr> <op> <slot> so that the slot is
-   * on the left hand side. Predicates where <slot> is wrapped in a cast (implicit or
-   * explicit) are normalized, too.
+ * Normalizes binary predicates of the form <expr> <op> <slot> so that the slot is
+ * on the left hand side. Predicates where <slot> is wrapped in a cast (implicit or
+ * explicit) are normalized, too. Predicates of the form <constant> <op> <expr>
+ * are also normalized so that <constant> is always on the right hand side.
  *
  * Examples:
  * 5 > id -> id < 5
+ * cast(0 as double) = id -> id = cast(0 as double)
+ * 5 = id + 2 -> id + 2 = 5
+ *
  */
 public class NormalizeBinaryPredicatesRule implements ExprRewriteRule {
   public static ExprRewriteRule INSTANCE = new NormalizeBinaryPredicatesRule();
@@ -39,11 +40,20 @@ public class NormalizeBinaryPredicatesRule implements ExprRewriteRule {
   @Override
   public Expr apply(Expr expr, Analyzer analyzer) throws AnalysisException {
     if (!(expr instanceof BinaryPredicate)) return expr;
-    if (expr.getChild(0).unwrapSlotRef(false) != null) return expr;
-    if (expr.getChild(1).unwrapSlotRef(false) == null) return expr;
 
-    BinaryPredicate.Operator op = ((BinaryPredicate) expr).getOp();
+    if (isExprOpSlotRef(expr) || isConstantOpExpr(expr)) {
+      BinaryPredicate.Operator op = ((BinaryPredicate) expr).getOp();
+      return new BinaryPredicate(op.converse(), expr.getChild(1), expr.getChild(0));
+    }
+    return expr;
+  }
 
-    return new BinaryPredicate(op.converse(), expr.getChild(1), expr.getChild(0));
+  boolean isConstantOpExpr(Expr expr) {
+    return expr.getChild(0).isConstant() && !expr.getChild(1).isConstant();
+  }
+
+  boolean isExprOpSlotRef(Expr expr) {
+    return expr.getChild(0).unwrapSlotRef(false) == null
+        && expr.getChild(1).unwrapSlotRef(false) != null;
   }
 }

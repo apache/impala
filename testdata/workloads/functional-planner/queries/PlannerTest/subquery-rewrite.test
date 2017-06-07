@@ -1231,7 +1231,7 @@ PLAN-ROOT SINK
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: count(*)
-|  |  having: 100 < count(*)
+|  |  having: count(*) > 100
 |  |
 |  01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
@@ -1256,7 +1256,7 @@ PLAN-ROOT SINK
 |
 |--03:AGGREGATE [FINALIZE]
 |  |  output: count(id)
-|  |  having: 100 > count(id)
+|  |  having: count(id) < 100
 |  |
 |  02:AGGREGATE
 |  |  group by: id
