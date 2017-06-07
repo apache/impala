@@ -36,7 +36,8 @@ Memory consumption / limit: <strong>{{consumption}}</strong> / <strong>{{mem_lim
     <th>Value</th>
     <th>Description</th>
   </tr>
-  {{#buffer_pool}}
+{{/buffer_pool}}
+{{#buffer_pool}}
   <tr>
     <td><tt>{{name}}</tt></td>
     {{! Is this a stats metric? }}
@@ -54,7 +55,8 @@ Memory consumption / limit: <strong>{{consumption}}</strong> / <strong>{{mem_lim
       {{description}}
     </td>
   </tr>
-  {{/buffer_pool}}
+{{/buffer_pool}}
+{{?buffer_pool}}
 </table>
 {{/buffer_pool}}
 
@@ -66,7 +68,8 @@ Memory consumption / limit: <strong>{{consumption}}</strong> / <strong>{{mem_lim
     <th>Value</th>
     <th>Description</th>
   </tr>
-  {{#jvm_total}}
+{{/jvm_total}}
+{{#jvm_total}}
   <tr>
     <td><tt>{{name}}</tt></td>
     {{! Is this a stats metric? }}
@@ -84,7 +87,8 @@ Memory consumption / limit: <strong>{{consumption}}</strong> / <strong>{{mem_lim
       {{description}}
     </td>
   </tr>
-  {{/jvm_total}}
+{{/jvm_total}}
+{{?jvm_total}}
 </table>
 {{/jvm_total}}
 
@@ -97,7 +101,8 @@ Memory consumption / limit: <strong>{{consumption}}</strong> / <strong>{{mem_lim
     <th>Value</th>
     <th>Description</th>
   </tr>
-  {{#jvm_heap}}
+{{/jvm_heap}}
+{{#jvm_heap}}
   <tr>
     <td><tt>{{name}}</tt></td>
     {{! Is this a stats metric? }}
@@ -115,7 +120,8 @@ Memory consumption / limit: <strong>{{consumption}}</strong> / <strong>{{mem_lim
       {{description}}
     </td>
   </tr>
-  {{/jvm_heap}}
+{{/jvm_heap}}
+{{?jvm_heap}}
 </table>
 {{/jvm_heap}}
 
@@ -127,7 +133,8 @@ Memory consumption / limit: <strong>{{consumption}}</strong> / <strong>{{mem_lim
     <th>Value</th>
     <th>Description</th>
   </tr>
-  {{#jvm_non_heap}}
+{{/jvm_non_heap}}
+{{#jvm_non_heap}}
   <tr>
     <td><tt>{{name}}</tt></td>
     {{! Is this a stats metric? }}
@@ -145,7 +152,8 @@ Memory consumption / limit: <strong>{{consumption}}</strong> / <strong>{{mem_lim
       {{description}}
     </td>
   </tr>
-  {{/jvm_non_heap}}
+{{/jvm_non_heap}}
+{{?jvm_non_heap}}
 </table>
 {{/jvm_non_heap}}
 
