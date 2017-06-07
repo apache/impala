@@ -28,6 +28,7 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.TreeNode;
+import org.apache.impala.planner.PlanNode.ExecPhaseResourceProfiles;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPartitionType;
 import org.apache.impala.thrift.TPlanFragment;
@@ -104,6 +105,11 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   // if the output is UNPARTITIONED, it is being broadcast
   private DataPartition outputPartition_;
 
+  // Resource requirements and estimates for all instances of this plan fragment running
+  // on a host. Initialized with a dummy value. Gets set correctly in
+  // computeResourceProfile().
+  private ResourceProfile perHostResourceProfile_ = ResourceProfile.invalid();
+
   /**
    * C'tor for fragment with specific partition; the output is by default broadcast.
    */
@@ -128,11 +134,12 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   }
 
   /**
-   * Collect all PlanNodes that belong to the exec tree of this fragment.
+   * Collect and return all PlanNodes that belong to the exec tree of this fragment.
    */
-  public void collectPlanNodes(List<PlanNode> nodes) {
-    Preconditions.checkNotNull(nodes);
+  public List<PlanNode> collectPlanNodes() {
+    List<PlanNode> nodes = Lists.newArrayList();
     collectPlanNodesHelper(planRoot_, nodes);
+    return nodes;
   }
 
   private void collectPlanNodesHelper(PlanNode root, List<PlanNode> nodes) {
@@ -148,14 +155,13 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   public List<Expr> getOutputExprs() { return outputExprs_; }
 
   /**
-   * Finalize plan tree and create stream sink, if needed.
-   * Computes resource profiles for all nodes and sinks in this fragment.
+   * Do any final work to set up the ExchangeNodes and DataStreamSinks for this fragment.
    * If this fragment is hash partitioned, ensures that the corresponding partition
    * exprs of all hash-partitioning senders are cast to identical types.
    * Otherwise, the hashes generated for identical partition values may differ
    * among senders if the partition-expr types are not identical.
    */
-  public void finalize(Analyzer analyzer)
+  public void finalizeExchanges(Analyzer analyzer)
       throws InternalException, NotImplementedException {
     if (destNode_ != null) {
       Preconditions.checkState(sink_ == null);
@@ -164,7 +170,6 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       streamSink.setFragment(this);
       sink_ = streamSink;
     }
-    computeResourceProfile(analyzer);
 
     if (!dataPartition_.isHashPartitioned()) return;
 
@@ -202,16 +207,38 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   }
 
   /**
-   * Compute the resource profile of the fragment. Must be called after all the
-   * plan nodes and sinks are added to the fragment.
+   * Compute the peak resource profile for all instances of this fragment per host. Must
+   * be called after all the plan nodes and sinks are added to the fragment and resource
+   * profiles of all children fragments are computed.
    */
-  private void computeResourceProfile(Analyzer analyzer) {
+  public void computeResourceProfile(Analyzer analyzer) {
+    // Compute resource profiles for all plan nodes and sinks in the fragment.
     sink_.computeResourceProfile(analyzer.getQueryOptions());
-    List<PlanNode> nodes = Lists.newArrayList();
-    collectPlanNodes(nodes);
-    for (PlanNode node: nodes) {
-      node.computeResourceProfile(analyzer.getQueryOptions());
+    for (PlanNode node: collectPlanNodes()) {
+      node.computeNodeResourceProfile(analyzer.getQueryOptions());
     }
+
+    if (sink_ instanceof JoinBuildSink) {
+      // Resource consumption of fragments with join build sinks is included in the
+      // parent fragment because the join node blocks waiting for the join build to
+      // finish - see JoinNode.computeTreeResourceProfiles().
+      perHostResourceProfile_ = ResourceProfile.invalid();
+      return;
+    }
+
+    ExecPhaseResourceProfiles planTreeProfile =
+        planRoot_.computeTreeResourceProfiles(analyzer.getQueryOptions());
+    // The sink is opened after the plan tree.
+    ResourceProfile fInstancePostOpenProfile =
+        planTreeProfile.postOpenProfile.sum(sink_.getResourceProfile());
+    ResourceProfile fInstanceProfile =
+        planTreeProfile.duringOpenProfile.max(fInstancePostOpenProfile);
+    int numInstances = getNumInstancesPerHost(analyzer.getQueryOptions().getMt_dop());
+    perHostResourceProfile_ = fInstanceProfile.multiply(numInstances);
+  }
+
+  public ResourceProfile getPerHostResourceProfile() {
+    return perHostResourceProfile_;
   }
 
   /**
@@ -313,17 +340,15 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       prefix = "  ";
       rootPrefix = "  ";
       detailPrefix = prefix + "|  ";
-      str.append(getFragmentHeaderString(queryOptions.getMt_dop()));
-      str.append("\n");
+      str.append(getFragmentHeaderString("", "", queryOptions.getMt_dop()));
       if (sink_ != null && sink_ instanceof DataStreamSink) {
         str.append(
             sink_.getExplainString(rootPrefix, detailPrefix, queryOptions, detailLevel));
       }
     } else if (detailLevel == TExplainLevel.EXTENDED) {
       // Print a fragment prefix displaying the # nodes and # instances
-      str.append(rootPrefix);
-      str.append(getFragmentHeaderString(queryOptions.getMt_dop()));
-      str.append("\n");
+      str.append(
+          getFragmentHeaderString(rootPrefix, detailPrefix, queryOptions.getMt_dop()));
       rootPrefix = prefix;
     }
 
@@ -348,12 +373,22 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   /**
    * Get a header string for a fragment in an explain plan.
    */
-  public String getFragmentHeaderString(int mt_dop) {
+  public String getFragmentHeaderString(String firstLinePrefix, String detailPrefix,
+      int mt_dop) {
     StringBuilder builder = new StringBuilder();
-    builder.append(String.format("%s:PLAN FRAGMENT [%s]", fragmentId_.toString(),
-        dataPartition_.getExplainString()));
+    builder.append(String.format("%s%s:PLAN FRAGMENT [%s]", firstLinePrefix,
+        fragmentId_.toString(), dataPartition_.getExplainString()));
     builder.append(PrintUtils.printNumHosts(" ", getNumNodes()));
     builder.append(PrintUtils.printNumInstances(" ", getNumInstances(mt_dop)));
+    builder.append("\n");
+    builder.append(detailPrefix);
+    builder.append("Per-Host Resources: ");
+    if (sink_ instanceof JoinBuildSink) {
+      builder.append("included in parent fragment");
+    } else {
+      builder.append(perHostResourceProfile_.getExplainString());
+    }
+    builder.append("\n");
     return builder.toString();
   }
 
@@ -419,8 +454,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    */
   public void verifyTree() {
     // PlanNode.fragment_ is set correctly
-    List<PlanNode> nodes = Lists.newArrayList();
-    collectPlanNodes(nodes);
+    List<PlanNode> nodes = collectPlanNodes();
     List<PlanNode> exchNodes = Lists.newArrayList();
     for (PlanNode node: nodes) {
       if (node instanceof ExchangeNode) exchNodes.add(node);

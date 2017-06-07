@@ -35,10 +35,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hive.service.rpc.thrift.TGetColumnsReq;
-import org.apache.hive.service.rpc.thrift.TGetFunctionsReq;
-import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
-import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.CreateDataSrcStmt;
 import org.apache.impala.analysis.CreateDropRoleStmt;
@@ -1008,6 +1004,9 @@ public class Frontend {
       planRoots.add(planner.createPlan().get(0));
     }
 
+    // Compute resource requirements of the final plans.
+    planner.computeResourceReqs(planRoots, result);
+
     // create per-plan exec info;
     // also assemble list of names of tables with missing or corrupt stats for
     // assembling a warning message
@@ -1015,10 +1014,6 @@ public class Frontend {
       result.addToPlan_exec_info(
           createPlanExecInfo(planRoot, planner, queryCtx, result));
     }
-
-    // Compute resource requirements after scan range locations because the cost
-    // estimates of scan nodes rely on them.
-    planner.computeResourceReqs(planRoots, result);
 
     // Optionally disable spilling in the backend. Allow spilling if there are plan hints
     // or if all tables have stats.

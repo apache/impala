@@ -144,21 +144,28 @@ void BlockingJoinNode::Close(RuntimeState* state) {
   ExecNode::Close(state);
 }
 
-void BlockingJoinNode::ProcessBuildInputAsync(RuntimeState* state, DataSink* build_sink,
-    Status* status) {
+void BlockingJoinNode::ProcessBuildInputAsync(
+    RuntimeState* state, DataSink* build_sink, Status* status) {
   DCHECK(status != nullptr);
   SCOPED_THREAD_COUNTER_MEASUREMENT(state->total_thread_statistics());
-  if (build_sink == nullptr){
-    *status = ProcessBuildInput(state);
-  } else {
-    *status = SendBuildInputToSink<true>(state, build_sink);
+  {
+    SCOPED_STOP_WATCH(&built_probe_overlap_stop_watch_);
+    *status = child(1)->Open(state);
+  }
+  if (status->ok()) *status = AcquireResourcesForBuild(state);
+  if (status->ok()) {
+    if (build_sink == nullptr){
+      *status = ProcessBuildInput(state);
+    } else {
+      *status = SendBuildInputToSink<true>(state, build_sink);
+    }
   }
   // IMPALA-1863: If the build-side thread failed, then we need to close the right
   // (build-side) child to avoid a potential deadlock between fragment instances.  This
   // is safe to do because while the build may have partially completed, it will not be
-  // probed.  BlockJoinNode::Open() will return failure as soon as child(0)->Open()
+  // probed. BlockingJoinNode::Open() will return failure as soon as child(0)->Open()
   // completes.
-  if (!status->ok()) child(1)->Close(state);
+  if (CanCloseBuildEarly() || !status->ok()) child(1)->Close(state);
   // Release the thread token as soon as possible (before the main thread joins
   // on it).  This way, if we had a chain of 10 joins using 1 additional thread,
   // we'd keep the additional thread busy the whole time.
@@ -180,9 +187,9 @@ Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
   // Inside a subplan we expect Open() to be called a number of times proportional to the
   // input data of the SubplanNode, so we prefer doing processing the build input in the
   // main thread, assuming that thread creation is expensive relative to a single subplan
-  // iteration.
+  // iteration. TODO-MT: disable async build thread when mt_dop >= 1.
   //
-  // In this block, we also compute the 'overlap' time for the left and right child.  This
+  // In this block, we also compute the 'overlap' time for the left and right child. This
   // is the time (i.e. clock reads) when the right child stops overlapping with the left
   // child. For the single threaded case, the left and right child never overlap. For the
   // build side in a different thread, the overlap stops when the left child Open()
@@ -217,6 +224,8 @@ Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
     // TODO: Remove this special-case behavior for subplans once we have proper
     // projection. See UnnestNode for details on the current projection implementation.
     RETURN_IF_ERROR(child(0)->Open(state));
+    RETURN_IF_ERROR(child(1)->Open(state));
+    RETURN_IF_ERROR(AcquireResourcesForBuild(state));
     if (build_sink == NULL) {
       RETURN_IF_ERROR(ProcessBuildInput(state));
     } else {
@@ -225,11 +234,16 @@ Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
   } else {
     // The left/right child never overlap. The overlap stops here.
     built_probe_overlap_stop_watch_.SetTimeCeiling();
+    // Open the build side before acquiring our own resources so that the build side
+    // can release any resources only used during its Open().
+    RETURN_IF_ERROR(child(1)->Open(state));
+    RETURN_IF_ERROR(AcquireResourcesForBuild(state));
     if (build_sink == NULL) {
       RETURN_IF_ERROR(ProcessBuildInput(state));
     } else {
       RETURN_IF_ERROR(SendBuildInputToSink<false>(state, build_sink));
     }
+    if (CanCloseBuildEarly()) child(1)->Close(state);
     RETURN_IF_ERROR(child(0)->Open(state));
   }
   return Status::OK();
@@ -258,11 +272,6 @@ Status BlockingJoinNode::GetFirstProbeRow(RuntimeState* state) {
 template <bool ASYNC_BUILD>
 Status BlockingJoinNode::SendBuildInputToSink(RuntimeState* state,
     DataSink* build_sink) {
-  {
-    CONDITIONAL_SCOPED_STOP_WATCH(&built_probe_overlap_stop_watch_, ASYNC_BUILD);
-    RETURN_IF_ERROR(child(1)->Open(state));
-  }
-
   {
     SCOPED_TIMER(build_timer_);
     RETURN_IF_ERROR(build_sink->Open(state));

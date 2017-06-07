@@ -77,7 +77,7 @@ public class NestedLoopJoinNode extends JoinNode {
   }
 
   @Override
-  public void computeResourceProfile(TQueryOptions queryOptions) {
+  public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     long perInstanceMemEstimate;
     if (getChild(1).getCardinality() == -1 || getChild(1).getAvgRowSize() == -1
         || numNodes_ == 0) {
@@ -86,7 +86,7 @@ public class NestedLoopJoinNode extends JoinNode {
       perInstanceMemEstimate =
           (long) Math.ceil(getChild(1).cardinality_ * getChild(1).avgRowSize_);
     }
-    resourceProfile_ = new ResourceProfile(perInstanceMemEstimate, 0);
+    nodeResourceProfile_ = new ResourceProfile(perInstanceMemEstimate, 0);
   }
 
   @Override

@@ -40,6 +40,7 @@ order by cnt, bigint_col
 limit 10
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=264.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -66,6 +67,7 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=16B cardinality=unavailable
 ---- PARALLELPLANS
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -76,6 +78,7 @@ PLAN-ROOT SINK
 |  tuple-ids=2 row-size=16B cardinality=10
 |
 F01:PLAN FRAGMENT [HASH(bigint_col)] hosts=3 instances=9
+Per-Host Resources: mem-estimate=384.00MB mem-reservation=792.00MB
 02:TOP-N [LIMIT=10]
 |  order by: count(int_col) ASC, bigint_col ASC
 |  mem-estimate=160B mem-reservation=0B
@@ -92,6 +95,7 @@ F01:PLAN FRAGMENT [HASH(bigint_col)] hosts=3 instances=9
 |  tuple-ids=1 row-size=16B cardinality=unavailable
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
+Per-Host Resources: mem-estimate=432.00MB mem-reservation=0B
 01:AGGREGATE [STREAMING]
 |  output: count(int_col)
 |  group by: bigint_col
@@ -115,6 +119,7 @@ from functional_parquet.alltypes
 where id < 10
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=16.00MB mem-reservation=40.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -143,6 +148,7 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=8B cardinality=unavailable
 ---- PARALLELPLANS
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -151,6 +157,7 @@ PLAN-ROOT SINK
 |  tuple-ids=4,3 row-size=16B cardinality=unavailable
 |
 F01:PLAN FRAGMENT [HASH(int_col)] hosts=3 instances=9
+Per-Host Resources: mem-estimate=0B mem-reservation=120.00MB
 02:ANALYTIC
 |  functions: row_number()
 |  partition by: int_col
@@ -169,6 +176,7 @@ F01:PLAN FRAGMENT [HASH(int_col)] hosts=3 instances=9
 |  tuple-ids=0 row-size=8B cardinality=unavailable
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
+Per-Host Resources: mem-estimate=48.00MB mem-reservation=0B
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
    partitions=24/24 files=24 size=178.13KB
    predicates: id < 10
@@ -186,6 +194,7 @@ from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems
 where c_custkey < 10 and o_orderkey < 5 and l_linenumber < 3
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=88.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -226,12 +235,12 @@ PLAN-ROOT SINK
 |     tuple-ids=1 row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=292.35MB
    predicates: c_custkey < 10, !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey < 5
    predicates on o_lineitems: l_linenumber < 3
    stats-rows=150000 extrapolated-rows=disabled
-   table stats: rows=150000 size=292.36MB
+   table stats: rows=150000 size=292.35MB
    columns missing stats: c_orders
    parquet statistics predicates: c_custkey < 10
    parquet dictionary predicates: c_custkey < 10
@@ -239,6 +248,7 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=254B cardinality=15000
 ---- PARALLELPLANS
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -247,6 +257,7 @@ PLAN-ROOT SINK
 |  tuple-ids=2,1,0 row-size=562B cardinality=1500000
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
+Per-Host Resources: mem-estimate=264.00MB mem-reservation=0B
 01:SUBPLAN
 |  mem-estimate=0B mem-reservation=0B
 |  tuple-ids=2,1,0 row-size=562B cardinality=1500000
@@ -284,12 +295,12 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
 |     tuple-ids=1 row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=292.35MB
    predicates: c_custkey < 10, !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey < 5
    predicates on o_lineitems: l_linenumber < 3
    stats-rows=150000 extrapolated-rows=disabled
-   table stats: rows=150000 size=292.36MB
+   table stats: rows=150000 size=292.35MB
    columns missing stats: c_orders
    parquet statistics predicates: c_custkey < 10
    parquet dictionary predicates: c_custkey < 10
@@ -302,6 +313,7 @@ from tpch_nested_parquet.customer c, c.c_orders o1, c.c_orders o2
 where o1.o_orderkey = o2.o_orderkey + 2 and o1.o_orderkey < 5
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=88.00MB mem-reservation=136.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -335,16 +347,17 @@ PLAN-ROOT SINK
 |     tuple-ids=1 row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=292.35MB
    predicates: !empty(c.c_orders), !empty(c.c_orders)
    predicates on o1: o1.o_orderkey < 5
    stats-rows=150000 extrapolated-rows=disabled
-   table stats: rows=150000 size=292.36MB
+   table stats: rows=150000 size=292.35MB
    columns missing stats: c_orders, c_orders
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=270B cardinality=150000
 ---- PARALLELPLANS
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -353,6 +366,7 @@ PLAN-ROOT SINK
 |  tuple-ids=1,0,2 row-size=286B cardinality=1500000
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
+Per-Host Resources: mem-estimate=264.00MB mem-reservation=408.00MB
 01:SUBPLAN
 |  mem-estimate=0B mem-reservation=0B
 |  tuple-ids=1,0,2 row-size=286B cardinality=1500000
@@ -383,11 +397,11 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
 |     tuple-ids=1 row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=292.35MB
    predicates: !empty(c.c_orders), !empty(c.c_orders)
    predicates on o1: o1.o_orderkey < 5
    stats-rows=150000 extrapolated-rows=disabled
-   table stats: rows=150000 size=292.36MB
+   table stats: rows=150000 size=292.35MB
    columns missing stats: c_orders, c_orders
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=270B cardinality=150000

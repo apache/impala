@@ -6,9 +6,10 @@ select *
 from tpch.lineitem join tpch.orders on l_orderkey = o_orderkey;
 ---- RESULTS: VERIFY_IS_EQUAL
 'Per-Host Resource Reservation: Memory=136.00MB'
-'Per-Host Resource Estimates: Memory=388.41MB'
+'Per-Host Resource Estimates: Memory=476.41MB'
 ''
 'F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
+'|  Per-Host Resources: mem-estimate=0B mem-reservation=0B'
 'PLAN-ROOT SINK'
 '|  mem-estimate=0B mem-reservation=0B'
 '|'
@@ -17,6 +18,7 @@ from tpch.lineitem join tpch.orders on l_orderkey = o_orderkey;
 '|  tuple-ids=0,1 row-size=454B cardinality=5757710'
 '|'
 'F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3'
+'Per-Host Resources: mem-estimate=388.41MB mem-reservation=136.00MB'
 '02:HASH JOIN [INNER JOIN, BROADCAST]'
 '|  hash predicates: l_orderkey = o_orderkey'
 '|  fk/pk conjuncts: l_orderkey = o_orderkey'
@@ -29,6 +31,7 @@ from tpch.lineitem join tpch.orders on l_orderkey = o_orderkey;
 '|  |  tuple-ids=1 row-size=191B cardinality=1500000'
 '|  |'
 '|  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2'
+'|  Per-Host Resources: mem-estimate=88.00MB mem-reservation=0B'
 '|  01:SCAN HDFS [tpch.orders, RANDOM]'
 row_regex:.*partitions=1/1 files=1 size=.*
 '|     stats-rows=1500000 extrapolated-rows=disabled'
@@ -54,7 +57,7 @@ from functional_avro.alltypes t1
   left outer join functional_avro.alltypes t3 on (t2.id = t3.id)
 where t1.month = 1 and t2.year = 2009 and t3.bool_col = false
 ---- RESULTS: VERIFY_IS_SUBSET
-'Per-Host Resource Estimates: Memory=4.03GB'
+'Per-Host Resource Estimates: Memory=4.07GB'
 'WARNING: The following tables are missing relevant table and/or column statistics.'
 'functional_avro.alltypes, functional_parquet.alltypessmall'
 ====

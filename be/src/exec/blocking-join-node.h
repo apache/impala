@@ -101,26 +101,34 @@ class BlockingJoinNode : public ExecNode {
   /// with the probe child Open().
   MonotonicStopWatch built_probe_overlap_stop_watch_;
 
+  // True for a join node subclass if the build side can be closed before the probe
+  // side is opened. Should be true wherever possible to reduce resource consumption.
+  // E.g. this is true or PartitionedHashJoinNode because it rematerializes the build rows
+  // and false for NestedLoopJoinNode because it accumulates RowBatches that may reference
+  // memory still owned by the build-side ExecNode tree.
+  // Changes here must be kept in sync with the planner's resource profile computation.
+  // TODO: IMPALA-4179: this should always be true once resource transfer has been fixed.
+  virtual bool CanCloseBuildEarly() const { return false; }
+
+  /// Called by BlockingJoinNode after opening child(1) succeeds and before
+  /// SendBuildInputToSink is called to allocate resources for this ExecNode.
+  virtual Status AcquireResourcesForBuild(RuntimeState* state) { return Status::OK(); }
+
   /// Processes the build-side input.
   /// Called from ProcessBuildInputAndOpenProbe() if the subclass does not provide a
-  /// DataSink to consume the build input.
+  /// DataSink to consume the build input. The build-side input is already open when
+  /// this is called.
   /// Note that this can be called concurrently with Open'ing the left child to
   /// increase parallelism. If, for example, the left child is another join node,
   /// it can start its own build at the same time.
   /// TODO: move all subclasses to use the DataSink interface and remove this method.
   virtual Status ProcessBuildInput(RuntimeState* state) = 0;
 
-  /// Processes the build-side input and opens the probe side. Will do both concurrently
-  /// if the plan shape and thread token availability permit it.
-  /// If 'build_sink' is non-NULL, sends the build-side input to 'build_sink'. Otherwise
-  /// calls ProcessBuildInput on the subclass.
+  /// Processes the build-side input, which should be already open, and opens the probe
+  /// side. Will do both concurrently if not in a subplan and an extra thread token is
+  /// available. If 'build_sink' is non-NULL, sends the build-side input to 'build_sink'.
+  /// Otherwise calls ProcessBuildInput on the subclass.
   Status ProcessBuildInputAndOpenProbe(RuntimeState* state, DataSink* build_sink);
-
-  /// Helper function to process the build input by sending it to a DataSink.
-  /// ASYNC_BUILD enables timers that impose some overhead but are required if the build
-  /// is processed concurrently with the Open() of the left child.
-  template <bool ASYNC_BUILD>
-  Status SendBuildInputToSink(RuntimeState* state, DataSink* build_sink);
 
   /// Set up 'current_probe_row_' to point to the first input row from the left child
   /// (probe side). Fills 'probe_batch_' with rows from the left child and updates
@@ -199,12 +207,19 @@ class BlockingJoinNode : public ExecNode {
       const MonotonicStopWatch* child_overlap_timer);
 
  private:
-  /// The main function for the thread that processes the build input asynchronously.
-  /// Its status is returned in the 'status' promise. If 'build_sink' is non-NULL, it
-  /// is used for the build. Otherwise, ProcessBuildInput() is called on the subclass.
+  /// Helper function to process the build input by sending it to a DataSink. The build
+  /// input must already be open before calling this. ASYNC_BUILD enables timers that
+  /// impose some overhead but are required if the build is processed concurrently with
+  /// the Open() of the left child.
+  template <bool ASYNC_BUILD>
+  Status SendBuildInputToSink(RuntimeState* state, DataSink* build_sink);
+
+  /// The main function for the thread that opens the build side and processes the build
+  /// input asynchronously.  Its status is returned in the 'status' promise. If
+  /// 'build_sink' is non-NULL, it is used for the build. Otherwise, ProcessBuildInput()
+  /// is called on the subclass.
   void ProcessBuildInputAsync(RuntimeState* state, DataSink* build_sink, Status* status);
 };
-
 }
 
 #endif

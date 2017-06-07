@@ -108,18 +108,23 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
       const DescriptorTbl& descs);
   virtual ~PartitionedHashJoinNode();
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
-  virtual Status Prepare(RuntimeState* state);
-  virtual void Codegen(RuntimeState* state);
-  virtual Status Open(RuntimeState* state);
-  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
-  virtual Status Reset(RuntimeState* state);
-  virtual void Close(RuntimeState* state);
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status Prepare(RuntimeState* state) override;
+  virtual void Codegen(RuntimeState* state) override;
+  virtual Status Open(RuntimeState* state) override;
+  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
+  virtual Status Reset(RuntimeState* state) override;
+  virtual void Close(RuntimeState* state) override;
 
  protected:
-  virtual Status QueryMaintenance(RuntimeState* state);
-  virtual void AddToDebugString(int indentation_level, std::stringstream* out) const;
-  virtual Status ProcessBuildInput(RuntimeState* state);
+  virtual Status QueryMaintenance(RuntimeState* state) override;
+  virtual void AddToDebugString(
+      int indentation_level, std::stringstream* out) const override;
+  virtual Status ProcessBuildInput(RuntimeState* state) override;
+
+  // Safe to close the build side early because we rematerialize the build rows always.
+  virtual bool CanCloseBuildEarly() const override { return true; }
+  virtual Status AcquireResourcesForBuild(RuntimeState* state) override;
 
  private:
   class ProbePartition;

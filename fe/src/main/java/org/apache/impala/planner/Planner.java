@@ -58,6 +58,13 @@ import com.google.common.collect.Lists;
 public class Planner {
   private final static Logger LOG = LoggerFactory.getLogger(Planner.class);
 
+  // Minimum per-host resource requirements to ensure that no plan node set can have
+  // estimates of zero, even if the contained PlanNodes have estimates of zero.
+  public static final long MIN_PER_HOST_MEM_ESTIMATE_BYTES = 10 * 1024 * 1024;
+
+  public static final ResourceProfile MIN_PER_HOST_RESOURCES =
+      new ResourceProfile(MIN_PER_HOST_MEM_ESTIMATE_BYTES, 0);
+
   private final PlannerContext ctx_;
 
   public Planner(AnalysisContext.AnalysisResult analysisResult, TQueryCtx queryCtx) {
@@ -159,7 +166,7 @@ public class Planner {
       LOG.trace("finalize plan fragments");
     }
     for (PlanFragment fragment: fragments) {
-      fragment.finalize(ctx_.getRootAnalyzer());
+      fragment.finalizeExchanges(ctx_.getRootAnalyzer());
     }
 
     Collections.reverse(fragments);
@@ -332,48 +339,66 @@ public class Planner {
   }
 
   /**
-   * Estimates the per-host resource requirements for the given plans, and sets the
-   * results in request.
-   * TODO: The LOG.warn() messages should eventually become Preconditions checks
-   * once resource estimation is more robust.
+   * Computes the per-host resource profile for the given plans, i.e. the peak resources
+   * consumed by all fragment instances belonging to the query per host. Sets the
+   * per-host resource values in 'request'.
    */
   public void computeResourceReqs(List<PlanFragment> planRoots,
       TQueryExecRequest request) {
     Preconditions.checkState(!planRoots.isEmpty());
     Preconditions.checkNotNull(request);
+    TQueryOptions queryOptions = ctx_.getRootAnalyzer().getQueryOptions();
+    int mtDop = queryOptions.getMt_dop();
 
-    // Compute the sum over all plans.
-    // TODO: Revisit during MT work - scheduling of fragments will change and computing
-    // the sum may not be correct or optimal.
-    ResourceProfile totalResources = ResourceProfile.invalid();
-    for (PlanFragment planRoot: planRoots) {
-      ResourceProfile planMaxResources = ResourceProfile.invalid();
-      ArrayList<PlanFragment> fragments = planRoot.getNodesPreOrder();
-      // Compute pipelined plan node sets.
-      ArrayList<PipelinedPlanNodeSet> planNodeSets =
-          PipelinedPlanNodeSet.computePlanNodeSets(fragments.get(0).getPlanRoot());
+    // Peak per-host peak resources for all plan fragments.
+    ResourceProfile perHostPeakResources = ResourceProfile.invalid();
+    // Total of initial reservation claims in bytes by all operators in all fragment
+    // instances per host. Computed by summing the per-host minimum reservations of
+    // all plan nodes and sinks.
+    long perHostInitialReservationTotal = 0;
 
-      // Compute the max of the per-host resources requirement.
-      // Note that the different maxes may come from different plan node sets.
-      for (PipelinedPlanNodeSet planNodeSet : planNodeSets) {
-        TQueryOptions queryOptions = ctx_.getQueryOptions();
-        ResourceProfile perHostResources =
-            planNodeSet.computePerHostResources(queryOptions);
-        if (!perHostResources.isValid()) continue;
-        planMaxResources = ResourceProfile.max(planMaxResources, perHostResources);
+    // Do a pass over all the fragments to compute resource profiles. Compute the
+    // profiles bottom-up since a fragment's profile may depend on its descendants.
+    List<PlanFragment> allFragments = planRoots.get(0).getNodesPostOrder();
+    for (PlanFragment fragment: allFragments) {
+      // Compute the per-node, per-sink and aggregate profiles for the fragment.
+      fragment.computeResourceProfile(ctx_.getRootAnalyzer());
+
+      // Different fragments do not synchronize their Open() and Close(), so the backend
+      // does not provide strong guarantees about whether one fragment instance releases
+      // resources before another acquires them. Conservatively assume that all fragment
+      // instances can consume their peak resources at the same time, i.e. that the
+      // query-wide peak resources is the sum of the per-fragment-instance peak
+      // resources.
+      perHostPeakResources =
+          perHostPeakResources.sum(fragment.getPerHostResourceProfile());
+      perHostInitialReservationTotal += fragment.getNumInstancesPerHost(mtDop)
+          * fragment.getSink().getResourceProfile().getMinReservationBytes();
+
+      for (PlanNode node: fragment.collectPlanNodes()) {
+        perHostInitialReservationTotal += fragment.getNumInstances(mtDop)
+            * node.getNodeResourceProfile().getMinReservationBytes();
       }
-      totalResources = ResourceProfile.sum(totalResources, planMaxResources);
     }
 
-    Preconditions.checkState(totalResources.getMemEstimateBytes() >= 0);
-    Preconditions.checkState(totalResources.getMinReservationBytes() >= 0);
-    request.setPer_host_mem_estimate(totalResources.getMemEstimateBytes());
-    request.setPer_host_min_reservation(totalResources.getMinReservationBytes());
+    Preconditions.checkState(perHostPeakResources.getMemEstimateBytes() >= 0,
+        perHostPeakResources.getMemEstimateBytes());
+    Preconditions.checkState(perHostPeakResources.getMinReservationBytes() >= 0,
+        perHostPeakResources.getMinReservationBytes());
+
+    perHostPeakResources = MIN_PER_HOST_RESOURCES.max(perHostPeakResources);
+
+    request.setPer_host_mem_estimate(perHostPeakResources.getMemEstimateBytes());
+    request.setPer_host_min_reservation(perHostPeakResources.getMinReservationBytes());
+    request.setPer_host_initial_reservation_total_claims(perHostInitialReservationTotal);
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Per-host min buffer : " + totalResources.getMinReservationBytes());
-      LOG.trace("Estimated per-host memory: " + totalResources.getMemEstimateBytes());
+      LOG.trace("Per-host min buffer : " + perHostPeakResources.getMinReservationBytes());
+      LOG.trace(
+          "Estimated per-host memory: " + perHostPeakResources.getMemEstimateBytes());
+      LOG.trace("Per-host initial reservation total: " + perHostInitialReservationTotal);
     }
   }
+
 
   /**
    * Traverses the plan tree rooted at 'root' and inverts outer and semi joins

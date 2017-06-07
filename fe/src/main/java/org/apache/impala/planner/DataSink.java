@@ -34,7 +34,7 @@ public abstract class DataSink {
 
   // resource requirements and estimates for this plan node.
   // set in computeResourceProfile()
-  protected ResourceProfile resourceProfile_ = null;
+  protected ResourceProfile resourceProfile_ = ResourceProfile.invalid();
 
   /**
    * Return an explain string for the DataSink. Each line of the explain will be prefixed

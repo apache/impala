@@ -223,10 +223,6 @@ Status HashJoinNode::ProcessBuildInput(RuntimeState* state) {
   // row ptrs.  The row ptrs are copied into the hash table's internal structure so they
   // don't need to be stored in the build_pool_.
   RowBatch build_batch(child(1)->row_desc(), state->batch_size(), mem_tracker());
-  {
-    SCOPED_STOP_WATCH(&built_probe_overlap_stop_watch_);
-    RETURN_IF_ERROR(child(1)->Open(state));
-  }
   while (true) {
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(QueryMaintenance(state));

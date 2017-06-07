@@ -81,18 +81,14 @@ public class ParallelPlanner {
     List<JoinNode> joins = Lists.newArrayList();
     collectJoins(fragment.getPlanRoot(), joins);
     if (!joins.isEmpty()) {
-      List<String> joinIds = Lists.newArrayList();
-      for (JoinNode join: joins) joinIds.add(join.getId().toString());
-
       if (buildCohortId == null) buildCohortId = cohortIdGenerator_.getNextId();
       for (JoinNode join: joins) createBuildPlan(join, buildCohortId);
     }
 
-    if (!fragment.getChildren().isEmpty()) {
-      List<String> ids = Lists.newArrayList();
-      for (PlanFragment c: fragment.getChildren()) ids.add(c.getId().toString());
-    }
     for (PlanFragment child: fragment.getChildren()) {
+      // We already recursed on the join build fragment in createBuildPlan().
+      if (child.getSink() instanceof JoinBuildSink) continue;
+      // Propagate the plan and cohort IDs to children that are part of the same plan.
       child.setPlanId(fragment.getPlanId());
       child.setCohortId(fragment.getCohortId());
       createBuildPlans(child, buildCohortId);
@@ -171,19 +167,16 @@ public class ParallelPlanner {
         join.getChild(1), join.getFragment().getDataPartition());
     buildFragment.setSink(buildSink);
 
-    // move input fragments
+    // Fix up the child/parent relationships in the PlanFragment tree.
     for (int i = 0; i < exchNodes.size(); ++i) {
       Preconditions.checkState(exchNodes.get(i).getFragment() == buildFragment);
       join.getFragment().removeChild(inputFragments.get(i));
       buildFragment.getChildren().add(inputFragments.get(i));
     }
-
-    // compute the resource profile for the newly-added build sink.
-    buildSink.computeResourceProfile(ctx_.getQueryOptions());
+    join.getFragment().addChild(buildFragment);
 
     // assign plan and cohort id
     buildFragment.setPlanId(planIdGenerator_.getNextId());
-    PlanId parentPlanId = join.getFragment().getPlanId();
     buildFragment.setCohortId(cohortId);
 
     planRoots_.add(buildFragment);

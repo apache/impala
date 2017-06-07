@@ -2,7 +2,7 @@
 select count(*) from functional.alltypes
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
-Per-Host Resource Estimates: Memory=138.00MB
+Per-Host Resource Estimates: Memory=148.00MB
 Codegen disabled by planner
 
 PLAN-ROOT SINK
@@ -22,7 +22,7 @@ PLAN-ROOT SINK
 select count(*) from functional.alltypesagg
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
-Per-Host Resource Estimates: Memory=90.00MB
+Per-Host Resource Estimates: Memory=100.00MB
 
 PLAN-ROOT SINK
 |
@@ -41,7 +41,7 @@ PLAN-ROOT SINK
 select count(*) from functional_parquet.alltypes
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
-Per-Host Resource Estimates: Memory=26.00MB
+Per-Host Resource Estimates: Memory=36.00MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.alltypes
 
@@ -56,7 +56,7 @@ PLAN-ROOT SINK
 |  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=24/24 files=24 size=179.68KB
+   partitions=24/24 files=24 size=178.13KB
 ====
 # > 3000 rows returned to coordinator: codegen should be enabled
 select * from functional_parquet.alltypes
@@ -71,7 +71,7 @@ PLAN-ROOT SINK
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=24/24 files=24 size=179.68KB
+   partitions=24/24 files=24 size=178.13KB
 ====
 # Optimisation is enabled for join producing < 3000 rows
 select count(*)
@@ -79,7 +79,7 @@ from functional.alltypes t1
 join functional.alltypestiny t2 on t1.id = t2.id
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=136.00MB
-Per-Host Resource Estimates: Memory=138.00MB
+Per-Host Resource Estimates: Memory=180.00MB
 Codegen disabled by planner
 
 PLAN-ROOT SINK
@@ -109,7 +109,7 @@ PLAN-ROOT SINK
 select count(*) from functional.alltypes t1, functional.alltypes t2
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
-Per-Host Resource Estimates: Memory=138.00MB
+Per-Host Resource Estimates: Memory=276.00MB
 
 PLAN-ROOT SINK
 |
@@ -138,7 +138,7 @@ select count(*) from (
   select * from functional.alltypestiny) v
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
-Per-Host Resource Estimates: Memory=170.00MB
+Per-Host Resource Estimates: Memory=148.00MB
 Codegen disabled by planner
 
 PLAN-ROOT SINK
@@ -167,7 +167,7 @@ select count(*) from (
   select * from functional.alltypes) v
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
-Per-Host Resource Estimates: Memory=266.00MB
+Per-Host Resource Estimates: Memory=148.00MB
 
 PLAN-ROOT SINK
 |

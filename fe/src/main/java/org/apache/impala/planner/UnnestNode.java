@@ -74,9 +74,9 @@ public class UnnestNode extends PlanNode {
   }
 
   @Override
-  public void computeResourceProfile(TQueryOptions queryOptions) {
+  public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     // TODO: add an estimate
-    resourceProfile_ = new ResourceProfile(0, 0);
+    nodeResourceProfile_ = new ResourceProfile(0, 0);
   }
 
   @Override

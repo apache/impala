@@ -1,10 +1,27 @@
 # Parquet scan
 select * from tpch_parquet.lineitem
+---- PLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=80.00MB
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   partitions=1/1 files=3 size=193.92MB
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.92MB
+   column stats: all
+   mem-estimate=80.00MB mem-reservation=0B
+   tuple-ids=0 row-size=263B cardinality=6001215
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=80.00MB
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -13,6 +30,7 @@ PLAN-ROOT SINK
 |  tuple-ids=0 row-size=263B cardinality=6001215
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.92MB
    stats-rows=6001215 extrapolated-rows=disabled
@@ -25,6 +43,7 @@ Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=160.00MB
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -33,6 +52,7 @@ PLAN-ROOT SINK
 |  tuple-ids=0 row-size=263B cardinality=6001215
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=160.00MB mem-reservation=0B
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.92MB
    stats-rows=6001215 extrapolated-rows=disabled
@@ -43,11 +63,28 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 ====
 # Text scan
 select * from tpch.lineitem;
+---- PLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=88.00MB
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=88.00MB mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+00:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 files=1 size=718.94MB
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
+   column stats: all
+   mem-estimate=88.00MB mem-reservation=0B
+   tuple-ids=0 row-size=263B cardinality=6001215
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=88.00MB
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -56,6 +93,7 @@ PLAN-ROOT SINK
 |  tuple-ids=0 row-size=263B cardinality=6001215
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=88.00MB mem-reservation=0B
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    stats-rows=6001215 extrapolated-rows=disabled
@@ -68,6 +106,7 @@ Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=176.00MB
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -76,6 +115,7 @@ PLAN-ROOT SINK
 |  tuple-ids=0 row-size=263B cardinality=6001215
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=176.00MB mem-reservation=0B
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    stats-rows=6001215 extrapolated-rows=disabled
@@ -86,6 +126,22 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 ====
 # HBase scan
 select * from functional_hbase.alltypes
+---- PLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=1.00GB
+WARNING: The following tables are missing relevant table and/or column statistics.
+functional_hbase.alltypes
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=1.00GB mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+00:SCAN HBASE [functional_hbase.alltypes]
+   table stats: rows=unavailable
+   column stats: unavailable
+   mem-estimate=1.00GB mem-reservation=0B
+   tuple-ids=0 row-size=88B cardinality=14298
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=1.00GB
@@ -93,6 +149,7 @@ WARNING: The following tables are missing relevant table and/or column statistic
 functional_hbase.alltypes
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -100,7 +157,8 @@ PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |  tuple-ids=0 row-size=88B cardinality=14298
 |
-F00:PLAN FRAGMENT [RANDOM] hosts=100 instances=100
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Host Resources: mem-estimate=1.00GB mem-reservation=0B
 00:SCAN HBASE [functional_hbase.alltypes]
    table stats: rows=unavailable
    column stats: unavailable
@@ -113,6 +171,7 @@ WARNING: The following tables are missing relevant table and/or column statistic
 functional_hbase.alltypes
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -120,7 +179,8 @@ PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |  tuple-ids=0 row-size=88B cardinality=14298
 |
-F00:PLAN FRAGMENT [RANDOM] hosts=100 instances=200
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
+Per-Host Resources: mem-estimate=2.00GB mem-reservation=0B
 00:SCAN HBASE [functional_hbase.alltypes]
    table stats: rows=unavailable
    column stats: unavailable
@@ -129,6 +189,20 @@ F00:PLAN FRAGMENT [RANDOM] hosts=100 instances=200
 ====
 # Data source scan
 select * from functional.alltypes_datasource
+---- PLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=1.00GB
+WARNING: The following tables are missing relevant table and/or column statistics.
+functional.alltypes_datasource
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=1.00GB mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+00:SCAN DATA SOURCE [functional.alltypes_datasource]
+   mem-estimate=1.00GB mem-reservation=0B
+   tuple-ids=0 row-size=116B cardinality=5000
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=1.00GB
@@ -136,6 +210,7 @@ WARNING: The following tables are missing relevant table and/or column statistic
 functional.alltypes_datasource
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -144,6 +219,7 @@ PLAN-ROOT SINK
 |  tuple-ids=0 row-size=116B cardinality=5000
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Host Resources: mem-estimate=1.00GB mem-reservation=0B
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
    mem-estimate=1.00GB mem-reservation=0B
    tuple-ids=0 row-size=116B cardinality=5000
@@ -154,6 +230,7 @@ WARNING: The following tables are missing relevant table and/or column statistic
 functional.alltypes_datasource
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -162,6 +239,7 @@ PLAN-ROOT SINK
 |  tuple-ids=0 row-size=116B cardinality=5000
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
+Per-Host Resources: mem-estimate=2.00GB mem-reservation=0B
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
    mem-estimate=1.00GB mem-reservation=0B
    tuple-ids=0 row-size=116B cardinality=5000
@@ -170,11 +248,41 @@ F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
 select * from tpch.lineitem
 union all
 select * from tpch.lineitem
+---- PLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=88.00MB
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=88.00MB mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+00:UNION
+|  pass-through-operands: all
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=2 row-size=263B cardinality=12002430
+|
+|--02:SCAN HDFS [tpch.lineitem]
+|     partitions=1/1 files=1 size=718.94MB
+|     stats-rows=6001215 extrapolated-rows=disabled
+|     table stats: rows=6001215 size=718.94MB
+|     column stats: all
+|     mem-estimate=88.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=263B cardinality=6001215
+|
+01:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 files=1 size=718.94MB
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
+   column stats: all
+   mem-estimate=88.00MB mem-reservation=0B
+   tuple-ids=0 row-size=263B cardinality=6001215
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
-Per-Host Resource Estimates: Memory=176.00MB
+Per-Host Resource Estimates: Memory=88.00MB
 
 F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -183,6 +291,7 @@ PLAN-ROOT SINK
 |  tuple-ids=2 row-size=263B cardinality=12002430
 |
 F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=88.00MB mem-reservation=0B
 00:UNION
 |  pass-through-operands: all
 |  mem-estimate=0B mem-reservation=0B
@@ -205,9 +314,10 @@ F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
    tuple-ids=0 row-size=263B cardinality=6001215
 ---- PARALLELPLANS
 Per-Host Resource Reservation: Memory=0B
-Per-Host Resource Estimates: Memory=352.00MB
+Per-Host Resource Estimates: Memory=176.00MB
 
 F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -216,6 +326,7 @@ PLAN-ROOT SINK
 |  tuple-ids=2 row-size=263B cardinality=12002430
 |
 F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=176.00MB mem-reservation=0B
 00:UNION
 |  pass-through-operands: all
 |  mem-estimate=0B mem-reservation=0B
@@ -241,11 +352,34 @@ F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 select l_orderkey, count(*)
 from tpch_parquet.lineitem
 group by l_orderkey
+---- PLAN
+Per-Host Resource Reservation: Memory=264.00MB
+Per-Host Resource Estimates: Memory=106.24MB
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=106.24MB mem-reservation=264.00MB
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: l_orderkey
+|  mem-estimate=26.24MB mem-reservation=264.00MB
+|  tuple-ids=1 row-size=16B cardinality=1563438
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   partitions=1/1 files=3 size=193.92MB
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.92MB
+   column stats: all
+   mem-estimate=80.00MB mem-reservation=0B
+   tuple-ids=0 row-size=8B cardinality=6001215
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=264.00MB
 Per-Host Resource Estimates: Memory=116.24MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -254,6 +388,7 @@ PLAN-ROOT SINK
 |  tuple-ids=1 row-size=16B cardinality=1563438
 |
 F01:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=10.00MB mem-reservation=264.00MB
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
 |  group by: l_orderkey
@@ -265,6 +400,7 @@ F01:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
 |  tuple-ids=1 row-size=16B cardinality=1563438
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=106.24MB mem-reservation=0B
 01:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: l_orderkey
@@ -283,6 +419,7 @@ Per-Host Resource Reservation: Memory=528.00MB
 Per-Host Resource Estimates: Memory=232.48MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -291,6 +428,7 @@ PLAN-ROOT SINK
 |  tuple-ids=1 row-size=16B cardinality=1563438
 |
 F01:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
+Per-Host Resources: mem-estimate=20.00MB mem-reservation=528.00MB
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
 |  group by: l_orderkey
@@ -302,6 +440,7 @@ F01:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
 |  tuple-ids=1 row-size=16B cardinality=1563438
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=212.48MB mem-reservation=0B
 01:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: l_orderkey
@@ -318,11 +457,33 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 ====
 # Non-grouping aggregation with zero-slot parquet scan
 select count(*) from tpch_parquet.lineitem
----- DISTRIBUTEDPLAN
+---- PLAN
 Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=90.00MB
 
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=90.00MB mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(tpch_parquet.lineitem.parquet-stats: num_rows)
+|  mem-estimate=10.00MB mem-reservation=0B
+|  tuple-ids=1 row-size=8B cardinality=1
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   partitions=1/1 files=3 size=193.92MB
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.92MB
+   column stats: all
+   mem-estimate=80.00MB mem-reservation=0B
+   tuple-ids=0 row-size=8B cardinality=6001215
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=100.00MB
+
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=10.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -336,6 +497,7 @@ PLAN-ROOT SINK
 |  tuple-ids=1 row-size=8B cardinality=1
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=90.00MB mem-reservation=0B
 01:AGGREGATE
 |  output: sum_init_zero(tpch_parquet.lineitem.parquet-stats: num_rows)
 |  mem-estimate=10.00MB mem-reservation=0B
@@ -350,9 +512,10 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
    tuple-ids=0 row-size=8B cardinality=6001215
 ---- PARALLELPLANS
 Per-Host Resource Reservation: Memory=0B
-Per-Host Resource Estimates: Memory=180.00MB
+Per-Host Resource Estimates: Memory=190.00MB
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=10.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -366,6 +529,7 @@ PLAN-ROOT SINK
 |  tuple-ids=1 row-size=8B cardinality=1
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=180.00MB mem-reservation=0B
 01:AGGREGATE
 |  output: sum_init_zero(tpch_parquet.lineitem.parquet-stats: num_rows)
 |  mem-estimate=10.00MB mem-reservation=0B
@@ -383,11 +547,33 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 select *
 from tpch_parquet.lineitem
 order by l_comment
+---- PLAN
+Per-Host Resource Reservation: Memory=48.00MB
+Per-Host Resource Estimates: Memory=240.00MB
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=240.00MB mem-reservation=48.00MB
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+01:SORT
+|  order by: l_comment ASC
+|  mem-estimate=160.00MB mem-reservation=48.00MB
+|  tuple-ids=1 row-size=263B cardinality=6001215
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   partitions=1/1 files=3 size=193.92MB
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.92MB
+   column stats: all
+   mem-estimate=80.00MB mem-reservation=0B
+   tuple-ids=0 row-size=263B cardinality=6001215
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=48.00MB
 Per-Host Resource Estimates: Memory=240.00MB
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -397,6 +583,7 @@ PLAN-ROOT SINK
 |  tuple-ids=1 row-size=263B cardinality=6001215
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=240.00MB mem-reservation=48.00MB
 01:SORT
 |  order by: l_comment ASC
 |  mem-estimate=160.00MB mem-reservation=48.00MB
@@ -414,6 +601,7 @@ Per-Host Resource Reservation: Memory=96.00MB
 Per-Host Resource Estimates: Memory=480.00MB
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -423,6 +611,7 @@ PLAN-ROOT SINK
 |  tuple-ids=1 row-size=263B cardinality=6001215
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=480.00MB mem-reservation=96.00MB
 01:SORT
 |  order by: l_comment ASC
 |  mem-estimate=160.00MB mem-reservation=48.00MB
@@ -441,11 +630,33 @@ select *
 from tpch_parquet.lineitem
 order by l_comment
 limit 100
+---- PLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=80.03MB
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=80.03MB mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+01:TOP-N [LIMIT=100]
+|  order by: l_comment ASC
+|  mem-estimate=25.66KB mem-reservation=0B
+|  tuple-ids=1 row-size=263B cardinality=100
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   partitions=1/1 files=3 size=193.92MB
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.92MB
+   column stats: all
+   mem-estimate=80.00MB mem-reservation=0B
+   tuple-ids=0 row-size=263B cardinality=6001215
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=80.03MB
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -456,6 +667,7 @@ PLAN-ROOT SINK
 |  tuple-ids=1 row-size=263B cardinality=100
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=80.03MB mem-reservation=0B
 01:TOP-N [LIMIT=100]
 |  order by: l_comment ASC
 |  mem-estimate=25.66KB mem-reservation=0B
@@ -473,6 +685,7 @@ Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=160.05MB
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -483,6 +696,7 @@ PLAN-ROOT SINK
 |  tuple-ids=1 row-size=263B cardinality=100
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=160.05MB mem-reservation=0B
 01:TOP-N [LIMIT=100]
 |  order by: l_comment ASC
 |  mem-estimate=25.66KB mem-reservation=0B
@@ -496,14 +710,47 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
 ====
-# Hash Join
+# Broadcast Hash Join
 select *
 from tpch.lineitem inner join tpch.orders on l_orderkey = o_orderkey
+---- PLAN
+Per-Host Resource Reservation: Memory=136.00MB
+Per-Host Resource Estimates: Memory=476.41MB
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=476.41MB mem-reservation=136.00MB
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  runtime filters: RF000 <- o_orderkey
+|  mem-estimate=300.41MB mem-reservation=136.00MB
+|  tuple-ids=0,1 row-size=454B cardinality=5757710
+|
+|--01:SCAN HDFS [tpch.orders]
+|     partitions=1/1 files=1 size=162.56MB
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=162.56MB
+|     column stats: all
+|     mem-estimate=88.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=191B cardinality=1500000
+|
+00:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 files=1 size=718.94MB
+   runtime filters: RF000 -> l_orderkey
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
+   column stats: all
+   mem-estimate=88.00MB mem-reservation=0B
+   tuple-ids=0 row-size=263B cardinality=6001215
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=136.00MB
-Per-Host Resource Estimates: Memory=388.41MB
+Per-Host Resource Estimates: Memory=476.41MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -512,6 +759,7 @@ PLAN-ROOT SINK
 |  tuple-ids=0,1 row-size=454B cardinality=5757710
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=388.41MB mem-reservation=136.00MB
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_orderkey = o_orderkey
 |  fk/pk conjuncts: l_orderkey = o_orderkey
@@ -524,6 +772,7 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 |  |  tuple-ids=1 row-size=191B cardinality=1500000
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=88.00MB mem-reservation=0B
 |  01:SCAN HDFS [tpch.orders, RANDOM]
 |     partitions=1/1 files=1 size=162.56MB
 |     stats-rows=1500000 extrapolated-rows=disabled
@@ -545,6 +794,7 @@ Per-Host Resource Reservation: Memory=272.00MB
 Per-Host Resource Estimates: Memory=952.83MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -553,6 +803,7 @@ PLAN-ROOT SINK
 |  tuple-ids=0,1 row-size=454B cardinality=5757710
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=776.83MB mem-reservation=272.00MB
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash-table-id=00
 |  hash predicates: l_orderkey = o_orderkey
@@ -562,6 +813,7 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 |  tuple-ids=0,1 row-size=454B cardinality=5757710
 |
 |--F03:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+|  |  Per-Host Resources: included in parent fragment
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: o_orderkey
@@ -572,6 +824,7 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 |  |  tuple-ids=1 row-size=191B cardinality=1500000
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+|  Per-Host Resources: mem-estimate=176.00MB mem-reservation=0B
 |  01:SCAN HDFS [tpch.orders, RANDOM]
 |     partitions=1/1 files=1 size=162.56MB
 |     stats-rows=1500000 extrapolated-rows=disabled
@@ -589,14 +842,187 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=263B cardinality=6001215
 ====
+# Shuffle Hash Join
+select *
+from tpch.lineitem inner join /* +shuffle */ tpch.orders on l_orderkey = o_orderkey
+---- PLAN
+Per-Host Resource Reservation: Memory=136.00MB
+Per-Host Resource Estimates: Memory=476.41MB
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=476.41MB mem-reservation=136.00MB
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  runtime filters: RF000 <- o_orderkey
+|  mem-estimate=300.41MB mem-reservation=136.00MB
+|  tuple-ids=0,1 row-size=454B cardinality=5757710
+|
+|--01:SCAN HDFS [tpch.orders]
+|     partitions=1/1 files=1 size=162.56MB
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=162.56MB
+|     column stats: all
+|     mem-estimate=88.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=191B cardinality=1500000
+|
+00:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 files=1 size=718.94MB
+   runtime filters: RF000 -> l_orderkey
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
+   column stats: all
+   mem-estimate=88.00MB mem-reservation=0B
+   tuple-ids=0 row-size=263B cardinality=6001215
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=136.00MB
+Per-Host Resource Estimates: Memory=276.14MB
+
+F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+05:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0,1 row-size=454B cardinality=5757710
+|
+F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=100.14MB mem-reservation=136.00MB
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  runtime filters: RF000 <- o_orderkey
+|  mem-estimate=100.14MB mem-reservation=136.00MB
+|  tuple-ids=0,1 row-size=454B cardinality=5757710
+|
+|--04:EXCHANGE [HASH(o_orderkey)]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1 row-size=191B cardinality=1500000
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=88.00MB mem-reservation=0B
+|  01:SCAN HDFS [tpch.orders, RANDOM]
+|     partitions=1/1 files=1 size=162.56MB
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=162.56MB
+|     column stats: all
+|     mem-estimate=88.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=191B cardinality=1500000
+|
+03:EXCHANGE [HASH(l_orderkey)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0 row-size=263B cardinality=6001215
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=88.00MB mem-reservation=0B
+00:SCAN HDFS [tpch.lineitem, RANDOM]
+   partitions=1/1 files=1 size=718.94MB
+   runtime filters: RF000 -> l_orderkey
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
+   column stats: all
+   mem-estimate=88.00MB mem-reservation=0B
+   tuple-ids=0 row-size=263B cardinality=6001215
+---- PARALLELPLANS
+Per-Host Resource Reservation: Memory=272.00MB
+Per-Host Resource Estimates: Memory=452.14MB
+
+F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+05:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0,1 row-size=454B cardinality=5757710
+|
+F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
+Per-Host Resources: mem-estimate=100.14MB mem-reservation=272.00MB
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash-table-id=00
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  runtime filters: RF000 <- o_orderkey
+|  mem-estimate=50.07MB mem-reservation=136.00MB
+|  tuple-ids=0,1 row-size=454B cardinality=5757710
+|
+|--F04:PLAN FRAGMENT [HASH(l_orderkey)] hosts=2 instances=4
+|  |  Per-Host Resources: included in parent fragment
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: o_orderkey
+|  |  mem-estimate=0B mem-reservation=0B
+|  |
+|  04:EXCHANGE [HASH(o_orderkey)]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1 row-size=191B cardinality=1500000
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+|  Per-Host Resources: mem-estimate=176.00MB mem-reservation=0B
+|  01:SCAN HDFS [tpch.orders, RANDOM]
+|     partitions=1/1 files=1 size=162.56MB
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=162.56MB
+|     column stats: all
+|     mem-estimate=88.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=191B cardinality=1500000
+|
+03:EXCHANGE [HASH(l_orderkey)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0 row-size=263B cardinality=6001215
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=176.00MB mem-reservation=0B
+00:SCAN HDFS [tpch.lineitem, RANDOM]
+   partitions=1/1 files=1 size=718.94MB
+   runtime filters: RF000 -> l_orderkey
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
+   column stats: all
+   mem-estimate=88.00MB mem-reservation=0B
+   tuple-ids=0 row-size=263B cardinality=6001215
+====
 # Nested loop join
 select *
 from tpch.lineitem, tpch.orders
+---- PLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=449.10MB
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=449.10MB mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+02:NESTED LOOP JOIN [CROSS JOIN]
+|  mem-estimate=273.10MB mem-reservation=0B
+|  tuple-ids=0,1 row-size=454B cardinality=9001822500000
+|
+|--01:SCAN HDFS [tpch.orders]
+|     partitions=1/1 files=1 size=162.56MB
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=162.56MB
+|     column stats: all
+|     mem-estimate=88.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=191B cardinality=1500000
+|
+00:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 files=1 size=718.94MB
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
+   column stats: all
+   mem-estimate=88.00MB mem-reservation=0B
+   tuple-ids=0 row-size=263B cardinality=6001215
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
-Per-Host Resource Estimates: Memory=361.10MB
+Per-Host Resource Estimates: Memory=449.10MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -605,6 +1031,7 @@ PLAN-ROOT SINK
 |  tuple-ids=0,1 row-size=454B cardinality=9001822500000
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=361.10MB mem-reservation=0B
 02:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
 |  mem-estimate=273.10MB mem-reservation=0B
 |  tuple-ids=0,1 row-size=454B cardinality=9001822500000
@@ -614,6 +1041,7 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 |  |  tuple-ids=1 row-size=191B cardinality=1500000
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=88.00MB mem-reservation=0B
 |  01:SCAN HDFS [tpch.orders, RANDOM]
 |     partitions=1/1 files=1 size=162.56MB
 |     stats-rows=1500000 extrapolated-rows=disabled
@@ -634,6 +1062,7 @@ Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=898.21MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -642,12 +1071,14 @@ PLAN-ROOT SINK
 |  tuple-ids=0,1 row-size=454B cardinality=9001822500000
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=722.21MB mem-reservation=0B
 02:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
 |  join table id: 00
 |  mem-estimate=273.10MB mem-reservation=0B
 |  tuple-ids=0,1 row-size=454B cardinality=9001822500000
 |
 |--F03:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+|  |  Per-Host Resources: included in parent fragment
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  mem-estimate=0B mem-reservation=0B
@@ -657,6 +1088,7 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 |  |  tuple-ids=1 row-size=191B cardinality=1500000
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+|  Per-Host Resources: mem-estimate=176.00MB mem-reservation=0B
 |  01:SCAN HDFS [tpch.orders, RANDOM]
 |     partitions=1/1 files=1 size=162.56MB
 |     stats-rows=1500000 extrapolated-rows=disabled
@@ -675,12 +1107,26 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 ====
 # Empty set node
 select * from functional.alltypes where 1 = 2
+---- PLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=10.00MB
+Codegen disabled by planner
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+00:EMPTYSET
+   mem-estimate=0B mem-reservation=0B
+   tuple-ids=0 row-size=0B cardinality=0
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=10.00MB
 Codegen disabled by planner
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -693,6 +1139,7 @@ Per-Host Resource Estimates: Memory=10.00MB
 Codegen disabled by planner
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -703,12 +1150,41 @@ PLAN-ROOT SINK
 # Analytic function
 select max(tinyint_col) over(partition by int_col)
 from functional.alltypes
+---- PLAN
+Per-Host Resource Reservation: Memory=40.00MB
+Per-Host Resource Estimates: Memory=24.00MB
+Codegen disabled by planner
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=24.00MB mem-reservation=40.00MB
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+02:ANALYTIC
+|  functions: max(tinyint_col)
+|  partition by: int_col
+|  mem-estimate=0B mem-reservation=16.00MB
+|  tuple-ids=3,2 row-size=6B cardinality=7300
+|
+01:SORT
+|  order by: int_col ASC NULLS FIRST
+|  mem-estimate=8.00MB mem-reservation=24.00MB
+|  tuple-ids=3 row-size=5B cardinality=7300
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   stats-rows=7300 extrapolated-rows=disabled
+   table stats: rows=7300 size=478.45KB
+   column stats: all
+   mem-estimate=16.00MB mem-reservation=0B
+   tuple-ids=0 row-size=5B cardinality=7300
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=40.00MB
 Per-Host Resource Estimates: Memory=24.00MB
 Codegen disabled by planner
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -717,6 +1193,7 @@ PLAN-ROOT SINK
 |  tuple-ids=3,2 row-size=6B cardinality=7300
 |
 F01:PLAN FRAGMENT [HASH(int_col)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=8.00MB mem-reservation=40.00MB
 02:ANALYTIC
 |  functions: max(tinyint_col)
 |  partition by: int_col
@@ -733,6 +1210,7 @@ F01:PLAN FRAGMENT [HASH(int_col)] hosts=3 instances=3
 |  tuple-ids=0 row-size=5B cardinality=7300
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=16.00MB mem-reservation=0B
 00:SCAN HDFS [functional.alltypes, RANDOM]
    partitions=24/24 files=24 size=478.45KB
    stats-rows=7300 extrapolated-rows=disabled
@@ -746,6 +1224,7 @@ Per-Host Resource Estimates: Memory=48.00MB
 Codegen disabled by planner
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -754,6 +1233,7 @@ PLAN-ROOT SINK
 |  tuple-ids=3,2 row-size=6B cardinality=7300
 |
 F01:PLAN FRAGMENT [HASH(int_col)] hosts=3 instances=6
+Per-Host Resources: mem-estimate=16.00MB mem-reservation=80.00MB
 02:ANALYTIC
 |  functions: max(tinyint_col)
 |  partition by: int_col
@@ -770,6 +1250,7 @@ F01:PLAN FRAGMENT [HASH(int_col)] hosts=3 instances=6
 |  tuple-ids=0 row-size=5B cardinality=7300
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=32.00MB mem-reservation=0B
 00:SCAN HDFS [functional.alltypes, RANDOM]
    partitions=24/24 files=24 size=478.45KB
    stats-rows=7300 extrapolated-rows=disabled
@@ -777,6 +1258,599 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
    column stats: all
    mem-estimate=16.00MB mem-reservation=0B
    tuple-ids=0 row-size=5B cardinality=7300
+====
+# Pipeline of blocking operators from analytic fns. Blocking operators break
+# the pipeline so they do not all consume resources concurrently.
+select *, row_number() over (order by o_totalprice) rnum_price,
+  row_number() over (order by o_orderdate) rnum_date,
+  row_number() over (order by o_orderpriority) rnum_priority
+from tpch_parquet.orders
+---- PLAN
+Per-Host Resource Reservation: Memory=144.00MB
+Per-Host Resource Estimates: Memory=160.00MB
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=160.00MB mem-reservation=144.00MB
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+06:ANALYTIC
+|  functions: row_number()
+|  order by: o_orderpriority ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=0B mem-reservation=16.00MB
+|  tuple-ids=10,5 row-size=215B cardinality=1500000
+|
+05:SORT
+|  order by: o_orderpriority ASC
+|  mem-estimate=80.00MB mem-reservation=48.00MB
+|  tuple-ids=10 row-size=207B cardinality=1500000
+|
+04:ANALYTIC
+|  functions: row_number()
+|  order by: o_orderdate ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=0B mem-reservation=16.00MB
+|  tuple-ids=8,4 row-size=207B cardinality=1500000
+|
+03:SORT
+|  order by: o_orderdate ASC
+|  mem-estimate=80.00MB mem-reservation=48.00MB
+|  tuple-ids=8 row-size=199B cardinality=1500000
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: o_totalprice ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=0B mem-reservation=16.00MB
+|  tuple-ids=6,3 row-size=199B cardinality=1500000
+|
+01:SORT
+|  order by: o_totalprice ASC
+|  mem-estimate=80.00MB mem-reservation=48.00MB
+|  tuple-ids=6 row-size=191B cardinality=1500000
+|
+00:SCAN HDFS [tpch_parquet.orders]
+   partitions=1/1 files=2 size=54.20MB
+   stats-rows=1500000 extrapolated-rows=disabled
+   table stats: rows=1500000 size=54.20MB
+   column stats: all
+   mem-estimate=40.00MB mem-reservation=0B
+   tuple-ids=0 row-size=191B cardinality=1500000
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=176.00MB
+Per-Host Resource Estimates: Memory=280.00MB
+
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=160.00MB mem-reservation=128.00MB
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+06:ANALYTIC
+|  functions: row_number()
+|  order by: o_orderpriority ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=0B mem-reservation=16.00MB
+|  tuple-ids=10,5 row-size=215B cardinality=1500000
+|
+05:SORT
+|  order by: o_orderpriority ASC
+|  mem-estimate=80.00MB mem-reservation=48.00MB
+|  tuple-ids=10 row-size=207B cardinality=1500000
+|
+04:ANALYTIC
+|  functions: row_number()
+|  order by: o_orderdate ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=0B mem-reservation=16.00MB
+|  tuple-ids=8,4 row-size=207B cardinality=1500000
+|
+03:SORT
+|  order by: o_orderdate ASC
+|  mem-estimate=80.00MB mem-reservation=48.00MB
+|  tuple-ids=8 row-size=199B cardinality=1500000
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: o_totalprice ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=0B mem-reservation=16.00MB
+|  tuple-ids=6,3 row-size=199B cardinality=1500000
+|
+07:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: o_totalprice ASC
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=6 row-size=191B cardinality=1500000
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+Per-Host Resources: mem-estimate=120.00MB mem-reservation=48.00MB
+01:SORT
+|  order by: o_totalprice ASC
+|  mem-estimate=80.00MB mem-reservation=48.00MB
+|  tuple-ids=6 row-size=191B cardinality=1500000
+|
+00:SCAN HDFS [tpch_parquet.orders, RANDOM]
+   partitions=1/1 files=2 size=54.20MB
+   stats-rows=1500000 extrapolated-rows=disabled
+   table stats: rows=1500000 size=54.20MB
+   column stats: all
+   mem-estimate=40.00MB mem-reservation=0B
+   tuple-ids=0 row-size=191B cardinality=1500000
+---- PARALLELPLANS
+Per-Host Resource Reservation: Memory=224.00MB
+Per-Host Resource Estimates: Memory=400.00MB
+
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=160.00MB mem-reservation=128.00MB
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+06:ANALYTIC
+|  functions: row_number()
+|  order by: o_orderpriority ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=0B mem-reservation=16.00MB
+|  tuple-ids=10,5 row-size=215B cardinality=1500000
+|
+05:SORT
+|  order by: o_orderpriority ASC
+|  mem-estimate=80.00MB mem-reservation=48.00MB
+|  tuple-ids=10 row-size=207B cardinality=1500000
+|
+04:ANALYTIC
+|  functions: row_number()
+|  order by: o_orderdate ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=0B mem-reservation=16.00MB
+|  tuple-ids=8,4 row-size=207B cardinality=1500000
+|
+03:SORT
+|  order by: o_orderdate ASC
+|  mem-estimate=80.00MB mem-reservation=48.00MB
+|  tuple-ids=8 row-size=199B cardinality=1500000
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: o_totalprice ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=0B mem-reservation=16.00MB
+|  tuple-ids=6,3 row-size=199B cardinality=1500000
+|
+07:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: o_totalprice ASC
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=6 row-size=191B cardinality=1500000
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+Per-Host Resources: mem-estimate=240.00MB mem-reservation=96.00MB
+01:SORT
+|  order by: o_totalprice ASC
+|  mem-estimate=80.00MB mem-reservation=48.00MB
+|  tuple-ids=6 row-size=191B cardinality=1500000
+|
+00:SCAN HDFS [tpch_parquet.orders, RANDOM]
+   partitions=1/1 files=2 size=54.20MB
+   stats-rows=1500000 extrapolated-rows=disabled
+   table stats: rows=1500000 size=54.20MB
+   column stats: all
+   mem-estimate=40.00MB mem-reservation=0B
+   tuple-ids=0 row-size=191B cardinality=1500000
+====
+# Union with non-trivial branches: each branch executes sequentially within fragment.
+select distinct l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
+from tpch_parquet.lineitem join tpch_parquet.orders on l_orderkey = o_orderkey
+where l_tax > 10
+union all
+select l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
+from tpch_parquet.lineitem join tpch_parquet.orders on l_orderkey = o_orderkey
+where o_orderpriority = '2-HIGH'
+union all
+select l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
+from tpch_parquet.lineitem join tpch_parquet.orders on l_orderkey = o_orderkey
+where l_shipmode = 'F'
+---- PLAN
+Per-Host Resource Reservation: Memory=400.00MB
+Per-Host Resource Estimates: Memory=135.17MB
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=135.17MB mem-reservation=400.00MB
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+00:UNION
+|  pass-through-operands: 04
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=7 row-size=70B cardinality=2549844
+|
+|--10:HASH JOIN [INNER JOIN]
+|  |  hash predicates: l_orderkey = o_orderkey
+|  |  fk/pk conjuncts: l_orderkey = o_orderkey
+|  |  runtime filters: RF002 <- o_orderkey
+|  |  mem-estimate=12.59MB mem-reservation=136.00MB
+|  |  tuple-ids=5,6 row-size=99B cardinality=822530
+|  |
+|  |--09:SCAN HDFS [tpch_parquet.orders]
+|  |     partitions=1/1 files=2 size=54.20MB
+|  |     stats-rows=1500000 extrapolated-rows=disabled
+|  |     table stats: rows=1500000 size=54.20MB
+|  |     column stats: all
+|  |     mem-estimate=40.00MB mem-reservation=0B
+|  |     tuple-ids=6 row-size=8B cardinality=1500000
+|  |
+|  08:SCAN HDFS [tpch_parquet.lineitem]
+|     partitions=1/1 files=3 size=193.92MB
+|     predicates: l_shipmode = 'F'
+|     runtime filters: RF002 -> l_orderkey
+|     stats-rows=6001215 extrapolated-rows=disabled
+|     table stats: rows=6001215 size=193.92MB
+|     column stats: all
+|     parquet statistics predicates: l_shipmode = 'F'
+|     parquet dictionary predicates: l_shipmode = 'F'
+|     mem-estimate=80.00MB mem-reservation=0B
+|     tuple-ids=5 row-size=91B cardinality=857316
+|
+|--07:HASH JOIN [INNER JOIN]
+|  |  hash predicates: l_orderkey = o_orderkey
+|  |  fk/pk conjuncts: l_orderkey = o_orderkey
+|  |  runtime filters: RF001 <- o_orderkey
+|  |  mem-estimate=10.20MB mem-reservation=136.00MB
+|  |  tuple-ids=3,4 row-size=103B cardinality=1151542
+|  |
+|  |--06:SCAN HDFS [tpch_parquet.orders]
+|  |     partitions=1/1 files=2 size=54.20MB
+|  |     predicates: o_orderpriority = '2-HIGH'
+|  |     stats-rows=1500000 extrapolated-rows=disabled
+|  |     table stats: rows=1500000 size=54.20MB
+|  |     column stats: all
+|  |     parquet statistics predicates: o_orderpriority = '2-HIGH'
+|  |     parquet dictionary predicates: o_orderpriority = '2-HIGH'
+|  |     mem-estimate=40.00MB mem-reservation=0B
+|  |     tuple-ids=4 row-size=32B cardinality=300000
+|  |
+|  05:SCAN HDFS [tpch_parquet.lineitem]
+|     partitions=1/1 files=3 size=193.92MB
+|     runtime filters: RF001 -> l_orderkey
+|     stats-rows=6001215 extrapolated-rows=disabled
+|     table stats: rows=6001215 size=193.92MB
+|     column stats: all
+|     mem-estimate=80.00MB mem-reservation=0B
+|     tuple-ids=3 row-size=70B cardinality=6001215
+|
+04:AGGREGATE [FINALIZE]
+|  group by: l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
+|  mem-estimate=42.58MB mem-reservation=264.00MB
+|  tuple-ids=2 row-size=70B cardinality=575772
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  runtime filters: RF000 <- o_orderkey
+|  mem-estimate=12.59MB mem-reservation=136.00MB
+|  tuple-ids=0,1 row-size=86B cardinality=575772
+|
+|--02:SCAN HDFS [tpch_parquet.orders]
+|     partitions=1/1 files=2 size=54.20MB
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=54.20MB
+|     column stats: all
+|     mem-estimate=40.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=8B cardinality=1500000
+|
+01:SCAN HDFS [tpch_parquet.lineitem]
+   partitions=1/1 files=3 size=193.92MB
+   predicates: l_tax > 10
+   runtime filters: RF000 -> l_orderkey
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.92MB
+   column stats: all
+   parquet statistics predicates: l_tax > 10
+   parquet dictionary predicates: l_tax > 10
+   mem-estimate=80.00MB mem-reservation=0B
+   tuple-ids=0 row-size=78B cardinality=600122
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=400.00MB
+Per-Host Resource Estimates: Memory=339.36MB
+
+F09:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+17:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=7 row-size=70B cardinality=2549844
+|
+F08:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=92.59MB mem-reservation=264.00MB
+00:UNION
+|  pass-through-operands: 14
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=7 row-size=70B cardinality=2549844
+|
+|--10:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: l_orderkey = o_orderkey
+|  |  fk/pk conjuncts: l_orderkey = o_orderkey
+|  |  runtime filters: RF002 <- o_orderkey
+|  |  mem-estimate=12.59MB mem-reservation=136.00MB
+|  |  tuple-ids=5,6 row-size=99B cardinality=822530
+|  |
+|  |--16:EXCHANGE [BROADCAST]
+|  |  |  mem-estimate=0B mem-reservation=0B
+|  |  |  tuple-ids=6 row-size=8B cardinality=1500000
+|  |  |
+|  |  F07:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  |  Per-Host Resources: mem-estimate=40.00MB mem-reservation=0B
+|  |  09:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|  |     partitions=1/1 files=2 size=54.20MB
+|  |     stats-rows=1500000 extrapolated-rows=disabled
+|  |     table stats: rows=1500000 size=54.20MB
+|  |     column stats: all
+|  |     mem-estimate=40.00MB mem-reservation=0B
+|  |     tuple-ids=6 row-size=8B cardinality=1500000
+|  |
+|  08:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+|     partitions=1/1 files=3 size=193.92MB
+|     predicates: l_shipmode = 'F'
+|     runtime filters: RF002 -> l_orderkey
+|     stats-rows=6001215 extrapolated-rows=disabled
+|     table stats: rows=6001215 size=193.92MB
+|     column stats: all
+|     parquet statistics predicates: l_shipmode = 'F'
+|     parquet dictionary predicates: l_shipmode = 'F'
+|     mem-estimate=80.00MB mem-reservation=0B
+|     tuple-ids=5 row-size=91B cardinality=857316
+|
+|--07:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: l_orderkey = o_orderkey
+|  |  fk/pk conjuncts: l_orderkey = o_orderkey
+|  |  runtime filters: RF001 <- o_orderkey
+|  |  mem-estimate=10.20MB mem-reservation=136.00MB
+|  |  tuple-ids=3,4 row-size=103B cardinality=1151542
+|  |
+|  |--15:EXCHANGE [BROADCAST]
+|  |  |  mem-estimate=0B mem-reservation=0B
+|  |  |  tuple-ids=4 row-size=32B cardinality=300000
+|  |  |
+|  |  F05:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  |  Per-Host Resources: mem-estimate=40.00MB mem-reservation=0B
+|  |  06:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|  |     partitions=1/1 files=2 size=54.20MB
+|  |     predicates: o_orderpriority = '2-HIGH'
+|  |     stats-rows=1500000 extrapolated-rows=disabled
+|  |     table stats: rows=1500000 size=54.20MB
+|  |     column stats: all
+|  |     parquet statistics predicates: o_orderpriority = '2-HIGH'
+|  |     parquet dictionary predicates: o_orderpriority = '2-HIGH'
+|  |     mem-estimate=40.00MB mem-reservation=0B
+|  |     tuple-ids=4 row-size=32B cardinality=300000
+|  |
+|  05:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+|     partitions=1/1 files=3 size=193.92MB
+|     runtime filters: RF001 -> l_orderkey
+|     stats-rows=6001215 extrapolated-rows=disabled
+|     table stats: rows=6001215 size=193.92MB
+|     column stats: all
+|     mem-estimate=80.00MB mem-reservation=0B
+|     tuple-ids=3 row-size=70B cardinality=6001215
+|
+14:AGGREGATE [FINALIZE]
+|  group by: l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
+|  mem-estimate=42.58MB mem-reservation=264.00MB
+|  tuple-ids=2 row-size=70B cardinality=575772
+|
+13:EXCHANGE [HASH(l_orderkey,l_partkey,l_suppkey,l_linenumber,l_comment)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=2 row-size=70B cardinality=575772
+|
+F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=46.78MB mem-reservation=136.00MB
+04:AGGREGATE [STREAMING]
+|  group by: l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
+|  mem-estimate=42.58MB mem-reservation=0B
+|  tuple-ids=2 row-size=70B cardinality=575772
+|
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  runtime filters: RF000 <- o_orderkey
+|  mem-estimate=4.20MB mem-reservation=136.00MB
+|  tuple-ids=0,1 row-size=86B cardinality=575772
+|
+|--12:EXCHANGE [HASH(o_orderkey)]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1 row-size=8B cardinality=1500000
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=40.00MB mem-reservation=0B
+|  02:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|     partitions=1/1 files=2 size=54.20MB
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=54.20MB
+|     column stats: all
+|     mem-estimate=40.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=8B cardinality=1500000
+|
+11:EXCHANGE [HASH(l_orderkey)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0 row-size=78B cardinality=600122
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
+01:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   partitions=1/1 files=3 size=193.92MB
+   predicates: l_tax > 10
+   runtime filters: RF000 -> l_orderkey
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.92MB
+   column stats: all
+   parquet statistics predicates: l_tax > 10
+   parquet dictionary predicates: l_tax > 10
+   mem-estimate=80.00MB mem-reservation=0B
+   tuple-ids=0 row-size=78B cardinality=600122
+---- PARALLELPLANS
+Per-Host Resource Reservation: Memory=800.00MB
+Per-Host Resource Estimates: Memory=674.53MB
+
+F09:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+17:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=7 row-size=70B cardinality=2549844
+|
+F08:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=185.18MB mem-reservation=528.00MB
+00:UNION
+|  pass-through-operands: 14
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=7 row-size=70B cardinality=2549844
+|
+|--10:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash-table-id=01
+|  |  hash predicates: l_orderkey = o_orderkey
+|  |  fk/pk conjuncts: l_orderkey = o_orderkey
+|  |  runtime filters: RF002 <- o_orderkey
+|  |  mem-estimate=12.59MB mem-reservation=136.00MB
+|  |  tuple-ids=5,6 row-size=99B cardinality=822530
+|  |
+|  |--F11:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+|  |  |  Per-Host Resources: included in parent fragment
+|  |  JOIN BUILD
+|  |  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  |  build expressions: o_orderkey
+|  |  |  mem-estimate=0B mem-reservation=0B
+|  |  |
+|  |  16:EXCHANGE [BROADCAST]
+|  |  |  mem-estimate=0B mem-reservation=0B
+|  |  |  tuple-ids=6 row-size=8B cardinality=1500000
+|  |  |
+|  |  F07:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+|  |  Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
+|  |  09:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|  |     partitions=1/1 files=2 size=54.20MB
+|  |     stats-rows=1500000 extrapolated-rows=disabled
+|  |     table stats: rows=1500000 size=54.20MB
+|  |     column stats: all
+|  |     mem-estimate=40.00MB mem-reservation=0B
+|  |     tuple-ids=6 row-size=8B cardinality=1500000
+|  |
+|  08:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+|     partitions=1/1 files=3 size=193.92MB
+|     predicates: l_shipmode = 'F'
+|     runtime filters: RF002 -> l_orderkey
+|     stats-rows=6001215 extrapolated-rows=disabled
+|     table stats: rows=6001215 size=193.92MB
+|     column stats: all
+|     parquet statistics predicates: l_shipmode = 'F'
+|     parquet dictionary predicates: l_shipmode = 'F'
+|     mem-estimate=80.00MB mem-reservation=0B
+|     tuple-ids=5 row-size=91B cardinality=857316
+|
+|--07:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash-table-id=00
+|  |  hash predicates: l_orderkey = o_orderkey
+|  |  fk/pk conjuncts: l_orderkey = o_orderkey
+|  |  runtime filters: RF001 <- o_orderkey
+|  |  mem-estimate=10.20MB mem-reservation=136.00MB
+|  |  tuple-ids=3,4 row-size=103B cardinality=1151542
+|  |
+|  |--F10:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+|  |  |  Per-Host Resources: included in parent fragment
+|  |  JOIN BUILD
+|  |  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  |  build expressions: o_orderkey
+|  |  |  mem-estimate=0B mem-reservation=0B
+|  |  |
+|  |  15:EXCHANGE [BROADCAST]
+|  |  |  mem-estimate=0B mem-reservation=0B
+|  |  |  tuple-ids=4 row-size=32B cardinality=300000
+|  |  |
+|  |  F05:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+|  |  Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
+|  |  06:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|  |     partitions=1/1 files=2 size=54.20MB
+|  |     predicates: o_orderpriority = '2-HIGH'
+|  |     stats-rows=1500000 extrapolated-rows=disabled
+|  |     table stats: rows=1500000 size=54.20MB
+|  |     column stats: all
+|  |     parquet statistics predicates: o_orderpriority = '2-HIGH'
+|  |     parquet dictionary predicates: o_orderpriority = '2-HIGH'
+|  |     mem-estimate=40.00MB mem-reservation=0B
+|  |     tuple-ids=4 row-size=32B cardinality=300000
+|  |
+|  05:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+|     partitions=1/1 files=3 size=193.92MB
+|     runtime filters: RF001 -> l_orderkey
+|     stats-rows=6001215 extrapolated-rows=disabled
+|     table stats: rows=6001215 size=193.92MB
+|     column stats: all
+|     mem-estimate=80.00MB mem-reservation=0B
+|     tuple-ids=3 row-size=70B cardinality=6001215
+|
+14:AGGREGATE [FINALIZE]
+|  group by: l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
+|  mem-estimate=42.58MB mem-reservation=264.00MB
+|  tuple-ids=2 row-size=70B cardinality=575772
+|
+13:EXCHANGE [HASH(l_orderkey,l_partkey,l_suppkey,l_linenumber,l_comment)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=2 row-size=70B cardinality=575772
+|
+F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
+Per-Host Resources: mem-estimate=89.35MB mem-reservation=272.00MB
+04:AGGREGATE [STREAMING]
+|  group by: l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
+|  mem-estimate=42.58MB mem-reservation=0B
+|  tuple-ids=2 row-size=70B cardinality=575772
+|
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash-table-id=02
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  runtime filters: RF000 <- o_orderkey
+|  mem-estimate=2.10MB mem-reservation=136.00MB
+|  tuple-ids=0,1 row-size=86B cardinality=575772
+|
+|--F12:PLAN FRAGMENT [HASH(l_orderkey)] hosts=2 instances=4
+|  |  Per-Host Resources: included in parent fragment
+|  JOIN BUILD
+|  |  join-table-id=02 plan-id=03 cohort-id=01
+|  |  build expressions: o_orderkey
+|  |  mem-estimate=0B mem-reservation=0B
+|  |
+|  12:EXCHANGE [HASH(o_orderkey)]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1 row-size=8B cardinality=1500000
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+|  Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
+|  02:SCAN HDFS [tpch_parquet.orders, RANDOM]
+|     partitions=1/1 files=2 size=54.20MB
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=54.20MB
+|     column stats: all
+|     mem-estimate=40.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=8B cardinality=1500000
+|
+11:EXCHANGE [HASH(l_orderkey)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0 row-size=78B cardinality=600122
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=160.00MB mem-reservation=0B
+01:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   partitions=1/1 files=3 size=193.92MB
+   predicates: l_tax > 10
+   runtime filters: RF000 -> l_orderkey
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=193.92MB
+   column stats: all
+   parquet statistics predicates: l_tax > 10
+   parquet dictionary predicates: l_tax > 10
+   mem-estimate=80.00MB mem-reservation=0B
+   tuple-ids=0 row-size=78B cardinality=600122
 ====
 # TPC-H Q18: Pipeline of joins with some non-trivial subtrees on right side of joins
  select
@@ -813,11 +1887,92 @@ order by
   o_totalprice desc,
   o_orderdate
 limit 100
----- DISTRIBUTEDPLAN
+---- PLAN
 Per-Host Resource Reservation: Memory=672.00MB
-Per-Host Resource Estimates: Memory=242.95MB
+Per-Host Resource Estimates: Memory=391.29MB
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=391.29MB mem-reservation=672.00MB
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+09:TOP-N [LIMIT=100]
+|  order by: o_totalprice DESC, o_orderdate ASC
+|  mem-estimate=9.77KB mem-reservation=0B
+|  tuple-ids=7 row-size=100B cardinality=100
+|
+08:AGGREGATE [FINALIZE]
+|  output: sum(l_quantity)
+|  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
+|  mem-estimate=60.40MB mem-reservation=264.00MB
+|  tuple-ids=6 row-size=100B cardinality=575772
+|
+07:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: o_orderkey = l_orderkey
+|  runtime filters: RF000 <- l_orderkey
+|  mem-estimate=3.94MB mem-reservation=136.00MB
+|  tuple-ids=2,1,0 row-size=108B cardinality=575772
+|
+|--04:AGGREGATE [FINALIZE]
+|  |  output: sum(l_quantity)
+|  |  group by: l_orderkey
+|  |  having: sum(l_quantity) > 300
+|  |  mem-estimate=10.00MB mem-reservation=264.00MB
+|  |  tuple-ids=4 row-size=24B cardinality=156344
+|  |
+|  03:SCAN HDFS [tpch.lineitem]
+|     partitions=1/1 files=1 size=718.94MB
+|     stats-rows=6001215 extrapolated-rows=disabled
+|     table stats: rows=6001215 size=718.94MB
+|     column stats: all
+|     mem-estimate=88.00MB mem-reservation=0B
+|     tuple-ids=3 row-size=16B cardinality=6001215
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: o_custkey = c_custkey
+|  fk/pk conjuncts: o_custkey = c_custkey
+|  runtime filters: RF001 <- c_custkey
+|  mem-estimate=6.61MB mem-reservation=136.00MB
+|  tuple-ids=2,1,0 row-size=108B cardinality=5757710
+|
+|--00:SCAN HDFS [tpch.customer]
+|     partitions=1/1 files=1 size=23.08MB
+|     stats-rows=150000 extrapolated-rows=disabled
+|     table stats: rows=150000 size=23.08MB
+|     column stats: all
+|     mem-estimate=32.00MB mem-reservation=0B
+|     tuple-ids=0 row-size=42B cardinality=150000
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  runtime filters: RF002 <- o_orderkey
+|  mem-estimate=78.68MB mem-reservation=136.00MB
+|  tuple-ids=2,1 row-size=66B cardinality=5757710
+|
+|--01:SCAN HDFS [tpch.orders]
+|     partitions=1/1 files=1 size=162.56MB
+|     runtime filters: RF000 -> o_orderkey, RF001 -> o_custkey
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=162.56MB
+|     column stats: all
+|     mem-estimate=88.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=50B cardinality=1500000
+|
+02:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 files=1 size=718.94MB
+   runtime filters: RF000 -> tpch.lineitem.l_orderkey, RF002 -> l_orderkey
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
+   column stats: all
+   mem-estimate=88.00MB mem-reservation=0B
+   tuple-ids=2 row-size=16B cardinality=6001215
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=936.00MB
+Per-Host Resource Estimates: Memory=500.32MB
 
 F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -828,6 +1983,7 @@ PLAN-ROOT SINK
 |  tuple-ids=7 row-size=100B cardinality=100
 |
 F06:PLAN FRAGMENT [HASH(c_name,c_custkey,o_orderkey,o_orderdate,o_totalprice)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=60.41MB mem-reservation=264.00MB
 09:TOP-N [LIMIT=100]
 |  order by: o_totalprice DESC, o_orderdate ASC
 |  mem-estimate=9.77KB mem-reservation=0B
@@ -844,6 +2000,7 @@ F06:PLAN FRAGMENT [HASH(c_name,c_custkey,o_orderkey,o_orderdate,o_totalprice)] h
 |  tuple-ids=6 row-size=100B cardinality=575772
 |
 F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=104.55MB mem-reservation=672.00MB
 08:AGGREGATE [STREAMING]
 |  output: sum(l_quantity)
 |  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
@@ -868,6 +2025,7 @@ F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
 |  |  tuple-ids=4 row-size=24B cardinality=1563438
 |  |
 |  F04:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  Per-Host Resources: mem-estimate=127.36MB mem-reservation=0B
 |  04:AGGREGATE [STREAMING]
 |  |  output: sum(l_quantity)
 |  |  group by: l_orderkey
@@ -894,6 +2052,7 @@ F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
 |  |  tuple-ids=0 row-size=42B cardinality=150000
 |  |
 |  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=0B
 |  00:SCAN HDFS [tpch.customer, RANDOM]
 |     partitions=1/1 files=1 size=23.08MB
 |     stats-rows=150000 extrapolated-rows=disabled
@@ -914,6 +2073,7 @@ F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
 |  |  tuple-ids=1 row-size=50B cardinality=1500000
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=88.00MB mem-reservation=0B
 |  01:SCAN HDFS [tpch.orders, RANDOM]
 |     partitions=1/1 files=1 size=162.56MB
 |     runtime filters: RF000 -> o_orderkey, RF001 -> o_custkey
@@ -928,6 +2088,7 @@ F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
 |  tuple-ids=2 row-size=16B cardinality=6001215
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=88.00MB mem-reservation=0B
 02:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    runtime filters: RF000 -> tpch.lineitem.l_orderkey, RF002 -> l_orderkey
@@ -937,10 +2098,11 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=2 row-size=16B cardinality=6001215
 ---- PARALLELPLANS
-Per-Host Resource Reservation: Memory=1.83GB
-Per-Host Resource Estimates: Memory=973.08MB
+Per-Host Resource Reservation: Memory=1.31GB
+Per-Host Resource Estimates: Memory=953.10MB
 
 F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -951,6 +2113,7 @@ PLAN-ROOT SINK
 |  tuple-ids=7 row-size=100B cardinality=100
 |
 F06:PLAN FRAGMENT [HASH(c_name,c_custkey,o_orderkey,o_orderdate,o_totalprice)] hosts=3 instances=6
+Per-Host Resources: mem-estimate=120.82MB mem-reservation=528.00MB
 09:TOP-N [LIMIT=100]
 |  order by: o_totalprice DESC, o_orderdate ASC
 |  mem-estimate=9.77KB mem-reservation=0B
@@ -967,6 +2130,7 @@ F06:PLAN FRAGMENT [HASH(c_name,c_custkey,o_orderkey,o_orderdate,o_totalprice)] h
 |  tuple-ids=6 row-size=100B cardinality=575772
 |
 F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
+Per-Host Resources: mem-estimate=161.56MB mem-reservation=816.00MB
 08:AGGREGATE [STREAMING]
 |  output: sum(l_quantity)
 |  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
@@ -981,6 +2145,7 @@ F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
 |  tuple-ids=2,1,0 row-size=108B cardinality=575772
 |
 |--F08:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
+|  |  Per-Host Resources: included in parent fragment
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: l_orderkey
@@ -998,6 +2163,7 @@ F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
 |  |  tuple-ids=4 row-size=24B cardinality=1563438
 |  |
 |  F04:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+|  Per-Host Resources: mem-estimate=254.73MB mem-reservation=0B
 |  04:AGGREGATE [STREAMING]
 |  |  output: sum(l_quantity)
 |  |  group by: l_orderkey
@@ -1021,6 +2187,7 @@ F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
 |  tuple-ids=2,1,0 row-size=108B cardinality=5757710
 |
 |--F09:PLAN FRAGMENT [HASH(l_orderkey)] hosts=1 instances=2
+|  |  Per-Host Resources: included in parent fragment
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: c_custkey
@@ -1031,6 +2198,7 @@ F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
 |  |  tuple-ids=0 row-size=42B cardinality=150000
 |  |
 |  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
+|  Per-Host Resources: mem-estimate=64.00MB mem-reservation=0B
 |  00:SCAN HDFS [tpch.customer, RANDOM]
 |     partitions=1/1 files=1 size=23.08MB
 |     stats-rows=150000 extrapolated-rows=disabled
@@ -1048,6 +2216,7 @@ F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
 |  tuple-ids=2,1 row-size=66B cardinality=5757710
 |
 |--F10:PLAN FRAGMENT [HASH(l_orderkey)] hosts=2 instances=4
+|  |  Per-Host Resources: included in parent fragment
 |  JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: o_orderkey
@@ -1058,6 +2227,7 @@ F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
 |  |  tuple-ids=1 row-size=50B cardinality=1500000
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+|  Per-Host Resources: mem-estimate=176.00MB mem-reservation=0B
 |  01:SCAN HDFS [tpch.orders, RANDOM]
 |     partitions=1/1 files=1 size=162.56MB
 |     runtime filters: RF000 -> o_orderkey, RF001 -> o_custkey
@@ -1072,6 +2242,7 @@ F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
 |  tuple-ids=2 row-size=16B cardinality=6001215
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=176.00MB mem-reservation=0B
 02:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    runtime filters: RF000 -> tpch.lineitem.l_orderkey, RF002 -> l_orderkey
@@ -1087,12 +2258,31 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypes
 where year=2009 and month=05
+---- PLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=16.03MB
+Codegen disabled by planner
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=16.03MB mem-reservation=0B
+WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
+|  partitions=1
+|  mem-estimate=26.94KB mem-reservation=0B
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=1/24 files=1 size=20.36KB
+   stats-rows=310 extrapolated-rows=disabled
+   table stats: rows=7300 size=478.45KB
+   column stats: all
+   mem-estimate=16.00MB mem-reservation=0B
+   tuple-ids=0 row-size=89B cardinality=310
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=16.03MB
 Codegen disabled by planner
 
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=16.03MB mem-reservation=0B
 WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  partitions=1
 |  mem-estimate=26.94KB mem-reservation=0B
@@ -1110,6 +2300,7 @@ Per-Host Resource Estimates: Memory=32.03MB
 Codegen disabled by planner
 
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
+|  Per-Host Resources: mem-estimate=32.03MB mem-reservation=0B
 WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  partitions=1
 |  mem-estimate=13.47KB mem-reservation=0B
@@ -1126,11 +2317,29 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 create table dummy_insert
 partitioned by (l_partkey) as
 select l_comment, l_partkey from tpch.lineitem
+---- PLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=376.99MB
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=376.99MB mem-reservation=0B
+WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)]
+|  partitions=200516
+|  mem-estimate=288.99MB mem-reservation=0B
+|
+00:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 files=1 size=718.94MB
+   stats-rows=6001215 extrapolated-rows=disabled
+   table stats: rows=6001215 size=718.94MB
+   column stats: all
+   mem-estimate=88.00MB mem-reservation=0B
+   tuple-ids=0 row-size=50B cardinality=6001215
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=184.33MB
 
 F01:PLAN FRAGMENT [HASH(l_partkey)] hosts=3 instances=3
+|  Per-Host Resources: mem-estimate=96.33MB mem-reservation=0B
 WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)]
 |  partitions=200516
 |  mem-estimate=96.33MB mem-reservation=0B
@@ -1140,6 +2349,7 @@ WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)
 |  tuple-ids=0 row-size=50B cardinality=6001215
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=88.00MB mem-reservation=0B
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    stats-rows=6001215 extrapolated-rows=disabled
@@ -1152,6 +2362,7 @@ Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=272.33MB
 
 F01:PLAN FRAGMENT [HASH(l_partkey)] hosts=3 instances=6
+|  Per-Host Resources: mem-estimate=96.33MB mem-reservation=0B
 WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)]
 |  partitions=200516
 |  mem-estimate=48.16MB mem-reservation=0B
@@ -1161,6 +2372,7 @@ WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)
 |  tuple-ids=0 row-size=50B cardinality=6001215
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=176.00MB mem-reservation=0B
 00:SCAN HDFS [tpch.lineitem, RANDOM]
    partitions=1/1 files=1 size=718.94MB
    stats-rows=6001215 extrapolated-rows=disabled
@@ -1168,4 +2380,1056 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
    column stats: all
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=50B cardinality=6001215
+====
+# Variety of operators in and outside of subplan. All operators in subplan consume
+# resources while the subplan is open.
+select distinct c_name, v.o_orderkey, v.o_orderstatus
+from tpch_nested_parquet.customer c,
+  (select distinct o1.o_orderkey, o2.o_orderstatus
+   from c.c_orders o1
+   join c.c_orders o2 on o1.o_orderkey = o2.o_orderkey
+   order by o1.o_orderkey limit 100) v
+---- PLAN
+Per-Host Resource Reservation: Memory=664.00MB
+Per-Host Resource Estimates: Memory=344.00MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+tpch_nested_parquet.customer
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=344.00MB mem-reservation=664.00MB
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+09:AGGREGATE [FINALIZE]
+|  group by: c_name, o1.o_orderkey, o2.o_orderstatus
+|  mem-estimate=128.00MB mem-reservation=264.00MB
+|  tuple-ids=6 row-size=58B cardinality=1500000
+|
+01:SUBPLAN
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=4,0 row-size=90B cardinality=1500000
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |  mem-estimate=66B mem-reservation=0B
+|  |  tuple-ids=4,0 row-size=90B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     parent-subplan=01
+|  |     mem-estimate=0B mem-reservation=0B
+|  |     tuple-ids=0 row-size=66B cardinality=1
+|  |
+|  07:TOP-N [LIMIT=100]
+|  |  order by: o1.o_orderkey ASC
+|  |  mem-estimate=240B mem-reservation=0B
+|  |  tuple-ids=4 row-size=24B cardinality=10
+|  |
+|  06:AGGREGATE [FINALIZE]
+|  |  group by: o1.o_orderkey, o2.o_orderstatus
+|  |  mem-estimate=128.00MB mem-reservation=264.00MB
+|  |  tuple-ids=3 row-size=24B cardinality=10
+|  |
+|  05:HASH JOIN [INNER JOIN]
+|  |  hash predicates: o1.o_orderkey = o2.o_orderkey
+|  |  fk/pk conjuncts: assumed fk/pk
+|  |  mem-estimate=0B mem-reservation=136.00MB
+|  |  tuple-ids=1,2 row-size=32B cardinality=10
+|  |
+|  |--04:UNNEST [c.c_orders o2]
+|  |     parent-subplan=01
+|  |     mem-estimate=0B mem-reservation=0B
+|  |     tuple-ids=2 row-size=0B cardinality=10
+|  |
+|  03:UNNEST [c.c_orders o1]
+|     parent-subplan=01
+|     mem-estimate=0B mem-reservation=0B
+|     tuple-ids=1 row-size=0B cardinality=10
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=292.35MB
+   stats-rows=150000 extrapolated-rows=disabled
+   table stats: rows=150000 size=292.35MB
+   columns missing stats: c_orders, c_orders
+   mem-estimate=88.00MB mem-reservation=0B
+   tuple-ids=0 row-size=66B cardinality=150000
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=664.00MB
+Per-Host Resource Estimates: Memory=472.00MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+tpch_nested_parquet.customer
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+12:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=6 row-size=58B cardinality=1500000
+|
+F01:PLAN FRAGMENT [HASH(c_name,v.o_orderkey,v.o_orderstatus)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=128.00MB mem-reservation=264.00MB
+11:AGGREGATE [FINALIZE]
+|  group by: c_name, v.o_orderkey, v.o_orderstatus
+|  mem-estimate=128.00MB mem-reservation=264.00MB
+|  tuple-ids=6 row-size=58B cardinality=1500000
+|
+10:EXCHANGE [HASH(c_name,v.o_orderkey,v.o_orderstatus)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=6 row-size=58B cardinality=1500000
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=344.00MB mem-reservation=400.00MB
+09:AGGREGATE [STREAMING]
+|  group by: c_name, o1.o_orderkey, o2.o_orderstatus
+|  mem-estimate=128.00MB mem-reservation=0B
+|  tuple-ids=6 row-size=58B cardinality=1500000
+|
+01:SUBPLAN
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=4,0 row-size=90B cardinality=1500000
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |  mem-estimate=66B mem-reservation=0B
+|  |  tuple-ids=4,0 row-size=90B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     parent-subplan=01
+|  |     mem-estimate=0B mem-reservation=0B
+|  |     tuple-ids=0 row-size=66B cardinality=1
+|  |
+|  07:TOP-N [LIMIT=100]
+|  |  order by: o1.o_orderkey ASC
+|  |  mem-estimate=240B mem-reservation=0B
+|  |  tuple-ids=4 row-size=24B cardinality=10
+|  |
+|  06:AGGREGATE [FINALIZE]
+|  |  group by: o1.o_orderkey, o2.o_orderstatus
+|  |  mem-estimate=128.00MB mem-reservation=264.00MB
+|  |  tuple-ids=3 row-size=24B cardinality=10
+|  |
+|  05:HASH JOIN [INNER JOIN]
+|  |  hash predicates: o1.o_orderkey = o2.o_orderkey
+|  |  fk/pk conjuncts: assumed fk/pk
+|  |  mem-estimate=0B mem-reservation=136.00MB
+|  |  tuple-ids=1,2 row-size=32B cardinality=10
+|  |
+|  |--04:UNNEST [c.c_orders o2]
+|  |     parent-subplan=01
+|  |     mem-estimate=0B mem-reservation=0B
+|  |     tuple-ids=2 row-size=0B cardinality=10
+|  |
+|  03:UNNEST [c.c_orders o1]
+|     parent-subplan=01
+|     mem-estimate=0B mem-reservation=0B
+|     tuple-ids=1 row-size=0B cardinality=10
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
+   partitions=1/1 files=4 size=292.35MB
+   stats-rows=150000 extrapolated-rows=disabled
+   table stats: rows=150000 size=292.35MB
+   columns missing stats: c_orders, c_orders
+   mem-estimate=88.00MB mem-reservation=0B
+   tuple-ids=0 row-size=66B cardinality=150000
+---- PARALLELPLANS
+Per-Host Resource Reservation: Memory=1.30GB
+Per-Host Resource Estimates: Memory=944.00MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+tpch_nested_parquet.customer
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+12:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=6 row-size=58B cardinality=1500000
+|
+F01:PLAN FRAGMENT [HASH(c_name,v.o_orderkey,v.o_orderstatus)] hosts=3 instances=6
+Per-Host Resources: mem-estimate=256.00MB mem-reservation=528.00MB
+11:AGGREGATE [FINALIZE]
+|  group by: c_name, v.o_orderkey, v.o_orderstatus
+|  mem-estimate=128.00MB mem-reservation=264.00MB
+|  tuple-ids=6 row-size=58B cardinality=1500000
+|
+10:EXCHANGE [HASH(c_name,v.o_orderkey,v.o_orderstatus)]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=6 row-size=58B cardinality=1500000
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=688.00MB mem-reservation=800.00MB
+09:AGGREGATE [STREAMING]
+|  group by: c_name, o1.o_orderkey, o2.o_orderstatus
+|  mem-estimate=128.00MB mem-reservation=0B
+|  tuple-ids=6 row-size=58B cardinality=1500000
+|
+01:SUBPLAN
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=4,0 row-size=90B cardinality=1500000
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |  mem-estimate=66B mem-reservation=0B
+|  |  tuple-ids=4,0 row-size=90B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     parent-subplan=01
+|  |     mem-estimate=0B mem-reservation=0B
+|  |     tuple-ids=0 row-size=66B cardinality=1
+|  |
+|  07:TOP-N [LIMIT=100]
+|  |  order by: o1.o_orderkey ASC
+|  |  mem-estimate=240B mem-reservation=0B
+|  |  tuple-ids=4 row-size=24B cardinality=10
+|  |
+|  06:AGGREGATE [FINALIZE]
+|  |  group by: o1.o_orderkey, o2.o_orderstatus
+|  |  mem-estimate=128.00MB mem-reservation=264.00MB
+|  |  tuple-ids=3 row-size=24B cardinality=10
+|  |
+|  05:HASH JOIN [INNER JOIN]
+|  |  hash predicates: o1.o_orderkey = o2.o_orderkey
+|  |  fk/pk conjuncts: assumed fk/pk
+|  |  mem-estimate=0B mem-reservation=136.00MB
+|  |  tuple-ids=1,2 row-size=32B cardinality=10
+|  |
+|  |--04:UNNEST [c.c_orders o2]
+|  |     parent-subplan=01
+|  |     mem-estimate=0B mem-reservation=0B
+|  |     tuple-ids=2 row-size=0B cardinality=10
+|  |
+|  03:UNNEST [c.c_orders o1]
+|     parent-subplan=01
+|     mem-estimate=0B mem-reservation=0B
+|     tuple-ids=1 row-size=0B cardinality=10
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
+   partitions=1/1 files=4 size=292.35MB
+   stats-rows=150000 extrapolated-rows=disabled
+   table stats: rows=150000 size=292.35MB
+   columns missing stats: c_orders, c_orders
+   mem-estimate=88.00MB mem-reservation=0B
+   tuple-ids=0 row-size=66B cardinality=150000
+====
+# Pipeline of blocking operators in a subplan. All operators consume resources at the
+# same time (unlike blocking operators outside of a subplan).
+select *
+from tpch_nested_parquet.customer c,
+  (select *, row_number() over (order by o_totalprice) rnum_price,
+    row_number() over (order by o_orderdate) rnum_date,
+    row_number() over (order by o_orderpriority) rnum_priority
+   from c.c_orders) v;
+---- PLAN
+Per-Host Resource Reservation: Memory=192.00MB
+Per-Host Resource Estimates: Memory=136.00MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+tpch_nested_parquet.customer
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=136.00MB mem-reservation=192.00MB
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+01:SUBPLAN
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=12,7,0 row-size=418B cardinality=1500000
+|
+|--10:NESTED LOOP JOIN [CROSS JOIN]
+|  |  mem-estimate=254B mem-reservation=0B
+|  |  tuple-ids=12,7,0 row-size=418B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     parent-subplan=01
+|  |     mem-estimate=0B mem-reservation=0B
+|  |     tuple-ids=0 row-size=254B cardinality=1
+|  |
+|  09:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: o_orderpriority ASC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  mem-estimate=0B mem-reservation=16.00MB
+|  |  tuple-ids=12,7 row-size=164B cardinality=10
+|  |
+|  08:SORT
+|  |  order by: o_orderpriority ASC
+|  |  mem-estimate=16.00MB mem-reservation=48.00MB
+|  |  tuple-ids=12 row-size=156B cardinality=10
+|  |
+|  07:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: o_orderdate ASC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  mem-estimate=0B mem-reservation=16.00MB
+|  |  tuple-ids=10,6 row-size=156B cardinality=10
+|  |
+|  06:SORT
+|  |  order by: o_orderdate ASC
+|  |  mem-estimate=16.00MB mem-reservation=48.00MB
+|  |  tuple-ids=10 row-size=148B cardinality=10
+|  |
+|  05:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: o_totalprice ASC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  mem-estimate=0B mem-reservation=16.00MB
+|  |  tuple-ids=8,5 row-size=148B cardinality=10
+|  |
+|  04:SORT
+|  |  order by: o_totalprice ASC
+|  |  mem-estimate=16.00MB mem-reservation=48.00MB
+|  |  tuple-ids=8 row-size=140B cardinality=10
+|  |
+|  03:UNNEST [c.c_orders]
+|     parent-subplan=01
+|     mem-estimate=0B mem-reservation=0B
+|     tuple-ids=1 row-size=0B cardinality=10
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=292.35MB
+   stats-rows=150000 extrapolated-rows=disabled
+   table stats: rows=150000 size=292.35MB
+   columns missing stats: c_orders
+   mem-estimate=88.00MB mem-reservation=0B
+   tuple-ids=0 row-size=254B cardinality=150000
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=192.00MB
+Per-Host Resource Estimates: Memory=136.00MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+tpch_nested_parquet.customer
+
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+11:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=12,7,0 row-size=418B cardinality=1500000
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=136.00MB mem-reservation=192.00MB
+01:SUBPLAN
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=12,7,0 row-size=418B cardinality=1500000
+|
+|--10:NESTED LOOP JOIN [CROSS JOIN]
+|  |  mem-estimate=254B mem-reservation=0B
+|  |  tuple-ids=12,7,0 row-size=418B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     parent-subplan=01
+|  |     mem-estimate=0B mem-reservation=0B
+|  |     tuple-ids=0 row-size=254B cardinality=1
+|  |
+|  09:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: o_orderpriority ASC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  mem-estimate=0B mem-reservation=16.00MB
+|  |  tuple-ids=12,7 row-size=164B cardinality=10
+|  |
+|  08:SORT
+|  |  order by: o_orderpriority ASC
+|  |  mem-estimate=16.00MB mem-reservation=48.00MB
+|  |  tuple-ids=12 row-size=156B cardinality=10
+|  |
+|  07:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: o_orderdate ASC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  mem-estimate=0B mem-reservation=16.00MB
+|  |  tuple-ids=10,6 row-size=156B cardinality=10
+|  |
+|  06:SORT
+|  |  order by: o_orderdate ASC
+|  |  mem-estimate=16.00MB mem-reservation=48.00MB
+|  |  tuple-ids=10 row-size=148B cardinality=10
+|  |
+|  05:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: o_totalprice ASC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  mem-estimate=0B mem-reservation=16.00MB
+|  |  tuple-ids=8,5 row-size=148B cardinality=10
+|  |
+|  04:SORT
+|  |  order by: o_totalprice ASC
+|  |  mem-estimate=16.00MB mem-reservation=48.00MB
+|  |  tuple-ids=8 row-size=140B cardinality=10
+|  |
+|  03:UNNEST [c.c_orders]
+|     parent-subplan=01
+|     mem-estimate=0B mem-reservation=0B
+|     tuple-ids=1 row-size=0B cardinality=10
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
+   partitions=1/1 files=4 size=292.35MB
+   stats-rows=150000 extrapolated-rows=disabled
+   table stats: rows=150000 size=292.35MB
+   columns missing stats: c_orders
+   mem-estimate=88.00MB mem-reservation=0B
+   tuple-ids=0 row-size=254B cardinality=150000
+---- PARALLELPLANS
+Per-Host Resource Reservation: Memory=384.00MB
+Per-Host Resource Estimates: Memory=272.00MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+tpch_nested_parquet.customer
+
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+11:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=12,7,0 row-size=418B cardinality=1500000
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=272.00MB mem-reservation=384.00MB
+01:SUBPLAN
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=12,7,0 row-size=418B cardinality=1500000
+|
+|--10:NESTED LOOP JOIN [CROSS JOIN]
+|  |  mem-estimate=254B mem-reservation=0B
+|  |  tuple-ids=12,7,0 row-size=418B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     parent-subplan=01
+|  |     mem-estimate=0B mem-reservation=0B
+|  |     tuple-ids=0 row-size=254B cardinality=1
+|  |
+|  09:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: o_orderpriority ASC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  mem-estimate=0B mem-reservation=16.00MB
+|  |  tuple-ids=12,7 row-size=164B cardinality=10
+|  |
+|  08:SORT
+|  |  order by: o_orderpriority ASC
+|  |  mem-estimate=16.00MB mem-reservation=48.00MB
+|  |  tuple-ids=12 row-size=156B cardinality=10
+|  |
+|  07:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: o_orderdate ASC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  mem-estimate=0B mem-reservation=16.00MB
+|  |  tuple-ids=10,6 row-size=156B cardinality=10
+|  |
+|  06:SORT
+|  |  order by: o_orderdate ASC
+|  |  mem-estimate=16.00MB mem-reservation=48.00MB
+|  |  tuple-ids=10 row-size=148B cardinality=10
+|  |
+|  05:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: o_totalprice ASC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  mem-estimate=0B mem-reservation=16.00MB
+|  |  tuple-ids=8,5 row-size=148B cardinality=10
+|  |
+|  04:SORT
+|  |  order by: o_totalprice ASC
+|  |  mem-estimate=16.00MB mem-reservation=48.00MB
+|  |  tuple-ids=8 row-size=140B cardinality=10
+|  |
+|  03:UNNEST [c.c_orders]
+|     parent-subplan=01
+|     mem-estimate=0B mem-reservation=0B
+|     tuple-ids=1 row-size=0B cardinality=10
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
+   partitions=1/1 files=4 size=292.35MB
+   stats-rows=150000 extrapolated-rows=disabled
+   table stats: rows=150000 size=292.35MB
+   columns missing stats: c_orders
+   mem-estimate=88.00MB mem-reservation=0B
+   tuple-ids=0 row-size=254B cardinality=150000
+====
+# Bushy hash join plan. Only two of the hash joins can execute concurrently, so we only
+# need enough reservation for 2 hash joins.
+select straight_join *
+from tpch_parquet.orders t1
+join (
+  select straight_join t2.o_orderkey k2, k3, k4
+  from tpch_parquet.orders t2
+  join (
+    select straight_join t3.o_orderkey k3, t4.o_orderkey k4
+    from tpch_parquet.orders t3
+    join tpch_parquet.orders t4 on t3.o_orderkey = t4.o_orderkey
+  ) v2 on v2.k3 = t2.o_orderkey
+) v1 on v1.k3 = t1.o_orderkey
+---- PLAN
+Per-Host Resource Reservation: Memory=272.00MB
+Per-Host Resource Estimates: Memory=172.59MB
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=172.59MB mem-reservation=272.00MB
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.o_orderkey = t3.o_orderkey
+|  fk/pk conjuncts: t1.o_orderkey = t3.o_orderkey
+|  runtime filters: RF000 <- t3.o_orderkey
+|  mem-estimate=37.77MB mem-reservation=136.00MB
+|  tuple-ids=0,1,2,3 row-size=215B cardinality=1500000
+|
+|--05:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t2.o_orderkey = t3.o_orderkey
+|  |  fk/pk conjuncts: t2.o_orderkey = t3.o_orderkey
+|  |  runtime filters: RF001 <- t3.o_orderkey
+|  |  mem-estimate=25.18MB mem-reservation=136.00MB
+|  |  tuple-ids=1,2,3 row-size=24B cardinality=1500000
+|  |
+|  |--04:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: t3.o_orderkey = t4.o_orderkey
+|  |  |  fk/pk conjuncts: t3.o_orderkey = t4.o_orderkey
+|  |  |  runtime filters: RF002 <- t4.o_orderkey
+|  |  |  mem-estimate=12.59MB mem-reservation=136.00MB
+|  |  |  tuple-ids=2,3 row-size=16B cardinality=1500000
+|  |  |
+|  |  |--03:SCAN HDFS [tpch_parquet.orders t4]
+|  |  |     partitions=1/1 files=2 size=54.20MB
+|  |  |     stats-rows=1500000 extrapolated-rows=disabled
+|  |  |     table stats: rows=1500000 size=54.20MB
+|  |  |     column stats: all
+|  |  |     mem-estimate=40.00MB mem-reservation=0B
+|  |  |     tuple-ids=3 row-size=8B cardinality=1500000
+|  |  |
+|  |  02:SCAN HDFS [tpch_parquet.orders t3]
+|  |     partitions=1/1 files=2 size=54.20MB
+|  |     runtime filters: RF002 -> t3.o_orderkey
+|  |     stats-rows=1500000 extrapolated-rows=disabled
+|  |     table stats: rows=1500000 size=54.20MB
+|  |     column stats: all
+|  |     mem-estimate=40.00MB mem-reservation=0B
+|  |     tuple-ids=2 row-size=8B cardinality=1500000
+|  |
+|  01:SCAN HDFS [tpch_parquet.orders t2]
+|     partitions=1/1 files=2 size=54.20MB
+|     runtime filters: RF001 -> t2.o_orderkey
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=54.20MB
+|     column stats: all
+|     mem-estimate=40.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=8B cardinality=1500000
+|
+00:SCAN HDFS [tpch_parquet.orders t1]
+   partitions=1/1 files=2 size=54.20MB
+   runtime filters: RF000 -> t1.o_orderkey
+   stats-rows=1500000 extrapolated-rows=disabled
+   table stats: rows=1500000 size=54.20MB
+   column stats: all
+   mem-estimate=40.00MB mem-reservation=0B
+   tuple-ids=0 row-size=191B cardinality=1500000
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=408.00MB
+Per-Host Resource Estimates: Memory=216.65MB
+
+F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+11:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0,1,2,3 row-size=215B cardinality=1500000
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+Per-Host Resources: mem-estimate=77.77MB mem-reservation=136.00MB
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: t1.o_orderkey = t3.o_orderkey
+|  fk/pk conjuncts: t1.o_orderkey = t3.o_orderkey
+|  runtime filters: RF000 <- t3.o_orderkey
+|  mem-estimate=37.77MB mem-reservation=136.00MB
+|  tuple-ids=0,1,2,3 row-size=215B cardinality=1500000
+|
+|--10:EXCHANGE [BROADCAST]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1,2,3 row-size=24B cardinality=1500000
+|  |
+|  F04:PLAN FRAGMENT [HASH(t3.o_orderkey)] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=18.88MB mem-reservation=272.00MB
+|  05:HASH JOIN [INNER JOIN, PARTITIONED]
+|  |  hash predicates: t2.o_orderkey = t3.o_orderkey
+|  |  fk/pk conjuncts: t2.o_orderkey = t3.o_orderkey
+|  |  runtime filters: RF001 <- t3.o_orderkey
+|  |  mem-estimate=12.59MB mem-reservation=136.00MB
+|  |  tuple-ids=1,2,3 row-size=24B cardinality=1500000
+|  |
+|  |--04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  |  |  hash predicates: t3.o_orderkey = t4.o_orderkey
+|  |  |  fk/pk conjuncts: t3.o_orderkey = t4.o_orderkey
+|  |  |  runtime filters: RF002 <- t4.o_orderkey
+|  |  |  mem-estimate=6.29MB mem-reservation=136.00MB
+|  |  |  tuple-ids=2,3 row-size=16B cardinality=1500000
+|  |  |
+|  |  |--08:EXCHANGE [HASH(t4.o_orderkey)]
+|  |  |  |  mem-estimate=0B mem-reservation=0B
+|  |  |  |  tuple-ids=3 row-size=8B cardinality=1500000
+|  |  |  |
+|  |  |  F03:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  |  |  Per-Host Resources: mem-estimate=40.00MB mem-reservation=0B
+|  |  |  03:SCAN HDFS [tpch_parquet.orders t4, RANDOM]
+|  |  |     partitions=1/1 files=2 size=54.20MB
+|  |  |     stats-rows=1500000 extrapolated-rows=disabled
+|  |  |     table stats: rows=1500000 size=54.20MB
+|  |  |     column stats: all
+|  |  |     mem-estimate=40.00MB mem-reservation=0B
+|  |  |     tuple-ids=3 row-size=8B cardinality=1500000
+|  |  |
+|  |  07:EXCHANGE [HASH(t3.o_orderkey)]
+|  |  |  mem-estimate=0B mem-reservation=0B
+|  |  |  tuple-ids=2 row-size=8B cardinality=1500000
+|  |  |
+|  |  F02:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  |  Per-Host Resources: mem-estimate=40.00MB mem-reservation=0B
+|  |  02:SCAN HDFS [tpch_parquet.orders t3, RANDOM]
+|  |     partitions=1/1 files=2 size=54.20MB
+|  |     runtime filters: RF002 -> t3.o_orderkey
+|  |     stats-rows=1500000 extrapolated-rows=disabled
+|  |     table stats: rows=1500000 size=54.20MB
+|  |     column stats: all
+|  |     mem-estimate=40.00MB mem-reservation=0B
+|  |     tuple-ids=2 row-size=8B cardinality=1500000
+|  |
+|  09:EXCHANGE [HASH(t2.o_orderkey)]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1 row-size=8B cardinality=1500000
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=40.00MB mem-reservation=0B
+|  01:SCAN HDFS [tpch_parquet.orders t2, RANDOM]
+|     partitions=1/1 files=2 size=54.20MB
+|     runtime filters: RF001 -> t2.o_orderkey
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=54.20MB
+|     column stats: all
+|     mem-estimate=40.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=8B cardinality=1500000
+|
+00:SCAN HDFS [tpch_parquet.orders t1, RANDOM]
+   partitions=1/1 files=2 size=54.20MB
+   runtime filters: RF000 -> t1.o_orderkey
+   stats-rows=1500000 extrapolated-rows=disabled
+   table stats: rows=1500000 size=54.20MB
+   column stats: all
+   mem-estimate=40.00MB mem-reservation=0B
+   tuple-ids=0 row-size=191B cardinality=1500000
+---- PARALLELPLANS
+Per-Host Resource Reservation: Memory=816.00MB
+Per-Host Resource Estimates: Memory=414.41MB
+
+F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+11:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0,1,2,3 row-size=215B cardinality=1500000
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+Per-Host Resources: mem-estimate=155.53MB mem-reservation=272.00MB
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=00
+|  hash predicates: t1.o_orderkey = t3.o_orderkey
+|  fk/pk conjuncts: t1.o_orderkey = t3.o_orderkey
+|  runtime filters: RF000 <- t3.o_orderkey
+|  mem-estimate=37.77MB mem-reservation=136.00MB
+|  tuple-ids=0,1,2,3 row-size=215B cardinality=1500000
+|
+|--F06:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+|  |  Per-Host Resources: included in parent fragment
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: t3.o_orderkey
+|  |  mem-estimate=0B mem-reservation=0B
+|  |
+|  10:EXCHANGE [BROADCAST]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1,2,3 row-size=24B cardinality=1500000
+|  |
+|  F04:PLAN FRAGMENT [HASH(t3.o_orderkey)] hosts=2 instances=4
+|  Per-Host Resources: mem-estimate=18.88MB mem-reservation=544.00MB
+|  05:HASH JOIN [INNER JOIN, PARTITIONED]
+|  |  hash-table-id=01
+|  |  hash predicates: t2.o_orderkey = t3.o_orderkey
+|  |  fk/pk conjuncts: t2.o_orderkey = t3.o_orderkey
+|  |  runtime filters: RF001 <- t3.o_orderkey
+|  |  mem-estimate=6.29MB mem-reservation=136.00MB
+|  |  tuple-ids=1,2,3 row-size=24B cardinality=1500000
+|  |
+|  |--F07:PLAN FRAGMENT [HASH(t3.o_orderkey)] hosts=2 instances=4
+|  |  |  Per-Host Resources: included in parent fragment
+|  |  JOIN BUILD
+|  |  |  join-table-id=01 plan-id=02 cohort-id=02
+|  |  |  build expressions: t3.o_orderkey
+|  |  |  mem-estimate=0B mem-reservation=0B
+|  |  |
+|  |  04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  |  |  hash-table-id=02
+|  |  |  hash predicates: t3.o_orderkey = t4.o_orderkey
+|  |  |  fk/pk conjuncts: t3.o_orderkey = t4.o_orderkey
+|  |  |  runtime filters: RF002 <- t4.o_orderkey
+|  |  |  mem-estimate=3.15MB mem-reservation=136.00MB
+|  |  |  tuple-ids=2,3 row-size=16B cardinality=1500000
+|  |  |
+|  |  |--F08:PLAN FRAGMENT [HASH(t3.o_orderkey)] hosts=2 instances=4
+|  |  |  |  Per-Host Resources: included in parent fragment
+|  |  |  JOIN BUILD
+|  |  |  |  join-table-id=02 plan-id=03 cohort-id=03
+|  |  |  |  build expressions: t4.o_orderkey
+|  |  |  |  mem-estimate=0B mem-reservation=0B
+|  |  |  |
+|  |  |  08:EXCHANGE [HASH(t4.o_orderkey)]
+|  |  |  |  mem-estimate=0B mem-reservation=0B
+|  |  |  |  tuple-ids=3 row-size=8B cardinality=1500000
+|  |  |  |
+|  |  |  F03:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+|  |  |  Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
+|  |  |  03:SCAN HDFS [tpch_parquet.orders t4, RANDOM]
+|  |  |     partitions=1/1 files=2 size=54.20MB
+|  |  |     stats-rows=1500000 extrapolated-rows=disabled
+|  |  |     table stats: rows=1500000 size=54.20MB
+|  |  |     column stats: all
+|  |  |     mem-estimate=40.00MB mem-reservation=0B
+|  |  |     tuple-ids=3 row-size=8B cardinality=1500000
+|  |  |
+|  |  07:EXCHANGE [HASH(t3.o_orderkey)]
+|  |  |  mem-estimate=0B mem-reservation=0B
+|  |  |  tuple-ids=2 row-size=8B cardinality=1500000
+|  |  |
+|  |  F02:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+|  |  Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
+|  |  02:SCAN HDFS [tpch_parquet.orders t3, RANDOM]
+|  |     partitions=1/1 files=2 size=54.20MB
+|  |     runtime filters: RF002 -> t3.o_orderkey
+|  |     stats-rows=1500000 extrapolated-rows=disabled
+|  |     table stats: rows=1500000 size=54.20MB
+|  |     column stats: all
+|  |     mem-estimate=40.00MB mem-reservation=0B
+|  |     tuple-ids=2 row-size=8B cardinality=1500000
+|  |
+|  09:EXCHANGE [HASH(t2.o_orderkey)]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1 row-size=8B cardinality=1500000
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
+|  Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
+|  01:SCAN HDFS [tpch_parquet.orders t2, RANDOM]
+|     partitions=1/1 files=2 size=54.20MB
+|     runtime filters: RF001 -> t2.o_orderkey
+|     stats-rows=1500000 extrapolated-rows=disabled
+|     table stats: rows=1500000 size=54.20MB
+|     column stats: all
+|     mem-estimate=40.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=8B cardinality=1500000
+|
+00:SCAN HDFS [tpch_parquet.orders t1, RANDOM]
+   partitions=1/1 files=2 size=54.20MB
+   runtime filters: RF000 -> t1.o_orderkey
+   stats-rows=1500000 extrapolated-rows=disabled
+   table stats: rows=1500000 size=54.20MB
+   column stats: all
+   mem-estimate=40.00MB mem-reservation=0B
+   tuple-ids=0 row-size=191B cardinality=1500000
+====
+# Bushy nested loop join plan. Because of IMPALA-4179 the nested loop join cannot close
+# its build-side child immediately after the build phase. Therefore the whole tree of
+# joins remains open until the query finishes.
+# TODO: IMPALA-4179: the estimates should get lower.
+select straight_join *
+from tpch_parquet.nation t1
+join (
+  select straight_join t2.n_nationkey k2, k3, k4
+  from tpch_parquet.nation t2
+  join (
+    select straight_join t3.n_nationkey k3, t4.s_suppkey k4
+    from tpch_parquet.nation t3
+    join tpch_parquet.supplier t4
+  ) v2
+) v1
+---- PLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=137.99MB
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=137.99MB mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+06:NESTED LOOP JOIN [CROSS JOIN]
+|  mem-estimate=71.53MB mem-reservation=0B
+|  tuple-ids=0,1,2,3 row-size=129B cardinality=156250000
+|
+|--05:NESTED LOOP JOIN [CROSS JOIN]
+|  |  mem-estimate=2.38MB mem-reservation=0B
+|  |  tuple-ids=1,2,3 row-size=12B cardinality=6250000
+|  |
+|  |--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |  mem-estimate=78.12KB mem-reservation=0B
+|  |  |  tuple-ids=2,3 row-size=10B cardinality=250000
+|  |  |
+|  |  |--03:SCAN HDFS [tpch_parquet.supplier t4]
+|  |  |     partitions=1/1 files=1 size=882.76KB
+|  |  |     stats-rows=10000 extrapolated-rows=disabled
+|  |  |     table stats: rows=10000 size=882.76KB
+|  |  |     column stats: all
+|  |  |     mem-estimate=16.00MB mem-reservation=0B
+|  |  |     tuple-ids=3 row-size=8B cardinality=10000
+|  |  |
+|  |  02:SCAN HDFS [tpch_parquet.nation t3]
+|  |     partitions=1/1 files=1 size=2.94KB
+|  |     stats-rows=25 extrapolated-rows=disabled
+|  |     table stats: rows=25 size=2.94KB
+|  |     column stats: all
+|  |     mem-estimate=16.00MB mem-reservation=0B
+|  |     tuple-ids=2 row-size=2B cardinality=25
+|  |
+|  01:SCAN HDFS [tpch_parquet.nation t2]
+|     partitions=1/1 files=1 size=2.94KB
+|     stats-rows=25 extrapolated-rows=disabled
+|     table stats: rows=25 size=2.94KB
+|     column stats: all
+|     mem-estimate=16.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=2B cardinality=25
+|
+00:SCAN HDFS [tpch_parquet.nation t1]
+   partitions=1/1 files=1 size=2.94KB
+   stats-rows=25 extrapolated-rows=disabled
+   table stats: rows=25 size=2.94KB
+   column stats: all
+   mem-estimate=16.00MB mem-reservation=0B
+   tuple-ids=0 row-size=117B cardinality=25
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=137.99MB
+
+F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+10:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0,1,2,3 row-size=129B cardinality=156250000
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Host Resources: mem-estimate=87.53MB mem-reservation=0B
+06:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  mem-estimate=71.53MB mem-reservation=0B
+|  tuple-ids=0,1,2,3 row-size=129B cardinality=156250000
+|
+|--09:EXCHANGE [BROADCAST]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1,2,3 row-size=12B cardinality=6250000
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=18.38MB mem-reservation=0B
+|  05:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  |  mem-estimate=2.38MB mem-reservation=0B
+|  |  tuple-ids=1,2,3 row-size=12B cardinality=6250000
+|  |
+|  |--08:EXCHANGE [BROADCAST]
+|  |  |  mem-estimate=0B mem-reservation=0B
+|  |  |  tuple-ids=2,3 row-size=10B cardinality=250000
+|  |  |
+|  |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  |  Per-Host Resources: mem-estimate=16.08MB mem-reservation=0B
+|  |  04:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  |  |  mem-estimate=78.12KB mem-reservation=0B
+|  |  |  tuple-ids=2,3 row-size=10B cardinality=250000
+|  |  |
+|  |  |--07:EXCHANGE [BROADCAST]
+|  |  |  |  mem-estimate=0B mem-reservation=0B
+|  |  |  |  tuple-ids=3 row-size=8B cardinality=10000
+|  |  |  |
+|  |  |  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  |  |  Per-Host Resources: mem-estimate=16.00MB mem-reservation=0B
+|  |  |  03:SCAN HDFS [tpch_parquet.supplier t4, RANDOM]
+|  |  |     partitions=1/1 files=1 size=882.76KB
+|  |  |     stats-rows=10000 extrapolated-rows=disabled
+|  |  |     table stats: rows=10000 size=882.76KB
+|  |  |     column stats: all
+|  |  |     mem-estimate=16.00MB mem-reservation=0B
+|  |  |     tuple-ids=3 row-size=8B cardinality=10000
+|  |  |
+|  |  02:SCAN HDFS [tpch_parquet.nation t3, RANDOM]
+|  |     partitions=1/1 files=1 size=2.94KB
+|  |     stats-rows=25 extrapolated-rows=disabled
+|  |     table stats: rows=25 size=2.94KB
+|  |     column stats: all
+|  |     mem-estimate=16.00MB mem-reservation=0B
+|  |     tuple-ids=2 row-size=2B cardinality=25
+|  |
+|  01:SCAN HDFS [tpch_parquet.nation t2, RANDOM]
+|     partitions=1/1 files=1 size=2.94KB
+|     stats-rows=25 extrapolated-rows=disabled
+|     table stats: rows=25 size=2.94KB
+|     column stats: all
+|     mem-estimate=16.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=2B cardinality=25
+|
+00:SCAN HDFS [tpch_parquet.nation t1, RANDOM]
+   partitions=1/1 files=1 size=2.94KB
+   stats-rows=25 extrapolated-rows=disabled
+   table stats: rows=25 size=2.94KB
+   column stats: all
+   mem-estimate=16.00MB mem-reservation=0B
+   tuple-ids=0 row-size=117B cardinality=25
+---- PARALLELPLANS
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=275.97MB
+
+F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+10:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=0,1,2,3 row-size=129B cardinality=156250000
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
+Per-Host Resources: mem-estimate=175.05MB mem-reservation=0B
+06:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 00
+|  mem-estimate=71.53MB mem-reservation=0B
+|  tuple-ids=0,1,2,3 row-size=129B cardinality=156250000
+|
+|--F05:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
+|  |  Per-Host Resources: included in parent fragment
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  mem-estimate=0B mem-reservation=0B
+|  |
+|  09:EXCHANGE [BROADCAST]
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=1,2,3 row-size=12B cardinality=6250000
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
+|  Per-Host Resources: mem-estimate=36.77MB mem-reservation=0B
+|  05:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  |  join table id: 01
+|  |  mem-estimate=2.38MB mem-reservation=0B
+|  |  tuple-ids=1,2,3 row-size=12B cardinality=6250000
+|  |
+|  |--F06:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
+|  |  |  Per-Host Resources: included in parent fragment
+|  |  JOIN BUILD
+|  |  |  join-table-id=01 plan-id=02 cohort-id=02
+|  |  |  mem-estimate=0B mem-reservation=0B
+|  |  |
+|  |  08:EXCHANGE [BROADCAST]
+|  |  |  mem-estimate=0B mem-reservation=0B
+|  |  |  tuple-ids=2,3 row-size=10B cardinality=250000
+|  |  |
+|  |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
+|  |  Per-Host Resources: mem-estimate=32.15MB mem-reservation=0B
+|  |  04:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  |  |  join table id: 02
+|  |  |  mem-estimate=78.12KB mem-reservation=0B
+|  |  |  tuple-ids=2,3 row-size=10B cardinality=250000
+|  |  |
+|  |  |--F07:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
+|  |  |  |  Per-Host Resources: included in parent fragment
+|  |  |  JOIN BUILD
+|  |  |  |  join-table-id=02 plan-id=03 cohort-id=03
+|  |  |  |  mem-estimate=0B mem-reservation=0B
+|  |  |  |
+|  |  |  07:EXCHANGE [BROADCAST]
+|  |  |  |  mem-estimate=0B mem-reservation=0B
+|  |  |  |  tuple-ids=3 row-size=8B cardinality=10000
+|  |  |  |
+|  |  |  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
+|  |  |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=0B
+|  |  |  03:SCAN HDFS [tpch_parquet.supplier t4, RANDOM]
+|  |  |     partitions=1/1 files=1 size=882.76KB
+|  |  |     stats-rows=10000 extrapolated-rows=disabled
+|  |  |     table stats: rows=10000 size=882.76KB
+|  |  |     column stats: all
+|  |  |     mem-estimate=16.00MB mem-reservation=0B
+|  |  |     tuple-ids=3 row-size=8B cardinality=10000
+|  |  |
+|  |  02:SCAN HDFS [tpch_parquet.nation t3, RANDOM]
+|  |     partitions=1/1 files=1 size=2.94KB
+|  |     stats-rows=25 extrapolated-rows=disabled
+|  |     table stats: rows=25 size=2.94KB
+|  |     column stats: all
+|  |     mem-estimate=16.00MB mem-reservation=0B
+|  |     tuple-ids=2 row-size=2B cardinality=25
+|  |
+|  01:SCAN HDFS [tpch_parquet.nation t2, RANDOM]
+|     partitions=1/1 files=1 size=2.94KB
+|     stats-rows=25 extrapolated-rows=disabled
+|     table stats: rows=25 size=2.94KB
+|     column stats: all
+|     mem-estimate=16.00MB mem-reservation=0B
+|     tuple-ids=1 row-size=2B cardinality=25
+|
+00:SCAN HDFS [tpch_parquet.nation t1, RANDOM]
+   partitions=1/1 files=1 size=2.94KB
+   stats-rows=25 extrapolated-rows=disabled
+   table stats: rows=25 size=2.94KB
+   column stats: all
+   mem-estimate=16.00MB mem-reservation=0B
+   tuple-ids=0 row-size=117B cardinality=25
+====
+# Pipeline of analytic nodes. They should be treated as streaming nodes.
+select tinyint_col, smallint_col,
+sum(smallint_col) over (partition by tinyint_col order by smallint_col),
+sum(smallint_col) over (partition by tinyint_col order by smallint_col
+                        rows between unbounded preceding and 1 following),
+                        sum(smallint_col) over (partition by tinyint_col order by smallint_col
+                                                rows between 1 following and 2 following)
+                                                from functional.alltypesagg
+---- PLAN
+Per-Host Resource Reservation: Memory=72.00MB
+Per-Host Resource Estimates: Memory=24.00MB
+Codegen disabled by planner
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=24.00MB mem-reservation=72.00MB
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+04:ANALYTIC
+|  functions: sum(smallint_col)
+|  partition by: tinyint_col
+|  order by: smallint_col ASC
+|  window: ROWS BETWEEN 1 FOLLOWING AND 2 FOLLOWING
+|  mem-estimate=0B mem-reservation=16.00MB
+|  tuple-ids=5,2,3,4 row-size=27B cardinality=11000
+|
+03:ANALYTIC
+|  functions: sum(smallint_col)
+|  partition by: tinyint_col
+|  order by: smallint_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING
+|  mem-estimate=0B mem-reservation=16.00MB
+|  tuple-ids=5,2,3 row-size=19B cardinality=11000
+|
+02:ANALYTIC
+|  functions: sum(smallint_col)
+|  partition by: tinyint_col
+|  order by: smallint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=0B mem-reservation=16.00MB
+|  tuple-ids=5,2 row-size=11B cardinality=11000
+|
+01:SORT
+|  order by: tinyint_col ASC NULLS FIRST, smallint_col ASC
+|  mem-estimate=8.00MB mem-reservation=24.00MB
+|  tuple-ids=5 row-size=3B cardinality=11000
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 files=11 size=814.73KB
+   stats-rows=11000 extrapolated-rows=disabled
+   table stats: rows=11000 size=814.73KB
+   column stats: all
+   mem-estimate=16.00MB mem-reservation=0B
+   tuple-ids=0 row-size=3B cardinality=11000
 ====

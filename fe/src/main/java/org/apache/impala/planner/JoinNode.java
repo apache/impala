@@ -33,6 +33,8 @@ import org.apache.impala.catalog.Table;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TJoinDistributionMode;
+import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TQueryOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -629,5 +631,50 @@ public abstract class JoinNode extends PlanNode {
     conjuncts_ = orderConjunctsByCost(conjuncts_);
     eqJoinConjuncts_ = orderConjunctsByCost(eqJoinConjuncts_);
     otherJoinConjuncts_ = orderConjunctsByCost(otherJoinConjuncts_);
+  }
+
+  @Override
+  public ExecPhaseResourceProfiles computeTreeResourceProfiles(
+      TQueryOptions queryOptions) {
+    Preconditions.checkState(isBlockingJoinNode(), "Only blocking join nodes supported");
+
+    ExecPhaseResourceProfiles buildSideProfile =
+        getChild(1).computeTreeResourceProfiles(queryOptions);
+    ExecPhaseResourceProfiles probeSideProfile =
+        getChild(0).computeTreeResourceProfiles(queryOptions);
+
+    // The peak resource consumption of the build phase is either during the Open() of
+    // the build side or while we're doing the join build and calling GetNext() on the
+    // build side.
+    ResourceProfile buildPhaseProfile = buildSideProfile.duringOpenProfile.max(
+        buildSideProfile.postOpenProfile.sum(nodeResourceProfile_));
+
+    ResourceProfile finishedBuildProfile = nodeResourceProfile_;
+    if (this instanceof NestedLoopJoinNode
+        || !BackendConfig.INSTANCE.isPartitionedHashJoinEnabled()) {
+      // These exec node implementations may hold references into the build side, which
+      // prevents closing of the build side in a timely manner. This means we have to
+      // count the post-open resource consumption of the build side in the same way as
+      // the other in-memory data structures.
+      // TODO: IMPALA-4179: remove this workaround
+      finishedBuildProfile = buildSideProfile.postOpenProfile.sum(nodeResourceProfile_);
+    }
+
+    // Peak resource consumption of this subtree during Open().
+    ResourceProfile duringOpenProfile;
+    if (queryOptions.getMt_dop() == 0) {
+      // The build and probe side can be open and therefore consume resources
+      // simultaneously when mt_dop = 0 because of the async build thread.
+      duringOpenProfile = buildPhaseProfile.sum(probeSideProfile.duringOpenProfile);
+    } else {
+      // Open() of the probe side happens after the build completes.
+      duringOpenProfile = buildPhaseProfile.max(
+          finishedBuildProfile.sum(probeSideProfile.duringOpenProfile));
+    }
+
+    // After Open(), the probe side remains open and the join build remain in memory.
+    ResourceProfile probePhaseProfile =
+        finishedBuildProfile.sum(probeSideProfile.postOpenProfile);
+    return new ExecPhaseResourceProfiles(duringOpenProfile, probePhaseProfile);
   }
 }

@@ -281,7 +281,7 @@ public class AggregationNode extends PlanNode {
   }
 
   @Override
-  public void computeResourceProfile(TQueryOptions queryOptions) {
+  public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     Preconditions.checkNotNull(
         fragment_, "PlanNode must be placed into a fragment before calling this method.");
     long perInstanceCardinality = fragment_.getPerInstanceNdv(
@@ -319,7 +319,7 @@ public class AggregationNode extends PlanNode {
       perInstanceMinBuffers = bufferSize * minBuffers;
     }
 
-    resourceProfile_ =
+    nodeResourceProfile_ =
         new ResourceProfile(perInstanceMemEstimate, perInstanceMinBuffers);
   }
 }

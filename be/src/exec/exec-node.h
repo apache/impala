@@ -83,6 +83,14 @@ class ExecNode {
   /// If overridden in subclass, must first call superclass's Open().
   /// Open() is called after Prepare() or Reset(), i.e., possibly multiple times
   /// throughout the lifetime of this node.
+  ///
+  /// Memory resources must be acquired by an ExecNode only during or after the first
+  /// call to Open(). Blocking ExecNodes outside of a subplan must call Open() on their
+  /// child before acquiring their own resources to reduce the peak resource requirement.
+  /// This is particularly important if there are multiple blocking ExecNodes in a
+  /// pipeline because the lower nodes will release resources in Close() before the
+  /// Open() of their parent retuns.  The resource profile calculation in the frontend
+  /// relies on this when computing the peak resources required for a query.
   virtual Status Open(RuntimeState* state) WARN_UNUSED_RESULT;
 
   /// Retrieves rows and returns them via row_batch. Sets eos to true

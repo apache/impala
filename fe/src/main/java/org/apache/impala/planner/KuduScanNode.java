@@ -268,8 +268,8 @@ public class KuduScanNode extends ScanNode {
   }
 
   @Override
-  public void computeResourceProfile(TQueryOptions queryOptions) {
-    resourceProfile_ = new ResourceProfile(0, 0);
+  public void computeNodeResourceProfile(TQueryOptions queryOptions) {
+    nodeResourceProfile_ = new ResourceProfile(0, 0);
   }
 
   @Override

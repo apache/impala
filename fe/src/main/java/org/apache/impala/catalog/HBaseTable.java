@@ -19,7 +19,6 @@ package org.apache.impala.catalog;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -33,10 +32,8 @@ import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HRegionLocation;
-import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.ServerLoad;
-import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.RegionLoad;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
@@ -668,11 +665,6 @@ public class HBaseTable extends Table {
 
   public String getHBaseTableName() {
     return hbaseTableName_;
-  }
-
-  public int getNumNodes() {
-    // TODO: implement
-    return 100;
   }
 
   @Override

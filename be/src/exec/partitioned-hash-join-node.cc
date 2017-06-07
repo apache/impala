@@ -156,11 +156,6 @@ Status PartitionedHashJoinNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ht_ctx_->Open(state));
   RETURN_IF_ERROR(ScalarExprEvaluator::Open(other_join_conjunct_evals_, state));
 
-  if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
-    RETURN_IF_ERROR(InitNullAwareProbePartition());
-    RETURN_IF_ERROR(InitNullProbeRows());
-  }
-
   // Check for errors and free local allocations before opening children.
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
@@ -178,6 +173,16 @@ Status PartitionedHashJoinNode::Open(RuntimeState* state) {
   ResetForProbe();
   DCHECK(null_aware_probe_partition_ == NULL
       || join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN);
+  return Status::OK();
+}
+
+Status PartitionedHashJoinNode::AcquireResourcesForBuild(RuntimeState* state) {
+  if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
+    // Initialize these partitions before doing the build so that the build does not
+    // use the reservation intended for them.
+    RETURN_IF_ERROR(InitNullAwareProbePartition());
+    RETURN_IF_ERROR(InitNullProbeRows());
+  }
   return Status::OK();
 }
 

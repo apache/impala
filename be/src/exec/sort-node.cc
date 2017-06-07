@@ -69,20 +69,17 @@ void SortNode::Codegen(RuntimeState* state) {
 
 Status SortNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  // Open the child before consuming resources in this node.
+  RETURN_IF_ERROR(child(0)->Open(state));
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_ERROR(less_than_->Open(pool_, state, expr_mem_pool()));
   RETURN_IF_ERROR(sorter_->Open());
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
-  RETURN_IF_ERROR(child(0)->Open(state));
 
   // The child has been opened and the sorter created. Sort the input.
   // The final merge is done on-demand as rows are requested in GetNext().
   RETURN_IF_ERROR(SortInput(state));
-
-  // Unless we are inside a subplan expecting to call Open()/GetNext() on the child
-  // again, the child can be closed at this point.
-  if (!IsInSubplan()) child(0)->Close(state);
   return Status::OK();
 }
 
@@ -163,12 +160,17 @@ Status SortNode::SortInput(RuntimeState* state) {
   RowBatch batch(child(0)->row_desc(), state->batch_size(), mem_tracker());
   bool eos;
   do {
-    batch.Reset();
     RETURN_IF_ERROR(child(0)->GetNext(state, &batch, &eos));
     RETURN_IF_ERROR(sorter_->AddBatch(&batch));
+    batch.Reset();
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(QueryMaintenance(state));
   } while(!eos);
+
+  // Unless we are inside a subplan expecting to call Open()/GetNext() on the child
+  // again, the child can be closed at this point to release resources.
+  if (!IsInSubplan()) child(0)->Close(state);
+
   RETURN_IF_ERROR(sorter_->InputDone());
   return Status::OK();
 }

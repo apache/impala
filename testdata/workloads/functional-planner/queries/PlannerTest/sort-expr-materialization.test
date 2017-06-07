@@ -2,6 +2,7 @@
 select * from functional.alltypes order by random()
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=48.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -23,6 +24,7 @@ PLAN-ROOT SINK
 select * from functional.alltypes order by abs(id) + abs(id)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=48.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -44,6 +46,7 @@ PLAN-ROOT SINK
 select * from functional.alltypes order by tinyint_col + 1
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=48.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -65,6 +68,7 @@ select * from functional.alltypes
 order by dayofweek(timestamp_col), true, id + 1, string_col = date_string_col, id = tinyint_col
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=48.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -87,6 +91,7 @@ select last_value(id) over (order by to_date(timestamp_col), bool_col is null)
 from functional.alltypes
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=64.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -116,6 +121,7 @@ select id from functional.alltypes order by string_col like 'a.*b', id * bigint_
 regexp_replace(string_col, 'a.*b', 'c') limit 10
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=128.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -137,6 +143,7 @@ PLAN-ROOT SINK
 select * from functional.alltypes order by TestFn(double_col)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=48.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -158,6 +165,7 @@ PLAN-ROOT SINK
 select concat(date_string_col, string_col) c from functional.alltypes order by c
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=48.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |

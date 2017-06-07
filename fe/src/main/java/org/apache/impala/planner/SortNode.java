@@ -216,12 +216,12 @@ public class SortNode extends PlanNode {
   }
 
   @Override
-  public void computeResourceProfile(TQueryOptions queryOptions) {
+  public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     Preconditions.checkState(hasValidStats());
     if (useTopN_) {
       long perInstanceMemEstimate =
               (long) Math.ceil((cardinality_ + offset_) * avgRowSize_);
-      resourceProfile_ = new ResourceProfile(perInstanceMemEstimate, 0);
+      nodeResourceProfile_ = new ResourceProfile(perInstanceMemEstimate, 0);
       return;
     }
 
@@ -253,7 +253,7 @@ public class SortNode extends PlanNode {
     if (info_.getSortTupleDescriptor().hasVarLenSlots()) {
       perInstanceMinReservation *= 2;
     }
-    resourceProfile_ =
+    nodeResourceProfile_ =
         new ResourceProfile(perInstanceMemEstimate, perInstanceMinReservation);
   }
 

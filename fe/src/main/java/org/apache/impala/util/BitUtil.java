@@ -26,7 +26,7 @@ public class BitUtil {
   }
 
   // Round up 'val' to the nearest power of two. 'val' must be > 0.
-  public static int roundUpToPowerOf2(long val) {
-    return 1 << log2Ceiling(val);
+  public static long roundUpToPowerOf2(long val) {
+    return 1L << log2Ceiling(val);
   }
 }

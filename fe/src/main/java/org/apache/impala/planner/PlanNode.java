@@ -115,7 +115,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // resource requirements and estimates for this plan node.
   // Initialized with a dummy value. Gets set correctly in
   // computeResourceProfile().
-  protected ResourceProfile resourceProfile_ = ResourceProfile.invalid();
+  protected ResourceProfile nodeResourceProfile_ = ResourceProfile.invalid();
 
   // sum of tupleIds_' avgSerializedSizes; set in computeStats()
   protected float avgRowSize_;
@@ -192,7 +192,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public boolean hasLimit() { return limit_ > -1; }
   public long getCardinality() { return cardinality_; }
   public int getNumNodes() { return numNodes_; }
-  public ResourceProfile getResourceProfile() { return resourceProfile_; }
+  public ResourceProfile getNodeResourceProfile() { return nodeResourceProfile_; }
   public float getAvgRowSize() { return avgRowSize_; }
   public void setFragment(PlanFragment fragment) { fragment_ = fragment; }
   public PlanFragment getFragment() { return fragment_; }
@@ -306,7 +306,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
       // Print resource profile.
       expBuilder.append(detailPrefix);
-      expBuilder.append(resourceProfile_.getExplainString());
+      expBuilder.append(nodeResourceProfile_.getExplainString());
       expBuilder.append("\n");
 
       // Print tuple ids, row size and cardinality.
@@ -344,10 +344,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       PlanFragment childFragment = children_.get(0).fragment_;
       if (fragment_ != childFragment && detailLevel == TExplainLevel.EXTENDED) {
         // we're crossing a fragment boundary - print the fragment header.
-        expBuilder.append(prefix);
-        expBuilder.append(
-            childFragment.getFragmentHeaderString(queryOptions.getMt_dop()));
-        expBuilder.append("\n");
+        expBuilder.append(childFragment.getFragmentHeaderString(prefix, prefix,
+            queryOptions.getMt_dop()));
       }
       expBuilder.append(
           children_.get(0).getExplainString(prefix, prefix, queryOptions, detailLevel));
@@ -390,7 +388,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
     TExecStats estimatedStats = new TExecStats();
     estimatedStats.setCardinality(cardinality_);
-    estimatedStats.setMemory_used(resourceProfile_.getMemEstimateBytes());
+    estimatedStats.setMemory_used(nodeResourceProfile_.getMemEstimateBytes());
     msg.setLabel(getDisplayLabel());
     msg.setLabel_detail(getDisplayLabelDetail());
     msg.setEstimated_stats(estimatedStats);
@@ -616,15 +614,71 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public boolean isBlockingNode() { return false; }
 
   /**
-   * Compute resources consumed when executing this PlanNode, initializing
-   * 'resource_profile_'. May only be called after this PlanNode has been placed in a
-   * PlanFragment because the cost computation is dependent on the enclosing fragment's
+   * Compute peak resources consumed when executing this PlanNode, initializing
+   * 'nodeResourceProfile_'. May only be called after this PlanNode has been placed in
+   * a PlanFragment because the cost computation is dependent on the enclosing fragment's
    * data partition.
    */
-  public abstract void computeResourceProfile(TQueryOptions queryOptions);
+  public abstract void computeNodeResourceProfile(TQueryOptions queryOptions);
 
   /**
-   * The default size of buffer used in spilling nodes. Used in computeResourceProfile().
+   * Wrapper class to represent resource profiles during different phases of execution.
+   */
+  public static class ExecPhaseResourceProfiles {
+    public ExecPhaseResourceProfiles(
+        ResourceProfile duringOpenProfile, ResourceProfile postOpenProfile) {
+      this.duringOpenProfile = duringOpenProfile;
+      this.postOpenProfile = postOpenProfile;
+    }
+
+    /** Peak resources consumed while Open() is executing for this subtree */
+    public final ResourceProfile duringOpenProfile;
+
+    /**
+     * Peak resources consumed for this subtree from the time when ExecNode::Open()
+     * returns until the time when ExecNode::Close() returns.
+     */
+    public final ResourceProfile postOpenProfile;
+  }
+
+  /**
+   * Recursive function used to compute the peak resources consumed by this subtree of
+   * the plan within a fragment instance. The default implementation of this function
+   * is correct for streaming and blocking PlanNodes with a single child. PlanNodes
+   * that don't meet this description must override this function.
+   *
+   * Not called for PlanNodes inside a subplan: the root SubplanNode is responsible for
+   * computing the peak resources for the entire subplan.
+   *
+   * computeNodeResourceProfile() must be called on all plan nodes in this subtree before
+   * calling this function.
+   */
+  public ExecPhaseResourceProfiles computeTreeResourceProfiles(
+      TQueryOptions queryOptions) {
+    Preconditions.checkState(
+        children_.size() <= 1, "Plan nodes with > 1 child must override");
+    if (children_.isEmpty()) {
+      return new ExecPhaseResourceProfiles(nodeResourceProfile_, nodeResourceProfile_);
+    }
+    ExecPhaseResourceProfiles childResources =
+        getChild(0).computeTreeResourceProfiles(queryOptions);
+    if (isBlockingNode()) {
+      // This does not consume resources until after child's Open() returns. The child is
+      // then closed before Open() of this node returns.
+      ResourceProfile duringOpenProfile = childResources.duringOpenProfile.max(
+          childResources.postOpenProfile.sum(nodeResourceProfile_));
+      return new ExecPhaseResourceProfiles(duringOpenProfile, nodeResourceProfile_);
+    } else {
+      // Streaming node: this node, child and ancestor execute concurrently.
+      return new ExecPhaseResourceProfiles(
+          childResources.duringOpenProfile.sum(nodeResourceProfile_),
+          childResources.postOpenProfile.sum(nodeResourceProfile_));
+    }
+  }
+
+  /**
+   * The default size of buffer used in spilling nodes. Used in
+   * computeNodeResourceProfile().
    */
   protected final static long getDefaultSpillableBufferBytes() {
     // BufferedBlockMgr uses --read_size to determine buffer size.

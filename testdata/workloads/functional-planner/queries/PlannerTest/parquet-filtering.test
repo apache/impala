@@ -8,6 +8,7 @@ where int_col > 1 and int_col * rand() > 50 and int_col is null
 and int_col > tinyint_col;
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=42.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -37,6 +38,7 @@ and timestamp_cmp(timestamp_col, '2016-11-20 00:00:00') = 1
 and year > 2000 and month < 12;
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -67,6 +69,7 @@ and mod(int_col,50) IN (0,1)
 and id IN (int_col);
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=58.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |

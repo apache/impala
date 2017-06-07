@@ -93,9 +93,26 @@ public class SubplanNode extends PlanNode {
   }
 
   @Override
-  public void computeResourceProfile(TQueryOptions queryOptions) {
+  public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     // TODO: add an estimate
-    resourceProfile_ = new ResourceProfile(0, 0);
+    nodeResourceProfile_ = new ResourceProfile(0, 0);
+  }
+
+  @Override
+  public ExecPhaseResourceProfiles computeTreeResourceProfiles(
+      TQueryOptions queryOptions) {
+    // All nodes in a subplan remain open at the same time across iterations of a subplan,
+    // therefore the peak resource consumption is simply the sum of all node resources.
+    ResourceProfile subplanProfile = subplanComputePeakResources(this);
+    return new ExecPhaseResourceProfiles(subplanProfile, subplanProfile);
+  }
+
+  private static ResourceProfile subplanComputePeakResources(PlanNode node) {
+    ResourceProfile result = node.nodeResourceProfile_;
+    for (PlanNode child: node.getChildren()) {
+      result = result.sum(subplanComputePeakResources(child));
+    }
+    return result;
   }
 
   @Override

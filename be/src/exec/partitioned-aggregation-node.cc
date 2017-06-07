@@ -263,6 +263,9 @@ void PartitionedAggregationNode::Codegen(RuntimeState* state) {
 
 Status PartitionedAggregationNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  // Open the child before consuming resources in this node.
+  RETURN_IF_ERROR(child(0)->Open(state));
+
   RETURN_IF_ERROR(ExecNode::Open(state));
   if (ht_ctx_.get() != nullptr) RETURN_IF_ERROR(ht_ctx_->Open(state));
   RETURN_IF_ERROR(AggFnEvaluator::Open(agg_fn_evals_, state));
@@ -277,8 +280,6 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
   } else {
     RETURN_IF_ERROR(CreateHashPartitions(0));
   }
-
-  RETURN_IF_ERROR(children_[0]->Open(state));
 
   // Streaming preaggregations do all processing in GetNext().
   if (is_streaming_preagg_) return Status::OK();

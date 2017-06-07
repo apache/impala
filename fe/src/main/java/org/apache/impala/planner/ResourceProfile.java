@@ -18,9 +18,11 @@
 package org.apache.impala.planner;
 
 import org.apache.impala.common.PrintUtils;
+import org.apache.impala.util.MathUtil;
 
 /**
- * The resources that will be consumed by a set of plan nodes.
+ * The resources that will be consumed by some part of a plan, e.g. a plan node or
+ * plan fragment.
  */
 public class ResourceProfile {
   // If the computed values are valid.
@@ -64,20 +66,29 @@ public class ResourceProfile {
     return output.toString();
   }
 
-  // Returns a profile with the max of each value in 'p1' and 'p2'.
-  public static ResourceProfile max(ResourceProfile p1, ResourceProfile p2) {
-    if (!p1.isValid()) return p2;
-    if (!p2.isValid()) return p1;
+  // Returns a profile with the max of each value in 'this' and 'other'.
+  public ResourceProfile max(ResourceProfile other) {
+    if (!isValid()) return other;
+    if (!other.isValid()) return this;
     return new ResourceProfile(
-        Math.max(p1.getMemEstimateBytes(), p2.getMemEstimateBytes()),
-        Math.max(p1.getMinReservationBytes(), p2.getMinReservationBytes()));
+        Math.max(getMemEstimateBytes(), other.getMemEstimateBytes()),
+        Math.max(getMinReservationBytes(), other.getMinReservationBytes()));
   }
 
-  // Returns a profile with the sum of each value in 'p1' and 'p2'.
-  public static ResourceProfile sum(ResourceProfile p1, ResourceProfile p2) {
-    if (!p1.isValid()) return p2;
-    if (!p2.isValid()) return p1;
-    return new ResourceProfile(p1.getMemEstimateBytes() + p2.getMemEstimateBytes(),
-        p1.getMinReservationBytes() + p2.getMinReservationBytes());
+  // Returns a profile with the sum of each value in 'this' and 'other'.
+  public ResourceProfile sum(ResourceProfile other) {
+    if (!isValid()) return other;
+    if (!other.isValid()) return this;
+    return new ResourceProfile(
+        MathUtil.saturatingAdd(getMemEstimateBytes(), other.getMemEstimateBytes()),
+        MathUtil.saturatingAdd(getMinReservationBytes(), other.getMinReservationBytes()));
+  }
+
+  // Returns a profile with all values multiplied by 'factor'.
+  public ResourceProfile multiply(int factor) {
+    if (!isValid()) return this;
+    return new ResourceProfile(
+        MathUtil.saturatingMultiply(memEstimateBytes_, factor),
+        MathUtil.saturatingMultiply(minReservationBytes_, factor));
   }
 }

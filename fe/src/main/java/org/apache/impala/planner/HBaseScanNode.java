@@ -24,8 +24,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.filter.CompareFilter;
@@ -54,6 +52,7 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
 import org.apache.impala.thrift.TScanRangeLocationList;
+import org.apache.impala.util.MembershipSnapshot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -217,8 +216,10 @@ public class HBaseScanNode extends ScanNode {
       LOG.trace("computeStats HbaseScan: cardinality=" + Long.toString(cardinality_));
     }
 
-    // TODO: take actual regions into account
-    numNodes_ = Math.max(1, tbl.getNumNodes());
+    // Assume that each node in the cluster gets a scan range, unless there are fewer
+    // scan ranges than nodes.
+    numNodes_ = Math.max(1,
+        Math.min(scanRanges_.size(), MembershipSnapshot.getCluster().numNodes()));
     if (LOG.isTraceEnabled()) {
       LOG.trace("computeStats HbaseScan: #nodes=" + Integer.toString(numNodes_));
     }
@@ -494,9 +495,9 @@ public class HBaseScanNode extends ScanNode {
   }
 
   @Override
-  public void computeResourceProfile(TQueryOptions queryOptions) {
+  public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     // TODO: What's a good estimate of memory consumption?
-    resourceProfile_ =  new ResourceProfile(1024L * 1024L * 1024L, 0);
+    nodeResourceProfile_ =  new ResourceProfile(1024L * 1024L * 1024L, 0);
   }
 
   /**

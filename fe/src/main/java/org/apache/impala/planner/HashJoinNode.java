@@ -197,7 +197,7 @@ public class HashJoinNode extends JoinNode {
   }
 
   @Override
-  public void computeResourceProfile(TQueryOptions queryOptions) {
+  public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     long perInstanceMemEstimate;
     long perInstanceDataBytes;
     int numInstances = fragment_.getNumInstances(queryOptions.getMt_dop());
@@ -234,6 +234,6 @@ public class HashJoinNode extends JoinNode {
     }
 
     long perInstanceMinBufferBytes = bufferSize * minBuffers;
-    resourceProfile_ = new ResourceProfile(perInstanceMemEstimate, perInstanceMinBufferBytes);
+    nodeResourceProfile_ = new ResourceProfile(perInstanceMemEstimate, perInstanceMinBufferBytes);
   }
 }
