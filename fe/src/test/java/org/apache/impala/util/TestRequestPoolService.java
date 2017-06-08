@@ -204,7 +204,7 @@ public class TestRequestPoolService {
     // the system is busy this may take even longer, so we need to try a few times.
     Thread.sleep(CHECK_INTERVAL_MS + AllocationFileLoaderService.ALLOC_RELOAD_WAIT_MS);
 
-    int numAttempts = 10;
+    int numAttempts = 20;
     while (true) {
       try {
         checkModifiedConfigResults();
