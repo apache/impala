@@ -17,6 +17,8 @@
 
 package org.apache.impala.catalog;
 
+import com.google.common.base.Preconditions;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.fs.Path;
@@ -105,7 +107,7 @@ public class ImpaladCatalog extends Catalog {
    * existing in the catalog in order to be added.
    */
   private boolean isTopLevelCatalogObject(TCatalogObject catalogObject) {
-    return catalogObject.getType() == TCatalogObjectType.DATABASE||
+    return catalogObject.getType() == TCatalogObjectType.DATABASE ||
         catalogObject.getType() == TCatalogObjectType.DATA_SOURCE ||
         catalogObject.getType() == TCatalogObjectType.HDFS_CACHE_POOL ||
         catalogObject.getType() == TCatalogObjectType.ROLE;
@@ -144,11 +146,9 @@ public class ImpaladCatalog extends Catalog {
 
     // Process updates to top level objects first because they don't depend on any other
     // objects already existing in the catalog.
-    long newCatalogVersion = lastSyncedCatalogVersion_;
     for (TCatalogObject catalogObject: req.getUpdated_objects()) {
-      if (catalogObject.getType() == TCatalogObjectType.CATALOG) {
-        newCatalogVersion = catalogObject.getCatalog_version();
-      } else if (isTopLevelCatalogObject(catalogObject)) {
+      if (isTopLevelCatalogObject(catalogObject)) {
+        Preconditions.checkState(catalogObject.getType() != TCatalogObjectType.CATALOG);
         try {
           addCatalogObject(catalogObject);
         } catch (Exception e) {
@@ -160,8 +160,11 @@ public class ImpaladCatalog extends Catalog {
     // Process updates to dependent objects next. Since the top level objects were already
     // processed, we are guaranteed that the top level objects that the dependent objects
     // depend on exist in the catalog.
+    long newCatalogVersion = lastSyncedCatalogVersion_;
     for (TCatalogObject catalogObject: req.getUpdated_objects()) {
-      if (!isTopLevelCatalogObject(catalogObject)) {
+      if (catalogObject.getType() == TCatalogObjectType.CATALOG) {
+        newCatalogVersion = catalogObject.getCatalog_version();
+      } else if (!isTopLevelCatalogObject(catalogObject)) {
         try {
           addCatalogObject(catalogObject);
         } catch (Exception e) {
