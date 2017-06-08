@@ -157,13 +157,13 @@ body {
             for build instructions</a>.</p>
 
             <p>Please check the <a href=
-            "https://dist.apache.org/repos/dist/release/incubator/impala/2.8.0/apache-impala-incubating-2.8.0.tar.gz.md5">
+            "https://www.apache.org/dist/incubator/impala/2.8.0/apache-impala-incubating-2.8.0.tar.gz.md5">
             MD5</a> and <a href=
-            "https://dist.apache.org/repos/dist/release/incubator/impala/2.8.0/apache-impala-incubating-2.8.0.tar.gz.sha">
+            "https://www.apache.org/dist/incubator/impala/2.8.0/apache-impala-incubating-2.8.0.tar.gz.sha">
             SHA1</a> and <a href=
-            "https://dist.apache.org/repos/dist/release/incubator/impala/2.8.0/apache-impala-incubating-2.8.0.tar.gz.asc">
+            "https://www.apache.org/dist/incubator/impala/2.8.0/apache-impala-incubating-2.8.0.tar.gz.asc">
             GPG signature</a>, the latter by using <a href=
-            "https://dist.apache.org/repos/dist/release/incubator/impala/KEYS">the code
+            "https://www.apache.org/dist/incubator/impala/KEYS">the code
             signing keys of the release managers</a>.</p>
 
             <p>Developers interested in working on Impala can <code>git clone https://git-wip-us.apache.org/repos/asf/incubator-impala.git</code></p>
@@ -173,13 +173,39 @@ body {
                 <li>
                   <a href="http://www.apache.org/dyn/closer.cgi?action=download&amp;filename=incubator/impala/2.7.0/apache-impala-incubating-2.7.0.tar.gz">
                     Impala 2.7.0</a>, with associated
-                  <a href="https://dist.apache.org/repos/dist/release/incubator/impala/2.7.0/apache-impala-incubating-2.7.0.tar.gz.md5">
+                  <a href="https://www.apache.org/dist/incubator/impala/2.7.0/apache-impala-incubating-2.7.0.tar.gz.md5">
                     MD5</a>,
-                  <a href="https://dist.apache.org/repos/dist/release/incubator/impala/2.7.0/apache-impala-incubating-2.7.0.tar.gz.sha">
+                  <a href="https://www.apache.org/dist/incubator/impala/2.7.0/apache-impala-incubating-2.7.0.tar.gz.sha">
                     SHA1</a>, and
-                  <a href="https://dist.apache.org/repos/dist/release/incubator/impala/2.7.0/apache-impala-incubating-2.7.0.tar.gz.asc">
+                  <a href="https://www.apache.org/dist/incubator/impala/2.7.0/apache-impala-incubating-2.7.0.tar.gz.asc">
                     GPG signature</a>.
                 </li>
+              </ul>
+            </p>
+            <p>How to check sigs and hashes:
+              <ul>
+                <li>To check an MD5 sum:
+                  <ul>
+                    <li>On Linux, run <code>md5sum --check ${IMPALA_TARBALL}.md5</code></li>
+                    <li>On a Mac, run <code>md5 ${IMPALA_TARBALL} &amp;&amp; cat
+                        ${IMPALA_TARBALL}.md5</code> and compare the two lines that were printed;
+                        they sould be the same.</li>
+                </ul></li>
+                <li>To check a SHA1 sum:
+                  <ul>
+                    <li>On Linux, run <code>sha1sum --check ${IMPALA_TARBALL}.sha</code></li>
+                    <li>On a Mac, run <code>shasum --check ${IMPALA_TARBALL}.sha</code></li>
+                  </ul>
+                </li>
+                <li>To check a SHA512 sum:
+                  <ul>
+                    <li>On Linux, run <code>sha512sum --check ${IMPALA_TARBALL}.sha</code></li>
+                    <li>On a Mac, run <code>shasum --check ${IMPALA_TARBALL}.sha</code></li>
+                  </ul>
+                </li>
+                <li>To check a GPG signature, first download the code signing keys of the release
+                  managers. Then import them using <code>gpg --import KEYS</code>. Finally,
+                  run <code>gpg --verify ${IMPALA_TARBALL}.asc</code></li>
               </ul>
             </p>
             <div class="navbar">
