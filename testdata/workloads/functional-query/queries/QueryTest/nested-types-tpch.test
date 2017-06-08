@@ -233,3 +233,20 @@ order by c_custkey
 ---- TYPES
 bigint, bigint
 ====
+---- QUERY
+# IMPALA-5446: dropped status from Sorter::Reset() when sort cannot get reserved buffer.
+# This query is designed to allow the initial subplan iterations to succeed, but have
+# later iterations fail because the aggregation outside the subplan has accumulated all
+# the memory.
+set max_block_mgr_memory=100m;
+select c_custkey, c_name, c_address, c_phone, c_acctbal, c_mktsegment, c_comment,
+       o_orderdate, sum(o_totalprice), min(rnum)
+from customer c,
+  (select o_orderkey, o_totalprice, o_orderdate, row_number() over (order by o_orderdate desc) rnum
+   from c.c_orders) v
+group by 1, 2, 3, 4, 5, 6, 7, 8
+order by 9, 10 desc
+limit 10
+---- CATCH
+Memory limit exceeded: Query did not have enough memory to get the minimum required buffers in the block manager.
+====

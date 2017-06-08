@@ -1362,13 +1362,12 @@ Sorter::~Sorter() {
   DCHECK(merge_output_run_ == NULL);
 }
 
-Status Sorter::Init() {
-  DCHECK(unsorted_run_ == NULL) << "Already initialized";
+Status Sorter::Prepare() {
+  DCHECK(in_mem_tuple_sorter_ == NULL) << "Already prepared";
   TupleDescriptor* sort_tuple_desc = output_row_desc_->tuple_descriptors()[0];
   has_var_len_slots_ = sort_tuple_desc->HasVarlenSlots();
   in_mem_tuple_sorter_.reset(new TupleSorter(compare_less_than_,
       block_mgr_->max_block_size(), sort_tuple_desc->byte_size(), state_));
-  unsorted_run_ = obj_pool_.Add(new Run(this, sort_tuple_desc, true));
 
   initial_runs_counter_ = ADD_COUNTER(profile_, "InitialRunsCreated", TUnit::UNIT);
   spilled_runs_counter_ = ADD_COUNTER(profile_, "SpilledRuns", TUnit::UNIT);
@@ -1384,8 +1383,14 @@ Status Sorter::Init() {
 
   RETURN_IF_ERROR(block_mgr_->RegisterClient(Substitute("Sorter ptr=$0", this),
       min_buffers_required, false, mem_tracker_, state_, &block_mgr_client_));
+  return Status::OK();
+}
 
-  DCHECK(unsorted_run_ != NULL);
+Status Sorter::Open() {
+  DCHECK(in_mem_tuple_sorter_ != NULL) << "Not prepared";
+  DCHECK(unsorted_run_ == NULL) << "Already open";
+  TupleDescriptor* sort_tuple_desc = output_row_desc_->tuple_descriptors()[0];
+  unsorted_run_ = obj_pool_.Add(new Run(this, sort_tuple_desc, true));
   RETURN_IF_ERROR(unsorted_run_->Init());
   return Status::OK();
 }
@@ -1446,16 +1451,12 @@ Status Sorter::GetNext(RowBatch* output_batch, bool* eos) {
   }
 }
 
-Status Sorter::Reset() {
+void Sorter::Reset() {
   DCHECK(unsorted_run_ == NULL) << "Cannot Reset() before calling InputDone()";
   merger_.reset();
   // Free resources from the current runs.
   CleanupAllRuns();
   obj_pool_.Clear();
-  unsorted_run_ = obj_pool_.Add(
-      new Run(this, output_row_desc_->tuple_descriptors()[0], true));
-  RETURN_IF_ERROR(unsorted_run_->Init());
-  return Status::OK();
 }
 
 void Sorter::Close() {

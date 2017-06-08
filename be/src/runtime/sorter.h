@@ -100,24 +100,27 @@ class Sorter {
 
   ~Sorter();
 
-  /// Initialization code, including registration to the block_mgr and the initialization
-  /// of the unsorted_run_, both of these may fail.
-  Status Init();
+  /// Initial set-up of the sorter for execution. Registers with the block mgr.
+  Status Prepare() WARN_UNUSED_RESULT;
+
+  /// Open the sorter for adding rows. Must be called after Prepare() or Reset() and
+  /// before calling AddBatch().
+  Status Open() WARN_UNUSED_RESULT;
 
   /// Adds a batch of input rows to the current unsorted run.
-  Status AddBatch(RowBatch* batch);
+  Status AddBatch(RowBatch* batch) WARN_UNUSED_RESULT;
 
   /// Called to indicate there is no more input. Triggers the creation of merger(s) if
   /// necessary.
-  Status InputDone();
+  Status InputDone() WARN_UNUSED_RESULT;
 
   /// Get the next batch of sorted output rows from the sorter.
-  Status GetNext(RowBatch* batch, bool* eos);
+  Status GetNext(RowBatch* batch, bool* eos) WARN_UNUSED_RESULT;
 
   /// Resets all internal state like ExecNode::Reset().
   /// Init() must have been called, AddBatch()/GetNext()/InputDone()
   /// may or may not have been called.
-  Status Reset();
+  void Reset();
 
   /// Close the Sorter and free resources.
   void Close();
@@ -134,7 +137,7 @@ class Sorter {
   /// 'sorted_runs_'.  The Sorter sets the 'deep_copy_input' flag to true for the
   /// merger, since the blocks containing input run data will be deleted as input
   /// runs are read.
-  Status CreateMerger(int max_num_runs);
+  Status CreateMerger(int max_num_runs) WARN_UNUSED_RESULT;
 
   /// Repeatedly replaces multiple smaller runs in sorted_runs_ with a single larger
   /// merged run until there are few enough runs to be merged with a single merger.
@@ -143,15 +146,15 @@ class Sorter {
   /// a merge. If the number of sorted runs is too large, merge sets of smaller runs
   /// into large runs until a final merge can be performed. An intermediate row batch
   /// containing deep copied rows is used for the output of each intermediate merge.
-  Status MergeIntermediateRuns();
+  Status MergeIntermediateRuns() WARN_UNUSED_RESULT;
 
   /// Execute a single step of the intermediate merge, pulling rows from 'merger_'
   /// and adding them to 'merged_run'.
-  Status ExecuteIntermediateMerge(Sorter::Run* merged_run);
+  Status ExecuteIntermediateMerge(Sorter::Run* merged_run) WARN_UNUSED_RESULT;
 
   /// Called once there no more rows to be added to 'unsorted_run_'. Sorts
   /// 'unsorted_run_' and appends it to the list of sorted runs.
-  Status SortCurrentInputRun();
+  Status SortCurrentInputRun() WARN_UNUSED_RESULT;
 
   /// Helper that cleans up all runs in the sorter.
   void CleanupAllRuns();

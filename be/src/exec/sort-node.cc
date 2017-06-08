@@ -54,7 +54,7 @@ Status SortNode::Prepare(RuntimeState* state) {
   sorter_.reset(
       new Sorter(*less_than_.get(), sort_exec_exprs_.sort_tuple_slot_expr_ctxs(),
           &row_descriptor_, mem_tracker(), runtime_profile(), state));
-  RETURN_IF_ERROR(sorter_->Init());
+  RETURN_IF_ERROR(sorter_->Prepare());
   AddCodegenDisabledMessage(state);
   return Status::OK();
 }
@@ -75,6 +75,7 @@ Status SortNode::Open(RuntimeState* state) {
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
   RETURN_IF_ERROR(child(0)->Open(state));
+  RETURN_IF_ERROR(sorter_->Open());
 
   // The child has been opened and the sorter created. Sort the input.
   // The final merge is done on-demand as rows are requested in GetNext().
