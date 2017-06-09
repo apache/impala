@@ -54,7 +54,7 @@ STRING, STRING, STRING
 ---- QUERY
 # Creating a table from a file containing parquet logical types
 # used to annotate string columns (UTF8, ENUM).
-create table $DATABASE.like_enumtype_file like parquet
+create external table $DATABASE.like_enumtype_file like parquet
 '$FILESYSTEM_PREFIX/test-warehouse/schemas/enum/enum.parquet'
 STORED AS PARQUET
 LOCATION '$FILESYSTEM_PREFIX/test-warehouse/schemas/enum'
