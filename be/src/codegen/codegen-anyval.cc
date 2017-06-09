@@ -699,7 +699,11 @@ Value* CodegenAnyVal::Compare(CodegenAnyVal* other, const char* name) {
   Value* void_v1 = builder_->CreateBitCast(v1, codegen_->ptr_type());
   Value* v2 = other->ToNativePtr();
   Value* void_v2 = builder_->CreateBitCast(v2, codegen_->ptr_type());
-  Value* type_ptr = codegen_->GetPtrTo(builder_, type_.ToIR(codegen_), "type");
+  // Create a global constant of the values' ColumnType. It needs to be a constant
+  // for constant propagation and dead code elimination in 'compare_fn'.
+  Type* col_type = codegen_->GetType(ColumnType::LLVM_CLASS_NAME);
+  Constant* type_ptr =
+      codegen_->ConstantToGVPtr(col_type, type_.ToIR(codegen_), "type");
   Function* compare_fn = codegen_->GetFunction(IRFunction::RAW_VALUE_COMPARE, false);
   Value* args[] = { void_v1, void_v2, type_ptr };
   return builder_->CreateCall(compare_fn, args, name);

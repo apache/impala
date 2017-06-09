@@ -26,7 +26,8 @@
 
 using namespace impala;
 
-int RawValue::Compare(const void* v1, const void* v2, const ColumnType& type) {
+int IR_ALWAYS_INLINE RawValue::Compare(
+    const void* v1, const void* v2, const ColumnType& type) noexcept {
   const StringValue* string_value1;
   const StringValue* string_value2;
   const TimestampValue* ts_value1;
@@ -106,8 +107,8 @@ int RawValue::Compare(const void* v1, const void* v2, const ColumnType& type) {
   };
 }
 
-uint32_t IR_ALWAYS_INLINE RawValue::GetHashValue(const void* v, const ColumnType& type,
-    uint32_t seed) noexcept {
+uint32_t IR_ALWAYS_INLINE RawValue::GetHashValue(
+    const void* v, const ColumnType& type, uint32_t seed) noexcept {
   // The choice of hash function needs to be consistent across all hosts of the cluster.
 
   // Use HashCombine with arbitrary constant to ensure we don't return seed.

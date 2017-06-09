@@ -60,7 +60,8 @@ class RuntimeFilter {
   /// not in that 'bloom_filter_'. Otherwise returns true. Is safe to call concurrently
   /// with SetBloomFilter(). 'val' is a value derived from evaluating a tuple row against
   /// the expression of the owning filter context. 'col_type' is the value's type.
-  bool Eval(void* val, const ColumnType& col_type) const noexcept;
+  /// Inlined in IR so that the constant 'col_type' can be propagated.
+  bool IR_ALWAYS_INLINE Eval(void* val, const ColumnType& col_type) const noexcept;
 
   /// Returns the amount of time waited since registration for the filter to
   /// arrive. Returns 0 if filter has not yet arrived.

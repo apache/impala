@@ -54,15 +54,16 @@ class RawValue {
                                 std::stringstream* stream);
 
   /// Returns hash value for 'v' interpreted as 'type'.  The resulting hash value
-  /// is combined with the seed value.
+  /// is combined with the seed value. Inlined in IR so that the constant 'type' can be
+  /// propagated.
   static uint32_t IR_ALWAYS_INLINE GetHashValue(
       const void* v, const ColumnType& type, uint32_t seed = 0) noexcept;
 
   /// Templatized version of GetHashValue, use if type is known ahead. GetHashValue
-  /// handles nulls.
+  /// handles nulls. Inlined in IR so that the constant 'type' can be propagated.
   template<typename T>
-  static inline uint32_t IR_ALWAYS_INLINE GetHashValue(const T* v, const ColumnType& type,
-      uint32_t seed = 0) noexcept;
+  static inline uint32_t IR_ALWAYS_INLINE GetHashValue(
+      const T* v, const ColumnType& type, uint32_t seed = 0) noexcept;
 
   /// Returns hash value for non-nullable 'v' for type T. GetHashValueNonNull doesn't
   /// handle nulls.
@@ -79,7 +80,9 @@ class RawValue {
 
   /// Compares both values.
   /// Return value is < 0  if v1 < v2, 0 if v1 == v2, > 0 if v1 > v2.
-  static int Compare(const void* v1, const void* v2, const ColumnType& type);
+  /// Inlined in IR so that the constant 'type' can be propagated.
+  static int IR_ALWAYS_INLINE Compare(
+      const void* v1, const void* v2, const ColumnType& type) noexcept;
 
   /// Writes the bytes of a given value into the slot of a tuple.
   /// For string values, the string data is copied into memory allocated from 'pool'

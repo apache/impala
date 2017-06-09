@@ -21,7 +21,8 @@
 
 using namespace impala;
 
-bool RuntimeFilter::Eval(void* val, const ColumnType& col_type) const noexcept {
+bool IR_ALWAYS_INLINE RuntimeFilter::Eval(
+    void* val, const ColumnType& col_type) const noexcept {
   // Safe to read bloom_filter_ concurrently with any ongoing SetBloomFilter() thanks
   // to a) the atomicity of / pointer assignments and b) the x86 TSO memory model.
   if (bloom_filter_ == BloomFilter::ALWAYS_TRUE_FILTER) return true;
