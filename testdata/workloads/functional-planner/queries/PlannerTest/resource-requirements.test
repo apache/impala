@@ -676,6 +676,7 @@ select * from functional.alltypes where 1 = 2
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=10.00MB
+Codegen disabled by planner
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 PLAN-ROOT SINK
@@ -687,6 +688,7 @@ PLAN-ROOT SINK
 ---- PARALLELPLANS
 Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=10.00MB
+Codegen disabled by planner
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 PLAN-ROOT SINK
@@ -702,6 +704,7 @@ from functional.alltypes
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=40.00MB
 Per-Host Resource Estimates: Memory=24.00MB
+Codegen disabled by planner
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 PLAN-ROOT SINK
@@ -738,6 +741,7 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 ---- PARALLELPLANS
 Per-Host Resource Reservation: Memory=80.00MB
 Per-Host Resource Estimates: Memory=48.00MB
+Codegen disabled by planner
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 PLAN-ROOT SINK
@@ -1080,6 +1084,7 @@ where year=2009 and month=05
 ---- DISTRIBUTEDPLAN
 Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=16.03MB
+Codegen disabled by planner
 
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
@@ -1096,6 +1101,7 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 ---- PARALLELPLANS
 Per-Host Resource Reservation: Memory=0B
 Per-Host Resource Estimates: Memory=32.03MB
+Codegen disabled by planner
 
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
 WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]

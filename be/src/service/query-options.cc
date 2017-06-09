@@ -366,8 +366,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
         StringParser::ParseResult status;
         int val = StringParser::StringToInt<int>(value.c_str(), value.size(), &status);
         if (status != StringParser::PARSE_SUCCESS) {
-          return Status(Substitute("Invalid number of runtime filters: '$0'.",
-              value.c_str()));
+          return Status(Substitute("Invalid number of runtime filters: '$0'.", value));
         }
         if (val < 0) {
           return Status(Substitute("Invalid number of runtime filters: '$0'. "
@@ -491,6 +490,19 @@ Status impala::SetQueryOption(const string& key, const string& value,
           return Status(Substitute("Invalid default_join_distribution_mode '$0'. "
               "Valid values are BROADCAST or SHUFFLE", value));
         }
+        break;
+      }
+      case TImpalaQueryOptions::DISABLE_CODEGEN_ROWS_THRESHOLD: {
+        StringParser::ParseResult status;
+        int val = StringParser::StringToInt<int>(value.c_str(), value.size(), &status);
+        if (status != StringParser::PARSE_SUCCESS) {
+          return Status(Substitute("Invalid threshold: '$0'.", value));
+        }
+        if (val < 0) {
+          return Status(Substitute(
+              "Invalid threshold: '$0'. Only positive values are allowed.", val));
+        }
+        query_options->__set_disable_codegen_rows_threshold(val);
         break;
       }
       default:

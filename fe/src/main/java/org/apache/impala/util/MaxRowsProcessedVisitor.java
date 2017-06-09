@@ -17,8 +17,9 @@
 
 package org.apache.impala.util;
 
-import org.apache.impala.planner.NestedLoopJoinNode;
-import org.apache.impala.planner.HashJoinNode;
+import com.google.common.base.Preconditions;
+import org.apache.impala.planner.JoinNode;
+import org.apache.impala.planner.PlanFragment;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.planner.ScanNode;
 
@@ -27,40 +28,67 @@ import org.apache.impala.planner.ScanNode;
  */
 public class MaxRowsProcessedVisitor implements Visitor<PlanNode> {
 
-  private boolean abort_ = false;
-  private long result_ = -1l;
+  // True if we should abort because we don't have valid estimates
+  // for a plan node.
+  private boolean valid_ = true;
+  private boolean foundJoinNode_ = false;
+
+  // Max number of rows processed across all instances of a plan node.
+  private long maxRowsProcessed_ = 0;
+
+  // Max number of rows processed per backend impala daemon for a plan node.
+  private long maxRowsProcessedPerNode_ = 0;
 
   @Override
   public void visit(PlanNode caller) {
-    if (abort_) return;
+    if (!valid_) return;
+    if (caller instanceof JoinNode) foundJoinNode_ = true;
 
+    PlanFragment fragment = caller.getFragment();
+    int numNodes = fragment == null ? 1 : fragment.getNumNodes();
     if (caller instanceof ScanNode) {
-      long tmp = caller.getInputCardinality();
+      long numRows = caller.getInputCardinality();
       ScanNode scan = (ScanNode) caller;
       boolean missingStats = scan.isTableMissingStats() || scan.hasCorruptTableStats();
       // In the absence of collection stats, treat scans on collections as if they
       // have no limit.
-      if (scan.isAccessingCollectionType() || (missingStats && !scan.hasLimit())) {
-        abort_ = true;
+      if (scan.isAccessingCollectionType()
+          || (missingStats && !(scan.hasLimit() && scan.getConjuncts().isEmpty()))) {
+        valid_ = false;
         return;
       }
-      result_ = Math.max(result_, tmp);
-    } else if (caller instanceof HashJoinNode || caller instanceof NestedLoopJoinNode) {
-      // Revisit when multiple scan nodes can be executed in a single fragment, IMPALA-561
-      abort_ = true;
-      return;
+      maxRowsProcessed_ = Math.max(maxRowsProcessed_, numRows);
+      maxRowsProcessedPerNode_ = Math.max(maxRowsProcessedPerNode_,
+          (long)Math.ceil(numRows / (double)numNodes));
     } else {
       long in = caller.getInputCardinality();
       long out = caller.getCardinality();
       if ((in == -1) || (out == -1)) {
-        abort_ = true;
+        valid_ = false;
         return;
       }
-      result_ = Math.max(result_, Math.max(in, out));
+      long numRows = Math.max(in, out);
+      maxRowsProcessed_ = Math.max(maxRowsProcessed_, numRows);
+      maxRowsProcessedPerNode_ = Math.max(maxRowsProcessedPerNode_,
+          (long)Math.ceil(numRows / (double)numNodes));
     }
   }
 
-  public long get() {
-    return abort_ ? -1 : result_;
+  public boolean valid() { return valid_; }
+
+  public long getMaxRowsProcessed() {
+    Preconditions.checkState(valid_);
+    return maxRowsProcessed_;
   }
+
+  public long getMaxRowsProcessedPerNode() {
+    Preconditions.checkState(valid_);
+    return maxRowsProcessedPerNode_;
+  }
+
+  public boolean foundJoinNode() {
+    Preconditions.checkState(valid_);
+    return foundJoinNode_;
+  }
+
 }

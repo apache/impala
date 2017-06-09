@@ -35,7 +35,7 @@ class TQueryOptions;
 // the DCHECK.
 #define QUERY_OPTS_TABLE\
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),\
-      TImpalaQueryOptions::DEFAULT_JOIN_DISTRIBUTION_MODE + 1);\
+      TImpalaQueryOptions::DISABLE_CODEGEN_ROWS_THRESHOLD + 1);\
   QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED)\
   QUERY_OPT_FN(abort_on_error, ABORT_ON_ERROR)\
   QUERY_OPT_FN(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS)\
@@ -92,6 +92,7 @@ class TQueryOptions;
   QUERY_OPT_FN(parquet_array_resolution, PARQUET_ARRAY_RESOLUTION)\
   QUERY_OPT_FN(parquet_read_statistics, PARQUET_READ_STATISTICS)\
   QUERY_OPT_FN(default_join_distribution_mode, DEFAULT_JOIN_DISTRIBUTION_MODE)\
+  QUERY_OPT_FN(disable_codegen_rows_threshold, DISABLE_CODEGEN_ROWS_THRESHOLD)\
   ;
 
 

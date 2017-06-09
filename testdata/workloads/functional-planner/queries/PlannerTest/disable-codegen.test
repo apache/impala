@@ -1,0 +1,232 @@
+# Rows per node is < 3000: codegen should be disabled.
+select count(*) from functional.alltypes
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=138.00MB
+Codegen disabled by planner
+
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(*)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Rows per node is > 3000: codegen should be enabled.
+select count(*) from functional.alltypesagg
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=90.00MB
+
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(*)
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 files=11 size=814.73KB
+====
+# No stats on functional_parquet: codegen should be disabled.
+select count(*) from functional_parquet.alltypes
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=20.00MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+functional_parquet.alltypes
+
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(*)
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=178.13KB
+====
+# > 3000 rows returned to coordinator: codegen should be enabled
+select * from functional_parquet.alltypes
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=128.00MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+functional_parquet.alltypes
+
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partitions=24/24 files=24 size=178.13KB
+====
+# Optimisation is enabled for join producing < 3000 rows
+select count(*)
+from functional.alltypes t1
+join functional.alltypestiny t2 on t1.id = t2.id
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=136.00MB
+Per-Host Resource Estimates: Memory=138.00MB
+Codegen disabled by planner
+
+PLAN-ROOT SINK
+|
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE
+|  output: count(*)
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
+|
+|--04:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypestiny t2]
+|     partitions=4/4 files=4 size=460B
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.id
+====
+# Optimisation is disabled by cross join producing > 3000 rows
+select count(*) from functional.alltypes t1, functional.alltypes t2
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=138.00MB
+
+PLAN-ROOT SINK
+|
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE
+|  output: count(*)
+|
+02:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|
+|--04:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Optimisation is enabled for union producing < 3000 rows
+select count(*) from (
+  select * from functional.alltypes
+  union all
+  select * from functional.alltypestiny) v
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=170.00MB
+Codegen disabled by planner
+
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE
+|  output: count(*)
+|
+00:UNION
+|  pass-through-operands: all
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 files=4 size=460B
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Optimisation is disabled by union producing > 3000 rows
+select count(*) from (
+  select * from functional.alltypes
+  union all
+  select * from functional.alltypes) v
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=266.00MB
+
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE
+|  output: count(*)
+|
+00:UNION
+|  pass-through-operands: all
+|
+|--02:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Scan with limit on large table: the number of rows scanned is bounded,
+# codegen should be disabled
+select sum(l_discount)
+from (select * from tpch.lineitem limit 1000) v
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=274.00MB
+Codegen disabled by planner
+
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum(tpch.lineitem.l_discount)
+|
+02:EXCHANGE [UNPARTITIONED]
+|  limit: 1000
+|
+00:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 files=1 size=718.94MB
+   limit: 1000
+====
+# Scan with limit and predicates on large table: any number of rows could be scanned:
+# codegen should be enabled
+select sum(l_discount)
+from (select * from tpch.lineitem where l_orderkey > 100 limit 1000) v
+---- DISTRIBUTEDPLAN
+Per-Host Resource Reservation: Memory=0B
+Per-Host Resource Estimates: Memory=274.00MB
+
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum(tpch.lineitem.l_discount)
+|
+02:EXCHANGE [UNPARTITIONED]
+|  limit: 1000
+|
+00:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 files=1 size=718.94MB
+   predicates: l_orderkey > 100
+   limit: 1000
+====

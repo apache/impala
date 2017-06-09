@@ -38,7 +38,6 @@ import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExplainLevel;
-import org.apache.impala.thrift.TPartitionType;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryExecRequest;
 import org.apache.impala.thrift.TQueryOptions;
@@ -91,24 +90,7 @@ public class Planner {
     ctx_.getAnalysisResult().getTimeline().markEvent("Single node plan created");
     ArrayList<PlanFragment> fragments = null;
 
-    // Determine the maximum number of rows processed by any node in the plan tree
-    MaxRowsProcessedVisitor visitor = new MaxRowsProcessedVisitor();
-    singleNodePlan.accept(visitor);
-    long maxRowsProcessed = visitor.get() == -1 ? Long.MAX_VALUE : visitor.get();
-    boolean isSmallQuery =
-        maxRowsProcessed < ctx_.getQueryOptions().exec_single_node_rows_threshold;
-    if (isSmallQuery) {
-      // Execute on a single node and disable codegen for small results
-      ctx_.getQueryOptions().setNum_nodes(1);
-      ctx_.getQueryCtx().disable_codegen_hint = true;
-      if (maxRowsProcessed < ctx_.getQueryOptions().batch_size ||
-          maxRowsProcessed < 1024 && ctx_.getQueryOptions().batch_size == 0) {
-        // Only one scanner thread for small queries
-        ctx_.getQueryOptions().setNum_scanner_threads(1);
-      }
-      // disable runtime filters
-      ctx_.getQueryOptions().setRuntime_filter_mode(TRuntimeFilterMode.OFF);
-    }
+    checkForSmallQueryOptimization(singleNodePlan);
 
     // Join rewrites.
     invertJoins(singleNodePlan, ctx_.isSingleNodeExec());
@@ -166,6 +148,10 @@ public class Planner {
       resultExprs = queryStmt.getResultExprs();
     }
     rootFragment.setOutputExprs(resultExprs);
+
+    // The check for disabling codegen uses estimates of rows per node so must be done
+    // on the distributed plan.
+    checkForDisableCodegen(rootFragment.getPlanRoot());
 
     if (LOG.isTraceEnabled()) {
       LOG.trace("desctbl: " + ctx_.getRootAnalyzer().getDescTbl().debugString());
@@ -278,6 +264,9 @@ public class Planner {
       str.append(String.format("Per-Host Resource Estimates: Memory=%s\n",
           PrintUtils.printBytes(request.getPer_host_mem_estimate())));
       hasHeader = true;
+    }
+    if (request.query_ctx.disable_codegen_hint) {
+      str.append("Codegen disabled by planner\n");
     }
 
     // IMPALA-1983 In the case of corrupt stats, issue a warning for all queries except
@@ -480,6 +469,42 @@ public class Planner {
     newJoinNode.setId(joinNode.getId());
     newJoinNode.init(analyzer);
     return newJoinNode;
+  }
+
+  private void checkForSmallQueryOptimization(PlanNode singleNodePlan) {
+    MaxRowsProcessedVisitor visitor = new MaxRowsProcessedVisitor();
+    singleNodePlan.accept(visitor);
+    // TODO: IMPALA-3335: support the optimization for plans with joins.
+    if (!visitor.valid() || visitor.foundJoinNode()) return;
+    // This optimization executes the plan on a single node so the threshold must
+    // be based on the total number of rows processed.
+    long maxRowsProcessed = visitor.getMaxRowsProcessed();
+    int threshold = ctx_.getQueryOptions().exec_single_node_rows_threshold;
+    if (maxRowsProcessed < threshold) {
+      // Execute on a single node and disable codegen for small results
+      ctx_.getQueryOptions().setNum_nodes(1);
+      ctx_.getQueryCtx().disable_codegen_hint = true;
+      if (maxRowsProcessed < ctx_.getQueryOptions().batch_size ||
+          maxRowsProcessed < 1024 && ctx_.getQueryOptions().batch_size == 0) {
+        // Only one scanner thread for small queries
+        ctx_.getQueryOptions().setNum_scanner_threads(1);
+      }
+      // disable runtime filters
+      ctx_.getQueryOptions().setRuntime_filter_mode(TRuntimeFilterMode.OFF);
+    }
+  }
+
+  private void checkForDisableCodegen(PlanNode distributedPlan) {
+    MaxRowsProcessedVisitor visitor = new MaxRowsProcessedVisitor();
+    distributedPlan.accept(visitor);
+    if (!visitor.valid()) return;
+    // This heuristic threshold tries to determine if the per-node codegen time will
+    // reduce per-node execution time enough to justify the cost of codegen. Per-node
+    // execution time is correlated with the number of rows flowing through the plan.
+    if (visitor.getMaxRowsProcessedPerNode()
+        < ctx_.getQueryOptions().getDisable_codegen_rows_threshold()) {
+      ctx_.getQueryCtx().disable_codegen_hint = true;
+    }
   }
 
   /**

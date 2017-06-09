@@ -255,7 +255,7 @@ public class KuduScanNode extends ScanNode {
   protected void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     // Update the number of nodes to reflect the hosts that have relevant data.
-    numNodes_ = hostIndexSet_.size();
+    numNodes_ = Math.max(1, hostIndexSet_.size());
 
     // Update the cardinality
     inputCardinality_ = cardinality_ = kuduTable_.getNumRows();

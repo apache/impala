@@ -1,0 +1,30 @@
+====
+---- QUERY
+# alltypes has 7300 rows - codegen should be enabled if there
+# are < 1000 backend daemons.
+set disable_codegen_rows_threshold=8;
+select count(*) from alltypes t1
+  join alltypestiny t2 on t1.id = t2.id
+---- RESULTS
+8
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+# Verify that codegen was enabled for join and scan
+row_regex: .*Build Side Codegen Enabled.*
+row_regex: .*TEXT Codegen Enabled.*
+====
+---- QUERY
+# alltypes has 7300 rows - codegen should be disabled regardless
+# of # of backend impala daemons.
+set disable_codegen_rows_threshold=8000;
+select count(*) from alltypes t1
+  join alltypestiny t2 on t1.id = t2.id
+---- RESULTS
+8
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+# Verify that codegen was disabled
+row_regex: .*Codegen Disabled: disabled due to optimization hints.*
+====

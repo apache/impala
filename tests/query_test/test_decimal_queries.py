@@ -34,7 +34,9 @@ class TestDecimalQueries(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
       create_exec_option_dimension_from_dict({
         'decimal_v2' : ['false', 'true'],
-        'batch_size' : [0, 1]}))
+        'batch_size' : [0, 1],
+        'disable_codegen' : ['false', 'true'],
+        'disable_codegen_rows_threshold' : [0]}))
     # Hive < 0.11 does not support decimal so we can't run these tests against the other
     # file formats.
     # TODO: Enable them on Hive >= 0.11.

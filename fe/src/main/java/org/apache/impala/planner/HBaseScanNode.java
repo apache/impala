@@ -218,7 +218,7 @@ public class HBaseScanNode extends ScanNode {
     }
 
     // TODO: take actual regions into account
-    numNodes_ = tbl.getNumNodes();
+    numNodes_ = Math.max(1, tbl.getNumNodes());
     if (LOG.isTraceEnabled()) {
       LOG.trace("computeStats HbaseScan: #nodes=" + Integer.toString(numNodes_));
     }

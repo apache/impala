@@ -253,6 +253,13 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testDisableCodegenOptimization() {
+    TQueryOptions options = new TQueryOptions();
+    options.setDisable_codegen_rows_threshold(3000);
+    runPlannerTestFile("disable-codegen", options, false);
+  }
+
+  @Test
   public void testSingleNodeNlJoin() {
     TQueryOptions options = new TQueryOptions();
     options.setNum_nodes(1);

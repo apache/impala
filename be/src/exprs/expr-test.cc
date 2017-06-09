@@ -7312,6 +7312,7 @@ int main(int argc, char **argv) {
   executor_->PushExecOption("ENABLE_EXPR_REWRITES=0");
   executor_->PushExecOption("DISABLE_CODEGEN=0");
   executor_->PushExecOption("EXEC_SINGLE_NODE_ROWS_THRESHOLD=0");
+  executor_->PushExecOption("DISABLE_CODEGEN_ROWS_THRESHOLD=0");
   cout << endl << "Running with codegen" << endl;
   ret = RUN_ALL_TESTS();
   if (ret != 0) return ret;

@@ -29,6 +29,7 @@ explain select id from alltypes;
 ---- RESULTS: VERIFY_IS_EQUAL
 'Per-Host Resource Reservation: Memory=0B'
 'Per-Host Resource Estimates: Memory=16.00MB'
+'Codegen disabled by planner'
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 'PLAN-ROOT SINK'
@@ -50,6 +51,7 @@ explain select id from alltypes where month in (1, 2, 3);
 ---- RESULTS: VERIFY_IS_EQUAL
 'Per-Host Resource Reservation: Memory=0B'
 'Per-Host Resource Estimates: Memory=16.00MB'
+'Codegen disabled by planner'
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 'PLAN-ROOT SINK'
@@ -96,6 +98,7 @@ explain select id from alltypes where year = 2010;
 ---- RESULTS: VERIFY_IS_EQUAL
 'Per-Host Resource Reservation: Memory=0B'
 'Per-Host Resource Estimates: Memory=16.00MB'
+'Codegen disabled by planner'
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 'PLAN-ROOT SINK'
@@ -118,6 +121,7 @@ explain select id from alltypes where year = 2010;
 ---- RESULTS: VERIFY_IS_EQUAL
 'Per-Host Resource Reservation: Memory=0B'
 'Per-Host Resource Estimates: Memory=16.00MB'
+'Codegen disabled by planner'
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 'PLAN-ROOT SINK'

@@ -150,6 +150,7 @@ class TestScannersFuzzing(ImpalaTestSuite):
       query_options = copy(vector.get_value('exec_option'))
       query_options['batch_size'] = batch_size
       query_options['disable_codegen'] = disable_codegen
+      query_options['disable_codegen_rows_threshold'] = 0
       try:
         result = self.execute_query(query, query_options = query_options)
         LOG.info('\n'.join(result.log))

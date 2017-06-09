@@ -261,6 +261,7 @@ class TestUdfExecution(TestUdfBase):
     super(TestUdfExecution, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
         create_exec_option_dimension_from_dict({"disable_codegen" : [False, True],
+          "disable_codegen_rows_threshold" : [0],
           "exec_single_node_rows_threshold" : [0,100],
           "enable_expr_rewrites" : [False, True]}))
     # There is no reason to run these tests using all dimensions.

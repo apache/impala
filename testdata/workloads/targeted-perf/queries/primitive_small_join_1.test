@@ -1,0 +1,10 @@
+====
+---- QUERY: primitive_small_join_1
+-- Description : join with small input on both sides
+-- Target test case : Small queries where cost of codegen exceeds benefit.
+SELECT count(*)
+FROM (SELECT * FROM customer LIMIT 100000) c
+JOIN nation ON c_nationkey = n_nationkey
+---- RESULTS
+---- TYPES
+====
