@@ -550,10 +550,14 @@ bool HdfsScanNodeBase::FilePassesFilterPredicates(const vector<FilterContext>& f
 
 bool HdfsScanNodeBase::WaitForRuntimeFilters(int32_t time_ms) {
   vector<string> arrived_filter_ids;
+  vector<string> missing_filter_ids;
   int32_t start = MonotonicMillis();
   for (auto& ctx: filter_ctxs_) {
+    string filter_id = Substitute("$0", ctx.filter->id());
     if (ctx.filter->WaitForArrival(time_ms)) {
-      arrived_filter_ids.push_back(Substitute("$0", ctx.filter->id()));
+      arrived_filter_ids.push_back(filter_id);
+    } else {
+      missing_filter_ids.push_back(filter_id);
     }
   }
   int32_t end = MonotonicMillis();
@@ -566,8 +570,9 @@ bool HdfsScanNodeBase::WaitForRuntimeFilters(int32_t time_ms) {
     return true;
   }
 
-  const string& filter_str = Substitute("Only following filters arrived: $0, waited $1",
-      join(arrived_filter_ids, ", "), wait_time);
+  const string& filter_str = Substitute(
+      "Not all filters arrived (arrived: [$0], missing [$1]), waited for $2",
+      join(arrived_filter_ids, ", "), join(missing_filter_ids, ", "), wait_time);
   runtime_profile()->AddInfoString("Runtime filters", filter_str);
   VLOG_QUERY << filter_str;
   return false;
