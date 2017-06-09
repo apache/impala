@@ -50,7 +50,7 @@ void TestFunction(int batch_size, void* d) {
   }
 }
 
-TEST(BenchmarkTest, Basic) {
+TEST(BenchmarkTest, DISABLED_Basic) {
   MemcpyData data;
   data.src = reinterpret_cast<char*>(malloc(128));
   data.dst = reinterpret_cast<char*>(malloc(128));
