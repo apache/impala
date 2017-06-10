@@ -21,7 +21,12 @@ import logging
 import os
 import sys
 from getpass import getuser
+from requests.packages.urllib3.exceptions import (
+    InsecurePlatformWarning,
+    InsecureRequestWarning,
+    SecurityWarning)
 from tempfile import gettempdir
+from warnings import filterwarnings
 
 from tests.comparison import db_connection
 from tests.comparison.cluster import (
@@ -172,6 +177,10 @@ def add_ssl_options(parser):
   group.add_argument(
       '--use-ssl', action='store_true', default=False,
       help='Use SSL to connect')
+  group.add_argument(
+      '--ca_cert', default=None, metavar='CA cert path',
+      help='Path to optional CA certificate. This is needed to verify SSL requests if '
+           'the Impala certificate is self-signed in a test environment.')
 
 
 def create_cluster(args):
@@ -187,6 +196,27 @@ def create_cluster(args):
   cluster.hadoop_user_name = args.hadoop_user_name
   cluster.use_kerberos = getattr(args, 'use_kerberos', False)
   cluster.use_ssl = getattr(args, 'use_ssl', False)
+  if cluster.use_ssl:
+    # Prevent excessive warning spam on the console.
+    #
+    # The first warning is related to certificates that do not comply with RFC 2818.
+    # https://github.com/shazow/urllib3/issues/497 . Permit one warning.
+    filterwarnings(
+        'once',
+        'Certificate has no `subjectAltName`',
+        SecurityWarning)
+    # Permit one warning with unverified HTTPS requests
+    filterwarnings(
+        'once',
+        'Unverified HTTPS request is being made',
+        InsecureRequestWarning)
+    # TODO: IMPALA-5264 to fix python environment to prevent InsecurePlatformWarning .
+    # Once we fix that we should remove this suppression.
+    filterwarnings(
+        'once',
+        'A true SSLContext object is not available',
+        InsecurePlatformWarning)
+  cluster.ca_cert = getattr(args, 'ca_cert', None)
   return cluster
 
 

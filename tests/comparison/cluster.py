@@ -78,6 +78,7 @@ class Cluster(object):
     self.hadoop_user_name = getuser()
     self.use_kerberos = False
     self.use_ssl = False
+    self.ca_cert = None
 
     self._hdfs = None
     self._yarn = None
@@ -491,9 +492,15 @@ class Hive(Service):
     return self._warehouse_dir
 
   def connect(self, db_name=None):
-    conn = HiveConnection(host_name=self.hs2_host_name, port=self.hs2_port,
-        user_name=self.cluster.hadoop_user_name, db_name=db_name,
-        use_kerberos=self.cluster.use_kerberos, use_ssl=self.cluster.use_ssl)
+    conn = HiveConnection(
+        host_name=self.hs2_host_name,
+        port=self.hs2_port,
+        user_name=self.cluster.hadoop_user_name,
+        db_name=db_name,
+        use_kerberos=self.cluster.use_kerberos,
+        use_ssl=self.cluster.use_ssl,
+        ca_cert=self.cluster.ca_cert,
+    )
     conn.cluster = self.cluster
     return conn
 
@@ -525,9 +532,15 @@ class Impala(Service):
   def connect(self, db_name=None, impalad=None):
     if not impalad:
       impalad = choice(self.impalads)
-    conn = ImpalaConnection(host_name=impalad.host_name, port=impalad.hs2_port,
-        user_name=self.cluster.hadoop_user_name, db_name=db_name,
-        use_kerberos=self.cluster.use_kerberos, use_ssl=self.cluster.use_ssl)
+    conn = ImpalaConnection(
+        host_name=impalad.host_name,
+        port=impalad.hs2_port,
+        user_name=self.cluster.hadoop_user_name,
+        db_name=db_name,
+        use_kerberos=self.cluster.use_kerberos,
+        use_ssl=self.cluster.use_ssl,
+        ca_cert=self.cluster.ca_cert,
+    )
     conn.cluster = self.cluster
     return conn
 
@@ -774,9 +787,9 @@ class Impalad(object):
         port=self.web_ui_port,
         url=relative_url)
     try:
-      # verify=False is needed because of self-signed certifiates
-      # TODO: support a CA bundle that users could point to instead
-      resp = requests.get(url, params=params, timeout=timeout_secs, verify=False)
+      verify_ca = self.cluster.ca_cert if self.cluster.ca_cert is not None else False
+      resp = requests.get(url, params=params, timeout=timeout_secs,
+                          verify=verify_ca)
     except requests.exceptions.Timeout as e:
       raise Timeout(underlying_exception=e)
     resp.raise_for_status()
