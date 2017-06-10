@@ -117,7 +117,11 @@ void RawValue::Write(const void* value, void* dst, const ColumnType& type,
     case TYPE_NULL:
       break;
     case TYPE_BOOLEAN:
-      *reinterpret_cast<bool*>(dst) = *reinterpret_cast<const bool*>(value);
+      // Unlike the other scalar types, bool has a limited set of valid values, so if
+      // 'dst' is uninitialized memory and happens to point to a value that is not a valid
+      // bool, then dereferencing it via *reinterpret_cast<bool*>(dst) is undefined
+      // behavior.
+      memcpy(dst, value, sizeof(bool));
       break;
     case TYPE_TINYINT:
       *reinterpret_cast<int8_t*>(dst) = *reinterpret_cast<const int8_t*>(value);
