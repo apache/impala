@@ -111,20 +111,27 @@ for ((i=1; i <= HBASE_START_RETRY_ATTEMPTS; ++i)); do
     if ! ${HBASE_HOME}/bin/start-hbase.sh 2>&1 | tee -a ${HBASE_LOGDIR}/hbase-startup.out
     then
       echo "HBase Master startup failed"
-    elif ! ${HBASE_HOME}/bin/local-regionservers.sh start 2 3 2>&1 | \
+      continue
+    fi
+    if ! ${HBASE_HOME}/bin/local-regionservers.sh start 2 3 2>&1 | \
         tee -a ${HBASE_LOGDIR}/hbase-rs-startup.out
     then
       echo "HBase regionserver startup failed"
-    else
-      break
+      continue
     fi
+    if ! ${CLUSTER_BIN}/check-hbase-nodes.py; then
+      echo "HBase nodes did not come online"
+      continue
+    fi
+    # If we made it to here, HBase started up correctly so we can stop the retry logic.
+    break
   else
     # In the last iteration, it's fine for errexit to do its thing.
     ${HBASE_HOME}/bin/start-hbase.sh 2>&1 | tee -a ${HBASE_LOGDIR}/hbase-startup.out
     ${HBASE_HOME}/bin/local-regionservers.sh start 2 3 2>&1 | \
         tee -a ${HBASE_LOGDIR}/hbase-rs-startup.out
+    ${CLUSTER_BIN}/check-hbase-nodes.py
   fi
 
 done
-${CLUSTER_BIN}/check-hbase-nodes.py
 echo "HBase startup scripts succeeded"
