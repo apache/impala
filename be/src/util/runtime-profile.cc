@@ -761,13 +761,10 @@ void RuntimeProfile::ToThrift(TRuntimeProfileTree* tree) const {
 }
 
 void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
-  nodes->reserve(nodes->size() + children_.size());
-
   int index = nodes->size();
   nodes->push_back(TRuntimeProfileNode());
   TRuntimeProfileNode& node = (*nodes)[index];
   node.name = name_;
-  node.num_children = children_.size();
   node.metadata = metadata_;
   node.indent = true;
 
@@ -839,6 +836,7 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
   {
     lock_guard<SpinLock> l(children_lock_);
     children = children_;
+    node.num_children = children_.size();
   }
   for (int i = 0; i < children.size(); ++i) {
     int child_idx = nodes->size();
