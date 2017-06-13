@@ -173,11 +173,15 @@ public class InPredicate extends Predicate {
     // TODO: Fix selectivity_ for nested predicate
     Reference<SlotRef> slotRefRef = new Reference<SlotRef>();
     Reference<Integer> idxRef = new Reference<Integer>();
-    if (isSingleColumnPredicate(slotRefRef, idxRef)
-        && idxRef.getRef() == 0
+    if (isSingleColumnPredicate(slotRefRef, idxRef) && idxRef.getRef() == 0
         && slotRefRef.getRef().getNumDistinctValues() > 0) {
-      selectivity_ = (double) (getChildren().size() - 1)
-          / (double) slotRefRef.getRef().getNumDistinctValues();
+      if (isNotIn()) {
+        selectivity_ = 1.0 - ((double) (getChildren().size() - 1)
+            / (double) slotRefRef.getRef().getNumDistinctValues());
+      } else {
+        selectivity_ = (double) (getChildren().size() - 1)
+            / (double) slotRefRef.getRef().getNumDistinctValues();
+      }
       selectivity_ = Math.max(0.0, Math.min(1.0, selectivity_));
     }
 
