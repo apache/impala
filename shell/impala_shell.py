@@ -1388,7 +1388,7 @@ if __name__ == "__main__":
 
   intro = WELCOME_STRING
   if not options.ssl and options.creds_ok_in_clear and options.use_ldap:
-    intro += ("\n\\nLDAP authentication is enabled, but the connection to Impala is " +
+    intro += ("\n\nLDAP authentication is enabled, but the connection to Impala is "
               "not secured by TLS.\nALL PASSWORDS WILL BE SENT IN THE CLEAR TO IMPALA.\n")
 
   shell = ImpalaShell(options)
