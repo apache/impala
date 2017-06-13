@@ -88,6 +88,8 @@ INSERT OVERWRITE parquet_table SELECT * FROM text_table;
       <b>Default:</b> 0 (produces files with a target size of 256 MB; files might be larger for very wide tables)
     </p>
 
+    <p conref="../shared/impala_common.xml#common/adls_block_splitting"/>
+
     <p conref="../shared/impala_common.xml#common/isilon_blurb"/>
     <p conref="../shared/impala_common.xml#common/isilon_block_size_caveat"/>
 

@@ -288,6 +288,7 @@ under the License.
   <topicref href="topics/impala_kudu.xml"/>
   <topicref href="topics/impala_hbase.xml"/>
   <topicref href="topics/impala_s3.xml"/>
+  <topicref rev="2.9.0" href="topics/impala_adls.xml"/>
   <topicref href="topics/impala_isilon.xml"/>
   <topicref href="topics/impala_logging.xml"/>
   <topicref href="topics/impala_troubleshooting.xml">

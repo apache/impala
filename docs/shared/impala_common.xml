@@ -1069,6 +1069,13 @@ drop database temp;
         <codeph>hadoop fs -cp</codeph>, or <codeph>INSERT</codeph> in Impala or Hive.
       </p>
 
+      <p rev="2.9.0 IMPALA-5333" id="adls_dml_performance">
+        <draft-comment>
+          Currently nothing to say on this subject. Leaving this placeholder
+          in case there are DML performance implications to discuss in future.
+        </draft-comment>
+      </p>
+
       <p rev="2.6.0 IMPALA-1878" id="s3_dml_performance">
         Because of differences between S3 and traditional filesystems, DML operations
         for S3 tables can take longer than for tables on HDFS. For example, both the
@@ -1085,6 +1092,14 @@ drop database temp;
         See <xref href="../topics/impala_s3_skip_insert_staging.xml#s3_skip_insert_staging"/> for details.
       </p>
 
+      <p id="adls_block_splitting" rev="IMPALA-5383">
+        Because ADLS does not expose the block sizes of data files the way HDFS does,
+        any Impala <codeph>INSERT</codeph> or <codeph>CREATE TABLE AS SELECT</codeph> statements
+        use the <codeph>PARQUET_FILE_SIZE</codeph> query option setting to define the size of
+        Parquet data files. (Using a large block size is more important for Parquet tables than
+        for tables that use other file formats.)
+      </p>
+
       <p rev="2.6.0 IMPALA-3453" id="s3_block_splitting">
         In <keyword keyref="impala26_full"/> and higher, Impala queries are optimized for files stored in Amazon S3.
         For Impala tables that use the file formats Parquet, RCFile, SequenceFile,
@@ -1099,6 +1114,13 @@ drop database temp;
         Parquet files written by Impala, increase <codeph>fs.s3a.block.size</codeph>
         to 268435456 (256 MB) to match the row group size produced by Impala.
       </p>
+
+      <note rev="2.9.0 IMPALA-5333" id="adls_production" type="important">
+        <p>
+          Currently, the ADLS support in Impala is preliminary and not
+          fully tested. Do not use Impala with ADLS in a production environment.
+        </p>
+      </note>
 
       <note rev="2.6.0 IMPALA-1878" id="s3_production" type="important">
         <p>
@@ -1124,6 +1146,18 @@ drop database temp;
         as needed in the Amazon S3 system. Prior to <keyword keyref="impala26_full"/>, you had to create folders yourself and point
         Impala database, tables, or partitions at them, and manually remove folders when no longer needed.
         See <xref href="../topics/impala_s3.xml#s3"/> for details about reading and writing S3 data with Impala.
+      </p>
+
+      <p rev="2.9.0 IMPALA-5333" id="adls_dml">
+        In <keyword keyref="impala29_full"/> and higher, the Impala DML statements (<codeph>INSERT</codeph>, <codeph>LOAD DATA</codeph>,
+        and <codeph>CREATE TABLE AS SELECT</codeph>) can write data into a table or partition that resides in the
+        Azure Data Lake Store (ADLS).
+        The syntax of the DML statements is the same as for any other tables, because the ADLS location for tables and
+        partitions is specified by an <codeph>adl://</codeph> prefix in the
+        <codeph>LOCATION</codeph> attribute of
+        <codeph>CREATE TABLE</codeph> or <codeph>ALTER TABLE</codeph> statements.
+        If you bring data into ADLS using the normal ADLS transfer mechanisms instead of Impala DML statements,
+        issue a <codeph>REFRESH</codeph> statement for the table before using Impala to query the ADLS data.
       </p>
 
       <p rev="2.6.0 IMPALA-1878" id="s3_dml">
@@ -2390,6 +2424,10 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
 
       <p id="s3_blurb" rev="2.2.0">
         <b>Amazon S3 considerations:</b>
+      </p>
+
+      <p id="adls_blurb" rev="2.9.0">
+        <b>ADLS considerations:</b>
       </p>
 
       <p id="isilon_blurb" rev="2.2.3">

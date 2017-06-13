@@ -239,6 +239,10 @@ Returned 1 row(s) in 0.62s</codeblock>
     <p conref="../shared/impala_common.xml#common/s3_dml_performance"/>
     <p>See <xref href="../topics/impala_s3.xml#s3"/> for details about reading and writing S3 data with Impala.</p>
 
+    <p conref="../shared/impala_common.xml#common/adls_blurb"/>
+    <p conref="../shared/impala_common.xml#common/adls_dml"/>
+    <p>See <xref href="../topics/impala_adls.xml#adls"/> for details about reading and writing ADLS data with Impala.</p>
+
     <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
 
     <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
