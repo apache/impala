@@ -1918,7 +1918,8 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
   DCHECK((hs2_port == 0) == (hs2_server == nullptr));
   DCHECK((be_port == 0) == (be_server == nullptr));
   if (!FLAGS_is_coordinator && !FLAGS_is_executor) {
-    return Status("Impala server needs to have a role (EXECUTOR, COORDINATOR)");
+    return Status("Impala does not have a valid role configured. "
+        "Either --is_coordinator or --is_executor must be set to true.");
   }
 
   impala_server->reset(new ImpalaServer(exec_env));
