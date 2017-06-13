@@ -42,22 +42,23 @@ using namespace impala;
 InProcessImpalaServer* InProcessImpalaServer::StartWithEphemeralPorts(
     const string& statestore_host, int statestore_port) {
   for (int tries = 0; tries < 10; ++tries) {
-    int backend_port = FindUnusedEphemeralPort();
+    vector<int> used_ports;
+    int backend_port = FindUnusedEphemeralPort(&used_ports);
     if (backend_port == -1) continue;
     // This flag is read directly in several places to find the address of the local
     // backend interface.
     FLAGS_be_port = backend_port;
 
-    int subscriber_port = FindUnusedEphemeralPort();
+    int subscriber_port = FindUnusedEphemeralPort(&used_ports);
     if (subscriber_port == -1) continue;
 
-    int webserver_port = FindUnusedEphemeralPort();
+    int webserver_port = FindUnusedEphemeralPort(&used_ports);
     if (webserver_port == -1) continue;
 
-    int beeswax_port = FindUnusedEphemeralPort();
+    int beeswax_port = FindUnusedEphemeralPort(&used_ports);
     if (beeswax_port == -1) continue;
 
-    int hs2_port = FindUnusedEphemeralPort();
+    int hs2_port = FindUnusedEphemeralPort(&used_ports);
     if (hs2_port == -1) continue;
 
     InProcessImpalaServer* impala =
@@ -134,10 +135,11 @@ Status InProcessImpalaServer::Join() {
 
 InProcessStatestore* InProcessStatestore::StartWithEphemeralPorts() {
   for (int tries = 0; tries < 10; ++tries) {
-    int statestore_port = FindUnusedEphemeralPort();
+    vector<int> used_ports;
+    int statestore_port = FindUnusedEphemeralPort(&used_ports);
     if (statestore_port == -1) continue;
 
-    int webserver_port = FindUnusedEphemeralPort();
+    int webserver_port = FindUnusedEphemeralPort(&used_ports);
     if (webserver_port == -1) continue;
 
     InProcessStatestore* ips = new InProcessStatestore(statestore_port, webserver_port);

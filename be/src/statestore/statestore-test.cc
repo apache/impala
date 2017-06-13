@@ -44,7 +44,7 @@ TEST(StatestoreTest, SmokeTest) {
       new InProcessStatestore(ips->port(), ips->port() + 10);
   ASSERT_FALSE(statestore_wont_start->Start().ok());
 
-  int subscriber_port = FindUnusedEphemeralPort();
+  int subscriber_port = FindUnusedEphemeralPort(nullptr);
   ASSERT_NE(subscriber_port, -1) << "Could not find unused port";
 
   StatestoreSubscriber* sub_will_start = new StatestoreSubscriber("sub1",
@@ -72,7 +72,8 @@ TEST(StatestoreSslTest, SmokeTest) {
   InProcessStatestore* statestore =  InProcessStatestore::StartWithEphemeralPorts();
   if (statestore == NULL) FAIL() << "Unable to start Statestore";
 
-  int subscriber_port = FindUnusedEphemeralPort();
+  vector<int> used_ports;
+  int subscriber_port = FindUnusedEphemeralPort(&used_ports);
   ASSERT_NE(subscriber_port, -1) << "Could not find unused port";
 
   StatestoreSubscriber* sub_will_start = new StatestoreSubscriber("smoke_sub1",
@@ -83,7 +84,7 @@ TEST(StatestoreSslTest, SmokeTest) {
   stringstream invalid_server_cert;
   invalid_server_cert << impala_home << "/be/src/testutil/invalid-server-cert.pem";
   FLAGS_ssl_client_ca_certificate = invalid_server_cert.str();
-  int another_subscriber_port = FindUnusedEphemeralPort();
+  int another_subscriber_port = FindUnusedEphemeralPort(&used_ports);
   ASSERT_NE(another_subscriber_port, -1) << "Could not find unused port";
 
   StatestoreSubscriber* sub_will_not_start = new StatestoreSubscriber("smoke_sub2",

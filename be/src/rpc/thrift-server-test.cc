@@ -64,7 +64,7 @@ boost::shared_ptr<TProcessor> MakeProcessor() {
 }
 
 int GetServerPort() {
-  int port = FindUnusedEphemeralPort();
+  int port = FindUnusedEphemeralPort(nullptr);
   EXPECT_FALSE(port == -1);
   return port;
 }

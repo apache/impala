@@ -22,6 +22,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <limits.h>
+#include <algorithm>
 #include <sstream>
 #include <random>
 #include <vector>
@@ -35,6 +36,7 @@
 
 using boost::algorithm::is_any_of;
 using boost::algorithm::split;
+using std::find;
 using std::random_device;
 
 #ifdef __APPLE__
@@ -176,7 +178,7 @@ ostream& operator<<(ostream& out, const TNetworkAddress& hostport) {
 
 /// Pick a random port in the range of ephemeral ports
 /// https://tools.ietf.org/html/rfc6335
-int FindUnusedEphemeralPort() {
+int FindUnusedEphemeralPort(vector<int>* used_ports) {
   static uint32_t LOWER = 49152, UPPER = 65000;
   random_device rd;
   srand(rd());
@@ -187,17 +189,21 @@ int FindUnusedEphemeralPort() {
   bzero(reinterpret_cast<char*>(&server_address), sizeof(server_address));
   server_address.sin_family = AF_INET;
   server_address.sin_addr.s_addr = INADDR_ANY;
-  for (uint32_t tries = 0; tries < 10; ++tries) {
+  for (int tries = 0; tries < 100; ++tries) {
     int port = LOWER + rand() % (UPPER - LOWER);
+    if (used_ports != nullptr
+        && find(used_ports->begin(), used_ports->end(), port) != used_ports->end()) {
+      continue;
+    }
     server_address.sin_port = htons(port);
     if (bind(sockfd, reinterpret_cast<struct sockaddr*>(&server_address),
         sizeof(server_address)) == 0) {
       close(sockfd);
+      if (used_ports != nullptr) used_ports->push_back(port);
       return port;
     }
   }
   close(sockfd);
   return -1;
 }
-
 }
