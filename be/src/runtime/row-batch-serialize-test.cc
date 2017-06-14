@@ -68,7 +68,7 @@ class RowBatchSerializeTest : public testing::Test {
     TRowBatch trow_batch;
     EXPECT_OK(batch->Serialize(&trow_batch, full_dedup));
 
-    RowBatch deserialized_batch(row_desc, trow_batch, tracker_.get());
+    RowBatch deserialized_batch(&row_desc, trow_batch, tracker_.get());
     if (print_batches) cout << PrintBatch(&deserialized_batch) << endl;
 
     EXPECT_EQ(batch->num_rows(), deserialized_batch.num_rows());
@@ -198,7 +198,7 @@ class RowBatchSerializeTest : public testing::Test {
 
   // Creates a row batch with randomized values.
   RowBatch* CreateRowBatch(const RowDescriptor& row_desc) {
-    RowBatch* batch = pool_.Add(new RowBatch(row_desc, NUM_ROWS, tracker_.get()));
+    RowBatch* batch = pool_.Add(new RowBatch(&row_desc, NUM_ROWS, tracker_.get()));
     int len = row_desc.GetRowSize() * NUM_ROWS;
     uint8_t* tuple_mem = batch->tuple_data_pool()->Allocate(len);
     memset(tuple_mem, 0, len);
@@ -259,7 +259,7 @@ class RowBatchSerializeTest : public testing::Test {
   // order provided, starting at the beginning once all are used.
   void AddTuplesToRowBatch(int num_rows, const vector<vector<Tuple*>>& tuples,
       const vector<int>& repeats, RowBatch* batch) {
-    int tuples_per_row = batch->row_desc().tuple_descriptors().size();
+    int tuples_per_row = batch->row_desc()->tuple_descriptors().size();
     ASSERT_EQ(tuples_per_row, tuples.size());
     ASSERT_EQ(tuples_per_row, repeats.size());
     vector<int> next_tuple(tuples_per_row, 0);
@@ -447,7 +447,7 @@ void RowBatchSerializeTest::TestDupCorrectness(bool full_dedup) {
   repeats.push_back(1);
   // All string dups are consecutive
   repeats.push_back(num_rows / distinct_string_tuples + 1);
-  RowBatch* batch = pool_.Add(new RowBatch(row_desc, num_rows, tracker_.get()));
+  RowBatch* batch = pool_.Add(new RowBatch(&row_desc, num_rows, tracker_.get()));
   vector<vector<Tuple*>> distinct_tuples(2);
   CreateTuples(*row_desc.tuple_descriptors()[0], batch->tuple_data_pool(),
       distinct_int_tuples, 0, 10, &distinct_tuples[0]);
@@ -481,7 +481,7 @@ void RowBatchSerializeTest::TestDupRemoval(bool full_dedup) {
   int num_distinct_tuples = 100;
   // All dups are consecutive
   int repeats = num_rows / num_distinct_tuples;
-  RowBatch* batch = pool_.Add(new RowBatch(row_desc, num_rows, tracker_.get()));
+  RowBatch* batch = pool_.Add(new RowBatch(&row_desc, num_rows, tracker_.get()));
   vector<Tuple*> tuples;
   CreateTuples(tuple_desc, batch->tuple_data_pool(), num_distinct_tuples, 0, 10, &tuples);
   AddTuplesToRowBatch(num_rows, tuples, repeats, batch);
@@ -517,7 +517,7 @@ void RowBatchSerializeTest::TestConsecutiveNulls(bool full_dedup) {
   int num_rows = 100;
   int num_distinct_tuples = 20;
   int repeats = 5;
-  RowBatch* batch = pool_.Add(new RowBatch(row_desc, num_rows, tracker_.get()));
+  RowBatch* batch = pool_.Add(new RowBatch(&row_desc, num_rows, tracker_.get()));
   vector<Tuple*> tuples;
   CreateTuples(*row_desc.tuple_descriptors()[0], batch->tuple_data_pool(),
       num_distinct_tuples, 50, 10, &tuples);
@@ -587,7 +587,7 @@ TEST_F(RowBatchSerializeTest, DedupPathologicalFull) {
   vector<vector<Tuple*>> tuples(num_tuples);
   vector<int> repeats(num_tuples, 1); // Don't repeat tuples adjacently
   int64_t total_byte_size = 0;
-  RowBatch* batch = pool_.Add(new RowBatch(row_desc, num_rows, tracker_.get()));
+  RowBatch* batch = pool_.Add(new RowBatch(&row_desc, num_rows, tracker_.get()));
   // First two tuples are integers because it doesn't matter for this test.
   for (int tuple_idx = 0; tuple_idx < num_int_tuples; ++tuple_idx) {
     TupleDescriptor* tuple_desc = row_desc.tuple_descriptors()[tuple_idx];
@@ -630,7 +630,7 @@ TEST_F(RowBatchSerializeTest, DedupPathologicalFull) {
   // Serialized data should only have one copy of each tuple.
   EXPECT_EQ(total_byte_size, trow_batch.uncompressed_size);
   LOG(INFO) << "Deserializing row batch";
-  RowBatch deserialized_batch(row_desc, trow_batch, tracker_.get());
+  RowBatch deserialized_batch(&row_desc, trow_batch, tracker_.get());
   LOG(INFO) << "Verifying row batch";
   // Need to do special verification: comparing all duplicate strings is too slow.
   EXPECT_EQ(batch->num_rows(), deserialized_batch.num_rows());

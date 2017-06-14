@@ -56,7 +56,7 @@ namespace impala {
 const static string& ROOT_PARTITION_KEY =
     g_ImpalaInternalService_constants.ROOT_PARTITION_KEY;
 
-HdfsTableSink::HdfsTableSink(const RowDescriptor& row_desc, const TDataSink& tsink)
+HdfsTableSink::HdfsTableSink(const RowDescriptor* row_desc, const TDataSink& tsink)
   : DataSink(row_desc),
     table_desc_(nullptr),
     default_partition_(nullptr),
@@ -85,7 +85,7 @@ Status HdfsTableSink::Init(const vector<TExpr>& thrift_output_exprs,
   RETURN_IF_ERROR(DataSink::Init(thrift_output_exprs, tsink, state));
   DCHECK(tsink.__isset.table_sink);
   RETURN_IF_ERROR(ScalarExpr::Create(tsink.table_sink.hdfs_table_sink.partition_key_exprs,
-      row_desc_, state, &partition_key_exprs_));
+      *row_desc_, state, &partition_key_exprs_));
   return Status::OK();
 }
 

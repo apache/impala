@@ -492,7 +492,9 @@ class DescriptorTbl {
       const HdfsTableDescriptor& hdfs_tbl, ObjectPool* pool) WARN_UNUSED_RESULT;
 };
 
-/// Records positions of tuples within row produced by ExecNode.
+/// Records positions of tuples within row produced by ExecNode. RowDescriptors are
+/// typically owned by their ExecNode, and shared by reference across the plan tree.
+///
 /// TODO: this needs to differentiate between tuples contained in row
 /// and tuples produced by ExecNode (parallel to PlanNode.rowTupleIds and
 /// PlanNode.tupleIds); right now, we conflate the two (and distinguish based on
@@ -544,7 +546,7 @@ class RowDescriptor {
   }
 
   /// Populate row_tuple_ids with our ids.
-  void ToThrift(std::vector<TTupleId>* row_tuple_ids);
+  void ToThrift(std::vector<TTupleId>* row_tuple_ids) const;
 
   /// Return true if the tuple ids of this descriptor are a prefix
   /// of the tuple ids of other_desc.

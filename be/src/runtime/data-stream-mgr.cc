@@ -73,7 +73,7 @@ inline uint32_t DataStreamMgr::GetHashValue(
 }
 
 shared_ptr<DataStreamRecvr> DataStreamMgr::CreateRecvr(RuntimeState* state,
-    const RowDescriptor& row_desc, const TUniqueId& fragment_instance_id,
+    const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
     PlanNodeId dest_node_id, int num_senders, int buffer_size, RuntimeProfile* profile,
     bool is_merging) {
   DCHECK(profile != NULL);

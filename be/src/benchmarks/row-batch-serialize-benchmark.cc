@@ -106,7 +106,7 @@ class RowBatchSerializeBaseline {
     output_batch->compression_type = THdfsCompression::NONE;
 
     output_batch->num_rows = batch->num_rows_;
-    batch->row_desc_.ToThrift(&output_batch->row_tuples);
+    batch->row_desc_->ToThrift(&output_batch->row_tuples);
     output_batch->tuple_offsets.reserve(batch->num_rows_ * batch->num_tuples_per_row_);
 
     int64_t size = TotalByteSize(batch);
@@ -152,9 +152,9 @@ class RowBatchSerializeBaseline {
     char* tuple_data = const_cast<char*>(output_batch->tuple_data.c_str());
 
     for (int i = 0; i < batch->num_rows_; ++i) {
-       vector<TupleDescriptor*>::const_iterator desc =
-         batch->row_desc_.tuple_descriptors().begin();
-      for (int j = 0; desc != batch->row_desc_.tuple_descriptors().end(); ++desc, ++j) {
+      vector<TupleDescriptor*>::const_iterator desc =
+          batch->row_desc_->tuple_descriptors().begin();
+      for (int j = 0; desc != batch->row_desc_->tuple_descriptors().end(); ++desc, ++j) {
         Tuple* tuple = batch->GetRow(i)->GetTuple(j);
         if (tuple == NULL) {
           // NULLs are encoded as -1
@@ -177,7 +177,7 @@ class RowBatchSerializeBaseline {
       for (int j = 0; j < batch->num_tuples_per_row_; ++j) {
         Tuple* tuple = batch->GetRow(i)->GetTuple(j);
         if (tuple == NULL) continue;
-        result += tuple->TotalByteSize(*batch->row_desc_.tuple_descriptors()[j]);
+        result += tuple->TotalByteSize(*batch->row_desc_->tuple_descriptors()[j]);
       }
     }
     return result;
@@ -223,11 +223,11 @@ class RowBatchSerializeBaseline {
     }
 
     // Check whether we have slots that require offset-to-pointer conversion.
-    if (!batch->row_desc_.HasVarlenSlots()) return;
+    if (!batch->row_desc_->HasVarlenSlots()) return;
 
     for (int i = 0; i < batch->num_rows_; ++i) {
       for (int j = 0; j < batch->num_tuples_per_row_; ++j) {
-        const TupleDescriptor* desc = batch->row_desc_.tuple_descriptors()[j];
+        const TupleDescriptor* desc = batch->row_desc_->tuple_descriptors()[j];
         if (!desc->HasVarlenSlots()) continue;
         Tuple* tuple = batch->GetRow(i)->GetTuple(j);
         if (tuple == NULL) continue;
@@ -244,7 +244,7 @@ class RowBatchSerializeBenchmark {
     srand(rand_seed);
     if (cycle <= 0) cycle = NUM_ROWS; // Negative means no repeats in cycle.
     MemPool* mem_pool = batch->tuple_data_pool();
-    const TupleDescriptor* tuple_desc = batch->row_desc().tuple_descriptors()[0];
+    const TupleDescriptor* tuple_desc = batch->row_desc()->tuple_descriptors()[0];
     int unique_tuples = (NUM_ROWS - 1) / repeats + 1;
     uint8_t* tuple_mem = mem_pool->Allocate(tuple_desc->byte_size() * unique_tuples);
     for (int i = 0; i < NUM_ROWS; ++i) {
@@ -307,15 +307,15 @@ class RowBatchSerializeBenchmark {
   static void TestDeserialize(int batch_size, void* data) {
     struct DeserializeArgs* args = reinterpret_cast<struct DeserializeArgs*>(data);
     for (int iter = 0; iter < batch_size; ++iter) {
-      RowBatch deserialized_batch(*args->row_desc, *args->trow_batch, args->tracker);
+      RowBatch deserialized_batch(args->row_desc, *args->trow_batch, args->tracker);
     }
   }
 
   static void TestDeserializeBaseline(int batch_size, void* data) {
     struct DeserializeArgs* args = reinterpret_cast<struct DeserializeArgs*>(data);
     for (int iter = 0; iter < batch_size; ++iter) {
-      RowBatch deserialized_batch(*args->row_desc, args->trow_batch->num_rows,
-          args->tracker);
+      RowBatch deserialized_batch(
+          args->row_desc, args->trow_batch->num_rows, args->tracker);
       RowBatchSerializeBaseline::Deserialize(&deserialized_batch, *args->trow_batch);
     }
   }
@@ -334,19 +334,18 @@ class RowBatchSerializeBenchmark {
     vector<TTupleId> tuple_id(1, (TTupleId) 0);
     RowDescriptor row_desc(*desc_tbl, tuple_id, nullable_tuples);
 
-    RowBatch* no_dup_batch = obj_pool.Add(new RowBatch(row_desc, NUM_ROWS, &tracker));
+    RowBatch* no_dup_batch = obj_pool.Add(new RowBatch(&row_desc, NUM_ROWS, &tracker));
     FillBatch(no_dup_batch, 12345, 1, -1);
     TRowBatch no_dup_tbatch;
     no_dup_batch->Serialize(&no_dup_tbatch);
 
     RowBatch* adjacent_dup_batch =
-        obj_pool.Add(new RowBatch(row_desc, NUM_ROWS, &tracker));
+        obj_pool.Add(new RowBatch(&row_desc, NUM_ROWS, &tracker));
     FillBatch(adjacent_dup_batch, 12345, 5, -1);
     TRowBatch adjacent_dup_tbatch;
     adjacent_dup_batch->Serialize(&adjacent_dup_tbatch, false);
 
-    RowBatch* dup_batch =
-        obj_pool.Add(new RowBatch(row_desc, NUM_ROWS, &tracker));
+    RowBatch* dup_batch = obj_pool.Add(new RowBatch(&row_desc, NUM_ROWS, &tracker));
     // Non-adjacent duplicates.
     FillBatch(dup_batch, 12345, 1, NUM_ROWS / 5);
     TRowBatch dup_tbatch;

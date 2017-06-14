@@ -428,7 +428,7 @@ bool RowDescriptor::IsAnyTupleNullable() const {
   return false;
 }
 
-void RowDescriptor::ToThrift(vector<TTupleId>* row_tuple_ids) {
+void RowDescriptor::ToThrift(vector<TTupleId>* row_tuple_ids) const {
   row_tuple_ids->clear();
   for (int i = 0; i < tuple_desc_map_.size(); ++i) {
     row_tuple_ids->push_back(tuple_desc_map_[i]->id());

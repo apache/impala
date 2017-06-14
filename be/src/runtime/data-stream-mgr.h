@@ -73,10 +73,9 @@ class DataStreamMgr {
   /// single stream.
   /// Ownership of the receiver is shared between this DataStream mgr instance and the
   /// caller.
-  std::shared_ptr<DataStreamRecvr> CreateRecvr(
-      RuntimeState* state, const RowDescriptor& row_desc,
-      const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id,
-      int num_senders, int buffer_size, RuntimeProfile* profile,
+  std::shared_ptr<DataStreamRecvr> CreateRecvr(RuntimeState* state,
+      const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
+      PlanNodeId dest_node_id, int num_senders, int buffer_size, RuntimeProfile* profile,
       bool is_merging);
 
   /// Adds a row batch to the recvr identified by fragment_instance_id/dest_node_id

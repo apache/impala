@@ -127,7 +127,7 @@ struct OutputPartition {
 /// This is consistent with Hive's behavior.
 class HdfsTableSink : public DataSink {
  public:
-  HdfsTableSink(const RowDescriptor& row_desc, const TDataSink& tsink);
+  HdfsTableSink(const RowDescriptor* row_desc, const TDataSink& tsink);
 
   virtual std::string GetName() { return "HdfsTableSink"; }
 

@@ -47,7 +47,7 @@ using namespace strings;
 using BufferHandle = BufferPool::BufferHandle;
 
 BufferedTupleStreamV2::BufferedTupleStreamV2(RuntimeState* state,
-    const RowDescriptor& row_desc, BufferPool::ClientHandle* buffer_pool_client,
+    const RowDescriptor* row_desc, BufferPool::ClientHandle* buffer_pool_client,
     int64_t default_page_len, int64_t max_page_len, const set<SlotId>& ext_varlen_slots)
   : state_(state),
     desc_(row_desc),
@@ -70,7 +70,7 @@ BufferedTupleStreamV2::BufferedTupleStreamV2(RuntimeState* state,
     num_rows_(0),
     default_page_len_(default_page_len),
     max_page_len_(max_page_len),
-    has_nullable_tuple_(row_desc.IsAnyTupleNullable()),
+    has_nullable_tuple_(row_desc->IsAnyTupleNullable()),
     delete_on_read_(false),
     closed_(false),
     pinned_(true) {
@@ -78,8 +78,8 @@ BufferedTupleStreamV2::BufferedTupleStreamV2(RuntimeState* state,
   DCHECK(BitUtil::IsPowerOf2(default_page_len)) << default_page_len;
   DCHECK(BitUtil::IsPowerOf2(max_page_len)) << max_page_len;
   read_page_ = pages_.end();
-  for (int i = 0; i < desc_.tuple_descriptors().size(); ++i) {
-    const TupleDescriptor* tuple_desc = desc_.tuple_descriptors()[i];
+  for (int i = 0; i < desc_->tuple_descriptors().size(); ++i) {
+    const TupleDescriptor* tuple_desc = desc_->tuple_descriptors()[i];
     const int tuple_byte_size = tuple_desc->byte_size();
     fixed_tuple_sizes_.push_back(tuple_byte_size);
 
@@ -704,7 +704,7 @@ template <bool FILL_FLAT_ROWS, bool HAS_NULLABLE_TUPLE>
 Status BufferedTupleStreamV2::GetNextInternal(
     RowBatch* batch, bool* eos, vector<FlatRowPtr>* flat_rows) {
   DCHECK(!closed_);
-  DCHECK(batch->row_desc().Equals(desc_));
+  DCHECK(batch->row_desc()->Equals(*desc_));
   DCHECK(is_pinned() || !FILL_FLAT_ROWS)
       << "FlatRowPtrs are only valid for pinned streams";
   *eos = (rows_returned_ == num_rows_);
@@ -739,7 +739,7 @@ Status BufferedTupleStreamV2::GetNextInternal(
     flat_rows->reserve(rows_to_fill);
   }
 
-  const uint64_t tuples_per_row = desc_.tuple_descriptors().size();
+  const uint64_t tuples_per_row = desc_->tuple_descriptors().size();
   // Start reading from the current position in 'read_page_'.
   for (int i = 0; i < rows_to_fill; ++i) {
     if (FILL_FLAT_ROWS) {
@@ -921,7 +921,7 @@ template <bool HAS_NULLABLE_TUPLE>
 bool BufferedTupleStreamV2::DeepCopyInternal(
     TupleRow* row, uint8_t** data, const uint8_t* data_end) noexcept {
   uint8_t* pos = *data;
-  const uint64_t tuples_per_row = desc_.tuple_descriptors().size();
+  const uint64_t tuples_per_row = desc_->tuple_descriptors().size();
   // Copy the not NULL fixed len tuples. For the NULL tuples just update the NULL tuple
   // indicator.
   if (HAS_NULLABLE_TUPLE) {
@@ -1038,7 +1038,7 @@ void BufferedTupleStreamV2::GetTupleRow(FlatRowPtr flat_row, TupleRow* row) cons
 
 template <bool HAS_NULLABLE_TUPLE>
 void BufferedTupleStreamV2::UnflattenTupleRow(uint8_t** data, TupleRow* row) const {
-  const int tuples_per_row = desc_.tuple_descriptors().size();
+  const int tuples_per_row = desc_->tuple_descriptors().size();
   uint8_t* ptr = *data;
   if (has_nullable_tuple_) {
     // Stitch together the tuples from the page and the NULL ones.

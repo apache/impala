@@ -49,7 +49,7 @@ using namespace strings;
 using std::unique_ptr;
 
 PhjBuilder::PhjBuilder(int join_node_id, TJoinOp::type join_op,
-    const RowDescriptor& probe_row_desc, const RowDescriptor& build_row_desc,
+    const RowDescriptor* probe_row_desc, const RowDescriptor* build_row_desc,
     RuntimeState* state)
   : DataSink(build_row_desc),
     runtime_state_(state),
@@ -86,7 +86,7 @@ Status PhjBuilder::InitExprsAndFilters(RuntimeState* state,
   for (const TEqJoinCondition& eq_join_conjunct : eq_join_conjuncts) {
     ScalarExpr* build_expr;
     RETURN_IF_ERROR(
-        ScalarExpr::Create(eq_join_conjunct.right, row_desc_, state, &build_expr));
+        ScalarExpr::Create(eq_join_conjunct.right, *row_desc_, state, &build_expr));
     build_exprs_.push_back(build_expr);
     is_not_distinct_from_.push_back(eq_join_conjunct.is_not_distinct_from);
   }
@@ -104,7 +104,7 @@ Status PhjBuilder::InitExprsAndFilters(RuntimeState* state,
     }
     ScalarExpr* filter_expr;
     RETURN_IF_ERROR(
-        ScalarExpr::Create(filter_desc.src_expr, row_desc_, state, &filter_expr));
+        ScalarExpr::Create(filter_desc.src_expr, *row_desc_, state, &filter_expr));
     filter_exprs_.push_back(filter_expr);
 
     // TODO: Move to Prepare().
@@ -129,7 +129,7 @@ Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) 
   RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
   RETURN_IF_ERROR(HashTableCtx::Create(&pool_, state, build_exprs_, build_exprs_,
       HashTableStoresNulls(), is_not_distinct_from_, state->fragment_hash_seed(),
-      MAX_PARTITION_DEPTH, row_desc_.tuple_descriptors().size(), expr_mem_pool(),
+      MAX_PARTITION_DEPTH, row_desc_->tuple_descriptors().size(), expr_mem_pool(),
       &ht_ctx_));
 
   DCHECK_EQ(filter_exprs_.size(), filter_ctxs_.size());
@@ -678,7 +678,7 @@ Status PhjBuilder::Partition::BuildHashTable(bool* built) {
       HashTable::EstimateNumBuckets(build_rows()->num_rows()) :
       state->batch_size() * 2;
   hash_tbl_.reset(HashTable::Create(state, parent_->block_mgr_client_,
-      true /* store_duplicates */, parent_->row_desc_.tuple_descriptors().size(),
+      true /* store_duplicates */, parent_->row_desc_->tuple_descriptors().size(),
       build_rows(), 1 << (32 - NUM_PARTITIONING_BITS), estimated_num_buckets));
   if (!hash_tbl_->Init()) goto not_built;
 
@@ -796,7 +796,7 @@ Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen,
   // Replace some hash table parameters with constants.
   HashTableCtx::HashTableReplacedConstants replaced_constants;
   const bool stores_duplicates = true;
-  const int num_build_tuples = row_desc_.tuple_descriptors().size();
+  const int num_build_tuples = row_desc_->tuple_descriptors().size();
   RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(codegen, stores_duplicates,
       num_build_tuples, process_build_batch_fn, &replaced_constants));
   DCHECK_GE(replaced_constants.stores_nulls, 1);
@@ -878,7 +878,7 @@ Status PhjBuilder::CodegenInsertBatch(LlvmCodeGen* codegen, Function* hash_fn,
   // Replace hash-table parameters with constants.
   HashTableCtx::HashTableReplacedConstants replaced_constants;
   const bool stores_duplicates = true;
-  const int num_build_tuples = row_desc_.tuple_descriptors().size();
+  const int num_build_tuples = row_desc_->tuple_descriptors().size();
   RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(codegen, stores_duplicates,
       num_build_tuples, insert_batch_fn, &replaced_constants));
   DCHECK_GE(replaced_constants.stores_nulls, 1);

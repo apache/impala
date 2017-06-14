@@ -54,7 +54,7 @@ class TInsertStats;
 /// Close() is called to release any resources before destroying the sink.
 class DataSink {
  public:
-  DataSink(const RowDescriptor& row_desc);
+  DataSink(const RowDescriptor* row_desc);
   virtual ~DataSink();
 
   /// Return the name to use in profiles, etc.
@@ -86,7 +86,7 @@ class DataSink {
   /// thrift_sink.
   static Status Create(const TPlanFragmentCtx& fragment_ctx,
       const TPlanFragmentInstanceCtx& fragment_instance_ctx,
-      const RowDescriptor& row_desc, RuntimeState* state, DataSink** sink);
+      const RowDescriptor* row_desc, RuntimeState* state, DataSink** sink);
 
   /// Merges one update to the DML stats for a partition. dst_stats will have the
   /// combined stats of src_stats and dst_stats after this method returns.
@@ -109,8 +109,9 @@ class DataSink {
   /// Close().
   bool closed_;
 
-  /// The row descriptor for the rows consumed by the sink. Not owned.
-  const RowDescriptor& row_desc_;
+  /// The row descriptor for the rows consumed by the sink. Owned by root exec node of
+  /// plan tree, which feeds into this sink.
+  const RowDescriptor* row_desc_;
 
   /// The runtime profile for this DataSink. Initialized in Prepare(). Not owned.
   RuntimeProfile* profile_;

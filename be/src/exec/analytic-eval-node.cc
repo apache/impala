@@ -116,7 +116,7 @@ Status AnalyticEvalNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   for (int i = 0; i < analytic_node.analytic_functions.size(); ++i) {
     AggFn* analytic_fn;
     RETURN_IF_ERROR(AggFn::Create(analytic_node.analytic_functions[i],
-        child(0)->row_desc(), *(intermediate_tuple_desc_->slots()[i]),
+        *child(0)->row_desc(), *(intermediate_tuple_desc_->slots()[i]),
         *(result_tuple_desc_->slots()[i]), state, &analytic_fn));
     analytic_fns_.push_back(analytic_fn);
     DCHECK(!analytic_fn->is_merge());
@@ -134,7 +134,7 @@ Status AnalyticEvalNode::Init(const TPlanNode& tnode, RuntimeState* state) {
     DCHECK(analytic_node.__isset.buffered_tuple_id);
     DCHECK(buffered_tuple_desc_ != nullptr);
     vector<TTupleId> tuple_ids;
-    tuple_ids.push_back(child(0)->row_desc().tuple_descriptors()[0]->id());
+    tuple_ids.push_back(child(0)->row_desc()->tuple_descriptors()[0]->id());
     tuple_ids.push_back(buffered_tuple_desc_->id());
     RowDescriptor cmp_row_desc(state->desc_tbl(), tuple_ids, vector<bool>(2, false));
 
@@ -153,7 +153,7 @@ Status AnalyticEvalNode::Init(const TPlanNode& tnode, RuntimeState* state) {
 Status AnalyticEvalNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
-  DCHECK(child(0)->row_desc().IsPrefixOf(row_desc()));
+  DCHECK(child(0)->row_desc()->IsPrefixOf(*row_desc()));
   curr_tuple_pool_.reset(new MemPool(mem_tracker()));
   prev_tuple_pool_.reset(new MemPool(mem_tracker()));
   mem_pool_.reset(new MemPool(mem_tracker()));
@@ -353,8 +353,7 @@ inline Status AnalyticEvalNode::AddRow(int64_t stream_idx, TupleRow* row) {
     if (window_.__isset.window_start) {
       VLOG_ROW << id() << " Adding tuple to window at idx=" << stream_idx;
       Tuple* tuple = row->GetTuple(0)->DeepCopy(
-          *child(0)->row_desc().tuple_descriptors()[0],
-          curr_tuple_pool_.get());
+          *child(0)->row_desc()->tuple_descriptors()[0], curr_tuple_pool_.get());
       window_tuples_.push_back(pair<int64_t, Tuple*>(stream_idx, tuple));
     }
   }
@@ -719,7 +718,7 @@ Status AnalyticEvalNode::GetNextOutputBatch(
     return Status::OK();
   }
 
-  const int num_child_tuples = child(0)->row_desc().tuple_descriptors().size();
+  const int num_child_tuples = child(0)->row_desc()->tuple_descriptors().size();
   RowBatch input_batch(child(0)->row_desc(), output_batch->capacity(), mem_tracker());
   int64_t stream_idx = input_stream_->rows_returned();
   RETURN_IF_ERROR(input_stream_->GetNext(&input_batch, eos));

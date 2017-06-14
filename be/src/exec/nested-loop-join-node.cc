@@ -53,7 +53,7 @@ Status NestedLoopJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   DCHECK(tnode.__isset.nested_loop_join_node);
   // join_conjunct_evals_ are evaluated in the context of rows assembled from
   // all inner and outer tuples.
-  RowDescriptor full_row_desc(child(0)->row_desc(), child(1)->row_desc());
+  RowDescriptor full_row_desc(*child(0)->row_desc(), *child(1)->row_desc());
   RETURN_IF_ERROR(ScalarExpr::Create(tnode.nested_loop_join_node.join_conjuncts,
       full_row_desc, state, &join_conjuncts_));
   DCHECK(tnode.nested_loop_join_node.join_op != TJoinOp::CROSS_JOIN ||
@@ -316,7 +316,7 @@ Status NestedLoopJoinNode::GetNextLeftSemiJoin(RuntimeState* state,
       // A match is found. Create the output row from the probe row.
       TupleRow* output_row = output_batch->GetRow(output_batch->AddRow());
       output_batch->CopyRow(current_probe_row_, output_row);
-      VLOG_ROW << "match row: " << PrintRow(output_row, row_desc());
+      VLOG_ROW << "match row: " << PrintRow(output_row, *row_desc());
       output_batch->CommitLastRow();
       ++num_rows_returned_;
       if (ReachedLimit()) {
@@ -433,7 +433,7 @@ Status NestedLoopJoinNode::GetNextRightSemiJoin(RuntimeState* state,
       output_batch->CopyRow(build_row_iterator_.GetRow(), output_row);
       build_row_iterator_.Next();
       ++current_build_row_idx_;
-      VLOG_ROW << "match row: " << PrintRow(output_row, row_desc());
+      VLOG_ROW << "match row: " << PrintRow(output_row, *row_desc());
       output_batch->CommitLastRow();
       ++num_rows_returned_;
       if (output_batch->AtCapacity()) {
@@ -521,7 +521,7 @@ Status NestedLoopJoinNode::ProcessUnmatchedProbeRow(RuntimeState* state,
   }
   // Evaluate all the other (non-join) conjuncts.
   if (EvalConjuncts(conjunct_evals, num_conjuncts, output_row)) {
-    VLOG_ROW << "match row:" << PrintRow(output_row, row_desc());
+    VLOG_ROW << "match row:" << PrintRow(output_row, *row_desc());
     output_batch->CommitLastRow();
     ++num_rows_returned_;
     COUNTER_ADD(rows_returned_counter_, 1);
@@ -576,7 +576,7 @@ Status NestedLoopJoinNode::ProcessUnmatchedBuildRows(
     // Evaluate conjuncts that don't affect the matching rows of the join on the
     // result row.
     if (EvalConjuncts(conjunct_evals, num_conjuncts, output_row)) {
-      VLOG_ROW << "match row: " << PrintRow(output_row, row_desc());
+      VLOG_ROW << "match row: " << PrintRow(output_row, *row_desc());
       output_batch->CommitLastRow();
       ++num_rows_returned_;
       if (output_batch->AtCapacity()) {
@@ -628,7 +628,7 @@ Status NestedLoopJoinNode::FindBuildMatches(
       matching_build_rows_->Set(current_build_row_idx_ - 1, true);
     }
     if (!EvalConjuncts(conjunct_evals, num_conjuncts, output_row)) continue;
-    VLOG_ROW << "match row: " << PrintRow(output_row, row_desc());
+    VLOG_ROW << "match row: " << PrintRow(output_row, *row_desc());
     output_batch->CommitLastRow();
     ++num_rows_returned_;
     if (output_batch->AtCapacity()) {

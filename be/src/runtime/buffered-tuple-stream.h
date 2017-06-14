@@ -214,7 +214,7 @@ class BufferedTupleStream {
   /// read_write: Stream allows interchanging read and write operations. Requires at
   /// least two blocks may be pinned.
   /// ext_varlen_slots: set of varlen slots with data stored externally to the stream
-  BufferedTupleStream(RuntimeState* state, const RowDescriptor& row_desc,
+  BufferedTupleStream(RuntimeState* state, const RowDescriptor* row_desc,
       BufferedBlockMgr* block_mgr, BufferedBlockMgr::Client* client,
       bool use_initial_small_buffers, bool read_write,
       const std::set<SlotId>& ext_varlen_slots = std::set<SlotId>());
@@ -350,7 +350,7 @@ class BufferedTupleStream {
   RuntimeState* const state_;
 
   /// Description of rows stored in the stream.
-  const RowDescriptor& desc_;
+  const RowDescriptor* desc_;
 
   /// Sum of the fixed length portion of all the tuples in desc_.
   int fixed_tuple_row_size_;

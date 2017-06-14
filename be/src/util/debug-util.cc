@@ -224,7 +224,7 @@ string PrintRow(TupleRow* row, const RowDescriptor& d) {
 string PrintBatch(RowBatch* batch) {
   stringstream out;
   for (int i = 0; i < batch->num_rows(); ++i) {
-    out << PrintRow(batch->GetRow(i), batch->row_desc()) << "\n";
+    out << PrintRow(batch->GetRow(i), *batch->row_desc()) << "\n";
   }
   return out.str();
 }

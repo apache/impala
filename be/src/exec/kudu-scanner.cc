@@ -192,9 +192,9 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_me
   int num_rows = cur_kudu_batch_.NumRows();
 
   for (int krow_idx = cur_kudu_batch_num_read_; krow_idx < num_rows; ++krow_idx) {
-    Tuple* kudu_tuple = const_cast<Tuple*>(reinterpret_cast<const Tuple*>(
-        cur_kudu_batch_.direct_data().data() +
-        (krow_idx * scan_node_->row_desc().GetRowSize())));
+    Tuple* kudu_tuple = const_cast<Tuple*>(
+        reinterpret_cast<const Tuple*>(cur_kudu_batch_.direct_data().data()
+            + (krow_idx * scan_node_->row_desc()->GetRowSize())));
     ++cur_kudu_batch_num_read_;
 
     // Kudu tuples containing TIMESTAMP columns (UNIXTIME_MICROS in Kudu, stored as an

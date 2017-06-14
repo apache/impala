@@ -41,15 +41,15 @@ using strings::Substitute;
 
 namespace impala {
 
-DataSink::DataSink(const RowDescriptor& row_desc) :
-    closed_(false), row_desc_(row_desc), mem_tracker_(NULL) {}
+DataSink::DataSink(const RowDescriptor* row_desc)
+  : closed_(false), row_desc_(row_desc), mem_tracker_(NULL) {}
 
 DataSink::~DataSink() {
   DCHECK(closed_);
 }
 
 Status DataSink::Create(const TPlanFragmentCtx& fragment_ctx,
-    const TPlanFragmentInstanceCtx& fragment_instance_ctx, const RowDescriptor& row_desc,
+    const TPlanFragmentInstanceCtx& fragment_instance_ctx, const RowDescriptor* row_desc,
     RuntimeState* state, DataSink** sink) {
   const TDataSink& thrift_sink = fragment_ctx.fragment.output_sink;
   const vector<TExpr>& thrift_output_exprs = fragment_ctx.fragment.output_exprs;
@@ -103,7 +103,7 @@ Status DataSink::Create(const TPlanFragmentCtx& fragment_ctx,
 
 Status DataSink::Init(const vector<TExpr>& thrift_output_exprs,
     const TDataSink& tsink, RuntimeState* state) {
-  return ScalarExpr::Create(thrift_output_exprs, row_desc_, state, &output_exprs_);
+  return ScalarExpr::Create(thrift_output_exprs, *row_desc_, state, &output_exprs_);
 }
 
 void DataSink::MergeDmlStats(const TInsertStats& src_stats,

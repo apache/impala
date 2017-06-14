@@ -208,7 +208,7 @@ void DataStreamRecvr::SenderQueue::AddBatch(const TRowBatch& thrift_batch) {
       // Note: if this function makes a row batch, the batch *must* be added
       // to batch_queue_. It is not valid to create the row batch and destroy
       // it in this thread.
-      batch = new RowBatch(recvr_->row_desc(), thrift_batch, recvr_->mem_tracker());
+      batch = new RowBatch(recvr_->row_desc_, thrift_batch, recvr_->mem_tracker());
     }
     VLOG_ROW << "added #rows=" << batch->num_rows()
              << " batch_size=" << batch_size << "\n";
@@ -265,7 +265,7 @@ Status DataStreamRecvr::CreateMerger(const TupleRowComparator& less_than) {
   input_batch_suppliers.reserve(sender_queues_.size());
 
   // Create the merger that will a single stream of sorted rows.
-  merger_.reset(new SortedRunMerger(less_than, &row_desc_, profile_, false));
+  merger_.reset(new SortedRunMerger(less_than, row_desc_, profile_, false));
 
   for (int i = 0; i < sender_queues_.size(); ++i) {
     input_batch_suppliers.push_back(
@@ -284,7 +284,7 @@ void DataStreamRecvr::TransferAllResources(RowBatch* transfer_batch) {
 }
 
 DataStreamRecvr::DataStreamRecvr(DataStreamMgr* stream_mgr, MemTracker* parent_tracker,
-    const RowDescriptor& row_desc, const TUniqueId& fragment_instance_id,
+    const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
     PlanNodeId dest_node_id, int num_senders, bool is_merging, int total_buffer_limit,
     RuntimeProfile* profile)
   : mgr_(stream_mgr),

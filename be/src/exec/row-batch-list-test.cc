@@ -63,7 +63,7 @@ class RowBatchListTest : public testing::Test {
 
   RowBatch* CreateRowBatch(int start, int end) {
     int num_rows = end - start + 1;
-    RowBatch* batch = pool_.Add(new RowBatch(*desc_, num_rows, &tracker_));
+    RowBatch* batch = pool_.Add(new RowBatch(desc_, num_rows, &tracker_));
     int32_t* tuple_mem = reinterpret_cast<int32_t*>(
         batch->tuple_data_pool()->Allocate(sizeof(int32_t) * num_rows));
 
@@ -113,7 +113,7 @@ TEST_F(RowBatchListTest, BasicTest) {
 TEST_F(RowBatchListTest, EmptyBatchTest) {
   const int ALLOC_SIZE = 128;
   RowBatchList row_list;
-  RowBatch* batch1 = pool_.Add(new RowBatch(*desc_, 1, &tracker_));
+  RowBatch* batch1 = pool_.Add(new RowBatch(desc_, 1, &tracker_));
   batch1->tuple_data_pool()->Allocate(ALLOC_SIZE);
   DCHECK_EQ(ALLOC_SIZE, batch1->tuple_data_pool()->total_allocated_bytes());
 
@@ -123,7 +123,7 @@ TEST_F(RowBatchListTest, EmptyBatchTest) {
   EXPECT_TRUE(it.AtEnd());
 
   // IMPALA-4049: list should transfer resources attached to empty batch.
-  RowBatch* batch2 = pool_.Add(new RowBatch(*desc_, 1, &tracker_));
+  RowBatch* batch2 = pool_.Add(new RowBatch(desc_, 1, &tracker_));
   DCHECK_EQ(0, batch2->tuple_data_pool()->total_allocated_bytes());
   row_list.TransferResourceOwnership(batch2);
   DCHECK_EQ(0, batch1->tuple_data_pool()->total_allocated_bytes());

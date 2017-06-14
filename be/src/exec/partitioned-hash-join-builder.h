@@ -71,8 +71,8 @@ class PhjBuilder : public DataSink {
  public:
   class Partition;
 
-  PhjBuilder(int join_node_id, TJoinOp::type join_op, const RowDescriptor& probe_row_desc,
-      const RowDescriptor& build_row_desc, RuntimeState* state);
+  PhjBuilder(int join_node_id, TJoinOp::type join_op, const RowDescriptor* probe_row_desc,
+      const RowDescriptor* build_row_desc, RuntimeState* state);
 
   Status InitExprsAndFilters(RuntimeState* state,
       const std::vector<TEqJoinCondition>& eq_join_conjuncts,
@@ -351,7 +351,7 @@ class PhjBuilder : public DataSink {
   const TJoinOp::type join_op_;
 
   /// Descriptor for the probe rows, needed to initialize probe streams.
-  const RowDescriptor& probe_row_desc_;
+  const RowDescriptor* probe_row_desc_;
 
   /// Pool for objects with same lifetime as builder.
   ObjectPool pool_;

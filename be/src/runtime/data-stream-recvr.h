@@ -90,7 +90,7 @@ class DataStreamRecvr {
 
   const TUniqueId& fragment_instance_id() const { return fragment_instance_id_; }
   PlanNodeId dest_node_id() const { return dest_node_id_; }
-  const RowDescriptor& row_desc() const { return row_desc_; }
+  const RowDescriptor& row_desc() const { return *row_desc_; }
   MemTracker* mem_tracker() const { return mem_tracker_.get(); }
 
  private:
@@ -98,7 +98,7 @@ class DataStreamRecvr {
   class SenderQueue;
 
   DataStreamRecvr(DataStreamMgr* stream_mgr, MemTracker* parent_tracker,
-      const RowDescriptor& row_desc, const TUniqueId& fragment_instance_id,
+      const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
       PlanNodeId dest_node_id, int num_senders, bool is_merging, int total_buffer_limit,
       RuntimeProfile* profile);
 
@@ -131,8 +131,8 @@ class DataStreamRecvr {
   /// exceeds this value
   int total_buffer_limit_;
 
-  /// Row schema, copied from the caller of CreateRecvr().
-  RowDescriptor row_desc_;
+  /// Row schema.
+  const RowDescriptor* row_desc_;
 
   /// True if this reciver merges incoming rows from different senders. Per-sender
   /// row batch queues are maintained in this case.

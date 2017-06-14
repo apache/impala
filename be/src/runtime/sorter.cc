@@ -538,8 +538,8 @@ Status Sorter::Run::AddBatchInternal(RowBatch* batch, int start_index, int* num_
 
   if (!INITIAL_RUN) {
     // For intermediate merges, the input row is the sort tuple.
-    DCHECK_EQ(batch->row_desc().tuple_descriptors().size(), 1);
-    DCHECK_EQ(batch->row_desc().tuple_descriptors()[0], sort_tuple_desc_);
+    DCHECK_EQ(batch->row_desc()->tuple_descriptors().size(), 1);
+    DCHECK_EQ(batch->row_desc()->tuple_descriptors()[0], sort_tuple_desc_);
   }
 
   /// Keep initial unsorted runs pinned in memory so we can sort them.
@@ -756,8 +756,8 @@ Status Sorter::Run::PrepareRead(bool* pinned_all_blocks) {
   end_of_fixed_len_block_ = end_of_var_len_block_ = fixed_len_blocks_.empty();
   num_tuples_returned_ = 0;
 
-  buffered_batch_.reset(new RowBatch(*sorter_->output_row_desc_,
-      sorter_->state_->batch_size(), sorter_->mem_tracker_));
+  buffered_batch_.reset(new RowBatch(
+      sorter_->output_row_desc_, sorter_->state_->batch_size(), sorter_->mem_tracker_));
 
   // If the run is pinned, all blocks are already pinned, so we're ready to read.
   if (is_pinned_) {
@@ -1587,8 +1587,7 @@ Status Sorter::CreateMerger(int max_num_runs) {
 }
 
 Status Sorter::ExecuteIntermediateMerge(Sorter::Run* merged_run) {
-  RowBatch intermediate_merge_batch(*output_row_desc_, state_->batch_size(),
-      mem_tracker_);
+  RowBatch intermediate_merge_batch(output_row_desc_, state_->batch_size(), mem_tracker_);
   bool eos = false;
   while (!eos) {
     // Copy rows into the new run until done.

@@ -154,24 +154,24 @@ DiskIoMgr::ScanRange* HdfsParquetScanner::FindFooterSplit(HdfsFileDesc* file) {
 namespace impala {
 
 HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
-    : HdfsScanner(scan_node, state),
-      row_group_idx_(-1),
-      row_group_rows_read_(0),
-      advance_row_group_(true),
-      min_max_tuple_buffer_(scan_node->mem_tracker()),
-      row_batches_produced_(0),
-      scratch_batch_(new ScratchTupleBatch(
-          scan_node->row_desc(), state_->batch_size(), scan_node->mem_tracker())),
-      metadata_range_(NULL),
-      dictionary_pool_(new MemPool(scan_node->mem_tracker())),
-      dict_filter_tuple_backing_(scan_node->mem_tracker()),
-      assemble_rows_timer_(scan_node_->materialize_tuple_timer()),
-      process_footer_timer_stats_(NULL),
-      num_cols_counter_(NULL),
-      num_row_groups_counter_(NULL),
-      num_scanners_with_no_reads_counter_(NULL),
-      num_dict_filtered_row_groups_counter_(NULL),
-      codegend_process_scratch_batch_fn_(NULL) {
+  : HdfsScanner(scan_node, state),
+    row_group_idx_(-1),
+    row_group_rows_read_(0),
+    advance_row_group_(true),
+    min_max_tuple_buffer_(scan_node->mem_tracker()),
+    row_batches_produced_(0),
+    scratch_batch_(new ScratchTupleBatch(
+        *scan_node->row_desc(), state_->batch_size(), scan_node->mem_tracker())),
+    metadata_range_(NULL),
+    dictionary_pool_(new MemPool(scan_node->mem_tracker())),
+    dict_filter_tuple_backing_(scan_node->mem_tracker()),
+    assemble_rows_timer_(scan_node_->materialize_tuple_timer()),
+    process_footer_timer_stats_(NULL),
+    num_cols_counter_(NULL),
+    num_row_groups_counter_(NULL),
+    num_scanners_with_no_reads_counter_(NULL),
+    num_dict_filtered_row_groups_counter_(NULL),
+    codegend_process_scratch_batch_fn_(NULL) {
   assemble_rows_timer_.Stop();
 }
 
@@ -1006,7 +1006,7 @@ int HdfsParquetScanner::TransferScratchTuples(RowBatch* dst_batch) {
   // never be empty.
   DCHECK_LT(dst_batch->num_rows(), dst_batch->capacity());
   DCHECK_EQ(scan_node_->tuple_idx(), 0);
-  DCHECK_EQ(dst_batch->row_desc().tuple_descriptors().size(), 1);
+  DCHECK_EQ(dst_batch->row_desc()->tuple_descriptors().size(), 1);
   if (scratch_batch_->tuple_byte_size == 0) {
     Tuple** output_row =
         reinterpret_cast<Tuple**>(dst_batch->GetRow(dst_batch->num_rows()));

@@ -34,7 +34,7 @@ class MemTracker;
 /// Simple cache of row batches.
 class RowBatchCache {
  public:
-  RowBatchCache(const RowDescriptor& row_desc, int batch_size)
+  RowBatchCache(const RowDescriptor* row_desc, int batch_size)
     : row_desc_(row_desc), batch_size_(batch_size), next_row_batch_idx_(0) {}
 
   ~RowBatchCache() { DCHECK_EQ(0, row_batches_.size()); }
@@ -72,7 +72,7 @@ class RowBatchCache {
 
  private:
   /// Parameters needed for creating row batches.
-  const RowDescriptor& row_desc_;
+  const RowDescriptor* row_desc_;
   int batch_size_;
 
   /// List of cached row-batch objects. The row-batch objects are owned by this cache.

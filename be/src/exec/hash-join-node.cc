@@ -76,12 +76,12 @@ Status HashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
 
   for (int i = 0; i < eq_join_conjuncts.size(); ++i) {
     ScalarExpr* probe_expr;
-    RETURN_IF_ERROR(ScalarExpr::Create(eq_join_conjuncts[i].left, child(0)->row_desc(),
-        state, &probe_expr));
+    RETURN_IF_ERROR(ScalarExpr::Create(
+        eq_join_conjuncts[i].left, *child(0)->row_desc(), state, &probe_expr));
     probe_exprs_.push_back(probe_expr);
     ScalarExpr* build_expr;
-    RETURN_IF_ERROR(ScalarExpr::Create(eq_join_conjuncts[i].right, child(1)->row_desc(),
-        state, &build_expr));
+    RETURN_IF_ERROR(ScalarExpr::Create(
+        eq_join_conjuncts[i].right, *child(1)->row_desc(), state, &build_expr));
     build_exprs_.push_back(build_expr);
     is_not_distinct_from_.push_back(eq_join_conjuncts[i].is_not_distinct_from);
   }
@@ -89,7 +89,7 @@ Status HashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   // other_join_conjunct_evals_ are evaluated in the context of rows assembled from
   // all build and probe tuples; full_row_desc is not necessarily the same as the output
   // row desc, e.g., because semi joins only return the build xor probe tuples
-  RowDescriptor full_row_desc(child(0)->row_desc(), child(1)->row_desc());
+  RowDescriptor full_row_desc(*child(0)->row_desc(), *child(1)->row_desc());
   RETURN_IF_ERROR(ScalarExpr::Create(tnode.hash_join_node.other_join_conjuncts,
       full_row_desc, state, &other_join_conjuncts_));
 
@@ -107,7 +107,7 @@ Status HashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
     filters_.push_back(state->filter_bank()->RegisterFilter(tfilter, true));
     ScalarExpr* filter_expr;
     RETURN_IF_ERROR(
-        ScalarExpr::Create(tfilter.src_expr, child(1)->row_desc(), state, &filter_expr));
+        ScalarExpr::Create(tfilter.src_expr, *child(1)->row_desc(), state, &filter_expr));
     filter_exprs_.push_back(filter_expr);
   }
   return Status::OK();
@@ -135,7 +135,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
                                 false, std::logical_or<bool>());
 
   RETURN_IF_ERROR(OldHashTable::Create(pool_, state, build_exprs_, probe_exprs_,
-      filter_exprs_, child(1)->row_desc().tuple_descriptors().size(), stores_nulls,
+      filter_exprs_, child(1)->row_desc()->tuple_descriptors().size(), stores_nulls,
       is_not_distinct_from_, state->fragment_hash_seed(), mem_tracker(), filters_,
       &hash_tbl_));
   build_pool_.reset(new MemPool(mem_tracker()));
@@ -246,7 +246,7 @@ Status HashJoinNode::ProcessBuildInput(RuntimeState* state) {
     } else {
       process_build_batch_fn_(this, &build_batch);
     }
-    VLOG_ROW << hash_tbl_->DebugString(true, false, &child(1)->row_desc());
+    VLOG_ROW << hash_tbl_->DebugString(true, false, child(1)->row_desc());
 
     COUNTER_SET(build_row_counter_, hash_tbl_->size());
     COUNTER_SET(build_buckets_counter_, hash_tbl_->num_buckets());
@@ -340,7 +340,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
       hash_tbl_iterator_.Next<true>();
       if (EvalConjuncts(conjunct_evals_.data(), num_conjuncts, out_row)) {
         out_batch->CommitLastRow();
-        VLOG_ROW << "match row: " << PrintRow(out_row, row_desc());
+        VLOG_ROW << "match row: " << PrintRow(out_row, *row_desc());
         ++num_rows_returned_;
         COUNTER_SET(rows_returned_counter_, num_rows_returned_);
         if (out_batch->AtCapacity() || ReachedLimit()) {
@@ -359,7 +359,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
       CreateOutputRow(out_row, current_probe_row_, NULL);
       if (EvalConjuncts(conjunct_evals_.data(), num_conjuncts, out_row)) {
         out_batch->CommitLastRow();
-        VLOG_ROW << "match row: " << PrintRow(out_row, row_desc());
+        VLOG_ROW << "match row: " << PrintRow(out_row, *row_desc());
         ++num_rows_returned_;
         COUNTER_SET(rows_returned_counter_, num_rows_returned_);
         matched_probe_ = true;
@@ -429,7 +429,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
       CreateOutputRow(out_row, NULL, build_row);
       if (EvalConjuncts(conjunct_evals_.data(), num_conjuncts, out_row)) {
         out_batch->CommitLastRow();
-        VLOG_ROW << "match row: " << PrintRow(out_row, row_desc());
+        VLOG_ROW << "match row: " << PrintRow(out_row, *row_desc());
         ++num_rows_returned_;
         COUNTER_SET(rows_returned_counter_, num_rows_returned_);
         if (ReachedLimit()) {
@@ -556,8 +556,8 @@ Function* HashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen) {
   Value* probe_row_arg = builder.CreateBitCast(args[2], tuple_row_working_type, "probe");
   Value* build_row_arg = builder.CreateBitCast(args[3], tuple_row_working_type, "build");
 
-  int num_probe_tuples = child(0)->row_desc().tuple_descriptors().size();
-  int num_build_tuples = child(1)->row_desc().tuple_descriptors().size();
+  int num_probe_tuples = child(0)->row_desc()->tuple_descriptors().size();
+  int num_build_tuples = child(1)->row_desc()->tuple_descriptors().size();
 
   // Copy probe row
   codegen->CodegenMemcpy(&builder, out_row_arg, probe_row_arg, probe_tuple_row_size_);

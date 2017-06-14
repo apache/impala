@@ -84,18 +84,18 @@ Status PartitionedHashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state
 
   for (const TEqJoinCondition& eq_join_conjunct : eq_join_conjuncts) {
     ScalarExpr* probe_expr;
-    RETURN_IF_ERROR(ScalarExpr::Create(eq_join_conjunct.left, child(0)->row_desc(),
-        state, &probe_expr));
+    RETURN_IF_ERROR(ScalarExpr::Create(
+        eq_join_conjunct.left, *child(0)->row_desc(), state, &probe_expr));
     probe_exprs_.push_back(probe_expr);
     ScalarExpr* build_expr;
-    RETURN_IF_ERROR(ScalarExpr::Create(eq_join_conjunct.right, child(1)->row_desc(),
-        state, &build_expr));
+    RETURN_IF_ERROR(ScalarExpr::Create(
+        eq_join_conjunct.right, *child(1)->row_desc(), state, &build_expr));
     build_exprs_.push_back(build_expr);
   }
   // other_join_conjuncts_ are evaluated in the context of rows assembled from all build
   // and probe tuples; full_row_desc is not necessarily the same as the output row desc,
   // e.g., because semi joins only return the build xor probe tuples
-  RowDescriptor full_row_desc(child(0)->row_desc(), child(1)->row_desc());
+  RowDescriptor full_row_desc(*child(0)->row_desc(), *child(1)->row_desc());
   RETURN_IF_ERROR(ScalarExpr::Create(tnode.hash_join_node.other_join_conjuncts,
       full_row_desc, state, &other_join_conjuncts_));
   DCHECK(join_op_ != TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN || eq_join_conjuncts.size() == 1);
@@ -118,7 +118,7 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(HashTableCtx::Create(pool_, state, build_exprs_, probe_exprs_,
       builder_->HashTableStoresNulls(), builder_->is_not_distinct_from(),
       state->fragment_hash_seed(), MAX_PARTITION_DEPTH,
-      child(1)->row_desc().tuple_descriptors().size(), expr_mem_pool(), &ht_ctx_));
+      child(1)->row_desc()->tuple_descriptors().size(), expr_mem_pool(), &ht_ctx_));
   if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
     null_aware_eval_timer_ = ADD_TIMER(runtime_profile(), "NullAwareAntiJoinEvalTime");
   }
@@ -1248,8 +1248,8 @@ Status PartitionedHashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen,
   Value* probe_row_arg = builder.CreateBitCast(args[2], tuple_row_working_type, "probe");
   Value* build_row_arg = builder.CreateBitCast(args[3], tuple_row_working_type, "build");
 
-  int num_probe_tuples = child(0)->row_desc().tuple_descriptors().size();
-  int num_build_tuples = child(1)->row_desc().tuple_descriptors().size();
+  int num_probe_tuples = child(0)->row_desc()->tuple_descriptors().size();
+  int num_build_tuples = child(1)->row_desc()->tuple_descriptors().size();
 
   // Copy probe row
   codegen->CodegenMemcpy(&builder, out_row_arg, probe_row_arg, probe_tuple_row_size_);
@@ -1421,7 +1421,7 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
   // Replace hash-table parameters with constants.
   HashTableCtx::HashTableReplacedConstants replaced_constants;
   const bool stores_duplicates = true;
-  const int num_build_tuples = child(1)->row_desc().tuple_descriptors().size();
+  const int num_build_tuples = child(1)->row_desc()->tuple_descriptors().size();
   RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(codegen, stores_duplicates,
       num_build_tuples, process_probe_batch_fn, &replaced_constants));
   DCHECK_GE(replaced_constants.stores_nulls, 1);

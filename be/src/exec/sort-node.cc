@@ -42,7 +42,7 @@ Status SortNode::Init(const TPlanNode& tnode, RuntimeState* state) {
       state, &ordering_exprs_));
   DCHECK(tsort_info.__isset.sort_tuple_slot_exprs);
   RETURN_IF_ERROR(ScalarExpr::Create(tsort_info.sort_tuple_slot_exprs,
-      child(0)->row_desc(), state, &sort_tuple_exprs_));
+      *child(0)->row_desc(), state, &sort_tuple_exprs_));
   is_asc_order_ = tnode.sort_node.sort_info.is_asc_order;
   nulls_first_ = tnode.sort_node.sort_info.nulls_first;
   return Status::OK();

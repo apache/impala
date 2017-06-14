@@ -136,16 +136,16 @@ class SimpleTupleStreamTest : public testing::Test {
   /// 'offset' is used to account for rows occupied by any previous row batches. This is
   /// needed to match the values generated in VerifyResults(). If 'gen_null' is true,
   /// some tuples will be set to NULL.
-  virtual RowBatch* CreateBatch(const RowDescriptor& row_desc, int offset,
-      int num_rows, bool gen_null) {
+  virtual RowBatch* CreateBatch(
+      const RowDescriptor* row_desc, int offset, int num_rows, bool gen_null) {
     RowBatch* batch = pool_.Add(new RowBatch(row_desc, num_rows, &tracker_));
-    int num_tuples = row_desc.tuple_descriptors().size();
+    int num_tuples = row_desc->tuple_descriptors().size();
 
-    int idx = offset * CountSlotsPerRow(row_desc);
+    int idx = offset * CountSlotsPerRow(*row_desc);
     for (int row_idx = 0; row_idx < num_rows; ++row_idx) {
       TupleRow* row = batch->GetRow(row_idx);
       for (int tuple_idx = 0; tuple_idx < num_tuples; ++tuple_idx) {
-        TupleDescriptor* tuple_desc = row_desc.tuple_descriptors()[tuple_idx];
+        TupleDescriptor* tuple_desc = row_desc->tuple_descriptors()[tuple_idx];
         Tuple* tuple = Tuple::Create(tuple_desc->byte_size(), batch->tuple_data_pool());
         bool is_null = gen_null && !GenBoolValue(idx);
         for (int slot_idx = 0; slot_idx < tuple_desc->slots().size(); ++slot_idx, ++idx) {
@@ -175,11 +175,11 @@ class SimpleTupleStreamTest : public testing::Test {
   }
 
   virtual RowBatch* CreateIntBatch(int offset, int num_rows, bool gen_null) {
-    return CreateBatch(*int_desc_, offset, num_rows, gen_null);
+    return CreateBatch(int_desc_, offset, num_rows, gen_null);
   }
 
   virtual RowBatch* CreateStringBatch(int offset, int num_rows, bool gen_null) {
-    return CreateBatch(*string_desc_, offset, num_rows, gen_null);
+    return CreateBatch(string_desc_, offset, num_rows, gen_null);
   }
 
   void AppendValue(uint8_t* ptr, vector<int>* results) {
@@ -228,7 +228,7 @@ class SimpleTupleStreamTest : public testing::Test {
   void ReadValues(BufferedTupleStream* stream, RowDescriptor* desc, vector<T>* results,
       int num_batches = -1) {
     bool eos = false;
-    RowBatch batch(*desc, BATCH_SIZE, &tracker_);
+    RowBatch batch(desc, BATCH_SIZE, &tracker_);
     int batches_read = 0;
     do {
       batch.Reset();
@@ -286,8 +286,8 @@ class SimpleTupleStreamTest : public testing::Test {
   template <typename T>
   void TestValues(int num_batches, RowDescriptor* desc, bool gen_null,
       bool unpin_stream, int num_rows = BATCH_SIZE, bool use_small_buffers = true) {
-    BufferedTupleStream stream(runtime_state_, *desc, runtime_state_->block_mgr(),
-        client_, use_small_buffers, false);
+    BufferedTupleStream stream(runtime_state_, desc, runtime_state_->block_mgr(), client_,
+        use_small_buffers, false);
     ASSERT_OK(stream.Init(-1, NULL, true));
     bool got_write_buffer;
     ASSERT_OK(stream.PrepareForWrite(&got_write_buffer));
@@ -303,7 +303,7 @@ class SimpleTupleStreamTest : public testing::Test {
 
       Status status;
       ASSERT_TRUE(sizeof(T) == sizeof(int) || sizeof(T) == sizeof(StringValue));
-      batch = CreateBatch(*desc, offset, num_rows, gen_null);
+      batch = CreateBatch(desc, offset, num_rows, gen_null);
       for (int j = 0; j < batch->num_rows(); ++j) {
         bool b = stream.AddRow(batch->GetRow(j), &status);
         ASSERT_OK(status);
@@ -339,8 +339,8 @@ class SimpleTupleStreamTest : public testing::Test {
   void TestIntValuesInterleaved(int num_batches, int num_batches_before_read,
       bool unpin_stream) {
     for (int small_buffers = 0; small_buffers < 2; ++small_buffers) {
-      BufferedTupleStream stream(runtime_state_, *int_desc_, runtime_state_->block_mgr(),
-          client_, small_buffers == 0,  // initial small buffers
+      BufferedTupleStream stream(runtime_state_, int_desc_, runtime_state_->block_mgr(),
+          client_, small_buffers == 0, // initial small buffers
           true); // read_write
       ASSERT_OK(stream.Init(-1, NULL, true));
       bool got_write_buffer;
@@ -563,8 +563,8 @@ void SimpleTupleStreamTest::TestUnpinPin(bool varlen_data) {
   InitBlockMgr(3 * buffer_size, buffer_size);
   RowDescriptor* row_desc = varlen_data ? string_desc_ : int_desc_;
 
-  BufferedTupleStream stream(runtime_state_, *row_desc, runtime_state_->block_mgr(),
-      client_, true, false);
+  BufferedTupleStream stream(
+      runtime_state_, row_desc, runtime_state_->block_mgr(), client_, true, false);
   ASSERT_OK(stream.Init(-1, NULL, true));
   bool got_write_buffer;
   ASSERT_OK(stream.PrepareForWrite(&got_write_buffer));
@@ -635,8 +635,8 @@ TEST_F(SimpleTupleStreamTest, SmallBuffers) {
   int buffer_size = IO_BLOCK_SIZE;
   InitBlockMgr(2 * buffer_size, buffer_size);
 
-  BufferedTupleStream stream(runtime_state_, *int_desc_, runtime_state_->block_mgr(),
-      client_, true, false);
+  BufferedTupleStream stream(
+      runtime_state_, int_desc_, runtime_state_->block_mgr(), client_, true, false);
   ASSERT_OK(stream.Init(-1, NULL, false));
   bool got_write_buffer;
   ASSERT_OK(stream.PrepareForWrite(&got_write_buffer));
@@ -685,8 +685,8 @@ void SimpleTupleStreamTest::TestTransferMemory(bool pin_stream, bool read_write)
   int buffer_size = 4 * 1024;
   InitBlockMgr(100 * buffer_size, buffer_size);
 
-  BufferedTupleStream stream(runtime_state_, *int_desc_, runtime_state_->block_mgr(),
-      client_, false, read_write);
+  BufferedTupleStream stream(
+      runtime_state_, int_desc_, runtime_state_->block_mgr(), client_, false, read_write);
   ASSERT_OK(stream.Init(-1, NULL, pin_stream));
   bool got_write_buffer;
   ASSERT_OK(stream.PrepareForWrite(&got_write_buffer));
@@ -759,7 +759,7 @@ TEST_F(SimpleTupleStreamTest, StringsOutsideStream) {
     external_slots.insert(tuple_desc.string_slots()[i]->id());
   }
 
-  BufferedTupleStream stream(runtime_state_, *string_desc_, runtime_state_->block_mgr(),
+  BufferedTupleStream stream(runtime_state_, string_desc_, runtime_state_->block_mgr(),
       client_, true, false, external_slots);
   for (int i = 0; i < num_batches; ++i) {
     RowBatch* batch = CreateStringBatch(rows_added, BATCH_SIZE, false);
@@ -824,7 +824,7 @@ TEST_F(SimpleTupleStreamTest, BigRow) {
   RowDescriptor* nullable_row_desc = pool_.Add(new RowDescriptor(
       *desc, tuple_ids, nullable_tuples));
   ASSERT_TRUE(nullable_row_desc->IsAnyTupleNullable());
-  BufferedTupleStream nullable_stream(runtime_state_, *nullable_row_desc,
+  BufferedTupleStream nullable_stream(runtime_state_, nullable_row_desc,
       runtime_state_->block_mgr(), client_, false, false);
   Status status = nullable_stream.Init(-1, NULL, true);
   ASSERT_FALSE(status.ok());
@@ -834,8 +834,8 @@ TEST_F(SimpleTupleStreamTest, BigRow) {
 // Test for IMPALA-3923: overflow of 32-bit int in GetRows().
 TEST_F(SimpleTupleStreamTest, TestGetRowsOverflow) {
   InitBlockMgr(-1, 8 * 1024 * 1024);
-  BufferedTupleStream stream(runtime_state_, *int_desc_, runtime_state_->block_mgr(),
-      client_, false, false);
+  BufferedTupleStream stream(
+      runtime_state_, int_desc_, runtime_state_->block_mgr(), client_, false, false);
   ASSERT_OK(stream.Init(-1, NULL, true));
 
   Status status;
@@ -926,8 +926,8 @@ TEST_F(MultiTupleStreamTest, MultiTupleAllocateRow) {
 
   int num_batches = 1;
   int rows_added = 0;
-  BufferedTupleStream stream(runtime_state_, *string_desc_, runtime_state_->block_mgr(),
-      client_, false, false);
+  BufferedTupleStream stream(
+      runtime_state_, string_desc_, runtime_state_->block_mgr(), client_, false, false);
   ASSERT_OK(stream.Init(-1, NULL, false));
   bool got_write_buffer;
   ASSERT_OK(stream.PrepareForWrite(&got_write_buffer));
@@ -1032,7 +1032,7 @@ TEST_F(MultiNullableTupleStreamTest, TestComputeRowSize) {
   const SlotDescriptor* external_string_slot = tuple_descs[1]->slots()[0];
   external_slots.insert(external_string_slot->id());
 
-  BufferedTupleStream stream(runtime_state_, *string_desc_, runtime_state_->block_mgr(),
+  BufferedTupleStream stream(runtime_state_, string_desc_, runtime_state_->block_mgr(),
       client_, false, false, external_slots);
   gscoped_ptr<TupleRow, FreeDeleter> row(reinterpret_cast<TupleRow*>(
         malloc(tuple_descs.size() * sizeof(Tuple*))));
@@ -1079,8 +1079,8 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
   Status status;
   InitBlockMgr(-1, IO_BLOCK_SIZE);
   const int NUM_ROWS = 4000;
-  BufferedTupleStream stream(runtime_state_, *array_desc_, runtime_state_->block_mgr(),
-      client_, false, false);
+  BufferedTupleStream stream(
+      runtime_state_, array_desc_, runtime_state_->block_mgr(), client_, false, false);
   const vector<TupleDescriptor*>& tuple_descs = array_desc_->tuple_descriptors();
   // Write out a predictable pattern of data by iterating over arrays of constants.
   int strings_index = 0; // we take the mod of this as index into STRINGS.
@@ -1148,7 +1148,7 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
   array_len_index = 0;
   bool eos = false;
   int rows_read = 0;
-  RowBatch batch(*array_desc_, BATCH_SIZE, &tracker_);
+  RowBatch batch(array_desc_, BATCH_SIZE, &tracker_);
   do {
     batch.Reset();
     ASSERT_OK(stream.GetNext(&batch, &eos));
@@ -1191,7 +1191,7 @@ TEST_F(ArrayTupleStreamTest, TestComputeRowSize) {
   const SlotDescriptor* external_array_slot = tuple_descs[0]->slots()[1];
   external_slots.insert(external_array_slot->id());
 
-  BufferedTupleStream stream(runtime_state_, *array_desc_, runtime_state_->block_mgr(),
+  BufferedTupleStream stream(runtime_state_, array_desc_, runtime_state_->block_mgr(),
       client_, false, false, external_slots);
   gscoped_ptr<TupleRow, FreeDeleter> row(reinterpret_cast<TupleRow*>(
         malloc(tuple_descs.size() * sizeof(Tuple*))));

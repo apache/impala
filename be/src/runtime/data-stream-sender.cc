@@ -66,9 +66,9 @@ class DataStreamSender::Channel : public CacheLineAligned {
   // combination. buffer_size is specified in bytes and a soft limit on
   // how much tuple data is getting accumulated before being sent; it only applies
   // when data is added via AddRow() and not sent directly via SendBatch().
-  Channel(DataStreamSender* parent, const RowDescriptor& row_desc,
-          const TNetworkAddress& destination, const TUniqueId& fragment_instance_id,
-          PlanNodeId dest_node_id, int buffer_size)
+  Channel(DataStreamSender* parent, const RowDescriptor* row_desc,
+      const TNetworkAddress& destination, const TUniqueId& fragment_instance_id,
+      PlanNodeId dest_node_id, int buffer_size)
     : parent_(parent),
       buffer_size_(buffer_size),
       row_desc_(row_desc),
@@ -78,8 +78,7 @@ class DataStreamSender::Channel : public CacheLineAligned {
       num_data_bytes_sent_(0),
       rpc_thread_("DataStreamSender", "SenderThread", 1, 1,
           bind<void>(mem_fn(&Channel::TransmitData), this, _1, _2)),
-      rpc_in_flight_(false) {
-  }
+      rpc_in_flight_(false) {}
 
   // Initialize channel.
   // Returns OK if successful, error indication otherwise.
@@ -115,7 +114,7 @@ class DataStreamSender::Channel : public CacheLineAligned {
   DataStreamSender* parent_;
   int buffer_size_;
 
-  const RowDescriptor& row_desc_;
+  const RowDescriptor* row_desc_;
   TNetworkAddress address_;
   TUniqueId fragment_instance_id_;
   PlanNodeId dest_node_id_;
@@ -159,7 +158,7 @@ class DataStreamSender::Channel : public CacheLineAligned {
 Status DataStreamSender::Channel::Init(RuntimeState* state) {
   runtime_state_ = state;
   // TODO: figure out how to size batch_
-  int capacity = max(1, buffer_size_ / max(row_desc_.GetRowSize(), 1));
+  int capacity = max(1, buffer_size_ / max(row_desc_->GetRowSize(), 1));
   batch_.reset(new RowBatch(row_desc_, capacity, parent_->mem_tracker()));
   return Status::OK();
 }
@@ -250,7 +249,7 @@ Status DataStreamSender::Channel::AddRow(TupleRow* row) {
     RETURN_IF_ERROR(SendCurrentBatch());
   }
   TupleRow* dest = batch_->GetRow(batch_->AddRow());
-  const vector<TupleDescriptor*>& descs = row_desc_.tuple_descriptors();
+  const vector<TupleDescriptor*>& descs = row_desc_->tuple_descriptors();
   for (int i = 0; i < descs.size(); ++i) {
     if (UNLIKELY(row->GetTuple(i) == NULL)) {
       dest->SetTuple(i, NULL);
@@ -325,9 +324,8 @@ void DataStreamSender::Channel::Teardown(RuntimeState* state) {
   batch_.reset();
 }
 
-DataStreamSender::DataStreamSender(int sender_id,
-    const RowDescriptor& row_desc, const TDataStreamSink& sink,
-    const vector<TPlanFragmentDestination>& destinations,
+DataStreamSender::DataStreamSender(int sender_id, const RowDescriptor* row_desc,
+    const TDataStreamSink& sink, const vector<TPlanFragmentDestination>& destinations,
     int per_channel_buffer_size)
   : DataSink(row_desc),
     sender_id_(sender_id),
@@ -381,7 +379,7 @@ Status DataStreamSender::Init(const vector<TExpr>& thrift_output_exprs,
   if (partition_type_ == TPartitionType::HASH_PARTITIONED ||
       partition_type_ == TPartitionType::KUDU) {
     RETURN_IF_ERROR(ScalarExpr::Create(tsink.stream_sink.output_partition.partition_exprs,
-        row_desc_, state, &partition_exprs_));
+        *row_desc_, state, &partition_exprs_));
   }
   return Status::OK();
 }

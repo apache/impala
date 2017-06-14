@@ -27,7 +27,7 @@
 
 using namespace impala;
 
-NljBuilder::NljBuilder(const RowDescriptor& row_desc, RuntimeState* state)
+NljBuilder::NljBuilder(const RowDescriptor* row_desc, RuntimeState* state)
   : DataSink(row_desc), build_batch_cache_(row_desc, state->batch_size()) {}
 
 Status NljBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
@@ -105,4 +105,3 @@ Status NljBuilder::DeepCopyBuildBatches(RuntimeState* state) {
   input_build_batches_.Reset();
   return Status::OK();
 }
-

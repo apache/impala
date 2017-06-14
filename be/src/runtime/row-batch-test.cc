@@ -47,25 +47,25 @@ TEST(RowBatchTest, AcquireStateWithMarkFlushResources) {
   RowDescriptor row_desc(*desc_tbl, tuple_id, nullable_tuples);
   MemTracker tracker;
   {
-    RowBatch src(row_desc, 1024, &tracker);
+    RowBatch src(&row_desc, 1024, &tracker);
     src.AddRow();
     src.CommitLastRow();
     // Calls MarkFlushResources().
     src.MarkNeedsDeepCopy();
 
     // Note InitialCapacity(), not capacity(). Latter will DCHECK.
-    RowBatch dest(row_desc, src.InitialCapacity(), &tracker);
+    RowBatch dest(&row_desc, src.InitialCapacity(), &tracker);
     dest.AcquireState(&src);
   }
 
   // Confirm the bad pattern causes an error.
   {
-    RowBatch src(row_desc, 1024, &tracker);
+    RowBatch src(&row_desc, 1024, &tracker);
     src.AddRow();
     src.CommitLastRow();
     // Calls MarkFlushResources().
     src.MarkNeedsDeepCopy();
-    RowBatch bad_dest(row_desc, src.capacity(), &tracker);
+    RowBatch bad_dest(&row_desc, src.capacity(), &tracker);
     IMPALA_ASSERT_DEBUG_DEATH(bad_dest.AcquireState(&src), "");
   }
 }

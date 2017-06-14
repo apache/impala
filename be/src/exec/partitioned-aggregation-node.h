@@ -185,7 +185,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// nor this node's output row desc may contain the intermediate tuple, e.g.,
   /// in a single-node plan with an intermediate tuple different from the output tuple.
   /// Lives in the query state's obj_pool.
-  RowDescriptor* intermediate_row_desc_;
+  RowDescriptor intermediate_row_desc_;
 
   /// Tuple into which Finalize() results are stored. Possibly the same as
   /// the intermediate tuple.

@@ -34,8 +34,7 @@ namespace impala {
 
 const string PlanRootSink::NAME = "PLAN_ROOT_SINK";
 
-PlanRootSink::PlanRootSink(const RowDescriptor& row_desc)
-  : DataSink(row_desc) { }
+PlanRootSink::PlanRootSink(const RowDescriptor* row_desc) : DataSink(row_desc) {}
 
 namespace {
 
@@ -66,7 +65,7 @@ void ValidateCollectionSlots(const RowDescriptor& row_desc, RowBatch* batch) {
 }
 
 Status PlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
-  ValidateCollectionSlots(row_desc_, batch);
+  ValidateCollectionSlots(*row_desc_, batch);
   int current_batch_row = 0;
 
   // Don't enter the loop if batch->num_rows() == 0; no point triggering the consumer with

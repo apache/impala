@@ -43,7 +43,8 @@ class TPlan;
 class TupleRow;
 class TDebugOptions;
 
-/// Superclass of all executor nodes.
+/// Superclass of all execution nodes.
+///
 /// All subclasses need to make sure to check RuntimeState::is_cancelled()
 /// periodically in order to ensure timely termination after the cancellation
 /// flag gets set.
@@ -178,7 +179,13 @@ class ExecNode {
 
   int id() const { return id_; }
   TPlanNodeType::type type() const { return type_; }
-  const RowDescriptor& row_desc() const { return row_descriptor_; }
+
+  /// Returns the row descriptor for rows produced by this node. The RowDescriptor is
+  /// constant for the lifetime of the fragment instance, and so is shared by reference
+  /// across the plan tree, including in RowBatches. The lifetime of the descriptor is the
+  /// same as the lifetime of this node.
+  const RowDescriptor* row_desc() const { return &row_descriptor_; }
+
   ExecNode* child(int i) { return children_[i]; }
   int num_children() const { return children_.size(); }
   SubplanNode* get_containing_subplan() const { return containing_subplan_; }

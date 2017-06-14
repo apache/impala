@@ -128,7 +128,7 @@ Status HdfsScanNodeBase::Init(const TPlanNode& tnode, RuntimeState* state) {
     }
     ScalarExpr* filter_expr;
     RETURN_IF_ERROR(
-        ScalarExpr::Create(target.target_expr, row_desc(), state, &filter_expr));
+        ScalarExpr::Create(target.target_expr, *row_desc(), state, &filter_expr));
     filter_exprs_.push_back(filter_expr);
 
     // TODO: Move this to Prepare()
@@ -732,9 +732,9 @@ void HdfsScanNodeBase::InitNullCollectionValues(const TupleDescriptor* tuple_des
 }
 
 void HdfsScanNodeBase::InitNullCollectionValues(RowBatch* row_batch) const {
-  DCHECK_EQ(row_batch->row_desc().tuple_descriptors().size(), 1);
+  DCHECK_EQ(row_batch->row_desc()->tuple_descriptors().size(), 1);
   const TupleDescriptor& tuple_desc =
-      *row_batch->row_desc().tuple_descriptors()[tuple_idx()];
+      *row_batch->row_desc()->tuple_descriptors()[tuple_idx()];
   if (tuple_desc.collection_slots().empty()) return;
   for (int i = 0; i < row_batch->num_rows(); ++i) {
     Tuple* tuple = row_batch->GetRow(i)->GetTuple(tuple_idx());

@@ -81,8 +81,8 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
 
   // Validate the row desc layout is what we expect because the current join
   // implementation relies on it to enable some optimizations.
-  int num_left_tuples = child(0)->row_desc().tuple_descriptors().size();
-  int num_build_tuples = child(1)->row_desc().tuple_descriptors().size();
+  int num_left_tuples = child(0)->row_desc()->tuple_descriptors().size();
+  int num_build_tuples = child(1)->row_desc()->tuple_descriptors().size();
 
 #ifndef NDEBUG
   switch (join_op_) {
@@ -90,13 +90,13 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
     case TJoinOp::LEFT_SEMI_JOIN:
     case TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN: {
       // Only return the surviving probe-side tuples.
-      DCHECK(row_desc().Equals(child(0)->row_desc()));
+      DCHECK(row_desc()->Equals(*child(0)->row_desc()));
       break;
     }
     case TJoinOp::RIGHT_ANTI_JOIN:
     case TJoinOp::RIGHT_SEMI_JOIN: {
       // Only return the surviving build-side tuples.
-      DCHECK(row_desc().Equals(child(1)->row_desc()));
+      DCHECK(row_desc()->Equals(*child(1)->row_desc()));
       break;
     }
     default: {
@@ -107,12 +107,12 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
       //   result[1] = build[0]
       //   result[2] = build[1]
       for (int i = 0; i < num_left_tuples; ++i) {
-        TupleDescriptor* desc = child(0)->row_desc().tuple_descriptors()[i];
-        DCHECK_EQ(i, row_desc().GetTupleIdx(desc->id()));
+        TupleDescriptor* desc = child(0)->row_desc()->tuple_descriptors()[i];
+        DCHECK_EQ(i, row_desc()->GetTupleIdx(desc->id()));
       }
       for (int i = 0; i < num_build_tuples; ++i) {
-        TupleDescriptor* desc = child(1)->row_desc().tuple_descriptors()[i];
-        DCHECK_EQ(num_left_tuples + i, row_desc().GetTupleIdx(desc->id()));
+        TupleDescriptor* desc = child(1)->row_desc()->tuple_descriptors()[i];
+        DCHECK_EQ(num_left_tuples + i, row_desc()->GetTupleIdx(desc->id()));
       }
       break;
     }
@@ -307,14 +307,14 @@ void BlockingJoinNode::DebugString(int indentation_level, stringstream* out) con
 string BlockingJoinNode::GetLeftChildRowString(TupleRow* row) {
   stringstream out;
   out << "[";
-  int num_probe_tuple_rows = child(0)->row_desc().tuple_descriptors().size();
-  for (int i = 0; i < row_desc().tuple_descriptors().size(); ++i) {
+  int num_probe_tuple_rows = child(0)->row_desc()->tuple_descriptors().size();
+  for (int i = 0; i < row_desc()->tuple_descriptors().size(); ++i) {
     if (i != 0) out << " ";
     if (i >= num_probe_tuple_rows) {
       // Build row is not yet populated, print NULL
-      out << PrintTuple(NULL, *row_desc().tuple_descriptors()[i]);
+      out << PrintTuple(NULL, *row_desc()->tuple_descriptors()[i]);
     } else {
-      out << PrintTuple(row->GetTuple(i), *row_desc().tuple_descriptors()[i]);
+      out << PrintTuple(row->GetTuple(i), *row_desc()->tuple_descriptors()[i]);
     }
   }
   out << "]";

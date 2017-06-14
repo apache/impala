@@ -105,7 +105,7 @@ PartitionedAggregationNode::PartitionedAggregationNode(
   : ExecNode(pool, tnode, descs),
     intermediate_tuple_id_(tnode.agg_node.intermediate_tuple_id),
     intermediate_tuple_desc_(descs.GetTupleDescriptor(intermediate_tuple_id_)),
-    intermediate_row_desc_(pool->Add(new RowDescriptor(intermediate_tuple_desc_, false))),
+    intermediate_row_desc_(intermediate_tuple_desc_, false),
     output_tuple_id_(tnode.agg_node.output_tuple_id),
     output_tuple_desc_(descs.GetTupleDescriptor(output_tuple_id_)),
     needs_finalize_(tnode.agg_node.need_finalize),
@@ -150,7 +150,7 @@ Status PartitionedAggregationNode::Init(const TPlanNode& tnode, RuntimeState* st
   DCHECK(intermediate_tuple_desc_ != nullptr);
   DCHECK(output_tuple_desc_ != nullptr);
   DCHECK_EQ(intermediate_tuple_desc_->slots().size(), output_tuple_desc_->slots().size());
-  const RowDescriptor& row_desc = child(0)->row_desc();
+  const RowDescriptor& row_desc = *child(0)->row_desc();
   RETURN_IF_ERROR(ScalarExpr::Create(tnode.agg_node.grouping_exprs, row_desc,
       state, &grouping_exprs_));
 
@@ -162,7 +162,7 @@ Status PartitionedAggregationNode::Init(const TPlanNode& tnode, RuntimeState* st
     SlotRef* build_expr = pool_->Add(desc->type().type != TYPE_NULL ?
         new SlotRef(desc) : new SlotRef(desc, TYPE_BOOLEAN));
     build_exprs_.push_back(build_expr);
-    RETURN_IF_ERROR(build_expr->Init(*intermediate_row_desc_, state));
+    RETURN_IF_ERROR(build_expr->Init(intermediate_row_desc_, state));
     if (build_expr->type().IsVarLenStringType()) string_grouping_exprs_.push_back(i);
   }
 
@@ -232,7 +232,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   // TODO: Is there a need to create the stream here? If memory reservations work we may
   // be able to create this stream lazily and only whenever we need to spill.
   if (!is_streaming_preagg_ && needs_serialize_ && block_mgr_client_ != NULL) {
-    serialize_stream_.reset(new BufferedTupleStream(state, *intermediate_row_desc_,
+    serialize_stream_.reset(new BufferedTupleStream(state, &intermediate_row_desc_,
         state->block_mgr(), block_mgr_client_, false /* use_initial_small_buffers */,
         false /* read_write */));
     RETURN_IF_ERROR(serialize_stream_->Init(id(), runtime_profile(), false));
@@ -294,7 +294,7 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
     if (UNLIKELY(VLOG_ROW_IS_ON)) {
       for (int i = 0; i < batch.num_rows(); ++i) {
         TupleRow* row = batch.GetRow(i);
-        VLOG_ROW << "input row: " << PrintRow(row, children_[0]->row_desc());
+        VLOG_ROW << "input row: " << PrintRow(row, *children_[0]->row_desc());
       }
     }
 
@@ -369,7 +369,7 @@ Status PartitionedAggregationNode::HandleOutputStrings(RowBatch* row_batch,
 Status PartitionedAggregationNode::CopyStringData(const SlotDescriptor& slot_desc,
     RowBatch* row_batch, int first_row_idx, MemPool* pool) {
   DCHECK(slot_desc.type().IsVarLenStringType());
-  DCHECK_EQ(row_batch->row_desc().tuple_descriptors().size(), 1);
+  DCHECK_EQ(row_batch->row_desc()->tuple_descriptors().size(), 1);
   FOREACH_ROW(row_batch, first_row_idx, batch_iter) {
     Tuple* tuple = batch_iter.Get()->GetTuple(0);
     StringValue* sv = reinterpret_cast<StringValue*>(
@@ -705,7 +705,7 @@ Status PartitionedAggregationNode::Partition::InitStreams() {
   }
 
   aggregated_row_stream.reset(new BufferedTupleStream(parent->state_,
-      *parent->intermediate_row_desc_, parent->state_->block_mgr(),
+      &parent->intermediate_row_desc_, parent->state_->block_mgr(),
       parent->block_mgr_client_, true /* use_initial_small_buffers */,
       false /* read_write */, external_varlen_slots));
   RETURN_IF_ERROR(
@@ -803,10 +803,10 @@ Status PartitionedAggregationNode::Partition::SerializeStreamForSpilling() {
     // when we need to spill again. We need to have this available before we need
     // to spill to make sure it is available. This should be acquirable since we just
     // freed at least one buffer from this partition's (old) aggregated_row_stream.
-    parent->serialize_stream_.reset(new BufferedTupleStream(parent->state_,
-        *parent->intermediate_row_desc_, parent->state_->block_mgr(),
-        parent->block_mgr_client_, false /* use_initial_small_buffers */,
-        false /* read_write */));
+    parent->serialize_stream_.reset(
+        new BufferedTupleStream(parent->state_, &parent->intermediate_row_desc_,
+            parent->state_->block_mgr(), parent->block_mgr_client_,
+            false /* use_initial_small_buffers */, false /* read_write */));
     status = parent->serialize_stream_->Init(parent->id(), parent->runtime_profile(),
         false);
     if (status.ok()) {
@@ -1272,8 +1272,9 @@ Status PartitionedAggregationNode::ProcessStream(BufferedTupleStream* input_stre
 
     TPrefetchMode::type prefetch_mode = state_->query_options().prefetch_mode;
     bool eos = false;
-    RowBatch batch(AGGREGATED_ROWS ? *intermediate_row_desc_ : children_[0]->row_desc(),
-                   state_->batch_size(), mem_tracker());
+    const RowDescriptor* desc =
+        AGGREGATED_ROWS ? &intermediate_row_desc_ : children_[0]->row_desc();
+    RowBatch batch(desc, state_->batch_size(), mem_tracker());
     do {
       RETURN_IF_ERROR(input_stream->GetNext(&batch, &eos));
       RETURN_IF_ERROR(

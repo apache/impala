@@ -79,7 +79,7 @@ Status AggregationNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   DCHECK(output_tuple_desc_ != nullptr);
   RETURN_IF_ERROR(ExecNode::Init(tnode, state));
 
-  const RowDescriptor& row_desc = child(0)->row_desc();
+  const RowDescriptor& row_desc = *child(0)->row_desc();
   RETURN_IF_ERROR(ScalarExpr::Create(tnode.agg_node.grouping_exprs, row_desc, state,
       &grouping_exprs_));
   for (int i = 0; i < grouping_exprs_.size(); ++i) {
@@ -182,7 +182,7 @@ Status AggregationNode::Open(RuntimeState* state) {
     if (VLOG_ROW_IS_ON) {
       for (int i = 0; i < batch.num_rows(); ++i) {
         TupleRow* row = batch.GetRow(i);
-        VLOG_ROW << "input row: " << PrintRow(row, children_[0]->row_desc());
+        VLOG_ROW << "input row: " << PrintRow(row, *children_[0]->row_desc());
       }
     }
     if (process_row_batch_fn_ != nullptr) {
@@ -244,7 +244,7 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
     output_iterator_.Next<false>();
     row->SetTuple(0, output_tuple);
     if (ExecNode::EvalConjuncts(evals, num_conjuncts, row)) {
-      VLOG_ROW << "output row: " << PrintRow(row, row_desc());
+      VLOG_ROW << "output row: " << PrintRow(row, *row_desc());
       row_batch->CommitLastRow();
       ++num_rows_returned_;
       if (ReachedLimit()) break;

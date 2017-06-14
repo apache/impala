@@ -55,7 +55,7 @@ class SortedRunMerger {
   /// zero).
   typedef boost::function<Status (RowBatch**)> RunBatchSupplierFn;
 
-  SortedRunMerger(const TupleRowComparator& comparator, RowDescriptor* row_desc,
+  SortedRunMerger(const TupleRowComparator& comparator, const RowDescriptor* row_desc,
       RuntimeProfile* profile, bool deep_copy_input);
 
   /// Prepare this merger to merge and return rows from the sorted runs in 'input_runs'.
@@ -96,7 +96,7 @@ class SortedRunMerger {
 
   /// Descriptor for the rows provided by the input runs. Owned by the exec-node through
   /// which this merger was created.
-  RowDescriptor* input_row_desc_;
+  const RowDescriptor* input_row_desc_;
 
   /// True if rows must be deep copied into the output batch.
   bool deep_copy_input_;

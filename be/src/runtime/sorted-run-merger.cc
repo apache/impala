@@ -126,7 +126,7 @@ void SortedRunMerger::Heapify(int parent_index) {
 }
 
 SortedRunMerger::SortedRunMerger(const TupleRowComparator& comparator,
-    RowDescriptor* row_desc, RuntimeProfile* profile, bool deep_copy_input)
+    const RowDescriptor* row_desc, RuntimeProfile* profile, bool deep_copy_input)
   : comparator_(comparator),
     input_row_desc_(row_desc),
     deep_copy_input_(deep_copy_input) {

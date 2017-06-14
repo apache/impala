@@ -85,15 +85,15 @@ class RowBatch {
   /// Create RowBatch for a maximum of 'capacity' rows of tuples specified
   /// by 'row_desc'.
   /// tracker cannot be NULL.
-  RowBatch(const RowDescriptor& row_desc, int capacity, MemTracker* tracker);
+  RowBatch(const RowDescriptor* row_desc, int capacity, MemTracker* tracker);
 
   /// Populate a row batch from input_batch by copying input_batch's
   /// tuple_data into the row batch's mempool and converting all offsets
   /// in the data back into pointers.
   /// TODO: figure out how to transfer the data from input_batch to this RowBatch
   /// (so that we don't need to make yet another copy)
-  RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch,
-      MemTracker* tracker);
+  RowBatch(
+      const RowDescriptor* row_desc, const TRowBatch& input_batch, MemTracker* tracker);
 
   /// Releases all resources accumulated at this row batch.  This includes
   ///  - tuple_ptrs
@@ -321,7 +321,7 @@ class RowBatch {
     return tuple_ptrs_size_ / (num_tuples_per_row_ * sizeof(Tuple*));
   }
 
-  const RowDescriptor& row_desc() const { return row_desc_; }
+  const RowDescriptor* row_desc() const { return row_desc_; }
 
   /// Max memory that this row batch can accumulate before it is considered at capacity.
   /// This is a soft capacity: row batches may exceed the capacity, preferably only by a
@@ -424,8 +424,9 @@ class RowBatch {
   // Less frequently used members that are not accessed on performance-critical paths
   // should go below here.
 
-  /// Full row descriptor for rows in this batch.
-  RowDescriptor row_desc_;
+  /// Full row descriptor for rows in this batch. Owned by the exec node that produced
+  /// this batch.
+  const RowDescriptor* row_desc_;
 
   MemTracker* mem_tracker_;  // not owned
 

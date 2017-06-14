@@ -53,7 +53,7 @@ Status UnionNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   const vector<vector<TExpr>>& const_texpr_lists = tnode.union_node.const_expr_lists;
   for (const vector<TExpr>& texprs : const_texpr_lists) {
     vector<ScalarExpr*> const_exprs;
-    RETURN_IF_ERROR(ScalarExpr::Create(texprs, row_desc(), state, &const_exprs));
+    RETURN_IF_ERROR(ScalarExpr::Create(texprs, *row_desc(), state, &const_exprs));
     DCHECK_EQ(const_exprs.size(), tuple_desc_->slots().size());
     const_exprs_lists_.push_back(const_exprs);
   }
@@ -63,7 +63,7 @@ Status UnionNode::Init(const TPlanNode& tnode, RuntimeState* state) {
     const vector<TExpr>& texprs = thrift_result_exprs[i];
     vector<ScalarExpr*> child_exprs;
     RETURN_IF_ERROR(
-        ScalarExpr::Create(texprs, child(i)->row_desc(), state, &child_exprs));
+        ScalarExpr::Create(texprs, *child(i)->row_desc(), state, &child_exprs));
     child_exprs_lists_.push_back(child_exprs);
     DCHECK_EQ(child_exprs.size(), tuple_desc_->slots().size());
   }
@@ -164,7 +164,7 @@ Status UnionNode::GetNextPassThrough(RuntimeState* state, RowBatch* row_batch) {
   DCHECK(!IsInSubplan());
   DCHECK_LT(child_idx_, children_.size());
   DCHECK(IsChildPassthrough(child_idx_));
-  DCHECK(child(child_idx_)->row_desc().LayoutEquals(row_batch->row_desc()));
+  DCHECK(child(child_idx_)->row_desc()->LayoutEquals(*row_batch->row_desc()));
   if (child_eos_) RETURN_IF_ERROR(child(child_idx_)->Open(state));
   DCHECK_EQ(row_batch->num_rows(), 0);
   RETURN_IF_ERROR(child(child_idx_)->GetNext(state, row_batch, &child_eos_));

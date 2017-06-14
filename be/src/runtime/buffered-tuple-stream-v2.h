@@ -208,7 +208,7 @@ class BufferedTupleStreamV2 {
   /// that are added and the rows being returned.
   /// page_len: the size of pages to use in the stream
   /// ext_varlen_slots: set of varlen slots with data stored externally to the stream
-  BufferedTupleStreamV2(RuntimeState* state, const RowDescriptor& row_desc,
+  BufferedTupleStreamV2(RuntimeState* state, const RowDescriptor* row_desc,
       BufferPool::ClientHandle* buffer_pool_client, int64_t default_page_len,
       int64_t max_page_len,
       const std::set<SlotId>& ext_varlen_slots = std::set<SlotId>());
@@ -406,7 +406,7 @@ class BufferedTupleStreamV2 {
   RuntimeState* const state_;
 
   /// Description of rows stored in the stream.
-  const RowDescriptor& desc_;
+  const RowDescriptor* desc_;
 
   /// Plan node ID, used for error reporting.
   int node_id_;

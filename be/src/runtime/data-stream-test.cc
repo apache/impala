@@ -310,7 +310,7 @@ class DataStreamTest : public testing::Test {
 
   // Create batch_, but don't fill it with data yet. Assumes we created row_desc_.
   RowBatch* CreateRowBatch() {
-    RowBatch* batch = new RowBatch(*row_desc_, BATCH_CAPACITY, &tracker_);
+    RowBatch* batch = new RowBatch(row_desc_, BATCH_CAPACITY, &tracker_);
     int64_t* tuple_mem = reinterpret_cast<int64_t*>(
         batch->tuple_data_pool()->Allocate(BATCH_CAPACITY * 8));
     bzero(tuple_mem, BATCH_CAPACITY * 8);
@@ -341,7 +341,7 @@ class DataStreamTest : public testing::Test {
     GetNextInstanceId(&instance_id);
     receiver_info_.push_back(ReceiverInfo(stream_type, num_senders, receiver_num));
     ReceiverInfo& info = receiver_info_.back();
-    info.stream_recvr = stream_mgr_->CreateRecvr(runtime_state_.get(), *row_desc_,
+    info.stream_recvr = stream_mgr_->CreateRecvr(runtime_state_.get(), row_desc_,
         instance_id, DEST_NODE_ID, num_senders, buffer_size, profile, is_merging);
     if (!is_merging) {
       info.thread_handle = new thread(&DataStreamTest::ReadStream, this, &info);
@@ -380,7 +380,7 @@ class DataStreamTest : public testing::Test {
   void ReadStreamMerging(ReceiverInfo* info, RuntimeProfile* profile) {
     info->status = info->stream_recvr->CreateMerger(*less_than_);
     if (info->status.IsCancelled()) return;
-    RowBatch batch(*row_desc_, 1024, &tracker_);
+    RowBatch batch(row_desc_, 1024, &tracker_);
     VLOG_QUERY << "start reading merging";
     bool eos;
     while (!(info->status = info->stream_recvr->GetNext(&batch, &eos)).IsCancelled()) {
@@ -489,7 +489,7 @@ class DataStreamTest : public testing::Test {
     VLOG_QUERY << "create sender " << sender_num;
     const TDataSink& sink = GetSink(partition_type);
     DataStreamSender sender(
-        sender_num, *row_desc_, sink.stream_sink, dest_, channel_buffer_size);
+        sender_num, row_desc_, sink.stream_sink, dest_, channel_buffer_size);
 
     TExprNode expr_node;
     expr_node.node_type = TExprNodeType::SLOT_REF;
@@ -607,7 +607,7 @@ TEST_F(DataStreamTest, CloseRecvrWhileReferencesRemain) {
   TUniqueId instance_id;
   GetNextInstanceId(&instance_id);
   shared_ptr<DataStreamRecvr> stream_recvr = stream_mgr_->CreateRecvr(runtime_state.get(),
-      *row_desc_, instance_id, DEST_NODE_ID, 1, 1, profile.get(), false);
+      row_desc_, instance_id, DEST_NODE_ID, 1, 1, profile.get(), false);
 
   // Perform tear down, but keep a reference to the receiver so that it is deleted last
   // (to confirm that the destructor does not access invalid state after tear-down).

@@ -79,7 +79,7 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
   // TODO: figure out appropriate buffer size
   DCHECK_GT(num_senders_, 0);
   stream_recvr_ = ExecEnv::GetInstance()->stream_mgr()->CreateRecvr(state,
-      input_row_desc_, state->fragment_instance_id(), id_, num_senders_,
+      &input_row_desc_, state->fragment_instance_id(), id_, num_senders_,
       FLAGS_exchg_node_buffer_size_bytes, runtime_profile(), is_merging_);
   if (is_merging_) {
     less_than_.reset(
@@ -197,7 +197,7 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
     *eos = (input_batch_ == NULL);
     if (*eos) return Status::OK();
     next_row_idx_ = 0;
-    DCHECK(input_batch_->row_desc().LayoutIsPrefixOf(output_batch->row_desc()));
+    DCHECK(input_batch_->row_desc()->LayoutIsPrefixOf(*output_batch->row_desc()));
   }
 }
 

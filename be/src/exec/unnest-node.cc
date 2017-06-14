@@ -59,7 +59,7 @@ Status UnnestNode::Init(const TPlanNode& tnode, RuntimeState* state) {
 Status UnnestNode::InitCollExpr(RuntimeState* state) {
   DCHECK(containing_subplan_ != nullptr)
       << "set_containing_subplan() must have been called";
-  const RowDescriptor& row_desc = containing_subplan_->child(0)->row_desc();
+  const RowDescriptor& row_desc = *containing_subplan_->child(0)->row_desc();
   RETURN_IF_ERROR(ScalarExpr::Create(thrift_coll_expr_, row_desc, state, &coll_expr_));
   DCHECK(coll_expr_->IsSlotRef());
   return Status::OK();
@@ -78,8 +78,8 @@ Status UnnestNode::Prepare(RuntimeState* state) {
   num_collections_counter_ =
       ADD_COUNTER(runtime_profile_, "NumCollections", TUnit::UNIT);
 
-  DCHECK_EQ(1, row_desc().tuple_descriptors().size());
-  const TupleDescriptor* item_tuple_desc = row_desc().tuple_descriptors()[0];
+  DCHECK_EQ(1, row_desc()->tuple_descriptors().size());
+  const TupleDescriptor* item_tuple_desc = row_desc()->tuple_descriptors()[0];
   DCHECK(item_tuple_desc != nullptr);
   item_byte_size_ = item_tuple_desc->byte_size();
 
@@ -92,8 +92,8 @@ Status UnnestNode::Prepare(RuntimeState* state) {
   const SlotRef* slot_ref = static_cast<SlotRef*>(coll_expr_);
   coll_slot_desc_ = state->desc_tbl().GetSlotDescriptor(slot_ref->slot_id());
   DCHECK(coll_slot_desc_ != nullptr);
-  const RowDescriptor& row_desc = containing_subplan_->child(0)->row_desc();
-  coll_tuple_idx_ = row_desc.GetTupleIdx(coll_slot_desc_->parent()->id());
+  const RowDescriptor* row_desc = containing_subplan_->child(0)->row_desc();
+  coll_tuple_idx_ = row_desc->GetTupleIdx(coll_slot_desc_->parent()->id());
 
   return Status::OK();
 }
