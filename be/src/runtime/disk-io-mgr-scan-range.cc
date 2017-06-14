@@ -289,29 +289,19 @@ Status DiskIoMgr::ScanRange::Open(bool use_file_handle_cache) {
     // so s3 and remote filesystems should obtain an exclusive file handle
     // for each scan range.
     if (use_file_handle_cache && expected_local_) return Status::OK();
+    // Get a new exclusive file handle.
     exclusive_hdfs_fh_ = io_mgr_->GetCachedHdfsFileHandle(fs_, file_string(),
-        mtime(), reader_);
+        mtime(), reader_, true);
     if (exclusive_hdfs_fh_ == nullptr) {
       return Status(GetHdfsErrorMsg("Failed to open HDFS file ", file_));
     }
 
-    int num_retries = 0;
-    while (true) {
-      if (hdfsSeek(fs_, exclusive_hdfs_fh_->file(), offset_) == 0) break;
-      // Seek failed. If already retried once, return error. Otherwise, destroy
-      // the current file handle and retry with a new handle.
-      DCHECK_LE(num_retries, 1);
-      if (num_retries == 1) {
-        io_mgr_->ReleaseCachedHdfsFileHandle(file_string(), exclusive_hdfs_fh_);
-        exclusive_hdfs_fh_ = nullptr;
-        string error_msg = GetHdfsErrorMsg("");
-        stringstream ss;
-        ss << "Error seeking to " << offset_ << " in file: " << file_ << " " << error_msg;
-        return Status(ss.str());
-      }
-      ++num_retries;
-      RETURN_IF_ERROR(io_mgr_->ReopenCachedHdfsFileHandle(fs_, file_string(),
-          mtime(), &exclusive_hdfs_fh_));
+    if (hdfsSeek(fs_, exclusive_hdfs_fh_->file(), offset_) != 0) {
+      // Destroy the file handle and remove it from the cache.
+      io_mgr_->ReleaseCachedHdfsFileHandle(file_string(), exclusive_hdfs_fh_, true);
+      exclusive_hdfs_fh_ = nullptr;
+      return Status(Substitute("Error seeking to $0 in file: $1 $2", offset_, file_,
+          GetHdfsErrorMsg("")));
     }
   } else {
     if (local_file_ != nullptr) return Status::OK();
@@ -352,7 +342,8 @@ void DiskIoMgr::ScanRange::Close() {
         external_buffer_tag_ = ExternalBufferTag::NO_BUFFER;
       }
 
-      io_mgr_->ReleaseCachedHdfsFileHandle(file_string(), exclusive_hdfs_fh_);
+      // Destroy the file handle and remove it from the cache.
+      io_mgr_->ReleaseCachedHdfsFileHandle(file_string(), exclusive_hdfs_fh_, true);
       exclusive_hdfs_fh_ = nullptr;
       closed_file = true;
     }
@@ -434,7 +425,7 @@ Status DiskIoMgr::ScanRange::Read(
       hdfs_file = exclusive_hdfs_fh_->file();
     } else {
       borrowed_hdfs_fh = io_mgr_->GetCachedHdfsFileHandle(fs_, file_string(),
-          mtime(), reader_);
+          mtime(), reader_, false);
       if (borrowed_hdfs_fh == nullptr) {
         return Status(GetHdfsErrorMsg("Failed to open HDFS file ", file_));
       }
@@ -489,17 +480,17 @@ Status DiskIoMgr::ScanRange::Read(
         // Do not retry:
         // - if read was successful (current_bytes_read != -1)
         // - or if already retried once
+        // - or if this not using a borrowed file handle
         DCHECK_LE(num_retries, 1);
-        if (current_bytes_read != -1 || num_retries == 1) {
+        if (current_bytes_read != -1 || borrowed_hdfs_fh == nullptr ||
+            num_retries == 1) {
           break;
         }
         // The error may be due to a bad file handle. Reopen the file handle and retry.
         ++num_retries;
-        HdfsFileHandle** fh_to_refresh =
-            (borrowed_hdfs_fh != nullptr ? &borrowed_hdfs_fh : &exclusive_hdfs_fh_);
         RETURN_IF_ERROR(io_mgr_->ReopenCachedHdfsFileHandle(fs_, file_string(),
-            mtime(), fh_to_refresh));
-        hdfs_file = (*fh_to_refresh)->file();
+            mtime(), &borrowed_hdfs_fh));
+        hdfs_file = borrowed_hdfs_fh->file();
       }
       if (!status.ok()) break;
       if (current_bytes_read == 0) {
@@ -514,7 +505,7 @@ Status DiskIoMgr::ScanRange::Read(
     }
 
     if (borrowed_hdfs_fh != nullptr) {
-      io_mgr_->ReleaseCachedHdfsFileHandle(file_string(), borrowed_hdfs_fh);
+      io_mgr_->ReleaseCachedHdfsFileHandle(file_string(), borrowed_hdfs_fh, false);
     }
     if (!status.ok()) return status;
   } else {
@@ -558,19 +549,10 @@ Status DiskIoMgr::ScanRange::ReadFromCache(bool* read_succeeded) {
 
     DCHECK(exclusive_hdfs_fh_ != nullptr);
     DCHECK(external_buffer_tag_ == ExternalBufferTag::NO_BUFFER);
-    int num_retries = 0;
-    while (true) {
-      cached_buffer_ = hadoopReadZero(exclusive_hdfs_fh_->file(),
-          io_mgr_->cached_read_options_, len());
-      if (cached_buffer_ != nullptr) {
-        external_buffer_tag_ = ExternalBufferTag::CACHED_BUFFER;
-        break;
-      }
-      DCHECK_LE(num_retries, 1);
-      if (num_retries == 1) break;
-      ++num_retries;
-      RETURN_IF_ERROR(io_mgr_->ReopenCachedHdfsFileHandle(fs_, file_string(), mtime(),
-          &exclusive_hdfs_fh_));
+    cached_buffer_ =
+      hadoopReadZero(exclusive_hdfs_fh_->file(), io_mgr_->cached_read_options_, len());
+    if (cached_buffer_ != nullptr) {
+      external_buffer_tag_ = ExternalBufferTag::CACHED_BUFFER;
     }
   }
   // Data was not cached, caller will fall back to normal read path.

@@ -1206,12 +1206,14 @@ int DiskIoMgr::AssignQueue(const char* file, int disk_id, bool expected_local) {
 }
 
 HdfsFileHandle* DiskIoMgr::GetCachedHdfsFileHandle(const hdfsFS& fs,
-    std::string* fname, int64_t mtime, DiskIoRequestContext *reader) {
+    std::string* fname, int64_t mtime, DiskIoRequestContext *reader,
+    bool require_new) {
   bool cache_hit;
-  HdfsFileHandle* fh = file_handle_cache_.GetFileHandle(fs, fname, mtime, false,
+  HdfsFileHandle* fh = file_handle_cache_.GetFileHandle(fs, fname, mtime, require_new,
       &cache_hit);
-  if (!fh) return nullptr;
+  if (fh == nullptr) return nullptr;
   if (cache_hit) {
+    DCHECK(!require_new);
     ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO->Update(1L);
     ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT->Increment(1L);
     reader->cached_file_handles_hit_count_.Add(1L);
@@ -1223,19 +1225,21 @@ HdfsFileHandle* DiskIoMgr::GetCachedHdfsFileHandle(const hdfsFS& fs,
   return fh;
 }
 
-void DiskIoMgr::ReleaseCachedHdfsFileHandle(std::string* fname, HdfsFileHandle* fid) {
-  file_handle_cache_.ReleaseFileHandle(fname, fid, false);
+void DiskIoMgr::ReleaseCachedHdfsFileHandle(std::string* fname, HdfsFileHandle* fid,
+    bool destroy_handle) {
+  file_handle_cache_.ReleaseFileHandle(fname, fid, destroy_handle);
 }
 
 Status DiskIoMgr::ReopenCachedHdfsFileHandle(const hdfsFS& fs, std::string* fname,
     int64_t mtime, HdfsFileHandle** fid) {
-  bool dummy;
+  bool cache_hit;
   file_handle_cache_.ReleaseFileHandle(fname, *fid, true);
   // The old handle has been destroyed, so *fid must be overwritten before returning.
   *fid = file_handle_cache_.GetFileHandle(fs, fname, mtime, true,
-      &dummy);
+      &cache_hit);
   if (*fid == nullptr) {
     return Status(GetHdfsErrorMsg("Failed to open HDFS file ", fname->data()));
   }
+  DCHECK(!cache_hit);
   return Status::OK();
 }

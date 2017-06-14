@@ -452,7 +452,8 @@ class DiskIoMgr : public CacheLineAligned {
     /// If 'use_file_handle_cache' is false or this is a remote hdfs file or this is
     /// a local OS file, Open() will maintain a file handle on the scan range for
     /// exclusive use by this scan range. An exclusive hdfs file handle still comes
-    /// from the cache, but it is held for the entire duration of a scan range's lifetime.
+    /// from the cache, but it is a newly opened file handle that is held for the
+    /// entire duration of a scan range's lifetime and destroyed in Close().
     /// All local OS files are opened using normal OS file APIs.
     Status Open(bool use_file_handle_cache) WARN_UNUSED_RESULT;
 
@@ -512,8 +513,8 @@ class DiskIoMgr : public CacheLineAligned {
     /// 2. The scan range is using hdfs caching.
     /// -OR-
     /// 3. The hdfs file is expected to be remote (expected_local_ == false)
-    /// In each case, the scan range gets a file handle from the file handle cache
-    /// at Open() and holds it exclusively until Close() is called.
+    /// In each case, the scan range gets a new file handle from the file handle cache
+    /// at Open(), holds it exclusively, and destroys it in Close().
     union {
       FILE* local_file_ = nullptr;
       HdfsFileHandle* exclusive_hdfs_fh_;
@@ -773,14 +774,19 @@ class DiskIoMgr : public CacheLineAligned {
   bool Validate() const;
 
   /// Given a FS handle, name and last modified time of the file, gets an HdfsFileHandle
-  /// from the file handle cache. On success, records statistics about whether this was
-  /// a cache hit or miss in the `reader` as well as at the system level. In case of an
+  /// from the file handle cache. If 'require_new_handle' is true, the cache will open
+  /// a fresh file handle. On success, records statistics about whether this was
+  /// a cache hit or miss in the 'reader' as well as at the system level. In case of an
   /// error returns nullptr.
   HdfsFileHandle* GetCachedHdfsFileHandle(const hdfsFS& fs,
-      std::string* fname, int64_t mtime, DiskIoRequestContext *reader);
+      std::string* fname, int64_t mtime, DiskIoRequestContext *reader,
+      bool require_new_handle);
 
   /// Releases a file handle back to the file handle cache when it is no longer in use.
-  void ReleaseCachedHdfsFileHandle(std::string* fname, HdfsFileHandle* fid);
+  /// If 'destroy_handle' is true, the file handle cache will close the file handle
+  /// immediately.
+  void ReleaseCachedHdfsFileHandle(std::string* fname, HdfsFileHandle* fid,
+      bool destroy_handle);
 
   /// Reopens a file handle by destroying the file handle and getting a fresh
   /// file handle from the cache. Returns an error if the file could not be reopened.

@@ -85,9 +85,6 @@ class SkipIf:
   not_hdfs = pytest.mark.skipif(not IS_HDFS, reason="HDFS Filesystem needed")
   no_secondary_fs = pytest.mark.skipif(not SECONDARY_FILESYSTEM,
       reason="Secondary filesystem needed")
-  no_file_handle_caching = pytest.mark.skipif(IS_S3 or IS_ADLS or IS_ISILON or \
-      pytest.config.option.testing_remote_cluster,
-      reason="File handle caching needed")
 
 class SkipIfIsilon:
   caching = pytest.mark.skipif(IS_ISILON, reason="SET CACHED not implemented for Isilon")
@@ -126,6 +123,8 @@ class SkipIfLocal:
       reason="Multiple impalads are not supported when using local file system")
   parquet_file_size = pytest.mark.skipif(IS_LOCAL,
       reason="Parquet block size incorrectly determined")
+  hdfs_fd_caching = pytest.mark.skipif(IS_LOCAL,
+      reason="HDFS file handle caching not supported for local non-HDFS files")
 
   # These ones need test infra work to re-enable.
   hbase = pytest.mark.skipif(IS_LOCAL,

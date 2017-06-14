@@ -18,9 +18,13 @@
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIf
+from tests.common.skip import SkipIfLocal
+from tests.util.filesystem_utils import (
+    IS_ISILON,
+    IS_S3,
+    IS_ADLS)
 
-@SkipIf.no_file_handle_caching
+@SkipIfLocal.hdfs_fd_caching
 class TestHdfsFdCaching(CustomClusterTestSuite):
   """Tests that if HDFS file handle caching is enabled, file handles are actually cached
   and the associated metrics return valid results. In addition, tests that the upper bound
@@ -55,24 +59,32 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
     super(TestHdfsFdCaching, self).teardown_method(method)
     self.client.execute("drop database if exists cachefd cascade")
 
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
-      impalad_args="--max_cached_file_handles=16",
-      catalogd_args="--load_catalog_in_background=false")
-  def test_scan_does_cache_fd(self, vector):
-    """Tests that an hdfs scan will lead to caching HDFS file descriptors."""
+  def run_fd_caching_test(self, vector, caching_expected, cache_capacity):
+    """
+    Tests that HDFS file handles are cached as expected. This is used both
+    for the positive and negative test cases. If caching_expected is true,
+    this verifies that the cache adheres to the specified capacity. Also,
+    repeated queries across the same files reuse the file handles.
+    If caching_expected is false, it verifies that the cache does not
+    change in size while running queries.
+    """
 
-    # Maximum number of file handles cached
-    assert self.max_cached_handles() <= 16
-    # The table has one file, so there should be one more handle cached after the
-    # first select.
-    num_handles_before = self.cached_handles()
+    # Maximum number of file handles cached (applies whether caching expected
+    # or not)
+    assert self.max_cached_handles() <= cache_capacity
+
+    num_handles_start = self.cached_handles()
+    # The table has one file. If caching is expected, there should be one more
+    # handle cached after the first select. If caching is not expected, the
+    # number of handles should not change from the initial number.
     self.execute_query("select * from cachefd.simple", vector=vector)
     num_handles_after = self.cached_handles()
-    assert self.max_cached_handles() <= 16
+    assert self.max_cached_handles() <= cache_capacity
 
-    # Should have one more file handle
-    assert num_handles_after == (num_handles_before + 1)
+    if caching_expected:
+      assert num_handles_after == (num_handles_start + 1)
+    else:
+      assert num_handles_after == num_handles_start
 
     # No open handles if scanning is finished
     assert self.outstanding_handles() == 0
@@ -81,18 +93,46 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
     for x in range(10):
       self.execute_query("select * from cachefd.simple", vector=vector)
       assert self.cached_handles() == num_handles_after
-      assert self.max_cached_handles() <= 16
+      assert self.max_cached_handles() <= cache_capacity
       assert self.outstanding_handles() == 0
 
     # Create more files. This means there are more files than the cache size.
     # The cache size should still be enforced.
-    self.create_n_files(100)
+    self.create_n_files(cache_capacity + 100)
 
     # Read all the files of the table and make sure no FD leak
     for x in range(10):
       self.execute_query("select count(*) from cachefd.simple;", vector=vector)
       assert self.max_cached_handles() <= 16
+      if not caching_expected:
+        assert self.cached_handles() == num_handles_start
     assert self.outstanding_handles() == 0
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--max_cached_file_handles=16",
+      catalogd_args="--load_catalog_in_background=false")
+  def test_caching_enabled(self, vector):
+    """Test of the HDFS file handle cache with the parameter specified"""
+    cache_capacity = 16
+
+    # Caching only applies to local HDFS files. If this is local HDFS, then verify
+    # that caching works. Otherwise, verify that file handles are not cached.
+    if (IS_S3 or IS_ADLS or IS_ISILON or pytest.config.option.testing_remote_cluster):
+      caching_expected = False
+    else:
+      caching_expected = True
+    self.run_fd_caching_test(vector, caching_expected, cache_capacity)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--max_cached_file_handles=0",
+      catalogd_args="--load_catalog_in_background=false")
+  def test_caching_disabled_by_param(self, vector):
+    """Test that the HDFS file handle cache is disabled when the parameter is zero"""
+    cache_capacity = 0
+    caching_expected = False
+    self.run_fd_caching_test(vector, caching_expected, cache_capacity)
 
   def cached_handles(self):
     return self.get_agg_metric("impala-server.io.mgr.num-cached-file-handles")
