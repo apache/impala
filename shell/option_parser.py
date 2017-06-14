@@ -84,7 +84,8 @@ def get_option_parser(defaults):
   parser.add_option("-q", "--query", dest="query",
                     help="Execute a query without the shell")
   parser.add_option("-f", "--query_file", dest="query_file",
-                    help="Execute the queries in the query file, delimited by ;")
+                    help="Execute the queries in the query file, delimited by ;."
+                         " Queries may be read from stdin if the argument to -f is -.")
   parser.add_option("-k", "--kerberos", dest="use_kerberos",
                     action="store_true", help="Connect to a kerberized impalad")
   parser.add_option("-o", "--output_file", dest="output_file",
