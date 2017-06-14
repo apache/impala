@@ -550,7 +550,7 @@ Status PhjBuilder::RepartitionBuildInput(
   // reservation and avoid this complication.
   while (true) {
     bool got_buffer;
-    input_probe_rows->PrepareForRead(true, &got_buffer);
+    RETURN_IF_ERROR(input_probe_rows->PrepareForRead(true, &got_buffer));
     if (got_buffer) break;
     RETURN_IF_ERROR(SpillPartition(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
   }

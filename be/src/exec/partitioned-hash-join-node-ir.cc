@@ -242,7 +242,8 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRow(
         remaining_capacity, status);
   } else {
     DCHECK(JoinOp == TJoinOp::RIGHT_OUTER_JOIN ||
-           JoinOp == TJoinOp::LEFT_OUTER_JOIN || TJoinOp::FULL_OUTER_JOIN);
+           JoinOp == TJoinOp::LEFT_OUTER_JOIN ||
+           JoinOp == TJoinOp::FULL_OUTER_JOIN);
     return ProcessProbeRowOuterJoins<JoinOp>(other_join_conjunct_evals,
         num_other_join_conjuncts, conjunct_evals, num_conjuncts, out_batch_iterator,
         remaining_capacity);

@@ -76,7 +76,7 @@ class PhjBuilder : public DataSink {
 
   Status InitExprsAndFilters(RuntimeState* state,
       const std::vector<TEqJoinCondition>& eq_join_conjuncts,
-      const std::vector<TRuntimeFilterDesc>& filters);
+      const std::vector<TRuntimeFilterDesc>& filters) WARN_UNUSED_RESULT;
 
   /// Implementations of DataSink interface methods.
   virtual std::string GetName() override;
@@ -121,8 +121,8 @@ class PhjBuilder : public DataSink {
   /// 'level' is the level new partitions should be created with. This functions prepares
   /// 'input_probe_rows' for reading in "delete_on_read" mode, so that the probe phase
   /// has enough buffers preallocated to execute successfully.
-  Status RepartitionBuildInput(
-      Partition* input_partition, int level, BufferedTupleStream* input_probe_rows);
+  Status RepartitionBuildInput(Partition* input_partition, int level,
+      BufferedTupleStream* input_probe_rows) WARN_UNUSED_RESULT;
 
   /// Returns the largest build row count out of the current hash partitions.
   int64_t LargestPartitionRows() const;
@@ -196,11 +196,11 @@ class PhjBuilder : public DataSink {
     /// pinned or the hash table could not be built due to memory pressure, sets *built
     /// to false and returns OK. Returns an error status if any other error is
     /// encountered.
-    Status BuildHashTable(bool* built);
+    Status BuildHashTable(bool* built) WARN_UNUSED_RESULT;
 
     /// Spills this partition, the partition's stream is unpinned with 'mode' and
     /// its hash table is destroyed if it was built.
-    Status Spill(BufferedTupleStream::UnpinMode mode);
+    Status Spill(BufferedTupleStream::UnpinMode mode) WARN_UNUSED_RESULT;
 
     bool ALWAYS_INLINE IsClosed() const { return build_rows_ == NULL; }
     BufferedTupleStream* ALWAYS_INLINE build_rows() { return build_rows_.get(); }
@@ -267,14 +267,15 @@ class PhjBuilder : public DataSink {
   /// Create and initialize a set of hash partitions for partitioning level 'level'.
   /// The previous hash partitions must have been cleared with ClearHashPartitions().
   /// After calling this, batches are added to the new partitions by calling Send().
-  Status CreateHashPartitions(int level);
+  Status CreateHashPartitions(int level) WARN_UNUSED_RESULT;
 
   /// Create a new partition in 'all_partitions_' and prepare it for writing.
-  Status CreateAndPreparePartition(int level, Partition** partition);
+  Status CreateAndPreparePartition(int level, Partition** partition) WARN_UNUSED_RESULT;
 
   /// Reads the rows in build_batch and partitions them into hash_partitions_. If
   /// 'build_filters' is true, runtime filters are populated.
-  Status ProcessBuildBatch(RowBatch* build_batch, HashTableCtx* ctx, bool build_filters);
+  Status ProcessBuildBatch(
+      RowBatch* build_batch, HashTableCtx* ctx, bool build_filters) WARN_UNUSED_RESULT;
 
   /// Append 'row' to 'stream'. In the common case, appending the row to the stream
   /// immediately succeeds. Otherwise this function falls back to the slower path of
@@ -282,19 +283,20 @@ class PhjBuilder : public DataSink {
   /// and sets 'status' if it was unable to append the row, even after spilling
   /// partitions. This odd return convention is used to avoid emitting unnecessary code
   /// for ~Status in perf-critical code.
-  bool AppendRow(BufferedTupleStream* stream, TupleRow* row, Status* status);
+  bool AppendRow(
+      BufferedTupleStream* stream, TupleRow* row, Status* status) WARN_UNUSED_RESULT;
 
   /// Slow path for AppendRow() above. It is called when the stream has failed to append
   /// the row. We need to find more memory by either switching to IO-buffers, in case the
   /// stream still uses small buffers, or spilling a partition. Returns false and sets
   /// 'status' if it was unable to append the row, even after spilling partitions.
-  bool AppendRowStreamFull(
-      BufferedTupleStream* stream, TupleRow* row, Status* status) noexcept;
+  bool AppendRowStreamFull(BufferedTupleStream* stream, TupleRow* row,
+      Status* status) noexcept WARN_UNUSED_RESULT;
 
   /// Frees memory by spilling one of the hash partitions. The 'mode' argument is passed
   /// to the Spill() call for the selected partition. The current policy is to spill the
   /// largest partition. Returns non-ok status if we couldn't spill a partition.
-  Status SpillPartition(BufferedTupleStream::UnpinMode mode);
+  Status SpillPartition(BufferedTupleStream::UnpinMode mode) WARN_UNUSED_RESULT;
 
   /// Tries to build hash tables for all unspilled hash partitions. Called after
   /// FlushFinal() when all build rows have been partitioned and added to the appropriate
@@ -307,13 +309,13 @@ class PhjBuilder : public DataSink {
   /// 2. in-memory. The build rows are pinned and has a hash table built. No probe
   ///     partition is created.
   /// 3. spilled. The build rows are fully unpinned and the probe stream is prepared.
-  Status BuildHashTablesAndPrepareProbeStreams();
+  Status BuildHashTablesAndPrepareProbeStreams() WARN_UNUSED_RESULT;
 
   /// Ensures that 'spilled_partition_probe_streams_' has a stream per spilled partition
   /// in 'hash_partitions_'. May spill additional partitions until it can create enough
   /// probe streams with write buffers. Returns an error if an error is encountered or
   /// if it runs out of partitions to spill.
-  Status InitSpilledPartitionProbeStreams();
+  Status InitSpilledPartitionProbeStreams() WARN_UNUSED_RESULT;
 
   /// Calls Close() on every Partition, deletes them, and cleans up any pointers that
   /// may reference them. Also cleans up 'spilled_partition_probe_streams_'.
@@ -332,13 +334,13 @@ class PhjBuilder : public DataSink {
   /// Codegen processing build batches. Identical signature to ProcessBuildBatch().
   /// Returns non-OK status if codegen was not possible.
   Status CodegenProcessBuildBatch(LlvmCodeGen* codegen, llvm::Function* hash_fn,
-      llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn);
+      llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn) WARN_UNUSED_RESULT;
 
   /// Codegen inserting batches into a partition's hash table. Identical signature to
   /// Partition::InsertBatch(). Returns non-OK if codegen was not possible.
   Status CodegenInsertBatch(LlvmCodeGen* codegen, llvm::Function* hash_fn,
       llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn,
-      TPrefetchMode::type prefetch_mode);
+      TPrefetchMode::type prefetch_mode) WARN_UNUSED_RESULT;
 
   RuntimeState* const runtime_state_;
 
