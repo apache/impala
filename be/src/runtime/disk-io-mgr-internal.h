@@ -180,16 +180,12 @@ class DiskIoRequestContext {
     state.ScheduleContext(this, range->disk_id());
   }
 
-  /// Cancels the context with status code 'status'.
+  /// Cancels the context with status code 'status'
   void Cancel(const Status& status);
 
   /// Adds request range to disk queue for this request context. Currently,
   /// schedule_immediately must be false is RequestRange is a write range.
   void AddRequestRange(RequestRange* range, bool schedule_immediately);
-
-  /// Returns the default queue capacity for scan ranges. This is updated
-  /// as the reader processes ranges.
-  int initial_scan_range_queue_capacity() const { return initial_queue_capacity_; }
 
   /// Validates invariants of reader.  Reader lock must be taken beforehand.
   bool Validate() const;
@@ -265,22 +261,9 @@ class DiskIoRequestContext {
   /// This is the sum of all queued buffers in all ranges for this reader context.
   AtomicInt32 num_ready_buffers_;
 
-  /// The total (sum) of queue capacities for finished scan ranges. This value
-  /// divided by num_finished_ranges_ is the average for finished ranges and
-  /// used to seed the starting queue capacity for future ranges. The assumption
-  /// is that if previous ranges were fast, new ones will be fast too. The scan
-  /// range adjusts the queue capacity dynamically so a rough approximation will do.
-  AtomicInt32 total_range_queue_capacity_;
-
-  /// The initial queue size for new scan ranges. This is always
-  /// total_range_queue_capacity_ / num_finished_ranges_ but stored as a separate
-  /// variable to allow reading this value without taking a lock. Doing the division
-  /// at read time (with no lock) could lead to a race where only
-  /// total_range_queue_capacity_ or num_finished_ranges_ was updated.
-  int initial_queue_capacity_;
-
   /// All fields below are accessed by multiple threads and the lock needs to be
-  /// taken before accessing them.
+  /// taken before accessing them. Must be acquired before ScanRange::lock_ if both
+  /// are held simultaneously.
   boost::mutex lock_;
 
   /// Current state of the reader

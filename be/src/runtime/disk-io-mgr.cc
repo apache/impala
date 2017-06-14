@@ -118,7 +118,7 @@ DEFINE_uint64(unused_file_handle_timeout_sec, 21600, "Maximum time, in seconds, 
 // current queue size.
 static const int LOW_MEMORY = 64 * 1024 * 1024;
 
-const int DiskIoMgr::DEFAULT_QUEUE_CAPACITY = 2;
+const int DiskIoMgr::SCAN_RANGE_READY_BUFFER_LIMIT;
 
 AtomicInt32 DiskIoMgr::next_disk_id_;
 
@@ -583,7 +583,7 @@ Status DiskIoMgr::AddScanRanges(DiskIoRequestContext* reader,
     if (range->try_cache_) {
       if (schedule_immediately) {
         bool cached_read_succeeded;
-        RETURN_IF_ERROR(range->ReadFromCache(&cached_read_succeeded));
+        RETURN_IF_ERROR(range->ReadFromCache(reader_lock, &cached_read_succeeded));
         if (cached_read_succeeded) continue;
         // Cached read failed, fall back to AddRequestRange() below.
       } else {
@@ -633,7 +633,7 @@ Status DiskIoMgr::GetNextRange(DiskIoRequestContext* reader, ScanRange** range) 
       *range = reader->cached_ranges_.Dequeue();
       DCHECK((*range)->try_cache_);
       bool cached_read_succeeded;
-      RETURN_IF_ERROR((*range)->ReadFromCache(&cached_read_succeeded));
+      RETURN_IF_ERROR((*range)->ReadFromCache(reader_lock, &cached_read_succeeded));
       if (cached_read_succeeded) return Status::OK();
 
       // This range ended up not being cached. Loop again and pick up a new range.
@@ -994,7 +994,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, DiskIoRequestContext* 
     ScanRange* scan_range = buffer->scan_range_;
     scan_range->Cancel(reader->status_);
     // Enqueue the buffer to use the scan range's buffer cleanup path.
-    scan_range->EnqueueBuffer(move(buffer));
+    scan_range->EnqueueBuffer(reader_lock, move(buffer));
     return;
   }
 
@@ -1021,7 +1021,7 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, DiskIoRequestContext* 
   bool eosr = buffer->eosr_;
   ScanRange* scan_range = buffer->scan_range_;
   bool is_cached = buffer->is_cached();
-  bool queue_full = scan_range->EnqueueBuffer(move(buffer));
+  bool queue_full = scan_range->EnqueueBuffer(reader_lock, move(buffer));
   if (eosr) {
     // For cached buffers, we can't close the range until the cached buffer is returned.
     // Close() is called from DiskIoMgr::ReturnBuffer().
