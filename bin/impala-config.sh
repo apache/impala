@@ -321,7 +321,8 @@ elif [ "${TARGET_FILESYSTEM}" != "hdfs" ]; then
 fi
 
 # Directories where local cluster logs will go when running tests or loading data
-export IMPALA_LOGS_DIR="${IMPALA_HOME}/logs"
+DEFAULT_LOGS_DIR="${IMPALA_HOME}/logs"  # override by setting IMPALA_LOGS_DIR env var
+export IMPALA_LOGS_DIR="${IMPALA_LOGS_DIR:-$DEFAULT_LOGS_DIR}"
 export IMPALA_CLUSTER_LOGS_DIR="${IMPALA_LOGS_DIR}/cluster"
 export IMPALA_DATA_LOADING_LOGS_DIR="${IMPALA_LOGS_DIR}/data_loading"
 export IMPALA_DATA_LOADING_SQL_DIR="${IMPALA_DATA_LOADING_LOGS_DIR}/sql"
