@@ -227,6 +227,7 @@ visible_functions = [
       '_ZN6impala18TimestampFunctions22UnixAndFromUnixPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE',
       '_ZN6impala18TimestampFunctions20UnixAndFromUnixCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE'],
   [['now', 'current_timestamp'], 'TIMESTAMP', [], '_ZN6impala18TimestampFunctions3NowEPN10impala_udf15FunctionContextE'],
+  [['utc_timestamp'], 'TIMESTAMP', [], '_ZN6impala18TimestampFunctions12UtcTimestampEPN10impala_udf15FunctionContextE'],
   [['from_utc_timestamp'], 'TIMESTAMP', ['TIMESTAMP', 'STRING'],
    "impala::TimestampFunctions::FromUtc"],
   [['to_utc_timestamp'], 'TIMESTAMP', ['TIMESTAMP', 'STRING'],

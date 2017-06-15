@@ -304,6 +304,13 @@ TimestampVal TimestampFunctions::Now(FunctionContext* context) {
   return return_val;
 }
 
+TimestampVal TimestampFunctions::UtcTimestamp(FunctionContext* context) {
+  const TimestampValue* utc_timestamp = context->impl()->state()->utc_timestamp();
+  TimestampVal return_val;
+  utc_timestamp->ToTimestampVal(&return_val);
+  return return_val;
+}
+
 // Writes 'num' as ASCII into 'dst'. If necessary, adds leading zeros to make the ASCII
 // representation exactly 'len' characters. Both 'num' and 'len' must be >= 0.
 static inline void IntToChar(uint8_t* dst, int num, int len) {

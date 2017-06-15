@@ -875,7 +875,11 @@ Status ImpalaServer::ExecuteInternal(
 
 void ImpalaServer::PrepareQueryContext(TQueryCtx* query_ctx) {
   query_ctx->__set_pid(getpid());
-  query_ctx->__set_now_string(TimestampValue::LocalTime().ToString());
+  TimestampValue utc_timestamp = TimestampValue::UtcTime();
+  query_ctx->__set_utc_timestamp_string(utc_timestamp.ToString());
+  TimestampValue local_timestamp(utc_timestamp);
+  local_timestamp.UtcToLocal();
+  query_ctx->__set_now_string(local_timestamp.ToString());
   query_ctx->__set_start_unix_millis(UnixMillis());
   query_ctx->__set_coord_address(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
 

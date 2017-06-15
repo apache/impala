@@ -140,6 +140,7 @@ class TimestampFunctions {
 
   /// Date/time functions.
   static TimestampVal Now(FunctionContext* context);
+  static TimestampVal UtcTimestamp(FunctionContext* context);
   static StringVal ToDate(FunctionContext* context, const TimestampVal& ts_val);
   static IntVal DateDiff(FunctionContext* context, const TimestampVal& ts_val1,
       const TimestampVal& ts_val2);

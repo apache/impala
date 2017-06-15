@@ -3864,6 +3864,7 @@ TEST_F(ExprTest, UtilityFunctions) {
   TestStringValue("typeOf(cast(10 as DOUBLE))", "DOUBLE");
   TestStringValue("typeOf(current_database())", "STRING");
   TestStringValue("typeOf(now())", "TIMESTAMP");
+  TestStringValue("typeOf(utc_timestamp())", "TIMESTAMP");
   TestStringValue("typeOf(cast(10 as DECIMAL))", "DECIMAL(9,0)");
   TestStringValue("typeOf(0.0)", "DECIMAL(1,1)");
   TestStringValue("typeOf(3.14)", "DECIMAL(3,2)");
@@ -5229,6 +5230,7 @@ TEST_F(ExprTest, TimestampFunctions) {
 
   // Test functions with unknown expected value.
   TestValidTimestampValue("now()");
+  TestValidTimestampValue("utc_timestamp()");
   TestValidTimestampValue("current_timestamp()");
   TestValidTimestampValue("cast(unix_timestamp() as timestamp)");
 
@@ -5264,6 +5266,10 @@ TEST_F(ExprTest, TimestampFunctions) {
   timestamp_result = ConvertValue<TimestampValue>(GetValue("current_timestamp()",
       TYPE_TIMESTAMP));
   EXPECT_BETWEEN(start_time, timestamp_result, TimestampValue::LocalTime());
+  const TimestampValue utc_start_time = TimestampValue::UtcTime();
+  timestamp_result = ConvertValue<TimestampValue>(GetValue("utc_timestamp()",
+      TYPE_TIMESTAMP));
+  EXPECT_BETWEEN(utc_start_time, timestamp_result, TimestampValue::UtcTime());
   // UNIX_TIMESTAMP() has second precision so the comparison start time is shifted back
   // a second to ensure an earlier value.
   unix_start_time =
@@ -5272,6 +5278,31 @@ TEST_F(ExprTest, TimestampFunctions) {
       "cast(unix_timestamp() as timestamp)", TYPE_TIMESTAMP));
   EXPECT_BETWEEN(TimestampValue::FromUnixTime(unix_start_time - 1), timestamp_result,
       TimestampValue::LocalTime());
+
+  // Test that UTC and local time represent the same point in time
+  {
+    const string stmt = "select now(), utc_timestamp()";
+    vector<FieldSchema> result_types;
+    Status status = executor_->Exec(stmt, &result_types);
+    EXPECT_TRUE(status.ok()) << "stmt: " << stmt << "\nerror: " << status.GetDetail();
+    DCHECK(result_types.size() == 2);
+    EXPECT_EQ(TypeToOdbcString(TYPE_TIMESTAMP), result_types[0].type)
+        << "invalid type returned by now()";
+    EXPECT_EQ(TypeToOdbcString(TYPE_TIMESTAMP), result_types[1].type)
+        << "invalid type returned by utc_timestamp()";
+    string result_row;
+    status = executor_->FetchResult(&result_row);
+    EXPECT_TRUE(status.ok()) << "stmt: " << stmt << "\nerror: " << status.GetDetail();
+    vector<string> result_cols;
+    boost::split(result_cols, result_row, boost::is_any_of("\t"));
+    // To ensure this fails if columns are not tab separated
+    DCHECK(result_cols.size() == 2);
+    const TimestampValue local_time = ConvertValue<TimestampValue>(result_cols[0]);
+    const TimestampValue utc_timestamp = ConvertValue<TimestampValue>(result_cols[1]);
+    TimestampValue utc_converted_to_local(utc_timestamp);
+    utc_converted_to_local.UtcToLocal();
+    EXPECT_EQ(utc_converted_to_local, local_time);
+  }
 
   // Test alias
   TestValue("now() = current_timestamp()", TYPE_BOOLEAN, true);

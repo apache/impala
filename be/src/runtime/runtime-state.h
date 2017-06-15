@@ -115,6 +115,7 @@ class RuntimeState {
     return query_ctx().session.connected_user;
   }
   const TimestampValue* now() const { return now_.get(); }
+  const TimestampValue* utc_timestamp() const { return utc_timestamp_.get(); }
   void set_now(const TimestampValue* now);
   const TUniqueId& query_id() const { return query_ctx().query_id; }
   const TUniqueId& fragment_instance_id() const {
@@ -338,9 +339,12 @@ class RuntimeState {
   /// Provides instance id if instance_ctx_ == nullptr
   TUniqueId no_instance_id_;
 
-  /// Query-global timestamp, e.g., for implementing now(). Set from query_globals_.
-  /// Use pointer to avoid inclusion of timestampvalue.h and avoid clang issues.
+  /// Query-global timestamps for implementing now() and utc_timestamp(). Both represent
+  /// the same point in time but now_ is in local time and utc_timestamp_ is in UTC.
+  /// Set from query_globals_. Use pointer to avoid inclusion of timestampvalue.h and
+  /// avoid clang issues.
   boost::scoped_ptr<TimestampValue> now_;
+  boost::scoped_ptr<TimestampValue> utc_timestamp_;
 
   /// TODO: get rid of this and use ExecEnv::GetInstance() instead
   ExecEnv* exec_env_;

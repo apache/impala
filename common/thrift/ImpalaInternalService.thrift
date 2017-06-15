@@ -322,7 +322,7 @@ struct TQueryCtx {
   // Session state including user.
   3: required TSessionState session
 
-  // String containing a timestamp set as the query submission time.
+  // String containing a timestamp (in local timezone) set as the query submission time.
   4: required string now_string
 
   // Process ID of the impalad to which the user is connected.
@@ -371,6 +371,10 @@ struct TQueryCtx {
   // The pool to which this request has been submitted. Used to update pool statistics
   // for admission control.
   16: optional string request_pool
+
+  // String containing a timestamp (in UTC) set as the query submission time. It
+  // represents the same point in time as now_string
+  17: required string utc_timestamp_string
 }
 
 // Specification of one output destination of a plan fragment

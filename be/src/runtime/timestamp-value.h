@@ -123,6 +123,14 @@ class TimestampValue {
     return TimestampValue(boost::posix_time::microsec_clock::local_time());
   }
 
+  /// Returns the current Coordinated Universal Time ("UTC") with microsecond accuracy.
+  /// This should not be used to time something because it is affected by adjustments to
+  /// the system clock such as a manual correction by a system admin. For timings,
+  /// use functions in util/time.h.
+  static TimestampValue UtcTime() {
+    return TimestampValue(boost::posix_time::microsec_clock::universal_time());
+  }
+
   /// Returns a TimestampValue converted from a TimestampVal. The caller must ensure
   /// the TimestampVal does not represent a NULL.
   static TimestampValue FromTimestampVal(const impala_udf::TimestampVal& udf_value) {
