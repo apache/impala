@@ -391,7 +391,7 @@ Status DiskIoMgr::Init(MemTracker* process_mem_tracker) {
     for (int j = 0; j < num_threads_per_disk; ++j) {
       stringstream ss;
       ss << "work-loop(Disk: " << i << ", Thread: " << j << ")";
-      disk_thread_group_.AddThread(new Thread("disk-io-mgr", ss.str(),
+      disk_thread_group_.AddThread(make_unique<Thread>("disk-io-mgr", ss.str(),
           &DiskIoMgr::WorkLoop, this, disk_queues_[i]));
     }
   }

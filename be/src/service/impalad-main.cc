@@ -77,7 +77,8 @@ int ImpaladMain(int argc, char** argv) {
 
   // start backend service for the coordinator on be_port
   ExecEnv exec_env;
-  StartThreadInstrumentation(exec_env.metrics(), exec_env.webserver(), true);
+  ABORT_IF_ERROR(
+      StartThreadInstrumentation(exec_env.metrics(), exec_env.webserver(), true));
   InitRpcEventTracing(exec_env.webserver());
 
   CommonMetrics::InitCommonMetrics(exec_env.metrics());

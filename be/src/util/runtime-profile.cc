@@ -33,6 +33,7 @@
 #include "util/periodic-counter-updater.h"
 #include "util/pretty-printer.h"
 #include "util/redactor.h"
+#include "util/scope-exit-trigger.h"
 
 #include "common/names.h"
 
@@ -723,37 +724,39 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
   }
 }
 
-string RuntimeProfile::SerializeToArchiveString() const {
+Status RuntimeProfile::SerializeToArchiveString(string* out) const {
   stringstream ss;
-  SerializeToArchiveString(&ss);
-  return ss.str();
+  RETURN_IF_ERROR(SerializeToArchiveString(&ss));
+  *out = ss.str();
+  return Status::OK();
 }
 
-void RuntimeProfile::SerializeToArchiveString(stringstream* out) const {
+Status RuntimeProfile::SerializeToArchiveString(stringstream* out) const {
+  Status status;
   TRuntimeProfileTree thrift_object;
   const_cast<RuntimeProfile*>(this)->ToThrift(&thrift_object);
   ThriftSerializer serializer(true);
   vector<uint8_t> serialized_buffer;
-  Status status = serializer.Serialize(&thrift_object, &serialized_buffer);
-  if (!status.ok()) return;
+  RETURN_IF_ERROR(serializer.Serialize(&thrift_object, &serialized_buffer));
 
   // Compress the serialized thrift string.  This uses string keys and is very
   // easy to compress.
   scoped_ptr<Codec> compressor;
-  status = Codec::CreateCompressor(NULL, false, THdfsCompression::DEFAULT, &compressor);
-  DCHECK(status.ok()) << status.GetDetail();
-  if (!status.ok()) return;
+  RETURN_IF_ERROR(
+      Codec::CreateCompressor(NULL, false, THdfsCompression::DEFAULT, &compressor));
+  const auto close_compressor =
+      MakeScopeExitTrigger([&compressor]() { compressor->Close(); });
 
   vector<uint8_t> compressed_buffer;
   compressed_buffer.resize(compressor->MaxOutputLen(serialized_buffer.size()));
   int64_t result_len = compressed_buffer.size();
   uint8_t* compressed_buffer_ptr = compressed_buffer.data();
-  compressor->ProcessBlock(true, serialized_buffer.size(), serialized_buffer.data(),
-      &result_len, &compressed_buffer_ptr);
+  RETURN_IF_ERROR(compressor->ProcessBlock(true, serialized_buffer.size(),
+      serialized_buffer.data(), &result_len, &compressed_buffer_ptr));
   compressed_buffer.resize(result_len);
 
   Base64Encode(compressed_buffer, out);
-  compressor->Close();
+  return Status::OK();;
 }
 
 void RuntimeProfile::ToThrift(TRuntimeProfileTree* tree) const {

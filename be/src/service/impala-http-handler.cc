@@ -547,11 +547,12 @@ void ImpalaHttpHandler::CatalogObjectsHandler(const Webserver::ArgumentMap& args
 
     // Get the object type and name from the topic entry key
     TCatalogObject request;
-    TCatalogObjectFromObjectName(object_type, object_name_arg->second, &request);
-
-    // Get the object and dump its contents.
     TCatalogObject result;
-    Status status = server_->exec_env_->frontend()->GetCatalogObject(request, &result);
+    Status status = TCatalogObjectFromObjectName(object_type, object_name_arg->second, &request);
+    if (status.ok()) {
+      // Get the object and dump its contents.
+      status = server_->exec_env_->frontend()->GetCatalogObject(request, &result);
+    }
     if (status.ok()) {
       Value debug_string(ThriftDebugString(result).c_str(), document->GetAllocator());
       document->AddMember("thrift_string", debug_string, document->GetAllocator());

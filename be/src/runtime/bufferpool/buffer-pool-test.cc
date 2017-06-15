@@ -89,7 +89,7 @@ class BufferPoolTest : public ::testing::Test {
     for (string created_tmp_dir : created_tmp_dirs_) {
       chmod((created_tmp_dir + SCRATCH_SUFFIX).c_str(), S_IRWXU);
     }
-    FileSystemUtil::RemovePaths(created_tmp_dirs_);
+    ASSERT_OK(FileSystemUtil::RemovePaths(created_tmp_dirs_));
     created_tmp_dirs_.clear();
     CpuTestUtil::ResetAffinity(); // Some tests modify affinity.
   }
@@ -806,14 +806,15 @@ TEST_F(BufferPoolTest, PinWithoutReservation) {
       TEST_BUFFER_LEN, NewProfile(), &client));
 
   BufferPool::PageHandle handle;
-  IMPALA_ASSERT_DEBUG_DEATH(pool.CreatePage(&client, TEST_BUFFER_LEN, &handle), "");
+  IMPALA_ASSERT_DEBUG_DEATH(
+      discard_result(pool.CreatePage(&client, TEST_BUFFER_LEN, &handle)), "");
 
   // Should succeed after increasing reservation.
   ASSERT_TRUE(client.IncreaseReservationToFit(TEST_BUFFER_LEN));
   ASSERT_OK(pool.CreatePage(&client, TEST_BUFFER_LEN, &handle));
 
   // But we can't pin again.
-  IMPALA_ASSERT_DEBUG_DEATH(pool.Pin(&client, &handle), "");
+  IMPALA_ASSERT_DEBUG_DEATH(discard_result(pool.Pin(&client, &handle)), "");
 
   pool.DestroyPage(&client, &handle);
   pool.DeregisterClient(&client);
@@ -866,7 +867,8 @@ TEST_F(BufferPoolTest, ExtractBuffer) {
   // Test that ExtractBuffer() DCHECKs for unpinned pages.
   ASSERT_OK(pool.CreatePage(&client, TEST_BUFFER_LEN, &page));
   pool.Unpin(&client, &page);
-  IMPALA_ASSERT_DEBUG_DEATH((void)pool.ExtractBuffer(&client, &page, &buffer), "");
+  IMPALA_ASSERT_DEBUG_DEATH(
+      discard_result(pool.ExtractBuffer(&client, &page, &buffer)), "");
   pool.DestroyPage(&client, &page);
 
   pool.DeregisterClient(&client);
@@ -955,7 +957,8 @@ TEST_F(BufferPoolTest, EvictPageSameClient) {
   ASSERT_OK(pool.CreatePage(&client, TEST_BUFFER_LEN, &handle1));
 
   // Do not have enough reservations because we pinned the page.
-  IMPALA_ASSERT_DEBUG_DEATH(pool.CreatePage(&client, TEST_BUFFER_LEN, &handle2), "");
+  IMPALA_ASSERT_DEBUG_DEATH(
+      discard_result(pool.CreatePage(&client, TEST_BUFFER_LEN, &handle2)), "");
 
   // We should be able to create a new page after unpinned and evicting the first one.
   pool.Unpin(&client, &handle1);
@@ -1319,7 +1322,7 @@ void BufferPoolTest::TestQueryTeardown(bool write_error) {
     string tmp_file_path = TmpFilePath(pages.data());
     FreeBuffers(pool, &client, &tmp_buffers);
 
-    PinAll(pool, &client, &pages);
+    ASSERT_OK(PinAll(pool, &client, &pages));
     // Remove temporary file to force future writes to that file to fail.
     DisableBackingFile(tmp_file_path);
   }
@@ -1367,7 +1370,7 @@ void BufferPoolTest::TestWriteError(int write_delay_ms) {
   UnpinAll(&pool, &client, &pages);
   WaitForAllWrites(&client);
   // Repin the pages
-  PinAll(&pool, &client, &pages);
+  ASSERT_OK(PinAll(&pool, &client, &pages));
   // Remove permissions to the backing storage so that future writes will fail
   ASSERT_GT(RemoveScratchPerms(), 0);
   // Give the first write a chance to fail before the second write starts.
@@ -1480,7 +1483,9 @@ TEST_F(BufferPoolTest, WriteErrorBlacklist) {
   PageHandle* error_page = FindPageInDir(pages[ERROR_QUERY], error_dir);
   ASSERT_TRUE(error_page != NULL) << "Expected a tmp file in dir " << error_dir;
   const string& error_file_path = TmpFilePath(error_page);
-  for (int i = 0; i < INITIAL_QUERIES; ++i) PinAll(&pool, &clients[i], &pages[i]);
+  for (int i = 0; i < INITIAL_QUERIES; ++i) {
+    ASSERT_OK(PinAll(&pool, &clients[i], &pages[i]));
+  }
   DisableBackingFile(error_file_path);
   for (int i = 0; i < INITIAL_QUERIES; ++i) UnpinAll(&pool, &clients[i], &pages[i]);
 
@@ -1489,7 +1494,7 @@ TEST_F(BufferPoolTest, WriteErrorBlacklist) {
 
   // Both clients should still be usable - test the API.
   for (int i = 0; i < INITIAL_QUERIES; ++i) {
-    PinAll(&pool, &clients[i], &pages[i]);
+    ASSERT_OK(PinAll(&pool, &clients[i], &pages[i]));
     VerifyData(pages[i], 0);
     UnpinAll(&pool, &clients[i], &pages[i]);
     ASSERT_OK(AllocateAndFree(&pool, &clients[i], TEST_BUFFER_LEN));
@@ -1521,7 +1526,7 @@ TEST_F(BufferPoolTest, WriteErrorBlacklist) {
   }
   DestroyAll(&pool, &clients[ERROR_QUERY], &error_new_pages);
 
-  PinAll(&pool, &clients[NO_ERROR_QUERY], &pages[NO_ERROR_QUERY]);
+  ASSERT_OK(PinAll(&pool, &clients[NO_ERROR_QUERY], &pages[NO_ERROR_QUERY]));
   UnpinAll(&pool, &clients[NO_ERROR_QUERY], &pages[NO_ERROR_QUERY]);
   WaitForAllWrites(&clients[NO_ERROR_QUERY]);
   EXPECT_TRUE(FindPageInDir(pages[NO_ERROR_QUERY], good_dir) != NULL);
@@ -1929,7 +1934,7 @@ int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport();
-  impala::LlvmCodeGen::InitializeLlvm();
+  ABORT_IF_ERROR(impala::LlvmCodeGen::InitializeLlvm());
   int result = 0;
   for (bool encryption : {false, true}) {
     for (bool numa : {false, true}) {

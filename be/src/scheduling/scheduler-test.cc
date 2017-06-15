@@ -43,7 +43,7 @@ TEST_F(SchedulerTest, SingleHostSingleFile) {
 
   Result result(plan);
   SchedulerWrapper scheduler(plan);
-  scheduler.Compute(&result);
+  ASSERT_OK(scheduler.Compute(&result));
 
   EXPECT_EQ(1, result.NumTotalAssignments());
   EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes());
@@ -67,7 +67,7 @@ TEST_F(SchedulerTest, SingleCoordinatorNoExecutor) {
 
   Result result(plan);
   SchedulerWrapper scheduler(plan);
-  scheduler.Compute(&result);
+  ASSERT_OK(scheduler.Compute(&result));
 
   EXPECT_EQ(2, result.NumDistinctBackends());
   EXPECT_EQ(0, result.NumDiskAssignments(0));
@@ -87,7 +87,7 @@ TEST_F(SchedulerTest, ExecAtCoord) {
   Result result(plan);
   SchedulerWrapper scheduler(plan);
   bool exec_at_coord = true;
-  scheduler.Compute(exec_at_coord, &result);
+  ASSERT_OK(scheduler.Compute(exec_at_coord, &result));
 
   EXPECT_EQ(3 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(0));
   EXPECT_EQ(0, result.NumTotalAssignedBytes(1));
@@ -108,7 +108,7 @@ TEST_F(SchedulerTest, ScanTableTwice) {
 
   Result result(plan);
   SchedulerWrapper scheduler(plan);
-  scheduler.Compute(&result);
+  ASSERT_OK(scheduler.Compute(&result));
 
   EXPECT_EQ(4 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes());
   EXPECT_EQ(4 * Block::DEFAULT_BLOCK_SIZE, result.NumDiskAssignedBytes());
@@ -130,7 +130,7 @@ TEST_F(SchedulerTest, RandomReads) {
 
   Result result(plan);
   SchedulerWrapper scheduler(plan);
-  for (int i = 0; i < 100; ++i) scheduler.Compute(&result);
+  for (int i = 0; i < 100; ++i) ASSERT_OK(scheduler.Compute(&result));
 
   ASSERT_EQ(100, result.NumAssignments());
   EXPECT_EQ(100, result.NumTotalAssignments());
@@ -154,7 +154,7 @@ TEST_F(SchedulerTest, LocalReadsPickFirstReplica) {
 
   Result result(plan);
   SchedulerWrapper scheduler(plan);
-  for (int i = 0; i < 3; ++i) scheduler.Compute(&result);
+  for (int i = 0; i < 3; ++i) ASSERT_OK(scheduler.Compute(&result));
 
   EXPECT_EQ(3, result.NumTotalAssignments());
   EXPECT_EQ(3, result.NumDiskAssignments(0));
@@ -179,7 +179,7 @@ TEST_F(SchedulerTest, TestMediumSizedCluster) {
 
   Result result(plan);
   SchedulerWrapper scheduler(plan);
-  scheduler.Compute(&result);
+  ASSERT_OK(scheduler.Compute(&result));
 
   EXPECT_EQ(16, result.NumTotalAssignments());
   EXPECT_EQ(16, result.NumDiskAssignments());
@@ -198,7 +198,7 @@ TEST_F(SchedulerTest, RemoteOnlyPlacement) {
 
   Result result(plan);
   SchedulerWrapper scheduler(plan);
-  scheduler.Compute(&result);
+  ASSERT_OK(scheduler.Compute(&result));
 
   EXPECT_EQ(10, result.NumTotalAssignments());
   EXPECT_EQ(10, result.NumRemoteAssignments());
@@ -219,7 +219,7 @@ TEST_F(SchedulerTest, ManyScanRanges) {
 
   Result result(plan);
   SchedulerWrapper scheduler(plan);
-  scheduler.Compute(&result);
+  ASSERT_OK(scheduler.Compute(&result));
 
   EXPECT_EQ(1000, result.NumTotalAssignments());
   EXPECT_EQ(1000, result.NumDiskAssignments());
@@ -245,7 +245,7 @@ TEST_F(SchedulerTest, DisjointClusterWithRemoteReads) {
 
   Result result(plan);
   SchedulerWrapper scheduler(plan);
-  scheduler.Compute(&result);
+  ASSERT_OK(scheduler.Compute(&result));
 
   EXPECT_EQ(10, result.NumTotalAssignments());
   EXPECT_EQ(10, result.NumRemoteAssignments());
@@ -267,14 +267,14 @@ TEST_F(SchedulerTest, TestCachedReadPreferred) {
 
   Result result(plan);
   SchedulerWrapper scheduler(plan);
-  scheduler.Compute(&result);
+  ASSERT_OK(scheduler.Compute(&result));
   EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumCachedAssignedBytes());
   EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumCachedAssignedBytes(1));
   EXPECT_EQ(0, result.NumDiskAssignedBytes());
   EXPECT_EQ(0, result.NumRemoteAssignedBytes());
 
   // Compute additional assignments.
-  for (int i = 0; i < 8; ++i) scheduler.Compute(&result);
+  for (int i = 0; i < 8; ++i) ASSERT_OK(scheduler.Compute(&result));
   EXPECT_EQ(9 * Block::DEFAULT_BLOCK_SIZE, result.NumCachedAssignedBytes());
   EXPECT_EQ(9 * Block::DEFAULT_BLOCK_SIZE, result.NumCachedAssignedBytes(1));
   EXPECT_EQ(0, result.NumDiskAssignedBytes());
@@ -296,13 +296,13 @@ TEST_F(SchedulerTest, TestDisableCachedReads) {
 
   Result result(plan);
   SchedulerWrapper scheduler(plan);
-  scheduler.Compute(&result);
+  ASSERT_OK(scheduler.Compute(&result));
   EXPECT_EQ(0, result.NumCachedAssignedBytes());
   EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumDiskAssignedBytes());
   EXPECT_EQ(0, result.NumRemoteAssignedBytes());
 
   // Compute additional assignments.
-  for (int i = 0; i < 8; ++i) scheduler.Compute(&result);
+  for (int i = 0; i < 8; ++i) ASSERT_OK(scheduler.Compute(&result));
   EXPECT_EQ(0, result.NumCachedAssignedBytes());
   EXPECT_EQ(9 * Block::DEFAULT_BLOCK_SIZE, result.NumDiskAssignedBytes());
   EXPECT_EQ(0, result.NumRemoteAssignedBytes());
@@ -326,7 +326,7 @@ TEST_F(SchedulerTest, EmptyStatestoreMessage) {
   Result result(plan);
   SchedulerWrapper scheduler(plan);
 
-  scheduler.Compute(&result);
+  ASSERT_OK(scheduler.Compute(&result));
   EXPECT_EQ(0, result.NumTotalAssignedBytes(0));
   EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(1));
   EXPECT_EQ(0, result.NumTotalAssignedBytes(2));
@@ -335,7 +335,7 @@ TEST_F(SchedulerTest, EmptyStatestoreMessage) {
   result.Reset();
 
   scheduler.SendEmptyUpdate();
-  scheduler.Compute(&result);
+  ASSERT_OK(scheduler.Compute(&result));
   EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(0));
   EXPECT_EQ(0, result.NumTotalAssignedBytes(1));
   EXPECT_EQ(0, result.NumTotalAssignedBytes(2));
@@ -359,7 +359,7 @@ TEST_F(SchedulerTest, TestSendUpdates) {
   Result result(plan);
   SchedulerWrapper scheduler(plan);
 
-  scheduler.Compute(&result);
+  ASSERT_OK(scheduler.Compute(&result));
   // Two backends are registered, so the scheduler will pick a random one.
   EXPECT_EQ(0, result.NumTotalAssignedBytes(0));
   EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(1));
@@ -368,7 +368,7 @@ TEST_F(SchedulerTest, TestSendUpdates) {
   scheduler.RemoveBackend(cluster.hosts()[1]);
   result.Reset();
 
-  scheduler.Compute(&result);
+  ASSERT_OK(scheduler.Compute(&result));
   EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(0));
   EXPECT_EQ(0, result.NumTotalAssignedBytes(1));
 
@@ -376,7 +376,7 @@ TEST_F(SchedulerTest, TestSendUpdates) {
   scheduler.AddBackend(cluster.hosts()[1]);
   result.Reset();
 
-  scheduler.Compute(&result);
+  ASSERT_OK(scheduler.Compute(&result));
   // Two backends are registered, so the scheduler will pick a random one.
   EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(0));
   EXPECT_EQ(0, result.NumTotalAssignedBytes(1));

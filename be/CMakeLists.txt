@@ -70,6 +70,16 @@ SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -Wno-mismatched-tags")
 #   -g: Enable symbols for profiler tools
 #   -Wno-unused-local-typedefs: Do not warn for local typedefs that are unused.
 SET(CXX_GCC_FLAGS "-g -Wno-unused-local-typedefs")
+if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
+  # We need to add additional arguments for GCC 7+. We go down this branch if building
+  # with a non-GCC compiler of version 7+, but in that case CXX_GCC_FLAGS is not used,
+  # so it is inconsequential. TODO: IMPALA-5490: make this non-conditional when we
+  # upgrade GCC.
+  #  -faligned-new: new will automatically align types. Otherwise "new Counter()" in the
+  #       Kudu util code produces a warning (see KUDU-2094).
+  #   TODO: -faligned-new is part of C++17, remove flag when we bump language version.
+  SET(CXX_GCC_FLAGS "${CXX_GCC_FLAGS} -faligned-new")
+endif()
 
 # compiler flags for different build types (run 'cmake -DCMAKE_BUILD_TYPE=<type> .')
 # For CMAKE_BUILD_TYPE=Debug
@@ -264,7 +274,8 @@ set(CLANG_INCLUDE_FLAGS
   "-I${GFLAGS_INCLUDE_DIR}"
   "-I${RAPIDJSON_INCLUDE_DIR}"
   "-I${AVRO_INCLUDE_DIR}"
-  "-I${BOOST_INCLUDEDIR}"
+  # Include Boost as a system directory to suppress warnings from headers.
+  "-isystem${BOOST_INCLUDEDIR}"
   # Required so that jni.h can be found during Clang compilation
   "-I${JAVA_INCLUDE_PATH}"
   "-I${JAVA_INCLUDE_PATH2}"

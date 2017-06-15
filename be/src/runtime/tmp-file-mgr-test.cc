@@ -17,6 +17,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <numeric>
 
 #include <boost/filesystem.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -239,7 +240,7 @@ TEST_F(TmpFileMgrTest, TestOneDirPerDevice) {
   TmpFileMgr::File* file = files[0];
   // Check the prefix is the expected temporary directory.
   EXPECT_EQ(0, file->path().find(tmp_dirs[0]));
-  FileSystemUtil::RemovePaths(tmp_dirs);
+  ASSERT_OK(FileSystemUtil::RemovePaths(tmp_dirs));
   file_group.Close();
   CheckMetrics(&tmp_file_mgr);
 }
@@ -266,7 +267,7 @@ TEST_F(TmpFileMgrTest, TestMultiDirsPerDevice) {
     // Check the prefix is the expected temporary directory.
     EXPECT_EQ(0, files[i]->path().find(tmp_dirs[i]));
   }
-  FileSystemUtil::RemovePaths(tmp_dirs);
+  ASSERT_OK(FileSystemUtil::RemovePaths(tmp_dirs));
   file_group.Close();
   CheckMetrics(&tmp_file_mgr);
 }
@@ -312,7 +313,7 @@ TEST_F(TmpFileMgrTest, TestReportError) {
   // Attempts to allocate new files on bad device should succeed.
   unique_ptr<TmpFileMgr::File> bad_file2;
   ASSERT_OK(NewFile(&tmp_file_mgr, &file_group, bad_device, &bad_file2));
-  FileSystemUtil::RemovePaths(tmp_dirs);
+  ASSERT_OK(FileSystemUtil::RemovePaths(tmp_dirs));
   file_group.Close();
   CheckMetrics(&tmp_file_mgr);
 }
@@ -343,7 +344,7 @@ TEST_F(TmpFileMgrTest, TestAllocateNonWritable) {
   ASSERT_OK(FileAllocateSpace(allocated_files[1], 1, &offset));
 
   chmod(scratch_subdirs[0].c_str(), S_IRWXU);
-  FileSystemUtil::RemovePaths(tmp_dirs);
+  ASSERT_OK(FileSystemUtil::RemovePaths(tmp_dirs));
   file_group.Close();
 }
 

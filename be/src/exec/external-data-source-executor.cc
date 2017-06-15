@@ -204,7 +204,7 @@ Status ExternalDataSourceExecutor::Close(const TCloseParams& params,
   Status status = CallJniMethod(executor_, s.close_id_, params,
       result);
   JNIEnv* env = getJNIEnv();
-  if (executor_ != NULL) status.MergeStatus(JniUtil::FreeGlobalRef(env, executor_));
+  if (executor_ != NULL) env->DeleteGlobalRef(executor_);
   is_initialized_ = false;
   return status;
 }

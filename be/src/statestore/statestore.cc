@@ -720,8 +720,13 @@ void Statestore::DoSubscriberUpdate(bool is_heartbeat, int thread_id,
       // Schedule the next message.
       VLOG(3) << "Next " << (is_heartbeat ? "heartbeat" : "update") << " deadline for: "
               << subscriber->id() << " is in " << deadline_ms << "ms";
-      OfferUpdate(make_pair(deadline_ms, subscriber->id()), is_heartbeat ?
+      status = OfferUpdate(make_pair(deadline_ms, subscriber->id()), is_heartbeat ?
           &subscriber_heartbeat_threadpool_ : &subscriber_topic_update_threadpool_);
+      if (!status.ok()) {
+        LOG(INFO) << "Unable to send next " << (is_heartbeat ? "heartbeat" : "update")
+                  << " message to subscriber '" << subscriber->id() << "': "
+                  << status.GetDetail();
+      }
     }
   }
 }
@@ -755,7 +760,6 @@ void Statestore::UnregisterSubscriber(Subscriber* subscriber) {
   subscribers_.erase(subscriber->id());
 }
 
-Status Statestore::MainLoop() {
+void Statestore::MainLoop() {
   subscriber_topic_update_threadpool_.Join();
-  return Status::OK();
 }

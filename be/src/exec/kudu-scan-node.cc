@@ -164,7 +164,7 @@ void KuduScanNode::ThreadAvailableCb(ThreadResourceMgr::ResourcePool* pool) {
     auto fn = [this, token, name]() { this->RunScannerThread(name, token); };
     VLOG_RPC << "Thread started: " << name;
     scanner_threads_.AddThread(
-        new Thread(FragmentInstanceState::FINST_THREAD_GROUP_NAME, name, fn));
+        make_unique<Thread>(FragmentInstanceState::FINST_THREAD_GROUP_NAME, name, fn));
   }
 }
 

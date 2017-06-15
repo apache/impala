@@ -100,12 +100,6 @@ Status JniUtil::LocalToGlobalRef(JNIEnv* env, jobject local_ref, jobject* global
   return Status::OK();
 }
 
-Status JniUtil::FreeGlobalRef(JNIEnv* env, jobject global_ref) {
-  env->DeleteGlobalRef(global_ref);
-  RETURN_ERROR_IF_EXC(env);
-  return Status::OK();
-}
-
 Status JniUtil::Init() {
   // Get the JNIEnv* corresponding to current thread.
   JNIEnv* env = getJNIEnv();

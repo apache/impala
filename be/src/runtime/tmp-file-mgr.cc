@@ -212,8 +212,7 @@ void TmpFileMgr::File::Blacklist(const ErrorMsg& msg) {
 
 Status TmpFileMgr::File::Remove() {
   // Remove the file if present (it may not be present if no writes completed).
-  FileSystemUtil::RemovePaths({path_});
-  return Status::OK();
+  return FileSystemUtil::RemovePaths({path_});
 }
 
 string TmpFileMgr::File::DebugString() {

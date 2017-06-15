@@ -82,7 +82,7 @@ class KuduTableSink : public DataSink {
   /// appropriate counters for ignored errors.
   //
   /// Returns a bad Status if there are non-ignorable errors.
-  Status CheckForErrors(RuntimeState* state);
+  Status CheckForErrors(RuntimeState* state) WARN_UNUSED_RESULT;
 
   /// Used to get the KuduTableDescriptor from the RuntimeState
   TableId table_id_;

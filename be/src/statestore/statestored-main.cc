@@ -67,10 +67,12 @@ int StatestoredMain(int argc, char** argv) {
     LOG(INFO) << "Not starting webserver";
   }
 
-  metrics->Init(FLAGS_enable_webserver ? webserver.get() : nullptr);
+  ABORT_IF_ERROR(
+      metrics->Init(FLAGS_enable_webserver ? webserver.get() : nullptr));
   ABORT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), false, nullptr, nullptr));
   StartMemoryMaintenanceThread();
-  StartThreadInstrumentation(metrics.get(), webserver.get(), false);
+  ABORT_IF_ERROR(
+    StartThreadInstrumentation(metrics.get(), webserver.get(), false));
   InitRpcEventTracing(webserver.get());
   // TODO: Add a 'common metrics' method to add standard metrics to
   // both statestored and impalad

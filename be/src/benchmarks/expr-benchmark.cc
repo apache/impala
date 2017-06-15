@@ -65,8 +65,8 @@ using namespace impala;
 class Planner {
  public:
   Planner() {
-    frontend_.SetCatalogInitialized();
-    exec_env_.InitForFeTests();
+    ABORT_IF_ERROR(frontend_.SetCatalogInitialized());
+    ABORT_IF_ERROR(exec_env_.InitForFeTests());
   }
 
   Status GeneratePlan(const string& stmt, TExecRequest* result) {
@@ -561,7 +561,7 @@ Benchmark* BenchmarkTimestampFunctions() {
 int main(int argc, char** argv) {
   impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport(false);
-  impala::LlvmCodeGen::InitializeLlvm();
+  ABORT_IF_ERROR(impala::LlvmCodeGen::InitializeLlvm());
 
   // Dynamically construct at runtime as the planner initialization depends on
   // static objects being initialized in other compilation modules.

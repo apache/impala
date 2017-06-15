@@ -80,7 +80,7 @@ namespace impala {
 /// TODO: macros:
 /// RETURN_IF_ERROR(status) << "msg"
 /// MAKE_ERROR() << "msg"
-class Status {
+class NODISCARD Status {
  public:
   typedef strings::internal::SubstituteArg ArgType;
 
@@ -265,7 +265,7 @@ std::ostream& operator<<(std::ostream& os, const Status& status);
 /// some generally useful macros
 #define RETURN_IF_ERROR(stmt)                          \
   do {                                                 \
-    Status __status__ = (stmt);                        \
+    ::impala::Status __status__ = (stmt);              \
     if (UNLIKELY(!__status__.ok())) return __status__; \
   } while (false)
 
@@ -276,7 +276,7 @@ std::ostream& operator<<(std::ostream& os, const Status& status);
 
 #define ABORT_IF_ERROR(stmt) \
   do { \
-    Status __status__ = (stmt); \
+    ::impala::Status __status__ = (stmt); \
     if (UNLIKELY(!__status__.ok())) { \
       ABORT_WITH_ERROR(__status__.GetDetail()); \
     } \

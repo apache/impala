@@ -344,8 +344,10 @@ void DataStreamRecvr::CancelStream() {
 
 void DataStreamRecvr::Close() {
   // Remove this receiver from the DataStreamMgr that created it.
-  // TODO: log error msg
-  mgr_->DeregisterRecvr(fragment_instance_id(), dest_node_id());
+  const Status status = mgr_->DeregisterRecvr(fragment_instance_id(), dest_node_id());
+  if (!status.ok()) {
+    LOG(WARNING) << "Error deregistering receiver: " << status.GetDetail();
+  }
   mgr_ = NULL;
   for (int i = 0; i < sender_queues_.size(); ++i) {
     sender_queues_[i]->Close();

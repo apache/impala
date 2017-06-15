@@ -124,7 +124,7 @@ class JniLocalFrame {
   /// The number of local references created inside the frame might exceed max_local_ref,
   /// but there is no guarantee that memory will be available.
   /// Push should be called at most once.
-  Status push(JNIEnv* env, int max_local_ref=10);
+  Status push(JNIEnv* env, int max_local_ref = 10) WARN_UNUSED_RESULT;
 
  private:
   JNIEnv* env_;
@@ -187,7 +187,7 @@ class JniUtil {
   static void InitLibhdfs();
 
   /// Find JniUtil class, and get JniUtil.throwableToString method id
-  static Status Init();
+  static Status Init() WARN_UNUSED_RESULT;
 
   /// Returns true if the given class could be found on the CLASSPATH in env.
   /// Returns false otherwise, or if any other error occurred (e.g. a JNI exception).
@@ -204,13 +204,15 @@ class JniUtil {
   /// The returned reference must eventually be freed by calling FreeGlobalRef() (or have
   /// the lifetime of the impalad process).
   /// Catches Java exceptions and converts their message into status.
-  static Status GetGlobalClassRef(JNIEnv* env, const char* class_str, jclass* class_ref);
+  static Status GetGlobalClassRef(
+      JNIEnv* env, const char* class_str, jclass* class_ref) WARN_UNUSED_RESULT;
 
   /// Creates a global reference from a local reference returned into global_ref.
   /// The returned reference must eventually be freed by calling FreeGlobalRef() (or have
   /// the lifetime of the impalad process).
   /// Catches Java exceptions and converts their message into status.
-  static Status LocalToGlobalRef(JNIEnv* env, jobject local_ref, jobject* global_ref);
+  static Status LocalToGlobalRef(JNIEnv* env, jobject local_ref,
+      jobject* global_ref) WARN_UNUSED_RESULT;
 
   /// Templated wrapper for jobject subclasses (e.g. jclass, jarray). This is necessary
   /// because according to
@@ -224,14 +226,10 @@ class JniUtil {
   /// to use a subclass like _jclass**. This is safe in this case because the returned
   /// subclass is known to be correct.
   template <typename jobject_subclass>
-  static Status LocalToGlobalRef(JNIEnv* env, jobject local_ref,
-      jobject_subclass* global_ref) {
+  static Status LocalToGlobalRef(
+      JNIEnv* env, jobject local_ref, jobject_subclass* global_ref) {
     return LocalToGlobalRef(env, local_ref, reinterpret_cast<jobject*>(global_ref));
   }
-
-  /// Deletes 'global_ref'. Catches Java exceptions and converts their message into
-  /// status.
-  static Status FreeGlobalRef(JNIEnv* env, jobject global_ref);
 
   static jmethodID throwable_to_string_id() { return throwable_to_string_id_; }
   static jmethodID throwable_to_stack_trace_id() { return throwable_to_stack_trace_id_; }
@@ -246,30 +244,31 @@ class JniUtil {
   /// log_stack determines if the stack trace is written to the log
   /// prefix, if non-empty will be prepended to the error message.
   static Status GetJniExceptionMsg(JNIEnv* env, bool log_stack = true,
-      const std::string& prefix = "");
+      const std::string& prefix = "") WARN_UNUSED_RESULT;
 
   /// Populates 'result' with a list of memory metrics from the Jvm. Returns Status::OK
   /// unless there is an exception.
   static Status GetJvmMetrics(const TGetJvmMetricsRequest& request,
-      TGetJvmMetricsResponse* result);
+      TGetJvmMetricsResponse* result) WARN_UNUSED_RESULT;
 
   // Populates 'result' with information about live JVM threads. Returns
   // Status::OK unless there is an exception.
   static Status GetJvmThreadsInfo(const TGetJvmThreadsInfoRequest& request,
-      TGetJvmThreadsInfoResponse* result);
+      TGetJvmThreadsInfoResponse* result) WARN_UNUSED_RESULT;
 
   /// Loads a method whose signature is in the supplied descriptor. Returns Status::OK
   /// and sets descriptor->method_id to a JNI method handle if successful, otherwise an
   /// error status is returned.
   static Status LoadJniMethod(JNIEnv* jni_env, const jclass& jni_class,
-      JniMethodDescriptor* descriptor);
+      JniMethodDescriptor* descriptor) WARN_UNUSED_RESULT;
 
   /// Same as LoadJniMethod(...), except that this loads a static method.
   static Status LoadStaticJniMethod(JNIEnv* jni_env, const jclass& jni_class,
-      JniMethodDescriptor* descriptor);
+      JniMethodDescriptor* descriptor) WARN_UNUSED_RESULT;
 
   /// Utility methods to avoid repeating lots of the JNI call boilerplate.
-  static Status CallJniMethod(const jobject& obj, const jmethodID& method) {
+  static Status CallJniMethod(
+      const jobject& obj, const jmethodID& method) WARN_UNUSED_RESULT {
     JNIEnv* jni_env = getJNIEnv();
     JniLocalFrame jni_frame;
     RETURN_IF_ERROR(jni_frame.push(jni_env));

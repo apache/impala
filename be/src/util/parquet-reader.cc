@@ -136,6 +136,7 @@ class ParquetLevelReader : public impala::RleDecoder {
 //     were actually written if the final run is a literal run, only if the final run is
 //     a repeated run (see util/rle-encoding.h for more details).
 // Returns the number of rows specified by the header.
+// Aborts the process if reading the file fails.
 int CheckDataPage(const ColumnChunk& col, const PageHeader& header, const uint8_t* page) {
   const uint8_t* data = page;
   std::vector<uint8_t> decompressed_buffer;
@@ -143,8 +144,8 @@ int CheckDataPage(const ColumnChunk& col, const PageHeader& header, const uint8_
     decompressed_buffer.resize(header.uncompressed_page_size);
 
     boost::scoped_ptr<impala::Codec> decompressor;
-    impala::Codec::CreateDecompressor(
-        NULL, false, impala::PARQUET_TO_IMPALA_CODEC[col.meta_data.codec], &decompressor);
+    ABORT_IF_ERROR(impala::Codec::CreateDecompressor(NULL, false,
+        impala::PARQUET_TO_IMPALA_CODEC[col.meta_data.codec], &decompressor));
 
     uint8_t* buffer_ptr = decompressed_buffer.data();
     int uncompressed_page_size = header.uncompressed_page_size;

@@ -52,7 +52,7 @@ class ThreadPool : public CacheLineAligned {
     for (int i = 0; i < num_threads; ++i) {
       std::stringstream threadname;
       threadname << thread_prefix << "(" << i + 1 << ":" << num_threads << ")";
-      threads_.AddThread(new Thread(group, threadname.str(),
+      threads_.AddThread(std::make_unique<Thread>(group, threadname.str(),
           boost::bind<void>(boost::mem_fn(&ThreadPool<T>::WorkerThread), this, i)));
     }
   }

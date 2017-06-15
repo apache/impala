@@ -420,7 +420,7 @@ int main(int argc, char **argv) {
   cout << Benchmark::GetMachineInfo() << endl;
   impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport();
-  LlvmCodeGen::InitializeLlvm();
+  ABORT_IF_ERROR(LlvmCodeGen::InitializeLlvm());
 
   const int NUM_ROWS = 1024;
 

@@ -265,7 +265,7 @@ Status ExecEnv::StartServices() {
   buffer_pool_limit = BitUtil::RoundDown(buffer_pool_limit, FLAGS_min_buffer_size);
   InitBufferPool(FLAGS_min_buffer_size, buffer_pool_limit);
 
-  metrics_->Init(enable_webserver_ ? webserver_.get() : nullptr);
+  RETURN_IF_ERROR(metrics_->Init(enable_webserver_ ? webserver_.get() : nullptr));
   impalad_client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");
   catalogd_client_cache_->InitMetrics(metrics_.get(), "catalog.server");
   RETURN_IF_ERROR(RegisterMemoryMetrics(
@@ -326,7 +326,7 @@ Status ExecEnv::StartServices() {
   TGetHadoopConfigRequest config_request;
   config_request.__set_name(DEFAULT_FS);
   TGetHadoopConfigResponse config_response;
-  frontend_->GetHadoopConfig(config_request, &config_response);
+  RETURN_IF_ERROR(frontend_->GetHadoopConfig(config_request, &config_response));
   if (config_response.__isset.value) {
     default_fs_ = config_response.value;
   } else {

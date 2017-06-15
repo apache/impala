@@ -69,9 +69,9 @@ Java_org_apache_impala_service_FeSupport_NativeFeTestInit(
   // Init the JVM to load the classes in JniUtil that are needed for returning
   // exceptions to the FE.
   InitCommonRuntime(1, &name, true, TestInfo::FE_TEST);
-  LlvmCodeGen::InitializeLlvm(true);
+  THROW_IF_ERROR(LlvmCodeGen::InitializeLlvm(true), env, JniUtil::internal_exc_class());
   ExecEnv* exec_env = new ExecEnv(); // This also caches it from the process.
-  exec_env->InitForFeTests();
+  THROW_IF_ERROR(exec_env->InitForFeTests(), env, JniUtil::internal_exc_class());
 }
 
 // Serializes expression value 'value' to thrift structure TColumnValue 'col_val'.
@@ -168,9 +168,12 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
   vector<TColumnValue> results;
   ObjectPool obj_pool;
 
-  DeserializeThriftMsg(env, thrift_expr_batch, &expr_batch);
-  DeserializeThriftMsg(env, thrift_query_ctx_bytes, &query_ctx);
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_expr_batch, &expr_batch), env,
+     JniUtil::internal_exc_class(), nullptr);
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_query_ctx_bytes, &query_ctx), env,
+     JniUtil::internal_exc_class(), nullptr);
   vector<TExpr>& texprs = expr_batch.exprs;
+
   // Disable codegen advisorily to avoid unnecessary latency. For testing purposes
   // (expr-test.cc), fe_support_disable_codegen may be set to false.
   query_ctx.disable_codegen_hint = fe_support_disable_codegen;
@@ -377,7 +380,8 @@ JNIEXPORT jbyteArray JNICALL
 Java_org_apache_impala_service_FeSupport_NativeCacheJar(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_struct) {
   TCacheJarParams params;
-  DeserializeThriftMsg(env, thrift_struct, &params);
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_struct, &params), env,
+      JniUtil::internal_exc_class(), nullptr);
 
   TCacheJarResult result;
   string local_path;
@@ -397,7 +401,8 @@ JNIEXPORT jbyteArray JNICALL
 Java_org_apache_impala_service_FeSupport_NativeLookupSymbol(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_struct) {
   TSymbolLookupParams lookup;
-  DeserializeThriftMsg(env, thrift_struct, &lookup);
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_struct, &lookup), env,
+      JniUtil::internal_exc_class(), nullptr);
 
   vector<ColumnType> arg_types;
   for (int i = 0; i < lookup.arg_types.size(); ++i) {
@@ -420,7 +425,8 @@ JNIEXPORT jbyteArray JNICALL
 Java_org_apache_impala_service_FeSupport_NativePrioritizeLoad(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_struct) {
   TPrioritizeLoadRequest request;
-  DeserializeThriftMsg(env, thrift_struct, &request);
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_struct, &request), env,
+      JniUtil::internal_exc_class(), nullptr);
 
   CatalogOpExecutor catalog_op_executor(ExecEnv::GetInstance(), NULL, NULL);
   TPrioritizeLoadResponse result;

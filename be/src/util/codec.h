@@ -63,7 +63,8 @@ class Codec {
   /// If mem_pool is nullptr, then the resulting codec will never allocate memory and
   /// the caller must be responsible for it.
   static Status CreateDecompressor(MemPool* mem_pool, bool reuse,
-    THdfsCompression::type format, boost::scoped_ptr<Codec>* decompressor);
+      THdfsCompression::type format,
+      boost::scoped_ptr<Codec>* decompressor) WARN_UNUSED_RESULT;
 
   /// Alternate factory method: takes a codec string and populates a scoped pointer.
   static Status CreateDecompressor(MemPool* mem_pool, bool reuse,
@@ -88,7 +89,8 @@ class Codec {
   /// Return the name of a compression algorithm.
   static std::string GetCodecName(THdfsCompression::type);
   /// Returns the java class name for the given compression type
-  static Status GetHadoopCodecClassName(THdfsCompression::type, std::string* out_name);
+  static Status GetHadoopCodecClassName(
+      THdfsCompression::type, std::string* out_name) WARN_UNUSED_RESULT;
 
   virtual ~Codec() {}
 
@@ -109,7 +111,8 @@ class Codec {
   ///   input_length: length of the data to process
   ///   input: data to process
   virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
-      const uint8_t* input, int64_t* output_length, uint8_t** output) = 0;
+      const uint8_t* input, int64_t* output_length,
+      uint8_t** output) WARN_UNUSED_RESULT = 0;
 
   /// Wrapper to the actual ProcessBlock() function. This wrapper uses lengths as ints and
   /// not int64_ts. We need to keep this interface because the Parquet thrift uses ints.

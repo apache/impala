@@ -81,7 +81,7 @@ class ExecEnv {
   ~ExecEnv();
 
   /// Starts any dependent services in their correct order
-  Status StartServices();
+  Status StartServices() WARN_UNUSED_RESULT;
 
   /// TODO: Should ExecEnv own the ImpalaServer as well?
   void SetImpalaServer(ImpalaServer* server) { impala_server_ = server; }
@@ -127,7 +127,7 @@ class ExecEnv {
   const TNetworkAddress& backend_address() const { return backend_address_; }
 
   /// Initializes the exec env for running FE tests.
-  Status InitForFeTests();
+  Status InitForFeTests() WARN_UNUSED_RESULT;
 
   /// Returns true if this environment was created from the FE tests. This makes the
   /// environment special since the JVM is started first and libraries are loaded
@@ -135,14 +135,14 @@ class ExecEnv {
   bool is_fe_tests() { return is_fe_tests_; }
 
   /// Returns the configured defaultFs set in core-site.xml
-  string default_fs() { return default_fs_; }
+  const string& default_fs() { return default_fs_; }
 
   /// Gets a KuduClient for this list of master addresses. It will look up and share
   /// an existing KuduClient if possible. Otherwise, it will create a new KuduClient
   /// internally and return a pointer to it. All KuduClients accessed through this
   /// interface are owned by the ExecEnv. Thread safe.
-  Status GetKuduClient(
-      const std::vector<std::string>& master_addrs, kudu::client::KuduClient** client);
+  Status GetKuduClient(const std::vector<std::string>& master_addrs,
+      kudu::client::KuduClient** client) WARN_UNUSED_RESULT;
 
  private:
   boost::scoped_ptr<ObjectPool> obj_pool_;

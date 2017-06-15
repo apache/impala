@@ -74,7 +74,7 @@ class InProcessImpalaServer {
 
   /// Sets the catalog on this impalad to be initialized. If we don't
   /// start up a catalogd, then there is no one to initialize it otherwise.
-  void SetCatalogInitialized();
+  Status SetCatalogInitialized();
 
   uint32_t beeswax_port() const { return beeswax_port_; }
 

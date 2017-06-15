@@ -18,11 +18,13 @@
 #ifndef IMPALA_UTIL_THREAD_H
 #define IMPALA_UTIL_THREAD_H
 
+#include <memory>
+#include <vector>
+
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread.hpp>
-#include <boost/ptr_container/ptr_vector.hpp>
 
 #include "common/status.h"
 #include "util/promise.h"
@@ -173,7 +175,7 @@ class ThreadGroup {
   /// will destroy it when the ThreadGroup is destroyed.  Threads will linger until that
   /// point (even if terminated), however, so callers should be mindful of the cost of
   /// placing very many threads in this set.
-  Status AddThread(Thread* thread);
+  void AddThread(std::unique_ptr<Thread> thread);
 
   /// Waits for all threads to finish. DO NOT call this from a thread inside this set;
   /// deadlock will predictably ensue.
@@ -184,7 +186,7 @@ class ThreadGroup {
 
  private:
   /// All the threads grouped by this set.
-  boost::ptr_vector<Thread> threads_;
+  std::vector<std::unique_ptr<Thread>> threads_;
 };
 
 /// Initialises the threading subsystem. Must be called before a Thread is created.

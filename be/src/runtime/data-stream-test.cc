@@ -113,7 +113,7 @@ class DataStreamTest : public testing::Test {
  protected:
   DataStreamTest() : next_val_(0) {
     // Initialize MemTrackers and RuntimeState for use by the data stream receiver.
-    exec_env_.InitForFeTests();
+    ABORT_IF_ERROR(exec_env_.InitForFeTests());
     runtime_state_.reset(new RuntimeState(TQueryCtx(), &exec_env_));
     mem_pool_.reset(new MemPool(&tracker_));
 
@@ -307,7 +307,7 @@ class DataStreamTest : public testing::Test {
     ordering_exprs_.push_back(lhs_slot);
     less_than_ = obj_pool_.Add(new TupleRowComparator(ordering_exprs_,
         is_asc_, nulls_first_));
-    less_than_->Open(&obj_pool_, runtime_state_.get(), mem_pool_.get());
+    ASSERT_OK(less_than_->Open(&obj_pool_, runtime_state_.get(), mem_pool_.get()));
   }
 
   // Create batch_, but don't fill it with data yet. Assumes we created row_desc_.
@@ -459,8 +459,9 @@ class DataStreamTest : public testing::Test {
     boost::shared_ptr<ImpalaTestBackend> handler(
         new ImpalaTestBackend(dynamic_cast<DataStreamMgr*>(stream_mgr_)));
     boost::shared_ptr<TProcessor> processor(new ImpalaInternalServiceProcessor(handler));
-    ThriftServerBuilder("DataStreamTest backend", processor, FLAGS_port).Build(&server_);
-    server_->Start();
+    ThriftServerBuilder builder("DataStreamTest backend", processor, FLAGS_port);
+    ASSERT_OK(builder.Build(&server_));
+    ASSERT_OK(server_->Start());
   }
 
   void StopBackend() {
@@ -514,7 +515,7 @@ class DataStreamTest : public testing::Test {
       if (!info.status.ok()) break;
     }
     VLOG_QUERY << "closing sender" << sender_num;
-    sender.FlushFinal(&state);
+    info.status.MergeStatus(sender.FlushFinal(&state));
     sender.Close(&state);
     info.num_bytes_sent = sender.GetNumDataBytesSent();
 
@@ -656,6 +657,6 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
   InitFeSupport();
-  impala::LlvmCodeGen::InitializeLlvm();
+  ABORT_IF_ERROR(impala::LlvmCodeGen::InitializeLlvm());
   return RUN_ALL_TESTS();
 }

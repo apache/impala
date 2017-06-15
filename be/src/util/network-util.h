@@ -32,7 +32,7 @@ typedef std::string IpAddr;
 /// 'address'. If the IP addresses of a host don't change, then subsequent calls will
 /// always return the same address. Returns an error status if any system call failed,
 /// otherwise OK. Even if OK is returned, addresses may still be of zero length.
-Status HostnameToIpAddr(const Hostname& hostname, IpAddr* ip);
+Status HostnameToIpAddr(const Hostname& hostname, IpAddr* ip) WARN_UNUSED_RESULT;
 
 /// Finds the first non-localhost IP address in the given list. Returns
 /// true if such an address was found, false otherwise.
@@ -40,7 +40,7 @@ bool FindFirstNonLocalhost(const std::vector<std::string>& addresses, std::strin
 
 /// Sets the output argument to the system defined hostname.
 /// Returns OK if a hostname can be found, false otherwise.
-Status GetHostname(std::string* hostname);
+Status GetHostname(std::string* hostname) WARN_UNUSED_RESULT;
 
 /// Utility method because Thrift does not supply useful constructors
 TNetworkAddress MakeNetworkAddress(const std::string& hostname, int port);

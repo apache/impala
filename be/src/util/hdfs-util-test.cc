@@ -34,7 +34,8 @@ TEST(HdfsUtilTest, CheckFilesystemsMatch) {
   ExecEnv* exec_env = new ExecEnv();
 
   // We do this to retrieve the default FS from the frontend.
-  exec_env->StartServices();
+  // It doesn't matter if starting the services fails.
+  discard_result(exec_env->StartServices());
 
   // Tests with both paths qualified.
   EXPECT_TRUE(FilesystemsMatch("s3a://dummybucket/temp_dir/temp_path",

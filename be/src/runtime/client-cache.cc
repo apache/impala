@@ -111,9 +111,9 @@ Status ClientCacheHelper::CreateClient(const TNetworkAddress& address,
   shared_ptr<ThriftClientImpl> client_impl(factory_method(address, client_key));
   VLOG(2) << "CreateClient(): creating new client for " << client_impl->address();
 
-  if (!client_impl->socket_create_status().ok()) {
+  if (!client_impl->init_status().ok()) {
     *client_key = nullptr;
-    return client_impl->socket_create_status();
+    return client_impl->init_status();
   }
 
   // Set the TSocket's send and receive timeouts.

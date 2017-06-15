@@ -39,19 +39,21 @@ class Thread;
 class AuthProvider {
  public:
   /// Initialises any state required to perform authentication using this provider.
-  virtual Status Start() = 0;
+  virtual Status Start() WARN_UNUSED_RESULT = 0;
 
   /// Creates a new Thrift transport factory in the out parameter that performs
   /// authorisation per this provider's protocol.
   virtual Status GetServerTransportFactory(
-      boost::shared_ptr<apache::thrift::transport::TTransportFactory>* factory) = 0;
+      boost::shared_ptr<apache::thrift::transport::TTransportFactory>* factory)
+      WARN_UNUSED_RESULT = 0;
 
-  /// Called by Thrift clients to wrap a raw transport with any intermediate transport that
-  /// an auth protocol requires.
+  /// Called by Thrift clients to wrap a raw transport with any intermediate transport
+  /// that an auth protocol requires.
   virtual Status WrapClientTransport(const std::string& hostname,
       boost::shared_ptr<apache::thrift::transport::TTransport> raw_transport,
       const std::string& service_name,
-      boost::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport) = 0;
+      boost::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport)
+      WARN_UNUSED_RESULT = 0;
 
   /// Returns true if this provider uses Sasl at the transport layer.
   virtual bool is_sasl() = 0;
@@ -151,7 +153,7 @@ class SaslAuthProvider : public AuthProvider {
   void RunKinit(Promise<Status>* first_kinit);
 
   /// One-time kerberos-specific environment variable setup.  Called by InitKerberos().
-  Status InitKerberosEnv();
+  Status InitKerberosEnv() WARN_UNUSED_RESULT;
 };
 
 /// This provider implements no authentication, so any connection is immediately

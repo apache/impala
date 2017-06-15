@@ -49,7 +49,7 @@ class CollectionValueBuilder {
   /// of tuples that may be written before calling CommitTuples() in 'num_tuples'. After
   /// calling CommitTuples(), GetMemory() can be called again. Allocates if there is no
   /// free tuple memory left. Returns error status if memory limit is exceeded.
-  Status GetFreeMemory(Tuple** tuple_mem, int* num_tuples) {
+  Status GetFreeMemory(Tuple** tuple_mem, int* num_tuples) WARN_UNUSED_RESULT {
     if (tuple_desc_.byte_size() == 0) {
       // No tuple memory necessary, so caller can write as many tuples as 'num_tuples'
       // field can count.

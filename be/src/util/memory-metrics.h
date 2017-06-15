@@ -155,7 +155,7 @@ class JvmMetric : public IntGauge {
  public:
   /// Registers many Jvm memory metrics: one for every member of JvmMetricType for each
   /// pool (usually ~5 pools plus a synthetic 'total' pool).
-  static Status InitMetrics(MetricGroup* metrics);
+  static Status InitMetrics(MetricGroup* metrics) WARN_UNUSED_RESULT;
 
  protected:
   /// Searches through jvm_metrics_response_ for a matching memory pool and pulls out the
@@ -193,7 +193,7 @@ class JvmMetric : public IntGauge {
 class BufferPoolMetric : public UIntGauge {
  public:
   static Status InitMetrics(MetricGroup* metrics, ReservationTracker* global_reservations,
-      BufferPool* buffer_pool);
+      BufferPool* buffer_pool) WARN_UNUSED_RESULT;
 
   /// Global metrics, initialized by CreateAndRegisterMetrics().
   static BufferPoolMetric* LIMIT;

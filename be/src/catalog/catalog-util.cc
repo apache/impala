@@ -201,9 +201,9 @@ Status CompressCatalogObject(string* catalog_object) {
       const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(output_buffer.data()));
   ReadWriteUtil::PutInt(output_buffer_ptr, static_cast<uint32_t>(catalog_object->size()));
   output_buffer_ptr += sizeof(uint32_t);
-  compressor->ProcessBlock(true, catalog_object->size(),
+  RETURN_IF_ERROR(compressor->ProcessBlock(true, catalog_object->size(),
       reinterpret_cast<const uint8_t*>(catalog_object->data()), &compressed_data_len,
-      &output_buffer_ptr);
+      &output_buffer_ptr));
   output_buffer.resize(compressed_data_len + sizeof(uint32_t));
   *catalog_object = move(output_buffer);
   return Status::OK();

@@ -3927,7 +3927,7 @@ TEST_F(ExprTest, SessionFunctions) {
 
   map<Session, map<Query, string>> results;
   for (Session session: {S1, S2}) {
-    executor_->Setup(); // Starts new session
+    ASSERT_OK(executor_->Setup()); // Starts new session
     results[session][Q1] = GetValue("current_session()", TYPE_STRING);
     results[session][Q2] = GetValue("current_sid()", TYPE_STRING);
   }
@@ -7307,7 +7307,7 @@ int main(int argc, char **argv) {
   InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
   ABORT_IF_ERROR(TimezoneDatabase::Initialize());
   InitFeSupport(false);
-  impala::LlvmCodeGen::InitializeLlvm();
+  ABORT_IF_ERROR(impala::LlvmCodeGen::InitializeLlvm());
 
   // Disable llvm optimization passes if the env var is no set to true. Running without
   // the optimizations makes the tests run much faster.

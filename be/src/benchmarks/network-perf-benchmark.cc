@@ -81,7 +81,7 @@ class TestServer : public NetworkTestServiceIf {
   }
 
   void Server(ThriftServer* server) {
-    server->Start();
+    ABORT_IF_ERROR(server->Start());
     server->Join();
   }
 };

@@ -34,7 +34,6 @@
 #include "common/names.h"
 
 namespace this_thread = boost::this_thread;
-using boost::ptr_vector;
 using namespace rapidjson;
 
 namespace impala {
@@ -331,13 +330,12 @@ void Thread::SuperviseThread(const string& name, const string& category,
   thread_mgr_ref->RemoveThread(this_thread::get_id(), category_copy);
 }
 
-Status ThreadGroup::AddThread(Thread* thread) {
-  threads_.push_back(thread);
-  return Status::OK();
+void ThreadGroup::AddThread(unique_ptr<Thread> thread) {
+  threads_.emplace_back(move(thread));
 }
 
 void ThreadGroup::JoinAll() {
-  for (const Thread& thread: threads_) thread.Join();
+  for (auto& thread : threads_) thread->Join();
 }
 
 int ThreadGroup::Size() const {

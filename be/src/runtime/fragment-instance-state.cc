@@ -97,7 +97,9 @@ done:
 }
 
 void FragmentInstanceState::Cancel() {
-  WaitForPrepare();  // make sure Prepare() finished
+  // Make sure Prepare() finished. We don't care about the status since the query is
+  // being cancelled.
+  discard_result(WaitForPrepare());
 
   // Ensure that the sink is closed from both sides. Although in ordinary executions we
   // rely on the consumer to do this, in error cases the consumer may not be able to send

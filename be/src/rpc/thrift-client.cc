@@ -42,16 +42,16 @@ ThriftClientImpl::ThriftClientImpl(const std::string& ipaddress, int port, bool 
   : address_(MakeNetworkAddress(ipaddress, port)), ssl_(ssl) {
   if (ssl_) {
     SSLProtocol version;
-    socket_create_status_ =
+    init_status_ =
         SSLProtoVersions::StringToProtocol(FLAGS_ssl_minimum_version, &version);
-    if (!socket_create_status_.ok()) return;
+    if (!init_status_.ok()) return;
     ssl_factory_.reset(new TSSLSocketFactory(version));
   }
-  socket_create_status_ = CreateSocket();
+  init_status_ = CreateSocket();
 }
 
 Status ThriftClientImpl::Open() {
-  if (!socket_create_status_.ok()) return socket_create_status_;
+  RETURN_IF_ERROR(init_status_);
   try {
     if (!transport_->isOpen()) {
       transport_->open();
@@ -71,7 +71,7 @@ Status ThriftClientImpl::Open() {
 
 Status ThriftClientImpl::OpenWithRetry(uint32_t num_tries, uint64_t wait_ms) {
   // Socket creation failures are not recoverable.
-  if (!socket_create_status_.ok()) return socket_create_status_;
+  RETURN_IF_ERROR(init_status_);
 
   uint32_t try_count = 0L;
   while (true) {

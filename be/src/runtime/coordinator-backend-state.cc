@@ -388,7 +388,10 @@ void Coordinator::BackendState::PublishFilter(
   TPublishFilterParams local_params(*rpc_params);
   local_params.__set_bloom_filter(rpc_params->bloom_filter);
   TPublishFilterResult res;
-  backend_client.DoRpc(&ImpalaBackendClient::PublishFilter, local_params, &res);
+  status = backend_client.DoRpc(&ImpalaBackendClient::PublishFilter, local_params, &res);
+  if (!status.ok()) {
+    LOG(WARNING) << "Error publishing filter, continuing..." << status.GetDetail();
+  }
   // TODO: switch back to the following once we fix the lifecycle
   // problems of Coordinator
   //std::cref(fragment_inst->impalad_address()),

@@ -430,7 +430,7 @@ Status HBaseTableScanner::HandleResultScannerTimeout(JNIEnv* env, bool* timeout)
   jbyteArray start_bytes =
     (jbyteArray) env->CallObjectMethod(cell, cell_get_row_array_);
   jbyteArray end_bytes;
-  CreateByteArray(env, scan_range.stop_key(), &end_bytes);
+  RETURN_IF_ERROR(CreateByteArray(env, scan_range.stop_key(), &end_bytes));
   return InitScanRange(env, start_bytes, end_bytes);
 }
 
@@ -438,9 +438,9 @@ Status HBaseTableScanner::InitScanRange(JNIEnv* env, const ScanRange& scan_range
   JniLocalFrame jni_frame;
   RETURN_IF_ERROR(jni_frame.push(env));
   jbyteArray start_bytes;
-  CreateByteArray(env, scan_range.start_key(), &start_bytes);
+  RETURN_IF_ERROR(CreateByteArray(env, scan_range.start_key(), &start_bytes));
   jbyteArray end_bytes;
-  CreateByteArray(env, scan_range.stop_key(), &end_bytes);
+  RETURN_IF_ERROR(CreateByteArray(env, scan_range.stop_key(), &end_bytes));
   return InitScanRange(env, start_bytes, end_bytes);
 }
 
@@ -457,7 +457,8 @@ Status HBaseTableScanner::InitScanRange(JNIEnv* env, jbyteArray start_bytes,
   if (resultscanner_ != NULL) {
     // resultscanner_.close();
     env->CallObjectMethod(resultscanner_, resultscanner_close_id_);
-    RETURN_IF_ERROR(JniUtil::FreeGlobalRef(env, resultscanner_));
+    RETURN_ERROR_IF_EXC(env);
+    env->DeleteGlobalRef(resultscanner_);
     resultscanner_ = NULL;
   }
   // resultscanner_ = htable_.getScanner(scan_);
@@ -542,7 +543,7 @@ Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
     return Status::OK();
   }
 
-  if (cells_ != NULL) RETURN_IF_ERROR(JniUtil::FreeGlobalRef(env, cells_));
+  if (cells_ != NULL) env->DeleteGlobalRef(cells_);
   // cells_ = result.raw();
   jobject local_cells = reinterpret_cast<jobjectArray>(
       env->CallObjectMethod(result, result_raw_cells_id_));
@@ -656,7 +657,7 @@ Status HBaseTableScanner::GetRowKey(JNIEnv* env, const SlotDescriptor* slot_desc
   void* key;
   int key_length;
   jobject cell = env->GetObjectArrayElement(cells_, 0);
-  GetRowKey(env, cell, &key, &key_length);
+  RETURN_IF_ERROR(GetRowKey(env, cell, &key, &key_length));
   DCHECK_EQ(key_length, slot_desc->type().GetByteSize());
   WriteTupleSlot(slot_desc, tuple, reinterpret_cast<char*>(key));
   RETURN_ERROR_IF_EXC(env);
@@ -700,7 +701,7 @@ Status HBaseTableScanner::GetCurrentValue(JNIEnv* env, const string& family,
 Status HBaseTableScanner::GetValue(JNIEnv* env, const string& family,
     const string& qualifier, void** value, int* value_length) {
   bool is_null;
-  GetCurrentValue(env, family, qualifier, value, value_length, &is_null);
+  RETURN_IF_ERROR(GetCurrentValue(env, family, qualifier, value, value_length, &is_null));
   RETURN_ERROR_IF_EXC(env);
   if (is_null) {
     *value = NULL;
@@ -716,7 +717,8 @@ Status HBaseTableScanner::GetValue(JNIEnv* env, const string& family,
   void* value;
   int value_length;
   bool is_null;
-  GetCurrentValue(env, family, qualifier, &value, &value_length, &is_null);
+  RETURN_IF_ERROR(
+      GetCurrentValue(env, family, qualifier, &value, &value_length, &is_null));
   RETURN_ERROR_IF_EXC(env);
   if (is_null) {
     tuple->SetNull(slot_desc->null_indicator_offset());
@@ -755,15 +757,16 @@ void HBaseTableScanner::Close(JNIEnv* env) {
                   << "(this does not necessarily indicate a problem)";
       } else {
         // GetJniExceptionMsg will clear the exception status and log
-        JniUtil::GetJniExceptionMsg(env, true,
+        Status status = JniUtil::GetJniExceptionMsg(env, true,
             "Unknown error occurred while closing ResultScanner: ");
+        if (!status.ok()) LOG(WARNING) << "Error closing ResultScanner()";
       }
     }
-    JniUtil::FreeGlobalRef(env, resultscanner_);
+    env->DeleteGlobalRef(resultscanner_);
     resultscanner_ = NULL;
   }
-  if (scan_ != NULL) JniUtil::FreeGlobalRef(env, scan_);
-  if (cells_ != NULL) JniUtil::FreeGlobalRef(env, cells_);
+  if (scan_ != NULL) env->DeleteGlobalRef(scan_);
+  if (cells_ != NULL) env->DeleteGlobalRef(cells_);
 
   // Close the HTable so that the connections are not kept around.
   if (htable_.get() != NULL) htable_->Close(state_);

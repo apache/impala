@@ -144,7 +144,8 @@ endfunction()
 
 
 find_package(Boost REQUIRED COMPONENTS thread regex filesystem system date_time)
-include_directories(${Boost_INCLUDE_DIRS})
+# Mark Boost as a system header to avoid compile warnings.
+include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 message(STATUS "Boost include dir: " ${Boost_INCLUDE_DIRS})
 message(STATUS "Boost libraries: " ${Boost_LIBRARIES})
 

@@ -68,7 +68,8 @@ InProcessImpalaServer* InProcessImpalaServer::StartWithEphemeralPorts(
     // pick a new set of ports
     Status started = impala->StartWithClientServers(beeswax_port, hs2_port);
     if (started.ok()) {
-      impala->SetCatalogInitialized();
+      const Status status = impala->SetCatalogInitialized();
+      if (!status.ok()) LOG(WARNING) << status.GetDetail();
       return impala;
     }
     delete impala;
@@ -88,13 +89,14 @@ InProcessImpalaServer::InProcessImpalaServer(const string& hostname, int backend
           statestore_host, statestore_port)) {
 }
 
-void InProcessImpalaServer::SetCatalogInitialized() {
+Status InProcessImpalaServer::SetCatalogInitialized() {
   DCHECK(impala_server_ != NULL) << "Call Start*() first.";
-  exec_env_->frontend()->SetCatalogInitialized();
+  return exec_env_->frontend()->SetCatalogInitialized();
 }
 
 Status InProcessImpalaServer::StartWithClientServers(int beeswax_port, int hs2_port) {
   RETURN_IF_ERROR(exec_env_->StartServices());
+
   beeswax_port_ = beeswax_port;
   hs2_port_ = hs2_port;
   ThriftServer* be_server;
@@ -158,7 +160,7 @@ InProcessStatestore::InProcessStatestore(int statestore_port, int webserver_port
 }
 
 Status InProcessStatestore::Start() {
-  webserver_->Start();
+  RETURN_IF_ERROR(webserver_->Start());
   boost::shared_ptr<TProcessor> processor(
       new StatestoreServiceProcessor(statestore_->thrift_iface()));
 

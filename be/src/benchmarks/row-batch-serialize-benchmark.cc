@@ -289,7 +289,7 @@ class RowBatchSerializeBenchmark {
     SerializeArgs* args = reinterpret_cast<SerializeArgs*>(data);
     for (int iter = 0; iter < batch_size; ++iter) {
       TRowBatch trow_batch;
-      args->batch->Serialize(&trow_batch, args->full_dedup);
+      ABORT_IF_ERROR(args->batch->Serialize(&trow_batch, args->full_dedup));
     }
   }
 
@@ -338,19 +338,19 @@ class RowBatchSerializeBenchmark {
     RowBatch* no_dup_batch = obj_pool.Add(new RowBatch(&row_desc, NUM_ROWS, &tracker));
     FillBatch(no_dup_batch, 12345, 1, -1);
     TRowBatch no_dup_tbatch;
-    no_dup_batch->Serialize(&no_dup_tbatch);
+    ABORT_IF_ERROR(no_dup_batch->Serialize(&no_dup_tbatch));
 
     RowBatch* adjacent_dup_batch =
         obj_pool.Add(new RowBatch(&row_desc, NUM_ROWS, &tracker));
     FillBatch(adjacent_dup_batch, 12345, 5, -1);
     TRowBatch adjacent_dup_tbatch;
-    adjacent_dup_batch->Serialize(&adjacent_dup_tbatch, false);
+    ABORT_IF_ERROR(adjacent_dup_batch->Serialize(&adjacent_dup_tbatch, false));
 
     RowBatch* dup_batch = obj_pool.Add(new RowBatch(&row_desc, NUM_ROWS, &tracker));
     // Non-adjacent duplicates.
     FillBatch(dup_batch, 12345, 1, NUM_ROWS / 5);
     TRowBatch dup_tbatch;
-    dup_batch->Serialize(&dup_tbatch, true);
+    ABORT_IF_ERROR(dup_batch->Serialize(&dup_tbatch, true));
 
     int baseline;
     Benchmark ser_suite("serialize");

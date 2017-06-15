@@ -627,7 +627,7 @@ void ClientRequestState::Wait() {
     } else {
       query_events()->MarkEvent("Request finished");
     }
-    (void) UpdateQueryStatus(status);
+    discard_result(UpdateQueryStatus(status));
   }
   if (status.ok()) {
     UpdateNonErrorQueryState(beeswax::QueryState::FINISHED);
@@ -681,7 +681,7 @@ Status ClientRequestState::FetchRows(const int32_t max_rows,
   MarkActive();
 
   // ImpalaServer::FetchInternal has already taken our lock_
-  (void) UpdateQueryStatus(FetchRowsInternal(max_rows, fetched_rows));
+  discard_result(UpdateQueryStatus(FetchRowsInternal(max_rows, fetched_rows)));
 
   MarkInactive();
   return query_status_;
@@ -737,7 +737,7 @@ Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
     // max_rows <= 0 means no limit
     while ((num_rows < max_rows || max_rows <= 0)
         && num_rows_fetched_ < all_rows.size()) {
-      fetched_rows->AddOneRow(all_rows[num_rows_fetched_]);
+      RETURN_IF_ERROR(fetched_rows->AddOneRow(all_rows[num_rows_fetched_]));
       ++num_rows_fetched_;
       ++num_rows;
     }
@@ -867,7 +867,7 @@ Status ClientRequestState::Cancel(bool check_inflight, const Status* cause) {
     bool already_done = eos_ || query_state_ == beeswax::QueryState::EXCEPTION;
     if (!already_done && cause != NULL) {
       DCHECK(!cause->ok());
-      (void) UpdateQueryStatus(*cause);
+      discard_result(UpdateQueryStatus(*cause));
       query_events_->MarkEvent("Cancelled");
       DCHECK_EQ(query_state_, beeswax::QueryState::EXCEPTION);
     }

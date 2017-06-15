@@ -1317,7 +1317,7 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
         cv, *item_desc, mem_pool_.get(), runtime_state_, array_len);
     Tuple* array_data;
     int num_rows;
-    builder.GetFreeMemory(&array_data, &num_rows);
+    ASSERT_OK(builder.GetFreeMemory(&array_data, &num_rows));
     expected_row_size += item_desc->byte_size() * array_len;
 
     // Fill the array with pointers to our constant strings.
@@ -1423,7 +1423,7 @@ TEST_F(ArrayTupleStreamTest, TestComputeRowSize) {
       cv, *item_desc, mem_pool_.get(), runtime_state_, array_len);
   Tuple* array_data;
   int num_rows;
-  builder.GetFreeMemory(&array_data, &num_rows);
+  ASSERT_OK(builder.GetFreeMemory(&array_data, &num_rows));
   expected_row_size += item_desc->byte_size() * array_len;
 
   // Fill the array with pointers to our constant strings.
@@ -1457,6 +1457,6 @@ int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport();
-  impala::LlvmCodeGen::InitializeLlvm();
+  ABORT_IF_ERROR(impala::LlvmCodeGen::InitializeLlvm());
   return RUN_ALL_TESTS();
 }

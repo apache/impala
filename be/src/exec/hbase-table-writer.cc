@@ -194,7 +194,7 @@ Status HBaseTableWriter::AppendRows(RowBatch* batch) {
     RETURN_IF_ERROR(table_->Put(put_list_));
   }
   // Now clean put_list_.
-  RETURN_IF_ERROR(JniUtil::FreeGlobalRef(env, put_list_));
+  env->DeleteGlobalRef(put_list_);
   put_list_ = NULL;
   return Status::OK();
 }
@@ -204,17 +204,12 @@ Status HBaseTableWriter::CleanUpJni() {
   if (env == NULL) return Status("Error getting JNIEnv.");
 
   if (put_list_ != NULL) {
-    RETURN_IF_ERROR(JniUtil::FreeGlobalRef(env, put_list_));
+    env->DeleteGlobalRef(put_list_);
     put_list_ = NULL;
   }
 
-  for (jbyteArray ref: cf_arrays_) {
-    RETURN_IF_ERROR(JniUtil::FreeGlobalRef(env, ref));
-  }
-  for (jbyteArray ref: qual_arrays_) {
-    RETURN_IF_ERROR(JniUtil::FreeGlobalRef(env, ref));
-  }
-
+  for (jbyteArray ref: cf_arrays_) env->DeleteGlobalRef(ref);
+  for (jbyteArray ref: qual_arrays_) env->DeleteGlobalRef(ref);
   return Status::OK();
 }
 

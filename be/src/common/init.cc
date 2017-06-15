@@ -184,7 +184,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   CpuInfo::VerifyCpuRequirements();
 
   // Set the default hostname. The user can override this with the hostname flag.
-  GetHostname(&FLAGS_hostname);
+  ABORT_IF_ERROR(GetHostname(&FLAGS_hostname));
 
   google::SetVersionString(impala::GetBuildVersion());
   google::ParseCommandLineFlags(&argc, &argv, true);
@@ -225,7 +225,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   LOG(INFO) << "Process ID: " << getpid();
 
   // Required for the FE's Catalog
-  impala::LibCache::Init();
+  ABORT_IF_ERROR(impala::LibCache::Init());
   Status fs_cache_init_status = impala::HdfsFsCache::Init();
   if (!fs_cache_init_status.ok()) CLEAN_EXIT_WITH_ERROR(fs_cache_init_status.GetDetail());
 

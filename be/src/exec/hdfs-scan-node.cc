@@ -354,7 +354,7 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
 
     auto fn = [this]() { this->ScannerThread(); };
     scanner_threads_.AddThread(
-        new Thread(FragmentInstanceState::FINST_THREAD_GROUP_NAME, name, fn));
+        make_unique<Thread>(FragmentInstanceState::FINST_THREAD_GROUP_NAME, name, fn));
   }
 }
 

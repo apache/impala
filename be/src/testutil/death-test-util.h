@@ -25,10 +25,10 @@
 // Wrapper around gtest's ASSERT_DEBUG_DEATH that prevents coredumps and minidumps
 // being generated as the result of the death test.
 #ifndef NDEBUG
-#define IMPALA_ASSERT_DEBUG_DEATH(fn, msg)    \
-  do {                                        \
-    ScopedCoredumpDisabler disable_coredumps; \
-    ASSERT_DEBUG_DEATH((void)fn, msg);              \
+#define IMPALA_ASSERT_DEBUG_DEATH(fn, msg)      \
+  do {                                          \
+    ScopedCoredumpDisabler disable_coredumps;   \
+    ASSERT_DEBUG_DEATH((void)fn, msg); \
   } while (false);
 #else
 // Gtest's ASSERT_DEBUG_DEATH macro has peculiar semantics where in debug builds it

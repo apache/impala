@@ -68,7 +68,7 @@ class ThriftClientImpl {
   /// Set send timeout on the underlying TSocket.
   void setSendTimeout(int32_t ms) { socket_->setSendTimeout(ms); }
 
-  Status socket_create_status() { return socket_create_status_; }
+  Status init_status() { return init_status_; }
 
  protected:
   ThriftClientImpl(const std::string& ipaddress, int port, bool ssl);
@@ -83,7 +83,7 @@ class ThriftClientImpl {
   /// True if ssl encryption is enabled on this connection.
   bool ssl_;
 
-  Status socket_create_status_;
+  Status init_status_;
 
   /// Sasl Client object.  Contains client kerberos identification data.
   /// Will be NULL if kerberos is not being used.
@@ -145,15 +145,16 @@ ThriftClient<InterfaceType>::ThriftClient(const std::string& ipaddress, int port
   // not use the client after that.
   // TODO: Move initialization code that can fail into a separate Init() method.
   if (socket_ == NULL) {
-    DCHECK(!socket_create_status_.ok());
+    DCHECK(!init_status_.ok());
     return;
   }
 
   // transport_ is created by wrapping the socket_ in the TTransport provided by the
   // auth_provider_ and then a TBufferedTransport (IMPALA-1928).
   transport_ = socket_;
-  auth_provider_->WrapClientTransport(address_.hostname, transport_, service_name,
-      &transport_);
+  init_status_ = auth_provider_->WrapClientTransport(address_.hostname, transport_,
+      service_name, &transport_);
+  if (!init_status_.ok()) return; // The caller will decide what to do with the Status.
   ThriftServer::BufferedTransportFactory factory;
   transport_ = factory.getTransport(transport_);
 

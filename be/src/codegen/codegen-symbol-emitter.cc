@@ -61,7 +61,7 @@ void CodegenSymbolEmitter::NotifyObjectEmitted(const ObjectFile &obj,
     if (asm_file.fail()) {
       // Log error and continue if we can't write the disassembly to a file. Note that
       // fstream operations don't throw exceptions by default unless configured to do so.
-      LOG(ERROR) << "Could not save disassembly to: " << asm_file;
+      LOG(ERROR) << "Could not save disassembly to: " << asm_path_;
     }
   }
 

@@ -154,7 +154,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
 
   Status exec_status = request_state->Exec(*request);
   if (!exec_status.ok()) {
-    (void) UnregisterQuery(request_state->query_id(), false, &exec_status);
+    discard_result(UnregisterQuery(request_state->query_id(), false, &exec_status));
     status->__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
     status->__set_errorMessage(exec_status.GetDetail());
     status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
@@ -165,7 +165,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
 
   Status inflight_status = SetQueryInflight(session, request_state);
   if (!inflight_status.ok()) {
-    (void) UnregisterQuery(request_state->query_id(), false, &inflight_status);
+    discard_result(UnregisterQuery(request_state->query_id(), false, &inflight_status));
     status->__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
     status->__set_errorMessage(inflight_status.GetDetail());
     status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
@@ -340,8 +340,8 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
       } else {
         // Normal configuration key. Use it to set session default query options.
         // Ignore failure (failures will be logged in SetQueryOption()).
-        SetQueryOption(v.first, v.second, &state->default_query_options,
-            &state->set_query_options_mask);
+        discard_result(SetQueryOption(v.first, v.second, &state->default_query_options,
+            &state->set_query_options_mask));
       }
     }
   }
@@ -465,7 +465,7 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
             session->hs2_version, *request_state->result_metadata(), nullptr),
         cache_num_rows);
     if (!status.ok()) {
-      (void) UnregisterQuery(request_state->query_id(), false, &status);
+      discard_result(UnregisterQuery(request_state->query_id(), false, &status));
       HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
     }
   }
@@ -476,7 +476,7 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
   // set of in-flight queries.
   status = SetQueryInflight(session, request_state);
   if (!status.ok()) {
-    (void) UnregisterQuery(request_state->query_id(), false, &status);
+    discard_result(UnregisterQuery(request_state->query_id(), false, &status));
     HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
   return_val.__isset.operationHandle = true;
@@ -795,7 +795,7 @@ void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
     if (status.IsRecoverableError()) {
       DCHECK(fetch_first);
     } else {
-      (void) UnregisterQuery(query_id, false, &status);
+      discard_result(UnregisterQuery(query_id, false, &status));
     }
     HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }

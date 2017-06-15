@@ -20,6 +20,10 @@
 #include "exprs/scalar-expr.h"
 #include "udf/udf.h"
 
+#ifdef IR_COMPILE
+#include "exprs/decimal-operators-ir.cc"
+#endif
+
 using namespace impala;
 using namespace impala_udf;
 
@@ -30,10 +34,6 @@ struct FnAttr {
   int arg1_type_size;
   int arg2_type_size;
 };
-
-#ifdef IR_COMPILE
-#include "exprs/decimal-operators-ir.cc"
-#endif
 
 DecimalVal TestGetFnAttrs(
     FunctionContext* ctx, const DecimalVal& arg0, BooleanVal& arg1, StringVal& arg2) {
@@ -359,7 +359,7 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
   InitFeSupport();
-  LlvmCodeGen::InitializeLlvm();
+  ABORT_IF_ERROR(LlvmCodeGen::InitializeLlvm());
 
   return RUN_ALL_TESTS();
 }

@@ -73,6 +73,7 @@
 #include "util/runtime-profile.h"
 #include "util/string-parser.h"
 #include "util/summary-util.h"
+#include "util/test-info.h"
 #include "util/uid-util.h"
 
 #include "gen-cpp/Types_types.h"
@@ -357,21 +358,22 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
 
   ABORT_IF_ERROR(ExternalDataSourceExecutor::InitJNI(exec_env->metrics()));
 
-  // Register the membership callback if required
-  if (exec_env->subscriber() != nullptr) {
+  // Register the membership callback if running in a real cluster.
+  if (!TestInfo::is_test()) {
     auto cb = [this] (const StatestoreSubscriber::TopicDeltaMap& state,
          vector<TTopicDelta>* topic_updates) {
       this->MembershipCallback(state, topic_updates);
     };
-    exec_env->subscriber()->AddTopic(Scheduler::IMPALA_MEMBERSHIP_TOPIC, true, cb);
+    ABORT_IF_ERROR(
+        exec_env->subscriber()->AddTopic(Scheduler::IMPALA_MEMBERSHIP_TOPIC, true, cb));
 
     if (FLAGS_is_coordinator) {
       auto catalog_cb = [this] (const StatestoreSubscriber::TopicDeltaMap& state,
           vector<TTopicDelta>* topic_updates) {
         this->CatalogUpdateCallback(state, topic_updates);
       };
-      exec_env->subscriber()->AddTopic(CatalogServer::IMPALA_CATALOG_TOPIC, true,
-          catalog_cb);
+      ABORT_IF_ERROR(exec_env->subscriber()->AddTopic(
+            CatalogServer::IMPALA_CATALOG_TOPIC, true, catalog_cb));
     }
   }
 
@@ -581,11 +583,11 @@ void ImpalaServer::LogQueryEvents(const ClientRequestState& request_state) {
   if (IsAuditEventLoggingEnabled() &&
       (Frontend::IsAuthorizationError(request_state.query_status()) || log_events)) {
     // TODO: deal with an error status
-    (void) LogAuditRecord(request_state, request_state.exec_request());
+    discard_result(LogAuditRecord(request_state, request_state.exec_request()));
   }
   if (IsLineageLoggingEnabled() && log_events) {
     // TODO: deal with an error status
-    (void) LogLineageRecord(request_state);
+    discard_result(LogLineageRecord(request_state));
   }
 }
 
@@ -622,7 +624,7 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
       RETURN_IF_ERROR(CheckProfileAccess(user, request_state->effective_user(),
           request_state->user_has_profile_access()));
       if (base64_encoded) {
-        request_state->profile().SerializeToArchiveString(output);
+        RETURN_IF_ERROR(request_state->profile().SerializeToArchiveString(output));
       } else {
         request_state->profile().PrettyPrint(output);
       }
@@ -703,7 +705,10 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
 [[noreturn]] void ImpalaServer::LogFileFlushThread() {
   while (true) {
     sleep(5);
-    profile_logger_->Flush();
+    const Status status = profile_logger_->Flush();
+    if (!status.ok()) {
+      LOG(WARNING) << "Error flushing profile log: " << status.GetDetail();
+    }
   }
 }
 
@@ -736,14 +741,21 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
 }
 
 void ImpalaServer::ArchiveQuery(const ClientRequestState& query) {
-  const string& encoded_profile_str = query.profile().SerializeToArchiveString();
+  string encoded_profile_str;
+  Status status = query.profile().SerializeToArchiveString(&encoded_profile_str);
+  if (!status.ok()) {
+    // Didn't serialize the string. Continue with empty string.
+    LOG_EVERY_N(WARNING, 1000) << "Could not serialize profile to archive string "
+                               << status.GetDetail();
+    return;
+  }
 
   // If there was an error initialising archival (e.g. directory is not writeable),
   // FLAGS_log_query_to_file will have been set to false
   if (FLAGS_log_query_to_file) {
     stringstream ss;
     ss << UnixMillis() << " " << query.query_id() << " " << encoded_profile_str;
-    Status status = profile_logger_->AppendEntry(ss.str());
+    status = profile_logger_->AppendEntry(ss.str());
     if (!status.ok()) {
       LOG_EVERY_N(WARNING, 1000) << "Could not write to profile log file file ("
                                  << google::COUNTER << " attempts failed): "
@@ -826,7 +838,7 @@ Status ImpalaServer::Execute(TQueryCtx* query_ctx,
   Status status = ExecuteInternal(*query_ctx, session_state, &registered_request_state,
       request_state);
   if (!status.ok() && registered_request_state) {
-    (void) UnregisterQuery((*request_state)->query_id(), false, &status);
+    discard_result(UnregisterQuery((*request_state)->query_id(), false, &status));
   }
   return status;
 }
@@ -1105,7 +1117,7 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
   Status status("Session closed");
   for (const TUniqueId& query_id: inflight_queries) {
     // TODO: deal with an error status
-    (void) UnregisterQuery(query_id, false, &status);
+    discard_result(UnregisterQuery(query_id, false, &status));
   }
   // Reconfigure the poll period of session_timeout_thread_ if necessary.
   int32_t session_timeout = session_state->session_timeout;
@@ -1427,7 +1439,7 @@ void ImpalaServer::CatalogUpdateCallback(
       }
       ImpaladMetrics::CATALOG_READY->set_value(new_catalog_version > 0);
       // TODO: deal with an error status
-      (void) UpdateCatalogMetrics();
+      discard_result(UpdateCatalogMetrics());
       // Remove all dropped objects from the library cache.
       // TODO: is this expensive? We'd like to process heartbeats promptly.
       for (TCatalogObject& object: dropped_objects) {
@@ -1690,7 +1702,12 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const ClientRequestState& reque
     request_state.profile().PrettyPrint(&ss);
     profile_str = ss.str();
     if (encoded_profile.empty()) {
-      encoded_profile_str = request_state.profile().SerializeToArchiveString();
+      Status status =
+          request_state.profile().SerializeToArchiveString(&encoded_profile_str);
+      if (!status.ok()) {
+        LOG_EVERY_N(WARNING, 1000) << "Could not serialize profile to archive string "
+                                   << status.GetDetail();
+      }
     } else {
       encoded_profile_str = encoded_profile;
     }

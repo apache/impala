@@ -48,7 +48,7 @@ bool KuduClientIsSupported();
 /// Returns OK if Kudu is available or an error status containing the reason Kudu is not
 /// available. Kudu may not be available if no Kudu client is available for the platform
 /// or if Kudu was disabled by the startup flag --disable_kudu.
-Status CheckKuduAvailability();
+Status CheckKuduAvailability() WARN_UNUSED_RESULT;
 
 /// Convenience function for the bool equivalent of CheckKuduAvailability().
 bool KuduIsAvailable();
@@ -56,7 +56,7 @@ bool KuduIsAvailable();
 /// Creates a new KuduClient using the specified master adresses. If any error occurs,
 /// 'client' is not set and an error status is returned.
 Status CreateKuduClient(const std::vector<std::string>& master_addrs,
-    kudu::client::sp::shared_ptr<kudu::client::KuduClient>* client);
+    kudu::client::sp::shared_ptr<kudu::client::KuduClient>* client) WARN_UNUSED_RESULT;
 
 /// Returns a debug string for the KuduSchema.
 std::string KuduSchemaDebugString(const kudu::client::KuduSchema& schema);

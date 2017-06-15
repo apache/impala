@@ -35,7 +35,7 @@ Status ParallelExecutor::Exec(Function function, void** args, int num_args,
   for (int i = 0; i < num_args; ++i) {
     stringstream ss;
     ss << "worker-thread(" << i << ")";
-    worker_threads.AddThread(new Thread("parallel-executor", ss.str(),
+    worker_threads.AddThread(make_unique<Thread>("parallel-executor", ss.str(),
         &ParallelExecutor::Worker, function, args[i], &lock, &status, latencies));
   }
   worker_threads.JoinAll();
