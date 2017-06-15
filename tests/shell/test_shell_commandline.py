@@ -420,6 +420,10 @@ class TestImpalaShell(ImpalaTestSuite):
            % (os.path.join(QUERY_FILE_PATH, 'test_var_substitution.sql'))
     result = run_impala_shell_cmd(args, expect_success=True)
     assert_var_substitution(result)
+    args = '--var=foo'
+    result = run_impala_shell_cmd(args, expect_success=False)
+    assert ("Error: Could not parse key-value \"foo\". It must follow the pattern "
+             "\"KEY=VALUE\".") in result.stderr
 
   # Checks if 'messages' exists/does not exist in 'result_stderr' based on the value of
   # 'should_exist'

@@ -1252,8 +1252,8 @@ def parse_variables(keyvals):
     for keyval in keyvals:
       match = re.match(kv_pattern, keyval)
       if not match:
-        print_to_stderr('Error: Could not parse key-value "%s". ' + \
-                        'It must follow the pattern "KEY=VALUE".' % (keyval,))
+        print_to_stderr('Error: Could not parse key-value "%s". ' % (keyval,) +
+                        'It must follow the pattern "KEY=VALUE".')
         parser.print_help()
         sys.exit(1)
       else:
