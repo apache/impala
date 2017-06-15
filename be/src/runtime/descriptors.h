@@ -90,7 +90,7 @@ struct NullIndicatorOffset {
   int byte_offset;
   uint8_t bit_mask;  /// to extract null indicator
 
-  NullIndicatorOffset(int byte_offset, int bit_offset)
+  NullIndicatorOffset(int byte_offset = 0, int bit_offset = -1)
     : byte_offset(byte_offset),
       bit_mask(bit_offset == -1 ? 0 : 1 << bit_offset) {
   }

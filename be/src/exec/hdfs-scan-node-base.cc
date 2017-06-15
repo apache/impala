@@ -638,7 +638,7 @@ void HdfsScanNodeBase::SetFileMetadata(const string& filename, void* metadata) {
 
 void* HdfsScanNodeBase::GetFileMetadata(const string& filename) {
   unique_lock<mutex> l(metadata_lock_);
-  map<string, void*>::iterator it = per_file_metadata_.find(filename);
+  auto it = per_file_metadata_.find(filename);
   if (it == per_file_metadata_.end()) return NULL;
   return it->second;
 }

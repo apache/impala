@@ -278,7 +278,7 @@ class ParquetColumnReader {
       def_level_(HdfsParquetScanner::INVALID_LEVEL),
       max_def_level_(node_.max_def_level),
       tuple_offset_(slot_desc == NULL ? -1 : slot_desc->tuple_offset()),
-      null_indicator_offset_(slot_desc == NULL ? NullIndicatorOffset(-1, -1) :
+      null_indicator_offset_(slot_desc == NULL ? NullIndicatorOffset() :
           slot_desc->null_indicator_offset()) {
     DCHECK_GE(node_.max_rep_level, 0);
     DCHECK_LE(node_.max_rep_level, std::numeric_limits<int16_t>::max());

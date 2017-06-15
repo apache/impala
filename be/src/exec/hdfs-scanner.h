@@ -238,7 +238,7 @@ class HdfsScanner {
   /// descs) has a template tuple, or NULL if there are no partition key or default slots.
   /// Template tuples are computed once for each file and are allocated from
   /// template_tuple_pool_.
-  std::map<const TupleDescriptor*, Tuple*> template_tuple_map_;
+  std::unordered_map<const TupleDescriptor*, Tuple*> template_tuple_map_;
 
   /// Convenience variable set to the top-level template tuple
   /// (i.e. template_tuple_map_[scan_node_->tuple_desc()]).

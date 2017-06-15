@@ -117,11 +117,11 @@ class HdfsScanNodeBase : public ScanNode {
   HdfsScanNodeBase(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
   ~HdfsScanNodeBase();
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
-  virtual Status Prepare(RuntimeState* state);
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) WARN_UNUSED_RESULT;
+  virtual Status Prepare(RuntimeState* state) WARN_UNUSED_RESULT;
   virtual void Codegen(RuntimeState* state);
-  virtual Status Open(RuntimeState* state);
-  virtual Status Reset(RuntimeState* state);
+  virtual Status Open(RuntimeState* state) WARN_UNUSED_RESULT;
+  virtual Status Reset(RuntimeState* state) WARN_UNUSED_RESULT;
   virtual void Close(RuntimeState* state);
 
   /// Returns true if this node uses separate threads for scanners that append RowBatches
@@ -155,7 +155,8 @@ class HdfsScanNodeBase : public ScanNode {
   int skip_header_line_count() const { return skip_header_line_count_; }
   DiskIoRequestContext* reader_context() { return reader_context_; }
 
-  typedef std::map<TupleId, std::vector<ScalarExprEvaluator*>> ConjunctEvaluatorsMap;
+  typedef std::unordered_map<TupleId, std::vector<ScalarExprEvaluator*>>
+    ConjunctEvaluatorsMap;
   const ConjunctEvaluatorsMap& conjuncts_map() const { return conjunct_evals_map_; }
 
   /// Slot Id => Dictionary Filter eligible conjuncts for that slot
@@ -216,11 +217,11 @@ class HdfsScanNodeBase : public ScanNode {
   /// threads needed to process those in 'ranges'.
   /// Can be overridden to add scan-node specific actions like starting scanner threads.
   virtual Status AddDiskIoRanges(const std::vector<DiskIoMgr::ScanRange*>& ranges,
-      int num_files_queued);
+      int num_files_queued) WARN_UNUSED_RESULT;
 
   /// Adds all splits for file_desc to the io mgr queue and indicates one file has
   /// been added completely.
-  inline Status AddDiskIoRanges(const HdfsFileDesc* file_desc) {
+  inline Status AddDiskIoRanges(const HdfsFileDesc* file_desc) WARN_UNUSED_RESULT {
     return AddDiskIoRanges(file_desc->splits, 1);
   }
 
@@ -342,21 +343,22 @@ class HdfsScanNodeBase : public ScanNode {
   std::unordered_set<int64_t> partition_ids_;
 
   /// File path => file descriptor (which includes the file's splits)
-  typedef std::map<std::string, HdfsFileDesc*> FileDescMap;
+  typedef std::unordered_map<std::string, HdfsFileDesc*> FileDescMap;
   FileDescMap file_descs_;
 
   /// File format => file descriptors.
-  typedef std::map<THdfsFileFormat::type, std::vector<HdfsFileDesc*>> FileFormatsMap;
+  typedef std::map<THdfsFileFormat::type, std::vector<HdfsFileDesc*>>
+    FileFormatsMap;
   FileFormatsMap per_type_files_;
 
   /// Scanner specific per file metadata (e.g. header information) and associated lock.
   /// TODO: Remove this lock when removing the legacy scanners and scan nodes.
   boost::mutex metadata_lock_;
-  std::map<std::string, void*> per_file_metadata_;
+  std::unordered_map<std::string, void*> per_file_metadata_;
 
   /// Conjuncts for each materialized tuple (top-level row batch tuples and collection
   /// item tuples). Includes a copy of ExecNode.conjuncts_.
-  typedef std::map<TupleId, std::vector<ScalarExpr*>> ConjunctsMap;
+  typedef std::unordered_map<TupleId, std::vector<ScalarExpr*>> ConjunctsMap;
   ConjunctsMap conjuncts_map_;
   ConjunctEvaluatorsMap conjunct_evals_map_;
 
@@ -372,7 +374,7 @@ class HdfsScanNodeBase : public ScanNode {
   AtomicInt32 num_unqueued_files_;
 
   /// Per scanner type codegen'd fn.
-  typedef std::map<THdfsFileFormat::type, void*> CodegendFnMap;
+  typedef boost::unordered_map<THdfsFileFormat::type, void*> CodegendFnMap;
   CodegendFnMap codegend_fn_map_;
 
   /// Maps from a slot's path to its index into materialized_slots_.
@@ -465,12 +467,13 @@ class HdfsScanNodeBase : public ScanNode {
   /// Performs dynamic partition pruning, i.e., applies runtime filters to files, and
   /// issues initial ranges for all file types. Waits for runtime filters if necessary.
   /// Only valid to call if !initial_ranges_issued_. Sets initial_ranges_issued_ to true.
-  Status IssueInitialScanRanges(RuntimeState* state);
+  Status IssueInitialScanRanges(RuntimeState* state) WARN_UNUSED_RESULT;
 
   /// Create and open new scanner for this partition type.
   /// If the scanner is successfully created and opened, it is returned in 'scanner'.
   Status CreateAndOpenScanner(HdfsPartitionDescriptor* partition,
-      ScannerContext* context, boost::scoped_ptr<HdfsScanner>* scanner);
+      ScannerContext* context, boost::scoped_ptr<HdfsScanner>* scanner)
+      WARN_UNUSED_RESULT;
 
   /// Recursively initializes all NULL collection slots to an empty CollectionValue in
   /// addition to maintaining the null bit. Hack to allow UnnestNode to project out
@@ -504,7 +507,7 @@ class HdfsScanNodeBase : public ScanNode {
 
   /// Calls ExecNode::ExecDebugAction() with 'phase'. Returns the status based on the
   /// debug action specified for the query.
-  Status ScanNodeDebugAction(TExecNodePhase::type phase);
+  Status ScanNodeDebugAction(TExecNodePhase::type phase) WARN_UNUSED_RESULT;
 };
 
 }
