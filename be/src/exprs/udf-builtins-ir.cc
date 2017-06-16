@@ -108,6 +108,11 @@ TimestampVal UdfBuiltins::Trunc(FunctionContext* context, const TimestampVal& tv
   return TruncImpl(context, tv, unit_str);
 }
 
+TimestampVal UdfBuiltins::DateTrunc(
+    FunctionContext* context, const StringVal& unit_str, const TimestampVal& tv) {
+  return DateTruncImpl(context, tv, unit_str);
+}
+
 // Maps the user facing name of a unit to a TExtractField
 // Returns the TExtractField for the given unit
 TExtractField::type StrToExtractField(FunctionContext* ctx, const StringVal& unit_str) {

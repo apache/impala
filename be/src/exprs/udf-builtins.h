@@ -79,8 +79,36 @@ class UdfBuiltins {
       const StringVal& unit_str);
   static void TruncPrepare(FunctionContext* context,
       FunctionContext::FunctionStateScope scope);
-  static void TruncClose(FunctionContext* context,
-      FunctionContext::FunctionStateScope scope);
+  static void TruncClose(
+      FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+  /// Rounds (truncating down) a Timestamp to the specified unit.
+  ///    Units:
+  ///    MILLENNIUM: The millennium number.
+  ///    CENTURY: The century number.
+  ///    DECADE: The year field divided by 10.
+  ///    YEAR: The year field (1400 - 9999).
+  ///    MONTH: The number of the month within the year (1–12)
+  ///    WEEK: The number of the week of the year that the day is in.
+  ///    DAY: The day (of the month) field (1–31).
+  ///    HOUR: The hour field (0–23).
+  ///    MINUTE: The minutes field (0–59).
+  ///    SECOND: The seconds field (0–59).
+  ///    MILLISECONDS: The milliseconds fraction in the seconds.
+  ///    MICROSECONDS: The microseconds fraction in the seconds.
+
+  ///    Reference:
+  ///    https://my.vertica.com/docs/8.1.x/HTML/index.htm#Authoring/
+  ///       SQLReferenceManual/Functions/Date-Time/DATE_TRUNC.htm
+  static TimestampVal DateTrunc(
+      FunctionContext* context, const StringVal& unit_str, const TimestampVal& date);
+  /// Implementation of DateTrunc, not cross-compiled.
+  static TimestampVal DateTruncImpl(
+      FunctionContext* context, const TimestampVal& date, const StringVal& unit_str);
+  static void DateTruncPrepare(
+      FunctionContext* context, FunctionContext::FunctionStateScope scope);
+  static void DateTruncClose(
+      FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
   /// Returns a single field from a timestamp
   ///    Fields:

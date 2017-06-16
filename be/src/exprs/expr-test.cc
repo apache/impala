@@ -7300,9 +7300,122 @@ TEST_F(ExprTest, UuidTest) {
   EXPECT_TRUE(string_set.size() == NUM_UUIDS);
 }
 
+TEST_F(ExprTest, DateTruncTest) {
+  TestTimestampValue("date_trunc('MILLENNIUM', '2016-05-08 10:30:00')",
+      TimestampValue::Parse("2000-01-01 00:00:00"));
+  TestTimestampValue("date_trunc('MILLENNIUM', '2000-01-01 00:00:00')",
+      TimestampValue::Parse("2000-01-01 00:00:00"));
+  TestTimestampValue("date_trunc('CENTURY', '2016-05-08 10:30:00')",
+      TimestampValue::Parse("2000-01-01 00:00:00  "));
+  TestTimestampValue("date_trunc('CENTURY', '2116-05-08 10:30:00')",
+      TimestampValue::Parse("2100-01-01 00:00:00"));
+  TestTimestampValue("date_trunc('DECADE', '2116-05-08 10:30:00')",
+      TimestampValue::Parse("2110-01-01 00:00:00"));
+  TestTimestampValue("date_trunc('YEAR', '2016-05-08 10:30:00')",
+      TimestampValue::Parse("2016-01-01 00:00:00"));
+  TestTimestampValue("date_trunc('MONTH', '2016-05-08 00:00:00')",
+      TimestampValue::Parse("2016-05-01 00:00:00"));
+  TestTimestampValue("date_trunc('WEEK', '2116-05-08 10:30:00')",
+      TimestampValue::Parse("2116-05-04 00:00:00"));
+  TestTimestampValue("date_trunc('WEEK', '2017-01-01 10:37:03.455722111')",
+      TimestampValue::Parse("2016-12-26 00:00:00"));
+  TestTimestampValue("date_trunc('WEEK', '2017-01-02 10:37:03.455722111')",
+      TimestampValue::Parse("2017-01-02 00:00:00"));
+  TestTimestampValue("date_trunc('WEEK', '2017-01-07 10:37:03.455722111')",
+      TimestampValue::Parse("2017-01-02 00:00:00"));
+  TestTimestampValue("date_trunc('WEEK', '2017-01-08 10:37:03.455722111')",
+      TimestampValue::Parse("2017-01-02 00:00:00"));
+  TestTimestampValue("date_trunc('WEEK', '2017-01-09 10:37:03.455722111')",
+      TimestampValue::Parse("2017-01-09 00:00:00"));
+  TestTimestampValue("date_trunc('DAY', '1416-05-08 10:37:03.455722111')",
+      TimestampValue::Parse("1416-05-08 00:00:00"));
+
+  TestTimestampValue("date_trunc('HOUR', '1416-05-08 10:30:03.455722111')",
+      TimestampValue::Parse("1416-05-08 10:00:00"));
+  TestTimestampValue("date_trunc('HOUR', '1416-05-08 23:30:03.455722111')",
+      TimestampValue::Parse("1416-05-08 23:00:00"));
+  TestTimestampValue("date_trunc('MINUTE', '1416-05-08 10:37:03.455722111')",
+      TimestampValue::Parse("1416-05-08 10:37:00"));
+  TestTimestampValue("date_trunc('SECOND', '1416-05-08 10:37:03.455722111')",
+      TimestampValue::Parse("1416-05-08 10:37:03"));
+  TestTimestampValue("date_trunc('MILLISECONDS', '1416-05-08 10:37:03.455722111')",
+      TimestampValue::Parse("1416-05-08 10:37:03.455000000"));
+  TestTimestampValue("date_trunc('MICROSECONDS', '1416-05-08 10:37:03.455722111')",
+      TimestampValue::Parse("1416-05-08 10:37:03.455722000"));
+
+  // Test corner cases.
+  TestTimestampValue("date_trunc('MILLENNIUM', '9999-12-31 23:59:59.999999999')",
+      TimestampValue::Parse("9000-01-01 00:00:00"));
+  TestTimestampValue("date_trunc('CENTURY', '9999-12-31 23:59:59.999999999')",
+      TimestampValue::Parse("9900-01-01 00:00:00"));
+  TestTimestampValue("date_trunc('DECADE', '9999-12-31 23:59:59.999999999')",
+      TimestampValue::Parse("9990-01-01 00:00:00"));
+  TestTimestampValue("date_trunc('YEAR', '9999-12-31 23:59:59.999999999')",
+      TimestampValue::Parse("9999-01-01 00:00:00"));
+  TestTimestampValue("date_trunc('MONTH', '9999-12-31 23:59:59.999999999')",
+      TimestampValue::Parse("9999-12-01 00:00:00"));
+  TestTimestampValue("date_trunc('WEEK', '9999-12-31 23:59:59.999999999')",
+      TimestampValue::Parse("9999-12-27 00:00:00"));
+  TestTimestampValue("date_trunc('WEEK', '1400-01-06 23:59:59.999999999')",
+      TimestampValue::Parse("1400-01-06 00:00:00"));
+  TestTimestampValue("date_trunc('WEEK', '1400-01-07 23:59:59.999999999')",
+      TimestampValue::Parse("1400-01-06 00:00:00"));
+  TestTimestampValue("date_trunc('DAY', '9999-12-31 23:59:59.999999999')",
+      TimestampValue::Parse("9999-12-31 00:00:00"));
+  TestTimestampValue("date_trunc('HOUR', '9999-12-31 23:59:59.999999999')",
+      TimestampValue::Parse("9999-12-31 23:00:00"));
+  TestTimestampValue("date_trunc('MINUTE', '9999-12-31 23:59:59.999999999')",
+      TimestampValue::Parse("9999-12-31 23:59:00"));
+  TestTimestampValue("date_trunc('SECOND', '9999-12-31 23:59:59.999999999')",
+      TimestampValue::Parse("9999-12-31 23:59:59"));
+  TestTimestampValue("date_trunc('MILLISECONDS', '9999-12-31 23:59:59.999999999')",
+      TimestampValue::Parse("9999-12-31 23:59:59.999"));
+  TestTimestampValue("date_trunc('MICROSECONDS', '9999-12-31 23:59:59.999999999')",
+      TimestampValue::Parse("9999-12-31 23:59:59.999999"));
+
+  TestTimestampValue("date_trunc('CENTURY', '1400-01-01 00:00:00')",
+      TimestampValue::Parse("1400-01-01 00:00:00"));
+  TestTimestampValue("date_trunc('DECADE', '1400-01-01 00:00:00')",
+      TimestampValue::Parse("1400-01-01 00:00:00"));
+  TestTimestampValue("date_trunc('YEAR', '1400-01-01 00:00:00')",
+      TimestampValue::Parse("1400-01-01 00:00:00"));
+  TestTimestampValue("date_trunc('MONTH', '1400-01-01 00:00:00')",
+      TimestampValue::Parse("1400-01-01 00:00:00"));
+  TestTimestampValue("date_trunc('DAY', '1400-01-01 00:00:00')",
+      TimestampValue::Parse("1400-01-01 00:00:00"));
+  TestTimestampValue("date_trunc('HOUR', '1400-01-01 00:00:00')",
+      TimestampValue::Parse("1400-01-01 00:00:00"));
+  TestTimestampValue("date_trunc('MINUTE', '1400-01-01 00:00:00')",
+      TimestampValue::Parse("1400-01-01 00:00:00"));
+  TestTimestampValue("date_trunc('SECOND', '1400-01-01 00:00:00')",
+      TimestampValue::Parse("1400-01-01 00:00:00"));
+  TestTimestampValue("date_trunc('MILLISECONDS', '1400-01-01 00:00:00')",
+      TimestampValue::Parse("1400-01-01 00:00:00"));
+  TestTimestampValue("date_trunc('MICROSECONDS', '1400-01-01 00:00:00')",
+      TimestampValue::Parse("1400-01-01 00:00:00"));
+
+  // valid input with invalid output
+  TestIsNull("date_trunc('MILLENNIUM', '1416-05-08 10:30:00')", TYPE_TIMESTAMP);
+  TestIsNull("date_trunc('MILLENNIUM', '1999-12-31 11:59:59.999999')", TYPE_TIMESTAMP);
+  TestIsNull("date_trunc('WEEK', '1400-01-01 00:00:00')", TYPE_TIMESTAMP);
+  TestIsNull("date_trunc('WEEK', '1400-01-05 00:00:00')", TYPE_TIMESTAMP);
+
+  // Test invalid input.
+  TestIsNull("date_trunc('HOUR', '12202010')", TYPE_TIMESTAMP);
+  TestIsNull("date_trunc('HOUR', '')", TYPE_TIMESTAMP);
+  TestIsNull("date_trunc('HOUR', NULL)", TYPE_TIMESTAMP);
+  TestIsNull("date_trunc('HOUR', '02-13-2014')", TYPE_TIMESTAMP);
+  TestIsNull("date_trunc('CENTURY', '16-05-08 10:30:00')", TYPE_TIMESTAMP);
+  TestIsNull("date_trunc('CENTURY', '1116-05-08 10:30:00')", TYPE_TIMESTAMP);
+  TestIsNull("date_trunc('DAY', '00:00:00')", TYPE_TIMESTAMP);
+  TestError("date_trunc('YsEAR', '2016-05-08 10:30:00')");
+  TestError("date_trunc('D', '2116-05-08 10:30:00')");
+  TestError("date_trunc('2017-01-09', '2017-01-09 10:37:03.455722111' )");
+  TestError("date_trunc('2017-01-09 10:00:00', 'HOUR')");
+}
 } // namespace impala
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
   ABORT_IF_ERROR(TimezoneDatabase::Initialize());
