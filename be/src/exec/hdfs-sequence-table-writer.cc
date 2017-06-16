@@ -348,7 +348,6 @@ Status HdfsSequenceTableWriter::Flush() {
   }
   out_.Clear();
   out_value_lengths_block_.Clear();
-  mem_pool_->FreeAll();
   unflushed_rows_ = 0;
   return Status::OK();
 }

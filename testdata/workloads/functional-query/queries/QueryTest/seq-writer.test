@@ -288,3 +288,21 @@ select count(*) from store_sales_seq_gzip_block;
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# IMPALA-5407: Create a table containing seq files with GZIP+RECORD. If the number of
+# impalad workers is three, three files will be created, two of which are large enough
+# (> 64MB) to force multiple flushes. Make sure that the files have been created
+# successfully.
+SET COMPRESSION_CODEC=GZIP;
+SET SEQ_COMPRESSION_MODE=RECORD;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
+create table catalog_sales_seq_gzip_rec like tpcds.catalog_sales stored as SEQUENCEFILE;
+insert into catalog_sales_seq_gzip_rec select * from tpcds.catalog_sales;
+====
+---- QUERY
+select count(*) from catalog_sales_seq_gzip_rec;
+---- RESULTS
+1441548
+---- TYPES
+BIGINT
+====
