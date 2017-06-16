@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Impala 2.9 Change Log</title>
+</head>
+<body>
+<h1>Impala 2.9 Change Log</h1>
+
+<h2>        New Feature
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3586'>IMPALA-3586</a>] -         Passthrough mode for Union ALL operator
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3807'>IMPALA-3807</a>] -         Introduce support for dedicated Impalad coordinator(s)
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3909'>IMPALA-3909</a>] -         Parquet file writer should populate the min/max statistics per block per column to be used by the reader
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4166'>IMPALA-4166</a>] -         Introduce SORT BY clause in CREATE TABLE statement
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4403'>IMPALA-4403</a>] -         Implement SHOW RANGE PARTITIONS for Kudu tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4431'>IMPALA-4431</a>] -         Add a way to control the number of audit event log files
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4460'>IMPALA-4460</a>] -         Investigate and support Kudu basic authentication
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4616'>IMPALA-4616</a>] -         Specify more options when adding new kudu columns
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4728'>IMPALA-4728</a>] -         materialize expressions for window sorts vs lazy expression evaluation
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4729'>IMPALA-4729</a>] -         REPLACE() function
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4734'>IMPALA-4734</a>] -         HdfsParquetTableWriter should populate sorting_columns in row groups with any ordering columns
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4740'>IMPALA-4740</a>] -         Add option to use hdfsPread() instead of hdfsRead() for HDFS hedged reads
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4810'>IMPALA-4810</a>] -         DECIMAL datatype changes for Impala 2.9
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4815'>IMPALA-4815</a>] -         Populate min/max statistics in Parquet files for Decimal types
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4817'>IMPALA-4817</a>] -         Populate min/max statistics in Parquet files for String values
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4819'>IMPALA-4819</a>] -         Populate min/max statistics in Parquet files for Timestamp values
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4883'>IMPALA-4883</a>] -         Implement Codegen for the Union operator
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5030'>IMPALA-5030</a>] -         add NVL2()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5137'>IMPALA-5137</a>] -         Support Kudu UNIXTIME_MICROS as Impala TIMESTAMP
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5259'>IMPALA-5259</a>] -         Add REFRESH FUNCTIONS &lt;db&gt; statement
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5333'>IMPALA-5333</a>] -         Add support for Impala to work with ADLS
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5381'>IMPALA-5381</a>] -         Add query option to control join strategy when tables have no stats
+</li>
+</ul>
+
+<h2>        Improvement
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-681'>IMPALA-681</a>] -         Investigate memory usage in TestWideRow
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-1430'>IMPALA-1430</a>] -         Codegen all aggregate functions, including UDAs
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-1861'>IMPALA-1861</a>] -         Conditional functions with constant arguments should be simplified during analysis
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-2079'>IMPALA-2079</a>] -         Don&#39;t fail when write to scratch dir results in error.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3175'>IMPALA-3175</a>] -         Cache the Kudu client between queries
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3654'>IMPALA-3654</a>] -         Range based pruning for in-predicate
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3742'>IMPALA-3742</a>] -         INSERTs into Kudu tables should partition and sort
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3955'>IMPALA-3955</a>] -         Remove Scheduler class and rename SimpleScheduler to Scheduler
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3989'>IMPALA-3989</a>] -         Display skew warning for poorly formatted Parquet files
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4118'>IMPALA-4118</a>] -         Implement disk spill encryption and integrity checking for new buffer pool
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4141'>IMPALA-4141</a>] -         Error when creating a partition that already exists in HMS
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4282'>IMPALA-4282</a>] -         Allow Impala to create columns whose type has more than 4000 characters
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4293'>IMPALA-4293</a>] -         Query profile should include error log
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4341'>IMPALA-4341</a>] -         Include metadata loading time in planner timeline
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4547'>IMPALA-4547</a>] -         Fix ExecEnv singleton issues in tests
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4611'>IMPALA-4611</a>] -         Checking perms on S3 files is a very expensive no-op
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4617'>IMPALA-4617</a>] -         Remove duplication of isConstant() and IsConstant() in frontend and backend
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4624'>IMPALA-4624</a>] -         Add dictionary filtering to Parquet scanner
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4635'>IMPALA-4635</a>] -         Reduce bootstrap time for Python virtualenv
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4636'>IMPALA-4636</a>] -         Add support for SLES12 for Impala/Kudu integration
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4648'>IMPALA-4648</a>] -         Remove build_thirdparty.sh
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4649'>IMPALA-4649</a>] -         Add a mechanism to pass flags into make
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4653'>IMPALA-4653</a>] -         Revamp impala-config.sh to avoid annoying &quot;sticky config variables&quot; problem
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4673'>IMPALA-4673</a>] -         Use --local_library_dir for timestamp db scratch space
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4676'>IMPALA-4676</a>] -         Remove vestigial references to getBlockStorageLocations() API
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4711'>IMPALA-4711</a>] -         Document is_null semantics in UDF interface
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4735'>IMPALA-4735</a>] -         py.test needs to be upgraded in the Impala python environment
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4750'>IMPALA-4750</a>] -         Future proof use of pytest in Impala environment
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4752'>IMPALA-4752</a>] -         ObjectPool should not do extra dynamic memory allocation
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4762'>IMPALA-4762</a>] -         RECOVER PARTITIONS should send new partitions in small batches to HMS
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4764'>IMPALA-4764</a>] -         add hedged read metrics
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4774'>IMPALA-4774</a>] -         Change log level without restart
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4787'>IMPALA-4787</a>] -         Optimize APPX_MEDIAN() mem usage in case of many grouping keys
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4822'>IMPALA-4822</a>] -         Allow dynamic log4j configuration for Catalog and Impalads
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4825'>IMPALA-4825</a>] -         Change Timestamp representation for binary compatibility with Kudu.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4846'>IMPALA-4846</a>] -         Upgrade snappy to 1.1.4
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4859'>IMPALA-4859</a>] -         Push down IS NULL / IS NOT NULL to Kudu
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4873'>IMPALA-4873</a>] -         run_test_case() should find/replace arbitrary strings in /testdata/workloads/*/queries/*.test
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4880'>IMPALA-4880</a>] -         Clarify synchronization policy for &#39;done_&#39; in KuduScanNode
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4891'>IMPALA-4891</a>] -         [Kudu] Pushdown IS NULL and IS NOT NULL predicates
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4941'>IMPALA-4941</a>] -         Bump Zookeeper version to 3.4.10 to address ZOOKEEPER-2044
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4943'>IMPALA-4943</a>] -         Improve metadata load speed for &quot;alter table add partition&quot;.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4966'>IMPALA-4966</a>] -         Add flatbuffers 1.6.0 to toolchain
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4988'>IMPALA-4988</a>] -         Add query option to control filtering based on parquet::Statistics
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5003'>IMPALA-5003</a>] -         Add &#39;constant propagation&#39; for Views with a partition filter
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5015'>IMPALA-5015</a>] -         Run parquet_stats_test.py with mt_dop != 0
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5034'>IMPALA-5034</a>] -         Update breakpad to a newer version
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5110'>IMPALA-5110</a>] -         dump_breakpad_symbols.py should support Debian packages
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5120'>IMPALA-5120</a>] -         Consider defaulting to partitioned join when no stats are available.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5127'>IMPALA-5127</a>] -         Impala shell history size is fixed and very small
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5140'>IMPALA-5140</a>] -         clean up markdown, make slight improvements to doc building howto
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5156'>IMPALA-5156</a>] -         Drop VLOG level passed into Kudu client
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5162'>IMPALA-5162</a>] -         support kerberized+ssl TPC-H nested data loading
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5163'>IMPALA-5163</a>] -         support running concurrent_select.py against Kerberized+SSL Impala
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5169'>IMPALA-5169</a>] -         Parallelise read I/O of BufferPool::Pin()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5181'>IMPALA-5181</a>] -         Make it possible to get Python package metadata from an HTML web page in pip_download.py
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5187'>IMPALA-5187</a>] -         Bump breakpad version to include the fix for Breakpad #681, re-enable the strict check that was disabled in IMPALA-3794
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5192'>IMPALA-5192</a>] -         Avoid hard coding pointer to the tuple pool into generated IR of Tuple::CodegenMaterializeExprs()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5214'>IMPALA-5214</a>] -         Distcc scripts should not require toolchain at /opt/Impala-Toolchain
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5220'>IMPALA-5220</a>] -         Clean up TCMalloc memory maintenance logic
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5229'>IMPALA-5229</a>] -         Try using TCMalloc + Huge Pages for buffers
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5238'>IMPALA-5238</a>] -         Support transferring reservation between ReservationTrackers
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5301'>IMPALA-5301</a>] -         minicluster kudu needs mem limits set
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5304'>IMPALA-5304</a>] -         Parquet scanner transfers decompression buffers when not needed
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5347'>IMPALA-5347</a>] -         Parquet scanner has a lot of small CPU inefficiencies
+</li>
+</ul>
+
+<h2>        Bug
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-391'>IMPALA-391</a>] -         Expr-test does not actually test the codegen path
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-397'>IMPALA-397</a>] -         ORDER BY rand() does not work.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-1427'>IMPALA-1427</a>] -         Improve &quot;unknown disk id&quot; warning messages
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-1464'>IMPALA-1464</a>] -         Bug in explain plan: Plan nodes in unpartitioned fragments should have hosts=1.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-1670'>IMPALA-1670</a>] -         Support multiple partition specs in ALTER TABLE ADD PARTITION
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-1972'>IMPALA-1972</a>] -         Queries that take a long time to plan can cause webserver to block other queries
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-2328'>IMPALA-2328</a>] -         Parquet scan should use min/max statistics to skip blocks based on predicate
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-2518'>IMPALA-2518</a>] -         DROP DATABASE CASCADE does not remove cache directives of tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-2716'>IMPALA-2716</a>] -         Hive/Impala incompatibility for timestamp data in Parquet
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-2800'>IMPALA-2800</a>] -         impalad process blocked while releasing memory after a big query
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3079'>IMPALA-3079</a>] -         Fix Sequence file writer (crashes or produces invalid files)
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3524'>IMPALA-3524</a>] -         Spilling joins unnecessarily process spilled partitions with 0 probe rows
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3641'>IMPALA-3641</a>] -         DROP / CREATE sequence on same table failed with &quot;table already exists&quot;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3785'>IMPALA-3785</a>] -         &quot;Invalid query handle&quot; error should report which query handle is invalid.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3794'>IMPALA-3794</a>] -         test_breakpad.py is flaky
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3932'>IMPALA-3932</a>] -         virtualenv does not build binary python packages with toolchain
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4033'>IMPALA-4033</a>] -         ALTER TABLE ADD PARTITION treats string-partition key values as case insensitive.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4036'>IMPALA-4036</a>] -         show create table outputs invalid sql for partitioned tables with comments
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4055'>IMPALA-4055</a>] -         Investigate and fix to_date() slowness
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4088'>IMPALA-4088</a>] -         HDFS data nodes pick HTTP server ports at random, sometimes stealing HBase master&#39;s port
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4164'>IMPALA-4164</a>] -         Codegen does not generate target-specific machine code for cross-compiled functions
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4263'>IMPALA-4263</a>] -         Wrong results due to missing hash exchange believed to be redundant.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4449'>IMPALA-4449</a>] -         Revisit locking scheme in CatalogOpEx.alterTable()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4499'>IMPALA-4499</a>] -         Address Kudu query profile issues
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4546'>IMPALA-4546</a>] -         Incorporate Russian/Moscow timezone changes in to the tz db
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4548'>IMPALA-4548</a>] -         BlockingJoinNode::Close() should wait for completion of async build thread
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4549'>IMPALA-4549</a>] -         Validation of timestamp year is inconsistent about whether upper bound is 9999 or 10000
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4593'>IMPALA-4593</a>] -         kudu-python is built with the system C++ compiler, which may not be ABI-compatible with the toolchain C++ compiler
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4615'>IMPALA-4615</a>] -         test_avro_schema_resolution.py fails with wrong results
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4640'>IMPALA-4640</a>] -         parquet-reader always prints &quot;Rows: 0&quot;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4647'>IMPALA-4647</a>] -         Cannot do full data load with ninja
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4659'>IMPALA-4659</a>] -         TestScannersFuzzing should set a mem_limit
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4675'>IMPALA-4675</a>] -         Mixed or uppercase columns are not resolved in parquet when using PARQUET_FALLBACK_SCHEMA_RESOLUTION=NAME
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4684'>IMPALA-4684</a>] -         check-hbase-nodes.py: Build failing on RHEL7 when trying to start HBase
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4689'>IMPALA-4689</a>] -         Expiration computes last active timestamp wrong
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4701'>IMPALA-4701</a>] -         ccache does not understand that distcc.sh could be clang or gcc
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4702'>IMPALA-4702</a>] -         Webserver command line option &#39;webserver_private_key_file&#39; erroneously refers to &#39;ssl_server_certificate&#39; instead of &#39;webserver_certificate_file
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4705'>IMPALA-4705</a>] -         Impala may miss materialization of indirectly referenced functions
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4707'>IMPALA-4707</a>] -         Heap use-after-free in QueryExecMgr
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4710'>IMPALA-4710</a>] -         There is an error in control audit log file size number
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4716'>IMPALA-4716</a>] -         Expr rewrite causes IllegalStateException
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4721'>IMPALA-4721</a>] -         Test names which are prefix of other tests make it impossible to select them using impala-py.test -k
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4722'>IMPALA-4722</a>] -         test_scratch_disk.py fails sporadically when asserting logfile content
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4725'>IMPALA-4725</a>] -         Wrong field resolution of nested Parquet fields
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4731'>IMPALA-4731</a>] -         Sorter crash Impalad instance
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4733'>IMPALA-4733</a>] -         HBase/Zookeeper continues to be flaky when starting the minicluster on RHEL7
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4738'>IMPALA-4738</a>] -         stddev_samp() returns 0 when it should return NULL
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4742'>IMPALA-4742</a>] -         run-tests.py not compatible with python 2.6
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4745'>IMPALA-4745</a>] -         TestScratchLimit fails on S3
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4748'>IMPALA-4748</a>] -         tmp-file-mgr.h:263] Check failed: !write_in_flight_
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4749'>IMPALA-4749</a>] -         Hit DCHECK in sorter for spilling query with scratch limit
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4751'>IMPALA-4751</a>] -         For unknown query IDs, /query_profile_encoded?query_id=123 starts with an empty line
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4757'>IMPALA-4757</a>] -         Macros in testutil/gtest-util.h evaluate their arguments twice
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4765'>IMPALA-4765</a>] -         Catalog loading threads can be wasted waiting for a large table to load
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4767'>IMPALA-4767</a>] -         Table stats are removed after any ALTER TABLE in Impala
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4768'>IMPALA-4768</a>] -         Improve logging of table loading for supportability.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4775'>IMPALA-4775</a>] -         discrepancy_searcher.py logging overwriting itself
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4779'>IMPALA-4779</a>] -         Conditional functions isfalse(), istrue(), isnotfalse() and isnottrue() don&#39;t work with codegen
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4780'>IMPALA-4780</a>] -         Wrong result with next_day() when codegen is enabled.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4788'>IMPALA-4788</a>] -         Partition recovery is very slow as it uses an ArrayList to check if a partition already exists
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4789'>IMPALA-4789</a>] -         Slow metadata loading with many partitions that have inconsistent HDFS path qualification
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4792'>IMPALA-4792</a>] -         NDV estimates for case expressions with limited number of output values could be improved
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4801'>IMPALA-4801</a>] -         Heap use-after-free in expr-test
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4808'>IMPALA-4808</a>] -         Crash in old hash join node for full outer join
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4818'>IMPALA-4818</a>] -         TestCancellationSerial.test_cancel_insert is meta-flaky
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4820'>IMPALA-4820</a>] -         TmpFileMgr can write unencrypted data to disk even when encryption is on
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4828'>IMPALA-4828</a>] -         Altering Kudu table schema outside of Impala may result in crash on read
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4839'>IMPALA-4839</a>] -         Kudu-related tests failing on remote cluster because localhost / loopback is hard-coded in the test framework
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4840'>IMPALA-4840</a>] -         Fix REFRESH perf issues.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4842'>IMPALA-4842</a>] -         BufferedBlockMgrTest.WriteError occasionally fails with error
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4849'>IMPALA-4849</a>] -         Case expression with constant condition generates IllegalStateException
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4853'>IMPALA-4853</a>] -         test_kudu_dml_reporting in test_shell_commandline.py should not run on distros where Kudu is not supported
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4854'>IMPALA-4854</a>] -         COMPUTE INCREMENTAL STATS should ignore missing stats on complex columns
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4858'>IMPALA-4858</a>] -         Provide better explanation for obscure Memory limit exceeded failures
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4868'>IMPALA-4868</a>] -         TestRequestPoolService.testUpdatingConfigs fails: &quot;checkModifiedConfigResults:245 expected:&lt;root.queueC&gt; but was:&lt;null&gt;&quot;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4876'>IMPALA-4876</a>] -         Remove _test suffix from test names that had been introduced to make names prefix-free
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4878'>IMPALA-4878</a>] -         FunctionContext::GetIntermediateType() is not implemented
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4879'>IMPALA-4879</a>] -         FunctionContext::GetArgType() returns wrong type in UDA Merge() and Finalize()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4887'>IMPALA-4887</a>] -         Broken local filesystem TestHdfsParquetTableStatsWriter
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4890'>IMPALA-4890</a>] -         stress crash: Coordinator race between TearDown() and GetNext() (crash dereferencing executor_)
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4893'>IMPALA-4893</a>] -         Sequence scanner increments RuntimeProfile rows read counter per row wasting 30% CPU
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4895'>IMPALA-4895</a>] -         Memory limit exceeded in TestTPCHJoinQueries.test_outer_joins on local filesystem and non-partitioned-aggs-and-joins
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4897'>IMPALA-4897</a>] -         AnalysisException: specified cache pool does not exist
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4899'>IMPALA-4899</a>] -         Parquet table writer leaks dictionaries
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4902'>IMPALA-4902</a>] -         Concurrent DDL may fail with a ConcurrentModificationException
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4904'>IMPALA-4904</a>] -         test_ddl_stress isn&#39;t runnable through buildall.sh entry point
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4907'>IMPALA-4907</a>] -         Unable to open scanner: Timed out errors when running COMPUTE STATS on Kudu-related tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4913'>IMPALA-4913</a>] -         Toolchain broken on centos6/ubuntu12 after Kudu added boost
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4914'>IMPALA-4914</a>] -         TestSpillStress makes flawed assumptions about running concurrently
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4915'>IMPALA-4915</a>] -         Unbounded DECIMAL casts from floating point to decimal trigger undefined behavior
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4916'>IMPALA-4916</a>] -         Missing, redundant or non-evaluable predicates due to buggy equivalence classes.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4920'>IMPALA-4920</a>] -         pytest metadata for custom cluster tests being put in wrong path
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4923'>IMPALA-4923</a>] -         Operators running on top of selective Hdfs scan nodes spend a lot of time calling impala::MemPool::FreeAll on empty batches
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4936'>IMPALA-4936</a>] -         Cast from double to decimal doesn&#39;t always handle overflow correctly
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4937'>IMPALA-4937</a>] -         Remove unused kudu scanner keep alive vairable
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4946'>IMPALA-4946</a>] -         Rare hang in buffer-pool-test
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4955'>IMPALA-4955</a>] -         Insert overwrite into partitioned table started failing with IllegalStateException: null
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4962'>IMPALA-4962</a>] -         Max Size column incorrectly has NULLs in column stats via HS2 interface
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4977'>IMPALA-4977</a>] -         Evaluate IN predicates against parquet::Statistics
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4980'>IMPALA-4980</a>] -         Drop partition against table with custom partition paths is failing with Error making &#39;dropPartition&#39; RPC to Hive Metastore
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4981'>IMPALA-4981</a>] -         COMPUTE STATS with MT_DOP=1 and tight memory limit produces spilling error
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4982'>IMPALA-4982</a>] -         Add a test for statistics based filtering of row groups for root-level scalar columns of parquet files with nested types
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4983'>IMPALA-4983</a>] -         Regression in exchange operators introduced by LZ4 1.7.5 upgrade
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4995'>IMPALA-4995</a>] -         crash when limit clause &gt; MAX_INT
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4997'>IMPALA-4997</a>] -         crash when using sortby hint on a very large table
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4998'>IMPALA-4998</a>] -         Table.toThrift() called without holding the table lock: test_view_compatibility_b0595633.test_hive org.apache.impala.catalog
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4999'>IMPALA-4999</a>] -         Impala.tests.custom_cluster.test_spilling.TestSpillStress.test_spill_stress failed intermittently
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5005'>IMPALA-5005</a>] -         Don&#39;t allow server to send SASL COMPLETE message out of order
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5008'>IMPALA-5008</a>] -         AddressSanitizer: heap-buffer-overflow in ParquetPlainEncoder
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5021'>IMPALA-5021</a>] -         COMPUTE STATS hang while RowsRead of one SCAN fragment winds down
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5025'>IMPALA-5025</a>] -         Upgrade binutils to 2.26.1
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5027'>IMPALA-5027</a>] -         udf headers are not longer buildable outside of Impala source tree
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5028'>IMPALA-5028</a>] -         Exception in catalog web UI when trying to display loaded table
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5038'>IMPALA-5038</a>] -         File size mismatch in PlannerTest.testPredicatePropagation
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5039'>IMPALA-5039</a>] -         test_mt_dop.py fails on local filesystem build
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5041'>IMPALA-5041</a>] -         Allow AuthManager::Init() to be called more than once
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5042'>IMPALA-5042</a>] -         Loading metadata for partitioned tables is slow due to usage of an ArrayList, potential 4x speedup
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5044'>IMPALA-5044</a>] -         backports.tempfile not supported in python 2.6
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5055'>IMPALA-5055</a>] -         Jenkins test run hit DCHECK in parquet-column-readers.cc
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5072'>IMPALA-5072</a>] -         test_recover_many_partitions fails on S3
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5074'>IMPALA-5074</a>] -         query_test.test_aggregation.TestAggregationQueries.test_aggregation fails on SLES12 SP2
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5075'>IMPALA-5075</a>] -         query_test.test_queries.TestQueriesTextTables.test_strict_mode fails on SLES12 SP2
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5076'>IMPALA-5076</a>] -         query_test.test_exprs.TestExprs.test_exprs fails on SLES12 SP2
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5077'>IMPALA-5077</a>] -         Add NUMA info and the current CPU to CpuInfo
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5079'>IMPALA-5079</a>] -         Flaky tests: Kudu EE tests need longer HS2 connection timeouts
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5080'>IMPALA-5080</a>] -         test_java_udfs: OutOfMemoryError: PermGen space
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5088'>IMPALA-5088</a>] -         heap-buffer-overflow in impala_udf::StringVal::CopyFrom
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5111'>IMPALA-5111</a>] -         IllegalArgumentException when using explicit &quot;NOT NULL&quot; on pk column
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5115'>IMPALA-5115</a>] -         Occasional crash in HdfsTableSink while using mod(cast(rand(7) * 1000000000 as int),2) as partition column 
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5123'>IMPALA-5123</a>] -         ASAN failure: heap-use-after-free in timezone_db.cc:683
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5125'>IMPALA-5125</a>] -         Check failed: tuple_desc_map_.back() != __null
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5143'>IMPALA-5143</a>] -         Crash while running/cancelling concurrent queries QueryExecState::ExecQueryOrDmlRequest  query-exec-state.cc:469
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5144'>IMPALA-5144</a>] -         Remove sortby() query hint
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5145'>IMPALA-5145</a>] -         CTAS failing when creating from a view with error &quot;Unsupported type &#39;null_type&#39;&quot;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5150'>IMPALA-5150</a>] -         Uneven load distribution of work across NUMA nodes
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5154'>IMPALA-5154</a>] -         catalogd hangs trying to load an unpartitioned Kudu table
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5157'>IMPALA-5157</a>] -         Remove &quot;SORTBY()&quot; hint from new features in 2.8.0
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5164'>IMPALA-5164</a>] -         BenchmarkTest.Basic test is flaky
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5171'>IMPALA-5171</a>] -         fix broken RAT build
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5172'>IMPALA-5172</a>] -         crash in tcmalloc::CentralFreeList::FetchFromOneSpans
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5173'>IMPALA-5173</a>] -         Crash when NestedLoopJoin has HashJoin feeding directly into it&#39;s right side
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5177'>IMPALA-5177</a>] -         Error making alter_table rpc, job failure
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5180'>IMPALA-5180</a>] -         Non-deterministic exprs without slot refs cause HDFS query failure
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5182'>IMPALA-5182</a>] -         Explicitly close connection to impalad on error from shell
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5183'>IMPALA-5183</a>] -         buffered-block-mgr-test: Writes did not complete after 500ms
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5186'>IMPALA-5186</a>] -         stress test caused crash in HdfsParquetScanner::Close()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5188'>IMPALA-5188</a>] -         DCHECK in UnionNode::GetNextPassThrough with GROUP BY, AVG
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5189'>IMPALA-5189</a>] -         python env fails to install pytest-xdist
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5193'>IMPALA-5193</a>] -         Impala reads gzip compressed text as binary when skip.header.line.count &gt; 0
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5197'>IMPALA-5197</a>] -         Parquet scan may incorrectly report &quot;Corrupt Parquet file&quot; in the logs
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5198'>IMPALA-5198</a>] -         Error messages are sometimes dropped before reaching client
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5207'>IMPALA-5207</a>] -         enable_distcc doesn&#39;t reset IMPALA_DISTCC_ENABLED
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5208'>IMPALA-5208</a>] -         Forked breakpad process blocks indefinitely for WaitForContinueSignal and fails new Impalad process at startup 
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5217'>IMPALA-5217</a>] -         KuduTableSink checks null constraints incorrectly
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5222'>IMPALA-5222</a>] -         Bits::Log2Ceiling eating 1% of CPU when running targeted-perf.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5224'>IMPALA-5224</a>] -         Remove repository.codehaus.org from Maven pom&#39;s
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5230'>IMPALA-5230</a>] -         Impala does not start under ASAN
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5231'>IMPALA-5231</a>] -         S3 build fails because memory estimates changes
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5232'>IMPALA-5232</a>] -         Parquet reader error message prints memory address instead of value
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5235'>IMPALA-5235</a>] -         Query throws a NullPointerException on starting impala cluster with logging_level=3
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5244'>IMPALA-5244</a>] -         data_errors/test_data_errors.py:56: in test_hdfs_file_open_fail on local filesystem build
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5245'>IMPALA-5245</a>] -         buffer-allocator-test failed in ASAN build
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5246'>IMPALA-5246</a>] -         Queries failing with &quot;Process: memory limit exceeded&quot; during ASAN builds
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5247'>IMPALA-5247</a>] -         test_kudu_col_null_changed flaky
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5251'>IMPALA-5251</a>] -         DecimalAvgFinalize() gets the wrong arg type
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5252'>IMPALA-5252</a>] -         Java UDF returning string can lead to crash under memory pressure.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5257'>IMPALA-5257</a>] -         TestTableWriters.test_seq_writer_hive_compatibility fails in local file system build
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5258'>IMPALA-5258</a>] -         Need to reenable building Impala-lzo in release mode
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5261'>IMPALA-5261</a>] -         Heap use-after-free in HdfsSequenceTableWriter::ConsumeRow()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5262'>IMPALA-5262</a>] -         test_sort.py::test_analytic_order_by_random fails with assert
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5267'>IMPALA-5267</a>] -         test_seq_writer_hive_compatibility hits error running statement on Hive
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5268'>IMPALA-5268</a>] -         After canceling query on secure cluster coordinator node doesn&#39;t accept new connections
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5273'>IMPALA-5273</a>] -         StringCompare is very slow
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5287'>IMPALA-5287</a>] -         Add a test for skip.header.line.count on compressed files
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5291'>IMPALA-5291</a>] -         statestore-test failed during exhaustive testing of ASF RELEASE build
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5294'>IMPALA-5294</a>] -         Kudu INSERT partitioning fails with constants
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5295'>IMPALA-5295</a>] -         &quot;Process: memory limit exceeded&quot; in shell tests during asf-master-core-asan build
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5297'>IMPALA-5297</a>] -         free-pool-test may be OOM killed on jenkins.impala.io runs
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5302'>IMPALA-5302</a>] -         tcmalloc contention limits CPU utilization on machines with &gt;40 logical processors
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5305'>IMPALA-5305</a>] -         query_test/test_observability.py failing on s3, localFS and Isilon after recent changes to test data
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5318'>IMPALA-5318</a>] -         Impala does not always generated fully qualified table names in audit events
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5319'>IMPALA-5319</a>] -          data_errors/test_data_errors.py::TestHdfsScanNodeErrors failing on asf-master-exhaustive
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5322'>IMPALA-5322</a>] -         Potential crash in Frontend &amp; Catalog JNI startup
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5324'>IMPALA-5324</a>] -         Fix version check in EvalDictionaryFilters
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5330'>IMPALA-5330</a>] -         Impala tests never use or set a secondary FS, so TestMultipleFilesystems is always skipped
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5331'>IMPALA-5331</a>] -         Use new libHDFS API to address &quot;Unknown Error 255&quot;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5338'>IMPALA-5338</a>] -         Fix Kudu timestamp default values
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5339'>IMPALA-5339</a>] -         IMPALA-4166 breaks queries on tables with sort.column that do a expr rewrite
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5340'>IMPALA-5340</a>] -         Query profile and debug webpage can disagree about &#39;Query State&#39;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5342'>IMPALA-5342</a>] -         GetTables() Thrift call does not fill up the table comments field
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5343'>IMPALA-5343</a>] -         Sort by Column(s) added as part of inserting into Kudu table is incorrect 
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5349'>IMPALA-5349</a>] -         BufferedBlockMgrTest.NoDirsAllocationError failed to write earlier than expected
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5354'>IMPALA-5354</a>] -         nocluster/noshuffle doesn&#39;t work for DML into Kudu tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5357'>IMPALA-5357</a>] -         Reading Kudu timestamp causes severe kernel spinning due to locking in impala::TimestampValue::UnixTimeToPtime-&gt; __tz_convert
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5358'>IMPALA-5358</a>] -         Off-by-one error in testTableSample
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5375'>IMPALA-5375</a>] -         Builds on CentOS 6.4 failing with broken python dependencies
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5378'>IMPALA-5378</a>] -         Disk IO manager needs to understand ADLS
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5379'>IMPALA-5379</a>] -         parquet_dictionary_filtering query option is not tested
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5383'>IMPALA-5383</a>] -         Fix PARQUET_FILE_SIZE option for ADLS
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5387'>IMPALA-5387</a>] -         Excessive logging to INFO and ERROR files when reading S3 data
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5388'>IMPALA-5388</a>] -         wrong results under stress with secure cluster
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5391'>IMPALA-5391</a>] -         Cannot compile UDFs with older GCC versions
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5402'>IMPALA-5402</a>] -         Changing the log level on the Catalog doesn&#39;t work as expected 
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5411'>IMPALA-5411</a>] -         Excessive logging while queries are loading metadata from ImpalaServer::GetRuntimeProfileStr
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5413'>IMPALA-5413</a>] -         test_seq_writer_hive_compatibility fails on a real cluster because test user lacks write access
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5419'>IMPALA-5419</a>] -         PhjBuilder::Partition::InsertBatch () continue to make progress even after query cancellation
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5426'>IMPALA-5426</a>] -         Metastore fails to start up
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5479'>IMPALA-5479</a>] -         Propagate the argument &#39;type&#39; for RawValue::Compare()
+</li>
+</ul>
+
+<h2>        Task
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-2923'>IMPALA-2923</a>] -         Integration job should run full data load + exhaustive.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3398'>IMPALA-3398</a>] -         Move Impala documentation development to ASF
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3557'>IMPALA-3557</a>] -         Add workaround to create BIGINT stored as Kudu&#39;s UNIXTIME_MICROS
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4686'>IMPALA-4686</a>] -         parquet-reader doesn&#39;t know about INT96 columns
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4803'>IMPALA-4803</a>] -         Write release notes for 2.8 and 2.9
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4829'>IMPALA-4829</a>] -         Change default Kudu read behavior for &quot;RYW&quot;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5002'>IMPALA-5002</a>] -         Toolchain build flags should be associated with builds
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5033'>IMPALA-5033</a>] -         update external hadoop ecosystem versions
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5328'>IMPALA-5328</a>] -         [DOCS] Document Parquet enhancements
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5329'>IMPALA-5329</a>] -         [DOCS] Document Kudu enhancements
+</li>
+</ul>
+
+<h2>        Sub-task
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-2020'>IMPALA-2020</a>] -         Rounding should be done instead of truncating when casting DECIMAL to DECIMAL, FLOAT/DOUBLE to DECIMAL, DECIMAL to INT
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-2550'>IMPALA-2550</a>] -         Switch to per-query exec rpc
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3202'>IMPALA-3202</a>] -         Add spilling support to new buffer pool
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3203'>IMPALA-3203</a>] -         Implement scalable buffer recycling in buffer pool
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3224'>IMPALA-3224</a>] -         Move Impala JIRA to ASF
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3401'>IMPALA-3401</a>] -         Remove Cloudera Manager-related content from doc source
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3402'>IMPALA-3402</a>] -         Remove CDH version number dependencies from doc source
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3403'>IMPALA-3403</a>] -         Rework Impala installation instructions to be generic
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3405'>IMPALA-3405</a>] -         Rework Impala upgrade instructions to be generic
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3406'>IMPALA-3406</a>] -         Rework Impala FAQs to be generic
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3410'>IMPALA-3410</a>] -         Rework Impala security info to be generic
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-3411'>IMPALA-3411</a>] -         Rework Impala data management / governance info to be generic
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4014'>IMPALA-4014</a>] -         Introduce query-wide execution state.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4029'>IMPALA-4029</a>] -         Reduce memory requirements for storing THdfsFileDesc
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4041'>IMPALA-4041</a>] -         Limit catalog and admission control updates to coordinator nodes only
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4114'>IMPALA-4114</a>] -         Port relevant BufferedBlockMgr unit tests for BufferPool
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4181'>IMPALA-4181</a>] -         Host rendered documentation on ASF resources
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4251'>IMPALA-4251</a>] -         Define gerrit process for documentation updates and reviews
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4351'>IMPALA-4351</a>] -         query generator random profile options for INSERT
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4353'>IMPALA-4353</a>] -         random query generation for INSERTs
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4355'>IMPALA-4355</a>] -         qgen: rework query execution to handle CRUD queries
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4359'>IMPALA-4359</a>] -         qgen: add UPSERT support
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4370'>IMPALA-4370</a>] -         DECIMAL divide result type (Impala TPC-DS query 11 result lost one row)
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4643'>IMPALA-4643</a>] -         Consolidate links that point outside the Impala doc bundle
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4650'>IMPALA-4650</a>] -         Add Protobuf 2.6.1 to toolchain and as a build dependency
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4651'>IMPALA-4651</a>] -         Add libev 4.2.0 to toolchain and as a build dependency
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4652'>IMPALA-4652</a>] -         Add crcutil to toolchain
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4678'>IMPALA-4678</a>] -         Set up query mem tracker in QueryState
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4758'>IMPALA-4758</a>] -         Upgrade gutil to recent Kudu version
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4809'>IMPALA-4809</a>] -         Add codegen GetConstant() for query options
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4811'>IMPALA-4811</a>] -         Add strict mode tests for DECIMAL overflow of precision/scale in text file parsing
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4813'>IMPALA-4813</a>] -         DECIMAL div/mod/multiply rounding
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4821'>IMPALA-4821</a>] -         DECIMAL AVG() result type
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4831'>IMPALA-4831</a>] -         Clients can violate BufferPool invariants by calling ReservationTracker methods directly.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4877'>IMPALA-4877</a>] -         Incorrect precedence of unary minus and plus
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4884'>IMPALA-4884</a>] -         Add JVM heap and non-heap usage in memory metrics and UI
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4885'>IMPALA-4885</a>] -         Add JVM thread stacktraces and synchronization info in web UI
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4926'>IMPALA-4926</a>] -         Upgrade LZ4 to recent version
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4984'>IMPALA-4984</a>] -         [DOCS] Remove Cloudera copyright information from codeblocks
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4996'>IMPALA-4996</a>] -         Single-threaded KuduScanNode
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5006'>IMPALA-5006</a>] -         [DOCS] Remove Cloudera-specific chunks of content tagged audience=hidden from security guide
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5057'>IMPALA-5057</a>] -         Upgrade glog and gflags to most recent releases
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5106'>IMPALA-5106</a>] -         KRPC DCHECK hit when closing DataStreamRecvr
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5113'>IMPALA-5113</a>] -         Buffer pool unpinned invariant does not take into account multiply-pinned bytes
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5124'>IMPALA-5124</a>] -         Fix BufferPool handling of scratch read errors
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5130'>IMPALA-5130</a>] -         MemTracker::EnableReservationReporting() is not thread-safe
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5147'>IMPALA-5147</a>] -         Add the ability to exclude coordinators from query execution
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5166'>IMPALA-5166</a>] -         Clean up BufferPool profile counters
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5174'>IMPALA-5174</a>] -         Suppress kudu flags that aren&#39;t relevant to Impala
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5184'>IMPALA-5184</a>] -         Get Impala working against Hive2 APIs
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5228'>IMPALA-5228</a>] -         test_coordinators custom cluster test fails after rebase
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5309'>IMPALA-5309</a>] -         Implement TABLESAMPLE for HDFS tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5326'>IMPALA-5326</a>] -         [DOCS] Document REPLACE() function
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5359'>IMPALA-5359</a>] -         Document SORT BY syntax for CREATE TABLE and ALTER TABLE
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5370'>IMPALA-5370</a>] -         Document REFRESH FUNCTIONS syntax
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5371'>IMPALA-5371</a>] -         Document TIMESTAMP support for Kudu tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5372'>IMPALA-5372</a>] -         Document new ALTER TABLE ADD COLUMNS options for Kudu tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5374'>IMPALA-5374</a>] -         Document perf improvement from IS [NOT] NULL pushdown to Kudu
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5382'>IMPALA-5382</a>] -         Document ADLS support for Impala
+</li>
+</ul>
+
+<h2>        Project
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5253'>IMPALA-5253</a>] -         Use appropriate transport for the StatestoreSubscriber
+</li>
+</ul>
+
+</body>
+</html>
