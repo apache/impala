@@ -58,6 +58,7 @@ from tempfile import mkdtemp
 import json
 import os
 import sh
+import shutil
 import subprocess
 import sys
 import textwrap
@@ -229,6 +230,7 @@ def perf_ab_test(options, args):
   if len(args) > 1 and args[1]:
     hash_b = get_git_hash_for_name(args[1])
     # discard any changes created by the previous restore_workloads()
+    shutil.rmtree("testdata/workloads")
     sh.git.checkout("--", "testdata/workloads")
     build(hash_b, options)
     restore_workloads(workload_dir)
@@ -298,11 +300,14 @@ def main():
     current_hash = get_git_hash_for_name("HEAD")
 
   try:
+    workloads = backup_workloads()
     perf_ab_test(options, args)
   finally:
     # discard any changes created by the previous restore_workloads()
+    shutil.rmtree("testdata/workloads")
     sh.git.checkout("--", "testdata/workloads")
     sh.git.checkout(current_hash)
+    restore_workloads(workloads)
 
 
 if __name__ == "__main__":
