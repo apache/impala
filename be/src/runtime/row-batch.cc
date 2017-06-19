@@ -30,6 +30,7 @@
 #include "util/debug-util.h"
 #include "util/decompress.h"
 #include "util/fixed-size-hash-table.h"
+#include "util/scope-exit-trigger.h"
 
 #include "common/names.h"
 
@@ -97,22 +98,24 @@ RowBatch::RowBatch(
   }
   uint8_t* tuple_data;
   if (input_batch.compression_type != THdfsCompression::NONE) {
+    DCHECK_EQ(THdfsCompression::LZ4, input_batch.compression_type)
+        << "Unexpected compression type: " << input_batch.compression_type;
     // Decompress tuple data into data pool
     uint8_t* compressed_data = (uint8_t*)input_batch.tuple_data.c_str();
     size_t compressed_size = input_batch.tuple_data.size();
 
-    scoped_ptr<Codec> decompressor;
-    Status status = Codec::CreateDecompressor(NULL, false, input_batch.compression_type,
-        &decompressor);
+    Lz4Decompressor decompressor(nullptr, false);
+    Status status = decompressor.Init();
     DCHECK(status.ok()) << status.GetDetail();
+    auto compressor_cleanup =
+        MakeScopeExitTrigger([&decompressor]() { decompressor.Close(); });
 
     int64_t uncompressed_size = input_batch.uncompressed_size;
     DCHECK_NE(uncompressed_size, -1) << "RowBatch decompression failed";
     tuple_data = tuple_data_pool_.Allocate(uncompressed_size);
-    status = decompressor->ProcessBlock(true, compressed_size, compressed_data,
-        &uncompressed_size, &tuple_data);
+    status = decompressor.ProcessBlock(
+        true, compressed_size, compressed_data, &uncompressed_size, &tuple_data);
     DCHECK(status.ok()) << "RowBatch decompression failed.";
-    decompressor->Close();
   } else {
     // Tuple data uncompressed, copy directly into data pool
     tuple_data = tuple_data_pool_.Allocate(input_batch.tuple_data.size());
@@ -205,18 +208,20 @@ Status RowBatch::Serialize(TRowBatch* output_batch, bool full_dedup) {
   if (size > 0) {
     // Try compressing tuple_data to compression_scratch_, swap if compressed data is
     // smaller
-    scoped_ptr<Codec> compressor;
-    RETURN_IF_ERROR(Codec::CreateCompressor(NULL, false, THdfsCompression::LZ4,
-                                            &compressor));
+    Lz4Compressor compressor(nullptr, false);
+    RETURN_IF_ERROR(compressor.Init());
+    auto compressor_cleanup =
+        MakeScopeExitTrigger([&compressor]() { compressor.Close(); });
 
-    int64_t compressed_size = compressor->MaxOutputLen(size);
+    int64_t compressed_size = compressor.MaxOutputLen(size);
     if (compression_scratch_.size() < compressed_size) {
       compression_scratch_.resize(compressed_size);
     }
     uint8_t* input = (uint8_t*)output_batch->tuple_data.c_str();
     uint8_t* compressed_output = (uint8_t*)compression_scratch_.c_str();
-    RETURN_IF_ERROR(compressor->ProcessBlock(true, size, input, &compressed_size,
-        &compressed_output));
+    RETURN_IF_ERROR(
+        compressor.ProcessBlock(true, size, input, &compressed_size, &compressed_output));
+
     if (LIKELY(compressed_size < size)) {
       compression_scratch_.resize(compressed_size);
       output_batch->tuple_data.swap(compression_scratch_);

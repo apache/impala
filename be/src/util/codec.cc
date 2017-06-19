@@ -17,19 +17,15 @@
 
 #include "util/codec.h"
 
-#include <boost/assign/list_of.hpp>
-#include <limits> // for std::numeric_limits
 #include <gutil/strings/substitute.h>
 
 #include "util/compress.h"
 #include "util/decompress.h"
 
-#include "gen-cpp/CatalogObjects_types.h"
 #include "gen-cpp/CatalogObjects_constants.h"
 
 #include "common/names.h"
 
-using boost::assign::map_list_of;
 using namespace impala;
 using namespace strings;
 
@@ -43,12 +39,11 @@ const char* const Codec::UNKNOWN_CODEC_ERROR =
 const char* const NO_LZO_MSG = "LZO codecs may not be created via the Codec interface. "
     "Instead the LZO library is directly invoked.";
 
-const Codec::CodecMap Codec::CODEC_MAP = map_list_of
-  ("", THdfsCompression::NONE)
-  (DEFAULT_COMPRESSION, THdfsCompression::DEFAULT)
-  (GZIP_COMPRESSION, THdfsCompression::GZIP)
-  (BZIP2_COMPRESSION, THdfsCompression::BZIP2)
-  (SNAPPY_COMPRESSION, THdfsCompression::SNAPPY_BLOCKED);
+const Codec::CodecMap Codec::CODEC_MAP = {{"", THdfsCompression::NONE},
+    {DEFAULT_COMPRESSION, THdfsCompression::DEFAULT},
+    {GZIP_COMPRESSION, THdfsCompression::GZIP},
+    {BZIP2_COMPRESSION, THdfsCompression::BZIP2},
+    {SNAPPY_COMPRESSION, THdfsCompression::SNAPPY_BLOCKED}};
 
 string Codec::GetCodecName(THdfsCompression::type type) {
   for (const CodecMap::value_type& codec: g_CatalogObjects_constants.COMPRESSION_MAP) {
@@ -85,7 +80,7 @@ Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse,
     THdfsCompression::type format, scoped_ptr<Codec>* compressor) {
   switch (format) {
     case THdfsCompression::NONE:
-      compressor->reset(NULL);
+      compressor->reset(nullptr);
       return Status::OK();
     case THdfsCompression::GZIP:
       compressor->reset(new GzipCompressor(GzipCompressor::GZIP, mem_pool, reuse));
@@ -133,7 +128,7 @@ Status Codec::CreateDecompressor(MemPool* mem_pool, bool reuse,
     THdfsCompression::type format, scoped_ptr<Codec>* decompressor) {
   switch (format) {
     case THdfsCompression::NONE:
-      decompressor->reset(NULL);
+      decompressor->reset(nullptr);
       return Status::OK();
     case THdfsCompression::DEFAULT:
     case THdfsCompression::GZIP:
@@ -166,17 +161,15 @@ Status Codec::CreateDecompressor(MemPool* mem_pool, bool reuse,
 Codec::Codec(MemPool* mem_pool, bool reuse_buffer, bool supports_streaming)
   : memory_pool_(mem_pool),
     reuse_buffer_(reuse_buffer),
-    out_buffer_(NULL),
-    buffer_length_(0),
     supports_streaming_(supports_streaming) {
-  if (memory_pool_ != NULL) {
+  if (memory_pool_ != nullptr) {
     temp_memory_pool_.reset(new MemPool(memory_pool_->mem_tracker()));
   }
 }
 
 void Codec::Close() {
-  if (temp_memory_pool_.get() != NULL) {
-    DCHECK(memory_pool_ != NULL);
+  if (temp_memory_pool_.get() != nullptr) {
+    DCHECK(memory_pool_ != nullptr);
     memory_pool_->AcquireData(temp_memory_pool_.get(), false);
   }
 }

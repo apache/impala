@@ -24,27 +24,33 @@
 #include <bzlib.h>
 
 #include "util/codec.h"
-#include "exec/hdfs-scanner.h"
-#include "runtime/mem-pool.h"
 
 namespace impala {
 
+class MemPool;
+
 class GzipDecompressor : public Codec {
  public:
+  GzipDecompressor(
+      MemPool* mem_pool = nullptr, bool reuse_buffer = false, bool is_deflate = false);
   virtual ~GzipDecompressor();
-  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
+
+  virtual Status Init() override WARN_UNUSED_RESULT;
+
+  virtual int64_t MaxOutputLen(
+      int64_t input_len, const uint8_t* input = nullptr) override;
+
   virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
-      const uint8_t* input, int64_t* output_length, uint8_t** output);
+      const uint8_t* input, int64_t* output_length,
+      uint8_t** output) override WARN_UNUSED_RESULT;
+
   virtual Status ProcessBlockStreaming(int64_t input_length, const uint8_t* input,
       int64_t* input_bytes_read, int64_t* output_length, uint8_t** output,
-      bool* stream_end);
-  virtual std::string file_extension() const { return "gz"; }
+      bool* stream_end) override WARN_UNUSED_RESULT;
+
+  virtual std::string file_extension() const override { return "gz"; }
 
  private:
-  friend class Codec;
-  GzipDecompressor(
-      MemPool* mem_pool = NULL, bool reuse_buffer = false, bool is_deflate = false);
-  virtual Status Init();
   std::string DebugStreamState() const;
 
   /// If set assume deflate format, otherwise zlib or gzip
@@ -59,19 +65,21 @@ class GzipDecompressor : public Codec {
 
 class BzipDecompressor : public Codec {
  public:
-  virtual ~BzipDecompressor();
-  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
-  virtual Status ProcessBlock(bool output_preallocated,
-                              int64_t input_length, const uint8_t* input,
-                              int64_t* output_length, uint8_t** output);
-  virtual Status ProcessBlockStreaming(int64_t input_length, const uint8_t* input,
-      int64_t* input_bytes_read, int64_t* output_length, uint8_t** output, bool* stream_end);
-  virtual std::string file_extension() const { return "bz2"; }
- private:
-  friend class Codec;
   BzipDecompressor(MemPool* mem_pool, bool reuse_buffer);
+  virtual ~BzipDecompressor();
 
-  virtual Status Init();
+  virtual Status Init() override WARN_UNUSED_RESULT;
+  virtual int64_t MaxOutputLen(
+      int64_t input_len, const uint8_t* input = nullptr) override;
+  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
+      const uint8_t* input, int64_t* output_length,
+      uint8_t** output) override WARN_UNUSED_RESULT;
+  virtual Status ProcessBlockStreaming(int64_t input_length, const uint8_t* input,
+      int64_t* input_bytes_read, int64_t* output_length, uint8_t** output,
+      bool* stream_end) override WARN_UNUSED_RESULT;
+  virtual std::string file_extension() const override { return "bz2"; }
+
+ private:
   std::string DebugStreamState() const;
 
   /// Used for streaming decompression.
@@ -84,16 +92,15 @@ class SnappyDecompressor : public Codec {
   /// doesn't expect this.
   static const uint TRAILING_CHECKSUM_LEN = 4;
 
+  SnappyDecompressor(MemPool* mem_pool = nullptr, bool reuse_buffer = false);
   virtual ~SnappyDecompressor() { }
-  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
-  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
-      const uint8_t* input, int64_t* output_length, uint8_t** output);
-  virtual std::string file_extension() const { return "snappy"; }
 
- private:
-  friend class Codec;
-  SnappyDecompressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
-  virtual Status Init() { return Status::OK(); }
+  virtual int64_t MaxOutputLen(
+      int64_t input_len, const uint8_t* input = nullptr) override;
+  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
+      const uint8_t* input, int64_t* output_length,
+      uint8_t** output) override WARN_UNUSED_RESULT;
+  virtual std::string file_extension() const override { return "snappy"; }
 };
 
 /// Lz4 is a compression codec with similar compression ratios as snappy but much faster
@@ -102,29 +109,27 @@ class SnappyDecompressor : public Codec {
 class Lz4Decompressor : public Codec {
  public:
   virtual ~Lz4Decompressor() { }
-  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
-  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
-      const uint8_t* input, int64_t* output_length, uint8_t** output);
-  virtual std::string file_extension() const { return "lz4"; }
+  Lz4Decompressor(MemPool* mem_pool = nullptr, bool reuse_buffer = false);
 
- private:
-  friend class Codec;
-  Lz4Decompressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
-  virtual Status Init() { return Status::OK(); }
+  virtual int64_t MaxOutputLen(
+      int64_t input_len, const uint8_t* input = nullptr) override;
+  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
+      const uint8_t* input, int64_t* output_length,
+      uint8_t** output) override WARN_UNUSED_RESULT;
+  virtual std::string file_extension() const override { return "lz4"; }
 };
 
 class SnappyBlockDecompressor : public Codec {
  public:
-  virtual ~SnappyBlockDecompressor() { }
-  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
-  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
-      const uint8_t* input, int64_t* output_length, uint8_t** output);
-  virtual std::string file_extension() const { return "snappy"; }
-
- private:
-  friend class Codec;
   SnappyBlockDecompressor(MemPool* mem_pool, bool reuse_buffer);
-  virtual Status Init() { return Status::OK(); }
+  virtual ~SnappyBlockDecompressor() { }
+
+  virtual int64_t MaxOutputLen(
+      int64_t input_len, const uint8_t* input = nullptr) override;
+  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
+      const uint8_t* input, int64_t* output_length,
+      uint8_t** output) override WARN_UNUSED_RESULT;
+  virtual std::string file_extension() const override { return "snappy"; }
 };
 
 }

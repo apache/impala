@@ -23,10 +23,10 @@
 #include <zlib.h>
 
 #include "util/codec.h"
-#include "exec/hdfs-scanner.h"
-#include "runtime/mem-pool.h"
 
 namespace impala {
+
+class MemPool;
 
 /// Different compression classes.  The classes all expose the same API and
 /// abstracts the underlying calls to the compression libraries.
@@ -41,18 +41,19 @@ class GzipCompressor : public Codec {
     GZIP,
   };
 
+  GzipCompressor(Format format, MemPool* mem_pool = nullptr, bool reuse_buffer = false);
   virtual ~GzipCompressor();
-  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
-  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
-      const uint8_t* input, int64_t* output_length, uint8_t** output);
 
-  virtual std::string file_extension() const { return "gz"; }
+  virtual Status Init() override WARN_UNUSED_RESULT;
+  virtual int64_t MaxOutputLen(
+      int64_t input_len, const uint8_t* input = nullptr) override;
+  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
+      const uint8_t* input, int64_t* output_length,
+      uint8_t** output) override WARN_UNUSED_RESULT;
+
+  virtual std::string file_extension() const override { return "gz"; }
 
  private:
-  friend class Codec;
-  GzipCompressor(Format format, MemPool* mem_pool = NULL, bool reuse_buffer = false);
-  virtual Status Init();
-
   Format format_;
 
   /// Structure used to communicate with the library.
@@ -66,73 +67,68 @@ class GzipCompressor : public Codec {
   /// at least big enough.
   /// *output_length should be called with the length of the output buffer and on return
   /// is the length of the output.
-  Status Compress(int64_t input_length, const uint8_t* input,
-      int64_t* output_length, uint8_t* output);
+  Status Compress(int64_t input_length, const uint8_t* input, int64_t* output_length,
+      uint8_t* output) WARN_UNUSED_RESULT;
 };
 
 class BzipCompressor : public Codec {
  public:
-  virtual ~BzipCompressor() { }
-  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
-  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
-      const uint8_t* input, int64_t* output_length, uint8_t** output);
-  virtual std::string file_extension() const { return "bz2"; }
-
- private:
-  friend class Codec;
   BzipCompressor(MemPool* mem_pool, bool reuse_buffer);
-  virtual Status Init() { return Status::OK(); }
+  virtual ~BzipCompressor() { }
+
+  virtual int64_t MaxOutputLen(
+      int64_t input_len, const uint8_t* input = nullptr) override;
+  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
+      const uint8_t* input, int64_t* output_length,
+      uint8_t** output) override WARN_UNUSED_RESULT;
+  virtual std::string file_extension() const override { return "bz2"; }
 };
 
 class SnappyBlockCompressor : public Codec {
  public:
-  virtual ~SnappyBlockCompressor() { }
-  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
-  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
-      const uint8_t* input, int64_t* output_length, uint8_t** output);
-  virtual std::string file_extension() const { return "snappy"; }
-
- private:
-  friend class Codec;
   SnappyBlockCompressor(MemPool* mem_pool, bool reuse_buffer);
-  virtual Status Init() { return Status::OK(); }
+  virtual ~SnappyBlockCompressor() { }
+
+  virtual int64_t MaxOutputLen(
+      int64_t input_len, const uint8_t* input = nullptr) override;
+  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
+      const uint8_t* input, int64_t* output_length,
+      uint8_t** output) override WARN_UNUSED_RESULT;
+  virtual std::string file_extension() const override { return "snappy"; }
 };
 
 class SnappyCompressor : public Codec {
  public:
+  SnappyCompressor(MemPool* mem_pool = nullptr, bool reuse_buffer = false);
   virtual ~SnappyCompressor() { }
-  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
+
+  virtual int64_t MaxOutputLen(
+      int64_t input_len, const uint8_t* input = nullptr) override;
   virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
-      const uint8_t* input, int64_t* output_length, uint8_t** output);
-  virtual std::string file_extension() const { return "snappy"; }
+      const uint8_t* input, int64_t* output_length,
+      uint8_t** output) override WARN_UNUSED_RESULT;
+  virtual std::string file_extension() const override { return "snappy"; }
 
   /// Computes the crc checksum that snappy expects when used in a framing format.
   /// This checksum needs to come after the compressed data.
   /// http://code.google.com/p/snappy/source/browse/trunk/framing_format.txt
   static uint32_t ComputeChecksum(int64_t input_len, const uint8_t* input);
-
- private:
-  friend class Codec;
-  SnappyCompressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
-  virtual Status Init() { return Status::OK(); }
 };
 
-/// Lz4 is a compression codec with similar compression ratios as snappy
-/// but much faster decompression. This compressor is not able to compress
-/// unless the output buffer is allocated and will cause an error if
-/// asked to do so.
+/// Lz4 is a compression codec with similar compression ratios as snappy but much faster
+/// decompression. This compressor is not able to compress unless the output buffer is
+/// allocated and will cause an error if asked to do so.
 class Lz4Compressor : public Codec {
  public:
+  Lz4Compressor(MemPool* mem_pool = nullptr, bool reuse_buffer = false);
   virtual ~Lz4Compressor() { }
-  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
-  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
-      const uint8_t* input, int64_t* output_length, uint8_t** output);
-  virtual std::string file_extension() const { return "lz4"; }
 
- private:
-  friend class Codec;
-  Lz4Compressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
-  virtual Status Init() { return Status::OK(); }
+  virtual int64_t MaxOutputLen(
+      int64_t input_len, const uint8_t* input = nullptr) override;
+  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
+      const uint8_t* input, int64_t* output_length,
+      uint8_t** output) override WARN_UNUSED_RESULT;
+  virtual std::string file_extension() const override { return "lz4"; }
 };
 
 }

@@ -23,6 +23,7 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
+#include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
 #include "service/fe-support.h"
 #include "service/frontend.h"
@@ -31,6 +32,7 @@
 #include "util/compress.h"
 #include "util/cpu-info.h"
 #include "util/decompress.h"
+#include "util/scope-exit-trigger.h"
 
 #include "common/names.h"
 
@@ -115,18 +117,21 @@ class RowBatchSerializeBaseline {
     if (size > 0) {
       // Try compressing tuple_data to compression_scratch_, swap if compressed data is
       // smaller
-      scoped_ptr<Codec> compressor;
-      Status status = Codec::CreateCompressor(NULL, false, THdfsCompression::LZ4,
-                                              &compressor);
+      Lz4Compressor compressor(nullptr, false);
+      Status status = compressor.Init();
       DCHECK(status.ok()) << status.GetDetail();
+      auto compressor_cleanup =
+          MakeScopeExitTrigger([&compressor]() { compressor.Close(); });
 
-      int64_t compressed_size = compressor->MaxOutputLen(size);
+      int64_t compressed_size = compressor.MaxOutputLen(size);
       if (batch->compression_scratch_.size() < compressed_size) {
         batch->compression_scratch_.resize(compressed_size);
       }
       uint8_t* input = (uint8_t*)output_batch->tuple_data.c_str();
       uint8_t* compressed_output = (uint8_t*)batch->compression_scratch_.c_str();
-      compressor->ProcessBlock(true, size, input, &compressed_size, &compressed_output);
+      status =
+          compressor.ProcessBlock(true, size, input, &compressed_size, &compressed_output);
+      DCHECK(status.ok()) << status.GetDetail();
       if (LIKELY(compressed_size < size)) {
         batch->compression_scratch_.resize(compressed_size);
         output_batch->tuple_data.swap(batch->compression_scratch_);
@@ -193,18 +198,18 @@ class RowBatchSerializeBaseline {
       uint8_t* compressed_data = (uint8_t*)input_batch.tuple_data.c_str();
       size_t compressed_size = input_batch.tuple_data.size();
 
-      scoped_ptr<Codec> decompressor;
-      Status status = Codec::CreateDecompressor(NULL, false, input_batch.compression_type,
-          &decompressor);
+      Lz4Decompressor decompressor(nullptr, false);
+      Status status = decompressor.Init();
       DCHECK(status.ok()) << status.GetDetail();
+      auto compressor_cleanup =
+          MakeScopeExitTrigger([&decompressor]() { decompressor.Close(); });
 
       int64_t uncompressed_size = input_batch.uncompressed_size;
       DCHECK_NE(uncompressed_size, -1) << "RowBatch decompression failed";
       tuple_data = batch->tuple_data_pool()->Allocate(uncompressed_size);
-      status = decompressor->ProcessBlock(true, compressed_size, compressed_data,
-          &uncompressed_size, &tuple_data);
+      status = decompressor.ProcessBlock(
+          true, compressed_size, compressed_data, &uncompressed_size, &tuple_data);
       DCHECK(status.ok()) << "RowBatch decompression failed.";
-      decompressor->Close();
     } else {
       // Tuple data uncompressed, copy directly into data pool
       tuple_data = batch->tuple_data_pool()->Allocate(input_batch.tuple_data.size());
@@ -321,8 +326,6 @@ class RowBatchSerializeBenchmark {
   }
 
   static void Run() {
-    CpuInfo::Init();
-
     MemTracker tracker;
     MemPool mem_pool(&tracker);
     ObjectPool obj_pool;

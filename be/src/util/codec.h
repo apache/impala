@@ -22,11 +22,10 @@
 #include "common/status.h"
 
 #include <boost/scoped_ptr.hpp>
-#include "gen-cpp/Descriptors_types.h"
+
+#include "runtime/mem-pool.h"
 
 namespace impala {
-
-class MemPool;
 
 /// Create a compression object.  This is the base class for all compression algorithms. A
 /// compression algorithm is either a compressor or a decompressor.  To add a new
@@ -61,14 +60,15 @@ class Codec {
   ///  format: the type of decompressor to create.
   /// Output:
   ///  decompressor: scoped pointer to the decompressor class to use.
-  /// If mem_pool is NULL, then the resulting codec will never allocate memory and
+  /// If mem_pool is nullptr, then the resulting codec will never allocate memory and
   /// the caller must be responsible for it.
   static Status CreateDecompressor(MemPool* mem_pool, bool reuse,
     THdfsCompression::type format, boost::scoped_ptr<Codec>* decompressor);
 
   /// Alternate factory method: takes a codec string and populates a scoped pointer.
   static Status CreateDecompressor(MemPool* mem_pool, bool reuse,
-      const std::string& codec, boost::scoped_ptr<Codec>* decompressor);
+      const std::string& codec,
+      boost::scoped_ptr<Codec>* decompressor) WARN_UNUSED_RESULT;
 
   /// Create a compressor.
   /// Input:
@@ -78,11 +78,12 @@ class Codec {
   /// Output:
   ///  compressor: scoped pointer to the compressor class to use.
   static Status CreateCompressor(MemPool* mem_pool, bool reuse,
-      THdfsCompression::type format, boost::scoped_ptr<Codec>* compressor);
+      THdfsCompression::type format,
+      boost::scoped_ptr<Codec>* compressor) WARN_UNUSED_RESULT;
 
   /// Alternate factory method: takes a codec string and populates a scoped pointer.
-  static Status CreateCompressor(MemPool* mem_pool, bool reuse,
-      const std::string& codec, boost::scoped_ptr<Codec>* compressor);
+  static Status CreateCompressor(MemPool* mem_pool, bool reuse, const std::string& codec,
+      boost::scoped_ptr<Codec>* compressor) WARN_UNUSED_RESULT;
 
   /// Return the name of a compression algorithm.
   static std::string GetCodecName(THdfsCompression::type);
@@ -90,6 +91,9 @@ class Codec {
   static Status GetHadoopCodecClassName(THdfsCompression::type, std::string* out_name);
 
   virtual ~Codec() {}
+
+  /// Initialize the codec. This should only be called once.
+  virtual Status Init() WARN_UNUSED_RESULT { return Status::OK(); }
 
   /// Process a block of data, either compressing or decompressing it.
   //
@@ -111,7 +115,7 @@ class Codec {
   /// not int64_ts. We need to keep this interface because the Parquet thrift uses ints.
   /// See IMPALA-1116.
   Status ProcessBlock32(bool output_preallocated, int input_length, const uint8_t* input,
-      int* output_length, uint8_t** output);
+      int* output_length, uint8_t** output) WARN_UNUSED_RESULT;
 
   /// Process data like ProcessBlock(), but can consume partial input and may only produce
   /// partial output. *input_bytes_read returns the number of bytes of input that have
@@ -132,7 +136,8 @@ class Codec {
   ///   output: decompressed data
   ///   stream_end: end of output buffer corresponds to the end of a compressed stream.
   virtual Status ProcessBlockStreaming(int64_t input_length, const uint8_t* input,
-      int64_t* input_bytes_read, int64_t* output_length, uint8_t** output, bool* stream_end) {
+      int64_t* input_bytes_read, int64_t* output_length, uint8_t** output,
+      bool* stream_end) WARN_UNUSED_RESULT {
     return Status("Not implemented.");
   }
 
@@ -141,7 +146,7 @@ class Codec {
   /// a buffer.
   /// This must be an O(1) operation (i.e. cannot read all of input).  Codecs that
   /// don't support this should return -1.
-  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL) = 0;
+  virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = nullptr) = 0;
 
   /// Must be called on codec before destructor for final cleanup.
   virtual void Close();
@@ -156,16 +161,13 @@ class Codec {
  protected:
   /// Create a compression operator
   /// Inputs:
-  ///   mem_pool: memory pool to allocate the output buffer. If mem_pool is NULL then the
-  ///             caller must always preallocate *output in ProcessBlock().
+  ///   mem_pool: memory pool to allocate the output buffer. If mem_pool is nullptr then
+  ///   the caller must always preallocate *output in ProcessBlock().
   ///   reuse_buffer: if false always allocate a new buffer rather than reuse.
   Codec(MemPool* mem_pool, bool reuse_buffer, bool supports_streaming = false);
 
-  /// Initialize the codec. This should only be called once.
-  virtual Status Init() = 0;
-
   /// Pool to allocate the buffer to hold transformed data.
-  MemPool* memory_pool_;
+  MemPool* memory_pool_ = nullptr;
 
   /// Temporary memory pool: in case we get the output size too small we can use this to
   /// free unused buffers.
@@ -176,10 +178,10 @@ class Codec {
 
   /// Buffer to hold transformed data.
   /// Either passed from the caller or allocated from memory_pool_.
-  uint8_t* out_buffer_;
+  uint8_t* out_buffer_ = nullptr;
 
   /// Length of the output buffer.
-  int64_t buffer_length_;
+  int64_t buffer_length_ = 0;
 
   /// Can decompressor support streaming mode.
   /// This is set to true for codecs that implement ProcessBlockStreaming().

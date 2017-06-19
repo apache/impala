@@ -69,7 +69,8 @@ void TestCompression(int num, int min_len, int max_len, THdfsCompression::type c
   }
 
   scoped_ptr<Codec> compressor;
-  Codec::CreateCompressor(NULL, false, codec, &compressor);
+  Status status = Codec::CreateCompressor(NULL, false, codec, &compressor);
+  DCHECK(status.ok());
 
   int64_t compressed_len = compressor->MaxOutputLen(offset);
   uint8_t* compressed_buffer = (uint8_t*)malloc(compressed_len);
@@ -102,4 +103,3 @@ int main(int argc, char **argv) {
   impala::TestCompression(1000000, 5, 15, impala::THdfsCompression::GZIP);
   return 0;
 }
-

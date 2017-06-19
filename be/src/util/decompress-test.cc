@@ -400,7 +400,8 @@ TEST_F(DecompressorTest, Impala1506) {
   MemTracker trax;
   MemPool pool(&trax);
   scoped_ptr<Codec> compressor;
-  Codec::CreateCompressor(&pool, true, impala::THdfsCompression::GZIP, &compressor);
+  EXPECT_OK(
+      Codec::CreateCompressor(&pool, true, impala::THdfsCompression::GZIP, &compressor));
 
   int64_t input_len = 3;
   const uint8_t input[3] = {1, 2, 3};

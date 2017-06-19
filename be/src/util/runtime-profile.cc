@@ -31,6 +31,7 @@
 #include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/periodic-counter-updater.h"
+#include "util/pretty-printer.h"
 #include "util/redactor.h"
 
 #include "common/names.h"
