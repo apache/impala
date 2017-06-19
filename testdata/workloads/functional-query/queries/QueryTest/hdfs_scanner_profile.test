@@ -1,8 +1,34 @@
-====
----- QUERY
 # This query will do a full table scan to count the num of rows
 # read during a scan
 select * from alltypesagg
 ---- RUNTIME_PROFILE
 row_regex: .*RowsRead: 11.00K .
+====
+---- QUERY
+# This query verifies that a scan range is marked as skipped
+# in the profile if the correct compression cannot be inferred
+# for a scan range
+select count(*) from tpcds_parquet.store_sales
+---- RUNTIME_PROFILE
+row_regex: .*File Formats: PARQUET/Unknown\(Skipped\):.*
+====
+---- QUERY
+# This query verifies that a when a parquet scan range is runtime
+# filtered, it is marked as skipped and the compression codec is
+# marked as unknown.
+set runtime_filter_wait_time_ms=500000;
+select count(*) from tpcds_parquet.store_sales
+join tpcds_parquet.date_dim on
+ss_sold_date_sk = d_date_sk where d_qoy=1
+---- RUNTIME_PROFILE
+row_regex: .*File Formats: PARQUET/NONE:.* PARQUET/Unknown\(Skipped\).*
+====
+---- QUERY
+# This query verifies that a when a text scan range is runtime
+# filtered, it is marked as skipped.
+set runtime_filter_wait_time_ms=100000;
+select count(*) from tpcds.store_sales join tpcds.date_dim on
+ss_sold_date_sk = d_date_sk where d_qoy=1
+---- RUNTIME_PROFILE
+row_regex: .*File Formats: TEXT/NONE:.* TEXT/NONE\(Skipped\):.*
 ====

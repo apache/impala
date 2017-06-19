@@ -23,6 +23,7 @@
 #include <memory>
 #include <unordered_set>
 #include <vector>
+#include <tuple>
 
 #include <boost/unordered_map.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -252,11 +253,15 @@ class HdfsScanNodeBase : public ScanNode {
   /// Otherwise, scan nodes using a RowBatch queue may lose the last batch due
   /// to racing with shutting down the queue.
   void RangeComplete(const THdfsFileFormat::type& file_type,
-      const THdfsCompression::type& compression_type);
+      const THdfsCompression::type& compression_type, bool skipped = false);
+
   /// Same as above except for when multiple compression codecs were used
   /// in the file. The metrics are incremented for each compression_type.
+  /// 'skipped' is set to true in the following cases -
+  /// 1. when a scan range is filtered at runtime
+  /// 2. scan range is a metadata read only(e.x. count(*) on parquet files)
   virtual void RangeComplete(const THdfsFileFormat::type& file_type,
-      const std::vector<THdfsCompression::type>& compression_type);
+      const std::vector<THdfsCompression::type>& compression_type, bool skipped = false);
 
   /// Utility function to compute the order in which to materialize slots to allow for
   /// computing conjuncts as slots get materialized (on partial tuples).
@@ -492,7 +497,8 @@ class HdfsScanNodeBase : public ScanNode {
   /// Mapping of file formats (file type, compression type) to the number of
   /// splits of that type and the lock protecting it.
   typedef std::map<
-      std::pair<THdfsFileFormat::type, THdfsCompression::type>, int> FileTypeCountsMap;
+     std::tuple<THdfsFileFormat::type, bool, THdfsCompression::type>,
+     int> FileTypeCountsMap;
   FileTypeCountsMap file_type_counts_;
 
   /// Performs dynamic partition pruning, i.e., applies runtime filters to files, and

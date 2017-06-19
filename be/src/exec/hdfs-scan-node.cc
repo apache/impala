@@ -242,9 +242,9 @@ void HdfsScanNode::Close(RuntimeState* state) {
 }
 
 void HdfsScanNode::RangeComplete(const THdfsFileFormat::type& file_type,
-    const std::vector<THdfsCompression::type>& compression_type) {
+    const std::vector<THdfsCompression::type>& compression_type, bool skipped) {
   lock_guard<SpinLock> l(file_type_counts_);
-  HdfsScanNodeBase::RangeComplete(file_type, compression_type);
+  HdfsScanNodeBase::RangeComplete(file_type, compression_type, skipped);
 }
 
 void HdfsScanNode::TransferToScanNodePool(MemPool* pool) {

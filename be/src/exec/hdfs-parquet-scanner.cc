@@ -315,9 +315,12 @@ void HdfsParquetScanner::Close(RowBatch* row_batch) {
   assemble_rows_timer_.ReleaseCounter();
 
   // If this was a metadata only read (i.e. count(*)), there are no columns.
-  if (compression_types.empty()) compression_types.push_back(THdfsCompression::NONE);
-  scan_node_->RangeComplete(THdfsFileFormat::PARQUET, compression_types);
-
+  if (compression_types.empty()) {
+    compression_types.push_back(THdfsCompression::NONE);
+    scan_node_->RangeComplete(THdfsFileFormat::PARQUET, compression_types, true);
+  } else {
+    scan_node_->RangeComplete(THdfsFileFormat::PARQUET, compression_types);
+  }
   if (schema_resolver_.get() != nullptr) schema_resolver_.reset();
 
   ScalarExprEvaluator::Close(min_max_conjunct_evals_, state_);
