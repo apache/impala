@@ -21,6 +21,8 @@
 
 #include "catalog/catalog-util.h"
 #include "common/status.h"
+#include "exec/read-write-util.h"
+#include "util/compress.h"
 #include "util/debug-util.h"
 
 #include "common/names.h"
@@ -187,5 +189,41 @@ string TCatalogObjectToEntryKey(const TCatalogObject& catalog_object) {
   return entry_key.str();
 }
 
+Status CompressCatalogObject(string* catalog_object) {
+  scoped_ptr<Codec> compressor;
+  RETURN_IF_ERROR(Codec::CreateCompressor(nullptr, false, THdfsCompression::LZ4,
+      &compressor));
+  string output_buffer;
+  int64_t compressed_data_len = compressor->MaxOutputLen(catalog_object->size());
+  int64_t output_buffer_len = compressed_data_len + sizeof(uint32_t);
+  output_buffer.resize(output_buffer_len);
+  uint8_t* output_buffer_ptr =
+      const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(output_buffer.data()));
+  ReadWriteUtil::PutInt(output_buffer_ptr, static_cast<uint32_t>(catalog_object->size()));
+  output_buffer_ptr += sizeof(uint32_t);
+  compressor->ProcessBlock(true, catalog_object->size(),
+      reinterpret_cast<const uint8_t*>(catalog_object->data()), &compressed_data_len,
+      &output_buffer_ptr);
+  output_buffer.resize(compressed_data_len + sizeof(uint32_t));
+  *catalog_object = move(output_buffer);
+  return Status::OK();
+}
+
+Status DecompressCatalogObject(const string& compressed_catalog_object,
+    vector<uint8_t>* output_buffer) {
+  scoped_ptr<Codec> decompressor;
+  RETURN_IF_ERROR(Codec::CreateDecompressor(nullptr, false, THdfsCompression::LZ4,
+      &decompressor));
+  const uint8_t* input_data_ptr =
+      reinterpret_cast<const uint8_t*>(compressed_catalog_object.data());
+  int64_t decompressed_len = ReadWriteUtil::GetInt<uint32_t>(input_data_ptr);
+  output_buffer->resize(decompressed_len);
+  input_data_ptr += sizeof(uint32_t);
+  uint8_t* decompressed_data_ptr = output_buffer->data();
+  int64_t compressed_data_len = compressed_catalog_object.size() - sizeof(uint32_t);
+  RETURN_IF_ERROR(decompressor->ProcessBlock(true, compressed_data_len,
+      input_data_ptr, &decompressed_len, &decompressed_data_ptr));
+  return Status::OK();
+}
 
 }

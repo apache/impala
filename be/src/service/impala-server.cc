@@ -1262,6 +1262,7 @@ void ImpalaServer::CatalogUpdateCallback(
   if (topic == incoming_topic_deltas.end()) return;
   const TTopicDelta& delta = topic->second;
 
+
   // Update catalog cache in frontend. An update is split into batches of size
   // MAX_CATALOG_UPDATE_BATCH_SIZE_BYTES each for multiple updates. IMPALA-3499
   if (delta.topic_entries.size() != 0 || delta.topic_deletions.size() != 0)  {
@@ -1274,12 +1275,29 @@ void ImpalaServer::CatalogUpdateCallback(
     int64_t new_catalog_version = catalog_update_info_.catalog_version;
     uint64_t batch_size_bytes = 0;
     for (const TTopicItem& item: delta.topic_entries) {
-      uint32_t len = item.value.size();
       TCatalogObject catalog_object;
-      Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
-          item.value.data()), &len, FLAGS_compact_catalog_topic, &catalog_object);
+      Status status;
+      vector<uint8_t> data_buffer;
+      const uint8_t* data_buffer_ptr = nullptr;
+      uint32_t len = 0;
+      if (FLAGS_compact_catalog_topic) {
+        status = DecompressCatalogObject(item.value, &data_buffer);
+        if (!status.ok()) {
+          LOG(ERROR) << "Error decompressing catalog object " << item.key
+                     << ": " << status.GetDetail();
+          continue;
+        }
+        data_buffer_ptr = data_buffer.data();
+        len = data_buffer.size();
+      } else {
+        data_buffer_ptr = reinterpret_cast<const uint8_t*>(item.value.data());
+        len = item.value.size();
+      }
+      status = DeserializeThriftMsg(data_buffer_ptr, &len, FLAGS_compact_catalog_topic,
+          &catalog_object);
       if (!status.ok()) {
-        LOG(ERROR) << "Error deserializing item: " << status.GetDetail();
+        LOG(ERROR) << "Error deserializing item " << item.key
+                   << ": " << status.GetDetail();
         continue;
       }
       if (len > 100 * 1024 * 1024 /* 100MB */) {

@@ -19,6 +19,7 @@
 #ifndef IMPALA_CATALOG_CATALOG_UTIL_H
 #define IMPALA_CATALOG_CATALOG_UTIL_H
 
+#include "common/status.h"
 #include "gen-cpp/CatalogObjects_types.h"
 
 namespace impala {
@@ -50,6 +51,18 @@ Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
 /// "foo" in a database named "bar" would have a key of: "TABLE:bar.foo"
 /// Returns an empty string if there were any problem building the key.
 std::string TCatalogObjectToEntryKey(const TCatalogObject& catalog_object);
+
+/// Compresses a serialized catalog object using LZ4 and stores it back in
+/// 'catalog_object'. Stores the size of the uncopressed catalog object in the
+/// first sizeof(uint32_t) bytes of 'catalog_object'.
+Status CompressCatalogObject(std::string* catalog_object) WARN_UNUSED_RESULT;
+
+/// Decompress an LZ4-compressed catalog object. The decompressed object
+/// is stored in 'output_buffer'. The first sizeof(uint32_t) bytes of
+/// 'compressed_catalog_object' store the size of the uncompressed catalog
+/// object.
+Status DecompressCatalogObject(const std::string& compressed_catalog_object,
+    std::vector<uint8_t>* output_buffer) WARN_UNUSED_RESULT;
 
 }
 

@@ -21,6 +21,7 @@
 #include <thrift/protocol/TDebugProtocol.h>
 
 #include "catalog/catalog-util.h"
+#include "exec/read-write-util.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/debug-util.h"
 #include "util/logging-support.h"
@@ -299,7 +300,6 @@ void CatalogServer::UpdateCatalogTopicCallback(
 
 void CatalogServer::BuildTopicUpdates(const vector<TCatalogObject>& catalog_objects) {
   unordered_set<string> current_entry_keys;
-
   // Add any new/updated catalog objects to the topic.
   for (const TCatalogObject& catalog_object: catalog_objects) {
     const string& entry_key = TCatalogObjectToEntryKey(catalog_object);
@@ -327,6 +327,14 @@ void CatalogServer::BuildTopicUpdates(const vector<TCatalogObject>& catalog_obje
     if (!status.ok()) {
       LOG(ERROR) << "Error serializing topic value: " << status.GetDetail();
       pending_topic_updates_.pop_back();
+      continue;
+    }
+    if (FLAGS_compact_catalog_topic) {
+      status = CompressCatalogObject(&item.value);
+      if (!status.ok()) {
+        LOG(ERROR) << "Error compressing catalog object: " << status.GetDetail();
+        pending_topic_updates_.pop_back();
+      }
     }
   }
 
