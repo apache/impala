@@ -131,6 +131,7 @@ file(MAKE_DIRECTORY ${BE_OUTPUT_DIR})
 file(MAKE_DIRECTORY ${FE_OUTPUT_DIR})
 file(MAKE_DIRECTORY ${EXT_DS_OUTPUT_DIR})
 file(MAKE_DIRECTORY ${PYTHON_OUTPUT_DIR})
+file(MAKE_DIRECTORY ${HIVE_THRIFT_SOURCE_DIR})
 
 # Args passed to thrift for Java gen
 set(JAVA_FE_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen java:hashcode -o ${FE_OUTPUT_DIR})
@@ -207,10 +208,12 @@ THRIFT_GEN_DS(THRIFT_DATA_SRC_FILES ${EXT_DATA_SRC_FILES})
 
 add_custom_target(thrift-generated-files-error DEPENDS ErrorCodes.thrift)
 add_custom_target(thrift-generated-files-metrics DEPENDS MetricDefs.thrift)
+add_custom_target(thrift-generated-files-tcli-service DEPENDS ${TCLI_SERVICE_THRIFT})
 
 # Add a custom target that generates all the thrift files
 add_custom_target(thrift-cpp ALL DEPENDS ${THRIFT_ALL_FILES})
-add_dependencies(thrift-cpp thrift-generated-files-metrics thrift-generated-files-error)
+add_dependencies(thrift-cpp thrift-generated-files-metrics thrift-generated-files-error
+  thrift-generated-files-tcli-service)
 
 add_custom_target(thrift-ext-data-src ALL DEPENDS ${THRIFT_DATA_SRC_FILES})
 add_dependencies(thrift-ext-data-src thrift-cpp)
