@@ -564,6 +564,32 @@ https://issues.apache.org/jira/browse/IMPALA-2144 - Don't have
 
     </conbody>
 
+    <concept id="flatbuffers_mem_usage">
+      <title>Memory usage when compact_catalog_topic flag enabled</title>
+      <conbody>
+        <p>
+          The efficiency improvement from <xref keyref="IMPALA-4029">IMPALA-4029</xref>
+          can cause an increase in size of the updates to Impala catalog metadata
+          that are broadcast to the <cmdname>impalad</cmdname> daemons
+          by the <cmdname>statestored</cmdname> daemon.
+          The increase in catalog update topic size results in higher CPU and network
+          utilization. By default, the increase in topic size is about 5-7%. If the
+          <codeph>compact_catalog_topic</codeph> flag is used, the
+          size increase is more substantial, with a topic size approximately twice as
+          large as in previous versions.
+        </p>
+        <p><b>Bug:</b> <xref keyref="IMPALA-5500">IMPALA-5500</xref></p>
+        <p><b>Severity:</b> Medium</p>
+        <p>
+          <b>Workaround:</b> Consider leaving the <codeph>compact_catalog_topic</codeph>
+          configuration setting at its default value of <codeph>false</codeph> until
+          this issue is resolved.
+        </p>
+        <p><b>Resolution:</b> A fix is in the pipeline. Check the status of
+        <xref keyref="IMPALA-5500">IMPALA-5500</xref> for the release where the fix is available.</p>
+      </conbody>
+    </concept>
+
     <concept id="drop_table_purge_s3a">
       <title>DROP TABLE PURGE on S3A table may not delete externally written files</title>
       <conbody>
