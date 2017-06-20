@@ -24,8 +24,9 @@
 
 #include "common/status.h"
 #include "gen-cpp/StatestoreService_types.h"
-#include "statestore/failure-detector.h"
 #include "rpc/thrift-util.h"
+#include "statestore/failure-detector.h"
+#include "statestore/statestore-subscriber-client-wrapper.h"
 #include "util/debug-util.h"
 #include "util/logging-support.h"
 #include "util/time.h"
@@ -100,7 +101,7 @@ const int32_t STATESTORE_MAX_SUBSCRIBERS = 10000;
 // Updates or heartbeats that miss their deadline by this much are logged.
 const uint32_t DEADLINE_MISS_THRESHOLD_MS = 2000;
 
-typedef ClientConnection<StatestoreSubscriberClient> StatestoreSubscriberConnection;
+typedef ClientConnection<StatestoreSubscriberClientWrapper> StatestoreSubscriberConn;
 
 class StatestoreThriftIf : public StatestoreServiceIf {
  public:
@@ -224,11 +225,11 @@ Statestore::Statestore(MetricGroup* metrics)
         FLAGS_statestore_num_heartbeat_threads,
         STATESTORE_MAX_SUBSCRIBERS,
         bind<void>(mem_fn(&Statestore::DoSubscriberUpdate), this, true, _1, _2)),
-    update_state_client_cache_(new ClientCache<StatestoreSubscriberClient>(1, 0,
+    update_state_client_cache_(new StatestoreSubscriberClientCache(1, 0,
         FLAGS_statestore_update_tcp_timeout_seconds * 1000,
         FLAGS_statestore_update_tcp_timeout_seconds * 1000, "",
         EnableInternalSslConnections())),
-    heartbeat_client_cache_(new ClientCache<StatestoreSubscriberClient>(1, 0,
+    heartbeat_client_cache_(new StatestoreSubscriberClientCache(1, 0,
         FLAGS_statestore_heartbeat_tcp_timeout_seconds * 1000,
         FLAGS_statestore_heartbeat_tcp_timeout_seconds * 1000, "",
         EnableInternalSslConnections())),
@@ -422,13 +423,13 @@ Status Statestore::SendTopicUpdate(Subscriber* subscriber, bool* update_skipped)
 
   // Second: try and send it
   Status status;
-  StatestoreSubscriberConnection client(update_state_client_cache_.get(),
+  StatestoreSubscriberConn client(update_state_client_cache_.get(),
       subscriber->network_address(), &status);
   RETURN_IF_ERROR(status);
 
   TUpdateStateResponse response;
   RETURN_IF_ERROR(client.DoRpc(
-      &StatestoreSubscriberClient::UpdateState, update_state_request, &response));
+      &StatestoreSubscriberClientWrapper::UpdateState, update_state_request, &response));
 
   status = Status(response.status);
   if (!status.ok()) {
@@ -602,7 +603,7 @@ Status Statestore::SendHeartbeat(Subscriber* subscriber) {
   sw.Start();
 
   Status status;
-  StatestoreSubscriberConnection client(heartbeat_client_cache_.get(),
+  StatestoreSubscriberConn client(heartbeat_client_cache_.get(),
       subscriber->network_address(), &status);
   RETURN_IF_ERROR(status);
 
@@ -610,7 +611,7 @@ Status Statestore::SendHeartbeat(Subscriber* subscriber) {
   THeartbeatResponse response;
   request.__set_registration_id(subscriber->registration_id());
   RETURN_IF_ERROR(
-      client.DoRpc(&StatestoreSubscriberClient::Heartbeat, request, &response));
+      client.DoRpc(&StatestoreSubscriberClientWrapper::Heartbeat, request, &response));
 
   heartbeat_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
   return Status::OK();

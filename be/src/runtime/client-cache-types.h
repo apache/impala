@@ -33,9 +33,9 @@ class ImpalaInternalServiceClient;
 typedef ClientCache<ImpalaInternalServiceClient> ImpalaInternalServiceClientCache;
 typedef ClientConnection<ImpalaInternalServiceClient> ImpalaInternalServiceConnection;
 
-class CatalogServiceClient;
-typedef ClientCache<CatalogServiceClient> CatalogServiceClientCache;
-typedef ClientConnection<CatalogServiceClient> CatalogServiceConnection;
+class CatalogServiceClientWrapper;
+typedef ClientCache<CatalogServiceClientWrapper> CatalogServiceClientCache;
+typedef ClientConnection<CatalogServiceClientWrapper> CatalogServiceConnection;
 
 class ImpalaBackendClient;
 typedef ClientCache<ImpalaBackendClient> ImpalaBackendClientCache;

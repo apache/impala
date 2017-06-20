@@ -31,6 +31,7 @@
 #include "gen-cpp/StatestoreService_types.h"
 #include "rpc/rpc-trace.h"
 #include "rpc/thrift-util.h"
+#include "statestore/statestore-service-client-wrapper.h"
 #include "util/time.h"
 #include "util/debug-util.h"
 
@@ -64,7 +65,7 @@ const string CALLBACK_METRIC_PATTERN = "statestore-subscriber.topic-$0.processin
 // statestore after a failure.
 const int32_t SLEEP_INTERVAL_MS = 5000;
 
-typedef ClientConnection<StatestoreServiceClient> StatestoreConnection;
+typedef ClientConnection<StatestoreServiceClientWrapper> StatestoreServiceConn;
 
 // Proxy class for the subscriber heartbeat thrift API, which
 // translates RPCs into method calls on the local subscriber object.
@@ -142,7 +143,7 @@ Status StatestoreSubscriber::AddTopic(const Statestore::TopicId& topic_id,
 
 Status StatestoreSubscriber::Register() {
   Status client_status;
-  StatestoreConnection client(client_cache_.get(), statestore_address_, &client_status);
+  StatestoreServiceConn client(client_cache_.get(), statestore_address_, &client_status);
   RETURN_IF_ERROR(client_status);
 
   TRegisterSubscriberRequest request;
@@ -157,8 +158,8 @@ Status StatestoreSubscriber::Register() {
   request.subscriber_location = heartbeat_address_;
   request.subscriber_id = subscriber_id_;
   TRegisterSubscriberResponse response;
-  RETURN_IF_ERROR(
-      client.DoRpc(&StatestoreServiceClient::RegisterSubscriber, request, &response));
+  RETURN_IF_ERROR(client.DoRpc(&StatestoreServiceClientWrapper::RegisterSubscriber,
+      request, &response));
   Status status = Status(response.status);
   if (status.ok()) connected_to_statestore_metric_->set_value(true);
   if (response.__isset.registration_id) {

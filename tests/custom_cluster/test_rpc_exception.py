@@ -43,7 +43,7 @@ class TestRPCException(CustomClusterTestSuite):
   # Execute TEST_QUERY. If 'exception_string' is None, it's expected to complete
   # sucessfully with result matching EXPECTED_RESULT. Otherwise, it's expected
   # to fail with 'exception_string'.
-  def execute_query(self, exception_string):
+  def execute_test_query(self, exception_string):
     try:
       result = self.client.execute(self.TEST_QUERY)
       assert result.data == self.EXPECTED_RESULT
@@ -54,24 +54,47 @@ class TestRPCException(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=1"
       " --fault_injection_rpc_type=5")
-  def test_transmitdata_send_fail(self, vector):
-    self.execute_query(None)
+  def test_transmitdata_send_lost_connection(self, vector):
+    self.execute_test_query(None)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=2"
       " --fault_injection_rpc_type=5")
-  def test_transmitdata_recv_fail(self, vector):
-    self.execute_query("Called read on non-open socket")
+  def test_transmitdata_send_timed_out(self, vector):
+    self.execute_test_query(None)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=3"
       " --fault_injection_rpc_type=5")
-  def test_transmitdata_secure_send_error(self, vector):
-    self.execute_query("SSL_write: SSL resource temporarily unavailable")
+  def test_transmitdata_recv_lost_connection(self, vector):
+    self.execute_test_query("Called read on non-open socket")
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=4"
       " --fault_injection_rpc_type=5")
-  def test_transmitdata_secure_recv_error(self, vector):
-    self.execute_query("SSL_read: SSL resource temporarily unavailable")
+  def test_transmitdata_recv_timed_out(self, vector):
+    self.execute_test_query(None)
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=5"
+      " --fault_injection_rpc_type=5")
+  def test_transmitdata_secure_send_lost_connection(self, vector):
+    self.execute_test_query(None);
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=6"
+      " --fault_injection_rpc_type=5")
+  def test_transmitdata_secure_send_timed_out(self, vector):
+    self.execute_test_query("SSL_write: Resource temporarily unavailable")
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=7"
+      " --fault_injection_rpc_type=5")
+  def test_transmitdata_secure_recv_lost_connection(self, vector):
+    self.execute_test_query("TTransportException: Transport not open")
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=8"
+      " --fault_injection_rpc_type=5")
+  def test_transmitdata_secure_recv_timed_out(self, vector):
+    self.execute_test_query(None)

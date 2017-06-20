@@ -71,12 +71,12 @@ int GetServerPort() {
 
 TEST(ThriftServer, Connectivity) {
   int port = GetServerPort();
-  ThriftClient<StatestoreServiceClient> wrong_port_client("localhost",
+  ThriftClient<StatestoreServiceClientWrapper> wrong_port_client("localhost",
       port, "", NULL, false);
   ASSERT_FALSE(wrong_port_client.Open().ok());
 
-  ThriftServer* server = new ThriftServer("DummyStatestore", MakeProcessor(), port, NULL,
-      NULL, 5);
+  ThriftServer* server =
+      new ThriftServer("DummyStatestore", MakeProcessor(), port, NULL, NULL, 5);
   ASSERT_OK(server->Start());
 
   // Test that client recovers from failure to connect.
@@ -95,30 +95,33 @@ TEST(SslTest, Connectivity) {
   ASSERT_OK(server->Start());
 
   FLAGS_ssl_client_ca_certificate = SERVER_CERT;
-  ThriftClient<StatestoreServiceClient> ssl_client(
+  ThriftClient<StatestoreServiceClientWrapper> ssl_client(
       "localhost", port, "", NULL, true);
   ASSERT_OK(ssl_client.Open());
   TRegisterSubscriberResponse resp;
-  EXPECT_NO_THROW({
-    ssl_client.iface()->RegisterSubscriber(resp, TRegisterSubscriberRequest());
+  bool send_done = false;
+  EXPECT_NO_THROW({ssl_client.iface()->RegisterSubscriber(resp,
+      TRegisterSubscriberRequest(), &send_done);
   });
 
   // Disable SSL for this client.
-  ThriftClient<StatestoreServiceClient> non_ssl_client(
+  ThriftClient<StatestoreServiceClientWrapper> non_ssl_client(
       "localhost", port, "", NULL, false);
   ASSERT_OK(non_ssl_client.Open());
+  send_done = false;
   EXPECT_THROW(non_ssl_client.iface()->RegisterSubscriber(
-      resp, TRegisterSubscriberRequest()), TTransportException);
+      resp, TRegisterSubscriberRequest(), &send_done), TTransportException);
 }
 
 TEST(SslTest, BadCertificate) {
   FLAGS_ssl_client_ca_certificate = "unknown";
   int port = GetServerPort();
-  ThriftClient<StatestoreServiceClient> ssl_client("localhost", port, "", NULL, true);
+  ThriftClient<StatestoreServiceClientWrapper>
+      ssl_client("localhost", port, "", NULL, true);
   ASSERT_FALSE(ssl_client.Open().ok());
 
-  ThriftServer* server = new ThriftServer("DummyStatestore", MakeProcessor(), port, NULL,
-      NULL, 5);
+  ThriftServer* server =
+      new ThriftServer("DummyStatestore", MakeProcessor(), port, NULL, NULL, 5);
   ASSERT_OK(server->EnableSsl(SERVER_CERT, PRIVATE_KEY, "echo password"));
   ASSERT_OK(server->Start());
 
@@ -136,12 +139,13 @@ TEST(PasswordProtectedPemFile, CorrectOperation) {
       SERVER_CERT, PASSWORD_PROTECTED_PRIVATE_KEY, "echo password"));
   ASSERT_OK(server->Start());
   FLAGS_ssl_client_ca_certificate = SERVER_CERT;
-  ThriftClient<StatestoreServiceClient> ssl_client("localhost", port, "", NULL, true);
+  ThriftClient<StatestoreServiceClientWrapper>
+      ssl_client("localhost", port, "", NULL, true);
   ASSERT_OK(ssl_client.Open());
   TRegisterSubscriberResponse resp;
-  EXPECT_NO_THROW({
-    ssl_client.iface()->RegisterSubscriber(resp, TRegisterSubscriberRequest());
-  });
+  bool send_done = false;
+  EXPECT_NO_THROW({ssl_client.iface()->RegisterSubscriber(resp,
+      TRegisterSubscriberRequest(), &send_done);});
 }
 
 TEST(PasswordProtectedPemFile, BadPassword) {
@@ -163,15 +167,17 @@ TEST(SslTest, ClientBeforeServer) {
   // Instantiate a thrift client before a thrift server and test if it works (IMPALA-2747)
   FLAGS_ssl_client_ca_certificate = SERVER_CERT;
   int port = GetServerPort();
-  ThriftClient<StatestoreServiceClient> ssl_client("localhost", port, "", NULL, true);
-  ThriftServer* server = new ThriftServer("DummyStatestore", MakeProcessor(), port, NULL,
-      NULL, 5);
+  ThriftClient<StatestoreServiceClientWrapper>
+      ssl_client("localhost", port, "", NULL, true);
+  ThriftServer* server =
+      new ThriftServer("DummyStatestore", MakeProcessor(), port, NULL, NULL, 5);
   ASSERT_OK(server->EnableSsl(SERVER_CERT, PRIVATE_KEY));
   ASSERT_OK(server->Start());
 
   ASSERT_OK(ssl_client.Open());
+  bool send_done = false;
   TRegisterSubscriberResponse resp;
-    ssl_client.iface()->RegisterSubscriber(resp, TRegisterSubscriberRequest());
+  ssl_client.iface()->RegisterSubscriber(resp, TRegisterSubscriberRequest(), &send_done);
 }
 
 /// Test disabled because requires a high ulimit -n on build machines. Since the test does
@@ -203,18 +209,19 @@ TEST(NoPasswordPemFile, BadServerCertificate) {
   EXPECT_OK(server->EnableSsl(BAD_SERVER_CERT, BAD_PRIVATE_KEY));
   EXPECT_OK(server->Start());
   FLAGS_ssl_client_ca_certificate = SERVER_CERT;
-  ThriftClient<StatestoreServiceClient> ssl_client(
+  ThriftClient<StatestoreServiceClientWrapper> ssl_client(
       "localhost", FLAGS_state_store_port + 5, "", NULL, true);
   EXPECT_OK(ssl_client.Open());
   TRegisterSubscriberResponse resp;
-  EXPECT_THROW({
-    ssl_client.iface()->RegisterSubscriber(resp, TRegisterSubscriberRequest());
+  bool send_done = false;
+  EXPECT_THROW({ssl_client.iface()->RegisterSubscriber(resp, TRegisterSubscriberRequest(),
+      &send_done);
   }, TSSLException);
   // Close and reopen the socket
   ssl_client.Close();
   EXPECT_OK(ssl_client.Open());
-  EXPECT_THROW({
-    ssl_client.iface()->RegisterSubscriber(resp, TRegisterSubscriberRequest());
+  EXPECT_THROW({ssl_client.iface()->RegisterSubscriber(resp, TRegisterSubscriberRequest(),
+      &send_done);
   }, TSSLException);
 }
 

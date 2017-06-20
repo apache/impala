@@ -35,6 +35,7 @@
 #include "runtime/client-cache.h"
 #include "runtime/timestamp-value.h"
 #include "statestore/failure-detector.h"
+#include "statestore/statestore-subscriber-client-wrapper.h"
 #include "util/aligned-new.h"
 #include "util/collection-metrics.h"
 #include "util/metrics.h"
@@ -44,6 +45,8 @@
 namespace impala {
 
 class Status;
+
+typedef ClientCache<StatestoreSubscriberClientWrapper> StatestoreSubscriberClientCache;
 
 /// The Statestore is a soft-state key-value store that maintains a set of Topics, which
 /// are maps from string keys to byte array values.
@@ -400,13 +403,13 @@ class Statestore : public CacheLineAligned {
 
   /// Cache of subscriber clients used for UpdateState() RPCs. Only one client per
   /// subscriber should be used, but the cache helps with the client lifecycle on failure.
-  boost::scoped_ptr<ClientCache<StatestoreSubscriberClient>> update_state_client_cache_;
+  boost::scoped_ptr<StatestoreSubscriberClientCache> update_state_client_cache_;
 
   /// Cache of subscriber clients used for Heartbeat() RPCs. Separate from
   /// update_state_client_cache_ because we enable TCP-level timeouts for these calls,
   /// whereas they are not safe for UpdateState() RPCs which can take an unbounded amount
   /// of time.
-  boost::scoped_ptr<ClientCache<StatestoreSubscriberClient>> heartbeat_client_cache_;
+  boost::scoped_ptr<StatestoreSubscriberClientCache> heartbeat_client_cache_;
 
   /// Thrift API implementation which proxies requests onto this Statestore
   boost::shared_ptr<StatestoreServiceIf> thrift_iface_;

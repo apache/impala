@@ -29,6 +29,7 @@
 #include "util/stopwatch.h"
 #include "rpc/thrift-util.h"
 #include "rpc/thrift-client.h"
+#include "statestore/statestore-service-client-wrapper.h"
 #include "util/metrics.h"
 #include "gen-cpp/StatestoreService.h"
 #include "gen-cpp/StatestoreSubscriber.h"
@@ -41,7 +42,7 @@ class Thread;
 class ThriftServer;
 class TNetworkAddress;
 
-typedef ClientCache<StatestoreServiceClient> StatestoreClientCache;
+typedef ClientCache<StatestoreServiceClientWrapper> StatestoreClientCache;
 
 /// A StatestoreSubscriber communicates with a statestore periodically through the exchange
 /// of topic update messages. These messages contain updates from the statestore to a list

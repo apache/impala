@@ -26,6 +26,7 @@
 #include <boost/bind.hpp>
 #include <gutil/strings/substitute.h>
 
+#include "catalog/catalog-service-client-wrapper.h"
 #include "runtime/client-cache-types.h"
 #include "util/metrics.h"
 #include "rpc/thrift-client.h"
@@ -237,20 +238,23 @@ class ClientConnection {
   /// closed cnxn).
   /// Application-level failures should be signalled through the response type.
   ///
+  /// TODO: Consider replacing 'retry_is_safe' with a bool which callers pass to
+  /// indicate intention to retry recv part of the RPC if it times out.
   template <class F, class Request, class Response>
   Status DoRpc(const F& f, const Request& request, Response* response,
       bool* retry_is_safe = NULL) {
     DCHECK(response != NULL);
     client_is_unrecoverable_ = true;
     if (retry_is_safe != nullptr) *retry_is_safe = false;
+    bool send_done = false;
     try {
-      (client_->*f)(*response, request);
+      (client_->*f)(*response, request, &send_done);
     } catch (const apache::thrift::transport::TTransportException& e) {
-      if (IsRecvTimeoutTException(e)) {
+      if (send_done && IsRecvTimeoutTException(e)) {
         return Status(TErrorCode::RPC_RECV_TIMEOUT, strings::Substitute(
             "Client $0 timed-out during recv call.", TNetworkAddressToString(address_)));
       }
-      if (IsSendFailTException(e)) {
+      if (!send_done && IsSendFailTException(e)) {
         return RetryRpc(f, request, response, retry_is_safe);
       }
       return Status(TErrorCode::RPC_GENERAL_ERROR, ExceptionMsg(e));
@@ -315,13 +319,15 @@ class ClientConnection {
       return Status(TErrorCode::RPC_CLIENT_CONNECT_FAILURE, status.GetDetail());
     }
     try {
-      (client_->*f)(*response, request);
+      bool send_done = false;
+      (client_->*f)(*response, request, &send_done);
     } catch (const apache::thrift::TException& e) {
       // By this point the RPC really has failed.
       // TODO: Revisit this logic later. It's possible that the new connection
       // works but we hit timeout here.
       return Status(TErrorCode::RPC_GENERAL_ERROR, ExceptionMsg(e));
     }
+    client_is_unrecoverable_ = false;
     return Status::OK();
   }
 };

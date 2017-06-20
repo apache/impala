@@ -40,7 +40,38 @@ class ImpalaBackendClient : public ImpalaInternalServiceClient {
     : ImpalaInternalServiceClient(iprot, oprot), transmit_csw_(NULL) {
   }
 
-  void TransmitData(TTransmitDataResult& _return, const TTransmitDataParams& params) {
+/// We intentionally disable this clang warning as we intend to hide the
+/// the same-named functions defined in the base class.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Woverloaded-virtual"
+
+  void ExecQueryFInstances(TExecQueryFInstancesResult& _return,
+      const TExecQueryFInstancesParams& params, bool* send_done) {
+    DCHECK(!*send_done);
+    ImpalaInternalServiceClient::send_ExecQueryFInstances(params);
+    *send_done = true;
+    ImpalaInternalServiceClient::recv_ExecQueryFInstances(_return);
+  }
+
+  void ReportExecStatus(TReportExecStatusResult& _return,
+      const TReportExecStatusParams& params, bool* send_done) {
+    DCHECK(!*send_done);
+    ImpalaInternalServiceClient::send_ReportExecStatus(params);
+    *send_done = true;
+    ImpalaInternalServiceClient::recv_ReportExecStatus(_return);
+  }
+
+  void CancelQueryFInstances(TCancelQueryFInstancesResult& _return,
+      const TCancelQueryFInstancesParams& params, bool* send_done) {
+    DCHECK(!*send_done);
+    ImpalaInternalServiceClient::send_CancelQueryFInstances(params);
+    *send_done = true;
+    ImpalaInternalServiceClient::recv_CancelQueryFInstances(_return);
+  }
+
+  void TransmitData(TTransmitDataResult& _return, const TTransmitDataParams& params,
+      bool* send_done) {
+    DCHECK(!*send_done);
     FAULT_INJECTION_RPC_EXCEPTION(RPC_TRANSMITDATA, true /* is_send */);
     if (transmit_csw_ != NULL) {
       SCOPED_CONCURRENT_COUNTER(transmit_csw_);
@@ -48,6 +79,7 @@ class ImpalaBackendClient : public ImpalaInternalServiceClient {
     } else {
       ImpalaInternalServiceClient::send_TransmitData(params);
     }
+    *send_done = true;
     FAULT_INJECTION_RPC_EXCEPTION(RPC_TRANSMITDATA, false /* is_send */);
     ImpalaInternalServiceClient::recv_TransmitData(_return);
   }
@@ -64,6 +96,24 @@ class ImpalaBackendClient : public ImpalaInternalServiceClient {
   void ResetTransmitDataCounter() {
     transmit_csw_ = NULL;
   }
+
+  void UpdateFilter(TUpdateFilterResult& _return, const TUpdateFilterParams& params,
+      bool* send_done) {
+    DCHECK(!*send_done);
+    ImpalaInternalServiceClient::send_UpdateFilter(params);
+    *send_done = true;
+    ImpalaInternalServiceClient::recv_UpdateFilter(_return);
+  }
+
+  void PublishFilter(TPublishFilterResult& _return, const TPublishFilterParams& params,
+      bool* send_done) {
+    DCHECK(!*send_done);
+    ImpalaInternalServiceClient::send_PublishFilter(params);
+    *send_done = true;
+    ImpalaInternalServiceClient::recv_PublishFilter(_return);
+  }
+
+#pragma clang diagnostic pop
 
  private:
   RuntimeProfile::ConcurrentTimerCounter* transmit_csw_;

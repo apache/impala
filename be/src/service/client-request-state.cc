@@ -931,8 +931,8 @@ Status ClientRequestState::UpdateCatalog() {
 
       VLOG_QUERY << "Executing FinalizeDml() using CatalogService";
       TUpdateCatalogResponse resp;
-      RETURN_IF_ERROR(
-          client.DoRpc(&CatalogServiceClient::UpdateCatalog, catalog_update, &resp));
+      RETURN_IF_ERROR(client.DoRpc(&CatalogServiceClientWrapper::UpdateCatalog,
+          catalog_update, &resp));
 
       Status status(resp.result.status);
       if (!status.ok()) LOG(ERROR) << "ERROR Finalizing DML: " << status.GetDetail();

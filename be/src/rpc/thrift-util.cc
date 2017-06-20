@@ -188,22 +188,28 @@ bool TNetworkAddressComparator(const TNetworkAddress& a, const TNetworkAddress& 
 
 bool IsRecvTimeoutTException(const TTransportException& e) {
   // String taken from TSocket::read() Thrift's TSocket.cpp.
-  return e.getType() == TTransportException::TIMED_OUT &&
-      strstr(e.what(), "EAGAIN (timed out)") != nullptr;
+  return (e.getType() == TTransportException::TIMED_OUT &&
+             strstr(e.what(), "EAGAIN (timed out)") != nullptr) ||
+         (e.getType() == TTransportException::INTERNAL_ERROR &&
+             strstr(e.what(), "SSL_read: Resource temporarily unavailable") != nullptr);
 }
 
 // This function implements some heuristics to match against exception details
-// thrown by write_partial() in thrift library. This is not very robust as it's
-// possible that the receiver of the RPC call may have received all the RPC payload
-// but the ACK to the sender may have been dropped somehow. In which case, it's
-// not safe to retry the RPC if it's not idempotent.
-// TODO: end-to-end tracking of RPC calls to detect duplicated calls in the receiver side
+// thrown by functions in TSocket.cpp and TSSLSocket.cpp in thrift library. It's
+// expected the caller (e.g. DoRpc()) has already verified the send part of the RPC
+// didn't complete. It's only safe to retry an RPC if the send part didn't complete.
+// It's also expected that the RPC client will close the existing connection and reopen
+// a new connection before retrying the RPC. If the exception occurs after the send part
+// is done, only the recv part of the RPC can be retried.
 bool IsSendFailTException(const TTransportException& e) {
   // String taken from TSocket::write_partial() in Thrift's TSocket.cpp
   return (e.getType() == TTransportException::TIMED_OUT &&
              strstr(e.what(), "send timeout expired") != nullptr) ||
          (e.getType() == TTransportException::NOT_OPEN &&
-             (strstr(e.what(), "write() send()") != nullptr ||
+             // "TTransportException: Transport not open" can be from TSSLSocket.cpp
+             // when the underlying socket was closed.
+             (strstr(e.what(), "TTransportException: Transport not open") ||
+              strstr(e.what(), "write() send()") != nullptr ||
               strstr(e.what(), "Called write on non-open socket") != nullptr ||
               strstr(e.what(), "Socket send returned 0.") != nullptr));
 }
