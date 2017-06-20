@@ -10926,6 +10926,7 @@ under the License.
   <keydef href="topics/impala_scalability.xml" keys="scalability"/>
   <keydef audience="hidden" href="topics/impala_scalability.xml#scalability_memory" keys="scalability_memory"/>
   <keydef href="topics/impala_scalability.xml#scalability_catalog" keys="scalability_catalog"/>
+  <keydef href="topics/impala_scalability.xml#scalability_coordinator" keys="scalability_coordinator"/>
   <keydef href="topics/impala_scalability.xml#statestore_scalability" keys="statestore_scalability"/>
   <keydef audience="hidden" href="topics/impala_scalability.xml#scalability_cluster_size" keys="scalability_cluster_size"/>
   <keydef audience="hidden" href="topics/impala_scalability.xml#concurrent_connections" keys="concurrent_connections"/>

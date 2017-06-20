@@ -72,6 +72,16 @@ under the License.
             See <xref keyref="string_functions"/> for details.
           </p>
         </li>
+        <li>
+          <p rev="2.9.0 IMPALA-3807 IMPALA-5147 IMPALA-5503">
+            Startup flags for the <cmdname>impalad</cmdname> daemon, <codeph>is_executor</codeph>
+            and <codeph>is_coordinator</codeph>, let you divide the work on a large, busy cluster
+            between a small number of hosts acting as query coordinators, and a larger number of
+            hosts acting as query executors. By default, each host can act in both roles,
+            potentially introducing bottlenecks during heavily concurrent workloads.
+            See <xref keyref="scalability_coordinator"/> for details.
+          </p>
+        </li>
       </ul>
 
     </conbody>

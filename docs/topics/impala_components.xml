@@ -78,6 +78,12 @@ under the License.
         METADATA</codeph> statements that were needed to coordinate metadata across nodes prior to Impala 1.2.
       </p>
 
+      <p rev="2.9.0 IMPALA-3807 IMPALA-5147 IMPALA-5503">
+        In <keyword keyref="impala29_full"/> and higher, you can control which hosts act as query coordinators
+        and which act as query executors, to improve scalability for highly concurrent workloads on large clusters.
+        See <xref keyref="scalability_coordinator"/> for details.
+      </p>
+
       <p>
         <b>Related information:</b> <xref href="impala_config_options.xml#config_options"/>,
         <xref href="impala_processes.xml#processes"/>, <xref href="impala_timeouts.xml#impalad_timeout"/>,
