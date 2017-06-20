@@ -315,8 +315,9 @@ class StressRunner(object):
     self.result_hash_log_dir = gettempdir()
 
     self._status_headers = [
-        " Done", "Running", "Mem Lmt Ex", "Time Out", "Cancel",
-        "Err", "Next Qry Mem Lmt", "Tot Qry Mem Lmt", "Tracked Mem", "RSS Mem"]
+        "Done", "Running", "Mem Lmt Ex", "Time Out", "Cancel",
+        "Err", "Incorrect", "Next Qry Mem Lmt", "Tot Qry Mem Lmt", "Tracked Mem",
+        "RSS Mem"]
 
     self._num_queries_to_run = None
     self._query_producer_thread = None
@@ -435,6 +436,15 @@ class StressRunner(object):
     # And print the final state.
     if should_print_status:
       self._print_status()
+
+    if (
+        self._num_other_errors.value > 0 or
+        self._num_result_mismatches.value > 0 or
+        self._num_queries_timedout.value - self._num_queries_cancelled.value > 0
+    ):
+      LOG.error("Failing the stress test due to unexpected errors, incorrect results, or "
+                "timed out queries. See the report line above for details.")
+      sys.exit(1)
 
   def _start_producing_queries(self, queries):
     def enqueue_queries():
@@ -693,15 +703,27 @@ class StressRunner(object):
     reported_mem, actual_mem = self._get_mem_usage_values(reset=True)
     status_format = " | ".join(["%%%ss" % len(header) for header in self._status_headers])
     print(status_format % (
+        # Done
         self._num_queries_finished.value,
+        # Running
         self._num_queries_started.value - self._num_queries_finished.value,
+        # Mem Lmt Ex
         self._num_queries_exceeded_mem_limit.value,
+        # Time Out
         self._num_queries_timedout.value - self._num_queries_cancelled.value,
+        # Cancel
         self._num_queries_cancelled.value,
+        # Err
         self._num_other_errors.value,
+        # Incorrect
+        self._num_result_mismatches.value,
+        # Next Qry Mem Lmt
         self._mem_mb_needed_for_next_query.value,
+        # Total Qry Mem Lmt
         self._mem_broker.total_mem_mb - self._mem_broker.available_mem_mb,
+        # Tracked Mem
         "" if reported_mem == -1 else reported_mem,
+        # RSS Mem
         "" if actual_mem == -1 else actual_mem))
 
   def _update_from_query_report(self, report):
