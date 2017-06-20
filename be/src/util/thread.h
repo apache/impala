@@ -164,7 +164,7 @@ class Thread {
 };
 
 /// Utility class to group together a set of threads. A replacement for
-/// boost::thread_group.
+/// boost::thread_group. Not thread safe.
 class ThreadGroup {
  public:
   ThreadGroup() {}
@@ -178,6 +178,9 @@ class ThreadGroup {
   /// Waits for all threads to finish. DO NOT call this from a thread inside this set;
   /// deadlock will predictably ensue.
   void JoinAll();
+
+  /// Returns the number of threads in the group
+  int Size() const;
 
  private:
   /// All the threads grouped by this set.

@@ -54,12 +54,16 @@ class DiskInfo {
     return disks_[disk_id].name;
   }
 
+  /// Returns true if the disk with disk_id exists and is a rotational disk, is false
+  /// otherwise
   static bool is_rotational(int disk_id) {
     DCHECK_GE(disk_id, 0);
-    DCHECK_LT(disk_id, disks_.size());
+    // TODO: temporarily removed DCHECK due to an issue tracked in IMPALA-5574, put it
+    // back after its resolved
+    if (disk_id >= disks_.size()) return false;
     return disks_[disk_id].is_rotational;
   }
-  
+
   static std::string DebugString();
 
  private:
@@ -75,7 +79,7 @@ class DiskInfo {
 
     bool is_rotational;
 
-    Disk(const std::string& name = "", int id = -1, bool is_rotational = true) 
+    Disk(const std::string& name = "", int id = -1, bool is_rotational = true)
       : name(name), id(id), is_rotational(is_rotational) {}
   };
 

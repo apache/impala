@@ -41,22 +41,43 @@ using namespace strings;
 DEFINE_int32(num_disks, 0, "Number of disks on data node.");
 // Default IoMgr configs:
 // The maximum number of the threads per disk is also the max queue depth per disk.
-DEFINE_int32(num_threads_per_disk, 0, "number of threads per disk");
+DEFINE_int32(num_threads_per_disk, 0, "Number of I/O threads per disk");
+
+// Rotational disks should have 1 thread per disk to minimize seeks.  Non-rotational
+// don't have this penalty and benefit from multiple concurrent IO requests.
+static const int THREADS_PER_ROTATIONAL_DISK = 1;
+static const int THREADS_PER_SOLID_STATE_DISK = 8;
+
+// The maximum number of the threads per rotational disk is also the max queue depth per
+// rotational disk.
+static const string num_io_threads_per_rotational_disk_help_msg = Substitute("Number of "
+    "I/O threads per rotational disk. Has priority over num_threads_per_disk. If neither"
+    " is set, defaults to $0 thread(s) per rotational disk", THREADS_PER_ROTATIONAL_DISK);
+DEFINE_int32(num_io_threads_per_rotational_disk, 0,
+    num_io_threads_per_rotational_disk_help_msg.c_str());
+// The maximum number of the threads per solid state disk is also the max queue depth per
+// solid state disk.
+static const string num_io_threads_per_solid_state_disk_help_msg = Substitute("Number of"
+    " I/O threads per solid state disk. Has priority over num_threads_per_disk. If "
+    "neither is set, defaults to $0 thread(s) per solid state disk",
+    THREADS_PER_SOLID_STATE_DISK);
+DEFINE_int32(num_io_threads_per_solid_state_disk, 0,
+    num_io_threads_per_solid_state_disk_help_msg.c_str());
 // The maximum number of remote HDFS I/O threads.  HDFS access that are expected to be
 // remote are placed on a separate remote disk queue.  This is the queue depth for that
 // queue.  If 0, then the remote queue is not used and instead ranges are round-robined
 // across the local disk queues.
-DEFINE_int32(num_remote_hdfs_io_threads, 8, "number of remote HDFS I/O threads");
+DEFINE_int32(num_remote_hdfs_io_threads, 8, "Number of remote HDFS I/O threads");
 // The maximum number of S3 I/O threads. The default value of 16 was chosen emperically
 // to maximize S3 throughput. Maximum throughput is achieved with multiple connections
 // open to S3 and use of multiple CPU cores since S3 reads are relatively compute
 // expensive (SSL and JNI buffer overheads).
-DEFINE_int32(num_s3_io_threads, 16, "number of S3 I/O threads");
+DEFINE_int32(num_s3_io_threads, 16, "Number of S3 I/O threads");
 // The maximum number of ADLS I/O threads. This number is a good default to have for
 // clusters that may vary widely in size, due to an undocumented concurrency limit
 // enforced by ADLS for a cluster, which spans between 500-700. For smaller clusters
 // (~10 nodes), 64 threads would be more ideal.
-DEFINE_int32(num_adls_io_threads, 16, "number of ADLS I/O threads");
+DEFINE_int32(num_adls_io_threads, 16, "Number of ADLS I/O threads");
 // The read size is the size of the reads sent to hdfs/os.
 // There is a trade off of latency and throughout, trying to keep disks busy but
 // not introduce seeks.  The literature seems to agree that with 8 MB reads, random
@@ -75,11 +96,6 @@ DEFINE_int32(max_free_io_buffers, 128,
 // or smaller, depending on the replication factor for this file or the path name.
 DEFINE_uint64(max_cached_file_handles, 20000, "Maximum number of HDFS file handles "
     "that will be cached. Disabled if set to 0.");
-
-// Rotational disks should have 1 thread per disk to minimize seeks.  Non-rotational
-// don't have this penalty and benefit from multiple concurrent IO requests.
-static const int THREADS_PER_ROTATIONAL_DISK = 1;
-static const int THREADS_PER_FLASH_DISK = 8;
 
 // The IoMgr is able to run with a wide range of memory usage. If a query has memory
 // remaining less than this value, the IoMgr will stop all buffering regardless of the
@@ -251,8 +267,19 @@ static void CheckSseSupport() {
   }
 }
 
+// Utility function to select flag that is set (has a positive value) based on precedence
+static inline int GetFirstPositiveVal(const int first_val, const int second_val,
+    const int default_val) {
+  return first_val > 0 ? first_val : (second_val > 0 ? second_val : default_val);
+}
+
 DiskIoMgr::DiskIoMgr() :
-    num_threads_per_disk_(FLAGS_num_threads_per_disk),
+    num_io_threads_per_rotational_disk_(GetFirstPositiveVal(
+        FLAGS_num_io_threads_per_rotational_disk, FLAGS_num_threads_per_disk,
+        THREADS_PER_ROTATIONAL_DISK)),
+    num_io_threads_per_solid_state_disk_(GetFirstPositiveVal(
+        FLAGS_num_io_threads_per_solid_state_disk, FLAGS_num_threads_per_disk,
+        THREADS_PER_SOLID_STATE_DISK)),
     max_buffer_size_(FLAGS_read_size),
     min_buffer_size_(FLAGS_min_buffer_size),
     shut_down_(false),
@@ -262,14 +289,22 @@ DiskIoMgr::DiskIoMgr() :
         FileSystemUtil::MaxNumFileHandles())) {
   int64_t max_buffer_size_scaled = BitUtil::Ceil(max_buffer_size_, min_buffer_size_);
   free_buffers_.resize(BitUtil::Log2Ceiling64(max_buffer_size_scaled) + 1);
-  int num_local_disks = FLAGS_num_disks == 0 ? DiskInfo::num_disks() : FLAGS_num_disks;
+  int num_local_disks = DiskInfo::num_disks();
+  if (FLAGS_num_disks < 0 || FLAGS_num_disks > DiskInfo::num_disks()) {
+    LOG(WARNING) << "Number of disks specified should be between 0 and the number of "
+        "logical disks on the system. Defaulting to system setting of " <<
+        DiskInfo::num_disks() << " disks";
+  } else if (FLAGS_num_disks > 0) {
+    num_local_disks = FLAGS_num_disks;
+  }
   disk_queues_.resize(num_local_disks + REMOTE_NUM_DISKS);
   CheckSseSupport();
 }
 
-DiskIoMgr::DiskIoMgr(int num_local_disks, int threads_per_disk, int min_buffer_size,
-                     int max_buffer_size) :
-    num_threads_per_disk_(threads_per_disk),
+DiskIoMgr::DiskIoMgr(int num_local_disks, int threads_per_rotational_disk,
+    int threads_per_solid_state_disk, int min_buffer_size, int max_buffer_size) :
+    num_io_threads_per_rotational_disk_(threads_per_rotational_disk),
+    num_io_threads_per_solid_state_disk_(threads_per_solid_state_disk),
     max_buffer_size_(max_buffer_size),
     min_buffer_size_(min_buffer_size),
     shut_down_(false),
@@ -346,12 +381,10 @@ Status DiskIoMgr::Init(MemTracker* process_mem_tracker) {
       num_threads_per_disk = FLAGS_num_s3_io_threads;
     } else if (i == RemoteAdlsDiskId()) {
       num_threads_per_disk = FLAGS_num_adls_io_threads;
-    } else if (num_threads_per_disk_ != 0) {
-      num_threads_per_disk = num_threads_per_disk_;
     } else if (DiskInfo::is_rotational(i)) {
-      num_threads_per_disk = THREADS_PER_ROTATIONAL_DISK;
+      num_threads_per_disk = num_io_threads_per_rotational_disk_;
     } else {
-      num_threads_per_disk = THREADS_PER_FLASH_DISK;
+      num_threads_per_disk = num_io_threads_per_solid_state_disk_;
     }
     for (int j = 0; j < num_threads_per_disk; ++j) {
       stringstream ss;

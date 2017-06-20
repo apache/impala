@@ -340,6 +340,10 @@ void ThreadGroup::JoinAll() {
   for (const Thread& thread: threads_) thread.Join();
 }
 
+int ThreadGroup::Size() const {
+  return threads_.size();
+}
+
 namespace {
 
 void RegisterUrlCallbacks(bool include_jvm_threads, Webserver* webserver) {

@@ -76,7 +76,7 @@ public class SentryServicePinger {
         LOG.info("Sentry Service ping succeeded.");
         System.exit(0);
       } catch (Exception e) {
-        LOG.error(String.format("Error issing RPC to Sentry Service (attempt %d/%d): ",
+        LOG.error(String.format("Error issuing RPC to Sentry Service (attempt %d/%d): ",
             maxPings - numPings + 1, maxPings), e);
         Thread.sleep(sleepSecs * 1000);
       }

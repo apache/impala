@@ -628,15 +628,17 @@ class DiskIoMgr : public CacheLineAligned {
     WriteDoneCallback callback_;
   };
 
-  /// Create a DiskIoMgr object.
+  /// Create a DiskIoMgr object. This constructor is only used for testing.
   ///  - num_disks: The number of disks the IoMgr should use. This is used for testing.
   ///    Specify 0, to have the disk IoMgr query the os for the number of disks.
-  ///  - threads_per_disk: number of read threads to create per disk. This is also
-  ///    the max queue depth.
+  ///  - threads_per_rotational_disk: number of read threads to create per rotational
+  ///    disk. This is also the max queue depth.
+  ///  - threads_per_solid_state_disk: number of read threads to create per solid state
+  ///    disk. This is also the max queue depth.
   ///  - min_buffer_size: minimum io buffer size (in bytes)
   ///  - max_buffer_size: maximum io buffer size (in bytes). Also the max read size.
-  DiskIoMgr(int num_disks, int threads_per_disk, int min_buffer_size,
-      int max_buffer_size);
+  DiskIoMgr(int num_disks, int threads_per_rotational_disk,
+      int threads_per_solid_state_disk, int min_buffer_size, int max_buffer_size);
 
   /// Create DiskIoMgr with default configs.
   DiskIoMgr();
@@ -817,6 +819,7 @@ class DiskIoMgr : public CacheLineAligned {
   class RequestContextCache;
 
   friend class DiskIoMgrTest_Buffers_Test;
+  friend class DiskIoMgrTest_VerifyNumThreadsParameter_Test;
 
   /// Memory tracker for unused I/O buffers owned by DiskIoMgr.
   boost::scoped_ptr<MemTracker> free_buffer_mem_tracker_;
@@ -826,9 +829,13 @@ class DiskIoMgr : public CacheLineAligned {
   /// provide a MemTracker.
   boost::scoped_ptr<MemTracker> unowned_buffer_mem_tracker_;
 
-  /// Number of worker(read) threads per disk. Also the max depth of queued
+  /// Number of worker(read) threads per rotational disk. Also the max depth of queued
   /// work to the disk.
-  const int num_threads_per_disk_;
+  const int num_io_threads_per_rotational_disk_;
+
+  /// Number of worker(read) threads per solid state disk. Also the max depth of queued
+  /// work to the disk.
+  const int num_io_threads_per_solid_state_disk_;
 
   /// Maximum read size. This is also the maximum size of each allocated buffer.
   const int max_buffer_size_;

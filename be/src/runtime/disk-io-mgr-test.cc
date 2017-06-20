@@ -33,6 +33,10 @@
 
 #include "common/names.h"
 
+DECLARE_int32(num_remote_hdfs_io_threads);
+DECLARE_int32(num_s3_io_threads);
+DECLARE_int32(num_adls_io_threads);
+
 using boost::condition_variable;
 
 const int MIN_BUFFER_SIZE = 512;
@@ -200,7 +204,7 @@ TEST_F(DiskIoMgrTest, SingleWriter) {
     EXPECT_TRUE(false);
   }
 
-  scoped_ptr<DiskIoMgr> read_io_mgr(new DiskIoMgr(1, 1, 1, 10));
+  scoped_ptr<DiskIoMgr> read_io_mgr(new DiskIoMgr(1, 1, 1, 1, 10));
   MemTracker reader_mem_tracker(LARGE_MEM_LIMIT);
   ASSERT_OK(read_io_mgr->Init(&reader_mem_tracker));
   DiskIoRequestContext* reader;
@@ -208,7 +212,7 @@ TEST_F(DiskIoMgrTest, SingleWriter) {
   for (int num_threads_per_disk = 1; num_threads_per_disk <= 5; ++num_threads_per_disk) {
     for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
       pool_.reset(new ObjectPool);
-      DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1, 10);
+      DiskIoMgr io_mgr(num_disks, num_threads_per_disk, num_threads_per_disk, 1, 10);
       ASSERT_OK(io_mgr.Init(&mem_tracker));
       DiskIoRequestContext* writer;
       io_mgr.RegisterContext(&writer, &mem_tracker);
@@ -245,7 +249,7 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
   MemTracker mem_tracker(LARGE_MEM_LIMIT);
   num_ranges_written_ = 0;
   string tmp_file = "/non-existent/file.txt";
-  DiskIoMgr io_mgr(1, 1, 1, 10);
+  DiskIoMgr io_mgr(1, 1, 1, 1, 10);
   ASSERT_OK(io_mgr.Init(&mem_tracker));
   DiskIoRequestContext* writer;
   io_mgr.RegisterContext(&writer, NULL);
@@ -306,7 +310,7 @@ TEST_F(DiskIoMgrTest, SingleWriterCancel) {
     EXPECT_TRUE(false);
   }
 
-  scoped_ptr<DiskIoMgr> read_io_mgr(new DiskIoMgr(1, 1, 1, 10));
+  scoped_ptr<DiskIoMgr> read_io_mgr(new DiskIoMgr(1, 1, 1, 1, 10));
   MemTracker reader_mem_tracker(LARGE_MEM_LIMIT);
   ASSERT_OK(read_io_mgr->Init(&reader_mem_tracker));
   DiskIoRequestContext* reader;
@@ -314,7 +318,7 @@ TEST_F(DiskIoMgrTest, SingleWriterCancel) {
   for (int num_threads_per_disk = 1; num_threads_per_disk <= 5; ++num_threads_per_disk) {
     for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
       pool_.reset(new ObjectPool);
-      DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1, 10);
+      DiskIoMgr io_mgr(num_disks, num_threads_per_disk, num_threads_per_disk, 1, 10);
       ASSERT_OK(io_mgr.Init(&mem_tracker));
       DiskIoRequestContext* writer;
       io_mgr.RegisterContext(&writer, &mem_tracker);
@@ -376,7 +380,7 @@ TEST_F(DiskIoMgrTest, SingleReader) {
                     << " num_read_threads=" << num_read_threads;
 
           if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
-          DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1, 1);
+          DiskIoMgr io_mgr(num_disks, num_threads_per_disk, num_threads_per_disk, 1, 1);
 
           ASSERT_OK(io_mgr.Init(&mem_tracker));
           MemTracker reader_mem_tracker;
@@ -430,7 +434,7 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
                   << " num_disk=" << num_disks << " num_buffers=" << num_buffers;
 
         if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
-        DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1, 1);
+        DiskIoMgr io_mgr(num_disks, num_threads_per_disk, num_threads_per_disk, 1, 1);
 
         ASSERT_OK(io_mgr.Init(&mem_tracker));
         MemTracker reader_mem_tracker;
@@ -502,8 +506,8 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
                   << " num_disk=" << num_disks << " num_buffers=" << num_buffers;
 
         if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
-        DiskIoMgr io_mgr(
-            num_disks, num_threads_per_disk, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
+        DiskIoMgr io_mgr(num_disks, num_threads_per_disk, num_threads_per_disk,
+            MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
 
         ASSERT_OK(io_mgr.Init(&mem_tracker));
         MemTracker reader_mem_tracker;
@@ -573,7 +577,7 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
                   << " num_disk=" << num_disks << " num_buffers=" << num_buffers;
 
         if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
-        DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1, 1);
+        DiskIoMgr io_mgr(num_disks, num_threads_per_disk, num_threads_per_disk, 1, 1);
 
         ASSERT_OK(io_mgr.Init(&mem_tracker));
         MemTracker reader_mem_tracker;
@@ -638,7 +642,7 @@ TEST_F(DiskIoMgrTest, MemLimits) {
     if (++iters % 1000 == 0) LOG(ERROR) << "Starting iteration " << iters;
 
     MemTracker root_mem_tracker(mem_limit_num_buffers * MAX_BUFFER_SIZE);
-    DiskIoMgr io_mgr(1, 1, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
+    DiskIoMgr io_mgr(1, 1, 1, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
 
     ASSERT_OK(io_mgr.Init(&root_mem_tracker));
     MemTracker reader_mem_tracker(-1, "Reader", &root_mem_tracker);
@@ -713,7 +717,7 @@ TEST_F(DiskIoMgrTest, CachedReads) {
   {
     pool_.reset(new ObjectPool);
     if (++iters % 5000 == 0) LOG(ERROR) << "Starting iteration " << iters;
-    DiskIoMgr io_mgr(num_disks, 1, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
+    DiskIoMgr io_mgr(num_disks, 1, 1, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
 
     ASSERT_OK(io_mgr.Init(&mem_tracker));
     MemTracker reader_mem_tracker;
@@ -787,7 +791,8 @@ TEST_F(DiskIoMgrTest, MultipleReaderWriter) {
   for (int iteration = 0; iteration < ITERATIONS; ++iteration) {
     for (int threads_per_disk = 1; threads_per_disk <= 5; ++threads_per_disk) {
       for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
-        DiskIoMgr io_mgr(num_disks, threads_per_disk, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
+        DiskIoMgr io_mgr(num_disks, threads_per_disk, threads_per_disk, MIN_BUFFER_SIZE,
+            MAX_BUFFER_SIZE);
         ASSERT_OK(io_mgr.Init(&mem_tracker));
         for (int file_index = 0; file_index < num_contexts; ++file_index) {
           io_mgr.RegisterContext(&contexts[file_index], &mem_tracker);
@@ -900,7 +905,8 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
                     << " num_disk=" << num_disks << " num_buffers=" << num_buffers;
           if (++iters % 2500 == 0) LOG(ERROR) << "Starting iteration " << iters;
 
-          DiskIoMgr io_mgr(num_disks, threads_per_disk, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
+          DiskIoMgr io_mgr(num_disks, threads_per_disk, threads_per_disk, MIN_BUFFER_SIZE,
+              MAX_BUFFER_SIZE);
           EXPECT_OK(io_mgr.Init(&mem_tracker));
 
           for (int i = 0; i < NUM_READERS; ++i) {
@@ -952,7 +958,7 @@ TEST_F(DiskIoMgrTest, Buffers) {
   int max_buffer_size = 8 * 1024 * 1024; // 8 MB
   MemTracker root_mem_tracker(max_buffer_size * 2);
 
-  DiskIoMgr io_mgr(1, 1, min_buffer_size, max_buffer_size);
+  DiskIoMgr io_mgr(1, 1, 1, min_buffer_size, max_buffer_size);
   ASSERT_OK(io_mgr.Init(&root_mem_tracker));
   ASSERT_EQ(root_mem_tracker.consumption(), 0);
 
@@ -1029,7 +1035,7 @@ TEST_F(DiskIoMgrTest, PartialRead) {
   struct stat stat_val;
   stat(tmp_file, &stat_val);
 
-  scoped_ptr<DiskIoMgr> io_mgr(new DiskIoMgr(1, 1, read_len, read_len));
+  scoped_ptr<DiskIoMgr> io_mgr(new DiskIoMgr(1, 1, 1, read_len, read_len));
 
   ASSERT_OK(io_mgr->Init(&mem_tracker));
   MemTracker reader_mem_tracker;
@@ -1061,7 +1067,7 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBuffer) {
   int read_len = 4; // Make buffer size smaller than client-provided buffer.
   CreateTempFile(tmp_file, data);
 
-  scoped_ptr<DiskIoMgr> io_mgr(new DiskIoMgr(1, 1, read_len, read_len));
+  scoped_ptr<DiskIoMgr> io_mgr(new DiskIoMgr(1, 1, 1, read_len, read_len));
 
   ASSERT_OK(io_mgr->Init(&mem_tracker));
   // Reader doesn't need to provide mem tracker if it's providing buffers.
@@ -1101,7 +1107,7 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBufferError) {
   const char* tmp_file = "/file/that/does/not/exist";
   const int SCAN_LEN = 128;
 
-  scoped_ptr<DiskIoMgr> io_mgr(new DiskIoMgr(1, 1, SCAN_LEN, SCAN_LEN));
+  scoped_ptr<DiskIoMgr> io_mgr(new DiskIoMgr(1, 1, 1, SCAN_LEN, SCAN_LEN));
 
   ASSERT_OK(io_mgr->Init(&mem_tracker));
   // Reader doesn't need to provide mem tracker if it's providing buffers.
@@ -1131,6 +1137,24 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBufferError) {
   pool_.reset();
   io_mgr.reset();
   EXPECT_EQ(mem_tracker.consumption(), 0);
+}
+
+// Test to verify configuration parameters for number of I/O threads per disk.
+TEST_F(DiskIoMgrTest, VerifyNumThreadsParameter) {
+  const int num_io_threads_for_remote_disks = FLAGS_num_remote_hdfs_io_threads
+      + FLAGS_num_s3_io_threads + FLAGS_num_adls_io_threads;
+
+  // Verify num_io_threads_per_rotational_disk and num_io_threads_per_solid_state_disk.
+  // Since we do not have control over which disk is used, we check for either type
+  // (rotational/solid state)
+  MemTracker mem_tracker(LARGE_MEM_LIMIT);
+  const int num_io_threads_per_rotational_or_ssd = 2;
+  DiskIoMgr io_mgr(1, num_io_threads_per_rotational_or_ssd,
+      num_io_threads_per_rotational_or_ssd, 1, 10);
+  ASSERT_OK(io_mgr.Init(&mem_tracker));
+  const int num_io_threads = io_mgr.disk_thread_group_.Size();
+  ASSERT_TRUE(num_io_threads ==
+      num_io_threads_per_rotational_or_ssd + num_io_threads_for_remote_disks);
 }
 }
 
