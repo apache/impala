@@ -72,7 +72,7 @@ fi
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=411-56f2cd654f
+export IMPALA_TOOLCHAIN_BUILD_ID=412-4a0bb605de
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p4
@@ -120,7 +120,7 @@ if [[ $OSTYPE == "darwin"* ]]; then
 fi
 
 # Kudu version in the toolchain; provides libkudu_client.so and minicluster binaries.
-export IMPALA_KUDU_VERSION=1.4.0-RC1
+export IMPALA_KUDU_VERSION=c0798a9
 
 # Kudu version used to identify Java client jar from maven
 export KUDU_JAVA_VERSION=1.5.0-cdh5.13.0-SNAPSHOT
