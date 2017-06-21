@@ -50,11 +50,8 @@ class Literal: public ScalarExpr {
       override WARN_UNUSED_RESULT;
   virtual std::string DebugString() const override;
 
-  /// Test function that parses 'str' according to 'type'. The caller owns the returned
-  /// Literal.
-  static Literal* CreateLiteral(const ColumnType& type, const std::string& str);
-
  protected:
+  friend class ExprTest;
   friend class ScalarExpr;
   friend class ScalarExprEvaluator;
 

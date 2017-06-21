@@ -49,6 +49,7 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/string-value.h"
+#include "runtime/timestamp-parse-util.h"
 #include "runtime/timestamp-value.h"
 #include "service/fe-support.h"
 #include "service/impala-server.h"
@@ -1013,6 +1014,20 @@ class ExprTest : public testing::Test {
   template<typename T>
   TimestampValue CreateTestTimestamp(T val);
 
+  // Parse the given string representation of a value into 'val' of type T.
+  // Returns false on parse failure.
+  template<class T>
+  bool ParseString(const string& str, T* val);
+
+  // Create a Literal expression out of 'str'.
+  Literal* CreateLiteral(const ColumnType& type, const string& str);
+
+  // Helper function for LiteralConstruction test. Creates a Literal expression
+  // of 'type' from 'str' and verifies it compares equally to 'value'.
+  template <typename T>
+  void TestSingleLiteralConstruction(
+      const ColumnType& type, const T& value, const string& string_val);
+
   // Test casting stmt to all types.  Expected result is val.
   template<typename T>
   void TestCast(const string& stmt, T val, bool timestamp_out_of_range = false) {
@@ -1135,15 +1150,89 @@ void ExprTest::TestValidTimestampValue(const string& expr) {
       ConvertValue<TimestampValue>(GetValue(expr, TYPE_TIMESTAMP)).HasDateOrTime());
 }
 
+template<class T>
+bool ExprTest::ParseString(const string& str, T* val) {
+  istringstream stream(str);
+  stream >> *val;
+  return !stream.fail();
+}
+
+template<>
+bool ExprTest::ParseString(const string& str, TimestampValue* val) {
+  boost::gregorian::date date;
+  boost::posix_time::time_duration time;
+  bool success = TimestampParser::Parse(str.data(), str.length(), &date, &time);
+  val->set_date(date);
+  val->set_time(time);
+  return success;
+}
+
+Literal* ExprTest::CreateLiteral(const ColumnType& type, const string& str) {
+  switch (type.type) {
+    case TYPE_BOOLEAN: {
+      bool v = false;
+      EXPECT_TRUE(ParseString<bool>(str, &v));
+      return new Literal(type, v);
+    }
+    case TYPE_TINYINT: {
+      int8_t v = 0;
+      EXPECT_TRUE(ParseString<int8_t>(str, &v));
+      return new Literal(type, v);
+    }
+    case TYPE_SMALLINT: {
+      int16_t v = 0;
+      EXPECT_TRUE(ParseString<int16_t>(str, &v));
+      return new Literal(type, v);
+    }
+    case TYPE_INT: {
+      int32_t v = 0;
+      EXPECT_TRUE(ParseString<int32_t>(str, &v));
+      return new Literal(type, v);
+    }
+    case TYPE_BIGINT: {
+      int64_t v = 0;
+      EXPECT_TRUE(ParseString<int64_t>(str, &v));
+      return new Literal(type, v);
+    }
+    case TYPE_FLOAT: {
+      float v = 0;
+      EXPECT_TRUE(ParseString<float>(str, &v));
+      return new Literal(type, v);
+    }
+    case TYPE_DOUBLE: {
+      double v = 0;
+      EXPECT_TRUE(ParseString<double>(str, &v));
+      return new Literal(type, v);
+    }
+    case TYPE_STRING:
+    case TYPE_VARCHAR:
+    case TYPE_CHAR:
+      return new Literal(type, str);
+    case TYPE_TIMESTAMP: {
+      TimestampValue v;
+      EXPECT_TRUE(ParseString<TimestampValue>(str, &v));
+      return new Literal(type, v);
+    }
+    case TYPE_DECIMAL: {
+      double v = 0;
+      EXPECT_TRUE(ParseString<double>(str, &v));
+      return new Literal(type, v);
+    }
+    default:
+      DCHECK(false) << "Invalid type: " << type.DebugString();
+      return nullptr;
+  }
+}
+
 template <typename T>
-void TestSingleLiteralConstruction(
+void ExprTest::TestSingleLiteralConstruction(
     const ColumnType& type, const T& value, const string& string_val) {
   ObjectPool pool;
   RuntimeState state(TQueryCtx(), ExecEnv::GetInstance());
   MemTracker tracker;
   MemPool mem_pool(&tracker);
 
-  ScalarExpr* expr = Literal::CreateLiteral(type, string_val);
+  Literal* expr = CreateLiteral(type, string_val);
   ScalarExprEvaluator* eval;
   EXPECT_OK(ScalarExprEvaluator::Create(*expr, &state, &pool, &mem_pool, &eval));
   EXPECT_OK(eval->Open(&state));
@@ -6126,9 +6215,9 @@ TEST_F(ExprTest, ResultsLayoutTest) {
     // With one expr, all offsets should be 0.
     expected_offsets[t.GetByteSize()] = set<int>({0});
     if (t.type != TYPE_TIMESTAMP) {
-      exprs.push_back(pool.Add(Literal::CreateLiteral(t, "0")));
+      exprs.push_back(pool.Add(CreateLiteral(t, "0")));
     } else {
-      exprs.push_back(pool.Add(Literal::CreateLiteral(t, "2016-11-09")));
+      exprs.push_back(pool.Add(CreateLiteral(t, "2016-11-09")));
     }
     if (t.IsVarLenStringType()) {
       ValidateLayout(exprs, 16, 0, expected_offsets);
@@ -6144,28 +6233,28 @@ TEST_F(ExprTest, ResultsLayoutTest) {
 
   // Test layout adding a bunch of exprs.  This is designed to trigger padding.
   // The expected result is computed along the way
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_BOOLEAN, "0")));
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TINYINT, "0")));
-  exprs.push_back(pool.Add(Literal::CreateLiteral(ColumnType::CreateCharType(1), "0")));
+  exprs.push_back(pool.Add(CreateLiteral(TYPE_BOOLEAN, "0")));
+  exprs.push_back(pool.Add(CreateLiteral(TYPE_TINYINT, "0")));
+  exprs.push_back(pool.Add(CreateLiteral(ColumnType::CreateCharType(1), "0")));
   expected_offsets[1].insert(expected_byte_size);
   expected_offsets[1].insert(expected_byte_size + 1);
   expected_offsets[1].insert(expected_byte_size + 2);
   expected_byte_size += 3 * 1 + 1;  // 1 byte of padding
 
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_SMALLINT, "0")));
+  exprs.push_back(pool.Add(CreateLiteral(TYPE_SMALLINT, "0")));
   expected_offsets[2].insert(expected_byte_size);
   expected_byte_size += 2; // No padding before CHAR
 
-  exprs.push_back(pool.Add(Literal::CreateLiteral(ColumnType::CreateCharType(3), "0")));
+  exprs.push_back(pool.Add(CreateLiteral(ColumnType::CreateCharType(3), "0")));
   expected_offsets[3].insert(expected_byte_size);
   expected_byte_size += 3 + 3; // 3 byte of padding
   ASSERT_EQ(expected_byte_size % 4, 0);
 
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_INT, "0")));
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_FLOAT, "0")));
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_FLOAT, "0")));
+  exprs.push_back(pool.Add(CreateLiteral(TYPE_INT, "0")));
+  exprs.push_back(pool.Add(CreateLiteral(TYPE_FLOAT, "0")));
+  exprs.push_back(pool.Add(CreateLiteral(TYPE_FLOAT, "0")));
   exprs.push_back(pool.Add(
-      Literal::CreateLiteral(ColumnType::CreateDecimalType(9, 0), "0")));
+      CreateLiteral(ColumnType::CreateDecimalType(9, 0), "0")));
   expected_offsets[4].insert(expected_byte_size);
   expected_offsets[4].insert(expected_byte_size + 4);
   expected_offsets[4].insert(expected_byte_size + 8);
@@ -6173,12 +6262,12 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   expected_byte_size += 4 * 4 + 4;  // 4 bytes of padding
   ASSERT_EQ(expected_byte_size % 8, 0);
 
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_BIGINT, "0")));
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_BIGINT, "0")));
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_BIGINT, "0")));
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_DOUBLE, "0")));
+  exprs.push_back(pool.Add(CreateLiteral(TYPE_BIGINT, "0")));
+  exprs.push_back(pool.Add(CreateLiteral(TYPE_BIGINT, "0")));
+  exprs.push_back(pool.Add(CreateLiteral(TYPE_BIGINT, "0")));
+  exprs.push_back(pool.Add(CreateLiteral(TYPE_DOUBLE, "0")));
   exprs.push_back(pool.Add(
-      Literal::CreateLiteral(ColumnType::CreateDecimalType(18, 0), "0")));
+      CreateLiteral(ColumnType::CreateDecimalType(18, 0), "0")));
   expected_offsets[8].insert(expected_byte_size);
   expected_offsets[8].insert(expected_byte_size + 8);
   expected_offsets[8].insert(expected_byte_size + 16);
@@ -6187,20 +6276,20 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   expected_byte_size += 5 * 8;      // No more padding
   ASSERT_EQ(expected_byte_size % 8, 0);
 
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TIMESTAMP, "2016-11-09")));
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TIMESTAMP, "2016-11-09")));
+  exprs.push_back(pool.Add(CreateLiteral(TYPE_TIMESTAMP, "2016-11-09")));
+  exprs.push_back(pool.Add(CreateLiteral(TYPE_TIMESTAMP, "2016-11-09")));
   exprs.push_back(pool.Add(
-      Literal::CreateLiteral(ColumnType::CreateDecimalType(20, 0), "0")));
+      CreateLiteral(ColumnType::CreateDecimalType(20, 0), "0")));
   expected_offsets[16].insert(expected_byte_size);
   expected_offsets[16].insert(expected_byte_size + 16);
   expected_offsets[16].insert(expected_byte_size + 32);
   expected_byte_size += 3 * 16;
   ASSERT_EQ(expected_byte_size % 8, 0);
 
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_STRING, "0")));
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_STRING, "0")));
+  exprs.push_back(pool.Add(CreateLiteral(TYPE_STRING, "0")));
+  exprs.push_back(pool.Add(CreateLiteral(TYPE_STRING, "0")));
   exprs.push_back(pool.Add(
-      Literal::CreateLiteral(ColumnType::CreateVarcharType(1), "0")));
+      CreateLiteral(ColumnType::CreateVarcharType(1), "0")));
   expected_offsets[0].insert(expected_byte_size);
   expected_offsets[0].insert(expected_byte_size + 16);
   expected_offsets[0].insert(expected_byte_size + 32);
