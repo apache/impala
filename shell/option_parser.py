@@ -126,6 +126,13 @@ def get_option_parser(defaults):
 
   parser.add_option("-i", "--impalad", dest="impalad",
                     help="<host:port> of impalad to connect to \t\t")
+  parser.add_option("-b", "--kerberos_host_fqdn", dest="kerberos_host_fqdn",
+                    help="If set, overrides the expected hostname of the Impalad's "
+                         "kerberos service principal. impala-shell will check that "
+                         "the server's principal matches this hostname. This may be "
+                         "used when impalad is configured to be accessed via a "
+                         "load-balancer, but it is desired for impala-shell to talk "
+                         "to a specific impalad directly.")
   parser.add_option("-q", "--query", dest="query",
                     help="Execute a query without the shell")
   parser.add_option("-f", "--query_file", dest="query_file",

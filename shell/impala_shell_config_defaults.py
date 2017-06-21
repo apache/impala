@@ -30,6 +30,7 @@ impala_shell_defaults = {
             'history_max': 1000,
             'ignore_query_failure': False,
             'impalad': socket.getfqdn() + ':21000',
+            'kerberos_host_fqdn': None,
             'kerberos_service_name': 'impala',
             'output_delimiter': '\\t',
             'output_file': None,

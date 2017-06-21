@@ -138,6 +138,7 @@ class ImpalaShell(object, cmd.Cmd):
     self.is_alive = True
 
     self.impalad = None
+    self.kerberos_host_fqdn = options.kerberos_host_fqdn
     self.use_kerberos = options.use_kerberos
     self.kerberos_service_name = options.kerberos_service_name
     self.use_ssl = options.ssl
@@ -482,7 +483,7 @@ class ImpalaShell(object, cmd.Cmd):
     return completed_cmd
 
   def _new_impala_client(self):
-    return ImpalaClient(self.impalad, self.use_kerberos,
+    return ImpalaClient(self.impalad, self.kerberos_host_fqdn, self.use_kerberos,
                         self.kerberos_service_name, self.use_ssl,
                         self.ca_cert, self.user, self.ldap_password,
                         self.use_ldap)
