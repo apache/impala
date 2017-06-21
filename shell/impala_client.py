@@ -59,11 +59,12 @@ class QueryCancelledByShellException(Exception): pass
 
 class ImpalaClient(object):
 
-  def __init__(self, impalad, use_kerberos=False, kerberos_service_name="impala",
-               use_ssl=False, ca_cert=None, user=None, ldap_password=None,
-               use_ldap=False):
+  def __init__(self, impalad, kerberos_host_fqdn, use_kerberos=False,
+               kerberos_service_name="impala", use_ssl=False, ca_cert=None, user=None,
+               ldap_password=None, use_ldap=False):
     self.connected = False
     self.impalad = impalad
+    self.kerberos_host_fqdn = kerberos_host_fqdn
     self.imp_service = None
     self.transport = None
     self.use_kerberos = use_kerberos
@@ -275,7 +276,16 @@ class ImpalaClient(object):
       from TSSLSocketWithWildcardSAN import TSSLSocketWithWildcardSAN
 
     # sasl does not accept unicode strings, explicitly encode the string into ascii.
-    host, port = self.impalad[0].encode('ascii', 'ignore'), int(self.impalad[1])
+    # The kerberos_host_fqdn option exposes the SASL client's hostname attribute to
+    # the user. impala-shell checks to ensure this host matches the host in the kerberos
+    # principal. So in the presence of a load balancer, the its hostname is expected by
+    # impala-shell. Setting this option to the load balancer hostname allows impala-shell to
+    # connect directly to an impalad.
+    if self.kerberos_host_fqdn is not None:
+      host, port = (self.kerberos_host_fqdn.split(':')[0].encode('ascii', 'ignore'),
+            int(self.impalad[1]))
+    else:
+      host, port = self.impalad[0].encode('ascii', 'ignore'), int(self.impalad[1])
     if self.use_ssl:
       if self.ca_cert is None:
         # No CA cert means don't try to verify the certificate
