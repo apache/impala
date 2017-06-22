@@ -543,3 +543,10 @@ PLAN-ROOT SINK
 |
 00:EMPTYSET
 ====
+# IMPALA-5562: Relative table ref and limit 0.
+select * from tpch_nested_parquet.customer c, c.c_orders limit 0
+---- PLAN
+PLAN-ROOT SINK
+|
+00:EMPTYSET
+====

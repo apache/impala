@@ -239,6 +239,8 @@ public class SingleNodePlanner {
       Preconditions.checkState(collExpr instanceof SlotRef);
       SlotRef collSlotRef = (SlotRef) collExpr;
       collSlotRef.getDesc().setIsMaterialized(false);
+      // Re-compute the mem layout if necessary. The tuple may not have a mem layout if
+      // no plan has been generated for the TableRef (e.g. due to limit 0 or similar).
       collSlotRef.getDesc().getParent().recomputeMemLayout();
     }
   }
