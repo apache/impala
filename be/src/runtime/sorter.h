@@ -38,15 +38,19 @@ class RowBatch;
 /// AddBatch() is used to add input rows to be sorted. Multiple tuples in an input row are
 /// materialized into a row with a single tuple (the sort tuple) using the materialization
 /// exprs in sort_tuple_exprs_. The sort tuples are sorted according to the sort
-/// parameters and output by the sorter.
-/// AddBatch() can be called multiple times.
+/// parameters and output by the sorter. AddBatch() can be called multiple times.
+//
+/// Callers that don't want to spill can use AddBatchNoSpill() instead, which only adds
+/// rows up to the memory limit and then returns the number of rows that were added.
+/// For this use case, 'enable_spill' should be set to false so that the sorter can reduce
+/// the number of buffers requested from the block mgr since there won't be merges.
 //
 /// InputDone() is called to indicate the end of input. If multiple sorted runs were
 /// created, it triggers intermediate merge steps (if necessary) and creates the final
 /// merger that returns results via GetNext().
 //
 /// GetNext() is used to retrieve sorted rows. It can be called multiple times.
-/// AddBatch(), InputDone() and GetNext() must be called in that order.
+/// AddBatch()/AddBatchNoSpill(), InputDone() and GetNext() must be called in that order.
 //
 /// Batches of input rows are collected into a sequence of pinned BufferedBlockMgr blocks
 /// called a run. The maximum size of a run is determined by the number of blocks that
@@ -92,11 +96,13 @@ class Sorter {
   /// 'sort_tuple_exprs' are the slot exprs used to materialize the tuples to be
   /// sorted. 'compare_less_than' is a comparator for the sort tuples (returns true if
   /// lhs < rhs). 'merge_batch_size_' is the size of the batches created to provide rows
-  /// to the merger and retrieve rows from an intermediate merger.
+  /// to the merger and retrieve rows from an intermediate merger. 'enable_spilling'
+  /// should be set to false to reduce the number of requested buffers if the caller will
+  /// use AddBatchNoSpill().
   Sorter(const TupleRowComparator& compare_less_than,
-      const std::vector<ScalarExpr*>& sort_tuple_exprs,
-      RowDescriptor* output_row_desc, MemTracker* mem_tracker,
-      RuntimeProfile* profile, RuntimeState* state);
+      const std::vector<ScalarExpr*>& sort_tuple_exprs, RowDescriptor* output_row_desc,
+      MemTracker* mem_tracker, RuntimeProfile* profile, RuntimeState* state,
+      bool enable_spilling = true);
 
   ~Sorter();
 
@@ -109,8 +115,15 @@ class Sorter {
   /// the tuples. Must be called after Prepare() or Reset() and before calling AddBatch().
   Status Open() WARN_UNUSED_RESULT;
 
-  /// Adds a batch of input rows to the current unsorted run.
+  /// Adds the entire batch of input rows to the sorter. If the current unsorted run fills
+  /// up, it is sorted and a new unsorted run is created. Cannot be called if
+  /// 'enable_spill' is false.
   Status AddBatch(RowBatch* batch) WARN_UNUSED_RESULT;
+
+  /// Adds input rows to the current unsorted run, starting from 'start_index' up to the
+  /// memory limit. Returns the number of rows added in 'num_processed'.
+  Status AddBatchNoSpill(
+      RowBatch* batch, int start_index, int* num_processed) WARN_UNUSED_RESULT;
 
   /// Called to indicate there is no more input. Triggers the creation of merger(s) if
   /// necessary.
@@ -191,6 +204,9 @@ class Sorter {
   /// sorting. Not owned by the Sorter.
   RowDescriptor* output_row_desc_;
 
+  /// True if this sorter can spill. Used to determine the number of buffers to reserve.
+  bool enable_spilling_;
+
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
 
@@ -242,6 +258,9 @@ class Sorter {
 
   /// Total size of the initial runs in bytes.
   RuntimeProfile::Counter* sorted_data_size_;
+
+  /// Min, max, and avg size of runs in number of tuples.
+  RuntimeProfile::SummaryStatsCounter* run_sizes_;
 };
 
 } // namespace impala

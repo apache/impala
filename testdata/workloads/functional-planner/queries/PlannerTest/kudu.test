@@ -50,7 +50,7 @@ INSERT INTO KUDU [functional_kudu.testtbl]
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
 |
-02:SORT
+02:PARTIAL SORT
 |  order by: KuduPartition(10) ASC NULLS LAST, 10 ASC NULLS LAST
 |
 01:EXCHANGE [KUDU(KuduPartition(10))]
@@ -66,7 +66,7 @@ INSERT INTO KUDU [functional_kudu.testtbl]
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
 |
-02:SORT
+02:PARTIAL SORT
 |  order by: KuduPartition(int_col) ASC NULLS LAST, int_col ASC NULLS LAST
 |
 01:EXCHANGE [KUDU(KuduPartition(int_col))]
@@ -90,7 +90,7 @@ INSERT INTO KUDU [functional_kudu.testtbl]
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
 |
-06:SORT
+06:PARTIAL SORT
 |  order by: KuduPartition(count(id)) ASC NULLS LAST, count(id) ASC NULLS LAST
 |
 05:EXCHANGE [KUDU(KuduPartition(count(id)))]
@@ -264,7 +264,7 @@ INSERT INTO KUDU [functional_kudu.alltypes]
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.alltypes]
 |
-02:SORT
+02:PARTIAL SORT
 |  order by: KuduPartition(functional_kudu.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
 |
 01:EXCHANGE [KUDU(KuduPartition(functional_kudu.alltypes.id))]
@@ -288,7 +288,7 @@ INSERT INTO KUDU [functional_kudu.testtbl]
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
 |
-05:SORT
+05:PARTIAL SORT
 |  order by: KuduPartition(id) ASC NULLS LAST, id ASC NULLS LAST
 |
 04:EXCHANGE [KUDU(KuduPartition(id))]
@@ -394,7 +394,7 @@ insert into functional_kudu.alltypes /* +noshuffle */ select * from functional.a
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.alltypes]
 |
-01:SORT
+01:PARTIAL SORT
 |  order by: KuduPartition(functional.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
 |
 00:SCAN HDFS [functional.alltypes]

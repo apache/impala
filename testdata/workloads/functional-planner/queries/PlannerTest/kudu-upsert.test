@@ -10,7 +10,7 @@ UPSERT INTO KUDU [functional_kudu.testtbl]
 ---- DISTRIBUTEDPLAN
 UPSERT INTO KUDU [functional_kudu.testtbl]
 |
-02:SORT
+02:PARTIAL SORT
 |  order by: KuduPartition(bigint_col) ASC NULLS LAST, bigint_col ASC NULLS LAST
 |
 01:EXCHANGE [KUDU(KuduPartition(bigint_col))]
@@ -51,7 +51,7 @@ UPSERT INTO KUDU [functional_kudu.testtbl]
 ---- DISTRIBUTEDPLAN
 UPSERT INTO KUDU [functional_kudu.testtbl]
 |
-08:SORT
+08:PARTIAL SORT
 |  order by: KuduPartition(a.bigint_col) ASC NULLS LAST, bigint_col ASC NULLS LAST
 |
 07:EXCHANGE [KUDU(KuduPartition(a.bigint_col))]
@@ -97,7 +97,7 @@ UPSERT INTO KUDU [functional_kudu.testtbl]
 ---- DISTRIBUTEDPLAN
 UPSERT INTO KUDU [functional_kudu.testtbl]
 |
-05:SORT
+05:PARTIAL SORT
 |  order by: KuduPartition(id) ASC NULLS LAST, id ASC NULLS LAST
 |
 04:EXCHANGE [KUDU(KuduPartition(id))]
@@ -125,7 +125,7 @@ UPSERT INTO KUDU [functional_kudu.testtbl]
 ---- DISTRIBUTEDPLAN
 UPSERT INTO KUDU [functional_kudu.testtbl]
 |
-02:SORT
+02:PARTIAL SORT
 |  order by: KuduPartition(functional_kudu.testtbl.id) ASC NULLS LAST, id ASC NULLS LAST
 |
 01:EXCHANGE [KUDU(KuduPartition(functional_kudu.testtbl.id))]
@@ -148,7 +148,7 @@ UPSERT INTO KUDU [functional_kudu.testtbl]
 ---- DISTRIBUTEDPLAN
 UPSERT INTO KUDU [functional_kudu.testtbl]
 |
-04:SORT
+04:PARTIAL SORT
 |  order by: KuduPartition(id) ASC NULLS LAST, id ASC NULLS LAST
 |
 03:EXCHANGE [KUDU(KuduPartition(id))]
@@ -175,7 +175,7 @@ UPSERT INTO KUDU [functional_kudu.alltypes]
 ---- DISTRIBUTEDPLAN
 UPSERT INTO KUDU [functional_kudu.alltypes]
 |
-05:SORT
+05:PARTIAL SORT
 |  order by: KuduPartition(id) ASC NULLS LAST, id ASC NULLS LAST
 |
 04:EXCHANGE [KUDU(KuduPartition(id))]
@@ -195,7 +195,7 @@ upsert into functional_kudu.alltypes /* +noshuffle */ select * from functional.a
 ---- DISTRIBUTEDPLAN
 UPSERT INTO KUDU [functional_kudu.alltypes]
 |
-01:SORT
+01:PARTIAL SORT
 |  order by: KuduPartition(functional.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
 |
 00:SCAN HDFS [functional.alltypes]
@@ -216,7 +216,7 @@ upsert into functional_kudu.alltypes /* +noshuffle */ select * from functional.a
 ---- DISTRIBUTEDPLAN
 UPSERT INTO KUDU [functional_kudu.alltypes]
 |
-01:SORT
+01:PARTIAL SORT
 |  order by: KuduPartition(functional.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
 |
 00:SCAN HDFS [functional.alltypes]

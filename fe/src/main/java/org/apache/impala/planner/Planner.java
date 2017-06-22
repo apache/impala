@@ -547,11 +547,13 @@ public class Planner {
        Analyzer analyzer) throws ImpalaException {
     List<Expr> orderingExprs = Lists.newArrayList();
 
+    boolean partialSort = false;
     if (insertStmt.getTargetTable() instanceof KuduTable) {
       if (!insertStmt.hasNoClusteredHint() && !ctx_.isSingleNodeExec()) {
         orderingExprs.add(
             KuduUtil.createPartitionExpr(insertStmt, ctx_.getRootAnalyzer()));
         orderingExprs.addAll(insertStmt.getPrimaryKeyExprs());
+        partialSort = true;
       }
     } else if (insertStmt.hasClusteredHint() || !insertStmt.getSortExprs().isEmpty()) {
       // NOTE: If the table has a 'sort.columns' property and the query has a
@@ -576,10 +578,16 @@ public class Planner {
 
     insertStmt.substituteResultExprs(smap, analyzer);
 
-    SortNode sortNode = new SortNode(ctx_.getNextNodeId(), inputFragment.getPlanRoot(),
-        sortInfo, false, 0);
-    sortNode.init(analyzer);
+    PlanNode node = null;
+    if (partialSort) {
+      node = SortNode.createPartialSortNode(
+          ctx_.getNextNodeId(), inputFragment.getPlanRoot(), sortInfo);
+    } else {
+      node = SortNode.createTotalSortNode(
+          ctx_.getNextNodeId(), inputFragment.getPlanRoot(), sortInfo, 0);
+    }
+    node.init(analyzer);
 
-    inputFragment.setPlanRoot(sortNode);
+    inputFragment.setPlanRoot(node);
   }
 }

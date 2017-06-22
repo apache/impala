@@ -295,8 +295,13 @@ public class SingleNodePlanner {
       // TODO: External sort could be used for very large limits
       // not just unlimited order-by
       boolean useTopN = stmt.hasLimit() && !disableTopN;
-      root = new SortNode(ctx_.getNextNodeId(), root, stmt.getSortInfo(),
-          useTopN, stmt.getOffset());
+      if (useTopN) {
+        root = SortNode.createTopNSortNode(
+            ctx_.getNextNodeId(), root, stmt.getSortInfo(), stmt.getOffset());
+      } else {
+        root = SortNode.createTotalSortNode(
+            ctx_.getNextNodeId(), root, stmt.getSortInfo(), stmt.getOffset());
+      }
       Preconditions.checkState(root.hasValidStats());
       root.setLimit(limit);
       root.init(analyzer);

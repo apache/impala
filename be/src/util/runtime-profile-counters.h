@@ -48,6 +48,8 @@ namespace impala {
   #define ADD_TIMER(profile, name) (profile)->AddCounter(name, TUnit::TIME_NS)
   #define ADD_SUMMARY_STATS_TIMER(profile, name) \
       (profile)->AddSummaryStatsCounter(name, TUnit::TIME_NS)
+  #define ADD_SUMMARY_STATS_COUNTER(profile, name, unit) \
+      (profile)->AddSummaryStatsCounter(name, unit)
   #define ADD_CHILD_TIMER(profile, name, parent) \
       (profile)->AddCounter(name, TUnit::TIME_NS, parent)
   #define SCOPED_TIMER(c) \

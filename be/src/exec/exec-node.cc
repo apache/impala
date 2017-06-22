@@ -42,6 +42,7 @@
 #include "exec/kudu-scan-node-mt.h"
 #include "exec/kudu-util.h"
 #include "exec/nested-loop-join-node.h"
+#include "exec/partial-sort-node.h"
 #include "exec/partitioned-aggregation-node.h"
 #include "exec/partitioned-hash-join-node.h"
 #include "exec/select-node.h"
@@ -330,9 +331,12 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       *node = pool->Add(new SelectNode(pool, tnode, descs));
       break;
     case TPlanNodeType::SORT_NODE:
-      if (tnode.sort_node.use_top_n) {
+      if (tnode.sort_node.type == TSortType::PARTIAL) {
+        *node = pool->Add(new PartialSortNode(pool, tnode, descs));
+      } else if (tnode.sort_node.type == TSortType::TOPN) {
         *node = pool->Add(new TopNNode(pool, tnode, descs));
       } else {
+        DCHECK(tnode.sort_node.type == TSortType::TOTAL);
         *node = pool->Add(new SortNode(pool, tnode, descs));
       }
       break;

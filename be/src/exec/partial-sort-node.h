@@ -15,28 +15,36 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_EXEC_SORT_NODE_H
-#define IMPALA_EXEC_SORT_NODE_H
+#ifndef IMPALA_EXEC_PARTIAL_SORT_NODE_H
+#define IMPALA_EXEC_PARTIAL_SORT_NODE_H
 
 #include "exec/exec-node.h"
-#include "runtime/sorter.h"
 #include "runtime/buffered-block-mgr.h"
+#include "runtime/sorter.h"
 
 namespace impala {
 
-/// Node that implements a full sort of its input with a fixed memory budget, spilling
-/// to disk if the input is larger than available memory.
-/// Uses Sorter and BufferedBlockMgr for the external sort implementation.
-/// Input rows to SortNode are materialized by the Sorter into a single tuple
-/// using the expressions specified in sort_tuple_exprs_.
-/// In GetNext(), SortNode passes in the output batch to the sorter instance created
-/// in Open() to fill it with sorted rows.
-/// If a merge phase was performed in the sort, sorted rows are deep copied into
-/// the output batch. Otherwise, the sorter instance owns the sorted data.
-class SortNode : public ExecNode {
+/// Node that implements a partial sort, where its input is divided up into runs, each
+/// of which is sorted individually.
+///
+/// In GetNext(), PartialSortNode accepts rows up to its memory limit and sorts them,
+/// creating a single sorted run. It then outputs as many rows as fit in the output batch.
+/// Subsequent calls to GetNext() continue to ouptut rows from the sorted run until it is
+/// exhausted, at which point the next call to GetNext() will again accept rows to create
+/// another run. This means that PartialSortNode never spills to disk.
+///
+/// Uses Sorter and BufferedBlockMgr for the external sort implementation. The sorter
+/// instance owns the sorted data.
+///
+/// Input rows to PartialSortNode may consist of several tuples. The Sorter materializes
+/// them into a single tuple using the expressions specified in sort_tuple_exprs_. This
+/// single tuple is then what the sort operates on.
+///
+/// PartialSortNode does not support limits or offsets.
+class PartialSortNode : public ExecNode {
  public:
-  SortNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
-  ~SortNode();
+  PartialSortNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  ~PartialSortNode();
 
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
@@ -51,12 +59,6 @@ class SortNode : public ExecNode {
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
-  /// Fetch input rows and feed them to the sorter until the input is exhausted.
-  Status SortInput(RuntimeState* state) WARN_UNUSED_RESULT;
-
-  /// Number of rows to skip.
-  int64_t offset_;
-
   /// Compares tuples according to 'ordering_exprs'.
   boost::scoped_ptr<TupleRowComparator> less_than_;
 
@@ -76,13 +78,23 @@ class SortNode : public ExecNode {
   /// Object used for external sorting.
   boost::scoped_ptr<Sorter> sorter_;
 
-  /// Keeps track of the number of rows skipped for handling offset_.
-  int64_t num_rows_skipped_;
+  /// The current batch of rows retrieved from the input (the output of child(0)). This
+  /// allows us to store rows across calls to GetNext when the sorter run fills up.
+  std::unique_ptr<RowBatch> input_batch_;
+
+  /// The index in 'input_batch_' of the next row to be passed to the sorter.
+  int input_batch_index_;
+
+  /// True if the end of the input (the output of child(0)) has been reached.
+  bool input_eos_;
+
+  /// True if the current run in the sorter has been fully output. This node is done when
+  /// both 'sorter_eos_' and 'input_eos_' are true.
+  bool sorter_eos_;
 
   /// END: Members that must be Reset()
   /////////////////////////////////////////
 };
-
 }
 
 #endif

@@ -36,19 +36,26 @@ import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSortInfo;
 import org.apache.impala.thrift.TSortNode;
+import org.apache.impala.thrift.TSortType;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
- * Node that implements a sort with or without a limit. useTopN_ is true for sorts
- * with limits that are implemented by a TopNNode in the backend. SortNode is used
- * otherwise.
+ * Node the implements various types of sorts:
+ * - TOTAL: uses SortNode in the BE.
+ * - TOPN: uses TopNNode in the BE. Must have a limit.
+ * - PARTIAL: use PartialSortNode in the BE. Cannot have a limit or offset.
+ *
  * Will always materialize the new tuple info_.sortTupleDesc_.
  */
 public class SortNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(SortNode.class);
+
+  // Memory limit for partial sorts, specified in bytes. TODO: determine the value for
+  // this, consider making it configurable, enforce it in the BE. (IMPALA-5669)
+  private final long PARTIAL_SORT_MEM_LIMIT = 128 * 1024 * 1024;
 
   private final SortInfo info_;
 
@@ -61,24 +68,50 @@ public class SortNode extends PlanNode {
   // info_.sortTupleSlotExprs_ substituted with the outputSmap_ for materialized slots
   // in init().
   private List<Expr> resolvedTupleExprs_;
-  private final boolean useTopN_;
+
   // The offset of the first row to return.
   protected long offset_;
 
-  public SortNode(PlanNodeId id, PlanNode input, SortInfo info, boolean useTopN,
-      long offset) {
-    super(id, info.getSortTupleDescriptor().getId().asList(),
-        getDisplayName(useTopN, false));
+  // The type of sort. Determines the exec node used in the BE.
+  private TSortType type_;
+
+  /**
+   * Creates a new SortNode that implements a partial sort.
+   */
+  public static SortNode createPartialSortNode(
+      PlanNodeId id, PlanNode input, SortInfo info) {
+    return new SortNode(id, input, info, 0, TSortType.PARTIAL);
+  }
+
+  /**
+   * Creates a new SortNode with a limit that is executed with TopNNode in the BE.
+   */
+  public static SortNode createTopNSortNode(
+      PlanNodeId id, PlanNode input, SortInfo info, long offset) {
+    return new SortNode(id, input, info, offset, TSortType.TOPN);
+  }
+
+  /**
+   * Creates a new SortNode that does a total sort, possibly with a limit.
+   */
+  public static SortNode createTotalSortNode(
+      PlanNodeId id, PlanNode input, SortInfo info, long offset) {
+    return new SortNode(id, input, info, offset, TSortType.TOTAL);
+  }
+
+  private SortNode(
+      PlanNodeId id, PlanNode input, SortInfo info, long offset, TSortType type) {
+    super(id, info.getSortTupleDescriptor().getId().asList(), getDisplayName(type));
     info_ = info;
-    useTopN_ = useTopN;
     children_.add(input);
     offset_ = offset;
+    type_ = type;
   }
 
   public long getOffset() { return offset_; }
   public void setOffset(long offset) { offset_ = offset; }
   public boolean hasOffset() { return offset_ > 0; }
-  public boolean useTopN() { return useTopN_; }
+  public boolean useTopN() { return type_ == TSortType.TOPN; }
   public SortInfo getSortInfo() { return info_; }
   public void setInputPartition(DataPartition inputPartition) {
     inputPartition_ = inputPartition;
@@ -88,7 +121,7 @@ public class SortNode extends PlanNode {
   public void setIsAnalyticSort(boolean v) { isAnalyticSort_ = v; }
 
   @Override
-  public boolean isBlockingNode() { return true; }
+  public boolean isBlockingNode() { return type_ != TSortType.PARTIAL; }
 
   @Override
   public void init(Analyzer analyzer) throws InternalException {
@@ -146,6 +179,7 @@ public class SortNode extends PlanNode {
       strings.add(isAsc ? "a" : "d");
     }
     return Objects.toStringHelper(this)
+        .add("type_", type_)
         .add("ordering_exprs", Expr.debugString(info_.getOrderingExprs()))
         .add("is_asc", "[" + Joiner.on(" ").join(strings) + "]")
         .add("nulls_first", "[" + Joiner.on(" ").join(info_.getNullsFirst()) + "]")
@@ -162,7 +196,7 @@ public class SortNode extends PlanNode {
     Preconditions.checkState(tupleIds_.size() == 1,
         "Incorrect size for tupleIds_ in SortNode");
     sort_info.setSort_tuple_slot_exprs(Expr.treesToThrift(resolvedTupleExprs_));
-    TSortNode sort_node = new TSortNode(sort_info, useTopN_);
+    TSortNode sort_node = new TSortNode(sort_info, type_);
     sort_node.setOffset(offset_);
     msg.sort_node = sort_node;
   }
@@ -218,7 +252,7 @@ public class SortNode extends PlanNode {
   @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     Preconditions.checkState(hasValidStats());
-    if (useTopN_) {
+    if (type_ == TSortType.TOPN) {
       long perInstanceMemEstimate =
               (long) Math.ceil((cardinality_ + offset_) * avgRowSize_);
       nodeResourceProfile_ = new ResourceProfile(perInstanceMemEstimate, 0);
@@ -245,22 +279,39 @@ public class SortNode extends PlanNode {
     // blocks on disk and reads from both sequences when merging. This effectively
     // doubles the block size when there are var-len columns present.
     if (hasVarLenSlots) blockSize *= 2;
-    double numInputBlocks = Math.ceil(fullInputSize / blockSize);
-    long perInstanceMemEstimate = blockSize * (long) Math.ceil(Math.sqrt(numInputBlocks));
 
-    // Must be kept in sync with min_buffers_required in Sorter in be.
-    long perInstanceMinReservation = 3 * getDefaultSpillableBufferBytes();
-    if (info_.getSortTupleDescriptor().hasVarLenSlots()) {
-      perInstanceMinReservation *= 2;
+    if (type_ == TSortType.PARTIAL) {
+      // The memory limit cannot be less than the size of the required blocks.
+      long mem_limit =
+          PARTIAL_SORT_MEM_LIMIT > blockSize ? PARTIAL_SORT_MEM_LIMIT : blockSize;
+      // 'fullInputSize' will be negative if stats are missing, just use the limit.
+      long perInstanceMemEstimate = fullInputSize < 0 ?
+          mem_limit :
+          Math.min((long) Math.ceil(fullInputSize), mem_limit);
+      nodeResourceProfile_ = new ResourceProfile(perInstanceMemEstimate, blockSize);
+    } else {
+      Preconditions.checkState(type_ == TSortType.TOTAL);
+      double numInputBlocks = Math.ceil(fullInputSize / blockSize);
+      long perInstanceMemEstimate =
+          blockSize * (long) Math.ceil(Math.sqrt(numInputBlocks));
+
+      // Must be kept in sync with min_buffers_required in Sorter in be.
+      long perInstanceMinReservation = 3 * getDefaultSpillableBufferBytes();
+      if (info_.getSortTupleDescriptor().hasVarLenSlots()) {
+        perInstanceMinReservation *= 2;
+      }
+      nodeResourceProfile_ =
+          new ResourceProfile(perInstanceMemEstimate, perInstanceMinReservation);
     }
-    nodeResourceProfile_ =
-        new ResourceProfile(perInstanceMemEstimate, perInstanceMinReservation);
   }
 
-  private static String getDisplayName(boolean isTopN, boolean isMergeOnly) {
-    if (isTopN) {
+  private static String getDisplayName(TSortType type) {
+    if (type == TSortType.TOPN) {
       return "TOP-N";
+    } else if (type == TSortType.PARTIAL) {
+      return "PARTIAL SORT";
     } else {
+      Preconditions.checkState(type == TSortType.TOTAL);
       return "SORT";
     }
   }

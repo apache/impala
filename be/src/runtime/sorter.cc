@@ -1339,9 +1339,9 @@ inline void Sorter::TupleSorter::Swap(Tuple* left, Tuple* right, Tuple* swap_tup
 }
 
 Sorter::Sorter(const TupleRowComparator& compare_less_than,
-    const vector<ScalarExpr*>& sort_tuple_exprs,
-    RowDescriptor* output_row_desc, MemTracker* mem_tracker,
-    RuntimeProfile* profile, RuntimeState* state)
+    const vector<ScalarExpr*>& sort_tuple_exprs, RowDescriptor* output_row_desc,
+    MemTracker* mem_tracker, RuntimeProfile* profile, RuntimeState* state,
+    bool enable_spilling)
   : state_(state),
     compare_less_than_(compare_less_than),
     in_mem_tuple_sorter_(NULL),
@@ -1351,14 +1351,15 @@ Sorter::Sorter(const TupleRowComparator& compare_less_than,
     sort_tuple_exprs_(sort_tuple_exprs),
     mem_tracker_(mem_tracker),
     output_row_desc_(output_row_desc),
+    enable_spilling_(enable_spilling),
     unsorted_run_(NULL),
     merge_output_run_(NULL),
     profile_(profile),
     initial_runs_counter_(NULL),
     num_merges_counter_(NULL),
     in_mem_sort_timer_(NULL),
-    sorted_data_size_(NULL) {
-}
+    sorted_data_size_(NULL),
+    run_sizes_(NULL) {}
 
 Sorter::~Sorter() {
   DCHECK(sorted_runs_.empty());
@@ -1379,12 +1380,15 @@ Status Sorter::Prepare(ObjectPool* obj_pool, MemPool* expr_mem_pool) {
   num_merges_counter_ = ADD_COUNTER(profile_, "TotalMergesPerformed", TUnit::UNIT);
   in_mem_sort_timer_ = ADD_TIMER(profile_, "InMemorySortTime");
   sorted_data_size_ = ADD_COUNTER(profile_, "SortDataSize", TUnit::BYTES);
+  run_sizes_ = ADD_SUMMARY_STATS_COUNTER(profile_, "NumRowsPerRun", TUnit::UNIT);
 
+  // If spilling is enabled, we need enough buffers to perform merges. Otherwise, there
+  // won't be any merges and we only need 1 buffer.
   // Must be kept in sync with SortNode.computeResourceProfile() in fe.
-  int min_buffers_required = MIN_BUFFERS_PER_MERGE;
-  // Fixed and var-length blocks are separate, so we need MIN_BUFFERS_PER_MERGE
-  // blocks for both if there is var-length data.
-  if (has_var_len_slots_) min_buffers_required *= 2;
+  int min_buffers_required = enable_spilling_ ? MIN_BUFFERS_PER_MERGE : 1;
+  // Fixed and var-length blocks are separate, so we need twice as many blocks for both if
+  // there is var-length data.
+  if (sort_tuple_desc->HasVarlenSlots()) min_buffers_required *= 2;
 
   RETURN_IF_ERROR(block_mgr_->RegisterClient(Substitute("Sorter ptr=$0", this),
       min_buffers_required, false, mem_tracker_, state_, &block_mgr_client_));
@@ -1412,10 +1416,11 @@ void Sorter::FreeLocalAllocations() {
 Status Sorter::AddBatch(RowBatch* batch) {
   DCHECK(unsorted_run_ != NULL);
   DCHECK(batch != NULL);
+  DCHECK(enable_spilling_);
   int num_processed = 0;
   int cur_batch_index = 0;
   while (cur_batch_index < batch->num_rows()) {
-    RETURN_IF_ERROR(unsorted_run_->AddInputBatch(batch, cur_batch_index, &num_processed));
+    RETURN_IF_ERROR(AddBatchNoSpill(batch, cur_batch_index, &num_processed));
 
     cur_batch_index += num_processed;
     if (cur_batch_index < batch->num_rows()) {
@@ -1427,6 +1432,12 @@ Status Sorter::AddBatch(RowBatch* batch) {
       RETURN_IF_ERROR(unsorted_run_->Init());
     }
   }
+  return Status::OK();
+}
+
+Status Sorter::AddBatchNoSpill(RowBatch* batch, int start_index, int* num_processed) {
+  DCHECK(batch != nullptr);
+  RETURN_IF_ERROR(unsorted_run_->AddInputBatch(batch, start_index, num_processed));
   return Status::OK();
 }
 
@@ -1443,6 +1454,7 @@ Status Sorter::InputDone() {
     DCHECK(success) << "Should always be able to prepare pinned run for read.";
     return Status::OK();
   }
+  DCHECK(enable_spilling_);
 
   // Unpin the final run to free up memory for the merge.
   // TODO: we could keep it in memory in some circumstances as an optimisation, once
@@ -1498,6 +1510,7 @@ Status Sorter::SortCurrentInputRun() {
   }
   sorted_runs_.push_back(unsorted_run_);
   sorted_data_size_->Add(unsorted_run_->TotalBytes());
+  run_sizes_->UpdateCounter(unsorted_run_->num_tuples());
   unsorted_run_ = NULL;
 
   RETURN_IF_CANCELLED(state_);

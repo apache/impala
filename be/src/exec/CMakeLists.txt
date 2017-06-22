@@ -73,6 +73,7 @@ add_library(Exec
   parquet-column-readers.cc
   parquet-column-stats.cc
   parquet-metadata-utils.cc
+  partial-sort-node.cc
   partitioned-aggregation-node.cc
   partitioned-aggregation-node-ir.cc
   partitioned-hash-join-builder.cc
