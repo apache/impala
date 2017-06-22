@@ -279,7 +279,7 @@ void AggFnEvaluator::Init(Tuple* dst) {
     void* slot = dst->GetSlot(slot_desc.tuple_offset());
     StringVal* sv = reinterpret_cast<StringVal*>(staging_intermediate_val_);
     sv->is_null = dst->IsNull(slot_desc.null_indicator_offset());
-    sv->ptr = reinterpret_cast<uint8_t*>(StringValue::CharSlotToPtr(slot, type));
+    sv->ptr = reinterpret_cast<uint8_t*>(slot);
     sv->len = type.len;
   }
   reinterpret_cast<InitFn>(agg_fn_.init_fn_)(

@@ -387,7 +387,7 @@ template<>
 inline StringValue* HdfsParquetTableWriter::ColumnWriter<StringValue>::CastValue(
     void* value) {
   if (type().type == TYPE_CHAR) {
-    temp_.ptr = StringValue::CharSlotToPtr(value, type());
+    temp_.ptr = reinterpret_cast<char*>(value);
     temp_.len = StringValue::UnpaddedCharLength(temp_.ptr, type().len);
     return &temp_;
   }

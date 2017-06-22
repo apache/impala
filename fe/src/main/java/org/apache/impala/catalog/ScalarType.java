@@ -59,10 +59,6 @@ public class ScalarType extends Type {
   public static final int MAX_VARCHAR_LENGTH = (1 << 16) - 1; // 65535
   public static final int MAX_CHAR_LENGTH = (1 << 8) - 1; // 255
 
-  // Longest CHAR that we in line in the tuple.
-  // Keep consistent with backend ColumnType::CHAR_INLINE_LENGTH
-  public static final int CHAR_INLINE_LENGTH = (1 << 7); // 128
-
   // Hive, mysql, sql server standard.
   public static final int MAX_PRECISION = 38;
   public static final int MAX_SCALE = MAX_PRECISION;
@@ -311,7 +307,6 @@ public class ScalarType extends Type {
   public int getSlotSize() {
     switch (type_) {
       case CHAR:
-        if (len_ > CHAR_INLINE_LENGTH || len_ == 0) return STRING.getSlotSize();
         return len_;
       case DECIMAL: return TypesUtil.getDecimalSlotSize(this);
       default:

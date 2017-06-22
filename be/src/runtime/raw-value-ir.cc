@@ -80,8 +80,8 @@ int IR_ALWAYS_INLINE RawValue::Compare(
       ts_value2 = reinterpret_cast<const TimestampValue*>(v2);
       return *ts_value1 > *ts_value2 ? 1 : (*ts_value1 < *ts_value2 ? -1 : 0);
     case TYPE_CHAR: {
-      const char* v1ptr = StringValue::CharSlotToPtr(v1, type);
-      const char* v2ptr = StringValue::CharSlotToPtr(v2, type);
+      const char* v1ptr = reinterpret_cast<const char*>(v1);
+      const char* v2ptr = reinterpret_cast<const char*>(v2);
       int64_t l1 = StringValue::UnpaddedCharLength(v1ptr, type.len);
       int64_t l2 = StringValue::UnpaddedCharLength(v2ptr, type.len);
       return StringCompare(v1ptr, l1, v2ptr, l2, std::min(l1, l2));

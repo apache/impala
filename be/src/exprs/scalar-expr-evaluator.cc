@@ -325,11 +325,7 @@ void* ScalarExprEvaluator::GetValue(const ScalarExpr& expr, const TupleRow* row)
       if (v.is_null) return nullptr;
       result_.string_val.ptr = reinterpret_cast<char*>(v.ptr);
       result_.string_val.len = v.len;
-      if (expr.type_.IsVarLenStringType()) {
-        return &result_.string_val;
-      } else {
-        return result_.string_val.ptr;
-      }
+      return result_.string_val.ptr;
     }
     case TYPE_TIMESTAMP: {
       impala_udf::TimestampVal v = expr.GetTimestampVal(this, row);

@@ -128,7 +128,7 @@ Status HdfsTextTableWriter::AppendRows(
         if (value != NULL) {
           const ColumnType& type = output_expr_evals_[j]->root().type();
           if (type.type == TYPE_CHAR) {
-            char* val_ptr = StringValue::CharSlotToPtr(value, type);
+            char* val_ptr = reinterpret_cast<char*>(value);
             StringValue sv(val_ptr, StringValue::UnpaddedCharLength(val_ptr, type.len));
             PrintEscaped(&sv);
           } else if (type.IsVarLenStringType()) {

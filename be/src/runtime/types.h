@@ -76,7 +76,6 @@ struct ColumnType {
   int len;
   static const int MAX_VARCHAR_LENGTH = (1 << 16) - 1; // 65535
   static const int MAX_CHAR_LENGTH = (1 << 8) - 1; // 255
-  static const int MAX_CHAR_INLINE_LENGTH = (1 << 7); // 128
 
   /// Only set if type == TYPE_DECIMAL
   int precision, scale;
@@ -199,8 +198,7 @@ struct ColumnType {
   inline bool IsTimestampType() const { return type == TYPE_TIMESTAMP; }
 
   inline bool IsVarLenStringType() const {
-    return type == TYPE_STRING || type == TYPE_VARCHAR
-        || (type == TYPE_CHAR && len > MAX_CHAR_INLINE_LENGTH);
+    return type == TYPE_STRING || type == TYPE_VARCHAR;
   }
 
   inline bool IsComplexType() const {
@@ -224,7 +222,6 @@ struct ColumnType {
       case TYPE_VARCHAR:
         return 0;
       case TYPE_CHAR:
-        if (IsVarLenStringType()) return 0;
         return len;
       case TYPE_NULL:
       case TYPE_BOOLEAN:
@@ -258,7 +255,6 @@ struct ColumnType {
       case TYPE_VARCHAR:
         return 16;
       case TYPE_CHAR:
-        if (IsVarLenStringType()) return 16;
         return len;
       case TYPE_ARRAY:
       case TYPE_MAP:

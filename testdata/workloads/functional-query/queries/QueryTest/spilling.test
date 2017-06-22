@@ -391,7 +391,7 @@ BIGINT
 row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
-# Test sort with inlined char column materialized by exprs.
+# Test sort with small char column materialized by exprs.
 # Set low memory limit to force spilling.
 # IMPALA-3332: comparator makes local allocations that cause runaway memory consumption.
 set num_nodes=0;
@@ -431,7 +431,7 @@ row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
 row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
-# Test sort with input inlined char column materialized before sort.
+# Test sort with small input char column materialized before sort.
 set num_nodes=0;
 set mem_limit=200m;
 set max_block_mgr_memory=4m;
@@ -470,7 +470,7 @@ row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
 row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
-# Test sort with input non-inlined char column materialized before sort.
+# Test sort with large input char column materialized before sort.
 # Set low memory limit to force spilling.
 set num_nodes=0;
 set mem_limit=200m;

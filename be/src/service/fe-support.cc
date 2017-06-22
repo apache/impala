@@ -132,7 +132,7 @@ static void SetTColumnValue(
       break;
     }
     case TYPE_CHAR:
-      tmp.assign(StringValue::CharSlotToPtr(value, type), type.len);
+      tmp.assign(reinterpret_cast<const char*>(value), type.len);
       col_val->binary_val.swap(tmp);
       col_val->__isset.binary_val = true;
       break;

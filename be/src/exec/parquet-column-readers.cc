@@ -498,7 +498,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
       return false;
     }
     if (UNLIKELY(NeedsConversionInline() && !tuple->IsNull(null_indicator_offset_)
-            && !ConvertSlot(val_ptr, reinterpret_cast<T*>(slot), pool))) {
+            && !ConvertSlot(val_ptr, slot, pool))) {
       return false;
     }
     return true;
@@ -520,8 +520,8 @@ class ScalarColumnReader : public BaseScalarColumnReader {
     return false;
   }
 
-  /// Converts and writes src into dst based on desc_->type()
-  bool ConvertSlot(const T* src, T* dst, MemPool* pool) {
+  /// Converts and writes 'src' into 'slot' based on desc_->type()
+  bool ConvertSlot(const T* src, void* slot, MemPool* pool) {
     DCHECK(false);
     return false;
   }
@@ -564,29 +564,14 @@ inline bool ScalarColumnReader<StringValue, true>::NeedsConversionInline() const
 
 template<>
 bool ScalarColumnReader<StringValue, true>::ConvertSlot(
-    const StringValue* src, StringValue* dst, MemPool* pool) {
+    const StringValue* src, void* slot, MemPool* pool) {
   DCHECK(slot_desc() != NULL);
   DCHECK(slot_desc()->type().type == TYPE_CHAR);
-  int len = slot_desc()->type().len;
-  StringValue sv;
-  sv.len = len;
-  if (slot_desc()->type().IsVarLenStringType()) {
-    sv.ptr = reinterpret_cast<char*>(pool->TryAllocate(len));
-    if (UNLIKELY(sv.ptr == NULL)) {
-      string details = Substitute(PARQUET_COL_MEM_LIMIT_EXCEEDED, "ConvertSlot",
-          len, "StringValue");
-      parent_->parse_status_ =
-          pool->mem_tracker()->MemLimitExceeded(parent_->state_, details, len);
-      return false;
-    }
-  } else {
-    sv.ptr = reinterpret_cast<char*>(dst);
-  }
-  int unpadded_len = min(len, src->len);
-  memcpy(sv.ptr, src->ptr, unpadded_len);
-  StringValue::PadWithSpaces(sv.ptr, len, unpadded_len);
-
-  if (slot_desc()->type().IsVarLenStringType()) *dst = sv;
+  int char_len = slot_desc()->type().len;
+  int unpadded_len = min(char_len, src->len);
+  char* dst_char = reinterpret_cast<char*>(slot);
+  memcpy(dst_char, src->ptr, unpadded_len);
+  StringValue::PadWithSpaces(dst_char, char_len, unpadded_len);
   return true;
 }
 
@@ -597,11 +582,12 @@ inline bool ScalarColumnReader<TimestampValue, true>::NeedsConversionInline() co
 
 template<>
 bool ScalarColumnReader<TimestampValue, true>::ConvertSlot(
-    const TimestampValue* src, TimestampValue* dst, MemPool* pool) {
+    const TimestampValue* src, void* slot, MemPool* pool) {
   // Conversion should only happen when this flag is enabled.
   DCHECK(FLAGS_convert_legacy_hive_parquet_utc_timestamps);
-  *dst = *src;
-  if (dst->HasDateAndTime()) dst->UtcToLocal();
+  TimestampValue* dst_ts = reinterpret_cast<TimestampValue*>(slot);
+  *dst_ts = *src;
+  if (dst_ts->HasDateAndTime()) dst_ts->UtcToLocal();
   return true;
 }
 

@@ -182,7 +182,7 @@ void impala::ExprValueToHS2TColumn(const void* value, const TColumnType& type,
       if (value != NULL) {
         ColumnType char_type = ColumnType::CreateCharType(type.types[0].scalar_type.len);
         column->stringVal.values.back().assign(
-            StringValue::CharSlotToPtr(value, char_type), char_type.len);
+            reinterpret_cast<const char*>(value), char_type.len);
       }
       nulls = &column->stringVal.nulls;
       break;
@@ -346,7 +346,7 @@ void impala::ExprValueToHS2TColumnValue(const void* value, const TColumnType& ty
       if (not_null) {
         ColumnType char_type = ColumnType::CreateCharType(type.types[0].scalar_type.len);
         hs2_col_val->stringVal.value.assign(
-           StringValue::CharSlotToPtr(value, char_type), char_type.len);
+           reinterpret_cast<const char*>(value), char_type.len);
       }
       break;
     case TPrimitiveType::TIMESTAMP:

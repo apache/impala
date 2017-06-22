@@ -69,15 +69,21 @@ static uint32_t SEED_PRIMES[] = {
 // We don't want(NULL, 1) to hash to the same as (0, 1).
 // This needs to be as big as the biggest primitive type since the bytes
 // get copied directly.
-// TODO find a better approach, since primitives like CHAR(N) can be up to 128 bytes
-static int64_t NULL_VALUE[] = { HashUtil::FNV_SEED, HashUtil::FNV_SEED,
-                                HashUtil::FNV_SEED, HashUtil::FNV_SEED,
-                                HashUtil::FNV_SEED, HashUtil::FNV_SEED,
-                                HashUtil::FNV_SEED, HashUtil::FNV_SEED,
-                                HashUtil::FNV_SEED, HashUtil::FNV_SEED,
-                                HashUtil::FNV_SEED, HashUtil::FNV_SEED,
-                                HashUtil::FNV_SEED, HashUtil::FNV_SEED,
-                                HashUtil::FNV_SEED, HashUtil::FNV_SEED };
+// TODO find a better approach, since primitives like CHAR(N) can be up
+// to 255 bytes
+static int64_t NULL_VALUE[] = {
+  HashUtil::FNV_SEED, HashUtil::FNV_SEED, HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+  HashUtil::FNV_SEED, HashUtil::FNV_SEED, HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+  HashUtil::FNV_SEED, HashUtil::FNV_SEED, HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+  HashUtil::FNV_SEED, HashUtil::FNV_SEED, HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+  HashUtil::FNV_SEED, HashUtil::FNV_SEED, HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+  HashUtil::FNV_SEED, HashUtil::FNV_SEED, HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+  HashUtil::FNV_SEED, HashUtil::FNV_SEED, HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+  HashUtil::FNV_SEED, HashUtil::FNV_SEED, HashUtil::FNV_SEED, HashUtil::FNV_SEED
+};
+
+static_assert(sizeof(NULL_VALUE) >= ColumnType::MAX_CHAR_LENGTH,
+    "NULL_VALUE must be at least as large as the largest possible slot");
 
 // The first NUM_SMALL_BLOCKS of nodes_ are made of blocks less than the IO size (of 8MB)
 // to reduce the memory footprint of small queries. In particular, we always first use a

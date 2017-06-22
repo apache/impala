@@ -73,8 +73,8 @@ inline bool RawValue::Eq(const void* v1, const void* v2, const ColumnType& type)
       return *reinterpret_cast<const TimestampValue*>(v1) ==
           *reinterpret_cast<const TimestampValue*>(v2);
     case TYPE_CHAR: {
-      const char* v1ptr = StringValue::CharSlotToPtr(v1, type);
-      const char* v2ptr = StringValue::CharSlotToPtr(v2, type);
+      const char* v1ptr = reinterpret_cast<const char*>(v1);
+      const char* v2ptr = reinterpret_cast<const char*>(v2);
       int64_t l1 = StringValue::UnpaddedCharLength(v1ptr, type.len);
       int64_t l2 = StringValue::UnpaddedCharLength(v2ptr, type.len);
       return StringCompare(v1ptr, l1, v2ptr, l2, std::min(l1, l2)) == 0;
@@ -160,9 +160,10 @@ inline uint32_t RawValue::GetHashValueNonNull<impala::StringValue>(
     const impala::StringValue* v,const ColumnType& type, uint32_t seed) {
   DCHECK(v != NULL);
   if (type.type == TYPE_CHAR) {
-    return HashUtil::MurmurHash2_64(
-        StringValue::CharSlotToPtr(reinterpret_cast<const void*>(v), type), type.len,
-        seed);
+    // This is a inlined CHAR(n) slot.
+    // TODO: this is a bit wonky since it's not really a StringValue*. Handle CHAR(n)
+    // in a separate function.
+    return HashUtil::MurmurHash2_64(v, type.len, seed);
   } else {
     DCHECK(type.type == TYPE_STRING || type.type == TYPE_VARCHAR);
     if (v->len == 0) {
