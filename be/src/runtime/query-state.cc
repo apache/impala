@@ -37,8 +37,6 @@
 
 using namespace impala;
 
-#define RETRY_SLEEP_MS 100
-
 QueryState::ScopedRef::ScopedRef(const TUniqueId& query_id) {
   DCHECK(ExecEnv::GetInstance()->query_exec_mgr() != nullptr);
   query_state_ = ExecEnv::GetInstance()->query_exec_mgr()->GetQueryState(query_id);
@@ -183,18 +181,6 @@ void QueryState::ReportExecStatusAux(bool done, const Status& status,
   // This will send a report even if we are cancelled.  If the query completed correctly
   // but fragments still need to be cancelled (e.g. limit reached), the coordinator will
   // be waiting for a final report and profile.
-
-  Status coord_status;
-  ImpalaBackendConnection coord(ExecEnv::GetInstance()->impalad_client_cache(),
-      query_ctx().coord_address, &coord_status);
-  if (!coord_status.ok()) {
-    // TODO: this might flood the log
-    LOG(WARNING) << "Couldn't get a client for " << query_ctx().coord_address
-        <<"\tReason: " << coord_status.GetDetail();
-    if (instances_started) Cancel();
-    return;
-  }
-
   TReportExecStatusParams params;
   params.protocol_version = ImpalaInternalServiceVersion::V1;
   params.__set_query_id(query_ctx().query_id);
@@ -234,16 +220,20 @@ void QueryState::ReportExecStatusAux(bool done, const Status& status,
     params.__isset.error_log = (params.error_log.size() > 0);
   }
 
-  TReportExecStatusResult res;
   Status rpc_status;
-  bool retry_is_safe;
-  // Try to send the RPC 3 times before failing.
+  TReportExecStatusResult res;
+  DCHECK_EQ(res.status.status_code, TErrorCode::OK);
+  // Try to send the RPC 3 times before failing. Sleep for 100ms between retries.
+  // It's safe to retry the RPC as the coordinator handles duplicate RPC messages.
   for (int i = 0; i < 3; ++i) {
-    rpc_status = coord.DoRpc(
-        &ImpalaBackendClient::ReportExecStatus, params, &res, &retry_is_safe);
-    if (rpc_status.ok()) break;
-    if (!retry_is_safe) break;
-    if (i < 2) SleepForMs(RETRY_SLEEP_MS);
+    Status client_status;
+    ImpalaBackendConnection client(ExecEnv::GetInstance()->impalad_client_cache(),
+        query_ctx().coord_address, &client_status);
+    if (client_status.ok()) {
+      rpc_status = client.DoRpc(&ImpalaBackendClient::ReportExecStatus, params, &res);
+      if (rpc_status.ok()) break;
+    }
+    if (i < 2) SleepForMs(100);
   }
   Status result_status(res.status);
   if ((!rpc_status.ok() || !result_status.ok()) && instances_started) {
@@ -251,6 +241,8 @@ void QueryState::ReportExecStatusAux(bool done, const Status& status,
     // report, following this Cancel(), may not succeed anyway.)
     // TODO: not keeping an error status here means that all instances might
     // abort with CANCELLED status, despite there being an error
+    // TODO: Fix IMPALA-2990. Cancelling fragment instances here may cause query to
+    // hang as the coordinator may not be aware of the cancellation.
     Cancel();
   }
 }

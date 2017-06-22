@@ -52,49 +52,51 @@ class TestRPCException(CustomClusterTestSuite):
       assert exception_string in str(e)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=1"
-      " --fault_injection_rpc_type=5")
-  def test_transmitdata_send_lost_connection(self, vector):
+  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=1")
+  def test_rpc_send_closed_connection(self, vector):
     self.execute_test_query(None)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=2"
-      " --fault_injection_rpc_type=5")
-  def test_transmitdata_send_timed_out(self, vector):
+  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=2")
+  def test_rpc_send_stale_connection(self, vector):
     self.execute_test_query(None)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=3"
-      " --fault_injection_rpc_type=5")
-  def test_transmitdata_recv_lost_connection(self, vector):
+  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=3")
+  def test_rpc_send_timed_out(self, vector):
+    self.execute_test_query(None)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=4")
+  def test_rpc_recv_closed_connection(self, vector):
     self.execute_test_query("Called read on non-open socket")
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=4"
-      " --fault_injection_rpc_type=5")
-  def test_transmitdata_recv_timed_out(self, vector):
+  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=5")
+  def test_rpc_recv_timed_out(self, vector):
     self.execute_test_query(None)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=5"
-      " --fault_injection_rpc_type=5")
-  def test_transmitdata_secure_send_lost_connection(self, vector):
-    self.execute_test_query(None);
+  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=6")
+  def test_rpc_secure_send_closed_connection(self, vector):
+    self.execute_test_query(None)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=6"
-      " --fault_injection_rpc_type=5")
-  def test_transmitdata_secure_send_timed_out(self, vector):
-    self.execute_test_query("SSL_write: Resource temporarily unavailable")
+  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=7")
+  def test_rpc_secure_send_stale_connection(self, vector):
+    self.execute_test_query(None)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=7"
-      " --fault_injection_rpc_type=5")
-  def test_transmitdata_secure_recv_lost_connection(self, vector):
+  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=8")
+  def test_rpc_secure_send_timed_out(self, vector):
+    self.execute_test_query(None)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=9")
+  def test_rpc_secure_recv_closed_connection(self, vector):
     self.execute_test_query("TTransportException: Transport not open")
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=8"
-      " --fault_injection_rpc_type=5")
-  def test_transmitdata_secure_recv_timed_out(self, vector):
+  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=10")
+  def test_rpc_secure_recv_timed_out(self, vector):
     self.execute_test_query(None)

@@ -48,31 +48,37 @@ class ImpalaBackendClient : public ImpalaInternalServiceClient {
   void ExecQueryFInstances(TExecQueryFInstancesResult& _return,
       const TExecQueryFInstancesParams& params, bool* send_done) {
     DCHECK(!*send_done);
+    FAULT_INJECTION_SEND_RPC_EXCEPTION(5);
     ImpalaInternalServiceClient::send_ExecQueryFInstances(params);
     *send_done = true;
+    // Cannot inject fault on recv() side as the callers cannot handle it.
     ImpalaInternalServiceClient::recv_ExecQueryFInstances(_return);
   }
 
   void ReportExecStatus(TReportExecStatusResult& _return,
       const TReportExecStatusParams& params, bool* send_done) {
     DCHECK(!*send_done);
+    FAULT_INJECTION_SEND_RPC_EXCEPTION(3);
     ImpalaInternalServiceClient::send_ReportExecStatus(params);
     *send_done = true;
+    FAULT_INJECTION_RECV_RPC_EXCEPTION(3);
     ImpalaInternalServiceClient::recv_ReportExecStatus(_return);
   }
 
   void CancelQueryFInstances(TCancelQueryFInstancesResult& _return,
       const TCancelQueryFInstancesParams& params, bool* send_done) {
     DCHECK(!*send_done);
+    FAULT_INJECTION_SEND_RPC_EXCEPTION(3);
     ImpalaInternalServiceClient::send_CancelQueryFInstances(params);
     *send_done = true;
+    FAULT_INJECTION_RECV_RPC_EXCEPTION(3);
     ImpalaInternalServiceClient::recv_CancelQueryFInstances(_return);
   }
 
   void TransmitData(TTransmitDataResult& _return, const TTransmitDataParams& params,
       bool* send_done) {
     DCHECK(!*send_done);
-    FAULT_INJECTION_RPC_EXCEPTION(RPC_TRANSMITDATA, true /* is_send */);
+    FAULT_INJECTION_SEND_RPC_EXCEPTION(1024);
     if (transmit_csw_ != NULL) {
       SCOPED_CONCURRENT_COUNTER(transmit_csw_);
       ImpalaInternalServiceClient::send_TransmitData(params);
@@ -80,7 +86,7 @@ class ImpalaBackendClient : public ImpalaInternalServiceClient {
       ImpalaInternalServiceClient::send_TransmitData(params);
     }
     *send_done = true;
-    FAULT_INJECTION_RPC_EXCEPTION(RPC_TRANSMITDATA, false /* is_send */);
+    FAULT_INJECTION_RECV_RPC_EXCEPTION(1024);
     ImpalaInternalServiceClient::recv_TransmitData(_return);
   }
 

@@ -158,9 +158,8 @@ bool TNetworkAddressComparator(const TNetworkAddress& a, const TNetworkAddress& 
 /// Returns true if the TTransportException corresponds to a TCP socket recv timeout.
 bool IsRecvTimeoutTException(const apache::thrift::transport::TTransportException& e);
 
-/// Returns true if the TTransportException corresponds to a send failure due to
-/// lost network connection or timeout.
-bool IsSendFailTException(const apache::thrift::transport::TTransportException& e);
+/// Returns true if the exception indicates the other end of the TCP socket was closed.
+bool IsConnResetTException(const apache::thrift::transport::TTransportException& e);
 
 }
 

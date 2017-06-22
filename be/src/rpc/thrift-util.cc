@@ -194,24 +194,15 @@ bool IsRecvTimeoutTException(const TTransportException& e) {
              strstr(e.what(), "SSL_read: Resource temporarily unavailable") != nullptr);
 }
 
-// This function implements some heuristics to match against exception details
-// thrown by functions in TSocket.cpp and TSSLSocket.cpp in thrift library. It's
-// expected the caller (e.g. DoRpc()) has already verified the send part of the RPC
-// didn't complete. It's only safe to retry an RPC if the send part didn't complete.
-// It's also expected that the RPC client will close the existing connection and reopen
-// a new connection before retrying the RPC. If the exception occurs after the send part
-// is done, only the recv part of the RPC can be retried.
-bool IsSendFailTException(const TTransportException& e) {
-  // String taken from TSocket::write_partial() in Thrift's TSocket.cpp
-  return (e.getType() == TTransportException::TIMED_OUT &&
-             strstr(e.what(), "send timeout expired") != nullptr) ||
-         (e.getType() == TTransportException::NOT_OPEN &&
-             // "TTransportException: Transport not open" can be from TSSLSocket.cpp
-             // when the underlying socket was closed.
-             (strstr(e.what(), "TTransportException: Transport not open") ||
-              strstr(e.what(), "write() send()") != nullptr ||
-              strstr(e.what(), "Called write on non-open socket") != nullptr ||
-              strstr(e.what(), "Socket send returned 0.") != nullptr));
+bool IsConnResetTException(const TTransportException& e) {
+  // Strings taken from TTransport::readAll(). This happens iff TSocket::read() returns 0.
+  // As readAll() is reading non-zero length payload, this can only mean recv() called
+  // by read() returns 0. According to man page of recv(), this implies a stream socket
+  // peer has performed an orderly shutdown.
+  return (e.getType() == TTransportException::END_OF_FILE &&
+             strstr(e.what(), "No more data to read.") != nullptr) ||
+         (e.getType() == TTransportException::INTERNAL_ERROR &&
+             strstr(e.what(), "SSL_read: Connection reset by peer") != nullptr);
 }
 
 }

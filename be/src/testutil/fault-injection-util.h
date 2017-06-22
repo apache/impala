@@ -39,13 +39,15 @@ class FaultInjectionUtil {
 
   enum RpcExceptionType {
     RPC_EXCEPTION_NONE = 0,
-    RPC_EXCEPTION_SEND_LOST_CONNECTION,
+    RPC_EXCEPTION_SEND_CLOSED_CONNECTION,
+    RPC_EXCEPTION_SEND_STALE_CONNECTION,
     RPC_EXCEPTION_SEND_TIMEDOUT,
-    RPC_EXCEPTION_RECV_LOST_CONNECTION,
+    RPC_EXCEPTION_RECV_CLOSED_CONNECTION,
     RPC_EXCEPTION_RECV_TIMEDOUT,
-    RPC_EXCEPTION_SSL_SEND_LOST_CONNECTION,
+    RPC_EXCEPTION_SSL_SEND_CLOSED_CONNECTION,
+    RPC_EXCEPTION_SSL_SEND_STALE_CONNECTION,
     RPC_EXCEPTION_SSL_SEND_TIMEDOUT,
-    RPC_EXCEPTION_SSL_RECV_LOST_CONNECTION,
+    RPC_EXCEPTION_SSL_RECV_CLOSED_CONNECTION,
     RPC_EXCEPTION_SSL_RECV_TIMEDOUT,
   };
 
@@ -57,27 +59,28 @@ class FaultInjectionUtil {
   static void InjectRpcDelay(RpcCallType my_type);
 
   /// Test util function that injects exceptions to RPC client functions.
-  /// 'my_type' specifies which RPC type of the current function. Currently, only
-  /// TransmitData() is supported.
-  /// 'is_send' indicates whether injected fault is at the send RPC call or recv RPC.
-  ///  It's true if for send RPC call and false for recv RPC call.
-  /// FLAGS_fault_injection_rpc_exception_type specifies the exception to be injected.
-  static void InjectRpcException(RpcCallType my_type, bool is_send);
+  /// 'is_send' indicates whether injected fault is at the send() or recv() of an RPC.
+  /// The exception specified in 'FLAGS_fault_injection_rpc_exception_type' is injected
+  /// on every 'freq' invocations of this function.
+  static void InjectRpcException(bool is_send, int freq);
 
  private:
   static int32_t GetTargetRPCType();
 
 };
 
-#define FAULT_INJECTION_RPC_DELAY(type)                         \
+#define FAULT_INJECTION_RPC_DELAY(type)                          \
     FaultInjectionUtil::InjectRpcDelay(FaultInjectionUtil::type)
-#define FAULT_INJECTION_RPC_EXCEPTION(type, is_send)            \
-    FaultInjectionUtil::InjectRpcException(FaultInjectionUtil::type, is_send)
+#define FAULT_INJECTION_SEND_RPC_EXCEPTION(freq)                 \
+    FaultInjectionUtil::InjectRpcException(true, freq)
+#define FAULT_INJECTION_RECV_RPC_EXCEPTION(freq)                 \
+    FaultInjectionUtil::InjectRpcException(false, freq)
 
 #else // NDEBUG
 
 #define FAULT_INJECTION_RPC_DELAY(type)
-#define FAULT_INJECTION_RPC_EXCEPTION(type, is_send)
+#define FAULT_INJECTION_SEND_RPC_EXCEPTION(freq)
+#define FAULT_INJECTION_RECV_RPC_EXCEPTION(freq)
 
 #endif
 

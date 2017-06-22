@@ -51,42 +51,45 @@ void FaultInjectionUtil::InjectRpcDelay(RpcCallType my_type) {
   if (target_rpc_type == my_type) SleepForMs(delay_ms);
 }
 
-void FaultInjectionUtil::InjectRpcException(RpcCallType my_type, bool is_send) {
+void FaultInjectionUtil::InjectRpcException(bool is_send, int freq) {
   static AtomicInt32 send_count(-1);
   static AtomicInt32 recv_count(-1);
   int32_t xcp_type = FLAGS_fault_injection_rpc_exception_type;
   if (xcp_type == RPC_EXCEPTION_NONE) return;
 
-  // We currently support injecting exception at TransmitData() RPC only.
-  int32_t target_rpc_type = GetTargetRPCType();
-  DCHECK_EQ(target_rpc_type, RPC_TRANSMITDATA);
-
+  // We currently support injecting exception at some RPCs only.
   if (is_send) {
-    if (send_count.Add(1) % 1024 == 0) {
+    if (send_count.Add(1) % freq == 0) {
       switch (xcp_type) {
-        case RPC_EXCEPTION_SEND_LOST_CONNECTION:
+        case RPC_EXCEPTION_SEND_CLOSED_CONNECTION:
           throw TTransportException(TTransportException::NOT_OPEN,
               "Called write on non-open socket");
         case RPC_EXCEPTION_SEND_TIMEDOUT:
           throw TTransportException(TTransportException::TIMED_OUT,
               "send timeout expired");
-        case RPC_EXCEPTION_SSL_SEND_LOST_CONNECTION:
+        case RPC_EXCEPTION_SSL_SEND_CLOSED_CONNECTION:
           throw TTransportException(TTransportException::NOT_OPEN);
         case RPC_EXCEPTION_SSL_SEND_TIMEDOUT:
           throw TSSLException("SSL_write: Resource temporarily unavailable");
+        // Simulate half-opened connections.
+        case RPC_EXCEPTION_SEND_STALE_CONNECTION:
+          throw TTransportException(TTransportException::END_OF_FILE,
+             "No more data to read.");
+        case RPC_EXCEPTION_SSL_SEND_STALE_CONNECTION:
+          throw TSSLException("SSL_read: Connection reset by peer");
         // fall through for the default case.
       }
     }
   } else {
-    if (recv_count.Add(1) % 1024 == 0) {
+    if (recv_count.Add(1) % freq == 0) {
       switch (xcp_type) {
-        case RPC_EXCEPTION_RECV_LOST_CONNECTION:
+        case RPC_EXCEPTION_RECV_CLOSED_CONNECTION:
           throw TTransportException(TTransportException::NOT_OPEN,
               "Called read on non-open socket");
         case RPC_EXCEPTION_RECV_TIMEDOUT:
           throw TTransportException(TTransportException::TIMED_OUT,
               "EAGAIN (timed out)");
-        case RPC_EXCEPTION_SSL_RECV_LOST_CONNECTION:
+        case RPC_EXCEPTION_SSL_RECV_CLOSED_CONNECTION:
           throw TTransportException(TTransportException::NOT_OPEN);
         case RPC_EXCEPTION_SSL_RECV_TIMEDOUT:
           throw TSSLException("SSL_read: Resource temporarily unavailable");
