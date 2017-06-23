@@ -240,8 +240,8 @@ void RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
 }
 
 Status RuntimeState::CheckQueryState() {
-  if (instance_mem_tracker_ != nullptr
-      && UNLIKELY(instance_mem_tracker_->AnyLimitExceeded())) {
+  DCHECK(instance_mem_tracker_ != nullptr);
+  if (UNLIKELY(instance_mem_tracker_->AnyLimitExceeded())) {
     SetMemLimitExceeded(instance_mem_tracker_.get());
   }
   return GetQueryStatus();
@@ -261,6 +261,7 @@ void RuntimeState::UnregisterReaderContexts() {
 }
 
 void RuntimeState::ReleaseResources() {
+  // TODO: IMPALA-5587: control structures (e.g. MemTrackers) shouldn't be destroyed here.
   UnregisterReaderContexts();
   if (filter_bank_ != nullptr) filter_bank_->Close();
   if (resource_pool_ != nullptr) {

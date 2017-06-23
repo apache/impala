@@ -142,12 +142,12 @@ Status PlanRootSink::GetNext(
   while (!eos_ && results_ != nullptr && !sender_done_) consumer_cv_.wait(l);
 
   *eos = eos_;
-  return state->CheckQueryState();
+  return state->GetQueryStatus();
 }
 
 void PlanRootSink::GetRowValue(
     TupleRow* row, vector<void*>* result, vector<int>* scales) {
-  DCHECK(result->size() >= output_expr_evals_.size());
+  DCHECK_GE(result->size(), output_expr_evals_.size());
   for (int i = 0; i < output_expr_evals_.size(); ++i) {
     (*result)[i] = output_expr_evals_[i]->GetValue(row);
     (*scales)[i] = output_expr_evals_[i]->output_scale();

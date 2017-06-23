@@ -293,8 +293,8 @@ class RuntimeState {
 
   /// Returns a non-OK status if query execution should stop (e.g., the query was
   /// cancelled or a mem limit was exceeded). Exec nodes should check this periodically so
-  /// execution doesn't continue if the query terminates abnormally. This can be called
-  /// after ReleaseResources().
+  /// execution doesn't continue if the query terminates abnormally. This should not be
+  /// called after ReleaseResources().
   Status CheckQueryState();
 
   /// Create a codegen object accessible via codegen() if it doesn't exist already.
