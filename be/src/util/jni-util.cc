@@ -56,6 +56,17 @@ bool JniUtil::ClassExists(JNIEnv* env, const char* class_str) {
   return true;
 }
 
+bool JniUtil::MethodExists(JNIEnv* env, jclass class_ref, const char* method_str,
+    const char* method_signature) {
+  env->GetMethodID(class_ref, method_str, method_signature);
+  jthrowable exc = env->ExceptionOccurred();
+  if (exc != nullptr) {
+    env->ExceptionClear();
+    return false;
+  }
+  return true;
+}
+
 Status JniUtil::GetGlobalClassRef(JNIEnv* env, const char* class_str, jclass* class_ref) {
   *class_ref = NULL;
   jclass local_cl = env->FindClass(class_str);

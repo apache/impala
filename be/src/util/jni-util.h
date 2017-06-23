@@ -168,6 +168,12 @@ class JniUtil {
   /// This function does not log any errors or exceptions.
   static bool ClassExists(JNIEnv* env, const char* class_str);
 
+  /// Return true if the given class has a non-static method with a specific name and
+  /// signature. Returns false otherwise, or if any other error occurred
+  /// (e.g. a JNI exception). This function does not log any errors or exceptions.
+  static bool MethodExists(JNIEnv* env, jclass class_ref,
+      const char* method_str, const char* method_signature);
+
   /// Returns a global JNI reference to the class specified by class_str into class_ref.
   /// The returned reference must eventually be freed by calling FreeGlobalRef() (or have
   /// the lifetime of the impalad process).

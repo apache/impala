@@ -55,11 +55,18 @@ class HBaseScanNode;
 /// be overridden by the query option hbase_caching. FE will also suggest a max value such
 /// that it won't put too much memory pressure on the region server.
 //
-/// HBase version compatibility: Starting from HBase 0.95.2 result rows are represented by
-/// Cells instead of KeyValues (prior HBase versions). To mitigate this API
-/// incompatibility the Cell class and its methods are replaced with corresponding
-/// KeyValue equivalents if the Cell is not found in the classpath. The HBase version
-/// detection and KeyValue/Cell replacements are performed in Init().
+/// HBase version compatibility: This code supports HBase 1.0 and HBase 2.0 APIs. It
+/// uses the Cell class for result rows rather than the older KeyValue class, which
+/// limits support to HBase >= 0.95.2. The code handles some minor incompatibilities
+/// across versions:
+/// 1. Scan.setCaching() and Scan.setCacheBlocks() tolerate the older void return value
+///    as well as the newer Scan return value (See HBASE-10841).
+/// 2. ScannerTimeoutException has been removed in HBase 2.0, as HBase has a heartbeat
+///    to prevent timeout. HBase 2.0 will reset the scanner and retry rather than
+///    throwing an exception. See HBASE-16266 and HBASE-17809.
+///    If ScannerTimeoutException does not exist, then HandleResultScannerTimeout()
+///    simply checks for an exception and returns any error via status.
+/// Both are detected and handled in Init().
 //
 /// Note: When none of the requested family/qualifiers exist in a particular row,
 /// HBase will not return the row at all, leading to "missing" NULL values.
@@ -153,14 +160,15 @@ class HBaseTableScanner {
   static jclass scan_cl_;
   static jclass resultscanner_cl_;
   static jclass result_cl_;
-  /// Cell or KeyValue class depending on HBase version (see class comment).
   static jclass cell_cl_;
   static jclass hconstants_cl_;
   static jclass filter_list_cl_;
   static jclass filter_list_op_cl_;
   static jclass single_column_value_filter_cl_;
   static jclass compare_op_cl_;
-  /// Exception thrown when a ResultScanner times out
+  /// Exception thrown when a ResultScanner times out. ScannerTimeoutException was
+  /// removed in HBase 2.0. In this case, scanner_timeout_ex_cl_ is null and HBase
+  /// will not throw this exception.
   static jclass scanner_timeout_ex_cl_;
 
   static jmethodID scan_ctor_;
@@ -251,7 +259,8 @@ class HBaseTableScanner {
   /// ResultScanner times out. If a timeout occurs, the ResultScanner is re-created
   /// (with the scan range adjusted if some results have already been returned) and
   /// the exception is cleared. If any other exception is thrown, the error message
-  /// is returned in the status.
+  /// is returned in the status. In HBase 2.0, ScannerTimeoutException no longer
+  /// exists and the error message is returned in the status.
   /// 'timeout' is true if a ScannerTimeoutException was thrown, false otherwise.
   Status HandleResultScannerTimeout(JNIEnv* env, bool* timeout);
 

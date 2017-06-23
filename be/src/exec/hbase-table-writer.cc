@@ -42,7 +42,7 @@ jmethodID HBaseTableWriter::put_ctor_ = NULL;
 jmethodID HBaseTableWriter::list_ctor_ = NULL;
 jmethodID HBaseTableWriter::list_add_id_ = NULL;
 
-jmethodID HBaseTableWriter::put_add_id_ = NULL;
+jmethodID HBaseTableWriter::put_addcolumn_id_ = NULL;
 
 HBaseTableWriter::HBaseTableWriter(HBaseTableDescriptor* table_desc,
     const vector<ScalarExprEvaluator*>& output_expr_evals, RuntimeProfile* profile)
@@ -100,7 +100,7 @@ Status HBaseTableWriter::InitJNI() {
   RETURN_ERROR_IF_EXC(env);
   put_ctor_ = env->GetMethodID(put_cl_, "<init>", "([B)V");
   RETURN_ERROR_IF_EXC(env);
-  put_add_id_ = env->GetMethodID(put_cl_, "add",
+  put_addcolumn_id_ = env->GetMethodID(put_cl_, "addColumn",
     "([B[B[B)Lorg/apache/hadoop/hbase/client/Put;");
   RETURN_ERROR_IF_EXC(env);
   RETURN_IF_ERROR(
@@ -171,8 +171,8 @@ Status HBaseTableWriter::AppendRows(RowBatch* batch) {
             DCHECK(put != NULL) << "Put shouldn't be NULL for non-key cols.";
             jbyteArray val_array;
             RETURN_IF_ERROR(CreateByteArray(env, data, data_len, &val_array));
-            env->CallObjectMethod(put, put_add_id_, cf_arrays_[j-1], qual_arrays_[j-1],
-                val_array);
+            env->CallObjectMethod(put, put_addcolumn_id_, cf_arrays_[j-1],
+                qual_arrays_[j-1], val_array);
             RETURN_ERROR_IF_EXC(env);
 
             // Clean up the local references.

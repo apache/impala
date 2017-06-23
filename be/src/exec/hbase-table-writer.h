@@ -105,8 +105,8 @@ class HBaseTableWriter {
   /// new Put(byte[])
   static jmethodID put_ctor_;
 
-  /// Put#add(byte[], byte[], byte[])
-  static jmethodID put_add_id_;
+  /// Put#addColumn(byte[], byte[], byte[])
+  static jmethodID put_addcolumn_id_;
 
   /// java.util.ArrayList
   static jclass list_cl_;
