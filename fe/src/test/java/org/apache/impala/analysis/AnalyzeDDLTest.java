@@ -2379,7 +2379,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("create table tdefault (id int primary key, ts timestamp default now())" +
         "partition by hash(id) partitions 3 stored as kudu");
     AnalyzesOk("create table tdefault (id int primary key, ts timestamp default " +
-        "timestamp_from_unix_micros(1230768000000000)) partition by hash(id) " +
+        "unix_micros_to_utc_timestamp(1230768000000000)) partition by hash(id) " +
         "partitions 3 stored as kudu");
     AnalyzesOk("create table tdefault (id int primary key, " +
         "ts timestamp not null default '2009-01-01 00:00:00') " +

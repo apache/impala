@@ -146,3 +146,31 @@ class TestExprLimits(ImpalaTestSuite):
       assert impala_ret.success, "Failed to execute query %s" % (sql_str)
     except: # consider any exception a failure
       assert False, "Failed to execute query %s" % (sql_str)
+
+class TestUtcTimestampFunctions(ImpalaTestSuite):
+  """Tests for UTC timestamp functions, i.e. functions that do not depend on the behavior
+     of the flag --use_local_tz_for_unix_timestamp_conversions. Tests added here should
+     also be run in the custom cluster test test_local_tz_conversion.py to ensure they
+     have the same behavior when the conversion flag is set to true."""
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestUtcTimestampFunctions, cls).add_test_dimensions()
+    # Test with and without expr rewrites to cover regular expr evaluations
+    # as well as constant folding, in particular, timestamp literals.
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('enable_expr_rewrites', *[0,1]))
+    if cls.exploration_strategy() == 'core':
+      # Test with file format that supports codegen
+      cls.ImpalaTestMatrix.add_constraint(lambda v:\
+          v.get_value('table_format').file_format == 'text' and\
+          v.get_value('table_format').compression_codec == 'none')
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  def test_utc_functions(self, vector):
+    vector.get_value('exec_option')['enable_expr_rewrites'] = \
+        vector.get_value('enable_expr_rewrites')
+    self.run_test_case('QueryTest/utc-timestamp-functions', vector)

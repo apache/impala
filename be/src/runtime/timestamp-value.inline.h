@@ -28,10 +28,10 @@
 
 namespace impala {
 
-inline TimestampValue TimestampValue::FromUnixTimeMicros(int64_t unix_time_micros) {
+inline TimestampValue TimestampValue::UtcFromUnixTimeMicros(int64_t unix_time_micros) {
   int64_t ts_seconds = unix_time_micros / MICROS_PER_SEC;
   int64_t micros_part = unix_time_micros - (ts_seconds * MICROS_PER_SEC);
-  boost::posix_time::ptime temp = UnixTimeToPtime(ts_seconds);
+  boost::posix_time::ptime temp = UnixTimeToUtcPtime(ts_seconds);
   temp += boost::posix_time::microseconds(micros_part);
   return TimestampValue(temp);
 }

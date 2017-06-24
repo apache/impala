@@ -215,7 +215,7 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_me
       }
       int64_t ts_micros = *reinterpret_cast<int64_t*>(
           kudu_tuple->GetSlot(slot->tuple_offset()));
-      TimestampValue tv = TimestampValue::FromUnixTimeMicros(ts_micros);
+      TimestampValue tv = TimestampValue::UtcFromUnixTimeMicros(ts_micros);
       if (tv.HasDateAndTime()) {
         RawValue::Write(&tv, kudu_tuple, slot, NULL);
       } else {

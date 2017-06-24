@@ -115,7 +115,7 @@ ostream& operator<<(ostream& os, const TimestampValue& timestamp_value) {
 /// Return a ptime representation of the given Unix time (seconds since the Unix epoch).
 /// The time zone of the resulting ptime is local time. This is called by
 /// UnixTimeToPtime.
-inline ptime UnixTimeToLocalPtime(time_t unix_time) {
+ptime TimestampValue::UnixTimeToLocalPtime(time_t unix_time) {
   tm temp_tm;
   // TODO: avoid localtime*, which takes a global timezone db lock
   if (UNLIKELY(localtime_r(&unix_time, &temp_tm) == nullptr)) {
@@ -139,7 +139,7 @@ inline ptime UnixTimeToLocalPtime(time_t unix_time) {
 /// use the libc function gmtime_r which supports those dates but takes the global lock
 /// for the timezone db (even though technically it is not needed for the conversion,
 /// again see IMPALA-5357). This is called by UnixTimeToPtime.
-inline ptime UnixTimeToUtcPtime(time_t unix_time) {
+ptime TimestampValue::UnixTimeToUtcPtime(time_t unix_time) {
   // Minimum Unix time that can be converted with from_time_t: 1677-Sep-21 00:12:44
   const int64_t MIN_BOOST_CONVERT_UNIX_TIME = -9223372036;
   // Maximum Unix time that can be converted with from_time_t: 2262-Apr-11 23:47:16

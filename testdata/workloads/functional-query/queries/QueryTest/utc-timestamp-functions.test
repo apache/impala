@@ -1,0 +1,16 @@
+====
+---- QUERY
+# Tests for unix_micros_to_utc_timestamp().
+# TODO: after fixing IMPALA-5664, add test for -17987443200 * 1000000 - 1
+SELECT
+unix_micros_to_utc_timestamp(NULL),
+unix_micros_to_utc_timestamp(0),
+unix_micros_to_utc_timestamp(1),
+unix_micros_to_utc_timestamp(-17987443200 * 1000000),
+unix_micros_to_utc_timestamp(253402300799 * 1000000),
+unix_micros_to_utc_timestamp(253402300799 * 1000000 + 1);
+---- TYPES
+TIMESTAMP,TIMESTAMP,TIMESTAMP,TIMESTAMP,TIMESTAMP,TIMESTAMP
+---- RESULTS
+NULL,1970-01-01 00:00:00,1970-01-01 00:00:00.000001000,1400-01-01 00:00:00,9999-12-31 23:59:59,9999-12-31 23:59:59.000001000
+====

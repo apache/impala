@@ -32,6 +32,16 @@ class TestKuduOperations(CustomClusterTestSuite, KuduTestSuite):
     return 'functional-query'
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(impalad_args=\
+      "--use_local_tz_for_unix_timestamp_conversions=true")
+  def test_local_tz_conversion_ops(self, vector, unique_database):
+    """IMPALA-5539: Test Kudu timestamp reads/writes are correct with the
+       use_local_tz_for_unix_timestamp_conversions flag."""
+    # These tests provide enough coverage of queries with timestamps.
+    self.run_test_case('QueryTest/kudu-scan-node', vector, use_db=unique_database)
+    self.run_test_case('QueryTest/kudu_insert', vector, use_db=unique_database)
+
+  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="-kudu_master_hosts=")
   def test_kudu_master_hosts(self, cursor, kudu_client):
     """Check behavior when -kudu_master_hosts is not provided to catalogd."""

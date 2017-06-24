@@ -102,8 +102,9 @@ class TimestampValue {
     return TimestampValue(temp);
   }
 
-  /// Same as FromUnixTime() above, but the unix time is specified in microseconds.
-  static TimestampValue FromUnixTimeMicros(int64_t unix_time_micros);
+  /// Return the corresponding timestamp in UTC for the Unix time specified in
+  /// microseconds.
+  static TimestampValue UtcFromUnixTimeMicros(int64_t unix_time_micros);
 
   /// Returns a TimestampValue where the integer part of the specified 'unix_time'
   /// specifies the number of seconds (see above), and the fractional part is converted
@@ -280,6 +281,13 @@ class TimestampValue {
   /// FLAGS_use_local_tz_for_unix_timestamp_conversions. If the flag is true, the value
   /// will be in the local time zone. If the flag is false, the value will be in UTC.
   static boost::posix_time::ptime UnixTimeToPtime(time_t unix_time);
+
+  /// Same as the above, but the time zone of the resulting ptime is always in the local
+  /// time zone.
+  static boost::posix_time::ptime UnixTimeToLocalPtime(time_t unix_time);
+
+  /// Same as the above, but the time zone of the resulting ptime is always in UTC.
+  static boost::posix_time::ptime UnixTimeToUtcPtime(time_t unix_time);
 };
 
 /// This function must be called 'hash_value' to be picked up by boost.

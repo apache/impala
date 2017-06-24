@@ -134,7 +134,7 @@ public class KuduColumn extends Column {
   public String getDefaultValueSql() {
     if (!hasDefaultValue()) return null;
     if (!type_.isTimestamp()) return defaultValue_.toSql();
-    return "timestamp_from_unix_micros(" + defaultValue_.getStringValue() + ")";
+    return "unix_micros_to_utc_timestamp(" + defaultValue_.getStringValue() + ")";
   }
 
   /**

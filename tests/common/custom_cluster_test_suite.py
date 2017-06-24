@@ -48,6 +48,14 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(CustomClusterTestSuite, cls).add_test_dimensions()
+    cls.add_custom_cluster_constraints()
+
+  @classmethod
+  def add_custom_cluster_constraints(cls):
+    # Defines constraints for custom cluster tests, called by add_test_dimensions.
+    # By default, custom cluster tests only run on text/none and with a limited set of
+    # exec options. Subclasses may override this to relax these default constraints.
+    super(CustomClusterTestSuite, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'text' and
         v.get_value('table_format').compression_codec == 'none')
