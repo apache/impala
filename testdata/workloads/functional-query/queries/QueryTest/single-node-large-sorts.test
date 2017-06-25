@@ -29,6 +29,38 @@ STRING,STRING,STRING
 'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','',''
 'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','',''
 ---- RUNTIME_PROFILE
-row_regex: .* TotalMergesPerformed: [^0] .*
-row_regex: .* SpilledRuns: [^0] .*
+row_regex: .* TotalMergesPerformed: [^0].*
+row_regex: .* SpilledRuns: [^0].*
+====
+---- QUERY
+# Regression test for IMPALA-5554: first string column in sort tuple is null
+# on boundary of spilled block. Test does two sorts with a NULL and non-NULL
+# string column in both potential orders.
+set max_block_mgr_memory=50m;
+select *
+from (
+  select *, first_value(col) over (order by sort_col) fv
+  from (
+    select concat(l_linestatus, repeat('a', 63)) sort_col, if(l_returnflag = 'foo', l_returnflag, NULL) col
+    from tpch_parquet.lineitem limit 100000
+    union all
+    select if(l_returnflag = 'foo', l_returnflag, NULL) sort_col, concat(l_linestatus, repeat('a', 63)) col
+    from tpch_parquet.lineitem) q limit 100000
+  ) q2
+limit 10
+---- TYPES
+STRING,STRING,STRING
+---- RESULTS
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','NULL','NULL'
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','NULL','NULL'
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','NULL','NULL'
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','NULL','NULL'
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','NULL','NULL'
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','NULL','NULL'
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','NULL','NULL'
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','NULL','NULL'
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','NULL','NULL'
+'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','NULL','NULL'
+---- RUNTIME_PROFILE
+row_regex: .* SpilledRuns: [^0].*
 ====

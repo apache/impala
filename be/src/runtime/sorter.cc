@@ -1006,9 +1006,11 @@ bool Sorter::Run::ConvertOffsetsToPtrs(Tuple* tuple) {
       var_len_blocks_[var_len_blocks_index_]->buffer();
 
   const vector<SlotDescriptor*>& string_slots = sort_tuple_desc_->string_slots();
+  int num_non_null_string_slots = 0;
   for (int i = 0; i < string_slots.size(); ++i) {
     SlotDescriptor* slot_desc = string_slots[i];
     if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
+    ++num_non_null_string_slots;
 
     DCHECK(slot_desc->type().IsVarLenStringType());
     StringValue* value = reinterpret_cast<StringValue*>(
@@ -1026,7 +1028,9 @@ bool Sorter::Run::ConvertOffsetsToPtrs(Tuple* tuple) {
       DCHECK_LE(block_index, var_len_blocks_.size());
       DCHECK_EQ(block_index, var_len_blocks_index_ + 1);
       DCHECK_EQ(block_offset, 0); // The data is the first thing in the next block.
-      DCHECK_EQ(i, 0); // Var len data for tuple shouldn't be split across blocks.
+      // This must be the first slot with var len data for the tuple. Var len data
+      // for tuple shouldn't be split across blocks.
+      DCHECK_EQ(num_non_null_string_slots, 1);
       return false;
     }
 
