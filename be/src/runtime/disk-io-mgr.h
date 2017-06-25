@@ -484,14 +484,14 @@ class DiskIoMgr : public CacheLineAligned {
     /// If true, this scan range is expected to be cached. Note that this might be wrong
     /// since the block could have been uncached. In that case, the cached path
     /// will fail and we'll just put the scan range on the normal read path.
-    bool try_cache_;
+    bool try_cache_ = false;
 
     /// If true, we expect this scan range to be a local read. Note that if this is false,
     /// it does not necessarily mean we expect the read to be remote, and that we never
     /// create scan ranges where some of the range is expected to be remote and some of it
     /// local.
     /// TODO: we can do more with this
-    bool expected_local_;
+    bool expected_local_ = false;
 
     /// Total number of bytes read remotely. This is necessary to maintain a count of
     /// the number of remote scan ranges. Since IO statistics can be collected multiple
@@ -552,14 +552,14 @@ class DiskIoMgr : public CacheLineAligned {
     Status status_;
 
     /// If true, the last buffer for this scan range has been queued.
-    bool eosr_queued_;
+    bool eosr_queued_ = false;
 
     /// If true, the last buffer for this scan range has been returned.
-    bool eosr_returned_;
+    bool eosr_returned_ = false;
 
     /// If true, this scan range has been removed from the reader's in_flight_ranges
     /// queue because the ready_buffers_ queue is full.
-    bool blocked_on_queue_;
+    bool blocked_on_queue_ = false;
 
     /// IO buffers that are queued for this scan range.
     /// Condition variable for GetNext
@@ -581,7 +581,7 @@ class DiskIoMgr : public CacheLineAligned {
     boost::mutex hdfs_lock_;
 
     /// If true, this scan range has been cancelled.
-    bool is_cancelled_;
+    bool is_cancelled_ = false;
 
     /// Last modified time of the file associated with the scan range
     int64_t mtime_;

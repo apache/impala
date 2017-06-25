@@ -213,8 +213,6 @@ bool DiskIoMgr::ScanRange::Validate() {
 
 DiskIoMgr::ScanRange::ScanRange(int capacity)
   : RequestRange(RequestType::READ),
-    try_cache_(false),
-    expected_local_(false),
     num_remote_bytes_(0),
     external_buffer_tag_(ExternalBufferTag::NO_BUFFER),
     ready_buffers_capacity_(capacity),
