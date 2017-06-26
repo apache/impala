@@ -2906,7 +2906,11 @@ public class CatalogOpExecutor {
       updatedPrivs.add(catalogObject);
     }
 
-    if (!updatedPrivs.isEmpty()) {
+    // TODO: Currently we only support sending back 1 catalog object in a "direct DDL"
+    // response. If multiple privileges have been updated, just send back the
+    // catalog version so subscribers can wait for the statestore heartbeat that
+    // contains all updates (see IMPALA-5571).
+    if (updatedPrivs.size() == 1) {
       // If this is a REVOKE statement with hasGrantOpt, only the GRANT OPTION is revoked
       // from the privilege.
       if (grantRevokePrivParams.isIs_grant() ||
@@ -2915,6 +2919,8 @@ public class CatalogOpExecutor {
       } else {
         resp.result.setRemoved_catalog_objects(updatedPrivs);
       }
+      resp.result.setVersion(updatedPrivs.get(0).getCatalog_version());
+    } else if (updatedPrivs.size() > 1) {
       resp.result.setVersion(
           updatedPrivs.get(updatedPrivs.size() - 1).getCatalog_version());
     }
