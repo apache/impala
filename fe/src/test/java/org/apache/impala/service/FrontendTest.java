@@ -207,6 +207,16 @@ public class FrontendTest extends FrontendTestBase {
         assertEquals("", row.colVals.get(4).string_val);
       }
     }
+
+    // Make sure tables that can't be loaded don't result in errors in the GetTables
+    // request (see IMPALA-5579)
+    req = new TMetadataOpRequest();
+    req.opcode = TMetadataOpcode.GET_TABLES;
+    req.get_tables_req = new TGetTablesReq();
+    req.get_tables_req.setSchemaName("functional");
+    req.get_tables_req.setTableName("hive_index_tbl");
+    resp = execMetadataOp(req);
+    assertEquals(0, resp.rows.size());
   }
 
   @Test

@@ -272,7 +272,6 @@ public class MetadataOp {
         List<List<Column>> tablesColumnsList = Lists.newArrayList();
         List<String> tableComments = Lists.newArrayList();
         for (String tabName: fe.getTableNames(db.getName(), tablePatternMatcher, user)) {
-          tableList.add(tabName);
           Table table = null;
           try {
             table = catalog.getTable(db.getName(), tabName);
@@ -291,6 +290,7 @@ public class MetadataOp {
             comment = table.getMetaStoreTable().getParameters().get("comment");
             columns.addAll(fe.getColumns(table, columnPatternMatcher, user));
           }
+          tableList.add(tabName);
           tablesColumnsList.add(columns);
           tableComments.add(Strings.nullToEmpty(comment));
         }
