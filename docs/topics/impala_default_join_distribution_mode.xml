@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="default_join_distribution_mode" rev="2.9.0 IMPALA-5381 IMPALA-5583">
+
+  <title>DEFAULT_JOIN_DISTRIBUTION_MODE Query Option</title>
+  <titlealts audience="PDF"><navtitle>DEFAULT_JOIN_DISTRIBUTION_MODE</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="hidden">DEFAULT_JOIN_DISTRIBUTION_MODE query option</indexterm>
+      This option determines the join distribution that Impala uses when any of the tables
+      involved in a join query is missing statistics.
+    </p>
+
+    <p>
+      Impala optimizes join queries based on the presence of table statistics,
+      which are produced by the Impala <codeph>COMPUTE STATS</codeph> statement.
+      By default, when a table involved in the join query does not have statistics,
+      Impala uses the <q>broadcast</q> technique that transmits the entire contents
+      of the table to all executor nodes participating in the query. If one table
+      involved in a join has statistics and the other does not, the table without
+      statistics is broadcast. If both tables are missing statistics, the table
+      that is referenced second in the join order is broadcast. This behavior
+      is appropriate when the table involved is relatively small, but can lead to
+      excessive network, memory, and CPU overhead if the table being broadcast is
+      large.
+    </p>
+
+    <p>
+      Because Impala queries frequently involve very large tables, and suboptimal
+      joins for such tables could result in spilling or out-of-memory errors,
+      the setting <codeph>DEFAULT_JOIN_DISTRIBUTION_MODE=SHUFFLE</codeph> lets you
+      override the default behavior. The shuffle join mechanism divides the corresponding rows
+      of each table involved in a join query using a hashing algorithm, and transmits
+      subsets of the rows to other nodes for processing. Typically, this kind of join is
+      more efficient for joins between large tables of similar size.
+    </p>
+
+    <p>
+      The setting <codeph>DEFAULT_JOIN_DISTRIBUTION_MODE=SHUFFLE</codeph> is
+      recommended when setting up and deploying new clusters, because it is less likely
+      to result in serious consequences such as spilling or out-of-memory errors if
+      the query plan is based on incomplete information. This setting is not the default,
+      to avoid changing the performance characteristics of join queries for clusters that
+      are already tuned for their existing workloads.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_integer"/>
+    <p>
+      The allowed values are <codeph>BROADCAST</codeph> (equivalent to 0)
+      or <codeph>SHUFFLE</codeph> (equivalent to 1).
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+    <p>
+      The following examples demonstrate appropriate scenarios for each
+      setting of this query option.
+    </p>
+
+<codeblock>
+-- Create a billion-row table.
+create table big_table stored as parquet
+  as select * from huge_table limit 1e9;
+
+-- For a big table with no statistics, the
+-- shuffle join mechanism is appropriate.
+set default_join_distribution_mode=shuffle;
+
+...join queries involving the big table...
+</codeblock>
+
+<codeblock>
+-- Create a hundred-row table.
+create table tiny_table stored as parquet
+  as select * from huge_table limit 100;
+
+-- For a tiny table with no statistics, the
+-- broadcast join mechanism is appropriate.
+set default_join_distribution_mode=broadcast;
+
+...join queries involving the tiny table...
+</codeblock>
+
+<codeblock>
+compute stats tiny_table;
+compute stats big_table;
+
+-- Once the stats are computed, the query option has
+-- no effect on join queries involving these tables.
+-- Impala can determine the absolute and relative sizes
+-- of each side of the join query by examining the
+-- row size, cardinality, and so on of each table.
+
+...join queries involving both of these tables...
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref keyref="compute_stats"/>,
+      <xref keyref="joins"/>,
+      <xref keyref="perf_joins"/>
+    </p>
+
+  </conbody>
+</concept>

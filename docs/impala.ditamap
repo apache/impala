@@ -176,6 +176,7 @@ under the License.
           <topicref href="topics/impala_batch_size.xml"/>
           <topicref href="topics/impala_compression_codec.xml"/>
           <topicref href="topics/impala_debug_action.xml"/>
+          <topicref rev="2.9.0 IMPALA-5381" href="topics/impala_default_join_distribution_mode.xml"/>
           <topicref href="topics/impala_default_order_by_limit.xml"/>
           <topicref audience="hidden" href="topics/impala_disable_cached_reads.xml"/>
           <topicref href="topics/impala_disable_codegen.xml"/>
