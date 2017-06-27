@@ -28,7 +28,6 @@ DEBUG_ACTION_DIMS = [None,
   '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@0.9',
   '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0']
 
-
 @pytest.mark.xfail(pytest.config.option.testing_remote_cluster,
                    reason='Queries may not spill on larger clusters')
 class TestSpilling(ImpalaTestSuite):
@@ -56,6 +55,18 @@ class TestSpilling(ImpalaTestSuite):
     """Test that we can process large rows in spilling operators, with or without
        spilling to disk"""
     self.run_test_case('QueryTest/spilling-large-rows', vector, unique_database)
+
+  def test_spilling_naaj(self, vector):
+    """Test spilling null-aware anti-joins"""
+    self.run_test_case('QueryTest/spilling-naaj', vector)
+
+  def test_spilling_naaj_no_deny_reservation(self, vector):
+    """
+    Null-aware anti-join tests that depend on getting more than the minimum reservation
+    and therefore will not reliably pass with the deny reservation debug action enabled.
+    """
+    if vector.get_value('exec_option')['debug_action'] is None:
+      self.run_test_case('QueryTest/spilling-naaj-no-deny-reservation', vector)
 
   def test_spilling_sorts_exhaustive(self, vector):
     if self.exploration_strategy() != 'exhaustive':

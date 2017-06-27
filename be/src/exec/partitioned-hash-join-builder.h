@@ -201,14 +201,25 @@ class PhjBuilder : public DataSink {
     Status BuildHashTable(bool* built) WARN_UNUSED_RESULT;
 
     /// Spills this partition, the partition's stream is unpinned with 'mode' and
-    /// its hash table is destroyed if it was built.
+    /// its hash table is destroyed if it was built. Calling with 'mode' UNPIN_ALL
+    /// unpins all pages and frees all buffers associated with the partition so that
+    /// the partition does not use any reservation. Calling with 'mode'
+    /// UNPIN_ALL_EXCEPT_CURRENT may leave the read or write pages of the unpinned stream
+    /// pinned and therefore using reservation. If the partition was previously
+    /// spilled with mode UNPIN_ALL_EXCEPT_CURRENT, then calling Spill() again with
+    /// UNPIN_ALL may release more reservation by unpinning the read or write page
+    /// in the stream.
     Status Spill(BufferedTupleStream::UnpinMode mode) WARN_UNUSED_RESULT;
+
+    std::string DebugString();
 
     bool ALWAYS_INLINE IsClosed() const { return build_rows_ == NULL; }
     BufferedTupleStream* ALWAYS_INLINE build_rows() { return build_rows_.get(); }
     HashTable* ALWAYS_INLINE hash_tbl() const { return hash_tbl_.get(); }
     bool ALWAYS_INLINE is_spilled() const { return is_spilled_; }
     int ALWAYS_INLINE level() const { return level_; }
+    /// Return true if the partition can be spilled - is not closed and is not spilled.
+    bool CanSpill() const { return !IsClosed() && !is_spilled(); }
 
    private:
     /// Inserts each row in 'batch' into 'hash_tbl_' using 'ctx'. 'flat_rows' is an array
@@ -301,8 +312,11 @@ class PhjBuilder : public DataSink {
 
   /// Frees memory by spilling one of the hash partitions. The 'mode' argument is passed
   /// to the Spill() call for the selected partition. The current policy is to spill the
-  /// largest partition. Returns non-ok status if we couldn't spill a partition.
-  Status SpillPartition(BufferedTupleStream::UnpinMode mode) WARN_UNUSED_RESULT;
+  /// null-aware partition first (if a NAAJ), then the largest partition. Returns non-ok
+  /// status if we couldn't spill a partition. If 'spilled_partition' is non-NULL, set
+  /// to the partition that was the one spilled.
+  Status SpillPartition(BufferedTupleStream::UnpinMode mode,
+      Partition** spilled_partition = nullptr) WARN_UNUSED_RESULT;
 
   /// Tries to build hash tables for all unspilled hash partitions. Called after
   /// FlushFinal() when all build rows have been partitioned and added to the appropriate
@@ -452,6 +466,7 @@ class PhjBuilder : public DataSink {
   /// store all the rows for which 'build_expr_evals_' evaluated over the row returns
   /// NULL (i.e. it has a NULL on the eq join slot).
   /// NULL if the join is not null aware or we are done processing this partition.
+  /// This partitions starts off in memory but can be spilled.
   Partition* null_aware_partition_;
 
   /// Populated during the hash table building phase if any partitions spilled.

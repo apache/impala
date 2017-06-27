@@ -169,8 +169,19 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// Returns false and sets 'status' to an error if an error is encountered. This odd
   /// return convention is used to avoid emitting unnecessary code for ~Status in perf-
   /// critical code.
+  bool AppendSpilledProbeRow(
+      BufferedTupleStream* stream, TupleRow* row, Status* status) WARN_UNUSED_RESULT;
+
+  /// Append the probe row 'row' to 'stream'. The stream may be pinned or unpinned and
+  /// and must have a write buffer allocated. Unpins the stream if needed to append the
+  /// row, so this will succeed unless an error is encountered. Returns false and sets
+  /// 'status' to an error if an error is encountered. This odd return convention is
+  /// used to avoid emitting unnecessary code for ~Status in perf-critical code.
   bool AppendProbeRow(
       BufferedTupleStream* stream, TupleRow* row, Status* status) WARN_UNUSED_RESULT;
+
+  /// Slow path for AppendProbeRow() where appending fails initially.
+  bool AppendProbeRowSlow(BufferedTupleStream* stream, TupleRow* row, Status* status);
 
   /// Probes the hash table for rows matching the current probe row and appends
   /// all the matching build rows (with probe row) to output batch. Returns true
@@ -368,6 +379,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   Status PrepareSpilledPartitionForProbe(
       RuntimeState* state, bool* got_partition) WARN_UNUSED_RESULT;
 
+  /// Construct an error status for the null-aware anti-join when it could not fit 'rows'
+  /// from the build side in memory.
+  Status NullAwareAntiJoinError(BufferedTupleStream* rows);
+
   /// Calls Close() on every probe partition, destroys the partitions and cleans up any
   /// references to the partitions. Also closes and destroys 'null_probe_rows_'.
   void CloseAndDeletePartitions();
@@ -468,10 +483,14 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// At the very end, we then iterate over the partition's probe rows. For each probe
   /// row, we return the rows that did not match any of the partition's build rows. This
   /// is NULL if this join is not null aware or we are done processing this partition.
+  /// The probe stream starts off in memory but is unpinned if there is memory pressure,
+  /// specifically if any partitions spilled or appending to the pinned stream failed.
   boost::scoped_ptr<ProbePartition> null_aware_probe_partition_;
 
   /// For NAAJ, this stream contains all probe rows that had NULL on the hash table
   /// conjuncts. Must be unique_ptr so we can release it and transfer to output batches.
+  /// The stream starts off in memory but is unpinned if there is memory pressure,
+  /// specifically if any partitions spilled or appending to the pinned stream failed.
   std::unique_ptr<BufferedTupleStream> null_probe_rows_;
 
   /// For each row in null_probe_rows_, true if this row has matched any build row

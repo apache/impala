@@ -235,12 +235,21 @@ Status PhjBuilder::FlushFinal(RuntimeState* state) {
          << " (fraction=" << fixed << setprecision(2) << percent << "%)" << endl
          << "    #rows:" << partition->build_rows()->num_rows() << endl;
     }
+    if (null_aware_partition_ != nullptr) {
+      ss << " Null-aware partition: " << null_aware_partition_->DebugString();
+    }
     VLOG(2) << ss.str();
   }
 
   if (ht_ctx_->level() == 0) {
     PublishRuntimeFilters(num_build_rows);
     non_empty_build_ |= (num_build_rows > 0);
+  }
+
+  if (null_aware_partition_ != nullptr && null_aware_partition_->is_spilled()) {
+    // Free up memory for the hash tables of other partitions by unpinning the
+    // last block of the null aware partition's stream.
+    RETURN_IF_ERROR(null_aware_partition_->Spill(BufferedTupleStream::UNPIN_ALL));
   }
 
   RETURN_IF_ERROR(BuildHashTablesAndPrepareProbeStreams());
@@ -308,38 +317,42 @@ bool PhjBuilder::AppendRowStreamFull(
 }
 
 // TODO: can we do better with a different spilling heuristic?
-Status PhjBuilder::SpillPartition(BufferedTupleStream::UnpinMode mode) {
+Status PhjBuilder::SpillPartition(BufferedTupleStream::UnpinMode mode,
+    Partition** spilled_partition) {
   DCHECK_EQ(hash_partitions_.size(), PARTITION_FANOUT);
-  int64_t max_freed_mem = 0;
-  int partition_idx = -1;
-
-  // Iterate over the partitions and pick the largest partition to spill.
-  for (int i = 0; i < PARTITION_FANOUT; ++i) {
-    Partition* candidate = hash_partitions_[i];
-    if (candidate->IsClosed()) continue;
-    if (candidate->is_spilled()) continue;
-    int64_t mem = candidate->build_rows()->BytesPinned(false);
-    if (candidate->hash_tbl() != NULL) {
-      // The hash table should not have matches, since we have not probed it yet.
-      // Losing match info would lead to incorrect results (IMPALA-1488).
-      DCHECK(!candidate->hash_tbl()->HasMatches());
-      mem += candidate->hash_tbl()->ByteSize();
-    }
-    if (mem > max_freed_mem) {
-      max_freed_mem = mem;
-      partition_idx = i;
+  Partition* best_candidate = nullptr;
+  if (null_aware_partition_ != nullptr && null_aware_partition_->CanSpill()) {
+    // Spill null-aware partition first if possible - it is always processed last.
+    best_candidate = null_aware_partition_;
+  } else {
+    // Iterate over the partitions and pick the largest partition to spill.
+    int64_t max_freed_mem = 0;
+    for (Partition* candidate : hash_partitions_) {
+      if (!candidate->CanSpill()) continue;
+      int64_t mem = candidate->build_rows()->BytesPinned(false);
+      if (candidate->hash_tbl() != NULL) {
+        // The hash table should not have matches, since we have not probed it yet.
+        // Losing match info would lead to incorrect results (IMPALA-1488).
+        DCHECK(!candidate->hash_tbl()->HasMatches());
+        mem += candidate->hash_tbl()->ByteSize();
+      }
+      if (mem > max_freed_mem) {
+        max_freed_mem = mem;
+        best_candidate = candidate;
+      }
     }
   }
 
-  if (partition_idx == -1) {
+  if (best_candidate == nullptr) {
     return Status(Substitute("Internal error: could not find a partition to spill in "
-                             " hash join $1: \n$2\nClient:\n$3",
+                             " hash join $0: \n$1\nClient:\n$2",
         join_node_id_, DebugString(), buffer_pool_client_->DebugString()));
   }
 
-  VLOG(2) << "Spilling partition: " << partition_idx << endl << DebugString();
-  Partition* build_partition = hash_partitions_[partition_idx];
-  RETURN_IF_ERROR(build_partition->Spill(mode));
+  VLOG(2) << "Spilling partition: " << best_candidate->DebugString() << endl
+          << DebugString();
+  RETURN_IF_ERROR(best_candidate->Spill(mode));
+  if (spilled_partition != nullptr) *spilled_partition = best_candidate;
   return Status::OK();
 }
 
@@ -436,8 +449,11 @@ Status PhjBuilder::InitSpilledPartitionProbeStreams() {
       RETURN_IF_ERROR(probe_stream->PrepareForWrite(&got_buffer));
       if (got_buffer) break;
 
-      RETURN_IF_ERROR(SpillPartition(BufferedTupleStream::UNPIN_ALL));
-      ++probe_streams_to_create;
+      Partition* spilled_partition;
+      RETURN_IF_ERROR(SpillPartition(
+            BufferedTupleStream::UNPIN_ALL, &spilled_partition));
+      // Don't need to create a probe stream for the null-aware partition.
+      if (spilled_partition != null_aware_partition_) ++probe_streams_to_create;
     }
     --probe_streams_to_create;
   }
@@ -705,6 +721,27 @@ not_built:
   return status;
 }
 
+std::string PhjBuilder::Partition::DebugString() {
+  stringstream ss;
+  ss << "<Partition>: ptr=" << this;
+  if (IsClosed()) {
+    ss << " Closed";
+    return ss.str();
+  }
+  if (is_spilled()) {
+    ss << " Spilled";
+  }
+  DCHECK(build_rows() != nullptr);
+  ss << endl
+     << "    Build Rows: " << build_rows_->num_rows()
+     << " (Bytes pinned: " << build_rows_->BytesPinned(false) << ")"
+     << endl;
+  if (hash_tbl_ != NULL) {
+    ss << "    Hash Table Rows: " << hash_tbl_->size();
+  }
+  return ss.str();
+}
+
 void PhjBuilder::Codegen(LlvmCodeGen* codegen) {
   Status build_codegen_status;
   Status insert_codegen_status;
@@ -739,23 +776,10 @@ string PhjBuilder::DebugString() const {
   stringstream ss;
   ss << "Hash partitions: " << hash_partitions_.size() << ":" << endl;
   for (int i = 0; i < hash_partitions_.size(); ++i) {
-    Partition* partition = hash_partitions_[i];
-    ss << " Hash partition " << i << " ptr=" << partition;
-    if (partition->IsClosed()) {
-      ss << " Closed";
-      continue;
-    }
-    if (partition->is_spilled()) {
-      ss << " Spilled";
-    }
-    DCHECK(partition->build_rows() != NULL);
-    ss << endl
-       << "    Build Rows: " << partition->build_rows()->num_rows()
-       << " (Bytes pinned: " << partition->build_rows()->BytesPinned(false) << ")"
-       << endl;
-    if (partition->hash_tbl() != NULL) {
-      ss << "    Hash Table Rows: " << partition->hash_tbl()->size() << endl;
-    }
+    ss << " Hash partition " << i << " " << hash_partitions_[i]->DebugString() << endl;
+  }
+  if (null_aware_partition_ != nullptr) {
+    ss << "Null-aware partition: " << null_aware_partition_->DebugString();
   }
   return ss.str();
 }
