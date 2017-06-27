@@ -26,6 +26,7 @@ from time import sleep
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_uncompressed_text_dimension
+from tests.util.calculation_util import get_random_id
 from tests.verifiers.metric_verifier import MetricVerifier
 
 SENTRY_CONFIG_FILE = getenv('IMPALA_HOME') + '/fe/src/test/resources/sentry-site.xml'
@@ -98,6 +99,72 @@ class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--server_name=server1",
+      catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE +
+                    " --sentry_catalog_polling_frequency_s=1",
+      statestored_args="--statestore_update_frequency_ms=300")
+  def test_role_privilege_case(self, vector):
+    """IMPALA-5582: Store sentry privileges in lower case. This
+    test grants select privileges to roles assgined to tables/db
+    specified in lower, upper and mix cases. This test verifies
+    that these privileges do not vanish on a sentryProxy thread
+    update.
+    """
+    db_name = "test_role_privilege_case_x_" + get_random_id(5)
+    db_name_upper_case = "TEST_ROLE_PRIVILEGE_CASE_Y_" + get_random_id(5).upper()
+    db_name_mixed_case = "TesT_Role_PRIVIlege_case_z" + get_random_id(5)
+    role_name = "test_role_" + get_random_id(5)
+    try:
+      self.client.execute("create role {0}".format(role_name))
+      self.client.execute("grant all on server to {0}".format(role_name))
+      self.client.execute(
+          "grant role {0} to group {1}".format(
+           role_name, grp.getgrnam(getuser()).gr_name))
+
+      self.client.execute("create database " + db_name)
+      self.client.execute("create database " + db_name_upper_case)
+      self.client.execute("create database " + db_name_mixed_case)
+      self.client.execute(
+          "create table if not exists {0}.test1(i int)".format(db_name))
+      self.client.execute("create table if not exists {0}.TEST2(i int)".format(db_name))
+      self.client.execute("create table if not exists {0}.Test3(i int)".format(db_name))
+
+      self.client.execute(
+          "grant select on table {0}.test1 to {1}".format(db_name, role_name))
+      self.client.execute(
+          "grant select on table {0}.TEST2 to {1}".format(db_name, role_name))
+      self.client.execute(
+          "grant select on table {0}.TesT3 to {1}".format(db_name, role_name))
+      self.client.execute("grant all on database {0} to {1}".format(db_name, role_name))
+      self.client.execute(
+          "grant all on database {0} to {1}".format(db_name_upper_case, role_name))
+      self.client.execute(
+          "grant all on database {0} to {1}".format(db_name_mixed_case, role_name))
+      result = self.client.execute("show grant role {0}".format(role_name))
+      assert any('test1' in x for x in result.data)
+      assert any('test2' in x for x in result.data)
+      assert any('test3' in x for x in result.data)
+      assert any(db_name_upper_case.lower() in x for x in result.data)
+      assert any(db_name_mixed_case.lower() in x for x in result.data)
+      # Sleep for 2 seconds and make sure that the privileges
+      # on all 3 tables still persist on a sentryProxy thread
+      # update. sentry_catalog_polling_frequency_s is set to 1
+      # seconds.
+      sleep(2)
+      result = self.client.execute("show grant role {0}".format(role_name))
+      assert any('test1' in x for x in result.data)
+      assert any('test2' in x for x in result.data)
+      assert any('test3' in x for x in result.data)
+      assert any(db_name_upper_case.lower() in x for x in result.data)
+      assert any(db_name_mixed_case.lower() in x for x in result.data)
+    finally:
+      self.client.execute("drop database if exists {0}".format(db_name_upper_case))
+      self.client.execute("drop database if exists {0}".format(db_name_mixed_case))
+      self.client.execute("drop database if exists {0} cascade".format(db_name))
+      self.client.execute("drop role {0}".format(role_name))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--server_name=server1",
       catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE,
       statestored_args=("--statestore_heartbeat_frequency_ms=300 "
                         "--statestore_update_frequency_ms=300"))
@@ -106,25 +173,29 @@ class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
     reverse order if a role was modified, but not the associated privilege. Verify that
     Impala is able to handle this.
     """
-    self.client.execute("create role test_role")
-    self.client.execute("grant all on server to test_role")
-    # Wait a few seconds to make sure the update propagates to the statestore.
-    sleep(3)
-    # Update the role, increasing its catalog verion.
-    self.client.execute("grant role test_role to group {0}".format(
-        grp.getgrnam(getuser()).gr_name))
-    result = self.client.execute("show tables in functional")
-    assert 'alltypes' in result.data
-    privileges_before = self.client.execute("show grant role test_role")
-    # Wait a few seconds before restarting Impalad to make sure that the Catalog gets
-    # updated.
-    sleep(3)
-    self.restart_first_impalad()
-    verifier = MetricVerifier(self.cluster.impalads[0].service)
-    verifier.wait_for_metric("catalog.ready", True)
-    # Verify that we still have the right privileges after the first impalad was
-    # restarted.
-    result = self.client.execute("show tables in functional");
-    assert 'alltypes' in result.data
-    privileges_after = self.client.execute("show grant role test_role")
-    assert privileges_before.data == privileges_after.data
+    role_name = "test_role_" + get_random_id(5)
+    try:
+      self.client.execute("create role {0}".format(role_name))
+      self.client.execute("grant all on server to {0}".format(role_name))
+      # Wait a few seconds to make sure the update propagates to the statestore.
+      sleep(3)
+      # Update the role, increasing its catalog verion.
+      self.client.execute("grant role {0} to group {1}".format(
+          role_name, grp.getgrnam(getuser()).gr_name))
+      result = self.client.execute("show tables in functional")
+      assert 'alltypes' in result.data
+      privileges_before = self.client.execute("show grant role {0}".format(role_name))
+      # Wait a few seconds before restarting Impalad to make sure that the Catalog gets
+      # updated.
+      sleep(3)
+      self.restart_first_impalad()
+      verifier = MetricVerifier(self.cluster.impalads[0].service)
+      verifier.wait_for_metric("catalog.ready", True)
+      # Verify that we still have the right privileges after the first impalad was
+      # restarted.
+      result = self.client.execute("show tables in functional")
+      assert 'alltypes' in result.data
+      privileges_after = self.client.execute("show grant role {0}".format(role_name))
+      assert privileges_before.data == privileges_after.data
+    finally:
+      self.client.execute("drop role {0}".format(role_name))

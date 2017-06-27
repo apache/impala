@@ -38,6 +38,9 @@ DEFINE_int32(num_metadata_loading_threads, 16,
 DEFINE_int32(initial_hms_cnxn_timeout_s, 120,
     "Number of seconds catalogd will wait to establish an initial connection to the HMS "
     "before exiting.");
+DEFINE_int64(sentry_catalog_polling_frequency_s, 60,
+    "Frequency (in seconds) at which the the catalogd polls the sentry service to update "
+    "any policy changes.");
 DEFINE_string(sentry_config, "", "Local path to a sentry-site.xml configuration "
     "file. If set, authorization will be enabled.");
 

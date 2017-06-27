@@ -33,6 +33,7 @@ DECLARE_int32(read_size);
 DECLARE_int32(num_metadata_loading_threads);
 DECLARE_int32(initial_hms_cnxn_timeout_s);
 DECLARE_int32(kudu_operation_timeout_ms);
+DECLARE_int64(sentry_catalog_polling_frequency_s);
 DECLARE_int64(inc_stats_size_limit_bytes);
 DECLARE_string(principal);
 DECLARE_string(lineage_event_log_dir);
@@ -73,6 +74,7 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_local_library_path(FLAGS_local_library_dir);
   cfg.__set_kudu_operation_timeout_ms(FLAGS_kudu_operation_timeout_ms);
   cfg.__set_enable_partitioned_hash_join(FLAGS_enable_partitioned_hash_join);
+  cfg.__set_sentry_catalog_polling_frequency_s(FLAGS_sentry_catalog_polling_frequency_s);
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &cfg, cfg_bytes));
   return Status::OK();
 }

@@ -31,8 +31,6 @@ struct TBackendGflags {
 
   5: required i64 inc_stats_size_limit_bytes
 
- 19: required bool enable_stats_extrapolation
-
   6: required string lineage_event_log_dir
 
   7: required bool load_catalog_in_background
@@ -58,4 +56,8 @@ struct TBackendGflags {
   17: required i32 initial_hms_cnxn_timeout_s
 
   18: required bool enable_partitioned_hash_join
+
+  19: required bool enable_stats_extrapolation
+
+  20: required i64 sentry_catalog_polling_frequency_s
 }

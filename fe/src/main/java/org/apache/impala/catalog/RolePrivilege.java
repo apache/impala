@@ -66,30 +66,42 @@ public class RolePrivilege implements CatalogObject {
       Preconditions.checkNotNull(scope);
       switch (scope) {
         case SERVER: {
-          authorizable.add(KV_JOINER.join("server", privilege.getServer_name()));
+          authorizable.add(KV_JOINER.join("server", privilege.getServer_name().
+              toLowerCase()));
           break;
         }
         case URI: {
-          authorizable.add(KV_JOINER.join("server", privilege.getServer_name()));
+          authorizable.add(KV_JOINER.join("server", privilege.getServer_name().
+              toLowerCase()));
+          // (IMPALA-2695) URIs are case sensitive
           authorizable.add(KV_JOINER.join("uri", privilege.getUri()));
           break;
         }
         case DATABASE: {
-          authorizable.add(KV_JOINER.join("server", privilege.getServer_name()));
-          authorizable.add(KV_JOINER.join("db", privilege.getDb_name()));
+          authorizable.add(KV_JOINER.join("server", privilege.getServer_name().
+              toLowerCase()));
+          authorizable.add(KV_JOINER.join("db", privilege.getDb_name().
+              toLowerCase()));
           break;
         }
         case TABLE: {
-          authorizable.add(KV_JOINER.join("server", privilege.getServer_name()));
-          authorizable.add(KV_JOINER.join("db", privilege.getDb_name()));
-          authorizable.add(KV_JOINER.join("table", privilege.getTable_name()));
+          authorizable.add(KV_JOINER.join("server", privilege.getServer_name().
+              toLowerCase()));
+          authorizable.add(KV_JOINER.join("db", privilege.getDb_name().
+              toLowerCase()));
+          authorizable.add(KV_JOINER.join("table", privilege.getTable_name().
+              toLowerCase()));
           break;
         }
         case COLUMN: {
-          authorizable.add(KV_JOINER.join("server", privilege.getServer_name()));
-          authorizable.add(KV_JOINER.join("db", privilege.getDb_name()));
-          authorizable.add(KV_JOINER.join("table", privilege.getTable_name()));
-          authorizable.add(KV_JOINER.join("column", privilege.getColumn_name()));
+          authorizable.add(KV_JOINER.join("server", privilege.getServer_name().
+              toLowerCase()));
+          authorizable.add(KV_JOINER.join("db", privilege.getDb_name().
+              toLowerCase()));
+          authorizable.add(KV_JOINER.join("table", privilege.getTable_name().
+              toLowerCase()));
+          authorizable.add(KV_JOINER.join("column", privilege.getColumn_name().
+              toLowerCase()));
           break;
         }
         default: {

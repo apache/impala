@@ -328,12 +328,13 @@ public class AuthorizationPolicy implements PrivilegeCache {
         if (!privName.equalsIgnoreCase(privilege.getPrivilege_name())) continue;
       }
       TResultRowBuilder rowBuilder = new TResultRowBuilder();
-      rowBuilder.add(privilege.getScope().toString());
-      rowBuilder.add(Strings.nullToEmpty(privilege.getDb_name()));
-      rowBuilder.add(Strings.nullToEmpty(privilege.getTable_name()));
-      rowBuilder.add(Strings.nullToEmpty(privilege.getColumn_name()));
+      rowBuilder.add(privilege.getScope().toString().toLowerCase());
+      rowBuilder.add(Strings.nullToEmpty(privilege.getDb_name()).toLowerCase());
+      rowBuilder.add(Strings.nullToEmpty(privilege.getTable_name()).toLowerCase());
+      rowBuilder.add(Strings.nullToEmpty(privilege.getColumn_name()).toLowerCase());
+      // URIs are case sensitive
       rowBuilder.add(Strings.nullToEmpty(privilege.getUri()));
-      rowBuilder.add(privilege.getPrivilege_level().toString());
+      rowBuilder.add(privilege.getPrivilege_level().toString().toLowerCase());
       rowBuilder.add(Boolean.toString(privilege.isHas_grant_opt()));
       if (privilege.getCreate_time_ms() == -1) {
         rowBuilder.add(null);
