@@ -256,3 +256,7 @@ explain select count(distinct double_col) from functional.alltypesagg;
 '01:AGGREGATE'
 '00:SCAN HDFS [functional.alltypesagg]'
 ====
+---- QUERY
+# IMPALA-5591: This shouldn't throw an error.
+set scratch_limit=-1;
+====

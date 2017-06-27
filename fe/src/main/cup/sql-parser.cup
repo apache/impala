@@ -356,6 +356,7 @@ nonterminal AnalyticWindow opt_window_clause;
 nonterminal AnalyticWindow.Type window_type;
 nonterminal AnalyticWindow.Boundary window_boundary;
 nonterminal LiteralExpr literal;
+nonterminal NumericLiteral numeric_literal;
 nonterminal CaseExpr case_expr;
 nonterminal ArrayList<CaseWhenClause> case_when_clause_list;
 nonterminal FunctionParams function_params;
@@ -2287,6 +2288,10 @@ select_clause ::=
 set_stmt ::=
   KW_SET ident_or_default:key EQUAL literal:l
   {: RESULT = new SetStmt(key, l.getStringValue()); :}
+  | KW_SET ident_or_default:key EQUAL SUBTRACT numeric_literal:l
+  {:
+    l.swapSign();
+    RESULT = new SetStmt(key, l.getStringValue()); :}
   | KW_SET ident_or_default:key EQUAL ident_or_default:ident
   {: RESULT = new SetStmt(key, ident); :}
   | KW_SET
@@ -2859,11 +2864,16 @@ timestamp_arithmetic_expr ::=
   :}
   ;
 
-literal ::=
+numeric_literal ::=
   INTEGER_LITERAL:l
   {: RESULT = new NumericLiteral(l); :}
   | DECIMAL_LITERAL:l
   {: RESULT = new NumericLiteral(l); :}
+  ;
+
+literal ::=
+  numeric_literal:l
+  {: RESULT = l; :}
   | STRING_LITERAL:l
   {: RESULT = new StringLiteral(l); :}
   | KW_TRUE
