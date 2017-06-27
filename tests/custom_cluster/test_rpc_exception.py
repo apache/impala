@@ -49,6 +49,8 @@ class TestRPCException(CustomClusterTestSuite):
       assert result.data == self.EXPECTED_RESULT
       assert not exception_string
     except ImpalaBeeswaxException as e:
+      if exception_string is None:
+        raise e
       assert exception_string in str(e)
 
   @pytest.mark.execute_serially

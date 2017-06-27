@@ -48,7 +48,7 @@ class ImpalaBackendClient : public ImpalaInternalServiceClient {
   void ExecQueryFInstances(TExecQueryFInstancesResult& _return,
       const TExecQueryFInstancesParams& params, bool* send_done) {
     DCHECK(!*send_done);
-    FAULT_INJECTION_SEND_RPC_EXCEPTION(5);
+    FAULT_INJECTION_SEND_RPC_EXCEPTION(16);
     ImpalaInternalServiceClient::send_ExecQueryFInstances(params);
     *send_done = true;
     // Cannot inject fault on recv() side as the callers cannot handle it.
@@ -58,20 +58,20 @@ class ImpalaBackendClient : public ImpalaInternalServiceClient {
   void ReportExecStatus(TReportExecStatusResult& _return,
       const TReportExecStatusParams& params, bool* send_done) {
     DCHECK(!*send_done);
-    FAULT_INJECTION_SEND_RPC_EXCEPTION(3);
+    FAULT_INJECTION_SEND_RPC_EXCEPTION(16);
     ImpalaInternalServiceClient::send_ReportExecStatus(params);
     *send_done = true;
-    FAULT_INJECTION_RECV_RPC_EXCEPTION(3);
+    FAULT_INJECTION_RECV_RPC_EXCEPTION(16);
     ImpalaInternalServiceClient::recv_ReportExecStatus(_return);
   }
 
   void CancelQueryFInstances(TCancelQueryFInstancesResult& _return,
       const TCancelQueryFInstancesParams& params, bool* send_done) {
     DCHECK(!*send_done);
-    FAULT_INJECTION_SEND_RPC_EXCEPTION(3);
+    FAULT_INJECTION_SEND_RPC_EXCEPTION(16);
     ImpalaInternalServiceClient::send_CancelQueryFInstances(params);
     *send_done = true;
-    FAULT_INJECTION_RECV_RPC_EXCEPTION(3);
+    FAULT_INJECTION_RECV_RPC_EXCEPTION(16);
     ImpalaInternalServiceClient::recv_CancelQueryFInstances(_return);
   }
 
