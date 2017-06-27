@@ -406,14 +406,14 @@ public class AuditingTest extends AnalyzerTest {
         "functional_kudu.alltypes");
     Assert.assertEquals(accessEvents, Sets.newHashSet(
         new TAccessEvent("functional_kudu.alltypes", TCatalogObjectType.TABLE, "SELECT"),
-        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "INSERT")));
+        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "ALL")));
 
     // Delete
     accessEvents = AnalyzeAccessEvents(
         "delete from functional_kudu.testtbl where id = 1");
     Assert.assertEquals(accessEvents, Sets.newHashSet(
         new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "SELECT"),
-        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "INSERT")));
+        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "ALL")));
 
     // Delete using a complex query
     accessEvents = AnalyzeAccessEvents(
@@ -422,14 +422,14 @@ public class AuditingTest extends AnalyzerTest {
     Assert.assertEquals(accessEvents, Sets.newHashSet(
         new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "SELECT"),
         new TAccessEvent("functional_kudu.alltypes", TCatalogObjectType.TABLE, "SELECT"),
-        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "INSERT")));
+        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "ALL")));
 
     // Update
     accessEvents = AnalyzeAccessEvents(
         "update functional_kudu.testtbl set name = 'test' where id < 10");
     Assert.assertEquals(accessEvents, Sets.newHashSet(
         new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "SELECT"),
-        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "INSERT")));
+        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "ALL")));
 
     // Drop table
     accessEvents = AnalyzeAccessEvents("drop table functional_kudu.testtbl");

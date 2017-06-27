@@ -283,17 +283,6 @@ public class PrivilegeSpec implements ParseNode {
           "to issue a GRANT/REVOKE statement.", tableName_.toString()));
     }
     Preconditions.checkNotNull(table);
-    if (table instanceof KuduTable) {
-      // We only support the ALL privilege on Kudu tables since many of the finer-grained
-      // levels (DELETE/UPDATE) are not available. See IMPALA-4000 for details.
-      if (privilegeLevel_ != TPrivilegeLevel.ALL) {
-        throw new AnalysisException("Kudu tables only support the ALL privilege level.");
-      }
-      if (scope_ == TPrivilegeScope.COLUMN) {
-        throw new AnalysisException("Column-level privileges on Kudu " +
-            "tables are not supported.");
-      }
-    }
     return table;
   }
 }

@@ -404,6 +404,9 @@ public class InsertStmt extends StatementBase {
    * Adds table_ to the analyzer's descriptor table if analysis succeeds.
    */
   private void analyzeTargetTable(Analyzer analyzer) throws AnalysisException {
+    // Fine-grained privileges for UPSERT do not exist yet, so they require ALL for now.
+    Privilege privilegeRequired = isUpsert_ ? Privilege.ALL : Privilege.INSERT;
+
     // If the table has not yet been set, load it from the Catalog. This allows for
     // callers to set a table to analyze that may not actually be created in the Catalog.
     // One example use case is CREATE TABLE AS SELECT which must run analysis on the
@@ -413,12 +416,12 @@ public class InsertStmt extends StatementBase {
         targetTableName_ =
             new TableName(analyzer.getDefaultDb(), targetTableName_.getTbl());
       }
-      table_ = analyzer.getTable(targetTableName_, Privilege.INSERT);
+      table_ = analyzer.getTable(targetTableName_, privilegeRequired);
     } else {
       targetTableName_ = new TableName(table_.getDb().getName(), table_.getName());
       PrivilegeRequestBuilder pb = new PrivilegeRequestBuilder();
       analyzer.registerPrivReq(pb.onTable(table_.getDb().getName(), table_.getName())
-          .allOf(Privilege.INSERT).toRequest());
+          .allOf(privilegeRequired).toRequest());
     }
 
     // We do not support (in|up)serting into views.

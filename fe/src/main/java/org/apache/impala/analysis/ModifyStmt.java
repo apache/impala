@@ -144,9 +144,9 @@ public abstract class ModifyStmt extends StatementBase {
     }
     table_ = (KuduTable) dstTbl;
 
-    // Make sure that the user is allowed to modify the target table, since no
-    // UPDATE / DELETE privilege exists, we reuse the INSERT one.
-    analyzer.registerAuthAndAuditEvent(dstTbl, Privilege.INSERT);
+    // Make sure that the user is allowed to modify the target table. Use ALL because no
+    // UPDATE / DELETE privilege exists yet (IMPALA-3840).
+    analyzer.registerAuthAndAuditEvent(dstTbl, Privilege.ALL);
 
     // Validates the assignments_ and creates the sourceStmt_.
     if (sourceStmt_ == null) createSourceStmt(analyzer);

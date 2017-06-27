@@ -99,11 +99,89 @@ alter table grant_rev_db.kudu_tbl set tblproperties('EXTERNAL'='TRUE');
 alter table grant_rev_db.kudu_tbl set tblproperties('EXTERNAL'='FALSE');
 ====
 ---- QUERY
+create role grant_revoke_test_KUDU
+====
+---- QUERY
+grant role grant_revoke_test_KUDU to group $GROUP_NAME;
+====
+---- QUERY
+revoke role grant_revoke_test_ALL_SERVER from group $GROUP_NAME
+====
+---- QUERY
+revoke role grant_revoke_test_ALL_TEST_DB from group $GROUP_NAME
+====
+---- QUERY
+insert into grant_rev_db.kudu_tbl values (1, "foo");
+---- CATCH
+does not have privileges to execute 'INSERT' on: grant_rev_db.kudu_tbl
+====
+---- QUERY
+grant insert on table grant_rev_db.kudu_tbl to grant_revoke_test_KUDU
+====
+---- QUERY
+insert into grant_rev_db.kudu_tbl values (1, "foo");
+====
+---- QUERY
+# UPSERT requires ALL
+upsert into grant_rev_db.kudu_tbl values (1, "bar");
+---- CATCH
+does not have privileges to access: grant_rev_db.kudu_tbl
+====
+---- QUERY
+select * from grant_rev_db.kudu_tbl
+---- CATCH
+does not have privileges to execute 'SELECT' on: grant_rev_db.kudu_tbl
+====
+---- QUERY
+grant select(i) on table grant_rev_db.kudu_tbl to grant_revoke_test_KUDU
+====
+---- QUERY
+select i from grant_rev_db.kudu_tbl
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
+# UPDATE/DELETE requires ALL privileges
+update grant_rev_db.kudu_tbl set a = "zzz"
+---- CATCH
+does not have privileges to access: grant_rev_db.kudu_tbl
+====
+---- QUERY
+delete from grant_rev_db.kudu_tbl
+---- CATCH
+does not have privileges to access: grant_rev_db.kudu_tbl
+====
+---- QUERY
+grant select(a) on table grant_rev_db.kudu_tbl to grant_revoke_test_KUDU
+---- RESULTS
+====
+---- QUERY
+grant ALL on table grant_rev_db.kudu_tbl to grant_revoke_test_KUDU
+====
+---- QUERY
+update grant_rev_db.kudu_tbl set a = "zzz"
+---- RESULTS
+====
+---- QUERY
+upsert into grant_rev_db.kudu_tbl values (1, "mom");
+---- RESULTS
+====
+---- QUERY
+select * from grant_rev_db.kudu_tbl
+---- RESULTS
+1,'mom'
+---- TYPES
+INT, STRING
+====
+---- QUERY
 drop table grant_rev_db.kudu_tbl
 ====
 ---- QUERY
 # Cleanup test roles
 drop role grant_revoke_test_ALL_SERVER;
 drop role grant_revoke_test_ALL_TEST_DB;
+drop role grant_revoke_test_KUDU;
 ---- RESULTS
 ====

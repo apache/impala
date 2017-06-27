@@ -3520,6 +3520,10 @@ public class ParserTest extends FrontendTestBase {
 
     ParserError("GRANT ALL ON TABLE foo FROM myrole");
     ParserError("REVOKE ALL ON TABLE foo TO myrole");
+
+    ParserError("GRANT UPDATE ON TABLE foo TO myRole");
+    ParserError("GRANT DELETE ON TABLE foo TO myRole");
+    ParserError("GRANT UPSERT ON TABLE foo TO myRole");
   }
 
   @Test
