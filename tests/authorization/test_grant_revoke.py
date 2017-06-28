@@ -86,6 +86,14 @@ class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
   def test_grant_revoke(self, vector):
     self.run_test_case('QueryTest/grant_revoke', vector, use_db="default")
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--server_name=server1",
+      catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE)
+  def test_grant_revoke_kudu(self, vector):
+    if getenv("KUDU_IS_SUPPORTED") == "false":
+      pytest.skip("Kudu is not supported")
+    self.run_test_case('QueryTest/grant_revoke_kudu', vector, use_db="default")
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

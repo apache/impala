@@ -1,0 +1,109 @@
+====
+---- QUERY
+create role grant_revoke_test_ALL_SERVER
+---- RESULTS
+====
+---- QUERY
+create role grant_revoke_test_ALL_TEST_DB
+---- RESULTS
+====
+---- QUERY
+show roles
+---- RESULTS: VERIFY_IS_SUBSET
+'grant_revoke_test_ALL_SERVER'
+'grant_revoke_test_ALL_TEST_DB'
+---- TYPES
+STRING
+====
+---- QUERY
+grant role grant_revoke_test_ALL_SERVER to group $GROUP_NAME
+====
+---- QUERY
+grant all on server to grant_revoke_test_ALL_SERVER
+====
+---- QUERY
+create database grant_rev_db
+====
+---- QUERY
+grant role grant_revoke_test_ALL_TEST_DB to group $GROUP_NAME
+====
+---- QUERY
+# Should now have all privileges on the test db
+grant all on database grant_rev_db to grant_revoke_test_ALL_TEST_DB
+====
+---- QUERY
+revoke role grant_revoke_test_ALL_SERVER from group $GROUP_NAME
+====
+---- QUERY
+show current roles
+---- RESULTS
+'grant_revoke_test_ALL_TEST_DB'
+---- TYPES
+STRING
+====
+---- QUERY
+# Even though the user has all privileges on the database, they do not have privileges
+# to set a Kudu table to be EXTERNAL as that requires ALL on the server. Create a
+# managed table with the EXTERNAL property explicitly set.
+create table grant_rev_db.kudu_tbl_with_ext (i int primary key, a string)
+partition by hash(i) partitions 3 stored as kudu
+tblproperties('EXTERNAL'='TRUE')
+---- CATCH
+does not have privileges to access:
+====
+---- QUERY
+# Check 'external' case-insensitive (see IMPALA-5637).
+create table grant_rev_db.kudu_tbl_with_ext (i int primary key, a string)
+partition by hash(i) partitions 3 stored as kudu
+tblproperties('external'='true')
+---- CATCH
+does not have privileges to access:
+====
+---- QUERY
+# Similarly, a managed table with explicit master addresses requires ALL on server.
+create table grant_rev_db.kudu_tbl_with_addr (i int primary key, a string)
+partition by hash(i) partitions 3 stored as kudu
+tblproperties('kudu.master_addresses'='foo')
+---- CATCH
+does not have privileges to access:
+====
+---- QUERY
+create table grant_rev_db.kudu_tbl (i int primary key, a string)
+partition by hash(i) partitions 3 stored as kudu;
+====
+---- QUERY
+# Similarly, the table properties cannot be set via alter table set tblproperties.
+alter table grant_rev_db.kudu_tbl set tblproperties('kudu.master_addresses'='foo');
+---- CATCH
+does not have privileges to access:
+====
+---- QUERY
+alter table grant_rev_db.kudu_tbl set tblproperties('EXTERNAL'='TRUE');
+---- CATCH
+does not have privileges to access:
+====
+---- QUERY
+alter table grant_rev_db.kudu_tbl set tblproperties('external'='true');
+---- CATCH
+does not have privileges to access:
+====
+---- QUERY
+grant role grant_revoke_test_ALL_SERVER to group $GROUP_NAME
+====
+---- QUERY
+# Now the alter table succeeds
+alter table grant_rev_db.kudu_tbl set tblproperties('EXTERNAL'='TRUE');
+====
+---- QUERY
+# Set it back to FALSE
+alter table grant_rev_db.kudu_tbl set tblproperties('EXTERNAL'='FALSE');
+====
+---- QUERY
+drop table grant_rev_db.kudu_tbl
+====
+---- QUERY
+# Cleanup test roles
+drop role grant_revoke_test_ALL_SERVER;
+drop role grant_revoke_test_ALL_TEST_DB;
+---- RESULTS
+====

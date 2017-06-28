@@ -904,11 +904,14 @@ public class AuthorizationTest {
     AuthzError("create external table tpch.kudu_tbl stored as kudu " +
         "TBLPROPERTIES ('kudu.master_addresses'='127.0.0.1', 'kudu.table_name'='tbl')",
         "User '%s' does not have privileges to access: server1");
+    AuthzError("create table tpch.kudu_tbl (i int, j int, primary key (i))" +
+        " PARTITION BY HASH (i) PARTITIONS 9 stored as kudu TBLPROPERTIES " +
+        "('kudu.master_addresses'='127.0.0.1')",
+        "User '%s' does not have privileges to access: server1");
 
     // IMPALA-4000: ALL privileges on SERVER are not required to create managed tables.
     AuthzOk("create table tpch.kudu_tbl (i int, j int, primary key (i))" +
-        " PARTITION BY HASH (i) PARTITIONS 9 stored as kudu TBLPROPERTIES " +
-        "('kudu.master_addresses'='127.0.0.1')");
+        " PARTITION BY HASH (i) PARTITIONS 9 stored as kudu");
 
     // User does not have permission to create table at the specified location..
     AuthzError("create table tpch.new_table (i int) location " +

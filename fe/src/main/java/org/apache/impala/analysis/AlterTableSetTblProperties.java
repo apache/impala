@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.avro.SchemaParseException;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
+import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsTable;
@@ -88,6 +89,18 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
       throw new AnalysisException(String.format("Changing the '%s' table property is " +
           "not supported to protect against metadata corruption.",
           hive_metastoreConstants.META_TABLE_STORAGE));
+    }
+
+    if (getTargetTable() instanceof KuduTable && analyzer.getAuthzConfig().isEnabled()) {
+      // Checking for 'EXTERNAL' is case-insensitive, see IMPALA-5637.
+      boolean setsExternal =
+          MetaStoreUtil.findTblPropKeyCaseInsensitive(tblProperties_, "EXTERNAL") != null;
+      if (setsExternal || tblProperties_.containsKey(KuduTable.KEY_MASTER_HOSTS)) {
+        String authzServer = analyzer.getAuthzConfig().getServerName();
+        Preconditions.checkNotNull(authzServer);
+        analyzer.registerPrivReq(new PrivilegeRequestBuilder().onServer(
+            authzServer).all().toRequest());
+      }
     }
 
     // Check avro schema when it is set in avro.schema.url or avro.schema.literal to

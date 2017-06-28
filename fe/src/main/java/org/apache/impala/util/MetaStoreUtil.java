@@ -163,8 +163,8 @@ public class MetaStoreUtil {
   }
 
   /**
-   * Checks that each key and value in a proprty map is short enough for HMS to handle. If
-   * not, An 'AnalysisException' is thrown with 'mapName' as its prefix.
+   * Checks that each key and value in a property map is short enough for HMS to handle.
+   * If not, An 'AnalysisException' is thrown with 'mapName' as its prefix.
    */
   public static void checkShortPropertyMap(
       String mapName, Map<String, String> propertyMap) throws AnalysisException {
@@ -175,6 +175,21 @@ public class MetaStoreUtil {
             mapName + " value", property.getValue(), MAX_PROPERTY_VALUE_LENGTH);
       }
     }
+  }
+
+  /**
+   * Does a case-insensitive search for 'propertyKey' in 'propertyMap'. If a match is
+   * found, the matched key is returned, otherwise null is returned. 'propertyMap' and
+   * 'propertyKey' must not be null.
+   */
+  public static String findTblPropKeyCaseInsensitive(Map<String, String> propertyMap,
+      String propertyKey) {
+    Preconditions.checkNotNull(propertyMap);
+    Preconditions.checkNotNull(propertyKey);
+    for (String key : propertyMap.keySet()) {
+      if (key != null && key.equalsIgnoreCase(propertyKey)) return key;
+    }
+    return null;
   }
 
   /**
