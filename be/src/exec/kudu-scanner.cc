@@ -155,8 +155,12 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token)  {
       "Could not set scanner timeout");
   VLOG_ROW << "Starting KuduScanner with ReadMode=" << mode << " timeout=" <<
       FLAGS_kudu_operation_timeout_ms;
-  uint64_t row_format_flags = kudu::client::KuduScanner::PAD_UNIXTIME_MICROS_TO_16_BYTES;
-  scanner_->SetRowFormatFlags(row_format_flags);
+
+  if (!timestamp_slots_.empty()) {
+    uint64_t row_format_flags =
+        kudu::client::KuduScanner::PAD_UNIXTIME_MICROS_TO_16_BYTES;
+    scanner_->SetRowFormatFlags(row_format_flags);
+  }
 
   {
     SCOPED_TIMER(state_->total_storage_wait_timer());
