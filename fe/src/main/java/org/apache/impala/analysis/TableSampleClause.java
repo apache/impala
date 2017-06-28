@@ -17,8 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import com.google.common.base.Preconditions;
 import org.apache.impala.common.AnalysisException;
-import org.apache.kudu.client.shaded.com.google.common.base.Preconditions;
 
 /**
  * Represents a TABLESAMPLE clause.
