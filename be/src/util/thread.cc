@@ -163,7 +163,10 @@ class ThreadMgr {
   // A ThreadCategory is a set of threads that are logically related.
   // TODO: unordered_map is incompatible with boost::thread::id, but would be more
   // efficient here.
-  typedef map<const thread::id, ThreadDescriptor> ThreadCategory;
+  struct ThreadCategory {
+    int64_t num_threads_created;
+    map<const thread::id, ThreadDescriptor> threads_by_id;
+  };
 
   // All thread categorys, keyed on the category name.
   typedef map<string, ThreadCategory> ThreadCategoryMap;
@@ -197,7 +200,9 @@ Status ThreadMgr::StartInstrumentation(MetricGroup* metrics) {
 void ThreadMgr::AddThread(const thread::id& thread, const string& name,
     const string& category, int64_t tid) {
   lock_guard<mutex> l(lock_);
-  thread_categories_[category][thread] = ThreadDescriptor(category, name, tid);
+  ThreadCategory& thread_category = thread_categories_[category];
+  thread_category.threads_by_id[thread] = ThreadDescriptor(category, name, tid);
+  ++thread_category.num_threads_created;
   if (metrics_enabled_) {
     current_num_threads_metric_->Increment(1L);
     total_threads_metric_->Increment(1L);
@@ -208,7 +213,7 @@ void ThreadMgr::RemoveThread(const thread::id& boost_id, const string& category)
   lock_guard<mutex> l(lock_);
   ThreadCategoryMap::iterator category_it = thread_categories_.find(category);
   DCHECK(category_it != thread_categories_.end());
-  category_it->second.erase(boost_id);
+  category_it->second.threads_by_id.erase(boost_id);
   if (metrics_enabled_) current_num_threads_metric_->Increment(-1L);
 }
 
@@ -222,7 +227,10 @@ void ThreadMgr::GetThreadOverview(Document* document) {
   for (const ThreadCategoryMap::value_type& category: thread_categories_) {
     Value val(kObjectType);
     val.AddMember("name", category.first.c_str(), document->GetAllocator());
-    val.AddMember("size", static_cast<uint64_t>(category.second.size()),
+    val.AddMember("size", static_cast<uint64_t>(category.second.threads_by_id.size()),
+        document->GetAllocator());
+    val.AddMember("num_created",
+        static_cast<uint64_t>(category.second.num_threads_created),
         document->GetAllocator());
     // TODO: URLEncode() name?
     lst.PushBack(val, document->GetAllocator());
@@ -245,7 +253,7 @@ void ThreadMgr::ThreadGroupUrlCallback(const Webserver::ArgumentMap& args,
     categories_to_print.push_back(&category->second);
     Value val(kObjectType);
     val.AddMember("category", category->first.c_str(), document->GetAllocator());
-    val.AddMember("size", static_cast<uint64_t>(category->second.size()),
+    val.AddMember("size", static_cast<uint64_t>(category->second.threads_by_id.size()),
         document->GetAllocator());
     document->AddMember("thread-group", val, document->GetAllocator());
   } else {
@@ -256,7 +264,7 @@ void ThreadMgr::ThreadGroupUrlCallback(const Webserver::ArgumentMap& args,
 
   Value lst(kArrayType);
   for (const ThreadCategory* category: categories_to_print) {
-    for (const ThreadCategory::value_type& thread: *category) {
+    for (const auto& thread : category->threads_by_id) {
       Value val(kObjectType);
       val.AddMember("name", thread.second.name().c_str(), document->GetAllocator());
       val.AddMember("id", thread.second.thread_id(), document->GetAllocator());
