@@ -100,6 +100,19 @@ DEFINE_int32(max_free_io_buffers, 128,
 DEFINE_uint64(max_cached_file_handles, 20000, "Maximum number of HDFS file handles "
     "that will be cached. Disabled if set to 0.");
 
+// The unused file handle timeout specifies how long a file handle will remain in the
+// cache if it is not being used. Aging out unused handles ensures that the cache is not
+// wasting memory on handles that aren't useful. This allows users to specify a larger
+// cache size, as the system will only use the memory on useful file handles.
+// Additionally, cached file handles keep an open file descriptor for local files.
+// If a file is deleted through HDFS, this open file descriptor can keep the disk space
+// from being freed. When the metadata sees that a file has been deleted, the file handle
+// will no longer be used by future queries. Aging out this file handle allows the
+// disk space to be freed in an appropriate period of time.
+DEFINE_uint64(unused_file_handle_timeout_sec, 21600, "Maximum time, in seconds, that an "
+    "unused HDFS file handle will remain in the file handle cache. Disabled if set "
+    "to 0.");
+
 // The IoMgr is able to run with a wide range of memory usage. If a query has memory
 // remaining less than this value, the IoMgr will stop all buffering regardless of the
 // current queue size.
@@ -289,7 +302,8 @@ DiskIoMgr::DiskIoMgr() :
     total_bytes_read_counter_(TUnit::BYTES),
     read_timer_(TUnit::TIME_NS),
     file_handle_cache_(min(FLAGS_max_cached_file_handles,
-        FileSystemUtil::MaxNumFileHandles())) {
+        FileSystemUtil::MaxNumFileHandles()),
+        FLAGS_unused_file_handle_timeout_sec) {
   int64_t max_buffer_size_scaled = BitUtil::Ceil(max_buffer_size_, min_buffer_size_);
   free_buffers_.resize(BitUtil::Log2Ceiling64(max_buffer_size_scaled) + 1);
   int num_local_disks = DiskInfo::num_disks();
@@ -314,7 +328,8 @@ DiskIoMgr::DiskIoMgr(int num_local_disks, int threads_per_rotational_disk,
     total_bytes_read_counter_(TUnit::BYTES),
     read_timer_(TUnit::TIME_NS),
     file_handle_cache_(min(FLAGS_max_cached_file_handles,
-        FileSystemUtil::MaxNumFileHandles())) {
+        FileSystemUtil::MaxNumFileHandles()),
+        FLAGS_unused_file_handle_timeout_sec) {
   int64_t max_buffer_size_scaled = BitUtil::Ceil(max_buffer_size_, min_buffer_size_);
   free_buffers_.resize(BitUtil::Log2Ceiling64(max_buffer_size_scaled) + 1);
   if (num_local_disks == 0) num_local_disks = DiskInfo::num_disks();
@@ -396,6 +411,7 @@ Status DiskIoMgr::Init(MemTracker* process_mem_tracker) {
     }
   }
   request_context_cache_.reset(new RequestContextCache(this));
+  file_handle_cache_.Init();
 
   cached_read_options_ = hadoopRzOptionsAlloc();
   DCHECK(cached_read_options_ != nullptr);
