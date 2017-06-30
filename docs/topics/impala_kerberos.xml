@@ -351,4 +351,12 @@ $ chown impala:impala impala-http.keytab</codeblock>
     </conbody>
   </concept>
 
+  <concept rev="IMPALA-2294" id="kerberos_overhead_memory_usage">
+  <title>Kerberos-Related Memory Overhead for Large Clusters</title>
+  <conbody>
+    <p conref="../shared/impala_common.xml#common/vm_overcommit_memory_intro"/>
+    <p conref="../shared/impala_common.xml#common/vm_overcommit_memory_start" conrefend="vm_overcommit_memory_end"/>
+  </conbody>
+  </concept>
+
 </concept>

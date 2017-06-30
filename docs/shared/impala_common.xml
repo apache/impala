@@ -1365,6 +1365,38 @@ select c_first_name, c_last_name from customer where lower(trim(c_last_name)) rl
         <codeph>user@example.com</codeph>, in a Kerberized environment.
       </p>
 
+      <p id="vm_overcommit_memory_intro">
+        On a kerberized cluster with high memory utilization, <cmdname>kinit</cmdname> commands executed after
+        every <codeph>'kerberos_reinit_interval'</codeph> may cause out-of-memory errors, because executing
+        the command involves a fork of the Impala process. The error looks similar to the following:
+<codeblock><![CDATA[
+Failed to obtain Kerberos ticket for principal: <varname>principal_details</varname>
+Failed to execute shell cmd: 'kinit -k -t <varname>keytab_details</varname>',
+error was: Error(12): Cannot allocate memory
+]]>
+</codeblock>
+      </p>
+
+      <p id="vm_overcommit_memory_start">
+        The following command changes the <codeph>vm.overcommit_memory</codeph>
+        setting immediately on a running host. However, this setting is reset
+        when the host is restarted.
+<codeblock><![CDATA[
+echo 1 > /proc/sys/vm/overcommit_memory
+]]>
+</codeblock>
+      </p>
+      <p>
+        To change the setting in a persistent way, add the following line to the
+        <filepath>/etc/sysctl.conf</filepath> file:
+<codeblock><![CDATA[
+vm.overcommit_memory=1
+]]>
+</codeblock>
+      </p>
+      <p id="vm_overcommit_memory_end">
+        Then run <codeph>sysctl -p</codeph>. No reboot is needed.
+      </p>
       <ul>
         <li id="grant_revoke_single">
           Currently, each Impala <codeph>GRANT</codeph> or <codeph>REVOKE</codeph> statement can only grant or

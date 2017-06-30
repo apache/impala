@@ -623,6 +623,17 @@ impala hard nproc 262144
       </conbody>
     </concept>
 
+    <concept id="IMPALA-2294">
+      <title>Kerberos initialization errors due to high memory usage</title>
+      <conbody>
+        <p conref="../shared/impala_common.xml#common/vm_overcommit_memory_intro"/>
+        <p><b>Bug:</b> <xref keyref="IMPALA-2294">IMPALA-2294</xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Workaround:</b></p>
+        <p conref="../shared/impala_common.xml#common/vm_overcommit_memory_start" conrefend="vm_overcommit_memory_end"/>
+      </conbody>
+    </concept>
+
     <concept id="drop_table_purge_s3a">
       <title>DROP TABLE PURGE on S3A table may not delete externally written files</title>
       <conbody>
