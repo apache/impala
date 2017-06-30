@@ -564,6 +564,39 @@ https://issues.apache.org/jira/browse/IMPALA-2144 - Don't have
 
     </conbody>
 
+    <concept id="IMPALA-5605">
+      <title>Configuration to prevent crashes caused by thread resource limits</title>
+      <conbody>
+        <p>
+          Impala could encounter a serious error due to resource usage under very high concurrency.
+          The error message is similar to:
+        </p>
+<codeblock><![CDATA[
+F0629 08:20:02.956413 29088 llvm-codegen.cc:111] LLVM hit fatal error: Unable to allocate section memory!
+terminate called after throwing an instance of 'boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::thread_resource_error> >'
+]]>
+</codeblock>
+        <p><b>Bug:</b> <xref keyref="IMPALA-5605">IMPALA-5605</xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Workaround:</b>
+          To prevent such errors, configure each host running an <cmdname>impalad</cmdname>
+          daemon with the following settings:
+        </p>
+<codeblock>
+echo 2000000 > /proc/sys/kernel/threads-max
+echo 2000000 > /proc/sys/kernel/pid_max
+echo 8000000 > /proc/sys/vm/max_map_count
+</codeblock>
+        <p>
+        Add the following lines in <filepath>/etc/security/limits.conf</filepath>:
+        </p>
+<codeblock>
+impala soft nproc 262144
+impala hard nproc 262144
+</codeblock>
+      </conbody>
+    </concept>
+
     <concept id="flatbuffers_mem_usage">
       <title>Memory usage when compact_catalog_topic flag enabled</title>
       <conbody>
