@@ -82,21 +82,21 @@ class DataStreamSender::Channel : public CacheLineAligned {
 
   // Initialize channel.
   // Returns OK if successful, error indication otherwise.
-  Status Init(RuntimeState* state);
+  Status Init(RuntimeState* state) WARN_UNUSED_RESULT;
 
   // Copies a single row into this channel's output buffer and flushes buffer
   // if it reaches capacity.
   // Returns error status if any of the preceding rpcs failed, OK otherwise.
-  Status AddRow(TupleRow* row);
+  Status AddRow(TupleRow* row) WARN_UNUSED_RESULT;
 
   // Asynchronously sends a row batch.
   // Returns the status of the most recently finished TransmitData
   // rpc (or OK if there wasn't one that hasn't been reported yet).
-  Status SendBatch(TRowBatch* batch);
+  Status SendBatch(TRowBatch* batch) WARN_UNUSED_RESULT;
 
   // Return status of last TransmitData rpc (initiated by the most recent call
   // to either SendBatch() or SendCurrentBatch()).
-  Status GetSendStatus();
+  Status GetSendStatus() WARN_UNUSED_RESULT;
 
   // Waits for the rpc thread pool to finish the current rpc.
   void WaitForRpc();
@@ -105,7 +105,7 @@ class DataStreamSender::Channel : public CacheLineAligned {
   void Teardown(RuntimeState* state);
 
   // Flushes any buffered row batches and sends the EOS RPC to close the channel.
-  Status FlushAndSendEos(RuntimeState* state);
+  Status FlushAndSendEos(RuntimeState* state) WARN_UNUSED_RESULT;
 
   int64_t num_data_bytes_sent() const { return num_data_bytes_sent_; }
   TRowBatch* thrift_batch() { return &thrift_batch_; }
@@ -452,7 +452,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
         partition = next_unknown_partition_;
         ++next_unknown_partition_;
       }
-      channels_[partition % num_channels]->AddRow(row);
+      RETURN_IF_ERROR(channels_[partition % num_channels]->AddRow(row));
     }
   } else {
     DCHECK(partition_type_ == TPartitionType::HASH_PARTITIONED);
@@ -474,11 +474,11 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
         hash_val = RawValue::GetHashValueFnv(
             partition_val, partition_exprs_[i]->type(), hash_val);
       }
-      ScalarExprEvaluator::FreeLocalAllocations(partition_expr_evals_);
       RETURN_IF_ERROR(channels_[hash_val % num_channels]->AddRow(row));
     }
   }
   COUNTER_ADD(total_sent_rows_counter_, batch->num_rows());
+  ScalarExprEvaluator::FreeLocalAllocations(partition_expr_evals_);
   RETURN_IF_ERROR(state->CheckQueryState());
   return Status::OK();
 }
