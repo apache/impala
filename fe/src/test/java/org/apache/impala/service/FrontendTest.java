@@ -22,6 +22,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -44,11 +45,9 @@ import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.testutil.TestUtils;
-import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TMetadataOpcode;
 import org.apache.impala.thrift.TQueryCtx;
-import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
 
@@ -178,6 +177,47 @@ public class FrontendTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestGetTablesTypeTable() throws ImpalaException {
+    TMetadataOpRequest req = new TMetadataOpRequest();
+    req.opcode = TMetadataOpcode.GET_TABLES;
+    req.get_tables_req = new TGetTablesReq();
+    req.get_tables_req.setSchemaName("functional");
+    req.get_tables_req.setTableName("alltypes\\_%");
+    req.get_tables_req.setTableTypes(Arrays.asList("TABLE"));
+    TResultSet resp = execMetadataOp(req);
+    // HiveServer2 GetTables has 5 columns.
+    assertEquals(5, resp.schema.columns.size());
+    assertEquals(5, resp.rows.get(0).colVals.size());
+    assertEquals(1, resp.rows.size());
+    assertEquals("alltypes_datasource", resp.rows.get(0).colVals.get(2).string_val.toLowerCase());
+  }
+
+  @Test
+  public void TestGetTablesTypeView() throws ImpalaException {
+    // Issue the statements to make sure all the views are loaded
+    AnalyzesOk("select * from functional.alltypes_hive_view");
+    AnalyzesOk("select * from functional.alltypes_parens");
+    AnalyzesOk("select * from functional.alltypes_view");
+    AnalyzesOk("select * from functional.alltypes_view_sub");
+
+    TMetadataOpRequest req = new TMetadataOpRequest();
+    req.opcode = TMetadataOpcode.GET_TABLES;
+    req.get_tables_req = new TGetTablesReq();
+    req.get_tables_req.setSchemaName("functional");
+    req.get_tables_req.setTableName("alltypes%");
+    req.get_tables_req.setTableTypes(Arrays.asList("VIEW"));
+    TResultSet resp = execMetadataOp(req);
+    // HiveServer2 GetTables has 5 columns.
+    assertEquals(5, resp.schema.columns.size());
+    assertEquals(5, resp.rows.get(0).colVals.size());
+    assertEquals(4, resp.rows.size());
+    assertEquals("alltypes_hive_view", resp.rows.get(0).colVals.get(2).string_val.toLowerCase());
+    assertEquals("alltypes_parens", resp.rows.get(1).colVals.get(2).string_val.toLowerCase());
+    assertEquals("alltypes_view", resp.rows.get(2).colVals.get(2).string_val.toLowerCase());
+    assertEquals("alltypes_view_sub", resp.rows.get(3).colVals.get(2).string_val.toLowerCase());
+  }
+
+  @Test
   public void TestGetTablesWithComments() throws ImpalaException {
     // Add test db and test tables with comments
     final String dbName = "tbls_with_comments_test_db";
@@ -220,6 +260,46 @@ public class FrontendTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestUnloadedView() throws ImpalaException {
+    final String dbName = "tbls_for_views_test_db";
+    Db testDb = addTestDb(dbName, "Stores views");
+    assertNotNull(testDb);
+    Table view = addTestView(String.format(
+        "create view %s.test_view as select * from functional.alltypes", dbName));
+    assertNotNull(view);
+
+    // Prepare and perform the GetTables request
+    TMetadataOpRequest req = new TMetadataOpRequest();
+    req.opcode = TMetadataOpcode.GET_TABLES;
+    req.get_tables_req = new TGetTablesReq();
+    req.get_tables_req.setSchemaName(dbName);
+    TResultSet resp = execMetadataOp(req);
+    assertEquals(1, resp.rows.size());
+    for (TResultRow row : resp.rows) {
+      assertEquals(row.colVals.get(2).string_val.toLowerCase(), "test_view");
+      assertEquals("table", row.colVals.get(3).string_val.toLowerCase());
+    }
+  }
+
+  @Test
+  public void TestLoadedView() throws ImpalaException {
+    // Issue the statement to make sure the view is loaded
+    AnalyzesOk("select * from functional.alltypes_view");
+    // Prepare and perform the GetTables request
+    TMetadataOpRequest req = new TMetadataOpRequest();
+    req.opcode = TMetadataOpcode.GET_TABLES;
+    req.get_tables_req = new TGetTablesReq();
+    req.get_tables_req.setSchemaName("functional");
+    req.get_tables_req.setTableName("alltypes_view");
+
+    TResultSet resp = execMetadataOp(req);
+    assertEquals(1, resp.rows.size());
+    for (TResultRow row : resp.rows) {
+      assertEquals("VIEW", row.colVals.get(3).string_val);
+    }
+  }
+
+  @Test
   public void TestGetColumns() throws ImpalaException {
     // It should return one column: default.alltypes.string_col
     TMetadataOpRequest req = new TMetadataOpRequest();
@@ -257,15 +337,15 @@ public class FrontendTest extends FrontendTestBase {
 
   @Test
   public void TestGetTableTypes() throws ImpalaException {
-    // Impala should only return TABLE as the only table type.
     TMetadataOpRequest req = new TMetadataOpRequest();
     req.opcode = TMetadataOpcode.GET_TABLE_TYPES;
     TResultSet resp = execMetadataOp(req);
     // HiveServer2 GetTableTypes() has 1 column.
+    assertEquals(2, resp.rows.size());
     assertEquals(1, resp.schema.columns.size());
     assertEquals(1, resp.rows.get(0).colVals.size());
-    assertEquals(1, resp.rows.size());
     assertEquals("TABLE", resp.rows.get(0).getColVals().get(0).string_val);
+    assertEquals("VIEW", resp.rows.get(1).getColVals().get(0).string_val);
   }
 
   @Test

@@ -190,10 +190,11 @@ public class JdbcTest {
 
   @Test
   public void testMetaDataGetTableTypes() throws SQLException {
-    // There is only one table type: "table".
     ResultSet rs = con_.getMetaData().getTableTypes();
     assertTrue(rs.next());
     assertEquals(rs.getString(1).toLowerCase(), "table");
+    assertTrue(rs.next());
+    assertEquals(rs.getString(1).toLowerCase(), "view");
     assertFalse(rs.next());
     rs.close();
   }
