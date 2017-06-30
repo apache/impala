@@ -722,9 +722,10 @@ select now() as right_now, days_sub(now(), 31) as 31_days_ago;
           <indexterm audience="hidden">extract() function</indexterm>
           <b>Purpose:</b> Returns one of the numeric date or time fields from a <codeph>TIMESTAMP</codeph> value.
           <p>
-            <b>Unit argument:</b> The <codeph>unit</codeph> string can be one of <codeph>year</codeph>,
-            <codeph>month</codeph>, <codeph>day</codeph>, <codeph>hour</codeph>, <codeph>minute</codeph>,
-            <codeph>second</codeph>, or <codeph>millisecond</codeph>. This argument value is case-insensitive.
+            <b>Unit argument:</b> The <codeph>unit</codeph> string can be one of <codeph>epoch</codeph>,
+            <codeph>year</codeph>, <codeph>month</codeph>, <codeph>day</codeph>, <codeph>hour</codeph>,
+            <codeph>minute</codeph>, <codeph>second</codeph>, or <codeph>millisecond</codeph>.
+            This argument value is case-insensitive.
           </p>
           <p rev="2.0.0">
             In Impala 2.0 and higher, you can use special syntax rather than a regular function call, for
