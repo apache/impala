@@ -334,17 +334,12 @@ export IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR="${IMPALA_LOGS_DIR}/custom_cluster_te
 # List of all Impala log dirs so they can be created by buildall.sh
 export IMPALA_ALL_LOGS_DIRS="${IMPALA_CLUSTER_LOGS_DIR}
   ${IMPALA_DATA_LOADING_LOGS_DIR} ${IMPALA_DATA_LOADING_SQL_DIR}
-  ${IMPALA_EE_TEST_LOGS_DIR} ${IMPALA_FE_TEST_COVERAGE_DIR}
+  ${IMPALA_FE_TEST_LOGS_DIR} ${IMPALA_FE_TEST_COVERAGE_DIR}
   ${IMPALA_BE_TEST_LOGS_DIR} ${IMPALA_EE_TEST_LOGS_DIR}
   ${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR}"
 
 # Reduce the concurrency for local tests to half the number of cores in the system.
-# Note than nproc may not be available on older distributions (centos5.5)
-if type nproc >/dev/null 2>&1; then
-  CORES=$(($(nproc) / 2))
-else
-  CORES=4
-fi
+CORES=$(($(getconf _NPROCESSORS_ONLN) / 2))
 export NUM_CONCURRENT_TESTS="${NUM_CONCURRENT_TESTS-${CORES}}"
 
 export KUDU_MASTER_HOSTS="${KUDU_MASTER_HOSTS:-127.0.0.1}"
@@ -448,31 +443,23 @@ export USER="${USER-`id -un`}"
 # Enable if you suspect a JNI issue
 # TODO: figure out how to turn this off only the stuff that can't run with it.
 #LIBHDFS_OPTS="-Xcheck:jni -Xcheck:nabounds"
-# - Points to the location of libbackend.so.
 export LIBHDFS_OPTS="${LIBHDFS_OPTS:-} -Djava.library.path=${HADOOP_LIB_DIR}/native/"
-# READER BEWARE: This always points to the debug build.
-# TODO: Consider having cmake scripts change this value depending on
-# the build type.
-LIBHDFS_OPTS="${LIBHDFS_OPTS}:${IMPALA_HOME}/be/build/debug/service"
+
 # IMPALA-5080: Our use of PermGen space sometimes exceeds the default maximum while
 # running tests that load UDF jars.
 LIBHDFS_OPTS="${LIBHDFS_OPTS} -XX:MaxPermSize=128m"
-
-export ARTISTIC_STYLE_OPTIONS="$IMPALA_BE_DIR/.astylerc"
 
 export IMPALA_SNAPPY_PATH="${IMPALA_TOOLCHAIN}/snappy-${IMPALA_SNAPPY_VERSION}/lib"
 
 export JAVA_LIBRARY_PATH="${IMPALA_SNAPPY_PATH}"
 
-# So that the frontend tests and PlanService can pick up libbackend.so
-# and other required libraries
+# So that the frontend tests and PlanService can pick up required libraries
 LIB_JAVA=`find "${JAVA_HOME}/"   -name libjava.so | head -1`
 LIB_JSIG=`find "${JAVA_HOME}/"   -name libjsig.so | head -1`
 LIB_JVM=` find "${JAVA_HOME}/"   -name libjvm.so  | head -1`
 export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}:`dirname ${LIB_JAVA}`:`dirname ${LIB_JSIG}`"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JVM}`"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${HADOOP_LIB_DIR}/native"
-LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/be/build/debug/service"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_SNAPPY_PATH}"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_LZO}/build"
 
@@ -487,10 +474,6 @@ export CLASSPATH="$IMPALA_FE_DIR/target/dependency:${CLASSPATH-}"
 CLASSPATH="$IMPALA_FE_DIR/target/classes:$CLASSPATH"
 CLASSPATH="$IMPALA_FE_DIR/src/test/resources:$CLASSPATH"
 CLASSPATH="$LZO_JAR_PATH:$CLASSPATH"
-
-# Setup aliases
-# Helper alias to script that verifies and merges Gerrit changes
-alias gerrit-verify-only="${IMPALA_AUX_TEST_HOME}/jenkins/gerrit-verify-only.sh"
 
 # A marker in the environment to prove that we really did source this file
 export IMPALA_CONFIG_SOURCED=1
