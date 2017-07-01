@@ -744,18 +744,18 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-20:MERGING-EXCHANGE [UNPARTITIONED]
+22:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
 |  limit: 100
 |
 12:TOP-N [LIMIT=100]
 |  order by: sum(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
 |
-19:AGGREGATE [FINALIZE]
+21:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_ext_sales_price)
 |  group by: i_brand, i_brand_id, i_manufact_id, i_manufact
 |
-18:EXCHANGE [HASH(i_brand,i_brand_id,i_manufact_id,i_manufact)]
+20:EXCHANGE [HASH(i_brand,i_brand_id,i_manufact_id,i_manufact)]
 |
 11:AGGREGATE [STREAMING]
 |  output: sum(ss_ext_sales_price)
@@ -766,69 +766,72 @@ PLAN-ROOT SINK
 |  other predicates: substr(ca_zip, 1, 5) != substr(s_zip, 1, 5)
 |  runtime filters: RF000 <- s_store_sk
 |
-|--17:EXCHANGE [BROADCAST]
+|--19:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpcds.store]
 |     partitions=1/1 files=1 size=3.08KB
 |
-09:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: ca_address_sk = c_current_addr_sk
-|  runtime filters: RF001 <- c_current_addr_sk
+09:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c_current_addr_sk = ca_address_sk
+|  runtime filters: RF001 <- ca_address_sk
 |
-|--16:EXCHANGE [BROADCAST]
+|--18:EXCHANGE [HASH(ca_address_sk)]
 |  |
-|  08:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: c_customer_sk = ss_customer_sk
-|  |  runtime filters: RF002 <- ss_customer_sk
-|  |
-|  |--15:EXCHANGE [BROADCAST]
-|  |  |
-|  |  07:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  |  hash predicates: ss_sold_date_sk = d_date_sk
-|  |  |  runtime filters: RF003 <- d_date_sk
-|  |  |
-|  |  |--14:EXCHANGE [BROADCAST]
-|  |  |  |
-|  |  |  00:SCAN HDFS [tpcds.date_dim]
-|  |  |     partitions=1/1 files=1 size=9.84MB
-|  |  |     predicates: d_year = 1999, d_moy = 11, tpcds.date_dim.d_date_sk <= 2451513, tpcds.date_dim.d_date_sk >= 2451484
-|  |  |
-|  |  06:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  |  hash predicates: ss_item_sk = i_item_sk
-|  |  |  runtime filters: RF004 <- i_item_sk
-|  |  |
-|  |  |--13:EXCHANGE [BROADCAST]
-|  |  |  |
-|  |  |  02:SCAN HDFS [tpcds.item]
-|  |  |     partitions=1/1 files=1 size=4.82MB
-|  |  |     predicates: i_manager_id = 7
-|  |  |
-|  |  01:SCAN HDFS [tpcds.store_sales]
-|  |     partitions=30/1824 files=30 size=9.93MB
-|  |     runtime filters: RF000 -> ss_store_sk, RF003 -> ss_sold_date_sk, RF004 -> ss_item_sk
+|  04:SCAN HDFS [tpcds.customer_address]
+|     partitions=1/1 files=1 size=5.25MB
+|
+17:EXCHANGE [HASH(c_current_addr_sk)]
+|
+08:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: ss_customer_sk = c_customer_sk
+|  runtime filters: RF002 <- c_customer_sk
+|
+|--16:EXCHANGE [HASH(c_customer_sk)]
 |  |
 |  03:SCAN HDFS [tpcds.customer]
 |     partitions=1/1 files=1 size=12.60MB
-|     runtime filters: RF002 -> c_customer_sk
+|     runtime filters: RF001 -> c_current_addr_sk
 |
-04:SCAN HDFS [tpcds.customer_address]
-   partitions=1/1 files=1 size=5.25MB
-   runtime filters: RF001 -> ca_address_sk
+15:EXCHANGE [HASH(ss_customer_sk)]
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  runtime filters: RF003 <- d_date_sk
+|
+|--14:EXCHANGE [BROADCAST]
+|  |
+|  00:SCAN HDFS [tpcds.date_dim]
+|     partitions=1/1 files=1 size=9.84MB
+|     predicates: d_year = 1999, d_moy = 11, tpcds.date_dim.d_date_sk <= 2451513, tpcds.date_dim.d_date_sk >= 2451484
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_item_sk = i_item_sk
+|  runtime filters: RF004 <- i_item_sk
+|
+|--13:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.item]
+|     partitions=1/1 files=1 size=4.82MB
+|     predicates: i_manager_id = 7
+|
+01:SCAN HDFS [tpcds.store_sales]
+   partitions=30/1824 files=30 size=9.93MB
+   runtime filters: RF000 -> ss_store_sk, RF002 -> ss_customer_sk, RF003 -> ss_sold_date_sk, RF004 -> ss_item_sk
 ---- PARALLELPLANS
 PLAN-ROOT SINK
 |
-20:MERGING-EXCHANGE [UNPARTITIONED]
+22:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
 |  limit: 100
 |
 12:TOP-N [LIMIT=100]
 |  order by: sum(ss_ext_sales_price) DESC, i_brand ASC, i_brand_id ASC, i_manufact_id ASC, i_manufact ASC
 |
-19:AGGREGATE [FINALIZE]
+21:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_ext_sales_price)
 |  group by: i_brand, i_brand_id, i_manufact_id, i_manufact
 |
-18:EXCHANGE [HASH(i_brand,i_brand_id,i_manufact_id,i_manufact)]
+20:EXCHANGE [HASH(i_brand,i_brand_id,i_manufact_id,i_manufact)]
 |
 11:AGGREGATE [STREAMING]
 |  output: sum(ss_ext_sales_price)
@@ -843,70 +846,73 @@ PLAN-ROOT SINK
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: s_store_sk
 |  |
-|  17:EXCHANGE [BROADCAST]
+|  19:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpcds.store]
 |     partitions=1/1 files=1 size=3.08KB
 |
-09:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: ca_address_sk = c_current_addr_sk
-|  runtime filters: RF001 <- c_current_addr_sk
+09:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c_current_addr_sk = ca_address_sk
+|  runtime filters: RF001 <- ca_address_sk
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
-|  |  build expressions: c_current_addr_sk
+|  |  build expressions: ca_address_sk
 |  |
-|  16:EXCHANGE [BROADCAST]
+|  18:EXCHANGE [HASH(ca_address_sk)]
 |  |
-|  08:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: c_customer_sk = ss_customer_sk
-|  |  runtime filters: RF002 <- ss_customer_sk
+|  04:SCAN HDFS [tpcds.customer_address]
+|     partitions=1/1 files=1 size=5.25MB
+|
+17:EXCHANGE [HASH(c_current_addr_sk)]
+|
+08:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: ss_customer_sk = c_customer_sk
+|  runtime filters: RF002 <- c_customer_sk
+|
+|--JOIN BUILD
+|  |  join-table-id=02 plan-id=03 cohort-id=01
+|  |  build expressions: c_customer_sk
 |  |
-|  |--JOIN BUILD
-|  |  |  join-table-id=02 plan-id=03 cohort-id=02
-|  |  |  build expressions: ss_customer_sk
-|  |  |
-|  |  15:EXCHANGE [BROADCAST]
-|  |  |
-|  |  07:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  |  hash predicates: ss_sold_date_sk = d_date_sk
-|  |  |  runtime filters: RF003 <- d_date_sk
-|  |  |
-|  |  |--JOIN BUILD
-|  |  |  |  join-table-id=03 plan-id=04 cohort-id=03
-|  |  |  |  build expressions: d_date_sk
-|  |  |  |
-|  |  |  14:EXCHANGE [BROADCAST]
-|  |  |  |
-|  |  |  00:SCAN HDFS [tpcds.date_dim]
-|  |  |     partitions=1/1 files=1 size=9.84MB
-|  |  |     predicates: d_year = 1999, d_moy = 11, tpcds.date_dim.d_date_sk <= 2451513, tpcds.date_dim.d_date_sk >= 2451484
-|  |  |
-|  |  06:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  |  hash predicates: ss_item_sk = i_item_sk
-|  |  |  runtime filters: RF004 <- i_item_sk
-|  |  |
-|  |  |--JOIN BUILD
-|  |  |  |  join-table-id=04 plan-id=05 cohort-id=03
-|  |  |  |  build expressions: i_item_sk
-|  |  |  |
-|  |  |  13:EXCHANGE [BROADCAST]
-|  |  |  |
-|  |  |  02:SCAN HDFS [tpcds.item]
-|  |  |     partitions=1/1 files=1 size=4.82MB
-|  |  |     predicates: i_manager_id = 7
-|  |  |
-|  |  01:SCAN HDFS [tpcds.store_sales]
-|  |     partitions=30/1824 files=30 size=9.93MB
-|  |     runtime filters: RF000 -> ss_store_sk, RF003 -> ss_sold_date_sk, RF004 -> ss_item_sk
+|  16:EXCHANGE [HASH(c_customer_sk)]
 |  |
 |  03:SCAN HDFS [tpcds.customer]
 |     partitions=1/1 files=1 size=12.60MB
-|     runtime filters: RF002 -> c_customer_sk
+|     runtime filters: RF001 -> c_current_addr_sk
 |
-04:SCAN HDFS [tpcds.customer_address]
-   partitions=1/1 files=1 size=5.25MB
-   runtime filters: RF001 -> ca_address_sk
+15:EXCHANGE [HASH(ss_customer_sk)]
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  runtime filters: RF003 <- d_date_sk
+|
+|--JOIN BUILD
+|  |  join-table-id=03 plan-id=04 cohort-id=01
+|  |  build expressions: d_date_sk
+|  |
+|  14:EXCHANGE [BROADCAST]
+|  |
+|  00:SCAN HDFS [tpcds.date_dim]
+|     partitions=1/1 files=1 size=9.84MB
+|     predicates: d_year = 1999, d_moy = 11, tpcds.date_dim.d_date_sk <= 2451513, tpcds.date_dim.d_date_sk >= 2451484
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_item_sk = i_item_sk
+|  runtime filters: RF004 <- i_item_sk
+|
+|--JOIN BUILD
+|  |  join-table-id=04 plan-id=05 cohort-id=01
+|  |  build expressions: i_item_sk
+|  |
+|  13:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.item]
+|     partitions=1/1 files=1 size=4.82MB
+|     predicates: i_manager_id = 7
+|
+01:SCAN HDFS [tpcds.store_sales]
+   partitions=30/1824 files=30 size=9.93MB
+   runtime filters: RF000 -> ss_store_sk, RF002 -> ss_customer_sk, RF003 -> ss_sold_date_sk, RF004 -> ss_item_sk
 ====
 # TPCDS-Q27
 select
@@ -1217,147 +1223,149 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-17:MERGING-EXCHANGE [UNPARTITIONED]
+18:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC
 |  limit: 100000
 |
 10:TOP-N [LIMIT=100000]
 |  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC
 |
-09:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: c_customer_sk = ss_customer_sk
-|  runtime filters: RF000 <- ss_customer_sk
+09:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: ss_customer_sk = c_customer_sk
+|  runtime filters: RF000 <- c_customer_sk
 |
-|--16:EXCHANGE [BROADCAST]
+|--17:EXCHANGE [HASH(c_customer_sk)]
 |  |
-|  15:AGGREGATE [FINALIZE]
-|  |  output: count:merge(*)
-|  |  group by: ss_ticket_number, ss_customer_sk
-|  |  having: count(*) <= 20, count(*) >= 15
-|  |
-|  14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk)]
-|  |
-|  07:AGGREGATE [STREAMING]
-|  |  output: count(*)
-|  |  group by: ss_ticket_number, ss_customer_sk
-|  |
-|  06:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
-|  |  runtime filters: RF001 <- store.s_store_sk
-|  |
-|  |--13:EXCHANGE [BROADCAST]
-|  |  |
-|  |  02:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
-|  |     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County', 'Fairfield County', 'Raleigh County', 'Ziebach County', 'Williamson County')
-|  |
-|  05:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
-|  |  runtime filters: RF002 <- date_dim.d_date_sk
-|  |
-|  |--12:EXCHANGE [BROADCAST]
-|  |  |
-|  |  01:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: date_dim.d_year IN (1998, 1999, 2000), (date_dim.d_dom >= 1 AND date_dim.d_dom <= 3 OR date_dim.d_dom >= 25 AND date_dim.d_dom <= 28)
-|  |
-|  04:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
-|  |  runtime filters: RF003 <- household_demographics.hd_demo_sk
-|  |
-|  |--11:EXCHANGE [BROADCAST]
-|  |  |
-|  |  03:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2
-|  |
-|  00:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
-|     runtime filters: RF001 -> store_sales.ss_store_sk, RF002 -> store_sales.ss_sold_date_sk, RF003 -> store_sales.ss_hdemo_sk
+|  08:SCAN HDFS [tpcds.customer]
+|     partitions=1/1 files=1 size=12.60MB
 |
-08:SCAN HDFS [tpcds.customer]
-   partitions=1/1 files=1 size=12.60MB
-   runtime filters: RF000 -> c_customer_sk
+16:EXCHANGE [HASH(ss_customer_sk)]
+|
+15:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: ss_ticket_number, ss_customer_sk
+|  having: count(*) <= 20, count(*) >= 15
+|
+14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk)]
+|
+07:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: ss_ticket_number, ss_customer_sk
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|  runtime filters: RF001 <- store.s_store_sk
+|
+|--13:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.store]
+|     partitions=1/1 files=1 size=3.08KB
+|     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County', 'Fairfield County', 'Raleigh County', 'Ziebach County', 'Williamson County')
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|  runtime filters: RF002 <- date_dim.d_date_sk
+|
+|--12:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim]
+|     partitions=1/1 files=1 size=9.84MB
+|     predicates: date_dim.d_year IN (1998, 1999, 2000), (date_dim.d_dom >= 1 AND date_dim.d_dom <= 3 OR date_dim.d_dom >= 25 AND date_dim.d_dom <= 28)
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
+|  runtime filters: RF003 <- household_demographics.hd_demo_sk
+|
+|--11:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.household_demographics]
+|     partitions=1/1 files=1 size=148.10KB
+|     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=1824/1824 files=1824 size=326.32MB
+   runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF001 -> store_sales.ss_store_sk, RF002 -> store_sales.ss_sold_date_sk, RF003 -> store_sales.ss_hdemo_sk
 ---- PARALLELPLANS
 PLAN-ROOT SINK
 |
-17:MERGING-EXCHANGE [UNPARTITIONED]
+18:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC
 |  limit: 100000
 |
 10:TOP-N [LIMIT=100000]
 |  order by: c_last_name ASC, c_first_name ASC, c_salutation ASC, c_preferred_cust_flag DESC
 |
-09:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: c_customer_sk = ss_customer_sk
-|  runtime filters: RF000 <- ss_customer_sk
+09:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: ss_customer_sk = c_customer_sk
+|  runtime filters: RF000 <- c_customer_sk
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
-|  |  build expressions: ss_customer_sk
+|  |  build expressions: c_customer_sk
 |  |
-|  16:EXCHANGE [BROADCAST]
+|  17:EXCHANGE [HASH(c_customer_sk)]
 |  |
-|  15:AGGREGATE [FINALIZE]
-|  |  output: count:merge(*)
-|  |  group by: ss_ticket_number, ss_customer_sk
-|  |  having: count(*) <= 20, count(*) >= 15
-|  |
-|  14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk)]
-|  |
-|  07:AGGREGATE [STREAMING]
-|  |  output: count(*)
-|  |  group by: ss_ticket_number, ss_customer_sk
-|  |
-|  06:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
-|  |  runtime filters: RF001 <- store.s_store_sk
-|  |
-|  |--JOIN BUILD
-|  |  |  join-table-id=01 plan-id=02 cohort-id=02
-|  |  |  build expressions: store.s_store_sk
-|  |  |
-|  |  13:EXCHANGE [BROADCAST]
-|  |  |
-|  |  02:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
-|  |     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County', 'Fairfield County', 'Raleigh County', 'Ziebach County', 'Williamson County')
-|  |
-|  05:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
-|  |  runtime filters: RF002 <- date_dim.d_date_sk
-|  |
-|  |--JOIN BUILD
-|  |  |  join-table-id=02 plan-id=03 cohort-id=02
-|  |  |  build expressions: date_dim.d_date_sk
-|  |  |
-|  |  12:EXCHANGE [BROADCAST]
-|  |  |
-|  |  01:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: date_dim.d_year IN (1998, 1999, 2000), (date_dim.d_dom >= 1 AND date_dim.d_dom <= 3 OR date_dim.d_dom >= 25 AND date_dim.d_dom <= 28)
-|  |
-|  04:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
-|  |  runtime filters: RF003 <- household_demographics.hd_demo_sk
-|  |
-|  |--JOIN BUILD
-|  |  |  join-table-id=03 plan-id=04 cohort-id=02
-|  |  |  build expressions: household_demographics.hd_demo_sk
-|  |  |
-|  |  11:EXCHANGE [BROADCAST]
-|  |  |
-|  |  03:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2
-|  |
-|  00:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
-|     runtime filters: RF001 -> store_sales.ss_store_sk, RF002 -> store_sales.ss_sold_date_sk, RF003 -> store_sales.ss_hdemo_sk
+|  08:SCAN HDFS [tpcds.customer]
+|     partitions=1/1 files=1 size=12.60MB
 |
-08:SCAN HDFS [tpcds.customer]
-   partitions=1/1 files=1 size=12.60MB
-   runtime filters: RF000 -> c_customer_sk
+16:EXCHANGE [HASH(ss_customer_sk)]
+|
+15:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: ss_ticket_number, ss_customer_sk
+|  having: count(*) <= 20, count(*) >= 15
+|
+14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk)]
+|
+07:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: ss_ticket_number, ss_customer_sk
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|  runtime filters: RF001 <- store.s_store_sk
+|
+|--JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: store.s_store_sk
+|  |
+|  13:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.store]
+|     partitions=1/1 files=1 size=3.08KB
+|     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County', 'Fairfield County', 'Raleigh County', 'Ziebach County', 'Williamson County')
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|  runtime filters: RF002 <- date_dim.d_date_sk
+|
+|--JOIN BUILD
+|  |  join-table-id=02 plan-id=03 cohort-id=01
+|  |  build expressions: date_dim.d_date_sk
+|  |
+|  12:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim]
+|     partitions=1/1 files=1 size=9.84MB
+|     predicates: date_dim.d_year IN (1998, 1999, 2000), (date_dim.d_dom >= 1 AND date_dim.d_dom <= 3 OR date_dim.d_dom >= 25 AND date_dim.d_dom <= 28)
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
+|  runtime filters: RF003 <- household_demographics.hd_demo_sk
+|
+|--JOIN BUILD
+|  |  join-table-id=03 plan-id=04 cohort-id=01
+|  |  build expressions: household_demographics.hd_demo_sk
+|  |
+|  11:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.household_demographics]
+|     partitions=1/1 files=1 size=148.10KB
+|     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=1824/1824 files=1824 size=326.32MB
+   runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF001 -> store_sales.ss_store_sk, RF002 -> store_sales.ss_sold_date_sk, RF003 -> store_sales.ss_hdemo_sk
 ====
 # TPCDS-Q42
 select
@@ -3774,145 +3782,147 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-17:MERGING-EXCHANGE [UNPARTITIONED]
+18:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: cnt DESC
 |  limit: 1000
 |
 10:TOP-N [LIMIT=1000]
 |  order by: cnt DESC
 |
-09:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: c_customer_sk = ss_customer_sk
-|  runtime filters: RF000 <- ss_customer_sk
+09:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: ss_customer_sk = c_customer_sk
+|  runtime filters: RF000 <- c_customer_sk
 |
-|--16:EXCHANGE [BROADCAST]
+|--17:EXCHANGE [HASH(c_customer_sk)]
 |  |
-|  15:AGGREGATE [FINALIZE]
-|  |  output: count:merge(*)
-|  |  group by: ss_ticket_number, ss_customer_sk
-|  |  having: count(*) <= 5, count(*) >= 1
-|  |
-|  14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk)]
-|  |
-|  07:AGGREGATE [STREAMING]
-|  |  output: count(*)
-|  |  group by: ss_ticket_number, ss_customer_sk
-|  |
-|  06:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
-|  |  runtime filters: RF001 <- store.s_store_sk
-|  |
-|  |--13:EXCHANGE [BROADCAST]
-|  |  |
-|  |  02:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
-|  |     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County')
-|  |
-|  05:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
-|  |  runtime filters: RF002 <- date_dim.d_date_sk
-|  |
-|  |--12:EXCHANGE [BROADCAST]
-|  |  |
-|  |  01:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
-|  |
-|  04:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
-|  |  runtime filters: RF003 <- household_demographics.hd_demo_sk
-|  |
-|  |--11:EXCHANGE [BROADCAST]
-|  |  |
-|  |  03:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END > 1
-|  |
-|  00:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
-|     runtime filters: RF001 -> store_sales.ss_store_sk, RF002 -> store_sales.ss_sold_date_sk, RF003 -> store_sales.ss_hdemo_sk
+|  08:SCAN HDFS [tpcds.customer]
+|     partitions=1/1 files=1 size=12.60MB
 |
-08:SCAN HDFS [tpcds.customer]
-   partitions=1/1 files=1 size=12.60MB
-   runtime filters: RF000 -> c_customer_sk
+16:EXCHANGE [HASH(ss_customer_sk)]
+|
+15:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: ss_ticket_number, ss_customer_sk
+|  having: count(*) <= 5, count(*) >= 1
+|
+14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk)]
+|
+07:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: ss_ticket_number, ss_customer_sk
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|  runtime filters: RF001 <- store.s_store_sk
+|
+|--13:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.store]
+|     partitions=1/1 files=1 size=3.08KB
+|     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County')
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|  runtime filters: RF002 <- date_dim.d_date_sk
+|
+|--12:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim]
+|     partitions=1/1 files=1 size=9.84MB
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
+|  runtime filters: RF003 <- household_demographics.hd_demo_sk
+|
+|--11:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.household_demographics]
+|     partitions=1/1 files=1 size=148.10KB
+|     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END > 1
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=1824/1824 files=1824 size=326.32MB
+   runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF001 -> store_sales.ss_store_sk, RF002 -> store_sales.ss_sold_date_sk, RF003 -> store_sales.ss_hdemo_sk
 ---- PARALLELPLANS
 PLAN-ROOT SINK
 |
-17:MERGING-EXCHANGE [UNPARTITIONED]
+18:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: cnt DESC
 |  limit: 1000
 |
 10:TOP-N [LIMIT=1000]
 |  order by: cnt DESC
 |
-09:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: c_customer_sk = ss_customer_sk
-|  runtime filters: RF000 <- ss_customer_sk
+09:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: ss_customer_sk = c_customer_sk
+|  runtime filters: RF000 <- c_customer_sk
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
-|  |  build expressions: ss_customer_sk
+|  |  build expressions: c_customer_sk
 |  |
-|  16:EXCHANGE [BROADCAST]
+|  17:EXCHANGE [HASH(c_customer_sk)]
 |  |
-|  15:AGGREGATE [FINALIZE]
-|  |  output: count:merge(*)
-|  |  group by: ss_ticket_number, ss_customer_sk
-|  |  having: count(*) <= 5, count(*) >= 1
-|  |
-|  14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk)]
-|  |
-|  07:AGGREGATE [STREAMING]
-|  |  output: count(*)
-|  |  group by: ss_ticket_number, ss_customer_sk
-|  |
-|  06:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
-|  |  runtime filters: RF001 <- store.s_store_sk
-|  |
-|  |--JOIN BUILD
-|  |  |  join-table-id=01 plan-id=02 cohort-id=02
-|  |  |  build expressions: store.s_store_sk
-|  |  |
-|  |  13:EXCHANGE [BROADCAST]
-|  |  |
-|  |  02:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
-|  |     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County')
-|  |
-|  05:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
-|  |  runtime filters: RF002 <- date_dim.d_date_sk
-|  |
-|  |--JOIN BUILD
-|  |  |  join-table-id=02 plan-id=03 cohort-id=02
-|  |  |  build expressions: date_dim.d_date_sk
-|  |  |
-|  |  12:EXCHANGE [BROADCAST]
-|  |  |
-|  |  01:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
-|  |
-|  04:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
-|  |  runtime filters: RF003 <- household_demographics.hd_demo_sk
-|  |
-|  |--JOIN BUILD
-|  |  |  join-table-id=03 plan-id=04 cohort-id=02
-|  |  |  build expressions: household_demographics.hd_demo_sk
-|  |  |
-|  |  11:EXCHANGE [BROADCAST]
-|  |  |
-|  |  03:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END > 1
-|  |
-|  00:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
-|     runtime filters: RF001 -> store_sales.ss_store_sk, RF002 -> store_sales.ss_sold_date_sk, RF003 -> store_sales.ss_hdemo_sk
+|  08:SCAN HDFS [tpcds.customer]
+|     partitions=1/1 files=1 size=12.60MB
 |
-08:SCAN HDFS [tpcds.customer]
-   partitions=1/1 files=1 size=12.60MB
-   runtime filters: RF000 -> c_customer_sk
+16:EXCHANGE [HASH(ss_customer_sk)]
+|
+15:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: ss_ticket_number, ss_customer_sk
+|  having: count(*) <= 5, count(*) >= 1
+|
+14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk)]
+|
+07:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: ss_ticket_number, ss_customer_sk
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|  runtime filters: RF001 <- store.s_store_sk
+|
+|--JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: store.s_store_sk
+|  |
+|  13:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.store]
+|     partitions=1/1 files=1 size=3.08KB
+|     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County')
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|  runtime filters: RF002 <- date_dim.d_date_sk
+|
+|--JOIN BUILD
+|  |  join-table-id=02 plan-id=03 cohort-id=01
+|  |  build expressions: date_dim.d_date_sk
+|  |
+|  12:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim]
+|     partitions=1/1 files=1 size=9.84MB
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
+|  runtime filters: RF003 <- household_demographics.hd_demo_sk
+|
+|--JOIN BUILD
+|  |  join-table-id=03 plan-id=04 cohort-id=01
+|  |  build expressions: household_demographics.hd_demo_sk
+|  |
+|  11:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.household_demographics]
+|     partitions=1/1 files=1 size=148.10KB
+|     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END > 1
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=1824/1824 files=1824 size=326.32MB
+   runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF001 -> store_sales.ss_store_sk, RF002 -> store_sales.ss_sold_date_sk, RF003 -> store_sales.ss_hdemo_sk
 ====
 # TPCDS-Q79
 select
@@ -4005,145 +4015,147 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-17:MERGING-EXCHANGE [UNPARTITIONED]
+18:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: c_last_name ASC, c_first_name ASC, substr(s_city, 1, 30) ASC, profit ASC
 |  limit: 100
 |
 10:TOP-N [LIMIT=100]
 |  order by: c_last_name ASC, c_first_name ASC, substr(s_city, 1, 30) ASC, profit ASC
 |
-09:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: c_customer_sk = ss_customer_sk
-|  runtime filters: RF000 <- ss_customer_sk
+09:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: ss_customer_sk = c_customer_sk
+|  runtime filters: RF000 <- c_customer_sk
 |
-|--16:EXCHANGE [BROADCAST]
+|--17:EXCHANGE [HASH(c_customer_sk)]
 |  |
-|  15:AGGREGATE [FINALIZE]
-|  |  output: sum:merge(ss_coupon_amt), sum:merge(ss_net_profit)
-|  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, store.s_city
-|  |
-|  14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk,ss_addr_sk,store.s_city)]
-|  |
-|  07:AGGREGATE [STREAMING]
-|  |  output: sum(ss_coupon_amt), sum(ss_net_profit)
-|  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, store.s_city
-|  |
-|  06:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
-|  |  runtime filters: RF001 <- date_dim.d_date_sk
-|  |
-|  |--13:EXCHANGE [BROADCAST]
-|  |  |
-|  |  01:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: d_date <= '1999-03-31', d_date >= '1999-01-01'
-|  |
-|  05:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
-|  |  runtime filters: RF002 <- store.s_store_sk
-|  |
-|  |--12:EXCHANGE [BROADCAST]
-|  |  |
-|  |  02:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
-|  |     predicates: store.s_number_employees <= 295, store.s_number_employees >= 200
-|  |
-|  04:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
-|  |  runtime filters: RF003 <- household_demographics.hd_demo_sk
-|  |
-|  |--11:EXCHANGE [BROADCAST]
-|  |  |
-|  |  03:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: (household_demographics.hd_dep_count = 8 OR household_demographics.hd_vehicle_count > 0)
-|  |
-|  00:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
-|     runtime filters: RF001 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_store_sk, RF003 -> store_sales.ss_hdemo_sk
+|  08:SCAN HDFS [tpcds.customer]
+|     partitions=1/1 files=1 size=12.60MB
 |
-08:SCAN HDFS [tpcds.customer]
-   partitions=1/1 files=1 size=12.60MB
-   runtime filters: RF000 -> c_customer_sk
+16:EXCHANGE [HASH(ss_customer_sk)]
+|
+15:AGGREGATE [FINALIZE]
+|  output: sum:merge(ss_coupon_amt), sum:merge(ss_net_profit)
+|  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, store.s_city
+|
+14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk,ss_addr_sk,store.s_city)]
+|
+07:AGGREGATE [STREAMING]
+|  output: sum(ss_coupon_amt), sum(ss_net_profit)
+|  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, store.s_city
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|  runtime filters: RF001 <- date_dim.d_date_sk
+|
+|--13:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim]
+|     partitions=1/1 files=1 size=9.84MB
+|     predicates: d_date <= '1999-03-31', d_date >= '1999-01-01'
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|  runtime filters: RF002 <- store.s_store_sk
+|
+|--12:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.store]
+|     partitions=1/1 files=1 size=3.08KB
+|     predicates: store.s_number_employees <= 295, store.s_number_employees >= 200
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
+|  runtime filters: RF003 <- household_demographics.hd_demo_sk
+|
+|--11:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.household_demographics]
+|     partitions=1/1 files=1 size=148.10KB
+|     predicates: (household_demographics.hd_dep_count = 8 OR household_demographics.hd_vehicle_count > 0)
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=1824/1824 files=1824 size=326.32MB
+   runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF001 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_store_sk, RF003 -> store_sales.ss_hdemo_sk
 ---- PARALLELPLANS
 PLAN-ROOT SINK
 |
-17:MERGING-EXCHANGE [UNPARTITIONED]
+18:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: c_last_name ASC, c_first_name ASC, substr(s_city, 1, 30) ASC, profit ASC
 |  limit: 100
 |
 10:TOP-N [LIMIT=100]
 |  order by: c_last_name ASC, c_first_name ASC, substr(s_city, 1, 30) ASC, profit ASC
 |
-09:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: c_customer_sk = ss_customer_sk
-|  runtime filters: RF000 <- ss_customer_sk
+09:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: ss_customer_sk = c_customer_sk
+|  runtime filters: RF000 <- c_customer_sk
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
-|  |  build expressions: ss_customer_sk
+|  |  build expressions: c_customer_sk
 |  |
-|  16:EXCHANGE [BROADCAST]
+|  17:EXCHANGE [HASH(c_customer_sk)]
 |  |
-|  15:AGGREGATE [FINALIZE]
-|  |  output: sum:merge(ss_coupon_amt), sum:merge(ss_net_profit)
-|  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, store.s_city
-|  |
-|  14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk,ss_addr_sk,store.s_city)]
-|  |
-|  07:AGGREGATE [STREAMING]
-|  |  output: sum(ss_coupon_amt), sum(ss_net_profit)
-|  |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, store.s_city
-|  |
-|  06:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
-|  |  runtime filters: RF001 <- date_dim.d_date_sk
-|  |
-|  |--JOIN BUILD
-|  |  |  join-table-id=01 plan-id=02 cohort-id=02
-|  |  |  build expressions: date_dim.d_date_sk
-|  |  |
-|  |  13:EXCHANGE [BROADCAST]
-|  |  |
-|  |  01:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: d_date <= '1999-03-31', d_date >= '1999-01-01'
-|  |
-|  05:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
-|  |  runtime filters: RF002 <- store.s_store_sk
-|  |
-|  |--JOIN BUILD
-|  |  |  join-table-id=02 plan-id=03 cohort-id=02
-|  |  |  build expressions: store.s_store_sk
-|  |  |
-|  |  12:EXCHANGE [BROADCAST]
-|  |  |
-|  |  02:SCAN HDFS [tpcds.store]
-|  |     partitions=1/1 files=1 size=3.08KB
-|  |     predicates: store.s_number_employees <= 295, store.s_number_employees >= 200
-|  |
-|  04:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
-|  |  runtime filters: RF003 <- household_demographics.hd_demo_sk
-|  |
-|  |--JOIN BUILD
-|  |  |  join-table-id=03 plan-id=04 cohort-id=02
-|  |  |  build expressions: household_demographics.hd_demo_sk
-|  |  |
-|  |  11:EXCHANGE [BROADCAST]
-|  |  |
-|  |  03:SCAN HDFS [tpcds.household_demographics]
-|  |     partitions=1/1 files=1 size=148.10KB
-|  |     predicates: (household_demographics.hd_dep_count = 8 OR household_demographics.hd_vehicle_count > 0)
-|  |
-|  00:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
-|     runtime filters: RF001 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_store_sk, RF003 -> store_sales.ss_hdemo_sk
+|  08:SCAN HDFS [tpcds.customer]
+|     partitions=1/1 files=1 size=12.60MB
 |
-08:SCAN HDFS [tpcds.customer]
-   partitions=1/1 files=1 size=12.60MB
-   runtime filters: RF000 -> c_customer_sk
+16:EXCHANGE [HASH(ss_customer_sk)]
+|
+15:AGGREGATE [FINALIZE]
+|  output: sum:merge(ss_coupon_amt), sum:merge(ss_net_profit)
+|  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, store.s_city
+|
+14:EXCHANGE [HASH(ss_ticket_number,ss_customer_sk,ss_addr_sk,store.s_city)]
+|
+07:AGGREGATE [STREAMING]
+|  output: sum(ss_coupon_amt), sum(ss_net_profit)
+|  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, store.s_city
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|  runtime filters: RF001 <- date_dim.d_date_sk
+|
+|--JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: date_dim.d_date_sk
+|  |
+|  13:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim]
+|     partitions=1/1 files=1 size=9.84MB
+|     predicates: d_date <= '1999-03-31', d_date >= '1999-01-01'
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_store_sk = store.s_store_sk
+|  runtime filters: RF002 <- store.s_store_sk
+|
+|--JOIN BUILD
+|  |  join-table-id=02 plan-id=03 cohort-id=01
+|  |  build expressions: store.s_store_sk
+|  |
+|  12:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.store]
+|     partitions=1/1 files=1 size=3.08KB
+|     predicates: store.s_number_employees <= 295, store.s_number_employees >= 200
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
+|  runtime filters: RF003 <- household_demographics.hd_demo_sk
+|
+|--JOIN BUILD
+|  |  join-table-id=03 plan-id=04 cohort-id=01
+|  |  build expressions: household_demographics.hd_demo_sk
+|  |
+|  11:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.household_demographics]
+|     partitions=1/1 files=1 size=148.10KB
+|     predicates: (household_demographics.hd_dep_count = 8 OR household_demographics.hd_vehicle_count > 0)
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=1824/1824 files=1824 size=326.32MB
+   runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF001 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_store_sk, RF003 -> store_sales.ss_hdemo_sk
 ====
 # TPCDS-Q89
 select * from (select  *
@@ -4574,7 +4586,7 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-13:MERGING-EXCHANGE [UNPARTITIONED]
+14:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: i_category ASC, i_class ASC, i_item_id ASC, i_item_desc ASC, sum(ss_ext_sales_price) * 100 / sum(sum(ss_ext_sales_price)) ASC
 |  limit: 1000
 |
@@ -4588,11 +4600,11 @@ PLAN-ROOT SINK
 06:SORT
 |  order by: i_class ASC NULLS FIRST
 |
-12:AGGREGATE [FINALIZE]
+13:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
 |
-11:EXCHANGE [HASH(i_class)]
+12:EXCHANGE [HASH(i_class)]
 |
 05:AGGREGATE [STREAMING]
 |  output: sum(ss_ext_sales_price)
@@ -4602,30 +4614,31 @@ PLAN-ROOT SINK
 |  hash predicates: ss_sold_date_sk = d_date_sk
 |  runtime filters: RF000 <- d_date_sk
 |
-|--10:EXCHANGE [BROADCAST]
+|--11:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
 |     partitions=1/1 files=1 size=9.84MB
 |     predicates: tpcds.date_dim.d_date_sk <= 2451941, tpcds.date_dim.d_date_sk >= 2451911, d_date <= '2001-01-31', d_date >= '2001-01-01'
 |
-03:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: i_item_sk = ss_item_sk
-|  runtime filters: RF001 <- ss_item_sk
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: ss_item_sk = i_item_sk
+|  runtime filters: RF001 <- i_item_sk
 |
-|--09:EXCHANGE [BROADCAST]
+|--10:EXCHANGE [HASH(i_item_sk)]
 |  |
-|  00:SCAN HDFS [tpcds.store_sales]
-|     partitions=31/1824 files=31 size=3.43MB
-|     runtime filters: RF000 -> ss_sold_date_sk
+|  01:SCAN HDFS [tpcds.item]
+|     partitions=1/1 files=1 size=4.82MB
+|     predicates: i_category IN ('Jewelry', 'Sports', 'Books')
 |
-01:SCAN HDFS [tpcds.item]
-   partitions=1/1 files=1 size=4.82MB
-   predicates: i_category IN ('Jewelry', 'Sports', 'Books')
-   runtime filters: RF001 -> i_item_sk
+09:EXCHANGE [HASH(ss_item_sk)]
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=31/1824 files=31 size=3.43MB
+   runtime filters: RF000 -> ss_sold_date_sk, RF001 -> ss_item_sk
 ---- PARALLELPLANS
 PLAN-ROOT SINK
 |
-13:MERGING-EXCHANGE [UNPARTITIONED]
+14:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: i_category ASC, i_class ASC, i_item_id ASC, i_item_desc ASC, sum(ss_ext_sales_price) * 100 / sum(sum(ss_ext_sales_price)) ASC
 |  limit: 1000
 |
@@ -4639,11 +4652,11 @@ PLAN-ROOT SINK
 06:SORT
 |  order by: i_class ASC NULLS FIRST
 |
-12:AGGREGATE [FINALIZE]
+13:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
 |
-11:EXCHANGE [HASH(i_class)]
+12:EXCHANGE [HASH(i_class)]
 |
 05:AGGREGATE [STREAMING]
 |  output: sum(ss_ext_sales_price)
@@ -4657,30 +4670,31 @@ PLAN-ROOT SINK
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: d_date_sk
 |  |
-|  10:EXCHANGE [BROADCAST]
+|  11:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
 |     partitions=1/1 files=1 size=9.84MB
 |     predicates: tpcds.date_dim.d_date_sk <= 2451941, tpcds.date_dim.d_date_sk >= 2451911, d_date <= '2001-01-31', d_date >= '2001-01-01'
 |
-03:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: i_item_sk = ss_item_sk
-|  runtime filters: RF001 <- ss_item_sk
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: ss_item_sk = i_item_sk
+|  runtime filters: RF001 <- i_item_sk
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
-|  |  build expressions: ss_item_sk
+|  |  build expressions: i_item_sk
 |  |
-|  09:EXCHANGE [BROADCAST]
+|  10:EXCHANGE [HASH(i_item_sk)]
 |  |
-|  00:SCAN HDFS [tpcds.store_sales]
-|     partitions=31/1824 files=31 size=3.43MB
-|     runtime filters: RF000 -> ss_sold_date_sk
+|  01:SCAN HDFS [tpcds.item]
+|     partitions=1/1 files=1 size=4.82MB
+|     predicates: i_category IN ('Jewelry', 'Sports', 'Books')
 |
-01:SCAN HDFS [tpcds.item]
-   partitions=1/1 files=1 size=4.82MB
-   predicates: i_category IN ('Jewelry', 'Sports', 'Books')
-   runtime filters: RF001 -> i_item_sk
+09:EXCHANGE [HASH(ss_item_sk)]
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=31/1824 files=31 size=3.43MB
+   runtime filters: RF000 -> ss_sold_date_sk, RF001 -> ss_item_sk
 ====
 # TPCD-Q6
 select * from (
