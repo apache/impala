@@ -570,14 +570,16 @@
     "key": "impala-server.hedged-read-ops-win"
   },
   {
-    "description": "The local start time of the Impala Server.",
+    "description": "The local start time of the process",
     "contexts": [
-      "IMPALAD"
+      "IMPALAD",
+      "CATALOGSERVER",
+      "STATESTORE"
     ],
-    "label": "Impala Server Start Time",
+    "label": "Process Start Time",
     "units": "NONE",
     "kind": "PROPERTY",
-    "key": "impala-server.start-time"
+    "key": "process-start-time"
   },
   {
     "description": "The full version string of the Impala Server.",

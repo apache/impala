@@ -27,9 +27,15 @@
 
 #include "common/logging.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/exec-env.h"
+#include "service/impala-server.h"
+#include "util/common-metrics.h"
 #include "util/debug-util.h"
 #include "util/pprof-path-handlers.h"
-#include "util/webserver.h"
+#include "util/mem-info.h"
+#include "util/cpu-info.h"
+#include "util/disk-info.h"
+#include "util/process-state-info.h"
 
 #include "common/names.h"
 
@@ -174,8 +180,41 @@ void MemUsageHandler(MemTracker* mem_tracker, MetricGroup* metric_group,
   }
 }
 
+namespace impala {
 
-void impala::AddDefaultUrlCallbacks(
+void RootHandler(const Webserver::ArgumentMap& args, Document* document) {
+  Value version(GetVersionString().c_str(), document->GetAllocator());
+  document->AddMember("version", version, document->GetAllocator());
+  Value cpu_info(CpuInfo::DebugString().c_str(), document->GetAllocator());
+  document->AddMember("cpu_info", cpu_info, document->GetAllocator());
+  Value mem_info(MemInfo::DebugString().c_str(), document->GetAllocator());
+  document->AddMember("mem_info", mem_info, document->GetAllocator());
+  Value disk_info(DiskInfo::DebugString().c_str(), document->GetAllocator());
+  document->AddMember("disk_info", disk_info, document->GetAllocator());
+  Value os_info(OsInfo::DebugString().c_str(), document->GetAllocator());
+  document->AddMember("os_info", os_info, document->GetAllocator());
+  Value process_state_info(ProcessStateInfo().DebugString().c_str(),
+    document->GetAllocator());
+  document->AddMember("process_state_info", process_state_info,
+    document->GetAllocator());
+
+  if (CommonMetrics::PROCESS_START_TIME != nullptr) {
+    Value process_start_time(CommonMetrics::PROCESS_START_TIME->value().c_str(),
+      document->GetAllocator());
+    document->AddMember("process_start_time", process_start_time,
+      document->GetAllocator());
+  }
+
+  ExecEnv* env = ExecEnv::GetInstance();
+  if (env == nullptr || env->impala_server() == nullptr) return;
+  document->AddMember("impala_server_mode", true, document->GetAllocator());
+  document->AddMember("is_coordinator", env->impala_server()->IsCoordinator(),
+      document->GetAllocator());
+  document->AddMember("is_executor", env->impala_server()->IsExecutor(),
+      document->GetAllocator());
+}
+
+void AddDefaultUrlCallbacks(
     Webserver* webserver, MemTracker* process_mem_tracker, MetricGroup* metric_group) {
   webserver->RegisterUrlCallback("/logs", "logs.tmpl", LogsHandler);
   webserver->RegisterUrlCallback("/varz", "flags.tmpl", FlagsHandler);
@@ -193,4 +232,12 @@ void impala::AddDefaultUrlCallbacks(
     AddPprofUrlCallbacks(webserver);
   }
 #endif
+
+  auto root_handler =
+    [](const Webserver::ArgumentMap& args, Document* doc) {
+      RootHandler(args, doc);
+    };
+  webserver->RegisterUrlCallback("/", "root.tmpl", root_handler);
+}
+
 }

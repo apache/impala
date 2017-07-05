@@ -337,8 +337,6 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   // Initialize impalad metrics
   ImpaladMetrics::CreateMetrics(
       exec_env->metrics()->GetOrCreateChildGroup("impala-server"));
-  ImpaladMetrics::IMPALA_SERVER_START_TIME->set_value(
-      TimestampValue::LocalTime().ToString());
 
   ABORT_IF_ERROR(ExternalDataSourceExecutor::InitJNI(exec_env->metrics()));
 

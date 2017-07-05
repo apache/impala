@@ -29,9 +29,6 @@ class HistogramMetric;
 /// Contains the keys (strings) for impala metrics.
 class ImpaladMetricKeys {
  public:
-  /// Local time that the server started
-  static const char* IMPALA_SERVER_START_TIME;
-
   /// Full version string of the Impala server
   static const char* IMPALA_SERVER_VERSION;
 
@@ -196,7 +193,6 @@ class ImpaladMetrics {
   // Properties
   static BooleanProperty* CATALOG_READY;
   static BooleanProperty* IMPALA_SERVER_READY;
-  static StringProperty* IMPALA_SERVER_START_TIME;
   static StringProperty* IMPALA_SERVER_VERSION;
   // Histograms
   static HistogramMetric* QUERY_DURATIONS;

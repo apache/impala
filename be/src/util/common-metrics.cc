@@ -15,27 +15,19 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H
-#define IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H
-
-#include <stdio.h>
-
-#include "util/webserver.h"
-#include "rapidjson/document.h"
+#include "util/common-metrics.h"
+#include "runtime/timestamp-value.h"
 
 namespace impala {
 
-class MemTracker;
-class MetricGroup;
+StringProperty* CommonMetrics::PROCESS_START_TIME = nullptr;
+string CommonMetrics::PROCESS_START_TIME_METRIC_NAME = "process-start-time";
 
-/// Adds a set of default path handlers to the webserver to display
-/// logs and configuration flags
-void AddDefaultUrlCallbacks(Webserver* webserver, MemTracker* process_mem_tracker = NULL,
-    MetricGroup* metric_group = NULL);
-
-/// Registered to handle "/"
-/// Populates document with various system-wide information.
-void RootHandler(const Webserver::ArgumentMap& args, rapidjson::Document* document);
+void CommonMetrics::InitCommonMetrics(MetricGroup* metric_group) {
+  PROCESS_START_TIME = metric_group->AddProperty<string>(
+    PROCESS_START_TIME_METRIC_NAME, "");
+  // TODO: IMPALA-5599: Clean up non-TIMESTAMP usages of TimestampValue
+  PROCESS_START_TIME->set_value(TimestampValue::LocalTime().ToString());
 }
 
-#endif // IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H
+}

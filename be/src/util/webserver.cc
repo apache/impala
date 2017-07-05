@@ -176,31 +176,6 @@ Webserver::~Webserver() {
   Stop();
 }
 
-void Webserver::RootHandler(const ArgumentMap& args, Document* document) {
-  Value version(GetVersionString().c_str(), document->GetAllocator());
-  document->AddMember("version", version, document->GetAllocator());
-  Value cpu_info(CpuInfo::DebugString().c_str(), document->GetAllocator());
-  document->AddMember("cpu_info", cpu_info, document->GetAllocator());
-  Value mem_info(MemInfo::DebugString().c_str(), document->GetAllocator());
-  document->AddMember("mem_info", mem_info, document->GetAllocator());
-  Value disk_info(DiskInfo::DebugString().c_str(), document->GetAllocator());
-  document->AddMember("disk_info", disk_info, document->GetAllocator());
-  Value os_info(OsInfo::DebugString().c_str(), document->GetAllocator());
-  document->AddMember("os_info", os_info, document->GetAllocator());
-  Value process_state_info(ProcessStateInfo().DebugString().c_str(),
-    document->GetAllocator());
-  document->AddMember("process_state_info", process_state_info,
-    document->GetAllocator());
-
-  ExecEnv* env = ExecEnv::GetInstance();
-  if (env == nullptr || env->impala_server() == nullptr) return;
-  document->AddMember("impala_server_mode", true, document->GetAllocator());
-  document->AddMember("is_coordinator", env->impala_server()->IsCoordinator(),
-      document->GetAllocator());
-  document->AddMember("is_executor", env->impala_server()->IsExecutor(),
-      document->GetAllocator());
-}
-
 void Webserver::ErrorHandler(const ArgumentMap& args, Document* document) {
   ArgumentMap::const_iterator it = args.find(ERROR_KEY);
   if (it == args.end()) return;
@@ -339,11 +314,6 @@ Status Webserver::Start() {
     error_msg << "Webserver: Could not start on address " << http_address_;
     return Status(error_msg.str());
   }
-
-  UrlCallback default_callback =
-      bind<void>(mem_fn(&Webserver::RootHandler), this, _1, _2);
-
-  RegisterUrlCallback("/", "root.tmpl", default_callback, false);
 
   LOG(INFO) << "Webserver started";
   return Status::OK();

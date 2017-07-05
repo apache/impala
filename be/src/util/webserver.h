@@ -150,9 +150,6 @@ class Webserver {
   void RenderUrlWithTemplate(const ArgumentMap& arguments, const UrlHandler& url_handler,
       std::stringstream* output, ContentType* content_type);
 
-  /// Registered to handle "/", populates document with various system-wide information.
-  void RootHandler(const ArgumentMap& args, rapidjson::Document* document);
-
   /// Called when an error is encountered, e.g. when a handler for a URI cannot be found.
   void ErrorHandler(const ArgumentMap& args, rapidjson::Document* document);
 

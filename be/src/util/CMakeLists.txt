@@ -34,6 +34,7 @@ add_library(Util
   bloom-filter.cc
   coding-util.cc
   codec.cc
+  common-metrics.cc
   compress.cc
   cpu-info.cc
   decimal-util.cc

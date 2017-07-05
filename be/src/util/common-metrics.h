@@ -15,27 +15,22 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H
-#define IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H
-
-#include <stdio.h>
-
-#include "util/webserver.h"
-#include "rapidjson/document.h"
+#include "util/metrics.h"
 
 namespace impala {
 
-class MemTracker;
-class MetricGroup;
+/// This class stores the metrics that are common for the Impalad
+/// Statestored and Catalogd processes.
+/// Also responsible for registering and initializing these metrics.
+class CommonMetrics {
+public:
+  static StringProperty* PROCESS_START_TIME;
 
-/// Adds a set of default path handlers to the webserver to display
-/// logs and configuration flags
-void AddDefaultUrlCallbacks(Webserver* webserver, MemTracker* process_mem_tracker = NULL,
-    MetricGroup* metric_group = NULL);
+  /// Registers and initializes the commnon metrics
+  static void InitCommonMetrics(MetricGroup* metric_group);
 
-/// Registered to handle "/"
-/// Populates document with various system-wide information.
-void RootHandler(const Webserver::ArgumentMap& args, rapidjson::Document* document);
+private:
+  static string PROCESS_START_TIME_METRIC_NAME;
+};
+
 }
-
-#endif // IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H

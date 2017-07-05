@@ -23,6 +23,7 @@
 
 #include "testutil/gtest-util.h"
 #include "util/webserver.h"
+#include "util/default-path-handlers.h"
 #include "common/init.h"
 
 DECLARE_int32(webserver_port);
@@ -94,6 +95,7 @@ Status HttpGet(const string& host, const int32_t& port, const string& url_path,
 TEST(Webserver, SmokeTest) {
   Webserver webserver(FLAGS_webserver_port);
   ASSERT_OK(webserver.Start());
+  AddDefaultUrlCallbacks(&webserver);
 
   stringstream contents;
   ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port, "/", &contents));

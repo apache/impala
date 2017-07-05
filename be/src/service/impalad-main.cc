@@ -33,6 +33,7 @@
 #include "common/status.h"
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
+#include "util/common-metrics.h"
 #include "util/jni-util.h"
 #include "util/network-util.h"
 #include "rpc/thrift-util.h"
@@ -78,6 +79,8 @@ int ImpaladMain(int argc, char** argv) {
   ExecEnv exec_env;
   StartThreadInstrumentation(exec_env.metrics(), exec_env.webserver(), true);
   InitRpcEventTracing(exec_env.webserver());
+
+  CommonMetrics::InitCommonMetrics(exec_env.metrics());
 
   ThriftServer* beeswax_server = NULL;
   ThriftServer* hs2_server = NULL;

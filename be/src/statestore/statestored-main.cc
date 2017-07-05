@@ -28,6 +28,7 @@
 #include "rpc/rpc-trace.h"
 #include "runtime/mem-tracker.h"
 #include "statestore/statestore.h"
+#include "util/common-metrics.h"
 #include "util/debug-util.h"
 #include "util/metrics.h"
 #include "util/memory-metrics.h"
@@ -70,6 +71,8 @@ int StatestoredMain(int argc, char** argv) {
   // TODO: Add a 'common metrics' method to add standard metrics to
   // both statestored and impalad
   metrics->AddProperty<string>("statestore.version", GetVersionString(true));
+
+  CommonMetrics::InitCommonMetrics(metrics.get());
 
   Statestore statestore(metrics.get());
   statestore.RegisterWebpages(webserver.get());

@@ -32,6 +32,7 @@
 #include "util/debug-util.h"
 #include "util/jni-util.h"
 #include "util/metrics.h"
+#include "util/common-metrics.h"
 #include "util/network-util.h"
 #include "util/memory-metrics.h"
 #include "util/webserver.h"
@@ -75,6 +76,8 @@ int CatalogdMain(int argc, char** argv) {
 
   InitRpcEventTracing(webserver.get());
   metrics->AddProperty<string>("catalog.version", GetVersionString(true));
+
+  CommonMetrics::InitCommonMetrics(metrics.get());
 
   CatalogServer catalog_server(metrics.get());
   ABORT_IF_ERROR(catalog_server.Start());

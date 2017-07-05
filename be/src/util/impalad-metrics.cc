@@ -26,8 +26,6 @@ namespace impala {
 
 // Naming convention: Components should be separated by '.' and words should
 // be separated by '-'.
-const char* ImpaladMetricKeys::IMPALA_SERVER_START_TIME =
-    "impala-server.start-time";
 const char* ImpaladMetricKeys::IMPALA_SERVER_VERSION =
     "impala-server.version";
 const char* ImpaladMetricKeys::IMPALA_SERVER_READY =
@@ -146,7 +144,6 @@ IntGauge* ImpaladMetrics::RESULTSET_CACHE_TOTAL_BYTES = NULL;
 // Properties
 BooleanProperty* ImpaladMetrics::CATALOG_READY = NULL;
 BooleanProperty* ImpaladMetrics::IMPALA_SERVER_READY = NULL;
-StringProperty* ImpaladMetrics::IMPALA_SERVER_START_TIME = NULL;
 StringProperty* ImpaladMetrics::IMPALA_SERVER_VERSION = NULL;
 
 // Histograms
@@ -159,8 +156,6 @@ ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO = NULL;
 
 void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
   // Initialize impalad metrics
-  IMPALA_SERVER_START_TIME = m->AddProperty<string>(
-      ImpaladMetricKeys::IMPALA_SERVER_START_TIME, "");
   IMPALA_SERVER_VERSION = m->AddProperty<string>(
       ImpaladMetricKeys::IMPALA_SERVER_VERSION, GetVersionString(true));
   IMPALA_SERVER_READY = m->AddProperty<bool>(
