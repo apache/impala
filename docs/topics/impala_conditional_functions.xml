@@ -436,6 +436,56 @@ END</codeblock>
 
       </dlentry>
 
+      <dlentry id="nvl2" rev="2.9.0 IMPALA-5030">
+
+        <dt>
+          <codeph>nvl2(type a, type ifNull, type ifNotNull)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="hidden">nvl2() function</indexterm>
+          <b>Purpose:</b> Enhanced variant of the <codeph>nvl()</codeph> function. Tests an expression
+          and returns different result values depending on whether it is <codeph>NULL</codeph> or not.
+          If the first argument is <codeph>NULL</codeph>, returns the second argument.
+          If the first argument is not <codeph>NULL</codeph>, returns the third argument.
+          Equivalent to the <codeph>nvl2()</codeph> function from Oracle Database.
+          <p>
+            <b>Return type:</b> Same as the first argument value
+          </p>
+          <p conref="../shared/impala_common.xml#common/added_in_290"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            The following examples show how a query can use special indicator values
+            to represent null and not-null expression values. The first example tests
+            an <codeph>INT</codeph> column and so uses special integer values.
+            The second example tests a <codeph>STRING</codeph> column and so uses
+            special string values.
+          </p>
+<codeblock>
+select x, nvl2(x, 999, 0) from nvl2_demo;
++------+---------------------------+
+| x    | if(x is not null, 999, 0) |
++------+---------------------------+
+| NULL | 0                         |
+| 1    | 999                       |
+| NULL | 0                         |
+| 2    | 999                       |
++------+---------------------------+
+
+select s, nvl2(s, 'is not null', 'is null') from nvl2_demo;
++------+---------------------------------------------+
+| s    | if(s is not null, 'is not null', 'is null') |
++------+---------------------------------------------+
+| NULL | is null                                     |
+| one  | is not null                                 |
+| NULL | is null                                     |
+| two  | is not null                                 |
++------+---------------------------------------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
       <dlentry rev="1.3.0" id="zeroifnull">
 
         <dt>

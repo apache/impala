@@ -874,6 +874,7 @@ Returned 1 row(s) in 0.12s</codeblock>
             string, the expansion is only performed once, instead of
             applying again to the newly constructed string.
           </p>
+          <p conref="../shared/impala_common.xml#common/added_in_290"/>
           <p conref="../shared/impala_common.xml#common/example_blurb"/>
 <codeblock>-- Replace one string with another.
 select replace('hello world','world','earth');
