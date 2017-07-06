@@ -31,12 +31,11 @@ inline int BufferedTupleStreamV2::NullIndicatorBytesPerRow() const {
   return BitUtil::RoundUpNumBytes(fixed_tuple_sizes_.size());
 }
 
-inline bool BufferedTupleStreamV2::AddRowCustom(
-    int64_t size, const WriteRowFn& write_fn, Status* status) {
+inline uint8_t* BufferedTupleStreamV2::AddRowCustomBegin(int64_t size, Status* status) {
   DCHECK(!closed_);
   DCHECK(has_write_iterator());
   if (UNLIKELY(write_page_ == nullptr || write_ptr_ + size > write_end_ptr_)) {
-    return AddRowCustomSlow(size, write_fn, status);
+    return AddRowCustomBeginSlow(size, status);
   }
   DCHECK(write_page_ != nullptr);
   DCHECK(write_page_->is_pinned());
@@ -46,8 +45,11 @@ inline bool BufferedTupleStreamV2::AddRowCustom(
 
   uint8_t* data = write_ptr_;
   write_ptr_ += size;
-  write_fn(data);
-  return true;
+  return data;
+}
+
+inline void BufferedTupleStreamV2::AddRowCustomEnd(int64_t size) {
+  if (UNLIKELY(size > default_page_len_)) AddLargeRowCustomEnd(size);
 }
 }
 

@@ -540,6 +540,9 @@ void BufferedTupleStreamV2::InvalidateReadIterator() {
   if (read_page_reservation_.GetReservation() > 0) {
     buffer_pool_client_->RestoreReservation(&read_page_reservation_, default_page_len_);
   }
+  // It is safe to re-read a delete-on-read stream if no rows were read and no pages
+  // were therefore deleted.
+  if (rows_returned_ == 0) delete_on_read_ = false;
 }
 
 Status BufferedTupleStreamV2::PrepareForRead(bool delete_on_read, bool* got_reservation) {
@@ -863,39 +866,41 @@ int64_t BufferedTupleStreamV2::ComputeRowSize(TupleRow* row) const noexcept {
 }
 
 bool BufferedTupleStreamV2::AddRowSlow(TupleRow* row, Status* status) noexcept {
-  // Use AddRowCustomSlow() to do the work of advancing the page.
+  // Use AddRowCustom*() to do the work of advancing the page.
   int64_t row_size = ComputeRowSize(row);
-  return AddRowCustomSlow(row_size,
-      [this, row, row_size](uint8_t* data) {
-        bool success = DeepCopy(row, &data, data + row_size);
-        DCHECK(success);
-        DCHECK_EQ(data, write_ptr_);
-      },
-      status);
+  uint8_t* data = AddRowCustomBeginSlow(row_size, status);
+  if (data == nullptr) return false;
+  bool success = DeepCopy(row, &data, data + row_size);
+  DCHECK(success);
+  DCHECK_EQ(data, write_ptr_);
+  AddRowCustomEnd(row_size);
+  return true;
 }
 
-bool BufferedTupleStreamV2::AddRowCustomSlow(
-    int64_t size, const WriteRowFn& write_fn, Status* status) noexcept {
+uint8_t* BufferedTupleStreamV2::AddRowCustomBeginSlow(
+    int64_t size, Status* status) noexcept {
   bool got_reservation;
   *status = AdvanceWritePage(size, &got_reservation);
-  if (!status->ok() || !got_reservation) return false;
+  if (!status->ok() || !got_reservation) return nullptr;
 
   // We have a large-enough page so now success is guaranteed.
-  bool result = AddRowCustom(size, write_fn, status);
-  DCHECK(result);
-  if (size > default_page_len_) {
-    // Immediately unpin the large write page so that we're not using up extra reservation
-    // and so we don't append another row to the page.
-    ResetWritePage();
-    // Save some of the reservation we freed up so we can create the next write page when
-    // needed.
-    if (NeedWriteReservation()) {
-      buffer_pool_client_->SaveReservation(&write_page_reservation_, default_page_len_);
-    }
+  uint8_t* result = AddRowCustomBegin(size, status);
+  DCHECK(result != nullptr);
+  return result;
+}
+
+void BufferedTupleStreamV2::AddLargeRowCustomEnd(int64_t size) noexcept {
+  DCHECK_GT(size, default_page_len_);
+  // Immediately unpin the large write page so that we're not using up extra reservation
+  // and so we don't append another row to the page.
+  ResetWritePage();
+  // Save some of the reservation we freed up so we can create the next write page when
+  // needed.
+  if (NeedWriteReservation()) {
+    buffer_pool_client_->SaveReservation(&write_page_reservation_, default_page_len_);
   }
   // The stream should be in a consistent state once the row is added.
   CHECK_CONSISTENCY();
-  return true;
 }
 
 bool BufferedTupleStreamV2::AddRow(TupleRow* row, Status* status) noexcept {

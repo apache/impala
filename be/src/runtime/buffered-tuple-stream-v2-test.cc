@@ -794,12 +794,11 @@ TEST_F(SimpleTupleStreamTest, StringsOutsideStream) {
     for (int j = 0; j < batch->num_rows(); ++j) {
       int fixed_size = tuple_desc.byte_size();
       // Copy fixed portion in, but leave it pointing to row batch's varlen data.
-      ASSERT_TRUE(stream.AddRowCustom(fixed_size,
-          [batch, fixed_size, j](uint8_t* tuple_data) {
-            memcpy(tuple_data, batch->GetRow(j)->GetTuple(0), fixed_size);
-          },
-          &status));
+      uint8_t* tuple_data = stream.AddRowCustomBegin(fixed_size, &status);
+      ASSERT_TRUE(tuple_data != nullptr);
       ASSERT_TRUE(status.ok());
+      memcpy(tuple_data, batch->GetRow(j)->GetTuple(0), fixed_size);
+      stream.AddRowCustomEnd(fixed_size);
     }
     rows_added += batch->num_rows();
   }
@@ -1125,12 +1124,11 @@ TEST_F(MultiTupleStreamTest, MultiTupleAddRowCustom) {
         fixed_size += tuple_desc->byte_size();
         varlen_size += row->GetTuple(k)->VarlenByteSize(*tuple_desc);
       }
-      ASSERT_TRUE(stream.AddRowCustom(fixed_size + varlen_size,
-          [this, row, fixed_size, varlen_size](uint8_t* data) {
-            WriteStringRow(string_desc_, row, fixed_size, varlen_size, data);
-          },
-          &status));
+      uint8_t* data = stream.AddRowCustomBegin(fixed_size + varlen_size, &status);
+      ASSERT_TRUE(data != nullptr);
       ASSERT_TRUE(status.ok());
+      WriteStringRow(string_desc_, row, fixed_size, varlen_size, data);
+      stream.AddRowCustomEnd(fixed_size + varlen_size);
     }
     rows_added += batch->num_rows();
   }
