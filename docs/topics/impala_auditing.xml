@@ -52,11 +52,21 @@ under the License.
       </li>
 
       <li>
-        Decide how many queries will be represented in each log file. By default,
-        Impala starts a new log file every 5000 queries. To specify a different number,
+        Decide how many queries will be represented in each audit event log file. By default,
+        Impala starts a new audit event log file every 5000 queries. To specify a different number,
         <ph audience="standalone">include
-        the option <codeph>-max_audit_event_log_file_size=<varname>number_of_queries</varname></codeph>
+        the option <codeph>--max_audit_event_log_file_size=<varname>number_of_queries</varname></codeph>
         in the <cmdname>impalad</cmdname> startup options</ph>.
+      </li>
+
+      <li rev="2.9.0 IMPALA-4431">
+        In <keyword keyref="impala29_full"/> and higher, you can control how many
+        audit event log files are kept on each host. Specify the option
+        <codeph>--max_audit_event_log_files=<varname>number_of_log_files</varname></codeph>
+        in the <cmdname>impalad</cmdname> startup options. Once the limit is reached, older
+        files are rotated out using the same mechanism as for other Impala log files.
+        The default value for this setting is 0, representing an unlimited number of audit
+        event log files.
       </li>
 
       <li> 

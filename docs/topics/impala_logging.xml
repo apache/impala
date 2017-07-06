@@ -70,6 +70,14 @@ under the License.
         enabled. See <xref href="impala_auditing.xml#auditing"/> for details.
       </p>
 
+      <p rev="2.9.0 IMPALA-4431">
+        In <keyword keyref="impala29_full"/> and higher, you can control how many
+        audit event log files are kept on each host through the
+        <codeph>--max_audit_event_log_files</codeph> startup option for the
+        <cmdname>impalad</cmdname> daemon, similar to the <codeph>--max_log_files</codeph>
+        option for regular log files.
+      </p>
+
       <p rev="2.2.0">
         The lineage feature introduced in Impala 2.2.0 produces a separate lineage log file when
         enabled. See <xref href="impala_lineage.xml#lineage"/> for details.
@@ -159,7 +167,7 @@ under the License.
         </li>
 
         <li>
-          The <codeph>-logbuflevel</codeph> startup flag for the <cmdname>impalad</cmdname> daemon specifies how
+          The <codeph>--logbuflevel</codeph> startup flag for the <cmdname>impalad</cmdname> daemon specifies how
           often the log information is written to disk. The default is 0, meaning that the log is immediately
           flushed to disk when Impala outputs an important messages such as a warning or an error, but less
           important messages such as informational ones are buffered in memory rather than being flushed to disk
@@ -215,7 +223,7 @@ under the License.
       </p>
 
       <p>
-        In Impala 2.2 and higher, the <codeph>-max_log_files</codeph> configuration option specifies how many log
+        In Impala 2.2 and higher, the <codeph>--max_log_files</codeph> configuration option specifies how many log
         files to keep at each severity level. You can specify an appropriate setting for each Impala-related daemon
         (<cmdname>impalad</cmdname>, <cmdname>statestored</cmdname>, and <cmdname>catalogd</cmdname>). The default
         value is 10, meaning that Impala preserves the latest 10 log files for each severity level
