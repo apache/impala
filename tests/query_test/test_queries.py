@@ -19,6 +19,7 @@
 
 import copy
 import pytest
+import re
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_uncompressed_text_dimension
@@ -217,3 +218,37 @@ class TestHdfsQueries(TestQueries):
 
   def test_file_partitions(self, vector):
     self.run_test_case('QueryTest/hdfs-partitions', vector)
+
+class TestTopNReclaimQuery(ImpalaTestSuite):
+  """Test class to validate that TopN periodically reclaims tuple pool memory
+   and runs with a lower memory footprint."""
+  QUERY = "select * from tpch.lineitem order by l_orderkey desc limit 10;"
+
+  # Mem limit empirically selected so that the query fails if tuple pool reclamation
+  # is not implemented for TopN
+  MEM_LIMIT = "50m"
+
+  @classmethod
+  def get_workload(self):
+    return 'tpch'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestTopNReclaimQuery, cls).add_test_dimensions()
+    # The tpch tests take a long time to execute so restrict the combinations they
+    # execute over.
+    cls.ImpalaTestMatrix.add_dimension(
+      create_uncompressed_text_dimension(cls.get_workload()))
+
+  def test_top_n_reclaim(self, vector):
+    exec_options = vector.get_value('exec_option')
+    exec_options['mem_limit'] = self.MEM_LIMIT
+    result = self.execute_query(self.QUERY, exec_options)
+    runtime_profile = str(result.runtime_profile)
+    num_of_times_tuple_pool_reclaimed = re.findall(
+      'TuplePoolReclamations: ([0-9]*)', runtime_profile)
+    # Confirm newly added counter is visible
+    assert len(num_of_times_tuple_pool_reclaimed) > 0
+    # Tuple pool is expected to be reclaimed for this query
+    for n in num_of_times_tuple_pool_reclaimed:
+      assert int(n) > 0

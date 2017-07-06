@@ -29,14 +29,14 @@ void TopNNode::InsertBatch(RowBatch* batch) {
 void TopNNode::InsertTupleRow(TupleRow* input_row) {
   Tuple* insert_tuple = nullptr;
 
-  if (priority_queue_->size() < limit_ + offset_) {
+  if (priority_queue_.size() < limit_ + offset_) {
     insert_tuple = reinterpret_cast<Tuple*>(
         tuple_pool_->Allocate(output_tuple_desc_->byte_size()));
     insert_tuple->MaterializeExprs<false, false>(input_row, *output_tuple_desc_,
         output_tuple_expr_evals_, tuple_pool_.get());
   } else {
-    DCHECK(!priority_queue_->empty());
-    Tuple* top_tuple = priority_queue_->top();
+    DCHECK(!priority_queue_.empty());
+    Tuple* top_tuple = priority_queue_.front();
     tmp_tuple_->MaterializeExprs<false, true>(input_row, *output_tuple_desc_,
         output_tuple_expr_evals_, nullptr);
     if (tuple_row_less_than_->Less(tmp_tuple_, top_tuple)) {
@@ -44,9 +44,14 @@ void TopNNode::InsertTupleRow(TupleRow* input_row) {
       // to be fixed to use a freelist
       tmp_tuple_->DeepCopy(top_tuple, *output_tuple_desc_, tuple_pool_.get());
       insert_tuple = top_tuple;
-      priority_queue_->pop();
+      PopHeap(&priority_queue_,
+          ComparatorWrapper<TupleRowComparator>(*tuple_row_less_than_));
+      rows_to_reclaim_++;
     }
   }
 
-  if (insert_tuple != nullptr) priority_queue_->push(insert_tuple);
+  if (insert_tuple != nullptr) {
+    PushHeap(&priority_queue_,
+        ComparatorWrapper<TupleRowComparator>(*tuple_row_less_than_), insert_tuple);
+  }
 }

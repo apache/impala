@@ -23,6 +23,7 @@
 #include "exprs/scalar-expr.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple.h"
@@ -47,8 +48,9 @@ TopNNode::TopNNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
     tmp_tuple_(NULL),
     tuple_pool_(NULL),
     codegend_insert_batch_fn_(NULL),
-    num_rows_skipped_(0),
-    priority_queue_(NULL) {
+    rows_to_reclaim_(0),
+    tuple_pool_reclaim_counter_(NULL),
+    num_rows_skipped_(0) {
 }
 
 Status TopNNode::Init(const TPlanNode& tnode, RuntimeState* state) {
@@ -76,12 +78,11 @@ Status TopNNode::Prepare(RuntimeState* state) {
   AddEvaluatorsToFree(output_tuple_expr_evals_);
   tuple_row_less_than_.reset(
       new TupleRowComparator(ordering_exprs_, is_asc_order_, nulls_first_));
-  priority_queue_.reset(
-      new priority_queue<Tuple*, vector<Tuple*>, ComparatorWrapper<TupleRowComparator>>(
-          *tuple_row_less_than_));
   output_tuple_desc_ = row_descriptor_.tuple_descriptors()[0];
   insert_batch_timer_ = ADD_TIMER(runtime_profile(), "InsertBatchTime");
   AddCodegenDisabledMessage(state);
+  tuple_pool_reclaim_counter_ = ADD_COUNTER(runtime_profile(), "TuplePoolReclamations",
+      TUnit::UNIT);
   return Status::OK();
 }
 
@@ -162,12 +163,16 @@ Status TopNNode::Open(RuntimeState* state) {
         } else {
           InsertBatch(&batch);
         }
+        if (rows_to_reclaim_ > 2 * (limit_ + offset_)) {
+          RETURN_IF_ERROR(ReclaimTuplePool(state));
+          COUNTER_ADD(tuple_pool_reclaim_counter_, 1);
+        }
       }
       RETURN_IF_CANCELLED(state);
       RETURN_IF_ERROR(QueryMaintenance(state));
     } while (!eos);
   }
-  DCHECK_LE(priority_queue_->size(), limit_ + offset_);
+  DCHECK_LE(priority_queue_.size(), limit_ + offset_);
   PrepareForOutput();
 
   // Unless we are inside a subplan expecting to call Open()/GetNext() on the child
@@ -208,7 +213,7 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 }
 
 Status TopNNode::Reset(RuntimeState* state) {
-  while(!priority_queue_->empty()) priority_queue_->pop();
+  priority_queue_.clear();
   num_rows_skipped_ = 0;
   // We deliberately do not free the tuple_pool_ here to allow selective transferring
   // of resources in the future.
@@ -232,17 +237,46 @@ Status TopNNode::QueryMaintenance(RuntimeState* state) {
 
 // Reverse the order of the tuples in the priority queue
 void TopNNode::PrepareForOutput() {
-  sorted_top_n_.resize(priority_queue_->size());
+  sorted_top_n_.resize(priority_queue_.size());
   int64_t index = sorted_top_n_.size() - 1;
 
-  while (priority_queue_->size() > 0) {
-    Tuple* tuple = priority_queue_->top();
-    priority_queue_->pop();
+  while (priority_queue_.size() > 0) {
+    Tuple* tuple = priority_queue_.front();
+    PopHeap(&priority_queue_,
+        ComparatorWrapper<TupleRowComparator>(*tuple_row_less_than_));
     sorted_top_n_[index] = tuple;
     --index;
   }
 
   get_next_iter_ = sorted_top_n_.begin();
+}
+
+Status TopNNode::ReclaimTuplePool(RuntimeState* state) {
+  unique_ptr<MemPool> temp_pool(new MemPool(mem_tracker()));
+
+  for (int i = 0; i < priority_queue_.size(); i++) {
+    Tuple* insert_tuple = reinterpret_cast<Tuple*>(temp_pool->TryAllocate(
+        output_tuple_desc_->byte_size()));
+    if (UNLIKELY(insert_tuple == nullptr)) {
+      return temp_pool->mem_tracker()->MemLimitExceeded(state,
+          "Failed to allocate memory in TopNNode::ReclaimTuplePool.",
+          output_tuple_desc_->byte_size());
+    }
+    priority_queue_[i]->DeepCopy(insert_tuple, *output_tuple_desc_, temp_pool.get());
+    priority_queue_[i] = insert_tuple;
+  }
+
+  rows_to_reclaim_ = 0;
+  tmp_tuple_ = reinterpret_cast<Tuple*>(temp_pool->TryAllocate(
+      output_tuple_desc_->byte_size()));
+  if (UNLIKELY(tmp_tuple_ == nullptr)) {
+    return temp_pool->mem_tracker()->MemLimitExceeded(state,
+        "Failed to allocate memory in TopNNode::ReclaimTuplePool.",
+        output_tuple_desc_->byte_size());
+  }
+  tuple_pool_->FreeAll();
+  tuple_pool_.reset(temp_pool.release());
+  return Status::OK();
 }
 
 void TopNNode::DebugString(int indentation_level, stringstream* out) const {
