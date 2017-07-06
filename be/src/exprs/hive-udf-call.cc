@@ -327,6 +327,7 @@ StringVal HiveUdfCall::GetStringVal(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_STRING);
   StringVal result = *reinterpret_cast<StringVal*>(Evaluate(eval, row));
+  if (result.is_null) return StringVal::null();
   // Copy the string into a local allocation with the usual lifetime for expr results.
   // Needed because the UDF output buffer is owned by the Java UDF executor and may be
   // freed or reused by the next call into the Java UDF executor.

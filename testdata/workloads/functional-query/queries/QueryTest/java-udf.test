@@ -22,71 +22,67 @@ DOUBLE
 ====
 ---- QUERY
 # Test identity functions
-select identity(true);
+select identity(true), identity(cast(NULL as boolean));
 ---- TYPES
-boolean
+boolean, boolean
 ---- RESULTS
-true
+true,NULL
 ====
 ---- QUERY
-select identity(cast(10 as tinyint));
+select identity(cast(10 as tinyint)), identity(cast(NULL as tinyint));
 ---- TYPES
-tinyint
+tinyint, tinyint
 ---- RESULTS
-10
+10,NULL
 ====
 ---- QUERY
-select identity(cast(10 as smallint));
+select identity(cast(10 as smallint)), identity(cast(NULL as smallint));
 ---- TYPES
-smallint
+smallint, smallint
 ---- RESULTS
-10
+10,NULL
 ====
 ---- QUERY
-select identity(cast(10 as int));
+select identity(cast(10 as int)), identity(cast(NULL as int));
 ---- TYPES
-int
+int, int
 ---- RESULTS
-10
+10,NULL
 ====
 ---- QUERY
-select identity(cast(10 as bigint));
+select identity(cast(10 as bigint)), identity(cast(NULL as bigint));
 ---- TYPES
-bigint
+bigint, bigint
 ---- RESULTS
-10
+10,NULL
 ====
 ---- QUERY
-select identity(cast(10.0 as float));
+select identity(cast(10.0 as float)), identity(cast(NULL as float));
 ---- TYPES
-float
+float, float
 ---- RESULTS
-10
+10,NULL
 ====
 ---- QUERY
-select identity(cast(10.0 as double));
+select identity(cast(10.0 as double)), identity(cast(NULL as double));
 ---- TYPES
-double
+double, double
 ---- RESULTS
-10
+10,NULL
 ====
 ---- QUERY
 # IMPALA-1456. Each "identity" call below tests a different type (BytesWritable, Text,
 # and String).
 select identity("why hello there"),
        identity("why", " hello there"),
-       identity("why", " hello", " there");
+       identity("why", " hello", " there"),
+       identity(cast(NULL as string)),
+       identity(cast(NULL as string), cast(NULL as string)),
+       identity(cast(NULL as string), cast(NULL as string), cast(NULL as string));
 ---- TYPES
-string, string, string
+string, string, string, string, string, string
 ---- RESULTS
-'why hello there','why hello there','why hello there'
-====
----- QUERY
-select identity(NULL);
----- TYPES
-boolean
----- RESULTS
-NULL
+'why hello there','why hello there','why hello there','NULL','NULL','NULL'
 ====
 ---- QUERY
 # IMPALA-1134. Each "identity" call below tests a different type (BytesWritable, Text,
