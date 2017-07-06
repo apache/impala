@@ -1442,7 +1442,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     checkDecimalReturnType("select d1 - 1.1 from functional.decimal_tbl",
         ScalarType.createDecimalType(11, 1));
     checkDecimalReturnType("select d1 * 1.1 from functional.decimal_tbl",
-        ScalarType.createDecimalType(11, 1));
+        ScalarType.createDecimalType(11, 1), ScalarType.createDecimalType(12, 1));
     checkDecimalReturnType("select d1 / 1.1 from functional.decimal_tbl",
         ScalarType.createDecimalType(14, 4), ScalarType.createDecimalType(16, 6));
     checkDecimalReturnType("select d1 % 1.1 from functional.decimal_tbl",
@@ -1453,7 +1453,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     checkDecimalReturnType("select d1 - 2 from functional.decimal_tbl",
         ScalarType.createDecimalType(10, 0));
     checkDecimalReturnType("select d1 * 2 from functional.decimal_tbl",
-        ScalarType.createDecimalType(12, 0));
+        ScalarType.createDecimalType(12, 0), ScalarType.createDecimalType(13, 0));
     checkDecimalReturnType("select d1 / 2 from functional.decimal_tbl",
         ScalarType.createDecimalType(13, 4), ScalarType.createDecimalType(15, 6));
     checkDecimalReturnType("select d1 % 2 from functional.decimal_tbl",
@@ -1465,7 +1465,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     checkDecimalReturnType("select int_col - 1.1 from functional.alltypestiny",
         Type.DOUBLE, ScalarType.createDecimalType(12, 1));
     checkDecimalReturnType("select int_col * 1.1 from functional.alltypestiny",
-        Type.DOUBLE, ScalarType.createDecimalType(12, 1));
+        Type.DOUBLE, ScalarType.createDecimalType(13, 1));
     checkDecimalReturnType("select int_col / 1.1 from functional.alltypestiny",
         Type.DOUBLE, ScalarType.createDecimalType(17, 6));
     checkDecimalReturnType("select int_col % 1.1 from functional.alltypestiny",

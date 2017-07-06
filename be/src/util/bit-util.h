@@ -33,6 +33,7 @@
 
 #include "common/compiler-util.h"
 #include "gutil/bits.h"
+#include "runtime/multi-precision.h"
 #include "util/cpu-info.h"
 #include "util/sse-util.h"
 
@@ -61,7 +62,7 @@ class BitUtil {
   /// Return an integer signifying the sign of the value, returning +1 for
   /// positive integers (and zero), -1 for negative integers.
   /// The extra shift is to silence GCC warnings about full width shift on
-  /// unsigned types.  It compiles out in optimized builds into the expected increment
+  /// unsigned types. It compiles out in optimized builds into the expected increment.
   template<typename T>
   constexpr static inline T Sign(T value) {
     return 1 | ((value >> (UnsignedWidth<T>() - 1)) >> 1);
@@ -286,6 +287,16 @@ class BitUtil {
     return __builtin_ctzll(v);
   }
 
+  static inline int CountLeadingZeros(unsigned __int128 v) {
+    if (UNLIKELY(v == 0)) return 128;
+    unsigned __int128 shifted = v >> 64;
+    if (shifted != 0) {
+      return __builtin_clzll(shifted);
+    } else {
+      return __builtin_clzll(v) + 64;
+    }
+  }
+
   // Wrap the gutil/ version for convenience.
   static inline int Log2Floor(uint32_t n) {
     return Bits::Log2Floor(n);
@@ -335,6 +346,11 @@ class BitUtil {
     }
   }
 };
+
+template<>
+inline int256_t BitUtil::Sign(int256_t value) {
+  return value < 0 ? -1 : 1;
+}
 
 /// An encapsulation class of SIMD byteswap functions
 class SimdByteSwap {

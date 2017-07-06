@@ -225,7 +225,7 @@ public class TypesUtil {
    * http://blogs.msdn.com/b/sqlprogrammability/archive/2006/03/29/564110.aspx
    * https://msdn.microsoft.com/en-us/library/ms190476.aspx
    *
-   * TODO: implement V2 rules for ADD/SUB/MULTIPLY.
+   * TODO: implement V2 rules for ADD/SUB.
    *
    * Changes:
    *  - There are slight difference with how precision/scale reduction occurs compared
@@ -255,9 +255,12 @@ public class TypesUtil {
         resultScale = Math.max(s1, s2);
         resultPrecision = Math.min(p1 - s1, p2 - s2) + resultScale;
         break;
+      case MULTIPLY:
+        resultScale = s1 + s2;
+        resultPrecision = p1 + p2 + 1;
+        break;
       case ADD:
       case SUBTRACT:
-      case MULTIPLY:
       default:
         // Not yet implemented - fall back to V1 rules.
         return getDecimalArithmeticResultTypeV1(t1, t2, op);

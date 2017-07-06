@@ -1500,6 +1500,59 @@ struct DecimalTestCase {
   DecimalExpectedResult expected[2];
 };
 
+// Utility function to construct int128 types.
+int128_t StringToInt128(string s) {
+  int128_t result = 0;
+  int sign = 1;
+  int digit = 0;
+  for (int i = 0; i < s.length(); ++i) {
+    switch (s[i]) {
+      case '-':
+        digit = -1;
+        break;
+      case '0':
+        digit = 0;
+        break;
+      case '1':
+        digit = 1;
+        break;
+      case '2':
+        digit = 2;
+        break;
+      case '3':
+        digit = 3;
+        break;
+      case '4':
+        digit = 4;
+        break;
+      case '5':
+        digit = 5;
+        break;
+      case '6':
+        digit = 6;
+        break;
+      case '7':
+        digit = 7;
+        break;
+      case '8':
+        digit = 8;
+        break;
+      case '9':
+        digit = 9;
+        break;
+      default:
+        DCHECK(false) << "Unexpected character.";
+    }
+    if (digit == -1) {
+      DCHECK_EQ(sign, 1) << "Minus symbol appears multiple times.";
+      sign = -1;
+    } else {
+      result = result * 10 + digit;
+    }
+  }
+  return sign * result;
+}
+
 // Format is:
 // { Test Expression (as a string),
 //  { expected null, scaled_val, precision, scale for V1
@@ -1512,8 +1565,198 @@ DecimalTestCase decimal_cases[] = {
   { "cast(1.23 as decimal(30,2)) - cast(1 as decimal(4,3))", {{ false, 230, 32, 3 }}},
   { "cast(1 as decimal(38,0)) + cast(.2 as decimal(38,1))", {{ false, 12, 38, 1 }}},
   // Test multiply operator
-  { "cast(1.23 as decimal(30,2)) * cast(1 as decimal(10,3))", {{ false, 123000, 38, 5 }}},
-  { "1.23 * cast(1 as decimal(20,3))", {{ false, 123000, 23, 5 }}},
+  { "cast(1.23 as decimal(30,2)) * cast(1 as decimal(10,3))",
+    {{ false, 123000, 38, 5 }}},
+  { "cast(1.23 as decimal(3,2)) * cast(1 as decimal(20,3))",
+    {{ false, 123000, 23, 5 },
+     { false, 123000, 24, 5 }}},
+  { "cast(0.1 as decimal(20,20)) * cast(1 as decimal(20,19))",
+    {{ false, StringToInt128("10000000000000000000000000000000000000"), 38, 38 },
+     { false, StringToInt128("100000000000000000000000000000000000"), 38, 36 }}},
+  { "cast(111.22 as decimal(5,2)) * cast(3333.444 as decimal(7,3))",
+    {{ false, 37074564168, 12, 5 },
+     { false, 37074564168, 13, 5 }}},
+  { "cast(0.01 as decimal(38,38)) * cast(25 as decimal(38,0))",
+    {{ false, StringToInt128("25000000000000000000000000000000000000"), 38, 38 },
+     { false, 250000, 38, 6 }}},
+  { "cast(-0.01 as decimal(38,38)) * cast(25 as decimal(38,0))",
+    {{ false, StringToInt128("-25000000000000000000000000000000000000"), 38, 38 },
+     { false, -250000, 38, 6 }}},
+  { "cast(-0.01 as decimal(38,38)) * cast(-25 as decimal(38,0))",
+    {{ false, StringToInt128("25000000000000000000000000000000000000"), 38, 38 },
+     { false, 250000, 38, 6 }}},
+  { "cast(0.1 as decimal(38,38)) * cast(25 as decimal(38,0))",
+    {{ true, 0, 38, 38 },
+     { false, 2500000, 38, 6 }}},
+  { "cast(-0.1 as decimal(38,38)) * cast(25 as decimal(38,0))",
+    {{ true, 0, 38, 38 },
+     { false, -2500000, 38, 6 }}},
+  { "cast(-0.1 as decimal(38,38)) * cast(-25 as decimal(38,0))",
+    {{ true, 0, 38, 38 },
+     { false, 2500000, 38, 6 }}},
+  { "cast(9999999999999999.9999 as decimal(20,4)) * "
+      "cast(9999999999999999.994 as decimal(19,3))",
+    {{ true, 0, 38, 7 },
+     { false, StringToInt128("99999999999999999939000000000000000001"), 38, 6 }}},
+  { "cast(9.99999 as decimal(6,5)) * "
+      "cast(9999999999999999999999999999999.94 as decimal(33,2))",
+    {{ true, 0, 38, 7 },
+     { false, StringToInt128("99999899999999999999999999999999400001"), 38, 6 }}},
+  { "cast(0 as decimal(38,38)) * cast(1 as decimal(5,2))",
+    {{ false, 0, 38, 38 },
+     { false, 0, 38, 34 }}},
+  { "cast(12345.67 as decimal(7,2)) * cast(12345.67 as decimal(7,2))",
+    {{ false, 1524155677489, 14, 4 },
+     { false, 1524155677489, 15, 4 }}},
+  { "cast(2643918831543678.5772617359442611897419 as decimal(38,22)) * "
+      "cast(3972211379387512.6946776728996748717839 as decimal(38,22))",
+    {{ true, 0, 38, 38 },
+     { false, StringToInt128("10502204468834736291038133384309593605"), 38, 6 }}},
+  { "cast(-2643918831543678.5772617359442611897419 as decimal(38,22)) * "
+      "cast(3972211379387512.6946776728996748717839 as decimal(38,22))",
+    {{ true, 0, 38, 38 },
+     { false, StringToInt128("-10502204468834736291038133384309593605"), 38, 6 }}},
+  { "cast(-2643918831543678.5772617359442611897419 as decimal(38,22)) * "
+      "cast(-3972211379387512.6946776728996748717839 as decimal(38,22))",
+    {{ true, 0, 38, 38 },
+     { false, StringToInt128("10502204468834736291038133384309593605"), 38, 6 }}},
+  { "cast(2545664579818579.6268123468146829994472 as decimal(38,22)) * "
+      "cast(8862165565622381.6689679519457799681439 as decimal(38,22))",
+    {{ true, 0, 38, 38 },
+     { false, StringToInt128("22560100980892785285767018366785939200"), 38, 6 }}},
+  { "cast(2575543652687181.7412422395638291836214 as decimal(38,22)) * "
+      "cast(9142529549684737.3986798331295277312253 as decimal(38,22))",
+    {{ true, 0, 38, 38 },
+     { false, StringToInt128("23546983951195523383767823614338114083"), 38, 6 }}},
+  { "cast(6188696551164477.9944646378584981371524 as decimal(38,22)) * "
+      "cast(9234914917975734.1781526147879384775182 as decimal(38,22))",
+    {{ true, 0, 38, 38 },
+     { false, StringToInt128("57152086103173814294786121078946977968"), 38, 6 }}},
+  { "cast(-6188696551164477.9944646378584981371524 as decimal(38,22)) * "
+      "cast(9234914917975734.1781526147879384775182 as decimal(38,22))",
+    {{ true, 0, 38, 38 },
+     { false, StringToInt128("-57152086103173814294786121078946977968"), 38, 6 }}},
+  { "cast(1.006 as decimal(4,2)) * cast(1.1 as decimal(4,2))",
+    {{ false, 11000, 8, 4 },
+     { false, 11110, 9, 4 }}},
+  { "cast(0.9994 as decimal(38,4)) * cast(0.999 as decimal(38,3))",
+    {{ false, 9984006, 38, 7 },
+     { false, 998401, 38, 6 }}},
+  { "cast(0.000000000000000000000000000000000001 as decimal(38,38)) * "
+      "cast(0.000000000000000000000000000000000001 as decimal(38,38))",
+    {{ false, 0, 38, 38 },
+     { false, 0, 38, 37 }}},
+  { "cast(0.00000000000000000000000000000000001 as decimal(38,37)) * "
+      "cast(0.00000000000000000000000000000000001 as decimal(38,37))",
+    {{ false, 0, 38, 38 },
+     { false, 0, 38, 35 }}},
+  { "cast(0.00000000000000001 as decimal(38,37)) * "
+      "cast(0.000000000000000001 as decimal(38,37))",
+    {{ false, 1000, 38, 38 },
+     { false, 1, 38, 35 }}},
+  { "cast(9e-18 as decimal(38,38)) * cast(1e-21 as decimal(38,38))",
+    {{ false, 0, 38, 38 },
+     { false, 0, 38, 37 }}},
+  { "cast(1e-37 as decimal(38,38)) * cast(0.1 as decimal(38,38))",
+    {{ false, 1, 38, 38 },
+     { false, 0, 38, 37 }}},
+  { "cast(1e-37 as decimal(38,38)) * cast(-0.1 as decimal(38,38))",
+    {{ false, -1, 38, 38 },
+     { false, 0, 38, 37 }}},
+  { "cast(9e-36 as decimal(38,38)) * cast(0.1 as decimal(38,38))",
+    {{ false, 90, 38, 38 },
+     { false, 9, 38, 37 }}},
+  { "cast(9e-37 as decimal(38,38)) * cast(0.1 as decimal(38,38))",
+    {{ false, 9, 38, 38 },
+     { false, 1, 38, 37 }}},
+  // We are multiplying (2^64 - 1) * (2^63 - 1), which produces the largest intermediate
+  // result that does not require int256. It overflows because the result is larger than
+  // MAX_UNSCALED_DECIMAL16.
+  { "cast(18446744073709551615 as decimal(38,0)) * cast(9223372036854775807 as decimal(38,0))",
+    {{ true, 0, 38, 0 }}},
+  { "cast(-18446744073709551615 as decimal(38,0)) * cast(9223372036854775807 as decimal(38,0))",
+    {{ true, 0, 38, 0 }}},
+  // int256 is required. We are multiplying (2^64 - 1) * (2^63) here.
+  { "cast(18446744073709551615 as decimal(38,0)) * cast(9223372036854775808 as decimal(38,0))",
+    {{ true, 0, 38, 0 }}},
+  { "cast(-18446744073709551615 as decimal(38,0)) * cast(9223372036854775808 as decimal(38,0))",
+    {{ true, 0, 38, 0 }}},
+  // Largest intermediate result that does not require int256.
+  { "cast(1844674407370.9551615 as decimal(38,7)) * cast(9223372036854775807 as decimal(38,0))",
+    {{ true, 0, 38, 7 },
+     { false, StringToInt128("17014118346046923170401718760531977831"), 38, 6 }}},
+  { "cast(-1844674407370.9551615 as decimal(38,7)) * cast(9223372036854775807 as decimal(38,0))",
+    {{ true, 0, 38, 7 },
+     { false, StringToInt128("-17014118346046923170401718760531977831"), 38, 6 }}},
+  // int256 is required.
+  { "cast(1844674407370.9551615 as decimal(38,7)) * cast(9223372036854775808 as decimal(38,0))",
+    {{ true, 0, 38, 7 },
+     { false, StringToInt128("17014118346046923172246393167902932992"), 38, 6 }}},
+  { "cast(-1844674407370.9551615 as decimal(38,7)) * cast(9223372036854775808 as decimal(38,0))",
+    {{ true, 0, 38, 7 },
+     { false, StringToInt128("-17014118346046923172246393167902932992"), 38, 6 }}},
+  // Smallest intermediate value that requires double checking if int256 is required.
+  { "cast(9223372036854775808 as decimal(38,0)) * cast(9223372036854775808 as decimal(38,0))",
+    {{ false, StringToInt128("85070591730234615865843651857942052864"), 38, 0 }}},
+  { "cast(-9223372036854775808 as decimal(38,0)) * cast(9223372036854775808 as decimal(38,0))",
+    {{ false, StringToInt128("-85070591730234615865843651857942052864"), 38, 0 }}},
+  // Scale down the intermediate value by 10^39.
+  { "cast(0.33333333333333333333333333333333333333 as decimal(38,38)) * "
+      "cast(0.00000000000000000000000000000000000003 as decimal(38,38))",
+    {{ false, 0, 38, 38 },
+     { false, 0, 38, 37 }}},
+  { "cast(0.33333333333333333333333333333333333333 as decimal(38,38)) * "
+      "cast(0.3 as decimal(38,38))",
+    {{ false, StringToInt128("9999999999999999999999999999999999999"), 38, 38 },
+     { false, StringToInt128("1000000000000000000000000000000000000"), 38, 37 }}},
+  { "cast(10000000000000000000 as decimal(21,0)) * "
+      "cast(10000000000000000000 as decimal(21,0))",
+    {{ true, 0, 38, 0 }}},
+  { "cast(1000000000000000.0000 as decimal(38,4)) * "
+      "cast(1000000000000000.0000 as decimal(38,4))",
+    {{ true, 0, 38, 8 },
+     { false, StringToInt128("1000000000000000000000000000000000000"), 38, 6 }}},
+  { "cast(-1000000000000000.0000 as decimal(38,4)) * "
+      "cast(1000000000000000.0000 as decimal(38,4))",
+    {{ true, 0, 38, 8 },
+     { false, StringToInt128("-1000000000000000000000000000000000000"), 38, 6 }}},
+  // Smallest 256 bit intermediate result that can't be scaled down to 128 bits.
+  { "cast(10000000000000000.0000 as decimal(38,4)) * "
+      "cast(10000000000000000.0000 as decimal(38,4))",
+    {{ true, 0, 38, 8 },
+     { true, 0, 38, 6 }}},
+  { "cast(-10000000000000000.0000 as decimal(38,4)) * "
+      "cast(10000000000000000.0000 as decimal(38,4))",
+    {{ true, 0, 38, 8 },
+     { true, 0, 38, 6 }}},
+  // The reason why the result of (38,38) * (38,38) is (38,37).
+  { "cast(0.99999999999999999999999999999999999999 as decimal(38,38)) * "
+      "cast(0.99999999999999999999999999999999999999 as decimal(38,38))",
+    {{ false, StringToInt128("99999999999999999999999999999999999998"), 38, 38 },
+     { false, StringToInt128("10000000000000000000000000000000000000"), 38, 37 }}},
+  { "cast(-0.99999999999999999999999999999999999999 as decimal(38,38)) * "
+      "cast(0.99999999999999999999999999999999999999 as decimal(38,38))",
+    {{ false, StringToInt128("-99999999999999999999999999999999999998"), 38, 38 },
+     { false, StringToInt128("-10000000000000000000000000000000000000"), 38, 37 }}},
+  { "cast(99999999999999999999999999999999999999 as decimal(38,0)) * "
+      "cast(1 as decimal(38,0))",
+    {{ false, StringToInt128("99999999999999999999999999999999999999"), 38, 0 }}},
+  { "cast(99999999999999999999999999999999999999 as decimal(38,0)) * "
+      "cast(-1 as decimal(38,0))",
+    {{ false, StringToInt128("-99999999999999999999999999999999999999"), 38, 0 }}},
+  // Rounding.
+  { "cast(0.000005 as decimal(38,6)) * cast(0.1 as decimal(38,1))",
+    {{ false, 5, 38, 7 },
+     { false, 1, 38, 6 }}},
+  { "cast(-0.000005 as decimal(38,6)) * cast(0.1 as decimal(38,1))",
+    {{ false, -5, 38, 7 },
+     { false, -1, 38, 6 }}},
+  { "cast(0.000004 as decimal(38,6)) * cast(0.1 as decimal(38,1))",
+    {{ false, 4, 38, 7 },
+     { false, 0, 38, 6 }}},
+  { "cast(-0.000004 as decimal(38,6)) * cast(0.1 as decimal(38,1))",
+    {{ false, -4, 38, 7 },
+     { false, 0, 38, 6 }}},
   // Test divide operator
   { "cast(1.23 as decimal(8,2)) / cast(1 as decimal(4,3))", {{ false, 12300000, 16, 7}}},
   { "cast(1.23 as decimal(30,2)) / cast(1 as decimal(20,3))",
@@ -2290,7 +2533,7 @@ TEST_F(ExprTest, DecimalV2MixedArithmeticExprs) {
   TestDecimalValue(
       "10.0 - 3", Decimal4Value(70), ColumnType::CreateDecimalType(5, 1));
   TestDecimalValue(
-      "10.0 * 3", Decimal4Value(300), ColumnType::CreateDecimalType(6, 1));
+      "10.0 * 3", Decimal4Value(300), ColumnType::CreateDecimalType(7, 1));
   TestDecimalValue(
       "10.0 / 3", Decimal4Value(3333333), ColumnType::CreateDecimalType(8, 6));
   // Comparisons between DECIMAL values are precise.
