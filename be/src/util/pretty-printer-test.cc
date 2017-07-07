@@ -63,6 +63,12 @@ TEST(PrettyPrinterTest, Bytes) {
   EXPECT_EQ(PrettyPrinter::Print(1024 * 1024, TUnit::BYTES), "1.00 MB");
   EXPECT_EQ(PrettyPrinter::Print(1024 * 1024 * 1024, TUnit::BYTES), "1.00 GB");
 
+  // Negative values
+  EXPECT_EQ(PrettyPrinter::Print(-2, TUnit::BYTES), "-2.00 B");
+  EXPECT_EQ(PrettyPrinter::Print(-1024, TUnit::BYTES), "-1.00 KB");
+  EXPECT_EQ(PrettyPrinter::Print(-1024 * 1024, TUnit::BYTES), "-1.00 MB");
+  EXPECT_EQ(PrettyPrinter::Print(-1024 * 1024 * 1024, TUnit::BYTES), "-1.00 GB");
+
   EXPECT_EQ(PrettyPrinter::Print(1536, TUnit::BYTES), "1.50 KB");
   EXPECT_EQ(PrettyPrinter::Print(1536.0, TUnit::BYTES), "1.50 KB");
 

@@ -90,7 +90,7 @@ class MemTracker {
   /// Consume()/Release() can still be called. This is used for the root process tracker
   /// (if 'parent' is NULL). It is also to report on other categories of memory under the
   /// process tracker, e.g. buffer pool free buffers (if 'parent - non-NULL).
-  MemTracker(UIntGauge* consumption_metric, int64_t byte_limit = -1,
+  MemTracker(IntGauge* consumption_metric, int64_t byte_limit = -1,
       const std::string& label = std::string(), MemTracker* parent = NULL);
 
   ~MemTracker();
@@ -400,7 +400,7 @@ class MemTracker {
   /// If non-NULL, used to measure consumption (in bytes) rather than the values provided
   /// to Consume()/Release(). Only used for the process tracker, thus parent_ should be
   /// NULL if consumption_metric_ is set.
-  UIntGauge* consumption_metric_;
+  IntGauge* consumption_metric_;
 
   /// If non-NULL, counters from a corresponding ReservationTracker that should be
   /// reported in logs and other diagnostics. Owned by this MemTracker. The counters

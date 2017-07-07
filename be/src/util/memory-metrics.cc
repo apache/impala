@@ -32,11 +32,11 @@ using namespace strings;
 
 DECLARE_bool(mmap_buffers);
 
-SumGauge<uint64_t>* AggregateMemoryMetrics::TOTAL_USED = nullptr;
-UIntGauge* AggregateMemoryMetrics::NUM_MAPS = nullptr;
-UIntGauge* AggregateMemoryMetrics::MAPPED_BYTES = nullptr;
-UIntGauge* AggregateMemoryMetrics::RSS = nullptr;
-UIntGauge* AggregateMemoryMetrics::ANON_HUGE_PAGE_BYTES = nullptr;
+SumGauge<int64_t>* AggregateMemoryMetrics::TOTAL_USED = nullptr;
+IntGauge* AggregateMemoryMetrics::NUM_MAPS = nullptr;
+IntGauge* AggregateMemoryMetrics::MAPPED_BYTES = nullptr;
+IntGauge* AggregateMemoryMetrics::RSS = nullptr;
+IntGauge* AggregateMemoryMetrics::ANON_HUGE_PAGE_BYTES = nullptr;
 StringProperty* AggregateMemoryMetrics::THP_ENABLED = nullptr;
 StringProperty* AggregateMemoryMetrics::THP_DEFRAG = nullptr;
 StringProperty* AggregateMemoryMetrics::THP_KHUGEPAGED_DEFRAG = nullptr;
@@ -52,6 +52,7 @@ AsanMallocMetric* AsanMallocMetric::BYTES_ALLOCATED = nullptr;
 BufferPoolMetric* BufferPoolMetric::LIMIT = nullptr;
 BufferPoolMetric* BufferPoolMetric::SYSTEM_ALLOCATED = nullptr;
 BufferPoolMetric* BufferPoolMetric::RESERVED = nullptr;
+BufferPoolMetric* BufferPoolMetric::UNUSED_RESERVATION_BYTES = nullptr;
 BufferPoolMetric* BufferPoolMetric::NUM_FREE_BUFFERS = nullptr;
 BufferPoolMetric* BufferPoolMetric::FREE_BUFFER_BYTES = nullptr;
 BufferPoolMetric* BufferPoolMetric::CLEAN_PAGES_LIMIT = nullptr;
@@ -73,7 +74,7 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
 
   // Add compound metrics that track totals across malloc and the buffer pool.
   // total-used should track the total physical memory in use.
-  vector<UIntGauge*> used_metrics;
+  vector<IntGauge*> used_metrics;
   if (FLAGS_mmap_buffers && global_reservations != nullptr) {
     // If we mmap() buffers, the buffers are not allocated via malloc. Ensure they are
     // properly tracked.
@@ -109,19 +110,19 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
 #endif
   MetricGroup* aggregate_metrics = metrics->GetOrCreateChildGroup("memory");
   AggregateMemoryMetrics::TOTAL_USED = aggregate_metrics->RegisterMetric(
-      new SumGauge<uint64_t>(MetricDefs::Get("memory.total-used"), used_metrics));
+      new SumGauge<int64_t>(MetricDefs::Get("memory.total-used"), used_metrics));
   if (register_jvm_metrics) {
     RETURN_IF_ERROR(JvmMetric::InitMetrics(metrics->GetOrCreateChildGroup("jvm")));
   }
 
   if (MemInfo::HaveSmaps()) {
     AggregateMemoryMetrics::NUM_MAPS =
-        aggregate_metrics->AddGauge<uint64_t>("memory.num-maps", 0U);
+        aggregate_metrics->AddGauge<int64_t>("memory.num-maps", 0U);
     AggregateMemoryMetrics::MAPPED_BYTES =
-        aggregate_metrics->AddGauge<uint64_t>("memory.mapped-bytes", 0U);
-    AggregateMemoryMetrics::RSS = aggregate_metrics->AddGauge<uint64_t>("memory.rss", 0U);
+        aggregate_metrics->AddGauge<int64_t>("memory.mapped-bytes", 0U);
+    AggregateMemoryMetrics::RSS = aggregate_metrics->AddGauge<int64_t>("memory.rss", 0U);
     AggregateMemoryMetrics::ANON_HUGE_PAGE_BYTES =
-        aggregate_metrics->AddGauge<uint64_t>("memory.anon-huge-page-bytes", 0U);
+        aggregate_metrics->AddGauge<int64_t>("memory.anon-huge-page-bytes", 0U);
   }
   ThpConfig thp_config = MemInfo::ParseThpConfig();
   AggregateMemoryMetrics::THP_ENABLED =
@@ -233,6 +234,10 @@ Status BufferPoolMetric::InitMetrics(MetricGroup* metrics,
   RESERVED = metrics->RegisterMetric(
       new BufferPoolMetric(MetricDefs::Get("buffer-pool.reserved"),
           BufferPoolMetricType::RESERVED, global_reservations, buffer_pool));
+  UNUSED_RESERVATION_BYTES = metrics->RegisterMetric(
+      new BufferPoolMetric(MetricDefs::Get("buffer-pool.unused-reservation-bytes"),
+          BufferPoolMetricType::UNUSED_RESERVATION_BYTES, global_reservations,
+          buffer_pool));
   NUM_FREE_BUFFERS = metrics->RegisterMetric(
       new BufferPoolMetric(MetricDefs::Get("buffer-pool.free-buffers"),
           BufferPoolMetricType::NUM_FREE_BUFFERS, global_reservations, buffer_pool));
@@ -253,7 +258,7 @@ Status BufferPoolMetric::InitMetrics(MetricGroup* metrics,
 
 BufferPoolMetric::BufferPoolMetric(const TMetricDef& def, BufferPoolMetricType type,
     ReservationTracker* global_reservations, BufferPool* buffer_pool)
-  : UIntGauge(def, 0),
+  : IntGauge(def, 0),
     type_(type),
     global_reservations_(global_reservations),
     buffer_pool_(buffer_pool) {}
@@ -269,6 +274,16 @@ void BufferPoolMetric::CalculateValue() {
     case BufferPoolMetricType::RESERVED:
       value_ = global_reservations_->GetReservation();
       break;
+    case BufferPoolMetricType::UNUSED_RESERVATION_BYTES: {
+      // Estimate the unused reservation based on other aggregate values, defined as
+      // the total bytes of reservation where there is no corresponding buffer in use
+      // by a client. Buffers are either in-use, free buffers, or attached to clean pages.
+      int64_t total_used_reservation = buffer_pool_->GetSystemBytesAllocated()
+        - buffer_pool_->GetFreeBufferBytes()
+        - buffer_pool_->GetCleanPageBytes();
+      value_ = global_reservations_->GetReservation() - total_used_reservation;
+      break;
+    }
     case BufferPoolMetricType::NUM_FREE_BUFFERS:
       value_ = buffer_pool_->GetNumFreeBuffers();
       break;

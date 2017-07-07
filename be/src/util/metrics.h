@@ -232,6 +232,24 @@ class SumGauge : public SimpleMetric<T, TMetricKind::GAUGE> {
   std::vector<SimpleMetric<T, TMetricKind::GAUGE>*> metrics_;
 };
 
+// Gauge metric that negates another gauge.
+template <typename T>
+class NegatedGauge : public SimpleMetric<T, TMetricKind::GAUGE> {
+ public:
+  NegatedGauge(const TMetricDef& metric_def,
+      SimpleMetric<T, TMetricKind::GAUGE>* metric)
+    : SimpleMetric<T, TMetricKind::GAUGE>(metric_def, 0), metric_(metric) {}
+  virtual ~NegatedGauge() {}
+
+ private:
+  virtual void CalculateValue() override {
+    this->value_ = -metric_->value();
+  }
+
+  /// The metric to be negated.
+  SimpleMetric<T, TMetricKind::GAUGE>* metric_;
+};
+
 /// Container for a set of metrics. A MetricGroup owns the memory for every metric
 /// contained within it (see Add*() to create commonly used metric
 /// types). Metrics are 'registered' with a MetricGroup, once registered they cannot be
@@ -364,13 +382,16 @@ class MetricGroup {
 
 /// We write 'Int' as a placeholder for all integer types.
 typedef class SimpleMetric<int64_t, TMetricKind::GAUGE> IntGauge;
-typedef class SimpleMetric<uint64_t, TMetricKind::GAUGE> UIntGauge;
 typedef class SimpleMetric<double, TMetricKind::GAUGE> DoubleGauge;
 typedef class SimpleMetric<int64_t, TMetricKind::COUNTER> IntCounter;
 
 typedef class SimpleMetric<bool, TMetricKind::PROPERTY> BooleanProperty;
 typedef class SimpleMetric<std::string, TMetricKind::PROPERTY> StringProperty;
 
+/// Convenience method to instantiate a TMetricDef with a subset of its fields defined.
+/// Most externally-visible metrics should be defined in metrics.json and retrieved via
+/// MetricDefs::Get(). This alternative method of instantiating TMetricDefs is only used
+/// in special cases where the regular approach is unsuitable.
 TMetricDef MakeTMetricDef(const std::string& key, TMetricKind::type kind,
     TUnit::type unit);
 }

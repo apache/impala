@@ -282,14 +282,20 @@ Status ExecEnv::StartServices() {
   // Limit of -1 means no memory limit.
   mem_tracker_.reset(new MemTracker(AggregateMemoryMetrics::TOTAL_USED,
       no_process_mem_limit ? -1 : bytes_limit, "Process"));
-  if (buffer_pool_ != nullptr) {
-    // Add BufferPool MemTrackers for cached memory that is not tracked against queries
-    // but is included in process memory consumption.
-    obj_pool_->Add(new MemTracker(BufferPoolMetric::FREE_BUFFER_BYTES, -1,
-        "Buffer Pool: Free Buffers", mem_tracker_.get()));
-    obj_pool_->Add(new MemTracker(BufferPoolMetric::CLEAN_PAGE_BYTES, -1,
-        "Buffer Pool: Clean Pages", mem_tracker_.get()));
-  }
+  // Add BufferPool MemTrackers for cached memory that is not tracked against queries
+  // but is included in process memory consumption.
+  obj_pool_->Add(new MemTracker(BufferPoolMetric::FREE_BUFFER_BYTES, -1,
+      "Buffer Pool: Free Buffers", mem_tracker_.get()));
+  obj_pool_->Add(new MemTracker(BufferPoolMetric::CLEAN_PAGE_BYTES, -1,
+      "Buffer Pool: Clean Pages", mem_tracker_.get()));
+  // Also need a MemTracker for unused reservations as a negative value. Unused
+  // reservations are counted against queries but not against the process memory
+  // consumption. This accounts for that difference.
+  IntGauge* negated_unused_reservation = obj_pool_->Add(new NegatedGauge<int64_t>(
+        MakeTMetricDef("negated_unused_reservation", TMetricKind::GAUGE, TUnit::BYTES),
+        BufferPoolMetric::UNUSED_RESERVATION_BYTES));
+  obj_pool_->Add(new MemTracker(negated_unused_reservation, -1,
+      "Buffer Pool: Unused Reservation", mem_tracker_.get()));
 #ifndef ADDRESS_SANITIZER
   // Aggressive decommit is required so that unused pages in the TCMalloc page heap are
   // not backed by physical pages and do not contribute towards memory consumption.

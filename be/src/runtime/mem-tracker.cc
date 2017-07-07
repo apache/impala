@@ -75,8 +75,8 @@ MemTracker::MemTracker(RuntimeProfile* profile, int64_t byte_limit,
   Init();
 }
 
-MemTracker::MemTracker(UIntGauge* consumption_metric, int64_t byte_limit,
-    const string& label, MemTracker* parent)
+MemTracker::MemTracker(IntGauge* consumption_metric,
+    int64_t byte_limit, const string& label, MemTracker* parent)
   : limit_(byte_limit),
     label_(label),
     parent_(parent),

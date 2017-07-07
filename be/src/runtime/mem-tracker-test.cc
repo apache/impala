@@ -61,53 +61,74 @@ TEST(MemTestTest, ConsumptionMetric) {
   md.__set_key("test");
   md.__set_units(TUnit::BYTES);
   md.__set_kind(TMetricKind::GAUGE);
-  UIntGauge metric(md, 0);
+  IntGauge metric(md, 0);
   EXPECT_EQ(metric.value(), 0);
 
+  TMetricDef neg_md;
+  neg_md.__set_key("neg_test");
+  neg_md.__set_units(TUnit::BYTES);
+  neg_md.__set_kind(TMetricKind::GAUGE);
+  NegatedGauge<int64_t> neg_metric(neg_md, &metric);
+
   MemTracker t(&metric, 100, "");
+  MemTracker neg_t(&neg_metric, 100, "");
   EXPECT_TRUE(t.has_limit());
   EXPECT_EQ(t.consumption(), 0);
+  EXPECT_EQ(neg_t.consumption(), 0);
 
   // Consume()/Release() arguments have no effect
   t.Consume(150);
   EXPECT_EQ(t.consumption(), 0);
   EXPECT_EQ(t.peak_consumption(), 0);
   EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_EQ(neg_t.consumption(), 0);
   t.Release(5);
   EXPECT_EQ(t.consumption(), 0);
   EXPECT_EQ(t.peak_consumption(), 0);
   EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_EQ(neg_t.consumption(), 0);
 
   metric.Increment(10);
   // consumption_ is only updated with consumption_metric_ after calls to
   // Consume()/Release() with a non-zero value
   t.Consume(1);
+  neg_t.Consume(1);
   EXPECT_EQ(t.consumption(), 10);
   EXPECT_EQ(t.peak_consumption(), 10);
+  EXPECT_EQ(neg_t.consumption(), -10);
   metric.Increment(-5);
   t.Consume(-1);
+  neg_t.Consume(1);
   EXPECT_EQ(t.consumption(), 5);
   EXPECT_EQ(t.peak_consumption(), 10);
   EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_EQ(neg_t.consumption(), -5);
   metric.Increment(150);
   t.Consume(1);
+  neg_t.Consume(1);
   EXPECT_EQ(t.consumption(), 155);
   EXPECT_EQ(t.peak_consumption(), 155);
   EXPECT_TRUE(t.LimitExceeded());
+  EXPECT_EQ(neg_t.consumption(), -155);
   metric.Increment(-150);
   t.Consume(-1);
+  neg_t.Consume(1);
   EXPECT_EQ(t.consumption(), 5);
   EXPECT_EQ(t.peak_consumption(), 155);
   EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_EQ(neg_t.consumption(), -5);
   // consumption_ is not updated when Consume()/Release() is called with a zero value
   metric.Increment(10);
   t.Consume(0);
+  neg_t.Consume(0);
   EXPECT_EQ(t.consumption(), 5);
   EXPECT_EQ(t.peak_consumption(), 155);
   EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_EQ(neg_t.consumption(), -5);
   // Clean up.
   metric.Increment(-15);
   t.Consume(-1);
+  neg_t.Consume(-1);
 }
 
 TEST(MemTestTest, TrackerHierarchy) {

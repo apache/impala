@@ -204,13 +204,13 @@ class PrettyPrinter {
     if (value == 0) {
       *unit = "";
       return value;
-    } else if (value >= GIGABYTE) {
+    } else if (value >= GIGABYTE || value <= -GIGABYTE) {
       *unit = "GB";
       return value / (double) GIGABYTE;
-    } else if (value >= MEGABYTE ) {
+    } else if (value >= MEGABYTE || value <= -MEGABYTE ) {
       *unit = "MB";
       return value / (double) MEGABYTE;
-    } else if (value >= KILOBYTE)  {
+    } else if (value >= KILOBYTE || value <= -KILOBYTE)  {
       *unit = "KB";
       return value / (double) KILOBYTE;
     } else {

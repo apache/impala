@@ -1156,6 +1156,16 @@
     "key": "buffer-pool.reserved"
   },
   {
+    "description": "Total bytes of buffer reservations by Impala subsystems that are currently unused",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool Unused Reservation Bytes.",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "buffer-pool.unused-reservation-bytes"
+  },
+  {
     "description": "Total number of free buffers cached in the buffer pool.",
     "contexts": [
       "IMPALAD"
