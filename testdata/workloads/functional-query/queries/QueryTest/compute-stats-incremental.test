@@ -259,6 +259,69 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
 ---- QUERY
+# Drop and recompute incremental stats for general partition expressions
+drop incremental stats alltypes_incremental partition(year=2010);
+====
+---- QUERY
+compute incremental stats alltypes_incremental partition(year=2010);
+---- RESULTS
+'Updated 12 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats alltypes_incremental;
+---- RESULTS
+'2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','3',310,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','4',300,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','1',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','2',280,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','3',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','4',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'Total','',7300,24,'586.84KB','0B','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+show column stats alltypes_incremental
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',7505,-1,4,4
+'bool_col','BOOLEAN',2,-1,1,1
+'tinyint_col','TINYINT',10,-1,1,1
+'smallint_col','SMALLINT',10,-1,2,2
+'int_col','INT',10,-1,4,4
+'bigint_col','BIGINT',10,-1,8,8
+'float_col','FLOAT',10,-1,4,4
+'double_col','DOUBLE',10,-1,8,8
+'date_string_col','STRING',736,-1,8,8
+'string_col','STRING',10,-1,1,1
+'timestamp_col','TIMESTAMP',7554,-1,16,16
+'year','INT',2,0,4,4
+'month','INT',12,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+====
+---- QUERY
 # Confirm that dropping stats drops incremental stats as well
 drop stats alltypes_incremental;
 show table stats alltypes_incremental;

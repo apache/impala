@@ -19,6 +19,7 @@ package org.apache.impala.analysis;
 
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.HashSet;
 import java.util.List;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -41,6 +42,7 @@ import org.apache.log4j.Logger;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Represents a COMPUTE STATS <table> and COMPUTE INCREMENTAL STATS <table> [PARTITION
@@ -355,12 +357,9 @@ public class ComputeStatsStmt extends StatementBase {
           expectAllPartitions_ = true;
         }
       } else {
-        List<HdfsPartition> targetPartitions = partitionSet_.getPartitions();
-
         // Always compute stats on a set of partitions when told to.
-        List<String> partitionConjuncts = Lists.newArrayList();
-        for (HdfsPartition targetPartition : targetPartitions) {
-          partitionConjuncts.add(targetPartition.getConjunctSql());
+        for (HdfsPartition targetPartition: partitionSet_.getPartitions()) {
+          filterPreds.add(targetPartition.getConjunctSql());
           List<String> partValues = Lists.newArrayList();
           for (LiteralExpr partValue: targetPartition.getPartitionValues()) {
             partValues.add(PartitionKeyValue.getPartitionKeyValueString(partValue,
@@ -368,7 +367,9 @@ public class ComputeStatsStmt extends StatementBase {
           }
           expectedPartitions_.add(partValues);
         }
-        filterPreds.add("(" + Joiner.on(" AND ").join(partitionConjuncts) + ")");
+        // Create a hash set out of partitionSet_ for O(1) lookups.
+        HashSet<HdfsPartition> targetPartitions =
+            Sets.newHashSet(partitionSet_.getPartitions());
         for (HdfsPartition p : hdfsTable.getPartitions()) {
           if (p.isDefaultPartition()) continue;
           if (targetPartitions.contains(p)) continue;
