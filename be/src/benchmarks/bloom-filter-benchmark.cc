@@ -308,7 +308,7 @@ void RunBenchmarks() {
   }
 
   {
-    Benchmark suite("union");
+    Benchmark suite("union", false /* micro_heuristics */);
     vector<unique_ptr<either::TestData> > testdata;
     for (int ndv = 10000; ndv <= 100 * 1000 * 1000; ndv *= 100) {
       for (int log10fpp = -1; log10fpp >= -3; --log10fpp) {
@@ -330,7 +330,7 @@ int main(int argc, char **argv) {
 
   {
     char name[120];
-    Benchmark suite("initialize");
+    Benchmark suite("initialize", false /* micro_heuristics */);
     vector<unique_ptr<int> > testdata;
     for (int ndv = 10000; ndv <= 100 * 1000 * 1000; ndv *= 100) {
       for (int log10fpp = -1; log10fpp >= -3; --log10fpp) {
