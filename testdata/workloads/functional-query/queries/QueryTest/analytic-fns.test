@@ -1904,6 +1904,22 @@ from functional.alltypes) x
 where x.a = x.b
 ---- TYPES
 BIGINT
+---- ERRORS
+---- RESULTS
+7299
+====
+---- QUERY
+# Regression test for IMPALA-5623: lag() should free UDF allocated memory.
+# i.e. the fix for IMPALA-4120 should apply to lag() as well.
+select count(*) from (
+select
+  from_unixtime(lag(bigint_col, 1) over (order by id), 'yyyyMMddHH:mm:ss') as a,
+  lag(from_unixtime(bigint_col, 'yyyyMMddHH:mm:ss'), 1) over (order by id) AS b
+from functional.alltypes) x
+where x.a = x.b
+---- TYPES
+BIGINT
+---- ERRORS
 ---- RESULTS
 7299
 ====
