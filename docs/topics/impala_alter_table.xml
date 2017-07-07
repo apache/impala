@@ -467,7 +467,7 @@ yes,no</codeblock>
       See <xref href="impala_perf_stats.xml#perf_table_stats_manual"/> for an example of using table properties to
       fine-tune the performance-related table statistics.
     </p>
-      
+
     <p>
       <b>To manually set or update table or column statistics:</b>
     </p>
@@ -669,7 +669,7 @@ select * from p2;
 
 alter table p2 drop column x;
 select * from p2;
-WARNINGS: 
+WARNINGS:
 File '<varname>hdfs_filename</varname>' has an incompatible Parquet schema for column 'add_columns.p2.s3'.
 Column type: STRING, Parquet schema:
 optional int32 x [i:1 d:1 r:0]

@@ -943,7 +943,7 @@ show table stats kudu_table;
         Kudu tables. Therefore, you do not need to re-run <codeph>COMPUTE STATS</codeph>
         when you see -1 in the <codeph># Rows</codeph> column of the output from
         <codeph>SHOW TABLE STATS</codeph>. That column always shows -1 for
-        all Kudu tables. 
+        all Kudu tables.
       </p>
 
       <p conref="../shared/impala_common.xml#common/example_blurb"/>

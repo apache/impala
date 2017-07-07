@@ -69,10 +69,10 @@ under the License.
         event log files.
       </li>
 
-      <li> 
+      <li>
         Use a cluster manager with governance capabilities to filter, visualize,
         and produce reports based on the audit logs collected
-        from all the hosts in the cluster. 
+        from all the hosts in the cluster.
       </li>
     </ul>
 
@@ -102,18 +102,18 @@ under the License.
         <codeph>fsync()</codeph> system call) to avoid loss of audit data in case of a crash.
       </p>
 
-      <p> 
+      <p>
         The runtime overhead of auditing applies to whichever host serves as the coordinator
         for the query, that is, the host you connect to when you issue the query. This might
         be the same host for all queries, or different applications or users might connect to
-        and issue queries through different hosts. 
+        and issue queries through different hosts.
       </p>
 
-      <p> 
+      <p>
         To avoid excessive I/O overhead on busy coordinator hosts, Impala syncs the audit log
         data (using the <codeph>fsync()</codeph> system call) periodically rather than after
         every query. Currently, the <codeph>fsync()</codeph> calls are issued at a fixed
-        interval, every 5 seconds. 
+        interval, every 5 seconds.
       </p>
 
       <p>
@@ -138,12 +138,12 @@ under the License.
 
     <conbody>
 
-      <p> 
+      <p>
         The audit log files represent the query information in JSON format, one query per line.
         Typically, rather than looking at the log files themselves, you should use cluster-management
         software to consolidate the log data from all Impala hosts and filter and visualize the results
         in useful ways. (If you do examine the raw log data, you might run the files through
-        a JSON pretty-printer first.) 
+        a JSON pretty-printer first.)
      </p>
 
       <p>

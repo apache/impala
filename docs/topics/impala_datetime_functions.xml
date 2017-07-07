@@ -193,7 +193,7 @@ select now(), current_timestamp();
 | 2016-05-19 16:10:14.237849000 | 2016-05-19 16:10:14.237849000 |
 +-------------------------------+-------------------------------+
 
-select current_timestamp() as right_now,            
+select current_timestamp() as right_now,
   current_timestamp() + interval 3 hours as in_three_hours;
 +-------------------------------+-------------------------------+
 | right_now                     | in_three_hours                |
@@ -412,7 +412,7 @@ select date_sub(cast('2016-05-31' as timestamp), interval 1 months) as 'april_31
           </p>
           <p conref="../shared/impala_common.xml#common/example_blurb"/>
           <p>
-            The following example shows how comparing a <q>late</q> value with 
+            The following example shows how comparing a <q>late</q> value with
             an <q>earlier</q> value produces a positive number. In this case,
             the result is (365 * 5) + 1, because one of the intervening years is
             a leap year.
@@ -760,8 +760,8 @@ select now() as right_now,
 +-------------------------------+-----------+------------+
 
 select now() as right_now,
-  extract(day from now()) as this_day,  
-  extract(hour from now()) as this_hour;  
+  extract(day from now()) as this_day,
+  extract(hour from now()) as this_hour;
 +-------------------------------+----------+-----------+
 | right_now                     | this_day | this_hour |
 +-------------------------------+----------+-----------+

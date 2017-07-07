@@ -737,7 +737,7 @@ Returned 27 row(s) in 0.17s</codeblock>
     </ul>
 
     <p rev="kudu">
-      The following example shows <codeph>DESCRIBE</codeph> output for a simple Kudu table, with 
+      The following example shows <codeph>DESCRIBE</codeph> output for a simple Kudu table, with
       a single-column primary key and all column attributes left with their default values:
     </p>
 

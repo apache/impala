@@ -296,12 +296,12 @@ under the License.
             </li>
             <li>
               <p rev="2.6.0 IMPALA-3480">
-                <xref href="impala_runtime_filter_max_size.xml#runtime_filter_max_size"/> 
+                <xref href="impala_runtime_filter_max_size.xml#runtime_filter_max_size"/>
               </p>
             </li>
             <li>
               <p rev="2.6.0 IMPALA-3480">
-                <xref href="impala_runtime_filter_min_size.xml#runtime_filter_min_size"/> 
+                <xref href="impala_runtime_filter_min_size.xml#runtime_filter_min_size"/>
               </p>
             </li>
             <li>
