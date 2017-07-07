@@ -196,7 +196,7 @@ Status HdfsAvroTableWriter::AppendRows(
     }
   }
 
-  if (out_.Size() > DEFAULT_AVRO_BLOCK_SIZE) Flush();
+  if (out_.Size() > DEFAULT_AVRO_BLOCK_SIZE) RETURN_IF_ERROR(Flush());
   *new_file = false;
   return Status::OK();
 }

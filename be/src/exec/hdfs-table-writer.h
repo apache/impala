@@ -64,10 +64,10 @@ class HdfsTableWriter {
   /// text), 1) is called once and 2-4) is called repeatedly for each file.
 
   /// Do initialization of writer.
-  virtual Status Init() = 0;
+  virtual Status Init() WARN_UNUSED_RESULT = 0;
 
   /// Called when a new file is started.
-  virtual Status InitNewFile() = 0;
+  virtual Status InitNewFile() WARN_UNUSED_RESULT = 0;
 
   /// Appends rows of 'batch' to the partition that are selected via 'row_group_indices',
   /// and if the latter is empty, appends every row.
@@ -75,13 +75,14 @@ class HdfsTableWriter {
   /// *new_file == true. A new file will be opened and the same row batch will be passed
   /// again. The writer must track how much of the batch it had already processed asking
   /// for a new file. Otherwise the writer will return with *newfile == false.
-  virtual Status AppendRows(
-      RowBatch* batch, const std::vector<int32_t>& row_group_indices, bool* new_file) = 0;
+  virtual Status AppendRows(RowBatch* batch,
+      const std::vector<int32_t>& row_group_indices,
+      bool* new_file) WARN_UNUSED_RESULT = 0;
 
   /// Finalize this partition. The writer needs to finish processing
   /// all data have written out after the return from this call.
   /// This is called once for each call to InitNewFile()
-  virtual Status Finalize() = 0;
+  virtual Status Finalize() WARN_UNUSED_RESULT = 0;
 
   /// Called once when this writer should cleanup any resources.
   virtual void Close() = 0;

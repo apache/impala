@@ -48,7 +48,7 @@ class StringBuffer {
 
   /// Append 'str' to the current string, allocating a new buffer as necessary.
   /// Return error status if memory limit is exceeded.
-  Status Append(const char* str, int64_t str_len) {
+  Status Append(const char* str, int64_t str_len) WARN_UNUSED_RESULT {
     int64_t new_len = len_ + str_len;
     if (UNLIKELY(new_len > buffer_size_)) RETURN_IF_ERROR(GrowBuffer(new_len));
     memcpy(buffer_ + len_, str, str_len);
@@ -57,7 +57,7 @@ class StringBuffer {
   }
 
   /// Wrapper around append() for input type 'uint8_t'.
-  Status Append(const uint8_t* str, int64_t str_len) {
+  Status Append(const uint8_t* str, int64_t str_len) WARN_UNUSED_RESULT {
     return Append(reinterpret_cast<const char*>(str), str_len);
   }
 
@@ -78,7 +78,7 @@ class StringBuffer {
   /// Grows the buffer to be at least 'new_size', copying over the previous data
   /// into the new buffer. The old buffer is not freed. Return an error status if
   /// growing the buffer will exceed memory limit.
-  Status GrowBuffer(int64_t new_size) {
+  Status GrowBuffer(int64_t new_size) WARN_UNUSED_RESULT {
     if (LIKELY(new_size > buffer_size_)) {
       int64_t old_size = buffer_size_;
       buffer_size_ = std::max<int64_t>(buffer_size_ * 2, new_size);

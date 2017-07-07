@@ -117,11 +117,12 @@ bool ColumnStatsBase::ReadFromThrift(const parquet::ColumnChunk& col_chunk,
   return false;
 }
 
-void ColumnStatsBase::CopyToBuffer(StringBuffer* buffer, StringValue* value) {
-  if (value->ptr == buffer->buffer()) return;
+Status ColumnStatsBase::CopyToBuffer(StringBuffer* buffer, StringValue* value) {
+  if (value->ptr == buffer->buffer()) return Status::OK();
   buffer->Clear();
-  buffer->Append(value->ptr, value->len);
+  RETURN_IF_ERROR(buffer->Append(value->ptr, value->len));
   value->ptr = buffer->buffer();
+  return Status::OK();
 }
 
 bool ColumnStatsBase::CanUseStats(

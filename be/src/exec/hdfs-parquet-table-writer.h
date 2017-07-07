@@ -58,25 +58,25 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   ~HdfsParquetTableWriter();
 
   /// Initialize column information.
-  virtual Status Init();
+  virtual Status Init() override;
 
   /// Initializes a new file.  This resets the file metadata object and writes
   /// the file header to the output file.
-  virtual Status InitNewFile();
+  virtual Status InitNewFile() override;
 
   /// Appends parquet representation of rows in the batch to the current file.
-  virtual Status AppendRows(
-      RowBatch* batch, const std::vector<int32_t>& row_group_indices, bool* new_file);
+  virtual Status AppendRows(RowBatch* batch,
+      const std::vector<int32_t>& row_group_indices, bool* new_file) override;
 
   /// Write out all the data.
-  virtual Status Finalize();
+  virtual Status Finalize() override;
 
-  virtual void Close();
+  virtual void Close() override;
 
   /// Returns the target HDFS block size to use.
-  virtual uint64_t default_block_size() const;
+  virtual uint64_t default_block_size() const override;
 
-  virtual std::string file_extension() const { return "parq"; }
+  virtual std::string file_extension() const override { return "parq"; }
 
  private:
   /// Default data page size. In bytes.

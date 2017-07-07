@@ -170,9 +170,10 @@ inline void ColumnStats<StringValue>::Update(
 // StringValues need to be copied at the end of processing a row batch, since the batch
 // memory will be released.
 template <>
-inline void ColumnStats<StringValue>::MaterializeStringValuesToInternalBuffers() {
-  if (min_buffer_.IsEmpty()) CopyToBuffer(&min_buffer_, &min_value_);
-  if (max_buffer_.IsEmpty()) CopyToBuffer(&max_buffer_, &max_value_);
+inline Status ColumnStats<StringValue>::MaterializeStringValuesToInternalBuffers() {
+  if (min_buffer_.IsEmpty()) RETURN_IF_ERROR(CopyToBuffer(&min_buffer_, &min_value_));
+  if (max_buffer_.IsEmpty()) RETURN_IF_ERROR(CopyToBuffer(&max_buffer_, &max_value_));
+  return Status::OK();
 }
 
 } // end ns impala

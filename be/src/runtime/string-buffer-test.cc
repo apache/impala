@@ -50,12 +50,12 @@ TEST(StringBufferTest, Basic) {
 
   // Append to empty
   std_str.append("Hello");
-  str.Append("Hello", strlen("Hello"));
+  ASSERT_OK(str.Append("Hello", strlen("Hello")));
   ValidateString(std_str, str);
 
   // Append some more
   std_str.append("World");
-  str.Append("World", strlen("World"));
+  ASSERT_OK(str.Append("World", strlen("World")));
   ValidateString(std_str, str);
 
   // Clear
@@ -81,7 +81,7 @@ TEST(StringBufferTest, AppendBoundary) {
   std_str.resize(chunk_size, 'a');
   int64_t data_size = 0;
   while (data_size + chunk_size <= max_data_size) {
-    str.Append(std_str.c_str(), chunk_size);
+    ASSERT_OK(str.Append(std_str.c_str(), chunk_size));
     data_size += chunk_size;
   }
   EXPECT_EQ(str.buffer_size(), data_size);

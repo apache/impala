@@ -81,7 +81,9 @@ class ColumnStatsBase {
   /// data types (e.g. StringValue) need to be copied at the end of processing a row
   /// batch, since the batch memory will be released. Overwrite this method in derived
   /// classes to provide the functionality.
-  virtual void MaterializeStringValuesToInternalBuffers() {}
+  virtual Status MaterializeStringValuesToInternalBuffers() WARN_UNUSED_RESULT {
+    return Status::OK();
+  }
 
   /// Returns the number of bytes needed to encode the current statistics into a
   /// parquet::Statistics object.
@@ -100,7 +102,7 @@ class ColumnStatsBase {
  protected:
   // Copies the memory of 'value' into 'buffer' and make 'value' point to 'buffer'.
   // 'buffer' is reset before making the copy.
-  static void CopyToBuffer(StringBuffer* buffer, StringValue* value);
+  static Status CopyToBuffer(StringBuffer* buffer, StringValue* value) WARN_UNUSED_RESULT;
 
   /// Stores whether the min and max values of the current object have been initialized.
   bool has_min_max_values_;
@@ -163,7 +165,9 @@ class ColumnStats : public ColumnStatsBase {
   void Update(const T& v) { Update(v, v); }
 
   virtual void Merge(const ColumnStatsBase& other) override;
-  virtual void MaterializeStringValuesToInternalBuffers() override {}
+  virtual Status MaterializeStringValuesToInternalBuffers() override {
+    return Status::OK();
+  }
 
   virtual int64_t BytesNeeded() const override;
   virtual void EncodeToThrift(parquet::Statistics* out) const override;

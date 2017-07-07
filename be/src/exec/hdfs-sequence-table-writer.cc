@@ -125,7 +125,7 @@ Status HdfsSequenceTableWriter::AppendRows(
     out_.WriteBytes(neg1_sync_marker_.size(), neg1_sync_marker_.data());
   }
 
-  if (out_.Size() >= approx_block_size_) Flush();
+  if (out_.Size() >= approx_block_size_) RETURN_IF_ERROR(Flush());
   *new_file = false;
   return Status::OK();
 }
