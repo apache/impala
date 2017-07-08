@@ -431,6 +431,9 @@ class BufferedTupleStreamV2 {
   /// * before the first row has been added with AddRow() or AddRowCustom().
   /// * after the stream has been destructively read in 'delete_on_read' mode
   std::list<Page> pages_;
+  // IMPALA-5629: avoid O(n) list.size() call by explicitly tracking the number of pages.
+  // TODO: remove when we switch to GCC5+, where list.size() is O(1). See GCC bug #49561.
+  int64_t num_pages_;
 
   /// Total size of pages_, including any pages already deleted in 'delete_on_read'
   /// mode.
