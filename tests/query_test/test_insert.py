@@ -32,8 +32,7 @@ from tests.common.test_result_verifier import (
     parse_result_rows)
 from tests.common.test_vector import ImpalaTestDimension
 
-# TODO: Add Gzip back.  IMPALA-424
-PARQUET_CODECS = ['none', 'snappy']
+PARQUET_CODECS = ['none', 'snappy', 'gzip']
 
 class TestInsertQueries(ImpalaTestSuite):
   @classmethod

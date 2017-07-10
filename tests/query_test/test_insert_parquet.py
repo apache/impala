@@ -36,8 +36,7 @@ from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import get_fs_path
 from tests.util.get_parquet_metadata import get_parquet_metadata, decode_stats_value
 
-# TODO: Add Gzip back.  IMPALA-424
-PARQUET_CODECS = ['none', 'snappy']
+PARQUET_CODECS = ['none', 'snappy', 'gzip']
 
 
 class RoundFloat():
