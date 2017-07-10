@@ -129,6 +129,53 @@ https://issues.apache.org/jira/browse/IMPALA-2144 - Don't have
 
 -->
 
+  <concept id="known_issues_startup">
+
+    <title>Impala Known Issues: Startup</title>
+
+    <conbody>
+
+      <p>
+        These issues can prevent one or more Impala-related daemons
+        from starting properly.
+      </p>
+
+    </conbody>
+
+    <concept id="IMPALA-4978">
+      <title id="IMPALA-5253">Problem retrieving FQDN causes startup problem on kerberized clusters</title>
+      <conbody>
+        <p>
+          The method Impala uses to retrieve the host name while constructing the Kerberos
+          principal is the <codeph>gethostname()</codeph> system call. This function might
+          not always return the fully qualified domain name, depending on the network
+          configuration. If the daemons cannot determine the FQDN, Impala does not start
+          on a kerberized cluster.
+        </p>
+        <p>
+          This problem might occur immediately after an upgrade of a CDH cluster, due to changes
+          in Cloudera Manager that supplies the <codeph>--hostname</codeph> flag automatically to
+          the Impala-related daemons. (See the issue <q>hostname parameter is not passed to Impala catalog role</q>
+          at <xref href="https://www.cloudera.com/documentation/enterprise/release-notes/topics/cm_rn_known_issues.html" scope="external" format="html">the Cloudera Manager Known Issues page</xref>.)
+        </p>
+        <p><b>Bugs:</b> <xref keyref="IMPALA-4978">IMPALA-4978</xref>, <xref keyref="IMPALA-5253">IMPALA-5253</xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Resolution:</b> The issue is expected to occur less frequently on systems
+          with fixes for <xref keyref="IMPALA-4978">IMPALA-4978</xref>, <xref keyref="IMPALA-5253">IMPALA-5253</xref>,
+          or both. Even on systems with fixes for both of these issues, the workaround might still
+          be required in some cases.
+        </p>
+        <p><b>Workaround:</b> Test if a host is affected by checking whether the output of the
+          <cmdname>hostname</cmdname> command includes the FQDN. On hosts where <cmdname>hostname</cmdname>
+          only returns the short name, pass the command-line flag
+          <codeph>--hostname=<varname>fully_qualified_domain_name</varname></codeph>
+          in the startup options of all Impala-related daemons.
+        </p>
+      </conbody>
+    </concept>
+
+  </concept>
+
   <concept id="known_issues_crash">
 
     <title>Impala Known Issues: Crashes and Hangs</title>
@@ -182,6 +229,7 @@ https://issues.apache.org/jira/browse/IMPALA-2144 - Don't have
         </p>
 
       </conbody>
+    </concept>
 
     <concept id="IMPALA-4595">
       <title>Linking IR UDF module to main module crashes Impala</title>
@@ -2083,5 +2131,4 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
   </concept>
 
-</concept>
 </concept>
