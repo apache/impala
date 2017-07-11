@@ -85,7 +85,8 @@ def get_option_parser(defaults):
                     help="Execute a query without the shell")
   parser.add_option("-f", "--query_file", dest="query_file",
                     help="Execute the queries in the query file, delimited by ;."
-                         " Queries may be read from stdin if the argument to -f is -.")
+                         " If the argument to -f is \"-\", then queries are read from"
+                         " stdin and terminated with ctrl-d.")
   parser.add_option("-k", "--kerberos", dest="use_kerberos",
                     action="store_true", help="Connect to a kerberized impalad")
   parser.add_option("-o", "--output_file", dest="output_file",
@@ -157,7 +158,10 @@ def get_option_parser(defaults):
   parser.add_option("--ldap_password_cmd",
                     help="Shell command to run to retrieve the LDAP password")
   parser.add_option("--var", dest="keyval", action="append",
-                    help="Define variable(s) to be used within the Impala session.")
+                    help="Define variable(s) to be used within the Impala session."
+                         " It must follow the pattern \"KEY=VALUE\","
+                         " KEY starts with an alphabetic character and"
+                         " contains alphanumeric characters or underscores.")
 
   # add default values to the help text
   for option in parser.option_list:
