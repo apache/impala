@@ -916,9 +916,71 @@ partition by hash (school) partitions 10,
 
       <div class="body conbody">
 
+        <div class="p">
+        In <span class="keyword">Impala 2.9</span> and higher, you can include <code class="ph codeph">TIMESTAMP</code>
+        columns in Kudu tables, instead of representing the date and time as a <code class="ph codeph">BIGINT</code>
+        value. The behavior of <code class="ph codeph">TIMESTAMP</code> for Kudu tables has some special considerations:
+
+        <ul class="ul">
+          <li class="li">
+            <p class="p">
+              Any nanoseconds in the original 96-bit value produced by Impala are not stored, because
+              Kudu represents date/time columns using 64-bit values. The nanosecond portion of the value
+              is rounded, not truncated. Therefore, a <code class="ph codeph">TIMESTAMP</code> value
+              that you store in a Kudu table might not be bit-for-bit identical to the value returned by a query.
+            </p>
+          </li>
+          <li class="li">
+            <p class="p">
+              The conversion between the Impala 96-bit representation and the Kudu 64-bit representation
+              introduces some performance overhead when reading or writing <code class="ph codeph">TIMESTAMP</code>
+              columns. You can minimize the overhead during writes by performing inserts through the
+              Kudu API. Because the overhead during reads applies to each query, you might continue to
+              use a <code class="ph codeph">BIGINT</code> column to represent date/time values  in performance-critical
+              applications.
+            </p>
+          </li>
+          <li class="li">
+            <p class="p">
+              The Impala <code class="ph codeph">TIMESTAMP</code> type has a narrower range for years than the underlying
+              Kudu data type. Impala can represent years 1400-9999. If year values outside this range
+              are written to a Kudu table by a non-Impala client, Impala returns <code class="ph codeph">NULL</code>
+              by default when reading those <code class="ph codeph">TIMESTAMP</code> values during a query. Or, if the
+              <code class="ph codeph">ABORT_ON_ERROR</code> query option is enabled, the query fails when it encounters
+              a value with an out-of-range year.
+            </p>
+          </li>
+        </ul>
+      </div>
+
+<pre class="pre codeblock"><code>--- Make a table representing a date/time value as TIMESTAMP.
+-- The strings representing the partition bounds are automatically
+-- cast to TIMESTAMP values.
+create table native_timestamp(id bigint, when_exactly timestamp, event string, primary key (id, when_exactly))
+  partition by hash (id) partitions 20,
+  range (when_exactly)
+  (
+    partition '2015-01-01' &lt;= values &lt; '2016-01-01',
+    partition '2016-01-01' &lt;= values &lt; '2017-01-01',
+    partition '2017-01-01' &lt;= values &lt; '2018-01-01'
+  )
+  stored as kudu;
+
+insert into native_timestamp values (12345, now(), 'Working on doc examples');
+
+select * from native_timestamp;
++-------+-------------------------------+-------------------------+
+| id    | when_exactly                  | event                   |
++-------+-------------------------------+-------------------------+
+| 12345 | 2017-05-31 16:27:42.667542000 | Working on doc examples |
++-------+-------------------------------+-------------------------+
+
+</code></pre>
+
         <p class="p">
-          Because currently a Kudu table cannot have a column with the Impala
-          <code class="ph codeph">TIMESTAMP</code> type, expect to store date/time information as the number
+          Because Kudu tables have some performance overhead to convert <code class="ph codeph">TIMESTAMP</code>
+          columns to the Impala 96-bit internal representation, for performance-critical
+          applications you might store date/time information as the number
           of seconds, milliseconds, or microseconds since the Unix epoch date of January 1,
           1970. Specify the column as <code class="ph codeph">BIGINT</code> in the Impala <code class="ph codeph">CREATE
           TABLE</code> statement, corresponding to an 8-byte integer (an
@@ -966,14 +1028,14 @@ select unix_timestamp('2017-01-01');
 -- Construct 1 range partition and 20 associated hash partitions for each year.
 -- Use date/time conversion functions to express the ranges as human-readable dates.
 create table time_series(id bigint, when_exactly bigint, event string, primary key (id, when_exactly))
-	partition by hash (id) partitions 20,
-	range (when_exactly)
-	(
-		partition unix_timestamp('2015-01-01') &lt;= values &lt; unix_timestamp('2016-01-01'),
-		partition unix_timestamp('2016-01-01') &lt;= values &lt; unix_timestamp('2017-01-01'),
-		partition unix_timestamp('2017-01-01') &lt;= values &lt; unix_timestamp('2018-01-01')
-	)
-	stored as kudu;
+  partition by hash (id) partitions 20,
+  range (when_exactly)
+  (
+    partition unix_timestamp('2015-01-01') &lt;= values &lt; unix_timestamp('2016-01-01'),
+    partition unix_timestamp('2016-01-01') &lt;= values &lt; unix_timestamp('2017-01-01'),
+    partition unix_timestamp('2017-01-01') &lt;= values &lt; unix_timestamp('2018-01-01')
+  )
+  stored as kudu;
 
 -- On insert, we can transform a human-readable date/time into a numeric value.
 insert into time_series values (12345, unix_timestamp('2017-01-25 23:24:56'), 'Working on doc examples');
@@ -1266,6 +1328,18 @@ kudu.table_name  | impala::some_database.table_name_demo
         authorization, currently the Sentry support is considered preliminary
         and subject to change.
       </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            Kerberos authentication. See <a class="xref" href="https://kudu.apache.org/docs/security.html" target="_blank">Kudu Security</a> for details.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            TLS encryption. See <a class="xref" href="https://kudu.apache.org/docs/security.html" target="_blank">Kudu Security</a> for details.
+          </p>
         </li>
 
         <li class="li">

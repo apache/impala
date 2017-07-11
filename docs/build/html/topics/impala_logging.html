@@ -44,6 +44,14 @@
       </p>
 
       <p class="p">
+        In <span class="keyword">Impala 2.9</span> and higher, you can control how many
+        audit event log files are kept on each host through the
+        <code class="ph codeph">--max_audit_event_log_files</code> startup option for the
+        <span class="keyword cmdname">impalad</span> daemon, similar to the <code class="ph codeph">--max_log_files</code>
+        option for regular log files.
+      </p>
+
+      <p class="p">
         The lineage feature introduced in Impala 2.2.0 produces a separate lineage log file when
         enabled. See <a class="xref" href="impala_lineage.html#lineage">Viewing Lineage Information for Impala Data</a> for details.
       </p>
@@ -132,7 +140,7 @@
         </li>
 
         <li class="li">
-          The <code class="ph codeph">-logbuflevel</code> startup flag for the <span class="keyword cmdname">impalad</span> daemon specifies how
+          The <code class="ph codeph">--logbuflevel</code> startup flag for the <span class="keyword cmdname">impalad</span> daemon specifies how
           often the log information is written to disk. The default is 0, meaning that the log is immediately
           flushed to disk when Impala outputs an important messages such as a warning or an error, but less
           important messages such as informational ones are buffered in memory rather than being flushed to disk
@@ -177,7 +185,7 @@
       </p>
 
       <p class="p">
-        In Impala 2.2 and higher, the <code class="ph codeph">-max_log_files</code> configuration option specifies how many log
+        In Impala 2.2 and higher, the <code class="ph codeph">--max_log_files</code> configuration option specifies how many log
         files to keep at each severity level. You can specify an appropriate setting for each Impala-related daemon
         (<span class="keyword cmdname">impalad</span>, <span class="keyword cmdname">statestored</span>, and <span class="keyword cmdname">catalogd</span>). The default
         value is 10, meaning that Impala preserves the latest 10 log files for each severity level

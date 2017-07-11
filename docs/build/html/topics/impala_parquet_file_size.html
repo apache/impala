@@ -65,6 +65,14 @@ INSERT OVERWRITE parquet_table SELECT * FROM text_table;
     </p>
 
     <p class="p">
+        Because ADLS does not expose the block sizes of data files the way HDFS does,
+        any Impala <code class="ph codeph">INSERT</code> or <code class="ph codeph">CREATE TABLE AS SELECT</code> statements
+        use the <code class="ph codeph">PARQUET_FILE_SIZE</code> query option setting to define the size of
+        Parquet data files. (Using a large block size is more important for Parquet tables than
+        for tables that use other file formats.)
+      </p>
+
+    <p class="p">
         <strong class="ph b">Isilon considerations:</strong>
       </p>
     <div class="p">

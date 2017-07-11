@@ -19,9 +19,7 @@
         <strong class="ph b">Syntax:</strong>
       </p>
 
-
-
-<pre class="pre codeblock"><code>GROUP_CONCAT([ALL] <var class="keyword varname">expression</var> [, <var class="keyword varname">separator</var>])</code></pre>
+<pre class="pre codeblock"><code>GROUP_CONCAT([ALL<span class="ph"> | DISTINCT</span>] <var class="keyword varname">expression</var> [, <var class="keyword varname">separator</var>])</code></pre>
 
     <p class="p">
         <strong class="ph b">Usage notes:</strong> <code class="ph codeph">concat()</code> and <code class="ph codeph">concat_ws()</code> are appropriate for
@@ -37,14 +35,6 @@
 
     <p class="p">
       <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
-    </p>
-
-    <p class="p">
-        <strong class="ph b">Restrictions:</strong>
-      </p>
-
-    <p class="p">
-      You cannot apply the <code class="ph codeph">DISTINCT</code> operator to the argument of this function.
     </p>
 
     <p class="p">
@@ -82,6 +72,20 @@
 +---------------------------------+
 | 1, 3, 2, 1                      |
 +---------------------------------+
+</code></pre>
+
+    <p class="p">
+      Specify the <code class="ph codeph">DISTINCT</code> keyword to eliminate duplicate values from
+      the concatenated result:
+    </p>
+
+<pre class="pre codeblock"><code>
+[localhost:21000] &gt; select group_concat(distinct s) from t1;
++--------------------------+
+| group_concat(distinct s) |
++--------------------------+
+| three, two, one          |
++--------------------------+
 </code></pre>
 
     <p class="p">

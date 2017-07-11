@@ -295,7 +295,7 @@ select case bool_col when true then 'yes' when false 'no' else 'null' end from t
 
       <p class="p">
         You can also use <code class="ph codeph">INTERVAL</code> expressions to add or subtract from timestamp literal values,
-        such as <code class="ph codeph">'1966-07-30' + INTERVAL 5 YEARS + INTERVAL 3 DAYS</code>. See
+        such as <code class="ph codeph">CAST('1966-07-30' AS TIMESTAMP) + INTERVAL 5 YEARS + INTERVAL 3 DAYS</code>. See
         <a class="xref" href="impala_timestamp.html#timestamp">TIMESTAMP Data Type</a> for details.
       </p>
 

@@ -21,7 +21,9 @@
         <strong class="ph b">Syntax:</strong>
       </p>
 
-<pre class="pre codeblock"><code>REFRESH [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var> [PARTITION (<var class="keyword varname">key_col1</var>=<var class="keyword varname">val1</var> [, <var class="keyword varname">key_col2</var>=<var class="keyword varname">val2</var>...])]</code></pre>
+<pre class="pre codeblock"><code>REFRESH [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var> [PARTITION (<var class="keyword varname">key_col1</var>=<var class="keyword varname">val1</var> [, <var class="keyword varname">key_col2</var>=<var class="keyword varname">val2</var>...])]
+<span class="ph">REFRESH FUNCTIONS <var class="keyword varname">db_name</var></span>
+</code></pre>
 
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
@@ -375,6 +377,25 @@ ERROR: AnalysisException: Items in partition spec must exactly match the partiti
         such as adding or dropping a column, by a mechanism other than
         Impala.
       </p>
+
+    <p class="p">
+        <strong class="ph b">UDF considerations:</strong>
+      </p>
+    <div class="p">
+        In <span class="keyword">Impala 2.9</span> and higher, you can refresh the user-defined functions (UDFs)
+        that Impala recognizes, at the database level, by running the <code class="ph codeph">REFRESH FUNCTIONS</code>
+        statement with the database name as an argument. Java-based UDFs can be added to the metastore
+        database through Hive <code class="ph codeph">CREATE FUNCTION</code> statements, and made visible to Impala
+        by subsequently running <code class="ph codeph">REFRESH FUNCTIONS</code>. For example:
+
+<pre class="pre codeblock"><code>CREATE DATABASE shared_udfs;
+USE shared_udfs;
+...use CREATE FUNCTION statements in Hive to create some Java-based UDFs
+   that Impala is not initially aware of...
+REFRESH FUNCTIONS shared_udfs;
+SELECT udf_created_by_hive(c1) FROM ...
+</code></pre>
+      </div>
 
     <p class="p">
         <strong class="ph b">Related information:</strong>

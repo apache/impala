@@ -84,22 +84,34 @@ Trying to re-register with state-store</code></pre>
 
       <ul class="ul">
         <li class="li">
-          The <code class="ph codeph">--idle_query_timeout</code> option specifies the time in seconds after
-          which an idle query is cancelled. This could be a query whose results were all fetched
-          but was never closed, or one whose results were partially fetched and then the client
-          program stopped requesting further results. This condition is most likely to occur in
-          a client program using the JDBC or ODBC interfaces, rather than in the interactive
-          <span class="keyword cmdname">impala-shell</span> interpreter. Once the query is cancelled, the client
-          program cannot retrieve any further results.
+          <p class="p">
+            The <code class="ph codeph">--idle_query_timeout</code> option specifies the time in seconds after
+            which an idle query is cancelled. This could be a query whose results were all fetched
+            but was never closed, or one whose results were partially fetched and then the client
+            program stopped requesting further results. This condition is most likely to occur in
+            a client program using the JDBC or ODBC interfaces, rather than in the interactive
+            <span class="keyword cmdname">impala-shell</span> interpreter. Once the query is cancelled, the client
+            program cannot retrieve any further results.
+          </p>
+
+          <p class="p">
+            You can reduce the idle query timeout by using the <code class="ph codeph">QUERY_TIMEOUT_S</code>
+            query option. Any non-zero value specified for the <code class="ph codeph">--idle_query_timeout</code> startup
+            option serves as an upper limit for the <code class="ph codeph">QUERY_TIMEOUT_S</code> query option.
+            A zero value for <code class="ph codeph">--idle_query_timeout</code> disables query timeouts.
+            See <a class="xref" href="impala_query_timeout_s.html#query_timeout_s">QUERY_TIMEOUT_S Query Option (Impala 2.0 or higher only)</a> for details.
+          </p>
         </li>
 
         <li class="li">
-          The <code class="ph codeph">--idle_session_timeout</code> option specifies the time in seconds after
-          which an idle session is expired. A session is idle when no activity is occurring for
-          any of the queries in that session, and the session has not started any new queries.
-          Once a session is expired, you cannot issue any new query requests to it. The session
-          remains open, but the only operation you can perform is to close it. The default value
-          of 0 means that sessions never expire.
+          <p class="p">
+            The <code class="ph codeph">--idle_session_timeout</code> option specifies the time in seconds after
+            which an idle session is expired. A session is idle when no activity is occurring for
+            any of the queries in that session, and the session has not started any new queries.
+            Once a session is expired, you cannot issue any new query requests to it. The session
+            remains open, but the only operation you can perform is to close it. The default value
+            of 0 means that sessions never expire.
+          </p>
         </li>
       </ul>
 
@@ -108,12 +120,14 @@ Trying to re-register with state-store</code></pre>
         <a class="xref" href="impala_config_options.html#config_options">Modifying Impala Startup Options</a>.
       </p>
 
-      <p class="p">
-        You can reduce the idle query timeout by using the <code class="ph codeph">QUERY_TIMEOUT_S</code>
-        query option. Any value specified for the <code class="ph codeph">--idle_query_timeout</code> startup
-        option serves as an upper limit for the <code class="ph codeph">QUERY_TIMEOUT_S</code> query option.
-        See <a class="xref" href="impala_query_timeout_s.html#query_timeout_s">QUERY_TIMEOUT_S Query Option (Impala 2.0 or higher only)</a> for details.
-      </p>
+      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+        <p class="p">
+          Impala checks periodically for idle sessions and queries
+          to cancel. The actual idle time before cancellation might be up to 50% greater than
+          the specified configuration setting. For example, if the timeout setting was 60, the
+          session or query might be cancelled after being idle between 60 and 90 seconds.
+        </p>
+      </div>
 
     </div>
 

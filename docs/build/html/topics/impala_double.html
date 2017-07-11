@@ -59,6 +59,17 @@
       The data type <code class="ph codeph">REAL</code> is an alias for <code class="ph codeph">DOUBLE</code>.
     </p>
 
+    
+    <p class="p">
+        Impala does not evaluate NaN (not a number) as equal to any other numeric values,
+        including other NaN values. For example, the following statement, which evaluates equality
+        between two NaN values, returns <code class="ph codeph">false</code>:
+      </p>
+
+<pre class="pre codeblock"><code>
+SELECT CAST('nan' AS DOUBLE)=CAST('nan' AS DOUBLE);
+</code></pre>
+
     <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>

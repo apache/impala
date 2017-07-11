@@ -607,8 +607,8 @@ select fmod(9.9,3.3);
           <p class="p">
         Infinity and NaN can be specified in text data files as <code class="ph codeph">inf</code> and <code class="ph codeph">nan</code>
         respectively, and Impala interprets them as these special values. They can also be produced by certain
-        arithmetic expressions; for example, <code class="ph codeph">pow(-1, 0.5)</code> returns <code class="ph codeph">Infinity</code> and
-        <code class="ph codeph">1/0</code> returns <code class="ph codeph">NaN</code>. Or you can cast the literal values, such as <code class="ph codeph">CAST('nan' AS
+        arithmetic expressions; for example, <code class="ph codeph">1/0</code> returns <code class="ph codeph">Infinity</code> and
+        <code class="ph codeph">pow(-1, 0.5)</code> returns <code class="ph codeph">NaN</code>. Or you can cast the literal values, such as <code class="ph codeph">CAST('nan' AS
         DOUBLE)</code> or <code class="ph codeph">CAST('inf' AS DOUBLE)</code>.
       </p>
         </dd>
@@ -634,8 +634,8 @@ select fmod(9.9,3.3);
           <p class="p">
         Infinity and NaN can be specified in text data files as <code class="ph codeph">inf</code> and <code class="ph codeph">nan</code>
         respectively, and Impala interprets them as these special values. They can also be produced by certain
-        arithmetic expressions; for example, <code class="ph codeph">pow(-1, 0.5)</code> returns <code class="ph codeph">Infinity</code> and
-        <code class="ph codeph">1/0</code> returns <code class="ph codeph">NaN</code>. Or you can cast the literal values, such as <code class="ph codeph">CAST('nan' AS
+        arithmetic expressions; for example, <code class="ph codeph">1/0</code> returns <code class="ph codeph">Infinity</code> and
+        <code class="ph codeph">pow(-1, 0.5)</code> returns <code class="ph codeph">NaN</code>. Or you can cast the literal values, such as <code class="ph codeph">CAST('nan' AS
         DOUBLE)</code> or <code class="ph codeph">CAST('inf' AS DOUBLE)</code>.
       </p>
         </dd>

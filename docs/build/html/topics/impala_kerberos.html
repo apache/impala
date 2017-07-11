@@ -339,4 +339,39 @@ $ chown impala:impala impala-http.keytab</code></pre>
     </div>
   </article>
 
+  <article class="topic concept nested1" aria-labelledby="ariaid-title11" id="kerberos__kerberos_overhead_memory_usage">
+  <h2 class="title topictitle2" id="ariaid-title11">Kerberos-Related Memory Overhead for Large Clusters</h2>
+  <div class="body conbody">
+    <div class="p">
+        On a kerberized cluster with high memory utilization, <span class="keyword cmdname">kinit</span> commands executed after
+        every <code class="ph codeph">'kerberos_reinit_interval'</code> may cause out-of-memory errors, because executing
+        the command involves a fork of the Impala process. The error looks similar to the following:
+<pre class="pre codeblock"><code>
+Failed to obtain Kerberos ticket for principal: &lt;varname&gt;principal_details&lt;/varname&gt;
+Failed to execute shell cmd: 'kinit -k -t &lt;varname&gt;keytab_details&lt;/varname&gt;',
+error was: Error(12): Cannot allocate memory
+
+</code></pre>
+      </div>
+    <div class="p">
+        The following command changes the <code class="ph codeph">vm.overcommit_memory</code>
+        setting immediately on a running host. However, this setting is reset
+        when the host is restarted.
+<pre class="pre codeblock"><code>
+echo 1 &gt; /proc/sys/vm/overcommit_memory
+
+</code></pre>
+      </div><div class="p">
+        To change the setting in a persistent way, add the following line to the
+        <span class="ph filepath">/etc/sysctl.conf</span> file:
+<pre class="pre codeblock"><code>
+vm.overcommit_memory=1
+
+</code></pre>
+      </div><p class="p">
+        Then run <code class="ph codeph">sysctl -p</code>. No reboot is needed.
+      </p>
+  </div>
+  </article>
+
 </article></main></body></html>

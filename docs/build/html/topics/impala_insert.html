@@ -29,8 +29,24 @@ INSERT { INTO | OVERWRITE } [TABLE] <var class="keyword varname">table_name</var
 
 partition_clause ::= <var class="keyword varname">col_name</var> [= <var class="keyword varname">constant</var>] [, <var class="keyword varname">col_name</var> [= <var class="keyword varname">constant</var>] ...]
 
-hint_clause ::= [SHUFFLE] | [NOSHUFFLE]    (Note: the square brackets are part of the syntax.)
+hint_clause ::=
+  <var class="keyword varname">hint_with_dashes</var> |
+  <var class="keyword varname">hint_with_cstyle_delimiters</var> |
+  <var class="keyword varname">hint_with_brackets</var>
+
+hint_with_dashes ::= -- +SHUFFLE | -- +NOSHUFFLE <span class="ph">-- +CLUSTERED</span>
+
+hint_with_cstyle_comments ::= /* +SHUFFLE */ | /* +NOSHUFFLE */ <span class="ph">| /* +CLUSTERED */</span>
+
+hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
+  (With this hint format, the square brackets are part of the syntax.)
 </code></pre>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+        The square bracket style of hint is now deprecated and might be removed in
+        a future release. For that reason, any newly added hints are not available
+        with the square bracket syntax.
+      </div>
 
     <p class="p">
       <strong class="ph b">Appending or replacing (INTO and OVERWRITE clauses):</strong>
@@ -737,6 +753,22 @@ Inserted 2 rows in 0.16s
         See <a class="xref" href="../shared/../topics/impala_s3_skip_insert_staging.html#s3_skip_insert_staging">S3_SKIP_INSERT_STAGING Query Option (Impala 2.6 or higher only)</a> for details.
       </p>
       <p class="p">See <a class="xref" href="impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about reading and writing S3 data with Impala.</p>
+
+      <p class="p">
+        <strong class="ph b">ADLS considerations:</strong>
+      </p>
+      <p class="p">
+        In <span class="keyword">Impala 2.9</span> and higher, the Impala DML statements (<code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>,
+        and <code class="ph codeph">CREATE TABLE AS SELECT</code>) can write data into a table or partition that resides in the
+        Azure Data Lake Store (ADLS).
+        The syntax of the DML statements is the same as for any other tables, because the ADLS location for tables and
+        partitions is specified by an <code class="ph codeph">adl://</code> prefix in the
+        <code class="ph codeph">LOCATION</code> attribute of
+        <code class="ph codeph">CREATE TABLE</code> or <code class="ph codeph">ALTER TABLE</code> statements.
+        If you bring data into ADLS using the normal ADLS transfer mechanisms instead of Impala DML statements,
+        issue a <code class="ph codeph">REFRESH</code> statement for the table before using Impala to query the ADLS data.
+      </p>
+      <p class="p">See <a class="xref" href="impala_adls.html#adls">Using Impala with the Azure Data Lake Store (ADLS)</a> for details about reading and writing ADLS data with Impala.</p>
 
       <p class="p">
         <strong class="ph b">Security considerations:</strong>

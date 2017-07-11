@@ -298,7 +298,7 @@ SELECT chr(97);
       
 
         <dt class="dt dlterm" id="string_functions__instr">
-          <code class="ph codeph">instr(string str, string substr)</code>
+          <code class="ph codeph">instr(string str, string substr <span class="ph">[, bigint position [, bigint occurrence ] ]</span>)</code>
         </dt>
 
         <dd class="dd">
@@ -308,6 +308,180 @@ SELECT chr(97);
           <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">int</code>
           </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+          <p class="p">
+            If the substring is not present in the string, the function returns 0:
+          </p>
+
+<pre class="pre codeblock"><code>
+select instr('foo bar bletch', 'z');
++------------------------------+
+| instr('foo bar bletch', 'z') |
++------------------------------+
+| 0                            |
++------------------------------+
+</code></pre>
+
+          <p class="p">
+            The optional third and fourth arguments let you find instances of the substring
+            other than the first instance starting from the left:
+          </p>
+          <ul class="ul">
+            <li class="li">
+              <p class="p">
+                The third argument lets you specify a starting point within the string
+                other than 1:
+              </p>
+
+<pre class="pre codeblock"><code>
+-- Restricting the search to positions 7..end,
+-- the first occurrence of 'b' is at position 9.
+select instr('foo bar bletch', 'b', 7);
++---------------------------------+
+| instr('foo bar bletch', 'b', 7) |
++---------------------------------+
+| 9                               |
++---------------------------------+
+
+-- If there are no more occurrences after the
+-- specified position, the result is 0.
+select instr('foo bar bletch', 'b', 10);
++----------------------------------+
+| instr('foo bar bletch', 'b', 10) |
++----------------------------------+
+| 0                                |
++----------------------------------+
+</code></pre>
+
+              <p class="p">
+                If the third argument is negative, the search works right-to-left
+                starting that many characters from the right. The return value still
+                represents the position starting from the left side of the string.
+              </p>
+
+<pre class="pre codeblock"><code>
+-- Scanning right to left, the first occurrence of 'o'
+-- is at position 8. (8th character from the left.)
+select instr('hello world','o',-1);
++-------------------------------+
+| instr('hello world', 'o', -1) |
++-------------------------------+
+| 8                             |
++-------------------------------+
+
+-- Scanning right to left, starting from the 6th character
+-- from the right, the first occurrence of 'o' is at
+-- position 5 (5th character from the left).
+select instr('hello world','o',-6);
++-------------------------------+
+| instr('hello world', 'o', -6) |
++-------------------------------+
+| 5                             |
++-------------------------------+
+
+-- If there are no more occurrences after the
+-- specified position, the result is 0.
+select instr('hello world','o',-10);
++--------------------------------+
+| instr('hello world', 'o', -10) |
++--------------------------------+
+| 0                              |
++--------------------------------+
+</code></pre>
+
+            </li>
+
+            <li class="li">
+              <p class="p">
+                The fourth argument lets you specify an occurrence other than the first:
+              </p>
+
+<pre class="pre codeblock"><code>
+-- 2nd occurrence of 'b' is at position 9.
+select instr('foo bar bletch', 'b', 1, 2);
++------------------------------------+
+| instr('foo bar bletch', 'b', 1, 2) |
++------------------------------------+
+| 9                                  |
++------------------------------------+
+
+-- Negative position argument means scan right-to-left.
+-- This example finds second instance of 'b' from the right.
+select instr('foo bar bletch', 'b', -1, 2);
++-------------------------------------+
+| instr('foo bar bletch', 'b', -1, 2) |
++-------------------------------------+
+| 5                                   |
++-------------------------------------+
+</code></pre>
+
+              <p class="p">
+                If the fourth argument is greater than the number of matching occurrences,
+                the function returns 0:
+              </p>
+
+<pre class="pre codeblock"><code>
+-- There is no 3rd occurrence within the string.
+select instr('foo bar bletch', 'b', 1, 3);
++------------------------------------+
+| instr('foo bar bletch', 'b', 1, 3) |
++------------------------------------+
+| 0                                  |
++------------------------------------+
+
+-- There is not even 1 occurrence when scanning
+-- the string starting at position 10.
+select instr('foo bar bletch', 'b', 10, 1);
++-------------------------------------+
+| instr('foo bar bletch', 'b', 10, 1) |
++-------------------------------------+
+| 0                                   |
++-------------------------------------+
+</code></pre>
+
+              <p class="p">
+                The fourth argument cannot be negative or zero. A non-positive value for
+                this argument causes an error:
+              </p>
+
+<pre class="pre codeblock"><code>
+select instr('foo bar bletch', 'b', 1, 0);
+ERROR: UDF ERROR: Invalid occurrence parameter to instr function: 0
+
+select instr('aaaaaaaaa','aa', 1, -1);
+ERROR: UDF ERROR: Invalid occurrence parameter to instr function: -1
+</code></pre>
+
+            </li>
+
+            <li class="li">
+              <p class="p">
+                If either of the optional arguments is <code class="ph codeph">NULL</code>,
+                the function also returns <code class="ph codeph">NULL</code>:
+              </p>
+
+<pre class="pre codeblock"><code>
+select instr('foo bar bletch', 'b', null);
++------------------------------------+
+| instr('foo bar bletch', 'b', null) |
++------------------------------------+
+| NULL                               |
++------------------------------------+
+
+select instr('foo bar bletch', 'b', 1, null);
++---------------------------------------+
+| instr('foo bar bletch', 'b', 1, null) |
++---------------------------------------+
+| NULL                                  |
++---------------------------------------+
+</code></pre>
+            </li>
+
+          </ul>
+
         </dd>
 
       
@@ -733,6 +907,71 @@ Returned 1 row(s) in 0.12s</code></pre>
           <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
           </p>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__replace">
+          <code class="ph codeph">replace(string initial, string target, string replacement)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns the initial argument with all occurrences of the target string
+          replaced by the replacement string.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+          <p class="p">
+            Because this function does not use any regular expression patterns, it is typically faster
+            than <code class="ph codeph">regexp_replace()</code> for simple string substitutions.
+          </p>
+          <p class="p">
+            If any argument is <code class="ph codeph">NULL</code>, the return value is <code class="ph codeph">NULL</code>.
+          </p>
+          <p class="p">
+            Matching is case-sensitive.
+          </p>
+          <p class="p">
+            If the replacement string contains another instance of the target
+            string, the expansion is only performed once, instead of
+            applying again to the newly constructed string.
+          </p>
+          <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.9.0</span>
+      </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+<pre class="pre codeblock"><code>-- Replace one string with another.
+select replace('hello world','world','earth');
++------------------------------------------+
+| replace('hello world', 'world', 'earth') |
++------------------------------------------+
+| hello earth                              |
++------------------------------------------+
+
+-- All occurrences of the target string are replaced.
+select replace('hello world','o','0');
++----------------------------------+
+| replace('hello world', 'o', '0') |
++----------------------------------+
+| hell0 w0rld                      |
++----------------------------------+
+
+-- If no match is found, the original string is returned unchanged.
+select replace('hello world','xyz','abc');
++--------------------------------------+
+| replace('hello world', 'xyz', 'abc') |
++--------------------------------------+
+| hello world                          |
++--------------------------------------+
+</code></pre>
         </dd>
 
       

@@ -35,26 +35,39 @@
         <strong class="ph b">Syntax:</strong>
       </p>
 
-    <p class="p">
-      You can represent the hints as keywords surrounded by <code class="ph codeph">[]</code> square brackets; include the
-      brackets in the text of the SQL statement.
-    </p>
+    <div class="p">
+      You can also represent the hints as keywords surrounded by <code class="ph codeph">[]</code>
+      square brackets; include the brackets in the text of the SQL statement.
+      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+        The square bracket style of hint is now deprecated and might be removed in
+        a future release. For that reason, any newly added hints are not available
+        with the square bracket syntax.
+      </div>
+    </div>
 
 <pre class="pre codeblock"><code>SELECT STRAIGHT_JOIN <var class="keyword varname">select_list</var> FROM
 <var class="keyword varname">join_left_hand_table</var>
-  JOIN [{BROADCAST|SHUFFLE}]
+  JOIN [{ /* +BROADCAST */ | /* +SHUFFLE */ }]
 <var class="keyword varname">join_right_hand_table</var>
 <var class="keyword varname">remainder_of_query</var>;
 
 INSERT <var class="keyword varname">insert_clauses</var>
-  [{SHUFFLE|NOSHUFFLE}]
+  [{ /* +SHUFFLE */ | /* +NOSHUFFLE */ }]
+  [<span class="ph">/* +CLUSTERED */</span>]
   SELECT <var class="keyword varname">remainder_of_query</var>;
 </code></pre>
 
     <p class="p">
       In <span class="keyword">Impala 2.0</span> and higher, you can also specify the hints inside comments that use
       either the <code class="ph codeph">/* */</code> or <code class="ph codeph">--</code> notation. Specify a <code class="ph codeph">+</code> symbol
-      immediately before the hint name.
+      immediately before the hint name. Recently added hints are only available using the <code class="ph codeph">/* */</code>
+      and <code class="ph codeph">--</code> notation.
+      For clarity, the <code class="ph codeph">/* */</code> and <code class="ph codeph">--</code> styles
+      are used in the syntax and examples throughout this section.
+      With the <code class="ph codeph">/* */</code> or <code class="ph codeph">--</code> notation for
+      hints, specify a <code class="ph codeph">+</code> symbol immediately before the first hint name.
+      Multiple hints can be specified separated by commas, for example
+      <code class="ph codeph">/* +clustered,shuffle */</code>
     </p>
 
 <pre class="pre codeblock"><code>SELECT STRAIGHT_JOIN <var class="keyword varname">select_list</var> FROM
@@ -76,6 +89,20 @@ INSERT <var class="keyword varname">insert_clauses</var>
 INSERT <var class="keyword varname">insert_clauses</var>
   -- +SHUFFLE|NOSHUFFLE
   SELECT <var class="keyword varname">remainder_of_query</var>;
+
+<span class="ph">SELECT <var class="keyword varname">select_list</var> FROM
+<var class="keyword varname">table_ref</var>
+  /* +{SCHEDULE_CACHE_LOCAL | SCHEDULE_DISK_LOCAL | SCHEDULE_REMOTE}
+    [,RANDOM_REPLICA] */
+<var class="keyword varname">remainder_of_query</var>;</span>
+
+<span class="ph">INSERT <var class="keyword varname">insert_clauses</var>
+  -- +CLUSTERED
+  SELECT <var class="keyword varname">remainder_of_query</var>;
+
+INSERT <var class="keyword varname">insert_clauses</var>
+  /* +CLUSTERED */
+  SELECT <var class="keyword varname">remainder_of_query</var>;</span>
 </code></pre>
 
     <p class="p">
@@ -85,7 +112,7 @@ INSERT <var class="keyword varname">insert_clauses</var>
     <p class="p">
       With both forms of hint syntax, include the <code class="ph codeph">STRAIGHT_JOIN</code>
       keyword immediately after the <code class="ph codeph">SELECT</code> keyword to prevent Impala from
-      reordering the tables in a way that makes the hint ineffective.
+      reordering the tables in a way that makes the join-related hints ineffective.
     </p>
 
     <p class="p">
@@ -107,14 +134,14 @@ INSERT <var class="keyword varname">insert_clauses</var>
     </p>
 
     <p class="p">
-      The <code class="ph codeph">[BROADCAST]</code> and <code class="ph codeph">[SHUFFLE]</code> hints control the execution strategy for join
+      The <code class="ph codeph">/* +BROADCAST */</code> and <code class="ph codeph">/* +SHUFFLE */</code> hints control the execution strategy for join
       queries. Specify one of the following constructs immediately after the <code class="ph codeph">JOIN</code> keyword in a
       query:
     </p>
 
     <ul class="ul">
       <li class="li">
-        <code class="ph codeph">[SHUFFLE]</code> - Makes that join operation use the <span class="q">"partitioned"</span> technique, which divides
+        <code class="ph codeph">/* +SHUFFLE */</code> - Makes that join operation use the <span class="q">"partitioned"</span> technique, which divides
         up corresponding rows from both tables using a hashing algorithm, sending subsets of the rows to other
         nodes for processing. (The keyword <code class="ph codeph">SHUFFLE</code> is used to indicate a <span class="q">"partitioned join"</span>,
         because that type of join is not related to <span class="q">"partitioned tables"</span>.) Since the alternative
@@ -124,7 +151,7 @@ INSERT <var class="keyword varname">insert_clauses</var>
       </li>
 
       <li class="li">
-        <code class="ph codeph">[BROADCAST]</code> - Makes that join operation use the <span class="q">"broadcast"</span> technique that sends the
+        <code class="ph codeph">/* +BROADCAST */</code> - Makes that join operation use the <span class="q">"broadcast"</span> technique that sends the
         entire contents of the right-hand table to all nodes involved in processing the join. This is the default
         mode of operation when table and index statistics are unavailable, so you would typically only need it if
         stale metadata caused Impala to mistakenly choose a partitioned join operation. Typically, broadcast joins
@@ -142,24 +169,21 @@ INSERT <var class="keyword varname">insert_clauses</var>
         the <code class="ph codeph">INSERT</code> statement to fine-tune the overall performance of the operation and its
         resource usage:
         <ul class="ul">
-          <li class="li">
-            These hints are available in Impala 1.2.2 and higher.
-          </li>
 
           <li class="li">
-            You would only use these hints if an <code class="ph codeph">INSERT</code> into a partitioned Parquet table was
+            You would only use hints if an <code class="ph codeph">INSERT</code> into a partitioned Parquet table was
             failing due to capacity limits, or if such an <code class="ph codeph">INSERT</code> was succeeding but with
             less-than-optimal performance.
           </li>
 
           <li class="li">
-            To use these hints, put the hint keyword <code class="ph codeph">[SHUFFLE]</code> or <code class="ph codeph">[NOSHUFFLE]</code>
+            To use a hint to influence the join order, put the hint keyword <code class="ph codeph">/* +SHUFFLE */</code> or <code class="ph codeph">/* +NOSHUFFLE */</code>
             (including the square brackets) after the <code class="ph codeph">PARTITION</code> clause, immediately before the
             <code class="ph codeph">SELECT</code> keyword.
           </li>
 
           <li class="li">
-            <code class="ph codeph">[SHUFFLE]</code> selects an execution plan that minimizes the number of files being written
+            <code class="ph codeph">/* +SHUFFLE */</code> selects an execution plan that reduces the number of files being written
             simultaneously to HDFS, and the number of memory buffers holding data for individual partitions. Thus
             it reduces overall resource usage for the <code class="ph codeph">INSERT</code> operation, allowing some
             <code class="ph codeph">INSERT</code> operations to succeed that otherwise would fail. It does involve some data
@@ -168,29 +192,72 @@ INSERT <var class="keyword varname">insert_clauses</var>
           </li>
 
           <li class="li">
-            <code class="ph codeph">[NOSHUFFLE]</code> selects an execution plan that might be faster overall, but might also
+            <code class="ph codeph">/* +NOSHUFFLE */</code> selects an execution plan that might be faster overall, but might also
             produce a larger number of small data files or exceed capacity limits, causing the
-            <code class="ph codeph">INSERT</code> operation to fail. Use <code class="ph codeph">[SHUFFLE]</code> in cases where an
+            <code class="ph codeph">INSERT</code> operation to fail. Use <code class="ph codeph">/* +SHUFFLE */</code> in cases where an
             <code class="ph codeph">INSERT</code> statement fails or runs inefficiently due to all nodes attempting to construct
             data for all partitions.
           </li>
 
           <li class="li">
-            Impala automatically uses the <code class="ph codeph">[SHUFFLE]</code> method if any partition key column in the
+            Impala automatically uses the <code class="ph codeph">/* +SHUFFLE */</code> method if any partition key column in the
             source table, mentioned in the <code class="ph codeph">INSERT ... SELECT</code> query, does not have column
-            statistics. In this case, only the <code class="ph codeph">[NOSHUFFLE]</code> hint would have any effect.
+            statistics. In this case, only the <code class="ph codeph">/* +NOSHUFFLE */</code> hint would have any effect.
           </li>
 
           <li class="li">
             If column statistics are available for all partition key columns in the source table mentioned in the
-            <code class="ph codeph">INSERT ... SELECT</code> query, Impala chooses whether to use the <code class="ph codeph">[SHUFFLE]</code>
-            or <code class="ph codeph">[NOSHUFFLE]</code> technique based on the estimated number of distinct values in those
+            <code class="ph codeph">INSERT ... SELECT</code> query, Impala chooses whether to use the <code class="ph codeph">/* +SHUFFLE */</code>
+            or <code class="ph codeph">/* +NOSHUFFLE */</code> technique based on the estimated number of distinct values in those
             columns and the number of nodes involved in the <code class="ph codeph">INSERT</code> operation. In this case, you
-            might need the <code class="ph codeph">[SHUFFLE]</code> or the <code class="ph codeph">[NOSHUFFLE]</code> hint to override the
+            might need the <code class="ph codeph">/* +SHUFFLE */</code> or the <code class="ph codeph">/* +NOSHUFFLE */</code> hint to override the
             execution plan selected by Impala.
           </li>
+
+          <li class="li">
+            In <span class="keyword">Impala 2.8</span> or higher, you can make the
+            <code class="ph codeph">INSERT</code> operation organize (<span class="q">"cluster"</span>)
+            the data for each partition to avoid buffering data for multiple partitions
+            and reduce the risk of an out-of-memory condition. Specify the hint as
+            <code class="ph codeph">/* +CLUSTERED */</code>. This technique is primarily
+            useful for inserts into Parquet tables, where the large block
+            size requires substantial memory to buffer data for multiple
+            output files at once.
+          </li>
+
         </ul>
       </div>
+
+    <p class="p">
+      <strong class="ph b">Hints for scheduling of HDFS blocks:</strong>
+    </p>
+
+    <p class="p">
+      The hints <code class="ph codeph">/* +SCHEDULE_CACHE_LOCAL */</code>,
+      <code class="ph codeph">/* +SCHEDULE_DISK_LOCAL */</code>, and
+      <code class="ph codeph">/* +SCHEDULE_REMOTE */</code> have the same effect
+      as specifying the <code class="ph codeph">REPLICA_PREFERENCE</code> query
+      option with the respective option settings of <code class="ph codeph">CACHE_LOCAL</code>,
+      <code class="ph codeph">DISK_LOCAL</code>, or <code class="ph codeph">REMOTE</code>.
+      The hint <code class="ph codeph">/* +RANDOM_REPLICA */</code> is the same as
+      enabling the <code class="ph codeph">SCHEDULE_RANDOM_REPLICA</code> query option.
+    </p>
+
+    <p class="p">
+      You can use these hints in combination by separating them with commas,
+      for example, <code class="ph codeph">/* +SCHEDULE_CACHE_LOCAL,RANDOM_REPLICA */</code>.
+      See <a class="xref" href="impala_replica_preference.html">REPLICA_PREFERENCE Query Option (Impala 2.7 or higher only)</a> and
+      <a class="xref" href="impala_schedule_random_replica.html">SCHEDULE_RANDOM_REPLICA Query Option (Impala 2.5 or higher only)</a> for information about how
+      these settings influence the way Impala processes HDFS data blocks.
+    </p>
+
+    <p class="p">
+      Specifying the replica preference as a query hint always overrides the
+      query option setting. Specifying either the <code class="ph codeph">SCHEDULE_RANDOM_REPLICA</code>
+      query option or the corresponding <code class="ph codeph">RANDOM_REPLICA</code> query hint
+      enables the random tie-breaking behavior when processing data blocks
+      during the query.
+    </p>
 
     <p class="p">
       <strong class="ph b">Suggestions versus directives:</strong>
@@ -228,7 +295,7 @@ INSERT <var class="keyword varname">insert_clauses</var>
     </p>
 
     <p class="p">
-      In particular, the <code class="ph codeph">[BROADCAST]</code> and <code class="ph codeph">[SHUFFLE]</code> hints are expected to be
+      In particular, the <code class="ph codeph">/* +BROADCAST */</code> and <code class="ph codeph">/* +SHUFFLE */</code> hints are expected to be
       needed much less frequently in Impala 1.2.2 and higher, because the join order optimization feature in
       combination with the <code class="ph codeph">COMPUTE STATS</code> statement now automatically choose join order and join
       mechanism without the need to rewrite the query and add hints. See
@@ -263,21 +330,21 @@ INSERT <var class="keyword varname">insert_clauses</var>
     <p class="p">
       For example, this query joins a large customer table with a small lookup table of less than 100 rows. The
       right-hand table can be broadcast efficiently to all nodes involved in the join. Thus, you would use the
-      <code class="ph codeph">[broadcast]</code> hint to force a broadcast join strategy:
+      <code class="ph codeph">/* +broadcast */</code> hint to force a broadcast join strategy:
     </p>
 
 <pre class="pre codeblock"><code>select straight_join customer.address, state_lookup.state_name
-  from customer join <strong class="ph b">[broadcast]</strong> state_lookup
+  from customer join <strong class="ph b">/* +broadcast */</strong> state_lookup
   on customer.state_id = state_lookup.state_id;</code></pre>
 
     <p class="p">
       This query joins two large tables of unpredictable size. You might benchmark the query with both kinds of
       hints and find that it is more efficient to transmit portions of each table to other nodes for processing.
-      Thus, you would use the <code class="ph codeph">[shuffle]</code> hint to force a partitioned join strategy:
+      Thus, you would use the <code class="ph codeph">/* +shuffle */</code> hint to force a partitioned join strategy:
     </p>
 
 <pre class="pre codeblock"><code>select straight_join weather.wind_velocity, geospatial.altitude
-  from weather join <strong class="ph b">[shuffle]</strong> geospatial
+  from weather join <strong class="ph b">/* +shuffle */</strong> geospatial
   on weather.lat = geospatial.lat and weather.long = geospatial.long;</code></pre>
 
     <p class="p">
@@ -289,7 +356,7 @@ INSERT <var class="keyword varname">insert_clauses</var>
     </p>
 
 <pre class="pre codeblock"><code>select straight_join t1.name, t2.id, t3.price
-  from t1 join <strong class="ph b">[shuffle]</strong> t2 join <strong class="ph b">[broadcast]</strong> t3
+  from t1 join <strong class="ph b">/* +shuffle */</strong> t2 join <strong class="ph b">/* +broadcast */</strong> t3
   on t1.id = t2.id and t2.id = t3.id;</code></pre>
 
     

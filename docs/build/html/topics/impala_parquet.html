@@ -170,24 +170,21 @@
         the <code class="ph codeph">INSERT</code> statement to fine-tune the overall performance of the operation and its
         resource usage:
         <ul class="ul">
-          <li class="li">
-            These hints are available in Impala 1.2.2 and higher.
-          </li>
 
           <li class="li">
-            You would only use these hints if an <code class="ph codeph">INSERT</code> into a partitioned Parquet table was
+            You would only use hints if an <code class="ph codeph">INSERT</code> into a partitioned Parquet table was
             failing due to capacity limits, or if such an <code class="ph codeph">INSERT</code> was succeeding but with
             less-than-optimal performance.
           </li>
 
           <li class="li">
-            To use these hints, put the hint keyword <code class="ph codeph">[SHUFFLE]</code> or <code class="ph codeph">[NOSHUFFLE]</code>
+            To use a hint to influence the join order, put the hint keyword <code class="ph codeph">/* +SHUFFLE */</code> or <code class="ph codeph">/* +NOSHUFFLE */</code>
             (including the square brackets) after the <code class="ph codeph">PARTITION</code> clause, immediately before the
             <code class="ph codeph">SELECT</code> keyword.
           </li>
 
           <li class="li">
-            <code class="ph codeph">[SHUFFLE]</code> selects an execution plan that minimizes the number of files being written
+            <code class="ph codeph">/* +SHUFFLE */</code> selects an execution plan that reduces the number of files being written
             simultaneously to HDFS, and the number of memory buffers holding data for individual partitions. Thus
             it reduces overall resource usage for the <code class="ph codeph">INSERT</code> operation, allowing some
             <code class="ph codeph">INSERT</code> operations to succeed that otherwise would fail. It does involve some data
@@ -196,27 +193,39 @@
           </li>
 
           <li class="li">
-            <code class="ph codeph">[NOSHUFFLE]</code> selects an execution plan that might be faster overall, but might also
+            <code class="ph codeph">/* +NOSHUFFLE */</code> selects an execution plan that might be faster overall, but might also
             produce a larger number of small data files or exceed capacity limits, causing the
-            <code class="ph codeph">INSERT</code> operation to fail. Use <code class="ph codeph">[SHUFFLE]</code> in cases where an
+            <code class="ph codeph">INSERT</code> operation to fail. Use <code class="ph codeph">/* +SHUFFLE */</code> in cases where an
             <code class="ph codeph">INSERT</code> statement fails or runs inefficiently due to all nodes attempting to construct
             data for all partitions.
           </li>
 
           <li class="li">
-            Impala automatically uses the <code class="ph codeph">[SHUFFLE]</code> method if any partition key column in the
+            Impala automatically uses the <code class="ph codeph">/* +SHUFFLE */</code> method if any partition key column in the
             source table, mentioned in the <code class="ph codeph">INSERT ... SELECT</code> query, does not have column
-            statistics. In this case, only the <code class="ph codeph">[NOSHUFFLE]</code> hint would have any effect.
+            statistics. In this case, only the <code class="ph codeph">/* +NOSHUFFLE */</code> hint would have any effect.
           </li>
 
           <li class="li">
             If column statistics are available for all partition key columns in the source table mentioned in the
-            <code class="ph codeph">INSERT ... SELECT</code> query, Impala chooses whether to use the <code class="ph codeph">[SHUFFLE]</code>
-            or <code class="ph codeph">[NOSHUFFLE]</code> technique based on the estimated number of distinct values in those
+            <code class="ph codeph">INSERT ... SELECT</code> query, Impala chooses whether to use the <code class="ph codeph">/* +SHUFFLE */</code>
+            or <code class="ph codeph">/* +NOSHUFFLE */</code> technique based on the estimated number of distinct values in those
             columns and the number of nodes involved in the <code class="ph codeph">INSERT</code> operation. In this case, you
-            might need the <code class="ph codeph">[SHUFFLE]</code> or the <code class="ph codeph">[NOSHUFFLE]</code> hint to override the
+            might need the <code class="ph codeph">/* +SHUFFLE */</code> or the <code class="ph codeph">/* +NOSHUFFLE */</code> hint to override the
             execution plan selected by Impala.
           </li>
+
+          <li class="li">
+            In <span class="keyword">Impala 2.8</span> or higher, you can make the
+            <code class="ph codeph">INSERT</code> operation organize (<span class="q">"cluster"</span>)
+            the data for each partition to avoid buffering data for multiple partitions
+            and reduce the risk of an out-of-memory condition. Specify the hint as
+            <code class="ph codeph">/* +CLUSTERED */</code>. This technique is primarily
+            useful for inserts into Parquet tables, where the large block
+            size requires substantial memory to buffer data for multiple
+            output files at once.
+          </li>
+
         </ul>
       </div>
 
@@ -403,6 +412,25 @@
         to 134217728 (128 MB) to match the row group size of those files. If most S3 queries involve
         Parquet files written by Impala, increase <code class="ph codeph">fs.s3a.block.size</code>
         to 268435456 (256 MB) to match the row group size produced by Impala.
+      </p>
+
+      <p class="p">
+        In <span class="keyword">Impala 2.9</span> and higher, Parquet files written by Impala include
+        embedded metadata specifying the minimum and maximum values for each column, within
+        each row group and each data page within the row group. Impala-written Parquet files
+        typically contain a single row group; a row group can contain many data pages.
+        Impala uses this information (currently, only the metadata for each row group)
+        when reading each Parquet data file during a query, to quickly determine whether each
+        row group within the file potentially includes any rows that match the conditions in the
+        <code class="ph codeph">WHERE</code> clause. For example, if the column <code class="ph codeph">X</code> within
+        a particular Parquet file has a minimum value of 1 and a maximum value of 100, then
+        a query including the clause <code class="ph codeph">WHERE x &gt; 200</code> can quickly determine
+        that it is safe to skip that particular file, instead of scanning all the associated
+        column values. This optimization technique is especially effective for tables that
+        use the <code class="ph codeph">SORT BY</code> clause for the columns most frequently checked in
+        <code class="ph codeph">WHERE</code> clauses, because any <code class="ph codeph">INSERT</code> operation on
+        such tables produces Parquet data files with relatively narrow ranges of column values
+        within each file.
       </p>
 
     </div>
@@ -1372,6 +1400,7 @@ INT96 -&gt; TIMESTAMP
       </p>
 
 <pre class="pre codeblock"><code>BINARY + OriginalType UTF8 -&gt; STRING
+BINARY + OriginalType ENUM -&gt; STRING
 BINARY + OriginalType DECIMAL -&gt; DECIMAL
 </code></pre>
 

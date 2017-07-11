@@ -52,6 +52,21 @@
     </p>
 
     <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+    
+    <p class="p">
+        Impala does not evaluate NaN (not a number) as equal to any other numeric values,
+        including other NaN values. For example, the following statement, which evaluates equality
+        between two NaN values, returns <code class="ph codeph">false</code>:
+      </p>
+
+<pre class="pre codeblock"><code>
+SELECT CAST('nan' AS FLOAT)=CAST('nan' AS FLOAT);
+</code></pre>
+
+    <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
 

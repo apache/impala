@@ -228,6 +228,24 @@ select most_profitable_location(store_id, sales, expenses, tax_rate, depreciatio
           </li>
         </ol>
 
+        <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+          <div class="p">
+        In <span class="keyword">Impala 2.9</span> and higher, you can refresh the user-defined functions (UDFs)
+        that Impala recognizes, at the database level, by running the <code class="ph codeph">REFRESH FUNCTIONS</code>
+        statement with the database name as an argument. Java-based UDFs can be added to the metastore
+        database through Hive <code class="ph codeph">CREATE FUNCTION</code> statements, and made visible to Impala
+        by subsequently running <code class="ph codeph">REFRESH FUNCTIONS</code>. For example:
+
+<pre class="pre codeblock"><code>CREATE DATABASE shared_udfs;
+USE shared_udfs;
+...use CREATE FUNCTION statements in Hive to create some Java-based UDFs
+   that Impala is not initially aware of...
+REFRESH FUNCTIONS shared_udfs;
+SELECT udf_created_by_hive(c1) FROM ...
+</code></pre>
+      </div>
+        </div>
+
         <div class="example"><h4 class="title sectiontitle">Java UDF Example: Reusing lower() Function</h4>
 
           

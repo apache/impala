@@ -488,6 +488,60 @@ END</code></pre>
 
       
 
+        <dt class="dt dlterm" id="conditional_functions__nvl2">
+          <code class="ph codeph">nvl2(type a, type ifNull, type ifNotNull)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Enhanced variant of the <code class="ph codeph">nvl()</code> function. Tests an expression
+          and returns different result values depending on whether it is <code class="ph codeph">NULL</code> or not.
+          If the first argument is <code class="ph codeph">NULL</code>, returns the second argument.
+          If the first argument is not <code class="ph codeph">NULL</code>, returns the third argument.
+          Equivalent to the <code class="ph codeph">nvl2()</code> function from Oracle Database.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> Same as the first argument value
+          </p>
+          <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.9.0</span>
+      </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+          <p class="p">
+            The following examples show how a query can use special indicator values
+            to represent null and not-null expression values. The first example tests
+            an <code class="ph codeph">INT</code> column and so uses special integer values.
+            The second example tests a <code class="ph codeph">STRING</code> column and so uses
+            special string values.
+          </p>
+<pre class="pre codeblock"><code>
+select x, nvl2(x, 999, 0) from nvl2_demo;
++------+---------------------------+
+| x    | if(x is not null, 999, 0) |
++------+---------------------------+
+| NULL | 0                         |
+| 1    | 999                       |
+| NULL | 0                         |
+| 2    | 999                       |
++------+---------------------------+
+
+select s, nvl2(s, 'is not null', 'is null') from nvl2_demo;
++------+---------------------------------------------+
+| s    | if(s is not null, 'is not null', 'is null') |
++------+---------------------------------------------+
+| NULL | is null                                     |
+| one  | is not null                                 |
+| NULL | is null                                     |
+| two  | is not null                                 |
++------+---------------------------------------------+
+</code></pre>
+        </dd>
+
+      
+
+      
+
         <dt class="dt dlterm" id="conditional_functions__zeroifnull">
           <code class="ph codeph">zeroifnull(<var class="keyword varname">numeric_expr</var>)</code>
         </dt>

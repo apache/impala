@@ -169,7 +169,7 @@ select now(), current_timestamp();
 | 2016-05-19 16:10:14.237849000 | 2016-05-19 16:10:14.237849000 |
 +-------------------------------+-------------------------------+
 
-select current_timestamp() as right_now,            
+select current_timestamp() as right_now,
   current_timestamp() + interval 3 hours as in_three_hours;
 +-------------------------------+-------------------------------+
 | right_now                     | in_three_hours                |
@@ -391,7 +391,7 @@ select date_sub(cast('2016-05-31' as timestamp), interval 1 months) as 'april_31
         <strong class="ph b">Examples:</strong>
       </p>
           <p class="p">
-            The following example shows how comparing a <span class="q">"late"</span> value with 
+            The following example shows how comparing a <span class="q">"late"</span> value with
             an <span class="q">"earlier"</span> value produces a positive number. In this case,
             the result is (365 * 5) + 1, because one of the intervening years is
             a leap year.
@@ -713,9 +713,10 @@ select now() as right_now, days_sub(now(), 31) as 31_days_ago;
           
           <strong class="ph b">Purpose:</strong> Returns one of the numeric date or time fields from a <code class="ph codeph">TIMESTAMP</code> value.
           <p class="p">
-            <strong class="ph b">Unit argument:</strong> The <code class="ph codeph">unit</code> string can be one of <code class="ph codeph">year</code>,
-            <code class="ph codeph">month</code>, <code class="ph codeph">day</code>, <code class="ph codeph">hour</code>, <code class="ph codeph">minute</code>,
-            <code class="ph codeph">second</code>, or <code class="ph codeph">millisecond</code>. This argument value is case-insensitive.
+            <strong class="ph b">Unit argument:</strong> The <code class="ph codeph">unit</code> string can be one of <code class="ph codeph">epoch</code>,
+            <code class="ph codeph">year</code>, <code class="ph codeph">month</code>, <code class="ph codeph">day</code>, <code class="ph codeph">hour</code>,
+            <code class="ph codeph">minute</code>, <code class="ph codeph">second</code>, or <code class="ph codeph">millisecond</code>.
+            This argument value is case-insensitive.
           </p>
           <div class="p">
             In Impala 2.0 and higher, you can use special syntax rather than a regular function call, for
@@ -754,8 +755,8 @@ select now() as right_now,
 +-------------------------------+-----------+------------+
 
 select now() as right_now,
-  extract(day from now()) as this_day,  
-  extract(hour from now()) as this_hour;  
+  extract(day from now()) as this_day,
+  extract(hour from now()) as this_hour;
 +-------------------------------+----------+-----------+
 | right_now                     | this_day | this_hour |
 +-------------------------------+----------+-----------+
@@ -1696,6 +1697,14 @@ with t1 as (select trunc(now(), 'dd') as today)
             <strong class="ph b">Return type:</strong> <code class="ph codeph">timestamp</code>
           </p>
           <p class="p">
+        <strong class="ph b">Kudu considerations:</strong>
+      </p>
+          <p class="p">
+        The nanosecond portion of an Impala <code class="ph codeph">TIMESTAMP</code> value
+        is rounded to the nearest microsecond when that value is stored in a
+        Kudu table.
+      </p>
+          <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
 <pre class="pre codeblock"><code>
@@ -1731,6 +1740,14 @@ select now() as right_now, nanoseconds_add(now(), 1e9) as 1_second_later;
           <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">timestamp</code>
           </p>
+          <p class="p">
+        <strong class="ph b">Kudu considerations:</strong>
+      </p>
+          <p class="p">
+        The nanosecond portion of an Impala <code class="ph codeph">TIMESTAMP</code> value
+        is rounded to the nearest microsecond when that value is stored in a
+        Kudu table.
+      </p>
 <pre class="pre codeblock"><code>
 select now() as right_now, nanoseconds_sub(now(), 1) as 1_nanosecond_earlier;
 +-------------------------------+-------------------------------+

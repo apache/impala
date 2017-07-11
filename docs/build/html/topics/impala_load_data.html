@@ -258,6 +258,22 @@ Returned 1 row(s) in 0.62s</code></pre>
     <p class="p">See <a class="xref" href="impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about reading and writing S3 data with Impala.</p>
 
     <p class="p">
+        <strong class="ph b">ADLS considerations:</strong>
+      </p>
+    <p class="p">
+        In <span class="keyword">Impala 2.9</span> and higher, the Impala DML statements (<code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>,
+        and <code class="ph codeph">CREATE TABLE AS SELECT</code>) can write data into a table or partition that resides in the
+        Azure Data Lake Store (ADLS).
+        The syntax of the DML statements is the same as for any other tables, because the ADLS location for tables and
+        partitions is specified by an <code class="ph codeph">adl://</code> prefix in the
+        <code class="ph codeph">LOCATION</code> attribute of
+        <code class="ph codeph">CREATE TABLE</code> or <code class="ph codeph">ALTER TABLE</code> statements.
+        If you bring data into ADLS using the normal ADLS transfer mechanisms instead of Impala DML statements,
+        issue a <code class="ph codeph">REFRESH</code> statement for the table before using Impala to query the ADLS data.
+      </p>
+    <p class="p">See <a class="xref" href="impala_adls.html#adls">Using Impala with the Azure Data Lake Store (ADLS)</a> for details about reading and writing ADLS data with Impala.</p>
+
+    <p class="p">
         <strong class="ph b">Cancellation:</strong> Cannot be cancelled.
       </p>
 

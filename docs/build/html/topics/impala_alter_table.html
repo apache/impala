@@ -57,7 +57,10 @@ statsKey ::= numDVs | numNulls | avgSize | maxSize</span>
 
 <var class="keyword varname">new_name</var> ::= [<var class="keyword varname">new_database</var>.]<var class="keyword varname">new_table_name</var>
 
-<var class="keyword varname">col_spec</var> ::= <var class="keyword varname">col_name</var> <var class="keyword varname">type_name</var>
+<var class="keyword varname">col_spec</var> ::= <var class="keyword varname">col_name</var> <var class="keyword varname">type_name</var> <span class="ph">[<var class="keyword varname">kudu_attributes</var>]</span>
+
+<span class="ph"><var class="keyword varname">kudu_attributes</var> ::= { [NOT] NULL | ENCODING <var class="keyword varname">codec</var> | COMPRESSION <var class="keyword varname">algorithm</var> |
+  DEFAULT <var class="keyword varname">constant</var> | BLOCK_SIZE <var class="keyword varname">number</var> }</span>
 
 <var class="keyword varname">partition_spec</var> ::= <var class="keyword varname">simple_partition_spec</var> | <span class="ph"><var class="keyword varname">complex_partition_spec</var></span>
 
@@ -465,7 +468,7 @@ yes,no</code></pre>
       See <a class="xref" href="impala_perf_stats.html#perf_table_stats_manual">Setting the NUMROWS Value Manually through ALTER TABLE</a> for an example of using table properties to
       fine-tune the performance-related table statistics.
     </p>
-      
+
     <p class="p">
       <strong class="ph b">To manually set or update table or column statistics:</strong>
     </p>
@@ -701,7 +704,7 @@ select * from p2;
 
 alter table p2 drop column x;
 select * from p2;
-WARNINGS: 
+WARNINGS:
 File '<var class="keyword varname">hdfs_filename</var>' has an incompatible Parquet schema for column 'add_columns.p2.s3'.
 Column type: STRING, Parquet schema:
 optional int32 x [i:1 d:1 r:0]
@@ -966,6 +969,12 @@ ALTER TABLE <var class="keyword varname">table_name</var> SET TBLPROPERTIES('EXT
         </li>
         <li class="li">
           <p class="p">
+            In <span class="keyword">Impala 2.9</span> and higher, you can also specify the <code class="ph codeph">ENCODING</code>,
+            <code class="ph codeph">COMPRESSION</code>, and <code class="ph codeph">BLOCK_SIZE</code> attributes when adding a column.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
             If you add a column with a <code class="ph codeph">NOT NULL</code> attribute, it must also have a
             <code class="ph codeph">DEFAULT</code> attribute, so the default value can be assigned to that
             column for all existing rows.
@@ -981,12 +990,6 @@ ALTER TABLE <var class="keyword varname">table_name</var> SET TBLPROPERTIES('EXT
           <p class="p">
             Although you can change the name of a column with the <code class="ph codeph">CHANGE</code> clause,
             you cannot change the type of a column in a Kudu table.
-          </p>
-        </li>
-        <li class="li">
-          <p class="p">
-            You cannot assign the <code class="ph codeph">ENCODING</code>, <code class="ph codeph">COMPRESSION</code>,
-            or <code class="ph codeph">BLOCK_SIZE</code> attributes when adding a column.
           </p>
         </li>
         <li class="li">
@@ -1011,6 +1014,20 @@ ALTER TABLE <var class="keyword varname">table_name</var> SET TBLPROPERTIES('EXT
         </li>
       </ul>
     </div>
+
+    <p class="p">
+      The following are some examples of using the <code class="ph codeph">ADD COLUMNS</code> clause for a Kudu table:
+    </p>
+
+<pre class="pre codeblock"><code>
+CREATE TABLE t1 ( x INT, PRIMARY KEY (x) )
+  PARTITION BY HASH (x) PARTITIONS 16
+  STORED AS KUDU
+
+ALTER TABLE t1 ADD COLUMNS (y STRING ENCODING prefix_encoding);
+ALTER TABLE t1 ADD COLUMNS (z INT DEFAULT 10);
+ALTER TABLE t1 ADD COLUMNS (a STRING NOT NULL DEFAULT '', t TIMESTAMP COMPRESSION default_compression);
+</code></pre>
 
     <p class="p">
       Kudu tables all use an underlying partitioning mechanism. The partition syntax is different than for non-Kudu

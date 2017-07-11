@@ -25,17 +25,27 @@
       </li>
 
       <li class="li">
-        Decide how many queries will be represented in each log file. By default,
-        Impala starts a new log file every 5000 queries. To specify a different number,
+        Decide how many queries will be represented in each audit event log file. By default,
+        Impala starts a new audit event log file every 5000 queries. To specify a different number,
         <span class="ph">include
-        the option <code class="ph codeph">-max_audit_event_log_file_size=<var class="keyword varname">number_of_queries</var></code>
+        the option <code class="ph codeph">--max_audit_event_log_file_size=<var class="keyword varname">number_of_queries</var></code>
         in the <span class="keyword cmdname">impalad</span> startup options</span>.
       </li>
 
-      <li class="li"> 
+      <li class="li">
+        In <span class="keyword">Impala 2.9</span> and higher, you can control how many
+        audit event log files are kept on each host. Specify the option
+        <code class="ph codeph">--max_audit_event_log_files=<var class="keyword varname">number_of_log_files</var></code>
+        in the <span class="keyword cmdname">impalad</span> startup options. Once the limit is reached, older
+        files are rotated out using the same mechanism as for other Impala log files.
+        The default value for this setting is 0, representing an unlimited number of audit
+        event log files.
+      </li>
+
+      <li class="li">
         Use a cluster manager with governance capabilities to filter, visualize,
         and produce reports based on the audit logs collected
-        from all the hosts in the cluster. 
+        from all the hosts in the cluster.
       </li>
     </ul>
 
@@ -61,18 +71,18 @@
         <code class="ph codeph">fsync()</code> system call) to avoid loss of audit data in case of a crash.
       </p>
 
-      <p class="p"> 
+      <p class="p">
         The runtime overhead of auditing applies to whichever host serves as the coordinator
         for the query, that is, the host you connect to when you issue the query. This might
         be the same host for all queries, or different applications or users might connect to
-        and issue queries through different hosts. 
+        and issue queries through different hosts.
       </p>
 
-      <p class="p"> 
+      <p class="p">
         To avoid excessive I/O overhead on busy coordinator hosts, Impala syncs the audit log
         data (using the <code class="ph codeph">fsync()</code> system call) periodically rather than after
         every query. Currently, the <code class="ph codeph">fsync()</code> calls are issued at a fixed
-        interval, every 5 seconds. 
+        interval, every 5 seconds.
       </p>
 
       <p class="p">
@@ -92,12 +102,12 @@
 
     <div class="body conbody">
 
-      <p class="p"> 
+      <p class="p">
         The audit log files represent the query information in JSON format, one query per line.
         Typically, rather than looking at the log files themselves, you should use cluster-management
         software to consolidate the log data from all Impala hosts and filter and visualize the results
         in useful ways. (If you do examine the raw log data, you might run the files through
-        a JSON pretty-printer first.) 
+        a JSON pretty-printer first.)
      </p>
 
       <p class="p">
