@@ -1332,6 +1332,11 @@ if __name__ == "__main__":
                     "connections. Enable SSL or set --auth_creds_ok_in_clear")
     sys.exit(1)
 
+  if not options.use_ldap and options.ldap_password_cmd:
+    print_to_stderr("Option --ldap_password_cmd requires using LDAP authentication " +
+                    "mechanism (-l)")
+    sys.exit(1)
+
   if options.use_kerberos:
     print_to_stderr("Starting Impala Shell using Kerberos authentication")
     print_to_stderr("Using service name '%s'" % options.kerberos_service_name)
