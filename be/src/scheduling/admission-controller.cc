@@ -397,7 +397,7 @@ Status AdmissionController::RejectImmediately(QuerySchedule* schedule,
     reject_reason = Substitute(REASON_REQ_OVER_POOL_MEM, PrintBytes(cluster_mem_needed),
         PrintBytes(pool_cfg.max_mem_resources));
   } else if (pool_cfg.max_mem_resources > 0 &&
-      schedule->GetPerHostMemoryEstimate() >= GetProcMemLimit()) {
+      schedule->GetPerHostMemoryEstimate() > GetProcMemLimit()) {
     reject_reason = Substitute(REASON_REQ_OVER_NODE_MEM,
         PrintBytes(schedule->GetPerHostMemoryEstimate()), PrintBytes(GetProcMemLimit()));
   } else if (stats->agg_num_queued() >= pool_cfg.max_queued) {

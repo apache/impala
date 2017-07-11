@@ -315,6 +315,22 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       assert re.search("Rejected query from pool default-pool : request memory needed "
           ".* is greater than pool max mem resources 10.00 MB", str(ex))
 
+  # Process mem_limit used in test_mem_limit_upper_bound
+  PROC_MEM_TEST_LIMIT = 1024 * 1024 * 1024
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_flags(1, 1, 10 * PROC_MEM_TEST_LIMIT,
+          PROC_MEM_TEST_LIMIT))
+  def test_mem_limit_upper_bound(self, vector):
+    """ Test to ensure that a query is admitted if the requested memory is equal to the
+    process mem limit"""
+    query = "select * from functional.alltypesagg limit 1"
+    exec_options = vector.get_value('exec_option')
+    # Setting requested memory equal to process memory limit
+    exec_options['mem_limit'] = self.PROC_MEM_TEST_LIMIT
+    self.execute_query_expect_success(self.client, query, exec_options)
+
 class TestAdmissionControllerStress(TestAdmissionControllerBase):
   """Submits a number of queries (parameterized) with some delay between submissions
   (parameterized) and the ability to submit to one impalad or many in a round-robin
