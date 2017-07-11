@@ -608,7 +608,7 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
     // Finished up all probe rows for 'hash_partitions_'. We may have already cleaned up
     // the hash partitions, e.g. if we had to output some unmatched build rows below.
     if (builder_->num_hash_partitions() != 0) {
-      RETURN_IF_ERROR(CleanUpHashPartitions(out_batch));
+      RETURN_IF_ERROR(CleanUpHashPartitions(state, out_batch));
       if (out_batch->AtCapacity()) break;
     }
 
@@ -914,7 +914,8 @@ Status PartitionedHashJoinNode::OutputNullAwareProbeRows(RuntimeState* state,
     RETURN_IF_ERROR(probe_stream->GetNext(probe_batch_.get(), &eos));
 
     if (probe_batch_->num_rows() == 0) {
-      RETURN_IF_ERROR(EvaluateNullProbe(builder_->null_aware_partition()->build_rows()));
+      RETURN_IF_ERROR(EvaluateNullProbe(
+            state, builder_->null_aware_partition()->build_rows()));
       nulls_build_batch_.reset();
       RETURN_IF_ERROR(PrepareNullAwareNullProbe());
       return Status::OK();
@@ -994,7 +995,8 @@ void PartitionedHashJoinNode::CreateProbePartition(
       this, builder_->hash_partition(partition_idx), std::move(probe_rows));
 }
 
-Status PartitionedHashJoinNode::EvaluateNullProbe(BufferedTupleStream* build) {
+Status PartitionedHashJoinNode::EvaluateNullProbe(
+    RuntimeState* state, BufferedTupleStream* build) {
   if (null_probe_rows_ == NULL || null_probe_rows_->num_rows() == 0) {
     return Status::OK();
   }
@@ -1011,13 +1013,17 @@ Status PartitionedHashJoinNode::EvaluateNullProbe(BufferedTupleStream* build) {
 
   ScalarExprEvaluator* const* join_conjunct_evals = other_join_conjunct_evals_.data();
   int num_join_conjuncts = other_join_conjuncts_.size();
-
   DCHECK_LE(probe_rows->num_rows(), matched_null_probe_.size());
   // For each row, iterate over all rows in the build table.
   SCOPED_TIMER(null_aware_eval_timer_);
   for (int i = 0; i < probe_rows->num_rows(); ++i) {
+    // This loop may run for a long time. Check for cancellation.
+    RETURN_IF_CANCELLED(state);
     if (matched_null_probe_[i]) continue;
     for (int j = 0; j < build_rows->num_rows(); ++j) {
+      // This loop may run for a long time if the number of build_rows is large.
+      // Periodically check for cancellation.
+      if (j % 1024 == 0) RETURN_IF_CANCELLED(state);
       CreateOutputRow(semi_join_staging_row_, probe_rows->GetRow(i),
           build_rows->GetRow(j));
       if (ExecNode::EvalConjuncts(
@@ -1031,7 +1037,8 @@ Status PartitionedHashJoinNode::EvaluateNullProbe(BufferedTupleStream* build) {
   return Status::OK();
 }
 
-Status PartitionedHashJoinNode::CleanUpHashPartitions(RowBatch* batch) {
+Status PartitionedHashJoinNode::CleanUpHashPartitions(
+    RuntimeState* state, RowBatch* batch) {
   DCHECK_EQ(probe_batch_pos_, -1);
   // At this point all the rows have been read from the probe side for all partitions in
   // hash_partitions_.
@@ -1090,7 +1097,7 @@ Status PartitionedHashJoinNode::CleanUpHashPartitions(RowBatch* batch) {
         // For NAAJ, we need to try to match all the NULL probe rows with this partition
         // before closing it. The NULL probe rows could have come from any partition
         // so we collect them all and match them at the end.
-        RETURN_IF_ERROR(EvaluateNullProbe(build_partition->build_rows()));
+        RETURN_IF_ERROR(EvaluateNullProbe(state, build_partition->build_rows()));
         build_partition->Close(batch);
       } else {
         build_partition->Close(batch);
