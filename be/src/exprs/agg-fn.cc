@@ -50,7 +50,7 @@ AggFn::AggFn(const TExprNode& tnode, const SlotDescriptor& intermediate_slot_des
     agg_op_ = MIN;
   } else if (fn_name == "max") {
     agg_op_ = MAX;
-  } else if (fn_name == "sum") {
+  } else if (fn_name == "sum" || fn_name == "sum_init_zero") {
     agg_op_ = SUM;
   } else if (fn_name == "avg") {
     agg_op_ = AVG;

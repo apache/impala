@@ -1587,10 +1587,15 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
     } else {
       result = builder.CreateAdd(dst_value, src.GetVal());
     }
-    // Dst may have been NULL, make sure to unset the NULL bit.
-    DCHECK(slot_desc->is_nullable());
-    slot_desc->CodegenSetNullIndicator(
-        codegen, &builder, agg_tuple_arg, codegen->false_value());
+
+    if (slot_desc->is_nullable()) {
+      slot_desc->CodegenSetNullIndicator(
+          codegen, &builder, agg_tuple_arg, codegen->false_value());
+    } else {
+      // 'slot_desc' is not nullable if the aggregate function is sum_init_zero(),
+      // because the slot is initialized to be zero and the null bit is nonexistent.
+      DCHECK_EQ(agg_fn->fn_name(), "sum_init_zero");
+    }
   } else {
     // The remaining cases are implemented using the UDA interface.
     // Create intermediate argument 'dst' from 'dst_value'
