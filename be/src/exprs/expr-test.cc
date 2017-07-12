@@ -5788,6 +5788,9 @@ TEST_F(ExprTest, TimestampFunctions) {
 
   // next_day udf test for IMPALA-2459
   TestNextDayFunction();
+
+  // last_day udf test for IMPALA-5316
+  TestLastDayFunction();
 }
 
 TEST_F(ExprTest, ConditionalFunctions) {
