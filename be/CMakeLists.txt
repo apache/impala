@@ -350,27 +350,28 @@ if (BUILD_SHARED_LIBS)
 endif ()
 
 set (IMPALA_DEPENDENCIES
-  ${SNAPPY_STATIC_LIB}
-  ${LZ4_STATIC_LIB}
-  ${RE2_STATIC_LIB}
+  snappy
+  lz4
+  re2
   ${Boost_LIBRARIES}
   ${LLVM_MODULE_LIBS}
-  thriftstatic
-  ${SASL_LIBRARY}
-  ${LDAP_LIBRARY}
-  ${LBER_LIBRARY}
+  thrift
+  cyrus_sasl
+  ldap
+  lber
   ThriftSaslTransport
-  ${OPENSSL_LIBS}
+  openssl_ssl
+  openssl_crypto
   gutil
-  glogstatic
-  gflagsstatic
-  pprofstatic
+  glog
+  gflags
+  pprof
   breakpad
-  ${HDFS_LIB}
-  ${LIBZ}
-  ${LIBBZ2}
-  ${AVRO_STATIC_LIB}
-  ${JAVA_JVM_LIBRARY}
+  hdfs
+  zlib
+  bzip2
+  avro
+  java_jvm
   kudu_client)
 
 # Add all external dependencies. They should come after the impala libs.
@@ -396,8 +397,9 @@ endif()
 # library. The result will not compile as libhdfs.a is not compiled with -fpic. The same
 # is true for other system dependencies that we don't have control over.
 set(IMPALA_LINK_LIBS_DYNAMIC_TARGETS ${IMPALA_LINK_LIBS_NO_TCMALLOC})
-list(REMOVE_ITEM IMPALA_LINK_LIBS_DYNAMIC_TARGETS HDFS_STATIC)
-set(IMPALA_LINK_LIBS_DYNAMIC_TARGETS ${IMPALA_LINK_LIBS_DYNAMIC_TARGETS} ${HDFS_LIBRARIES})
+list(REMOVE_ITEM IMPALA_LINK_LIBS_DYNAMIC_TARGETS hdfs)
+set(IMPALA_LINK_LIBS_DYNAMIC_TARGETS ${IMPALA_LINK_LIBS_DYNAMIC_TARGETS}
+  ${HDFS_SHARED_LIB})
 
 # Link libs for test executables.  Although not all tests need all libs,
 # the build time for the tests is rather small and not worth the trouble.

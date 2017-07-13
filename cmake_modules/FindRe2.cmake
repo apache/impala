@@ -22,7 +22,6 @@
 # This module defines
 #  RE2_INCLUDE_DIR, directory containing headers
 #  RE2_STATIC_LIB, path to libsnappy.a
-#  re2 imported static library
 
 set(RE2_SEARCH_HEADER_PATHS
   ${RE2_ROOT}/include
@@ -61,14 +60,11 @@ if (NOT RE2_INCLUDE_DIR OR NOT RE2_LIBS OR
     "Looked for headers in ${RE2_SEARCH_HEADER_PATH}, "
     "and for libs in ${RE2_SEARCH_LIB_PATH}")
 else()
-    set(RE2_FOUND TRUE)
-    add_library(re2 STATIC IMPORTED)
-    set_target_properties(re2 PROPERTIES IMPORTED_LOCATION "${RE2_STATIC_LIB}")
+  set(RE2_FOUND TRUE)
 endif ()
 
 mark_as_advanced(
   RE2_INCLUDE_DIR
   RE2_LIBS
   RE2_STATIC_LIB
-  re2
 )

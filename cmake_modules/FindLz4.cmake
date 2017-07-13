@@ -24,7 +24,6 @@
 # LZ4_INCLUDE_DIR, directory containing headers
 # LZ4_LIBS, directory containing lz4 libraries
 # LZ4_STATIC_LIB, path to liblz4.a
-# lz4 - static library
 
 set(LZ4_SEARCH_LIB_PATH
   ${LZ4_ROOT}/lib
@@ -61,13 +60,10 @@ if (NOT LZ4_LIBS OR NOT LZ4_STATIC_LIB)
   set(LZ4_FOUND FALSE)
 else()
   set(LZ4_FOUND TRUE)
-  add_library(lz4 STATIC IMPORTED)
-  set_target_properties(lz4 PROPERTIES IMPORTED_LOCATION "${LZ4_STATIC_LIB}")
 endif ()
 
 mark_as_advanced(
   LZ4_INCLUDE_DIR
   LZ4_LIBS
   LZ4_STATIC_LIB
-  lz4
 )

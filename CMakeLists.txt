@@ -118,82 +118,69 @@ if (CMAKE_DEBUG)
   set(Boost_DEBUG TRUE)
 endif()
 
+# Adds a third-party library with name ${NAME}. If BUILD_SHARED_LIBS is true, the new
+# library refers to ${SHARED_LIB}; otherwise it refers to ${STATIC_LIB}. If only one
+# library (static or shared) is provided, it is used regardless of BUILD_SHARED_LIBS. The
+# library's headers are added to the system include path.
+function(IMPALA_ADD_THIRDPARTY_LIB NAME HEADER STATIC_LIB SHARED_LIB)
+  message(STATUS "----------> Adding thirdparty library ${NAME}. <----------")
+  if (HEADER)
+    include_directories(SYSTEM ${HEADER})
+    message(STATUS "Header files: ${HEADER}")
+  endif()
+  if (NOT STATIC_LIB AND NOT SHARED_LIB)
+    message(FATAL_ERROR "Library '${NAME}' has neither shared nor static library files")
+    return ()
+  endif()
+
+  if ((BUILD_SHARED_LIBS AND SHARED_LIB) OR NOT STATIC_LIB)
+    ADD_THIRDPARTY_LIB(${NAME} SHARED_LIB ${SHARED_LIB})
+  else()
+    ADD_THIRDPARTY_LIB(${NAME} STATIC_LIB ${STATIC_LIB})
+  endif()
+endfunction()
+
+
 find_package(Boost REQUIRED COMPONENTS thread regex filesystem system date_time)
 include_directories(${Boost_INCLUDE_DIRS})
-set(LIBS ${LIBS} ${Boost_LIBRARIES})
 message(STATUS "Boost include dir: " ${Boost_INCLUDE_DIRS})
 message(STATUS "Boost libraries: " ${Boost_LIBRARIES})
 
 find_package(OpenSSL REQUIRED)
-include_directories(${OPENSSL_INCLUDE_DIR})
-set(OPENSSL_LIBS ${OPENSSL_SSL} ${OPENSSL_CRYPTO})
-message(STATUS "OpenSSL: ${OPENSSL_LIBS}")
+IMPALA_ADD_THIRDPARTY_LIB(openssl_ssl ${OPENSSL_INCLUDE_DIR} "" ${OPENSSL_SSL_LIBRARY})
+IMPALA_ADD_THIRDPARTY_LIB(openssl_crypto "" "" ${OPENSSL_CRYPTO_LIBRARY})
 
 find_package(Bzip2 REQUIRED)
-include_directories(${BZIP2_INCLUDE_DIR})
+IMPALA_ADD_THIRDPARTY_LIB(bzip2 ${BZIP2_INCLUDE_DIR} ${BZIP2_STATIC_LIBRARIES} "")
 
 find_package(Zlib REQUIRED)
-include_directories(${ZLIB_INCLUDE_DIR})
-message(STATUS "zlib: Static -> ${ZLIB_STATIC}, Other -> ${ZLIB_LIBRARIES}")
-
-if(NOT BUILD_SHARED_LIBS)
-  # Panic if we cannot find the static libraries as they are supposed to be
-  # in the toolchain.
-  if (NOT BZIP2_STATIC_FOUND)
-    message(FATAL_ERROR "bzip2 static library libbz2.a not found in $ENV{IMPALA_TOOLCHAIN}")
-  endif()
-  if (NOT ZLIB_STATIC_FOUND)
-    message(FATAL_ERROR "zlib static library libz.a not found in $ENV{IMPALA_TOOLCHAIN}")
-  endif()
-
-  set(LIBBZ2 BZIP2_STATIC)
-  set(LIBZ ZLIB_STATIC)
-else()
-  set(LIBBZ2 ${BZIP2_LIBRARIES})
-  set(LIBZ ${ZLIB_LIBRARIES})
-endif ()
+IMPALA_ADD_THIRDPARTY_LIB(zlib ${ZLIB_INCLUDE_DIR} ${ZLIB_STATIC_LIBRARIES}
+  ${ZLIB_SHARED_LIBRARIES})
 
 # find HDFS headers and libs
+set(HDFS_FIND_QUIETLY TRUE)
 find_package(HDFS REQUIRED)
-include_directories(${HDFS_INCLUDE_DIR})
-
-if(BUILD_SHARED_LIBS)
-  set(LIBS ${LIBS} ${HDFS_LIBRARIES})
-  set(HDFS_LIB ${HDFS_LIBRARIES})
-else()
-  set(LIBS ${LIBS} HDFS_STATIC)
-  set(HDFS_LIB HDFS_STATIC)
-endif()
+IMPALA_ADD_THIRDPARTY_LIB(hdfs ${HDFS_INCLUDE_DIR} ${HDFS_STATIC_LIB} ${HDFS_SHARED_LIB})
 
 # find GLog headers and libs.  Must include glog headers before the other
 # google libraries.  They all have a config.h and we want glog's to be picked
 # up first.
 find_package(GLog REQUIRED)
-include_directories(${GLOG_INCLUDE_DIR})
-set(LIBS ${LIBS} ${GLOG_LIBS})
-message(STATUS "GLog include dir: " ${GLOG_INCLUDE_DIR})
+IMPALA_ADD_THIRDPARTY_LIB(glog ${GLOG_INCLUDE_DIR} ${GLOG_STATIC_LIB} ${GLOG_SHARED_LIB})
 
-# find GFlags headers and libs (needed for GLog)
+# find GFlags headers and libs
 find_package(GFlags REQUIRED)
-include_directories(${GFLAGS_INCLUDE_DIR})
-set(LIBS ${LIBS} ${GFLAGS_LIBS})
-message(STATUS "GFlags include dir: " ${GFLAGS_INCLUDE_DIR})
-message(STATUS "GFlags lib dir: " ${GFLAGS_LIBS})
+IMPALA_ADD_THIRDPARTY_LIB(gflags ${GFLAGS_INCLUDE_DIR} ${GFLAGS_STATIC_LIB}
+  ${GFLAGS_SHARED_LIB})
 
 # find PProf libs
 find_package(PProf REQUIRED)
-include_directories(${PPROF_INCLUDE_DIR})
-set (LIBS ${LIBS} ${PPROF_LIBRARIES})
-message(STATUS "PProf include dir: " ${PPROF_INCLUDE_DIR})
-message(STATUS "PProf static lib: " ${PPROF_STATIC_LIB})
+IMPALA_ADD_THIRDPARTY_LIB(pprof ${PPROF_INCLUDE_DIR} ${PPROF_STATIC_LIB} "")
 
 # find GTest headers and libs
+set (GTEST_FIND_QUIETLY TRUE)
 find_package(GTest REQUIRED)
-include_directories(${GTEST_INCLUDE_DIR})
-set(LIBS ${LIBS} ${GTEST_LIBRARIES})
-
-message(STATUS "GTest include dir: " ${GTEST_INCLUDE_DIR})
-message(STATUS "GTest library: " ${GTEST_LIBRARY})
+IMPALA_ADD_THIRDPARTY_LIB(gtest ${GTEST_INCLUDE_DIR} ${GTEST_STATIC_LIB} "")
 
 # Use LLVM release binaries.
 set(LLVM_BINARIES_ROOT ${LLVM_ROOT})
@@ -211,23 +198,16 @@ message(STATUS "LLVM_ROOT: " ${LLVM_ROOT})
 
 find_package(Llvm REQUIRED)
 include_directories(${LLVM_INCLUDE_DIR})
-set(LIBS ${LIBS} ${LLVM_MODULE_LIBS})
 
 # find Sasl
+set(SASL_FIND_QUIETLY TRUE)
 find_package(Sasl REQUIRED)
-include_directories(${SASL_INCLUDE_DIR})
-add_library(sasllib SHARED IMPORTED)
-set_target_properties(sasllib PROPERTIES IMPORTED_LOCATION ${SASL_SHARED_LIB})
-set(SASL_LIBRARY sasllib)
-message(STATUS "Sasl include dir: " ${SASL_INCLUDE_DIR})
-message(STATUS "Sasl library: " ${SASL_LIBRARY})
+IMPALA_ADD_THIRDPARTY_LIB(cyrus_sasl ${SASL_INCLUDE_DIR} "" ${SASL_SHARED_LIB})
 
 # find openldap
 find_package(Ldap REQUIRED)
-include_directories(${LDAP_INCLUDE_DIR})
-set(LDAP_LIBRARY ldapstatic)
-set(LBER_LIBRARY lberstatic)
-message(STATUS "LDAP: ${LDAP_INCLUDE_DIR}")
+IMPALA_ADD_THIRDPARTY_LIB(ldap ${LDAP_INCLUDE_DIR} ${LDAP_STATIC_LIBRARY} "")
+IMPALA_ADD_THIRDPARTY_LIB(lber "" ${LBER_STATIC_LIBRARY} "")
 
 # The environment variable $THRIFT_HOME is set in impala-config.sh
 # Make sure it's consistent with $THRIFT_ROOT.
@@ -236,43 +216,30 @@ if (NOT ($ENV{THRIFT_HOME} STREQUAL ${THRIFT_ROOT}))
       "variable THRIFT_HOME ($ENV{THRIFT_HOME}).")
 endif()
 # find thrift headers and libs
+set(THRIFT_FIND_QUIETLY TRUE)
 find_package(Thrift REQUIRED)
-include_directories(${THRIFT_INCLUDE_DIR})
-set(LIBS ${LIBS} ${THRIFT_LIBS})
-message(STATUS "Thrift include dir: ${THRIFT_INCLUDE_DIR}")
+IMPALA_ADD_THIRDPARTY_LIB(thrift ${THRIFT_INCLUDE_DIR} ${THRIFT_STATIC_LIB} "")
+message(STATUS "Thrift version: ${THRIFT_VERSION}")
 message(STATUS "Thrift contrib dir: ${THRIFT_CONTRIB_DIR}")
-message(STATUS "Thrift library path: ${THRIFT_LIBS}")
-message(STATUS "Thrift static library: ${THRIFT_STATIC_LIB}")
 message(STATUS "Thrift compiler: ${THRIFT_COMPILER}")
 
 # find flatbuffers headers, lib and compiler
 find_package(FlatBuffers REQUIRED)
-include_directories(${FLATBUFFERS_INCLUDE_DIR})
-set(LIBS ${LIBS} ${FLATBUFFERS_LIBS})
-message(STATUS "FlatBuffers include dir: ${FLATBUFFERS_INCLUDE_DIR}")
-message(STATUS "FlatBuffers library path: ${FLATBUFFERS_LIBS}")
+IMPALA_ADD_THIRDPARTY_LIB(flatbuffers ${FLATBUFFERS_INCLUDE_DIR}
+  ${FLATBUFFERS_STATIC_LIB} "")
 message(STATUS "FlatBuffers compiler: ${FLATBUFFERS_COMPILER}")
 
 # find Snappy headers and libs
 find_package(Snappy REQUIRED)
-include_directories(${SNAPPY_INCLUDE_DIR})
-set(LIBS ${LIBS} ${SNAPPY_LIBRARIES})
-message(STATUS "Snappy include dir: " ${SNAPPY_INCLUDE_DIR})
-message(STATUS "Snappy library: " "${SNAPPY_STATIC_LIB}")
+IMPALA_ADD_THIRDPARTY_LIB(snappy ${SNAPPY_INCLUDE_DIR} ${SNAPPY_STATIC_LIB} "")
 
 # find lz4 lib
 find_package(Lz4 REQUIRED)
-include_directories(${LZ4_INCLUDE_DIR})
-set(LIBS ${LIBS} ${LZ4_LIBRARIES})
-message(STATUS "Lz4 include dir: " ${LZ4_INCLUDE_DIR})
-message(STATUS "Lz4 library: " "${LZ4_STATIC_LIB}")
+IMPALA_ADD_THIRDPARTY_LIB(lz4 ${LZ4_INCLUDE_DIR} ${LZ4_STATIC_LIB} "")
 
 # find re2 headers and libs
 find_package(Re2 REQUIRED)
-include_directories(${RE2_INCLUDE_DIR})
-set(LIBS ${LIBS} ${RE2_LIBRARIES})
-message(STATUS "Re2 include dir: " ${RE2_INCLUDE_DIR})
-message(STATUS "Re2 library: " ${RE2_STATIC_LIB})
+IMPALA_ADD_THIRDPARTY_LIB(re2 ${RE2_INCLUDE_DIR} ${RE2_STATIC_LIB} "")
 
 # find rapidjson headers
 find_package(RapidJson REQUIRED)
@@ -281,23 +248,34 @@ message(STATUS "RapidJson include dir: " ${RAPIDJSON_INCLUDE_DIR})
 
 # find Avro headers and libs
 find_package(Avro REQUIRED)
-include_directories(${AVRO_INCLUDE_DIR})
-set(LIBS ${LIBS} ${AVRO_STATIC_LIB})
-message(STATUS "Avro include dir: " ${AVRO_INCLUDE_DIR})
-message(STATUS "Avro static library: " ${AVRO_STATIC_LIB})
+IMPALA_ADD_THIRDPARTY_LIB(avro ${AVRO_INCLUDE_DIR} ${AVRO_STATIC_LIB} "")
 
-###################################################################
-# These dependencies use Kudu's CMake functions
+# find protobuf headers, libs and compiler
+find_package(Protobuf REQUIRED)
+IMPALA_ADD_THIRDPARTY_LIB(protobuf ${PROTOBUF_INCLUDE_DIR} ${PROTOBUF_STATIC_LIBRARY}
+  ${PROTOBUF_SHARED_LIBRARY})
+IMPALA_ADD_THIRDPARTY_LIB(protoc ${PROTOBUF_INCLUDE_DIR} ${PROTOBUF_PROTOC_STATIC_LIBRARY}
+  ${PROTOBUF_PROTOC_SHARED_LIBRARY})
 
-ADD_THIRDPARTY_LIB(glog
-  STATIC_LIB ${GLOG_STATIC_LIB})
-ADD_THIRDPARTY_LIB(gflags
-  STATIC_LIB ${GFLAGS_STATIC_LIB})
-ADD_THIRDPARTY_LIB(zlib
-  STATIC_LIB ${ZLIB_STATIC_LIBRARIES})
-ADD_THIRDPARTY_LIB(cyrus_sasl
-  SHARED_LIB ${SASL_SHARED_LIB})
+# find libev headers and libs
+find_package(LibEv REQUIRED)
+IMPALA_ADD_THIRDPARTY_LIB(libev ${LIBEV_INCLUDE_DIR} ${LIBEV_STATIC_LIB}
+  ${LIBEV_SHARED_LIB})
 
+# Find crcutil headers and libs
+find_package(Crcutil REQUIRED)
+IMPALA_ADD_THIRDPARTY_LIB(crcutil ${CRCUTIL_INCLUDE_DIR} ${CRCUTIL_STATIC_LIB}
+  ${CRCUTIL_SHARED_LIB})
+
+# find jni headers and libs
+find_package(JNI REQUIRED)
+IMPALA_ADD_THIRDPARTY_LIB(java_jvm "${JNI_INCLUDE_DIRS}" ${JAVA_JVM_LIBRARY} "")
+
+# find breakpad headers and libs
+find_package(Breakpad REQUIRED)
+IMPALA_ADD_THIRDPARTY_LIB(breakpad ${BREAKPAD_INCLUDE_DIR} ${BREAKPAD_STATIC_LIB} "")
+
+# System dependencies
 if (NOT APPLE)
   find_library(RT_LIB_PATH rt)
   if(NOT RT_LIB_PATH)
@@ -314,29 +292,7 @@ if (NOT APPLE)
     SHARED_LIB "${DL_LIB_PATH}")
 endif()
 
-# find protobuf headers, libs and compiler
-find_package(Protobuf REQUIRED)
-include_directories(SYSTEM ${PROTOBUF_INCLUDE_DIR})
-message(STATUS "Protobuf include dir: " ${PROTOBUF_INCLUDE_DIR})
-
-ADD_THIRDPARTY_LIB(protobuf
-  STATIC_LIB "${PROTOBUF_STATIC_LIBRARY}")
-ADD_THIRDPARTY_LIB(protoc
-  STATIC_LIB "${PROTOBUF_PROTOC_STATIC_LIBRARY}"
-  DEPS protobuf)
-
-find_package(LibEv REQUIRED)
-include_directories(SYSTEM ${LIBEV_INCLUDE_DIR})
-ADD_THIRDPARTY_LIB(libev
-  STATIC_LIB "${LIBEV_STATIC_LIB}")
-
-find_package(Crcutil REQUIRED)
-include_directories(SYSTEM ${CRCUTIL_INCLUDE_DIR})
-ADD_THIRDPARTY_LIB(crcutil
-  STATIC_LIB "${CRCUTIL_STATIC_LIB}")
-
 ###################################################################
-
 # KuduClient can use GLOG
 add_definitions(-DKUDU_HEADERS_USE_GLOG)
 if(NOT $ENV{KUDU_CLIENT_DIR} EQUAL "")
@@ -353,20 +309,6 @@ endif()
 # stub. It's still needed to link though.
 find_package(kuduClient REQUIRED NO_DEFAULT_PATH)
 include_directories(SYSTEM ${KUDU_CLIENT_INCLUDE_DIR})
-
-# find jni headers and libs
-find_package(JNI REQUIRED)
-include_directories(${JNI_INCLUDE_DIRS})
-set(LIBS ${LIBS} ${JNI_LIBRARIES})
-message(STATUS "JNI_INCLUDE_DIRS: ${JNI_INCLUDE_DIRS}")
-message(STATUS "JNI_LIBRARIES: ${JNI_LIBRARIES}")
-
-# find breakpad headers and libs
-find_package(Breakpad REQUIRED)
-include_directories(${BREAKPAD_INCLUDE_DIR})
-set(LIBS ${LIBS} ${BREAKPAD_LIBRARIES})
-message(STATUS "Breakpad include dir: " ${BREAKPAD_INCLUDE_DIR})
-message(STATUS "Breakpad library: " ${BREAKPAD_STATIC_LIB})
 
 # compile these subdirs using their own CMakeLists.txt
 add_subdirectory(common/function-registry)

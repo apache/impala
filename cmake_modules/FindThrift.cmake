@@ -28,7 +28,9 @@
 #  thriftstatic - imported static library
 
 # prefer the thrift version supplied in THRIFT_HOME
-message(STATUS "THRIFT_HOME: $ENV{THRIFT_HOME}")
+if (NOT THRIFT_FIND_QUIETLY)
+  message(STATUS "THRIFT_HOME: $ENV{THRIFT_HOME}")
+endif()
 find_path(THRIFT_INCLUDE_DIR thrift/Thrift.h HINTS
   ${THRIFT_ROOT}/include
   $ENV{THRIFT_HOME}/include/

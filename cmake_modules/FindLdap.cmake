@@ -24,7 +24,6 @@
 #  LDAP_INCLUDE_DIR, where to find LDAP headers
 #  LDAP_STATIC_LIBRARY, the LDAP library to use.
 #  LBER_STATIC_LIBRARY, a support library for LDAP.
-#  ldapstatic, lberstatic, imported libraries
 
 set(THIRDPARTY_LDAP $ENV{IMPALA_HOME}/thirdparty/openldap-$ENV{IMPALA_OPENLDAP_VERSION})
 
@@ -57,17 +56,10 @@ if (NOT LDAP_STATIC_LIBRARY OR NOT LBER_STATIC_LIBRARY OR
   set(LDAP_FOUND TRUE)
 else()
   set(LDAP_FOUND FALSE)
-  add_library(ldapstatic STATIC IMPORTED)
-  set_target_properties(ldapstatic PROPERTIES IMPORTED_LOCATION ${LDAP_STATIC_LIBRARY})
-  add_library(lberstatic STATIC IMPORTED)
-  set_target_properties(lberstatic PROPERTIES IMPORTED_LOCATION ${LBER_STATIC_LIBRARY})
 endif ()
 
 
 mark_as_advanced(
   LDAP_STATIC_LIBRARY
   LBER_STATIC_LIBRARY
-  LDAP_INCLUDE_DIR
-  ldapstatic
-  lberstatic
-)
+  LDAP_INCLUDE_DIR)

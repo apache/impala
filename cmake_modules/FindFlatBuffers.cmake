@@ -20,7 +20,7 @@
 # Find FLATBUFFERS (flatbuffers/include, libflatbuffers.a, flatc)
 # This module defines:
 # FLATBUFFERS_INCLUDE_DIR, directory containing headers
-# FLATBUFFERS_LIBS, path to flatbuffers's static library
+# FLATBUFFERS_STATIC_LIB, path to flatbuffers's static library
 # FLATBUFFERS_COMPILER, path to flatc compiler
 
 find_path(FLATBUFFERS_INCLUDE_DIR flatbuffers/flatbuffers.h
@@ -28,7 +28,7 @@ find_path(FLATBUFFERS_INCLUDE_DIR flatbuffers/flatbuffers.h
   NO_CMAKE_SYSTEM_PATH
   NO_SYSTEM_ENVIRONMENT_PATH)
 
-find_library(FLATBUFFERS_LIBS libflatbuffers.a
+find_library(FLATBUFFERS_STATIC_LIB libflatbuffers.a
   PATHS ${FLATBUFFERS_ROOT}/lib
   NO_CMAKE_SYSTEM_PATH
   NO_SYSTEM_ENVIRONMENT_PATH)
@@ -40,4 +40,4 @@ find_program(FLATBUFFERS_COMPILER flatc
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(FLATBUFFERS REQUIRED_VARS
-  FLATBUFFERS_INCLUDE_DIR FLATBUFFERS_LIBS FLATBUFFERS_COMPILER)
+  FLATBUFFERS_INCLUDE_DIR FLATBUFFERS_STATIC_LIB FLATBUFFERS_COMPILER)

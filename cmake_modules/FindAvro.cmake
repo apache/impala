@@ -22,7 +22,6 @@
 #  AVRO_INCLUDE_DIR, directory containing headers
 #  AVRO_STATIC_LIB, path to libavrocpp_s.a
 #  AVRO_FOUND
-#  avro - static library
 set(AVRO_SEARCH_HEADER_PATHS
   ${AVRO_ROOT}/include
   $ENV{IMPALA_HOME}/thirdparty/avro-c-$ENV{IMPALA_AVRO_VERSION}/src)
@@ -45,8 +44,6 @@ if(NOT AVRO_STATIC_LIB)
   set(AVRO_FOUND FALSE)
 else()
   set(AVRO_FOUND TRUE)
-  add_library(avro STATIC IMPORTED)
-  set_target_properties(avro PROPERTIES IMPORTED_LOCATION "${AVRO_STATIC_LIB}")
 endif ()
 
 set(AVRO_FOUND ${AVRO_STATIC_LIB_FOUND})
@@ -55,5 +52,4 @@ mark_as_advanced(
   AVRO_INCLUDE_DIR
   AVRO_STATIC_LIB
   AVRO_FOUND
-  avro
 )

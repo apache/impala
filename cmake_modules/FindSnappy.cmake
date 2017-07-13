@@ -61,13 +61,10 @@ if (NOT SNAPPY_LIBS OR NOT SNAPPY_STATIC_LIB)
   set(SNAPPY_FOUND FALSE)
 else()
   set(SNAPPY_FOUND TRUE)
-  add_library(snappy STATIC IMPORTED)
-  set_target_properties(snappy PROPERTIES IMPORTED_LOCATION "${SNAPPY_STATIC_LIB}")
 endif ()
 
 mark_as_advanced(
   SNAPPY_INCLUDE_DIR
   SNAPPY_LIBS
   SNAPPY_STATIC_LIB
-  snappy
 )

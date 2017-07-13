@@ -22,6 +22,7 @@
 # - ZLIB,
 # - ZLIB_LIBRARIES,
 # - ZLIB_STATIC,
+# - ZLIB_SHARED
 # - ZLIB_FOUND
 
 set(_ZLIB_SEARCH_DIR)
@@ -34,15 +35,15 @@ find_path(ZLIB_INCLUDE_DIR zlib.h ${_ZLIB_SEARCH_DIR}
 
 find_library(ZLIB_STATIC_LIBRARIES libz.a
   ${_ZLIB_SEARCH_DIR} PATH_SUFFIXES lib lib64)
+find_library(ZLIB_SHARED_LIBRARIES libz.so
+  ${_ZLIB_SEARCH_DIR} PATH_SUFFIXES lib lib64)
 
-if (ZLIB_STATIC_LIBRARIES)
-  add_library(ZLIB_STATIC STATIC IMPORTED)
-  set_target_properties(ZLIB_STATIC PROPERTIES
-    IMPORTED_LOCATION ${ZLIB_STATIC_LIBRARIES})
-  set(ZLIB_STATIC_FOUND ON)
+if (ZLIB_STATIC_LIBRARIES AND ZLIB_SHARED_LIBRARIES)
+  set(ZLIB_FOUND ON)
 else()
-  set(ZLIB_STATIC_FOUND OFF)
-  set(ZLIB_STATIC ${ZLIB_STATIC_LIBRARIES})
+  message(FATAL_ERROR "zlib headers and libraries NOT found. "
+    "Looked for both ${_ZLIB_SEARCH_DIR}.")
+  set(ZLIB_FOUND OFF)
 endif()
 
 set(ZLIB_NAMES z zlib zdll zlib1 zlibd zlibd1)

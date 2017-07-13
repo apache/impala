@@ -27,48 +27,43 @@
 # This module defines
 # GTEST_INCLUDE_DIR, where to find gtest include files, etc.
 # GTEST_LIBRARIES, the libraries to link against to use gtest.
-# GTest_FOUND, If false, do not try to use gtest.
-
-# also defined, but not for general use are
-# GTEST_LIBRARY, where to find the GTest library.
-# gtest
+# GTEST_FOUND, If false, do not try to use gtest.
+# GTEST_STATIC_LIB, where to find the GTest library.
 
 set(GTEST_H gtest/gtest.h)
 
 find_path(GTEST_INCLUDE_DIR ${GTEST_H}
   PATHS ${GTEST_ROOT}/include
-        $ENV{IMPALA_HOME}/thirdparty/gtest-1.6.0/include
+        $ENV{IMPALA_HOME}/thirdparty/gtest-$ENV{IMPALA_GTEST_VERSION}/include
         NO_DEFAULT_PATH
   DOC   "Path to the ${GTEST_H} file"
 )
 
-find_library(GTEST_LIBRARY NAMES gtest
+find_library(GTEST_STATIC_LIB NAMES libgtest.a
   PATHS ${GTEST_ROOT}/lib
-        $ENV{IMPALA_HOME}/thirdparty/gtest-1.6.0
+        $ENV{IMPALA_HOME}/thirdparty/gtest-$ENV{IMPALA_GTEST_VERSION}
         NO_DEFAULT_PATH
   DOC   "Google's framework for writing C++ tests (gtest)"
 )
 
-find_library(GTEST_MAIN_LIBRARY NAMES gtest_main
+find_library(GTEST_MAIN_LIBRARY NAMES libgtest_main.a
   PATHS ${GTEST_ROOT}/lib
-        $ENV{IMPALA_HOME}/thirdparty/gtest-1.6.0
+        $ENV{IMPALA_HOME}/thirdparty/gtest-$ENV{IMPALA_GTEST_VERSION}
         NO_DEFAULT_PATH
   DOC   "Google's framework for writing C++ tests (gtest_main)"
 )
 
-if(GTEST_INCLUDE_DIR AND GTEST_LIBRARY AND GTEST_MAIN_LIBRARY)
-  set(GTEST_LIBRARIES ${GTEST_LIBRARY} ${GTEST_MAIN_LIBRARY})
+if(GTEST_INCLUDE_DIR AND GTEST_STATIC_LIB AND GTEST_MAIN_LIBRARY)
+  set(GTEST_LIBRARIES ${GTEST_STATIC_LIB} ${GTEST_MAIN_LIBRARY})
   set(GTEST_FOUND TRUE)
-else(GTEST_INCLUDE_DIR AND GTEST_LIBRARY AND GTEST_MAIN_LIBRARY)
+else(GTEST_INCLUDE_DIR AND GTEST_STATIC_LIB AND GTEST_MAIN_LIBRARY)
   set(GTEST_FOUND FALSE)
-endif(GTEST_INCLUDE_DIR AND GTEST_LIBRARY AND GTEST_MAIN_LIBRARY)
+endif(GTEST_INCLUDE_DIR AND GTEST_STATIC_LIB AND GTEST_MAIN_LIBRARY)
 
 if(GTEST_FOUND)
-  if(NOT GTest_FIND_QUIETLY)
+  if(NOT GTEST_FIND_QUIETLY)
     message(STATUS "Found GTest: ${GTEST_LIBRARIES}")
-  endif(NOT GTest_FIND_QUIETLY)
-  add_library(gtest STATIC IMPORTED)
-  set_target_properties(gtest PROPERTIES IMPORTED_LOCATION "${GTEST_LIBRARY}")
+  endif(NOT GTEST_FIND_QUIETLY)
 else(GTEST_FOUND)
   message(FATAL_ERROR "Could not find the GTest Library")
 endif(GTEST_FOUND)
@@ -76,4 +71,4 @@ endif(GTEST_FOUND)
 mark_as_advanced(
   GTEST_INCLUDE_DIR
   GTEST_LIBRARIES
-  gtest)
+  GTEST_STATIC_LIB)

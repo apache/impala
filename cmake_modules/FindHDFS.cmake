@@ -43,25 +43,26 @@ else ()
   set(arch_hint "x86")
 endif()
 
-message(STATUS "Architecture: ${arch_hint}")
 set(HDFS_LIB_PATHS $ENV{HADOOP_LIB_DIR}/native)
 
-message(STATUS "HDFS_LIB_PATHS: ${HDFS_LIB_PATHS}")
+if (NOT HDFS_FIND_QUIETLY)
+  message(STATUS "Architecture: ${arch_hint}")
+  message(STATUS "HDFS_LIB_PATHS: ${HDFS_LIB_PATHS}")
+endif()
 
-find_library(HDFS_LIB NAMES hdfs PATHS
+find_library(HDFS_STATIC_LIB NAMES libhdfs.a PATHS
   ${HDFS_LIB_PATHS}
   # make sure we don't accidentally pick up a different version
   NO_DEFAULT_PATH
-)
+  )
+find_library(HDFS_SHARED_LIB NAMES libhdfs.so PATHS
+  ${HDFS_LIB_PATHS}
+  # make sure we don't accidentally pick up a different version
+  NO_DEFAULT_PATH
+  )
 
-if (HDFS_LIB)
+if (HDFS_STATIC_LIB AND HDFS_SHARED_LIB)
   set(HDFS_FOUND TRUE)
-  set(HDFS_LIBRARIES ${HDFS_LIB})
-  set(HDFS_STATIC_LIB ${HDFS_LIB_PATHS}/libhdfs.a)
-
-  add_library(HDFS_STATIC STATIC IMPORTED)
-  set_target_properties(HDFS_STATIC PROPERTIES IMPORTED_LOCATION ${HDFS_STATIC_LIB})
-
 else ()
   set(HDFS_FOUND FALSE)
 endif ()
@@ -70,17 +71,17 @@ if (HDFS_FOUND)
   if (NOT HDFS_FIND_QUIETLY)
     message(STATUS "${Hadoop_VERSION}")
     message(STATUS "HDFS_INCLUDE_DIR: ${HDFS_INCLUDE_DIR}")
-    message(STATUS "HDFS_LIBRARIES: ${HDFS_LIBRARIES}")
-    message(STATUS "HDFS_STATIC: ${HDFS_STATIC_LIB}")
+    message(STATUS "HDFS_STATIC_LIB: ${HDFS_STATIC_LIB}")
+    message(STATUS "HDFS_SHARED_LIB: ${HDFS_SHARED_LIB}")
   endif ()
 else ()
-  message(FATAL_ERROR "HDFS includes and libraries NOT found."
-    "Thrift support will be disabled (${Thrift_RETURN}, "
+  message(FATAL_ERROR "HDFS includes and libraries NOT found. "
     "${HDFS_INCLUDE_DIR}, ${HDFS_LIB})")
 endif ()
 
 mark_as_advanced(
-  HDFS_LIBRARIES
+  HDFS_STATIC_LIB
+  HDFS_SHARED_LIB
   HDFS_INCLUDE_DIR
   HDFS_STATIC
 )
