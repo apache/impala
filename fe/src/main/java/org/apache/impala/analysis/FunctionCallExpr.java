@@ -150,7 +150,8 @@ public class FunctionCallExpr extends Expr {
       Preconditions.checkState(children_.isEmpty());
       params_ = FunctionParams.createStarParam();
     } else {
-      params_ = new FunctionParams(other.params_.isDistinct(), children_);
+      params_ = new FunctionParams(other.params_.isDistinct(),
+          other.params_.isIgnoreNulls(), children_);
     }
     label_ = other.label_;
   }
@@ -173,6 +174,7 @@ public class FunctionCallExpr extends Expr {
     FunctionCallExpr o = (FunctionCallExpr)obj;
     return fnName_.equals(o.fnName_) &&
            params_.isDistinct() == o.params_.isDistinct() &&
+           params_.isIgnoreNulls() == o.params_.isIgnoreNulls() &&
            params_.isStar() == o.params_.isStar();
   }
 
@@ -185,7 +187,9 @@ public class FunctionCallExpr extends Expr {
     sb.append(fnName_).append("(");
     if (params_.isStar()) sb.append("*");
     if (params_.isDistinct()) sb.append("DISTINCT ");
-    sb.append(Joiner.on(", ").join(childrenToSql())).append(")");
+    sb.append(Joiner.on(", ").join(childrenToSql()));
+    if (params_.isIgnoreNulls()) sb.append(" IGNORE NULLS");
+    sb.append(")");
     return sb.toString();
   }
 
@@ -195,6 +199,7 @@ public class FunctionCallExpr extends Expr {
         .add("name", fnName_)
         .add("isStar", params_.isStar())
         .add("isDistinct", params_.isDistinct())
+        .add("isIgnoreNulls", params_.isIgnoreNulls())
         .addValue(super.debugString())
         .toString();
   }

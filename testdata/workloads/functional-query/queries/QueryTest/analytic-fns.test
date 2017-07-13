@@ -1933,3 +1933,25 @@ STRING, STRING
 'a\x00b',''
 'a\x00b','NULL'
 ====
+---- QUERY
+# Test for IMPALA-5657: Ignore nulls should be applied correctly on views.
+# Without the fix for IMPALA-5657, the select * query on the view does not
+# apply ignore nulls and returns a few NULLs in the query result.
+create view if not exists imp5657_view as
+select
+  last_value(tinyint_col ignore nulls) over (order by tinyint_col)
+from functional.alltypesagg
+where id < 5;
+====
+---- QUERY
+select * from imp5657_view;
+---- TYPES
+TINYINT
+---- RESULTS
+1
+2
+3
+4
+4
+4
+====

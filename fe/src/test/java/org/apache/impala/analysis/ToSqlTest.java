@@ -1166,6 +1166,11 @@ public class ToSqlTest extends FrontendTestBase {
           + "rows between unbounded preceding and current row) from functional.alltypes",
         "SELECT sum(int_col) OVER (PARTITION BY id ORDER BY tinyint_col ASC ROWS "
           + "BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM functional.alltypes");
+    testToSql(
+        "select last_value(tinyint_col ignore nulls) over (order by tinyint_col) "
+          + "from functional.alltypesagg",
+        "SELECT last_value(tinyint_col IGNORE NULLS) OVER (ORDER BY tinyint_col ASC) "
+          + "FROM functional.alltypesagg");
   }
 
   /**
