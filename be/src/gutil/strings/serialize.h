@@ -8,9 +8,6 @@
 #define STRINGS_SERIALIZE_H_
 
 #include <string.h>
-#include <ext/hash_map>
-using __gnu_cxx::hash;
-using __gnu_cxx::hash_map;
 #include <string>
 using std::string;
 #include <utility>
@@ -18,6 +15,8 @@ using std::make_pair;
 using std::pair;
 #include <vector>
 using std::vector;
+#include <unordered_map>
+using std::unordered_map;
 
 #include <common/logging.h>
 
@@ -328,15 +327,15 @@ bool DictionaryParse(const string& encoded_str,
 //   Note: these routines are not meant for use with very large dictionaries.
 //   They are written for convenience and not efficiency.
 // --------------------------------------------------------------------------
-string DictionaryInt32Encode(const hash_map<string, int32>* dictionary);
-string DictionaryInt64Encode(const hash_map<string, int64>* dictionary);
-string DictionaryDoubleEncode(const hash_map<string, double>* dictionary);
+string DictionaryInt32Encode(const unordered_map<string, int32>* dictionary);
+string DictionaryInt64Encode(const unordered_map<string, int64>* dictionary);
+string DictionaryDoubleEncode(const unordered_map<string, double>* dictionary);
 
-bool DictionaryInt32Decode(hash_map<string, int32>* dictionary,
+bool DictionaryInt32Decode(unordered_map<string, int32>* dictionary,
                            const string& encoded_str);
-bool DictionaryInt64Decode(hash_map<string, int64>* dictionary,
+bool DictionaryInt64Decode(unordered_map<string, int64>* dictionary,
                            const string& encoded_str);
-bool DictionaryDoubleDecode(hash_map<string, double>* dictionary,
+bool DictionaryDoubleDecode(unordered_map<string, double>* dictionary,
                             const string& encoded_str);
 
 
