@@ -144,15 +144,16 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       assert re.search(expected_error_re, str(e))
 
   def __check_query_options(self, profile, expected_query_options):
-    """Validate that the per-pool query options were set on the specified profile.
-    expected_query_options is a list of "KEY=VALUE" strings, e.g. ["MEM_LIMIT=1", ...]"""
+    """Validate that the expected per-pool query options were set on the specified
+    profile. expected_query_options is a list of "KEY=VALUE" strings, e.g.
+    ["MEM_LIMIT=1", ...]"""
     confs = []
     for line in profile.split("\n"):
       if PROFILE_QUERY_OPTIONS_KEY in line:
         rhs = re.split(": ", line)[1]
         confs = re.split(",", rhs)
         break
-    assert len(confs) == len(expected_query_options)
+    assert len(confs) >= len(expected_query_options)
     confs = map(str.lower, confs)
     for expected in expected_query_options:
       assert expected.lower() in confs,\
