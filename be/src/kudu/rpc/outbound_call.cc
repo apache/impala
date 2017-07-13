@@ -46,6 +46,12 @@ DEFINE_int64(rpc_callback_max_cycles, 100 * 1000 * 1000,
 TAG_FLAG(rpc_callback_max_cycles, advanced);
 TAG_FLAG(rpc_callback_max_cycles, runtime);
 
+// Flag used in debug build for injecting cancellation at different code paths.
+DEFINE_int32(rpc_inject_cancellation_state, -1,
+             "If this flag is not -1, it is the state in which a cancellation request "
+             "will be injected. Should use values in OutboundCall::State only");
+TAG_FLAG(rpc_inject_cancellation_state, unsafe);
+
 using std::unique_ptr;
 
 namespace kudu {
@@ -70,7 +76,8 @@ OutboundCall::OutboundCall(const ConnectionId& conn_id,
       conn_id_(conn_id),
       callback_(std::move(callback)),
       controller_(DCHECK_NOTNULL(controller)),
-      response_(DCHECK_NOTNULL(response_storage)) {
+      response_(DCHECK_NOTNULL(response_storage)),
+      cancellation_requested_(false) {
   DVLOG(4) << "OutboundCall " << this << " constructed with state_: " << StateName(state_)
            << " and RPC timeout: "
            << (controller->timeout().Initialized() ? controller->timeout().ToString() : "none");
@@ -157,6 +164,8 @@ string OutboundCall::StateName(State state) {
       return "NEGOTIATION_TIMED_OUT";
     case TIMED_OUT:
       return "TIMED_OUT";
+    case CANCELLED:
+      return "CANCELLED";
     case FINISHED_NEGOTIATION_ERROR:
       return "FINISHED_NEGOTIATION_ERROR";
     case FINISHED_ERROR:
@@ -201,6 +210,9 @@ void OutboundCall::set_state_unlocked(State new_state) {
     case TIMED_OUT:
       DCHECK(state_ == SENT || state_ == ON_OUTBOUND_QUEUE || state_ == SENDING);
       break;
+    case CANCELLED:
+      DCHECK(state_ == READY || state_ == ON_OUTBOUND_QUEUE || state_ == SENT);
+      break;
     case FINISHED_SUCCESS:
       DCHECK_EQ(state_, SENT);
       break;
@@ -212,7 +224,31 @@ void OutboundCall::set_state_unlocked(State new_state) {
   state_ = new_state;
 }
 
+void OutboundCall::Cancel() {
+  cancellation_requested_ = true;
+  // No lock needed as it's called from reactor thread
+  switch (state_) {
+    case READY:
+    case ON_OUTBOUND_QUEUE:
+    case SENT: {
+      SetCancelled();
+      break;
+    }
+    case SENDING:
+    case NEGOTIATION_TIMED_OUT:
+    case TIMED_OUT:
+    case CANCELLED:
+    case FINISHED_NEGOTIATION_ERROR:
+    case FINISHED_ERROR:
+    case FINISHED_SUCCESS:
+      break;
+  }
+}
+
 void OutboundCall::CallCallback() {
+  // Clear references to outbound sidecars before invoking callback.
+  sidecars_.clear();
+
   int64_t start_cycles = CycleClock::Now();
   {
     SCOPED_WATCH_STACK(100);
@@ -283,6 +319,11 @@ void OutboundCall::SetSent() {
   // request_buf_ is also done being used here, but since it was allocated by
   // the caller thread, we would rather let that thread free it whenever it
   // deletes the RpcController.
+
+  // If cancellation was requested, it's now a good time to do the actual cancellation.
+  if (cancellation_requested()) {
+    SetCancelled();
+  }
 }
 
 void OutboundCall::SetFailed(const Status &status,
@@ -325,6 +366,20 @@ void OutboundCall::SetTimedOut(Phase phase) {
   CallCallback();
 }
 
+void OutboundCall::SetCancelled() {
+  DCHECK(!IsFinished());
+  {
+    std::lock_guard<simple_spinlock> l(lock_);
+    status_ = Status::Aborted(
+        Substitute("$0 RPC to $1 is cancelled in state $2",
+                   remote_method_.method_name(),
+                   conn_id_.remote().ToString(),
+                   StateName(state_)));
+    set_state_unlocked(CANCELLED);
+  }
+  CallCallback();
+}
+
 bool OutboundCall::IsTimedOut() const {
   std::lock_guard<simple_spinlock> l(lock_);
   switch (state_) {
@@ -334,6 +389,11 @@ bool OutboundCall::IsTimedOut() const {
     default:
       return false;
   }
+}
+
+bool OutboundCall::IsCancelled() const {
+  std::lock_guard<simple_spinlock> l(lock_);
+  return state_ == CANCELLED;
 }
 
 bool OutboundCall::IsNegotiationError() const {
@@ -357,6 +417,7 @@ bool OutboundCall::IsFinished() const {
       return false;
     case NEGOTIATION_TIMED_OUT:
     case TIMED_OUT:
+    case CANCELLED:
     case FINISHED_NEGOTIATION_ERROR:
     case FINISHED_ERROR:
     case FINISHED_SUCCESS:
@@ -396,6 +457,9 @@ void OutboundCall::DumpPB(const DumpRunningRpcsRequestPB& req,
       break;
     case TIMED_OUT:
       resp->set_state(RpcCallInProgressPB::TIMED_OUT);
+      break;
+    case CANCELLED:
+      resp->set_state(RpcCallInProgressPB::CANCELLED);
       break;
     case FINISHED_NEGOTIATION_ERROR:
       resp->set_state(RpcCallInProgressPB::FINISHED_NEGOTIATION_ERROR);
