@@ -443,32 +443,6 @@ public class FileSystemUtil {
   }
 
   /**
-   * Returns true if Path 'p' is a descendant of Path 'parent', false otherwise.
-   * This function relies on Path.equals() which requires paths to have the same
-   * schema and authority to compare equal. So both 'p' and 'parent' should either
-   * be qualified or unqualified paths for this function to behave as expected.
-   */
-  public static boolean isDescendantPath(Path p, Path parent) {
-    if (p == null || parent == null) return false;
-    while (!p.isRoot() && p.depth() != parent.depth()) p = p.getParent();
-    if (p.isRoot()) return false;
-    boolean result = p.equals(parent);
-    if (!result && LOG.isTraceEnabled()) {
-      // Add a message to the log if 'p' and 'parent' have inconsistent qualification.
-      URI pUri = p.toUri();
-      URI parentUri = parent.toUri();
-      boolean sameScheme = Objects.equal(pUri.getScheme(), parentUri.getScheme());
-      boolean sameAuthority =
-          Objects.equal(pUri.getAuthority(), parentUri.getAuthority());
-      if (!sameScheme || !sameAuthority) {
-        LOG.trace("Inconsistent schema or authority for paths: " +
-            p.toString() + " " + parent.toString());
-      }
-    }
-    return result;
-  }
-
-  /**
    * Returns the configuration.
    */
   public static Configuration getConfiguration() {
