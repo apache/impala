@@ -122,7 +122,6 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.nation (
   N_REGIONKEY BIGINT,
   N_COMMENT STRING
 )
-partition by hash (n_nationkey) partitions {buckets}
 STORED AS KUDU
 tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 
@@ -134,7 +133,6 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.region (
   R_NAME STRING,
   R_COMMENT STRING
 )
-partition by hash (r_regionkey) partitions {buckets}
 STORED AS KUDU
 tblproperties ('kudu.master_addresses' = '{kudu_master}:7051');
 

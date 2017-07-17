@@ -179,7 +179,7 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   N_REGIONKEY SMALLINT,
   N_COMMENT STRING
 )
-partition by hash (n_nationkey) partitions 9 stored as kudu;
+stored as kudu;
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
@@ -202,7 +202,7 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   R_NAME STRING,
   R_COMMENT STRING
 )
-partition by hash (r_regionkey) partitions 9 stored as kudu;
+stored as kudu;
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD

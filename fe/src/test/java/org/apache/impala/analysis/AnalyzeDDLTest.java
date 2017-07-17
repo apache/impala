@@ -1587,6 +1587,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "partition value = 30) stored as kudu as select id, bool_col, tinyint_col, " +
         "smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, " +
         "string_col from functional.alltypestiny");
+    // Creating unpartitioned table results in a warning.
+    AnalyzesOk("create table t primary key(id) stored as kudu as select id, bool_col " +
+        "from functional.alltypestiny",
+        "Unpartitioned Kudu tables are inefficient for large data sizes.");
     // CTAS in an external Kudu table
     AnalysisError("create external table t stored as kudu " +
         "tblproperties('kudu.table_name'='t') as select id, int_col from " +
@@ -2197,9 +2201,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table tab (x int) tblproperties (" +
         "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler')",
         CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
-    AnalysisError("create table tab (x int primary key) stored as kudu tblproperties (" +
+    // Creating unpartitioned table results in a warning.
+    AnalyzesOk("create table tab (x int primary key) stored as kudu tblproperties (" +
         "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler')",
-        "Table partitioning must be specified for managed Kudu tables.");
+        "Unpartitioned Kudu tables are inefficient for large data sizes.");
     // Invalid value for number of replicas
     AnalysisError("create table t (x int primary key) stored as kudu tblproperties (" +
         "'kudu.num_tablet_replicas'='1.1')",
@@ -2211,9 +2216,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table tab (a int primary key) partition by hash (a) " +
         "partitions 3 stored as kudu location '/test-warehouse/'",
         "LOCATION cannot be specified for a Kudu table.");
-    // PARTITION BY is required for managed tables.
-    AnalysisError("create table tab (a int, primary key (a)) stored as kudu",
-        "Table partitioning must be specified for managed Kudu tables.");
+    // Creating unpartitioned table results in a warning.
+    AnalyzesOk("create table tab (a int, primary key (a)) stored as kudu",
+        "Unpartitioned Kudu tables are inefficient for large data sizes.");
     AnalysisError("create table tab (a int) stored as kudu",
         "A primary key is required for a Kudu table.");
     // Using ROW FORMAT with a Kudu table

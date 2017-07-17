@@ -248,3 +248,43 @@ I, TS1, TS2
 ---- TYPES
 INT,TIMESTAMP,TIMESTAMP
 ====
+---- QUERY
+# create an unpartitioned table
+create table unpartitioned_kudu_table (col0 bigint primary key, col1 string)
+stored as kudu
+---- RESULTS
+---- ERRORS
+Unpartitioned Kudu tables are inefficient for large data sizes.
+====
+---- QUERY
+insert into unpartitioned_kudu_table values (0, 'zero'), (1, 'one')
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumRowErrors: 0
+---- LABELS
+COL0,COL1
+---- DML_RESULTS: unpartitioned_kudu_table
+0,'zero'
+1,'one'
+---- TYPES
+BIGINT,STRING
+====
+---- QUERY
+create table unpartitioned_kudu_table2 primary key(id) stored as kudu
+as select id from functional.alltypestiny where id > 4
+---- RESULTS
+'Inserted 3 row(s)'
+---- ERRORS
+Unpartitioned Kudu tables are inefficient for large data sizes.
+====
+---- QUERY
+select * from unpartitioned_kudu_table2
+---- RESULTS
+5
+6
+7
+---- LABELS
+ID
+---- TYPES
+INT
+====

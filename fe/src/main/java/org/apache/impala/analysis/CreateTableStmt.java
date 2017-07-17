@@ -320,8 +320,8 @@ public class CreateTableStmt extends StatementBase {
     if (!getKuduPartitionParams().isEmpty()) {
       analyzeKuduPartitionParams(analyzer);
     } else {
-      throw new AnalysisException("Table partitioning must be specified for " +
-          "managed Kudu tables.");
+      analyzer.addWarning(
+          "Unpartitioned Kudu tables are inefficient for large data sizes.");
     }
   }
 
