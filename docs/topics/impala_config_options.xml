@@ -98,7 +98,6 @@ IMPALA_SERVER_ARGS=" \
 -log_dir=${IMPALA_LOG_DIR} \
 -catalog_service_host=${IMPALA_CATALOG_SERVICE_HOST} \
 -state_store_port=${IMPALA_STATE_STORE_PORT} \
--use_statestore \
 -state_store_host=${IMPALA_STATE_STORE_HOST} \
 -be_port=${IMPALA_BACKEND_PORT}"
 export ENABLE_CORE_DUMPS=${ENABLE_COREDUMPS:-false}</codeblock>
@@ -179,14 +178,14 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
 <codeblock>export IMPALA_SERVER_ARGS=${IMPALA_SERVER_ARGS:- \
     -log_dir=${IMPALA_LOG_DIR} \
     -state_store_port=${IMPALA_STATE_STORE_PORT} \
-    -use_statestore -state_store_host=${IMPALA_STATE_STORE_HOST} \
+    -state_store_host=${IMPALA_STATE_STORE_HOST} \
     -be_port=${IMPALA_BACKEND_PORT}}</codeblock>
           <p>
             to:
           </p>
 <codeblock>export IMPALA_SERVER_ARGS=${IMPALA_SERVER_ARGS:- \
     -log_dir=${IMPALA_LOG_DIR} -state_store_port=${IMPALA_STATE_STORE_PORT} \
-    -use_statestore -state_store_host=${IMPALA_STATE_STORE_HOST} \
+    -state_store_host=${IMPALA_STATE_STORE_HOST} \
     -be_port=${IMPALA_BACKEND_PORT} -mem_limit=70%}</codeblock>
           <p>
             You can specify the memory limit using absolute notation such as
@@ -357,14 +356,14 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
 <codeblock>export IMPALA_SERVER_ARGS=${IMPALA_SERVER_ARGS:- \
     -log_dir=${IMPALA_LOG_DIR} \
     -state_store_port=${IMPALA_STATE_STORE_PORT} \
-    -use_statestore -state_store_host=${IMPALA_STATE_STORE_HOST} \
+    -state_store_host=${IMPALA_STATE_STORE_HOST} \
     -be_port=${IMPALA_BACKEND_PORT}}</codeblock>
             <p>
               to:
             </p>
 <codeblock>export IMPALA_SERVER_ARGS=${IMPALA_SERVER_ARGS:- \
     -log_dir=${IMPALA_LOG_DIR} -state_store_port=${IMPALA_STATE_STORE_PORT} \
-    -use_statestore -state_store_host=${IMPALA_STATE_STORE_HOST} \
+    -state_store_host=${IMPALA_STATE_STORE_HOST} \
     -be_port=${IMPALA_BACKEND_PORT} -mem_limit=70%}</codeblock>
             <p>
               You can specify the memory limit using absolute notation such as

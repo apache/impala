@@ -53,16 +53,16 @@ class RequestPoolService;
 class ReservationTracker;
 class Scheduler;
 class StatestoreSubscriber;
-class TestExecEnv;
-
 class ThreadResourceMgr;
 class TmpFileMgr;
 class Webserver;
 
-/// Execution environment for queries/plan fragments.
-/// Contains all required global structures, and handles to
-/// singleton services. Clients must call StartServices exactly
-/// once to properly initialise service state.
+/// Execution environment for Impala daemon. Contains all required global structures, and
+/// handles to singleton services. Clients must call StartServices() exactly once to
+/// properly initialise service state.
+///
+/// There should only be one ExecEnv instance. It should always be accessed by calling
+/// ExecEnv::GetInstance().
 class ExecEnv {
  public:
   ExecEnv();
@@ -76,8 +76,12 @@ class ExecEnv {
   static ExecEnv* GetInstance() { return exec_env_; }
 
   /// Destructor - only used in backend tests that create new environment per test.
-  virtual ~ExecEnv();
+  ~ExecEnv();
 
+  /// Starts any dependent services in their correct order
+  Status StartServices();
+
+  /// TODO: Should ExecEnv own the ImpalaServer as well?
   void SetImpalaServer(ImpalaServer* server) { impala_server_ = server; }
 
   DataStreamMgr* stream_mgr() { return stream_mgr_.get(); }
@@ -113,9 +117,6 @@ class ExecEnv {
 
   const TNetworkAddress& backend_address() const { return backend_address_; }
 
-  /// Starts any dependent services in their correct order
-  virtual Status StartServices();
-
   /// Initializes the exec env for running FE tests.
   Status InitForFeTests();
 
@@ -134,8 +135,7 @@ class ExecEnv {
   Status GetKuduClient(
       const std::vector<std::string>& master_addrs, kudu::client::KuduClient** client);
 
- protected:
-  /// Leave protected so that subclasses can override
+ private:
   boost::scoped_ptr<ObjectPool> obj_pool_;
   boost::scoped_ptr<MetricGroup> metrics_;
   boost::scoped_ptr<DataStreamMgr> stream_mgr_;
@@ -165,7 +165,7 @@ class ExecEnv {
   boost::scoped_ptr<BufferPool> buffer_pool_;
 
   /// Not owned by this class
-  ImpalaServer* impala_server_;
+  ImpalaServer* impala_server_ = nullptr;
 
   bool enable_webserver_;
 
@@ -173,7 +173,7 @@ class ExecEnv {
   friend class TestEnv;
 
   static ExecEnv* exec_env_;
-  bool is_fe_tests_;
+  bool is_fe_tests_ = false;
 
   /// Address of the Impala backend server instance
   TNetworkAddress backend_address_;

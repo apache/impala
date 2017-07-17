@@ -27,7 +27,6 @@
 #include "common/logging.h"
 #include "common/object-pool.h"
 #include "exec/kudu-util.h"
-#include "gen-cpp/CatalogService.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "runtime/backend-client.h"
 #include "runtime/bufferpool/buffer-pool.h"
@@ -48,14 +47,10 @@
 #include "scheduling/scheduler.h"
 #include "service/frontend.h"
 #include "statestore/statestore-subscriber.h"
-#include "util/bit-util.h"
-#include "util/debug-util.h"
 #include "util/debug-util.h"
 #include "util/default-path-handlers.h"
 #include "util/hdfs-bulk-ops.h"
 #include "util/mem-info.h"
-#include "util/mem-info.h"
-#include "util/memory-metrics.h"
 #include "util/memory-metrics.h"
 #include "util/metrics.h"
 #include "util/network-util.h"
@@ -66,15 +61,10 @@
 
 #include "common/names.h"
 
-using boost::algorithm::is_any_of;
 using boost::algorithm::join;
-using boost::algorithm::split;
-using boost::algorithm::to_lower;
-using boost::algorithm::token_compress_on;
 using namespace strings;
 
-DEFINE_bool(use_statestore, true,
-    "Use an external statestore process to manage cluster membership");
+DEFINE_bool_hidden(use_statestore, true, "Deprecated, do not use");
 DEFINE_string(catalog_service_host, "localhost",
     "hostname where CatalogService is running");
 DEFINE_bool(enable_webserver, true, "If true, debug webserver is enabled");
@@ -92,22 +82,23 @@ DECLARE_int32(num_cores);
 DECLARE_int32(be_port);
 DECLARE_string(mem_limit);
 DECLARE_bool(is_coordinator);
+DECLARE_int32(webserver_port);
 
 // TODO: Remove the following RM-related flags in Impala 3.0.
-DEFINE_bool(enable_rm, false, "Deprecated");
-DEFINE_int32(llama_callback_port, 28000, "Deprecated");
-DEFINE_string(llama_host, "", "Deprecated");
-DEFINE_int32(llama_port, 15000, "Deprecated");
-DEFINE_string(llama_addresses, "", "Deprecated");
-DEFINE_int64(llama_registration_timeout_secs, 30, "Deprecated");
-DEFINE_int64(llama_registration_wait_secs, 3, "Deprecated");
-DEFINE_int64(llama_max_request_attempts, 5, "Deprecated");
-DEFINE_string(cgroup_hierarchy_path, "", "Deprecated");
-DEFINE_string(staging_cgroup, "impala_staging", "Deprecated");
-DEFINE_int32(resource_broker_cnxn_attempts, 1, "Deprecated");
-DEFINE_int32(resource_broker_cnxn_retry_interval_ms, 3000, "Deprecated");
-DEFINE_int32(resource_broker_send_timeout, 0, "Deprecated");
-DEFINE_int32(resource_broker_recv_timeout, 0, "Deprecated");
+DEFINE_bool_hidden(enable_rm, false, "Deprecated");
+DEFINE_int32_hidden(llama_callback_port, 28000, "Deprecated");
+DEFINE_string_hidden(llama_host, "", "Deprecated");
+DEFINE_int32_hidden(llama_port, 15000, "Deprecated");
+DEFINE_string_hidden(llama_addresses, "", "Deprecated");
+DEFINE_int64_hidden(llama_registration_timeout_secs, 30, "Deprecated");
+DEFINE_int64_hidden(llama_registration_wait_secs, 3, "Deprecated");
+DEFINE_int64_hidden(llama_max_request_attempts, 5, "Deprecated");
+DEFINE_string_hidden(cgroup_hierarchy_path, "", "Deprecated");
+DEFINE_string_hidden(staging_cgroup, "impala_staging", "Deprecated");
+DEFINE_int32_hidden(resource_broker_cnxn_attempts, 1, "Deprecated");
+DEFINE_int32_hidden(resource_broker_cnxn_retry_interval_ms, 3000, "Deprecated");
+DEFINE_int32_hidden(resource_broker_send_timeout, 0, "Deprecated");
+DEFINE_int32_hidden(resource_broker_recv_timeout, 0, "Deprecated");
 
 // TODO-MT: rename or retire
 DEFINE_int32(coordinator_rpc_threads, 12, "(Advanced) Number of threads available to "
@@ -138,71 +129,9 @@ struct ExecEnv::KuduClientPtr {
 ExecEnv* ExecEnv::exec_env_ = nullptr;
 
 ExecEnv::ExecEnv()
-  : obj_pool_(new ObjectPool),
-    metrics_(new MetricGroup("impala-metrics")),
-    stream_mgr_(new DataStreamMgr(metrics_.get())),
-    impalad_client_cache_(
-        new ImpalaBackendClientCache(FLAGS_backend_client_connection_num_retries, 0,
-            FLAGS_backend_client_rpc_timeout_ms, FLAGS_backend_client_rpc_timeout_ms, "",
-            !FLAGS_ssl_client_ca_certificate.empty())),
-    catalogd_client_cache_(
-        new CatalogServiceClientCache(FLAGS_catalog_client_connection_num_retries, 0,
-            FLAGS_catalog_client_rpc_timeout_ms, FLAGS_catalog_client_rpc_timeout_ms, "",
-            !FLAGS_ssl_client_ca_certificate.empty())),
-    htable_factory_(new HBaseTableFactory()),
-    disk_io_mgr_(new DiskIoMgr()),
-    webserver_(new Webserver()),
-    mem_tracker_(nullptr),
-    pool_mem_trackers_(new PoolMemTrackerRegistry),
-    thread_mgr_(new ThreadResourceMgr),
-    hdfs_op_thread_pool_(
-        CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024)),
-    tmp_file_mgr_(new TmpFileMgr),
-    request_pool_service_(new RequestPoolService(metrics_.get())),
-    frontend_(new Frontend()),
-    exec_rpc_thread_pool_(new CallableThreadPool("exec-rpc-pool", "worker",
-        FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
-    async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
-    query_exec_mgr_(new QueryExecMgr()),
-    buffer_reservation_(nullptr),
-    buffer_pool_(nullptr),
-    enable_webserver_(FLAGS_enable_webserver),
-    is_fe_tests_(false),
-    backend_address_(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port)) {
-  // Initialize the scheduler either dynamically (with a statestore) or statically (with
-  // a standalone single backend)
-  if (FLAGS_use_statestore) {
-    TNetworkAddress subscriber_address =
-        MakeNetworkAddress(FLAGS_hostname, FLAGS_state_store_subscriber_port);
-    TNetworkAddress statestore_address =
-        MakeNetworkAddress(FLAGS_state_store_host, FLAGS_state_store_port);
+  : ExecEnv(FLAGS_hostname, FLAGS_be_port, FLAGS_state_store_subscriber_port,
+        FLAGS_webserver_port, FLAGS_state_store_host, FLAGS_state_store_port) {}
 
-    statestore_subscriber_.reset(new StatestoreSubscriber(
-        Substitute("impalad@$0", TNetworkAddressToString(backend_address_)),
-        subscriber_address, statestore_address, metrics_.get()));
-
-    if (FLAGS_is_coordinator) {
-      scheduler_.reset(new Scheduler(statestore_subscriber_.get(),
-          statestore_subscriber_->id(), backend_address_, metrics_.get(),
-          webserver_.get(), request_pool_service_.get()));
-    }
-
-    if (!FLAGS_disable_admission_control) {
-      admission_controller_.reset(new AdmissionController(statestore_subscriber_.get(),
-          request_pool_service_.get(), metrics_.get(), backend_address_));
-    } else {
-      LOG(INFO) << "Admission control is disabled.";
-    }
-  } else if (FLAGS_is_coordinator) {
-    vector<TNetworkAddress> addresses;
-    addresses.push_back(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
-    scheduler_.reset(new Scheduler(
-        addresses, metrics_.get(), webserver_.get(), request_pool_service_.get()));
-  }
-  exec_env_ = this;
-}
-
-// TODO: Need refactor to get rid of duplicated code.
 ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     int webserver_port, const string& statestore_host, int statestore_port)
   : obj_pool_(new ObjectPool),
@@ -219,7 +148,6 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     htable_factory_(new HBaseTableFactory()),
     disk_io_mgr_(new DiskIoMgr()),
     webserver_(new Webserver(webserver_port)),
-    mem_tracker_(nullptr),
     pool_mem_trackers_(new PoolMemTrackerRegistry),
     thread_mgr_(new ThreadResourceMgr),
     hdfs_op_thread_pool_(
@@ -230,39 +158,29 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
         FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
     async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
     query_exec_mgr_(new QueryExecMgr()),
-    buffer_reservation_(nullptr),
-    buffer_pool_(nullptr),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
-    is_fe_tests_(false),
-    backend_address_(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port)) {
+    backend_address_(MakeNetworkAddress(hostname, backend_port)) {
   request_pool_service_.reset(new RequestPoolService(metrics_.get()));
 
-  if (FLAGS_use_statestore && statestore_port > 0) {
-    TNetworkAddress subscriber_address =
-        MakeNetworkAddress(hostname, subscriber_port);
-    TNetworkAddress statestore_address =
-        MakeNetworkAddress(statestore_host, statestore_port);
+  TNetworkAddress subscriber_address = MakeNetworkAddress(hostname, subscriber_port);
+  TNetworkAddress statestore_address =
+      MakeNetworkAddress(statestore_host, statestore_port);
 
-    statestore_subscriber_.reset(new StatestoreSubscriber(
-        Substitute("impalad@$0", TNetworkAddressToString(backend_address_)),
-        subscriber_address, statestore_address, metrics_.get()));
+  statestore_subscriber_.reset(new StatestoreSubscriber(
+      Substitute("impalad@$0", TNetworkAddressToString(backend_address_)),
+      subscriber_address, statestore_address, metrics_.get()));
 
-    if (FLAGS_is_coordinator) {
-      scheduler_.reset(new Scheduler(statestore_subscriber_.get(),
-          statestore_subscriber_->id(), backend_address_, metrics_.get(),
-          webserver_.get(), request_pool_service_.get()));
-    }
+  if (FLAGS_is_coordinator) {
+    scheduler_.reset(new Scheduler(statestore_subscriber_.get(),
+        statestore_subscriber_->id(), backend_address_, metrics_.get(), webserver_.get(),
+        request_pool_service_.get()));
+  }
 
-    if (FLAGS_disable_admission_control) LOG(INFO) << "Admission control is disabled.";
-    if (!FLAGS_disable_admission_control) {
-      admission_controller_.reset(new AdmissionController(statestore_subscriber_.get(),
-          request_pool_service_.get(), metrics_.get(), backend_address_));
-    }
-  } else if (FLAGS_is_coordinator) {
-    vector<TNetworkAddress> addresses;
-    addresses.push_back(MakeNetworkAddress(hostname, backend_port));
-    scheduler_.reset(new Scheduler(
-        addresses, metrics_.get(), webserver_.get(), request_pool_service_.get()));
+  if (FLAGS_disable_admission_control) {
+    LOG(INFO) << "Admission control is disabled.";
+  } else {
+    admission_controller_.reset(new AdmissionController(statestore_subscriber_.get(),
+        request_pool_service_.get(), metrics_.get(), backend_address_));
   }
   exec_env_ = this;
 }

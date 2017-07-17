@@ -119,8 +119,8 @@ $ ps ax | grep [c]atalogd
               <codeph>impalad</codeph> if the service started successfully.
 <codeblock>$ sudo service impala-server start
 $ ps ax | grep [i]mpalad
- 7936 ?        Sl     0:12 /usr/lib/impala/sbin/impalad -log_dir=/var/log/impala -state_store_port=24000 -use_statestore
--state_store_host=127.0.0.1 -be_port=22000
+ 7936 ?        Sl     0:12 /usr/lib/impala/sbin/impalad -log_dir=/var/log/impala -state_store_port=24000
+ -state_store_host=127.0.0.1 -be_port=22000
 </codeblock>
             </li>
           </ol>

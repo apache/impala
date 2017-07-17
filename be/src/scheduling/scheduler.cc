@@ -70,21 +70,6 @@ Scheduler::Scheduler(StatestoreSubscriber* subscriber, const string& backend_id,
   local_backend_descriptor_.address = backend_address;
 }
 
-Scheduler::Scheduler(const vector<TNetworkAddress>& backends, MetricGroup* metrics,
-    Webserver* webserver, RequestPoolService* request_pool_service)
-  : executors_config_(std::make_shared<const BackendConfig>(backends)),
-    metrics_(metrics),
-    webserver_(webserver),
-    statestore_subscriber_(nullptr),
-    thrift_serializer_(false),
-    total_assignments_(nullptr),
-    total_local_assignments_(nullptr),
-    initialized_(nullptr),
-    request_pool_service_(request_pool_service) {
-  DCHECK(backends.size() > 0);
-  local_backend_descriptor_.address = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
-}
-
 Status Scheduler::Init() {
   LOG(INFO) << "Starting scheduler";
 

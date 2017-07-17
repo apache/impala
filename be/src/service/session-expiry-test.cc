@@ -43,7 +43,9 @@ DECLARE_int32(beeswax_port);
 
 TEST(SessionTest, TestExpiry) {
   FLAGS_idle_session_timeout = 1;
-  InProcessImpalaServer* impala = InProcessImpalaServer::StartWithEphemeralPorts();
+  InProcessStatestore* ips = InProcessStatestore::StartWithEphemeralPorts();
+  InProcessImpalaServer* impala =
+      InProcessImpalaServer::StartWithEphemeralPorts("localhost", ips->port());
   IntCounter* expired_metric =
       impala->metrics()->FindMetricForTesting<IntCounter>(
           ImpaladMetricKeys::NUM_SESSIONS_EXPIRED);

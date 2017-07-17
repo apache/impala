@@ -49,12 +49,9 @@
 
 using namespace impala;
 
-DECLARE_string(classpath);
-DECLARE_bool(use_statestore);
 DECLARE_int32(beeswax_port);
 DECLARE_int32(hs2_port);
 DECLARE_int32(be_port);
-DECLARE_string(principal);
 DECLARE_bool(enable_rm);
 DECLARE_bool(is_coordinator);
 

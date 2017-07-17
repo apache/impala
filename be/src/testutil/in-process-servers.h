@@ -54,16 +54,15 @@ class InProcessImpalaServer {
   /// indicate that a statestore connection should not be used. These values are directly
   /// forwarded to the ExecEnv.
   static InProcessImpalaServer* StartWithEphemeralPorts(
-      const std::string& statestore_host = "", int statestore_port = 0);
+      const std::string& statestore_host, int statestore_port);
 
   /// Starts all servers, including the beeswax and hs2 client
-  /// servers. If use_statestore is set, a connection to the statestore
-  /// is established. If there is no error, returns Status::OK.
-  Status StartWithClientServers(int beeswax_port, int hs2_port, bool use_statestore);
+  /// servers.
+  Status StartWithClientServers(int beeswax_port, int hs2_port);
 
   /// Starts only the backend server; useful when running a cluster of
   /// InProcessImpalaServers and only one is to serve client requests.
-  Status StartAsBackendOnly(bool use_statestore);
+  Status StartAsBackendOnly();
 
   /// Blocks until the backend server exits. Returns Status::OK unless
   /// there was an error joining.

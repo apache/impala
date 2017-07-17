@@ -86,11 +86,6 @@ class Scheduler {
       const TNetworkAddress& backend_address, MetricGroup* metrics, Webserver* webserver,
       RequestPoolService* request_pool_service);
 
-  /// Initialize with a list of <host:port> pairs in 'static' mode - i.e. the set of
-  /// backends is fixed and will not be updated.
-  Scheduler(const std::vector<TNetworkAddress>& backends, MetricGroup* metrics,
-      Webserver* webserver, RequestPoolService* request_pool_service);
-
   /// Initialises the scheduler, acquiring all resources needed to make scheduling
   /// decisions once this method returns. Register with the subscription manager if
   /// required.

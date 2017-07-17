@@ -39,7 +39,6 @@ DECLARE_int32(be_port);
 DECLARE_int32(beeswax_port);
 DECLARE_int32(hs2_port);
 DECLARE_string(principal);
-DECLARE_bool(use_statestore);
 
 #include "common/names.h"
 
@@ -67,7 +66,7 @@ int main(int argc, char** argv) {
   int hs2_port = 21050;
 
   scoped_ptr<InProcessStatestore> statestore(new InProcessStatestore(23000, 25100));
-  if (FLAGS_use_statestore) ABORT_IF_ERROR(statestore->Start());
+  ABORT_IF_ERROR(statestore->Start());
   LOG(INFO) << "Started in-process statestore";
 
   vector<InProcessImpalaServer*> impala_servers;
@@ -78,10 +77,9 @@ int main(int argc, char** argv) {
                                   FLAGS_hostname, 23000));
     // First server in the list runs client servers
     if (i == 0) {
-      ABORT_IF_ERROR(impala_servers[i]->StartWithClientServers(beeswax_port, hs2_port,
-                                                              FLAGS_use_statestore));
+      ABORT_IF_ERROR(impala_servers[i]->StartWithClientServers(beeswax_port, hs2_port));
     } else {
-      ABORT_IF_ERROR(impala_servers[i]->StartAsBackendOnly(FLAGS_use_statestore));
+      ABORT_IF_ERROR(impala_servers[i]->StartAsBackendOnly());
     }
   }
 
