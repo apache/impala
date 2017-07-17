@@ -112,7 +112,7 @@ under the License.
 
   <keydef href="https://code.google.com/p/re2/" scope="external" format="html" keys="re2"/>
   <keydef href="http://goog-perftools.sourceforge.net/doc/tcmalloc.html" scope="external" format="html" keys="tcmalloc"/>
-  <keydef href="http://google-glog.googlecode.com/svn/trunk/doc/glog.html" scope="external" format="html" keys="glog"/>
+  <keydef href="https://github.com/google/glog" scope="external" format="html" keys="glog.html"/>
 
   <keydef href="https://issues.apache.org/jira/browse/HIVE-656" scope="external" format="html" keys="HIVE-656"/>
 

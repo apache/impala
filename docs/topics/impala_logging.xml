@@ -381,8 +381,7 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
       <p>
         For more information on how to configure GLOG, including how to set variable logging levels for different
         system components, see
-        <xref href="http://google-glog.googlecode.com/svn/trunk/doc/glog.html" scope="external" format="html">How
-        To Use Google Logging Library (glog)</xref>.
+        <xref keyref="glog.html">documentation for the glog project on github</xref>.
       </p>
 
       <section id="loglevels_details">
