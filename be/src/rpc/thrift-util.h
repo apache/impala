@@ -126,7 +126,7 @@ Status DeserializeThriftMsg(const uint8_t* buf, uint32_t* len, bool compact,
   } catch (std::exception& e) {
     std::stringstream msg;
     msg << "couldn't deserialize thrift msg:\n" << e.what();
-    return Status(msg.str());
+    return Status::Expected(msg.str());
   } catch (...) {
     /// TODO: Find the right exception for 0 bytes
     return Status("Unknown exception");

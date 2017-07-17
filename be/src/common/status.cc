@@ -37,12 +37,12 @@ const Status Status::DEPRECATED_RPC(ErrorMsg::Init(TErrorCode::NOT_IMPLEMENTED_E
     "Deprecated RPC; please update your client"));
 
 Status Status::MemLimitExceeded() {
-  return Status(TErrorCode::MEM_LIMIT_EXCEEDED, "Memory limit exceeded");
+  return Status(ErrorMsg(TErrorCode::MEM_LIMIT_EXCEEDED, "Memory limit exceeded"), true);
 }
 
 Status Status::MemLimitExceeded(const std::string& details) {
-  return Status(TErrorCode::MEM_LIMIT_EXCEEDED,
-        Substitute("Memory limit exceeded: $0", details));
+  return Status(ErrorMsg(TErrorCode::MEM_LIMIT_EXCEEDED,
+      Substitute("Memory limit exceeded: $0", details)), true);
 }
 
 Status::Status(TErrorCode::type code)

@@ -312,10 +312,10 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
   for (int i = 0; i < node->materialized_slots().size(); ++i) {
     SlotDescriptor* slot_desc = node->materialized_slots()[i];
     if (slot_desc->type().type == TYPE_TIMESTAMP) {
-      return Status("Timestamp not yet supported for codegen.");
+      return Status::Expected("Timestamp not yet supported for codegen.");
     }
     if (slot_desc->type().type == TYPE_DECIMAL) {
-      return Status("Decimal not yet supported for codegen.");
+      return Status::Expected("Decimal not yet supported for codegen.");
     }
   }
 

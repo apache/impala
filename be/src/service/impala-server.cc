@@ -658,17 +658,29 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
   }
 
   // Look for the query in completed query log.
+  // IMPALA-5275: Don't create Status while holding query_log_lock_
   {
-    lock_guard<mutex> l(query_log_lock_);
-    QueryLogIndex::const_iterator query_record = query_log_index_.find(query_id);
-    if (query_record == query_log_index_.end()) {
+    string effective_user;
+    bool user_has_profile_access = false;
+    bool is_query_missing = false;
+    TExecSummary exec_summary;
+    {
+      lock_guard<mutex> l(query_log_lock_);
+      QueryLogIndex::const_iterator query_record = query_log_index_.find(query_id);
+      is_query_missing = query_record == query_log_index_.end();
+      if (!is_query_missing) {
+        effective_user = query_record->second->effective_user;
+        user_has_profile_access = query_record->second->user_has_profile_access;
+        exec_summary = query_record->second->exec_summary;
+      }
+    }
+    if (is_query_missing) {
       stringstream ss;
       ss << "Query id " << PrintId(query_id) << " not found.";
       return Status(ss.str());
     }
-    RETURN_IF_ERROR(CheckProfileAccess(user, query_record->second->effective_user,
-        query_record->second->user_has_profile_access));
-    *result = query_record->second->exec_summary;
+    RETURN_IF_ERROR(CheckProfileAccess(user, effective_user, user_has_profile_access));
+    *result = exec_summary;
   }
   return Status::OK();
 }

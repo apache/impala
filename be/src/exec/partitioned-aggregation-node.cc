@@ -1743,14 +1743,14 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(
 
   for (const SlotDescriptor* slot_desc : intermediate_tuple_desc_->slots()) {
     if (slot_desc->type().type == TYPE_CHAR) {
-      return Status("PartitionedAggregationNode::CodegenUpdateTuple(): cannot codegen"
-                    "CHAR in aggregations");
+      return Status::Expected("PartitionedAggregationNode::CodegenUpdateTuple(): cannot "
+          "codegen CHAR in aggregations");
     }
   }
 
   if (intermediate_tuple_desc_->GetLlvmStruct(codegen) == NULL) {
-    return Status("PartitionedAggregationNode::CodegenUpdateTuple(): failed to generate "
-                  "intermediate tuple desc");
+    return Status::Expected("PartitionedAggregationNode::CodegenUpdateTuple(): failed to"
+        " generate intermediate tuple desc");
   }
 
   // Get the types to match the UpdateTuple signature
