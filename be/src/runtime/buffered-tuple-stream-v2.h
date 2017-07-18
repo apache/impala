@@ -692,8 +692,13 @@ class BufferedTupleStreamV2 {
   int64_t CalcBytesPinned() const;
 
   /// DCHECKs if the stream is internally inconsistent. The stream should always be in
-  /// a consistent state after returning success from a public API call.
-  void CheckConsistency() const;
+  /// a consistent state after returning success from a public API call. The Fast version
+  /// has constant runtime and does not check all of 'pages_'. The Full version includes
+  /// O(n) checks that require iterating over the whole 'pages_' list (e.g. checking that
+  /// each page is in a valid state).
+  void CheckConsistencyFast() const;
+  void CheckConsistencyFull() const;
+  void CheckPageConsistency(const Page* page) const;
 };
 }
 
