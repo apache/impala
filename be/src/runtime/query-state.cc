@@ -201,22 +201,23 @@ void QueryState::ReportExecStatusAux(bool done, const Status& status,
       instance_status.__isset.profile = true;
     }
 
-    // Only send updates to insert status if fragment is finished, the coordinator
-    // waits until query execution is done to use them anyhow.
-    if (done) {
+    // Only send updates to insert status if fragment is finished, the coordinator waits
+    // until query execution is done to use them anyhow.
+    RuntimeState* state = fis->runtime_state();
+    if (done && (state->hdfs_files_to_move()->size() > 0
+        || state->per_partition_status()->size() > 0)) {
       TInsertExecStatus insert_status;
-      if (fis->runtime_state()->hdfs_files_to_move()->size() > 0) {
-        insert_status.__set_files_to_move(*fis->runtime_state()->hdfs_files_to_move());
+      if (state->hdfs_files_to_move()->size() > 0) {
+        insert_status.__set_files_to_move(*state->hdfs_files_to_move());
       }
-      if (fis->runtime_state()->per_partition_status()->size() > 0) {
-        insert_status.__set_per_partition_status(
-            *fis->runtime_state()->per_partition_status());
+      if (state->per_partition_status()->size() > 0) {
+        insert_status.__set_per_partition_status(*state->per_partition_status());
       }
       params.__set_insert_exec_status(insert_status);
     }
 
     // Send new errors to coordinator
-    fis->runtime_state()->GetUnreportedErrors(&params.error_log);
+    state->GetUnreportedErrors(&params.error_log);
     params.__isset.error_log = (params.error_log.size() > 0);
   }
 
