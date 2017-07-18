@@ -394,6 +394,7 @@ public class FunctionCallExpr extends Expr {
       digitsAfter = 0;
     } else if (fnName_.getFunction().equalsIgnoreCase("truncate") ||
                fnName_.getFunction().equalsIgnoreCase("dtrunc") ||
+               fnName_.getFunction().equalsIgnoreCase("trunc") ||
                fnName_.getFunction().equalsIgnoreCase("round") ||
                fnName_.getFunction().equalsIgnoreCase("dround")) {
       if (children_.size() > 1) {

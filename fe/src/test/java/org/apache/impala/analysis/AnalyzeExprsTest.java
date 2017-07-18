@@ -2193,6 +2193,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
   @Test
   public void TestDecimalFunctions() throws AnalysisException {
+    final String [] aliasesOfTruncate = new String[]{"truncate", "dtrunc", "trunc"};
     AnalyzesOk("select abs(cast(1 as decimal))");
     AnalyzesOk("select abs(cast(-1.1 as decimal(10,3)))");
 
@@ -2205,18 +2206,25 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select round(cast(1.123 as decimal(10,3)), 5)");
     AnalyzesOk("select round(cast(1.123 as decimal(10,3)), -2)");
 
-    AnalyzesOk("select truncate(cast(1.123 as decimal(10,3)))");
-    AnalyzesOk("select truncate(cast(1.123 as decimal(10,3)), 0)");
-    AnalyzesOk("select truncate(cast(1.123 as decimal(10,3)), 2)");
-    AnalyzesOk("select truncate(cast(1.123 as decimal(10,3)), 5)");
-    AnalyzesOk("select truncate(cast(1.123 as decimal(10,3)), -1)");
+    for (final String alias : aliasesOfTruncate) {
+        AnalyzesOk(String.format("select %s(cast(1.123 as decimal(10,3)))", alias));
+        AnalyzesOk(String.format("select %s(cast(1.123 as decimal(10,3)), 0)", alias));
+        AnalyzesOk(String.format("select %s(cast(1.123 as decimal(10,3)), 2)", alias));
+        AnalyzesOk(String.format("select %s(cast(1.123 as decimal(10,3)), 5)", alias));
+        AnalyzesOk(String.format("select %s(cast(1.123 as decimal(10,3)), -1)", alias));
+    }
 
     AnalysisError("select round(cast(1.123 as decimal(10,3)), 5.1)",
         "No matching function with signature: round(DECIMAL(10,3), DECIMAL(2,1))");
     AnalysisError("select round(cast(1.123 as decimal(30,20)), 40)",
         "Cannot round/truncate to scales greater than 38.");
-    AnalysisError("select truncate(cast(1.123 as decimal(10,3)), 40)",
-        "Cannot round/truncate to scales greater than 38.");
+    for (final String alias : aliasesOfTruncate) {
+        AnalysisError(String.format("select truncate(cast(1.123 as decimal(10,3)), 40)",
+            alias), "Cannot round/truncate to scales greater than 38.");
+        AnalyzesOk(String.format("select %s(NULL)", alias));
+        AnalysisError(String.format("select %s(NULL, 1)", alias),
+            "Cannot resolve DECIMAL precision and scale from NULL type.");
+    }
     AnalysisError("select round(cast(1.123 as decimal(10,3)), NULL)",
         "round() cannot be called with a NULL second argument.");
 
@@ -2244,12 +2252,20 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testDecimalExpr("ceil(123.45)", ScalarType.createDecimalType(4, 0));
     testDecimalExpr("floor(12.345)", ScalarType.createDecimalType(3, 0));
 
-    testDecimalExpr("truncate(1.23)", ScalarType.createDecimalType(1, 0));
-    testDecimalExpr("truncate(1.23, 1)", ScalarType.createDecimalType(2, 1));
-    testDecimalExpr("truncate(1.23, 0)", ScalarType.createDecimalType(1, 0));
-    testDecimalExpr("truncate(1.23, 3)", ScalarType.createDecimalType(4, 3));
-    testDecimalExpr("truncate(1.23, -1)", ScalarType.createDecimalType(1, 0));
-    testDecimalExpr("truncate(1.23, -2)", ScalarType.createDecimalType(1, 0));
+    for (final String alias : aliasesOfTruncate) {
+        testDecimalExpr(String.format("%s(1.23)", alias),
+            ScalarType.createDecimalType(1, 0));
+        testDecimalExpr(String.format("%s(1.23, 1)", alias),
+            ScalarType.createDecimalType(2, 1));
+        testDecimalExpr(String.format("%s(1.23, 0)", alias),
+            ScalarType.createDecimalType(1, 0));
+        testDecimalExpr(String.format("%s(1.23, 3)", alias),
+            ScalarType.createDecimalType(4, 3));
+        testDecimalExpr(String.format("%s(1.23, -1)", alias),
+            ScalarType.createDecimalType(1, 0));
+        testDecimalExpr(String.format("%s(1.23, -2)", alias),
+            ScalarType.createDecimalType(1, 0));
+    }
   }
 
   /**
