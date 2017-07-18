@@ -105,15 +105,6 @@ public class Planner {
     invertJoins(singleNodePlan, ctx_.isSingleNodeExec());
     singleNodePlan = useNljForSingularRowBuilds(singleNodePlan, ctx_.getRootAnalyzer());
 
-    // create runtime filters
-    if (ctx_.getQueryOptions().getRuntime_filter_mode() != TRuntimeFilterMode.OFF) {
-      // Always compute filters, even if the BE won't always use all of them.
-      RuntimeFilterGenerator.generateRuntimeFilters(ctx_.getRootAnalyzer(),
-          singleNodePlan, ctx_.getQueryOptions().getMax_num_runtime_filters());
-      ctx_.getAnalysisResult().getTimeline().markEvent(
-          "Runtime filters computed");
-    }
-
     singleNodePlanner.validatePlan(singleNodePlan);
 
     if (ctx_.isSingleNodeExec()) {
@@ -125,7 +116,13 @@ public class Planner {
       fragments = distributedPlanner.createPlanFragments(singleNodePlan);
     }
 
+    // Create runtime filters.
     PlanFragment rootFragment = fragments.get(fragments.size() - 1);
+    if (ctx_.getQueryOptions().getRuntime_filter_mode() != TRuntimeFilterMode.OFF) {
+      RuntimeFilterGenerator.generateRuntimeFilters(ctx_, rootFragment.getPlanRoot());
+      ctx_.getAnalysisResult().getTimeline().markEvent("Runtime filters computed");
+    }
+
     rootFragment.verifyTree();
     ExprSubstitutionMap rootNodeSmap = rootFragment.getPlanRoot().getOutputSmap();
     List<Expr> resultExprs = null;

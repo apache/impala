@@ -402,15 +402,8 @@ public class PlannerTestBase extends FrontendTestBase {
    * of 'testCase'.
    */
   private void runTestCase(TestCase testCase, StringBuilder errorLog,
-      StringBuilder actualOutput, String dbName, TQueryOptions options,
-      boolean ignoreExplainHeader)
+      StringBuilder actualOutput, String dbName, boolean ignoreExplainHeader)
       throws CatalogException {
-    if (options == null) {
-      options = defaultQueryOptions();
-    } else {
-      options = mergeQueryOptions(defaultQueryOptions(), options);
-    }
-
     String query = testCase.getQuery();
     LOG.info("running query " + query);
     if (query.isEmpty()) {
@@ -419,7 +412,7 @@ public class PlannerTestBase extends FrontendTestBase {
     }
     TQueryCtx queryCtx = TestUtils.createQueryContext(
         dbName, System.getProperty("user.name"));
-    queryCtx.client_request.query_options = options;
+    queryCtx.client_request.query_options = testCase.getOptions();
     // Test single node plan, scan range locations, and column lineage.
     TExecRequest singleNodeExecRequest = testPlan(testCase, Section.PLAN, queryCtx,
         ignoreExplainHeader, errorLog, actualOutput);
@@ -736,7 +729,12 @@ public class PlannerTestBase extends FrontendTestBase {
   private void runPlannerTestFile(String testFile, String dbName, TQueryOptions options,
       boolean ignoreExplainHeader) {
     String fileName = testDir_.resolve(testFile + ".test").toString();
-    TestFileParser queryFileParser = new TestFileParser(fileName);
+    if (options == null) {
+      options = defaultQueryOptions();
+    } else {
+      options = mergeQueryOptions(defaultQueryOptions(), options);
+    }
+    TestFileParser queryFileParser = new TestFileParser(fileName, options);
     StringBuilder actualOutput = new StringBuilder();
 
     queryFileParser.parseFile();
@@ -745,8 +743,7 @@ public class PlannerTestBase extends FrontendTestBase {
       actualOutput.append(testCase.getSectionAsString(Section.QUERY, true, "\n"));
       actualOutput.append("\n");
       try {
-        runTestCase(testCase, errorLog, actualOutput, dbName, options,
-                ignoreExplainHeader);
+        runTestCase(testCase, errorLog, actualOutput, dbName, ignoreExplainHeader);
       } catch (CatalogException e) {
         errorLog.append(String.format("Failed to plan query\n%s\n%s",
             testCase.getQuery(), e.getMessage()));

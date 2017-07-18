@@ -62,14 +62,10 @@ Status ScanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
     auto it = filter_desc.planid_to_target_ndx.find(tnode.node_id);
     DCHECK(it != filter_desc.planid_to_target_ndx.end());
     const TRuntimeFilterTargetDesc& target = filter_desc.targets[it->second];
-    if (state->query_options().runtime_filter_mode == TRuntimeFilterMode::LOCAL &&
-        !target.is_local_target) {
-      continue;
-    }
-    if (query_options.disable_row_runtime_filtering &&
-        !target.is_bound_by_partition_columns) {
-      continue;
-    }
+    DCHECK(state->query_options().runtime_filter_mode == TRuntimeFilterMode::GLOBAL ||
+        target.is_local_target);
+    DCHECK(!query_options.disable_row_runtime_filtering ||
+        target.is_bound_by_partition_columns);
     ScalarExpr* filter_expr;
     RETURN_IF_ERROR(
         ScalarExpr::Create(target.target_expr, *row_desc(), state, &filter_expr));

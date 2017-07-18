@@ -297,6 +297,11 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testRuntimeFilterQueryOptions() {
+    runPlannerTestFile("runtime-filter-query-options");
+  }
+
+  @Test
   public void testConjunctOrdering() {
     runPlannerTestFile("conjunct-ordering");
   }

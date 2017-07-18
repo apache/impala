@@ -103,16 +103,10 @@ Status PhjBuilder::InitExprsAndFilters(RuntimeState* state,
   }
 
   for (const TRuntimeFilterDesc& filter_desc : filter_descs) {
-    // If filter propagation not enabled, only consider building broadcast joins (that
-    // may be consumed by this fragment).
-    if (state->query_options().runtime_filter_mode != TRuntimeFilterMode::GLOBAL &&
-        !filter_desc.is_broadcast_join) {
-      continue;
-    }
-    if (state->query_options().disable_row_runtime_filtering &&
-        !filter_desc.applied_on_partition_columns) {
-      continue;
-    }
+    DCHECK(state->query_options().runtime_filter_mode == TRuntimeFilterMode::GLOBAL ||
+        filter_desc.is_broadcast_join);
+    DCHECK(!state->query_options().disable_row_runtime_filtering ||
+        filter_desc.applied_on_partition_columns);
     ScalarExpr* filter_expr;
     RETURN_IF_ERROR(
         ScalarExpr::Create(filter_desc.src_expr, *row_desc_, state, &filter_expr));

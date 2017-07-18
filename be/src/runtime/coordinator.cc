@@ -281,9 +281,7 @@ void Coordinator::InitFilterRoutingTable() {
     for (const TPlanNode& plan_node: fragment_params.fragment.plan.nodes) {
       if (!plan_node.__isset.runtime_filters) continue;
       for (const TRuntimeFilterDesc& filter: plan_node.runtime_filters) {
-        if (filter_mode_ == TRuntimeFilterMode::LOCAL && !filter.has_local_targets) {
-          continue;
-        }
+        DCHECK(filter_mode_ == TRuntimeFilterMode::GLOBAL || filter.has_local_targets);
         FilterRoutingTable::iterator i = filter_routing_table_.emplace(
             filter.filter_id, FilterState(filter, plan_node.node_id)).first;
         FilterState* f = &(i->second);
@@ -317,9 +315,7 @@ void Coordinator::InitFilterRoutingTable() {
           auto it = filter.planid_to_target_ndx.find(plan_node.node_id);
           DCHECK(it != filter.planid_to_target_ndx.end());
           const TRuntimeFilterTargetDesc& t_target = filter.targets[it->second];
-          if (filter_mode_ == TRuntimeFilterMode::LOCAL && !t_target.is_local_target) {
-            continue;
-          }
+          DCHECK(filter_mode_ == TRuntimeFilterMode::GLOBAL || t_target.is_local_target);
           f->targets()->emplace_back(t_target, fragment_params.fragment.idx);
         } else {
           DCHECK(false) << "Unexpected plan node with runtime filters: "

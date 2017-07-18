@@ -488,15 +488,6 @@ public class DistributedPlanner {
           lhsHasCompatPartition, rhsHasCompatPartition, leftChildFragment,
           rightChildFragment, lhsJoinExprs, rhsJoinExprs, fragments);
     }
-
-    for (RuntimeFilter filter: node.getRuntimeFilters()) {
-      filter.setIsBroadcast(distrMode == DistributionMode.BROADCAST);
-      filter.computeHasLocalTargets();
-      // Work around IMPALA-3450, where cardinalities might be wrong in single-node plans
-      // with UNION and LIMITs.
-      // TODO: Remove.
-      filter.computeNdvEstimate();
-    }
     return hjFragment;
  }
 

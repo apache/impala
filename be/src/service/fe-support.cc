@@ -41,6 +41,7 @@
 #include "runtime/raw-value.h"
 #include "runtime/runtime-state.h"
 #include "service/impala-server.h"
+#include "service/query-options.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
@@ -445,6 +446,31 @@ Java_org_apache_impala_service_FeSupport_NativePrioritizeLoad(
   return result_bytes;
 }
 
+// Used to call native code from the FE to parse and set comma-delimited key=value query
+// options.
+extern "C"
+JNIEXPORT jbyteArray JNICALL
+Java_org_apache_impala_service_FeSupport_NativeParseQueryOptions(
+    JNIEnv* env, jclass caller_class, jstring csv_query_options,
+    jbyteArray tquery_options) {
+  TQueryOptions options;
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, tquery_options, &options), env,
+      JniUtil::internal_exc_class(), nullptr);
+
+  JniUtfCharGuard csv_query_options_guard;
+  THROW_IF_ERROR_RET(
+      JniUtfCharGuard::create(env, csv_query_options, &csv_query_options_guard), env,
+      JniUtil::internal_exc_class(), nullptr);
+  THROW_IF_ERROR_RET(
+      impala::ParseQueryOptions(csv_query_options_guard.get(), &options, NULL), env,
+      JniUtil::internal_exc_class(), nullptr);
+
+  jbyteArray result_bytes = NULL;
+  THROW_IF_ERROR_RET(SerializeThriftMsg(env, &options, &result_bytes), env,
+      JniUtil::internal_exc_class(), result_bytes);
+  return result_bytes;
+}
+
 namespace impala {
 
 static JNINativeMethod native_methods[] = {
@@ -467,6 +493,10 @@ static JNINativeMethod native_methods[] = {
   {
     (char*)"NativePrioritizeLoad", (char*)"([B)[B",
     (void*)::Java_org_apache_impala_service_FeSupport_NativePrioritizeLoad
+  },
+  {
+    (char*)"NativeParseQueryOptions", (char*)"(Ljava/lang/String;[B)[B",
+    (void*)::Java_org_apache_impala_service_FeSupport_NativeParseQueryOptions
   },
 };
 
