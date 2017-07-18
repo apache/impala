@@ -224,6 +224,7 @@ string
 symbol
 table
 tables
+<ph rev="2.9.0">tablesample</ph>
 tblproperties
 terminated
 textfile
@@ -364,7 +365,6 @@ shutdown
 some
 statistics
 system_user
-tablesample
 textsize
 then
 top
