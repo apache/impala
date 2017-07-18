@@ -21,7 +21,13 @@
 // a main()), or flags that are referenced from multiple places and having them here
 // calms the linker errors that would otherwise ensue.
 
+#include <string>
+
+#include "common/constant-strings.h"
 #include "common/logging.h"
+#include "gutil/strings/substitute.h"
+
+#include "common/names.h"
 
 // This will be defaulted to the host name returned by the OS.
 // This name is used in the principal generated for Kerberos authorization.
@@ -41,10 +47,18 @@ DEFINE_string(krb5_conf, "", "Absolute path to Kerberos krb5.conf if in a non-st
     "location. Does not normally need to be set.");
 DEFINE_string(krb5_debug_file, "", "Turn on Kerberos debugging and output to this file");
 
-DEFINE_string(mem_limit, "80%", "Process memory limit specified as number of bytes "
-              "('<int>[bB]?'), megabytes ('<float>[mM]'), gigabytes ('<float>[gG]'), "
-              "or percentage of the physical memory ('<int>%'). "
-              "Defaults to bytes if no unit is given");
+static const string mem_limit_help_msg = "Limit on process memory consumption, "
+    "excluding the JVM's memory consumption. "
+    + Substitute(MEM_UNITS_HELP_MSG, "the physical memory");
+DEFINE_string(mem_limit, "80%",  mem_limit_help_msg.c_str());
+
+static const string buffer_pool_limit_help_msg = "(Advanced) Limit on buffer pool size. "
+     + Substitute(MEM_UNITS_HELP_MSG, "the process memory limit") + " "
+    "The default value and behaviour of this flag may change between releases.";
+DEFINE_string(buffer_pool_limit, "80%", buffer_pool_limit_help_msg.c_str());
+
+DEFINE_int64(min_buffer_size, 64 * 1024,
+    "(Advanced) The minimum buffer size to use in the buffer pool");
 
 DEFINE_bool(enable_process_lifetime_heap_profiling, false, "(Advanced) Enables heap "
     "profiling for the lifetime of the process. Profile output will be stored in the "

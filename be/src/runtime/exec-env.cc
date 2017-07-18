@@ -75,14 +75,14 @@ DEFINE_int32(state_store_subscriber_port, 23000,
 DEFINE_int32(num_hdfs_worker_threads, 16,
     "(Advanced) The number of threads in the global HDFS operation pool");
 DEFINE_bool(disable_admission_control, false, "Disables admission control.");
-DEFINE_int64(min_buffer_size, 64 * 1024,
-    "(Advanced) The minimum buffer size to use in the buffer pool");
 
 DECLARE_int32(state_store_port);
 DECLARE_int32(num_threads_per_core);
 DECLARE_int32(num_cores);
 DECLARE_int32(be_port);
 DECLARE_string(mem_limit);
+DECLARE_string(buffer_pool_limit);
+DECLARE_int64(min_buffer_size);
 DECLARE_bool(is_coordinator);
 DECLARE_int32(webserver_port);
 
@@ -241,9 +241,14 @@ Status ExecEnv::StartServices() {
     return Status(Substitute(
         "--min_buffer_size must be a power-of-two: $0", FLAGS_min_buffer_size));
   }
-  int64_t buffer_pool_capacity = BitUtil::RoundDown(
-      no_process_mem_limit ? system_mem : bytes_limit * 4 / 5, FLAGS_min_buffer_size);
-  InitBufferPool(FLAGS_min_buffer_size, buffer_pool_capacity);
+  int64_t buffer_pool_limit = ParseUtil::ParseMemSpec(FLAGS_buffer_pool_limit,
+      &is_percent, no_process_mem_limit ? system_mem : bytes_limit);
+  if (buffer_pool_limit <= 0) {
+    return Status(Substitute("Invalid --buffer_pool_limit value, must be a percentage or "
+          "positive bytes value: $0", FLAGS_buffer_pool_limit));
+  }
+  buffer_pool_limit = BitUtil::RoundDown(buffer_pool_limit, FLAGS_min_buffer_size);
+  InitBufferPool(FLAGS_min_buffer_size, buffer_pool_limit);
 
   metrics_->Init(enable_webserver_ ? webserver_.get() : nullptr);
   impalad_client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");
@@ -282,8 +287,8 @@ Status ExecEnv::StartServices() {
   }
   LOG(INFO) << "Using global memory limit: "
             << PrettyPrinter::Print(bytes_limit, TUnit::BYTES);
-  LOG(INFO) << "Buffer pool capacity: "
-            << PrettyPrinter::Print(buffer_pool_capacity, TUnit::BYTES);
+  LOG(INFO) << "Buffer pool limit: "
+            << PrettyPrinter::Print(buffer_pool_limit, TUnit::BYTES);
 
   RETURN_IF_ERROR(disk_io_mgr_->Init(mem_tracker_.get()));
 
