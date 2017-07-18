@@ -925,6 +925,7 @@ class QueryRunner(object):
     # Exceeding a mem limit may result in the message "cancelled". See IMPALA-2234
     if "memory limit exceeded" in caught_msg or \
        "repartitioning did not reduce the size of a spilled partition" in caught_msg or \
+       "failed to get minimum memory reservation" in caught_msg or \
        caught_msg == "cancelled":
       report.mem_limit_exceeded = True
       return
