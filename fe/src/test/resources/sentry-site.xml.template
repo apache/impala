@@ -39,6 +39,13 @@
  <value>localhost</value>
 </property>
 <property>
+<!--
+ TODO(IMPALA-5686): Remove this or the previous property when Sentry standardizes on one.
+-->
+ <name>sentry.service.client.server.rpc-addresses</name>
+ <value>localhost</value>
+</property>
+<property>
  <name>sentry.service.client.server.rpc-port</name>
  <value>30911</value>
 </property>
