@@ -37,14 +37,45 @@ class ReservationTracker;
 class Thread;
 
 /// Memory metrics including TCMalloc and BufferPool memory.
-class AggregateMemoryMetric {
+class AggregateMemoryMetrics {
  public:
   /// The sum of Tcmalloc TOTAL_BYTES_RESERVED and BufferPool SYSTEM_ALLOCATED.
   /// Approximates the total amount of physical memory consumed by the backend (i.e. not
   /// including JVM memory), which is either in use by queries or cached by the BufferPool
-  /// or TcMalloc. NULL when running under ASAN.
+  /// or the malloc implementation.
   /// TODO: IMPALA-691 - consider changing this to include JVM memory.
   static SumGauge<uint64_t>* TOTAL_USED;
+
+  /// The total number of virtual memory regions for the process.
+  /// The value must be refreshed by calling Refresh().
+  static UIntGauge* NUM_MAPS;
+
+  /// The total size of virtual memory regions for the process.
+  /// The value must be refreshed by calling Refresh().
+  static UIntGauge* MAPPED_BYTES;
+
+  /// The total RSS of all virtual memory regions for the process.
+  /// The value must be refreshed by calling Refresh().
+  static UIntGauge* RSS;
+
+  /// The total RSS of all virtual memory regions for the process.
+  /// The value must be refreshed by calling Refresh().
+  static UIntGauge* ANON_HUGE_PAGE_BYTES;
+
+  /// The string reporting the /enabled setting for transparent huge pages.
+  /// The value must be refreshed by calling Refresh().
+  static StringProperty* THP_ENABLED;
+
+  /// The string reporting the /defrag setting for transparent huge pages.
+  /// The value must be refreshed by calling Refresh().
+  static StringProperty* THP_DEFRAG;
+
+  /// The string reporting the khugepaged/defrag setting for transparent huge pages.
+  /// The value must be refreshed by calling Refresh().
+  static StringProperty* THP_KHUGEPAGED_DEFRAG;
+
+  /// Refreshes values of any of the aggregate metrics that require refreshing.
+  static void Refresh();
 };
 
 /// Specialised metric which exposes numeric properties from tcmalloc.

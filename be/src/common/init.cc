@@ -128,21 +128,27 @@ static scoped_ptr<impala::Thread> pause_monitor;
   while (true) {
     SleepForMs(FLAGS_memory_maintenance_sleep_time_ms);
     impala::ExecEnv* env = impala::ExecEnv::GetInstance();
-    if (env == nullptr) continue; // ExecEnv may not have been created yet.
-    BufferPool* buffer_pool = env->buffer_pool();
-    if (buffer_pool != nullptr) buffer_pool->Maintenance();
+    // ExecEnv may not have been created yet or this may be the catalogd or statestored,
+    // which don't have ExecEnvs.
+    if (env != nullptr) {
+      BufferPool* buffer_pool = env->buffer_pool();
+      if (buffer_pool != nullptr) buffer_pool->Maintenance();
 
 #ifndef ADDRESS_SANITIZER
-    // When using tcmalloc, the process limit as measured by our trackers will
-    // be out of sync with the process usage. The metric is refreshed whenever
-    // memory is consumed or released via a MemTracker, so on a system with
-    // queries executing it will be refreshed frequently. However if the system
-    // is idle, we need to refresh the tracker occasionally since untracked
-    // memory may be allocated or freed, e.g. by background threads.
-    if (env != NULL && env->process_mem_tracker() != NULL) {
-      env->process_mem_tracker()->RefreshConsumptionFromMetric();
-    }
+      // When using tcmalloc, the process limit as measured by our trackers will
+      // be out of sync with the process usage. The metric is refreshed whenever
+      // memory is consumed or released via a MemTracker, so on a system with
+      // queries executing it will be refreshed frequently. However if the system
+      // is idle, we need to refresh the tracker occasionally since untracked
+      // memory may be allocated or freed, e.g. by background threads.
+      if (env->process_mem_tracker() != nullptr) {
+        env->process_mem_tracker()->RefreshConsumptionFromMetric();
+      }
 #endif
+    }
+    // Periodically refresh values of the aggregate memory metrics to ensure they are
+    // somewhat up-to-date.
+    AggregateMemoryMetrics::Refresh();
   }
 }
 

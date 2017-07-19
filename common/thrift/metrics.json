@@ -1208,6 +1208,90 @@
     "key": "memory.total-used"
   },
   {
+    "description": "Total number of memory mappings in this process.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Number of memory mappings.",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "memory.num-maps"
+  },
+  {
+    "description": "Total bytes of memory mappings in this process (the virtual memory size).",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Total Virtual Memory.",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "memory.mapped-bytes"
+  },
+  {
+    "description": "Resident set size (RSS) of this process, including TCMalloc, buffer pool and Jvm.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Resident set size.",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "memory.rss"
+  },
+  {
+    "description": "Total bytes of anonymous (a.k.a. transparent) huge pages used by this process.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Anonymous Huge Pages.",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "memory.anon-huge-page-bytes"
+  },
+  {
+    "description": "The system-wide 'enabled' setting for Transparent Huge Pages.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Transparent Huge Pages Enabled.",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "memory.thp.enabled"
+  },
+  {
+    "description": "The system-wide 'defrag' setting for Transparent Huge Pages.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Transparent Huge Pages Defrag Enabled.",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "memory.thp.defrag"
+  },
+  {
+    "description": "The system-wide 'defrag' setting for khugepaged.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Khugepaged Defrag Enabled.",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "memory.thp.khugepaged-defrag"
+  },
+  {
     "description": "The number of running threads in this process.",
     "contexts": [
       "STATESTORE",

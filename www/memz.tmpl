@@ -28,6 +28,41 @@ Memory consumption / limit: <strong>{{consumption}}</strong> / <strong>{{mem_lim
 <h3>tcmalloc</h3>
 <pre>{{overview}}</pre>
 
+<h3>System</h3>
+<pre>{{systeminfo}}</pre>
+
+{{?aggregate_metrics}}
+<h3>Process and system memory metrics</h3>
+<table class='table table-bordered table-hover'>
+  <tr>
+    <th>Name</th>
+    <th>Value</th>
+    <th>Description</th>
+  </tr>
+{{/aggregate_metrics}}
+{{#aggregate_metrics}}
+  <tr>
+    <td><tt>{{name}}</tt></td>
+    {{! Is this a stats metric? }}
+    {{?mean}}
+    <td>
+      Last (of {{count}}): <strong>{{last}}</strong>.
+      Min: {{min}}, max: {{max}}, avg: {{mean}}</td>
+    {{/mean}}
+    {{^mean}}
+    <td>
+      {{human_readable}}
+    </td>
+    {{/mean}}
+    <td>
+      {{description}}
+    </td>
+  </tr>
+{{/aggregate_metrics}}
+{{?aggregate_metrics}}
+</table>
+{{/aggregate_metrics}}
+
 {{?buffer_pool}}
 <h3>Buffer pool memory metrics</h3>
 <table class='table table-bordered table-hover'>

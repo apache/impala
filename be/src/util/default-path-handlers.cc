@@ -31,6 +31,7 @@
 #include "service/impala-server.h"
 #include "util/common-metrics.h"
 #include "util/debug-util.h"
+#include "util/mem-info.h"
 #include "util/pprof-path-handlers.h"
 #include "util/mem-info.h"
 #include "util/cpu-info.h"
@@ -149,7 +150,17 @@ void MemUsageHandler(MemTracker* mem_tracker, MetricGroup* metric_group,
   Value detailed(mem_tracker->LogUsage().c_str(), document->GetAllocator());
   document->AddMember("detailed", detailed, document->GetAllocator());
 
+  Value systeminfo(MemInfo::DebugString().c_str(), document->GetAllocator());
+  document->AddMember("systeminfo", systeminfo, document->GetAllocator());
+
   if (metric_group != nullptr) {
+    MetricGroup* aggregate_group = metric_group->FindChildGroup("memory");
+    if (aggregate_group != nullptr) {
+      Value json_metrics(kObjectType);
+      aggregate_group->ToJson(false, document, &json_metrics);
+      document->AddMember(
+          "aggregate_metrics", json_metrics["metrics"], document->GetAllocator());
+    }
     MetricGroup* jvm_group = metric_group->FindChildGroup("jvm");
     if (jvm_group != nullptr) {
       Value jvm(kObjectType);

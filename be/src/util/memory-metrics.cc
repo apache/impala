@@ -23,6 +23,7 @@
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "util/jni-util.h"
+#include "util/mem-info.h"
 #include "util/time.h"
 
 using boost::algorithm::to_lower;
@@ -31,13 +32,20 @@ using namespace strings;
 
 DECLARE_bool(mmap_buffers);
 
-SumGauge<uint64_t>* AggregateMemoryMetric::TOTAL_USED = nullptr;
+SumGauge<uint64_t>* AggregateMemoryMetrics::TOTAL_USED = nullptr;
+UIntGauge* AggregateMemoryMetrics::NUM_MAPS = nullptr;
+UIntGauge* AggregateMemoryMetrics::MAPPED_BYTES = nullptr;
+UIntGauge* AggregateMemoryMetrics::RSS = nullptr;
+UIntGauge* AggregateMemoryMetrics::ANON_HUGE_PAGE_BYTES = nullptr;
+StringProperty* AggregateMemoryMetrics::THP_ENABLED = nullptr;
+StringProperty* AggregateMemoryMetrics::THP_DEFRAG = nullptr;
+StringProperty* AggregateMemoryMetrics::THP_KHUGEPAGED_DEFRAG = nullptr;
 
-TcmallocMetric* TcmallocMetric::BYTES_IN_USE = NULL;
-TcmallocMetric* TcmallocMetric::PAGEHEAP_FREE_BYTES = NULL;
-TcmallocMetric* TcmallocMetric::TOTAL_BYTES_RESERVED = NULL;
-TcmallocMetric* TcmallocMetric::PAGEHEAP_UNMAPPED_BYTES = NULL;
-TcmallocMetric::PhysicalBytesMetric* TcmallocMetric::PHYSICAL_BYTES_RESERVED = NULL;
+TcmallocMetric* TcmallocMetric::BYTES_IN_USE = nullptr;
+TcmallocMetric* TcmallocMetric::PAGEHEAP_FREE_BYTES = nullptr;
+TcmallocMetric* TcmallocMetric::TOTAL_BYTES_RESERVED = nullptr;
+TcmallocMetric* TcmallocMetric::PAGEHEAP_UNMAPPED_BYTES = nullptr;
+TcmallocMetric::PhysicalBytesMetric* TcmallocMetric::PHYSICAL_BYTES_RESERVED = nullptr;
 
 AsanMallocMetric* AsanMallocMetric::BYTES_ALLOCATED = nullptr;
 
@@ -76,32 +84,69 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
       new AsanMallocMetric(MetricDefs::Get("asan-total-bytes-allocated")));
   used_metrics.push_back(AsanMallocMetric::BYTES_ALLOCATED);
 #else
+  MetricGroup* tcmalloc_metrics = metrics->GetOrCreateChildGroup("tcmalloc");
   // We rely on TCMalloc for our global memory metrics, so skip setting them up
   // if we're not using TCMalloc.
   TcmallocMetric::BYTES_IN_USE = TcmallocMetric::CreateAndRegister(
-      metrics, "tcmalloc.bytes-in-use", "generic.current_allocated_bytes");
+      tcmalloc_metrics, "tcmalloc.bytes-in-use", "generic.current_allocated_bytes");
 
   TcmallocMetric::TOTAL_BYTES_RESERVED = TcmallocMetric::CreateAndRegister(
-      metrics, "tcmalloc.total-bytes-reserved", "generic.heap_size");
+      tcmalloc_metrics, "tcmalloc.total-bytes-reserved", "generic.heap_size");
 
-  TcmallocMetric::PAGEHEAP_FREE_BYTES = TcmallocMetric::CreateAndRegister(metrics,
-      "tcmalloc.pageheap-free-bytes", "tcmalloc.pageheap_free_bytes");
+  TcmallocMetric::PAGEHEAP_FREE_BYTES = TcmallocMetric::CreateAndRegister(
+      tcmalloc_metrics, "tcmalloc.pageheap-free-bytes", "tcmalloc.pageheap_free_bytes");
 
-  TcmallocMetric::PAGEHEAP_UNMAPPED_BYTES = TcmallocMetric::CreateAndRegister(metrics,
-      "tcmalloc.pageheap-unmapped-bytes", "tcmalloc.pageheap_unmapped_bytes");
+  TcmallocMetric::PAGEHEAP_UNMAPPED_BYTES =
+      TcmallocMetric::CreateAndRegister(tcmalloc_metrics,
+          "tcmalloc.pageheap-unmapped-bytes", "tcmalloc.pageheap_unmapped_bytes");
 
   TcmallocMetric::PHYSICAL_BYTES_RESERVED =
-      metrics->RegisterMetric(new TcmallocMetric::PhysicalBytesMetric(
+      tcmalloc_metrics->RegisterMetric(new TcmallocMetric::PhysicalBytesMetric(
           MetricDefs::Get("tcmalloc.physical-bytes-reserved")));
 
   used_metrics.push_back(TcmallocMetric::PHYSICAL_BYTES_RESERVED);
 #endif
-  AggregateMemoryMetric::TOTAL_USED = metrics->RegisterMetric(
+  MetricGroup* aggregate_metrics = metrics->GetOrCreateChildGroup("memory");
+  AggregateMemoryMetrics::TOTAL_USED = aggregate_metrics->RegisterMetric(
       new SumGauge<uint64_t>(MetricDefs::Get("memory.total-used"), used_metrics));
   if (register_jvm_metrics) {
     RETURN_IF_ERROR(JvmMetric::InitMetrics(metrics->GetOrCreateChildGroup("jvm")));
   }
+
+  if (MemInfo::HaveSmaps()) {
+    AggregateMemoryMetrics::NUM_MAPS =
+        aggregate_metrics->AddGauge<uint64_t>("memory.num-maps", 0U);
+    AggregateMemoryMetrics::MAPPED_BYTES =
+        aggregate_metrics->AddGauge<uint64_t>("memory.mapped-bytes", 0U);
+    AggregateMemoryMetrics::RSS = aggregate_metrics->AddGauge<uint64_t>("memory.rss", 0U);
+    AggregateMemoryMetrics::ANON_HUGE_PAGE_BYTES =
+        aggregate_metrics->AddGauge<uint64_t>("memory.anon-huge-page-bytes", 0U);
+  }
+  ThpConfig thp_config = MemInfo::ParseThpConfig();
+  AggregateMemoryMetrics::THP_ENABLED =
+      aggregate_metrics->AddProperty("memory.thp.enabled", thp_config.enabled);
+  AggregateMemoryMetrics::THP_DEFRAG =
+      aggregate_metrics->AddProperty("memory.thp.defrag", thp_config.defrag);
+  AggregateMemoryMetrics::THP_KHUGEPAGED_DEFRAG = aggregate_metrics->AddProperty(
+      "memory.thp.khugepaged-defrag", thp_config.khugepaged_defrag);
+  AggregateMemoryMetrics::Refresh();
   return Status::OK();
+}
+
+void AggregateMemoryMetrics::Refresh() {
+  if (NUM_MAPS != nullptr) {
+    // Only call ParseSmaps() if the metrics were created.
+    MappedMemInfo map_info = MemInfo::ParseSmaps();
+    NUM_MAPS->set_value(map_info.num_maps);
+    MAPPED_BYTES->set_value(map_info.size_kb * 1024);
+    RSS->set_value(map_info.rss_kb * 1024);
+    ANON_HUGE_PAGE_BYTES->set_value(map_info.anon_huge_pages_kb * 1024);
+  }
+
+  ThpConfig thp_config = MemInfo::ParseThpConfig();
+  THP_ENABLED->set_value(thp_config.enabled);
+  THP_DEFRAG->set_value(thp_config.defrag);
+  THP_KHUGEPAGED_DEFRAG->set_value(thp_config.khugepaged_defrag);
 }
 
 JvmMetric* JvmMetric::CreateAndRegister(MetricGroup* metrics, const string& key,
@@ -120,7 +165,7 @@ JvmMetric::JvmMetric(const TMetricDef& def, const string& mempool_name,
 }
 
 Status JvmMetric::InitMetrics(MetricGroup* metrics) {
-  DCHECK(metrics != NULL);
+  DCHECK(metrics != nullptr);
   TGetJvmMetricsRequest request;
   request.get_all = true;
   TGetJvmMetricsResponse response;

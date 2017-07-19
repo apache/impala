@@ -241,7 +241,7 @@ Status ExecEnv::StartServices() {
 
   // Limit of -1 means no memory limit.
   mem_tracker_.reset(new MemTracker(
-      AggregateMemoryMetric::TOTAL_USED, bytes_limit > 0 ? bytes_limit : -1, "Process"));
+      AggregateMemoryMetrics::TOTAL_USED, bytes_limit > 0 ? bytes_limit : -1, "Process"));
   if (buffer_pool_ != nullptr) {
     // Add BufferPool MemTrackers for cached memory that is not tracked against queries
     // but is included in process memory consumption.
