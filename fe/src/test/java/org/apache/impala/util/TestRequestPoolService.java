@@ -25,6 +25,7 @@ import java.net.URISyntaxException;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.AllocationFileLoaderService;
 import org.junit.After;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -186,7 +187,7 @@ public class TestRequestPoolService {
     checkPoolConfigResult("root", -1, 200, -1);
   }
 
-  @Test
+  @Ignore("IMPALA-4868") @Test
   public void testUpdatingConfigs() throws Exception {
     // Tests updating the config files and then checking the pool resolution, ACLs, and
     // pool limit configs. This tests all three together rather than separating into
