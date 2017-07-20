@@ -3331,9 +3331,9 @@ TEST_F(ExprTest, StringFunctions) {
   big_str[ColumnType::MAX_VARCHAR_LENGTH] = '\0';
   sprintf(query, "cast('%sxxx' as VARCHAR(%d))", big_str, ColumnType::MAX_VARCHAR_LENGTH);
   TestStringValue(query, big_str);
+}
 
-  // base64{en,de}code
-
+TEST_F(ExprTest, StringBase64Coding) {
   // Test some known values of base64{en,de}code
   TestIsNull("base64encode(NULL)", TYPE_STRING);
   TestIsNull("base64decode(NULL)", TYPE_STRING);
@@ -3348,12 +3348,12 @@ TEST_F(ExprTest, StringFunctions) {
 
   // Test random short strings.
   srand(0);
-  for (int length = 1; length < 100; ++length) {
+  // Pick some 'interesting' (i.e. random, but include some powers of two, some primes,
+  // and edge-cases) lengths to test.
+  for (int length: {1, 2, 3, 5, 8, 32, 42, 50, 64, 71, 89, 99}) {
     for (int iteration = 0; iteration < 10; ++iteration) {
       string raw(length, ' ');
-      for (int j = 0; j < length; ++j) {
-        raw[j] = rand() % 128;
-      }
+      for (int j = 0; j < length; ++j) raw[j] = rand() % 128;
       const string as_octal = StringToOctalLiteral(raw);
       TestValue("length(base64encode('" + as_octal + "')) > length('" + as_octal + "')",
           TYPE_BOOLEAN, true);
@@ -3366,7 +3366,9 @@ TEST_F(ExprTest, StringFunctions) {
 TEST_F(ExprTest, LongReverse) {
   static const int MAX_LEN = 2048;
   string to_reverse(MAX_LEN, ' '), reversed(MAX_LEN, ' ');
-  for (int i = 0; i < MAX_LEN; ++i) {
+  // Pick some 'interesting' (i.e. random, but include some powers of two, some primes,
+  // and edge-cases) lengths to test.
+  for (int i: {1, 2, 3, 5, 8, 32, 42, 512, 1024, 1357, 1788, 2012, 2047}) {
     to_reverse[i] = reversed[MAX_LEN - 1 - i] = 'a' + (rand() % 26);
     TestStringValue("reverse('" + to_reverse.substr(0, i + 1) + "')",
         reversed.substr(MAX_LEN - 1 - i));
