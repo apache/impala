@@ -170,6 +170,25 @@ public abstract class JoinNode extends PlanNode {
     }
   }
 
+  /**
+   * Returns true if the join node can be inverted. Inversions are not allowed
+   * in the following cases:
+   * 1. Straight join.
+   * 2. The operator is a null-aware left anti-join. There is no backend support
+   *    for a null-aware right anti-join because we cannot execute it efficiently.
+   * 3. In the case of a distributed plan, the resulting join is a non-equi right
+   *    semi-join or a non-equi right outer-join. There is no backend support.
+   */
+  public boolean isInvertible(boolean isLocalPlan) {
+    if (isStraightJoin()) return false;
+    if (joinOp_.isNullAwareLeftAntiJoin()) return false;
+    if (isLocalPlan) return true;
+    if (!eqJoinConjuncts_.isEmpty()) return true;
+    if (joinOp_.isLeftOuterJoin()) return false;
+    if (joinOp_.isLeftSemiJoin()) return false;
+    return true;
+  }
+
   public JoinOperator getJoinOp() { return joinOp_; }
   public List<BinaryPredicate> getEqJoinConjuncts() { return eqJoinConjuncts_; }
   public List<Expr> getOtherJoinConjuncts() { return otherJoinConjuncts_; }
@@ -613,11 +632,6 @@ public abstract class JoinNode extends PlanNode {
     joinOp_ = joinOp_.invert();
     Collections.swap(children_, 0, 1);
     for (BinaryPredicate p: eqJoinConjuncts_) p.reverse();
-  }
-
-  public boolean hasConjuncts() {
-    return !eqJoinConjuncts_.isEmpty() || !otherJoinConjuncts_.isEmpty() ||
-        !conjuncts_.isEmpty();
   }
 
   @Override

@@ -427,12 +427,9 @@ public class Planner {
       JoinNode joinNode = (JoinNode) root;
       JoinOperator joinOp = joinNode.getJoinOp();
 
-      // 1. No inversion allowed due to straight join.
-      // 2. The null-aware left anti-join operator is not considered for inversion.
-      //    There is no backend support for a null-aware right anti-join because
-      //    we cannot execute it efficiently.
-      if (joinNode.isStraightJoin() || joinOp.isNullAwareLeftAntiJoin()) {
-        // Re-compute tuple ids since their order must correspond to the order of children.
+      if (!joinNode.isInvertible(isLocalPlan)) {
+        // Re-compute tuple ids since their order must correspond to the order
+        // of children.
         root.computeTupleIds();
         return;
       }
