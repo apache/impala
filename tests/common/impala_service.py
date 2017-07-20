@@ -88,6 +88,10 @@ class BaseImpalaService(object):
     assert 0, 'Metric value %s did not reach value %s in %ss' %\
         (metric_name, expected_value, timeout)
 
+  def get_catalog_object_dump(self, object_type, object_name):
+    return self.read_debug_webpage('catalog_object?object_type=%s&object_name=%s' %\
+        (object_type, object_name))
+
 # Allows for interacting with an Impalad instance to perform operations such as creating
 # new connections or accessing the debug webpage.
 class ImpaladService(BaseImpalaService):
@@ -214,10 +218,6 @@ class ImpaladService(BaseImpalaService):
     hs2_client = TCLIService.Client(protocol)
     return hs2_client
 
-  def get_catalog_object_dump(self, object_type, object_name):
-    return self.read_debug_webpage('catalog_objects?object_type=%s&object_name=%s' %\
-        (object_type, object_name))
-
 
 # Allows for interacting with the StateStore service to perform operations such as
 # accessing the debug webpage.
@@ -229,6 +229,9 @@ class StateStoredService(BaseImpalaService):
     self.wait_for_metric_value('statestore.live-backends', num_subscribers,
                                timeout=timeout, interval=interval)
 
+  def get_catalog_object_dump(self, object_type, object_name):
+    raise Exception("Statestore does not contain catalog object")
+
 
 # Allows for interacting with the Catalog service to perform operations such as
 # accessing the debug webpage.
@@ -236,7 +239,3 @@ class CatalogdService(BaseImpalaService):
   def __init__(self, hostname, webserver_port, service_port):
     super(CatalogdService, self).__init__(hostname, webserver_port)
     self.service_port = service_port
-
-  def get_catalog_object_dump(self, object_type, object_name):
-    return self.read_debug_webpage('catalog_objects?object_type=%s&object_name=%s' %\
-        (object_type, object_name))

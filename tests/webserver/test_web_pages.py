@@ -142,6 +142,12 @@ class TestWebPage(ImpalaTestSuite):
     self.__test_catalog_object("functional_parquet", "alltypes")
     self.__test_catalog_object("functional", "alltypesnopart")
     self.__test_catalog_object("functional_kudu", "alltypes")
+    # IMPALA-4795: Test getTCatalogObject() to fetch a function via the WebUI code path.
+    # Only tested on impalad since catalogd does not maintain metadata for builtin
+    # functions
+    result = self.impalad_test_service.get_catalog_object_dump("FUNCTION",
+        "_impala_builtins.abs(BIGINT)")
+    assert "abs(BIGINT)" in result
 
   def __test_catalog_object(self, db_name, tbl_name):
     """Tests the /catalog_object endpoint for the given db/table. Runs

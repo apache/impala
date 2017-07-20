@@ -272,6 +272,24 @@ public abstract class Catalog {
     return db.getFunction(desc, mode);
   }
 
+  /**
+   * Returns the function that best matches 'tfn' and is registered with the
+   * catalog using 'INDISTINGUISHABLE' mode to check for matching. If scalar_fn or
+   * aggregate_fn field is not set in 'tfn' then function is looked up by signature.
+   * Returns null if function is not found or enough fields are not set in 'tfn'
+   */
+  private Function getFunction(TFunction tfn) {
+    Function fn = null;
+    if (tfn.isSetScalar_fn() || tfn.isSetAggregate_fn()) {
+      Function desc = Function.fromThrift(tfn);
+      fn = getFunction(desc, Function.CompareMode.IS_INDISTINGUISHABLE);
+    } else if (tfn.isSetSignature()) {
+      Db db = getDb(tfn.getName().getDb_name());
+      fn = (db == null) ? null : db.getFunction(tfn.getSignature());
+    }
+    return fn;
+  }
+
   public static Function getBuiltin(Function desc, Function.CompareMode mode) {
     return builtinsDb_.getFunction(desc, mode);
   }
@@ -461,8 +479,7 @@ public abstract class Catalog {
       }
       case FUNCTION: {
         TFunction tfn = objectDesc.getFn();
-        Function desc = Function.fromThrift(tfn);
-        Function fn = getFunction(desc, Function.CompareMode.IS_INDISTINGUISHABLE);
+        Function fn = getFunction(tfn);
         if (fn == null) {
           throw new CatalogException("Function not found: " + tfn);
         }
