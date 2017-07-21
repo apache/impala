@@ -155,7 +155,7 @@ class HdfsScanNodeBase : public ScanNode {
   int skip_header_line_count() const { return skip_header_line_count_; }
   DiskIoRequestContext* reader_context() { return reader_context_; }
   bool optimize_parquet_count_star() const { return optimize_parquet_count_star_; }
-  bool parquet_count_star_slot_offset() const { return parquet_count_star_slot_offset_; }
+  int parquet_count_star_slot_offset() const { return parquet_count_star_slot_offset_; }
 
   typedef std::unordered_map<TupleId, std::vector<ScalarExprEvaluator*>>
     ConjunctEvaluatorsMap;
