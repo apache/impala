@@ -114,8 +114,8 @@ DEFINE_int32(hs2_port, 21050, "port on which HiveServer2 client requests are ser
 
 DEFINE_int32(fe_service_threads, 64,
     "number of threads available to serve client requests");
-DEFINE_int32(be_service_threads, 64,
-    "(Advanced) number of threads available to serve backend execution requests");
+DEFINE_int32_hidden(be_service_threads, 64,
+    "Deprecated, no longer has any effect. Will be removed in Impala 3.0.");
 DEFINE_string(default_query_options, "", "key=value pair of default query options for"
     " impalad, separated by ','");
 DEFINE_int32(query_log_size, 25, "Number of queries to retain in the query log. If -1, "
@@ -1934,7 +1934,7 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
     be_processor->setEventHandler(event_handler);
 
     *be_server = new ThriftServer("backend", be_processor, be_port, nullptr,
-        exec_env->metrics(), FLAGS_be_service_threads);
+        exec_env->metrics());
     if (EnableInternalSslConnections()) {
       LOG(INFO) << "Enabling SSL for backend";
       RETURN_IF_ERROR((*be_server)->EnableSsl(FLAGS_ssl_server_certificate,
