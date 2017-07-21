@@ -454,7 +454,7 @@ class DataStreamTest : public testing::Test {
   void StartBackend() {
     boost::shared_ptr<ImpalaTestBackend> handler(new ImpalaTestBackend(stream_mgr_));
     boost::shared_ptr<TProcessor> processor(new ImpalaInternalServiceProcessor(handler));
-    server_ = new ThriftServer("DataStreamTest backend", processor, FLAGS_port, nullptr);
+    ThriftServerBuilder("DataStreamTest backend", processor, FLAGS_port).Build(&server_);
     server_->Start();
   }
 

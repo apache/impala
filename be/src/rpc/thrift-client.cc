@@ -32,6 +32,7 @@ using namespace apache::thrift;
 using namespace strings;
 
 DECLARE_string(ssl_client_ca_certificate);
+DECLARE_string(ssl_cipher_list);
 
 namespace impala {
 
@@ -100,6 +101,7 @@ Status ThriftClientImpl::CreateSocket() {
     socket_.reset(new TSocket(address_.hostname, address_.port));
   } else {
     try {
+      if (!FLAGS_ssl_cipher_list.empty()) ssl_factory_->ciphers(FLAGS_ssl_cipher_list);
       ssl_factory_->loadTrustedCertificates(FLAGS_ssl_client_ca_certificate.c_str());
       socket_ = ssl_factory_->createSocket(address_.hostname, address_.port);
     } catch (const TException& e) {

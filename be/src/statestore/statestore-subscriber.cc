@@ -47,11 +47,12 @@ DEFINE_int32(statestore_subscriber_cnxn_attempts, 10, "The number of times to re
     "RPC connection to the statestore. A setting of 0 means retry indefinitely");
 DEFINE_int32(statestore_subscriber_cnxn_retry_interval_ms, 3000, "The interval, in ms, "
     "to wait between attempts to make an RPC connection to the statestore.");
-DECLARE_string(ssl_client_ca_certificate);
 
+DECLARE_string(ssl_client_ca_certificate);
 DECLARE_string(ssl_server_certificate);
 DECLARE_string(ssl_private_key);
 DECLARE_string(ssl_private_key_password_cmd);
+DECLARE_string(ssl_cipher_list);
 
 namespace impala {
 
@@ -192,13 +193,18 @@ Status StatestoreSubscriber::Start() {
         new RpcEventHandler("statestore-subscriber", metrics_));
     processor->setEventHandler(event_handler);
 
-    heartbeat_server_.reset(new ThriftServer("StatestoreSubscriber", processor,
-        heartbeat_address_.port, NULL, NULL, 5));
+    ThriftServerBuilder builder(
+        "StatestoreSubscriber", processor, heartbeat_address_.port);
     if (EnableInternalSslConnections()) {
       LOG(INFO) << "Enabling SSL for Statestore subscriber";
-      RETURN_IF_ERROR(heartbeat_server_->EnableSsl(FLAGS_ssl_server_certificate,
-          FLAGS_ssl_private_key, FLAGS_ssl_private_key_password_cmd));
+      builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
+          .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
+          .cipher_list(FLAGS_ssl_cipher_list);
     }
+
+    ThriftServer* server;
+    RETURN_IF_ERROR(builder.Build(&server));
+    heartbeat_server_.reset(server);
     RETURN_IF_ERROR(heartbeat_server_->Start());
 
     LOG(INFO) << "Registering with statestore";

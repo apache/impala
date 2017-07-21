@@ -15,7 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 #ifndef IMPALA_RPC_THRIFT_SERVER_H
 #define IMPALA_RPC_THRIFT_SERVER_H
 
@@ -37,8 +36,11 @@ namespace impala {
 /// Utility class for all Thrift servers. Runs a threaded server by default, or a
 /// TThreadPoolServer with, by default, 2 worker threads, that exposes the interface
 /// described by a user-supplied TProcessor object.
+///
+/// Use a ThriftServerBuilder to construct a ThriftServer. ThriftServer's c'tors are
+/// private.
+///
 /// If TThreadPoolServer is used, client must use TSocket as transport.
-/// TODO: Need a builder to help with the unwieldy constructor
 /// TODO: shutdown is buggy (which only harms tests)
 class ThriftServer {
  public:
@@ -95,30 +97,6 @@ class ThriftServer {
   /// Threaded    -- Allocates 1 thread per connection, as needed.
   enum ServerType { ThreadPool = 0, Threaded };
 
-  /// Creates, but does not start, a new server on the specified port
-  /// that exports the supplied interface.
-  ///  - name: human-readable name of this server. Should not contain spaces
-  ///  - processor: Thrift processor to handle RPCs
-  ///  - port: The port the server will listen for connections on
-  ///  - auth_provider: Authentication scheme to use. If NULL, use the global default
-  ///    demon<->demon provider.
-  ///  - metrics: if not NULL, the server will register metrics on this object
-  ///  - num_worker_threads: the number of worker threads to use in any thread pool
-  ///  - server_type: the type of IO strategy this server should employ
-  ThriftServer(const std::string& name,
-      const boost::shared_ptr<apache::thrift::TProcessor>& processor, int port,
-      AuthProvider* auth_provider = NULL, MetricGroup* metrics = NULL,
-      int num_worker_threads = DEFAULT_WORKER_THREADS, ServerType server_type = Threaded);
-
-  /// Enables secure access over SSL. Must be called before Start(). The first two
-  /// arguments are paths to certificate and private key files in .PEM format,
-  /// respectively. If either file does not exist, an error is returned. The final
-  /// optional argument provides the command to run if a password is required to decrypt
-  /// the private key. It is invoked once, and the resulting password is used only for
-  /// password-protected .PEM files.
-  Status EnableSsl(const std::string& certificate, const std::string& private_key,
-      const std::string& pem_password_cmd = "");
-
   int port() const { return port_; }
 
   bool ssl_enabled() const { return ssl_enabled_; }
@@ -161,6 +139,32 @@ class ThriftServer {
   static const ConnectionContext* GetThreadConnectionContext();
 
  private:
+  friend class ThriftServerBuilder;
+
+  /// Creates, but does not start, a new server on the specified port
+  /// that exports the supplied interface.
+  ///  - name: human-readable name of this server. Should not contain spaces
+  ///  - processor: Thrift processor to handle RPCs
+  ///  - port: The port the server will listen for connections on
+  ///  - auth_provider: Authentication scheme to use. If nullptr, use the global default
+  ///    demon<->demon provider.
+  ///  - metrics: if not nullptr, the server will register metrics on this object
+  ///  - num_worker_threads: the number of worker threads to use in any thread pool
+  ///  - server_type: the type of IO strategy this server should employ
+  ThriftServer(const std::string& name,
+      const boost::shared_ptr<apache::thrift::TProcessor>& processor, int port,
+      AuthProvider* auth_provider = nullptr, MetricGroup* metrics = nullptr,
+      int num_worker_threads = DEFAULT_WORKER_THREADS, ServerType server_type = Threaded);
+
+  /// Enables secure access over SSL. Must be called before Start(). The first two
+  /// arguments are paths to certificate and private key files in .PEM format,
+  /// respectively. If either file does not exist, an error is returned. The final
+  /// optional argument provides the command to run if a password is required to decrypt
+  /// the private key. It is invoked once, and the resulting password is used only for
+  /// password-protected .PEM files.
+  Status EnableSsl(const std::string& certificate, const std::string& private_key,
+      const std::string& pem_password_cmd = "", const std::string& ciphers = "");
+
   /// Creates the server socket on which this server listens. May be SSL enabled. Returns
   /// OK unless there was a Thrift error.
   Status CreateSocket(
@@ -184,6 +188,9 @@ class ThriftServer {
   /// Password string retrieved by running command in EnableSsl().
   std::string key_password_;
 
+  /// List of ciphers that are ok for clients to use when connecting.
+  std::string cipher_list_;
+
   /// How many worker threads to use to serve incoming requests
   /// (requests are queued if no thread is immediately available)
   int num_worker_threads_;
@@ -201,7 +208,7 @@ class ThriftServer {
   boost::scoped_ptr<apache::thrift::server::TServer> server_;
   boost::shared_ptr<apache::thrift::TProcessor> processor_;
 
-  /// If not NULL, called when connection events happen. Not owned by us.
+  /// If not nullptr, called when connection events happen. Not owned by us.
   ConnectionHandlerIf* connection_handler_;
 
   /// Protects connection_contexts_
@@ -235,6 +242,94 @@ class ThriftServer {
   /// is not used outside of this class.
   class ThriftServerEventProcessor;
   friend class ThriftServerEventProcessor;
+};
+
+/// Helper class to build new ThriftServer instances.
+class ThriftServerBuilder {
+ public:
+  ThriftServerBuilder(const std::string& name,
+      const boost::shared_ptr<apache::thrift::TProcessor>& processor, int port)
+    : name_(name), processor_(processor), port_(port) {}
+
+  /// Sets the auth provider for this server. Default is the system global auth provider.
+  ThriftServerBuilder& auth_provider(AuthProvider* provider) {
+    auth_provider_ = provider;
+    return *this;
+  }
+
+  /// Sets the metrics instance that this server should register metrics with. Default is
+  /// nullptr.
+  ThriftServerBuilder& metrics(MetricGroup* metrics) {
+    metrics_ = metrics;
+    return *this;
+  }
+
+  /// Make this server a thread-pool server with 'num_worker_threads' threads.
+  ThriftServerBuilder& thread_pool(int num_worker_threads) {
+    server_type_ = ThriftServer::ServerType::ThreadPool;
+    num_worker_threads_ = num_worker_threads;
+    return *this;
+  }
+
+  /// Make this server a threaded server (i.e. one thread per connection).
+  ThriftServerBuilder& threaded() {
+    server_type_ = ThriftServer::ServerType::Threaded;
+    return *this;
+  }
+
+  /// Enables SSL for this server.
+  ThriftServerBuilder& ssl(
+      const std::string& certificate, const std::string& private_key) {
+    enable_ssl_ = true;
+    certificate_ = certificate;
+    private_key_ = private_key;
+    return *this;
+  }
+
+  /// Sets the command used to compute the password for the SSL private key. Default is
+  /// empty, i.e. no password needed.
+  ThriftServerBuilder& pem_password_cmd(const std::string& pem_password_cmd) {
+    pem_password_cmd_ = pem_password_cmd;
+    return *this;
+  }
+
+  /// Sets the list of acceptable cipher suites for this server. Default is to use all
+  /// available system cipher suites.
+  ThriftServerBuilder& cipher_list(const std::string& ciphers) {
+    ciphers_ = ciphers;
+    return *this;
+  }
+
+  /// Constructs a new ThriftServer and puts it in 'server', if construction was
+  /// successful, returns an error otherwise. In the error case, 'server' will not have
+  /// been set and will not need to be freed, otherwise the caller assumes ownership of
+  /// '*server'.
+  Status Build(ThriftServer** server) {
+    std::unique_ptr<ThriftServer> ptr(new ThriftServer(name_, processor_, port_,
+        auth_provider_, metrics_, num_worker_threads_, server_type_));
+    if (enable_ssl_) {
+      RETURN_IF_ERROR(
+          ptr->EnableSsl(certificate_, private_key_, pem_password_cmd_, ciphers_));
+    }
+    (*server) = ptr.release();
+    return Status::OK();
+  }
+
+ private:
+  ThriftServer::ServerType server_type_ = ThriftServer::ServerType::Threaded;
+  int num_worker_threads_ = ThriftServer::DEFAULT_WORKER_THREADS;
+  std::string name_;
+  boost::shared_ptr<apache::thrift::TProcessor> processor_;
+  int port_ = 0;
+
+  AuthProvider* auth_provider_ = nullptr;
+  MetricGroup* metrics_ = nullptr;
+
+  bool enable_ssl_ = false;
+  std::string certificate_;
+  std::string private_key_;
+  std::string pem_password_cmd_;
+  std::string ciphers_;
 };
 
 // Returns true if, per the process configuration flags, server<->server communications

@@ -221,8 +221,10 @@ int main(int argc, char** argv) {
   boost::shared_ptr<ThreadFactory> thread_factory(
       new ThriftThreadFactory("test", "test"));
   boost::shared_ptr<TProcessor> processor(new NetworkTestServiceProcessor(handler));
-  ThriftServer* server = new ThriftServer("Network Test Server", processor,
-      FLAGS_port, NULL, NULL, 100, ThriftServer::ThreadPool);
+  ThriftServer* server;
+  ABORT_IF_ERROR(ThriftServerBuilder("Network Test Server", processor, FLAGS_port)
+                     .thread_pool(100)
+                     .Build(&server));
   thread* server_thread = new thread(&TestServer::Server, handler.get(), server);
 
   string input;

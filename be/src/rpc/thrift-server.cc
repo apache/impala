@@ -66,6 +66,7 @@ DECLARE_string(principal);
 DECLARE_string(keytab_file);
 DECLARE_string(ssl_client_ca_certificate);
 DECLARE_string(ssl_server_certificate);
+DECLARE_string(ssl_cipher_list);
 
 namespace impala {
 
@@ -352,6 +353,7 @@ Status ThriftServer::CreateSocket(boost::shared_ptr<TServerTransport>* socket) {
         new ImpalaSslSocketFactory(key_password_));
     socket_factory->overrideDefaultPasswordCallback();
     try {
+      if (!cipher_list_.empty()) socket_factory->ciphers(cipher_list_);
       socket_factory->loadCertificate(certificate_path_.c_str());
       socket_factory->loadPrivateKey(private_key_path_.c_str());
       socket->reset(new TSSLServerSocket(port_, socket_factory));
@@ -366,7 +368,7 @@ Status ThriftServer::CreateSocket(boost::shared_ptr<TServerTransport>* socket) {
 }
 
 Status ThriftServer::EnableSsl(const string& certificate, const string& private_key,
-    const string& pem_password_cmd) {
+    const string& pem_password_cmd, const std::string& ciphers) {
   DCHECK(!started_);
   if (certificate.empty()) return Status(TErrorCode::SSL_CERTIFICATE_PATH_BLANK);
   if (private_key.empty()) return Status(TErrorCode::SSL_PRIVATE_KEY_PATH_BLANK);
@@ -383,6 +385,7 @@ Status ThriftServer::EnableSsl(const string& certificate, const string& private_
   ssl_enabled_ = true;
   certificate_path_ = certificate;
   private_key_path_ = private_key;
+  cipher_list_ = ciphers;
 
   if (!pem_password_cmd.empty()) {
     if (!RunShellProcess(pem_password_cmd, &key_password_, true)) {

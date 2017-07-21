@@ -162,13 +162,14 @@ Status InProcessStatestore::Start() {
   boost::shared_ptr<TProcessor> processor(
       new StatestoreServiceProcessor(statestore_->thrift_iface()));
 
-  statestore_server_.reset(new ThriftServer("StatestoreService", processor,
-      statestore_port_, NULL, metrics_.get(), 5));
+  ThriftServerBuilder builder("StatestoreService", processor, statestore_port_);
   if (EnableInternalSslConnections()) {
     LOG(INFO) << "Enabling SSL for Statestore";
-    ABORT_IF_ERROR(statestore_server_->EnableSsl(
-        FLAGS_ssl_server_certificate, FLAGS_ssl_private_key));
+    builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key);
   }
+  ThriftServer* server;
+  ABORT_IF_ERROR(builder.metrics(metrics_.get()).Build(&server));
+  statestore_server_.reset(server);
   statestore_main_loop_.reset(
       new Thread("statestore", "main-loop", &Statestore::MainLoop, statestore_.get()));
 

@@ -170,6 +170,13 @@ DEFINE_string(ssl_private_key_password_cmd, "", "A Unix command whose output ret
     "then all trailing whitespace will be trimmed before it is used to decrypt the "
     "private key");
 
+// TODO: For 3.0 (compatibility-breaking release), set this to a whitelist of ciphers,
+// e.g.  https://wiki.mozilla.org/Security/Server_Side_TLS
+DEFINE_string(ssl_cipher_list, "",
+    "The cipher suite preferences to use for TLS-secured "
+    "Thrift RPC connections. Uses the OpenSSL cipher preference list format. See man (1) "
+    "ciphers for more information. If empty, the default cipher list for your platform "
+    "is used");
 
 DEFINE_int32(idle_session_timeout, 0, "The time, in seconds, that a session may be idle"
     " for before it is closed (and all running queries cancelled) by Impala. If 0, idle"
@@ -1931,19 +1938,19 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
         new RpcEventHandler("backend", exec_env->metrics()));
     be_processor->setEventHandler(event_handler);
 
-    *be_server = new ThriftServer("backend", be_processor, be_port, nullptr,
-        exec_env->metrics());
+    ThriftServerBuilder be_builder("backend", be_processor, be_port);
+
     if (EnableInternalSslConnections()) {
       LOG(INFO) << "Enabling SSL for backend";
-      RETURN_IF_ERROR((*be_server)->EnableSsl(FLAGS_ssl_server_certificate,
-          FLAGS_ssl_private_key, FLAGS_ssl_private_key_password_cmd));
+      be_builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
+          .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
+          .cipher_list(FLAGS_ssl_cipher_list);
     }
-
+    RETURN_IF_ERROR(be_builder.metrics(exec_env->metrics()).Build(be_server));
     LOG(INFO) << "ImpalaInternalService listening on " << be_port;
   }
 
   if (!FLAGS_is_coordinator) {
-
     LOG(INFO) << "Started executor Impala server on "
               << ExecEnv::GetInstance()->backend_address();
     return Status::OK();
@@ -1958,16 +1965,20 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
     boost::shared_ptr<TProcessorEventHandler> event_handler(
         new RpcEventHandler("beeswax", exec_env->metrics()));
     beeswax_processor->setEventHandler(event_handler);
-    *beeswax_server = new ThriftServer(BEESWAX_SERVER_NAME, beeswax_processor,
-        beeswax_port, AuthManager::GetInstance()->GetExternalAuthProvider(),
-        exec_env->metrics(), FLAGS_fe_service_threads, ThriftServer::ThreadPool);
+    ThriftServerBuilder builder(BEESWAX_SERVER_NAME, beeswax_processor, beeswax_port);
 
-    (*beeswax_server)->SetConnectionHandler(impala_server->get());
     if (!FLAGS_ssl_server_certificate.empty()) {
       LOG(INFO) << "Enabling SSL for Beeswax";
-      RETURN_IF_ERROR((*beeswax_server)->EnableSsl(FLAGS_ssl_server_certificate,
-          FLAGS_ssl_private_key, FLAGS_ssl_private_key_password_cmd));
+      builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
+          .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
+          .cipher_list(FLAGS_ssl_cipher_list);
     }
+    RETURN_IF_ERROR(
+        builder.auth_provider(AuthManager::GetInstance()->GetExternalAuthProvider())
+            .metrics(exec_env->metrics())
+            .thread_pool(FLAGS_fe_service_threads)
+            .Build(beeswax_server));
+    (*beeswax_server)->SetConnectionHandler(impala_server->get());
 
     LOG(INFO) << "Impala Beeswax Service listening on " << beeswax_port;
   }
@@ -1980,16 +1991,21 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
         new RpcEventHandler("hs2", exec_env->metrics()));
     hs2_fe_processor->setEventHandler(event_handler);
 
-    *hs2_server = new ThriftServer(HS2_SERVER_NAME, hs2_fe_processor, hs2_port,
-        AuthManager::GetInstance()->GetExternalAuthProvider(), exec_env->metrics(),
-        FLAGS_fe_service_threads, ThriftServer::ThreadPool);
+    ThriftServerBuilder builder(HS2_SERVER_NAME, hs2_fe_processor, hs2_port);
 
-    (*hs2_server)->SetConnectionHandler(impala_server->get());
     if (!FLAGS_ssl_server_certificate.empty()) {
       LOG(INFO) << "Enabling SSL for HiveServer2";
-      RETURN_IF_ERROR((*hs2_server)->EnableSsl(FLAGS_ssl_server_certificate,
-          FLAGS_ssl_private_key, FLAGS_ssl_private_key_password_cmd));
+      builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
+          .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
+          .cipher_list(FLAGS_ssl_cipher_list);
     }
+
+    RETURN_IF_ERROR(
+        builder.auth_provider(AuthManager::GetInstance()->GetExternalAuthProvider())
+            .metrics(exec_env->metrics())
+            .thread_pool(FLAGS_fe_service_threads)
+            .Build(hs2_server));
+    (*hs2_server)->SetConnectionHandler(impala_server->get());
 
     LOG(INFO) << "Impala HiveServer2 Service listening on " << hs2_port;
   }

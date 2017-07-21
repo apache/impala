@@ -47,6 +47,7 @@ DECLARE_int32(state_store_subscriber_port);
 DECLARE_string(ssl_server_certificate);
 DECLARE_string(ssl_private_key);
 DECLARE_string(ssl_private_key_password_cmd);
+DECLARE_string(ssl_cipher_list);
 
 #include "common/names.h"
 
@@ -89,13 +90,16 @@ int CatalogdMain(int argc, char** argv) {
       new RpcEventHandler("catalog-server", metrics.get()));
   processor->setEventHandler(event_handler);
 
-  ThriftServer* server = new ThriftServer("CatalogService", processor,
-      FLAGS_catalog_service_port, NULL, metrics.get(), 5);
+  ThriftServer* server;
+  ThriftServerBuilder builder("CatalogService", processor, FLAGS_catalog_service_port);
+
   if (EnableInternalSslConnections()) {
     LOG(INFO) << "Enabling SSL for CatalogService";
-    ABORT_IF_ERROR(server->EnableSsl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key,
-        FLAGS_ssl_private_key_password_cmd));
+    builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
+        .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
+        .cipher_list(FLAGS_ssl_cipher_list);
   }
+  ABORT_IF_ERROR(builder.metrics(metrics.get()).Build(&server));
   ABORT_IF_ERROR(server->Start());
   LOG(INFO) << "CatalogService started on port: " << FLAGS_catalog_service_port;
   server->Join();

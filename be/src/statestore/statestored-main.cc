@@ -42,6 +42,7 @@ DECLARE_string(principal);
 DECLARE_string(ssl_server_certificate);
 DECLARE_string(ssl_private_key);
 DECLARE_string(ssl_private_key_password_cmd);
+DECLARE_string(ssl_cipher_list);
 
 #include "common/names.h"
 
@@ -83,13 +84,15 @@ int StatestoredMain(int argc, char** argv) {
       new RpcEventHandler("statestore", metrics.get()));
   processor->setEventHandler(event_handler);
 
-  ThriftServer* server = new ThriftServer("StatestoreService", processor,
-      FLAGS_state_store_port, NULL, metrics.get(), 5);
+  ThriftServer* server;
+  ThriftServerBuilder builder("StatestoreService", processor, FLAGS_state_store_port);
   if (EnableInternalSslConnections()) {
     LOG(INFO) << "Enabling SSL for Statestore";
-    ABORT_IF_ERROR(server->EnableSsl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key,
-        FLAGS_ssl_private_key_password_cmd));
+    builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
+        .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
+        .cipher_list(FLAGS_ssl_cipher_list);
   }
+  ABORT_IF_ERROR(builder.metrics(metrics.get()).Build(&server));
   ABORT_IF_ERROR(server->Start());
 
   statestore.MainLoop();
