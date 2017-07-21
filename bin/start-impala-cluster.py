@@ -139,7 +139,7 @@ def exec_impala_process(cmd, args, stderr_log_file_path):
   os.system(cmd)
 
 def kill_cluster_processes(force=False):
-  binaries = ['catalogd', 'impalad', 'statestored', 'mini-impala-cluster']
+  binaries = ['catalogd', 'impalad', 'statestored']
   kill_matching_processes(binaries, force)
 
 def kill_matching_processes(binary_names, force=False):
@@ -182,14 +182,6 @@ def start_catalogd():
   if not check_process_exists("catalogd", 10):
     raise RuntimeError("Unable to start catalogd. Check log or file permissions"
                        " for more details.")
-
-def start_mini_impala_cluster(cluster_size):
-  print ("Starting in-process Impala Cluster logging "
-         "to %s/mini-impala-cluster.INFO" % options.log_dir)
-  args = "-num_backends=%s %s" %\
-         (cluster_size, build_impalad_logging_args(0, 'mini-impala-cluster'))
-  stderr_log_file_path = os.path.join(options.log_dir, 'mini-impala-cluster-error.log')
-  exec_impala_process(MINI_IMPALA_CLUSTER_PATH, args, stderr_log_file_path)
 
 def build_impalad_port_args(instance_num):
   BASE_BEESWAX_PORT = 21000
@@ -388,23 +380,18 @@ if __name__ == "__main__":
     # restart_only_impalad=True.
     wait_for_cluster = wait_for_cluster_cmdline
 
-  if options.inprocess:
-    # The statestore and the impalads start in the same process.
-    start_mini_impala_cluster(options.cluster_size)
-    wait_for_cluster_cmdline()
-  else:
-    try:
-      if not options.restart_impalad_only:
-        start_statestore()
-        start_catalogd()
-      start_impalad_instances(options.cluster_size, options.num_coordinators,
-          options.use_exclusive_coordinators)
-      # Sleep briefly to reduce log spam: the cluster takes some time to start up.
-      sleep(3)
-      wait_for_cluster()
-    except Exception, e:
-      print 'Error starting cluster: %s' % e
-      sys.exit(1)
+  try:
+    if not options.restart_impalad_only:
+      start_statestore()
+      start_catalogd()
+    start_impalad_instances(options.cluster_size, options.num_coordinators,
+                            options.use_exclusive_coordinators)
+    # Sleep briefly to reduce log spam: the cluster takes some time to start up.
+    sleep(3)
+    wait_for_cluster()
+  except Exception, e:
+    print 'Error starting cluster: %s' % e
+    sys.exit(1)
 
   print 'Impala Cluster Running with %d nodes and %d coordinators.' % (
       options.cluster_size, options.num_coordinators)

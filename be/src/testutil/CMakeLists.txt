@@ -42,9 +42,3 @@ add_dependencies(test-udfs-ir thrift-deps)
 
 add_library(TestUdas SHARED test-udas.cc)
 add_dependencies(TestUdas thrift-deps)
-
-add_executable(mini-impala-cluster
-  mini-impala-cluster.cc
-)
-
-target_link_libraries(mini-impala-cluster ${IMPALA_LINK_LIBS})
