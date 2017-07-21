@@ -40,29 +40,18 @@
 #include "gen-cpp/Types_types.h"
 #include "runtime/runtime-state.h" // for PartitionStatusMap; TODO: disentangle
 #include "scheduling/query-schedule.h"
-#include "util/histogram-metric.h"
 #include "util/progress-updater.h"
-#include "util/runtime-profile.h"
 
 namespace impala {
 
 class CountingBarrier;
-class DataStreamMgr;
-class DataSink;
-class RowBatch;
-class RowDescriptor;
 class ObjectPool;
 class RuntimeState;
-class ExecEnv;
 class TUpdateCatalogRequest;
-class TQueryExecRequest;
 class TReportExecStatusParams;
-class TRowBatch;
 class TPlanExecRequest;
 class TRuntimeProfileTree;
 class RuntimeProfile;
-class TablePrinter;
-class TPlanFragment;
 class QueryResultSet;
 class MemTracker;
 class PlanRootSink;
