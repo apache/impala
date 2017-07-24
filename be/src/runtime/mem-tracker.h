@@ -95,8 +95,19 @@ class MemTracker {
 
   ~MemTracker();
 
-  /// Removes this tracker from parent_->child_trackers_.
-  void UnregisterFromParent();
+  /// Closes this MemTracker. After closing it is invalid to consume memory on this
+  /// tracker and the tracker's consumption counter (which may be owned by a
+  /// RuntimeProfile, not this MemTracker) can be safely destroyed. MemTrackers without
+  /// consumption metrics in the context of a daemon must always be closed.
+  /// Idempotent: calling multiple times has no effect.
+  void Close();
+
+  /// Closes the MemTracker and deregisters it from its parent. Can be called before
+  /// destruction to prevent other threads from getting a reference to the MemTracker
+  /// via its parent. Only used to deregister the query-level MemTracker from the
+  /// global hierarchy.
+  /// TODO: IMPALA-3200: this is also used by BufferedBlockMgr, which will be deleted.
+  void CloseAndUnregisterFromParent();
 
   /// Include counters from a ReservationTracker in logs and other diagnostics.
   /// The counters should be owned by the fragment's RuntimeProfile.
@@ -112,6 +123,7 @@ class MemTracker {
 
   /// Increases consumption of this tracker and its ancestors by 'bytes'.
   void Consume(int64_t bytes) {
+    DCHECK(!closed_) << label_;
     if (bytes <= 0) {
       if (bytes < 0) Release(-bytes);
       return;
@@ -121,11 +133,10 @@ class MemTracker {
       RefreshConsumptionFromMetric();
       return;
     }
-    for (std::vector<MemTracker*>::iterator tracker = all_trackers_.begin();
-         tracker != all_trackers_.end(); ++tracker) {
-      (*tracker)->consumption_->Add(bytes);
-      if ((*tracker)->consumption_metric_ == NULL) {
-        DCHECK_GE((*tracker)->consumption_->current_value(), 0);
+    for (MemTracker* tracker : all_trackers_) {
+      tracker->consumption_->Add(bytes);
+      if (tracker->consumption_metric_ == NULL) {
+        DCHECK_GE(tracker->consumption_->current_value(), 0);
       }
     }
   }
@@ -136,11 +147,13 @@ class MemTracker {
   /// to update tracking on a particular mem tracker but the consumption against
   /// the limit recorded in one of its ancestors already happened.
   void ConsumeLocal(int64_t bytes, MemTracker* end_tracker) {
+    DCHECK(!closed_) << label_;
     DCHECK(consumption_metric_ == NULL) << "Should not be called on root.";
-    for (int i = 0; i < all_trackers_.size(); ++i) {
-      if (all_trackers_[i] == end_tracker) return;
-      DCHECK(!all_trackers_[i]->has_limit());
-      all_trackers_[i]->consumption_->Add(bytes);
+    for (MemTracker* tracker : all_trackers_) {
+      if (tracker == end_tracker) return;
+      DCHECK(!tracker->has_limit());
+      DCHECK(!tracker->closed_) << tracker->label_;
+      tracker->consumption_->Add(bytes);
     }
     DCHECK(false) << "end_tracker is not an ancestor";
   }
@@ -155,6 +168,7 @@ class MemTracker {
   /// Returns true if the try succeeded.
   WARN_UNUSED_RESULT
   bool TryConsume(int64_t bytes) {
+    DCHECK(!closed_) << label_;
     if (consumption_metric_ != NULL) RefreshConsumptionFromMetric();
     if (UNLIKELY(bytes <= 0)) return true;
     int i;
@@ -195,6 +209,7 @@ class MemTracker {
 
   /// Decreases consumption of this tracker and its ancestors by 'bytes'.
   void Release(int64_t bytes) {
+    DCHECK(!closed_) << label_;
     if (bytes <= 0) {
       if (bytes < 0) Consume(-bytes);
       return;
@@ -204,30 +219,26 @@ class MemTracker {
       RefreshConsumptionFromMetric();
       return;
     }
-    for (std::vector<MemTracker*>::iterator tracker = all_trackers_.begin();
-         tracker != all_trackers_.end(); ++tracker) {
-      (*tracker)->consumption_->Add(-bytes);
+    for (MemTracker* tracker : all_trackers_) {
+      tracker->consumption_->Add(-bytes);
       /// If a UDF calls FunctionContext::TrackAllocation() but allocates less than the
       /// reported amount, the subsequent call to FunctionContext::Free() may cause the
       /// process mem tracker to go negative until it is synced back to the tcmalloc
       /// metric. Don't blow up in this case. (Note that this doesn't affect non-process
       /// trackers since we can enforce that the reported memory usage is internally
       /// consistent.)
-      if ((*tracker)->consumption_metric_ == NULL) {
-        DCHECK_GE((*tracker)->consumption_->current_value(), 0)
-          << std::endl << (*tracker)->LogUsage();
+      if (tracker->consumption_metric_ == NULL) {
+        DCHECK_GE(tracker->consumption_->current_value(), 0)
+          << std::endl << tracker->LogUsage();
       }
     }
-
-    /// TODO: Release brokered memory?
   }
 
   /// Returns true if a valid limit of this tracker or one of its ancestors is
   /// exceeded.
   bool AnyLimitExceeded() {
-    for (std::vector<MemTracker*>::iterator tracker = limit_trackers_.begin();
-         tracker != limit_trackers_.end(); ++tracker) {
-      if ((*tracker)->LimitExceeded()) return true;
+    for (MemTracker* tracker : limit_trackers_) {
+      if (tracker->LimitExceeded()) return true;
     }
     return false;
   }
@@ -402,6 +413,8 @@ class MemTracker {
   /// If false, this tracker (and its children) will not be included in LogUsage() output
   /// if consumption is 0.
   bool log_usage_if_zero_;
+
+  bool closed_ = false;
 
   /// The number of times the GcFunctions were called.
   IntCounter* num_gcs_metric_;

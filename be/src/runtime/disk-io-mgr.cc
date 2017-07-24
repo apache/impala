@@ -362,8 +362,7 @@ DiskIoMgr::~DiskIoMgr() {
     delete disk_queues_[i];
   }
 
-  if (free_buffer_mem_tracker_ != nullptr) free_buffer_mem_tracker_->UnregisterFromParent();
-
+  if (free_buffer_mem_tracker_ != nullptr) free_buffer_mem_tracker_->Close();
   if (cached_read_options_ != nullptr) hadoopRzOptionsFree(cached_read_options_);
 }
 

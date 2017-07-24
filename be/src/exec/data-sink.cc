@@ -192,14 +192,8 @@ void DataSink::Close(RuntimeState* state) {
   ScalarExprEvaluator::Close(output_expr_evals_, state);
   ScalarExpr::Close(output_exprs_);
   if (expr_mem_pool() != nullptr) expr_mem_pool_->FreeAll();
-  if (expr_mem_tracker_ != NULL) {
-    expr_mem_tracker_->UnregisterFromParent();
-    expr_mem_tracker_.reset();
-  }
-  if (mem_tracker_ != NULL) {
-    mem_tracker_->UnregisterFromParent();
-    mem_tracker_.reset();
-  }
+  if (expr_mem_tracker_ != nullptr) expr_mem_tracker_->Close();
+  if (mem_tracker_ != nullptr) mem_tracker_->Close();
   closed_ = true;
 }
 

@@ -284,8 +284,8 @@ TEST_F(ReservationTrackerTest, MemTrackerIntegrationTwoLevel) {
   ASSERT_EQ(0, child_mem_tracker2.consumption());
   ASSERT_EQ(0, root_mem_tracker.consumption());
   ASSERT_EQ(0, root_.GetUsedReservation());
-  child_mem_tracker1.UnregisterFromParent();
-  child_mem_tracker2.UnregisterFromParent();
+  child_mem_tracker1.Close();
+  child_mem_tracker2.Close();
 }
 
 TEST_F(ReservationTrackerTest, MemTrackerIntegrationMultiLevel) {
@@ -364,7 +364,7 @@ TEST_F(ReservationTrackerTest, MemTrackerIntegrationMultiLevel) {
 
   for (int i = HIERARCHY_DEPTH - 1; i >= 0; --i) {
     reservations[i].Close();
-    if (i != 0) mem_trackers[i]->UnregisterFromParent();
+    if (i != 0) mem_trackers[i]->Close();
   }
 }
 
@@ -469,12 +469,12 @@ TEST_F(ReservationTrackerTest, TransferReservation) {
   EXPECT_EQ(GRANDPARENT_LIMIT, root_.GetReservation());
 
   child->Close();
-  child_mem_tracker->UnregisterFromParent();
+  child_mem_tracker->Close();
   aunt->Close();
   parent->Close();
-  parent_mem_tracker->UnregisterFromParent();
+  parent_mem_tracker->Close();
   grandparent->Close();
-  grandparent_mem_tracker->UnregisterFromParent();
+  grandparent_mem_tracker->Close();
 }
 }
 

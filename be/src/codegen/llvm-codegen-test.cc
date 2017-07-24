@@ -29,6 +29,7 @@
 #include "util/cpu-info.h"
 #include "util/hash-util.h"
 #include "util/path-builder.h"
+#include "util/scope-exit-trigger.h"
 #include "util/test-info.h"
 
 #include "common/names.h"
@@ -65,6 +66,10 @@ class LlvmCodeGenTest : public testing:: Test {
       ASSERT_OK(object1.Init(unique_ptr<Module>(new Module("Test", object1.context()))));
       ASSERT_OK(object2.Init(unique_ptr<Module>(new Module("Test", object2.context()))));
       ASSERT_OK(object3.Init(unique_ptr<Module>(new Module("Test", object3.context()))));
+
+      object1.Close();
+      object2.Close();
+      object3.Close();
     }
   }
 
@@ -113,6 +118,7 @@ TEST_F(LlvmCodeGenTest, BadIRFile) {
   string module_file = "NonExistentFile.ir";
   scoped_ptr<LlvmCodeGen> codegen;
   EXPECT_FALSE(CreateFromFile(module_file.c_str(), &codegen).ok());
+  codegen->Close();
 }
 
 // IR for the generated linner loop
@@ -236,6 +242,7 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   TestLoopFn new_loop_fn2 = reinterpret_cast<TestLoopFn>(new_loop2);
   new_loop_fn2(5);
   EXPECT_EQ(0, jitted_counter);
+  codegen->Close();
 }
 
 // Test function for c++/ir interop for strings.  Function will do:
@@ -325,6 +332,7 @@ TEST_F(LlvmCodeGenTest, StringValue) {
   int32_t* bytes = reinterpret_cast<int32_t*>(&str_val);
   EXPECT_EQ(1, bytes[2]);   // str_val.len
   EXPECT_EQ(0, bytes[3]);   // padding
+  codegen->Close();
 }
 
 // Test calling memcpy intrinsic
@@ -362,6 +370,7 @@ TEST_F(LlvmCodeGenTest, MemcpyTest) {
   test_fn(dst, src, 4);
 
   EXPECT_EQ(memcmp(src, dst, 4), 0);
+  codegen->Close();
 }
 
 // Test codegen for hash
@@ -377,6 +386,8 @@ TEST_F(LlvmCodeGenTest, HashTest) {
     scoped_ptr<LlvmCodeGen> codegen;
     ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(runtime_state_, NULL, "test", &codegen));
     ASSERT_TRUE(codegen.get() != NULL);
+    const auto close_codegen =
+        MakeScopeExitTrigger([&codegen]() { codegen->Close(); });
 
     Value* llvm_data1 =
         codegen->CastPtrToLlvmPtr(codegen->ptr_type(), const_cast<char*>(data1));

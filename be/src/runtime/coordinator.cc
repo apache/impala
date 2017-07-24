@@ -144,7 +144,7 @@ Status Coordinator::Exec() {
   lock_guard<mutex> l(lock_);
 
   query_state_ = ExecEnv::GetInstance()->query_exec_mgr()->CreateQueryState(query_ctx_);
-  filter_mem_tracker_.reset(new MemTracker(
+  filter_mem_tracker_ = query_state_->obj_pool()->Add(new MemTracker(
       -1, "Runtime Filter (Coordinator)", query_state_->query_mem_tracker(), false));
 
   InitFragmentStats();
@@ -1090,15 +1090,11 @@ void Coordinator::ReleaseResources() {
     lock_guard<SpinLock> l(filter_lock_);
     for (auto& filter : filter_routing_table_) {
       FilterState* state = &filter.second;
-      state->Disable(filter_mem_tracker_.get());
+      state->Disable(filter_mem_tracker_);
     }
   }
   // This may be NULL while executing UDFs.
-  if (filter_mem_tracker_.get() != nullptr) {
-    // TODO: move this elsewhere, this isn't releasing resources (it's dismantling
-    // control structures)
-    filter_mem_tracker_->UnregisterFromParent();
-  }
+  if (filter_mem_tracker_ != nullptr) filter_mem_tracker_->Close();
   // Need to protect against failed Prepare(), where root_sink() would not be set.
   if (coord_sink_ != nullptr) {
     coord_sink_->CloseConsumer();
@@ -1171,7 +1167,7 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
     }
 
     // Filter is complete, and can be released.
-    state->Disable(filter_mem_tracker_.get());
+    state->Disable(filter_mem_tracker_);
     DCHECK(state->bloom_filter() == nullptr);
   }
 
@@ -1196,15 +1192,15 @@ void Coordinator::FilterState::ApplyUpdate(const TUpdateFilterParams& params,
 
   --pending_count_;
   if (params.bloom_filter.always_true) {
-    Disable(coord->filter_mem_tracker_.get());
+    Disable(coord->filter_mem_tracker_);
   } else if (bloom_filter_.get() == nullptr) {
     int64_t heap_space = params.bloom_filter.directory.size();
-    if (!coord->filter_mem_tracker_.get()->TryConsume(heap_space)) {
+    if (!coord->filter_mem_tracker_->TryConsume(heap_space)) {
       VLOG_QUERY << "Not enough memory to allocate filter: "
                  << PrettyPrinter::Print(heap_space, TUnit::BYTES)
                  << " (query: " << coord->query_id() << ")";
       // Disable, as one missing update means a correct filter cannot be produced.
-      Disable(coord->filter_mem_tracker_.get());
+      Disable(coord->filter_mem_tracker_);
     } else {
       bloom_filter_.reset(new TBloomFilter());
       // Workaround for fact that parameters are const& for Thrift RPCs - yet we want to

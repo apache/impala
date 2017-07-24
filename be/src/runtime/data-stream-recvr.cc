@@ -350,8 +350,7 @@ void DataStreamRecvr::Close() {
     sender_queues_[i]->Close();
   }
   merger_.reset();
-  mem_tracker_->UnregisterFromParent();
-  mem_tracker_.reset();
+  mem_tracker_->Close();
 }
 
 DataStreamRecvr::~DataStreamRecvr() {

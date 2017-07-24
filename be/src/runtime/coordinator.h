@@ -249,8 +249,9 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   TRuntimeFilterMode::type filter_mode_;
 
   /// Tracks the memory consumed by runtime filters during aggregation. Child of
-  /// the query mem tracker in 'query_state_' and set in Exec().
-  std::unique_ptr<MemTracker> filter_mem_tracker_;
+  /// the query mem tracker in 'query_state_' and set in Exec(). Stored in
+  /// query_state_->obj_pool() so it has same lifetime as other MemTrackers.
+  MemTracker* filter_mem_tracker_ = nullptr;
 
   /// Object pool owned by the coordinator.
   boost::scoped_ptr<ObjectPool> obj_pool_;

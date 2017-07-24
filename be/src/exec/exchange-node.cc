@@ -123,7 +123,6 @@ void ExchangeNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (less_than_.get() != nullptr) less_than_->Close(state);
   if (stream_recvr_ != nullptr) stream_recvr_->Close();
-  stream_recvr_.reset();
   ScalarExpr::Close(ordering_exprs_);
   ExecNode::Close(state);
 }

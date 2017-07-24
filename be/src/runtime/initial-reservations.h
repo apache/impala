@@ -70,6 +70,8 @@ class InitialReservations {
   // Return() returns reservations to.
   ReservationTracker initial_reservations_;
 
+  MemTracker* const initial_reservation_mem_tracker_;
+
   /// The total bytes of additional reservations that we expect to be claimed.
   /// initial_reservations_->GetReservation() <= remaining_initial_reservation_claims_.
   int64_t remaining_initial_reservation_claims_;

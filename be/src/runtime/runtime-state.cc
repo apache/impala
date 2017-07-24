@@ -70,9 +70,7 @@ RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragmentCtx& frag
         query_state->query_ctx().utc_timestamp_string))),
     exec_env_(exec_env),
     profile_(obj_pool(), "Fragment " + PrintId(instance_ctx.fragment_instance_id)),
-    instance_buffer_reservation_(new ReservationTracker),
-    is_cancelled_(false),
-    root_node_id_(-1) {
+    instance_buffer_reservation_(new ReservationTracker) {
   Init();
 }
 
@@ -85,10 +83,7 @@ RuntimeState::RuntimeState(
     now_(new TimestampValue(TimestampValue::Parse(qctx.now_string))),
     utc_timestamp_(new TimestampValue(TimestampValue::Parse(qctx.utc_timestamp_string))),
     exec_env_(exec_env),
-    profile_(obj_pool(), "<unnamed>"),
-    instance_buffer_reservation_(nullptr),
-    is_cancelled_(false),
-    root_node_id_(-1) {
+    profile_(obj_pool(), "<unnamed>") {
   if (query_ctx().request_pool.empty()) {
     const_cast<TQueryCtx&>(query_ctx()).request_pool = "test-pool";
   }
@@ -97,7 +92,7 @@ RuntimeState::RuntimeState(
 }
 
 RuntimeState::~RuntimeState() {
-  DCHECK(instance_mem_tracker_ == nullptr) << "Must call ReleaseResources()";
+  DCHECK(released_resources_) << "Must call ReleaseResources()";
 }
 
 void RuntimeState::Init() {
@@ -233,33 +228,30 @@ void RuntimeState::UnregisterReaderContexts() {
 }
 
 void RuntimeState::ReleaseResources() {
-  // TODO: IMPALA-5587: control structures (e.g. MemTrackers) shouldn't be destroyed here.
+  DCHECK(!released_resources_);
   UnregisterReaderContexts();
   if (filter_bank_ != nullptr) filter_bank_->Close();
   if (resource_pool_ != nullptr) {
     exec_env_->thread_mgr()->UnregisterPool(resource_pool_);
   }
-  codegen_.reset(); // Release any memory associated with codegen.
+  // Release any memory associated with codegen.
+  if (codegen_ != nullptr) codegen_->Close();
 
   // Release the reservation, which should be unused at the point.
   if (instance_buffer_reservation_ != nullptr) instance_buffer_reservation_->Close();
 
-  // 'query_mem_tracker()' must be valid as long as 'instance_mem_tracker_' is so
-  // delete 'instance_mem_tracker_' first.
-  // LogUsage() walks the MemTracker tree top-down when the memory limit is exceeded, so
-  // break the link between 'instance_mem_tracker_' and its parent before
-  // 'instance_mem_tracker_' and its children are destroyed.
-  instance_mem_tracker_->UnregisterFromParent();
+  // No more memory should be tracked for this instance at this point.
   if (instance_mem_tracker_->consumption() != 0) {
     LOG(WARNING) << "Query " << query_id() << " may have leaked memory." << endl
                  << instance_mem_tracker_->LogUsage();
   }
-  instance_mem_tracker_.reset();
+  instance_mem_tracker_->Close();
 
   if (local_query_state_.get() != nullptr) {
     // if we created this QueryState, we must call ReleaseResources()
     local_query_state_->ReleaseResources();
   }
+  released_resources_ = true;
 }
 
 const std::string& RuntimeState::GetEffectiveUser() const {

@@ -348,6 +348,7 @@ TEST_F(ExprCodegenTest, TestInlineConstFnAttrs) {
   EXPECT_EQ(result.is_null, false);
   EXPECT_EQ(result.val8, 100003);
   CheckFnAttr();
+  codegen->Close();
 }
 
 }

@@ -228,5 +228,5 @@ void RuntimeFilterBank::Close() {
   closed_ = true;
   obj_pool_.Clear();
   filter_mem_tracker_->Release(memory_allocated_->value());
-  filter_mem_tracker_->UnregisterFromParent();
+  filter_mem_tracker_->Close();
 }

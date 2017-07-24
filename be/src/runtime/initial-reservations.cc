@@ -40,11 +40,11 @@ namespace impala {
 InitialReservations::InitialReservations(ObjectPool* obj_pool,
     ReservationTracker* query_reservation, MemTracker* query_mem_tracker,
     int64_t initial_reservation_total_claims)
-  : remaining_initial_reservation_claims_(initial_reservation_total_claims) {
-  MemTracker* initial_reservation_tracker = obj_pool->Add(
-      new MemTracker(-1, "Unclaimed reservations", query_mem_tracker, false));
+  : initial_reservation_mem_tracker_(obj_pool->Add(
+      new MemTracker(-1, "Unclaimed reservations", query_mem_tracker, false))),
+      remaining_initial_reservation_claims_(initial_reservation_total_claims) {
   initial_reservations_.InitChildTracker(nullptr, query_reservation,
-      initial_reservation_tracker, numeric_limits<int64_t>::max());
+      initial_reservation_mem_tracker_, numeric_limits<int64_t>::max());
 }
 
 Status InitialReservations::Init(
@@ -86,5 +86,6 @@ void InitialReservations::Return(BufferPool::ClientHandle* src, int64_t bytes) {
 
 void InitialReservations::ReleaseResources() {
   initial_reservations_.Close();
+  initial_reservation_mem_tracker_->Close();
 }
 }

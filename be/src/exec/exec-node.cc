@@ -211,11 +211,15 @@ void ExecNode::Close(RuntimeState* state) {
         &buffer_pool_client_, resource_profile_.min_reservation);
     state->exec_env()->buffer_pool()->DeregisterClient(&buffer_pool_client_);
   }
-  if (mem_tracker() != NULL && mem_tracker()->consumption() != 0) {
-    LOG(WARNING) << "Query " << state->query_id() << " may have leaked memory." << endl
-                 << state->instance_mem_tracker()->LogUsage();
-    DCHECK_EQ(mem_tracker()->consumption(), 0)
-        << "Leaked memory." << endl << state->instance_mem_tracker()->LogUsage();
+  if (expr_mem_tracker_ != nullptr) expr_mem_tracker_->Close();
+  if (mem_tracker_ != nullptr) {
+    if (mem_tracker()->consumption() != 0) {
+      LOG(WARNING) << "Query " << state->query_id() << " may have leaked memory." << endl
+                   << state->instance_mem_tracker()->LogUsage();
+      DCHECK_EQ(mem_tracker()->consumption(), 0)
+          << "Leaked memory." << endl << state->instance_mem_tracker()->LogUsage();
+    }
+    mem_tracker_->Close();
   }
 }
 

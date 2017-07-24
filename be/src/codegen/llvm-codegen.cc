@@ -160,6 +160,7 @@ Status LlvmCodeGen::InitializeLlvm(bool load_backend) {
 
   // Initialize the global shared call graph.
   shared_call_graph_.Init(init_codegen->module_);
+  init_codegen->Close();
   return Status::OK();
 }
 
@@ -168,7 +169,7 @@ LlvmCodeGen::LlvmCodeGen(RuntimeState* state, ObjectPool* pool,
   : state_(state),
     id_(id),
     profile_(pool, "CodeGen"),
-    mem_tracker_(new MemTracker(&profile_, -1, "CodeGen", parent_mem_tracker)),
+    mem_tracker_(pool->Add(new MemTracker(&profile_, -1, "CodeGen", parent_mem_tracker))),
     optimizations_enabled_(false),
     is_corrupt_(false),
     is_compiled_(false),
@@ -405,13 +406,20 @@ void LlvmCodeGen::SetupJITListeners() {
 }
 
 LlvmCodeGen::~LlvmCodeGen() {
-  if (memory_manager_ != NULL) mem_tracker_->Release(memory_manager_->bytes_tracked());
-  if (mem_tracker_->parent() != NULL) mem_tracker_->UnregisterFromParent();
-  mem_tracker_.reset();
+  DCHECK(execution_engine_ == nullptr) << "Must Close() before destruction";
+}
+
+void LlvmCodeGen::Close() {
+  if (memory_manager_ != nullptr) {
+    mem_tracker_->Release(memory_manager_->bytes_tracked());
+    memory_manager_ = nullptr;
+  }
+  if (mem_tracker_ != nullptr) mem_tracker_->Close();
 
   // Execution engine executes callback on event listener, so tear down engine first.
   execution_engine_.reset();
   symbol_emitter_.reset();
+  module_ = nullptr;
 }
 
 void LlvmCodeGen::EnableOptimizations(bool enable) {
@@ -1242,6 +1250,7 @@ Status LlvmCodeGen::GetSymbols(const string& file, const string& module_id,
   for (const Function& fn: codegen->module_->functions()) {
     if (fn.isMaterializable()) symbols->insert(fn.getName());
   }
+  codegen->Close();
   return Status::OK();
 }
 

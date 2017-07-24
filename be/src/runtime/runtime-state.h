@@ -302,7 +302,7 @@ class RuntimeState {
   /// Helper to call QueryState::StartSpilling().
   Status StartSpilling(MemTracker* mem_tracker);
 
-  /// Release resources and prepare this object for destruction.
+  /// Release resources and prepare this object for destruction. Can only be called once.
   void ReleaseResources();
 
  private:
@@ -376,7 +376,10 @@ class RuntimeState {
   boost::scoped_ptr<ReservationTracker> instance_buffer_reservation_;
 
   /// if true, execution should stop with a CANCELLED status
-  bool is_cancelled_;
+  bool is_cancelled_ = false;
+
+  /// if true, ReleaseResources() was called.
+  bool released_resources_ = false;
 
   /// Non-OK if an error has occurred and query execution should abort. Used only for
   /// asynchronously reporting such errors (e.g., when a UDF reports an error), so this
@@ -397,7 +400,7 @@ class RuntimeState {
   /// 2) It is different between different fragments, so we do not run into hash
   /// collisions after data partitioning (across fragments). See IMPALA-219 for more
   /// details.
-  PlanNodeId root_node_id_;
+  PlanNodeId root_node_id_ = -1;
 
   /// Manages runtime filters that are either produced or consumed (or both!) by plan
   /// nodes that share this runtime state.

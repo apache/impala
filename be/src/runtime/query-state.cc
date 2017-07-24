@@ -94,8 +94,13 @@ void QueryState::ReleaseResources() {
   // Release any remaining reservation.
   if (initial_reservations_ != nullptr) initial_reservations_->ReleaseResources();
   if (buffer_reservation_ != nullptr) buffer_reservation_->Close();
-  // Avoid dangling reference from the parent of 'query_mem_tracker_'.
-  if (query_mem_tracker_ != nullptr) query_mem_tracker_->UnregisterFromParent();
+  if (query_mem_tracker_ != nullptr) {
+    // No more tracked memory should be used by the query after this point, so we can
+    // close the MemTracker and remove the whole query subtree of MemTrackers from the
+    // global tree. After this point nothing should be touching this query's MemTrackers
+    // and they can be safely destroyed.
+    query_mem_tracker_->CloseAndUnregisterFromParent();
+  }
   if (desc_tbl_ != nullptr) desc_tbl_->ReleaseResources();
   released_resources_ = true;
 }

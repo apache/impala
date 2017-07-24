@@ -28,6 +28,7 @@
 #include "util/debug-util.h"
 #include "util/mem-info.h"
 #include "util/pretty-printer.h"
+#include "util/test-info.h"
 #include "util/uid-util.h"
 
 #include "common/names.h"
@@ -109,8 +110,18 @@ void MemTracker::AddChildTracker(MemTracker* tracker) {
   tracker->child_tracker_it_ = child_trackers_.insert(child_trackers_.end(), tracker);
 }
 
-void MemTracker::UnregisterFromParent() {
-  DCHECK(parent_ != NULL);
+void MemTracker::Close() {
+  if (closed_) return;
+  if (consumption_metric_ == nullptr) {
+    DCHECK_EQ(consumption_->current_value(), 0) << label_ << "\n"
+                                                << GetStackTrace() << "\n"
+                                                << LogUsage("");
+  }
+  closed_ = true;
+}
+
+void MemTracker::CloseAndUnregisterFromParent() {
+  Close();
   lock_guard<SpinLock> l(parent_->child_trackers_lock_);
   parent_->child_trackers_.erase(child_tracker_it_);
   child_tracker_it_ = parent_->child_trackers_.end();
@@ -187,9 +198,10 @@ MemTracker* MemTracker::CreateQueryMemTracker(const TUniqueId& id,
 }
 
 MemTracker::~MemTracker() {
-  DCHECK_EQ(consumption_->current_value(), 0) << label_ << "\n"
-                                              << GetStackTrace() << "\n"
-                                              << LogUsage("");
+  // We should explicitly close MemTrackers in the context of a daemon process. It is ok
+  // if backend tests don't call Close() to make tests more concise.
+  if (TestInfo::is_test()) Close();
+  DCHECK(closed_) << label_;
   delete reservation_counters_.Load();
 }
 

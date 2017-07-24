@@ -154,8 +154,11 @@ class LlvmCodeGen {
   static Status CreateImpalaCodegen(RuntimeState* state, MemTracker* parent_mem_tracker,
       const std::string& id, boost::scoped_ptr<LlvmCodeGen>* codegen);
 
-  /// Removes all jit compiled dynamically linked functions from the process.
   ~LlvmCodeGen();
+
+  /// Releases all resources associated with the codegen object. It is invalid to call
+  /// any other API methods after calling close.
+  void Close();
 
   RuntimeProfile* runtime_profile() { return &profile_; }
   RuntimeProfile::Counter* codegen_timer() { return codegen_timer_; }
@@ -668,8 +671,9 @@ class LlvmCodeGen {
   RuntimeProfile profile_;
 
   /// MemTracker used for tracking memory consumed by codegen. Connected to a parent
-  /// MemTracker if one was provided during initialization.
-  boost::scoped_ptr<MemTracker> mem_tracker_;
+  /// MemTracker if one was provided during initialization. Owned by the ObjectPool
+  /// provided in the constructor.
+  MemTracker* mem_tracker_;
 
   /// Time spent reading the .ir file from the file system.
   RuntimeProfile::Counter* load_module_timer_;
