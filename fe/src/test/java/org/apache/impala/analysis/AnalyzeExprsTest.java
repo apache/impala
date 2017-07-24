@@ -735,6 +735,17 @@ public class AnalyzeExprsTest extends AnalyzerTest {
                "from functional.alltypesagg a " +
                "where exists (select 1 from functional.alltypes b where a.id = b.id)");
 
+    // last_value/first_value without using order by
+    AnalyzesOk("select first_value(tinyint_col) over () from functional.alltypesagg");
+    AnalyzesOk("select last_value(tinyint_col) over () from functional.alltypesagg");
+    AnalyzesOk("select first_value(tinyint_col ignore nulls) over () from "
+        + "functional.alltypesagg");
+    AnalyzesOk("select last_value(tinyint_col ignore nulls) over () from "
+        + "functional.alltypesagg");
+    AnalyzesOk("select first_value(tinyint_col ignore nulls) over ()," +
+        "last_value(tinyint_col ignore nulls) over () from functional.alltypesagg a " +
+        "where exists (select 1 from functional.alltypes b where a.id = b.id)");
+
     // legal combinations of analytic and agg functions
     AnalyzesOk("select sum(count(id)) over (partition by min(int_col) "
         + "order by max(bigint_col)) from functional.alltypes group by id, tinyint_col "

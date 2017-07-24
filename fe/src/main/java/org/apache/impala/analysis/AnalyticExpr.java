@@ -227,6 +227,12 @@ public class AnalyticExpr extends Expr {
         isAnalyticFn(fn, ROWNUMBER);
   }
 
+  static private boolean isFirstOrLastValueFn(Function fn) {
+    return isAnalyticFn(fn, LAST_VALUE) || isAnalyticFn(fn, FIRST_VALUE) ||
+        isAnalyticFn(fn, LAST_VALUE_IGNORE_NULLS) ||
+        isAnalyticFn(fn, FIRST_VALUE_IGNORE_NULLS);
+  }
+
   /**
    * Rewrite the following analytic functions:
    * percent_rank(), cume_dist() and ntile()
@@ -447,16 +453,13 @@ public class AnalyticExpr extends Expr {
           "DISTINCT not allowed in analytic function: " + getFnCall().toSql());
     }
 
-    if (getFnCall().getParams().isIgnoreNulls()) {
-      String fnName = getFnCall().getFnName().getFunction();
-      if (!fnName.equals(LAST_VALUE) && !fnName.equals(FIRST_VALUE)) {
-        throw new AnalysisException("Function " + fnName.toUpperCase()
-            + " does not accept the keyword IGNORE NULLS.");
-      }
+    Function fn = getFnCall().getFn();
+    if (getFnCall().getParams().isIgnoreNulls() && !isFirstOrLastValueFn(fn)) {
+      throw new AnalysisException("Function " + fn.functionName().toUpperCase()
+          + " does not accept the keyword IGNORE NULLS.");
     }
 
     // check for correct composition of analytic expr
-    Function fn = getFnCall().getFn();
     if (!(fn instanceof AggregateFunction)) {
         throw new AnalysisException(
             "OVER clause requires aggregate or analytic function: "
@@ -471,7 +474,7 @@ public class AnalyticExpr extends Expr {
     }
 
     if (isAnalyticFn(fn) && !isAggregateFn(fn)) {
-      if (orderByElements_.isEmpty()) {
+      if (!isFirstOrLastValueFn(fn) && orderByElements_.isEmpty()) {
         throw new AnalysisException(
             "'" + getFnCall().toSql() + "' requires an ORDER BY clause");
       }
