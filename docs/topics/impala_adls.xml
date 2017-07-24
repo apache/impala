@@ -35,8 +35,6 @@ under the License.
 
   <conbody>
 
-    <note conref="../shared/impala_common.xml#common/adls_production"/>
-
     <p>
       <indexterm audience="hidden">ADLS with Impala</indexterm>
       You can use Impala to query data residing on the Azure Data Lake Store (ADLS) filesystem.

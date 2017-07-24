@@ -1115,13 +1115,6 @@ drop database temp;
         to 268435456 (256 MB) to match the row group size produced by Impala.
       </p>
 
-      <note rev="2.9.0 IMPALA-5333" id="adls_production" type="important">
-        <p>
-          Currently, the ADLS support in Impala is preliminary and not
-          fully tested. Do not use Impala with ADLS in a production environment.
-        </p>
-      </note>
-
       <note rev="2.6.0 IMPALA-1878" id="s3_production" type="important">
         <p>
           In <keyword keyref="impala26_full"/> and higher, Impala supports both queries (<codeph>SELECT</codeph>)
