@@ -1247,6 +1247,13 @@ string_col string
 id int
 ---- ALTER
 ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION (string_col = "partition1");
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION (string_col = "2009-01-01 00:00:00");
+---- LOAD
+SET hive.exec.dynamic.partition.mode=nonstrict;
+SET hive.exec.dynamic.partition=true;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION(string_col)
+SELECT id, timestamp_col as string_col from functional.alltypestiny
+WHERE timestamp_col = "2009-01-01 00:00:00";
 ====
 ---- DATASET
 functional

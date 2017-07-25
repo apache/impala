@@ -182,6 +182,7 @@ public class HdfsPartitionPruner {
         return false;
       }
       BinaryPredicate bp = (BinaryPredicate)expr;
+      if (bp.getChild(0).isImplicitCast()) return false;
       SlotRef slot = bp.getBoundSlot();
       if (slot == null) return false;
       Expr bindingExpr = bp.getSlotBinding(slot.getSlotId());

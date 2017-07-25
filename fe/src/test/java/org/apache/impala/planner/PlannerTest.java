@@ -456,6 +456,13 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testPartitionPruning() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.EXTENDED);
+    runPlannerTestFile("partition-pruning", options);
+  }
+
+  @Test
   public void testComputeStatsDisableSpill() throws ImpalaException {
     TQueryCtx queryCtx = TestUtils.createQueryContext(Catalog.DEFAULT_DB,
         System.getProperty("user.name"));
