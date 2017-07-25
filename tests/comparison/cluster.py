@@ -563,6 +563,9 @@ class Impala(Service):
   def cancel_queries(self):
     self.for_each_impalad(lambda i: i.cancel_queries())
 
+  def get_version_info(self):
+    return self.for_each_impalad(lambda i: i.get_version_info(), as_dict=True)
+
   def queries_are_running(self):
     return any(self.for_each_impalad(lambda i: i.queries_are_running()))
 
@@ -675,6 +678,11 @@ class Impalad(object):
     except requests.exceptions.HTTPError as e:
       # TODO: Handle losing the race
       raise e
+
+  def get_version_info(self):
+    with self.cluster.impala.cursor(impalad=self) as cursor:
+      cursor.execute("SELECT version()")
+      return ''.join(cursor.fetchone()).strip()
 
   def shell(self, cmd, timeout_secs=DEFAULT_TIMEOUT):
     return self.cluster.shell(cmd, self.host_name, timeout_secs=timeout_secs)

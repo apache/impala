@@ -1654,6 +1654,19 @@ def populate_all_queries(queries, impala, args, runtime_info_path,
   return result
 
 
+def print_version(cluster):
+  """
+  Print the cluster impalad version info to the console sorted by hostname.
+  """
+  def _sorter(i1, i2):
+    return cmp(i1.host_name, i2.host_name)
+
+  version_info = cluster.impala.get_version_info()
+  print("Cluster Impalad Version Info:")
+  for impalad in sorted(version_info.keys(), cmp=_sorter):
+    print("{0}: {1}".format(impalad.host_name, version_info[impalad]))
+
+
 def main():
   from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
   from random import shuffle
@@ -1851,6 +1864,7 @@ def main():
   impala = cluster.impala
   if impala.find_stopped_impalads():
     impala.restart()
+  print_version(cluster)
   impala.find_and_set_path_to_running_impalad_binary()
   if args.cancel_current_queries and impala.queries_are_running():
     impala.cancel_queries()
