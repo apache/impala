@@ -206,7 +206,7 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
     exprs.push_back(expr);
     ScalarExprEvaluator* eval;
     status = ScalarExprEvaluator::Create(*expr, &state, &obj_pool, &expr_mem_pool,
-        &eval);
+        &expr_mem_pool, &eval);
     evals.push_back(eval);
     if (!status.ok()) goto error;
   }

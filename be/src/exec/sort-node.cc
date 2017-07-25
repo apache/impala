@@ -52,12 +52,11 @@ Status SortNode::Init(const TPlanNode& tnode, RuntimeState* state) {
 Status SortNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
-  less_than_.reset(new TupleRowComparator(ordering_exprs_, is_asc_order_, nulls_first_));
   sorter_.reset(
-      new Sorter(*less_than_, sort_tuple_exprs_, &row_descriptor_, mem_tracker(),
-          &buffer_pool_client_, resource_profile_.spillable_buffer_size,
-          runtime_profile(), state, id(), true));
-  RETURN_IF_ERROR(sorter_->Prepare(pool_, expr_mem_pool()));
+      new Sorter(ordering_exprs_, is_asc_order_, nulls_first_, sort_tuple_exprs_,
+          &row_descriptor_, mem_tracker(), &buffer_pool_client_,
+          resource_profile_.spillable_buffer_size, runtime_profile(), state, id(), true));
+  RETURN_IF_ERROR(sorter_->Prepare(pool_));
   DCHECK_GE(resource_profile_.min_reservation, sorter_->ComputeMinReservation());
   AddCodegenDisabledMessage(state);
   return Status::OK();
@@ -67,7 +66,7 @@ void SortNode::Codegen(RuntimeState* state) {
   DCHECK(state->ShouldCodegen());
   ExecNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
-  Status codegen_status = less_than_->Codegen(state);
+  Status codegen_status = sorter_->Codegen(state);
   runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
 }
 
@@ -80,7 +79,6 @@ Status SortNode::Open(RuntimeState* state) {
   if (!buffer_pool_client_.is_registered()) {
     RETURN_IF_ERROR(ClaimBufferReservation(state));
   }
-  RETURN_IF_ERROR(less_than_->Open(pool_, state, expr_mem_pool()));
   RETURN_IF_ERROR(sorter_->Open());
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
@@ -153,17 +151,11 @@ Status SortNode::Reset(RuntimeState* state) {
 
 void SortNode::Close(RuntimeState* state) {
   if (is_closed()) return;
-  if (less_than_.get() != nullptr) less_than_->Close(state);
   if (sorter_ != nullptr) sorter_->Close(state);
   sorter_.reset();
   ScalarExpr::Close(ordering_exprs_);
   ScalarExpr::Close(sort_tuple_exprs_);
   ExecNode::Close(state);
-}
-
-Status SortNode::QueryMaintenance(RuntimeState* state) {
-  sorter_->FreeLocalAllocations();
-  return ExecNode::QueryMaintenance(state);
 }
 
 void SortNode::DebugString(int indentation_level, stringstream* out) const {

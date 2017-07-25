@@ -100,7 +100,7 @@ struct FilterContext {
   /// Clones this FilterContext for use in a multi-threaded context (i.e. by scanner
   /// threads).
   Status CloneFrom(const FilterContext& from, ObjectPool* pool, RuntimeState* state,
-      MemPool* mem_pool);
+      MemPool* expr_perm_pool, MemPool* expr_results_pool);
 
   /// Evaluates 'row' with 'expr_eval' with the resulting value being checked
   /// against runtime filter 'filter' for matches. Returns true if 'row' finds

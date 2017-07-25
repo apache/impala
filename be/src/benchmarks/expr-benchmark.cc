@@ -113,7 +113,8 @@ static Status PrepareSelectList(
   RuntimeState* state = planner->GetRuntimeState();
   ScalarExpr* expr;
   RETURN_IF_ERROR(ScalarExpr::Create(texprs[0], RowDescriptor(), state, &expr));
-  RETURN_IF_ERROR(ScalarExprEvaluator::Create(*expr, state, &pool, &mem_pool, eval));
+  RETURN_IF_ERROR(
+      ScalarExprEvaluator::Create(*expr, state, &pool, &mem_pool, &mem_pool, eval));
   return Status::OK();
 }
 

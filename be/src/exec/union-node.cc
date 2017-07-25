@@ -80,8 +80,7 @@ Status UnionNode::Prepare(RuntimeState* state) {
   for (const vector<ScalarExpr*>& const_exprs : const_exprs_lists_) {
     vector<ScalarExprEvaluator*> const_expr_evals;
     RETURN_IF_ERROR(ScalarExprEvaluator::Create(const_exprs, state, pool_,
-        expr_mem_pool(), &const_expr_evals));
-    AddEvaluatorsToFree(const_expr_evals);
+        expr_perm_pool(), expr_results_pool(), &const_expr_evals));
     const_expr_evals_lists_.push_back(const_expr_evals);
   }
 
@@ -89,8 +88,7 @@ Status UnionNode::Prepare(RuntimeState* state) {
   for (const vector<ScalarExpr*>& child_exprs : child_exprs_lists_) {
     vector<ScalarExprEvaluator*> child_expr_evals;
     RETURN_IF_ERROR(ScalarExprEvaluator::Create(child_exprs, state, pool_,
-        expr_mem_pool(), &child_expr_evals));
-    AddEvaluatorsToFree(child_expr_evals);
+        expr_perm_pool(), expr_results_pool(), &child_expr_evals));
     child_expr_evals_lists_.push_back(child_expr_evals);
   }
   return Status::OK();

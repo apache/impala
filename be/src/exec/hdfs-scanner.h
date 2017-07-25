@@ -205,9 +205,9 @@ class HdfsScanner {
   /// Starts as false and is set to true in Close().
   bool is_closed_ = false;
 
-  /// MemPool used for expression evaluators in this scanner. Need to be local
-  /// to each scanner as MemPool is not thread safe.
-  boost::scoped_ptr<MemPool> expr_mem_pool_;
+  /// MemPool used for expr-managed memory in expression evaluators in this scanner.
+  /// Need to be local to each scanner as MemPool is not thread safe.
+  boost::scoped_ptr<MemPool> expr_perm_pool_;
 
   /// Clones of the conjuncts' evaluators in scan_node_->conjuncts_map().
   /// Each scanner has its own ScalarExprEvaluators so the conjuncts can be safely
@@ -311,7 +311,7 @@ class HdfsScanner {
 
   /// Commits 'num_rows' to 'row_batch'. Advances 'tuple_mem_' and 'tuple_' accordingly.
   /// Attaches completed resources from 'context_' to 'row_batch' if necessary.
-  /// Frees local expr allocations. Returns non-OK if 'context_' is cancelled or the
+  /// Frees expr result allocations. Returns non-OK if 'context_' is cancelled or the
   /// query status in 'state_' is non-OK.
   Status CommitRows(int num_rows, RowBatch* row_batch) WARN_UNUSED_RESULT;
 

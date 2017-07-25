@@ -90,9 +90,14 @@ class KuduScanner {
   /// For objects which have the same life time as the scanner.
   ObjectPool obj_pool_;
 
-  /// MemPool used for expression evaluators in this scanner. Need to be local
-  /// to each scanner as MemPool is not thread safe.
-  boost::scoped_ptr<MemPool> expr_mem_pool_;
+  /// MemPool used for expr-managed allocations in expression evaluators in this scanner.
+  /// Need to be local to each scanner as MemPool is not thread safe.
+  boost::scoped_ptr<MemPool> expr_perm_pool_;
+
+  /// MemPool used for allocations by expression evaluators in this scanner that hold
+  /// results of expression evaluation. Need to be local to each scanner as MemPool is
+  /// not thread safe.
+  boost::scoped_ptr<MemPool> expr_results_pool_;
 
   /// The kudu::client::KuduScanner for the current scan token. A new KuduScanner is
   /// created for each scan token using KuduScanToken::DeserializeIntoScanner().

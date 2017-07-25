@@ -217,8 +217,8 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
 
   // Clone the min/max statistics conjuncts.
   RETURN_IF_ERROR(ScalarExprEvaluator::Clone(&obj_pool_, state_,
-      expr_mem_pool_.get(), scan_node_->min_max_conjunct_evals(),
-      &min_max_conjunct_evals_));
+      expr_perm_pool_.get(), context_->expr_results_pool(),
+      scan_node_->min_max_conjunct_evals(), &min_max_conjunct_evals_));
 
   for (int i = 0; i < context->filter_ctxs().size(); ++i) {
     const FilterContext* ctx = &context->filter_ctxs()[i];
@@ -605,8 +605,8 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
     }
   }
 
-  // Free any local allocations accumulated during conjunct evaluation.
-  ScalarExprEvaluator::FreeLocalAllocations(min_max_conjunct_evals_);
+  // Free any expr result allocations accumulated during conjunct evaluation.
+  context_->expr_results_pool()->Clear();
   return Status::OK();
 }
 
@@ -918,9 +918,9 @@ Status HdfsParquetScanner::EvalDictionaryFilters(const parquet::RowGroup& row_gr
     bool column_has_match = false;
     for (int dict_idx = 0; dict_idx < dictionary->num_entries(); ++dict_idx) {
       if (dict_idx % 1024 == 0) {
-        // Don't let local allocations accumulate too much for large dictionaries or
+        // Don't let expr result allocations accumulate too much for large dictionaries or
         // many row groups.
-        ScalarExprEvaluator::FreeLocalAllocations(dict_filter_conjunct_evals);
+        context_->expr_results_pool()->Clear();
       }
       dictionary->GetValue(dict_idx, slot);
 
@@ -934,8 +934,8 @@ Status HdfsParquetScanner::EvalDictionaryFilters(const parquet::RowGroup& row_gr
         break;
       }
     }
-    // Free all local allocations now that we're done with the filter.
-    ScalarExprEvaluator::FreeLocalAllocations(dict_filter_conjunct_evals);
+    // Free all expr result allocations now that we're done with the filter.
+    context_->expr_results_pool()->Clear();
 
     if (!column_has_match) {
       // The column contains no value that matches the conjunct. The row group
@@ -1042,18 +1042,10 @@ Status HdfsParquetScanner::CommitRows(RowBatch* dst_batch, int num_rows) {
   // Store UDF error in thread local storage or make UDF return status so it can merge
   // with parse_status_.
   RETURN_IF_ERROR(state_->GetQueryStatus());
-  // Free local expr allocations made when evaluating conjuncts for this batch.
-  FreeLocalAllocationsForConjuncts();
+  // Clear expr result allocations for this thread to avoid accumulating too much
+  // memory from evaluating the scanner conjuncts.
+  context_->expr_results_pool()->Clear();
   return Status::OK();
-}
-
-void HdfsParquetScanner::FreeLocalAllocationsForConjuncts() {
-  for (const auto& kv: conjunct_evals_map_) {
-    ScalarExprEvaluator::FreeLocalAllocations(kv.second);
-  }
-  for (const FilterContext* filter_ctx : filter_ctxs_) {
-    filter_ctx->expr_eval->FreeLocalAllocations();
-  }
 }
 
 int HdfsParquetScanner::TransferScratchTuples(RowBatch* dst_batch) {

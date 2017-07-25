@@ -109,7 +109,8 @@ Status ExchangeNode::Open(RuntimeState* state) {
   if (is_merging_) {
     // CreateMerger() will populate its merging heap with batches from the stream_recvr_,
     // so it is not necessary to call FillInputRowBatch().
-    RETURN_IF_ERROR(less_than_->Open(pool_, state, expr_mem_pool()));
+    RETURN_IF_ERROR(
+        less_than_->Open(pool_, state, expr_perm_pool(), expr_results_pool()));
     RETURN_IF_ERROR(stream_recvr_->CreateMerger(*less_than_.get()));
   } else {
     RETURN_IF_ERROR(FillInputRowBatch(state));
@@ -128,11 +129,6 @@ void ExchangeNode::Close(RuntimeState* state) {
   if (stream_recvr_ != nullptr) stream_recvr_->Close();
   ScalarExpr::Close(ordering_exprs_);
   ExecNode::Close(state);
-}
-
-Status ExchangeNode::QueryMaintenance(RuntimeState* state) {
-  if (less_than_.get() != nullptr) less_than_->FreeLocalAllocations();
-  return ExecNode::QueryMaintenance(state);
 }
 
 Status ExchangeNode::FillInputRowBatch(RuntimeState* state) {
@@ -208,6 +204,8 @@ Status ExchangeNode::GetNextMerging(RuntimeState* state, RowBatch* output_batch,
   DCHECK_EQ(output_batch->num_rows(), 0);
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
+  // Clear any expr result allocations made by the merger.
+  expr_results_pool_->Clear();
   RETURN_IF_ERROR(stream_recvr_->GetNext(output_batch, eos));
 
   while (num_rows_skipped_ < offset_) {

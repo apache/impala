@@ -144,8 +144,6 @@ class PartitionedAggregationNode : public ExecNode {
   static const char* LLVM_CLASS_NAME;
 
  protected:
-  /// Frees local allocations from aggregate_evals_ and agg_fn_evals
-  virtual Status QueryMaintenance(RuntimeState* state);
   virtual std::string DebugString(int indentation_level) const;
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
@@ -213,13 +211,14 @@ class PartitionedAggregationNode : public ExecNode {
   /// The list of all aggregate operations for this exec node.
   std::vector<AggFn*> agg_fns_;
 
-  /// Evaluators for each aggregate function and backing MemPool. String data
-  /// returned by the aggregate functions is allocated via these evaluators.
-  /// These evaluatorss are only used for the non-grouping cases. For queries
-  /// with the group-by clause, each partition will clone these evaluators.
-  /// TODO: we really need to plumb through CHAR(N) for intermediate types.
+  /// Evaluators for each aggregate function. If this is a grouping aggregation, these
+  /// evaluators are only used to create cloned per-partition evaluators. The cloned
+  /// evaluators are then used to evaluate the functions. If this is a non-grouping
+  /// aggregation these evaluators are used directly to evaluate the functions.
+  ///
+  /// Permanent and result allocations for these allocators are allocated from
+  /// 'expr_perm_pool_' and 'expr_results_pool_' respectively.
   std::vector<AggFnEvaluator*> agg_fn_evals_;
-  boost::scoped_ptr<MemPool> agg_fn_pool_;
 
   /// Exprs used to evaluate input rows
   std::vector<ScalarExpr*> grouping_exprs_;
@@ -243,7 +242,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// For non-grouping aggregations, the ownership of the pool's memory is transferred
   /// to the output batch on eos. The pool should not be Reset() to allow amortizing
   /// memory allocation over a series of Reset()/Open()/GetNext()* calls.
-  boost::scoped_ptr<MemPool> mem_pool_;
+  boost::scoped_ptr<MemPool> singleton_tuple_pool_;
 
   /// The current partition and iterator to the next row in its hash table that we need
   /// to return in GetNext()
@@ -415,9 +414,15 @@ class PartitionedAggregationNode : public ExecNode {
     /// is spilled or we are passing through all rows for this partition).
     boost::scoped_ptr<HashTable> hash_tbl;
 
-    /// Clone of parent's agg_fn_evals_ and backing MemPool.
+    /// Clone of parent's agg_fn_evals_. Permanent allocations come from
+    /// 'agg_fn_perm_pool' and result allocations come from the ExecNode's
+    /// 'expr_results_pool_'.
     std::vector<AggFnEvaluator*> agg_fn_evals;
-    boost::scoped_ptr<MemPool> agg_fn_pool;
+
+    /// Pool for permanent allocations for this partition's 'agg_fn_evals'. Freed at the
+    /// same times as 'agg_fn_evals' are closed: either when the partition is closed or
+    /// when it is spilled.
+    boost::scoped_ptr<MemPool> agg_fn_perm_pool;
 
     /// Tuple stream used to store aggregated rows. When the partition is not spilled,
     /// (meaning the hash table is maintained), this stream is pinned and contains the
@@ -446,20 +451,6 @@ class PartitionedAggregationNode : public ExecNode {
     DCHECK_EQ(ht, hash_partitions_[partition_idx]->hash_tbl.get());
     return ht;
   }
-
-  /// Materializes 'row_batch' in either grouping or non-grouping case.
-  Status GetNextInternal(RuntimeState* state, RowBatch* row_batch, bool* eos);
-
-  /// Helper function called by GetNextInternal() to ensure that string data referenced in
-  /// 'row_batch' will live as long as 'row_batch's tuples. 'first_row_idx' indexes the
-  /// first row that should be processed in 'row_batch'.
-  Status HandleOutputStrings(RowBatch* row_batch, int first_row_idx);
-
-  /// Copies string data from the specified slot into 'pool', and sets the StringValues'
-  /// ptrs to the copied data. Copies data from all tuples in 'row_batch' from
-  /// 'first_row_idx' onwards. 'slot_desc' must have a var-len string type.
-  Status CopyStringData(const SlotDescriptor& slot_desc, RowBatch* row_batch,
-      int first_row_idx, MemPool* pool);
 
   /// Constructs singleton output tuple, allocating memory from pool.
   Tuple* ConstructSingletonOutputTuple(

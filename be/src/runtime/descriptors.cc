@@ -486,7 +486,7 @@ Status DescriptorTbl::CreatePartKeyExprs(
     // TODO: RowDescriptor should arguably be optional in Prepare for known literals.
     // Partition exprs are not used in the codegen case. Don't codegen them.
     RETURN_IF_ERROR(ScalarExprEvaluator::Create(partition_key_value_exprs, nullptr,
-        pool, nullptr, &part_desc->partition_key_value_evals_));
+        pool, nullptr, nullptr, &part_desc->partition_key_value_evals_));
     RETURN_IF_ERROR(ScalarExprEvaluator::Open(
         part_desc->partition_key_value_evals_, nullptr));
   }

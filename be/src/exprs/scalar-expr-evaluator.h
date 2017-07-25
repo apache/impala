@@ -71,19 +71,28 @@ class ScalarExprEvaluator {
   ~ScalarExprEvaluator();
 
   /// Creates an evaluator for the scalar expression tree rooted at 'expr' and all
-  /// FunctionContexts needed during evaluation. Allocations from this evaluator will
-  /// be from 'mem_pool'. The newly created evaluator will be stored in 'pool' and
-  /// returned in 'eval'. Returns error status on failure. Note that it's the
-  /// responsibility to call Close() on all created evaluators even if this function
-  /// returns error on initialization failure.
+  /// FunctionContexts needed during evaluation.
+  ///
+  /// Permanent allocations (i.e. those that must live until the evaluator is closed) come
+  /// from 'expr_perm_pool'. Allocations that may contain expr results (i.e. the
+  /// results of GetValue(), GetStringVal(), etc) come from 'expr_results_pool'. Lifetime
+  /// of memory in 'expr_results_pool' is managed by the owner of the pool and may freed
+  /// by the owner at any time except when the evaluator is in the middle of evaluating
+  /// the expression. These pools can be shared between evaluators (so long as the
+  /// required memory lifetimes are compatible) but cannot be shared between threads
+  /// since MemPools are not thread-safe.
+  ///
+  /// Note that the caller is responsible to call Close() on all evaluators even if this
+  /// function returns error status on initialization failure.
   static Status Create(const ScalarExpr& expr, RuntimeState* state, ObjectPool* pool,
-      MemPool* mem_pool, ScalarExprEvaluator** eval) WARN_UNUSED_RESULT;
+      MemPool* expr_perm_pool, MemPool* expr_results_pool,
+      ScalarExprEvaluator** eval) WARN_UNUSED_RESULT;
 
   /// Convenience function for creating multiple ScalarExprEvaluators. The evaluators
   /// are returned in 'evals'.
   static Status Create(const std::vector<ScalarExpr*>& exprs, RuntimeState* state,
-      ObjectPool* pool, MemPool* mem_pool, std::vector<ScalarExprEvaluator*>* evals)
-      WARN_UNUSED_RESULT;
+      ObjectPool* pool, MemPool* expr_perm_pool, MemPool* expr_results_pool,
+      std::vector<ScalarExprEvaluator*>* evals) WARN_UNUSED_RESULT;
 
   /// Initializes the ScalarExprEvaluator on all nodes in the ScalarExpr tree. This is
   /// also the location in which constant arguments to functions are computed. Does not
@@ -105,21 +114,22 @@ class ScalarExprEvaluator {
 
   /// Creates a copy of this ScalarExprEvaluator. Open() must be called first. The copy
   /// contains clones of each FunctionContext, which share the fragment-local state of the
-  /// original one but have their own FreePool and thread-local state. This should be used
+  /// original one but have their own memory and thread-local state. This should be used
   /// to create an ScalarExprEvaluator for each execution thread that needs to evaluate
-  /// 'root_'. All allocations will be from 'mem_pool' so callers should use different
-  /// MemPool for evaluators in different threads. Note that clones are considered opened.
-  /// The cloned ScalarExprEvaluator cannot be used after the original ScalarExprEvaluator
-  /// is destroyed because it may reference fragment-local state from the original.
+  /// 'root_'. 'expr_perm_pool' and 'expr_results_pool' are used for allocations so callers
+  /// must use different MemPools for evaluators in different threads. Note that clones
+  /// are considered opened. The cloned ScalarExprEvaluator cannot be used after the
+  /// original ScalarExprEvaluator is destroyed because it may reference fragment-local
+  /// state from the original.
   /// TODO: IMPALA-4743: Evaluate input arguments in ScalarExpr::Init() and store them
   /// in ScalarExpr.
-  Status Clone(ObjectPool* pool, RuntimeState* state, MemPool* mem_pool,
-      ScalarExprEvaluator** new_eval) const WARN_UNUSED_RESULT;
+  Status Clone(ObjectPool* pool, RuntimeState* state, MemPool* expr_perm_pool,
+      MemPool* expr_results_pool, ScalarExprEvaluator** new_eval) const WARN_UNUSED_RESULT;
 
   /// Convenience functions for cloning multiple ScalarExprEvaluators. The newly
   /// created evaluators are appended to 'new_evals.
-  static Status Clone(ObjectPool* pool, RuntimeState* state, MemPool* mem_pool,
-      const std::vector<ScalarExprEvaluator*>& evals,
+  static Status Clone(ObjectPool* pool, RuntimeState* state, MemPool* expr_perm_pool,
+      MemPool* expr_results_pool, const std::vector<ScalarExprEvaluator*>& evals,
       std::vector<ScalarExprEvaluator*>* new_evals) WARN_UNUSED_RESULT;
 
   /// If 'expr' is constant, evaluates it with no input row argument and returns the
@@ -166,15 +176,6 @@ class ScalarExprEvaluator {
   void PrintValue(void* value, std::string* str);
   void PrintValue(void* value, std::stringstream* stream);
 
-  /// Returns true if any of the expression contexts in the array has local allocations.
-  static bool HasLocalAllocations(const std::vector<ScalarExprEvaluator*>& evals);
-  bool HasLocalAllocations() const;
-
-  /// Frees all local allocations made by fn_ctxs_. This can be called when result
-  /// data from this context is no longer needed.
-  void FreeLocalAllocations();
-  static void FreeLocalAllocations(const std::vector<ScalarExprEvaluator*>& evals);
-
   /// Get the number of digits after the decimal that should be displayed for this value.
   /// Returns -1 if no scale has been specified (currently the scale is only set for
   /// doubles set by RoundUpTo). GetValue() must have already been called.
@@ -184,7 +185,7 @@ class ScalarExprEvaluator {
   bool opened() const { return opened_; }
   bool closed() const { return closed_; }
   bool is_clone() const { return is_clone_; }
-  MemPool* mem_pool() const { return mem_pool_; }
+  MemPool* expr_perm_pool() const { return expr_perm_pool_; }
 
   /// The builtin functions are not called from anywhere in the code and the
   /// symbols are therefore not included in the binary. We call these functions
@@ -220,9 +221,10 @@ class ScalarExprEvaluator {
   /// to access the correct FunctionContext.
   FunctionContext** fn_ctxs_ptr_ = nullptr;
 
-  /// Pointer to the MemPool which all allocations (including fn_ctxs_') come from.
-  /// Owned by the exec node which owns this evaluator.
-  MemPool* mem_pool_;
+  /// Pointer to the MemPool which all permanent allocations (including those from
+  /// 'fn_ctxs_') come from. Owned by the exec node or data sink which owns this
+  /// evaluator.
+  MemPool* const expr_perm_pool_;
 
   /// The expr tree which this evaluator is for.
   const ScalarExpr& root_;
@@ -246,13 +248,14 @@ class ScalarExprEvaluator {
   /// TODO: move this to Expr initialization after IMPALA-4743 is fixed.
   int output_scale_ = -1;
 
-  ScalarExprEvaluator(const ScalarExpr& root, MemPool* mem_pool);
+  ScalarExprEvaluator(const ScalarExpr& root, MemPool* expr_perm_pool,
+      MemPool* expr_results_pool);
 
   /// Walks the expression tree 'expr' and fills in 'fn_ctxs_' for all Expr nodes
   /// which need FunctionContext.
-  void CreateFnCtxs(RuntimeState* state, const ScalarExpr& expr);
+  void CreateFnCtxs(RuntimeState* state, const ScalarExpr& expr, MemPool* expr_perm_pool,
+      MemPool* expr_results_pool);
 };
-
 }
 
 #endif

@@ -93,18 +93,18 @@ class RowBatch;
 class Sorter {
  public:
   /// 'sort_tuple_exprs' are the slot exprs used to materialize the tuples to be
-  /// sorted. 'compare_less_than' is a comparator for the sort tuples (returns true if
-  /// lhs < rhs). 'merge_batch_size_' is the size of the batches created to provide rows
-  /// to the merger and retrieve rows from an intermediate merger. 'node_id' is the ID of
-  /// the exec node using the sorter for error reporting. 'enable_spilling' should be set
-  /// to false to reduce the number of requested buffers if the caller will use
-  /// AddBatchNoSpill().
+  /// sorted. 'ordering_exprs', 'is_asc_order' and 'nulls_first' are parameters
+  /// for the comparator for the sort tuples.
+  /// 'node_id' is the ID of the exec node using the sorter for error reporting.
+  /// 'enable_spilling' should be set to false to reduce the number of requested buffers
+  /// if the caller will use AddBatchNoSpill().
   ///
   /// The Sorter assumes that it has exclusive use of the client's
   /// reservations for sorting, and may increase the size of the client's reservation.
   /// The caller is responsible for ensuring that the minimum reservation (returned from
   /// ComputeMinReservation()) is available.
-  Sorter(const TupleRowComparator& compare_less_than,
+  Sorter(const std::vector<ScalarExpr*>& ordering_exprs,
+      const std::vector<bool>& is_asc_order, const std::vector<bool>& nulls_first,
       const std::vector<ScalarExpr*>& sort_tuple_exprs, RowDescriptor* output_row_desc,
       MemTracker* mem_tracker, BufferPool::ClientHandle* client, int64_t page_len,
       RuntimeProfile* profile, RuntimeState* state, int node_id,
@@ -113,8 +113,11 @@ class Sorter {
 
   /// Initial set-up of the sorter for execution.
   /// The evaluators for 'sort_tuple_exprs_' will be created and stored in 'obj_pool'.
-  /// All allocation from the evaluators will be from 'expr_mem_pool'.
-  Status Prepare(ObjectPool* obj_pool, MemPool* expr_mem_pool) WARN_UNUSED_RESULT;
+  Status Prepare(ObjectPool* obj_pool) WARN_UNUSED_RESULT;
+
+  /// Do codegen for the Sorter. Called after Prepare() if codegen is desired. Returns OK
+  /// if successful or a Status describing the reason why Codegen failed otherwise.
+  Status Codegen(RuntimeState* state);
 
   /// Opens the sorter for adding rows and initializes the evaluators for materializing
   /// the tuples. Must be called after Prepare() or Reset() and before calling AddBatch().
@@ -136,9 +139,6 @@ class Sorter {
 
   /// Get the next batch of sorted output rows from the sorter.
   Status GetNext(RowBatch* batch, bool* eos) WARN_UNUSED_RESULT;
-
-  /// Free any local allocations made when materializing and sorting the tuples.
-  void FreeLocalAllocations();
 
   /// Resets all internal state like ExecNode::Reset().
   /// Init() must have been called, AddBatch()/GetNext()/InputDone()
@@ -196,8 +196,15 @@ class Sorter {
   /// Runtime state instance used to check for cancellation. Not owned.
   RuntimeState* const state_;
 
+  /// MemPool for allocating data structures used by expression evaluators in the sorter.
+  MemPool expr_perm_pool_;
+
+  /// MemPool for allocations that hold results of expression evaluation in the sorter.
+  /// Cleared periodically during sorting to prevent memory accumulating.
+  MemPool expr_results_pool_;
+
   /// In memory sorter and less-than comparator.
-  const TupleRowComparator& compare_less_than_;
+  TupleRowComparator compare_less_than_;
   boost::scoped_ptr<TupleSorter> in_mem_tuple_sorter_;
 
   /// Client used to allocate pages from the buffer pool. Not owned.
@@ -251,13 +258,16 @@ class Sorter {
   Run* merge_output_run_;
 
   /// Pool of owned Run objects. Maintains Runs objects across non-freeing Reset() calls.
-  ObjectPool obj_pool_;
+  ObjectPool run_pool_;
 
   /// END: Members that must be Reset()
   /////////////////////////////////////////
 
   /// Runtime profile and counters for this sorter instance.
   RuntimeProfile* profile_;
+
+  /// Pool of objects (e.g. exprs) that are not freed during Reset() calls.
+  ObjectPool obj_pool_;
 
   /// Number of initial runs created.
   RuntimeProfile::Counter* initial_runs_counter_;

@@ -1234,7 +1234,8 @@ void ExprTest::TestSingleLiteralConstruction(
 
   Literal* expr = CreateLiteral(type, string_val);
   ScalarExprEvaluator* eval;
-  EXPECT_OK(ScalarExprEvaluator::Create(*expr, &state, &pool, &mem_pool, &eval));
+  EXPECT_OK(
+      ScalarExprEvaluator::Create(*expr, &state, &pool, &mem_pool, &mem_pool, &eval));
   EXPECT_OK(eval->Open(&state));
   EXPECT_EQ(0, RawValue::Compare(eval->GetValue(nullptr), &value, type))
       << "type: " << type << ", value: " << value;
@@ -1252,7 +1253,8 @@ TEST_F(ExprTest, NullLiteral) {
 
     NullLiteral expr(static_cast<PrimitiveType>(type));
     ScalarExprEvaluator* eval;
-    EXPECT_OK(ScalarExprEvaluator::Create(expr, &state, &pool, &mem_pool, &eval));
+    EXPECT_OK(
+        ScalarExprEvaluator::Create(expr, &state, &pool, &mem_pool, &mem_pool, &eval));
     EXPECT_OK(eval->Open(&state));
     EXPECT_TRUE(eval->GetValue(nullptr) == nullptr);
     eval->Close(&state);
@@ -3293,12 +3295,18 @@ TEST_F(ExprTest, StringFunctions) {
   StringVal bam(static_cast<uint8_t*>(short_buf->data()), StringVal::MAX_LENGTH);
   auto r4 = StringFunctions::Replace(context, bam, z, aaa);
   EXPECT_TRUE(r4.is_null);
+  // Re-create context to clear the error from failed allocation.
+  UdfTestHarness::CloseContext(context);
+  context = UdfTestHarness::CreateTestContext(str_desc, v, nullptr, &pool);
 
   // Similar test for second overflow.  This tests overflowing on re-allocation.
   (*short_buf)[4095] = 'Z';
   StringVal bam2(static_cast<uint8_t*>(short_buf->data()), StringVal::MAX_LENGTH-2);
   auto r5 = StringFunctions::Replace(context, bam2, z, aaa);
   EXPECT_TRUE(r5.is_null);
+  // Re-create context to clear the error from failed allocation.
+  UdfTestHarness::CloseContext(context);
+  context = UdfTestHarness::CreateTestContext(str_desc, v, nullptr, &pool);
 
   // Finally, test expanding to exactly MAX_LENGTH
   // There are 4 Zs in giga4 (not including the trailing one, as we truncate that)

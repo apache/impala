@@ -25,13 +25,11 @@
 #include <sstream>
 #include <unordered_map>
 
-#include "common/atomic.h"
 #include "common/logging.h"
 #include "gutil/dynamic_annotations.h"
 #include "runtime/mem-pool.h"
 #include "util/bit-util.h"
 
-DECLARE_int32(stress_free_pool_alloc);
 DECLARE_bool(disable_mem_pools);
 
 namespace impala {
@@ -62,12 +60,6 @@ class FreePool {
   /// Allocates a buffer of size between [0, 2^62 - 1 - sizeof(FreeListNode)] bytes.
   uint8_t* Allocate(const int64_t requested_size) {
     DCHECK_GE(requested_size, 0);
-#ifndef NDEBUG
-    if (FLAGS_stress_free_pool_alloc > 0 &&
-        (alloc_counts_.Add(1) % FLAGS_stress_free_pool_alloc) == 0) {
-      return nullptr;
-    }
-#endif
     /// Return a non-nullptr dummy pointer. nullptr is reserved for failures.
     if (UNLIKELY(requested_size == 0)) return mem_pool_->EmptyAllocPtr();
     ++net_allocations_;
@@ -140,12 +132,6 @@ class FreePool {
   /// nullptr will be returned on allocation failure. It's the caller's responsibility to
   /// free the memory buffer pointed to by "ptr" in this case.
   uint8_t* Reallocate(uint8_t* ptr, int64_t size) {
-#ifndef NDEBUG
-    if (FLAGS_stress_free_pool_alloc > 0 &&
-        (alloc_counts_.Add(1) % FLAGS_stress_free_pool_alloc) == 0) {
-      return nullptr;
-    }
-#endif
     if (UNLIKELY(ptr == nullptr || ptr == mem_pool_->EmptyAllocPtr())) return Allocate(size);
     if (FLAGS_disable_mem_pools) {
       return reinterpret_cast<uint8_t*>(realloc(reinterpret_cast<void*>(ptr), size));
@@ -258,12 +244,6 @@ class FreePool {
 
   /// Diagnostic counter that tracks (# Allocates - # Frees)
   int64_t net_allocations_;
-
-#ifndef NDEBUG
-  /// Counter for tracking the number of allocations. Used only if the
-  /// the stress flag FLAGS_stress_free_pool_alloc is set.
-  static AtomicInt32 alloc_counts_;
-#endif
 };
 
 }

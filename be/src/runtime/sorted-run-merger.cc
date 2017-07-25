@@ -172,9 +172,6 @@ Status SortedRunMerger::GetNext(RowBatch* output_batch, bool* eos) {
     output_batch->CommitLastRow();
     RETURN_IF_ERROR(AdvanceMinRow(output_batch));
   }
-  // Free local allocations made by comparator_.Less();
-  comparator_.FreeLocalAllocations();
-
   *eos = min_heap_.empty();
   return Status::OK();
 }

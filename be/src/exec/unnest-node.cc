@@ -84,7 +84,7 @@ Status UnnestNode::Prepare(RuntimeState* state) {
   item_byte_size_ = item_tuple_desc->byte_size();
 
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(*coll_expr_, state, pool_,
-      expr_mem_pool(), &coll_expr_eval_));
+      expr_perm_pool(), expr_results_pool(), &coll_expr_eval_));
 
   // Set the coll_slot_desc_ and the corresponding tuple index used for manually
   // evaluating the collection SlotRef and for projection.

@@ -38,7 +38,6 @@ add_library(Runtime
   disk-io-mgr-scan-range.cc
   disk-io-mgr-stress.cc
   exec-env.cc
-  free-pool.cc
   fragment-instance-state.cc
   hbase-table.cc
   hbase-table-factory.cc

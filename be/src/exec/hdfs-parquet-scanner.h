@@ -650,11 +650,6 @@ class HdfsParquetScanner : public HdfsScanner {
   /// no values that pass the relevant conjuncts, then the row group can be skipped.
   Status EvalDictionaryFilters(const parquet::RowGroup& row_group,
       bool* skip_row_group) WARN_UNUSED_RESULT;
-
-  /// Free local allocations made when evaluating conjuncts over each row. Does not free
-  /// local allocations made when evaluated conjuncts for row groups, pages, etc. Those
-  /// should be freed separately after they are evaluated.
-  void FreeLocalAllocationsForConjuncts();
 };
 
 } // namespace impala

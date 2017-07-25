@@ -347,15 +347,15 @@ typedef void (*UdfClose)(FunctionContext* context,
 /// intermediate type should be string and the UDA can cast the ptr to the structure
 /// it is using.
 ///
-/// Memory Management: For allocations that are not returned to Impala, the UDA should use
-/// the FunctionContext::Allocate()/Free() methods. In general, Allocate() is called in
-/// Init(), and then Free() must be called in both Serialize() and Finalize(), since
-/// either of these functions may be called to clean up the state. For StringVal
-/// allocations returned to Impala (e.g. returned by UdaSerialize()), the UDA should
-/// allocate the result via StringVal(FunctionContext*, int) ctor or the function
-/// StringVal::CopyFrom(FunctionContext*, const uint8_t*, size_t) and Impala will
-/// automatically handle freeing it.
-//
+/// Memory Management: allocations that are referred to by the intermediate values
+/// returned by Init(), Update() and Merge() must be allocated via
+/// FunctionContext::Allocate() and freed via FunctionContext::Free(). Both Serialize()
+/// and Finalize() are responsible for cleaning up the intermediate value and freeing
+/// such allocations. StringVals returned to Impala directly by Serialize(), Finalize()
+/// or GetValue() should be backed by temporary results memory allocated via the
+/// StringVal(FunctionContext*, int) ctor, StringVal::CopyFrom(FunctionContext*,
+/// const uint8_t*, size_t), or StringVal::Resize().
+///
 /// Note that in the rare case the StringVal ctor or StringVal::CopyFrom() fail to
 /// allocate memory, the StringVal object will be marked as a null string.
 /// Serialize()/Finalize() should handle allocation failures by checking the is_null
@@ -609,17 +609,19 @@ struct StringVal : public AnyVal {
   /// large, the constructor will construct a NULL string and set an error on the function
   /// context.
   ///
-  /// The memory backing this StringVal is a local allocation, and so doesn't need
+  /// The memory backing this StringVal is managed by the Impala runtime and so doesn't need
   /// to be explicitly freed.
   StringVal(FunctionContext* context, int len) NOEXCEPT;
 
-  /// Reallocate a StringVal that is backed by a local allocation so that it as
-  /// at least as large as len.  May shrink or / expand the string.  If the
-  /// string is expanded, the content of the new space is undefined.
+  /// Resize a string value to 'len'. If 'len' is the same as or smaller than the current
+  /// length, truncates the string. Otherwise, increases the string's length, allocating
+  /// new memory and copying over the current contents if needed. The content of the new
+  /// space is undefined. If a resize fails, the length and contents of the StringVal are
+  /// unchanged.
   ///
-  /// If the resize fails, the original StringVal remains in place.  Callers do not
-  /// otherwise need to be concerned with backing storage, which is allocated from a
-  /// local allocation.
+  /// Resized strings can be returned from UDFs as the result value. Callers do not
+  /// otherwise need to be concerned with backing storage, which is managed by the
+  /// Impala runtime and freed at some point after the UDF returns.
   ///
   /// Returns true on success, false on failure.
   bool Resize(FunctionContext* context, int len) NOEXCEPT;

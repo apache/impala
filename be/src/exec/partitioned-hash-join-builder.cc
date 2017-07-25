@@ -129,24 +129,17 @@ string PhjBuilder::GetName() {
   return Substitute("Hash Join Builder (join_node_id=$0)", join_node_id_);
 }
 
-void PhjBuilder::FreeLocalAllocations() const {
-  if (ht_ctx_.get() != nullptr) ht_ctx_->FreeLocalAllocations();
-  for (const FilterContext& ctx : filter_ctxs_) {
-    if (ctx.expr_eval != nullptr) ctx.expr_eval->FreeLocalAllocations();
-  }
-}
-
 Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
-  RETURN_IF_ERROR(HashTableCtx::Create(&pool_, state, build_exprs_, build_exprs_,
+  RETURN_IF_ERROR(HashTableCtx::Create(&obj_pool_, state, build_exprs_, build_exprs_,
       HashTableStoresNulls(), is_not_distinct_from_, state->fragment_hash_seed(),
-      MAX_PARTITION_DEPTH, row_desc_->tuple_descriptors().size(), expr_mem_pool(),
-      &ht_ctx_));
+      MAX_PARTITION_DEPTH, row_desc_->tuple_descriptors().size(), expr_perm_pool_.get(),
+      expr_results_pool_.get(), expr_results_pool_.get(), &ht_ctx_));
 
   DCHECK_EQ(filter_exprs_.size(), filter_ctxs_.size());
   for (int i = 0; i < filter_exprs_.size(); ++i) {
-    RETURN_IF_ERROR(ScalarExprEvaluator::Create(*filter_exprs_[i], state, &pool_,
-        expr_mem_pool(), &filter_ctxs_[i].expr_eval));
+    RETURN_IF_ERROR(ScalarExprEvaluator::Create(*filter_exprs_[i], state, &obj_pool_,
+        expr_perm_pool_.get(), expr_results_pool_.get(), &filter_ctxs_[i].expr_eval));
   }
 
   partitions_created_ = ADD_COUNTER(profile(), "PartitionsCreated", TUnit::UNIT);
@@ -210,8 +203,8 @@ Status PhjBuilder::Send(RuntimeState* state, RowBatch* batch) {
     }
   }
 
-  // Free any local allocations made during partitioning.
-  FreeLocalAllocations();
+  // Free any expr result allocations made during partitioning.
+  expr_results_pool_->Clear();
   COUNTER_ADD(num_build_rows_partitioned_, batch->num_rows());
   return Status::OK();
 }
@@ -266,7 +259,6 @@ Status PhjBuilder::FlushFinal(RuntimeState* state) {
 
 void PhjBuilder::Close(RuntimeState* state) {
   if (closed_) return;
-  FreeLocalAllocations();
   CloseAndDeletePartitions();
   if (ht_ctx_ != nullptr) ht_ctx_->Close(state);
   ht_ctx_.reset();
@@ -275,13 +267,13 @@ void PhjBuilder::Close(RuntimeState* state) {
   }
   ScalarExpr::Close(filter_exprs_);
   ScalarExpr::Close(build_exprs_);
-  pool_.Clear();
+  obj_pool_.Clear();
   DataSink::Close(state);
   closed_ = true;
 }
 
 void PhjBuilder::Reset() {
-  FreeLocalAllocations();
+  expr_results_pool_->Clear();
   non_empty_build_ = false;
   CloseAndDeletePartitions();
 }
@@ -712,8 +704,8 @@ Status PhjBuilder::Partition::BuildHashTable(bool* built) {
     }
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(state->GetQueryStatus());
-    // Free any local allocations made while inserting.
-    parent_->FreeLocalAllocations();
+    // Free any expr result allocations made while inserting.
+    parent_->expr_results_pool_->Clear();
     batch.Reset();
   } while (!eos);
 

@@ -111,7 +111,6 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   virtual void Close(RuntimeState* state) override;
 
  protected:
-  virtual Status QueryMaintenance(RuntimeState* state) override;
   virtual void AddToDebugString(
       int indentation_level, std::stringstream* out) const override;
 
@@ -422,6 +421,11 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// This owns the evaluators for the build and probe expressions used during insertion
   /// and probing of the hash tables.
   boost::scoped_ptr<HashTableCtx> ht_ctx_;
+
+  /// MemPool that stores allocations that hold results from evaluation of probe
+  /// exprs by 'ht_ctx_'. Cached probe expression values may reference memory in this
+  /// pool.
+  boost::scoped_ptr<MemPool> probe_expr_results_pool_;
 
   /// The iterator that corresponds to the look up of current_probe_row_.
   HashTable::Iterator hash_tbl_iterator_;

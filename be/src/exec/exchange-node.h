@@ -58,7 +58,6 @@ class ExchangeNode : public ExecNode {
   void set_num_senders(int num_senders) { num_senders_ = num_senders; }
 
  protected:
-  virtual Status QueryMaintenance(RuntimeState* state);
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:

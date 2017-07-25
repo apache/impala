@@ -57,11 +57,10 @@ Status PartialSortNode::Init(const TPlanNode& tnode, RuntimeState* state) {
 Status PartialSortNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
-  less_than_.reset(new TupleRowComparator(ordering_exprs_, is_asc_order_, nulls_first_));
-  sorter_.reset(new Sorter(*less_than_, sort_tuple_exprs_, &row_descriptor_,
-      mem_tracker(), &buffer_pool_client_, resource_profile_.spillable_buffer_size,
-      runtime_profile(), state, id(), false));
-  RETURN_IF_ERROR(sorter_->Prepare(pool_, expr_mem_pool()));
+  sorter_.reset(new Sorter(ordering_exprs_, is_asc_order_, nulls_first_,
+      sort_tuple_exprs_, &row_descriptor_, mem_tracker(), &buffer_pool_client_,
+      resource_profile_.spillable_buffer_size, runtime_profile(), state, id(), false));
+  RETURN_IF_ERROR(sorter_->Prepare(pool_));
   DCHECK_GE(resource_profile_.min_reservation, sorter_->ComputeMinReservation());
   AddCodegenDisabledMessage(state);
   input_batch_.reset(
@@ -73,14 +72,13 @@ void PartialSortNode::Codegen(RuntimeState* state) {
   DCHECK(state->ShouldCodegen());
   ExecNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
-  Status codegen_status = less_than_->Codegen(state);
+  Status codegen_status = sorter_->Codegen(state);
   runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
 }
 
 Status PartialSortNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Open(state));
-  RETURN_IF_ERROR(less_than_->Open(pool_, state, expr_mem_pool()));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
   RETURN_IF_ERROR(child(0)->Open(state));
@@ -151,18 +149,12 @@ Status PartialSortNode::Reset(RuntimeState* state) {
 void PartialSortNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   child(0)->Close(state);
-  if (less_than_.get() != nullptr) less_than_->Close(state);
   if (sorter_ != nullptr) sorter_->Close(state);
   sorter_.reset();
   ScalarExpr::Close(ordering_exprs_);
   ScalarExpr::Close(sort_tuple_exprs_);
   input_batch_.reset();
   ExecNode::Close(state);
-}
-
-Status PartialSortNode::QueryMaintenance(RuntimeState* state) {
-  sorter_->FreeLocalAllocations();
-  return ExecNode::QueryMaintenance(state);
 }
 
 void PartialSortNode::DebugString(int indentation_level, stringstream* out) const {

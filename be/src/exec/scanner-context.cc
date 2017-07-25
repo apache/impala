@@ -44,12 +44,13 @@ static const int64_t OUTPUT_BUFFER_BYTES_LEFT_INIT = 0;
 
 ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNodeBase* scan_node,
     HdfsPartitionDescriptor* partition_desc, DiskIoMgr::ScanRange* scan_range,
-    const vector<FilterContext>& filter_ctxs)
+    const vector<FilterContext>& filter_ctxs, MemPool* expr_results_pool)
   : state_(state),
     scan_node_(scan_node),
     partition_desc_(partition_desc),
     num_completed_io_buffers_(0),
-    filter_ctxs_(filter_ctxs) {
+    filter_ctxs_(filter_ctxs),
+    expr_results_pool_(expr_results_pool) {
   AddStream(scan_range);
 }
 

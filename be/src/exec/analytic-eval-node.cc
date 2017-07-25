@@ -161,23 +161,20 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
   curr_tuple_pool_.reset(new MemPool(mem_tracker()));
   prev_tuple_pool_.reset(new MemPool(mem_tracker()));
   mem_pool_.reset(new MemPool(mem_tracker()));
-  fn_pool_.reset(new MemPool(expr_mem_tracker()));
   evaluation_timer_ = ADD_TIMER(runtime_profile(), "EvaluationTime");
 
   DCHECK_EQ(result_tuple_desc_->slots().size(), analytic_fns_.size());
-  RETURN_IF_ERROR(AggFnEvaluator::Create(analytic_fns_, state, pool_, fn_pool_.get(),
-      &analytic_fn_evals_));
+  RETURN_IF_ERROR(AggFnEvaluator::Create(analytic_fns_, state, pool_, expr_perm_pool(),
+      expr_results_pool(), &analytic_fn_evals_));
 
   if (partition_by_eq_expr_ != nullptr) {
     RETURN_IF_ERROR(ScalarExprEvaluator::Create(*partition_by_eq_expr_, state, pool_,
-        fn_pool_.get(), &partition_by_eq_expr_eval_));
-    AddEvaluatorToFree(partition_by_eq_expr_eval_);
+        expr_perm_pool(), expr_results_pool(), &partition_by_eq_expr_eval_));
   }
 
   if (order_by_eq_expr_ != nullptr) {
     RETURN_IF_ERROR(ScalarExprEvaluator::Create(*order_by_eq_expr_, state, pool_,
-        fn_pool_.get(), &order_by_eq_expr_eval_));
-    AddEvaluatorToFree(order_by_eq_expr_eval_);
+        expr_perm_pool(), expr_results_pool(), &order_by_eq_expr_eval_));
   }
   return Status::OK();
 }
@@ -382,12 +379,13 @@ Status AnalyticEvalNode::AddResultTuple(int64_t stream_idx) {
   Tuple* result_tuple = Tuple::Create(result_tuple_desc_->byte_size(), cur_tuple_pool);
 
   AggFnEvaluator::GetValue(analytic_fn_evals_, curr_tuple_, result_tuple);
-  // Copy any string data in 'result_tuple' into 'cur_tuple_pool_'.
-  for (const SlotDescriptor* slot_desc : result_tuple_desc_->slots()) {
-    if (!slot_desc->type().IsVarLenStringType()) continue;
-    StringValue* sv = reinterpret_cast<StringValue*>(
-        result_tuple->GetSlot(slot_desc->tuple_offset()));
-    if (sv == nullptr || sv->len == 0) continue;
+  // Copy any string data in 'result_tuple' into 'cur_tuple_pool'. The var-len data
+  // returned by GetValue() may be backed by an allocation from
+  // 'expr_results_pool_' that will be recycled so it must be copied out.
+  for (const SlotDescriptor* slot_desc : result_tuple_desc_->string_slots()) {
+    if (result_tuple->IsNull(slot_desc->null_indicator_offset())) continue;
+    StringValue* sv = result_tuple->GetStringSlot(slot_desc->tuple_offset());
+    if (sv->len == 0) continue;
     char* new_ptr = reinterpret_cast<char*>(
         cur_tuple_pool->TryAllocateUnaligned(sv->len));
     if (UNLIKELY(new_ptr == nullptr)) {
@@ -889,7 +887,6 @@ void AnalyticEvalNode::Close(RuntimeState* state) {
   if (curr_tuple_pool_.get() != nullptr) curr_tuple_pool_->FreeAll();
   if (prev_tuple_pool_.get() != nullptr) prev_tuple_pool_->FreeAll();
   if (mem_pool_.get() != nullptr) mem_pool_->FreeAll();
-  if (fn_pool_.get() != nullptr) fn_pool_->FreeAll();
   ExecNode::Close(state);
 }
 
@@ -907,10 +904,4 @@ void AnalyticEvalNode::DebugString(int indentation_level, stringstream* out) con
   ExecNode::DebugString(indentation_level, out);
   *out << ")";
 }
-
-Status AnalyticEvalNode::QueryMaintenance(RuntimeState* state) {
-  AggFnEvaluator::FreeLocalAllocations(analytic_fn_evals_);
-  return ExecNode::QueryMaintenance(state);
-}
-
 }

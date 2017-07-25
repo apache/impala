@@ -115,8 +115,7 @@ Status ScanNode::Prepare(RuntimeState* state) {
   DCHECK_EQ(filter_exprs_.size(), filter_ctxs_.size());
   for (int i = 0; i < filter_exprs_.size(); ++i) {
     RETURN_IF_ERROR(ScalarExprEvaluator::Create(*filter_exprs_[i], state, pool_,
-        expr_mem_pool(), &filter_ctxs_[i].expr_eval));
-    AddEvaluatorToFree(filter_ctxs_[i].expr_eval);
+        expr_perm_pool(), expr_results_pool(), &filter_ctxs_[i].expr_eval));
   }
 
   return Status::OK();

@@ -180,9 +180,10 @@ Status DataSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   mem_tracker_.reset(new MemTracker(profile_, -1, name, parent_mem_tracker));
   expr_mem_tracker_.reset(
       new MemTracker(-1, Substitute("$0 Exprs", name), mem_tracker_.get(), false));
-  expr_mem_pool_.reset(new MemPool(expr_mem_tracker_.get()));
+  expr_perm_pool_.reset(new MemPool(expr_mem_tracker_.get()));
+  expr_results_pool_.reset(new MemPool(expr_mem_tracker_.get()));
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(output_exprs_, state, state->obj_pool(),
-      expr_mem_pool(), &output_expr_evals_));
+      expr_perm_pool_.get(), expr_results_pool_.get(), &output_expr_evals_));
   return Status::OK();
 }
 
@@ -195,7 +196,8 @@ void DataSink::Close(RuntimeState* state) {
   if (closed_) return;
   ScalarExprEvaluator::Close(output_expr_evals_, state);
   ScalarExpr::Close(output_exprs_);
-  if (expr_mem_pool() != nullptr) expr_mem_pool_->FreeAll();
+  if (expr_perm_pool_ != nullptr) expr_perm_pool_->FreeAll();
+  if (expr_results_pool_.get() != nullptr) expr_results_pool_->FreeAll();
   if (expr_mem_tracker_ != nullptr) expr_mem_tracker_->Close();
   if (mem_tracker_ != nullptr) mem_tracker_->Close();
   closed_ = true;

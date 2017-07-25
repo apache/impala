@@ -277,9 +277,6 @@ class PhjBuilder : public DataSink {
   virtual Status Init(const std::vector<TExpr>& thrift_output_exprs,
       const TDataSink& tsink, RuntimeState* state) override;
 
-  /// Free local allocations made from expr evaluators during hash table construction.
-  void FreeLocalAllocations() const;
-
  private:
   /// Create and initialize a set of hash partitions for partitioning level 'level'.
   /// The previous hash partitions must have been cleared with ClearHashPartitions().
@@ -388,7 +385,7 @@ class PhjBuilder : public DataSink {
   const RowDescriptor* probe_row_desc_;
 
   /// Pool for objects with same lifetime as builder.
-  ObjectPool pool_;
+  ObjectPool obj_pool_;
 
   /// Client to the buffer pool, used to allocate build partition buffers and hash tables.
   /// When probing, the spilling algorithm keeps some build partitions in memory while

@@ -65,7 +65,8 @@ class ScannerContext {
   /// get pushed to) and the scan range to process.
   /// This context starts with 1 stream.
   ScannerContext(RuntimeState*, HdfsScanNodeBase*, HdfsPartitionDescriptor*,
-      DiskIoMgr::ScanRange* scan_range, const std::vector<FilterContext>& filter_ctxs);
+      DiskIoMgr::ScanRange* scan_range, const std::vector<FilterContext>& filter_ctxs,
+      MemPool* expr_results_pool);
 
   /// Destructor verifies that all stream objects have been released.
   ~ScannerContext();
@@ -311,7 +312,7 @@ class ScannerContext {
   int num_completed_io_buffers() const { return num_completed_io_buffers_; }
   HdfsPartitionDescriptor* partition_descriptor() { return partition_desc_; }
   const std::vector<FilterContext>& filter_ctxs() const { return filter_ctxs_; }
-
+  MemPool* expr_results_pool() const { return expr_results_pool_; }
  private:
   friend class Stream;
 
@@ -329,6 +330,18 @@ class ScannerContext {
   /// Filter contexts for all filters applicable to this scan. Memory attached to the
   /// context is owned by the scan node.
   std::vector<FilterContext> filter_ctxs_;
+
+  /// MemPool used for allocations that hold results of expression evaluation in the
+  /// scanner and 'filter_ctxs_'. Must be thread-local since MemPool is not thread-safe.
+  /// Owned by ScannerThread() in the multi-threaded scan node and by the ExecNode in the
+  /// single-threaded scan node implementation.
+  ///
+  /// The scanner is responsible for clearing the MemPool periodically after expression
+  /// evaluation to prevent memory from accumulating.
+  ///
+  /// TODO: IMPALA-6015: it should be possible to simplify the lifecycle of this pool and
+  /// filter_ctxs_ once the multithreaded scan node is removed.
+  MemPool* const expr_results_pool_;
 };
 
 }

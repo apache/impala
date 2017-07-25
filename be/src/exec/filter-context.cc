@@ -68,10 +68,11 @@ void FilterStats::RegisterCounterGroup(const string& key) {
 }
 
 Status FilterContext::CloneFrom(const FilterContext& from, ObjectPool* pool,
-    RuntimeState* state, MemPool* mem_pool) {
+    RuntimeState* state, MemPool* expr_perm_pool, MemPool* expr_results_pool) {
   filter = from.filter;
   stats = from.stats;
-  return from.expr_eval->Clone(pool, state, mem_pool, &expr_eval);
+  return from.expr_eval->Clone(
+      pool, state, expr_perm_pool, expr_results_pool, &expr_eval);
 }
 
 bool FilterContext::Eval(TupleRow* row) const noexcept {

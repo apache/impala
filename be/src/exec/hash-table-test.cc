@@ -84,14 +84,14 @@ class HashTableTest : public testing::Test {
     ASSERT_OK(build_expr->Init(desc, nullptr));
     build_exprs_.push_back(build_expr);
     ASSERT_OK(ScalarExprEvaluator::Create(build_exprs_, nullptr, &pool_, &mem_pool_,
-        &build_expr_evals_));
+        &mem_pool_, &build_expr_evals_));
     ASSERT_OK(ScalarExprEvaluator::Open(build_expr_evals_, nullptr));
 
     ScalarExpr* probe_expr = pool_.Add(new SlotRef(TYPE_INT, 1, true /* nullable */));
     ASSERT_OK(probe_expr->Init(desc, nullptr));
     probe_exprs_.push_back(probe_expr);
     ASSERT_OK(ScalarExprEvaluator::Create(probe_exprs_, nullptr, &pool_, &mem_pool_,
-        &probe_expr_evals_));
+        &mem_pool_, &probe_expr_evals_));
     ASSERT_OK(ScalarExprEvaluator::Open(probe_expr_evals_, nullptr));
 
     CreateTestEnv();
@@ -304,7 +304,8 @@ class HashTableTest : public testing::Test {
     scoped_ptr<HashTableCtx> ht_ctx;
     EXPECT_OK(HashTableCtx::Create(&pool_, runtime_state_,
         build_exprs_, probe_exprs_, true /* stores_nulls_ */,
-        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_, &ht_ctx));
+        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_, &mem_pool_,
+        &mem_pool_, &ht_ctx));
     EXPECT_OK(ht_ctx->Open(runtime_state_));
 
     for (int i = 0; i < 2; ++i) {
@@ -342,7 +343,8 @@ class HashTableTest : public testing::Test {
     scoped_ptr<HashTableCtx> ht_ctx;
     Status status = HashTableCtx::Create(&pool_, runtime_state_, build_exprs_,
         probe_exprs_, false /* !stores_nulls_ */,
-        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_, &ht_ctx);
+        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_, &mem_pool_,
+        &mem_pool_, &ht_ctx);
     EXPECT_OK(status);
     EXPECT_OK(ht_ctx->Open(runtime_state_));
     bool success;
@@ -402,7 +404,8 @@ class HashTableTest : public testing::Test {
     scoped_ptr<HashTableCtx> ht_ctx;
     Status status = HashTableCtx::Create(&pool_, runtime_state_, build_exprs_,
         probe_exprs_, false /* !stores_nulls_ */,
-        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_, &ht_ctx);
+        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_, &mem_pool_,
+        &mem_pool_, &ht_ctx);
     EXPECT_OK(status);
     EXPECT_OK(ht_ctx->Open(runtime_state_));
 
@@ -466,7 +469,8 @@ class HashTableTest : public testing::Test {
     scoped_ptr<HashTableCtx> ht_ctx;
     Status status = HashTableCtx::Create(&pool_, runtime_state_, build_exprs_,
         probe_exprs_, false /* !stores_nulls_ */,
-        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_, &ht_ctx);
+        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_, &mem_pool_,
+        &mem_pool_, &ht_ctx);
     EXPECT_OK(status);
 
     // Inserts num_to_add + (num_to_add^2) + (num_to_add^4) + ... + (num_to_add^20)
@@ -553,7 +557,8 @@ class HashTableTest : public testing::Test {
     scoped_ptr<HashTableCtx> ht_ctx;
     Status status = HashTableCtx::Create(&pool_, runtime_state_, build_exprs_,
         probe_exprs_, false /* !stores_nulls_ */,
-        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_, &ht_ctx);
+        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_,
+        &mem_pool_, &mem_pool_, &ht_ctx);
     EXPECT_OK(status);
 
     // Insert and probe table_size different tuples. All of them are expected to be
@@ -626,7 +631,7 @@ class HashTableTest : public testing::Test {
     scoped_ptr<HashTableCtx> ht_ctx;
     Status status = HashTableCtx::Create(&pool_, runtime_state_, build_exprs_,
         probe_exprs_, false /* !stores_nulls_ */, vector<bool>(build_exprs_.size(), false), 1, 0, 1,
-        &mem_pool_, &ht_ctx);
+        &mem_pool_, &mem_pool_, &mem_pool_, &ht_ctx);
     EXPECT_OK(status);
     HashTable::Iterator iter = hash_table->Begin(ht_ctx.get());
     EXPECT_TRUE(iter.AtEnd());
@@ -712,7 +717,8 @@ TEST_F(HashTableTest, HashEmpty) {
   scoped_ptr<HashTableCtx> ht_ctx;
   Status status = HashTableCtx::Create(&pool_, runtime_state_, build_exprs_,
       probe_exprs_, false /* !stores_nulls_ */,
-      vector<bool>(build_exprs_.size(), false), 1, 2, 1, &mem_pool_, &ht_ctx);
+      vector<bool>(build_exprs_.size(), false), 1, 2, 1, &mem_pool_, &mem_pool_,
+      &mem_pool_, &ht_ctx);
   EXPECT_OK(status);
   EXPECT_OK(ht_ctx->Open(runtime_state_));
 

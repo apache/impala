@@ -142,14 +142,14 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
     } else {
       DCHECK(conjunct_evals_map_[entry.first].empty());
       RETURN_IF_ERROR(ScalarExprEvaluator::Create(entry.second, state, pool_,
-          expr_mem_pool(), &conjunct_evals_map_[entry.first]));
+          expr_perm_pool(), expr_results_pool(), &conjunct_evals_map_[entry.first]));
     }
   }
 
   // Prepare min max statistics conjuncts.
   if (min_max_tuple_id_ != -1) {
     RETURN_IF_ERROR(ScalarExprEvaluator::Create(min_max_conjuncts_, state, pool_,
-        expr_mem_pool(), &min_max_conjunct_evals_));
+        expr_perm_pool(), expr_results_pool(), &min_max_conjunct_evals_));
   }
 
   // One-time initialization of state that is constant across scan ranges

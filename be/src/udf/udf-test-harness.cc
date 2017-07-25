@@ -30,7 +30,8 @@ FunctionContext* UdfTestHarness::CreateTestContext(
     const FunctionContext::TypeDesc& return_type,
     const vector<FunctionContext::TypeDesc>& arg_types, RuntimeState* state,
     MemPool* pool) {
-  return FunctionContextImpl::CreateContext(state, pool, return_type, arg_types, 0, true);
+  return FunctionContextImpl::CreateContext(
+      state, pool, pool, return_type, arg_types, 0, true);
 }
 
 void UdfTestHarness::SetConstantArgs(

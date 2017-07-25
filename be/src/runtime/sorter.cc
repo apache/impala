@@ -541,8 +541,8 @@ class Sorter::TupleIterator {
 /// instance to check for cancellation during an in-memory sort.
 class Sorter::TupleSorter {
  public:
-  TupleSorter(const TupleRowComparator& comparator, int64_t page_size, int tuple_size,
-      RuntimeState* state);
+  TupleSorter(Sorter* parent, const TupleRowComparator& comparator, int64_t page_size,
+      int tuple_size, RuntimeState* state);
 
   ~TupleSorter();
 
@@ -555,6 +555,8 @@ class Sorter::TupleSorter {
  private:
   static const int INSERTION_THRESHOLD = 16;
 
+  Sorter* const parent_;
+
   /// Size of the tuples in memory.
   const int tuple_size_;
 
@@ -562,7 +564,7 @@ class Sorter::TupleSorter {
   const TupleRowComparator& comparator_;
 
   /// Number of times comparator_.Less() can be invoked again before
-  /// comparator_.FreeLocalAllocations() needs to be called.
+  /// comparator_. expr_results_pool_.Clear() needs to be called.
   int num_comparisons_till_free_;
 
   /// Runtime state instance to check for cancellation. Not owned.
@@ -581,7 +583,7 @@ class Sorter::TupleSorter {
   /// high: Mersenne Twister should be more than adequate.
   mt19937_64 rng_;
 
-  /// Wrapper around comparator_.Less(). Also call comparator_.FreeLocalAllocations()
+  /// Wrapper around comparator_.Less(). Also call expr_results_pool_.Clear()
   /// on every 'state_->batch_size()' invocations of comparator_.Less(). Returns true
   /// if 'lhs' is less than 'rhs'.
   bool Less(const TupleRow* lhs, const TupleRow* rhs);
@@ -1251,9 +1253,10 @@ void Sorter::TupleIterator::PrevPage(Sorter::Run* run, int tuple_size) {
   tuple_ = run->fixed_len_pages_[page_index_].data() + last_tuple_page_offset;
 }
 
-Sorter::TupleSorter::TupleSorter(const TupleRowComparator& comp, int64_t page_size,
-    int tuple_size, RuntimeState* state)
-  : tuple_size_(tuple_size),
+Sorter::TupleSorter::TupleSorter(Sorter* parent, const TupleRowComparator& comp,
+    int64_t page_size, int tuple_size, RuntimeState* state)
+  : parent_(parent),
+    tuple_size_(tuple_size),
     comparator_(comp),
     num_comparisons_till_free_(state->batch_size()),
     state_(state) {
@@ -1270,7 +1273,7 @@ bool Sorter::TupleSorter::Less(const TupleRow* lhs, const TupleRow* rhs) {
   --num_comparisons_till_free_;
   DCHECK_GE(num_comparisons_till_free_, 0);
   if (UNLIKELY(num_comparisons_till_free_ == 0)) {
-    comparator_.FreeLocalAllocations();
+    parent_->expr_results_pool_.Clear();
     num_comparisons_till_free_ = state_->batch_size();
   }
   return comparator_.Less(lhs, rhs);
@@ -1463,14 +1466,17 @@ inline void Sorter::TupleSorter::Swap(Tuple* left, Tuple* right, Tuple* swap_tup
   memcpy(right, swap_tuple, tuple_size);
 }
 
-Sorter::Sorter(const TupleRowComparator& compare_less_than,
+Sorter::Sorter(const std::vector<ScalarExpr*>& ordering_exprs,
+      const std::vector<bool>& is_asc_order, const std::vector<bool>& nulls_first,
     const vector<ScalarExpr*>& sort_tuple_exprs, RowDescriptor* output_row_desc,
     MemTracker* mem_tracker, BufferPool::ClientHandle* buffer_pool_client,
     int64_t page_len, RuntimeProfile* profile, RuntimeState* state, int node_id,
     bool enable_spilling)
   : node_id_(node_id),
     state_(state),
-    compare_less_than_(compare_less_than),
+    expr_perm_pool_(mem_tracker),
+    expr_results_pool_(mem_tracker),
+    compare_less_than_(ordering_exprs, is_asc_order, nulls_first),
     in_mem_tuple_sorter_(NULL),
     buffer_pool_client_(buffer_pool_client),
     page_len_(page_len),
@@ -1495,7 +1501,7 @@ Sorter::~Sorter() {
   DCHECK(merge_output_run_ == NULL);
 }
 
-Status Sorter::Prepare(ObjectPool* obj_pool, MemPool* expr_mem_pool) {
+Status Sorter::Prepare(ObjectPool* obj_pool) {
   DCHECK(in_mem_tuple_sorter_ == NULL) << "Already prepared";
   // Page byte offsets are packed into uint32_t values, which limits the supported
   // page size.
@@ -1513,7 +1519,7 @@ Status Sorter::Prepare(ObjectPool* obj_pool, MemPool* expr_mem_pool) {
         PrettyPrinter::Print(state_->query_options().max_row_size, TUnit::BYTES));
   }
   has_var_len_slots_ = sort_tuple_desc->HasVarlenSlots();
-  in_mem_tuple_sorter_.reset(new TupleSorter(compare_less_than_, page_len_,
+  in_mem_tuple_sorter_.reset(new TupleSorter(this, compare_less_than_, page_len_,
       sort_tuple_desc->byte_size(), state_));
 
   if (enable_spilling_) {
@@ -1528,23 +1534,24 @@ Status Sorter::Prepare(ObjectPool* obj_pool, MemPool* expr_mem_pool) {
   run_sizes_ = ADD_SUMMARY_STATS_COUNTER(profile_, "NumRowsPerRun", TUnit::UNIT);
 
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(sort_tuple_exprs_, state_, obj_pool,
-      expr_mem_pool, &sort_tuple_expr_evals_));
+      &expr_perm_pool_, &expr_results_pool_, &sort_tuple_expr_evals_));
   return Status::OK();
+}
+
+Status Sorter::Codegen(RuntimeState* state) {
+  return compare_less_than_.Codegen(state);
 }
 
 Status Sorter::Open() {
   DCHECK(in_mem_tuple_sorter_ != NULL) << "Not prepared";
   DCHECK(unsorted_run_ == NULL) << "Already open";
+  RETURN_IF_ERROR(compare_less_than_.Open(&obj_pool_, state_, &expr_perm_pool_,
+      &expr_results_pool_));
   TupleDescriptor* sort_tuple_desc = output_row_desc_->tuple_descriptors()[0];
-  unsorted_run_ = obj_pool_.Add(new Run(this, sort_tuple_desc, true));
+  unsorted_run_ = run_pool_.Add(new Run(this, sort_tuple_desc, true));
   RETURN_IF_ERROR(unsorted_run_->Init());
   RETURN_IF_ERROR(ScalarExprEvaluator::Open(sort_tuple_expr_evals_, state_));
   return Status::OK();
-}
-
-void Sorter::FreeLocalAllocations() {
-  compare_less_than_.FreeLocalAllocations();
-  ScalarExprEvaluator::FreeLocalAllocations(sort_tuple_expr_evals_);
 }
 
 int64_t Sorter::ComputeMinReservation() {
@@ -1572,16 +1579,20 @@ Status Sorter::AddBatch(RowBatch* batch) {
       RETURN_IF_ERROR(SortCurrentInputRun());
       RETURN_IF_ERROR(sorted_runs_.back()->UnpinAllPages());
       unsorted_run_ =
-          obj_pool_.Add(new Run(this, output_row_desc_->tuple_descriptors()[0], true));
+          run_pool_.Add(new Run(this, output_row_desc_->tuple_descriptors()[0], true));
       RETURN_IF_ERROR(unsorted_run_->Init());
     }
   }
+  // Clear any temporary allocations made while materializing the sort tuples.
+  expr_results_pool_.Clear();
   return Status::OK();
 }
 
 Status Sorter::AddBatchNoSpill(RowBatch* batch, int start_index, int* num_processed) {
   DCHECK(batch != nullptr);
   RETURN_IF_ERROR(unsorted_run_->AddInputBatch(batch, start_index, num_processed));
+  // Clear any temporary allocations made while materializing the sort tuples.
+  expr_results_pool_.Clear();
   return Status::OK();
 }
 
@@ -1617,7 +1628,10 @@ Status Sorter::GetNext(RowBatch* output_batch, bool* eos) {
     DCHECK(sorted_runs_.back()->is_pinned());
     return sorted_runs_.back()->GetNext<false>(output_batch, eos);
   } else {
-    return merger_->GetNext(output_batch, eos);
+    RETURN_IF_ERROR(merger_->GetNext(output_batch, eos));
+    // Clear any temporary allocations made by the merger.
+    expr_results_pool_.Clear();
+    return Status::OK();
   }
 }
 
@@ -1626,13 +1640,16 @@ void Sorter::Reset() {
   merger_.reset();
   // Free resources from the current runs.
   CleanupAllRuns();
-  obj_pool_.Clear();
+  compare_less_than_.Close(state_);
 }
 
 void Sorter::Close(RuntimeState* state) {
   CleanupAllRuns();
-  obj_pool_.Clear();
+  compare_less_than_.Close(state);
   ScalarExprEvaluator::Close(sort_tuple_expr_evals_, state);
+  expr_perm_pool_.FreeAll();
+  expr_results_pool_.FreeAll();
+  obj_pool_.Clear();
 }
 
 void Sorter::CleanupAllRuns() {
@@ -1642,6 +1659,7 @@ void Sorter::CleanupAllRuns() {
   unsorted_run_ = NULL;
   if (merge_output_run_ != NULL) merge_output_run_->CloseAllPages();
   merge_output_run_ = NULL;
+  run_pool_.Clear();
 }
 
 Status Sorter::SortCurrentInputRun() {
@@ -1683,7 +1701,7 @@ Status Sorter::MergeIntermediateRuns() {
     // intermediate merges.
     // TODO: this isn't optimal: we could defer creating the merged run if we have
     // reliable reservations (IMPALA-3200).
-    merge_output_run_ = obj_pool_.Add(
+    merge_output_run_ = run_pool_.Add(
         new Run(this, output_row_desc_->tuple_descriptors()[0], false));
     RETURN_IF_ERROR(merge_output_run_->Init());
     RETURN_IF_ERROR(CreateMerger(num_runs_to_merge));
@@ -1754,6 +1772,8 @@ Status Sorter::ExecuteIntermediateMerge(Sorter::Run* merged_run) {
     // Copy rows into the new run until done.
     int num_copied;
     RETURN_IF_CANCELLED(state_);
+    // Clear any temporary allocations made by the merger.
+    expr_results_pool_.Clear();
     RETURN_IF_ERROR(merger_->GetNext(&intermediate_merge_batch, &eos));
     RETURN_IF_ERROR(
         merged_run->AddIntermediateBatch(&intermediate_merge_batch, 0, &num_copied));

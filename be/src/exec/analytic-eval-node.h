@@ -71,9 +71,6 @@ class AnalyticEvalNode : public ExecNode {
   virtual void Close(RuntimeState* state);
 
  protected:
-  /// Frees local allocations from analytic_fn_evals_
-  virtual Status QueryMaintenance(RuntimeState* state);
-
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
@@ -242,11 +239,6 @@ class AnalyticEvalNode : public ExecNode {
   /// partitions determined by the offset. Set in Open() by inspecting the agg fns.
   bool has_first_val_null_offset_;
   long first_val_null_offset_;
-
-  /// Mem pool backing allocations from fn_ctxs_. This pool must not be Reset() because
-  /// the memory is managed by the FreePools of the function contexts which do their own
-  /// bookkeeping using a pointer-based structure stored in the memory blocks themselves.
-  boost::scoped_ptr<MemPool> fn_pool_;
 
   /// Pools used to allocate result tuples (added to result_tuples_ and later returned)
   /// and window tuples (added to window_tuples_ to buffer the current window). Resources

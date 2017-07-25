@@ -97,7 +97,8 @@ static_assert(sizeof(NULL_VALUE) >= ColumnType::MAX_CHAR_LENGTH,
 HashTableCtx::HashTableCtx(const std::vector<ScalarExpr*>& build_exprs,
     const std::vector<ScalarExpr*>& probe_exprs, bool stores_nulls,
     const std::vector<bool>& finds_nulls, int32_t initial_seed,
-    int max_levels, MemPool* mem_pool)
+    int max_levels, MemPool* expr_perm_pool, MemPool* build_expr_results_pool,
+    MemPool* probe_expr_results_pool)
     : build_exprs_(build_exprs),
       probe_exprs_(probe_exprs),
       stores_nulls_(stores_nulls),
@@ -106,7 +107,9 @@ HashTableCtx::HashTableCtx(const std::vector<ScalarExpr*>& build_exprs,
           finds_nulls_.begin(), finds_nulls_.end(), false, std::logical_or<bool>())),
       level_(0),
       scratch_row_(NULL),
-      mem_pool_(mem_pool) {
+      expr_perm_pool_(expr_perm_pool),
+      build_expr_results_pool_(build_expr_results_pool),
+      probe_expr_results_pool_(probe_expr_results_pool) {
   DCHECK(!finds_some_nulls_ || stores_nulls_);
   // Compute the layout and buffer size to store the evaluated expr results
   DCHECK_EQ(build_exprs_.size(), probe_exprs_.size());
@@ -131,22 +134,24 @@ Status HashTableCtx::Init(ObjectPool* pool, RuntimeState* state, int num_build_t
     return Status(Substitute("Failed to allocate $0 bytes for scratch row of "
         "HashTableCtx.", scratch_row_size));
   }
-  RETURN_IF_ERROR(ScalarExprEvaluator::Create(build_exprs_, state, pool, mem_pool_,
-      &build_expr_evals_));
+  RETURN_IF_ERROR(ScalarExprEvaluator::Create(build_exprs_, state, pool, expr_perm_pool_,
+      build_expr_results_pool_, &build_expr_evals_));
   DCHECK_EQ(build_exprs_.size(), build_expr_evals_.size());
-  RETURN_IF_ERROR(ScalarExprEvaluator::Create(probe_exprs_, state, pool, mem_pool_,
-      &probe_expr_evals_));
+  RETURN_IF_ERROR(ScalarExprEvaluator::Create(probe_exprs_, state, pool, expr_perm_pool_,
+      probe_expr_results_pool_, &probe_expr_evals_));
   DCHECK_EQ(probe_exprs_.size(), probe_expr_evals_.size());
-  return expr_values_cache_.Init(state, mem_pool_->mem_tracker(), build_exprs_);
+  return expr_values_cache_.Init(state, expr_perm_pool_->mem_tracker(), build_exprs_);
 }
 
 Status HashTableCtx::Create(ObjectPool* pool, RuntimeState* state,
     const std::vector<ScalarExpr*>& build_exprs,
     const std::vector<ScalarExpr*>& probe_exprs, bool stores_nulls,
     const std::vector<bool>& finds_nulls, int32_t initial_seed, int max_levels,
-    int num_build_tuples, MemPool* mem_pool, scoped_ptr<HashTableCtx>* ht_ctx) {
+    int num_build_tuples, MemPool* expr_perm_pool, MemPool* build_expr_results_pool,
+    MemPool* probe_expr_results_pool, scoped_ptr<HashTableCtx>* ht_ctx) {
   ht_ctx->reset(new HashTableCtx(build_exprs, probe_exprs, stores_nulls,
-      finds_nulls, initial_seed, max_levels, mem_pool));
+      finds_nulls, initial_seed, max_levels, expr_perm_pool,
+      build_expr_results_pool, probe_expr_results_pool));
   return (*ht_ctx)->Init(pool, state, num_build_tuples);
 }
 
@@ -159,22 +164,9 @@ Status HashTableCtx::Open(RuntimeState* state) {
 void HashTableCtx::Close(RuntimeState* state) {
   free(scratch_row_);
   scratch_row_ = NULL;
-  expr_values_cache_.Close(mem_pool_->mem_tracker());
+  expr_values_cache_.Close(expr_perm_pool_->mem_tracker());
   ScalarExprEvaluator::Close(build_expr_evals_, state);
   ScalarExprEvaluator::Close(probe_expr_evals_, state);
-}
-
-void HashTableCtx::FreeBuildLocalAllocations() {
-  ScalarExprEvaluator::FreeLocalAllocations(build_expr_evals_);
-}
-
-void HashTableCtx::FreeProbeLocalAllocations() {
-  ScalarExprEvaluator::FreeLocalAllocations(probe_expr_evals_);
-}
-
-void HashTableCtx::FreeLocalAllocations() {
-  FreeBuildLocalAllocations();
-  FreeProbeLocalAllocations();
 }
 
 uint32_t HashTableCtx::Hash(const void* input, int len, uint32_t hash) const {

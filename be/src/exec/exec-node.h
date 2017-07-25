@@ -211,7 +211,8 @@ class ExecNode {
   RuntimeProfile* runtime_profile() { return runtime_profile_; }
   MemTracker* mem_tracker() { return mem_tracker_.get(); }
   MemTracker* expr_mem_tracker() { return expr_mem_tracker_.get(); }
-  MemPool* expr_mem_pool() { return expr_mem_pool_.get(); }
+  MemPool* expr_perm_pool() { return expr_perm_pool_.get(); }
+  MemPool* expr_results_pool() { return expr_results_pool_.get(); }
 
   /// Return true if codegen was disabled by the planner for this ExecNode. Does not
   /// check to see if codegen was enabled for the enclosing fragment.
@@ -318,12 +319,19 @@ class ExecNode {
   /// Account for peak memory used by this node
   boost::scoped_ptr<MemTracker> mem_tracker_;
 
-  /// MemTracker used by 'expr_mem_pool_'.
+  /// MemTracker used by 'expr_perm_pool_' and 'expr_results_pool_'.
   boost::scoped_ptr<MemTracker> expr_mem_tracker_;
 
-  /// MemPool for allocating data structures used by expression evaluators in this node.
-  /// Created in Prepare().
-  boost::scoped_ptr<MemPool> expr_mem_pool_;
+  /// MemPool for allocations made by expression evaluators in this node that are
+  /// "permanent" and live until Close() is called. Created in Prepare().
+  boost::scoped_ptr<MemPool> expr_perm_pool_;
+
+  /// MemPool for allocations made by expression evaluators in this node that hold
+  /// intermediate or final results of expression evaluation. Should be cleared
+  /// periodically to free accumulated memory. QueryMaintenance() clears this pool, but
+  /// it may be appropriate for ExecNode implementation to clear it at other points in
+  /// execution where the memory is not needed.
+  boost::scoped_ptr<MemPool> expr_results_pool_;
 
   /// Buffer pool client for this node. Initialized with the node's minimum reservation
   /// in ClaimBufferReservation(). After initialization, the client must hold onto at
@@ -365,22 +373,11 @@ class ExecNode {
     return ExecDebugActionImpl(phase, state);
   }
 
-  /// Frees any local allocations made by evals_to_free_ and returns the result of
-  /// state->CheckQueryState(). Nodes should call this periodically, e.g. once per input
-  /// row batch. This should not be called outside the main execution thread.
-  //
-  /// Nodes may override this to add extra periodic cleanup, e.g. freeing other local
-  /// allocations. ExecNodes overriding this function should return
-  /// ExecNode::QueryMaintenance().
-  virtual Status QueryMaintenance(RuntimeState* state) WARN_UNUSED_RESULT;
-
-  /// Add an expr evaluator to have its local allocations freed by QueryMaintenance().
-  /// Exprs that are evaluated in the main execution thread should be added. Exprs
-  /// evaluated in a separate thread are generally not safe to add, since a local
-  /// allocation may be freed while it's being used. Rather than using this mechanism,
-  /// threads should call FreeLocalAllocations() on local evaluators periodically.
-  void AddEvaluatorToFree(ScalarExprEvaluator* eval);
-  void AddEvaluatorsToFree(const std::vector<ScalarExprEvaluator*>& evals);
+  /// Clears 'expr_results_pool_' and returns the result of state->CheckQueryState().
+  /// Nodes should call this periodically, e.g. once per input row batch. This should
+  /// not be called outside the main execution thread.
+  /// TODO: IMPALA-2399: replace QueryMaintenance() - see JIRA for more details.
+  Status QueryMaintenance(RuntimeState* state) WARN_UNUSED_RESULT;
 
  private:
   /// Implementation of ExecDebugAction(). This is the slow path we take when there is
@@ -391,10 +388,6 @@ class ExecNode {
   /// Set in ExecNode::Close(). Used to make Close() idempotent. This is not protected
   /// by a lock, it assumes all calls to Close() are made by the same thread.
   bool is_closed_;
-
-  /// Expr evaluators whose local allocations are safe to free in the main execution
-  /// thread.
-  std::vector<ScalarExprEvaluator*> evals_to_free_;
 };
 
 inline bool ExecNode::EvalPredicate(ScalarExprEvaluator* eval, TupleRow* row) {

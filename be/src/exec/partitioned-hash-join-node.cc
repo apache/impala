@@ -119,13 +119,22 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   runtime_profile()->PrependChild(builder_->profile());
 
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(other_join_conjuncts_, state, pool_,
-      expr_mem_pool(), &other_join_conjunct_evals_));
-  AddEvaluatorsToFree(other_join_conjunct_evals_);
+      expr_perm_pool(), expr_results_pool(), &other_join_conjunct_evals_));
 
+  probe_expr_results_pool_.reset(new MemPool(mem_tracker()));
+
+  // We have to carefully set up expression evaluators in the HashTableCtx to use
+  // MemPools with appropriate lifetime.  The values of build exprs are only used
+  // temporarily while processing each build batch or when processing a probe row
+  // so can be stored in 'expr_results_pool_', which is freed during
+  // QueryMaintenance(). Values of probe exprs may need to live longer until the
+  // cache is reset so are stored in 'probe_expr_results_pool_', which is cleared
+  // manually at the appropriate time.
   RETURN_IF_ERROR(HashTableCtx::Create(pool_, state, build_exprs_, probe_exprs_,
       builder_->HashTableStoresNulls(), builder_->is_not_distinct_from(),
       state->fragment_hash_seed(), MAX_PARTITION_DEPTH,
-      child(1)->row_desc()->tuple_descriptors().size(), expr_mem_pool(), &ht_ctx_));
+      child(1)->row_desc()->tuple_descriptors().size(), expr_perm_pool(),
+      expr_results_pool(), probe_expr_results_pool_.get(), &ht_ctx_));
   if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
     null_aware_eval_timer_ = ADD_TIMER(runtime_profile(), "NullAwareAntiJoinEvalTime");
   }
@@ -163,14 +172,14 @@ Status PartitionedHashJoinNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ht_ctx_->Open(state));
   RETURN_IF_ERROR(ScalarExprEvaluator::Open(other_join_conjunct_evals_, state));
 
-  // Check for errors and free local allocations before opening children.
+  // Check for errors and free expr result allocations before opening children.
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
-  // The prepare functions of probe expressions may have done local allocations implicitly
-  // (e.g. calling UdfBuiltins::Lower()). The probe expressions' local allocations need to
-  // be freed now as they don't get freed again till probing. Other exprs' local allocations
-  // are freed in ExecNode::FreeLocalAllocations().
-  ht_ctx_->FreeProbeLocalAllocations();
+  // The prepare functions of probe expressions may have made result allocations implicitly
+  // (e.g. calling UdfBuiltins::Lower()). The probe expressions' expr result allocations need to
+  // be cleared now as they don't get cleared again till probing. Other exprs' result allocations
+  // are cleared in QueryMaintenance().
+  probe_expr_results_pool_->Clear();
 
   RETURN_IF_ERROR(BlockingJoinNode::ProcessBuildInputAndOpenProbe(state, builder_.get()));
   RETURN_IF_ERROR(PrepareForProbe());
@@ -195,15 +204,6 @@ Status PartitionedHashJoinNode::AcquireResourcesForBuild(RuntimeState* state) {
     RETURN_IF_ERROR(InitNullProbeRows());
   }
   return Status::OK();
-}
-
-Status PartitionedHashJoinNode::QueryMaintenance(RuntimeState* state) {
-  // Build expressions may be evaluated during probing, so must be freed.
-  // Probe side expr is not included in QueryMaintenance(). We cache the probe expression
-  // values in ExprValuesCache. Local allocations need to survive until the cache is reset
-  // so we need to manually free probe expr local allocations.
-  if (ht_ctx_.get() != nullptr) ht_ctx_->FreeBuildLocalAllocations();
-  return ExecNode::QueryMaintenance(state);
 }
 
 Status PartitionedHashJoinNode::Reset(RuntimeState* state) {
@@ -260,6 +260,7 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
   ScalarExpr::Close(build_exprs_);
   ScalarExpr::Close(probe_exprs_);
   ScalarExpr::Close(other_join_conjuncts_);
+  if (probe_expr_results_pool_ != nullptr) probe_expr_results_pool_->FreeAll();
   BlockingJoinNode::Close(state);
 }
 
@@ -591,10 +592,10 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
         RETURN_IF_ERROR(NextSpilledProbeRowBatch(state, out_batch));
       }
     }
-    // Free local allocations of the probe side expressions only after ExprValuesCache
-    // has been reset.
+    // Free expr result allocations of the probe side expressions only after
+    // ExprValuesCache has been reset.
     DCHECK(ht_ctx_->expr_values_cache()->AtEnd());
-    ht_ctx_->FreeProbeLocalAllocations();
+    probe_expr_results_pool_->Clear();
 
     // We want to return as soon as we have attached a tuple stream to the out_batch
     // (before preparing a new partition). The attached tuple stream will be recycled

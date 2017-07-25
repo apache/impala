@@ -120,9 +120,9 @@ DEFINE_bool(load_auth_to_local_rules, false, "If true, load auth_to_local config
 
 // Stress options that are only enabled in debug builds for testing.
 #ifndef NDEBUG
-DEFINE_int32(stress_free_pool_alloc, 0, "A stress option which causes memory allocations "
-    "to fail once every n allocations where n is the value of this flag. Effective in "
-    "debug builds only.");
+DEFINE_int32(stress_fn_ctx_alloc, 0, "A stress option which causes memory allocations "
+    "in function contexts to fail once every n allocations where n is the value of this "
+    "flag. Effective in debug builds only.");
 DEFINE_int32(stress_datastream_recvr_delay_ms, 0, "A stress option that causes data "
     "stream receiver registration to be delayed. Effective in debug builds only.");
 DEFINE_bool(skip_file_runtime_filtering, false, "Skips file-based runtime filtering in "

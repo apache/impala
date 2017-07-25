@@ -390,7 +390,8 @@ Status DataStreamSender::Prepare(RuntimeState* state, MemTracker* parent_mem_tra
   state_ = state;
   SCOPED_TIMER(profile_->total_time_counter());
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(partition_exprs_, state,
-      state->obj_pool(), expr_mem_pool(), &partition_expr_evals_));
+      state->obj_pool(), expr_perm_pool_.get(), expr_results_pool_.get(),
+      &partition_expr_evals_));
   bytes_sent_counter_ = ADD_COUNTER(profile(), "BytesSent", TUnit::BYTES);
   uncompressed_bytes_counter_ =
       ADD_COUNTER(profile(), "UncompressedRowBatchSize", TUnit::BYTES);
@@ -479,7 +480,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
     }
   }
   COUNTER_ADD(total_sent_rows_counter_, batch->num_rows());
-  ScalarExprEvaluator::FreeLocalAllocations(partition_expr_evals_);
+  expr_results_pool_->Clear();
   RETURN_IF_ERROR(state->CheckQueryState());
   return Status::OK();
 }

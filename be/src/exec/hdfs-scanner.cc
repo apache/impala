@@ -60,7 +60,7 @@ const char* HdfsScanner::LLVM_CLASS_NAME = "class.impala::HdfsScanner";
 HdfsScanner::HdfsScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
     : scan_node_(scan_node),
       state_(state),
-      expr_mem_pool_(new MemPool(scan_node->expr_mem_tracker())),
+      expr_perm_pool_(new MemPool(scan_node->expr_mem_tracker())),
       template_tuple_pool_(new MemPool(scan_node->mem_tracker())),
       tuple_byte_size_(scan_node->tuple_desc()->byte_size()),
       data_buffer_pool_(new MemPool(scan_node->mem_tracker())) {
@@ -84,7 +84,7 @@ Status HdfsScanner::Open(ScannerContext* context) {
   // caller.
   for (const auto& entry: scan_node_->conjuncts_map()) {
     RETURN_IF_ERROR(ScalarExprEvaluator::Clone(&obj_pool_, scan_node_->runtime_state(),
-        expr_mem_pool_.get(), entry.second,
+        expr_perm_pool_.get(), context_->expr_results_pool(), entry.second,
         &conjunct_evals_map_[entry.first]));
   }
   DCHECK(conjunct_evals_map_.find(scan_node_->tuple_desc()->id()) !=
@@ -145,7 +145,8 @@ void HdfsScanner::CloseInternal() {
   for (auto& entry : conjunct_evals_map_) {
     ScalarExprEvaluator::Close(entry.second, state_);
   }
-  expr_mem_pool_->FreeAll();
+  expr_perm_pool_->FreeAll();
+  context_->expr_results_pool()->FreeAll();
   obj_pool_.Clear();
   stream_ = nullptr;
   context_->ClearStreams();
@@ -199,11 +200,9 @@ Status HdfsScanner::CommitRows(int num_rows, RowBatch* row_batch) {
   if (context_->cancelled()) return Status::CANCELLED;
   // Check for UDF errors.
   RETURN_IF_ERROR(state_->GetQueryStatus());
-  // Free local expr allocations for this thread to avoid accumulating too much
+  // Clear expr result allocations for this thread to avoid accumulating too much
   // memory from evaluating the scanner conjuncts.
-  for (const auto& entry: conjunct_evals_map_) {
-    ScalarExprEvaluator::FreeLocalAllocations(entry.second);
-  }
+  context_->expr_results_pool()->Clear();
   return Status::OK();
 }
 

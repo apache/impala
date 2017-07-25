@@ -229,7 +229,7 @@ Status HiveUdfCall::OpenEvaluator(FunctionContext::FunctionStateScope scope,
   RETURN_ERROR_IF_EXC(env);
   RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, jni_ctx->executor, &jni_ctx->executor));
 
-  RETURN_IF_ERROR(AllocateAnyVal(state, eval->mem_pool(), type_,
+  RETURN_IF_ERROR(AllocateAnyVal(state, eval->expr_perm_pool(), type_,
       "Could not allocate JNI output value", &jni_ctx->output_anyval));
   return Status::OK();
 }
@@ -327,7 +327,7 @@ StringVal HiveUdfCall::GetStringVal(
   DCHECK_EQ(type_.type, TYPE_STRING);
   StringVal result = *reinterpret_cast<StringVal*>(Evaluate(eval, row));
   if (result.is_null) return StringVal::null();
-  // Copy the string into a local allocation with the usual lifetime for expr results.
+  // Copy the string into a result allocation with the usual lifetime for expr results.
   // Needed because the UDF output buffer is owned by the Java UDF executor and may be
   // freed or reused by the next call into the Java UDF executor.
   FunctionContext* fn_ctx = eval->fn_context(fn_ctx_idx_);

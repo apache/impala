@@ -185,7 +185,7 @@ StringVal CastFunctions::CastToChar(FunctionContext* ctx, const StringVal& val) 
   DCHECK_GE(type.len, 1);
   char* cptr;
   if (type.len > val.len) {
-    cptr = reinterpret_cast<char*>(ctx->impl()->AllocateLocal(type.len));
+    cptr = reinterpret_cast<char*>(ctx->impl()->AllocateForResults(type.len));
     if (UNLIKELY(cptr == NULL)) {
       DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
       return StringVal::null();

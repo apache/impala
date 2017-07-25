@@ -118,20 +118,14 @@ class HashTableCtx {
       const std::vector<ScalarExpr*>& build_exprs,
       const std::vector<ScalarExpr*>& probe_exprs, bool stores_nulls,
       const std::vector<bool>& finds_nulls, int32_t initial_seed, int max_levels,
-      int num_build_tuples, MemPool* mem_pool, boost::scoped_ptr<HashTableCtx>* ht_ctx);
+      int num_build_tuples, MemPool* expr_perm_pool, MemPool* build_expr_results_pool,
+      MemPool* probe_expr_results_pool, boost::scoped_ptr<HashTableCtx>* ht_ctx);
 
   /// Initialize the build and probe expression evaluators.
   Status Open(RuntimeState* state);
 
   /// Call to cleanup any resources allocated by the expression evaluators.
   void Close(RuntimeState* state);
-
-  /// Free local allocations made by build and probe expression evaluators respectively.
-  void FreeBuildLocalAllocations();
-  void FreeProbeLocalAllocations();
-
-  /// Free local allocations of both build and probe expression evaluators.
-  void FreeLocalAllocations();
 
   void set_level(int level);
 
@@ -398,9 +392,18 @@ class HashTableCtx {
   ///  - initial_seed: initial seed value to use when computing hashes for rows with
   ///        level 0. Other levels have their seeds derived from this seed.
   ///  - max_levels: the max lhashevels we will hash with.
-  ///  - mem_pool: the MemPool which the expression evaluators allocate from. Owned by the
-  ///        exec node which owns this hash table context. Memory usage of the expression
-  ///        value cache is charged against its MemTracker.
+  ///  - expr_perm_pool: the MemPool from which the expression evaluators make permanent
+  ///        allocations that live until Close(). Owned by the exec node which owns this
+  ///        hash table context. Memory usage of the expression value cache is charged
+  ///        against this MemPool's tracker.
+  ///  - build_expr_results_pool: the MemPool from which the expression evaluators make
+  ///        allocations to hold expression results. Cached build expression values may
+  ///        reference memory in this pool. Owned by the exec node which owns this hash
+  ///        table context.
+  ///  - probe_expr_results_pool: the MemPool from which the expression evaluators make
+  ///        allocations to hold expression results. Cached probe expression values may
+  ///        reference memory in this pool. Owned by the exec node which owns this hash
+  ///        table context.
   ///
   /// TODO: stores_nulls is too coarse: for a hash table in which some columns are joined
   ///       with '<=>' and others with '=', stores_nulls could distinguish between columns
@@ -409,7 +412,8 @@ class HashTableCtx {
   HashTableCtx(const std::vector<ScalarExpr*>& build_exprs,
       const std::vector<ScalarExpr*>& probe_exprs, bool stores_nulls,
       const std::vector<bool>& finds_nulls, int32_t initial_seed,
-      int max_levels, MemPool* mem_pool);
+      int max_levels, MemPool* expr_perm_pool, MemPool* build_expr_results_pool,
+      MemPool* probe_expr_results_pool);
 
   /// Allocate various buffers for storing expression evaluation results, hash values,
   /// null bits etc. Also allocate evaluators for the build and probe expressions and
@@ -513,9 +517,15 @@ class HashTableCtx {
   /// Scratch buffer to generate rows on the fly.
   TupleRow* scratch_row_;
 
-  /// MemPool for 'build_expr_evals_' and 'probe_expr_evals_' to allocate from.
-  /// Not owned.
-  MemPool* mem_pool_;
+  /// MemPool for 'build_expr_evals_' and 'probe_expr_evals_' to allocate expr-managed
+  /// memory from. Not owned.
+  MemPool* expr_perm_pool_;
+
+  /// MemPools for allocations by 'build_expr_evals_' and 'probe_expr_evals_' that hold
+  /// results of expr evaluation. Not owned. The owner of these pools is responsible for
+  /// clearing them when results from the respective expr evaluators are no longer needed.
+  MemPool* build_expr_results_pool_;
+  MemPool* probe_expr_results_pool_;
 };
 
 /// The hash table consists of a contiguous array of buckets that contain a pointer to the
