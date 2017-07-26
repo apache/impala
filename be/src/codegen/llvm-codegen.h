@@ -237,7 +237,8 @@ class LlvmCodeGen {
   /// Return a pointer to pointer type for 'name' type.
   llvm::PointerType* GetPtrPtrType(const std::string& name);
 
-  /// Returns llvm type for the column type
+  /// Returns llvm type for Impala's internal representation of this column type,
+  /// i.e. the way Impala represents this type in a Tuple.
   llvm::Type* GetType(const ColumnType& type);
 
   /// Return a pointer type to 'type' (e.g. int16_t*)
@@ -474,7 +475,6 @@ class LlvmCodeGen {
   llvm::Type* bigint_type() { return GetType(TYPE_BIGINT); }
   llvm::Type* float_type() { return GetType(TYPE_FLOAT); }
   llvm::Type* double_type() { return GetType(TYPE_DOUBLE); }
-  llvm::Type* string_val_type() { return string_val_type_; }
   llvm::PointerType* ptr_type() { return ptr_type_; }
   llvm::Type* void_type() { return void_type_; }
   llvm::Type* i128_type() { return llvm::Type::getIntNTy(context(), 128); }
@@ -764,8 +764,8 @@ class LlvmCodeGen {
   /// llvm representation of a few common types.  Owned by context.
   llvm::PointerType* ptr_type_;             // int8_t*
   llvm::Type* void_type_;                   // void
-  llvm::Type* string_val_type_;             // StringValue
-  llvm::Type* timestamp_val_type_;          // TimestampValue
+  llvm::Type* string_value_type_;           // StringValue
+  llvm::Type* timestamp_value_type_;        // TimestampValue
 
   /// llvm constants to help with code gen verbosity
   llvm::Value* true_value_;

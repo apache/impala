@@ -3127,6 +3127,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create aggregate function foo(int) RETURNS struct<f:int> " +
         loc + "UPDATE_FN='AggUpdate'",
         "Type 'STRUCT<f:INT>' is not supported in UDFs/UDAs.");
+    AnalysisError("create aggregate function foo(int) RETURNS int " +
+        "INTERMEDIATE fixed_uda_intermediate(10) " + loc + " UPDATE_FN='foo'",
+        "Syntax error in line 1");
 
     // Test missing .ll file. TODO: reenable when we can run IR UDAs
     AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +

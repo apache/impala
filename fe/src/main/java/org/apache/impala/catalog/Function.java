@@ -451,6 +451,8 @@ public class Function implements CatalogObject {
     case STRING:
     case VARCHAR:
     case CHAR:
+    case FIXED_UDA_INTERMEDIATE:
+      // These types are marshaled into a StringVal.
       return "StringVal";
     case TIMESTAMP:
       return "TimestampVal";

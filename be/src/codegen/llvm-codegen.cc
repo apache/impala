@@ -326,15 +326,15 @@ Status LlvmCodeGen::CreateImpalaCodegen(RuntimeState* state,
   SCOPED_TIMER(codegen->prepare_module_timer_);
 
   // Get type for StringValue
-  codegen->string_val_type_ = codegen->GetType(StringValue::LLVM_CLASS_NAME);
+  codegen->string_value_type_ = codegen->GetType(StringValue::LLVM_CLASS_NAME);
 
   // Get type for TimestampValue
-  codegen->timestamp_val_type_ = codegen->GetType(TimestampValue::LLVM_CLASS_NAME);
+  codegen->timestamp_value_type_ = codegen->GetType(TimestampValue::LLVM_CLASS_NAME);
 
   // Verify size is correct
   const DataLayout& data_layout = codegen->execution_engine()->getDataLayout();
   const StructLayout* layout =
-      data_layout.getStructLayout(static_cast<StructType*>(codegen->string_val_type_));
+      data_layout.getStructLayout(static_cast<StructType*>(codegen->string_value_type_));
   if (layout->getSizeInBytes() != sizeof(StringValue)) {
     DCHECK_EQ(layout->getSizeInBytes(), sizeof(StringValue));
     return Status("Could not create llvm struct type for StringVal");
@@ -470,14 +470,17 @@ Type* LlvmCodeGen::GetType(const ColumnType& type) {
       return Type::getDoubleTy(context());
     case TYPE_STRING:
     case TYPE_VARCHAR:
-      return string_val_type_;
+      return string_value_type_;
+    case TYPE_FIXED_UDA_INTERMEDIATE:
+      // Represent this as an array of bytes.
+      return ArrayType::get(GetType(TYPE_TINYINT), type.len);
     case TYPE_CHAR:
       // IMPALA-3207: Codegen for CHAR is not yet implemented, this should not
       // be called for TYPE_CHAR.
       DCHECK(false) << "NYI";
       return NULL;
     case TYPE_TIMESTAMP:
-      return timestamp_val_type_;
+      return timestamp_value_type_;
     case TYPE_DECIMAL:
       return Type::getIntNTy(context(), type.GetByteSize() * 8);
     default:

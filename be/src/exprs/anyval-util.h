@@ -188,6 +188,7 @@ class AnyValUtil {
       case TYPE_STRING:
       case TYPE_VARCHAR:
       case TYPE_CHAR:
+      case TYPE_FIXED_UDA_INTERMEDIATE:
         return sizeof(StringVal);
       case TYPE_TIMESTAMP: return sizeof(TimestampVal);
       case TYPE_DECIMAL: return sizeof(DecimalVal);
@@ -210,6 +211,7 @@ class AnyValUtil {
       case TYPE_STRING:
       case TYPE_VARCHAR:
       case TYPE_CHAR:
+      case TYPE_FIXED_UDA_INTERMEDIATE:
         return alignof(StringVal);
       case TYPE_TIMESTAMP: return alignof(TimestampVal);
       case TYPE_DECIMAL: return alignof(DecimalVal);
@@ -287,7 +289,8 @@ class AnyValUtil {
           DCHECK_LE(sv->len, type.len);
         }
         return;
-      case TYPE_CHAR: {
+      case TYPE_CHAR:
+      case TYPE_FIXED_UDA_INTERMEDIATE: {
         StringVal* sv = reinterpret_cast<StringVal*>(dst);
         sv->ptr = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(slot));
         sv->len = type.len;

@@ -77,9 +77,12 @@ class FunctionContext {
     TYPE_DOUBLE,
     TYPE_TIMESTAMP,
     TYPE_STRING,
+    // Not used - maps to CHAR(N), which is not supported for UDFs and UDAs.
     TYPE_FIXED_BUFFER,
     TYPE_DECIMAL,
-    TYPE_VARCHAR
+    TYPE_VARCHAR,
+    // A fixed-size buffer, passed as a StringVal.
+    TYPE_FIXED_UDA_INTERMEDIATE
   };
 
   struct TypeDesc {
@@ -89,7 +92,8 @@ class FunctionContext {
     int precision;
     int scale;
 
-    /// Only valid if type == TYPE_FIXED_BUFFER || type == TYPE_VARCHAR
+    /// Only valid if type is one of TYPE_FIXED_BUFFER, TYPE_FIXED_UDA_INTERMEDIATE or
+    /// TYPE_VARCHAR.
     int len;
   };
 
@@ -337,10 +341,8 @@ typedef void (*UdfClose)(FunctionContext* context,
 /// The UDA is registered with three types: the result type, the input type and
 /// the intermediate type.
 ///
-/// If the UDA needs a fixed byte width intermediate buffer, the type should be
-/// TYPE_FIXED_BUFFER and Impala will allocate the buffer. If the UDA needs an unknown
-/// sized buffer, it should use TYPE_STRING and allocate it from the FunctionContext
-/// manually.
+/// If the UDA needs a variable-sized buffer, it should use TYPE_STRING and allocate it
+/// from the FunctionContext manually.
 /// For UDAs that need a complex data structure as the intermediate state, the
 /// intermediate type should be string and the UDA can cast the ptr to the structure
 /// it is using.
@@ -571,6 +573,7 @@ struct TimestampVal : public AnyVal {
   bool operator!=(const TimestampVal& other) const { return !(*this == other); }
 };
 
+/// A String value represented as a buffer + length.
 /// Note: there is a difference between a NULL string (is_null == true) and an
 /// empty string (len == 0).
 struct StringVal : public AnyVal {
@@ -579,7 +582,12 @@ struct StringVal : public AnyVal {
   // in case of overflow.
   static const unsigned MAX_LENGTH = (1 << 30);
 
+  // The length of the string buffer in bytes.
   int len;
+
+  // Pointer to the start of the string buffer. The buffer is not aligned and is not
+  // null-terminated. Functions must not read or write past the end of the buffer.
+  // I.e.  accessing ptr[i] where i >= len is invalid.
   uint8_t* ptr;
 
   /// Construct a StringVal from ptr/len. Note: this does not make a copy of ptr

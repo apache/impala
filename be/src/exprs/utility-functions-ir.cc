@@ -133,9 +133,10 @@ StringVal UtilityFunctions::TypeOf(FunctionContext* ctx, const T& /*input_val*/)
     case TYPE_DECIMAL:
       return AnyValUtil::FromString(ctx, Substitute("$0($1,$2)", type_string,
           type_desc.precision, type_desc.scale));
-    // Show length of CHAR and VARCHAR.
+    // Show types parameterised by length.
     case TYPE_CHAR:
     case TYPE_VARCHAR:
+    case TYPE_FIXED_UDA_INTERMEDIATE:
       return AnyValUtil::FromString(ctx, Substitute("$0($1)", type_string,
           type_desc.len));
     default:

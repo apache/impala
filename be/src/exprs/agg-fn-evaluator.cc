@@ -26,6 +26,7 @@
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-fn-call.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/lib-cache.h"
 #include "runtime/raw-value.h"
 #include "runtime/runtime-state.h"
@@ -225,8 +226,10 @@ void AggFnEvaluator::SetDstSlot(const AnyVal* src, const SlotDescriptor& dst_slo
           StringValue::FromStringVal(*reinterpret_cast<const StringVal*>(src));
       return;
     case TYPE_CHAR:
-      if (slot != reinterpret_cast<const StringVal*>(src)->ptr) {
-        agg_fn_ctx_->SetError("UDA should not set pointer of CHAR(N) intermediate");
+    case TYPE_FIXED_UDA_INTERMEDIATE:
+      if (UNLIKELY(slot != reinterpret_cast<const StringVal*>(src)->ptr)) {
+        agg_fn_ctx_->SetError(Substitute("UDA should not set pointer of $0 intermediate",
+              dst_slot_desc.type().DebugString()).c_str());
       }
       return;
     case TYPE_TIMESTAMP:
@@ -272,9 +275,10 @@ void AggFnEvaluator::Init(Tuple* dst) {
 
   const ColumnType& type = intermediate_type();
   const SlotDescriptor& slot_desc = intermediate_slot_desc();
-  if (type.type == TYPE_CHAR) {
-    // For type char, we want to initialize the staging_intermediate_val_ with
-    // a pointer into the tuple (the UDA should not be allocating it).
+  if (type.type == TYPE_CHAR || type.type == TYPE_FIXED_UDA_INTERMEDIATE) {
+    // The intermediate value is represented as a fixed-length buffer inline in the tuple.
+    // The aggregate function writes to this buffer directly. staging_intermediate_val_
+    // is a StringVal with a pointer to the slot and the length of the slot.
     void* slot = dst->GetSlot(slot_desc.tuple_offset());
     StringVal* sv = reinterpret_cast<StringVal*>(staging_intermediate_val_);
     sv->is_null = dst->IsNull(slot_desc.null_indicator_offset());
@@ -469,6 +473,20 @@ void AggFnEvaluator::SerializeOrFinalize(Tuple* src,
       TimestampVal v = reinterpret_cast<Fn>(fn)(
           agg_fn_ctx_.get(), staging_intermediate_val_);
       SetDstSlot(&v, dst_slot_desc, dst);
+      break;
+    }
+    case TYPE_CHAR:
+    case TYPE_FIXED_UDA_INTERMEDIATE: {
+      // Serialize() or Finalize() may rewrite the data in place, but must return the
+      // same pointer.
+      typedef StringVal(*Fn)(FunctionContext*, AnyVal*);
+      StringVal v = reinterpret_cast<Fn>(fn)(
+          agg_fn_ctx_.get(), staging_intermediate_val_);
+      if (UNLIKELY(dst->GetSlot(dst_slot_desc.tuple_offset()) != v.ptr)) {
+        agg_fn_ctx_->SetError(Substitute("UDA Serialize() and Finalize() must return "
+            "same pointer as input for $0 intermediate",
+            dst_slot_desc.type().DebugString()).c_str());
+      }
       break;
     }
     default:

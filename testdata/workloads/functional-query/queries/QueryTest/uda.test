@@ -140,3 +140,25 @@ group by
 ---- TYPES
 decimal,decimal,bigint,bigint,decimal
 ====
+---- QUERY
+# Test that char intermediate works as expected. The function char_intermediate_sum()
+# computes the sum with an intermediate int.
+select year, month, day, char_intermediate_sum(int_col), sum(int_col)
+from functional.alltypesagg
+group by year, month, day
+order by year, month, day
+---- RESULTS
+2010,1,1,499500,499500
+2010,1,2,499500,499500
+2010,1,3,499500,499500
+2010,1,4,499500,499500
+2010,1,5,499500,499500
+2010,1,6,499500,499500
+2010,1,7,499500,499500
+2010,1,8,499500,499500
+2010,1,9,499500,499500
+2010,1,10,499500,499500
+2010,1,NULL,495000,495000
+---- TYPES
+int,int,int,int,bigint
+====

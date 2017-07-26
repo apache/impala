@@ -1501,8 +1501,8 @@ Status PartitionedAggregationNode::QueryMaintenance(RuntimeState* state) {
 // The IR for ndv(timestamp_col), which uses the UDA interface, is:
 //
 // define void @UpdateSlot(%"class.impala::AggFnEvaluator"* %agg_fn_eval,
-//     <{ %"struct.impala::StringValue" }>* %agg_tuple,
-//     %"class.impala::TupleRow"* %row) #33 {
+//     <{ [1024 x i8] }>* %agg_tuple,
+//     %"class.impala::TupleRow"* %row) #39 {
 // entry:
 //   %dst_lowered_ptr = alloca { i64, i8* }
 //   %0 = alloca { i64, i64 }
@@ -1516,22 +1516,17 @@ Status PartitionedAggregationNode::QueryMaintenance(RuntimeState* state) {
 //   %input0 = call { i64, i64 } @GetSlotRef(
 //       %"class.impala::ScalarExprEvaluator"* %input_eval,
 //       %"class.impala::TupleRow"* %row)
-//   %dst_slot_ptr = getelementptr inbounds <{ %"struct.impala::StringValue" }>,
-//       <{ %"struct.impala::StringValue" }>* %agg_tuple, i32 0, i32 0
-//   %dst_val =
-//       load %"struct.impala::StringValue", %"struct.impala::StringValue"* %dst_slot_ptr
-//   %ptr = extractvalue %"struct.impala::StringValue" %dst_val, 0
-//   %dst = insertvalue { i64, i8* } zeroinitializer, i8* %ptr, 1
-//   %len = extractvalue %"struct.impala::StringValue" %dst_val, 1
-//   %2 = extractvalue { i64, i8* } %dst, 0
-//   %3 = zext i32 %len to i64
-//   %4 = shl i64 %3, 32
-//   %5 = and i64 %2, 4294967295
-//   %6 = or i64 %5, %4
-//   %dst1 = insertvalue { i64, i8* } %dst, i64 %6, 0
+//   %dst_slot_ptr = getelementptr inbounds <{ [1024 x i8] }>,
+//       <{ [1024 x i8] }>* %agg_tuple, i32 0, i32 0
+//   %2 = bitcast [1024 x i8]* %dst_slot_ptr to i8*
+//   %dst = insertvalue { i64, i8* } zeroinitializer, i8* %2, 1
+//   %3 = extractvalue { i64, i8* } %dst, 0
+//   %4 = and i64 %3, 4294967295
+//   %5 = or i64 %4, 4398046511104
+//   %dst1 = insertvalue { i64, i8* } %dst, i64 %5, 0
 //   %agg_fn_ctx = call %"class.impala_udf::FunctionContext"*
 //       @_ZNK6impala14AggFnEvaluator10agg_fn_ctxEv(
-//           %"class.impala::AggFnEvaluator"* %agg_fn_eval)
+//          %"class.impala::AggFnEvaluator"* %agg_fn_eval)
 //   store { i64, i64 } %input0, { i64, i64 }* %0
 //   %input_unlowered_ptr =
 //       bitcast { i64, i64 }* %0 to %"struct.impala_udf::TimestampVal"*
@@ -1543,13 +1538,6 @@ Status PartitionedAggregationNode::QueryMaintenance(RuntimeState* state) {
 //       %"struct.impala_udf::TimestampVal"* %input_unlowered_ptr,
 //       %"struct.impala_udf::StringVal"* %dst_unlowered_ptr)
 //   %anyval_result = load { i64, i8* }, { i64, i8* }* %dst_lowered_ptr
-//   %7 = extractvalue { i64, i8* } %anyval_result, 0
-//   %8 = ashr i64 %7, 32
-//   %9 = trunc i64 %8 to i32
-//   %10 = insertvalue %"struct.impala::StringValue" zeroinitializer, i32 %9, 1
-//   %11 = extractvalue { i64, i8* } %anyval_result, 1
-//   %12 = insertvalue %"struct.impala::StringValue" %10, i8* %11, 0
-//   store %"struct.impala::StringValue" %12, %"struct.impala::StringValue"* %dst_slot_ptr
 //   br label %ret
 //
 // ret:                                              ; preds = %entry
@@ -1622,36 +1610,36 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
   // 'dst_slot_ptr' points to the slot in the aggregate tuple to update.
   Value* dst_slot_ptr = builder.CreateStructGEP(
       NULL, agg_tuple_arg, slot_desc->llvm_field_idx(), "dst_slot_ptr");
-  Value* result = NULL;
-  Value* dst_value = builder.CreateLoad(dst_slot_ptr, "dst_val");
   // TODO: consider moving the following codegen logic to AggFn.
   if (agg_op == AggFn::COUNT) {
     src.CodegenBranchIfNull(&builder, ret_block);
-    if (agg_fn->is_merge()) {
-      result = builder.CreateAdd(dst_value, src.GetVal(), "count_sum");
-    } else {
-      result = builder.CreateAdd(
-          dst_value, codegen->GetIntConstant(TYPE_BIGINT, 1), "count_inc");
-    }
+    Value* dst_value = builder.CreateLoad(dst_slot_ptr, "dst_val");
+    Value* result = agg_fn->is_merge()
+        ? builder.CreateAdd(dst_value, src.GetVal(), "count_sum")
+        : builder.CreateAdd(
+            dst_value, codegen->GetIntConstant(TYPE_BIGINT, 1), "count_inc");
+    builder.CreateStore(result, dst_slot_ptr);
     DCHECK(!slot_desc->is_nullable());
   } else if ((agg_op == AggFn::MIN || agg_op == AggFn::MAX) && dst_is_numeric_or_bool) {
     bool is_min = agg_op == AggFn::MIN;
     src.CodegenBranchIfNull(&builder, ret_block);
     Function* min_max_fn = codegen->CodegenMinMax(slot_desc->type(), is_min);
+    Value* dst_value = builder.CreateLoad(dst_slot_ptr, "dst_val");
     Value* min_max_args[] = {dst_value, src.GetVal()};
-    result =
+    Value* result =
         builder.CreateCall(min_max_fn, min_max_args, is_min ? "min_value" : "max_value");
+    builder.CreateStore(result, dst_slot_ptr);
     // Dst may have been NULL, make sure to unset the NULL bit.
     DCHECK(slot_desc->is_nullable());
     slot_desc->CodegenSetNullIndicator(
         codegen, &builder, agg_tuple_arg, codegen->false_value());
   } else if (agg_op == AggFn::SUM && dst_is_int_or_float_or_bool) {
     src.CodegenBranchIfNull(&builder, ret_block);
-    if (dst_type.IsFloatingPointType()) {
-      result = builder.CreateFAdd(dst_value, src.GetVal());
-    } else {
-      result = builder.CreateAdd(dst_value, src.GetVal());
-    }
+    Value* dst_value = builder.CreateLoad(dst_slot_ptr, "dst_val");
+    Value* result = dst_type.IsFloatingPointType()
+        ? builder.CreateFAdd(dst_value, src.GetVal())
+        : builder.CreateAdd(dst_value, src.GetVal());
+    builder.CreateStore(result, dst_slot_ptr);
 
     if (slot_desc->is_nullable()) {
       slot_desc->CodegenSetNullIndicator(
@@ -1685,7 +1673,7 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
         dst.SetIsNull(slot_desc->CodegenIsNull(codegen, &builder, agg_tuple_arg));
       }
     }
-    dst.SetFromRawValue(dst_value);
+    dst.LoadFromNativePtr(dst_slot_ptr);
 
     // Get the FunctionContext object for the AggFnEvaluator.
     Function* get_agg_fn_ctx_fn =
@@ -1699,7 +1687,11 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
     CodegenAnyVal updated_dst_val;
     RETURN_IF_ERROR(CodegenCallUda(codegen, &builder, agg_fn, agg_fn_ctx_val,
         input_vals, dst, &updated_dst_val));
-    result = updated_dst_val.ToNativeValue();
+    // Copy the value back to the slot. In the FIXED_UDA_INTERMEDIATE case, the
+    // UDA function writes directly to the slot so there is nothing to copy.
+    if (dst_type.type != TYPE_FIXED_UDA_INTERMEDIATE) {
+      updated_dst_val.StoreToNativePtr(dst_slot_ptr);
+    }
 
     if (slot_desc->is_nullable() && !special_null_handling) {
       // Set NULL bit in the slot based on the return value.
@@ -1708,9 +1700,6 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
           codegen, &builder, agg_tuple_arg, result_is_null);
     }
   }
-
-  // TODO: Store to register in the loop and store once to memory at the end of the loop.
-  builder.CreateStore(result, dst_slot_ptr);
   builder.CreateBr(ret_block);
 
   builder.SetInsertPoint(ret_block);

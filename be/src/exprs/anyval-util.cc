@@ -81,6 +81,10 @@ FunctionContext::TypeDesc AnyValUtil::ColumnTypeToTypeDesc(const ColumnType& typ
       out.type = FunctionContext::TYPE_FIXED_BUFFER;
       out.len = type.len;
       break;
+    case TYPE_FIXED_UDA_INTERMEDIATE:
+      out.type = FunctionContext::TYPE_FIXED_UDA_INTERMEDIATE;
+      out.len = type.len;
+      break;
     case TYPE_DECIMAL:
       out.type = FunctionContext::TYPE_DECIMAL;
       out.precision = type.precision;
@@ -123,6 +127,8 @@ ColumnType AnyValUtil::TypeDescToColumnType(const FunctionContext::TypeDesc& typ
       return ColumnType::CreateDecimalType(type.precision, type.scale);
     case FunctionContext::TYPE_FIXED_BUFFER:
       return ColumnType::CreateCharType(type.len);
+    case FunctionContext::TYPE_FIXED_UDA_INTERMEDIATE:
+      return ColumnType::CreateFixedUdaIntermediateType(type.len);
     case FunctionContext::TYPE_VARCHAR:
       return ColumnType::CreateVarcharType(type.len);
     default:

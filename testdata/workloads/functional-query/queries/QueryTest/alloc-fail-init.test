@@ -1,11 +1,6 @@
 ====
 ---- QUERY
 # TODO: IMPALA-3350: Add 'group by' to these tests to exercise different code paths.
-select ndv(string_col) from functional.alltypes
----- CATCH
-FunctionContext::Allocate() failed to allocate 1024 bytes.
-====
----- QUERY
 select min(string_col) from functional.alltypes
 ---- CATCH
 FunctionContext::Allocate() failed to allocate 1 bytes.
@@ -16,44 +11,14 @@ select max(string_col) from functional.alltypes
 FunctionContext::Allocate() failed to allocate 1 bytes.
 ====
 ---- QUERY
-select avg(d1) from functional.decimal_tbl
----- CATCH
-FunctionContext::Allocate() failed to allocate 48 bytes.
-====
----- QUERY
-select avg(double_col) from functional.alltypes
----- CATCH
-FunctionContext::Allocate() failed to allocate 16 bytes.
-====
----- QUERY
-select avg(timestamp_col) from functional.alltypes
----- CATCH
-FunctionContext::Allocate() failed to allocate 16 bytes.
-====
----- QUERY
 select sample(timestamp_col) from functional.alltypes
 ---- CATCH
 FunctionContext::Allocate() failed to allocate 248 bytes.
 ====
 ---- QUERY
-select distinctpc(int_col) from functional.alltypes
----- CATCH
-FunctionContext::Allocate() failed to allocate 256 bytes.
-====
----- QUERY
-select distinctpcsa(string_col) from functional.alltypes
----- CATCH
-FunctionContext::Allocate() failed to allocate 256 bytes.
-====
----- QUERY
 select group_concat(string_col) from functional.alltypes
 ---- CATCH
 FunctionContext::Allocate() failed to allocate 4 bytes.
-====
----- QUERY
-select rank() over (partition by month order by year) from functional.alltypes
----- CATCH
-FunctionContext::Allocate() failed to allocate 16 bytes.
 ====
 ---- QUERY
 select extract(year from timestamp_col) from functional.alltypes limit 10

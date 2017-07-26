@@ -31,7 +31,6 @@ import org.apache.impala.thrift.TPrimitiveType;
 import org.apache.impala.thrift.TScalarType;
 import org.apache.impala.thrift.TStructField;
 import org.apache.impala.thrift.TTypeNode;
-import org.apache.impala.thrift.TTypeNodeType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -69,6 +68,8 @@ public abstract class Type {
   public static final ScalarType DEFAULT_VARCHAR = ScalarType.createVarcharType(-1);
   public static final ScalarType VARCHAR = ScalarType.createVarcharType(-1);
   public static final ScalarType CHAR = ScalarType.createCharType(-1);
+  public static final ScalarType FIXED_UDA_INTERMEDIATE =
+      ScalarType.createFixedUdaIntermediateType(-1);
 
   private static ArrayList<ScalarType> integerTypes;
   private static ArrayList<ScalarType> numericTypes;
@@ -457,6 +458,7 @@ public abstract class Type {
         return 29;
       case CHAR:
       case VARCHAR:
+      case FIXED_UDA_INTERMEDIATE:
         return t.getLength();
       default:
         return null;
@@ -577,6 +579,7 @@ public abstract class Type {
       case VARCHAR: return java.sql.Types.VARCHAR;
       case BINARY: return java.sql.Types.BINARY;
       case DECIMAL: return java.sql.Types.DECIMAL;
+      case FIXED_UDA_INTERMEDIATE: return java.sql.Types.BINARY;
       default:
         Preconditions.checkArgument(false, "Invalid primitive type " +
             t.getPrimitiveType().name());
@@ -620,6 +623,14 @@ public abstract class Type {
       // BINARY is not supported.
       compatibilityMatrix[BINARY.ordinal()][i] = PrimitiveType.INVALID_TYPE;
       compatibilityMatrix[i][BINARY.ordinal()] = PrimitiveType.INVALID_TYPE;
+
+      // FIXED_UDA_INTERMEDIATE cannot be cast to/from another type
+      if (i != FIXED_UDA_INTERMEDIATE.ordinal()) {
+        compatibilityMatrix[FIXED_UDA_INTERMEDIATE.ordinal()][i] =
+            PrimitiveType.INVALID_TYPE;
+        compatibilityMatrix[i][FIXED_UDA_INTERMEDIATE.ordinal()] =
+            PrimitiveType.INVALID_TYPE;
+      }
     }
 
     compatibilityMatrix[BOOLEAN.ordinal()][TINYINT.ordinal()] = PrimitiveType.TINYINT;

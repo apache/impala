@@ -251,7 +251,11 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
     ptr = builder.CreateLoad(ptr_ptr, "ptr");
     Value* len_ptr = builder.CreateStructGEP(NULL, val_ptr, 1, "len_ptr");
     len = builder.CreateLoad(len_ptr, "len");
-  } else if (type() == TYPE_TIMESTAMP) {
+  } else if (type_.type == TYPE_FIXED_UDA_INTERMEDIATE) {
+    // ptr and len are the slot and its fixed length.
+    ptr = builder.CreateBitCast(val_ptr, codegen->ptr_type());
+    len = codegen->GetIntConstant(TYPE_INT, type_.len);
+  } else if (type_.type == TYPE_TIMESTAMP) {
     Value* time_of_day_ptr = builder.CreateStructGEP(NULL, val_ptr, 0, "time_of_day_ptr");
     // Cast boost::posix_time::time_duration to i64
     Value* time_of_day_cast =
@@ -280,7 +284,7 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   // *Val. The optimizer does a better job when there is a phi node for each value, rather
   // than having get_slot_block generate an AnyVal and having a single phi node over that.
   // TODO: revisit this code, can possibly be simplified
-  if (type().IsVarLenStringType()) {
+  if (type_.IsVarLenStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE) {
     DCHECK(ptr != NULL);
     DCHECK(len != NULL);
     PHINode* ptr_phi = builder.CreatePHI(ptr->getType(), 2, "ptr_phi");
@@ -309,7 +313,7 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
     result.SetPtr(ptr_phi);
     result.SetLen(len_phi);
     builder.CreateRet(result.GetLoweredValue());
-  } else if (type() == TYPE_TIMESTAMP) {
+  } else if (type_.type == TYPE_TIMESTAMP) {
     DCHECK(time_of_day != NULL);
     DCHECK(date != NULL);
     PHINode* time_of_day_phi =
@@ -423,11 +427,11 @@ DoubleVal SlotRef::GetDoubleVal(
 
 StringVal SlotRef::GetStringVal(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
-  DCHECK(type_.IsStringType());
+  DCHECK(type_.IsStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return StringVal::null();
   StringVal result;
-  if (type_.type == TYPE_CHAR) {
+  if (type_.type == TYPE_CHAR || type_.type == TYPE_FIXED_UDA_INTERMEDIATE) {
     result.ptr = reinterpret_cast<uint8_t*>(t->GetSlot(slot_offset_));
     result.len = type_.len;
   } else {

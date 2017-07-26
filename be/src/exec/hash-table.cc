@@ -818,7 +818,7 @@ Status HashTableCtx::CodegenEvalRow(LlvmCodeGen* codegen, bool build, Function**
 
     // Not null block
     builder.SetInsertPoint(not_null_block);
-    result.ToNativePtr(llvm_loc);
+    result.StoreToNativePtr(llvm_loc);
     builder.CreateBr(continue_block);
 
     // Continue block

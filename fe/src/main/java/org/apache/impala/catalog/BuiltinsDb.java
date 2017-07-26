@@ -36,6 +36,26 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 
 public class BuiltinsDb extends Db {
+  // Size in bytes of AvgState used for integer, floating point, and timestamp avg().
+  private static final int AVG_INTERMEDIATE_SIZE = 16;
+
+  // Size in bytes of DecimalAvgState used for decimal avg().
+  private static final int DECIMAL_AVG_INTERMEDIATE_SIZE = 32;
+
+  // Size in bytes of KnuthVarianceState used for stddev(), variance(), etc.
+  private static final int STDDEV_INTERMEDIATE_SIZE = 24;
+
+  // Size in bytes of probabilistic counting bitmap, used for distinctpc(), etc.
+  // Must match PC_INTERMEDIATE_BYTES in aggregate-functions-ir.cc.
+  private static final int PC_INTERMEDIATE_SIZE = 256;
+
+  // Size in bytes of Hyperloglog intermediate value used for ndv().
+  // Must match HLL_LEN in aggregate-functions-ir.cc.
+  private static final int HLL_INTERMEDIATE_SIZE = 1024;
+
+  // Size in bytes of RankState used for rank() and dense_rank().
+  private static final int RANK_INTERMEDIATE_SIZE = 16;
+
   public BuiltinsDb(String name, Catalog catalog) {
     super(name, catalog, createMetastoreDb(name));
     setIsSystemDb(true);
@@ -748,50 +768,54 @@ public class BuiltinsDb extends Db {
           false, false, true));
 
       // NDV
-      // TODO: this needs to switch to CHAR(64) as the intermediate type
+      Type hllIntermediateType =
+          ScalarType.createFixedUdaIntermediateType(HLL_INTERMEDIATE_SIZE);
       db.addBuiltin(AggregateFunction.createBuiltin(db, "ndv",
-          Lists.newArrayList(t), Type.BIGINT, Type.STRING,
+          Lists.newArrayList(t), Type.BIGINT, hllIntermediateType,
           prefix + "7HllInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
           prefix + HLL_UPDATE_SYMBOL.get(t),
           prefix + "8HllMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-          stringValSerializeOrFinalize,
+          null,
           prefix + "11HllFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
           true, false, true));
 
       db.addBuiltin(AggregateFunction.createBuiltin(db, "ndv_no_finalize",
-          Lists.newArrayList(t), Type.STRING, Type.STRING,
+          Lists.newArrayList(t), Type.STRING, hllIntermediateType,
           prefix + "7HllInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
           prefix + HLL_UPDATE_SYMBOL.get(t),
           prefix + "8HllMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-          stringValSerializeOrFinalize,
+          null,
           "_Z20IncrementNdvFinalizePN10impala_udf15FunctionContextERKNS_9StringValE",
           true, false, true));
 
+
+      Type pcIntermediateType =
+          ScalarType.createFixedUdaIntermediateType(PC_INTERMEDIATE_SIZE);
       // distinctpc
-      // TODO: this needs to switch to CHAR(64) as the intermediate type
       db.addBuiltin(AggregateFunction.createBuiltin(db, "distinctpc",
-          Lists.newArrayList(t), Type.BIGINT, Type.STRING,
+          Lists.newArrayList(t), Type.BIGINT, pcIntermediateType,
           prefix + "6PcInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
           prefix + PC_UPDATE_SYMBOL.get(t),
           prefix + "7PcMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-          stringValSerializeOrFinalize,
+          null,
           prefix + "10PcFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
           false, false, true));
 
       // distinctpcsa
-      // TODO: this needs to switch to CHAR(64) as the intermediate type
       db.addBuiltin(AggregateFunction.createBuiltin(db, "distinctpcsa",
-          Lists.newArrayList(t), Type.BIGINT, Type.STRING,
+          Lists.newArrayList(t), Type.BIGINT, pcIntermediateType,
           prefix + "6PcInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
           prefix + PCSA_UPDATE_SYMBOL.get(t),
           prefix + "7PcMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-          stringValSerializeOrFinalize,
+          null,
           prefix + "12PcsaFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
           false, false, true));
 
       if (STDDEV_UPDATE_SYMBOL.containsKey(t)) {
+        Type stddevIntermediateType =
+            ScalarType.createFixedUdaIntermediateType(STDDEV_INTERMEDIATE_SIZE);
         db.addBuiltin(AggregateFunction.createBuiltin(db, "stddev",
-            Lists.newArrayList(t), Type.DOUBLE, ScalarType.createCharType(24),
+            Lists.newArrayList(t), Type.DOUBLE, stddevIntermediateType,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
             prefix + STDDEV_UPDATE_SYMBOL.get(t),
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -799,7 +823,7 @@ public class BuiltinsDb extends Db {
             prefix + "19KnuthStddevFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
             false, false, false));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "stddev_samp",
-            Lists.newArrayList(t), Type.DOUBLE, ScalarType.createCharType(24),
+            Lists.newArrayList(t), Type.DOUBLE, stddevIntermediateType,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
             prefix + STDDEV_UPDATE_SYMBOL.get(t),
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -807,7 +831,7 @@ public class BuiltinsDb extends Db {
             prefix + "19KnuthStddevFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
             false, false, false));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "stddev_pop",
-            Lists.newArrayList(t), Type.DOUBLE, ScalarType.createCharType(24),
+            Lists.newArrayList(t), Type.DOUBLE, stddevIntermediateType,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
             prefix + STDDEV_UPDATE_SYMBOL.get(t),
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -815,7 +839,7 @@ public class BuiltinsDb extends Db {
             prefix + "22KnuthStddevPopFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
             false, false, false));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "variance",
-            Lists.newArrayList(t), Type.DOUBLE, ScalarType.createCharType(24),
+            Lists.newArrayList(t), Type.DOUBLE, stddevIntermediateType,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
             prefix + STDDEV_UPDATE_SYMBOL.get(t),
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -823,7 +847,7 @@ public class BuiltinsDb extends Db {
             prefix + "16KnuthVarFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
             false, false, false));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "variance_samp",
-            Lists.newArrayList(t), Type.DOUBLE, ScalarType.createCharType(24),
+            Lists.newArrayList(t), Type.DOUBLE, stddevIntermediateType,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
             prefix + STDDEV_UPDATE_SYMBOL.get(t),
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -831,7 +855,7 @@ public class BuiltinsDb extends Db {
             prefix + "16KnuthVarFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
             false, false, false));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "var_samp",
-            Lists.newArrayList(t), Type.DOUBLE, ScalarType.createCharType(24),
+            Lists.newArrayList(t), Type.DOUBLE, stddevIntermediateType,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
             prefix + STDDEV_UPDATE_SYMBOL.get(t),
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -839,7 +863,7 @@ public class BuiltinsDb extends Db {
             prefix + "16KnuthVarFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
             false, false, false));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "variance_pop",
-            Lists.newArrayList(t), Type.DOUBLE, ScalarType.createCharType(24),
+            Lists.newArrayList(t), Type.DOUBLE, stddevIntermediateType,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
             prefix + STDDEV_UPDATE_SYMBOL.get(t),
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -847,7 +871,7 @@ public class BuiltinsDb extends Db {
             prefix + "19KnuthVarPopFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
             false, false, false));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "var_pop",
-            Lists.newArrayList(t), Type.DOUBLE, ScalarType.createCharType(24),
+            Lists.newArrayList(t), Type.DOUBLE, stddevIntermediateType,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
             prefix + STDDEV_UPDATE_SYMBOL.get(t),
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -891,44 +915,47 @@ public class BuiltinsDb extends Db {
         null, false, true, true));
 
     // Avg
-    // TODO: switch to CHAR(sizeof(AvgIntermediateType) when that becomes available
+    Type avgIntermediateType =
+        ScalarType.createFixedUdaIntermediateType(AVG_INTERMEDIATE_SIZE);
+    Type decimalAvgIntermediateType =
+        ScalarType.createFixedUdaIntermediateType(DECIMAL_AVG_INTERMEDIATE_SIZE);
     db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",
-        Lists.<Type>newArrayList(Type.BIGINT), Type.DOUBLE, Type.STRING,
+        Lists.<Type>newArrayList(Type.BIGINT), Type.DOUBLE, avgIntermediateType,
         prefix + "7AvgInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
         prefix + "9AvgUpdateIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE",
         prefix + "8AvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-        stringValSerializeOrFinalize,
+        null,
         prefix + "11AvgGetValueEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         prefix + "9AvgRemoveIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE",
         prefix + "11AvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         false, true, false));
     db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",
-        Lists.<Type>newArrayList(Type.DOUBLE), Type.DOUBLE, Type.STRING,
+        Lists.<Type>newArrayList(Type.DOUBLE), Type.DOUBLE, avgIntermediateType,
         prefix + "7AvgInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
         prefix + "9AvgUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE",
         prefix + "8AvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-        stringValSerializeOrFinalize,
+        null,
         prefix + "11AvgGetValueEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         prefix + "9AvgRemoveIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE",
         prefix + "11AvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         false, true, false));
     db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",
-        Lists.<Type>newArrayList(Type.DECIMAL), Type.DECIMAL, Type.STRING,
+        Lists.<Type>newArrayList(Type.DECIMAL), Type.DECIMAL, decimalAvgIntermediateType,
         prefix + "14DecimalAvgInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
         prefix + "16DecimalAvgUpdateEPN10impala_udf15FunctionContextERKNS1_10DecimalValEPNS1_9StringValE",
         prefix + "15DecimalAvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-        stringValSerializeOrFinalize,
+        null,
         prefix + "18DecimalAvgGetValueEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         prefix + "16DecimalAvgRemoveEPN10impala_udf15FunctionContextERKNS1_10DecimalValEPNS1_9StringValE",
         prefix + "18DecimalAvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         false, true, false));
     // Avg(Timestamp)
     db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",
-        Lists.<Type>newArrayList(Type.TIMESTAMP), Type.TIMESTAMP, Type.STRING,
+        Lists.<Type>newArrayList(Type.TIMESTAMP), Type.TIMESTAMP, avgIntermediateType,
         prefix + "7AvgInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
         prefix + "18TimestampAvgUpdateEPN10impala_udf15FunctionContextERKNS1_12TimestampValEPNS1_9StringValE",
         prefix + "8AvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-        stringValSerializeOrFinalize,
+        null,
         prefix + "20TimestampAvgGetValueEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         prefix + "18TimestampAvgRemoveEPN10impala_udf15FunctionContextERKNS1_12TimestampValEPNS1_9StringValE",
         prefix + "20TimestampAvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
@@ -960,8 +987,10 @@ public class BuiltinsDb extends Db {
 
     // analytic functions
     // Rank
+    Type rankIntermediateType =
+        ScalarType.createFixedUdaIntermediateType(RANK_INTERMEDIATE_SIZE);
     db.addBuiltin(AggregateFunction.createAnalyticBuiltin(db, "rank",
-        Lists.<Type>newArrayList(), Type.BIGINT, Type.STRING,
+        Lists.<Type>newArrayList(), Type.BIGINT, rankIntermediateType,
         prefix + "8RankInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
         prefix + "10RankUpdateEPN10impala_udf15FunctionContextEPNS1_9StringValE",
         null,
@@ -969,7 +998,7 @@ public class BuiltinsDb extends Db {
         prefix + "12RankFinalizeEPN10impala_udf15FunctionContextERNS1_9StringValE"));
     // Dense rank
     db.addBuiltin(AggregateFunction.createAnalyticBuiltin(db, "dense_rank",
-        Lists.<Type>newArrayList(), Type.BIGINT, Type.STRING,
+        Lists.<Type>newArrayList(), Type.BIGINT, rankIntermediateType,
         prefix + "8RankInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
         prefix + "15DenseRankUpdateEPN10impala_udf15FunctionContextEPNS1_9StringValE",
         null,

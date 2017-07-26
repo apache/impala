@@ -269,7 +269,11 @@ struct AvgState {
 };
 
 void AggregateFunctions::AvgInit(FunctionContext* ctx, StringVal* dst) {
-  AllocBuffer(ctx, dst, sizeof(AvgState));
+  // avg() uses a preallocated FIXED_UDA_INTERMEDIATE intermediate value.
+  DCHECK_EQ(dst->len, sizeof(AvgState));
+  AvgState* avg = reinterpret_cast<AvgState*>(dst->ptr);
+  avg->sum = 0.0;
+  avg->count = 0;
 }
 
 template <typename T>
@@ -314,7 +318,6 @@ DoubleVal AggregateFunctions::AvgGetValue(FunctionContext* ctx, const StringVal&
 DoubleVal AggregateFunctions::AvgFinalize(FunctionContext* ctx, const StringVal& src) {
   if (UNLIKELY(src.is_null)) return DoubleVal::null();
   DoubleVal result = AvgGetValue(ctx, src);
-  ctx->Free(src.ptr);
   return result;
 }
 
@@ -366,17 +369,20 @@ TimestampVal AggregateFunctions::TimestampAvgFinalize(FunctionContext* ctx,
     const StringVal& src) {
   if (UNLIKELY(src.is_null)) return TimestampVal::null();
   TimestampVal result = TimestampAvgGetValue(ctx, src);
-  ctx->Free(src.ptr);
   return result;
 }
 
 struct DecimalAvgState {
-  DecimalVal sum; // only using val16
+  __int128_t sum_val16; // Always uses max precision decimal.
   int64_t count;
 };
 
 void AggregateFunctions::DecimalAvgInit(FunctionContext* ctx, StringVal* dst) {
-  AllocBuffer(ctx, dst, sizeof(DecimalAvgState));
+  // avg() uses a preallocated FIXED_UDA_INTERMEDIATE intermediate value.
+  DCHECK_EQ(dst->len, sizeof(DecimalAvgState));
+  DecimalAvgState* avg = reinterpret_cast<DecimalAvgState*>(dst->ptr);
+  avg->sum_val16 = 0;
+  avg->count = 0;
 }
 
 void AggregateFunctions::DecimalAvgUpdate(FunctionContext* ctx, const DecimalVal& src,
@@ -402,13 +408,13 @@ IR_ALWAYS_INLINE void AggregateFunctions::DecimalAvgAddOrRemove(FunctionContext*
   int m = remove ? -1 : 1;
   switch (ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_SIZE, 0)) {
     case 4:
-      avg->sum.val16 += m * src.val4;
+      avg->sum_val16 += m * src.val4;
       break;
     case 8:
-      avg->sum.val16 += m * src.val8;
+      avg->sum_val16 += m * src.val8;
       break;
     case 16:
-      avg->sum.val16 += m * src.val16;
+      avg->sum_val16 += m * src.val16;
       break;
     default:
       DCHECK(false) << "Invalid byte size";
@@ -428,7 +434,7 @@ void AggregateFunctions::DecimalAvgMerge(FunctionContext* ctx,
   DCHECK(dst->ptr != NULL);
   DCHECK_EQ(sizeof(DecimalAvgState), dst->len);
   DecimalAvgState* dst_struct = reinterpret_cast<DecimalAvgState*>(dst->ptr);
-  dst_struct->sum.val16 += src_struct->sum.val16;
+  dst_struct->sum_val16 += src_struct->sum_val16;
   dst_struct->count += src_struct->count;
 }
 
@@ -436,7 +442,7 @@ DecimalVal AggregateFunctions::DecimalAvgGetValue(FunctionContext* ctx,
     const StringVal& src) {
   DecimalAvgState* val_struct = reinterpret_cast<DecimalAvgState*>(src.ptr);
   if (val_struct->count == 0) return DecimalVal::null();
-  Decimal16Value sum(val_struct->sum.val16);
+  Decimal16Value sum(val_struct->sum_val16);
   Decimal16Value count(val_struct->count);
 
   int output_precision =
@@ -461,7 +467,6 @@ DecimalVal AggregateFunctions::DecimalAvgFinalize(FunctionContext* ctx,
     const StringVal& src) {
   if (UNLIKELY(src.is_null)) return DecimalVal::null();
   DecimalVal result = DecimalAvgGetValue(ctx, src);
-  ctx->Free(src.ptr);
   return result;
 }
 
@@ -733,26 +738,28 @@ const static int PC_BITMAP_LENGTH = 32; // the length of each bit map
 const static float PC_THETA = 0.77351f; // the magic number to compute the final result
 const static float PC_K = -1.75f; // the magic correction for low cardinalities
 
+// Size of the distinct estimate bit map - Probabilistic Counting Algorithms for Data
+// Base Applications (Flajolet and Martin)
+//
+// The bitmap is a 64bit(1st index) x 32bit(2nd index) matrix.
+// So, the string length of 256 byte is enough.
+// The layout is:
+//   row  1: 8bit 8bit 8bit 8bit
+//   row  2: 8bit 8bit 8bit 8bit
+//   ...     ..
+//   ...     ..
+//   row 64: 8bit 8bit 8bit 8bit
+//
+// Using 32bit length, we can count up to 10^8. This will not be enough for Fact table
+// primary key, but once we approach the limit, we could interpret the result as
+// "every row is distinct".
+const static int PC_INTERMEDIATE_BYTES = NUM_PC_BITMAPS * PC_BITMAP_LENGTH / 8;
+
 void AggregateFunctions::PcInit(FunctionContext* c, StringVal* dst) {
-  // Initialize the distinct estimate bit map - Probabilistic Counting Algorithms for Data
-  // Base Applications (Flajolet and Martin)
-  //
-  // The bitmap is a 64bit(1st index) x 32bit(2nd index) matrix.
-  // So, the string length of 256 byte is enough.
-  // The layout is:
-  //   row  1: 8bit 8bit 8bit 8bit
-  //   row  2: 8bit 8bit 8bit 8bit
-  //   ...     ..
-  //   ...     ..
-  //   row 64: 8bit 8bit 8bit 8bit
-  //
-  // Using 32bit length, we can count up to 10^8. This will not be enough for Fact table
-  // primary key, but once we approach the limit, we could interpret the result as
-  // "every row is distinct".
-  //
-  // We use "string" type for DISTINCT_PC function so that we can use the string
-  // slot to hold the bitmaps.
-  AllocBuffer(c, dst, NUM_PC_BITMAPS * PC_BITMAP_LENGTH / 8);
+  // The distinctpc*() functions use a preallocated FIXED_UDA_INTERMEDIATE intermediate
+  // value.
+  DCHECK_EQ(dst->len, PC_INTERMEDIATE_BYTES);
+  memset(dst->ptr, 0, PC_INTERMEDIATE_BYTES);
 }
 
 static inline void SetDistinctEstimateBit(uint8_t* bitmap,
@@ -772,6 +779,7 @@ static inline bool GetDistinctEstimateBit(uint8_t* bitmap,
 
 template<typename T>
 void AggregateFunctions::PcUpdate(FunctionContext* c, const T& input, StringVal* dst) {
+  DCHECK_EQ(dst->len, PC_INTERMEDIATE_BYTES);
   if (input.is_null) return;
   // Core of the algorithm. This is a direct translation of the code in the paper.
   // Please see the paper for details. For simple averaging, we need to compute hash
@@ -787,6 +795,7 @@ void AggregateFunctions::PcUpdate(FunctionContext* c, const T& input, StringVal*
 
 template<typename T>
 void AggregateFunctions::PcsaUpdate(FunctionContext* c, const T& input, StringVal* dst) {
+  DCHECK_EQ(dst->len, PC_INTERMEDIATE_BYTES);
   if (input.is_null) return;
 
   // Core of the algorithm. This is a direct translation of the code in the paper.
@@ -822,12 +831,13 @@ void AggregateFunctions::PcMerge(FunctionContext* c,
     const StringVal& src, StringVal* dst) {
   DCHECK(!src.is_null);
   DCHECK(!dst->is_null);
-  DCHECK_EQ(src.len, NUM_PC_BITMAPS * PC_BITMAP_LENGTH / 8);
+  DCHECK_EQ(src.len, PC_INTERMEDIATE_BYTES);
+  DCHECK_EQ(dst->len, PC_INTERMEDIATE_BYTES);
 
   // Merge the bits
   // I think _mm_or_ps can do it, but perf doesn't really matter here. We call this only
   // once group per node.
-  for (int i = 0; i < NUM_PC_BITMAPS * PC_BITMAP_LENGTH / 8; ++i) {
+  for (int i = 0; i < PC_INTERMEDIATE_BYTES; ++i) {
     *(dst->ptr + i) |= *(src.ptr + i);
   }
 
@@ -837,9 +847,9 @@ void AggregateFunctions::PcMerge(FunctionContext* c,
            << DistinctEstimateBitMapToString(dst->ptr);
 }
 
-static double DistinceEstimateFinalize(const StringVal& src) {
+static double DistinctEstimateFinalize(const StringVal& src) {
   DCHECK(!src.is_null);
-  DCHECK_EQ(src.len, NUM_PC_BITMAPS * PC_BITMAP_LENGTH / 8);
+  DCHECK_EQ(src.len, PC_INTERMEDIATE_BYTES);
   VLOG_ROW << "FinalizeEstimateSlot Bit map:\n"
            << DistinctEstimateBitMapToString(src.ptr);
 
@@ -847,7 +857,7 @@ static double DistinceEstimateFinalize(const StringVal& src) {
   // distinct rows. We're overwriting the result in the same string buffer we've
   // allocated.
   bool is_empty = true;
-  for (int i = 0; i < NUM_PC_BITMAPS * PC_BITMAP_LENGTH / 8; ++i) {
+  for (int i = 0; i < PC_INTERMEDIATE_BYTES; ++i) {
     if (src.ptr[i] != 0) {
       is_empty = false;
       break;
@@ -884,16 +894,14 @@ static double DistinceEstimateFinalize(const StringVal& src) {
 
 BigIntVal AggregateFunctions::PcFinalize(FunctionContext* c, const StringVal& src) {
   if (UNLIKELY(src.is_null)) return BigIntVal::null();
-  double estimate = DistinceEstimateFinalize(src);
-  c->Free(src.ptr);
+  double estimate = DistinctEstimateFinalize(src);
   return static_cast<int64_t>(estimate);
 }
 
 BigIntVal AggregateFunctions::PcsaFinalize(FunctionContext* c, const StringVal& src) {
   if (UNLIKELY(src.is_null)) return BigIntVal::null();
   // When using stochastic averaging, the result has to be multiplied by NUM_PC_BITMAPS.
-  double estimate = DistinceEstimateFinalize(src) * NUM_PC_BITMAPS;
-  c->Free(src.ptr);
+  double estimate = DistinctEstimateFinalize(src) * NUM_PC_BITMAPS;
   return static_cast<int64_t>(estimate);
 }
 
@@ -1333,7 +1341,9 @@ T AggregateFunctions::AppxMedianFinalize(FunctionContext* ctx, const StringVal& 
 }
 
 void AggregateFunctions::HllInit(FunctionContext* ctx, StringVal* dst) {
-  AllocBuffer(ctx, dst, HLL_LEN);
+  // The HLL functions use a preallocated FIXED_UDA_INTERMEDIATE intermediate value.
+  DCHECK_EQ(dst->len, HLL_LEN);
+  memset(dst->ptr, 0, HLL_LEN);
 }
 
 template <typename T>
@@ -1424,7 +1434,6 @@ uint64_t AggregateFunctions::HllFinalEstimate(const uint8_t* buckets,
 BigIntVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal& src) {
   if (UNLIKELY(src.is_null)) return BigIntVal::null();
   uint64_t estimate = HllFinalEstimate(src.ptr, src.len);
-  ctx->Free(src.ptr);
   return estimate;
 }
 
@@ -1447,7 +1456,8 @@ static double ComputeKnuthVariance(const KnuthVarianceState& state, bool pop) {
 }
 
 void AggregateFunctions::KnuthVarInit(FunctionContext* ctx, StringVal* dst) {
-  dst->is_null = false;
+  // The Knuth variance functions use a preallocated FIXED_UDA_INTERMEDIATE intermediate
+  // value.
   DCHECK_EQ(dst->len, sizeof(KnuthVarianceState));
   memset(dst->ptr, 0, dst->len);
 }
@@ -1529,11 +1539,8 @@ struct RankState {
 };
 
 void AggregateFunctions::RankInit(FunctionContext* ctx, StringVal* dst) {
-  AllocBuffer(ctx, dst, sizeof(RankState));
-  if (UNLIKELY(dst->is_null)) {
-    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
-    return;
-  }
+  // The rank functions use a preallocated FIXED_UDA_INTERMEDIATE intermediate value.
+  DCHECK_EQ(dst->len, sizeof(RankState));
   *reinterpret_cast<RankState*>(dst->ptr) = RankState();
 }
 
@@ -1581,7 +1588,6 @@ BigIntVal AggregateFunctions::RankFinalize(FunctionContext* ctx,
   DCHECK_EQ(src_val.len, sizeof(RankState));
   RankState* state = reinterpret_cast<RankState*>(src_val.ptr);
   int64_t result = state->rank;
-  ctx->Free(src_val.ptr);
   return BigIntVal(result);
 }
 

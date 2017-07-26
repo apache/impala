@@ -141,9 +141,9 @@ public class FrontendTest extends FrontendTestBase {
     assertEquals(18, resp.schema.columns.size());
     assertEquals(18, resp.rows.get(0).colVals.size());
     // All primitives types, except INVALID_TYPE, DATE, DATETIME, DECIMAL, CHAR,
-    // and VARCHAR should be returned.
-    // Therefore #supported types =  PrimitiveType.values().length - 6.
-    assertEquals(PrimitiveType.values().length - 6, resp.rows.size());
+    // VARCHAR, and FIXED_UDA_INTERMEDIATE should be returned.
+    // Therefore #supported types =  PrimitiveType.values().length - 7.
+    assertEquals(PrimitiveType.values().length - 7, resp.rows.size());
   }
 
   @Test
