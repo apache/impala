@@ -169,7 +169,6 @@ class HdfsParquetTableWriter::BaseColumnWriter {
     data_encoding_stats_.clear();
     // Repetition/definition level encodings are constant. Incorporate them here.
     column_encodings_.insert(Encoding::RLE);
-    column_encodings_.insert(Encoding::BIT_PACKED);
   }
 
   // Close this writer. This is only called after Flush() and no more rows will
@@ -738,7 +737,7 @@ void HdfsParquetTableWriter::BaseColumnWriter::NewPage() {
     // relies on these specific values for the definition/repetition level
     // encodings.
     header.definition_level_encoding = Encoding::RLE;
-    header.repetition_level_encoding = Encoding::BIT_PACKED;
+    header.repetition_level_encoding = Encoding::RLE;
     current_page_->header.__set_data_page_header(header);
   }
   current_encoding_ = next_page_encoding_;
