@@ -230,6 +230,9 @@ void TestTimestampTokens(vector<TimestampToken>* toks, int year, int month,
 }
 
 TEST(TimestampTest, Basic) {
+  // Fix current time to determine the behavior parsing 2-digit year format
+  TimestampValue now(date(2017, 7, 28), time_duration(16, 14, 24));
+
   char s1[] = "2012-01-20 01:10:01";
   char s2[] = "1990-10-20 10:10:10.123456789  ";
   char s3[] = "  1990-10-20 10:10:10.123456789";
@@ -472,6 +475,14 @@ TEST(TimestampTest, Basic) {
     // Test short year token
     (TimestampTC("y-MM-dd", "2013-11-13", false, true, false, 2013, 11, 13))
     (TimestampTC("y-MM-dd", "13-11-13", false, true, false, 2013, 11, 13))
+    // Test 2-digit year format
+    (TimestampTC("yy-MM-dd", "37-07-28", false, true, false, 2037, 7, 28))
+    (TimestampTC("yy-MM-dd", "37-07-29", false, true, false, 1937, 7, 29))
+    // Test 1-digit year format with time to show the exact boundary
+    (TimestampTC("y-MM-dd HH:mm:ss", "37-07-28 16:14:23", false, true, false,
+                 2037, 7, 28, 16, 14, 23))
+    (TimestampTC("y-MM-dd HH:mm:ss", "37-07-28 16:14:24", false, true, false,
+                 1937, 7, 28, 16, 14, 24))
     // Test short month token
     (TimestampTC("yyyy-M-dd", "2013-11-13", false, true, false, 2013, 11, 13))
     (TimestampTC("yyyy-M-dd", "2013-1-13", false, true, false, 2013, 1, 13))
@@ -501,6 +512,7 @@ TEST(TimestampTest, Basic) {
   for (int i = 0; i < test_cases.size(); ++i) {
     TimestampTC test_case = test_cases[i];
     DateTimeFormatContext dt_ctx(test_case.fmt, strlen(test_case.fmt));
+    dt_ctx.SetCenturyBreak(now);
     bool parse_result = TimestampParser::ParseFormatTokens(&dt_ctx);
     if (test_case.fmt_should_fail) {
       EXPECT_FALSE(parse_result) << "TC: " << i;

@@ -19,10 +19,10 @@
 
 #include <boost/assign/list_of.hpp>
 #include <boost/date_time/gregorian/gregorian.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/unordered_map.hpp>
 
 #include "runtime/string-value.inline.h"
+#include "runtime/timestamp-value.h"
 #include "util/string-parser.h"
 
 namespace assign = boost::assign;
@@ -57,6 +57,12 @@ struct DateTimeParseResult {
       tz_offset(0,0,0,0) {
   }
 };
+
+void DateTimeFormatContext::SetCenturyBreak(const TimestampValue &now) {
+  const date& now_date = now.date();
+  century_break_ptime = boost::posix_time::ptime(
+      date(now_date.year() - 80, now_date.month(), now_date.day()), now.time());
+}
 
 bool TimestampParser::initialized_ = false;
 
@@ -422,6 +428,8 @@ bool TimestampParser::ParseDateTime(const char* str, int str_len,
   // Keep track of the number of characters we need to shift token positions by.
   // Variable-length tokens will result in values > 0;
   int shift_len = 0;
+  // Whether to realign the year for 2-digit year format
+  bool realign_year = false;
   for (const DateTimeFormatToken& tok: dt_ctx.toks) {
     const char* tok_val = str + tok.pos + shift_len;
     if (tok.type == SEPARATOR) {
@@ -442,7 +450,9 @@ bool TimestampParser::ParseDateTime(const char* str, int str_len,
         dt_result->year = StringParser::StringToInt<int>(tok_val, tok_len, &status);
         if (UNLIKELY(StringParser::PARSE_SUCCESS != status)) return false;
         if (UNLIKELY(dt_result->year < 1 || dt_result->year > 9999)) return false;
-        if (tok_len < 4 && dt_result->year < 99) dt_result->year += 2000;
+        // Year in "Y" and "YY" format should be in the interval
+        // [current time - 80 years, current time + 20 years)
+        if (tok_len <= 2) realign_year = true;
         break;
       }
       case MONTH_IN_YEAR: {
@@ -534,6 +544,23 @@ bool TimestampParser::ParseDateTime(const char* str, int str_len,
         break;
       }
       default: DCHECK(false) << "Unknown date/time format token";
+    }
+  }
+  // Hive uses Java's SimpleDateFormat to parse timestamp:
+  // In SimpleDateFormat, the century for 2-digit-year breaks at current_time - 80 years.
+  // https://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
+  if (realign_year) {
+    DCHECK(!dt_ctx.century_break_ptime.is_special());
+    // Let the century start at AABB and the year parsed be YY, this gives us AAYY.
+    dt_result->year += (dt_ctx.century_break_ptime.date().year() / 100) * 100;
+    date parsed_date(dt_result->year, dt_result->month, dt_result->day);
+    time_duration parsed_time(dt_result->hour, dt_result->minute, dt_result->second,
+        dt_result->fraction);
+    // Advance 100 years if parsed time is before the century break
+    // For example if the century breaks at 1937 but dt_result->year = 1936,
+    // the correct year would be 2036.
+    if (boost::posix_time::ptime(parsed_date, parsed_time) < dt_ctx.century_break_ptime) {
+      dt_result->year += 100;
     }
   }
   return true;

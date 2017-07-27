@@ -184,6 +184,7 @@ void TimestampFunctions::UnixAndFromUnixPrepare(
     // This is much cheaper vs alloc/dealloc'ing a context for each evaluation.
     dt_ctx = new DateTimeFormatContext();
   }
+  dt_ctx->SetCenturyBreak(*context->impl()->state()->now());
   context->SetFunctionState(scope, dt_ctx);
 }
 
