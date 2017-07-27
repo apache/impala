@@ -59,6 +59,11 @@ class DecimalUtil {
     DCHECK_GE(scale, 0);
     T result = 1;
     for (int i = 0; i < scale; ++i) {
+      // Verify that the result of multiplication does not overflow.
+      // TODO: This is not an ideal way to check for overflow because if T is signed, the
+      // behavior is undefined in case of overflow. Replace this with a better overflow
+      // check.
+      DCHECK_GE(result * 10, result);
       result *= 10;
     }
     return result;

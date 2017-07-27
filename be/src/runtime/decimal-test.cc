@@ -294,7 +294,14 @@ TEST(StringToDecimal, Basic) {
   StringToAllDecimals("1.1.0e0", 10, 0, 100, StringParser::PARSE_FAILURE);
   StringToAllDecimals("1e1.0", 10, 0, 100, StringParser::PARSE_FAILURE);
   StringToAllDecimals("1..1e1", 10, 0, 100, StringParser::PARSE_FAILURE);
-  StringToAllDecimals("1e9999999999999999999", 10, 0, 100, StringParser::PARSE_OVERFLOW);
+  StringToAllDecimals("1e9999999999999999999", 10, 0, 0, StringParser::PARSE_OVERFLOW);
+  StringToAllDecimals("1e-38", 10, 2, 0, StringParser::PARSE_UNDERFLOW);
+  StringToAllDecimals("1e-38", 38, 38, 1, StringParser::PARSE_SUCCESS);
+  StringToAllDecimals("-1e-38", 38, 38, -1, StringParser::PARSE_SUCCESS);
+  StringToAllDecimals("1e-39", 38, 38, 0, StringParser::PARSE_UNDERFLOW);
+  StringToAllDecimals("-1e-39", 38, 38, 0, StringParser::PARSE_UNDERFLOW);
+  StringToAllDecimals("1e-9999999999999999999", 10, 0, 0, StringParser::PARSE_UNDERFLOW);
+  StringToAllDecimals("-1e-9999999999999999999", 10, 0, 0, StringParser::PARSE_UNDERFLOW);
 
   StringToAllDecimals(" 1e0 ", 10, 2, 100, StringParser::PARSE_SUCCESS);
   StringToAllDecimals("-1e0", 10, 2, -100, StringParser::PARSE_SUCCESS);

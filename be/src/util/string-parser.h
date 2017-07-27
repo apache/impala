@@ -142,7 +142,7 @@ class StringParser {
       --len;
     }
 
-    // Ignore leading zeros even after a dot. This allows for differetiating between
+    // Ignore leading zeros even after a dot. This allows for differentiating between
     // cases like 0.01e2, which would fit in a DECIMAL(1, 0), and 0.10e2, which would
     // overflow.
     int scale = 0;
@@ -182,7 +182,12 @@ class StringParser {
       } else if ((c == 'e' || c == 'E') && LIKELY(!found_exponent)) {
         found_exponent = true;
         exponent = StringToIntInternal<int8_t>(s + i + 1, len - i - 1, result);
-        if (UNLIKELY(*result != StringParser::PARSE_SUCCESS)) return DecimalValue<T>(0);
+        if (UNLIKELY(*result != StringParser::PARSE_SUCCESS)) {
+          if (*result == StringParser::PARSE_OVERFLOW && exponent < 0) {
+            *result = StringParser::PARSE_UNDERFLOW;
+          }
+          return DecimalValue<T>(0);
+        }
         break;
       } else {
         *result = StringParser::PARSE_FAILURE;
@@ -216,9 +221,17 @@ class StringParser {
     } else if (UNLIKELY(scale > type_scale)) {
       *result = StringParser::PARSE_UNDERFLOW;
       int shift = scale - type_scale;
-      if (truncated_digit_count > 0) shift -= truncated_digit_count;
-      if (shift > 0) value /= DecimalUtil::GetScaleMultiplier<T>(shift);
-      DCHECK(value >= 0);
+      if (UNLIKELY(truncated_digit_count > 0)) shift -= truncated_digit_count;
+      if (shift > 0) {
+        T divisor = DecimalUtil::GetScaleMultiplier<T>(shift);
+        if (LIKELY(divisor >= 0)) {
+          value /= divisor;
+        } else {
+          DCHECK(divisor == -1); // DCHECK_EQ doesn't work with int128_t.
+          value = 0;
+        }
+      }
+      DCHECK(value >= 0); // DCHECK_GE doesn't work with int128_t.
     } else if (UNLIKELY(!found_value && !found_dot)) {
       *result = StringParser::PARSE_FAILURE;
     }
