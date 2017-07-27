@@ -17,15 +17,22 @@
 
 #include "util/common-metrics.h"
 #include "runtime/timestamp-value.h"
+#include <kudu/client/client.h>
 
 namespace impala {
 
 StringProperty* CommonMetrics::PROCESS_START_TIME = nullptr;
+StringProperty* CommonMetrics::KUDU_CLIENT_VERSION = nullptr;
+
 string CommonMetrics::PROCESS_START_TIME_METRIC_NAME = "process-start-time";
+string CommonMetrics::KUDU_CLIENT_VERSION_METRIC_NAME = "kudu-client.version";
 
 void CommonMetrics::InitCommonMetrics(MetricGroup* metric_group) {
   PROCESS_START_TIME = metric_group->AddProperty<string>(
-    PROCESS_START_TIME_METRIC_NAME, "");
+      PROCESS_START_TIME_METRIC_NAME, "");
+  KUDU_CLIENT_VERSION = metric_group->AddProperty<string>(
+      KUDU_CLIENT_VERSION_METRIC_NAME, kudu::client::GetShortVersionString());
+
   // TODO: IMPALA-5599: Clean up non-TIMESTAMP usages of TimestampValue
   PROCESS_START_TIME->set_value(TimestampValue::LocalTime().ToString());
 }

@@ -1438,5 +1438,17 @@
     "units": "NONE",
     "kind": "COUNTER",
     "key": "total-senders-timedout-waiting-for-recvr-creation"
+  },
+  {
+    "description": "A version string identifying the Kudu client",
+    "contexts": [
+      "IMPALAD",
+      "CATALOGSERVER",
+      "STATESTORE"
+    ],
+    "label": "Kudu Client Version",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "kudu-client.version"
   }
 ]
