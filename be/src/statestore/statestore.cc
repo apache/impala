@@ -519,23 +519,19 @@ void Statestore::GatherTopicUpdates(const Subscriber& subscriber,
       topic_delta.is_delta = last_processed_version > Subscriber::TOPIC_INITIAL_VERSION;
       topic_delta.__set_from_version(last_processed_version);
 
-      if (!topic_delta.is_delta &&
-          topic.last_version() > Subscriber::TOPIC_INITIAL_VERSION) {
-        int64_t topic_size =
-            topic.total_key_size_bytes() + topic.total_value_size_bytes();
-        VLOG_QUERY << "Preparing initial " << topic_delta.topic_name
-                   << " topic update for " << subscriber.id() << ". Size = "
-                   << PrettyPrinter::Print(topic_size, TUnit::BYTES);
-      }
-
       TopicUpdateLog::const_iterator next_update =
           topic.topic_update_log().upper_bound(last_processed_version);
 
+      int64_t deleted_key_size_bytes = 0;
       for (; next_update != topic.topic_update_log().end(); ++next_update) {
         TopicEntryMap::const_iterator itr = topic.entries().find(next_update->second);
         DCHECK(itr != topic.entries().end());
         const TopicEntry& topic_entry = itr->second;
         if (topic_entry.value() == Statestore::TopicEntry::NULL_VALUE) {
+          if (!topic_delta.is_delta) {
+            deleted_key_size_bytes += itr->first.size();
+            continue;
+          }
           topic_delta.topic_deletions.push_back(itr->first);
         } else {
           topic_delta.topic_entries.push_back(TTopicItem());
@@ -544,6 +540,15 @@ void Statestore::GatherTopicUpdates(const Subscriber& subscriber,
           // TODO: Does this do a needless copy?
           topic_item.value = topic_entry.value();
         }
+      }
+
+      if (!topic_delta.is_delta &&
+          topic.last_version() > Subscriber::TOPIC_INITIAL_VERSION) {
+        int64_t topic_size = topic.total_key_size_bytes() - deleted_key_size_bytes
+            + topic.total_value_size_bytes();
+        VLOG_QUERY << "Preparing initial " << topic_delta.topic_name
+                   << " topic update for " << subscriber.id() << ". Size = "
+                   << PrettyPrinter::Print(topic_size, TUnit::BYTES);
       }
 
       if (topic.topic_update_log().size() > 0) {

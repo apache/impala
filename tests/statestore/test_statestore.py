@@ -461,7 +461,7 @@ class TestStatestore():
         assert len(args.topic_deltas[persistent_topic_name].topic_entries) == 1
         # Statestore should not send deletions when the update is not a delta, see
         # IMPALA-1891
-        # assert len(args.topic_deltas[transient_topic_name].topic_deletions) == 0
+        assert len(args.topic_deltas[transient_topic_name].topic_deletions) == 0
       return DEFAULT_UPDATE_STATE_RESPONSE
 
     reg = [TTopicRegistration(topic_name=persistent_topic_name, is_transient=False),
