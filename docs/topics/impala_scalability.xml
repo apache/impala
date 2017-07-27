@@ -843,23 +843,31 @@ Currently, there is no throttling mechanism for Impala I/O.
 </conbody>
 </concept>
 
-<concept id="big_tables">
-<title>Scalability Considerations for Table Layout</title>
-<conbody>
-<p>
-Due to the overhead of retrieving and updating table metadata
-in the metastore database, try to limit the number of columns
-in a table to a maximum of approximately 2000.
-Although Impala can handle wider tables than this, the metastore overhead
-can become significant, leading to query performance that is slower
-than expected based on the actual data volume.
-</p>
-<p>
-To minimize overhead related to the metastore database and Impala query planning,
-try to limit the number of partitions for any partitioned table to a few tens of thousands.
-</p>
-</conbody>
-</concept>
+  <concept id="big_tables">
+    <title>Scalability Considerations for Table Layout</title>
+    <conbody>
+      <p>
+        Due to the overhead of retrieving and updating table metadata
+        in the metastore database, try to limit the number of columns
+        in a table to a maximum of approximately 2000.
+        Although Impala can handle wider tables than this, the metastore overhead
+        can become significant, leading to query performance that is slower
+        than expected based on the actual data volume.
+      </p>
+      <p>
+        To minimize overhead related to the metastore database and Impala query planning,
+        try to limit the number of partitions for any partitioned table to a few tens of thousands.
+      </p>
+      <p rev="IMPALA-5309">
+        If the volume of data within a table makes it impractical to run exploratory
+        queries, consider using the <codeph>TABLESAMPLE</codeph> clause to limit query processing
+        to only a percentage of data within the table. This technique reduces the overhead
+        for query startup, I/O to read the data, and the amount of network, CPU, and memory
+        needed to process intermediate results during the query. See <xref keyref="tablesample"/>
+        for details.
+      </p>
+    </conbody>
+  </concept>
 
 <concept rev="" id="kerberos_overhead_cluster_size">
 <title>Kerberos-Related Network Overhead for Large Clusters</title>

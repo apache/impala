@@ -163,6 +163,7 @@ under the License.
         <topicref href="topics/impala_offset.xml"/>
         <topicref href="topics/impala_union.xml"/>
         <topicref href="topics/impala_subqueries.xml"/>
+        <topicref rev="IMPALA-5309" href="topics/impala_tablesample.xml"/>
         <topicref href="topics/impala_with.xml"/>
         <topicref href="topics/impala_distinct.xml"/>
         <topicref href="topics/impala_hints.xml"/>

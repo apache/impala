@@ -765,6 +765,14 @@ select concat('abc','mno','xyz');</codeblock>
         they are primarily used in new SQL syntax topics underneath that parent topic.
       </p>
 
+      <p id="tablesample_caveat" rev="IMPALA-5309">
+        The <codeph>TABLESAMPLE</codeph> clause of the <codeph>SELECT</codeph>
+        statement does not apply to a table reference derived from a view, a subquery,
+        or anything other than a real base table. This clause only works for tables
+        backed by HDFS or HDFS-like data files, therefore it does not apply to Kudu or
+        HBase tables.
+      </p>
+
 <codeblock id="parquet_fallback_schema_resolution_example"><![CDATA[
 create database schema_evolution;
 use schema_evolution;

@@ -313,6 +313,9 @@ Therefore, this is not an efficient construct to use with Impala queries for HBa
           when referring to any column from the outer query block within a subquery.
         </p>
       </li>
+      <li>
+        <p conref="../shared/impala_common.xml#common/tablesample_caveat"/>
+      </li>
     </ul>
 
     <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>

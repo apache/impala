@@ -10732,6 +10732,7 @@ under the License.
   <keydef href="topics/impala_joins.xml" keys="joins"/>
   <keydef href="topics/impala_order_by.xml" keys="order_by"/>
   <keydef href="topics/impala_group_by.xml" keys="group_by"/>
+  <keydef rev="IMPALA-5309" href="topics/impala_tablesample.xml" keys="tablesample"/>
   <keydef href="topics/impala_having.xml" keys="having"/>
   <keydef href="topics/impala_limit.xml" keys="limit"/>
   <keydef href="topics/impala_offset.xml" keys="offset"/>
