@@ -47,6 +47,7 @@ OS_MAPPING = {
   "debian8" : "ec2-package-debian-8",
   "suselinux11": "ec2-package-sles-11",
   "suselinux12": "ec2-package-sles-12",
+  "suse12.2": "ec2-package-sles-12",
   "ubuntu12.04" : "ec2-package-ubuntu-12-04",
   "ubuntu14.04" : "ec2-package-ubuntu-14-04",
   "ubuntu15.04" : "ec2-package-ubuntu-14-04",
