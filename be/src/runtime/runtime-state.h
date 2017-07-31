@@ -48,7 +48,7 @@ class Status;
 class TimestampValue;
 class TUniqueId;
 class ExecEnv;
-class DataStreamMgr;
+class DataStreamMgrBase;
 class HBaseTableFactory;
 class TPlanFragmentCtx;
 class TPlanFragmentInstanceCtx;
@@ -121,7 +121,7 @@ class RuntimeState {
         : no_instance_id_;
   }
   ExecEnv* exec_env() { return exec_env_; }
-  DataStreamMgr* stream_mgr();
+  DataStreamMgrBase* stream_mgr();
   HBaseTableFactory* htable_factory();
   ImpalaBackendClientCache* impalad_client_cache();
   CatalogServiceClientCache* catalogd_client_cache();

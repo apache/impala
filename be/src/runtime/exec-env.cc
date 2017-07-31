@@ -37,6 +37,7 @@
 #include "runtime/disk-io-mgr.h"
 #include "runtime/hbase-table-factory.h"
 #include "runtime/hdfs-fs-cache.h"
+#include "runtime/krpc-data-stream-mgr.h"
 #include "runtime/lib-cache.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-exec-mgr.h"
@@ -75,6 +76,9 @@ DEFINE_int32(state_store_subscriber_port, 23000,
 DEFINE_int32(num_hdfs_worker_threads, 16,
     "(Advanced) The number of threads in the global HDFS operation pool");
 DEFINE_bool(disable_admission_control, false, "Disables admission control.");
+DEFINE_bool_hidden(use_krpc, false, "Used to indicate whether to use Kudu RPC for the "
+    "DataStream subsystem, or the Thrift RPC layer instead. Defaults to false. "
+    "KRPC not yet supported");
 
 DECLARE_int32(state_store_port);
 DECLARE_int32(num_threads_per_core);
@@ -138,7 +142,6 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     int webserver_port, const string& statestore_host, int statestore_port)
   : obj_pool_(new ObjectPool),
     metrics_(new MetricGroup("impala-metrics")),
-    stream_mgr_(new DataStreamMgr(metrics_.get())),
     impalad_client_cache_(
         new ImpalaBackendClientCache(FLAGS_backend_client_connection_num_retries, 0,
             FLAGS_backend_client_rpc_timeout_ms, FLAGS_backend_client_rpc_timeout_ms, "",
@@ -162,6 +165,13 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     query_exec_mgr_(new QueryExecMgr()),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
     backend_address_(MakeNetworkAddress(hostname, backend_port)) {
+
+  if (FLAGS_use_krpc) {
+    stream_mgr_.reset(new KrpcDataStreamMgr(metrics_.get()));
+  } else {
+    stream_mgr_.reset(new DataStreamMgr(metrics_.get()));
+  }
+
   request_pool_service_.reset(new RequestPoolService(metrics_.get()));
 
   TNetworkAddress subscriber_address = MakeNetworkAddress(hostname, subscriber_port);
@@ -357,4 +367,15 @@ Status ExecEnv::GetKuduClient(
   }
   return Status::OK();
 }
+
+DataStreamMgr* ExecEnv::ThriftStreamMgr() {
+  DCHECK(!FLAGS_use_krpc);
+  return dynamic_cast<DataStreamMgr*>(stream_mgr_.get());
+}
+
+KrpcDataStreamMgr* ExecEnv::KrpcStreamMgr() {
+  DCHECK(FLAGS_use_krpc);
+  return dynamic_cast<KrpcDataStreamMgr*>(stream_mgr_.get());
+}
+
 }

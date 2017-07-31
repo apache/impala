@@ -64,6 +64,9 @@ DataStreamMgr::DataStreamMgr(MetricGroup* metrics) {
       "total-senders-timedout-waiting-for-recvr-creation", 0L);
 }
 
+DataStreamMgr::~DataStreamMgr() {
+}
+
 inline uint32_t DataStreamMgr::GetHashValue(
     const TUniqueId& fragment_instance_id, PlanNodeId node_id) {
   uint32_t value = RawValue::GetHashValue(&fragment_instance_id.lo, TYPE_BIGINT, 0);
@@ -72,7 +75,7 @@ inline uint32_t DataStreamMgr::GetHashValue(
   return value;
 }
 
-shared_ptr<DataStreamRecvr> DataStreamMgr::CreateRecvr(RuntimeState* state,
+shared_ptr<DataStreamRecvrBase> DataStreamMgr::CreateRecvr(RuntimeState* state,
     const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
     PlanNodeId dest_node_id, int num_senders, int buffer_size, RuntimeProfile* profile,
     bool is_merging) {

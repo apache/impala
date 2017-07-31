@@ -37,6 +37,8 @@
 
 #include "common/names.h"
 
+DECLARE_bool(use_krpc);
+
 using strings::Substitute;
 
 namespace impala {
@@ -58,6 +60,8 @@ Status DataSink::Create(const TPlanFragmentCtx& fragment_ctx,
     case TDataSinkType::DATA_STREAM_SINK:
       if (!thrift_sink.__isset.stream_sink) return Status("Missing data stream sink.");
 
+      // TODO: Remove DCHECK when KRPC is supported.
+      DCHECK(!FLAGS_use_krpc);
       // TODO: figure out good buffer size based on size of output row
       *sink = pool->Add(new DataStreamSender(fragment_instance_ctx.sender_id, row_desc,
           thrift_sink.stream_sink, fragment_ctx.destinations, 16 * 1024));

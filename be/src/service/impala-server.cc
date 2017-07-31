@@ -1164,7 +1164,7 @@ void ImpalaServer::TransmitData(
   // TODO: fix Thrift so we can simply take ownership of thrift_batch instead
   // of having to copy its data
   if (params.row_batch.num_rows > 0) {
-    Status status = exec_env_->stream_mgr()->AddData(
+    Status status = exec_env_->ThriftStreamMgr()->AddData(
         params.dest_fragment_instance_id, params.dest_node_id, params.row_batch,
         params.sender_id);
     status.SetTStatus(&return_val);
@@ -1923,6 +1923,7 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
   DCHECK((beeswax_port == 0) == (beeswax_server == nullptr));
   DCHECK((hs2_port == 0) == (hs2_server == nullptr));
   DCHECK((be_port == 0) == (be_server == nullptr));
+
   if (!FLAGS_is_coordinator && !FLAGS_is_executor) {
     return Status("Impala does not have a valid role configured. "
         "Either --is_coordinator or --is_executor must be set to true.");

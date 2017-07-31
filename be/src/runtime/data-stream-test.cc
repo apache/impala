@@ -27,9 +27,11 @@
 #include "rpc/thrift-server.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "runtime/data-stream-mgr-base.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/exec-env.h"
 #include "runtime/data-stream-sender.h"
+#include "runtime/data-stream-recvr-base.h"
 #include "runtime/data-stream-recvr.h"
 #include "runtime/descriptors.h"
 #include "runtime/client-cache.h"
@@ -214,7 +216,7 @@ class DataStreamTest : public testing::Test {
   int64_t* tuple_mem_;
 
   // receiving node
-  DataStreamMgr* stream_mgr_;
+  DataStreamMgrBase* stream_mgr_;
   ThriftServer* server_;
 
   // sending node(s)
@@ -238,7 +240,7 @@ class DataStreamTest : public testing::Test {
     int receiver_num;
 
     thread* thread_handle;
-    shared_ptr<DataStreamRecvr> stream_recvr;
+    shared_ptr<DataStreamRecvrBase> stream_recvr;
     Status status;
     int num_rows_received;
     multiset<int64_t> data_values;
@@ -452,7 +454,10 @@ class DataStreamTest : public testing::Test {
 
   // Start backend in separate thread.
   void StartBackend() {
-    boost::shared_ptr<ImpalaTestBackend> handler(new ImpalaTestBackend(stream_mgr_));
+    // Dynamic cast stream_mgr_ which is of type DataStreamMgrBase to derived type
+    // DataStreamMgr, since ImpalaTestBackend() accepts only DataStreamMgr*.
+    boost::shared_ptr<ImpalaTestBackend> handler(
+        new ImpalaTestBackend(dynamic_cast<DataStreamMgr*>(stream_mgr_)));
     boost::shared_ptr<TProcessor> processor(new ImpalaInternalServiceProcessor(handler));
     ThriftServerBuilder("DataStreamTest backend", processor, FLAGS_port).Build(&server_);
     server_->Start();
@@ -606,8 +611,9 @@ TEST_F(DataStreamTest, CloseRecvrWhileReferencesRemain) {
   // Start just one receiver.
   TUniqueId instance_id;
   GetNextInstanceId(&instance_id);
-  shared_ptr<DataStreamRecvr> stream_recvr = stream_mgr_->CreateRecvr(runtime_state.get(),
-      row_desc_, instance_id, DEST_NODE_ID, 1, 1, profile.get(), false);
+  shared_ptr<DataStreamRecvrBase> stream_recvr = stream_mgr_->CreateRecvr(
+      runtime_state.get(), row_desc_, instance_id, DEST_NODE_ID, 1, 1, profile.get(),
+      false);
 
   // Perform tear down, but keep a reference to the receiver so that it is deleted last
   // (to confirm that the destructor does not access invalid state after tear-down).

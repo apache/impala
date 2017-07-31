@@ -36,6 +36,7 @@ namespace impala {
 class AdmissionController;
 class BufferPool;
 class CallableThreadPool;
+class DataStreamMgrBase;
 class DataStreamMgr;
 class DiskIoMgr;
 class QueryExecMgr;
@@ -43,6 +44,7 @@ class Frontend;
 class HBaseTableFactory;
 class HdfsFsCache;
 class ImpalaServer;
+class KrpcDataStreamMgr;
 class LibCache;
 class MemTracker;
 class MetricGroup;
@@ -84,7 +86,14 @@ class ExecEnv {
   /// TODO: Should ExecEnv own the ImpalaServer as well?
   void SetImpalaServer(ImpalaServer* server) { impala_server_ = server; }
 
-  DataStreamMgr* stream_mgr() { return stream_mgr_.get(); }
+  DataStreamMgrBase* stream_mgr() { return stream_mgr_.get(); }
+
+  /// TODO: Remove once a single DataStreamMgrBase implementation is standardized on.
+  /// Clients of DataStreamMgrBase should use stream_mgr() unless they need to access
+  /// members that are not a part of the DataStreamMgrBase interface.
+  DataStreamMgr* ThriftStreamMgr();
+  KrpcDataStreamMgr* KrpcStreamMgr();
+
   ImpalaBackendClientCache* impalad_client_cache() {
     return impalad_client_cache_.get();
   }
@@ -138,7 +147,7 @@ class ExecEnv {
  private:
   boost::scoped_ptr<ObjectPool> obj_pool_;
   boost::scoped_ptr<MetricGroup> metrics_;
-  boost::scoped_ptr<DataStreamMgr> stream_mgr_;
+  boost::scoped_ptr<DataStreamMgrBase> stream_mgr_;
   boost::scoped_ptr<Scheduler> scheduler_;
   boost::scoped_ptr<AdmissionController> admission_controller_;
   boost::scoped_ptr<StatestoreSubscriber> statestore_subscriber_;

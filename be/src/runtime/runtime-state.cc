@@ -33,7 +33,7 @@
 #include "exprs/scalar-fn-call.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
-#include "runtime/data-stream-mgr.h"
+#include "runtime/data-stream-mgr-base.h"
 #include "runtime/data-stream-recvr.h"
 #include "runtime/descriptors.h"
 #include "runtime/exec-env.h"
@@ -270,7 +270,7 @@ DiskIoMgr* RuntimeState::io_mgr() {
   return exec_env_->disk_io_mgr();
 }
 
-DataStreamMgr* RuntimeState::stream_mgr() {
+DataStreamMgrBase* RuntimeState::stream_mgr() {
   return exec_env_->stream_mgr();
 }
 

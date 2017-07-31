@@ -19,6 +19,7 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include "exprs/scalar-expr.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/data-stream-recvr.h"
 #include "runtime/runtime-state.h"
@@ -27,6 +28,8 @@
 #include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
 #include "util/time.h"
+#include "util/tuple-row-compare.h"
+
 #include "gen-cpp/PlanNodes_types.h"
 
 #include "common/names.h"

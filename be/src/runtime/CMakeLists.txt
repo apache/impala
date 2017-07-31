@@ -29,8 +29,8 @@ add_library(Runtime
   coordinator.cc
   coordinator-backend-state.cc
   data-stream-mgr.cc
-  data-stream-sender.cc
   data-stream-recvr.cc
+  data-stream-sender.cc
   debug-options.cc
   descriptors.cc
   disk-io-mgr.cc
@@ -44,6 +44,8 @@ add_library(Runtime
   hbase-table-factory.cc
   hdfs-fs-cache.cc
   initial-reservations.cc
+  krpc-data-stream-mgr.cc
+  krpc-data-stream-recvr.cc
   lib-cache.cc
   mem-tracker.cc
   mem-pool.cc
