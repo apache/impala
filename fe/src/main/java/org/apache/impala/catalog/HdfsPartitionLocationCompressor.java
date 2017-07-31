@@ -51,7 +51,7 @@ class HdfsPartitionLocationCompressor {
   // Construct an HdfsPartitionLocationCompressor with a pre-filled bidirectional map
   // (indexToPrefix_, prefixToIndex_).
   public HdfsPartitionLocationCompressor(
-      int numClusteringColumns, ArrayList<String> prefixes) {
+      int numClusteringColumns, List<String> prefixes) {
     numClusteringColumns_ = numClusteringColumns;
     prefixMap_.populate(prefixes);
   }

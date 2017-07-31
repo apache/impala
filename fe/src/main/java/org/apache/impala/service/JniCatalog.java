@@ -88,6 +88,8 @@ public class JniCatalog {
     BackendConfig.create(cfg);
 
     Preconditions.checkArgument(cfg.num_metadata_loading_threads > 0);
+    Preconditions.checkArgument(cfg.max_hdfs_partitions_parallel_load > 0);
+    Preconditions.checkArgument(cfg.max_nonhdfs_partitions_parallel_load > 0);
     Preconditions.checkArgument(cfg.initial_hms_cnxn_timeout_s > 0);
     // This trick saves having to pass a TLogLevel enum, which is an object and more
     // complex to pass through JNI.

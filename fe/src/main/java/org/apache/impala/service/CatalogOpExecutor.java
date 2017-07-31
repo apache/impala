@@ -613,15 +613,22 @@ public class CatalogOpExecutor {
    */
   private Table addHdfsPartition(Table tbl, Partition partition)
       throws CatalogException {
+    return addHdfsPartitions(tbl, Lists.newArrayList(partition));
+  }
+
+  private Table addHdfsPartitions(Table tbl, List<Partition> partitions)
+      throws CatalogException {
     Preconditions.checkNotNull(tbl);
-    Preconditions.checkNotNull(partition);
+    Preconditions.checkNotNull(partitions);
     if (!(tbl instanceof HdfsTable)) {
       throw new CatalogException("Table " + tbl.getFullName() + " is not an HDFS table");
     }
     HdfsTable hdfsTable = (HdfsTable) tbl;
-    HdfsPartition hdfsPartition =
-        hdfsTable.createAndLoadPartition(partition.getSd(), partition);
-    return catalog_.addPartition(hdfsPartition);
+    List<HdfsPartition> hdfsPartitions = hdfsTable.createAndLoadPartitions(partitions);
+    for (HdfsPartition hdfsPartition: hdfsPartitions) {
+      catalog_.addPartition(hdfsPartition);
+    }
+    return hdfsTable;
   }
 
   /**
@@ -1979,12 +1986,7 @@ public class CatalogOpExecutor {
         addedHmsPartitions.addAll(
             getPartitionsFromHms(msTbl, msClient, tableName, difference));
       }
-
-      for (Partition partition: addedHmsPartitions) {
-        // Create and add the HdfsPartition to catalog. Return the table object with an
-        // updated catalog version.
-        addHdfsPartition(tbl, partition);
-      }
+      addHdfsPartitions(tbl, addedHmsPartitions);
     }
     return tbl;
   }
@@ -2614,12 +2616,7 @@ public class CatalogOpExecutor {
         // ifNotExists and needResults are true.
         List<Partition> hmsAddedPartitions =
             msClient.getHiveClient().add_partitions(hmsSublist, true, true);
-        for (Partition partition: hmsAddedPartitions) {
-          // Create and add the HdfsPartition. Return the table object with an updated
-          // catalog version.
-          addHdfsPartition(tbl, partition);
-        }
-
+        addHdfsPartitions(tbl, hmsAddedPartitions);
         // Handle HDFS cache.
         if (cachePoolName != null) {
           for (Partition partition: hmsAddedPartitions) {

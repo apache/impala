@@ -30,6 +30,8 @@ DECLARE_bool(load_auth_to_local_rules);
 DECLARE_bool(enable_stats_extrapolation);
 DECLARE_int32(non_impala_java_vlog);
 DECLARE_int32(num_metadata_loading_threads);
+DECLARE_int32(max_hdfs_partitions_parallel_load);
+DECLARE_int32(max_nonhdfs_partitions_parallel_load);
 DECLARE_int32(initial_hms_cnxn_timeout_s);
 DECLARE_int32(kudu_operation_timeout_ms);
 DECLARE_int64(sentry_catalog_polling_frequency_s);
@@ -59,6 +61,9 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_kudu_master_hosts(FLAGS_kudu_master_hosts);
   cfg.__set_read_size(FLAGS_read_size);
   cfg.__set_num_metadata_loading_threads(FLAGS_num_metadata_loading_threads);
+  cfg.__set_max_hdfs_partitions_parallel_load(FLAGS_max_hdfs_partitions_parallel_load);
+  cfg.__set_max_nonhdfs_partitions_parallel_load(
+      FLAGS_max_nonhdfs_partitions_parallel_load);
   cfg.__set_initial_hms_cnxn_timeout_s(FLAGS_initial_hms_cnxn_timeout_s);
   cfg.__set_sentry_config(FLAGS_sentry_config);
   // auth_to_local rules are read if --load_auth_to_local_rules is set to true
