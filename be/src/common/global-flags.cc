@@ -70,6 +70,9 @@ DEFINE_string(redaction_rules_file, "", "Absolute path to sensitive data redacti
     "Web UI and audit records. Query results will not be affected. Refer to the "
     "documentation for the rule file format.");
 
+DEFINE_bool(enable_minidumps, true, "Whether to enable minidump generation upon process "
+    "crash or SIGUSR1.");
+
 DEFINE_string(minidump_path, "minidumps", "Directory to write minidump files to. This "
     "can be either an absolute path or a path relative to log_dir. Each daemon will "
     "create an additional sub-directory to prevent naming conflicts and to make it "

@@ -83,9 +83,6 @@ class TestBreakpad(CustomClusterTestSuite):
     self.start_cluster_with_args(minidump_path=self.tmp_dir,
                                  max_minidumps=self.MAX_MINIDUMPS)
 
-  def start_cluster_without_minidumps(self):
-    self.start_cluster_with_args(minidump_path='', max_minidumps=self.MAX_MINIDUMPS)
-
   def kill_cluster(self, signal):
     self.cluster.refresh()
     processes = self.cluster.impalads + [self.cluster.catalogd, self.cluster.statestored]
@@ -216,10 +213,18 @@ class TestBreakpad(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   def test_disable_minidumps(self):
+    """Check that setting enable_minidumps to false disables minidump creation."""
+    assert self.count_all_minidumps() == 0
+    self.start_cluster_with_args(enable_minidumps=False)
+    self.kill_cluster(SIGSEGV)
+    self.assert_num_logfile_entries(0)
+
+  @pytest.mark.execute_serially
+  def test_empty_minidump_path_disables_breakpad(self):
     """Check that setting the minidump_path to an empty value disables minidump creation.
     """
     assert self.count_all_minidumps() == 0
-    self.start_cluster_without_minidumps()
+    self.start_cluster_with_args(minidump_path='', max_minidumps=self.MAX_MINIDUMPS)
     self.kill_cluster(SIGSEGV)
     self.assert_num_logfile_entries(0)
 

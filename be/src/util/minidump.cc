@@ -44,6 +44,7 @@ using boost::filesystem::path;
 using boost::filesystem::remove;
 
 DECLARE_string(log_dir);
+DECLARE_bool(enable_minidumps);
 DECLARE_string(minidump_path);
 DECLARE_int32(max_minidumps);
 DECLARE_int32(minidump_size_limit_hint_kb);
@@ -193,6 +194,7 @@ Status RegisterMinidump(const char* cmd_line_path) {
   DCHECK(!registered);
   registered = true;
 
+  if (!FLAGS_enable_minidumps) return Status::OK();
   if (FLAGS_minidump_path.empty()) return Status::OK();
 
   if (path(FLAGS_minidump_path).is_relative()) {
