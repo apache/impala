@@ -248,7 +248,7 @@ struct TPrioritizeLoadRequest {
 
 struct TPrioritizeLoadResponse {
   // The status of the operation, OK if the operation was successful.
-  1: optional Status.TStatus status
+  1: required Status.TStatus status
 }
 
 // Request to perform a privilege check with the Sentry Service to determine

@@ -427,9 +427,7 @@ Java_org_apache_impala_service_FeSupport_NativePrioritizeLoad(
   Status status = catalog_op_executor.PrioritizeLoad(request, &result);
   if (!status.ok()) {
     LOG(ERROR) << status.GetDetail();
-    // Create a new Status, copy in this error, then update the result.
-    Status catalog_service_status(result.status);
-    catalog_service_status.MergeStatus(status);
+    status.AddDetail("Error making an RPC call to Catalog server.");
     status.ToThrift(&result.status);
   }
 
