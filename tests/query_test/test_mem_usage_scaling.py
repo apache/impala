@@ -24,6 +24,11 @@ from tests.common.skip import SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
 
+# Substrings of the expected error messages when the mem limit is too low
+MEM_LIMIT_EXCEEDED_MSG = "Memory limit exceeded"
+INITIAL_RESERVATION_MSG = "Failed to get minimum memory reservation"
+MEM_LIMIT_ERROR_MSGS = [MEM_LIMIT_EXCEEDED_MSG, INITIAL_RESERVATION_MSG]
+
 class TestQueryMemLimitScaling(ImpalaTestSuite):
   """Test class to do functional validation of per query memory limits. """
   QUERY = ["select * from lineitem where l_orderkey = -1",
@@ -35,6 +40,8 @@ class TestQueryMemLimitScaling(ImpalaTestSuite):
 
   @classmethod
   def get_workload(self):
+    # Note: this workload doesn't run exhaustively. See IMPALA-3947 before trying to move
+    # this test to exhaustive.
     return 'tpch'
 
   @classmethod
@@ -58,9 +65,12 @@ class TestQueryMemLimitScaling(ImpalaTestSuite):
     for query in self.QUERY:
       self.execute_query(query, exec_options, table_format=table_format)
 
+
 class TestExprMemUsage(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):
+    # Note: this workload doesn't run exhaustively. See IMPALA-3947 before trying to move
+    # this test to exhaustive.
     return 'tpch'
 
   @classmethod
@@ -80,10 +90,32 @@ class TestExprMemUsage(ImpalaTestSuite):
       table_format=vector.get_value('table_format'))
 
 
+class TestInitialReservation(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    # Note: this workload doesn't run exhaustively. See IMPALA-3947 before trying to move
+    # this test to exhaustive.
+    return 'tpch'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestInitialReservation, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').file_format in ['parquet'])
+
+  def test_initial_reservation(self, vector):
+    """Test failure to get the initial reservation."""
+    exec_options = copy(vector.get_value('exec_option'))
+    exec_options['mem_limit'] = '20m'
+    query = """select * from tpch_parquet.lineitem l1
+               join tpch_parquet.lineitem l2 on l1.l_orderkey = l2.l_orderkey"""
+    result = self.execute_query_expect_failure(self.client, query, exec_options)
+    assert (INITIAL_RESERVATION_MSG in str(result))
+
+
 class TestLowMemoryLimits(ImpalaTestSuite):
   '''Super class for the memory limit tests with the TPC-H and TPC-DS queries'''
-  EXPECTED_ERROR_MSGS = ["Memory limit exceeded",
-      "Failed to get minimum memory reservation"]
 
   def low_memory_limit_test(self, vector, tpch_query, limit, xfail_mem_limit=None):
     mem = vector.get_value('mem_limit')
@@ -104,7 +136,7 @@ class TestLowMemoryLimits(ImpalaTestSuite):
     except ImpalaBeeswaxException as e:
       if not expects_error and not xfail_mem_limit: raise
       found_expected_error = False
-      for error_msg in TestLowMemoryLimits.EXPECTED_ERROR_MSGS:
+      for error_msg in MEM_LIMIT_ERROR_MSGS:
         if error_msg in str(e): found_expected_error = True
       assert found_expected_error, str(e)
       if not expects_error and xfail_mem_limit:
@@ -112,7 +144,6 @@ class TestLowMemoryLimits(ImpalaTestSuite):
 
 
 class TestTpchMemLimitError(TestLowMemoryLimits):
-  # TODO: consider moving this test to exhaustive.
   # The mem limits that will be used.
   MEM_IN_MB = [20, 140, 180, 220, 275, 450, 700]
 
@@ -127,6 +158,8 @@ class TestTpchMemLimitError(TestLowMemoryLimits):
 
   @classmethod
   def get_workload(self):
+    # Note: this workload doesn't run exhaustively. See IMPALA-3947 before trying to move
+    # this test to exhaustive.
     return 'tpch'
 
   @classmethod
@@ -209,6 +242,51 @@ class TestTpchMemLimitError(TestLowMemoryLimits):
     self.low_memory_limit_test(vector, 'tpch-q22', self.MIN_MEM_FOR_TPCH['Q22'])
 
 
+class TestTpchPrimitivesMemLimitError(TestLowMemoryLimits):
+  """
+  Memory usage tests using targeted-perf queries to exercise specific operators.
+  """
+
+  # The mem limits that will be used.
+  MEM_IN_MB = [20, 100, 120, 200]
+
+  # Different values of mem limits and minimum mem limit (in MBs) each query is expected
+  # to run without problem. Determined by manual binary search.
+  MIN_MEM = { 'primitive_broadcast_join_3': 115, 'primitive_groupby_bigint_highndv': 110,
+              'primitive_orderby_all': 120}
+
+  @classmethod
+  def get_workload(self):
+    # Note: this workload doesn't run exhaustively. See IMPALA-3947 before trying to move
+    # this test to exhaustive.
+    return 'targeted-perf'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestTpchPrimitivesMemLimitError, cls).add_test_dimensions()
+
+    cls.ImpalaTestMatrix.add_dimension(
+      ImpalaTestDimension('mem_limit', *cls.MEM_IN_MB))
+
+    cls.ImpalaTestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').file_format in ['parquet'])
+
+  def run_primitive_query(self, vector, query_name):
+    self.low_memory_limit_test(vector, query_name, self.MIN_MEM[query_name])
+
+  def test_low_mem_limit_broadcast_join_3(self, vector):
+    """Test hash join memory requirements."""
+    self.run_primitive_query(vector, 'primitive_broadcast_join_3')
+
+  def test_low_mem_limit_groupby_bigint_highndv(self, vector):
+    """Test grouping aggregation memory requirements."""
+    self.run_primitive_query(vector, 'primitive_groupby_bigint_highndv')
+
+  def test_low_mem_limit_orderby_all(self, vector):
+    """Test sort and analytic memory requirements."""
+    self.run_primitive_query(vector, 'primitive_orderby_all')
+
+
 class TestTpcdsMemLimitError(TestLowMemoryLimits):
   # The mem limits that will be used.
   MEM_IN_MB = [20, 100, 116, 150]
@@ -219,6 +297,8 @@ class TestTpcdsMemLimitError(TestLowMemoryLimits):
 
   @classmethod
   def get_workload(self):
+    # Note: this workload doesn't run exhaustively. See IMPALA-3947 before trying to move
+    # this test to exhaustive.
     return 'tpcds'
 
   @classmethod

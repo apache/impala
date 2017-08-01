@@ -48,3 +48,8 @@ class TestSpilling(ImpalaTestSuite):
 
   def test_spilling(self, vector):
     self.run_test_case('QueryTest/spilling', vector)
+
+  def test_spilling_sorts_exhaustive(self, vector):
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip("only run large sorts on exhaustive")
+    self.run_test_case('QueryTest/spilling-sorts-exhaustive', vector)

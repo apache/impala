@@ -28,5 +28,15 @@ FROM (
   ) a
 WHERE rank < 10;
 ---- RESULTS
+1
+2
+3
+4
+5
+6
+7
+8
+9
 ---- TYPES
+BIGINT
 ====

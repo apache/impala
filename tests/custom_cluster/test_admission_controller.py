@@ -297,8 +297,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args=impalad_admission_ctrl_flags(1, 1, 10 * 1024 * 1024,
-          1024 * 1024 * 1024),
+      impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,
+          pool_max_mem=10 * 1024 * 1024, proc_mem_limit=1024 * 1024 * 1024),
       statestored_args=_STATESTORED_ARGS)
   def test_trivial_coord_query_limits(self):
     """Tests that trivial coordinator only queries have negligible resource requirements.
@@ -316,13 +316,28 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       assert re.search("Rejected query from pool default-pool : request memory needed "
           ".* is greater than pool max mem resources 10.00 MB", str(ex))
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,
+          pool_max_mem=10 * 1024 * 1024, proc_mem_limit=1024 * 1024 * 1024),
+      statestored_args=_STATESTORED_ARGS)
+  def test_initial_reservation(self):
+    """Test behaviour with admission control enabled if the initial reservation cannot be
+    acquired. The query options are set so that the query will be admitted, but acquiring
+    the initial reservation will fail because it is larger than mem_limit.
+    """
+    query = "select distinct * from functional_parquet.alltypesagg"
+    opts = {'mem_limit': '10MB', 'num_nodes': '1'}
+    ex = self.execute_query_expect_failure(self.client, query, opts)
+    assert "Failed to get minimum memory reservation" in str(ex)
+
   # Process mem_limit used in test_mem_limit_upper_bound
   PROC_MEM_TEST_LIMIT = 1024 * 1024 * 1024
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args=impalad_admission_ctrl_flags(1, 1, 10 * PROC_MEM_TEST_LIMIT,
-          PROC_MEM_TEST_LIMIT))
+      impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,
+          pool_max_mem=10 * PROC_MEM_TEST_LIMIT, proc_mem_limit=PROC_MEM_TEST_LIMIT))
   def test_mem_limit_upper_bound(self, vector):
     """ Test to ensure that a query is admitted if the requested memory is equal to the
     process mem limit"""
@@ -754,8 +769,8 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args=impalad_admission_ctrl_flags(MAX_NUM_CONCURRENT_QUERIES,
-        MAX_NUM_QUEUED_QUERIES, -1),
+      impalad_args=impalad_admission_ctrl_flags(max_requests=MAX_NUM_CONCURRENT_QUERIES,
+        max_queued=MAX_NUM_QUEUED_QUERIES, pool_max_mem=-1),
       statestored_args=_STATESTORED_ARGS)
   def test_admission_controller_with_flags(self, vector):
     self.pool_name = 'default-pool'
@@ -786,8 +801,9 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args=impalad_admission_ctrl_flags(MAX_NUM_CONCURRENT_QUERIES * 30,
-        MAX_NUM_QUEUED_QUERIES, MEM_TEST_LIMIT, MEM_TEST_LIMIT),
+      impalad_args=impalad_admission_ctrl_flags(
+        max_requests=MAX_NUM_CONCURRENT_QUERIES * 30, max_queued=MAX_NUM_QUEUED_QUERIES,
+        pool_max_mem=MEM_TEST_LIMIT, proc_mem_limit=MEM_TEST_LIMIT),
       statestored_args=_STATESTORED_ARGS)
   def test_mem_limit(self, vector):
     # Impala may set the proc mem limit lower than we think depending on the overcommit
