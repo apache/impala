@@ -185,6 +185,7 @@ ir_functions = [
   ["STRING_TO_INT64", "IrStringToInt64"],
   ["STRING_TO_FLOAT", "IrStringToFloat"],
   ["STRING_TO_DOUBLE", "IrStringToDouble"],
+  ["STRING_TO_TIMESTAMP", "IrStringToTimestamp"],
   ["IS_NULL_STRING", "IrIsNullString"],
   ["GENERIC_IS_NULL_STRING", "IrGenericIsNullString"],
   ["RAW_VALUE_COMPARE",

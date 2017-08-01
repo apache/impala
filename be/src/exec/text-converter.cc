@@ -220,6 +220,9 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
       case TYPE_DOUBLE:
         parse_fn_enum = IRFunction::STRING_TO_DOUBLE;
         break;
+      case TYPE_TIMESTAMP:
+        parse_fn_enum = IRFunction::STRING_TO_TIMESTAMP;
+        break;
       default:
         DCHECK(false);
         return NULL;
@@ -234,9 +237,18 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     LlvmCodeGen::NamedVariable parse_result("parse_result", codegen->GetType(TYPE_INT));
     Value* parse_result_ptr = codegen->CreateEntryBlockAlloca(fn, parse_result);
 
+    Value* parse_return;
     // Call Impala's StringTo* function
-    Value* result = builder.CreateCall(parse_fn,
-        ArrayRef<Value*>({args[1], args[2], parse_result_ptr}));
+    if (parse_fn->arg_size() == 3) {
+      parse_return = builder.CreateCall(parse_fn, {args[1], args[2], parse_result_ptr});
+    } else {
+      DCHECK(parse_fn->arg_size() == 4);
+      // If the return value is large (more than 16 bytes in our toolchain) the first
+      // parameter would be a pointer to value parsed and the return value of callee
+      // should be ignored
+      builder.CreateCall(parse_fn, {slot, args[1], args[2], parse_result_ptr});
+      parse_return = nullptr;
+    }
     Value* parse_result_val = builder.CreateLoad(parse_result_ptr, "parse_result");
     Value* failed_value = codegen->GetIntConstant(TYPE_INT, StringParser::PARSE_FAILURE);
 
@@ -254,7 +266,8 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
 
     // Parse succeeded
     builder.SetInsertPoint(parse_success_block);
-    builder.CreateStore(result, slot);
+    // If the parsed value is in parse_return, move it into slot
+    if (parse_fn->arg_size() == 3) builder.CreateStore(parse_return, slot);
     builder.CreateRet(codegen->true_value());
 
     // Parse failed, set slot to null and return false

@@ -25,6 +25,8 @@
 
 #include "common/logging.h"
 #include "runtime/decimal-value.h"
+#include "runtime/timestamp-parse-util.h"
+#include "runtime/timestamp-value.h"
 #include "util/decimal-util.h"
 
 namespace impala {
@@ -93,6 +95,15 @@ class StringParser {
 
     int i = SkipLeadingWhitespace(s, len);
     return StringToBoolInternal(s + i, len - i, result);
+  }
+
+  /// Parse a TimestampValue from s.
+  static inline TimestampValue StringToTimestamp(const char* s, int len,
+      ParseResult* result) {
+    boost::gregorian::date d;
+    boost::posix_time::time_duration t;
+    *result = TimestampParser::Parse(s, len, &d, &t) ? PARSE_SUCCESS : PARSE_FAILURE;
+    return {d, t};
   }
 
   /// Parses a decimal from s, returning the result.

@@ -117,6 +117,12 @@ double IrStringToDouble(const char* s, int len, StringParser::ParseResult* resul
 }
 
 extern "C"
+TimestampValue IrStringToTimestamp(const char* s, int len,
+    StringParser::ParseResult* result) {
+  return StringParser::StringToTimestamp(s, len, result);
+}
+
+extern "C"
 bool IrIsNullString(const char* data, int len) {
   return data == NULL || (len == 2 && data[0] == '\\' && data[1] == 'N');
 }
