@@ -71,11 +71,7 @@ class ThriftClientImpl {
   Status socket_create_status() { return socket_create_status_; }
 
  protected:
-  ThriftClientImpl(const std::string& ipaddress, int port, bool ssl)
-      : address_(MakeNetworkAddress(ipaddress, port)), ssl_(ssl) {
-    if (ssl_) ssl_factory_.reset(new TSSLSocketFactory());
-    socket_create_status_ = CreateSocket();
-  }
+  ThriftClientImpl(const std::string& ipaddress, int port, bool ssl);
 
   /// Create a new socket without opening it. Returns an error if the socket could not
   /// be created.

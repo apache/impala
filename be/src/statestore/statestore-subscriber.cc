@@ -39,6 +39,7 @@
 
 using boost::posix_time::seconds;
 using namespace apache::thrift;
+using namespace apache::thrift::transport;
 using namespace strings;
 
 DEFINE_int32(statestore_subscriber_timeout_seconds, 30, "The amount of time (in seconds)"
@@ -53,6 +54,7 @@ DECLARE_string(ssl_server_certificate);
 DECLARE_string(ssl_private_key);
 DECLARE_string(ssl_private_key_password_cmd);
 DECLARE_string(ssl_cipher_list);
+DECLARE_string(ssl_minimum_version);
 
 namespace impala {
 
@@ -196,9 +198,13 @@ Status StatestoreSubscriber::Start() {
     ThriftServerBuilder builder(
         "StatestoreSubscriber", processor, heartbeat_address_.port);
     if (EnableInternalSslConnections()) {
+      SSLProtocol ssl_version;
+      RETURN_IF_ERROR(
+          SSLProtoVersions::StringToProtocol(FLAGS_ssl_minimum_version, &ssl_version));
       LOG(INFO) << "Enabling SSL for Statestore subscriber";
       builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
           .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
+          .ssl_version(ssl_version)
           .cipher_list(FLAGS_ssl_cipher_list);
     }
 

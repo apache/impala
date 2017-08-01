@@ -30,9 +30,11 @@
 using namespace impala;
 using namespace strings;
 using namespace apache::thrift;
+using apache::thrift::transport::SSLProtocol;
 
 DECLARE_string(ssl_client_ca_certificate);
 DECLARE_string(ssl_cipher_list);
+DECLARE_string(ssl_minimum_version);
 
 DECLARE_int32(state_store_port);
 
@@ -255,6 +257,92 @@ TEST(SslTest, MismatchedCiphers) {
   EXPECT_THROW(ssl_client.iface()->RegisterSubscriber(
                    resp, TRegisterSubscriberRequest(), &send_done),
       TTransportException);
+}
+
+// Test that StringToProtocol() correctly maps strings to their symbolic protocol
+// equivalents.
+TEST(SslTest, StringToProtocol) {
+  SSLProtocol version;
+#if OPENSSL_VERSION_NUMBER < 0x10001000L
+  // No TLSv1.1+ support in OpenSSL v1.0.0.
+  EXPECT_FALSE(SSLProtoVersions::StringToProtocol("tlsv1.2", &version).ok());
+  EXPECT_FALSE(SSLProtoVersions::StringToProtocol("tlsv1.1", &version).ok());
+  EXPECT_OK(SSLProtoVersions::StringToProtocol("tlsv1", &version));
+  EXPECT_EQ(TLSv1_0_plus, version);
+#else
+  map<string, SSLProtocol> TEST_CASES = {{"tlsv1", TLSv1_0_plus},
+      {"tlsv1.1", TLSv1_1_plus}, {"tlsv1.2", TLSv1_2_plus}, {"tlsv1_only", TLSv1_0},
+      {"tlsv1.1_only", TLSv1_1}, {"tlsv1.2_only", TLSv1_2}};
+  for (auto p : TEST_CASES) {
+    EXPECT_OK(SSLProtoVersions::StringToProtocol(p.first, &version));
+    EXPECT_EQ(p.second, version) << "TLS version: " << p.first;
+  }
+#endif
+}
+
+TEST(SslTest, TLSVersionControl) {
+  auto flag =
+      ScopedFlagSetter<string>::Make(&FLAGS_ssl_client_ca_certificate, SERVER_CERT);
+
+  // A config is really a pair (server_version, whitelist), where 'server_version' is the
+  // server TLS version to test, and 'whitelist' is the set of client protocols that
+  // should be able to connect successfully. This test tries all client protocols,
+  // expecting those in the whitelist to succeed, and those that are not to fail.
+  struct Config {
+    SSLProtocol server_version;
+    set<SSLProtocol> whitelist;
+  };
+
+#if OPENSSL_VERSION_NUMBER < 0x10001000L
+  vector<Config> configs = {
+      {TLSv1_0, {TLSv1_0, TLSv1_0_plus}}, {TLSv1_0_plus, {TLSv1_0, TLSv1_0_plus}}};
+#else
+  vector<Config> configs = {{TLSv1_0, {TLSv1_0, TLSv1_0_plus}},
+      {TLSv1_0_plus,
+          {TLSv1_0, TLSv1_1, TLSv1_2, TLSv1_0_plus, TLSv1_1_plus, TLSv1_2_plus}},
+      {TLSv1_1, {TLSv1_1_plus, TLSv1_1, TLSv1_0_plus}},
+      {TLSv1_1_plus, {TLSv1_1, TLSv1_2, TLSv1_0_plus, TLSv1_1_plus, TLSv1_2_plus}},
+      {TLSv1_2, {TLSv1_2, TLSv1_0_plus, TLSv1_1_plus, TLSv1_2_plus}},
+      {TLSv1_2_plus, {TLSv1_2, TLSv1_0_plus, TLSv1_1_plus, TLSv1_2_plus}}};
+#endif
+
+  for (const auto& config : configs) {
+    // For each config, start a server with the requested protocol spec, and then try to
+    // connect a client to it with every possible spec. This is an N^2 test, but the value
+    // of N is 6.
+    int port = GetServerPort();
+
+    ThriftServer* server;
+    EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
+                  .ssl(SERVER_CERT, PRIVATE_KEY)
+                  .ssl_version(config.server_version)
+                  .Build(&server));
+    EXPECT_OK(server->Start());
+
+    for (auto client_version : SSLProtoVersions::PROTO_MAP) {
+      auto s = ScopedFlagSetter<string>::Make(
+          &FLAGS_ssl_minimum_version, client_version.first);
+      ThriftClient<StatestoreServiceClientWrapper> ssl_client(
+          "localhost", port, "", nullptr, true);
+      EXPECT_OK(ssl_client.Open());
+      bool send_done = false;
+      TRegisterSubscriberResponse resp;
+
+      if (config.whitelist.find(client_version.second) == config.whitelist.end()) {
+        EXPECT_THROW(ssl_client.iface()->RegisterSubscriber(
+                         resp, TRegisterSubscriberRequest(), &send_done),
+            TTransportException)
+            << "TLS version: " << config.server_version
+            << ", client version: " << client_version.first;
+      } else {
+        EXPECT_NO_THROW({
+          ssl_client.iface()->RegisterSubscriber(
+              resp, TRegisterSubscriberRequest(), &send_done);
+        }) << "TLS version: "
+           << config.server_version << ", client version: " << client_version.first;
+      }
+    }
+  }
 }
 
 TEST(SslTest, MatchedCiphers) {

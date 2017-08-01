@@ -18,20 +18,22 @@
 #ifndef IMPALA_RPC_THRIFT_SERVER_H
 #define IMPALA_RPC_THRIFT_SERVER_H
 
-#include <boost/thread/mutex.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/thread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/uuid/uuid_generators.hpp>
-#include <thrift/server/TServer.h>
 #include <thrift/TProcessor.h>
+#include <thrift/server/TServer.h>
+#include <thrift/transport/TSSLSocket.h>
 
 #include "common/status.h"
-#include "rpc/auth-provider.h"
 #include "util/metrics.h"
 #include "util/thread.h"
 
 namespace impala {
+
+class AuthProvider;
 
 /// Utility class for all Thrift servers. Runs a threaded server by default, or a
 /// TThreadPoolServer with, by default, 2 worker threads, that exposes the interface
@@ -156,13 +158,15 @@ class ThriftServer {
       AuthProvider* auth_provider = nullptr, MetricGroup* metrics = nullptr,
       int num_worker_threads = DEFAULT_WORKER_THREADS, ServerType server_type = Threaded);
 
-  /// Enables secure access over SSL. Must be called before Start(). The first two
-  /// arguments are paths to certificate and private key files in .PEM format,
-  /// respectively. If either file does not exist, an error is returned. The final
-  /// optional argument provides the command to run if a password is required to decrypt
-  /// the private key. It is invoked once, and the resulting password is used only for
-  /// password-protected .PEM files.
-  Status EnableSsl(const std::string& certificate, const std::string& private_key,
+  /// Enables secure access over SSL. Must be called before Start(). The first three
+  /// arguments are the minimum SSL/TLS version, and paths to certificate and private key
+  /// files in .PEM format, respectively. If either file does not exist, an error is
+  /// returned. The fourth, optional, argument provides the command to run if a password
+  /// is required to decrypt the private key. It is invoked once, and the resulting
+  /// password is used only for password-protected .PEM files. The final argument is a
+  /// string containing a list of cipher suites, separated by commas, to enable.
+  Status EnableSsl(apache::thrift::transport::SSLProtocol version,
+      const std::string& certificate, const std::string& private_key,
       const std::string& pem_password_cmd = "", const std::string& ciphers = "");
 
   /// Creates the server socket on which this server listens. May be SSL enabled. Returns
@@ -190,6 +194,9 @@ class ThriftServer {
 
   /// List of ciphers that are ok for clients to use when connecting.
   std::string cipher_list_;
+
+  /// The SSL/TLS protocol client versions that this server will allow to connect.
+  apache::thrift::transport::SSLProtocol version_;
 
   /// How many worker threads to use to serve incoming requests
   /// (requests are queued if no thread is immediately available)
@@ -286,6 +293,12 @@ class ThriftServerBuilder {
     return *this;
   }
 
+  /// Sets the SSL/TLS client version(s) that this server will allow to connect.
+  ThriftServerBuilder& ssl_version(apache::thrift::transport::SSLProtocol version) {
+    version_ = version;
+    return *this;
+  }
+
   /// Sets the command used to compute the password for the SSL private key. Default is
   /// empty, i.e. no password needed.
   ThriftServerBuilder& pem_password_cmd(const std::string& pem_password_cmd) {
@@ -308,8 +321,8 @@ class ThriftServerBuilder {
     std::unique_ptr<ThriftServer> ptr(new ThriftServer(name_, processor_, port_,
         auth_provider_, metrics_, num_worker_threads_, server_type_));
     if (enable_ssl_) {
-      RETURN_IF_ERROR(
-          ptr->EnableSsl(certificate_, private_key_, pem_password_cmd_, ciphers_));
+      RETURN_IF_ERROR(ptr->EnableSsl(
+          version_, certificate_, private_key_, pem_password_cmd_, ciphers_));
     }
     (*server) = ptr.release();
     return Status::OK();
@@ -326,10 +339,22 @@ class ThriftServerBuilder {
   MetricGroup* metrics_ = nullptr;
 
   bool enable_ssl_ = false;
+  apache::thrift::transport::SSLProtocol version_ =
+      apache::thrift::transport::SSLProtocol::TLSv1_0;
   std::string certificate_;
   std::string private_key_;
   std::string pem_password_cmd_;
   std::string ciphers_;
+};
+
+/// Contains a map from string for --ssl_minimum_version to Thrift's SSLProtocol.
+struct SSLProtoVersions {
+  static std::map<std::string, apache::thrift::transport::SSLProtocol> PROTO_MAP;
+
+  /// Given a string, find a corresponding SSLProtocol from PROTO_MAP. Returns an error if
+  /// one cannot be found. Matching is case-insensitive.
+  static Status StringToProtocol(
+      const std::string& in, apache::thrift::transport::SSLProtocol* protocol);
 };
 
 // Returns true if, per the process configuration flags, server<->server communications

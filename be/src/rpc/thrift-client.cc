@@ -23,6 +23,7 @@
 #include <thrift/Thrift.h>
 #include <gutil/strings/substitute.h>
 
+#include "util/network-util.h"
 #include "util/time.h"
 
 #include "common/names.h"
@@ -33,8 +34,21 @@ using namespace strings;
 
 DECLARE_string(ssl_client_ca_certificate);
 DECLARE_string(ssl_cipher_list);
+DECLARE_string(ssl_minimum_version);
 
 namespace impala {
+
+ThriftClientImpl::ThriftClientImpl(const std::string& ipaddress, int port, bool ssl)
+  : address_(MakeNetworkAddress(ipaddress, port)), ssl_(ssl) {
+  if (ssl_) {
+    SSLProtocol version;
+    socket_create_status_ =
+        SSLProtoVersions::StringToProtocol(FLAGS_ssl_minimum_version, &version);
+    if (!socket_create_status_.ok()) return;
+    ssl_factory_.reset(new TSSLSocketFactory(version));
+  }
+  socket_create_status_ = CreateSocket();
+}
 
 Status ThriftClientImpl::Open() {
   if (!socket_create_status_.ok()) return socket_create_status_;

@@ -96,6 +96,7 @@ using boost::system_time;
 using boost::uuids::random_generator;
 using boost::uuids::uuid;
 using namespace apache::thrift;
+using namespace apache::thrift::transport;
 using namespace boost::posix_time;
 using namespace beeswax;
 using namespace rapidjson;
@@ -177,6 +178,15 @@ DEFINE_string(ssl_cipher_list, "",
     "Thrift RPC connections. Uses the OpenSSL cipher preference list format. See man (1) "
     "ciphers for more information. If empty, the default cipher list for your platform "
     "is used");
+
+const string SSL_MIN_VERSION_HELP = "The minimum SSL/TLS version that Thrift "
+    "services should use for both client and server connections. Supported versions are "
+#if OPENSSL_VERSION_NUMBER >= 0x10001000L
+    "TLSv1.0, TLSv1.1 and TLSv1.2";
+#else
+    "TLSv1.0";
+#endif
+DEFINE_string(ssl_minimum_version, "tlsv1", SSL_MIN_VERSION_HELP.c_str());
 
 DEFINE_int32(idle_session_timeout, 0, "The time, in seconds, that a session may be idle"
     " for before it is closed (and all running queries cancelled) by Impala. If 0, idle"
@@ -1933,6 +1943,12 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
 
   impala_server->reset(new ImpalaServer(exec_env));
 
+  SSLProtocol ssl_version = SSLProtocol::TLSv1_0;
+  if (!FLAGS_ssl_server_certificate.empty() || EnableInternalSslConnections()) {
+    RETURN_IF_ERROR(
+        SSLProtoVersions::StringToProtocol(FLAGS_ssl_minimum_version, &ssl_version));
+  }
+
   if (be_port != 0 && be_server != nullptr) {
     boost::shared_ptr<ImpalaInternalService> thrift_if(new ImpalaInternalService());
     boost::shared_ptr<TProcessor> be_processor(
@@ -1947,6 +1963,7 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
       LOG(INFO) << "Enabling SSL for backend";
       be_builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
           .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
+          .ssl_version(ssl_version)
           .cipher_list(FLAGS_ssl_cipher_list);
     }
     RETURN_IF_ERROR(be_builder.metrics(exec_env->metrics()).Build(be_server));
@@ -1974,6 +1991,7 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
       LOG(INFO) << "Enabling SSL for Beeswax";
       builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
           .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
+          .ssl_version(ssl_version)
           .cipher_list(FLAGS_ssl_cipher_list);
     }
     RETURN_IF_ERROR(
@@ -2000,6 +2018,7 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
       LOG(INFO) << "Enabling SSL for HiveServer2";
       builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
           .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
+          .ssl_version(ssl_version)
           .cipher_list(FLAGS_ssl_cipher_list);
     }
 
