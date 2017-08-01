@@ -362,4 +362,7 @@ public class DataSourceScanNode extends ScanNode {
     }
     return output.toString();
   }
+
+  @Override
+  public boolean hasStorageLayerConjuncts() { return !acceptedConjuncts_.isEmpty(); }
 }

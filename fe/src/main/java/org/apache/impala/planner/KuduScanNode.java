@@ -521,4 +521,7 @@ public class KuduScanNode extends ScanNode {
       default: return null;
     }
   }
+
+  @Override
+  public boolean hasStorageLayerConjuncts() { return !kuduConjuncts_.isEmpty(); }
 }

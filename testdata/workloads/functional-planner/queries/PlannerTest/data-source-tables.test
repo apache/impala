@@ -96,3 +96,18 @@ PLAN-ROOT SINK
 |
 00:EMPTYSET
 ====
+---- QUERY
+# IMPALA-5602: If a query contains predicates that are all pushed to the datasource and
+# there is a limit, then the query should not incorrectly run with 'small query'
+# optimization.
+select * from functional.alltypes_datasource where id = 1 limit 15
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|  limit: 15
+|
+00:SCAN DATA SOURCE [functional.alltypes_datasource]
+data source predicates: id = 1
+   limit: 15
+====

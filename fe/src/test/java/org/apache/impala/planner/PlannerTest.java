@@ -314,6 +314,9 @@ public class PlannerTest extends PlannerTestBase {
   @Test
   public void testKudu() {
     Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
+    addTestDb("kudu_planner_test", "Test DB for Kudu Planner.");
+    addTestTable("CREATE EXTERNAL TABLE kudu_planner_test.no_stats STORED AS KUDU " +
+        "TBLPROPERTIES ('kudu.table_name' = 'impala::functional_kudu.alltypes');");
     runPlannerTestFile("kudu");
   }
 

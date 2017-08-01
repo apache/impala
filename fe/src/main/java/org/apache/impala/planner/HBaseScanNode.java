@@ -508,4 +508,7 @@ public class HBaseScanNode extends ScanNode {
     // TODO: What's a good estimate of memory consumption?
     return 1024L * 1024L * 1024L;
   }
+
+  @Override
+  public boolean hasStorageLayerConjuncts() { return !filters_.isEmpty(); }
 }

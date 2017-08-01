@@ -182,6 +182,30 @@ public class KuduTable extends Table {
   }
 
   /**
+   * Load schema and partitioning schemes directly from Kudu.
+   */
+  public void loadSchemaFromKudu() throws ImpalaRuntimeException {
+    // This is set to 0 for Kudu tables.
+    // TODO: Change this to reflect the number of pk columns and modify all the
+    // places (e.g. insert stmt) that currently make use of this parameter.
+    numClusteringCols_ = 0;
+    org.apache.kudu.client.KuduTable kuduTable = null;
+    // Connect to Kudu to retrieve table metadata
+    KuduClient kuduClient = KuduUtil.getKuduClient(getKuduMasterHosts());
+    try {
+      kuduTable = kuduClient.openTable(kuduTableName_);
+    } catch (KuduException e) {
+      throw new ImpalaRuntimeException(
+          String.format("Error opening Kudu table '%s', Kudu error: %s", kuduTableName_,
+              e.getMessage()));
+    }
+    Preconditions.checkNotNull(kuduTable);
+
+    loadSchema(kuduTable);
+    loadPartitionByParams(kuduTable);
+  }
+
+  /**
    * Loads the metadata of a Kudu table.
    *
    * Schema and partitioning schemes are loaded directly from Kudu whereas column stats
@@ -192,32 +216,14 @@ public class KuduTable extends Table {
   public void load(boolean dummy /* not used */, IMetaStoreClient msClient,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
     msTable_ = msTbl;
-    // This is set to 0 for Kudu tables.
-    // TODO: Change this to reflect the number of pk columns and modify all the
-    // places (e.g. insert stmt) that currently make use of this parameter.
-    numClusteringCols_ = 0;
     kuduTableName_ = msTable_.getParameters().get(KuduTable.KEY_TABLE_NAME);
     Preconditions.checkNotNull(kuduTableName_);
     kuduMasters_ = msTable_.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
     Preconditions.checkNotNull(kuduMasters_);
-    org.apache.kudu.client.KuduTable kuduTable = null;
     setTableStats(msTable_);
-
-    // Connect to Kudu to retrieve table metadata
-    KuduClient kuduClient = KuduUtil.getKuduClient(getKuduMasterHosts());
-    try {
-      kuduTable = kuduClient.openTable(kuduTableName_);
-    } catch (KuduException e) {
-      throw new TableLoadingException(String.format(
-          "Error opening Kudu table '%s', Kudu error: %s",
-          kuduTableName_, e.getMessage()));
-    }
-    Preconditions.checkNotNull(kuduTable);
-
     // Load metadata from Kudu and HMS
     try {
-      loadSchema(kuduTable);
-      loadPartitionByParams(kuduTable);
+      loadSchemaFromKudu();
       loadAllColumnStats(msClient);
     } catch (ImpalaRuntimeException e) {
       throw new TableLoadingException("Error loading metadata for Kudu table " +
