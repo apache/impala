@@ -398,20 +398,9 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("coalesce(1 + 2, id, year)", rules, "3");
     RewritesOk("coalesce(null is null, bool_col)", rules, "TRUE");
     RewritesOk("coalesce(10 + null, id, year)", rules, "coalesce(id, year)");
-    // If the leading parameter is partition column, try to rewrite with partition metadata.
-    RewritesOk("coalesce(year, id)", rule, "year");
-    RewritesOk("coalesce(year, bigint_col)", rule, "year");
-    RewritesOk("coalesce(cast(year as string), string_col)", rule, "CAST(year AS STRING)");
-    RewritesOk("coalesce(id, year)", rule, null);
-    RewritesOk("coalesce(null, year, id)", rule, "year");
-    // If the leading partition column has NULL value, do not rewrite.
-    RewritesOk("functional.alltypesagg", "coalesce(year, id)", rule, "year");
-    RewritesOk("functional.alltypesagg", "coalesce(day, id)", rule, null);
-    // If the leading column is not nullable, rewrite to the column.
-    RewritesOk("functional_kudu.alltypessmall", "coalesce(id, year)", rule, "id");
-    RewritesOk("functional_kudu.alltypessmall", "coalesce(cast(id as string), string_col)", rule,
-        "CAST(id AS STRING)");
-    RewritesOk("functional_kudu.alltypessmall", "coalesce(null, id, year)", rule, "id");
+    // Don't rewrite based on nullability of slots. TODO (IMPALA-5753).
+    RewritesOk("coalesce(year, id)", rule, null);
+    RewritesOk("functional_kudu.alltypessmall", "coalesce(id, year)", rule, null);
   }
 
   @Test

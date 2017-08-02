@@ -2742,3 +2742,25 @@ select if (true, 0, sum(id)) from functional.alltypestiny
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# IMPALA-5725: test coalesce() is not rewritten when its first parameter is a non-nullable
+# Kudu column, but can have NULL values due to an outer join.
+select coalesce(b.id, a.id), b.id, a.id
+from functional_kudu.alltypes a left join functional_kudu.alltypestiny b on a.id = b.id
+where a.id = 100
+---- RESULTS
+100,NULL,100
+---- TYPES
+INT,INT,INT
+====
+---- QUERY
+# IMPALA-5725: test coalesce() is not rewritten when its first parameter is an HDFS
+# partition col with no NULL partitions, but can have NULL values due to an outer join.
+select coalesce(b.year, a.id), b.id, a.id
+from functional.alltypes a left join functional.alltypestiny b on a.id = b.id
+where a.id = 100
+---- RESULTS
+100,NULL,100
+---- TYPES
+INT,INT,INT
+====

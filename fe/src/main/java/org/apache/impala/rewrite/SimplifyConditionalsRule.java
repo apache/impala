@@ -103,8 +103,6 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
    * Simplify COALESCE by skipping leading nulls and applying the following transformations:
    * COALESCE(null, a, b) -> COALESCE(a, b);
    * COALESCE(<literal>, a, b) -> <literal>, when literal is not NullLiteral;
-   * COALESCE(<partition-slotref>, a, b) -> <partition-slotref>,
-   * when the partition column does not contain NULL.
    */
   private Expr simplifyCoalesceFunctionCallExpr(FunctionCallExpr expr) {
     int numChildren = expr.getChildren().size();
@@ -113,7 +111,7 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
       Expr childExpr = expr.getChildren().get(i);
       // Skip leading nulls.
       if (childExpr.isNullLiteral()) continue;
-      if ((i == numChildren - 1) || canSimplifyCoalesceUsingChild(childExpr)) {
+      if ((i == numChildren - 1) || childExpr.isLiteral()) {
         result = childExpr;
       } else if (i == 0) {
         result = expr;
@@ -124,32 +122,6 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
       break;
     }
     return result;
-  }
-
-  /**
-   * Checks if the given child expr is nullable. Returns true if one of the following holds:
-   * child is a non-NULL literal;
-   * child is a possibly cast SlotRef against a non-nullable slot;
-   * child is a possible cast SlotRef against a partition column that does not contain NULL.
-   */
-  private boolean canSimplifyCoalesceUsingChild(Expr child) {
-    if (child.isLiteral() && !child.isNullLiteral()) return true;
-
-    SlotRef slotRef = child.unwrapSlotRef(false);
-    if (slotRef == null) return false;
-    SlotDescriptor slotDesc = slotRef.getDesc();
-    if (!slotDesc.getIsNullable()) return true;
-    // Check partition column using partition metadata.
-    if (slotDesc.getParent().getTable() instanceof HdfsTable
-        && slotDesc.getColumn() != null
-        && slotDesc.getParent().getTable().isClusteringColumn(slotDesc.getColumn())) {
-      HdfsTable table = (HdfsTable) slotDesc.getParent().getTable();
-      // Return true if the partition column does not have a NULL value.
-      if (table.getNullPartitionIds(slotDesc.getColumn().getPosition()).isEmpty()) {
-        return true;
-      }
-    }
-    return false;
   }
 
   private Expr simplifyFunctionCallExpr(FunctionCallExpr expr) {

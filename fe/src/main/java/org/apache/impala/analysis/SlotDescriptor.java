@@ -55,6 +55,8 @@ public class SlotDescriptor {
   private boolean isMaterialized_ = false;
 
   // if false, this slot cannot be NULL
+  // Note: it is still possible that a SlotRef pointing to this descriptor could have a
+  // NULL value if the entire tuple is NULL, for example as the result of an outer join.
   private boolean isNullable_ = true;
 
   // physical layout parameters
