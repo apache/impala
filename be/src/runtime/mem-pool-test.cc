@@ -175,6 +175,33 @@ TEST(MemPoolTest, Keep) {
   p2.FreeAll();
 }
 
+#ifdef ADDRESS_SANITIZER
+
+/// These tests confirm that ASAN will catch use-after-return errors (even though the
+/// memory is still valid, just cached by the MemPool).
+TEST(MemPoolTest, UseAfterClear) {
+  MemTracker tracker;
+  MemPool p(&tracker);
+  uint8_t* ptr = p.Allocate(1024);
+  ptr[10] = 'A';
+  p.Clear();
+  ASSERT_DEATH({ptr[10] = 'B';}, "use-after-poison");
+  p.FreeAll();
+}
+
+TEST(MemPoolTest, UseAfterPartialReturn) {
+  MemTracker tracker;
+  MemPool p(&tracker);
+  uint8_t* ptr = p.Allocate(1024);
+  ptr[10] = 'A';
+  p.ReturnPartialAllocation(512);
+  ptr[511] = 'B';
+  ASSERT_DEATH({ptr[512] = 'X';}, "use-after-poison");
+  p.FreeAll();
+}
+
+#endif
+
 // Tests that we can return partial allocations.
 TEST(MemPoolTest, ReturnPartial) {
   MemTracker tracker;

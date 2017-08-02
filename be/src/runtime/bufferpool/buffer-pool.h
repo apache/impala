@@ -420,6 +420,14 @@ class BufferPool::BufferHandle {
 
   std::string DebugString() const;
 
+  /// Poison the memory associated with this handle. If ASAN is not enabled, this is a
+  /// no-op.
+  void Poison() { ASAN_POISON_MEMORY_REGION(data(), len()); }
+
+  /// Unpoison the memory associated with this handle. If ASAN is not enabled, this is a
+  /// no-op.
+  void Unpoison() { ASAN_UNPOISON_MEMORY_REGION(data(), len()); }
+
  private:
   DISALLOW_COPY_AND_ASSIGN(BufferHandle);
   friend class BufferPool;

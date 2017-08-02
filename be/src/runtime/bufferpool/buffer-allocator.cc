@@ -351,6 +351,7 @@ void BufferPool::BufferAllocator::Free(BufferHandle&& handle) {
   DCHECK(handle.is_open());
   handle.client_ = nullptr; // Buffer is no longer associated with a client.
   FreeBufferArena* arena = per_core_arenas_[handle.home_core_].get();
+  handle.Poison();
   arena->AddFreeBuffer(move(handle));
 }
 
@@ -398,6 +399,8 @@ int64_t BufferPool::BufferAllocator::FreeToSystem(vector<BufferHandle>&& buffers
   int64_t bytes_freed = 0;
   for (BufferHandle& buffer : buffers) {
     bytes_freed += buffer.len();
+    // Ensure that the memory is unpoisoned when it's next allocated by the system.
+    buffer.Unpoison();
     system_allocator_->Free(move(buffer));
   }
   return bytes_freed;
@@ -497,6 +500,7 @@ bool BufferPool::FreeBufferArena::PopFreeBuffer(
   FreeList* list = &lists->free_buffers;
   DCHECK_EQ(lists->num_free_buffers.Load(), list->Size());
   if (!list->PopFreeBuffer(buffer)) return false;
+  buffer->Unpoison();
   lists->num_free_buffers.Add(-1);
   lists->low_water_mark = min<int>(lists->low_water_mark, list->Size());
   return true;

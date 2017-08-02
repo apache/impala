@@ -75,9 +75,9 @@ MemPool::~MemPool() {
 
 void MemPool::Clear() {
   current_chunk_idx_ = -1;
-  for (std::vector<ChunkInfo>::iterator chunk = chunks_.begin();
-       chunk != chunks_.end(); ++chunk) {
-    chunk->allocated_bytes = 0;
+  for (auto& chunk: chunks_) {
+    chunk.allocated_bytes = 0;
+    ASAN_POISON_MEMORY_REGION(chunk.data, chunk.size);
   }
   total_allocated_bytes_ = 0;
   DCHECK(CheckIntegrity(false));
@@ -85,9 +85,9 @@ void MemPool::Clear() {
 
 void MemPool::FreeAll() {
   int64_t total_bytes_released = 0;
-  for (size_t i = 0; i < chunks_.size(); ++i) {
-    total_bytes_released += chunks_[i].size;
-    free(chunks_[i].data);
+  for (auto& chunk: chunks_) {
+    total_bytes_released += chunk.size;
+    free(chunk.data);
   }
   chunks_.clear();
   next_chunk_size_ = INITIAL_CHUNK_SIZE;
@@ -151,6 +151,8 @@ bool MemPool::FindChunk(int64_t min_size, bool check_limits) noexcept {
     mem_tracker_->Release(chunk_size);
     return false;
   }
+
+  ASAN_POISON_MEMORY_REGION(buf, chunk_size);
 
   // Put it before the first free chunk. If no free chunks, it goes at the end.
   if (first_free_idx == static_cast<int>(chunks_.size())) {

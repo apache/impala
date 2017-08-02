@@ -67,14 +67,14 @@ TEST(FreePoolTest, Basic) {
   // We know have 2 1 byte allocations, which were rounded up to 8 bytes. Make an 8
   // byte allocation, which can reuse one of the existing ones.
   uint8_t* p4 = pool.Allocate(2);
-  memset(p4, 2, 123);
+  memset(p4, 123, 2);
   EXPECT_EQ(mem_pool.total_allocated_bytes(), 32);
   EXPECT_TRUE(p4 == p1 || p4 == p2 || p4 == p3);
   pool.Free(p4);
 
   // Make a 9 byte allocation, which requires a new allocation.
   uint8_t* p5 = pool.Allocate(9);
-  memset(p5, 9, 123);
+  memset(p5, 123, 9);
   EXPECT_EQ(mem_pool.total_allocated_bytes(), 56);
   pool.Free(p5);
   EXPECT_TRUE(p5 != p1);
@@ -113,6 +113,48 @@ TEST(FreePoolTest, Basic) {
 
   mem_pool.FreeAll();
 }
+
+#ifdef ADDRESS_SANITIZER
+
+// The following tests confirm that ASAN catches invalid memory accesses thanks to the
+// FreePool manually (un)poisoning memory.
+TEST(FreePoolTest, OutOfBoundsAccess) {
+  MemTracker tracker;
+  MemPool mem_pool(&tracker);
+  FreePool pool(&mem_pool);
+
+  uint8_t* ptr = pool.Allocate(5);
+  ptr[4] = 'O';
+  ASSERT_DEATH({ptr[5] = 'X';}, "use-after-poison");
+  mem_pool.FreeAll();
+}
+
+TEST(FreePoolTest, UseAfterFree) {
+  MemTracker tracker;
+  MemPool mem_pool(&tracker);
+  FreePool pool(&mem_pool);
+
+  uint8_t* ptr = pool.Allocate(5);
+  ptr[4] = 'O';
+  pool.Free(ptr);
+  ASSERT_DEATH({ptr[0] = 'X';}, "use-after-poison");
+  mem_pool.FreeAll();
+}
+
+TEST(FreePoolTest, ReallocPoison) {
+  MemTracker tracker;
+  MemPool mem_pool(&tracker);
+  FreePool pool(&mem_pool);
+
+  uint8_t* ptr = pool.Allocate(32);
+  ptr[30] = 'O';
+  ptr = pool.Reallocate(ptr, 16);
+  ASSERT_DEATH({ptr[30] = 'X';}, "use-after-poison");
+  mem_pool.FreeAll();
+}
+
+#endif
+
 
 // In this test we make two allocations at increasing sizes and then we
 // free both to prime the pool. Then, for a few iterations, we make the same allocations

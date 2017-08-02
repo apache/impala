@@ -194,6 +194,10 @@ set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-c" "-std=c++14" "-DIR_COMPILE" "-DNDEBUG"
 # -Werror: compile warnings should be errors when using the toolchain compiler.
 set(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-Werror")
 
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
+  SET(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-DADDRESS_SANITIZER")
+endif()
+
 IF($ENV{ENABLE_IMPALA_IR_DEBUG_INFO} STREQUAL "true")
   # -g: emit debug symbols in IR. These increase IR size and memory overhead of LLVM, but
   #     are useful for debugging codegened code and interpreting codegen disassembly

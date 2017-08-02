@@ -68,6 +68,23 @@ class BufferAllocatorTest : public ::testing::Test {
   ReservationTracker dummy_reservation_;
 };
 
+#ifdef ADDRESS_SANITIZER
+
+// Confirm that ASAN will catch use-after-free errors, even if the BufferAllocator caches
+// returned memory.
+TEST_F(BufferAllocatorTest, Poisoning) {
+  BufferAllocator allocator(dummy_pool_, TEST_BUFFER_LEN, 2 * TEST_BUFFER_LEN);
+  BufferHandle buffer;
+  ASSERT_OK(allocator.Allocate(&dummy_client_, TEST_BUFFER_LEN, &buffer));
+  uint8_t* data = buffer.data();
+  allocator.Free(move(buffer));
+
+  // Should trigger a ASAN failure.
+  ASSERT_DEATH({data[10] = 0;}, "use-after-poison");
+}
+
+#endif
+
 // Functional test that makes sure the free lists cache as many buffers as expected.
 TEST_F(BufferAllocatorTest, FreeListSizes) {
   // Run on core 0 to ensure that we always go to the same free list.

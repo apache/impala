@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "common/logging.h"
+#include "gutil/dynamic_annotations.h"
 #include "util/bit-util.h"
 
 namespace impala {
@@ -128,6 +129,7 @@ class MemPool {
     ChunkInfo& info = chunks_[current_chunk_idx_];
     DCHECK_GE(info.allocated_bytes, byte_size);
     info.allocated_bytes -= byte_size;
+    ASAN_POISON_MEMORY_REGION(info.data + info.allocated_bytes, byte_size);
     total_allocated_bytes_ -= byte_size;
   }
 
@@ -266,6 +268,7 @@ class MemPool {
 
     ChunkInfo& info = chunks_[current_chunk_idx_];
     uint8_t* result = info.data + info.allocated_bytes;
+    ASAN_UNPOISON_MEMORY_REGION(result, size);
     DCHECK_LE(info.allocated_bytes + size, info.size);
     info.allocated_bytes += size;
     total_allocated_bytes_ += size;
