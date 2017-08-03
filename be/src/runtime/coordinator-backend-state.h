@@ -67,13 +67,14 @@ class Coordinator::BackendState {
       CountingBarrier* rpc_complete_barrier);
 
   /// Update overall execution status, including the instances' exec status/profiles
-  /// and the error log. Updates the fragment instances' TExecStats in exec_summary
-  /// (exec_summary->nodes.exec_stats) and updates progress_update, and sets
-  /// done to true if all fragment instances completed, regardless of status.
-  /// If any instance reports an error, the overall execution status becomes the first
-  /// reported error status and 'done' is set to true.
-  void ApplyExecStatusReport(const TReportExecStatusParams& backend_exec_status,
-      ExecSummary* exec_summary, ProgressUpdater* scan_range_progress, bool* done);
+  /// and the error log, if this backend is not already done. Updates the fragment
+  /// instances' TExecStats in exec_summary (exec_summary->nodes.exec_stats) and updates
+  /// progress_update. If any instance reports an error, the overall execution status
+  /// becomes the first reported error status. Returns true iff this update changed
+  /// IsDone() from false to true, either because it was the last fragment to complete or
+  /// because it was the first error received.
+  bool ApplyExecStatusReport(const TReportExecStatusParams& backend_exec_status,
+      ExecSummary* exec_summary, ProgressUpdater* scan_range_progress);
 
   /// Update completion_times, rates, and avg_profile for all fragment_stats.
   void UpdateExecStats(const std::vector<FragmentStats*>& fragment_stats);
@@ -108,8 +109,9 @@ class Coordinator::BackendState {
   /// Only valid after Exec().
   int64_t rpc_latency() const { return rpc_latency_; }
 
-  /// Return true if execution at this backend is done.
-  bool IsDone();
+  /// Print host/port info for the first backend that's still in progress as a
+  /// debugging aid for backend deadlocks.
+  static void LogFirstInProgress(std::vector<BackendState*> backend_states);
 
  private:
   /// Execution stats for a single fragment instance.
@@ -217,8 +219,8 @@ class Coordinator::BackendState {
       const FilterRoutingTable& filter_routing_table,
       TExecQueryFInstancesParams* rpc_params);
 
-  /// Return true if execution at this backend is done. Doesn't acquire lock.
-  bool IsDoneInternal() const;
+  /// Return true if execution at this backend is done. Caller must hold lock_.
+  bool IsDone() const;
 };
 
 /// Per fragment execution statistics.

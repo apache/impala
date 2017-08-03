@@ -228,20 +228,29 @@ void Coordinator::BackendState::MergeErrorLog(ErrorLogMap* merged) {
   if (error_log_.size() > 0)  MergeErrorMaps(error_log_, merged);
 }
 
-bool Coordinator::BackendState::IsDone() {
-  lock_guard<mutex> l(lock_);
-  return IsDoneInternal();
+void Coordinator::BackendState::LogFirstInProgress(
+    std::vector<Coordinator::BackendState*> backend_states) {
+  for (Coordinator::BackendState* backend_state : backend_states) {
+    lock_guard<mutex> l(backend_state->lock_);
+    if (!backend_state->IsDone()) {
+      VLOG_QUERY << "query_id=" << backend_state->query_id_
+                 << ": first in-progress backend: " << backend_state->impalad_address();
+      break;
+    }
+  }
 }
 
-inline bool Coordinator::BackendState::IsDoneInternal() const {
+inline bool Coordinator::BackendState::IsDone() const {
   return num_remaining_instances_ == 0 || !status_.ok();
 }
 
-void Coordinator::BackendState::ApplyExecStatusReport(
+bool Coordinator::BackendState::ApplyExecStatusReport(
     const TReportExecStatusParams& backend_exec_status, ExecSummary* exec_summary,
-    ProgressUpdater* scan_range_progress, bool* done) {
+    ProgressUpdater* scan_range_progress) {
   lock_guard<SpinLock> l1(exec_summary->lock);
   lock_guard<mutex> l2(lock_);
+  // If this backend completed previously, don't apply the update.
+  if (IsDone()) return false;
   for (const TFragmentInstanceExecStatus& instance_exec_status:
       backend_exec_status.instance_exec_status) {
     Status instance_status(instance_exec_status.status);
@@ -298,8 +307,8 @@ void Coordinator::BackendState::ApplyExecStatusReport(
     VLOG_FILE << "host=" << host_ << " error log: " << PrintErrorMapToString(error_log_);
   }
 
-  *done = IsDoneInternal();
   // TODO: keep backend-wide stopwatch?
+  return IsDone();
 }
 
 void Coordinator::BackendState::UpdateExecStats(
@@ -327,7 +336,7 @@ bool Coordinator::BackendState::Cancel() {
   if (!rpc_sent_) return false;
 
   // don't cancel if it already finished (for any reason)
-  if (IsDoneInternal()) return false;
+  if (IsDone()) return false;
 
   /// If the status is not OK, we still try to cancel - !OK status might mean
   /// communication failure between backend and coordinator, but fragment

@@ -931,15 +931,9 @@ Status Coordinator::UpdateBackendExecStatus(const TReportExecStatusParams& param
             params.coord_state_idx, backend_states_.size() - 1));
   }
   BackendState* backend_state = backend_states_[params.coord_state_idx];
-  // ignore stray exec reports if we're already done, otherwise we lose
-  // track of num_remaining_backends_
-  if (backend_state->IsDone()) return Status::OK();
   // TODO: return here if returned_all_results_?
   // TODO: return CANCELLED in that case? Although that makes the cancellation propagation
   // path more irregular.
-
-  bool done;
-  backend_state->ApplyExecStatusReport(params, &exec_summary_, &progress_, &done);
 
   // TODO: only do this when the sink is done; probably missing a done field
   // in TReportExecStatus for that
@@ -947,43 +941,38 @@ Status Coordinator::UpdateBackendExecStatus(const TReportExecStatusParams& param
     UpdateInsertExecStatus(params.insert_exec_status);
   }
 
-  // for now, abort the query if we see any error except if returned_all_results_ is true
-  // (UpdateStatus() initiates cancellation, if it hasn't already been)
-  // TODO: clarify control flow here, it's unclear we should even process this status
-  // report if returned_all_results_ is true
-  TUniqueId failed_instance_id;
-  Status status = backend_state->GetStatus(&failed_instance_id);
-  if (!status.ok() && !returned_all_results_) {
-    Status ignored = UpdateStatus(status, failed_instance_id,
-        TNetworkAddressToString(backend_state->impalad_address()));
-    return Status::OK();
-  }
+  if (backend_state->ApplyExecStatusReport(params, &exec_summary_, &progress_)) {
+    // This report made this backend done, so update the status and
+    // num_remaining_backends_.
 
-  // If all results have been returned, return a cancelled status to force the fragment
-  // instance to stop executing.
-  if (!done && returned_all_results_) return Status::CANCELLED;
+    // for now, abort the query if we see any error except if returned_all_results_ is
+    // true (UpdateStatus() initiates cancellation, if it hasn't already been)
+    // TODO: clarify control flow here, it's unclear we should even process this status
+    // report if returned_all_results_ is true
+    TUniqueId failed_instance_id;
+    Status status = backend_state->GetStatus(&failed_instance_id);
+    if (!status.ok() && !returned_all_results_) {
+      Status ignored = UpdateStatus(status, failed_instance_id,
+          TNetworkAddressToString(backend_state->impalad_address()));
+      return Status::OK();
+    }
 
-  if (done) {
     lock_guard<mutex> l(lock_);
     DCHECK_GT(num_remaining_backends_, 0);
-    VLOG_QUERY << "Backend completed: "
-        << " host=" << backend_state->impalad_address()
-        << " remaining=" << num_remaining_backends_ - 1;
     if (VLOG_QUERY_IS_ON && num_remaining_backends_ > 1) {
-      // print host/port info for the first backend that's still in progress as a
-      // debugging aid for backend deadlocks
-      for (BackendState* backend_state: backend_states_) {
-        if (!backend_state->IsDone()) {
-          VLOG_QUERY << "query_id=" << query_id() << ": first in-progress backend: "
-                     << backend_state->impalad_address();
-          break;
-        }
-      }
+      VLOG_QUERY << "Backend completed: "
+          << " host=" << backend_state->impalad_address()
+          << " remaining=" << num_remaining_backends_ - 1;
+      BackendState::LogFirstInProgress(backend_states_);
     }
     if (--num_remaining_backends_ == 0 || !status.ok()) {
       backend_completion_cv_.notify_all();
     }
+    return Status::OK();
   }
+  // If all results have been returned, return a cancelled status to force the fragment
+  // instance to stop executing.
+  if (returned_all_results_) return Status::CANCELLED;
 
   return Status::OK();
 }
