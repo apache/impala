@@ -54,7 +54,8 @@ Status InitialReservations::Init(
     return Status(TErrorCode::MINIMUM_RESERVATION_UNAVAILABLE,
         PrettyPrinter::Print(query_min_reservation, TUnit::BYTES), FLAGS_hostname,
         FLAGS_be_port, PrintId(query_id),
-        ExecEnv::GetInstance()->process_mem_tracker()->LogUsage());
+        ExecEnv::GetInstance()->process_mem_tracker()->LogUsage(
+            MemTracker::PROCESS_MEMTRACKER_LIMITED_DEPTH));
   }
   VLOG_QUERY << "Successfully claimed initial reservations ("
             << PrettyPrinter::Print(query_min_reservation, TUnit::BYTES) << ") for"

@@ -229,7 +229,7 @@ class MemTracker {
       /// consistent.)
       if (tracker->consumption_metric_ == NULL) {
         DCHECK_GE(tracker->consumption_->current_value(), 0)
-          << std::endl << tracker->LogUsage();
+          << std::endl << tracker->LogUsage(UNLIMITED_DEPTH);
       }
     }
   }
@@ -324,12 +324,24 @@ class MemTracker {
   /// "<prefix>.<metric name>".
   void RegisterMetrics(MetricGroup* metrics, const std::string& prefix);
 
-  /// Logs the usage of this tracker and all of its children (recursively).
+  /// Logs the usage of this tracker and optionally its children (recursively).
   /// If 'logged_consumption' is non-NULL, sets the consumption value logged.
+  /// 'max_recursive_depth' specifies the maximum number of levels of children
+  /// to include in the dump. If it is zero, then no children are dumped.
+  /// Limiting the recursive depth reduces the cost of dumping, particularly
+  /// for the process MemTracker.
   /// TODO: once all memory is accounted in ReservationTracker hierarchy, move
   /// reporting there.
-  std::string LogUsage(
+  std::string LogUsage(int max_recursive_depth,
       const std::string& prefix = "", int64_t* logged_consumption = nullptr);
+  /// Dumping the process MemTracker is expensive. Limiting the recursive depth
+  /// to two levels limits the level of detail to a one-line summary for each query
+  /// MemTracker, avoiding all MemTrackers below that level. This provides a summary
+  /// of process usage with substantially lower cost than the full dump.
+  static const int PROCESS_MEMTRACKER_LIMITED_DEPTH = 2;
+  /// Unlimited dumping is useful for query memtrackers or error conditions that
+  /// are not performance sensitive
+  static const int UNLIMITED_DEPTH = INT_MAX;
 
   /// Log the memory usage when memory limit is exceeded and return a status object with
   /// details of the allocation which caused the limit to be exceeded.
@@ -358,8 +370,9 @@ class MemTracker {
   void AddChildTracker(MemTracker* tracker);
 
   /// Log consumption of all the trackers provided. Returns the sum of consumption in
-  /// 'logged_consumption'.
-  static std::string LogUsage(const std::string& prefix,
+  /// 'logged_consumption'. 'max_recursive_depth' specifies the maximum number of levels
+  /// of children to include in the dump. If it is zero, then no children are dumped.
+  static std::string LogUsage(int max_recursive_depth, const std::string& prefix,
       const std::list<MemTracker*>& trackers, int64_t* logged_consumption);
 
   /// Lock to protect GcMemory(). This prevents many GCs from occurring at once.

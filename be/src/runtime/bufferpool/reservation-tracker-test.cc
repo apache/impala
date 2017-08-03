@@ -330,7 +330,7 @@ TEST_F(ReservationTrackerTest, MemTrackerIntegrationMultiLevel) {
           ASSERT_EQ(amount, mem_trackers[ancestor]->consumption());
         }
 
-        LOG(INFO) << "\n" << mem_trackers[0]->LogUsage();
+        LOG(INFO) << "\n" << mem_trackers[0]->LogUsage(MemTracker::UNLIMITED_DEPTH);
         reservations[level].Close();
       } else {
         ASSERT_FALSE(increased);

@@ -147,7 +147,8 @@ void MemUsageHandler(MemTracker* mem_tracker, MetricGroup* metric_group,
   document->AddMember("overview", overview, document->GetAllocator());
 
   // Dump all mem trackers.
-  Value detailed(mem_tracker->LogUsage().c_str(), document->GetAllocator());
+  Value detailed(mem_tracker->LogUsage(MemTracker::UNLIMITED_DEPTH).c_str(),
+      document->GetAllocator());
   document->AddMember("detailed", detailed, document->GetAllocator());
 
   Value systeminfo(MemInfo::DebugString().c_str(), document->GetAllocator());

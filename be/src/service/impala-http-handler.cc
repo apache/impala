@@ -261,7 +261,7 @@ void ImpalaHttpHandler::QueryMemoryHandler(const Webserver::ArgumentMap& args,
   string mem_usage_text;
   // Only in-flight queries have a MemTracker to get usage from.
   if (qs.get() != nullptr) {
-    mem_usage_text = qs->query_mem_tracker()->LogUsage();
+    mem_usage_text = qs->query_mem_tracker()->LogUsage(MemTracker::UNLIMITED_DEPTH);
   } else {
     mem_usage_text =
         "The query is finished, current memory consumption is not available.";

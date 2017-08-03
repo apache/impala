@@ -215,9 +215,10 @@ void ExecNode::Close(RuntimeState* state) {
   if (mem_tracker_ != nullptr) {
     if (mem_tracker()->consumption() != 0) {
       LOG(WARNING) << "Query " << state->query_id() << " may have leaked memory." << endl
-                   << state->instance_mem_tracker()->LogUsage();
+          << state->instance_mem_tracker()->LogUsage(MemTracker::UNLIMITED_DEPTH);
       DCHECK_EQ(mem_tracker()->consumption(), 0)
-          << "Leaked memory." << endl << state->instance_mem_tracker()->LogUsage();
+          << "Leaked memory." << endl
+          << state->instance_mem_tracker()->LogUsage(MemTracker::UNLIMITED_DEPTH);
     }
     mem_tracker_->Close();
   }

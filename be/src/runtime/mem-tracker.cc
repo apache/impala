@@ -115,7 +115,7 @@ void MemTracker::Close() {
   if (consumption_metric_ == nullptr) {
     DCHECK_EQ(consumption_->current_value(), 0) << label_ << "\n"
                                                 << GetStackTrace() << "\n"
-                                                << LogUsage("");
+                                                << LogUsage(UNLIMITED_DEPTH);
   }
   closed_ = true;
 }
@@ -135,7 +135,7 @@ void MemTracker::EnableReservationReporting(const ReservationTrackerCounters& co
 int64_t MemTracker::GetPoolMemReserved() {
   // Pool trackers should have a pool_name_ and no limit.
   DCHECK(!pool_name_.empty());
-  DCHECK_EQ(limit_, -1) << LogUsage("");
+  DCHECK_EQ(limit_, -1) << LogUsage(UNLIMITED_DEPTH);
 
   int64_t mem_reserved = 0L;
   lock_guard<SpinLock> l(child_trackers_lock_);
@@ -145,7 +145,7 @@ int64_t MemTracker::GetPoolMemReserved() {
       // Make sure we don't overflow if the query limits are set to ridiculous values.
       mem_reserved += std::min(child_limit, MemInfo::physical_mem());
     } else {
-      DCHECK_EQ(child_limit, -1) << child->LogUsage("");
+      DCHECK_EQ(child_limit, -1) << child->LogUsage(UNLIMITED_DEPTH);
       mem_reserved += child->consumption();
     }
   }
@@ -239,7 +239,8 @@ void MemTracker::RegisterMetrics(MetricGroup* metrics, const string& prefix) {
 //   TrackerName: Limit=5.00 MB Reservation=5.00 MB OtherMemory=1.04 MB
 //                Total=6.04 MB Peak=6.45 MB
 //
-string MemTracker::LogUsage(const string& prefix, int64_t* logged_consumption) {
+string MemTracker::LogUsage(int max_recursive_depth, const string& prefix,
+    int64_t* logged_consumption) {
   // Make sure the consumption is up to date.
   if (consumption_metric_ != nullptr) RefreshConsumptionFromMetric();
   int64_t curr_consumption = consumption();
@@ -273,12 +274,17 @@ string MemTracker::LogUsage(const string& prefix, int64_t* logged_consumption) {
     ss << " Peak=" << PrettyPrinter::Print(peak_consumption, TUnit::BYTES);
   }
 
+  // This call does not need the children, so return early.
+  if (max_recursive_depth == 0) return ss.str();
+
+  // Recurse and get information about the children
   string new_prefix = Substitute("  $0", prefix);
   int64_t child_consumption;
   string child_trackers_usage;
   {
     lock_guard<SpinLock> l(child_trackers_lock_);
-    child_trackers_usage = LogUsage(new_prefix, child_trackers_, &child_consumption);
+    child_trackers_usage = LogUsage(max_recursive_depth - 1, new_prefix,
+        child_trackers_, &child_consumption);
   }
   if (!child_trackers_usage.empty()) ss << "\n" << child_trackers_usage;
 
@@ -296,13 +302,14 @@ string MemTracker::LogUsage(const string& prefix, int64_t* logged_consumption) {
   return ss.str();
 }
 
-string MemTracker::LogUsage(const string& prefix, const list<MemTracker*>& trackers,
-    int64_t* logged_consumption) {
+string MemTracker::LogUsage(int max_recursive_depth, const string& prefix,
+    const list<MemTracker*>& trackers, int64_t* logged_consumption) {
   *logged_consumption = 0;
   vector<string> usage_strings;
   for (MemTracker* tracker : trackers) {
     int64_t tracker_consumption;
-    string usage_string = tracker->LogUsage(prefix, &tracker_consumption);
+    string usage_string = tracker->LogUsage(max_recursive_depth, prefix,
+        &tracker_consumption);
     if (!usage_string.empty()) usage_strings.push_back(usage_string);
     *logged_consumption += tracker_consumption;
   }
@@ -328,18 +335,25 @@ Status MemTracker::MemLimitExceeded(RuntimeState* state, const std::string& deta
   ss << "Memory left in process limit: "
      << PrettyPrinter::Print(process_capacity, TUnit::BYTES) << endl;
 
-  // Choose which tracker to log the usage of. Default to the process tracker so we can
-  // get the full view of memory consumption.
-  MemTracker* tracker_to_log = process_tracker;
-  if (state != nullptr && state->query_mem_tracker()->has_limit()) {
+  // Always log the query tracker (if available).
+  if (state != nullptr) {
     MemTracker* query_tracker = state->query_mem_tracker();
-    const int64_t query_capacity = query_tracker->limit() - query_tracker->consumption();
-    ss << "Memory left in query limit: "
-       << PrettyPrinter::Print(query_capacity, TUnit::BYTES) << endl;
-    // Log the query tracker only if the query limit was closer to being exceeded.
-    if (query_capacity < process_capacity) tracker_to_log = query_tracker;
+    if (query_tracker->has_limit()) {
+      const int64_t query_capacity = query_tracker->limit() - query_tracker->consumption();
+      ss << "Memory left in query limit: "
+         << PrettyPrinter::Print(query_capacity, TUnit::BYTES) << endl;
+    }
+    ss << query_tracker->LogUsage(UNLIMITED_DEPTH);
   }
-  ss << tracker_to_log->LogUsage();
+
+  // Log the process level if the process tracker is close to the limit or
+  // if the query tracker was not available.
+  if (process_capacity < failed_allocation_size || state == nullptr) {
+    // IMPALA-5598: For performance reasons, limit the levels of recursion when
+    // dumping the process tracker to only two layers.
+    ss << process_tracker->LogUsage(PROCESS_MEMTRACKER_LIMITED_DEPTH);
+  }
+
   Status status = Status::MemLimitExceeded(ss.str());
   if (state != nullptr) state->LogError(status.msg());
   return status;

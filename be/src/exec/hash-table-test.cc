@@ -476,7 +476,7 @@ class HashTableTest : public testing::Test {
       bool success;
       EXPECT_OK(hash_table->CheckAndResize(num_to_add, ht_ctx.get(), &success));
       EXPECT_TRUE(success) << " failed to resize: " << num_to_add << "\n"
-                           << tracker_.LogUsage() << "\n"
+                           << tracker_.LogUsage(MemTracker::UNLIMITED_DEPTH) << "\n"
                            << clients_.back()->DebugString();
       for (int j = 0; j < num_to_add; ++build_row_val, ++j) {
         TupleRow* row = CreateTupleRow(build_row_val);
