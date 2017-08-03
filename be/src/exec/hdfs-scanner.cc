@@ -320,11 +320,11 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
   TupleDescriptor* tuple_desc = const_cast<TupleDescriptor*>(node->tuple_desc());
   vector<Function*> slot_fns;
   for (int i = 0; i < node->materialized_slots().size(); ++i) {
+    Function *fn = nullptr;
     SlotDescriptor* slot_desc = node->materialized_slots()[i];
-    Function* fn = TextConverter::CodegenWriteSlot(codegen, tuple_desc, slot_desc,
+    RETURN_IF_ERROR(TextConverter::CodegenWriteSlot(codegen, tuple_desc, slot_desc, &fn,
         node->hdfs_table()->null_column_value().data(),
-        node->hdfs_table()->null_column_value().size(), true, state->strict_mode());
-    if (fn == NULL) return Status("CodegenWriteSlot failed.");
+        node->hdfs_table()->null_column_value().size(), true, state->strict_mode()));
     if (i >= LlvmCodeGen::CODEGEN_INLINE_EXPRS_THRESHOLD) codegen->SetNoInline(fn);
     slot_fns.push_back(fn);
   }
