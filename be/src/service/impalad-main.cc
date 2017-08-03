@@ -96,6 +96,7 @@ int ImpaladMain(int argc, char** argv) {
     ShutdownLogging();
     exit(1);
   }
+  StartMemoryMaintenanceThread(); // Memory metrics are created in StartServices().
 
   DCHECK(exec_env.process_mem_tracker() != nullptr)
       << "ExecEnv::StartServices() must be called before starting RPC services";

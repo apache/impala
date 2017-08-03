@@ -205,14 +205,6 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   log_maintenance_thread.reset(
       new Thread("common", "log-maintenance-thread", &LogMaintenanceThread));
 
-  // Memory maintenance isn't necessary for frontend tests, and it's undesirable
-  // to asynchronously free memory in backend tests that are testing memory
-  // management behaviour.
-  if (!impala::TestInfo::is_test()) {
-    memory_maintenance_thread.reset(
-        new Thread("common", "memory-maintenance-thread", &MemoryMaintenanceThread));
-  }
-
   pause_monitor.reset(new Thread("common", "pause-monitor", &PauseMonitorLoop));
 
   LOG(INFO) << impala::GetVersionString();
@@ -252,4 +244,10 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     HeapProfilerStart(FLAGS_heap_profile_dir.c_str());
   }
 #endif
+}
+
+void impala::StartMemoryMaintenanceThread() {
+  DCHECK(AggregateMemoryMetrics::NUM_MAPS != nullptr) << "Mem metrics not registered.";
+  memory_maintenance_thread.reset(
+      new Thread("common", "memory-maintenance-thread", &MemoryMaintenanceThread));
 }

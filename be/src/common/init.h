@@ -30,6 +30,10 @@ namespace impala {
 void InitCommonRuntime(int argc, char** argv, bool init_jvm,
     TestInfo::Mode m = TestInfo::NON_TEST);
 
+/// Starts background memory maintenance thread. Must be called after
+/// RegisterMemoryMetrics(). This thread is needed for daemons to free memory and
+/// refresh metrics but is not needed for standalone tests.
+void StartMemoryMaintenanceThread();
 }
 
 #endif
