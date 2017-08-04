@@ -98,9 +98,10 @@ class BufferPoolTest : public ::testing::Test {
   const static int64_t TEST_BUFFER_LEN = 1024;
 
   /// Test helper to simulate registering then deregistering a number of queries with
-  /// the given initial reservation and reservation limit.
+  /// the given initial reservation and reservation limit. 'rng' is used to generate
+  /// any random numbers needed.
   void RegisterQueriesAndClients(BufferPool* pool, int query_id_hi, int num_queries,
-      int64_t initial_query_reservation, int64_t query_reservation_limit);
+      int64_t initial_query_reservation, int64_t query_reservation_limit, mt19937* rng);
 
   /// Create and destroy a page multiple times.
   void CreatePageLoop(BufferPool* pool, TmpFileMgr::FileGroup* file_group,
@@ -389,7 +390,8 @@ class BufferPoolTest : public ::testing::Test {
 const int64_t BufferPoolTest::TEST_BUFFER_LEN;
 
 void BufferPoolTest::RegisterQueriesAndClients(BufferPool* pool, int query_id_hi,
-    int num_queries, int64_t initial_query_reservation, int64_t query_reservation_limit) {
+    int num_queries, int64_t initial_query_reservation, int64_t query_reservation_limit,
+    mt19937* rng) {
   Status status;
 
   int clients_per_query = 32;
@@ -416,7 +418,7 @@ void BufferPoolTest::RegisterQueriesAndClients(BufferPool* pool, int query_id_hi
           initial_query_reservation / clients_per_query + j
           < initial_query_reservation % clients_per_query;
       // Reservation limit can be anything greater or equal to the initial reservation.
-      int64_t client_reservation_limit = initial_client_reservation + rng_() % 100000;
+      int64_t client_reservation_limit = initial_client_reservation + (*rng)() % 100000;
       string name = Substitute("Client $0 for query $1", j, query_id);
       EXPECT_OK(pool->RegisterClient(name, NULL, query_reservation, NULL,
           client_reservation_limit, NewProfile(), &clients[i][j]));
@@ -453,8 +455,8 @@ TEST_F(BufferPoolTest, BasicRegistration) {
 
   BufferPool pool(TEST_BUFFER_LEN, total_mem);
 
-  RegisterQueriesAndClients(
-      &pool, 0, num_concurrent_queries, sum_initial_reservations, reservation_limit);
+  RegisterQueriesAndClients(&pool, 0, num_concurrent_queries, sum_initial_reservations,
+      reservation_limit, &rng_);
 
   ASSERT_EQ(global_reservations_.GetUsedReservation(), 0);
   ASSERT_EQ(global_reservations_.GetChildReservations(), 0);
@@ -475,12 +477,13 @@ TEST_F(BufferPoolTest, ConcurrentRegistration) {
   global_reservations_.InitRootTracker(NewProfile(), total_mem);
 
   BufferPool pool(TEST_BUFFER_LEN, total_mem);
-
+  vector<mt19937> thread_rngs = RandTestUtil::CreateThreadLocalRngs(num_threads, &rng_);
   // Launch threads, each with a different set of query IDs.
   thread_group workers;
   for (int i = 0; i < num_threads; ++i) {
     workers.add_thread(new thread(bind(&BufferPoolTest::RegisterQueriesAndClients, this,
-        &pool, i, queries_per_thread, sum_initial_reservations, reservation_limit)));
+        &pool, i, queries_per_thread, sum_initial_reservations, reservation_limit,
+        &thread_rngs[i])));
   }
   workers.join_all();
 
@@ -1767,9 +1770,8 @@ void BufferPoolTest::TestRandomInternalMulti(
   MemTracker global_tracker(TOTAL_MEM);
   FileGroup* shared_file_group = NewFileGroup();
   thread_group workers;
-  vector<mt19937> rngs(num_threads);
+  vector<mt19937> rngs = RandTestUtil::CreateThreadLocalRngs(num_threads, &rng_);
   for (int i = 0; i < num_threads; ++i) {
-    rngs[i].seed(rng_()); // Seed the thread-local rngs.
     workers.add_thread(new thread(
         [this, &pool, shared_file_group, &global_tracker, &rngs, i, multiple_pins]() {
           TestRandomInternalImpl(
