@@ -530,6 +530,10 @@ public class TableRef implements ParseNode {
         throw new AnalysisException(
             "analytic expression not allowed in ON clause: " + toSql());
       }
+      if (onClause_.contains(Subquery.class)) {
+        throw new AnalysisException(
+            "Subquery is not allowed in ON clause: " + toSql());
+      }
       Set<TupleId> onClauseTupleIds = Sets.newHashSet();
       List<Expr> conjuncts = onClause_.getConjuncts();
       // Outer join clause conjuncts are registered for this particular table ref

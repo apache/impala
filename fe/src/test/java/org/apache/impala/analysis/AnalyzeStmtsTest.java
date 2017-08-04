@@ -1355,6 +1355,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "join functional.alltypes b on (a.bigint_col = " +
         "lag(b.int_col) over(order by a.bigint_col))",
         "analytic expression not allowed in ON clause");
+    AnalysisError(
+        "select a.int_col from functional.alltypes a " +
+        "join functional.alltypes b on (a.id = b.id) and " +
+        "a.int_col < (select min(id) from functional.alltypes c)",
+        "Subquery is not allowed in ON clause");
     // unknown column
     AnalysisError(
         "select a.int_col from functional.alltypes a " +
