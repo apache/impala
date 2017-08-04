@@ -1,6 +1,13 @@
 *~
 
 build
+
+# Generated sources.
 generated-sources/**/*
 src/common/version.cc
+src/kudu/util/protoc-gen-insertions
+*.pb.h
+*.pb.cc
 
+# Static libraries.
+*.a

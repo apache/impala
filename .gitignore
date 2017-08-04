@@ -16,6 +16,7 @@ bin/impala-config-local.sh
 
 # distcc options
 .impala_compiler_opts
+.impala_compiler_opts_v2
 
 pprof.out
 
@@ -56,5 +57,7 @@ hs_err_pid*.log
 *.jar
 
 # Vim related files
+.*.swn
+.*.swo
 .*.swp
 .vimrc
