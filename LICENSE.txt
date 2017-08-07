@@ -396,6 +396,7 @@ www/DataTables* and www/datatables*: MIT license
 
 --------------------------------------------------------------------------------
 
+shell/pkg_resources.py: Python Software License V2
 Parts of be/src/runtime/string-search.h: Python Software License V2
 
   Copyright (c) 2001 - 2016 Python Software Foundation; All Rights Reserved
@@ -765,3 +766,5 @@ Some portions of this module are derived from code from LevelDB
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
+
+SHA-1 code from be/src/thirdparty/squeasel/squeasel.c: public domain
