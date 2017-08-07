@@ -313,7 +313,7 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::NextProbeRow(
           // The partition is not in memory, spill the probe row and move to the next row.
           // Skip the current row if we manage to append to the spilled partition's BTS.
           // Otherwise, we need to bail out and report the failure.
-          BufferedTupleStreamV2* probe_rows = probe_partition->probe_rows();
+          BufferedTupleStream* probe_rows = probe_partition->probe_rows();
           if (UNLIKELY(!AppendProbeRow(probe_rows, current_probe_row_, status))) {
             DCHECK(!status->ok());
             return false;
@@ -438,7 +438,7 @@ int PartitionedHashJoinNode::ProcessProbeBatch(TPrefetchMode::type prefetch_mode
 }
 
 inline bool PartitionedHashJoinNode::AppendProbeRow(
-    BufferedTupleStreamV2* stream, TupleRow* row, Status* status) {
+    BufferedTupleStream* stream, TupleRow* row, Status* status) {
   DCHECK(stream->has_write_iterator());
   DCHECK(!stream->is_pinned());
   return stream->AddRow(row, status);

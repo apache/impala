@@ -19,7 +19,7 @@
 #define IMPALA_EXEC_ANALYTIC_EVAL_NODE_H
 
 #include "exec/exec-node.h"
-#include "runtime/buffered-tuple-stream-v2.h"
+#include "runtime/buffered-tuple-stream.h"
 #include "runtime/tuple.h"
 
 namespace impala {
@@ -339,7 +339,7 @@ class AnalyticEvalNode : public ExecNode {
   /// buffers with tuple data are attached to an output row batch on eos or
   /// ReachedLimit().
   /// TODO: Consider re-pinning unpinned streams when possible.
-  boost::scoped_ptr<BufferedTupleStreamV2> input_stream_;
+  boost::scoped_ptr<BufferedTupleStream> input_stream_;
 
   /// Pool used for O(1) allocations that live until Close() or Reset().
   /// Does not own data backing tuples returned in GetNext(), so it does not

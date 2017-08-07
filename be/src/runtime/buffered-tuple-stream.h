@@ -15,8 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RUNTIME_BUFFERED_TUPLE_STREAM_V2_H
-#define IMPALA_RUNTIME_BUFFERED_TUPLE_STREAM_V2_H
+#ifndef IMPALA_RUNTIME_BUFFERED_TUPLE_STREAM_H
+#define IMPALA_RUNTIME_BUFFERED_TUPLE_STREAM_H
 
 #include <set>
 #include <vector>
@@ -200,7 +200,7 @@ class TupleRow;
 ///
 /// TODO: we need to be able to do read ahead for pages. We need some way to indicate a
 /// page will need to be pinned soon.
-class BufferedTupleStreamV2 {
+class BufferedTupleStream {
  public:
   /// A pointer to the start of a flattened TupleRow in the stream.
   typedef uint8_t* FlatRowPtr;
@@ -209,12 +209,12 @@ class BufferedTupleStreamV2 {
   /// that are added and the rows being returned.
   /// page_len: the size of pages to use in the stream
   /// ext_varlen_slots: set of varlen slots with data stored externally to the stream
-  BufferedTupleStreamV2(RuntimeState* state, const RowDescriptor* row_desc,
+  BufferedTupleStream(RuntimeState* state, const RowDescriptor* row_desc,
       BufferPool::ClientHandle* buffer_pool_client, int64_t default_page_len,
       int64_t max_page_len,
       const std::set<SlotId>& ext_varlen_slots = std::set<SlotId>());
 
-  virtual ~BufferedTupleStreamV2();
+  virtual ~BufferedTupleStream();
 
   /// Initializes the tuple stream object on behalf of node 'node_id'. Must be called
   /// once before any of the other APIs.
@@ -371,7 +371,7 @@ class BufferedTupleStreamV2 {
   std::string DebugString() const;
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(BufferedTupleStreamV2);
+  DISALLOW_COPY_AND_ASSIGN(BufferedTupleStream);
   friend class ArrayTupleStreamTest_TestArrayDeepCopy_Test;
   friend class ArrayTupleStreamTest_TestComputeRowSize_Test;
   friend class MultiNullableTupleStreamTest_TestComputeRowSize_Test;

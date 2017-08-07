@@ -31,7 +31,7 @@
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/slot-ref.h"
 #include "gutil/strings/substitute.h"
-#include "runtime/buffered-tuple-stream-v2.inline.h"
+#include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/descriptors.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-pool.h"
@@ -275,7 +275,7 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
           &buffer_pool_client_, resource_profile_.spillable_buffer_size));
 
       if (!is_streaming_preagg_ && needs_serialize_) {
-        serialize_stream_.reset(new BufferedTupleStreamV2(state, &intermediate_row_desc_,
+        serialize_stream_.reset(new BufferedTupleStream(state, &intermediate_row_desc_,
             &buffer_pool_client_, resource_profile_.spillable_buffer_size,
             resource_profile_.spillable_buffer_size));
         RETURN_IF_ERROR(serialize_stream_->Init(id(), false));
@@ -722,7 +722,7 @@ Status PartitionedAggregationNode::Partition::InitStreams() {
     }
   }
 
-  aggregated_row_stream.reset(new BufferedTupleStreamV2(parent->state_,
+  aggregated_row_stream.reset(new BufferedTupleStream(parent->state_,
       &parent->intermediate_row_desc_, &parent->buffer_pool_client_,
       parent->resource_profile_.spillable_buffer_size,
       parent->resource_profile_.spillable_buffer_size, external_varlen_slots));
@@ -740,7 +740,7 @@ Status PartitionedAggregationNode::Partition::InitStreams() {
   }
 
   if (!parent->is_streaming_preagg_) {
-    unaggregated_row_stream.reset(new BufferedTupleStreamV2(parent->state_,
+    unaggregated_row_stream.reset(new BufferedTupleStream(parent->state_,
         parent->child(0)->row_desc(), &parent->buffer_pool_client_,
         parent->resource_profile_.spillable_buffer_size,
         parent->resource_profile_.spillable_buffer_size));
@@ -786,7 +786,7 @@ Status PartitionedAggregationNode::Partition::SerializeStreamForSpilling() {
 
     // Serialize and copy the spilled partition's stream into the new stream.
     Status status;
-    BufferedTupleStreamV2* new_stream = parent->serialize_stream_.get();
+    BufferedTupleStream* new_stream = parent->serialize_stream_.get();
     HashTable::Iterator it = hash_tbl->Begin(parent->ht_ctx_.get());
     while (!it.AtEnd()) {
       Tuple* tuple = it.GetTuple();
@@ -811,7 +811,7 @@ Status PartitionedAggregationNode::Partition::SerializeStreamForSpilling() {
     // when we need to spill again. We need to have this available before we need
     // to spill to make sure it is available. This should be acquirable since we just
     // freed at least one buffer from this partition's (old) aggregated_row_stream.
-    parent->serialize_stream_.reset(new BufferedTupleStreamV2(parent->state_,
+    parent->serialize_stream_.reset(new BufferedTupleStream(parent->state_,
         &parent->intermediate_row_desc_, &parent->buffer_pool_client_,
         parent->resource_profile_.spillable_buffer_size,
         parent->resource_profile_.spillable_buffer_size));
@@ -866,9 +866,9 @@ Status PartitionedAggregationNode::Partition::Spill(bool more_aggregate_rows) {
   DCHECK(aggregated_row_stream->has_write_iterator());
   DCHECK(!unaggregated_row_stream->has_write_iterator());
   if (more_aggregate_rows) {
-    aggregated_row_stream->UnpinStream(BufferedTupleStreamV2::UNPIN_ALL_EXCEPT_CURRENT);
+    aggregated_row_stream->UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
   } else {
-    aggregated_row_stream->UnpinStream(BufferedTupleStreamV2::UNPIN_ALL);
+    aggregated_row_stream->UnpinStream(BufferedTupleStream::UNPIN_ALL);
     bool got_buffer;
     RETURN_IF_ERROR(unaggregated_row_stream->PrepareForWrite(&got_buffer));
     DCHECK(got_buffer)
@@ -932,7 +932,7 @@ Tuple* PartitionedAggregationNode::ConstructIntermediateTuple(
 }
 
 Tuple* PartitionedAggregationNode::ConstructIntermediateTuple(
-    const vector<AggFnEvaluator*>& agg_fn_evals, BufferedTupleStreamV2* stream,
+    const vector<AggFnEvaluator*>& agg_fn_evals, BufferedTupleStream* stream,
     Status* status) noexcept {
   DCHECK(stream != NULL && status != NULL);
   // Allocate space for the entire tuple in the stream.
@@ -1077,7 +1077,7 @@ Status PartitionedAggregationNode::AppendSpilledRow(
     Partition* __restrict__ partition, TupleRow* __restrict__ row) {
   DCHECK(!is_streaming_preagg_);
   DCHECK(partition->is_spilled());
-  BufferedTupleStreamV2* stream = AGGREGATED_ROWS ?
+  BufferedTupleStream* stream = AGGREGATED_ROWS ?
       partition->aggregated_row_stream.get() :
       partition->unaggregated_row_stream.get();
   DCHECK(!stream->is_pinned());
@@ -1297,7 +1297,7 @@ Status PartitionedAggregationNode::RepartitionSpilledPartition() {
     if (!hash_partition->is_spilled()) continue;
     // The aggregated rows have been repartitioned. Free up at least a buffer's worth of
     // reservation and use it to pin the unaggregated write buffer.
-    hash_partition->aggregated_row_stream->UnpinStream(BufferedTupleStreamV2::UNPIN_ALL);
+    hash_partition->aggregated_row_stream->UnpinStream(BufferedTupleStream::UNPIN_ALL);
     bool got_buffer;
     RETURN_IF_ERROR(
         hash_partition->unaggregated_row_stream->PrepareForWrite(&got_buffer));
@@ -1332,7 +1332,7 @@ Status PartitionedAggregationNode::RepartitionSpilledPartition() {
 }
 
 template <bool AGGREGATED_ROWS>
-Status PartitionedAggregationNode::ProcessStream(BufferedTupleStreamV2* input_stream) {
+Status PartitionedAggregationNode::ProcessStream(BufferedTupleStream* input_stream) {
   DCHECK(!is_streaming_preagg_);
   if (input_stream->num_rows() > 0) {
     while (true) {
@@ -1430,8 +1430,8 @@ void PartitionedAggregationNode::PushSpilledPartition(Partition* partition) {
   // Ensure all pages in the spilled partition's streams are unpinned by invalidating
   // the streams' read and write iterators. We may need all the memory to process the
   // next spilled partitions.
-  partition->aggregated_row_stream->UnpinStream(BufferedTupleStreamV2::UNPIN_ALL);
-  partition->unaggregated_row_stream->UnpinStream(BufferedTupleStreamV2::UNPIN_ALL);
+  partition->aggregated_row_stream->UnpinStream(BufferedTupleStream::UNPIN_ALL);
+  partition->unaggregated_row_stream->UnpinStream(BufferedTupleStream::UNPIN_ALL);
   spilled_partitions_.push_front(partition);
 }
 

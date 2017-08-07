@@ -15,10 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RUNTIME_BUFFERED_TUPLE_STREAM_V2_INLINE_H
-#define IMPALA_RUNTIME_BUFFERED_TUPLE_STREAM_V2_INLINE_H
+#ifndef IMPALA_RUNTIME_BUFFERED_TUPLE_STREAM_INLINE_H
+#define IMPALA_RUNTIME_BUFFERED_TUPLE_STREAM_INLINE_H
 
-#include "runtime/buffered-tuple-stream-v2.h"
+#include "runtime/buffered-tuple-stream.h"
 
 #include "runtime/descriptors.h"
 #include "runtime/tuple-row.h"
@@ -26,12 +26,12 @@
 
 namespace impala {
 
-inline int BufferedTupleStreamV2::NullIndicatorBytesPerRow() const {
+inline int BufferedTupleStream::NullIndicatorBytesPerRow() const {
   DCHECK(has_nullable_tuple_);
   return BitUtil::RoundUpNumBytes(fixed_tuple_sizes_.size());
 }
 
-inline uint8_t* BufferedTupleStreamV2::AddRowCustomBegin(int64_t size, Status* status) {
+inline uint8_t* BufferedTupleStream::AddRowCustomBegin(int64_t size, Status* status) {
   DCHECK(!closed_);
   DCHECK(has_write_iterator());
   if (UNLIKELY(write_page_ == nullptr || write_ptr_ + size > write_end_ptr_)) {
@@ -48,7 +48,7 @@ inline uint8_t* BufferedTupleStreamV2::AddRowCustomBegin(int64_t size, Status* s
   return data;
 }
 
-inline void BufferedTupleStreamV2::AddRowCustomEnd(int64_t size) {
+inline void BufferedTupleStream::AddRowCustomEnd(int64_t size) {
   if (UNLIKELY(size > default_page_len_)) AddLargeRowCustomEnd(size);
 }
 }

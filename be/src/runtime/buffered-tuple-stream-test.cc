@@ -25,7 +25,7 @@
 
 #include "codegen/llvm-codegen.h"
 #include "gutil/gscoped_ptr.h"
-#include "runtime/buffered-tuple-stream-v2.inline.h"
+#include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/query-state.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/collection-value-builder.h"
@@ -255,7 +255,7 @@ class SimpleTupleStreamTest : public testing::Test {
   }
 
   template <typename T>
-  void ReadValues(BufferedTupleStreamV2* stream, RowDescriptor* desc, vector<T>* results,
+  void ReadValues(BufferedTupleStream* stream, RowDescriptor* desc, vector<T>* results,
       int num_batches = -1) {
     bool eos = false;
     RowBatch batch(desc, BATCH_SIZE, &tracker_);
@@ -318,7 +318,7 @@ class SimpleTupleStreamTest : public testing::Test {
       int num_rows = BATCH_SIZE) {
     if (max_page_len == -1) max_page_len = default_page_len;
 
-    BufferedTupleStreamV2 stream(
+    BufferedTupleStream stream(
         runtime_state_, desc, &client_, default_page_len, max_page_len);
     ASSERT_OK(stream.Init(-1, true));
     bool got_write_reservation;
@@ -326,7 +326,7 @@ class SimpleTupleStreamTest : public testing::Test {
     ASSERT_TRUE(got_write_reservation);
 
     if (unpin_stream) {
-      stream.UnpinStream(BufferedTupleStreamV2::UNPIN_ALL_EXCEPT_CURRENT);
+      stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
     }
     // Add rows to the stream
     int offset = 0;
@@ -363,13 +363,13 @@ class SimpleTupleStreamTest : public testing::Test {
 
   void TestIntValuesInterleaved(int num_batches, int num_batches_before_read,
       bool unpin_stream, int64_t page_len = PAGE_LEN) {
-    BufferedTupleStreamV2 stream(runtime_state_, int_desc_, &client_, page_len, page_len);
+    BufferedTupleStream stream(runtime_state_, int_desc_, &client_, page_len, page_len);
     ASSERT_OK(stream.Init(-1, true));
     bool got_reservation;
     ASSERT_OK(stream.PrepareForReadWrite(true, &got_reservation));
     ASSERT_TRUE(got_reservation);
     if (unpin_stream) {
-      stream.UnpinStream(BufferedTupleStreamV2::UNPIN_ALL_EXCEPT_CURRENT);
+      stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
     }
 
     vector<int> results;
@@ -604,7 +604,7 @@ void SimpleTupleStreamTest::TestUnpinPin(bool varlen_data, bool read_write) {
   Init(num_buffers * buffer_size);
   RowDescriptor* row_desc = varlen_data ? string_desc_ : int_desc_;
 
-  BufferedTupleStreamV2 stream(
+  BufferedTupleStream stream(
       runtime_state_, row_desc, &client_, buffer_size, buffer_size);
   ASSERT_OK(stream.Init(-1, true));
   if (read_write) {
@@ -624,7 +624,7 @@ void SimpleTupleStreamTest::TestUnpinPin(bool varlen_data, bool read_write) {
     // Make sure we can switch between pinned and unpinned states while writing.
     if (num_batches % 10 == 0) {
       bool pinned;
-      stream.UnpinStream(BufferedTupleStreamV2::UNPIN_ALL_EXCEPT_CURRENT);
+      stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
       ASSERT_OK(stream.PinStream(&pinned));
       DCHECK(pinned);
     }
@@ -642,7 +642,7 @@ void SimpleTupleStreamTest::TestUnpinPin(bool varlen_data, bool read_write) {
     ++num_batches;
   }
 
-  stream.UnpinStream(BufferedTupleStreamV2::UNPIN_ALL_EXCEPT_CURRENT);
+  stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
 
   bool pinned = false;
   ASSERT_OK(stream.PinStream(&pinned));
@@ -671,7 +671,7 @@ void SimpleTupleStreamTest::TestUnpinPin(bool varlen_data, bool read_write) {
   }
 
   // After delete_on_read, all blocks aside from the last should be deleted.
-  // Note: this should really be 0, but the BufferedTupleStreamV2 returns eos before
+  // Note: this should really be 0, but the BufferedTupleStream returns eos before
   // deleting the last block, rather than after, so the last block isn't deleted
   // until the stream is closed.
   ASSERT_EQ(stream.BytesPinned(false), buffer_size);
@@ -699,7 +699,7 @@ void SimpleTupleStreamTest::TestTransferMemory(bool pin_stream, bool read_write)
   int buffer_size = 4 * 1024;
   Init(100 * buffer_size);
 
-  BufferedTupleStreamV2 stream(
+  BufferedTupleStream stream(
       runtime_state_, int_desc_, &client_, buffer_size, buffer_size);
   ASSERT_OK(stream.Init(-1, pin_stream));
   if (read_write) {
@@ -782,7 +782,7 @@ TEST_F(SimpleTupleStreamTest, StringsOutsideStream) {
     external_slots.insert(tuple_desc.string_slots()[i]->id());
   }
 
-  BufferedTupleStreamV2 stream(
+  BufferedTupleStream stream(
       runtime_state_, string_desc_, &client_, buffer_size, buffer_size, external_slots);
   ASSERT_OK(stream.Init(0, false));
   bool got_reservation;
@@ -856,7 +856,7 @@ TEST_F(SimpleTupleStreamTest, BigRow) {
   // Construct a big row with nullable tuples. This requires extra space for null
   // indicators in the stream so adding the row will fail.
   ASSERT_TRUE(nullable_big_row_desc_->IsAnyTupleNullable());
-  BufferedTupleStreamV2 nullable_stream(
+  BufferedTupleStream nullable_stream(
       runtime_state_, nullable_big_row_desc_, &client_, BIG_ROW_BYTES, BIG_ROW_BYTES);
   ASSERT_OK(nullable_stream.Init(-1, true));
   bool got_reservation;
@@ -880,7 +880,7 @@ TEST_F(SimpleTupleStreamTest, BigRowMemoryUse) {
   const int64_t DEFAULT_PAGE_LEN = BIG_ROW_BYTES / 4;
   Init(MAX_BUFFERS * BIG_ROW_BYTES);
   Status status;
-  BufferedTupleStreamV2 stream(
+  BufferedTupleStream stream(
       runtime_state_, big_row_desc_, &client_, DEFAULT_PAGE_LEN, BIG_ROW_BYTES * 2);
   ASSERT_OK(stream.Init(-1, true));
   RowBatch* batch;
@@ -902,7 +902,7 @@ TEST_F(SimpleTupleStreamTest, BigRowMemoryUse) {
   bool success = stream.AddRow(batch->GetRow(0), &status);
   ASSERT_FALSE(success);
   ASSERT_OK(status);
-  stream.UnpinStream(BufferedTupleStreamV2::UNPIN_ALL_EXCEPT_CURRENT);
+  stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
   success = stream.AddRow(batch->GetRow(0), &status);
   ASSERT_TRUE(success);
   // Read all the rows back and verify.
@@ -917,7 +917,7 @@ TEST_F(SimpleTupleStreamTest, BigRowMemoryUse) {
 // Test for IMPALA-3923: overflow of 32-bit int in GetRows().
 TEST_F(SimpleTupleStreamTest, TestGetRowsOverflow) {
   Init(BUFFER_POOL_LIMIT);
-  BufferedTupleStreamV2 stream(runtime_state_, int_desc_, &client_, PAGE_LEN, PAGE_LEN);
+  BufferedTupleStream stream(runtime_state_, int_desc_, &client_, PAGE_LEN, PAGE_LEN);
   ASSERT_OK(stream.Init(-1, true));
 
   Status status;
@@ -938,7 +938,7 @@ TEST_F(SimpleTupleStreamTest, BigStringReadWrite) {
   const int64_t DEFAULT_PAGE_LEN = BIG_ROW_BYTES / 4;
   Init(MAX_BUFFERS * BIG_ROW_BYTES);
   Status status;
-  BufferedTupleStreamV2 stream(
+  BufferedTupleStream stream(
       runtime_state_, string_desc_, &client_, DEFAULT_PAGE_LEN, BIG_ROW_BYTES * 2);
   ASSERT_OK(stream.Init(-1, true));
   RowBatch write_batch(string_desc_, 1024, &tracker_);
@@ -991,7 +991,7 @@ TEST_F(SimpleTupleStreamTest, BigStringReadWrite) {
   bool success = stream.AddRow(write_row, &status);
   ASSERT_FALSE(success);
   ASSERT_OK(status);
-  stream.UnpinStream(BufferedTupleStreamV2::UNPIN_ALL_EXCEPT_CURRENT);
+  stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
   success = stream.AddRow(write_row, &status);
   ASSERT_TRUE(success);
 
@@ -1106,7 +1106,7 @@ TEST_F(MultiTupleStreamTest, MultiTupleAddRowCustom) {
 
   int num_batches = 1;
   int rows_added = 0;
-  BufferedTupleStreamV2 stream(
+  BufferedTupleStream stream(
       runtime_state_, string_desc_, &client_, buffer_size, buffer_size);
   ASSERT_OK(stream.Init(-1, false));
   bool got_write_reservation;
@@ -1225,7 +1225,7 @@ TEST_F(MultiNullableTupleStreamTest, TestComputeRowSize) {
   const SlotDescriptor* external_string_slot = tuple_descs[1]->slots()[0];
   external_slots.insert(external_string_slot->id());
 
-  BufferedTupleStreamV2 stream(
+  BufferedTupleStream stream(
       runtime_state_, string_desc_, &client_, PAGE_LEN, PAGE_LEN, external_slots);
   gscoped_ptr<TupleRow, FreeDeleter> row(
       reinterpret_cast<TupleRow*>(malloc(tuple_descs.size() * sizeof(Tuple*))));
@@ -1276,7 +1276,7 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
   Status status;
   Init(BUFFER_POOL_LIMIT);
   const int NUM_ROWS = 4000;
-  BufferedTupleStreamV2 stream(runtime_state_, array_desc_, &client_, PAGE_LEN, PAGE_LEN);
+  BufferedTupleStream stream(runtime_state_, array_desc_, &client_, PAGE_LEN, PAGE_LEN);
   const vector<TupleDescriptor*>& tuple_descs = array_desc_->tuple_descriptors();
   // Write out a predictable pattern of data by iterating over arrays of constants.
   int strings_index = 0; // we take the mod of this as index into STRINGS.
@@ -1389,7 +1389,7 @@ TEST_F(ArrayTupleStreamTest, TestComputeRowSize) {
   const SlotDescriptor* external_array_slot = tuple_descs[0]->slots()[1];
   external_slots.insert(external_array_slot->id());
 
-  BufferedTupleStreamV2 stream(
+  BufferedTupleStream stream(
       runtime_state_, array_desc_, &client_, PAGE_LEN, PAGE_LEN, external_slots);
   gscoped_ptr<TupleRow, FreeDeleter> row(
       reinterpret_cast<TupleRow*>(malloc(tuple_descs.size() * sizeof(Tuple*))));

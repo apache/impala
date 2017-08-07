@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "runtime/buffered-tuple-stream-v2.inline.h"
+#include "runtime/buffered-tuple-stream.inline.h"
 
 #include <boost/bind.hpp>
 #include <gutil/strings/substitute.h>
@@ -48,7 +48,7 @@ using namespace strings;
 
 using BufferHandle = BufferPool::BufferHandle;
 
-BufferedTupleStreamV2::BufferedTupleStreamV2(RuntimeState* state,
+BufferedTupleStream::BufferedTupleStream(RuntimeState* state,
     const RowDescriptor* row_desc, BufferPool::ClientHandle* buffer_pool_client,
     int64_t default_page_len, int64_t max_page_len, const set<SlotId>& ext_varlen_slots)
   : state_(state),
@@ -110,11 +110,11 @@ BufferedTupleStreamV2::BufferedTupleStreamV2(RuntimeState* state,
   }
 }
 
-BufferedTupleStreamV2::~BufferedTupleStreamV2() {
+BufferedTupleStream::~BufferedTupleStream() {
   DCHECK(closed_);
 }
 
-void BufferedTupleStreamV2::CheckConsistencyFull() const {
+void BufferedTupleStream::CheckConsistencyFull() const {
   CheckConsistencyFast();
   // The below checks require iterating over all the pages in the stream.
   DCHECK_EQ(bytes_pinned_, CalcBytesPinned()) << DebugString();
@@ -122,7 +122,7 @@ void BufferedTupleStreamV2::CheckConsistencyFull() const {
   for (const Page& page : pages_) CheckPageConsistency(&page);
 }
 
-void BufferedTupleStreamV2::CheckConsistencyFast() const {
+void BufferedTupleStream::CheckConsistencyFast() const {
   // All the below checks should be O(1).
   DCHECK(has_write_iterator() || write_page_ == nullptr);
   if (write_page_ != nullptr) {
@@ -158,7 +158,7 @@ void BufferedTupleStreamV2::CheckConsistencyFast() const {
   }
 }
 
-void BufferedTupleStreamV2::CheckPageConsistency(const Page* page) const {
+void BufferedTupleStream::CheckPageConsistency(const Page* page) const {
   DCHECK_EQ(ExpectedPinCount(pinned_, page), page->pin_count()) << DebugString();
   // Only one large row per page.
   if (page->len() > default_page_len_) DCHECK_LE(page->num_rows, 1);
@@ -166,9 +166,9 @@ void BufferedTupleStreamV2::CheckPageConsistency(const Page* page) const {
   DCHECK_GT(page->num_rows, 0);
 }
 
-string BufferedTupleStreamV2::DebugString() const {
+string BufferedTupleStream::DebugString() const {
   stringstream ss;
-  ss << "BufferedTupleStreamV2 num_rows=" << num_rows_
+  ss << "BufferedTupleStream num_rows=" << num_rows_
      << " rows_returned=" << rows_returned_ << " pinned=" << pinned_
      << " delete_on_read=" << delete_on_read_ << " closed=" << closed_ << "\n"
      << " bytes_pinned=" << bytes_pinned_ << " has_write_iterator=" << has_write_iterator_
@@ -201,17 +201,17 @@ string BufferedTupleStreamV2::DebugString() const {
   return ss.str();
 }
 
-string BufferedTupleStreamV2::Page::DebugString() const {
+string BufferedTupleStream::Page::DebugString() const {
   return Substitute("$0 num_rows=$1", handle.DebugString(), num_rows);
 }
 
-Status BufferedTupleStreamV2::Init(int node_id, bool pinned) {
+Status BufferedTupleStream::Init(int node_id, bool pinned) {
   if (!pinned) UnpinStream(UNPIN_ALL_EXCEPT_CURRENT);
   node_id_ = node_id;
   return Status::OK();
 }
 
-Status BufferedTupleStreamV2::PrepareForWrite(bool* got_reservation) {
+Status BufferedTupleStream::PrepareForWrite(bool* got_reservation) {
   // This must be the first iterator created.
   DCHECK(pages_.empty());
   DCHECK(!delete_on_read_);
@@ -228,7 +228,7 @@ Status BufferedTupleStreamV2::PrepareForWrite(bool* got_reservation) {
   return Status::OK();
 }
 
-Status BufferedTupleStreamV2::PrepareForReadWrite(
+Status BufferedTupleStream::PrepareForReadWrite(
     bool delete_on_read, bool* got_reservation) {
   // This must be the first iterator created.
   DCHECK(pages_.empty());
@@ -247,7 +247,7 @@ Status BufferedTupleStreamV2::PrepareForReadWrite(
   return Status::OK();
 }
 
-void BufferedTupleStreamV2::Close(RowBatch* batch, RowBatch::FlushMode flush) {
+void BufferedTupleStream::Close(RowBatch* batch, RowBatch::FlushMode flush) {
   for (Page& page : pages_) {
     if (batch != nullptr && page.retrieved_buffer) {
       // Subtle: We only need to attach buffers from pages that we may have returned
@@ -269,23 +269,23 @@ void BufferedTupleStreamV2::Close(RowBatch* batch, RowBatch::FlushMode flush) {
   closed_ = true;
 }
 
-int64_t BufferedTupleStreamV2::CalcBytesPinned() const {
+int64_t BufferedTupleStream::CalcBytesPinned() const {
   int64_t result = 0;
   for (const Page& page : pages_) result += page.pin_count() * page.len();
   return result;
 }
 
-Status BufferedTupleStreamV2::PinPage(Page* page) {
+Status BufferedTupleStream::PinPage(Page* page) {
   RETURN_IF_ERROR(buffer_pool_->Pin(buffer_pool_client_, &page->handle));
   bytes_pinned_ += page->len();
   return Status::OK();
 }
 
-int BufferedTupleStreamV2::ExpectedPinCount(bool stream_pinned, const Page* page) const {
+int BufferedTupleStream::ExpectedPinCount(bool stream_pinned, const Page* page) const {
   return (stream_pinned || is_read_page(page) || is_write_page(page)) ? 1 : 0;
 }
 
-Status BufferedTupleStreamV2::PinPageIfNeeded(Page* page, bool stream_pinned) {
+Status BufferedTupleStream::PinPageIfNeeded(Page* page, bool stream_pinned) {
   int new_pin_count = ExpectedPinCount(stream_pinned, page);
   if (new_pin_count != page->pin_count()) {
     DCHECK_EQ(new_pin_count, page->pin_count() + 1);
@@ -294,7 +294,7 @@ Status BufferedTupleStreamV2::PinPageIfNeeded(Page* page, bool stream_pinned) {
   return Status::OK();
 }
 
-void BufferedTupleStreamV2::UnpinPageIfNeeded(Page* page, bool stream_pinned) {
+void BufferedTupleStream::UnpinPageIfNeeded(Page* page, bool stream_pinned) {
   int new_pin_count = ExpectedPinCount(stream_pinned, page);
   if (new_pin_count != page->pin_count()) {
     DCHECK_EQ(new_pin_count, page->pin_count() - 1);
@@ -304,16 +304,16 @@ void BufferedTupleStreamV2::UnpinPageIfNeeded(Page* page, bool stream_pinned) {
   }
 }
 
-bool BufferedTupleStreamV2::NeedWriteReservation() const {
+bool BufferedTupleStream::NeedWriteReservation() const {
   return NeedWriteReservation(pinned_);
 }
 
-bool BufferedTupleStreamV2::NeedWriteReservation(bool stream_pinned) const {
+bool BufferedTupleStream::NeedWriteReservation(bool stream_pinned) const {
   return NeedWriteReservation(stream_pinned, num_pages_, has_write_iterator(),
       write_page_ != nullptr, has_read_write_page());
 }
 
-bool BufferedTupleStreamV2::NeedWriteReservation(bool stream_pinned, int64_t num_pages,
+bool BufferedTupleStream::NeedWriteReservation(bool stream_pinned, int64_t num_pages,
     bool has_write_iterator, bool has_write_page, bool has_read_write_page) {
   if (!has_write_iterator) return false;
   // If the stream is empty the write reservation hasn't been used yet.
@@ -329,22 +329,22 @@ bool BufferedTupleStreamV2::NeedWriteReservation(bool stream_pinned, int64_t num
   }
 }
 
-bool BufferedTupleStreamV2::NeedReadReservation() const {
+bool BufferedTupleStream::NeedReadReservation() const {
   return NeedReadReservation(pinned_);
 }
 
-bool BufferedTupleStreamV2::NeedReadReservation(bool stream_pinned) const {
+bool BufferedTupleStream::NeedReadReservation(bool stream_pinned) const {
   return NeedReadReservation(
       stream_pinned, num_pages_, has_read_iterator(), read_page_ != pages_.end());
 }
 
-bool BufferedTupleStreamV2::NeedReadReservation(bool stream_pinned, int64_t num_pages,
+bool BufferedTupleStream::NeedReadReservation(bool stream_pinned, int64_t num_pages,
     bool has_read_iterator, bool has_read_page) const {
   return NeedReadReservation(stream_pinned, num_pages, has_read_iterator, has_read_page,
       has_write_iterator(), write_page_ != nullptr);
 }
 
-bool BufferedTupleStreamV2::NeedReadReservation(bool stream_pinned, int64_t num_pages,
+bool BufferedTupleStream::NeedReadReservation(bool stream_pinned, int64_t num_pages,
     bool has_read_iterator, bool has_read_page, bool has_write_iterator,
     bool has_write_page) {
   if (!has_read_iterator) return false;
@@ -359,7 +359,7 @@ bool BufferedTupleStreamV2::NeedReadReservation(bool stream_pinned, int64_t num_
   }
 }
 
-Status BufferedTupleStreamV2::NewWritePage(int64_t page_len) noexcept {
+Status BufferedTupleStream::NewWritePage(int64_t page_len) noexcept {
   DCHECK(!closed_);
   DCHECK(write_page_ == nullptr);
 
@@ -379,7 +379,7 @@ Status BufferedTupleStreamV2::NewWritePage(int64_t page_len) noexcept {
   return Status::OK();
 }
 
-Status BufferedTupleStreamV2::CalcPageLenForRow(int64_t row_size, int64_t* page_len) {
+Status BufferedTupleStream::CalcPageLenForRow(int64_t row_size, int64_t* page_len) {
   if (UNLIKELY(row_size > max_page_len_)) {
     return Status(TErrorCode::MAX_ROW_SIZE,
         PrettyPrinter::Print(row_size, TUnit::BYTES), node_id_,
@@ -389,7 +389,7 @@ Status BufferedTupleStreamV2::CalcPageLenForRow(int64_t row_size, int64_t* page_
   return Status::OK();
 }
 
-Status BufferedTupleStreamV2::AdvanceWritePage(
+Status BufferedTupleStream::AdvanceWritePage(
     int64_t row_size, bool* got_reservation) noexcept {
   DCHECK(has_write_iterator());
   CHECK_CONSISTENCY_FAST();
@@ -442,7 +442,7 @@ Status BufferedTupleStreamV2::AdvanceWritePage(
   return Status::OK();
 }
 
-void BufferedTupleStreamV2::ResetWritePage() {
+void BufferedTupleStream::ResetWritePage() {
   if (write_page_ == nullptr) return;
   // Unpin the write page if we're reading in unpinned mode.
   Page* prev_write_page = write_page_;
@@ -455,7 +455,7 @@ void BufferedTupleStreamV2::ResetWritePage() {
   UnpinPageIfNeeded(prev_write_page, pinned_);
 }
 
-void BufferedTupleStreamV2::InvalidateWriteIterator() {
+void BufferedTupleStream::InvalidateWriteIterator() {
   if (!has_write_iterator()) return;
   ResetWritePage();
   has_write_iterator_ = false;
@@ -470,7 +470,7 @@ void BufferedTupleStreamV2::InvalidateWriteIterator() {
   }
 }
 
-Status BufferedTupleStreamV2::NextReadPage() {
+Status BufferedTupleStream::NextReadPage() {
   DCHECK(has_read_iterator());
   DCHECK(!closed_);
   CHECK_CONSISTENCY_FAST();
@@ -542,7 +542,7 @@ Status BufferedTupleStreamV2::NextReadPage() {
   return Status::OK();
 }
 
-void BufferedTupleStreamV2::InvalidateReadIterator() {
+void BufferedTupleStream::InvalidateReadIterator() {
   if (read_page_ != pages_.end()) {
     // Unpin the write page if we're reading in unpinned mode.
     Page* prev_read_page = &*read_page_;
@@ -562,7 +562,7 @@ void BufferedTupleStreamV2::InvalidateReadIterator() {
   if (rows_returned_ == 0) delete_on_read_ = false;
 }
 
-Status BufferedTupleStreamV2::PrepareForRead(bool delete_on_read, bool* got_reservation) {
+Status BufferedTupleStream::PrepareForRead(bool delete_on_read, bool* got_reservation) {
   CHECK_CONSISTENCY_FULL();
   InvalidateWriteIterator();
   InvalidateReadIterator();
@@ -573,7 +573,7 @@ Status BufferedTupleStreamV2::PrepareForRead(bool delete_on_read, bool* got_rese
   return PrepareForReadInternal(delete_on_read);
 }
 
-Status BufferedTupleStreamV2::PrepareForReadInternal(bool delete_on_read) {
+Status BufferedTupleStream::PrepareForReadInternal(bool delete_on_read) {
   DCHECK(!closed_);
   DCHECK(!delete_on_read_);
   DCHECK(!has_read_iterator());
@@ -604,7 +604,7 @@ Status BufferedTupleStreamV2::PrepareForReadInternal(bool delete_on_read) {
   return Status::OK();
 }
 
-Status BufferedTupleStreamV2::PinStream(bool* pinned) {
+Status BufferedTupleStream::PinStream(bool* pinned) {
   DCHECK(!closed_);
   CHECK_CONSISTENCY_FULL();
   if (pinned_) {
@@ -650,7 +650,7 @@ Status BufferedTupleStreamV2::PinStream(bool* pinned) {
   return Status::OK();
 }
 
-void BufferedTupleStreamV2::UnpinStream(UnpinMode mode) {
+void BufferedTupleStream::UnpinStream(UnpinMode mode) {
   CHECK_CONSISTENCY_FULL();
   DCHECK(!closed_);
   if (mode == UNPIN_ALL) {
@@ -677,7 +677,7 @@ void BufferedTupleStreamV2::UnpinStream(UnpinMode mode) {
   CHECK_CONSISTENCY_FULL();
 }
 
-Status BufferedTupleStreamV2::GetRows(
+Status BufferedTupleStream::GetRows(
     MemTracker* tracker, scoped_ptr<RowBatch>* batch, bool* got_rows) {
   if (num_rows() > numeric_limits<int>::max()) {
     // RowBatch::num_rows_ is a 32-bit int, avoid an overflow.
@@ -701,17 +701,17 @@ Status BufferedTupleStreamV2::GetRows(
   return Status::OK();
 }
 
-Status BufferedTupleStreamV2::GetNext(RowBatch* batch, bool* eos) {
+Status BufferedTupleStream::GetNext(RowBatch* batch, bool* eos) {
   return GetNextInternal<false>(batch, eos, nullptr);
 }
 
-Status BufferedTupleStreamV2::GetNext(
+Status BufferedTupleStream::GetNext(
     RowBatch* batch, bool* eos, vector<FlatRowPtr>* flat_rows) {
   return GetNextInternal<true>(batch, eos, flat_rows);
 }
 
 template <bool FILL_FLAT_ROWS>
-Status BufferedTupleStreamV2::GetNextInternal(
+Status BufferedTupleStream::GetNextInternal(
     RowBatch* batch, bool* eos, vector<FlatRowPtr>* flat_rows) {
   if (has_nullable_tuple_) {
     return GetNextInternal<FILL_FLAT_ROWS, true>(batch, eos, flat_rows);
@@ -721,7 +721,7 @@ Status BufferedTupleStreamV2::GetNextInternal(
 }
 
 template <bool FILL_FLAT_ROWS, bool HAS_NULLABLE_TUPLE>
-Status BufferedTupleStreamV2::GetNextInternal(
+Status BufferedTupleStream::GetNextInternal(
     RowBatch* batch, bool* eos, vector<FlatRowPtr>* flat_rows) {
   DCHECK(!closed_);
   DCHECK(batch->row_desc()->Equals(*desc_));
@@ -803,7 +803,7 @@ Status BufferedTupleStreamV2::GetNextInternal(
   return Status::OK();
 }
 
-void BufferedTupleStreamV2::FixUpStringsForRead(
+void BufferedTupleStream::FixUpStringsForRead(
     const vector<SlotDescriptor*>& string_slots, Tuple* tuple) {
   DCHECK(tuple != nullptr);
   for (const SlotDescriptor* slot_desc : string_slots) {
@@ -816,7 +816,7 @@ void BufferedTupleStreamV2::FixUpStringsForRead(
   }
 }
 
-void BufferedTupleStreamV2::FixUpCollectionsForRead(
+void BufferedTupleStream::FixUpCollectionsForRead(
     const vector<SlotDescriptor*>& collection_slots, Tuple* tuple) {
   DCHECK(tuple != nullptr);
   for (const SlotDescriptor* slot_desc : collection_slots) {
@@ -840,7 +840,7 @@ void BufferedTupleStreamV2::FixUpCollectionsForRead(
   }
 }
 
-int64_t BufferedTupleStreamV2::ComputeRowSize(TupleRow* row) const noexcept {
+int64_t BufferedTupleStream::ComputeRowSize(TupleRow* row) const noexcept {
   int64_t size = 0;
   if (has_nullable_tuple_) {
     size += NullIndicatorBytesPerRow();
@@ -882,7 +882,7 @@ int64_t BufferedTupleStreamV2::ComputeRowSize(TupleRow* row) const noexcept {
   return size;
 }
 
-bool BufferedTupleStreamV2::AddRowSlow(TupleRow* row, Status* status) noexcept {
+bool BufferedTupleStream::AddRowSlow(TupleRow* row, Status* status) noexcept {
   // Use AddRowCustom*() to do the work of advancing the page.
   int64_t row_size = ComputeRowSize(row);
   uint8_t* data = AddRowCustomBeginSlow(row_size, status);
@@ -894,7 +894,7 @@ bool BufferedTupleStreamV2::AddRowSlow(TupleRow* row, Status* status) noexcept {
   return true;
 }
 
-uint8_t* BufferedTupleStreamV2::AddRowCustomBeginSlow(
+uint8_t* BufferedTupleStream::AddRowCustomBeginSlow(
     int64_t size, Status* status) noexcept {
   bool got_reservation;
   *status = AdvanceWritePage(size, &got_reservation);
@@ -906,7 +906,7 @@ uint8_t* BufferedTupleStreamV2::AddRowCustomBeginSlow(
   return result;
 }
 
-void BufferedTupleStreamV2::AddLargeRowCustomEnd(int64_t size) noexcept {
+void BufferedTupleStream::AddLargeRowCustomEnd(int64_t size) noexcept {
   DCHECK_GT(size, default_page_len_);
   // Immediately unpin the large write page so that we're not using up extra reservation
   // and so we don't append another row to the page.
@@ -920,7 +920,7 @@ void BufferedTupleStreamV2::AddLargeRowCustomEnd(int64_t size) noexcept {
   CHECK_CONSISTENCY_FAST();
 }
 
-bool BufferedTupleStreamV2::AddRow(TupleRow* row, Status* status) noexcept {
+bool BufferedTupleStream::AddRow(TupleRow* row, Status* status) noexcept {
   DCHECK(!closed_);
   DCHECK(has_write_iterator());
   if (UNLIKELY(write_page_ == nullptr || !DeepCopy(row, &write_ptr_, write_end_ptr_))) {
@@ -931,7 +931,7 @@ bool BufferedTupleStreamV2::AddRow(TupleRow* row, Status* status) noexcept {
   return true;
 }
 
-bool BufferedTupleStreamV2::DeepCopy(
+bool BufferedTupleStream::DeepCopy(
     TupleRow* row, uint8_t** data, const uint8_t* data_end) noexcept {
   return has_nullable_tuple_ ? DeepCopyInternal<true>(row, data, data_end) :
                                DeepCopyInternal<false>(row, data, data_end);
@@ -940,7 +940,7 @@ bool BufferedTupleStreamV2::DeepCopy(
 // TODO: consider codegening this.
 // TODO: in case of duplicate tuples, this can redundantly serialize data.
 template <bool HAS_NULLABLE_TUPLE>
-bool BufferedTupleStreamV2::DeepCopyInternal(
+bool BufferedTupleStream::DeepCopyInternal(
     TupleRow* row, uint8_t** data, const uint8_t* data_end) noexcept {
   uint8_t* pos = *data;
   const uint64_t tuples_per_row = desc_->tuple_descriptors().size();
@@ -1002,7 +1002,7 @@ bool BufferedTupleStreamV2::DeepCopyInternal(
   return true;
 }
 
-bool BufferedTupleStreamV2::CopyStrings(const Tuple* tuple,
+bool BufferedTupleStream::CopyStrings(const Tuple* tuple,
     const vector<SlotDescriptor*>& string_slots, uint8_t** data, const uint8_t* data_end) {
   for (const SlotDescriptor* slot_desc : string_slots) {
     if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
@@ -1017,7 +1017,7 @@ bool BufferedTupleStreamV2::CopyStrings(const Tuple* tuple,
   return true;
 }
 
-bool BufferedTupleStreamV2::CopyCollections(const Tuple* tuple,
+bool BufferedTupleStream::CopyCollections(const Tuple* tuple,
     const vector<SlotDescriptor*>& collection_slots, uint8_t** data, const uint8_t* data_end) {
   for (const SlotDescriptor* slot_desc : collection_slots) {
     if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
@@ -1048,7 +1048,7 @@ bool BufferedTupleStreamV2::CopyCollections(const Tuple* tuple,
   return true;
 }
 
-void BufferedTupleStreamV2::GetTupleRow(FlatRowPtr flat_row, TupleRow* row) const {
+void BufferedTupleStream::GetTupleRow(FlatRowPtr flat_row, TupleRow* row) const {
   DCHECK(row != nullptr);
   DCHECK(!closed_);
   DCHECK(is_pinned());
@@ -1059,7 +1059,7 @@ void BufferedTupleStreamV2::GetTupleRow(FlatRowPtr flat_row, TupleRow* row) cons
 }
 
 template <bool HAS_NULLABLE_TUPLE>
-void BufferedTupleStreamV2::UnflattenTupleRow(uint8_t** data, TupleRow* row) const {
+void BufferedTupleStream::UnflattenTupleRow(uint8_t** data, TupleRow* row) const {
   const int tuples_per_row = desc_->tuple_descriptors().size();
   uint8_t* ptr = *data;
   if (has_nullable_tuple_) {

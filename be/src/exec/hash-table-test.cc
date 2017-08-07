@@ -309,7 +309,7 @@ class HashTableTest : public testing::Test {
 
     for (int i = 0; i < 2; ++i) {
       if (!ht_ctx->EvalAndHashBuild(build_rows[i])) continue;
-      BufferedTupleStreamV2::FlatRowPtr dummy_flat_row = nullptr;
+      BufferedTupleStream::FlatRowPtr dummy_flat_row = nullptr;
       EXPECT_TRUE(hash_table->stores_tuples_);
       Status status;
       bool inserted =
@@ -350,7 +350,7 @@ class HashTableTest : public testing::Test {
     ASSERT_TRUE(success);
     for (int i = 0; i < 5; ++i) {
       if (!ht_ctx->EvalAndHashBuild(build_rows[i])) continue;
-      BufferedTupleStreamV2::FlatRowPtr dummy_flat_row = nullptr;
+      BufferedTupleStream::FlatRowPtr dummy_flat_row = nullptr;
       EXPECT_TRUE(hash_table->stores_tuples_);
       bool inserted =
           hash_table->Insert(ht_ctx.get(), dummy_flat_row, build_rows[i], &status);
@@ -418,7 +418,7 @@ class HashTableTest : public testing::Test {
       for (int i = 0; i < val; ++i) {
         TupleRow* row = CreateTupleRow(val);
         if (!ht_ctx->EvalAndHashBuild(row)) continue;
-        BufferedTupleStreamV2::FlatRowPtr dummy_flat_row = nullptr;
+        BufferedTupleStream::FlatRowPtr dummy_flat_row = nullptr;
         EXPECT_TRUE(hash_table->stores_tuples_);
         ASSERT_TRUE(hash_table->Insert(ht_ctx.get(), dummy_flat_row, row, &status));
         ASSERT_OK(status);
@@ -481,7 +481,7 @@ class HashTableTest : public testing::Test {
       for (int j = 0; j < num_to_add; ++build_row_val, ++j) {
         TupleRow* row = CreateTupleRow(build_row_val);
         if (!ht_ctx->EvalAndHashBuild(row)) continue;
-        BufferedTupleStreamV2::FlatRowPtr dummy_flat_row = nullptr;
+        BufferedTupleStream::FlatRowPtr dummy_flat_row = nullptr;
         EXPECT_TRUE(hash_table->stores_tuples_);
         bool inserted = hash_table->Insert(ht_ctx.get(), dummy_flat_row, row, &status);
         ASSERT_OK(status);
@@ -518,7 +518,7 @@ class HashTableTest : public testing::Test {
     while (true) {
       TupleRow* duplicate_row = CreateTupleRow(DUPLICATE_VAL);
       if (!ht_ctx->EvalAndHashBuild(duplicate_row)) continue;
-      BufferedTupleStreamV2::FlatRowPtr dummy_flat_row = nullptr;
+      BufferedTupleStream::FlatRowPtr dummy_flat_row = nullptr;
       bool inserted =
           hash_table->Insert(ht_ctx.get(), dummy_flat_row, duplicate_row, &status);
       ASSERT_OK(status);
@@ -569,7 +569,7 @@ class HashTableTest : public testing::Test {
 
       // Insert using both Insert() and FindBucket() methods.
       if (build_row_val % 2 == 0) {
-        BufferedTupleStreamV2::FlatRowPtr dummy_flat_row = nullptr;
+        BufferedTupleStream::FlatRowPtr dummy_flat_row = nullptr;
         EXPECT_TRUE(hash_table->stores_tuples_);
         bool inserted = hash_table->Insert(ht_ctx.get(), dummy_flat_row, row, &status);
         EXPECT_TRUE(inserted);

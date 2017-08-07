@@ -26,8 +26,8 @@
 #include "codegen/impala-ir.h"
 #include "common/compiler-util.h"
 #include "common/logging.h"
-#include "runtime/buffered-tuple-stream-v2.h"
-#include "runtime/buffered-tuple-stream-v2.inline.h"
+#include "runtime/buffered-tuple-stream.h"
+#include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/suballocator.h"
 #include "runtime/tuple-row.h"
@@ -533,7 +533,7 @@ class HashTable {
   /// of two formats, depending on the number of tuples in the row.
   union HtData {
     // For rows with multiple tuples per row, a pointer to the flattened TupleRow.
-    BufferedTupleStreamV2::FlatRowPtr flat_row;
+    BufferedTupleStream::FlatRowPtr flat_row;
     // For rows with one tuple per row, a pointer to the Tuple itself.
     Tuple* tuple;
   };
@@ -600,7 +600,7 @@ class HashTable {
   ///  - initial_num_buckets: number of buckets that the hash table should be initialized
   ///    with.
   static HashTable* Create(Suballocator* allocator, bool stores_duplicates,
-      int num_build_tuples, BufferedTupleStreamV2* tuple_stream, int64_t max_num_buckets,
+      int num_build_tuples, BufferedTupleStream* tuple_stream, int64_t max_num_buckets,
       int64_t initial_num_buckets);
 
   /// Allocates the initial bucket structure. Returns a non-OK status if an error is
@@ -623,7 +623,7 @@ class HashTable {
   /// is stored. The 'row' is not copied by the hash table and the caller must guarantee
   /// it stays in memory. This will not grow the hash table.
   bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx,
-      BufferedTupleStreamV2::FlatRowPtr flat_row, TupleRow* row,
+      BufferedTupleStream::FlatRowPtr flat_row, TupleRow* row,
       Status* status) WARN_UNUSED_RESULT;
 
   /// Prefetch the hash table bucket which the given hash value 'hash' maps to.
@@ -819,7 +819,7 @@ class HashTable {
   ///  - quadratic_probing: set to true when the probing algorithm is quadratic, as
   ///    opposed to linear.
   HashTable(bool quadratic_probing, Suballocator* allocator, bool stores_duplicates,
-      int num_build_tuples, BufferedTupleStreamV2* tuple_stream, int64_t max_num_buckets,
+      int num_build_tuples, BufferedTupleStream* tuple_stream, int64_t max_num_buckets,
       int64_t initial_num_buckets);
 
   /// Performs the probing operation according to the probing algorithm (linear or
@@ -918,7 +918,7 @@ class HashTable {
   /// Stream contains the rows referenced by the hash table. Can be NULL if the
   /// row only contains a single tuple, in which case the TupleRow indirection
   /// is removed by the hash table.
-  BufferedTupleStreamV2* tuple_stream_;
+  BufferedTupleStream* tuple_stream_;
 
   /// Constants on how the hash table should behave.
 

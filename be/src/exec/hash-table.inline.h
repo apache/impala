@@ -109,7 +109,7 @@ inline HashTable::HtData* HashTable::InsertInternal(
 }
 
 inline bool HashTable::Insert(HashTableCtx* ht_ctx,
-    BufferedTupleStreamV2::FlatRowPtr flat_row, TupleRow* row, Status* status) {
+    BufferedTupleStream::FlatRowPtr flat_row, TupleRow* row, Status* status) {
   HtData* htdata = InsertInternal(ht_ctx, status);
   // If successful insert, update the contents of the newly inserted entry with 'idx'.
   if (LIKELY(htdata != NULL)) {

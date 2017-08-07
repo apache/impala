@@ -385,14 +385,14 @@ constexpr double HashTable::MAX_FILL_FACTOR;
 constexpr int64_t HashTable::DATA_PAGE_SIZE;
 
 HashTable* HashTable::Create(Suballocator* allocator, bool stores_duplicates,
-    int num_build_tuples, BufferedTupleStreamV2* tuple_stream, int64_t max_num_buckets,
+    int num_build_tuples, BufferedTupleStream* tuple_stream, int64_t max_num_buckets,
     int64_t initial_num_buckets) {
   return new HashTable(FLAGS_enable_quadratic_probing, allocator, stores_duplicates,
       num_build_tuples, tuple_stream, max_num_buckets, initial_num_buckets);
 }
 
 HashTable::HashTable(bool quadratic_probing, Suballocator* allocator,
-    bool stores_duplicates, int num_build_tuples, BufferedTupleStreamV2* stream,
+    bool stores_duplicates, int num_build_tuples, BufferedTupleStream* stream,
     int64_t max_num_buckets, int64_t num_buckets)
   : allocator_(allocator),
     tuple_stream_(stream),

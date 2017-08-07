@@ -26,7 +26,7 @@
 #include "exec/data-sink.h"
 #include "exec/filter-context.h"
 #include "exec/hash-table.h"
-#include "runtime/buffered-tuple-stream-v2.h"
+#include "runtime/buffered-tuple-stream.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/suballocator.h"
 
@@ -103,7 +103,7 @@ class PhjBuilder : public DataSink {
   /// Transfer ownership of the probe streams to the caller. One stream was allocated per
   /// spilled partition in FlushFinal(). The probe streams are empty but prepared for
   /// writing with a write buffer allocated.
-  std::vector<std::unique_ptr<BufferedTupleStreamV2>> TransferProbeStreams();
+  std::vector<std::unique_ptr<BufferedTupleStream>> TransferProbeStreams();
 
   /// Clears the current list of hash partitions. Called after probing of the partitions
   /// is done. The partitions are not closed or destroyed, since they may be spilled or
@@ -124,7 +124,7 @@ class PhjBuilder : public DataSink {
   /// 'input_probe_rows' for reading in "delete_on_read" mode, so that the probe phase
   /// has enough buffers preallocated to execute successfully.
   Status RepartitionBuildInput(Partition* input_partition, int level,
-      BufferedTupleStreamV2* input_probe_rows) WARN_UNUSED_RESULT;
+      BufferedTupleStream* input_probe_rows) WARN_UNUSED_RESULT;
 
   /// Returns the largest build row count out of the current hash partitions.
   int64_t LargestPartitionRows() const;
@@ -201,10 +201,10 @@ class PhjBuilder : public DataSink {
 
     /// Spills this partition, the partition's stream is unpinned with 'mode' and
     /// its hash table is destroyed if it was built.
-    Status Spill(BufferedTupleStreamV2::UnpinMode mode) WARN_UNUSED_RESULT;
+    Status Spill(BufferedTupleStream::UnpinMode mode) WARN_UNUSED_RESULT;
 
     bool ALWAYS_INLINE IsClosed() const { return build_rows_ == NULL; }
-    BufferedTupleStreamV2* ALWAYS_INLINE build_rows() { return build_rows_.get(); }
+    BufferedTupleStream* ALWAYS_INLINE build_rows() { return build_rows_.get(); }
     HashTable* ALWAYS_INLINE hash_tbl() const { return hash_tbl_.get(); }
     bool ALWAYS_INLINE is_spilled() const { return is_spilled_; }
     int ALWAYS_INLINE level() const { return level_; }
@@ -220,7 +220,7 @@ class PhjBuilder : public DataSink {
     /// failed: if 'status' is ok, inserting failed because not enough reservation
     /// was available and if 'status' is an error, inserting failed because of that error.
     bool InsertBatch(TPrefetchMode::type prefetch_mode, HashTableCtx* ctx,
-        RowBatch* batch, const std::vector<BufferedTupleStreamV2::FlatRowPtr>& flat_rows,
+        RowBatch* batch, const std::vector<BufferedTupleStream::FlatRowPtr>& flat_rows,
         Status* status);
 
     const PhjBuilder* parent_;
@@ -239,7 +239,7 @@ class PhjBuilder : public DataSink {
     /// Stream of build tuples in this partition. Initially owned by this object but
     /// transferred to the parent exec node (via the row batch) when the partition
     /// is closed. If NULL, ownership has been transferred and the partition is closed.
-    std::unique_ptr<BufferedTupleStreamV2> build_rows_;
+    std::unique_ptr<BufferedTupleStream> build_rows_;
   };
 
   /// Computes the minimum number of buffers required to execute the spilling partitioned
@@ -288,19 +288,19 @@ class PhjBuilder : public DataSink {
   /// partitions. This odd return convention is used to avoid emitting unnecessary code
   /// for ~Status in perf-critical code.
   bool AppendRow(
-      BufferedTupleStreamV2* stream, TupleRow* row, Status* status) WARN_UNUSED_RESULT;
+      BufferedTupleStream* stream, TupleRow* row, Status* status) WARN_UNUSED_RESULT;
 
   /// Slow path for AppendRow() above. It is called when the stream has failed to append
   /// the row. We need to find more memory by either switching to IO-buffers, in case the
   /// stream still uses small buffers, or spilling a partition. Returns false and sets
   /// 'status' if it was unable to append the row, even after spilling partitions.
-  bool AppendRowStreamFull(BufferedTupleStreamV2* stream, TupleRow* row,
+  bool AppendRowStreamFull(BufferedTupleStream* stream, TupleRow* row,
       Status* status) noexcept WARN_UNUSED_RESULT;
 
   /// Frees memory by spilling one of the hash partitions. The 'mode' argument is passed
   /// to the Spill() call for the selected partition. The current policy is to spill the
   /// largest partition. Returns non-ok status if we couldn't spill a partition.
-  Status SpillPartition(BufferedTupleStreamV2::UnpinMode mode) WARN_UNUSED_RESULT;
+  Status SpillPartition(BufferedTupleStream::UnpinMode mode) WARN_UNUSED_RESULT;
 
   /// Tries to build hash tables for all unspilled hash partitions. Called after
   /// FlushFinal() when all build rows have been partitioned and added to the appropriate
@@ -464,7 +464,7 @@ class PhjBuilder : public DataSink {
   ///
   /// Because of this, at the end of the build phase, we always have sufficient memory
   /// to execute the probe phase of the algorithm without spilling more partitions.
-  std::vector<std::unique_ptr<BufferedTupleStreamV2>> spilled_partition_probe_streams_;
+  std::vector<std::unique_ptr<BufferedTupleStream>> spilled_partition_probe_streams_;
 
   /// END: Members that must be Reset()
   /////////////////////////////////////////
@@ -479,7 +479,7 @@ class PhjBuilder : public DataSink {
   ProcessBuildBatchFn process_build_batch_fn_level0_;
 
   typedef bool (*InsertBatchFn)(Partition*, TPrefetchMode::type, HashTableCtx*, RowBatch*,
-      const std::vector<BufferedTupleStreamV2::FlatRowPtr>&, Status*);
+      const std::vector<BufferedTupleStream::FlatRowPtr>&, Status*);
   /// Jitted Partition::InsertBatch() function pointers. NULL if codegen is disabled.
   InsertBatchFn insert_batch_fn_;
   InsertBatchFn insert_batch_fn_level0_;

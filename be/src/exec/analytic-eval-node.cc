@@ -23,7 +23,7 @@
 #include "exprs/agg-fn-evaluator.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
-#include "runtime/buffered-tuple-stream-v2.inline.h"
+#include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-state.h"
@@ -195,7 +195,7 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
     RETURN_IF_ERROR(ClaimBufferReservation(state));
   }
   DCHECK(input_stream_ == nullptr);
-  input_stream_.reset(new BufferedTupleStreamV2(state, child(0)->row_desc(),
+  input_stream_.reset(new BufferedTupleStream(state, child(0)->row_desc(),
       &buffer_pool_client_, resource_profile_.spillable_buffer_size,
       resource_profile_.spillable_buffer_size));
   RETURN_IF_ERROR(input_stream_->Init(id(), true));
@@ -363,7 +363,7 @@ inline Status AnalyticEvalNode::AddRow(int64_t stream_idx, TupleRow* row) {
     // TODO: Consider re-pinning later if the output stream is fully consumed.
     RETURN_IF_ERROR(status);
     RETURN_IF_ERROR(state_->StartSpilling(mem_tracker()));
-    input_stream_->UnpinStream(BufferedTupleStreamV2::UNPIN_ALL_EXCEPT_CURRENT);
+    input_stream_->UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
     VLOG_FILE << id() << " Unpin input stream while adding row idx=" << stream_idx;
     if (!input_stream_->AddRow(row, &status)) {
       // Rows should be added in unpinned mode unless an error occurs.
@@ -623,7 +623,7 @@ Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
             << " tuple pool size:" << curr_tuple_pool_->total_allocated_bytes();
   SCOPED_TIMER(evaluation_timer_);
 
-  // BufferedTupleStreamV2::num_rows() returns the total number of rows that have been
+  // BufferedTupleStream::num_rows() returns the total number of rows that have been
   // inserted into the stream (it does not decrease when we read rows), so the index of
   // the next input row that will be inserted will be the current size of the stream.
   int64_t stream_idx = input_stream_->num_rows();

@@ -25,7 +25,7 @@
 
 #include "exec/exec-node.h"
 #include "exec/hash-table.h"
-#include "runtime/buffered-tuple-stream-v2.h"
+#include "runtime/buffered-tuple-stream.h"
 #include "runtime/bufferpool/suballocator.h"
 #include "runtime/descriptors.h" // for TupleId
 #include "runtime/mem-pool.h"
@@ -425,18 +425,18 @@ class PartitionedAggregationNode : public ExecNode {
     /// For streaming preaggs, this may be NULL if sufficient memory is not available.
     /// In that case hash_tbl is also NULL and all rows for the partition will be passed
     /// through.
-    boost::scoped_ptr<BufferedTupleStreamV2> aggregated_row_stream;
+    boost::scoped_ptr<BufferedTupleStream> aggregated_row_stream;
 
     /// Unaggregated rows that are spilled. Always NULL for streaming pre-aggregations.
     /// Always unpinned. Has a write buffer allocated when the partition is spilled and
     /// unaggregated rows are being processed.
-    boost::scoped_ptr<BufferedTupleStreamV2> unaggregated_row_stream;
+    boost::scoped_ptr<BufferedTupleStream> unaggregated_row_stream;
   };
 
   /// Stream used to store serialized spilled rows. Only used if needs_serialize_
   /// is set. This stream is never pinned and only used in Partition::Spill as a
   /// a temporary buffer.
-  boost::scoped_ptr<BufferedTupleStreamV2> serialize_stream_;
+  boost::scoped_ptr<BufferedTupleStream> serialize_stream_;
 
   /// Accessor for 'hash_tbls_' that verifies consistency with the partitions.
   HashTable* ALWAYS_INLINE GetHashTable(int partition_idx) {
@@ -471,7 +471,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// FunctionContexts, so is stored outside the stream. If stream's small buffers get
   /// full, it will attempt to switch to IO-buffers.
   Tuple* ConstructIntermediateTuple(const std::vector<AggFnEvaluator*>& agg_fn_evals,
-      BufferedTupleStreamV2* stream, Status* status) noexcept;
+      BufferedTupleStream* stream, Status* status) noexcept;
 
   /// Constructs intermediate tuple, allocating memory from pool instead of the stream.
   /// Returns NULL and sets status if there is not enough memory to allocate the tuple.
@@ -571,7 +571,7 @@ class PartitionedAggregationNode : public ExecNode {
 
   /// Reads all the rows from input_stream and process them by calling ProcessBatch().
   template <bool AGGREGATED_ROWS>
-  Status ProcessStream(BufferedTupleStreamV2* input_stream) WARN_UNUSED_RESULT;
+  Status ProcessStream(BufferedTupleStream* input_stream) WARN_UNUSED_RESULT;
 
   /// Output 'singleton_output_tuple_' and transfer memory to 'row_batch'.
   void GetSingletonOutput(RowBatch* row_batch);
