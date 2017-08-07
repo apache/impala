@@ -814,7 +814,7 @@ IntVal StringFunctions::FindInSet(FunctionContext* context, const StringVal& str
   do {
     end = start;
     // Position end.
-    while(str_set.ptr[end] != ',' && end < str_set.len) ++end;
+    while (end < str_set.len && str_set.ptr[end] != ',') ++end;
     StringValue token(reinterpret_cast<char*>(str_set.ptr) + start, end - start);
     if (str_sv.Eq(token)) return IntVal(token_index);
 
