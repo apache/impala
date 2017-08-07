@@ -55,12 +55,13 @@
 
 using namespace impala;
 
-DECLARE_string(hostname);
-DECLARE_string(redaction_rules_file);
-// TODO: renamed this to be more generic when we have a good CM release to do so.
-DECLARE_int32(logbufsecs);
-DECLARE_string(heap_profile_dir);
 DECLARE_bool(enable_process_lifetime_heap_profiling);
+DECLARE_string(heap_profile_dir);
+DECLARE_string(hostname);
+// TODO: rename this to be more generic when we have a good CM release to do so.
+DECLARE_int32(logbufsecs);
+DECLARE_int32(max_minidumps);
+DECLARE_string(redaction_rules_file);
 
 DEFINE_int32(max_log_files, 10, "Maximum number of log files to retain per severity "
     "level. The most recent log files are retained. If set to 0, all log files are "
@@ -121,6 +122,10 @@ static scoped_ptr<impala::Thread> pause_monitor;
     impala::CheckAndRotateLogFiles(FLAGS_max_log_files);
     // Check for audit event log rotation in every interval of the maintenance thread
     impala::CheckAndRotateAuditEventLogFiles(FLAGS_max_audit_event_log_files);
+    // Check for minidump rotation in every interval of the maintenance thread. This is
+    // necessary since an arbitrary number of minidumps can be written by sending SIGUSR1
+    // to the process.
+    impala::CheckAndRotateMinidumps(FLAGS_max_minidumps);
   }
 }
 

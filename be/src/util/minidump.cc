@@ -116,9 +116,7 @@ static void SetupSigUSR1Handler(bool minidumps_enabled) {
   sigaction(SIGUSR1, &sig_action, NULL);
 }
 
-/// Check the number of minidump files and removes the oldest ones to maintain an upper
-/// bound on the number of files.
-static void CheckAndRemoveMinidumps(int max_minidumps) {
+void CheckAndRotateMinidumps(int max_minidumps) {
   // Disable rotation if 0 or wrong input
   if (max_minidumps <= 0) return;
 
@@ -224,11 +222,6 @@ Status RegisterMinidump(const char* cmd_line_path) {
         << "was: " << err;
     return Status(ss.str());
   }
-
-  // Rotate old minidump files. We only need to do this on startup (in contrast to
-  // periodically) because only process crashes will trigger the creation of new minidump
-  // files.
-  CheckAndRemoveMinidumps(FLAGS_max_minidumps);
 
   google_breakpad::MinidumpDescriptor desc(FLAGS_minidump_path.c_str());
 

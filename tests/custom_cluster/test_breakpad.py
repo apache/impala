@@ -117,7 +117,7 @@ class TestBreakpad(CustomClusterTestSuite):
       return self.cluster.statestored and 1 or 0
     raise RuntimeError("Unknown daemon name: %s" % daemon)
 
-  def wait_for_num_processes(self, daemon, num_expected, timeout=60):
+  def wait_for_num_processes(self, daemon, num_expected, timeout=5):
     end = time.time() + timeout
     self.cluster.refresh()
     num_processes = self.get_num_processes(daemon)
@@ -146,7 +146,6 @@ class TestBreakpad(CustomClusterTestSuite):
     assert self.count_minidumps('statestored', base_dir) == 1
     assert self.count_minidumps('catalogd', base_dir) == 1
 
-
   def assert_num_logfile_entries(self, expected_count):
     self.assert_impalad_log_contains('INFO', 'Wrote minidump to ',
         expected_count=expected_count)
@@ -172,9 +171,9 @@ class TestBreakpad(CustomClusterTestSuite):
     cluster_size = self.get_num_processes('impalad')
     self.kill_cluster(SIGUSR1)
     # Breakpad forks to write its minidump files, wait for all the clones to terminate.
-    assert self.wait_for_num_processes('impalad', cluster_size, 5) == cluster_size
-    assert self.wait_for_num_processes('catalogd', 1, 5) == 1
-    assert self.wait_for_num_processes('statestored', 1, 5) == 1
+    assert self.wait_for_num_processes('impalad', cluster_size) == cluster_size
+    assert self.wait_for_num_processes('catalogd', 1) == 1
+    assert self.wait_for_num_processes('statestored', 1) == 1
     # Make sure impalad still answers queries.
     client = self.create_impala_client()
     self.execute_query_expect_success(client, "SELECT COUNT(*) FROM functional.alltypes")
@@ -227,6 +226,33 @@ class TestBreakpad(CustomClusterTestSuite):
     assert self.count_minidumps('impalad') == expected_impalads
     assert self.count_minidumps('statestored') == 1
     assert self.count_minidumps('catalogd') == 1
+
+  @pytest.mark.execute_serially
+  def test_minidump_cleanup_thread(self):
+    """Check that periodic rotation preserves a limited number of minidumps."""
+    assert self.count_all_minidumps() == 0
+    # Maximum number of minidump that the impalads should keep for this test.
+    max_minidumps = 2
+    # Sleep interval for the log rotation thread.
+    rotation_interval = 1
+    self.start_cluster_with_args(minidump_path=self.tmp_dir,
+                                 max_minidumps=max_minidumps,
+                                 logbufsecs=rotation_interval)
+    cluster_size = self.get_num_processes('impalad')
+    # We trigger several rounds of minidump creation to make sure that all daemons wrote
+    # enough files to trigger rotation.
+    for i in xrange(max_minidumps + 1):
+      self.kill_cluster(SIGUSR1)
+      # Breakpad forks to write its minidump files, wait for all the clones to terminate.
+      assert self.wait_for_num_processes('impalad', cluster_size) == cluster_size
+      assert self.wait_for_num_processes('catalogd', 1) == 1
+      assert self.wait_for_num_processes('statestored', 1) == 1
+      self.assert_num_logfile_entries(i + 1)
+    # Sleep long enough for log cleaning to take effect.
+    time.sleep(rotation_interval + 1)
+    assert self.count_minidumps('impalad') == min(cluster_size, max_minidumps)
+    assert self.count_minidumps('statestored') == max_minidumps
+    assert self.count_minidumps('catalogd') == max_minidumps
 
   @pytest.mark.execute_serially
   def test_disable_minidumps(self):
