@@ -157,6 +157,14 @@ class BufferPoolTest : public ::testing::Test {
     return !page->page_->buffer.is_open();
   }
 
+  int NumEvicted(vector<BufferPool::PageHandle>& pages) {
+    int num_evicted = 0;
+    for (PageHandle& page : pages) {
+      if (IsEvicted(&page)) ++num_evicted;
+    }
+    return num_evicted;
+  }
+
   /// Allocate buffers of varying sizes at most 'max_buffer_size' that add up to
   /// 'total_bytes'. Both numbers must be a multiple of the minimum buffer size.
   /// If 'randomize_core' is true, will switch thread between cores randomly before
@@ -606,6 +614,7 @@ TEST_F(BufferPoolTest, CleanPageStats) {
   vector<PageHandle> pages;
   CreatePages(&pool, &client, TEST_BUFFER_LEN, TOTAL_MEM, &pages);
   WriteData(pages, 0);
+  EXPECT_FALSE(client.has_unpinned_pages());
 
   // Pages don't start off clean.
   EXPECT_EQ(0, pool.GetNumCleanPages());
@@ -613,22 +622,27 @@ TEST_F(BufferPoolTest, CleanPageStats) {
 
   // Unpin pages and wait until they're written out and therefore clean.
   UnpinAll(&pool, &client, &pages);
+  EXPECT_TRUE(client.has_unpinned_pages());
   WaitForAllWrites(&client);
   EXPECT_EQ(MAX_NUM_BUFFERS, pool.GetNumCleanPages());
   EXPECT_EQ(TOTAL_MEM, pool.GetCleanPageBytes());
+  EXPECT_TRUE(client.has_unpinned_pages());
 
   // Do an allocation to force eviction of one page.
   ASSERT_OK(AllocateAndFree(&pool, &client, TEST_BUFFER_LEN));
   EXPECT_EQ(MAX_NUM_BUFFERS - 1, pool.GetNumCleanPages());
   EXPECT_EQ(TOTAL_MEM - TEST_BUFFER_LEN, pool.GetCleanPageBytes());
+  EXPECT_TRUE(client.has_unpinned_pages());
 
   // Re-pin all the pages - none will be clean afterwards.
   ASSERT_OK(PinAll(&pool, &client, &pages));
   VerifyData(pages, 0);
   EXPECT_EQ(0, pool.GetNumCleanPages());
   EXPECT_EQ(0, pool.GetCleanPageBytes());
+  EXPECT_FALSE(client.has_unpinned_pages());
 
   DestroyAll(&pool, &client, &pages);
+  EXPECT_FALSE(client.has_unpinned_pages());
   pool.DeregisterClient(&client);
   global_reservations_.Close();
 }
@@ -1242,11 +1256,7 @@ void BufferPoolTest::TestEvictionPolicy(int64_t page_size) {
   // No additional memory should have been allocated - it should have been recycled.
   EXPECT_EQ(total_mem, pool.GetSystemBytesAllocated());
   // Check that two pages were evicted.
-  int num_evicted = 0;
-  for (PageHandle& page : pages) {
-    if (IsEvicted(&page)) ++num_evicted;
-  }
-  EXPECT_EQ(NUM_EXTRA_BUFFERS, num_evicted);
+  EXPECT_EQ(NUM_EXTRA_BUFFERS, NumEvicted(pages));
 
   // Free up memory required to pin the original pages again.
   FreeBuffers(&pool, &client, &extra_buffers);
@@ -1927,6 +1937,48 @@ TEST_F(BufferPoolTest, SubReservation) {
 
   subreservation.Close();
   pool.DeregisterClient(&client);
+}
+
+// Check that we can decrease reservation without violating any buffer pool invariants.
+TEST_F(BufferPoolTest, DecreaseReservation) {
+  const int MAX_NUM_BUFFERS = 4;
+  const int64_t TOTAL_MEM = MAX_NUM_BUFFERS * TEST_BUFFER_LEN;
+  global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
+  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM);
+
+  ClientHandle client;
+  ASSERT_OK(pool.RegisterClient("test client", NewFileGroup(), &global_reservations_,
+      nullptr, TOTAL_MEM, NewProfile(), &client));
+  ASSERT_TRUE(client.IncreaseReservation(TOTAL_MEM));
+
+  vector<PageHandle> pages;
+  CreatePages(&pool, &client, TEST_BUFFER_LEN, TOTAL_MEM, &pages);
+  WriteData(pages, 0);
+
+  // Unpin pages and decrease reservation while the writes are in flight.
+  UnpinAll(&pool, &client, &pages);
+  ASSERT_OK(client.DecreaseReservationTo(2 * TEST_BUFFER_LEN));
+  // Two pages must be clean to stay within reservation
+  EXPECT_GE(pool.GetNumCleanPages(), 2);
+  EXPECT_EQ(2 * TEST_BUFFER_LEN, client.GetReservation());
+
+  // Decrease it further after the pages are evicted.
+  WaitForAllWrites(&client);
+  ASSERT_OK(client.DecreaseReservationTo(TEST_BUFFER_LEN));
+  EXPECT_GE(pool.GetNumCleanPages(), 3);
+  EXPECT_EQ(TEST_BUFFER_LEN, client.GetReservation());
+
+  // Check that we can still use the reservation.
+  ASSERT_OK(AllocateAndFree(&pool, &client, TEST_BUFFER_LEN));
+  EXPECT_EQ(1, NumEvicted(pages));
+
+  // Check that we can decrease it to zero.
+  ASSERT_OK(client.DecreaseReservationTo(0));
+  EXPECT_EQ(0, client.GetReservation());
+
+  DestroyAll(&pool, &client, &pages);
+  pool.DeregisterClient(&client);
+  global_reservations_.Close();
 }
 }
 

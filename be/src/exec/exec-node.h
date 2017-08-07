@@ -233,7 +233,16 @@ class ExecNode {
   /// ExecNode. Only needs to be called by ExecNodes that will use the client.
   /// The client is automatically cleaned up in Close(). Should not be called if
   /// the client is already open.
-  Status ClaimBufferReservation(RuntimeState* state);
+  ///
+  /// The ExecNode must return the initial reservation to
+  /// QueryState::initial_reservations(), which is done automatically in Close() as long
+  /// as the initial reservation is not released before Close().
+  Status ClaimBufferReservation(RuntimeState* state) WARN_UNUSED_RESULT;
+
+  /// Release any unused reservation in excess of the node's initial reservation. Returns
+  /// an error if releasing the reservation requires flushing pages to disk, and that
+  /// fails.
+  Status ReleaseUnusedReservation() WARN_UNUSED_RESULT;
 
   /// Extends blocking queue for row batches. Row batches have a property that
   /// they must be processed in the order they were produced, even in cancellation

@@ -296,6 +296,10 @@ bool BufferPool::ClientHandle::IncreaseReservationToFit(int64_t bytes) {
   return impl_->reservation()->IncreaseReservationToFit(bytes);
 }
 
+Status BufferPool::ClientHandle::DecreaseReservationTo(int64_t target_bytes) {
+  return impl_->DecreaseReservationTo(target_bytes);
+}
+
 int64_t BufferPool::ClientHandle::GetReservation() const {
   return impl_->reservation()->GetReservation();
 }
@@ -332,6 +336,10 @@ void BufferPool::ClientHandle::RestoreReservation(SubReservation* src, int64_t b
 
 void BufferPool::ClientHandle::SetDebugDenyIncreaseReservation(double probability) {
   impl_->reservation()->SetDebugDenyIncreaseReservation(probability);
+}
+
+bool BufferPool::ClientHandle::has_unpinned_pages() const {
+  return impl_->has_unpinned_pages();
 }
 
 BufferPool::SubReservation::SubReservation(ClientHandle* client) {
@@ -540,6 +548,19 @@ Status BufferPool::Client::PrepareToAllocateBuffer(int64_t len) {
   reservation_.AllocateFrom(len);
   buffers_allocated_bytes_ += len;
   DCHECK_CONSISTENCY();
+  return Status::OK();
+}
+
+Status BufferPool::Client::DecreaseReservationTo(int64_t target_bytes) {
+  unique_lock<mutex> lock(lock_);
+  int64_t current_reservation = reservation_.GetReservation();
+  DCHECK_GE(current_reservation, target_bytes);
+  int64_t amount_to_free =
+      min(reservation_.GetUnusedReservation(), current_reservation - target_bytes);
+  if (amount_to_free == 0) return Status::OK();
+  // Clean enough pages to allow us to safely release reservation.
+  RETURN_IF_ERROR(CleanPages(&lock, amount_to_free));
+  reservation_.DecreaseReservation(amount_to_free);
   return Status::OK();
 }
 

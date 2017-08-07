@@ -103,6 +103,19 @@ Status SortNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     *eos = false;
   }
 
+  if (returned_buffer_) {
+    // If the Sorter returned a buffer on the last call to GetNext(), we might have an
+    // opportunity to release memory. Release reservation, unless it might be needed
+    // for the next subplan iteration or merging spilled runs.
+    returned_buffer_ = false;
+    if (!IsInSubplan() && !sorter_->HasSpilledRuns()) {
+      DCHECK(!buffer_pool_client_.has_unpinned_pages());
+      Status status = ReleaseUnusedReservation();
+      DCHECK(status.ok()) << "Should not fail - no runs were spilled so no pages are "
+                          << "unpinned. " << status.GetDetail();
+    }
+  }
+
   DCHECK_EQ(row_batch->num_rows(), 0);
   RETURN_IF_ERROR(sorter_->GetNext(row_batch, eos));
   while ((num_rows_skipped_ < offset_)) {
@@ -119,6 +132,7 @@ Status SortNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     RETURN_IF_ERROR(sorter_->GetNext(row_batch, eos));
   }
 
+  returned_buffer_ = row_batch->num_buffers() > 0;
   num_rows_returned_ += row_batch->num_rows();
   if (ReachedLimit()) {
     row_batch->set_num_rows(row_batch->num_rows() - (num_rows_returned_ - limit_));

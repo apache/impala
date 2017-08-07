@@ -247,6 +247,10 @@ Status ExecNode::ClaimBufferReservation(RuntimeState* state) {
   return Status::OK();
 }
 
+Status ExecNode::ReleaseUnusedReservation() {
+  return buffer_pool_client_.DecreaseReservationTo(resource_profile_.min_reservation);
+}
+
 Status ExecNode::CreateTree(
     RuntimeState* state, const TPlan& plan, const DescriptorTbl& descs, ExecNode** root) {
   if (plan.nodes.size() == 0) {

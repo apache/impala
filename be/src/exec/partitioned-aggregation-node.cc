@@ -1198,6 +1198,16 @@ int64_t PartitionedAggregationNode::LargestSpilledPartition() const {
 Status PartitionedAggregationNode::NextPartition() {
   DCHECK(output_partition_ == nullptr);
 
+  if (!IsInSubplan() && spilled_partitions_.empty()) {
+    // All partitions are in memory. Release reservation that was used for previous
+    // partitions that is no longer needed. If we have spilled partitions, we want to
+    // hold onto all reservation in case it is needed to process the spilled partitions.
+    DCHECK(!buffer_pool_client_.has_unpinned_pages());
+    Status status = ReleaseUnusedReservation();
+    DCHECK(status.ok()) << "Should not fail - all partitions are in memory so there are "
+                        << "no unpinned pages. " << status.GetDetail();
+  }
+
   // Keep looping until we get to a partition that fits in memory.
   Partition* partition = nullptr;
   while (true) {

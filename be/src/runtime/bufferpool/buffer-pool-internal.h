@@ -227,7 +227,7 @@ class BufferPool::Client {
   /// already in memory, ensures the data is in the page's buffer. If the data is on
   /// disk, starts an async read of the data and sets 'pin_in_flight' on the page to
   /// true. Neither the client's lock nor page->buffer_lock should be held by the caller.
-  Status StartMoveToPinned(ClientHandle* client, Page* page);
+  Status StartMoveToPinned(ClientHandle* client, Page* page) WARN_UNUSED_RESULT;
 
   /// Moves a page that has a pin in flight back to the evicted state, undoing
   /// StartMoveToPinned(). Neither the client's lock nor page->buffer_lock should be held
@@ -236,13 +236,16 @@ class BufferPool::Client {
 
   /// Finish the work of bring the data of an evicted page to memory if
   /// page->pin_in_flight was set to true by StartMoveToPinned().
-  Status FinishMoveEvictedToPinned(Page* page);
+  Status FinishMoveEvictedToPinned(Page* page) WARN_UNUSED_RESULT;
 
   /// Must be called once before allocating a buffer of 'len' via the AllocateBuffer()
   /// API to deduct from the client's reservation and update internal accounting. Cleans
   /// dirty pages if needed to satisfy the buffer pool's internal invariants. No page or
   /// client locks should be held by the caller.
-  Status PrepareToAllocateBuffer(int64_t len);
+  Status PrepareToAllocateBuffer(int64_t len) WARN_UNUSED_RESULT;
+
+  /// Implementation of ClientHandle::DecreaseReservationTo().
+  Status DecreaseReservationTo(int64_t target_bytes) WARN_UNUSED_RESULT;
 
   /// Called after a buffer of 'len' is freed via the FreeBuffer() API to update
   /// internal accounting and release the buffer to the client's reservation. No page or
@@ -272,6 +275,11 @@ class BufferPool::Client {
   const BufferPoolClientCounters& counters() const { return counters_; }
   bool spilling_enabled() const { return file_group_ != NULL; }
   void set_debug_write_delay_ms(int val) { debug_write_delay_ms_ = val; }
+  bool has_unpinned_pages() const {
+    // Safe to read without lock since other threads should not be calling BufferPool
+    // functions that create, destroy or unpin pages.
+    return pinned_pages_.size() < num_pages_;
+  }
 
   std::string DebugString();
 

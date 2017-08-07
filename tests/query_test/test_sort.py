@@ -159,6 +159,10 @@ class TestQueryFullSort(ImpalaTestSuite):
       query, exec_option, table_format=table_format).data)
     assert(result[0] == sorted(result[0]))
 
+  def test_sort_reservation_usage(self, vector):
+    """Tests for sorter reservation usage."""
+    self.run_test_case('sort-reservation-usage', vector)
+
 class TestRandomSort(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

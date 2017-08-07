@@ -324,6 +324,13 @@ class BufferPool::ClientHandle {
   /// if successful, after which 'bytes' can be used.
   bool IncreaseReservationToFit(int64_t bytes) WARN_UNUSED_RESULT;
 
+  /// Try to decrease this client's reservation down to a minimum of 'target_bytes' by
+  /// releasing unused reservation to ancestor ReservationTrackers, all the way up to
+  /// the root of the ReservationTracker tree. This client's reservation must be at least
+  /// 'target_bytes' before calling this method. May fail if decreasing the reservation
+  /// requires flushing unpinned pages to disk and a write to disk fails.
+  Status DecreaseReservationTo(int64_t target_bytes) WARN_UNUSED_RESULT;
+
   /// Move some of this client's reservation to the SubReservation. 'bytes' of unused
   /// reservation must be available in this tracker.
   void SaveReservation(SubReservation* dst, int64_t bytes);
@@ -350,6 +357,9 @@ class BufferPool::ClientHandle {
   void SetDebugDenyIncreaseReservation(double probability);
 
   bool is_registered() const { return impl_ != NULL; }
+
+  /// Return true if there are any unpinned pages for this client.
+  bool has_unpinned_pages() const;
 
   std::string DebugString() const;
 

@@ -1760,4 +1760,11 @@ Status Sorter::ExecuteIntermediateMerge(Sorter::Run* merged_run) {
   RETURN_IF_ERROR(merged_run->FinalizeInput());
   return Status::OK();
 }
+
+bool Sorter::HasSpilledRuns() const {
+  // All runs in 'merging_runs_' are spilled. 'sorted_runs_' can contain at most one
+  // non-spilled run.
+  return !merging_runs_.empty() || sorted_runs_.size() > 1 ||
+      (sorted_runs_.size() == 1 && !sorted_runs_.back()->is_pinned());
+}
 } // namespace impala

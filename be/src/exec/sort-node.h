@@ -69,6 +69,10 @@ class SortNode : public ExecNode {
   std::vector<bool> is_asc_order_;
   std::vector<bool> nulls_first_;
 
+  /// Whether the previous call to GetNext() returned a buffer attached to the RowBatch.
+  /// Used to avoid unnecessary calls to ReleaseUnusedReservation().
+  bool returned_buffer_ = false;
+
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
 

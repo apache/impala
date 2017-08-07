@@ -152,6 +152,9 @@ class Sorter {
   /// sort with the current sorter.
   int64_t ComputeMinReservation();
 
+  /// Return true if the sorter has any spilled runs.
+  bool HasSpilledRuns() const;
+
  private:
   class Page;
   class Run;
@@ -239,7 +242,7 @@ class Sorter {
   /// memory.
   boost::scoped_ptr<SortedRunMerger> merger_;
 
-  /// Runs that are currently processed by the merge_.
+  /// Spilled runs that are currently processed by the merge_.
   /// These runs can be deleted when we are done with the current merge.
   std::deque<Run*> merging_runs_;
 
