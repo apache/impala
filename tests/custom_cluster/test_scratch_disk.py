@@ -37,10 +37,9 @@ class TestScratchDir(CustomClusterTestSuite):
   in_mem_query = """
       select o_orderdate, o_custkey, o_comment from tpch.orders
       """
-  # Block manager memory limit that is low enough to force Impala to spill to disk when
-  # executing spill_query and high enough that we can execute in_mem_query without
-  # spilling.
-  buffer_pool_limit = "64m"
+  # Buffer pool limit that is low enough to force Impala to spill to disk when executing
+  # spill_query.
+  buffer_pool_limit = "32m"
 
   def count_nonempty_dirs(self, dirs):
     count = 0
