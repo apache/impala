@@ -609,7 +609,8 @@ Status HdfsParquetScanner::NextRowGroup() {
   int64_t split_offset = split_range->offset();
   int64_t split_length = split_range->len();
 
-  HdfsFileDesc* file_desc = scan_node_->GetFileDesc(filename());
+  HdfsFileDesc* file_desc = scan_node_->GetFileDesc(
+      context_->partition_descriptor()->id(), filename());
 
   bool start_with_first_row_group = row_group_idx_ == -1;
   bool misaligned_row_group_skipped = false;
@@ -1361,7 +1362,8 @@ Status HdfsParquetScanner::ProcessFooter() {
     // In this case, the metadata is bigger than our guess meaning there are
     // not enough bytes in the footer range from IssueInitialRanges().
     // We'll just issue more ranges to the IoMgr that is the actual footer.
-    const HdfsFileDesc* file_desc = scan_node_->GetFileDesc(filename());
+    int64_t partition_id = context_->partition_descriptor()->id();
+    const HdfsFileDesc* file_desc = scan_node_->GetFileDesc(partition_id, filename());
     DCHECK(file_desc != NULL);
     // The start of the metadata is:
     // file_length - 4-byte metadata size - footer-size - metadata size
@@ -1383,7 +1385,7 @@ Status HdfsParquetScanner::ProcessFooter() {
 
     // Read the header into the metadata buffer.
     DiskIoMgr::ScanRange* metadata_range = scan_node_->AllocateScanRange(
-        metadata_range_->fs(), filename(), metadata_size, metadata_start, -1,
+        metadata_range_->fs(), filename(), metadata_size, metadata_start, partition_id,
         metadata_range_->disk_id(), metadata_range_->expected_local(),
         DiskIoMgr::BufferOpts::ReadInto(metadata_buffer.buffer(), metadata_size));
 
@@ -1585,7 +1587,8 @@ Status HdfsParquetScanner::CreateCountingReader(const SchemaPath& parent_path,
 
 Status HdfsParquetScanner::InitColumns(
     int row_group_idx, const vector<ParquetColumnReader*>& column_readers) {
-  const HdfsFileDesc* file_desc = scan_node_->GetFileDesc(filename());
+  int64_t partition_id = context_->partition_descriptor()->id();
+  const HdfsFileDesc* file_desc = scan_node_->GetFileDesc(partition_id, filename());
   DCHECK(file_desc != NULL);
   parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx];
 
@@ -1665,7 +1668,7 @@ Status HdfsParquetScanner::InitColumns(
         && col_start >= split_range->offset()
         && col_end <= split_range->offset() + split_range->len();
     DiskIoMgr::ScanRange* col_range = scan_node_->AllocateScanRange(metadata_range_->fs(),
-        filename(), col_len, col_start, scalar_reader->col_idx(), split_range->disk_id(),
+        filename(), col_len, col_start, partition_id, split_range->disk_id(),
         col_range_local,
         DiskIoMgr::BufferOpts(split_range->try_cache(), file_desc->mtime));
     col_ranges.push_back(col_range);

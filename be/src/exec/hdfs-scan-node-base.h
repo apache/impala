@@ -34,6 +34,7 @@
 #include "util/avro-util.h"
 #include "util/progress-updater.h"
 #include "util/spinlock.h"
+#include "util/container-util.h"
 
 namespace impala {
 
@@ -196,10 +197,10 @@ class HdfsScanNodeBase : public ScanNode {
 
   /// Allocate a new scan range object, stored in the runtime state's object pool. For
   /// scan ranges that correspond to the original hdfs splits, the partition id must be
-  /// set to the range's partition id. For other ranges (e.g. columns in parquet, read
-  /// past buffers), the partition_id is unused. expected_local should be true if this
-  /// scan range is not expected to require a remote read. The range must fall within
-  /// the file bounds. That is, the offset must be >= 0, and offset + len <= file_length.
+  /// set to the range's partition id. Partition_id is mandatory as it is used to gather
+  /// file descriptor info. expected_local should be true if this scan range is not
+  /// expected to require a remote read. The range must fall within the file bounds.
+  /// That is, the offset must be >= 0, and offset + len <= file_length.
   /// If not NULL, the 'original_split' pointer is stored for reference in the scan range
   /// metadata of the scan range that is to be allocated.
   /// This is thread safe.
@@ -233,16 +234,17 @@ class HdfsScanNodeBase : public ScanNode {
   Tuple* InitTemplateTuple(const std::vector<ScalarExprEvaluator*>& value_evals,
       MemPool* pool, RuntimeState* state) const;
 
-  /// Returns the file desc for 'filename'.  Returns nullptr if filename is invalid.
-  HdfsFileDesc* GetFileDesc(const std::string& filename);
+  /// Given a partition_id and filename returns the related file descriptor
+  /// DCHECK ensures there is always file descriptor returned
+  HdfsFileDesc* GetFileDesc(int64_t partition_id, const std::string& filename);
 
-  /// Sets the scanner specific metadata for 'filename'. Scanners can use this to store
-  /// file header information. Thread safe.
-  void SetFileMetadata(const std::string& filename, void* metadata);
+  /// Sets the scanner specific metadata for 'partition_id' and 'filename'.
+  /// Scanners can use this to store file header information. Thread safe.
+  void SetFileMetadata(int64_t partition_id, const std::string& filename, void* metadata);
 
-  /// Returns the scanner specific metadata for 'filename'. Returns nullptr if there is
-  /// no metadata. Thread safe.
-  void* GetFileMetadata(const std::string& filename);
+  /// Returns the scanner specific metadata for 'partition_id' and 'filename'.
+  /// Returns nullptr if there is no metadata. Thread safe.
+  void* GetFileMetadata(int64_t partition_id, const std::string& filename);
 
   /// Called by scanners when a range is complete. Used to record progress.
   /// This *must* only be called after a scanner has completely finished its
@@ -356,8 +358,11 @@ class HdfsScanNodeBase : public ScanNode {
   /// Partitions scanned by this scan node.
   std::unordered_set<int64_t> partition_ids_;
 
-  /// File path => file descriptor (which includes the file's splits)
-  typedef std::unordered_map<std::string, HdfsFileDesc*> FileDescMap;
+  /// This is a pair for partition ID and filename
+  typedef pair<int64_t, std::string> PartitionFileKey;
+
+  /// partition_id, File path => file descriptor (which includes the file's splits)
+  typedef std::unordered_map<PartitionFileKey, HdfsFileDesc*, pair_hash> FileDescMap;
   FileDescMap file_descs_;
 
   /// File format => file descriptors.
@@ -366,9 +371,10 @@ class HdfsScanNodeBase : public ScanNode {
   FileFormatsMap per_type_files_;
 
   /// Scanner specific per file metadata (e.g. header information) and associated lock.
+  /// Key of the map is partition_id, filename pair
   /// TODO: Remove this lock when removing the legacy scanners and scan nodes.
   boost::mutex metadata_lock_;
-  std::unordered_map<std::string, void*> per_file_metadata_;
+  std::unordered_map<PartitionFileKey, void*, pair_hash> per_file_metadata_;
 
   /// Conjuncts for each materialized tuple (top-level row batch tuples and collection
   /// item tuples). Includes a copy of ExecNode.conjuncts_.

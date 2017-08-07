@@ -86,7 +86,8 @@ Status BaseSequenceScanner::Open(ScannerContext* context) {
       scan_node_->runtime_profile(), "BytesSkipped", TUnit::BYTES);
 
   header_ = reinterpret_cast<FileHeader*>(
-      scan_node_->GetFileMetadata(stream_->filename()));
+      scan_node_->GetFileMetadata(
+          context->partition_descriptor()->id(), stream_->filename()));
   if (header_ == nullptr) {
     only_parsing_header_ = true;
     return Status::OK();
@@ -157,8 +158,9 @@ Status BaseSequenceScanner::GetNextInternal(RowBatch* row_batch) {
     }
     // Header is parsed, set the metadata in the scan node and issue more ranges.
     static_cast<HdfsScanNodeBase*>(scan_node_)->SetFileMetadata(
-        stream_->filename(), header_);
-    HdfsFileDesc* desc = scan_node_->GetFileDesc(stream_->filename());
+        context_->partition_descriptor()->id(), stream_->filename(), header_);
+    HdfsFileDesc* desc = scan_node_->GetFileDesc(
+        context_->partition_descriptor()->id(), stream_->filename());
     RETURN_IF_ERROR(scan_node_->AddDiskIoRanges(desc));
     return Status::OK();
   }
@@ -303,7 +305,8 @@ Status BaseSequenceScanner::SkipToSync(const uint8_t* sync, int sync_size) {
 
 void BaseSequenceScanner::CloseFileRanges(const char* filename) {
   DCHECK(only_parsing_header_);
-  HdfsFileDesc* desc = scan_node_->GetFileDesc(filename);
+  HdfsFileDesc* desc = scan_node_->GetFileDesc(
+      context_->partition_descriptor()->id(), filename);
   const vector<DiskIoMgr::ScanRange*>& splits = desc->splits;
   for (int i = 0; i < splits.size(); ++i) {
     COUNTER_ADD(bytes_skipped_counter_, splits[i]->len());

@@ -77,7 +77,7 @@ ScannerContext::Stream::Stream(ScannerContext* parent)
 ScannerContext::Stream* ScannerContext::AddStream(DiskIoMgr::ScanRange* range) {
   std::unique_ptr<Stream> stream(new Stream(this));
   stream->scan_range_ = range;
-  stream->file_desc_ = scan_node_->GetFileDesc(stream->filename());
+  stream->file_desc_ = scan_node_->GetFileDesc(partition_desc_->id(), stream->filename());
   stream->file_len_ = stream->file_desc_->file_length;
   stream->total_bytes_returned_ = 0;
   stream->io_buffer_pos_ = NULL;
@@ -175,8 +175,9 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
       // TODO: We are leaving io_buffer_ = NULL, revisit.
       return Status::OK();
     }
+    int64_t partition_id = parent_->partition_descriptor()->id();
     DiskIoMgr::ScanRange* range = parent_->scan_node_->AllocateScanRange(
-        scan_range_->fs(), filename(), read_past_buffer_size, offset, -1,
+        scan_range_->fs(), filename(), read_past_buffer_size, offset, partition_id,
         scan_range_->disk_id(), false, DiskIoMgr::BufferOpts::Uncached());
     RETURN_IF_ERROR(parent_->state_->io_mgr()->Read(
         parent_->scan_node_->reader_context(), range, &io_buffer_));

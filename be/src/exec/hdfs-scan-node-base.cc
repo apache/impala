@@ -263,12 +263,13 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
     file_path.append(split.file_name, filesystem::path::codecvt());
     const string& native_file_path = file_path.native();
 
+    auto file_desc_map_key = make_pair(partition_desc->id(), native_file_path);
     HdfsFileDesc* file_desc = NULL;
-    FileDescMap::iterator file_desc_it = file_descs_.find(native_file_path);
+    FileDescMap::iterator file_desc_it = file_descs_.find(file_desc_map_key);
     if (file_desc_it == file_descs_.end()) {
       // Add new file_desc to file_descs_ and per_type_files_
       file_desc = runtime_state_->obj_pool()->Add(new HdfsFileDesc(native_file_path));
-      file_descs_[native_file_path] = file_desc;
+      file_descs_[file_desc_map_key] = file_desc;
       file_desc->file_length = split.file_length;
       file_desc->mtime = split.mtime;
       file_desc->file_compression = split.file_compression;
@@ -603,7 +604,7 @@ DiskIoMgr::ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char*
   // beyond the end of the file).
   DCHECK_GE(offset, 0);
   DCHECK_GE(len, 0);
-  DCHECK_LE(offset + len, GetFileDesc(file)->file_length)
+  DCHECK_LE(offset + len, GetFileDesc(partition_id, file)->file_length)
       << "Scan range beyond end of file (offset=" << offset << ", len=" << len << ")";
   disk_id = runtime_state_->io_mgr()->AssignQueue(file, disk_id, expected_local);
 
@@ -630,20 +631,25 @@ Status HdfsScanNodeBase::AddDiskIoRanges(const vector<DiskIoMgr::ScanRange*>& ra
   return Status::OK();
 }
 
-HdfsFileDesc* HdfsScanNodeBase::GetFileDesc(const string& filename) {
-  DCHECK(file_descs_.find(filename) != file_descs_.end());
-  return file_descs_[filename];
+HdfsFileDesc* HdfsScanNodeBase::GetFileDesc(int64_t partition_id, const string& filename) {
+  auto file_desc_map_key = make_pair(partition_id, filename);
+  DCHECK(file_descs_.find(file_desc_map_key) != file_descs_.end());
+  return file_descs_[file_desc_map_key];
 }
 
-void HdfsScanNodeBase::SetFileMetadata(const string& filename, void* metadata) {
+void HdfsScanNodeBase::SetFileMetadata(
+    int64_t partition_id, const string& filename, void* metadata) {
   unique_lock<mutex> l(metadata_lock_);
-  DCHECK(per_file_metadata_.find(filename) == per_file_metadata_.end());
-  per_file_metadata_[filename] = metadata;
+  auto file_metadata_map_key = make_pair(partition_id, filename);
+  DCHECK(per_file_metadata_.find(file_metadata_map_key) == per_file_metadata_.end());
+  per_file_metadata_[file_metadata_map_key] = metadata;
 }
 
-void* HdfsScanNodeBase::GetFileMetadata(const string& filename) {
+void* HdfsScanNodeBase::GetFileMetadata(
+    int64_t partition_id, const string& filename) {
   unique_lock<mutex> l(metadata_lock_);
-  auto it = per_file_metadata_.find(filename);
+  auto file_metadata_map_key = make_pair(partition_id, filename);
+  auto it = per_file_metadata_.find(file_metadata_map_key);
   if (it == per_file_metadata_.end()) return NULL;
   return it->second;
 }

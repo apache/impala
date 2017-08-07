@@ -585,7 +585,8 @@ Status HdfsTextScanner::FillByteBufferCompressedFile(bool* eosr) {
   // For other compressed text: attempt to read and decompress the entire file, point
   // to the decompressed buffer, and then continue normal processing.
   DCHECK(decompression_type_ != THdfsCompression::SNAPPY);
-  HdfsFileDesc* desc = scan_node_->GetFileDesc(stream_->filename());
+  HdfsFileDesc* desc = scan_node_->GetFileDesc(
+      context_->partition_descriptor()->id(), stream_->filename());
   int64_t file_size = desc->file_length;
   DCHECK_GT(file_size, 0);
 
