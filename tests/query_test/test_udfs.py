@@ -537,7 +537,7 @@ class TestUdfTargeted(TestUdfBase):
     self._run_query_all_impalads(
         exec_options, query_template.format(old_function_name), ["New UDF"])
 
-  def test_drop_then_add_function_while_running(self, vector, unique_database):
+  def test_drop_function_while_running(self, vector, unique_database):
     self.client.execute("drop function if exists `{0}`.drop_while_running(BIGINT)"
                         .format(unique_database))
     self.client.execute(
@@ -561,20 +561,8 @@ class TestUdfTargeted(TestUdfBase):
     self.client.execute(
         "drop function `{0}`.drop_while_running(BIGINT)".format(unique_database))
 
-    # Fetch some rows from the async query to make sure the UDF is being used
-    results = self.client.fetch(query, handle, 1)
-    assert results.success
-    assert len(results.data) == 1
-
-    # Re-create function associated with the same binary while the original query is
-    # running
-    self.client.execute(
-      "create function `{0}`.drop_while_running(BIGINT) returns "
-      "BIGINT LOCATION '{1}' SYMBOL='Identity'".format(
-        unique_database,
-        get_fs_path('/test-warehouse/libTestUdfs.so')))
-
     # Fetch the rest of the rows, this should still be able to run the UDF
     results = self.client.fetch(query, handle, -1)
     assert results.success
-    assert len(results.data) == 9998
+    assert len(results.data) == 9999
+
