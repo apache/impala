@@ -206,7 +206,7 @@ Status ExecEnv::StartServices() {
   // memory limit either based on the available physical memory, or if overcommitting
   // is turned off, we use the memory commit limit from /proc/meminfo (see
   // IMPALA-1690).
-  // --mem_limit="" means no memory limit. TODO: IMPALA-5652: deprecate this mode
+  // --mem_limit="" means no memory limit. TODO: IMPALA-5653: remove this mode
   int64_t bytes_limit = 0;
   bool is_percent;
   int64_t system_mem;
@@ -231,8 +231,13 @@ Status ExecEnv::StartServices() {
     system_mem = MemInfo::physical_mem();
     bytes_limit = ParseUtil::ParseMemSpec(FLAGS_mem_limit, &is_percent, system_mem);
   }
-  // ParseMemSpec returns 0 to mean unlimited. TODO: IMPALA-5652: deprecate this mode.
+  // ParseMemSpec returns 0 to mean unlimited.
   bool no_process_mem_limit = bytes_limit == 0;
+  if (no_process_mem_limit) {
+    LOG(WARNING) << "Configured with unlimited process memory limit (--mem_limit='"
+                 << FLAGS_mem_limit << "'). Starting in the next Impala release, "
+                 << "a process memory limit must always be specified. See IMPALA-5653.";
+  }
   if (bytes_limit < 0) {
     return Status("Failed to parse mem limit from '" + FLAGS_mem_limit + "'.");
   }
