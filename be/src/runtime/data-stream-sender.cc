@@ -218,7 +218,7 @@ void DataStreamSender::Channel::TransmitDataHelper(const TRowBatch* batch) {
   if (res.status.status_code != TErrorCode::OK) {
     rpc_status_ = res.status;
   } else {
-    num_data_bytes_sent_ += RowBatch::GetBatchSize(*batch);
+    num_data_bytes_sent_ += RowBatch::GetSerializedSize(*batch);
     VLOG_ROW << "incremented #data_bytes_sent="
              << num_data_bytes_sent_;
   }
@@ -507,17 +507,15 @@ void DataStreamSender::Close(RuntimeState* state) {
   closed_ = true;
 }
 
-Status DataStreamSender::SerializeBatch(RowBatch* src, TRowBatch* dest, int num_receivers) {
+Status DataStreamSender::SerializeBatch(
+    RowBatch* src, TRowBatch* dest, int num_receivers) {
   VLOG_ROW << "serializing " << src->num_rows() << " rows";
   {
     SCOPED_TIMER(profile_->total_time_counter());
     SCOPED_TIMER(serialize_batch_timer_);
     RETURN_IF_ERROR(src->Serialize(dest));
-    int bytes = RowBatch::GetBatchSize(*dest);
-    int uncompressed_bytes = bytes - dest->tuple_data.size() + dest->uncompressed_size;
-    // The size output_batch would be if we didn't compress tuple_data (will be equal to
-    // actual batch size if tuple_data isn't compressed)
-
+    int64_t bytes = RowBatch::GetSerializedSize(*dest);
+    int64_t uncompressed_bytes = RowBatch::GetDeserializedSize(*dest);
     COUNTER_ADD(bytes_sent_counter_, bytes * num_receivers);
     COUNTER_ADD(uncompressed_bytes_counter_, uncompressed_bytes * num_receivers);
   }

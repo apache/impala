@@ -44,8 +44,8 @@ class DataStreamMgrBase {
   /// Create a receiver for a specific fragment_instance_id/node_id destination;
   virtual std::shared_ptr<DataStreamRecvrBase> CreateRecvr(RuntimeState* state,
       const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
-      PlanNodeId dest_node_id, int num_senders, int buffer_size, RuntimeProfile* profile,
-      bool is_merging) = 0;
+      PlanNodeId dest_node_id, int num_senders, int64_t buffer_size,
+      RuntimeProfile* profile, bool is_merging) = 0;
 
   /// Notifies the recvr associated with the fragment/node id that the specified
   /// sender has closed.

@@ -38,8 +38,8 @@ DECLARE_int32(stress_datastream_recvr_delay_ms);
 
 using namespace impala;
 
-DEFINE_int32(exchg_node_buffer_size_bytes, 1024 * 1024 * 10,
-             "(Advanced) Maximum size of per-query receive-side buffer");
+DEFINE_int64(exchg_node_buffer_size_bytes, 1024 * 1024 * 10,
+    "(Advanced) Maximum size of per-query receive-side buffer");
 
 ExchangeNode::ExchangeNode(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)

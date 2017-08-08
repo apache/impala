@@ -104,8 +104,8 @@ class DataStreamRecvr : public DataStreamRecvrBase {
 
   DataStreamRecvr(DataStreamMgr* stream_mgr, MemTracker* parent_tracker,
       const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
-      PlanNodeId dest_node_id, int num_senders, bool is_merging, int total_buffer_limit,
-      RuntimeProfile* profile);
+      PlanNodeId dest_node_id, int num_senders, bool is_merging,
+      int64_t total_buffer_limit, RuntimeProfile* profile);
 
   /// Add a new batch of rows to the appropriate sender queue, blocking if the queue is
   /// full. Called from DataStreamMgr.
@@ -120,7 +120,7 @@ class DataStreamRecvr : public DataStreamRecvrBase {
 
   /// Return true if the addition of a new batch of size 'batch_size' would exceed the
   /// total buffer limit.
-  bool ExceedsLimit(int batch_size) {
+  bool ExceedsLimit(int64_t batch_size) {
     return num_buffered_bytes_.Load() + batch_size > total_buffer_limit_;
   }
 
@@ -144,7 +144,7 @@ class DataStreamRecvr : public DataStreamRecvrBase {
   bool is_merging_;
 
   /// total number of bytes held across all sender queues.
-  AtomicInt32 num_buffered_bytes_;
+  AtomicInt64 num_buffered_bytes_;
 
   /// Memtracker for batches in the sender queue(s).
   boost::scoped_ptr<MemTracker> mem_tracker_;

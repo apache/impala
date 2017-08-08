@@ -300,8 +300,11 @@ class RowBatch {
   /// it is ignored. This function does not Reset().
   Status Serialize(TRowBatch* output_batch);
 
-  /// Utility function: returns total size of batch.
-  static int GetBatchSize(const TRowBatch& batch);
+  /// Utility function: returns total byte size of a batch in either serialized or
+  /// deserialized form. If a row batch is compressed, its serialized size can be much
+  /// less than the deserialized size.
+  static int64_t GetSerializedSize(const TRowBatch& batch);
+  static int64_t GetDeserializedSize(const TRowBatch& batch);
 
   int ALWAYS_INLINE num_rows() const { return num_rows_; }
   int ALWAYS_INLINE capacity() const { return capacity_; }

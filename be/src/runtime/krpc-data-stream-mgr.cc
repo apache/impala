@@ -36,13 +36,12 @@ namespace impala {
   AbortUnsupportedFeature();
 }
 
-KrpcDataStreamMgr::~KrpcDataStreamMgr() {
-}
+KrpcDataStreamMgr::~KrpcDataStreamMgr(){}
 
-[[noreturn]] std::shared_ptr<DataStreamRecvrBase> KrpcDataStreamMgr::CreateRecvr(RuntimeState* state,
-    const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
-    PlanNodeId dest_node_id, int num_senders, int buffer_size, RuntimeProfile* profile,
-    bool is_merging) {
+    [[noreturn]] std::shared_ptr<DataStreamRecvrBase> KrpcDataStreamMgr::CreateRecvr(
+        RuntimeState* state, const RowDescriptor* row_desc,
+        const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id, int num_senders,
+        int64_t buffer_size, RuntimeProfile* profile, bool is_merging) {
   AbortUnsupportedFeature();
 }
 

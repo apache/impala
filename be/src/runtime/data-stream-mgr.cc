@@ -77,8 +77,8 @@ inline uint32_t DataStreamMgr::GetHashValue(
 
 shared_ptr<DataStreamRecvrBase> DataStreamMgr::CreateRecvr(RuntimeState* state,
     const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
-    PlanNodeId dest_node_id, int num_senders, int buffer_size, RuntimeProfile* profile,
-    bool is_merging) {
+    PlanNodeId dest_node_id, int num_senders, int64_t buffer_size,
+    RuntimeProfile* profile, bool is_merging) {
   DCHECK(profile != NULL);
   VLOG_FILE << "creating receiver for fragment="
             << fragment_instance_id << ", node=" << dest_node_id;
@@ -172,7 +172,7 @@ Status DataStreamMgr::AddData(const TUniqueId& fragment_instance_id,
     PlanNodeId dest_node_id, const TRowBatch& thrift_batch, int sender_id) {
   VLOG_ROW << "AddData(): fragment_instance_id=" << fragment_instance_id
            << " node=" << dest_node_id
-           << " size=" << RowBatch::GetBatchSize(thrift_batch);
+           << " size=" << RowBatch::GetDeserializedSize(thrift_batch);
   bool already_unregistered;
   shared_ptr<DataStreamRecvr> recvr = FindRecvrOrWait(fragment_instance_id, dest_node_id,
       &already_unregistered);

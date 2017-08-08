@@ -340,8 +340,15 @@ void RowBatch::TransferResourceOwnership(RowBatch* dest) {
   Reset();
 }
 
-int RowBatch::GetBatchSize(const TRowBatch& batch) {
-  int result = batch.tuple_data.size();
+int64_t RowBatch::GetDeserializedSize(const TRowBatch& batch) {
+  int64_t result = batch.uncompressed_size;
+  result += batch.row_tuples.size() * sizeof(TTupleId);
+  result += batch.tuple_offsets.size() * sizeof(int32_t);
+  return result;
+}
+
+int64_t RowBatch::GetSerializedSize(const TRowBatch& batch) {
+  int64_t result = batch.tuple_data.size();
   result += batch.row_tuples.size() * sizeof(TTupleId);
   result += batch.tuple_offsets.size() * sizeof(int32_t);
   return result;

@@ -77,8 +77,8 @@ class DataStreamMgr : public DataStreamMgrBase {
   /// caller.
   std::shared_ptr<DataStreamRecvrBase> CreateRecvr(RuntimeState* state,
       const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
-      PlanNodeId dest_node_id, int num_senders, int buffer_size, RuntimeProfile* profile,
-      bool is_merging) override;
+      PlanNodeId dest_node_id, int num_senders, int64_t buffer_size,
+      RuntimeProfile* profile, bool is_merging) override;
 
   /// Adds a row batch to the recvr identified by fragment_instance_id/dest_node_id
   /// if the recvr has not been cancelled. sender_id identifies the sender instance

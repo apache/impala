@@ -140,9 +140,7 @@ class RowBatchSerializeBaseline {
       VLOG_ROW << "uncompressed size: " << size << ", compressed size: " << compressed_size;
     }
 
-    // The size output_batch would be if we didn't compress tuple_data (will be equal to
-    // actual batch size if tuple_data isn't compressed)
-    return batch->GetBatchSize(*output_batch) - output_batch->tuple_data.size() + size;
+    return RowBatch::GetDeserializedSize(*output_batch);
   }
 
   // Copy of baseline version without dedup logic

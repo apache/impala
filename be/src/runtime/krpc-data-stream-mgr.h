@@ -38,8 +38,8 @@ class KrpcDataStreamMgr : public DataStreamMgrBase {
 
   [[noreturn]] std::shared_ptr<DataStreamRecvrBase> CreateRecvr(RuntimeState* state,
       const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
-      PlanNodeId dest_node_id, int num_senders, int buffer_size, RuntimeProfile* profile,
-      bool is_merging) override;
+      PlanNodeId dest_node_id, int num_senders, int64_t buffer_size,
+      RuntimeProfile* profile, bool is_merging) override;
 
   [[noreturn]] Status CloseSender(const TUniqueId& fragment_instance_id,
       PlanNodeId dest_node_id, int sender_id) override;
