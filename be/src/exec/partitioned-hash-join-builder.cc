@@ -55,7 +55,7 @@ using strings::Substitute;
 PhjBuilder::PhjBuilder(int join_node_id, TJoinOp::type join_op,
     const RowDescriptor* probe_row_desc, const RowDescriptor* build_row_desc,
     RuntimeState* state, BufferPool::ClientHandle* buffer_pool_client,
-    int64_t spillable_buffer_size)
+    int64_t spillable_buffer_size, int64_t max_row_buffer_size)
   : DataSink(build_row_desc),
     runtime_state_(state),
     join_node_id_(join_node_id),
@@ -63,6 +63,7 @@ PhjBuilder::PhjBuilder(int join_node_id, TJoinOp::type join_op,
     probe_row_desc_(probe_row_desc),
     buffer_pool_client_(buffer_pool_client),
     spillable_buffer_size_(spillable_buffer_size),
+    max_row_buffer_size_(max_row_buffer_size),
     non_empty_build_(false),
     partitions_created_(NULL),
     largest_partition_percent_(NULL),
@@ -424,7 +425,7 @@ Status PhjBuilder::InitSpilledPartitionProbeStreams() {
     // Create stream in vector, so that it will be cleaned up after any failure.
     spilled_partition_probe_streams_.emplace_back(
         make_unique<BufferedTupleStream>(runtime_state_, probe_row_desc_,
-            buffer_pool_client_, spillable_buffer_size_, spillable_buffer_size_));
+            buffer_pool_client_, spillable_buffer_size_, max_row_buffer_size_));
     BufferedTupleStream* probe_stream = spilled_partition_probe_streams_.back().get();
     RETURN_IF_ERROR(probe_stream->Init(join_node_id_, false));
 
@@ -575,7 +576,7 @@ PhjBuilder::Partition::Partition(RuntimeState* state, PhjBuilder* parent, int le
   : parent_(parent), is_spilled_(false), level_(level) {
   build_rows_ = make_unique<BufferedTupleStream>(state, parent_->row_desc_,
       parent_->buffer_pool_client_, parent->spillable_buffer_size_,
-      parent->spillable_buffer_size_);
+      parent->max_row_buffer_size_);
 }
 
 PhjBuilder::Partition::~Partition() {

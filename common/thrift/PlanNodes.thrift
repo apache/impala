@@ -497,6 +497,10 @@ struct TBackendResourceProfile {
   // The spillable buffer size in bytes to use for this node, chosen by the planner.
   // Set iff the node uses spillable buffers.
   3: optional i64 spillable_buffer_size
+
+  // The buffer size in bytes that is large enough to fit the largest row to be processed.
+  // Set if the node allocates buffers for rows from the buffer pool.
+  4: optional i64 max_row_buffer_size
 }
 
 // This is essentially a union of all messages corresponding to subclasses

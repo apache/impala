@@ -3,8 +3,8 @@ select straight_join *
 from tpch_parquet.customer
     inner join tpch_parquet.nation on c_nationkey = n_nationkey
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=1.06MB
-Per-Host Resource Estimates: Memory=41.06MB
+Max Per-Host Resource Reservation: Memory=1.94MB
+Per-Host Resource Estimates: Memory=41.94MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B
@@ -16,12 +16,12 @@ PLAN-ROOT SINK
 |  tuple-ids=0,1 row-size=355B cardinality=150000
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-Per-Host Resources: mem-estimate=25.06MB mem-reservation=1.06MB
+Per-Host Resources: mem-estimate=25.94MB mem-reservation=1.94MB
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c_nationkey = n_nationkey
 |  fk/pk conjuncts: c_nationkey = n_nationkey
 |  runtime filters: RF000 <- n_nationkey
-|  mem-estimate=1.06MB mem-reservation=1.06MB spill-buffer=64.00KB
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=0,1 row-size=355B cardinality=150000
 |
 |--03:EXCHANGE [BROADCAST]
@@ -47,8 +47,8 @@ Per-Host Resources: mem-estimate=25.06MB mem-reservation=1.06MB
    mem-estimate=24.00MB mem-reservation=0B
    tuple-ids=0 row-size=238B cardinality=150000
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=2.12MB
-Per-Host Resource Estimates: Memory=82.12MB
+Max Per-Host Resource Reservation: Memory=3.88MB
+Per-Host Resource Estimates: Memory=83.88MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B
@@ -60,13 +60,13 @@ PLAN-ROOT SINK
 |  tuple-ids=0,1 row-size=355B cardinality=150000
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
-Per-Host Resources: mem-estimate=50.12MB mem-reservation=2.12MB
+Per-Host Resources: mem-estimate=51.88MB mem-reservation=3.88MB
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash-table-id=00
 |  hash predicates: c_nationkey = n_nationkey
 |  fk/pk conjuncts: c_nationkey = n_nationkey
 |  runtime filters: RF000 <- n_nationkey
-|  mem-estimate=1.06MB mem-reservation=1.06MB spill-buffer=64.00KB
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=0,1 row-size=355B cardinality=150000
 |
 |--F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
@@ -516,7 +516,7 @@ select c_nationkey, avg(c_acctbal)
 from tpch_parquet.customer
 group by c_nationkey
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=1.06MB
+Max Per-Host Resource Reservation: Memory=1.94MB
 Per-Host Resource Estimates: Memory=44.00MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -529,11 +529,11 @@ PLAN-ROOT SINK
 |  tuple-ids=2 row-size=10B cardinality=25
 |
 F01:PLAN FRAGMENT [HASH(c_nationkey)] hosts=1 instances=1
-Per-Host Resources: mem-estimate=10.00MB mem-reservation=1.06MB
+Per-Host Resources: mem-estimate=10.00MB mem-reservation=1.94MB
 03:AGGREGATE [FINALIZE]
 |  output: avg:merge(c_acctbal)
 |  group by: c_nationkey
-|  mem-estimate=10.00MB mem-reservation=1.06MB spill-buffer=64.00KB
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=2 row-size=10B cardinality=25
 |
 02:EXCHANGE [HASH(c_nationkey)]
@@ -556,7 +556,7 @@ Per-Host Resources: mem-estimate=34.00MB mem-reservation=0B
    mem-estimate=24.00MB mem-reservation=0B
    tuple-ids=0 row-size=10B cardinality=150000
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=2.12MB
+Max Per-Host Resource Reservation: Memory=3.88MB
 Per-Host Resource Estimates: Memory=88.00MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -569,11 +569,11 @@ PLAN-ROOT SINK
 |  tuple-ids=2 row-size=10B cardinality=25
 |
 F01:PLAN FRAGMENT [HASH(c_nationkey)] hosts=1 instances=2
-Per-Host Resources: mem-estimate=20.00MB mem-reservation=2.12MB
+Per-Host Resources: mem-estimate=20.00MB mem-reservation=3.88MB
 03:AGGREGATE [FINALIZE]
 |  output: avg:merge(c_acctbal)
 |  group by: c_nationkey
-|  mem-estimate=10.00MB mem-reservation=1.06MB spill-buffer=64.00KB
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=2 row-size=10B cardinality=25
 |
 02:EXCHANGE [HASH(c_nationkey)]

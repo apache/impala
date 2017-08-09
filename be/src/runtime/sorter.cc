@@ -700,9 +700,10 @@ Status Sorter::Run::AddBatchInternal(
             *sort_tuple_desc_, sorter_->sort_tuple_expr_evals_, NULL,
             &string_values, &total_var_len);
         if (total_var_len > sorter_->page_len_) {
+          int64_t max_row_size = sorter_->state_->query_options().max_row_size;
           return Status(TErrorCode::MAX_ROW_SIZE,
               PrettyPrinter::Print(total_var_len, TUnit::BYTES), sorter_->node_id_,
-              PrettyPrinter::Print(0, TUnit::BYTES));
+              PrettyPrinter::Print(max_row_size, TUnit::BYTES));
         }
       } else {
         memcpy(new_tuple, input_row->GetTuple(0), sort_tuple_size_);
@@ -1509,7 +1510,7 @@ Status Sorter::Prepare(ObjectPool* obj_pool, MemPool* expr_mem_pool) {
   if (sort_tuple_desc->byte_size() > page_len_) {
     return Status(TErrorCode::MAX_ROW_SIZE,
         PrettyPrinter::Print(sort_tuple_desc->byte_size(), TUnit::BYTES), node_id_,
-        PrettyPrinter::Print(0, TUnit::BYTES));
+        PrettyPrinter::Print(state_->query_options().max_row_size, TUnit::BYTES));
   }
   has_var_len_slots_ = sort_tuple_desc->HasVarlenSlots();
   in_mem_tuple_sorter_.reset(new TupleSorter(compare_less_than_, page_len_,

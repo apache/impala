@@ -313,7 +313,7 @@ from tpch_nested_parquet.customer c, c.c_orders o1, c.c_orders o2
 where o1.o_orderkey = o2.o_orderkey + 2 and o1.o_orderkey < 5
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=89.06MB mem-reservation=1.06MB
+|  Per-Host Resources: mem-estimate=89.94MB mem-reservation=1.94MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -324,7 +324,7 @@ PLAN-ROOT SINK
 |--06:HASH JOIN [INNER JOIN]
 |  |  hash predicates: o1.o_orderkey = o2.o_orderkey + 2
 |  |  fk/pk conjuncts: assumed fk/pk
-|  |  mem-estimate=1.06MB mem-reservation=1.06MB spill-buffer=64.00KB
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  |  tuple-ids=1,0,2 row-size=286B cardinality=10
 |  |
 |  |--04:UNNEST [c.c_orders o2]
@@ -366,7 +366,7 @@ PLAN-ROOT SINK
 |  tuple-ids=1,0,2 row-size=286B cardinality=1500000
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
-Per-Host Resources: mem-estimate=267.19MB mem-reservation=3.19MB
+Per-Host Resources: mem-estimate=269.81MB mem-reservation=5.81MB
 01:SUBPLAN
 |  mem-estimate=0B mem-reservation=0B
 |  tuple-ids=1,0,2 row-size=286B cardinality=1500000
@@ -374,7 +374,7 @@ Per-Host Resources: mem-estimate=267.19MB mem-reservation=3.19MB
 |--06:HASH JOIN [INNER JOIN]
 |  |  hash predicates: o1.o_orderkey = o2.o_orderkey + 2
 |  |  fk/pk conjuncts: assumed fk/pk
-|  |  mem-estimate=1.06MB mem-reservation=1.06MB spill-buffer=64.00KB
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  |  tuple-ids=1,0,2 row-size=286B cardinality=10
 |  |
 |  |--04:UNNEST [c.c_orders o2]

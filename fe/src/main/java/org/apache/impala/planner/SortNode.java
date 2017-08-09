@@ -272,8 +272,10 @@ public class SortNode extends PlanNode {
       }
     }
 
-    // Sort always uses the default spillable buffer size.
-    long bufferSize = queryOptions.getDefault_spillable_buffer_size();
+    // Sort uses a single buffer size - either the default spillable buffer size or the
+    // smallest buffer size required to fit the maximum row size.
+    long bufferSize = computeMaxSpillableBufferSize(
+        queryOptions.getDefault_spillable_buffer_size(), queryOptions.getMax_row_size());
 
     // The external sorter writes fixed-len and var-len data in separate sequences of
     // pages on disk and reads from both sequences when merging. This effectively
@@ -296,8 +298,10 @@ public class SortNode extends PlanNode {
           bufferSize * (long) Math.ceil(Math.sqrt(numInputBlocks));
       perInstanceMinReservation = 3 * bufferSize * pageMultiplier;
     }
-    nodeResourceProfile_ = ResourceProfile.spillableWithMinReservation(
-        perInstanceMemEstimate, perInstanceMinReservation, bufferSize);
+    nodeResourceProfile_ = new ResourceProfileBuilder()
+        .setMemEstimateBytes(perInstanceMemEstimate)
+        .setMinReservationBytes(perInstanceMinReservation)
+        .setSpillableBufferBytes(bufferSize).setMaxRowBufferBytes(bufferSize).build();
   }
 
   private static String getDisplayName(TSortType type) {

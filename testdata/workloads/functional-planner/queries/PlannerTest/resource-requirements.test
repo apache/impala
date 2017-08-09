@@ -415,7 +415,7 @@ Per-Host Resources: mem-estimate=106.24MB mem-reservation=0B
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=8B cardinality=6001215
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=8.50MB
+Max Per-Host Resource Reservation: Memory=9.50MB
 Per-Host Resource Estimates: Memory=232.48MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -428,11 +428,11 @@ PLAN-ROOT SINK
 |  tuple-ids=1 row-size=16B cardinality=1563438
 |
 F01:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
-Per-Host Resources: mem-estimate=20.00MB mem-reservation=8.50MB
+Per-Host Resources: mem-estimate=20.00MB mem-reservation=9.50MB
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
 |  group by: l_orderkey
-|  mem-estimate=10.00MB mem-reservation=4.25MB spill-buffer=256.00KB
+|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB
 |  tuple-ids=1 row-size=16B cardinality=1563438
 |
 02:EXCHANGE [HASH(l_orderkey)]
@@ -1548,8 +1548,8 @@ PLAN-ROOT SINK
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=78B cardinality=600122
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=38.25MB
-Per-Host Resource Estimates: Memory=343.83MB
+Max Per-Host Resource Reservation: Memory=38.75MB
+Per-Host Resource Estimates: Memory=344.33MB
 
 F09:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B
@@ -1643,7 +1643,7 @@ Per-Host Resources: mem-estimate=97.00MB mem-reservation=34.00MB
 |  tuple-ids=2 row-size=70B cardinality=575772
 |
 F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=46.83MB mem-reservation=4.25MB
+Per-Host Resources: mem-estimate=47.33MB mem-reservation=4.75MB
 04:AGGREGATE [STREAMING]
 |  group by: l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
 |  mem-estimate=42.58MB mem-reservation=0B spill-buffer=2.00MB
@@ -1653,7 +1653,7 @@ Per-Host Resources: mem-estimate=46.83MB mem-reservation=4.25MB
 |  hash predicates: l_orderkey = o_orderkey
 |  fk/pk conjuncts: l_orderkey = o_orderkey
 |  runtime filters: RF000 <- o_orderkey
-|  mem-estimate=4.25MB mem-reservation=4.25MB spill-buffer=256.00KB
+|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB
 |  tuple-ids=0,1 row-size=86B cardinality=575772
 |
 |--12:EXCHANGE [HASH(o_orderkey)]
@@ -1688,8 +1688,8 @@ Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
    mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=78B cardinality=600122
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=72.25MB
-Per-Host Resource Estimates: Memory=683.41MB
+Max Per-Host Resource Reservation: Memory=73.75MB
+Per-Host Resource Estimates: Memory=684.91MB
 
 F09:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B
@@ -1799,7 +1799,7 @@ Per-Host Resources: mem-estimate=194.00MB mem-reservation=68.00MB
 |  tuple-ids=2 row-size=70B cardinality=575772
 |
 F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
-Per-Host Resources: mem-estimate=89.41MB mem-reservation=4.25MB
+Per-Host Resources: mem-estimate=90.91MB mem-reservation=5.75MB
 04:AGGREGATE [STREAMING]
 |  group by: l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
 |  mem-estimate=42.58MB mem-reservation=0B spill-buffer=2.00MB
@@ -1810,7 +1810,7 @@ Per-Host Resources: mem-estimate=89.41MB mem-reservation=4.25MB
 |  hash predicates: l_orderkey = o_orderkey
 |  fk/pk conjuncts: l_orderkey = o_orderkey
 |  runtime filters: RF000 <- o_orderkey
-|  mem-estimate=2.12MB mem-reservation=2.12MB spill-buffer=128.00KB
+|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB
 |  tuple-ids=0,1 row-size=86B cardinality=575772
 |
 |--F12:PLAN FRAGMENT [HASH(l_orderkey)] hosts=2 instances=4
@@ -1888,11 +1888,11 @@ order by
   o_orderdate
 limit 100
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=80.75MB
+Max Per-Host Resource Reservation: Memory=81.25MB
 Per-Host Resource Estimates: Memory=393.18MB
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=393.18MB mem-reservation=80.75MB
+|  Per-Host Resources: mem-estimate=393.18MB mem-reservation=81.25MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -1910,14 +1910,14 @@ PLAN-ROOT SINK
 07:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: o_orderkey = l_orderkey
 |  runtime filters: RF000 <- l_orderkey
-|  mem-estimate=4.25MB mem-reservation=4.25MB spill-buffer=256.00KB
+|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB
 |  tuple-ids=2,1,0 row-size=108B cardinality=575772
 |
 |--04:AGGREGATE [FINALIZE]
 |  |  output: sum(l_quantity)
 |  |  group by: l_orderkey
 |  |  having: sum(l_quantity) > 300
-|  |  mem-estimate=10.00MB mem-reservation=4.25MB spill-buffer=256.00KB
+|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB
 |  |  tuple-ids=4 row-size=24B cardinality=156344
 |  |
 |  03:SCAN HDFS [tpch.lineitem]
@@ -1968,8 +1968,8 @@ PLAN-ROOT SINK
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=2 row-size=16B cardinality=6001215
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=82.88MB
-Per-Host Resource Estimates: Memory=510.80MB
+Max Per-Host Resource Reservation: Memory=84.12MB
+Per-Host Resource Estimates: Memory=511.55MB
 
 F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B
@@ -2000,7 +2000,7 @@ Per-Host Resources: mem-estimate=60.41MB mem-reservation=34.00MB
 |  tuple-ids=6 row-size=100B cardinality=575772
 |
 F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=115.03MB mem-reservation=48.88MB
+Per-Host Resources: mem-estimate=115.78MB mem-reservation=50.12MB
 08:AGGREGATE [STREAMING]
 |  output: sum(l_quantity)
 |  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
@@ -2010,14 +2010,14 @@ Per-Host Resources: mem-estimate=115.03MB mem-reservation=48.88MB
 07:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
 |  hash predicates: o_orderkey = l_orderkey
 |  runtime filters: RF000 <- l_orderkey
-|  mem-estimate=2.12MB mem-reservation=2.12MB spill-buffer=128.00KB
+|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB
 |  tuple-ids=2,1,0 row-size=108B cardinality=575772
 |
 |--14:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(l_quantity)
 |  |  group by: l_orderkey
 |  |  having: sum(l_quantity) > 300
-|  |  mem-estimate=10.00MB mem-reservation=4.25MB spill-buffer=256.00KB
+|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB
 |  |  tuple-ids=4 row-size=24B cardinality=156344
 |  |
 |  13:EXCHANGE [HASH(l_orderkey)]
@@ -2098,8 +2098,8 @@ Per-Host Resources: mem-estimate=88.00MB mem-reservation=0B
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=2 row-size=16B cardinality=6001215
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=121.12MB
-Per-Host Resource Estimates: Memory=965.47MB
+Max Per-Host Resource Reservation: Memory=122.88MB
+Per-Host Resource Estimates: Memory=967.22MB
 
 F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B
@@ -2130,7 +2130,7 @@ Per-Host Resources: mem-estimate=120.82MB mem-reservation=68.00MB
 |  tuple-ids=6 row-size=100B cardinality=575772
 |
 F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
-Per-Host Resources: mem-estimate=173.93MB mem-reservation=53.12MB
+Per-Host Resources: mem-estimate=175.68MB mem-reservation=54.88MB
 08:AGGREGATE [STREAMING]
 |  output: sum(l_quantity)
 |  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
@@ -2141,7 +2141,7 @@ Per-Host Resources: mem-estimate=173.93MB mem-reservation=53.12MB
 |  hash-table-id=00
 |  hash predicates: o_orderkey = l_orderkey
 |  runtime filters: RF000 <- l_orderkey
-|  mem-estimate=1.06MB mem-reservation=1.06MB spill-buffer=64.00KB
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=2,1,0 row-size=108B cardinality=575772
 |
 |--F08:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
@@ -2155,7 +2155,7 @@ Per-Host Resources: mem-estimate=173.93MB mem-reservation=53.12MB
 |  |  output: sum:merge(l_quantity)
 |  |  group by: l_orderkey
 |  |  having: sum(l_quantity) > 300
-|  |  mem-estimate=10.00MB mem-reservation=4.25MB spill-buffer=256.00KB
+|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB
 |  |  tuple-ids=4 row-size=24B cardinality=156344
 |  |
 |  13:EXCHANGE [HASH(l_orderkey)]
@@ -2390,13 +2390,13 @@ from tpch_nested_parquet.customer c,
    join c.c_orders o2 on o1.o_orderkey = o2.o_orderkey
    order by o1.o_orderkey limit 100) v
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=69.06MB
-Per-Host Resource Estimates: Memory=345.06MB
+Max Per-Host Resource Reservation: Memory=69.94MB
+Per-Host Resource Estimates: Memory=345.94MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 tpch_nested_parquet.customer
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=345.06MB mem-reservation=69.06MB
+|  Per-Host Resources: mem-estimate=345.94MB mem-reservation=69.94MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -2431,7 +2431,7 @@ PLAN-ROOT SINK
 |  05:HASH JOIN [INNER JOIN]
 |  |  hash predicates: o1.o_orderkey = o2.o_orderkey
 |  |  fk/pk conjuncts: assumed fk/pk
-|  |  mem-estimate=1.06MB mem-reservation=1.06MB spill-buffer=64.00KB
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  |  tuple-ids=1,2 row-size=32B cardinality=10
 |  |
 |  |--04:UNNEST [c.c_orders o2]
@@ -2452,8 +2452,8 @@ PLAN-ROOT SINK
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=66B cardinality=150000
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=69.06MB
-Per-Host Resource Estimates: Memory=473.06MB
+Max Per-Host Resource Reservation: Memory=69.94MB
+Per-Host Resource Estimates: Memory=473.94MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 tpch_nested_parquet.customer
 
@@ -2478,7 +2478,7 @@ Per-Host Resources: mem-estimate=128.00MB mem-reservation=34.00MB
 |  tuple-ids=6 row-size=58B cardinality=1500000
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=345.06MB mem-reservation=35.06MB
+Per-Host Resources: mem-estimate=345.94MB mem-reservation=35.94MB
 09:AGGREGATE [STREAMING]
 |  group by: c_name, o1.o_orderkey, o2.o_orderstatus
 |  mem-estimate=128.00MB mem-reservation=0B spill-buffer=2.00MB
@@ -2510,7 +2510,7 @@ Per-Host Resources: mem-estimate=345.06MB mem-reservation=35.06MB
 |  05:HASH JOIN [INNER JOIN]
 |  |  hash predicates: o1.o_orderkey = o2.o_orderkey
 |  |  fk/pk conjuncts: assumed fk/pk
-|  |  mem-estimate=1.06MB mem-reservation=1.06MB spill-buffer=64.00KB
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  |  tuple-ids=1,2 row-size=32B cardinality=10
 |  |
 |  |--04:UNNEST [c.c_orders o2]
@@ -2531,8 +2531,8 @@ Per-Host Resources: mem-estimate=345.06MB mem-reservation=35.06MB
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=66B cardinality=150000
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=138.12MB
-Per-Host Resource Estimates: Memory=946.13MB
+Max Per-Host Resource Reservation: Memory=139.88MB
+Per-Host Resource Estimates: Memory=947.88MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 tpch_nested_parquet.customer
 
@@ -2557,7 +2557,7 @@ Per-Host Resources: mem-estimate=256.00MB mem-reservation=68.00MB
 |  tuple-ids=6 row-size=58B cardinality=1500000
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
-Per-Host Resources: mem-estimate=690.13MB mem-reservation=70.12MB
+Per-Host Resources: mem-estimate=691.88MB mem-reservation=71.88MB
 09:AGGREGATE [STREAMING]
 |  group by: c_name, o1.o_orderkey, o2.o_orderstatus
 |  mem-estimate=128.00MB mem-reservation=0B spill-buffer=2.00MB
@@ -2589,7 +2589,7 @@ Per-Host Resources: mem-estimate=690.13MB mem-reservation=70.12MB
 |  05:HASH JOIN [INNER JOIN]
 |  |  hash predicates: o1.o_orderkey = o2.o_orderkey
 |  |  fk/pk conjuncts: assumed fk/pk
-|  |  mem-estimate=1.06MB mem-reservation=1.06MB spill-buffer=64.00KB
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  |  tuple-ids=1,2 row-size=32B cardinality=10
 |  |
 |  |--04:UNNEST [c.c_orders o2]
@@ -3019,8 +3019,8 @@ Per-Host Resources: mem-estimate=77.77MB mem-reservation=34.00MB
    mem-estimate=40.00MB mem-reservation=0B
    tuple-ids=0 row-size=191B cardinality=1500000
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=93.50MB
-Per-Host Resource Estimates: Memory=421.03MB
+Max Per-Host Resource Reservation: Memory=94.50MB
+Per-Host Resource Estimates: Memory=422.03MB
 
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B
@@ -3053,7 +3053,7 @@ Per-Host Resources: mem-estimate=155.53MB mem-reservation=68.00MB
 |  |  tuple-ids=1,2,3 row-size=24B cardinality=1500000
 |  |
 |  F04:PLAN FRAGMENT [HASH(t3.o_orderkey)] hosts=2 instances=4
-|  Per-Host Resources: mem-estimate=25.50MB mem-reservation=25.50MB
+|  Per-Host Resources: mem-estimate=26.50MB mem-reservation=26.50MB
 |  05:HASH JOIN [INNER JOIN, PARTITIONED]
 |  |  hash-table-id=01
 |  |  hash predicates: t2.o_orderkey = t3.o_orderkey
@@ -3074,7 +3074,7 @@ Per-Host Resources: mem-estimate=155.53MB mem-reservation=68.00MB
 |  |  |  hash predicates: t3.o_orderkey = t4.o_orderkey
 |  |  |  fk/pk conjuncts: t3.o_orderkey = t4.o_orderkey
 |  |  |  runtime filters: RF002 <- t4.o_orderkey
-|  |  |  mem-estimate=4.25MB mem-reservation=4.25MB spill-buffer=256.00KB
+|  |  |  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB
 |  |  |  tuple-ids=2,3 row-size=16B cardinality=1500000
 |  |  |
 |  |  |--F08:PLAN FRAGMENT [HASH(t3.o_orderkey)] hosts=2 instances=4

@@ -74,7 +74,8 @@ class PhjBuilder : public DataSink {
 
   PhjBuilder(int join_node_id, TJoinOp::type join_op, const RowDescriptor* probe_row_desc,
       const RowDescriptor* build_row_desc, RuntimeState* state,
-      BufferPool::ClientHandle* buffer_pool_client, int64_t spillable_buffer_size);
+      BufferPool::ClientHandle* buffer_pool_client, int64_t spillable_buffer_size,
+      int64_t max_row_buffer_size);
 
   Status InitExprsAndFilters(RuntimeState* state,
       const std::vector<TEqJoinCondition>& eq_join_conjuncts,
@@ -242,7 +243,7 @@ class PhjBuilder : public DataSink {
     std::unique_ptr<BufferedTupleStream> build_rows_;
   };
 
-  /// Computes the minimum number of buffers required to execute the spilling partitioned
+  /// Computes the minimum reservation required to execute the spilling partitioned
   /// hash algorithm successfully for any input size (assuming enough disk space is
   /// available for spilled rows). The buffers are used for buffering both build and
   /// probe rows at different times, so the total requirement is the peak sum of build
@@ -251,11 +252,12 @@ class PhjBuilder : public DataSink {
   /// need one additional buffer for the input while repartitioning the build or probe.
   /// For NAAJ, we need 3 additional buffers for 'null_aware_partition_',
   /// 'null_aware_probe_partition_' and 'null_probe_rows_'.
-  int MinRequiredBuffers() const {
+  int64_t MinReservation() const {
     // Must be kept in sync with HashJoinNode.computeNodeResourceProfile() in fe.
     int num_reserved_buffers = PARTITION_FANOUT + 1;
     if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) num_reserved_buffers += 3;
-    return num_reserved_buffers;
+    // Two of the buffers must fit the maximum row.
+    return spillable_buffer_size_ * (num_reserved_buffers - 2) + max_row_buffer_size_ * 2;
   }
 
  protected:
@@ -371,8 +373,9 @@ class PhjBuilder : public DataSink {
   /// 1:N relationship from builders to join nodes.
   BufferPool::ClientHandle* buffer_pool_client_;
 
-  /// The size of buffers to use in the build and probe streams.
+  /// The default and max buffer sizes to use in the build and probe streams.
   const int64_t spillable_buffer_size_;
+  const int64_t max_row_buffer_size_;
 
   /// Allocator for hash table memory.
   boost::scoped_ptr<Suballocator> ht_allocator_;

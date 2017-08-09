@@ -508,7 +508,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
       case TImpalaQueryOptions::DEFAULT_SPILLABLE_BUFFER_SIZE: {
         int64_t buffer_size_bytes;
         RETURN_IF_ERROR(
-            ParseMemValue(value, "Spillable buffer size", &buffer_size_bytes));
+            ParseMemValue(value, "Default spillable buffer size", &buffer_size_bytes));
         if (!BitUtil::IsPowerOf2(buffer_size_bytes)) {
           return Status(
               Substitute("Buffer size must be a power of two: $0", buffer_size_bytes));
@@ -519,12 +519,22 @@ Status impala::SetQueryOption(const string& key, const string& value,
       case TImpalaQueryOptions::MIN_SPILLABLE_BUFFER_SIZE: {
         int64_t buffer_size_bytes;
         RETURN_IF_ERROR(
-            ParseMemValue(value, "Spillable buffer size", &buffer_size_bytes));
+            ParseMemValue(value, "Minimum spillable buffer size", &buffer_size_bytes));
         if (!BitUtil::IsPowerOf2(buffer_size_bytes)) {
           return Status(
               Substitute("Buffer size must be a power of two: $0", buffer_size_bytes));
         }
         query_options->__set_min_spillable_buffer_size(buffer_size_bytes);
+        break;
+      }
+      case TImpalaQueryOptions::MAX_ROW_SIZE: {
+        int64_t max_row_size_bytes;
+        RETURN_IF_ERROR(ParseMemValue(value, "Max row size", &max_row_size_bytes));
+        if (max_row_size_bytes <= 0) {
+          return Status(Substitute(
+              "Max row size must be a positive number of bytes: $0", value));
+        }
+        query_options->__set_max_row_size(max_row_size_bytes);
         break;
       }
       default:

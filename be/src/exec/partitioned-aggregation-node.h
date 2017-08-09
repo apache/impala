@@ -80,11 +80,13 @@ class SlotDescriptor;
 /// 4) Unaggregated tuple stream. Stream to spill unaggregated rows.
 ///    Rows in this stream always have child(0)'s layout.
 ///
-/// Buffering: Each stream and hash table needs to maintain at least one buffer for
-/// some duration of the processing. To minimize the memory requirements of small queries
-/// (i.e. memory usage is less than one IO-buffer per partition), the streams and hash
-/// tables of each partition start using small (less than IO-sized) buffers, regardless
-/// of the level.
+/// Buffering: Each stream and hash table needs to maintain at least one buffer when
+/// it is being read or written. The streams for a given agg use a uniform buffer size,
+/// except when processing rows larger than that buffer size. In that case, the agg uses
+/// BufferedTupleStream's variable buffer size support to handle larger rows up to the
+/// maximum row size. Only two max-sized buffers are needed for the agg to spill: one
+/// to hold rows being read from a spilled input stream and another for a temporary write
+/// buffer when adding a row to an output stream.
 ///
 /// Two-phase aggregation: we support two-phase distributed aggregations, where
 /// pre-aggregrations attempt to reduce the size of data before shuffling data across the
@@ -719,18 +721,24 @@ class PartitionedAggregationNode : public ExecNode {
   Status CodegenProcessBatchStreaming(
       LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) WARN_UNUSED_RESULT;
 
-  /// Compute minimum buffer requirement for grouping aggregations.
+  /// Compute minimum buffer reservation for grouping aggregations.
   /// We need one buffer per partition, which is used either as the write buffer for the
   /// aggregated stream or the unaggregated stream. We need an additional buffer to read
-  /// the stream we are currently repartitioning.
+  /// the stream we are currently repartitioning. The read buffer needs to be a max-sized
+  /// buffer to hold a max-sized row and we need one max-sized write buffer that is used
+  /// temporarily to append a row to any stream.
+  ///
   /// If we need to serialize, we need an additional buffer while spilling a partition
   /// as the partitions aggregate stream needs to be serialized and rewritten.
   /// We do not spill streaming preaggregations, so we do not need to reserve any buffers.
-  int MinRequiredBuffers() const {
+  int64_t MinReservation() const {
     DCHECK(!grouping_exprs_.empty());
     // Must be kept in sync with AggregationNode.computeNodeResourceProfile() in fe.
     if (is_streaming_preagg_) return 0; // Need 0 buffers to pass through rows.
-    return PARTITION_FANOUT + 1 + (needs_serialize_ ? 1 : 0);
+    int num_buffers = PARTITION_FANOUT + 1 + (needs_serialize_ ? 1 : 0);
+    // Two of the buffers must fit the maximum row.
+    return resource_profile_.spillable_buffer_size * (num_buffers - 2) +
+          resource_profile_.max_row_buffer_size * 2;
   }
 };
 }

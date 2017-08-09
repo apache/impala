@@ -169,6 +169,7 @@ row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 ---- QUERY
 # Test aggregation with minimum required reservation to exercise IMPALA-2708.
 # Merge aggregation requires 17 buffers. The buffer size is 256k for this test.
+set max_row_size=256k;
 set buffer_pool_limit=4352k;
 select count(*)
 from (select distinct * from orders) t

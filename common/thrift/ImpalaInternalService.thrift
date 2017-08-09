@@ -263,6 +263,16 @@ struct TQueryOptions {
   // The minimum spillable buffer to use. The planner will not choose a size smaller than
   // this. Defaults to 64KB.
   59: optional i64 min_spillable_buffer_size = 65536;
+
+  // The maximum size of row that the query will reserve memory to process. Processing
+  // rows larger than this may result in a query failure. Defaults to 512KB, e.g.
+  // enough for a row with 15 32KB strings or many smaller columns.
+  //
+  // Different operators handle this option in different ways. E.g. some simply increase
+  // the size of all their buffers to fit this row size, whereas others may use more
+  // sophisticated strategies - e.g. reserving a small number of buffers large enough to
+  // fit maximum-sized rows.
+  60: optional i64 max_row_size = 524288;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

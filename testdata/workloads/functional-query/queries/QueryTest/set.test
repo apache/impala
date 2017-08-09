@@ -260,3 +260,34 @@ explain select count(distinct double_col) from functional.alltypesagg;
 # IMPALA-5591: This shouldn't throw an error.
 set scratch_limit=-1;
 ====
+---- QUERY
+# Power of two max_row_size.
+set max_row_size=8m;
+set;
+---- RESULTS: VERIFY_IS_SUBSET
+'MAX_ROW_SIZE','8388608'
+---- TYPES
+STRING,STRING
+====
+---- QUERY
+# Non power of two max_row_size.
+set max_row_size=12345;
+set;
+---- RESULTS: VERIFY_IS_SUBSET
+'MAX_ROW_SIZE','12345'
+---- TYPES
+STRING,STRING
+====
+---- QUERY
+set max_row_size=8m;
+====
+---- QUERY
+set max_row_size=-1;
+---- CATCH
+Max row size must be a positive number of bytes: -1
+====
+---- QUERY
+set max_row_size=0;
+---- CATCH
+Max row size must be a positive number of bytes: 0
+====

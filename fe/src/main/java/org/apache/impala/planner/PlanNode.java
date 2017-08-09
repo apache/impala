@@ -33,12 +33,12 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
-import org.apache.impala.thrift.TBackendResourceProfile;
 import org.apache.impala.thrift.TExecStats;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlan;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.util.BitUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -676,6 +676,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
           childResources.duringOpenProfile.sum(nodeResourceProfile_),
           childResources.postOpenProfile.sum(nodeResourceProfile_));
     }
+  }
+
+  /**
+   * Compute the buffer size that will be used to fit the maximum-sized row - either the
+   * default buffer size provided or the smallest buffer that fits a maximum-sized row.
+   */
+  protected static long computeMaxSpillableBufferSize(long defaultBufferSize,
+      long maxRowSize) {
+    return Math.max(defaultBufferSize, BitUtil.roundUpToPowerOf2(maxRowSize));
   }
 
   /**

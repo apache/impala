@@ -383,7 +383,7 @@ Status BufferedTupleStream::CalcPageLenForRow(int64_t row_size, int64_t* page_le
   if (UNLIKELY(row_size > max_page_len_)) {
     return Status(TErrorCode::MAX_ROW_SIZE,
         PrettyPrinter::Print(row_size, TUnit::BYTES), node_id_,
-        PrettyPrinter::Print(0, TUnit::BYTES));
+        PrettyPrinter::Print(state_->query_options().max_row_size, TUnit::BYTES));
   }
   *page_len = max(default_page_len_, BitUtil::RoundUpToPowerOfTwo(row_size));
   return Status::OK();

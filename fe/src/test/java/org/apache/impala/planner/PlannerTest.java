@@ -429,6 +429,17 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testMaxRowSize() {
+    // Tests that an increased value of 'max_row_size' is correctly factored into the
+    // resource calculations by the planner.
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.EXTENDED);
+    options.setNum_scanner_threads(1); // Required so that output doesn't vary by machine
+    options.setMax_row_size(8L * 1024L * 1024L);
+    runPlannerTestFile("max-row-size", options, false);
+  }
+
+  @Test
   public void testSortExprMaterialization() {
     addTestFunction("TestFn", Lists.newArrayList(Type.DOUBLE), false);
     TQueryOptions options = defaultQueryOptions();

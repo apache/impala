@@ -84,7 +84,7 @@ Status PartitionedHashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state
   // being separated out further.
   builder_.reset(new PhjBuilder(id(), join_op_, child(0)->row_desc(),
         child(1)->row_desc(), state, &buffer_pool_client_,
-        resource_profile_.spillable_buffer_size));
+        resource_profile_.spillable_buffer_size, resource_profile_.max_row_buffer_size));
   RETURN_IF_ERROR(
       builder_->InitExprsAndFilters(state, eq_join_conjuncts, tnode.runtime_filters));
 
@@ -183,8 +183,7 @@ Status PartitionedHashJoinNode::Open(RuntimeState* state) {
 }
 
 Status PartitionedHashJoinNode::AcquireResourcesForBuild(RuntimeState* state) {
-  DCHECK_GE(resource_profile_.min_reservation,
-      resource_profile_.spillable_buffer_size * builder_->MinRequiredBuffers());
+  DCHECK_GE(resource_profile_.min_reservation, builder_->MinReservation());
   if (!buffer_pool_client_.is_registered()) {
     RETURN_IF_ERROR(ClaimBufferReservation(state));
   }
@@ -825,7 +824,7 @@ Status PartitionedHashJoinNode::InitNullAwareProbePartition() {
   unique_ptr<BufferedTupleStream> probe_rows = make_unique<BufferedTupleStream>(
       state, child(0)->row_desc(), &buffer_pool_client_,
       resource_profile_.spillable_buffer_size,
-      resource_profile_.spillable_buffer_size);
+      resource_profile_.max_row_buffer_size);
   // TODO: this should be pinned if spilling is disabled.
   Status status = probe_rows->Init(id(), false);
   if (!status.ok()) goto error;
@@ -849,7 +848,7 @@ Status PartitionedHashJoinNode::InitNullProbeRows() {
   RuntimeState* state = runtime_state_;
   null_probe_rows_ = make_unique<BufferedTupleStream>(state, child(0)->row_desc(),
       &buffer_pool_client_, resource_profile_.spillable_buffer_size,
-      resource_profile_.spillable_buffer_size);
+      resource_profile_.max_row_buffer_size);
   // TODO: we shouldn't start with this unpinned if spilling is disabled.
   RETURN_IF_ERROR(null_probe_rows_->Init(id(), false));
   bool got_buffer;

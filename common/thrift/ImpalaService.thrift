@@ -285,6 +285,9 @@ enum TImpalaQueryOptions {
 
   // The minimum spillable buffer size, in bytes.
   MIN_SPILLABLE_BUFFER_SIZE,
+
+  // The maximum row size that memory is reserved for, in bytes.
+  MAX_ROW_SIZE,
 }
 
 // The summary of a DML statement.

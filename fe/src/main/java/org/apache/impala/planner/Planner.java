@@ -64,7 +64,8 @@ public class Planner {
   public static final long MIN_PER_HOST_MEM_ESTIMATE_BYTES = 10 * 1024 * 1024;
 
   public static final ResourceProfile MIN_PER_HOST_RESOURCES =
-      ResourceProfile.withMinReservation(MIN_PER_HOST_MEM_ESTIMATE_BYTES, 0);
+      new ResourceProfileBuilder().setMemEstimateBytes(MIN_PER_HOST_MEM_ESTIMATE_BYTES)
+      .setMinReservationBytes(0).build();
 
   private final PlannerContext ctx_;
 

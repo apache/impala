@@ -299,11 +299,13 @@ public class AggregationNode extends PlanNode {
           PlannerContext.HASH_TBL_SPACE_OVERHEAD, MIN_HASH_TBL_MEM);
     }
 
-    // Must be kept in sync with PartitionedAggregationNode::MinRequiredBuffers() in be.
-    long perInstanceMinBuffers;
+    // Must be kept in sync with PartitionedAggregationNode::MinReservation() in be.
+    long perInstanceMinReservation;
     long bufferSize = queryOptions.getDefault_spillable_buffer_size();
+    long maxRowBufferSize =
+        computeMaxSpillableBufferSize(bufferSize, queryOptions.getMax_row_size());
     if (aggInfo_.getGroupingExprs().isEmpty() || useStreamingPreagg_) {
-      perInstanceMinBuffers = 0;
+      perInstanceMinReservation = 0;
     } else {
       final int PARTITION_FANOUT = 16;
       long minBuffers = PARTITION_FANOUT + 1 + (aggInfo_.needsSerialize() ? 1 : 0);
@@ -314,11 +316,19 @@ public class AggregationNode extends PlanNode {
         bufferSize = Math.min(bufferSize, Math.max(
             queryOptions.getMin_spillable_buffer_size(),
             BitUtil.roundUpToPowerOf2(bytesPerBuffer)));
+        // Recompute the max row buffer size with the smaller buffer.
+        maxRowBufferSize =
+            computeMaxSpillableBufferSize(bufferSize, queryOptions.getMax_row_size());
       }
-      perInstanceMinBuffers = bufferSize * minBuffers;
+      // Two of the buffers need to be buffers large enough to hold the maximum-sized row
+      // to serve as input and output buffers while repartitioning.
+      perInstanceMinReservation = bufferSize * (minBuffers - 2) + maxRowBufferSize * 2;
     }
 
-    nodeResourceProfile_ = ResourceProfile.spillableWithMinReservation(
-        perInstanceMemEstimate, perInstanceMinBuffers, bufferSize);
+    nodeResourceProfile_ = new ResourceProfileBuilder()
+        .setMemEstimateBytes(perInstanceMemEstimate)
+        .setMinReservationBytes(perInstanceMinReservation)
+        .setSpillableBufferBytes(bufferSize)
+        .setMaxRowBufferBytes(maxRowBufferSize).build();
   }
 }

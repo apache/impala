@@ -217,7 +217,7 @@ public class HashJoinNode extends JoinNode {
           perInstanceDataBytes * PlannerContext.HASH_TBL_SPACE_OVERHEAD);
     }
 
-    // Must be kept in sync with PartitionedHashJoinBuilder::MinRequiredBuffers() in be.
+    // Must be kept in sync with PartitionedHashJoinBuilder::MinReservation() in be.
     final int PARTITION_FANOUT = 16;
     long minBuffers = PARTITION_FANOUT + 1
         + (joinOp_ == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN ? 3 : 0);
@@ -232,8 +232,16 @@ public class HashJoinNode extends JoinNode {
           BitUtil.roundUpToPowerOf2(bytesPerBuffer)));
     }
 
-    long perInstanceMinBufferBytes = bufferSize * minBuffers;
-    nodeResourceProfile_ = ResourceProfile.spillableWithMinReservation(
-        perInstanceMemEstimate, perInstanceMinBufferBytes, bufferSize);
+    // Two of the buffers need to be buffers large enough to hold the maximum-sized row
+    // to serve as input and output buffers while repartitioning.
+    long maxRowBufferSize =
+        computeMaxSpillableBufferSize(bufferSize, queryOptions.getMax_row_size());
+    long perInstanceMinBufferBytes =
+        bufferSize * (minBuffers - 2) + maxRowBufferSize * 2;
+    nodeResourceProfile_ = new ResourceProfileBuilder()
+        .setMemEstimateBytes(perInstanceMemEstimate)
+        .setMinReservationBytes(perInstanceMinBufferBytes)
+        .setSpillableBufferBytes(bufferSize)
+        .setMaxRowBufferBytes(maxRowBufferSize).build();
   }
 }

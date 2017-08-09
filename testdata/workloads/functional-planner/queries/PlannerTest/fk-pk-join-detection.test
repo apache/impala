@@ -117,7 +117,7 @@ on ss_item_sk = sr_item_sk and ss_ticket_number = sr_ticket_number
 where sr_return_quantity < 10
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=212.25MB mem-reservation=4.25MB
+|  Per-Host Resources: mem-estimate=212.75MB mem-reservation=4.75MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -125,7 +125,7 @@ PLAN-ROOT SINK
 |  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
 |  fk/pk conjuncts: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
 |  runtime filters: RF000 <- sr_item_sk, RF001 <- sr_ticket_number
-|  mem-estimate=4.25MB mem-reservation=4.25MB spill-buffer=256.00KB
+|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB
 |  tuple-ids=0,1 row-size=188B cardinality=211838
 |
 |--01:SCAN HDFS [tpcds.store_returns]
@@ -229,7 +229,7 @@ where ss_item_sk = sr_item_sk and ss_ticket_number = sr_ticket_number
   and d1.d_fy_week_seq = 1000
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=355.19MB mem-reservation=4.25MB
+|  Per-Host Resources: mem-estimate=357.81MB mem-reservation=7.75MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -237,7 +237,7 @@ PLAN-ROOT SINK
 |  hash predicates: ss_addr_sk = c_current_addr_sk
 |  fk/pk conjuncts: none
 |  runtime filters: RF000 <- c_current_addr_sk
-|  mem-estimate=1.06MB mem-reservation=1.06MB spill-buffer=64.00KB
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=1,0,3,4,2 row-size=60B cardinality=19358
 |
 |--02:SCAN HDFS [tpcds.customer]
@@ -252,7 +252,7 @@ PLAN-ROOT SINK
 |  hash predicates: sr_returned_date_sk = d2.d_date_sk
 |  fk/pk conjuncts: sr_returned_date_sk = d2.d_date_sk
 |  runtime filters: RF001 <- d2.d_date_sk
-|  mem-estimate=1.06MB mem-reservation=1.06MB spill-buffer=64.00KB
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=1,0,3,4 row-size=56B cardinality=8131
 |
 |--04:SCAN HDFS [tpcds.date_dim d2]
@@ -267,14 +267,14 @@ PLAN-ROOT SINK
 |  hash predicates: sr_item_sk = ss_item_sk, sr_ticket_number = ss_ticket_number
 |  fk/pk conjuncts: sr_item_sk = ss_item_sk, sr_ticket_number = ss_ticket_number
 |  runtime filters: RF002 <- ss_item_sk, RF003 <- ss_ticket_number
-|  mem-estimate=1.06MB mem-reservation=1.06MB spill-buffer=64.00KB
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=1,0,3 row-size=52B cardinality=8131
 |
 |--05:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_date_sk = d1.d_date_sk
 |  |  fk/pk conjuncts: ss_sold_date_sk = d1.d_date_sk
 |  |  runtime filters: RF004 <- d1.d_date_sk
-|  |  mem-estimate=1.06MB mem-reservation=1.06MB spill-buffer=64.00KB
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  |  tuple-ids=0,3 row-size=32B cardinality=11055
 |  |
 |  |--03:SCAN HDFS [tpcds.date_dim d1]
@@ -380,7 +380,7 @@ tpcds_seq_snap.store_sales inner join tpcds.customer
 on ss_customer_sk = c_customer_sk
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=177.06MB mem-reservation=1.06MB
+|  Per-Host Resources: mem-estimate=177.94MB mem-reservation=1.94MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -388,7 +388,7 @@ PLAN-ROOT SINK
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  fk/pk conjuncts: assumed fk/pk
 |  runtime filters: RF000 <- c_customer_sk
-|  mem-estimate=1.06MB mem-reservation=1.06MB spill-buffer=64.00KB
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=0,1 row-size=8B cardinality=unavailable
 |
 |--01:SCAN HDFS [tpcds.customer]
@@ -416,7 +416,7 @@ tpcds.store_sales inner join
 on ss_sold_time_sk = ws_sold_time_sk
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=298.00MB mem-reservation=2.12MB
+|  Per-Host Resources: mem-estimate=298.00MB mem-reservation=3.88MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -424,12 +424,12 @@ PLAN-ROOT SINK
 |  hash predicates: ss_sold_time_sk = ws_sold_time_sk
 |  fk/pk conjuncts: none
 |  runtime filters: RF000 <- ws_sold_time_sk
-|  mem-estimate=1.06MB mem-reservation=1.06MB spill-buffer=64.00KB
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=0,2 row-size=104B cardinality=2440073
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  group by: ws_sold_time_sk
-|  |  mem-estimate=10.00MB mem-reservation=1.06MB spill-buffer=64.00KB
+|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  |  tuple-ids=2 row-size=4B cardinality=39771
 |  |
 |  01:SCAN HDFS [tpcds.web_sales]

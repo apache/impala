@@ -253,8 +253,7 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
   // Claim reservation after the child has been opened to reduce the peak reservation
   // requirement.
   if (!buffer_pool_client_.is_registered() && !grouping_exprs_.empty()) {
-    DCHECK_GE(resource_profile_.min_reservation,
-        resource_profile_.spillable_buffer_size * MinRequiredBuffers());
+    DCHECK_GE(resource_profile_.min_reservation, MinReservation());
     RETURN_IF_ERROR(ClaimBufferReservation(state));
   }
 
@@ -277,7 +276,7 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
       if (!is_streaming_preagg_ && needs_serialize_) {
         serialize_stream_.reset(new BufferedTupleStream(state, &intermediate_row_desc_,
             &buffer_pool_client_, resource_profile_.spillable_buffer_size,
-            resource_profile_.spillable_buffer_size));
+            resource_profile_.max_row_buffer_size));
         RETURN_IF_ERROR(serialize_stream_->Init(id(), false));
         bool got_buffer;
         // Reserve the memory for 'serialize_stream_' so we don't need to scrounge up
@@ -725,7 +724,7 @@ Status PartitionedAggregationNode::Partition::InitStreams() {
   aggregated_row_stream.reset(new BufferedTupleStream(parent->state_,
       &parent->intermediate_row_desc_, &parent->buffer_pool_client_,
       parent->resource_profile_.spillable_buffer_size,
-      parent->resource_profile_.spillable_buffer_size, external_varlen_slots));
+      parent->resource_profile_.max_row_buffer_size, external_varlen_slots));
   RETURN_IF_ERROR(aggregated_row_stream->Init(parent->id(), true));
   bool got_buffer;
   RETURN_IF_ERROR(aggregated_row_stream->PrepareForWrite(&got_buffer));
@@ -743,7 +742,7 @@ Status PartitionedAggregationNode::Partition::InitStreams() {
     unaggregated_row_stream.reset(new BufferedTupleStream(parent->state_,
         parent->child(0)->row_desc(), &parent->buffer_pool_client_,
         parent->resource_profile_.spillable_buffer_size,
-        parent->resource_profile_.spillable_buffer_size));
+        parent->resource_profile_.max_row_buffer_size));
     // This stream is only used to spill, no need to ever have this pinned.
     RETURN_IF_ERROR(unaggregated_row_stream->Init(parent->id(), false));
     // Save memory by waiting until we spill to allocate the write buffer for the
@@ -814,7 +813,7 @@ Status PartitionedAggregationNode::Partition::SerializeStreamForSpilling() {
     parent->serialize_stream_.reset(new BufferedTupleStream(parent->state_,
         &parent->intermediate_row_desc_, &parent->buffer_pool_client_,
         parent->resource_profile_.spillable_buffer_size,
-        parent->resource_profile_.spillable_buffer_size));
+        parent->resource_profile_.max_row_buffer_size));
     status = parent->serialize_stream_->Init(parent->id(), false);
     if (status.ok()) {
       bool got_buffer;

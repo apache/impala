@@ -52,6 +52,11 @@ class TestSpilling(ImpalaTestSuite):
   def test_spilling_aggs(self, vector):
     self.run_test_case('QueryTest/spilling-aggs', vector)
 
+  def test_spilling_large_rows(self, vector, unique_database):
+    """Test that we can process large rows in spilling operators, with or without
+       spilling to disk"""
+    self.run_test_case('QueryTest/spilling-large-rows', vector, unique_database)
+
   def test_spilling_sorts_exhaustive(self, vector):
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip("only run large sorts on exhaustive")
