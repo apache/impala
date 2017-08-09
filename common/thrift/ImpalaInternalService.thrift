@@ -387,18 +387,6 @@ struct TQueryCtx {
   // String containing a timestamp (in UTC) set as the query submission time. It
   // represents the same point in time as now_string
   17: required string utc_timestamp_string
-
-  // Minimum query-wide buffer reservation required per host in bytes. This is the peak
-  // minimum reservation that may be required by the concurrently-executing operators at
-  // any point in query execution. It may be less than the initial reservation total
-  // claims (below) if execution of some operators never overlaps, which allows reuse of
-  // reservations.
-  18: optional i64 per_host_min_reservation;
-
-  // Total of the initial buffer reservations that we expect to be claimed per host.
-  // I.e. the sum over all operators in all fragment instances that execute on that host.
-  // Measured in bytes.
-  19: optional i64 per_host_initial_reservation_total_claims;
 }
 
 // Specification of one output destination of a plan fragment
@@ -486,11 +474,20 @@ struct TExecQueryFInstancesParams {
   3: optional TQueryCtx query_ctx
 
   // required in V1
-  4: list<TPlanFragmentCtx> fragment_ctxs
+  4: optional list<TPlanFragmentCtx> fragment_ctxs
 
   // the order corresponds to the order of fragments in fragment_ctxs
   // required in V1
-  5: list<TPlanFragmentInstanceCtx> fragment_instance_ctxs
+  5: optional list<TPlanFragmentInstanceCtx> fragment_instance_ctxs
+
+  // The minimum reservation size (in bytes) required for all fragments in fragment_ctxs.
+  // required in V1
+  6: optional i64 min_reservation_bytes
+
+  // The total of initial reservations (in bytes) that will be claimed over the lifetime
+  // of this query for the fragments in fragment_ctxs.
+  // required in V1
+  7: optional i64 initial_reservation_total_bytes
 }
 
 struct TExecQueryFInstancesResult {

@@ -168,11 +168,13 @@ void QuerySchedule::Validate() const {
       }
     }
   }
+  // TODO: add validation for BackendExecParams
 }
 
 int64_t QuerySchedule::GetClusterMemoryEstimate() const {
-  DCHECK_GT(unique_hosts_.size(), 0);
-  const int64_t total_cluster_mem = GetPerHostMemoryEstimate() * unique_hosts_.size();
+  DCHECK_GT(per_backend_exec_params_.size(), 0);
+  const int64_t total_cluster_mem =
+      GetPerHostMemoryEstimate() * per_backend_exec_params_.size();
   DCHECK_GE(total_cluster_mem, 0); // Assume total cluster memory fits in an int64_t.
   return total_cluster_mem;
 }
@@ -204,10 +206,6 @@ int64_t QuerySchedule::GetPerHostMemoryEstimate() const {
   // Cap the memory estimate at the amount of physical memory available. The user's
   // provided value or the estimate from planning can each be unreasonable.
   return min(per_host_mem, MemInfo::physical_mem());
-}
-
-void QuerySchedule::SetUniqueHosts(const unordered_set<TNetworkAddress>& unique_hosts) {
-  unique_hosts_ = unique_hosts;
 }
 
 TUniqueId QuerySchedule::GetNextInstanceId() {

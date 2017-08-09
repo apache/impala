@@ -386,14 +386,19 @@ struct TQueryExecRequest {
   // AS SELECT), these may differ.
   7: required Types.TStmtType stmt_type
 
-  // Estimated per-host peak memory consumption in bytes. Used for resource management.
-  8: optional i64 per_host_mem_estimate
-
   // List of replica hosts.  Used by the host_idx field of TScanRangeLocation.
   9: required list<Types.TNetworkAddress> host_list
 
   // Column lineage graph
   10: optional LineageGraph.TLineageGraph lineage_graph
+
+  // Estimated per-host peak memory consumption in bytes. Used by admission control.
+  // TODO: Remove when AC doesn't rely on this any more.
+  8: optional i64 per_host_mem_estimate
+
+  // Maximum possible (in the case all fragments are scheduled on all hosts with
+  // max DOP) minimum reservation required per host, in bytes.
+  11: optional i64 max_per_host_min_reservation;
 }
 
 enum TCatalogOpType {

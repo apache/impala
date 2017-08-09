@@ -139,9 +139,9 @@ Status QueryState::Init(const TExecQueryFInstancesParams& rpc_params) {
   // to handle releasing it if a later step fails.
   initial_reservations_ = obj_pool_.Add(new InitialReservations(&obj_pool_,
       buffer_reservation_, query_mem_tracker_,
-      query_ctx_.per_host_initial_reservation_total_claims));
+      rpc_params.initial_reservation_total_bytes));
   RETURN_IF_ERROR(
-      initial_reservations_->Init(query_id(), query_ctx_.per_host_min_reservation));
+      initial_reservations_->Init(query_id(), rpc_params.min_reservation_bytes));
   DCHECK_EQ(0, initial_reservation_refcnt_.Load());
   initial_reservation_refcnt_.Add(1); // Decremented in QueryExecMgr::StartQueryHelper().
   return Status::OK();

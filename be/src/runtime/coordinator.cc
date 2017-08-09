@@ -225,25 +225,15 @@ void Coordinator::InitFragmentStats() {
 }
 
 void Coordinator::InitBackendStates() {
-  int num_backends = schedule_.unique_hosts().size();
+  int num_backends = schedule_.per_backend_exec_params().size();
   DCHECK_GT(num_backends, 0);
   backend_states_.resize(num_backends);
-
-  // collect the FInstanceExecParams for each host
-  typedef map<TNetworkAddress, vector<const FInstanceExecParams*>> BackendParamsMap;
-  BackendParamsMap backend_params_map;
-  for (const FragmentExecParams& fragment_params: schedule_.fragment_exec_params()) {
-    for (const FInstanceExecParams& instance_params:
-        fragment_params.instance_exec_params) {
-      backend_params_map[instance_params.host].push_back(&instance_params);
-    }
-  }
 
   // create BackendStates
   bool has_coord_fragment = schedule_.GetCoordFragment() != nullptr;
   const TNetworkAddress& coord_address = ExecEnv::GetInstance()->backend_address();
   int backend_idx = 0;
-  for (const auto& entry: backend_params_map) {
+  for (const auto& entry: schedule_.per_backend_exec_params()) {
     if (has_coord_fragment && coord_address == entry.first) {
       coord_backend_idx_ = backend_idx;
     }

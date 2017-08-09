@@ -114,7 +114,7 @@ class TestCoordinators(CustomClusterTestSuite):
     exec_and_verify_num_executors(3)
     # Stop the cluster
     self._stop_impala_cluster()
-    # Cluster config where the oordinator can only execute coordinator fragments
+    # Cluster config where the coordinator can only execute coordinator fragments
     self._start_impala_cluster([], cluster_size=3, num_coordinators=1,
         use_exclusive_coordinators=True)
     exec_and_verify_num_executors(2)

@@ -296,8 +296,8 @@ void AdmissionController::PoolStats::Dequeue(const QuerySchedule& schedule,
 
 void AdmissionController::UpdateHostMemAdmitted(const QuerySchedule& schedule,
     int64_t per_node_mem) {
-  const unordered_set<TNetworkAddress>& hosts = schedule.unique_hosts();
-  for (const TNetworkAddress& host_addr: hosts) {
+  for (const auto& entry : schedule.per_backend_exec_params()) {
+    const TNetworkAddress& host_addr = entry.first;
     const string host = TNetworkAddressToString(host_addr);
     VLOG_ROW << "Update admitted mem reserved for host=" << host
              << " prev=" << PrintBytes(host_mem_admitted_[host])
@@ -337,7 +337,8 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
 
   // Case 2:
   int64_t proc_mem_limit = GetProcMemLimit();
-  for (const TNetworkAddress& host: schedule.unique_hosts()) {
+  for (const auto& entry : schedule.per_backend_exec_params()) {
+    const TNetworkAddress& host = entry.first;
     const string host_id = TNetworkAddressToString(host);
     int64_t mem_reserved = host_mem_reserved_[host_id];
     int64_t mem_admitted = host_mem_admitted_[host_id];

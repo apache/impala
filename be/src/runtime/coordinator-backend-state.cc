@@ -60,16 +60,17 @@ Coordinator::BackendState::BackendState(
 }
 
 void Coordinator::BackendState::Init(
-    const vector<const FInstanceExecParams*>& instance_params_list,
+    const BackendExecParams& exec_params,
     const vector<FragmentStats*>& fragment_stats, ObjectPool* obj_pool) {
-  instance_params_list_ = instance_params_list;
-  host_ = instance_params_list_[0]->host;
-  num_remaining_instances_ = instance_params_list.size();
+  backend_exec_params_ = &exec_params;
+  host_ = backend_exec_params_->instance_params[0]->host;
+  num_remaining_instances_ = backend_exec_params_->instance_params.size();
 
   // populate instance_stats_map_ and install instance
   // profiles as child profiles in fragment_stats' profile
   int prev_fragment_idx = -1;
-  for (const FInstanceExecParams* instance_params: instance_params_list) {
+  for (const FInstanceExecParams* instance_params:
+       backend_exec_params_->instance_params) {
     DCHECK_EQ(host_, instance_params->host);  // all hosts must be the same
     int fragment_idx = instance_params->fragment().idx;
     DCHECK_LT(fragment_idx, fragment_stats.size());
@@ -92,12 +93,17 @@ void Coordinator::BackendState::SetRpcParams(
     TExecQueryFInstancesParams* rpc_params) {
   rpc_params->__set_protocol_version(ImpalaInternalServiceVersion::V1);
   rpc_params->__set_coord_state_idx(state_idx_);
+  rpc_params->__set_min_reservation_bytes(backend_exec_params_->min_reservation_bytes);
+  rpc_params->__set_initial_reservation_total_bytes(
+      backend_exec_params_->initial_reservation_total_bytes);
 
   // set fragment_ctxs and fragment_instance_ctxs
-  rpc_params->fragment_instance_ctxs.resize(instance_params_list_.size());
-  for (int i = 0; i < instance_params_list_.size(); ++i) {
+  rpc_params->__isset.fragment_ctxs = true;
+  rpc_params->__isset.fragment_instance_ctxs = true;
+  rpc_params->fragment_instance_ctxs.resize(backend_exec_params_->instance_params.size());
+  for (int i = 0; i < backend_exec_params_->instance_params.size(); ++i) {
     TPlanFragmentInstanceCtx& instance_ctx = rpc_params->fragment_instance_ctxs[i];
-    const FInstanceExecParams& params = *instance_params_list_[i];
+    const FInstanceExecParams& params = *backend_exec_params_->instance_params[i];
     int fragment_idx = params.fragment_exec_params.fragment.idx;
 
     // add a TPlanFragmentCtx, if we don't already have it

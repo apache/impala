@@ -16,9 +16,11 @@
 // under the License.
 
 #include "scheduling/scheduler-test-util.h"
-#include "scheduling/scheduler.h"
+
+#include <boost/unordered_set.hpp>
 
 #include "common/names.h"
+#include "scheduling/scheduler.h"
 
 using namespace impala;
 using namespace impala::test;

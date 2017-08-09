@@ -262,9 +262,9 @@ public class Planner {
       TQueryExecRequest request, TExplainLevel explainLevel) {
     StringBuilder str = new StringBuilder();
     boolean hasHeader = false;
-    if (request.query_ctx.isSetPer_host_min_reservation()) {
-      str.append(String.format("Per-Host Resource Reservation: Memory=%s\n",
-          PrintUtils.printBytes(request.query_ctx.getPer_host_min_reservation())));
+    if (request.isSetMax_per_host_min_reservation()) {
+      str.append(String.format("Max Per-Host Resource Reservation: Memory=%s\n",
+          PrintUtils.printBytes(request.getMax_per_host_min_reservation())));
       hasHeader = true;
     }
     if (request.isSetPer_host_mem_estimate()) {
@@ -350,12 +350,10 @@ public class Planner {
     TQueryOptions queryOptions = ctx_.getRootAnalyzer().getQueryOptions();
     int mtDop = queryOptions.getMt_dop();
 
-    // Peak per-host peak resources for all plan fragments.
-    ResourceProfile perHostPeakResources = ResourceProfile.invalid();
-    // Total of initial reservation claims in bytes by all operators in all fragment
-    // instances per host. Computed by summing the per-host minimum reservations of
-    // all plan nodes and sinks.
-    long perHostInitialReservationTotal = 0;
+    // Peak per-host peak resources for all plan fragments, assuming that all fragments
+    // are scheduled on all nodes. The actual per-host resource requirements are computed
+    // after scheduling.
+    ResourceProfile maxPerHostPeakResources = ResourceProfile.invalid();
 
     // Do a pass over all the fragments to compute resource profiles. Compute the
     // profiles bottom-up since a fragment's profile may depend on its descendants.
@@ -367,35 +365,30 @@ public class Planner {
       // Different fragments do not synchronize their Open() and Close(), so the backend
       // does not provide strong guarantees about whether one fragment instance releases
       // resources before another acquires them. Conservatively assume that all fragment
-      // instances can consume their peak resources at the same time, i.e. that the
-      // query-wide peak resources is the sum of the per-fragment-instance peak
-      // resources.
-      perHostPeakResources =
-          perHostPeakResources.sum(fragment.getPerHostResourceProfile());
-      perHostInitialReservationTotal += fragment.getNumInstancesPerHost(mtDop)
-          * fragment.getSink().getResourceProfile().getMinReservationBytes();
-
-      for (PlanNode node: fragment.collectPlanNodes()) {
-        perHostInitialReservationTotal += fragment.getNumInstances(mtDop)
-            * node.getNodeResourceProfile().getMinReservationBytes();
-      }
+      // instances run on all backends with max DOP, and can consume their peak resources
+      // at the same time, i.e. that the query-wide peak resources is the sum of the
+      // per-fragment-instance peak resources.
+      maxPerHostPeakResources = maxPerHostPeakResources.sum(
+          fragment.getResourceProfile().multiply(fragment.getNumInstancesPerHost(mtDop)));
     }
 
-    Preconditions.checkState(perHostPeakResources.getMemEstimateBytes() >= 0,
-        perHostPeakResources.getMemEstimateBytes());
-    Preconditions.checkState(perHostPeakResources.getMinReservationBytes() >= 0,
-        perHostPeakResources.getMinReservationBytes());
+    Preconditions.checkState(maxPerHostPeakResources.getMemEstimateBytes() >= 0,
+        maxPerHostPeakResources.getMemEstimateBytes());
+    Preconditions.checkState(maxPerHostPeakResources.getMinReservationBytes() >= 0,
+        maxPerHostPeakResources.getMinReservationBytes());
 
-    perHostPeakResources = MIN_PER_HOST_RESOURCES.max(perHostPeakResources);
+    maxPerHostPeakResources = MIN_PER_HOST_RESOURCES.max(maxPerHostPeakResources);
 
-    request.setPer_host_mem_estimate(perHostPeakResources.getMemEstimateBytes());
-    queryCtx.setPer_host_min_reservation(perHostPeakResources.getMinReservationBytes());
-    queryCtx.setPer_host_initial_reservation_total_claims(perHostInitialReservationTotal);
+    // TODO: Remove per_host_mem_estimate from the TQueryExecRequest when AC no longer
+    // needs it.
+    request.setPer_host_mem_estimate(maxPerHostPeakResources.getMemEstimateBytes());
+    request.setMax_per_host_min_reservation(
+        maxPerHostPeakResources.getMinReservationBytes());
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Per-host min buffer : " + perHostPeakResources.getMinReservationBytes());
-      LOG.trace(
-          "Estimated per-host memory: " + perHostPeakResources.getMemEstimateBytes());
-      LOG.trace("Per-host initial reservation total: " + perHostInitialReservationTotal);
+      LOG.trace("Max per-host min reservation: " +
+          maxPerHostPeakResources.getMinReservationBytes());
+      LOG.trace("Max estimated per-host memory: " +
+          maxPerHostPeakResources.getMemEstimateBytes());
     }
   }
 

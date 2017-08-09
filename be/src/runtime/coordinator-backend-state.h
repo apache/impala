@@ -32,7 +32,6 @@
 namespace impala {
 
 class ProgressUpdater;
-class FInstanceExecParams;
 class ObjectPool;
 class DebugOptions;
 class CountingBarrier;
@@ -40,6 +39,7 @@ class TUniqueId;
 class TQueryCtx;
 class TReportExecStatusParams;
 class ExecSummary;
+struct FInstanceExecParams;
 
 /// This class manages all aspects of the execution of all fragment instances of a
 /// single query on a particular backend.
@@ -49,11 +49,11 @@ class Coordinator::BackendState {
   BackendState(const TUniqueId& query_id, int state_idx,
       TRuntimeFilterMode::type filter_mode);
 
-  /// Creates InstanceStats for all entries in instance_params_list in obj_pool
+  /// Creates InstanceStats for all instance in backend_exec_params in obj_pool
   /// and installs the instance profiles as children of the corresponding FragmentStats'
   /// root profile.
   /// Separated from c'tor to simplify future handling of out-of-mem errors.
-  void Init(const vector<const FInstanceExecParams*>& instance_params_list,
+  void Init(const BackendExecParams& backend_exec_params,
       const std::vector<FragmentStats*>& fragment_stats, ObjectPool* obj_pool);
 
   /// Starts query execution at this backend by issuing an ExecQueryFInstances rpc and
@@ -102,7 +102,10 @@ class Coordinator::BackendState {
   const TNetworkAddress& impalad_address() const { return host_; }
   int state_idx() const { return state_idx_; }
 
-  /// only valid after Exec()
+  /// Valid after Init().
+  const BackendExecParams* exec_params() const { return backend_exec_params_; }
+
+  /// Only valid after Exec().
   int64_t rpc_latency() const { return rpc_latency_; }
 
   /// Return true if execution at this backend is done.
@@ -166,9 +169,8 @@ class Coordinator::BackendState {
   const int state_idx_;  /// index of 'this' in Coordinator::backend_states_
   const TRuntimeFilterMode::type filter_mode_;
 
-  /// all instances of a particular fragment are contiguous in this vector;
-  /// query lifetime
-  std::vector<const FInstanceExecParams*> instance_params_list_;
+  /// Backend exec params, owned by the QuerySchedule and has query lifetime.
+  const BackendExecParams* backend_exec_params_;
 
   /// map from instance idx to InstanceStats, the latter live in the obj_pool parameter
   /// of Init()

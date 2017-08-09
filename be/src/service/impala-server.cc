@@ -878,11 +878,12 @@ Status ImpalaServer::ExecuteInternal(
   }
 
   if ((*request_state)->coord() != nullptr) {
-    const unordered_set<TNetworkAddress>& unique_hosts =
-        (*request_state)->schedule()->unique_hosts();
-    if (!unique_hosts.empty()) {
+    const PerBackendExecParams& per_backend_params =
+        (*request_state)->schedule()->per_backend_exec_params();
+    if (!per_backend_params.empty()) {
       lock_guard<mutex> l(query_locations_lock_);
-      for (const TNetworkAddress& host: unique_hosts) {
+      for (const auto& entry : per_backend_params) {
+        const TNetworkAddress& host = entry.first;
         query_locations_[host].insert((*request_state)->query_id());
       }
     }
@@ -1013,11 +1014,12 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
     request_state->summary_profile()->AddInfoString("Errors",
         request_state->coord()->GetErrorLog());
 
-    const unordered_set<TNetworkAddress>& unique_hosts =
-        request_state->schedule()->unique_hosts();
-    if (!unique_hosts.empty()) {
+    const PerBackendExecParams& per_backend_params =
+        request_state->schedule()->per_backend_exec_params();
+    if (!per_backend_params.empty()) {
       lock_guard<mutex> l(query_locations_lock_);
-      for (const TNetworkAddress& hostport: unique_hosts) {
+      for (const auto& entry : per_backend_params) {
+        const TNetworkAddress& hostport = entry.first;
         // Query may have been removed already by cancellation path. In particular, if
         // node to fail was last sender to an exchange, the coordinator will realise and
         // fail the query at the same time the failure detection path does the same

@@ -105,10 +105,14 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   // if the output is UNPARTITIONED, it is being broadcast
   private DataPartition outputPartition_;
 
-  // Resource requirements and estimates for all instances of this plan fragment running
-  // on a host. Initialized with a dummy value. Gets set correctly in
+  // Resource requirements and estimates for an instance of this plan fragment.
+  // Initialized with a dummy value. Gets set correctly in
   // computeResourceProfile().
-  private ResourceProfile perHostResourceProfile_ = ResourceProfile.invalid();
+  private ResourceProfile resourceProfile_ = ResourceProfile.invalid();
+
+  // The total of initial reservations (in bytes) that will be claimed over the lifetime
+  // of this fragment. Computed in computeResourceProfile().
+  private long initialReservationTotalBytes_ = -1;
 
   /**
    * C'tor for fragment with specific partition; the output is by default broadcast.
@@ -207,7 +211,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   }
 
   /**
-   * Compute the peak resource profile for all instances of this fragment per host. Must
+   * Compute the peak resource profile for an instance of this fragment. Must
    * be called after all the plan nodes and sinks are added to the fragment and resource
    * profiles of all children fragments are computed.
    */
@@ -222,7 +226,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       // Resource consumption of fragments with join build sinks is included in the
       // parent fragment because the join node blocks waiting for the join build to
       // finish - see JoinNode.computeTreeResourceProfiles().
-      perHostResourceProfile_ = ResourceProfile.invalid();
+      resourceProfile_ = ResourceProfile.invalid();
       return;
     }
 
@@ -231,15 +235,17 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     // The sink is opened after the plan tree.
     ResourceProfile fInstancePostOpenProfile =
         planTreeProfile.postOpenProfile.sum(sink_.getResourceProfile());
-    ResourceProfile fInstanceProfile =
+    resourceProfile_ =
         planTreeProfile.duringOpenProfile.max(fInstancePostOpenProfile);
-    int numInstances = getNumInstancesPerHost(analyzer.getQueryOptions().getMt_dop());
-    perHostResourceProfile_ = fInstanceProfile.multiply(numInstances);
+
+    initialReservationTotalBytes_ = sink_.getResourceProfile().getMinReservationBytes();
+    for (PlanNode node: collectPlanNodes()) {
+      initialReservationTotalBytes_ +=
+          node.getNodeResourceProfile().getMinReservationBytes();
+    }
   }
 
-  public ResourceProfile getPerHostResourceProfile() {
-    return perHostResourceProfile_;
-  }
+  public ResourceProfile getResourceProfile() { return resourceProfile_; }
 
   /**
    * Return the number of nodes on which the plan fragment will execute.
@@ -306,6 +312,14 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     }
     if (sink_ != null) result.setOutput_sink(sink_.toThrift());
     result.setPartition(dataPartition_.toThrift());
+    if (resourceProfile_.isValid()) {
+      Preconditions.checkArgument(initialReservationTotalBytes_ > -1);
+      result.setMin_reservation_bytes(resourceProfile_.getMinReservationBytes());
+      result.setInitial_reservation_total_bytes(initialReservationTotalBytes_);
+    } else {
+      result.setMin_reservation_bytes(0);
+      result.setInitial_reservation_total_bytes(0);
+    }
     return result;
   }
 
@@ -386,7 +400,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     if (sink_ instanceof JoinBuildSink) {
       builder.append("included in parent fragment");
     } else {
-      builder.append(perHostResourceProfile_.getExplainString());
+      builder.append(resourceProfile_.multiply(getNumInstancesPerHost(mt_dop))
+          .getExplainString());
     }
     builder.append("\n");
     return builder.toString();
