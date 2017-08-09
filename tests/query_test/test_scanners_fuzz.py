@@ -17,6 +17,7 @@
 
 from copy import copy
 import itertools
+import math
 import os
 import pytest
 import random
@@ -213,17 +214,18 @@ class TestScannersFuzzing(ImpalaTestSuite):
     with open(path, "rb") as f:
       data = bytearray(f.read())
 
-    if rng.random() < 0.5:
+    num_corruptions = rng.randint(0, int(math.log(len(data))))
+    for _ in xrange(num_corruptions):
       flip_offset = rng.randint(0, len(data) - 1)
       flip_val = rng.randint(0, 255)
-      LOG.info("corrupt_file: Flip byte in %s at %d from %d to %d", path, flip_offset,
-          data[flip_offset], flip_val)
+      LOG.info("corrupt file: Flip byte in {} at {} from {} to {}".format(
+          path, flip_offset, data[flip_offset], flip_val))
       data[flip_offset] = flip_val
-    else:
+
+    if rng.random() < 0.4:
       truncation = rng.randint(0, len(data))
-      LOG.info("corrupt_file: Truncate %s to %d", path, truncation)
+      LOG.info("corrupt file: Truncate {} to {}".format(path, truncation))
       data = data[:truncation]
 
     with open(path, "wb") as f:
       f.write(data)
-

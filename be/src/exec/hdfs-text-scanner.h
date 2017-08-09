@@ -183,23 +183,31 @@ class HdfsTextScanner : public HdfsScanner {
   /// Returns the number of rows added to the row batch.
   int WriteFields(int num_fields, int num_tuples, MemPool* pool, TupleRow* row);
 
-  /// Utility function to write out 'num_fields' to 'tuple_'.  This is used to parse
-  /// partial tuples. If copy_strings is true, strings from fields will be copied into
-  /// the boundary pool.
-  void WritePartialTuple(FieldLocation*, int num_fields, bool copy_strings);
+  /// Utility function to parse 'num_fields' and materialize the resulting slots into
+  /// 'partial_tuple_'.  The data of var-len fields is copied into 'boundary_pool_'.
+  void WritePartialTuple(FieldLocation*, int num_fields);
 
-  /// Current state of this scanner. Advances through the states exactly in order.
+  /// Deep copies the partial tuple into 'tuple_'.  The deep copy is done to simplify
+  /// memory ownership.  Also clears the boundary pool to prevent the accumulation of
+  /// variable length data in it.
+  void CopyAndClearPartialTuple(MemPool* pool);
+
+  /// Current state of this scanner.  Advances through the states exactly in order.
   TextScanState scan_state_;
 
-  /// Mem pool for boundary_row_ and boundary_column_.
+  /// Mem pool for boundary_row_, boundary_column_, partial_tuple_ and any variable length
+  /// data that is pointed at by the partial tuple.  Does not hold any tuple data
+  /// of returned batches, because the data is always deep-copied into the output batch.
   boost::scoped_ptr<MemPool> boundary_pool_;
 
-  /// Helper string for dealing with input rows that span file blocks.
-  /// We keep track of a whole line that spans file blocks to be able to report
-  /// the line as erroneous in case of parsing errors.
+  /// Helper string for dealing with input rows that span file blocks.  We keep track of
+  /// a whole line that spans file blocks to be able to report the line as erroneous in
+  /// case of parsing errors.  Does not hold any tuple data of returned batches.
   StringBuffer boundary_row_;
 
-  /// Helper string for dealing with columns that span file blocks.
+  /// Helper string for dealing with columns that span file blocks.  Does not hold any
+  /// tuple data of returned batches, because the data is always deep-copied into the
+  /// output batch.  Memory comes from boundary_pool_.
   StringBuffer boundary_column_;
 
   /// Index into materialized_slots_ for the next slot to output for the current tuple.
@@ -225,14 +233,10 @@ class HdfsTextScanner : public HdfsScanner {
   /// logged.
   bool error_in_row_;
 
-  /// Memory to store partial tuples split across buffers.  Memory comes from
-  /// boundary_pool_.  There is only one tuple allocated for this object and reused
-  /// for boundary tuples.
+  /// Memory to store partial tuples split across buffers.  Does not hold any tuple data
+  /// of returned batches, because the data is always deep-copied into the output batch.
+  /// Memory comes from boundary_pool_.
   Tuple* partial_tuple_;
-
-  /// If false, there is a tuple that is partially materialized (i.e. partial_tuple_
-  /// contains data)
-  bool partial_tuple_empty_;
 
   /// Time parsing text files
   RuntimeProfile::Counter* parse_delimiter_timer_;
