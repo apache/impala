@@ -117,7 +117,7 @@ class ImpalaClient(object):
     processed, used internally to this method only.
 
     NOTE: This is duplicated in impala_beeswax.py, and changes made here should also be
-    made there.
+    made there. TODO: refactor into a shared library. (IMPALA-5792)
     """
     attrs = ["latency_ns", "cpu_time_ns", "cardinality", "memory_used"]
 
