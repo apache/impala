@@ -78,11 +78,14 @@ DEFINE_int32(num_s3_io_threads, 16, "Number of S3 I/O threads");
 // enforced by ADLS for a cluster, which spans between 500-700. For smaller clusters
 // (~10 nodes), 64 threads would be more ideal.
 DEFINE_int32(num_adls_io_threads, 16, "Number of ADLS I/O threads");
-// The read size is the size of the reads sent to hdfs/os.
+// The read size is the preferred size of the reads issued to HDFS or the local FS.
 // There is a trade off of latency and throughout, trying to keep disks busy but
 // not introduce seeks.  The literature seems to agree that with 8 MB reads, random
 // io and sequential io perform similarly.
-DEFINE_int32(read_size, 8 * 1024 * 1024, "Read Size (in bytes)");
+DEFINE_int32(read_size, 8 * 1024 * 1024, "(Advanced) The preferred I/O request size in "
+    "bytes to issue to HDFS or the local filesystem. Increasing the read size will "
+    "increase memory requirements. Decreasing the read size may decrease I/O "
+    "throughput.");
 DECLARE_int64(min_buffer_size);
 
 // With 1024B through 8MB buffers, this is up to ~2GB of buffers.

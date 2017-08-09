@@ -206,9 +206,7 @@ error_codes = (
 
   ("UDF_MEM_LIMIT_EXCEEDED", 64, "$0's allocations exceeded memory limits."),
 
-  ("BTS_BLOCK_OVERFLOW", 65, "Cannot process row that is bigger than the IO size "
-   "(row_size=$0, null_indicators_size=$1). To run this query, increase the IO size "
-   "(--read_size option)."),
+  ("UNUSED_65", 65, "No longer in use."),
 
   ("COMPRESSED_FILE_MULTIPLE_BLOCKS", 66,
    "For better performance, snappy-, gzip-, and bzip-compressed files "
