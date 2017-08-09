@@ -51,6 +51,11 @@ const string& BAD_PRIVATE_KEY =
 const string& PASSWORD_PROTECTED_PRIVATE_KEY =
     Substitute("$0/be/src/testutil/server-key-password.pem", IMPALA_HOME);
 
+// Only use TLSv1.0 compatible ciphers, as tests might run on machines with only TLSv1.0
+// support.
+const string TLS1_0_COMPATIBLE_CIPHER = "RC4-SHA";
+const string TLS1_0_COMPATIBLE_CIPHER_2 = "RC4-MD5";
+
 /// Dummy server class (chosen because it has the smallest interface to implement) that
 /// tests can use to start Thrift servers.
 class DummyStatestoreService : public StatestoreServiceIf {
@@ -233,11 +238,11 @@ TEST(SslTest, MismatchedCiphers) {
   EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
                 .ssl(SERVER_CERT, PASSWORD_PROTECTED_PRIVATE_KEY)
                 .pem_password_cmd("echo password")
-                .cipher_list("AES256-SHA256")
+                .cipher_list(TLS1_0_COMPATIBLE_CIPHER)
                 .Build(&server));
   EXPECT_OK(server->Start());
-
-  auto s = ScopedFlagSetter<string>::Make(&FLAGS_ssl_cipher_list, "RC4-SHA");
+  auto s =
+      ScopedFlagSetter<string>::Make(&FLAGS_ssl_cipher_list, TLS1_0_COMPATIBLE_CIPHER_2);
   ThriftClient<StatestoreServiceClientWrapper> ssl_client(
       "localhost", port, "", nullptr, true);
 
@@ -258,12 +263,13 @@ TEST(SslTest, MatchedCiphers) {
   EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
                 .ssl(SERVER_CERT, PASSWORD_PROTECTED_PRIVATE_KEY)
                 .pem_password_cmd("echo password")
-                .cipher_list("AES256-SHA256")
+                .cipher_list(TLS1_0_COMPATIBLE_CIPHER)
                 .Build(&server));
   EXPECT_OK(server->Start());
 
   FLAGS_ssl_client_ca_certificate = SERVER_CERT;
-  auto s = ScopedFlagSetter<string>::Make(&FLAGS_ssl_cipher_list, "AES256-SHA256");
+  auto s =
+      ScopedFlagSetter<string>::Make(&FLAGS_ssl_cipher_list, TLS1_0_COMPATIBLE_CIPHER);
   ThriftClient<StatestoreServiceClientWrapper> ssl_client(
       "localhost", port, "", nullptr, true);
 
@@ -279,17 +285,19 @@ TEST(SslTest, MatchedCiphers) {
 
 TEST(SslTest, OverlappingMatchedCiphers) {
   int port = GetServerPort();
+  const string CIPHER_LIST = Substitute("$0,$1", TLS1_0_COMPATIBLE_CIPHER,
+      TLS1_0_COMPATIBLE_CIPHER_2);
   ThriftServer* server;
   EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
       .ssl(SERVER_CERT, PASSWORD_PROTECTED_PRIVATE_KEY)
       .pem_password_cmd("echo password")
-      .cipher_list("RC4-SHA,AES256-SHA256")
+      .cipher_list(CIPHER_LIST)
       .Build(&server));
   EXPECT_OK(server->Start());
 
   FLAGS_ssl_client_ca_certificate = SERVER_CERT;
   auto s = ScopedFlagSetter<string>::Make(&FLAGS_ssl_cipher_list,
-      "AES256-SHA256,not-a-cipher");
+      Substitute("$0,not-a-cipher", TLS1_0_COMPATIBLE_CIPHER));
   ThriftClient<StatestoreServiceClientWrapper> ssl_client(
       "localhost", port, "", nullptr, true);
 
