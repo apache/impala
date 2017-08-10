@@ -86,6 +86,7 @@ DECLARE_int32(num_cores);
 DECLARE_int32(be_port);
 DECLARE_string(mem_limit);
 DECLARE_string(buffer_pool_limit);
+DECLARE_string(buffer_pool_clean_pages_limit);
 DECLARE_int64(min_buffer_size);
 DECLARE_bool(is_coordinator);
 DECLARE_int32(webserver_port);
@@ -263,7 +264,14 @@ Status ExecEnv::StartServices() {
           "positive bytes value: $0", FLAGS_buffer_pool_limit));
   }
   buffer_pool_limit = BitUtil::RoundDown(buffer_pool_limit, FLAGS_min_buffer_size);
-  InitBufferPool(FLAGS_min_buffer_size, buffer_pool_limit);
+
+  int64_t clean_pages_limit = ParseUtil::ParseMemSpec(FLAGS_buffer_pool_clean_pages_limit,
+      &is_percent, buffer_pool_limit);
+  if (clean_pages_limit <= 0) {
+    return Status(Substitute("Invalid --buffer_pool_clean_pages_limit value, must be a percentage or "
+          "positive bytes value: $0", FLAGS_buffer_pool_clean_pages_limit));
+  }
+  InitBufferPool(FLAGS_min_buffer_size, buffer_pool_limit, clean_pages_limit);
 
   RETURN_IF_ERROR(metrics_->Init(enable_webserver_ ? webserver_.get() : nullptr));
   impalad_client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");
@@ -344,8 +352,9 @@ Status ExecEnv::StartServices() {
   return Status::OK();
 }
 
-void ExecEnv::InitBufferPool(int64_t min_buffer_size, int64_t capacity) {
-  buffer_pool_.reset(new BufferPool(min_buffer_size, capacity));
+void ExecEnv::InitBufferPool(int64_t min_buffer_size, int64_t capacity,
+    int64_t clean_pages_limit) {
+  buffer_pool_.reset(new BufferPool(min_buffer_size, capacity, clean_pages_limit));
   buffer_reservation_.reset(new ReservationTracker());
   buffer_reservation_->InitRootTracker(nullptr, capacity);
 }

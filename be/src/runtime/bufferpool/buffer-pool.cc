@@ -104,8 +104,10 @@ Status BufferPool::PageHandle::GetBuffer(const BufferHandle** buffer) const {
   return Status::OK();
 }
 
-BufferPool::BufferPool(int64_t min_buffer_len, int64_t buffer_bytes_limit)
-  : allocator_(new BufferAllocator(this, min_buffer_len, buffer_bytes_limit)),
+BufferPool::BufferPool(int64_t min_buffer_len, int64_t buffer_bytes_limit,
+      int64_t clean_page_bytes_limit)
+  : allocator_(new BufferAllocator(
+        this, min_buffer_len, buffer_bytes_limit, clean_page_bytes_limit)),
     min_buffer_len_(min_buffer_len) {
   DCHECK_GT(min_buffer_len, 0);
   DCHECK_EQ(min_buffer_len, BitUtil::RoundUpToPowerOfTwo(min_buffer_len));
@@ -270,6 +272,10 @@ int64_t BufferPool::GetSystemBytesLimit() const {
 
 int64_t BufferPool::GetSystemBytesAllocated() const {
   return allocator_->GetSystemBytesAllocated();
+}
+
+int64_t BufferPool::GetCleanPageBytesLimit() const {
+  return allocator_->GetCleanPageBytesLimit();
 }
 
 int64_t BufferPool::GetNumCleanPages() const {

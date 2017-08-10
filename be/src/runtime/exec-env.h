@@ -206,7 +206,7 @@ class ExecEnv {
   KuduClientMap kudu_client_map_;
 
   /// Initialise 'buffer_pool_' and 'buffer_reservation_' with given capacity.
-  void InitBufferPool(int64_t min_page_len, int64_t capacity);
+  void InitBufferPool(int64_t min_page_len, int64_t capacity, int64_t clean_pages_limit);
 };
 
 } // namespace impala

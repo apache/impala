@@ -1176,6 +1176,16 @@
     "key": "buffer-pool.free-buffer-bytes"
   },
   {
+    "description": "Limit on number of clean pages cached in the buffer pool.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool Clean Pages Limit.",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "buffer-pool.clean-pages-limit"
+  },
+  {
     "description": "Total number of clean pages cached in the buffer pool.",
     "contexts": [
       "IMPALAD"

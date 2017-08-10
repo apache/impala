@@ -39,7 +39,7 @@ using BufferHandle = BufferPool::BufferHandle;
 class BufferAllocatorTest : public ::testing::Test {
  public:
   virtual void SetUp() {
-    dummy_pool_ = obj_pool_.Add(new BufferPool(1, 0));
+    dummy_pool_ = obj_pool_.Add(new BufferPool(1, 0, 0));
     dummy_reservation_.InitRootTracker(nullptr, 0);
     ASSERT_OK(dummy_pool_->RegisterClient("", nullptr, &dummy_reservation_, nullptr, 0,
         obj_pool_.Add(new RuntimeProfile(&obj_pool_, "")), &dummy_client_));
@@ -73,7 +73,8 @@ class BufferAllocatorTest : public ::testing::Test {
 // Confirm that ASAN will catch use-after-free errors, even if the BufferAllocator caches
 // returned memory.
 TEST_F(BufferAllocatorTest, Poisoning) {
-  BufferAllocator allocator(dummy_pool_, TEST_BUFFER_LEN, 2 * TEST_BUFFER_LEN);
+  BufferAllocator allocator(
+      dummy_pool_, TEST_BUFFER_LEN, 2 * TEST_BUFFER_LEN, 2 * TEST_BUFFER_LEN);
   BufferHandle buffer;
   ASSERT_OK(allocator.Allocate(&dummy_client_, TEST_BUFFER_LEN, &buffer));
   uint8_t* data = buffer.data();
@@ -94,7 +95,7 @@ TEST_F(BufferAllocatorTest, FreeListSizes) {
   const int NUM_BUFFERS = 512;
   const int64_t TOTAL_BYTES = NUM_BUFFERS * TEST_BUFFER_LEN;
 
-  BufferAllocator allocator(dummy_pool_, TEST_BUFFER_LEN, TOTAL_BYTES);
+  BufferAllocator allocator(dummy_pool_, TEST_BUFFER_LEN, TOTAL_BYTES, TOTAL_BYTES);
 
   // Allocate a bunch of buffers - all free list checks should miss.
   vector<BufferHandle> buffers(NUM_BUFFERS);

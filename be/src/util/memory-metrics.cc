@@ -54,6 +54,7 @@ BufferPoolMetric* BufferPoolMetric::SYSTEM_ALLOCATED = nullptr;
 BufferPoolMetric* BufferPoolMetric::RESERVED = nullptr;
 BufferPoolMetric* BufferPoolMetric::NUM_FREE_BUFFERS = nullptr;
 BufferPoolMetric* BufferPoolMetric::FREE_BUFFER_BYTES = nullptr;
+BufferPoolMetric* BufferPoolMetric::CLEAN_PAGES_LIMIT = nullptr;
 BufferPoolMetric* BufferPoolMetric::NUM_CLEAN_PAGES = nullptr;
 BufferPoolMetric* BufferPoolMetric::CLEAN_PAGE_BYTES = nullptr;
 
@@ -238,6 +239,9 @@ Status BufferPoolMetric::InitMetrics(MetricGroup* metrics,
   FREE_BUFFER_BYTES = metrics->RegisterMetric(
       new BufferPoolMetric(MetricDefs::Get("buffer-pool.free-buffer-bytes"),
           BufferPoolMetricType::FREE_BUFFER_BYTES, global_reservations, buffer_pool));
+  CLEAN_PAGES_LIMIT = metrics->RegisterMetric(
+      new BufferPoolMetric(MetricDefs::Get("buffer-pool.clean-pages-limit"),
+          BufferPoolMetricType::CLEAN_PAGES_LIMIT, global_reservations, buffer_pool));
   NUM_CLEAN_PAGES = metrics->RegisterMetric(
       new BufferPoolMetric(MetricDefs::Get("buffer-pool.clean-pages"),
           BufferPoolMetricType::NUM_CLEAN_PAGES, global_reservations, buffer_pool));
@@ -270,6 +274,9 @@ void BufferPoolMetric::CalculateValue() {
       break;
     case BufferPoolMetricType::FREE_BUFFER_BYTES:
       value_ = buffer_pool_->GetFreeBufferBytes();
+      break;
+    case BufferPoolMetricType::CLEAN_PAGES_LIMIT:
+      value_ = buffer_pool_->GetCleanPageBytesLimit();
       break;
     case BufferPoolMetricType::NUM_CLEAN_PAGES:
       value_ = buffer_pool_->GetNumCleanPages();

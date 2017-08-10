@@ -57,6 +57,12 @@ static const string buffer_pool_limit_help_msg = "(Advanced) Limit on buffer poo
     "The default value and behaviour of this flag may change between releases.";
 DEFINE_string(buffer_pool_limit, "80%", buffer_pool_limit_help_msg.c_str());
 
+static const string buffer_pool_clean_pages_limit_help_msg = "(Advanced) Limit on bytes "
+    "of clean pages that will be accumulated in the buffer pool. "
+     + Substitute(MEM_UNITS_HELP_MSG, "the buffer pool limit") + ".";
+DEFINE_string(buffer_pool_clean_pages_limit, "10%",
+    buffer_pool_clean_pages_limit_help_msg.c_str());
+
 DEFINE_int64(min_buffer_size, 64 * 1024,
     "(Advanced) The minimum buffer size to use in the buffer pool");
 

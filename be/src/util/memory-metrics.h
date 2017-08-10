@@ -201,6 +201,7 @@ class BufferPoolMetric : public UIntGauge {
   static BufferPoolMetric* RESERVED;
   static BufferPoolMetric* NUM_FREE_BUFFERS;
   static BufferPoolMetric* FREE_BUFFER_BYTES;
+  static BufferPoolMetric* CLEAN_PAGES_LIMIT;
   static BufferPoolMetric* NUM_CLEAN_PAGES;
   static BufferPoolMetric* CLEAN_PAGE_BYTES;
 
@@ -218,6 +219,7 @@ class BufferPoolMetric : public UIntGauge {
     RESERVED,
     NUM_FREE_BUFFERS, // Total number of free buffers in BufferPool.
     FREE_BUFFER_BYTES, // Total bytes of free buffers in BufferPool.
+    CLEAN_PAGES_LIMIT, // Limit on number of clean pages in BufferPool.
     NUM_CLEAN_PAGES, // Total number of clean pages in BufferPool.
     CLEAN_PAGE_BYTES, // Total bytes of clean pages in BufferPool.
   };

@@ -158,7 +158,10 @@ class BufferPool : public CacheLineAligned {
   /// 'buffer_bytes_limit': the maximum physical memory in bytes that can be used by the
   ///     buffer pool. If 'buffer_bytes_limit' is not a multiple of 'min_buffer_len', the
   ///     remainder will not be usable.
-  BufferPool(int64_t min_buffer_len, int64_t buffer_bytes_limit);
+  /// 'clean_page_bytes_limit': the maximum bytes of clean pages that will be retained by the
+  ///     buffer pool.
+  BufferPool(int64_t min_buffer_len, int64_t buffer_bytes_limit,
+      int64_t clean_page_bytes_limit);
   ~BufferPool();
 
   /// Register a client. Returns an error status and does not register the client if the
@@ -263,6 +266,9 @@ class BufferPool : public CacheLineAligned {
   int64_t min_buffer_len() const { return min_buffer_len_; }
   int64_t GetSystemBytesLimit() const;
   int64_t GetSystemBytesAllocated() const;
+
+  /// Return the limit on bytes of clean pages in the pool.
+  int64_t GetCleanPageBytesLimit() const;
 
   /// Return the total number of clean pages in the pool.
   int64_t GetNumCleanPages() const;
