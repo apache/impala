@@ -142,6 +142,32 @@ struct JniMethodDescriptor {
   jmethodID* method_id;
 };
 
+/// Helper class for lifetime management of chars from JNI, releasing JNI chars when
+/// destructed
+class JniUtfCharGuard {
+ public:
+  /// Construct a JniUtfCharGuards holding nothing
+  JniUtfCharGuard() : utf_chars(nullptr) {}
+
+  /// Release the held char sequence if there is one.
+  ~JniUtfCharGuard() {
+    if (utf_chars != nullptr) env->ReleaseStringUTFChars(jstr, utf_chars);
+  }
+
+  /// Try to get chars from jstring. If error is returned, utf_chars and get() remain
+  /// to be nullptr, otherwise they point to a valid char sequence. The char sequence
+  /// lives as long as this guard.
+  static Status create(JNIEnv* env, jstring jstr, JniUtfCharGuard* out);
+
+  /// Get the char sequence. Returns nullptr if the guard does hold a char sequence.
+  const char* get() { return utf_chars; }
+ private:
+  JNIEnv* env;
+  jstring jstr;
+  const char* utf_chars;
+  DISALLOW_COPY_AND_ASSIGN(JniUtfCharGuard);
+};
+
 /// Utility class for JNI-related functionality.
 /// Init() should be called as soon as the native library is loaded.
 /// Creates global class references, and promotes local references to global references.

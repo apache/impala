@@ -269,6 +269,11 @@ std::ostream& operator<<(std::ostream& os, const Status& status);
     if (UNLIKELY(!__status__.ok())) return __status__; \
   } while (false)
 
+#define RETURN_VOID_IF_ERROR(stmt)                     \
+  do {                                                 \
+    if (UNLIKELY(!(stmt).ok())) return;                \
+  } while (false)
+
 #define ABORT_IF_ERROR(stmt) \
   do { \
     Status __status__ = (stmt); \
