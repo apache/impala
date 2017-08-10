@@ -155,7 +155,7 @@ class TestBreakpad(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   def test_minidump_creation(self):
-    """Check that when a daemon crashes it writes a minidump file."""
+    """Check that when a daemon crashes, it writes a minidump file."""
     assert self.count_all_minidumps() == 0
     self.start_cluster()
     assert self.count_all_minidumps() == 0
@@ -165,7 +165,7 @@ class TestBreakpad(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   def test_sigusr1_writes_minidump(self):
-    """Check that when a daemon receives SIGUSR1 it writes a minidump file."""
+    """Check that when a daemon receives SIGUSR1, it writes a minidump file."""
     assert self.count_all_minidumps() == 0
     self.start_cluster()
     assert self.count_all_minidumps() == 0
@@ -181,6 +181,23 @@ class TestBreakpad(CustomClusterTestSuite):
     # Kill the cluster. Sending SIGKILL will not trigger minidumps to be written.
     self.kill_cluster(SIGKILL)
     self.assert_num_minidumps_for_all_daemons(cluster_size)
+
+  @pytest.mark.execute_serially
+  def test_sigusr1_doesnt_kill(self):
+    """Check that when minidumps are disabled and a daemon receives SIGUSR1, it does not
+    die.
+    """
+    assert self.count_all_minidumps() == 0
+    self.start_cluster_with_args(enable_minidumps=False)
+    cluster_size = self.get_num_processes('impalad')
+    self.kill_cluster(SIGUSR1)
+    # Check that no minidumps have been written.
+    self.assert_num_logfile_entries(0)
+    assert self.count_all_minidumps() == 0
+    # Check that all daemons are still alive.
+    assert self.get_num_processes('impalad') == cluster_size
+    assert self.get_num_processes('catalogd') == 1
+    assert self.get_num_processes('statestored') == 1
 
   @pytest.mark.execute_serially
   def test_minidump_relative_path(self):

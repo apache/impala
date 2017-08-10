@@ -101,13 +101,18 @@ static void HandleSignal(int signal) {
   minidump_exception_handler->WriteMinidump(FLAGS_minidump_path, DumpCallback, NULL);
 }
 
-/// Register our signal handler to write minidumps on SIGUSR1.
-static void SetupSignalHandler() {
-  DCHECK(minidump_exception_handler != NULL);
+/// Register our signal handler to write minidumps on SIGUSR1. Will make us ignore the
+/// signal if 'minidumps_enabled' is false.
+static void SetupSigUSR1Handler(bool minidumps_enabled) {
   struct sigaction sig_action;
   memset(&sig_action, 0, sizeof(sig_action));
   sigemptyset(&sig_action.sa_mask);
-  sig_action.sa_handler = &HandleSignal;
+  if (minidumps_enabled) {
+    DCHECK(minidump_exception_handler != NULL);
+    sig_action.sa_handler = &HandleSignal;
+  } else {
+    sig_action.sa_handler = SIG_IGN;
+  }
   sigaction(SIGUSR1, &sig_action, NULL);
 }
 
@@ -194,8 +199,10 @@ Status RegisterMinidump(const char* cmd_line_path) {
   DCHECK(!registered);
   registered = true;
 
-  if (!FLAGS_enable_minidumps) return Status::OK();
-  if (FLAGS_minidump_path.empty()) return Status::OK();
+  if (!FLAGS_enable_minidumps || FLAGS_minidump_path.empty()) {
+    SetupSigUSR1Handler(false);
+    return Status::OK();
+  }
 
   if (path(FLAGS_minidump_path).is_relative()) {
     path log_dir(FLAGS_log_dir);
@@ -238,7 +245,7 @@ Status RegisterMinidump(const char* cmd_line_path) {
       desc, FilterCallback, DumpCallback, NULL, true, -1);
 
   // Setup signal handler for SIGUSR1.
-  SetupSignalHandler();
+  SetupSigUSR1Handler(true);
 
   return Status::OK();
 }
