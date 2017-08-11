@@ -76,7 +76,7 @@ void LogKuduMessage(kudu::client::KuduLogSeverity severity, const char* filename
 /// into memory owned by the row. If false, string data must remain valid while the row
 /// is being used.
 Status WriteKuduValue(int col, PrimitiveType type, const void* value,
-    bool copy_strings, kudu::KuduPartialRow* row);
+    bool copy_strings, kudu::KuduPartialRow* row) WARN_UNUSED_RESULT;
 
 } /// namespace impala
 #endif

@@ -237,7 +237,13 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
       }
 
       PrimitiveType type = output_expr_evals_[j]->root().type().type;
-      WriteKuduValue(col, type, value, true, write->mutable_row());
+      Status s = WriteKuduValue(col, type, value, true, write->mutable_row());
+      // This can only fail if we set a col to an incorrect type, which would be a bug in
+      // planning, so we can DCHECK.
+      DCHECK(s.ok()) << "WriteKuduValue failed for col = "
+                     << table_schema.Column(col).name() << " and type = "
+                     << output_expr_evals_[j]->root().type() << ": " << s.GetDetail();
+      RETURN_IF_ERROR(s);
     }
     if (add_row) write_ops.push_back(move(write));
   }
