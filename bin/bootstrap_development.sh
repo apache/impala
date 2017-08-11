@@ -76,9 +76,23 @@ then
   exit 1
 fi
 
-sudo apt-get update
-sudo apt-get --yes install apt-utils
-sudo apt-get --yes install git
+REAL_APT_GET=$(which apt-get)
+function apt-get {
+  for ITER in $(seq 1 20); do
+    echo "ATTEMPT: ${ITER}"
+    if sudo "${REAL_APT_GET}" "$@"
+    then
+      return 0
+    fi
+    sleep "${ITER}"
+  done
+  echo "NO MORE RETRIES"
+  return 1
+}
+
+apt-get update
+apt-get --yes install apt-utils
+apt-get --yes install git
 
 # If there is no Impala git repo, get one now
 if ! [[ -d ~/Impala ]]
@@ -90,9 +104,9 @@ SET_IMPALA_HOME="export IMPALA_HOME=$(pwd)"
 echo "$SET_IMPALA_HOME" >> ~/.bashrc
 eval "$SET_IMPALA_HOME"
 
-sudo apt-get --yes install ccache g++ gcc libffi-dev liblzo2-dev libkrb5-dev \
-     libsasl2-dev libssl-dev make maven ninja-build ntp ntpdate python-dev \
-     python-setuptools postgresql ssh wget vim-common
+apt-get --yes install ccache g++ gcc libffi-dev liblzo2-dev libkrb5-dev libsasl2-dev \
+        libssl-dev make maven ninja-build ntp ntpdate python-dev python-setuptools \
+        postgresql ssh wget vim-common
 
 if ! { service --status-all | grep -E '^ \[ \+ \]  ssh$'; }
 then
@@ -108,7 +122,7 @@ if [[ $DISTRIB_RELEASE = 14.04 ]]
 then
   JDK_VERSION=7
 fi
-sudo apt-get --yes install openjdk-${JDK_VERSION}-jdk
+apt-get --yes install openjdk-${JDK_VERSION}-jdk
 SET_JAVA_HOME="export JAVA_HOME=/usr/lib/jvm/java-${JDK_VERSION}-openjdk-amd64"
 echo "$SET_JAVA_HOME" >> "${IMPALA_HOME}/bin/impala-config-local.sh"
 eval "$SET_JAVA_HOME"
@@ -174,7 +188,7 @@ echo "127.0.0.1 $(hostname -s) $(hostname)" | sudo tee -a /etc/hosts
 # basically sed -i but with cp instead of mv for -i part.
 NEW_HOSTS=$(mktemp)
 sed 's/127.0.1.1/127.0.0.1/g' /etc/hosts > "${NEW_HOSTS}"
-diff -u /etc/hosts "${NEW_HOSTS}"
+diff -u /etc/hosts "${NEW_HOSTS}" || true
 sudo cp "${NEW_HOSTS}" /etc/hosts
 rm "${NEW_HOSTS}"
 
