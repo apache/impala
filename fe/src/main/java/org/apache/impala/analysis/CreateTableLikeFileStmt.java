@@ -362,7 +362,7 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
       throw new AnalysisException("CREATE TABLE LIKE FILE statement is not supported " +
           "for Kudu tables.");
     }
-    schemaLocation_.analyze(analyzer, Privilege.ALL, FsAction.READ_WRITE);
+    schemaLocation_.analyze(analyzer, Privilege.ALL, FsAction.READ);
     switch (schemaFileFormat_) {
       case PARQUET:
         getColumnDefs().addAll(extractParquetSchema(schemaLocation_));
