@@ -140,9 +140,7 @@ void Scheduler::UpdateMembership(
 
   // If the delta transmitted by the statestore is empty we can skip processing
   // altogether and avoid making a copy of executors_config_.
-  if (delta.is_delta && delta.topic_entries.empty() && delta.topic_deletions.empty()) {
-    return;
-  }
+  if (delta.is_delta && delta.topic_entries.empty()) return;
 
   // This function needs to handle both delta and non-delta updates. To minimize the
   // time needed to hold locks, all updates are applied to a copy of
@@ -159,10 +157,17 @@ void Scheduler::UpdateMembership(
     new_executors_config = std::make_shared<BackendConfig>(*executors_config_);
   }
 
-  // Process new entries to the topic. Update executors_config_ and
+  // Process new and removed entries to the topic. Update executors_config_ and
   // current_executors_ to match the set of executors given by the
   // subscriber_topic_updates.
   for (const TTopicItem& item : delta.topic_entries) {
+    if (item.deleted) {
+      if (current_executors_.find(item.key) != current_executors_.end()) {
+        new_executors_config->RemoveBackend(current_executors_[item.key]);
+        current_executors_.erase(item.key);
+      }
+      continue;
+    }
     TBackendDescriptor be_desc;
     // Benchmarks have suggested that this method can deserialize
     // ~10m messages per second, so no immediate need to consider optimization.
@@ -195,15 +200,6 @@ void Scheduler::UpdateMembership(
       current_executors_.insert(make_pair(item.key, be_desc));
     }
   }
-
-  // Process deletions from the topic
-  for (const string& backend_id : delta.topic_deletions) {
-    if (current_executors_.find(backend_id) != current_executors_.end()) {
-      new_executors_config->RemoveBackend(current_executors_[backend_id]);
-      current_executors_.erase(backend_id);
-    }
-  }
-
   SetExecutorsConfig(new_executors_config);
 
   if (metrics_ != nullptr) {

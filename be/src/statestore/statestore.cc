@@ -85,8 +85,6 @@ const string STATESTORE_TOTAL_TOPIC_SIZE_BYTES = "statestore.total-topic-size-by
 const string STATESTORE_UPDATE_DURATION = "statestore.topic-update-durations";
 const string STATESTORE_HEARTBEAT_DURATION = "statestore.heartbeat-durations";
 
-const Statestore::TopicEntry::Value Statestore::TopicEntry::NULL_VALUE = "";
-
 // Initial version for each Topic registered by a Subscriber. Generally, the Topic will
 // have a Version that is the MAX() of all entries in the Topic, but this initial
 // value needs to be less than TopicEntry::TOPIC_ENTRY_INITIAL_VERSION to distinguish
@@ -124,13 +122,13 @@ class StatestoreThriftIf : public StatestoreServiceIf {
 
 void Statestore::TopicEntry::SetValue(const Statestore::TopicEntry::Value& bytes,
     TopicEntry::Version version) {
-  DCHECK(bytes == Statestore::TopicEntry::NULL_VALUE || bytes.size() > 0);
+  DCHECK_GT(bytes.size(), 0);
   value_ = bytes;
   version_ = version;
 }
 
 Statestore::TopicEntry::Version Statestore::Topic::Put(const string& key,
-    const Statestore::TopicEntry::Value& bytes) {
+    const Statestore::TopicEntry::Value& bytes, bool is_deleted) {
   TopicEntryMap::iterator entry_it = entries_.find(key);
   int64_t key_size_delta = 0;
   int64_t value_size_delta = 0;
@@ -147,6 +145,7 @@ Statestore::TopicEntry::Version Statestore::Topic::Put(const string& key,
   value_size_delta += bytes.size();
 
   entry_it->second.SetValue(bytes, ++last_version_);
+  entry_it->second.SetDeleted(is_deleted);
   topic_update_log_.insert(make_pair(entry_it->second.version(), key));
 
   total_key_size_bytes_ += key_size_delta;
@@ -168,12 +167,10 @@ void Statestore::Topic::DeleteIfVersionsMatch(TopicEntry::Version version,
     // entry
     topic_update_log_.erase(version);
     topic_update_log_.insert(make_pair(++last_version_, key));
-    total_value_size_bytes_ -= entry_it->second.value().size();
-    DCHECK_GE(total_value_size_bytes_, static_cast<int64_t>(0));
-
     value_size_metric_->Increment(entry_it->second.value().size());
     topic_size_metric_->Increment(entry_it->second.value().size());
-    entry_it->second.SetValue(Statestore::TopicEntry::NULL_VALUE, last_version_);
+    entry_it->second.SetDeleted(true);
+    entry_it->second.SetVersion(last_version_);
   }
 }
 
@@ -454,11 +451,9 @@ Status Statestore::SendTopicUpdate(Subscriber* subscriber, bool* update_skipped)
 
   // At this point the updates are assumed to have been successfully processed by the
   // subscriber. Update the subscriber's max version of each topic.
-  map<TopicEntryKey, TTopicDelta>::const_iterator topic_delta =
-      update_state_request.topic_deltas.begin();
-  for (; topic_delta != update_state_request.topic_deltas.end(); ++topic_delta) {
-    subscriber->SetLastTopicVersionProcessed(topic_delta->first,
-        topic_delta->second.to_version);
+  for (const auto& topic_delta: update_state_request.topic_deltas) {
+    subscriber->SetLastTopicVersionProcessed(topic_delta.first,
+        topic_delta.second.to_version);
   }
 
   // Thirdly: perform any / all updates returned by the subscriber
@@ -487,14 +482,8 @@ Status Statestore::SendTopicUpdate(Subscriber* subscriber, bool* update_skipped)
 
       Topic* topic = &topic_it->second;
       for (const TTopicItem& item: update.topic_entries) {
-        TopicEntry::Version version = topic->Put(item.key, item.value);
-        subscriber->AddTransientUpdate(update.topic_name, item.key, version);
-      }
-
-      for (const string& key: update.topic_deletions) {
-        TopicEntry::Version version =
-            topic->Put(key, Statestore::TopicEntry::NULL_VALUE);
-        subscriber->AddTransientUpdate(update.topic_name, key, version);
+        subscriber->AddTransientUpdate(update.topic_name, item.key,
+            topic->Put(item.key, item.value, item.deleted));
       }
     }
   }
@@ -528,30 +517,25 @@ void Statestore::GatherTopicUpdates(const Subscriber& subscriber,
       TopicUpdateLog::const_iterator next_update =
           topic.topic_update_log().upper_bound(last_processed_version);
 
-      int64_t deleted_key_size_bytes = 0;
+      uint64_t topic_size = 0;
       for (; next_update != topic.topic_update_log().end(); ++next_update) {
         TopicEntryMap::const_iterator itr = topic.entries().find(next_update->second);
         DCHECK(itr != topic.entries().end());
         const TopicEntry& topic_entry = itr->second;
-        if (topic_entry.value() == Statestore::TopicEntry::NULL_VALUE) {
-          if (!topic_delta.is_delta) {
-            deleted_key_size_bytes += itr->first.size();
-            continue;
-          }
-          topic_delta.topic_deletions.push_back(itr->first);
-        } else {
-          topic_delta.topic_entries.push_back(TTopicItem());
-          TTopicItem& topic_item = topic_delta.topic_entries.back();
-          topic_item.key = itr->first;
-          // TODO: Does this do a needless copy?
-          topic_item.value = topic_entry.value();
+        // Don't send deleted entries for non-delta updates.
+        if (!topic_delta.is_delta && topic_entry.is_deleted()) {
+          continue;
         }
+        topic_delta.topic_entries.push_back(TTopicItem());
+        TTopicItem& topic_item = topic_delta.topic_entries.back();
+        topic_item.key = itr->first;
+        topic_item.value = topic_entry.value();
+        topic_item.deleted = topic_entry.is_deleted();
+        topic_size += topic_item.key.size() + topic_item.value.size();
       }
 
       if (!topic_delta.is_delta &&
           topic.last_version() > Subscriber::TOPIC_INITIAL_VERSION) {
-        int64_t topic_size = topic.total_key_size_bytes() - deleted_key_size_bytes
-            + topic.total_value_size_bytes();
         VLOG_QUERY << "Preparing initial " << topic_delta.topic_name
                    << " topic update for " << subscriber.id() << ". Size = "
                    << PrettyPrinter::Print(topic_size, TUnit::BYTES);

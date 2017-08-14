@@ -45,7 +45,6 @@ import org.apache.hadoop.hive.metastore.api.ResourceType;
 import org.apache.hadoop.hive.metastore.api.ResourceUri;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.hive.ql.exec.FunctionUtils;
-import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.authorization.SentryConfig;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.FileSystemUtil;
@@ -59,7 +58,7 @@ import org.apache.impala.thrift.TCatalog;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TFunction;
-import org.apache.impala.thrift.TGetAllCatalogObjectsResponse;
+import org.apache.impala.thrift.TGetCatalogDeltaResponse;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TTable;
@@ -150,6 +149,9 @@ public class CatalogServiceCatalog extends Catalog {
   // Local temporary directory to copy UDF Jars.
   private static String localLibraryPath_;
 
+  // Log of deleted catalog objects.
+  private final CatalogDeltaLog deleteLog_;
+
   /**
    * Initialize the CatalogServiceCatalog. If 'loadInBackground' is true, table metadata
    * will be loaded in the background. 'initialHmsCnxnTimeoutSec' specifies the time (in
@@ -180,6 +182,7 @@ public class CatalogServiceCatalog extends Catalog {
       sentryProxy_ = null;
     }
     localLibraryPath_ = new String("file://" + localLibraryPath);
+    deleteLog_ = new CatalogDeltaLog();
   }
 
   // Timeout for acquiring a table lock
@@ -266,8 +269,15 @@ public class CatalogServiceCatalog extends Catalog {
         }
         // Remove dropped cache pools.
         for (String cachePoolName: droppedCachePoolNames) {
-          hdfsCachePools_.remove(cachePoolName);
-          CatalogServiceCatalog.this.incrementAndGetCatalogVersion();
+          HdfsCachePool cachePool = hdfsCachePools_.remove(cachePoolName);
+          if (cachePool != null) {
+            cachePool.setCatalogVersion(incrementAndGetCatalogVersion());
+            TCatalogObject removedObject =
+                new TCatalogObject(TCatalogObjectType.HDFS_CACHE_POOL,
+                    cachePool.getCatalogVersion());
+            removedObject.setCache_pool(cachePool.toThrift());
+            deleteLog_.addRemovedObject(removedObject);
+          }
         }
       } finally {
         catalogLock_.writeLock().unlock();
@@ -297,99 +307,14 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Returns all known objects in the Catalog (Tables, Views, Databases, and
-   * Functions). Some metadata may be skipped for objects that have a catalog
-   * version < the specified "fromVersion". Takes a lock on the catalog to ensure this
-   * update contains a consistent snapshot of all items in the catalog. While holding the
-   * catalog lock, it locks each accessed table to protect against concurrent
-   * modifications.
+   * Computes and returns a delta of catalog objects relative to 'fromVersion'. Takes a
+   * lock on the catalog to ensure this update contains a consistent snapshot of the
+   * catalog.
    */
-  public TGetAllCatalogObjectsResponse getCatalogObjects(long fromVersion) {
-    TGetAllCatalogObjectsResponse resp = new TGetAllCatalogObjectsResponse();
-    resp.setObjects(new ArrayList<TCatalogObject>());
-    resp.setMax_catalog_version(Catalog.INITIAL_CATALOG_VERSION);
+  public TGetCatalogDeltaResponse getCatalogDelta(long fromVersion) {
     catalogLock_.readLock().lock();
     try {
-      for (Db db: getDbs(PatternMatcher.MATCHER_MATCH_ALL)) {
-        TCatalogObject catalogDb = new TCatalogObject(TCatalogObjectType.DATABASE,
-            db.getCatalogVersion());
-        catalogDb.setDb(db.toThrift());
-        resp.addToObjects(catalogDb);
-
-        for (String tblName: db.getAllTableNames()) {
-          TCatalogObject catalogTbl = new TCatalogObject(TCatalogObjectType.TABLE,
-              Catalog.INITIAL_CATALOG_VERSION);
-
-          Table tbl = db.getTable(tblName);
-          if (tbl == null) {
-            LOG.error("Table: " + tblName + " was expected to be in the catalog " +
-                "cache. Skipping table for this update.");
-            continue;
-          }
-
-          // Protect the table from concurrent modifications.
-          tbl.getLock().lock();
-          try {
-            // Only add the extended metadata if this table's version is >=
-            // the fromVersion.
-            if (tbl.getCatalogVersion() >= fromVersion) {
-              try {
-                catalogTbl.setTable(tbl.toThrift());
-              } catch (Exception e) {
-                if (LOG.isTraceEnabled()) {
-                  LOG.trace(String.format("Error calling toThrift() on table %s.%s: %s",
-                      db.getName(), tblName, e.getMessage()), e);
-                }
-                continue;
-              }
-              catalogTbl.setCatalog_version(tbl.getCatalogVersion());
-            } else {
-              catalogTbl.setTable(new TTable(db.getName(), tblName));
-            }
-          } finally {
-            tbl.getLock().unlock();
-          }
-          resp.addToObjects(catalogTbl);
-        }
-
-        for (Function fn: db.getFunctions(null, new PatternMatcher())) {
-          TCatalogObject function = new TCatalogObject(TCatalogObjectType.FUNCTION,
-              fn.getCatalogVersion());
-          function.setFn(fn.toThrift());
-          resp.addToObjects(function);
-        }
-      }
-
-      for (DataSource dataSource: getDataSources()) {
-        TCatalogObject catalogObj = new TCatalogObject(TCatalogObjectType.DATA_SOURCE,
-            dataSource.getCatalogVersion());
-        catalogObj.setData_source(dataSource.toThrift());
-        resp.addToObjects(catalogObj);
-      }
-      for (HdfsCachePool cachePool: hdfsCachePools_) {
-        TCatalogObject pool = new TCatalogObject(TCatalogObjectType.HDFS_CACHE_POOL,
-            cachePool.getCatalogVersion());
-        pool.setCache_pool(cachePool.toThrift());
-        resp.addToObjects(pool);
-      }
-
-      // Get all roles
-      for (Role role: authPolicy_.getAllRoles()) {
-        TCatalogObject thriftRole = new TCatalogObject();
-        thriftRole.setRole(role.toThrift());
-        thriftRole.setCatalog_version(role.getCatalogVersion());
-        thriftRole.setType(role.getCatalogObjectType());
-        resp.addToObjects(thriftRole);
-
-        for (RolePrivilege p: role.getPrivileges()) {
-          TCatalogObject privilege = new TCatalogObject();
-          privilege.setPrivilege(p.toThrift());
-          privilege.setCatalog_version(p.getCatalogVersion());
-          privilege.setType(p.getCatalogObjectType());
-          resp.addToObjects(privilege);
-        }
-      }
-
+      TGetCatalogDeltaResponse resp = getCatalogObjects(fromVersion);
       // Each update should contain a single "TCatalog" object which is used to
       // pass overall state on the catalog, such as the current version and the
       // catalog service id.
@@ -398,16 +323,124 @@ public class CatalogServiceCatalog extends Catalog {
       // By setting the catalog version to the latest catalog version at this point,
       // it ensure impalads will always bump their versions, even in the case where
       // an object has been dropped.
-      catalog.setCatalog_version(getCatalogVersion());
+      long currentCatalogVersion = getCatalogVersion();
+      catalog.setCatalog_version(currentCatalogVersion);
       catalog.setCatalog(new TCatalog(catalogServiceId_));
-      resp.addToObjects(catalog);
+      resp.addToUpdated_objects(catalog);
 
       // The max version is the max catalog version of all items in the update.
-      resp.setMax_catalog_version(getCatalogVersion());
+      resp.setMax_catalog_version(currentCatalogVersion);
+      deleteLog_.garbageCollect(currentCatalogVersion);
       return resp;
     } finally {
       catalogLock_.readLock().unlock();
     }
+  }
+
+  /**
+   * Identify and return the catalog objects that were added/modified/deleted in the
+   * catalog with versions > 'fromVersion'. The caller of this function must hold the
+   * catalog read lock to prevent concurrent modifications of the catalog.
+   */
+  private TGetCatalogDeltaResponse getCatalogObjects(long fromVersion) {
+    TGetCatalogDeltaResponse resp = new TGetCatalogDeltaResponse();
+    resp.setUpdated_objects(new ArrayList<TCatalogObject>());
+    resp.setDeleted_objects(new ArrayList<TCatalogObject>());
+    resp.setMax_catalog_version(Catalog.INITIAL_CATALOG_VERSION);
+
+    // process databases
+    for (Db db: getDbs(PatternMatcher.MATCHER_MATCH_ALL)) {
+      if (db.getCatalogVersion() > fromVersion) {
+        TCatalogObject catalogDb = new TCatalogObject(TCatalogObjectType.DATABASE,
+            db.getCatalogVersion());
+        catalogDb.setDb(db.toThrift());
+        resp.addToUpdated_objects(catalogDb);
+      }
+      // process tables
+      for (Table tbl: db.getTables()) {
+        TCatalogObject catalogTbl = new TCatalogObject(TCatalogObjectType.TABLE,
+            Catalog.INITIAL_CATALOG_VERSION);
+        // Protect the table from concurrent modifications.
+        tbl.getLock().lock();
+        try {
+          // Only add the extended metadata if this table's version is > fromVersion.
+          if (tbl.getCatalogVersion() > fromVersion) {
+            try {
+              catalogTbl.setTable(tbl.toThrift());
+            } catch (Exception e) {
+              if (LOG.isDebugEnabled()) {
+                LOG.debug(String.format("Error calling toThrift() on table %s: %s",
+                    tbl.getFullName(), e.getMessage()), e);
+              }
+              continue;
+            }
+            catalogTbl.setCatalog_version(tbl.getCatalogVersion());
+            resp.addToUpdated_objects(catalogTbl);
+          }
+        } finally {
+          tbl.getLock().unlock();
+        }
+      }
+      // process functions
+      for (Function fn: db.getFunctions(null, new PatternMatcher())) {
+        if (fn.getCatalogVersion() <= fromVersion) continue;
+        TCatalogObject function = new TCatalogObject(TCatalogObjectType.FUNCTION,
+            fn.getCatalogVersion());
+        function.setFn(fn.toThrift());
+        resp.addToUpdated_objects(function);
+      }
+    }
+    // process data sources
+    for (DataSource dataSource: getDataSources()) {
+      if (dataSource.getCatalogVersion() <= fromVersion) continue;
+      TCatalogObject catalogObj = new TCatalogObject(TCatalogObjectType.DATA_SOURCE,
+          dataSource.getCatalogVersion());
+      catalogObj.setData_source(dataSource.toThrift());
+      resp.addToUpdated_objects(catalogObj);
+    }
+    // process cache pools
+    for (HdfsCachePool cachePool: hdfsCachePools_) {
+      if (cachePool.getCatalogVersion() <= fromVersion) continue;
+      TCatalogObject pool = new TCatalogObject(TCatalogObjectType.HDFS_CACHE_POOL,
+          cachePool.getCatalogVersion());
+      pool.setCache_pool(cachePool.toThrift());
+      resp.addToUpdated_objects(pool);
+    }
+    // process roles and privileges
+    for (Role role: authPolicy_.getAllRoles()) {
+      if (role.getCatalogVersion() > fromVersion) {
+        TCatalogObject thriftRole = new TCatalogObject();
+        thriftRole.setRole(role.toThrift());
+        thriftRole.setCatalog_version(role.getCatalogVersion());
+        thriftRole.setType(role.getCatalogObjectType());
+        resp.addToUpdated_objects(thriftRole);
+      }
+
+      for (RolePrivilege p: role.getPrivileges()) {
+        if (p.getCatalogVersion() <= fromVersion) continue;
+        TCatalogObject privilege = new TCatalogObject();
+        privilege.setPrivilege(p.toThrift());
+        privilege.setCatalog_version(p.getCatalogVersion());
+        privilege.setType(p.getCatalogObjectType());
+        resp.addToUpdated_objects(privilege);
+      }
+    }
+
+    Set<String> updatedCatalogObjects = Sets.newHashSet();
+    for (TCatalogObject catalogObj: resp.updated_objects) {
+      updatedCatalogObjects.add(CatalogDeltaLog.toCatalogObjectKey(catalogObj));
+    }
+
+    // Identify the catalog objects that were removed from the catalog for which the
+    // version is > 'fromVersion'. We need to make sure that we don't include "deleted"
+    // objects that were re-added to the catalog.
+    for (TCatalogObject removedObject: deleteLog_.retrieveObjects(fromVersion)) {
+      if (!updatedCatalogObjects.contains(CatalogDeltaLog.toCatalogObjectKey(
+          removedObject))) {
+        resp.addToDeleted_objects(removedObject);
+      }
+    }
+    return resp;
   }
 
   /**
@@ -710,6 +743,40 @@ public class CatalogServiceCatalog extends Catalog {
           tblsToBackgroundLoad.add(new TTableName(dbName, tableName.toLowerCase()));
         }
       }
+
+      if (existingDb != null) {
+        // Identify any removed functions and add them to the delta log.
+        for (Map.Entry<String, List<Function>> e:
+             existingDb.getAllFunctions().entrySet()) {
+          for (Function fn: e.getValue()) {
+            if (newDb.getFunction(fn,
+                Function.CompareMode.IS_INDISTINGUISHABLE) == null) {
+              fn.setCatalogVersion(incrementAndGetCatalogVersion());
+              TCatalogObject removedObject =
+                  new TCatalogObject(TCatalogObjectType.FUNCTION, fn.getCatalogVersion());
+              removedObject.setFn(fn.toThrift());
+              deleteLog_.addRemovedObject(removedObject);
+            }
+          }
+        }
+
+        // Identify any deleted tables and add them to the delta log
+        Set<String> oldTableNames = Sets.newHashSet(existingDb.getAllTableNames());
+        Set<String> newTableNames = Sets.newHashSet(newDb.getAllTableNames());
+        oldTableNames.removeAll(newTableNames);
+        for (String removedTableName: oldTableNames) {
+          Table removedTable = IncompleteTable.createUninitializedTable(existingDb,
+              removedTableName);
+          removedTable.setCatalogVersion(incrementAndGetCatalogVersion());
+          TCatalogObject removedObject =
+              new TCatalogObject(TCatalogObjectType.TABLE,
+                  removedTable.getCatalogVersion());
+          removedObject.setTable(new TTable());
+          removedObject.getTable().setDb_name(existingDb.getName());
+          removedObject.getTable().setTbl_name(removedTableName);
+          deleteLog_.addRemovedObject(removedObject);
+        }
+      }
       return Pair.create(newDb, tblsToBackgroundLoad);
     } catch (Exception e) {
       LOG.warn("Encountered an exception while invalidating database: " + dbName +
@@ -757,6 +824,22 @@ public class CatalogServiceCatalog extends Catalog {
         }
       }
       dbCache_.set(newDbCache);
+
+      // Identify any deleted databases and add them to the delta log.
+      Set<String> oldDbNames = oldDbCache.keySet();
+      Set<String> newDbNames = newDbCache.keySet();
+      oldDbNames.removeAll(newDbNames);
+      for (String dbName: oldDbNames) {
+        Db removedDb = oldDbCache.get(dbName);
+        Preconditions.checkNotNull(removedDb);
+        removedDb.setCatalogVersion(
+            CatalogServiceCatalog.this.incrementAndGetCatalogVersion());
+        TCatalogObject removedObject = new TCatalogObject(TCatalogObjectType.DATABASE,
+            removedDb.getCatalogVersion());
+        removedObject.setDb(removedDb.toThrift());
+        deleteLog_.addRemovedObject(removedObject);
+      }
+
       // Submit tables for background loading.
       for (TTableName tblName: tblsToBackgroundLoad) {
         tableLoadingMgr_.backgroundLoad(tblName);
@@ -1359,4 +1442,6 @@ public class CatalogServiceCatalog extends Catalog {
       tbl.getLock().unlock();
     }
   }
+
+  public CatalogDeltaLog getDeleteLog() { return deleteLog_; }
 }
