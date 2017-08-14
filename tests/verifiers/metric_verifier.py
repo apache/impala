@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-# Verfier for common impalad metrics
+# Verifier for common impalad metrics
 
 # List of metrics that should be equal to zero when there are no outstanding queries.
 METRIC_LIST = [
@@ -30,6 +30,10 @@ METRIC_LIST = [
                "impala-server.num-files-open-for-insert",
                # Disable checking of num-missing-volume-id due to IMPALA-467
                # "impala-server.scan-ranges.num-missing-volume-id",
+               # Buffer pool pages belong to specific queries. Therefore there should be
+               # no clean pages if there are no queries running.
+               "buffer-pool.clean-pages",
+               "buffer-pool.clean-page-bytes"
                ]
 
 class MetricVerifier(object):

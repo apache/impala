@@ -19,6 +19,8 @@ import pytest
 import threading
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_test_suite import LOG
+from tests.verifiers.metric_verifier import MetricVerifier
 
 class TestMemReservations(CustomClusterTestSuite):
   """Tests for memory reservations that require custom cluster arguments."""
@@ -28,7 +30,8 @@ class TestMemReservations(CustomClusterTestSuite):
     return 'functional-query'
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(impalad_args="--buffer_pool_limit=2g")
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--buffer_pool_limit=2g --memory_maintenance_sleep_time_ms=100")
   def test_per_backend_min_reservation(self, vector):
     """Tests that the per-backend minimum reservations are used (IMPALA-4833).
        The test sets the buffer_pool_limit very low (2gb), and then runs a query against
@@ -37,12 +40,15 @@ class TestMemReservations(CustomClusterTestSuite):
        per-backend minimum reservations are not used, then one of the queries fails to
        acquire its minimum reservation. This was verified to fail before IMPALA-4833, and
        succeeds after.
+
+       Memory maintenance sleep time is set low so we can verify that buffers are
+       released.
     """
     assert len(self.cluster.impalads) == 3
 
     # This query will have scan fragments on all nodes, but the coordinator fragment
     # has 6 analytic nodes, 5 sort nodes, and an aggregation.
-    QUERY = """
+    COORDINATOR_QUERY = """
     select max(t.c1), avg(t.c2), min(t.c3), avg(c4), avg(c5), avg(c6)
     from (select
         max(tinyint_col) over (order by int_col) c1,
@@ -54,15 +60,22 @@ class TestMemReservations(CustomClusterTestSuite):
         from functional.alltypes) t;
         """
 
-    # Set the DEFAULT_SPILLABLE_BUFFER_SIZE and MIN_SPILLABLE_BUFFER_SIZE to 64MiB
-    # so that the coordinator node requires ~1.2gb and the other backends require ~200mb.
+    # This query has two grouping aggregations on each node.
+    SYMMETRIC_QUERY = """
+    select count(*)
+    from (select distinct * from functional.alltypes) v"""
+
+    # Set the DEFAULT_SPILLABLE_BUFFER_SIZE and MIN_SPILLABLE_BUFFER_SIZE to 64MiB.
+    # so that for COORDINATOR_QUERY, the coordinator node requires ~1.2gb and the
+    # other backends require ~200mb and for SYMMETRIC_QUERY all backends require
+    # ~1.05gb.
     CONFIG_MAP = {'DEFAULT_SPILLABLE_BUFFER_SIZE': '67108864',
                   'MIN_SPILLABLE_BUFFER_SIZE': '67108864'}
 
-    # Create two threads to submit QUERY to two different coordinators concurrently.
     class QuerySubmitThread(threading.Thread):
-      def __init__(self, coordinator):
+      def __init__(self, query, coordinator):
         super(QuerySubmitThread, self).__init__()
+        self.query = query
         self.coordinator = coordinator
         self.error = None
 
@@ -71,7 +84,7 @@ class TestMemReservations(CustomClusterTestSuite):
         try:
           client.set_configuration(CONFIG_MAP)
           for i in xrange(20):
-            result = client.execute(QUERY)
+            result = client.execute(self.query)
             assert result.success
             assert len(result.data) == 1
         except Exception, e:
@@ -79,8 +92,34 @@ class TestMemReservations(CustomClusterTestSuite):
         finally:
           client.close()
 
-    threads = [QuerySubmitThread(self.cluster.impalads[i]) for i in xrange(2)]
+    # Create two threads to submit COORDINATOR_QUERY to two different coordinators concurrently.
+    # They should both succeed.
+    threads = [QuerySubmitThread(COORDINATOR_QUERY, self.cluster.impalads[i])
+              for i in xrange(2)]
     for t in threads: t.start()
     for t in threads:
       t.join()
       assert t.error is None
+
+    # Create two threads to submit COORDINATOR_QUERY to one coordinator and
+    # SYMMETRIC_QUERY to another coordinator. One of the queries should fail because
+    # memory would be overcommitted on daemon 0.
+    threads = [QuerySubmitThread(COORDINATOR_QUERY, self.cluster.impalads[0]),
+               QuerySubmitThread(SYMMETRIC_QUERY, self.cluster.impalads[1])]
+    for t in threads: t.start()
+    num_errors = 0
+    for t in threads:
+      t.join()
+      if t.error is not None:
+        assert "Failed to get minimum memory reservation" in t.error
+        LOG.info("Query failed with error: %s", t.error)
+        LOG.info(t.query)
+        num_errors += 1
+    assert num_errors == 1
+
+    # Check that free buffers are released over time. We set the memory maintenance sleep
+    # time very low above so this should happen quickly.
+    verifiers = [MetricVerifier(i.service) for i in self.cluster.impalads]
+    for v in verifiers:
+      v.wait_for_metric("buffer-pool.free-buffers", 0, timeout=60)
+      v.wait_for_metric("buffer-pool.free-buffer-bytes", 0, timeout=60)
