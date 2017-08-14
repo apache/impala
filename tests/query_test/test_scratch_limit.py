@@ -47,9 +47,9 @@ class TestScratchLimit(ImpalaTestSuite):
   spilling_queries = [spilling_sort_query, spilling_agg_query, spilling_join_query,
       spilling_analytic_query]
 
-  # Block manager memory limit that is low enough to
-  # force Impala to spill to disk when executing 'spilling_sort_query'
-  buffer_pool_limit = "64m"
+  # Buffer pool limit that is low enough to force Impala to spill to disk when executing
+  # spill_query.
+  buffer_pool_limit = "32m"
 
   @classmethod
   def get_workload(self):
