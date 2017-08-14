@@ -421,56 +421,59 @@ enum TCatalogOpType {
 struct TCatalogOpRequest {
   1: required TCatalogOpType op_type
 
+  // True if SYNC_DDL is used in the query options
+  2: required bool sync_ddl
+
   // Parameters for USE commands
-  2: optional TUseDbParams use_db_params
+  3: optional TUseDbParams use_db_params
 
   // Parameters for DESCRIBE DATABASE db commands
-  17: optional TDescribeDbParams describe_db_params
+  4: optional TDescribeDbParams describe_db_params
 
   // Parameters for DESCRIBE table commands
-  3: optional TDescribeTableParams describe_table_params
+  5: optional TDescribeTableParams describe_table_params
 
   // Parameters for SHOW DATABASES
-  4: optional TShowDbsParams show_dbs_params
+  6: optional TShowDbsParams show_dbs_params
 
   // Parameters for SHOW TABLES
-  5: optional TShowTablesParams show_tables_params
+  7: optional TShowTablesParams show_tables_params
 
   // Parameters for SHOW FUNCTIONS
-  6: optional TShowFunctionsParams show_fns_params
+  8: optional TShowFunctionsParams show_fns_params
 
   // Parameters for SHOW DATA SOURCES
-  11: optional TShowDataSrcsParams show_data_srcs_params
+  9: optional TShowDataSrcsParams show_data_srcs_params
 
   // Parameters for SHOW ROLES
-  12: optional TShowRolesParams show_roles_params
+  10: optional TShowRolesParams show_roles_params
 
   // Parameters for SHOW GRANT ROLE
-  13: optional TShowGrantRoleParams show_grant_role_params
+  11: optional TShowGrantRoleParams show_grant_role_params
 
   // Parameters for DDL requests executed using the CatalogServer
   // such as CREATE, ALTER, and DROP. See CatalogService.TDdlExecRequest
   // for details.
-  7: optional CatalogService.TDdlExecRequest ddl_params
+  12: optional CatalogService.TDdlExecRequest ddl_params
 
   // Parameters for RESET/INVALIDATE METADATA, executed using the CatalogServer.
   // See CatalogService.TResetMetadataRequest for more details.
-  8: optional CatalogService.TResetMetadataRequest reset_metadata_params
+  13: optional CatalogService.TResetMetadataRequest reset_metadata_params
 
   // Parameters for SHOW TABLE/COLUMN STATS
-  9: optional TShowStatsParams show_stats_params
+  14: optional TShowStatsParams show_stats_params
 
   // Parameters for SHOW CREATE TABLE
-  10: optional CatalogObjects.TTableName show_create_table_params
+  15: optional CatalogObjects.TTableName show_create_table_params
 
   // Parameters for SHOW FILES
-  14: optional TShowFilesParams show_files_params
+  16: optional TShowFilesParams show_files_params
 
   // Column lineage graph
-  15: optional LineageGraph.TLineageGraph lineage_graph
+  17: optional LineageGraph.TLineageGraph lineage_graph
 
   // Parameters for SHOW_CREATE_FUNCTION
-  16: optional TGetFunctionsParams show_create_function_params
+  18: optional TGetFunctionsParams show_create_function_params
 }
 
 // Parameters for the SET query option command
@@ -661,6 +664,9 @@ struct TUpdateCatalogCacheRequest {
 struct TUpdateCatalogCacheResponse {
   // The catalog service id this version is from.
   1: required Types.TUniqueId catalog_service_id
+
+  // The minimum catalog object version after CatalogUpdate() was processed.
+  2: required i64 min_catalog_object_version
 }
 
 // Sent from the impalad BE to FE with the latest cluster membership snapshot resulting

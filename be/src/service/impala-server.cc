@@ -1327,10 +1327,10 @@ void ImpalaServer::CatalogUpdateCallback(
   if (topic == incoming_topic_deltas.end()) return;
   const TTopicDelta& delta = topic->second;
 
-
   // Update catalog cache in frontend. An update is split into batches of size
   // MAX_CATALOG_UPDATE_BATCH_SIZE_BYTES each for multiple updates. IMPALA-3499
-  if (delta.topic_entries.size() != 0 || delta.topic_deletions.size() != 0)  {
+  if (delta.topic_entries.size() != 0)  {
+    vector<TCatalogObject> dropped_objects;
     vector<TUpdateCatalogCacheRequest> update_reqs;
     update_reqs.push_back(TUpdateCatalogCacheRequest());
     TUpdateCatalogCacheRequest* incremental_request = &update_reqs.back();
@@ -1340,7 +1340,6 @@ void ImpalaServer::CatalogUpdateCallback(
     int64_t new_catalog_version = catalog_update_info_.catalog_version;
     uint64_t batch_size_bytes = 0;
     for (const TTopicItem& item: delta.topic_entries) {
-      TCatalogObject catalog_object;
       Status status;
       vector<uint8_t> data_buffer;
       const uint8_t* data_buffer_ptr = nullptr;
@@ -1358,82 +1357,70 @@ void ImpalaServer::CatalogUpdateCallback(
         data_buffer_ptr = reinterpret_cast<const uint8_t*>(item.value.data());
         len = item.value.size();
       }
+      if (len > 100 * 1024 * 1024 /* 100MB */) {
+        LOG(INFO) << "Received large catalog object(>100mb): "
+            << item.key << " is "
+            << PrettyPrinter::Print(len, TUnit::BYTES);
+      }
+      TCatalogObject catalog_object;
       status = DeserializeThriftMsg(data_buffer_ptr, &len, FLAGS_compact_catalog_topic,
           &catalog_object);
       if (!status.ok()) {
         LOG(ERROR) << "Error deserializing item " << item.key
-                   << ": " << status.GetDetail();
+            << ": " << status.GetDetail();
         continue;
       }
-      if (len > 100 * 1024 * 1024 /* 100MB */) {
-        LOG(INFO) << "Received large catalog update(>100mb): "
-                     << item.key << " is "
-                     << PrettyPrinter::Print(len, TUnit::BYTES);
+
+      if (batch_size_bytes + len > MAX_CATALOG_UPDATE_BATCH_SIZE_BYTES) {
+        // Initialize a new batch of catalog updates.
+        update_reqs.push_back(TUpdateCatalogCacheRequest());
+        incremental_request = &update_reqs.back();
+        batch_size_bytes = 0;
       }
+
       if (catalog_object.type == TCatalogObjectType::CATALOG) {
         incremental_request->__set_catalog_service_id(
             catalog_object.catalog.catalog_service_id);
         new_catalog_version = catalog_object.catalog_version;
       }
+      VLOG(3) << (item.deleted ? "Deleted " : "Added ") << "item: " << item.key
+          << " version: " << catalog_object.catalog_version << " of size: " << len;
 
-      // Refresh the lib cache entries of any added functions and data sources
-      // TODO: if frontend returns the list of functions and data sources, we do not
-      // need to deserialize these in backend.
-      if (catalog_object.type == TCatalogObjectType::FUNCTION) {
-        DCHECK(catalog_object.__isset.fn);
-        LibCache::instance()->SetNeedsRefresh(catalog_object.fn.hdfs_location);
-      }
-      if (catalog_object.type == TCatalogObjectType::DATA_SOURCE) {
-        DCHECK(catalog_object.__isset.data_source);
-        LibCache::instance()->SetNeedsRefresh(catalog_object.data_source.hdfs_location);
-      }
-
-      if (batch_size_bytes + len > MAX_CATALOG_UPDATE_BATCH_SIZE_BYTES) {
-        update_reqs.push_back(TUpdateCatalogCacheRequest());
-        incremental_request = &update_reqs.back();
-        batch_size_bytes = 0;
-      }
-      incremental_request->updated_objects.push_back(catalog_object);
-      batch_size_bytes += len;
-    }
-    update_reqs.push_back(TUpdateCatalogCacheRequest());
-    TUpdateCatalogCacheRequest* deletion_request = &update_reqs.back();
-
-    // We need to look up the dropped functions and data sources and remove them
-    // from the library cache. The data sent from the catalog service does not
-    // contain all the function metadata so we'll ask our local frontend for it. We
-    // need to do this before updating the catalog.
-    vector<TCatalogObject> dropped_objects;
-
-    // Process all Catalog deletions (dropped objects). We only know the keys (object
-    // names) so must parse each key to determine the TCatalogObject.
-    for (const string& key: delta.topic_deletions) {
-      LOG(INFO) << "Catalog topic entry deletion: " << key;
-      TCatalogObject catalog_object;
-      Status status = TCatalogObjectFromEntryKey(key, &catalog_object);
-      if (!status.ok()) {
-        LOG(ERROR) << "Error parsing catalog topic entry deletion key: " << key << " "
-                   << "Error: " << status.GetDetail();
-        continue;
-      }
-      deletion_request->removed_objects.push_back(catalog_object);
-      if (catalog_object.type == TCatalogObjectType::FUNCTION ||
-          catalog_object.type == TCatalogObjectType::DATA_SOURCE) {
-        TCatalogObject dropped_object;
-        if (exec_env_->frontend()->GetCatalogObject(
-                catalog_object, &dropped_object).ok()) {
-          // This object may have been dropped and re-created. To avoid removing the
-          // re-created object's entry from the cache verify the existing object has a
-          // catalog version <= the catalog version included in this statestore heartbeat.
-          if (dropped_object.catalog_version <= new_catalog_version) {
-            if (catalog_object.type == TCatalogObjectType::FUNCTION ||
-                catalog_object.type == TCatalogObjectType::DATA_SOURCE) {
-              dropped_objects.push_back(dropped_object);
+      if (!item.deleted) {
+        // Refresh the lib cache entries of any added functions and data sources
+        // TODO: if frontend returns the list of functions and data sources, we do not
+        // need to deserialize these in backend.
+        if (catalog_object.type == TCatalogObjectType::FUNCTION) {
+          DCHECK(catalog_object.__isset.fn);
+          LibCache::instance()->SetNeedsRefresh(catalog_object.fn.hdfs_location);
+        }
+        if (catalog_object.type == TCatalogObjectType::DATA_SOURCE) {
+          DCHECK(catalog_object.__isset.data_source);
+          LibCache::instance()->SetNeedsRefresh(catalog_object.data_source.hdfs_location);
+        }
+        incremental_request->updated_objects.push_back(catalog_object);
+      } else {
+        // We need to look up any dropped functions and data sources and remove
+        // them from the library cache.
+        if (catalog_object.type == TCatalogObjectType::FUNCTION ||
+            catalog_object.type == TCatalogObjectType::DATA_SOURCE) {
+          TCatalogObject existing_object;
+          if (exec_env_->frontend()->GetCatalogObject(
+              catalog_object, &existing_object).ok()) {
+            // If the object exists in the catalog it may have been dropped and
+            // re-created. To avoid removing the re-created object's entry from
+            // the cache verify that the existing object's version <= the
+            // version of the dropped object included in this statestore
+            // heartbeat.
+            DCHECK_NE(existing_object.catalog_version, catalog_object.catalog_version);
+            if (existing_object.catalog_version < catalog_object.catalog_version) {
+              dropped_objects.push_back(existing_object);
             }
           }
         }
-        // Nothing to do in error case.
+        incremental_request->removed_objects.push_back(catalog_object);
       }
+      batch_size_bytes += len;
     }
 
     // Call the FE to apply the changes to the Impalad Catalog.
@@ -1456,6 +1443,9 @@ void ImpalaServer::CatalogUpdateCallback(
         catalog_update_info_.catalog_version = new_catalog_version;
         catalog_update_info_.catalog_topic_version = delta.to_version;
         catalog_update_info_.catalog_service_id = resp.catalog_service_id;
+        catalog_update_info_.min_catalog_object_version = resp.min_catalog_object_version;
+        LOG(INFO) << "Catalog topic update applied with version: " << new_catalog_version
+            << " new min catalog object version: " << resp.min_catalog_object_version;
       }
       ImpaladMetrics::CATALOG_READY->set_value(new_catalog_version > 0);
       // TODO: deal with an error status
@@ -1482,13 +1472,89 @@ void ImpalaServer::CatalogUpdateCallback(
   catalog_version_update_cv_.NotifyAll();
 }
 
+void ImpalaServer::WaitForCatalogUpdate(const int64_t catalog_update_version,
+    const TUniqueId& catalog_service_id) {
+  unique_lock<mutex> unique_lock(catalog_version_lock_);
+  // Wait for the update to be processed locally.
+  VLOG_QUERY << "Waiting for catalog version: " << catalog_update_version
+             << " current version: " << catalog_update_info_.catalog_version;
+  while (catalog_update_info_.catalog_version < catalog_update_version &&
+         catalog_update_info_.catalog_service_id == catalog_service_id) {
+    catalog_version_update_cv_.Wait(unique_lock);
+  }
+
+  if (catalog_update_info_.catalog_service_id != catalog_service_id) {
+    VLOG_QUERY << "Detected change in catalog service ID";
+  } else {
+    VLOG_QUERY << "Received catalog version: " << catalog_update_version;
+  }
+}
+
+void ImpalaServer::WaitForCatalogUpdateTopicPropagation(
+    const TUniqueId& catalog_service_id) {
+  unique_lock<mutex> unique_lock(catalog_version_lock_);
+  int64_t min_req_subscriber_topic_version =
+      catalog_update_info_.catalog_topic_version;
+  VLOG_QUERY << "Waiting for min subscriber topic version: "
+      << min_req_subscriber_topic_version << " current version: "
+      << min_subscriber_catalog_topic_version_;
+  while (min_subscriber_catalog_topic_version_ < min_req_subscriber_topic_version &&
+         catalog_update_info_.catalog_service_id == catalog_service_id) {
+    catalog_version_update_cv_.Wait(unique_lock);
+  }
+
+  if (catalog_update_info_.catalog_service_id != catalog_service_id) {
+    VLOG_QUERY << "Detected change in catalog service ID";
+  } else {
+    VLOG_QUERY << "Received min subscriber topic version: "
+        << min_req_subscriber_topic_version;
+  }
+}
+
+void ImpalaServer::WaitForMinCatalogUpdate(const int64_t min_req_catalog_object_version,
+    const TUniqueId& catalog_service_id) {
+  unique_lock<mutex> unique_lock(catalog_version_lock_);
+  int64_t min_catalog_object_version =
+      catalog_update_info_.min_catalog_object_version;
+  // TODO: Set a timeout to eventually break out of this loop is something goes
+  // wrong?
+  VLOG_QUERY << "Waiting for minimum catalog object version: "
+      << min_req_catalog_object_version << " current version: "
+      << min_catalog_object_version;
+  while (catalog_update_info_.min_catalog_object_version < min_req_catalog_object_version
+      && catalog_update_info_.catalog_service_id == catalog_service_id) {
+    catalog_version_update_cv_.Wait(unique_lock);
+  }
+
+  if (catalog_update_info_.catalog_service_id != catalog_service_id) {
+    VLOG_QUERY << "Detected change in catalog service ID";
+  } else {
+    VLOG_QUERY << "Updated minimum catalog object version: "
+        << min_req_catalog_object_version;
+  }
+}
+
 Status ImpalaServer::ProcessCatalogUpdateResult(
     const TCatalogUpdateResult& catalog_update_result, bool wait_for_all_subscribers) {
-  // If this update result contains catalog objects to add or remove, directly apply the
-  // updates to the local impalad's catalog cache. Otherwise, wait for a statestore
-  // heartbeat that contains this update version.
-  if (catalog_update_result.__isset.updated_catalog_objects ||
-      catalog_update_result.__isset.removed_catalog_objects) {
+  const TUniqueId& catalog_service_id = catalog_update_result.catalog_service_id;
+  if (!catalog_update_result.__isset.updated_catalog_objects &&
+      !catalog_update_result.__isset.removed_catalog_objects) {
+    // Operation with no result set. Use the version specified in
+    // 'catalog_update_result' to determine when the effects of this operation
+    // have been applied to the local catalog cache.
+    if (catalog_update_result.is_invalidate) {
+      WaitForMinCatalogUpdate(catalog_update_result.version, catalog_service_id);
+    } else {
+      WaitForCatalogUpdate(catalog_update_result.version, catalog_service_id);
+    }
+    if (wait_for_all_subscribers) {
+      // Now wait for this update to be propagated to all catalog topic subscribers.
+      // If we make it here it implies the first condition was met (the update was
+      // processed locally or the catalog service id has changed).
+      WaitForCatalogUpdateTopicPropagation(catalog_service_id);
+    }
+  } else {
+    // Operation with a result set.
     TUpdateCatalogCacheRequest update_req;
     update_req.__set_is_delta(true);
     update_req.__set_catalog_service_id(catalog_update_result.catalog_service_id);
@@ -1498,7 +1564,6 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
     if (catalog_update_result.__isset.removed_catalog_objects) {
       update_req.__set_removed_objects(catalog_update_result.removed_catalog_objects);
     }
-
     // Apply the changes to the local catalog cache.
     TUpdateCatalogCacheResponse resp;
     Status status = exec_env_->frontend()->UpdateCatalogCache(
@@ -1506,34 +1571,12 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     RETURN_IF_ERROR(status);
     if (!wait_for_all_subscribers) return Status::OK();
-  }
-
-  unique_lock<mutex> unique_lock(catalog_version_lock_);
-  int64_t min_req_catalog_version = catalog_update_result.version;
-  const TUniqueId& catalog_service_id = catalog_update_result.catalog_service_id;
-
-  // Wait for the update to be processed locally.
-  // TODO: What about query cancellation?
-  VLOG_QUERY << "Waiting for catalog version: " << min_req_catalog_version
-             << " current version: " << catalog_update_info_.catalog_version;
-  while (catalog_update_info_.catalog_version < min_req_catalog_version &&
-         catalog_update_info_.catalog_service_id == catalog_service_id) {
-    catalog_version_update_cv_.Wait(unique_lock);
-  }
-
-  if (!wait_for_all_subscribers) return Status::OK();
-
-  // Now wait for this update to be propagated to all catalog topic subscribers.
-  // If we make it here it implies the first condition was met (the update was processed
-  // locally or the catalog service id has changed).
-  int64_t min_req_subscriber_topic_version = catalog_update_info_.catalog_topic_version;
-
-  VLOG_QUERY << "Waiting for min subscriber topic version: "
-             << min_req_subscriber_topic_version << " current version: "
-             << min_subscriber_catalog_topic_version_;
-  while (min_subscriber_catalog_topic_version_ < min_req_subscriber_topic_version &&
-         catalog_update_info_.catalog_service_id == catalog_service_id) {
-    catalog_version_update_cv_.Wait(unique_lock);
+    // Wait until we receive and process the catalog update that covers the effects
+    // (catalog objects) of this operation.
+    WaitForCatalogUpdate(catalog_update_result.version, catalog_service_id);
+    // Now wait for this update to be propagated to all catalog topic
+    // subscribers.
+    WaitForCatalogUpdateTopicPropagation(catalog_service_id);
   }
   return Status::OK();
 }
@@ -1554,6 +1597,10 @@ void ImpalaServer::MembershipCallback(
 
     // Process membership additions.
     for (const TTopicItem& item: delta.topic_entries) {
+      if (item.deleted) {
+        known_backends_.erase(item.key);
+        continue;
+      }
       uint32_t len = item.value.size();
       TBackendDescriptor backend_descriptor;
       Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
@@ -1570,18 +1617,12 @@ void ImpalaServer::MembershipCallback(
     // Only register if all ports have been opened and are ready.
     if (services_started_.load()) AddLocalBackendToStatestore(subscriber_topic_updates);
 
-    // Process membership deletions.
-    for (const string& backend_id: delta.topic_deletions) {
-      known_backends_.erase(backend_id);
-    }
-
     // Create a set of known backend network addresses. Used to test for cluster
     // membership by network address.
     set<TNetworkAddress> current_membership;
     // Also reflect changes to the frontend. Initialized only if any_changes is true.
     TUpdateMembershipRequest update_req;
-    bool any_changes = !delta.topic_entries.empty() || !delta.topic_deletions.empty() ||
-        !delta.is_delta;
+    bool any_changes = !delta.topic_entries.empty() || !delta.is_delta;
     for (const BackendDescriptorMap::value_type& backend: known_backends_) {
       current_membership.insert(backend.second.address);
       if (any_changes) {

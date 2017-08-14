@@ -89,16 +89,20 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
 }
 
 Status CatalogOpExecutor::ExecComputeStats(
-    const TComputeStatsParams& compute_stats_params,
+    const TCatalogOpRequest& compute_stats_request,
     const TTableSchema& tbl_stats_schema, const TRowSet& tbl_stats_data,
     const TTableSchema& col_stats_schema, const TRowSet& col_stats_data) {
   // Create a new DDL request to alter the table's statistics.
   TCatalogOpRequest catalog_op_req;
   catalog_op_req.__isset.ddl_params = true;
   catalog_op_req.__set_op_type(TCatalogOpType::DDL);
+  catalog_op_req.__set_sync_ddl(compute_stats_request.sync_ddl);
   TDdlExecRequest& update_stats_req = catalog_op_req.ddl_params;
   update_stats_req.__set_ddl_type(TDdlType::ALTER_TABLE);
+  update_stats_req.__set_sync_ddl(compute_stats_request.sync_ddl);
 
+  const TComputeStatsParams& compute_stats_params =
+      compute_stats_request.ddl_params.compute_stats_params;
   TAlterTableUpdateStatsParams& update_stats_params =
       update_stats_req.alter_table_params.update_stats_params;
   update_stats_req.__isset.alter_table_params = true;

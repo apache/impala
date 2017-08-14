@@ -17,6 +17,7 @@
 
 #include "service/frontend.h"
 
+#include <jni.h>
 #include <list>
 #include <string>
 

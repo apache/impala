@@ -308,21 +308,43 @@ class ImpalaServer : public ImpalaServiceIf,
   void CatalogUpdateCallback(const StatestoreSubscriber::TopicDeltaMap& topic_deltas,
       std::vector<TTopicDelta>* topic_updates);
 
-  /// Processes a CatalogUpdateResult returned from the CatalogServer and ensures
-  /// the update has been applied to the local impalad's catalog cache. If
-  /// wait_for_all_subscribers is true, this function will also wait until all
-  /// catalog topic subscribers have processed the update. Called from ClientRequestState
-  /// after executing any statement that modifies the catalog.
-  /// If wait_for_all_subscribers is false AND if the TCatalogUpdateResult contains
-  /// TCatalogObject(s) to add and/or remove, this function will update the local cache
-  /// by directly calling UpdateCatalog() with the TCatalogObject results.
-  /// Otherwise this function will wait until the local impalad's catalog cache has been
-  /// updated from a statestore heartbeat that includes this catalog update's catalog
-  /// version. If wait_for_all_subscribers is true, this function also wait all other
-  /// catalog topic subscribers to process this update by checking the current
-  /// min_subscriber_topic_version included in each state store heartbeat.
+  /// Processes a TCatalogUpdateResult returned from the CatalogServer and ensures
+  /// the update has been applied to the local impalad's catalog cache. Called from
+  /// ClientRequestState after executing any statement that modifies the catalog.
+  ///
+  /// If TCatalogUpdateResult contains TCatalogObject(s) to add and/or remove, this
+  /// function will update the local cache by directly calling UpdateCatalog() with the
+  /// TCatalogObject results.
+  ///
+  /// If TCatalogUpdateResult does not contain any TCatalogObjects and this is
+  /// the result of an INVALIDATE METADATA operation, it waits until the minimum
+  /// catalog version in the local cache is greater than or equal to the catalog
+  /// version specified in TCatalogUpdateResult. If it is not an INVALIDATE
+  /// METADATA operation, it waits until the local impalad's catalog cache has
+  /// been updated from a statestore heartbeat that includes this catalog
+  /// update's version.
+  ///
+  /// If wait_for_all_subscribers is true, this function also
+  /// waits for all other catalog topic subscribers to process this update by checking the
+  /// current min_subscriber_topic_version included in each state store heartbeat.
   Status ProcessCatalogUpdateResult(const TCatalogUpdateResult& catalog_update_result,
       bool wait_for_all_subscribers) WARN_UNUSED_RESULT;
+
+  /// Wait until the catalog update with version 'catalog_update_version' is
+  /// received and applied in the local catalog cache or until the catalog
+  /// service id has changed.
+  void WaitForCatalogUpdate(const int64_t catalog_update_version,
+      const TUniqueId& catalog_service_id);
+
+  /// Wait until the minimum catalog object version in the local cache is
+  /// greater than or equal to 'min_catalog_update_version' or until the catalog
+  /// service id has changed.
+  void WaitForMinCatalogUpdate(const int64_t min_catalog_update_version,
+      const TUniqueId& catalog_service_id);
+
+  /// Wait until the last applied catalog update has been broadcast to
+  /// all coordinators or until the catalog service id has changed.
+  void WaitForCatalogUpdateTopicPropagation(const TUniqueId& catalog_service_id);
 
   /// Returns true if lineage logging is enabled, false otherwise.
   bool IsLineageLoggingEnabled();
@@ -961,7 +983,7 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Lock to protect uuid_generator
   boost::mutex uuid_lock_;
 
-  /// Lock for catalog_update_version_info_, min_subscriber_catalog_topic_version_,
+  /// Lock for catalog_update_version_, min_subscriber_catalog_topic_version_,
   /// and catalog_version_update_cv_
   boost::mutex catalog_version_lock_;
 
@@ -972,7 +994,8 @@ class ImpalaServer : public ImpalaServiceIf,
   struct CatalogUpdateVersionInfo {
     CatalogUpdateVersionInfo() :
       catalog_version(0L),
-      catalog_topic_version(0L) {
+      catalog_topic_version(0L),
+      min_catalog_object_version(0L) {
     }
 
     /// The last catalog version returned from UpdateCatalog()
@@ -981,6 +1004,8 @@ class ImpalaServer : public ImpalaServiceIf,
     TUniqueId catalog_service_id;
     /// The statestore catalog topic version this update was received in.
     int64_t catalog_topic_version;
+    /// Minimum catalog object version after a call to UpdateCatalog()
+    int64_t min_catalog_object_version;
   };
 
   /// The version information from the last successfull call to UpdateCatalog().

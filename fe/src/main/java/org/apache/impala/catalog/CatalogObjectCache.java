@@ -30,6 +30,8 @@ import com.google.common.collect.Lists;
 /**
  * Thread safe cache for storing CatalogObjects. Enforces that updates to existing
  * entries only get applied if the new/updated object has a larger catalog version.
+ * add() and remove() functions also update the entries of the global instance of
+ * CatalogObjectVersionQueue which keeps track of the catalog objects versions.
  */
 public class CatalogObjectCache<T extends CatalogObject> implements Iterable<T> {
   private final boolean caseInsensitiveKeys_;
@@ -71,13 +73,19 @@ public class CatalogObjectCache<T extends CatalogObject> implements Iterable<T> 
     String key = catalogObject.getName();
     if (caseInsensitiveKeys_) key = key.toLowerCase();
     T existingItem = metadataCache_.putIfAbsent(key, catalogObject);
-    if (existingItem == null) return true;
+    if (existingItem == null) {
+      CatalogObjectVersionQueue.INSTANCE.addVersion(
+          catalogObject.getCatalogVersion());
+      return true;
+    }
 
     if (existingItem.getCatalogVersion() < catalogObject.getCatalogVersion()) {
       // When existingItem != null it indicates there was already an existing entry
       // associated with the key. Add the updated object iff it has a catalog
       // version greater than the existing entry.
       metadataCache_.put(key, catalogObject);
+      CatalogObjectVersionQueue.INSTANCE.updateVersions(
+          existingItem.getCatalogVersion(), catalogObject.getCatalogVersion());
       return true;
     }
     return false;
@@ -89,7 +97,12 @@ public class CatalogObjectCache<T extends CatalogObject> implements Iterable<T> 
    */
   public synchronized T remove(String name) {
     if (caseInsensitiveKeys_) name = name.toLowerCase();
-    return metadataCache_.remove(name);
+    T removedObject = metadataCache_.remove(name);
+    if (removedObject != null) {
+      CatalogObjectVersionQueue.INSTANCE.removeVersion(
+          removedObject.getCatalogVersion());
+    }
+    return removedObject;
   }
 
   /**

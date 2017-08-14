@@ -183,12 +183,15 @@ Status ClientRequestState::Exec(TExecRequest* exec_request) {
 
       // Now refresh the table metadata.
       TCatalogOpRequest reset_req;
+      reset_req.__set_sync_ddl(exec_request_.query_options.sync_ddl);
       reset_req.__set_op_type(TCatalogOpType::RESET_METADATA);
       reset_req.__set_reset_metadata_params(TResetMetadataRequest());
       reset_req.reset_metadata_params.__set_header(TCatalogServiceRequestHeader());
       reset_req.reset_metadata_params.__set_is_refresh(true);
       reset_req.reset_metadata_params.__set_table_name(
           exec_request_.load_data_request.table_name);
+      reset_req.reset_metadata_params.__set_sync_ddl(
+          exec_request_.query_options.sync_ddl);
       catalog_op_executor_.reset(
           new CatalogOpExecutor(exec_env_, frontend_, server_profile_));
       RETURN_IF_ERROR(catalog_op_executor_->Exec(reset_req));
@@ -923,6 +926,7 @@ Status ClientRequestState::UpdateCatalog() {
   if (query_exec_request.__isset.finalize_params) {
     const TFinalizeParams& finalize_params = query_exec_request.finalize_params;
     TUpdateCatalogRequest catalog_update;
+    catalog_update.__set_sync_ddl(exec_request().query_options.sync_ddl);
     catalog_update.__set_header(TCatalogServiceRequestHeader());
     catalog_update.header.__set_requesting_user(effective_user());
     if (!coord()->PrepareCatalogUpdate(&catalog_update)) {
@@ -1078,7 +1082,7 @@ Status ClientRequestState::UpdateTableAndColumnStats(
   }
 
   Status status = catalog_op_executor_->ExecComputeStats(
-      exec_request_.catalog_op_request.ddl_params.compute_stats_params,
+      exec_request_.catalog_op_request,
       child_queries[0]->result_schema(),
       child_queries[0]->result_data(),
       col_stats_schema,

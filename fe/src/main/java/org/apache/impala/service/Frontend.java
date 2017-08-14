@@ -520,13 +520,17 @@ public class Frontend {
     } else {
       throw new IllegalStateException("Unexpected CatalogOp statement type.");
     }
-
     result.setResult_set_metadata(metadata);
+    ddl.setSync_ddl(result.getQuery_options().isSync_ddl());
     result.setCatalog_op_request(ddl);
     if (ddl.getOp_type() == TCatalogOpType.DDL) {
       TCatalogServiceRequestHeader header = new TCatalogServiceRequestHeader();
       header.setRequesting_user(analysis.getAnalyzer().getUser().getName());
       ddl.getDdl_params().setHeader(header);
+      ddl.getDdl_params().setSync_ddl(ddl.isSync_ddl());
+    }
+    if (ddl.getOp_type() == TCatalogOpType.RESET_METADATA) {
+      ddl.getReset_metadata_params().setSync_ddl(ddl.isSync_ddl());
     }
   }
 

@@ -17,27 +17,31 @@
 
 package org.apache.impala.catalog;
 
+import java.util.concurrent.atomic.AtomicLong;
+
+import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.thrift.TCatalogObjectType;
 
-/**
- * Interface that all catalog objects implement.
- */
-public interface CatalogObject {
-  // Returns the TCatalogObject type of this Catalog object.
-  public TCatalogObjectType getCatalogObjectType();
+abstract public class CatalogObjectImpl implements CatalogObject {
+  // Current catalog version of this object. Initialized to
+  // Catalog.INITIAL_CATALOG_VERSION.
+  private AtomicLong catalogVersion_ = new AtomicLong(Catalog.INITIAL_CATALOG_VERSION);
 
-  // Returns the unqualified object name.
-  public String getName();
+  protected CatalogObjectImpl() {}
 
-  // Returns the unique name of this catalog object.
-  public String getUniqueName();
+  @Override
+  public long getCatalogVersion() { return catalogVersion_.get(); }
 
-  // Returns the version of this catalog object.
-  public long getCatalogVersion();
+  @Override
+  public void setCatalogVersion(long newVersion) { catalogVersion_.set(newVersion); }
 
-  // Sets the version of this catalog object.
-  public void setCatalogVersion(long newVersion);
+  @Override
+  public boolean isLoaded() { return true; }
 
-  // Returns true if this CatalogObject has had its metadata loaded, false otherwise.
-  public boolean isLoaded();
+  @Override
+  public String getName() { return ""; }
+
+  @Override
+  public String getUniqueName() { return ""; }
 }
+

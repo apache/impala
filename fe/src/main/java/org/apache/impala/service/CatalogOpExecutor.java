@@ -179,7 +179,7 @@ import com.google.common.math.LongMath;
  * update operations and requires the use of fair table locks to prevent starvation.
  *
  *   DO {
- *     Acquire the catalog lock (see CatalogServiceCatalog.catalogLock_)
+ *     Acquire the catalog lock (see CatalogServiceCatalog.versionLock_)
  *     Try to acquire a table lock
  *     IF the table lock acquisition fails {
  *       Release the catalog lock
@@ -324,6 +324,15 @@ public class CatalogOpExecutor {
         break;
       default: throw new IllegalStateException("Unexpected DDL exec request type: " +
           ddlRequest.ddl_type);
+    }
+
+    // If SYNC_DDL is set, set the catalog update that contains the results of this DDL
+    // operation. The version of this catalog update is returned to the requesting
+    // impalad which will wait until this catalog update has been broadcast to all the
+    // coordinators.
+    if (ddlRequest.isSync_ddl()) {
+      response.getResult().setVersion(
+          catalog_.waitForSyncDdlVersion(response.getResult()));
     }
 
     // At this point, the operation is considered successful. If any errors occurred
@@ -909,12 +918,15 @@ public class CatalogOpExecutor {
     String dbName = params.getDb();
     Preconditions.checkState(dbName != null && !dbName.isEmpty(),
         "Null or empty database name passed as argument to Catalog.createDatabase");
-    if (params.if_not_exists && catalog_.getDb(dbName) != null) {
+    Db existingDb = catalog_.getDb(dbName);
+    if (params.if_not_exists && existingDb != null) {
       if (LOG.isTraceEnabled()) {
         LOG.trace("Skipping database creation because " + dbName + " already exists "
             + "and IF NOT EXISTS was specified.");
       }
-      resp.getResult().setVersion(catalog_.getCatalogVersion());
+      Preconditions.checkNotNull(existingDb);
+      resp.getResult().addToUpdated_catalog_objects(existingDb.toTCatalogObject());
+      resp.getResult().setVersion(existingDb.getCatalogVersion());
       return;
     }
     org.apache.hadoop.hive.metastore.api.Database db =
@@ -960,11 +972,7 @@ public class CatalogOpExecutor {
       }
 
       Preconditions.checkNotNull(newDb);
-      TCatalogObject thriftDb = new TCatalogObject(
-          TCatalogObjectType.DATABASE, Catalog.INITIAL_CATALOG_VERSION);
-      thriftDb.setDb(newDb.toThrift());
-      thriftDb.setCatalog_version(newDb.getCatalogVersion());
-      resp.result.addToUpdated_catalog_objects(thriftDb);
+      resp.result.addToUpdated_catalog_objects(newDb.toTCatalogObject());
     }
     resp.result.setVersion(newDb.getCatalogVersion());
   }
@@ -1038,22 +1046,18 @@ public class CatalogOpExecutor {
       throws ImpalaException {
     if (LOG.isTraceEnabled()) { LOG.trace("Adding DATA SOURCE: " + params.toString()); }
     DataSource dataSource = DataSource.fromThrift(params.getData_source());
-    if (catalog_.getDataSource(dataSource.getName()) != null) {
+    DataSource existingDataSource = catalog_.getDataSource(dataSource.getName());
+    if (existingDataSource != null) {
       if (!params.if_not_exists) {
         throw new ImpalaRuntimeException("Data source " + dataSource.getName() +
             " already exists.");
       }
-      // The user specified IF NOT EXISTS and the data source exists, just
-      // return the current catalog version.
-      resp.result.setVersion(catalog_.getCatalogVersion());
+      resp.result.addToUpdated_catalog_objects(existingDataSource.toTCatalogObject());
+      resp.result.setVersion(existingDataSource.getCatalogVersion());
       return;
     }
     catalog_.addDataSource(dataSource);
-    TCatalogObject addedObject = new TCatalogObject();
-    addedObject.setType(TCatalogObjectType.DATA_SOURCE);
-    addedObject.setData_source(dataSource.toThrift());
-    addedObject.setCatalog_version(dataSource.getCatalogVersion());
-    resp.result.addToUpdated_catalog_objects(addedObject);
+    resp.result.addToUpdated_catalog_objects(dataSource.toTCatalogObject());
     resp.result.setVersion(dataSource.getCatalogVersion());
   }
 
@@ -1070,11 +1074,7 @@ public class CatalogOpExecutor {
       resp.result.setVersion(catalog_.getCatalogVersion());
       return;
     }
-    TCatalogObject removedObject = new TCatalogObject();
-    removedObject.setType(TCatalogObjectType.DATA_SOURCE);
-    removedObject.setData_source(dataSource.toThrift());
-    removedObject.setCatalog_version(dataSource.getCatalogVersion());
-    resp.result.addToRemoved_catalog_objects(removedObject);
+    resp.result.addToRemoved_catalog_objects(dataSource.toTCatalogObject());
     resp.result.setVersion(dataSource.getCatalogVersion());
   }
 
@@ -1229,7 +1229,7 @@ public class CatalogOpExecutor {
       throw new CatalogException("Database " + db.getName() + " is not empty");
     }
 
-    TCatalogObject removedObject = new TCatalogObject();
+    TCatalogObject removedObject = null;
     synchronized (metastoreDdlLock_) {
       // Remove all the Kudu tables of 'db' from the Kudu storage engine.
       if (db != null && params.cascade) dropTablesFromKudu(db);
@@ -1251,11 +1251,9 @@ public class CatalogOpExecutor {
       for (String tableName: removedDb.getAllTableNames()) {
         uncacheTable(removedDb.getTable(tableName));
       }
-      removedObject.setCatalog_version(removedDb.getCatalogVersion());
+      removedObject = removedDb.toTCatalogObject();
     }
-    removedObject.setType(TCatalogObjectType.DATABASE);
-    removedObject.setDb(new TDatabase());
-    removedObject.getDb().setDb_name(params.getDb());
+    Preconditions.checkNotNull(removedObject);
     resp.result.setVersion(removedObject.getCatalog_version());
     resp.result.addToRemoved_catalog_objects(removedObject);
   }
@@ -1525,12 +1523,17 @@ public class CatalogOpExecutor {
     Preconditions.checkState(params.getColumns() != null,
         "Null column list given as argument to Catalog.createTable");
 
-    if (params.if_not_exists &&
-        catalog_.containsTable(tableName.getDb(), tableName.getTbl())) {
+    Table existingTbl = catalog_.getTable(tableName.getDb(), tableName.getTbl(), false);
+    if (params.if_not_exists && existingTbl != null) {
       LOG.trace(String.format("Skipping table creation because %s already exists and " +
           "IF NOT EXISTS was specified.", tableName));
-      response.getResult().setVersion(catalog_.getCatalogVersion());
-      return false;
+      existingTbl.getLock().lock();
+      try {
+        addTableToCatalogUpdate(existingTbl, response.getResult());
+        return false;
+      } finally {
+        existingTbl.getLock().unlock();
+      }
     }
     org.apache.hadoop.hive.metastore.api.Table tbl = createMetaStoreTable(params);
     LOG.trace(String.format("Creating table %s", tableName));
@@ -1736,12 +1739,17 @@ public class CatalogOpExecutor {
     Preconditions.checkState(tblName != null && tblName.isFullyQualified());
     Preconditions.checkState(srcTblName != null && srcTblName.isFullyQualified());
 
-    if (params.if_not_exists &&
-        catalog_.containsTable(tblName.getDb(), tblName.getTbl())) {
+    Table existingTbl = catalog_.getTable(tblName.getDb(), tblName.getTbl(), false);
+    if (params.if_not_exists && existingTbl != null) {
       LOG.trace(String.format("Skipping table creation because %s already exists and " +
           "IF NOT EXISTS was specified.", tblName));
-      response.getResult().setVersion(catalog_.getCatalogVersion());
-      return;
+      existingTbl.getLock().lock();
+      try {
+        addTableToCatalogUpdate(existingTbl, response.getResult());
+        return;
+      } finally {
+        existingTbl.getLock().unlock();
+      }
     }
     Table srcTable = getExistingTable(srcTblName.getDb(), srcTblName.getTbl());
     org.apache.hadoop.hive.metastore.api.Table tbl =
@@ -2185,8 +2193,9 @@ public class CatalogOpExecutor {
     }
     // Rename the table in the Catalog and get the resulting catalog object.
     // ALTER TABLE/VIEW RENAME is implemented as an ADD + DROP.
-    Table newTable = catalog_.renameTable(tableName.toThrift(), newTableName.toThrift());
-    if (newTable == null) {
+    Pair<Table, Table> result =
+        catalog_.renameTable(tableName.toThrift(), newTableName.toThrift());
+    if (result.first == null || result.second == null) {
       // The rename succeeded in the HMS but failed in the catalog cache. The cache is in
       // an inconsistent state, but can likely be fixed by running "invalidate metadata".
       throw new ImpalaRuntimeException(String.format(
@@ -2196,14 +2205,9 @@ public class CatalogOpExecutor {
           newTableName.toString()));
     }
 
-    TCatalogObject addedObject = newTable.toTCatalogObject();
-    TCatalogObject removedObject = new TCatalogObject();
-    removedObject.setType(TCatalogObjectType.TABLE);
-    removedObject.setTable(new TTable(tableName.getDb(), tableName.getTbl()));
-    removedObject.setCatalog_version(addedObject.getCatalog_version());
-    response.result.addToRemoved_catalog_objects(removedObject);
-    response.result.addToUpdated_catalog_objects(addedObject);
-    response.result.setVersion(addedObject.getCatalog_version());
+    response.result.addToRemoved_catalog_objects(result.first.toMinimalTCatalogObject());
+    response.result.addToUpdated_catalog_objects(result.second.toTCatalogObject());
+    response.result.setVersion(result.second.getCatalogVersion());
   }
 
   /**
@@ -2851,28 +2855,18 @@ public class CatalogOpExecutor {
     Preconditions.checkNotNull(rolePrivileges);
     List<TCatalogObject> updatedPrivs = Lists.newArrayList();
     for (RolePrivilege rolePriv: rolePrivileges) {
-      TCatalogObject catalogObject = new TCatalogObject();
-      catalogObject.setType(rolePriv.getCatalogObjectType());
-      catalogObject.setPrivilege(rolePriv.toThrift());
-      catalogObject.setCatalog_version(rolePriv.getCatalogVersion());
-      updatedPrivs.add(catalogObject);
+      updatedPrivs.add(rolePriv.toTCatalogObject());
     }
 
-    // TODO: Currently we only support sending back 1 catalog object in a "direct DDL"
-    // response. If multiple privileges have been updated, just send back the
-    // catalog version so subscribers can wait for the statestore heartbeat that
-    // contains all updates (see IMPALA-5571).
-    if (updatedPrivs.size() == 1) {
+    if (!updatedPrivs.isEmpty()) {
       // If this is a REVOKE statement with hasGrantOpt, only the GRANT OPTION is revoked
-      // from the privilege.
+      // from the privileges. Otherwise the privileges are removed from the catalog.
       if (grantRevokePrivParams.isIs_grant() ||
           privileges.get(0).isHas_grant_opt()) {
         resp.result.setUpdated_catalog_objects(updatedPrivs);
       } else {
         resp.result.setRemoved_catalog_objects(updatedPrivs);
       }
-      resp.result.setVersion(updatedPrivs.get(0).getCatalog_version());
-    } else if (updatedPrivs.size() > 1) {
       resp.result.setVersion(
           updatedPrivs.get(updatedPrivs.size() - 1).getCatalog_version());
     }
@@ -3027,6 +3021,9 @@ public class CatalogOpExecutor {
           resp.result.setUpdated_catalog_objects(addedFuncs);
           resp.result.setRemoved_catalog_objects(removedFuncs);
           resp.result.setVersion(catalog_.getCatalogVersion());
+          for (TCatalogObject removedFn: removedFuncs) {
+            catalog_.getDeleteLog().addRemovedObject(removedFn);
+          }
         }
       }
     } else if (req.isSetTable_name()) {
@@ -3059,26 +3056,32 @@ public class CatalogOpExecutor {
             req.getTable_name().getTable_name());
       }
 
-      if (!dbWasAdded.getRef()) {
-        // Return the TCatalogObject in the result to indicate this request can be
-        // processed as a direct DDL operation.
-        if (tblWasRemoved.getRef()) {
-          resp.getResult().addToRemoved_catalog_objects(updatedThriftTable);
-        } else {
-          resp.getResult().addToUpdated_catalog_objects(updatedThriftTable);
-        }
+      // Return the TCatalogObject in the result to indicate this request can be
+      // processed as a direct DDL operation.
+      if (tblWasRemoved.getRef()) {
+        resp.getResult().addToRemoved_catalog_objects(updatedThriftTable);
       } else {
-        // Since multiple catalog objects were modified (db and table), don't treat this
-        // as a direct DDL operation. Set the overall catalog version and the impalad
-        // will wait for a statestore heartbeat that contains the update.
-        Preconditions.checkState(!req.isIs_refresh());
+        resp.getResult().addToUpdated_catalog_objects(updatedThriftTable);
+      }
+
+      if (dbWasAdded.getRef()) {
+        Db addedDb = catalog_.getDb(updatedThriftTable.getTable().getDb_name());
+        if (addedDb == null) {
+          throw new CatalogException("Database " +
+              updatedThriftTable.getTable().getDb_name() + " was removed by a " +
+              "concurrent operation. Try invalidating the table again.");
+        }
+        resp.getResult().addToUpdated_catalog_objects(addedDb.toTCatalogObject());
       }
       resp.getResult().setVersion(updatedThriftTable.getCatalog_version());
     } else {
       // Invalidate the entire catalog if no table name is provided.
       Preconditions.checkArgument(!req.isIs_refresh());
-      catalog_.reset();
-      resp.result.setVersion(catalog_.getCatalogVersion());
+      resp.getResult().setVersion(catalog_.reset());
+      resp.getResult().setIs_invalidate(true);
+    }
+    if (req.isSync_ddl()) {
+      resp.getResult().setVersion(catalog_.waitForSyncDdlVersion(resp.getResult()));
     }
     resp.getResult().setStatus(new TStatus(TErrorCode.OK, new ArrayList<String>()));
     return resp;
@@ -3261,11 +3264,16 @@ public class CatalogOpExecutor {
 
       loadTableMetadata(table, newCatalogVersion, true, false, partsToLoadMetadata);
       addTableToCatalogUpdate(table, response.result);
-      return response;
     } finally {
       Preconditions.checkState(!catalog_.getLock().isWriteLockedByCurrentThread());
       table.getLock().unlock();
     }
+
+    if (update.isSync_ddl()) {
+      response.getResult().setVersion(
+          catalog_.waitForSyncDdlVersion(response.getResult()));
+    }
+    return response;
   }
 
   private List<String> getPartValsFromName(org.apache.hadoop.hive.metastore.api.Table

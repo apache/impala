@@ -19,6 +19,7 @@ package org.apache.impala.catalog;
 
 import org.apache.hadoop.fs.Path;
 
+import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDataSource;
 import com.google.common.base.Objects;
@@ -27,13 +28,12 @@ import com.google.common.base.Objects;
  * Represents a data source in the catalog. Contains the data source name and all
  * information needed to locate and load the data source.
  */
-public class DataSource implements CatalogObject {
+public class DataSource extends CatalogObjectImpl {
   private final String dataSrcName_;
   private final String className_;
   private final String apiVersionString_;
   // Qualified path to the data source.
   private final String location_;
-  private long catalogVersion_ =  Catalog.INITIAL_CATALOG_VERSION;
 
   public DataSource(String dataSrcName, String location, String className,
       String apiVersionString) {
@@ -54,16 +54,9 @@ public class DataSource implements CatalogObject {
   }
 
   @Override
-  public long getCatalogVersion() { return catalogVersion_; }
-
-  @Override
-  public void setCatalogVersion(long newVersion) { catalogVersion_ = newVersion; }
-
-  @Override
   public String getName() { return dataSrcName_; }
-
   @Override
-  public boolean isLoaded() { return true; }
+  public String getUniqueName() { return "DATA_SOURCE:" + dataSrcName_.toLowerCase(); }
 
   public String getLocation() { return location_; }
   public String getClassName() { return className_; }
@@ -84,5 +77,12 @@ public class DataSource implements CatalogObject {
 
   public static String debugString(TDataSource thrift) {
     return fromThrift(thrift).debugString();
+  }
+
+  public TCatalogObject toTCatalogObject() {
+    TCatalogObject catalogObj =
+        new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
+    catalogObj.setData_source(toThrift());
+    return catalogObj;
   }
 }

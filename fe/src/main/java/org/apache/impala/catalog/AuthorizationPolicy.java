@@ -86,6 +86,7 @@ public class AuthorizationPolicy implements PrivilegeCache {
     if (existingRole != null) {
       // Remove the role. This will also clean up the grantGroup mappings.
       removeRole(existingRole.getName());
+      CatalogObjectVersionQueue.INSTANCE.removeAll(existingRole.getPrivileges());
       if (existingRole.getId() == role.getId()) {
         // Copy the privileges from the existing role.
         for (RolePrivilege p: existingRole.getPrivileges()) {

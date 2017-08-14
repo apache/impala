@@ -38,7 +38,8 @@ import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TFunction;
-import org.apache.impala.thrift.TGetAllCatalogObjectsResponse;
+import org.apache.impala.thrift.TGetCatalogDeltaResponse;
+import org.apache.impala.thrift.TGetCatalogDeltaRequest;
 import org.apache.impala.thrift.TGetDbsParams;
 import org.apache.impala.thrift.TGetDbsResult;
 import org.apache.impala.thrift.TGetFunctionsRequest;
@@ -119,9 +120,11 @@ public class JniCatalog {
   /**
    * Gets all catalog objects
    */
-  public byte[] getCatalogObjects(long from_version) throws ImpalaException, TException {
-    TGetAllCatalogObjectsResponse resp =
-        catalog_.getCatalogObjects(from_version);
+  public byte[] getCatalogDelta(byte[] thriftGetCatalogDeltaReq)
+      throws ImpalaException, TException {
+    TGetCatalogDeltaRequest params = new TGetCatalogDeltaRequest();
+    JniUtil.deserializeThrift(protocolFactory_, params, thriftGetCatalogDeltaReq);
+    TGetCatalogDeltaResponse resp = catalog_.getCatalogDelta(params.getFrom_version());
     TSerializer serializer = new TSerializer(protocolFactory_);
     return serializer.serialize(resp);
   }

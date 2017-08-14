@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TRole;
 import com.google.common.base.Preconditions;
@@ -30,11 +31,10 @@ import com.google.common.collect.Sets;
 /**
  * Represents a role in an authorization policy. This class is thread safe.
  */
-public class Role implements CatalogObject {
+public class Role extends CatalogObjectImpl {
   private final TRole role_;
   // The last role ID assigned, starts at 0.
   private static AtomicInteger roleId_ = new AtomicInteger(0);
-  private long catalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
 
   private final CatalogObjectCache<RolePrivilege> rolePrivileges_ =
       new CatalogObjectCache<RolePrivilege>();
@@ -134,11 +134,12 @@ public class Role implements CatalogObject {
   public String getName() { return role_.getRole_name(); }
   public int getId() { return role_.getRole_id(); }
   @Override
-  public synchronized long getCatalogVersion() { return catalogVersion_; }
-  @Override
-  public synchronized void setCatalogVersion(long newVersion) {
-    catalogVersion_ = newVersion;
+  public String getUniqueName() { return "ROLE:" + getName().toLowerCase(); }
+
+  public TCatalogObject toTCatalogObject() {
+    TCatalogObject catalogObject =
+        new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
+    catalogObject.setRole(toThrift());
+    return catalogObject;
   }
-  @Override
-  public boolean isLoaded() { return true; }
 }

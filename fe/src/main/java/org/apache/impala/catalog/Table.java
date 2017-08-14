@@ -56,13 +56,9 @@ import com.google.common.collect.Maps;
  * is more general than Hive's CLUSTER BY ... INTO BUCKETS clause (which partitions
  * a key range into a fixed number of buckets).
  */
-public abstract class Table implements CatalogObject {
+public abstract class Table extends CatalogObjectImpl {
   private static final Logger LOG = Logger.getLogger(Table.class);
-
-  // Catalog version assigned to this table
-  private long catalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
   protected org.apache.hadoop.hive.metastore.api.Table msTable_;
-
   protected final Db db_;
   protected final String name_;
   protected final String owner_;
@@ -358,10 +354,18 @@ public abstract class Table implements CatalogObject {
   }
 
   public TCatalogObject toTCatalogObject() {
-    TCatalogObject catalogObject = new TCatalogObject();
-    catalogObject.setType(getCatalogObjectType());
-    catalogObject.setCatalog_version(getCatalogVersion());
+    TCatalogObject catalogObject =
+        new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
     catalogObject.setTable(toThrift());
+    return catalogObject;
+  }
+
+  public TCatalogObject toMinimalTCatalogObject() {
+    TCatalogObject catalogObject =
+        new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
+    catalogObject.setTable(new TTable());
+    catalogObject.getTable().setDb_name(getDb().getName());
+    catalogObject.getTable().setTbl_name(getName());
     return catalogObject;
   }
 
@@ -396,6 +400,8 @@ public abstract class Table implements CatalogObject {
   public TableName getTableName() {
     return new TableName(db_ != null ? db_.getName() : null, name_);
   }
+  @Override
+  public String getUniqueName() { return "TABLE:" + getFullName(); }
 
   public ArrayList<Column> getColumns() { return colsByPos_; }
 
@@ -489,17 +495,6 @@ public abstract class Table implements CatalogObject {
   public long getNumRows() { return tableStats_.num_rows; }
   public TTableStats getTTableStats() { return tableStats_; }
   public ArrayType getType() { return type_; }
-
-  @Override
-  public long getCatalogVersion() { return catalogVersion_; }
-
-  @Override
-  public void setCatalogVersion(long catalogVersion) {
-    catalogVersion_ = catalogVersion;
-  }
-
-  @Override
-  public boolean isLoaded() { return true; }
 
   public static boolean isExternalTable(
       org.apache.hadoop.hive.metastore.api.Table msTbl) {

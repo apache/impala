@@ -21,6 +21,7 @@ import java.util.List;
 
 import org.apache.log4j.Logger;
 
+import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TPrivilegeLevel;
@@ -33,16 +34,14 @@ import com.google.common.collect.Lists;
  * Represents a privilege that has been granted to a role in an authorization policy.
  * This class is thread safe.
  */
-public class RolePrivilege implements CatalogObject {
+public class RolePrivilege extends CatalogObjectImpl {
   private static final Logger LOG = Logger.getLogger(AuthorizationPolicy.class);
   // These Joiners are used to build role names. For simplicity, the role name we
   // use can also be sent to the Sentry library to perform authorization checks
   // so we build them in the same format.
   private static final Joiner AUTHORIZABLE_JOINER = Joiner.on("->");
   private static final Joiner KV_JOINER = Joiner.on("=");
-
   private final TPrivilege privilege_;
-  private long catalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
 
   private RolePrivilege(TPrivilege privilege) {
     privilege_ = privilege;
@@ -132,13 +131,16 @@ public class RolePrivilege implements CatalogObject {
   public String getName() { return privilege_.getPrivilege_name(); }
   public int getRoleId() { return privilege_.getRole_id(); }
   @Override
-  public synchronized long getCatalogVersion() { return catalogVersion_; }
-  @Override
-  public synchronized void setCatalogVersion(long newVersion) {
-    catalogVersion_ = newVersion;
+  public String getUniqueName() {
+    return "PRIVILEGE:" + getName().toLowerCase() + "." + Integer.toString(getRoleId());
   }
-  @Override
-  public boolean isLoaded() { return true; }
+
+  public TCatalogObject toTCatalogObject() {
+    TCatalogObject catalogObject =
+        new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
+    catalogObject.setPrivilege(toThrift());
+    return catalogObject;
+  }
 
   // The time this role was created. Used to quickly check if the same privilege
   // was dropped and re-created. Assumes a role will not be created + dropped + created

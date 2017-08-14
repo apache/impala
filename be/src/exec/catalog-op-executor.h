@@ -47,10 +47,10 @@ class CatalogOpExecutor {
   /// be loaded.
   Status GetCatalogObject(const TCatalogObject& object_desc, TCatalogObject* result);
 
-  /// Translates the given compute stats params and its child-query results into
+  /// Translates the given compute stats request and its child-query results into
   /// a new table alteration request for updating the stats metadata, and executes
   /// the alteration via Exec();
-  Status ExecComputeStats(const TComputeStatsParams& compute_stats_params,
+  Status ExecComputeStats(const TCatalogOpRequest& compute_stats_request,
       const apache::hive::service::cli::thrift::TTableSchema& tbl_stats_schema,
       const apache::hive::service::cli::thrift::TRowSet& tbl_stats_data,
       const apache::hive::service::cli::thrift::TTableSchema& col_stats_schema,

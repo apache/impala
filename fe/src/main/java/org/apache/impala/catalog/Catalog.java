@@ -32,6 +32,7 @@ import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TPartitionKeyValue;
+import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.log4j.Logger;
@@ -141,16 +142,21 @@ public abstract class Catalog {
   }
 
   /**
-   * Returns the Table object for the given dbName/tableName. This will trigger a
-   * metadata load if the table metadata is not yet cached.
+   * Returns the Table object for the given dbName/tableName. If 'throwIfError' is true,
+   * an exception is thrown if the associated database does not exist. Otherwise, null is
+   * returned.
    */
-  public Table getTable(String dbName, String tableName) throws
-      CatalogException {
+  public Table getTable(String dbName, String tableName, boolean throwIfError)
+      throws CatalogException {
     Db db = getDb(dbName);
-    if (db == null) {
+    if (db == null && throwIfError) {
       throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
     }
     return db.getTable(tableName);
+  }
+
+  public Table getTable(String dbName, String tableName) throws CatalogException {
+    return getTable(dbName, tableName, true);
   }
 
   /**
@@ -529,5 +535,46 @@ public abstract class Catalog {
 
   public static boolean isDefaultDb(String dbName) {
     return DEFAULT_DB.equals(dbName.toLowerCase());
+  }
+
+  /**
+   * Returns a unique string key of a catalog object.
+   */
+  public static String toCatalogObjectKey(TCatalogObject catalogObject) {
+    Preconditions.checkNotNull(catalogObject);
+    switch (catalogObject.getType()) {
+      case DATABASE:
+        return "DATABASE:" + catalogObject.getDb().getDb_name().toLowerCase();
+      case TABLE:
+      case VIEW:
+        TTable tbl = catalogObject.getTable();
+        return "TABLE:" + tbl.getDb_name().toLowerCase() + "." +
+            tbl.getTbl_name().toLowerCase();
+      case FUNCTION:
+        return "FUNCTION:" + catalogObject.getFn().getName() + "(" +
+            catalogObject.getFn().getSignature() + ")";
+      case ROLE:
+        return "ROLE:" + catalogObject.getRole().getRole_name().toLowerCase();
+      case PRIVILEGE:
+        return "PRIVILEGE:" +
+            catalogObject.getPrivilege().getPrivilege_name().toLowerCase() + "." +
+            Integer.toString(catalogObject.getPrivilege().getRole_id());
+      case HDFS_CACHE_POOL:
+        return "HDFS_CACHE_POOL:" +
+            catalogObject.getCache_pool().getPool_name().toLowerCase();
+      case DATA_SOURCE:
+        return "DATA_SOURCE:" + catalogObject.getData_source().getName().toLowerCase();
+      default:
+        throw new IllegalStateException(
+            "Unsupported catalog object type: " + catalogObject.getType());
+    }
+  }
+
+  /**
+   * Returns true if the two objects have the same object type and key (generated using
+   * toCatalogObjectKey()).
+   */
+  public static boolean keyEquals(TCatalogObject first, TCatalogObject second) {
+    return toCatalogObjectKey(first).equals(toCatalogObjectKey(second));
   }
 }

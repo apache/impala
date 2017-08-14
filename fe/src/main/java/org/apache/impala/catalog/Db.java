@@ -34,6 +34,7 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.JniUtil;
+import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TFunction;
@@ -59,11 +60,10 @@ import com.google.common.collect.Maps;
  * value is the base64 representation of the thrift serialized function object.
  *
  */
-public class Db implements CatalogObject {
+public class Db extends CatalogObjectImpl {
   private static final Logger LOG = LoggerFactory.getLogger(Db.class);
   private final Catalog parentCatalog_;
   private final TDatabase thriftDb_;
-  private long catalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
 
   public static final String FUNCTION_INDEX_PREFIX = "impala_registered_function_";
 
@@ -134,16 +134,14 @@ public class Db implements CatalogObject {
   @Override
   public String getName() { return thriftDb_.getDb_name(); }
   @Override
-  public TCatalogObjectType getCatalogObjectType() {
-    return TCatalogObjectType.DATABASE;
-  }
+  public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.DATABASE; }
+  @Override
+  public String getUniqueName() { return "DATABASE:" + getName().toLowerCase(); }
 
   /**
    * Adds a table to the table cache.
    */
-  public void addTable(Table table) {
-    tableCache_.add(table);
-  }
+  public void addTable(Table table) { tableCache_.add(table); }
 
   /**
    * Gets all table names in the table cache.
@@ -165,9 +163,7 @@ public class Db implements CatalogObject {
    * Returns the Table with the given name if present in the table cache or null if the
    * table does not exist in the cache.
    */
-  public Table getTable(String tblName) {
-    return tableCache_.get(tblName);
-  }
+  public Table getTable(String tblName) { return tableCache_.get(tblName); }
 
   /**
    * Removes the table name and any cached metadata from the Table cache.
@@ -495,11 +491,10 @@ public class Db implements CatalogObject {
     return result;
   }
 
-  @Override
-  public long getCatalogVersion() { return catalogVersion_; }
-  @Override
-  public void setCatalogVersion(long newVersion) { catalogVersion_ = newVersion; }
-
-  @Override
-  public boolean isLoaded() { return true; }
+  public TCatalogObject toTCatalogObject() {
+    TCatalogObject catalogObj =
+        new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
+    catalogObj.setDb(toThrift());
+    return catalogObj;
+  }
 }

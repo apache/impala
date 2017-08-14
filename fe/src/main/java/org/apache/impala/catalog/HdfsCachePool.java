@@ -28,8 +28,7 @@ import com.google.common.base.Preconditions;
  * care about for cache pools is the cache pool name. In the future it may be desirable
  * to track additional metadata such as the owner, size, and current usage of the pool.
  */
-public class HdfsCachePool implements CatalogObject {
-  private long catalogVersion_;
+public class HdfsCachePool extends CatalogObjectImpl {
   private final THdfsCachePool cachePool_;
 
   public HdfsCachePool(CachePoolInfo cachePoolInfo) {
@@ -57,9 +56,5 @@ public class HdfsCachePool implements CatalogObject {
   @Override
   public String getName() { return cachePool_.getPool_name(); }
   @Override
-  public long getCatalogVersion() { return catalogVersion_; }
-  @Override
-  public void setCatalogVersion(long newVersion) { catalogVersion_ = newVersion; }
-  @Override
-  public boolean isLoaded() { return true; }
+  public String getUniqueName() { return "HDFS_CACHE_POOL:" + getName().toLowerCase(); }
 }

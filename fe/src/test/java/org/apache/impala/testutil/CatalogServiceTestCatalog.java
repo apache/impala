@@ -38,7 +38,7 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
     // Cache pools are typically loaded asynchronously, but as there is no fixed execution
     // order for tests, the cache pools are loaded synchronously before the tests are
     // executed.
-    CachePoolReader rd = new CachePoolReader();
+    CachePoolReader rd = new CachePoolReader(false);
     rd.run();
   }
 

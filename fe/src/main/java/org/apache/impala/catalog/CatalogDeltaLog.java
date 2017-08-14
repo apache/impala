@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog;
 
+import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -24,24 +25,35 @@ import java.util.TreeMap;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TTable;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 
 /**
- * The impalad catalog cache can be modified by either a state store update or by a
- * direct ("fast") update that applies the result of a catalog operation to the cache
- * out-of-band of a state store update. This thread safe log tracks the divergence
- * (due to direct updates to the cache) of this impalad's cache from the last state
- * store update. This log is needed to ensure work is never undone. For example,
- * consider the following sequence of events:
- * t1: [Direct Update] - Add item A - (Catalog Version 9)
- * t2: [Direct Update] - Drop item A - (Catalog Version 10)
- * t3: [StateStore Update] - (From Catalog Version 9)
- * This log is used to ensure the state store update in t3 does not undo the drop in t2.
+ * Represents a log of deleted catalog objects.
  *
- * Currently this only tracks objects that were dropped, since the catalog cache can be
- * queried to check if an object was added. TODO: Also track object additions from async
- * operations. This could be used to to "replay" the log in the case of a catalog reset
- * ("invalidate metadata"). Currently, the catalog may briefly go back in time if
- * "invalidate metadata" is run concurrently with async catalog operations.
+ * There are currently two use cases for this log:
+ *
+ * a) Processing catalog updates in the impalads
+ *   The impalad catalog cache can be modified by either a state store update or by a
+ *   direct update that applies the result of a catalog operation to the cache
+ *   out-of-band of a state store update. This thread safe log tracks the divergence
+ *   (due to direct updates to the cache) of this impalad's cache from the last state
+ *   store update. This log is needed to ensure work is never undone. For example,
+ *   consider the following sequence of events:
+ *   t1: [Direct Update] - Add item A - (Catalog Version 9)
+ *   t2: [Direct Update] - Drop item A - (Catalog Version 10)
+ *   t3: [StateStore Update] - (From Catalog Version 9)
+ *   This log is used to ensure the state store update in t3 does not undo the drop in t2.
+ *   Currently this only tracks objects that were dropped, since the catalog cache can be
+ *   queried to check if an object was added. TODO: Also track object additions from async
+ *   operations. This could be used to to "replay" the log in the case of a catalog reset
+ *   ("invalidate metadata"). Currently, the catalog may briefly go back in time if
+ *   "invalidate metadata" is run concurrently with async catalog operations.
+ *
+ * b) Building catalog topic updates in the catalogd
+ *   The catalogd uses this log to identify deleted catalog objects that have been deleted
+ *   since the last catalog topic update. Once the catalog topic update is constructed,
+ *   the old entries in the log are garbage collected to prevent the log from growing
+ *   indefinitely.
  */
 public class CatalogDeltaLog {
   // Map of the catalog version an object was removed from the catalog
@@ -55,6 +67,17 @@ public class CatalogDeltaLog {
   public synchronized void addRemovedObject(TCatalogObject catalogObject) {
     Preconditions.checkNotNull(catalogObject);
     removedCatalogObjects_.put(catalogObject.getCatalog_version(), catalogObject);
+  }
+
+  /**
+   * Retrieve all the removed catalog objects with versions in range
+   * (fromVersion, toVersion].
+   */
+  public synchronized List<TCatalogObject> retrieveObjects(long fromVersion,
+      long toVersion) {
+    SortedMap<Long, TCatalogObject> objects =
+        removedCatalogObjects_.subMap(fromVersion + 1, toVersion + 1);
+    return ImmutableList.<TCatalogObject>copyOf(objects.values());
   }
 
   /**
@@ -85,36 +108,8 @@ public class CatalogDeltaLog {
     SortedMap<Long, TCatalogObject> candidateObjects =
         removedCatalogObjects_.tailMap(catalogObject.getCatalog_version());
     for (Map.Entry<Long, TCatalogObject> entry: candidateObjects.entrySet()) {
-      if (objectNamesMatch(catalogObject, entry.getValue())) return true;
+      if (Catalog.keyEquals(catalogObject, entry.getValue())) return true;
     }
     return false;
-  }
-
-  /**
-   * Returns true if the two objects have the same object type and name.
-   * TODO: Use global object IDs everywhere instead of tracking catalog objects by name.
-   */
-  private boolean objectNamesMatch(TCatalogObject first, TCatalogObject second) {
-    if (first.getType() != second.getType()) return false;
-    switch (first.getType()) {
-      case DATABASE:
-        return first.getDb().getDb_name().equalsIgnoreCase(second.getDb().getDb_name());
-      case TABLE:
-      case VIEW:
-        TTable firstTbl = first.getTable();
-        return firstTbl.getDb_name().equalsIgnoreCase(second.getTable().getDb_name()) &&
-            firstTbl.getTbl_name().equalsIgnoreCase(second.getTable().getTbl_name());
-      case FUNCTION:
-        return first.getFn().getSignature().equals(second.getFn().getSignature()) &&
-            first.getFn().getName().equals(second.getFn().getName());
-      case ROLE:
-        return first.getRole().getRole_name().equalsIgnoreCase(
-            second.getRole().getRole_name());
-      case PRIVILEGE:
-        return first.getPrivilege().getPrivilege_name().equalsIgnoreCase(
-            second.getPrivilege().getPrivilege_name()) &&
-            first.getPrivilege().getRole_id() == second.getPrivilege().getRole_id();
-      default: return false;
-    }
   }
 }

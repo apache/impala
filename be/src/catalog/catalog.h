@@ -56,12 +56,10 @@ class Catalog {
   /// Status object with information on the error will be returned.
   Status GetCatalogVersion(long* version);
 
-  /// Gets all Catalog objects and the metadata that is applicable for the given request.
-  /// Always returns all object names that exist in the Catalog, but allows for extended
-  /// metadata for objects that were modified after the specified version.
-  /// Returns OK if the operation was successful, otherwise a Status object with
-  /// information on the error will be returned.
-  Status GetAllCatalogObjects(long from_version, TGetAllCatalogObjectsResponse* resp);
+  /// Retrieves the catalog objects that were added/modified/deleted since version
+  /// 'from_version'. Returns OK if the operation was successful, otherwise a Status
+  /// object with information on the error will be returned.
+  Status GetCatalogDelta(long from_version, TGetCatalogDeltaResponse* resp);
 
   /// Gets the Thrift representation of a Catalog object. The request is a TCatalogObject
   /// which has the desired TCatalogObjectType and name properly set.
@@ -74,7 +72,7 @@ class Catalog {
   /// match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
   /// and each pN may contain wildcards denoted by '*' which match all strings.
   /// TODO: GetDbs() and GetTableNames() can probably be scrapped in favor of
-  /// GetAllCatalogObjects(). Consider removing them and moving everything to use
+  /// GetCatalogDelta(). Consider removing them and moving everything to use
   /// that.
   Status GetDbs(const std::string* pattern, TGetDbsResult* dbs);
 
@@ -109,7 +107,7 @@ class Catalog {
   jmethodID exec_ddl_id_;  // JniCatalog.execDdl()
   jmethodID reset_metadata_id_;  // JniCatalog.resetMetdata()
   jmethodID get_catalog_object_id_;  // JniCatalog.getCatalogObject()
-  jmethodID get_catalog_objects_id_;  // JniCatalog.getCatalogObjects()
+  jmethodID get_catalog_delta_id_;  // JniCatalog.getCatalogDelta()
   jmethodID get_catalog_version_id_;  // JniCatalog.getCatalogVersion()
   jmethodID get_dbs_id_; // JniCatalog.getDbs()
   jmethodID get_table_names_id_; // JniCatalog.getTableNames()

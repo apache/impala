@@ -65,9 +65,7 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
   /**
    * Reloads all metadata from the source catalog.
    */
-  public void reset() throws CatalogException {
-    srcCatalog_.reset();
-  }
+  public void reset() throws CatalogException { srcCatalog_.reset(); }
 
   /**
    * Overrides ImpaladCatalog.getTable to load the table metadata if it is missing.

@@ -55,21 +55,6 @@ TCatalogObjectType::type TCatalogObjectTypeFromName(const string& name) {
   return TCatalogObjectType::UNKNOWN;
 }
 
-Status TCatalogObjectFromEntryKey(const string& key,
-    TCatalogObject* catalog_object) {
-  // Reconstruct the object based only on the key.
-  size_t pos = key.find(":");
-  if (pos == string::npos || pos >= key.size() - 1) {
-    stringstream error_msg;
-    error_msg << "Invalid topic entry key format: " << key;
-    return Status(error_msg.str());
-  }
-
-  TCatalogObjectType::type object_type = TCatalogObjectTypeFromName(key.substr(0, pos));
-  string object_name = key.substr(pos + 1);
-  return TCatalogObjectFromObjectName(object_type, object_name, catalog_object);
-}
-
 Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
     const string& object_name, TCatalogObject* catalog_object) {
   switch (object_type) {
