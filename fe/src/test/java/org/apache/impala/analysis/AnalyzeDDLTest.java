@@ -1591,6 +1591,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("create table t primary key(id) stored as kudu as select id, bool_col " +
         "from functional.alltypestiny",
         "Unpartitioned Kudu tables are inefficient for large data sizes.");
+    // IMPALA-5796: CTAS into a Kudu table with expr rewriting.
+    AnalyzesOk("create table t primary key(id) stored as kudu as select id, bool_col " +
+        "from functional.alltypestiny where id between 0 and 10");
     // CTAS in an external Kudu table
     AnalysisError("create external table t stored as kudu " +
         "tblproperties('kudu.table_name'='t') as select id, int_col from " +
