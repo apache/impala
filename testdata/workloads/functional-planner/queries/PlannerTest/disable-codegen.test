@@ -79,7 +79,7 @@ from functional.alltypes t1
 join functional.alltypestiny t2 on t1.id = t2.id
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=1.06MB
-Per-Host Resource Estimates: Memory=180.00MB
+Per-Host Resource Estimates: Memory=181.06MB
 Codegen disabled by planner
 
 PLAN-ROOT SINK

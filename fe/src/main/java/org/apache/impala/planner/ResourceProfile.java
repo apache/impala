@@ -29,7 +29,8 @@ public class ResourceProfile {
   // If the computed values are valid.
   private final boolean isValid_;
 
-  // Estimated memory consumption in bytes.
+  // Estimated memory consumption in bytes. Guaranteed to be >= minReservationBytes_ if
+  // both are set (the constructor ensures this).
   // TODO: IMPALA-5013: currently we are inconsistent about how these estimates are
   // derived or what they mean. Re-evaluate what they mean and either deprecate or
   // fix them.
@@ -51,7 +52,8 @@ public class ResourceProfile {
   private ResourceProfile(boolean isValid, long memEstimateBytes,
       long minReservationBytes, long maxReservationBytes, long spillableBufferBytes) {
     isValid_ = isValid;
-    memEstimateBytes_ = memEstimateBytes;
+    memEstimateBytes_ = (minReservationBytes != -1) ?
+        Math.max(memEstimateBytes, minReservationBytes) : memEstimateBytes;
     minReservationBytes_ = minReservationBytes;
     maxReservationBytes_ = maxReservationBytes;
     spillableBufferBytes_ = spillableBufferBytes;

@@ -129,7 +129,7 @@ left outer join functional.alltypes b
 where round(1.11 + 2.22 + 3.33 + 4.44, 1) < cast(b.double_col as decimal(3, 2))
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=256.02MB mem-reservation=1.06MB
+|  Per-Host Resources: mem-estimate=257.06MB mem-reservation=1.06MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -138,7 +138,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: assumed fk/pk
 |  other join predicates: a.int_col <= b.bigint_col + 97, a.int_col >= 0 + b.bigint_col
 |  other predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
-|  mem-estimate=15.68KB mem-reservation=1.06MB spill-buffer=64.00KB
+|  mem-estimate=1.06MB mem-reservation=1.06MB spill-buffer=64.00KB
 |  tuple-ids=0,1N row-size=28B cardinality=7300
 |
 |--01:SCAN HDFS [functional.alltypes b]
@@ -265,7 +265,7 @@ select first_value(1 + 1 + int_col - (1 - 1)) over
 from functional.alltypes
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=130.00MB mem-reservation=16.00MB
+|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=16.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -274,13 +274,13 @@ PLAN-ROOT SINK
 |  partition by: concat('ab', string_col)
 |  order by: greatest(20, bigint_col) ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  mem-estimate=0B mem-reservation=4.00MB spill-buffer=2.00MB
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB
 |  tuple-ids=3,2 row-size=61B cardinality=7300
 |
 01:SORT
 |  order by: concat('ab', string_col) ASC NULLS FIRST, greatest(20, bigint_col) ASC
 |  materialized: concat('ab', string_col), greatest(20, bigint_col)
-|  mem-estimate=2.00MB mem-reservation=12.00MB spill-buffer=2.00MB
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB
 |  tuple-ids=3 row-size=53B cardinality=7300
 |
 00:SCAN HDFS [functional.alltypes]
@@ -296,13 +296,13 @@ select int_col from functional.alltypes
 order by id * abs((factorial(5) / power(2, 4)))
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=130.00MB mem-reservation=6.00MB
+|  Per-Host Resources: mem-estimate=134.00MB mem-reservation=6.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
 01:SORT
 |  order by: id * 7.5 ASC
-|  mem-estimate=2.00MB mem-reservation=6.00MB spill-buffer=2.00MB
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB
 |  tuple-ids=1 row-size=8B cardinality=7300
 |
 00:SCAN HDFS [functional.alltypes]
