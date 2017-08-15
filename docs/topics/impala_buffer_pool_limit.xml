@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="buffer_pool_limit" rev="2.10.0 IMPALA-3200">
+
+  <title>BUFFER_POOL_LIMIT Query Option</title>
+  <titlealts audience="PDF"><navtitle>BUFFER_POOL_LIMIT</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="hidden">BUFFER_POOL_LIMIT query option</indexterm>
+      Defines a limit on the amount of memory that a query can allocate from the
+      internal buffer pool. The value for this limit applies to the memory on each host,
+      not the aggregate memory across the cluster. Typically not changed by users, except
+      during diagnosis of out-of-memory errors during queries.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_integer"/>
+
+<!--  BUFFER_POOL_LIMIT: [0] -->
+
+    <p conref="../shared/impala_common.xml#common/default_blurb"/>
+    <p>
+      The default setting for this option is the lower of 80% of the
+      <codeph>MEM_LIMIT</codeph> setting, or the <codeph>MEM_LIMIT</codeph>
+      setting minus 100 MB.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/added_in_2100"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+    <p>
+      If queries encounter out-of-memory errors, consider decreasing the
+      <codeph>BUFFER_POOL_LIMIT</codeph> setting to less than 80% of the
+      <codeph>MEM_LIMIT setting</codeph>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock><![CDATA[
+-- Set an absolute value.
+set buffer_pool_limit=8GB;
+
+-- Set a relative value based on the MEM_LIMIT setting.
+set buffer_pool_limit=80%;
+]]>
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref keyref="default_spillable_buffer_size"/>,
+      <xref keyref="max_row_size"/>,
+      <xref keyref="min_spillable_buffer_size"/>,
+      <xref keyref="scalability_buffer_pool"/>
+    </p>
+
+  </conbody>
+</concept>

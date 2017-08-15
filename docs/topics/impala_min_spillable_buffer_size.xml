@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="min_spillable_buffer_size" rev="2.10.0 IMPALA-3200">
+
+  <title>MIN_SPILLABLE_BUFFER_SIZE Query Option</title>
+  <titlealts audience="PDF"><navtitle>MIN_SPILLABLE_BUFFER_SIZE</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="hidden">MIN_SPILLABLE_BUFFER_SIZE query option</indexterm>
+      Specifies the minimum size for a memory buffer used when the
+      spill-to-disk mechanism is activated, for example for queries against
+      a large table with no statistics, or large join operations.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_integer"/>
+
+<!--  MIN_SPILLABLE_BUFFER_SIZE: [65536] -->
+
+    <p conref="../shared/impala_common.xml#common/default_blurb"/>
+    <p>
+      <codeph>65536</codeph> (64 KB)
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/units_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/added_in_2100"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+    <p>
+      This query option sets a lower bound on the size of the internal
+      buffer size that can be used during spill-to-disk operations. The
+      actual size of the buffer is chosen by the query planner.
+    </p>
+    <p>
+      If overall query performance is limited by the time needed for spilling,
+      consider increasing the <codeph>MIN_SPILLABLE_BUFFER_SIZE</codeph> setting.
+      Larger buffer sizes result in Impala issuing larger I/O requests to storage
+      devices, which might result in higher throughput, particularly on rotational
+      disks.
+    </p>
+    <p>
+      The tradeoff with a large value for this setting is increased memory usage during
+      spill-to-disk operations. Reducing this value may reduce memory consumption.
+    </p>
+    <p>
+      To determine if the value for this setting is having an effect by capping the
+      spillable buffer size, you can see the buffer size chosen by the query planner for
+      a particular query. <codeph>EXPLAIN</codeph> the query while the setting
+      <codeph>EXPLAIN_LEVEL=2</codeph> is in effect.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock><![CDATA[
+set min_spillable_buffer_size=128KB;
+]]>
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref keyref="buffer_pool_limit"/>,
+      <xref keyref="default_spillable_buffer_size"/>,
+      <xref keyref="max_row_size"/>,
+      <xref keyref="scalability_buffer_pool"/>
+    </p>
+
+  </conbody>
+</concept>

@@ -1322,7 +1322,6 @@ drop database temp;
         <ph conref="../shared/impala_common.xml#common/cast_int_to_timestamp"/>
       </p>
 
-
       <p>
         <ph id="cast_int_to_timestamp">Casting an integer or floating-point value <codeph>N</codeph> to
         <codeph>TIMESTAMP</codeph> produces a value that is <codeph>N</codeph> seconds past the start of the epoch
@@ -1865,6 +1864,10 @@ explain select s from yy2 where year in (select year from yy where year between 
         <b>Type:</b> integer
       </p>
 
+      <p id="default_blurb">
+        <b>Default:</b>
+      </p>
+
       <p id="default_false">
         <b>Default:</b> <codeph>false</codeph>
       </p>
@@ -1879,6 +1882,12 @@ explain select s from yy2 where year in (select year from yy where year between 
 
       <p id="default_true_1">
         <b>Default:</b> <codeph>true</codeph> (shown as 1 in output of <codeph>SET</codeph> statement)
+      </p>
+
+      <p id="units_blurb">
+        <b>Units:</b> A numeric argument represents a size in bytes; you can also use a suffix of <codeph>m</codeph>
+        or <codeph>mb</codeph> for megabytes, or <codeph>g</codeph> or <codeph>gb</codeph> for gigabytes. If you
+        specify a value with unrecognized formats, subsequent queries fail with an error.
       </p>
 
       <p id="odd_return_type_string">
@@ -2778,6 +2787,9 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
         each value.
       </p>
 
+      <p rev="2.9.0" id="added_in_2100">
+        <b>Added in:</b> <keyword keyref="impala2100"/>
+      </p>
       <p rev="2.9.0" id="added_in_290">
         <b>Added in:</b> <keyword keyref="impala290"/>
       </p>
