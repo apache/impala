@@ -45,6 +45,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -169,6 +170,16 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       new com.google.common.base.Predicate<Expr>() {
         @Override
         public boolean apply(Expr arg) { return BinaryPredicate.getEqSlots(arg) != null; }
+      };
+
+  public final static com.google.common.base.Predicate<Expr> IS_NOT_EQ_BINARY_PREDICATE =
+      new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) {
+          return arg instanceof BinaryPredicate
+              && ((BinaryPredicate) arg).getOp() != Operator.EQ
+              && ((BinaryPredicate) arg).getOp() != Operator.NOT_DISTINCT;
+        }
       };
 
   public final static com.google.common.base.Predicate<Expr> IS_BINARY_PREDICATE =
@@ -1397,5 +1408,20 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       // function calls that return string.
       return DEFAULT_AVG_STRING_LENGTH;
     }
+  }
+
+  /**
+   * Generates a comma-separated string from the toSql() string representations of
+   * 'exprs'.
+   */
+  public static String listToSql(List<Expr> exprs) {
+    com.google.common.base.Function<Expr, String> toSql =
+        new com.google.common.base.Function<Expr, String>() {
+        @Override
+        public String apply(Expr arg) {
+          return arg.toSql();
+        }
+    };
+    return Joiner.on(",").join(Iterables.transform(exprs, toSql));
   }
 }

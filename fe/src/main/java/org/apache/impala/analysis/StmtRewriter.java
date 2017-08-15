@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
@@ -336,9 +337,8 @@ public class StmtRewriter {
     // Extract all correlated predicates from the subquery.
     List<Expr> onClauseConjuncts = extractCorrelatedPredicates(subqueryStmt);
     if (!onClauseConjuncts.isEmpty()) {
-      canRewriteCorrelatedSubquery(expr, onClauseConjuncts);
-      // For correlated subqueries that are eligible for rewrite by transforming
-      // into a join, a LIMIT clause has no effect on the results, so we can
+      validateCorrelatedSubqueryStmt(expr);
+      // For correlated subqueries, a LIMIT clause has no effect on the results, so we can
       // safely remove it.
       subqueryStmt.limitElement_ = new LimitElement(null, null);
     }
@@ -393,6 +393,12 @@ public class StmtRewriter {
       }
 
       if (joinConjunct != null) onClauseConjuncts.add(joinConjunct);
+    }
+
+    // Ensure that all the extracted correlated predicates can be added to the ON-clause
+    // of the generated join.
+    if (!onClauseConjuncts.isEmpty()) {
+      validateCorrelatedPredicates(expr, inlineView, onClauseConjuncts);
     }
 
     // Create the ON clause from the extracted correlated predicates.
@@ -634,15 +640,12 @@ public class StmtRewriter {
 
   /**
    * Checks if an expr containing a correlated subquery is eligible for rewrite by
-   * tranforming into a join. 'correlatedPredicates' contains the correlated
-   * predicates identified in the subquery. Throws an AnalysisException if 'expr'
-   * is not eligible for rewrite.
+   * tranforming into a join. Throws an AnalysisException if 'expr' is not eligible for
+   * rewrite.
    * TODO: Merge all the rewrite eligibility tests into a single function.
    */
-  private static void canRewriteCorrelatedSubquery(Expr expr,
-      List<Expr> correlatedPredicates) throws AnalysisException {
+  private static void validateCorrelatedSubqueryStmt(Expr expr) throws AnalysisException {
     Preconditions.checkNotNull(expr);
-    Preconditions.checkNotNull(correlatedPredicates);
     Preconditions.checkState(expr.contains(Subquery.class));
     SelectStmt stmt = (SelectStmt) expr.getSubquery().getStatement();
     Preconditions.checkNotNull(stmt);
@@ -655,6 +658,30 @@ public class StmtRewriter {
           "and/or aggregation: " + stmt.toSql());
     }
 
+    // The following correlated subqueries with a limit clause are supported:
+    // 1. EXISTS subqueries
+    // 2. Scalar subqueries with aggregation
+    if (stmt.hasLimit() &&
+        (!(expr instanceof BinaryPredicate) || !stmt.hasAggInfo() ||
+         stmt.selectList_.isDistinct()) &&
+        !(expr instanceof ExistsPredicate)) {
+      throw new AnalysisException("Unsupported correlated subquery with a " +
+          "LIMIT clause: " + stmt.toSql());
+    }
+  }
+
+  /**
+   * Checks if all the 'correlatedPredicates' extracted from the subquery of 'expr' can be
+   * added to the ON-clause of the join that results from the subquery rewrite. It throws
+   * an AnalysisException is this is not the case. 'inlineView' is the generated inline
+   * view that will replace the subquery in the rewritten statement.
+   */
+  private static void validateCorrelatedPredicates(Expr expr, InlineViewRef inlineView,
+      List<Expr> correlatedPredicates) throws AnalysisException {
+    Preconditions.checkNotNull(expr);
+    Preconditions.checkNotNull(correlatedPredicates);
+    Preconditions.checkState(inlineView.isAnalyzed());
+    SelectStmt stmt = (SelectStmt) expr.getSubquery().getStatement();
     final com.google.common.base.Predicate<Expr> isSingleSlotRef =
         new com.google.common.base.Predicate<Expr>() {
       @Override
@@ -673,15 +700,31 @@ public class StmtRewriter {
           "HAVING clause: " + stmt.toSql());
     }
 
-    // The following correlated subqueries with a limit clause are supported:
-    // 1. EXISTS subqueries
-    // 2. Scalar subqueries with aggregation
-    if (stmt.hasLimit() &&
-        (!(expr instanceof BinaryPredicate) || !stmt.hasAggInfo() ||
-         stmt.selectList_.isDistinct()) &&
-        !(expr instanceof ExistsPredicate)) {
-      throw new AnalysisException("Unsupported correlated subquery with a " +
-          "LIMIT clause: " + stmt.toSql());
+    // We only support equality correlated predicates in aggregate subqueries
+    // (see IMPALA-5531). This check needs to be performed after the inline view
+    // has been analyzed to make sure we don't incorrectly reject non-equality correlated
+    // predicates from nested collections.
+    if (expr instanceof BinaryPredicate && !inlineView.isCorrelated()
+        && !correlatedPredicates.isEmpty()) {
+      final List<TupleId> subqueryTblIds = stmt.getTableRefIds();
+      final com.google.common.base.Predicate<Expr> isBoundBySubqueryTids =
+          new com.google.common.base.Predicate<Expr>() {
+            @Override
+            public boolean apply(Expr arg) {
+              List<TupleId> tids = Lists.newArrayList();
+              arg.getIds(tids, null);
+              return !Collections.disjoint(tids, subqueryTblIds);
+            }
+        };
+
+      List<Expr> unsupportedPredicates = Lists.newArrayList(Iterables.filter(
+          correlatedPredicates, Predicates.and(Expr.IS_NOT_EQ_BINARY_PREDICATE,
+              isBoundBySubqueryTids)));
+      if (!unsupportedPredicates.isEmpty()) {
+        throw new AnalysisException("Unsupported aggregate subquery with " +
+            "non-equality correlated predicates: " +
+            Expr.listToSql(unsupportedPredicates));
+      }
     }
   }
 
