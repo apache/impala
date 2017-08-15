@@ -183,7 +183,7 @@ row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 # IMPALA-3304: test that avg() can spill with a query mem limit.
 # This test only covers that use FIXED_UDA_INTERMEDIATE, not functions that allocate
 # strings for intermediate values.
-set mem_limit=200m;
+set mem_limit=150m;
 select l_orderkey, avg(l_tax), avg(l_quantity), avg(l_discount), avg(l_extendedprice)
 from tpch_parquet.lineitem
 group by 1

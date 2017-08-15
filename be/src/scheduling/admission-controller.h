@@ -460,10 +460,12 @@ class AdmissionController {
   /// admission_ctrl_lock_.
   void UpdateHostMemAdmitted(const QuerySchedule& schedule, int64_t per_node_mem);
 
-  /// Returns an error status if this request must be rejected immediately, e.g. requires
-  /// more memory than possible to reserve or the queue is already full.
+  /// Returns true if this request must be rejected immediately, e.g. requires more
+  /// memory than possible to reserve or the queue is already full. If true,
+  /// rejection_reason is set to a explanation of why the request was rejected.
   /// Must hold admission_ctrl_lock_.
-  Status RejectImmediately(QuerySchedule* schedule, const TPoolConfig& pool_cfg);
+  bool RejectImmediately(QuerySchedule* schedule, const TPoolConfig& pool_cfg,
+      std::string* rejection_reason);
 
   /// Gets or creates the PoolStats for pool_name. Must hold admission_ctrl_lock_.
   PoolStats* GetPoolStats(const std::string& pool_name);

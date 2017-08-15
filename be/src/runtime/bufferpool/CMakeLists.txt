@@ -25,6 +25,7 @@ add_library(BufferPool
   buffer-allocator.cc
   buffer-pool.cc
   reservation-tracker.cc
+  reservation-util.cc
   suballocator.cc
   system-allocator.cc
 )

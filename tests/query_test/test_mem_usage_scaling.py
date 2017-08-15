@@ -26,8 +26,9 @@ from tests.common.test_vector import ImpalaTestDimension
 
 # Substrings of the expected error messages when the mem limit is too low
 MEM_LIMIT_EXCEEDED_MSG = "Memory limit exceeded"
-INITIAL_RESERVATION_MSG = "Failed to get minimum memory reservation"
-MEM_LIMIT_ERROR_MSGS = [MEM_LIMIT_EXCEEDED_MSG, INITIAL_RESERVATION_MSG]
+MEM_LIMIT_TOO_LOW_FOR_RESERVATION = ("minimum memory reservation is greater than memory "
+  "available to the query for buffer reservations")
+MEM_LIMIT_ERROR_MSGS = [MEM_LIMIT_EXCEEDED_MSG, MEM_LIMIT_TOO_LOW_FOR_RESERVATION]
 
 class TestQueryMemLimitScaling(ImpalaTestSuite):
   """Test class to do functional validation of per query memory limits. """
@@ -88,30 +89,6 @@ class TestExprMemUsage(ImpalaTestSuite):
     self.execute_query_expect_success(self.client,
       "select count(*) from lineitem where lower(l_comment) = 'hello'", exec_options,
       table_format=vector.get_value('table_format'))
-
-
-class TestInitialReservation(ImpalaTestSuite):
-  @classmethod
-  def get_workload(self):
-    # Note: this workload doesn't run exhaustively. See IMPALA-3947 before trying to move
-    # this test to exhaustive.
-    return 'tpch'
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestInitialReservation, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format in ['parquet'])
-
-  def test_initial_reservation(self, vector):
-    """Test failure to get the initial reservation."""
-    exec_options = copy(vector.get_value('exec_option'))
-    exec_options['mem_limit'] = '20m'
-    query = """select * from tpch_parquet.lineitem l1
-               join tpch_parquet.lineitem l2 on l1.l_orderkey = l2.l_orderkey"""
-    result = self.execute_query_expect_failure(self.client, query, exec_options)
-    assert (INITIAL_RESERVATION_MSG in str(result))
 
 
 class TestLowMemoryLimits(ImpalaTestSuite):

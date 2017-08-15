@@ -328,6 +328,11 @@ error_codes = (
   ("MINIMUM_RESERVATION_UNAVAILABLE", 106, "Failed to get minimum memory reservation of "
      "$0 on daemon $1:$2 for query $3 because it would exceed an applicable query, "
      "request pool or process memory limit. Memory usage:\\n$4"),
+
+  ("ADMISSION_REJECTED", 107, "Rejected query from pool $0: $1"),
+
+  ("ADMISSION_TIMED_OUT", 108, "Admission for query exceeded timeout $0ms in pool $1. "
+     "Queued reason: $2"),
 )
 
 import sys

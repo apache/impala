@@ -1583,18 +1583,8 @@ from functional.alltypestiny order by id
 int, bigint, bigint, double
 ====
 ---- QUERY
-# Regression test for IMPALA-2265, IMPALA-2559. The buffer_pool_limit is tuned to
-# reproduce the issue when running this query against functional_parquet.
-SET default_spillable_buffer_size=8m;
-SET buffer_pool_limit=16m;
-SELECT lag(-180, 13) over (ORDER BY t1.int_col ASC, t2.int_col ASC) AS int_col
-FROM functional_parquet.alltypes t1 CROSS JOIN functional_parquet.alltypes t2 LIMIT 10;
----- CATCH
-Failed to get minimum memory reservation
-====
----- QUERY
-# Check that the above query can succeed with the minimum buffers (3 buffers for sort,
-# 2 buffer for analytic).
+# Check that the a large analytic query can succeed with the minimum buffers (3 buffers
+# for sort, 2 buffer for analytic).
 SET default_spillable_buffer_size=8m;
 SET buffer_pool_limit=40m;
 SELECT lag(-180, 13) over (ORDER BY t1.int_col ASC, t2.int_col ASC) AS int_col

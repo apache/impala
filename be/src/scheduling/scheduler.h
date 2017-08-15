@@ -89,8 +89,7 @@ class Scheduler {
   impala::Status Init();
 
   /// Populates given query schedule and assigns fragments to hosts based on scan
-  /// ranges in the query exec request. Submits schedule to admission control before
-  /// returning.
+  /// ranges in the query exec request.
   Status Schedule(QuerySchedule* schedule);
 
  private:

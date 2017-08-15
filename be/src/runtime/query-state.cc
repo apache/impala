@@ -24,6 +24,7 @@
 #include "runtime/backend-client.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
+#include "runtime/bufferpool/reservation-util.h"
 #include "runtime/exec-env.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/initial-reservations.h"
@@ -37,20 +38,6 @@
 #include "common/names.h"
 
 using namespace impala;
-
-// The fraction of the query mem limit that is used for buffer reservations. Most
-// operators that accumulate memory use reservations, so the majority of memory should
-// be allocated to buffer reservations, as a heuristic.
-// TODO: this will go away once all operators use buffer reservations.
-static const double RESERVATION_MEM_FRACTION = 0.8;
-
-// The minimum amount of memory that should be left after buffer reservations.
-// The limit on reservations is computed as:
-// min(query_limit * RESERVATION_MEM_FRACTION,
-//     query_limit - RESERVATION_MEM_MIN_REMAINING)
-// TODO: this will go away once all operators use buffer reservations and we have accurate
-// minimum requirements.
-static const int64_t RESERVATION_MEM_MIN_REMAINING = 100 * 1024 * 1024;
 
 QueryState::ScopedRef::ScopedRef(const TUniqueId& query_id) {
   DCHECK(ExecEnv::GetInstance()->query_exec_mgr() != nullptr);
@@ -172,9 +159,7 @@ Status QueryState::InitBufferPoolState() {
     max_reservation = numeric_limits<int64_t>::max();
   } else {
     DCHECK_GE(mem_limit, 0);
-    max_reservation = min<int64_t>(
-        mem_limit * RESERVATION_MEM_FRACTION, mem_limit - RESERVATION_MEM_MIN_REMAINING);
-    max_reservation = max<int64_t>(0, max_reservation);
+    max_reservation = ReservationUtil::GetReservationLimitFromMemLimit(mem_limit);
   }
   VLOG_QUERY << "Buffer pool limit for " << PrintId(query_id()) << ": " << max_reservation;
 
