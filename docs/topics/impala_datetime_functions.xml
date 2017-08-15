@@ -1082,6 +1082,68 @@ select int_months_between('2015-03-31', '2015-01-30');
 
       </dlentry>
 
+      <dlentry id="last_day" rev="2.9.0 IMPALA-5316">
+
+        <dt>
+          <codeph>last_day(timestamp t)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="hidden">last_day() function</indexterm>
+          <b>Purpose:</b> Returns a <codeph>TIMESTAMP</codeph> corresponding to
+          the beginning of the last calendar day in the same month as the
+          <codeph>TIMESTAMP</codeph> argument.
+          <p>
+            <b>Return type:</b> <codeph>timestamp</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/added_in_290"/>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            If the input argument does not represent a valid Impala <codeph>TIMESTAMP</codeph>
+            including both date and time portions, the function returns <codeph>NULL</codeph>.
+            For example, if the input argument is a string that cannot be implicitly cast to
+            <codeph>TIMESTAMP</codeph>, does not include a date portion, or is out of the
+            allowed range for Impala <codeph>TIMESTAMP</codeph> values, the function returns
+            <codeph>NULL</codeph>.
+          </p>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            The following example shows how to examine the current date, and dates around the
+            end of the month, as <codeph>TIMESTAMP</codeph> values with any time portion removed:
+          </p>
+<codeblock>
+select
+    now() as right_now
+  , trunc(now(),'dd') as today
+  , last_day(now()) as last_day_of_month
+  , last_day(now()) + interval 1 day as first_of_next_month;
++-------------------------------+---------------------+---------------------+---------------------+
+| right_now                     | today               | last_day_of_month   | first_of_next_month |
++-------------------------------+---------------------+---------------------+---------------------+
+| 2017-08-15 15:07:58.823812000 | 2017-08-15 00:00:00 | 2017-08-31 00:00:00 | 2017-09-01 00:00:00 |
++-------------------------------+---------------------+---------------------+---------------------+
+</codeblock>
+          <p>
+            The following example shows how to examine the current date and dates around the
+            end of the month as integers representing the day of the month:
+          </p>
+<codeblock>
+select
+    now() as right_now
+  , dayofmonth(now()) as day
+  , extract(day from now()) as also_day
+  , dayofmonth(last_day(now())) as last_day
+  , extract(day from last_day(now())) as also_last_day;
++-------------------------------+-----+----------+----------+---------------+
+| right_now                     | day | also_day | last_day | also_last_day |
++-------------------------------+-----+----------+----------+---------------+
+| 2017-08-15 15:07:59.417755000 | 15  | 15       | 31       | 31            |
++-------------------------------+-----+----------+----------+---------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
       <dlentry rev="1.3.0" id="microseconds_add">
 
         <dt>
