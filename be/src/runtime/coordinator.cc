@@ -389,7 +389,8 @@ Status Coordinator::FinishBackendStartup() {
   Status status = Status::OK();
   const TMetricDef& def =
       MakeTMetricDef("backend-startup-latencies", TMetricKind::HISTOGRAM, TUnit::TIME_MS);
-  HistogramMetric latencies(def, 20000, 3);
+  // Capture up to 30 minutes of start-up times, in ms, with 4 s.f. accuracy.
+  HistogramMetric latencies(def, 30 * 60 * 1000, 4);
   for (BackendState* backend_state: backend_states_) {
     // preserve the first non-OK, if there is one
     Status backend_status = backend_state->GetStatus();
