@@ -33,6 +33,8 @@ DECLARE_string(webserver_certificate_file);
 DECLARE_string(webserver_private_key_file);
 DECLARE_string(webserver_private_key_password_cmd);
 DECLARE_string(webserver_x_frame_options);
+DECLARE_string(ssl_cipher_list);
+DECLARE_string(ssl_minimum_version);
 
 #include "common/names.h"
 
@@ -241,6 +243,44 @@ TEST(Webserver, SslBadPrivateKeyPasswordTest) {
       Substitute("$0/be/src/testutil/server-key-password.pem", getenv("IMPALA_HOME")));
   auto cmd = ScopedFlagSetter<string>::Make(
       &FLAGS_webserver_private_key_password_cmd, "echo wrongpassword");
+
+  Webserver webserver(FLAGS_webserver_port);
+  ASSERT_FALSE(webserver.Start().ok());
+}
+
+TEST(Webserver, SslCipherSuite) {
+  auto cert = ScopedFlagSetter<string>::Make(&FLAGS_webserver_certificate_file,
+      Substitute("$0/be/src/testutil/server-cert.pem", getenv("IMPALA_HOME")));
+  auto key = ScopedFlagSetter<string>::Make(&FLAGS_webserver_private_key_file,
+      Substitute("$0/be/src/testutil/server-key-password.pem", getenv("IMPALA_HOME")));
+  auto cmd = ScopedFlagSetter<string>::Make(
+      &FLAGS_webserver_private_key_password_cmd, "echo password");
+
+  {
+    auto ciphers = ScopedFlagSetter<string>::Make(
+        &FLAGS_ssl_cipher_list, "not_a_cipher");
+    Webserver webserver(FLAGS_webserver_port);
+    ASSERT_FALSE(webserver.Start().ok());
+  }
+
+  {
+    auto ciphers = ScopedFlagSetter<string>::Make(
+        &FLAGS_ssl_cipher_list, "RC4-SHA");
+    Webserver webserver(FLAGS_webserver_port);
+    ASSERT_OK(webserver.Start());
+  }
+}
+
+TEST(Webserver, SslBadTlsVersion) {
+  auto cert = ScopedFlagSetter<string>::Make(&FLAGS_webserver_certificate_file,
+      Substitute("$0/be/src/testutil/server-cert.pem", getenv("IMPALA_HOME")));
+  auto key = ScopedFlagSetter<string>::Make(&FLAGS_webserver_private_key_file,
+      Substitute("$0/be/src/testutil/server-key-password.pem", getenv("IMPALA_HOME")));
+  auto cmd = ScopedFlagSetter<string>::Make(
+      &FLAGS_webserver_private_key_password_cmd, "echo password");
+
+  auto ssl_version = ScopedFlagSetter<string>::Make(
+      &FLAGS_ssl_minimum_version, "not_a_version");
 
   Webserver webserver(FLAGS_webserver_port);
   ASSERT_FALSE(webserver.Start().ok());

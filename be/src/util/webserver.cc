@@ -101,6 +101,8 @@ DEFINE_string(webserver_x_frame_options, "DENY",
     "webserver will add X-Frame-Options HTTP header with this value");
 
 DECLARE_bool(is_coordinator);
+DECLARE_string(ssl_minimum_version);
+DECLARE_string(ssl_cipher_list);
 
 static const char* DOC_FOLDER = "/www/";
 static const int DOC_FOLDER_LEN = strlen(DOC_FOLDER);
@@ -260,6 +262,13 @@ Status Webserver::Start() {
         options.push_back("ssl_private_key_password");
         options.push_back(key_password.c_str());
       }
+    }
+
+    options.push_back("ssl_min_version");
+    options.push_back(FLAGS_ssl_minimum_version.c_str());
+    if (!FLAGS_ssl_cipher_list.empty()) {
+      options.push_back("ssl_ciphers");
+      options.push_back(FLAGS_ssl_cipher_list.c_str());
     }
   }
 
