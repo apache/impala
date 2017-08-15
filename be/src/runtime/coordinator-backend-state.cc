@@ -94,8 +94,8 @@ void Coordinator::BackendState::SetRpcParams(
   rpc_params->__set_protocol_version(ImpalaInternalServiceVersion::V1);
   rpc_params->__set_coord_state_idx(state_idx_);
   rpc_params->__set_min_reservation_bytes(backend_exec_params_->min_reservation_bytes);
-  rpc_params->__set_initial_reservation_total_bytes(
-      backend_exec_params_->initial_reservation_total_bytes);
+  rpc_params->__set_initial_reservation_total_claims(
+      backend_exec_params_->initial_reservation_total_claims);
 
   // set fragment_ctxs and fragment_instance_ctxs
   rpc_params->__isset.fragment_ctxs = true;

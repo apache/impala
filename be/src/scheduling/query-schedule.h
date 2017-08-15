@@ -53,13 +53,18 @@ struct BackendExecParams {
   /// FInstanceExecParams are owned by QuerySchedule::fragment_exec_params_.
   std::vector<const FInstanceExecParams*> instance_params;
 
-  // The minimum reservation size (in bytes) required for all fragments in
-  // instance_params.
+  // The minimum query-wide buffer reservation size (in bytes) required for this backend.
+  // This is the peak minimum reservation that may be required by the
+  // concurrently-executing operators at any point in query execution. It may be less
+  // than the initial reservation total claims (below) if execution of some operators
+  // never overlaps, which allows reuse of reservations.
   int64_t min_reservation_bytes;
 
-  // The total of initial reservations (in bytes) that will be claimed over the lifetime
-  // of this query for the fragments in instance_params.
-  int64_t initial_reservation_total_bytes;
+  // Total of the initial buffer reservations that we expect to be claimed on this
+  // backend for all fragment instances in instance_params. I.e. the sum over all
+  // operators in all fragment instances that execute on this backend. This is used for
+  // an optimization in InitialReservation. Measured in bytes.
+  int64_t initial_reservation_total_claims;
 };
 
 /// map from an impalad host address to the list of assigned fragment instance params.

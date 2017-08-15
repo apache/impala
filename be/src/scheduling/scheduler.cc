@@ -708,8 +708,8 @@ void Scheduler::ComputeBackendExecParams(QuerySchedule* schedule) {
       // i.e. that this backend's peak resources is the sum of the per-fragment-instance
       // peak resources for the instances executing on this backend.
       be_params.min_reservation_bytes += f.fragment.min_reservation_bytes;
-      be_params.initial_reservation_total_bytes +=
-          f.fragment.initial_reservation_total_bytes;
+      be_params.initial_reservation_total_claims +=
+          f.fragment.initial_reservation_total_claims;
     }
   }
   schedule->set_per_backend_exec_params(per_backend_params);

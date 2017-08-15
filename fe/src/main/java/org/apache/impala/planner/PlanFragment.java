@@ -112,7 +112,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
 
   // The total of initial reservations (in bytes) that will be claimed over the lifetime
   // of this fragment. Computed in computeResourceProfile().
-  private long initialReservationTotalBytes_ = -1;
+  private long initialReservationTotalClaims_ = -1;
 
   /**
    * C'tor for fragment with specific partition; the output is by default broadcast.
@@ -238,9 +238,9 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     resourceProfile_ =
         planTreeProfile.duringOpenProfile.max(fInstancePostOpenProfile);
 
-    initialReservationTotalBytes_ = sink_.getResourceProfile().getMinReservationBytes();
+    initialReservationTotalClaims_ = sink_.getResourceProfile().getMinReservationBytes();
     for (PlanNode node: collectPlanNodes()) {
-      initialReservationTotalBytes_ +=
+      initialReservationTotalClaims_ +=
           node.getNodeResourceProfile().getMinReservationBytes();
     }
   }
@@ -313,12 +313,12 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     if (sink_ != null) result.setOutput_sink(sink_.toThrift());
     result.setPartition(dataPartition_.toThrift());
     if (resourceProfile_.isValid()) {
-      Preconditions.checkArgument(initialReservationTotalBytes_ > -1);
+      Preconditions.checkArgument(initialReservationTotalClaims_ > -1);
       result.setMin_reservation_bytes(resourceProfile_.getMinReservationBytes());
-      result.setInitial_reservation_total_bytes(initialReservationTotalBytes_);
+      result.setInitial_reservation_total_claims(initialReservationTotalClaims_);
     } else {
       result.setMin_reservation_bytes(0);
-      result.setInitial_reservation_total_bytes(0);
+      result.setInitial_reservation_total_claims(0);
     }
     return result;
   }
