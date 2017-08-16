@@ -91,6 +91,11 @@ class ImpalaHttpHandler {
   void QuerySummaryHandler(bool include_plan_json, bool include_summary,
       const Webserver::ArgumentMap& args, rapidjson::Document* document);
 
+  /// If 'args' contains a query id, serializes all backend states for that query to
+  /// 'document'.
+  void QueryBackendsHandler(
+      const Webserver::ArgumentMap& args, rapidjson::Document* document);
+
   /// Cancels an in-flight query and writes the result to 'contents'.
   void CancelQueryHandler(const Webserver::ArgumentMap& args,
       rapidjson::Document* document);

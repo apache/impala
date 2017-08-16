@@ -47,6 +47,7 @@
 #include "common/names.h"
 
 using namespace impala;
+using namespace rapidjson;
 namespace accumulators = boost::accumulators;
 
 Coordinator::BackendState::BackendState(
@@ -249,6 +250,8 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
     ProgressUpdater* scan_range_progress) {
   lock_guard<SpinLock> l1(exec_summary->lock);
   lock_guard<mutex> l2(lock_);
+  last_report_time_ms_ = MonotonicMillis();
+
   // If this backend completed previously, don't apply the update.
   if (IsDone()) return false;
   for (const TFragmentInstanceExecStatus& instance_exec_status:
@@ -560,4 +563,27 @@ void Coordinator::FragmentStats::AddExecStats() {
   // why plural?
   avg_profile_->AddInfoString("execution rates", rates_label.str());
   avg_profile_->AddInfoString("num instances", lexical_cast<string>(num_instances_));
+}
+
+void Coordinator::BackendState::ToJson(Value* value, Document* document) {
+  lock_guard<mutex> l(lock_);
+  value->AddMember("num_instances", fragments_.size(), document->GetAllocator());
+  value->AddMember("done", IsDone(), document->GetAllocator());
+  value->AddMember(
+      "peak_mem_consumption", peak_consumption_, document->GetAllocator());
+
+  string host = TNetworkAddressToString(impalad_address());
+  Value val(host.c_str(), document->GetAllocator());
+  value->AddMember("host", val, document->GetAllocator());
+
+  value->AddMember("rpc_latency", rpc_latency(), document->GetAllocator());
+  value->AddMember("time_since_last_heard_from", MonotonicMillis() - last_report_time_ms_,
+      document->GetAllocator());
+
+  string status_str = status_.ok() ? "OK" : status_.GetDetail();
+  Value status_val(status_str.c_str(), document->GetAllocator());
+  value->AddMember("status", status_val, document->GetAllocator());
+
+  value->AddMember(
+      "num_remaining_instances", num_remaining_instances_, document->GetAllocator());
 }

@@ -18,20 +18,21 @@
 #ifndef IMPALA_RUNTIME_COORDINATOR_H
 #define IMPALA_RUNTIME_COORDINATOR_H
 
-#include <vector>
 #include <string>
-#include <boost/scoped_ptr.hpp>
+#include <vector>
 #include <boost/accumulators/accumulators.hpp>
-#include <boost/accumulators/statistics/stats.hpp>
-#include <boost/accumulators/statistics/min.hpp>
+#include <boost/accumulators/statistics/max.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/accumulators/statistics/median.hpp>
-#include <boost/accumulators/statistics/max.hpp>
+#include <boost/accumulators/statistics/min.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
+#include <boost/scoped_ptr.hpp>
+#include <boost/thread/condition_variable.hpp>
+#include <boost/thread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/condition_variable.hpp>
+#include <rapidjson/document.h>
 
 #include "common/global-types.h"
 #include "common/hdfs.h"
@@ -185,6 +186,10 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// filter ID have been received (may be 1 or more per filter), broadcast the global
   /// filter to fragment instances.
   void UpdateFilter(const TUpdateFilterParams& params);
+
+  /// Adds to 'document' a serialized array of all backends in a member named
+  /// 'backend_states'.
+  void BackendsToJson(rapidjson::Document* document);
 
  private:
   class BackendState;

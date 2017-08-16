@@ -71,6 +71,7 @@
 #include "common/names.h"
 
 using namespace apache::thrift;
+using namespace rapidjson;
 using namespace strings;
 using boost::algorithm::iequals;
 using boost::algorithm::is_any_of;
@@ -1220,5 +1221,16 @@ void Coordinator::GetTExecSummary(TExecSummary* exec_summary) {
 
 MemTracker* Coordinator::query_mem_tracker() const {
   return query_state()->query_mem_tracker();
+}
+
+void Coordinator::BackendsToJson(Document* doc) {
+  lock_guard<mutex> l(lock_);
+  Value states(kArrayType);
+  for (BackendState* state : backend_states_) {
+    Value val(kObjectType);
+    state->ToJson(&val, doc);
+    states.PushBack(val, doc->GetAllocator());
+  }
+  doc->AddMember("backend_states", states, doc->GetAllocator());
 }
 }

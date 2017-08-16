@@ -113,6 +113,10 @@ class Coordinator::BackendState {
   /// debugging aid for backend deadlocks.
   static void LogFirstInProgress(std::vector<BackendState*> backend_states);
 
+  /// Serializes backend state to JSON by adding members to 'value', including total
+  /// number of instances, peak memory consumption, host and status amongst others.
+  void ToJson(rapidjson::Value* value, rapidjson::Document* doc);
+
  private:
   /// Execution stats for a single fragment instance.
   /// Not thread-safe.
@@ -212,6 +216,9 @@ class Coordinator::BackendState {
   /// peak memory used for this query (value of that node's query memtracker's
   /// peak_consumption()
   int64_t peak_consumption_;
+
+  /// Set in ApplyExecStatusReport(). Uses MonotonicMillis().
+  int64_t last_report_time_ms_ = 0;
 
   /// Fill in rpc_params based on state. Uses filter_routing_table to remove filters
   /// that weren't selected during its construction.
