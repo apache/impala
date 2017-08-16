@@ -113,7 +113,7 @@ string impala::PrintExecSummary(const TExecSummary& exec_summary) {
   if (!exec_summary.__isset.nodes) return "";
 
   TablePrinter printer;
-  printer.set_max_output_width(30);
+  printer.set_max_output_width(1000);
   printer.AddColumn("Operator", true);
   printer.AddColumn("#Hosts", false);
   printer.AddColumn("Avg Time", false);
