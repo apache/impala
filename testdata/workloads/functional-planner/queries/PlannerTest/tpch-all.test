@@ -2917,20 +2917,26 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-12:MERGING-EXCHANGE [UNPARTITIONED]
+14:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: count(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
 |
 07:SORT
 |  order by: count(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
 |
-06:AGGREGATE [FINALIZE]
+13:AGGREGATE [FINALIZE]
+|  output: count:merge(ps_suppkey)
+|  group by: p_brand, p_type, p_size
+|
+12:EXCHANGE [HASH(p_brand,p_type,p_size)]
+|
+06:AGGREGATE [STREAMING]
 |  output: count(ps_suppkey)
 |  group by: p_brand, p_type, p_size
 |
 11:AGGREGATE
 |  group by: p_brand, p_type, p_size, ps_suppkey
 |
-10:EXCHANGE [HASH(p_brand,p_type,p_size)]
+10:EXCHANGE [HASH(p_brand,p_type,p_size,ps_suppkey)]
 |
 05:AGGREGATE [STREAMING]
 |  group by: p_brand, p_type, p_size, ps_suppkey
@@ -2960,20 +2966,26 @@ PLAN-ROOT SINK
 ---- PARALLELPLANS
 PLAN-ROOT SINK
 |
-12:MERGING-EXCHANGE [UNPARTITIONED]
+14:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: count(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
 |
 07:SORT
 |  order by: count(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
 |
-06:AGGREGATE [FINALIZE]
+13:AGGREGATE [FINALIZE]
+|  output: count:merge(ps_suppkey)
+|  group by: p_brand, p_type, p_size
+|
+12:EXCHANGE [HASH(p_brand,p_type,p_size)]
+|
+06:AGGREGATE [STREAMING]
 |  output: count(ps_suppkey)
 |  group by: p_brand, p_type, p_size
 |
 11:AGGREGATE
 |  group by: p_brand, p_type, p_size, ps_suppkey
 |
-10:EXCHANGE [HASH(p_brand,p_type,p_size)]
+10:EXCHANGE [HASH(p_brand,p_type,p_size,ps_suppkey)]
 |
 05:AGGREGATE [STREAMING]
 |  group by: p_brand, p_type, p_size, ps_suppkey

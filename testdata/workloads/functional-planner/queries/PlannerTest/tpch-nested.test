@@ -1854,20 +1854,26 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-13:MERGING-EXCHANGE [UNPARTITIONED]
+15:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: count(s_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
 |
 09:SORT
 |  order by: count(s_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
 |
-08:AGGREGATE [FINALIZE]
+14:AGGREGATE [FINALIZE]
+|  output: count:merge(s_suppkey)
+|  group by: p_brand, p_type, p_size
+|
+13:EXCHANGE [HASH(p_brand,p_type,p_size)]
+|
+08:AGGREGATE [STREAMING]
 |  output: count(s_suppkey)
 |  group by: p_brand, p_type, p_size
 |
 12:AGGREGATE
 |  group by: p_brand, p_type, p_size, s_suppkey
 |
-11:EXCHANGE [HASH(p_brand,p_type,p_size)]
+11:EXCHANGE [HASH(p_brand,p_type,p_size,s_suppkey)]
 |
 07:AGGREGATE [STREAMING]
 |  group by: p_brand, p_type, p_size, s_suppkey

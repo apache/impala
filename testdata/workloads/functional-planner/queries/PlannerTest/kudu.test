@@ -90,19 +90,25 @@ INSERT INTO KUDU [functional_kudu.testtbl]
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
 |
-06:PARTIAL SORT
+08:PARTIAL SORT
 |  order by: KuduPartition(count(id)) ASC NULLS LAST, count(id) ASC NULLS LAST
 |
-05:EXCHANGE [KUDU(KuduPartition(count(id)))]
+07:EXCHANGE [KUDU(KuduPartition(count(id)))]
 |
-02:AGGREGATE [FINALIZE]
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(id)
+|  group by: name
+|
+05:EXCHANGE [HASH(name)]
+|
+02:AGGREGATE [STREAMING]
 |  output: count(id)
 |  group by: name
 |
 04:AGGREGATE
 |  group by: name, id
 |
-03:EXCHANGE [HASH(name)]
+03:EXCHANGE [HASH(name,id)]
 |
 01:AGGREGATE [STREAMING]
 |  group by: name, id

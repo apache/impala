@@ -402,14 +402,20 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
 WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
 |  partitions=1
 |
-02:AGGREGATE [FINALIZE]
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(int_col)
+|  group by: string_col
+|
+05:EXCHANGE [HASH(string_col)]
+|
+02:AGGREGATE [STREAMING]
 |  output: count(int_col)
 |  group by: string_col
 |
 04:AGGREGATE
 |  group by: string_col, int_col
 |
-03:EXCHANGE [HASH(string_col)]
+03:EXCHANGE [HASH(string_col,int_col)]
 |
 01:AGGREGATE [STREAMING]
 |  group by: string_col, int_col
