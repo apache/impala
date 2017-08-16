@@ -30,7 +30,10 @@ from kudu.schema import (
 from kudu.client import Partitioning
 import logging
 import pytest
+import random
 import textwrap
+import threading
+import time
 from datetime import datetime
 from pytz import utc
 
@@ -394,6 +397,48 @@ class TestKuduOperations(KuduTestSuite):
         i += 1
     cursor.execute("select count(*) from %s" % table_name)
     print cursor.fetchall() == [(i, )]
+
+  def test_concurrent_schema_change(self, cursor, unique_database):
+    """Tests that an insert into a Kudu table with a concurrent schema change either
+    succeeds or fails gracefully."""
+    table_name = "%s.test_schema_change" % unique_database
+    cursor.execute("""create table %s (col0 bigint primary key, col1 bigint)
+    partition by hash(col0) partitions 16 stored as kudu""" % table_name)
+
+    iters = 5
+    def insert_values():
+      threading.current_thread().errors = []
+      client = self.create_impala_client()
+      for i in range(0, iters):
+        time.sleep(random.random()) # sleeps for up to one second
+        try:
+          client.execute("insert into %s values (0, 0), (1, 1)" % table_name)
+        except Exception as e:
+          threading.current_thread().errors.append(e)
+
+    insert_thread = threading.Thread(target=insert_values)
+    insert_thread.start()
+
+    for i in range(0, iters):
+      time.sleep(random.random()) # sleeps for up to one second
+      cursor.execute("alter table %s drop column col1" % table_name)
+      if i % 2 == 0:
+        cursor.execute("alter table %s add columns (col1 string)" % table_name)
+      else:
+        cursor.execute("alter table %s add columns (col1 bigint)" % table_name)
+
+    insert_thread.join()
+
+    for error in insert_thread.errors:
+      msg = str(error)
+      # The first two are AnalysisExceptions, the next two come from KuduTableSink::Open()
+      # if the schema has changed since analysis, the last comes from the Kudu server if
+      # the schema changes between KuduTableSink::Open() and when the write ops are sent.
+      assert "has fewer columns (1) than the SELECT / VALUES clause returns (2)" in msg \
+        or "(type: TINYINT) is not compatible with column 'col1' (type: STRING)" in msg \
+        or "has fewer columns than expected." in msg \
+        or "Column col1 has unexpected type." in msg \
+        or "Client provided column col1[int64 NULLABLE] not present in tablet" in msg
 
 class TestCreateExternalTable(KuduTestSuite):
 

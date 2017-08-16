@@ -78,5 +78,8 @@ void LogKuduMessage(kudu::client::KuduLogSeverity severity, const char* filename
 Status WriteKuduValue(int col, PrimitiveType type, const void* value,
     bool copy_strings, kudu::KuduPartialRow* row) WARN_UNUSED_RESULT;
 
+/// Takes a Kudu client DataType and returns the corresponding Impala ColumnType.
+ColumnType KuduDataTypeToColumnType(kudu::client::KuduColumnSchema::DataType type);
+
 } /// namespace impala
 #endif
