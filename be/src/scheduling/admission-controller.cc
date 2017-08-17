@@ -218,12 +218,13 @@ AdmissionController::AdmissionController(StatestoreSubscriber* subscriber,
       metrics_group_(metrics),
       host_id_(TNetworkAddressToString(host_addr)),
       thrift_serializer_(false),
-      done_(false) {
-  dequeue_thread_.reset(new Thread("scheduling", "admission-thread",
-        &AdmissionController::DequeueLoop, this));
-}
+      done_(false) {}
 
 AdmissionController::~AdmissionController() {
+  // If the dequeue thread is not running (e.g. if Init() fails), then there is
+  // nothing to do.
+  if (dequeue_thread_ == nullptr) return;
+
   // The AdmissionController should live for the lifetime of the impalad, but
   // for unit tests we need to ensure that no thread is waiting on the
   // condition variable. This notifies the dequeue thread to stop and waits
@@ -238,6 +239,8 @@ AdmissionController::~AdmissionController() {
 }
 
 Status AdmissionController::Init() {
+  RETURN_IF_ERROR(Thread::Create("scheduling", "admission-thread",
+      &AdmissionController::DequeueLoop, this, &dequeue_thread_));
   StatestoreSubscriber::UpdateCallback cb =
     bind<void>(mem_fn(&AdmissionController::UpdatePoolStats), this, _1, _2);
   Status status = subscriber_->AddTopic(IMPALA_REQUEST_QUEUE_TOPIC, true, cb);

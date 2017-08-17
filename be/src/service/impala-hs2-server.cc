@@ -464,21 +464,16 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
         QueryResultSet::CreateHS2ResultSet(
             session->hs2_version, *request_state->result_metadata(), nullptr),
         cache_num_rows);
-    if (!status.ok()) {
-      discard_result(UnregisterQuery(request_state->query_id(), false, &status));
-      HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
-    }
+    if (!status.ok()) goto return_error;
   }
   request_state->UpdateNonErrorQueryState(beeswax::QueryState::RUNNING);
   // Start thread to wait for results to become available.
-  request_state->WaitAsync();
+  status = request_state->WaitAsync();
+  if (!status.ok()) goto return_error;
   // Once the query is running do a final check for session closure and add it to the
   // set of in-flight queries.
   status = SetQueryInflight(session, request_state);
-  if (!status.ok()) {
-    discard_result(UnregisterQuery(request_state->query_id(), false, &status));
-    HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
-  }
+  if (!status.ok()) goto return_error;
   return_val.__isset.operationHandle = true;
   return_val.operationHandle.__set_operationType(TOperationType::EXECUTE_STATEMENT);
   return_val.operationHandle.__set_hasResultSet(request_state->returns_result_set());
@@ -489,6 +484,11 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
       apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
 
   VLOG_QUERY << "ExecuteStatement(): return_val=" << ThriftDebugString(return_val);
+  return;
+
+ return_error:
+  discard_result(UnregisterQuery(request_state->query_id(), false, &status));
+  HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
 }
 
 void ImpalaServer::GetTypeInfo(TGetTypeInfoResp& return_val,

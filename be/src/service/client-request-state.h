@@ -78,7 +78,7 @@ class ClientRequestState {
   void Wait();
 
   /// Calls Wait() asynchronously in a thread and returns immediately.
-  void WaitAsync();
+  Status WaitAsync();
 
   /// BlockOnWait() may be called after WaitAsync() has been called in order to wait
   /// for the asynchronous thread (wait_thread_) to complete. It is safe to call this
@@ -250,7 +250,7 @@ class ClientRequestState {
   ExecEnv* exec_env_;
 
   /// Thread for asynchronously running Wait().
-  boost::scoped_ptr<Thread> wait_thread_;
+  std::unique_ptr<Thread> wait_thread_;
 
   /// Condition variable to make BlockOnWait() thread-safe. One thread joins
   /// wait_thread_, and all other threads block on this cv. Used with lock_.

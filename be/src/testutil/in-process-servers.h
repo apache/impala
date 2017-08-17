@@ -141,7 +141,7 @@ class InProcessStatestore {
   /// Statestore Thrift server
   boost::scoped_ptr<ThriftServer> statestore_server_;
 
-  boost::scoped_ptr<Thread> statestore_main_loop_;
+  std::unique_ptr<Thread> statestore_main_loop_;
 };
 
 }

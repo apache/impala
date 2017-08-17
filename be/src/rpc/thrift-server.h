@@ -209,7 +209,7 @@ class ThriftServer {
   const std::string name_;
 
   /// Thread that runs ThriftServerEventProcessor::Supervise() in a separate loop
-  boost::scoped_ptr<Thread> server_thread_;
+  std::unique_ptr<Thread> server_thread_;
 
   /// Thrift housekeeping
   boost::scoped_ptr<apache::thrift::server::TServer> server_;

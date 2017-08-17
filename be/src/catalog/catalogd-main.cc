@@ -75,7 +75,7 @@ int CatalogdMain(int argc, char** argv) {
 
   ABORT_IF_ERROR(metrics->Init(FLAGS_enable_webserver ? webserver.get() : nullptr));
   ABORT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), true, nullptr, nullptr));
-  StartMemoryMaintenanceThread();
+  ABORT_IF_ERROR(StartMemoryMaintenanceThread());
   ABORT_IF_ERROR(StartThreadInstrumentation(metrics.get(), webserver.get(), true));
 
   InitRpcEventTracing(webserver.get());

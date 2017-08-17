@@ -19,6 +19,7 @@
 #define IMPALA_COMMON_INIT_H
 
 #include "util/test-info.h"
+#include "common/status.h"
 
 namespace impala {
 
@@ -33,7 +34,7 @@ void InitCommonRuntime(int argc, char** argv, bool init_jvm,
 /// Starts background memory maintenance thread. Must be called after
 /// RegisterMemoryMetrics(). This thread is needed for daemons to free memory and
 /// refresh metrics but is not needed for standalone tests.
-void StartMemoryMaintenanceThread();
+Status StartMemoryMaintenanceThread() WARN_UNUSED_RESULT;
 }
 
 #endif

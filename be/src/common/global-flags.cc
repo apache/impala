@@ -137,6 +137,9 @@ DEFINE_int32(fault_injection_rpc_exception_type, 0, "A fault injection option th
     "in debug builds only");
 DEFINE_int32(stress_scratch_write_delay_ms, 0, "A stress option which causes writes to "
     "scratch files to be to be delayed to simulate slow writes.");
+DEFINE_bool(thread_creation_fault_injection, false, "A fault injection option that "
+    " causes calls to Thread::Create() to fail randomly 1% of the time on eligible "
+    " codepaths. Effective in debug builds only.");
 #endif
 
 // Used for testing the path where the Kudu client is stubbed.

@@ -219,7 +219,7 @@ class AdmissionController {
   MetricGroup* metrics_group_;
 
   /// Thread dequeuing and admitting queries.
-  boost::scoped_ptr<Thread> dequeue_thread_;
+  std::unique_ptr<Thread> dequeue_thread_;
 
   // The local impalad's host/port id, used to construct topic keys.
   const std::string host_id_;

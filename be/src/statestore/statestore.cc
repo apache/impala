@@ -256,6 +256,12 @@ Statestore::Statestore(MetricGroup* metrics)
   heartbeat_client_cache_->InitMetrics(metrics, "subscriber-heartbeat");
 }
 
+Status Statestore::Init() {
+  RETURN_IF_ERROR(subscriber_topic_update_threadpool_.Init());
+  RETURN_IF_ERROR(subscriber_heartbeat_threadpool_.Init());
+  return Status::OK();
+}
+
 void Statestore::RegisterWebpages(Webserver* webserver) {
   Webserver::UrlCallback topics_callback =
       bind<void>(mem_fn(&Statestore::TopicsHandler), this, _1, _2);

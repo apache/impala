@@ -415,6 +415,7 @@ TEST(ConcurrencyTest, DISABLED_ManyConcurrentConnections) {
         Status status = client->Open();
         ASSERT_OK(status);
       });
+  ASSERT_OK(pool.Init());
   for (int i = 0; i < 1024 * 16; ++i) pool.Offer(i);
   pool.DrainAndShutdown();
 }

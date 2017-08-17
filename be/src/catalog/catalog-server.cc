@@ -170,9 +170,13 @@ Status CatalogServer::Start() {
 
   // This will trigger a full Catalog metadata load.
   catalog_.reset(new Catalog());
-  catalog_update_gathering_thread_.reset(new Thread("catalog-server",
-      "catalog-update-gathering-thread",
-      &CatalogServer::GatherCatalogUpdatesThread, this));
+  Status status = Thread::Create("catalog-server", "catalog-update-gathering-thread",
+      &CatalogServer::GatherCatalogUpdatesThread, this,
+      &catalog_update_gathering_thread_);
+  if (!status.ok()) {
+    status.AddDetail("CatalogService failed to start");
+    return status;
+  }
 
   statestore_subscriber_.reset(new StatestoreSubscriber(
      Substitute("catalog-server@$0", TNetworkAddressToString(server_address)),
@@ -180,7 +184,7 @@ Status CatalogServer::Start() {
 
   StatestoreSubscriber::UpdateCallback cb =
       bind<void>(mem_fn(&CatalogServer::UpdateCatalogTopicCallback), this, _1, _2);
-  Status status = statestore_subscriber_->AddTopic(IMPALA_CATALOG_TOPIC, false, cb);
+  status = statestore_subscriber_->AddTopic(IMPALA_CATALOG_TOPIC, false, cb);
   if (!status.ok()) {
     status.AddDetail("CatalogService failed to start");
     return status;

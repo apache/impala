@@ -35,8 +35,15 @@ Status ParallelExecutor::Exec(Function function, void** args, int num_args,
   for (int i = 0; i < num_args; ++i) {
     stringstream ss;
     ss << "worker-thread(" << i << ")";
-    worker_threads.AddThread(make_unique<Thread>("parallel-executor", ss.str(),
-        &ParallelExecutor::Worker, function, args[i], &lock, &status, latencies));
+    std::unique_ptr<Thread> t;
+    Status thread_status = Thread::Create("parallel-executor", ss.str(),
+        &ParallelExecutor::Worker, function, args[i], &lock, &status, latencies, &t);
+    if (!thread_status.ok()) {
+      unique_lock<mutex> l(lock);
+      status = thread_status;
+      break;
+    }
+    worker_threads.AddThread(move(t));
   }
   worker_threads.JoinAll();
 

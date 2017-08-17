@@ -111,8 +111,10 @@ class ThreadResourceMgr {
     /// each call to AcquireThreadToken and each successful call to TryAcquireThreadToken
     /// If the thread token is from AcquireThreadToken, required must be true; false
     /// if from TryAcquireThreadToken.
-    /// Must not be called from from ThreadAvailableCb.
-    void ReleaseThreadToken(bool required);
+    /// If 'skip_callbacks' is true, ReleaseThreadToken() will not run callbacks to find
+    /// a replacement for this thread. This is dangerous and can lead to underutilization
+    /// of the system.
+    void ReleaseThreadToken(bool required, bool skip_callbacks = false);
 
     /// Register a callback to be notified when a thread is available.
     /// Returns a unique id to be used when removing the callback.
@@ -266,7 +268,8 @@ inline bool ThreadResourceMgr::ResourcePool::TryAcquireThreadToken(bool* is_rese
   }
 }
 
-inline void ThreadResourceMgr::ResourcePool::ReleaseThreadToken(bool required) {
+inline void ThreadResourceMgr::ResourcePool::ReleaseThreadToken(
+    bool required, bool skip_callbacks) {
   if (required) {
     DCHECK_GT(num_required_threads(), 0);
     __sync_fetch_and_add(&num_threads_, -1);
@@ -282,7 +285,7 @@ inline void ThreadResourceMgr::ResourcePool::ReleaseThreadToken(bool required) {
       }
     }
   }
-  InvokeCallbacks();
+  if (!skip_callbacks) InvokeCallbacks();
 }
 
 } // namespace impala

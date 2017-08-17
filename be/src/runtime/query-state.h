@@ -155,8 +155,10 @@ class QueryState {
   void ReleaseResources();
 
   /// Sends a ReportExecStatus rpc to the coordinator. If fis == nullptr, the
-  /// status must be an error. If fis is given, expects that fis finished its Prepare
-  /// phase; it then sends a report for that instance, including its profile.
+  /// status must be an error. If fis is given, the content will depend on whether
+  /// the fis has finished its Prepare phase. It sends a report for the instance,
+  /// and it will include the profile if the fis is prepared. If the fis is not
+  /// prepared, the status must be an error.
   /// If there is an error during the rpc, initiates cancellation.
   void ReportExecStatus(bool done, const Status& status, FragmentInstanceState* fis);
 

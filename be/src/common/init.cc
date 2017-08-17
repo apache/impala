@@ -95,18 +95,18 @@ using std::string;
 // glog only automatically flushes the log file if logbufsecs has passed since the
 // previous flush when a new log is written. That means that on a quiet system, logs
 // will be buffered indefinitely. It also rotates log files.
-static scoped_ptr<impala::Thread> log_maintenance_thread;
+static unique_ptr<impala::Thread> log_maintenance_thread;
 
 // Memory Maintenance thread that runs periodically to free up memory. It does the
 // following things every memory_maintenance_sleep_time_ms secs:
 // 1) Releases BufferPool memory that is not currently in use.
 // 2) Frees excess memory that TCMalloc has left in its pageheap.
-static scoped_ptr<impala::Thread> memory_maintenance_thread;
+static unique_ptr<impala::Thread> memory_maintenance_thread;
 
 // A pause monitor thread to monitor process pauses in impala daemons. The thread sleeps
 // for a short interval of time (THREAD_SLEEP_TIME_MS), wakes up and calculates the actual
 // time slept. If that exceeds PAUSE_WARN_THRESHOLD_MS, a warning is logged.
-static scoped_ptr<impala::Thread> pause_monitor;
+static unique_ptr<impala::Thread> pause_monitor;
 
 [[noreturn]] static void LogMaintenanceThread() {
   while (true) {
@@ -205,10 +205,13 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   ABORT_IF_ERROR(impala::InitAuth(argv[0]));
 
   // Initialize maintenance_thread after InitGoogleLoggingSafe and InitThreading.
-  log_maintenance_thread.reset(
-      new Thread("common", "log-maintenance-thread", &LogMaintenanceThread));
+  Status thread_spawn_status = Thread::Create("common", "log-maintenance-thread",
+      &LogMaintenanceThread, &log_maintenance_thread);
+  if (!thread_spawn_status.ok()) CLEAN_EXIT_WITH_ERROR(thread_spawn_status.GetDetail());
 
-  pause_monitor.reset(new Thread("common", "pause-monitor", &PauseMonitorLoop));
+  thread_spawn_status = Thread::Create("common", "pause-monitor",
+      &PauseMonitorLoop, &pause_monitor);
+  if (!thread_spawn_status.ok()) CLEAN_EXIT_WITH_ERROR(thread_spawn_status.GetDetail());
 
   PeriodicCounterUpdater::Init();
 
@@ -251,8 +254,8 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
 #endif
 }
 
-void impala::StartMemoryMaintenanceThread() {
+Status impala::StartMemoryMaintenanceThread() {
   DCHECK(AggregateMemoryMetrics::NUM_MAPS != nullptr) << "Mem metrics not registered.";
-  memory_maintenance_thread.reset(
-      new Thread("common", "memory-maintenance-thread", &MemoryMaintenanceThread));
+  return Thread::Create("common", "memory-maintenance-thread",
+      &MemoryMaintenanceThread, &memory_maintenance_thread);
 }

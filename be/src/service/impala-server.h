@@ -745,13 +745,13 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   boost::scoped_ptr<SimpleLogger> lineage_logger_;
 
   /// If profile logging is enabled, wakes once every 5s to flush query profiles to disk
-  boost::scoped_ptr<Thread> profile_log_file_flush_thread_;
+  std::unique_ptr<Thread> profile_log_file_flush_thread_;
 
   /// If audit event logging is enabled, wakes once every 5s to flush audit events to disk
-  boost::scoped_ptr<Thread> audit_event_logger_flush_thread_;
+  std::unique_ptr<Thread> audit_event_logger_flush_thread_;
 
   /// If lineage logging is enabled, wakes once every 5s to flush lineage events to disk
-  boost::scoped_ptr<Thread> lineage_logger_flush_thread_;
+  std::unique_ptr<Thread> lineage_logger_flush_thread_;
 
   /// global, per-server state
   ExecEnv* exec_env_;  // not owned
@@ -762,7 +762,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   /// Thread that runs ExpireSessions. It will wake up periodically to check for sessions
   /// which are idle for more their timeout values.
-  boost::scoped_ptr<Thread> session_timeout_thread_;
+  std::unique_ptr<Thread> session_timeout_thread_;
 
   /// Contains all the non-zero idle session timeout values.
   std::multiset<int32_t> session_timeout_set_;
@@ -966,7 +966,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   ExpirationQueue queries_by_timestamp_;
 
   /// Container for a thread that runs ExpireQueries() if FLAGS_idle_query_timeout is set.
-  boost::scoped_ptr<Thread> query_expiration_thread_;
+  std::unique_ptr<Thread> query_expiration_thread_;
 
   /// Serializes TBackendDescriptors when creating topic updates
   ThriftSerializer thrift_serializer_;

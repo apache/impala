@@ -180,8 +180,11 @@ class HdfsScanNode : public HdfsScanNodeBase {
   Status GetNextInternal(RuntimeState* state, RowBatch* row_batch, bool* eos)
       WARN_UNUSED_RESULT;
 
-  /// sets done_ to true and triggers threads to cleanup. Cannot be called with
-  /// any locks taken. Calling it repeatedly ignores subsequent calls.
+  /// Sets done_ to true and triggers threads to cleanup. Must be called with lock_
+  /// taken. Calling it repeatedly ignores subsequent calls.
+  void SetDoneInternal();
+
+  /// Gets lock_ and calls SetDoneInternal()
   void SetDone();
 };
 

@@ -383,15 +383,16 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
           "impala-server", "cancellation-worker",
       FLAGS_cancellation_thread_pool_size, MAX_CANCELLATION_QUEUE_SIZE,
       bind<void>(&ImpalaServer::CancelFromThreadPool, this, _1, _2)));
+  ABORT_IF_ERROR(cancellation_thread_pool_->Init());
 
   // Initialize a session expiry thread which blocks indefinitely until the first session
   // with non-zero timeout value is opened. Note that a session which doesn't specify any
   // idle session timeout value will use the default value FLAGS_idle_session_timeout.
-  session_timeout_thread_.reset(new Thread("impala-server", "session-expirer",
-      bind<void>(&ImpalaServer::ExpireSessions, this)));
+  ABORT_IF_ERROR(Thread::Create("impala-server", "session-expirer",
+      bind<void>(&ImpalaServer::ExpireSessions, this), &session_timeout_thread_));
 
-  query_expiration_thread_.reset(new Thread("impala-server", "query-expirer",
-      bind<void>(&ImpalaServer::ExpireQueries, this)));
+  ABORT_IF_ERROR(Thread::Create("impala-server", "query-expirer",
+      bind<void>(&ImpalaServer::ExpireQueries, this), &query_expiration_thread_));
 
   is_coordinator_ = FLAGS_is_coordinator;
   is_executor_ = FLAGS_is_executor;
@@ -448,8 +449,8 @@ Status ImpalaServer::InitLineageLogging() {
   lineage_logger_.reset(new SimpleLogger(FLAGS_lineage_event_log_dir,
       LINEAGE_LOG_FILE_PREFIX, FLAGS_max_lineage_log_file_size));
   RETURN_IF_ERROR(lineage_logger_->Init());
-  lineage_logger_flush_thread_.reset(new Thread("impala-server",
-        "lineage-log-flush", &ImpalaServer::LineageLoggerFlushThread, this));
+  RETURN_IF_ERROR(Thread::Create("impala-server", "lineage-log-flush",
+      &ImpalaServer::LineageLoggerFlushThread, this, &lineage_logger_flush_thread_));
   return Status::OK();
 }
 
@@ -540,8 +541,9 @@ Status ImpalaServer::InitAuditEventLogging() {
   audit_event_logger_.reset(new SimpleLogger(FLAGS_audit_event_log_dir,
      AUDIT_EVENT_LOG_FILE_PREFIX, FLAGS_max_audit_event_log_file_size));
   RETURN_IF_ERROR(audit_event_logger_->Init());
-  audit_event_logger_flush_thread_.reset(new Thread("impala-server",
-        "audit-event-log-flush", &ImpalaServer::AuditEventLoggerFlushThread, this));
+  RETURN_IF_ERROR(Thread::Create("impala-server", "audit-event-log-flush",
+      &ImpalaServer::AuditEventLoggerFlushThread, this,
+      &audit_event_logger_flush_thread_));
   return Status::OK();
 }
 
@@ -600,8 +602,8 @@ Status ImpalaServer::InitProfileLogging() {
       PROFILE_LOG_FILE_PREFIX, FLAGS_max_profile_log_file_size,
       FLAGS_max_profile_log_files));
   RETURN_IF_ERROR(profile_logger_->Init());
-  profile_log_file_flush_thread_.reset(new Thread("impala-server", "log-flush-thread",
-      &ImpalaServer::LogFileFlushThread, this));
+  RETURN_IF_ERROR(Thread::Create("impala-server", "log-flush-thread",
+      &ImpalaServer::LogFileFlushThread, this, &profile_log_file_flush_thread_));
 
   return Status::OK();
 }

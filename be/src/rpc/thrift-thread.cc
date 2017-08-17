@@ -20,7 +20,10 @@
 #include <boost/bind.hpp>
 #include <sstream>
 
+#include <thrift/concurrency/Exception.h>
+
 #include "common/names.h"
+#include "common/status.h"
 
 using namespace impala;
 
@@ -29,8 +32,15 @@ namespace atc = apache::thrift::concurrency;
 
 void ThriftThread::start() {
   Promise<atc::Thread::id_t> promise;
-  impala_thread_.reset(new impala::Thread(group_, name_,
-      bind(&ThriftThread::RunRunnable, this, runnable(), &promise)));
+  Status status = impala::Thread::Create(group_, name_,
+      bind(&ThriftThread::RunRunnable, this, runnable(), &promise), &impala_thread_);
+
+  // Thread creation failed. Thrift expects an exception in this case. See
+  // the implementation of atc::PosixThreadFactory.cpp or atc::BoostThreadFactory.cpp.
+  if (!status.ok()) {
+    throw atc::SystemResourceException(
+        Substitute("Thread::Create() failed: $0", status.GetDetail()));
+  }
 
   // Blocks until the thread id has been set
   tid_ = promise.Get();

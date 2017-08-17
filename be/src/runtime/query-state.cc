@@ -291,6 +291,7 @@ void QueryState::StartFInstances() {
   VLOG_QUERY << "descriptor table for query=" << PrintId(query_id())
              << "\n" << desc_tbl_->DebugString();
 
+  Status thread_create_status;
   DCHECK_GT(rpc_params_.fragment_ctxs.size(), 0);
   TPlanFragmentCtx* fragment_ctx = &rpc_params_.fragment_ctxs[0];
   int fragment_ctx_idx = 0;
@@ -305,25 +306,35 @@ void QueryState::StartFInstances() {
     }
     FragmentInstanceState* fis = obj_pool_.Add(
         new FragmentInstanceState(this, *fragment_ctx, instance_ctx));
-    fis_map_.emplace(fis->instance_id(), fis);
-
-    // update fragment_map_
-    vector<FragmentInstanceState*>& fis_list = fragment_map_[instance_ctx.fragment_idx];
-    fis_list.push_back(fis);
 
     // start new thread to execute instance
     refcnt_.Add(1);  // decremented in ExecFInstance()
     initial_reservation_refcnt_.Add(1);  // decremented in ExecFInstance()
     string thread_name = Substitute(
         "exec-finstance (finst:$0)", PrintId(instance_ctx.fragment_instance_id));
-    Thread t(FragmentInstanceState::FINST_THREAD_GROUP_NAME, thread_name,
-        [this, fis]() { this->ExecFInstance(fis); });
-    t.Detach();
+    unique_ptr<Thread> t;
+    thread_create_status = Thread::Create(FragmentInstanceState::FINST_THREAD_GROUP_NAME,
+        thread_name, [this, fis]() { this->ExecFInstance(fis); }, &t, true);
+    if (!thread_create_status.ok()) {
+      // Undo refcnt increments done immediately prior to Thread::Create(). The
+      // reference counts were both greater than zero before the increments, so
+      // neither of these decrements will free any structures.
+      ReleaseInitialReservationRefcount();
+      ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(this);
+      break;
+    }
+    // Fragment instance successfully started
+    fis_map_.emplace(fis->instance_id(), fis);
+    // update fragment_map_
+    vector<FragmentInstanceState*>& fis_list = fragment_map_[instance_ctx.fragment_idx];
+    fis_list.push_back(fis);
+    t->Detach();
   }
 
   // don't return until every instance is prepared and record the first non-OK
-  // (non-CANCELLED if available) status
-  Status prepare_status;
+  // (non-CANCELLED if available) status (including any error from thread creation
+  // above).
+  Status prepare_status = thread_create_status;
   for (auto entry: fis_map_) {
     Status instance_status = entry.second->WaitForPrepare();
     // don't wipe out an error in one instance with the resulting CANCELLED from
@@ -333,6 +344,12 @@ void QueryState::StartFInstances() {
     }
   }
   instances_prepared_promise_.Set(prepare_status);
+  // If this is aborting due to failure in thread creation, report status to the
+  // coordinator to start query cancellation. (Other errors are reported by the
+  // fragment instance itself.)
+  if (!thread_create_status.ok()) {
+    ReportExecStatusAux(true, thread_create_status, nullptr, true);
+  }
 }
 
 void QueryState::ReleaseInitialReservationRefcount() {

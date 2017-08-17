@@ -70,7 +70,7 @@ int StatestoredMain(int argc, char** argv) {
   ABORT_IF_ERROR(
       metrics->Init(FLAGS_enable_webserver ? webserver.get() : nullptr));
   ABORT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), false, nullptr, nullptr));
-  StartMemoryMaintenanceThread();
+  ABORT_IF_ERROR(StartMemoryMaintenanceThread());
   ABORT_IF_ERROR(
     StartThreadInstrumentation(metrics.get(), webserver.get(), false));
   InitRpcEventTracing(webserver.get());
@@ -81,6 +81,7 @@ int StatestoredMain(int argc, char** argv) {
   CommonMetrics::InitCommonMetrics(metrics.get());
 
   Statestore statestore(metrics.get());
+  ABORT_IF_ERROR(statestore.Init());
   statestore.RegisterWebpages(webserver.get());
   boost::shared_ptr<TProcessor> processor(
       new StatestoreServiceProcessor(statestore.thrift_iface()));

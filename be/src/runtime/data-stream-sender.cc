@@ -77,7 +77,7 @@ class DataStreamSender::Channel : public CacheLineAligned {
       dest_node_id_(dest_node_id),
       num_data_bytes_sent_(0),
       rpc_thread_("DataStreamSender", "SenderThread", 1, 1,
-          bind<void>(mem_fn(&Channel::TransmitData), this, _1, _2)),
+          bind<void>(mem_fn(&Channel::TransmitData), this, _1, _2), true),
       rpc_in_flight_(false) {}
 
   // Initialize channel.
@@ -156,6 +156,7 @@ class DataStreamSender::Channel : public CacheLineAligned {
 };
 
 Status DataStreamSender::Channel::Init(RuntimeState* state) {
+  RETURN_IF_ERROR(rpc_thread_.Init());
   runtime_state_ = state;
   // TODO: figure out how to size batch_
   int capacity = max(1, buffer_size_ / max(row_desc_->GetRowSize(), 1));

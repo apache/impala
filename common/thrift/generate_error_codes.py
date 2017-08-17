@@ -331,6 +331,8 @@ error_codes = (
 
   ("ADMISSION_TIMED_OUT", 108, "Admission for query exceeded timeout $0ms in pool $1. "
      "Queued reason: $2"),
+
+  ("THREAD_CREATION_FAILED", 109, "Failed to create thread $0 in category $1: $2"),
 )
 
 import sys

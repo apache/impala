@@ -172,9 +172,9 @@ Status ThriftServer::ThriftServerEventProcessor::StartAndWaitForServer() {
 
   stringstream name;
   name << "supervise-" << thrift_server_->name_;
-  thrift_server_->server_thread_.reset(
-      new Thread("thrift-server", name.str(),
-                 &ThriftServer::ThriftServerEventProcessor::Supervise, this));
+  RETURN_IF_ERROR(Thread::Create("thrift-server", name.str(),
+      &ThriftServer::ThriftServerEventProcessor::Supervise, this,
+      &thrift_server_->server_thread_));
 
   system_time deadline = get_system_time() +
       posix_time::milliseconds(ThriftServer::ThriftServerEventProcessor::TIMEOUT_MS);
@@ -335,7 +335,6 @@ ThriftServer::ThriftServer(const string& name,
     num_worker_threads_(num_worker_threads),
     server_type_(server_type),
     name_(name),
-    server_thread_(NULL),
     server_(NULL),
     processor_(processor),
     connection_handler_(NULL),

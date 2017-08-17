@@ -69,9 +69,9 @@ FileHandleCache<NUM_PARTITIONS>::~FileHandleCache() {
 }
 
 template <size_t NUM_PARTITIONS>
-void FileHandleCache<NUM_PARTITIONS>::Init() {
-  eviction_thread_.reset(new Thread("disk-io-mgr-handle-cache", "File Handle Timeout",
-      &FileHandleCache<NUM_PARTITIONS>::EvictHandlesLoop, this));
+Status FileHandleCache<NUM_PARTITIONS>::Init() {
+  return Thread::Create("disk-io-mgr-handle-cache", "File Handle Timeout",
+      &FileHandleCache<NUM_PARTITIONS>::EvictHandlesLoop, this, &eviction_thread_);
 }
 
 template <size_t NUM_PARTITIONS>

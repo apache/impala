@@ -28,6 +28,7 @@
 #include <boost/unordered_map.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 
+#include "common/status.h"
 #include "gen-cpp/StatestoreService.h"
 #include "gen-cpp/StatestoreSubscriber.h"
 #include "gen-cpp/Types_types.h"
@@ -96,6 +97,10 @@ class Statestore : public CacheLineAligned {
 
   /// The only constructor; initialises member variables only.
   Statestore(MetricGroup* metrics);
+
+  /// Initialize the ThreadPools used for updates and heartbeats. Returns an error if
+  /// ThreadPool initialization fails.
+  Status Init() WARN_UNUSED_RESULT;
 
   /// Registers a new subscriber with the given unique subscriber ID, running a subscriber
   /// service at the given location, with the provided list of topic subscriptions.

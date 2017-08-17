@@ -406,12 +406,14 @@ Status DiskIoMgr::Init(MemTracker* process_mem_tracker) {
     for (int j = 0; j < num_threads_per_disk; ++j) {
       stringstream ss;
       ss << "work-loop(Disk: " << i << ", Thread: " << j << ")";
-      disk_thread_group_.AddThread(make_unique<Thread>("disk-io-mgr", ss.str(),
-          &DiskIoMgr::WorkLoop, this, disk_queues_[i]));
+      std::unique_ptr<Thread> t;
+      RETURN_IF_ERROR(Thread::Create("disk-io-mgr", ss.str(), &DiskIoMgr::WorkLoop,
+          this, disk_queues_[i], &t));
+      disk_thread_group_.AddThread(move(t));
     }
   }
   request_context_cache_.reset(new RequestContextCache(this));
-  file_handle_cache_.Init();
+  RETURN_IF_ERROR(file_handle_cache_.Init());
 
   cached_read_options_ = hadoopRzOptionsAlloc();
   DCHECK(cached_read_options_ != nullptr);

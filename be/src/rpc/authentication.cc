@@ -835,8 +835,8 @@ Status SaslAuthProvider::Start() {
     Promise<Status> first_kinit;
     stringstream thread_name;
     thread_name << "kinit-" << principal_;
-    kinit_thread_.reset(new Thread("authentication", thread_name.str(),
-        &SaslAuthProvider::RunKinit, this, &first_kinit));
+    RETURN_IF_ERROR(Thread::Create("authentication", thread_name.str(),
+        &SaslAuthProvider::RunKinit, this, &first_kinit, &kinit_thread_));
     LOG(INFO) << "Waiting for Kerberos ticket for principal: " << principal_;
     RETURN_IF_ERROR(first_kinit.Get());
     LOG(INFO) << "Kerberos ticket granted to " << principal_;

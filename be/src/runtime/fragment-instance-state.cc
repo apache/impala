@@ -226,9 +226,8 @@ Status FragmentInstanceState::Prepare() {
   if (FLAGS_status_report_interval > 0) {
     string thread_name = Substitute("profile-report (finst:$0)", PrintId(instance_id()));
     unique_lock<mutex> l(report_thread_lock_);
-    report_thread_.reset(
-        new Thread(FragmentInstanceState::FINST_THREAD_GROUP_NAME, thread_name,
-            [this]() { this->ReportProfileThread(); }));
+    RETURN_IF_ERROR(Thread::Create(FragmentInstanceState::FINST_THREAD_GROUP_NAME,
+        thread_name, [this]() { this->ReportProfileThread(); }, &report_thread_, true));
     // Make sure the thread started up, otherwise ReportProfileThread() might get into
     // a race with StopReportThread().
     while (!report_thread_active_) report_thread_started_cv_.wait(l);

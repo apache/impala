@@ -19,7 +19,7 @@
 #define IMPALA_SERVICE_CHILD_QUERY_H
 
 #include <string>
-#include <boost/thread.hpp>
+#include <boost/thread/mutex.hpp>
 
 #include "common/status.h"
 #include "impala-server.h"
@@ -156,7 +156,7 @@ class ChildQueryExecutor {
   /// Asynchronously executes 'child_queries' one by one in a new thread. 'child_queries'
   /// must be non-empty. May clear or modify the 'child_queries' arg. Can only be called
   /// once. Does nothing if Cancel() was already called.
-  void ExecAsync(std::vector<ChildQuery>&& child_queries);
+  Status ExecAsync(std::vector<ChildQuery>&& child_queries) WARN_UNUSED_RESULT;
 
   /// Waits for all child queries to complete successfully or with an error. Returns a
   /// non-OK status if a child query fails. Returns OK if ExecAsync() was not called,
@@ -200,7 +200,7 @@ class ChildQueryExecutor {
 
   /// Thread to execute 'child_queries_' in. Immutable after the first time it is set or
   /// after 'is_cancelled_' is true.
-  boost::scoped_ptr<Thread> child_queries_thread_;
+  std::unique_ptr<Thread> child_queries_thread_;
 
   /// The status of the child queries. The status is OK iff all child queries complete
   /// successfully. Otherwise, status contains the error of the first child query that

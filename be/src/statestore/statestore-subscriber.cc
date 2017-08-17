@@ -224,8 +224,8 @@ Status StatestoreSubscriber::Start() {
   }
 
   // Registration is finished at this point, so it's fine to release the lock.
-  recovery_mode_thread_.reset(new Thread("statestore-subscriber", "recovery-mode-thread",
-      &StatestoreSubscriber::RecoveryModeChecker, this));
+  RETURN_IF_ERROR(Thread::Create("statestore-subscriber", "recovery-mode-thread",
+      &StatestoreSubscriber::RecoveryModeChecker, this, &recovery_mode_thread_));
 
   return status;
 }

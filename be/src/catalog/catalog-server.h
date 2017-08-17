@@ -36,7 +36,6 @@ namespace impala {
 
 class StatestoreSubscriber;
 class Catalog;
-class TGetAllCatalogObjectsResponse;
 
 /// The Impala CatalogServer manages the caching and persistence of cluster-wide metadata.
 /// The CatalogServer aggregates the metadata from the Hive Metastore, the NameNode,
@@ -86,7 +85,7 @@ class CatalogServer {
   StatsMetric<double>* topic_processing_time_metric_;
 
   /// Thread that polls the catalog for any updates.
-  boost::scoped_ptr<Thread> catalog_update_gathering_thread_;
+  std::unique_ptr<Thread> catalog_update_gathering_thread_;
 
   /// Tracks the set of catalog objects that exist via their topic entry key.
   /// During each IMPALA_CATALOG_TOPIC heartbeat, stores the set of known catalog objects

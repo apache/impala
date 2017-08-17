@@ -31,6 +31,7 @@
 #include <unistd.h>
 #endif
 
+#include "common/status.h"
 #include "util/thread-pool.h"
 
 DEFINE_int32(accepted_cnxn_queue_depth, 10000,
@@ -217,6 +218,14 @@ void TAcceptQueueServer::serve() {
       [this](int tid, const shared_ptr<TTransport>& item) {
         this->SetupConnection(item);
       });
+  // Initialize the thread pool
+  Status status = connection_setup_pool.Init();
+  if (!status.ok()) {
+    status.AddDetail("TAcceptQueueServer: thread pool could not start.");
+    string errStr = status.GetDetail();
+    GlobalOutput(errStr.c_str());
+    stop_ = true;
+  }
 
   while (!stop_) {
     try {

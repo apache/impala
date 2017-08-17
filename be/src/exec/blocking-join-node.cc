@@ -193,10 +193,15 @@ Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
     runtime_profile()->AppendExecOption("Join Build-Side Prepared Asynchronously");
     string thread_name = Substitute("join-build-thread (finst:$0, plan-node-id:$1)",
         PrintId(state->fragment_instance_id()), id());
-    Thread build_thread(FragmentInstanceState::FINST_THREAD_GROUP_NAME, thread_name,
-        [this, state, build_sink, status=&build_side_status]() {
+    unique_ptr<Thread> build_thread;
+    Status thread_status = Thread::Create(FragmentInstanceState::FINST_THREAD_GROUP_NAME,
+        thread_name, [this, state, build_sink, status=&build_side_status]() {
           ProcessBuildInputAsync(state, build_sink, status);
-        });
+        }, &build_thread, true);
+    if (!thread_status.ok()) {
+      state->resource_pool()->ReleaseThreadToken(false);
+      return thread_status;
+    }
     // Open the left child so that it may perform any initialisation in parallel.
     // Don't exit even if we see an error, we still need to wait for the build thread
     // to finish.
@@ -207,7 +212,7 @@ Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
 
     // Blocks until ProcessBuildInput has returned, after which the build side structures
     // are fully constructed.
-    build_thread.Join();
+    build_thread->Join();
     RETURN_IF_ERROR(build_side_status);
     RETURN_IF_ERROR(open_status);
   } else if (IsInSubplan()) {

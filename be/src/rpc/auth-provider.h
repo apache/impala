@@ -19,7 +19,6 @@
 #define IMPALA_RPC_AUTH_PROVIDER_H
 
 #include <string>
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include <sasl/sasl.h>
 
@@ -142,7 +141,7 @@ class SaslAuthProvider : public AuthProvider {
   bool needs_kinit_;
 
   /// Runs "RunKinit" below if needs_kinit_ is true.
-  boost::scoped_ptr<Thread> kinit_thread_;
+  std::unique_ptr<Thread> kinit_thread_;
 
   /// Periodically (roughly once every FLAGS_kerberos_reinit_interval minutes) calls kinit
   /// to get a ticket granting ticket from the kerberos server for principal_, which is

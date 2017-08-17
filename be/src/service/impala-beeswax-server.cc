@@ -68,10 +68,14 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
   request_state->UpdateNonErrorQueryState(beeswax::QueryState::RUNNING);
   // start thread to wait for results to become available, which will allow
   // us to advance query state to FINISHED or EXCEPTION
-  request_state->WaitAsync();
+  Status status = request_state->WaitAsync();
+  if (!status.ok()) {
+    discard_result(UnregisterQuery(request_state->query_id(), false, &status));
+    RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
+  }
   // Once the query is running do a final check for session closure and add it to the
   // set of in-flight queries.
-  Status status = SetQueryInflight(session, request_state);
+  status = SetQueryInflight(session, request_state);
   if (!status.ok()) {
     discard_result(UnregisterQuery(request_state->query_id(), false, &status));
     RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);

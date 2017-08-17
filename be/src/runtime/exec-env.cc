@@ -216,6 +216,11 @@ Status ExecEnv::InitForFeTests() {
 Status ExecEnv::StartServices() {
   LOG(INFO) << "Starting global services";
 
+  // Initialize thread pools
+  RETURN_IF_ERROR(exec_rpc_thread_pool_->Init());
+  RETURN_IF_ERROR(async_rpc_pool_->Init());
+  RETURN_IF_ERROR(hdfs_op_thread_pool_->Init());
+
   // Initialize global memory limit.
   // Depending on the system configuration, we will have to calculate the process
   // memory limit either based on the available physical memory, or if overcommitting

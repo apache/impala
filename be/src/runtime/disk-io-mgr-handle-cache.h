@@ -26,6 +26,7 @@
 #include <boost/thread/mutex.hpp>
 
 #include "common/hdfs.h"
+#include "common/status.h"
 #include "util/aligned-new.h"
 #include "util/impalad-metrics.h"
 #include "util/spinlock.h"
@@ -96,7 +97,7 @@ class FileHandleCache {
 
   /// Starts up a thread that monitors the age of file handles and evicts any that
   /// exceed the limit.
-  void Init();
+  Status Init() WARN_UNUSED_RESULT;
 
   /// Get a file handle from the cache for the specified filename (fname) and
   /// last modification time (mtime). This will hash the filename to determine

@@ -152,16 +152,17 @@ ChildQueryExecutor::~ChildQueryExecutor() {
   DCHECK(!is_running_);
 }
 
-void ChildQueryExecutor::ExecAsync(vector<ChildQuery>&& child_queries) {
+Status ChildQueryExecutor::ExecAsync(vector<ChildQuery>&& child_queries) {
   DCHECK(!child_queries.empty());
   lock_guard<SpinLock> lock(lock_);
   DCHECK(child_queries_.empty());
   DCHECK(child_queries_thread_.get() == NULL);
-  if (is_cancelled_) return;
+  if (is_cancelled_) return Status::OK();
   child_queries_ = move(child_queries);
-  child_queries_thread_.reset(new Thread("query-exec-state", "async child queries",
-      bind(&ChildQueryExecutor::ExecChildQueries, this)));
+  RETURN_IF_ERROR(Thread::Create("query-exec-state", "async child queries",
+      bind(&ChildQueryExecutor::ExecChildQueries, this), &child_queries_thread_));
   is_running_ = true;
+  return Status::OK();
 }
 
 void ChildQueryExecutor::ExecChildQueries() {

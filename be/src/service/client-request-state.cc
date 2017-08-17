@@ -495,7 +495,9 @@ Status ClientRequestState::ExecDdlRequest() {
           ChildQuery(compute_stats_params.col_stats_query, this, parent_server_));
     }
 
-    if (child_queries.size() > 0) child_query_executor_->ExecAsync(move(child_queries));
+    if (child_queries.size() > 0) {
+      RETURN_IF_ERROR(child_query_executor_->ExecAsync(move(child_queries)));
+    }
     return Status::OK();
   }
 
@@ -592,9 +594,9 @@ Status ClientRequestState::Exec(const TMetadataOpRequest& exec_request) {
   return Status::OK();
 }
 
-void ClientRequestState::WaitAsync() {
-  wait_thread_.reset(new Thread(
-      "query-exec-state", "wait-thread", &ClientRequestState::Wait, this));
+Status ClientRequestState::WaitAsync() {
+  return Thread::Create("query-exec-state", "wait-thread",
+      &ClientRequestState::Wait, this, &wait_thread_, true);
 }
 
 void ClientRequestState::BlockOnWait() {
