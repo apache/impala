@@ -1814,10 +1814,9 @@ void ImpalaServer::RegisterSessionTimeout(int32_t session_timeout) {
       if (session_timeout_set_.empty()) {
         session_timeout_cv_.wait(timeout_lock);
       } else {
-        // Sleep for half the minimum session timeout; the maximum delay between a session
-        // expiring and this method picking it up is equal to the size of this sleep.
-        int64_t session_timeout_min_ms = *session_timeout_set_.begin() * 1000 / 2;
-        system_time deadline = get_system_time() + milliseconds(session_timeout_min_ms);
+        // Sleep for a second before checking whether an active session can be expired.
+        const int64_t SLEEP_TIME_MS = 1000;
+        system_time deadline = get_system_time() + milliseconds(SLEEP_TIME_MS);
         session_timeout_cv_.timed_wait(timeout_lock, deadline);
       }
     }
