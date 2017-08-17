@@ -52,6 +52,8 @@
 #include "kudu/util/stopwatch.h"
 #include "kudu/util/status.h"
 
+#include "common/config.h"
+
 using std::string;
 using std::unique_ptr;
 using std::vector;
