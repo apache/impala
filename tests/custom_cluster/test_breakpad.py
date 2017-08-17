@@ -37,9 +37,6 @@ class TestBreakpad(CustomClusterTestSuite):
   writing minidump files on unhandled signals and rotating old minidumps on startup. The
   tests kill the daemons by sending a SIGSEGV signal.
   """
-  # Limit for the number of minidumps that gets passed to the daemons as a startup flag.
-  MAX_MINIDUMPS = 2
-
   @classmethod
   def get_workload(cls):
     return 'functional-query'
@@ -80,8 +77,7 @@ class TestBreakpad(CustomClusterTestSuite):
     self._start_impala_cluster(cluster_options)
 
   def start_cluster(self):
-    self.start_cluster_with_args(minidump_path=self.tmp_dir,
-                                 max_minidumps=self.MAX_MINIDUMPS)
+    self.start_cluster_with_args(minidump_path=self.tmp_dir)
 
   def kill_cluster(self, signal):
     self.cluster.refresh()
@@ -219,11 +215,14 @@ class TestBreakpad(CustomClusterTestSuite):
     """Check that a limited number of minidumps is preserved during startup."""
     assert self.count_all_minidumps() == 0
     self.start_cluster()
+    cluster_size = self.get_num_processes('impalad')
     self.kill_cluster(SIGSEGV)
     self.assert_num_logfile_entries(1)
-    self.start_cluster()
-    expected_impalads = min(self.get_num_processes('impalad'), self.MAX_MINIDUMPS)
-    assert self.count_minidumps('impalad') == expected_impalads
+    # Maximum number of minidumps that the impalads should keep for this test.
+    max_minidumps = 2
+    self.start_cluster_with_args(minidump_path=self.tmp_dir,
+                                 max_minidumps=max_minidumps)
+    assert self.count_minidumps('impalad') == min(cluster_size, max_minidumps)
     assert self.count_minidumps('statestored') == 1
     assert self.count_minidumps('catalogd') == 1
 
@@ -231,7 +230,7 @@ class TestBreakpad(CustomClusterTestSuite):
   def test_minidump_cleanup_thread(self):
     """Check that periodic rotation preserves a limited number of minidumps."""
     assert self.count_all_minidumps() == 0
-    # Maximum number of minidump that the impalads should keep for this test.
+    # Maximum number of minidumps that the impalads should keep for this test.
     max_minidumps = 2
     # Sleep interval for the log rotation thread.
     rotation_interval = 1
@@ -267,7 +266,7 @@ class TestBreakpad(CustomClusterTestSuite):
     """Check that setting the minidump_path to an empty value disables minidump creation.
     """
     assert self.count_all_minidumps() == 0
-    self.start_cluster_with_args(minidump_path='', max_minidumps=self.MAX_MINIDUMPS)
+    self.start_cluster_with_args(minidump_path='')
     self.kill_cluster(SIGSEGV)
     self.assert_num_logfile_entries(0)
 
