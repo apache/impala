@@ -336,10 +336,14 @@ class PartitionedAggregationNode : public ExecNode {
   /// Object pool that holds the Partition objects in hash_partitions_.
   boost::scoped_ptr<ObjectPool> partition_pool_;
 
-  /// Current partitions we are partitioning into.
+  /// Current partitions we are partitioning into. IMPALA-5788: For the case where we
+  /// rebuild a spilled partition that fits in memory, all pointers in this vector will
+  /// point to a single in-memory partition.
   std::vector<Partition*> hash_partitions_;
 
-  /// Cache for hash tables in 'hash_partitions_'.
+  /// Cache for hash tables in 'hash_partitions_'. IMPALA-5788: For the case where we
+  /// rebuild a spilled partition that fits in memory, all pointers in this array will
+  /// point to the hash table that is a part of a single in-memory partition.
   HashTable* hash_tbls_[PARTITION_FANOUT];
 
   /// All partitions that have been spilled and need further processing.
@@ -623,8 +627,7 @@ class PartitionedAggregationNode : public ExecNode {
 
   /// Initializes hash_partitions_. 'level' is the level for the partitions to create.
   /// If 'single_partition_idx' is provided, it must be a number in range
-  /// [0, PARTITION_FANOUT), and only that partition is created - the others are
-  /// initialized to NULL.
+  /// [0, PARTITION_FANOUT), and only that partition is created - all others point to it.
   /// Also sets ht_ctx_'s level to 'level'.
   Status CreateHashPartitions(
       int level, int single_partition_idx = -1) WARN_UNUSED_RESULT;

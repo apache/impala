@@ -343,3 +343,16 @@ bigint,bigint,bigint,int,decimal,decimal,decimal,decimal,string,string,string,st
 1382,156162,6163,5,31.00,37762.96,0.07,0.03,'R','F','1993-10-26','1993-10-15','1993-11-09','TAKE BACK RETURN','FOB','hely regular dependencies. f'
 1509,186349,3904,6,31.00,44495.54,0.04,0.03,'A','F','1993-07-14','1993-08-21','1993-08-06','COLLECT COD','SHIP','ic deposits cajole carefully. quickly bold '
 ====
+---- QUERY
+# Test spilling aggregation when grouping by nondeterministic expression
+set buffer_pool_limit=5m;
+set num_nodes=1;
+select l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
+from tpch_parquet.lineitem
+group by 1, 2, 3, 4, 5, random()
+limit 5
+---- RUNTIME_PROFILE
+row_regex: .*Query State: FINISHED.*
+row_regex: .*Query Status: OK.*
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+====

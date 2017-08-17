@@ -1152,6 +1152,17 @@ Status PartitionedAggregationNode::CreateHashPartitions(
     }
     hash_tbls_[i] = partition->hash_tbl.get();
   }
+  // In this case we did not have to repartition, so ensure that while building the hash
+  // table all rows will be inserted into the partition at 'single_partition_idx' in case
+  // a non deterministic grouping expression causes a row to hash to a different
+  // partition index.
+  if (single_partition_idx != -1) {
+    Partition* partition = hash_partitions_[single_partition_idx];
+    for (int i = 0; i < PARTITION_FANOUT; ++i) {
+      hash_partitions_[i] = partition;
+      hash_tbls_[i] = partition->hash_tbl.get();
+    }
+  }
 
   COUNTER_ADD(partitions_created_, num_partitions_created);
   if (!is_streaming_preagg_) {
@@ -1390,7 +1401,13 @@ Status PartitionedAggregationNode::SpillPartition(bool more_aggregate_rows) {
   }
   DCHECK_NE(partition_idx, -1) << "Should have been able to spill a partition to "
                                << "reclaim memory: " << buffer_pool_client_.DebugString();
-  hash_tbls_[partition_idx] = NULL;
+  // Remove references to the destroyed hash table from 'hash_tbls_'.
+  // Additionally, we might be dealing with a rebuilt spilled partition, where all
+  // partitions point to a single in-memory partition. This also ensures that 'hash_tbls_'
+  // remains consistent in that case.
+  for (int i = 0; i < PARTITION_FANOUT; ++i) {
+    if (hash_partitions_[i] == hash_partitions_[partition_idx]) hash_tbls_[i] = nullptr;
+  }
   return hash_partitions_[partition_idx]->Spill(more_aggregate_rows);
 }
 
@@ -1402,6 +1419,10 @@ Status PartitionedAggregationNode::MoveHashPartitions(int64_t num_input_rows) {
   for (int i = 0; i < hash_partitions_.size(); ++i) {
     Partition* partition = hash_partitions_[i];
     if (partition == nullptr) continue;
+    // We might be dealing with a rebuilt spilled partition, where all partitions are
+    // pointing to a single in-memory partition, so make sure we only proceed for the
+    // right partition.
+    if(i != partition->idx) continue;
     int64_t aggregated_rows = 0;
     if (partition->aggregated_row_stream != nullptr) {
       aggregated_rows = partition->aggregated_row_stream->num_rows();
