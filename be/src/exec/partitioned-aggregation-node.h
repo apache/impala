@@ -146,6 +146,7 @@ class PartitionedAggregationNode : public ExecNode {
  protected:
   /// Frees local allocations from aggregate_evals_ and agg_fn_evals
   virtual Status QueryMaintenance(RuntimeState* state);
+  virtual std::string DebugString(int indentation_level) const;
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
@@ -393,11 +394,6 @@ class PartitionedAggregationNode : public ExecNode {
     /// success, one of the streams is left with a write iterator: the aggregated stream
     /// if 'more_aggregate_rows' is true or the unaggregated stream otherwise.
     Status Spill(bool more_aggregate_rows) WARN_UNUSED_RESULT;
-
-    /// Discards the aggregated row stream and hash table. Only valid to call if this is
-    /// a streaming preaggregation and the initial memory allocation for hash tables or
-    /// the aggregated stream failed. The aggregated stream must have 0 rows.
-    void DiscardAggregatedRowStream();
 
     bool is_spilled() const { return hash_tbl.get() == NULL; }
 
@@ -732,7 +728,10 @@ class PartitionedAggregationNode : public ExecNode {
   int64_t MinReservation() const {
     DCHECK(!grouping_exprs_.empty());
     // Must be kept in sync with AggregationNode.computeNodeResourceProfile() in fe.
-    if (is_streaming_preagg_) return 0; // Need 0 buffers to pass through rows.
+    if (is_streaming_preagg_) {
+      // Reserve at least one buffer and a 64kb hash table per partition.
+      return (resource_profile_.spillable_buffer_size + 64 * 1024) * PARTITION_FANOUT;
+    }
     int num_buffers = PARTITION_FANOUT + 1 + (needs_serialize_ ? 1 : 0);
     // Two of the buffers must fit the maximum row.
     return resource_profile_.spillable_buffer_size * (num_buffers - 2) +

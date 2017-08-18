@@ -529,12 +529,8 @@ Status PartitionedAggregationNode::GetRowsStreaming(RuntimeState* state,
     bool ht_needs_expansion = false;
     for (int i = 0; i < PARTITION_FANOUT; ++i) {
       HashTable* hash_tbl = GetHashTable(i);
-      if (hash_tbl == nullptr) {
-        remaining_capacity[i] = 0;
-      } else {
-        remaining_capacity[i] = hash_tbl->NumInsertsBeforeResize();
-        ht_needs_expansion |= remaining_capacity[i] < child_batch_->num_rows();
-      }
+      remaining_capacity[i] = hash_tbl->NumInsertsBeforeResize();
+      ht_needs_expansion |= remaining_capacity[i] < child_batch_->num_rows();
     }
 
     // Stop expanding hash tables if we're not reducing the input sufficiently. As our
@@ -545,7 +541,7 @@ Status PartitionedAggregationNode::GetRowsStreaming(RuntimeState* state,
     if (ht_needs_expansion && ShouldExpandPreaggHashTables()) {
       for (int i = 0; i < PARTITION_FANOUT; ++i) {
         HashTable* ht = GetHashTable(i);
-        if (ht != nullptr && remaining_capacity[i] < child_batch_->num_rows()) {
+        if (remaining_capacity[i] < child_batch_->num_rows()) {
           SCOPED_TIMER(ht_resize_timer_);
           bool resized;
           RETURN_IF_ERROR(
@@ -585,10 +581,8 @@ bool PartitionedAggregationNode::ShouldExpandPreaggHashTables() const {
   int64_t ht_rows = 0;
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
     HashTable* ht = hash_partitions_[i]->hash_tbl.get();
-    if (ht != nullptr) {
-      ht_mem += ht->CurrentMemSize();
-      ht_rows += ht->size();
-    }
+    ht_mem += ht->CurrentMemSize();
+    ht_rows += ht->size();
   }
 
   // Need some rows in tables to have valid statistics.
@@ -728,16 +722,9 @@ Status PartitionedAggregationNode::Partition::InitStreams() {
   RETURN_IF_ERROR(aggregated_row_stream->Init(parent->id(), true));
   bool got_buffer;
   RETURN_IF_ERROR(aggregated_row_stream->PrepareForWrite(&got_buffer));
-  if (!got_buffer) {
-    stringstream ss;
-    parent->DebugString(2, &ss);
-    DCHECK(parent->is_streaming_preagg_)
-        << "Merge agg should have enough reservation " << parent->id_ << "\n"
-        << parent->buffer_pool_client_.DebugString() << "\n"
-        << ss.str();
-    DiscardAggregatedRowStream();
-  }
-
+  DCHECK(got_buffer) << "Buffer included in reservation " << parent->id_ << "\n"
+                     << parent->buffer_pool_client_.DebugString() << "\n"
+                     << parent->DebugString(2);
   if (!parent->is_streaming_preagg_) {
     unaggregated_row_stream.reset(new BufferedTupleStream(parent->state_,
         parent->child(0)->row_desc(), &parent->buffer_pool_client_,
@@ -828,16 +815,6 @@ Status PartitionedAggregationNode::Partition::SerializeStreamForSpilling() {
     DCHECK(parent->serialize_stream_->has_write_iterator());
   }
   return Status::OK();
-}
-
-void PartitionedAggregationNode::Partition::DiscardAggregatedRowStream() {
-  DCHECK(parent->is_streaming_preagg_);
-  DCHECK(aggregated_row_stream != nullptr);
-  DCHECK_EQ(aggregated_row_stream->num_rows(), 0);
-  if (hash_tbl != nullptr) hash_tbl->Close();
-  hash_tbl.reset();
-  aggregated_row_stream->Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
-  aggregated_row_stream.reset();
 }
 
 Status PartitionedAggregationNode::Partition::Spill(bool more_aggregate_rows) {
@@ -1093,6 +1070,12 @@ Status PartitionedAggregationNode::AppendSpilledRow(
   }
 }
 
+string PartitionedAggregationNode::DebugString(int indentation_level) const {
+  stringstream ss;
+  DebugString(indentation_level, &ss);
+  return ss.str();
+}
+
 void PartitionedAggregationNode::DebugString(
     int indentation_level, stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
@@ -1142,12 +1125,9 @@ Status PartitionedAggregationNode::CreateHashPartitions(
       RETURN_IF_ERROR(partition->InitHashTable(&got_memory));
       // Spill the partition if we cannot create a hash table for a merge aggregation.
       if (UNLIKELY(!got_memory)) {
-        if (is_streaming_preagg_) {
-          partition->DiscardAggregatedRowStream();
-        } else {
-          // If we're repartitioning, we will be writing aggregated rows first.
-          RETURN_IF_ERROR(partition->Spill(level > 0));
-        }
+        DCHECK(!is_streaming_preagg_) << "Preagg reserves enough memory for hash tables";
+        // If we're repartitioning, we will be writing aggregated rows first.
+        RETURN_IF_ERROR(partition->Spill(level > 0));
       }
     }
     hash_tbls_[i] = partition->hash_tbl.get();

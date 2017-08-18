@@ -221,7 +221,6 @@ bool PartitionedAggregationNode::TryAddToHashTable(
   DCHECK(remaining_capacity != NULL);
   DCHECK_EQ(hash_tbl, partition->hash_tbl.get());
   DCHECK_GE(*remaining_capacity, 0);
-  if (hash_tbl == nullptr) return false; // Hash table was not created - pass through.
   bool found;
   // This is called from ProcessBatchStreaming() so the rows are not aggregated.
   HashTable::Iterator it = hash_tbl->FindBuildRowBucket(ht_ctx, &found);

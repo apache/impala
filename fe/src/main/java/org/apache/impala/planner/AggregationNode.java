@@ -304,25 +304,35 @@ public class AggregationNode extends PlanNode {
     long bufferSize = queryOptions.getDefault_spillable_buffer_size();
     long maxRowBufferSize =
         computeMaxSpillableBufferSize(bufferSize, queryOptions.getMax_row_size());
-    if (aggInfo_.getGroupingExprs().isEmpty() || useStreamingPreagg_) {
+    if (aggInfo_.getGroupingExprs().isEmpty()) {
       perInstanceMinReservation = 0;
     } else {
+      // This is a grouping pre-aggregation or merge aggregation.
       final int PARTITION_FANOUT = 16;
-      long minBuffers = PARTITION_FANOUT + 1 + (aggInfo_.needsSerialize() ? 1 : 0);
       if (perInstanceDataBytes != -1) {
-        long bytesPerBuffer = perInstanceDataBytes / PARTITION_FANOUT;
+        long bytesPerPartition = perInstanceDataBytes / PARTITION_FANOUT;
         // Scale down the buffer size if we think there will be excess free space with the
         // default buffer size, e.g. with small dimension tables.
         bufferSize = Math.min(bufferSize, Math.max(
             queryOptions.getMin_spillable_buffer_size(),
-            BitUtil.roundUpToPowerOf2(bytesPerBuffer)));
+            BitUtil.roundUpToPowerOf2(bytesPerPartition)));
         // Recompute the max row buffer size with the smaller buffer.
         maxRowBufferSize =
             computeMaxSpillableBufferSize(bufferSize, queryOptions.getMax_row_size());
       }
-      // Two of the buffers need to be buffers large enough to hold the maximum-sized row
-      // to serve as input and output buffers while repartitioning.
-      perInstanceMinReservation = bufferSize * (minBuffers - 2) + maxRowBufferSize * 2;
+      if (useStreamingPreagg_) {
+        // We can execute a streaming preagg without any buffers by passing through rows,
+        // but that is a very low performance mode of execution if the aggregation reduces
+        // its input significantly. Instead reserve memory for one buffer and 64kb of hash
+        // tables per partition. We don't need to reserve memory for large rows since they
+        // can be passed through if needed.
+        perInstanceMinReservation = (bufferSize + 64 * 1024) * PARTITION_FANOUT;
+      } else {
+        long minBuffers = PARTITION_FANOUT + 1 + (aggInfo_.needsSerialize() ? 1 : 0);
+        // Two of the buffers need to be buffers large enough to hold the maximum-sized
+        // row to serve as input and output buffers while repartitioning.
+        perInstanceMinReservation = bufferSize * (minBuffers - 2) + maxRowBufferSize * 2;
+      }
     }
 
     nodeResourceProfile_ = new ResourceProfileBuilder()
