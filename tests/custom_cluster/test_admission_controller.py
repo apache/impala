@@ -84,7 +84,7 @@ _STATESTORED_ARGS = "-statestore_heartbeat_frequency_ms=%s "\
                     (STATESTORE_RPC_FREQUENCY_MS, STATESTORE_RPC_FREQUENCY_MS)
 
 # Key in the query profile for the query options.
-PROFILE_QUERY_OPTIONS_KEY = "Query Options (non default): "
+PROFILE_QUERY_OPTIONS_KEY = "Query Options (set by configuration): "
 
 def impalad_admission_ctrl_flags(max_requests, max_queued, pool_max_mem,
     proc_mem_limit = None):
@@ -153,7 +153,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
         rhs = re.split(": ", line)[1]
         confs = re.split(",", rhs)
         break
-    assert len(confs) >= len(expected_query_options)
+    assert len(confs) == len(expected_query_options)
     confs = map(str.lower, confs)
     for expected in expected_query_options:
       assert expected.lower() in confs,\

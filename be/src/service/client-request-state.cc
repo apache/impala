@@ -146,7 +146,9 @@ Status ClientRequestState::Exec(TExecRequest* exec_request) {
 
   profile_.AddChild(&server_profile_);
   summary_profile_.AddInfoString("Query Type", PrintTStmtType(stmt_type()));
-  summary_profile_.AddInfoString("Query Options (non default)",
+  summary_profile_.AddInfoString("Query Options (set by configuration)",
+      DebugQueryOptions(query_ctx_.client_request.query_options));
+  summary_profile_.AddInfoString("Query Options (set by configuration and planner)",
       DebugQueryOptions(exec_request_.query_options));
 
   switch (exec_request->stmt_type) {
