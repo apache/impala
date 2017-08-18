@@ -598,6 +598,15 @@ inline int StringParser::StringParseTraits<int32_t>::max_ascii_len() { return 10
 template<>
 inline int StringParser::StringParseTraits<int64_t>::max_ascii_len() { return 19; }
 
-}
+// These functions are too large to benefit from inlining.
+Decimal4Value StringToDecimal4(const char* s, int len, int type_precision,
+    int type_scale, StringParser::ParseResult* result);
 
+Decimal8Value StringToDecimal8(const char* s, int len, int type_precision,
+    int type_scale, StringParser::ParseResult* result);
+
+Decimal16Value StringToDecimal16(const char* s, int len, int type_precision,
+    int type_scale, StringParser::ParseResult* result);
+
+}
 #endif

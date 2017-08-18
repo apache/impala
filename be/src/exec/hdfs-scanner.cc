@@ -308,14 +308,6 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
   SCOPED_TIMER(codegen->codegen_timer());
   RuntimeState* state = node->runtime_state();
 
-  // TODO: Timestamp is not yet supported
-  for (int i = 0; i < node->materialized_slots().size(); ++i) {
-    SlotDescriptor* slot_desc = node->materialized_slots()[i];
-    if (slot_desc->type().type == TYPE_DECIMAL) {
-      return Status::Expected("Decimal not yet supported for codegen.");
-    }
-  }
-
   // Cast away const-ness.  The codegen only sets the cached typed llvm struct.
   TupleDescriptor* tuple_desc = const_cast<TupleDescriptor*>(node->tuple_desc());
   vector<Function*> slot_fns;
