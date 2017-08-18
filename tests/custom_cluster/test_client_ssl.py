@@ -61,10 +61,15 @@ class TestClientSsl(CustomClusterTestSuite):
                           "--ssl_private_key=%s/wildcard-san-cert.key"
                           % (CERT_DIR, CERT_DIR, CERT_DIR))
 
+  SSL_ARGS = ("--ssl_client_ca_certificate=%s/server-cert.pem "
+              "--ssl_server_certificate=%s/server-cert.pem "
+              "--ssl_private_key=%s/server-key.pem "
+              "--hostname=localhost " # Required to match hostname in certificate
+              % (CERT_DIR, CERT_DIR, CERT_DIR))
+
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--ssl_server_certificate=%s/server-cert.pem "
-                                    "--ssl_private_key=%s/server-key.pem"
-                                    % (CERT_DIR, CERT_DIR))
+  @CustomClusterTestSuite.with_args(impalad_args=SSL_ARGS, statestored_args=SSL_ARGS,
+                                    catalogd_args=SSL_ARGS)
   def test_ssl(self, vector):
 
     self._verify_negative_cases()
