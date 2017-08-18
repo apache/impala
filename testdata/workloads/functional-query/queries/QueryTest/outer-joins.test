@@ -712,3 +712,19 @@ ON t1.id = v3.id
 ---- TYPES
 int,bigint,int,bigint
 ====
+---- QUERY
+# IMPALA-5504: Check that a TupleIsNullPredicate evaluates to false if one of tuples to
+# check is non-nullable. This happens for exprs that are evaluated before the outer join
+# that makes those tuples nullable, e.g., in the ON-clause of that join.
+SELECT /* +straight_join */ COUNT(t1.id)
+FROM functional.alltypessmall t1
+LEFT OUTER JOIN (
+  SELECT /* +straight_join */ IFNULL(t2.int_col, 1) AS c
+  FROM functional.alltypessmall t2
+  LEFT OUTER JOIN functional.alltypestiny t3 ON t2.id = t3.id + 1000
+) v ON t1.int_col = v.c;
+---- RESULTS
+1040
+---- TYPES
+bigint
+====
