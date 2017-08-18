@@ -387,7 +387,7 @@ Status PartitionedHashJoinNode::PrepareSpilledPartitionForProbe(
     DCHECK(NeedToProcessUnmatchedBuildRows());
     bool got_read_buffer = false;
     RETURN_IF_ERROR(input_partition_->build_partition()->build_rows()->PrepareForRead(
-        false, &got_read_buffer));
+        true, &got_read_buffer));
     if (!got_read_buffer) {
       return mem_tracker()->MemLimitExceeded(
           runtime_state_, Substitute(PREPARE_FOR_READ_FAILED_ERROR_MSG, id_));
@@ -682,6 +682,12 @@ Status PartitionedHashJoinNode::OutputAllBuild(RowBatch* out_batch) {
     if (output_unmatched_batch_iter_->AtEnd()) {
       output_unmatched_batch_->TransferResourceOwnership(out_batch);
       output_unmatched_batch_->Reset();
+      // Need to flush any resources attached to 'out_batch' before calling
+      // build_rows()->GetNext().  E.g. if the previous call to GetNext() set the
+      // 'needs_deep_copy' flag, then calling GetNext() before we return the current
+      // batch leave the batch referencing invalid memory (see IMPALA-5815).
+      if (out_batch->AtCapacity()) break;
+
       RETURN_IF_ERROR(output_build_partitions_.front()->build_rows()->GetNext(
           output_unmatched_batch_.get(), &eos));
       output_unmatched_batch_iter_.reset(
