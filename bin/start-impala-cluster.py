@@ -94,7 +94,7 @@ CATALOGD_PATH = os.path.join(IMPALA_HOME,
 MINI_IMPALA_CLUSTER_PATH = IMPALAD_PATH + " -in-process"
 
 IMPALA_SHELL = os.path.join(IMPALA_HOME, 'bin/impala-shell.sh')
-IMPALAD_PORTS = ("-beeswax_port=%d -hs2_port=%d  -be_port=%d "
+IMPALAD_PORTS = ("-beeswax_port=%d -hs2_port=%d  -be_port=%d -krpc_port=%d "
                  "-state_store_subscriber_port=%d -webserver_port=%d")
 JVM_ARGS = "-jvm_debug_port=%s -jvm_args=%s"
 BE_LOGGING_ARGS = "-log_filename=%s -log_dir=%s -v=%s -logbufsecs=5 -max_log_files=%s"
@@ -187,10 +187,12 @@ def build_impalad_port_args(instance_num):
   BASE_BEESWAX_PORT = 21000
   BASE_HS2_PORT = 21050
   BASE_BE_PORT = 22000
+  BASE_KRPC_PORT = 29000
   BASE_STATE_STORE_SUBSCRIBER_PORT = 23000
   BASE_WEBSERVER_PORT = 25000
   return IMPALAD_PORTS % (BASE_BEESWAX_PORT + instance_num, BASE_HS2_PORT + instance_num,
                           BASE_BE_PORT + instance_num,
+                          BASE_KRPC_PORT + instance_num,
                           BASE_STATE_STORE_SUBSCRIBER_PORT + instance_num,
                           BASE_WEBSERVER_PORT + instance_num)
 

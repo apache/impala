@@ -52,10 +52,15 @@ class BackendConfig {
   /// Look up the IP address of 'hostname' in the internal backend maps and return
   /// whether the lookup was successful. If 'hostname' itself is a valid IP address and
   /// is contained in backend_map_, then it is copied to 'ip' and true is returned. 'ip'
-  /// can be NULL if the caller only wants to check whether the lookup succeeds. Use this
-  /// method to resolve datanode hostnames to IP addresses during scheduling, to prevent
-  /// blocking on the OS.
+  /// can be nullptr if the caller only wants to check whether the lookup succeeds. Use
+  /// this method to resolve datanode hostnames to IP addresses during scheduling, to
+  /// prevent blocking on the OS.
   bool LookUpBackendIp(const Hostname& hostname, IpAddr* ip) const;
+
+  /// Look up the backend descriptor for the backend with hostname 'host'.
+  /// Returns nullptr if it's not found. The returned descriptor should not
+  /// be retained beyond the lifetime of this BackendConfig.
+  const TBackendDescriptor* LookUpBackendDesc(const TNetworkAddress& host) const;
 
   int NumBackends() const { return backend_map_.size(); }
 

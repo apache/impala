@@ -43,8 +43,7 @@ using boost::algorithm::join;
 using namespace apache::thrift;
 using namespace strings;
 
-DECLARE_int32(be_port);
-DECLARE_string(hostname);
+DECLARE_bool(use_krpc);
 
 namespace impala {
 
@@ -56,28 +55,25 @@ static const string NUM_BACKENDS_KEY("simple-scheduler.num-backends");
 const string Scheduler::IMPALA_MEMBERSHIP_TOPIC("impala-membership");
 
 Scheduler::Scheduler(StatestoreSubscriber* subscriber, const string& backend_id,
-    const TNetworkAddress& backend_address, MetricGroup* metrics, Webserver* webserver,
-    RequestPoolService* request_pool_service)
+    MetricGroup* metrics, Webserver* webserver, RequestPoolService* request_pool_service)
   : executors_config_(std::make_shared<const BackendConfig>()),
     metrics_(metrics->GetOrCreateChildGroup("scheduler")),
     webserver_(webserver),
     statestore_subscriber_(subscriber),
     local_backend_id_(backend_id),
     thrift_serializer_(false),
-    total_assignments_(nullptr),
-    total_local_assignments_(nullptr),
-    initialized_(nullptr),
     request_pool_service_(request_pool_service) {
-  local_backend_descriptor_.address = backend_address;
 }
 
-Status Scheduler::Init() {
+Status Scheduler::Init(const TNetworkAddress& backend_address, int krpc_port) {
   LOG(INFO) << "Starting scheduler";
 
-  // Figure out what our IP address is, so that each subscriber
-  // doesn't have to resolve it on every heartbeat.
+  // Figure out what our IP address is, so that each subscriber doesn't have to resolve
+  // it on every heartbeat. KRPC also assumes that the address is resolved already.
+  // May as well do it up front to avoid frequent DNS requests.
+  local_backend_descriptor_.address = backend_address;
   IpAddr ip;
-  const Hostname& hostname = local_backend_descriptor_.address.hostname;
+  const Hostname& hostname = backend_address.hostname;
   Status status = HostnameToIpAddr(hostname, &ip);
   if (!status.ok()) {
     VLOG(1) << status.GetDetail();
@@ -87,6 +83,12 @@ Status Scheduler::Init() {
 
   local_backend_descriptor_.ip_address = ip;
   LOG(INFO) << "Scheduler using " << ip << " as IP address";
+
+  if (FLAGS_use_krpc) {
+    // KRPC expects address to have been resolved already.
+    TNetworkAddress krpc_svc_addr = MakeNetworkAddress(ip, krpc_port);
+    local_backend_descriptor_.__set_krpc_address(krpc_svc_addr);
+  }
 
   coord_only_backend_config_.AddBackend(local_backend_descriptor_);
 
@@ -222,10 +224,22 @@ void Scheduler::SetExecutorsConfig(const ExecutorsConfigPtr& executors_config) {
   executors_config_ = executors_config;
 }
 
-Status Scheduler::ComputeScanRangeAssignment(QuerySchedule* schedule) {
+const TBackendDescriptor& Scheduler::LookUpBackendDesc(
+    const BackendConfig& executor_config, const TNetworkAddress& host) {
+  const TBackendDescriptor* desc = executor_config.LookUpBackendDesc(host);
+  if (desc == nullptr) {
+    // Local host may not be in executor_config if it's a dedicated coordinator.
+    DCHECK_EQ(host, local_backend_descriptor_.address);
+    DCHECK(!local_backend_descriptor_.is_executor);
+    desc = &local_backend_descriptor_;
+  }
+  return *desc;
+}
+
+Status Scheduler::ComputeScanRangeAssignment(
+    const BackendConfig& executor_config, QuerySchedule* schedule) {
   RuntimeProfile::Counter* total_assignment_timer =
       ADD_TIMER(schedule->summary_profile(), "ComputeScanRangeAssignmentTimer");
-  ExecutorsConfigPtr executor_config = GetExecutorsConfig();
   const TQueryExecRequest& exec_request = schedule->request();
   for (const TPlanExecInfo& plan_exec_info : exec_request.plan_exec_info) {
     for (const auto& entry : plan_exec_info.per_node_scan_ranges) {
@@ -248,7 +262,7 @@ Status Scheduler::ComputeScanRangeAssignment(QuerySchedule* schedule) {
       FragmentScanRangeAssignment* assignment =
           &schedule->GetFragmentExecParams(fragment.idx)->scan_range_assignment;
       RETURN_IF_ERROR(
-          ComputeScanRangeAssignment(*executor_config, node_id, node_replica_preference,
+          ComputeScanRangeAssignment(executor_config, node_id, node_replica_preference,
               node_random_replica, entry.second, exec_request.host_list, exec_at_coord,
               schedule->query_options(), total_assignment_timer, assignment));
       schedule->IncNumScanRanges(entry.second.size());
@@ -257,7 +271,8 @@ Status Scheduler::ComputeScanRangeAssignment(QuerySchedule* schedule) {
   return Status::OK();
 }
 
-void Scheduler::ComputeFragmentExecParams(QuerySchedule* schedule) {
+void Scheduler::ComputeFragmentExecParams(
+    const BackendConfig& executor_config, QuerySchedule* schedule) {
   const TQueryExecRequest& exec_request = schedule->request();
 
   // for each plan, compute the FInstanceExecParams for the tree of fragments
@@ -282,7 +297,14 @@ void Scheduler::ComputeFragmentExecParams(QuerySchedule* schedule) {
       for (int i = 0; i < dest_params->instance_exec_params.size(); ++i) {
         TPlanFragmentDestination& dest = src_params->destinations[i];
         dest.__set_fragment_instance_id(dest_params->instance_exec_params[i].instance_id);
-        dest.__set_server(dest_params->instance_exec_params[i].host);
+        const TNetworkAddress& host = dest_params->instance_exec_params[i].host;
+        dest.__set_server(host);
+        if (FLAGS_use_krpc) {
+          const TBackendDescriptor& desc = LookUpBackendDesc(executor_config, host);
+          DCHECK(desc.__isset.krpc_address);
+          DCHECK(IsResolvedAddress(desc.krpc_address));
+          dest.__set_krpc_server(desc.krpc_address);
+        }
       }
 
       // enumerate senders consecutively;
@@ -679,8 +701,11 @@ void Scheduler::GetScanHosts(TPlanNodeId scan_id, const FragmentExecParams& para
 }
 
 Status Scheduler::Schedule(QuerySchedule* schedule) {
-  RETURN_IF_ERROR(ComputeScanRangeAssignment(schedule));
-  ComputeFragmentExecParams(schedule);
+  // Make a copy of the executor_config upfront to avoid using inconsistent views
+  // between ComputeScanRangeAssignment() and ComputeFragmentExecParams().
+  ExecutorsConfigPtr config_ptr = GetExecutorsConfig();
+  RETURN_IF_ERROR(ComputeScanRangeAssignment(*config_ptr, schedule));
+  ComputeFragmentExecParams(*config_ptr, schedule);
   ComputeBackendExecParams(schedule);
 #ifndef NDEBUG
   schedule->Validate();

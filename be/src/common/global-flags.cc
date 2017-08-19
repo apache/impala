@@ -35,7 +35,10 @@ DEFINE_string(hostname, "", "Hostname to use for this daemon, also used as part 
               "the Kerberos principal, if enabled. If not set, the system default will be"
               " used");
 
-DEFINE_int32(be_port, 22000, "port on which ImpalaInternalService is exported");
+DEFINE_int32(be_port, 22000,
+    "port on which thrift based ImpalaInternalService is exported");
+DEFINE_int32_hidden(krpc_port, 29000,
+    "port on which KRPC based ImpalaInternalService is exported");
 
 // Kerberos is enabled if and only if principal is set.
 DEFINE_string(principal, "", "Kerberos principal. If set, both client and backend network"

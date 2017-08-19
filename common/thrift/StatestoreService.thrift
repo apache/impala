@@ -50,7 +50,7 @@ struct TPoolStats {
 // all other Impalads in the cluster. Impalads can act as coordinators, executors or
 // both.
 struct TBackendDescriptor {
-  // Network address of the Impala service on this backend
+  // Network address of the thrift based ImpalaInternalService on this backend
   1: required Types.TNetworkAddress address;
 
   // IP address corresponding to address.hostname. Explicitly including this saves the
@@ -68,6 +68,9 @@ struct TBackendDescriptor {
 
   // True if the debug webserver is secured (for correctly generating links)
   6: optional bool secure_webserver;
+
+  // IP address + port of KRPC based ImpalaInternalService on this backend
+  7: optional Types.TNetworkAddress krpc_address;
 }
 
 // Description of a single entry in a topic

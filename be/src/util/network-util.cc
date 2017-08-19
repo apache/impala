@@ -28,6 +28,7 @@
 #include <vector>
 #include <boost/algorithm/string.hpp>
 
+#include "kudu/util/net/sockaddr.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
 #include <util/string-parser.h>
@@ -111,6 +112,11 @@ Status HostnameToIpAddr(const Hostname& hostname, IpAddr* ip){
     VLOG(3) << "Only localhost addresses found for " << hostname;
   }
   return Status::OK();
+}
+
+bool IsResolvedAddress(const TNetworkAddress& addr) {
+  kudu::Sockaddr sock;
+  return sock.ParseString(addr.hostname, addr.port).ok();
 }
 
 bool FindFirstNonLocalhost(const vector<string>& addresses, string* addr) {

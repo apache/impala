@@ -76,7 +76,7 @@ DEFINE_int32(state_store_subscriber_port, 23000,
 DEFINE_int32(num_hdfs_worker_threads, 16,
     "(Advanced) The number of threads in the global HDFS operation pool");
 DEFINE_bool(disable_admission_control, false, "Disables admission control.");
-DEFINE_bool_hidden(use_krpc, false, "Used to indicate whether to use Kudu RPC for the "
+DEFINE_bool_hidden(use_krpc, false, "Used to indicate whether to use KRPC for the "
     "DataStream subsystem, or the Thrift RPC layer instead. Defaults to false. "
     "KRPC not yet supported");
 
@@ -84,6 +84,7 @@ DECLARE_int32(state_store_port);
 DECLARE_int32(num_threads_per_core);
 DECLARE_int32(num_cores);
 DECLARE_int32(be_port);
+DECLARE_int32(krpc_port);
 DECLARE_string(mem_limit);
 DECLARE_string(buffer_pool_limit);
 DECLARE_string(buffer_pool_clean_pages_limit);
@@ -136,11 +137,13 @@ struct ExecEnv::KuduClientPtr {
 ExecEnv* ExecEnv::exec_env_ = nullptr;
 
 ExecEnv::ExecEnv()
-  : ExecEnv(FLAGS_hostname, FLAGS_be_port, FLAGS_state_store_subscriber_port,
-        FLAGS_webserver_port, FLAGS_state_store_host, FLAGS_state_store_port) {}
+  : ExecEnv(FLAGS_hostname, FLAGS_be_port, FLAGS_krpc_port,
+        FLAGS_state_store_subscriber_port, FLAGS_webserver_port,
+        FLAGS_state_store_host, FLAGS_state_store_port) {}
 
-ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
-    int webserver_port, const string& statestore_host, int statestore_port)
+ExecEnv::ExecEnv(const string& hostname, int backend_port, int krpc_port,
+    int subscriber_port, int webserver_port, const string& statestore_host,
+    int statestore_port)
   : obj_pool_(new ObjectPool),
     metrics_(new MetricGroup("impala-metrics")),
     impalad_client_cache_(
@@ -165,7 +168,8 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
     async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
     query_exec_mgr_(new QueryExecMgr()),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
-    backend_address_(MakeNetworkAddress(hostname, backend_port)) {
+    backend_address_(MakeNetworkAddress(hostname, backend_port)),
+    krpc_port_(krpc_port) {
 
   if (FLAGS_use_krpc) {
     stream_mgr_.reset(new KrpcDataStreamMgr(metrics_.get()));
@@ -185,7 +189,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
 
   if (FLAGS_is_coordinator) {
     scheduler_.reset(new Scheduler(statestore_subscriber_.get(),
-        statestore_subscriber_->id(), backend_address_, metrics_.get(), webserver_.get(),
+        statestore_subscriber_->id(), metrics_.get(), webserver_.get(),
         request_pool_service_.get()));
   }
 
@@ -332,7 +336,9 @@ Status ExecEnv::StartServices() {
     LOG(INFO) << "Not starting webserver";
   }
 
-  if (scheduler_ != nullptr) RETURN_IF_ERROR(scheduler_->Init());
+  if (scheduler_ != nullptr) {
+    RETURN_IF_ERROR(scheduler_->Init(backend_address_, krpc_port_));
+  }
   if (admission_controller_ != nullptr) RETURN_IF_ERROR(admission_controller_->Init());
 
   // Get the fs.defaultFS value set in core-site.xml and assign it to

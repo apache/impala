@@ -75,15 +75,27 @@ void BackendConfig::RemoveBackend(const TBackendDescriptor& be_desc) {
 bool BackendConfig::LookUpBackendIp(const Hostname& hostname, IpAddr* ip) const {
   // Check if hostname is already a valid IP address.
   if (backend_map_.find(hostname) != backend_map_.end()) {
-    if (ip) *ip = hostname;
+    if (ip != nullptr) *ip = hostname;
     return true;
   }
   auto it = backend_ip_map_.find(hostname);
   if (it != backend_ip_map_.end()) {
-    if (ip) *ip = it->second;
+    if (ip != nullptr) *ip = it->second;
     return true;
   }
   return false;
+}
+
+const TBackendDescriptor* BackendConfig::LookUpBackendDesc(
+    const TNetworkAddress& host) const {
+  IpAddr ip;
+  if (LIKELY(LookUpBackendIp(host.hostname, &ip))) {
+    const BackendConfig::BackendList& be_list = GetBackendListForHost(ip);
+    for (const TBackendDescriptor& desc : be_list) {
+      if (desc.address == host) return &desc;
+    }
+  }
+  return nullptr;
 }
 
 }  // end ns impala

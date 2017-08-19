@@ -350,7 +350,7 @@ struct TQueryCtx {
   // Process ID of the impalad to which the user is connected.
   5: required i32 pid
 
-  // Initiating coordinator.
+  // The initiating coordinator's address of its thrift based ImpalaInternalService.
   // TODO: determine whether we can get this somehow via the Thrift rpc mechanism.
   6: optional Types.TNetworkAddress coord_address
 
@@ -404,8 +404,11 @@ struct TPlanFragmentDestination {
   // the globally unique fragment instance id
   1: required Types.TUniqueId fragment_instance_id
 
-  // ... which is being executed on this server
+  // IP address + port of the thrift based ImpalaInteralService on the destination
   2: required Types.TNetworkAddress server
+
+  // IP address + port of the KRPC based ImpalaInternalService on the destination
+  3: optional Types.TNetworkAddress krpc_server
 }
 
 // Context to collect information, which is shared among all instances of that plan

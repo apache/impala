@@ -20,10 +20,13 @@
 #include <boost/unordered_set.hpp>
 
 #include "common/names.h"
+#include "runtime/exec-env.h"
 #include "scheduling/scheduler.h"
 
 using namespace impala;
 using namespace impala::test;
+
+DECLARE_int32(krpc_port);
 
 /// Sample 'n' elements without replacement from the set [0..N-1].
 /// This is an implementation of "Algorithm R" by J. Vitter.
@@ -507,9 +510,9 @@ void SchedulerWrapper::InitializeScheduler() {
   scheduler_backend_address.hostname = scheduler_host.ip;
   scheduler_backend_address.port = scheduler_host.be_port;
 
-  scheduler_.reset(new Scheduler(nullptr, scheduler_backend_id, scheduler_backend_address,
+  scheduler_.reset(new Scheduler(nullptr, scheduler_backend_id,
       &metrics_, nullptr, nullptr));
-  const Status status = scheduler_->Init();
+  const Status status = scheduler_->Init(scheduler_backend_address, FLAGS_krpc_port);
   DCHECK(status.ok()) << "Scheduler init failed in test";
   // Initialize the scheduler backend maps.
   SendFullMembershipMap();

@@ -69,8 +69,9 @@ class ExecEnv {
  public:
   ExecEnv();
 
-  ExecEnv(const std::string& hostname, int backend_port, int subscriber_port,
-      int webserver_port, const std::string& statestore_host, int statestore_port);
+  ExecEnv(const std::string& hostname, int backend_port, int krpc_port,
+      int subscriber_port, int webserver_port, const std::string& statestore_host,
+      int statestore_port);
 
   /// Returns the first created exec env instance. In a normal impalad, this is
   /// the only instance. In test setups with multiple ExecEnv's per process,
@@ -125,6 +126,8 @@ class ExecEnv {
   StatestoreSubscriber* subscriber() { return statestore_subscriber_.get(); }
 
   const TNetworkAddress& backend_address() const { return backend_address_; }
+
+  int krpc_port() const { return krpc_port_; }
 
   /// Initializes the exec env for running FE tests.
   Status InitForFeTests() WARN_UNUSED_RESULT;
@@ -186,6 +189,9 @@ class ExecEnv {
 
   /// Address of the Impala backend server instance
   TNetworkAddress backend_address_;
+
+  /// Port number on which all KRPC-based services are exported.
+  int krpc_port_;
 
   /// fs.defaultFs value set in core-site.xml
   std::string default_fs_;

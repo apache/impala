@@ -110,6 +110,7 @@ DECLARE_string(authorized_proxy_user_config);
 DECLARE_string(authorized_proxy_user_config_delimiter);
 DECLARE_bool(abort_on_config_error);
 DECLARE_bool(disk_spill_encryption);
+DECLARE_bool(use_krpc);
 
 DEFINE_int32(beeswax_port, 21000, "port on which Beeswax client requests are served");
 DEFINE_int32(hs2_port, 21050, "port on which HiveServer2 client requests are served");
@@ -921,7 +922,7 @@ void ImpalaServer::PrepareQueryContext(TQueryCtx* query_ctx) {
   local_timestamp.UtcToLocal();
   query_ctx->__set_now_string(local_timestamp.ToString());
   query_ctx->__set_start_unix_millis(UnixMillis());
-  query_ctx->__set_coord_address(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
+  query_ctx->__set_coord_address(ExecEnv::GetInstance()->backend_address());
 
   // Creating a random_generator every time is not free, but
   // benchmarks show it to be slightly cheaper than contending for a
@@ -1641,8 +1642,7 @@ void ImpalaServer::AddLocalBackendToStatestore(
   TBackendDescriptor local_backend_descriptor;
   local_backend_descriptor.__set_is_coordinator(FLAGS_is_coordinator);
   local_backend_descriptor.__set_is_executor(FLAGS_is_executor);
-  local_backend_descriptor.__set_address(
-      MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
+  local_backend_descriptor.__set_address(exec_env_->backend_address());
   IpAddr ip;
   const Hostname& hostname = local_backend_descriptor.address.hostname;
   Status status = HostnameToIpAddr(hostname, &ip);
@@ -1653,6 +1653,10 @@ void ImpalaServer::AddLocalBackendToStatestore(
     return;
   }
   local_backend_descriptor.ip_address = ip;
+  if (FLAGS_use_krpc) {
+    TNetworkAddress krpc_address = MakeNetworkAddress(ip, exec_env_->krpc_port());
+    local_backend_descriptor.__set_krpc_address(krpc_address);
+  }
   subscriber_topic_updates->emplace_back(TTopicDelta());
   TTopicDelta& update = subscriber_topic_updates->back();
   update.topic_name = Scheduler::IMPALA_MEMBERSHIP_TOPIC;

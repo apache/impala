@@ -28,6 +28,9 @@ typedef std::string Hostname;
 /// Type to store IPv4 addresses.
 typedef std::string IpAddr;
 
+/// Returns true if 'addr' is a fully resolved IP address, rather than a fqdn + port.
+bool IsResolvedAddress(const TNetworkAddress& addr);
+
 /// Looks up all IP addresses associated with a given hostname and returns one of them via
 /// 'address'. If the IP addresses of a host don't change, then subsequent calls will
 /// always return the same address. Returns an error status if any system call failed,

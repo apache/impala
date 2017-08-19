@@ -78,15 +78,17 @@ class Scheduler {
   /// Initialize with a subscription manager that we can register with for updates to the
   /// set of available backends.
   ///  - backend_id - unique identifier for this Impala backend (usually a host:port)
-  ///  - backend_address - the address that this backend listens on
   Scheduler(StatestoreSubscriber* subscriber, const std::string& backend_id,
-      const TNetworkAddress& backend_address, MetricGroup* metrics, Webserver* webserver,
+      MetricGroup* metrics, Webserver* webserver,
       RequestPoolService* request_pool_service);
 
-  /// Initialises the scheduler, acquiring all resources needed to make scheduling
+  /// Initializes the scheduler, acquiring all resources needed to make scheduling
   /// decisions once this method returns. Register with the subscription manager if
-  /// required.
-  impala::Status Init();
+  /// required. Also initializes the local backend descriptor. Returns error status
+  /// on failure. 'backend_address' is the address of thrift based ImpalaInternalService
+  /// of this backend. 'krpc_port' is the port on which KRPC based ImpalaInternalService
+  /// is exported.
+  Status Init(const TNetworkAddress& backend_address, int krpc_port);
 
   /// Populates given query schedule and assigns fragments to hosts based on scan
   /// ranges in the query exec request.
@@ -300,14 +302,14 @@ class Scheduler {
   ThriftSerializer thrift_serializer_;
 
   /// Locality metrics
-  IntCounter* total_assignments_;
-  IntCounter* total_local_assignments_;
+  IntCounter* total_assignments_ = nullptr;
+  IntCounter* total_local_assignments_ = nullptr;
 
   /// Initialization metric
-  BooleanProperty* initialized_;
+  BooleanProperty* initialized_ = nullptr;
 
   /// Current number of executors
-  IntGauge* num_fragment_instances_metric_;
+  IntGauge* num_fragment_instances_metric_ = nullptr;
 
   /// Used for user-to-pool resolution and looking up pool configurations. Not owned by
   /// us.
@@ -317,6 +319,12 @@ class Scheduler {
   /// protecting the access with executors_config_lock_.
   ExecutorsConfigPtr GetExecutorsConfig() const;
   void SetExecutorsConfig(const ExecutorsConfigPtr& executors_config);
+
+  /// Returns the backend descriptor corresponding to 'host' which could be a remote
+  /// backend or the local host itself. The returned descriptor should not be retained
+  /// beyond the lifetime of 'executor_config'.
+  const TBackendDescriptor& LookUpBackendDesc(
+      const BackendConfig& executor_config, const TNetworkAddress& host);
 
   /// Called asynchronously when an update is received from the subscription manager
   void UpdateMembership(const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
@@ -331,7 +339,9 @@ class Scheduler {
   /// Unpartitioned fragments are assigned to the coordinator. Populate the schedule's
   /// fragment_exec_params_ with the resulting scan range assignment.
   /// We have a benchmark for this method in be/src/benchmarks/scheduler-benchmark.cc.
-  Status ComputeScanRangeAssignment(QuerySchedule* schedule);
+  /// 'executor_config' is the executor configuration to use for scheduling.
+  Status ComputeScanRangeAssignment(const BackendConfig& executor_config,
+      QuerySchedule* schedule);
 
   /// Process the list of scan ranges of a single plan node and compute scan range
   /// assignments (returned in 'assignment'). The result is a mapping from hosts to their
@@ -407,7 +417,9 @@ class Scheduler {
   /// TQueryExecRequest.plan_exec_info.
   /// This includes the routing information (destinations, per_exch_num_senders,
   /// sender_id)
-  void ComputeFragmentExecParams(QuerySchedule* schedule);
+  /// 'executor_config' is the executor configuration to use for scheduling.
+  void ComputeFragmentExecParams(const BackendConfig& executor_config,
+      QuerySchedule* schedule);
 
   /// Recursively create FInstanceExecParams and set per_node_scan_ranges for
   /// fragment_params and its input fragments via a depth-first traversal.
