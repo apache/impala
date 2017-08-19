@@ -99,7 +99,7 @@ ir_functions = [
   ["HASH_FNV", "IrFnvHash"],
   ["HASH_MURMUR", "IrMurmurHash"],
   ["PHJ_PROCESS_BUILD_BATCH",
-   "_ZN6impala10PhjBuilder17ProcessBuildBatchEPNS_8RowBatchEPNS_12HashTableCtxEb"],
+   "_ZN6impala10PhjBuilder17ProcessBuildBatchEPNS_8RowBatchEPNS_12HashTableCtxEbb"],
   ["PHJ_PROCESS_PROBE_BATCH_INNER_JOIN",
    "_ZN6impala23PartitionedHashJoinNode17ProcessProbeBatchILi0EEEiNS_13TPrefetchMode4typeEPNS_8RowBatchEPNS_12HashTableCtxEPNS_6StatusE"],
   ["PHJ_PROCESS_PROBE_BATCH_LEFT_OUTER_JOIN",

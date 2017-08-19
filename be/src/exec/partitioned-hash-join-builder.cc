@@ -191,14 +191,18 @@ Status PhjBuilder::Send(RuntimeState* state, RowBatch* batch) {
   SCOPED_TIMER(partition_build_rows_timer_);
   bool build_filters = ht_ctx_->level() == 0 && filter_ctxs_.size() > 0;
   if (process_build_batch_fn_ == NULL) {
-    RETURN_IF_ERROR(ProcessBuildBatch(batch, ht_ctx_.get(), build_filters));
+      RETURN_IF_ERROR(ProcessBuildBatch(batch, ht_ctx_.get(), build_filters,
+          join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN));
+
   } else {
     DCHECK(process_build_batch_fn_level0_ != NULL);
     if (ht_ctx_->level() == 0) {
       RETURN_IF_ERROR(
-          process_build_batch_fn_level0_(this, batch, ht_ctx_.get(), build_filters));
+          process_build_batch_fn_level0_(this, batch, ht_ctx_.get(), build_filters,
+              join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN));
     } else {
-      RETURN_IF_ERROR(process_build_batch_fn_(this, batch, ht_ctx_.get(), build_filters));
+      RETURN_IF_ERROR(process_build_batch_fn_(this, batch, ht_ctx_.get(), build_filters,
+          join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN));
     }
   }
 
@@ -806,6 +810,11 @@ Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen,
   DCHECK_EQ(replaced_constants.stores_duplicates, 0);
   DCHECK_EQ(replaced_constants.stores_tuples, 0);
   DCHECK_EQ(replaced_constants.quadratic_probing, 0);
+
+  Value* is_null_aware_arg = codegen->GetArgument(process_build_batch_fn, 5);
+  is_null_aware_arg->replaceAllUsesWith(
+      ConstantInt::get(Type::getInt1Ty(codegen->context()),
+      join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN));
 
   Function* process_build_batch_fn_level0 =
       codegen->CloneFunction(process_build_batch_fn);
