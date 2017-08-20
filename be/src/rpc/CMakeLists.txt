@@ -22,10 +22,12 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/rpc")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/rpc")
 
 # Mark the protobuf files as generated
+set_source_files_properties(${COMMON_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 set_source_files_properties(${RPC_TEST_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 
 add_library(Rpc
   authentication.cc
+  ${COMMON_PROTO_SRCS}
   rpc-mgr.cc
   rpc-trace.cc
   TAcceptQueueServer.cpp

@@ -23,6 +23,9 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime")
 
+# Mark the protobuf file as generated
+set_source_files_properties(${ROW_BATCH_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+
 add_library(Runtime
   buffered-tuple-stream.cc
   client-cache.cc
@@ -45,6 +48,7 @@ add_library(Runtime
   initial-reservations.cc
   krpc-data-stream-mgr.cc
   krpc-data-stream-recvr.cc
+  krpc-data-stream-sender.cc
   lib-cache.cc
   mem-tracker.cc
   mem-pool.cc
@@ -56,6 +60,7 @@ add_library(Runtime
   raw-value.cc
   raw-value-ir.cc
   row-batch.cc
+  ${ROW_BATCH_PROTO_SRCS}
   runtime-filter.cc
   runtime-filter-bank.cc
   runtime-filter-ir.cc

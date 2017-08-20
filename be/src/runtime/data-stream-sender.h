@@ -95,15 +95,15 @@ class DataStreamSender : public DataSink {
   /// used to maintain metrics.
   Status SerializeBatch(RowBatch* src, TRowBatch* dest, int num_receivers = 1);
 
-  /// Return total number of bytes sent in TRowBatch.data. If batches are
-  /// broadcast to multiple receivers, they are counted once per receiver.
-  int64_t GetNumDataBytesSent() const;
-
  protected:
   friend class DataStreamTest;
 
   virtual Status Init(const std::vector<TExpr>& thrift_output_exprs,
       const TDataSink& tsink, RuntimeState* state);
+
+  /// Return total number of bytes sent in TRowBatch.data. If batches are
+  /// broadcast to multiple receivers, they are counted once per receiver.
+  int64_t GetNumDataBytesSent() const;
 
  private:
   class Channel;

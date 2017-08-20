@@ -44,6 +44,8 @@ DEFINE_int32(num_acceptor_threads, 2,
 DEFINE_int32(num_reactor_threads, 0,
     "Number of threads dedicated to managing network IO for RPC services. If left at "
     "default value 0, it will be set to number of CPU cores.");
+DEFINE_int32(rpc_retry_interval_ms, 5,
+    "Time in millisecond of waiting before retrying an RPC when remote is busy");
 
 namespace impala {
 
@@ -72,7 +74,7 @@ Status RpcMgr::RegisterService(int32_t num_service_threads, int32_t service_queu
       messenger_->RegisterService(service_pool->service_name(), service_pool),
       "Could not register service");
   service_pools_.push_back(service_pool);
-
+  VLOG_QUERY << "Registered KRPC service: " << service_pool->service_name();
   return Status::OK();
 }
 

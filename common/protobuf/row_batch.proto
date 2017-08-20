@@ -1,0 +1,39 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+//
+
+package impala;
+
+import "common.proto";
+
+// The serialized version of a header of a RowBatch (in be/src/runtime/row-batch.h).
+// It contains the meta-data of a row batch. The actual data of a row batch is sent
+// as KRPC sidecars. Please see TransmitDataRequestPB for details.
+// All fields are required in V1.
+message RowBatchHeaderPB {
+  // Total number of rows contained in this batch.
+  optional int32 num_rows = 1;
+
+  // Number of tuples per row in this batch.
+  optional int32 num_tuples_per_row = 2;
+
+  // Size of 'tuple_data' in bytes before any compression is applied.
+  optional int64 uncompressed_size = 3;
+
+  // The compression codec (if any) used for compressing the row batch.
+  optional CompressionType compression_type = 4;
+}

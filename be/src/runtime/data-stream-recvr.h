@@ -134,7 +134,7 @@ class DataStreamRecvr : public DataStreamRecvrBase {
   /// soft upper limit on the total amount of buffering allowed for this stream across
   /// all sender queues. we stop acking incoming data once the amount of buffered data
   /// exceeds this value
-  int total_buffer_limit_;
+  int64_t total_buffer_limit_;
 
   /// Row schema.
   const RowDescriptor* row_desc_;

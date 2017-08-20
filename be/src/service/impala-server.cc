@@ -1195,7 +1195,7 @@ void ImpalaServer::TransmitData(
   }
 
   if (params.eos) {
-    exec_env_->stream_mgr()->CloseSender(
+    exec_env_->ThriftStreamMgr()->CloseSender(
         params.dest_fragment_instance_id, params.dest_node_id,
         params.sender_id).SetTStatus(&return_val);
   }

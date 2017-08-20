@@ -149,6 +149,8 @@ class RpcMgr {
     return messenger_->metric_entity();
   }
 
+  std::shared_ptr<kudu::rpc::Messenger> messenger() { return messenger_; }
+
   ~RpcMgr() {
     DCHECK_EQ(service_pools_.size(), 0)
         << "Must call Shutdown() before destroying RpcMgr";

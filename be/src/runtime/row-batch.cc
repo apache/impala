@@ -21,7 +21,6 @@
 #include <memory>
 #include <boost/scoped_ptr.hpp>
 
-#include "gen-cpp/Results_types.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/string-value.h"
@@ -31,6 +30,9 @@
 #include "util/decompress.h"
 #include "util/fixed-size-hash-table.h"
 #include "util/scope-exit-trigger.h"
+
+#include "gen-cpp/Results_types.h"
+#include "gen-cpp/row_batch.pb.h"
 
 #include "common/names.h"
 
@@ -76,21 +78,56 @@ RowBatch::RowBatch(
     tuple_data_pool_(mem_tracker),
     row_desc_(row_desc),
     mem_tracker_(mem_tracker) {
-  DCHECK(mem_tracker_ != NULL);
-  tuple_ptrs_size_ = num_rows_ * input_batch.row_tuples.size() * sizeof(Tuple*);
-  DCHECK_EQ(input_batch.row_tuples.size(), row_desc->tuple_descriptors().size());
-  DCHECK_GT(tuple_ptrs_size_, 0);
+  DCHECK(mem_tracker_ != nullptr);
+  kudu::Slice tuple_data =
+      kudu::Slice(input_batch.tuple_data.c_str(), input_batch.tuple_data.size());
+  kudu::Slice tuple_offsets = kudu::Slice(
+      reinterpret_cast<const char*>(input_batch.tuple_offsets.data()),
+      input_batch.tuple_offsets.size() * sizeof(int32_t));
+  const THdfsCompression::type& compression_type = input_batch.compression_type;
+  DCHECK(compression_type == THdfsCompression::NONE ||
+      compression_type == THdfsCompression::LZ4)
+      << "Unexpected compression type: " << input_batch.compression_type;
+  Deserialize(tuple_offsets, tuple_data, input_batch.uncompressed_size,
+      compression_type == THdfsCompression::LZ4);
+}
+
+RowBatch::RowBatch(const RowDescriptor* row_desc, const RowBatchHeaderPB& header,
+    const kudu::Slice& tuple_offsets, const kudu::Slice& tuple_data,
+    MemTracker* mem_tracker)
+  : num_rows_(header.num_rows()),
+    capacity_(header.num_rows()),
+    flush_(FlushMode::NO_FLUSH_RESOURCES),
+    needs_deep_copy_(false),
+    num_tuples_per_row_(header.num_tuples_per_row()),
+    attached_buffer_bytes_(0),
+    tuple_data_pool_(mem_tracker),
+    row_desc_(row_desc),
+    mem_tracker_(mem_tracker) {
+  DCHECK(mem_tracker_ != nullptr);
+  const CompressionType& compression_type = header.compression_type();
+  DCHECK(compression_type == CompressionType::NONE ||
+      compression_type == CompressionType::LZ4)
+      << "Unexpected compression type: " << compression_type;
+  Deserialize(tuple_offsets, tuple_data, header.uncompressed_size(),
+      compression_type == CompressionType::LZ4);
+}
+
+void RowBatch::Deserialize(const kudu::Slice& input_tuple_offsets,
+    const kudu::Slice& input_tuple_data, int64_t uncompressed_size, bool is_compressed) {
   // TODO: switch to Init() pattern so we can check memory limit and return Status.
+  DCHECK_EQ(num_tuples_per_row_, row_desc_->tuple_descriptors().size());
+  tuple_ptrs_size_ = num_rows_ * num_tuples_per_row_ * sizeof(Tuple*);
+  DCHECK_GT(tuple_ptrs_size_, 0);
   mem_tracker_->Consume(tuple_ptrs_size_);
   tuple_ptrs_ = reinterpret_cast<Tuple**>(malloc(tuple_ptrs_size_));
-  DCHECK(tuple_ptrs_ != NULL);
+  DCHECK(tuple_ptrs_ != nullptr);
+
   uint8_t* tuple_data;
-  if (input_batch.compression_type != THdfsCompression::NONE) {
-    DCHECK_EQ(THdfsCompression::LZ4, input_batch.compression_type)
-        << "Unexpected compression type: " << input_batch.compression_type;
+  if (is_compressed) {
     // Decompress tuple data into data pool
-    uint8_t* compressed_data = (uint8_t*)input_batch.tuple_data.c_str();
-    size_t compressed_size = input_batch.tuple_data.size();
+    const uint8_t* compressed_data = input_tuple_data.data();
+    size_t compressed_size = input_tuple_data.size();
 
     Lz4Decompressor decompressor(nullptr, false);
     Status status = decompressor.Init();
@@ -98,7 +135,6 @@ RowBatch::RowBatch(
     auto compressor_cleanup =
         MakeScopeExitTrigger([&decompressor]() { decompressor.Close(); });
 
-    int64_t uncompressed_size = input_batch.uncompressed_size;
     DCHECK_NE(uncompressed_size, -1) << "RowBatch decompression failed";
     tuple_data = tuple_data_pool_.Allocate(uncompressed_size);
     status = decompressor.ProcessBlock(
@@ -106,18 +142,21 @@ RowBatch::RowBatch(
     DCHECK(status.ok()) << "RowBatch decompression failed.";
   } else {
     // Tuple data uncompressed, copy directly into data pool
-    tuple_data = tuple_data_pool_.Allocate(input_batch.tuple_data.size());
-    memcpy(tuple_data, input_batch.tuple_data.c_str(), input_batch.tuple_data.size());
+    tuple_data = tuple_data_pool_.Allocate(input_tuple_data.size());
+    memcpy(tuple_data, input_tuple_data.data(), input_tuple_data.size());
   }
 
   // Convert input_batch.tuple_offsets into pointers
-  int tuple_idx = 0;
-  for (vector<int32_t>::const_iterator offset = input_batch.tuple_offsets.begin();
-       offset != input_batch.tuple_offsets.end(); ++offset) {
-    if (*offset == -1) {
-      tuple_ptrs_[tuple_idx++] = NULL;
+  const int32_t* tuple_offsets =
+      reinterpret_cast<const int32_t*>(input_tuple_offsets.data());
+  DCHECK_EQ(input_tuple_offsets.size() % sizeof(int32_t), 0);
+  int num_tuples = input_tuple_offsets.size() / sizeof(int32_t);
+  for (int tuple_idx = 0; tuple_idx < num_tuples; ++tuple_idx) {
+    int32_t offset = tuple_offsets[tuple_idx];
+    if (offset == -1) {
+      tuple_ptrs_[tuple_idx] = nullptr;
     } else {
-      tuple_ptrs_[tuple_idx++] = reinterpret_cast<Tuple*>(tuple_data + *offset);
+      tuple_ptrs_[tuple_idx] = reinterpret_cast<Tuple*>(tuple_data + offset);
     }
   }
 
@@ -126,9 +165,9 @@ RowBatch::RowBatch(
 
   // For every unique tuple, convert string offsets contained in tuple data into
   // pointers. Tuples were serialized in the order we are deserializing them in,
-  // so the first occurrence of a tuple will always have a higher offset than any tuple
-  // we already converted.
-  Tuple* last_converted = NULL;
+  // so the first occurrence of a tuple will always have a higher offset than any
+  // tuple we already converted.
+  Tuple* last_converted = nullptr;
   for (int i = 0; i < num_rows_; ++i) {
     for (int j = 0; j < num_tuples_per_row_; ++j) {
       const TupleDescriptor* desc = row_desc_->tuple_descriptors()[j];
@@ -148,10 +187,10 @@ RowBatch::~RowBatch() {
     ExecEnv::GetInstance()->buffer_pool()->FreeBuffer(
         buffer_info.client, &buffer_info.buffer);
   }
-  DCHECK(tuple_ptrs_ != NULL);
+  DCHECK(tuple_ptrs_ != nullptr);
   free(tuple_ptrs_);
   mem_tracker_->Release(tuple_ptrs_size_);
-  tuple_ptrs_ = NULL;
+  tuple_ptrs_ = nullptr;
 }
 
 Status RowBatch::Serialize(TRowBatch* output_batch) {
@@ -162,11 +201,41 @@ Status RowBatch::Serialize(TRowBatch* output_batch, bool full_dedup) {
   // why does Thrift not generate a Clear() function?
   output_batch->row_tuples.clear();
   output_batch->tuple_offsets.clear();
-  output_batch->compression_type = THdfsCompression::NONE;
-
-  output_batch->num_rows = num_rows_;
+  int64_t uncompressed_size;
+  bool is_compressed;
+  RETURN_IF_ERROR(Serialize(full_dedup, &output_batch->tuple_offsets,
+      &output_batch->tuple_data, &uncompressed_size, &is_compressed));
+  // TODO: max_size() is much larger than the amount of memory we could feasibly
+  // allocate. Need better way to detect problem.
+  DCHECK_LE(uncompressed_size, output_batch->tuple_data.max_size());
+  output_batch->__set_num_rows(num_rows_);
+  output_batch->__set_uncompressed_size(uncompressed_size);
+  output_batch->__set_compression_type(
+      is_compressed ? THdfsCompression::LZ4 : THdfsCompression::NONE);
   row_desc_->ToThrift(&output_batch->row_tuples);
+  return Status::OK();
+}
 
+Status RowBatch::Serialize(OutboundRowBatch* output_batch) {
+  int64_t uncompressed_size;
+  bool is_compressed;
+  output_batch->tuple_offsets_.clear();
+  RETURN_IF_ERROR(Serialize(UseFullDedup(), &output_batch->tuple_offsets_,
+      &output_batch->tuple_data_, &uncompressed_size, &is_compressed));
+
+  // Initialize the RowBatchHeaderPB
+  RowBatchHeaderPB* header = &output_batch->header_;
+  header->Clear();
+  header->set_num_rows(num_rows_);
+  header->set_num_tuples_per_row(row_desc_->tuple_descriptors().size());
+  header->set_uncompressed_size(uncompressed_size);
+  header->set_compression_type(
+      is_compressed ? CompressionType::LZ4 : CompressionType::NONE);
+  return Status::OK();
+}
+
+Status RowBatch::Serialize(bool full_dedup, vector<int32_t>* tuple_offsets,
+    string* tuple_data, int64_t* uncompressed_size, bool* is_compressed) {
   // As part of the serialization process we deduplicate tuples to avoid serializing a
   // Tuple multiple times for the RowBatch. By default we only detect duplicate tuples
   // in adjacent rows only. If full deduplication is enabled, we will build a
@@ -179,11 +248,13 @@ Status RowBatch::Serialize(TRowBatch* output_batch, bool full_dedup) {
     RETURN_IF_ERROR(distinct_tuples.Init(num_rows_ * num_tuples_per_row_ * 2, 0));
     size = TotalByteSize(&distinct_tuples);
     distinct_tuples.Clear(); // Reuse allocated hash table.
-    SerializeInternal(size, &distinct_tuples, output_batch);
+    SerializeInternal(size, &distinct_tuples, tuple_offsets, tuple_data);
   } else {
-    size = TotalByteSize(NULL);
-    SerializeInternal(size, NULL, output_batch);
+    size = TotalByteSize(nullptr);
+    SerializeInternal(size, nullptr, tuple_offsets, tuple_data);
   }
+  *uncompressed_size = size;
+  *is_compressed = false;
 
   if (size > 0) {
     // Try compressing tuple_data to compression_scratch_, swap if compressed data is
@@ -197,15 +268,14 @@ Status RowBatch::Serialize(TRowBatch* output_batch, bool full_dedup) {
     if (compression_scratch_.size() < compressed_size) {
       compression_scratch_.resize(compressed_size);
     }
-    uint8_t* input = (uint8_t*)output_batch->tuple_data.c_str();
+    uint8_t* input = (uint8_t*)tuple_data->c_str();
     uint8_t* compressed_output = (uint8_t*)compression_scratch_.c_str();
     RETURN_IF_ERROR(
         compressor.ProcessBlock(true, size, input, &compressed_size, &compressed_output));
-
     if (LIKELY(compressed_size < size)) {
       compression_scratch_.resize(compressed_size);
-      output_batch->tuple_data.swap(compression_scratch_);
-      output_batch->compression_type = THdfsCompression::LZ4;
+      tuple_data->swap(compression_scratch_);
+      *is_compressed = true;
     }
     VLOG_ROW << "uncompressed size: " << size << ", compressed size: " << compressed_size;
   }
@@ -227,54 +297,52 @@ bool RowBatch::UseFullDedup() {
 }
 
 void RowBatch::SerializeInternal(int64_t size, DedupMap* distinct_tuples,
-    TRowBatch* output_batch) {
-  DCHECK(distinct_tuples == NULL || distinct_tuples->size() == 0);
+    vector<int32_t>* tuple_offsets, string* tuple_data_str) {
+  DCHECK(distinct_tuples == nullptr || distinct_tuples->size() == 0);
   // TODO: max_size() is much larger than the amount of memory we could feasibly
   // allocate. Need better way to detect problem.
-  DCHECK_LE(size, output_batch->tuple_data.max_size());
+  DCHECK_LE(size, tuple_data_str->max_size());
 
   // TODO: track memory usage
   // TODO: detect if serialized size is too large to allocate and return proper error.
-  output_batch->tuple_data.resize(size);
-  output_batch->uncompressed_size = size;
-  output_batch->tuple_offsets.reserve(num_rows_ * num_tuples_per_row_);
+  tuple_data_str->resize(size);
+  tuple_offsets->reserve(num_rows_ * num_tuples_per_row_);
 
   // Copy tuple data of unique tuples, including strings, into output_batch (converting
   // string pointers into offsets in the process).
   int offset = 0; // current offset into output_batch->tuple_data
-  char* tuple_data = const_cast<char*>(output_batch->tuple_data.c_str());
+  char* tuple_data = const_cast<char*>(tuple_data_str->c_str());
 
   for (int i = 0; i < num_rows_; ++i) {
     vector<TupleDescriptor*>::const_iterator desc =
         row_desc_->tuple_descriptors().begin();
     for (int j = 0; desc != row_desc_->tuple_descriptors().end(); ++desc, ++j) {
       Tuple* tuple = GetRow(i)->GetTuple(j);
-      if (UNLIKELY(tuple == NULL)) {
+      if (UNLIKELY(tuple == nullptr)) {
         // NULLs are encoded as -1
-        output_batch->tuple_offsets.push_back(-1);
+        tuple_offsets->push_back(-1);
         continue;
       } else if (LIKELY(i > 0) && UNLIKELY(GetRow(i - 1)->GetTuple(j) == tuple)) {
         // Fast tuple deduplication for adjacent rows.
-        int prev_row_idx = output_batch->tuple_offsets.size() - num_tuples_per_row_;
-        output_batch->tuple_offsets.push_back(
-            output_batch->tuple_offsets[prev_row_idx]);
+        int prev_row_idx = tuple_offsets->size() - num_tuples_per_row_;
+        tuple_offsets->push_back((*tuple_offsets)[prev_row_idx]);
         continue;
-      } else if (UNLIKELY(distinct_tuples != NULL)) {
+      } else if (UNLIKELY(distinct_tuples != nullptr)) {
         if ((*desc)->byte_size() == 0) {
-          // Zero-length tuples can be represented as NULL.
-          output_batch->tuple_offsets.push_back(-1);
+          // Zero-length tuples can be represented as nullptr.
+          tuple_offsets->push_back(-1);
           continue;
         }
         int* dedupd_offset = distinct_tuples->FindOrInsert(tuple, offset);
         if (*dedupd_offset != offset) {
           // Repeat of tuple
           DCHECK_GE(*dedupd_offset, 0);
-          output_batch->tuple_offsets.push_back(*dedupd_offset);
+          tuple_offsets->push_back(*dedupd_offset);
           continue;
         }
       }
       // Record offset before creating copy (which increments offset and tuple_data)
-      output_batch->tuple_offsets.push_back(offset);
+      tuple_offsets->push_back(offset);
       tuple->DeepCopy(**desc, &tuple_data, &offset, /* convert_ptrs */ true);
       DCHECK_LE(offset, size);
     }
@@ -323,10 +391,7 @@ void RowBatch::TransferResourceOwnership(RowBatch* dest) {
 }
 
 int64_t RowBatch::GetDeserializedSize(const TRowBatch& batch) {
-  int64_t result = batch.uncompressed_size;
-  result += batch.row_tuples.size() * sizeof(TTupleId);
-  result += batch.tuple_offsets.size() * sizeof(int32_t);
-  return result;
+  return batch.uncompressed_size + batch.tuple_offsets.size() * sizeof(Tuple*);
 }
 
 int64_t RowBatch::GetSerializedSize(const TRowBatch& batch) {
@@ -334,6 +399,21 @@ int64_t RowBatch::GetSerializedSize(const TRowBatch& batch) {
   result += batch.row_tuples.size() * sizeof(TTupleId);
   result += batch.tuple_offsets.size() * sizeof(int32_t);
   return result;
+}
+
+int64_t RowBatch::GetDeserializedSize(const RowBatchHeaderPB& header,
+    const kudu::Slice& tuple_offsets) {
+  DCHECK_EQ(tuple_offsets.size() % sizeof(int32_t), 0);
+  return header.uncompressed_size() +
+      (tuple_offsets.size() / sizeof(int32_t)) * sizeof(Tuple*);
+}
+
+int64_t RowBatch::GetDeserializedSize(const OutboundRowBatch& batch) {
+  return batch.header_.uncompressed_size() + batch.tuple_offsets_.size() * sizeof(Tuple*);
+}
+
+int64_t RowBatch::GetSerializedSize(const OutboundRowBatch& batch) {
+  return batch.tuple_data_.size() + batch.tuple_offsets_.size() * sizeof(int32_t);
 }
 
 void RowBatch::AcquireState(RowBatch* src) {
@@ -370,7 +450,7 @@ void RowBatch::DeepCopyTo(RowBatch* dst) {
 
 // TODO: consider computing size of batches as they are built up
 int64_t RowBatch::TotalByteSize(DedupMap* distinct_tuples) {
-  DCHECK(distinct_tuples == NULL || distinct_tuples->size() == 0);
+  DCHECK(distinct_tuples == nullptr || distinct_tuples->size() == 0);
   int64_t result = 0;
   vector<int> tuple_count(row_desc_->tuple_descriptors().size(), 0);
 
@@ -378,12 +458,12 @@ int64_t RowBatch::TotalByteSize(DedupMap* distinct_tuples) {
   for (int i = 0; i < num_rows_; ++i) {
     for (int j = 0; j < num_tuples_per_row_; ++j) {
       Tuple* tuple = GetRow(i)->GetTuple(j);
-      if (UNLIKELY(tuple == NULL)) continue;
+      if (UNLIKELY(tuple == nullptr)) continue;
       // Only count the data of unique tuples.
       if (LIKELY(i > 0) && UNLIKELY(GetRow(i - 1)->GetTuple(j) == tuple)) {
         // Fast tuple deduplication for adjacent rows.
         continue;
-      } else if (UNLIKELY(distinct_tuples != NULL)) {
+      } else if (UNLIKELY(distinct_tuples != nullptr)) {
         if (row_desc_->tuple_descriptors()[j]->byte_size() == 0) continue;
         bool inserted = distinct_tuples->InsertIfNotPresent(tuple, -1);
         if (!inserted) continue;
@@ -413,7 +493,7 @@ Status RowBatch::ResizeAndAllocateTupleBuffer(RuntimeState* state, MemPool* pool
   }
   *buffer_size = static_cast<int64_t>(row_size) * *capacity;
   *buffer = pool->TryAllocate(*buffer_size);
-  if (*buffer == NULL) {
+  if (*buffer == nullptr) {
     return pool->mem_tracker()->MemLimitExceeded(
         state, "Failed to allocate tuple buffer", *buffer_size);
   }

@@ -336,7 +336,8 @@ error_codes = (
 
   ("DISK_IO_ERROR", 110, "Disk I/O error: $0"),
 
-
+  ("DATASTREAM_RECVR_CLOSED", 111,
+   "DataStreamRecvr for fragment=$0, node=$1 is closed already"),
 )
 
 import sys

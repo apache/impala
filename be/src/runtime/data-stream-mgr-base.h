@@ -21,6 +21,7 @@
 
 #include "common/status.h"
 #include "runtime/descriptors.h"  // for PlanNodeId
+#include "util/aligned-new.h"
 
 namespace impala {
 
@@ -35,7 +36,7 @@ class TUniqueId;
 /// TODO: This is a temporary pure virtual base class that defines the basic interface for
 /// 2 parallel implementations of the DataStreamMgrBase, one each for Thrift and KRPC.
 /// Remove this in favor of the KRPC implementation when possible.
-class DataStreamMgrBase {
+class DataStreamMgrBase : public CacheLineAligned {
  public:
   DataStreamMgrBase() {}
 
@@ -46,11 +47,6 @@ class DataStreamMgrBase {
       const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
       PlanNodeId dest_node_id, int num_senders, int64_t buffer_size,
       RuntimeProfile* profile, bool is_merging) = 0;
-
-  /// Notifies the recvr associated with the fragment/node id that the specified
-  /// sender has closed.
-  virtual Status CloseSender(const TUniqueId& fragment_instance_id,
-      PlanNodeId dest_node_id, int sender_id) = 0;
 
   /// Closes all receivers registered for fragment_instance_id immediately.
   virtual void Cancel(const TUniqueId& fragment_instance_id) = 0;
