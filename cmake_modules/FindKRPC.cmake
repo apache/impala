@@ -101,7 +101,9 @@ function(KRPC_GENERATE SRCS HDRS TGTS)
     # This custom target enforces that there's just one invocation of protoc
     # when there are multiple consumers of the generated files. The target name
     # must be unique; adding parts of the filename helps ensure this.
-    set(TGT_NAME ${REL_DIR}${FIL})
+    # Adding the prefix "KRPC_" to avoid conflation with the input proto file
+    # when ninja is used. Otherwise, ninja will flag a false circular dependency.
+    set(TGT_NAME KRPC_${REL_DIR}${FIL})
     string(REPLACE "/" "-" TGT_NAME ${TGT_NAME})
     add_custom_target(${TGT_NAME}
       DEPENDS "${SERVICE_CC}" "${SERVICE_H}"

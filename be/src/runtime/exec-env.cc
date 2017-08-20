@@ -28,6 +28,7 @@
 #include "common/object-pool.h"
 #include "exec/kudu-util.h"
 #include "gen-cpp/ImpalaInternalService.h"
+#include "rpc/rpc-mgr.h"
 #include "runtime/backend-client.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
@@ -168,10 +169,12 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int krpc_port,
     async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
     query_exec_mgr_(new QueryExecMgr()),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
-    backend_address_(MakeNetworkAddress(hostname, backend_port)),
-    krpc_port_(krpc_port) {
+    backend_address_(MakeNetworkAddress(hostname, backend_port)) {
 
   if (FLAGS_use_krpc) {
+    // KRPC relies on resolved IP address. It's set in StartServices().
+    krpc_address_.__set_port(krpc_port);
+    rpc_mgr_.reset(new RpcMgr());
     stream_mgr_.reset(new KrpcDataStreamMgr(metrics_.get()));
   } else {
     stream_mgr_.reset(new DataStreamMgr(metrics_.get()));
@@ -204,6 +207,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int krpc_port,
 
 ExecEnv::~ExecEnv() {
   if (buffer_reservation_ != nullptr) buffer_reservation_->Close();
+  if (rpc_mgr_ != nullptr) rpc_mgr_->Shutdown();
   disk_io_mgr_.reset(); // Need to tear down before mem_tracker_.
 }
 
@@ -281,6 +285,15 @@ Status ExecEnv::Init() {
   RETURN_IF_ERROR(RegisterMemoryMetrics(
       metrics_.get(), true, buffer_reservation_.get(), buffer_pool_.get()));
 
+  // Resolve hostname to IP address.
+  RETURN_IF_ERROR(HostnameToIpAddr(backend_address_.hostname, &ip_address_));
+
+  // Initialize the RPCMgr before allowing services registration.
+  if (FLAGS_use_krpc) {
+    krpc_address_.__set_hostname(ip_address_);
+    RETURN_IF_ERROR(rpc_mgr_->Init());
+  }
+
   mem_tracker_.reset(
       new MemTracker(AggregateMemoryMetrics::TOTAL_USED, bytes_limit, "Process"));
   // Add BufferPool MemTrackers for cached memory that is not tracked against queries
@@ -334,7 +347,7 @@ Status ExecEnv::Init() {
   }
 
   if (scheduler_ != nullptr) {
-    RETURN_IF_ERROR(scheduler_->Init(backend_address_, krpc_port_));
+    RETURN_IF_ERROR(scheduler_->Init(backend_address_, krpc_address_, ip_address_));
   }
   if (admission_controller_ != nullptr) RETURN_IF_ERROR(admission_controller_->Init());
 
@@ -364,6 +377,8 @@ Status ExecEnv::StartServices() {
     }
   }
 
+  // Start this last so everything is in place before accepting the first call.
+  if (FLAGS_use_krpc) RETURN_IF_ERROR(rpc_mgr_->StartServices(krpc_address_));
   return Status::OK();
 }
 
@@ -402,4 +417,4 @@ KrpcDataStreamMgr* ExecEnv::KrpcStreamMgr() {
   return dynamic_cast<KrpcDataStreamMgr*>(stream_mgr_.get());
 }
 
-}
+} // namespace impala

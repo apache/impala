@@ -20,7 +20,6 @@
 #include <boost/unordered_set.hpp>
 
 #include "common/names.h"
-#include "runtime/exec-env.h"
 #include "scheduling/scheduler.h"
 
 using namespace impala;
@@ -509,13 +508,14 @@ void SchedulerWrapper::InitializeScheduler() {
                                            << "hosts.";
   const Host& scheduler_host = plan_.cluster().hosts()[0];
   string scheduler_backend_id = scheduler_host.ip;
-  TNetworkAddress scheduler_backend_address;
-  scheduler_backend_address.hostname = scheduler_host.ip;
-  scheduler_backend_address.port = scheduler_host.be_port;
-
+  TNetworkAddress scheduler_backend_address =
+      MakeNetworkAddress(scheduler_host.ip, scheduler_host.be_port);
+  TNetworkAddress scheduler_krpc_address =
+      MakeNetworkAddress(scheduler_host.ip, FLAGS_krpc_port);
   scheduler_.reset(new Scheduler(nullptr, scheduler_backend_id,
       &metrics_, nullptr, nullptr));
-  const Status status = scheduler_->Init(scheduler_backend_address, FLAGS_krpc_port);
+  const Status status = scheduler_->Init(scheduler_backend_address,
+      scheduler_krpc_address, scheduler_host.ip);
   DCHECK(status.ok()) << "Scheduler init failed in test";
   // Initialize the scheduler backend maps.
   SendFullMembershipMap();

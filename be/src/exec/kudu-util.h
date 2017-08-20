@@ -81,5 +81,18 @@ Status WriteKuduValue(int col, PrimitiveType type, const void* value,
 /// Takes a Kudu client DataType and returns the corresponding Impala ColumnType.
 ColumnType KuduDataTypeToColumnType(kudu::client::KuduColumnSchema::DataType type);
 
+/// Utility function for creating an Impala Status object based on a kudu::Status object.
+/// 'k_status' is the kudu::Status object.
+/// 'prepend' is a string to be prepended to details of 'k_status' when creating the
+/// Impala Status object.
+/// Note that we don't translate the kudu::Status error code to Impala error code
+/// so the returned status' type is always of TErrorCode::GENERAL.
+inline Status FromKuduStatus(
+    const kudu::Status& k_status, const std::string prepend = "") {
+  if (LIKELY(k_status.ok())) return Status::OK();
+  if (prepend.empty()) return Status(k_status.ToString());
+  return Status(strings::Substitute("$0: $1", prepend, k_status.ToString()));
+}
+
 } /// namespace impala
 #endif

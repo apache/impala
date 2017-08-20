@@ -20,6 +20,10 @@
 #include "gen-cpp/Types_types.h"
 #include <vector>
 
+namespace kudu {
+class Sockaddr;
+} // namespace kudu
+
 namespace impala {
 
 /// Type to store hostnames, which can be rfc1123 hostnames or IPv4 addresses.
@@ -64,6 +68,11 @@ bool IsWildcardAddress(const std::string& ipaddress);
 /// Utility method to print address as address:port
 std::string TNetworkAddressToString(const TNetworkAddress& address);
 
+/// Utility method to convert TNetworkAddress to Kudu sock addr.
+/// Note that 'address' has to contain a resolved IP address.
+Status TNetworkAddressToSockaddr(const TNetworkAddress& address,
+    kudu::Sockaddr* sockaddr);
+
 /// Prints a hostport as ipaddress:port
 std::ostream& operator<<(std::ostream& out, const TNetworkAddress& hostport);
 
@@ -71,4 +80,5 @@ std::ostream& operator<<(std::ostream& out, const TNetworkAddress& hostport);
 /// a free ephemeral port can't be found after 100 tries. If 'used_ports' is non-NULL,
 /// does not select those ports and adds the selected port to 'used_ports'.
 int FindUnusedEphemeralPort(std::vector<int>* used_ports);
-}
+
+} // namespace impala

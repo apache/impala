@@ -86,9 +86,11 @@ class Scheduler {
   /// decisions once this method returns. Register with the subscription manager if
   /// required. Also initializes the local backend descriptor. Returns error status
   /// on failure. 'backend_address' is the address of thrift based ImpalaInternalService
-  /// of this backend. 'krpc_port' is the port on which KRPC based ImpalaInternalService
-  /// is exported.
-  Status Init(const TNetworkAddress& backend_address, int krpc_port);
+  /// of this backend. If FLAGS_use_krpc is true, 'krpc_address' contains IP-address:port
+  /// on which KRPC based ImpalaInternalService is exported. 'ip' is the resolved
+  /// IP address of this backend.
+  Status Init(const TNetworkAddress& backend_address,
+      const TNetworkAddress& krpc_address, const IpAddr& ip);
 
   /// Populates given query schedule and assigns fragments to hosts based on scan
   /// ranges in the query exec request.

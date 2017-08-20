@@ -21,8 +21,12 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/rpc")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/rpc")
 
+# Mark the protobuf files as generated
+set_source_files_properties(${RPC_TEST_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+
 add_library(Rpc
   authentication.cc
+  rpc-mgr.cc
   rpc-trace.cc
   TAcceptQueueServer.cpp
   thrift-util.cc
@@ -35,3 +39,11 @@ add_dependencies(Rpc gen-deps)
 ADD_BE_TEST(thrift-util-test)
 ADD_BE_TEST(thrift-server-test)
 ADD_BE_TEST(authentication-test)
+
+ADD_BE_TEST(rpc-mgr-test)
+add_dependencies(rpc-mgr-test rpc_test_proto)
+target_link_libraries(rpc-mgr-test rpc_test_proto)
+
+add_library(rpc_test_proto ${RPC_TEST_PROTO_SRCS})
+add_dependencies(rpc_test_proto rpc_test_proto_tgt krpc)
+target_link_libraries(rpc_test_proto krpc)

@@ -65,29 +65,20 @@ Scheduler::Scheduler(StatestoreSubscriber* subscriber, const string& backend_id,
     request_pool_service_(request_pool_service) {
 }
 
-Status Scheduler::Init(const TNetworkAddress& backend_address, int krpc_port) {
+Status Scheduler::Init(const TNetworkAddress& backend_address,
+    const TNetworkAddress& krpc_address, const IpAddr& ip) {
   LOG(INFO) << "Starting scheduler";
-
-  // Figure out what our IP address is, so that each subscriber doesn't have to resolve
-  // it on every heartbeat. KRPC also assumes that the address is resolved already.
-  // May as well do it up front to avoid frequent DNS requests.
   local_backend_descriptor_.address = backend_address;
-  IpAddr ip;
-  const Hostname& hostname = backend_address.hostname;
-  Status status = HostnameToIpAddr(hostname, &ip);
-  if (!status.ok()) {
-    VLOG(1) << status.GetDetail();
-    status.AddDetail("Scheduler failed to start");
-    return status;
-  }
-
+  // Store our IP address so that each subscriber doesn't have to resolve
+  // it on every heartbeat. May as well do it up front to avoid frequent DNS
+  // requests.
   local_backend_descriptor_.ip_address = ip;
   LOG(INFO) << "Scheduler using " << ip << " as IP address";
-
   if (FLAGS_use_krpc) {
-    // KRPC expects address to have been resolved already.
-    TNetworkAddress krpc_svc_addr = MakeNetworkAddress(ip, krpc_port);
-    local_backend_descriptor_.__set_krpc_address(krpc_svc_addr);
+    // KRPC relies on resolved IP address.
+    DCHECK(IsResolvedAddress(krpc_address));
+    DCHECK_EQ(krpc_address.hostname, ip);
+    local_backend_descriptor_.__set_krpc_address(krpc_address);
   }
 
   coord_only_backend_config_.AddBackend(local_backend_descriptor_);

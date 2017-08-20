@@ -18,6 +18,9 @@
 #ifndef IMPALA_UTIL_COUNTING_BARRIER_H
 #define IMPALA_UTIL_COUNTING_BARRIER_H
 
+#include "common/atomic.h"
+#include "util/promise.h"
+
 namespace impala {
 
 /// Allows clients to wait for the arrival of a fixed number of notifications before they

@@ -1629,18 +1629,10 @@ void ImpalaServer::AddLocalBackendToStatestore(
   local_backend_descriptor.__set_is_coordinator(FLAGS_is_coordinator);
   local_backend_descriptor.__set_is_executor(FLAGS_is_executor);
   local_backend_descriptor.__set_address(exec_env_->backend_address());
-  IpAddr ip;
-  const Hostname& hostname = local_backend_descriptor.address.hostname;
-  Status status = HostnameToIpAddr(hostname, &ip);
-  if (!status.ok()) {
-    // TODO: Should we do something about this failure?
-    LOG(WARNING) << "Failed to convert hostname " << hostname << " to IP address: "
-                 << status.GetDetail();
-    return;
-  }
-  local_backend_descriptor.ip_address = ip;
+  local_backend_descriptor.ip_address = exec_env_->ip_address();
   if (FLAGS_use_krpc) {
-    TNetworkAddress krpc_address = MakeNetworkAddress(ip, exec_env_->krpc_port());
+    const TNetworkAddress& krpc_address = exec_env_->krpc_address();
+    DCHECK(IsResolvedAddress(krpc_address));
     local_backend_descriptor.__set_krpc_address(krpc_address);
   }
   subscriber_topic_updates->emplace_back(TTopicDelta());
@@ -1650,7 +1642,7 @@ void ImpalaServer::AddLocalBackendToStatestore(
 
   TTopicItem& item = update.topic_entries.back();
   item.key = local_backend_id;
-  status = thrift_serializer_.Serialize(&local_backend_descriptor, &item.value);
+  Status status = thrift_serializer_.Serialize(&local_backend_descriptor, &item.value);
   if (!status.ok()) {
     LOG(WARNING) << "Failed to serialize Impala backend descriptor for statestore topic:"
                  << " " << status.GetDetail();

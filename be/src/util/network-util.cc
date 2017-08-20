@@ -28,6 +28,7 @@
 #include <vector>
 #include <boost/algorithm/string.hpp>
 
+#include "exec/kudu-util.h"
 #include "kudu/util/net/sockaddr.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
@@ -212,4 +213,14 @@ int FindUnusedEphemeralPort(vector<int>* used_ports) {
   close(sockfd);
   return -1;
 }
+
+Status TNetworkAddressToSockaddr(const TNetworkAddress& address,
+    kudu::Sockaddr* sockaddr) {
+  DCHECK(IsResolvedAddress(address));
+  KUDU_RETURN_IF_ERROR(
+      sockaddr->ParseString(TNetworkAddressToString(address), address.port),
+      "Failed to parse address to Kudu Sockaddr.");
+  return Status::OK();
+}
+
 }
