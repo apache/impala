@@ -218,13 +218,13 @@ class TestScannersFuzzing(ImpalaTestSuite):
     for _ in xrange(num_corruptions):
       flip_offset = rng.randint(0, len(data) - 1)
       flip_val = rng.randint(0, 255)
-      LOG.info("corrupt file: Flip byte in {} at {} from {} to {}".format(
+      LOG.info("corrupt file: Flip byte in {0} at {1} from {2} to {3}".format(
           path, flip_offset, data[flip_offset], flip_val))
       data[flip_offset] = flip_val
 
     if rng.random() < 0.4:
       truncation = rng.randint(0, len(data))
-      LOG.info("corrupt file: Truncate {} to {}".format(path, truncation))
+      LOG.info("corrupt file: Truncate {0} to {1}".format(path, truncation))
       data = data[:truncation]
 
     with open(path, "wb") as f:
