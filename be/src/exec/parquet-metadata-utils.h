@@ -44,10 +44,15 @@ class ParquetMetadataUtils {
   static Status ValidateOffsetInFile(const std::string& filename, int col_idx,
       int64_t file_length, int64_t offset, const std::string& offset_name);
 
-  /// Validates the column metadata to make sure this column is supported (e.g. encoding,
-  /// type, etc) and matches the type of given slot_desc.
-  static Status ValidateColumn(const parquet::FileMetaData& file_metadata,
+  /// Validates the column metadata inside a row group to make sure this column is
+  /// supported (e.g. encoding, type, etc).
+  static Status ValidateRowGroupColumn(const parquet::FileMetaData& file_metadata,
       const char* filename, int row_group_idx, int col_idx,
+      const parquet::SchemaElement& schema_element, RuntimeState* state);
+
+  /// Validates the column metadata to make sure the column is supported and its type
+  /// attributes conform to the parquet spec.
+  static Status ValidateColumn(const char* filename,
       const parquet::SchemaElement& schema_element, const SlotDescriptor* slot_desc,
       RuntimeState* state);
 };

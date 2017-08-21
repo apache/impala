@@ -116,3 +116,10 @@ Reproduction steps:
    file_metadata_.schema[0].__set_repetition_type(FieldRepetitionType::REQUIRED);
 2: Run test_compute_stats and grab the created Parquet file for
    alltypes_parquet table.
+
+binary_decimal_dictionary.parquet,
+binary_decimal_no_dictionary.parquet:
+Generated using parquet-mr and contents verified using parquet-tools-1.9.1.
+Contains decimals stored as variable sized BYTE_ARRAY with both dictionary
+and non-dictionary encoding respectively.
+

@@ -43,7 +43,8 @@ class ParquetLevelDecoder;
 class ParquetColumnReader;
 class CollectionColumnReader;
 class BaseScalarColumnReader;
-template<typename T, bool MATERIALIZED> class ScalarColumnReader;
+template<typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
+class ScalarColumnReader;
 class BoolColumnReader;
 
 /// This scanner parses Parquet files located in HDFS, and writes the content as tuples in
@@ -354,7 +355,8 @@ class HdfsParquetScanner : public HdfsScanner {
   friend class ParquetColumnReader;
   friend class CollectionColumnReader;
   friend class BaseScalarColumnReader;
-  template<typename T, bool MATERIALIZED> friend class ScalarColumnReader;
+  template<typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
+  friend class ScalarColumnReader;
   friend class BoolColumnReader;
 
   /// Size of the file footer.  This is a guess.  If this value is too little, we will

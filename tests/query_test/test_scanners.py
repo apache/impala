@@ -589,6 +589,24 @@ class TestParquet(ImpalaTestSuite):
     self.run_test_case('QueryTest/parquet-resolution-by-name', vector,
                        use_db=unique_database)
 
+  def test_decimal_encodings(self, vector, unique_database):
+    # Create a table using an existing data file with dictionary-encoded, variable-length
+    # physical encodings for decimals.
+    TABLE_NAME = "decimal_encodings"
+    self.client.execute('''create table if not exists %s.%s
+    (small_dec decimal(9,2), med_dec decimal(18,2), large_dec decimal(38,2))
+    STORED AS PARQUET''' % (unique_database, TABLE_NAME))
+
+    table_loc = get_fs_path(
+      "/test-warehouse/%s.db/%s" % (unique_database, TABLE_NAME))
+    for file_name in ["binary_decimal_dictionary.parquet",
+                      "binary_decimal_no_dictionary.parquet"]:
+      data_file_path = os.path.join(os.environ['IMPALA_HOME'],
+                                    "testdata/data/", file_name)
+      check_call(['hdfs', 'dfs', '-copyFromLocal', data_file_path, table_loc])
+
+    self.run_test_case('QueryTest/parquet-decimal-formats', vector, unique_database)
+
 # We use various scan range lengths to exercise corner cases in the HDFS scanner more
 # thoroughly. In particular, it will exercise:
 # 1. default scan range

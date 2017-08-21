@@ -40,6 +40,39 @@ using boost::algorithm::token_compress_on;
 
 namespace impala {
 
+namespace {
+
+const map<PrimitiveType, set<parquet::Type::type>> SUPPORTED_PHYSICAL_TYPES = {
+    {PrimitiveType::INVALID_TYPE, {parquet::Type::BOOLEAN}},
+    {PrimitiveType::TYPE_NULL, {parquet::Type::BOOLEAN}},
+    {PrimitiveType::TYPE_BOOLEAN, {parquet::Type::BOOLEAN}},
+    {PrimitiveType::TYPE_TINYINT, {parquet::Type::INT32}},
+    {PrimitiveType::TYPE_SMALLINT, {parquet::Type::INT32}},
+    {PrimitiveType::TYPE_INT, {parquet::Type::INT32}},
+    {PrimitiveType::TYPE_BIGINT, {parquet::Type::INT64}},
+    {PrimitiveType::TYPE_FLOAT, {parquet::Type::FLOAT}},
+    {PrimitiveType::TYPE_DOUBLE, {parquet::Type::DOUBLE}},
+    {PrimitiveType::TYPE_TIMESTAMP, {parquet::Type::INT96}},
+    {PrimitiveType::TYPE_STRING, {parquet::Type::BYTE_ARRAY}},
+    {PrimitiveType::TYPE_DATE, {parquet::Type::BYTE_ARRAY}},
+    {PrimitiveType::TYPE_DATETIME, {parquet::Type::BYTE_ARRAY}},
+    {PrimitiveType::TYPE_BINARY, {parquet::Type::BYTE_ARRAY}},
+    {PrimitiveType::TYPE_DECIMAL, {parquet::Type::FIXED_LEN_BYTE_ARRAY,
+        parquet::Type::BYTE_ARRAY}},
+    {PrimitiveType::TYPE_CHAR, {parquet::Type::BYTE_ARRAY}},
+    {PrimitiveType::TYPE_VARCHAR, {parquet::Type::BYTE_ARRAY}},
+};
+
+/// Returns true if 'parquet_type' is a supported physical encoding for the Impala
+/// primitive type, false otherwise.
+bool IsSupportedPhysicalType(PrimitiveType impala_type,
+    parquet::Type::type parquet_type) {
+  auto encodings = SUPPORTED_PHYSICAL_TYPES.find(impala_type);
+  DCHECK(encodings != SUPPORTED_PHYSICAL_TYPES.end());
+  return encodings->second.find(parquet_type) != encodings->second.end();
+}
+
+}
 // Needs to be in sync with the order of enum values declared in TParquetArrayResolution.
 const std::vector<ParquetSchemaResolver::ArrayEncoding>
     ParquetSchemaResolver::ORDERED_ARRAY_ENCODINGS[] =
@@ -110,97 +143,85 @@ static bool IsEncodingSupported(parquet::Encoding::type e) {
   }
 }
 
-Status ParquetMetadataUtils::ValidateColumn(const parquet::FileMetaData& file_metadata,
-    const char* filename, int row_group_idx, int col_idx,
-    const parquet::SchemaElement& schema_element, const SlotDescriptor* slot_desc,
-    RuntimeState* state) {
-  const parquet::ColumnChunk& file_data =
-      file_metadata.row_groups[row_group_idx].columns[col_idx];
+Status ParquetMetadataUtils::ValidateRowGroupColumn(
+    const parquet::FileMetaData& file_metadata, const char* filename, int row_group_idx,
+    int col_idx, const parquet::SchemaElement& schema_element, RuntimeState* state) {
+  const parquet::ColumnMetaData& col_chunk_metadata =
+      file_metadata.row_groups[row_group_idx].columns[col_idx].meta_data;
 
   // Check the encodings are supported.
-  const vector<parquet::Encoding::type>& encodings = file_data.meta_data.encodings;
+  const vector<parquet::Encoding::type>& encodings = col_chunk_metadata.encodings;
   for (int i = 0; i < encodings.size(); ++i) {
     if (!IsEncodingSupported(encodings[i])) {
-      stringstream ss;
-      ss << "File '" << filename << "' uses an unsupported encoding: "
-         << PrintEncoding(encodings[i]) << " for column '" << schema_element.name
-         << "'.";
-      return Status(ss.str());
+      return Status(Substitute("File '$0' uses an unsupported encoding: $1 for column "
+          "'$2'.", filename, PrintEncoding(encodings[i]), schema_element.name));
     }
   }
 
   // Check the compression is supported.
-  if (file_data.meta_data.codec != parquet::CompressionCodec::UNCOMPRESSED &&
-      file_data.meta_data.codec != parquet::CompressionCodec::SNAPPY &&
-      file_data.meta_data.codec != parquet::CompressionCodec::GZIP) {
-    stringstream ss;
-    ss << "File '" << filename << "' uses an unsupported compression: "
-        << file_data.meta_data.codec << " for column '" << schema_element.name
-        << "'.";
-    return Status(ss.str());
+  if (col_chunk_metadata.codec != parquet::CompressionCodec::UNCOMPRESSED &&
+      col_chunk_metadata.codec != parquet::CompressionCodec::SNAPPY &&
+      col_chunk_metadata.codec != parquet::CompressionCodec::GZIP) {
+    return Status(Substitute("File '$0' uses an unsupported compression: $1 for column "
+        "'$2'.", filename, col_chunk_metadata.codec, schema_element.name));
   }
 
-  // Validation after this point is only if col_reader is reading values.
-  if (slot_desc == NULL) return Status::OK();
-
-  parquet::Type::type type = IMPALA_TO_PARQUET_TYPES[slot_desc->type().type];
-  if (UNLIKELY(type != file_data.meta_data.type)) {
-    return Status(Substitute("Unexpected Parquet type in file '$0' metadata expected $1 "
-        "actual $2: file may be corrupt", filename, type, file_data.meta_data.type));
+  if (col_chunk_metadata.type != schema_element.type) {
+    return Status(Substitute("Mismatched column chunk Parquet type in file '$0' column "
+            "'$1'. Expected $2 actual $3: file may be corrupt", filename,
+            schema_element.name, col_chunk_metadata.type, schema_element.type));
   }
+  return Status::OK();
+}
+
+Status ParquetMetadataUtils::ValidateColumn(const char* filename,
+    const parquet::SchemaElement& schema_element, const SlotDescriptor* slot_desc,
+    RuntimeState* state) {
+  // Following validation logic is only for non-complex types.
+  if (slot_desc->type().IsComplexType()) return Status::OK();
+
+  if (UNLIKELY(!IsSupportedPhysicalType(slot_desc->type().type, schema_element.type))) {
+    return Status(Substitute("Unsupported Parquet type in file '$0' metadata. Logical "
+        "type: $1, physical type: $2. File may be corrupt.",
+        filename, slot_desc->type().type, schema_element.type));
+    }
 
   // Check the decimal scale in the file matches the metastore scale and precision.
   // We fail the query if the metadata makes it impossible for us to safely read
   // the file. If we don't require the metadata, we will fail the query if
   // abort_on_error is true, otherwise we will just log a warning.
-  bool is_converted_type_decimal = schema_element.__isset.converted_type &&
-      schema_element.converted_type == parquet::ConvertedType::DECIMAL;
+  bool is_converted_type_decimal = schema_element.__isset.converted_type
+      && schema_element.converted_type == parquet::ConvertedType::DECIMAL;
   if (slot_desc->type().type == TYPE_DECIMAL) {
     // We require that the scale and byte length be set.
-    if (schema_element.type != parquet::Type::FIXED_LEN_BYTE_ARRAY) {
-      stringstream ss;
-      ss << "File '" << filename << "' column '" << schema_element.name
-         << "' should be a decimal column encoded using FIXED_LEN_BYTE_ARRAY.";
-      return Status(ss.str());
-    }
+    if (schema_element.type == parquet::Type::FIXED_LEN_BYTE_ARRAY) {
+      if (!schema_element.__isset.type_length) {
+        return Status(Substitute("File '$0' column '$1' does not have type_length set.",
+            filename, schema_element.name));
+      }
 
-    if (!schema_element.__isset.type_length) {
-      stringstream ss;
-      ss << "File '" << filename << "' column '" << schema_element.name
-         << "' does not have type_length set.";
-      return Status(ss.str());
+      int expected_len = ParquetPlainEncoder::DecimalSize(slot_desc->type());
+      if (schema_element.type_length != expected_len) {
+        return Status(Substitute("File '$0' column '$1' has an invalid type length. "
+            "Expecting: $2 len in file: $3", filename, schema_element.name, expected_len,
+            schema_element.type_length));
+      }
     }
-
-    int expected_len = ParquetPlainEncoder::DecimalSize(slot_desc->type());
-    if (schema_element.type_length != expected_len) {
-      stringstream ss;
-      ss << "File '" << filename << "' column '" << schema_element.name
-         << "' has an invalid type length. Expecting: " << expected_len
-         << " len in file: " << schema_element.type_length;
-      return Status(ss.str());
-    }
-
     if (!schema_element.__isset.scale) {
-      stringstream ss;
-      ss << "File '" << filename << "' column '" << schema_element.name
-         << "' does not have the scale set.";
-      return Status(ss.str());
+      return Status(Substitute("File '$0' column '$1' does not have the scale set.",
+          filename, schema_element.name));
     }
 
     if (schema_element.scale != slot_desc->type().scale) {
       // TODO: we could allow a mismatch and do a conversion at this step.
-      stringstream ss;
-      ss << "File '" << filename << "' column '" << schema_element.name
-         << "' has a scale that does not match the table metadata scale."
-         << " File metadata scale: " << schema_element.scale
-         << " Table metadata scale: " << slot_desc->type().scale;
-      return Status(ss.str());
+      return Status(Substitute("File '$0' column '$1' has a scale that does not match "
+          "the table metadata scale. File metadata scale: $2 Table metadata scale: $3",
+          filename, schema_element.name, schema_element.scale, slot_desc->type().scale));
     }
 
     // The other decimal metadata should be there but we don't need it.
     if (!schema_element.__isset.precision) {
-      ErrorMsg msg(TErrorCode::PARQUET_MISSING_PRECISION, filename,
-          schema_element.name);
+      ErrorMsg msg(TErrorCode::PARQUET_MISSING_PRECISION, filename, schema_element.name);
       RETURN_IF_ERROR(state->LogOrReturnError(msg));
     } else {
       if (schema_element.precision != slot_desc->type().precision) {
@@ -218,10 +239,10 @@ Status ParquetMetadataUtils::ValidateColumn(const parquet::FileMetaData& file_me
           schema_element.name);
       RETURN_IF_ERROR(state->LogOrReturnError(msg));
     }
-  } else if (schema_element.__isset.scale || schema_element.__isset.precision ||
-      is_converted_type_decimal) {
-    ErrorMsg msg(TErrorCode::PARQUET_INCOMPATIBLE_DECIMAL, filename,
-        schema_element.name, slot_desc->type().DebugString());
+  } else if (schema_element.__isset.scale || schema_element.__isset.precision
+      || is_converted_type_decimal) {
+    ErrorMsg msg(TErrorCode::PARQUET_INCOMPATIBLE_DECIMAL, filename, schema_element.name,
+        slot_desc->type().DebugString());
     RETURN_IF_ERROR(state->LogOrReturnError(msg));
   }
   return Status::OK();
@@ -350,8 +371,8 @@ Status ParquetSchemaResolver::CreateSchemaTree(
     ++(*col_idx);
   } else if (node->element->num_children > SCHEMA_NODE_CHILDREN_SANITY_LIMIT) {
     // Sanity-check the schema to avoid allocating absurdly large buffers below.
-    return Status(Substitute("Schema in Parquet file '$0' has $1 children, more than limit of "
-        "$2. File is likely corrupt", filename_, node->element->num_children,
+    return Status(Substitute("Schema in Parquet file '$0' has $1 children, more than "
+        "limit of $2. File is likely corrupt", filename_, node->element->num_children,
         SCHEMA_NODE_CHILDREN_SANITY_LIMIT));
   } else if (node->element->num_children < 0) {
     return Status(Substitute("Corrupt Parquet file '$0': schema element has $1 children.",
@@ -668,8 +689,7 @@ Status ParquetSchemaResolver::ValidateScalarNode(const SchemaNode& node,
         PrintSubPath(tbl_desc_, path, idx), col_type.DebugString(), node.DebugString());
     return Status::Expected(msg);
   }
-  parquet::Type::type type = IMPALA_TO_PARQUET_TYPES[col_type.type];
-  if (type != node.element->type) {
+  if (!IsSupportedPhysicalType(col_type.type, node.element->type)) {
     ErrorMsg msg(TErrorCode::PARQUET_UNRECOGNIZED_SCHEMA, filename_,
         PrintSubPath(tbl_desc_, path, idx), col_type.DebugString(), node.DebugString());
     return Status::Expected(msg);

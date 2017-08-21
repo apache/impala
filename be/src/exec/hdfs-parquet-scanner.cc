@@ -1485,6 +1485,9 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
       continue;
     }
 
+    RETURN_IF_ERROR(ParquetMetadataUtils::ValidateColumn(filename(), *node->element,
+        slot_desc, state_));
+
     ParquetColumnReader* col_reader = ParquetColumnReader::Create(
         *node, slot_desc->type().IsCollectionType(), slot_desc, this);
     column_readers->push_back(col_reader);
@@ -1620,9 +1623,9 @@ Status HdfsParquetScanner::InitColumns(
           col_chunk.meta_data.num_values, num_values, filename());
     }
 
-    RETURN_IF_ERROR(ParquetMetadataUtils::ValidateColumn(file_metadata_, filename(),
-        row_group_idx, scalar_reader->col_idx(), scalar_reader->schema_element(),
-        scalar_reader->slot_desc_, state_));
+    RETURN_IF_ERROR(ParquetMetadataUtils::ValidateRowGroupColumn(file_metadata_,
+        filename(), row_group_idx, scalar_reader->col_idx(),
+        scalar_reader->schema_element(), state_));
 
     if (col_chunk.meta_data.__isset.dictionary_page_offset) {
       // Already validated in ValidateColumnOffsets()

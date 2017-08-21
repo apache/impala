@@ -61,11 +61,13 @@ bool ColumnStatsBase::ReadFromThrift(const parquet::ColumnChunk& col_chunk,
 
   switch (col_type.type) {
     case TYPE_BOOLEAN:
-      return ColumnStats<bool>::DecodePlainValue(*stat_value, slot);
+      return ColumnStats<bool>::DecodePlainValue(*stat_value, slot,
+          parquet::Type::BOOLEAN);
     case TYPE_TINYINT: {
       // parquet::Statistics encodes INT_8 values using 4 bytes.
       int32_t col_stats;
-      bool ret = ColumnStats<int32_t>::DecodePlainValue(*stat_value, &col_stats);
+      bool ret = ColumnStats<int32_t>::DecodePlainValue(*stat_value, &col_stats,
+          parquet::Type::INT32);
       if (!ret || col_stats < std::numeric_limits<int8_t>::min() ||
           col_stats > std::numeric_limits<int8_t>::max()) {
         return false;
@@ -76,7 +78,8 @@ bool ColumnStatsBase::ReadFromThrift(const parquet::ColumnChunk& col_chunk,
     case TYPE_SMALLINT: {
       // parquet::Statistics encodes INT_16 values using 4 bytes.
       int32_t col_stats;
-      bool ret = ColumnStats<int32_t>::DecodePlainValue(*stat_value, &col_stats);
+      bool ret = ColumnStats<int32_t>::DecodePlainValue(*stat_value, &col_stats,
+          parquet::Type::INT32);
       if (!ret || col_stats < std::numeric_limits<int16_t>::min() ||
           col_stats > std::numeric_limits<int16_t>::max()) {
         return false;
@@ -85,18 +88,24 @@ bool ColumnStatsBase::ReadFromThrift(const parquet::ColumnChunk& col_chunk,
       return true;
     }
     case TYPE_INT:
-      return ColumnStats<int32_t>::DecodePlainValue(*stat_value, slot);
+      return ColumnStats<int32_t>::DecodePlainValue(*stat_value, slot,
+          col_chunk.meta_data.type);
     case TYPE_BIGINT:
-      return ColumnStats<int64_t>::DecodePlainValue(*stat_value, slot);
+      return ColumnStats<int64_t>::DecodePlainValue(*stat_value, slot,
+          col_chunk.meta_data.type);
     case TYPE_FLOAT:
-      return ColumnStats<float>::DecodePlainValue(*stat_value, slot);
+      return ColumnStats<float>::DecodePlainValue(*stat_value, slot,
+          col_chunk.meta_data.type);
     case TYPE_DOUBLE:
-      return ColumnStats<double>::DecodePlainValue(*stat_value, slot);
+      return ColumnStats<double>::DecodePlainValue(*stat_value, slot,
+          col_chunk.meta_data.type);
     case TYPE_TIMESTAMP:
-      return ColumnStats<TimestampValue>::DecodePlainValue(*stat_value, slot);
+      return ColumnStats<TimestampValue>::DecodePlainValue(*stat_value, slot,
+          col_chunk.meta_data.type);
     case TYPE_STRING:
     case TYPE_VARCHAR:
-      return ColumnStats<StringValue>::DecodePlainValue(*stat_value, slot);
+      return ColumnStats<StringValue>::DecodePlainValue(*stat_value, slot,
+          col_chunk.meta_data.type);
     case TYPE_CHAR:
       /// We don't read statistics for CHAR columns, since CHAR support is broken in
       /// Impala (IMPALA-1652).
@@ -104,12 +113,15 @@ bool ColumnStatsBase::ReadFromThrift(const parquet::ColumnChunk& col_chunk,
     case TYPE_DECIMAL:
       switch (col_type.GetByteSize()) {
         case 4:
-          return ColumnStats<Decimal4Value>::DecodePlainValue(*stat_value, slot);
+          return ColumnStats<Decimal4Value>::DecodePlainValue(*stat_value, slot,
+              col_chunk.meta_data.type);
         case 8:
-          return ColumnStats<Decimal8Value>::DecodePlainValue(*stat_value, slot);
+          return ColumnStats<Decimal8Value>::DecodePlainValue(*stat_value, slot,
+              col_chunk.meta_data.type);
         case 16:
-          return ColumnStats<Decimal16Value>::DecodePlainValue(*stat_value, slot);
-      }
+          return ColumnStats<Decimal16Value>::DecodePlainValue(*stat_value, slot,
+              col_chunk.meta_data.type);
+        }
       DCHECK(false) << "Unknown decimal byte size: " << col_type.GetByteSize();
     default:
       DCHECK(false) << col_type.DebugString();

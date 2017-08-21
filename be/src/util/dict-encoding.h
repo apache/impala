@@ -210,6 +210,7 @@ class DictDecoder : public DictDecoderBase {
   /// dictionary values (values stored using FIXED_LEN_BYTE_ARRAY).
   /// Returns true if the dictionary values were all successfully decoded, or false
   /// if the dictionary was corrupt.
+  template<parquet::Type::type PARQUET_TYPE>
   bool Reset(uint8_t* dict_buffer, int dict_len, int fixed_len_size);
 
   virtual int num_entries() const { return dict_.size(); }
@@ -337,14 +338,15 @@ inline int DictEncoderBase::WriteData(uint8_t* buffer, int buffer_len) {
 }
 
 template<typename T>
+template<parquet::Type::type PARQUET_TYPE>
 inline bool DictDecoder<T>::Reset(uint8_t* dict_buffer, int dict_len,
     int fixed_len_size) {
   dict_.clear();
   uint8_t* end = dict_buffer + dict_len;
   while (dict_buffer < end) {
     T value;
-    int decoded_len =
-        ParquetPlainEncoder::Decode(dict_buffer, end, fixed_len_size, &value);
+    int decoded_len = ParquetPlainEncoder::Decode<T, PARQUET_TYPE>(dict_buffer, end,
+        fixed_len_size, &value);
     if (UNLIKELY(decoded_len < 0)) return false;
     dict_buffer += decoded_len;
     dict_.push_back(value);

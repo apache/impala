@@ -859,7 +859,7 @@ Status HdfsParquetTableWriter::CreateSchema() {
     parquet::SchemaElement& node = file_metadata_.schema[i + 1];
     const ColumnType& type = output_expr_evals_[i]->root().type();
     node.name = table_desc_->col_descs()[i + num_clustering_cols].name();
-    node.__set_type(IMPALA_TO_PARQUET_TYPES[type.type]);
+    node.__set_type(INTERNAL_TO_PARQUET_TYPES[type.type]);
     node.__set_repetition_type(FieldRepetitionType::OPTIONAL);
     if (type.type == TYPE_DECIMAL) {
       // This column is type decimal. Update the file metadata to include the
@@ -892,7 +892,7 @@ Status HdfsParquetTableWriter::AddRowGroup() {
   current_row_group_->columns.resize(columns_.size());
   for (int i = 0; i < columns_.size(); ++i) {
     ColumnMetaData metadata;
-    metadata.type = IMPALA_TO_PARQUET_TYPES[columns_[i]->type().type];
+    metadata.type = INTERNAL_TO_PARQUET_TYPES[columns_[i]->type().type];
     metadata.path_in_schema.push_back(
         table_desc_->col_descs()[i + num_clustering_cols].name());
     metadata.codec = columns_[i]->codec();

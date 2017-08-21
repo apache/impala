@@ -19,6 +19,7 @@
 #define IMPALA_EXEC_PARQUET_COLUMN_STATS_INLINE_H
 
 #include "exec/parquet-common.h"
+#include "gen-cpp/parquet_types.h"
 #include "parquet-column-stats.h"
 #include "runtime/string-value.inline.h"
 
@@ -79,11 +80,15 @@ inline void ColumnStats<T>::EncodePlainValue(
 }
 
 template <typename T>
-inline bool ColumnStats<T>::DecodePlainValue(const std::string& buffer, void* slot) {
+inline bool ColumnStats<T>::DecodePlainValue(const std::string& buffer, void* slot,
+    parquet::Type::type parquet_type) {
   T* result = reinterpret_cast<T*>(slot);
   int size = buffer.size();
   const uint8_t* data = reinterpret_cast<const uint8_t*>(buffer.data());
-  if (ParquetPlainEncoder::Decode(data, data + size, size, result) == -1) return false;
+  if (ParquetPlainEncoder::DecodeByParquetType<T>(data, data + size, size, result,
+      parquet_type) == -1) {
+    return false;
+  }
   return true;
 }
 
@@ -103,7 +108,8 @@ inline void ColumnStats<bool>::EncodePlainValue(
 }
 
 template <>
-inline bool ColumnStats<bool>::DecodePlainValue(const std::string& buffer, void* slot) {
+inline bool ColumnStats<bool>::DecodePlainValue(const std::string& buffer, void* slot,
+    parquet::Type::type parquet_type) {
   bool* result = reinterpret_cast<bool*>(slot);
   DCHECK(buffer.size() == 1);
   *result = (buffer[0] != 0);
@@ -118,11 +124,14 @@ inline int64_t ColumnStats<bool>::BytesNeeded(const bool& v) const {
 /// Timestamp values need validation.
 template <>
 inline bool ColumnStats<TimestampValue>::DecodePlainValue(
-    const std::string& buffer, void* slot) {
+    const std::string& buffer, void* slot, parquet::Type::type parquet_type) {
   TimestampValue* result = reinterpret_cast<TimestampValue*>(slot);
   int size = buffer.size();
   const uint8_t* data = reinterpret_cast<const uint8_t*>(buffer.data());
-  if (ParquetPlainEncoder::Decode(data, data + size, size, result) == -1) return false;
+  if (ParquetPlainEncoder::Decode<TimestampValue, parquet::Type::INT96>(data, data + size,
+      size, result) == -1) {
+    return false;
+  }
   // We don't need to convert the value here, since we don't support reading timestamp
   // statistics written by Hive / old versions of parquet-mr. Should Hive add support for
   // writing new statistics for the deprecated timestamp type, we will have to add support
@@ -139,7 +148,7 @@ inline void ColumnStats<StringValue>::EncodePlainValue(
 
 template <>
 inline bool ColumnStats<StringValue>::DecodePlainValue(
-    const std::string& buffer, void* slot) {
+    const std::string& buffer, void* slot, parquet::Type::type parquet_type) {
   StringValue* result = reinterpret_cast<StringValue*>(slot);
   result->ptr = const_cast<char*>(buffer.data());
   result->len = buffer.size();

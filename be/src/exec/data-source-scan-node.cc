@@ -23,6 +23,7 @@
 #include "exec/parquet-common.h"
 #include "exec/read-write-util.h"
 #include "exprs/scalar-expr.h"
+#include "gen-cpp/parquet_types.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/runtime-state.h"
@@ -172,24 +173,27 @@ inline Status SetDecimalVal(const ColumnType& type, char* bytes, int len,
   switch (type.GetByteSize()) {
     case 4: {
       Decimal4Value* val = reinterpret_cast<Decimal4Value*>(slot);
-      if (UNLIKELY(len > sizeof(Decimal4Value) ||
-          ParquetPlainEncoder::Decode(buffer, buffer + len, len, val) < 0)) {
+      if (UNLIKELY(len > sizeof(Decimal4Value) || (ParquetPlainEncoder::Decode
+          <Decimal4Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(buffer, buffer + len, len,
+              val)) < 0)) {
         return Status(ERROR_INVALID_DECIMAL);
       }
       break;
     }
     case 8: {
       Decimal8Value* val = reinterpret_cast<Decimal8Value*>(slot);
-      if (UNLIKELY(len > sizeof(Decimal8Value) ||
-          ParquetPlainEncoder::Decode(buffer, buffer + len, len, val) < 0)) {
+      if (UNLIKELY(len > sizeof(Decimal8Value) || (ParquetPlainEncoder::Decode
+          <Decimal8Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(buffer, buffer + len, len,
+              val)) < 0)) {
         return Status(ERROR_INVALID_DECIMAL);
       }
       break;
     }
     case 16: {
       Decimal16Value* val = reinterpret_cast<Decimal16Value*>(slot);
-      if (UNLIKELY(len > sizeof(Decimal16Value) ||
-          ParquetPlainEncoder::Decode(buffer, buffer + len, len, val) < 0)) {
+      if (UNLIKELY(len > sizeof(Decimal16Value) || (ParquetPlainEncoder::Decode
+          <Decimal16Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(buffer, buffer + len, len,
+              val)) < 0)) {
         return Status(ERROR_INVALID_DECIMAL);
       }
       break;

@@ -181,7 +181,8 @@ class ColumnStats : public ColumnStatsBase {
   /// Decodes the plain encoded stats value from 'buffer' and writes the result into the
   /// buffer pointed to by 'slot'. Returns true if decoding was successful, false
   /// otherwise. For timestamps, an additional validation will be performed.
-  static bool DecodePlainValue(const std::string& buffer, void* slot);
+  static bool DecodePlainValue(const std::string& buffer, void* slot,
+      parquet::Type::type parquet_type);
 
   /// Returns the number of bytes needed to encode value 'v'.
   int64_t BytesNeeded(const T& v) const;

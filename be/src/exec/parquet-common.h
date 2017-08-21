@@ -35,9 +35,9 @@ class TimestampValue;
 const uint8_t PARQUET_VERSION_NUMBER[4] = {'P', 'A', 'R', '1'};
 const uint32_t PARQUET_CURRENT_VERSION = 1;
 
-/// Mapping of impala types to parquet storage types.  This is indexed by
+/// Mapping of impala's internal types to parquet storage types. This is indexed by
 /// PrimitiveType enum
-const parquet::Type::type IMPALA_TO_PARQUET_TYPES[] = {
+const parquet::Type::type INTERNAL_TO_PARQUET_TYPES[] = {
   parquet::Type::BOOLEAN,     // Invalid
   parquet::Type::BOOLEAN,     // NULL type
   parquet::Type::BOOLEAN,
@@ -84,9 +84,10 @@ const parquet::CompressionCodec::type IMPALA_TO_PARQUET_CODEC[] = {
 /// calls.
 class ParquetPlainEncoder {
  public:
-  /// Returns the byte size of 'v'.
-  template <typename T>
-  static int ByteSize(const T& v) { return sizeof(T); }
+  /// Returns the byte size of 'v' where InternalType is the datatype that Impala uses
+  /// internally to store tuple data.
+  template <typename InternalType>
+  static int ByteSize(const InternalType& v) { return sizeof(InternalType); }
 
   /// Returns the encoded size of values of type t. Returns -1 if it is variable
   /// length. This can be different than the slot size of the types.
@@ -167,19 +168,52 @@ class ParquetPlainEncoder {
   /// be preallocated and big enough.  Buffer need not be aligned.
   /// 'fixed_len_size' is only applicable for data encoded using FIXED_LEN_BYTE_ARRAY and
   /// is the number of bytes the plain encoder should use.
-  template <typename T>
-  static int Encode(const T& t, int fixed_len_size, uint8_t* buffer) {
+  template <typename InternalType>
+  static int Encode(const InternalType& t, int fixed_len_size, uint8_t* buffer) {
     memcpy(buffer, &t, ByteSize(t));
     return ByteSize(t);
   }
 
+  template <typename InternalType>
+  static int DecodeByParquetType(const uint8_t* buffer, const uint8_t* buffer_end,
+      int fixed_len_size, InternalType* v, parquet::Type::type parquet_type) {
+    switch (parquet_type) {
+      case parquet::Type::BOOLEAN:
+        return ParquetPlainEncoder::Decode<InternalType, parquet::Type::BOOLEAN>(buffer,
+            buffer_end, fixed_len_size, v);
+      case parquet::Type::INT32:
+        return ParquetPlainEncoder::Decode<InternalType, parquet::Type::INT32>(buffer,
+            buffer_end, fixed_len_size, v);
+      case parquet::Type::INT64:
+        return ParquetPlainEncoder::Decode<InternalType, parquet::Type::INT64>(buffer,
+            buffer_end, fixed_len_size, v);
+      case parquet::Type::INT96:
+        return ParquetPlainEncoder::Decode<InternalType, parquet::Type::INT96>(buffer,
+            buffer_end, fixed_len_size, v);
+      case parquet::Type::FLOAT:
+        return ParquetPlainEncoder::Decode<InternalType, parquet::Type::FLOAT>(buffer,
+            buffer_end, fixed_len_size, v);
+      case parquet::Type::DOUBLE:
+        return ParquetPlainEncoder::Decode<InternalType, parquet::Type::DOUBLE>(buffer,
+            buffer_end, fixed_len_size, v);
+      case parquet::Type::BYTE_ARRAY:
+        return ParquetPlainEncoder::Decode<InternalType,
+            parquet::Type::BYTE_ARRAY>(buffer, buffer_end, fixed_len_size, v);
+      case parquet::Type::FIXED_LEN_BYTE_ARRAY:
+        return ParquetPlainEncoder::Decode<InternalType,
+            parquet::Type::FIXED_LEN_BYTE_ARRAY>(buffer, buffer_end, fixed_len_size, v);
+      default:
+        DCHECK(false) << "Unexpected physical type";
+    }
+  }
+
   /// Decodes t from 'buffer', reading up to the byte before 'buffer_end'. 'buffer'
-  /// need not be aligned. For types that are stored as FIXED_LEN_BYTE_ARRAY,
-  /// 'fixed_len_size' is the size of the object. Otherwise, it is unused.
+  /// need not be aligned. If PARQUET_TYPE is FIXED_LEN_BYTE_ARRAY then 'fixed_len_size'
+  /// is the size of the object. Otherwise, it is unused.
   /// Returns the number of bytes read or -1 if the value was not decoded successfully.
-  template <typename T>
+  template <typename InternalType, parquet::Type::type PARQUET_TYPE>
   static int Decode(const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size,
-      T* v) {
+      InternalType* v) {
     int byte_size = ByteSize(*v);
     if (UNLIKELY(buffer_end - buffer < byte_size)) return -1;
     memcpy(v, buffer, byte_size);
@@ -194,25 +228,27 @@ template <> int ParquetPlainEncoder::ByteSize(const ColumnType& t);
 /// Disable for bools. Plain encoding is not used for booleans.
 template <> int ParquetPlainEncoder::ByteSize(const bool& b);
 template <> int ParquetPlainEncoder::Encode(const bool&, int fixed_len_size, uint8_t*);
-template <> int ParquetPlainEncoder::Decode(const uint8_t*, const uint8_t*,
-    int fixed_len_size, bool* v);
+template <> int ParquetPlainEncoder::Decode<bool, parquet::Type::BOOLEAN>(const uint8_t*,
+    const uint8_t*, int fixed_len_size, bool* v);
 
 /// Not used for decimals since the plain encoding encodes them using
 /// FIXED_LEN_BYTE_ARRAY.
-template <>
-inline int ParquetPlainEncoder::ByteSize(const Decimal4Value&) {
+inline int DecimalByteSize() {
   DCHECK(false);
   return -1;
+}
+
+template <>
+inline int ParquetPlainEncoder::ByteSize(const Decimal4Value&) {
+  return DecimalByteSize();
 }
 template <>
 inline int ParquetPlainEncoder::ByteSize(const Decimal8Value&) {
-  DCHECK(false);
-  return -1;
+  return DecimalByteSize();
 }
 template <>
 inline int ParquetPlainEncoder::ByteSize(const Decimal16Value&) {
-  DCHECK(false);
-  return -1;
+  return DecimalByteSize();
 }
 
 /// Parquet doesn't have 8-bit or 16-bit ints. They are converted to 32-bit.
@@ -232,36 +268,39 @@ inline int ParquetPlainEncoder::ByteSize(const TimestampValue& v) {
 }
 
 template <>
-inline int ParquetPlainEncoder::Decode(const uint8_t* buffer, const uint8_t* buffer_end,
-    int fixed_len_size, int8_t* v) {
+inline int ParquetPlainEncoder::Decode<int8_t, parquet::Type::INT32>(
+    const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size, int8_t* v) {
   int byte_size = ByteSize(*v);
   if (UNLIKELY(buffer_end - buffer < byte_size)) return -1;
   *v = *buffer;
   return byte_size;
 }
 template <>
-inline int ParquetPlainEncoder::Decode(const uint8_t* buffer, const uint8_t* buffer_end,
-    int fixed_len_size, int16_t* v) {
+inline int ParquetPlainEncoder::Decode<int16_t, parquet::Type::INT32>(
+    const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size, int16_t* v) {
   int byte_size = ByteSize(*v);
   if (UNLIKELY(buffer_end - buffer < byte_size)) return -1;
   memcpy(v, buffer, sizeof(int16_t));
   return byte_size;
 }
 
+template<typename T>
+inline int EncodeToInt32(const T& v, int fixed_len_size, uint8_t* buffer) {
+  int32_t val = v;
+  memcpy(buffer, &val, sizeof(int32_t));
+  return ParquetPlainEncoder::ByteSize(v);
+}
+
 template <>
 inline int ParquetPlainEncoder::Encode(
     const int8_t& v, int fixed_len_size, uint8_t* buffer) {
-  int32_t val = v;
-  memcpy(buffer, &val, sizeof(int32_t));
-  return ByteSize(v);
+  return EncodeToInt32(v, fixed_len_size, buffer);
 }
 
 template <>
 inline int ParquetPlainEncoder::Encode(
     const int16_t& v, int fixed_len_size, uint8_t* buffer) {
-  int32_t val = v;
-  memcpy(buffer, &val, sizeof(int32_t));
-  return ByteSize(v);
+  return EncodeToInt32(v, fixed_len_size, buffer);
 }
 
 template <>
@@ -273,8 +312,9 @@ inline int ParquetPlainEncoder::Encode(
 }
 
 template <>
-inline int ParquetPlainEncoder::Decode(const uint8_t* buffer, const uint8_t* buffer_end,
-    int fixed_len_size, StringValue* v) {
+inline int ParquetPlainEncoder::Decode<StringValue, parquet::Type::BYTE_ARRAY>(
+    const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size,
+    StringValue* v) {
   if (UNLIKELY(buffer_end - buffer < sizeof(int32_t))) return -1;
   memcpy(&v->len, buffer, sizeof(int32_t));
   int byte_size = ByteSize(*v);
@@ -290,49 +330,92 @@ inline int ParquetPlainEncoder::Decode(const uint8_t* buffer, const uint8_t* buf
 /// that the value in the in-memory format has leading zeros or negative 1's.
 /// For example, precision 2 fits in 1 byte. All decimals stored as Decimal4Value
 /// will have 3 bytes of leading zeros, we will only store the interesting byte.
+template<typename T>
+inline int EncodeDecimal(const T& v, int fixed_len_size, uint8_t* buffer) {
+  DecimalUtil::EncodeToFixedLenByteArray(buffer, fixed_len_size, v);
+  return fixed_len_size;
+}
+
 template <>
 inline int ParquetPlainEncoder::Encode(
     const Decimal4Value& v, int fixed_len_size, uint8_t* buffer) {
-  DecimalUtil::EncodeToFixedLenByteArray(buffer, fixed_len_size, v);
-  return fixed_len_size;
+  return EncodeDecimal(v, fixed_len_size, buffer);
 }
 
 template <>
 inline int ParquetPlainEncoder::Encode(
     const Decimal8Value& v, int fixed_len_size, uint8_t* buffer) {
-  DecimalUtil::EncodeToFixedLenByteArray(buffer, fixed_len_size, v);
-  return fixed_len_size;
+  return EncodeDecimal(v, fixed_len_size, buffer);
 }
 
 template <>
 inline int ParquetPlainEncoder::Encode(
     const Decimal16Value& v, int fixed_len_size, uint8_t* buffer) {
-  DecimalUtil::EncodeToFixedLenByteArray(buffer, fixed_len_size, v);
-  return fixed_len_size;
+  return EncodeDecimal(v, fixed_len_size, buffer);
 }
 
-template <>
-inline int ParquetPlainEncoder::Decode(const uint8_t* buffer, const uint8_t* buffer_end,
-    int fixed_len_size, Decimal4Value* v) {
+template<typename T>
+inline int DecodeDecimalFixedLen(const uint8_t* buffer, const uint8_t* buffer_end,
+    int fixed_len_size, T* v) {
   if (UNLIKELY(buffer_end - buffer < fixed_len_size)) return -1;
   DecimalUtil::DecodeFromFixedLenByteArray(buffer, fixed_len_size, v);
   return fixed_len_size;
 }
 
 template <>
-inline int ParquetPlainEncoder::Decode(const uint8_t* buffer, const uint8_t* buffer_end,
-    int fixed_len_size, Decimal8Value* v) {
-  if (UNLIKELY(buffer_end - buffer < fixed_len_size)) return -1;
-  DecimalUtil::DecodeFromFixedLenByteArray(buffer, fixed_len_size, v);
-  return fixed_len_size;
+inline int ParquetPlainEncoder::
+Decode<Decimal4Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(const uint8_t* buffer,
+    const uint8_t* buffer_end, int fixed_len_size, Decimal4Value* v) {
+  return DecodeDecimalFixedLen(buffer, buffer_end, fixed_len_size, v);
 }
 
 template <>
-inline int ParquetPlainEncoder::Decode(const uint8_t* buffer, const uint8_t* buffer_end,
-    int fixed_len_size, Decimal16Value* v) {
-  if (UNLIKELY(buffer_end - buffer < fixed_len_size)) return -1;
-  DecimalUtil::DecodeFromFixedLenByteArray(buffer, fixed_len_size, v);
-  return fixed_len_size;
+inline int ParquetPlainEncoder::
+Decode<Decimal8Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(const uint8_t* buffer,
+    const uint8_t* buffer_end, int fixed_len_size, Decimal8Value* v) {
+  return DecodeDecimalFixedLen(buffer, buffer_end, fixed_len_size, v);
+}
+
+template <>
+inline int ParquetPlainEncoder::
+Decode<Decimal16Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(const uint8_t* buffer,
+    const uint8_t* buffer_end, int fixed_len_size, Decimal16Value* v) {
+  return DecodeDecimalFixedLen(buffer, buffer_end, fixed_len_size, v);
+}
+
+/// Helper method to decode Decimal type stored as variable length byte array.
+template<typename T>
+inline int DecodeDecimalByteArray(const uint8_t* buffer, const uint8_t* buffer_end,
+    int fixed_len_size, T* v) {
+  if (UNLIKELY(buffer_end - buffer < sizeof(int32_t))) return -1;
+  int encoded_byte_size;
+  memcpy(&encoded_byte_size, buffer, sizeof(int32_t));
+  int byte_size = sizeof(int32_t) + encoded_byte_size;
+  if (UNLIKELY(encoded_byte_size < 0 || buffer_end - buffer < byte_size)) return -1;
+  uint8_t* val_ptr = const_cast<uint8_t*>(buffer) + sizeof(int32_t);
+  DecimalUtil::DecodeFromFixedLenByteArray(val_ptr, encoded_byte_size, v);
+  return byte_size;
+}
+
+template <>
+inline int ParquetPlainEncoder::Decode<Decimal4Value, parquet::Type::BYTE_ARRAY>(
+    const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size,
+    Decimal4Value* v) {
+  return DecodeDecimalByteArray(buffer, buffer_end, fixed_len_size, v);
+}
+
+template <>
+inline int ParquetPlainEncoder::Decode<Decimal8Value, parquet::Type::BYTE_ARRAY>(
+    const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size,
+    Decimal8Value* v) {
+  return DecodeDecimalByteArray(buffer, buffer_end, fixed_len_size, v);
+}
+
+template <>
+inline int ParquetPlainEncoder::Decode<Decimal16Value, parquet::Type::BYTE_ARRAY>(
+    const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size,
+    Decimal16Value* v) {
+  return DecodeDecimalByteArray(buffer, buffer_end, fixed_len_size, v);
 }
 
 }
