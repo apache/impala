@@ -639,11 +639,6 @@ class PartitionedAggregationNode : public ExecNode {
   Status CheckAndResizeHashPartitions(
       bool aggregated_rows, int num_rows, const HashTableCtx* ht_ctx) WARN_UNUSED_RESULT;
 
-  /// Iterates over all the partitions in hash_partitions_ and returns the number of rows
-  /// of the largest spilled partition (in terms of number of aggregated and unaggregated
-  /// rows).
-  int64_t LargestSpilledPartition() const;
-
   /// Prepares the next partition to return results from. On return, this function
   /// initializes output_iterator_ and output_partition_. This either removes
   /// a partition from aggregated_partitions_ (and is done) or removes the next

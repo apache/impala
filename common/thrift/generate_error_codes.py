@@ -240,9 +240,7 @@ error_codes = (
    "id $0. Repartitioning did not reduce the size of a spilled partition. Repartitioning "
    "level $1. Number of rows $2:\\n$3\\n$4"),
 
-  ("PARTITIONED_AGG_REPARTITION_FAILS", 77,  "Cannot perform aggregation at node with "
-   "id $0. Repartitioning did not reduce the size of a spilled partition. Repartitioning "
-   "level $1. Number of rows $2:\\n$3\\n$4"),
+  ("UNUSED_77", 77,  "Not in use."),
 
   ("AVRO_TRUNCATED_BLOCK", 78, "File '$0' is corrupt: truncated data block at offset $1"),
 

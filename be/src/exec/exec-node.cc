@@ -244,11 +244,34 @@ Status ExecNode::ClaimBufferReservation(RuntimeState* state) {
   VLOG_FILE << id_ << " claiming reservation " << resource_profile_.min_reservation;
   state->query_state()->initial_reservations()->Claim(
       &buffer_pool_client_, resource_profile_.min_reservation);
+  if (debug_action_ == TDebugAction::SET_DENY_RESERVATION_PROBABILITY &&
+      (debug_phase_ == TExecNodePhase::PREPARE || debug_phase_ == TExecNodePhase::OPEN)) {
+    // We may not have been able to enable the debug action at the start of Prepare() or
+    // Open() because the client is not registered then. Do it now to be sure that it is
+    // effective.
+    RETURN_IF_ERROR(EnableDenyReservationDebugAction());
+  }
   return Status::OK();
 }
 
 Status ExecNode::ReleaseUnusedReservation() {
   return buffer_pool_client_.DecreaseReservationTo(resource_profile_.min_reservation);
+}
+
+Status ExecNode::EnableDenyReservationDebugAction() {
+  DCHECK_EQ(debug_action_, TDebugAction::SET_DENY_RESERVATION_PROBABILITY);
+  DCHECK(buffer_pool_client_.is_registered());
+  // Parse [0.0, 1.0] probability.
+  StringParser::ParseResult parse_result;
+  double probability = StringParser::StringToFloat<double>(
+      debug_action_param_.c_str(), debug_action_param_.size(), &parse_result);
+  if (parse_result != StringParser::PARSE_SUCCESS || probability < 0.0
+      || probability > 1.0) {
+    return Status(Substitute(
+        "Invalid SET_DENY_RESERVATION_PROBABILITY param: '$0'", debug_action_param_));
+  }
+  buffer_pool_client_.SetDebugDenyIncreaseReservation(probability);
+  return Status::OK();
 }
 
 Status ExecNode::CreateTree(
@@ -463,17 +486,12 @@ Status ExecNode::ExecDebugActionImpl(TExecNodePhase::type phase, RuntimeState* s
     return mem_tracker()->MemLimitExceeded(state, "Debug Action: MEM_LIMIT_EXCEEDED");
   } else {
     DCHECK_EQ(debug_action_, TDebugAction::SET_DENY_RESERVATION_PROBABILITY);
+    // We can only enable the debug action right if the buffer pool client is registered.
+    // If the buffer client is not registered at this point (e.g. if phase is PREPARE or
+    // OPEN), then we will enable the debug action at the time when the client is
+    // registered.
     if (buffer_pool_client_.is_registered()) {
-      // Parse [0.0, 1.0] probability.
-      StringParser::ParseResult parse_result;
-      double probability = StringParser::StringToFloat<double>(
-          debug_action_param_.c_str(), debug_action_param_.size(), &parse_result);
-      if (parse_result != StringParser::PARSE_SUCCESS || probability < 0.0
-          || probability > 1.0) {
-        return Status(Substitute(
-            "Invalid SET_DENY_RESERVATION_PROBABILITY param: '$0'", debug_action_param_));
-      }
-      buffer_pool_client_.SetDebugDenyIncreaseReservation(probability);
+      RETURN_IF_ERROR(EnableDenyReservationDebugAction());
     }
   }
   return Status::OK();

@@ -244,6 +244,11 @@ class ExecNode {
   /// fails.
   Status ReleaseUnusedReservation() WARN_UNUSED_RESULT;
 
+  /// Enable the increase reservation denial probability on 'buffer_pool_client_' based on
+  /// the 'debug_action_' set on this node. Returns an error if 'debug_action_param_' is
+  /// invalid.
+  Status EnableDenyReservationDebugAction();
+
   /// Extends blocking queue for row batches. Row batches have a property that
   /// they must be processed in the order they were produced, even in cancellation
   /// paths. Preceding row batches can contain ptrs to memory in subsequent row batches

@@ -1190,21 +1190,6 @@ Status PartitionedAggregationNode::CheckAndResizeHashPartitions(
   return Status::OK();
 }
 
-int64_t PartitionedAggregationNode::LargestSpilledPartition() const {
-  DCHECK(!is_streaming_preagg_);
-  int64_t max_rows = 0;
-  for (int i = 0; i < hash_partitions_.size(); ++i) {
-    Partition* partition = hash_partitions_[i];
-    if (partition == nullptr || partition->is_closed || !partition->is_spilled()) {
-      continue;
-    }
-    int64_t rows = partition->aggregated_row_stream->num_rows()
-        + partition->unaggregated_row_stream->num_rows();
-    if (rows > max_rows) max_rows = rows;
-  }
-  return max_rows;
-}
-
 Status PartitionedAggregationNode::NextPartition() {
   DCHECK(output_partition_ == nullptr);
 
@@ -1336,17 +1321,6 @@ Status PartitionedAggregationNode::RepartitionSpilledPartition() {
   // spilled_partitions_/aggregated_partitions_.
   int64_t num_input_rows = partition->aggregated_row_stream->num_rows()
       + partition->unaggregated_row_stream->num_rows();
-
-  // Check if there was any reduction in the size of partitions after repartitioning.
-  int64_t largest_partition = LargestSpilledPartition();
-  DCHECK_GE(num_input_rows, largest_partition) << "Partition had more rows than input";
-  if (UNLIKELY(num_input_rows == largest_partition)) {
-    stringstream ss;
-    DebugString(2, &ss);
-    return Status(TErrorCode::PARTITIONED_AGG_REPARTITION_FAILS, id_,
-        partition->level + 1, num_input_rows, buffer_pool_client_.DebugString(),
-        ss.str());
-  }
   RETURN_IF_ERROR(MoveHashPartitions(num_input_rows));
   return Status::OK();
 }
