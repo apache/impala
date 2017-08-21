@@ -162,7 +162,6 @@ void HdfsTextScanner::Close(RowBatch* row_batch) {
     decompressor_->Close();
     decompressor_.reset();
   }
-  DCHECK(boundary_column_.IsEmpty());
   boundary_pool_->FreeAll();
   if (row_batch != nullptr) {
     row_batch->tuple_data_pool()->AcquireData(template_tuple_pool_.get(), false);
@@ -331,6 +330,7 @@ Status HdfsTextScanner::FinishScanRange(RowBatch* row_batch) {
     DCHECK_EQ(num_tuples, 0);
   }
 
+  DCHECK(boundary_column_.IsEmpty()) << "Must finish processing boundary column";
   scan_state_ = DONE;
   return Status::OK();
 }
