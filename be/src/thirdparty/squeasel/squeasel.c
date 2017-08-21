@@ -153,6 +153,8 @@ static const char *http_500_error = "Internal Server Error";
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
+#define OPENSSL_VERSION_HAS_TLS_1_1 0x10001000L
+
 static const char *month_names[] = {
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
@@ -4142,8 +4144,6 @@ static int set_uid_option(struct sq_context *ctx) {
 
 #if !defined(NO_SSL)
 
-#define OPENSSL_VERSION_HAS_TLS_1_1 0x10001000L
-
 static pthread_mutex_t *ssl_mutexes;
 
 static int sslize(struct sq_connection *conn, SSL_CTX *s, int (*func)(SSL *)) {
@@ -4225,9 +4225,9 @@ static int set_ssl_option(struct sq_context *ctx) {
   if (sq_strcasecmp(ssl_version, "tlsv1") == 0) {
     // No-op - don't exclude any TLS protocols.
 #if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_HAS_TLS_1_1
-  } else if (sq_strcasecmp(ssl_version, "tlsv1_1") == 0) {
+  } else if (sq_strcasecmp(ssl_version, "tlsv1.1") == 0) {
     options |= SSL_OP_NO_TLSv1;
-  } else if (sq_strcasecmp(ssl_version, "tlsv1_2") == 0) {
+  } else if (sq_strcasecmp(ssl_version, "tlsv1.2") == 0) {
     options |= (SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
 #endif
   } else {
@@ -4272,12 +4272,11 @@ static int set_ssl_option(struct sq_context *ctx) {
     (void) SSL_CTX_use_certificate_chain_file(ctx->ssl_ctx, pem);
   }
 
-  if (ctx->config[SSL_CIPHERS] != NULL) {
-    if (SSL_CTX_set_cipher_list(ctx->ssl_ctx, ctx->config[SSL_CIPHERS]) == 0) {
-      cry(fc(ctx), "SSL_CTX_set_cipher_list: error setting ciphers (%s): %s",
-          ctx->config[SSL_CIPHERS], ssl_error());
-      return 0;
-    }
+  if (ctx->config[SSL_CIPHERS] != NULL &&
+      (SSL_CTX_set_cipher_list(ctx->ssl_ctx, ctx->config[SSL_CIPHERS]) == 0)) {
+    cry(fc(ctx), "SSL_CTX_set_cipher_list: error setting ciphers (%s): %s",
+        ctx->config[SSL_CIPHERS], ssl_error());
+    return 0;
   }
 
   return 1;

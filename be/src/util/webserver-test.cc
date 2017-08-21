@@ -20,6 +20,7 @@
 #include <boost/bind.hpp>
 #include <boost/lexical_cast.hpp>
 #include <gutil/strings/substitute.h>
+#include <openssl/ssl.h>
 
 #include "common/init.h"
 #include "testutil/gtest-util.h"
@@ -285,6 +286,29 @@ TEST(Webserver, SslBadTlsVersion) {
   Webserver webserver(FLAGS_webserver_port);
   ASSERT_FALSE(webserver.Start().ok());
 }
+
+TEST(Webserver, SslGoodTlsVersion) {
+  auto cert = ScopedFlagSetter<string>::Make(&FLAGS_webserver_certificate_file,
+      Substitute("$0/be/src/testutil/server-cert.pem", getenv("IMPALA_HOME")));
+  auto key = ScopedFlagSetter<string>::Make(&FLAGS_webserver_private_key_file,
+      Substitute("$0/be/src/testutil/server-key-password.pem", getenv("IMPALA_HOME")));
+  auto cmd = ScopedFlagSetter<string>::Make(
+      &FLAGS_webserver_private_key_password_cmd, "echo password");
+
+#if OPENSSL_VERSION_NUMBER >= 0x10001000L
+  auto versions = {"tlsv1", "tlsv1.1", "tlsv1.2"};
+#else
+  auto versions = {"tlsv1"};
+#endif
+  for (auto v: versions) {
+    auto ssl_version = ScopedFlagSetter<string>::Make(
+        &FLAGS_ssl_minimum_version, v);
+
+    Webserver webserver(FLAGS_webserver_port);
+    ASSERT_OK(webserver.Start());
+  }
+}
+
 
 TEST(Webserver, StartWithPasswordFileTest) {
   stringstream password_file;
