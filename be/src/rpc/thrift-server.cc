@@ -374,12 +374,13 @@ class ImpalaSslSocketFactory : public TSSLSocketFactory {
 }
 Status ThriftServer::CreateSocket(boost::shared_ptr<TServerTransport>* socket) {
   if (ssl_enabled()) {
-    // This 'factory' is only called once, since CreateSocket() is only called from
-    // Start()
-    boost::shared_ptr<TSSLSocketFactory> socket_factory(
-        new ImpalaSslSocketFactory(version_, key_password_));
-    socket_factory->overrideDefaultPasswordCallback();
     try {
+      // This 'factory' is only called once, since CreateSocket() is only called from
+      // Start(). The c'tor may throw if there is an error initializing the SSL context.
+      boost::shared_ptr<TSSLSocketFactory> socket_factory(
+          new ImpalaSslSocketFactory(version_, key_password_));
+      socket_factory->overrideDefaultPasswordCallback();
+
       if (!cipher_list_.empty()) socket_factory->ciphers(cipher_list_);
       socket_factory->loadCertificate(certificate_path_.c_str());
       socket_factory->loadPrivateKey(private_key_path_.c_str());
