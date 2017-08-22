@@ -90,7 +90,7 @@ Status ParquetLevelDecoder::Init(const string& filename,
       if (!ReadWriteUtil::Read(data, data_size, &num_bytes, &status)) {
         return status;
       }
-      if (num_bytes < 0) {
+      if (num_bytes < 0 || num_bytes > *data_size) {
         return Status(TErrorCode::PARQUET_CORRUPT_RLE_BYTES, filename, num_bytes);
       }
       int bit_width = BitUtil::Log2Ceiling64(max_level + 1);
