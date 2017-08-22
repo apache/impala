@@ -35,6 +35,7 @@ import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.junit.Assert;
 import org.junit.Test;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 /**
@@ -292,6 +293,19 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("if(null, id, id+1)", rule, "id + 1");
     RewritesOk("if(id = 0, true, false)", rule, null);
 
+    // IFNULL and its aliases
+    for (String f : ImmutableList.of("ifnull", "isnull", "nvl")) {
+      RewritesOk(f + "(null, id)", rule, "id");
+      RewritesOk(f + "(null, null)", rule, "NULL");
+      RewritesOk(f + "(id, id + 1)", rule, null);
+
+      RewritesOk(f + "(1, 2)", rule, "1");
+      RewritesOk(f + "(0, id)", rule, "0");
+      // non literal constants shouldn't be simplified by the rule
+      RewritesOk(f + "(1 + 1, id)", rule, null);
+      RewritesOk(f + "(NULL + 1, id)", rule, null);
+    }
+
     // CompoundPredicate
     RewritesOk("false || id = 0", rule, "id = 0");
     RewritesOk("true || id = 0", rule, "TRUE");
@@ -376,6 +390,8 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("if(true, 0, sum(id))", rule, null);
     RewritesOk("if(false, max(id), min(id))", rule, "min(id)");
     RewritesOk("true || sum(id) = 0", rule, null);
+    RewritesOk("ifnull(null, max(id))", rule, "max(id)");
+    RewritesOk("ifnull(1, max(id))", rule, null);
     RewritesOk("case when true then 0 when false then sum(id) end", rule, null);
     RewritesOk(
         "case when true then count(id) when false then sum(id) end", rule, "count(id)");

@@ -29,13 +29,12 @@ import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.FunctionName;
+import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
-import org.apache.impala.analysis.SlotDescriptor;
-import org.apache.impala.analysis.SlotRef;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.AnalysisException;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 /***
@@ -52,6 +51,9 @@ import com.google.common.collect.Lists;
  */
 public class SimplifyConditionalsRule implements ExprRewriteRule {
   public static ExprRewriteRule INSTANCE = new SimplifyConditionalsRule();
+
+  private static List<String> IFNULL_ALIASES = ImmutableList.of(
+      "ifnull", "isnull", "nvl");
 
   @Override
   public Expr apply(Expr expr, Analyzer analyzer) throws AnalysisException {
@@ -100,6 +102,20 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
   }
 
   /**
+   * Simplifies IFNULL if the condition is a literal, using the
+   * following transformations:
+   *   IFNULL(NULL, x) -> x
+   *   IFNULL(a, x) -> a, if a is a non-null literal
+   */
+  private Expr simplifyIfNullFunctionCallExpr(FunctionCallExpr expr) {
+    Preconditions.checkState(expr.getChildren().size() == 2);
+    Expr child0 = expr.getChild(0);
+    if (child0 instanceof NullLiteral) return expr.getChild(1);
+    if (child0.isLiteral()) return child0;
+    return expr;
+  }
+
+  /**
    * Simplify COALESCE by skipping leading nulls and applying the following transformations:
    * COALESCE(null, a, b) -> COALESCE(a, b);
    * COALESCE(<literal>, a, b) -> <literal>, when literal is not NullLiteral;
@@ -127,11 +143,13 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
   private Expr simplifyFunctionCallExpr(FunctionCallExpr expr) {
     FunctionName fnName = expr.getFnName();
 
-    // TODO: Add the other conditional functions, eg. ifnull, istrue, etc.
+    // TODO: Add the other conditional functions, eg. istrue, etc.
     if (fnName.getFunction().equals("if")) {
       return simplifyIfFunctionCallExpr(expr);
     } else if (fnName.getFunction().equals("coalesce")) {
       return simplifyCoalesceFunctionCallExpr(expr);
+    } else if (IFNULL_ALIASES.contains(fnName.getFunction())) {
+      return simplifyIfNullFunctionCallExpr(expr);
     }
     return expr;
   }
