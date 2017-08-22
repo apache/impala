@@ -71,8 +71,8 @@ using strings::Substitute;
 
 DECLARE_int32(be_port);
 DECLARE_string(hostname);
-DEFINE_bool(enable_partitioned_hash_join, true, "Deprecated - has no effect");
-DEFINE_bool(enable_partitioned_aggregation, true, "Deprecated - has no effect");
+DEFINE_bool_hidden(enable_partitioned_hash_join, true, "Deprecated - has no effect");
+DEFINE_bool_hidden(enable_partitioned_aggregation, true, "Deprecated - has no effect");
 
 namespace impala {
 

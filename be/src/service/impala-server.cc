@@ -210,7 +210,7 @@ DEFINE_bool(is_executor, true, "If true, this Impala daemon will execute query "
 #endif
 
 // TODO: Remove for Impala 3.0.
-DEFINE_string(local_nodemanager_url, "", "Deprecated");
+DEFINE_string_hidden(local_nodemanager_url, "", "Deprecated");
 
 DECLARE_bool(compact_catalog_topic);
 

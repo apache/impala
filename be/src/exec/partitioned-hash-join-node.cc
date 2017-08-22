@@ -38,7 +38,7 @@
 
 #include "common/names.h"
 
-DEFINE_bool(enable_phj_probe_side_filtering, true, "Deprecated.");
+DEFINE_bool_hidden(enable_phj_probe_side_filtering, true, "Deprecated.");
 
 static const string PREPARE_FOR_READ_FAILED_ERROR_MSG =
     "Failed to acquire initial read buffer for stream in hash join node $0. Reducing "
