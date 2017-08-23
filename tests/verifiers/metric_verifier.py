@@ -25,11 +25,9 @@ METRIC_LIST = [
                #"impala-server.backends.client-cache.clients-in-use",
                "impala-server.hash-table.total-bytes",
                "impala-server.io-mgr.num-open-files",
-               # Disable checking of mem-pool.total-bytes DUE TO IMPALA-1057
-               #"impala-server.mem-pool.total-bytes",
+               "impala-server.mem-pool.total-bytes",
                "impala-server.num-files-open-for-insert",
-               # Disable checking of num-missing-volume-id due to IMPALA-467
-               # "impala-server.scan-ranges.num-missing-volume-id",
+               "impala-server.scan-ranges.num-missing-volume-id",
                # Buffer pool pages belong to specific queries. Therefore there should be
                # no clean pages if there are no queries running.
                "buffer-pool.clean-pages",
