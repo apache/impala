@@ -72,3 +72,7 @@ class TestSpilling(ImpalaTestSuite):
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip("only run large sorts on exhaustive")
     self.run_test_case('QueryTest/spilling-sorts-exhaustive', vector)
+
+  def test_disable_unsafe_spills(self, vector):
+    """Test that the disable_unsafe_spills query options works end-to-end."""
+    self.run_test_case('QueryTest/disable-unsafe-spills', vector)
