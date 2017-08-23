@@ -41,7 +41,7 @@ PLAN-ROOT SINK
 select count(*) from functional_parquet.alltypes
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=0B
-Per-Host Resource Estimates: Memory=36.00MB
+Per-Host Resource Estimates: Memory=21.00MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.alltypes
 

@@ -459,10 +459,10 @@ Per-Host Resources: mem-estimate=212.48MB mem-reservation=0B
 select count(*) from tpch_parquet.lineitem
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=0B
-Per-Host Resource Estimates: Memory=90.00MB
+Per-Host Resource Estimates: Memory=11.00MB
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=90.00MB mem-reservation=0B
+|  Per-Host Resources: mem-estimate=11.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -476,11 +476,11 @@ PLAN-ROOT SINK
    stats-rows=6001215 extrapolated-rows=disabled
    table stats: rows=6001215 size=193.92MB
    column stats: all
-   mem-estimate=80.00MB mem-reservation=0B
+   mem-estimate=1.00MB mem-reservation=0B
    tuple-ids=0 row-size=8B cardinality=6001215
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=0B
-Per-Host Resource Estimates: Memory=100.00MB
+Per-Host Resource Estimates: Memory=21.00MB
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=10.00MB mem-reservation=0B
@@ -497,7 +497,7 @@ PLAN-ROOT SINK
 |  tuple-ids=1 row-size=8B cardinality=1
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=90.00MB mem-reservation=0B
+Per-Host Resources: mem-estimate=11.00MB mem-reservation=0B
 01:AGGREGATE
 |  output: sum_init_zero(tpch_parquet.lineitem.parquet-stats: num_rows)
 |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB
@@ -508,7 +508,7 @@ Per-Host Resources: mem-estimate=90.00MB mem-reservation=0B
    stats-rows=6001215 extrapolated-rows=disabled
    table stats: rows=6001215 size=193.92MB
    column stats: all
-   mem-estimate=80.00MB mem-reservation=0B
+   mem-estimate=1.00MB mem-reservation=0B
    tuple-ids=0 row-size=8B cardinality=6001215
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=0B
