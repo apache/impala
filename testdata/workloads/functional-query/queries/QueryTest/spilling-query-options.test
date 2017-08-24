@@ -1,0 +1,54 @@
+====
+---- QUERY
+# tpch_avro does not have stats computed, so if we set disable_unsafe_spills we should
+# not spill to disk.
+set disable_unsafe_spills=true;
+set buffer_pool_limit=40m;
+select distinct *
+from tpch_avro.orders
+---- CATCH
+Could not free memory by spilling to disk: spilling was disabled by planner. Re-enable spilling by setting the query option DISABLE_UNSAFE_SPILLS=false
+====
+---- QUERY
+# IMPALA-5823: make sure that SET_DENY_RESERVATION_PROBABILITY takes effect on PREPARE.
+set debug_action="-1:PREPARE:SET_DENY_RESERVATION_PROBABILITY@1.0";
+select count(*) from (
+  select distinct o_orderdate, o_custkey, o_comment
+  from tpch_parquet.orders where o_orderkey < 500000) v;
+---- TYPES
+BIGINT
+---- RESULTS
+124999
+---- RUNTIME_PROFILE
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# IMPALA-5823: make sure that SET_DENY_RESERVATION_PROBABILITY takes effect on OPEN.
+set debug_action="-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0";
+select count(*) from (
+  select distinct o_orderdate, o_custkey, o_comment
+  from tpch_parquet.orders where o_orderkey < 500000) v;
+---- TYPES
+BIGINT
+---- RESULTS
+124999
+---- RUNTIME_PROFILE
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# IMPALA-5823: make sure that SET_DENY_RESERVATION_PROBABILITY takes effect on GETNEXT.
+# This won't affect the merge aggregation, which accumulates its memory in Open(), but
+# will affect the streaming aggregation.
+set debug_action="-1:GETNEXT:SET_DENY_RESERVATION_PROBABILITY@1.0";
+select count(*) from (
+  select distinct o_orderdate, o_custkey, o_comment
+  from tpch_parquet.orders where o_orderkey < 500000) v;
+---- TYPES
+BIGINT
+---- RESULTS
+124999
+---- RUNTIME_PROFILE
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+====

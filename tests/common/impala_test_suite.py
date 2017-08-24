@@ -210,7 +210,7 @@ class ImpalaTestSuite(BaseTestSuite):
       if not query_option in self.default_query_options:
         continue
       default_val = self.default_query_options[query_option]
-      query_str = 'SET '+ query_option + '=' + default_val + ';'
+      query_str = 'SET '+ query_option + '="' + default_val + '"'
       try:
         impalad_client.execute(query_str)
       except Exception as e:
