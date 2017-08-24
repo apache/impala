@@ -171,6 +171,7 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
     num_row_groups_counter_(NULL),
     num_scanners_with_no_reads_counter_(NULL),
     num_dict_filtered_row_groups_counter_(NULL),
+    coll_items_read_counter_(0),
     codegend_process_scratch_batch_fn_(NULL) {
   assemble_rows_timer_.Stop();
 }
@@ -958,6 +959,7 @@ Status HdfsParquetScanner::AssembleRows(
   DCHECK_EQ(*skip_row_group, false);
   DCHECK(scratch_batch_ != NULL);
 
+  int64_t num_rows_read = 0;
   while (!column_readers[0]->RowGroupAtEnd()) {
     // Start a new scratch batch.
     RETURN_IF_ERROR(scratch_batch_->Reset(state_));
@@ -965,10 +967,9 @@ Status HdfsParquetScanner::AssembleRows(
 
     // Materialize the top-level slots into the scratch batch column-by-column.
     int last_num_tuples = -1;
-    int num_col_readers = column_readers.size();
-    bool continue_execution = true;
-    for (int c = 0; c < num_col_readers; ++c) {
+    for (int c = 0; c < column_readers.size(); ++c) {
       ParquetColumnReader* col_reader = column_readers[c];
+      bool continue_execution;
       if (col_reader->max_rep_level() > 0) {
         continue_execution = col_reader->ReadValueBatch(&scratch_batch_->aux_mem_pool,
             scratch_batch_->capacity, tuple_byte_size_, scratch_batch_->tuple_mem,
@@ -997,14 +998,16 @@ Status HdfsParquetScanner::AssembleRows(
       }
       last_num_tuples = scratch_batch_->num_tuples;
     }
-    row_group_rows_read_ += scratch_batch_->num_tuples;
-    COUNTER_ADD(scan_node_->rows_read_counter(), scratch_batch_->num_tuples);
-
+    num_rows_read += scratch_batch_->num_tuples;
     int num_row_to_commit = TransferScratchTuples(row_batch);
     RETURN_IF_ERROR(CommitRows(row_batch, num_row_to_commit));
-    if (row_batch->AtCapacity()) return Status::OK();
+    if (row_batch->AtCapacity()) break;
   }
-
+  row_group_rows_read_ += num_rows_read;
+  COUNTER_ADD(scan_node_->rows_read_counter(), num_rows_read);
+  // Merge Scanner-local counter into HdfsScanNode counter and reset.
+  COUNTER_ADD(scan_node_->collection_items_read_counter(), coll_items_read_counter_);
+  coll_items_read_counter_ = 0;
   return Status::OK();
 }
 
@@ -1265,11 +1268,10 @@ bool HdfsParquetScanner::AssembleCollection(
     }
 
     rows_read += row_idx;
-    COUNTER_ADD(scan_node_->rows_read_counter(), row_idx);
     coll_value_builder->CommitTuples(num_to_commit);
     continue_execution &= !scan_node_->ReachedLimit() && !context_->cancelled();
   }
-
+  coll_items_read_counter_ += rows_read;
   if (end_of_collection) {
     // All column readers should report the start of the same collection.
     for (int c = 1; c < column_readers.size(); ++c) {

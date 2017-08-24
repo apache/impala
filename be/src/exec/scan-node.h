@@ -97,6 +97,9 @@ class ScanNode : public ExecNode {
 
   RuntimeProfile::Counter* bytes_read_counter() const { return bytes_read_counter_; }
   RuntimeProfile::Counter* rows_read_counter() const { return rows_read_counter_; }
+  RuntimeProfile::Counter* collection_items_read_counter() const {
+    return collection_items_read_counter_;
+  }
   RuntimeProfile::Counter* read_timer() const { return read_timer_; }
   RuntimeProfile::Counter* total_throughput_counter() const {
     return total_throughput_counter_;
@@ -123,6 +126,7 @@ class ScanNode : public ExecNode {
   /// names of ScanNode common counters
   static const std::string BYTES_READ_COUNTER;
   static const std::string ROWS_READ_COUNTER;
+  static const std::string COLLECTION_ITEMS_READ_COUNTER;
   static const std::string TOTAL_HDFS_READ_TIMER;
   static const std::string TOTAL_HBASE_READ_TIMER;
   static const std::string TOTAL_THROUGHPUT_COUNTER;
@@ -143,8 +147,13 @@ class ScanNode : public ExecNode {
   RuntimeProfile::Counter* bytes_read_counter_; // # bytes read from the scanner
   /// Time series of the bytes_read_counter_
   RuntimeProfile::TimeSeriesCounter* bytes_read_timeseries_counter_;
-  /// # rows/tuples read from the scanner (including those discarded by EvalConjucts())
+  /// # top-level rows/tuples read from the scanner
+  /// (including those discarded by EvalConjucts())
   RuntimeProfile::Counter* rows_read_counter_;
+  /// # items the scanner read into CollectionValues. For example, for schema
+  /// array<struct<B: INT, array<C: INT>> and tuple
+  /// [(2, [(3)]), (4, [])] this counter will be 3: (2, [(3)]), (3) and (4, [])
+  RuntimeProfile::Counter* collection_items_read_counter_;
   RuntimeProfile::Counter* read_timer_; // total read time
   /// Wall based aggregate read throughput [bytes/sec]
   RuntimeProfile::Counter* total_throughput_counter_;
