@@ -18,37 +18,38 @@
 package org.apache.impala.rewrite;
 
 import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BoolLiteral;
-import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
 
 /**
- * Normalizes CompoundPredicates by ensuring that if either child of AND or OR is a
- * BoolLiteral, then the left (i.e. first) child is a BoolLiteral.
+ * Simplifies DISTINCT FROM and NOT DISTINCT FROM predicates
+ * where the arguments are identical expressions.
  *
- * Examples:
- * id = 0 && true -> true && id = 0
+ * x IS DISTINCT FROM x -> false
+ * x IS NOT DISTINCT FROM x -> true
+ *
+ * Note that "IS NOT DISTINCT FROM" and the "<=>" are the same.
  */
-public class NormalizeExprsRule implements ExprRewriteRule {
-  public static ExprRewriteRule INSTANCE = new NormalizeExprsRule();
+public class SimplifyDistinctFromRule implements ExprRewriteRule {
+  public static ExprRewriteRule INSTANCE = new SimplifyDistinctFromRule();
 
   @Override
   public Expr apply(Expr expr, Analyzer analyzer) {
     if (!expr.isAnalyzed()) return expr;
 
-    // TODO: add normalization for other expr types.
-    if (expr instanceof CompoundPredicate) {
-      return normalizeCompoundPredicate((CompoundPredicate) expr);
-    }
-    return expr;
-  }
-
-  private Expr normalizeCompoundPredicate(CompoundPredicate expr) {
-    if (expr.getOp() == CompoundPredicate.Operator.NOT) return expr;
-
-    if (!(expr.getChild(0) instanceof BoolLiteral)
-        && expr.getChild(1) instanceof BoolLiteral) {
-      return new CompoundPredicate(expr.getOp(), expr.getChild(1), expr.getChild(0));
+    if (expr instanceof BinaryPredicate) {
+      BinaryPredicate pred = (BinaryPredicate) expr;
+      if (pred.getOp() == BinaryPredicate.Operator.NOT_DISTINCT) {
+        if (pred.getChild(0).equals(pred.getChild(1))) {
+          return new BoolLiteral(true);
+        }
+      }
+      if (pred.getOp() == BinaryPredicate.Operator.DISTINCT_FROM) {
+        if (pred.getChild(0).equals(pred.getChild(1))) {
+          return new BoolLiteral(false);
+        }
+      }
     }
     return expr;
   }

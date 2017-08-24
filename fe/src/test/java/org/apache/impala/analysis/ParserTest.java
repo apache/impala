@@ -1211,6 +1211,11 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("select f1(distinct col)");
     ParsesOk("select f1(distinct col, col2)");
     ParsesOk("select decode(col, col2, col3)");
+    // nullif should rewrite to if
+    assertEquals("SELECT if(col IS DISTINCT FROM col2, col, NULL) FROM t",
+        ParsesOk("select nullif(col, col2) from t").toSql());
+    assertEquals("SELECT if(col IS DISTINCT FROM col2, col, NULL) FROM t",
+        ParsesOk("select _impala_builtins.nullif(col, col2) from t").toSql());
     ParserError("select f( from t");
     ParserError("select f(5.0 5.0) from t");
   }

@@ -28,8 +28,6 @@ import org.apache.impala.analysis.CaseWhenClause;
 import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
-import org.apache.impala.analysis.FunctionName;
-import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.common.AnalysisException;
 
@@ -48,6 +46,11 @@ import com.google.common.collect.Lists;
  * false AND id = 1 -> false
  * case when false then 0 when true then 1 end -> 1
  * coalesce(1, 0) -> 1
+ *
+ * Unary functions like isfalse, isnotfalse, istrue, isnottrue, nullvalue,
+ * and nonnullvalue don't need special handling as the fold constants rule
+ * will handle them.  nullif and nvl2 are converted to an if in FunctionCallExpr,
+ * and therefore don't need handling here.
  */
 public class SimplifyConditionalsRule implements ExprRewriteRule {
   public static ExprRewriteRule INSTANCE = new SimplifyConditionalsRule();
@@ -141,14 +144,13 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
   }
 
   private Expr simplifyFunctionCallExpr(FunctionCallExpr expr) {
-    FunctionName fnName = expr.getFnName();
+    String fnName = expr.getFnName().getFunction();
 
-    // TODO: Add the other conditional functions, eg. istrue, etc.
-    if (fnName.getFunction().equals("if")) {
+    if (fnName.equals("if")) {
       return simplifyIfFunctionCallExpr(expr);
-    } else if (fnName.getFunction().equals("coalesce")) {
+    } else if (fnName.equals("coalesce")) {
       return simplifyCoalesceFunctionCallExpr(expr);
-    } else if (IFNULL_ALIASES.contains(fnName.getFunction())) {
+    } else if (IFNULL_ALIASES.contains(fnName)) {
       return simplifyIfNullFunctionCallExpr(expr);
     }
     return expr;
@@ -193,10 +195,13 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
   }
 
   /**
-   * Simpilfies CASE and DECODE. If any of the 'when's have constant FALSE/NULL values,
+   * Simplifies CASE and DECODE. If any of the 'when's have constant FALSE/NULL values,
    * they are removed. If all of the 'when's are removed, just the ELSE is returned. If
    * any of the 'when's have constant TRUE values, the leftmost one becomes the ELSE
    * clause and all following cases are removed.
+   *
+   * Note that FunctionalCallExpr.createExpr() converts "nvl2" into "if",
+   * "decode" into "case", and "nullif" into "if".
    */
   private Expr simplifyCaseExpr(CaseExpr expr, Analyzer analyzer)
       throws AnalysisException {

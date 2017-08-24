@@ -22,7 +22,6 @@ import java.util.List;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
-import org.apache.impala.common.AnalysisException;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -48,7 +47,7 @@ public class ExtractCommonConjunctRule implements ExprRewriteRule {
   private static final int MAX_EQUALS_COMPARISONS = 30 * 30;
 
   @Override
-  public Expr apply(Expr expr, Analyzer analyzer) throws AnalysisException {
+  public Expr apply(Expr expr, Analyzer analyzer) {
     if (!Expr.IS_OR_PREDICATE.apply(expr)) return expr;
 
     // Get childrens' conjuncts and check

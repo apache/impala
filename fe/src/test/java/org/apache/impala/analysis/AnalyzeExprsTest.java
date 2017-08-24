@@ -1781,6 +1781,17 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select nvl2(now(), true)", "No matching function with signature: " +
         "if(BOOLEAN, BOOLEAN).");
     AnalysisError("select nvl2()", "No matching function with signature: if().");
+
+    // IFNULL() is converted to IF() before analysis.
+    AnalyzesOk("select nullif(1, 1)");
+    AnalyzesOk("select nullif(NULL, 'not null')");
+    AnalyzesOk("select nullif('not null', null)");
+    AnalyzesOk("select nullif(int_col, int_col) from functional.alltypesagg");
+    // Because of conversion, nullif() isn't found rather than having no
+    // matching function with the signature.
+    AnalysisError("select nullif(1,2,3)", "default.nullif() unknown");
+    AnalysisError("select nullif('x', 1)",
+        "operands of type STRING and TINYINT are not comparable: 'x' IS DISTINCT FROM 1");
   }
 
   @Test

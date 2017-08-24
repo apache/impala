@@ -30,7 +30,6 @@ using namespace impala_udf;
   }
 
 CONDITIONAL_CODEGEN_FN(IsNullExpr);
-CONDITIONAL_CODEGEN_FN(NullIfExpr);
 CONDITIONAL_CODEGEN_FN(IfExpr);
 CONDITIONAL_CODEGEN_FN(CoalesceExpr);
 

@@ -84,25 +84,35 @@ public class FunctionCallExpr extends Expr {
    */
   public static Expr createExpr(FunctionName fnName, FunctionParams params) {
     FunctionCallExpr functionCallExpr = new FunctionCallExpr(fnName, params);
-    if (fnName.getFnNamePath().size() == 1
-            && fnName.getFnNamePath().get(0).equalsIgnoreCase("decode")
-        || fnName.getFnNamePath().size() == 2
-            && fnName.getFnNamePath().get(0).equalsIgnoreCase(Catalog.BUILTINS_DB)
-            && fnName.getFnNamePath().get(1).equalsIgnoreCase("decode")) {
+    if (functionNameEqualsBuiltin(fnName, "decode")) {
       return new CaseExpr(functionCallExpr);
     }
-    if (fnName.getFnNamePath().size() == 1
-            && fnName.getFnNamePath().get(0).equalsIgnoreCase("nvl2")
-        || fnName.getFnNamePath().size() == 2
-            && fnName.getFnNamePath().get(0).equalsIgnoreCase(Catalog.BUILTINS_DB)
-            && fnName.getFnNamePath().get(1).equalsIgnoreCase("nvl2")) {
+    if (functionNameEqualsBuiltin(fnName, "nvl2")) {
       List<Expr> plist = Lists.newArrayList(params.exprs());
       if (!plist.isEmpty()) {
         plist.set(0, new IsNullPredicate(plist.get(0), true));
       }
       return new FunctionCallExpr("if", plist);
     }
+    // nullif(x, y) -> if(x DISTINCT FROM y, x, NULL)
+    if (functionNameEqualsBuiltin(fnName, "nullif") && params.size() == 2) {
+      return new FunctionCallExpr("if", Lists.newArrayList(
+          new BinaryPredicate(BinaryPredicate.Operator.DISTINCT_FROM, params.exprs().get(0),
+            params.exprs().get(1)), // x IS DISTINCT FROM y
+          params.exprs().get(0), // x
+          new NullLiteral() // NULL
+      ));
+    }
     return functionCallExpr;
+  }
+
+  /** Returns true if fnName is a built-in with given name. */
+  private static boolean functionNameEqualsBuiltin(FunctionName fnName, String name) {
+    return fnName.getFnNamePath().size() == 1
+           && fnName.getFnNamePath().get(0).equalsIgnoreCase(name)
+        || fnName.getFnNamePath().size() == 2
+           && fnName.getFnNamePath().get(0).equals(Catalog.BUILTINS_DB)
+           && fnName.getFnNamePath().get(1).equalsIgnoreCase(name);
   }
 
   /**

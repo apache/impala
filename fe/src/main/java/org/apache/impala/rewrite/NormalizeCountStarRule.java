@@ -22,7 +22,6 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.FunctionParams;
-import org.apache.impala.common.AnalysisException;
 
 /**
  * Replaces count(<literal>) with an equivalent count{*}.
@@ -36,7 +35,7 @@ public class NormalizeCountStarRule implements ExprRewriteRule {
   public static ExprRewriteRule INSTANCE = new NormalizeCountStarRule();
 
   @Override
-  public Expr apply(Expr expr, Analyzer analyzer) throws AnalysisException {
+  public Expr apply(Expr expr, Analyzer analyzer) {
     if (!(expr instanceof FunctionCallExpr)) return expr;
     FunctionCallExpr origExpr = (FunctionCallExpr) expr;
     if (!origExpr.getFnName().getFunction().equalsIgnoreCase("count")) return expr;

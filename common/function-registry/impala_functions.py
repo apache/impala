@@ -503,17 +503,6 @@ visible_functions = [
   [['if'], 'TIMESTAMP', ['BOOLEAN', 'TIMESTAMP', 'TIMESTAMP'], ''],
   [['if'], 'DECIMAL', ['BOOLEAN', 'DECIMAL', 'DECIMAL'], ''],
 
-  [['nullif'], 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], ''],
-  [['nullif'], 'TINYINT', ['TINYINT', 'TINYINT'], ''],
-  [['nullif'], 'SMALLINT', ['SMALLINT', 'SMALLINT'], ''],
-  [['nullif'], 'INT', ['INT', 'INT'], ''],
-  [['nullif'], 'BIGINT', ['BIGINT', 'BIGINT'], ''],
-  [['nullif'], 'FLOAT', ['FLOAT', 'FLOAT'], ''],
-  [['nullif'], 'DOUBLE', ['DOUBLE', 'DOUBLE'], ''],
-  [['nullif'], 'STRING', ['STRING', 'STRING'], ''],
-  [['nullif'], 'TIMESTAMP', ['TIMESTAMP', 'TIMESTAMP'], ''],
-  [['nullif'], 'DECIMAL', ['DECIMAL', 'DECIMAL'], ''],
-
   [['zeroifnull'], 'TINYINT', ['TINYINT'], 'impala::ConditionalFunctions::ZeroIfNull'],
   [['zeroifnull'], 'SMALLINT', ['SMALLINT'], 'impala::ConditionalFunctions::ZeroIfNull'],
   [['zeroifnull'], 'INT', ['INT'], 'impala::ConditionalFunctions::ZeroIfNull'],

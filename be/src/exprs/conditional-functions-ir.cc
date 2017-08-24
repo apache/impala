@@ -43,33 +43,6 @@ IS_NULL_COMPUTE_FUNCTION(StringVal);
 IS_NULL_COMPUTE_FUNCTION(TimestampVal);
 IS_NULL_COMPUTE_FUNCTION(DecimalVal);
 
-#define NULL_IF_COMPUTE_FUNCTION(AnyValType) \
-  AnyValType NullIfExpr::Get##AnyValType(ScalarExprEvaluator* eval, \
-      const TupleRow* row) const { \
-    DCHECK_EQ(children_.size(), 2); \
-    AnyValType lhs_val = GetChild(0)->Get##AnyValType(eval, row); \
-    /* Short-circuit in case lhs_val is NULL. Can never be equal to RHS. */ \
-    if (lhs_val.is_null) return AnyValType::null(); \
-    /* Get rhs and return NULL if lhs == rhs, lhs otherwise */ \
-    AnyValType rhs_val = GetChild(1)->Get##AnyValType(eval, row); \
-    if (!rhs_val.is_null && \
-        AnyValUtil::Equals(GetChild(0)->type(), lhs_val, rhs_val)) { \
-      return AnyValType::null(); \
-    } \
-    return lhs_val; \
-  }
-
-NULL_IF_COMPUTE_FUNCTION(BooleanVal);
-NULL_IF_COMPUTE_FUNCTION(TinyIntVal);
-NULL_IF_COMPUTE_FUNCTION(SmallIntVal);
-NULL_IF_COMPUTE_FUNCTION(IntVal);
-NULL_IF_COMPUTE_FUNCTION(BigIntVal);
-NULL_IF_COMPUTE_FUNCTION(FloatVal);
-NULL_IF_COMPUTE_FUNCTION(DoubleVal);
-NULL_IF_COMPUTE_FUNCTION(StringVal);
-NULL_IF_COMPUTE_FUNCTION(TimestampVal);
-NULL_IF_COMPUTE_FUNCTION(DecimalVal);
-
 #define NULL_IF_ZERO_COMPUTE_FUNCTION(type) \
   type ConditionalFunctions::NullIfZero(FunctionContext* ctx, const type& val) { \
     if (val.is_null || val.val == 0) return type::null(); \
