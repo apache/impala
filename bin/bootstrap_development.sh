@@ -122,7 +122,7 @@ if [[ $DISTRIB_RELEASE = 14.04 ]]
 then
   JDK_VERSION=7
 fi
-apt-get --yes install openjdk-${JDK_VERSION}-jdk
+apt-get --yes install openjdk-${JDK_VERSION}-jdk openjdk-${JDK_VERSION}-source
 SET_JAVA_HOME="export JAVA_HOME=/usr/lib/jvm/java-${JDK_VERSION}-openjdk-amd64"
 echo "$SET_JAVA_HOME" >> "${IMPALA_HOME}/bin/impala-config-local.sh"
 eval "$SET_JAVA_HOME"
