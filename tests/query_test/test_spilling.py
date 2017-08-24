@@ -30,14 +30,14 @@ DEBUG_ACTION_DIMS = [None,
 
 @pytest.mark.xfail(pytest.config.option.testing_remote_cluster,
                    reason='Queries may not spill on larger clusters')
-class TestSpilling(ImpalaTestSuite):
+class TestSpillingDebugActionDimensions(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
     return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestSpilling, cls).add_test_dimensions()
+    super(TestSpillingDebugActionDimensions, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.clear_constraints()
     cls.ImpalaTestMatrix.add_dimension(create_parquet_dimension('tpch'))
     # Tests are calibrated so that they can execute and spill with this page size.
@@ -60,19 +60,38 @@ class TestSpilling(ImpalaTestSuite):
     """Test spilling null-aware anti-joins"""
     self.run_test_case('QueryTest/spilling-naaj', vector)
 
-  def test_spilling_naaj_no_deny_reservation(self, vector):
-    """
-    Null-aware anti-join tests that depend on getting more than the minimum reservation
-    and therefore will not reliably pass with the deny reservation debug action enabled.
-    """
-    if vector.get_value('exec_option')['debug_action'] is None:
-      self.run_test_case('QueryTest/spilling-naaj-no-deny-reservation', vector)
-
   def test_spilling_sorts_exhaustive(self, vector):
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip("only run large sorts on exhaustive")
     self.run_test_case('QueryTest/spilling-sorts-exhaustive', vector)
 
-  def test_disable_unsafe_spills(self, vector):
-    """Test that the disable_unsafe_spills query options works end-to-end."""
-    self.run_test_case('QueryTest/disable-unsafe-spills', vector)
+
+@pytest.mark.xfail(pytest.config.option.testing_remote_cluster,
+                   reason='Queries may not spill on larger clusters')
+class TestSpillingNoDebugActionDimensions(ImpalaTestSuite):
+  """Spilling tests to which we don't want to apply the debug_action dimension."""
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestSpillingNoDebugActionDimensions, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.clear_constraints()
+    cls.ImpalaTestMatrix.add_dimension(create_parquet_dimension('tpch'))
+    # Tests are calibrated so that they can execute and spill with this page size.
+    cls.ImpalaTestMatrix.add_dimension(
+        create_exec_option_dimension_from_dict({'default_spillable_buffer_size' : ['256k']}))
+
+  def test_spilling_naaj_no_deny_reservation(self, vector):
+    """
+    Null-aware anti-join tests that depend on getting more than the minimum reservation
+    and therefore will not reliably pass with the deny reservation debug action enabled.
+    """
+    self.run_test_case('QueryTest/spilling-naaj-no-deny-reservation', vector)
+
+  def test_spilling_query_options(self, vector):
+    """Test that spilling-related query options work end-to-end. These tests rely on
+      setting debug_action to alternative values via query options."""
+    self.run_test_case('QueryTest/spilling-query-options', vector)
+
