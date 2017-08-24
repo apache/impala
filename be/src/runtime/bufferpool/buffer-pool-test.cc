@@ -1460,6 +1460,7 @@ void BufferPoolTest::TestWriteError(int write_delay_ms) {
   PageHandle tmp_page;
   Status error = pool.AllocateBuffer(&client, TEST_BUFFER_LEN, &tmp_buffer);
   EXPECT_EQ(TErrorCode::SCRATCH_ALLOCATION_FAILED, error.code());
+  ASSERT_NE(string::npos, error.msg().msg().find(GetBackendString()));
   EXPECT_FALSE(tmp_buffer.is_open());
   error = pool.CreatePage(&client, TEST_BUFFER_LEN, &tmp_page);
   EXPECT_EQ(TErrorCode::SCRATCH_ALLOCATION_FAILED, error.code());

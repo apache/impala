@@ -384,6 +384,7 @@ TEST_F(TmpFileMgrTest, TestScratchLimit) {
   status = GroupAllocateSpace(&file_group, 1, &alloc_file, &offset);
   ASSERT_FALSE(status.ok());
   ASSERT_EQ(status.code(), TErrorCode::SCRATCH_LIMIT_EXCEEDED);
+  ASSERT_NE(string::npos, status.msg().msg().find(GetBackendString()));
 
   file_group.Close();
 }

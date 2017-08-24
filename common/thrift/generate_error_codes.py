@@ -275,7 +275,7 @@ error_codes = (
    "supported length of 2147483647 bytes."),
 
   ("SCRATCH_LIMIT_EXCEEDED", 90, "Scratch space limit of $0 bytes exceeded for query "
-   "while spilling data to disk."),
+   "while spilling data to disk on backend $1."),
 
   ("BUFFER_ALLOCATION_FAILED", 91, "Unexpected error allocating $0 byte buffer: $1"),
 
@@ -306,11 +306,11 @@ error_codes = (
   # TODO: IMPALA-4697: the merged errors do not show up in the query error log,
   # so we must point users to the impalad error log.
   ("SCRATCH_ALLOCATION_FAILED", 101, "Could not create files in any configured scratch "
-   "directories (--scratch_dirs). See logs for previous errors that may have prevented "
-   "creating or writing scratch files."),
+   "directories (--scratch_dirs=$0) on backend '$1'. See logs for previous errors that may "
+   "have prevented creating or writing scratch files."),
 
-  ("SCRATCH_READ_TRUNCATED", 102, "Error reading $0 bytes from scratch file '$1' at "
-   "offset $2: could only read $3 bytes"),
+  ("SCRATCH_READ_TRUNCATED", 102, "Error reading $0 bytes from scratch file '$1' "
+   "on backend $2 at offset $3: could only read $4 bytes"),
 
   ("KUDU_TIMESTAMP_OUT_OF_RANGE", 103,
    "Kudu table '$0' column '$1' contains an out of range timestamp. "
