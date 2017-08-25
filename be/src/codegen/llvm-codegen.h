@@ -310,7 +310,9 @@ class LlvmCodeGen {
       LibCacheEntry** cache_entry);
 
   /// Replaces all instructions in 'caller' that call 'target_name' with a call
-  /// instruction to 'new_fn'. Returns the number of call sites updated.
+  /// instruction to 'new_fn'. The argument types of 'new_fn' must exactly match
+  /// the argument types of the function to be replaced. Returns the number of
+  /// call sites updated.
   ///
   /// 'target_name' must be a substring of the mangled symbol of the function to be
   /// replaced. This usually means that the unmangled function name is sufficient.

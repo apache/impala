@@ -17,6 +17,8 @@
 
 #include "codegen/codegen-anyval.h"
 
+#include "codegen/codegen-util.h"
+
 #include "common/names.h"
 
 using namespace impala;
@@ -138,15 +140,21 @@ Value* CodegenAnyVal::CreateCall(LlvmCodeGen* cg, LlvmBuilder* builder, Function
                      cg->CreateEntryBlockAlloca(*builder, ret_type, name) : result_ptr;
     vector<Value*> new_args = args.vec();
     new_args.insert(new_args.begin(), ret_ptr);
-    builder->CreateCall(fn, new_args);
+    // Bitcasting the args is often necessary when calling an IR UDF because the types
+    // in the IR module may have been renamed while linking. Bitcasting them avoids a
+    // type assertion.
+    CodeGenUtil::CreateCallWithBitCasts(builder, fn, new_args);
 
     // If 'result_ptr' was specified, we're done. Otherwise load and return the result.
     if (result_ptr != NULL) return NULL;
     return builder->CreateLoad(ret_ptr, name);
   } else {
     // Function returns *Val normally (note that it could still be returning a DecimalVal,
-    // since we generate non-complaint functions)
-    Value* ret = builder->CreateCall(fn, args, name);
+    // since we generate non-compliant functions).
+    // Bitcasting the args is often necessary when calling an IR UDF because the types
+    // in the IR module may have been renamed while linking. Bitcasting them avoids a
+    // type assertion.
+    Value* ret = CodeGenUtil::CreateCallWithBitCasts(builder, fn, args, name);
     if (result_ptr == NULL) return ret;
     builder->CreateStore(ret, result_ptr);
     return NULL;

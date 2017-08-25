@@ -55,6 +55,7 @@ DecimalVal TestGetFnAttrs(
 #ifndef IR_COMPILE
 
 #include "testutil/gtest-util.h"
+#include "codegen/codegen-util.h"
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
 #include "exprs/anyval-util.h"
@@ -328,7 +329,7 @@ TEST_F(ExprCodegenTest, TestInlineConstFnAttrs) {
   EXPECT_EQ(replaced, 9);
   ResetVerification(codegen.get());
   verification_succeeded = VerifyFunction(codegen.get(), fn);
-  EXPECT_TRUE(verification_succeeded) << LlvmCodeGen::Print(fn);
+  EXPECT_TRUE(verification_succeeded) << CodeGenUtil::Print(fn);
 
   // Compile module
   fn = codegen->FinalizeFunction(fn);
