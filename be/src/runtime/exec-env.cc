@@ -221,7 +221,6 @@ Status ExecEnv::StartServices() {
   // memory limit either based on the available physical memory, or if overcommitting
   // is turned off, we use the memory commit limit from /proc/meminfo (see
   // IMPALA-1690).
-  // --mem_limit="" means no memory limit. TODO: IMPALA-5653: remove this mode
   int64_t bytes_limit = 0;
   bool is_percent;
   int64_t system_mem;
@@ -246,15 +245,11 @@ Status ExecEnv::StartServices() {
     system_mem = MemInfo::physical_mem();
     bytes_limit = ParseUtil::ParseMemSpec(FLAGS_mem_limit, &is_percent, system_mem);
   }
-  // ParseMemSpec returns 0 to mean unlimited.
-  bool no_process_mem_limit = bytes_limit == 0;
-  if (no_process_mem_limit) {
-    LOG(WARNING) << "Configured with unlimited process memory limit (--mem_limit='"
-                 << FLAGS_mem_limit << "'). Starting in the next Impala release, "
-                 << "a process memory limit must always be specified. See IMPALA-5653.";
-  }
-  if (bytes_limit < 0) {
-    return Status("Failed to parse mem limit from '" + FLAGS_mem_limit + "'.");
+  // ParseMemSpec() returns -1 for invalid input and 0 to mean unlimited. From Impala
+  // 2.11 onwards we do not support unlimited process memory limits.
+  if (bytes_limit <= 0) {
+    return Status(Substitute("The process memory limit (--mem_limit) must be a positive "
+          "bytes value or percentage: $0", FLAGS_mem_limit));
   }
 
   if (!BitUtil::IsPowerOf2(FLAGS_min_buffer_size)) {
@@ -262,10 +257,10 @@ Status ExecEnv::StartServices() {
         "--min_buffer_size must be a power-of-two: $0", FLAGS_min_buffer_size));
   }
   int64_t buffer_pool_limit = ParseUtil::ParseMemSpec(FLAGS_buffer_pool_limit,
-      &is_percent, no_process_mem_limit ? system_mem : bytes_limit);
+      &is_percent, bytes_limit);
   if (buffer_pool_limit <= 0) {
     return Status(Substitute("Invalid --buffer_pool_limit value, must be a percentage or "
-          "positive bytes value: $0", FLAGS_buffer_pool_limit));
+          "positive bytes value or percentage: $0", FLAGS_buffer_pool_limit));
   }
   buffer_pool_limit = BitUtil::RoundDown(buffer_pool_limit, FLAGS_min_buffer_size);
 
@@ -273,7 +268,7 @@ Status ExecEnv::StartServices() {
       &is_percent, buffer_pool_limit);
   if (clean_pages_limit <= 0) {
     return Status(Substitute("Invalid --buffer_pool_clean_pages_limit value, must be a percentage or "
-          "positive bytes value: $0", FLAGS_buffer_pool_clean_pages_limit));
+          "positive bytes value or percentage: $0", FLAGS_buffer_pool_clean_pages_limit));
   }
   InitBufferPool(FLAGS_min_buffer_size, buffer_pool_limit, clean_pages_limit);
 
@@ -283,9 +278,8 @@ Status ExecEnv::StartServices() {
   RETURN_IF_ERROR(RegisterMemoryMetrics(
       metrics_.get(), true, buffer_reservation_.get(), buffer_pool_.get()));
 
-  // Limit of -1 means no memory limit.
-  mem_tracker_.reset(new MemTracker(AggregateMemoryMetrics::TOTAL_USED,
-      no_process_mem_limit ? -1 : bytes_limit, "Process"));
+  mem_tracker_.reset(
+      new MemTracker(AggregateMemoryMetrics::TOTAL_USED, bytes_limit, "Process"));
   // Add BufferPool MemTrackers for cached memory that is not tracked against queries
   // but is included in process memory consumption.
   obj_pool_->Add(new MemTracker(BufferPoolMetric::FREE_BUFFER_BYTES, -1,
