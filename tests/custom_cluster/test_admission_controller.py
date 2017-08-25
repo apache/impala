@@ -321,7 +321,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,
           pool_max_mem=10 * 1024 * 1024, proc_mem_limit=1024 * 1024 * 1024),
       statestored_args=_STATESTORED_ARGS)
-  def test_reject_min_reservation(self):
+  def test_reject_min_reservation(self, vector):
     """Test that the query will be rejected by admission control if:
        a) the largest per-backend min buffer reservation is larger than the query mem
           limit
@@ -330,26 +330,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
        c) the cluster-wide min-buffer reservation size is larger than the pool memory
           resources.
     """
-    query = "select distinct * from functional_parquet.alltypesagg"
-    opts = {'mem_limit': '10MB', 'num_nodes': '1'}
-    ex = self.execute_query_expect_failure(self.client, query, opts)
-    assert ("minimum memory reservation is greater than memory available to the query "
-        "for buffer reservations. Mem available for buffer reservations based on "
-        "mem_limit: 10.00 MB, memory reservation needed: 34.00 MB. "
-        "Set mem_limit to at least 109.00 MB.") in str(ex)
-
-    query = "select distinct * from functional_parquet.alltypesagg"
-    opts = {'buffer_pool_limit': '10MB', 'num_nodes': '1'}
-    ex = self.execute_query_expect_failure(self.client, query, opts)
-    assert ("minimum memory reservation is greater than memory available to the query "
-        "for buffer reservations. Mem available for buffer reservations based on "
-        "buffer_pool_limit: 10.00 MB, memory reservation needed: 34.00 MB.") in str(ex)
-
-    opts = {'mem_limit': '150MB', 'num_nodes': '1'}
-    ex = self.execute_query_expect_failure(self.client, query, opts)
-    assert ("minimum memory reservation needed is greater than pool max mem resources. "
-        "pool max mem resources: 10.00 MB, cluster-wide memory reservation needed: "
-        "34.00 MB") in str(ex)
+    self.run_test_case('QueryTest/admission-reject-min-reservation', vector)
 
   # Process mem_limit used in test_mem_limit_upper_bound
   PROC_MEM_TEST_LIMIT = 1024 * 1024 * 1024
