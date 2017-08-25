@@ -297,8 +297,10 @@ TEST(Webserver, SslGoodTlsVersion) {
 
 #if OPENSSL_VERSION_NUMBER >= 0x10001000L
   auto versions = {"tlsv1", "tlsv1.1", "tlsv1.2"};
+  vector<string> unsupported_versions = {};
 #else
   auto versions = {"tlsv1"};
+  auto unsupported_versions = {"tlsv1.1", "tlsv1.2"};
 #endif
   for (auto v: versions) {
     auto ssl_version = ScopedFlagSetter<string>::Make(
@@ -306,6 +308,13 @@ TEST(Webserver, SslGoodTlsVersion) {
 
     Webserver webserver(FLAGS_webserver_port);
     ASSERT_OK(webserver.Start());
+  }
+
+  for (auto v : unsupported_versions) {
+    auto ssl_version = ScopedFlagSetter<string>::Make(&FLAGS_ssl_minimum_version, v);
+
+    Webserver webserver(FLAGS_webserver_port);
+    EXPECT_FALSE(webserver.Start().ok()) << "Version: " << v;
   }
 }
 

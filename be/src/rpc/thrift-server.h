@@ -340,7 +340,7 @@ class ThriftServerBuilder {
 
   bool enable_ssl_ = false;
   apache::thrift::transport::SSLProtocol version_ =
-      apache::thrift::transport::SSLProtocol::TLSv1_0;
+      apache::thrift::transport::SSLProtocol::TLSv1_0_plus;
   std::string certificate_;
   std::string private_key_;
   std::string pem_password_cmd_;
@@ -355,6 +355,10 @@ struct SSLProtoVersions {
   /// one cannot be found. Matching is case-insensitive.
   static Status StringToProtocol(
       const std::string& in, apache::thrift::transport::SSLProtocol* protocol);
+
+  /// Returns true if 'protocol' is supported by the version of OpenSSL this binary is
+  /// linked to.
+  static bool IsSupported(const apache::thrift::transport::SSLProtocol& protocol);
 };
 
 // Returns true if, per the process configuration flags, server<->server communications

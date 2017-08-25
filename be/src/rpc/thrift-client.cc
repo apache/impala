@@ -44,6 +44,12 @@ ThriftClientImpl::ThriftClientImpl(const std::string& ipaddress, int port, bool 
     SSLProtocol version;
     init_status_ =
         SSLProtoVersions::StringToProtocol(FLAGS_ssl_minimum_version, &version);
+    if (init_status_.ok() && !SSLProtoVersions::IsSupported(version)) {
+      string err =
+          Substitute("TLS ($0) version not supported (linked OpenSSL version is $1)",
+              version, SSLeay());
+      init_status_ = Status(err);
+    }
     if (!init_status_.ok()) return;
     ssl_factory_.reset(new TSSLSocketFactory(version));
   }

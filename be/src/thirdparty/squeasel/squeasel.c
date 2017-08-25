@@ -150,10 +150,20 @@ typedef int socklen_t;
 
 static const char *http_500_error = "Internal Server Error";
 
+#include <openssl/crypto.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
-#define OPENSSL_VERSION_HAS_TLS_1_1 0x10001000L
+// If these constants aren't defined, we still need them to compile and maintain backwards
+// compatibility with pre-1.0.1 OpenSSL.
+#ifndef SSL_OP_NO_TLSv1
+#define SSL_OP_NO_TLSv1 0x04000000U
+#endif
+#ifndef SSL_OP_NO_TLSv1_1
+#define SSL_OP_NO_TLSv1_1 0x10000000U
+#endif
+
+#define OPENSSL_MIN_VERSION_WITH_TLS_1_1 0x10001000L
 
 static const char *month_names[] = {
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -4224,12 +4234,18 @@ static int set_ssl_option(struct sq_context *ctx) {
   int options = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
   if (sq_strcasecmp(ssl_version, "tlsv1") == 0) {
     // No-op - don't exclude any TLS protocols.
-#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_HAS_TLS_1_1
   } else if (sq_strcasecmp(ssl_version, "tlsv1.1") == 0) {
+    if (SSLeay() < OPENSSL_MIN_VERSION_WITH_TLS_1_1) {
+      cry(fc(ctx), "Unsupported TLS version: %s", ssl_version);
+      return 0;
+    }
     options |= SSL_OP_NO_TLSv1;
   } else if (sq_strcasecmp(ssl_version, "tlsv1.2") == 0) {
+    if (SSLeay() < OPENSSL_MIN_VERSION_WITH_TLS_1_1) {
+      cry(fc(ctx), "Unsupported TLS version: %s", ssl_version);
+      return 0;
+    }
     options |= (SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
-#endif
   } else {
     cry(fc(ctx), "%s: unknown SSL version: %s", __func__, ssl_version);
     return 0;
@@ -4251,7 +4267,11 @@ static int set_ssl_option(struct sq_context *ctx) {
     return 0;
   }
 
-  SSL_CTX_set_options(ctx->ssl_ctx, options);
+  if ((SSL_CTX_set_options(ctx->ssl_ctx, options) & options) != options) {
+    cry(fc(ctx), "SSL_CTX_set_options (server) error: could not set options (%d)",
+        options);
+    return 0;
+  }
 
   if (ctx->config[SSL_PRIVATE_KEY_PASSWORD] != NULL) {
     SSL_CTX_set_default_passwd_cb(ctx->ssl_ctx, ssl_password_callback);
