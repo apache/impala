@@ -376,7 +376,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
         if (result != StringParser::PARSE_SUCCESS || time_ms < 0) {
           return Status(
               Substitute("$0 is not a valid wait time. Valid sizes are in [0, $1].",
-                  value, 0, numeric_limits<int32_t>::max()));
+                  value, numeric_limits<int32_t>::max()));
         }
         query_options->__set_runtime_filter_wait_time_ms(time_ms);
         break;

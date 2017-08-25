@@ -101,39 +101,6 @@ set;
 STRING, STRING
 ====
 ---- QUERY
-# IMPALA-1906: Test that SET changes PARQUET_FILE_SIZE only if it's less than 2GB.
-set parquet_file_size='1.5g';
-set;
----- RESULTS: VERIFY_IS_SUBSET
-'ABORT_ON_DEFAULT_LIMIT_EXCEEDED','0'
-'ABORT_ON_ERROR','0'
-'ALLOW_UNSUPPORTED_FORMATS','0'
-'BATCH_SIZE','0'
-'DEBUG_ACTION',''
-'DEFAULT_ORDER_BY_LIMIT','-1'
-'DISABLE_CACHED_READS','0'
-'DISABLE_CODEGEN','0'
-'DISABLE_OUTERMOST_TOPN','0'
-'EXPLAIN_LEVEL','1'
-'HBASE_CACHE_BLOCKS','0'
-'HBASE_CACHING','0'
-'MAX_ERRORS','100'
-'MAX_IO_BUFFERS','0'
-'MAX_SCAN_RANGE_LENGTH','0'
-'MEM_LIMIT','0'
-'NUM_NODES','0'
-'NUM_SCANNER_THREADS','0'
-'COMPRESSION_CODEC',''
-'PARQUET_FILE_SIZE','1610612736'
-'REQUEST_POOL',''
-'RESERVATION_REQUEST_TIMEOUT',''
-'RM_INITIAL_MEM','0'
-'SYNC_DDL','0'
-'V_CPU_CORES',''
----- TYPES
-STRING, STRING
-====
----- QUERY
 set parquet_file_size='2g'
 ---- CATCH
 The PARQUET_FILE_SIZE query option must be less than 2GB.
@@ -261,31 +228,6 @@ explain select count(distinct double_col) from functional.alltypesagg;
 '03:EXCHANGE [HASH(double_col)]'
 '01:AGGREGATE'
 '00:SCAN HDFS [functional.alltypesagg]'
-====
----- QUERY
-# IMPALA-5591: This shouldn't throw an error.
-set scratch_limit=-1;
-====
----- QUERY
-# Power of two max_row_size.
-set max_row_size=8m;
-set;
----- RESULTS: VERIFY_IS_SUBSET
-'MAX_ROW_SIZE','8388608'
----- TYPES
-STRING,STRING
-====
----- QUERY
-# Non power of two max_row_size.
-set max_row_size=12345;
-set;
----- RESULTS: VERIFY_IS_SUBSET
-'MAX_ROW_SIZE','12345'
----- TYPES
-STRING,STRING
-====
----- QUERY
-set max_row_size=8m;
 ====
 ---- QUERY
 set max_row_size=-1;
