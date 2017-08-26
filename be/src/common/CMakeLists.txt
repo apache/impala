@@ -41,12 +41,12 @@ add_custom_command(
   COMMENT "Generating the version.cc file"
   VERBATIM
 )
-add_dependencies(Common thrift-deps)
+add_dependencies(Common gen-deps)
 
 add_library(GlobalFlags
   global-flags.cc
 )
-add_dependencies(GlobalFlags thrift-deps)
+add_dependencies(GlobalFlags gen-deps)
 
 ADD_BE_TEST(atomic-test)
 

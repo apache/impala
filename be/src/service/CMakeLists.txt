@@ -36,13 +36,13 @@ add_library(Service
   child-query.cc
   impalad-main.cc
 )
-add_dependencies(Service thrift-deps)
+add_dependencies(Service gen-deps)
 
 # this shared library provides Impala executor functionality to FE test.
 add_library(fesupport SHARED
   fe-support.cc
 )
-add_dependencies(fesupport thrift-deps)
+add_dependencies(fesupport gen-deps)
 
 target_link_libraries(fesupport ${IMPALA_LINK_LIBS_DYNAMIC_TARGETS})
 

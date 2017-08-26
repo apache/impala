@@ -24,7 +24,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/experiments")
 add_library(Experiments
   data-provider.cc
 )
-add_dependencies(Experiments thrift-deps)
+add_dependencies(Experiments gen-deps)
 
 add_executable(data-provider-test data-provider-test.cc)
 add_executable(tuple-splitter-test tuple-splitter-test.cc)

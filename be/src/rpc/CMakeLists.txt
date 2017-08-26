@@ -30,7 +30,7 @@ add_library(Rpc
   thrift-server.cc
   thrift-thread.cc
 )
-add_dependencies(Rpc thrift-deps)
+add_dependencies(Rpc gen-deps)
 
 ADD_BE_TEST(thrift-util-test)
 ADD_BE_TEST(thrift-server-test)

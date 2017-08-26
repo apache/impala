@@ -349,9 +349,12 @@ add_subdirectory(be)
 add_subdirectory(fe)
 add_subdirectory(ext-data-source)
 
+# Build target for all generated files which most backend code depends on
+add_custom_target(gen-deps ALL DEPENDS thrift-deps)
+
 add_custom_target(tarballs ALL DEPENDS shell_tarball)
 
-add_custom_target(shell_tarball DEPENDS thrift-deps
+add_custom_target(shell_tarball DEPENDS gen-deps
   COMMAND "${CMAKE_SOURCE_DIR}/shell/make_shell_tarball.sh"
 )
 
@@ -360,7 +363,7 @@ add_custom_target(cscope ALL
 )
 
 if (DEFINED ENV{IMPALA_LZO} AND EXISTS $ENV{IMPALA_LZO})
-  add_custom_target(impala-lzo ALL DEPENDS thrift-deps
+  add_custom_target(impala-lzo ALL DEPENDS gen-deps
     COMMAND $ENV{IMPALA_LZO}/build.sh ${CMAKE_BUILD_TYPE} ${CMAKE_SOURCE_DIR}
     $ENV{IMPALA_TOOLCHAIN}
   )

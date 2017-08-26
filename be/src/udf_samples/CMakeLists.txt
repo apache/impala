@@ -37,15 +37,15 @@ endfunction(COMPILE_TO_IR)
 
 # Build the UDA/UDFs into a shared library.
 add_library(udfsample SHARED udf-sample.cc)
-add_dependencies(udfsample thrift-deps)
+add_dependencies(udfsample gen-deps)
 add_library(udasample SHARED uda-sample.cc hyperloglog-uda.cc)
-add_dependencies(udasample thrift-deps)
+add_dependencies(udasample gen-deps)
 
 # Custom targest to cross compile UDA/UDF to ir
 COMPILE_TO_IR(udf-sample.cc )
-add_dependencies(udf-sample-ir thrift-deps)
+add_dependencies(udf-sample-ir gen-deps)
 COMPILE_TO_IR(uda-sample.cc )
-add_dependencies(uda-sample-ir thrift-deps)
+add_dependencies(uda-sample-ir gen-deps)
 
 # This is an example of how to use the test harness to help develop UDF and UDAs.
 add_executable(udf-sample-test udf-sample-test.cc)

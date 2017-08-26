@@ -31,7 +31,7 @@ add_library(Scheduling STATIC
   scheduler-test-util.cc
   scheduler.cc
 )
-add_dependencies(Scheduling thrift-deps)
+add_dependencies(Scheduling gen-deps)
 
 ADD_BE_TEST(scheduler-test)
 ADD_BE_TEST(backend-config-test)

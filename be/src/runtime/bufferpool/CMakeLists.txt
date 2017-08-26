@@ -29,7 +29,7 @@ add_library(BufferPool
   suballocator.cc
   system-allocator.cc
 )
-add_dependencies(BufferPool thrift-deps)
+add_dependencies(BufferPool gen-deps)
 
 ADD_BE_TEST(buffer-allocator-test)
 ADD_BE_TEST(buffer-pool-test)
