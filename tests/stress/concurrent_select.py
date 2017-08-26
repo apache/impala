@@ -945,6 +945,8 @@ class QueryRunner(object):
     if "memory limit exceeded" in caught_msg or \
        "repartitioning did not reduce the size of a spilled partition" in caught_msg or \
        "failed to get minimum memory reservation" in caught_msg or \
+       "minimum memory reservation is greater than" in caught_msg or \
+       "minimum memory reservation needed is greater than" in caught_msg or \
        caught_msg == "cancelled":
       report.mem_limit_exceeded = True
       return
