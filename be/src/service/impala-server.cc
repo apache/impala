@@ -2053,19 +2053,6 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
   return Status::OK();
 }
 
-bool ImpalaServer::GetSessionIdForQuery(const TUniqueId& query_id,
-    TUniqueId* session_id) {
-  DCHECK(session_id != nullptr);
-  lock_guard<mutex> l(client_request_state_map_lock_);
-  ClientRequestStateMap::iterator i = client_request_state_map_.find(query_id);
-  if (i == client_request_state_map_.end()) {
-    return false;
-  } else {
-    *session_id = i->second->session_id();
-    return true;
-  }
-}
-
 shared_ptr<ClientRequestState> ImpalaServer::GetClientRequestState(
     const TUniqueId& query_id) {
   lock_guard<mutex> l(client_request_state_map_lock_);

@@ -720,19 +720,6 @@ void ImpalaServer::GetResultSetMetadata(TGetResultSetMetadataResp& return_val,
       request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
   VLOG_QUERY << "GetResultSetMetadata(): query_id=" << PrintId(query_id);
 
-  // Look up the session ID (which takes session_state_map_lock_) before taking the query
-  // exec state lock.
-  TUniqueId session_id;
-  if (UNLIKELY(!GetSessionIdForQuery(query_id, &session_id))) {
-    // No handle was found
-    HS2_RETURN_ERROR(return_val,
-      Substitute("Unable to find session ID for query handle: $0", PrintId(query_id)),
-      SQLSTATE_GENERAL_ERROR);
-  }
-  ScopedSessionState session_handle(this);
-  HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id),
-      SQLSTATE_GENERAL_ERROR);
-
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state.get() == nullptr)) {
     VLOG_QUERY << "GetResultSetMetadata(): invalid query handle";
@@ -740,6 +727,10 @@ void ImpalaServer::GetResultSetMetadata(TGetResultSetMetadataResp& return_val,
     HS2_RETURN_ERROR(return_val,
       Substitute("Invalid query handle: $0", PrintId(query_id)), SQLSTATE_GENERAL_ERROR);
   }
+  ScopedSessionState session_handle(this);
+  const TUniqueId session_id = request_state->session_id();
+  HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id),
+      SQLSTATE_GENERAL_ERROR);
   {
     lock_guard<mutex> l(*request_state->lock());
 

@@ -400,10 +400,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   std::shared_ptr<ClientRequestState> GetClientRequestState(
       const TUniqueId& query_id);
 
-  /// Writes the session id, if found, for the given query to the output
-  /// parameter. Returns false if no query with the given ID is found.
-  bool GetSessionIdForQuery(const TUniqueId& query_id, TUniqueId* session_id);
-
   /// Updates the number of databases / tables metrics from the FE catalog
   Status UpdateCatalogMetrics() WARN_UNUSED_RESULT;
 

@@ -262,9 +262,18 @@ class TestHS2(HS2TestSuite):
     TestHS2.check_response(get_operation_status_resp, \
         TCLIService.TStatusCode.ERROR_STATUS)
 
-    print get_operation_status_resp.status.errorMessage
     err_msg = "Invalid query handle: efcdab8967452301:3031323334353637"
     assert err_msg in get_operation_status_resp.status.errorMessage
+
+    get_result_set_metadata_req = TCLIService.TGetResultSetMetadataReq()
+    get_result_set_metadata_req.operationHandle = operation_handle
+    get_result_set_metadata_resp = \
+        self.hs2_client.GetResultSetMetadata(get_result_set_metadata_req)
+    TestHS2.check_response(get_result_set_metadata_resp, \
+        TCLIService.TStatusCode.ERROR_STATUS)
+
+    err_msg = "Invalid query handle: efcdab8967452301:3031323334353637"
+    assert err_msg in get_result_set_metadata_resp.status.errorMessage
 
   @pytest.mark.execute_serially
   def test_socket_close_forces_session_close(self):
