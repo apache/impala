@@ -350,7 +350,8 @@ void Coordinator::InitFilterRoutingTable() {
           f->src_fragment_instance_idxs()->insert(src_idxs.begin(), src_idxs.end());
 
         // target plan node of filter
-        } else if (plan_node.__isset.hdfs_scan_node) {
+        } else if (plan_node.__isset.hdfs_scan_node || 
+                   plan_node.__isset.kudu_scan_node) {
           auto it = filter.planid_to_target_ndx.find(plan_node.node_id);
           DCHECK(it != filter.planid_to_target_ndx.end());
           const TRuntimeFilterTargetDesc& t_target = filter.targets[it->second];

@@ -55,6 +55,7 @@ class RuntimeFilter {
   /// Sets the internal filter bloom_filter to 'bloom_filter'. Can only legally be called
   /// once per filter. Does not acquire the memory associated with 'bloom_filter'.
   inline void SetBloomFilter(BloomFilter* bloom_filter);
+  const BloomFilter* GetBloomFilter() const { return bloom_filter_; }
 
   /// Returns false iff 'bloom_filter_' has been set via SetBloomFilter() and hash[val] is
   /// not in that 'bloom_filter_'. Otherwise returns true. Is safe to call concurrently

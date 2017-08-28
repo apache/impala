@@ -21,6 +21,7 @@
 #include <gtest/gtest.h>
 #include <kudu/client/client.h>
 
+#include "exec/filter-context.h"
 #include "exec/scan-node.h"
 #include "runtime/descriptors.h"
 
@@ -38,7 +39,7 @@ class KuduScanNodeBase : public ScanNode {
  public:
   KuduScanNodeBase(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
   ~KuduScanNodeBase();
-
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) = 0;
@@ -56,9 +57,12 @@ class KuduScanNodeBase : public ScanNode {
   /// Returns the next scan token. Returns NULL if there are no more scan tokens.
   /// Not thread safe, access must be synchronized.
   const std::string* GetNextScanToken();
+  //Status TransformFilterToKuduBF(impala_kudu::BloomFiltersPB& kudu_bf);
+  bool WaitForRuntimeFilters(int32_t time_ms);
 
   RuntimeState* runtime_state_;
-
+  std::vector<FilterContext> filter_ctxs_;
+  std::map<std::string, BloomFilter*> col_to_bf_;
   /// Stops periodic counters and aggregates counter values for the entire scan node.
   /// This should be called as soon as the scan node is complete to get the most accurate
   /// counter values.
@@ -101,9 +105,11 @@ class KuduScanNodeBase : public ScanNode {
   /// Returns a cloned copy of the scan node's conjuncts. Requires that the expressions
   /// have been open previously.
   Status GetConjunctCtxs(vector<ExprContext*>* ctxs);
-
+  void GetSlotRefColumnName(const TExprNode& node, string* col_name);
+  Status TransformFilterToKuduBF();
   const TupleDescriptor* tuple_desc() const { return tuple_desc_; }
   kudu::client::KuduClient* kudu_client() { return client_; }
+  std::map<std::string, BloomFilter*>& kudu_bloom_filter() { return col_to_bf_; }
   RuntimeProfile::Counter* kudu_round_trips() const { return kudu_round_trips_; }
 };
 

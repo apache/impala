@@ -18,6 +18,8 @@
 #include "exec/kudu-scan-node-base.h"
 
 #include <boost/algorithm/string.hpp>
+#include <boost/foreach.hpp>
+
 #include <kudu/client/row_result.h>
 #include <kudu/client/schema.h>
 #include <kudu/client/value.h>
@@ -27,13 +29,17 @@
 #include "exec/kudu-scanner.h"
 #include "exec/kudu-util.h"
 #include "exprs/expr.h"
+#include "exprs/expr-context.h"
+#include "runtime/descriptors.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-pool.h"
 #include "runtime/query-state.h"
+#include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
+#include "util/jni-util.h"
 #include "util/periodic-counter-updater.h"
 #include "util/runtime-profile-counters.h"
 
@@ -41,6 +47,7 @@
 
 using kudu::client::KuduClient;
 using kudu::client::KuduTable;
+using boost::algorithm::join;
 
 namespace impala {
 
@@ -59,6 +66,42 @@ KuduScanNodeBase::KuduScanNodeBase(ObjectPool* pool, const TPlanNode& tnode,
 
 KuduScanNodeBase::~KuduScanNodeBase() {
   DCHECK(is_closed());
+}
+
+Status KuduScanNodeBase::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
+
+  const TQueryOptions& query_options = state->query_options();
+  for (const TRuntimeFilterDesc& filter: tnode.runtime_filters) {
+    auto it = filter.planid_to_target_ndx.find(tnode.node_id);
+    DCHECK(it != filter.planid_to_target_ndx.end());
+    const TRuntimeFilterTargetDesc& target = filter.targets[it->second];
+    if (state->query_options().runtime_filter_mode == TRuntimeFilterMode::LOCAL &&
+        !target.is_local_target) {
+      continue;
+    }
+    if (query_options.disable_row_runtime_filtering &&
+        !target.is_bound_by_partition_columns) {
+      continue;
+    }
+
+    FilterContext filter_ctx;
+    RETURN_IF_ERROR(
+        Expr::CreateExprTree(pool_, target.target_expr, &filter_ctx.expr_ctx));
+    filter_ctx.filter = state->filter_bank()->RegisterFilter(filter, false);
+
+    string filter_profile_title = Substitute("Filter $0 ($1)", filter.filter_id,
+        PrettyPrinter::Print(filter_ctx.filter->filter_size(), TUnit::BYTES));
+    RuntimeProfile* profile = state->obj_pool()->Add(
+        new RuntimeProfile(state->obj_pool(), filter_profile_title));
+    runtime_profile_->AddChild(profile);
+    filter_ctx.stats = state->obj_pool()->Add(new FilterStats(profile,
+        target.is_bound_by_partition_columns));
+
+    filter_ctxs_.push_back(filter_ctx);
+  }
+
+  return Status::OK();
 }
 
 Status KuduScanNodeBase::Prepare(RuntimeState* state) {
@@ -123,6 +166,46 @@ bool KuduScanNodeBase::HasScanToken() {
   return (next_scan_token_idx_ < scan_tokens_.size());
 }
 
+Status KuduScanNodeBase::TransformFilterToKuduBF() {
+  for (auto& filter_ctx: filter_ctxs_) {
+    auto it = filter_ctx.filter->filter_desc().planid_to_target_ndx.find(id());
+    DCHECK(it != filter_ctx.filter->filter_desc().planid_to_target_ndx.end());
+    const TRuntimeFilterTargetDesc& target = filter_ctx.filter->filter_desc().targets[it->second];
+
+    TExpr expr = target.target_expr;
+    string col_name;
+    GetSlotRefColumnName(expr.nodes[0], &col_name);
+    col_to_bf_[col_name] = const_cast<BloomFilter*>(filter_ctx.filter->GetBloomFilter());
+  }
+  return Status::OK();
+}
+
+bool KuduScanNodeBase::WaitForRuntimeFilters(int32_t time_ms) {
+  vector<string> arrived_filter_ids;
+  int32_t start = MonotonicMillis();
+  for (auto& ctx: filter_ctxs_) {
+    if (ctx.filter->WaitForArrival(time_ms)) {
+      arrived_filter_ids.push_back(Substitute("$0", ctx.filter->id()));
+    }
+  }
+  int32_t end = MonotonicMillis();
+  const string& wait_time = PrettyPrinter::Print(end - start, TUnit::TIME_MS);
+
+  if (arrived_filter_ids.size() == filter_ctxs_.size()) {
+    runtime_profile()->AddInfoString("Runtime filters",
+                                     Substitute("All filters arrived. Waited $0", wait_time));
+    VLOG_QUERY << "Filters arrived. Waited " << wait_time;
+    TransformFilterToKuduBF();
+    return true;
+  }
+
+  const string& filter_str = Substitute("Only following filters arrived: $0, waited $1",
+      join(arrived_filter_ids, ", "), wait_time);
+  runtime_profile()->AddInfoString("Runtime filters", filter_str);
+  VLOG_QUERY << filter_str;
+  return false;
+}
+
 const string* KuduScanNodeBase::GetNextScanToken() {
   if (!HasScanToken()) return nullptr;
   const string* token = &scan_tokens_[next_scan_token_idx_++];
@@ -140,5 +223,21 @@ void KuduScanNodeBase::StopAndFinalizeCounters() {
 Status KuduScanNodeBase::GetConjunctCtxs(vector<ExprContext*>* ctxs) {
   return Expr::CloneIfNotExists(conjunct_ctxs_, runtime_state_, ctxs);
 }
+
+void KuduScanNodeBase::GetSlotRefColumnName(const TExprNode& node, string* col_name) {
+  const KuduTableDescriptor* table_desc =
+      static_cast<const KuduTableDescriptor*>(tuple_desc_->table_desc());
+  TSlotId slot_id = node.slot_ref.slot_id;
+  BOOST_FOREACH(SlotDescriptor* slot, tuple_desc_->slots()) {
+    if (slot->id() == slot_id) {
+      int col_idx = slot->col_pos();
+      *col_name = table_desc->col_descs()[col_idx].name();
+      return;
+    }
+  }
+
+  DCHECK(false) << "Could not find a slot with slot id: " << slot_id;
+}
+
 
 }  // namespace impala

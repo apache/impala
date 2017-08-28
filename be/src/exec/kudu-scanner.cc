@@ -18,6 +18,7 @@
 #include "exec/kudu-scanner.h"
 
 #include <kudu/client/row_result.h>
+#include <kudu/client/value_bloomfilter.h>
 #include <thrift/protocol/TDebugProtocol.h>
 #include <vector>
 #include <string>
@@ -153,6 +154,12 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token)  {
       FLAGS_kudu_operation_timeout_ms;
   uint64_t row_format_flags = kudu::client::KuduScanner::PAD_UNIXTIME_MICROS_TO_16_BYTES;
   scanner_->SetRowFormatFlags(row_format_flags);
+
+  for (auto& kudu_bf: scan_node_->kudu_bloom_filter()) {
+    kudu::client::KuduValueBloomFilter* bf = kudu::client::KuduValueBloomFilterBuilder().Build(kudu_bf.second);
+    kudu::client::KuduPredicate* p =  scan_node_->table_->NewBloomFilterPredicate(kudu_bf.first, bf);
+    scanner_->AddConjunctPredicate(p);
+  }
 
   {
     SCOPED_TIMER(state_->total_storage_wait_timer());
