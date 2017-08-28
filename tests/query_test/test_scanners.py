@@ -298,6 +298,20 @@ class TestParquet(ImpalaTestSuite):
     vector.get_value('exec_option')['abort_on_error'] = 1
     self.run_test_case('QueryTest/parquet-zero-rows', vector, unique_database)
 
+  def test_repeated_root_schema(self, vector, unique_database):
+    """IMPALA-4826: Tests that running a scan on a schema where the root schema's
+       repetetion level is set to REPEATED succeeds without errors."""
+    self.client.execute("create table %s.repeated_root_schema (i int) "
+        "stored as parquet" % unique_database)
+    repeated_root_schema_loc = get_fs_path(
+        "/test-warehouse/%s.db/%s" % (unique_database, "repeated_root_schema"))
+    check_call(['hdfs', 'dfs', '-copyFromLocal',
+        os.environ['IMPALA_HOME'] + "/testdata/data/repeated_root_schema.parquet",
+        repeated_root_schema_loc])
+
+    result = self.client.execute("select * from %s.repeated_root_schema" % unique_database)
+    assert len(result.data) == 300
+
   def test_huge_num_rows(self, vector, unique_database):
     """IMPALA-5021: Tests that a zero-slot scan on a file with a huge num_rows in the
     footer succeeds without errors."""
