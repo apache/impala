@@ -941,13 +941,11 @@ class QueryRunner(object):
     fetch_and_set_profile(cursor, report)
     caught_msg = str(caught_exception).lower().strip()
 
-    # Exceeding a mem limit may result in the message "cancelled". See IMPALA-2234
     if "memory limit exceeded" in caught_msg or \
        "repartitioning did not reduce the size of a spilled partition" in caught_msg or \
        "failed to get minimum memory reservation" in caught_msg or \
        "minimum memory reservation is greater than" in caught_msg or \
-       "minimum memory reservation needed is greater than" in caught_msg or \
-       caught_msg == "cancelled":
+       "minimum memory reservation needed is greater than" in caught_msg:
       report.mem_limit_exceeded = True
       return
 
