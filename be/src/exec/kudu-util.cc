@@ -23,6 +23,7 @@
 
 #include <kudu/client/callbacks.h>
 #include <kudu/client/schema.h>
+#include <kudu/common/partial_row.h>
 
 #include "common/logging.h"
 #include "common/names.h"

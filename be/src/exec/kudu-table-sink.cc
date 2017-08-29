@@ -17,6 +17,7 @@
 
 #include "exec/kudu-table-sink.h"
 
+#include <kudu/client/write_op.h>
 #include <sstream>
 #include <thrift/protocol/TDebugProtocol.h>
 
