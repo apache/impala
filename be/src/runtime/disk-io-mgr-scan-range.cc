@@ -350,14 +350,14 @@ void DiskIoMgr::ScanRange::Close() {
       // Update Hedged Read Metrics.
       // We call it only if the --use_hdfs_pread flag is set, to avoid having the
       // libhdfs client malloc and free a hdfsHedgedReadMetrics object unnecessarily
-      // otherwise.
+      // otherwise. 'hedged_metrics' is only set upon success.
       struct hdfsHedgedReadMetrics* hedged_metrics;
       int success = hdfsGetHedgedReadMetrics(fs_, &hedged_metrics);
       if (success == 0) {
         ImpaladMetrics::HEDGED_READ_OPS->set_value(hedged_metrics->hedgedReadOps);
         ImpaladMetrics::HEDGED_READ_OPS_WIN->set_value(hedged_metrics->hedgedReadOpsWin);
+        hdfsFreeHedgedReadMetrics(hedged_metrics);
       }
-      hdfsFreeHedgedReadMetrics(hedged_metrics);
     }
 
     if (num_remote_bytes_ > 0) {
