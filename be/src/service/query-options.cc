@@ -67,9 +67,13 @@ void impala::TQueryOptionsToMap(const TQueryOptions& query_options,
     map<string, string>* configuration) {
 #define QUERY_OPT_FN(NAME, ENUM)\
   {\
-    stringstream val;\
-    val << query_options.NAME;\
-    (*configuration)[#ENUM] = val.str();\
+    if (query_options.__isset.NAME) { \
+      stringstream val;\
+      val << query_options.NAME;\
+      (*configuration)[#ENUM] = val.str();\
+    } else { \
+      (*configuration)[#ENUM] = ""; \
+    }\
   }
   QUERY_OPTS_TABLE
 #undef QUERY_OPT_FN

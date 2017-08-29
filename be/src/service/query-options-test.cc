@@ -135,4 +135,16 @@ TEST(QueryOptions, ParseQueryOptions) {
   }
 }
 
+TEST(QueryOptions, MapOptionalDefaultlessToEmptyString) {
+  TQueryOptions options;
+  map<string, string> map;
+
+  TQueryOptionsToMap(options, &map);
+  // No default set
+  EXPECT_EQ(map["COMPRESSION_CODEC"], "");
+  EXPECT_EQ(map["MT_DOP"], "");
+  // Has defaults
+  EXPECT_EQ(map["EXPLAIN_LEVEL"], "1");
+}
+
 IMPALA_TEST_MAIN();
