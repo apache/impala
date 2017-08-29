@@ -25,9 +25,9 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
-import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.TreeNode;
+import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.planner.PlanNode.ExecPhaseResourceProfiles;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPartitionType;
@@ -38,7 +38,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -160,13 +159,12 @@ public class PlanFragment extends TreeNode<PlanFragment> {
 
   /**
    * Do any final work to set up the ExchangeNodes and DataStreamSinks for this fragment.
-   * If this fragment is hash partitioned, ensures that the corresponding partition
-   * exprs of all hash-partitioning senders are cast to identical types.
+   * If this fragment has partitioned joins, ensures that the corresponding partition
+   * exprs of all hash-partitioning senders are cast to appropriate types.
    * Otherwise, the hashes generated for identical partition values may differ
    * among senders if the partition-expr types are not identical.
    */
-  public void finalizeExchanges(Analyzer analyzer)
-      throws InternalException, NotImplementedException {
+  public void finalizeExchanges(Analyzer analyzer) throws InternalException {
     if (destNode_ != null) {
       Preconditions.checkState(sink_ == null);
       // we're streaming to an exchange node
@@ -175,38 +173,46 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       sink_ = streamSink;
     }
 
-    if (!dataPartition_.isHashPartitioned()) return;
+    // Must be called regardless of this fragment's data partition. This fragment might
+    // be RANDOM partitioned due to a union. The union could still have partitioned joins
+    // in its child subtrees for which casts on the exchange senders are needed.
+    castPartitionedJoinExchanges(planRoot_, analyzer);
+  }
 
-    // This fragment is hash partitioned. Gather all exchange nodes and ensure
-    // that all hash-partitioning senders hash on exprs-values of the same type.
-    List<ExchangeNode> exchNodes = Lists.newArrayList();
-    planRoot_.collect(Predicates.instanceOf(ExchangeNode.class), exchNodes);
+  /**
+   * Recursively traverses the plan tree rooted at 'node' and casts the partition exprs
+   * of all senders feeding into a series of partitioned joins to compatible types.
+   */
+  private void castPartitionedJoinExchanges(PlanNode node, Analyzer analyzer) {
+    if (node instanceof HashJoinNode
+        && ((JoinNode) node).getDistributionMode() == DistributionMode.PARTITIONED) {
+      // Contains all exchange nodes in this fragment below the current join node.
+      List<ExchangeNode> exchNodes = Lists.newArrayList();
+      node.collect(ExchangeNode.class, exchNodes);
 
-    // Contains partition-expr lists of all hash-partitioning sender fragments.
-    List<List<Expr>> senderPartitionExprs = Lists.newArrayList();
-    for (ExchangeNode exchNode: exchNodes) {
-      Preconditions.checkState(!exchNode.getChildren().isEmpty());
-      PlanFragment senderFragment = exchNode.getChild(0).getFragment();
-      Preconditions.checkNotNull(senderFragment);
-      if (!senderFragment.getOutputPartition().isHashPartitioned()) continue;
-      List<Expr> partExprs = senderFragment.getOutputPartition().getPartitionExprs();
-      // All hash-partitioning senders must have compatible partition exprs, otherwise
-      // this fragment's data partition must not be hash partitioned.
-      Preconditions.checkState(
-          partExprs.size() == dataPartition_.getPartitionExprs().size());
-      senderPartitionExprs.add(partExprs);
-    }
+      // Contains partition-expr lists of all hash-partitioning sender fragments.
+      List<List<Expr>> senderPartitionExprs = Lists.newArrayList();
+      for (ExchangeNode exchNode: exchNodes) {
+        Preconditions.checkState(!exchNode.getChildren().isEmpty());
+        PlanFragment senderFragment = exchNode.getChild(0).getFragment();
+        Preconditions.checkNotNull(senderFragment);
+        if (!senderFragment.getOutputPartition().isHashPartitioned()) continue;
+        List<Expr> partExprs = senderFragment.getOutputPartition().getPartitionExprs();
+        senderPartitionExprs.add(partExprs);
+      }
 
-    // Cast all corresponding hash partition exprs of all hash-partitioning senders
-    // to their compatible types. Also cast the data partition's exprs for consistency,
-    // although not strictly necessary. They should already be type identical to the
-    // exprs of one of the senders and they are not directly used for hashing in the BE.
-    senderPartitionExprs.add(dataPartition_.getPartitionExprs());
-    try {
-      analyzer.castToUnionCompatibleTypes(senderPartitionExprs);
-    } catch (AnalysisException e) {
-      // Should never happen. Analysis should have ensured type compatibility already.
-      throw new IllegalStateException(e);
+      // Cast partition exprs of all hash-partitioning senders to their compatible types.
+      try {
+        analyzer.castToUnionCompatibleTypes(senderPartitionExprs);
+      } catch (AnalysisException e) {
+        // Should never happen. Analysis should have ensured type compatibility already.
+        throw new IllegalStateException(e);
+      }
+    } else {
+      // Recursively traverse plan nodes in this fragment.
+      for (PlanNode child: node.getChildren()) {
+        if (child.getFragment() == this) castPartitionedJoinExchanges(child, analyzer);
+      }
     }
   }
 
