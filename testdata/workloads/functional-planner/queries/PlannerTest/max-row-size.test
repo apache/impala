@@ -150,7 +150,7 @@ from tpch_parquet.lineitem
 group by 1, 2
 having count(*) = 1
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=110.00MB
+Max Per-Host Resource Reservation: Memory=111.00MB
 Per-Host Resource Estimates: Memory=251.12MB
 
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -176,11 +176,11 @@ Per-Host Resources: mem-estimate=46.00MB mem-reservation=46.00MB
 |  tuple-ids=2 row-size=33B cardinality=4690314
 |
 F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=85.12MB mem-reservation=64.00MB
+Per-Host Resources: mem-estimate=85.12MB mem-reservation=65.00MB
 03:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: l_orderkey, o_orderstatus
-|  mem-estimate=54.12MB mem-reservation=33.00MB spill-buffer=2.00MB
+|  mem-estimate=54.12MB mem-reservation=34.00MB spill-buffer=2.00MB
 |  tuple-ids=2 row-size=33B cardinality=4690314
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -224,7 +224,7 @@ Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
 select distinct *
 from tpch_parquet.lineitem
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=79.00MB
+Max Per-Host Resource Reservation: Memory=80.00MB
 Per-Host Resource Estimates: Memory=3.31GB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -248,10 +248,10 @@ Per-Host Resources: mem-estimate=1.62GB mem-reservation=46.00MB
 |  tuple-ids=1 row-size=263B cardinality=6001215
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=1.69GB mem-reservation=33.00MB
+Per-Host Resources: mem-estimate=1.69GB mem-reservation=34.00MB
 01:AGGREGATE [STREAMING]
 |  group by: tpch_parquet.lineitem.l_orderkey, tpch_parquet.lineitem.l_partkey, tpch_parquet.lineitem.l_suppkey, tpch_parquet.lineitem.l_linenumber, tpch_parquet.lineitem.l_quantity, tpch_parquet.lineitem.l_extendedprice, tpch_parquet.lineitem.l_discount, tpch_parquet.lineitem.l_tax, tpch_parquet.lineitem.l_returnflag, tpch_parquet.lineitem.l_linestatus, tpch_parquet.lineitem.l_shipdate, tpch_parquet.lineitem.l_commitdate, tpch_parquet.lineitem.l_receiptdate, tpch_parquet.lineitem.l_shipinstruct, tpch_parquet.lineitem.l_shipmode, tpch_parquet.lineitem.l_comment
-|  mem-estimate=1.62GB mem-reservation=33.00MB spill-buffer=2.00MB
+|  mem-estimate=1.62GB mem-reservation=34.00MB spill-buffer=2.00MB
 |  tuple-ids=1 row-size=263B cardinality=6001215
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
@@ -268,7 +268,7 @@ select l_orderkey, l_partkey, group_concat(l_linestatus, ",")
 from tpch_parquet.lineitem
 group by 1, 2
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=81.00MB
+Max Per-Host Resource Reservation: Memory=82.00MB
 Per-Host Resource Estimates: Memory=482.91MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -293,11 +293,11 @@ Per-Host Resources: mem-estimate=201.46MB mem-reservation=48.00MB
 |  tuple-ids=1 row-size=32B cardinality=6001215
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=281.46MB mem-reservation=33.00MB
+Per-Host Resources: mem-estimate=281.46MB mem-reservation=34.00MB
 01:AGGREGATE [STREAMING]
 |  output: group_concat(l_linestatus, ',')
 |  group by: l_orderkey, l_partkey
-|  mem-estimate=201.46MB mem-reservation=33.00MB spill-buffer=2.00MB
+|  mem-estimate=201.46MB mem-reservation=34.00MB spill-buffer=2.00MB
 |  tuple-ids=1 row-size=32B cardinality=6001215
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]

@@ -1319,3 +1319,15 @@ select 1 from functional_parquet.alltypes having count(*) > 1
 ---- TYPES
 tinyint
 ====
+---- QUERY
+# IMPALA-5855: pre-aggregation does not reserve enough memory with 2MB buffers.
+# The pre-aggregation in this query is estimated to consume enough memory for the planner
+# to use 2MB buffers.
+set debug_action="-1:PREPARE:SET_DENY_RESERVATION_PROBABILITY@1.0";
+select count(*) from (
+    select distinct l_orderkey, l_comment from tpch_parquet.lineitem) v
+---- RESULTS
+6001198
+---- TYPES
+bigint
+====

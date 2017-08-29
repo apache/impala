@@ -323,10 +323,12 @@ public class AggregationNode extends PlanNode {
       if (useStreamingPreagg_) {
         // We can execute a streaming preagg without any buffers by passing through rows,
         // but that is a very low performance mode of execution if the aggregation reduces
-        // its input significantly. Instead reserve memory for one buffer and 64kb of hash
-        // tables per partition. We don't need to reserve memory for large rows since they
-        // can be passed through if needed.
-        perInstanceMinReservation = (bufferSize + 64 * 1024) * PARTITION_FANOUT;
+        // its input significantly. Instead reserve memory for one buffer per partition
+        // and at least 64kb for hash tables per partition. We must reserve at least one
+        // full buffer for hash tables for the suballocator to subdivide. We don't need to
+        // reserve memory for large rows since they can be passed through if needed.
+        perInstanceMinReservation = bufferSize * PARTITION_FANOUT +
+            Math.max(64 * 1024 * PARTITION_FANOUT, bufferSize);
       } else {
         long minBuffers = PARTITION_FANOUT + 1 + (aggInfo_.needsSerialize() ? 1 : 0);
         // Two of the buffers need to be buffers large enough to hold the maximum-sized

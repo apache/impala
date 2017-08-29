@@ -5,7 +5,7 @@ select distinct * from functional_parquet.alltypesagg
 ---- CATCH
 minimum memory reservation is greater than memory available to the
  query for buffer reservations. Memory reservation needed given the
- current plan: 67.00 MB. Set mem_limit to at least 142.00 MB.
+ current plan: 68.00 MB. Set mem_limit to at least 143.00 MB.
 ====
 ---- QUERY
 set mem_limit=150mb;
@@ -13,14 +13,14 @@ select distinct * from functional_parquet.alltypesagg
 ---- CATCH
 minimum memory reservation needed is greater than pool max mem resources.
  Pool max mem resources: 10.00 MB.
- Cluster-wide memory reservation needed: 201.00 MB
+ Cluster-wide memory reservation needed: 204.00 MB
 ====
 ---- QUERY
 set buffer_pool_limit=10mb;
 select distinct * from functional_parquet.alltypesagg
 ---- CATCH
 minimum memory reservation is greater than memory available to the query
- for buffer reservations. Increase the buffer_pool_limit to 67.00 MB.
+ for buffer reservations. Increase the buffer_pool_limit to 68.00 MB.
 ====
 ---- QUERY
 set mem_limit=1024;
