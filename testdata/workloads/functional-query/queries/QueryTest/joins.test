@@ -730,3 +730,44 @@ t1.timestamp_col = cast(t2.d4 as TIMESTAMP);
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# IMPALA-5850: Tests that the sender partition exprs of a series of partitioned hash
+# joins are cast to compatible types even when the containing fragment is RANDOM
+# partitioned due a union. This test borrows ideas from existing tests for IMPALA-1123.
+# The test has a union with three branches where each branch contains independent and
+# incompatible hash-partitioning exchanges. Two of the union branches contain
+# partitioned joins which require the sender partition exprs to be cast to produce
+# correct results.
+# Breakdown of result count:
+# The first union branch is expected to produce 2 rows
+# The second union branch is expected to produce 11200 rows (see IMPALA-1123 test)
+# The third union branch is expected to produce 10 rows
+select count(*) from (
+  select distinct tinyint_col, smallint_col, int_col
+  from functional.alltypestiny
+  union all
+  select /* +straight_join */ b.id, c.tinyint_col, null
+  from functional.alltypessmall a
+  inner join /* +shuffle */
+    (select /* +straight_join */ t2.id, t2.smallint_col
+     from functional.alltypessmall t1
+     inner join /* +shuffle */ functional.alltypessmall t2
+     on t1.tinyint_col = t2.smallint_col) b
+  on a.int_col = b.smallint_col
+  inner join /* +shuffle */
+    (select distinct tinyint_col
+     from functional.alltypessmall) c
+  on a.int_col = c.tinyint_col
+  union all
+  select /* +straight_join */ tinyint_col, bigint_col, null from
+    (select distinct tinyint_col, bigint_col div 10 as bigint_col
+     from functional.alltypessmall) a
+  inner join /* +shuffle */
+    (select distinct int_col, smallint_col
+     from functional.alltypessmall) b
+  on a.tinyint_col = b.int_col and a.bigint_col = b.smallint_col) v
+---- RESULTS
+11212
+---- TYPES
+BIGINT
+====
