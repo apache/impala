@@ -95,11 +95,11 @@ Per-Host Resources: mem-estimate=384.00MB mem-reservation=102.00MB
 |  tuple-ids=1 row-size=16B cardinality=unavailable
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
-Per-Host Resources: mem-estimate=432.00MB mem-reservation=99.00MB
+Per-Host Resources: mem-estimate=432.00MB mem-reservation=102.00MB
 01:AGGREGATE [STREAMING]
 |  output: count(int_col)
 |  group by: bigint_col
-|  mem-estimate=128.00MB mem-reservation=33.00MB spill-buffer=2.00MB
+|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB
 |  tuple-ids=1 row-size=16B cardinality=unavailable
 |
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
