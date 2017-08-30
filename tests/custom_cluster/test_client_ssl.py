@@ -111,10 +111,11 @@ class TestClientSsl(CustomClusterTestSuite):
 
   # Test that the shell can connect to a TLS1.2 only cluster, and for good measure
   # restrict the cipher suite to just one choice.
-  TLS_V12_ARGS = ("--ssl_server_certificate=%s/wildcard-cert.pem "
-                  "--ssl_private_key=%s/wildcard-cert.key "
+  TLS_V12_ARGS = ("--ssl_client_ca_certificate=%s/server-cert.pem "
+                  "--ssl_server_certificate=%s/server-cert.pem "
+                  "--ssl_private_key=%s/server-key.pem "
+                  "--hostname=localhost " # Required to match hostname in certificate"
                   "--ssl_minimum_version=tlsv1.2 "
-                  "--ssl_client_ca_certificate=%s/wildcardCA.pem "
                   "--ssl_cipher_list=AES128-GCM-SHA256 "
                   % (CERT_DIR, CERT_DIR, CERT_DIR))
 
@@ -124,13 +125,14 @@ class TestClientSsl(CustomClusterTestSuite):
                                     catalogd_args=TLS_V12_ARGS)
   @pytest.mark.skipif(HAS_LEGACY_OPENSSL, reason=SKIP_SSL_MSG)
   def test_tls_v12(self, vector):
-    self._validate_positive_cases("%s/wildcardCA.pem" % self.CERT_DIR)
+    self._validate_positive_cases("%s/server-cert.pem" % self.CERT_DIR)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=SSL_WILDCARD_ARGS,
                                     statestored_args=SSL_WILDCARD_ARGS,
                                     catalogd_args=SSL_WILDCARD_ARGS)
   @pytest.mark.skipif(HAS_LEGACY_OPENSSL, reason=SKIP_SSL_MSG)
+  @pytest.mark.xfail(run=True, reason="Inconsistent wildcard support on target platforms")
   def test_wildcard_ssl(self, vector):
     """ Test for IMPALA-3159: Test with a certificate which has a wildcard for the
     CommonName.
@@ -144,6 +146,7 @@ class TestClientSsl(CustomClusterTestSuite):
                                     statestored_args=SSL_WILDCARD_SAN_ARGS,
                                     catalogd_args=SSL_WILDCARD_SAN_ARGS)
   @pytest.mark.skipif(HAS_LEGACY_OPENSSL, reason=SKIP_SSL_MSG)
+  @pytest.mark.xfail(run=True, reason="Inconsistent wildcard support on target platforms")
   def test_wildcard_san_ssl(self, vector):
     """ Test for IMPALA-3159: Test with a certificate which has a wildcard as a SAN. """
 
