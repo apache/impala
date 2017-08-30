@@ -143,6 +143,9 @@ under the License.
   <keydef href="http://www.lzop.org/" scope="external" format="html" keys="lzop.org"/>
 
 <!-- Links to Wikipedia pages for background on industry terminology. -->
+  <keydef href="https://en.wikipedia.org/wiki/Base64" scope="external" format="html" keys="base64">
+    <topicmeta><linktext>Base64 article on Wikipedia</linktext></topicmeta>
+  </keydef>
   <keydef href="http://en.wikipedia.org/wiki/.htpasswd" scope="external" format="html" keys=".htpasswd"/>
   <keydef href="http://en.wikipedia.org/wiki/Coordinated_Universal_Time" scope="external" format="html" keys="Coordinated_Universal_Time"/>
   <keydef href="http://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function" scope="external" format="html" keys="wiki_fnv"/>

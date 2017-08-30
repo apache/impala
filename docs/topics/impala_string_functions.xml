@@ -85,6 +85,59 @@ under the License.
 
       </dlentry>
 
+      <dlentry id="base64decode" rev="2.6.0 IMPALA-2107">
+
+        <dt>
+          <codeph>base64decode(string str)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="hidden">base64decode() function</indexterm>
+          <b>Purpose:</b>
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            For general information about Base64 encoding, see
+            <xref keyref="base64"/>.
+          </p>
+          <p conref="../shared/impala_common.xml#common/base64_use_cases"/>
+          <p conref="../shared/impala_common.xml#common/base64_charset"/>
+          <p conref="../shared/impala_common.xml#common/base64_alignment"/>
+          <p conref="../shared/impala_common.xml#common/base64_error_handling"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p conref="../shared/impala_common.xml#common/base64_examples"/>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="base64encode" rev="2.6.0 IMPALA-2107">
+
+        <dt>
+          <codeph>base64encode(string str)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="hidden">base64encode() function</indexterm>
+          <b>Purpose:</b>
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            For general information about Base64 encoding, see
+            <xref keyref="base64"/>.
+          </p>
+          <p conref="../shared/impala_common.xml#common/base64_use_cases"/>
+          <p conref="../shared/impala_common.xml#common/base64_charset"/>
+          <p conref="../shared/impala_common.xml#common/base64_alignment"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p conref="../shared/impala_common.xml#common/base64_examples"/>
+        </dd>
+
+      </dlentry>
+
       <dlentry rev="2.3.0" id="btrim">
 
         <dt>
