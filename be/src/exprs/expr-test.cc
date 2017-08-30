@@ -2261,6 +2261,47 @@ TEST_F(ExprTest, DecimalArithmeticExprs) {
   }
 }
 
+// Tests for expressions that mix decimal and non-decimal arguments with DECIMAL_V2=false.
+TEST_F(ExprTest, DecimalV1MixedArithmeticExprs) {
+  executor_->PushExecOption("DECIMAL_V2=false");
+  // IMPALA-3437: decimal constants are implicitly converted to double.
+  TestValue("10.0 + 3", TYPE_DOUBLE, 13.0);
+  TestValue("10 + 3.0", TYPE_DOUBLE, 13.0);
+  TestValue("10.0 - 3", TYPE_DOUBLE, 7.0);
+  TestValue("10.0 * 3", TYPE_DOUBLE, 30.0);
+  TestValue("10.0 / 3", TYPE_DOUBLE, 10.0 / 3);
+  // Conversion to DOUBLE loses some precision.
+  TestValue("0.999999999999999999999999999999 = 1", TYPE_BOOLEAN, true);
+  TestValue("0.999999999999999999999999999999 != 1", TYPE_BOOLEAN, false);
+  TestValue("0.999999999999999999999999999999 < 1", TYPE_BOOLEAN, false);
+  TestValue("0.999999999999999999999999999999 >= 1", TYPE_BOOLEAN, true);
+  TestValue("0.999999999999999999999999999999 > 1", TYPE_BOOLEAN, false);
+  executor_->PopExecOption();
+}
+
+// Tests the same expressions as above with DECIMAL_V2=true.
+TEST_F(ExprTest, DecimalV2MixedArithmeticExprs) {
+  executor_->PushExecOption("DECIMAL_V2=true");
+  // IMPALA-3437: decimal constants remain decimal.
+  TestDecimalValue(
+      "10.0 + 3", Decimal4Value(130), ColumnType::CreateDecimalType(5, 1));
+  TestDecimalValue(
+      "10 + 3.0", Decimal4Value(130), ColumnType::CreateDecimalType(5, 1));
+  TestDecimalValue(
+      "10.0 - 3", Decimal4Value(70), ColumnType::CreateDecimalType(5, 1));
+  TestDecimalValue(
+      "10.0 * 3", Decimal4Value(300), ColumnType::CreateDecimalType(6, 1));
+  TestDecimalValue(
+      "10.0 / 3", Decimal4Value(3333333), ColumnType::CreateDecimalType(8, 6));
+  // Comparisons between DECIMAL values are precise.
+  TestValue("0.999999999999999999999999999999 = 1", TYPE_BOOLEAN, false);
+  TestValue("0.999999999999999999999999999999 != 1", TYPE_BOOLEAN, true);
+  TestValue("0.999999999999999999999999999999 < 1", TYPE_BOOLEAN, true);
+  TestValue("0.999999999999999999999999999999 >= 1", TYPE_BOOLEAN, false);
+  TestValue("0.999999999999999999999999999999 > 1", TYPE_BOOLEAN, false);
+  executor_->PopExecOption();
+}
+
 // There are two tests of ranges, the second of which requires a cast
 // of the second operand to a higher-resolution type.
 TEST_F(ExprTest, BinaryPredicates) {

@@ -510,8 +510,12 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * Converts numeric literal in the expr tree rooted at this expr to return floating
-   * point types instead of decimals, if possible.
+   * DECIMAL_V1:
+   * ----------
+   * This function applies a heuristic that casts literal child exprs of this expr from
+   * decimal to floating point in certain circumstances to reduce processing cost. In
+   * earlier versions of Impala's decimal support, it was much slower than floating point
+   * arithmetic. The original rationale for the automatic casting follows.
    *
    * Decimal has a higher processing cost than floating point and we should not pay
    * the cost if the user does not require the accuracy. For example:
@@ -524,14 +528,19 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    *
    * Another way to think about it is that DecimalLiterals are analyzed as returning
    * decimals (of the narrowest precision/scale) and we later convert them to a floating
-   * point type when it is consistent with the user's intent.
+   * point type according to a heuristic that attempts to guess what the user intended.
    *
-   * TODO: another option is to do constant folding in the FE and then apply this rule.
+   * DECIMAL_V2:
+   * ----------
+   * This function does nothing. All decimal numeric literals are interpreted as decimals
+   * and the normal expression typing rules apply.
    */
   protected void convertNumericLiteralsFromDecimal(Analyzer analyzer)
       throws AnalysisException {
     Preconditions.checkState(this instanceof ArithmeticExpr ||
         this instanceof BinaryPredicate);
+    // This heuristic conversion is not part of DECIMAL_V2.
+    if (analyzer.getQueryOptions().isDecimal_v2()) return;
     if (children_.size() == 1) return; // Do not attempt to convert for unary ops
     Preconditions.checkState(children_.size() == 2);
     Type t0 = getChild(0).getType();
