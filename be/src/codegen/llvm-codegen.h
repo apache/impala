@@ -62,10 +62,9 @@ namespace llvm {
     class PassManager;
   }
 
-  template<bool B, typename T, typename I>
+  template<typename T, typename I>
   class IRBuilder;
 
-  template<bool preserveName>
   class IRBuilderDefaultInserter;
 }
 

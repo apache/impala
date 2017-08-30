@@ -499,15 +499,16 @@ void FunctionContextImpl::SetNonConstantArgs(NonConstantArgsVector&& non_constan
 
 // Note: this function crashes LLVM's JIT in expr-test if it's xcompiled. Do not move to
 // expr-ir.cc. This could probably use further investigation.
-StringVal::StringVal(FunctionContext* context, int len) noexcept : len(len), ptr(NULL) {
-  if (UNLIKELY(len > StringVal::MAX_LENGTH)) {
+StringVal::StringVal(FunctionContext* context, int str_len) noexcept : len(str_len),
+                                                                       ptr(NULL) {
+  if (UNLIKELY(str_len > StringVal::MAX_LENGTH)) {
     context->SetError("String length larger than allowed limit of "
                       "1 GB character data.");
     len = 0;
     is_null = true;
   } else {
-    ptr = context->impl()->AllocateLocal(len);
-    if (UNLIKELY(ptr == NULL && len > 0)) {
+    ptr = context->impl()->AllocateLocal(str_len);
+    if (UNLIKELY(ptr == NULL && str_len > 0)) {
 #ifndef IMPALA_UDF_SDK_BUILD
       assert(!context->impl()->state()->GetQueryStatus().ok());
 #endif

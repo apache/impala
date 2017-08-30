@@ -20,6 +20,8 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <unordered_set>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/thread/mutex.hpp>
 #include <gutil/strings/substitute.h>
@@ -251,9 +253,9 @@ Status LlvmCodeGen::LoadModuleFromMemory(unique_ptr<MemoryBuffer> module_ir_buf,
     string module_name, unique_ptr<Module>* module) {
   DCHECK(!module_name.empty());
   SCOPED_TIMER(prepare_module_timer_);
-  ErrorOr<unique_ptr<Module>> tmp_module(NULL);
   COUNTER_ADD(module_bitcode_size_, module_ir_buf->getMemBufferRef().getBufferSize());
-  tmp_module = getLazyBitcodeModule(std::move(module_ir_buf), context(), false);
+  ErrorOr<unique_ptr<Module>> tmp_module =
+      getLazyBitcodeModule(std::move(module_ir_buf), context(), false);
   if (!tmp_module) {
     stringstream ss;
     ss << "Could not parse module " << module_name << ": " << tmp_module.getError();
@@ -444,7 +446,7 @@ string LlvmCodeGen::GetIR(bool full_module) const {
     module_->print(stream, NULL);
   } else {
     for (int i = 0; i < codegend_functions_.size(); ++i) {
-      codegend_functions_[i]->print(stream, true);
+      codegend_functions_[i]->print(stream, nullptr, false, true);
     }
   }
   return str;
@@ -970,9 +972,8 @@ Function* LlvmCodeGen::CloneFunction(Function* fn) {
   // GetFunction() to obtain the Function object.
   DCHECK(!fn->isMaterializable());
   // CloneFunction() automatically gives the new function a unique name
-  Function* fn_clone = llvm::CloneFunction(fn, dummy_vmap, false);
+  Function* fn_clone = llvm::CloneFunction(fn, dummy_vmap);
   fn_clone->copyAttributesFrom(fn);
-  module_->getFunctionList().push_back(fn_clone);
   return fn_clone;
 }
 
@@ -1117,13 +1118,16 @@ Status LlvmCodeGen::OptimizeModule() {
   // global dead code elimination pass. This causes all functions not registered to be
   // JIT'd to be marked as internal, and any internal functions that are not used are
   // deleted by DCE pass. This greatly decreases compile time by removing unused code.
-  vector<const char*> exported_fn_names;
-  for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
-    exported_fn_names.push_back(fns_to_jit_compile_[i].first->getName().data());
+  unordered_set<string> exported_fn_names;
+  for (auto& entry : fns_to_jit_compile_) {
+    exported_fn_names.insert(entry.first->getName().str());
   }
   unique_ptr<legacy::PassManager> module_pass_manager(new legacy::PassManager());
   module_pass_manager->add(createTargetTransformInfoWrapperPass(target_analysis));
-  module_pass_manager->add(createInternalizePass(exported_fn_names));
+  module_pass_manager->add(
+      createInternalizePass([&exported_fn_names] (const GlobalValue &gv) {
+        return exported_fn_names.find(gv.getName().str()) != exported_fn_names.end();
+      }));
   module_pass_manager->add(createGlobalDCEPass());
   module_pass_manager->run(*module_);
 

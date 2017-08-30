@@ -122,7 +122,8 @@ void BenchmarkFunction(int num_iterations, void* data) {
   TestCtx* test_ctx = static_cast<TestCtx*>(data);
   for (int i = 0; i < num_iterations; ++i) {
     test_ctx->result->Reset();
-    test_ctx->scheduler_wrapper->Compute(test_ctx->result.get());
+    Status status = test_ctx->scheduler_wrapper->Compute(test_ctx->result.get());
+    if (!status.ok()) LOG(FATAL) << status.GetDetail();
   }
 }
 

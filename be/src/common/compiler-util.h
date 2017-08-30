@@ -55,7 +55,7 @@
 
 /// GCC 5+ and Clang 3.6+ support __has_cpp_attribute(). Always return false on compilers
 /// that don't know about __has_cpp_attribute().
-#if !defined(__GNUC__) || __GNUC__ >= 5
+#if defined(__clang__) || __GNUC__ >= 5
 #define HAS_CPP_ATTRIBUTE(attr) __has_cpp_attribute(attr)
 #else
 #define HAS_CPP_ATTRIBUTE(attr) 0

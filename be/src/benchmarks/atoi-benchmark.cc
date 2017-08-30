@@ -108,7 +108,7 @@ inline int32_t AtoiUnrolled(char* s, int len) {
     bool negative = false;
     switch (*s) {
       case '-': negative = true;
-      case '+': --len, ++s;
+      case '+': --len; ++s;
     }
 
     switch(len) {
@@ -141,7 +141,7 @@ inline int32_t AtoiCased(char* s, int len) {
     bool negative = false;
     switch (*s) {
       case '-': negative = true;
-      case '+': --len, ++s;
+      case '+': --len; ++s;
     }
 
     switch(len) {
