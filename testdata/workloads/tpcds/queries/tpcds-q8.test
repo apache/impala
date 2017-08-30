@@ -6,7 +6,7 @@ select
 from
   store_sales
   join store on (store_sales.ss_store_sk = store.s_store_sk)
-  join 
+  join
   (select
     a.ca_zip
   from
@@ -22,8 +22,8 @@ from
       ca_zip
     having
       count(*) > 10
-    ) a 
-    left semi join 
+    ) a
+    left semi join
     (select
       substr(ca_zip, 1, 5) ca_zip
     from
@@ -66,7 +66,7 @@ where
 group by
   s_store_name
 order by
-  s_store_name 
+  s_store_name
 limit 100
 ---- RESULTS
 ---- TYPES

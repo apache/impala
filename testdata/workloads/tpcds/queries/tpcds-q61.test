@@ -1,6 +1,8 @@
 ====
 ---- QUERY: TPCDS-Q61
-select promotions,total,cast(promotions as decimal(15,4))/cast(total as decimal(15,4))*100
+-- RESULT MISMATCH FROM ORIGINAL in DECIMAL value
+-- FIXED. CAST RESULT QUOTIENT TO DECIMAL(15, 4), TAKE ACTUAL RESULT AS EXPECTED
+select promotions,total,cast(promotions*100.00/total as decimal(15,4))
 from
   (select sum(ss_ext_sales_price) promotions
    from  store_sales
@@ -41,7 +43,7 @@ from
    and   d_moy  = 1) all_sales
 order by promotions, total
 ---- RESULTS
-969445.96,1772143.56,54.70470800909605765700
+969445.96,1772143.56,54.7047
 ---- TYPES
 DECIMAL, DECIMAL, DECIMAL
 ====
