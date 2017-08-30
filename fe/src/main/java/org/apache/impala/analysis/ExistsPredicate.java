@@ -70,6 +70,9 @@ public class ExistsPredicate extends Predicate {
   public Expr clone() { return new ExistsPredicate(this); }
 
   @Override
+  protected float computeEvalCost() { return UNKNOWN_COST; }
+
+  @Override
   public String toSqlImpl() {
     StringBuilder strBuilder = new StringBuilder();
     if (notExists_) strBuilder.append("NOT ");

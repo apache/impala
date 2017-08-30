@@ -47,7 +47,6 @@ public class StringLiteral extends LiteralExpr {
   public StringLiteral(String value, Type type, boolean needsUnescaping) {
     value_ = value;
     type_ = type;
-    evalCost_ = LITERAL_COST;
     needsUnescaping_ = needsUnescaping;
   }
 

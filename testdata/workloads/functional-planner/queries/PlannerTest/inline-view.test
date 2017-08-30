@@ -215,7 +215,7 @@ PLAN-ROOT SINK
 |
 |--01:SCAN HDFS [functional.alltypessmall]
 |     partitions=2/4 files=2 size=3.17KB
-|     predicates: functional.alltypessmall.id + 15 = 27, functional.alltypessmall.string_col = '15'
+|     predicates: functional.alltypessmall.string_col = '15', functional.alltypessmall.id + 15 = 27
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=5/11 files=5 size=372.38KB
@@ -235,7 +235,7 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
 |     partitions=2/4 files=2 size=3.17KB
-|     predicates: functional.alltypessmall.id + 15 = 27, functional.alltypessmall.string_col = '15'
+|     predicates: functional.alltypessmall.string_col = '15', functional.alltypessmall.id + 15 = 27
 |
 03:EXCHANGE [HASH(id,int_col)]
 |

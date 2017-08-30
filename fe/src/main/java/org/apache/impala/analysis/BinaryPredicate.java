@@ -228,19 +228,20 @@ public class BinaryPredicate extends Predicate {
         selectivity_ = Math.max(0, Math.min(1, selectivity_));
       }
     }
+  }
 
-    // Compute cost.
-    if (hasChildCosts()) {
-      if (getChild(0).getType().isFixedLengthType()) {
-        evalCost_ = getChildCosts() + BINARY_PREDICATE_COST;
-      } else if (getChild(0).getType().isStringType()) {
-        evalCost_ = getChildCosts() +
-            (float) (getAvgStringLength(getChild(0)) + getAvgStringLength(getChild(1)) *
-            BINARY_PREDICATE_COST);
-      } else {
-        //TODO(tmarshall): Handle other var length types here.
-        evalCost_ = getChildCosts() + VAR_LEN_BINARY_PREDICATE_COST;
-      }
+  @Override
+  protected float computeEvalCost() {
+    if (!hasChildCosts()) return UNKNOWN_COST;
+    if (getChild(0).getType().isFixedLengthType()) {
+      return getChildCosts() + BINARY_PREDICATE_COST;
+    } else if (getChild(0).getType().isStringType()) {
+      return getChildCosts() +
+          (float) (getAvgStringLength(getChild(0)) + getAvgStringLength(getChild(1))) *
+              BINARY_PREDICATE_COST;
+    } else {
+      //TODO(tmarshall): Handle other var length types here.
+      return getChildCosts() + VAR_LEN_BINARY_PREDICATE_COST;
     }
   }
 

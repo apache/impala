@@ -569,9 +569,12 @@ public class FunctionCallExpr extends Expr {
     if (type_.isWildcardChar() || type_.isWildcardVarchar()) {
       type_ = ScalarType.STRING;
     }
+  }
 
+  @Override
+  protected float computeEvalCost() {
     // TODO(tmarshall): Differentiate based on the specific function.
-    if (hasChildCosts()) evalCost_ = getChildCosts() + FUNCTION_CALL_COST;
+    return hasChildCosts() ? getChildCosts() + FUNCTION_CALL_COST : UNKNOWN_COST;
   }
 
   public FunctionCallExpr getMergeAggInputFn() { return mergeAggInputFn_; }

@@ -111,7 +111,6 @@ public class SlotRef extends Expr {
       // HMS string.
       throw new AnalysisException("Unsupported type in '" + toSql() + "'.");
     }
-    evalCost_ = SLOT_REF_COST;
 
     numDistinctValues_ = desc_.getStats().getNumDistinctValues();
     Table rootTable = resolvedPath.getRootTable();
@@ -119,6 +118,11 @@ public class SlotRef extends Expr {
       // The NDV cannot exceed the #rows in the table.
       numDistinctValues_ = Math.min(numDistinctValues_, rootTable.getNumRows());
     }
+  }
+
+  @Override
+  protected float computeEvalCost() {
+    return SLOT_REF_COST;
   }
 
   @Override

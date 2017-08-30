@@ -35,8 +35,6 @@ import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.util.TColumnValueUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
@@ -553,6 +551,9 @@ public class AnalyticExpr extends Expr {
 
     setChildren();
   }
+
+  @Override
+  protected float computeEvalCost() { return UNKNOWN_COST; }
 
   /**
    * If necessary, rewrites the analytic function, window, and/or order-by elements into

@@ -26,7 +26,6 @@ import java.util.ListIterator;
 import java.util.Set;
 
 import org.apache.impala.analysis.BinaryPredicate.Operator;
-import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
@@ -86,6 +85,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public final static float LITERAL_COST = 1;
   public final static float SLOT_REF_COST = 1;
   public final static float TIMESTAMP_ARITHMETIC_COST = 5;
+  public final static float UNKNOWN_COST = -1;
 
   // To be used when estimating the cost of Exprs of type string where we don't otherwise
   // have an estimate of how long the strings produced by that Expr are.
@@ -341,6 +341,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
     // Do all the analysis for the expr subclass before marking the Expr analyzed.
     analyzeImpl(analyzer);
+    evalCost_ = computeEvalCost();
     analysisDone();
   }
 
@@ -362,6 +363,12 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       throw new IllegalStateException(e);
     }
   }
+
+  /**
+   * Compute and return evalcost of this expr given the evalcost of all children has been
+   * computed. Should be called bottom-up whenever the structure of subtree is modified.
+   */
+  abstract protected float computeEvalCost();
 
   protected void computeNumDistinctValues() {
     if (isConstant()) {

@@ -66,6 +66,7 @@ public class CastExpr extends Expr {
     try {
       analyze();
       computeNumDistinctValues();
+      evalCost_ = computeEvalCost();
     } catch (AnalysisException ex) {
       Preconditions.checkState(false,
           "Implicit casts should never throw analysis exception.");
@@ -205,9 +206,12 @@ public class CastExpr extends Expr {
     analyze();
   }
 
-  private void analyze() throws AnalysisException {
-    if (getChild(0).hasCost()) evalCost_ = getChild(0).getCost() + CAST_COST;
+  @Override
+  protected float computeEvalCost() {
+    return getChild(0).hasCost() ? getChild(0).getCost() + CAST_COST : UNKNOWN_COST;
+  }
 
+  private void analyze() throws AnalysisException {
     Preconditions.checkNotNull(type_);
     if (type_.isComplexType()) {
       throw new AnalysisException(

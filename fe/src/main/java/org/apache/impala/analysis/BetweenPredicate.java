@@ -57,6 +57,9 @@ public class BetweenPredicate extends Predicate {
     analyzer.castAllToCompatibleType(children_);
   }
 
+  @Override
+  protected float computeEvalCost() { return UNKNOWN_COST; }
+
   public boolean isNotBetween() { return isNotBetween_; }
 
   @Override
