@@ -38,9 +38,8 @@ Testing/
 llvm-ir/
 shell/gen-py/
 shell/build/
-tests/build
-tests/results
-tests/test-hive-udfs/target/
+benchmark_results*.json
+target
 
 avro_schemas/
 logs/

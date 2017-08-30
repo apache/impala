@@ -6,6 +6,11 @@ build
 generated-sources/**/*
 src/common/version.cc
 src/kudu/util/protoc-gen-insertions
+src/kudu/rpc/protoc-gen-krpc
+*.proxy.h
+*.proxy.cc
+*.service.h
+*.service.cc
 *.pb.h
 *.pb.cc
 

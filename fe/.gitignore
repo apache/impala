@@ -4,6 +4,7 @@ target
 .classpath
 .settings
 .project
+*.launch
 
 # IntelliJ artifacts
 .idea

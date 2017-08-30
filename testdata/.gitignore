@@ -19,7 +19,7 @@ target
 HBaseAllTypesError
 HBaseAllTypesErrorNoNulls
 
-# Impala test data (not in repo, manually copied)
+# Impala test data (not in repo, manually copied or linked)
 impala-data
 data/test-warehouse
 
