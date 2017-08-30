@@ -219,6 +219,16 @@ class TimestampParser {
   static bool ParseDateTime(const char* str, int str_len,
       const DateTimeFormatContext& dt_ctx, DateTimeParseResult* dt_result);
 
+  /// Helper function finding the correct century for 1 or 2 digit year according to
+  /// century break. Throws bad_year, bad_day_of_month, or bad_day_month if the date is
+  /// invalid. The century break behavior is copied from Java SimpleDateFormat in order to
+  /// be consistent with Hive.
+  /// In SimpleDateFormat, the century for 2-digit-year breaks at current_time - 80 years.
+  /// https://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
+  static boost::gregorian::date RealignYear(const DateTimeParseResult& dt_result,
+      const DateTimeFormatContext& dt_ctx, int day_offset,
+      const boost::posix_time::time_duration& t);
+
   /// Check if the string is a TimeZone offset token.
   /// Valid offset token format are 'hh:mm', 'hhmm', 'hh'.
   static bool IsValidTZOffset(const char* str_begin, const char* str_end);
