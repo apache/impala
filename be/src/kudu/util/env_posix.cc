@@ -626,7 +626,7 @@ class PosixWritableFile : public WritableFile {
                          Status::IOError(Env::kInjectedFailureStatusMsg));
     TRACE_EVENT1("io", "PosixWritableFile::Flush", "path", filename_);
     ThreadRestrictions::AssertIOAllowed();
-#if defined(__linux__)
+#if defined(HAVE_SYNC_FILE_RANGE)
     int flags = SYNC_FILE_RANGE_WRITE;
     if (mode == FLUSH_SYNC) {
       flags |= SYNC_FILE_RANGE_WAIT_BEFORE;
@@ -762,7 +762,7 @@ class PosixRWFile : public RWFile {
                          Status::IOError(Env::kInjectedFailureStatusMsg));
     TRACE_EVENT1("io", "PosixRWFile::Flush", "path", filename_);
     ThreadRestrictions::AssertIOAllowed();
-#if defined(__linux__)
+#if defined(HAVE_SYNC_FILE_RANGE)
     int flags = SYNC_FILE_RANGE_WRITE;
     if (mode == FLUSH_SYNC) {
       flags |= SYNC_FILE_RANGE_WAIT_AFTER;

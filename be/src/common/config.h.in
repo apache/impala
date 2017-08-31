@@ -29,5 +29,6 @@
 #cmakedefine HAVE_MAGIC_H
 #cmakedefine HAVE_KRB5_IS_CONFIG_PRINCIPAL
 #cmakedefine HAVE_KRB5_GET_INIT_CREDS_OPT_SET_OUT_CCACHE
+#cmakedefine HAVE_SYNC_FILE_RANGE
 
 #endif

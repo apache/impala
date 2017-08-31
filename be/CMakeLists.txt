@@ -312,6 +312,7 @@ EXECUTE_PROCESS(COMMAND ln ${MORE_ARGS} -sf ${BUILD_OUTPUT_ROOT_DIRECTORY}
 INCLUDE(CheckFunctionExists)
 CHECK_FUNCTION_EXISTS(sched_getcpu HAVE_SCHED_GETCPU)
 CHECK_FUNCTION_EXISTS(pipe2 HAVE_PIPE2)
+CHECK_FUNCTION_EXISTS(sync_file_range HAVE_SYNC_FILE_RANGE)
 
 # linux/fs.h defines HAVE_FALLOCATE whether or not the function is available,
 # which is why we use IMPALA_HAVE_FALLOCATE here.
