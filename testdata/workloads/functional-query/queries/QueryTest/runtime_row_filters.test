@@ -301,3 +301,21 @@ from alltypes a join [SHUFFLE] alltypessmall c
 ---- RESULTS
 108
 ====
+
+
+---- QUERY
+###################################################
+# Test case 14: filter with expression that uses local allocations.
+# IMPALA-5885: the parquet scanner should free local allocations from upper()/lower().
+# mem_limit is calibrated so that the query fails if allocations are not freed.
+###################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=100000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET MEM_LIMIT=200MB;
+select straight_join count(*)
+from tpch_parquet.lineitem l1 join tpch_parquet.lineitem l2
+    on lower(upper(lower(upper(lower(l1.l_comment))))) = concat(l2.l_comment, 'foo')
+---- RESULTS
+0
+====

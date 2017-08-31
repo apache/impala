@@ -459,12 +459,7 @@ void HdfsScanNode::ScannerThread() {
 
 exit:
   runtime_state_->resource_pool()->ReleaseThreadToken(false);
-  if (filter_status.ok()) {
-    for (auto& ctx: filter_ctxs) {
-      ctx.expr_eval->FreeLocalAllocations();
-      ctx.expr_eval->Close(runtime_state_);
-    }
-  }
+  for (auto& ctx: filter_ctxs) ctx.expr_eval->Close(runtime_state_);
   filter_mem_pool.FreeAll();
 }
 

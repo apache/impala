@@ -1029,11 +1029,18 @@ Status HdfsParquetScanner::CommitRows(RowBatch* dst_batch, int num_rows) {
   // Store UDF error in thread local storage or make UDF return status so it can merge
   // with parse_status_.
   RETURN_IF_ERROR(state_->GetQueryStatus());
-  // Free local expr allocations for this thread
+  // Free local expr allocations made when evaluating conjuncts for this batch.
+  FreeLocalAllocationsForConjuncts();
+  return Status::OK();
+}
+
+void HdfsParquetScanner::FreeLocalAllocationsForConjuncts() {
   for (const auto& kv: conjunct_evals_map_) {
     ScalarExprEvaluator::FreeLocalAllocations(kv.second);
   }
-  return Status::OK();
+  for (const FilterContext* filter_ctx : filter_ctxs_) {
+    filter_ctx->expr_eval->FreeLocalAllocations();
+  }
 }
 
 int HdfsParquetScanner::TransferScratchTuples(RowBatch* dst_batch) {
