@@ -830,8 +830,7 @@ public class AnalyticExpr extends Expr {
   }
 
   @Override
-  protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer)
-      throws AnalysisException {
+  protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer) {
     Expr e = super.substituteImpl(smap, analyzer);
     if (!(e instanceof AnalyticExpr)) return e;
     // Re-sync state after possible child substitution.

@@ -618,8 +618,7 @@ public class FunctionCallExpr extends Expr {
   public Expr clone() { return new FunctionCallExpr(this); }
 
   @Override
-  protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer)
-      throws AnalysisException {
+  protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer) {
     Expr e = super.substituteImpl(smap, analyzer);
     if (!(e instanceof FunctionCallExpr)) return e;
     FunctionCallExpr fn = (FunctionCallExpr) e;

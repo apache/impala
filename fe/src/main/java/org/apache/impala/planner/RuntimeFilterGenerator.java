@@ -36,6 +36,8 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.TupleIsNullPredicate;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.thrift.TRuntimeFilterDesc;
@@ -581,20 +583,21 @@ public final class RuntimeFilterGenerator {
       }
       Preconditions.checkState(exprSlots.size() == smap.size());
       try {
-        targetExpr = targetExpr.substitute(smap, analyzer, true);
+        targetExpr = targetExpr.substitute(smap, analyzer, false);
       } catch (Exception e) {
-        // An exception is thrown if we cannot generate a target expr from this
-        // scan node that has the same type as the lhs expr of the join predicate
-        // from which the runtime filter was generated. We skip that scan node and will
-        // try to assign the filter to a different scan node.
-        //
-        // TODO: Investigate if we can generate a type-compatible source/target expr
-        // pair from that scan node instead of skipping it.
         return null;
       }
     }
-    Preconditions.checkState(
-        targetExpr.getType().matchesType(filter.getSrcExpr().getType()));
+    Type srcType = filter.getSrcExpr().getType();
+    // Types of targetExpr and srcExpr must be exactly the same since runtime filters are
+    // based on hashing.
+    if (!targetExpr.getType().equals(srcType)) {
+      try {
+        targetExpr = targetExpr.castTo(srcType);
+      } catch (Exception e) {
+        return null;
+      }
+    }
     return targetExpr;
   }
 }
