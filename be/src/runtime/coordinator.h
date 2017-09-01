@@ -363,12 +363,17 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   void CancelInternal();
 
   /// Acquires lock_ and updates query_status_ with 'status' if it's not already
-  /// an error status, and returns the current query_status_.
+  /// an error status, and returns the current query_status_. The status may be
+  /// due to an error in a specific fragment instance, or it can be a general error
+  /// not tied to a specific fragment instance.
   /// Calls CancelInternal() when switching to an error status.
-  /// failed_fragment is the fragment_id that has failed, used for error reporting along
-  /// with instance_hostname.
-  Status UpdateStatus(const Status& status, const TUniqueId& failed_fragment,
-      const std::string& instance_hostname) WARN_UNUSED_RESULT;
+  /// When an error is due to a specific fragment instance, 'is_fragment_failure' must
+  /// be true and 'failed_fragment' is the fragment_id that has failed, used for error
+  /// reporting. For a general error not tied to a specific instance,
+  /// 'is_fragment_failure' must be false and 'failed_fragment' will be ignored.
+  /// 'backend_hostname' is used for error reporting in either case.
+  Status UpdateStatus(const Status& status, const std::string& backend_hostname,
+      bool is_fragment_failure, const TUniqueId& failed_fragment) WARN_UNUSED_RESULT;
 
   /// Update per_partition_status_ and files_to_move_.
   void UpdateInsertExecStatus(const TInsertExecStatus& insert_exec_status);

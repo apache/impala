@@ -211,9 +211,12 @@ void Coordinator::BackendState::Exec(
   VLOG_FILE << "rpc succeeded: ExecQueryFInstances query_id=" << PrintId(query_id_);
 }
 
-Status Coordinator::BackendState::GetStatus(TUniqueId* failed_instance_id) {
+Status Coordinator::BackendState::GetStatus(bool* is_fragment_failure,
+    TUniqueId* failed_instance_id) {
   lock_guard<mutex> l(lock_);
+  DCHECK_EQ(is_fragment_failure == nullptr, failed_instance_id == nullptr);
   if (!status_.ok() && failed_instance_id != nullptr) {
+    *is_fragment_failure = is_fragment_failure_;
     *failed_instance_id = failed_instance_id_;
   }
   return status_;
@@ -278,6 +281,7 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
       if (status_.ok() || status_.IsCancelled()) {
         status_ = instance_status;
         failed_instance_id_ = instance_exec_status.fragment_instance_id;
+        is_fragment_failure_ = true;
       }
     }
     DCHECK_GT(num_remaining_instances_, 0);
@@ -300,6 +304,14 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
       // TODO: We're losing this profile information. Call ReportQuerySummary only after
       // all backends have completed.
     }
+  }
+
+  // status_ has incorporated the status from all fragment instances. If the overall
+  // backend status is not OK, but no specific fragment instance reported an error, then
+  // this is a general backend error. Incorporate the general error into status_.
+  Status overall_backend_status(backend_exec_status.status);
+  if (!overall_backend_status.ok() && (status_.ok() || status_.IsCancelled())) {
+    status_ = overall_backend_status;
   }
 
   // Log messages aggregated by type

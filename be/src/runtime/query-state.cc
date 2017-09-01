@@ -207,6 +207,7 @@ void QueryState::ReportExecStatusAux(bool done, const Status& status,
   params.__set_query_id(query_ctx().query_id);
   DCHECK(rpc_params().__isset.coord_state_idx);
   params.__set_coord_state_idx(rpc_params().coord_state_idx);
+  status.SetTStatus(&params);
 
   if (fis != nullptr) {
     // create status for 'fis'

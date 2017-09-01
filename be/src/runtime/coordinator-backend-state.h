@@ -90,9 +90,19 @@ class Coordinator::BackendState {
   /// if cancellation was attempted, false otherwise.
   bool Cancel();
 
-  /// Return the overall execution status. For an error status, also return the id
-  /// of the instance that caused that status, if failed_instance_id != nullptr.
-  Status GetStatus(TUniqueId* failed_instance_id = nullptr) WARN_UNUSED_RESULT;
+  /// Return the overall execution status. For an error status, the error could come
+  /// from the fragment instance level or it can be a general error from the backend
+  /// (with no specific fragment responsible). For a caller to distinguish between
+  /// these errors and to determine the specific fragment instance (if applicable),
+  /// both 'is_fragment_failure' and 'failed_instance_id' must be non-null.
+  /// A general error will set *is_fragment_failure to false and leave
+  /// failed_instance_id untouched.
+  /// A fragment-specific error will set *is_fragment_failure to true and set
+  /// *failed_instance_id to the id of the fragment instance that failed.
+  /// If the caller does not need this information, both 'is_fragment_failure' and
+  /// 'failed_instance_id' must be omitted (using the default value of nullptr).
+  Status GetStatus(bool* is_fragment_failure = nullptr,
+      TUniqueId* failed_instance_id = nullptr) WARN_UNUSED_RESULT;
 
   /// Return peak memory consumption.
   int64_t GetPeakConsumption();
@@ -198,6 +208,11 @@ class Coordinator::BackendState {
   /// executing impalad (which then reported the error) or cancellation has been
   /// initiated; either way, execution must not be cancelled.
   Status status_;
+
+  /// Used to distinguish between errors reported by a specific fragment instance,
+  /// which would set failed_instance_id_, rather than an error independent of any
+  /// specific fragment.
+  bool is_fragment_failure_ = false;
 
   /// Id of the first fragment instance that reports an error status.
   /// Invalid if no fragment instance has reported an error status.

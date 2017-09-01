@@ -471,8 +471,8 @@ Status Coordinator::GetStatus() {
   return query_status_;
 }
 
-Status Coordinator::UpdateStatus(const Status& status, const TUniqueId& instance_id,
-    const string& instance_hostname) {
+  Status Coordinator::UpdateStatus(const Status& status, const string& backend_hostname,
+     bool is_fragment_failure, const TUniqueId& instance_id) {
   {
     lock_guard<mutex> l(lock_);
 
@@ -490,10 +490,14 @@ Status Coordinator::UpdateStatus(const Status& status, const TUniqueId& instance
     CancelInternal();
   }
 
-  // Log the id of the fragment that first failed so we can track it down more easily.
-  VLOG_QUERY << "Query id=" << query_id() << " failed because instance id="
-             << instance_id << " on host=" << instance_hostname << " failed.";
-
+  if (is_fragment_failure) {
+    // Log the id of the fragment that first failed so we can track it down more easily.
+    VLOG_QUERY << "Query id=" << query_id() << " failed because instance id="
+               << instance_id << " on host=" << backend_hostname << " failed.";
+  } else {
+    VLOG_QUERY << "Query id=" << query_id() << " failed due to error on host="
+               << backend_hostname;
+  }
   return query_status_;
 }
 
@@ -822,8 +826,8 @@ Status Coordinator::Wait() {
 
   if (stmt_type_ == TStmtType::QUERY) {
     DCHECK(coord_instance_ != nullptr);
-    return UpdateStatus(coord_instance_->WaitForOpen(),
-        runtime_state()->fragment_instance_id(), FLAGS_hostname);
+    return UpdateStatus(coord_instance_->WaitForOpen(), FLAGS_hostname, true,
+        runtime_state()->fragment_instance_id());
   }
 
   DCHECK_EQ(stmt_type_, TStmtType::DML);
@@ -867,8 +871,8 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos) {
   // if there was an error, we need to return the query's error status rather than
   // the status we just got back from the local executor (which may well be CANCELLED
   // in that case).  Coordinator fragment failed in this case so we log the query_id.
-  RETURN_IF_ERROR(
-      UpdateStatus(status, runtime_state()->fragment_instance_id(), FLAGS_hostname));
+  RETURN_IF_ERROR(UpdateStatus(status, FLAGS_hostname, true,
+      runtime_state()->fragment_instance_id()));
 
   if (*eos) {
     returned_all_results_ = true;
@@ -950,11 +954,13 @@ Status Coordinator::UpdateBackendExecStatus(const TReportExecStatusParams& param
     // true (UpdateStatus() initiates cancellation, if it hasn't already been)
     // TODO: clarify control flow here, it's unclear we should even process this status
     // report if returned_all_results_ is true
+    bool is_fragment_failure;
     TUniqueId failed_instance_id;
-    Status status = backend_state->GetStatus(&failed_instance_id);
+    Status status = backend_state->GetStatus(&is_fragment_failure, &failed_instance_id);
     if (!status.ok() && !returned_all_results_) {
-      Status ignored = UpdateStatus(status, failed_instance_id,
-          TNetworkAddressToString(backend_state->impalad_address()));
+      Status ignored =
+          UpdateStatus(status, TNetworkAddressToString(backend_state->impalad_address()),
+              is_fragment_failure, failed_instance_id);
       return Status::OK();
     }
 
