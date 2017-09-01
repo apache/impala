@@ -6157,6 +6157,21 @@ TEST_F(ExprTest, TimestampFunctions) {
 
   // last_day udf test for IMPALA-5316
   TestLastDayFunction();
+
+  // Test microsecond unix time conversion functions.
+  TestValue("utc_to_unix_micros(\"1400-01-01 00:00:00\")", TYPE_BIGINT,
+      -17987443200000000);
+  TestValue("utc_to_unix_micros(\"1970-01-01 00:00:00\")", TYPE_BIGINT,
+      0);
+  TestValue("utc_to_unix_micros(\"9999-01-01 23:59:59.9999999\")", TYPE_BIGINT,
+      253370851200000000);
+
+  TestStringValue("cast(unix_micros_to_utc_timestamp(-17987443200000000) as string)",
+      "1400-01-01 00:00:00");
+  TestIsNull("unix_micros_to_utc_timestamp(-17987443200000001)", TYPE_TIMESTAMP);
+  TestStringValue("cast(unix_micros_to_utc_timestamp(253402300799999999) as string)",
+      "9999-12-31 23:59:59.999999000");
+  TestIsNull("unix_micros_to_utc_timestamp(253402300800000000)", TYPE_TIMESTAMP);
 }
 
 TEST_F(ExprTest, ConditionalFunctions) {

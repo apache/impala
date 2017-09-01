@@ -40,7 +40,7 @@ struct DateTimeFormatContext;
 
 /// Represents either a (1) date and time, (2) a date with an undefined time, or (3)
 /// a time with an undefined date. In all cases, times have up to nanosecond resolution
-/// and the minimum and maximum dates are 1400-01-01 and 10000-12-31.
+/// and the minimum and maximum dates are 1400-01-01 and 9999-12-31.
 //
 /// This type is similar to Postgresql TIMESTAMP WITHOUT TIME ZONE datatype and MySQL's
 /// DATETIME datatype. Note that because TIMESTAMP does not contain time zone
@@ -73,10 +73,14 @@ class TimestampValue {
   TimestampValue(const boost::gregorian::date& d,
       const boost::posix_time::time_duration& t)
       : time_(t),
-        date_(d) {}
+        date_(d) {
+    Validate();
+  }
   TimestampValue(const boost::posix_time::ptime& t)
       : time_(t.time_of_day()),
-        date_(t.date()) {}
+        date_(t.date()) {
+    Validate();
+  }
   TimestampValue(const TimestampValue& tv) : time_(tv.time_), date_(tv.date_) {}
 
   /// Constructors that parse from a date/time string. See TimestampParser for details
@@ -165,8 +169,8 @@ class TimestampValue {
 
   std::string ToString() const;
 
-  /// Verifies that the timestamp date falls into a valid range (years 1400..9999).
-  inline bool IsValidDate() const {
+  /// Verifies that the date falls into a valid range (years 1400..9999).
+  static inline bool IsValidDate(const boost::gregorian::date& date) {
     // Smallest valid day number.
     const static int64_t MIN_DAY_NUMBER = static_cast<int64_t>(
         boost::gregorian::date(boost::date_time::min_date_time).day_number());
@@ -174,8 +178,8 @@ class TimestampValue {
     const static int64_t MAX_DAY_NUMBER = static_cast<int64_t>(
         boost::gregorian::date(boost::date_time::max_date_time).day_number());
 
-    return date_.day_number() >= MIN_DAY_NUMBER
-        && date_.day_number() <= MAX_DAY_NUMBER;
+    return date.day_number() >= MIN_DAY_NUMBER
+        && date.day_number() <= MAX_DAY_NUMBER;
   }
 
   /// Formats the timestamp using the given date/time context and places the result in the
@@ -275,6 +279,9 @@ class TimestampValue {
 
   /// 4 -bytes - stores the date as a day
   boost::gregorian::date date_;
+
+  /// Sets both date and time to invalid if date is outside the valid range.
+  void Validate();
 
   /// Return a ptime representation of the given Unix time (seconds since the Unix epoch).
   /// The time zone of the resulting ptime is determined by

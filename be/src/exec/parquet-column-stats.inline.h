@@ -127,7 +127,7 @@ inline bool ColumnStats<TimestampValue>::DecodePlainValue(
   // statistics written by Hive / old versions of parquet-mr. Should Hive add support for
   // writing new statistics for the deprecated timestamp type, we will have to add support
   // for conversion here.
-  return result->IsValidDate();
+  return TimestampValue::IsValidDate(result->date());
 }
 
 /// parquet::Statistics stores string values directly and does not use plain encoding.

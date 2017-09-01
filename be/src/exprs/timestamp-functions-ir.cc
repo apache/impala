@@ -329,7 +329,6 @@ StringVal TimestampFunctions::ToDate(FunctionContext* context,
   // Defensively, return NULL if the timestamp does not have a date portion. Some of
   // our built-in functions might incorrectly return such a malformed timestamp.
   if (!ts_value.HasDate()) return StringVal::null();
-  DCHECK(ts_value.IsValidDate());
   StringVal result(context, 10);
   result.len = 10;
   // Fill in year, month, and day.

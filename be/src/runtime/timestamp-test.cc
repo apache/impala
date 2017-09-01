@@ -661,6 +661,16 @@ TEST(TimestampTest, Basic) {
   EXPECT_FALSE(too_early.HasTime());
   EXPECT_FALSE(too_early.UtcToUnixTimeMicros(&tm_min_micros));
 
+  // Sub-second FromUnixTime functions incorrectly accepted the last second of 1399
+  // as valid, because validation logic checked the nearest second rounded towards 0
+  // (IMPALA-5664).
+  EXPECT_FALSE(TimestampValue::FromSubsecondUnixTime(
+      MIN_DATE_AS_UNIX_TIME - 0.1).HasDate());
+  EXPECT_FALSE(TimestampValue::UtcFromUnixTimeMicros(
+      MIN_DATE_AS_UNIX_TIME * MICROS_PER_SEC - 2000).HasDate());
+  EXPECT_FALSE(TimestampValue::FromUnixTimeNanos(
+      MIN_DATE_AS_UNIX_TIME, -NANOS_PER_MICRO * 100).HasDate());
+
   // Test the max supported date that can be represented in seconds.
   const int64_t MAX_DATE_AS_UNIX_TIME = 253402300799;
   TimestampValue max_date =
@@ -699,6 +709,22 @@ TEST(TimestampTest, Basic) {
   TimestampValue too_late = TimestampValue::FromUnixTime(MAX_DATE_AS_UNIX_TIME + 1);
   EXPECT_FALSE(too_late.HasDate());
   EXPECT_FALSE(too_late.HasTime());
+
+  // Checking sub-second FromUnixTime functions near 10000.01.01
+  EXPECT_TRUE(TimestampValue::FromSubsecondUnixTime(
+      MAX_DATE_AS_UNIX_TIME + 0.99).HasDate());
+  EXPECT_FALSE(TimestampValue::FromSubsecondUnixTime(
+      MAX_DATE_AS_UNIX_TIME + 1).HasDate());
+
+  EXPECT_TRUE(TimestampValue::UtcFromUnixTimeMicros(
+      MAX_DATE_AS_UNIX_TIME * MICROS_PER_SEC + MICROS_PER_SEC - 1).HasDate());
+  EXPECT_FALSE(TimestampValue::UtcFromUnixTimeMicros(
+      MAX_DATE_AS_UNIX_TIME * MICROS_PER_SEC + MICROS_PER_SEC).HasDate());
+
+  EXPECT_TRUE(TimestampValue::FromUnixTimeNanos(
+      MAX_DATE_AS_UNIX_TIME, NANOS_PER_SEC - 1).HasDate());
+  EXPECT_FALSE(TimestampValue::FromUnixTimeNanos(
+      MAX_DATE_AS_UNIX_TIME, NANOS_PER_SEC).HasDate());
 
   // Regression tests for IMPALA-1676, Unix times overflow int32 during year 2038
   EXPECT_EQ("2038-01-19 03:14:08",

@@ -2718,6 +2718,88 @@ TIMESTAMP
 UDF WARNING: Cannot subtract interval 1: Year is out of valid range: 1400..9999
 ====
 ---- QUERY
+# Test <1400 date handling during double to timestamp conversion.
+select CAST(CAST(CAST('1400-01-01' AS TIMESTAMP) AS DOUBLE) - 0.1 AS TIMESTAMP)
+---- RESULTS
+NULL
+---- TYPES
+TIMESTAMP
+====
+---- QUERY
+# Test >=10000 date handling during double to timestamp conversion.
+select CAST(CAST(CAST('9999-12-31 23:59:59' AS TIMESTAMP) AS DOUBLE) + 1.1 AS TIMESTAMP)
+---- RESULTS
+NULL
+---- TYPES
+TIMESTAMP
+====
+---- QUERY
+# Test <1400 date handling during bigint to timestamp conversion.
+select CAST(CAST(CAST('1400-01-01' AS TIMESTAMP) AS BIGINT) - 1 AS TIMESTAMP)
+---- RESULTS
+NULL
+---- TYPES
+TIMESTAMP
+====
+---- QUERY
+# Test >=10000 date handling during bigint to timestamp conversion.
+select CAST(CAST(CAST('9999-12-31 23:59:59' AS TIMESTAMP) AS BIGINT) + 1 AS TIMESTAMP)
+---- RESULTS
+NULL
+---- TYPES
+TIMESTAMP
+====
+---- QUERY
+# Test <1400 date handling during microsecond unix time to timestamp conversion.
+select unix_micros_to_utc_timestamp(
+  CAST(CAST('1400-01-01' AS TIMESTAMP) AS BIGINT) * 1000000 - 1)
+---- RESULTS
+NULL
+---- TYPES
+TIMESTAMP
+====
+---- QUERY
+# Test >=10000 date handling during microsecond unix time to timestamp conversion.
+select unix_micros_to_utc_timestamp(
+  (CAST(CAST('9999-12-31 23:59:59' AS TIMESTAMP) AS BIGINT) + 1) * 1000000 + 1)
+---- RESULTS
+NULL
+---- TYPES
+TIMESTAMP
+====
+---- QUERY
+# Test <1400 date handling during string to timestamp conversion.
+select CAST("1399-12-31 23:59:59.99999" AS TIMESTAMP);
+---- RESULTS
+NULL
+---- TYPES
+TIMESTAMP
+====
+---- QUERY
+# Test >=10000 date handling during string to timestamp conversion.
+select CAST("10000-01-01" AS TIMESTAMP);
+---- RESULTS
+NULL
+---- TYPES
+TIMESTAMP
+====
+---- QUERY
+# Test leap year checking during string to timestamp conversion.
+select CAST("1900-02-29" AS TIMESTAMP);
+---- RESULTS
+NULL
+---- TYPES
+TIMESTAMP
+====
+---- QUERY
+# Test invalid format handling during string to timestamp conversion.
+select CAST("not a timestamp" AS TIMESTAMP);
+---- RESULTS
+NULL
+---- TYPES
+TIMESTAMP
+====
+---- QUERY
 # IMPALA-4574: UUID() is not a constant expression.
 select count(*) from functional.alltypestiny group by concat(uuid(), "_test")
 ---- RESULTS

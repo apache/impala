@@ -622,7 +622,7 @@ inline bool ScalarColumnReader<TimestampValue, true>::NeedsValidationInline() co
 template<>
 bool ScalarColumnReader<TimestampValue, true>::ValidateSlot(
     TimestampValue* src, Tuple* tuple) const {
-  if (UNLIKELY(!src->IsValidDate())) {
+  if (UNLIKELY(!TimestampValue::IsValidDate(src->date()))) {
     ErrorMsg msg(TErrorCode::PARQUET_TIMESTAMP_OUT_OF_RANGE,
         filename(), node_.element->name);
     Status status = parent_->state_->LogOrReturnError(msg);
