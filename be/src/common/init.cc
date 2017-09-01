@@ -45,6 +45,7 @@
 #include "util/network-util.h"
 #include "util/openssl-util.h"
 #include "util/os-info.h"
+#include "util/periodic-counter-updater.h"
 #include "util/pretty-printer.h"
 #include "util/redactor.h"
 #include "util/test-info.h"
@@ -208,6 +209,8 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
       new Thread("common", "log-maintenance-thread", &LogMaintenanceThread));
 
   pause_monitor.reset(new Thread("common", "pause-monitor", &PauseMonitorLoop));
+
+  PeriodicCounterUpdater::Init();
 
   LOG(INFO) << impala::GetVersionString();
   LOG(INFO) << "Using hostname: " << FLAGS_hostname;

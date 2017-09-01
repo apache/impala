@@ -44,6 +44,10 @@ class PeriodicCounterUpdater {
     SAMPLING_COUNTER,
   };
 
+  // Sets up data structures and starts the counter update thread. Should only be called
+  // once during process startup and must be called before other methods.
+  static void Init();
+
   /// Registers a periodic counter to be updated by the update thread.
   /// Either sample_fn or dst_counter must be non-NULL.  When the periodic counter
   /// is updated, it either gets the value from the dst_counter or calls the sample
@@ -96,10 +100,6 @@ class PeriodicCounterUpdater {
     /// TODO: customize bucketing
   };
 
-  // Starts the counter update thread. We only have a single static object, so this
-  // is executed automatically when the process starts up.
-  PeriodicCounterUpdater();
-
   /// Loop for periodic counter update thread.  This thread wakes up once in a while
   /// and updates all the added rate counters and sampling counters.
   [[noreturn]] void UpdateLoop();
@@ -140,7 +140,7 @@ class PeriodicCounterUpdater {
 
   /// Singleton object that keeps track of all rate counters and the thread
   /// for updating them.
-  static PeriodicCounterUpdater state_;
+  static PeriodicCounterUpdater* instance_;
 };
 
 }
