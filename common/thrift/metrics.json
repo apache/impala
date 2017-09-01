@@ -1114,16 +1114,16 @@
     "key": "tcmalloc.total-bytes-reserved"
   },
   {
-    "description": "Bytes allocated from Address Sanitizer's malloc (Address Sanitizer debug builds only)",
+    "description": "Bytes allocated from the sanitizer malloc (Sanitizer debug builds only)",
     "contexts": [
       "STATESTORE",
       "CATALOGSERVER",
       "IMPALAD"
     ],
-    "label": "Address Sanitizer Malloc Bytes Allocated",
+    "label": "Sanitizer Malloc Bytes Allocated",
     "units": "BYTES",
     "kind": "GAUGE",
-    "key": "asan-total-bytes-allocated"
+    "key": "sanitizer-total-bytes-allocated"
   },
   {
     "description": "Maximum allowed bytes allocated by the buffer pool.",

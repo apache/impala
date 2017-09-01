@@ -23,7 +23,7 @@
 #include <boost/bind.hpp>
 #include <boost/thread/mutex.hpp>
 #include <gperftools/malloc_extension.h>
-#ifdef ADDRESS_SANITIZER
+#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
 #include <sanitizer/allocator_interface.h>
 #endif
 
@@ -125,7 +125,7 @@ class TcmallocMetric : public IntGauge {
       : IntGauge(def, 0), tcmalloc_var_(tcmalloc_var) { }
 
   virtual void CalculateValue() {
-#ifndef ADDRESS_SANITIZER
+#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
     DCHECK_EQ(sizeof(size_t), sizeof(value_));
     MallocExtension::instance()->GetNumericProperty(tcmalloc_var_.c_str(),
         reinterpret_cast<size_t*>(&value_));
@@ -133,15 +133,15 @@ class TcmallocMetric : public IntGauge {
   }
 };
 
-/// Alternative to TCMallocMetric if we're running under Address Sanitizer, which
-/// does not provide the same metrics.
-class AsanMallocMetric : public IntGauge {
+/// Alternative to TCMallocMetric if we're running under a sanitizer that replaces
+/// malloc(), e.g. address or thread sanitizer.
+class SanitizerMallocMetric : public IntGauge {
  public:
-  AsanMallocMetric(const TMetricDef& def) : IntGauge(def, 0) {}
-  static AsanMallocMetric* BYTES_ALLOCATED;
+  SanitizerMallocMetric(const TMetricDef& def) : IntGauge(def, 0) {}
+  static SanitizerMallocMetric* BYTES_ALLOCATED;
  private:
   virtual void CalculateValue() override {
-#ifdef ADDRESS_SANITIZER
+#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
     value_ = __sanitizer_get_current_allocated_bytes();
 #endif
   }

@@ -137,17 +137,15 @@ static scoped_ptr<impala::Thread> pause_monitor;
       BufferPool* buffer_pool = env->buffer_pool();
       if (buffer_pool != nullptr) buffer_pool->Maintenance();
 
-#ifndef ADDRESS_SANITIZER
-      // When using tcmalloc, the process limit as measured by our trackers will
-      // be out of sync with the process usage. The metric is refreshed whenever
-      // memory is consumed or released via a MemTracker, so on a system with
-      // queries executing it will be refreshed frequently. However if the system
-      // is idle, we need to refresh the tracker occasionally since untracked
-      // memory may be allocated or freed, e.g. by background threads.
+      // The process limit as measured by our trackers may get out of sync with the
+      // process usage if memory is allocated or freed without updating a MemTracker.
+      // The metric is refreshed whenever memory is consumed or released via a MemTracker,
+      // so on a system with queries executing it will be refreshed frequently. However
+      // if the system is idle, we need to refresh the tracker occasionally since
+      // untracked memory may be allocated or freed, e.g. by background threads.
       if (env->process_mem_tracker() != nullptr) {
         env->process_mem_tracker()->RefreshConsumptionFromMetric();
       }
-#endif
     }
     // Periodically refresh values of the aggregate memory metrics to ensure they are
     // somewhat up-to-date.
@@ -198,7 +196,9 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   impala::InitGoogleLoggingSafe(argv[0]);
   // Breakpad needs flags and logging to initialize.
   ABORT_IF_ERROR(RegisterMinidump(argv[0]));
+#ifndef THREAD_SANITIZER
   AtomicOps_x86CPUFeaturesInit();
+#endif
   impala::InitThreading();
   impala::TimestampParser::Init();
   impala::SeedOpenSSLRNG();
@@ -243,7 +243,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
 
   if (impala::KuduIsAvailable()) impala::InitKuduLogging();
 
-#ifndef ADDRESS_SANITIZER
+#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
   // tcmalloc and address sanitizer can not be used together
   if (FLAGS_enable_process_lifetime_heap_profiling) {
     HeapProfilerStart(FLAGS_heap_profile_dir.c_str());

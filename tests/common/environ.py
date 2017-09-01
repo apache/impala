@@ -35,7 +35,6 @@ except ImportError as e:
 
 LOG = logging.getLogger('tests.common.environ')
 
-
 test_start_cluster_args = os.environ.get("TEST_START_CLUSTER_ARGS", "")
 
 # Find the likely BuildType of the running Impala. Assume it's found through the path
@@ -58,8 +57,8 @@ IMPALAD_PATH = os.path.join(impalad_basedir, 'service', 'impalad')
 
 class SpecificImpaladBuildTypes:
   """
-  Represent a specific build type. In reality, there 5 specific build types. These
-  specific build types are needed by Python test code.
+  Represent a specific build type. These specific build types are needed by Python test
+  code.
 
   The specific build types and their *most distinguishing* compiler options are:
 
@@ -68,6 +67,7 @@ class SpecificImpaladBuildTypes:
   3. DEBUG_CODE_COVERAGE (gcc -ggdb -ftest-coverage)
   4. RELEASE (gcc)
   5. RELEASE_CODE_COVERAGE (gcc -ftest-coverage)
+  6. THREAD_SANITIZER (clang -fsanitize=thread)
   """
   # ./buildall.sh -asan
   ADDRESS_SANITIZER = 'address_sanitizer'
@@ -79,6 +79,8 @@ class SpecificImpaladBuildTypes:
   RELEASE = 'release'
   # ./buildall.sh -release -codecoverage
   RELEASE_CODE_COVERAGE = 'release_code_coverage'
+  # ./buildall.sh -tsan
+  THREAD_SANITIZER = 'thread_sanitizer'
 
 
 class ImpaladBuild(object):
@@ -111,6 +113,12 @@ class ImpaladBuild(object):
     """
     return self.specific_build_type == SpecificImpaladBuildTypes.ADDRESS_SANITIZER
 
+  def is_tsan(self):
+    """
+    Return whether the Impala under test was compiled with TSAN.
+    """
+    return self.specific_build_type == SpecificImpaladBuildTypes.THREAD_SANITIZER
+
   def is_dev(self):
     """
     Return whether the Impala under test is a development build (i.e., any debug or ASAN
@@ -118,14 +126,15 @@ class ImpaladBuild(object):
     """
     return self.specific_build_type in (
         SpecificImpaladBuildTypes.ADDRESS_SANITIZER, SpecificImpaladBuildTypes.DEBUG,
-        SpecificImpaladBuildTypes.DEBUG_CODE_COVERAGE)
+        SpecificImpaladBuildTypes.DEBUG_CODE_COVERAGE,
+        SpecificImpaladBuildTypes.THREAD_SANITIZER)
 
   def runs_slowly(self):
     """
     Return whether the Impala under test "runs slowly". For our purposes this means
-    either compiled with code coverage enabled or ASAN.
+    either compiled with code coverage enabled, ASAN or TSAN.
     """
-    return self.has_code_coverage() or self.is_asan()
+    return self.has_code_coverage() or self.is_asan() or self.is_tsan()
 
   def _get_impalad_dwarf_info(self):
     """
@@ -170,7 +179,8 @@ class ImpaladBuild(object):
     assuming a debug build and log a warning.
     """
     ASAN_CU_NAME = 'asan_preinit.cc'
-    NON_ASAN_CU_NAME = 'daemon-main.cc'
+    TSAN_CU_NAME = 'tsan_clock.cc'
+    DEFAULT_CU_NAME = 'daemon-main.cc'
     GDB_FLAG = '-ggdb'
     CODE_COVERAGE_FLAG = '-ftest-coverage'
 
@@ -185,7 +195,9 @@ class ImpaladBuild(object):
 
     if die_name.endswith(ASAN_CU_NAME):
       specific_build_type = SpecificImpaladBuildTypes.ADDRESS_SANITIZER
-    elif not die_name.endswith(NON_ASAN_CU_NAME):
+    if die_name.endswith(TSAN_CU_NAME):
+      specific_build_type = SpecificImpaladBuildTypes.THREAD_SANITIZER
+    elif not die_name.endswith(DEFAULT_CU_NAME):
       LOG.warn('Unexpected DW_AT_name in first CU: {0}; choosing '
                'DEBUG'.format(die_name))
       specific_build_type = SpecificImpaladBuildTypes.DEBUG

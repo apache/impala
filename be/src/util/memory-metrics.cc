@@ -47,7 +47,7 @@ TcmallocMetric* TcmallocMetric::TOTAL_BYTES_RESERVED = nullptr;
 TcmallocMetric* TcmallocMetric::PAGEHEAP_UNMAPPED_BYTES = nullptr;
 TcmallocMetric::PhysicalBytesMetric* TcmallocMetric::PHYSICAL_BYTES_RESERVED = nullptr;
 
-AsanMallocMetric* AsanMallocMetric::BYTES_ALLOCATED = nullptr;
+SanitizerMallocMetric* SanitizerMallocMetric::BYTES_ALLOCATED = nullptr;
 
 BufferPoolMetric* BufferPoolMetric::LIMIT = nullptr;
 BufferPoolMetric* BufferPoolMetric::SYSTEM_ALLOCATED = nullptr;
@@ -81,10 +81,10 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
     used_metrics.push_back(BufferPoolMetric::SYSTEM_ALLOCATED);
   }
 
-#ifdef ADDRESS_SANITIZER
-  AsanMallocMetric::BYTES_ALLOCATED = metrics->RegisterMetric(
-      new AsanMallocMetric(MetricDefs::Get("asan-total-bytes-allocated")));
-  used_metrics.push_back(AsanMallocMetric::BYTES_ALLOCATED);
+#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
+  SanitizerMallocMetric::BYTES_ALLOCATED = metrics->RegisterMetric(
+      new SanitizerMallocMetric(MetricDefs::Get("sanitizer-total-bytes-allocated")));
+  used_metrics.push_back(SanitizerMallocMetric::BYTES_ALLOCATED);
 #else
   MetricGroup* tcmalloc_metrics = metrics->GetOrCreateChildGroup("tcmalloc");
   // We rely on TCMalloc for our global memory metrics, so skip setting them up

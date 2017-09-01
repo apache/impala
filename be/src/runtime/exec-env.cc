@@ -294,7 +294,7 @@ Status ExecEnv::StartServices() {
         BufferPoolMetric::UNUSED_RESERVATION_BYTES));
   obj_pool_->Add(new MemTracker(negated_unused_reservation, -1,
       "Buffer Pool: Unused Reservation", mem_tracker_.get()));
-#ifndef ADDRESS_SANITIZER
+#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
   // Aggressive decommit is required so that unused pages in the TCMalloc page heap are
   // not backed by physical pages and do not contribute towards memory consumption.
   size_t aggressive_decommit_enabled = 0;

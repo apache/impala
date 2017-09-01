@@ -202,6 +202,24 @@ inline Atomic64 Release_CompareAndSwap(volatile Atomic64 *ptr,
   return cmp;
 }
 
+inline Atomic32 Barrier_CompareAndSwap(volatile Atomic32 *ptr,
+                                  Atomic32 old_value,
+                                  Atomic32 new_value) {
+  Atomic32 cmp = old_value;
+  __tsan_atomic32_compare_exchange_strong(ptr, &cmp, new_value,
+      __tsan_memory_order_acq_rel, __tsan_memory_order_relaxed);
+  return cmp;
+}
+
+inline Atomic64 Barrier_CompareAndSwap(volatile Atomic64 *ptr,
+                                  Atomic64 old_value,
+                                  Atomic64 new_value) {
+  Atomic64 cmp = old_value;
+  __tsan_atomic64_compare_exchange_strong(ptr, &cmp, new_value,
+      __tsan_memory_order_acq_rel, __tsan_memory_order_relaxed);
+  return cmp;
+}
+
 inline void MemoryBarrier() {
   __tsan_atomic_thread_fence(__tsan_memory_order_seq_cst);
 }

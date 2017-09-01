@@ -209,7 +209,8 @@ find_package(LlvmBinaries REQUIRED)
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG"
     OR "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER"
     OR "${CMAKE_BUILD_TYPE}" STREQUAL "TIDY"
-    OR "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN")
+    OR "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN"
+    OR "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN")
   # Use the LLVM libaries with assertions for debug builds.
   set(LLVM_ROOT ${LLVM_DEBUG_ROOT})
 endif()

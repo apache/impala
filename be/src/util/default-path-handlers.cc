@@ -135,8 +135,8 @@ void MemUsageHandler(MemTracker* mem_tracker, MetricGroup* metric_group,
   document->AddMember("consumption", consumption, document->GetAllocator());
 
   stringstream ss;
-#ifdef ADDRESS_SANITIZER
-  ss << "Memory tracking is not available with address sanitizer builds.";
+#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
+  ss << "Memory tracking is not available with address or thread sanitizer builds.";
 #else
   char buf[2048];
   MallocExtension::instance()->GetStats(buf, 2048);
@@ -238,7 +238,7 @@ void AddDefaultUrlCallbacks(
     webserver->RegisterUrlCallback("/memz", "memz.tmpl", callback);
   }
 
-#ifndef ADDRESS_SANITIZER
+#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
   // Remote (on-demand) profiling is disabled if the process is already being profiled.
   if (!FLAGS_enable_process_lifetime_heap_profiling) {
     AddPprofUrlCallbacks(webserver);

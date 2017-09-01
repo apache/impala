@@ -46,7 +46,7 @@ static int64_t HUGE_PAGE_SIZE = 2LL * 1024 * 1024;
 SystemAllocator::SystemAllocator(int64_t min_buffer_len)
   : min_buffer_len_(min_buffer_len) {
   DCHECK(BitUtil::IsPowerOf2(min_buffer_len));
-#ifndef ADDRESS_SANITIZER
+#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
   // Free() assumes that aggressive decommit is enabled for TCMalloc.
   size_t aggressive_decommit_enabled;
   MallocExtension::instance()->GetNumericProperty(

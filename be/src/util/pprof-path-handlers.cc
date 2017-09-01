@@ -54,9 +54,9 @@ void PprofCmdLineHandler(const Webserver::ArgumentMap& args, stringstream* outpu
 // by calling HeapProfileStart(filename), continue to do work, and then, some number of
 // seconds later, call GetHeapProfile() followed by HeapProfilerStop().
 void PprofHeapHandler(const Webserver::ArgumentMap& args, stringstream* output) {
-#ifdef ADDRESS_SANITIZER
+#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
   (void)PPROF_DEFAULT_SAMPLE_SECS; // Avoid unused variable warning.
-  (*output) << "Heap profiling is not available with address sanitizer builds.";
+  (*output) << "Heap profiling is not available with address/thread sanitizer builds.";
 #else
   Webserver::ArgumentMap::const_iterator it = args.find("seconds");
   int seconds = PPROF_DEFAULT_SAMPLE_SECS;
@@ -78,8 +78,8 @@ void PprofHeapHandler(const Webserver::ArgumentMap& args, stringstream* output) 
 // The server should respond by calling ProfilerStart(), continuing to do its work,
 // and then, XX seconds later, calling ProfilerStop().
 void PprofCpuProfileHandler(const Webserver::ArgumentMap& args, stringstream* output) {
-#ifdef ADDRESS_SANITIZER
-  (*output) << "CPU profiling is not available with address sanitizer builds.";
+#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
+  (*output) << "CPU profiling is not available with address/thread sanitizer builds.";
 #else
   Webserver::ArgumentMap::const_iterator it = args.find("seconds");
   int seconds = PPROF_DEFAULT_SAMPLE_SECS;
@@ -106,8 +106,8 @@ void PprofCpuProfileHandler(const Webserver::ArgumentMap& args, stringstream* ou
 // The server should respond by calling:
 // MallocExtension::instance()->GetHeapGrowthStacks(&output);
 void PprofGrowthHandler(const Webserver::ArgumentMap& args, stringstream* output) {
-#ifdef ADDRESS_SANITIZER
-  (*output) << "Growth profiling is not available with address sanitizer builds.";
+#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
+  (*output) << "Growth profiling is not available with address/thread sanitizer builds.";
 #else
   string heap_growth_stack;
   MallocExtension::instance()->GetHeapGrowthStacks(&heap_growth_stack);
