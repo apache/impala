@@ -556,7 +556,7 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
       // comparisons cannot happen here, since predicates with NULL literals are filtered
       // in the frontend.
       *skip_row_group = true;
-      return Status::OK();
+      break;
     }
 
     if (pos_field) {
@@ -597,10 +597,13 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
       row.SetTuple(0, min_max_tuple);
       if (!ExecNode::EvalPredicate(eval, &row)) {
         *skip_row_group = true;
-        return Status::OK();
+        break;
       }
     }
   }
+
+  // Free any local allocations accumulated during conjunct evaluation.
+  ScalarExprEvaluator::FreeLocalAllocations(min_max_conjunct_evals_);
   return Status::OK();
 }
 
@@ -911,6 +914,11 @@ Status HdfsParquetScanner::EvalDictionaryFilters(const parquet::RowGroup& row_gr
     void* slot = dict_filter_tuple->GetSlot(slot_desc->tuple_offset());
     bool column_has_match = false;
     for (int dict_idx = 0; dict_idx < dictionary->num_entries(); ++dict_idx) {
+      if (dict_idx % 1024 == 0) {
+        // Don't let local allocations accumulate too much for large dictionaries or
+        // many row groups.
+        ScalarExprEvaluator::FreeLocalAllocations(dict_filter_conjunct_evals);
+      }
       dictionary->GetValue(dict_idx, slot);
 
       // We can only eliminate this row group if no value from the dictionary matches.
@@ -923,6 +931,8 @@ Status HdfsParquetScanner::EvalDictionaryFilters(const parquet::RowGroup& row_gr
         break;
       }
     }
+    // Free all local allocations now that we're done with the filter.
+    ScalarExprEvaluator::FreeLocalAllocations(dict_filter_conjunct_evals);
 
     if (!column_has_match) {
       // The column contains no value that matches the conjunct. The row group
