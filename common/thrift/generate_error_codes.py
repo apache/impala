@@ -333,6 +333,10 @@ error_codes = (
      "Queued reason: $2"),
 
   ("THREAD_CREATION_FAILED", 109, "Failed to create thread $0 in category $1: $2"),
+
+  ("DISK_IO_ERROR", 110, "Disk I/O error: $0"),
+
+
 )
 
 import sys

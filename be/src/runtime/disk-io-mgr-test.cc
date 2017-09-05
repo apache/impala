@@ -61,7 +61,7 @@ class DiskIoMgrTest : public testing::Test {
     if (expected_status.code() == TErrorCode::CANCELLED) {
       EXPECT_TRUE(status.ok() || status.IsCancelled()) << "Error: " << status.GetDetail();
     } else {
-      EXPECT_TRUE(status.code() == expected_status.code());
+      EXPECT_EQ(status.code(), expected_status.code());
     }
     if (status.ok()) {
       DiskIoMgr::ScanRange* scan_range = pool_->Add(new DiskIoMgr::ScanRange());
@@ -261,7 +261,7 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
   DiskIoMgr::WriteRange::WriteDoneCallback callback =
       bind(mem_fn(&DiskIoMgrTest::WriteValidateCallback), this, 2, new_range,
           (DiskIoMgr*)NULL, (DiskIoRequestContext*)NULL, data,
-          Status(TErrorCode::RUNTIME_ERROR, "Test Failure"), _1);
+          Status(TErrorCode::DISK_IO_ERROR, "Test Failure"), _1);
   *new_range = pool_->Add(new DiskIoMgr::WriteRange(tmp_file, rand(), 0, callback));
 
   (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
@@ -278,7 +278,7 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
   new_range = pool_->Add(new DiskIoMgr::WriteRange*);
   callback = bind(mem_fn(&DiskIoMgrTest::WriteValidateCallback), this, 2,
       new_range, (DiskIoMgr*)NULL, (DiskIoRequestContext*)NULL,
-      data, Status(TErrorCode::RUNTIME_ERROR, "Test Failure"), _1);
+      data, Status(TErrorCode::DISK_IO_ERROR, "Test Failure"), _1);
 
   *new_range = pool_->Add(new DiskIoMgr::WriteRange(tmp_file, -1, 0, callback));
   (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));

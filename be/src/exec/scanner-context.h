@@ -87,7 +87,7 @@ class ScannerContext {
     ///    If the requested buffer straddles io buffers, a copy is done here.
     ///  - *out_len is the number of bytes returned.
     ///  - *status is set if there is an error.
-    /// Returns true if the call was success (i.e. status->ok())
+    /// Returns true if the call was successful (i.e. status->ok())
     /// This should only be called from the scanner thread.
     /// Note that this will return bytes past the end of the scan range until the end of
     /// the file.
@@ -264,6 +264,9 @@ class ScannerContext {
     /// resources are also freed.
     void ReleaseCompletedResources(RowBatch* batch, bool done);
 
+    /// Validates that the output buffer pointers point to the correct buffer.
+    bool ValidateBufferPointers() const;
+
     /// Error-reporting functions.
     Status ReportIncompleteRead(int64_t length, int64_t bytes_read);
     Status ReportInvalidRead(int64_t length);
@@ -301,7 +304,7 @@ class ScannerContext {
   /// The stream is created in the runtime state's object pool
   Stream* AddStream(DiskIoMgr::ScanRange* range);
 
-  /// Returns false it scan_node_ is multi-threaded and has been cancelled.
+  /// Returns false if scan_node_ is multi-threaded and has been cancelled.
   /// Always returns false if the scan_node_ is not multi-threaded.
   bool cancelled() const;
 

@@ -201,9 +201,19 @@ class NODISCARD Status {
         && msg_->error() == TErrorCode::MEM_LIMIT_EXCEEDED;
   }
 
+  bool IsInternalError() const {
+    return msg_ != NULL
+        && msg_->error() == TErrorCode::INTERNAL_ERROR;
+  }
+
   bool IsRecoverableError() const {
     return msg_ != NULL
         && msg_->error() == TErrorCode::RECOVERABLE_ERROR;
+  }
+
+  bool IsDiskIoError() const {
+    return msg_ != NULL
+        && msg_->error() == TErrorCode::DISK_IO_ERROR;
   }
 
   /// Returns the error message associated with a non-successful status.

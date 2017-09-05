@@ -291,14 +291,16 @@ Status DiskIoMgr::ScanRange::Open(bool use_file_handle_cache) {
     exclusive_hdfs_fh_ = io_mgr_->GetCachedHdfsFileHandle(fs_, file_string(),
         mtime(), reader_, true);
     if (exclusive_hdfs_fh_ == nullptr) {
-      return Status(GetHdfsErrorMsg("Failed to open HDFS file ", file_));
+      return Status(TErrorCode::DISK_IO_ERROR,
+          GetHdfsErrorMsg("Failed to open HDFS file ", file_));
     }
 
     if (hdfsSeek(fs_, exclusive_hdfs_fh_->file(), offset_) != 0) {
       // Destroy the file handle and remove it from the cache.
       io_mgr_->ReleaseCachedHdfsFileHandle(file_string(), exclusive_hdfs_fh_, true);
       exclusive_hdfs_fh_ = nullptr;
-      return Status(Substitute("Error seeking to $0 in file: $1 $2", offset_, file_,
+      return Status(TErrorCode::DISK_IO_ERROR,
+          Substitute("Error seeking to $0 in file: $1 $2", offset_, file_,
           GetHdfsErrorMsg("")));
     }
   } else {
@@ -306,19 +308,14 @@ Status DiskIoMgr::ScanRange::Open(bool use_file_handle_cache) {
 
     local_file_ = fopen(file(), "r");
     if (local_file_ == nullptr) {
-      string error_msg = GetStrErrMsg();
-      stringstream ss;
-      ss << "Could not open file: " << file_ << ": " << error_msg;
-      return Status(ss.str());
+      return Status(TErrorCode::DISK_IO_ERROR, Substitute("Could not open file: $0: $1",
+            file_, GetStrErrMsg()));
     }
     if (fseek(local_file_, offset_, SEEK_SET) == -1) {
       fclose(local_file_);
       local_file_ = nullptr;
-      string error_msg = GetStrErrMsg();
-      stringstream ss;
-      ss << "Could not seek to " << offset_ << " for file: " << file_
-         << ": " << error_msg;
-      return Status(ss.str());
+      return Status(TErrorCode::DISK_IO_ERROR, Substitute("Could not seek to $0 "
+          "for file: $1: $2", offset_, file_, GetStrErrMsg()));
     }
   }
   if (ImpaladMetrics::IO_MGR_NUM_OPEN_FILES != nullptr) {
@@ -425,7 +422,8 @@ Status DiskIoMgr::ScanRange::Read(
       borrowed_hdfs_fh = io_mgr_->GetCachedHdfsFileHandle(fs_, file_string(),
           mtime(), reader_, false);
       if (borrowed_hdfs_fh == nullptr) {
-        return Status(GetHdfsErrorMsg("Failed to open HDFS file ", file_));
+        return Status(TErrorCode::DISK_IO_ERROR,
+            GetHdfsErrorMsg("Failed to open HDFS file ", file_));
       }
       hdfs_file = borrowed_hdfs_fh->file();
     }
@@ -450,7 +448,8 @@ Status DiskIoMgr::ScanRange::Read(
           current_bytes_read = hdfsPread(fs_, hdfs_file, position_in_file,
               buffer + *bytes_read, chunk_size);
           if (current_bytes_read == -1) {
-            status = Status(GetHdfsErrorMsg("Error reading from HDFS file: ", file_));
+            status = Status(TErrorCode::DISK_IO_ERROR,
+                GetHdfsErrorMsg("Error reading from HDFS file: ", file_));
           }
         } else {
           // If the file handle is borrowed, it may not be at the appropriate
@@ -458,11 +457,8 @@ Status DiskIoMgr::ScanRange::Read(
           bool seek_failed = false;
           if (borrowed_hdfs_fh != nullptr) {
             if (hdfsSeek(fs_, hdfs_file, position_in_file) != 0) {
-              string error_msg = GetHdfsErrorMsg("");
-              stringstream ss;
-              ss << "Error seeking to " << position_in_file << " in file: "
-                 << file_ << " " << error_msg;
-              status = Status(ss.str());
+              status = Status(TErrorCode::DISK_IO_ERROR, Substitute("Error seeking to $0 "
+                  " in file: $1: $2", position_in_file, file_, GetHdfsErrorMsg("")));
               seek_failed = true;
             }
           }
@@ -470,7 +466,8 @@ Status DiskIoMgr::ScanRange::Read(
             current_bytes_read = hdfsRead(fs_, hdfs_file, buffer + *bytes_read,
                 chunk_size);
             if (current_bytes_read == -1) {
-              status = Status(GetHdfsErrorMsg("Error reading from HDFS file: ", file_));
+              status = Status(TErrorCode::DISK_IO_ERROR,
+                  GetHdfsErrorMsg("Error reading from HDFS file: ", file_));
             }
           }
         }
@@ -513,11 +510,8 @@ Status DiskIoMgr::ScanRange::Read(
     DCHECK_LE(*bytes_read, bytes_to_read);
     if (*bytes_read < bytes_to_read) {
       if (ferror(local_file_) != 0) {
-        string error_msg = GetStrErrMsg();
-        stringstream ss;
-        ss << "Error reading from " << file_ << " at byte offset: "
-           << (offset_ + bytes_read_) << ": " << error_msg;
-        return Status(ss.str());
+        return Status(TErrorCode::DISK_IO_ERROR, Substitute("Error reading from $0"
+            "at byte offset: $1: $2", file_, offset_ + bytes_read_, GetStrErrMsg()));
       } else {
         // On Linux, we should only get partial reads from block devices on error or eof.
         DCHECK(feof(local_file_) != 0);
@@ -569,7 +563,6 @@ Status DiskIoMgr::ScanRange::ReadFromCache(bool* read_succeeded) {
   // TODO: If HDFS ever supports partially cached blocks, we'll have to distinguish
   // between errors and partially cached blocks here.
   if (bytes_read < len()) {
-    stringstream ss;
     VLOG_QUERY << "Error reading file from HDFS cache: " << file_ << ". Expected "
       << len() << " bytes, but read " << bytes_read << ". Switching to disk read path.";
     // Close the scan range. 'read_succeeded' is still false, so the caller will fall back

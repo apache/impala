@@ -174,18 +174,19 @@ Status BaseSequenceScanner::GetNextInternal(RowBatch* row_batch) {
 
   Status status = ProcessRange(row_batch);
   if (!status.ok()) {
-    if (status.IsCancelled() || status.IsMemLimitExceeded()) return status;
-
     // Log error from file format parsing.
-    state_->LogError(ErrorMsg(TErrorCode::SEQUENCE_SCANNER_PARSE_ERROR,
-        stream_->filename(), stream_->file_offset(),
-        (stream_->eof() ? "(EOF)" : "")));
+    // TODO(IMPALA-5922): Include the file and offset in errors inside the scanners.
+    if (!status.IsCancelled() &&
+        !status.IsMemLimitExceeded() &&
+        !status.IsInternalError() &&
+        !status.IsDiskIoError()) {
+      state_->LogError(ErrorMsg(TErrorCode::SEQUENCE_SCANNER_PARSE_ERROR,
+          stream_->filename(), stream_->file_offset(),
+          (stream_->eof() ? "(EOF)" : "")));
+    }
 
-    // Make sure errors specified in the status are logged as well
-    state_->LogError(status.msg());
-
-    // If abort on error then return, otherwise try to recover.
-    if (state_->abort_on_error()) return status;
+    // This checks for abort_on_error.
+    RETURN_IF_ERROR(state_->LogOrReturnError(status.msg()));
 
     // Recover by skipping to the next sync.
     parse_status_ = Status::OK();

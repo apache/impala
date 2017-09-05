@@ -541,13 +541,16 @@ int64_t DiskIoMgr::GetReadThroughput() {
 Status DiskIoMgr::ValidateScanRange(ScanRange* range) {
   int disk_id = range->disk_id_;
   if (disk_id < 0 || disk_id >= disk_queues_.size()) {
-    return Status(Substitute("Invalid scan range.  Bad disk id: $0", disk_id));
+    return Status(TErrorCode::DISK_IO_ERROR,
+        Substitute("Invalid scan range.  Bad disk id: $0", disk_id));
   }
   if (range->offset_ < 0) {
-    return Status(Substitute("Invalid scan range. Negative offset $0", range->offset_));
+    return Status(TErrorCode::DISK_IO_ERROR,
+        Substitute("Invalid scan range. Negative offset $0", range->offset_));
   }
   if (range->len_ < 0) {
-    return Status(Substitute("Invalid scan range. Negative length $0", range->len_));
+    return Status(TErrorCode::DISK_IO_ERROR,
+        Substitute("Invalid scan range. Negative length $0", range->len_));
   }
   return Status::OK();
 }
@@ -665,9 +668,9 @@ Status DiskIoMgr::Read(DiskIoRequestContext* reader,
 
   if (range->len() > max_buffer_size_
       && range->external_buffer_tag_ != ScanRange::ExternalBufferTag::CLIENT_BUFFER) {
-    return Status(Substitute("Internal error: cannot perform sync read of '$0' bytes "
-                   "that is larger than the max read buffer size '$1'.",
-            range->len(), max_buffer_size_));
+    return Status(TErrorCode::DISK_IO_ERROR, Substitute("Internal error: cannot "
+        "perform sync read of '$0' bytes that is larger than the max read buffer size "
+        "'$1'.", range->len(), max_buffer_size_));
   }
 
   vector<DiskIoMgr::ScanRange*> ranges;
@@ -1164,13 +1167,13 @@ void DiskIoMgr::Write(DiskIoRequestContext* writer_context, WriteRange* write_ra
   // Raw open() syscall will create file if not present when passed these flags.
   int fd = open(write_range->file(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
   if (fd < 0) {
-    ret_status = Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
+    ret_status = Status(ErrorMsg(TErrorCode::DISK_IO_ERROR,
         Substitute("Opening '$0' for write failed with errno=$1 description=$2",
                                      write_range->file_, errno, GetStrErrMsg())));
   } else {
     file_handle = fdopen(fd, "wb");
     if (file_handle == nullptr) {
-      ret_status = Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
+      ret_status = Status(ErrorMsg(TErrorCode::DISK_IO_ERROR,
           Substitute("fdopen($0, \"wb\") failed with errno=$1 description=$2", fd, errno,
                                        GetStrErrMsg())));
     }
@@ -1181,7 +1184,7 @@ void DiskIoMgr::Write(DiskIoRequestContext* writer_context, WriteRange* write_ra
 
     int success = fclose(file_handle);
     if (ret_status.ok() && success != 0) {
-      ret_status = Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
+      ret_status = Status(ErrorMsg(TErrorCode::DISK_IO_ERROR,
           Substitute("fclose($0) failed", write_range->file_)));
     }
   }
@@ -1193,7 +1196,7 @@ Status DiskIoMgr::WriteRangeHelper(FILE* file_handle, WriteRange* write_range) {
   // Seek to the correct offset and perform the write.
   int success = fseek(file_handle, write_range->offset(), SEEK_SET);
   if (success != 0) {
-    return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
+    return Status(ErrorMsg(TErrorCode::DISK_IO_ERROR,
         Substitute("fseek($0, $1, SEEK_SET) failed with errno=$2 description=$3",
         write_range->file_, write_range->offset(), errno, GetStrErrMsg())));
   }
@@ -1205,7 +1208,7 @@ Status DiskIoMgr::WriteRangeHelper(FILE* file_handle, WriteRange* write_range) {
 #endif
   int64_t bytes_written = fwrite(write_range->data_, 1, write_range->len_, file_handle);
   if (bytes_written < write_range->len_) {
-    return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
+    return Status(ErrorMsg(TErrorCode::DISK_IO_ERROR,
         Substitute("fwrite(buffer, 1, $0, $1) failed with errno=$2 description=$3",
         write_range->len_, write_range->file_, errno, GetStrErrMsg())));
   }
@@ -1290,7 +1293,8 @@ Status DiskIoMgr::ReopenCachedHdfsFileHandle(const hdfsFS& fs, std::string* fnam
   *fid = file_handle_cache_.GetFileHandle(fs, fname, mtime, true,
       &cache_hit);
   if (*fid == nullptr) {
-    return Status(GetHdfsErrorMsg("Failed to open HDFS file ", fname->data()));
+    return Status(TErrorCode::DISK_IO_ERROR,
+        GetHdfsErrorMsg("Failed to open HDFS file ", fname->data()));
   }
   DCHECK(!cache_hit);
   return Status::OK();
