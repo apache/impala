@@ -1057,6 +1057,8 @@ public class SingleNodePlanner {
           // true for an outer-joined inline view that has no table refs.
           Preconditions.checkState(!analyzer.isOuterJoined(inlineViewRef.getId()));
           emptySetNode.setOutputSmap(inlineViewRef.getSmap());
+          // The tblRef materialized by this node is still the 'inlineViewRef'.
+          emptySetNode.setTblRefIds(Lists.newArrayList(inlineViewRef.getId()));
           return emptySetNode;
         }
         // Analysis should have generated a tuple id into which to materialize the exprs.

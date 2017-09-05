@@ -550,3 +550,20 @@ PLAN-ROOT SINK
 |
 00:EMPTYSET
 ====
+---- QUERY
+# IMPALA-5812: Test that a cross join with a constant select that returns an empty result
+# set translates into an EMPTYSET in the final plan
+select count(*) from functional.alltypes x cross join (select 1 as j) y where j is null
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+02:NESTED LOOP JOIN [CROSS JOIN]
+|
+|--01:EMPTYSET
+|
+00:SCAN HDFS [functional.alltypes x]
+   partitions=24/24 files=24 size=478.45KB
+====
