@@ -130,12 +130,14 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
     debug_action_(TDebugAction::WAIT),
     limit_(tnode.limit),
     num_rows_returned_(0),
+    runtime_profile_(RuntimeProfile::Create(pool_,
+        Substitute("$0 (id=$1)", PrintPlanNodeType(tnode.node_type), id_))),
     rows_returned_counter_(NULL),
     rows_returned_rate_(NULL),
     containing_subplan_(NULL),
     disable_codegen_(tnode.disable_codegen),
     is_closed_(false) {
-  InitRuntimeProfile(PrintPlanNodeType(tnode.node_type));
+  runtime_profile_->set_metadata(id_);
 }
 
 ExecNode::~ExecNode() {
@@ -149,8 +151,8 @@ Status ExecNode::Init(const TPlanNode& tnode, RuntimeState* state) {
 
 Status ExecNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::PREPARE, state));
-  DCHECK(runtime_profile_.get() != NULL);
-  mem_tracker_.reset(new MemTracker(runtime_profile_.get(), -1, runtime_profile_->name(),
+  DCHECK(runtime_profile_ != NULL);
+  mem_tracker_.reset(new MemTracker(runtime_profile_, -1, runtime_profile_->name(),
       state->instance_mem_tracker()));
   expr_mem_tracker_.reset(new MemTracker(-1, "Exprs", mem_tracker_.get(), false));
   expr_mem_pool_.reset(new MemPool(expr_mem_tracker_.get()));
@@ -460,13 +462,6 @@ void ExecNode::CollectScanNodes(vector<ExecNode*>* nodes) {
   CollectNodes(TPlanNodeType::HDFS_SCAN_NODE, nodes);
   CollectNodes(TPlanNodeType::HBASE_SCAN_NODE, nodes);
   CollectNodes(TPlanNodeType::KUDU_SCAN_NODE, nodes);
-}
-
-void ExecNode::InitRuntimeProfile(const string& name) {
-  stringstream ss;
-  ss << name << " (id=" << id_ << ")";
-  runtime_profile_.reset(new RuntimeProfile(pool_, ss.str()));
-  runtime_profile_->set_metadata(id_);
 }
 
 Status ExecNode::ExecDebugActionImpl(TExecNodePhase::type phase, RuntimeState* state) {

@@ -184,8 +184,8 @@ class ClientRequestState {
   void set_user_profile_access(bool user_has_profile_access) {
     user_has_profile_access_ = user_has_profile_access;
   }
-  const RuntimeProfile& profile() const { return profile_; }
-  const RuntimeProfile& summary_profile() const { return summary_profile_; }
+  const RuntimeProfile* profile() const { return profile_; }
+  const RuntimeProfile* summary_profile() const { return summary_profile_; }
   const TimestampValue& start_time() const { return start_time_; }
   const TimestampValue& end_time() const { return end_time_; }
   const std::string& sql_stmt() const { return query_ctx_.client_request.stmt; }
@@ -211,7 +211,7 @@ class ClientRequestState {
   }
 
   RuntimeProfile::EventSequence* query_events() const { return query_events_; }
-  RuntimeProfile* summary_profile() { return &summary_profile_; }
+  RuntimeProfile* summary_profile() { return summary_profile_; }
 
  private:
   const TQueryCtx query_ctx_;
@@ -299,9 +299,9 @@ class ClientRequestState {
   /// There's a fourth profile which is not built here (but is a
   /// child of profile_); the execution profile which tracks the
   /// actual fragment execution.
-  RuntimeProfile profile_;
-  RuntimeProfile server_profile_;
-  RuntimeProfile summary_profile_;
+  RuntimeProfile* const profile_;
+  RuntimeProfile* const server_profile_;
+  RuntimeProfile* const summary_profile_;
   RuntimeProfile::Counter* row_materialization_timer_;
 
   /// Tracks how long we are idle waiting for a client to fetch rows.

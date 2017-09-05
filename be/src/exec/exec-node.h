@@ -208,7 +208,7 @@ class ExecNode {
   int64_t limit() const { return limit_; }
   bool ReachedLimit() { return limit_ != -1 && num_rows_returned_ >= limit_; }
 
-  RuntimeProfile* runtime_profile() { return runtime_profile_.get(); }
+  RuntimeProfile* runtime_profile() { return runtime_profile_; }
   MemTracker* mem_tracker() { return mem_tracker_.get(); }
   MemTracker* expr_mem_tracker() { return expr_mem_tracker_.get(); }
   MemPool* expr_mem_pool() { return expr_mem_pool_.get(); }
@@ -310,7 +310,8 @@ class ExecNode {
   int64_t limit_;  // -1: no limit
   int64_t num_rows_returned_;
 
-  boost::scoped_ptr<RuntimeProfile> runtime_profile_;
+  /// Runtime profile for this node. Owned by the QueryState's ObjectPool.
+  RuntimeProfile* const runtime_profile_;
   RuntimeProfile::Counter* rows_returned_counter_;
   RuntimeProfile::Counter* rows_returned_rate_;
 
@@ -353,8 +354,6 @@ class ExecNode {
       int* node_idx, ExecNode** root) WARN_UNUSED_RESULT;
 
   virtual bool IsScanNode() const { return false; }
-
-  void InitRuntimeProfile(const std::string& name);
 
   /// Executes 'debug_action_' if 'phase' matches 'debug_phase_'.
   /// 'phase' must not be INVALID.

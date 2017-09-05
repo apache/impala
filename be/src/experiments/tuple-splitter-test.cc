@@ -380,14 +380,14 @@ int main(int argc, char **argv) {
   MemTracker tracker;
   MemPool pool(&tracker);
   ObjectPool obj_pool;
-  RuntimeProfile profile(&obj_pool, "PartitioningTest");
+  RuntimeProfile* profile = RuntimeProfile::Create(&obj_pool, "PartitioningTest");
 
-  DataProvider provider(&pool, &profile);
+  DataProvider provider(&pool, profile);
   provider.Reset(50*1024*1024, 1024, cols);
   //provider.Reset(100*1024, 1024, cols);
   //provider.Reset(100, 1024, cols);
 
-  DataPartitioner partitioner(&pool, &profile, provider.row_size(), 0);
+  DataPartitioner partitioner(&pool, profile, provider.row_size(), 0);
 
   cout << "Begin processing: " << provider.total_rows() << endl;
   int rows;
@@ -437,7 +437,7 @@ int main(int argc, char **argv) {
   cout << "Largest Partition: " << largest_partition << endl;;
 
   cout << endl;
-  profile.PrettyPrint(&cout);
+  profile->PrettyPrint(&cout);
 
   LOG(ERROR) << "Done.";
   return 0;

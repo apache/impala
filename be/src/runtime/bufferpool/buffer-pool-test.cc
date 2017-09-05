@@ -139,7 +139,7 @@ class BufferPoolTest : public ::testing::Test {
   }
 
   RuntimeProfile* NewProfile() {
-    return obj_pool_.Add(new RuntimeProfile(&obj_pool_, "test profile"));
+    return RuntimeProfile::Create(&obj_pool_, "test profile");
   }
 
   /// Create a new file group with the default configs.

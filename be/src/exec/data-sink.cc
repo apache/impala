@@ -175,7 +175,7 @@ string DataSink::OutputDmlStats(const PartitionStatusMap& stats,
 
 Status DataSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   DCHECK(parent_mem_tracker != NULL);
-  profile_ = state->obj_pool()->Add(new RuntimeProfile(state->obj_pool(), GetName()));
+  profile_ = RuntimeProfile::Create(state->obj_pool(), GetName());
   const string& name = GetName();
   mem_tracker_.reset(new MemTracker(profile_, -1, name, parent_mem_tracker));
   expr_mem_tracker_.reset(

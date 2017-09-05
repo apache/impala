@@ -150,7 +150,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// Get cumulative profile aggregated over all fragments of the query.
   /// This is a snapshot of the current state of execution and will change in
   /// the future if not all fragments have finished execution.
-  RuntimeProfile* query_profile() const { return query_profile_.get(); }
+  RuntimeProfile* query_profile() const { return query_profile_; }
 
   const TUniqueId& query_id() const;
 
@@ -278,8 +278,8 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 
   ExecSummary exec_summary_;
 
-  /// Aggregate counters for the entire query.
-  boost::scoped_ptr<RuntimeProfile> query_profile_;
+  /// Aggregate counters for the entire query. Lives in 'obj_pool_'.
+  RuntimeProfile* query_profile_ = nullptr;
 
   /// Protects all fields below. This is held while making RPCs, so this lock should
   /// only be acquired if the acquiring thread is prepared to wait for a significant

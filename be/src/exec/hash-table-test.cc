@@ -233,7 +233,7 @@ class HashTableTest : public testing::Test {
       int64_t block_size = 8 * 1024 * 1024, int max_num_blocks = 100,
       int initial_reserved_blocks = 10, int64_t suballocator_buffer_len = 64 * 1024) {
     BufferPool* buffer_pool = test_env_->exec_env()->buffer_pool();
-    RuntimeProfile* profile = pool_.Add(new RuntimeProfile(&pool_, "ht"));
+    RuntimeProfile* profile = RuntimeProfile::Create(&pool_, "ht");
 
     // Set up memory tracking for the hash table.
     MemTracker* client_tracker =

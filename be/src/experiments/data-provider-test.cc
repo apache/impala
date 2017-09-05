@@ -55,11 +55,11 @@ int main(int argc, char **argv) {
   cols.push_back(DataProvider::ColDesc::Create<StringValue>(min_str, max_str));
 
   ObjectPool obj_pool;
-  RuntimeProfile profile(&obj_pool, "DataGenTest");
+  RuntimeProfile* profile = RuntimeProfile::Create(&obj_pool, "DataGenTest");
 
   MemTracker tracker;
   MemPool pool(&tracker);
-  DataProvider provider(&pool, &profile);
+  DataProvider provider(&pool, profile);
   provider.Reset(20, 2, cols);
   int rows;
   void* data;
@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
     provider.Print(&cout, reinterpret_cast<char*>(data), rows);
   }
 
-  profile.PrettyPrint(&cout);
+  profile->PrettyPrint(&cout);
 
   cout << endl << "Done." << endl;
   return 0;

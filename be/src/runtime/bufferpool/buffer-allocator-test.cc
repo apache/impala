@@ -42,7 +42,7 @@ class BufferAllocatorTest : public ::testing::Test {
     dummy_pool_ = obj_pool_.Add(new BufferPool(1, 0, 0));
     dummy_reservation_.InitRootTracker(nullptr, 0);
     ASSERT_OK(dummy_pool_->RegisterClient("", nullptr, &dummy_reservation_, nullptr, 0,
-        obj_pool_.Add(new RuntimeProfile(&obj_pool_, "")), &dummy_client_));
+        RuntimeProfile::Create(&obj_pool_, ""), &dummy_client_));
   }
 
   virtual void TearDown() {

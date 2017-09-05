@@ -440,10 +440,10 @@ int main(int argc, char **argv) {
 
   MemTracker tracker;
   MemPool mem_pool(&tracker);
-  RuntimeProfile int_profile(state->obj_pool(), "IntGen");
-  RuntimeProfile mixed_profile(state->obj_pool(), "MixedGen");
-  DataProvider int_provider(&mem_pool, &int_profile);
-  DataProvider mixed_provider(&mem_pool, &mixed_profile);
+  RuntimeProfile* int_profile = RuntimeProfile::Create(state->obj_pool(), "IntGen");
+  RuntimeProfile* mixed_profile = RuntimeProfile::Create(state->obj_pool(), "MixedGen");
+  DataProvider int_provider(&mem_pool, int_profile);
+  DataProvider mixed_provider(&mem_pool, mixed_profile);
 
   scoped_ptr<LlvmCodeGen> codegen;
   status = LlvmCodeGen::CreateImpalaCodegen(state, NULL, "test", &codegen);

@@ -159,7 +159,7 @@ class LlvmCodeGen {
   /// any other API methods after calling close.
   void Close();
 
-  RuntimeProfile* runtime_profile() { return &profile_; }
+  RuntimeProfile* runtime_profile() { return profile_; }
   RuntimeProfile::Counter* codegen_timer() { return codegen_timer_; }
 
   /// Turns on/off optimization passes
@@ -669,7 +669,7 @@ class LlvmCodeGen {
   std::string id_;
 
   /// Codegen counters
-  RuntimeProfile profile_;
+  RuntimeProfile* const profile_;
 
   /// MemTracker used for tracking memory consumed by codegen. Connected to a parent
   /// MemTracker if one was provided during initialization. Owned by the ObjectPool

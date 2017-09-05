@@ -132,7 +132,7 @@ class SimpleTupleStreamTest : public testing::Test {
     ASSERT_OK(test_env_->CreateQueryState(0, nullptr, &runtime_state_));
     query_state_ = runtime_state_->query_state();
 
-    RuntimeProfile* client_profile = pool_.Add(new RuntimeProfile(&pool_, "client"));
+    RuntimeProfile* client_profile = RuntimeProfile::Create(&pool_, "client");
     MemTracker* client_tracker =
         pool_.Add(new MemTracker(-1, "client", runtime_state_->instance_mem_tracker()));
     ASSERT_OK(test_env_->exec_env()->buffer_pool()->RegisterClient("",

@@ -279,7 +279,7 @@ void HBaseScanNode::Close(RuntimeState* state) {
     JNIEnv* env = getJNIEnv();
     hbase_scanner_->Close(env);
   }
-  ExecNode::Close(state);
+  ScanNode::Close(state);
 }
 
 void HBaseScanNode::DebugString(int indentation_level, stringstream* out) const {

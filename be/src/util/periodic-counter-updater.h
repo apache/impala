@@ -70,12 +70,11 @@ class PeriodicCounterUpdater {
   /// Stops updating the value of 'counter'.
   static void StopSamplingCounter(RuntimeProfile::Counter* counter);
 
-  /// Stops updating the bucket counter.
-  /// If convert is true, convert the buckets from count to percentage.
-  /// Sampling counters are updated periodically so should be removed as soon as the
+  /// If the bucketing counters 'buckets' are registered, stops updating the counters and
+  /// convert the buckets from count to percentage. If not registered, has no effect.
+  /// Perioidic counters are updated periodically so should be removed as soon as the
   /// underlying counter is no longer going to change.
-  static void StopBucketingCounters(std::vector<RuntimeProfile::Counter*>* buckets,
-      bool convert);
+  static void StopBucketingCounters(std::vector<RuntimeProfile::Counter*>* buckets);
 
   /// Stops 'counter' from receiving any more samples.
   static void StopTimeSeriesCounter(RuntimeProfile::TimeSeriesCounter* counter);

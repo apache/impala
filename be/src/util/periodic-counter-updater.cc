@@ -93,21 +93,20 @@ void PeriodicCounterUpdater::RegisterBucketingCounters(
 }
 
 void PeriodicCounterUpdater::StopBucketingCounters(
-    vector<RuntimeProfile::Counter*>* buckets, bool convert) {
+    vector<RuntimeProfile::Counter*>* buckets) {
   int64_t num_sampled = 0;
   {
     lock_guard<SpinLock> bucketinglock(instance_->bucketing_lock_);
     BucketCountersMap::iterator itr =
         instance_->bucketing_counters_.find(buckets);
-    if (itr != instance_->bucketing_counters_.end()) {
-      num_sampled = itr->second.num_sampled;
-      instance_->bucketing_counters_.erase(itr);
-    }
+    // If not registered, we have nothing to do.
+    if (itr == instance_->bucketing_counters_.end()) return;
+    num_sampled = itr->second.num_sampled;
+    instance_->bucketing_counters_.erase(itr);
   }
 
-  if (convert && num_sampled > 0) {
-    for (int i = 0; i < buckets->size(); ++i) {
-      RuntimeProfile::Counter* counter = (*buckets)[i];
+  if (num_sampled > 0) {
+    for (RuntimeProfile::Counter* counter : *buckets) {
       double perc = 100 * counter->value() / (double)num_sampled;
       counter->Set(perc);
     }

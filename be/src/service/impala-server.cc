@@ -623,9 +623,9 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
       RETURN_IF_ERROR(CheckProfileAccess(user, request_state->effective_user(),
           request_state->user_has_profile_access()));
       if (base64_encoded) {
-        RETURN_IF_ERROR(request_state->profile().SerializeToArchiveString(output));
+        RETURN_IF_ERROR(request_state->profile()->SerializeToArchiveString(output));
       } else {
-        request_state->profile().PrettyPrint(output);
+        request_state->profile()->PrettyPrint(output);
       }
       return Status::OK();
     }
@@ -741,7 +741,7 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
 
 void ImpalaServer::ArchiveQuery(const ClientRequestState& query) {
   string encoded_profile_str;
-  Status status = query.profile().SerializeToArchiveString(&encoded_profile_str);
+  Status status = query.profile()->SerializeToArchiveString(&encoded_profile_str);
   if (!status.ok()) {
     // Didn't serialize the string. Continue with empty string.
     LOG_EVERY_N(WARNING, 1000) << "Could not serialize profile to archive string "
@@ -1677,7 +1677,7 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const ClientRequestState& reque
   id = request_state.query_id();
   const TExecRequest& request = request_state.exec_request();
 
-  const string* plan_str = request_state.summary_profile().GetInfoString("Plan");
+  const string* plan_str = request_state.summary_profile()->GetInfoString("Plan");
   if (plan_str != nullptr) plan = *plan_str;
   stmt = request_state.sql_stmt();
   stmt_type = request.stmt_type;
@@ -1701,11 +1701,11 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const ClientRequestState& reque
 
   if (copy_profile) {
     stringstream ss;
-    request_state.profile().PrettyPrint(&ss);
+    request_state.profile()->PrettyPrint(&ss);
     profile_str = ss.str();
     if (encoded_profile.empty()) {
       Status status =
-          request_state.profile().SerializeToArchiveString(&encoded_profile_str);
+          request_state.profile()->SerializeToArchiveString(&encoded_profile_str);
       if (!status.ok()) {
         LOG_EVERY_N(WARNING, 1000) << "Could not serialize profile to archive string "
                                    << status.GetDetail();

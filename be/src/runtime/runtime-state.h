@@ -149,7 +149,7 @@ class RuntimeState {
   PartitionStatusMap* per_partition_status() { return &per_partition_status_; }
 
   /// Returns runtime state profile
-  RuntimeProfile* runtime_profile() { return &profile_; }
+  RuntimeProfile* runtime_profile() { return profile_; }
 
   /// Returns the LlvmCodeGen object for this fragment instance.
   LlvmCodeGen* codegen() { return codegen_.get(); }
@@ -354,7 +354,7 @@ class RuntimeState {
   /// Records summary statistics for the results of inserts into Hdfs partitions.
   PartitionStatusMap per_partition_status_;
 
-  RuntimeProfile profile_;
+  RuntimeProfile* const profile_;
 
   /// Total time waiting in storage (across all threads)
   RuntimeProfile::Counter* total_storage_wait_timer_;

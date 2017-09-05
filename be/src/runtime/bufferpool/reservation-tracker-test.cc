@@ -44,7 +44,7 @@ class ReservationTrackerTest : public ::testing::Test {
 
  protected:
   RuntimeProfile* NewProfile() {
-    return obj_pool_.Add(new RuntimeProfile(&obj_pool_, "test profile"));
+    return RuntimeProfile::Create(&obj_pool_, "test profile");
   }
 
   ObjectPool obj_pool_;

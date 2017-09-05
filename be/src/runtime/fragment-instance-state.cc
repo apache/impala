@@ -123,8 +123,8 @@ Status FragmentInstanceState::Prepare() {
 
   // total_time_counter() is in the runtime_state_ so start it up now.
   SCOPED_TIMER(profile()->total_time_counter());
-  timings_profile_ = obj_pool()->Add(
-      new RuntimeProfile(obj_pool(), "Fragment Instance Lifecycle Timings"));
+  timings_profile_ =
+      RuntimeProfile::Create(obj_pool(), "Fragment Instance Lifecycle Timings");
   profile()->AddChild(timings_profile_);
   SCOPED_TIMER(ADD_TIMER(timings_profile_, PREPARE_TIMER_NAME));
 
@@ -289,12 +289,8 @@ void FragmentInstanceState::Close() {
   // guard against partially-finished Prepare()
   if (sink_ != nullptr) sink_->Close(runtime_state_);
 
-  // disconnect mem_usage_sampled_counter_ from the periodic updater before
-  // RuntimeState::ReleaseResources(), it references the instance memtracker
-  if (mem_usage_sampled_counter_ != nullptr) {
-    PeriodicCounterUpdater::StopTimeSeriesCounter(mem_usage_sampled_counter_);
-    mem_usage_sampled_counter_ = nullptr;
-  }
+  // Stop updating profile counters in background.
+  profile()->StopPeriodicCounters();
 
   // We need to delete row_batch_ here otherwise we can't delete the instance_mem_tracker_
   // in runtime_state_->ReleaseResources().

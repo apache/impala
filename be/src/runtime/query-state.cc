@@ -169,7 +169,7 @@ Status QueryState::InitBufferPoolState() {
 
   // TODO: once there's a mechanism for reporting non-fragment-local profiles,
   // should make sure to report this profile so it's not going into a black hole.
-  RuntimeProfile* dummy_profile = obj_pool_.Add(new RuntimeProfile(&obj_pool_, "dummy"));
+  RuntimeProfile* dummy_profile = RuntimeProfile::Create(&obj_pool_, "dummy");
   // Only create file group if spilling is enabled.
   if (query_options().scratch_limit != 0 && !query_ctx_.disable_spilling) {
     file_group_ = obj_pool_.Add(

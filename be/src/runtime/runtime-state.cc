@@ -69,7 +69,8 @@ RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragmentCtx& frag
     utc_timestamp_(new TimestampValue(TimestampValue::Parse(
         query_state->query_ctx().utc_timestamp_string))),
     exec_env_(exec_env),
-    profile_(obj_pool(), "Fragment " + PrintId(instance_ctx.fragment_instance_id)),
+    profile_(RuntimeProfile::Create(
+          obj_pool(), "Fragment " + PrintId(instance_ctx.fragment_instance_id))),
     instance_buffer_reservation_(new ReservationTracker) {
   Init();
 }
@@ -83,7 +84,7 @@ RuntimeState::RuntimeState(
     now_(new TimestampValue(TimestampValue::Parse(qctx.now_string))),
     utc_timestamp_(new TimestampValue(TimestampValue::Parse(qctx.utc_timestamp_string))),
     exec_env_(exec_env),
-    profile_(obj_pool(), "<unnamed>") {
+    profile_(RuntimeProfile::Create(obj_pool(), "<unnamed>")) {
   if (query_ctx().request_pool.empty()) {
     const_cast<TQueryCtx&>(query_ctx()).request_pool = "test-pool";
   }
@@ -96,7 +97,7 @@ RuntimeState::~RuntimeState() {
 }
 
 void RuntimeState::Init() {
-  SCOPED_TIMER(profile_.total_time_counter());
+  SCOPED_TIMER(profile_->total_time_counter());
 
   // Register with the thread mgr
   resource_pool_ = exec_env_->thread_mgr()->RegisterPool();
@@ -111,7 +112,7 @@ void RuntimeState::Init() {
       runtime_profile(), -1, runtime_profile()->name(), query_mem_tracker()));
 
   if (instance_buffer_reservation_ != nullptr) {
-    instance_buffer_reservation_->InitChildTracker(&profile_,
+    instance_buffer_reservation_->InitChildTracker(profile_,
         query_state_->buffer_reservation(), instance_mem_tracker_.get(),
         numeric_limits<int64_t>::max());
   }
@@ -127,7 +128,7 @@ Status RuntimeState::CreateCodegen() {
   RETURN_IF_ERROR(LlvmCodeGen::CreateImpalaCodegen(this,
       instance_mem_tracker_.get(), PrintId(fragment_instance_id()), &codegen_));
   codegen_->EnableOptimizations(true);
-  profile_.AddChild(codegen_->runtime_profile());
+  profile_->AddChild(codegen_->runtime_profile());
   return Status::OK();
 }
 

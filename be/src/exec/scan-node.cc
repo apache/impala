@@ -68,4 +68,12 @@ Status ScanNode::Prepare(RuntimeState* state) {
   return Status::OK();
 }
 
+void ScanNode::Close(RuntimeState* state) {
+  if (is_closed()) return;
+  // ScanNode::Prepare() started periodic counters including 'total_throughput_counter_'
+  // and 'bytes_read_timeseries_counter_'. Subclasses may also have started counters.
+  runtime_profile_->StopPeriodicCounters();
+  ExecNode::Close(state);
+}
+
 }

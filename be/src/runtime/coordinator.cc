@@ -123,8 +123,8 @@ Status Coordinator::Exec() {
   query_ctx_.__set_desc_tbl(request.desc_tbl);
   query_ctx_.__set_request_pool(schedule_.request_pool());
 
-  query_profile_.reset(
-      new RuntimeProfile(obj_pool(), "Execution Profile " + PrintId(query_id())));
+  query_profile_ =
+      RuntimeProfile::Create(obj_pool(), "Execution Profile " + PrintId(query_id()));
   finalization_timer_ = ADD_TIMER(query_profile_, "FinalizationTimer");
   filter_updates_received_ = ADD_COUNTER(query_profile_, "FiltersReceived", TUnit::UNIT);
 

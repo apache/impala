@@ -34,17 +34,17 @@ namespace impala {
 
 TEST(CountersTest, Basic) {
   ObjectPool pool;
-  RuntimeProfile profile_a(&pool, "ProfileA");
-  RuntimeProfile profile_a1(&pool, "ProfileA1");
-  RuntimeProfile profile_a2(&pool, "ProfileAb");
+  RuntimeProfile* profile_a = RuntimeProfile::Create(&pool, "ProfileA");
+  RuntimeProfile* profile_a1 = RuntimeProfile::Create(&pool, "ProfileA1");
+  RuntimeProfile* profile_a2 = RuntimeProfile::Create(&pool, "ProfileAb");
 
   TRuntimeProfileTree thrift_profile;
 
-  profile_a.AddChild(&profile_a1);
-  profile_a.AddChild(&profile_a2);
+  profile_a->AddChild(profile_a1);
+  profile_a->AddChild(profile_a2);
 
   // Test Empty
-  profile_a.ToThrift(&thrift_profile.nodes);
+  profile_a->ToThrift(&thrift_profile.nodes);
   EXPECT_EQ(thrift_profile.nodes.size(), 3);
   thrift_profile.nodes.clear();
 
@@ -53,7 +53,7 @@ TEST(CountersTest, Basic) {
   RuntimeProfile::Counter* counter_merged;
 
   // Updating/setting counter
-  counter_a = profile_a.AddCounter("A", TUnit::UNIT);
+  counter_a = profile_a->AddCounter("A", TUnit::UNIT);
   EXPECT_TRUE(counter_a != NULL);
   counter_a->Add(10);
   counter_a->Add(-5);
@@ -61,40 +61,40 @@ TEST(CountersTest, Basic) {
   counter_a->Set(1);
   EXPECT_EQ(counter_a->value(), 1);
 
-  counter_b = profile_a2.AddCounter("B", TUnit::BYTES);
+  counter_b = profile_a2->AddCounter("B", TUnit::BYTES);
   EXPECT_TRUE(counter_b != NULL);
 
   // Serialize/deserialize
-  profile_a.ToThrift(&thrift_profile.nodes);
+  profile_a->ToThrift(&thrift_profile.nodes);
   RuntimeProfile* from_thrift = RuntimeProfile::CreateFromThrift(&pool, thrift_profile);
   counter_merged = from_thrift->GetCounter("A");
   EXPECT_EQ(counter_merged->value(), 1);
   EXPECT_TRUE(from_thrift->GetCounter("Not there") ==  NULL);
 
   // Averaged
-  RuntimeProfile averaged_profile(&pool, "Merged", true);
-  averaged_profile.UpdateAverage(from_thrift);
-  counter_merged = averaged_profile.GetCounter("A");
+  RuntimeProfile* averaged_profile = RuntimeProfile::Create(&pool, "Merged", true);
+  averaged_profile->UpdateAverage(from_thrift);
+  counter_merged = averaged_profile->GetCounter("A");
   EXPECT_EQ(counter_merged->value(), 1);
 
   // UpdateAverage again, there should be no change.
-  averaged_profile.UpdateAverage(from_thrift);
+  averaged_profile->UpdateAverage(from_thrift);
   EXPECT_EQ(counter_merged->value(), 1);
 
-  counter_a = profile_a2.AddCounter("A", TUnit::UNIT);
+  counter_a = profile_a2->AddCounter("A", TUnit::UNIT);
   counter_a->Set(3);
-  averaged_profile.UpdateAverage(&profile_a2);
+  averaged_profile->UpdateAverage(profile_a2);
   EXPECT_EQ(counter_merged->value(), 2);
 
   // Update
-  RuntimeProfile updated_profile(&pool, "Updated");
-  updated_profile.Update(thrift_profile);
-  RuntimeProfile::Counter* counter_updated = updated_profile.GetCounter("A");
+  RuntimeProfile* updated_profile = RuntimeProfile::Create(&pool, "Updated");
+  updated_profile->Update(thrift_profile);
+  RuntimeProfile::Counter* counter_updated = updated_profile->GetCounter("A");
   EXPECT_EQ(counter_updated->value(), 1);
 
   // Update 2 more times, counters should stay the same
-  updated_profile.Update(thrift_profile);
-  updated_profile.Update(thrift_profile);
+  updated_profile->Update(thrift_profile);
+  updated_profile->Update(thrift_profile);
   EXPECT_EQ(counter_updated->value(), 1);
 }
 
@@ -110,27 +110,27 @@ TEST(CountersTest, MergeAndUpdate) {
   // children, with the counters from the shared child aggregated.
 
   ObjectPool pool;
-  RuntimeProfile profile1(&pool, "Parent1");
-  RuntimeProfile p1_child1(&pool, "Child1");
-  RuntimeProfile p1_child2(&pool, "Child2");
-  profile1.AddChild(&p1_child1);
-  profile1.AddChild(&p1_child2);
+  RuntimeProfile* profile1 = RuntimeProfile::Create(&pool, "Parent1");
+  RuntimeProfile* p1_child1 = RuntimeProfile::Create(&pool, "Child1");
+  RuntimeProfile* p1_child2 = RuntimeProfile::Create(&pool, "Child2");
+  profile1->AddChild(p1_child1);
+  profile1->AddChild(p1_child2);
 
-  RuntimeProfile profile2(&pool, "Parent2");
-  RuntimeProfile p2_child1(&pool, "Child1");
-  RuntimeProfile p2_child3(&pool, "Child3");
-  profile2.AddChild(&p2_child1);
-  profile2.AddChild(&p2_child3);
+  RuntimeProfile* profile2 = RuntimeProfile::Create(&pool, "Parent2");
+  RuntimeProfile* p2_child1 = RuntimeProfile::Create(&pool, "Child1");
+  RuntimeProfile* p2_child3 = RuntimeProfile::Create(&pool, "Child3");
+  profile2->AddChild(p2_child1);
+  profile2->AddChild(p2_child3);
 
   // Create parent level counters
   RuntimeProfile::Counter* parent1_shared =
-      profile1.AddCounter("Parent Shared", TUnit::UNIT);
+      profile1->AddCounter("Parent Shared", TUnit::UNIT);
   RuntimeProfile::Counter* parent2_shared =
-      profile2.AddCounter("Parent Shared", TUnit::UNIT);
+      profile2->AddCounter("Parent Shared", TUnit::UNIT);
   RuntimeProfile::Counter* parent1_only =
-      profile1.AddCounter("Parent 1 Only", TUnit::UNIT);
+      profile1->AddCounter("Parent 1 Only", TUnit::UNIT);
   RuntimeProfile::Counter* parent2_only =
-      profile2.AddCounter("Parent 2 Only", TUnit::UNIT);
+      profile2->AddCounter("Parent 2 Only", TUnit::UNIT);
   parent1_shared->Add(1);
   parent2_shared->Add(3);
   parent1_only->Add(2);
@@ -138,17 +138,17 @@ TEST(CountersTest, MergeAndUpdate) {
 
   // Create child level counters
   RuntimeProfile::Counter* p1_c1_shared =
-    p1_child1.AddCounter("Child1 Shared", TUnit::UNIT);
+    p1_child1->AddCounter("Child1 Shared", TUnit::UNIT);
   RuntimeProfile::Counter* p1_c1_only =
-    p1_child1.AddCounter("Child1 Parent 1 Only", TUnit::UNIT);
+    p1_child1->AddCounter("Child1 Parent 1 Only", TUnit::UNIT);
   RuntimeProfile::Counter* p1_c2 =
-    p1_child2.AddCounter("Child2", TUnit::UNIT);
+    p1_child2->AddCounter("Child2", TUnit::UNIT);
   RuntimeProfile::Counter* p2_c1_shared =
-    p2_child1.AddCounter("Child1 Shared", TUnit::UNIT);
+    p2_child1->AddCounter("Child1 Shared", TUnit::UNIT);
   RuntimeProfile::Counter* p2_c1_only =
-    p1_child1.AddCounter("Child1 Parent 2 Only", TUnit::UNIT);
+    p1_child1->AddCounter("Child1 Parent 2 Only", TUnit::UNIT);
   RuntimeProfile::Counter* p2_c3 =
-    p2_child3.AddCounter("Child3", TUnit::UNIT);
+    p2_child3->AddCounter("Child3", TUnit::UNIT);
   p1_c1_shared->Add(10);
   p1_c1_only->Add(50);
   p2_c1_shared->Add(20);
@@ -158,17 +158,17 @@ TEST(CountersTest, MergeAndUpdate) {
 
   // Merge the two and validate
   TRuntimeProfileTree tprofile1;
-  profile1.ToThrift(&tprofile1);
-  RuntimeProfile averaged_profile(&pool, "merged", true);
-  averaged_profile.UpdateAverage(&profile1);
-  averaged_profile.UpdateAverage(&profile2);
-  EXPECT_EQ(5, averaged_profile.num_counters());
-  ValidateCounter(&averaged_profile, "Parent Shared", 2);
-  ValidateCounter(&averaged_profile, "Parent 1 Only", 2);
-  ValidateCounter(&averaged_profile, "Parent 2 Only", 5);
+  profile1->ToThrift(&tprofile1);
+  RuntimeProfile* averaged_profile = RuntimeProfile::Create(&pool, "merged", true);
+  averaged_profile->UpdateAverage(profile1);
+  averaged_profile->UpdateAverage(profile2);
+  EXPECT_EQ(5, averaged_profile->num_counters());
+  ValidateCounter(averaged_profile, "Parent Shared", 2);
+  ValidateCounter(averaged_profile, "Parent 1 Only", 2);
+  ValidateCounter(averaged_profile, "Parent 2 Only", 5);
 
   vector<RuntimeProfile*> children;
-  averaged_profile.GetChildren(&children);
+  averaged_profile->GetChildren(&children);
   EXPECT_EQ(children.size(), 3);
 
   for (int i = 0; i < 3; ++i) {
@@ -191,16 +191,16 @@ TEST(CountersTest, MergeAndUpdate) {
 
   // make sure we can print
   stringstream dummy;
-  averaged_profile.PrettyPrint(&dummy);
+  averaged_profile->PrettyPrint(&dummy);
 
   // Update profile2 w/ profile1 and validate
-  profile2.Update(tprofile1);
-  EXPECT_EQ(5, profile2.num_counters());
-  ValidateCounter(&profile2, "Parent Shared", 1);
-  ValidateCounter(&profile2, "Parent 1 Only", 2);
-  ValidateCounter(&profile2, "Parent 2 Only", 5);
+  profile2->Update(tprofile1);
+  EXPECT_EQ(5, profile2->num_counters());
+  ValidateCounter(profile2, "Parent Shared", 1);
+  ValidateCounter(profile2, "Parent 1 Only", 2);
+  ValidateCounter(profile2, "Parent 2 Only", 5);
 
-  profile2.GetChildren(&children);
+  profile2->GetChildren(&children);
   EXPECT_EQ(children.size(), 3);
 
   for (int i = 0; i < 3; ++i) {
@@ -222,14 +222,14 @@ TEST(CountersTest, MergeAndUpdate) {
   }
 
   // make sure we can print
-  profile2.PrettyPrint(&dummy);
+  profile2->PrettyPrint(&dummy);
 }
 
 TEST(CountersTest, HighWaterMarkCounters) {
   ObjectPool pool;
-  RuntimeProfile profile(&pool, "Profile");
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
   RuntimeProfile::HighWaterMarkCounter* bytes_counter =
-      profile.AddHighWaterMarkCounter("bytes", TUnit::BYTES);
+      profile->AddHighWaterMarkCounter("bytes", TUnit::BYTES);
 
   bytes_counter->Set(10);
   EXPECT_EQ(bytes_counter->current_value(), 10);
@@ -260,9 +260,9 @@ TEST(CountersTest, HighWaterMarkCounters) {
 
 TEST(CountersTest, SummaryStatsCounters) {
   ObjectPool pool;
-  RuntimeProfile profile1(&pool, "Profile 1");
+  RuntimeProfile* profile1 = RuntimeProfile::Create(&pool, "Profile 1");
   RuntimeProfile::SummaryStatsCounter* summary_stats_counter_1 =
-    profile1.AddSummaryStatsCounter("summary_stats", TUnit::UNIT);
+    profile1->AddSummaryStatsCounter("summary_stats", TUnit::UNIT);
 
   EXPECT_EQ(summary_stats_counter_1->value(), 0);
   EXPECT_EQ(summary_stats_counter_1->MinValue(), numeric_limits<int64_t>::max());
@@ -297,9 +297,9 @@ TEST(CountersTest, SummaryStatsCounters) {
   EXPECT_EQ(summary_stats_counter_1->MinValue(), -40);
   EXPECT_EQ(summary_stats_counter_1->MaxValue(), 40);
 
-  RuntimeProfile profile2(&pool, "Profile 2");
+  RuntimeProfile* profile2 = RuntimeProfile::Create(&pool, "Profile 2");
   RuntimeProfile::SummaryStatsCounter* summary_stats_counter_2 =
-    profile2.AddSummaryStatsCounter("summary_stats", TUnit::UNIT);
+    profile2->AddSummaryStatsCounter("summary_stats", TUnit::UNIT);
 
   summary_stats_counter_2->UpdateCounter(100);
   EXPECT_EQ(summary_stats_counter_2->value(), 100);
@@ -307,10 +307,10 @@ TEST(CountersTest, SummaryStatsCounters) {
   EXPECT_EQ(summary_stats_counter_2->MaxValue(), 100);
 
   TRuntimeProfileTree tprofile1;
-  profile1.ToThrift(&tprofile1);
+  profile1->ToThrift(&tprofile1);
 
   // Merge profile1 and profile2 and check that profile2 is overwritten.
-  profile2.Update(tprofile1);
+  profile2->Update(tprofile1);
   EXPECT_EQ(summary_stats_counter_2->value(), 4);
   EXPECT_EQ(summary_stats_counter_2->MinValue(), -40);
   EXPECT_EQ(summary_stats_counter_2->MaxValue(), 40);
@@ -319,16 +319,16 @@ TEST(CountersTest, SummaryStatsCounters) {
 
 TEST(CountersTest, DerivedCounters) {
   ObjectPool pool;
-  RuntimeProfile profile(&pool, "Profile");
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
   RuntimeProfile::Counter* bytes_counter =
-      profile.AddCounter("bytes", TUnit::BYTES);
+      profile->AddCounter("bytes", TUnit::BYTES);
   RuntimeProfile::Counter* ticks_counter =
-      profile.AddCounter("ticks", TUnit::TIME_NS);
+      profile->AddCounter("ticks", TUnit::TIME_NS);
   // set to 1 sec
   ticks_counter->Set(1000L * 1000L * 1000L);
 
   RuntimeProfile::DerivedCounter* throughput_counter =
-      profile.AddDerivedCounter("throughput", TUnit::BYTES,
+      profile->AddDerivedCounter("throughput", TUnit::BYTES,
       bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_counter, ticks_counter));
 
   bytes_counter->Set(10);
@@ -341,11 +341,11 @@ TEST(CountersTest, DerivedCounters) {
 
 TEST(CountersTest, AverageSetCounters) {
   ObjectPool pool;
-  RuntimeProfile profile(&pool, "Profile");
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
   RuntimeProfile::Counter* bytes_1_counter =
-      profile.AddCounter("bytes 1", TUnit::BYTES);
+      profile->AddCounter("bytes 1", TUnit::BYTES);
   RuntimeProfile::Counter* bytes_2_counter =
-      profile.AddCounter("bytes 2", TUnit::BYTES);
+      profile->AddCounter("bytes 2", TUnit::BYTES);
 
   bytes_1_counter->Set(10);
   RuntimeProfile::AveragedCounter bytes_avg(TUnit::BYTES);
@@ -366,9 +366,9 @@ TEST(CountersTest, AverageSetCounters) {
   EXPECT_EQ(bytes_avg.value(), 25);
 
   RuntimeProfile::Counter* double_1_counter =
-      profile.AddCounter("double 1", TUnit::DOUBLE_VALUE);
+      profile->AddCounter("double 1", TUnit::DOUBLE_VALUE);
   RuntimeProfile::Counter* double_2_counter =
-      profile.AddCounter("double 2", TUnit::DOUBLE_VALUE);
+      profile->AddCounter("double 2", TUnit::DOUBLE_VALUE);
   double_1_counter->Set(1.0f);
   RuntimeProfile::AveragedCounter double_avg(TUnit::DOUBLE_VALUE);
   double_avg.UpdateCounter(double_1_counter);
@@ -390,17 +390,17 @@ TEST(CountersTest, AverageSetCounters) {
 
 TEST(CountersTest, InfoStringTest) {
   ObjectPool pool;
-  RuntimeProfile profile(&pool, "Profile");
-  EXPECT_TRUE(profile.GetInfoString("Key") == NULL);
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
+  EXPECT_TRUE(profile->GetInfoString("Key") == NULL);
 
-  profile.AddInfoString("Key", "Value");
-  const string* value = profile.GetInfoString("Key");
+  profile->AddInfoString("Key", "Value");
+  const string* value = profile->GetInfoString("Key");
   EXPECT_TRUE(value != NULL);
   EXPECT_EQ(*value, "Value");
 
   // Convert it to thrift
   TRuntimeProfileTree tprofile;
-  profile.ToThrift(&tprofile);
+  profile->ToThrift(&tprofile);
 
   // Convert it back
   RuntimeProfile* from_thrift = RuntimeProfile::CreateFromThrift(
@@ -410,34 +410,34 @@ TEST(CountersTest, InfoStringTest) {
   EXPECT_EQ(*value, "Value");
 
   // Test update.
-  RuntimeProfile update_dst_profile(&pool, "Profile2");
-  update_dst_profile.Update(tprofile);
-  value = update_dst_profile.GetInfoString("Key");
+  RuntimeProfile* update_dst_profile = RuntimeProfile::Create(&pool, "Profile2");
+  update_dst_profile->Update(tprofile);
+  value = update_dst_profile->GetInfoString("Key");
   EXPECT_TRUE(value != NULL);
   EXPECT_EQ(*value, "Value");
 
   // Update the original profile, convert it to thrift and update from the dst
   // profile
-  profile.AddInfoString("Key", "NewValue");
-  profile.AddInfoString("Foo", "Bar");
-  EXPECT_EQ(*profile.GetInfoString("Key"), "NewValue");
-  EXPECT_EQ(*profile.GetInfoString("Foo"), "Bar");
-  profile.ToThrift(&tprofile);
+  profile->AddInfoString("Key", "NewValue");
+  profile->AddInfoString("Foo", "Bar");
+  EXPECT_EQ(*profile->GetInfoString("Key"), "NewValue");
+  EXPECT_EQ(*profile->GetInfoString("Foo"), "Bar");
+  profile->ToThrift(&tprofile);
 
-  update_dst_profile.Update(tprofile);
-  EXPECT_EQ(*update_dst_profile.GetInfoString("Key"), "NewValue");
-  EXPECT_EQ(*update_dst_profile.GetInfoString("Foo"), "Bar");
+  update_dst_profile->Update(tprofile);
+  EXPECT_EQ(*update_dst_profile->GetInfoString("Key"), "NewValue");
+  EXPECT_EQ(*update_dst_profile->GetInfoString("Foo"), "Bar");
 }
 
 TEST(CountersTest, RateCounters) {
   ObjectPool pool;
-  RuntimeProfile profile(&pool, "Profile");
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
 
   RuntimeProfile::Counter* bytes_counter =
-      profile.AddCounter("bytes", TUnit::BYTES);
+      profile->AddCounter("bytes", TUnit::BYTES);
 
   RuntimeProfile::Counter* rate_counter =
-      profile.AddRateCounter("RateCounter", bytes_counter);
+      profile->AddRateCounter("RateCounter", bytes_counter);
   EXPECT_TRUE(rate_counter->unit() == TUnit::BYTES_PER_SECOND);
 
   EXPECT_EQ(rate_counter->value(), 0);
@@ -449,8 +449,8 @@ TEST(CountersTest, RateCounters) {
 
   int64_t rate = rate_counter->value();
 
-  // Remove the counter so it no longer gets updates
-  PeriodicCounterUpdater::StopRateCounter(rate_counter);
+  // Stop the counter so it no longer gets updates
+  profile->StopPeriodicCounters();
 
   // The rate counter is not perfectly accurate.  Currently updated at 500ms intervals,
   // we should have seen somewhere between 1 and 3 updates (33 - 200 MB/s)
@@ -468,44 +468,42 @@ TEST(CountersTest, RateCounters) {
 
 TEST(CountersTest, BucketCounters) {
   ObjectPool pool;
-  RuntimeProfile profile(&pool, "Profile");
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
 
   RuntimeProfile::Counter* unit_counter =
-      profile.AddCounter("unit", TUnit::UNIT);
+      profile->AddCounter("unit", TUnit::UNIT);
 
   // Set the unit to 1 before sampling
   unit_counter->Set(1);
 
   // Create the bucket counters and start sampling
-  vector<RuntimeProfile::Counter*> buckets;
-  buckets.push_back(pool.Add(new RuntimeProfile::Counter(TUnit::DOUBLE_VALUE, 0)));
-  buckets.push_back(pool.Add(new RuntimeProfile::Counter(TUnit::DOUBLE_VALUE, 0)));
-  profile.RegisterBucketingCounters(unit_counter, &buckets);
+  vector<RuntimeProfile::Counter*>* buckets =
+      profile->AddBucketingCounters(unit_counter, 2);
 
   // Wait two seconds.
   sleep(2);
 
   // Stop sampling
-  PeriodicCounterUpdater::StopBucketingCounters(&buckets, true);
+  profile->StopPeriodicCounters();
 
   // TODO: change the value to double
   // The value of buckets[0] should be zero and buckets[1] should be 1.
-  double val0 = buckets[0]->double_value();
-  double val1 = buckets[1]->double_value();
+  double val0 = (*buckets)[0]->double_value();
+  double val1 = (*buckets)[1]->double_value();
   EXPECT_EQ(0, val0);
   EXPECT_EQ(100, val1);
 
   // Wait another second.  The counter has been removed. So the value should not be
   // changed (much).
   sleep(2);
-  EXPECT_EQ(val0, buckets[0]->double_value());
-  EXPECT_EQ(val1, buckets[1]->double_value());
+  EXPECT_EQ(val0, (*buckets)[0]->double_value());
+  EXPECT_EQ(val1, (*buckets)[1]->double_value());
 }
 
 TEST(CountersTest, EventSequences) {
   ObjectPool pool;
-  RuntimeProfile profile(&pool, "Profile");
-  RuntimeProfile::EventSequence* seq = profile.AddEventSequence("event sequence");
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
+  RuntimeProfile::EventSequence* seq = profile->AddEventSequence("event sequence");
   seq->MarkEvent("aaaa");
   seq->MarkEvent("bbbb");
   seq->MarkEvent("cccc");
@@ -524,7 +522,7 @@ TEST(CountersTest, EventSequences) {
   }
 
   TRuntimeProfileTree thrift_profile;
-  profile.ToThrift(&thrift_profile);
+  profile->ToThrift(&thrift_profile);
   EXPECT_TRUE(thrift_profile.nodes[0].__isset.event_sequences);
   EXPECT_EQ(1, thrift_profile.nodes[0].event_sequences.size());
 

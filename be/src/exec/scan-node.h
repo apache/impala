@@ -82,10 +82,13 @@ class ScanNode : public ExecNode {
   ScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
     : ExecNode(pool, tnode, descs),
       scan_range_params_(NULL),
-      active_scanner_thread_counter_(TUnit::UNIT, 0),
-      active_hdfs_read_thread_counter_(TUnit::UNIT, 0) {}
+      active_scanner_thread_counter_(TUnit::UNIT, 0) {}
 
   virtual Status Prepare(RuntimeState* state) WARN_UNUSED_RESULT;
+
+  /// Stops all periodic counters and calls ExecNode::Close(). Subclasses of ScanNode can
+  /// start periodic counters and rely on this function stopping them.
+  virtual void Close(RuntimeState* state);
 
   /// This should be called before Prepare(), and the argument must be not destroyed until
   /// after Prepare().
@@ -172,18 +175,7 @@ class ScanNode : public ExecNode {
   /// This should be created in Open and stopped when all the scanner threads are done.
   RuntimeProfile::Counter* average_scanner_thread_concurrency_;
 
-  /// The number of active hdfs reading threads reading for this node.
-  RuntimeProfile::Counter active_hdfs_read_thread_counter_;
-
-  /// Average number of active hdfs reading threads
-  /// This should be created in Open and stopped when all the scanner threads are done.
-  RuntimeProfile::Counter* average_hdfs_read_thread_concurrency_;
-
   RuntimeProfile::Counter* num_scanner_threads_started_counter_;
-
-  /// HDFS read thread concurrency bucket: bucket[i] refers to the number of sample
-  /// taken where there are i concurrent hdfs read thread running
-  std::vector<RuntimeProfile::Counter*> hdfs_read_thread_concurrency_bucket_;
 };
 
 }

@@ -105,7 +105,7 @@ class DataStreamRecvr : public DataStreamRecvrBase {
   DataStreamRecvr(DataStreamMgr* stream_mgr, MemTracker* parent_tracker,
       const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
       PlanNodeId dest_node_id, int num_senders, bool is_merging,
-      int64_t total_buffer_limit, RuntimeProfile* profile);
+      int64_t total_buffer_limit, RuntimeProfile* parent_profile);
 
   /// Add a new batch of rows to the appropriate sender queue, blocking if the queue is
   /// full. Called from DataStreamMgr.
@@ -161,8 +161,9 @@ class DataStreamRecvr : public DataStreamRecvrBase {
   /// Pool of sender queues.
   ObjectPool sender_queue_pool_;
 
-  /// Runtime profile storing the counters below.
-  RuntimeProfile* profile_;
+  /// Runtime profile storing the counters below. Child of 'parent_profile' passed into
+  /// constructor.
+  RuntimeProfile* const profile_;
 
   /// Number of bytes received
   RuntimeProfile::Counter* bytes_received_counter_;

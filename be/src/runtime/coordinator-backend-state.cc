@@ -433,7 +433,7 @@ Coordinator::BackendState::InstanceStats::InstanceStats(
     total_ranges_complete_(0) {
   const string& profile_name = Substitute("Instance $0 (host=$1)",
       PrintId(exec_params.instance_id), lexical_cast<string>(exec_params.host));
-  profile_ = obj_pool->Add(new RuntimeProfile(obj_pool, profile_name));
+  profile_ = RuntimeProfile::Create(obj_pool, profile_name);
   fragment_stats->root_profile()->AddChild(profile_);
 
   // add total split size to fragment_stats->bytes_assigned()
@@ -514,10 +514,8 @@ void Coordinator::BackendState::InstanceStats::Update(
 
 Coordinator::FragmentStats::FragmentStats(const string& avg_profile_name,
     const string& root_profile_name, int num_instances, ObjectPool* obj_pool)
-  : avg_profile_(
-      obj_pool->Add(new RuntimeProfile(obj_pool, avg_profile_name, true))),
-    root_profile_(
-      obj_pool->Add(new RuntimeProfile(obj_pool, root_profile_name))),
+  : avg_profile_(RuntimeProfile::Create(obj_pool, avg_profile_name, true)),
+    root_profile_(RuntimeProfile::Create(obj_pool, root_profile_name)),
     num_instances_(num_instances) {
 }
 

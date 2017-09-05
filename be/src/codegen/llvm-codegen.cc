@@ -170,8 +170,8 @@ LlvmCodeGen::LlvmCodeGen(RuntimeState* state, ObjectPool* pool,
     MemTracker* parent_mem_tracker, const string& id)
   : state_(state),
     id_(id),
-    profile_(pool, "CodeGen"),
-    mem_tracker_(pool->Add(new MemTracker(&profile_, -1, "CodeGen", parent_mem_tracker))),
+    profile_(RuntimeProfile::Create(pool, "CodeGen")),
+    mem_tracker_(pool->Add(new MemTracker(profile_, -1, "CodeGen", parent_mem_tracker))),
     optimizations_enabled_(false),
     is_corrupt_(false),
     is_compiled_(false),
@@ -181,21 +181,21 @@ LlvmCodeGen::LlvmCodeGen(RuntimeState* state, ObjectPool* pool,
     loaded_functions_(IRFunction::FN_END, NULL) {
   DCHECK(llvm_initialized_) << "Must call LlvmCodeGen::InitializeLlvm first.";
 
-  load_module_timer_ = ADD_TIMER(&profile_, "LoadTime");
-  prepare_module_timer_ = ADD_TIMER(&profile_, "PrepareTime");
-  module_bitcode_size_ = ADD_COUNTER(&profile_, "ModuleBitcodeSize", TUnit::BYTES);
-  codegen_timer_ = ADD_TIMER(&profile_, "CodegenTime");
-  optimization_timer_ = ADD_TIMER(&profile_, "OptimizationTime");
-  compile_timer_ = ADD_TIMER(&profile_, "CompileTime");
-  num_functions_ = ADD_COUNTER(&profile_, "NumFunctions", TUnit::UNIT);
-  num_instructions_ = ADD_COUNTER(&profile_, "NumInstructions", TUnit::UNIT);
+  load_module_timer_ = ADD_TIMER(profile_, "LoadTime");
+  prepare_module_timer_ = ADD_TIMER(profile_, "PrepareTime");
+  module_bitcode_size_ = ADD_COUNTER(profile_, "ModuleBitcodeSize", TUnit::BYTES);
+  codegen_timer_ = ADD_TIMER(profile_, "CodegenTime");
+  optimization_timer_ = ADD_TIMER(profile_, "OptimizationTime");
+  compile_timer_ = ADD_TIMER(profile_, "CompileTime");
+  num_functions_ = ADD_COUNTER(profile_, "NumFunctions", TUnit::UNIT);
+  num_instructions_ = ADD_COUNTER(profile_, "NumInstructions", TUnit::UNIT);
 }
 
 Status LlvmCodeGen::CreateFromFile(RuntimeState* state, ObjectPool* pool,
     MemTracker* parent_mem_tracker, const string& file, const string& id,
     scoped_ptr<LlvmCodeGen>* codegen) {
   codegen->reset(new LlvmCodeGen(state, pool, parent_mem_tracker, id));
-  SCOPED_TIMER((*codegen)->profile_.total_time_counter());
+  SCOPED_TIMER((*codegen)->profile_->total_time_counter());
 
   unique_ptr<Module> loaded_module;
   RETURN_IF_ERROR((*codegen)->LoadModuleFromFile(file, &loaded_module));
@@ -206,7 +206,7 @@ Status LlvmCodeGen::CreateFromFile(RuntimeState* state, ObjectPool* pool,
 Status LlvmCodeGen::CreateFromMemory(RuntimeState* state, ObjectPool* pool,
     MemTracker* parent_mem_tracker, const string& id, scoped_ptr<LlvmCodeGen>* codegen) {
   codegen->reset(new LlvmCodeGen(state, pool, parent_mem_tracker, id));
-  SCOPED_TIMER((*codegen)->profile_.total_time_counter());
+  SCOPED_TIMER((*codegen)->profile_->total_time_counter());
 
   // Select the appropriate IR version. We cannot use LLVM IR with SSE4.2 instructions on
   // a machine without SSE4.2 support.
@@ -276,7 +276,7 @@ Status LlvmCodeGen::LoadModuleFromMemory(unique_ptr<MemoryBuffer> module_ir_buf,
 Status LlvmCodeGen::LinkModule(const string& file) {
   if (linked_modules_.find(file) != linked_modules_.end()) return Status::OK();
 
-  SCOPED_TIMER(profile_.total_time_counter());
+  SCOPED_TIMER(profile_->total_time_counter());
   unique_ptr<Module> new_module;
   RETURN_IF_ERROR(LoadModuleFromFile(file, &new_module));
 
@@ -324,7 +324,7 @@ Status LlvmCodeGen::CreateImpalaCodegen(RuntimeState* state,
   LlvmCodeGen* codegen = codegen_ret->get();
 
   // Parse module for cross compiled functions and types
-  SCOPED_TIMER(codegen->profile_.total_time_counter());
+  SCOPED_TIMER(codegen->profile_->total_time_counter());
   SCOPED_TIMER(codegen->prepare_module_timer_);
 
   // Get type for StringValue
@@ -620,7 +620,7 @@ Status LlvmCodeGen::MaterializeFunctionHelper(Function *fn) {
 }
 
 Status LlvmCodeGen::MaterializeFunction(Function *fn) {
-  SCOPED_TIMER(profile_.total_time_counter());
+  SCOPED_TIMER(profile_->total_time_counter());
   SCOPED_TIMER(prepare_module_timer_);
   return MaterializeFunctionHelper(fn);
 }
@@ -1037,7 +1037,7 @@ Status LlvmCodeGen::FinalizeModule() {
   }
 
   if (is_corrupt_) return Status("Module is corrupt.");
-  SCOPED_TIMER(profile_.total_time_counter());
+  SCOPED_TIMER(profile_->total_time_counter());
 
   // Don't waste time optimizing module if there are no functions to JIT. This can happen
   // if the codegen object is created but no functions are successfully codegen'd.

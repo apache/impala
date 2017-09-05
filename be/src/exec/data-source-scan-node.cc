@@ -365,15 +365,13 @@ Status DataSourceScanNode::Reset(RuntimeState* state) {
 void DataSourceScanNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   SCOPED_TIMER(runtime_profile_->total_time_counter());
-  PeriodicCounterUpdater::StopRateCounter(total_throughput_counter());
-  PeriodicCounterUpdater::StopTimeSeriesCounter(bytes_read_timeseries_counter_);
   input_batch_.reset();
   TCloseParams params;
   params.__set_scan_handle(scan_handle_);
   TCloseResult result;
   Status status = data_source_executor_->Close(params, &result);
   if (!status.ok()) state->LogError(status.msg());
-  ExecNode::Close(state);
+  ScanNode::Close(state);
 }
 
 void DataSourceScanNode::DebugString(int indentation_level, stringstream* out) const {

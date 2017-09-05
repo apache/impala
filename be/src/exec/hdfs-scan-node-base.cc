@@ -97,7 +97,8 @@ HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const TPlanNode& tnode,
       thrift_dict_filter_conjuncts_map_(
           tnode.hdfs_scan_node.__isset.dictionary_filter_conjuncts ?
           &tnode.hdfs_scan_node.dictionary_filter_conjuncts : nullptr),
-      disks_accessed_bitmap_(TUnit::UNIT, 0) {
+      disks_accessed_bitmap_(TUnit::UNIT, 0),
+      active_hdfs_read_thread_counter_(TUnit::UNIT, 0) {
 }
 
 HdfsScanNodeBase::~HdfsScanNodeBase() {
@@ -142,8 +143,8 @@ Status HdfsScanNodeBase::Init(const TPlanNode& tnode, RuntimeState* state) {
     filter_ctx.filter = state->filter_bank()->RegisterFilter(filter_desc, false);
     string filter_profile_title = Substitute("Filter $0 ($1)", filter_desc.filter_id,
         PrettyPrinter::Print(filter_ctx.filter->filter_size(), TUnit::BYTES));
-    RuntimeProfile* profile = state->obj_pool()->Add(
-        new RuntimeProfile(state->obj_pool(), filter_profile_title));
+    RuntimeProfile* profile =
+        RuntimeProfile::Create(state->obj_pool(), filter_profile_title);
     runtime_profile_->AddChild(profile);
     filter_ctx.stats = state->obj_pool()->Add(new FilterStats(profile,
         target.is_bound_by_partition_columns));
@@ -441,12 +442,8 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
   max_compressed_text_file_length_ = runtime_profile()->AddHighWaterMarkCounter(
       "MaxCompressedTextFileLength", TUnit::BYTES);
 
-  for (int i = 0; i < state->io_mgr()->num_total_disks() + 1; ++i) {
-    hdfs_read_thread_concurrency_bucket_.push_back(
-        pool_->Add(new RuntimeProfile::Counter(TUnit::DOUBLE_VALUE, 0)));
-  }
-  runtime_profile()->RegisterBucketingCounters(&active_hdfs_read_thread_counter_,
-      &hdfs_read_thread_concurrency_bucket_);
+  hdfs_read_thread_concurrency_bucket_ = runtime_profile()->AddBucketingCounters(
+      &active_hdfs_read_thread_counter_, state->io_mgr()->num_total_disks() + 1);
 
   counters_running_ = true;
 
@@ -851,18 +848,13 @@ void HdfsScanNodeBase::StopAndFinalizeCounters() {
   if (!counters_running_) return;
   counters_running_ = false;
 
-  PeriodicCounterUpdater::StopTimeSeriesCounter(bytes_read_timeseries_counter_);
-  PeriodicCounterUpdater::StopRateCounter(total_throughput_counter());
-  PeriodicCounterUpdater::StopSamplingCounter(average_scanner_thread_concurrency_);
-  PeriodicCounterUpdater::StopSamplingCounter(average_hdfs_read_thread_concurrency_);
-  PeriodicCounterUpdater::StopBucketingCounters(&hdfs_read_thread_concurrency_bucket_,
-      true);
+  runtime_profile_->StopPeriodicCounters();
 
   // Output hdfs read thread concurrency into info string
   stringstream ss;
-  for (int i = 0; i < hdfs_read_thread_concurrency_bucket_.size(); ++i) {
+  for (int i = 0; i < hdfs_read_thread_concurrency_bucket_->size(); ++i) {
     ss << i << ":" << setprecision(4)
-       << hdfs_read_thread_concurrency_bucket_[i]->double_value() << "% ";
+       << (*hdfs_read_thread_concurrency_bucket_)[i]->double_value() << "% ";
   }
   runtime_profile_->AddInfoString("Hdfs Read Thread Concurrency Bucket", ss.str());
 
