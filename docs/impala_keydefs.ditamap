@@ -10516,6 +10516,7 @@ under the License.
   <keydef href="https://issues.apache.org/jira/browse/IMPALA-9999" scope="external" format="html" keys="IMPALA-9999"/>
 
 <!-- Short form of mapping from Impala release to vendor-specific releases, for use in headings. -->
+  <keydef keys="impala210"><topicmeta><keywords><keyword>Impala 2.10</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala29"><topicmeta><keywords><keyword>Impala 2.9</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala28"><topicmeta><keywords><keyword>Impala 2.8</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala27"><topicmeta><keywords><keyword>Impala 2.7</keyword></keywords></topicmeta></keydef>
@@ -10530,6 +10531,7 @@ under the License.
   <keydef keys="impala13"><topicmeta><keywords><keyword>Impala 1.3</keyword></keywords></topicmeta></keydef>
 
 <!-- 3-part forms of version numbers, for use in release notes. -->
+  <keydef keys="impala2100"><topicmeta><keywords><keyword>Impala 2.10.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala290"><topicmeta><keywords><keyword>Impala 2.9.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala280"><topicmeta><keywords><keyword>Impala 2.8.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala270"><topicmeta><keywords><keyword>Impala 2.7.0</keyword></keywords></topicmeta></keydef>
@@ -10566,6 +10568,7 @@ under the License.
   <keydef keys="impala130"><topicmeta><keywords><keyword>Impala 1.3.0</keyword></keywords></topicmeta></keydef>
 
 <!-- Long form of mapping from Impala release to vendor-specific releases, for use in running text. -->
+  <keydef keys="impala210_full"><topicmeta><keywords><keyword>Impala 2.10</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala29_full"><topicmeta><keywords><keyword>Impala 2.9</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala28_full"><topicmeta><keywords><keyword>Impala 2.8</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala27_full"><topicmeta><keywords><keyword>Impala 2.7</keyword></keywords></topicmeta></keydef>
@@ -10581,6 +10584,7 @@ under the License.
   <keydef keys="impala13_full"><topicmeta><keywords><keyword>Impala 1.3</keyword></keywords></topicmeta></keydef>
 
 <!-- Pointers to changelog pages -->
+  <keydef keys="changelog_210" href="https://impala.incubator.apache.org/docs/changelog-2.10.html" scope="external" format="html"/>
   <keydef keys="changelog_29" href="https://impala.incubator.apache.org/docs/changelog-2.9.html" scope="external" format="html"/>
   <keydef keys="changelog_28" href="https://impala.incubator.apache.org/docs/changelog-2.8.html" scope="external" format="html"/>
 

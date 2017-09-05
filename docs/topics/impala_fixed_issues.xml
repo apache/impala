@@ -46,6 +46,22 @@ under the License.
     <p outputclass="toc inpage"/>
   </conbody>
 
+<!-- All 2.10.x subsections go under here -->
+
+  <concept rev="2.10.0" id="fixed_issues_2100">
+
+    <title>Issues Fixed in <keyword keyref="impala2100"/></title>
+
+    <conbody>
+
+      <p>
+        For the full list of issues closed in this release, including bug fixes,
+        see the <xref keyref="changelog_210">changelog for <keyword keyref="impala210"/></xref>.
+      </p>
+
+    </conbody>
+  </concept>
+
 <!-- All 2.9.x subsections go under here -->
 
   <concept rev="2.9.0" id="fixed_issues_290">
