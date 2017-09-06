@@ -48,9 +48,13 @@ static const string PREPARE_FOR_READ_FAILED_ERROR_MSG =
 using namespace impala;
 using llvm::ConstantInt;
 using llvm::Function;
+using llvm::LLVMContext;
+using llvm::PointerType;
 using llvm::Type;
 using llvm::Value;
 using strings::Substitute;
+
+const char* PhjBuilder::LLVM_CLASS_NAME = "class.impala::PhjBuilder";
 
 PhjBuilder::PhjBuilder(int join_node_id, TJoinOp::type join_op,
     const RowDescriptor* probe_row_desc, const RowDescriptor* build_row_desc,
@@ -491,6 +495,10 @@ void PhjBuilder::AllocateRuntimeFilters() {
   }
 }
 
+void PhjBuilder::InsertRuntimeFilters(TupleRow* build_row) noexcept {
+  for (const FilterContext& ctx : filter_ctxs_) ctx.Insert(build_row);
+}
+
 void PhjBuilder::PublishRuntimeFilters(int64_t num_build_rows) {
   int32_t num_enabled_filters = 0;
   // Use 'num_build_rows' to estimate FP-rate of each Bloom filter, and publish
@@ -761,10 +769,14 @@ void PhjBuilder::Codegen(LlvmCodeGen* codegen) {
   Function* eval_build_row_fn;
   codegen_status.MergeStatus(ht_ctx_->CodegenEvalRow(codegen, true, &eval_build_row_fn));
 
+  Function* insert_filters_fn;
+  codegen_status.MergeStatus(
+      CodegenInsertRuntimeFilters(codegen, filter_exprs_, &insert_filters_fn));
+
   if (codegen_status.ok()) {
     TPrefetchMode::type prefetch_mode = runtime_state_->query_options().prefetch_mode;
-    build_codegen_status =
-        CodegenProcessBuildBatch(codegen, hash_fn, murmur_hash_fn, eval_build_row_fn);
+    build_codegen_status = CodegenProcessBuildBatch(
+        codegen, hash_fn, murmur_hash_fn, eval_build_row_fn, insert_filters_fn);
     insert_codegen_status = CodegenInsertBatch(codegen, hash_fn, murmur_hash_fn,
         eval_build_row_fn, prefetch_mode);
   } else {
@@ -788,8 +800,8 @@ string PhjBuilder::DebugString() const {
   return ss.str();
 }
 
-Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen,
-    Function* hash_fn, Function* murmur_hash_fn, Function* eval_row_fn) {
+Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen, Function* hash_fn,
+    Function* murmur_hash_fn, Function* eval_row_fn, Function* insert_filters_fn) {
   Function* process_build_batch_fn =
       codegen->GetFunction(IRFunction::PHJ_PROCESS_BUILD_BATCH, true);
   DCHECK(process_build_batch_fn != NULL);
@@ -797,6 +809,10 @@ Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen,
   // Replace call sites
   int replaced =
       codegen->ReplaceCallSites(process_build_batch_fn, eval_row_fn, "EvalBuildRow");
+  DCHECK_EQ(replaced, 1);
+
+  replaced = codegen->ReplaceCallSites(
+      process_build_batch_fn, insert_filters_fn, "InsertRuntimeFilters");
   DCHECK_EQ(replaced, 1);
 
   // Replace some hash table parameters with constants.
@@ -922,5 +938,66 @@ Status PhjBuilder::CodegenInsertBatch(LlvmCodeGen* codegen, Function* hash_fn,
   codegen->AddFunctionToJit(insert_batch_fn, reinterpret_cast<void**>(&insert_batch_fn_));
   codegen->AddFunctionToJit(
       insert_batch_fn_level0, reinterpret_cast<void**>(&insert_batch_fn_level0_));
+  return Status::OK();
+}
+
+// An example of the generated code for a query with two filters built by this node.
+//
+// ; Function Attrs: noinline
+// define void @InsertRuntimeFilters(%"class.impala::PhjBuilder"* %this,
+//     %"class.impala::TupleRow"* %row) #46 {
+// entry:
+//   call void @FilterContextInsert(%"struct.impala::FilterContext"* inttoptr (
+//       i64 197870464 to %"struct.impala::FilterContext"*),
+//       %"class.impala::TupleRow"* %row)
+//   call void @FilterContextInsert.14(%"struct.impala::FilterContext"* inttoptr (
+//       i64 197870496 to %"struct.impala::FilterContext"*),
+//       %"class.impala::TupleRow"* %row)
+//   ret void
+// }
+Status PhjBuilder::CodegenInsertRuntimeFilters(
+    LlvmCodeGen* codegen, const vector<ScalarExpr*>& filter_exprs, Function** fn) {
+  LLVMContext& context = codegen->context();
+  LlvmBuilder builder(context);
+
+  *fn = nullptr;
+  Type* this_type = codegen->GetPtrType(PhjBuilder::LLVM_CLASS_NAME);
+  PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
+  LlvmCodeGen::FnPrototype prototype(
+      codegen, "InsertRuntimeFilters", codegen->void_type());
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("this", this_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
+
+  Value* args[2];
+  Function* insert_runtime_filters_fn = prototype.GeneratePrototype(&builder, args);
+  Value* row_arg = args[1];
+
+  int num_filters = filter_exprs.size();
+  for (int i = 0; i < num_filters; ++i) {
+    Function* insert_fn;
+    RETURN_IF_ERROR(FilterContext::CodegenInsert(codegen, filter_exprs_[i], &insert_fn));
+    PointerType* filter_context_type =
+        codegen->GetPtrType(FilterContext::LLVM_CLASS_NAME);
+    Value* filter_context_ptr =
+        codegen->CastPtrToLlvmPtr(filter_context_type, &filter_ctxs_[i]);
+
+    Value* insert_args[] = {filter_context_ptr, row_arg};
+    builder.CreateCall(insert_fn, insert_args);
+  }
+
+  builder.CreateRetVoid();
+
+  if (num_filters > 0) {
+    // Don't inline this function to avoid code bloat in ProcessBuildBatch().
+    // If there is any filter, InsertRuntimeFilters() is large enough to not benefit
+    // much from inlining.
+    insert_runtime_filters_fn->addFnAttr(llvm::Attribute::NoInline);
+  }
+
+  *fn = codegen->FinalizeFunction(insert_runtime_filters_fn);
+  if (*fn == nullptr) {
+    return Status("Codegen'd PhjBuilder::InsertRuntimeFilters() failed "
+                  "verification, see log");
+  }
   return Status::OK();
 }

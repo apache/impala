@@ -57,6 +57,7 @@
 #include "runtime/raw-value-ir.cc"
 #include "runtime/runtime-filter-ir.cc"
 #include "udf/udf-ir.cc"
+#include "util/bloom-filter-ir.cc"
 #include "util/hash-util-ir.cc"
 
 #pragma clang diagnostic pop

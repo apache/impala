@@ -115,7 +115,14 @@ struct FilterContext {
   /// argument to RuntimeFilter::Eval() with a constant. On success, 'fn' is set to
   /// the generated function. On failure, an error status is returned.
   static Status CodegenEval(LlvmCodeGen* codegen, ScalarExpr* filter_expr,
-     llvm::Function** fn) WARN_UNUSED_RESULT;
+      llvm::Function** fn) WARN_UNUSED_RESULT;
+
+  /// Codegen Insert() by codegen'ing the expression 'filter_expr', replacing the type
+  /// argument to RawValue::GetHashValue() with a constant, and calling into the correct
+  /// version of BloomFilter::Insert(), depending on the presence of AVX.  On success,
+  /// 'fn' is set to the generated function. On failure, an error status is returned.
+  static Status CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_expr,
+      llvm::Function** fn) WARN_UNUSED_RESULT;
 };
 
 }

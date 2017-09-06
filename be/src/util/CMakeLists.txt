@@ -32,6 +32,7 @@ add_library(Util
   bitmap.cc
   bit-util.cc
   bloom-filter.cc
+  bloom-filter-ir.cc
   coding-util.cc
   codec.cc
   common-metrics.cc

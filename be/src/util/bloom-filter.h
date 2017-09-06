@@ -131,6 +131,12 @@ class BloomFilter {
 
   Bucket* directory_;
 
+  // Same as Insert(), but skips the CPU check and assumes that AVX is not available.
+  void InsertNoAvx2(const uint32_t hash) noexcept;
+
+  // Same as Insert(), but skips the CPU check and assumes that AVX is available.
+  void InsertAvx2(const uint32_t hash) noexcept;
+
   /// Does the actual work of Insert(). bucket_idx is the index of the bucket to insert
   /// into and 'hash' is the value passed to Insert().
   void BucketInsert(const uint32_t bucket_idx, const uint32_t hash) noexcept;

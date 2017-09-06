@@ -193,6 +193,8 @@ ir_functions = [
   ["GENERIC_IS_NULL_STRING", "IrGenericIsNullString"],
   ["RAW_VALUE_COMPARE",
    "_ZN6impala8RawValue7CompareEPKvS2_RKNS_10ColumnTypeE"],
+  ["RAW_VALUE_GET_HASH_VALUE",
+   "_ZN6impala8RawValue12GetHashValueEPKvRKNS_10ColumnTypeEj"],
   ["TOPN_NODE_INSERT_BATCH",
    "_ZN6impala8TopNNode11InsertBatchEPNS_8RowBatchE"],
   ["MEMPOOL_ALLOCATE",
@@ -202,7 +204,9 @@ ir_functions = [
   ["RUNTIME_FILTER_EVAL",
    "_ZNK6impala13RuntimeFilter4EvalEPvRKNS_10ColumnTypeE"],
   ["UNION_MATERIALIZE_BATCH",
-  "_ZN6impala9UnionNode16MaterializeBatchEPNS_8RowBatchEPPh"]
+  "_ZN6impala9UnionNode16MaterializeBatchEPNS_8RowBatchEPPh"],
+  ["BLOOM_FILTER_INSERT_NO_AVX2", "_ZN6impala11BloomFilter12InsertNoAvx2Ej"],
+  ["BLOOM_FILTER_INSERT_AVX2", "_ZN6impala11BloomFilter10InsertAvx2Ej"]
 ]
 
 enums_preamble = '\
