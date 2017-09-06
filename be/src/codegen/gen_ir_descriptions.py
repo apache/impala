@@ -206,7 +206,8 @@ ir_functions = [
   ["UNION_MATERIALIZE_BATCH",
   "_ZN6impala9UnionNode16MaterializeBatchEPNS_8RowBatchEPPh"],
   ["BLOOM_FILTER_INSERT_NO_AVX2", "_ZN6impala11BloomFilter12InsertNoAvx2Ej"],
-  ["BLOOM_FILTER_INSERT_AVX2", "_ZN6impala11BloomFilter10InsertAvx2Ej"]
+  ["BLOOM_FILTER_INSERT_AVX2", "_ZN6impala11BloomFilter10InsertAvx2Ej"],
+  ["SELECT_NODE_COPY_ROWS", "_ZN6impala10SelectNode8CopyRowsEPNS_8RowBatchE"]
 ]
 
 enums_preamble = '\

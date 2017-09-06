@@ -16,6 +16,7 @@
 // under the License.
 
 #include "exec/select-node.h"
+#include "codegen/llvm-codegen.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "runtime/row-batch.h"
@@ -26,6 +27,8 @@
 
 #include "common/names.h"
 
+using llvm::Function;
+
 namespace impala {
 
 SelectNode::SelectNode(
@@ -33,12 +36,42 @@ SelectNode::SelectNode(
     : ExecNode(pool, tnode, descs),
       child_row_batch_(NULL),
       child_row_idx_(0),
-      child_eos_(false) {
+      child_eos_(false),
+      codegend_copy_rows_fn_(nullptr) {
 }
 
 Status SelectNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
+  return Status::OK();
+}
+
+void SelectNode::Codegen(RuntimeState* state) {
+  DCHECK(state->ShouldCodegen());
+  ExecNode::Codegen(state);
+  if (IsNodeCodegenDisabled()) return;
+  SCOPED_TIMER(state->codegen()->codegen_timer());
+  Status codegen_status = CodegenCopyRows(state);
+  runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
+}
+
+Status SelectNode::CodegenCopyRows(RuntimeState* state) {
+  LlvmCodeGen* codegen = state->codegen();
+  DCHECK(codegen != nullptr);
+  Function* copy_rows_fn = codegen->GetFunction(IRFunction::SELECT_NODE_COPY_ROWS, true);
+  DCHECK(copy_rows_fn != nullptr);
+
+  Function* eval_conjuncts_fn;
+  RETURN_IF_ERROR(
+      ExecNode::CodegenEvalConjuncts(codegen, conjuncts_, &eval_conjuncts_fn));
+
+  int replaced = codegen->ReplaceCallSites(copy_rows_fn, eval_conjuncts_fn,
+      "EvalConjuncts");
+  DCHECK_EQ(replaced, 1);
+  copy_rows_fn = codegen->FinalizeFunction(copy_rows_fn);
+  if (copy_rows_fn == nullptr) return Status("Failed to finalize CopyRows().");
+  codegen->AddFunctionToJit(copy_rows_fn,
+      reinterpret_cast<void**>(&codegend_copy_rows_fn_));
   return Status::OK();
 }
 
@@ -54,67 +87,30 @@ Status SelectNode::Open(RuntimeState* state) {
 Status SelectNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
-
-  if (ReachedLimit() || (child_row_idx_ == child_row_batch_->num_rows() && child_eos_)) {
-    // we're already done or we exhausted the last child batch and there won't be any
-    // new ones
-    *eos = true;
-    child_row_batch_->TransferResourceOwnership(row_batch);
-    return Status::OK();
-  }
-  *eos = false;
-
   // start (or continue) consuming row batches from child
-  while (true) {
+  do {
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(QueryMaintenance(state));
-    if (child_row_idx_ == child_row_batch_->num_rows()) {
-      child_row_idx_ = 0;
-      // fetch next batch
-      child_row_batch_->TransferResourceOwnership(row_batch);
-      child_row_batch_->Reset();
-      if (row_batch->AtCapacity()) return Status::OK();
+    if (child_row_batch_->num_rows() == 0) {
+      // Fetch rows from child if either child row batch has been
+      // consumed completely or it is empty.
       RETURN_IF_ERROR(child(0)->GetNext(state, child_row_batch_.get(), &child_eos_));
     }
-
-    if (CopyRows(row_batch)) {
-      *eos = ReachedLimit()
-          || (child_row_idx_ == child_row_batch_->num_rows() && child_eos_);
-      if (*eos) child_row_batch_->TransferResourceOwnership(row_batch);
-      return Status::OK();
+    if (codegend_copy_rows_fn_ != nullptr) {
+      codegend_copy_rows_fn_(this, row_batch);
+    } else {
+      CopyRows(row_batch);
     }
-    if (child_eos_) {
-      // finished w/ last child row batch, and child eos is true
+    COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+    *eos = ReachedLimit()
+        || (child_row_idx_ == child_row_batch_->num_rows() && child_eos_);
+    if (*eos || child_row_idx_ == child_row_batch_->num_rows()) {
+      child_row_idx_ = 0;
       child_row_batch_->TransferResourceOwnership(row_batch);
-      *eos = true;
-      return Status::OK();
+      child_row_batch_->Reset();
     }
-  }
+  } while (!*eos && !row_batch->AtCapacity());
   return Status::OK();
-}
-
-bool SelectNode::CopyRows(RowBatch* output_batch) {
-  ScalarExprEvaluator* const* conjunct_evals = conjunct_evals_.data();
-  int num_conjuncts = conjuncts_.size();
-  DCHECK_EQ(num_conjuncts, conjunct_evals_.size());
-
-  while (child_row_idx_ < child_row_batch_->num_rows()) {
-    // Add a new row to output_batch
-    int dst_row_idx = output_batch->AddRow();
-    TupleRow* dst_row = output_batch->GetRow(dst_row_idx);
-    TupleRow* src_row = child_row_batch_->GetRow(child_row_idx_);
-    // Make sure to increment row idx before returning.
-    ++child_row_idx_;
-
-    if (EvalConjuncts(conjunct_evals, num_conjuncts, src_row)) {
-      output_batch->CopyRow(src_row, dst_row);
-      output_batch->CommitLastRow();
-      ++num_rows_returned_;
-      COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-      if (ReachedLimit() || output_batch->AtCapacity()) return true;
-    }
-  }
-  return output_batch->AtCapacity();
 }
 
 Status SelectNode::Reset(RuntimeState* state) {

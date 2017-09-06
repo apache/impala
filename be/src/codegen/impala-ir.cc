@@ -33,6 +33,7 @@
 #include "exec/partitioned-aggregation-node-ir.cc"
 #include "exec/partitioned-hash-join-builder-ir.cc"
 #include "exec/partitioned-hash-join-node-ir.cc"
+#include "exec/select-node-ir.cc"
 #include "exec/topn-node-ir.cc"
 #include "exec/union-node-ir.cc"
 #include "exprs/aggregate-functions-ir.cc"

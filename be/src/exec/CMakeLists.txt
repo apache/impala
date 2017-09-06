@@ -85,6 +85,7 @@ add_library(Exec
   scan-node.cc
   scanner-context.cc
   select-node.cc
+  select-node-ir.cc
   singular-row-src-node.cc
   sort-node.cc
   subplan-node.cc

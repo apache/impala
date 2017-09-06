@@ -36,11 +36,12 @@ class SelectNode : public ExecNode {
  public:
   SelectNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
-  virtual Status Prepare(RuntimeState* state);
-  virtual Status Open(RuntimeState* state);
-  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
-  virtual Status Reset(RuntimeState* state);
-  virtual void Close(RuntimeState* state);
+  virtual Status Prepare(RuntimeState* state) override;
+  virtual void Codegen(RuntimeState* state) override;
+  virtual Status Open(RuntimeState* state) override;
+  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
+  virtual Status Reset(RuntimeState* state) override;
+  virtual void Close(RuntimeState* state) override;
 
  private:
   /////////////////////////////////////////
@@ -58,10 +59,15 @@ class SelectNode : public ExecNode {
   /// END: Members that must be Reset()
   /////////////////////////////////////////
 
+  typedef void (*CopyRowsFn)(SelectNode*, RowBatch*);
+  CopyRowsFn codegend_copy_rows_fn_;
+
   /// Copy rows from child_row_batch_ for which conjuncts_ evaluate to true to
-  /// output_batch, up to limit_.
-  /// Return true if limit was hit or output_batch should be returned, otherwise false.
-  bool CopyRows(RowBatch* output_batch);
+  /// output_batch, up to limit_ or till the output row batch reaches capacity.
+  void CopyRows(RowBatch* output_batch);
+
+  /// Codegen CopyRows(). Used for mostly codegen'ing the conjuncts evaluation logic.
+  Status CodegenCopyRows(RuntimeState* state);
 };
 
 }
