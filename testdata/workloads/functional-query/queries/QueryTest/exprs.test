@@ -1866,7 +1866,7 @@ Infinity,NaN,-0,-Infinity,Nan
 double,double,double,double,double
 ====
 ---- QUERY
-# Test that abs() retains the type of the paramter IMPALA-1424
+# Test that abs() promotes the type of the paramter IMPALA-4513
 select abs(cast(1 as int)), abs(cast(1 as smallint)),
   abs(cast(1 as tinyint)), abs(cast(8589934592 as bigint)),
   abs(cast(-1.3 as double)), abs(cast(-1.3 as float)),
@@ -1874,7 +1874,7 @@ select abs(cast(1 as int)), abs(cast(1 as smallint)),
 ---- RESULTS
 1,1,1,8589934592,1.3,1.299999952316284,1.322
 ---- TYPES
-int, smallint, tinyint, bigint, double, float, decimal
+bigint, int, smallint, bigint, double, float, decimal
 ====
 ---- QUERY
 # Regression test for IMPALA-1508

@@ -4253,6 +4253,21 @@ TEST_F(ExprTest, MathFunctions) {
   TestValue("e()", TYPE_DOUBLE, M_E);
   TestValue("abs(cast(-1.0 as double))", TYPE_DOUBLE, 1.0);
   TestValue("abs(cast(1.0 as double))", TYPE_DOUBLE, 1.0);
+  TestValue("abs(-127)", TYPE_SMALLINT, 127);
+  TestValue("abs(-128)", TYPE_SMALLINT, 128);
+  TestValue("abs(127)", TYPE_SMALLINT, 127);
+  TestValue("abs(128)", TYPE_INT, 128);
+  TestValue("abs(-32767)", TYPE_INT, 32767);
+  TestValue("abs(-32768)", TYPE_INT, 32768);
+  TestValue("abs(32767)", TYPE_INT, 32767);
+  TestValue("abs(32768)", TYPE_BIGINT, 32768);
+  TestValue("abs(-1 * cast(pow(2, 31) as int))", TYPE_BIGINT, 2147483648);
+  TestValue("abs(cast(pow(2, 31) as int))", TYPE_BIGINT, 2147483648);
+  TestValue("abs(2147483647)", TYPE_BIGINT, 2147483647);
+  TestValue("abs(2147483647)", TYPE_BIGINT, 2147483647);
+  TestValue("abs(-9223372036854775807)", TYPE_BIGINT,  9223372036854775807);
+  TestValue("abs(9223372036854775807)", TYPE_BIGINT,  9223372036854775807);
+  TestIsNull("abs(-9223372036854775808)", TYPE_BIGINT);
   TestValue("sign(0.0)", TYPE_FLOAT, 0.0f);
   TestValue("sign(-0.0)", TYPE_FLOAT, 0.0f);
   TestValue("sign(+0.0)", TYPE_FLOAT, 0.0f);
@@ -4521,7 +4536,7 @@ TEST_F(ExprTest, MathFunctions) {
 
   // NULL arguments. In some cases the NULL can match multiple overloads so the result
   // type depends on the order in which function overloads are considered.
-  TestIsNull("abs(NULL)", TYPE_TINYINT);
+  TestIsNull("abs(NULL)", TYPE_SMALLINT);
   TestIsNull("sign(NULL)", TYPE_FLOAT);
   TestIsNull("exp(NULL)", TYPE_DOUBLE);
   TestIsNull("ln(NULL)", TYPE_DOUBLE);
