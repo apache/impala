@@ -197,10 +197,19 @@ Status DataStreamMgr::CloseSender(const TUniqueId& fragment_instance_id,
     PlanNodeId dest_node_id, int sender_id) {
   VLOG_FILE << "CloseSender(): fragment_instance_id=" << fragment_instance_id
             << ", node=" << dest_node_id;
-  bool unused;
+  Status status;
+  bool already_unregistered;
   shared_ptr<DataStreamRecvr> recvr = FindRecvrOrWait(fragment_instance_id, dest_node_id,
-      &unused);
-  if (recvr.get() != NULL) recvr->RemoveSender(sender_id);
+      &already_unregistered);
+  if (recvr == nullptr) {
+    // Was not able to notify the receiver that this was the end of stream. Notify the
+    // sender that this failed so that they can take appropriate action (i.e. failing
+    // the query).
+    status = already_unregistered ? Status::OK() :
+        Status(TErrorCode::DATASTREAM_SENDER_TIMEOUT, PrintId(fragment_instance_id));
+  } else {
+    recvr->RemoveSender(sender_id);
+  }
 
   {
     // Remove any closed streams that have been in the cache for more than
@@ -221,7 +230,7 @@ Status DataStreamMgr::CloseSender(const TUniqueId& fragment_instance_id,
                  << PrettyPrinter::Print(MonotonicMillis() - now, TUnit::TIME_MS);
     }
   }
-  return Status::OK();
+  return status;
 }
 
 Status DataStreamMgr::DeregisterRecvr(
