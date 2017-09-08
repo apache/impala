@@ -193,7 +193,7 @@ TimestampValue TruncWeek(const date& orig_date) {
 
 // Same day of the week as the first day of the year
 TimestampValue TruncWW(const date& orig_date) {
-  const date& first_day_of_year = TruncYear(orig_date).date();
+  date first_day_of_year(orig_date.year(), 1, 1);
   int target_week_day = first_day_of_year.day_of_week();
   date new_date = GoBackToWeekday(orig_date, target_week_day);
   time_duration new_time(0, 0, 0, 0);
@@ -202,8 +202,8 @@ TimestampValue TruncWW(const date& orig_date) {
 
 // Same day of the week as the first day of the month
 TimestampValue TruncW(const date& orig_date) {
-  const date& first_day_of_mon = TruncMonth(orig_date).date();
-  const date& new_date = GoBackToWeekday(orig_date, first_day_of_mon.day_of_week());
+  date first_day_of_mon(orig_date.year(), orig_date.month(), 1);
+  date new_date = GoBackToWeekday(orig_date, first_day_of_mon.day_of_week());
   time_duration new_time(0, 0, 0, 0);
   return TimestampValue(new_date, new_time);
 }
@@ -216,7 +216,7 @@ TimestampValue TruncDay(const date& orig_date) {
 
 // Date of the previous Monday
 TimestampValue TruncDayOfWeek(const date& orig_date) {
-  const date& new_date = GoBackToWeekday(orig_date, 1);
+  date new_date = GoBackToWeekday(orig_date, 1);
   time_duration new_time(0, 0, 0, 0);
   return TimestampValue(new_date, new_time);
 }
@@ -364,7 +364,7 @@ TimestampVal DoTrunc(
 TimestampVal UdfBuiltins::TruncImpl(
     FunctionContext* context, const TimestampVal& tv, const StringVal& unit_str) {
   if (tv.is_null) return TimestampVal::null();
-  const TimestampValue& ts = TimestampValue::FromTimestampVal(tv);
+  TimestampValue ts = TimestampValue::FromTimestampVal(tv);
 
   // resolve trunc_unit using the prepared state if possible, o.w. parse now
   // TruncPrepare() can only parse trunc_unit if user passes it as a string literal
@@ -413,7 +413,7 @@ void UdfBuiltins::TruncClose(FunctionContext* ctx,
 TimestampVal UdfBuiltins::DateTruncImpl(
     FunctionContext* context, const TimestampVal& tv, const StringVal& unit_str) {
   if (tv.is_null) return TimestampVal::null();
-  const TimestampValue& ts = TimestampValue::FromTimestampVal(tv);
+  TimestampValue ts = TimestampValue::FromTimestampVal(tv);
 
   // resolve date_trunc_unit using the prepared state if possible, o.w. parse now
   // DateTruncPrepare() can only parse trunc_unit if user passes it as a string literal
