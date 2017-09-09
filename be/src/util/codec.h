@@ -104,8 +104,8 @@ class Codec {
   /// transformed output). If output_preallocated is false, *output will be allocated from
   /// the codec's mempool. In this case, a mempool must have been passed into the c'tor.
   //
-  /// In either case, *output_length will be set to the actual length of the transformed
-  /// output.
+  /// If the transformation succeeds, *output_length will be set to the actual length of
+  /// the transformed output. Otherwise it will be set to 0.
   //
   /// Inputs:
   ///   input_length: length of the data to process
