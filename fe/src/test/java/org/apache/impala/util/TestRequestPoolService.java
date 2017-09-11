@@ -22,16 +22,25 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URISyntaxException;
 
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.AllocationFileLoaderService;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTH_TO_LOCAL;
+
+import org.apache.hadoop.conf.Configuration;
+
+import org.apache.impala.yarn.server.resourcemanager.scheduler.fair.AllocationFileLoaderService;
+
+import org.apache.impala.authorization.User;
 import org.apache.impala.common.ByteUnits;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TPoolConfig;
 import org.apache.impala.thrift.TResolveRequestPoolParams;
@@ -107,6 +116,18 @@ public class TestRequestPoolService {
       poolService_.llamaConfWatcher_.setCheckIntervalMs(CHECK_INTERVAL_MS);
     }
     poolService_.start();
+  }
+
+  @BeforeClass
+  public static void setUpClass() throws Exception {
+    RuntimeEnv.INSTANCE.setTestEnv(true);
+    User.setRulesForTesting(
+        new Configuration().get(HADOOP_SECURITY_AUTH_TO_LOCAL, "DEFAULT"));
+  }
+
+  @AfterClass
+  public static void cleanUpClass() {
+    RuntimeEnv.INSTANCE.reset();
   }
 
   @After

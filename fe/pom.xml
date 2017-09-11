@@ -47,6 +47,7 @@ under the License.
     <impala.extdatasrc.api.version>1.0-SNAPSHOT</impala.extdatasrc.api.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <kudu.version>${env.KUDU_JAVA_VERSION}</kudu.version>
+    <yarn-extras.version>${project.version}</yarn-extras.version>
     <eclipse.output.directory>eclipse-classes</eclipse.output.directory>
   </properties>
 
@@ -98,21 +99,15 @@ under the License.
     </dependency>
 
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-yarn-api</artifactId>
-      <version>${hadoop.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
-      <version>${hadoop.version}</version>
-    </dependency>
-
-    <dependency>
       <groupId>org.apache.sentry</groupId>
       <artifactId>sentry-core-common</artifactId>
       <version>${sentry.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.impala</groupId>
+      <artifactId>yarn-extras</artifactId>
+      <version>${yarn-extras.version}</version>
     </dependency>
 
     <dependency>

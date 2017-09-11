@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-add_custom_target(fe ALL DEPENDS
-  thrift-deps fb-deps yarn-extras function-registry ext-data-source
+add_custom_target(yarn-extras ALL
   COMMAND $ENV{IMPALA_HOME}/bin/mvn-quiet.sh install -DskipTests
 )
