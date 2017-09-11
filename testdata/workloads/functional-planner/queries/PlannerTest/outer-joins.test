@@ -1016,3 +1016,36 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
 ====
+# IMPALA-5856: Test correct assignment of a join predicate with the following properties:
+# - from the On-clause of a left outer join
+# - only references the left-hand side tuples (not the right hand side tuple)
+# - references full-outer joined tuples; the full outer join appears on the left
+select * from functional.alltypes t1
+full outer join functional.alltypessmall t2
+  on t1.id = t2.id
+left outer join functional.alltypestiny t3
+  on coalesce(t1.id, t2.id) = t3.id and coalesce(t1.int_col, t2.int_col) = 2
+     and t1.bigint_col > 10 and t2.bigint_col > 30
+where concat(t1.string_col, t2.string_col) = 'test1' and t3.string_col = 'test2'
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: coalesce(t1.id, t2.id) = t3.id
+|  other join predicates: t1.bigint_col > 10, t2.bigint_col > 30, coalesce(t1.int_col, t2.int_col) = 2
+|  other predicates: t3.string_col = 'test2'
+|
+|--02:SCAN HDFS [functional.alltypestiny t3]
+|     partitions=4/4 files=4 size=460B
+|     predicates: t3.string_col = 'test2'
+|
+03:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: concat(t1.string_col, t2.string_col) = 'test1'
+|
+|--01:SCAN HDFS [functional.alltypessmall t2]
+|     partitions=4/4 files=4 size=6.32KB
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+====

@@ -83,7 +83,6 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -1223,6 +1222,10 @@ public class Analyzer {
     return result;
   }
 
+  public TableRef getOjRef(Expr e) {
+    return globalState_.ojClauseByConjunct.get(e.getId());
+  }
+
   public boolean isOjConjunct(Expr e) {
     return globalState_.ojClauseByConjunct.containsKey(e.getId());
   }
@@ -1375,9 +1378,14 @@ public class Analyzer {
    * evaluate 'e' at a node materializing 'tids'. Returns true otherwise.
    */
   public boolean canEvalFullOuterJoinedConjunct(Expr e, List<TupleId> tids) {
-    TableRef fullOuterJoin = getFullOuterJoinRef(e);
-    if (fullOuterJoin == null) return true;
-    return tids.containsAll(fullOuterJoin.getAllTableRefIds());
+    TableRef fullOjRef = getFullOuterJoinRef(e);
+    if (fullOjRef == null) return true;
+    // 'ojRef' represents the outer-join On-clause that 'e' originates from (if any).
+    // Might be the same as 'fullOjRef'. If different from 'fullOjRef' it means that
+    // 'e' should be assigned to the node materializing the 'ojRef' tuple ids.
+    TableRef ojRef = getOjRef(e);
+    TableRef targetRef = (ojRef != null && ojRef != fullOjRef) ? ojRef : fullOjRef;
+    return tids.containsAll(targetRef.getAllTableRefIds());
   }
 
   /**
@@ -1385,7 +1393,7 @@ public class Analyzer {
    * evaluate 'e' at a node materializing 'tids'. Returns true otherwise.
    */
   public boolean canEvalOuterJoinedConjunct(Expr e, List<TupleId> tids) {
-    TableRef outerJoin = globalState_.ojClauseByConjunct.get(e.getId());
+    TableRef outerJoin = getOjRef(e);
     if (outerJoin == null) return true;
     return tids.containsAll(outerJoin.getAllTableRefIds());
   }
