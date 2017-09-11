@@ -1,11 +1,17 @@
 ====
 ---- QUERY
+# Set an option explicitly; the test infrastructure should clear it before the next test.
+# The next test tests that buffer_pool_limit is unset ("").
+set buffer_pool_limit=7;
+====
+---- QUERY
 set
 ---- RESULTS: VERIFY_IS_SUBSET
 'ABORT_ON_DEFAULT_LIMIT_EXCEEDED','0'
 'ABORT_ON_ERROR','0'
 'ALLOW_UNSUPPORTED_FORMATS','0'
 'BATCH_SIZE','0'
+'BUFFER_POOL_LIMIT',''
 'DEBUG_ACTION',''
 'DEFAULT_ORDER_BY_LIMIT','-1'
 'DISABLE_CACHED_READS','0'

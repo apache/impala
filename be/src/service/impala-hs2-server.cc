@@ -241,11 +241,13 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
     RETURN_IF_ERROR(GetSessionState(session_id, &session_state));
     session_state->ToThrift(session_id, &query_ctx->session);
     lock_guard<mutex> l(session_state->lock);
-    query_ctx->client_request.query_options = session_state->default_query_options;
+    query_ctx->client_request.query_options = session_state->QueryOptions();
     set_query_options_mask = session_state->set_query_options_mask;
   }
 
   if (execute_request.__isset.confOverlay) {
+    TQueryOptions overlay;
+    QueryOptionsMask overlay_mask;
     map<string, string>::const_iterator conf_itr = execute_request.confOverlay.begin();
     for (; conf_itr != execute_request.confOverlay.end(); ++conf_itr) {
       if (conf_itr->first == IMPALA_RESULT_CACHING_OPT) continue;
@@ -256,8 +258,10 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
         continue;
       }
       RETURN_IF_ERROR(SetQueryOption(conf_itr->first, conf_itr->second,
-          &query_ctx->client_request.query_options, &set_query_options_mask));
+          &overlay, &overlay_mask));
     }
+    OverlayQueryOptions(overlay, overlay_mask, &query_ctx->client_request.query_options);
+    set_query_options_mask |= overlay_mask;
   }
   // Only query options not set in the session or confOverlay can be overridden by the
   // pool options.
@@ -313,7 +317,7 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   // Process the supplied configuration map.
   state->database = "default";
   state->session_timeout = FLAGS_idle_session_timeout;
-  state->default_query_options = default_query_options_;
+  state->server_default_query_options = &default_query_options_;
   if (request.__isset.configuration) {
     typedef map<string, string> ConfigurationMap;
     for (const ConfigurationMap::value_type& v: request.configuration) {
@@ -340,13 +344,13 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
       } else {
         // Normal configuration key. Use it to set session default query options.
         // Ignore failure (failures will be logged in SetQueryOption()).
-        discard_result(SetQueryOption(v.first, v.second, &state->default_query_options,
+        discard_result(SetQueryOption(v.first, v.second, &state->set_query_options,
             &state->set_query_options_mask));
       }
     }
   }
   RegisterSessionTimeout(state->session_timeout);
-  TQueryOptionsToMap(state->default_query_options, &return_val.configuration);
+  TQueryOptionsToMap(state->QueryOptions(), &return_val.configuration);
 
   // OpenSession() should return the coordinator's HTTP server address.
   const string& http_addr = lexical_cast<string>(

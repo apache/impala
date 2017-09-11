@@ -199,14 +199,14 @@ Status ClientRequestState::Exec(TExecRequest* exec_request) {
         RETURN_IF_ERROR(SetQueryOption(
             exec_request_.set_query_option_request.key,
             exec_request_.set_query_option_request.value,
-            &session_->default_query_options,
+            &session_->set_query_options,
             &session_->set_query_options_mask));
         SetResultSet({}, {});
       } else {
         // "SET" returns a table of all query options.
         map<string, string> config;
         TQueryOptionsToMap(
-            session_->default_query_options, &config);
+            session_->QueryOptions(), &config);
         vector<string> keys, values;
         map<string, string>::const_iterator itr = config.begin();
         for (; itr != config.end(); ++itr) {

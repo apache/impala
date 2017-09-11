@@ -124,7 +124,7 @@ void OverlayQueryOptions(const TQueryOptions& src, const QueryOptionsMask& mask,
 
 /// Set the key/value pair in TQueryOptions. It will override existing setting in
 /// query_options. The bit corresponding to query option 'key' in set_query_options_mask
-/// is set.
+/// is set. An empty string value will reset the key to its default value.
 Status SetQueryOption(const std::string& key, const std::string& value,
     TQueryOptions* query_options, QueryOptionsMask* set_query_options_mask);
 

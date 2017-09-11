@@ -436,7 +436,7 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
       // set yet, set it now.
       lock_guard<mutex> l(session->lock);
       if (session->connected_user.empty()) session->connected_user = query.hadoop_user;
-      query_ctx->client_request.query_options = session->default_query_options;
+      query_ctx->client_request.query_options = session->QueryOptions();
       set_query_options_mask = session->set_query_options_mask;
     }
     session->ToThrift(session_id, &query_ctx->session);
@@ -444,10 +444,13 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
 
   // Override default query options with Query.Configuration
   if (query.__isset.configuration) {
+    TQueryOptions overlay;
+    QueryOptionsMask overlay_mask;
     for (const string& option: query.configuration) {
-      RETURN_IF_ERROR(ParseQueryOptions(option, &query_ctx->client_request.query_options,
-          &set_query_options_mask));
+      RETURN_IF_ERROR(ParseQueryOptions(option, &overlay, &overlay_mask));
     }
+    OverlayQueryOptions(overlay, overlay_mask, &query_ctx->client_request.query_options);
+    set_query_options_mask |= overlay_mask;
   }
 
   // Only query options not set in the session or confOverlay can be overridden by the

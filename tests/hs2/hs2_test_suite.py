@@ -228,11 +228,13 @@ class HS2TestSuite(ImpalaTestSuite):
     assert False, 'Did not reach expected operation state %s in time, actual state was ' \
         '%s' % (expected_state, get_operation_status_resp.operationState)
 
-  def execute_statement(self, statement):
+  def execute_statement(self, statement, conf_overlay=None):
     """Executes statement and returns response, which is checked."""
     execute_statement_req = TCLIService.TExecuteStatementReq()
     execute_statement_req.sessionHandle = self.session_handle
     execute_statement_req.statement = statement
+    if conf_overlay:
+      execute_statement_req.confOverlay = conf_overlay
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     HS2TestSuite.check_response(execute_statement_resp)
     return execute_statement_resp

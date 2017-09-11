@@ -360,13 +360,17 @@ class ImpalaServer : public ImpalaServiceIf,
     /// The default database (changed as a result of 'use' query execution).
     std::string database;
 
-    /// The default query options of this session. When the session is created, the
-    /// session inherits the global defaults from ImpalaServer::default_query_options_.
-    TQueryOptions default_query_options;
+    /// Reference to the ImpalaServer's query options
+    TQueryOptions* server_default_query_options;
 
-    /// BitSet indicating which query options in default_query_options have been
+    /// Query options that have been explicitly set in this session.
+    TQueryOptions set_query_options;
+
+    /// BitSet indicating which query options in set_query_options have been
     /// explicitly set in the session. Updated when a query option is specified using a
     /// SET command: the bit corresponding to the TImpalaQueryOptions enum is set.
+    /// If the option is subsequently reset via a SET with an empty value, the bit
+    /// is cleared.
     QueryOptionsMask set_query_options_mask;
 
     /// For HS2 only, the protocol version this session is expecting.
@@ -399,6 +403,10 @@ class ImpalaServer : public ImpalaServiceIf,
     /// Builds a Thrift representation of this SessionState for serialisation to
     /// the frontend.
     void ToThrift(const TUniqueId& session_id, TSessionState* session_state);
+
+    /// Builds the overlay of the default server query options and the options
+    /// explicitly set in this session.
+    TQueryOptions QueryOptions();
   };
 
  private:

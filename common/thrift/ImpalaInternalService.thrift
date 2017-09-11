@@ -72,9 +72,22 @@ enum TJoinDistributionMode {
 //
 // (1) and (2) are set by administrators and provide the default query options for a
 // session, in that order, so options set in (2) override those in (1). The user
-// can specify query options with (3) to override the defaults, which are stored in the
-// SessionState. Finally, the client can pass a config 'overlay' (4) in the request
-// metadata which overrides everything else.
+// can specify query options with (3) to override the preceding layers; these
+// overrides are stored in SessionState. Finally, the client can pass a config
+// 'overlay' (4) in the request metadata which overrides everything else.
+//
+// Session options (level 3, above) can be set by the user with SET <key>=<value>
+// or in the OpenSession RPC. They can be unset with SET <key>="". When unset,
+// it's unset in that level, and the values as specified by the defaults,
+// and levels 1 and 2 above take hold.
+//
+// Because of the ambiguity between null and the empty string here, string-typed
+// options where the empty string is a valid value can cause problems as follows:
+// * If their default is not the empty string, a user can't set it to the
+//   empty string with SET.
+// * Even if their default is the empty string, they may be set to something
+//   else via process defaults or resource pool defaults, and the user
+//   may not be able to override them back to the empty string.
 struct TQueryOptions {
   1: optional bool abort_on_error = 0
   2: optional i32 max_errors = 100

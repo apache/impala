@@ -1241,6 +1241,12 @@ void ImpalaServer::SessionState::ToThrift(const TUniqueId& session_id,
   state->__set_kudu_latest_observed_ts(kudu_latest_observed_ts);
 }
 
+TQueryOptions ImpalaServer::SessionState::QueryOptions() {
+  TQueryOptions ret = *server_default_query_options;
+  OverlayQueryOptions(set_query_options, set_query_options_mask, &ret);
+  return ret;
+}
+
 void ImpalaServer::CancelFromThreadPool(uint32_t thread_id,
     const CancellationWork& cancellation_work) {
   if (cancellation_work.unregister()) {
@@ -1730,7 +1736,7 @@ void ImpalaServer::ConnectionStart(
     session_state->session_timeout = FLAGS_idle_session_timeout;
     session_state->session_type = TSessionType::BEESWAX;
     session_state->network_address = connection_context.network_address;
-    session_state->default_query_options = default_query_options_;
+    session_state->server_default_query_options = &default_query_options_;
     session_state->kudu_latest_observed_ts = 0;
 
     // If the username was set by a lower-level transport, use it.

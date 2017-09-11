@@ -147,4 +147,71 @@ TEST(QueryOptions, MapOptionalDefaultlessToEmptyString) {
   EXPECT_EQ(map["EXPLAIN_LEVEL"], "1");
 }
 
+/// Overlay a with b. batch_size is set in both places.
+/// num_nodes is set in a and is missing from the bit
+/// mask. mt_dop is only set in b.
+TEST(QueryOptions, TestOverlay) {
+  TQueryOptions a;
+  TQueryOptions b;
+  QueryOptionsMask mask;
+
+  // overlay
+  a.__set_batch_size(1);
+  b.__set_batch_size(2);
+  mask.set(TImpalaQueryOptions::BATCH_SIZE);
+
+  // no overlay
+  a.__set_num_nodes(3);
+
+  // missing mask on overlay
+  b.__set_debug_action("ignored"); // no mask set
+
+  // overlay; no original value
+  b.__set_mt_dop(4);
+  mask.set(TImpalaQueryOptions::MT_DOP);
+
+  TQueryOptions dst = a;
+  OverlayQueryOptions(b, mask, &dst);
+
+  EXPECT_EQ(2, dst.batch_size);
+  EXPECT_TRUE(dst.__isset.batch_size);
+  EXPECT_EQ(3, dst.num_nodes);
+  EXPECT_EQ(a.debug_action, dst.debug_action);
+  EXPECT_EQ(4, dst.mt_dop);
+  EXPECT_TRUE(dst.__isset.mt_dop);
+}
+
+TEST(QueryOptions, ResetToDefaultViaEmptyString) {
+  // MT_DOP has no default; resetting should do nothing.
+  {
+    TQueryOptions options;
+    EXPECT_TRUE(SetQueryOption("MT_DOP", "", &options, NULL).ok());
+    EXPECT_FALSE(options.__isset.mt_dop);
+  }
+
+  // Set and then reset; check mask too.
+  {
+    TQueryOptions options;
+    QueryOptionsMask mask;
+
+    EXPECT_FALSE(options.__isset.mt_dop);
+    EXPECT_TRUE(SetQueryOption("MT_DOP", "3", &options, &mask).ok());
+    EXPECT_TRUE(mask[TImpalaQueryOptions::MT_DOP]);
+    EXPECT_TRUE(SetQueryOption("MT_DOP", "", &options, &mask).ok());
+    EXPECT_FALSE(options.__isset.mt_dop);
+    // After reset, mask should be clear.
+    EXPECT_FALSE(mask[TImpalaQueryOptions::MT_DOP]);
+  }
+
+  // Reset should reset to defaults for something that has set defaults.
+  {
+    TQueryOptions options;
+
+    EXPECT_TRUE(SetQueryOption("EXPLAIN_LEVEL", "3", &options, NULL).ok());
+    EXPECT_TRUE(SetQueryOption("EXPLAIN_LEVEL", "", &options, NULL).ok());
+    EXPECT_TRUE(options.__isset.explain_level);
+    EXPECT_EQ(options.explain_level, 1);
+  }
+}
+
 IMPALA_TEST_MAIN();
