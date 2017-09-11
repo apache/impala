@@ -236,6 +236,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
   ScalarColumnReader(HdfsParquetScanner* parent, const SchemaNode& node,
       const SlotDescriptor* slot_desc)
     : BaseScalarColumnReader(parent, node, slot_desc),
+      dict_decoder_(parent->scan_node_->mem_tracker()),
       dict_decoder_init_(false),
       needs_conversion_(false) {
     if (!MATERIALIZED) {

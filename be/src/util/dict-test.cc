@@ -36,10 +36,15 @@ void ValidateDict(const vector<InternalType>& values,
     const vector<InternalType>& dict_values, int fixed_buffer_byte_size) {
   set<InternalType> values_set(values.begin(), values.end());
 
+  int bytes_alloc = 0;
+  MemTracker track_encoder;
   MemTracker tracker;
   MemPool pool(&tracker);
-  DictEncoder<InternalType> encoder(&pool, fixed_buffer_byte_size);
+  DictEncoder<InternalType> encoder(&pool, fixed_buffer_byte_size, &track_encoder);
+  encoder.UsedbyTest();
   for (InternalType i: values) encoder.Put(i);
+  bytes_alloc = encoder.DictByteSize();
+  EXPECT_EQ(track_encoder.consumption(), bytes_alloc);
   EXPECT_EQ(encoder.num_entries(), values_set.size());
 
   uint8_t dict_buffer[encoder.dict_encoded_size()];
@@ -51,9 +56,12 @@ void ValidateDict(const vector<InternalType>& values,
   EXPECT_GT(data_len, 0);
   encoder.ClearIndices();
 
-  DictDecoder<InternalType> decoder;
+  MemTracker decode_tracker;
+  DictDecoder<InternalType> decoder(&decode_tracker);
   ASSERT_TRUE(decoder.template Reset<PARQUET_TYPE>(dict_buffer,
       encoder.dict_encoded_size(),fixed_buffer_byte_size));
+  bytes_alloc = decoder.DictByteSize();
+  EXPECT_EQ(decode_tracker.consumption(), bytes_alloc);
 
   // Test direct access to the dictionary via indexes
   for (int i = 0; i < dict_values.size(); ++i) {
@@ -180,7 +188,8 @@ TEST(DictTest, TestInvalidStrings) {
 
   // Test a dictionary with a string encoded with negative length. Initializing
   // the decoder should fail.
-  DictDecoder<StringValue> decoder;
+  MemTracker tracker;
+  DictDecoder<StringValue> decoder(&tracker);
   ASSERT_FALSE(decoder.template Reset<parquet::Type::BYTE_ARRAY>(buffer, sizeof(buffer),
       0));
 }
@@ -193,7 +202,8 @@ TEST(DictTest, TestStringBufferOverrun) {
 
   // Initializing the dictionary should fail, since the string would reference
   // invalid memory.
-  DictDecoder<StringValue> decoder;
+  MemTracker tracker;
+  DictDecoder<StringValue> decoder(&tracker);
   ASSERT_FALSE(decoder.template Reset<parquet::Type::BYTE_ARRAY>(buffer, sizeof(buffer),
       0));
 }
@@ -202,9 +212,13 @@ TEST(DictTest, TestStringBufferOverrun) {
 // decoder to a clean state, even if the input is not fully consumed. The RLE decoder
 // has various state that needs to be reset.
 TEST(DictTest, SetDataAfterPartialRead) {
+  int bytes_alloc = 0;
   MemTracker tracker;
+  MemTracker track_encoder;
+  MemTracker track_decoder;
   MemPool pool(&tracker);
-  DictEncoder<int> encoder(&pool, sizeof(int));
+  DictEncoder<int> encoder(&pool, sizeof(int), &track_encoder);
+  encoder.UsedbyTest();
 
   // Literal run followed by a repeated run.
   vector<int> values{1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9};
@@ -214,10 +228,12 @@ TEST(DictTest, SetDataAfterPartialRead) {
   encoder.WriteDict(dict_buffer.data());
   vector<uint8_t> data_buffer(encoder.EstimatedDataEncodedSize() * 2);
   int data_len = encoder.WriteData(data_buffer.data(), data_buffer.size());
+  bytes_alloc = encoder.DictByteSize();
+  EXPECT_EQ(track_encoder.consumption(), bytes_alloc);
   ASSERT_GT(data_len, 0);
   encoder.ClearIndices();
 
-  DictDecoder<int> decoder;
+  DictDecoder<int> decoder(&track_decoder);
   ASSERT_TRUE(decoder.template Reset<parquet::Type::INT32>(
       dict_buffer.data(), dict_buffer.size(), sizeof(int)));
 
@@ -231,13 +247,19 @@ TEST(DictTest, SetDataAfterPartialRead) {
       EXPECT_EQ(values[i], val) << num_to_decode << " " << i;
     }
   }
+  bytes_alloc = decoder.DictByteSize();
+  EXPECT_EQ(track_decoder.consumption(), bytes_alloc);
 }
 
 // Test handling of decode errors from out-of-range values.
 TEST(DictTest, DecodeErrors) {
+  int bytes_alloc = 0;
   MemTracker tracker;
+  MemTracker track_encoder;
+  MemTracker track_decoder;
   MemPool pool(&tracker);
-  DictEncoder<int> small_dict_encoder(&pool, sizeof(int));
+  DictEncoder<int> small_dict_encoder(&pool, sizeof(int), &track_encoder);
+  small_dict_encoder.UsedbyTest();
 
   // Generate a dictionary with 9 values (requires 4 bits to encode).
   vector<int> small_dict_values{1, 2, 3, 4, 5, 6, 7, 8, 9};
@@ -245,9 +267,11 @@ TEST(DictTest, DecodeErrors) {
 
   vector<uint8_t> small_dict_buffer(small_dict_encoder.dict_encoded_size());
   small_dict_encoder.WriteDict(small_dict_buffer.data());
+  bytes_alloc = small_dict_encoder.DictByteSize();
+  EXPECT_EQ(track_encoder.consumption(), bytes_alloc);
   small_dict_encoder.ClearIndices();
 
-  DictDecoder<int> small_dict_decoder;
+  DictDecoder<int> small_dict_decoder(&track_decoder);
   ASSERT_TRUE(small_dict_decoder.template Reset<parquet::Type::INT32>(
         small_dict_buffer.data(), small_dict_buffer.size(), sizeof(int)));
 
@@ -266,17 +290,20 @@ TEST(DictTest, DecodeErrors) {
   for (TestCase& test_case: test_cases) {
     // Encode the values. This will produce a dictionary with more distinct values than
     // the small dictionary that we'll use to decode it.
-    DictEncoder<int> large_dict_encoder(&pool, sizeof(int));
+    DictEncoder<int> large_dict_encoder(&pool, sizeof(int), &track_encoder);
+    large_dict_encoder.UsedbyTest();
     // Initialize the dictionary with the values already in the small dictionary.
     for (int val : small_dict_values) large_dict_encoder.Put(val);
-    large_dict_encoder.ClearIndices();
+    large_dict_encoder.Close();
 
     for (int val: test_case.second) large_dict_encoder.Put(val);
 
     vector<uint8_t> data_buffer(large_dict_encoder.EstimatedDataEncodedSize() * 2);
     int data_len = large_dict_encoder.WriteData(data_buffer.data(), data_buffer.size());
     ASSERT_GT(data_len, 0);
-    large_dict_encoder.ClearIndices();
+    bytes_alloc = large_dict_encoder.DictByteSize();
+    EXPECT_EQ(track_encoder.consumption(), bytes_alloc);
+    large_dict_encoder.Close();
 
     ASSERT_OK(small_dict_decoder.SetData(data_buffer.data(), data_buffer.size()));
     bool failed = false;
@@ -285,6 +312,8 @@ TEST(DictTest, DecodeErrors) {
       failed = !small_dict_decoder.GetNextValue(&val);
       if (failed) break;
     }
+    bytes_alloc = small_dict_decoder.DictByteSize();
+    EXPECT_EQ(track_decoder.consumption(), bytes_alloc);
     EXPECT_TRUE(failed) << "Should have detected out-of-range dict-encoded value in test "
         << test_case.first;
   }

@@ -175,7 +175,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   // be added.
   void Close() {
     if (compressor_.get() != nullptr) compressor_->Close();
-    if (dict_encoder_base_ != nullptr) dict_encoder_base_->ClearIndices();
+    if (dict_encoder_base_ != nullptr) dict_encoder_base_->Close();
   }
 
   const ColumnType& type() const { return expr_eval_->root().type(); }
@@ -315,7 +315,8 @@ class HdfsParquetTableWriter::ColumnWriter :
     current_encoding_ = Encoding::PLAIN_DICTIONARY;
     next_page_encoding_ = Encoding::PLAIN_DICTIONARY;
     dict_encoder_.reset(
-        new DictEncoder<T>(parent_->per_file_mem_pool_.get(), plain_encoded_value_size_));
+        new DictEncoder<T>(parent_->per_file_mem_pool_.get(), plain_encoded_value_size_,
+            parent_->parent_->mem_tracker()));
     dict_encoder_base_ = dict_encoder_.get();
     page_stats_.reset(
         new ColumnStats<T>(parent_->per_file_mem_pool_.get(), plain_encoded_value_size_));

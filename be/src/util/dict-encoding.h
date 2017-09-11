@@ -52,6 +52,15 @@ class DictEncoderBase {
  public:
   virtual ~DictEncoderBase() {
     DCHECK(buffered_indices_.empty());
+    ReleaseBytes();
+    DCHECK_EQ(dict_bytes_cnt_, 0);
+  }
+
+  /// This function will clear the buffered_indices and
+  /// decrement the bytes used by dictionary.
+  void Close() {
+    ClearIndices();
+    ReleaseBytes();
   }
 
   /// Writes out the encoded dictionary to buffer. buffer must be preallocated to
@@ -86,26 +95,77 @@ class DictEncoderBase {
 
   int dict_encoded_size() { return dict_encoded_size_; }
 
+  void UsedbyTest() { used_by_test_ = true;}
+
  protected:
-  DictEncoderBase(MemPool* pool)
-    : dict_encoded_size_(0), pool_(pool) {
-  }
+  DictEncoderBase(MemPool* pool, MemTracker* mem_tracker) :
+      dict_encoded_size_(0),
+      pool_(pool),
+      dict_bytes_cnt_(0),
+      dict_mem_tracker_(mem_tracker) { }
 
   /// Indices that have not yet be written out by WriteData().
   std::vector<int> buffered_indices_;
 
+  /// Memtracker Consume is called every ENC_MEM_TRACK_CNT times.
+  /// Periodicity of calling Memtracker Consume.
+  const int ENC_MEM_TRACK_CNT = 8192;
+
+  /// Number of times ConsumeBytes() was called.
+  int num_call_track_{0};
+
   /// The number of bytes needed to encode the dictionary.
-  int dict_encoded_size_;
+  int dict_encoded_size_{0};
 
   /// Pool to store StringValue data. Not owned.
-  MemPool* pool_;
+  MemPool* pool_{nullptr};
+
+  /// This will account for bytes consumed by nodes_
+  int dict_bytes_cnt_{0};
+
+  /// This will account for bytes consumed, last_accounted by memtracker
+  int dict_bytes_cnt_memtrack_{0};
+
+  /// This will track the memory used by nodes_
+  MemTracker* dict_mem_tracker_{nullptr};
+
+  /// Function to decrement the byte counter and decrease the bytes usage
+  /// of the memory tracker.
+  void ReleaseBytes() {
+    if (dict_mem_tracker_ != nullptr) {
+      dict_mem_tracker_->Release(dict_bytes_cnt_memtrack_);
+      dict_bytes_cnt_ = 0;
+      dict_bytes_cnt_memtrack_ = 0;
+      num_call_track_ = 0;
+    }
+  }
+
+  /// Used by dict-test.cc to check the usage of bytes by dictionary
+  /// is properly accounted.
+  bool used_by_test_{false};
+
+  /// Function to increment the byte counter and increase the bytes usage
+  /// of the memory tracker.
+  void ConsumeBytes(int num_bytes) {
+    if (dict_mem_tracker_ != nullptr) {
+      dict_bytes_cnt_ += num_bytes;
+      // Calling Memtracker frequently may be expensive so update
+      // the memtracker every ENC_MEM_TRACK_CNT times.
+      if (num_call_track_ % ENC_MEM_TRACK_CNT == 0 || used_by_test_ == true) {
+        // TODO: TryConsume() can be called to check if memory limit has been exceeded.
+        dict_mem_tracker_->Consume(dict_bytes_cnt_ - dict_bytes_cnt_memtrack_);
+        dict_bytes_cnt_memtrack_ = dict_bytes_cnt_;
+      }
+      num_call_track_++;
+    }
+  }
 };
 
 template<typename T>
 class DictEncoder : public DictEncoderBase {
  public:
-  DictEncoder(MemPool* pool, int encoded_value_size) :
-      DictEncoderBase(pool), buckets_(HASH_TABLE_SIZE, Node::INVALID_INDEX),
+  DictEncoder(MemPool* pool, int encoded_value_size, MemTracker* mem_tracker) :
+      DictEncoderBase(pool, mem_tracker), buckets_(HASH_TABLE_SIZE, Node::INVALID_INDEX),
       encoded_value_size_(encoded_value_size) { }
 
   /// Encode value. Returns the number of bytes added to the dictionary page length
@@ -114,6 +174,13 @@ class DictEncoder : public DictEncoderBase {
   /// this does not actually write any data, just buffers the value's index to be
   /// written later.
   int Put(const T& value);
+
+  /// This function returns the size in bytes of the dictionary vector.
+  /// It is used by dict-test.cc for validation of bytes consumed against
+  /// memory tracked.
+  int DictByteSize() {
+    return sizeof(Node) * nodes_.size();
+  }
 
   virtual void WriteDict(uint8_t* buffer);
 
@@ -168,6 +235,9 @@ class DictEncoder : public DictEncoderBase {
 /// by the caller and valid as long as this object is.
 class DictDecoderBase {
  public:
+   DictDecoderBase(MemTracker* tracker) :
+     dict_bytes_cnt_(0), dict_mem_tracker_(tracker) { }
+
   /// The rle encoded indices into the dictionary. Returns an error status if the buffer
   /// is too short or the bit_width metadata in the buffer is invalid.
   Status SetData(uint8_t* buffer, int buffer_len) {
@@ -187,13 +257,21 @@ class DictDecoderBase {
     return Status::OK();
   }
 
-  virtual ~DictDecoderBase() {}
+  virtual ~DictDecoderBase() {
+    ReleaseBytes();
+    DCHECK_EQ(dict_bytes_cnt_, 0);
+  }
 
   virtual int num_entries() const = 0;
 
   /// Reads the dictionary value at the specified index into the buffer provided.
   /// The buffer must be large enough to receive the datatype for this dictionary.
   virtual void GetValue(int index, void* buffer) = 0;
+
+  /// This function will decrement the bytes used by dictionary, MemTracker
+  void Close() {
+    ReleaseBytes();
+  }
 
  protected:
   /// Number of decoded values to buffer at a time. A multiple of 32 is chosen to allow
@@ -212,13 +290,37 @@ class DictDecoderBase {
 
   /// The index of the next decoded value to return.
   int next_literal_idx_ = 0;
+
+  /// This will account for bytes consumed by dict_
+  int dict_bytes_cnt_{0};
+
+  /// This will track the memory used by dict_
+  MemTracker* dict_mem_tracker_{nullptr};
+
+  /// Function to decrement the byte counter and decrease the bytes usage
+  /// of the memory tracker.
+  void ReleaseBytes() {
+    if (dict_mem_tracker_ != nullptr) {
+      dict_mem_tracker_->Release(dict_bytes_cnt_);
+      dict_bytes_cnt_ = 0;
+    }
+  }
+
+  /// Function to increment the byte counter and increase the bytes usage
+  /// of the memory tracker.
+  void ConsumeBytes(int num_bytes) {
+    if (dict_mem_tracker_ != nullptr) {
+      dict_bytes_cnt_ += num_bytes;
+      dict_mem_tracker_->Consume(num_bytes);
+    }
+  }
 };
 
 template<typename T>
 class DictDecoder : public DictDecoderBase {
  public:
   /// Construct empty dictionary.
-  DictDecoder() {}
+  DictDecoder(MemTracker* tracker):DictDecoderBase(tracker) {}
 
   /// Initialize the decoder with an input buffer containing the dictionary.
   /// 'dict_len' is the byte length of dict_buffer.
@@ -245,7 +347,15 @@ class DictDecoder : public DictDecoderBase {
   /// the string data is from the dictionary buffer passed into the c'tor.
   bool GetNextValue(T* value) WARN_UNUSED_RESULT;
 
+  /// This function returns the size in bytes of the dictionary vector.
+  /// It is used by dict-test.cc for validation of bytes consumed against
+  /// memory tracked.
+  int DictByteSize() {
+    return sizeof(T) * dict_.size();
+  }
+
  private:
+  /// List of decoded values stored in the dict_
   std::vector<T> dict_;
 
   /// Decoded values, buffered to allow caller to consume one-by-one. If in the middle of
@@ -293,8 +403,10 @@ inline uint32_t DictEncoder<StringValue>::Hash(const StringValue& value) const {
 template<typename T>
 inline int DictEncoder<T>::AddToTable(const T& value, NodeIndex* bucket) {
   DCHECK_GT(encoded_value_size_, 0);
+  Node node(value, *bucket);
+  ConsumeBytes(sizeof(node));
   // Prepend the new node to this bucket's chain.
-  nodes_.push_back(Node(value, *bucket));
+  nodes_.push_back(node);
   *bucket = nodes_.size() - 1;
   dict_encoded_size_ += encoded_value_size_;
   return encoded_value_size_;
@@ -306,8 +418,10 @@ inline int DictEncoder<StringValue>::AddToTable(const StringValue& value,
   char* ptr_copy = reinterpret_cast<char*>(pool_->Allocate(value.len));
   memcpy(ptr_copy, value.ptr, value.len);
   StringValue sv(ptr_copy, value.len);
+  Node node(sv, *bucket);
+  ConsumeBytes(sizeof(node));
   // Prepend the new node to this bucket's chain.
-  nodes_.push_back(Node(sv, *bucket));
+  nodes_.push_back(node);
   *bucket = nodes_.size() - 1;
   int bytes_added = ParquetPlainEncoder::ByteSize(sv);
   dict_encoded_size_ += bytes_added;
@@ -386,6 +500,7 @@ template<parquet::Type::type PARQUET_TYPE>
 inline bool DictDecoder<T>::Reset(uint8_t* dict_buffer, int dict_len,
     int fixed_len_size) {
   dict_.clear();
+  ReleaseBytes();
   uint8_t* end = dict_buffer + dict_len;
   while (dict_buffer < end) {
     T value;
@@ -395,6 +510,7 @@ inline bool DictDecoder<T>::Reset(uint8_t* dict_buffer, int dict_len,
     dict_buffer += decoded_len;
     dict_.push_back(value);
   }
+  ConsumeBytes(sizeof(T) * dict_.size());
   return true;
 }
 

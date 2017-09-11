@@ -372,6 +372,8 @@ class BaseScalarColumnReader : public ParquetColumnReader {
       data_page_pool_->FreeAll();
     }
     if (decompressor_ != nullptr) decompressor_->Close();
+    DictDecoderBase* dict_decoder = GetDictionaryDecoder();
+    if (dict_decoder != nullptr) dict_decoder->Close();
   }
 
   int64_t total_len() const { return metadata_->total_compressed_size; }
