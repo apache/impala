@@ -131,7 +131,8 @@ INSERT <varname>insert_clauses</varname>
 
     <p>
       With both forms of hint syntax, include the <codeph>STRAIGHT_JOIN</codeph>
-      keyword immediately after the <codeph>SELECT</codeph> keyword to prevent Impala from
+      keyword immediately after the <codeph>SELECT</codeph> and any
+      <codeph>DISTINCT</codeph> or <codeph>ALL</codeph> keywords to prevent Impala from
       reordering the tables in a way that makes the join-related hints ineffective.
     </p>
 

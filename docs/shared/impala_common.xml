@@ -2722,7 +2722,7 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
         are supported in all Impala versions. The <codeph>CROSS JOIN</codeph> operator is available in Impala 1.2.2
         and higher. During performance tuning, you can override the reordering of join clauses that Impala does
         internally by including the keyword <codeph>STRAIGHT_JOIN</codeph> immediately after the
-        <codeph>SELECT</codeph> keyword
+        <codeph>SELECT</codeph> and any <codeph>DISTINCT</codeph> or <codeph>ALL</codeph> keywords.
       </p>
 
       <p id="catalog_server_124">
