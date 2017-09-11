@@ -87,7 +87,7 @@ public class PlannerTestBase extends FrontendTestBase {
   private final static Logger LOG = LoggerFactory.getLogger(PlannerTest.class);
   private final static boolean GENERATE_OUTPUT_FILE = true;
   private final String testDir_ = "functional-planner/queries/PlannerTest";
-  private final String outDir_ = "/tmp/PlannerTest/";
+  private static String outDir_;
   private static KuduClient kuduClient_;
 
   // Map from plan ID (TPlanNodeId) to the plan node with that ID.
@@ -108,6 +108,12 @@ public class PlannerTestBase extends FrontendTestBase {
 
     if (RuntimeEnv.INSTANCE.isKuduSupported()) {
       kuduClient_ = new KuduClient.KuduClientBuilder("127.0.0.1:7051").build();
+    }
+    String logDir = System.getenv("IMPALA_FE_TEST_LOGS_DIR");
+    if (logDir != null) {
+      outDir_ = logDir + "/PlannerTest";
+    } else {
+      outDir_ = "/tmp/PlannerTest";
     }
   }
 

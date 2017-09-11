@@ -65,6 +65,8 @@ JNIEXPORT void JNICALL
 Java_org_apache_impala_service_FeSupport_NativeFeTestInit(
     JNIEnv* env, jclass caller_class) {
   DCHECK(ExecEnv::GetInstance() == NULL) << "This should only be called once from the FE";
+  char* env_logs_dir_str = std::getenv("IMPALA_FE_TEST_LOGS_DIR");
+  if (env_logs_dir_str != nullptr) FLAGS_log_dir = env_logs_dir_str;
   char* name = const_cast<char*>("FeSupport");
   // Init the JVM to load the classes in JniUtil that are needed for returning
   // exceptions to the FE.

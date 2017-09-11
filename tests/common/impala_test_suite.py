@@ -97,6 +97,7 @@ WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 HDFS_CONF = HdfsConfig(pytest.config.option.minicluster_xml_conf)
 TARGET_FILESYSTEM = os.getenv("TARGET_FILESYSTEM") or "hdfs"
 IMPALA_HOME = os.getenv("IMPALA_HOME")
+EE_TEST_LOGS_DIR = os.getenv("IMPALA_EE_TEST_LOGS_DIR")
 # Match any SET statement. Assume that query options' names
 # only contain alphabets and underscores.
 SET_PATTERN = re.compile(r'\s*set\s*([a-zA-Z_]+)=*', re.I)
@@ -440,7 +441,8 @@ class ImpalaTestSuite(BaseTestSuite):
             vector.get_value('table_format').file_format,
             pytest.config.option.update_results, result_section='DML_RESULTS')
     if pytest.config.option.update_results:
-      output_file = os.path.join('/tmp', test_file_name.replace('/','_') + ".test")
+      output_file = os.path.join(EE_TEST_LOGS_DIR,
+                                 test_file_name.replace('/','_') + ".test")
       write_test_file(output_file, sections, encoding=encoding)
 
   def execute_test_case_setup(self, setup_section, table_format):
