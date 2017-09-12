@@ -289,6 +289,18 @@ class TestImpalaShellInteractive(object):
     assert_var_substitution(result)
 
   @pytest.mark.execute_serially
+  def test_query_option_configuration(self):
+    rcfile_path = os.path.join(QUERY_FILE_PATH, 'impalarc_with_query_options')
+    args = '-Q MT_dop=1 --query_option=MAX_ERRORS=200 --config_file="%s"' % rcfile_path
+    cmds = "set;"
+    result = run_impala_shell_interactive(cmds, shell_args=args)
+    assert "\tMT_DOP: 1" in result.stdout
+    assert "\tMAX_ERRORS: 200" in result.stdout
+    assert "\tEXPLAIN_LEVEL: 2" in result.stdout
+    assert "INVALID_QUERY_OPTION is not supported for the impalad being "
+    "connected to, ignoring." in result.stdout
+
+  @pytest.mark.execute_serially
   def test_source_file(self):
     cwd = os.getcwd()
     try:

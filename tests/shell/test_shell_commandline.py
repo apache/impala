@@ -376,6 +376,20 @@ class TestImpalaShell(ImpalaTestSuite):
     args = '--config_file=%s/bad_impalarc' % QUERY_FILE_PATH
     run_impala_shell_cmd(args, expect_success=False)
 
+    # Testing config file related warning and error messages
+    args = '--config_file=%s/impalarc_with_warnings' % QUERY_FILE_PATH
+    result = run_impala_shell_cmd(args, expect_success=True)
+    assert "WARNING: Option 'config_file' can be only set from shell." in result.stderr
+    err_msg = ("WARNING: Unable to read configuration file correctly. "
+               "Ignoring unrecognized config option: 'invalid_option'\n")
+    assert  err_msg in result.stderr
+
+    args = '--config_file=%s/impalarc_with_error' % QUERY_FILE_PATH
+    result = run_impala_shell_cmd(args, expect_success=False)
+    err_msg = ("Unexpected value in configuration file. "
+               "'maybe' is not a valid value for a boolean option.")
+    assert  err_msg in result.stderr
+
   def test_execute_queries_from_stdin(self):
     """Test that queries get executed correctly when STDIN is given as the sql file."""
     args = '-f - --quiet -B'

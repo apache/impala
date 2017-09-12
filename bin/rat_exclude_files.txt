@@ -110,6 +110,9 @@ testdata/hive_benchmark/grepTiny/part-00000
 tests/pytest.ini
 tests/shell/bad_impalarc
 tests/shell/good_impalarc
+tests/shell/impalarc_with_error
+tests/shell/impalarc_with_query_options
+tests/shell/impalarc_with_warnings
 tests/shell/shell.cmds
 tests/shell/shell2.cmds
 tests/shell/shell_error.cmds

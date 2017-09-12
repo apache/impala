@@ -19,56 +19,101 @@
 
 # Example .impalarc file:
 #
-# [Options]
+# [impala]
 # impalad=localhost:21002
 # verbose=false
 # refresh_after_connect=true
 #
+# [impala.query_options]
+# EXPLAIN_LEVEL=2
+# MT_DOP=2
 
 import ConfigParser
 import sys
 from impala_shell_config_defaults import impala_shell_defaults
 from optparse import OptionParser
 
+class ConfigFileFormatError(Exception):
+  """Raised when the config file cannot be read by ConfigParser."""
+  pass
+
+class InvalidOptionValueError(Exception):
+  """Raised when an option contains an invalid value."""
+  pass
+
+def parse_bool_option(value):
+  """Returns True for '1' and 'True', and False for '0' and 'False'.
+     Throws ValueError for other values.
+  """
+  if value.lower() in ["true", "1"]:
+    return True
+  elif value.lower() in ["false", "0"]:
+    return False
+  else:
+    raise InvalidOptionValueError("Unexpected value in configuration file. '" + value \
+      + "' is not a valid value for a boolean option.")
+
+def parse_shell_options(options, defaults):
+  """Filters unknown options and converts some values from string to their corresponding
+     python types (booleans and None).
+
+     Returns a dictionary with option names as keys and option values as values.
+  """
+  result = {}
+  for option, value in options:
+    if option not in defaults:
+      print >> sys.stderr, "WARNING: Unable to read configuration file correctly. " \
+        "Ignoring unrecognized config option: '%s'\n" % option
+    elif isinstance(defaults[option], bool):
+      result[option] = parse_bool_option(value)
+    elif value.lower() == "none":
+      result[option] = None
+    else:
+      result[option] = value
+  return result
+
 def get_config_from_file(config_filename):
   """Reads contents of configuration file
 
-  Validates some values (False, True, None)
-  because ConfigParser reads values as strings
+  Two config sections are supported:
+  "[impala]":
+  Overrides the defaults of the shell arguments. Unknown options are filtered
+  and some values are converted from string to their corresponding python types
+  (booleans and None).
 
+  Setting 'config_filename' in the config file would have no effect,
+  so its original value is kept.
+
+  "[impala.query_options]"
+  Overrides the defaults of the query options. Not validated here,
+  because validation will take place after connecting to impalad.
+
+  Returns a pair of dictionaries (shell_options, query_options), with option names
+  as keys and option values as values.
   """
 
   config = ConfigParser.ConfigParser()
-  config.read(config_filename)
-  section_title = "impala"
-  if config.has_section(section_title):
-    loaded_options = config.items(section_title);
+  try:
+    config.read(config_filename)
+  except Exception, e:
+    raise ConfigFileFormatError( \
+      "Unable to read configuration file correctly. Check formatting: %s" % e)
 
-    for i, (option, value) in enumerate(loaded_options):
-      if option not in impala_shell_defaults:
-        print >> sys.stderr, "WARNING: Unable to read configuration file correctly. " \
-          "Check formatting: '%s'\n" % option;
-        continue
+  shell_options = {}
+  if config.has_section("impala"):
+    shell_options = parse_shell_options(config.items("impala"), impala_shell_defaults)
+    if "config_file" in shell_options:
+      print >> sys.stderr, "WARNING: Option 'config_file' can be only set from shell."
+      shell_options["config_file"] = config_filename
 
-      if impala_shell_defaults[option] in [True, False]:
-        # validate the option if it can only be a boolean value
-        # the only choice for these options is true or false
-        if value.lower() == "true":
-          loaded_options[i] = (option, True)
-        elif value.lower() == 'false':
-          loaded_options[i] = (option, False)
-        else:
-          # if the option is not set to either true or false, use the default
-          loaded_options[i] = (option, impala_shell_defaults[option])
-      elif value.lower() == "none":
-        loaded_options[i] = (option, None)
-      elif option.lower() == "config_file":
-        loaded_options[i] = (option, config_filename)
-      else:
-        loaded_options[i] = (option, value)
-  else:
-    loaded_options = [];
-  return loaded_options
+  query_options = {}
+  if config.has_section("impala.query_options"):
+    # Query option keys must be "normalized" to upper case before updating with
+    # options coming from command line.
+    query_options = dict( \
+      [ (k.upper(), v) for k, v in config.items("impala.query_options") ])
+
+  return shell_options, query_options
 
 def get_option_parser(defaults):
   """Creates OptionParser and adds shell options (flags)
@@ -142,9 +187,10 @@ def get_option_parser(defaults):
                     "certificate"))
   parser.add_option("--config_file", dest="config_file",
                     help=("Specify the configuration file to load options. "
-                          "File must have case-sensitive '[impala]' header. "
+                          "The following sections are used: [impala], "
+                          "[impala.query_options]. Section names are case sensitive. "
                           "Specifying this option within a config file will have "
-                          "no effect. Only specify this as a option in the commandline."
+                          "no effect. Only specify this as an option in the commandline."
                           ))
   parser.add_option("--live_summary", dest="print_summary", action="store_true",
                     help="Print a query summary every 1s while the query is running.")
@@ -158,10 +204,17 @@ def get_option_parser(defaults):
   parser.add_option("--ldap_password_cmd",
                     help="Shell command to run to retrieve the LDAP password")
   parser.add_option("--var", dest="keyval", action="append",
-                    help="Define variable(s) to be used within the Impala session."
+                    help="Defines a variable to be used within the Impala session."
+                         " Can be used multiple times to set different variables."
                          " It must follow the pattern \"KEY=VALUE\","
                          " KEY starts with an alphabetic character and"
                          " contains alphanumeric characters or underscores.")
+  parser.add_option("-Q", "--query_option", dest="query_options", action="append",
+                    help="Sets the default for a query option."
+                         " Can be used multiple times to set different query options."
+                         " It must follow the pattern \"KEY=VALUE\","
+                         " KEY must be a valid query option. Valid query options "
+                         " can be listed by command 'set'.")
 
   # add default values to the help text
   for option in parser.option_list:

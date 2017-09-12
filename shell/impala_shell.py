@@ -120,7 +120,7 @@ class ImpalaShell(object, cmd.Cmd):
   # Minimum time in seconds between two calls to get the exec summary.
   PROGRESS_UPDATE_INTERVAL = 1.0
 
-  def __init__(self, options):
+  def __init__(self, options, query_options):
     cmd.Cmd.__init__(self)
     self.is_alive = True
 
@@ -156,7 +156,7 @@ class ImpalaShell(object, cmd.Cmd):
 
     self.progress_stream = OverwritingStdErrOutputStream()
 
-    self.set_query_options = {}
+    self.set_query_options = query_options
     self.set_variables = options.variables
 
     self._populate_command_list()
@@ -683,11 +683,16 @@ class ImpalaShell(object, cmd.Cmd):
     self.partial_cmd = str()
     # Check if any of query options set by the user are inconsistent
     # with the impalad being connected to
-    for set_option in self.set_query_options:
+
+    # Use a temporary to avoid changing set_query_options during iteration.
+    new_query_options = {}
+    for set_option, value in self.set_query_options.iteritems():
       if set_option not in set(self.imp_client.default_query_options):
         print ('%s is not supported for the impalad being '
                'connected to, ignoring.' % set_option)
-        del self.set_query_options[set_option]
+      else:
+        new_query_options[set_option] = value
+    self.set_query_options = new_query_options
 
   def _connect(self):
     try:
@@ -1308,7 +1313,7 @@ def parse_variables(keyvals):
         vars[match.groups()[0].upper()] = match.groups()[1]
   return vars
 
-def execute_queries_non_interactive_mode(options):
+def execute_queries_non_interactive_mode(options, query_options):
   """Run queries in non-interactive mode."""
   if options.query_file:
     try:
@@ -1328,12 +1333,19 @@ def execute_queries_non_interactive_mode(options):
     return
 
   queries = parse_query_text(query_text)
-  shell = ImpalaShell(options)
+  shell = ImpalaShell(options, query_options)
   if not (shell.execute_query_list(shell.cmdqueue) and
           shell.execute_query_list(queries)):
     sys.exit(1)
 
 if __name__ == "__main__":
+  """
+  There are two types of options: shell options and query_options. Both can be set in the
+  command line, which override the options set in config file (.impalarc). The default
+  shell options come from impala_shell_config_defaults.py. Query options have no defaults
+  within the impala-shell, but they do have defaults on the server. Query options can be
+  also changed in impala-shell with the 'set' command.
+  """
   # pass defaults into option parser
   parser = get_option_parser(impala_shell_defaults)
   options, args = parser.parse_args()
@@ -1351,13 +1363,15 @@ if __name__ == "__main__":
     print_to_stderr('%s not found.\n' % user_config)
     sys.exit(1)
 
-  # default options loaded in from impala_shell_config_defaults.py
+  query_options = {}
+
+  # default shell options loaded in from impala_shell_config_defaults.py
   # options defaults overwritten by those in config file
   try:
-    impala_shell_defaults.update(get_config_from_file(config_to_load))
+    loaded_shell_options, query_options = get_config_from_file(config_to_load)
+    impala_shell_defaults.update(loaded_shell_options)
   except Exception, e:
-    msg = "Unable to read configuration file correctly. Check formatting: %s\n" % e
-    print_to_stderr(msg)
+    print_to_stderr(e)
     sys.exit(1)
 
   parser = get_option_parser(impala_shell_defaults)
@@ -1436,12 +1450,17 @@ if __name__ == "__main__":
       sys.exit(1)
 
   options.variables = parse_variables(options.keyval)
+
+  # Override query_options from config file with those specified on the command line.
+  query_options.update(
+     [(k.upper(), v) for k, v in parse_variables(options.query_options).items()])
+
   if options.query or options.query_file:
     if options.print_progress or options.print_summary:
       print_to_stderr("Error: Live reporting is available for interactive mode only.")
       sys.exit(1)
 
-    execute_queries_non_interactive_mode(options)
+    execute_queries_non_interactive_mode(options, query_options)
     sys.exit(0)
 
   intro = WELCOME_STRING
@@ -1451,7 +1470,8 @@ if __name__ == "__main__":
 
   if options.refresh_after_connect:
     intro += REFRESH_AFTER_CONNECT_DEPRECATION_WARNING
-  shell = ImpalaShell(options)
+
+  shell = ImpalaShell(options, query_options)
   while shell.is_alive:
     try:
       try:

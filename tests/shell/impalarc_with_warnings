@@ -1,0 +1,3 @@
+[impala]
+config_file=a
+invalid_option=a
