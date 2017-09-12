@@ -71,31 +71,40 @@ class TestRowsAvailability(ImpalaTestSuite):
     self.impalad_test_service.wait_for_query_state(self.client, handle,
         self.client.QUERY_STATES['FINISHED'], timeout=20)
 
-    # Parse the query profile for the 'Rows available' timeline event.
-    rows_avail_line = self.__get_rows_available_event(handle)
-    # Match the parenthesized delta duration between the 'Rows available' event
-    # and the previous event.
-    matches = re.search(r'\(.*\)', rows_avail_line)
-    if matches is None:
-      assert False, "Failed to find parenthesized delta time in %s" % rows_avail_line
-    # Strip out parenthesis.
-    rows_avail_ms_str = matches.group(0)[1:-1]
-    rows_avail_ms = self.__parse_duration_ms(rows_avail_ms_str)
-    assert rows_avail_ms >= self.ROWS_AVAIL_LOWER_BOUND_MS,\
+    profile = self.client.get_runtime_profile(handle)
+    start_time_ms = None
+    rows_avail_time_ms = None
+    for line in profile.split("\n"):
+      if "Ready to start on" in line:
+        start_time_ms = self.__parse_time_ms(self.__find_time(line))
+      elif "Rows available:" in line:
+        rows_avail_time_ms = self.__parse_time_ms(self.__find_time(line))
+
+    if start_time_ms is None:
+      assert False, "Failed to find the 'Ready to start' timeline event in the " \
+                    "query profile:\n%s" % profile
+    if rows_avail_time_ms is None:
+      assert False, "Failed to find the 'Rows available' timeline event in the " \
+                    "query profile:\n%s" % profile
+    time_diff = rows_avail_time_ms - start_time_ms
+    assert time_diff >= self.ROWS_AVAIL_LOWER_BOUND_MS,\
         "The 'Rows available' timeline event was marked prematurely %sms after the "\
-        "previous timeline event.\nExpected the event to be marked no earlier than "\
-        "%sms after the previous event.\nQuery: %s"\
-        % (rows_avail_ms, self.ROWS_AVAIL_LOWER_BOUND_MS, query)
+        "'Ready to start' event.\nExpected the event to be marked no earlier than "\
+        "%sms after the 'Ready to start' event.\nQuery: %s"\
+        % (time_diff, self.ROWS_AVAIL_LOWER_BOUND_MS, query)
     self.close_query(handle)
 
-  def __get_rows_available_event(self, query_handle):
-    profile = self.client.get_runtime_profile(query_handle)
-    for line in profile.split("\n"):
-      if "Rows available:" in line: return line
-    assert False, "Failed to find the 'Rows available' timeline event in the "\
-        "query profile:\n%s" % profile
+  @staticmethod
+  def __find_time(line):
+    """Find event time point in a line from the runtime profile timeline."""
+    # Given line "- Rows available: 3s311ms (2s300ms)", this function returns "3s311ms"
+    match = re.search(r': (.*) \(', line)
+    if match is None:
+      assert False, "Failed to find time in runtime profile"
+    return match.group(1)
 
-  def __parse_duration_ms(self, duration):
+  @staticmethod
+  def __parse_time_ms(duration):
     """Parses a duration string of the form 1h2h3m4s5.6ms into milliseconds."""
     matches = re.findall(r'([0-9]+h)?([0-9]+m)?([0-9]+s)?([0-9]+(\.[0-9]+)?ms)?',
                          duration)
