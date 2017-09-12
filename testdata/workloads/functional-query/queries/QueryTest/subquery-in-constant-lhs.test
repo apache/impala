@@ -1,0 +1,296 @@
+====
+---- QUERY
+# Constant on LHS of [NOT] IN. Basics to test:
+# LHS constant: [not-null, null]
+# Predicate   : [IN, NOT IN]
+# RHS         : [NULL, Empty, Non-empty: has match, has no match/no null,
+#               has no match/null, (un)correlated]
+# LHS not-null, Predicate IN, RHS NULL. Expect no results.
+SELECT a.id, a.int_col, a.string_col FROM alltypessmall a
+WHERE 1 IN (SELECT null);
+---- RESULTS
+---- TYPES
+INT, INT, STRING
+====
+---- QUERY
+# LHS null, Predicate IN, RHS NULL. Expect no results.
+SELECT a.id, a.int_col, a.string_col FROM alltypessmall a
+WHERE NULL IN (SELECT null);
+---- RESULTS
+---- TYPES
+INT, INT, STRING
+====
+---- QUERY
+# LHS not-null, Predicate NOT IN, RHS NULL. Expect no results.
+SELECT a.id, a.int_col, a.string_col FROM alltypessmall a
+WHERE NULL NOT IN (SELECT null);
+---- RESULTS
+---- TYPES
+INT, INT, STRING
+====
+---- QUERY
+# LHS not-null, Predicate IN, RHS NULL. Expect no results.
+SELECT a.id, a.int_col, a.string_col FROM alltypessmall a
+WHERE 1 IN (SELECT null);
+---- RESULTS
+---- TYPES
+INT, INT, STRING
+====
+---- QUERY
+# LHS not-null, Predicate IN, RHS empty. Expect no results.
+SELECT a.id, a.int_col, a.string_col FROM alltypessmall a
+WHERE 1 IN (SELECT int_col from alltypessmall where int_col < 0);
+---- RESULTS
+---- TYPES
+INT, INT, STRING
+====
+---- QUERY
+# LHS null, Predicate IN, RHS empty. Expect no results.
+SELECT a.id, a.int_col, a.string_col FROM alltypessmall a
+WHERE NULL IN (SELECT int_col from alltypessmall where int_col < 0);
+---- RESULTS
+---- TYPES
+INT, INT, STRING
+====
+---- QUERY
+# LHS not-null, Predicate NOT IN, RHS has no results. Expect no results.
+SELECT a.id, a.int_col, a.string_col FROM alltypessmall a
+WHERE 1 NOT IN (SELECT id FROM alltypestiny WHERE bool_col = false) and a.id < 5;
+---- RESULTS
+---- TYPES
+INT, INT, STRING
+====
+---- QUERY
+# LHS not-null, Predicate NOT IN, RHS empty. Expect all results.
+SELECT count(*) FROM alltypessmall a
+WHERE 1 NOT IN (SELECT int_col from alltypessmall where int_col < 0);
+---- RESULTS
+100
+---- TYPES
+BIGINT
+====
+---- QUERY
+# LHS null, Predicate NOT IN, RHS empty. Expect all results.
+SELECT count(*) FROM alltypessmall a
+WHERE NULL NOT IN (SELECT int_col from alltypessmall where int_col < 0);
+---- RESULTS
+100
+---- TYPES
+BIGINT
+====
+---- QUERY
+# LHS not-null, Predicate IN, RHS not-empty with match. Uncorrelated. Expect all results.
+SELECT count(*) FROM alltypessmall a
+WHERE 1 IN (SELECT int_col FROM alltypestiny);
+---- RESULTS
+100
+---- TYPES
+BIGINT
+====
+---- QUERY
+# LHS not-null, Predicate IN, RHS not empty/correlated. Expect results.
+SELECT a.id, a.int_col, a.string_col FROM alltypessmall a
+WHERE 1 IN (SELECT id FROM alltypestiny WHERE bool_col = false AND id = a.id)
+---- RESULTS
+1,1,'1'
+---- TYPES
+INT, INT, STRING
+====
+---- QUERY
+# LHS not-null, Predicate IN, RHS has matches. Expect all
+# records with id < 5 are returned since subquery is always true.
+SELECT a.id, a.int_col, a.string_col FROM alltypessmall a
+WHERE 1 IN (SELECT id FROM alltypestiny WHERE bool_col = false) and a.id < 5
+---- RESULTS
+0,0,'0'
+1,1,'1'
+2,2,'2'
+3,3,'3'
+4,4,'4'
+---- TYPES
+INT, INT, STRING
+====
+---- QUERY
+# LHS null, Predicate IN, RHS not-empty with match. Uncorrelated. Expect no results.
+SELECT count(*) FROM alltypessmall a
+WHERE NULL IN (SELECT d FROM nulltable);
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# LHS not-null, Predicate IN, RHS not-empty with match. Correlated. Expect 4 results,
+# where int_col = 1.
+SELECT count(*) FROM alltypessmall a
+WHERE 1 IN (SELECT int_col FROM alltypestiny b where b.id = a.id);
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+====
+---- QUERY
+# LHS null, Predicate IN, RHS not-empty with match. Correlated. Expect no results,
+# where int_col = 1.
+SELECT count(*) FROM alltypessmall a
+WHERE NULL IN (SELECT NULL FROM alltypestiny b where b.id = a.id);
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# LHS not-null, Predicate IN, RHS not-empty with no match. Uncorrelated.
+# Expect no results.
+SELECT a.id, a.int_col, a.string_col FROM alltypessmall a
+WHERE 1 IN (SELECT int_col FROM alltypestiny where int_col != 1);
+---- RESULTS
+---- TYPES
+INT, INT, STRING
+====
+---- QUERY
+# LHS not-null, Predicate IN, RHS not-empty with no match, but with null. Uncorrelated.
+# Expect no results.
+SELECT a.id, a.int_col, a.string_col FROM alltypessmall a
+WHERE 1 IN (SELECT CASE WHEN id = 1 THEN NULL ELSE ID END FROM alltypestiny);
+---- RESULTS
+---- TYPES
+INT, INT, STRING
+====
+---- QUERY
+# LHS not-null, Predicate NOT IN, RHS not-empty with match. Uncorrelated.
+# Expect no results.
+SELECT a.id, a.int_col, a.string_col FROM alltypessmall a
+WHERE 1 NOT IN (SELECT int_col FROM alltypestiny);
+---- RESULTS
+---- TYPES
+INT, INT, STRING
+====
+---- QUERY
+# LHS null, Predicate NOT IN, RHS not-empty with match. Uncorrelated. Expect no results.
+SELECT a.id, a.int_col, a.string_col FROM alltypessmall a
+WHERE NULL NOT IN (SELECT NULL FROM alltypestiny);
+---- RESULTS
+---- TYPES
+INT, INT, STRING
+====
+----QUERY
+# LHS not-null, Predicate NOT IN, RHS not-empty with no match. Uncorrelated.
+# Expect all results.
+SELECT count(*) FROM alltypessmall a
+WHERE 1 NOT IN (SELECT int_col FROM alltypestiny where int_col != 1);
+---- RESULTS
+100
+---- TYPES
+BIGINT
+====
+----QUERY
+# LHS null, Predicate NOT IN, RHS not-empty with no match. Uncorrelated.
+# Expect no results.
+SELECT count(*) FROM alltypessmall a
+WHERE NULL NOT IN (SELECT int_col FROM alltypestiny where int_col != 1);
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# LHS not-null, Predicate NOT IN, RHS not-empty with no match, but null. Uncorrelated.
+# Expect no results.
+SELECT a.id, a.int_col, a.string_col FROM alltypessmall a
+WHERE 1 NOT IN (SELECT CASE WHEN id = 1 then null ELSE id END FROM alltypestiny);
+---- RESULTS
+---- TYPES
+INT, INT, STRING
+====
+---- QUERY
+# LHS null, Predicate NOT IN, RHS not-empty with no match, but null. Uncorrelated.
+# Expect no results.
+SELECT a.id, a.int_col, a.string_col FROM alltypessmall a
+WHERE NULL NOT IN (SELECT CASE WHEN id = 1 then null ELSE id END FROM alltypestiny);
+---- RESULTS
+---- TYPES
+INT, INT, STRING
+====
+---- QUERY
+# LHS is non-null, Predicate is IN, RHS is an aggregate.
+SELECT count(*) FROM alltypessmall a WHERE 0 IN (SELECT MIN(int_col) from tinyinttable);
+---- RESULTS
+100
+---- TYPES
+BIGINT
+====
+---- QUERY
+# LHS is non-null, Predicate is NOT IN, RHS is an aggregate.
+SELECT a.id FROM alltypessmall a WHERE 0 NOT IN (SELECT MIN(int_col) from tinyinttable);
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# LHS is not-null, Predicate is IN, RHS is group by without aggregation. Expect all results.
+SELECT count(*) from alltypessmall a where "a" IN (SELECT a from nulltable group by a);
+---- RESULTS
+100
+---- TYPES
+BIGINT
+====
+---- QUERY
+# LHS is null, Predicate is IN, RHS is group by without aggregation. Expect no results.
+SELECT a.id from alltypessmall a where NULL IN (SELECT d from nulltable group by d);
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# LHS is null, Predicate is NOT IN, RHS is group by without aggregation. Expect no results.
+SELECT a.id from alltypessmall a where NULL NOT IN (SELECT d from nulltable group by d);
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# LHS is non-null, Predicate is IN, RHS is select list is "*".
+SELECT a.id FROM alltypessmall a WHERE 1 IN (SELECT * FROM tinyinttable) and a.id < 3;
+---- RESULTS
+0
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+# LHS is non-null, Predicate is NOT IN, RHS is select list is "*".
+SELECT a.id FROM alltypessmall a WHERE 1 NOT IN (SELECT * FROM tinyinttable);
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# LHS is non-null, Predicate is IN, RHS select list is "*" and table is an inline view.
+SELECT count(*) from alltypessmall a WHERE 1 IN (SELECT * FROM
+(SELECT int_col from alltypessmall) b);
+---- RESULTS
+100
+---- TYPES
+BIGINT
+====
+---- QUERY
+# LHS is non-null, Predicate is NOT IN, RHS is select list is "*" and table is an
+# inline view.
+SELECT count(*) from alltypessmall a WHERE 1 NOT IN (SELECT * FROM
+(SELECT int_col from alltypessmall) b);
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# LHS is non-null, Predicate is IN, RHS includes nested subqueries.
+SELECT a.id FROM alltypessmall a WHERE
+1 IN (SELECT int_col FROM alltypessmall WHERE -10000 IN (SELECT * FROM tinyinttable));
+---- RESULTS
+---- TYPES
+INT
+====

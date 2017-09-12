@@ -89,6 +89,9 @@ public class SlotRef extends Expr {
 
   @Override
   protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
+    // TODO: derived slot refs (e.g., star-expanded) will not have rawPath set.
+    // Change construction to properly handle such cases.
+    Preconditions.checkState(rawPath_ != null);
     Path resolvedPath = null;
     try {
       resolvedPath = analyzer.resolvePath(rawPath_, PathType.SLOT_REF);

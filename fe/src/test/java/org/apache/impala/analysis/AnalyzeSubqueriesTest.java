@@ -24,6 +24,7 @@ import org.apache.impala.common.AnalysisException;
 
 public class AnalyzeSubqueriesTest extends AnalyzerTest {
   private static String cmpOperators[] = {"=", "!=", "<=", ">=", ">", "<"};
+  private static String nonEquiCmpOperators[] = {"!=", "<=", ">=", ">", "<"};
 
   @Test
   public void TestInSubqueries() throws AnalysisException {
@@ -34,10 +35,11 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "left semi join", "left anti join"};
 
     // [NOT] IN subquery predicates
-    String operators[] = {"in", "not in"};
+    String operators[] = {"IN", "NOT IN"};
     for (String op: operators) {
       AnalyzesOk(String.format("select * from functional.alltypes where id %s " +
           "(select id from functional.alltypestiny)", op));
+
       // Using column and table aliases similar to the ones produced by the
       // column/table alias generators during a rewrite.
       AnalyzesOk(String.format("select id `$c$1` from functional.alltypestiny `$a$1` " +
@@ -133,14 +135,14 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
             "s on a.int_col = s.int_col where a.bool_col = false)", op, joinOp));
       }
 
-      // Subquery with relative table references
+      // Complex type: subquery with relative table references
       AnalyzesOk(String.format(
           "select id from functional.allcomplextypes t where id %s " +
           "(select f1 from t.struct_array_col a, t.int_array_col b " +
           "where f2 = 'xyz' and b.item < 3 group by f1 having count(*) > 2 limit 5)",
           op));
 
-      // Correlated predicates in the subquery's ON clause
+      // Correlated predicates in the subquery's ON clause. Vary join column type.
       AnalyzesOk(String.format("select * from functional.alltypes t where t.id %s " +
           "(select a.id from functional.alltypesagg a left outer join " +
           "functional.alltypessmall s on s.int_col = t.int_col)", op));
@@ -220,6 +222,7 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
       AnalyzesOk(String.format(
           "select id from functional.allcomplextypes t where id %s " +
           "(select f1 from t.struct_array_col a where t.int_struct_col.f1 = a.f1)", op));
+
       // Test correlated BETWEEN predicates.
       AnalyzesOk(String.format("select 1 from functional.alltypes t where id %s " +
           "(select id from functional.alltypesagg a where " +
@@ -270,208 +273,291 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "functional.alltypestiny t1 where int_col %s (select min(bigint_col) " +
         "over (partition by bool_col) from functional.alltypessmall t2 where " +
         "int_col < 10)", op));
+
+      // [NOT] IN subquery with a correlated non-equi predicate is ok if the subquery only
+      // has relative table refs
+      AnalyzesOk(String.format("select 1 from functional.allcomplextypes t where id %s " +
+          "(select f1 from t.struct_array_col a where t.int_struct_col.f1 < a.f1)", op));
+
+      // Statement with a GROUP BY and a correlated IN subquery that has a non-equi
+      // correlated predicate and only relative table refs
+      AnalyzesOk(String.format("select id, count(*) from functional.allcomplextypes t " +
+          "where id %s" +
+          "(select f1 from t.struct_array_col a where t.int_struct_col.f1 < a.f1) " +
+          "group by id", op));
+
+      // Complex type: Correlated, non-equijoins.
+      for (String cmpOp: nonEquiCmpOperators) {
+        // Complex type: allowed because the subquery only has relative table refs.
+        AnalyzesOk(String.format("select 1 from functional.allcomplextypes t " +
+            "where id %s " +
+            "(select f1 from t.struct_array_col a where t.int_struct_col.f1 %s a.f1)",
+            op, cmpOp));
+      }
+
+      // Reference a non-existing table in the subquery
+      AnalysisError(String.format("select * from functional.alltypestiny t where id %s " +
+          "(select id from functional.alltypessmall s left outer join p on " +
+          "(s.int_col = p.int_col))", op),
+          "Could not resolve table reference: 'p'");
+      // Reference a non-existing column from a table in the outer scope
+      AnalysisError(String.format("select * from functional.alltypestiny t where id %s " +
+          "(select id from functional.alltypessmall s where s.int_col = t.bad_col)", op),
+          "Could not resolve column/field reference: 't.bad_col'");
+
+      // Referencing the same table in the inner and the outer query block
+      // No explicit alias
+      AnalyzesOk(String.format("select id from functional.alltypestiny where " +
+          "int_col %s (select int_col from functional.alltypestiny)", op));
+      // Different alias between inner and outer block referencing the same table
+      AnalyzesOk(String.format("select id from functional.alltypestiny t where " +
+          "int_col %s (select int_col from functional.alltypestiny p)", op));
+      // Alias only in the outer block
+      AnalyzesOk(String.format("select id from functional.alltypestiny t where " +
+          "int_col %s (select int_col from functional.alltypestiny)", op));
+      // Same alias in both inner and outer block
+      AnalyzesOk(String.format("select id from functional.alltypestiny t where " +
+          "int_col %s (select int_col from functional.alltypestiny t)", op));
+
+      // OR with subquery predicates
+      AnalysisError(String.format("select * from functional.alltypes t where t.id %s " +
+          "(select id from functional.alltypesagg) or t.bool_col = false", op),
+          String.format("Subqueries in OR predicates are not supported: t.id %s " +
+          "(SELECT id FROM functional.alltypesagg) OR t.bool_col = FALSE", op));
+      AnalysisError(String.format("select id from functional.allcomplextypes t where " +
+          "id %s " +
+          "(select f1 from t.struct_array_col a where t.int_struct_col.f1 < a.f1) " +
+          "or id < 10", op),
+          String.format("Subqueries in OR predicates are not supported: id %s " +
+          "(SELECT f1 FROM t.struct_array_col a WHERE t.int_struct_col.f1 < a.f1) " +
+          "OR id < 10", op));
+
+      // Binary predicate with non-comparable operands
+      AnalysisError(String.format("select * from functional.alltypes t where " +
+          "(id %s (select id from functional.alltypestiny)) = 'string_val'", op),
+          String.format("operands of type BOOLEAN and STRING are not comparable: " +
+          "(id %s (SELECT id FROM functional.alltypestiny)) = 'string_val'", op));
+
+      // TODO: Modify the StmtRewriter to allow this case with relative refs.
+      // Correlated subquery with relative table refs and OR predicate is not allowed
+      AnalysisError(String.format("select id from functional.allcomplextypes t where " +
+          "id %s (select f1 from t.struct_array_col a where t.int_struct_col.f1 < a.f1 " +
+          "or id < 10)", op),
+          "Disjunctions with correlated predicates are not supported: " +
+          "t.int_struct_col.f1 < a.f1 OR id < 10");
+      // Correlated subquery with absolute table refs and OR predicate is not allowed
+      AnalysisError(String.format("select * from functional.alltypes t where id %s " +
+          "(select id from functional.alltypesagg a where " +
+          "a.int_col = t.int_col or a.bool_col = false)", op), "Disjunctions " +
+              "with correlated predicates are not supported: a.int_col = " +
+          "t.int_col OR a.bool_col = FALSE");
+
+      AnalyzesOk(String.format("select * from functional.alltypes t where id %s " +
+          "(select id from functional.alltypestiny) and (bool_col = false or " +
+          "int_col = 10)", op));
+
+      // Correlated subqueries with GROUP BY, AGG functions or DISTINCT are not allowed
+      // with relative table refs in the subquery
+      // TODO: Modify the StmtRewriter to allow this case with relative refs
+      AnalysisError(String.format("select id from functional.allcomplextypes t where " +
+          "id %s" +
+          "(select count(f1) from t.struct_array_col a where t.int_struct_col.f1 < a.f1)",
+          op),
+          "Unsupported correlated subquery with grouping and/or aggregation: " +
+          "SELECT count(f1) FROM t.struct_array_col a WHERE t.int_struct_col.f1 < a.f1");
+      // Correlated subqueries with GROUP BY, AGG functions or DISTINCT are not allowed
+      // with absolute table refs in the subquery
+      AnalysisError(String.format("select * from functional.alltypes t where t.id %s " +
+          "(select max(a.id) from functional.alltypesagg a where " +
+          "t.int_col = a.int_col)", op),
+          "Unsupported correlated subquery with grouping and/or aggregation: " +
+          "SELECT max(a.id) FROM functional.alltypesagg a " +
+          "WHERE t.int_col = a.int_col");
+      AnalysisError(String.format("select * from functional.alltypes t where t.id %s " +
+          "(select a.id from functional.alltypesagg a where " +
+          "t.int_col = a.int_col group by a.id)", op), "Unsupported correlated " +
+              "subquery with grouping and/or aggregation: SELECT a.id FROM " +
+          "functional.alltypesagg a WHERE t.int_col = a.int_col GROUP BY a.id");
+      AnalysisError(String.format("select * from functional.alltypes t where t.id %s " +
+          "(select distinct a.id from functional.alltypesagg a where " +
+          "a.bigint_col = t.bigint_col)", op), "Unsupported correlated subquery with " +
+              "grouping and/or aggregation: SELECT DISTINCT a.id FROM " +
+          "functional.alltypesagg a WHERE a.bigint_col = t.bigint_col");
+
+      // Multiple subquery predicates
+      AnalyzesOk(String.format("select * from functional.alltypes t where id %s " +
+          "(select id from functional.alltypestiny where int_col = 10) and int_col %s " +
+          "(select int_col from functional.alltypessmall where bigint_col = 1000) and " +
+          "string_col not in (select string_col from functional.alltypesagg where " +
+          "tinyint_col > 10) and bool_col = false", op, op));
+      AnalyzesOk(String.format("select id, year, month from " +
+          "functional.allcomplextypes t where id %s " +
+          "(select item from t.int_array_col where item < 10) and id not in " +
+          "(select f1 from t.struct_array_col where f2 = 'test')", op));
+
+      // Correlated subquery with a LIMIT clause
+      AnalysisError(String.format("select * from functional.alltypes t where id %s " +
+          "(select s.id from functional.alltypesagg s where s.int_col = t.int_col " +
+          "limit 1)", op), "Unsupported correlated subquery with a LIMIT clause: " +
+              "SELECT s.id FROM functional.alltypesagg s WHERE s.int_col = t.int_col " +
+          "LIMIT 1");
+
+      // Correlated IN with an analytic function
+      AnalysisError(String.format("select id, int_col, bool_col from " +
+          "functional.alltypestiny t1 " +
+          "where int_col %s (select min(bigint_col) over (partition by bool_col) " +
+          "from functional.alltypessmall t2 where t1.id < t2.id)", op), "Unsupported " +
+              "correlated subquery with grouping and/or aggregation: SELECT " +
+              "min(bigint_col) OVER (PARTITION BY bool_col) FROM " +
+          "functional.alltypessmall t2 WHERE t1.id < t2.id");
+
+      // IN subquery in binary predicate
+      AnalysisError(String.format("select * from functional.alltypestiny where " +
+          "(tinyint_col %s (1,2)) = (bool_col %s (select bool_col from " +
+          "functional.alltypes))", op, op),
+          String.format("IN subquery predicates are not supported " +
+              "in binary predicates: (tinyint_col %s (1, 2)) = (bool_col %s (SELECT " +
+          "bool_col FROM functional.alltypes))", op, op));
+
+      // Column labels may conflict after the rewrite as an inline view
+      AnalyzesOk(String.format("select int_col from functional.alltypestiny where " +
+          "int_col %s (select 1 as int_col from functional.alltypesagg)", op));
+      AnalyzesOk(String.format("select int_col from functional.alltypestiny a where " +
+          "int_col %s (select 1 as int_col from functional.alltypesagg b " +
+          "where a.int_col = b.int_col)", op));
+
+      // NOT compound predicates with OR
+      AnalyzesOk(String.format("select * from functional.alltypes t where not (" +
+          "id %s (select id from functional.alltypesagg) or int_col < 10)", op));
+      AnalyzesOk(String.format("select * from functional.alltypes t where not (" +
+          "t.id < 10 or not (t.int_col %s (select int_col from " +
+          "functional.alltypesagg) and t.bool_col = false))", op));
     }
 
-    // Constant on the left hand side
-    AnalyzesOk("select * from functional.alltypes a where 1 in " +
-        "(select id from functional.alltypesagg s where s.int_col = a.int_col)");
-    AnalysisError("select * from functional.alltypes a where 1 not in " +
-        "(select id from functional.alltypesagg s where s.int_col = a.int_col)",
-        "Unsupported NOT IN predicate with subquery: 1 NOT IN (SELECT id FROM " +
-        "functional.alltypesagg s WHERE s.int_col = a.int_col)");
-
-    // IN subquery that is equivalent to an uncorrelated EXISTS subquery
-    AnalysisError("select * from functional.alltypes t where 1 in " +
-        "(select int_col from functional.alltypesagg)", "Unsupported " +
-        "predicate with subquery: 1 IN (SELECT int_col FROM functional.alltypesagg)");
-    // Different non-equi comparison operators in the correlated predicate
-    String nonEquiCmpOperators[] = {"!=", "<=", ">=", ">", "<"};
-    for (String cmpOp: nonEquiCmpOperators) {
-      // Allowed because the subquery only has relative table refs.
-      AnalyzesOk(String.format("select 1 from functional.allcomplextypes t where id in" +
-          "(select f1 from t.struct_array_col a where t.int_struct_col.f1 %s a.f1)",
-          cmpOp));
-      // Not allowed because the subquery has absolute table refs.
-      AnalysisError(String.format("select 1 from functional.alltypes t where 1 in " +
-          "(select int_col from functional.alltypesagg g where g.id %s t.id)",
-          cmpOp), String.format("Unsupported predicate with subquery: 1 " +
-          "IN (SELECT int_col FROM functional.alltypesagg g WHERE g.id %s t.id)",
-          cmpOp));
-    }
-
-    // NOT IN subquery with a correlated non-equi predicate is ok if the subquery only
-    // has relative table refs
-    AnalyzesOk("select 1 from functional.allcomplextypes t where id not in " +
-        "(select f1 from t.struct_array_col a where t.int_struct_col.f1 < a.f1)");
-    // NOT IN subquery with a correlated non-equi predicate is not ok if the subquery
-    // has absolute table refs
-    AnalysisError("select 1 from functional.alltypes t where 1 not in " +
-        "(select id from functional.alltypestiny g where g.id < t.id)",
-        "Unsupported predicate with subquery: 1 NOT IN (SELECT id FROM " +
-        "functional.alltypestiny g WHERE g.id < t.id)");
-
-    // Statement with a GROUP BY and a correlated IN subquery that has a non-equi
-    // correlated predicate and only relative table refs
-    AnalyzesOk("select id, count(*) from functional.allcomplextypes t where id in" +
-        "(select f1 from t.struct_array_col a where t.int_struct_col.f1 < a.f1) " +
-        "group by id");
-    // Statement with a GROUP BY and a correlated IN subquery that has a non-equi
-    // correlated predicate and absolute table refs
-    AnalysisError("select id, count(*) from functional.alltypes t " +
-        "where 1 IN (select id from functional.alltypesagg g where t.int_col < " +
-        "g.int_col) group by id", "Unsupported predicate with subquery: 1 IN " +
-        "(SELECT id FROM functional.alltypesagg g WHERE t.int_col < g.int_col)");
-
-    // Reference a non-existing table in the subquery
-    AnalysisError("select * from functional.alltypestiny t where id in " +
-        "(select id from functional.alltypessmall s left outer join p on " +
-        "(s.int_col = p.int_col))",
-        "Could not resolve table reference: 'p'");
-    // Reference a non-existing column from a table in the outer scope
-    AnalysisError("select * from functional.alltypestiny t where id in " +
-        "(select id from functional.alltypessmall s where s.int_col = t.bad_col)",
-        "Could not resolve column/field reference: 't.bad_col'");
-
-    // Referencing the same table in the inner and the outer query block
-    // No explicit alias
-    AnalyzesOk("select id from functional.alltypestiny where int_col in " +
-        "(select int_col from functional.alltypestiny)");
-    // Different alias between inner and outer block referencing the same table
-    AnalyzesOk("select id from functional.alltypestiny t where int_col in " +
-        "(select int_col from functional.alltypestiny p)");
-    // Alias only in the outer block
-    AnalyzesOk("select id from functional.alltypestiny t where int_col in " +
-        "(select int_col from functional.alltypestiny)");
-    // Same alias in both inner and outer block
-    AnalyzesOk("select id from functional.alltypestiny t where int_col in " +
-        "(select int_col from functional.alltypestiny t)");
-    // Binary predicate with non-comparable operands
-    AnalysisError("select * from functional.alltypes t where " +
-        "(id in (select id from functional.alltypestiny)) = 'string_val'",
-        "operands of type BOOLEAN and STRING are not comparable: " +
-        "(id IN (SELECT id FROM functional.alltypestiny)) = 'string_val'");
-
-    // OR with subquery predicates
-    AnalysisError("select * from functional.alltypes t where t.id in " +
-        "(select id from functional.alltypesagg) or t.bool_col = false",
-        "Subqueries in OR predicates are not supported: t.id IN " +
-        "(SELECT id FROM functional.alltypesagg) OR t.bool_col = FALSE");
+    // Negated [NOT] IN subquery with disjunction.
     AnalysisError("select * from functional.alltypes t where not (t.id in " +
         "(select id from functional.alltypesagg) and t.int_col = 10)",
         "Subqueries in OR predicates are not supported: t.id NOT IN " +
         "(SELECT id FROM functional.alltypesagg) OR t.int_col != 10");
+    AnalysisError("select * from functional.alltypes t where not (t.id not in " +
+        "(select id from functional.alltypesagg) and t.int_col = 10)",
+        "Subqueries in OR predicates are not supported: t.id IN " +
+        "(SELECT id FROM functional.alltypesagg) OR t.int_col != 10");
+
+    // Exists subquery with disjunction.
     AnalysisError("select * from functional.alltypes t where exists " +
         "(select * from functional.alltypesagg g where g.bool_col = false) " +
         "or t.bool_col = true", "Subqueries in OR predicates are not " +
         "supported: EXISTS (SELECT * FROM functional.alltypesagg g WHERE " +
         "g.bool_col = FALSE) OR t.bool_col = TRUE");
+
+    // Comparator-based subquery with disjunction.
     AnalysisError("select * from functional.alltypes t where t.id = " +
         "(select min(id) from functional.alltypesagg g) or t.id = 10",
         "Subqueries in OR predicates are not supported: t.id = " +
         "(SELECT min(id) FROM functional.alltypesagg g) OR t.id = 10");
-    AnalysisError("select id from functional.allcomplextypes t where id in" +
-        "(select f1 from t.struct_array_col a where t.int_struct_col.f1 < a.f1) " +
-        "or id < 10", "Subqueries in OR predicates are not supported: " +
-        "id IN (SELECT f1 FROM t.struct_array_col a WHERE t.int_struct_col.f1 < a.f1) " +
-        "OR id < 10");
+  }
 
-    // TODO for 2.3: Modify the StmtRewriter to allow this case with relative refs.
-    // Correlated subquery with relative table refs and OR predicate is not allowed
-    AnalysisError("select id from functional.allcomplextypes t where id in" +
-        "(select f1 from t.struct_array_col a where t.int_struct_col.f1 < a.f1 " +
-        "or id < 10)", "Disjunctions with correlated predicates are not supported: " +
-        "t.int_struct_col.f1 < a.f1 OR id < 10");
-    // Correlated subquery with absolute table refs and OR predicate is not allowed
-    AnalysisError("select * from functional.alltypes t where id in " +
-        "(select id from functional.alltypesagg a where " +
-        "a.int_col = t.int_col or a.bool_col = false)", "Disjunctions " +
-        "with correlated predicates are not supported: a.int_col = " +
-        "t.int_col OR a.bool_col = FALSE");
+  @Test
+  public void TestInConstantLHSSubqueries() throws AnalysisException {
+    // [NOT] IN subquery predicates
+    String operators[] = {"IN", "NOT IN"};
 
-    AnalyzesOk("select * from functional.alltypes t where id in " +
-        "(select id from functional.alltypestiny) and (bool_col = false or " +
-        "int_col = 10)");
+    for (String op: operators) {
+      // Uncorrelated subquery.
+      AnalyzesOk(String.format("select * from functional.alltypes t where 1 %s " +
+          "(select int_col from functional.alltypesagg)", op));
+      // Uncorrelated and limited subquery.
+      AnalyzesOk(String.format("select * from functional.alltypes t where 1 %s " +
+          "(select int_col from functional.alltypesagg limit 1)", op));
+      // Select * in uncorrelated subquery.
+      AnalyzesOk(String.format("select * from functional.alltypes t where 1 %s " +
+          "(select * from functional.tinyinttable)", op));
+      // Select * in subquery, uncorrelated inline view.
+      AnalyzesOk(String.format("select * from functional.alltypes t where 1 %s " +
+          "(select * from (select f2 from functional.emptytable) s)", op));
+      // Uncorrelated aggregate subquery.
+      AnalyzesOk(String.format("select * from functional.alltypestiny t1 where " +
+          "10 %s (select max(int_col) from functional.alltypestiny)", op));
+      AnalyzesOk(String.format("select * from functional.alltypestiny t1 where " +
+          "(10 - 2) %s (select count(*) from functional.alltypestiny)", op));
+      // Uncorrelated analytic function.
+      AnalyzesOk(String.format("select id, int_col, bool_col from " +
+          "functional.alltypestiny t1 where 1 %s (select min(bigint_col) " +
+          "over (partition by bool_col) from functional.alltypessmall t2 where " +
+          "int_col < 10)", op));
+      // Uncorrelated group by with no aggregate function.
+      AnalyzesOk(String.format("select id, int_col, bool_col from " +
+          "functional.alltypestiny t1 where int_col %s (select int_col " +
+          "from functional.alltypessmall t2 where " +
+          "int_col < 10 group by int_col)", op));
+      // Uncorrelated group by with only aggregate function.
+      AnalyzesOk(String.format("select id, int_col, bool_col from " +
+          "functional.alltypestiny t1 where int_col %s (select max(id) " +
+          "from functional.alltypessmall t2 where " +
+          "int_col < 10 group by int_col)", op));
+      // Nested subqueries.
+      AnalyzesOk(String.format("select * from functional.alltypes t where 1 %s " +
+          "(select int_col from functional.tinyinttable where " +
+          "1 %s (select int_col from functional.alltypestiny))", op, op));
+      // Nested subqueries with *.
+      AnalyzesOk(String.format("select * from functional.alltypes t where 1 %s " +
+          "(select * from functional.tinyinttable where " +
+          "1 %s (select * from functional.tinyinttable))", op, op));
+      // Limit + correlation
+      AnalysisError(String.format("select id from functional.alltypessmall a where 1 " +
+          "%s (select int_col from functional.alltypestiny b where b.id = a.id limit 5)",
+          op), "Unsupported correlated subquery with a LIMIT clause: ");
+      // Order + limit + correlation.
+      AnalysisError(String.format("select id from functional.alltypessmall a where 1 %s " +
+          "(select int_col from functional.alltypestiny b where b.id = a.id " +
+          "order by int_col limit 5)", op),
+          "Unsupported correlated subquery with a LIMIT clause");
+    }
 
-    // Correlated subqueries with GROUP BY, AGG functions or DISTINCT are not allowed
-    // with relative table refs in the subquery
-    // TODO for 2.3: Modify the StmtRewriter to allow this case with relative refs
-    AnalysisError("select id from functional.allcomplextypes t where id in" +
-        "(select count(f1) from t.struct_array_col a where t.int_struct_col.f1 < a.f1)",
-        "Unsupported correlated subquery with grouping and/or aggregation: " +
-        "SELECT count(f1) FROM t.struct_array_col a WHERE t.int_struct_col.f1 < a.f1");
-    // Correlated subqueries with GROUP BY, AGG functions or DISTINCT are not allowed
-    // with absolute table refs in the subquery
-    AnalysisError("select * from functional.alltypes t where t.id in " +
-        "(select max(a.id) from functional.alltypesagg a where " +
-        "t.int_col = a.int_col)", "Unsupported correlated subquery with grouping " +
-        "and/or aggregation: SELECT max(a.id) FROM functional.alltypesagg a " +
-        "WHERE t.int_col = a.int_col");
-    AnalysisError("select * from functional.alltypes t where t.id in " +
-        "(select a.id from functional.alltypesagg a where " +
-        "t.int_col = a.int_col group by a.id)", "Unsupported correlated " +
-        "subquery with grouping and/or aggregation: SELECT a.id FROM " +
-        "functional.alltypesagg a WHERE t.int_col = a.int_col GROUP BY a.id");
-    AnalysisError("select * from functional.alltypes t where t.id in " +
-        "(select distinct a.id from functional.alltypesagg a where " +
-        "a.bigint_col = t.bigint_col)", "Unsupported correlated subquery with " +
-        "grouping and/or aggregation: SELECT DISTINCT a.id FROM " +
-        "functional.alltypesagg a WHERE a.bigint_col = t.bigint_col");
+    // Non-equijoins are not supported for NOT IN (not supported for EXISTS) when there
+    // is a constant on the left-hand side and a correlation.
+    // TODO: move into above, main test loop when NOT IN is supported.
+    for (String cmpOp: nonEquiCmpOperators) {
+      // Constant on the left hand side: correlated, non-equijoins
+      AnalyzesOk(String.format("select 1 from functional.alltypes t where 1 IN " +
+          "(select int_col from functional.alltypesagg g where g.id %s t.id)", cmpOp));
+      AnalysisError(String.format("select 1 from functional.alltypes t where 1 NOT IN " +
+          "(select int_col from functional.alltypesagg g where g.id %s t.id)", cmpOp),
+          String.format("Unsupported NOT IN predicate with subquery: 1 NOT IN", cmpOp));
 
-    // NOT compound predicates with OR
-    AnalyzesOk("select * from functional.alltypes t where not (" +
-        "id in (select id from functional.alltypesagg) or int_col < 10)");
-    AnalyzesOk("select * from functional.alltypes t where not (" +
-        "t.id < 10 or not (t.int_col in (select int_col from " +
-        "functional.alltypesagg) and t.bool_col = false))");
+      // Constant on the left hand side: correlated, non-equijoin with a group by.
+      AnalyzesOk(String.format("select id, count(*) from functional.alltypes t " +
+          "where 1 IN (select id from functional.alltypesagg g where t.int_col %s " +
+          "g.int_col) group by id", cmpOp));
+      AnalysisError(String.format("select id, count(*) from functional.alltypes t " +
+          "where 1 NOT IN (select id from functional.alltypesagg g where t.int_col %s " +
+          "g.int_col) group by id", cmpOp),
+          String.format("Unsupported NOT IN predicate with subquery: 1 NOT IN", cmpOp));
+    }
 
-    // Multiple subquery predicates
-    AnalyzesOk("select * from functional.alltypes t where id in " +
-        "(select id from functional.alltypestiny where int_col = 10) and int_col in " +
-        "(select int_col from functional.alltypessmall where bigint_col = 1000) and " +
-        "string_col not in (select string_col from functional.alltypesagg where " +
-        "tinyint_col > 10) and bool_col = false");
-    AnalyzesOk("select id, year, month from functional.allcomplextypes t where id in " +
-        "(select item from t.int_array_col where item < 10) and id not in " +
-        "(select f1 from t.struct_array_col where f2 = 'test')");
+    // Correlated subquery.
+    AnalyzesOk("select * from functional.alltypes a where 1 in " +
+        "(select id from functional.alltypesagg s where s.int_col = a.int_col)");
+    AnalysisError("select * from functional.alltypes a where 1 not in " +
+        "(select id from functional.alltypesagg s where s.int_col = a.int_col)",
+        "Unsupported NOT IN predicate with subquery: 1 NOT IN");
 
-    // Correlated subquery with a LIMIT clause
-    AnalysisError("select * from functional.alltypes t where id in " +
-        "(select s.id from functional.alltypesagg s where s.int_col = t.int_col " +
-        "limit 1)", "Unsupported correlated subquery with a LIMIT clause: " +
-        "SELECT s.id FROM functional.alltypesagg s WHERE s.int_col = t.int_col " +
-        "LIMIT 1");
+    // Select * in correlated subquery.
+    AnalyzesOk("select * from functional.alltypes t where 1 in "
+        + "(select * from functional.tinyinttable x where t.id = x.int_col)");
+    AnalysisError("select * from functional.alltypes t where 1 not in "
+        + "(select * from functional.tinyinttable x where t.id = x.int_col)",
+        "Unsupported NOT IN predicate with subquery: 1 NOT IN");
 
-    // Correlated IN with an analytic function
-    AnalysisError("select id, int_col, bool_col from functional.alltypestiny t1 " +
-        "where int_col in (select min(bigint_col) over (partition by bool_col) " +
-        "from functional.alltypessmall t2 where t1.id < t2.id)", "Unsupported " +
-        "correlated subquery with grouping and/or aggregation: SELECT " +
-        "min(bigint_col) OVER (PARTITION BY bool_col) FROM " +
-        "functional.alltypessmall t2 WHERE t1.id < t2.id");
-
-    // IN subquery in binary predicate
-    AnalysisError("select * from functional.alltypestiny where " +
-        "(tinyint_col in (1,2)) = (bool_col in (select bool_col from " +
-        "functional.alltypes))", "IN subquery predicates are not supported " +
-        "in binary predicates: (tinyint_col IN (1, 2)) = (bool_col IN (SELECT " +
-        "bool_col FROM functional.alltypes))");
-
-    // Column labels may conflict after the rewrite as an inline view
-    AnalyzesOk("select int_col from functional.alltypestiny where " +
-        "int_col in (select 1 as int_col from functional.alltypesagg)");
-    AnalyzesOk("select int_col from functional.alltypestiny a where " +
-        "int_col not in (select 1 as int_col from functional.alltypesagg b " +
-        "where a.int_col = b.int_col)");
-
-    // NOT IN uncorrelated aggregate subquery with a constant
-    AnalysisError("select * from functional.alltypestiny t1 where " +
-        "10 not in (select max(int_col) from functional.alltypestiny)",
-        "Unsupported NOT IN predicate with subquery: 10 NOT IN (SELECT " +
-        "max(int_col) FROM functional.alltypestiny)");
-    AnalysisError("select * from functional.alltypestiny t1 where " +
-        "(10 - 2) not in (select count(*) from functional.alltypestiny)",
-        "Unsupported NOT IN predicate with subquery: (10 - 2) NOT IN " +
-        "(SELECT count(*) FROM functional.alltypestiny)");
+    // Select * in subquery, correlated inline view.
+    AnalyzesOk("select * from functional.alltypes t where 1 in "
+        + "(select * from (select f2 from functional.emptytable) s "
+        + "where s.f2 = t.int_col)");
+    AnalysisError("select * from functional.alltypes t where 1 not in "
+        + "(select * from (select f2 from functional.emptytable) s "
+        + "where s.f2 = t.int_col)",
+        "Unsupported NOT IN predicate with subquery: 1 NOT IN");
   }
 
   @Test
@@ -604,8 +690,6 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "where EXISTS (select id, min(int_col) over (partition by bool_col) " +
         "from functional.alltypesagg a where bigint_col < 10)");
 
-    // Different non-equi comparison operators in the correlated predicate
-    String nonEquiCmpOperators[] = {"!=", "<=", ">=", ">", "<"};
     for (String cmpOp: nonEquiCmpOperators) {
       // Allowed because the subquery only has relative table refs.
       AnalyzesOk(String.format(
@@ -980,7 +1064,7 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     }
 
     // Correlated aggregate subquery with a GROUP BY and a relative table ref
-    // TODO for 2.3: Modify the StmtRewriter to allow this query with only relative refs.
+    // TODO: Modify the StmtRewriter to allow this query with only relative refs.
     AnalysisError("select min(t.year) from functional.allcomplextypes t " +
         "where t.id < (select max(f1) from t.struct_array_col a " +
         "where a.f1 = t.id group by a.f2 order by 1 limit 1)",
@@ -1008,7 +1092,7 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
       "functional.alltypessmall t2 WHERE int_col < 10)");
 
     // Aggregate subquery with analytic function + limit 1 and a relative table ref
-    // TODO for 2.3: Modify the StmtRewriter to allow this query with only relative refs.
+    // TODO: Modify the StmtRewriter to allow this query with only relative refs.
     AnalysisError("select id from functional.allcomplextypes t where year = " +
         "(select min(f1) over (partition by f2) from t.struct_array_col a where " +
         "t.id = f1 limit 1)",

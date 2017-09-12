@@ -110,6 +110,9 @@ class TestQueries(ImpalaTestSuite):
   def test_subquery(self, vector):
     self.run_test_case('QueryTest/subquery', vector)
 
+  def test_subquery_in_constant_lhs(self, vector):
+    self.run_test_case('QueryTest/subquery-in-constant-lhs', vector)
+
   def test_empty(self, vector):
     self.run_test_case('QueryTest/empty', vector)
 

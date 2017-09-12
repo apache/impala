@@ -40,7 +40,7 @@ import com.google.common.collect.Lists;
 public class InPredicate extends Predicate {
   private static final String IN_SET_LOOKUP = "in_set_lookup";
   private static final String NOT_IN_SET_LOOKUP = "not_in_set_lookup";
-  private static final String IN_ITERATE= "in_iterate";
+  private static final String IN_ITERATE = "in_iterate";
   private static final String NOT_IN_ITERATE = "not_in_iterate";
   private final boolean isNotIn_;
 
