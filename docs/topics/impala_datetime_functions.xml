@@ -772,6 +772,68 @@ select now() as right_now,
 
       </dlentry>
 
+      <dlentry id="from_timestamp" rev="2.3.0 IMPALA-2190">
+
+        <dt>
+          <codeph>from_timestamp(datetime timestamp, pattern string)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="hidden">from_timestamp() function</indexterm>
+          <b>Purpose:</b> Converts a <codeph>TIMESTAMP</codeph> value into a
+          string representing the same value.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/added_in_230"/>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            The <codeph>from_timestamp()</codeph> function provides a flexible way to convert <codeph>TIMESTAMP</codeph>
+            values into arbitrary string formats for reporting purposes.
+          </p>
+          <p>
+            Because Impala implicitly converts string values into <codeph>TIMESTAMP</codeph>, you can
+            pass date/time values represented as strings (in the standard <codeph>yyyy-MM-dd HH:mm:ss.SSS</codeph> format)
+            to this function. The result is a string using different separator characters, order of fields, spelled-out month
+            names, or other variation of the date/time string representation.
+          </p>
+          <p>
+            The allowed tokens for the pattern string are the same as for the <codeph>from_unixtime()</codeph> function.
+          </p>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            The following examples show different ways to format a <codeph>TIMESTAMP</codeph>
+            value as a string:
+          </p>
+<codeblock>
+-- Reformat arbitrary TIMESTAMP value.
+select from_timestamp(now(), 'yyyy/MM/dd');
++-------------------------------------+
+| from_timestamp(now(), 'yyyy/mm/dd') |
++-------------------------------------+
+| 2017/10/01                          |
++-------------------------------------+
+
+-- Reformat string literal representing date/time.
+select from_timestamp('1984-09-25', 'yyyy/MM/dd');
++--------------------------------------------+
+| from_timestamp('1984-09-25', 'yyyy/mm/dd') |
++--------------------------------------------+
+| 1984/09/25                                 |
++--------------------------------------------+
+
+-- Alternative format for reporting purposes.
+select from_timestamp('1984-09-25 16:45:30.125', 'MMM dd, yyyy HH:mm:ss.SSS');
++------------------------------------------------------------------------+
+| from_timestamp('1984-09-25 16:45:30.125', 'mmm dd, yyyy hh:mm:ss.sss') |
++------------------------------------------------------------------------+
+| Sep 25, 1984 16:45:30.125                                              |
++------------------------------------------------------------------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
       <dlentry id="from_unixtime">
 
         <dt>
@@ -2096,6 +2158,88 @@ select now() as right_now,
 +-------------------------------+-------------------------------+
 | 2016-06-01 16:30:36.890325000 | The date today is 2016-06-01. |
 +-------------------------------+-------------------------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="to_timestamp" rev="2.3.0 IMPALA-2190">
+
+        <dt>
+          <codeph>to_timestamp(bigint unixtime)</codeph>,
+          <codeph>to_timestamp(string date, string pattern)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="hidden">to_timestamp() function</indexterm>
+          <b>Purpose:</b> Converts an integer or string representing
+          a date/time value into the corresponding <codeph>TIMESTAMP</codeph>
+          value.
+          <p>
+            <b>Return type:</b> <codeph>timestamp</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/added_in_230"/>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            An integer argument represents the number of seconds past the epoch (midnight
+            on January 1, 1970). It is the converse of the <codeph>unix_timestamp()</codeph>
+            function, which produces a <codeph>BIGINT</codeph> representing the number of
+            seconds past the epoch.
+          </p>
+          <p>
+            A string argument, plus another string argument representing the
+            pattern, turns an arbitrary string representation of a date and time
+            into a true <codeph>TIMESTAMP</codeph> value. The ability to parse
+            many kinds of date and time formats allows you to deal with temporal
+            data from diverse sources, and if desired to convert to efficient
+            <codeph>TIMESTAMP</codeph> values during your ETL process. Using
+            <codeph>TIMESTAMP</codeph> directly in queries and expressions lets you
+            perform date and time calculations without the overhead of extra
+            function calls and conversions each time you reference the applicable
+            columns.
+          </p>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            The following examples demonstrate how to convert an arbitrary string
+            representation to <codeph>TIMESTAMP</codeph> based on a pattern string:
+          </p>
+<codeblock>
+select to_timestamp('Sep 25, 1984', 'MMM dd, yyyy');
++----------------------------------------------+
+| to_timestamp('sep 25, 1984', 'mmm dd, yyyy') |
++----------------------------------------------+
+| 1984-09-25 00:00:00                          |
++----------------------------------------------+
+
+select to_timestamp('1984/09/25', 'yyyy/MM/dd');
++------------------------------------------+
+| to_timestamp('1984/09/25', 'yyyy/mm/dd') |
++------------------------------------------+
+| 1984-09-25 00:00:00                      |
++------------------------------------------+
+</codeblock>
+          <p>
+            The following examples show how to convert a <codeph>BIGINT</codeph>
+            representing seconds past epoch into a <codeph>TIMESTAMP</codeph> value:
+          </p>
+<codeblock>
+-- One day past the epoch.
+select to_timestamp(24 * 60 * 60);
++----------------------------+
+| to_timestamp(24 * 60 * 60) |
++----------------------------+
+| 1970-01-02 00:00:00        |
++----------------------------+
+
+-- 60 seconds in the past.
+select now() as 'current date/time',
+  unix_timestamp(now()) 'now in seconds',
+  to_timestamp(unix_timestamp(now()) - 60) as '60 seconds ago';
++-------------------------------+----------------+---------------------+
+| current date/time             | now in seconds | 60 seconds ago      |
++-------------------------------+----------------+---------------------+
+| 2017-10-01 22:03:46.885624000 | 1506895426     | 2017-10-01 22:02:46 |
++-------------------------------+----------------+---------------------+
 </codeblock>
         </dd>
 
