@@ -245,6 +245,30 @@ under the License.
               </p>
             </entry>
           </row>
+          <row id="rerun_cmd" rev="2.10.0 IMPALA-992">
+            <entry>
+              <p>
+                <codeph>rerun</codeph> or <codeph>@</codeph>
+              </p>
+            </entry>
+            <entry>
+              <p>
+                Executes a previous <cmdname>impala-shell</cmdname> command again,
+                from the list of commands displayed by the <codeph>history</codeph>
+                command. These could be SQL statements, or commands specific to
+                <cmdname>impala-shell</cmdname> such as <codeph>quit</codeph>
+                or <codeph>profile</codeph>.
+              </p>
+              <p>
+                Specify an integer argument. A positive integer <codeph>N</codeph>
+                represents the command labelled <codeph>N</codeph> in the history list.
+                A negative integer <codeph>-N</codeph> represents the <codeph>N</codeph>th
+                command from the end of the list, such as -1 for the most recent command.
+                Commands that are executed again do not produce new entries in the
+                history list.
+              </p>
+            </entry>
+          </row>
           <row id="select_cmd">
             <entry>
               <p>
