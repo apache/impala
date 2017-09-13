@@ -193,6 +193,9 @@ class LlvmCodeGen {
     /// Returns name of function
     const std::string& name() const { return name_; }
 
+    /// (Re-)sets name of function
+    void SetName(const std::string& name) { name_ = name; }
+
     /// Add argument
     void AddArgument(const NamedVariable& var) {
       args_.push_back(var);

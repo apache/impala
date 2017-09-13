@@ -18,6 +18,7 @@
 #include "exec/hdfs-avro-scanner.h"
 
 #include <avro/errors.h>
+#include <algorithm>    // std::min
 #include <avro/legacy.h>
 #include <gutil/strings/substitute.h>
 
@@ -55,6 +56,14 @@ const string AVRO_MEM_LIMIT_EXCEEDED = "HdfsAvroScanner::$0() failed to allocate
 
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
 
+static Status CheckSchema(const AvroSchemaElement& avro_schema) {
+  if (avro_schema.schema == nullptr) {
+    return Status("Missing Avro schema in scan node. This could be due to stale "
+        "metadata. Running 'invalidate metadata <tablename>' may resolve the problem.");
+  }
+  return Status::OK();
+}
+
 HdfsAvroScanner::HdfsAvroScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
   : BaseSequenceScanner(scan_node, state) {
 }
@@ -66,10 +75,7 @@ HdfsAvroScanner::HdfsAvroScanner()
 
 Status HdfsAvroScanner::Open(ScannerContext* context) {
   RETURN_IF_ERROR(BaseSequenceScanner::Open(context));
-  if (scan_node_->avro_schema().schema == nullptr) {
-    return Status("Missing Avro schema in scan node. This could be due to stale "
-        "metadata. Running 'invalidate metadata <tablename>' may resolve the problem.");
-  }
+  RETURN_IF_ERROR(CheckSchema(scan_node_->avro_schema()));
   return Status::OK();
 }
 
@@ -676,18 +682,20 @@ void HdfsAvroScanner::SetStatusValueOverflow(TErrorCode::type error_code, int64_
 // optimized for the table schema. Via helper functions CodegenReadRecord() and
 // CodegenReadScalar(), it eliminates the conditionals necessary when interpreting the
 // type of each element in the schema, instead generating code to handle each element in
-// the schema. Example output with tpch.region:
+// the schema.
 //
-// define i1 @MaterializeTuple(%"class.impala::HdfsAvroScanner"* %this,
-//   %"struct.impala::AvroSchemaElement"* %record_schema, %"class.impala::MemPool"* %pool,
-//   i8** %data, i8* %data_end, %"class.impala::Tuple"* %tuple) #33 {
+// To avoid overly long codegen times for wide schemas, this function generates
+// one function per 200 columns, and a function that calls them all together.
+//
+//
+// Example output with 'select count(*) from tpch_avro.region':
+//
+// define i1 @MaterializeTuple-helper0(%"class.impala::HdfsAvroScanner"* %this, %"struct.impala::AvroSchemaElement"* %record_schema, %"class.impala::MemPool"* %pool, i8** %data, i8* %data_end, %"class.impala::Tuple"* %tuple) #34 {
 // entry:
 //   %is_null_ptr = alloca i1
-//   %tuple_ptr = bitcast %"class.impala::Tuple"* %tuple to { i8, [3 x i8], i32,
-//     %"struct.impala::StringValue", %"struct.impala::StringValue" }*
+//   %tuple_ptr = bitcast %"class.impala::Tuple"* %tuple to <{}>*
 //   %0 = bitcast i1* %is_null_ptr to i8*
-//   %read_union_ok = call i1 @_ZN6impala15HdfsAvroScanner13ReadUnionTypeEiPPhPlPb(
-//     %"class.impala::HdfsAvroScanner"* %this, i32 1, i8** %data, i8* %data_end, i8* %0)
+//   %read_union_ok = call i1 @_ZN6impala15HdfsAvroScanner13ReadUnionTypeEiPPhS1_Pb(%"class.impala::HdfsAvroScanner"* %this, i32 1, i8** %data, i8* %data_end, i8* %0)
 //   br i1 %read_union_ok, label %read_union_ok1, label %bail_out
 //
 // read_union_ok1:                                   ; preds = %entry
@@ -695,25 +703,15 @@ void HdfsAvroScanner::SetStatusValueOverflow(TErrorCode::type error_code, int64_
 //   br i1 %is_null, label %null_field, label %read_field
 //
 // read_field:                                       ; preds = %read_union_ok1
-//   %slot = getelementptr inbounds { i8, [3 x i8], i32, %"struct.impala::StringValue",
-//    %"struct.impala::StringValue" }, { i8, [3 x i8], i32, %"struct.impala::StringValue",
-//    %"struct.impala::StringValue" }* %tuple_ptr, i32 0, i32 2
-//   %opaque_slot = bitcast i32* %slot to i8*
-//   %success = call i1
-//   @_ZN6impala15HdfsAvroScanner13ReadAvroInt32ENS_13PrimitiveTypeEPPhPlbPvPNS_7MemPoolE(
-//     %"class.impala::HdfsAvroScanner"* %this, i32 5, i8** %data, i8* %data_end,
-//     i1 true, i8* %opaque_slot, %"class.impala::MemPool"* %pool)
+//   %success = call i1 @_ZN6impala15HdfsAvroScanner13ReadAvroInt32ENS_13PrimitiveTypeEPPhS2_bPvPNS_7MemPoolE(%"class.impala::HdfsAvroScanner"* %this, i32 0, i8** %data, i8* %data_end, i1 false, i8* null, %"class.impala::MemPool"* %pool)
 //   br i1 %success, label %end_field, label %bail_out
 //
 // null_field:                                       ; preds = %read_union_ok1
-//   call void @SetNull({ i8, [3 x i8], i32, %"struct.impala::StringValue",
-//     %"struct.impala::StringValue" }* %tuple_ptr)
 //   br label %end_field
 //
 // end_field:                                        ; preds = %read_field, %null_field
 //   %1 = bitcast i1* %is_null_ptr to i8*
-//   %read_union_ok4 = call i1 @_ZN6impala15HdfsAvroScanner13ReadUnionTypeEiPPhPlPb(
-//     %"class.impala::HdfsAvroScanner"* %this, i32 1, i8** %data, i8* %data_end, i8* %1)
+//   %read_union_ok4 = call i1 @_ZN6impala15HdfsAvroScanner13ReadUnionTypeEiPPhS1_Pb(%"class.impala::HdfsAvroScanner"* %this, i32 1, i8** %data, i8* %data_end, i8* %1)
 //   br i1 %read_union_ok4, label %read_union_ok5, label %bail_out
 //
 // read_union_ok5:                                   ; preds = %end_field
@@ -721,52 +719,45 @@ void HdfsAvroScanner::SetStatusValueOverflow(TErrorCode::type error_code, int64_
 //   br i1 %is_null7, label %null_field6, label %read_field2
 //
 // read_field2:                                      ; preds = %read_union_ok5
-//   %slot8 = getelementptr inbounds { i8, [3 x i8], i32, %"struct.impala::StringValue",
-//    %"struct.impala::StringValue" }, { i8, [3 x i8], i32, %"struct.impala::StringValue",
-//    %"struct.impala::StringValue" }* %tuple_ptr, i32 0, i32 3
-//   %opaque_slot9 = bitcast %"struct.impala::StringValue"* %slot8 to i8*
-//   %success10 = call i1
-//  @_ZN6impala15HdfsAvroScanner14ReadAvroStringENS_13PrimitiveTypeEPPhPlbPvPNS_7MemPoolE(
-//     %"class.impala::HdfsAvroScanner"* %this, i32 10, i8** %data, i8* %data_end,
-//     i1 true, i8* %opaque_slot9, %"class.impala::MemPool"* %pool)
-//   br i1 %success10, label %end_field3, label %bail_out
+//   %success8 = call i1 @_ZN6impala15HdfsAvroScanner14ReadAvroStringENS_13PrimitiveTypeEPPhS2_bPvPNS_7MemPoolE(%"class.impala::HdfsAvroScanner"* %this, i32 0, i8** %data, i8* %data_end, i1 false, i8* null, %"class.impala::MemPool"* %pool)
+//   br i1 %success8, label %end_field3, label %bail_out
 //
 // null_field6:                                      ; preds = %read_union_ok5
-//   call void @SetNull.1({ i8, [3 x i8], i32, %"struct.impala::StringValue",
-//     %"struct.impala::StringValue" }* %tuple_ptr)
 //   br label %end_field3
 //
 // end_field3:                                       ; preds = %read_field2, %null_field6
 //   %2 = bitcast i1* %is_null_ptr to i8*
-//   %read_union_ok13 = call i1 @_ZN6impala15HdfsAvroScanner13ReadUnionTypeEiPPhPlPb(
-//     %"class.impala::HdfsAvroScanner"* %this, i32 1, i8** %data, i8* %data_end, i8* %2)
-//   br i1 %read_union_ok13, label %read_union_ok14, label %bail_out
+//   %read_union_ok11 = call i1 @_ZN6impala15HdfsAvroScanner13ReadUnionTypeEiPPhS1_Pb(%"class.impala::HdfsAvroScanner"* %this, i32 1, i8** %data, i8* %data_end, i8* %2)
+//   br i1 %read_union_ok11, label %read_union_ok12, label %bail_out
 //
-// read_union_ok14:                                  ; preds = %end_field3
-//   %is_null16 = load i1, i1* %is_null_ptr
-//   br i1 %is_null16, label %null_field15, label %read_field11
+// read_union_ok12:                                  ; preds = %end_field3
+//   %is_null14 = load i1, i1* %is_null_ptr
+//   br i1 %is_null14, label %null_field13, label %read_field9
 //
-// read_field11:                                     ; preds = %read_union_ok14
-//   %slot17 = getelementptr inbounds { i8, [3 x i8], i32, %"struct.impala::StringValue",
-//    %"struct.impala::StringValue" }, { i8, [3 x i8], i32, %"struct.impala::StringValue",
-//    %"struct.impala::StringValue" }* %tuple_ptr, i32 0, i32 4
-//   %opaque_slot18 = bitcast %"struct.impala::StringValue"* %slot17 to i8*
-//   %success19 = call i1
-//  @_ZN6impala15HdfsAvroScanner14ReadAvroStringENS_13PrimitiveTypeEPPhPlbPvPNS_7MemPoolE(
-//     %"class.impala::HdfsAvroScanner"* %this, i32 10, i8** %data, i8* %data_end,
-//     i1 true, i8* %opaque_slot18, %"class.impala::MemPool"* %pool)
-//   br i1 %success19, label %end_field12, label %bail_out
+// read_field9:                                      ; preds = %read_union_ok12
+//   %success15 = call i1 @_ZN6impala15HdfsAvroScanner14ReadAvroStringENS_13PrimitiveTypeEPPhS2_bPvPNS_7MemPoolE(%"class.impala::HdfsAvroScanner"* %this, i32 0, i8** %data, i8* %data_end, i1 false, i8* null, %"class.impala::MemPool"* %pool)
+//   br i1 %success15, label %end_field10, label %bail_out
 //
-// null_field15:                                     ; preds = %read_union_ok14
-//   call void @SetNull.2({ i8, [3 x i8], i32, %"struct.impala::StringValue",
-//     %"struct.impala::StringValue" }* %tuple_ptr)
-//   br label %end_field12
+// null_field13:                                     ; preds = %read_union_ok12
+//   br label %end_field10
 //
-// end_field12:                                    ; preds = %read_field11, %null_field15
+// end_field10:                                      ; preds = %read_field9, %null_field13
 //   ret i1 true
 //
-// bail_out:           ; preds = %read_field11, %end_field3, %read_field2, %end_field,
-//   ret i1 false      ;         %read_field, %entry
+// bail_out:                                         ; preds = %read_field9, %end_field3, %read_field2, %end_field, %read_field, %entry
+//   ret i1 false
+// }
+//
+// define i1 @MaterializeTuple(%"class.impala::HdfsAvroScanner"* %this, %"struct.impala::AvroSchemaElement"* %record_schema, %"class.impala::MemPool"* %pool, i8** %data, i8* %data_end, %"class.impala::Tuple"* %tuple) #34 {
+// entry:
+//   %helper_01 = call i1 @MaterializeTuple-helper0(%"class.impala::HdfsAvroScanner"* %this, %"struct.impala::AvroSchemaElement"* %record_schema, %"class.impala::MemPool"* %pool, i8** %data, i8* %data_end, %"class.impala::Tuple"* %tuple)
+//   br i1 %helper_01, label %helper_0, label %bail_out
+//
+// helper_0:                                         ; preds = %entry
+//   ret i1 true
+//
+// bail_out:                                         ; preds = %entry
+//   ret i1 false
 // }
 Status HdfsAvroScanner::CodegenMaterializeTuple(
     HdfsScanNodeBase* node, LlvmCodeGen* codegen, Function** materialize_tuple_fn) {
@@ -789,60 +780,121 @@ Status HdfsAvroScanner::CodegenMaterializeTuple(
   Type* mempool_type = PointerType::get(codegen->GetType(MemPool::LLVM_CLASS_NAME), 0);
   Type* schema_element_type = codegen->GetPtrType(AvroSchemaElement::LLVM_CLASS_NAME);
 
-  LlvmCodeGen::FnPrototype prototype(codegen, "MaterializeTuple", codegen->boolean_type());
+  // Schema can be null if metadata is stale. See test in
+  // queries/QueryTest/avro-schema-changes.test.
+  RETURN_IF_ERROR(CheckSchema(node->avro_schema()));
+  int num_children = node->avro_schema().children.size();
+  if (num_children == 0) {
+    return Status("Invalid Avro record schema: contains no children.");
+  }
+  // We handle step_size columns per function. This minimizes LLVM
+  // optimization time and was determined empirically. If there are
+  // too many functions, it takes LLVM longer to optimize. If the functions
+  // are too long, it takes LLVM longer too.
+  int step_size = 200;
+  std::vector<Function*> helper_functions;
+
+  // prototype re-used several times by amending with SetName()
+  LlvmCodeGen::FnPrototype prototype(codegen, "", codegen->boolean_type());
   prototype.AddArgument(LlvmCodeGen::NamedVariable("this", this_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("record_schema", schema_element_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("pool", mempool_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("data", data_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("data_end", codegen->ptr_type()));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple", tuple_opaque_ptr_type));
-  Value* args[6];
-  Function* fn = prototype.GeneratePrototype(&builder, args);
 
-  Value* this_val = args[0];
-  // Value* record_schema_val = args[1]; // don't need this
-  Value* pool_val = args[2];
-  Value* data_val = args[3];
-  Value* data_end_val = args[4];
-  Value* opaque_tuple_val = args[5];
+  // Generate helper functions for every step_size columns.
+  for (int i = 0; i < num_children; i += step_size) {
+    prototype.SetName("MaterializeTuple-helper" + std::to_string(i));
+    Value* args[6];
+    Function* helper_fn = prototype.GeneratePrototype(&builder, args);
 
-  Value* tuple_val = builder.CreateBitCast(opaque_tuple_val, tuple_ptr_type, "tuple_ptr");
+    Value* this_val = args[0];
+    // Value* record_schema_val = args[1]; // don't need this
+    Value* pool_val = args[2];
+    Value* data_val = args[3];
+    Value* data_end_val = args[4];
+    Value* opaque_tuple_val = args[5];
 
-  // Create a bail out block to handle decoding failures.
-  BasicBlock* bail_out_block = BasicBlock::Create(context, "bail_out", fn, nullptr);
+    Value* tuple_val = builder.CreateBitCast(
+        opaque_tuple_val, tuple_ptr_type, "tuple_ptr");
 
-  Status status = CodegenReadRecord(
-      SchemaPath(), node->avro_schema(), node, codegen, &builder, fn, bail_out_block,
-      bail_out_block, this_val, pool_val, tuple_val, data_val, data_end_val);
-  if (!status.ok()) {
-    VLOG_QUERY << status.GetDetail();
-    fn->eraseFromParent();
-    return status;
+    // Create a bail out block to handle decoding failures.
+    BasicBlock* bail_out_block = BasicBlock::Create(
+        context, "bail_out", helper_fn, nullptr);
+
+    Status status = CodegenReadRecord(
+        SchemaPath(), node->avro_schema(), i, std::min(num_children, i + step_size),
+        node, codegen, &builder, helper_fn, bail_out_block,
+        bail_out_block, this_val, pool_val, tuple_val, data_val, data_end_val);
+    if (!status.ok()) {
+      VLOG_QUERY << status.GetDetail();
+      helper_fn->eraseFromParent();
+      return status;
+    }
+
+    // Returns true on successful decoding.
+    builder.CreateRet(codegen->true_value());
+
+    // Returns false on decoding errors.
+    builder.SetInsertPoint(bail_out_block);
+    builder.CreateRet(codegen->false_value());
+
+    if (codegen->FinalizeFunction(helper_fn) == nullptr) {
+      return Status("Failed to finalize helper_fn.");
+    }
+    helper_functions.push_back(helper_fn);
   }
 
-  // Returns true on successful decoding.
-  builder.CreateRet(codegen->true_value());
+  // Actual MaterializeTuple. Call all the helper functions.
+  {
+    Value* args[6];
+    prototype.SetName("MaterializeTuple");
+    Function* fn = prototype.GeneratePrototype(&builder, args);
 
-  // Returns false on decoding errors.
-  builder.SetInsertPoint(bail_out_block);
-  builder.CreateRet(codegen->false_value());
+    // These are the blocks that we go to after the helper runs.
+    std::vector<BasicBlock*> helper_blocks;
+    for (int i = 0; i < helper_functions.size(); ++i) {
+      BasicBlock* helper_block = BasicBlock::Create(
+          context, "helper_" + std::to_string(i), fn, nullptr);
+      helper_blocks.push_back(helper_block);
+    }
 
-  *materialize_tuple_fn = codegen->FinalizeFunction(fn);
-  if (*materialize_tuple_fn == nullptr) {
-    return Status("Failed to finalize materialize_tuple_fn.");
+    // Block for failures
+    BasicBlock* bail_out_block = BasicBlock::Create(context, "bail_out", fn, nullptr);
+
+    // Call the helpers.
+    for (int i = 0; i < helper_functions.size(); ++i) {
+      if (i != 0) builder.SetInsertPoint(helper_blocks[i - 1]);
+      Function* fnHelper = helper_functions[i];
+      Value* helper_ok = builder.CreateCall(
+          fnHelper, args, "helper_" + std::to_string(i));
+      builder.CreateCondBr(helper_ok, helper_blocks[i], bail_out_block);
+    }
+
+    // Return false on errors
+    builder.SetInsertPoint(bail_out_block);
+    builder.CreateRet(codegen->false_value());
+
+    // And true on success
+    builder.SetInsertPoint(helper_blocks[helper_blocks.size() - 1]);
+    builder.CreateRet(codegen->true_value());
+
+    *materialize_tuple_fn = codegen->FinalizeFunction(fn);
+    if (*materialize_tuple_fn == nullptr) {
+      return Status("Failed to finalize materialize_tuple_fn.");
+    }
   }
+
   return Status::OK();
 }
 
 Status HdfsAvroScanner::CodegenReadRecord(
-    const SchemaPath& path, const AvroSchemaElement& record, HdfsScanNodeBase* node,
-    LlvmCodeGen* codegen, void* void_builder, Function* fn, BasicBlock* insert_before,
-    BasicBlock* bail_out, Value* this_val, Value* pool_val, Value* tuple_val,
-    Value* data_val, Value* data_end_val) {
-  if (record.schema == nullptr) {
-    return Status("Missing Avro schema in scan node. This could be due to stale "
-        "metadata. Running 'invalidate metadata <tablename>' may resolve the problem.");
-  }
+    const SchemaPath& path, const AvroSchemaElement& record, int child_start,
+    int child_end, HdfsScanNodeBase* node, LlvmCodeGen* codegen, void* void_builder,
+    Function* fn, BasicBlock* insert_before, BasicBlock* bail_out, Value* this_val,
+    Value* pool_val, Value* tuple_val, Value* data_val, Value* data_end_val) {
+  RETURN_IF_ERROR(CheckSchema(record));
   DCHECK_EQ(record.schema->type, AVRO_RECORD);
   LLVMContext& context = codegen->context();
   LlvmBuilder* builder = reinterpret_cast<LlvmBuilder*>(void_builder);
@@ -852,7 +904,7 @@ Status HdfsAvroScanner::CodegenReadRecord(
 
   // Used to store result of ReadUnionType() call
   Value* is_null_ptr = nullptr;
-  for (int i = 0; i < record.children.size(); ++i) {
+  for (int i = child_start; i < child_end; ++i) {
     const AvroSchemaElement* field = &record.children[i];
     int col_idx = i;
     // If we're about to process the table-level columns, account for the partition keys
@@ -918,7 +970,8 @@ Status HdfsAvroScanner::CodegenReadRecord(
     if (field->schema->type == AVRO_RECORD) {
       BasicBlock* insert_before_block =
           (null_block != nullptr) ? null_block : end_field_block;
-      RETURN_IF_ERROR(CodegenReadRecord(new_path, *field, node, codegen, builder, fn,
+      RETURN_IF_ERROR(CodegenReadRecord(new_path, *field, 0, field->children.size(),
+          node, codegen, builder, fn,
           insert_before_block, bail_out, this_val, pool_val, tuple_val, data_val,
           data_end_val));
     } else {
