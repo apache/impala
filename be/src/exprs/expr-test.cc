@@ -2646,9 +2646,15 @@ TEST_F(ExprTest, CastExprs) {
   // 32 bit Decimal.
   TestTimestampValue("cast(cast(123.45 as decimal(9,2)) as timestamp)",
       TimestampValue::Parse("1970-01-01 00:02:03.450000000", 29));
+  TestTimestampValue("cast(cast(-123.45 as decimal(9,2)) as timestamp)",
+      TimestampValue::Parse("1969-12-31 23:57:56.550000000", 29));
   // 64 bit Decimal.
   TestTimestampValue("cast(cast(123.45 as decimal(18,2)) as timestamp)",
       TimestampValue::Parse("1970-01-01 00:02:03.450000000", 29));
+  TestTimestampValue("cast(cast(-123.45 as decimal(18,2)) as timestamp)",
+      TimestampValue::Parse("1969-12-31 23:57:56.550000000", 29));
+  TestTimestampValue("cast(cast(-0.1 as decimal(18,10)) as timestamp)",
+      TimestampValue::Parse("1969-12-31 23:59:59.900000000", 29));
   TestTimestampValue("cast(cast(253402300799.99 as decimal(18, 2)) as timestamp)",
       TimestampValue::Parse("9999-12-31 23:59:59.990000000", 29));
   TestIsNull("cast(cast(260000000000.00 as decimal(18, 2)) as timestamp)",
@@ -2656,6 +2662,10 @@ TEST_F(ExprTest, CastExprs) {
   // 128 bit Decimal.
   TestTimestampValue("cast(cast(123.45 as decimal(38,2)) as timestamp)",
       TimestampValue::Parse("1970-01-01 00:02:03.450000000", 29));
+  TestTimestampValue("cast(cast(-123.45 as decimal(38,2)) as timestamp)",
+      TimestampValue::Parse("1969-12-31 23:57:56.550000000", 29));
+  TestTimestampValue("cast(cast(-0.1 as decimal(38,20)) as timestamp)",
+      TimestampValue::Parse("1969-12-31 23:59:59.900000000", 29));
   TestTimestampValue("cast(cast(253402300799.99 as decimal(38, 2)) as timestamp)",
       TimestampValue::Parse("9999-12-31 23:59:59.990000000", 29));
   TestTimestampValue("cast(cast(253402300799.99 as decimal(38, 26)) as timestamp)",

@@ -95,7 +95,7 @@ class TimestampValue {
   }
 
   /// Same as FromUnixTime() above, but adds the specified number of nanoseconds to the
-  /// resulting TimestampValue.
+  /// resulting TimestampValue. Handles negative nanoseconds too.
   static TimestampValue FromUnixTimeNanos(time_t unix_time, int64_t nanos) {
     boost::posix_time::ptime temp = UnixTimeToPtime(unix_time);
     temp += boost::posix_time::nanoseconds(nanos);
