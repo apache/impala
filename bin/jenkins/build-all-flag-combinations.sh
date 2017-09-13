@@ -25,6 +25,7 @@
 set -euo pipefail
 trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
+. bin/impala-config.sh
 OPTIONS=("-skiptests" "-noclean")
 FAILED_OPTIONS=""
 for BUILD_TYPE in "" -asan -release -ubsan -tsan
@@ -53,6 +54,7 @@ do
 done
 
 if [[ "$FAILED_OPTIONS" != "" ]]
+then
   echo "Builds with the following options failed:"
   echo "$FAILED_OPTIONS"
   exit 1
