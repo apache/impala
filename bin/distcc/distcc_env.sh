@@ -114,12 +114,7 @@ function clean_cmake_files {
     echo IMPALA_HOME=$IMPALA_HOME is not valid. 1>&2
     return 1
   fi
-  ROOT_DIR=${IMPALA_HOME%%/}
-  for loc in "${ROOT_DIR}/ -maxdepth 1" "$ROOT_DIR/be/" "$ROOT_DIR/fe/" \
-             "$ROOT_DIR/common/" "$ROOT_DIR/ext-data-source/"; do
-    find $loc \( -iname CMakeCache.txt -o -iname CMakeFiles \
-         -o -iname CTestTestfile.cmake -o -iname cmake_install.cmake \) -exec rm -Rf {} +
-  done
+  $IMPALA_HOME/bin/clean-cmake.sh
 }
 
 function switch_compiler {
