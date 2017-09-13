@@ -128,9 +128,17 @@ void ChildQuery::Cancel() {
     if (!is_running_) return;
     is_running_ = false;
   }
-  VLOG_QUERY << "Cancelling and closing child query with operation id: "
-             << hs2_handle_.operationId.guid;
+  TUniqueId session_id;
+  TUniqueId secret_unused;
   // Ignore return statuses because they are not actionable.
+  Status status = ImpalaServer::THandleIdentifierToTUniqueId(hs2_handle_.operationId,
+      &session_id, &secret_unused);
+  if (status.ok()) {
+    VLOG_QUERY << "Cancelling and closing child query with operation id: " << session_id;
+  } else {
+    VLOG_QUERY << "Cancelling and closing child query. Failed to get query id: " <<
+        status;
+  }
   TCancelOperationResp cancel_resp;
   TCancelOperationReq cancel_req;
   cancel_req.operationHandle = hs2_handle_;

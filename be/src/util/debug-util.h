@@ -69,7 +69,6 @@ std::string PrintTSessionType(const TSessionType::type& type);
 std::string PrintTStmtType(const TStmtType::type& type);
 std::string PrintQueryState(const beeswax::QueryState::type& type);
 std::string PrintEncoding(const parquet::Encoding::type& type);
-std::string PrintAsHex(const char* bytes, int64_t len);
 std::string PrintTMetricKind(const TMetricKind::type& type);
 std::string PrintTUnit(const TUnit::type& type);
 std::string PrintTImpalaQueryOptions(const TImpalaQueryOptions::type& type);

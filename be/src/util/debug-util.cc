@@ -113,15 +113,6 @@ string PrintId(const TUniqueId& id, const string& separator) {
   return out.str();
 }
 
-string PrintAsHex(const char* bytes, int64_t len) {
-  stringstream out;
-  out << hex << std::setfill('0');
-  for (int i = 0; i < len; ++i) {
-    out << setw(2) << static_cast<uint16_t>(bytes[i]);
-  }
-  return out.str();
-}
-
 bool ParseId(const string& s, TUniqueId* id) {
   // For backwards compatibility, this method parses two forms of query ID from text:
   //  - <hex-int64_t><colon><hex-int64_t> - this format is the standard going forward
