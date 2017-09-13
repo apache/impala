@@ -1113,7 +1113,7 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
         session_state->inflight_queries.end());
   }
   // Unregister all open queries from this session.
-  Status status("Session closed");
+  Status status = Status::Expected("Session closed");
   for (const TUniqueId& query_id: inflight_queries) {
     // TODO: deal with an error status
     discard_result(UnregisterQuery(query_id, false, &status));
