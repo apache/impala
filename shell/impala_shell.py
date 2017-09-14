@@ -1208,7 +1208,7 @@ class ImpalaShell(object, cmd.Cmd):
     if not self.imp_client.connected:
       print_to_stderr('Not connected to Impala, could not execute queries.')
       return False
-    queries = [ self.sanitise_input(q) for q in self.cmdqueue + queries ]
+    queries = [self.sanitise_input(q) for q in queries]
     for q in queries:
       if self.onecmd(q) is CmdStatus.ERROR:
         print_to_stderr('Could not execute command: %s' % q)
@@ -1321,7 +1321,9 @@ def execute_queries_non_interactive_mode(options):
     return
 
   queries = parse_query_text(query_text)
-  if not ImpalaShell(options).execute_query_list(queries):
+  shell = ImpalaShell(options)
+  if not (shell.execute_query_list(shell.cmdqueue) and
+          shell.execute_query_list(queries)):
     sys.exit(1)
 
 if __name__ == "__main__":

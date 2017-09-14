@@ -294,14 +294,18 @@ class TestImpalaShellInteractive(object):
     try:
       # Change working dir so that SOURCE command in shell.cmds can find shell2.cmds.
       os.chdir("%s/tests/shell/" % os.environ['IMPALA_HOME'])
-      result = run_impala_shell_interactive("source shell.cmds;")
+      # IMPALA-5416: Test that a command following 'source' won't be run twice.
+      result = run_impala_shell_interactive("source shell.cmds;select \"second command\";")
       assert "Query: use FUNCTIONAL" in result.stderr
       assert "Query: show TABLES" in result.stderr
       assert "alltypes" in result.stdout
-
       # This is from shell2.cmds, the result of sourcing a file from a sourced file.
       assert "select VERSION()" in result.stderr
       assert "version()" in result.stdout
+      assert len(re.findall("'second command'", result.stdout)) == 1
+      # IMPALA-5416: Test that two source commands on a line won't crash the shell.
+      result = run_impala_shell_interactive("source shell.cmds;source shell.cmds;")
+      assert len(re.findall("version\(\)", result.stdout)) == 2
     finally:
       os.chdir(cwd)
 
