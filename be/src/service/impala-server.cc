@@ -104,7 +104,6 @@ using namespace beeswax;
 using namespace rapidjson;
 using namespace strings;
 
-DECLARE_int32(be_port);
 DECLARE_string(nn);
 DECLARE_int32(nn_port);
 DECLARE_string(authorized_proxy_user_config);
@@ -1929,19 +1928,14 @@ void ImpalaServer::RegisterSessionTimeout(int32_t session_timeout) {
   }
 }
 
-Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int be_port,
-    ThriftServer** beeswax_server, ThriftServer** hs2_server, ThriftServer** be_server,
-    boost::shared_ptr<ImpalaServer>* impala_server) {
-  DCHECK((beeswax_port == 0) == (beeswax_server == nullptr));
-  DCHECK((hs2_port == 0) == (hs2_server == nullptr));
-  DCHECK((be_port == 0) == (be_server == nullptr));
+Status ImpalaServer::Init(int32_t thrift_be_port, int32_t beeswax_port, int32_t hs2_port) {
+  exec_env_->SetImpalaServer(this);
+  boost::shared_ptr<ImpalaServer> handler = shared_from_this();
 
   if (!FLAGS_is_coordinator && !FLAGS_is_executor) {
     return Status("Impala does not have a valid role configured. "
         "Either --is_coordinator or --is_executor must be set to true.");
   }
-
-  impala_server->reset(new ImpalaServer(exec_env));
 
   SSLProtocol ssl_version = SSLProtocol::TLSv1_0;
   if (!FLAGS_ssl_server_certificate.empty() || EnableInternalSslConnections()) {
@@ -1949,15 +1943,15 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
         SSLProtoVersions::StringToProtocol(FLAGS_ssl_minimum_version, &ssl_version));
   }
 
-  if (be_port != 0 && be_server != nullptr) {
+  if (thrift_be_port > 0) {
     boost::shared_ptr<ImpalaInternalService> thrift_if(new ImpalaInternalService());
     boost::shared_ptr<TProcessor> be_processor(
         new ImpalaInternalServiceProcessor(thrift_if));
     boost::shared_ptr<TProcessorEventHandler> event_handler(
-        new RpcEventHandler("backend", exec_env->metrics()));
+        new RpcEventHandler("backend", exec_env_->metrics()));
     be_processor->setEventHandler(event_handler);
 
-    ThriftServerBuilder be_builder("backend", be_processor, be_port);
+    ThriftServerBuilder be_builder("backend", be_processor, thrift_be_port);
 
     if (EnableInternalSslConnections()) {
       LOG(INFO) << "Enabling SSL for backend";
@@ -1966,24 +1960,24 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
           .ssl_version(ssl_version)
           .cipher_list(FLAGS_ssl_cipher_list);
     }
-    RETURN_IF_ERROR(be_builder.metrics(exec_env->metrics()).Build(be_server));
-    LOG(INFO) << "ImpalaInternalService listening on " << be_port;
+    ThriftServer* server;
+    RETURN_IF_ERROR(be_builder.metrics(exec_env_->metrics()).Build(&server));
+    thrift_be_server_.reset(server);
   }
 
   if (!FLAGS_is_coordinator) {
+    // We don't start the Beeswax and HS2 servers if this impala daemon is just an
+    // executor.
     LOG(INFO) << "Started executor Impala server on "
               << ExecEnv::GetInstance()->backend_address();
     return Status::OK();
   }
 
-  // Initialize the HS2 and Beeswax services.
-  if (beeswax_port != 0 && beeswax_server != nullptr) {
-    // Beeswax FE must be a TThreadPoolServer because ODBC and Hue only support
-    // TThreadPoolServer.
-    boost::shared_ptr<TProcessor> beeswax_processor(
-        new ImpalaServiceProcessor(*impala_server));
+  // Start the Beeswax and HS2 servers.
+  if (beeswax_port > 0) {
+    boost::shared_ptr<TProcessor> beeswax_processor(new ImpalaServiceProcessor(handler));
     boost::shared_ptr<TProcessorEventHandler> event_handler(
-        new RpcEventHandler("beeswax", exec_env->metrics()));
+        new RpcEventHandler("beeswax", exec_env_->metrics()));
     beeswax_processor->setEventHandler(event_handler);
     ThriftServerBuilder builder(BEESWAX_SERVER_NAME, beeswax_processor, beeswax_port);
 
@@ -1994,22 +1988,22 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
           .ssl_version(ssl_version)
           .cipher_list(FLAGS_ssl_cipher_list);
     }
+
+    ThriftServer* server;
     RETURN_IF_ERROR(
         builder.auth_provider(AuthManager::GetInstance()->GetExternalAuthProvider())
-            .metrics(exec_env->metrics())
+            .metrics(exec_env_->metrics())
             .thread_pool(FLAGS_fe_service_threads)
-            .Build(beeswax_server));
-    (*beeswax_server)->SetConnectionHandler(impala_server->get());
-
-    LOG(INFO) << "Impala Beeswax Service listening on " << beeswax_port;
+            .Build(&server));
+    beeswax_server_.reset(server);
+    beeswax_server_->SetConnectionHandler(this);
   }
 
-  if (hs2_port != 0 && hs2_server != nullptr) {
-    // HiveServer2 JDBC driver does not support non-blocking server.
+  if (hs2_port > 0) {
     boost::shared_ptr<TProcessor> hs2_fe_processor(
-        new ImpalaHiveServer2ServiceProcessor(*impala_server));
+        new ImpalaHiveServer2ServiceProcessor(handler));
     boost::shared_ptr<TProcessorEventHandler> event_handler(
-        new RpcEventHandler("hs2", exec_env->metrics()));
+        new RpcEventHandler("hs2", exec_env_->metrics()));
     hs2_fe_processor->setEventHandler(event_handler);
 
     ThriftServerBuilder builder(HS2_SERVER_NAME, hs2_fe_processor, hs2_port);
@@ -2022,19 +2016,52 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
           .cipher_list(FLAGS_ssl_cipher_list);
     }
 
+    ThriftServer* server;
     RETURN_IF_ERROR(
         builder.auth_provider(AuthManager::GetInstance()->GetExternalAuthProvider())
-            .metrics(exec_env->metrics())
+            .metrics(exec_env_->metrics())
             .thread_pool(FLAGS_fe_service_threads)
-            .Build(hs2_server));
-    (*hs2_server)->SetConnectionHandler(impala_server->get());
+            .Build(&server));
+    hs2_server_.reset(server);
+    hs2_server_->SetConnectionHandler(this);
 
-    LOG(INFO) << "Impala HiveServer2 Service listening on " << hs2_port;
   }
 
   LOG(INFO) << "Started coordinator/executor Impala server on "
             << ExecEnv::GetInstance()->backend_address();
+
   return Status::OK();
+}
+
+Status ImpalaServer::Start() {
+  RETURN_IF_ERROR(exec_env_->StartServices());
+  if (thrift_be_server_.get()) {
+    RETURN_IF_ERROR(thrift_be_server_->Start());
+    LOG(INFO) << "Impala InternalService listening on " << thrift_be_server_->port();
+  }
+
+  if (hs2_server_.get()) {
+    RETURN_IF_ERROR(hs2_server_->Start());
+    LOG(INFO) << "Impala HiveServer2 Service listening on " << beeswax_server_->port();
+  }
+  if (beeswax_server_.get()) {
+    RETURN_IF_ERROR(beeswax_server_->Start());
+    LOG(INFO) << "Impala Beeswax Service listening on " << hs2_server_->port();
+  }
+  return Status::OK();
+}
+
+void ImpalaServer::Join() {
+  thrift_be_server_->Join();
+  thrift_be_server_.reset();
+
+  if (FLAGS_is_coordinator) {
+    beeswax_server_->Join();
+    hs2_server_->Join();
+    beeswax_server_.reset();
+    hs2_server_.reset();
+  }
+  shutdown_promise_.Get();
 }
 
 shared_ptr<ClientRequestState> ImpalaServer::GetClientRequestState(

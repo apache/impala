@@ -60,10 +60,6 @@ class InProcessImpalaServer {
   /// servers.
   Status StartWithClientServers(int beeswax_port, int hs2_port);
 
-  /// Starts only the backend server; useful when running a cluster of
-  /// InProcessImpalaServers and only one is to serve client requests.
-  Status StartAsBackendOnly();
-
   /// Blocks until the backend server exits. Returns Status::OK unless
   /// there was an error joining.
   Status Join();
@@ -91,22 +87,11 @@ class InProcessImpalaServer {
 
   uint32_t hs2_port_;
 
-  /// The ImpalaServer that handles client and backend requests. Ownership is shared via
-  /// shared_ptrs with the ThriftServers. See CreateImpalaServer for details.
+  /// The ImpalaServer that handles client and backend requests.
   boost::shared_ptr<ImpalaServer> impala_server_;
 
   /// ExecEnv holds much of the per-service state
   boost::scoped_ptr<ExecEnv> exec_env_;
-
-  /// Backend Thrift server
-  boost::scoped_ptr<ThriftServer> be_server_;
-
-  /// Frontend HiveServer2 server
-  boost::scoped_ptr<ThriftServer> hs2_server_;
-
-  /// Frontend Beeswax server.
-  boost::scoped_ptr<ThriftServer> beeswax_server_;
-
 };
 
 /// An in-process statestore, with webserver and metrics.

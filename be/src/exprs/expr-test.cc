@@ -7538,7 +7538,7 @@ int main(int argc, char** argv) {
   VLOG_CONNECTION << "starting backends";
   InProcessStatestore* ips = InProcessStatestore::StartWithEphemeralPorts();
   InProcessImpalaServer* impala_server =
-      InProcessImpalaServer::StartWithEphemeralPorts("localhost", ips->port());
+      InProcessImpalaServer::StartWithEphemeralPorts(FLAGS_hostname, ips->port());
   executor_ = new ImpaladQueryExecutor(impala_server->hostname(),
       impala_server->beeswax_port());
   ABORT_IF_ERROR(executor_->Setup());

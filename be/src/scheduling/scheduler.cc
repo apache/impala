@@ -192,7 +192,9 @@ void Scheduler::UpdateMembership(
       // will try to re-register (i.e. overwrite their subscription), but there is
       // likely a configuration problem.
       LOG_EVERY_N(WARNING, 30) << "Duplicate subscriber registration from address: "
-                               << be_desc.address;
+                               << be_desc.address
+                               << " (we are: " << local_backend_descriptor_.address
+                               << ")";
       continue;
     }
     if (be_desc.is_executor) {

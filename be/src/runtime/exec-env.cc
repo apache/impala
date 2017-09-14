@@ -213,9 +213,7 @@ Status ExecEnv::InitForFeTests() {
   return Status::OK();
 }
 
-Status ExecEnv::StartServices() {
-  LOG(INFO) << "Starting global services";
-
+Status ExecEnv::Init() {
   // Initialize thread pools
   RETURN_IF_ERROR(exec_rpc_thread_pool_->Init());
   RETURN_IF_ERROR(async_rpc_pool_->Init());
@@ -340,8 +338,7 @@ Status ExecEnv::StartServices() {
   }
   if (admission_controller_ != nullptr) RETURN_IF_ERROR(admission_controller_->Init());
 
-  // Get the fs.defaultFS value set in core-site.xml and assign it to
-  // configured_defaultFs
+  // Get the fs.defaultFS value set in core-site.xml and assign it to configured_defaultFs
   TGetHadoopConfigRequest config_request;
   config_request.__set_name(DEFAULT_FS);
   TGetHadoopConfigResponse config_response;
@@ -351,6 +348,13 @@ Status ExecEnv::StartServices() {
   } else {
     default_fs_ = "hdfs://";
   }
+
+  return Status::OK();
+}
+
+Status ExecEnv::StartServices() {
+  LOG(INFO) << "Starting global services";
+
   // Must happen after all topic registrations / callbacks are done
   if (statestore_subscriber_.get() != nullptr) {
     Status status = statestore_subscriber_->Start();

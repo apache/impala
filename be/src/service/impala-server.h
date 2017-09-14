@@ -109,11 +109,28 @@ class ClientRequestState;
 /// TODO: The same doesn't apply to the execution state of an individual plan
 /// fragment: the originating coordinator might die, but we can get notified of
 /// that via the statestore. This still needs to be implemented.
-class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
-                     public ThriftServer::ConnectionHandlerIf {
+class ImpalaServer : public ImpalaServiceIf,
+                     public ImpalaHiveServer2ServiceIf,
+                     public ThriftServer::ConnectionHandlerIf,
+                     public boost::enable_shared_from_this<ImpalaServer> {
  public:
   ImpalaServer(ExecEnv* exec_env);
   ~ImpalaServer();
+
+  /// Initializes RPC services and other subsystems (like audit logging). Returns an error
+  /// if initialization failed. If any ports are <= 0, their respective service will not
+  /// be started.
+  Status Init(int32_t thrift_be_port, int32_t beeswax_port, int32_t hs2_port);
+
+  /// Starts client and internal services. Does not block. Returns an error if any service
+  /// failed to start.
+  Status Start();
+
+  /// Blocks until the server shuts down (by calling Shutdown()).
+  void Join();
+
+  /// Triggers service shutdown, by unblocking Join().
+  void Shutdown() { shutdown_promise_.Set(true); }
 
   /// ImpalaService rpcs: Beeswax API (implemented in impala-beeswax-server.cc)
   virtual void query(beeswax::QueryHandle& query_handle, const beeswax::Query& query);
@@ -977,25 +994,19 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   /// True if this ImpalaServer can execute query fragments.
   bool is_executor_;
+
+  /// Containers for client and internal services. May not be set if the ports passed to
+  /// Init() were <= 0.
+  /// Note that these hold a shared pointer to 'this', and so need to be reset()
+  /// explicitly.
+  boost::scoped_ptr<ThriftServer> beeswax_server_;
+  boost::scoped_ptr<ThriftServer> hs2_server_;
+  boost::scoped_ptr<ThriftServer> thrift_be_server_;
+
+  /// Set to true when this ImpalaServer should shut down.
+  Promise<bool> shutdown_promise_;
 };
 
-/// Create an ImpalaServer and Thrift servers.
-/// If beeswax_port != 0 (and fe_server != NULL), creates a ThriftServer exporting
-/// ImpalaService (Beeswax) on beeswax_port (returned via beeswax_server).
-/// If hs2_port != 0 (and hs2_server != NULL), creates a ThriftServer exporting
-/// ImpalaHiveServer2Service on hs2_port (returned via hs2_server).
-/// ImpalaService and ImpalaHiveServer2Service are initialized only if this
-/// Impala server is a coordinator (indicated by the is_coordinator flag).
-/// If be_port != 0 (and be_server != NULL), create a ThriftServer exporting
-/// ImpalaInternalService on be_port (returned via be_server).
-/// Returns created ImpalaServer. The caller owns fe_server and be_server.
-/// The returned ImpalaServer is referenced by both of these via shared_ptrs and will be
-/// deleted automatically.
-/// Returns OK unless there was some error creating the servers, in
-/// which case none of the output parameters can be assumed to be valid.
-Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
-    int be_port, ThriftServer** beeswax_server, ThriftServer** hs2_server,
-    ThriftServer** be_server, boost::shared_ptr<ImpalaServer>* impala_server);
 
 }
 

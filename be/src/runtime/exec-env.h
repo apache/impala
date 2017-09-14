@@ -81,6 +81,10 @@ class ExecEnv {
   /// Destructor - only used in backend tests that create new environment per test.
   ~ExecEnv();
 
+  /// Initialize the exec environment, including parsing memory limits and initializing
+  /// subsystems like the webserver, scheduler etc.
+  Status Init();
+
   /// Starts any dependent services in their correct order
   Status StartServices() WARN_UNUSED_RESULT;
 
