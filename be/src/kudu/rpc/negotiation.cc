@@ -44,13 +44,13 @@
 #include "kudu/util/status.h"
 #include "kudu/util/trace.h"
 
-DEFINE_bool(rpc_trace_negotiation, false,
+DEFINE_bool_hidden(rpc_trace_negotiation, false,
             "If enabled, dump traces of all RPC negotiations to the log");
 TAG_FLAG(rpc_trace_negotiation, runtime);
 TAG_FLAG(rpc_trace_negotiation, advanced);
 TAG_FLAG(rpc_trace_negotiation, experimental);
 
-DEFINE_int32(rpc_negotiation_inject_delay_ms, 0,
+DEFINE_int32_hidden(rpc_negotiation_inject_delay_ms, 0,
              "If enabled, injects the given number of milliseconds delay into "
              "the RPC negotiation process on the server side.");
 TAG_FLAG(rpc_negotiation_inject_delay_ms, unsafe);
@@ -58,7 +58,7 @@ TAG_FLAG(rpc_negotiation_inject_delay_ms, unsafe);
 DECLARE_string(keytab_file);
 DECLARE_string(rpc_certificate_file);
 
-DEFINE_bool(rpc_encrypt_loopback_connections, false,
+DEFINE_bool_hidden(rpc_encrypt_loopback_connections, false,
             "Whether to encrypt data transfer on RPC connections that stay within "
             "a single host. Encryption here is likely to offer no additional "
             "security benefit since only a local 'root' user could intercept the "

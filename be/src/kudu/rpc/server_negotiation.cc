@@ -57,7 +57,7 @@ using std::string;
 using std::unique_ptr;
 
 // Fault injection flags.
-DEFINE_double(rpc_inject_invalid_authn_token_ratio, 0,
+DEFINE_double_hidden(rpc_inject_invalid_authn_token_ratio, 0,
               "If set higher than 0, AuthenticateByToken() randomly injects "
               "errors replying with FATAL_INVALID_AUTHENTICATION_TOKEN code. "
               "The flag's value corresponds to the probability of the fault "
@@ -67,7 +67,7 @@ TAG_FLAG(rpc_inject_invalid_authn_token_ratio, unsafe);
 
 DECLARE_bool(rpc_encrypt_loopback_connections);
 
-DEFINE_string(trusted_subnets,
+DEFINE_string_hidden(trusted_subnets,
               "127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16",
               "A trusted subnet whitelist. If set explicitly, all unauthenticated "
               "or unencrypted connections are prohibited except the ones from the "

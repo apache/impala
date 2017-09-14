@@ -32,7 +32,7 @@
 // TODO remove this once we have fully cluster-tested this.
 // Despite being on by default, this is left in in case we discover
 // any issues in 0.10.0, we'll have an easy workaround to disable the feature.
-DEFINE_bool(enable_exactly_once, true, "Whether to enable exactly once semantics.");
+DEFINE_bool_hidden(enable_exactly_once, true, "Whether to enable exactly once semantics.");
 TAG_FLAG(enable_exactly_once, hidden);
 
 using google::protobuf::Message;

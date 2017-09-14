@@ -27,15 +27,15 @@
 #include "kudu/util/test_util.h"
 
 // Test gflags
-DEFINE_string(test_nondefault_ff, "default",
+DEFINE_string_hidden(test_nondefault_ff, "default",
              "Check if we track non defaults from flagfile");
-DEFINE_string(test_nondefault_explicit, "default",
+DEFINE_string_hidden(test_nondefault_explicit, "default",
              "Check if we track explicitly set non defaults");
-DEFINE_string(test_default_ff, "default",
+DEFINE_string_hidden(test_default_ff, "default",
              "Check if we track defaults from flagfile");
-DEFINE_string(test_default_explicit, "default",
+DEFINE_string_hidden(test_default_explicit, "default",
              "Check if we track explicitly set defaults");
-DEFINE_bool(test_sensitive_flag, false, "a sensitive flag");
+DEFINE_bool_hidden(test_sensitive_flag, false, "a sensitive flag");
 TAG_FLAG(test_sensitive_flag, sensitive);
 
 DECLARE_bool(never_fsync);

@@ -38,7 +38,7 @@
 #include "kudu/util/test_util.h"
 #include "kudu/util/user.h"
 
-DEFINE_bool(is_panic_test_child, false, "Used by TestRpcPanic");
+DEFINE_bool_hidden(is_panic_test_child, false, "Used by TestRpcPanic");
 DECLARE_bool(socket_inject_short_recvs);
 
 using std::shared_ptr;

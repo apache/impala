@@ -42,19 +42,19 @@
 #include "kudu/util/locks.h"
 #include "kudu/util/metrics.h"
 
-DEFINE_string(nvm_cache_path, "/vmem",
+DEFINE_string_hidden(nvm_cache_path, "/vmem",
               "The path at which the NVM cache will try to allocate its memory. "
               "This can be a tmpfs or ramfs for testing purposes.");
 TAG_FLAG(nvm_cache_path, experimental);
 
-DEFINE_int32(nvm_cache_allocation_retry_count, 10,
+DEFINE_int32_hidden(nvm_cache_allocation_retry_count, 10,
              "The number of times that the NVM cache will retry attempts to allocate "
              "memory for new entries. In between attempts, a cache entry will be "
              "evicted.");
 TAG_FLAG(nvm_cache_allocation_retry_count, advanced);
 TAG_FLAG(nvm_cache_allocation_retry_count, experimental);
 
-DEFINE_bool(nvm_cache_simulate_allocation_failure, false,
+DEFINE_bool_hidden(nvm_cache_simulate_allocation_failure, false,
             "If true, the NVM cache will inject failures in calls to vmem_malloc "
             "for testing.");
 TAG_FLAG(nvm_cache_simulate_allocation_failure, unsafe);

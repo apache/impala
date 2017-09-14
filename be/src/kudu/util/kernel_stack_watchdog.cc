@@ -32,7 +32,7 @@
 #include "kudu/gutil/map-util.h"
 #include "kudu/gutil/strings/substitute.h"
 
-DEFINE_int32(hung_task_check_interval_ms, 200,
+DEFINE_int32_hidden(hung_task_check_interval_ms, 200,
              "Number of milliseconds in between checks for hung threads");
 TAG_FLAG(hung_task_check_interval_ms, hidden);
 

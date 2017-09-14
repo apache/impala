@@ -31,7 +31,7 @@
 #endif
 
 // Useful in tests that require accurate cache capacity accounting.
-DEFINE_bool(cache_force_single_shard, false,
+DEFINE_bool_hidden(cache_force_single_shard, false,
             "Override all cache implementations to use just one shard");
 TAG_FLAG(cache_force_single_shard, hidden);
 

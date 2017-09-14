@@ -38,7 +38,7 @@
 #include "kudu/util/path_util.h"
 #include "kudu/util/status.h"
 
-DEFINE_int64(disk_reserved_bytes_free_for_testing, -1,
+DEFINE_int64_hidden(disk_reserved_bytes_free_for_testing, -1,
              "For testing only! Set to number of bytes free on each filesystem. "
              "Set to -1 to disable this test-specific override");
 TAG_FLAG(disk_reserved_bytes_free_for_testing, runtime);
@@ -46,18 +46,18 @@ TAG_FLAG(disk_reserved_bytes_free_for_testing, unsafe);
 
 // We define some flags for testing purposes: Two prefixes and their associated
 // "bytes free" overrides.
-DEFINE_string(disk_reserved_override_prefix_1_path_for_testing, "",
+DEFINE_string_hidden(disk_reserved_override_prefix_1_path_for_testing, "",
               "For testing only! Specifies a prefix to override the visible 'bytes free' on. "
               "Use --disk_reserved_override_prefix_1_bytes_free_for_testing to set the number of "
               "bytes free for this path prefix. Set to empty string to disable.");
-DEFINE_int64(disk_reserved_override_prefix_1_bytes_free_for_testing, -1,
+DEFINE_int64_hidden(disk_reserved_override_prefix_1_bytes_free_for_testing, -1,
              "For testing only! Set number of bytes free on the path prefix specified by "
              "--disk_reserved_override_prefix_1_path_for_testing. Set to -1 to disable.");
-DEFINE_string(disk_reserved_override_prefix_2_path_for_testing, "",
+DEFINE_string_hidden(disk_reserved_override_prefix_2_path_for_testing, "",
               "For testing only! Specifies a prefix to override the visible 'bytes free' on. "
               "Use --disk_reserved_override_prefix_2_bytes_free_for_testing to set the number of "
               "bytes free for this path prefix. Set to empty string to disable.");
-DEFINE_int64(disk_reserved_override_prefix_2_bytes_free_for_testing, -1,
+DEFINE_int64_hidden(disk_reserved_override_prefix_2_bytes_free_for_testing, -1,
              "For testing only! Set number of bytes free on the path prefix specified by "
              "--disk_reserved_override_prefix_2_path_for_testing. Set to -1 to disable.");
 TAG_FLAG(disk_reserved_override_prefix_1_path_for_testing, unsafe);

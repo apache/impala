@@ -34,11 +34,11 @@
 #include "kudu/util/random.h"
 #include "kudu/util/spinlock_profiling.h"
 
-DEFINE_string(test_leave_files, "on_failure",
+DEFINE_string_hidden(test_leave_files, "on_failure",
               "Whether to leave test files around after the test run. "
               " Valid values are 'always', 'on_failure', or 'never'");
 
-DEFINE_int32(test_random_seed, 0, "Random seed to use for randomized tests");
+DEFINE_int32_hidden(test_random_seed, 0, "Random seed to use for randomized tests");
 
 using std::string;
 using std::vector;

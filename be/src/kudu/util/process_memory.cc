@@ -31,18 +31,18 @@
 #include "kudu/util/random.h"
 #include "kudu/util/striped64.h"
 
-DEFINE_int64(memory_limit_hard_bytes, 0,
+DEFINE_int64_hidden(memory_limit_hard_bytes, 0,
              "Maximum amount of memory this daemon should use, in bytes. "
              "A value of 0 autosizes based on the total system memory. "
              "A value of -1 disables all memory limiting.");
 TAG_FLAG(memory_limit_hard_bytes, stable);
 
-DEFINE_int32(memory_pressure_percentage, 60,
+DEFINE_int32_hidden(memory_pressure_percentage, 60,
              "Percentage of the hard memory limit that this daemon may "
              "consume before flushing of in-memory data becomes prioritized.");
 TAG_FLAG(memory_pressure_percentage, advanced);
 
-DEFINE_int32(memory_limit_soft_percentage, 80,
+DEFINE_int32_hidden(memory_limit_soft_percentage, 80,
              "Percentage of the hard memory limit that this daemon may "
              "consume before memory throttling of writes begins. The greater "
              "the excess, the higher the chance of throttling. In general, a "
@@ -50,13 +50,13 @@ DEFINE_int32(memory_limit_soft_percentage, 80,
              "decreased throughput, and vice versa for a higher soft limit.");
 TAG_FLAG(memory_limit_soft_percentage, advanced);
 
-DEFINE_int32(memory_limit_warn_threshold_percentage, 98,
+DEFINE_int32_hidden(memory_limit_warn_threshold_percentage, 98,
              "Percentage of the hard memory limit that this daemon may "
              "consume before WARNING level messages are periodically logged.");
 TAG_FLAG(memory_limit_warn_threshold_percentage, advanced);
 
 #ifdef TCMALLOC_ENABLED
-DEFINE_int32(tcmalloc_max_free_bytes_percentage, 10,
+DEFINE_int32_hidden(tcmalloc_max_free_bytes_percentage, 10,
              "Maximum percentage of the RSS that tcmalloc is allowed to use for "
              "reserved but unallocated memory.");
 TAG_FLAG(tcmalloc_max_free_bytes_percentage, advanced);

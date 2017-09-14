@@ -35,26 +35,26 @@ using std::thread;
 using std::unique_ptr;
 using std::vector;
 
-DEFINE_int32(client_threads, 16,
+DEFINE_int32_hidden(client_threads, 16,
              "Number of client threads. For the synchronous benchmark, each thread has "
              "a single outstanding synchronous request at a time. For the async "
              "benchmark, this determines the number of client reactors.");
 
-DEFINE_int32(async_call_concurrency, 60,
+DEFINE_int32_hidden(async_call_concurrency, 60,
              "Number of concurrent requests that will be outstanding at a time for the "
              "async benchmark. The requests are multiplexed across the number of "
              "reactors specified by the 'client_threads' flag.");
 
-DEFINE_int32(worker_threads, 1,
+DEFINE_int32_hidden(worker_threads, 1,
              "Number of server worker threads");
 
-DEFINE_int32(server_reactors, 4,
+DEFINE_int32_hidden(server_reactors, 4,
              "Number of server reactor threads");
 
-DEFINE_int32(run_seconds, 1, "Seconds to run the test");
+DEFINE_int32_hidden(run_seconds, 1, "Seconds to run the test");
 
 DECLARE_bool(rpc_encrypt_loopback_connections);
-DEFINE_bool(enable_encryption, false, "Whether to enable TLS encryption for rpc-bench");
+DEFINE_bool_hidden(enable_encryption, false, "Whether to enable TLS encryption for rpc-bench");
 
 namespace kudu {
 namespace rpc {

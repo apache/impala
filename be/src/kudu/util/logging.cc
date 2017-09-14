@@ -47,12 +47,12 @@
 DECLARE_string(log_filename);
 TAG_FLAG(log_filename, stable);
 
-DEFINE_bool(log_async, true,
+DEFINE_bool_hidden(log_async, true,
             "Enable asynchronous writing to log files. This improves "
             "latency and stability.");
 TAG_FLAG(log_async, hidden);
 
-DEFINE_int32(log_async_buffer_bytes_per_level, 2 * 1024 * 1024,
+DEFINE_int32_hidden(log_async_buffer_bytes_per_level, 2 * 1024 * 1024,
              "The number of bytes of buffer space used by each log "
              "level. Only relevant when --log_async is enabled.");
 TAG_FLAG(log_async_buffer_bytes_per_level, hidden);

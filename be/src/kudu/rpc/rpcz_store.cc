@@ -35,7 +35,7 @@
 #include "kudu/util/trace.h"
 
 
-DEFINE_bool(rpc_dump_all_traces, false,
+DEFINE_bool_hidden(rpc_dump_all_traces, false,
             "If true, dump all RPC traces at INFO level");
 TAG_FLAG(rpc_dump_all_traces, advanced);
 TAG_FLAG(rpc_dump_all_traces, runtime);

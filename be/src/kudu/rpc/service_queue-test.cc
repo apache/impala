@@ -34,13 +34,13 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
-DEFINE_int32(num_producers, 4,
+DEFINE_int32_hidden(num_producers, 4,
              "Number of producer threads");
 
-DEFINE_int32(num_consumers, 20,
+DEFINE_int32_hidden(num_consumers, 20,
              "Number of consumer threads");
 
-DEFINE_int32(max_queue_size, 50,
+DEFINE_int32_hidden(max_queue_size, 50,
              "Max queue length");
 
 namespace kudu {

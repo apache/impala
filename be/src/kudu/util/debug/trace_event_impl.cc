@@ -30,7 +30,7 @@
 #include "kudu/util/flag_tags.h"
 #include "kudu/util/thread.h"
 
-DEFINE_string(trace_to_console, "",
+DEFINE_string_hidden(trace_to_console, "",
               "Trace pattern specifying which trace events should be dumped "
               "directly to the console");
 TAG_FLAG(trace_to_console, experimental);

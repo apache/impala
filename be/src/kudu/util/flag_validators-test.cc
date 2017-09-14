@@ -26,10 +26,10 @@
 #include "kudu/util/logging.h"
 #include "kudu/util/test_util.h"
 
-DEFINE_string(grouped_0, "", "First flag to set.");
-DEFINE_string(grouped_1, "", "Second flag to set.");
-DEFINE_string(grouped_2, "", "Third flag to set.");
-DEFINE_string(grouped_3, "", "Fourth flag to set.");
+DEFINE_string_hidden(grouped_0, "", "First flag to set.");
+DEFINE_string_hidden(grouped_1, "", "Second flag to set.");
+DEFINE_string_hidden(grouped_2, "", "Third flag to set.");
+DEFINE_string_hidden(grouped_3, "", "Fourth flag to set.");
 
 namespace kudu {
 

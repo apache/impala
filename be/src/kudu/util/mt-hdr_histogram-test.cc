@@ -26,9 +26,9 @@
 #include "kudu/util/test_util.h"
 #include "kudu/util/thread.h"
 
-DEFINE_int32(histogram_test_num_threads, 16,
+DEFINE_int32_hidden(histogram_test_num_threads, 16,
     "Number of threads to spawn for mt-hdr_histogram test");
-DEFINE_uint64(histogram_test_num_increments_per_thread, 100000LU,
+DEFINE_uint64_hidden(histogram_test_num_increments_per_thread, 100000LU,
     "Number of times to call Increment() per thread in mt-hdr_histogram test");
 
 using std::vector;

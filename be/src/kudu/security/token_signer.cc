@@ -37,7 +37,7 @@
 #include "kudu/util/locks.h"
 #include "kudu/util/status.h"
 
-DEFINE_int32(tsk_num_rsa_bits, 2048,
+DEFINE_int32_hidden(tsk_num_rsa_bits, 2048,
              "Number of bits in RSA keys used for token signing.");
 TAG_FLAG(tsk_num_rsa_bits, experimental);
 

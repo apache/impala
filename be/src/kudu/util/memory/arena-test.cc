@@ -27,9 +27,9 @@
 #include "kudu/util/memory/memory.h"
 #include "kudu/util/mem_tracker.h"
 
-DEFINE_int32(num_threads, 16, "Number of threads to test");
-DEFINE_int32(allocs_per_thread, 10000, "Number of allocations each thread should do");
-DEFINE_int32(alloc_size, 4, "number of bytes in each allocation");
+DEFINE_int32_hidden(num_threads, 16, "Number of threads to test");
+DEFINE_int32_hidden(allocs_per_thread, 10000, "Number of allocations each thread should do");
+DEFINE_int32_hidden(alloc_size, 4, "number of bytes in each allocation");
 
 namespace kudu {
 

@@ -70,12 +70,12 @@ using std::shared_ptr;
 using std::unique_ptr;
 using strings::Substitute;
 
-DEFINE_int64(rpc_negotiation_timeout_ms, 3000,
+DEFINE_int64_hidden(rpc_negotiation_timeout_ms, 3000,
              "Timeout for negotiating an RPC connection.");
 TAG_FLAG(rpc_negotiation_timeout_ms, advanced);
 TAG_FLAG(rpc_negotiation_timeout_ms, runtime);
 
-DEFINE_bool(rpc_reopen_outbound_connections, false,
+DEFINE_bool_hidden(rpc_reopen_outbound_connections, false,
             "Open a new connection to the server for every RPC call. "
             "If not enabled, an already existing connection to a "
             "server is reused upon making another call to the same server. "

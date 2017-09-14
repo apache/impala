@@ -45,12 +45,12 @@ using strings::Substitute;
 using std::string;
 using std::unique_lock;
 
-DEFINE_int32(ipki_server_key_size, 2048,
+DEFINE_int32_hidden(ipki_server_key_size, 2048,
              "the number of bits for server cert's private key. The server cert "
              "is used for TLS connections to and from clients and other servers.");
 TAG_FLAG(ipki_server_key_size, experimental);
 
-DEFINE_string(rpc_tls_ciphers,
+DEFINE_string_hidden(rpc_tls_ciphers,
               // This is the "modern compatibility" cipher list of the Mozilla Security
               // Server Side TLS recommendations, accessed Feb. 2017, with the addition of
               // the non ECDH/DH AES cipher suites from the "intermediate compatibility"
@@ -70,7 +70,7 @@ DEFINE_string(rpc_tls_ciphers,
               "for more information.");
 TAG_FLAG(rpc_tls_ciphers, advanced);
 
-DEFINE_string(rpc_tls_min_protocol, "TLSv1",
+DEFINE_string_hidden(rpc_tls_min_protocol, "TLSv1",
               "The minimum protocol version to allow when for securing RPC "
               "connections with TLS. May be one of 'TLSv1', 'TLSv1.1', or "
               "'TLSv1.2'.");

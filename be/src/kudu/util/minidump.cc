@@ -54,7 +54,7 @@ static constexpr bool kMinidumpPlatformSupported = false;
 
 DECLARE_string(log_dir);
 
-DEFINE_bool(enable_minidumps, kMinidumpPlatformSupported,
+DEFINE_bool_hidden(enable_minidumps, kMinidumpPlatformSupported,
             "Whether to enable minidump generation upon process crash or SIGUSR1. "
             "Currently only supported on Linux systems.");
 TAG_FLAG(enable_minidumps, advanced);

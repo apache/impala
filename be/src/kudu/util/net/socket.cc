@@ -43,13 +43,13 @@
 #include "kudu/util/random_util.h"
 #include "kudu/util/subprocess.h"
 
-DEFINE_string(local_ip_for_outbound_sockets, "",
+DEFINE_string_hidden(local_ip_for_outbound_sockets, "",
               "IP to bind to when making outgoing socket connections. "
               "This must be an IP address of the form A.B.C.D, not a hostname. "
               "Advanced parameter, subject to change.");
 TAG_FLAG(local_ip_for_outbound_sockets, experimental);
 
-DEFINE_bool(socket_inject_short_recvs, false,
+DEFINE_bool_hidden(socket_inject_short_recvs, false,
             "Inject short recv() responses which return less data than "
             "requested");
 TAG_FLAG(socket_inject_short_recvs, hidden);

@@ -66,7 +66,7 @@
 #define KRB5_VERSION_LE_1_10
 #endif
 
-DEFINE_bool(is_test_child, false,
+DEFINE_bool_hidden(is_test_child, false,
             "Used by tests which require clean processes. "
             "See TestDisableInit.");
 DECLARE_bool(rpc_encrypt_loopback_connections);

@@ -39,7 +39,7 @@
 // 100M cycles should be about 50ms on a 2Ghz box. This should be high
 // enough that involuntary context switches don't trigger it, but low enough
 // that any serious blocking behavior on the reactor would.
-DEFINE_int64(rpc_callback_max_cycles, 100 * 1000 * 1000,
+DEFINE_int64_hidden(rpc_callback_max_cycles, 100 * 1000 * 1000,
              "The maximum number of cycles for which an RPC callback "
              "should be allowed to run without emitting a warning."
              " (Advanced debugging option)");
@@ -47,7 +47,7 @@ TAG_FLAG(rpc_callback_max_cycles, advanced);
 TAG_FLAG(rpc_callback_max_cycles, runtime);
 
 // Flag used in debug build for injecting cancellation at different code paths.
-DEFINE_int32(rpc_inject_cancellation_state, -1,
+DEFINE_int32_hidden(rpc_inject_cancellation_state, -1,
              "If this flag is not -1, it is the state in which a cancellation request "
              "will be injected. Should use values in OutboundCall::State only");
 TAG_FLAG(rpc_inject_cancellation_state, unsafe);

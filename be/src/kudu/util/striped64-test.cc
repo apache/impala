@@ -26,8 +26,8 @@
 #include "kudu/util/thread.h"
 
 // These flags are used by the multi-threaded tests, can be used for microbenchmarking.
-DEFINE_int32(num_operations, 10*1000, "Number of operations to perform");
-DEFINE_int32(num_threads, 2, "Number of worker threads");
+DEFINE_int32_hidden(num_operations, 10*1000, "Number of operations to perform");
+DEFINE_int32_hidden(num_threads, 2, "Number of worker threads");
 
 namespace kudu {
 

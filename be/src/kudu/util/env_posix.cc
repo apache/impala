@@ -113,30 +113,30 @@
 } while ((nread) == 0 && ferror(stream) == EINTR)
 
 // See KUDU-588 for details.
-DEFINE_bool(env_use_fsync, false,
+DEFINE_bool_hidden(env_use_fsync, false,
             "Use fsync(2) instead of fdatasync(2) for synchronizing dirty "
             "data to disk.");
 TAG_FLAG(env_use_fsync, advanced);
 TAG_FLAG(env_use_fsync, evolving);
 
-DEFINE_bool(suicide_on_eio, true,
+DEFINE_bool_hidden(suicide_on_eio, true,
             "Kill the process if an I/O operation results in EIO");
 TAG_FLAG(suicide_on_eio, advanced);
 
-DEFINE_bool(never_fsync, false,
+DEFINE_bool_hidden(never_fsync, false,
             "Never fsync() anything to disk. This is used by certain test cases to "
             "speed up runtime. This is very unsafe to use in production.");
 TAG_FLAG(never_fsync, advanced);
 TAG_FLAG(never_fsync, unsafe);
 
-DEFINE_double(env_inject_io_error, 0.0,
+DEFINE_double_hidden(env_inject_io_error, 0.0,
               "Fraction of the time that certain I/O operations will fail");
 TAG_FLAG(env_inject_io_error, hidden);
 
-DEFINE_int32(env_inject_short_read_bytes, 0,
+DEFINE_int32_hidden(env_inject_short_read_bytes, 0,
              "The number of bytes less than the requested bytes to read");
 TAG_FLAG(env_inject_short_read_bytes, hidden);
-DEFINE_int32(env_inject_short_write_bytes, 0,
+DEFINE_int32_hidden(env_inject_short_write_bytes, 0,
              "The number of bytes less than the requested bytes to write");
 TAG_FLAG(env_inject_short_write_bytes, hidden);
 

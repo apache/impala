@@ -32,7 +32,7 @@
 #include "kudu/util/test_util.h"
 #include "kudu/util/thread.h"
 
-DEFINE_int32(mt_metrics_test_num_threads, 4,
+DEFINE_int32_hidden(mt_metrics_test_num_threads, 4,
              "Number of threads to spawn in mt metrics tests");
 
 METRIC_DEFINE_entity(test_entity);

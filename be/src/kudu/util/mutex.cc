@@ -34,7 +34,7 @@ using strings::Substitute;
 using strings::SubstituteAndAppend;
 
 #ifndef NDEBUG
-DEFINE_bool(debug_mutex_collect_stacktrace, false,
+DEFINE_bool_hidden(debug_mutex_collect_stacktrace, false,
             "Whether to collect a stacktrace on Mutex contention in a DEBUG build");
 TAG_FLAG(debug_mutex_collect_stacktrace, advanced);
 TAG_FLAG(debug_mutex_collect_stacktrace, hidden);

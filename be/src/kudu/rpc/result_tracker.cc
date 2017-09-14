@@ -30,7 +30,7 @@
 #include "kudu/util/pb_util.h"
 #include "kudu/util/trace.h"
 
-DEFINE_int64(remember_clients_ttl_ms, 3600 * 1000 /* 1 hour */,
+DEFINE_int64_hidden(remember_clients_ttl_ms, 3600 * 1000 /* 1 hour */,
     "Maximum amount of time, in milliseconds, the server \"remembers\" a client for the "
     "purpose of caching its responses. After this period without hearing from it, the "
     "client is no longer remembered and the memory occupied by its responses is reclaimed. "
@@ -38,14 +38,14 @@ DEFINE_int64(remember_clients_ttl_ms, 3600 * 1000 /* 1 hour */,
     "ones.");
 TAG_FLAG(remember_clients_ttl_ms, advanced);
 
-DEFINE_int64(remember_responses_ttl_ms, 600 * 1000 /* 10 mins */,
+DEFINE_int64_hidden(remember_responses_ttl_ms, 600 * 1000 /* 10 mins */,
     "Maximum amount of time, in milliseconds, the server \"remembers\" a response to a "
     "specific request for a client. After this period has elapsed, the response may have "
     "been garbage collected and the client might get a response indicating the request is "
     "STALE.");
 TAG_FLAG(remember_responses_ttl_ms, advanced);
 
-DEFINE_int64(result_tracker_gc_interval_ms, 1000,
+DEFINE_int64_hidden(result_tracker_gc_interval_ms, 1000,
     "Interval at which the result tracker will look for entries to GC.");
 TAG_FLAG(result_tracker_gc_interval_ms, hidden);
 

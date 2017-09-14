@@ -39,7 +39,7 @@
 #include "kudu/util/status.h"
 #include "kudu/util/thread.h"
 
-DEFINE_int32(file_cache_expiry_period_ms, 60 * 1000,
+DEFINE_int32_hidden(file_cache_expiry_period_ms, 60 * 1000,
              "Period of time (in ms) between removing expired file cache descriptors");
 TAG_FLAG(file_cache_expiry_period_ms, advanced);
 
