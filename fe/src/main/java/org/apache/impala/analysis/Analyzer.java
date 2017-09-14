@@ -2620,7 +2620,7 @@ public class Analyzer {
      *    This step partitions the value transfers into disjoint sets.
      * 4. Compute the transitive closure of each partition from (3) in the new slot
      *    domain separately. Hopefully, the partitions are small enough to afford
-     *    the O(N^3) complexity of the brute-force transitive closure computation.
+     *    the O(N^3) complexity of the Floyd-Warshall transitive closure computation.
      * The condensed graph is not transformed back into the original slot domain because
      * of the potential performance penalty. Instead, hasValueTransfer() consults
      * coalescedSlots_, valueTransfer_, and completeSubGraphs_ which can together
@@ -2695,24 +2695,15 @@ public class Analyzer {
           p[numPartitionSlots++] = slotId;
         }
         // Compute the transitive closure of this graph partition.
-        // TODO: Since we are operating on a DAG the performance can be improved if
-        // necessary (e.g., topological sort + backwards propagation of the transitive
-        // closure).
-        boolean changed = false;
-        do {
-          changed = false;
+        for (int j = 0; j < numPartitionSlots; ++j) {
           for (int i = 0; i < numPartitionSlots; ++i) {
-            for (int j = 0; j < numPartitionSlots; ++j) {
-              for (int k = 0; k < numPartitionSlots; ++k) {
-                if (valueTransfer_[p[i]][p[j]] && valueTransfer_[p[j]][p[k]]
-                    && !valueTransfer_[p[i]][p[k]]) {
-                  valueTransfer_[p[i]][p[k]] = true;
-                  changed = true;
-                }
-              }
+            // Our graphs are typically sparse so this filters out a lot of iterations.
+            if (!valueTransfer_[p[i]][p[j]]) continue;
+            for (int k = 0; k < numPartitionSlots; ++k) {
+              valueTransfer_[p[i]][p[k]] |= valueTransfer_[p[j]][p[k]];
             }
           }
-        } while (changed);
+        }
       }
 
       long end = System.currentTimeMillis();
