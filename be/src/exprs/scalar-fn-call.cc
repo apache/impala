@@ -296,12 +296,12 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
     return Status::OK();
   }
   if (type_.type == TYPE_CHAR) {
-    return Status("ScalarFnCall Codegen not supported for CHAR");
+    return Status::Expected("ScalarFnCall Codegen not supported for CHAR");
   }
   for (int i = 0; i < GetNumChildren(); ++i) {
     if (children_[i]->type().type == TYPE_CHAR) {
       *fn = NULL;
-      return Status("ScalarFnCall Codegen not supported for CHAR");
+      return Status::Expected("ScalarFnCall Codegen not supported for CHAR");
     }
   }
 

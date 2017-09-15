@@ -307,7 +307,7 @@ void HdfsScanNodeBase::Codegen(RuntimeState* state) {
       default:
         // No codegen for this format
         fn = NULL;
-        status = Status("Not implemented for this format.");
+        status = Status::Expected("Not implemented for this format.");
     }
     DCHECK(fn != NULL || !status.ok());
     const char* format_name = _THdfsFileFormat_VALUES_TO_NAMES.find(format)->second;

@@ -636,9 +636,10 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
     lock_guard<mutex> l(query_log_lock_);
     QueryLogIndex::const_iterator query_record = query_log_index_.find(query_id);
     if (query_record == query_log_index_.end()) {
-      stringstream ss;
-      ss << "Query id " << PrintId(query_id) << " not found.";
-      return Status(ss.str());
+      // Common error, so logging explicitly and eliding Status's stack trace.
+      string err = strings::Substitute("Query id $0 not found.", PrintId(query_id));
+      VLOG(1) << err;
+      return Status::Expected(err);
     }
     RETURN_IF_ERROR(CheckProfileAccess(user, query_record->second->effective_user,
         query_record->second->user_has_profile_access));
@@ -691,9 +692,10 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
       }
     }
     if (is_query_missing) {
-      stringstream ss;
-      ss << "Query id " << PrintId(query_id) << " not found.";
-      return Status(ss.str());
+      // Common error, so logging explicitly and eliding Status's stack trace.
+      string err = strings::Substitute("Query id $0 not found.", PrintId(query_id));
+      VLOG(1) << err;
+      return Status::Expected(err);
     }
     RETURN_IF_ERROR(CheckProfileAccess(user, effective_user, user_has_profile_access));
     *result = exec_summary;

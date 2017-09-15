@@ -305,9 +305,8 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_
     Status status = slot_materialize_exprs[i]->GetCodegendComputeFn(codegen,
         &materialize_expr_fns[i]);
     if (!status.ok()) {
-      stringstream ss;
-      ss << "Could not codegen CodegenMaterializeExprs: " << status.GetDetail();
-      return Status(ss.str());
+      return Status::Expected(Substitute("Could not codegen CodegenMaterializeExprs: $0",
+            status.GetDetail()));
     }
   }
 

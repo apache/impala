@@ -969,7 +969,7 @@ Status HdfsAvroScanner::CodegenReadScalar(const AvroSchemaElement& element,
       read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_DECIMAL, false);
       break;
     default:
-      return Status(Substitute(
+      return Status::Expected(Substitute(
           "Failed to codegen MaterializeTuple() due to unsupported type: $0",
           element.schema->type));
   }
