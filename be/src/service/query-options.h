@@ -99,9 +99,7 @@ class TQueryOptions;
   ;
 
 
-/// Converts a TQueryOptions struct into a map of key, value pairs.  Options that
-/// aren't set and lack defaults in common/thrift/ImpalaInternalService.thrift are
-/// mapped to the empty string.
+/// Converts a TQueryOptions struct into a map of key, value pairs.
 void TQueryOptionsToMap(const TQueryOptions& query_options,
     std::map<std::string, std::string>* configuration);
 
