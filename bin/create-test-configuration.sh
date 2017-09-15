@@ -92,8 +92,11 @@ if [ $CREATE_METASTORE -eq 1 ]; then
   dropdb -U hiveuser ${METASTORE_DB} 2> /dev/null || true
   createdb -U hiveuser ${METASTORE_DB}
 
-  psql -q -U hiveuser -d ${METASTORE_DB} \
-       -f ${HIVE_HOME}/scripts/metastore/upgrade/postgres/hive-schema-1.1.0.postgres.sql
+  # Hive schema SQL scripts include other scripts using \i, which expects absolute paths.
+  # Switch to the scripts directory to make this work.
+  pushd ${HIVE_HOME}/scripts/metastore/upgrade/postgres
+  psql -q -U hiveuser -d ${METASTORE_DB} -f hive-schema-1.1.0.postgres.sql
+  popd
   # Increase the size limit of PARAM_VALUE from SERDE_PARAMS table to be able to create
   # HBase tables with large number of columns.
   echo "alter table \"SERDE_PARAMS\" alter column \"PARAM_VALUE\" type character varying" \
