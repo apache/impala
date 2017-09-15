@@ -75,6 +75,7 @@
 #include "util/summary-util.h"
 #include "util/test-info.h"
 #include "util/uid-util.h"
+#include "util/time.h"
 
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaService.h"
@@ -914,12 +915,10 @@ Status ImpalaServer::ExecuteInternal(
 
 void ImpalaServer::PrepareQueryContext(TQueryCtx* query_ctx) {
   query_ctx->__set_pid(getpid());
-  TimestampValue utc_timestamp = TimestampValue::UtcTime();
-  query_ctx->__set_utc_timestamp_string(utc_timestamp.ToString());
-  TimestampValue local_timestamp(utc_timestamp);
-  local_timestamp.UtcToLocal();
-  query_ctx->__set_now_string(local_timestamp.ToString());
-  query_ctx->__set_start_unix_millis(UnixMillis());
+  int64_t now_us = UnixMicros();
+  query_ctx->__set_utc_timestamp_string(ToUtcStringFromUnixMicros(now_us));
+  query_ctx->__set_now_string(ToStringFromUnixMicros(now_us));
+  query_ctx->__set_start_unix_millis(now_us / MICROS_PER_MILLI);
   query_ctx->__set_coord_address(ExecEnv::GetInstance()->backend_address());
 
   // Creating a random_generator every time is not free, but
@@ -1141,11 +1140,10 @@ Status ImpalaServer::GetSessionState(const TUniqueId& session_id,
     if (mark_active) {
       lock_guard<mutex> session_lock(i->second->lock);
       if (i->second->expired) {
-        int64_t last_time_s = i->second->last_accessed_ms / 1000;
         stringstream ss;
         ss << "Client session expired due to more than " << i->second->session_timeout
            << "s of inactivity (last activity was at: "
-           << TimestampValue::FromUnixTime(last_time_s).ToString() << ").";
+           << ToStringFromUnixMillis(i->second->last_accessed_ms) << ").";
         return Status(ss.str());
       }
       if (i->second->closed) return Status("Session is closed");
@@ -1843,7 +1841,7 @@ void ImpalaServer::RegisterSessionTimeout(int32_t session_timeout) {
         if (now - last_accessed_ms <= session_timeout_ms) continue;
         LOG(INFO) << "Expiring session: " << session_state.first << ", user:"
                   << session_state.second->connected_user << ", last active: "
-                  << TimestampValue::FromUnixTime(last_accessed_ms / 1000).ToString();
+                  << ToStringFromUnixMillis(last_accessed_ms);
         session_state.second->expired = true;
         ImpaladMetrics::NUM_SESSIONS_EXPIRED->Increment(1L);
         // Since expired is true, no more queries will be added to the inflight list.
@@ -1919,11 +1917,10 @@ void ImpalaServer::RegisterSessionTimeout(int32_t session_timeout) {
           }
         } else if (!query_state->is_active()) {
           // Otherwise time to expire this query
-          int64_t last_active_s = query_state->last_active_ms() / 1000;
           VLOG_QUERY
               << "Expiring query due to client inactivity: " << expiration_event->second
               << ", last activity was at: "
-              << TimestampValue::FromUnixTime(last_active_s).ToString();
+              << ToStringFromUnixMillis(query_state->last_active_ms());
           const string& err_msg = Substitute(
               "Query $0 expired due to client inactivity (timeout is $1)",
               PrintId(expiration_event->second),
