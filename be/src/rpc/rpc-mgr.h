@@ -21,8 +21,8 @@
 #include "common/status.h"
 #include "kudu/rpc/messenger.h"
 #include "kudu/rpc/result_tracker.h"
-#include "kudu/rpc/service_pool.h"
 #include "kudu/util/metrics.h"
+#include "rpc/impala-service-pool.h"
 
 #include "gen-cpp/Types_types.h"
 
@@ -158,7 +158,7 @@ class RpcMgr {
 
  private:
   /// One pool per registered service. scoped_refptr<> is dictated by the Kudu interface.
-  std::vector<scoped_refptr<kudu::rpc::ServicePool>> service_pools_;
+  std::vector<scoped_refptr<ImpalaServicePool>> service_pools_;
 
   /// Required Kudu boilerplate for constructing the MetricEntity passed
   /// to c'tor of ServiceIf when creating a service.

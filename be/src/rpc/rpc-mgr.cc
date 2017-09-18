@@ -20,6 +20,7 @@
 #include "exec/kudu-util.h"
 #include "kudu/rpc/acceptor_pool.h"
 #include "kudu/rpc/rpc_controller.h"
+#include "kudu/rpc/rpc_introspection.pb.h"
 #include "kudu/rpc/service_if.h"
 #include "kudu/util/net/net_util.h"
 #include "util/auth-util.h"
@@ -28,15 +29,14 @@
 
 #include "common/names.h"
 
-using kudu::rpc::MessengerBuilder;
-using kudu::rpc::Messenger;
-using kudu::rpc::AcceptorPool;
-using kudu::rpc::RpcController;
-using kudu::rpc::ServiceIf;
-using kudu::rpc::ServicePool;
-using kudu::Sockaddr;
 using kudu::HostPort;
 using kudu::MetricEntity;
+using kudu::rpc::AcceptorPool;
+using kudu::rpc::MessengerBuilder;
+using kudu::rpc::Messenger;
+using kudu::rpc::RpcController;
+using kudu::rpc::ServiceIf;
+using kudu::Sockaddr;
 
 DECLARE_string(hostname);
 DECLARE_string(principal);
@@ -79,17 +79,19 @@ Status RpcMgr::RegisterService(int32_t num_service_threads, int32_t service_queu
     unique_ptr<ServiceIf> service_ptr) {
   DCHECK(is_inited()) << "Must call Init() before RegisterService()";
   DCHECK(!services_started_) << "Cannot call RegisterService() after StartServices()";
-  scoped_refptr<ServicePool> service_pool =
-      new ServicePool(gscoped_ptr<ServiceIf>(service_ptr.release()),
+  scoped_refptr<ImpalaServicePool> service_pool =
+      new ImpalaServicePool(std::move(service_ptr),
           messenger_->metric_entity(), service_queue_depth);
   // Start the thread pool first before registering the service in case the startup fails.
-  KUDU_RETURN_IF_ERROR(
-      service_pool->Init(num_service_threads), "Service pool failed to start");
+  RETURN_IF_ERROR(
+      service_pool->Init(num_service_threads));
   KUDU_RETURN_IF_ERROR(
       messenger_->RegisterService(service_pool->service_name(), service_pool),
       "Could not register service");
-  service_pools_.push_back(service_pool);
+
   VLOG_QUERY << "Registered KRPC service: " << service_pool->service_name();
+  service_pools_.push_back(std::move(service_pool));
+
   return Status::OK();
 }
 

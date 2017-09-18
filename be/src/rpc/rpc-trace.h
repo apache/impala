@@ -30,8 +30,8 @@
 
 namespace impala {
 
-class Webserver;
 class MetricGroup;
+class Webserver;
 
 /// An RpcEventHandler is called every time an Rpc is started and completed. There is at
 /// most one RpcEventHandler per ThriftServer. When an Rpc is started, getContext() creates

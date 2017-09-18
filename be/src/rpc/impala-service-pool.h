@@ -15,8 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef KUDU_SERVICE_POOL_H
-#define KUDU_SERVICE_POOL_H
+#ifndef IMPALA_SERVICE_POOL_H
+#define IMPALA_SERVICE_POOL_H
 
 #include <string>
 #include <vector>
@@ -26,30 +26,20 @@
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/rpc/rpc_service.h"
 #include "kudu/rpc/service_queue.h"
-#include "kudu/util/mutex.h"
-#include "kudu/util/thread.h"
 #include "kudu/util/status.h"
+#include "util/histogram-metric.h"
+#include "util/thread.h"
 
-namespace kudu {
-
-class Counter;
-class Histogram;
-class MetricEntity;
-class Socket;
-
-namespace rpc {
-
-class Messenger;
-class ServiceIf;
+namespace impala {
 
 // A pool of threads that handle new incoming RPC calls.
 // Also includes a queue that calls get pushed onto for handling by the pool.
-class ServicePool : public RpcService {
+class ImpalaServicePool : public kudu::rpc::RpcService {
  public:
-  ServicePool(gscoped_ptr<ServiceIf> service,
-              const scoped_refptr<MetricEntity>& metric_entity,
+  ImpalaServicePool(std::unique_ptr<kudu::rpc::ServiceIf> service,
+              const scoped_refptr<kudu::MetricEntity>& metric_entity,
               size_t service_queue_length);
-  virtual ~ServicePool();
+  virtual ~ImpalaServicePool();
 
   // Start up the thread pool.
   virtual Status Init(int num_threads);
@@ -57,42 +47,40 @@ class ServicePool : public RpcService {
   // Shut down the queue and the thread pool.
   virtual void Shutdown();
 
-  RpcMethodInfo* LookupMethod(const RemoteMethod& method) override;
+  kudu::rpc::RpcMethodInfo* LookupMethod(const kudu::rpc::RemoteMethod& method) override;
 
-  virtual Status QueueInboundCall(gscoped_ptr<InboundCall> call) OVERRIDE;
-
-  const Counter* RpcsTimedOutInQueueMetricForTests() const {
-    return rpcs_timed_out_in_queue_.get();
-  }
-
-  const Histogram* IncomingQueueTimeMetricForTests() const {
-    return incoming_queue_time_.get();
-  }
-
-  const Counter* RpcsQueueOverflowMetric() const {
-    return rpcs_queue_overflow_.get();
-  }
+  virtual kudu::Status
+      QueueInboundCall(gscoped_ptr<kudu::rpc::InboundCall> call) OVERRIDE;
 
   const std::string service_name() const;
 
  private:
   void RunThread();
-  void RejectTooBusy(InboundCall* c);
+  void RejectTooBusy(kudu::rpc::InboundCall* c);
 
-  gscoped_ptr<ServiceIf> service_;
-  std::vector<scoped_refptr<kudu::Thread> > threads_;
-  LifoServiceQueue service_queue_;
-  scoped_refptr<Histogram> incoming_queue_time_;
-  scoped_refptr<Counter> rpcs_timed_out_in_queue_;
-  scoped_refptr<Counter> rpcs_queue_overflow_;
+  std::unique_ptr<kudu::rpc::ServiceIf> service_;
+  std::vector<std::unique_ptr<Thread> > threads_;
+  kudu::rpc::LifoServiceQueue service_queue_;
 
-  mutable Mutex shutdown_lock_;
-  bool closing_;
+  // TODO: Display these metrics in the debug webpage. IMPALA-6269
+  // Number of RPCs that timed out while waiting in the service queue.
+  AtomicInt32 rpcs_timed_out_in_queue_;
+  // Number of RPCs that were rejected due to the queue being full.
+  AtomicInt32 rpcs_queue_overflow_;
 
-  DISALLOW_COPY_AND_ASSIGN(ServicePool);
+  // Dummy histogram needed to call InboundCall::RecordHandlingStarted() to set
+  // appropriate internal KRPC state. Unused otherwise.
+  // TODO: Consider displaying this histogram in the debug webpage. IMPALA-6269
+  scoped_refptr<kudu::Histogram> unused_histogram_;
+
+  // Protects against concurrent Shutdown() operations.
+  // TODO: This seems implausible given our current usage pattern. Consider removing lock.
+  boost::mutex shutdown_lock_;
+  bool closing_ = false;
+
+  DISALLOW_COPY_AND_ASSIGN(ImpalaServicePool);
 };
 
-} // namespace rpc
-} // namespace kudu
+} // namespace impala
 
-#endif
+#endif  // IMPALA_SERVICE_POOL_H
