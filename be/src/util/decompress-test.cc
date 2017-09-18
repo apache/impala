@@ -229,7 +229,9 @@ class DecompressorTest : public ::testing::Test {
 
     EXPECT_EQ(0, compressed_bytes_remaining);
     EXPECT_EQ(stream_end, expected_stream_end);
-    if (stream_end) EXPECT_EQ(decompressed_len, uncompressed_len);
+    if (stream_end) {
+      EXPECT_EQ(decompressed_len, uncompressed_len);
+    }
     if (bytes_decompressed != NULL) *bytes_decompressed = decompressed_len;
 
     return Status::OK();

@@ -267,8 +267,12 @@ void AssertJson(const Value& val, const string& name, const string& value,
   EXPECT_EQ(val["name"].GetString(), name);
   EXPECT_EQ(val["human_readable"].GetString(), value);
   EXPECT_EQ(val["description"].GetString(), description);
-  if (!kind.empty()) EXPECT_EQ(val["kind"].GetString(), kind);
-  if (!units.empty()) EXPECT_EQ(val["units"].GetString(), units);
+  if (!kind.empty()) {
+    EXPECT_EQ(val["kind"].GetString(), kind);
+  }
+  if (!units.empty()) {
+    EXPECT_EQ(val["units"].GetString(), units);
+  }
 }
 
 TEST_F(MetricsTest, CountersJson) {

@@ -505,7 +505,9 @@ const string Webserver::GetMimeType(const ContentType& content_type) {
     case HTML: return "text/html; charset=UTF-8";
     case PLAIN: return "text/plain; charset=UTF-8";
     case JSON: return "application/json";
-    default: DCHECK(false) << "Invalid content_type: " << content_type;
+    default:
+      DCHECK(false) << "Invalid content_type: " << content_type;
+      return "";
   }
 }
 }

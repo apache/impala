@@ -1452,8 +1452,9 @@ Status ImpalaServer::AuthorizeProxyUser(const string& user, const string& do_as_
   if (authorized_proxy_user_config_.size() == 0 &&
       authorized_proxy_group_config_.size() == 0) {
     error_msg << " User/group delegation is disabled.";
-    VLOG(1) << error_msg;
-    return Status::Expected(error_msg.str());
+    string error_msg_str = error_msg.str();
+    VLOG(1) << error_msg_str;
+    return Status::Expected(error_msg_str);
   }
 
   // Get the short version of the user name (the user name up to the first '/' or '@')
@@ -1505,8 +1506,9 @@ Status ImpalaServer::AuthorizeProxyUser(const string& user, const string& do_as_
     }
   }
 
-  VLOG(1) << error_msg;
-  return Status::Expected(error_msg.str());
+  string error_msg_str = error_msg.str();
+  VLOG(1) << error_msg_str;
+  return Status::Expected(error_msg_str);
 }
 
 void ImpalaServer::CatalogUpdateVersionInfo::UpdateCatalogVersionMetrics()

@@ -469,7 +469,7 @@ void FragmentInstanceState::PublishFilter(const TPublishFilterParams& params) {
   runtime_state_->filter_bank()->PublishGlobalFilter(params);
 }
 
-string FragmentInstanceState::ExecStateToString(FInstanceExecStatePB state) {
+const string& FragmentInstanceState::ExecStateToString(FInstanceExecStatePB state) {
   // Labels to send to the debug webpages to display the current state to the user.
   static const string finstance_state_labels[] = {
       "Waiting for Exec",         // WAITING_FOR_EXEC
@@ -483,10 +483,10 @@ string FragmentInstanceState::ExecStateToString(FInstanceExecStatePB state) {
       "Finished"                  // FINISHED
   };
   /// Make sure we have a label for every possible state.
-  static_assert(sizeof(finstance_state_labels) / sizeof(char*) ==
+  static_assert(sizeof(finstance_state_labels) / sizeof(string) ==
       FInstanceExecStatePB::FINISHED + 1, "");
 
-  DCHECK_LT(state, sizeof(finstance_state_labels) / sizeof(char*))
+  DCHECK_LT(state, sizeof(finstance_state_labels) / sizeof(string))
       << "Unknown instance state";
   return finstance_state_labels[state];
 }

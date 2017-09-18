@@ -24,6 +24,7 @@
 #include <regex>
 #include <boost/algorithm/string.hpp>
 
+#include "common/compiler-util.h"
 #include "common/logging.h"
 #include "kudu/util/path_util.h"
 #include "gutil/strings/ascii_ctype.h"
@@ -214,7 +215,7 @@ Status TimezoneDatabase::LoadZoneInfoFromHdfs(const string& hdfs_zone_info_zip,
   Status status = CopyHdfsFile(hdfs_conn, hdfs_zone_info_zip, local_conn,
       local_path.data());
   if (!status.ok()) {
-    (void)FileSystemUtil::RemovePaths({local_path.data()});
+    discard_result(FileSystemUtil::RemovePaths({local_path.data()}));
     return status;
   }
 

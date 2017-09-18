@@ -412,7 +412,9 @@ TEST_F(ReservationTrackerTest, MemTrackerIntegrationMultiLevel) {
     ASSERT_TRUE(reservations[level].IncreaseReservation(amount));
     ASSERT_EQ(amount, reservations[level].GetReservation());
     ASSERT_EQ(0, reservations[level].GetUsedReservation());
-    if (level != 0) ASSERT_EQ(amount, mem_trackers[level]->consumption());
+    if (level != 0) {
+      ASSERT_EQ(amount, mem_trackers[level]->consumption());
+    }
     for (int ancestor = 0; ancestor < level; ++ancestor) {
       ASSERT_EQ(0, reservations[ancestor].GetUsedReservation());
       ASSERT_EQ(amount, reservations[ancestor].GetChildReservations());

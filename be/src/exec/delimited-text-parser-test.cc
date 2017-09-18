@@ -42,7 +42,9 @@ void Validate(TupleDelimitedTextParser* parser, const string& data,
   } else {
     EXPECT_TRUE(data[offset - 1] == '\n' || data[offset - 1] == '\r')
         << data[offset - 1] << endl << data;
-    if (data[offset - 1] == '\r' && offset < data.size()) EXPECT_NE(data[offset], '\n');
+    if (data[offset - 1] == '\r' && offset < data.size()) {
+      EXPECT_NE(data[offset], '\n');
+    }
   }
 
   data_ptr += offset;

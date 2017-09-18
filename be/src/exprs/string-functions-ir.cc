@@ -18,6 +18,7 @@
 #include "exprs/string-functions.h"
 
 #include <cctype>
+#include <numeric>
 #include <stdint.h>
 #include <re2/re2.h>
 #include <re2/stringpiece.h>

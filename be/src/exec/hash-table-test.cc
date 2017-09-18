@@ -170,7 +170,9 @@ class HashTableTest : public testing::Test {
       int32_t val = *reinterpret_cast<int32_t*>(build_expr_evals_[0]->GetValue(row));
       EXPECT_GE(val, min);
       EXPECT_LT(val, max);
-      if (all_unique) EXPECT_TRUE(results[val] == nullptr);
+      if (all_unique) {
+        EXPECT_TRUE(results[val] == nullptr);
+      }
       EXPECT_EQ(row->GetTuple(0), expected[val]->GetTuple(0));
       results[val] = row;
       iter.Next();

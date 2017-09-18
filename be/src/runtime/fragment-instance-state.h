@@ -101,7 +101,7 @@ class FragmentInstanceState {
   PlanRootSink* root_sink() { return root_sink_; }
 
   /// Returns a string description of 'state'.
-  static string ExecStateToString(FInstanceExecStatePB state);
+  static const string& ExecStateToString(FInstanceExecStatePB state);
 
   /// Name of the counter that is tracking per query, per host peak mem usage.
   /// TODO: this doesn't look like it belongs here
