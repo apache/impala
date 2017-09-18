@@ -43,7 +43,6 @@ MemPool::MemPool(MemTracker* mem_tracker)
   : current_chunk_idx_(-1),
     next_chunk_size_(INITIAL_CHUNK_SIZE),
     total_allocated_bytes_(0),
-    peak_allocated_bytes_(0),
     total_reserved_bytes_(0),
     mem_tracker_(mem_tracker) {
   DCHECK(mem_tracker != NULL);
@@ -217,7 +216,6 @@ void MemPool::AcquireData(MemPool* src, bool keep_current) {
     total_allocated_bytes_ += src->total_allocated_bytes_;
     src->total_allocated_bytes_ = 0;
   }
-  peak_allocated_bytes_ = std::max(total_allocated_bytes_, peak_allocated_bytes_);
 
   if (!keep_current) src->FreeAll();
   DCHECK(src->CheckIntegrity(false));

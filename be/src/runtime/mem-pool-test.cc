@@ -82,41 +82,21 @@ TEST(MemPoolTest, Basic) {
     // size of the next allocated chunk (64K)
     p.Allocate(65 * 1024);
     EXPECT_EQ((12 + 8 + 65) * 1024, p.total_allocated_bytes());
-    if (iter == 0) {
-      EXPECT_EQ((12 + 8 + 65) * 1024, p.peak_allocated_bytes());
-    } else {
-      EXPECT_EQ((1 + 120 + 33) * 1024, p.peak_allocated_bytes());
-    }
     EXPECT_EQ((16 + 32 + 65) * 1024, p.GetTotalChunkSizes());
 
     // Clear() resets allocated data, but doesn't remove any chunks
     p.Clear();
     EXPECT_EQ(0, p.total_allocated_bytes());
-    if (iter == 0) {
-      EXPECT_EQ((12 + 8 + 65) * 1024, p.peak_allocated_bytes());
-    } else {
-      EXPECT_EQ((1 + 120 + 33) * 1024, p.peak_allocated_bytes());
-    }
     EXPECT_EQ((16 + 32 + 65) * 1024, p.GetTotalChunkSizes());
 
     // next allocation reuses existing chunks
     p.Allocate(1024);
     EXPECT_EQ(1024, p.total_allocated_bytes());
-    if (iter == 0) {
-      EXPECT_EQ((12 + 8 + 65) * 1024, p.peak_allocated_bytes());
-    } else {
-      EXPECT_EQ((1 + 120 + 33) * 1024, p.peak_allocated_bytes());
-    }
     EXPECT_EQ((16 + 32 + 65) * 1024, p.GetTotalChunkSizes());
 
     // ... unless it doesn't fit into any available chunk
     p.Allocate(120 * 1024);
     EXPECT_EQ((1 + 120) * 1024, p.total_allocated_bytes());
-    if (iter == 0) {
-      EXPECT_EQ((1 + 120) * 1024, p.peak_allocated_bytes());
-    } else {
-      EXPECT_EQ((1 + 120 + 33) * 1024, p.peak_allocated_bytes());
-    }
     EXPECT_EQ((130 + 16 + 32 + 65) * 1024, p.GetTotalChunkSizes());
 
     // ... Try another chunk that fits into an existing chunk
@@ -127,7 +107,6 @@ TEST(MemPoolTest, Basic) {
     // we're releasing 3 chunks, which get added to p2
     p2.AcquireData(&p, false);
     EXPECT_EQ(0, p.total_allocated_bytes());
-    EXPECT_EQ((1 + 120 + 33) * 1024, p.peak_allocated_bytes());
     EXPECT_EQ(0, p.GetTotalChunkSizes());
 
     p3.AcquireData(&p2, true);  // we're keeping the 65k chunk

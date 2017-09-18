@@ -69,8 +69,7 @@ class MemTracker;
 /// 28K of chunks have been allocated (chunk sizes: 4K, 8K, 16K)
 /// We track total and peak allocated bytes. At this point they would be the same:
 /// 28k bytes.  A call to Clear will return the allocated memory so
-/// total_allocate_bytes_
-/// becomes 0 while peak_allocate_bytes_ remains at 28k.
+/// total_allocated_bytes_ becomes 0.
 ///     p->Clear();
 /// the entire 1st chunk is returned:
 ///     .. = p->Allocate(4 * 1024);
@@ -82,8 +81,7 @@ class MemTracker;
 ///      MemPool* p2 = new MemPool();
 /// the new mempool receives all chunks containing data from p
 ///      p2->AcquireData(p, false);
-/// At this point p.total_allocated_bytes_ would be 0 while p.peak_allocated_bytes_
-/// remains unchanged.
+/// At this point p.total_allocated_bytes_ would be 0.
 /// The one remaining (empty) chunk is released:
 ///    delete p;
 
@@ -153,7 +151,6 @@ class MemPool {
   std::string DebugString();
 
   int64_t total_allocated_bytes() const { return total_allocated_bytes_; }
-  int64_t peak_allocated_bytes() const { return peak_allocated_bytes_; }
   int64_t total_reserved_bytes() const { return total_reserved_bytes_; }
   MemTracker* mem_tracker() { return mem_tracker_; }
 
@@ -207,9 +204,6 @@ class MemPool {
 
   /// sum of allocated_bytes_
   int64_t total_allocated_bytes_;
-
-  /// Maximum number of bytes allocated from this pool at one time.
-  int64_t peak_allocated_bytes_;
 
   /// sum of all bytes allocated in chunks_
   int64_t total_reserved_bytes_;
@@ -273,7 +267,6 @@ class MemPool {
     info.allocated_bytes += size;
     total_allocated_bytes_ += size;
     DCHECK_LE(current_chunk_idx_, chunks_.size() - 1);
-    peak_allocated_bytes_ = std::max(total_allocated_bytes_, peak_allocated_bytes_);
     return result;
   }
 };
