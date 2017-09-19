@@ -225,8 +225,6 @@ public class TypesUtil {
    * http://blogs.msdn.com/b/sqlprogrammability/archive/2006/03/29/564110.aspx
    * https://msdn.microsoft.com/en-us/library/ms190476.aspx
    *
-   * TODO: implement V2 rules for ADD/SUB.
-   *
    * Changes:
    *  - There are slight difference with how precision/scale reduction occurs compared
    *    to SQL server when the desired precision is more than the maximum supported
@@ -261,9 +259,12 @@ public class TypesUtil {
         break;
       case ADD:
       case SUBTRACT:
+        resultScale = Math.max(s1, s2);
+        resultPrecision = Math.max(p1 - s1, p2 - s2) + resultScale + 1;
+        break;
       default:
-        // Not yet implemented - fall back to V1 rules.
-        return getDecimalArithmeticResultTypeV1(t1, t2, op);
+        Preconditions.checkState(false);
+        return null;
     }
     // Use the scale reduction technique when resultPrecision is too large.
     return ScalarType.createAdjustedDecimalType(resultPrecision, resultScale);

@@ -195,9 +195,9 @@ class DecimalValue {
  private:
   T value_;
 
-  /// Returns in *x_val and *y_val, the adjusted values so that both
-  /// are at the same scale. The scale is the number of digits after the decimal.
-  /// Returns true if the adjusted causes overflow in which case the values in
+  /// Returns in *x_val and *y_val, the adjusted values so that both are at
+  /// max(x_scale, y_scale) scale. The scale is the number of digits after the decimal.
+  /// Returns true if the adjustment causes overflow in which case the values in
   /// x_scaled and y_scaled are unmodified.
   template <typename RESULT_T>
   static inline bool AdjustToSameScale(const DecimalValue& x, int x_scale,

@@ -1429,9 +1429,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // DECIMAL_V1: floating point + any numeric literal = floating point
     // DECIMAL_V2: floating point + any expr of type decimal = decimal
     checkDecimalReturnType("select float_col + 1.1 from functional.alltypestiny",
-        Type.DOUBLE, ScalarType.createDecimalType(38, 9));
+        Type.DOUBLE, ScalarType.createDecimalType(38, 8));
     checkDecimalReturnType("select float_col - 1.1 from functional.alltypestiny",
-        Type.DOUBLE, ScalarType.createDecimalType(38, 9));
+        Type.DOUBLE, ScalarType.createDecimalType(38, 8));
     checkDecimalReturnType("select float_col / 1.1 from functional.alltypestiny",
         Type.DOUBLE, ScalarType.createDecimalType(38, 8));
     checkDecimalReturnType("select float_col % 1.1 from functional.alltypestiny",
@@ -1497,16 +1497,18 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // must be an integer.
     checkDecimalReturnType("select round(1.2345, 2) * pow(10, 10)", Type.DOUBLE);
     checkDecimalReturnType("select round(1.2345, 2) + pow(10, 10)",
-        Type.DOUBLE, ScalarType.createDecimalType(38, 17));
+        Type.DOUBLE, ScalarType.createDecimalType(38, 16));
 
     // Explicitly casting the literal to a decimal or float changes the type of the
     // literal. This is independent of the DECIMAL_V2 setting.
     checkDecimalReturnType("select int_col + cast(1.1 as decimal(2,1)) from "
         + " functional.alltypestiny", ScalarType.createDecimalType(12, 1));
     checkDecimalReturnType("select float_col + cast(1.1 as decimal(2,1)) from "
-        + " functional.alltypestiny", ScalarType.createDecimalType(38, 9));
+        + " functional.alltypestiny",
+        ScalarType.createDecimalType(38, 9), ScalarType.createDecimalType(38, 8));
     checkDecimalReturnType("select float_col + cast(1.1*1.2+1.3 as decimal(2,1)) from "
-        + " functional.alltypestiny", ScalarType.createDecimalType(38, 9));
+        + " functional.alltypestiny",
+        ScalarType.createDecimalType(38, 9), ScalarType.createDecimalType(38, 8));
     checkDecimalReturnType("select float_col + cast(1.1 as float) from "
         + " functional.alltypestiny", Type.DOUBLE);
     checkDecimalReturnType("select float_col + cast(1.1 as float) from "
@@ -1516,24 +1518,24 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     // Test behavior of compound expressions with a single slot ref and many literals.
     checkDecimalReturnType("select 1.0 + float_col + 1.1 from functional.alltypestiny",
-        Type.DOUBLE, ScalarType.createDecimalType(38, 9));
+        Type.DOUBLE, ScalarType.createDecimalType(38, 7));
     checkDecimalReturnType("select 1.0 + 2.0 + float_col from functional.alltypestiny",
-        Type.DOUBLE, ScalarType.createDecimalType(38, 9));
+        Type.DOUBLE, ScalarType.createDecimalType(38, 8));
     checkDecimalReturnType("select 1.0 + 2.0 + pi() * float_col from functional.alltypestiny",
-        Type.DOUBLE, ScalarType.createDecimalType(38, 17));
+        Type.DOUBLE, ScalarType.createDecimalType(38, 16));
     checkDecimalReturnType("select 1.0 + d1 + 1.1 from functional.decimal_tbl",
         ScalarType.createDecimalType(12, 1));
     checkDecimalReturnType("select 1.0 + 2.0 + d1 from functional.decimal_tbl",
         ScalarType.createDecimalType(11, 1));
     checkDecimalReturnType("select 1.0 + 2.0 + pi() * d1 from functional.decimal_tbl",
-        Type.DOUBLE, ScalarType.createDecimalType(38, 17));
+        Type.DOUBLE, ScalarType.createDecimalType(38, 16));
 
     // Test behavior of compound expressions with multiple slot refs and literals.
     checkDecimalReturnType("select double_col + 1.23 + float_col + 1.0 " +
-        " from functional.alltypestiny", Type.DOUBLE, ScalarType.createDecimalType(38, 17));
+        " from functional.alltypestiny", Type.DOUBLE, ScalarType.createDecimalType(38, 7));
     checkDecimalReturnType("select double_col + 1.23 + float_col + 1.0 + int_col " +
         " + bigint_col from functional.alltypestiny", Type.DOUBLE,
-        ScalarType.createDecimalType(38, 17));
+        ScalarType.createDecimalType(38, 6));
     checkDecimalReturnType("select d1 + 1.23 + d2 + 1.0 " +
         " from functional.decimal_tbl", ScalarType.createDecimalType(14, 2));
 
