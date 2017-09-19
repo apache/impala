@@ -813,11 +813,11 @@ public class CatalogOpExecutor {
       }
     }
 
-    // Update the table's ROW_COUNT and RAW_DATA_SIZE parameters.
+    // Update the table's ROW_COUNT and TOTAL_SIZE parameters.
     msTbl.putToParameters(StatsSetupConst.ROW_COUNT,
         String.valueOf(params.getTable_stats().num_rows));
     if (params.getTable_stats().isSetTotal_file_bytes()) {
-      msTbl.putToParameters(StatsSetupConst.RAW_DATA_SIZE,
+      msTbl.putToParameters(StatsSetupConst.TOTAL_SIZE,
           String.valueOf(params.getTable_stats().total_file_bytes));
     }
     // HMS requires this param for stats changes to take effect.
@@ -1177,9 +1177,9 @@ public class CatalogOpExecutor {
     int numTargetedPartitions = 0;
     boolean droppedRowCount =
         msTbl.getParameters().remove(StatsSetupConst.ROW_COUNT) != null;
-    boolean droppedRawDataSize =
-        msTbl.getParameters().remove(StatsSetupConst.RAW_DATA_SIZE) != null;
-    if (droppedRowCount || droppedRawDataSize) {
+    boolean droppedTotalSize =
+        msTbl.getParameters().remove(StatsSetupConst.TOTAL_SIZE) != null;
+    if (droppedRowCount || droppedTotalSize) {
       applyAlterTable(msTbl);
       ++numTargetedPartitions;
     }

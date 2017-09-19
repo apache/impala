@@ -360,7 +360,7 @@ PLAN-ROOT SINK
 |--01:SCAN HDFS [tpcds_seq_snap.customer]
 |     partitions=1/1 files=1 size=8.58MB
 |     stats-rows=unavailable extrapolated-rows=disabled
-|     table stats: rows=unavailable size=unavailable
+|     table stats: rows=unavailable size=8.59MB
 |     column stats: unavailable
 |     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=4B cardinality=unavailable

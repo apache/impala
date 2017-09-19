@@ -38,10 +38,10 @@ import com.google.common.base.Preconditions;
 public class StatsExtrapolationTest extends FrontendTestBase {
 
   /**
-   * Sets the row count and raw data size stats in the given table.
+   * Sets the row count and total file size stats in the given table.
    * Unsets the corresponding statistic if a null value is passed.
    */
-  private void setStats(Table tbl, Long rowCount, Long rawDataSize) {
+  private void setStats(Table tbl, Long rowCount, Long totalSize) {
     org.apache.hadoop.hive.metastore.api.Table msTbl =
         new org.apache.hadoop.hive.metastore.api.Table();
     msTbl.setParameters(new HashMap<String, String>());
@@ -49,29 +49,29 @@ public class StatsExtrapolationTest extends FrontendTestBase {
       msTbl.getParameters().put(StatsSetupConst.ROW_COUNT,
           String.valueOf(rowCount));
     }
-    if (rawDataSize != null) {
-      msTbl.getParameters().put(StatsSetupConst.RAW_DATA_SIZE,
-          String.valueOf(rawDataSize));
+    if (totalSize != null) {
+      msTbl.getParameters().put(StatsSetupConst.TOTAL_SIZE,
+          String.valueOf(totalSize));
     }
     tbl.setMetaStoreTable(msTbl);
     tbl.setTableStats(msTbl);
   }
 
-  private void runTest(Table tbl, Long rowCount, Long rawDataSize,
+  private void runTest(Table tbl, Long rowCount, Long totalSize,
       long fileBytes, long expectedExtrapNumRows) {
     Preconditions.checkState(tbl instanceof HdfsTable);
-    setStats(tbl, rowCount, rawDataSize);
+    setStats(tbl, rowCount, totalSize);
     long actualExrtapNumRows = ((HdfsTable)tbl).getExtrapolatedNumRows(fileBytes);
     assertEquals(expectedExtrapNumRows, actualExrtapNumRows);
   }
 
-  private void testInvalidStats(Table tbl, Long rowCount, Long rawDataSize) {
-    runTest(tbl, rowCount, rawDataSize, 0, 0);
-    runTest(tbl, rowCount, rawDataSize, 1, -1);
-    runTest(tbl, rowCount, rawDataSize, 100, -1);
-    runTest(tbl, rowCount, rawDataSize, 1000000000, -1);
-    runTest(tbl, rowCount, rawDataSize, Long.MAX_VALUE, -1);
-    runTest(tbl, rowCount, rawDataSize, Long.MIN_VALUE, -1);
+  private void testInvalidStats(Table tbl, Long rowCount, Long totalSize) {
+    runTest(tbl, rowCount, totalSize, 0, 0);
+    runTest(tbl, rowCount, totalSize, 1, -1);
+    runTest(tbl, rowCount, totalSize, 100, -1);
+    runTest(tbl, rowCount, totalSize, 1000000000, -1);
+    runTest(tbl, rowCount, totalSize, Long.MAX_VALUE, -1);
+    runTest(tbl, rowCount, totalSize, Long.MIN_VALUE, -1);
   }
 
   @Test
@@ -99,13 +99,13 @@ public class StatsExtrapolationTest extends FrontendTestBase {
       runTest(tbl, 1000000000L, 123456789L, 123456789*3, 3000000000L);
       runTest(tbl, 7777777777L, 33333333L, 33333333L*2, 15555555554L);
       runTest(tbl, 7777777777L, 33333333L, 33333333L*3, 23333333331L);
-      // Very small row count and very big raw data size.
+      // Very small row count and very big total file size.
       runTest(tbl, 1L, Long.MAX_VALUE, 1, 1);
       runTest(tbl, 1L, Long.MAX_VALUE, 100, 1);
       runTest(tbl, 1L, Long.MAX_VALUE, 1000000000, 1);
       runTest(tbl, 1L, Long.MAX_VALUE, Long.MAX_VALUE, 1);
       runTest(tbl, 1L, Long.MAX_VALUE, -100, -1);
-      // Very large row count and very small raw data size.
+      // Very large row count and very small total file size.
       runTest(tbl, Long.MAX_VALUE, 1L, 1, Long.MAX_VALUE);
       runTest(tbl, Long.MAX_VALUE, 1L, 100, Long.MAX_VALUE);
       runTest(tbl, Long.MAX_VALUE, 1L, 1000000000, Long.MAX_VALUE);
