@@ -280,9 +280,17 @@ class ScalarColumnReader : public BaseScalarColumnReader {
     if (MATERIALIZED) {
       if (def_level_ >= max_def_level()) {
         if (page_encoding_ == parquet::Encoding::PLAIN_DICTIONARY) {
-          if (!ReadSlot<true>(tuple, pool)) return false;
+          if (NeedsConversionInline()) {
+            if (!ReadSlot<true, true>(tuple, pool)) return false;
+          } else {
+            if (!ReadSlot<true, false>(tuple, pool)) return false;
+          }
         } else {
-          if (!ReadSlot<false>(tuple, pool)) return false;
+          if (NeedsConversionInline()) {
+            if (!ReadSlot<false, true>(tuple, pool)) return false;
+          } else {
+            if (!ReadSlot<false, false>(tuple, pool)) return false;
+          }
         }
       } else {
         tuple->SetNull(null_indicator_offset_);
@@ -372,7 +380,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
   /// conservatively assumes that buffers like 'tuple_mem', 'num_values' or the
   /// 'def_levels_' 'rep_levels_' buffers may alias 'this', especially with
   /// -fno-strict-alias).
-  template <bool IN_COLLECTION, bool IS_DICT_ENCODED>
+  template <bool IN_COLLECTION, bool IS_DICT_ENCODED, bool NEEDS_CONVERSION>
   bool MaterializeValueBatch(MemPool* RESTRICT pool, int max_values, int tuple_size,
       uint8_t* RESTRICT tuple_mem, int* RESTRICT num_values) RESTRICT {
     DCHECK(MATERIALIZED || IN_COLLECTION);
@@ -404,7 +412,8 @@ class ScalarColumnReader : public BaseScalarColumnReader {
 
       if (MATERIALIZED) {
         if (def_level >= max_def_level()) {
-          bool continue_execution = ReadSlot<IS_DICT_ENCODED>(tuple, pool);
+          bool continue_execution =
+              ReadSlot<IS_DICT_ENCODED, NEEDS_CONVERSION>(tuple, pool);
           if (UNLIKELY(!continue_execution)) return false;
         } else {
           tuple->SetNull(null_indicator_offset_);
@@ -415,6 +424,20 @@ class ScalarColumnReader : public BaseScalarColumnReader {
     }
     *num_values = val_count;
     return true;
+  }
+
+  // Dispatch to the correct templated implementation of MaterializeValueBatch based
+  // on NeedsConversionInline().
+  template <bool IN_COLLECTION, bool IS_DICT_ENCODED>
+  bool MaterializeValueBatch(MemPool* RESTRICT pool, int max_values, int tuple_size,
+      uint8_t* RESTRICT tuple_mem, int* RESTRICT num_values) RESTRICT {
+    if (NeedsConversionInline()) {
+      return MaterializeValueBatch<IN_COLLECTION, IS_DICT_ENCODED, true>(
+          pool, max_values, tuple_size, tuple_mem, num_values);
+    } else {
+      return MaterializeValueBatch<IN_COLLECTION, IS_DICT_ENCODED, false>(
+          pool, max_values, tuple_size, tuple_mem, num_values);
+    }
   }
 
   virtual Status CreateDictionaryDecoder(uint8_t* values, int size,
@@ -470,13 +493,13 @@ class ScalarColumnReader : public BaseScalarColumnReader {
   /// true.
   ///
   /// Force inlining - GCC does not always inline this into hot loops.
-  template <bool IS_DICT_ENCODED>
+  template <bool IS_DICT_ENCODED, bool NEEDS_CONVERSION>
   ALWAYS_INLINE bool ReadSlot(Tuple* tuple, MemPool* pool) {
     void* slot = tuple->GetSlot(tuple_offset_);
     // Use an uninitialized stack allocation for temporary value to avoid running
     // constructors doing work unnecessarily, e.g. if T == StringValue.
     alignas(T) uint8_t val_buf[sizeof(T)];
-    T* val_ptr = reinterpret_cast<T*>(NeedsConversionInline() ? val_buf : slot);
+    T* val_ptr = reinterpret_cast<T*>(NEEDS_CONVERSION ? val_buf : slot);
     if (IS_DICT_ENCODED) {
       DCHECK_EQ(page_encoding_, parquet::Encoding::PLAIN_DICTIONARY);
       if (UNLIKELY(!dict_decoder_.GetNextValue(val_ptr))) {
@@ -497,8 +520,8 @@ class ScalarColumnReader : public BaseScalarColumnReader {
     if (UNLIKELY(NeedsValidationInline() && !ValidateSlot(val_ptr, tuple))) {
       return false;
     }
-    if (UNLIKELY(NeedsConversionInline() && !tuple->IsNull(null_indicator_offset_)
-            && !ConvertSlot(val_ptr, slot, pool))) {
+    if (NEEDS_CONVERSION && !tuple->IsNull(null_indicator_offset_)
+            && UNLIKELY(!ConvertSlot(val_ptr, slot, pool))) {
       return false;
     }
     return true;
