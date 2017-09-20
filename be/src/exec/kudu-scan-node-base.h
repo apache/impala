@@ -62,7 +62,14 @@ class KuduScanNodeBase : public ScanNode {
 
   RuntimeState* runtime_state_;
   std::vector<FilterContext> filter_ctxs_;
-  std::map<std::string, BloomFilter*> col_to_bf_;
+
+  // Column name to bloom filter which references to bloom filter pointer in RuntimeFilter.
+  std::map<std::string, BloomFilter*> column_to_bf_;
+  // The set of column names which has been collected.
+  std::set<std::string> column_done;
+  // Scan node will wait for expected runtime filters to arrive.
+  int32 wait_time_ms_;
+
   /// Stops periodic counters and aggregates counter values for the entire scan node.
   /// This should be called as soon as the scan node is complete to get the most accurate
   /// counter values.
@@ -106,11 +113,12 @@ class KuduScanNodeBase : public ScanNode {
   /// have been open previously.
   Status GetConjunctCtxs(vector<ExprContext*>* ctxs);
   void GetSlotRefColumnName(const TExprNode& node, string* col_name);
-  Status TransformFilterToKuduBF();
   const TupleDescriptor* tuple_desc() const { return tuple_desc_; }
   kudu::client::KuduClient* kudu_client() { return client_; }
-  std::map<std::string, BloomFilter*>& kudu_bloom_filter() { return col_to_bf_; }
   RuntimeProfile::Counter* kudu_round_trips() const { return kudu_round_trips_; }
+  Status CollectKuduBFs(const std::vector<FilterContext*>& filter);
+  std::map<std::string, BloomFilter*>& GetKuduBFs() { return column_to_bf_; }
+  void ClearKuduBFs() { column_to_bf_.clear(); }
 };
 
 }

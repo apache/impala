@@ -296,6 +296,10 @@ public class KuduScanNode extends ScanNode {
               kuduConjuncts_) + "\n");
         }
       }
+      if (!runtimeFilters_.isEmpty()) {
+        result.append(detailPrefix + "runtime filters: ");
+        result.append(getRuntimeFilterExplainString(false));
+      }
     }
     return result.toString();
   }

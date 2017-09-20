@@ -155,10 +155,15 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token)  {
   uint64_t row_format_flags = kudu::client::KuduScanner::PAD_UNIXTIME_MICROS_TO_16_BYTES;
   scanner_->SetRowFormatFlags(row_format_flags);
 
-  for (auto& kudu_bf: scan_node_->kudu_bloom_filter()) {
-    kudu::client::KuduValueBloomFilter* bf = kudu::client::KuduValueBloomFilterBuilder().Build(kudu_bf.second);
-    kudu::client::KuduPredicate* p =  scan_node_->table_->NewBloomFilterPredicate(kudu_bf.first, bf);
-    scanner_->AddConjunctPredicate(p);
+  // Push down the bloom filter predicates.
+  if (!scan_node_->GetKuduBFs().empty()) {
+    for (auto& one: scan_node_->GetKuduBFs()) {
+      kudu::client::KuduValueBloomFilter* bf = kudu::client::KuduValueBloomFilterBuilder().Build(one.second);
+      kudu::client::KuduPredicate* p =  scan_node_->table_->NewBloomFilterPredicate(one.first, bf);
+      scanner_->AddConjunctPredicate(p);
+    }
+    // Clear the map of bloom filters.
+    scan_node_->ClearKuduBFs();
   }
 
   {
@@ -255,6 +260,23 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_me
 Status KuduScanner::GetNextScannerBatch() {
   SCOPED_TIMER(state_->total_storage_wait_timer());
   int64_t now = MonotonicMicros();
+
+  // Wait for the runtime filters.
+  // It should not wait for runtime filters any more, if the size of 
+  // bloom filters that have been collected equals to the size of filter context's.
+  if (scan_node_->filter_ctxs_.size() > 0 && 
+      (scan_node_->filter_ctxs_.size() != scan_node_->column_done.size())) {
+    scan_node_->WaitForRuntimeFilters(scan_node_->wait_time_ms_/10);
+    if (!scan_node_->GetKuduBFs().empty()) {
+      for (auto& one: scan_node_->GetKuduBFs()) {
+        kudu::client::KuduValueBloomFilter* bf = kudu::client::KuduValueBloomFilterBuilder().Build(one.second);
+        kudu::client::KuduPredicate* p =  scan_node_->table_->NewBloomFilterPredicate(one.first, bf);
+        scanner_->AddConjunctPredicate(p);
+      }
+      scan_node_->ClearKuduBFs();
+    }
+  }
+
   KUDU_RETURN_IF_ERROR(scanner_->NextBatch(&cur_kudu_batch_), "Unable to advance iterator");
   COUNTER_ADD(scan_node_->kudu_round_trips(), 1);
   cur_kudu_batch_num_read_ = 0;

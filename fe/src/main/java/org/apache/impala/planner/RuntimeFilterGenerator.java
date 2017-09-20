@@ -536,14 +536,15 @@ public final class RuntimeFilterGenerator {
    * Currently, runtime filters can only be assigned to HdfsScanNodes.
    */
   private void assignRuntimeFilters(Analyzer analyzer, ScanNode scanNode) {
-    if (!((scanNode instanceof HdfsScanNode) || (scanNode instanceof KuduScanNode))) return;
-    TupleId tid = scanNode.getTupleIds().get(0);
-    if (!runtimeFiltersByTid_.containsKey(tid)) return;
-    for (RuntimeFilter filter: runtimeFiltersByTid_.get(tid)) {
-      if (filter.isFinalized()) continue;
-      Expr targetExpr = computeTargetExpr(filter, tid, analyzer);
-      if (targetExpr == null) continue;
-      filter.addTarget(scanNode, analyzer, targetExpr);
+    if (scanNode instanceof HdfsScanNode || scanNode instanceof KuduScanNode) {
+      TupleId tid = scanNode.getTupleIds().get(0);
+      if (!runtimeFiltersByTid_.containsKey(tid)) return;
+      for (RuntimeFilter filter: runtimeFiltersByTid_.get(tid)) {
+        if (filter.isFinalized()) continue;
+        Expr targetExpr = computeTargetExpr(filter, tid, analyzer);
+        if (targetExpr == null) continue;
+        filter.addTarget(scanNode, analyzer, targetExpr);
+      }
     }
   }
 

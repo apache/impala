@@ -197,8 +197,8 @@ void KuduScanNode::RunScannerThread(const string& name, const string* initial_to
     // Here, even though a read of 'done_' may conflict with a write to it,
     // ProcessScanToken() will return early, as will GetNextScanToken().
     while (!done_ && scan_token != NULL) {
-      if (filter_ctxs_.size() > 0 && col_to_bf_.empty()) {
-        WaitForRuntimeFilters(1000);
+      if (filter_ctxs_.size() > 0) {
+        WaitForRuntimeFilters(wait_time_ms_);
       }
       status = ProcessScanToken(&scanner, *scan_token);
       if (!status.ok()) break;
