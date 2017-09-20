@@ -72,6 +72,7 @@ LOGS.md
 README.md
 */README
 */README.dox
+*/README.txt
 testdata/bin/README-BENCHMARK-TEST-GENERATION
 tests/comparison/ORACLE.txt
 bin/distcc/README.md
