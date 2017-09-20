@@ -22,6 +22,7 @@ import static org.junit.Assert.fail;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -86,8 +87,9 @@ import com.google.common.collect.Sets;
 public class PlannerTestBase extends FrontendTestBase {
   private final static Logger LOG = LoggerFactory.getLogger(PlannerTest.class);
   private final static boolean GENERATE_OUTPUT_FILE = true;
-  private final String testDir_ = "functional-planner/queries/PlannerTest";
-  private static String outDir_;
+  private final java.nio.file.Path testDir_ = Paths.get("functional-planner", "queries",
+      "PlannerTest");
+  private static java.nio.file.Path outDir_;
   private static KuduClient kuduClient_;
 
   // Map from plan ID (TPlanNodeId) to the plan node with that ID.
@@ -110,11 +112,8 @@ public class PlannerTestBase extends FrontendTestBase {
       kuduClient_ = new KuduClient.KuduClientBuilder("127.0.0.1:7051").build();
     }
     String logDir = System.getenv("IMPALA_FE_TEST_LOGS_DIR");
-    if (logDir != null) {
-      outDir_ = logDir + "/PlannerTest";
-    } else {
-      outDir_ = "/tmp/PlannerTest";
-    }
+    if (logDir == null) logDir = "/tmp";
+    outDir_ = Paths.get(logDir, "PlannerTest");
   }
 
   @Before
@@ -736,7 +735,7 @@ public class PlannerTestBase extends FrontendTestBase {
 
   private void runPlannerTestFile(String testFile, String dbName, TQueryOptions options,
       boolean ignoreExplainHeader) {
-    String fileName = testDir_ + "/" + testFile + ".test";
+    String fileName = testDir_.resolve(testFile + ".test").toString();
     TestFileParser queryFileParser = new TestFileParser(fileName);
     StringBuilder actualOutput = new StringBuilder();
 
@@ -758,9 +757,8 @@ public class PlannerTestBase extends FrontendTestBase {
     // Create the actual output file
     if (GENERATE_OUTPUT_FILE) {
       try {
-        File outDirFile = new File(outDir_);
-        outDirFile.mkdirs();
-        FileWriter fw = new FileWriter(outDir_ + testFile + ".test");
+        outDir_.toFile().mkdirs();
+        FileWriter fw = new FileWriter(outDir_.resolve(testFile + ".test").toFile());
         fw.write(actualOutput.toString());
         fw.close();
       } catch (IOException e) {
