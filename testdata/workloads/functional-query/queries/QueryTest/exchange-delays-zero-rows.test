@@ -1,0 +1,11 @@
+====
+---- QUERY
+# IMPALA-5199: Query with zero rows sent over exchange.
+select l_orderkey, count(*)
+from tpch.lineitem
+where l_linenumber = -1
+group by l_orderkey
+---- RESULTS
+---- CATCH
+Sender timed out waiting for receiver fragment instance
+====

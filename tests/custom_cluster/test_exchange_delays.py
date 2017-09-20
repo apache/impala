@@ -47,3 +47,6 @@ class TestExchangeDelays(CustomClusterTestSuite):
     resulted in the query hanging.
     """
     self.run_test_case('QueryTest/exchange-delays', vector)
+
+    # Test the special case when no batches are sent and the EOS message times out.
+    self.run_test_case('QueryTest/exchange-delays-zero-rows', vector)
