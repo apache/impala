@@ -2548,6 +2548,48 @@ TEST_F(ExprTest, IsNullPredicate) {
   TestValue("NULL IS NOT NULL", TYPE_BOOLEAN, false);
 }
 
+TEST_F(ExprTest, BoolTestExpr) {
+  // Tests against constants.
+  TestValue("TRUE IS TRUE", TYPE_BOOLEAN, true);
+  TestValue("TRUE IS FALSE", TYPE_BOOLEAN, false);
+  TestValue("TRUE IS UNKNOWN", TYPE_BOOLEAN, false);
+  TestValue("TRUE IS NOT TRUE", TYPE_BOOLEAN, false);
+  TestValue("TRUE IS NOT FALSE", TYPE_BOOLEAN, true);
+  TestValue("TRUE IS NOT UNKNOWN", TYPE_BOOLEAN, true);
+  TestValue("FALSE IS TRUE", TYPE_BOOLEAN, false);
+  TestValue("FALSE IS FALSE", TYPE_BOOLEAN, true);
+  TestValue("FALSE IS UNKNOWN", TYPE_BOOLEAN, false);
+  TestValue("FALSE IS NOT TRUE", TYPE_BOOLEAN, true);
+  TestValue("FALSE IS NOT FALSE", TYPE_BOOLEAN, false);
+  TestValue("FALSE IS NOT UNKNOWN", TYPE_BOOLEAN, true);
+  TestValue("NULL IS TRUE", TYPE_BOOLEAN, false);
+  TestValue("NULL IS FALSE", TYPE_BOOLEAN, false);
+  TestValue("NULL IS UNKNOWN", TYPE_BOOLEAN, true);
+  TestValue("NULL IS NOT TRUE", TYPE_BOOLEAN, true);
+  TestValue("NULL IS NOT FALSE", TYPE_BOOLEAN, true);
+  TestValue("NULL IS NOT UNKNOWN", TYPE_BOOLEAN, false);
+
+  // Tests against expressions
+  TestValue("(2>1) IS TRUE", TYPE_BOOLEAN, true);
+  TestValue("(2>1) IS FALSE", TYPE_BOOLEAN, false);
+  TestValue("(2>1) IS UNKNOWN", TYPE_BOOLEAN, false);
+  TestValue("(2>1) IS NOT TRUE", TYPE_BOOLEAN, false);
+  TestValue("(2>1) IS NOT FALSE", TYPE_BOOLEAN, true);
+  TestValue("(2>1) IS NOT UNKNOWN", TYPE_BOOLEAN, true);
+  TestValue("(1>2) IS TRUE", TYPE_BOOLEAN, false);
+  TestValue("(1>2) IS FALSE", TYPE_BOOLEAN, true);
+  TestValue("(1>2) IS UNKNOWN", TYPE_BOOLEAN, false);
+  TestValue("(1>2) IS NOT TRUE", TYPE_BOOLEAN, true);
+  TestValue("(1>2) IS NOT FALSE", TYPE_BOOLEAN, false);
+  TestValue("(1>2) IS NOT UNKNOWN", TYPE_BOOLEAN, true);
+  TestValue("(NULL = 1) IS TRUE", TYPE_BOOLEAN, false);
+  TestValue("(NULL = 1) IS FALSE", TYPE_BOOLEAN, false);
+  TestValue("(NULL = 1) IS UNKNOWN", TYPE_BOOLEAN, true);
+  TestValue("(NULL = 1) IS NOT TRUE", TYPE_BOOLEAN, true);
+  TestValue("(NULL = 1) IS NOT FALSE", TYPE_BOOLEAN, true);
+  TestValue("(NULL = 1) IS NOT UNKNOWN", TYPE_BOOLEAN, false);
+}
+
 TEST_F(ExprTest, LikePredicate) {
   TestValue("'a' LIKE '%a%'", TYPE_BOOLEAN, true);
   TestValue("'a' LIKE '%abcde'", TYPE_BOOLEAN, false);

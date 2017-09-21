@@ -71,6 +71,50 @@ select count(*) from alltypesagg where tinyint_col is not null
 bigint
 ====
 ---- QUERY
+# boolean test: IS [NOT] (TRUE | FALSE | UNKNOWN)
+---- QUERY
+select count(*) from alltypesagg where (int_col < 100) is unknown;
+---- RESULTS
+20
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from alltypesagg where (int_col < 100) is true;
+---- RESULTS
+1080
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from alltypesagg where (int_col < 100) is false;
+---- RESULTS
+9900
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from alltypesagg where (int_col < 100) is not unknown;
+---- RESULTS
+10980
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from alltypesagg where (int_col < 100) is not true;
+---- RESULTS
+9920
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from alltypesagg where (int_col < 100) is not false;
+---- RESULTS
+1100
+---- TYPES
+bigint
+====
+---- QUERY
 # =
 select count(*) from alltypesagg where tinyint_col = 1
 ---- RESULTS

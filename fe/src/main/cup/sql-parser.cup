@@ -339,8 +339,9 @@ nonterminal ArrayList<String> opt_ident_list, opt_sort_cols;
 nonterminal TableName table_name;
 nonterminal FunctionName function_name;
 nonterminal Expr where_clause;
-nonterminal Predicate predicate, between_predicate, comparison_predicate,
-  compound_predicate, in_predicate, like_predicate, exists_predicate;
+nonterminal Expr predicate, bool_test_expr;
+nonterminal Predicate between_predicate, comparison_predicate, compound_predicate,
+  in_predicate, like_predicate, exists_predicate;
 nonterminal ArrayList<Expr> group_by_clause, opt_partition_by_clause;
 nonterminal Expr having_clause;
 nonterminal ArrayList<OrderByElement> order_by_elements, opt_order_by_clause;
@@ -493,6 +494,7 @@ nonterminal Boolean server_ident;
 nonterminal Boolean source_ident;
 nonterminal Boolean sources_ident;
 nonterminal Boolean uri_ident;
+nonterminal Boolean unknown_ident;
 
 // For Create/Drop/Show function ddl
 nonterminal FunctionArgs function_def_args;
@@ -1673,6 +1675,16 @@ option_ident ::=
   {:
     if (!ident.toUpperCase().equals("OPTION")) {
       parser.parseError("identifier", SqlParserSymbols.IDENT, "OPTION");
+    }
+    RESULT = true;
+  :}
+  ;
+
+unknown_ident ::=
+  IDENT:ident
+  {:
+    if (!ident.toUpperCase().equals("UNKNOWN")) {
+      parser.parseError("identifier", SqlParserSymbols.IDENT, "UNKNOWN");
     }
     RESULT = true;
   :}
@@ -2933,6 +2945,8 @@ predicate ::=
   {: RESULT = p; :}
   | like_predicate:p
   {: RESULT = p; :}
+  | bool_test_expr:e
+  {: RESULT = e; :}
   | LPAREN predicate:p RPAREN
   {:
     p.setPrintSqlInParens(true);
@@ -3015,6 +3029,22 @@ in_predicate ::=
   {: RESULT = new InPredicate(e, s, false); :}
   | expr:e KW_NOT KW_IN subquery:s
   {: RESULT = new InPredicate(e, s, true); :}
+  ;
+
+// Boolean test expression: <expr> IS [NOT] (TRUE | FALSE | UNKNOWN)
+bool_test_expr ::=
+  expr:e KW_IS KW_TRUE
+  {: RESULT = new FunctionCallExpr("istrue", Lists.newArrayList(e)); :}
+  | expr:e KW_IS KW_NOT KW_TRUE
+  {: RESULT = new FunctionCallExpr("isnottrue", Lists.newArrayList(e)); :}
+  | expr:e KW_IS KW_FALSE
+  {: RESULT = new FunctionCallExpr("isfalse", Lists.newArrayList(e)); :}
+  | expr:e KW_IS KW_NOT KW_FALSE
+  {: RESULT = new FunctionCallExpr("isnotfalse", Lists.newArrayList(e)); :}
+  | expr:e KW_IS unknown_ident
+  {: RESULT = new IsNullPredicate(e, false); :}
+  | expr:e KW_IS KW_NOT unknown_ident
+  {: RESULT = new IsNullPredicate(e, true); :}
   ;
 
 subquery ::=

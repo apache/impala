@@ -613,6 +613,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select * from functional.alltypes where int_col is null");
     AnalyzesOk("select * from functional.alltypes where string_col is not null");
     AnalyzesOk("select * from functional.alltypes where null is not null");
+
     AnalysisError("select 1 from functional.allcomplextypes where int_map_col is null",
         "IS NULL predicate does not support complex types: int_map_col IS NULL");
     AnalysisError("select * from functional.allcomplextypes where complex_struct_col " +
@@ -621,6 +622,45 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select * from functional.allcomplextypes where nested_struct_col " +
         "is not null", "IS NOT NULL predicate does not support complex types: " +
             "nested_struct_col IS NOT NULL");
+  }
+
+  @Test
+  public void TestBoolTestExpression() throws AnalysisException {
+    String[] rhsOptions = new String[] {"true", "false", "unknown"};
+    String[] lhsOptions = new String[] {
+        "bool_col",      // column reference
+        "1>1",           // boolean expression
+        "istrue(false)", // function
+        "(1>1 is true)"  // nested expression
+        };
+
+    // Bool test in both the select and where clauses. Includes negated IS clauses.
+    for (String rhsVal : rhsOptions) {
+      String template = "select (%s is %s) from functional.alltypes where (%s is %s)";
+      String lhsVal = rhsVal == "unknown" ? "null" : rhsVal;
+      String negatedRhsVal = "not " + rhsVal;
+
+      // Tests for lhs being one of true, false or null.
+      AnalyzesOk(String.format(template, lhsVal, rhsVal, lhsVal, rhsVal));
+      AnalyzesOk(String.format(template, lhsVal, negatedRhsVal, lhsVal, negatedRhsVal));
+
+      // Tests for lhs being one lhsOptions expressions.
+      for (String lhs : lhsOptions) {
+        AnalyzesOk(String.format(template, lhs, rhsVal, lhs, rhsVal));
+        AnalyzesOk(String.format(template, lhs, negatedRhsVal, lhs, negatedRhsVal));
+      }
+    }
+
+    AnalysisError("select ('foo' is true)",
+        "No matching function with signature: istrue(STRING).");
+    AnalysisError("select (10 is true)",
+        "No matching function with signature: istrue(TINYINT).");
+    AnalysisError("select (10 is not true)",
+        "No matching function with signature: isnottrue(TINYINT).");
+    AnalysisError("select (10 is false)",
+        "No matching function with signature: isfalse(TINYINT).");
+    AnalysisError("select (10 is not false)",
+        "No matching function with signature: isnotfalse(TINYINT).");
   }
 
   @Test
