@@ -388,7 +388,8 @@ Status AnalyticEvalNode::AddResultTuple(int64_t stream_idx) {
     StringValue* sv = reinterpret_cast<StringValue*>(
         result_tuple->GetSlot(slot_desc->tuple_offset()));
     if (sv == nullptr || sv->len == 0) continue;
-    char* new_ptr = reinterpret_cast<char*>(cur_tuple_pool->TryAllocate(sv->len));
+    char* new_ptr = reinterpret_cast<char*>(
+        cur_tuple_pool->TryAllocateUnaligned(sv->len));
     if (UNLIKELY(new_ptr == nullptr)) {
       return cur_tuple_pool->mem_tracker()->MemLimitExceeded(nullptr,
           "Failed to allocate memory for analytic function's result.", sv->len);

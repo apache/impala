@@ -118,6 +118,13 @@ class MemPool {
     return Allocate<true>(size, alignment);
   }
 
+  /// Same as TryAllocate() except returned memory is not aligned at all.
+  uint8_t* TryAllocateUnaligned(int64_t size) noexcept {
+    // Call templated implementation directly so that it is inlined here and the
+    // alignment logic can be optimised out.
+    return Allocate<true>(size, 1);
+  }
+
   /// Returns 'byte_size' to the current chunk back to the mem pool. This can
   /// only be used to return either all or part of the previous allocation returned
   /// by Allocate().
@@ -234,31 +241,33 @@ class MemPool {
   }
 
   template <bool CHECK_LIMIT_FIRST>
-  uint8_t* Allocate(int64_t size, int alignment) noexcept {
+  uint8_t* ALWAYS_INLINE Allocate(int64_t size, int alignment) noexcept {
     DCHECK_GE(size, 0);
     if (UNLIKELY(size == 0)) return reinterpret_cast<uint8_t*>(&zero_length_region_);
 
-    bool fits_in_chunk = false;
     if (current_chunk_idx_ != -1) {
+      ChunkInfo& info = chunks_[current_chunk_idx_];
       int64_t aligned_allocated_bytes = BitUtil::RoundUpToPowerOf2(
-          chunks_[current_chunk_idx_].allocated_bytes, alignment);
-      if (aligned_allocated_bytes + size <= chunks_[current_chunk_idx_].size) {
+          info.allocated_bytes, alignment);
+      if (aligned_allocated_bytes + size <= info.size) {
         // Ensure the requested alignment is respected.
-        total_allocated_bytes_ +=
-            aligned_allocated_bytes - chunks_[current_chunk_idx_].allocated_bytes;
-        chunks_[current_chunk_idx_].allocated_bytes = aligned_allocated_bytes;
-        fits_in_chunk = true;
+        int64_t padding = aligned_allocated_bytes - info.allocated_bytes;
+        uint8_t* result = info.data + aligned_allocated_bytes;
+        ASAN_UNPOISON_MEMORY_REGION(result, size);
+        DCHECK_LE(info.allocated_bytes + size, info.size);
+        info.allocated_bytes += padding + size;
+        total_allocated_bytes_ += padding + size;
+        DCHECK_LE(current_chunk_idx_, chunks_.size() - 1);
+        return result;
       }
     }
 
-    if (!fits_in_chunk) {
-      // If we couldn't allocate a new chunk, return NULL. malloc() guarantees alignment
-      // of alignof(std::max_align_t), so we do not need to do anything additional to
-      // guarantee alignment.
-      static_assert(
-          INITIAL_CHUNK_SIZE >= alignof(std::max_align_t), "Min chunk size too low");
-      if (UNLIKELY(!FindChunk(size, CHECK_LIMIT_FIRST))) return NULL;
-    }
+    // If we couldn't allocate a new chunk, return NULL. malloc() guarantees alignment
+    // of alignof(std::max_align_t), so we do not need to do anything additional to
+    // guarantee alignment.
+    static_assert(
+        INITIAL_CHUNK_SIZE >= alignof(std::max_align_t), "Min chunk size too low");
+    if (UNLIKELY(!FindChunk(size, CHECK_LIMIT_FIRST))) return NULL;
 
     ChunkInfo& info = chunks_[current_chunk_idx_];
     uint8_t* result = info.data + info.allocated_bytes;

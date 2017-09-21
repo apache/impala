@@ -222,7 +222,8 @@ Status DataSourceScanNode::MaterializeNextRow(MemPool* tuple_pool, Tuple* tuple)
           }
           const string& val = col.string_vals[val_idx];
           size_t val_size = val.size();
-          char* buffer = reinterpret_cast<char*>(tuple_pool->TryAllocate(val_size));
+          char* buffer = reinterpret_cast<char*>(
+              tuple_pool->TryAllocateUnaligned(val_size));
           if (UNLIKELY(buffer == NULL)) {
             string details = Substitute(ERROR_MEM_LIMIT_EXCEEDED, "MaterializeNextRow",
                 val_size, "string slot");

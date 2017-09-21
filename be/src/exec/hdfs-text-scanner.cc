@@ -870,7 +870,7 @@ Status HdfsTextScanner::CopyBoundaryField(FieldLocation* data, MemPool* pool) {
   bool needs_escape = data->len < 0;
   int copy_len = needs_escape ? -data->len : data->len;
   int64_t total_len = copy_len + boundary_column_.len();
-  char* str_data = reinterpret_cast<char*>(pool->TryAllocate(total_len));
+  char* str_data = reinterpret_cast<char*>(pool->TryAllocateUnaligned(total_len));
   if (UNLIKELY(str_data == nullptr)) {
     string details = Substitute("HdfsTextScanner::CopyBoundaryField() failed to allocate "
         "$0 bytes.", total_len);

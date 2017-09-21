@@ -252,7 +252,7 @@ Status ScalarExprEvaluator::GetConstValue(RuntimeState* state, const ScalarExpr&
     StringVal* sv = reinterpret_cast<StringVal*>(*const_val);
     if (!sv->is_null && sv->len > 0) {
       // Make sure the memory is owned by this evaluator.
-      char* ptr_copy = reinterpret_cast<char*>(mem_pool_->TryAllocate(sv->len));
+      char* ptr_copy = reinterpret_cast<char*>(mem_pool_->TryAllocateUnaligned(sv->len));
       if (ptr_copy == nullptr) {
         return mem_pool_->mem_tracker()->MemLimitExceeded(
             state, "Could not allocate constant string value", sv->len);

@@ -79,7 +79,7 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
         // 3. HdfsScanner::WriteCompleteTuple() always calls this function with
         //    'copy_string' == false.
         str.ptr = type.IsVarLenStringType() ?
-            reinterpret_cast<char*>(pool->TryAllocate(buffer_len)) :
+            reinterpret_cast<char*>(pool->TryAllocateUnaligned(buffer_len)) :
             reinterpret_cast<char*>(slot);
         if (UNLIKELY(str.ptr == NULL)) return false;
         if (need_escape) {
