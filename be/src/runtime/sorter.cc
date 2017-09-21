@@ -1516,9 +1516,13 @@ Status Sorter::Prepare(ObjectPool* obj_pool, MemPool* expr_mem_pool) {
   in_mem_tuple_sorter_.reset(new TupleSorter(compare_less_than_, page_len_,
       sort_tuple_desc->byte_size(), state_));
 
-  initial_runs_counter_ = ADD_COUNTER(profile_, "InitialRunsCreated", TUnit::UNIT);
-  spilled_runs_counter_ = ADD_COUNTER(profile_, "SpilledRuns", TUnit::UNIT);
-  num_merges_counter_ = ADD_COUNTER(profile_, "TotalMergesPerformed", TUnit::UNIT);
+  if (enable_spilling_) {
+    initial_runs_counter_ = ADD_COUNTER(profile_, "InitialRunsCreated", TUnit::UNIT);
+    spilled_runs_counter_ = ADD_COUNTER(profile_, "SpilledRuns", TUnit::UNIT);
+    num_merges_counter_ = ADD_COUNTER(profile_, "TotalMergesPerformed", TUnit::UNIT);
+  } else {
+    initial_runs_counter_ = ADD_COUNTER(profile_, "RunsCreated", TUnit::UNIT);
+  }
   in_mem_sort_timer_ = ADD_TIMER(profile_, "InMemorySortTime");
   sorted_data_size_ = ADD_COUNTER(profile_, "SortDataSize", TUnit::BYTES);
   run_sizes_ = ADD_SUMMARY_STATS_COUNTER(profile_, "NumRowsPerRun", TUnit::UNIT);

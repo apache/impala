@@ -45,6 +45,7 @@ Status SortNode::Init(const TPlanNode& tnode, RuntimeState* state) {
       *child(0)->row_desc(), state, &sort_tuple_exprs_));
   is_asc_order_ = tnode.sort_node.sort_info.is_asc_order;
   nulls_first_ = tnode.sort_node.sort_info.nulls_first;
+  runtime_profile()->AddInfoString("SortType", "Total");
   return Status::OK();
 }
 

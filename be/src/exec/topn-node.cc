@@ -65,6 +65,7 @@ Status TopNNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   nulls_first_ = tnode.sort_node.sort_info.nulls_first;
   DCHECK_EQ(conjuncts_.size(), 0)
       << "TopNNode should never have predicates to evaluate.";
+  runtime_profile()->AddInfoString("SortType", "TopN");
   return Status::OK();
 }
 

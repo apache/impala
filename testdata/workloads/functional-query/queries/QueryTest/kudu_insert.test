@@ -449,5 +449,5 @@ set mem_limit=400m;
 create table kudu_test primary key(a, b) partition by hash(a, b) partitions 8 stored as kudu as
 select l_orderkey a, concat(l_comment, l_comment, l_comment) b from tpch.lineitem
 ---- RUNTIME_PROFILE
-row_regex: .*SpilledRuns: 0 \(0\)
+row_regex: .*SortType: Partial
 ====
