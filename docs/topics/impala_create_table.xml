@@ -194,7 +194,7 @@ data_type:
     [, ...]
     [PRIMARY KEY (<varname>col_name</varname>[, ...])]
   )
-  <ph rev="kudu">[PARTITION BY <varname>kudu_partition_clause</varname></ph>
+  <ph rev="kudu">[PARTITION BY <varname>kudu_partition_clause</varname>]</ph>
   [COMMENT '<varname>table_comment</varname>']
   STORED AS KUDU
   [TBLPROPERTIES ('<varname>key1</varname>'='<varname>value1</varname>', '<varname>key2</varname>'='<varname>value2</varname>', ...)]
@@ -215,7 +215,7 @@ data_type:
     <p rev="kudu IMPALA-3719">
       <b>kudu_partition_clause:</b>
 <codeblock rev="kudu">
-kudu_partition_clause ::= PARTITION BY [<varname>hash_clause</varname>] [, <varname>range_clause</varname> [ , <varname>range_clause</varname> ] ]
+kudu_partition_clause ::= [<varname>hash_clause</varname>] [, <varname>range_clause</varname> [ , <varname>range_clause</varname> ] ]
 
 hash_clause ::=
   HASH [ (<varname>pk_col</varname> [, ...]) ]
@@ -251,7 +251,7 @@ range_comparison_operator ::= { &lt; | &lt;= }
 
 <codeblock rev="kudu">CREATE TABLE [IF NOT EXISTS] <varname>db_name</varname>.]<varname>table_name</varname>
   [PRIMARY KEY (<varname>col_name</varname>[, ...])]
-  [PARTITION BY <varname>kudu_partition_clause</varname>
+  [PARTITION BY <varname>kudu_partition_clause</varname>]
   [COMMENT '<varname>table_comment</varname>']
   STORED AS KUDU
   [TBLPROPERTIES ('<varname>key1</varname>'='<varname>value1</varname>', '<varname>key2</varname>'='<varname>value2</varname>', ...)]
@@ -367,6 +367,14 @@ AS
         tables. See the <codeph>PARTITION BY</codeph> clause, rather than <codeph>PARTITIONED
         BY</codeph>, for Kudu tables.
       </p>
+      <p rev="IMPALA-5546">
+        In <keyword keyref="impala210_full"/> and higher, the <codeph>PARTITION BY</codeph>
+        clause is optional for Kudu tables. If the clause is omitted, Impala automatically
+        constructs a single partition that is not connected to any column. Because such a
+        table cannot take advantage of Kudu features for parallelized queries and
+        query optimizations, omitting the <codeph>PARTITION BY</codeph> clause is only
+        appropriate for small lookup tables.
+      </p>
     </note>
 
     <p rev="2.5.0">
@@ -462,16 +470,24 @@ AS
       partitioning mechanisms, the syntax associated with the <codeph>STORED AS KUDU</codeph>
       clause is shown separately in the above syntax descriptions. Kudu tables have their own
       syntax for <codeph>CREATE TABLE</codeph>, <codeph>CREATE EXTERNAL TABLE</codeph>, and
-      <codeph>CREATE TABLE AS SELECT</codeph>. All internal Kudu tables require a
-      <codeph>PARTITION BY</codeph> clause, different than the <codeph>PARTITIONED BY</codeph>
-      clause for HDFS-backed tables.
+      <codeph>CREATE TABLE AS SELECT</codeph>. <ph rev="IMPALA-2256">Prior to <keyword keyref="impala210_full"/>,
+      all internal Kudu tables require a <codeph>PARTITION BY</codeph> clause, different than
+      the <codeph>PARTITIONED BY</codeph> clause for HDFS-backed tables.</ph>
     </p>
 
     <p>
       Here are some examples of creating empty Kudu tables:
     </p>
 
-<codeblock><![CDATA[
+<codeblock>
+<ph rev="IMPALA-2256">-- Single partition. Only for <keyword keyref="impala210_full"/> and higher.
+-- Only suitable for small lookup tables.
+CREATE TABLE kudu_no_partition_by_clause
+  (
+    id bigint PRIMARY KEY, s STRING, b BOOLEAN
+  )
+  STORED AS KUDU;</ph>
+
 -- Single-column primary key.
 CREATE TABLE kudu_t1 (id BIGINT PRIMARY key, s STRING, b BOOLEAN)
   PARTITION BY HASH (id) PARTITIONS 20 STORED AS KUDU;
@@ -480,7 +496,7 @@ CREATE TABLE kudu_t1 (id BIGINT PRIMARY key, s STRING, b BOOLEAN)
 CREATE TABLE kudu_t2 (id BIGINT, s STRING, b BOOLEAN, PRIMARY KEY (id,s))
   PARTITION BY HASH (s) PARTITIONS 30 STORED AS KUDU;
 
--- Meaningful primary key column is good for range partitioning.
+<![CDATA[-- Meaningful primary key column is good for range partitioning.
 CREATE TABLE kudu_t3 (id BIGINT, year INT, s STRING,
     b BOOLEAN, PRIMARY KEY (id,year))
   PARTITION BY HASH (id) PARTITIONS 20,
