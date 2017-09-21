@@ -63,7 +63,7 @@ under the License.
        </table>
 
        {% if schedule_items %}
-       <h3>Run Schdule</h3>
+       <h3>Run Schedule</h3>
        <table class="table table-hover">
          <tr>
            <th>Run Name</th>
