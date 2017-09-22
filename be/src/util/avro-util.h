@@ -72,7 +72,9 @@ struct ScopedAvroSchemaElement {
   ~ScopedAvroSchemaElement();
 
   AvroSchemaElement* operator->() { return &element_; }
+  const AvroSchemaElement* operator->() const { return &element_; }
   AvroSchemaElement* get() { return &element_; }
+  const AvroSchemaElement* get() const { return &element_; }
 
  private:
   AvroSchemaElement element_;

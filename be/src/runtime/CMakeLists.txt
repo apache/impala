@@ -67,6 +67,7 @@ add_library(Runtime
   timestamp-parse-util.cc
   timestamp-value.cc
   tuple.cc
+  tuple-ir.cc
   tuple-row.cc
   tmp-file-mgr.cc
 )

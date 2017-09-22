@@ -29,11 +29,15 @@ using std::numeric_limits;
 
 // Functions in this file are cross-compiled to IR with clang.
 
-const int AVRO_FLOAT_SIZE = 4;
-const int AVRO_DOUBLE_SIZE = 8;
+static const int AVRO_FLOAT_SIZE = 4;
+static const int AVRO_DOUBLE_SIZE = 8;
 
 int HdfsAvroScanner::DecodeAvroData(int max_tuples, MemPool* pool, uint8_t** data,
     uint8_t* data_end, Tuple* tuple, TupleRow* tuple_row) {
+  // If the file is uncompressed, StringValues will have pointers into the I/O buffers.
+  // We don't attach I/O buffers to output batches so need to copy out data referenced
+  // by tuples that survive conjunct evaluation.
+  const bool copy_out_strings = !header_->is_compressed && !string_slot_offsets_.empty();
   int num_to_commit = 0;
   for (int i = 0; i < max_tuples; ++i) {
     InitTuple(template_tuple_, tuple);
@@ -43,9 +47,16 @@ int HdfsAvroScanner::DecodeAvroData(int max_tuples, MemPool* pool, uint8_t** dat
     }
     tuple_row->SetTuple(scan_node_->tuple_idx(), tuple);
     if (EvalConjuncts(tuple_row)) {
+      if (copy_out_strings) {
+        if (UNLIKELY(!tuple->CopyStrings("HdfsAvroScanner::DecodeAvroData()",
+              state_, string_slot_offsets_.data(), string_slot_offsets_.size(), pool,
+              &parse_status_))) {
+          return 0;
+        }
+      }
       ++num_to_commit;
       tuple_row = next_row(tuple_row);
-      tuple = next_tuple(tuple_byte_size_, tuple);
+      tuple = next_tuple(tuple_byte_size(), tuple);
     }
   }
   return num_to_commit;
@@ -210,22 +221,8 @@ bool HdfsAvroScanner::ReadAvroChar(PrimitiveType type, int max_len, uint8_t** da
     // We need to be careful not to truncate the length before evaluating min().
     int str_len = static_cast<int>(std::min<int64_t>(len.val, max_len));
     DCHECK_GE(str_len, 0);
-    if (ctype.IsVarLenStringType()) {
-      StringValue* sv = reinterpret_cast<StringValue*>(slot);
-      sv->ptr = reinterpret_cast<char*>(pool->TryAllocate(max_len));
-      if (UNLIKELY(sv->ptr == nullptr)) {
-        string details = Substitute("HdfsAvroScanner::ReadAvroChar() failed to allocate"
-            "$0 bytes for char slot.", max_len);
-        parse_status_ = pool->mem_tracker()->MemLimitExceeded(state_, details, max_len);
-        return false;
-      }
-      sv->len = max_len;
-      memcpy(sv->ptr, *data, str_len);
-      StringValue::PadWithSpaces(sv->ptr, max_len, str_len);
-    } else {
-      memcpy(slot, *data, str_len);
-      StringValue::PadWithSpaces(reinterpret_cast<char*>(slot), max_len, str_len);
-    }
+    memcpy(slot, *data, str_len);
+    StringValue::PadWithSpaces(reinterpret_cast<char*>(slot), max_len, str_len);
   }
   *data += len.val;
   return true;

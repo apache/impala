@@ -266,6 +266,12 @@ class LlvmCodeGen {
   llvm::Constant* ConstantToGVPtr(llvm::Type* type, llvm::Constant* ir_constant,
       const std::string& name);
 
+  /// Creates a global value 'name' that is an array with element type 'element_type'
+  /// containing 'ir_constants'. Returns a pointer to the global value, i.e. a pointer
+  /// to a constant array of 'element_type'.
+  llvm::Constant* ConstantsToGVArrayPtr(llvm::Type* element_type,
+      llvm::ArrayRef<llvm::Constant*> ir_constants, const std::string& name);
+
   /// Returns reference to llvm context object.  Each LlvmCodeGen has its own
   /// context to allow multiple threads to be calling into llvm at the same time.
   llvm::LLVMContext& context() { return *context_.get(); }

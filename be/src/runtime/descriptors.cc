@@ -37,6 +37,11 @@
 #include "common/names.h"
 
 using boost::algorithm::join;
+using llvm::Constant;
+using llvm::ConstantAggregateZero;
+using llvm::ConstantInt;
+using llvm::ConstantStruct;
+using llvm::StructType;
 using namespace strings;
 
 // In 'thrift_partition', the location is stored in a compressed format that references
@@ -65,12 +70,24 @@ namespace impala {
 const int RowDescriptor::INVALID_IDX;
 
 const char* TupleDescriptor::LLVM_CLASS_NAME = "class.impala::TupleDescriptor";
+const char* NullIndicatorOffset::LLVM_CLASS_NAME = "struct.impala::NullIndicatorOffset";
 
 string NullIndicatorOffset::DebugString() const {
   stringstream out;
   out << "(offset=" << byte_offset
       << " mask=" << hex << static_cast<int>(bit_mask) << dec << ")";
   return out.str();
+}
+
+Constant* NullIndicatorOffset::ToIR(LlvmCodeGen* codegen) const {
+  StructType* null_indicator_offset_type =
+      static_cast<StructType*>(codegen->GetType(LLVM_CLASS_NAME));
+  // Populate padding at end of struct with zeroes.
+  ConstantAggregateZero* zeroes = ConstantAggregateZero::get(null_indicator_offset_type);
+  return ConstantStruct::get(null_indicator_offset_type,
+      {ConstantInt::get(codegen->int_type(), byte_offset),
+      ConstantInt::get(codegen->tinyint_type(), bit_mask),
+      zeroes->getStructElement(2)});
 }
 
 ostream& operator<<(ostream& os, const NullIndicatorOffset& null_indicator) {

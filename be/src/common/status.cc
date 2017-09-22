@@ -27,6 +27,8 @@
 
 namespace impala {
 
+const char* Status::LLVM_CLASS_NAME = "class.impala::Status";
+
 // NOTE: this is statically initialized and we must be very careful what
 // functions these constructors call.  In particular, we cannot call
 // glog functions which also rely on static initializations.

@@ -293,7 +293,7 @@ bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,
 // eval_fail:                                        ; preds = %parse
 //   ret i1 false
 // }
-Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
+Status HdfsScanner::CodegenWriteCompleteTuple(const HdfsScanNodeBase* node,
     LlvmCodeGen* codegen, const vector<ScalarExpr*>& conjuncts,
     Function** write_complete_tuple_fn) {
   *write_complete_tuple_fn = NULL;
@@ -368,23 +368,19 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
   // Extract the input args
   Value* this_arg = args[0];
   Value* fields_arg = args[2];
-  Value* tuple_arg = builder.CreateBitCast(args[3], tuple_ptr_type, "tuple_ptr");
+  Value* opaque_tuple_arg = args[3];
+  Value* tuple_arg = builder.CreateBitCast(opaque_tuple_arg, tuple_ptr_type, "tuple_ptr");
   Value* tuple_row_arg = args[4];
-  Value* template_arg = builder.CreateBitCast(args[5], tuple_ptr_type, "tuple_ptr");
+  Value* opaque_template_arg = args[5];
   Value* errors_arg = args[6];
   Value* error_in_row_arg = args[7];
 
   // Codegen for function body
   Value* error_in_row = codegen->false_value();
-  // Initialize tuple
-  if (node->num_materialized_partition_keys() == 0) {
-    // No partition key slots, just zero the NULL bytes.
-    codegen->CodegenClearNullBits(&builder, tuple_arg, *tuple_desc);
-  } else {
-    // Copy template tuple.
-    // TODO: only copy what's necessary from the template tuple.
-    codegen->CodegenMemcpy(&builder, tuple_arg, template_arg, tuple_desc->byte_size());
-  }
+
+  Function* init_tuple_fn;
+  RETURN_IF_ERROR(CodegenInitTuple(node, codegen, &init_tuple_fn));
+  builder.CreateCall(init_tuple_fn, {this_arg, opaque_template_arg, opaque_tuple_arg});
 
   // Put tuple in tuple_row
   Value* tuple_row_typed =
@@ -513,7 +509,7 @@ Status HdfsScanner::CodegenWriteCompleteTuple(HdfsScanNodeBase* node,
   return Status::OK();
 }
 
-Status HdfsScanner::CodegenWriteAlignedTuples(HdfsScanNodeBase* node,
+Status HdfsScanner::CodegenWriteAlignedTuples(const HdfsScanNodeBase* node,
     LlvmCodeGen* codegen, Function* write_complete_tuple_fn,
     Function** write_aligned_tuples_fn) {
   *write_aligned_tuples_fn = NULL;
@@ -531,6 +527,37 @@ Status HdfsScanner::CodegenWriteAlignedTuples(HdfsScanNodeBase* node,
   *write_aligned_tuples_fn = codegen->FinalizeFunction(write_tuples_fn);
   if (*write_aligned_tuples_fn == NULL) {
     return Status("Failed to finalize write_aligned_tuples_fn.");
+  }
+  return Status::OK();
+}
+
+Status HdfsScanner::CodegenInitTuple(
+    const HdfsScanNodeBase* node, LlvmCodeGen* codegen, Function** init_tuple_fn) {
+  *init_tuple_fn = codegen->GetFunction(IRFunction::HDFS_SCANNER_INIT_TUPLE, true);
+  DCHECK(*init_tuple_fn != nullptr);
+
+  // Replace all of the constants in InitTuple() to specialize the code.
+  int replaced = codegen->ReplaceCallSitesWithBoolConst(
+      *init_tuple_fn, node->num_materialized_partition_keys() > 0, "has_template_tuple");
+  DCHECK_EQ(replaced, 1);
+
+  const TupleDescriptor* tuple_desc = node->tuple_desc();
+  replaced = codegen->ReplaceCallSitesWithValue(*init_tuple_fn,
+      codegen->GetIntConstant(TYPE_INT, tuple_desc->byte_size()), "tuple_byte_size");
+  DCHECK_EQ(replaced, 1);
+
+  replaced = codegen->ReplaceCallSitesWithValue(*init_tuple_fn,
+      codegen->GetIntConstant(TYPE_INT, tuple_desc->null_bytes_offset()),
+      "null_bytes_offset");
+  DCHECK_EQ(replaced, 1);
+
+  replaced = codegen->ReplaceCallSitesWithValue(*init_tuple_fn,
+      codegen->GetIntConstant(TYPE_INT, tuple_desc->num_null_bytes()), "num_null_bytes");
+  DCHECK_EQ(replaced, 1);
+
+  *init_tuple_fn = codegen->FinalizeFunction(*init_tuple_fn);
+  if (*init_tuple_fn == nullptr) {
+    return Status("Failed to finalize codegen'd InitTuple().");
   }
   return Status::OK();
 }

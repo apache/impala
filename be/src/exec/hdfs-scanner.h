@@ -390,31 +390,42 @@ class HdfsScanner {
   /// Codegen function to replace WriteCompleteTuple. Should behave identically
   /// to WriteCompleteTuple. Stores the resulting function in 'write_complete_tuple_fn'
   /// if codegen was successful or NULL otherwise.
-  static Status CodegenWriteCompleteTuple(HdfsScanNodeBase* node, LlvmCodeGen* codegen,
-      const std::vector<ScalarExpr*>& conjuncts,
-      llvm::Function** write_complete_tuple_fn)
-      WARN_UNUSED_RESULT;
+  static Status CodegenWriteCompleteTuple(const HdfsScanNodeBase* node,
+      LlvmCodeGen* codegen, const std::vector<ScalarExpr*>& conjuncts,
+      llvm::Function** write_complete_tuple_fn) WARN_UNUSED_RESULT;
 
   /// Codegen function to replace WriteAlignedTuples.  WriteAlignedTuples is cross
   /// compiled to IR.  This function loads the precompiled IR function, modifies it,
   /// and stores the resulting function in 'write_aligned_tuples_fn' if codegen was
   /// successful or NULL otherwise.
-  static Status CodegenWriteAlignedTuples(HdfsScanNodeBase*, LlvmCodeGen*,
-      llvm::Function* write_tuple_fn, llvm::Function** write_aligned_tuples_fn)
-      WARN_UNUSED_RESULT;
+  static Status CodegenWriteAlignedTuples(const HdfsScanNodeBase*, LlvmCodeGen*,
+      llvm::Function* write_tuple_fn,
+      llvm::Function** write_aligned_tuples_fn) WARN_UNUSED_RESULT;
+
+  /// Codegen function to replace InitTuple() removing runtime constants like the tuple
+  /// size and branches like the template tuple existence check. The codegen'd version
+  /// of InitTuple() is stored in 'init_tuple_fn' if codegen was successful.
+  static Status CodegenInitTuple(
+      const HdfsScanNodeBase* node, LlvmCodeGen* codegen, llvm::Function** init_tuple_fn);
 
   /// Report parse error for column @ desc.   If abort_on_error is true, sets
   /// parse_status_ to the error message.
   void ReportColumnParseError(const SlotDescriptor* desc, const char* data, int len);
 
-  /// Initialize a tuple.
-  /// TODO: only copy over non-null slots.
-  void InitTuple(const TupleDescriptor* desc, Tuple* template_tuple, Tuple* tuple) {
-    if (template_tuple != NULL) {
-      InitTupleFromTemplate(template_tuple, tuple, desc->byte_size());
+  /// Initialize a tuple. Inlined into the convenience version below for codegen.
+  void IR_ALWAYS_INLINE InitTuple(
+      const TupleDescriptor* desc, Tuple* template_tuple, Tuple* tuple) {
+    if (has_template_tuple()) {
+      InitTupleFromTemplate(template_tuple, tuple, tuple_byte_size());
     } else {
-      tuple->ClearNullBits(*desc);
+      tuple->ClearNullBits(desc->null_bytes_offset(), desc->num_null_bytes());
     }
+  }
+
+  /// Convenience version of above that passes in the scan's TupleDescriptor.
+  /// Replaced with a codegen'd version in IR.
+  void IR_NO_INLINE InitTuple(Tuple* template_tuple, Tuple* tuple) {
+    return InitTuple(scan_node_->tuple_desc(), template_tuple, tuple);
   }
 
   /// Initialize 'tuple' with size 'tuple_byte_size' from 'template_tuple'
@@ -454,9 +465,12 @@ class HdfsScanner {
     }
   }
 
-  void InitTuple(Tuple* template_tuple, Tuple* tuple) {
-    InitTuple(scan_node_->tuple_desc(), template_tuple, tuple);
-  }
+  /// Not inlined in IR so it can be replaced with a constant.
+  int IR_NO_INLINE tuple_byte_size() const { return tuple_byte_size_; }
+
+  /// Returns true iff there is a template tuple with partition key values.
+  /// Not inlined in IR so it can be replaced with a constant.
+  bool IR_NO_INLINE has_template_tuple() const { return template_tuple_ != nullptr; }
 
   inline Tuple* next_tuple(int tuple_byte_size, Tuple* t) const {
     uint8_t* mem = reinterpret_cast<uint8_t*>(t);

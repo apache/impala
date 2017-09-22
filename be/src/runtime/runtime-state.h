@@ -305,6 +305,8 @@ class RuntimeState {
   /// Release resources and prepare this object for destruction. Can only be called once.
   void ReleaseResources();
 
+  static const char* LLVM_CLASS_NAME;
+
  private:
   /// Allow TestEnv to use private methods for testing.
   friend class TestEnv;

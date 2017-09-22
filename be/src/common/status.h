@@ -249,6 +249,7 @@ class NODISCARD Status {
     return msg_ == NULL ? TErrorCode::OK : msg_->error();
   }
 
+  static const char* LLVM_CLASS_NAME;
  private:
 
   // Status constructors that can suppress logging via 'silent' parameter

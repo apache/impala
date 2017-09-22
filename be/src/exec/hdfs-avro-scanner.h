@@ -130,6 +130,12 @@ class HdfsAvroScanner : public BaseSequenceScanner {
     bool use_codegend_decode_avro_data;
   };
 
+  /// Offsets of string slots in the result tuple that may need to be copied as part of
+  /// tuple materialization. Populated in constructor. This is redundant with offset
+  /// information stored in the TupleDescriptor but storing only the required metadata
+  /// in a simple array of struct simplifies codegen and speeds up interpretation.
+  std::vector<SlotOffsets> string_slot_offsets_;
+
   AvroFileHeader* avro_header_ = nullptr;
 
   /// Current data block after decompression with its end and length.
@@ -208,18 +214,16 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// Produces a version of DecodeAvroData that uses codegen'd instead of interpreted
   /// functions. Stores the resulting function in 'decode_avro_data_fn' if codegen was
   /// successful or returns an error.
-  static Status CodegenDecodeAvroData(LlvmCodeGen* codegen,
-      llvm::Function* materialize_tuple_fn,
+  static Status CodegenDecodeAvroData(const HdfsScanNodeBase* node, LlvmCodeGen* codegen,
       const std::vector<ScalarExpr*>& conjuncts,
-      llvm::Function** decode_avro_data_fn)
-      WARN_UNUSED_RESULT;
+      llvm::Function** decode_avro_data_fn) WARN_UNUSED_RESULT;
 
   /// Codegens a version of MaterializeTuple() that reads records based on the table
   /// schema. Stores the resulting function in 'materialize_tuple_fn' if codegen was
   /// successful or returns an error.
   /// TODO: Codegen a function for each unique file schema.
-  static Status CodegenMaterializeTuple(HdfsScanNodeBase* node, LlvmCodeGen* codegen,
-      llvm::Function** materialize_tuple_fn) WARN_UNUSED_RESULT;
+  static Status CodegenMaterializeTuple(const HdfsScanNodeBase* node,
+      LlvmCodeGen* codegen, llvm::Function** materialize_tuple_fn) WARN_UNUSED_RESULT;
 
   /// Used by CodegenMaterializeTuple to recursively create the IR for reading an Avro
   /// record.
@@ -237,12 +241,12 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   ///     MaterializeTuple()
   /// - child_start / child_end: specifies to only generate a subset of the record
   ///     schema's children
-  static Status CodegenReadRecord(
-      const SchemaPath& path, const AvroSchemaElement& record, int child_start,
-      int child_end, HdfsScanNodeBase* node, LlvmCodeGen* codegen, void* builder,
-      llvm::Function* fn, llvm::BasicBlock* insert_before, llvm::BasicBlock* bail_out,
-      llvm::Value* this_val, llvm::Value* pool_val, llvm::Value* tuple_val,
-      llvm::Value* data_val, llvm::Value* data_end_val) WARN_UNUSED_RESULT;
+  static Status CodegenReadRecord(const SchemaPath& path, const AvroSchemaElement& record,
+      int child_start, int child_end, const HdfsScanNodeBase* node, LlvmCodeGen* codegen,
+      void* builder, llvm::Function* fn, llvm::BasicBlock* insert_before,
+      llvm::BasicBlock* bail_out, llvm::Value* this_val, llvm::Value* pool_val,
+      llvm::Value* tuple_val, llvm::Value* data_val,
+      llvm::Value* data_end_val) WARN_UNUSED_RESULT;
 
   /// Creates the IR for reading an Avro scalar at builder's current insert point.
   static Status CodegenReadScalar(const AvroSchemaElement& element,

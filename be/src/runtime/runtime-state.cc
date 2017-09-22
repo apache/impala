@@ -60,6 +60,8 @@ DECLARE_int32(max_errors);
 
 namespace impala {
 
+const char* RuntimeState::LLVM_CLASS_NAME = "class.impala::RuntimeState";
+
 RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragmentCtx& fragment_ctx,
     const TPlanFragmentInstanceCtx& instance_ctx, ExecEnv* exec_env)
   : query_state_(query_state),

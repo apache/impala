@@ -1615,6 +1615,13 @@ Constant* LlvmCodeGen::ConstantToGVPtr(Type* type, Constant* ir_constant,
       ArrayRef<Constant*>({GetIntConstant(TYPE_INT, 0)}));
 }
 
+Constant* LlvmCodeGen::ConstantsToGVArrayPtr(Type* element_type,
+      ArrayRef<Constant*> ir_constants, const string& name) {
+  ArrayType* array_type = ArrayType::get(element_type, ir_constants.size());
+  Constant* array_const = ConstantArray::get(array_type, ir_constants);
+  return ConstantToGVPtr(array_type, array_const, name);
+}
+
 void LlvmCodeGen::DiagnosticHandler::DiagnosticHandlerFn(const DiagnosticInfo &info,
     void *context){
   if (info.getSeverity() == DiagnosticSeverity::DS_Error) {
@@ -1637,7 +1644,6 @@ string LlvmCodeGen::DiagnosticHandler::GetErrorString() {
   }
   return "";
 }
-
 }
 
 namespace boost {

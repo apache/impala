@@ -27,6 +27,7 @@
 
 namespace llvm {
 class Function;
+class Constant;
 }
 
 namespace impala {
@@ -35,6 +36,20 @@ struct CollectionValue;
 struct StringValue;
 class TupleDescriptor;
 class TupleRow;
+
+/// Minimal struct to hold slot offset information from a SlotDescriptor. Designed
+/// to simplify constant substitution in CodegenCopyStrings() and allow more efficient
+/// interpretation in CopyStrings().
+struct SlotOffsets {
+  NullIndicatorOffset null_indicator_offset;
+  int tuple_offset;
+
+  /// Generate an LLVM Constant containing the offset values of this SlotOffsets instance.
+  /// Needs to be updated if the layout of this struct changes.
+  llvm::Constant* ToIR(LlvmCodeGen* codegen) const;
+
+  static const char* LLVM_CLASS_NAME;
+};
 
 /// A tuple is stored as a contiguous sequence of bytes containing a fixed number
 /// of fixed-size slots. The slots are arranged in order of increasing byte length;
@@ -158,6 +173,17 @@ class Tuple {
     if (COLLECT_STRING_VALS) non_null_string_values->resize(num_non_null_string_values);
   }
 
+  /// Copy the var-len string data in this tuple into the provided memory pool and update
+  /// the string slots to point at the copied strings. 'string_slot_offsets' contains the
+  /// required offsets in a contiguous array to allow efficient iteration and easy
+  /// substitution of the array with constants for codegen. 'err_ctx' is a string that is
+  /// included in error messages to provide context. Returns true on success, otherwise on
+  /// failure sets 'status' to an error. This odd return convention is used to avoid
+  /// emitting unnecessary code for ~Status() in perf-critical code.
+  bool CopyStrings(const char* err_ctx, RuntimeState* state,
+      const SlotOffsets* string_slot_offsets, int num_string_slots, MemPool* pool,
+      Status* status) noexcept;
+
   /// Symbols (or substrings of the symbols) of MaterializeExprs(). These can be passed to
   /// LlvmCodeGen::ReplaceCallSites().
   static const char* MATERIALIZE_EXPRS_SYMBOL;
@@ -175,6 +201,14 @@ class Tuple {
   static Status CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_vals,
       const TupleDescriptor& desc, const vector<ScalarExpr*>& slot_materialize_exprs,
       bool use_mem_pool, llvm::Function** fn);
+
+  /// Generates an IR version of CopyStrings(). The offsets of string slots are replaced
+  /// with constants. This can allow the LLVM optimiser to unroll the loop and generate
+  /// efficient code without interpretation overhead. The LLVM optimiser at -O2 generally
+  /// will only unroll the loop for small numbers of iterations: 8 or less in some
+  /// experiements. On success, 'fn' is set to point to the generated function.
+  static Status CodegenCopyStrings(LlvmCodeGen* codegen,
+      const TupleDescriptor& desc, llvm::Function** materialize_strings_fn);
 
   /// Turn null indicator bit on. For non-nullable slots, the mask will be 0 and
   /// this is a no-op (but we don't have to branch to check is slots are nullable).
@@ -250,6 +284,14 @@ class Tuple {
       ScalarExprEvaluator* const* evals, MemPool* pool,
       StringValue** non_null_string_values, int* total_string_lengths,
       int* num_non_null_string_values);
+
+  /// Helper for CopyStrings() to allocate 'bytes' of memory. Returns a pointer to the
+  /// allocated buffer on success. Otherwise an error was encountered, in which case NULL
+  /// is returned and 'status' is set to an error. This odd return convention is used to
+  /// avoid emitting unnecessary code for ~Status() in perf-critical code.
+  char* AllocateStrings(const char* err_ctx, RuntimeState* state, int64_t bytes,
+      MemPool* pool, Status* status) noexcept;
+
 };
 
 }

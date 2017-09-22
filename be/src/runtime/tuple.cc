@@ -22,11 +22,13 @@
 
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
-#include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/scalar-expr.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/collection-value.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.h"
@@ -36,11 +38,10 @@
 
 #include "common/names.h"
 
-using namespace llvm;
-
 namespace impala {
 
 const char* Tuple::LLVM_CLASS_NAME = "class.impala::Tuple";
+const char* SlotOffsets::LLVM_CLASS_NAME = "struct.impala::SlotOffsets";
 
 const char* Tuple::MATERIALIZE_EXPRS_SYMBOL = "MaterializeExprsILb0ELb0";
 const char* Tuple::MATERIALIZE_EXPRS_NULL_POOL_SYMBOL = "MaterializeExprsILb0ELb1";
@@ -232,6 +233,18 @@ void Tuple::MaterializeExprs(TupleRow* row, const TupleDescriptor& desc,
   }
 }
 
+char* Tuple::AllocateStrings(const char* err_ctx, RuntimeState* state,
+    int64_t bytes, MemPool* pool, Status* status) noexcept {
+  char* buf = reinterpret_cast<char*>(pool->TryAllocateUnaligned(bytes));
+  if (UNLIKELY(buf == nullptr)) {
+    string details = Substitute("$0 failed to allocate $1 bytes for strings.",
+        err_ctx, bytes);
+    *status = pool->mem_tracker()->MemLimitExceeded(state, details, bytes);
+    return nullptr;
+  }
+  return buf;
+}
+
 // Codegens an unrolled version of MaterializeExprs(). Uses codegen'd exprs and slot
 // writes. If 'pool' is non-NULL, string data is copied into it.
 //
@@ -291,19 +304,19 @@ void Tuple::MaterializeExprs(TupleRow* row, const TupleDescriptor& desc,
 // }
 Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_vals,
     const TupleDescriptor& desc, const vector<ScalarExpr*>& slot_materialize_exprs,
-    bool use_mem_pool, Function** fn) {
+    bool use_mem_pool, llvm::Function** fn) {
   // Only support 'collect_string_vals' == false for now.
   if (collect_string_vals) {
     return Status("CodegenMaterializeExprs() collect_string_vals == true NYI");
   }
   SCOPED_TIMER(codegen->codegen_timer());
-  LLVMContext& context = codegen->context();
+  llvm::LLVMContext& context = codegen->context();
 
   // Codegen each compute function from slot_materialize_exprs
-  Function* materialize_expr_fns[slot_materialize_exprs.size()];
+  llvm::Function* materialize_expr_fns[slot_materialize_exprs.size()];
   for (int i = 0; i < slot_materialize_exprs.size(); ++i) {
-    Status status = slot_materialize_exprs[i]->GetCodegendComputeFn(codegen,
-        &materialize_expr_fns[i]);
+    Status status = slot_materialize_exprs[i]->GetCodegendComputeFn(
+        codegen, &materialize_expr_fns[i]);
     if (!status.ok()) {
       return Status::Expected(Substitute("Could not codegen CodegenMaterializeExprs: $0",
             status.GetDetail()));
@@ -315,15 +328,15 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_
   // void MaterializeExprs(Tuple* tuple, TupleRow* row, TupleDescriptor* desc,
   //     ScalarExprEvaluator** slot_materialize_exprs, MemPool* pool,
   //     StringValue** non_null_string_values, int* total_string_lengths)
-  PointerType* opaque_tuple_type = codegen->GetPtrType(Tuple::LLVM_CLASS_NAME);
-  PointerType* row_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
-  PointerType* desc_type = codegen->GetPtrType(TupleDescriptor::LLVM_CLASS_NAME);
-  PointerType* expr_evals_type =
+  llvm::PointerType* opaque_tuple_type = codegen->GetPtrType(Tuple::LLVM_CLASS_NAME);
+  llvm::PointerType* row_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
+  llvm::PointerType* desc_type = codegen->GetPtrType(TupleDescriptor::LLVM_CLASS_NAME);
+  llvm::PointerType* expr_evals_type =
       codegen->GetPtrType(codegen->GetPtrType(ScalarExprEvaluator::LLVM_CLASS_NAME));
-  PointerType* pool_type = codegen->GetPtrType(MemPool::LLVM_CLASS_NAME);
-  PointerType* string_values_type =
+  llvm::PointerType* pool_type = codegen->GetPtrType(MemPool::LLVM_CLASS_NAME);
+  llvm::PointerType* string_values_type =
       codegen->GetPtrType(codegen->GetPtrType(StringValue::LLVM_CLASS_NAME));
-  PointerType* int_ptr_type = codegen->GetPtrType(TYPE_INT);
+  llvm::PointerType* int_ptr_type = codegen->GetPtrType(TYPE_INT);
   LlvmCodeGen::FnPrototype prototype(codegen, "MaterializeExprs", codegen->void_type());
   prototype.AddArgument("opaque_tuple", opaque_tuple_type);
   prototype.AddArgument("row", row_type);
@@ -335,25 +348,25 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_
   prototype.AddArgument("num_non_null_string_values", int_ptr_type);
 
   LlvmBuilder builder(context);
-  Value* args[8];
+  llvm::Value* args[8];
   *fn = prototype.GeneratePrototype(&builder, args);
-  Value* opaque_tuple_arg = args[0];
-  Value* row_arg = args[1];
-  // Value* desc_arg = args[2]; // unused
-  Value* expr_evals_arg = args[3];
-  Value* pool_arg = args[4];
+  llvm::Value* opaque_tuple_arg = args[0];
+  llvm::Value* row_arg = args[1];
+  // llvm::Value* desc_arg = args[2]; // unused
+  llvm::Value* expr_evals_arg = args[3];
+  llvm::Value* pool_arg = args[4];
   // The followings arguments are unused as 'collect_string_vals' is false.
-  // Value* non_null_string_values_arg = args[5]; // unused
-  // Value* total_string_lengths_arg = args[6]; // unused
-  // Value* num_non_null_string_values_arg = args[7]; // unused
+  // llvm::Value* non_null_string_values_arg = args[5]; // unused
+  // llvm::Value* total_string_lengths_arg = args[6]; // unused
+  // llvm::Value* num_non_null_string_values_arg = args[7]; // unused
 
   // Cast the opaque Tuple* argument to the generated struct type
-  Type* tuple_struct_type = desc.GetLlvmStruct(codegen);
+  llvm::Type* tuple_struct_type = desc.GetLlvmStruct(codegen);
   if (tuple_struct_type == NULL) {
     return Status("CodegenMaterializeExprs(): failed to generate tuple desc");
   }
-  PointerType* tuple_type = codegen->GetPtrType(tuple_struct_type);
-  Value* tuple = builder.CreateBitCast(opaque_tuple_arg, tuple_type, "tuple");
+  llvm::PointerType* tuple_type = codegen->GetPtrType(tuple_struct_type);
+  llvm::Value* tuple = builder.CreateBitCast(opaque_tuple_arg, tuple_type, "tuple");
 
   // Clear tuple's null bytes
   codegen->CodegenClearNullBits(&builder, tuple, desc);
@@ -361,13 +374,13 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_
   // Evaluate the slot_materialize_exprs and place the results in the tuple.
   for (int i = 0; i < desc.slots().size(); ++i) {
     SlotDescriptor* slot_desc = desc.slots()[i];
-    DCHECK(slot_desc->type().type == TYPE_NULL ||
-        slot_desc->type() == slot_materialize_exprs[i]->type());
+    DCHECK(slot_desc->type().type == TYPE_NULL
+        || slot_desc->type() == slot_materialize_exprs[i]->type());
 
     // Call materialize_expr_fns[i](slot_materialize_exprs[i], row)
-    Value* expr_eval =
+    llvm::Value* expr_eval =
         codegen->CodegenArrayAt(&builder, expr_evals_arg, i, "expr_eval");
-    Value* expr_args[] = { expr_eval, row_arg };
+    llvm::Value* expr_args[] = {expr_eval, row_arg};
     CodegenAnyVal src = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
         slot_materialize_exprs[i]->type(), materialize_expr_fns[i], expr_args, "src");
 
@@ -378,7 +391,76 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_
   // TODO: if pool != NULL, OptimizeFunctionWithExprs() is inlining the Allocate()
   // call. Investigate if this is a good thing.
   *fn = codegen->FinalizeFunction(*fn);
+  if (*fn == nullptr) {
+    return Status("Tuple::CodegenMaterializeTuple(): failed to finalize function");
+  }
   return Status::OK();
+}
+
+Status Tuple::CodegenCopyStrings(
+    LlvmCodeGen* codegen, const TupleDescriptor& desc, llvm::Function** copy_strings_fn) {
+  llvm::PointerType* opaque_tuple_type = codegen->GetPtrType(Tuple::LLVM_CLASS_NAME);
+  llvm::PointerType* runtime_state_type =
+      codegen->GetPtrType(RuntimeState::LLVM_CLASS_NAME);
+  llvm::StructType* slot_offsets_type =
+      static_cast<llvm::StructType*>(codegen->GetType(SlotOffsets::LLVM_CLASS_NAME));
+  llvm::PointerType* pool_type = codegen->GetPtrType(MemPool::LLVM_CLASS_NAME);
+  llvm::PointerType* status_type = codegen->GetPtrType(Status::LLVM_CLASS_NAME);
+  LlvmCodeGen::FnPrototype prototype(
+      codegen, "CopyStringsWrapper", codegen->boolean_type());
+  prototype.AddArgument("opaque_tuple", opaque_tuple_type);
+  prototype.AddArgument("err_ctx", codegen->ptr_type());
+  prototype.AddArgument("state", runtime_state_type);
+  prototype.AddArgument("slot_offsets", codegen->GetPtrType(slot_offsets_type));
+  prototype.AddArgument("num_string_slots", codegen->int_type());
+  prototype.AddArgument("pool", pool_type);
+  prototype.AddArgument("status", status_type);
+
+  LlvmBuilder builder(codegen->context());
+  llvm::Value* args[7];
+  *copy_strings_fn = prototype.GeneratePrototype(&builder, args);
+  llvm::Value* opaque_tuple_arg = args[0];
+  llvm::Value* err_ctx_arg = args[1];
+  llvm::Value* state_arg = args[2];
+  // slot_offsets and num_string_slots are replaced with constants so args are unused.
+  llvm::Value* pool_arg = args[5];
+  llvm::Value* status_arg = args[6];
+
+  llvm::Function* cross_compiled_fn =
+      codegen->GetFunction(IRFunction::TUPLE_COPY_STRINGS, false);
+  DCHECK(cross_compiled_fn != nullptr);
+
+  // Convert the offsets of the string slots into a constant IR array 'slot_offsets'.
+  vector<llvm::Constant*> slot_offset_ir_constants;
+  for (SlotDescriptor* slot_desc : desc.string_slots()) {
+    SlotOffsets offsets = {slot_desc->null_indicator_offset(), slot_desc->tuple_offset()};
+    slot_offset_ir_constants.push_back(offsets.ToIR(codegen));
+  }
+  llvm::Constant* constant_slot_offsets = codegen->ConstantsToGVArrayPtr(
+      slot_offsets_type, slot_offset_ir_constants, "slot_offsets");
+  llvm::Constant* num_string_slots =
+      llvm::ConstantInt::get(codegen->int_type(), desc.string_slots().size());
+  // Get SlotOffsets* pointer to the first element of the constant array.
+  llvm::Value* constant_slot_offsets_first_element_ptr =
+      builder.CreateConstGEP2_64(constant_slot_offsets, 0, 0);
+
+  llvm::Value* result_val = builder.CreateCall(cross_compiled_fn,
+      {opaque_tuple_arg, err_ctx_arg, state_arg, constant_slot_offsets_first_element_ptr,
+          num_string_slots, pool_arg, status_arg});
+  builder.CreateRet(result_val);
+
+  *copy_strings_fn = codegen->FinalizeFunction(*copy_strings_fn);
+  if (*copy_strings_fn == nullptr) {
+    return Status("Tuple::CodegenCopyStrings(): failed to finalize function");
+  }
+  return Status::OK();
+}
+
+llvm::Constant* SlotOffsets::ToIR(LlvmCodeGen* codegen) const {
+  return llvm::ConstantStruct::get(
+      static_cast<llvm::StructType*>(codegen->GetType(LLVM_CLASS_NAME)),
+      {null_indicator_offset.ToIR(codegen),
+          llvm::ConstantInt::get(codegen->int_type(), tuple_offset)});
 }
 
 template void Tuple::MaterializeExprs<false, false>(TupleRow*, const TupleDescriptor&,

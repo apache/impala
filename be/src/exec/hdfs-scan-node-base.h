@@ -151,10 +151,10 @@ class HdfsScanNodeBase : public ScanNode {
 
   const TupleDescriptor* min_max_tuple_desc() const { return min_max_tuple_desc_; }
   const TupleDescriptor* tuple_desc() const { return tuple_desc_; }
-  const HdfsTableDescriptor* hdfs_table() { return hdfs_table_; }
-  const AvroSchemaElement& avro_schema() { return *avro_schema_.get(); }
+  const HdfsTableDescriptor* hdfs_table() const { return hdfs_table_; }
+  const AvroSchemaElement& avro_schema() const { return *avro_schema_.get(); }
   int skip_header_line_count() const { return skip_header_line_count_; }
-  DiskIoRequestContext* reader_context() { return reader_context_; }
+  DiskIoRequestContext* reader_context() const { return reader_context_; }
   bool optimize_parquet_count_star() const { return optimize_parquet_count_star_; }
   int parquet_count_star_slot_offset() const { return parquet_count_star_slot_offset_; }
 

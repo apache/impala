@@ -101,7 +101,7 @@ class ScanNode : public ExecNode {
 
   virtual bool IsScanNode() const { return true; }
 
-  RuntimeState* runtime_state() { return runtime_state_; }
+  RuntimeState* runtime_state() const { return runtime_state_; }
   RuntimeProfile::Counter* bytes_read_counter() const { return bytes_read_counter_; }
   RuntimeProfile::Counter* rows_read_counter() const { return rows_read_counter_; }
   RuntimeProfile::Counter* collection_items_read_counter() const {
