@@ -311,7 +311,7 @@ function create-internal-hbase-table {
   # Need to investigate this more, but this works around the problem to unblock automation.
   set +o errexit
   beeline -n $USER -u "${JDBC_URL}" -e\
-    "DROP TABLE IF EXISTS functional_hbase.internal_hbase_table"
+    "DROP TABLE IF EXISTS functional_hbase.internal_hbase_table;"
   echo "disable 'functional_hbase.internal_hbase_table'" | hbase shell
   echo "drop 'functional_hbase.internal_hbase_table'" | hbase shell
   set -e

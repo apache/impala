@@ -72,9 +72,9 @@ HDFS_PATH=/test-warehouse/many_blocks_num_blocks_per_partition_${BLOCKS_PER_PART
 DB_NAME=scale_db
 TBL_NAME=num_partitions_${NUM_PARTITIONS}_blocks_per_partition_${BLOCKS_PER_PARTITION}
 
-$HIVE_CMD -e "create database if not exists scale_db"
-$HIVE_CMD -e "drop table if exists ${DB_NAME}.${TBL_NAME}"
-$HIVE_CMD -e "create external table ${DB_NAME}.${TBL_NAME} (i int) partitioned by (j int)"
+$HIVE_CMD -e "create database if not exists scale_db;"
+$HIVE_CMD -e "drop table if exists ${DB_NAME}.${TBL_NAME};"
+$HIVE_CMD -e "create external table ${DB_NAME}.${TBL_NAME} (i int) partitioned by (j int);"
 
 # Generate many (small) files. Each file will be assigned a unique block.
 echo "Generating ${BLOCKS_PER_PARTITION} files"
