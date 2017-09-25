@@ -63,12 +63,14 @@ class KuduScanNodeBase : public ScanNode {
   RuntimeState* runtime_state_;
   std::vector<FilterContext> filter_ctxs_;
 
-  // Column name to bloom filter which references to bloom filter pointer in RuntimeFilter.
-  std::map<std::string, BloomFilter*> column_to_bf_;
-  // The set of column names which has been collected.
-  std::set<std::string> column_done;
-  // Scan node will wait for expected runtime filters to arrive.
-  int32 wait_time_ms_;
+  /// Set to true when the initial scan ranges are issued to the IoMgr. This happens on
+  /// the first call to GetNext(). The token manager, in a different thread, will read
+  /// this variable.
+  bool initial_ranges_issued_;
+
+  /// Waits for runtime filters if necessary.
+  /// Only valid to call if !initial_ranges_issued_. Sets initial_ranges_issued_ to true.
+  Status IssueRuntimeFilters(RuntimeState* state);
 
   /// Stops periodic counters and aggregates counter values for the entire scan node.
   /// This should be called as soon as the scan node is complete to get the most accurate
@@ -116,9 +118,6 @@ class KuduScanNodeBase : public ScanNode {
   const TupleDescriptor* tuple_desc() const { return tuple_desc_; }
   kudu::client::KuduClient* kudu_client() { return client_; }
   RuntimeProfile::Counter* kudu_round_trips() const { return kudu_round_trips_; }
-  Status CollectKuduBFs(const std::vector<FilterContext*>& filter);
-  std::map<std::string, BloomFilter*>& GetKuduBFs() { return column_to_bf_; }
-  void ClearKuduBFs() { column_to_bf_.clear(); }
 };
 
 }

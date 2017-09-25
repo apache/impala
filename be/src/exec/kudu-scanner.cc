@@ -29,6 +29,7 @@
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
+#include "runtime/runtime-filter.h"
 #include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/string-value.h"
@@ -73,6 +74,7 @@ Status KuduScanner::Open() {
     if (slot->type().type != TYPE_TIMESTAMP) continue;
     timestamp_slots_.push_back(slot);
   }
+  //filter_ctx_pushed_down_.resize(scan_node_->filter_ctxs_.size(), false);
   return scan_node_->GetConjunctCtxs(&conjunct_ctxs_);
 }
 
@@ -155,21 +157,58 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token)  {
   uint64_t row_format_flags = kudu::client::KuduScanner::PAD_UNIXTIME_MICROS_TO_16_BYTES;
   scanner_->SetRowFormatFlags(row_format_flags);
 
-  // Push down the bloom filter predicates.
-  if (!scan_node_->GetKuduBFs().empty()) {
-    for (auto& one: scan_node_->GetKuduBFs()) {
-      kudu::client::KuduValueBloomFilter* bf = kudu::client::KuduValueBloomFilterBuilder().Build(one.second);
-      kudu::client::KuduPredicate* p =  scan_node_->table_->NewBloomFilterPredicate(one.first, bf);
-      scanner_->AddConjunctPredicate(p);
-    }
-    // Clear the map of bloom filters.
-    scan_node_->ClearKuduBFs();
-  }
+  // Apply the runtime filters here.
+  RETURN_IF_ERROR(ApplyRuntimeFilters());
 
   {
     SCOPED_TIMER(state_->total_storage_wait_timer());
     KUDU_RETURN_IF_ERROR(scanner_->Open(), "Unable to open scanner");
   }
+  return Status::OK();
+}
+
+Status KuduScanner::ApplyRuntimeFilters() {
+  if (scan_node_->filter_ctxs_.empty()) return Status::OK();
+
+  // Reset 'filter_ctx_pushed_down_'.
+  filter_ctx_pushed_down_.clear();
+
+  // Apply runtime filters.
+  const TupleDescriptor* tuple_desc = scan_node_->tuple_desc_;
+  const TableDescriptor* table_desc = tuple_desc->table_desc();
+  std::vector<FilterContext>::iterator it = scan_node_->filter_ctxs_.begin();
+  for (int i = 0; it != scan_node_->filter_ctxs_.end(); ++it, ++i) {
+    // Skip 'not arrived' & 'ALWAYS_TRUE_FILTER'
+    const RuntimeFilter* rf = it->filter;
+    if (!(rf->HasBloomFilter())) continue;
+    BloomFilter* bf = const_cast<BloomFilter*>(rf->GetBloomFilter());
+    if (bf == BloomFilter::ALWAYS_TRUE_FILTER) continue;
+
+    // Is there any other way to get column name?
+    string column_name;
+    const TRuntimeFilterDesc& desc = it->filter->filter_desc();
+    const auto iter = desc.planid_to_target_ndx.find(scan_node_->id());
+    CHECK(iter != desc.planid_to_target_ndx.end());
+    const TRuntimeFilterTargetDesc& target = desc.targets[iter->second];
+    TSlotId slot_id = target.target_expr.nodes[0].slot_ref.slot_id;
+    std::vector<SlotDescriptor*>::const_iterator slot = tuple_desc->slots().begin();
+    for (; slot != tuple_desc->slots().end(); ++slot){
+      if ((*slot)->id() == slot_id) {
+        int col_idx = (*slot)->col_pos();
+        column_name = table_desc->col_descs()[col_idx].name();
+        break;
+      }
+    }
+    CHECK(!column_name.empty());
+
+    kudu::client::KuduValueBloomFilter* b = kudu::client::KuduValueBloomFilterBuilder().Build(bf);
+    kudu::client::KuduPredicate* p =  scan_node_->table_->NewBloomFilterPredicate(column_name, b);
+    scanner_->AddConjunctPredicate(p);
+
+    // Record the idx of 'filter_ctxs_'.
+    filter_ctx_pushed_down_.push_back(i);
+  }
+
   return Status::OK();
 }
 
@@ -233,6 +272,11 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_me
       }
     }
 
+    // Evaluate runtime filters that haven't been pushed down to Kudu.
+    /*if (!EvalRuntimeFilters(reinterpret_cast<TupleRow*>(output_row))) {
+        continue;
+    }*/
+
     // Evaluate the conjuncts that haven't been pushed down to Kudu. Conjunct evaluation
     // is performed directly on the Kudu tuple because its memory layout is identical to
     // Impala's. We only copy the surviving tuples to Impala's output row batch.
@@ -264,7 +308,7 @@ Status KuduScanner::GetNextScannerBatch() {
   // Wait for the runtime filters.
   // It should not wait for runtime filters any more, if the size of 
   // bloom filters that have been collected equals to the size of filter context's.
-  if (scan_node_->filter_ctxs_.size() > 0 && 
+  /*if (scan_node_->filter_ctxs_.size() > 0 && 
       (scan_node_->filter_ctxs_.size() != scan_node_->column_done.size())) {
     scan_node_->WaitForRuntimeFilters(scan_node_->wait_time_ms_/10);
     if (!scan_node_->GetKuduBFs().empty()) {
@@ -275,7 +319,7 @@ Status KuduScanner::GetNextScannerBatch() {
       }
       scan_node_->ClearKuduBFs();
     }
-  }
+  }*/
 
   KUDU_RETURN_IF_ERROR(scanner_->NextBatch(&cur_kudu_batch_), "Unable to advance iterator");
   COUNTER_ADD(scan_node_->kudu_round_trips(), 1);

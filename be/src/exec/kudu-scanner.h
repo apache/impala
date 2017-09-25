@@ -59,6 +59,9 @@ class KuduScanner {
   void Close();
 
  private:
+  /// Apply the runtime filters to KuduScanner.
+  Status ApplyRuntimeFilters();
+
   /// Handles the case where the projection is empty (e.g. count(*)).
   /// Does this by adding sets of rows to 'row_batch' instead of adding one-by-one.
   Status HandleEmptyProjection(RowBatch* row_batch);
@@ -105,6 +108,11 @@ class KuduScanner {
   /// Timestamp slots in the tuple descriptor of the scan node. Used to convert Kudu
   /// UNIXTIME_MICRO values inline.
   vector<const SlotDescriptor*> timestamp_slots_;
+
+  /// Be used to mark the filter contexts that have been pushed down yet.
+  /// The value 'true' means the filter context has been pushed down, else not.
+  /// The size of this vector equals to the size of 'filter_ctxs_'.
+  vector<bool> filter_ctx_pushed_down_;
 };
 
 } /// namespace impala

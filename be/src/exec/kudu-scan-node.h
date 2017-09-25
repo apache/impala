@@ -25,6 +25,8 @@
 #include "exec/kudu-scan-node-base.h"
 #include "runtime/thread-resource-mgr.h"
 #include "gutil/gscoped_ptr.h"
+#include "util/promise.h"
+#include "util/counting-barrier.h"
 #include "util/thread.h"
 
 namespace impala {
@@ -48,6 +50,9 @@ class KuduScanNode : public KuduScanNodeBase {
 
  private:
   friend class KuduScanner;
+
+  /// Released when initial runtime filters are issued in the first call to GetNext().
+  CountingBarrier runtimefilters_issued_barrier_;
 
   // Outgoing row batches queue. Row batches are produced asynchronously by the scanner
   // threads and consumed by the main thread.
@@ -96,6 +101,9 @@ class KuduScanNode : public KuduScanNodeBase {
   /// in 'materialized_row_batches_' until the scanner reports eos, an error occurs, or
   /// the limit is reached.
   Status ProcessScanToken(KuduScanner* scanner, const std::string& scan_token);
+
+  /// Checks for eos conditions and returns batches from materialized_row_batches_.
+  Status GetNextInternal(RuntimeState* state, RowBatch* row_batch, bool* eos);
 };
 
 }

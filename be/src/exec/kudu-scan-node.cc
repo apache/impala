@@ -34,11 +34,16 @@
 DEFINE_int32(kudu_max_row_batches, 0, "The maximum size of the row batch queue, "
     " for Kudu scanners.");
 
+// Amount of time to block waiting for GetNext() to release scanner threads between
+// checking if a scanner thread should yield itself back to the global thread pool.
+const int SCANNER_THREAD_WAIT_TIME_MS = 20;
+
 namespace impala {
 
 KuduScanNode::KuduScanNode(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
     : KuduScanNodeBase(pool, tnode, descs),
+      runtimefilters_issued_barrier_(1),
       num_active_scanners_(0),
       done_(false),
       thread_avail_cb_id_(-1) {
@@ -80,6 +85,14 @@ Status KuduScanNode::Open(RuntimeState* state) {
 }
 
 Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  if (!initial_ranges_issued_) {
+    RETURN_IF_ERROR(IssueRuntimeFilters(state));
+    runtimefilters_issued_barrier_.Notify();
+  }
+  return GetNextInternal(state, row_batch, eos);
+}
+
+Status KuduScanNode::GetNextInternal(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   DCHECK(row_batch != NULL);
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
@@ -194,12 +207,14 @@ void KuduScanNode::RunScannerThread(const string& name, const string* initial_to
   const string* scan_token = initial_token;
   Status status = scanner.Open();
   if (status.ok()) {
+    // Wake up every SCANNER_THREAD_COUNTERS to yield scanner threads back if unused, or
+    // to return if there's an error.
+    bool unused = false;
+    runtimefilters_issued_barrier_.Wait(SCANNER_THREAD_WAIT_TIME_MS, &unused);
+
     // Here, even though a read of 'done_' may conflict with a write to it,
     // ProcessScanToken() will return early, as will GetNextScanToken().
     while (!done_ && scan_token != NULL) {
-      if (filter_ctxs_.size() > 0) {
-        WaitForRuntimeFilters(wait_time_ms_);
-      }
       status = ProcessScanToken(&scanner, *scan_token);
       if (!status.ok()) break;
 

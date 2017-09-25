@@ -60,7 +60,6 @@ const string KuduScanNodeBase::KUDU_REMOTE_TOKENS = "KuduRemoteScanTokens";
 KuduScanNodeBase::KuduScanNodeBase(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
     : ScanNode(pool, tnode, descs),
-      wait_time_ms_(0),
       tuple_id_(tnode.kudu_scan_node.tuple_id),
       client_(nullptr),
       counters_running_(false),
@@ -153,10 +152,6 @@ Status KuduScanNodeBase::Open(RuntimeState* state) {
   KUDU_RETURN_IF_ERROR(client_->OpenTable(table_desc->table_name(), &table_),
       "Unable to open Kudu table");
 
-  wait_time_ms_ = FLAGS_kudu_runtime_filter_wait_time_ms;
-  if (runtime_state_->query_options().runtime_filter_wait_time_ms > 0) {
-      wait_time_ms_ = runtime_state_->query_options().runtime_filter_wait_time_ms;
-  }
   return Status::OK();
 }
 
@@ -175,49 +170,20 @@ bool KuduScanNodeBase::HasScanToken() {
   return (next_scan_token_idx_ < scan_tokens_.size());
 }
 
-Status KuduScanNodeBase::CollectKuduBFs(const std::vector<FilterContext*>& ctxs) {
-  std::vector<FilterContext*>::const_iterator it = ctxs.begin();
-  for (; it != ctxs.end(); ++it) {
-    const TRuntimeFilterDesc& desc = (*it)->filter->filter_desc();
-    const auto iter = desc.planid_to_target_ndx.find(id());
-    DCHECK(iter != desc.planid_to_target_ndx.end());
-    const TRuntimeFilterTargetDesc& target = desc.targets[iter->second];
-
-    // Is there any other method to get column name?
-    string col_name;
-    GetSlotRefColumnName(target.target_expr.nodes[0], &col_name);
-
-    // Check whether the column has been collected.
-    if (column_done.find(col_name) != column_done.end()) continue;
-    column_done.insert(col_name);
-    BloomFilter* bf = const_cast<BloomFilter*>((*it)->filter->GetBloomFilter());
-    if (bf != nullptr) {
-      column_to_bf_.insert(std::make_pair(col_name, bf));
-    }
-  }
-
-  return Status::OK();
-}
-
 bool KuduScanNodeBase::WaitForRuntimeFilters(int32_t time_ms) {
   vector<string> arrived_filter_ids;
-  vector<FilterContext*> ctxs;
   int32_t start = MonotonicMillis();
   for (auto& ctx: filter_ctxs_) {
     if (ctx.filter->WaitForArrival(time_ms)) {
       arrived_filter_ids.push_back(Substitute("$0", ctx.filter->id()));
-      ctxs.push_back(&ctx);
     }
   }
   int32_t end = MonotonicMillis();
   const string& wait_time = PrettyPrinter::Print(end - start, TUnit::TIME_MS);
 
-  // Collect bloom filters from filter contexts.
-  CollectKuduBFs(ctxs);
-
   if (arrived_filter_ids.size() == filter_ctxs_.size()) {
     runtime_profile()->AddInfoString("Runtime filters",
-                                     Substitute("All filters arrived. Waited $0", wait_time));
+        Substitute("All filters arrived. Waited $0", wait_time));
     VLOG_QUERY << "Filters arrived. Waited " << wait_time;
     return true;
   }
@@ -235,6 +201,18 @@ const string* KuduScanNodeBase::GetNextScanToken() {
   return token;
 }
 
+Status KuduScanNodeBase::IssueRuntimeFilters(RuntimeState* state) {
+  DCHECK(!initial_ranges_issued_);
+  initial_ranges_issued_ = true;
+
+  int32 wait_time_ms = FLAGS_kudu_runtime_filter_wait_time_ms;
+  if (state->query_options().runtime_filter_wait_time_ms > 0) {
+      wait_time_ms = state->query_options().runtime_filter_wait_time_ms;
+  }
+  if (filter_ctxs_.size() > 0) WaitForRuntimeFilters(wait_time_ms);
+  return Status::OK();
+}
+
 void KuduScanNodeBase::StopAndFinalizeCounters() {
   if (!counters_running_) return;
   counters_running_ = false;
@@ -246,21 +224,5 @@ void KuduScanNodeBase::StopAndFinalizeCounters() {
 Status KuduScanNodeBase::GetConjunctCtxs(vector<ExprContext*>* ctxs) {
   return Expr::CloneIfNotExists(conjunct_ctxs_, runtime_state_, ctxs);
 }
-
-void KuduScanNodeBase::GetSlotRefColumnName(const TExprNode& node, string* col_name) {
-  const KuduTableDescriptor* table_desc =
-      static_cast<const KuduTableDescriptor*>(tuple_desc_->table_desc());
-  TSlotId slot_id = node.slot_ref.slot_id;
-  BOOST_FOREACH(SlotDescriptor* slot, tuple_desc_->slots()) {
-    if (slot->id() == slot_id) {
-      int col_idx = slot->col_pos();
-      *col_name = table_desc->col_descs()[col_idx].name();
-      return;
-    }
-  }
-
-  DCHECK(false) << "Could not find a slot with slot id: " << slot_id;
-}
-
 
 }  // namespace impala
