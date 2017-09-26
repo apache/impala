@@ -741,10 +741,81 @@ scope, database, table, column, uri, privilege, grant_option, create_time
 STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
+# IMPALA-4951: make sure database is visible to a user having only column level access
+# to a table in the database
+grant role grant_revoke_test_ALL_SERVER to group $GROUP_NAME
+---- RESULTS
+====
+---- QUERY
+create role grant_revoke_test_COLUMN_PRIV
+====
+---- QUERY
+grant role grant_revoke_test_COLUMN_PRIV to group $GROUP_NAME;
+====
+---- QUERY
+create database if not exists grant_rev_db;
+====
+---- QUERY
+create table grant_rev_db.test_tbl4 (col1 int, col2 int);
+====
+---- QUERY
+revoke role grant_revoke_test_ALL_SERVER from group $GROUP_NAME
+====
+---- QUERY
+show grant role grant_revoke_test_COLUMN_PRIV
+---- RESULTS
+---- LABELS
+scope, database, table, column, uri, privilege, grant_option, create_time
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+====
+---- QUERY
+# grant_rev_db is not visible as user does not have any level of access to it
+show databases
+---- RESULTS
+'default','Default Hive database'
+---- TYPES
+STRING,STRING
+====
+---- QUERY
+grant select(col1) on table grant_rev_db.test_tbl4 to role grant_revoke_test_COLUMN_PRIV
+====
+---- QUERY
+show grant role grant_revoke_test_COLUMN_PRIV
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'column','grant_rev_db','test_tbl4','col1','','select',false,regex:.+
+---- LABELS
+scope, database, table, column, uri, privilege, grant_option, create_time
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+====
+---- QUERY
+show databases
+---- RESULTS
+'default','Default Hive database'
+'grant_rev_db',''
+---- TYPES
+STRING,STRING
+====
+---- QUERY
+grant role grant_revoke_test_ALL_SERVER to group $GROUP_NAME
+---- RESULTS
+====
+---- QUERY
+drop database if exists grant_rev_db cascade
+====
+---- QUERY
+revoke role grant_revoke_test_ALL_SERVER from group $GROUP_NAME
+====
+---- QUERY
+revoke role grant_revoke_test_COLUMN_PRIV from group $GROUP_NAME
+====
+---- QUERY
 # Cleanup test roles
 drop role grant_revoke_test_ALL_SERVER;
 drop role grant_revoke_test_SELECT_INSERT_TEST_TBL;
 drop role grant_revoke_test_ALL_URI;
 drop role grant_revoke_test_ROOT;
+drop role grant_revoke_test_COLUMN_PRIV;
 ---- RESULTS
 ====
