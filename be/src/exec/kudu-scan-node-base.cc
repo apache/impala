@@ -62,7 +62,6 @@ KuduScanNodeBase::~KuduScanNodeBase() {
 
 Status KuduScanNodeBase::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ScanNode::Prepare(state));
-  runtime_state_ = state;
 
   scan_ranges_complete_counter_ =
       ADD_COUNTER(runtime_profile(), SCAN_RANGES_COMPLETE_COUNTER, TUnit::UNIT);

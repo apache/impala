@@ -153,7 +153,6 @@ class HdfsScanNodeBase : public ScanNode {
   const TupleDescriptor* tuple_desc() const { return tuple_desc_; }
   const HdfsTableDescriptor* hdfs_table() { return hdfs_table_; }
   const AvroSchemaElement& avro_schema() { return *avro_schema_.get(); }
-  RuntimeState* runtime_state() { return runtime_state_; }
   int skip_header_line_count() const { return skip_header_line_count_; }
   DiskIoRequestContext* reader_context() { return reader_context_; }
   bool optimize_parquet_count_star() const { return optimize_parquet_count_star_; }
@@ -306,15 +305,9 @@ class HdfsScanNodeBase : public ScanNode {
   bool PartitionPassesFilters(int32_t partition_id, const std::string& stats_name,
       const std::vector<FilterContext>& filter_ctxs);
 
-  const std::vector<ScalarExpr*>& filter_exprs() const { return filter_exprs_; }
-
-  const std::vector<FilterContext>& filter_ctxs() const { return filter_ctxs_; }
-
  protected:
   friend class ScannerContext;
   friend class HdfsScanner;
-
-  RuntimeState* runtime_state_ = nullptr;
 
   /// Tuple id of the tuple used to evaluate conjuncts on parquet::Statistics.
   const int min_max_tuple_id_;
@@ -405,14 +398,6 @@ class HdfsScanNodeBase : public ScanNode {
   /// Maps from a slot's path to its index into materialized_slots_.
   typedef boost::unordered_map<std::vector<int>, int> PathToSlotIdxMap;
   PathToSlotIdxMap path_to_materialized_slot_idx_;
-
-  /// Expressions to evaluate the input rows for filtering against runtime filters.
-  std::vector<ScalarExpr*> filter_exprs_;
-
-  /// List of contexts for expected runtime filters for this scan node. These contexts are
-  /// cloned by individual scanners to be used in multi-threaded contexts, passed through
-  /// the per-scanner ScannerContext. Correspond to exprs in 'filter_exprs_'.
-  std::vector<FilterContext> filter_ctxs_;
 
   /// is_materialized_col_[i] = <true i-th column should be materialized, false otherwise>
   /// for 0 <= i < total # columns in table
@@ -528,11 +513,6 @@ class HdfsScanNodeBase : public ScanNode {
   /// for bookkeeping. Returns true if all filters pass or are not present.
   bool FilePassesFilterPredicates(const std::vector<FilterContext>& filter_ctxs,
       const THdfsFileFormat::type& file_type, HdfsFileDesc* file);
-
-  /// Waits for up to time_ms for runtime filters to arrive, checking every 20ms. Returns
-  /// true if all filters arrived within the time limit (as measured from the time of
-  /// RuntimeFilterBank::RegisterFilter()), false otherwise.
-  bool WaitForRuntimeFilters(int32_t time_ms);
 
   /// Stops periodic counters and aggregates counter values for the entire scan node.
   /// This should be called as soon as the scan node is complete to get the most accurate

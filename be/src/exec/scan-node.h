@@ -21,6 +21,7 @@
 
 #include <string>
 #include "exec/exec-node.h"
+#include "exec/filter-context.h"
 #include "util/runtime-profile.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 
@@ -84,7 +85,9 @@ class ScanNode : public ExecNode {
       scan_range_params_(NULL),
       active_scanner_thread_counter_(TUnit::UNIT, 0) {}
 
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) WARN_UNUSED_RESULT;
   virtual Status Prepare(RuntimeState* state) WARN_UNUSED_RESULT;
+  virtual Status Open(RuntimeState* state) WARN_UNUSED_RESULT;
 
   /// Stops all periodic counters and calls ExecNode::Close(). Subclasses of ScanNode can
   /// start periodic counters and rely on this function stopping them.
@@ -98,6 +101,7 @@ class ScanNode : public ExecNode {
 
   virtual bool IsScanNode() const { return true; }
 
+  RuntimeState* runtime_state() { return runtime_state_; }
   RuntimeProfile::Counter* bytes_read_counter() const { return bytes_read_counter_; }
   RuntimeProfile::Counter* rows_read_counter() const { return rows_read_counter_; }
   RuntimeProfile::Counter* collection_items_read_counter() const {
@@ -143,7 +147,13 @@ class ScanNode : public ExecNode {
   static const std::string AVERAGE_HDFS_READ_THREAD_CONCURRENCY;
   static const std::string NUM_SCANNER_THREADS_STARTED;
 
+  const std::vector<ScalarExpr*>& filter_exprs() const { return filter_exprs_; }
+
+  const std::vector<FilterContext>& filter_ctxs() const { return filter_ctxs_; }
+
  protected:
+  RuntimeState* runtime_state_ = nullptr;
+
   /// The scan ranges this scan node is responsible for. Not owned.
   const std::vector<TScanRangeParams>* scan_range_params_;
 
@@ -176,6 +186,20 @@ class ScanNode : public ExecNode {
   RuntimeProfile::Counter* average_scanner_thread_concurrency_;
 
   RuntimeProfile::Counter* num_scanner_threads_started_counter_;
+
+  /// Expressions to evaluate the input rows for filtering against runtime filters.
+  std::vector<ScalarExpr*> filter_exprs_;
+
+  /// List of contexts for expected runtime filters for this scan node. These contexts are
+  /// cloned by individual scanners to be used in multi-threaded contexts, passed through
+  /// the per-scanner ScannerContext. Correspond to exprs in 'filter_exprs_'.
+  std::vector<FilterContext> filter_ctxs_;
+
+  /// Waits for runtime filters to arrive, checking every 20ms. Max wait time is specified
+  /// by the 'runtime_filter_wait_time_ms' flag, which is overridden by the query option
+  /// of the same name. Returns true if all filters arrived within the time limit (as
+  /// measured from the time of RuntimeFilterBank::RegisterFilter()), false otherwise.
+  bool WaitForRuntimeFilters();
 };
 
 }

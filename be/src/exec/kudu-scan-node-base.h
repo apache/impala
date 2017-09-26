@@ -56,8 +56,6 @@ class KuduScanNodeBase : public ScanNode {
   /// Not thread safe, access must be synchronized.
   const std::string* GetNextScanToken();
 
-  RuntimeState* runtime_state_;
-
  private:
   friend class KuduScanner;
 
