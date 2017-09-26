@@ -43,16 +43,18 @@ class TupleDescriptor;
 
 /// A RowBatch encapsulates a batch of rows, each composed of a number of tuples.
 /// The maximum number of rows is fixed at the time of construction.
-/// The row batch reference a few different sources of memory.
-///   1. TupleRow ptrs - may be malloc'd and owned by the RowBatch or allocated from
-///      the tuple pool, depending on whether legacy joins and aggs are enabled.
-///      See the comment on tuple_ptrs_ for more details.
-///   2. Tuple memory - this is allocated (or transferred to) the row batches tuple pool.
-///   3. Auxiliary tuple memory (e.g. string data) - this can either be stored externally
-///      (don't copy strings) or from the tuple pool (strings are copied).  If external,
-///      the data is in an io buffer that may not be attached to this row batch.  The
-///      creator of that row batch has to make sure that the io buffer is not recycled
-///      until all batches that reference the memory have been consumed.
+/// The row batch can reference various types of memory.
+///   1. TupleRow ptrs - malloc'd and owned by the RowBatch. See the comment on
+///      tuple_ptrs_ for more details.
+///   2. Fixed and variable-length tuple data. This memory may be directly attached to
+///      the batch: either in the batch's MemPool or in an attached buffer. Or it may
+///      live elsewhere - either in a subsequent batch returned by an ExecNode or
+///      still be owned by the ExecNode that produced the batch. In those cases the
+///      owner of this RowBatch must be careful not to close the producing ExecNode
+///      or free resources from trailing batches while the batch's data is still being
+///      used.
+///     TODO: IMPALA-4179: simplify the ownership transfer model.
+///
 /// In order to minimize memory allocations, RowBatches and TRowBatches that have been
 /// serialized and sent over the wire should be reused (this prevents compression_scratch_
 /// from being needlessly reallocated).
@@ -62,13 +64,13 @@ class TupleDescriptor;
 /// and reference memory outside of the row batch. This results in most row batches
 /// having a very small memory footprint and in some row batches having a very large
 /// one (it contains all the memory that other row batches are referencing). An example
-/// is IoBuffers which are only attached to one row batch. Only when the row batch reaches
+/// is buffers which are only attached to one row batch. Only when the row batch reaches
 /// a blocking operator or the root of the fragment is the row batch memory freed.
 /// This means that in some cases (e.g. very selective queries), we still need to
 /// pass the row batch through the exec nodes (even if they have no rows) to trigger
-/// memory deletion. AtCapacity() encapsulates the check that we are not accumulating
-/// excessive memory.
-//
+/// memory deletion. AtCapacity() encapsulates the check that the batch does not have
+/// excessive memory attached to it.
+///
 /// A row batch is considered at capacity if all the rows are full or it has accumulated
 /// auxiliary memory up to a soft cap. (See at_capacity_mem_usage_ comment).
 class RowBatch {
@@ -138,7 +140,7 @@ class RowBatch {
     // MarkFlushResources().
     DCHECK((!needs_deep_copy_ && flush_ == FlushMode::NO_FLUSH_RESOURCES)
         || num_rows_ == capacity_);
-    int64_t mem_usage = auxiliary_mem_usage_ + tuple_data_pool_.total_allocated_bytes();
+    int64_t mem_usage = attached_buffer_bytes_ + tuple_data_pool_.total_allocated_bytes();
     return num_rows_ == capacity_ || mem_usage >= AT_CAPACITY_MEM_USAGE;
   }
 
@@ -203,24 +205,18 @@ class RowBatch {
   };
 
   int num_tuples_per_row() { return num_tuples_per_row_; }
-  int row_byte_size() { return num_tuples_per_row_ * sizeof(Tuple*); }
   MemPool* tuple_data_pool() { return &tuple_data_pool_; }
-  int num_io_buffers() const { return io_buffers_.size(); }
   int num_buffers() const { return buffers_.size(); }
 
   /// Resets the row batch, returning all resources it has accumulated.
   void Reset();
-
-  /// Add io buffer to this row batch.
-  void AddIoBuffer(std::unique_ptr<DiskIoMgr::BufferDescriptor> buffer);
 
   /// Adds a buffer to this row batch. The buffer is deleted when freeing resources.
   /// The buffer's memory remains accounted against the original owner, even when the
   /// ownership of batches is transferred. If the original owner wants the memory to be
   /// released, it should call this with 'mode' FLUSH_RESOURCES (see MarkFlushResources()
   /// for further explanation).
-  /// TODO: IMPALA-4179: after IMPALA-3200, simplify the ownership transfer model and
-  /// make it consistent between buffers and I/O buffers.
+  /// TODO: IMPALA-4179: simplify the ownership transfer model.
   void AddBuffer(BufferPool::ClientHandle* client, BufferPool::BufferHandle&& buffer,
       FlushMode flush);
 
@@ -230,10 +226,10 @@ class RowBatch {
   /// can be added. The "flush" mark is transferred by TransferResourceOwnership(). This
   /// ensures that batches are flushed by streaming operators all the way up the operator
   /// tree. Blocking operators can still accumulate batches with this flag.
-  /// TODO: IMPALA-3200: blocking operators should acquire all memory resources including
-  /// attached blocks/buffers, so that MarkFlushResources() can guarantee that the
+  /// TODO: IMPALA-4179: blocking operators should acquire all memory resources including
+  /// attached buffers, so that MarkFlushResources() can guarantee that the
   /// resources will not be accounted against the original operator (this is currently
-  /// not true for Blocks, which can't be transferred).
+  /// not true for buffers, which aren't transferred).
   void MarkFlushResources() {
     DCHECK_LE(num_rows_, capacity_);
     capacity_ = num_rows_;
@@ -256,7 +252,7 @@ class RowBatch {
   bool needs_deep_copy() { return needs_deep_copy_; }
 
   /// Transfer ownership of resources to dest.  This includes tuple data in mem
-  /// pool and io buffers.
+  /// pool and buffers.
   void TransferResourceOwnership(RowBatch* dest);
 
   void CopyRow(TupleRow* src, TupleRow* dest) {
@@ -277,7 +273,7 @@ class RowBatch {
     memset(row, 0, num_tuples_per_row_ * sizeof(Tuple*));
   }
 
-  /// Acquires state from the 'src' row batch into this row batch. This includes all IO
+  /// Acquires state from the 'src' row batch into this row batch. This includes all
   /// buffers and tuple data.
   /// This row batch must be empty and have the same row descriptor as the src batch.
   /// This is used for scan nodes which produce RowBatches asynchronously.  Typically,
@@ -399,9 +395,8 @@ class RowBatch {
   int tuple_ptrs_size_;
   Tuple** tuple_ptrs_;
 
-  /// Sum of all auxiliary bytes. This includes IoBuffers and memory from
-  /// TransferResourceOwnership().
-  int64_t auxiliary_mem_usage_;
+  /// Total bytes of BufferPool buffers attached to this batch.
+  int64_t attached_buffer_bytes_;
 
   /// holding (some of the) data referenced by rows
   MemPool tuple_data_pool_;
@@ -414,11 +409,6 @@ class RowBatch {
   const RowDescriptor* row_desc_;
 
   MemTracker* mem_tracker_;  // not owned
-
-  /// IO buffers current owned by this row batch. Ownership of IO buffers transfer
-  /// between row batches. Any IO buffer will be owned by at most one row batch
-  /// (i.e. they are not ref counted) so most row batches don't own any.
-  std::vector<std::unique_ptr<DiskIoMgr::BufferDescriptor>> io_buffers_;
 
   struct BufferInfo {
     BufferPool::ClientHandle* client;

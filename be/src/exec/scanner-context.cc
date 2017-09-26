@@ -58,9 +58,9 @@ ScannerContext::~ScannerContext() {
   DCHECK(streams_.empty());
 }
 
-void ScannerContext::ReleaseCompletedResources(RowBatch* batch, bool done) {
+void ScannerContext::ReleaseCompletedResources(bool done) {
   for (int i = 0; i < streams_.size(); ++i) {
-    streams_[i]->ReleaseCompletedResources(batch, done);
+    streams_[i]->ReleaseCompletedResources(done);
   }
 }
 
@@ -87,13 +87,11 @@ ScannerContext::Stream* ScannerContext::AddStream(DiskIoMgr::ScanRange* range) {
   stream->output_buffer_pos_ = NULL;
   stream->output_buffer_bytes_left_ =
       const_cast<int64_t*>(&OUTPUT_BUFFER_BYTES_LEFT_INIT);
-  stream->contains_tuple_data_ = scan_node_->tuple_desc()->ContainsStringData();
   streams_.push_back(std::move(stream));
   return streams_.back().get();
 }
 
-void ScannerContext::Stream::ReleaseCompletedResources(RowBatch* batch, bool done) {
-  DCHECK(batch != nullptr || done || !contains_tuple_data_);
+void ScannerContext::Stream::ReleaseCompletedResources(bool done) {
   if (done) {
     // Mark any pending resources as completed
     if (io_buffer_ != nullptr) {
@@ -108,24 +106,11 @@ void ScannerContext::Stream::ReleaseCompletedResources(RowBatch* batch, bool don
   }
 
   for (unique_ptr<DiskIoMgr::BufferDescriptor>& buffer : completed_io_buffers_) {
-    if (contains_tuple_data_ && batch != nullptr) {
-      batch->AddIoBuffer(move(buffer));
-      // TODO: We can do row batch compaction here.  This is the only place io buffers are
-      // queued.  A good heuristic is to check the number of io buffers queued and if
-      // there are too many, we should compact.
-    } else {
-      ExecEnv::GetInstance()->disk_io_mgr()->ReturnBuffer(move(buffer));
-      parent_->scan_node_->num_owned_io_buffers_.Add(-1);
-    }
+    ExecEnv::GetInstance()->disk_io_mgr()->ReturnBuffer(move(buffer));
   }
   parent_->num_completed_io_buffers_ -= completed_io_buffers_.size();
   completed_io_buffers_.clear();
 
-  if (contains_tuple_data_ && batch != nullptr) {
-    // If we're not done, keep using the last chunk allocated in boundary_pool_ so we
-    // don't have to reallocate. If we are done, transfer it to the row batch.
-    batch->tuple_data_pool()->AcquireData(boundary_pool_.get(), /* keep_current */ !done);
-  }
   if (done) boundary_pool_->FreeAll();
 }
 
@@ -196,7 +181,6 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
         filename(), offset));
   }
 
-  parent_->scan_node_->num_owned_io_buffers_.Add(1);
   io_buffer_pos_ = reinterpret_cast<uint8_t*>(io_buffer_->buffer());
   io_buffer_bytes_left_ = io_buffer_->len();
   if (io_buffer_->len() == 0) {
@@ -262,13 +246,7 @@ Status ScannerContext::Stream::GetBytesInternal(int64_t requested_len,
   DCHECK_GT(requested_len, boundary_buffer_bytes_left_);
   *out_buffer = NULL;
 
-  if (boundary_buffer_bytes_left_ == 0) {
-    if (contains_tuple_data_) {
-      boundary_buffer_->Reset();
-    } else {
-      boundary_buffer_->Clear();
-    }
-  }
+  if (boundary_buffer_bytes_left_ == 0) boundary_buffer_->Clear();
 
   DCHECK(ValidateBufferPointers());
 

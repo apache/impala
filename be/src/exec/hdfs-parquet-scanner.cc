@@ -164,7 +164,6 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
 
 Status HdfsParquetScanner::Open(ScannerContext* context) {
   RETURN_IF_ERROR(HdfsScanner::Open(context));
-  stream_->set_contains_tuple_data(false);
   metadata_range_ = stream_->scan_range();
   num_cols_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumColumns", TUnit::UNIT);
@@ -228,7 +227,7 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
 
   // Release I/O buffers immediately to make sure they are cleaned up
   // in case we return a non-OK status anywhere below.
-  context_->ReleaseCompletedResources(nullptr, true);
+  context_->ReleaseCompletedResources(true);
   RETURN_IF_ERROR(footer_status);
 
   // Parse the file schema into an internal representation for schema resolution.
@@ -265,7 +264,7 @@ void HdfsParquetScanner::Close(RowBatch* row_batch) {
   } else {
     template_tuple_pool_->FreeAll();
     dictionary_pool_.get()->FreeAll();
-    context_->ReleaseCompletedResources(nullptr, true);
+    context_->ReleaseCompletedResources(true);
     for (ParquetColumnReader* col_reader : column_readers_) col_reader->Close(nullptr);
     // The scratch batch may still contain tuple data. We can get into this case if
     // Open() fails or if the query is cancelled.
@@ -731,7 +730,7 @@ void HdfsParquetScanner::FlushRowGroupResources(RowBatch* row_batch) {
   DCHECK(row_batch != nullptr);
   row_batch->tuple_data_pool()->AcquireData(dictionary_pool_.get(), false);
   scratch_batch_->ReleaseResources(row_batch->tuple_data_pool());
-  context_->ReleaseCompletedResources(nullptr, true);
+  context_->ReleaseCompletedResources(true);
   for (ParquetColumnReader* col_reader : column_readers_) {
     col_reader->Close(row_batch);
   }
@@ -1676,8 +1675,6 @@ Status HdfsParquetScanner::InitColumns(
     DCHECK(stream != NULL);
 
     RETURN_IF_ERROR(scalar_reader->Reset(&col_chunk.meta_data, stream));
-    // Parquet column readers never return tuple data with pointers into I/O buffers.
-    stream->set_contains_tuple_data(false);
   }
   DCHECK_EQ(col_ranges.size(), num_scalar_readers);
 

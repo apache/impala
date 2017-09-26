@@ -103,7 +103,6 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
   if (!status.ok()) {
     scanner_->Close(row_batch);
     scanner_.reset();
-    num_owned_io_buffers_.Add(-row_batch->num_io_buffers());
     return status;
   }
   InitNullCollectionValues(row_batch);
@@ -119,7 +118,6 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
     *eos = true;
   }
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-  num_owned_io_buffers_.Add(-row_batch->num_io_buffers());
 
   if (*eos) StopAndFinalizeCounters();
   return Status::OK();

@@ -77,10 +77,6 @@ Status HdfsRCFileScanner::InitNewRange() {
   // ptrs into the decompressed data).
   reuse_row_group_buffer_ = scan_node_->tuple_desc()->string_slots().empty();
 
-  // The scanner currently copies all the column data out of the io buffer so the
-  // stream never contains any tuple data.
-  stream_->set_contains_tuple_data(false);
-
   if (header_->is_compressed) {
     RETURN_IF_ERROR(Codec::CreateDecompressor(nullptr,
         reuse_row_group_buffer_, header_->codec, &decompressor_));

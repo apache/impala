@@ -996,7 +996,7 @@ Status BaseScalarColumnReader::ReadDataPage() {
   }
   // We don't hold any pointers to earlier pages in the stream - we can safely free
   // any accumulated I/O or boundary buffers.
-  stream_->ReleaseCompletedResources(nullptr, false);
+  stream_->ReleaseCompletedResources(false);
 
   // Read the next data page, skipping page types we don't care about.
   // We break out of this loop on the non-error case (a data page was found or we read all

@@ -81,7 +81,6 @@ class ExecNode {
   virtual void Codegen(RuntimeState* state);
 
   /// Performs any preparatory work prior to calling GetNext().
-  /// Caller must not be holding any io buffers. This will cause deadlock.
   /// If overridden in subclass, must first call superclass's Open().
   /// Open() is called after Prepare() or Reset(), i.e., possibly multiple times
   /// throughout the lifetime of this node.
@@ -91,7 +90,7 @@ class ExecNode {
   /// child before acquiring their own resources to reduce the peak resource requirement.
   /// This is particularly important if there are multiple blocking ExecNodes in a
   /// pipeline because the lower nodes will release resources in Close() before the
-  /// Open() of their parent retuns.  The resource profile calculation in the frontend
+  /// Open() of their parent returns. The resource profile calculation in the frontend
   /// relies on this when computing the peak resources required for a query.
   virtual Status Open(RuntimeState* state) WARN_UNUSED_RESULT;
 
@@ -106,8 +105,6 @@ class ExecNode {
   /// In other words, if the memory holding the tuple data will be referenced
   /// by the callee in subsequent GetNext() calls, it must *not* be attached to the
   /// row_batch's tuple_data_pool.
-  /// Caller must not be holding any io buffers. This will cause deadlock.
-  /// TODO: AggregationNode and HashJoinNode cannot be "re-opened" yet.
   virtual Status GetNext(
       RuntimeState* state, RowBatch* row_batch, bool* eos) WARN_UNUSED_RESULT = 0;
 
@@ -274,8 +271,7 @@ class ExecNode {
 
     /// Deletes all row batches in cleanup_queue_. Not valid to call AddBatch()
     /// after this is called.
-    /// Returns the number of io buffers that were released (for debug tracking)
-    int Cleanup();
+    void Cleanup();
 
    private:
     /// Lock protecting cleanup_queue_

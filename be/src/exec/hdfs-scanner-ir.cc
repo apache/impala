@@ -19,6 +19,7 @@
 #include "runtime/row-batch.h"
 #include "util/string-parser.h"
 #include "runtime/string-value.inline.h"
+#include "runtime/tuple.h"
 
 #include "common/names.h"
 
@@ -33,9 +34,9 @@ using namespace impala;
 // This function takes more arguments than are strictly necessary (they could be
 // computed inside this function) but this is done to minimize the clang dependencies,
 // specifically, calling function on the scan node.
-int HdfsScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int row_size,
+int HdfsScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row,
     FieldLocation* fields, int num_tuples, int max_added_tuples,
-    int slots_per_tuple, int row_idx_start) {
+    int slots_per_tuple, int row_idx_start, bool copy_strings) {
   DCHECK(tuple_ != NULL);
   uint8_t* tuple_row_mem = reinterpret_cast<uint8_t*>(tuple_row);
   uint8_t* tuple_mem = reinterpret_cast<uint8_t*>(tuple_);
@@ -53,9 +54,16 @@ int HdfsScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int row_
     // function.
     if (WriteCompleteTuple(pool, fields, tuple, tuple_row, template_tuple_,
           error, &error_in_row)) {
+      if (copy_strings) {
+        if (UNLIKELY(!tuple->CopyStrings("HdfsScanner::WriteAlignedTuples()",
+              state_, string_slot_offsets_.data(), string_slot_offsets_.size(), pool,
+              &parse_status_))) {
+          return -1;
+        }
+      }
       ++tuples_returned;
-      tuple_mem += tuple_byte_size_;
-      tuple_row_mem += row_size;
+      tuple_mem += tuple_byte_size();
+      tuple_row_mem += sizeof(Tuple*);
       tuple = reinterpret_cast<Tuple*>(tuple_mem);
       tuple_row = reinterpret_cast<TupleRow*>(tuple_row_mem);
     }

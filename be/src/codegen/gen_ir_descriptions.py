@@ -174,7 +174,7 @@ ir_functions = [
   ["HDFS_SCANNER_INIT_TUPLE",
    "_ZN6impala11HdfsScanner9InitTupleEPNS_5TupleES2_"],
   ["HDFS_SCANNER_WRITE_ALIGNED_TUPLES",
-   "_ZN6impala11HdfsScanner18WriteAlignedTuplesEPNS_7MemPoolEPNS_8TupleRowEiPNS_13FieldLocationEiiii"],
+   "_ZN6impala11HdfsScanner18WriteAlignedTuplesEPNS_7MemPoolEPNS_8TupleRowEPNS_13FieldLocationEiiiib"],
   ["PROCESS_SCRATCH_BATCH",
    "_ZN6impala18HdfsParquetScanner19ProcessScratchBatchEPNS_8RowBatchE"],
   ["PARQUET_SCANNER_EVAL_RUNTIME_FILTER",

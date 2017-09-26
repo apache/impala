@@ -167,7 +167,6 @@ void HdfsTextScanner::Close(RowBatch* row_batch) {
   if (row_batch != nullptr) {
     row_batch->tuple_data_pool()->AcquireData(template_tuple_pool_.get(), false);
     row_batch->tuple_data_pool()->AcquireData(data_buffer_pool_.get(), false);
-    context_->ReleaseCompletedResources(row_batch, true);
     if (scan_node_->HasRowBatchQueue()) {
       static_cast<HdfsScanNode*>(scan_node_)->AddMaterializedRowBatch(
           unique_ptr<RowBatch>(row_batch));
@@ -175,8 +174,8 @@ void HdfsTextScanner::Close(RowBatch* row_batch) {
   } else {
     template_tuple_pool_->FreeAll();
     data_buffer_pool_->FreeAll();
-    context_->ReleaseCompletedResources(nullptr, true);
   }
+  context_->ReleaseCompletedResources(true);
 
   // Verify all resources (if any) have been transferred or freed.
   DCHECK_EQ(template_tuple_pool_.get()->total_allocated_bytes(), 0);
@@ -192,12 +191,6 @@ void HdfsTextScanner::Close(RowBatch* row_batch) {
 
 Status HdfsTextScanner::InitNewRange() {
   DCHECK_EQ(scan_state_, CONSTRUCTED);
-  // Compressed text does not reference data in the io buffers directly. In such case, we
-  // can recycle the buffers in the stream_ more promptly.
-  if (stream_->file_desc()->file_compression != THdfsCompression::NONE) {
-    stream_->set_contains_tuple_data(false);
-  }
-
   // Update the decompressor based on the compression type of the file in the context.
   DCHECK(stream_->file_desc()->file_compression != THdfsCompression::SNAPPY)
       << "FE should have generated SNAPPY_BLOCKED instead.";
@@ -591,7 +584,7 @@ Status HdfsTextScanner::FillByteBufferCompressedStream(MemPool* pool, bool* eosr
 
   if (*eosr) {
     DCHECK(stream_->eosr());
-    context_->ReleaseCompletedResources(nullptr, true);
+    context_->ReleaseCompletedResources(true);
   }
 
   return Status::OK();
@@ -637,7 +630,7 @@ Status HdfsTextScanner::FillByteBufferCompressedFile(bool* eosr) {
       &decompressed_buffer));
 
   // Inform 'stream_' that the buffer with the compressed text can be released.
-  context_->ReleaseCompletedResources(nullptr, true);
+  context_->ReleaseCompletedResources(true);
 
   VLOG_FILE << "Decompressed " << byte_buffer_read_size_ << " to " << decompressed_len;
   byte_buffer_ptr_ = reinterpret_cast<char*>(decompressed_buffer);
@@ -837,6 +830,9 @@ int HdfsTextScanner::WriteFields(int num_fields, int num_tuples, MemPool* pool,
 
   // Write complete tuples.  The current field, if any, is at the start of a tuple.
   if (num_tuples > 0) {
+    // Need to copy out strings if they may reference the original I/O buffer.
+    const bool copy_strings = !string_slot_offsets_.empty() &&
+        stream_->file_desc()->file_compression == THdfsCompression::NONE;
     int max_added_tuples = (scan_node_->limit() == -1) ?
         num_tuples : scan_node_->limit() - scan_node_->rows_returned();
     int tuples_returned = 0;
@@ -846,13 +842,13 @@ int HdfsTextScanner::WriteFields(int num_fields, int num_tuples, MemPool* pool,
       // slots and escape characters. TextConverter::WriteSlot() will be used instead.
       DCHECK(scan_node_->tuple_desc()->string_slots().empty() ||
           delimited_text_parser_->escape_char() == '\0');
-      tuples_returned = write_tuples_fn_(this, pool, row, sizeof(Tuple*), fields,
-          num_tuples, max_added_tuples, scan_node_->materialized_slots().size(),
-          num_tuples_processed);
+      tuples_returned = write_tuples_fn_(this, pool, row, fields, num_tuples,
+          max_added_tuples, scan_node_->materialized_slots().size(),
+          num_tuples_processed, copy_strings);
     } else {
-      tuples_returned = WriteAlignedTuples(pool, row, sizeof(Tuple*), fields,
-          num_tuples, max_added_tuples, scan_node_->materialized_slots().size(),
-          num_tuples_processed);
+      tuples_returned = WriteAlignedTuples(pool, row, fields, num_tuples,
+          max_added_tuples, scan_node_->materialized_slots().size(),
+          num_tuples_processed, copy_strings);
     }
     if (tuples_returned == -1) return 0;
     DCHECK_EQ(slot_idx_, 0);

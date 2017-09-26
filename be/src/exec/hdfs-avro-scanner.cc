@@ -66,10 +66,6 @@ static Status CheckSchema(const AvroSchemaElement& avro_schema) {
 
 HdfsAvroScanner::HdfsAvroScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
   : BaseSequenceScanner(scan_node, state) {
-  for (SlotDescriptor* string_slot : scan_node_->tuple_desc()->string_slots()) {
-    string_slot_offsets_.push_back(
-        {string_slot->null_indicator_offset(), string_slot->tuple_offset()});
-  }
 }
 
 HdfsAvroScanner::HdfsAvroScanner()
@@ -80,7 +76,6 @@ HdfsAvroScanner::HdfsAvroScanner()
 Status HdfsAvroScanner::Open(ScannerContext* context) {
   RETURN_IF_ERROR(BaseSequenceScanner::Open(context));
   RETURN_IF_ERROR(CheckSchema(scan_node_->avro_schema()));
-  stream_->set_contains_tuple_data(false); // Avro scanner always copies out data.
   return Status::OK();
 }
 

@@ -115,7 +115,6 @@ Status HdfsScanNode::GetNextInternal(
   *eos = false;
   unique_ptr<RowBatch> materialized_batch = materialized_row_batches_->GetBatch();
   if (materialized_batch != NULL) {
-    num_owned_io_buffers_.Add(-materialized_batch->num_io_buffers());
     row_batch->AcquireState(materialized_batch.get());
     // Update the number of materialized rows now instead of when they are materialized.
     // This means that scanners might process and queue up more rows than are necessary
@@ -133,7 +132,6 @@ Status HdfsScanNode::GetNextInternal(
       *eos = true;
       SetDone();
     }
-    DCHECK_EQ(materialized_batch->num_io_buffers(), 0);
     materialized_batch.reset();
     return Status::OK();
   }
@@ -229,16 +227,11 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 void HdfsScanNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   SetDone();
-
   if (thread_avail_cb_id_ != -1) {
     state->resource_pool()->RemoveThreadAvailableCb(thread_avail_cb_id_);
   }
-
   scanner_threads_.JoinAll();
-
-  num_owned_io_buffers_.Add(-materialized_row_batches_->Cleanup());
-  DCHECK_EQ(num_owned_io_buffers_.Load(), 0) << "ScanNode has leaked io buffers";
-
+  materialized_row_batches_->Cleanup();
   HdfsScanNodeBase::Close(state);
 }
 

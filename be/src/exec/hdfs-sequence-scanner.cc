@@ -266,6 +266,9 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock(RowBatch* row_batch) {
 
   // Materialize parsed cols to tuples
   SCOPED_TIMER(scan_node_->materialize_tuple_timer());
+
+  // Need to copy out strings if they may reference the original I/O buffer.
+  const bool copy_strings = !header_->is_compressed && !string_slot_offsets_.empty();
   // Call jitted function if possible
   int tuples_returned;
   if (write_tuples_fn_ != nullptr) {
@@ -275,12 +278,12 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock(RowBatch* row_batch) {
         delimited_text_parser_->escape_char() == '\0');
     // last argument: seq always starts at record_location[0]
     tuples_returned = write_tuples_fn_(this, row_batch->tuple_data_pool(), tuple_row,
-        row_batch->row_byte_size(), field_locations_.data(), num_to_process,
-        max_added_tuples, scan_node_->materialized_slots().size(), 0);
+        field_locations_.data(), num_to_process,
+        max_added_tuples, scan_node_->materialized_slots().size(), 0, copy_strings);
   } else {
     tuples_returned = WriteAlignedTuples(row_batch->tuple_data_pool(), tuple_row,
-        row_batch->row_byte_size(), field_locations_.data(), num_to_process,
-        max_added_tuples, scan_node_->materialized_slots().size(), 0);
+        field_locations_.data(), num_to_process,
+        max_added_tuples, scan_node_->materialized_slots().size(), 0, copy_strings);
   }
 
   if (tuples_returned == -1) return parse_status_;
@@ -301,6 +304,7 @@ Status HdfsSequenceScanner::ProcessRange(RowBatch* row_batch) {
   SCOPED_TIMER(scan_node_->materialize_tuple_timer());
   int64_t num_rows_read = 0;
 
+  const bool copy_strings = !seq_header->is_compressed && !string_slot_offsets_.empty();
   const bool has_materialized_slots = !scan_node_->materialized_slots().empty();
   while (!eos_) {
     DCHECK_GT(record_locations_.size(), 0);
@@ -323,11 +327,19 @@ Status HdfsSequenceScanner::ProcessRange(RowBatch* row_batch) {
       uint8_t error_in_row = false;
       uint8_t errors[num_fields];
       memset(errors, 0, num_fields);
-      add_row = WriteCompleteTuple(row_batch->tuple_data_pool(), field_locations_.data(),
+      MemPool* pool = row_batch->tuple_data_pool();
+      add_row = WriteCompleteTuple(pool, field_locations_.data(),
           tuple_, tuple_row_mem, template_tuple_, &errors[0], &error_in_row);
       if (UNLIKELY(error_in_row)) {
         ReportTupleParseError(field_locations_.data(), errors);
         RETURN_IF_ERROR(parse_status_);
+      }
+      if (add_row && copy_strings) {
+        if (UNLIKELY(!tuple_->CopyStrings("HdfsSequenceScanner::ProcessRange()",
+              state_, string_slot_offsets_.data(), string_slot_offsets_.size(), pool,
+              &parse_status_))) {
+          return parse_status_;
+        }
       }
     } else {
       add_row = WriteTemplateTuples(tuple_row_mem, 1);

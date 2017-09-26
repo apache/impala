@@ -48,6 +48,12 @@ HdfsScanner::HdfsScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
       template_tuple_pool_(new MemPool(scan_node->mem_tracker())),
       tuple_byte_size_(scan_node->tuple_desc()->byte_size()),
       data_buffer_pool_(new MemPool(scan_node->mem_tracker())) {
+  DCHECK_EQ(1, scan_node->row_desc()->tuple_descriptors().size())
+      << "All HDFS scanners assume one tuple per row";
+  for (SlotDescriptor* string_slot : scan_node_->tuple_desc()->string_slots()) {
+    string_slot_offsets_.push_back(
+        {string_slot->null_indicator_offset(), string_slot->tuple_offset()});
+  }
 }
 
 HdfsScanner::HdfsScanner()
@@ -188,7 +194,7 @@ Status HdfsScanner::CommitRows(int num_rows, RowBatch* row_batch) {
   // which can happen if the query is very selective. We need to release memory even
   // if no rows passed predicates.
   if (row_batch->AtCapacity() || context_->num_completed_io_buffers() > 0) {
-    context_->ReleaseCompletedResources(row_batch, /* done */ false);
+    context_->ReleaseCompletedResources(/* done */ false);
   }
   if (context_->cancelled()) return Status::CANCELLED;
   // Check for UDF errors.
@@ -522,6 +528,18 @@ Status HdfsScanner::CodegenWriteAlignedTuples(const HdfsScanNodeBase* node,
 
   int replaced = codegen->ReplaceCallSites(write_tuples_fn, write_complete_tuple_fn,
       "WriteCompleteTuple");
+  DCHECK_EQ(replaced, 1);
+
+  Function* copy_strings_fn;
+  RETURN_IF_ERROR(Tuple::CodegenCopyStrings(
+      codegen, *node->tuple_desc(), &copy_strings_fn));
+  replaced = codegen->ReplaceCallSites(
+      write_tuples_fn, copy_strings_fn, "CopyStrings");
+  DCHECK_EQ(replaced, 1);
+
+  int tuple_byte_size = node->tuple_desc()->byte_size();
+  replaced = codegen->ReplaceCallSitesWithValue(write_tuples_fn,
+      codegen->GetIntConstant(TYPE_INT, tuple_byte_size), "tuple_byte_size");
   DCHECK_EQ(replaced, 1);
 
   *write_aligned_tuples_fn = codegen->FinalizeFunction(write_tuples_fn);

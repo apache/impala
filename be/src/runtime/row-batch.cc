@@ -45,7 +45,7 @@ RowBatch::RowBatch(const RowDescriptor* row_desc, int capacity, MemTracker* mem_
     flush_(FlushMode::NO_FLUSH_RESOURCES),
     needs_deep_copy_(false),
     num_tuples_per_row_(row_desc->tuple_descriptors().size()),
-    auxiliary_mem_usage_(0),
+    attached_buffer_bytes_(0),
     tuple_data_pool_(mem_tracker),
     row_desc_(row_desc),
     mem_tracker_(mem_tracker) {
@@ -72,7 +72,7 @@ RowBatch::RowBatch(
     flush_(FlushMode::NO_FLUSH_RESOURCES),
     needs_deep_copy_(false),
     num_tuples_per_row_(input_batch.row_tuples.size()),
-    auxiliary_mem_usage_(0),
+    attached_buffer_bytes_(0),
     tuple_data_pool_(mem_tracker),
     row_desc_(row_desc),
     mem_tracker_(mem_tracker) {
@@ -144,9 +144,6 @@ RowBatch::RowBatch(
 
 RowBatch::~RowBatch() {
   tuple_data_pool_.FreeAll();
-  for (int i = 0; i < io_buffers_.size(); ++i) {
-    ExecEnv::GetInstance()->disk_io_mgr()->ReturnBuffer(move(io_buffers_[i]));
-  }
   for (BufferInfo& buffer_info : buffers_) {
     ExecEnv::GetInstance()->buffer_pool()->FreeBuffer(
         buffer_info.client, &buffer_info.buffer);
@@ -285,16 +282,9 @@ void RowBatch::SerializeInternal(int64_t size, DedupMap* distinct_tuples,
   DCHECK_EQ(offset, size);
 }
 
-void RowBatch::AddIoBuffer(unique_ptr<DiskIoMgr::BufferDescriptor> buffer) {
-  DCHECK(buffer != NULL);
-  auxiliary_mem_usage_ += buffer->buffer_len();
-  buffer->TransferOwnership(mem_tracker_);
-  io_buffers_.emplace_back(move(buffer));
-}
-
 void RowBatch::AddBuffer(BufferPool::ClientHandle* client,
     BufferPool::BufferHandle&& buffer, FlushMode flush) {
-  auxiliary_mem_usage_ += buffer.len();
+  attached_buffer_bytes_ += buffer.len();
   BufferInfo buffer_info;
   buffer_info.client = client;
   buffer_info.buffer = std::move(buffer);
@@ -307,26 +297,18 @@ void RowBatch::Reset() {
   capacity_ = tuple_ptrs_size_ / (num_tuples_per_row_ * sizeof(Tuple*));
   // TODO: Change this to Clear() and investigate the repercussions.
   tuple_data_pool_.FreeAll();
-  for (int i = 0; i < io_buffers_.size(); ++i) {
-    ExecEnv::GetInstance()->disk_io_mgr()->ReturnBuffer(move(io_buffers_[i]));
-  }
-  io_buffers_.clear();
   for (BufferInfo& buffer_info : buffers_) {
     ExecEnv::GetInstance()->buffer_pool()->FreeBuffer(
         buffer_info.client, &buffer_info.buffer);
   }
   buffers_.clear();
-  auxiliary_mem_usage_ = 0;
+  attached_buffer_bytes_ = 0;
   flush_ = FlushMode::NO_FLUSH_RESOURCES;
   needs_deep_copy_ = false;
 }
 
 void RowBatch::TransferResourceOwnership(RowBatch* dest) {
   dest->tuple_data_pool_.AcquireData(&tuple_data_pool_, false);
-  for (int i = 0; i < io_buffers_.size(); ++i) {
-    dest->AddIoBuffer(move(io_buffers_[i]));
-  }
-  io_buffers_.clear();
   for (BufferInfo& buffer_info : buffers_) {
     dest->AddBuffer(
         buffer_info.client, std::move(buffer_info.buffer), FlushMode::NO_FLUSH_RESOURCES);
@@ -362,7 +344,7 @@ void RowBatch::AcquireState(RowBatch* src) {
   // The destination row batch should be empty.
   DCHECK(!needs_deep_copy_);
   DCHECK_EQ(num_rows_, 0);
-  DCHECK_EQ(auxiliary_mem_usage_, 0);
+  DCHECK_EQ(attached_buffer_bytes_, 0);
 
   num_rows_ = src->num_rows_;
   capacity_ = src->capacity_;

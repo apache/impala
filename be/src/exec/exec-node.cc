@@ -103,21 +103,14 @@ unique_ptr<RowBatch> ExecNode::RowBatchQueue::GetBatch() {
   return unique_ptr<RowBatch>();
 }
 
-int ExecNode::RowBatchQueue::Cleanup() {
-  int num_io_buffers = 0;
-
+void ExecNode::RowBatchQueue::Cleanup() {
   unique_ptr<RowBatch> batch = NULL;
   while ((batch = GetBatch()) != NULL) {
-    num_io_buffers += batch->num_io_buffers();
     batch.reset();
   }
 
   lock_guard<SpinLock> l(lock_);
-  for (const unique_ptr<RowBatch>& row_batch: cleanup_queue_) {
-    num_io_buffers += row_batch->num_io_buffers();
-  }
   cleanup_queue_.clear();
-  return num_io_buffers;
 }
 
 ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)

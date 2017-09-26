@@ -103,8 +103,8 @@ void TextConverter::UnescapeString(const char* src, char* dest, int* len,
 //   store i8 %null_bit_set, i8* %null_byte_ptr
 //   ret i1 false
 //}
-
-
+// TODO: convert this function to use cross-compilation + constant substitution in whole
+// or part. It is currently too complex and doesn't implement the full functionality.
 Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc, Function** fn,
     const char* null_col_val, int len, bool check_null, bool strict_mode) {

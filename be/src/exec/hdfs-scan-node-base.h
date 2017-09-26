@@ -421,12 +421,6 @@ class HdfsScanNodeBase : public ScanNode {
   AtomicInt32 num_scanners_codegen_enabled_;
   AtomicInt32 num_scanners_codegen_disabled_;
 
-  /// This is the number of io buffers that are owned by the scan node and the scanners.
-  /// This is used just to help debug leaked io buffers to determine if the leak is
-  /// happening in the scanners vs other parts of the execution.
-  /// TODO: Remove this counter when deprecating the multi-threaded scan node.
-  AtomicInt32 num_owned_io_buffers_;
-
   /// If true, counters are actively running and need to be reported in the runtime
   /// profile.
   bool counters_running_ = false;

@@ -130,12 +130,6 @@ class HdfsAvroScanner : public BaseSequenceScanner {
     bool use_codegend_decode_avro_data;
   };
 
-  /// Offsets of string slots in the result tuple that may need to be copied as part of
-  /// tuple materialization. Populated in constructor. This is redundant with offset
-  /// information stored in the TupleDescriptor but storing only the required metadata
-  /// in a simple array of struct simplifies codegen and speeds up interpretation.
-  std::vector<SlotOffsets> string_slot_offsets_;
-
   AvroFileHeader* avro_header_ = nullptr;
 
   /// Current data block after decompression with its end and length.

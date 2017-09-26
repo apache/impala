@@ -96,7 +96,7 @@ struct FieldLocation {
 //
 /// This class also encapsulates row batch management.  Subclasses should call CommitRows()
 /// after writing to the current row batch, which handles creating row batches, attaching
-/// resources (IO buffers and mem pools) to the current row batch, and passing row batches
+/// resources (buffers and mem pools) to the current row batch, and passing row batches
 /// up to the scan node. Subclasses can also use GetMemory() to help with per-row memory
 /// management.
 /// TODO: Have a pass over all members and move them out of the base class if sensible
@@ -137,7 +137,7 @@ class HdfsScanner {
   /// queue. Only valid to call if HasRowBatchQueue().
   void Close();
 
-  /// Transfers the ownership of memory backing returned tuples such as IO buffers
+  /// Transfers the ownership of memory backing returned tuples such as buffers
   /// and memory in mem pools to the given row batch. If the row batch is NULL,
   /// those resources are released instead. In any case, releases all other resources
   /// that are not backing returned rows (e.g. temporary decompression buffers).
@@ -271,13 +271,19 @@ class HdfsScanner {
   /// decompressor and any other per data block allocations.
   boost::scoped_ptr<MemPool> data_buffer_pool_;
 
+  /// Offsets of string slots in the result tuple that may need to be copied as part of
+  /// tuple materialization. Populated in constructor. This is redundant with offset
+  /// information stored in the TupleDescriptor but storing only the required metadata
+  /// in a simple array of struct simplifies codegen and speeds up interpretation.
+  std::vector<SlotOffsets> string_slot_offsets_;
+
   /// Time spent decompressing bytes.
   RuntimeProfile::Counter* decompress_timer_ = nullptr;
 
   /// Matching typedef for WriteAlignedTuples for codegen.  Refer to comments for
   /// that function.
-  typedef int (*WriteTuplesFn)(HdfsScanner*, MemPool*, TupleRow*, int, FieldLocation*,
-      int, int, int, int);
+  typedef int (*WriteTuplesFn)(HdfsScanner*, MemPool*, TupleRow*, FieldLocation*,
+      int, int, int, int, bool);
   /// Jitted write tuples function pointer.  Null if codegen is disabled.
   WriteTuplesFn write_tuples_fn_ = nullptr;
 
@@ -332,15 +338,18 @@ class HdfsScanner {
   /// - 'fields' must start at the beginning of a tuple.
   /// - 'num_tuples' number of tuples to process
   /// - 'max_added_tuples' the maximum number of tuples that should be added to the batch.
-  /// - 'row_start_index' is the number of rows that have already been processed
+  /// - 'row_idx_start' is the number of rows that have already been processed
   ///   as part of WritePartialTuple.
+  /// - 'copy_strings': if true, strings in returned tuples that pass conjuncts are
+  ///   copied into 'pool'
   /// Returns the number of tuples added to the row batch.  This can be less than
   /// num_tuples/tuples_till_limit because of failed conjuncts.
-  /// Returns -1 if parsing should be aborted due to parse errors.
+  /// Returns -1 if an error is encountered, e.g. a parse error or a memory allocation
+  /// error.
   /// Only valid to call if the parent scan node is multi-threaded.
-  int WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row_mem, int row_size,
-      FieldLocation* fields, int num_tuples,
-      int max_added_tuples, int slots_per_tuple, int row_start_indx);
+  int WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row_mem, FieldLocation* fields,
+      int num_tuples, int max_added_tuples, int slots_per_tuple, int row_idx_start,
+      bool copy_strings);
 
   /// Update the decompressor_ object given a compression type or codec name. Depending on
   /// the old compression type and the new one, it may close the old decompressor and/or

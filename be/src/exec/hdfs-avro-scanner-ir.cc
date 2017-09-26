@@ -37,7 +37,7 @@ int HdfsAvroScanner::DecodeAvroData(int max_tuples, MemPool* pool, uint8_t** dat
   // If the file is uncompressed, StringValues will have pointers into the I/O buffers.
   // We don't attach I/O buffers to output batches so need to copy out data referenced
   // by tuples that survive conjunct evaluation.
-  const bool copy_out_strings = !header_->is_compressed && !string_slot_offsets_.empty();
+  const bool copy_strings = !header_->is_compressed && !string_slot_offsets_.empty();
   int num_to_commit = 0;
   for (int i = 0; i < max_tuples; ++i) {
     InitTuple(template_tuple_, tuple);
@@ -47,7 +47,7 @@ int HdfsAvroScanner::DecodeAvroData(int max_tuples, MemPool* pool, uint8_t** dat
     }
     tuple_row->SetTuple(scan_node_->tuple_idx(), tuple);
     if (EvalConjuncts(tuple_row)) {
-      if (copy_out_strings) {
+      if (copy_strings) {
         if (UNLIKELY(!tuple->CopyStrings("HdfsAvroScanner::DecodeAvroData()",
               state_, string_slot_offsets_.data(), string_slot_offsets_.size(), pool,
               &parse_status_))) {
