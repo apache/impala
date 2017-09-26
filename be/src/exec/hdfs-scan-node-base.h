@@ -479,13 +479,6 @@ class HdfsScanNodeBase : public ScanNode {
   /// scanner threads.
   Status status_;
 
-  /// Mapping of file formats (file type, compression type) to the number of
-  /// splits of that type and the lock protecting it.
-  typedef std::map<
-     std::tuple<THdfsFileFormat::type, bool, THdfsCompression::type>,
-     int> FileTypeCountsMap;
-  FileTypeCountsMap file_type_counts_;
-
   /// Performs dynamic partition pruning, i.e., applies runtime filters to files, and
   /// issues initial ranges for all file types. Waits for runtime filters if necessary.
   /// Only valid to call if !initial_ranges_issued_. Sets initial_ranges_issued_ to true.
@@ -525,6 +518,55 @@ class HdfsScanNodeBase : public ScanNode {
   /// Calls ExecNode::ExecDebugAction() with 'phase'. Returns the status based on the
   /// debug action specified for the query.
   Status ScanNodeDebugAction(TExecNodePhase::type phase) WARN_UNUSED_RESULT;
+
+ private:
+  class HdfsCompressionTypesSet {
+   public:
+    HdfsCompressionTypesSet(): bit_map_(0) {
+      DCHECK_GE(sizeof(bit_map_) * CHAR_BIT, _THdfsCompression_VALUES_TO_NAMES.size());
+    }
+
+    bool HasType(THdfsCompression::type type) {
+      return (bit_map_ & (1 << type)) != 0;
+    }
+
+    void AddType(const THdfsCompression::type type) {
+      bit_map_ |= (1 << type);
+    }
+
+    int Size() { return BitUtil::Popcount(bit_map_); }
+
+    THdfsCompression::type GetFirstType() {
+      DCHECK_GT(Size(), 0);
+      for (auto& elem : _THdfsCompression_VALUES_TO_NAMES) {
+        THdfsCompression::type type = static_cast<THdfsCompression::type>(elem.first);
+        if (HasType(type))  return type;
+      }
+      return THdfsCompression::NONE;
+    }
+
+    // The following operator overloading is needed so this class can be part of the
+    // std::map key.
+    bool operator< (const HdfsCompressionTypesSet& o) const {
+      return bit_map_ < o.bit_map_;
+    }
+
+    bool operator== (const HdfsCompressionTypesSet& o) const {
+      return bit_map_ == o.bit_map_;
+    }
+
+   private:
+    uint32_t bit_map_;
+  };
+
+  /// Mapping of file formats to the number of splits of that type. The key is a tuple
+  /// containing:
+  /// * file type
+  /// * whether the split was skipped
+  /// * compression types set
+  typedef std::map<std::tuple<THdfsFileFormat::type, bool, HdfsCompressionTypesSet>, int>
+      FileTypeCountsMap;
+  FileTypeCountsMap file_type_counts_;
 };
 
 }

@@ -697,9 +697,11 @@ void HdfsScanNodeBase::RangeComplete(const THdfsFileFormat::type& file_type,
     const vector<THdfsCompression::type>& compression_types, bool skipped) {
   scan_ranges_complete_counter()->Add(1);
   progress_.Update(1);
+  HdfsCompressionTypesSet compression_set;
   for (int i = 0; i < compression_types.size(); ++i) {
-    ++file_type_counts_[std::make_tuple(file_type, skipped, compression_types[i])];
+    compression_set.AddType(compression_types[i]);
   }
+  ++file_type_counts_[std::make_tuple(file_type, skipped, compression_set)];
 }
 
 void HdfsScanNodeBase::ComputeSlotMaterializationOrder(vector<int>* order) const {
@@ -786,19 +788,33 @@ void HdfsScanNodeBase::StopAndFinalizeCounters() {
 
         THdfsFileFormat::type file_format = std::get<0>(it->first);
         bool skipped = std::get<1>(it->first);
-        THdfsCompression::type compression_type = std::get<2>(it->first);
+        HdfsCompressionTypesSet compressions_set = std::get<2>(it->first);
+        int file_cnt = it->second;
 
         if (skipped) {
           if (file_format == THdfsFileFormat::PARQUET) {
             // If a scan range stored as parquet is skipped, its compression type
             // cannot be figured out without reading the data.
-            ss << file_format << "/" << "Unknown" << "(Skipped):" << it->second << " ";
+            ss << file_format << "/" << "Unknown" << "(Skipped):" << file_cnt << " ";
           } else {
-            ss << file_format << "/" << compression_type << "(Skipped):"
-               << it->second << " ";
+            ss << file_format << "/" << compressions_set.GetFirstType() << "(Skipped):"
+               << file_cnt << " ";
           }
+        } else if (compressions_set.Size() == 1) {
+          ss << file_format << "/" << compressions_set.GetFirstType() << ":" << file_cnt
+             << " ";
         } else {
-          ss << file_format << "/" << compression_type << ":" << it->second << " ";
+          ss << file_format << "/" << "(";
+          bool first = true;
+          for (auto& elem : _THdfsCompression_VALUES_TO_NAMES) {
+            THdfsCompression::type type = static_cast<THdfsCompression::type>(
+                elem.first);
+            if (!compressions_set.HasType(type)) continue;
+            if (!first) ss << ",";
+            ss << type;
+            first = false;
+          }
+          ss << "):" << file_cnt << " ";
         }
       }
     }
