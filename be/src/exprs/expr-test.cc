@@ -5002,6 +5002,11 @@ TEST_F(ExprTest, MoscowTimezoneConversion) {
   TestStringValue(MSC_TO_UTC("2015-06-20 12:00:00"), "2015-06-20 09:00:00");
   TestStringValue(MSC_TO_UTC("2015-12-20 12:00:00"), "2015-12-20 09:00:00");
 
+  // Timestamp conversions of "dateless" times should return null (and not crash,
+  // see IMPALA-5983).
+  TestIsNull(UTC_TO_MSC("10:00:00"), TYPE_STRING);
+  TestIsNull(MSC_TO_UTC("10:00:00"), TYPE_STRING);
+
 #pragma pop_macro("MSC_TO_UTC")
 #pragma pop_macro("UTC_TO_MSC")
 }
