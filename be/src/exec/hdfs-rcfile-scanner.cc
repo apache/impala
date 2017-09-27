@@ -433,7 +433,6 @@ Status HdfsRCFileScanner::ReadColumnBuffers() {
       uint8_t* uncompressed_data;
       RETURN_IF_FALSE(stream_->ReadBytes(
           column.buffer_len, &uncompressed_data, &parse_status_));
-      // TODO: this is bad.  Remove this copy.
       memcpy(row_group_buffer_ + column.start_offset,
           uncompressed_data, column.buffer_len);
     }
