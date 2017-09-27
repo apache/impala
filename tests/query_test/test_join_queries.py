@@ -61,9 +61,6 @@ class TestJoinQueries(ImpalaTestSuite):
     new_vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/single-node-joins-with-limits-exhaustive', new_vector)
 
-  def test_partitioned_joins(self, vector):
-    self.run_test_case('QueryTest/joins-partitioned', vector)
-
   @SkipIfS3.hbase
   @SkipIfADLS.hbase
   @SkipIfIsilon.hbase

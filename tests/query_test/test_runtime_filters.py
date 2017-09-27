@@ -62,6 +62,3 @@ class TestRuntimeRowFilters(ImpalaTestSuite):
 
   def test_row_filters(self, vector):
     self.run_test_case('QueryTest/runtime_row_filters', vector)
-
-  def test_row_filters_phj_only(self, vector):
-    self.run_test_case('QueryTest/runtime_row_filters_phj', vector)
