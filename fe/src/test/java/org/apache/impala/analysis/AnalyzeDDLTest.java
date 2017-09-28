@@ -2236,7 +2236,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Test unsupported Kudu types
     List<String> unsupportedTypes = Lists.newArrayList(
         "DECIMAL(9,0)", "VARCHAR(20)", "CHAR(20)",
-        "STRUCT<F1:INT,F2:STRING>", "ARRAY<INT>", "MAP<STRING,STRING>");
+        "STRUCT<f1:INT,f2:STRING>", "ARRAY<INT>", "MAP<STRING,STRING>");
     for (String t: unsupportedTypes) {
       String expectedError = String.format(
           "Cannot create table 'tab': Type %s is not supported in Kudu", t);

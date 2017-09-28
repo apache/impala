@@ -34,7 +34,9 @@ public class StructField {
   protected int position_;  // in struct
 
   public StructField(String name, Type type, String comment) {
-    name_ = name;
+    // Impala expects field names to be in lower case, but type strings stored in the HMS
+    // are not guaranteed to be lower case.
+    name_ = name.toLowerCase();
     type_ = type;
     comment_ = comment;
   }

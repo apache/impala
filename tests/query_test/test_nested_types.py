@@ -85,6 +85,21 @@ class TestNestedTypes(ImpalaTestSuite):
     vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/nested-types-parquet-stats', vector)
 
+  @SkipIfIsilon.hive
+  @SkipIfS3.hive
+  @SkipIfADLS.hive
+  @SkipIfLocal.hive
+  def test_upper_case_field_name(self, unique_database):
+    """IMPALA-5994: Tests that a Hive-created table with a struct field name with upper
+    case characters can be selected."""
+    table_name = "%s.upper_case_test" % unique_database
+    create_table = "CREATE TABLE %s (s struct<upperCaseName:int>) STORED AS PARQUET" % \
+        table_name
+    self.run_stmt_in_hive(create_table)
+    self.client.execute("invalidate metadata %s" % table_name)
+    self.client.execute("select s.UppercasenamE from %s" % table_name)
+    self.client.execute("select s.* from %s" % table_name)
+
 class TestParquetArrayEncodings(ImpalaTestSuite):
   TESTFILE_DIR = os.path.join(os.environ['IMPALA_HOME'],
                               "testdata/parquet_nested_types_encodings")
