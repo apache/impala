@@ -99,8 +99,8 @@ TARGET_FILESYSTEM = os.getenv("TARGET_FILESYSTEM") or "hdfs"
 IMPALA_HOME = os.getenv("IMPALA_HOME")
 EE_TEST_LOGS_DIR = os.getenv("IMPALA_EE_TEST_LOGS_DIR")
 # Match any SET statement. Assume that query options' names
-# only contain alphabets and underscores.
-SET_PATTERN = re.compile(r'\s*set\s*([a-zA-Z_]+)=*', re.I)
+# only contain alphabets, underscores and digits after position 1.
+SET_PATTERN = re.compile(r'\s*set\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=*', re.I)
 
 # Base class for Impala tests. All impala test cases should inherit from this class
 class ImpalaTestSuite(BaseTestSuite):
