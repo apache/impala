@@ -114,7 +114,7 @@ class KuduScanNodeBase : public ScanNode {
   /// Returns a cloned copy of the scan node's conjuncts. Requires that the expressions
   /// have been open previously.
   Status GetConjunctCtxs(vector<ExprContext*>* ctxs);
-  void GetSlotRefColumnName(const TExprNode& node, string* col_name);
+
   const TupleDescriptor* tuple_desc() const { return tuple_desc_; }
   kudu::client::KuduClient* kudu_client() { return client_; }
   RuntimeProfile::Counter* kudu_round_trips() const { return kudu_round_trips_; }

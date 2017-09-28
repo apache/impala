@@ -61,6 +61,7 @@ class KuduScanner {
  private:
   /// Apply the runtime filters to KuduScanner.
   Status ApplyRuntimeFilters();
+  Status PushDownRuntimeFilters();
 
   /// Handles the case where the projection is empty (e.g. count(*)).
   /// Does this by adding sets of rows to 'row_batch' instead of adding one-by-one.

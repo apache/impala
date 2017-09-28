@@ -74,7 +74,8 @@ Status KuduScanner::Open() {
     if (slot->type().type != TYPE_TIMESTAMP) continue;
     timestamp_slots_.push_back(slot);
   }
-  //filter_ctx_pushed_down_.resize(scan_node_->filter_ctxs_.size(), false);
+
+  filter_ctx_pushed_down_.resize(scan_node_->filter_ctxs_.size(), false);
   return scan_node_->GetConjunctCtxs(&conjunct_ctxs_);
 }
 
@@ -157,7 +158,8 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token)  {
   uint64_t row_format_flags = kudu::client::KuduScanner::PAD_UNIXTIME_MICROS_TO_16_BYTES;
   scanner_->SetRowFormatFlags(row_format_flags);
 
-  // Apply the runtime filters here.
+  // Apply the runtime filters.
+  LOG(INFO) << "ApplyRuntimeFilters start ...";
   RETURN_IF_ERROR(ApplyRuntimeFilters());
 
   {
@@ -170,23 +172,52 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token)  {
 Status KuduScanner::ApplyRuntimeFilters() {
   if (scan_node_->filter_ctxs_.empty()) return Status::OK();
 
-  // Reset 'filter_ctx_pushed_down_'.
-  filter_ctx_pushed_down_.clear();
+  // Reset.
+  vector<bool>::iterator it = filter_ctx_pushed_down_.begin();
+  for (; it != filter_ctx_pushed_down_.end(); ++it) {
+    (*it) = false;
+  }
 
-  // Apply runtime filters.
+  return PushDownRuntimeFilters();
+}
+
+Status KuduScanner::PushDownRuntimeFilters() {
+  if (scan_node_->filter_ctxs_.empty()) return Status::OK();
+
+  // Tuple descriptor & Table descriptor.
   const TupleDescriptor* tuple_desc = scan_node_->tuple_desc_;
   const TableDescriptor* table_desc = tuple_desc->table_desc();
-  std::vector<FilterContext>::iterator it = scan_node_->filter_ctxs_.begin();
-  for (int i = 0; it != scan_node_->filter_ctxs_.end(); ++it, ++i) {
-    // Skip 'not arrived' & 'ALWAYS_TRUE_FILTER'
-    const RuntimeFilter* rf = it->filter;
-    if (!(rf->HasBloomFilter())) continue;
-    BloomFilter* bf = const_cast<BloomFilter*>(rf->GetBloomFilter());
-    if (bf == BloomFilter::ALWAYS_TRUE_FILTER) continue;
+  vector<bool>::iterator it = filter_ctx_pushed_down_.begin();
+  for (int i = 0; it != filter_ctx_pushed_down_.end(); ++it, ++i) {
+    if (*it) continue;
 
-    // Is there any other way to get column name?
+    // Runtime Filter.
+    const RuntimeFilter* rf = scan_node_->filter_ctxs_[i].filter;
+    
+    // Skip the filter which is not arrived.
+    if (!(rf->HasBloomFilter())) continue;
+    // Mark True.
+    (*it) = true;
+
+    // Skip the filter which is 'ALWAYS_TRUE_FILTER'.
+    BloomFilter* bf = const_cast<BloomFilter*>(rf->GetBloomFilter());
+    if (bf == BloomFilter::ALWAYS_TRUE_FILTER) {
+      LOG(INFO) << "Scanner id:" << scan_node_->id() 
+                << " -> RuntimeFilter:  i:" << i
+                << " -> ALWAYS_TRUE_FILTER.";
+      continue;
+    }
+    // Skip the filter which size is larger than 48MB (kudu rpc max = 50MB).
+    if (bf->GetHeapSpaceUsed() > 48*1024*1024) {
+      LOG(INFO) << "Scanner id:" << scan_node_->id() 
+                << " -> RuntimeFilter:  i:" << i
+                << " -> Larger than 48 MB"
+                << " -> size:" << bf->GetHeapSpaceUsed();
+      continue;
+    }
+
     string column_name;
-    const TRuntimeFilterDesc& desc = it->filter->filter_desc();
+    const TRuntimeFilterDesc& desc = rf->filter_desc();
     const auto iter = desc.planid_to_target_ndx.find(scan_node_->id());
     CHECK(iter != desc.planid_to_target_ndx.end());
     const TRuntimeFilterTargetDesc& target = desc.targets[iter->second];
@@ -204,9 +235,11 @@ Status KuduScanner::ApplyRuntimeFilters() {
     kudu::client::KuduValueBloomFilter* b = kudu::client::KuduValueBloomFilterBuilder().Build(bf);
     kudu::client::KuduPredicate* p =  scan_node_->table_->NewBloomFilterPredicate(column_name, b);
     scanner_->AddConjunctPredicate(p);
-
-    // Record the idx of 'filter_ctxs_'.
-    filter_ctx_pushed_down_.push_back(i);
+    LOG(INFO) << "Scanner id:" << scan_node_->id() 
+              << " -> RuntimeFilter:  i:" << i 
+              << " -> Pushed down"
+              << " -> column_name:" << column_name 
+              << " -> size:" << bf->GetHeapSpaceUsed();
   }
 
   return Status::OK();
@@ -305,21 +338,8 @@ Status KuduScanner::GetNextScannerBatch() {
   SCOPED_TIMER(state_->total_storage_wait_timer());
   int64_t now = MonotonicMicros();
 
-  // Wait for the runtime filters.
-  // It should not wait for runtime filters any more, if the size of 
-  // bloom filters that have been collected equals to the size of filter context's.
-  /*if (scan_node_->filter_ctxs_.size() > 0 && 
-      (scan_node_->filter_ctxs_.size() != scan_node_->column_done.size())) {
-    scan_node_->WaitForRuntimeFilters(scan_node_->wait_time_ms_/10);
-    if (!scan_node_->GetKuduBFs().empty()) {
-      for (auto& one: scan_node_->GetKuduBFs()) {
-        kudu::client::KuduValueBloomFilter* bf = kudu::client::KuduValueBloomFilterBuilder().Build(one.second);
-        kudu::client::KuduPredicate* p =  scan_node_->table_->NewBloomFilterPredicate(one.first, bf);
-        scanner_->AddConjunctPredicate(p);
-      }
-      scan_node_->ClearKuduBFs();
-    }
-  }*/
+  // Continue to push down the runtime filters.
+  RETURN_IF_ERROR(PushDownRuntimeFilters());
 
   KUDU_RETURN_IF_ERROR(scanner_->NextBatch(&cur_kudu_batch_), "Unable to advance iterator");
   COUNTER_ADD(scan_node_->kudu_round_trips(), 1);
