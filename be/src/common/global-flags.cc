@@ -100,9 +100,10 @@ DEFINE_string(minidump_path, "minidumps", "Directory to write minidump files to.
     "can be either an absolute path or a path relative to log_dir. Each daemon will "
     "create an additional sub-directory to prevent naming conflicts and to make it "
     "easier to identify a crashing daemon. Minidump files contain crash-related "
-    "information in a compressed format and will only be written when a daemon exits "
-    "unexpectedly, for example on an unhandled exception or signal. Set to empty to "
-    "disable writing minidump files.");
+    "information in a compressed format and will be written when a daemon exits "
+    "unexpectedly, for example on an unhandled exception or signal. It is also possible "
+    "to create minidumps on demand without exiting the process by sending SIGUSR1. "
+    "Set to empty to disable writing minidump files.");
 
 DEFINE_int32(max_minidumps, 9, "Maximum number of minidump files to keep per daemon. "
     "Older files are removed first. Set to 0 to keep all minidump files.");
