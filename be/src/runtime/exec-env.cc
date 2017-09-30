@@ -382,8 +382,8 @@ Status ExecEnv::Init() {
   return Status::OK();
 }
 
-Status ExecEnv::StartServices() {
-  LOG(INFO) << "Starting global services";
+Status ExecEnv::StartStatestoreSubscriberService() {
+  LOG(INFO) << "Starting statestore subscriber service";
 
   // Must happen after all topic registrations / callbacks are done
   if (statestore_subscriber_.get() != nullptr) {
@@ -394,8 +394,14 @@ Status ExecEnv::StartServices() {
     }
   }
 
-  // Start this last so everything is in place before accepting the first call.
-  if (FLAGS_use_krpc) RETURN_IF_ERROR(rpc_mgr_->StartServices(krpc_address_));
+  return Status::OK();
+}
+
+Status ExecEnv::StartKrpcService() {
+  if (FLAGS_use_krpc) {
+    LOG(INFO) << "Starting KRPC service";
+    RETURN_IF_ERROR(rpc_mgr_->StartServices(krpc_address_));
+  }
   return Status::OK();
 }
 

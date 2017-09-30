@@ -91,8 +91,12 @@ class ExecEnv {
   /// subsystems like the webserver, scheduler etc.
   Status Init();
 
-  /// Starts any dependent services in their correct order
-  Status StartServices() WARN_UNUSED_RESULT;
+  /// Starts the service to subscribe to the statestore.
+  Status StartStatestoreSubscriberService() WARN_UNUSED_RESULT;
+
+  /// Starts krpc, if needed. Start this last so everything is in place before accepting
+  /// the first call.
+  Status StartKrpcService() WARN_UNUSED_RESULT;
 
   /// TODO: Should ExecEnv own the ImpalaServer as well?
   void SetImpalaServer(ImpalaServer* server) { impala_server_ = server; }

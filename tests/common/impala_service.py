@@ -78,7 +78,7 @@ class BaseImpalaService(object):
         LOG.error(e)
 
       if value == expected_value:
-        LOG.info("Metric '%s' has reach desired value: %s" % (metric_name, value))
+        LOG.info("Metric '%s' has reached desired value: %s" % (metric_name, value))
         return value
       else:
         LOG.info("Waiting for metric value '%s'=%s. Current value: %s" %

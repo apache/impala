@@ -65,7 +65,7 @@ using namespace impala;
 class Planner {
  public:
   Planner() {
-    ABORT_IF_ERROR(frontend_.SetCatalogInitialized());
+    frontend_.SetCatalogIsReady();
     ABORT_IF_ERROR(exec_env_.InitForFeTests());
   }
 

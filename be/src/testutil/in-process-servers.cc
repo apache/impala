@@ -72,11 +72,9 @@ InProcessImpalaServer* InProcessImpalaServer::StartWithEphemeralPorts(
     // Start the daemon and check if it works, if not delete the current server object and
     // pick a new set of ports
     Status started = impala->StartWithClientServers(beeswax_port, hs2_port);
-    if (started.ok()) {
-      const Status status = impala->SetCatalogInitialized();
-      if (!status.ok()) LOG(WARNING) << status.GetDetail();
-      return impala;
-    }
+    if (started.ok()) return impala;
+    LOG(WARNING) << started.GetDetail();
+
     delete impala;
   }
   DCHECK(false) << "Could not find port to start Impalad.";
@@ -94,9 +92,9 @@ InProcessImpalaServer::InProcessImpalaServer(const string& hostname, int backend
           webserver_port, statestore_host, statestore_port)) {
 }
 
-Status InProcessImpalaServer::SetCatalogInitialized() {
+void InProcessImpalaServer::SetCatalogIsReady() {
   DCHECK(impala_server_ != NULL) << "Call Start*() first.";
-  return exec_env_->frontend()->SetCatalogInitialized();
+  exec_env_->frontend()->SetCatalogIsReady();
 }
 
 Status InProcessImpalaServer::StartWithClientServers(int beeswax_port, int hs2_port) {
@@ -105,8 +103,8 @@ Status InProcessImpalaServer::StartWithClientServers(int beeswax_port, int hs2_p
   hs2_port_ = hs2_port;
 
   impala_server_.reset(new ImpalaServer(exec_env_.get()));
-  RETURN_IF_ERROR(impala_server_->Init(backend_port_, beeswax_port, hs2_port));
-  RETURN_IF_ERROR(impala_server_->Start());
+  SetCatalogIsReady();
+  RETURN_IF_ERROR(impala_server_->Start(backend_port_, beeswax_port, hs2_port));
 
   // Wait for up to 1s for the backend server to start
   RETURN_IF_ERROR(WaitForServer(hostname_, backend_port_, 10, 100));

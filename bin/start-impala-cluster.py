@@ -25,7 +25,8 @@ import psutil
 import sys
 from getpass import getuser
 from time import sleep, time
-from optparse import OptionParser
+from optparse import OptionParser, SUPPRESS_HELP
+from testdata.common import cgroups
 
 KUDU_MASTER_HOSTS = os.getenv('KUDU_MASTER_HOSTS', '127.0.0.1')
 DEFAULT_IMPALA_MAX_LOG_FILES = os.environ.get('IMPALA_MAX_LOG_FILES', 10)
@@ -69,9 +70,6 @@ parser.add_option('--max_log_files', default=DEFAULT_IMPALA_MAX_LOG_FILES,
                   help='Max number of log files before rotation occurs.')
 parser.add_option("-v", "--verbose", dest="verbose", action="store_true", default=False,
                   help="Prints all output to stderr/stdout.")
-parser.add_option("--wait_for_cluster", dest="wait_for_cluster", action="store_true",
-                  default=False, help="Wait until the cluster is ready to accept "
-                  "queries before returning.")
 parser.add_option("--log_level", type="int", dest="log_level", default=1,
                    help="Set the impalad backend logging level")
 parser.add_option("--jvm_args", dest="jvm_args", default="",
@@ -79,6 +77,11 @@ parser.add_option("--jvm_args", dest="jvm_args", default="",
 parser.add_option("--kudu_master_hosts", default=KUDU_MASTER_HOSTS,
                   help="The host name or address of the Kudu master. Multiple masters "
                       "can be specified using a comma separated list.")
+
+# For testing: list of comma-separated delays, in milliseconds, that delay impalad catalog
+# replica initialization. The ith delay is applied to the ith impalad.
+parser.add_option("--catalog_init_delays", dest="catalog_init_delays", default="",
+                  help=SUPPRESS_HELP)
 
 options, args = parser.parse_args()
 
@@ -217,6 +220,10 @@ def start_impalad_instances(cluster_size, num_coordinators, use_exclusive_coordi
   # --impalad_args flag. virtual_memory().total returns the total physical memory.
   mem_limit = int(0.8 * psutil.virtual_memory().total / cluster_size)
 
+  delay_list = []
+  if options.catalog_init_delays != "":
+    delay_list = [delay.strip() for delay in options.catalog_init_delays.split(",")]
+
   # Start each impalad instance and optionally redirect the output to a log file.
   for i in range(cluster_size):
     if i == 0:
@@ -247,6 +254,9 @@ def start_impalad_instances(cluster_size, num_coordinators, use_exclusive_coordi
     elif use_exclusive_coordinators:
       # Coordinator instance that doesn't execute non-coordinator fragments
       args = "-is_executor=false %s" % (args)
+
+    if i < len(delay_list):
+      args = "-stress_catalog_init_delay_ms=%s %s" % (delay_list[i], args)
 
     stderr_log_file_path = os.path.join(options.log_dir, '%s-error.log' % service_name)
     exec_impala_process(IMPALAD_PATH, args, stderr_log_file_path)
@@ -281,37 +291,53 @@ def wait_for_cluster_web(timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
   A cluster is deemed "ready" if:
     - All backends are registered with the statestore.
     - Each impalad knows about all other impalads.
+    - Each coordinator impalad's catalog cache is ready.
   This information is retrieved by querying the statestore debug webpage
   and each individual impalad's metrics webpage.
   """
   impala_cluster = ImpalaCluster()
   # impalad processes may take a while to come up.
   wait_for_impala_process_count(impala_cluster)
-  for impalad in impala_cluster.impalads:
-    impalad.service.wait_for_num_known_live_backends(options.cluster_size,
-        timeout=CLUSTER_WAIT_TIMEOUT_IN_SECONDS, interval=2)
-    if impalad._get_arg_value('is_coordinator', default='true') == 'true':
-      wait_for_catalog(impalad, timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS)
 
-def wait_for_catalog(impalad, timeout_in_seconds):
-  """Waits for the impalad catalog to become ready"""
+  # TODO: fix this for coordinator-only nodes as well.
+  expected_num_backends = options.cluster_size
+  if options.catalog_init_delays != "":
+    for delay in options.catalog_init_delays.split(","):
+      if int(delay.strip()) != 0: expected_num_backends -= 1
+
+  for impalad in impala_cluster.impalads:
+    impalad.service.wait_for_num_known_live_backends(expected_num_backends,
+        timeout=CLUSTER_WAIT_TIMEOUT_IN_SECONDS, interval=2)
+    if impalad._get_arg_value('is_coordinator', default='true') == 'true' and \
+       impalad._get_arg_value('stress_catalog_init_delay_ms', default=0) == 0:
+      wait_for_catalog(impalad)
+
+def wait_for_catalog(impalad, timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
+  """Waits for a catalog copy to be received by the impalad. When its received,
+     additionally waits for client ports to be opened."""
   start_time = time()
-  catalog_ready = False
-  attempt = 0
-  while (time() - start_time < timeout_in_seconds and not catalog_ready):
+  client_beeswax = None
+  client_hs2 = None
+  num_dbs = 0
+  num_tbls = 0
+  while (time() - start_time < timeout_in_seconds):
     try:
       num_dbs = impalad.service.get_metric_value('catalog.num-databases')
       num_tbls = impalad.service.get_metric_value('catalog.num-tables')
-      catalog_ready = impalad.service.get_metric_value('catalog.ready')
-      if catalog_ready or attempt % 4 == 0:
-          print 'Waiting for Catalog... Status: %s DBs / %s tables (ready=%s)' %\
-              (num_dbs, num_tbls, catalog_ready)
-      attempt += 1
-    except Exception, e:
-      print e
+      client_beeswax = impalad.service.create_beeswax_client()
+      client_hs2 = impalad.service.create_hs2_client()
+      break
+    except Exception as e:
+      print 'Client services not ready.'
+      print 'Waiting for catalog cache: (%s DBs / %s tables). Trying again ...' %\
+        (num_dbs, num_tbls)
+    finally:
+      if client_beeswax is not None: client_beeswax.close()
     sleep(0.5)
-  if not catalog_ready:
-    raise RuntimeError('Catalog was not initialized in expected time period.')
+
+  if client_beeswax is None or client_hs2 is None:
+    raise RuntimeError('Unable to open client ports within %s seconds.'\
+                       % timeout_in_seconds)
 
 def wait_for_cluster_cmdline(timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
   """Checks if the cluster is "ready" by executing a simple query in a loop"""
@@ -389,6 +415,8 @@ if __name__ == "__main__":
                             options.use_exclusive_coordinators)
     # Sleep briefly to reduce log spam: the cluster takes some time to start up.
     sleep(3)
+
+    # Check for the cluster to be ready.
     wait_for_cluster()
   except Exception, e:
     print 'Error starting cluster: %s' % e

@@ -31,12 +31,13 @@ from time import sleep
 IMPALA_HOME = os.environ['IMPALA_HOME']
 CLUSTER_SIZE = 3
 NUM_COORDINATORS = CLUSTER_SIZE
-# The number of statestore subscribers is CLUSTER_SIZE (# of impalad) + 1 (for catalogd).
-NUM_SUBSCRIBERS = CLUSTER_SIZE + 1
 
+# Additional args passed to respective daemon command line.
 IMPALAD_ARGS = 'impalad_args'
 STATESTORED_ARGS = 'state_store_args'
 CATALOGD_ARGS = 'catalogd_args'
+# Additional args passed to the start-impala-cluster script.
+START_ARGS = 'start_args'
 
 class CustomClusterTestSuite(ImpalaTestSuite):
   """Every test in a test suite deriving from this class gets its own Impala cluster.
@@ -81,7 +82,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     pass
 
   @staticmethod
-  def with_args(impalad_args=None, statestored_args=None, catalogd_args=None):
+  def with_args(impalad_args=None, statestored_args=None, catalogd_args=None, start_args=None):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     def decorate(func):
@@ -91,6 +92,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         func.func_dict[STATESTORED_ARGS] = statestored_args
       if catalogd_args is not None:
         func.func_dict[CATALOGD_ARGS] = catalogd_args
+      if start_args is not None:
+        func.func_dict[START_ARGS] = start_args
       return func
     return decorate
 
@@ -99,6 +102,9 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     for arg in [IMPALAD_ARGS, STATESTORED_ARGS, CATALOGD_ARGS]:
       if arg in method.func_dict:
         cluster_args.append("--%s=\"%s\" " % (arg, method.func_dict[arg]))
+    if START_ARGS in method.func_dict:
+      cluster_args.append(method.func_dict[START_ARGS])
+
     # Start a clean new cluster before each test
     self._start_impala_cluster(cluster_args)
     super(CustomClusterTestSuite, self).setup_class()
@@ -117,7 +123,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   @classmethod
   def _start_impala_cluster(cls, options, log_dir=os.getenv('LOG_DIR', "/tmp/"),
       cluster_size=CLUSTER_SIZE, num_coordinators=NUM_COORDINATORS,
-      use_exclusive_coordinators=False, log_level=1):
+      use_exclusive_coordinators=False, log_level=1, expected_num_executors=CLUSTER_SIZE):
     cls.impala_log_dir = log_dir
     cmd = [os.path.join(IMPALA_HOME, 'bin/start-impala-cluster.py'),
            '--cluster_size=%d' % cluster_size,
@@ -133,9 +139,14 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     statestored = cls.cluster.statestored
     if statestored is None:
       raise Exception("statestored was not found")
-    statestored.service.wait_for_live_subscribers(NUM_SUBSCRIBERS, timeout=60)
+
+    # The number of statestore subscribers is
+    # cluster_size (# of impalad) + 1 (for catalogd).
+    expected_subscribers = cluster_size + 1
+
+    statestored.service.wait_for_live_subscribers(expected_subscribers, timeout=60)
     for impalad in cls.cluster.impalads:
-      impalad.service.wait_for_num_known_live_backends(CLUSTER_SIZE, timeout=60)
+      impalad.service.wait_for_num_known_live_backends(expected_num_executors, timeout=60)
 
   def assert_impalad_log_contains(self, level, line_regex, expected_count=1):
     """

@@ -140,6 +140,9 @@ DEFINE_int32(stress_scratch_write_delay_ms, 0, "A stress option which causes wri
 DEFINE_bool(thread_creation_fault_injection, false, "A fault injection option that "
     " causes calls to Thread::Create() to fail randomly 1% of the time on eligible "
     " codepaths. Effective in debug builds only.");
+DEFINE_int32(stress_catalog_init_delay_ms, 0, "A stress option that injects extra delay"
+    " in milliseconds when initializing an impalad's local catalog replica. Delay <= 0"
+    " inject no delay.");
 #endif
 
 // Used for testing the path where the Kudu client is stubbed.

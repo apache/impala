@@ -18,6 +18,7 @@
 #ifndef IMPALA_SERVICE_IMPALA_SERVER_H
 #define IMPALA_SERVICE_IMPALA_SERVER_H
 
+#include <atomic>
 #include <boost/thread/mutex.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -75,6 +76,30 @@ class ClientRequestState;
 /// An ImpalaServer contains both frontend and backend functionality;
 /// it implements ImpalaService (Beeswax), ImpalaHiveServer2Service (HiveServer2)
 /// and ImpalaInternalService APIs.
+/// ImpalaServer can be started in 1 of 3 roles: executor, coordinator, or both executor
+/// and coordinator. All roles start ImpalaInternalService API's. The
+/// coordinator role additionally starts client API's (Beeswax and HiveServer2).
+///
+/// Startup Sequence
+/// ----------------
+/// The startup sequence opens and starts all services so that they are ready to be used
+/// by clients at the same time. The Impala server is considered 'ready' only when it can
+/// process requests with all of its specified roles. Avoiding states where some roles are
+/// ready and some are not makes it easier to reason about the state of the server.
+///
+/// Main thread (caller code), after instantiating the server, must call Start().
+/// Start() does the following:
+///    - Start internal services
+///    - Wait (indefinitely) for local catalog to be initialized from statestore
+///      (if coordinator)
+///    - Open ImpalaInternalService ports
+///    - Open client ports (if coordinator)
+///    - Start ImpalaInternalService API
+///    - Start client service API's (if coordinator)
+///    - Set services_started_ flag
+///
+/// Internally, the Membership callback thread also participates in startup:
+///    - If services_started_, then register to the statestore as an executor.
 ///
 /// Locking
 /// -------
@@ -118,14 +143,10 @@ class ImpalaServer : public ImpalaServiceIf,
   ImpalaServer(ExecEnv* exec_env);
   ~ImpalaServer();
 
-  /// Initializes RPC services and other subsystems (like audit logging). Returns an error
-  /// if initialization failed. If any ports are <= 0, their respective service will not
-  /// be started.
-  Status Init(int32_t thrift_be_port, int32_t beeswax_port, int32_t hs2_port);
-
-  /// Starts client and internal services. Does not block. Returns an error if any service
-  /// failed to start.
-  Status Start();
+  /// Initializes and starts RPC services and other subsystems (like audit logging).
+  /// Returns an error if starting any services failed. If the port is <= 0, their
+  ///respective service will not be started.
+  Status Start(int32_t thrift_be_port, int32_t beeswax_port, int32_t hs2_port);
 
   /// Blocks until the server shuts down (by calling Shutdown()).
   void Join();
@@ -1014,6 +1035,10 @@ class ImpalaServer : public ImpalaServiceIf,
   boost::scoped_ptr<ThriftServer> beeswax_server_;
   boost::scoped_ptr<ThriftServer> hs2_server_;
   boost::scoped_ptr<ThriftServer> thrift_be_server_;
+
+  /// Flag that records if backend and/or client services have been started. The flag is
+  /// set after all services required for the server have been started.
+  std::atomic_bool services_started_;
 
   /// Set to true when this ImpalaServer should shut down.
   Promise<bool> shutdown_promise_;

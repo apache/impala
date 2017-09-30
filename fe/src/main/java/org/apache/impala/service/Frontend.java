@@ -856,6 +856,28 @@ public class Frontend {
   }
 
   /**
+   * Waits indefinitely for the local catalog to be ready. The catalog is "ready" after
+   * the first catalog update is received from the statestore.
+   *
+   * @see ImpaladCatalog.isReady
+   */
+  public void waitForCatalog() {
+    LOG.info("Waiting for first catalog update from the statestore.");
+    int numTries = 0;
+    long startTimeMs = System.currentTimeMillis();
+    while (true) {
+      if (getCatalog().isReady()) {
+        LOG.info("Local catalog initialized after: " +
+            (System.currentTimeMillis() - startTimeMs) + " ms.");
+        return;
+      }
+      LOG.info("Waiting for local catalog to be initialized, attempt: " + numTries);
+      getCatalog().waitForCatalogUpdate(MAX_CATALOG_UPDATE_WAIT_TIME_MS);
+      ++numTries;
+    }
+  }
+
+  /**
    * Overload of requestTblLoadAndWait that uses the default timeout.
    */
   public boolean requestTblLoadAndWait(Set<TableName> requestedTbls)
@@ -879,10 +901,8 @@ public class Frontend {
    */
   private AnalysisContext.AnalysisResult analyzeStmt(TQueryCtx queryCtx)
       throws AnalysisException, InternalException, AuthorizationException {
-    if (!impaladCatalog_.get().isReady()) {
-      throw new AnalysisException("This Impala daemon is not ready to accept user " +
-          "requests. Status: Waiting for catalog update from the StateStore.");
-    }
+    Preconditions.checkState(getCatalog().isReady(),
+        "Local catalog has not been initialized. Aborting query analysis.");
 
     AnalysisContext analysisCtx = new AnalysisContext(impaladCatalog_.get(), queryCtx,
         authzConfig_);

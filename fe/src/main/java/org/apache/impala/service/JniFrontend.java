@@ -580,9 +580,11 @@ public class JniFrontend {
     }
   }
 
-  public void setCatalogInitialized() {
+  public void setCatalogIsReady() {
     frontend_.getCatalog().setIsReady(true);
   }
+
+  public void waitForCatalog() { frontend_.waitForCatalog(); }
 
   // Caching this saves ~50ms per call to getHadoopConfigAsHtml
   private static final Configuration CONF = new Configuration();

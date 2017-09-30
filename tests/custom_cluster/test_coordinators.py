@@ -93,6 +93,7 @@ class TestCoordinators(CustomClusterTestSuite):
       """Connects to the coordinator node, runs a query and verifies that certain
         operators are executed on 'expected_num_of_executors' nodes."""
       coordinator = self.cluster.impalads[0]
+      client = None
       try:
         client = coordinator.service.create_beeswax_client()
         assert client is not None
@@ -106,6 +107,7 @@ class TestCoordinators(CustomClusterTestSuite):
           elif rows['operator'] == '01:AGGREGATE':
             assert rows['num_hosts'] == expected_num_of_executors
       finally:
+        assert client is not None
         client.close()
 
     # Cluster config where the coordinator can execute query fragments

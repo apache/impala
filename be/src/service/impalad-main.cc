@@ -84,20 +84,14 @@ int ImpaladMain(int argc, char** argv) {
   InitRpcEventTracing(exec_env.webserver());
 
   boost::shared_ptr<ImpalaServer> impala_server(new ImpalaServer(&exec_env));
-  ABORT_IF_ERROR(impala_server->Init(FLAGS_be_port, FLAGS_beeswax_port, FLAGS_hs2_port));
-
-  DCHECK(exec_env.process_mem_tracker() != nullptr)
-      << "ExecEnv::StartServices() must be called before starting RPC services";
-  Status status = impala_server->Start();
+  Status status =
+      impala_server->Start(FLAGS_be_port, FLAGS_beeswax_port, FLAGS_hs2_port);
   if (!status.ok()) {
     LOG(ERROR) << "Impalad services did not start correctly, exiting.  Error: "
-               << status.GetDetail();
+        << status.GetDetail();
     ShutdownLogging();
     exit(1);
   }
-
-  ImpaladMetrics::IMPALA_SERVER_READY->set_value(true);
-  LOG(INFO) << "Impala has started.";
 
   impala_server->Join();
 
