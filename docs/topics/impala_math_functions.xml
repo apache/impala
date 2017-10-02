@@ -1327,63 +1327,204 @@ select x, unix_timestamp(now()), rand(unix_timestamp(now()))
 
         <dt rev="2.3.0">
           <codeph>truncate(double_or_decimal a[, digits_to_leave])</codeph>,
-          <ph id="dtrunc"><codeph>dtrunc(double_or_decimal a[, digits_to_leave])</codeph></ph>
+          <ph id="dtrunc"><codeph>dtrunc(double_or_decimal a[, digits_to_leave])</codeph></ph>,
+          <ph rev="2.10.0 IMPALA-5529" id="trunc_number"><codeph>trunc(double_or_decimal a[, digits_to_leave])</codeph></ph>
         </dt>
 
         <dd rev="2.3.0">
           <indexterm audience="hidden">truncate() function</indexterm>
           <indexterm audience="hidden">dtrunc() function</indexterm>
+          <indexterm audience="hidden">trunc() function</indexterm>
           <b>Purpose:</b> Removes some or all fractional digits from a numeric value.
-          With no argument, removes all fractional digits, leaving an integer value.
-          The optional argument specifies the number of fractional digits to include
-          in the return value, and only applies with the argument type is <codeph>DECIMAL</codeph>.
-          <codeph>truncate()</codeph> and <codeph>dtrunc()</codeph> are aliases for the same function.
+          <p>
+            <b>Arguments:</b>
+            With a single floating-point argument, removes all fractional digits, leaving an
+            integer value. The optional second argument specifies the number of fractional digits
+            to include in the return value, and only applies when the argument type is
+            <codeph>DECIMAL</codeph>. A second argument of 0 truncates to a whole integer value.
+            A second argument of negative N sets N digits to 0 on the left side of the decimal
+          </p>
+          <p rev="2.10.0 IMPALA-5529">
+            <b>Scale argument:</b> The scale argument applies only when truncating
+            <codeph>DECIMAL</codeph> values. It is an integer specifying how many
+            significant digits to leave to the right of the decimal point.
+            A scale argument of 0 truncates to a whole integer value. A scale
+            argument of negative N sets N digits to 0 on the left side of the decimal
+            point.
+          </p>
+          <p>
+            <codeph>truncate()</codeph>, <codeph>dtrunc()</codeph>,
+            <ph rev="2.10.0 IMPALA-5529">and <codeph>trunc()</codeph></ph> are aliases for the
+            same function.
+          </p>
           <p>
             <b>Return type:</b> <codeph>decimal</codeph> for <codeph>DECIMAL</codeph> arguments;
             <codeph>bigint</codeph> for <codeph>DOUBLE</codeph> arguments
           </p>
+          <p>
+            <b>Added in:</b> The <codeph>trunc()</codeph> alias was added in
+            <keyword keyref="impala210_full"/>.
+          </p>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p rev="2.10.0 IMPALA-5529">
+            You can also pass a <codeph>DOUBLE</codeph> argument, or <codeph>DECIMAL</codeph>
+            argument with optional scale, to the <codeph>dtrunc()</codeph> or
+            <codeph>truncate</codeph> functions. Using the <codeph>trunc()</codeph>
+            function for numeric values is common with other industry-standard database
+            systems, so you might find such <codeph>trunc()</codeph> calls in code that you
+            are porting to Impala.
+          </p>
+          <p>
+            The <codeph>trunc()</codeph> function also has a signature that applies to
+            <codeph>TIMESTAMP</codeph> values. See <xref keyref="datetime_functions"/>
+            for details.
+          </p>
           <p conref="../shared/impala_common.xml#common/example_blurb"/>
-<codeblock>select truncate(3.45)
+          <p>
+            The following examples demonstrate the <codeph>truncate()</codeph>
+            and <codeph>dtrunc()</codeph> signatures for this function:
+          </p>
+<codeblock>select truncate(3.45);
 +----------------+
 | truncate(3.45) |
 +----------------+
 | 3              |
 +----------------+
 
-select truncate(-3.45)
+select truncate(-3.45);
 +-----------------+
 | truncate(-3.45) |
 +-----------------+
 | -3              |
 +-----------------+
 
-select truncate(3.456,1)
+select truncate(3.456,1);
 +--------------------+
 | truncate(3.456, 1) |
 +--------------------+
 | 3.4                |
 +--------------------+
 
-select dtrunc(3.456,1)
+select dtrunc(3.456,1);
 +------------------+
 | dtrunc(3.456, 1) |
 +------------------+
 | 3.4              |
 +------------------+
 
-select truncate(3.456,2)
+select truncate(3.456,2);
 +--------------------+
 | truncate(3.456, 2) |
 +--------------------+
 | 3.45               |
 +--------------------+
 
-select truncate(3.456,7)
+select truncate(3.456,7);
 +--------------------+
 | truncate(3.456, 7) |
 +--------------------+
 | 3.4560000          |
 +--------------------+
+</codeblock>
+          <p rev="2.10.0 IMPALA-5529">
+            The following examples demonstrate using <codeph>trunc()</codeph> with
+            <codeph>DECIMAL</codeph> or <codeph>DOUBLE</codeph> values, and with
+            an optional scale argument for <codeph>DECIMAL</codeph> values.
+            (The behavior is the same for the <codeph>truncate()</codeph> and
+            <codeph>dtrunc()</codeph> aliases also.)
+          </p>
+<codeblock rev="2.10.0 IMPALA-5529">
+create table t1 (d decimal(20,7));
+
+-- By default, no digits to the right of the decimal point.
+insert into t1 values (1.1), (2.22), (3.333), (4.4444), (5.55555);
+select trunc(d) from t1 order by d;
++----------+
+| trunc(d) |
++----------+
+| 1        |
+| 2        |
+| 3        |
+| 4        |
+| 5        |
++----------+
+
+-- 1 digit to the right of the decimal point.
+select trunc(d,1) from t1 order by d;
++-------------+
+| trunc(d, 1) |
++-------------+
+| 1.1         |
+| 2.2         |
+| 3.3         |
+| 4.4         |
+| 5.5         |
++-------------+
+
+-- 2 digits to the right of the decimal point,
+-- including trailing zeroes if needed.
+select trunc(d,2) from t1 order by d;
++-------------+
+| trunc(d, 2) |
++-------------+
+| 1.10        |
+| 2.22        |
+| 3.33        |
+| 4.44        |
+| 5.55        |
++-------------+
+
+insert into t1 values (9999.9999), (8888.8888);
+
+-- Negative scale truncates digits to the left
+-- of the decimal point.
+select trunc(d,-2) from t1 where d > 100 order by d;
++--------------+
+| trunc(d, -2) |
++--------------+
+| 8800         |
+| 9900         |
++--------------+
+
+-- The scale of the result is adjusted to match the
+-- scale argument.
+select trunc(d,2),
+  precision(trunc(d,2)) as p,
+  scale(trunc(d,2)) as s
+from t1 order by d;
++-------------+----+---+
+| trunc(d, 2) | p  | s |
++-------------+----+---+
+| 1.10        | 15 | 2 |
+| 2.22        | 15 | 2 |
+| 3.33        | 15 | 2 |
+| 4.44        | 15 | 2 |
+| 5.55        | 15 | 2 |
+| 8888.88     | 15 | 2 |
+| 9999.99     | 15 | 2 |
++-------------+----+---+
+</codeblock>
+
+<codeblock rev="2.10.0 IMPALA-5529">
+create table dbl (d double);
+
+insert into dbl values
+  (1.1), (2.22), (3.333), (4.4444), (5.55555),
+  (8888.8888), (9999.9999);
+
+-- With double values, there is no optional scale argument.
+select trunc(d) from dbl order by d;
++----------+
+| trunc(d) |
++----------+
+| 1        |
+| 2        |
+| 3        |
+| 4        |
+| 5        |
+| 8888     |
+| 9999     |
++----------+
 </codeblock>
         </dd>
 

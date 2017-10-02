@@ -2313,7 +2313,7 @@ select now() as 'Current time in California USA',
 
       <dlentry rev="1.4.0" id="trunc">
 
-        <dt>
+        <dt id="trunc_timestamp">
           <codeph>trunc(timestamp, string unit)</codeph>
         </dt>
 
@@ -2321,7 +2321,8 @@ select now() as 'Current time in California USA',
           <indexterm audience="hidden">trunc() function</indexterm>
           <b>Purpose:</b> Strips off fields from a <codeph>TIMESTAMP</codeph> value.
           <p>
-            <b>Unit argument:</b> The <codeph>unit</codeph> argument value is case-sensitive. This argument string
+            <b>Unit argument:</b> The <codeph>unit</codeph> argument value for truncating
+            <codeph>TIMESTAMP</codeph> values is case-sensitive. This argument string
             can be one of:
 <!-- Some but not all of the arguments from http://docs.oracle.com/cd/B19306_01/server.102/b14200/functions230.htm#i1002084 are supported here.
      Impala doesn't support 2-digit years or ISO-related years or values derived from ISO years.
@@ -2364,12 +2365,16 @@ select now() as 'Current time in California USA',
               </li>
             </ul>
           </p>
+          <p>
+            <b>Added in:</b> The ability to truncate numeric values is new starting in
+            <keyword keyref="impala210_full"/>.
+          </p>
           <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
           <p>
-            Typically used in <codeph>GROUP BY</codeph> queries to aggregate results from the
-            same hour, day, week, month, quarter, and so on. You can also use this function in an <codeph>INSERT
-            ... SELECT</codeph> into a partitioned table to divide <codeph>TIMESTAMP</codeph> values into the
-            correct partition.
+            The <codeph>TIMESTAMP</codeph> form is typically used in <codeph>GROUP BY</codeph>
+            queries to aggregate results from the same hour, day, week, month, quarter, and so on.
+            You can also use this function in an <codeph>INSERT ... SELECT</codeph> into a
+            partitioned table to divide <codeph>TIMESTAMP</codeph> values into the correct partition.
           </p>
           <p>
             Because the return value is a <codeph>TIMESTAMP</codeph>, if you cast the result of
@@ -2378,6 +2383,13 @@ select now() as 'Current time in California USA',
             month, or year, use the <codeph>EXTRACT()</codeph> function instead. If you need the individual units
             from a truncated <codeph>TIMESTAMP</codeph> value, run the <codeph>TRUNCATE()</codeph> function on the
             original value, then run <codeph>EXTRACT()</codeph> on the result.
+          </p>
+          <p>
+            The <codeph>trunc()</codeph> function also has a signature that applies to
+            <codeph>DOUBLE</codeph> or <codeph>DECIMAL</codeph>values. <codeph>truncate()</codeph>,
+            <codeph>trunc()</codeph>, and <codeph>dtrunc()</codeph> are all aliased to the
+            same function. See <codeph>truncate()</codeph> under <xref keyref="math_functions"/>
+            for details.
           </p>
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
