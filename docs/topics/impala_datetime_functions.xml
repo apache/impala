@@ -2516,6 +2516,62 @@ select unix_timestamp
 
       </dlentry>
 
+      <dlentry id="utc_timestamp" rev="2.10.0 IMPALA-3504">
+
+        <dt>
+          <codeph>utc_timestamp()</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="hidden">utc_timestamp() function</indexterm>
+          <b>Purpose:</b> Returns a <codeph>TIMESTAMP</codeph> corresponding to the current
+          date and time in the UTC time zone.
+          <p>
+            <b>Return type:</b> <codeph>timestamp</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/added_in_210"/>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            Similar to the <codeph>now()</codeph> or <codeph>current_timestamp()</codeph> functions,
+            but does not use the local time zone as those functions do. Use <codeph>utc_timestamp()</codeph>
+            to record <codeph>TIMESTAMP</codeph> values that are interoperable with
+            servers around the world, in arbitrary time zones, without the need for
+            additional conversion functions to standardize the time zone of each
+            value representing a date/time.
+          </p>
+          <p>
+            For working with date/time values represented as integer values, you can convert
+            back and forth between <codeph>TIMESTAMP</codeph> and <codeph>BIGINT</codeph>
+            with the <codeph>unix_micros_to_utc_timestamp()</codeph> and
+            <codeph>utc_to_unix_micros()</codeph> functions. The integer values represent
+            the number of microseconds since the Unix epoch (midnight on January 1, 1970).
+          </p>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            The following example shows how <codeph>now()</codeph> and <codeph>current_timestamp()</codeph>
+            represent the current date/time in the local time zone (in this case, UTC-7), while
+            <codeph>utc_timestamp()</codeph> represents the same date/time in the standardized UTC
+            time zone:
+          </p>
+<codeblock>
+select now(), utc_timestamp();
++-------------------------------+-------------------------------+
+| now()                         | utc_timestamp()               |
++-------------------------------+-------------------------------+
+| 2017-10-01 23:33:58.919688000 | 2017-10-02 06:33:58.919688000 |
++-------------------------------+-------------------------------+
+
+select current_timestamp(), utc_timestamp();
++-------------------------------+-------------------------------+
+| current_timestamp()           | utc_timestamp()               |
++-------------------------------+-------------------------------+
+| 2017-10-01 23:34:07.400642000 | 2017-10-02 06:34:07.400642000 |
++-------------------------------+-------------------------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
       <dlentry id="weekofyear">
 
         <dt>
