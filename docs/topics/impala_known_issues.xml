@@ -331,6 +331,33 @@ https://issues.apache.org/jira/browse/IMPALA-2144 - Don't have
 
     </concept>
 
+    <concept id="ki_file_handle_cache">
+      <title>Interaction of File Handle Cache with HDFS Appends and Short-Circuit Reads</title>
+      <conbody>
+        <p>
+          If a data file used by Impala is being continuously appended or overwritten in place by an
+          HDFS mechanism, such as <cmdname>hdfs dfs -appendToFile</cmdname>, interaction with the
+          file handle caching feature in <keyword keyref="impala210_full"/> and higher could cause
+          short-circuit reads to sometimes be disabled on some DataNodes. When a mismatch is detected
+          between the cached file handle and a data block that was rewritten because of an append,
+          short-circuit reads are turned off on the affected host for a 10-minute period.
+        </p>
+        <p>
+          The possibility of encountering such an issue is the reason why the file handle caching
+          feature is currently turned off by default. See <xref keyref="scalability_file_handle_cache"/>
+          for information about this feature and how to enable it.
+        </p>
+        <p><b>Bug:</b> <xref href="https://issues.apache.org/jira/browse/HDFS-12528" scope="external" format="html">HDFS-12528</xref></p>
+        <p><b>Severity:</b> High</p>
+        <!-- <p><b>Resolution:</b> </p> -->
+        <p><b>Workaround:</b> Verify whether your ETL process is susceptible to this issue before enabling the file handle caching feature.
+          You can set the <cmdname>impalad</cmdname> configuration option <codeph>unused_file_handle_timeout_sec</codeph> to a time period
+          that is shorter than the HDFS setting <codeph>dfs.client.read.shortcircuit.streams.cache.expiry.ms</codeph>. (Keep in mind that
+          the HDFS setting is in milliseconds while the Impala setting is in seconds.)
+        </p>
+      </conbody>
+    </concept>
+
   </concept>
 
   <concept id="known_issues_usability">

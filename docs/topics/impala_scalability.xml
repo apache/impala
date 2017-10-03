@@ -941,4 +941,68 @@ so other secure services might be affected temporarily.
     </conbody>
   </concept>
 
+  <concept id="scalability_file_handle_cache" rev="2.10.0 IMPALA-4623">
+    <title>Scalability Considerations for NameNode Traffic with File Handle Caching</title>
+    <conbody>
+      <p>
+        One scalability aspect that affects heavily loaded clusters is the load on the HDFS
+        NameNode, from looking up the details as each HDFS file is opened. Impala queries
+        often access many different HDFS files, for example if a query does a full table scan
+        on a table with thousands of partitions, each partition containing multiple data files.
+        Accessing each column of a Parquet file also involves a separate <q>open</q> call,
+        further increasing the load on the NameNode. High NameNode overhead can add startup time
+        (that is, increase latency) to Impala queries, and reduce overall throughput for non-Impala
+        workloads that also require accessing HDFS files.
+      </p>
+      <p>
+        In <keyword keyref="impala210_full"/> and higher, you can reduce NameNode overhead by enabling
+        a caching feature for HDFS file handles. Data files that are accessed by different queries,
+        or even multiple times within the same query, can be accessed without a new <q>open</q>
+        call and without fetching the file details again from the NameNode.
+      </p>
+      <p>
+        Because this feature only involves HDFS data files, it does not apply to non-HDFS tables,
+        such as Kudu or HBase tables, or tables that store their data on cloud services such as
+        S3 or ADLS. Any read operations that perform remote reads also skip the cached file handles.
+      </p>
+      <p>
+        This feature is turned off by default. To enable it, set the configuration option
+        <codeph>max_cached_file_handles</codeph> to a non-zero value for each <cmdname>impalad</cmdname>
+        daemon. Consider an initial starting value of 20 thousand, and adjust upward if NameNode
+        overhead is still significant, or downward if it is more important to reduce the extra memory usage
+        on each host. Each cache entry consumes 6 KB, meaning that caching 20,000 file handles requires
+        up to 120 MB on each DataNode. The exact memory usage varies depending on how many file handles
+        have actually been cached; memory is freed as file handles are evicted from the cache.
+      </p>
+      <p>
+        If a manual HDFS operation moves a file to the HDFS Trashcan while the file handle is cached,
+        Impala still accesses the contents of that file. This is a change from prior behavior. Previously,
+        accessing a file that was in the trashcan would cause an error. This behavior only applies to
+        non-Impala methods of removing HDFS files, not the Impala mechanisms such as <codeph>TRUNCATE TABLE</codeph>
+        or <codeph>DROP TABLE</codeph>.
+      </p>
+      <p>
+        If files are removed, replaced, or appended by HDFS operations outside of Impala, the way to bring the
+        file information up to date is to run the <codeph>REFRESH</codeph> statement on the table.
+      </p>
+      <p>
+        File handle cache entries are evicted as the cache fills up, or based on a timeout period
+        when they have not been accessed for some time.
+      </p>
+      <p>
+        To evaluate the effectiveness of file handle caching for a particular workload, issue the
+        <codeph>PROFILE</codeph> statement in <cmdname>impala-shell</cmdname> or examine query
+        profiles in the Impala web UI. Look for the ratio of <codeph>CachedFileHandlesHitCount</codeph>
+        (ideally, should be high) to <codeph>CachedFileHandlesMissCount</codeph> (ideally, should be low).
+        Before starting any evaluation, run some representative queries to <q>warm up</q> the cache,
+        because the first time each data file is accessed is always recorded as a cache miss.
+        To see metrics about file handle caching for each <cmdname>impalad</cmdname> instance,
+        examine the <uicontrol>/metrics</uicontrol> page in the Impala web UI, in particular the fields
+        <uicontrol>impala-server.io.mgr.cached-file-handles-miss-count</uicontrol>,
+        <uicontrol>impala-server.io.mgr.cached-file-handles-hit-count</uicontrol>, and
+        <uicontrol>impala-server.io.mgr.num-cached-file-handles</uicontrol>.
+      </p>
+    </conbody>
+  </concept>
+
 </concept>

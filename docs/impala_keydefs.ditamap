@@ -10946,6 +10946,7 @@ under the License.
   <keydef href="topics/impala_scalability.xml#big_tables" keys="big_tables"/>
   <keydef href="topics/impala_scalability.xml#kerberos_overhead_cluster_size" keys="kerberos_overhead_cluster_size"/>
   <keydef href="topics/impala_scalability.xml#scalability_hotspots" keys="scalability_hotspots"/>
+  <keydef href="topics/impala_scalability.xml#scalability_file_handle_cache" keys="scalability_file_handle_cache"/>
 
   <keydef href="topics/impala_partitioning.xml" keys="partitioning"/>
   <keydef href="topics/impala_partitioning.xml#partitioning_choosing" keys="partitioning_choosing"/>
