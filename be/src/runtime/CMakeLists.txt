@@ -49,7 +49,6 @@ add_library(Runtime
   mem-tracker.cc
   mem-pool.cc
   multi-precision.cc
-  parallel-executor.cc
   query-exec-mgr.cc
   query-state.cc
   test-env.cc
@@ -83,7 +82,6 @@ ADD_BE_TEST(string-buffer-test)
 ADD_BE_TEST(data-stream-test)
 ADD_BE_TEST(timestamp-test)
 ADD_BE_TEST(disk-io-mgr-test)
-ADD_BE_TEST(parallel-executor-test)
 ADD_BE_TEST(raw-value-test)
 ADD_BE_TEST(string-compare-test)
 ADD_BE_TEST(string-search-test)
