@@ -319,6 +319,12 @@ class RuntimeProfile::EventSequence {
   void GetEvents(std::vector<Event>* events) {
     events->clear();
     boost::lock_guard<SpinLock> event_lock(lock_);
+    /// It's possible that concurrent events can be logged out of sequence.
+    /// So sort the events each time we are here.
+    std::sort(events_.begin(), events_.end(),
+        [](Event const &event1, Event const &event2) {
+        return event1.second < event2.second;
+      });
     events->insert(events->end(), events_.begin(), events_.end());
   }
 
