@@ -478,9 +478,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// This list is populated at CleanUpHashPartitions().
   std::list<PhjBuilder::Partition*> output_build_partitions_;
 
-  /// Used while processing null_aware_partition_. It contains all the build tuple rows
-  /// with a NULL when evaluating the hash table expr.
-  boost::scoped_ptr<RowBatch> nulls_build_batch_;
+  /// Whether this join is in a state outputting rows from OutputNullAwareProbeRows().
+  bool output_null_aware_probe_rows_running_;
 
   /// Partition used if 'null_aware_' is set. During probing, rows from the probe
   /// side that did not have a match in the hash table are appended to this partition.

@@ -914,23 +914,6 @@ TEST_F(SimpleTupleStreamTest, BigRowMemoryUse) {
   stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 }
 
-// Test for IMPALA-3923: overflow of 32-bit int in GetRows().
-TEST_F(SimpleTupleStreamTest, TestGetRowsOverflow) {
-  Init(BUFFER_POOL_LIMIT);
-  BufferedTupleStream stream(runtime_state_, int_desc_, &client_, PAGE_LEN, PAGE_LEN);
-  ASSERT_OK(stream.Init(-1, true));
-
-  Status status;
-  // Add more rows than can be fit in a RowBatch (limited by its 32-bit row count).
-  // Actually adding the rows would take a very long time, so just set num_rows_.
-  // This puts the stream in an inconsistent state, but exercises the right code path.
-  stream.num_rows_ = 1L << 33;
-  bool got_rows;
-  scoped_ptr<RowBatch> overflow_batch;
-  ASSERT_FALSE(stream.GetRows(&tracker_, &overflow_batch, &got_rows).ok());
-  stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
-}
-
 // Test rows greater than the default page size. Also exercise the read/write
 // mode with large pages.
 TEST_F(SimpleTupleStreamTest, BigStringReadWrite) {

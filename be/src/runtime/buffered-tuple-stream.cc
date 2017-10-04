@@ -677,30 +677,6 @@ void BufferedTupleStream::UnpinStream(UnpinMode mode) {
   CHECK_CONSISTENCY_FULL();
 }
 
-Status BufferedTupleStream::GetRows(
-    MemTracker* tracker, scoped_ptr<RowBatch>* batch, bool* got_rows) {
-  if (num_rows() > numeric_limits<int>::max()) {
-    // RowBatch::num_rows_ is a 32-bit int, avoid an overflow.
-    return Status(Substitute("Trying to read $0 rows into in-memory batch failed. Limit "
-                             "is $1",
-        num_rows(), numeric_limits<int>::max()));
-  }
-  RETURN_IF_ERROR(PinStream(got_rows));
-  if (!*got_rows) return Status::OK();
-  bool got_reservation;
-  RETURN_IF_ERROR(PrepareForRead(false, &got_reservation));
-  DCHECK(got_reservation) << "Stream was pinned";
-  batch->reset(new RowBatch(desc_, num_rows(), tracker));
-  bool eos = false;
-  // Loop until GetNext fills the entire batch. Each call can stop at page
-  // boundaries. We generally want it to stop, so that pages can be freed
-  // as we read. It is safe in this case because we pin the entire stream.
-  while (!eos) {
-    RETURN_IF_ERROR(GetNext(batch->get(), &eos));
-  }
-  return Status::OK();
-}
-
 Status BufferedTupleStream::GetNext(RowBatch* batch, bool* eos) {
   return GetNextInternal<false>(batch, eos, nullptr);
 }

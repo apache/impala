@@ -64,6 +64,7 @@ PartitionedHashJoinNode::PartitionedHashJoinNode(
     num_probe_rows_partitioned_(NULL),
     null_aware_eval_timer_(NULL),
     state_(PARTITIONING_BUILD),
+    output_null_aware_probe_rows_running_(false),
     null_probe_output_idx_(-1),
     process_probe_batch_fn_(NULL),
     process_probe_batch_fn_level0_(NULL) {
@@ -210,7 +211,7 @@ Status PartitionedHashJoinNode::Reset(RuntimeState* state) {
   if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
     null_probe_output_idx_ = -1;
     matched_null_probe_.clear();
-    nulls_build_batch_.reset();
+    output_null_aware_probe_rows_running_ = false;
   }
   state_ = PARTITIONING_BUILD;
   ht_ctx_->set_level(0);
@@ -251,7 +252,7 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (ht_ctx_ != nullptr) ht_ctx_->Close(state);
   ht_ctx_.reset();
-  nulls_build_batch_.reset();
+  output_null_aware_probe_rows_running_ = false;
   output_unmatched_batch_.reset();
   output_unmatched_batch_iter_.reset();
   CloseAndDeletePartitions();
@@ -542,7 +543,7 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
         continue;
       }
 
-      if (nulls_build_batch_ != NULL) {
+      if (output_null_aware_probe_rows_running_) {
         RETURN_IF_ERROR(OutputNullAwareProbeRows(state, out_batch));
         if (out_batch->AtCapacity()) break;
         continue;
@@ -783,7 +784,7 @@ Status PartitionedHashJoinNode::OutputNullAwareNullProbe(RuntimeState* state,
     RowBatch* out_batch) {
   DCHECK(builder_->null_aware_partition() != NULL);
   DCHECK(null_aware_probe_partition_ != NULL);
-  DCHECK(nulls_build_batch_ == NULL);
+  DCHECK(!output_null_aware_probe_rows_running_);
   DCHECK_NE(probe_batch_pos_, -1);
 
   if (probe_batch_pos_ == probe_batch_->num_rows()) {
@@ -873,7 +874,7 @@ Status PartitionedHashJoinNode::InitNullProbeRows() {
 Status PartitionedHashJoinNode::PrepareNullAwarePartition() {
   DCHECK(builder_->null_aware_partition() != NULL);
   DCHECK(null_aware_probe_partition_ != NULL);
-  DCHECK(nulls_build_batch_ == NULL);
+  DCHECK(!output_null_aware_probe_rows_running_);
   DCHECK_EQ(probe_batch_pos_, -1);
   DCHECK_EQ(probe_batch_->num_rows(), 0);
 
@@ -884,15 +885,15 @@ Status PartitionedHashJoinNode::PrepareNullAwarePartition() {
     // There were no build rows. Nothing to do. Just prepare to output the null
     // probe rows.
     DCHECK_EQ(probe_stream->num_rows(), 0);
-    nulls_build_batch_.reset();
+    output_null_aware_probe_rows_running_ = false;
     RETURN_IF_ERROR(PrepareNullAwareNullProbe());
     return Status::OK();
   }
 
-  // Bring the entire spilled build stream into memory and read into a single batch.
-  bool got_rows;
-  RETURN_IF_ERROR(build_stream->GetRows(mem_tracker(), &nulls_build_batch_, &got_rows));
-  if (!got_rows) return NullAwareAntiJoinError(build_stream);
+  output_null_aware_probe_rows_running_ = true;
+  bool pinned;
+  RETURN_IF_ERROR(build_stream->PinStream(&pinned));
+  if (!pinned) return NullAwareAntiJoinError(build_stream);
 
   // Initialize the streams for read.
   bool got_read_buffer;
@@ -909,7 +910,7 @@ Status PartitionedHashJoinNode::OutputNullAwareProbeRows(RuntimeState* state,
     RowBatch* out_batch) {
   DCHECK(builder_->null_aware_partition() != NULL);
   DCHECK(null_aware_probe_partition_ != NULL);
-  DCHECK(nulls_build_batch_ != NULL);
+  DCHECK(output_null_aware_probe_rows_running_);
 
   ScalarExprEvaluator* const* join_conjunct_evals = other_join_conjunct_evals_.data();
   int num_join_conjuncts = other_join_conjuncts_.size();
@@ -928,7 +929,7 @@ Status PartitionedHashJoinNode::OutputNullAwareProbeRows(RuntimeState* state,
     if (probe_batch_->num_rows() == 0) {
       RETURN_IF_ERROR(EvaluateNullProbe(
             state, builder_->null_aware_partition()->build_rows()));
-      nulls_build_batch_.reset();
+      output_null_aware_probe_rows_running_ = false;
       RETURN_IF_ERROR(PrepareNullAwareNullProbe());
       return Status::OK();
     }
@@ -940,15 +941,26 @@ Status PartitionedHashJoinNode::OutputNullAwareProbeRows(RuntimeState* state,
     if (out_batch->AtCapacity()) break;
     TupleRow* probe_row = probe_batch_->GetRow(probe_batch_pos_);
     bool matched = false;
-    for (int i = 0; i < nulls_build_batch_->num_rows(); ++i) {
-      CreateOutputRow(semi_join_staging_row_, probe_row, nulls_build_batch_->GetRow(i));
-      if (ExecNode::EvalConjuncts(
-              join_conjunct_evals, num_join_conjuncts, semi_join_staging_row_)) {
-        matched = true;
-        break;
+    bool got_reservation;
+    BufferedTupleStream* null_build_stream =
+        builder_->null_aware_partition()->build_rows();
+    RETURN_IF_ERROR(null_build_stream->PrepareForRead(false, &got_reservation));
+    DCHECK(got_reservation) << "Should have been pinned";
+    RowBatch null_build_batch(child(1)->row_desc(), state->batch_size(), mem_tracker());
+    bool eos;
+    do {
+      RETURN_IF_ERROR(null_build_stream->GetNext(&null_build_batch, &eos));
+      FOREACH_ROW(&null_build_batch, 0, iter) {
+        CreateOutputRow(semi_join_staging_row_, probe_row, iter.Get());
+        if (ExecNode::EvalConjuncts(
+            join_conjunct_evals, num_join_conjuncts, semi_join_staging_row_)) {
+          matched = true;
+          break;
+        }
       }
-    }
-
+      null_build_batch.Reset();
+      RETURN_IF_CANCELLED(state);
+    } while (!matched && !eos);
     if (!matched) {
       TupleRow* out_row = out_batch->GetRow(out_batch->AddRow());
       out_batch->CopyRow(probe_row, out_row);
@@ -1034,14 +1046,6 @@ Status PartitionedHashJoinNode::EvaluateNullProbe(
     return Status::OK();
   }
   DCHECK_EQ(null_probe_rows_->num_rows(), matched_null_probe_.size());
-
-  // Bring the build side into memory, since we need to do a pass over it for
-  // every probe row.
-  bool got_rows;
-  scoped_ptr<RowBatch> build_rows;
-  RETURN_IF_ERROR(build->GetRows(mem_tracker(), &build_rows, &got_rows));
-  if (!got_rows) return NullAwareAntiJoinError(build);
-
   bool got_read_buffer;
   RETURN_IF_ERROR(null_probe_rows_->PrepareForRead(false, &got_read_buffer));
   DCHECK(got_read_buffer) << "Probe stream should always have a read or write iterator";
@@ -1049,6 +1053,11 @@ Status PartitionedHashJoinNode::EvaluateNullProbe(
   ScalarExprEvaluator* const* join_conjunct_evals = other_join_conjunct_evals_.data();
   int num_join_conjuncts = other_join_conjuncts_.size();
   RowBatch probe_batch(child(0)->row_desc(), runtime_state_->batch_size(), mem_tracker());
+
+  bool pinned;
+  RETURN_IF_ERROR(build->PinStream(&pinned));
+  if (!pinned) return NullAwareAntiJoinError(build);
+
   // For each probe row, iterate over all rows in the build table.
   SCOPED_TIMER(null_aware_eval_timer_);
   int64_t probe_row_idx = 0;
@@ -1059,18 +1068,24 @@ Status PartitionedHashJoinNode::EvaluateNullProbe(
       // This loop may run for a long time. Check for cancellation.
       RETURN_IF_CANCELLED(state);
       if (matched_null_probe_[probe_row_idx]) continue;
-      for (int j = 0; j < build_rows->num_rows(); ++j) {
-        // This loop may run for a long time if the number of build_rows is large.
-        // Periodically check for cancellation.
-        if (j % 1024 == 0) RETURN_IF_CANCELLED(state);
-        CreateOutputRow(
-            semi_join_staging_row_, probe_batch.GetRow(i), build_rows->GetRow(j));
-        if (ExecNode::EvalConjuncts(
-                join_conjunct_evals, num_join_conjuncts, semi_join_staging_row_)) {
-          matched_null_probe_[probe_row_idx] = true;
-          break;
+      bool got_reservation;
+      RETURN_IF_ERROR(build->PrepareForRead(false, &got_reservation));
+      DCHECK(got_reservation) << "Should have been pinned";
+      RowBatch build_batch(child(1)->row_desc(), state->batch_size(), mem_tracker());
+      bool build_eos;
+      do {
+        RETURN_IF_ERROR(build->GetNext(&build_batch, &build_eos));
+        FOREACH_ROW(&build_batch, 0, iter) {
+          CreateOutputRow(semi_join_staging_row_, probe_batch.GetRow(i), iter.Get());
+          if (ExecNode::EvalConjuncts(
+              join_conjunct_evals, num_join_conjuncts, semi_join_staging_row_)) {
+            matched_null_probe_[probe_row_idx] = true;
+            break;
+          }
         }
-      }
+        build_batch.Reset();
+        RETURN_IF_CANCELLED(state);
+      } while (!matched_null_probe_[probe_row_idx] && !build_eos);
     }
     probe_batch.Reset();
   }

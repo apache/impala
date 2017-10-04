@@ -55,8 +55,7 @@ class TupleRow;
 /// To use write-only mode, PrepareForWrite() is called once and AddRow()/AddRowCustom*()
 /// are called repeatedly to initialize then advance a write iterator through the stream.
 /// Once the stream is fully written, it can be read back by calling PrepareForRead()
-/// then GetNext() repeatedly to advance a read iterator through the stream, or by
-/// calling GetRows() to get all of the rows at once.
+/// then GetNext() repeatedly to advance a read iterator through the stream.
 ///
 /// To use read/write mode, PrepareForReadWrite() is called once to initialize the read
 /// and write iterators. AddRow()/AddRowCustom*() then advance a write iterator through
@@ -124,7 +123,7 @@ class TupleRow;
 /// the tuple to be valid, we only need to update pointers to point to the var len data
 /// in the stream. These pointers need to be updated by the stream because a spilled
 /// page's data may be relocated to a different buffer. The pointers are updated lazily
-/// upon reading the stream via GetNext() or GetRows().
+/// upon reading the stream via GetNext().
 ///
 /// Example layout for a row with two non-nullable tuples ((1, "hello"), (2, "world"))
 /// with all var len data stored in the stream:
@@ -181,10 +180,10 @@ class TupleRow;
 ///
 /// Memory lifetime of rows read from stream:
 /// If the stream is pinned and delete on read is false, it is valid to access any tuples
-/// returned via GetNext() or GetRows() until the stream is unpinned. If the stream is
-/// unpinned or delete on read is true, then the batch returned from GetNext() may have
-/// the needs_deep_copy flag set, which means that any tuple memory returned so far from
-/// the stream may be freed on the next call to GetNext().
+/// returned via GetNext() until the stream is unpinned. If the stream is unpinned or
+/// delete on read is true, then the batch returned from GetNext() may have the
+/// needs_deep_copy flag set, which means that any tuple memory returned so far from the
+/// stream may be freed on the next call to GetNext().
 /// TODO: IMPALA-4179, instead of needs_deep_copy, attach the pages' buffers to the batch.
 ///
 /// Manual construction of rows with AddRowCustomBegin()/AddRowCustomEnd():
@@ -195,7 +194,7 @@ class TupleRow;
 /// AddRowCustomEnd() when done.
 ///
 /// If a caller constructs a tuple in this way, the caller can set the pointers and they
-/// will not be modified until the stream is read via GetNext() or GetRows().
+/// will not be modified until the stream is read via GetNext().
 /// TODO: IMPALA-5007: try to remove AddRowCustom*() by unifying with AddRow().
 ///
 /// TODO: we need to be able to do read ahead for pages. We need some way to indicate a
@@ -332,13 +331,6 @@ class BufferedTupleStream {
   Status GetNext(
       RowBatch* batch, bool* eos, std::vector<FlatRowPtr>* flat_rows) WARN_UNUSED_RESULT;
 
-  /// Returns all the rows in the stream in batch. This pins the entire stream in the
-  /// process. If the current unused reservation is not sufficient to pin the stream in
-  /// memory, this will try to increase the reservation. If that fails, 'got_rows' is set
-  /// to false.
-  Status GetRows(MemTracker* tracker, boost::scoped_ptr<RowBatch>* batch,
-      bool* got_rows) WARN_UNUSED_RESULT;
-
   /// Must be called once at the end to cleanup all resources. If 'batch' is non-NULL,
   /// attaches buffers from pinned pages that rows returned from GetNext() may reference.
   /// Otherwise deletes all pages. Does nothing if the stream was already closed. The
@@ -375,7 +367,6 @@ class BufferedTupleStream {
   friend class ArrayTupleStreamTest_TestArrayDeepCopy_Test;
   friend class ArrayTupleStreamTest_TestComputeRowSize_Test;
   friend class MultiNullableTupleStreamTest_TestComputeRowSize_Test;
-  friend class SimpleTupleStreamTest_TestGetRowsOverflow_Test;
 
   /// Wrapper around BufferPool::PageHandle that tracks additional info about the page.
   struct Page {
