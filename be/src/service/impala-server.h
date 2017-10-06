@@ -22,11 +22,11 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
-#include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <unordered_map>
 
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaHiveServer2Service.h"
@@ -39,10 +39,10 @@
 #include "util/condition-variable.h"
 #include "util/metrics.h"
 #include "util/runtime-profile.h"
+#include "util/sharded-query-map-util.h"
 #include "util/simple-logger.h"
 #include "util/thread-pool.h"
 #include "util/time.h"
-#include "util/uid-util.h"
 #include "runtime/coordinator.h"
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-value.h"
@@ -126,7 +126,6 @@ class ClientRequestState;
 /// * uuid_lock_
 /// * catalog_version_lock_
 /// * connection_to_sessions_map_lock_
-/// * client_request_state_map_lock_
 ///
 /// TODO: The state of a running query is currently not cleaned up if the
 /// query doesn't experience any errors at runtime and close() doesn't get called.
@@ -138,8 +137,10 @@ class ClientRequestState;
 class ImpalaServer : public ImpalaServiceIf,
                      public ImpalaHiveServer2ServiceIf,
                      public ThriftServer::ConnectionHandlerIf,
-                     public boost::enable_shared_from_this<ImpalaServer> {
+                     public boost::enable_shared_from_this<ImpalaServer>,
+                     public CacheLineAligned {
  public:
+
   ImpalaServer(ExecEnv* exec_env);
   ~ImpalaServer();
 
@@ -502,8 +503,8 @@ class ImpalaServer : public ImpalaServiceIf,
       std::shared_ptr<SessionState> session_state, bool* registered_exec_state,
       std::shared_ptr<ClientRequestState>* exec_state) WARN_UNUSED_RESULT;
 
-  /// Registers the query exec state with client_request_state_map_ using the globally
-  /// unique query_id and add the query id to session state's open query list.
+  /// Registers the query exec state with client_request_state_map_ using the
+  /// globally unique query_id and add the query id to session state's open query list.
   /// The caller must have checked out the session state.
   Status RegisterQuery(std::shared_ptr<SessionState> session_state,
       const std::shared_ptr<ClientRequestState>& exec_state) WARN_UNUSED_RESULT;
@@ -521,9 +522,9 @@ class ImpalaServer : public ImpalaServiceIf,
       const std::shared_ptr<ClientRequestState>& exec_state) WARN_UNUSED_RESULT;
 
   /// Unregister the query by cancelling it, removing exec_state from
-  /// client_request_state_map_, and removing the query id from session state's in-flight
-  /// query list.  If check_inflight is true, then return an error if the query is not
-  /// yet in-flight.  Otherwise, proceed even if the query isn't yet in-flight (for
+  /// client_request_state_map_, and removing the query id from session state's
+  /// in-flight query list.  If check_inflight is true, then return an error if the query
+  /// is not yet in-flight.  Otherwise, proceed even if the query isn't yet in-flight (for
   /// cleaning up after an error on the query issuing path).
   Status UnregisterQuery(const TUniqueId& query_id, bool check_inflight,
       const Status* cause = NULL) WARN_UNUSED_RESULT;
@@ -623,7 +624,7 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Copies a query's state into the query log. Called immediately prior to a
   /// ClientRequestState's deletion. Also writes the query profile to the profile log
-  /// on disk. Must be called with client_request_state_map_lock_ held
+  /// on disk.
   void ArchiveQuery(const ClientRequestState& query);
 
   /// Checks whether the given user is allowed to delegate as the specified do_as_user.
@@ -868,15 +869,11 @@ class ImpalaServer : public ImpalaServiceIf,
   /// when there are sessions that have a timeout.
   ConditionVariable session_timeout_cv_;
 
-  /// map from query id to exec state; ClientRequestState is owned by us and referenced
+  /// maps from query id to exec state; ClientRequestState is owned by us and referenced
   /// as a shared_ptr to allow asynchronous deletion
-  typedef boost::unordered_map<TUniqueId, std::shared_ptr<ClientRequestState>>
+  typedef class ShardedQueryMap<std::shared_ptr<ClientRequestState>>
       ClientRequestStateMap;
   ClientRequestStateMap client_request_state_map_;
-
-  /// Protects client_request_state_map_. See "Locking" in the class comment for lock
-  /// acquisition order.
-  boost::mutex client_request_state_map_lock_;
 
   /// Default query options in the form of TQueryOptions and beeswax::ConfigVariable
   TQueryOptions default_query_options_;
