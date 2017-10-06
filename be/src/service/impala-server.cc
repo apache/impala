@@ -921,6 +921,7 @@ void ImpalaServer::PrepareQueryContext(TQueryCtx* query_ctx) {
   // single generator under a lock (since random_generator is not
   // thread-safe).
   query_ctx->query_id = UuidToQueryId(random_generator()());
+
 }
 
 Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
@@ -933,16 +934,19 @@ Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
   if (session_state->closed) return Status("Session has been closed, ignoring query.");
   const TUniqueId& query_id = request_state->query_id();
   {
-    lock_guard<mutex> l(client_request_state_map_lock_);
-    ClientRequestStateMap::iterator entry = client_request_state_map_.find(query_id);
-    if (entry != client_request_state_map_.end()) {
+    ScopedShardedMapRef<std::shared_ptr<ClientRequestState>> map_ref(query_id,
+        &ExecEnv::GetInstance()->impala_server()->client_request_state_map_);
+    DCHECK(map_ref.get() != nullptr);
+
+    auto entry = map_ref->find(query_id);
+    if (entry != map_ref->end()) {
       // There shouldn't be an active query with that same id.
       // (query_id is globally unique)
       stringstream ss;
       ss << "query id " << PrintId(query_id) << " already exists";
       return Status(ErrorMsg(TErrorCode::INTERNAL_ERROR, ss.str()));
     }
-    client_request_state_map_.insert(make_pair(query_id, request_state));
+    map_ref->insert(make_pair(query_id, request_state));
   }
   // Metric is decremented in UnregisterQuery().
   ImpaladMetrics::NUM_QUERIES_REGISTERED->Increment(1L);
@@ -989,14 +993,17 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
 
   shared_ptr<ClientRequestState> request_state;
   {
-    lock_guard<mutex> l(client_request_state_map_lock_);
-    ClientRequestStateMap::iterator entry = client_request_state_map_.find(query_id);
-    if (entry == client_request_state_map_.end()) {
+    ScopedShardedMapRef<std::shared_ptr<ClientRequestState>> map_ref(query_id,
+        &ExecEnv::GetInstance()->impala_server()->client_request_state_map_);
+    DCHECK(map_ref.get() != nullptr);
+
+    auto entry = map_ref->find(query_id);
+    if (entry == map_ref->end()) {
       return Status("Invalid or unknown query handle");
     } else {
       request_state = entry->second;
     }
-    client_request_state_map_.erase(entry);
+    map_ref->erase(entry);
   }
 
   request_state->Done();
@@ -2046,12 +2053,15 @@ void ImpalaServer::Join() {
 
 shared_ptr<ClientRequestState> ImpalaServer::GetClientRequestState(
     const TUniqueId& query_id) {
-  lock_guard<mutex> l(client_request_state_map_lock_);
-  ClientRequestStateMap::iterator i = client_request_state_map_.find(query_id);
-  if (i == client_request_state_map_.end()) {
+  ScopedShardedMapRef<std::shared_ptr<ClientRequestState>> map_ref(query_id,
+      &ExecEnv::GetInstance()->impala_server()->client_request_state_map_);
+  DCHECK(map_ref.get() != nullptr);
+
+  auto entry = map_ref->find(query_id);
+  if (entry == map_ref->end()) {
     return shared_ptr<ClientRequestState>();
   } else {
-    return i->second;
+    return entry->second;
   }
 }
 

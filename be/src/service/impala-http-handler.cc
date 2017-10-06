@@ -37,6 +37,7 @@
 #include "util/redactor.h"
 #include "util/summary-util.h"
 #include "util/time.h"
+#include "util/uid-util.h"
 #include "util/webserver.h"
 
 #include "common/names.h"
@@ -243,12 +244,11 @@ void ImpalaHttpHandler::QueryProfileEncodedHandler(const Webserver::ArgumentMap&
 
 void ImpalaHttpHandler::InflightQueryIdsHandler(const Webserver::ArgumentMap& args,
     Document* document) {
-  lock_guard<mutex> l(server_->client_request_state_map_lock_);
   stringstream ss;
-  for (const ImpalaServer::ClientRequestStateMap::value_type& request_state:
-       server_->client_request_state_map_) {
-    ss << request_state.second->query_id() << "\n";
-  }
+  server_->client_request_state_map_.DoFuncForAllEntries(
+      [&](const std::shared_ptr<ClientRequestState>& request_state) {
+          ss << request_state->query_id() << "\n";
+      });
   document->AddMember(Webserver::ENABLE_RAW_JSON_KEY, true, document->GetAllocator());
   Value query_ids(ss.str().c_str(), document->GetAllocator());
   document->AddMember("contents", query_ids, document->GetAllocator());
@@ -366,14 +366,11 @@ void ImpalaHttpHandler::QueryStateHandler(const Webserver::ArgumentMap& args,
     Document* document) {
   set<ImpalaServer::QueryStateRecord, ImpalaServer::QueryStateRecordLessThan>
       sorted_query_records;
-  {
-    lock_guard<mutex> l(server_->client_request_state_map_lock_);
-    for (const ImpalaServer::ClientRequestStateMap::value_type& request_state:
-         server_->client_request_state_map_) {
-      // TODO: Do this in the browser so that sorts on other keys are possible.
-      sorted_query_records.insert(ImpalaServer::QueryStateRecord(*request_state.second));
-    }
-  }
+
+  server_->client_request_state_map_.DoFuncForAllEntries(
+      [&](const std::shared_ptr<ClientRequestState>& request_state) {
+          sorted_query_records.insert(ImpalaServer::QueryStateRecord(*request_state));
+      });
 
   Value in_flight_queries(kArrayType);
   int64_t num_waiting_queries = 0;

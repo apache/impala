@@ -82,9 +82,12 @@ QueryState* QueryExecMgr::GetQueryState(const TUniqueId& query_id) {
   QueryState* qs = nullptr;
   int refcnt;
   {
-    lock_guard<mutex> l(qs_map_lock_);
-    auto it = qs_map_.find(query_id);
-    if (it == qs_map_.end()) return nullptr;
+    ScopedShardedMapRef<QueryState*> map_ref(query_id,
+        &ExecEnv::GetInstance()->query_exec_mgr()->qs_map_);
+    DCHECK(map_ref.get() != nullptr);
+
+    auto it = map_ref->find(query_id);
+    if (it == map_ref->end()) return nullptr;
     qs = it->second;
     refcnt = qs->refcnt_.Add(1);
   }
@@ -98,12 +101,15 @@ QueryState* QueryExecMgr::GetOrCreateQueryState(
   QueryState* qs = nullptr;
   int refcnt;
   {
-    lock_guard<mutex> l(qs_map_lock_);
-    auto it = qs_map_.find(query_ctx.query_id);
-    if (it == qs_map_.end()) {
+    ScopedShardedMapRef<QueryState*> map_ref(query_ctx.query_id,
+        &ExecEnv::GetInstance()->query_exec_mgr()->qs_map_);
+    DCHECK(map_ref.get() != nullptr);
+
+    auto it = map_ref->find(query_ctx.query_id);
+    if (it == map_ref->end()) {
       // register new QueryState
       qs = new QueryState(query_ctx);
-      qs_map_.insert(make_pair(query_ctx.query_id, qs));
+      map_ref->insert(make_pair(query_ctx.query_id, qs));
       *created = true;
     } else {
       qs = it->second;
@@ -153,18 +159,20 @@ void QueryExecMgr::ReleaseQueryState(QueryState* qs) {
 
   QueryState* qs_from_map = nullptr;
   {
-    // for now, gc right away
-    lock_guard<mutex> l(qs_map_lock_);
-    auto it = qs_map_.find(query_id);
+    ScopedShardedMapRef<QueryState*> map_ref(query_id,
+        &ExecEnv::GetInstance()->query_exec_mgr()->qs_map_);
+    DCHECK(map_ref.get() != nullptr);
+
+    auto it = map_ref->find(query_id);
     // someone else might have gc'd the entry
-    if (it == qs_map_.end()) return;
+    if (it == map_ref->end()) return;
     qs_from_map = it->second;
     DCHECK_EQ(qs_from_map->query_ctx().query_id, query_id);
     int32_t cnt = qs_from_map->refcnt_.Load();
     DCHECK_GE(cnt, 0);
     // someone else might have increased the refcnt in the meantime
     if (cnt > 0) return;
-    qs_map_.erase(it);
+    map_ref->erase(it);
   }
   // TODO: send final status report during gc, but do this from a different thread
   delete qs_from_map;
