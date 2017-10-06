@@ -52,6 +52,10 @@ class FileSystemUtil {
   /// Returns the currently allowed maximum of possible file descriptors. In case of an
   /// error returns 0.
   static uint64_t MaxNumFileHandles();
+
+  /// Copy the specified file to the specified 'to_path'. Overwrite the file if it
+  /// already exists.
+  static Status CopyFile(const string& from_path, const string& to_path);
 };
 
 }

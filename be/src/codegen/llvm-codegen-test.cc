@@ -27,6 +27,7 @@
 #include "runtime/test-env.h"
 #include "service/fe-support.h"
 #include "util/cpu-info.h"
+#include "util/filesystem-util.h"
 #include "util/hash-util.h"
 #include "util/path-builder.h"
 #include "util/scope-exit-trigger.h"
@@ -95,6 +96,10 @@ class LlvmCodeGenTest : public testing:: Test {
   }
 
   static Status FinalizeModule(LlvmCodeGen* codegen) { return codegen->FinalizeModule(); }
+
+  static Status LinkModule(LlvmCodeGen* codegen, const string& file) {
+    return codegen->LinkModule(file);
+  }
 };
 
 // Simple test to just make and destroy llvmcodegen objects.  LLVM
@@ -454,6 +459,22 @@ TEST_F(LlvmCodeGenTest, HashTest) {
 
   // Restore hardware feature for next test
   CpuInfo::EnableFeature(CpuInfo::SSE4_2, restore_sse_support);
+}
+
+// Test that an error propagating through codegen's diagnostic handler is
+// captured by impala. An error is induced by asking Llvm to link the same lib twice.
+TEST_F(LlvmCodeGenTest, HandleLinkageError) {
+  string ir_file_path("llvm-ir/test-loop.bc");
+  string temp_copy_path("/tmp/test-loop.bc");
+  string module_file;
+  PathBuilder::GetFullPath(ir_file_path, &module_file);
+  ASSERT_OK(FileSystemUtil::CopyFile(module_file, temp_copy_path));
+  scoped_ptr<LlvmCodeGen> codegen;
+  ASSERT_OK(CreateFromFile(module_file.c_str(), &codegen));
+  EXPECT_TRUE(codegen.get() != NULL);
+  Status status = LinkModule(codegen.get(), temp_copy_path);
+  EXPECT_STR_CONTAINS(status.GetDetail(), "symbol multiply defined");
+  codegen->Close();
 }
 
 }

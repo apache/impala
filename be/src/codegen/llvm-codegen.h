@@ -47,6 +47,7 @@ namespace llvm {
   class AllocaInst;
   class BasicBlock;
   class ConstantFolder;
+  class DiagnosticInfo;
   class ExecutionEngine;
   class Function;
   class LLVMContext;
@@ -776,6 +777,29 @@ class LlvmCodeGen {
   /// 'symbol_emitter_' are called by 'execution_engine_' when code is emitted or freed.
   /// The lifetime of the symbol emitter must be longer than 'execution_engine_'.
   boost::scoped_ptr<CodegenSymbolEmitter> symbol_emitter_;
+
+  /// Provides an implementation of a LLVM diagnostic handler and maintains the error
+  /// information from its callbacks.
+  class DiagnosticHandler {
+   public:
+    /// Returns the last error that was reported via DiagnosticHandlerFn() and then
+    /// clears it. Returns an empty string otherwise. This should be called after any
+    /// LLVM API call that can fail but returns error info via this mechanism.
+    /// TODO: IMPALA-6038: use this to check and handle errors wherever needed.
+    std::string GetErrorString();
+
+    /// Handler function that sets the state on an instance of this class which is
+    /// accessible via the LlvmCodeGen object passed to it using the 'context'
+    /// input parameter.
+    static void DiagnosticHandlerFn(const llvm::DiagnosticInfo &info, void *context);
+
+   private:
+    /// Contains the last error that was reported via DiagnosticHandlerFn().
+    /// Is cleared by a call to GetErrorString().
+    std::string error_str_;
+  };
+
+  DiagnosticHandler diagnostic_handler_;
 
   /// Very rough estimate of memory in bytes that the IR and the intermediate data
   /// structures used by the optimizer may consume per LLVM IR instruction to be

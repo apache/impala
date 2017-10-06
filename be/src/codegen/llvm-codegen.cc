@@ -35,6 +35,8 @@
 #include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
+#include <llvm/IR/DiagnosticInfo.h>
+#include <llvm/IR/DiagnosticPrinter.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/InstIterator.h>
@@ -181,6 +183,7 @@ LlvmCodeGen::LlvmCodeGen(RuntimeState* state, ObjectPool* pool,
     loaded_functions_(IRFunction::FN_END, NULL) {
   DCHECK(llvm_initialized_) << "Must call LlvmCodeGen::InitializeLlvm first.";
 
+  context_->setDiagnosticHandler(&DiagnosticHandler::DiagnosticHandlerFn, this);
   load_module_timer_ = ADD_TIMER(profile_, "LoadTime");
   prepare_module_timer_ = ADD_TIMER(profile_, "PrepareTime");
   module_bitcode_size_ = ADD_COUNTER(profile_, "ModuleBitcodeSize", TUnit::BYTES);
@@ -298,9 +301,11 @@ Status LlvmCodeGen::LinkModule(const string& file) {
   }
 
   bool error = Linker::linkModules(*module_, std::move(new_module));
+  string diagnostic_err = diagnostic_handler_.GetErrorString();
   if (error) {
     stringstream ss;
     ss << "Problem linking " << file << " to main module.";
+    if (!diagnostic_err.empty()) ss << " " << diagnostic_err;
     return Status(ss.str());
   }
   linked_modules_.insert(file);
@@ -1608,6 +1613,29 @@ Constant* LlvmCodeGen::ConstantToGVPtr(Type* type, Constant* ir_constant,
       GlobalValue::PrivateLinkage, ir_constant, name);
   return ConstantExpr::getGetElementPtr(NULL, gv,
       ArrayRef<Constant*>({GetIntConstant(TYPE_INT, 0)}));
+}
+
+void LlvmCodeGen::DiagnosticHandler::DiagnosticHandlerFn(const DiagnosticInfo &info,
+    void *context){
+  if (info.getSeverity() == DiagnosticSeverity::DS_Error) {
+    LlvmCodeGen* codegen = reinterpret_cast<LlvmCodeGen*>(context);
+    codegen->diagnostic_handler_.error_str_.clear();
+    raw_string_ostream error_msg(codegen->diagnostic_handler_.error_str_);
+    DiagnosticPrinterRawOStream diagnostic_printer(error_msg);
+    diagnostic_printer << "LLVM diagnostic error: ";
+    info.print(diagnostic_printer);
+    error_msg.flush();
+    LOG(INFO) << "Query " << codegen->state_->query_id() << " encountered a "
+        << codegen->diagnostic_handler_.error_str_;
+  }
+}
+
+string LlvmCodeGen::DiagnosticHandler::GetErrorString() {
+  if (!error_str_.empty()) {
+    string return_msg(move(error_str_)); // Also clears error_str_.
+    return return_msg;
+  }
+  return "";
 }
 
 }
