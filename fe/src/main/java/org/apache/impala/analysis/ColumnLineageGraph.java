@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,14 +25,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
-import org.apache.impala.catalog.Table;
-import org.apache.impala.common.Id;
-import org.apache.impala.common.IdGenerator;
-import org.apache.impala.thrift.TEdgeType;
-import org.apache.impala.thrift.TLineageGraph;
-import org.apache.impala.thrift.TMultiEdge;
-import org.apache.impala.thrift.TQueryCtx;
-import org.apache.impala.thrift.TVertex;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
@@ -40,6 +33,14 @@ import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.impala.catalog.Table;
+import org.apache.impala.common.Id;
+import org.apache.impala.common.IdGenerator;
+import org.apache.impala.thrift.TEdgeType;
+import org.apache.impala.thrift.TQueryCtx;
+import org.apache.impala.thrift.TLineageGraph;
+import org.apache.impala.thrift.TMultiEdge;
+import org.apache.impala.thrift.TVertex;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -589,7 +590,7 @@ public class ColumnLineageGraph {
 
   private String getQueryHash(String queryStr) {
     Hasher hasher = Hashing.md5().newHasher();
-    hasher.putUnencodedChars(queryStr);
+    hasher.putString(queryStr);
     return hasher.hash().toString();
   }
 
