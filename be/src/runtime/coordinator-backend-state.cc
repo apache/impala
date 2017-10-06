@@ -17,31 +17,20 @@
 
 #include "runtime/coordinator-backend-state.h"
 
-#include <sstream>
-#include <string>
 #include <boost/lexical_cast.hpp>
-#include <boost/thread/locks.hpp>
-#include <boost/thread/lock_guard.hpp>
-#include <boost/accumulators/accumulators.hpp>
 
 #include "common/object-pool.h"
 #include "exec/exec-node.h"
 #include "exec/scan-node.h"
-#include "scheduling/query-schedule.h"
 #include "runtime/exec-env.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/debug-options.h"
 #include "runtime/client-cache.h"
-#include "runtime/client-cache-types.h"
 #include "runtime/backend-client.h"
 #include "runtime/coordinator-filter-state.h"
-#include "util/error-util.h"
 #include "util/uid-util.h"
 #include "util/network-util.h"
 #include "util/counting-barrier.h"
-#include "util/progress-updater.h"
-#include "gen-cpp/Types_types.h"
-#include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
 
 #include "common/names.h"
@@ -400,26 +389,18 @@ bool Coordinator::BackendState::Cancel() {
   return true;
 }
 
-void Coordinator::BackendState::PublishFilter(
-    shared_ptr<TPublishFilterParams> rpc_params) {
-  DCHECK_EQ(rpc_params->dst_query_id, query_id_);
-  if (fragments_.count(rpc_params->dst_fragment_idx) == 0) return;
+void Coordinator::BackendState::PublishFilter(const TPublishFilterParams& rpc_params) {
+  DCHECK_EQ(rpc_params.dst_query_id, query_id_);
+  if (fragments_.count(rpc_params.dst_fragment_idx) == 0) return;
   Status status;
   ImpalaBackendConnection backend_client(
       ExecEnv::GetInstance()->impalad_client_cache(), host_, &status);
   if (!status.ok()) return;
-  // Make a local copy of the shared 'master' set of parameters
-  TPublishFilterParams local_params(*rpc_params);
-  local_params.__set_bloom_filter(rpc_params->bloom_filter);
   TPublishFilterResult res;
-  status = backend_client.DoRpc(&ImpalaBackendClient::PublishFilter, local_params, &res);
+  status = backend_client.DoRpc(&ImpalaBackendClient::PublishFilter, rpc_params, &res);
   if (!status.ok()) {
     LOG(WARNING) << "Error publishing filter, continuing..." << status.GetDetail();
   }
-  // TODO: switch back to the following once we fix the lifecycle
-  // problems of Coordinator
-  //std::cref(fragment_inst->impalad_address()),
-  //std::cref(fragment_inst->fragment_instance_id())));
 }
 
 Coordinator::BackendState::InstanceStats::InstanceStats(

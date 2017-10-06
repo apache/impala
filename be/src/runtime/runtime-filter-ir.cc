@@ -17,8 +17,6 @@
 
 #include "runtime/runtime-filter.h"
 
-#include "runtime/raw-value.h"
-
 using namespace impala;
 
 bool IR_ALWAYS_INLINE RuntimeFilter::Eval(

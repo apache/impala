@@ -81,10 +81,7 @@ class Coordinator::BackendState {
 
   /// Make a PublishFilter rpc with given params if this backend has instances of the
   /// fragment with idx == rpc_params->dst_fragment_idx, otherwise do nothing.
-  /// This takes by-value parameters because we cannot guarantee that the originating
-  /// coordinator won't be destroyed while this executes.
-  /// TODO: switch to references when we fix the lifecycle problems of coordinators.
-  void PublishFilter(std::shared_ptr<TPublishFilterParams> rpc_params);
+  void PublishFilter(const TPublishFilterParams& rpc_params);
 
   /// Cancel execution at this backend if anything is running. Returns true
   /// if cancellation was attempted, false otherwise.

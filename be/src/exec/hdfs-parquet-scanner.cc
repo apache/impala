@@ -17,32 +17,18 @@
 
 #include "exec/hdfs-parquet-scanner.h"
 
-#include <limits> // for std::numeric_limits
 #include <queue>
 
-#include <gflags/gflags.h>
 #include <gutil/strings/substitute.h>
 
 #include "codegen/codegen-anyval.h"
-#include "codegen/llvm-codegen.h"
-#include "common/logging.h"
-#include "exec/hdfs-scanner.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/parquet-column-readers.h"
 #include "exec/parquet-column-stats.h"
 #include "exec/scanner-context.inline.h"
-#include "exprs/scalar-expr.h"
 #include "runtime/collection-value-builder.h"
-#include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
-#include "runtime/mem-pool.h"
-#include "runtime/row-batch.h"
 #include "runtime/runtime-filter.inline.h"
-#include "runtime/tuple-row.h"
-#include "runtime/tuple.h"
-#include "runtime/string-value.h"
-#include "util/debug-util.h"
-#include "util/error-util.h"
 #include "rpc/thrift-util.h"
 
 #include "common/names.h"
@@ -409,9 +395,13 @@ Status HdfsParquetScanner::ProcessSplit() {
   DCHECK(scan_node_->HasRowBatchQueue());
   HdfsScanNode* scan_node = static_cast<HdfsScanNode*>(scan_node_);
   do {
-    unique_ptr<RowBatch> batch = unique_ptr<RowBatch>(
-        new RowBatch(scan_node_->row_desc(), state_->batch_size(),
-        scan_node_->mem_tracker()));
+    if (FilterContext::CheckForAlwaysFalse(FilterStats::SPLITS_KEY,
+        context_->filter_ctxs())) {
+      eos_ = true;
+      break;
+    }
+    unique_ptr<RowBatch> batch = std::make_unique<RowBatch>(scan_node_->row_desc(),
+        state_->batch_size(), scan_node_->mem_tracker());
     Status status = GetNextInternal(batch.get());
     // Always add batch to the queue because it may contain data referenced by previously
     // appended batches.

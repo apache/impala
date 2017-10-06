@@ -17,39 +17,21 @@
 
 #include "runtime/coordinator.h"
 
-#include <map>
-#include <memory>
 #include <thrift/protocol/TDebugProtocol.h>
 #include <boost/algorithm/string/join.hpp>
-#include <boost/accumulators/accumulators.hpp>
-#include <boost/accumulators/statistics/stats.hpp>
-#include <boost/accumulators/statistics/min.hpp>
-#include <boost/accumulators/statistics/mean.hpp>
-#include <boost/accumulators/statistics/median.hpp>
-#include <boost/accumulators/statistics/max.hpp>
-#include <boost/accumulators/statistics/variance.hpp>
-#include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/unordered_set.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string.hpp>
 #include <gutil/strings/substitute.h>
-#include <errno.h>
 
-#include "common/logging.h"
 #include "exec/data-sink.h"
 #include "exec/plan-root-sink.h"
-#include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
-#include "gen-cpp/ImpalaInternalService_types.h"
-#include "gen-cpp/Partitions_types.h"
-#include "gen-cpp/PlanNodes_types.h"
 #include "runtime/exec-env.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/hdfs-fs-cache.h"
-#include "runtime/mem-tracker.h"
 #include "runtime/query-exec-mgr.h"
 #include "runtime/coordinator-filter-state.h"
 #include "runtime/coordinator-backend-state.h"
@@ -58,14 +40,9 @@
 #include "scheduling/scheduler.h"
 #include "util/bloom-filter.h"
 #include "util/counting-barrier.h"
-#include "util/debug-util.h"
-#include "util/error-util.h"
 #include "util/hdfs-bulk-ops.h"
 #include "util/hdfs-util.h"
 #include "util/histogram-metric.h"
-#include "util/network-util.h"
-#include "util/pretty-printer.h"
-#include "util/runtime-profile.h"
 #include "util/table-printer.h"
 
 #include "common/names.h"
@@ -1097,8 +1074,7 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
   DCHECK(filter_routing_table_complete_)
       << "Filter received before routing table complete";
 
-  // Make a 'master' copy that will be shared by all concurrent delivery RPC attempts.
-  shared_ptr<TPublishFilterParams> rpc_params(new TPublishFilterParams());
+  TPublishFilterParams rpc_params;
   unordered_set<int> target_fragment_idxs;
   {
     lock_guard<SpinLock> l(filter_lock_);
@@ -1129,7 +1105,6 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
 
     if (state->pending_count() > 0 && !state->disabled()) return;
     // At this point, we either disabled this filter or aggregation is complete.
-    DCHECK(state->disabled() || state->pending_count() == 0);
 
     // No more updates are pending on this filter ID. Create a distribution payload and
     // offer it to the queue.
@@ -1141,29 +1116,23 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
     }
 
     // Assign outgoing bloom filter.
-    if (state->bloom_filter() != nullptr) {
-      // Complete filter case.
-      // TODO: Replace with move() in Thrift 0.9.3.
-      TBloomFilter* aggregated_filter = state->bloom_filter();
-      filter_mem_tracker_->Release(aggregated_filter->directory.size());
-      swap(rpc_params->bloom_filter, *aggregated_filter);
-      DCHECK_EQ(aggregated_filter->directory.size(), 0);
-    } else {
-      // Disabled filter case (due to OOM or due to receiving an always_true filter).
-      rpc_params->bloom_filter.always_true = true;
-    }
-
+    TBloomFilter& aggregated_filter = state->bloom_filter();
+    filter_mem_tracker_->Release(aggregated_filter.directory.capacity());
+    swap(rpc_params.bloom_filter, aggregated_filter);
+    DCHECK(rpc_params.bloom_filter.always_false || rpc_params.bloom_filter.always_true ||
+        rpc_params.bloom_filter.directory.size() != 0);
+    rpc_params.__isset.bloom_filter = true;
+    DCHECK_EQ(aggregated_filter.directory.capacity(), 0);
     // Filter is complete, and can be released.
     state->Disable(filter_mem_tracker_);
-    DCHECK(state->bloom_filter() == nullptr);
   }
 
-  rpc_params->__set_dst_query_id(query_id());
-  rpc_params->__set_filter_id(params.filter_id);
+  rpc_params.__set_dst_query_id(query_id());
+  rpc_params.__set_filter_id(params.filter_id);
 
   for (BackendState* bs: backend_states_) {
     for (int fragment_idx: target_fragment_idxs) {
-      rpc_params->__set_dst_fragment_idx(fragment_idx);
+      rpc_params.__set_dst_fragment_idx(fragment_idx);
       bs->PublishFilter(rpc_params);
     }
   }
@@ -1171,6 +1140,7 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
 
 void Coordinator::FilterState::ApplyUpdate(const TUpdateFilterParams& params,
     Coordinator* coord) {
+  DCHECK(!disabled());
   DCHECK_GT(pending_count_, 0);
   DCHECK_EQ(completion_time_, 0L);
   if (first_arrival_time_ == 0L) {
@@ -1180,8 +1150,8 @@ void Coordinator::FilterState::ApplyUpdate(const TUpdateFilterParams& params,
   --pending_count_;
   if (params.bloom_filter.always_true) {
     Disable(coord->filter_mem_tracker_);
-  } else if (bloom_filter_.get() == nullptr) {
-    int64_t heap_space = params.bloom_filter.directory.size();
+  } else if (bloom_filter_.always_false) {
+    int64_t heap_space = params.bloom_filter.directory.capacity();
     if (!coord->filter_mem_tracker_->TryConsume(heap_space)) {
       VLOG_QUERY << "Not enough memory to allocate filter: "
                  << PrettyPrinter::Print(heap_space, TUnit::BYTES)
@@ -1189,31 +1159,29 @@ void Coordinator::FilterState::ApplyUpdate(const TUpdateFilterParams& params,
       // Disable, as one missing update means a correct filter cannot be produced.
       Disable(coord->filter_mem_tracker_);
     } else {
-      bloom_filter_.reset(new TBloomFilter());
       // Workaround for fact that parameters are const& for Thrift RPCs - yet we want to
       // move the payload from the request rather than copy it and take double the memory
       // cost. After this point, params.bloom_filter is an empty filter and should not be
       // read.
-      TBloomFilter* non_const_filter =
-          &const_cast<TBloomFilter&>(params.bloom_filter);
-      swap(*bloom_filter_.get(), *non_const_filter);
+      TBloomFilter* non_const_filter = &const_cast<TBloomFilter&>(params.bloom_filter);
+      swap(bloom_filter_, *non_const_filter);
       DCHECK_EQ(non_const_filter->directory.size(), 0);
     }
   } else {
-    BloomFilter::Or(params.bloom_filter, bloom_filter_.get());
+    BloomFilter::Or(params.bloom_filter, &bloom_filter_);
   }
 
-  if (pending_count_ == 0 || disabled_) {
+  if (pending_count_ == 0 || disabled()) {
     completion_time_ = coord->query_events_->ElapsedTime();
   }
 }
 
 void Coordinator::FilterState::Disable(MemTracker* tracker) {
-  disabled_ = true;
-  if (bloom_filter_.get() == nullptr) return;
-  int64_t heap_space = bloom_filter_.get()->directory.size();
-  tracker->Release(heap_space);
-  bloom_filter_.reset();
+  bloom_filter_.always_true = true;
+  bloom_filter_.always_false = false;
+  int64_t capacity = bloom_filter_.directory.capacity();
+  bloom_filter_.directory.clear();
+  tracker->Release(capacity);
 }
 
 const TUniqueId& Coordinator::query_id() const {

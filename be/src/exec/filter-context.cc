@@ -18,7 +18,7 @@
 #include "exec/filter-context.h"
 
 #include "codegen/codegen-anyval.h"
-#include "runtime/runtime-filter.h"
+#include "runtime/runtime-filter.inline.h"
 #include "runtime/tuple-row.h"
 #include "util/runtime-profile-counters.h"
 
@@ -34,13 +34,10 @@ const std::string FilterStats::ROWS_KEY = "Rows";
 const char* FilterContext::LLVM_CLASS_NAME = "struct.impala::FilterContext";
 
 FilterStats::FilterStats(RuntimeProfile* runtime_profile, bool is_partition_filter) {
-  DCHECK(runtime_profile != NULL);
+  DCHECK(runtime_profile != nullptr);
   profile = runtime_profile;
-  if (is_partition_filter) {
-    RegisterCounterGroup(FilterStats::SPLITS_KEY);
-    RegisterCounterGroup(FilterStats::FILES_KEY);
-  }
-
+  RegisterCounterGroup(FilterStats::SPLITS_KEY);
+  RegisterCounterGroup(FilterStats::FILES_KEY);
   // TODO: These only apply to Parquet, so only register them in that case.
   RegisterCounterGroup(FilterStats::ROWS_KEY);
   if (is_partition_filter) RegisterCounterGroup(FilterStats::ROW_GROUPS_KEY);
@@ -376,4 +373,15 @@ Status FilterContext::CodegenInsert(
     return Status("Codegen'ed FilterContext::Insert() fails verification, see log");
   }
   return Status::OK();
+}
+
+bool FilterContext::CheckForAlwaysFalse(const std::string& stats_name,
+    const std::vector<FilterContext>& ctxs) {
+  for (const FilterContext& ctx : ctxs) {
+    if (ctx.filter->AlwaysFalse()) {
+      ctx.stats->IncrCounters(stats_name, 1, 1, 1);
+      return true;
+    }
+  }
+  return false;
 }

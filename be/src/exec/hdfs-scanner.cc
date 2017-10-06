@@ -17,36 +17,20 @@
 
 #include "exec/hdfs-scanner.h"
 
-#include <sstream>
-#include <boost/algorithm/string.hpp>
-
 #include "codegen/codegen-anyval.h"
-#include "codegen/llvm-codegen.h"
-#include "common/logging.h"
-#include "common/object-pool.h"
+#include "exec/base-sequence-scanner.h"
 #include "exec/text-converter.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/hdfs-scan-node-mt.h"
 #include "exec/read-write-util.h"
 #include "exec/text-converter.inline.h"
-#include "exprs/scalar-expr.h"
 #include "runtime/collection-value-builder.h"
-#include "runtime/descriptors.h"
 #include "runtime/hdfs-fs-cache.h"
-#include "runtime/runtime-state.h"
-#include "runtime/mem-pool.h"
-#include "runtime/row-batch.h"
-#include "runtime/string-value.h"
+#include "runtime/runtime-filter.inline.h"
 #include "runtime/tuple-row.h"
-#include "runtime/tuple.h"
 #include "util/bitmap.h"
 #include "util/codec.h"
-#include "util/debug-util.h"
-#include "util/runtime-profile-counters.h"
-#include "util/sse-util.h"
-#include "util/string-parser.h"
 #include "util/test-info.h"
-#include "gen-cpp/PlanNodes_types.h"
 
 #include "common/names.h"
 
@@ -118,6 +102,15 @@ Status HdfsScanner::ProcessSplit() {
   DCHECK(scan_node_->HasRowBatchQueue());
   HdfsScanNode* scan_node = static_cast<HdfsScanNode*>(scan_node_);
   do {
+    // IMPALA-3798: Split-level runtime filtering is disabled with sequence-based file
+    // formats.
+    bool is_sequence_based = BaseSequenceScanner::FileFormatIsSequenceBased(
+        context_->partition_descriptor()->file_format());
+    if (!is_sequence_based && FilterContext::CheckForAlwaysFalse(FilterStats::SPLITS_KEY,
+        context_->filter_ctxs())) {
+      eos_ = true;
+      break;
+    }
     unique_ptr<RowBatch> batch = std::make_unique<RowBatch>(scan_node_->row_desc(),
         state_->batch_size(), scan_node_->mem_tracker());
     Status status = GetNextInternal(batch.get());

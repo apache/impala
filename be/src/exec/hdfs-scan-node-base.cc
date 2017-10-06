@@ -24,37 +24,18 @@
 #include "exec/hdfs-avro-scanner.h"
 #include "exec/hdfs-parquet-scanner.h"
 
-#include <sstream>
 #include <avro/errors.h>
 #include <avro/schema.h>
 #include <boost/filesystem.hpp>
 #include <gutil/strings/substitute.h>
 
 #include "codegen/llvm-codegen.h"
-#include "common/logging.h"
-#include "common/object-pool.h"
-#include "exprs/scalar-expr.h"
-#include "exprs/scalar-expr-evaluator.h"
-#include "runtime/descriptors.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
-#include "runtime/mem-pool.h"
-#include "runtime/mem-tracker.h"
-#include "runtime/raw-value.h"
-#include "runtime/row-batch.h"
-#include "runtime/string-buffer.h"
-#include "util/bit-util.h"
-#include "util/container-util.h"
-#include "util/debug-util.h"
 #include "util/disk-info.h"
-#include "util/error-util.h"
 #include "util/hdfs-util.h"
-#include "util/impalad-metrics.h"
 #include "util/periodic-counter-updater.h"
-#include "util/runtime-profile-counters.h"
-
-#include "gen-cpp/PlanNodes_types.h"
 
 #include "common/names.h"
 
@@ -664,12 +645,13 @@ void HdfsScanNodeBase::InitNullCollectionValues(RowBatch* row_batch) const {
 
 bool HdfsScanNodeBase::PartitionPassesFilters(int32_t partition_id,
     const string& stats_name, const vector<FilterContext>& filter_ctxs) {
-  if (filter_ctxs.size() == 0) return true;
+  if (filter_ctxs.empty()) return true;
+  if (FilterContext::CheckForAlwaysFalse(stats_name, filter_ctxs)) return false;
   DCHECK_EQ(filter_ctxs.size(), filter_ctxs_.size())
       << "Mismatched number of filter contexts";
   Tuple* template_tuple = partition_template_tuple_map_[partition_id];
   // Defensive - if template_tuple is NULL, there can be no filters on partition columns.
-  if (template_tuple == NULL) return true;
+  if (template_tuple == nullptr) return true;
   TupleRow* tuple_row_mem = reinterpret_cast<TupleRow*>(&template_tuple);
   for (const FilterContext& ctx: filter_ctxs) {
     int target_ndx = ctx.filter->filter_desc().planid_to_target_ndx.at(id_);

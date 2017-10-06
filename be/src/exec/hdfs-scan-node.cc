@@ -21,6 +21,7 @@
 #include <sstream>
 
 #include "common/logging.h"
+#include "exec/base-sequence-scanner.h"
 #include "exec/hdfs-scanner.h"
 #include "exec/scanner-context.h"
 #include "runtime/descriptors.h"
@@ -484,18 +485,6 @@ exit:
   expr_results_pool.FreeAll();
 }
 
-namespace {
-
-// Returns true if 'format' uses a scanner derived from BaseSequenceScanner. Used to
-// workaround IMPALA-3798.
-bool FileFormatIsSequenceBased(THdfsFileFormat::type format) {
-  return format == THdfsFileFormat::SEQUENCE_FILE ||
-      format == THdfsFileFormat::RC_FILE ||
-      format == THdfsFileFormat::AVRO;
-}
-
-}
-
 Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
     MemPool* expr_results_pool, DiskIoMgr::ScanRange* scan_range) {
   DCHECK(scan_range != NULL);
@@ -512,7 +501,7 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
   // process the header split, the remaining scan ranges in the file will not be marked as
   // done. See FilePassesFilterPredicates() for the correct logic to mark all splits in a
   // file as done; the correct fix here is to do that for every file in a thread-safe way.
-  if (!FileFormatIsSequenceBased(partition->file_format())) {
+  if (!BaseSequenceScanner::FileFormatIsSequenceBased(partition->file_format())) {
     if (!PartitionPassesFilters(partition_id, FilterStats::SPLITS_KEY, filter_ctxs)) {
       // Avoid leaking unread buffers in scan_range.
       scan_range->Cancel(Status::CANCELLED);

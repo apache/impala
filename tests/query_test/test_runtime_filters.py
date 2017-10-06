@@ -17,6 +17,7 @@
 #
 
 import pytest
+import re
 import time
 
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -47,6 +48,15 @@ class TestRuntimeFilters(ImpalaTestSuite):
     assert duration < 60, \
       "Query took too long (%ss, possibly waiting for missing filters?)" % str(duration)
 
+  def test_file_filtering(self, vector):
+    self.change_database(self.client, vector.get_value('table_format'))
+    self.execute_query("SET RUNTIME_FILTER_MODE=GLOBAL")
+    self.execute_query("SET RUNTIME_FILTER_WAIT_TIME_MS=10000")
+    result = self.execute_query("""select STRAIGHT_JOIN * from alltypes inner join
+                                (select * from alltypessmall where smallint_col=-1) v
+                                on v.year = alltypes.year""")
+    assert re.search("Files rejected: 8 \(8\)", result.runtime_profile) is not None
+    assert re.search("Splits rejected: [^0] \([^0]\)", result.runtime_profile) is None
 
 @SkipIfLocal.multiple_impalad
 class TestRuntimeRowFilters(ImpalaTestSuite):

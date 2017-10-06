@@ -68,6 +68,12 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
   return Status::OK();
 }
 
+bool BaseSequenceScanner::FileFormatIsSequenceBased(THdfsFileFormat::type format) {
+  return format == THdfsFileFormat::SEQUENCE_FILE ||
+         format == THdfsFileFormat::RC_FILE ||
+         format == THdfsFileFormat::AVRO;
+}
+
 BaseSequenceScanner::BaseSequenceScanner(HdfsScanNodeBase* node, RuntimeState* state)
   : HdfsScanner(node, state) {
 }

@@ -123,6 +123,11 @@ struct FilterContext {
   /// 'fn' is set to the generated function. On failure, an error status is returned.
   static Status CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_expr,
       llvm::Function** fn) WARN_UNUSED_RESULT;
+
+  // Returns if there is any always_false filter in ctxs. If there is, the counter stats
+  // is updated.
+  static bool CheckForAlwaysFalse(const std::string& stats_name,
+      const std::vector<FilterContext>& ctxs);
 };
 
 }

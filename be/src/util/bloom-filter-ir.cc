@@ -22,11 +22,13 @@
 using namespace impala;
 
 void BloomFilter::InsertNoAvx2(const uint32_t hash) noexcept {
+  always_false_ = false;
   const uint32_t bucket_idx = HashUtil::Rehash32to32(hash) & directory_mask_;
   BucketInsert(bucket_idx, hash);
 }
 
 void BloomFilter::InsertAvx2(const uint32_t hash) noexcept {
+  always_false_ = false;
   const uint32_t bucket_idx = HashUtil::Rehash32to32(hash) & directory_mask_;
   BucketInsertAVX2(bucket_idx, hash);
 }
