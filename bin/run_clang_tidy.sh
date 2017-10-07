@@ -35,7 +35,10 @@ then
   echo "WARNING: compile failed" >&2
 fi
 
-DIRS=$(ls -d "${IMPALA_HOME}/be/src/"*/ | grep -v gutil | grep -v kudu | tr '\n' ' ')
+DIRS=$(ls -d "${IMPALA_HOME}/be/src/"*/ | grep -v gutil | grep -v kudu |\
+  grep -v thirdparty | tr '\n' ' ')
+# Include/exclude select thirdparty dirs.
+DIRS=$DIRS$(ls -d "${IMPALA_HOME}/be/src/thirdparty/"*/ | grep -v mpfit | tr '\n' ' ')
 PIPE_DIRS=$(echo "${DIRS}" | tr ' ' '|')
 
 # Reduce the concurrency to one less than the number of cores in the system. Note than

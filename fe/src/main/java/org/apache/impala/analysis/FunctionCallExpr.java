@@ -469,8 +469,6 @@ public class FunctionCallExpr extends Expr {
       return;
     }
 
-    Type[] argTypes = collectChildReturnTypes();
-
     // User needs DB access.
     Db db = analyzer.getDb(fnName_.getDb(), Privilege.VIEW_METADATA, true);
     if (!db.containsFunction(fnName_.getFunction())) {
@@ -482,8 +480,7 @@ public class FunctionCallExpr extends Expr {
       // There is no version of COUNT() that takes more than 1 argument but after
       // the rewrite, we only need count(*).
       // TODO: fix how we rewrite count distinct.
-      argTypes = new Type[0];
-      Function searchDesc = new Function(fnName_, argTypes, Type.INVALID, false);
+      Function searchDesc = new Function(fnName_, new Type[0], Type.INVALID, false);
       fn_ = db.getFunction(searchDesc, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
       type_ = fn_.getReturnType();
       // Make sure BE doesn't see any TYPE_NULL exprs
@@ -506,6 +503,28 @@ public class FunctionCallExpr extends Expr {
           "AVG requires a numeric or timestamp parameter: " + toSql());
     }
 
+    // SAMPLED_NDV() is only valid with two children. Invocations with an invalid number
+    // of children are gracefully handled when resolving the function signature.
+    if (fnName_.getFunction().equalsIgnoreCase("sampled_ndv")
+        && children_.size() == 2) {
+      if (!(children_.get(1) instanceof NumericLiteral)) {
+        throw new AnalysisException(
+            "Second parameter of SAMPLED_NDV() must be a numeric literal in [0,1]: " +
+            children_.get(1).toSql());
+      }
+      NumericLiteral samplePerc = (NumericLiteral) children_.get(1);
+      if (samplePerc.getDoubleValue() < 0 || samplePerc.getDoubleValue() > 1.0) {
+        throw new AnalysisException(
+            "Second parameter of SAMPLED_NDV() must be a numeric literal in [0,1]: " +
+            samplePerc.toSql());
+      }
+      // Numeric literals with a decimal point are analyzed as decimals. Without this
+      // cast we might resolve to the wrong function because there is no exactly
+      // matching signature with decimal as the second argument.
+      children_.set(1, samplePerc.uncheckedCastTo(Type.DOUBLE));
+    }
+
+    Type[] argTypes = collectChildReturnTypes();
     Function searchDesc = new Function(fnName_, argTypes, Type.INVALID, false);
     fn_ = db.getFunction(searchDesc, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
     if (fn_ == null || (!isInternalFnCall_ && !fn_.userVisible())) {

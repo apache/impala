@@ -22,7 +22,6 @@ import java.util.Collections;
 import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.Database;
-
 import org.apache.impala.analysis.ArithmeticExpr;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.CaseExpr;
@@ -32,6 +31,7 @@ import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.LikePredicate;
 import org.apache.impala.builtins.ScalarBuiltins;
+
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 
@@ -302,6 +302,30 @@ public class BuiltinsDb extends Db {
             "9HllUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.DECIMAL,
             "9HllUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .build();
+
+  private static final Map<Type, String> SAMPLED_NDV_UPDATE_SYMBOL =
+      ImmutableMap.<Type, String>builder()
+        .put(Type.BOOLEAN,
+            "16SampledNdvUpdateIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_RKNS2_9DoubleValEPNS2_9StringValE")
+        .put(Type.TINYINT,
+            "16SampledNdvUpdateIN10impala_udf10TinyIntValEEEvPNS2_15FunctionContextERKT_RKNS2_9DoubleValEPNS2_9StringValE")
+        .put(Type.SMALLINT,
+            "16SampledNdvUpdateIN10impala_udf11SmallIntValEEEvPNS2_15FunctionContextERKT_RKNS2_9DoubleValEPNS2_9StringValE")
+        .put(Type.INT,
+            "16SampledNdvUpdateIN10impala_udf6IntValEEEvPNS2_15FunctionContextERKT_RKNS2_9DoubleValEPNS2_9StringValE")
+        .put(Type.BIGINT,
+            "16SampledNdvUpdateIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_RKNS2_9DoubleValEPNS2_9StringValE")
+        .put(Type.FLOAT,
+            "16SampledNdvUpdateIN10impala_udf8FloatValEEEvPNS2_15FunctionContextERKT_RKNS2_9DoubleValEPNS2_9StringValE")
+        .put(Type.DOUBLE,
+            "16SampledNdvUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_RKS3_PNS2_9StringValE")
+        .put(Type.STRING,
+            "16SampledNdvUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_RKNS2_9DoubleValEPS3_")
+        .put(Type.TIMESTAMP,
+            "16SampledNdvUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_RKNS2_9DoubleValEPNS2_9StringValE")
+        .put(Type.DECIMAL,
+            "16SampledNdvUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_RKNS2_9DoubleValEPNS2_9StringValE")
         .build();
 
   private static final Map<Type, String> PC_UPDATE_SYMBOL =
@@ -788,6 +812,19 @@ public class BuiltinsDb extends Db {
           "_Z20IncrementNdvFinalizePN10impala_udf15FunctionContextERKNS_9StringValE",
           true, false, true));
 
+      // SAMPLED_NDV.
+      // Size needs to be kept in sync with SampledNdvState in the BE.
+      int NUM_HLL_BUCKETS = 32;
+      int size = 16 + NUM_HLL_BUCKETS * (8 + HLL_INTERMEDIATE_SIZE);
+      Type sampledIntermediateType = ScalarType.createFixedUdaIntermediateType(size);
+      db.addBuiltin(AggregateFunction.createBuiltin(db, "sampled_ndv",
+          Lists.newArrayList(t, Type.DOUBLE), Type.BIGINT, sampledIntermediateType,
+          prefix + "14SampledNdvInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+          prefix + SAMPLED_NDV_UPDATE_SYMBOL.get(t),
+          prefix + "15SampledNdvMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+          null,
+          prefix + "18SampledNdvFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+          true, false, true));
 
       Type pcIntermediateType =
           ScalarType.createFixedUdaIntermediateType(PC_INTERMEDIATE_SIZE);

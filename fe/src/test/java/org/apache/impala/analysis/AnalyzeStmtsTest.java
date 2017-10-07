@@ -18,19 +18,23 @@
 package org.apache.impala.analysis;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.lang.reflect.Field;
 import java.util.List;
 
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.RuntimeEnv;
 import org.junit.Assert;
 import org.junit.Test;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -2048,6 +2052,55 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select tinyint_col, count(distinct int_col),"
         + "min(distinct smallint_col), max(distinct string_col) "
         + "from functional.alltypesagg group by 1");
+  }
+
+  @Test
+  public void TestSampledNdv() throws AnalysisException {
+    Table allScalarTypes = addAllScalarTypesTestTable();
+    String tblName = allScalarTypes.getFullName();
+
+    // Positive tests: Test all scalar types and valid sampling percents.
+    double validSamplePercs[] = new double[] { 0.0, 0.1, 0.2, 0.5, 0.8, 1.0 };
+    for (double perc: validSamplePercs) {
+      List<String> allAggFnCalls = Lists.newArrayList();
+      for (Column col: allScalarTypes.getColumns()) {
+        String aggFnCall = String.format("sampled_ndv(%s, %s)", col.getName(), perc);
+        allAggFnCalls.add(aggFnCall);
+        String stmtSql = String.format("select %s from %s", aggFnCall, tblName);
+        SelectStmt stmt = (SelectStmt) AnalyzesOk(stmtSql);
+        // Verify that the resolved function signature matches as expected.
+        Type[] args = stmt.getAggInfo().getAggregateExprs().get(0).getFn().getArgs();
+        assertEquals(args.length, 2);
+        assertTrue(col.getType().matchesType(args[0]) ||
+            col.getType().isStringType() && args[0].equals(Type.STRING));
+        assertEquals(Type.DOUBLE, args[1]);
+      }
+      // Test several calls in the same query block.
+      AnalyzesOk(String.format(
+          "select %s from %s", Joiner.on(",").join(allAggFnCalls), tblName));
+    }
+
+    // Negative tests: Incorrect number of args.
+    AnalysisError(
+        String.format("select sampled_ndv() from %s", tblName),
+        "No matching function with signature: sampled_ndv().");
+    AnalysisError(
+        String.format("select sampled_ndv(int_col) from %s", tblName),
+        "No matching function with signature: sampled_ndv(INT).");
+    AnalysisError(
+        String.format("select sampled_ndv(int_col, 0.1, 10) from %s", tblName),
+        "No matching function with signature: sampled_ndv(INT, DECIMAL(1,1), TINYINT).");
+
+    // Negative tests: Invalid sampling percent.
+    String invalidSamplePercs[] = new String[] {
+        "int_col", "double_col", "100 / 10", "-0.1", "1.1", "100", "50", "-50", "NULL"
+    };
+    for (String invalidPerc: invalidSamplePercs) {
+      AnalysisError(
+          String.format("select sampled_ndv(int_col, %s) from %s", invalidPerc, tblName),
+          "Second parameter of SAMPLED_NDV() must be a numeric literal in [0,1]: " +
+          invalidPerc);
+    }
   }
 
   @Test

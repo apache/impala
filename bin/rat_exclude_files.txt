@@ -19,8 +19,9 @@ testdata/__init__.py
 tests/__init__.py
 www/index.html
 
-# See LICENSE.txt
+# See $IMPALA_HOME/LICENSE.txt
 be/src/gutil/*
+be/src/thirdparty/mpfit/*
 be/src/kudu/gutil
 www/highlight/*
 www/DataTables*/*

@@ -17,6 +17,7 @@
 
 set(SQUEASEL_SRC_DIR "${CMAKE_SOURCE_DIR}/be/src/thirdparty/squeasel")
 set(MUSTACHE_SRC_DIR "${CMAKE_SOURCE_DIR}/be/src/thirdparty/mustache")
+set(MPFIT_SRC_DIR "${CMAKE_SOURCE_DIR}/be/src/thirdparty/mpfit")
 
 # where to put generated libraries
 set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util")
@@ -58,6 +59,7 @@ add_library(Util
   min-max-filter.cc
   min-max-filter-ir.cc
   minidump.cc
+  mpfit-util.cc
   network-util.cc
   openssl-util.cc
   os-info.cc
@@ -86,6 +88,7 @@ add_library(Util
   ${SQUEASEL_SRC_DIR}/squeasel.c
   webserver.cc
   ${MUSTACHE_SRC_DIR}/mustache.cc
+  ${MPFIT_SRC_DIR}/mpfit.c
 )
 add_dependencies(Util gen-deps gen_ir_descriptions)
 

@@ -17,24 +17,25 @@
 
 #include "exprs/aggregate-functions.h"
 
-#include <math.h>
 #include <algorithm>
 #include <map>
 #include <sstream>
 #include <utility>
+#include <cmath>
 
 #include <boost/random/ranlux.hpp>
 #include <boost/random/uniform_int.hpp>
 
 #include "codegen/impala-ir.h"
 #include "common/logging.h"
+#include "exprs/anyval-util.h"
+#include "exprs/hll-bias.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
-#include "exprs/anyval-util.h"
-#include "exprs/hll-bias.h"
+#include "util/mpfit-util.h"
 
 #include "common/names.h"
 
@@ -42,6 +43,7 @@ using boost::uniform_int;
 using boost::ranlux64_3;
 using std::make_pair;
 using std::map;
+using std::min_element;
 using std::nth_element;
 using std::pop_heap;
 using std::push_heap;
@@ -1480,6 +1482,186 @@ BigIntVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal&
   return estimate;
 }
 
+/// Intermediate aggregation state for the SampledNdv() function.
+/// Stores NUM_HLL_BUCKETS of the form <row_count, hll_state>.
+/// The 'row_count' keeps track of how many input rows were aggregated into that
+/// bucket, and the 'hll_state' is an intermediate aggregation state of HyperLogLog.
+/// See the header comments on the SampledNdv() function for more details.
+class SampledNdvState {
+ public:
+  /// Empirically determined number of HLL buckets. Power of two for fast modulo.
+  static const uint32_t NUM_HLL_BUCKETS = 32;
+
+  /// A bucket contains an update count and an HLL intermediate state.
+  static constexpr int64_t BUCKET_SIZE = sizeof(int64_t) + AggregateFunctions::HLL_LEN;
+
+  /// Sampling percent which was given as the second argument to SampledNdv().
+  /// Stored here to avoid existing issues with passing constant arguments to all
+  /// aggregation phases and because we convert the sampling percent argument from
+  /// decimal to double. See IMPALA-6179.
+  double sample_perc;
+
+  /// Counts the number of Update() calls. Used for determining which bucket to update.
+  int64_t total_row_count;
+
+  /// Array of buckets.
+  struct {
+    int64_t row_count;
+    uint8_t hll[AggregateFunctions::HLL_LEN];
+  } buckets[NUM_HLL_BUCKETS];
+};
+
+void AggregateFunctions::SampledNdvInit(FunctionContext* ctx, StringVal* dst) {
+  // Uses a preallocated FIXED_UDA_INTERMEDIATE intermediate value.
+  DCHECK_EQ(dst->len, sizeof(SampledNdvState));
+  memset(dst->ptr, 0, sizeof(SampledNdvState));
+
+  DoubleVal* sample_perc = reinterpret_cast<DoubleVal*>(ctx->GetConstantArg(1));
+  if (sample_perc == nullptr) return;
+  // Guaranteed by the FE.
+  DCHECK(!sample_perc->is_null);
+  DCHECK_GE(sample_perc->val, 0.0);
+  DCHECK_LE(sample_perc->val, 1.0);
+  SampledNdvState* state = reinterpret_cast<SampledNdvState*>(dst->ptr);
+  state->sample_perc = sample_perc->val;
+}
+
+/// Incorporate the 'src' into one of the intermediate HLLs, which will be used by
+/// Finalize() to generate a set of the (x,y) data points.
+template <typename T>
+void AggregateFunctions::SampledNdvUpdate(FunctionContext* ctx, const T& src,
+    const DoubleVal& sample_perc, StringVal* dst) {
+  SampledNdvState* state = reinterpret_cast<SampledNdvState*>(dst->ptr);
+  int64_t bucket_idx = state->total_row_count % SampledNdvState::NUM_HLL_BUCKETS;
+  StringVal hll_dst = StringVal(state->buckets[bucket_idx].hll, HLL_LEN);
+  HllUpdate(ctx, src, &hll_dst);
+  ++state->buckets[bucket_idx].row_count;
+  ++state->total_row_count;
+}
+
+void AggregateFunctions::SampledNdvMerge(FunctionContext* ctx, const StringVal& src,
+    StringVal* dst) {
+  SampledNdvState* src_state = reinterpret_cast<SampledNdvState*>(src.ptr);
+  SampledNdvState* dst_state = reinterpret_cast<SampledNdvState*>(dst->ptr);
+  for (int i = 0; i < SampledNdvState::NUM_HLL_BUCKETS; ++i) {
+    StringVal src_hll = StringVal(src_state->buckets[i].hll, HLL_LEN);
+    StringVal dst_hll = StringVal(dst_state->buckets[i].hll, HLL_LEN);
+    HllMerge(ctx, src_hll, &dst_hll);
+    dst_state->buckets[i].row_count += src_state->buckets[i].row_count;
+  }
+  // Total count. Not really needed after Update() but kept for sanity checking.
+  dst_state->total_row_count += src_state->total_row_count;
+  // Propagate sampling percent to Finalize().
+  dst_state->sample_perc = src_state->sample_perc;
+}
+
+BigIntVal AggregateFunctions::SampledNdvFinalize(FunctionContext* ctx,
+    const StringVal& src) {
+  SampledNdvState* state = reinterpret_cast<SampledNdvState*>(src.ptr);
+
+  // Generate 'num_points' data points with x=row_count and y=ndv_estimate. These points
+  // are used to fit a function for the NDV growth and estimate the real NDV.
+  constexpr int num_points =
+      SampledNdvState::NUM_HLL_BUCKETS * SampledNdvState::NUM_HLL_BUCKETS;
+  int64_t counts[num_points] = { 0 };
+  int64_t ndvs[num_points] = { 0 };
+
+  int64_t min_ndv = numeric_limits<int64_t>::max();
+  int64_t min_count = numeric_limits<int64_t>::max();
+  // We have a fixed number of HLL intermediates to generate data points. Any unique
+  // subset of intermediates can be combined to create a new data point. It was
+  // empirically determined that 'num_data' points is typically sufficient and there are
+  // diminishing returns from generating additional data points.
+  // The generation method below was chosen for its simplicity. It successively merges
+  // buckets in a rolling window of size NUM_HLL_BUCKETS. Repeating the last data point
+  // where all buckets are merged biases the curve fitting to hit that data point which
+  // makes sense because that's likely the most accurate one. The number of data points
+  // are sufficient for reasonable accuracy.
+  int pidx = 0;
+  for (int i = 0; i < SampledNdvState::NUM_HLL_BUCKETS; ++i) {
+    uint8_t merged_hll_data[HLL_LEN];
+    memset(merged_hll_data, 0, HLL_LEN);
+    StringVal merged_hll(merged_hll_data, HLL_LEN);
+    int64_t merged_count = 0;
+    for (int j = 0; j < SampledNdvState::NUM_HLL_BUCKETS; ++j) {
+      int bucket_idx = (i + j) % SampledNdvState::NUM_HLL_BUCKETS;
+      merged_count += state->buckets[bucket_idx].row_count;
+      counts[pidx] = merged_count;
+      StringVal hll = StringVal(state->buckets[bucket_idx].hll, HLL_LEN);
+      HllMerge(ctx, hll, &merged_hll);
+      ndvs[pidx] = HllFinalEstimate(merged_hll.ptr, HLL_LEN);
+      ++pidx;
+    }
+    min_count = std::min(min_count, state->buckets[i].row_count);
+    min_ndv = std::min(min_ndv, ndvs[i * SampledNdvState::NUM_HLL_BUCKETS]);
+  }
+  // Based on the point-generation method above the last elements represent the data
+  // point where all buckets are merged.
+  int64_t max_count = counts[num_points - 1];
+  int64_t max_ndv = ndvs[num_points - 1];
+
+  // Scale all values to [0,1] since some objective functions require it (e.g., Sigmoid).
+  double count_scale = max_count - min_count;
+  double ndv_scale = max_ndv - min_ndv;
+  if (count_scale == 0) count_scale = 1.0;
+  if (ndv_scale == 0) ndv_scale = 1.0;
+  double scaled_counts[num_points];
+  double scaled_ndvs[num_points];
+  for (int i = 0; i < num_points; ++i) {
+    scaled_counts[i] = counts[i] / count_scale;
+    scaled_ndvs[i] = ndvs[i] / ndv_scale;
+  }
+
+  // List of objective functions. Curve fitting will select the best values for the
+  // parameters a, b, c, d.
+  vector<ObjectiveFunction> ndv_fns;
+  // Linear function: f(x) = a + b * x
+  ndv_fns.push_back(ObjectiveFunction("LIN", 2,
+      [](double x, const double* params) -> double {
+        return params[0] + params[1] * x;
+      }
+  ));
+  // Logarithmic function: f(x) = a + b * log(x)
+  ndv_fns.push_back(ObjectiveFunction("LOG", 2,
+      [](double x, const double* params) -> double {
+        return params[0] + params[1] * log(x);
+      }
+  ));
+  // Power function: f(x) = a + b * pow(x, c)
+  ndv_fns.push_back(ObjectiveFunction("POW", 3,
+      [](double x, const double* params) -> double {
+        return params[0] + params[1] * pow(x, params[2]);
+      }
+  ));
+  // Sigmoid function: f(x) = a + b * (c / (c + pow(d, -x)))
+  ndv_fns.push_back(ObjectiveFunction("SIG", 4,
+      [](double x, const double* params) -> double {
+        return params[0] + params[1] * (params[2] / (params[2] + pow(params[3], -x)));
+      }
+  ));
+
+  // Perform least mean squares fitting on all objective functions.
+  vector<ObjectiveFunction> valid_ndv_fns;
+  for (ObjectiveFunction& f: ndv_fns) {
+    if(f.LmsFit(scaled_counts, scaled_ndvs, num_points)) {
+      valid_ndv_fns.push_back(std::move(f));
+    }
+  }
+
+  // Select the best-fit function for estimating the NDV.
+  auto best_fit_fn = min_element(valid_ndv_fns.begin(), valid_ndv_fns.end(),
+      [](const ObjectiveFunction& a, const ObjectiveFunction& b) -> bool {
+        return a.GetError() < b.GetError();
+      }
+  );
+
+  // Compute the extrapolated NDV based on the extrapolated row count.
+  double extrap_count = max_count / state->sample_perc;
+  double scaled_extrap_count = extrap_count / count_scale;
+  double scaled_extrap_ndv = best_fit_fn->GetY(scaled_extrap_count);
+  return round(scaled_extrap_ndv * ndv_scale);
+}
+
 // An implementation of a simple single pass variance algorithm. A standard UDA must
 // be single pass (i.e. does not scan the table more than once), so the most canonical
 // two pass approach is not practical.
@@ -2139,6 +2321,27 @@ template void AggregateFunctions::HllUpdate(
     FunctionContext*, const TimestampVal&, StringVal*);
 template void AggregateFunctions::HllUpdate(
     FunctionContext*, const DecimalVal&, StringVal*);
+
+template void AggregateFunctions::SampledNdvUpdate(
+    FunctionContext*, const BooleanVal&, const DoubleVal&, StringVal*);
+template void AggregateFunctions::SampledNdvUpdate(
+    FunctionContext*, const TinyIntVal&, const DoubleVal&, StringVal*);
+template void AggregateFunctions::SampledNdvUpdate(
+    FunctionContext*, const SmallIntVal&, const DoubleVal&, StringVal*);
+template void AggregateFunctions::SampledNdvUpdate(
+    FunctionContext*, const IntVal&, const DoubleVal&, StringVal*);
+template void AggregateFunctions::SampledNdvUpdate(
+    FunctionContext*, const BigIntVal&, const DoubleVal&, StringVal*);
+template void AggregateFunctions::SampledNdvUpdate(
+    FunctionContext*, const FloatVal&, const DoubleVal&, StringVal*);
+template void AggregateFunctions::SampledNdvUpdate(
+    FunctionContext*, const DoubleVal&, const DoubleVal&, StringVal*);
+template void AggregateFunctions::SampledNdvUpdate(
+    FunctionContext*, const StringVal&, const DoubleVal&, StringVal*);
+template void AggregateFunctions::SampledNdvUpdate(
+    FunctionContext*, const TimestampVal&, const DoubleVal&, StringVal*);
+template void AggregateFunctions::SampledNdvUpdate(
+    FunctionContext*, const DecimalVal&, const DoubleVal&, StringVal*);
 
 template void AggregateFunctions::KnuthVarUpdate(
     FunctionContext*, const TinyIntVal&, StringVal*);

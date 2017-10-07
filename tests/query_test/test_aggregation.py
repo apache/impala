@@ -275,6 +275,75 @@ class TestAggregationQueries(ImpalaTestSuite):
     vector.get_value('exec_option')['batch_size'] = 1
     self.run_test_case('QueryTest/parquet-stats-agg', vector, unique_database)
 
+  def test_sampled_ndv(self, vector, unique_database):
+    """The SAMPLED_NDV() function is inherently non-deterministic and cannot be
+    reasonably made deterministic with existing options so we test it separately.
+    The goal of this test is to ensure that SAMPLED_NDV() works on all data types
+    and returns approximately sensible estimates. It is not the goal of this test
+    to ensure tight error bounds on the NDV estimates. SAMPLED_NDV() is expected
+    be inaccurate on small data sets like the ones we use in this test."""
+    if (vector.get_value('table_format').file_format != 'text' or
+        vector.get_value('table_format').compression_codec != 'none'):
+      # No need to run this test on all file formats
+      pytest.skip()
+
+    # NDV() is used a baseline to compare SAMPLED_NDV(). Both NDV() and SAMPLED_NDV()
+    # are based on HyperLogLog so NDV() is roughly the best that SAMPLED_NDV() can do.
+    # Expectations: All columns except 'id' and 'timestmap_col' have low NDVs and are
+    # expected to be reasonably accurate with SAMPLED_NDV(). For the two high-NDV columns
+    # SAMPLED_NDV() is expected to have high variance and error.
+    ndv_stmt = """
+        select ndv(bool_col), ndv(tinyint_col),
+               ndv(smallint_col), ndv(int_col),
+               ndv(bigint_col), ndv(float_col),
+               ndv(double_col), ndv(string_col),
+               ndv(cast(double_col as decimal(3, 0))),
+               ndv(cast(double_col as decimal(10, 5))),
+               ndv(cast(double_col as decimal(20, 10))),
+               ndv(cast(double_col as decimal(38, 35))),
+               ndv(cast(string_col as varchar(20))),
+               ndv(cast(string_col as char(10))),
+               ndv(timestamp_col), ndv(id)
+        from functional_parquet.alltypesagg"""
+    ndv_result = self.execute_query(ndv_stmt)
+    ndv_vals = ndv_result.data[0].split('\t')
+
+    for sample_perc in [0.1, 0.2, 0.5, 1.0]:
+      sampled_ndv_stmt = """
+          select sampled_ndv(bool_col, {0}), sampled_ndv(tinyint_col, {0}),
+                 sampled_ndv(smallint_col, {0}), sampled_ndv(int_col, {0}),
+                 sampled_ndv(bigint_col, {0}), sampled_ndv(float_col, {0}),
+                 sampled_ndv(double_col, {0}), sampled_ndv(string_col, {0}),
+                 sampled_ndv(cast(double_col as decimal(3, 0)), {0}),
+                 sampled_ndv(cast(double_col as decimal(10, 5)), {0}),
+                 sampled_ndv(cast(double_col as decimal(20, 10)), {0}),
+                 sampled_ndv(cast(double_col as decimal(38, 35)), {0}),
+                 sampled_ndv(cast(string_col as varchar(20)), {0}),
+                 sampled_ndv(cast(string_col as char(10)), {0}),
+                 sampled_ndv(timestamp_col, {0}), sampled_ndv(id, {0})
+          from functional_parquet.alltypesagg""".format(sample_perc)
+      sampled_ndv_result = self.execute_query(sampled_ndv_stmt)
+      sampled_ndv_vals = sampled_ndv_result.data[0].split('\t')
+
+      assert len(sampled_ndv_vals) == len(ndv_vals)
+      # Low NDV columns. We expect a reasonaby accurate estimate regardless of the
+      # sampling percent.
+      for i in xrange(0, 14):
+        self.__appx_equals(int(sampled_ndv_vals[i]), int(ndv_vals[i]), 0.1)
+      # High NDV columns. We expect the estimate to have high variance and error.
+      # Since we give NDV() and SAMPLED_NDV() the same input data, i.e., we are not
+      # actually sampling for SAMPLED_NDV(), we expect the result of SAMPLED_NDV() to
+      # be bigger than NDV() proportional to the sampling percent.
+      # For example, the column 'id' is a PK so we expect the result of SAMPLED_NDV()
+      # with a sampling percent of 0.1 to be approximately 10x of the NDV().
+      for i in xrange(14, 16):
+        self.__appx_equals(int(sampled_ndv_vals[i]) * sample_perc, int(ndv_vals[i]), 2.0)
+
+  def __appx_equals(self, a, b, diff_perc):
+    """Returns True if 'a' and 'b' are within 'diff_perc' percent of each other,
+    False otherwise. 'diff_perc' must be a float in [0,1]."""
+    assert abs(a - b) / float(max(a, b)) <= diff_perc
+
 class TestWideAggregationQueries(ImpalaTestSuite):
   """Test that aggregations with many grouping columns work"""
   @classmethod

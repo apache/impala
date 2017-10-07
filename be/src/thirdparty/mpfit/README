@@ -1,0 +1,705 @@
+
+MPFIT: A MINPACK-1 Least Squares Fitting Library in C
+
+Original public domain version by B. Garbow, K. Hillstrom, J. More'
+  (Argonne National Laboratory, MINPACK project, March 1980)
+
+Tranlation to C Language by S. Moshier (moshier.net)
+
+Enhancements, documentation and packaging by C. Markwardt
+  (comparable to IDL fitting routine MPFIT
+   see http://cow.physics.wisc.edu/~craigm/idl/idl.html)
+  Copyright (C) 2003, 2004, 2006, 2007, 2009, 2010, 2013 Craig B. Markwardt
+
+
+SUMMARY of CHANGES
+ 16 Feb 2009 - version 1.0 - initial release
+ 18 Feb 2009 - version 1.1 - add 'version' field to 'results' struct
+ 22 Nov 2009 -             - allow to compile with C++ compiler
+                           - change to memset() instead of nonstandard bzero()
+                           - for Microsoft, proprietary equivalent of finite()
+ 04 Oct 2010 -             - add static declarations, remove some compiler warnings
+                             (reported by Lars Kr. Lundin)
+ 13 Nov 2010 - version 1.2 - additional documentation, cleanup of mpfit.h
+ 23 Apr 2013 - version 1.3 - add MP_NO_ITER; bug fix mpside=2 when debugging
+                             (thanks to M. Wojdyr)
+
+$Id: README,v 1.18 2016/06/02 19:14:16 craigm Exp $
+
+INTRODUCTION
+
+MPFIT uses the Levenberg-Marquardt technique to solve the
+least-squares problem.  In its typical use, MPFIT will be used to
+fit a user-supplied function (the "model") to user-supplied data
+points (the "data") by adjusting a set of parameters.  MPFIT is
+based upon MINPACK-1 (LMDIF.F) by More' and collaborators.
+
+For example, a researcher may think that a set of observed data
+points is best modelled with a Gaussian curve.  A Gaussian curve is
+parameterized by its mean, standard deviation and normalization.
+MPFIT will, within certain constraints, find the set of parameters
+which best fits the data.  The fit is "best" in the least-squares
+sense; that is, the sum of the weighted squared differences between
+the model and data is minimized.
+
+The Levenberg-Marquardt technique is a particular strategy for
+iteratively searching for the best fit.  This particular
+implementation is drawn from a robust routine called MINPACK-1 (see
+NETLIB).  This version allows upper and lower bounding constraints
+to be placed on each parameter, or the parameter can be held fixed.
+
+The user-supplied function should compute an array of weighted
+deviations between model and data.  In a typical scientific problem
+the residuals should be weighted so that each deviate has a
+gaussian sigma of 1.0.  If X represents values of the independent
+variable, Y represents a measurement for each value of X, and ERR
+represents the error in the measurements, then the deviates could
+be calculated as follows:
+
+    for (i=0; i<m; i++) {
+      deviates[i] = (y[i] - f(x[i])) / err[i];
+    }
+
+where m is the number of data points, and where F is the 
+function representing the model evaluated at X.  If ERR are the
+1-sigma uncertainties in Y, then the sum of deviates[i] squared will
+be the total chi-squared value, which MPFIT will seek to minimize.
+
+Simple constraints can be placed on parameter values by using the
+"pars" parameter to MPFIT, and other parameter-specific options can be
+set.  See below for a description of this optional parameter
+descriptor.
+
+MPFIT does not perform more general optimization tasks.  MPFIT is
+customized, based on MINPACK-1, to the least-squares minimization
+problem.
+
+BASIC CALLING INTERFACE of MPFIT
+
+At the very least, the user must supply a 'user function,' which
+calculates the residuals as described above, and one or more
+parameters.  The calling interface to mpfit is:
+
+  int mpfit(mp_func funct, int m, int npar,
+            double *xall, mp_par *pars, mp_config *config, 
+            void *private_data, 
+            mp_result *result);
+
+The user function <b>funct</b> is a C function which computes the
+residuals using any user data that is required.  The number of
+residuals is specified by the integer <b>m</b>.  The nature and
+properties of user function are described in greater detail below.
+
+The user function parameters are passed to mpfit as the array
+  double xall[npar];
+where <b>npar</b> is the number of parameters of the user function.
+It must be the case that m > npar, i.e. there are more data points
+than free parameters.  The user must pass an initial "best guess" of
+the user parameters to mpfit(), and upon successful return, the xall[]
+array will contain the "best fit" parameters of the fit (and the original
+values are overwritten).
+
+The user function is responsible to compute an array of generic
+residuals.  Usually these residuals will depend on user-dependent
+quantities such as measured data or independent variables such "x"
+when fitting a function of the form y(x).  The user should pass these
+quantities using the optional <b>private_data</b> pointer.  If
+private_data is not used then a null pointer should be passed.
+Otherwise, it can be any C pointer, typically a pointer to a structure
+such as this:
+  struct example_private_data {  /* EXAMPLE: fitting y(x) */
+    double *x;         /* x - independent variable of model */
+    double *y;         /* y - measured "y" values */
+    double *y_error;   /* y_error - measurement uncertainty in y */
+  };
+The user would be responsible to declare such a structure, and to fill
+it with pointers to the relevant data arrays before calling mpfit().
+mpfit() itself does not inspect or modify the private_data contents,
+but merely passes it along to the user function
+
+The structure <b>pars</b> is optional, and allows the user to specify
+additional information and constraints about each user function
+parameter.  For example, the user can specify simple bounding
+constraints.  If passed, then pars[] must be dimensioned as,
+  mp_par pars[npar];
+where mp_par is a structure defined in mpfit.h.  If no special 
+parameter information is necessary, then the user can pass 
+pars == 0.
+
+The optional structure <b>config</b> configures how mpfit() behaves,
+and is described in greater detail below.  By passing a null pointer,
+the user obtains the default behavior.
+
+The structure <b>result</b> contains results of the fit, returned by
+mpfit().  The user should pass a pointer to a structure of type
+'mp_result' (which should be zeroed), and upon return, the structure
+is filled with various diagnostic quantities about the fitting run.
+These quantities are described in greater detail below.  If these
+diagnostics are not required, then the user may pass a null pointer.
+
+
+USER FUNCTION
+
+The user must define a function which computes the appropriate values
+as specified above.  The function must compute the weighted deviations
+between the model and the data.  The user function may also optionally
+compute explicit derivatives (see below).  The user function should
+be of the following form:
+
+  int myfunct(int m, int n, double *p, double *deviates,
+              double **derivs, void *private)
+  {
+    int i;
+    /* Compute function deviates */
+    for (i=0; i<m; i++) {
+      deviates[i] = {function of p[] and private data};
+    }
+
+    return 0;
+  }
+
+The user function parameters are defined as follows:
+  int m     - number of data points
+  int n     - number of parameters
+  double *p - array of n parameters 
+  double *deviates - array of m deviates to be returned by myfunct()
+  double **derivs - used for user-computed derivatives (see below)
+                    (= 0  when automatic finite differences are computed)
+
+User functions may also indicate a fatal error condition by returning
+a negative error code.  Error codes from -15 to -1 are reserved for
+the user function.
+
+
+EXAMPLE 1 - USER FUNCTION y(x)
+
+Here is a sample user function which computes the residuals for a simple
+model fit of the form y = f(x).   The residuals are defined as 
+(y[i] - f(x[i]))/y_error[i].   We will use the example_private_data
+structure defined above.  The user function would appear like this:
+
+  int myfunct_y_x(int m, int n, double *p, double *deviates,
+                 double **derivs, struct example_private_data *private)
+  {
+    int i;
+    double *x, *y, *y_error;
+
+    /* Retrieve values of x, y and y_error from private structure */
+    x = private.x;
+    y = private.y;
+    y_error = private.y_error;
+
+    /* Compute function deviates */
+    for (i=0; i<m; i++) {
+      deviates[i] = (y[i] - f(x[i], p)) / y_error[i];
+    }
+
+    return 0;
+  }
+
+In this example, the user would be responsible to define the function
+f(x,p) where x is the independent variable and p is the array of user
+parameters.  Although this example shows y = f(x,p), it is trivial to
+extend it to additional independent variables, such as u = f(x,y,p),
+by adding additional elements to the private data structure.
+
+The setup and call to mpfit() could look something like this:
+  int m = 10;  /* 10 data points */
+  double x[10] = {1,2,3,4,5,6,7,8,9,10}; /* Independent variable */
+  double y[10] = {-0.42,1.59,0.8,3.2,2.09,6.39,6.29,9.01,7.47,7.58};/* Y measurements*/
+  double y_error[10] = {1,1,1,1,1,1,1,1,1,1}; /* Y uncertainties */
+  struct example_private_data private;
+
+  double xall[2] = { 1.0, 1.0 };  /* User parameters - initial guess */
+  /* Fill private data structure to pointers with user data */
+  private.x = x;
+  private.y = y;
+  private.y_error = y_error;
+
+  /* Call mpfit() */
+  status = mpfit(&myfunct_y_x, m, npar, xall, 0, 0, &private, 0);
+
+USER-COMPUTED DERIVATIVES
+
+The user function can also compute function derivatives, which are
+used in the minimization process.  This can be useful to save time, or
+when the derivative is tricky to evaluate numerically.  
+
+Users should pass the "pars" parameter (see below), and for the 'side'
+structure field, the value of 3 should be passed.  This indicates to
+mpfit() that it should request the user function will compute the
+derivative.  NOTE: this setting is specified on a parameter by
+parameter basis.  This means that users are free to choose which
+parameters' derivatives are computed explicitly and which
+numerically.  A combination of both is allowed.  However, since the
+default value of 'side' is 0, derivative estimates will be numerical
+unless explicitly requested using the 'side' structure field.
+
+The user function should only compute derivatives when the 'derivs'
+parameter is non-null.  Note that even when user-computed derivatives
+are enabled, mpfit() may call the user function with derivs set to
+null, so the user function must check before accessing this pointer.
+
+The 'derivs' parameter is an array of pointers, one pointer for each
+parameter.  If derivs[i] is non-null, then derivatives are requested
+for the ith parameter.  Note that if some parameters are fixed, or
+pars[i].side is not 3 for some parameters, then derivs[i] will be null
+and the derivatives do not need to be computed for those parameters.
+
+derivs[j][i] is the derivative of the ith deviate with respect to the
+jth parameter (for 0<=i<m, 0<=j<n).  Storage has already been
+allocated for this array, and the user is not responsible for freeing
+it.  The user function may assume that derivs[j][i] are initialized to
+zero.
+
+The function prototype for user-computed derivatives is:
+
+  int myfunct_with_derivs(int m, int n, double *p, double *deviates,
+                          double **derivs, void *private)
+  {
+    int i;
+    /* Compute function deviates */
+    for (i=0; i<m; i++) {
+      deviates[i] = {function of x[i], p and private data};
+    }
+
+    /* If derivs is non-zero then user-computed derivatives are 
+       requested */
+    if (derivs) {
+      int j;
+      for (j=0; j<n; j++) if (derivs[j]) {
+        /* It is only required to compute derivatives when
+           derivs[ipar] is non-null */
+        for (i=0; i<m; i++) {
+          derivs[j][i] = {derivative of the ith deviate with respect to
+                          the jth parameter = d(deviates[i])/d(par[j])}
+        }
+      }
+    }
+
+    return 0;
+  }
+
+TESTING EXPLICIT DERIVATIVES
+
+In principle, the process of computing explicit derivatives should be
+straightforward.  In practice, the computation can be error prone,
+often being wrong by a sign or a scale factor.
+
+In order to be sure that the explicit derivatives are correct, the
+user can set pars[i].deriv_debug = 1 for parameter i (see below for a
+description of the "pars" structure).  This will cause mpfit() to
+print *both* explicit derivatives and numerical derivatives to the
+console so that the user can compare the results.  This would
+typically be used during development and debugging to be sure the
+calculated derivatives are correct, than then deriv_debug would be set
+to zero for production use.
+
+If you want debugging derivatives, it is important to set pars[i].side
+to the kind of numerical derivative you want to compare with.
+pars[i].side should be set to 0, 1, -1, or 2, and *not* set to 3.
+When pars[i].deriv_debug is set, then mpfit() automatically
+understands to request user-computed derivatives.
+
+The console output will be sent to the standard output, and will
+appear as a block of ASCII text like this:
+  FJAC DEBUG BEGIN
+  # IPNT FUNC DERIV_U DERIV_N DIFF_ABS DIFF_REL
+  FJAC PARM 1
+  ....  derivative data for parameter 1 ....
+  FJAC PARM 2
+  ....  derivative data for parameter 2 ....
+  ....  and so on ....
+  FJAC DEBUG END
+
+which is to say, debugging data will be bracketed by pairs of "FJAC
+DEBUG" BEGIN/END phrases.  Derivative data for individual parameter i
+will be labeled by "FJAC PARM i".  The columns are, in order,
+
+  IPNT - data point number j
+  FUNC - user function evaluated at X[j]
+  DERIV_U - user-calculated derivative d(FUNC(X[j]))/d(P[i])
+  DERIV_N - numerically calculated derivative according to pars[i].side value
+  DIFF_ABS - difference between DERIV_U and DERIV_N = fabs(DERIV_U-DERIV_N)
+  DIFF_REL - relative difference = fabs(DERIV_U-DERIV_N)/DERIV_U
+
+Since individual numerical derivative values may contain significant
+round-off errors, it is up to the user to critically compare DERIV_U
+and DERIV_N, using DIFF_ABS and DIFF_REL as a guide. 
+
+
+CONSTRAINING PARAMETER VALUES WITH THE PARS PARAMETER
+
+The behavior of MPFIT can be modified with respect to each
+parameter to be fitted.  A parameter value can be fixed; simple
+boundary constraints can be imposed; and limitations on the
+parameter changes can be imposed.
+
+If fitting constraints are to be supplied, then the user should pass
+an array of mp_par structures to mpfit() in the pars parameter.  If
+pars is set to 0, then the fitting parameters are asssumed to be
+unconstrained.
+
+pars should be an array of structures, one for each parameter.
+Each parameter is associated with one element of the array, in
+numerical order.  The structure is declared to have the following
+fields:
+
+    .fixed - a boolean value, whether the parameter is to be held
+             fixed or not.  Fixed parameters are not varied by
+             MPFIT, but are passed on to MYFUNCT for evaluation.
+ 
+    .limited - a two-element boolean array.  If the first/second
+               element is set, then the parameter is bounded on the
+               lower/upper side.  A parameter can be bounded on both
+               sides.
+
+ 
+    .limits - a two-element float or double array.  Gives the
+              parameter limits on the lower and upper sides,
+              respectively.  Zero, one or two of these values can be
+              set, depending on the values of LIMITED.
+
+    .parname - a string, giving the name of the parameter.  The
+               fitting code of MPFIT does not use this tag in any
+               way.  However, it may be used for output purposes.
+
+    .step - the step size to be used in calculating the numerical
+            derivatives.  If set to zero, then the step size is
+            computed automatically.
+            This value is superceded by the RELSTEP value.
+
+    .relstep - the *relative* step size to be used in calculating
+               the numerical derivatives.  This number is the
+               fractional size of the step, compared to the
+               parameter value.  This value supercedes the STEP
+               setting.  If the parameter is zero, then a default
+               step size is chosen.
+
+    .side   - the sidedness of the finite difference when computing
+              numerical derivatives.  This field can take four
+              values:
+
+                 0 - one-sided derivative computed automatically
+                 1 - one-sided derivative (f(x+h) - f(x)  )/h
+                -1 - one-sided derivative (f(x)   - f(x-h))/h
+                 2 - two-sided derivative (f(x+h) - f(x-h))/(2*h)
+                 3 - user-computed explicit derivatives
+
+             Where H is the STEP parameter described above.  The
+             "automatic" one-sided derivative method will chose a
+             direction for the finite difference which does not
+             violate any constraints.  The other methods do not
+             perform this check.  The two-sided method is in
+             principle more precise, but requires twice as many
+             function evaluations.  Default: 0.
+
+    .deriv_debug - flag to enable/disable console debug logging of
+             user-computed derivatives, as described above.  1=enable
+             debugging; 0=disable debugging.  Note that when
+             pars[i].deriv_debug is set, then pars[i].side should be
+             set to 0, 1, -1 or 2, depending on which numerical
+             derivative you wish to compare to.
+             Default: 0.
+ 
+RETURN VALUE of MPFIT()
+
+mpfit() returns an integer status code.  In principle, any positive return
+value from mpfit() indicates success or partial success.
+
+The possible error codes are integer constants:
+MP_ERR_INPUT        /* General input parameter error */
+MP_ERR_NAN          /* User function produced non-finite values */
+MP_ERR_FUNC         /* No user function was supplied */
+MP_ERR_NPOINTS      /* No user data points were supplied */
+MP_ERR_NFREE        /* No free parameters */
+MP_ERR_MEMORY       /* Memory allocation error */
+MP_ERR_INITBOUNDS   /* Initial values inconsistent w constraints*/
+MP_ERR_BOUNDS       /* Initial constraints inconsistent */
+MP_ERR_PARAM        /* General input parameter error */
+MP_ERR_DOF          /* Not enough degrees of freedom */
+
+The possible success status codes are:
+MP_OK_CHI           /* Convergence in chi-square value */
+MP_OK_PAR           /* Convergence in parameter value */
+MP_OK_BOTH          /* Both MP_OK_PAR and MP_OK_CHI hold */
+MP_OK_DIR           /* Convergence in orthogonality */
+MP_MAXITER          /* Maximum number of iterations reached */
+MP_FTOL             /* ftol is too small; no further improvement*/
+MP_XTOL             /* xtol is too small; no further improvement*/
+MP_GTOL             /* gtol is too small; no further improvement*/
+
+
+CONFIGURING MPFIT()
+
+mpfit() is primarily configured using the config parameter, which in
+turn is defined as a pointer to the following structure:
+
+  struct mp_config_struct {
+    /* NOTE: the user may set the value explicitly; OR, if the passed
+       value is zero, then the "Default" value will be substituted by
+       mpfit(). */
+    double ftol;    /* Relative chi-square convergence criterium Default: 1e-10 */
+    double xtol;    /* Relative parameter convergence criterium  Default: 1e-10 */
+    double gtol;    /* Orthogonality convergence criterium       Default: 1e-10 */
+    double epsfcn;  /* Finite derivative step size               Default: MP_MACHEP0 */
+    double stepfactor; /* Initial step bound                     Default: 100.0 */
+    double covtol;  /* Range tolerance for covariance calculation Default: 1e-14 */
+    int maxiter;    /* Maximum number of iterations.  If maxiter == MP_NO_ITER,
+                       then basic error checking is done, and parameter
+                       errors/covariances are estimated based on input
+                       parameter values, but no fitting iterations are done. 
+                       Default: 200
+		  */
+    int maxfev;     /* Maximum number of function evaluations, or 0 for no limit
+  		       Default: 0 (no limit) */
+    int nprint;     /* Default: 1 */
+    int douserscale;/* Scale variables by user values?
+  		       1 = yes, user scale values in diag;
+  		       0 = no, variables scaled internally (Default) */
+    int nofinitecheck; /* Disable check for infinite quantities from user?
+  			0 = do not perform check (Default)
+  			1 = perform check 
+  		       */
+    mp_iterproc iterproc; /* Placeholder pointer - must set to 0 */
+  };
+
+Generally speaking, a value of 0 for a field in the structure above
+indicates that a default value should be used, indicated in
+parentheses.  Therefore, a user should zero this structure before
+passing it.
+
+
+EXTRACTING RESULTS FROM MPFIT()
+
+The basic result of mpfit() is the set of updated parameters, xall.
+However, there are other auxiliary quantities that the user can
+extract by using the results parameter.  This is a structure defined
+like this:
+
+  /* Definition of results structure, for when fit completes */
+  struct mp_result_struct {
+    double bestnorm;     /* Final chi^2 */
+    double orignorm;     /* Starting value of chi^2 */
+    int niter;           /* Number of iterations */
+    int nfev;            /* Number of function evaluations */
+    int status;          /* Fitting status code */
+
+    int npar;            /* Total number of parameters */
+    int nfree;           /* Number of free parameters */
+    int npegged;         /* Number of pegged parameters */
+    int nfunc;           /* Number of residuals (= num. of data points) */
+  
+    double *resid;       /* Final residuals
+  			  nfunc-vector, or 0 if not desired */
+    double *xerror;      /* Final parameter uncertainties (1-sigma)
+  			  npar-vector, or 0 if not desired */
+    double *covar;       /* Final parameter covariance matrix
+  			  npar x npar array, or 0 if not desired */
+    char version[20];    /* MPFIT version string */
+  };  
+
+All of the scalar numeric quantities are filled when mpfit() returns,
+and any incoming value will be overwritten.
+
+If the user would like the final residuals, parameter errors, or the
+covariance matrix, then they should allocate the required storage, and
+pass a pointer to it in the corresponding structure field.  A pointer
+value of zero indicates that the array should not be returned.  Thus,
+by default, the user should zero this structure before passing it.
+The user is responsible for allocating and freeing resid, xerror and
+covar storage.
+
+The 'version' string can be used to interpret the behavior of MPFIT,
+in case the behavior changes over time.  Version numbers will be of
+the form "i.j" or "i.j.k" where i, j and k are integers.
+
+
+EXAMPLE 2 - Basic call
+
+This example does the basics, which is to perform the optimization
+with no constraints, and returns the scalar results in the result
+structure.
+
+  mp_result result;
+
+  memset(&result, 0, sizeof(result));
+  status = mpfit(myfunct, m, n, p, 0, 0, 0, &result);
+
+
+EXAMPLE 3 - Requesting Parameter Errors
+
+The only modification needed to retrieve parameter uncertainties is to
+allocate storage for it, and place a pointer to it in result.
+
+  mp_result result;
+  double perror[n];
+
+  memset(&result, 0, sizeof(result));
+  result.xerror = perror;
+  status = mpfit(myfunct, m, n, p, 0, 0, 0, &result);
+
+
+EXAMPLE 4 - Fixing a parameter
+
+This example fixes the third parameter (i.e. p[2]) at its starting
+value
+
+  mp_result result;
+  mp_par    pars[n];
+
+  memset(&pars[0], 0, sizeof(pars));
+  pars[2].fixed = 1;
+
+  memset(&result, 0, sizeof(result));
+  status = mpfit(myfunct, m, n, p, pars, 0, 0, &result);
+
+EXAMPLE 5 - Applying parameter constraints
+
+This example ensures that the third parameter (i.e. p[2]) is always
+greater or equal to ten.
+
+  mp_result result;
+  mp_par    pars[n];
+
+  memset(&pars[0], 0, sizeof(pars));
+  pars[2].limited[0] = 1;    /* limited[0] indicates lower bound */
+  pars[2].limits[0]  = 10.0; /* Actual constraint p[2] >= 10 */
+
+  memset(&result, 0, sizeof(result));
+  status = mpfit(myfunct, m, n, p, pars, 0, 0, &result);
+
+
+EXAMPLE 6 - Increasing maximum number of iterations
+
+This example changes the maximum number of iterations from its default
+to 1000.
+
+  mp_config config;
+  mp_result result;
+
+  memset(&config, 0, sizeof(config));
+  config.maxiter = 1000;
+  memset(&result, 0, sizeof(result));
+  status = mpfit(myfunct, m, n, p, 0, &config, 0, &result);
+
+
+EXAMPLE 7 - Passing private data to user function
+
+This example passes "private" data to its user function using the
+private parameter.  It assumes that three variables, x, y, and ey,
+already exist, and that the user function will know what to do with
+them.
+
+  mp_result result;
+  struct mystruct {
+    double *x;
+    double *y;
+    double *ey;
+  };
+
+  struct mystruct mydata;
+
+  mydata.x = x;
+  mydata.y = y;
+  mydata.ey = ey;
+
+  memset(&result, 0, sizeof(result));
+  status = mpfit(myfunct, m, n, p, 0, 0, (void *)&mydata, &result);
+
+
+EXAMPLE 8 - Complete example
+
+
+This example shows how to fit sample data to a linear function
+y = f(x) = a - b*x, where a and b are fitted parameters.  There is sample
+data included within the program.  The parameters are initialized to
+a = 1.0, b = 1.0, and then the fitting occurs.  The function
+residuals; within linfunc(), the value of f(x) is computed.  The main
+routine, <b>main()</b> initializes the variables and calls mpfit().
+
+
+#include "mpfit.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+/* This is the private data structure which contains the data points
+   and their uncertainties */
+struct vars_struct {
+  double *x;
+  double *y;
+  double *ey;
+};
+
+/* 
+ * linear fit function
+ *
+ * m - number of data points
+ * n - number of parameters (2)
+ * p - array of fit parameters 
+ * dy - array of residuals to be returned
+ * vars - private data (struct vars_struct *)
+ *
+ * RETURNS: error code (0 = success)
+ */
+int linfunc(int m, int n, double *p, double *dy, double **dvec, void *vars)
+{
+  int i;
+  struct vars_struct *v = (struct vars_struct *) vars;
+  double *x, *y, *ey, f;
+
+  x = v->x;
+  y = v->y;
+  ey = v->ey;
+
+  for (i=0; i<m; i++) {
+    f = p[0] - p[1]*x[i];     /* Linear fit function; note f = a - b*x */
+    dy[i] = (y[i] - f)/ey[i];
+  }
+
+  return 0;
+}
+
+/* Test harness routine, which contains test data, invokes mpfit() */
+int main(int argc, char *argv[])
+{
+  /* X - independent variable */
+  double x[] = {-1.7237128E+00,1.8712276E+00,-9.6608055E-01,
+		-2.8394297E-01,1.3416969E+00,1.3757038E+00,
+		-1.3703436E+00,4.2581975E-02,-1.4970151E-01,
+		8.2065094E-01};
+  /* Y - measured value of dependent quantity */
+  double y[] = {1.9000429E-01,6.5807428E+00,1.4582725E+00,
+		2.7270851E+00,5.5969253E+00,5.6249280E+00,
+		0.787615,3.2599759E+00,2.9771762E+00,
+		4.5936475E+00};
+  double ey[10];   /* Measurement uncertainty - initialized below */
+   
+  double p[2] = {1.0, 1.0};           /* Initial conditions */
+  double pactual[2] = {3.20, 1.78};   /* Actual values used to make data */
+  double perror[2];                   /* Returned parameter errors */      
+  int i;
+  struct vars_struct v;  /* Private data structure */
+  int status;
+  mp_result result;
+
+  memset(&result,0,sizeof(result));       /* Zero results structure */
+  result.xerror = perror;
+  for (i=0; i<10; i++) ey[i] = 0.07;   /* Data errors */           
+
+  /* Fill private data structure */
+  v.x = x;
+  v.y = y;
+  v.ey = ey;
+
+  /* Call fitting function for 10 data points and 2 parameters */
+  status = mpfit(linfunc, 10, 2, p, 0, 0, (void *) &v, &result);
+
+  printf("*** testlinfit status = %d\n", status);
+  /* ... print or use the results of the fitted parametres p[] here! ... */
+
+  return 0;
+}
+
+

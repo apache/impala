@@ -2132,7 +2132,6 @@ public class HdfsTable extends Table {
       parts[selectedIdx] = parts[numFilesRemaining - 1];
       --numFilesRemaining;
     }
-
     return result;
   }
 }
