@@ -32,18 +32,13 @@ from tests.common.skip import SkipIfBuildType
 DAEMONS = ['impalad', 'statestored', 'catalogd']
 DAEMON_ARGS = ['impalad_args', 'state_store_args', 'catalogd_args']
 
-class TestBreakpad(CustomClusterTestSuite):
-  """Check that breakpad integration into the daemons works as expected. This includes
-  writing minidump files on unhandled signals and rotating old minidumps on startup. The
-  tests kill the daemons by sending a SIGSEGV signal.
-  """
+class TestBreakpadBase(CustomClusterTestSuite):
+  """Base class with utility methods for all breakpad tests."""
   @classmethod
   def get_workload(cls):
     return 'functional-query'
 
   def setup_method(self, method):
-    if self.exploration_strategy() != 'exhaustive':
-      pytest.skip()
     # Override parent
     # The temporary directory gets removed in teardown_method() after each test.
     self.tmp_dir = tempfile.mkdtemp()
@@ -57,8 +52,6 @@ class TestBreakpad(CustomClusterTestSuite):
 
   @classmethod
   def setup_class(cls):
-    if cls.exploration_strategy() != 'exhaustive':
-      pytest.skip('breakpad tests only run in exhaustive')
     # Disable core dumps for this test
     setrlimit(RLIMIT_CORE, (0, RLIM_INFINITY))
 
@@ -147,6 +140,37 @@ class TestBreakpad(CustomClusterTestSuite):
         expected_count=expected_count)
     self.assert_impalad_log_contains('ERROR', 'Wrote minidump to ',
         expected_count=expected_count)
+
+class TestBreakpadCore(TestBreakpadBase):
+  """Core tests to check that the breakpad integration into the daemons works as
+  expected. This includes writing minidump when the daemons call abort(). Add tests here
+  that depend on functionality of Impala other than the breakpad integration itself.
+  """
+  @pytest.mark.execute_serially
+  def test_abort_writes_minidump(self):
+    """Check that abort() (e.g. hitting a DCHECK macro) writes a minidump."""
+    assert self.count_all_minidumps() == 0
+    failed_to_start = False
+    try:
+      # Calling with an unresolvable hostname will abort.
+      self.start_cluster_with_args(minidump_path=self.tmp_dir,
+          hostname="jhzvlthd")
+    except CalledProcessError:
+      failed_to_start = True
+    assert failed_to_start
+    assert self.count_minidumps('impalad') > 0
+
+
+class TestBreakpadExhaustive(TestBreakpadBase):
+  """Exhaustive tests to check that the breakpad integration into the daemons works as
+  expected. This includes writing minidump files on unhandled signals and rotating old
+  minidumps on startup.
+  """
+  @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('These breakpad tests only run in exhaustive')
+    super(TestBreakpadExhaustive, cls).setup_class()
 
   @pytest.mark.execute_serially
   def test_minidump_creation(self):
@@ -305,17 +329,3 @@ class TestBreakpad(CustomClusterTestSuite):
     reduced_minidump_size = self.trigger_single_minidump_and_get_size()
     # Check that the minidump file size has been reduced.
     assert reduced_minidump_size < full_minidump_size
-
-  @SkipIfBuildType.not_dev_build
-  @pytest.mark.execute_serially
-  def test_dcheck_writes_minidump(self):
-    """Check that hitting a DCHECK macro writes a minidump."""
-    assert self.count_all_minidumps() == 0
-    failed_to_start = False
-    try:
-      self.start_cluster_with_args(minidump_path=self.tmp_dir,
-          beeswax_port=1)
-    except CalledProcessError:
-      failed_to_start = True
-    assert failed_to_start
-    assert self.count_minidumps('impalad') > 0
