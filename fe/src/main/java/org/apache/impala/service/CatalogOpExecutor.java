@@ -1925,7 +1925,7 @@ public class CatalogOpExecutor {
     TableName tableName = tbl.getTableName();
     org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable().deepCopy();
     boolean ifNotExists = addPartParams.isIf_not_exists();
-    List<Partition> hmsPartitionsToAdd = Lists.newArrayList();
+    List<Partition> allHmsPartitionsToAdd = Lists.newArrayList();
     Map<List<String>, THdfsCachingOp> partitionCachingOpMap = Maps.newHashMap();
     for (TPartitionDef partParams: addPartParams.getPartitions()) {
       List<TPartitionKeyValue> partitionSpec = partParams.getPartition_spec();
@@ -1943,23 +1943,26 @@ public class CatalogOpExecutor {
 
       Partition hmsPartition = createHmsPartition(partitionSpec, msTbl, tableName,
           partParams.getLocation());
-      hmsPartitionsToAdd.add(hmsPartition);
+      allHmsPartitionsToAdd.add(hmsPartition);
 
       THdfsCachingOp cacheOp = partParams.getCache_op();
       if (cacheOp != null) partitionCachingOpMap.put(hmsPartition.getValues(), cacheOp);
     }
 
-    if (hmsPartitionsToAdd.isEmpty()) return null;
+    if (allHmsPartitionsToAdd.isEmpty()) return null;
 
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-      // Add partitions in bulk
-      List<Partition> addedHmsPartitions = null;
-      try {
-        addedHmsPartitions = msClient.getHiveClient().add_partitions(hmsPartitionsToAdd,
-            ifNotExists, true);
-      } catch (TException e) {
-        throw new ImpalaRuntimeException(
-            String.format(HMS_RPC_ERROR_FORMAT_STR, "add_partitions"), e);
+      List<Partition> addedHmsPartitions = Lists.newArrayList();
+
+      for (List<Partition> hmsSublist :
+          Lists.partition(allHmsPartitionsToAdd, MAX_PARTITION_UPDATES_PER_RPC)) {
+        try {
+          addedHmsPartitions.addAll(msClient.getHiveClient().add_partitions(hmsSublist,
+              ifNotExists, true));
+        } catch (TException e) {
+          throw new ImpalaRuntimeException(
+              String.format(HMS_RPC_ERROR_FORMAT_STR, "add_partitions"), e);
+        }
       }
 
       // Handle HDFS cache. This is done in a separate round bacause we have to apply
@@ -1970,8 +1973,8 @@ public class CatalogOpExecutor {
       // If 'ifNotExists' is true, add_partitions() may fail to add all the partitions to
       // HMS because some of them may already exist there. In that case, we load in the
       // catalog the partitions that already exist in HMS but aren't in the catalog yet.
-      if (hmsPartitionsToAdd.size() != addedHmsPartitions.size()) {
-        List<Partition> difference = computeDifference(hmsPartitionsToAdd,
+      if (allHmsPartitionsToAdd.size() != addedHmsPartitions.size()) {
+        List<Partition> difference = computeDifference(allHmsPartitionsToAdd,
             addedHmsPartitions);
         addedHmsPartitions.addAll(
             getPartitionsFromHms(msTbl, msClient, tableName, difference));
@@ -1982,8 +1985,8 @@ public class CatalogOpExecutor {
         // updated catalog version.
         addHdfsPartition(tbl, partition);
       }
-      return tbl;
     }
+    return tbl;
   }
 
   /**
@@ -2606,10 +2609,8 @@ public class CatalogOpExecutor {
     // Add partitions to metastore.
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       // Apply the updates in batches of 'MAX_PARTITION_UPDATES_PER_RPC'.
-      for (int i = 0; i < hmsPartitions.size(); i += MAX_PARTITION_UPDATES_PER_RPC) {
-        int endPartitionIndex =
-            Math.min(i + MAX_PARTITION_UPDATES_PER_RPC, hmsPartitions.size());
-        List<Partition> hmsSublist = hmsPartitions.subList(i, endPartitionIndex);
+      for (List<Partition> hmsSublist :
+          Lists.partition(hmsPartitions, MAX_PARTITION_UPDATES_PER_RPC)) {
         // ifNotExists and needResults are true.
         List<Partition> hmsAddedPartitions =
             msClient.getHiveClient().add_partitions(hmsSublist, true, true);
@@ -2935,16 +2936,15 @@ public class CatalogOpExecutor {
 
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       // Apply the updates in batches of 'MAX_PARTITION_UPDATES_PER_RPC'.
-      for (int i = 0; i < hmsPartitions.size(); i += MAX_PARTITION_UPDATES_PER_RPC) {
-        int endPartitionIndex =
-            Math.min(i + MAX_PARTITION_UPDATES_PER_RPC, hmsPartitions.size());
+      for (List<Partition> hmsPartitionsSubList :
+        Lists.partition(hmsPartitions, MAX_PARTITION_UPDATES_PER_RPC)) {
         try {
           // Alter partitions in bulk.
           MetastoreShim.alterPartitions(msClient.getHiveClient(), dbName, tableName,
-              hmsPartitions.subList(i, endPartitionIndex));
+              hmsPartitionsSubList);
           // Mark the corresponding HdfsPartition objects as dirty
           for (org.apache.hadoop.hive.metastore.api.Partition msPartition:
-              hmsPartitions.subList(i, endPartitionIndex)) {
+              hmsPartitionsSubList) {
             try {
               catalog_.getHdfsPartition(dbName, tableName, msPartition).markDirty();
             } catch (PartitionNotFoundException e) {

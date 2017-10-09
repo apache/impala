@@ -17,6 +17,7 @@
 
 import getpass
 import pytest
+import re
 import time
 
 from test_ddl_base import TestDdlBase
@@ -24,7 +25,7 @@ from tests.common.impala_test_suite import LOG
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import SkipIf, SkipIfADLS, SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
-from tests.util.filesystem_utils import WAREHOUSE, IS_HDFS, IS_LOCAL, IS_S3, IS_ADLS
+from tests.util.filesystem_utils import WAREHOUSE, IS_HDFS, IS_S3, IS_ADLS
 
 # Validates DDL statements (create, drop)
 class TestDdlStatements(TestDdlBase):
@@ -365,6 +366,26 @@ class TestDdlStatements(TestDdlBase):
     self.client.execute(
         "insert into table {0} partition(j=1, s='1') select 1".format(fq_tbl_name))
     assert '1' == self.execute_scalar("select count(*) from {0}".format(fq_tbl_name))
+
+  def test_alter_table_create_many_partitions(self, vector, unique_database):
+    """
+    Checks that creating more partitions than the MAX_PARTITION_UPDATES_PER_RPC
+    batch size works, in that it creates all the underlying partitions.
+    """
+    self.client.execute(
+        "create table {0}.t(i int) partitioned by (p int)".format(unique_database))
+    MAX_PARTITION_UPDATES_PER_RPC = 500
+    alter_stmt = "alter table {0}.t add ".format(unique_database) + " ".join(
+        "partition(p=%d)" % (i,) for i in xrange(MAX_PARTITION_UPDATES_PER_RPC + 2))
+    self.client.execute(alter_stmt)
+    partitions = self.client.execute("show partitions {0}.t".format(unique_database))
+    # Show partitions will contain partition HDFS paths, which we expect to contain
+    # "p=val" subdirectories for each partition. The regexp finds all the "p=[0-9]*"
+    # paths, converts them to integers, and checks that wehave all the ones we
+    # expect.
+    PARTITION_RE = re.compile("p=([0-9]+)")
+    assert map(int, PARTITION_RE.findall(str(partitions))) == \
+        range(MAX_PARTITION_UPDATES_PER_RPC + 2)
 
   def test_create_alter_tbl_properties(self, vector, unique_database):
     fq_tbl_name = unique_database + ".test_alter_tbl"
