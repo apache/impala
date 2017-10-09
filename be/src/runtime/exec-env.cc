@@ -160,12 +160,8 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int krpc_port,
     webserver_(new Webserver(webserver_port)),
     pool_mem_trackers_(new PoolMemTrackerRegistry),
     thread_mgr_(new ThreadResourceMgr),
-    hdfs_op_thread_pool_(
-        CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024)),
     tmp_file_mgr_(new TmpFileMgr),
     frontend_(new Frontend()),
-    exec_rpc_thread_pool_(new CallableThreadPool("exec-rpc-pool", "worker",
-        FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
     async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
     query_exec_mgr_(new QueryExecMgr()),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
@@ -191,6 +187,10 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int krpc_port,
       subscriber_address, statestore_address, metrics_.get()));
 
   if (FLAGS_is_coordinator) {
+    hdfs_op_thread_pool_.reset(
+        CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024));
+    exec_rpc_thread_pool_.reset(new CallableThreadPool("exec-rpc-pool", "worker",
+        FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max()));
     scheduler_.reset(new Scheduler(statestore_subscriber_.get(),
         statestore_subscriber_->id(), metrics_.get(), webserver_.get(),
         request_pool_service_.get()));
@@ -219,9 +219,11 @@ Status ExecEnv::InitForFeTests() {
 
 Status ExecEnv::Init() {
   // Initialize thread pools
-  RETURN_IF_ERROR(exec_rpc_thread_pool_->Init());
+  if (FLAGS_is_coordinator) {
+    RETURN_IF_ERROR(exec_rpc_thread_pool_->Init());
+    RETURN_IF_ERROR(hdfs_op_thread_pool_->Init());
+  }
   RETURN_IF_ERROR(async_rpc_pool_->Init());
-  RETURN_IF_ERROR(hdfs_op_thread_pool_->Init());
 
   // Initialize global memory limit.
   // Depending on the system configuration, we will have to calculate the process
