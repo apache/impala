@@ -110,16 +110,17 @@ def bootstrap(toolchain_root, packages):
   # Detect the compiler
   compiler = "gcc-{0}".format(os.environ["IMPALA_GCC_VERSION"])
 
-  for p in packages:
+  def handle_package(p):
     pkg_name, pkg_version = unpack_name_and_version(p)
     if check_for_existing_package(toolchain_root, pkg_name, pkg_version, compiler):
-      continue
+      return
     if pkg_name != "kudu" or os.environ["KUDU_IS_SUPPORTED"] == "true":
       download_package(toolchain_root, pkg_name, pkg_version, compiler)
     else:
       build_kudu_stub(toolchain_root, pkg_version, compiler)
     write_version_file(toolchain_root, pkg_name, pkg_version, compiler,
         get_platform_release_label())
+  execute_many(handle_package, packages)
 
 def check_output(cmd_args):
   """Run the command and return the output. Raise an exception if the command returns
@@ -300,6 +301,22 @@ extern "C" void %s() {
   finally:
     shutil.rmtree(stub_build_dir)
 
+def execute_many(f, args):
+  """
+  Executes f(a) for a in args. If possible, uses a threadpool
+  to execute in parallel. The pool uses the number of CPUs
+  in the system as the default size.
+  """
+  pool = None
+  try:
+    import multiprocessing.pool
+    pool = multiprocessing.pool.ThreadPool()
+    return pool.map(f, args, 1)
+  except ImportError:
+    # multiprocessing was introduced in Python 2.6.
+    # For older Pythons (CentOS 5), degrade to single-threaded execution:
+    return [ f(a) for a in args ]
+
 def download_cdh_components(toolchain_root, cdh_components):
   """Downloads and unpacks the CDH components into $CDH_COMPONENTS_HOME if not found."""
   cdh_components_home = os.getenv("CDH_COMPONENTS_HOME")
@@ -315,16 +332,19 @@ def download_cdh_components(toolchain_root, cdh_components):
   # The URL prefix of where CDH components live in S3.
   download_path_prefix = HOST + "/cdh_components/"
 
-  for component in cdh_components:
+
+  def download(component):
     pkg_name, pkg_version = unpack_name_and_version(component)
     pkg_directory = package_directory(cdh_components_home, pkg_name, pkg_version)
     if os.path.isdir(pkg_directory):
-      continue
+      return
 
     # Download the package if it doesn't exist
     file_name = "{0}-{1}.tar.gz".format(pkg_name, pkg_version)
     download_path = download_path_prefix + file_name
     wget_and_unpack_package(download_path, file_name, cdh_components_home, False)
+
+  execute_many(download, cdh_components)
 
 if __name__ == "__main__":
   """Validates the presence of $IMPALA_HOME and $IMPALA_TOOLCHAIN in the environment.-
@@ -350,9 +370,12 @@ if __name__ == "__main__":
   if not os.path.exists(toolchain_root):
     os.makedirs(toolchain_root)
 
-  packages = ["avro", "binutils", "boost", "breakpad", "bzip2", "cmake", "crcutil",
-      "flatbuffers", "gcc", "gflags", "glog", "gperftools", "gtest", "kudu", "libev",
-      "llvm", ("llvm", "3.9.1-asserts"), "lz4", "openldap", "openssl", "protobuf",
+  # LLVM and Kudu are the largest packages. Sort them first so that
+  # their download starts as soon as possible.
+  packages = ["llvm", ("llvm", "3.9.1-asserts"), "kudu",
+      "avro", "binutils", "boost", "breakpad", "bzip2", "cmake", "crcutil",
+      "flatbuffers", "gcc", "gflags", "glog", "gperftools", "gtest", "libev",
+      "lz4", "openldap", "openssl", "protobuf",
       "rapidjson", "re2", "snappy", "thrift", "tpc-h", "tpc-ds", "zlib"]
   bootstrap(toolchain_root, packages)
 
