@@ -30,7 +30,7 @@
 
 namespace impala {
 
-const int MAX_WIDTH = BitReader::MAX_BITWIDTH;
+const int MAX_WIDTH = BatchedBitReader::MAX_BITWIDTH;
 
 TEST(BitArray, TestBool) {
   const int len = 8;
@@ -69,29 +69,24 @@ TEST(BitArray, TestBool) {
   EXPECT_EQ((int)buffer[1], BOOST_BINARY(1 1 0 0 1 1 0 0));
 
   // Use the reader and validate
-  BitReader reader(buffer, len);
+  BatchedBitReader reader(buffer, len);
+
   // Ensure it returns the same results after Reset().
   for (int trial = 0; trial < 2; ++trial) {
-    for (int i = 0; i < 8; ++i) {
-      bool val = false;
-      bool result = reader.GetValue(1, &val);
-      EXPECT_TRUE(result);
-      EXPECT_EQ(val, i % 2);
-    }
+    bool batch_vals[16];
+    EXPECT_EQ(16, reader.UnpackBatch(1, 16, batch_vals));
+    for (int i = 0; i < 8; ++i)  EXPECT_EQ(batch_vals[i], i % 2);
 
     for (int i = 0; i < 8; ++i) {
-      bool val = false;
-      bool result = reader.GetValue(1, &val);
-      EXPECT_TRUE(result);
       switch (i) {
         case 0:
         case 1:
         case 4:
         case 5:
-          EXPECT_EQ(val, false);
+          EXPECT_EQ(batch_vals[8 + i], false);
           break;
         default:
-          EXPECT_EQ(val, true);
+          EXPECT_EQ(batch_vals[8 + i], true);
           break;
       }
     }
@@ -113,17 +108,30 @@ void TestBitArrayValues(int bit_width, int num_vals) {
   writer.Flush();
   EXPECT_EQ(writer.bytes_written(), len);
 
-  BitReader reader(buffer, len);
+  BatchedBitReader reader(buffer, len);
+  BatchedBitReader reader2(reader); // Test copy constructor.
   // Ensure it returns the same results after Reset().
   for (int trial = 0; trial < 2; ++trial) {
+    // Unpack all values at once with one batched reader and in small batches with the
+    // other batched reader.
+    vector<int64_t> batch_vals(num_vals);
+    const int BATCH_SIZE = 32;
+    vector<int64_t> batch_vals2(BATCH_SIZE);
+    EXPECT_EQ(num_vals,
+        reader.UnpackBatch(bit_width, num_vals, batch_vals.data()));
     for (int i = 0; i < num_vals; ++i) {
-      int64_t val;
-      bool result = reader.GetValue(bit_width, &val);
-      EXPECT_TRUE(result);
-      EXPECT_EQ(val, i % mod);
+      if (i % BATCH_SIZE == 0) {
+        int num_to_unpack = min(BATCH_SIZE, num_vals - i);
+        EXPECT_EQ(num_to_unpack,
+           reader2.UnpackBatch(bit_width, num_to_unpack, batch_vals2.data()));
+      }
+      EXPECT_EQ(i % mod, batch_vals[i]);
+      EXPECT_EQ(i % mod, batch_vals2[i % BATCH_SIZE]);
     }
     EXPECT_EQ(reader.bytes_left(), 0);
+    EXPECT_EQ(reader2.bytes_left(), 0);
     reader.Reset(buffer, len);
+    reader2.Reset(buffer, len);
   }
 }
 
@@ -137,45 +145,32 @@ TEST(BitArray, TestValues) {
   }
 }
 
-// Test some mixed values
-TEST(BitArray, TestMixed) {
-  const int len = 1024;
-  uint8_t buffer[len];
-  bool parity = true;
-
-  BitWriter writer(buffer, len);
-  for (int i = 0; i < len; ++i) {
-    bool result;
-    if (i % 2 == 0) {
-      result = writer.PutValue(parity, 1);
-      parity = !parity;
-    } else {
-      result = writer.PutValue(i, 10);
-    }
-    EXPECT_TRUE(result);
-  }
-  writer.Flush();
-
-  parity = true;
-  BitReader reader(buffer, len);
-  // Ensure it returns the same results after Reset().
-  for (int trial = 0; trial < 2; ++trial) {
-    for (int i = 0; i < len; ++i) {
-      bool result;
-      if (i % 2 == 0) {
-        bool val;
-        result = reader.GetValue(1, &val);
-        EXPECT_EQ(val, parity);
-        parity = !parity;
-      } else {
-        int val;
-        result = reader.GetValue(10, &val);
-        EXPECT_EQ(val, i);
+/// Get many values from a batch RLE decoder.
+template <typename T>
+static bool GetRleValues(RleBatchDecoder<T>* decoder, int num_vals, T* vals) {
+  int decoded = 0;
+  // Decode repeated and literal runs until we've filled the output.
+  while (decoded < num_vals) {
+    if (decoder->NextNumRepeats() > 0) {
+      EXPECT_EQ(0, decoder->NextNumLiterals());
+      int num_repeats_to_output =
+          min<int>(decoder->NextNumRepeats(), num_vals - decoded);
+      T repeated_val = decoder->GetRepeatedValue(num_repeats_to_output);
+      for (int i = 0; i < num_repeats_to_output; ++i) {
+        *vals = repeated_val;
+        ++vals;
       }
-      EXPECT_TRUE(result);
+      decoded += num_repeats_to_output;
+      continue;
     }
-    reader.Reset(buffer, len);
+    int num_literals_to_output =
+          min<int>(decoder->NextNumLiterals(), num_vals - decoded);
+    if (num_literals_to_output == 0) return false;
+    if (!decoder->GetLiteralValues(num_literals_to_output, vals)) return false;
+    decoded += num_literals_to_output;
+    vals += num_literals_to_output;
   }
+  return true;
 }
 
 // Validates encoding of values by encoding and decoding them.  If
@@ -203,16 +198,32 @@ void ValidateRle(const vector<int>& values, int bit_width,
   }
 
   // Verify read
-  RleDecoder decoder(buffer, len, bit_width);
+  RleBatchDecoder<uint64_t> decoder(buffer, len, bit_width);
+  RleBatchDecoder<uint64_t> decoder2(buffer, len, bit_width);
   // Ensure it returns the same results after Reset().
   for (int trial = 0; trial < 2; ++trial) {
     for (int i = 0; i < values.size(); ++i) {
       uint64_t val;
-      bool result = decoder.Get(&val);
-      EXPECT_TRUE(result);
-      EXPECT_EQ(values[i], val);
+      EXPECT_TRUE(decoder.GetSingleValue(&val));
+      EXPECT_EQ(values[i], val) << i;
+    }
+    // Unpack everything at once from the second batch decoder.
+    vector<uint64_t> decoded_values(values.size());
+    EXPECT_TRUE(GetRleValues(&decoder2, values.size(), decoded_values.data()));
+    for (int i = 0; i < values.size(); ++i) {
+      EXPECT_EQ(values[i], decoded_values[i]) << i;
     }
     decoder.Reset(buffer, len, bit_width);
+    decoder2.Reset(buffer, len, bit_width);
+  }
+}
+
+/// Basic test case for literal unpacking - two literals in a run.
+TEST(Rle, TwoLiteralRun) {
+  vector<int> values{1, 0};
+  ValidateRle(values, 1, nullptr, -1);
+  for (int width = 1; width <= MAX_WIDTH; ++width) {
+    ValidateRle(values, width, nullptr, -1);
   }
 }
 
@@ -287,16 +298,22 @@ TEST(Rle, BitWidthZeroRepeated) {
   uint8_t buffer[1];
   const int num_values = 15;
   buffer[0] = num_values << 1; // repeated indicator byte
-  RleDecoder decoder(buffer, sizeof(buffer), 0);
+  RleBatchDecoder<uint8_t> decoder(buffer, sizeof(buffer), 0);
   // Ensure it returns the same results after Reset().
   for (int trial = 0; trial < 2; ++trial) {
     uint8_t val;
     for (int i = 0; i < num_values; ++i) {
-      bool result = decoder.Get(&val);
-      EXPECT_TRUE(result);
-      EXPECT_EQ(val, 0); // can only encode 0s with bit width 0
+      EXPECT_TRUE(decoder.GetSingleValue(&val));
+      EXPECT_EQ(val, 0);
     }
-    EXPECT_FALSE(decoder.Get(&val));
+    EXPECT_FALSE(decoder.GetSingleValue(&val));
+
+    // Test decoding all values in a batch.
+    decoder.Reset(buffer, sizeof(buffer), 0);
+    uint8_t decoded_values[num_values];
+    EXPECT_TRUE(GetRleValues(&decoder, num_values, decoded_values));
+    for (int i = 0; i < num_values; i++) EXPECT_EQ(0, decoded_values[i]) << i;
+    EXPECT_FALSE(decoder.GetSingleValue(&val));
     decoder.Reset(buffer, sizeof(buffer), 0);
   }
 }
@@ -305,17 +322,23 @@ TEST(Rle, BitWidthZeroLiteral) {
   uint8_t buffer[1];
   const int num_groups = 4;
   buffer[0] = num_groups << 1 | 1; // literal indicator byte
-  RleDecoder decoder = RleDecoder(buffer, sizeof(buffer), 0);
+  RleBatchDecoder<uint8_t> decoder(buffer, sizeof(buffer), 0);
   // Ensure it returns the same results after Reset().
   for (int trial = 0; trial < 2; ++trial) {
     const int num_values = num_groups * 8;
     uint8_t val;
     for (int i = 0; i < num_values; ++i) {
-      bool result = decoder.Get(&val);
-      EXPECT_TRUE(result);
+      EXPECT_TRUE(decoder.GetSingleValue(&val));
       EXPECT_EQ(val, 0); // can only encode 0s with bit width 0
     }
-    EXPECT_FALSE(decoder.Get(&val));
+
+    // Test decoding the whole batch at once.
+    decoder.Reset(buffer, sizeof(buffer), 0);
+    uint8_t decoded_values[num_values];
+    EXPECT_TRUE(GetRleValues(&decoder, num_values, decoded_values));
+    for (int i = 0; i < num_values; ++i) EXPECT_EQ(0, decoded_values[i]);
+
+    EXPECT_FALSE(GetRleValues(&decoder, 1, decoded_values));
     decoder.Reset(buffer, sizeof(buffer), 0);
   }
 }
@@ -402,20 +425,25 @@ TEST(BitRle, Overflow) {
     EXPECT_LE(bytes_written, len);
     EXPECT_GT(num_added, 0);
 
-    RleDecoder decoder(buffer, bytes_written, bit_width);
+    RleBatchDecoder<uint32_t> decoder(buffer, bytes_written, bit_width);
     // Ensure it returns the same results after Reset().
     for (int trial = 0; trial < 2; ++trial) {
       parity = true;
       uint32_t v;
       for (int i = 0; i < num_added; ++i) {
-        bool result = decoder.Get(&v);
-        EXPECT_TRUE(result);
+        EXPECT_TRUE(decoder.GetSingleValue(&v));
         EXPECT_EQ(v, parity);
         parity = !parity;
       }
       // Make sure we get false when reading past end a couple times.
-      EXPECT_FALSE(decoder.Get(&v));
-      EXPECT_FALSE(decoder.Get(&v));
+      EXPECT_FALSE(decoder.GetSingleValue(&v));
+      EXPECT_FALSE(decoder.GetSingleValue(&v));
+
+      decoder.Reset(buffer, bytes_written, bit_width);
+      uint32_t decoded_values[num_added];
+      EXPECT_TRUE(GetRleValues(&decoder, num_added, decoded_values));
+      for (int i = 0; i < num_added; ++i) EXPECT_EQ(i % 2 == 0, decoded_values[i]) << i;
+
       decoder.Reset(buffer, bytes_written, bit_width);
     }
   }
@@ -426,21 +454,20 @@ TEST(BitRle, Overflow) {
 TEST(Rle, ZeroLiteralOrRepeatCount) {
   const int len = 1024;
   uint8_t buffer[len];
-  RleDecoder decoder(buffer, len, 0);
-  uint64_t val;
-
+  RleBatchDecoder<uint64_t> decoder(buffer, len, 0);
   // Test the RLE repeated values path.
   memset(buffer, 0, len);
   for (int i = 0; i < 10; ++i) {
-    bool result = decoder.Get(&val);
-    EXPECT_FALSE(result);
+    EXPECT_EQ(0, decoder.NextNumLiterals());
+    EXPECT_EQ(0, decoder.NextNumRepeats());
   }
 
   // Test the RLE literal values path
   memset(buffer, 1, len);
+  decoder.Reset(buffer, len, 0);
   for (int i = 0; i < 10; ++i) {
-    bool result = decoder.Get(&val);
-    EXPECT_FALSE(result);
+    EXPECT_EQ(0, decoder.NextNumLiterals());
+    EXPECT_EQ(0, decoder.NextNumRepeats());
   }
 }
 

@@ -77,6 +77,8 @@ Status ParquetLevelDecoder::Init(const string& filename,
     parquet::Encoding::type encoding, MemPool* cache_pool, int cache_size,
     int max_level, int num_buffered_values, uint8_t** data, int* data_size) {
   DCHECK_GE(num_buffered_values, 0);
+  DCHECK_GT(cache_size, 0);
+  cache_size = BitUtil::RoundUpToPowerOf2(cache_size, 32);
   encoding_ = encoding;
   max_level_ = max_level;
   num_buffered_values_ = num_buffered_values;
@@ -97,7 +99,7 @@ Status ParquetLevelDecoder::Init(const string& filename,
         return Status(TErrorCode::PARQUET_CORRUPT_RLE_BYTES, filename, num_bytes);
       }
       int bit_width = BitUtil::Log2Ceiling64(max_level + 1);
-      Reset(*data, num_bytes, bit_width);
+      rle_decoder_.Reset(*data, num_bytes, bit_width);
       break;
     }
     case parquet::Encoding::BIT_PACKED:
@@ -143,66 +145,80 @@ Status ParquetLevelDecoder::InitCache(MemPool* pool, int cache_size) {
 }
 
 inline int16_t ParquetLevelDecoder::ReadLevel() {
-  bool valid;
-  uint8_t level;
-  if (encoding_ == parquet::Encoding::RLE) {
-    valid = Get(&level);
-  } else {
-    DCHECK_EQ(encoding_, parquet::Encoding::BIT_PACKED);
-    valid = bit_reader_.GetValue(1, &level);
+  if (UNLIKELY(!CacheHasNext())) {
+    if (UNLIKELY(!FillCache(cache_size_, &num_cached_levels_))) {
+      return HdfsParquetScanner::INVALID_LEVEL;
+    }
+    DCHECK_GE(num_cached_levels_, 0);
+    if (UNLIKELY(num_cached_levels_ == 0)) {
+      return HdfsParquetScanner::INVALID_LEVEL;
+    }
   }
-  return LIKELY(valid) ? level : HdfsParquetScanner::INVALID_LEVEL;
+  return CacheGetNext();
 }
 
-Status ParquetLevelDecoder::CacheNextBatch(int batch_size) {
-  DCHECK_LE(batch_size, cache_size_);
-  cached_level_idx_ = 0;
+Status ParquetLevelDecoder::CacheNextBatch(int vals_remaining) {
+  /// Fill the cache completely if there are enough values remaining.
+  /// Otherwise don't try to read more values than are left.
+  int batch_size = min(vals_remaining, cache_size_);
   if (max_level_ > 0) {
-    if (UNLIKELY(!FillCache(batch_size, &num_cached_levels_))) {
+    if (UNLIKELY(!FillCache(batch_size, &num_cached_levels_) ||
+          num_cached_levels_ < batch_size)) {
       return Status(decoding_error_code_, num_buffered_values_, filename_);
     }
   } else {
     // No levels to read, e.g., because the field is required. The cache was
     // already initialized with all zeros, so we can hand out those values.
     DCHECK_EQ(max_level_, 0);
+    cached_level_idx_ = 0;
     num_cached_levels_ = batch_size;
   }
   return Status::OK();
 }
 
-bool ParquetLevelDecoder::FillCache(int batch_size,
-    int* num_cached_levels) {
-  DCHECK(num_cached_levels != NULL);
-  int num_values = 0;
+bool ParquetLevelDecoder::FillCache(int batch_size, int* num_cached_levels) {
+  DCHECK(!CacheHasNext());
+  DCHECK(num_cached_levels != nullptr);
+  DCHECK_GE(max_level_, 0);
+  DCHECK_EQ(num_cached_levels_ % 32, 0) << "Last batch was not a multiple of 32";
+  cached_level_idx_ = 0;
+  if (max_level_ == 0) {
+    // No levels to read, e.g., because the field is required. The cache was
+    // already initialized with all zeros, so we can hand out those values.
+    *num_cached_levels = batch_size;
+    return true;
+  }
   if (encoding_ == parquet::Encoding::RLE) {
-    while (true) {
-      // Add RLE encoded values by repeating the current value this number of times.
-      uint32_t num_repeats_to_set =
-          min<uint32_t>(repeat_count_, batch_size - num_values);
-      memset(cached_levels_ + num_values, current_value_, num_repeats_to_set);
-      num_values += num_repeats_to_set;
-      repeat_count_ -= num_repeats_to_set;
-
-      // Add remaining literal values, if any.
-      uint32_t num_literals_to_set =
-          min<uint32_t>(literal_count_, batch_size - num_values);
-      int num_values_end = min<uint32_t>(num_values + literal_count_, batch_size);
-      for (; num_values < num_values_end; ++num_values) {
-        bool valid = bit_reader_.GetValue(bit_width_, &cached_levels_[num_values]);
-        if (UNLIKELY(!valid || cached_levels_[num_values] > max_level_)) return false;
-      }
-      literal_count_ -= num_literals_to_set;
-
-      if (num_values == batch_size) break;
-      if (UNLIKELY(!NextCounts<int16_t>())) return false;
-      if (repeat_count_ > 0 && current_value_ > max_level_) return false;
-    }
+    return FillCacheRle(batch_size, num_cached_levels);
   } else {
     DCHECK_EQ(encoding_, parquet::Encoding::BIT_PACKED);
-    for (; num_values < batch_size; ++num_values) {
-      bool valid = bit_reader_.GetValue(1, &cached_levels_[num_values]);
-      if (UNLIKELY(!valid || cached_levels_[num_values] > max_level_)) return false;
+    *num_cached_levels = bit_reader_.UnpackBatch(1, batch_size, cached_levels_);
+    return true;
+  }
+}
+
+bool ParquetLevelDecoder::FillCacheRle(int batch_size, int* num_cached_levels) {
+  int num_values = 0;
+  while (num_values < batch_size) {
+    // Add RLE encoded values by repeating the current value this number of times.
+    uint32_t num_repeats = rle_decoder_.NextNumRepeats();
+    if (num_repeats > 0) {
+      uint32_t num_repeats_to_set = min<uint32_t>(num_repeats, batch_size - num_values);
+      uint8_t repeated_value = rle_decoder_.GetRepeatedValue(num_repeats_to_set);
+      memset(cached_levels_ + num_values, repeated_value, num_repeats_to_set);
+      num_values += num_repeats_to_set;
+      continue;
     }
+
+    // Add remaining literal values, if any.
+    uint32_t num_literals = rle_decoder_.NextNumLiterals();
+    if (num_literals == 0) break;
+    uint32_t num_literals_to_set = min<uint32_t>(num_literals, batch_size - num_values);
+    if (!rle_decoder_.GetLiteralValues(
+          num_literals_to_set, &cached_levels_[num_values])) {
+      return false;
+    }
+    num_values += num_literals_to_set;
   }
   *num_cached_levels = num_values;
   return true;
@@ -282,9 +298,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
     // NextLevels() should have already been called and def and rep levels should be in
     // valid range.
     DCHECK_GE(rep_level_, 0);
-    DCHECK_LE(rep_level_, max_rep_level());
     DCHECK_GE(def_level_, 0);
-    DCHECK_LE(def_level_, max_def_level());
     DCHECK_GE(def_level_, def_level_of_immediate_repeated_ancestor()) <<
         "Caller should have called NextLevels() until we are ready to read a value";
 
@@ -330,6 +344,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
     int val_count = 0;
     bool continue_execution = true;
     while (val_count < max_values && !RowGroupAtEnd() && continue_execution) {
+      DCHECK_GE(num_buffered_values_, 0);
       // Read next page if necessary.
       if (num_buffered_values_ == 0) {
         if (!NextPage()) {
@@ -338,25 +353,28 @@ class ScalarColumnReader : public BaseScalarColumnReader {
         }
       }
 
-      // Fill def/rep level caches if they are empty.
-      int level_batch_size = min(parent_->state_->batch_size(), num_buffered_values_);
-      if (!def_levels_.CacheHasNext()) {
-        parent_->parse_status_.MergeStatus(def_levels_.CacheNextBatch(level_batch_size));
-      }
-      // We only need the repetition levels for populating the position slot since we
-      // are only populating top-level tuples.
-      if (IN_COLLECTION && pos_slot_desc_ != NULL && !rep_levels_.CacheHasNext()) {
-        parent_->parse_status_.MergeStatus(rep_levels_.CacheNextBatch(level_batch_size));
-      }
-      if (UNLIKELY(!parent_->parse_status_.ok())) return false;
-
-      // This special case is most efficiently handled here directly.
+      // Not materializing anything - skip decoding any levels and rely on the value
+      // count from page metadata to return the correct number of rows.
       if (!MATERIALIZED && !IN_COLLECTION) {
-        int vals_to_add = min(def_levels_.CacheRemaining(), max_values - val_count);
+        int vals_to_add = min(num_buffered_values_, max_values - val_count);
         val_count += vals_to_add;
-        def_levels_.CacheSkipLevels(vals_to_add);
         num_buffered_values_ -= vals_to_add;
         continue;
+      }
+      // Fill the rep level cache if needed. We are flattening out the fields of the
+      // nested collection into the top-level tuple returned by the scan, so we don't
+      // care about the nesting structure unless the position slot is being populated.
+      if (IN_COLLECTION && pos_slot_desc_ != nullptr && !rep_levels_.CacheHasNext()) {
+        parent_->parse_status_.MergeStatus(
+            rep_levels_.CacheNextBatch(num_buffered_values_));
+        if (UNLIKELY(!parent_->parse_status_.ok())) return false;
+      }
+
+      // Fill def level cache if needed.
+      if (!def_levels_.CacheHasNext()) {
+        // TODO: add a fast path here if there's a run of repeated values.
+        parent_->parse_status_.MergeStatus(
+            def_levels_.CacheNextBatch(num_buffered_values_));
       }
 
       // Read data page and cached levels to materialize values.
@@ -685,7 +703,9 @@ class BoolColumnReader : public BaseScalarColumnReader {
 
   virtual Status InitDataPage(uint8_t* data, int size) {
     // Initialize bool decoder
-    bool_values_ = BitReader(data, size);
+    bool_values_.Reset(data, size);
+    num_unpacked_values_ = 0;
+    unpacked_value_idx_ = 0;
     return Status::OK();
   }
 
@@ -695,9 +715,7 @@ class BoolColumnReader : public BaseScalarColumnReader {
     DCHECK(slot_desc_ != NULL);
     // Def and rep levels should be in valid range.
     DCHECK_GE(rep_level_, 0);
-    DCHECK_LE(rep_level_, max_rep_level());
     DCHECK_GE(def_level_, 0);
-    DCHECK_LE(def_level_, max_def_level());
     DCHECK_GE(def_level_, def_level_of_immediate_repeated_ancestor()) <<
         "Caller should have called NextLevels() until we are ready to read a value";
 
@@ -719,14 +737,38 @@ class BoolColumnReader : public BaseScalarColumnReader {
   template<bool IN_COLLECTION>
   inline bool ReadSlot(Tuple* tuple, MemPool* pool)  {
     void* slot = tuple->GetSlot(tuple_offset_);
-    if (!bool_values_.GetValue(1, reinterpret_cast<bool*>(slot))) {
-      parent_->parse_status_ = Status("Invalid bool column.");
-      return false;
+    bool val;
+    if (unpacked_value_idx_ < num_unpacked_values_) {
+      val = unpacked_values_[unpacked_value_idx_++];
+    } else {
+      // Unpack as many values as we can into the buffer. We expect to read at least one
+      // value.
+      int num_unpacked =
+          bool_values_.UnpackBatch(1, UNPACKED_BUFFER_LEN, &unpacked_values_[0]);
+      if (UNLIKELY(num_unpacked == 0)) {
+        parent_->parse_status_ = Status("Invalid bool column.");
+        return false;
+      }
+      val = unpacked_values_[0];
+      num_unpacked_values_ = num_unpacked;
+      unpacked_value_idx_ = 1;
     }
+    *reinterpret_cast<bool*>(slot) = val;
     return NextLevels<IN_COLLECTION>();
   }
 
-  BitReader bool_values_;
+  /// A buffer to store unpacked values. Must be a multiple of 32 size to use the
+  /// batch-oriented interface of BatchedBitReader.
+  static const int UNPACKED_BUFFER_LEN = 128;
+  bool unpacked_values_[UNPACKED_BUFFER_LEN];
+
+  /// The number of valid values in 'unpacked_values_'.
+  int num_unpacked_values_ = 0;
+
+  /// The next value to return from 'unpacked_values_'.
+  int unpacked_value_idx_ = 0;
+
+  BatchedBitReader bool_values_;
 };
 
 // Change 'val_count' to zero to exercise IMPALA-5197. This verifies the error handling

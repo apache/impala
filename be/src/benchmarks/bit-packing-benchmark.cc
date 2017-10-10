@@ -285,6 +285,126 @@ struct BenchmarkParams {
   int64_t data_len;
 };
 
+/// Legacy value-at-a-time implementation of bit unpacking. Retained here for
+/// purposes of comparison in the benchmark.
+class BitReader {
+ public:
+  /// 'buffer' is the buffer to read from.  The buffer's length is 'buffer_len'.
+  /// Does not take ownership of the buffer.
+  BitReader(const uint8_t* buffer, int buffer_len) { Reset(buffer, buffer_len); }
+
+  BitReader() : buffer_(NULL), max_bytes_(0) {}
+
+  // The implicit copy constructor is left defined. If a BitReader is copied, the
+  // two copies do not share any state. Invoking functions on either copy continues
+  // reading from the current read position without modifying the state of the other
+  // copy.
+
+  /// Resets the read to start reading from the start of 'buffer'. The buffer's
+  /// length is 'buffer_len'. Does not take ownership of the buffer.
+  void Reset(const uint8_t* buffer, int buffer_len) {
+    buffer_ = buffer;
+    max_bytes_ = buffer_len;
+    byte_offset_ = 0;
+    bit_offset_ = 0;
+    int num_bytes = std::min(8, max_bytes_);
+    memcpy(&buffered_values_, buffer_, num_bytes);
+  }
+
+  /// Gets the next value from the buffer.  Returns true if 'v' could be read or false if
+  /// there are not enough bytes left. num_bits must be <= 32.
+  template<typename T>
+  bool GetValue(int num_bits, T* v);
+
+  /// Reads a 'num_bytes'-sized value from the buffer and stores it in 'v'. T needs to be a
+  /// little-endian native type and big enough to store 'num_bytes'. The value is assumed
+  /// to be byte-aligned so the stream will be advanced to the start of the next byte
+  /// before 'v' is read. Returns false if there are not enough bytes left.
+  template<typename T>
+  bool GetBytes(int num_bytes, T* v);
+
+  /// Returns the number of bytes left in the stream, not including the current byte (i.e.,
+  /// there may be an additional fraction of a byte).
+  int bytes_left() { return max_bytes_ - (byte_offset_ + BitUtil::Ceil(bit_offset_, 8)); }
+
+  /// Maximum supported bitwidth for reader.
+  static const int MAX_BITWIDTH = 32;
+
+ private:
+  const uint8_t* buffer_;
+  int max_bytes_;
+
+  /// Bytes are memcpy'd from buffer_ and values are read from this variable. This is
+  /// faster than reading values byte by byte directly from buffer_.
+  uint64_t buffered_values_;
+
+  int byte_offset_;       // Offset in buffer_
+  int bit_offset_;        // Offset in buffered_values_
+};
+
+template <typename T>
+bool BitReader::GetValue(int num_bits, T* v) {
+  DCHECK(num_bits == 0 || buffer_ != NULL);
+  // TODO: revisit this limit if necessary
+  DCHECK_LE(num_bits, MAX_BITWIDTH);
+  DCHECK_LE(num_bits, sizeof(T) * 8);
+
+  // First do a cheap check to see if we may read past the end of the stream, using
+  // constant upper bounds for 'bit_offset_' and 'num_bits'.
+  if (UNLIKELY(byte_offset_ + sizeof(buffered_values_) + MAX_BITWIDTH / 8 > max_bytes_)) {
+    // Now do the precise check.
+    if (UNLIKELY(byte_offset_ * 8 + bit_offset_ + num_bits > max_bytes_ * 8)) {
+      return false;
+    }
+  }
+
+  DCHECK_GE(bit_offset_, 0);
+  DCHECK_LE(bit_offset_, 64);
+  *v = BitUtil::TrailingBits(buffered_values_, bit_offset_ + num_bits) >> bit_offset_;
+
+  bit_offset_ += num_bits;
+  if (bit_offset_ >= 64) {
+    byte_offset_ += 8;
+    bit_offset_ -= 64;
+
+    int bytes_remaining = max_bytes_ - byte_offset_;
+    if (LIKELY(bytes_remaining >= 8)) {
+      memcpy(&buffered_values_, buffer_ + byte_offset_, 8);
+    } else {
+      memcpy(&buffered_values_, buffer_ + byte_offset_, bytes_remaining);
+    }
+
+    // Read bits of v that crossed into new buffered_values_
+    *v |= BitUtil::TrailingBits(buffered_values_, bit_offset_)
+          << (num_bits - bit_offset_);
+  }
+  DCHECK_LE(bit_offset_, 64);
+  return true;
+}
+
+template<typename T>
+bool BitReader::GetBytes(int num_bytes, T* v) {
+  DCHECK_LE(num_bytes, sizeof(T));
+  int bytes_read = BitUtil::Ceil(bit_offset_, 8);
+  if (UNLIKELY(byte_offset_ + bytes_read + num_bytes > max_bytes_)) return false;
+
+  // Advance byte_offset to next unread byte and read num_bytes
+  byte_offset_ += bytes_read;
+  *v = 0; // Ensure unset bytes are initialized to zero.
+  memcpy(v, buffer_ + byte_offset_, num_bytes);
+  byte_offset_ += num_bytes;
+
+  // Reset buffered_values_
+  bit_offset_ = 0;
+  int bytes_remaining = max_bytes_ - byte_offset_;
+  if (LIKELY(bytes_remaining >= 8)) {
+    memcpy(&buffered_values_, buffer_ + byte_offset_, 8);
+  } else {
+    memcpy(&buffered_values_, buffer_ + byte_offset_, bytes_remaining);
+  }
+  return true;
+}
+
 /// Benchmark calling BitReader::GetValue() in a loop to unpack 32 * 'batch_size' values.
 void BitReaderBenchmark(int batch_size, void* data) {
   const BenchmarkParams* p = reinterpret_cast<BenchmarkParams*>(data);

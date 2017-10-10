@@ -22,6 +22,7 @@
 
 #include "exec/hdfs-parquet-scanner.h"
 #include "util/codec.h"
+#include "util/bit-stream-utils.h"
 #include "util/dict-encoding.h"
 #include "util/rle-encoding.h"
 
@@ -36,39 +37,34 @@ class MemPool;
 /// depth of 100, as enforced by the FE. Using a small type saves memory and speeds up
 /// populating the level cache (e.g., with RLE we can memset() repeated values).
 ///
-/// Inherits from RleDecoder instead of containing one for performance reasons.
-/// The containment design would require two BitReaders per column reader. The extra
-/// BitReader causes enough bloat for a column reader to require another cache line.
-/// TODO: It is not clear whether the inheritance vs. containment choice still makes
-/// sense with column-wise materialization. The containment design seems cleaner and
-/// we should revisit.
-class ParquetLevelDecoder : public RleDecoder {
+/// TODO: expose whether we're in a run of repeated values so that callers can
+/// optimise for that case.
+class ParquetLevelDecoder {
  public:
   ParquetLevelDecoder(bool is_def_level_decoder)
-    : cached_levels_(NULL),
-      num_cached_levels_(0),
-      cached_level_idx_(0),
-      encoding_(parquet::Encoding::PLAIN),
-      max_level_(0),
-      cache_size_(0),
-      num_buffered_values_(0),
-      decoding_error_code_(is_def_level_decoder ?
+    : decoding_error_code_(is_def_level_decoder ?
           TErrorCode::PARQUET_DEF_LEVEL_ERROR : TErrorCode::PARQUET_REP_LEVEL_ERROR) {
   }
 
   /// Initialize the LevelDecoder. Reads and advances the provided data buffer if the
-  /// encoding requires reading metadata from the page header.
+  /// encoding requires reading metadata from the page header. 'cache_size' will be
+  /// rounded up to a multiple of 32 internally.
   Status Init(const string& filename, parquet::Encoding::type encoding,
       MemPool* cache_pool, int cache_size, int max_level, int num_buffered_values,
       uint8_t** data, int* data_size);
 
-  /// Returns the next level or INVALID_LEVEL if there was an error.
+  /// Returns the next level or INVALID_LEVEL if there was an error. Not as efficient
+  /// as batched methods.
   inline int16_t ReadLevel();
 
-  /// Decodes and caches the next batch of levels. Resets members associated with the
-  /// cache. Returns a non-ok status if there was a problem decoding a level, or if a
-  /// level was encountered with a value greater than max_level_.
-  Status CacheNextBatch(int batch_size);
+  /// Decodes and caches the next batch of levels given that there are 'vals_remaining'
+  /// values left to decode in the page. Resets members associated with the cache.
+  /// Returns a non-ok status if there was a problem decoding a level, if a level was
+  /// encountered with a value greater than max_level_, or if fewer than
+  /// min(CacheSize(), vals_remaining) levels could be read, which indicates that the
+  /// input did not have the expected number of values. Only valid to call when
+  /// the cache has been exhausted, i.e. CacheHasNext() is false.
+  Status CacheNextBatch(int vals_remaining);
 
   /// Functions for working with the level cache.
   inline bool CacheHasNext() const { return cached_level_idx_ < num_cached_levels_; }
@@ -83,33 +79,57 @@ class ParquetLevelDecoder : public RleDecoder {
   inline int CacheSize() const { return num_cached_levels_; }
   inline int CacheRemaining() const { return num_cached_levels_ - cached_level_idx_; }
   inline int CacheCurrIdx() const { return cached_level_idx_; }
-
  private:
   /// Initializes members associated with the level cache. Allocates memory for
   /// the cache from pool, if necessary.
   Status InitCache(MemPool* pool, int cache_size);
 
-  /// Decodes and writes a batch of levels into the cache. Sets the number of
-  /// values written to the cache in *num_cached_levels. Returns false if there was
-  /// an error decoding a level or if there was a level value greater than max_level_.
+  /// Decodes and writes a batch of levels into the cache. Returns true and sets
+  /// the number of values written to the cache via *num_cached_levels if no errors
+  /// are encountered. *num_cached_levels is < 'batch_size' in this case iff the
+  /// end of input was hit without any other errors. Returns false if there was an
+  /// error decoding a level or if there was an invalid level value greater than
+  /// 'max_level_'. Only valid to call when the cache has been exhausted, i.e.
+  /// CacheHasNext() is false.
   bool FillCache(int batch_size, int* num_cached_levels);
 
-  /// Buffer for a batch of levels. The memory is allocated and owned by a pool in
-  /// passed in Init().
-  uint8_t* cached_levels_;
+  /// Implementation of FillCache() for RLE encoding.
+  bool FillCacheRle(int batch_size, int* num_cached_levels);
+
+  /// RLE decoder, used if 'encoding_' is RLE.
+  RleBatchDecoder<uint8_t> rle_decoder_;
+
+  /// Bit unpacker, used if 'encoding_' is BIT_PACKED.
+  BatchedBitReader bit_reader_;
+
+  /// Buffer for a batch of levels. The memory is allocated and owned by a pool passed
+  /// in Init().
+  uint8_t* cached_levels_ = nullptr;
+
   /// Number of valid level values in the cache.
-  int num_cached_levels_;
+  int num_cached_levels_ = 0;
+
   /// Current index into cached_levels_.
-  int cached_level_idx_;
-  parquet::Encoding::type encoding_;
+  int cached_level_idx_ = 0;
+
+  /// The parquet encoding used for the levels. Usually RLE but the deprecated BIT_PACKED
+  /// encoding is also allowed.
+  parquet::Encoding::type encoding_ = parquet::Encoding::PLAIN;
 
   /// For error checking and reporting.
-  int max_level_;
-  /// Number of level values cached_levels_ has memory allocated for.
-  int cache_size_;
+  int max_level_ = 0;
+
+  /// Number of level values cached_levels_ has memory allocated for. Always
+  /// a multiple of 32 to allow reading directly from 'bit_reader_' in batches.
+  int cache_size_ = 0;
+
   /// Number of remaining data values in the current data page.
-  int num_buffered_values_;
+  int num_buffered_values_ = 0;
+
+  /// Name of the parquet file. Used for reporting level decoding errors.
   string filename_;
+
+  /// Error code to use when reporting level decoding errors.
   TErrorCode::type decoding_error_code_;
 };
 

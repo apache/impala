@@ -49,6 +49,7 @@ using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
 using namespace apache::thrift;
 using namespace parquet;
+using impala::RleBatchDecoder;
 using std::min;
 
 using impala::PARQUET_VERSION_NUMBER;
@@ -119,15 +120,6 @@ string GetSchema(const FileMetaData& md) {
   return ss.str();
 }
 
-// Inherit from RleDecoder to get access to repeat_count_, which is protected.
-class ParquetLevelReader : public impala::RleDecoder {
- public:
-  ParquetLevelReader(uint8_t* buffer, int buffer_len, int bit_width)
-    : RleDecoder(buffer, buffer_len, bit_width) {}
-
-  uint32_t repeat_count() const { return repeat_count_; }
-};
-
 // Performs sanity checking on the contents of data pages, to ensure that:
 //   - Compressed pages can be uncompressed successfully.
 //   - The number of def levels matches num_values in the page header when using RLE.
@@ -163,18 +155,19 @@ int CheckDataPage(const ColumnChunk& col, const PageHeader& header, const uint8_
     // Parquet data pages always start with the encoded definition level data, and
     // RLE sections in Parquet always start with a 4 byte length followed by the data.
     int num_def_level_bytes = *reinterpret_cast<const int32_t*>(data);
-    ParquetLevelReader def_levels(const_cast<uint8_t*>(data) + sizeof(int32_t),
+    RleBatchDecoder<uint8_t> def_levels(const_cast<uint8_t*>(data) + sizeof(int32_t),
         num_def_level_bytes, sizeof(uint8_t));
     uint8_t level;
     for (int i = 0; i < header.data_page_header.num_values; ++i) {
-      if (!def_levels.Get(&level)) {
+      if (!def_levels.GetSingleValue(&level)) {
         cerr << "Error: Decoding of def levels failed.\n";
         exit(1);
       }
 
-      if (i + def_levels.repeat_count() + 1 > header.data_page_header.num_values) {
-        cerr << "Error: More def levels encoded (" << (i + def_levels.repeat_count() + 1)
-             << ") than num_values (" << header.data_page_header.num_values << ").\n";
+      if (i + def_levels.NextNumRepeats() + 1 > header.data_page_header.num_values) {
+        cerr << "Error: More def levels encoded ("
+              << (i + def_levels.NextNumRepeats() + 1) << ") than num_values ("
+              << header.data_page_header.num_values << ").\n";
         exit(1);
       }
     }

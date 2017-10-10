@@ -174,13 +174,16 @@ class DictDecoderBase {
     DCHECK_GE(buffer_len, 0);
     if (UNLIKELY(buffer_len == 0)) return Status("Dictionary cannot be 0 bytes");
     uint8_t bit_width = *buffer;
-    if (UNLIKELY(bit_width < 0 || bit_width > BitReader::MAX_BITWIDTH)) {
+    if (UNLIKELY(bit_width < 0 || bit_width > BatchedBitReader::MAX_BITWIDTH)) {
       return Status(strings::Substitute("Dictionary has invalid or unsupported bit "
           "width: $0", bit_width));
     }
     ++buffer;
     --buffer_len;
     data_decoder_.Reset(buffer, buffer_len, bit_width);
+    num_repeats_ = 0;
+    num_literal_values_ = 0;
+    next_literal_idx_ = 0;
     return Status::OK();
   }
 
@@ -193,7 +196,22 @@ class DictDecoderBase {
   virtual void GetValue(int index, void* buffer) = 0;
 
  protected:
-  RleDecoder data_decoder_;
+  /// Number of decoded values to buffer at a time. A multiple of 32 is chosen to allow
+  /// efficient reading in batches from data_decoder_. Increasing the batch size up to
+  /// 128 seems to improve performance, but increasing further did not make a noticeable
+  /// difference.
+  static const int DECODED_BUFFER_SIZE = 128;
+
+  RleBatchDecoder<uint32_t> data_decoder_;
+
+  /// Greater than zero if we've started decoding a repeated run.
+  int64_t num_repeats_ = 0;
+
+  /// Greater than zero if we have buffered some literal values.
+  int num_literal_values_ = 0;
+
+  /// The index of the next decoded value to return.
+  int next_literal_idx_ = 0;
 };
 
 template<typename T>
@@ -211,7 +229,7 @@ class DictDecoder : public DictDecoderBase {
   /// Returns true if the dictionary values were all successfully decoded, or false
   /// if the dictionary was corrupt.
   template<parquet::Type::type PARQUET_TYPE>
-  bool Reset(uint8_t* dict_buffer, int dict_len, int fixed_len_size);
+  bool Reset(uint8_t* dict_buffer, int dict_len, int fixed_len_size) WARN_UNUSED_RESULT;
 
   virtual int num_entries() const { return dict_.size(); }
 
@@ -219,17 +237,26 @@ class DictDecoder : public DictDecoderBase {
     T* val_ptr = reinterpret_cast<T*>(buffer);
     DCHECK_GE(index, 0);
     DCHECK_LT(index, dict_.size());
-    // TODO: is there any circumstance where this should be a memcpy?
     *val_ptr = dict_[index];
   }
 
   /// Returns the next value.  Returns false if the data is invalid.
   /// For StringValues, this does not make a copy of the data.  Instead,
   /// the string data is from the dictionary buffer passed into the c'tor.
-  bool GetNextValue(T* value);
+  bool GetNextValue(T* value) WARN_UNUSED_RESULT;
 
  private:
   std::vector<T> dict_;
+
+  /// Decoded values, buffered to allow caller to consume one-by-one. If in the middle of
+  /// a repeated run, the first element is the current dict value. If in a literal run,
+  /// this contains 'num_literal_values_' values, with the next value to be returned at
+  /// 'next_literal_idx_'.
+  T decoded_values_[DECODED_BUFFER_SIZE];
+
+  /// Slow path for GetNextValue() where we need to decode new values. Should not be
+  /// inlined everywhere.
+  bool DecodeNextValue(T* value);
 };
 
 template<typename T>
@@ -290,30 +317,47 @@ inline int DictEncoder<StringValue>::AddToTable(const StringValue& value,
 // Force inlining - GCC does not always inline this into hot loops in Parquet scanner.
 template <typename T>
 ALWAYS_INLINE inline bool DictDecoder<T>::GetNextValue(T* value) {
-  int index = -1; // Initialize to avoid compiler warning.
-  bool result = data_decoder_.Get(&index);
-  // Use & to avoid branches.
-  if (LIKELY(result & (index >= 0) & (index < dict_.size()))) {
-    *value = dict_[index];
+  // IMPALA-959: Use memcpy() instead of '=' to set *value: addresses are not always 16
+  // byte aligned for Decimal16Values.
+  if (num_repeats_ > 0) {
+    --num_repeats_;
+    memcpy(value, &decoded_values_[0], sizeof(T));
+    return true;
+  } else if (next_literal_idx_ < num_literal_values_) {
+    int idx = next_literal_idx_++;
+    memcpy(value, &decoded_values_[idx], sizeof(T));
     return true;
   }
-  return false;
+  // No decoded values left - need to decode some more.
+  return DecodeNextValue(value);
 }
 
-// Force inlining - GCC does not always inline this into hot loops in Parquet scanner.
-template <>
-ALWAYS_INLINE inline bool DictDecoder<Decimal16Value>::GetNextValue(
-    Decimal16Value* value) {
-  int index;
-  bool result = data_decoder_.Get(&index);
-  if (!result) return false;
-  if (index >= dict_.size()) return false;
-  // Workaround for IMPALA-959. Use memcpy instead of '=' so addresses
-  // do not need to be 16 byte aligned.
-  uint8_t* addr = reinterpret_cast<uint8_t*>(dict_.data());
-  addr = addr + index * sizeof(*value);
-  memcpy(value, addr, sizeof(*value));
-  return true;
+template <typename T>
+bool DictDecoder<T>::DecodeNextValue(T* value) {
+  // IMPALA-959: Use memcpy() instead of '=' to set *value: addresses are not always 16
+  // byte aligned for Decimal16Values.
+  uint32_t num_repeats = data_decoder_.NextNumRepeats();
+  if (num_repeats > 0) {
+    uint32_t idx = data_decoder_.GetRepeatedValue(num_repeats);
+    if (UNLIKELY(idx >= dict_.size())) return false;
+    memcpy(&decoded_values_[0], &dict_[idx], sizeof(T));
+    memcpy(value, &decoded_values_[0], sizeof(T));
+    num_repeats_ = num_repeats - 1;
+    return true;
+  } else {
+    uint32_t num_literals = data_decoder_.NextNumLiterals();
+    if (UNLIKELY(num_literals == 0)) return false;
+
+    uint32_t num_to_decode = std::min<uint32_t>(num_literals, DECODED_BUFFER_SIZE);
+    if (UNLIKELY(!data_decoder_.DecodeLiteralValues(
+            num_to_decode, dict_.data(), dict_.size(), &decoded_values_[0]))) {
+      return false;
+    }
+    num_literal_values_ = num_to_decode;
+    memcpy(value, &decoded_values_[0], sizeof(T));
+    next_literal_idx_ = 1;
+    return true;
+  }
 }
 
 template<typename T>
