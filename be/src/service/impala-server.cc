@@ -1169,8 +1169,8 @@ void ImpalaServer::ReportExecStatus(
     // cancellation is happening). Return an error to the caller to get it to stop.
     const string& err = Substitute("ReportExecStatus(): Received report for unknown "
         "query ID (probably closed or cancelled): $0", PrintId(params.query_id));
-    Status(TErrorCode::INTERNAL_ERROR, err).SetTStatus(&return_val);
-    //VLOG_QUERY << err;
+    VLOG(1) << err;
+    Status::Expected(err).SetTStatus(&return_val);
     return;
   }
   request_state->coord()->UpdateBackendExecStatus(params).SetTStatus(&return_val);

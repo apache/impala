@@ -69,8 +69,13 @@ Status ThriftClientImpl::Open() {
       VLOG(1) << "Error closing socket to: " << address_ << ", ignoring (" << e.what()
                 << ")";
     }
-    return Status(Substitute("Couldn't open transport for $0 ($1)",
-        lexical_cast<string>(address_), e.what()));
+    // In certain cases in which the remote host is overloaded, this failure can
+    // happen quite frequently. Let's print this error message without the stack
+    // trace as there aren't many callers of this function.
+    const string& err_msg = Substitute("Couldn't open transport for $0 ($1)",
+        lexical_cast<string>(address_), e.what());
+    VLOG(1) << err_msg;
+    return Status::Expected(err_msg);
   }
   return Status::OK();
 }
