@@ -327,6 +327,10 @@ class TestParquet(ImpalaTestSuite):
     assert len(result.data) == 1
     assert "4294967294" in result.data
 
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  @SkipIfS3.hive
   def test_multi_compression_types(self, vector, unique_database):
     """IMPALA-5448: Tests that parquet splits with multi compression types are counted
     correctly. Cases tested:
