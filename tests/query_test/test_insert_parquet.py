@@ -287,6 +287,75 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
         file_meta_data = get_parquet_metadata(parquet_file)
         assert file_meta_data.column_orders == expected_col_orders
 
+  def test_read_write_logical_types(self, vector, unique_database, tmpdir):
+    """IMPALA-5052: Read and write signed integer parquet logical types
+    This test creates a src_tbl like a parquet file. The parquet file was generated
+    to have columns with different signed integer logical types. The test verifies
+    that parquet file written by the hdfs parquet table writer using the genererated
+    file has the same column type metadata as the generated one."""
+    hdfs_path = (os.environ['DEFAULT_FS'] + "/test-warehouse/{0}.db/"
+                 "signed_integer_logical_types.parquet").format(unique_database)
+    check_call(['hdfs', 'dfs', '-copyFromLocal', os.environ['IMPALA_HOME'] +
+                '/testdata/data/signed_integer_logical_types.parquet', hdfs_path])
+    # Create table with signed integer logical types
+    src_tbl = "{0}.{1}".format(unique_database, "read_write_logical_type_src")
+    create_tbl_stmt = """create table {0} like parquet "{1}"
+        stored as parquet""".format(src_tbl, hdfs_path)
+    result = self.execute_query_expect_success(self.client, create_tbl_stmt)
+    # Check to see if the src_tbl column types matches the schema of the parquet
+    # file from which it was generated
+    result_src = self.execute_query_expect_success(self.client, "describe %s" %src_tbl)
+    for line in result_src.data:
+      line_split = line.split()
+      if line_split[0] == "id":
+        assert line_split[1] == 'int'
+      elif line_split[0] == "tinyint_col":
+        assert line_split[1] == 'tinyint'
+      elif line_split[0] == "smallint_col":
+        assert line_split[1] == 'smallint'
+      elif line_split[0] == "int_col":
+        assert line_split[1] == 'int'
+      else:
+        assert line_split[0] == 'bigint_col' and line_split[1] == 'bigint'
+
+    # Insert values in this table
+    insert_stmt = "insert into table {0} values(1, 2, 3, 4, 5)".format(src_tbl)
+    result = self.execute_query_expect_success(self.client, insert_stmt)
+
+    # To test the integer round tripping, a new dst_tbl is created by using the parquet
+    # file written by the src_tbl and running the following tests -
+    #   1. inserting same values into src and dst table and reading it back and comparing
+    #      them.
+    #   2. Ensuring that the column types in dst_tbl matches the column types in the
+    #      schema of the parquet file that was used to generate the src_tbl
+    result = self.execute_query_expect_success(self.client, "show files in %s" %src_tbl)
+    hdfs_path = result.data[0].split("\t")[0]
+    dst_tbl = "{0}.{1}".format(unique_database, "read_write_logical_type_dst")
+    create_tbl_stmt = 'create table {0} like parquet "{1}"'.format(dst_tbl, hdfs_path)
+    result = self.execute_query_expect_success(self.client, create_tbl_stmt)
+    result_dst = self.execute_query_expect_success(self.client, "describe %s" % dst_tbl)
+    for line in result_dst.data:
+      line_split = line.split()
+      if line_split[0] == "id":
+        assert line_split[1] == 'int'
+      elif line_split[0] == "tinyint_col":
+        assert line_split[1] == 'tinyint'
+      elif line_split[0] == "smallint_col":
+        assert line_split[1] == 'smallint'
+      elif line_split[0] == "int_col":
+        assert line_split[1] == 'int'
+      else:
+        assert line_split[0] == 'bigint_col' and line_split[1] == 'bigint'
+
+    insert_stmt = "insert into table {0} values(1, 2, 3, 4, 5)".format(dst_tbl)
+    self.execute_query_expect_success(self.client, insert_stmt)
+    # Check that the values inserted are same in both src and dst tables
+    result_src = self.execute_query_expect_success(self.client, "select * from %s"
+            % src_tbl)
+    result_dst = self.execute_query_expect_success(self.client, "select * from %s"
+            % dst_tbl)
+    assert result_src.data == result_dst.data
+
 @SkipIfIsilon.hive
 @SkipIfLocal.hive
 @SkipIfS3.hive
@@ -505,7 +574,6 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
         ColumnStats('vc', 'abc banana', 'ghj xyz', 0),
         ColumnStats('st', 'abc xyz', 'lorem ipsum', 0)
     ]
-
     self._ctas_table_and_verify_stats(vector, unique_database, tmpdir.strpath,
                                       qualified_table_name, expected_min_max_values)
 

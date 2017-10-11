@@ -132,3 +132,14 @@ null and non-null values. This is not actually a valid Parquet file because the
 bit-packed levels are written in the reverse order specified in the Parquet spec
 for BIT_PACKED. However, this is the order that Impala attempts to read the levels
 in - see IMPALA-3006.
+
+signed_integer_logical_types.parquet:
+Generated using a utility that uses the java Parquet API.
+The file has the following schema:
+  schema {
+    optional int32 id;
+    optional int32 tinyint_col (INT_8);
+    optional int32 smallint_col (INT_16);
+    optional int32 int_col;
+    optional int64 bigint_col;
+  }

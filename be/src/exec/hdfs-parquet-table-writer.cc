@@ -877,6 +877,14 @@ Status HdfsParquetTableWriter::CreateSchema() {
         (type.type == TYPE_STRING &&
          state_->query_options().parquet_annotate_strings_utf8)) {
       node.__set_converted_type(ConvertedType::UTF8);
+    } else if (type.type == TYPE_TINYINT) {
+      node.__set_converted_type(ConvertedType::INT_8);
+    } else if (type.type == TYPE_SMALLINT) {
+      node.__set_converted_type(ConvertedType::INT_16);
+    } else if (type.type == TYPE_INT) {
+      node.__set_converted_type(ConvertedType::INT_32);
+    } else if (type.type == TYPE_BIGINT) {
+      node.__set_converted_type(ConvertedType::INT_64);
     }
   }
 

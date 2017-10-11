@@ -281,6 +281,17 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
       return Type.STRING;
     }
 
+    if (prim.getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT32
+        || prim.getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT64) {
+      // Map signed integer types to an supported Impala column type
+      switch (orig) {
+        case INT_8: return Type.TINYINT;
+        case INT_16: return Type.SMALLINT;
+        case INT_32: return Type.INT;
+        case INT_64: return Type.BIGINT;
+      }
+    }
+
     if (orig == OriginalType.DECIMAL) {
       return ScalarType.createDecimalType(prim.getDecimalMetadata().getPrecision(),
                                            prim.getDecimalMetadata().getScale());
