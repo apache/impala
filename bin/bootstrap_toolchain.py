@@ -29,12 +29,14 @@
 #
 #     python bootstrap_toolchain.py
 import os
+import random
 import re
 import sh
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 HOST = "https://native-toolchain.s3.amazonaws.com/build"
 
@@ -77,9 +79,18 @@ def get_platform_release_label(release=None):
 
 def wget_and_unpack_package(download_path, file_name, destination, wget_no_clobber):
   print "URL {0}".format(download_path)
-  print "Downloading {0} to {1}".format(file_name, destination)
-  # --no-clobber avoids downloading the file if a file with the name already exists
-  sh.wget(download_path, directory_prefix=destination, no_clobber=wget_no_clobber)
+  NUM_ATTEMPTS = 3
+  for attempt in range(1, NUM_ATTEMPTS + 1):
+    print "Downloading {0} to {1} (attempt {2})".format(file_name, destination, attempt)
+    # --no-clobber avoids downloading the file if a file with the name already exists
+    try:
+      sh.wget(download_path, directory_prefix=destination, no_clobber=wget_no_clobber)
+      break
+    except Exception, e:
+      if attempt == NUM_ATTEMPTS:
+        raise
+      print "Download failed; retrying after sleep: " + str(e)
+      time.sleep(10 + random.random() * 5) # Sleep between 10 and 15 seconds.
   print "Extracting {0}".format(file_name)
   sh.tar(z=True, x=True, f=os.path.join(destination, file_name), directory=destination)
   sh.rm(os.path.join(destination, file_name))
@@ -310,7 +321,7 @@ def execute_many(f, args):
   pool = None
   try:
     import multiprocessing.pool
-    pool = multiprocessing.pool.ThreadPool()
+    pool = multiprocessing.pool.ThreadPool(processes=min(multiprocessing.cpu_count(), 4))
     return pool.map(f, args, 1)
   except ImportError:
     # multiprocessing was introduced in Python 2.6.
