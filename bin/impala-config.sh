@@ -285,8 +285,6 @@ export IMPALA_LZO="${IMPALA_LZO-$IMPALA_HOME/../Impala-lzo}"
 export IMPALA_AUX_TEST_HOME="${IMPALA_AUX_TEST_HOME-$IMPALA_HOME/../Impala-auxiliary-tests}"
 export TARGET_FILESYSTEM="${TARGET_FILESYSTEM-hdfs}"
 export FILESYSTEM_PREFIX="${FILESYSTEM_PREFIX-}"
-export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY-DummySecretAccessKey}"
-export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID-DummyAccessKeyId}"
 export S3_BUCKET="${S3_BUCKET-}"
 export azure_tenant_id="${azure_tenant_id-DummyAdlsTenantId}"
 export azure_client_id="${azure_client_id-DummyAdlsClientId}"
@@ -299,27 +297,64 @@ export WAREHOUSE_LOCATION_PREFIX="${WAREHOUSE_LOCATION_PREFIX-}"
 export LOCAL_FS="file:${WAREHOUSE_LOCATION_PREFIX}"
 export METASTORE_DB="hive_impala"
 
+# Environment variables carrying AWS security credentials are prepared
+# according to the following rules:
+#
+#     Instance:     Running outside EC2 ||  Running in EC2 |
+# --------------------+--------+--------++--------+--------+
+#   TARGET_FILESYSTEM |   S3   | not S3 ||   S3   | not S3 |
+# --------------------+--------+--------++--------+--------+
+#                     |        |        ||        |        |
+#               empty | unset  | dummy  ||  unset |  unset |
+# AWS_*               |        |        ||        |        |
+# env   --------------+--------+--------++--------+--------+
+# var                 |        |        ||        |        |
+#           not empty | export | export || export | export |
+#                     |        |        ||        |        |
+# --------------------+--------+--------++--------+--------+
+#
+# Legend: unset:  the variable is unset
+#         export: the variable is exported with its current value
+#         dummy:  the variable is set to a constant dummy value and exported
+#
+# Running on an EC2 VM is indicated by setting RUNNING_IN_EC2 to "true" and
+# exporting it from an script running before this one.
+
+# Checks are performed in a subshell to avoid leaking secrets to log files.
+if (set +x; [[ -n ${AWS_ACCESS_KEY_ID-} ]]); then
+  export AWS_ACCESS_KEY_ID
+else
+  if [[ "${TARGET_FILESYSTEM}" == "s3" || "${RUNNING_IN_EC2:-false}" == "true" ]]; then
+    unset AWS_ACCESS_KEY_ID
+  else
+    export AWS_ACCESS_KEY_ID=DummyAccessKeyId
+  fi
+fi
+
+if (set +x; [[ -n ${AWS_SECRET_ACCESS_KEY-} ]]); then
+  export AWS_SECRET_ACCESS_KEY
+else
+  if [[ "${TARGET_FILESYSTEM}" == "s3" || "${RUNNING_IN_EC2:-false}" == "true" ]]; then
+    unset AWS_SECRET_ACCESS_KEY
+  else
+    export AWS_SECRET_ACCESS_KEY=DummySecretAccessKey
+  fi
+fi
+
+# AWS_SESSION_TOKEN is not set to a dummy value, it is not needed by the FE tests
+if (set +x; [[ -n ${AWS_SESSION_TOKEN-} ]]); then
+  export AWS_SESSION_TOKEN
+else
+  unset AWS_SESSION_TOKEN
+fi
+
 if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
-  # Basic error checking
-  if [[ "${AWS_ACCESS_KEY_ID}" = "DummyAccessKeyId" ||\
-        "${AWS_SECRET_ACCESS_KEY}" = "DummySecretAccessKey" ]]; then
-    echo "Both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
-      need to be assigned valid values and belong to the owner of the s3
-      bucket in order to access the file system"
+  if ${IMPALA_HOME}/bin/check-s3-access.sh; then
+    export DEFAULT_FS="s3a://${S3_BUCKET}"
+    export FILESYSTEM_PREFIX="${DEFAULT_FS}"
+  else
     return 1
   fi
-  # Check if the s3 bucket is NULL.
-  if [[ "${S3_BUCKET}" = "" ]]; then
-    echo "S3_BUCKET cannot be an empty string for s3"
-    return 1
-  fi
-  aws s3 ls "s3://${S3_BUCKET}/" 1>/dev/null
-  if [ $? != 0 ]; then
-    echo "Access to ${S3_BUCKET} failed."
-    return 1
-  fi
-  DEFAULT_FS="s3a://${S3_BUCKET}"
-  export DEFAULT_FS
 elif [ "${TARGET_FILESYSTEM}" = "adls" ]; then
   # Basic error checking
   if [[ "${azure_client_id}" = "DummyAdlsClientId" ||\

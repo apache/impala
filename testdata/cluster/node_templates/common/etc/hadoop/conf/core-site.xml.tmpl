@@ -56,29 +56,7 @@ DEFAULT</value>
     <value>true</value>
   </property>
 
-  <!-- Needed by frontend tests that reference s3n paths. -->
-  <property>
-    <name>fs.s3n.awsAccessKeyId</name>
-    <value>${AWS_ACCESS_KEY_ID}</value>
-  </property>
-
-  <property>
-    <name>fs.s3n.awsSecretAccessKey</name>
-    <value>${AWS_SECRET_ACCESS_KEY}</value>
-  </property>
-
-  <!-- Needed when the TARGET_FILESYSTEM is s3 -->
-  <property>
-    <name>fs.s3a.awsAccessKeyId</name>
-    <value>${AWS_ACCESS_KEY_ID}</value>
-  </property>
-
-  <property>
-    <name>fs.s3a.awsSecretAccessKey</name>
-    <value>${AWS_SECRET_ACCESS_KEY}</value>
-  </property>
-
-  <property>
+ <property>
     <name>fs.s3a.connection.maximum</name>
     <value>1500</value>
   </property>
