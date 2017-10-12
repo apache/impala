@@ -48,6 +48,7 @@ ADD_BE_TEST(authentication-test)
 ADD_BE_TEST(rpc-mgr-test)
 add_dependencies(rpc-mgr-test rpc_test_proto)
 target_link_libraries(rpc-mgr-test rpc_test_proto)
+target_link_libraries(rpc-mgr-test security-test-for-impala)
 
 add_library(rpc_test_proto ${RPC_TEST_PROTO_SRCS})
 add_dependencies(rpc_test_proto rpc_test_proto_tgt krpc)

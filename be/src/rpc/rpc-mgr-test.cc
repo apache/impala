@@ -25,7 +25,9 @@
 #include "kudu/rpc/rpc_sidecar.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/status.h"
+#include "rpc/auth-provider.h"
 #include "testutil/gtest-util.h"
+#include "testutil/mini-kdc-wrapper.h"
 #include "util/counting-barrier.h"
 #include "util/network-util.h"
 #include "util/test-info.h"
@@ -49,13 +51,26 @@ DECLARE_int32(num_reactor_threads);
 DECLARE_int32(num_acceptor_threads);
 DECLARE_string(hostname);
 
+
+// The path of the current executable file that is required for passing into the SASL
+// library as the 'application name'.
+static string current_executable_path;
+
 namespace impala {
 
 static int32_t SERVICE_PORT = FindUnusedEphemeralPort(nullptr);
 
+int GetServerPort() {
+  int port = FindUnusedEphemeralPort(nullptr);
+  EXPECT_FALSE(port == -1);
+  return port;
+}
+
+static int kdc_port = GetServerPort();
+
 #define PAYLOAD_SIZE (4096)
 
-class RpcMgrTest : public testing::Test {
+template <class T> class RpcMgrTestBase : public T {
  protected:
   TNetworkAddress krpc_address_;
   RpcMgr rpc_mgr_;
@@ -87,6 +102,43 @@ class RpcMgrTest : public testing::Test {
 
  private:
   int32_t payload_[PAYLOAD_SIZE];
+};
+
+// For tests that do not require kerberized testing, we use RpcTest.
+class RpcMgrTest : public RpcMgrTestBase<testing::Test> {
+  virtual void SetUp() {
+    RpcMgrTestBase::SetUp();
+  }
+
+  virtual void TearDown() {
+    RpcMgrTestBase::TearDown();
+  }
+};
+
+class RpcMgrKerberizedTest :
+    public RpcMgrTestBase<testing::TestWithParam<KerberosSwitch> > {
+  virtual void SetUp() {
+    IpAddr ip;
+    ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
+    string spn = Substitute("impala-test/$0", ip);
+
+    kdc_wrapper_.reset(new MiniKdcWrapper(
+        std::move(spn), "KRBTEST.COM", "24h", "7d", kdc_port));
+    DCHECK(kdc_wrapper_.get() != nullptr);
+
+    ASSERT_OK(kdc_wrapper_->SetupAndStartMiniKDC(GetParam()));
+    ASSERT_OK(InitAuth(current_executable_path));
+
+    RpcMgrTestBase::SetUp();
+  }
+
+  virtual void TearDown() {
+    ASSERT_OK(kdc_wrapper_->TearDownMiniKDC(GetParam()));
+    RpcMgrTestBase::TearDown();
+  }
+
+ private:
+  boost::scoped_ptr<MiniKdcWrapper> kdc_wrapper_;
 };
 
 typedef std::function<void(RpcContext*)> ServiceCB;
@@ -139,7 +191,13 @@ class ScanMemServiceImpl : public ScanMemServiceIf {
   }
 };
 
-TEST_F(RpcMgrTest, MultipleServices) {
+INSTANTIATE_TEST_CASE_P(KerberosOnAndOff,
+                        RpcMgrKerberizedTest,
+                        ::testing::Values(KERBEROS_OFF,
+                                          USE_KUDU_KERBEROS,
+                                          USE_IMPALA_KERBEROS));
+
+TEST_P(RpcMgrKerberizedTest, MultipleServices) {
   // Test that a service can be started, and will respond to requests.
   unique_ptr<ServiceIf> ping_impl(
       new PingServiceImpl(rpc_mgr_.metric_entity(), rpc_mgr_.result_tracker()));
@@ -248,4 +306,11 @@ TEST_F(RpcMgrTest, AsyncCall) {
 
 } // namespace impala
 
-IMPALA_TEST_MAIN();
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
+
+  // Fill in the path of the current binary for use by the tests.
+  current_executable_path = argv[0];
+  return RUN_ALL_TESTS();
+}

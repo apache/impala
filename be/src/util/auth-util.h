@@ -44,5 +44,26 @@ const std::string& GetEffectiveUser(const ImpalaServer::SessionState& session);
 Status CheckProfileAccess(const std::string& user, const std::string& effective_user,
     bool has_access);
 
+/// Returns the internal kerberos principal. The internal kerberos principal is the
+/// principal that is used for backend connections only.
+/// 'out_principal' will contain the principal string. Must only be called if Kerberos
+/// is enabled.
+Status GetInternalKerberosPrincipal(std::string* out_principal);
+
+/// Returns the external kerberos principal. The external kerberos principal is the
+/// principal that is used for client connections only.
+/// 'out_principal' will contain the principal string. Must only be called if Kerberos
+/// is enabled.
+Status GetExternalKerberosPrincipal(std::string* out_principal);
+
+/// Splits the kerberos principal 'principal' which should be of the format:
+/// "<service>/<hostname>@<realm>", and fills in the respective out parameters.
+/// If 'principal' is not of the above format, an error status is returned.
+Status ParseKerberosPrincipal(const std::string& principal, std::string* service_name,
+    std::string* hostname, std::string* realm);
+
+/// Returns true if kerberos is enabled.
+bool IsKerberosEnabled();
+
 } // namespace impala
 #endif

@@ -338,6 +338,9 @@ error_codes = (
 
   ("DATASTREAM_RECVR_CLOSED", 111,
    "DataStreamRecvr for fragment=$0, node=$1 is closed already"),
+
+  ("BAD_PRINCIPAL_FORMAT", 112,
+    "Kerberos principal should be of the form: <service>/<hostname>@<realm> - got: $0"),
 )
 
 import sys

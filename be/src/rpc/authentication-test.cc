@@ -20,6 +20,7 @@
 #include "common/logging.h"
 #include "rpc/authentication.h"
 #include "rpc/thrift-server.h"
+#include "util/auth-util.h"
 #include "util/network-util.h"
 #include "util/thread.h"
 
@@ -52,13 +53,19 @@ TEST(Auth, PrincipalSubstitution) {
   string hostname;
   ASSERT_OK(GetHostname(&hostname));
   SaslAuthProvider sa(false);  // false means it's external
-  ASSERT_OK(sa.InitKerberos("service_name/_HOST@some.realm", "/etc/hosts"));
+
+  FLAGS_principal = "service_name/_HOST@some.realm";
+  string principal;
+  ASSERT_OK(GetExternalKerberosPrincipal(&principal));
+
+  ASSERT_OK(sa.InitKerberos(principal, "/etc/hosts"));
   ASSERT_OK(sa.Start());
   ASSERT_EQ(string::npos, sa.principal().find("_HOST"));
   ASSERT_NE(string::npos, sa.principal().find(hostname));
   ASSERT_EQ("service_name", sa.service_name());
   ASSERT_EQ(hostname, sa.hostname());
   ASSERT_EQ("some.realm", sa.realm());
+  FLAGS_principal.clear();
 }
 
 void AuthOk(const string& name, SaslAuthProvider* sa) {

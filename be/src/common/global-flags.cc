@@ -41,10 +41,11 @@ DEFINE_int32_hidden(krpc_port, 29000,
     "port on which KRPC based ImpalaInternalService is exported");
 
 // Kerberos is enabled if and only if principal is set.
-DEFINE_string(principal, "", "Kerberos principal. If set, both client and backend network"
-    "connections will use Kerberos encryption and authentication.");
+DEFINE_string(principal, "", "Kerberos principal. If set, both client and backend "
+    "network connections will use Kerberos encryption and authentication. Kerberos will "
+    "not be used for internal or external connections if this is not set.");
 DEFINE_string(be_principal, "", "Kerberos principal for backend network connections only,"
-    "overriding --principal if set.");
+    "overriding --principal if set. Must not be set if --principal is not set.");
 DEFINE_string(keytab_file, "", "Absolute path to Kerberos keytab file");
 DEFINE_string(krb5_conf, "", "Absolute path to Kerberos krb5.conf if in a non-standard "
     "location. Does not normally need to be set.");

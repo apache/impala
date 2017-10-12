@@ -24,6 +24,7 @@
 
 #include "common/status.h"
 #include "util/promise.h"
+#include "util/thread.h"
 
 namespace sasl { class TSasl; }
 
@@ -77,6 +78,7 @@ class SaslAuthProvider : public AuthProvider {
   /// Wrap the client transport with a new TSaslClientTransport.  This is only for
   /// internal connections.  Since, as a daemon, we only do Kerberos and not LDAP,
   /// we can go straight to Kerberos.
+  /// This is only applicable to Thrift connections and not KRPC connections.
   virtual Status WrapClientTransport(const std::string& hostname,
       boost::shared_ptr<apache::thrift::transport::TTransport> raw_transport,
       const std::string& service_name,
@@ -86,6 +88,7 @@ class SaslAuthProvider : public AuthProvider {
   /// When a connection comes in, thrift will see one of the above on the wire, do
   /// a table lookup, and associate the appropriate callbacks with the connection.
   /// Then presto! You've got authentication for the connection.
+  /// This is only applicable to Thrift connections and not KRPC connections.
   virtual Status GetServerTransportFactory(
       boost::shared_ptr<apache::thrift::transport::TTransportFactory>* factory);
 

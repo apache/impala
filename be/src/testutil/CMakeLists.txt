@@ -25,14 +25,16 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/testutil")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/testutil")
 
 add_library(TestUtil
+  desc-tbl-builder.cc
   fault-injection-util.cc
   impalad-query-executor.cc
   in-process-servers.cc
-  desc-tbl-builder.cc
+  mini-kdc-wrapper.cc
   test-udas.cc
   test-udfs.cc
 )
 add_dependencies(TestUtil gen-deps)
+target_link_libraries(TestUtil security-test-for-impala)
 
 add_library(TestUdfs SHARED test-udfs.cc)
 add_dependencies(TestUdfs gen-deps)
