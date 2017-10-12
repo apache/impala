@@ -362,8 +362,8 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
       Tuple* dst_tuple = reinterpret_cast<Tuple*>(tuple_buf);
       TupleRow* dst_row = row_batch->GetRow(row_batch->AddRow());
       InitTuple(template_tuple_, dst_tuple);
-      int64_t* dst_slot = reinterpret_cast<int64_t*>(dst_tuple->GetSlot(
-          scan_node_->parquet_count_star_slot_offset()));
+      int64_t* dst_slot =
+          dst_tuple->GetBigIntSlot(scan_node_->parquet_count_star_slot_offset());
       *dst_slot = file_metadata_.row_groups[row_group_idx_].num_rows;
       row_group_rows_read_ += *dst_slot;
       dst_row->SetTuple(0, dst_tuple);
@@ -1142,7 +1142,11 @@ inline bool HdfsParquetScanner::ReadCollectionItem(
       FILE_CHECK_GE(col_reader->def_level(),
                     col_reader->def_level_of_immediate_repeated_ancestor());
       // Fill in position slot if applicable
-      if (col_reader->pos_slot_desc() != nullptr) col_reader->ReadPosition(tuple);
+      const SlotDescriptor* pos_slot_desc = col_reader->pos_slot_desc();
+      if (pos_slot_desc != nullptr) {
+        col_reader->ReadPositionNonBatched(
+            tuple->GetBigIntSlot(pos_slot_desc->tuple_offset()));
+      }
       continue_execution = col_reader->ReadValue(pool, tuple);
     } else {
       // A containing repeated field is empty or NULL

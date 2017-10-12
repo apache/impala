@@ -471,6 +471,8 @@ inline void RleEncoder::Clear() {
 
 template <typename T>
 inline void RleBatchDecoder<T>::Reset(uint8_t* buffer, int buffer_len, int bit_width) {
+  DCHECK(buffer != nullptr);
+  DCHECK_GE(buffer_len, 0);
   DCHECK_GE(bit_width, 0);
   DCHECK_LE(bit_width, BatchedBitReader::MAX_BITWIDTH);
   bit_reader_.Reset(buffer, buffer_len);
