@@ -90,13 +90,13 @@ std::pair<const uint8_t*, int64_t> BitPacking::UnpackValues(
 template <typename OutType>
 std::pair<const uint8_t*, int64_t> BitPacking::UnpackAndDecodeValues(int bit_width,
     const uint8_t* __restrict__ in, int64_t in_bytes, OutType* __restrict__ dict,
-    int64_t dict_len, int64_t num_values, OutType* __restrict__ out,
+    int64_t dict_len, int64_t num_values, OutType* __restrict__ out, int64_t stride,
     bool* __restrict__ decode_error) {
 #pragma push_macro("UNPACK_VALUES_CASE")
 #define UNPACK_VALUES_CASE(ignore1, i, ignore2) \
   case i:                                       \
     return UnpackAndDecodeValues<OutType, i>(   \
-        in, in_bytes, dict, dict_len, num_values, out, decode_error);
+        in, in_bytes, dict, dict_len, num_values, out, stride, decode_error);
 
   switch (bit_width) {
     // Expand cases from 0 to 32.
@@ -111,25 +111,27 @@ std::pair<const uint8_t*, int64_t> BitPacking::UnpackAndDecodeValues(int bit_wid
 template <typename OutType, int BIT_WIDTH>
 std::pair<const uint8_t*, int64_t> BitPacking::UnpackAndDecodeValues(
     const uint8_t* __restrict__ in, int64_t in_bytes, OutType* __restrict__ dict,
-    int64_t dict_len, int64_t num_values, OutType* __restrict__ out,
+    int64_t dict_len, int64_t num_values, OutType* __restrict__ out, int64_t stride,
     bool* __restrict__ decode_error) {
   constexpr int BATCH_SIZE = 32;
   const int64_t values_to_read = NumValuesToUnpack(BIT_WIDTH, in_bytes, num_values);
   const int64_t batches_to_read = values_to_read / BATCH_SIZE;
   const int64_t remainder_values = values_to_read % BATCH_SIZE;
   const uint8_t* in_pos = in;
-  OutType* out_pos = out;
+  uint8_t* out_pos = reinterpret_cast<uint8_t*>(out);
   // First unpack as many full batches as possible.
   for (int64_t i = 0; i < batches_to_read; ++i) {
     in_pos = UnpackAndDecode32Values<OutType, BIT_WIDTH>(
-        in_pos, in_bytes, dict, dict_len, out_pos, decode_error);
-    out_pos += BATCH_SIZE;
+        in_pos, in_bytes, dict, dict_len, reinterpret_cast<OutType*>(out_pos), stride,
+        decode_error);
+    out_pos += stride * BATCH_SIZE;
     in_bytes -= (BATCH_SIZE * BIT_WIDTH) / CHAR_BIT;
   }
   // Then unpack the final partial batch.
   if (remainder_values > 0) {
     in_pos = UnpackAndDecodeUpTo31Values<OutType, BIT_WIDTH>(
-        in_pos, in_bytes, dict, dict_len, remainder_values, out_pos, decode_error);
+        in_pos, in_bytes, dict, dict_len, remainder_values,
+        reinterpret_cast<OutType*>(out_pos), stride, decode_error);
   }
   return std::make_pair(in_pos, values_to_read);
 }
@@ -237,7 +239,7 @@ const uint8_t* BitPacking::Unpack32Values(int bit_width, const uint8_t* __restri
 template <typename OutType, int BIT_WIDTH>
 const uint8_t* BitPacking::UnpackAndDecode32Values(const uint8_t* __restrict__ in,
     int64_t in_bytes, OutType* __restrict__ dict, int64_t dict_len,
-    OutType* __restrict__ out, bool* __restrict__ decode_error) {
+    OutType* __restrict__ out, int64_t stride, bool* __restrict__ decode_error) {
   static_assert(BIT_WIDTH >= 0, "BIT_WIDTH too low");
   static_assert(BIT_WIDTH <= 32, "BIT_WIDTH > 32");
   constexpr int BYTES_TO_READ = BitUtil::RoundUpNumBytes(32 * BIT_WIDTH);
@@ -250,7 +252,8 @@ const uint8_t* BitPacking::UnpackAndDecode32Values(const uint8_t* __restrict__ i
 #define DECODE_VALUE_CALL(ignore1, i, ignore2)               \
   {                                                          \
     uint32_t idx = UnpackValue<BIT_WIDTH, i>(in);            \
-    DecodeValue(dict, dict_len, idx, &out[i], decode_error); \
+    uint8_t* out_pos = reinterpret_cast<uint8_t*>(out) + i * stride; \
+    DecodeValue(dict, dict_len, idx, reinterpret_cast<OutType*>(out_pos), decode_error); \
   }
 
   BOOST_PP_REPEAT_FROM_TO(0, 32, DECODE_VALUE_CALL, ignore);
@@ -301,7 +304,7 @@ const uint8_t* BitPacking::UnpackUpTo31Values(const uint8_t* __restrict__ in,
 template <typename OutType, int BIT_WIDTH>
 const uint8_t* BitPacking::UnpackAndDecodeUpTo31Values(const uint8_t* __restrict__ in,
       int64_t in_bytes, OutType* __restrict__ dict, int64_t dict_len, int num_values,
-      OutType* __restrict__ out, bool* __restrict__ decode_error) {
+      OutType* __restrict__ out, int64_t stride, bool* __restrict__ decode_error) {
   static_assert(BIT_WIDTH >= 0, "BIT_WIDTH too low");
   static_assert(BIT_WIDTH <= 32, "BIT_WIDTH > 32");
   constexpr int MAX_BATCH_SIZE = 31;
@@ -326,7 +329,8 @@ const uint8_t* BitPacking::UnpackAndDecodeUpTo31Values(const uint8_t* __restrict
 #define DECODE_VALUES_CASE(ignore1, i, ignore2)                   \
   case 31 - i: {                                                  \
     uint32_t idx = UnpackValue<BIT_WIDTH, 30 - i>(in_buffer);     \
-    DecodeValue(dict, dict_len, idx, &out[30 - i], decode_error); \
+    uint8_t* out_pos = reinterpret_cast<uint8_t*>(out) + (30 - i) * stride; \
+    DecodeValue(dict, dict_len, idx, reinterpret_cast<OutType*>(out_pos), decode_error); \
   }
 
   // Use switch with fall-through cases to minimise branching.

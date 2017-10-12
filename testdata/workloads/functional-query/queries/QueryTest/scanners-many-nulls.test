@@ -1,0 +1,47 @@
+====
+---- QUERY
+# Test that we materialize the right number of nulls.
+select count(*),
+  count(id),
+  count(nullcol),
+  sum(nullcol)
+from manynulls
+---- RESULTS
+11000,11000,5500,28870000
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+# Spot check some values.
+select id, nullcol
+from manynulls
+where id >= 4490 and id <= 4510
+order by id
+---- RESULTS
+4490,NULL
+4490,NULL
+4491,NULL
+4492,NULL
+4493,NULL
+4494,NULL
+4495,NULL
+4496,NULL
+4497,NULL
+4498,NULL
+4499,NULL
+4500,4500
+4500,4500
+4501,4501
+4502,4502
+4503,4503
+4504,4504
+4505,4505
+4506,4506
+4507,4507
+4508,4508
+4509,4509
+4510,4510
+4510,4510
+---- TYPES
+INT,INT
+====

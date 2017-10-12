@@ -347,6 +347,7 @@ Status HdfsParquetScanner::ProcessSplit() {
 }
 
 Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
+  DCHECK(parse_status_.ok()) << parse_status_.GetDetail();
   if (scan_node_->optimize_parquet_count_star()) {
     // Populate the single slot with the Parquet num rows statistic.
     int64_t tuple_buf_size;

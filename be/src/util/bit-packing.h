@@ -68,19 +68,20 @@ class BitPacking {
       int64_t in_bytes, int64_t num_values, OutType* __restrict__ out);
 
   /// Unpack values as above, treating them as unsigned integers, and decode them
-  /// using the provided dict. Sets 'decode_error' to true if one of the packed
-  /// values was greater than 'dict_len'. Does not modify 'decode_error' on success.
+  /// using the provided dict. Writes them to 'out' with a stride of 'stride' bytes.
+  /// Sets 'decode_error' to true if one of the packed values was greater than 'dict_len'.
+  /// Does not modify 'decode_error' on success.
   template <typename OutType>
   static std::pair<const uint8_t*, int64_t> UnpackAndDecodeValues(int bit_width,
       const uint8_t* __restrict__ in, int64_t in_bytes, OutType* __restrict__ dict,
-      int64_t dict_len, int64_t num_values, OutType* __restrict__ out,
+      int64_t dict_len, int64_t num_values, OutType* __restrict__ out, int64_t stride,
       bool* __restrict__ decode_error);
 
   /// Same as above, templated by BIT_WIDTH.
   template <typename OutType, int BIT_WIDTH>
   static std::pair<const uint8_t*, int64_t> UnpackAndDecodeValues(
       const uint8_t* __restrict__ in, int64_t in_bytes, OutType* __restrict__ dict,
-      int64_t dict_len, int64_t num_values, OutType* __restrict__ out,
+      int64_t dict_len, int64_t num_values, OutType* __restrict__ out, int64_t stride,
       bool* __restrict__ decode_error);
 
   /// Unpack exactly 32 values of 'bit_width' from 'in' to 'out'. 'in' must point to
@@ -100,13 +101,14 @@ class BitPacking {
   template <typename OutType>
   static const uint8_t* UnpackAndDecode32Values(int bit_width,
       const uint8_t* __restrict__ in, int64_t in_bytes, OutType* __restrict__ dict,
-      int64_t dict_len, OutType* __restrict__ out, bool* __restrict__ decode_error);
+      int64_t dict_len, OutType* __restrict__ out, int64_t stride,
+      bool* __restrict__ decode_error);
 
   /// Same as UnpackAndDecode32Values() but templated by BIT_WIDTH.
   template <typename OutType, int BIT_WIDTH>
   static const uint8_t* UnpackAndDecode32Values(const uint8_t* __restrict__ in,
       int64_t in_bytes, OutType* __restrict__ dict, int64_t dict_len,
-      OutType* __restrict__ out, bool* __restrict__ decode_error);
+      OutType* __restrict__ out, int64_t stride, bool* __restrict__ decode_error);
 
   /// Unpacks 'num_values' values with the given BIT_WIDTH from 'in' to 'out'.
   /// 'num_values' must be at most 31. 'in' must point to 'in_bytes' of addressable
@@ -121,7 +123,7 @@ class BitPacking {
   template <typename OutType, int BIT_WIDTH>
   static const uint8_t* UnpackAndDecodeUpTo31Values(const uint8_t* __restrict__ in,
       int64_t in_bytes, OutType* __restrict__ dict, int64_t dict_len, int num_values,
-      OutType* __restrict__ out, bool* __restrict__ decode_error);
+      OutType* __restrict__ out, int64_t stride, bool* __restrict__ decode_error);
 
  private:
   /// Compute the number of values with the given bit width that can be unpacked from

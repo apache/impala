@@ -71,6 +71,7 @@ table_name:complextypes_multifileformat, constraint:restrict_to, table_format:te
 
 # TODO: Avro
 table_name:complextypestbl, constraint:restrict_to, table_format:parquet/none/none
+table_name:complextypestbl_medium, constraint:restrict_to, table_format:parquet/none/none
 
 table_name:alltypeserror, constraint:exclude, table_format:parquet/none/none
 table_name:alltypeserrornonulls, constraint:exclude, table_format:parquet/none/none
@@ -102,10 +103,11 @@ table_name:view_view, constraint:restrict_to, table_format:seq/snap/block
 table_name:subquery_view, constraint:restrict_to, table_format:seq/snap/block
 table_name:subquery_view, constraint:restrict_to, table_format:rc/none/none
 
-# liketbl and tblwithraggedcolumns all have
+# liketbl, tblwithraggedcolumns and manynulls all have
 # NULLs in primary key columns. hbase does not support
 # writing NULLs to primary key columns.
 table_name:liketbl, constraint:exclude, table_format:hbase/none/none
+table_name:manynulls, constraint:exclude, table_format:hbase/none/none
 table_name:tblwithraggedcolumns, constraint:exclude, table_format:hbase/none/none
 
 # Tables with only one column are not supported in hbase.
@@ -140,8 +142,9 @@ table_name:decimal_tiny, constraint:restrict_to, table_format:orc/def/block
 
 table_name:avro_decimal_tbl, constraint:restrict_to, table_format:avro/snap/block
 
-# TODO first set of tests are for text/none/none
-table_name:chars_tiny, constraint:restrict_to, table_format:text/none/none
+# CHAR is not supported by HBase.
+table_name:chars_tiny, constraint:exclude, table_format:hbase/none/none
+table_name:chars_medium, constraint:exclude, table_format:hbase/none/none
 
 # invalid_decimal_part_tbl[1,2,3] tables are used for testing invalid decimal
 # partition key values (see IMPALA-1040)
@@ -194,6 +197,7 @@ table_name:nullescapedtable, constraint:only, table_format:kudu/none/none
 table_name:decimal_tbl, constraint:only, table_format:kudu/none/none
 table_name:decimal_tiny, constraint:only, table_format:kudu/none/none
 table_name:strings_with_quotes, constraint:only, table_format:kudu/none/none
+table_name:manynulls, constraint:only, table_format:kudu/none/none
 
 # Skipping header lines is only effective with text tables
 table_name:table_with_header, constraint:restrict_to, table_format:text/none/none

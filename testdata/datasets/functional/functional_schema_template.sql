@@ -705,6 +705,22 @@ hadoop fs -put -f ${IMPALA_HOME}/testdata/ComplexTypesTbl/nonnullable.parq \
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+complextypestbl_medium
+---- COLUMNS
+id bigint
+int_array array<int>
+int_array_array array<array<int>>
+int_map map<string, int>
+int_map_array array<map<string, int>>
+nested_struct struct<a: int, b: array<int>, c: struct<d: array<array<struct<e: int, f: string>>>>, g: map<string, struct<h: struct<i: array<double>>>>>
+---- DEPENDENT_LOAD_HIVE
+-- This INSERT must run in Hive, because Impala doesn't support inserting into tables
+-- with complex types.
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT c.* FROM functional_parquet.complextypestbl c join functional.alltypes sort by id;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 complextypes_fileformat
 ---- CREATE_HIVE
 -- Used for positive/negative testing of complex types on various file formats.
@@ -2221,4 +2237,60 @@ PARTITION BY HASH (s) PARTITIONS 3 STORED AS KUDU;
 INSERT into TABLE {db_name}{db_suffix}.{table_name}
 SELECT s, i
 FROM {db_name}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+manynulls
+---- COLUMNS
+id int
+nullcol int
+---- ALTER
+-- Ensure the nulls are clustered together.
+ALTER TABLE {table_name} SORT BY (id);
+---- CREATE_KUDU
+DROP VIEW IF EXISTS {db_name}{db_suffix}.{table_name};
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name}_idx;
+
+CREATE TABLE {db_name}{db_suffix}.{table_name}_idx (
+  kudu_idx BIGINT PRIMARY KEY,
+  id INT,
+  nullcol INT NULL
+)
+PARTITION BY HASH (kudu_idx) PARTITIONS 3 STORED AS KUDU;
+CREATE VIEW {db_name}{db_suffix}.{table_name} AS
+SELECT id, nullcol
+FROM {db_name}{db_suffix}.{table_name}_idx;
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT id, nullcol
+FROM {db_name}.{table_name};
+---- DEPENDENT_LOAD_KUDU
+INSERT into TABLE {db_name}{db_suffix}.{table_name}_idx
+SELECT row_number() over (order by id),
+       id, nullcol
+FROM {db_name}.{table_name};
+---- LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT id, if((id div 500) % 2 = 0, NULL, id) as nullcol
+FROM functional.alltypesagg;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+chars_medium
+---- COLUMNS
+id int
+date_char_col char(8)
+char_col char(3)
+date_varchar_col varchar(8)
+varchar_col varchar(3)
+---- DEPENDENT_LOAD
+insert overwrite table {db_name}{db_suffix}.{table_name}
+select id, date_char_col, char_col, date_varchar_col, varchar_col
+from {db_name}.{table_name}
+---- LOAD
+insert overwrite table {db_name}{db_suffix}.{table_name}
+select id, date_string_col, case when id % 3 in (0, 1) then string_col end, date_string_col, case when id % 3 = 0 then string_col end
+from functional.alltypesagg
 ====

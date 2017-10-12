@@ -1,0 +1,47 @@
+====
+---- QUERY
+set abort_on_error=0;
+# Spot check some values to make sure the correct results are returned.
+SELECT id, timestamp_col FROM out_of_range_timestamp_hive_211 where id < 5;
+---- TYPES
+INT, TIMESTAMP
+---- RESULTS
+0,2009-01-01 00:00:00
+1,2009-01-01 00:01:00
+2,2009-01-01 00:02:00.100000000
+3,2009-01-01 00:03:00.300000000
+4,2009-01-01 00:04:00.600000000
+-1,NULL
+---- ERRORS
+Parquet file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_timestamp_hive_211/out_of_range_timestamp_hive_211.parquet' column 'timestamp_col' contains an out of range timestamp. The valid date range is 1400-01-01..9999-12-31.
+====
+---- QUERY
+set abort_on_error=1;
+SELECT id, timestamp_col FROM out_of_range_timestamp_hive_211 where id < 5;
+---- CATCH
+Parquet file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_timestamp_hive_211/out_of_range_timestamp_hive_211.parquet' column 'timestamp_col' contains an out of range timestamp. The valid date range is 1400-01-01..9999-12-31.
+====
+---- QUERY
+set abort_on_error=0;
+# Spot check some values to make sure the correct results are returned.
+SELECT id, timestamp_col FROM out_of_range_timestamp2_hive_211 where id in (-1, 5, 2000, 2345, 2346, 2347, 4100, 4101, 4102)
+---- TYPES
+INT, TIMESTAMP
+---- RESULTS
+5,NULL
+2000,NULL
+2345,NULL
+2346,2009-08-23 03:46:10.500000000
+2347,NULL
+4100,NULL
+4101,2010-02-15 02:21:06.300000000
+4102,NULL
+---- ERRORS
+Parquet file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_timestamp2_hive_211/out_of_range_timestamp2_hive_211.parquet' column 'timestamp_col' contains an out of range timestamp. The valid date range is 1400-01-01..9999-12-31. (1 of 2433 similar)
+====
+---- QUERY
+set abort_on_error=1;
+SELECT id, timestamp_col FROM out_of_range_timestamp2_hive_211 where id in (-1, 5, 2000, 2345, 2346, 2347, 4100, 4101, 4102)
+---- CATCH
+Parquet file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_timestamp2_hive_211/out_of_range_timestamp2_hive_211.parquet' column 'timestamp_col' contains an out of range timestamp. The valid date range is 1400-01-01..9999-12-31.
+====

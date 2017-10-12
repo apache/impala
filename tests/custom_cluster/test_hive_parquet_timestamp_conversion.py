@@ -22,6 +22,7 @@ import pytest
 from subprocess import check_call
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.file_utils import create_table_from_parquet
 from tests.util.filesystem_utils import get_fs_path
 
 class TestHiveParquetTimestampConversion(CustomClusterTestSuite):
@@ -40,6 +41,10 @@ class TestHiveParquetTimestampConversion(CustomClusterTestSuite):
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'parquet' and
         v.get_value('table_format').compression_codec == 'none')
+
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
 
   @classmethod
   def setup_class(cls):
@@ -79,7 +84,7 @@ class TestHiveParquetTimestampConversion(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("-convert_legacy_hive_parquet_utc_timestamps=true "
       "-hdfs_zone_info_zip=%s" % get_fs_path("/test-warehouse/tzdb/2017c.zip"))
-  def test_conversion(self, vector):
+  def test_conversion(self, vector, unique_database):
     tz_name = TestHiveParquetTimestampConversion._test_tz_name
     self.check_sanity(tz_name not in ("UTC", "GMT"))
     # The value read from the Hive table should be the same as reading a UTC converted
@@ -96,6 +101,20 @@ class TestHiveParquetTimestampConversion(CustomClusterTestSuite):
         """ % tz_name)\
         .get_data()
     assert len(data) == 0
+
+    self._test_conversion_with_validation(vector, unique_database)
+
+  def _test_conversion_with_validation(self, vector, unique_database):
+    """Test that timestamp validation also works as expected when converting timestamps.
+    Runs as part of test_conversion() to avoid restarting the cluster."""
+    create_table_from_parquet(self.client, unique_database,
+                              "out_of_range_timestamp_hive_211")
+    create_table_from_parquet(self.client, unique_database,
+                              "out_of_range_timestamp2_hive_211")
+    # Allow tests to override abort_or_error
+    del vector.get_value('exec_option')['abort_on_error']
+    self.run_test_case('QueryTest/out-of-range-timestamp-local-tz-conversion',
+         vector, unique_database)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("-convert_legacy_hive_parquet_utc_timestamps=false "

@@ -52,22 +52,30 @@ struct SlotOffsets {
 };
 
 /// A tuple is stored as a contiguous sequence of bytes containing a fixed number
-/// of fixed-size slots. The slots are arranged in order of increasing byte length;
-/// the tuple might contain padding between slots in order to align them according
-/// to their type.
-//
-/// The contents of a tuple:
-/// 1) a number of bytes holding a bitvector of null indicators
-/// 2) bool slots
-/// 3) tinyint slots
-/// 4) smallint slots
-/// 5) int slots
-/// 6) float slots
-/// 7) bigint slots
-/// 8) double slots
-/// 9) string slots
-//
-/// A tuple with 0 materialised slots is represented as NULL.
+/// of fixed-size slots along with a bit vector containing null indicators
+/// for each nullable slots. The layout of a tuple is computed by the planner and
+/// represented in a TupleDescriptor. A tuple has a "packed" memory layout - the
+/// start of the tuple can have any alignment and slots within the tuple are not
+/// necessarily aligned.
+///
+/// Tuples are handled as untyped memory throughout much of the runtime, with that
+/// memory reinterpreted as the appropriate slot types when needed. This Tuple class
+/// (which is a zero-length class with no members) provides a convenient abstraction
+/// over this untyped memory for common operations. The untyped tuple memory can be
+/// cast to a Tuple* in order to use the functions below.
+///
+/// NULL and zero-length Tuples
+/// ===========================
+/// Tuples can be logically NULL in some cases to indicate that all slots in the
+/// tuple are NULL. This occurs in rows produced by an outer join where a matching
+/// tuple was not found on one side of the join. In some plans the distinction between
+/// a NULL tuple and a non-NULL tuple with all NULL slots is significant and used by
+/// the planner via TupleIsNulLPredicate() to correctly place predicates at certain
+/// places in the plan.
+///
+/// A tuple with 0 materialised slots is either represented as an arbitrary non-NULL
+/// pointer (e.g. POISON), if the tuple is logically non-NULL or as a NULL pointer
+/// if the tuple is logically NULL.
 ///
 /// TODO: Our projection of collection-typed slots breaks/augments the conventional
 /// semantics of the null bits, because we rely on producers of array values to also
@@ -232,6 +240,12 @@ class Tuple {
         reinterpret_cast<const char*>(this) + offset.byte_offset;
     return (*null_indicator_byte & offset.bit_mask) != 0;
   }
+
+  /// Set the null indicators on 'num_tuples' tuples. The first tuple is stored at
+  /// 'tuple_mem' and subsequent tuples must be stored at a stride of 'tuple_stride'
+  /// bytes.
+  static void SetNullIndicators(NullIndicatorOffset offset, int64_t num_tuples,
+      int64_t tuple_stride, uint8_t* tuple_mem);
 
   void* GetSlot(int offset) {
     DCHECK(offset != -1); // -1 offset indicates non-materialized slot

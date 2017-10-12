@@ -36,26 +36,31 @@ class MemPool;
 /// Level values are unsigned 8-bit integers because we support a maximum nesting
 /// depth of 100, as enforced by the FE. Using a small type saves memory and speeds up
 /// populating the level cache (e.g., with RLE we can memset() repeated values).
-///
-/// TODO: expose whether we're in a run of repeated values so that callers can
-/// optimise for that case.
 class ParquetLevelDecoder {
  public:
   ParquetLevelDecoder(bool is_def_level_decoder)
-    : decoding_error_code_(is_def_level_decoder ?
-          TErrorCode::PARQUET_DEF_LEVEL_ERROR : TErrorCode::PARQUET_REP_LEVEL_ERROR) {
-  }
+    : decoding_error_code_(is_def_level_decoder ? TErrorCode::PARQUET_DEF_LEVEL_ERROR :
+                                                  TErrorCode::PARQUET_REP_LEVEL_ERROR) {}
 
   /// Initialize the LevelDecoder. Reads and advances the provided data buffer if the
   /// encoding requires reading metadata from the page header. 'cache_size' will be
   /// rounded up to a multiple of 32 internally.
   Status Init(const string& filename, parquet::Encoding::type encoding,
-      MemPool* cache_pool, int cache_size, int max_level, int num_buffered_values,
-      uint8_t** data, int* data_size);
+      MemPool* cache_pool, int cache_size, int max_level, uint8_t** data, int* data_size);
 
   /// Returns the next level or INVALID_LEVEL if there was an error. Not as efficient
   /// as batched methods.
   inline int16_t ReadLevel();
+
+  /// If the next value is part of a repeated run and is not cached, return the length
+  /// of the repeated run. A max level of 0 is treated as an arbitrarily long run of
+  /// zeroes, so this returns numeric_limits<int32_t>::max(). Otherwise return 0.
+  int32_t NextRepeatedRunLength();
+
+  /// Get the value of the repeated run (if NextRepeatedRunLength() > 0) and consume
+  /// 'num_to_consume' items in the run. Not valid to call if there are cached levels
+  /// that have not been consumed.
+  uint8_t GetRepeatedValue(uint32_t num_to_consume);
 
   /// Decodes and caches the next batch of levels given that there are 'vals_remaining'
   /// values left to decode in the page. Resets members associated with the cache.
@@ -93,7 +98,7 @@ class ParquetLevelDecoder {
   /// CacheHasNext() is false.
   bool FillCache(int batch_size, int* num_cached_levels);
 
-  /// RLE decoder, used if 'encoding_' is RLE.
+  /// RLE decoder, used if 'encoding_' is RLE and max_level_ > 0.
   RleBatchDecoder<uint8_t> rle_decoder_;
 
   /// Buffer for a batch of levels. The memory is allocated and owned by a pool passed
@@ -115,9 +120,6 @@ class ParquetLevelDecoder {
   /// Number of level values cached_levels_ has memory allocated for. Always
   /// a multiple of 32 to allow reading directly from 'bit_reader_' in batches.
   int cache_size_ = 0;
-
-  /// Number of remaining data values in the current data page.
-  int num_buffered_values_ = 0;
 
   /// Name of the parquet file. Used for reporting level decoding errors.
   string filename_;

@@ -189,3 +189,21 @@ order by c_custkey
 ---- TYPES
 bigint, bigint
 ====
+---- QUERY
+# Materialise runs of positions from flattened nested collections. The query is
+# constructed to pick out all of the nations from two of the regions. The position
+# of the nations in the collection may vary, but we expect all positions to be present.
+select pos, count(*)
+from region.r_nations
+where n_name in ('UNITED KINGDOM', 'RUSSIA', 'ROMANIA', 'GERMANY', 'FRANCE',
+                 'SAUDI ARABIA', 'JORDAN', 'IRAQ', 'IRAN', 'EGYPT')
+group by pos
+---- RESULTS
+0,2
+1,2
+2,2
+3,2
+4,2
+---- TYPES
+bigint, bigint
+====

@@ -644,3 +644,23 @@ where i1.e = 10 or i2.e = 10
 ---- TYPES
 bigint,bigint,bigint,bigint
 ====
+---- QUERY
+# Test materialising position slot in repeated nested collection to exercise
+# code path with repeated definition levels.
+select pos, item, count(*)
+from complextypestbl_medium.int_array
+group by 1, 2
+---- RESULTS
+0,-1,7300
+0,1,7300
+0,NULL,7300
+1,1,7300
+1,2,7300
+2,2,7300
+2,3,7300
+3,NULL,7300
+4,3,7300
+5,NULL,7300
+---- TYPES
+BIGINT, INT, BIGINT
+====

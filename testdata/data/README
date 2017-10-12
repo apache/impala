@@ -259,3 +259,25 @@ Example (all dates are 2017-10-29):
 UTC: 00:45:00, 01:00:00, 01:10:00 =>
 CET: 02:45:00, 02:00:00, 02:10:00
 Columns: rawvalue bigint, rowgroup int, millisutc timsestamp, microsutc timestamp
+
+out_of_range_timestamp_hive_211.parquet
+Hive-generated file with an out-of-range timestamp. Generated with Hive 2.1.1 using
+the following query:
+create table alltypes_hive stored as parquet as
+select * from functional.alltypes
+union all
+select -1, false, 0, 0, 0, 0, 0, 0, '', '', cast('1399-01-01 00:00:00' as timestamp), 0, 0
+
+out_of_range_timestamp2_hive_211.parquet
+Hive-generated file with out-of-range timestamps every second value, to exercise code
+paths in Parquet scanner for non-repeated runs. Generated with Hive 2.1.1 using
+the following query:
+create table hive_invalid_timestamps stored as parquet as
+select id,
+  case id % 3
+    when 0 then timestamp_col
+    when 1 then NULL
+    when 2 then cast('1300-01-01 9:9:9' as timestamp)
+  end timestamp_col
+from functional.alltypes
+sort by id

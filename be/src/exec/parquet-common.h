@@ -27,6 +27,7 @@
 #include "runtime/timestamp-value.inline.h"
 #include "util/bit-util.h"
 #include "util/decimal-util.h"
+#include "util/mem-util.h"
 
 /// This file contains common elements between the parquet Writer and Scanner.
 namespace impala {
@@ -203,6 +204,15 @@ class ParquetPlainEncoder {
     memcpy(v, buffer, byte_size);
     return byte_size;
   }
+
+  /// Batched version of Decode() that tries to decode 'num_values' values from the memory
+  /// range [buffer, buffer_end) and writes them to 'v' with a stride of 'stride' bytes.
+  /// Returns the number of bytes read from 'buffer' or -1 if there was an error
+  /// decoding, e.g. invalid data or running out of input data before reading
+  /// 'num_values'.
+  template <typename InternalType, parquet::Type::type PARQUET_TYPE>
+  static int64_t DecodeBatch(const uint8_t* buffer, const uint8_t* buffer_end,
+      int fixed_len_size, int64_t num_values, int64_t stride, InternalType* v);
 };
 
 /// Calling this with arguments of type ColumnType is certainly a programmer error, so we
@@ -364,9 +374,24 @@ inline int ParquetPlainEncoder::Encode(
   return EncodeDecimal(v, fixed_len_size, buffer);
 }
 
-template<typename T>
-inline int DecodeDecimalFixedLen(const uint8_t* buffer, const uint8_t* buffer_end,
-    int fixed_len_size, T* v) {
+template <typename InternalType, parquet::Type::type PARQUET_TYPE>
+inline int64_t ParquetPlainEncoder::DecodeBatch(const uint8_t* buffer,
+    const uint8_t* buffer_end, int fixed_len_size, int64_t num_values, int64_t stride,
+    InternalType* v) {
+  const uint8_t* buffer_pos = buffer;
+  StrideWriter<InternalType> out(v, stride);
+  for (int64_t i = 0; i < num_values; ++i) {
+    int encoded_len = Decode<InternalType, PARQUET_TYPE>(
+        buffer_pos, buffer_end, fixed_len_size, out.Advance());
+    if (UNLIKELY(encoded_len < 0)) return -1;
+    buffer_pos += encoded_len;
+  }
+  return buffer_pos - buffer;
+}
+
+template <typename T>
+inline int DecodeDecimalFixedLen(
+    const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size, T* v) {
   if (UNLIKELY(buffer_end - buffer < fixed_len_size)) return -1;
   DecimalUtil::DecodeFromFixedLenByteArray(buffer, fixed_len_size, v);
   return fixed_len_size;

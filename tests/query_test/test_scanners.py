@@ -87,9 +87,20 @@ class TestScannersAllTableFormats(ImpalaTestSuite):
 
   def test_scanners(self, vector):
     new_vector = deepcopy(vector)
+    # Copy over test dimensions to the matching query options.
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     new_vector.get_value('exec_option')['debug_action'] = vector.get_value('debug_action')
     self.run_test_case('QueryTest/scanners', new_vector)
+
+  def test_many_nulls(self, vector):
+    if vector.get_value('table_format').file_format == 'hbase':
+      # manynulls table not loaded for HBase
+      pytest.skip()
+    # Copy over test dimensions to the matching query options.
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
+    new_vector.get_value('exec_option')['debug_action'] = vector.get_value('debug_action')
+    self.run_test_case('QueryTest/scanners-many-nulls', new_vector)
 
   def test_hdfs_scanner_profile(self, vector):
     if vector.get_value('table_format').file_format in ('kudu', 'hbase') or \

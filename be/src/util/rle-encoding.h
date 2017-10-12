@@ -23,6 +23,7 @@
 #include "common/compiler-util.h"
 #include "util/bit-stream-utils.inline.h"
 #include "util/bit-util.h"
+#include "util/mem-util.h"
 #include "util/test-info.h"
 
 namespace impala {
@@ -96,7 +97,7 @@ class RleBatchDecoder {
   RleBatchDecoder(uint8_t* buffer, int buffer_len, int bit_width) {
     Reset(buffer, buffer_len, bit_width);
   }
-  RleBatchDecoder() : bit_width_(-1) {}
+  RleBatchDecoder() {}
 
   /// Reset the decoder to read from a new buffer.
   void Reset(uint8_t* buffer, int buffer_len, int bit_width);
@@ -107,7 +108,8 @@ class RleBatchDecoder {
 
   /// Get the value of the current repeated run and consume the given number of repeats.
   /// Only valid to call when NextNumRepeats() > 0. The given number of repeats cannot
-  /// be greater than the remaining number of repeats in the run.
+  /// be greater than the remaining number of repeats in the run. 'num_repeats_to_consume'
+  /// can be set to 0 to peek at the value without consuming repeats.
   T GetRepeatedValue(int32_t num_repeats_to_consume);
 
   /// Return the size of the current literal run. Returns zero if the current run is
@@ -122,7 +124,7 @@ class RleBatchDecoder {
   bool GetLiteralValues(int32_t num_literals_to_consume, T* values) WARN_UNUSED_RESULT;
 
   /// Consume 'num_literals_to_consume' literals from the current literal run,
-  /// decoding them using 'dict' and outputting them to 'values'.
+  /// decoding them using 'dict' and outputting them to 'out'.
   /// 'num_literals_to_consume' must be <= NextNumLiterals(). Returns true if
   /// the requested number of literals were successfully read or false if an error
   /// was encountered, e.g. the input was truncated or the value was not present
@@ -130,7 +132,7 @@ class RleBatchDecoder {
   /// to read from a new buffer.
   template <typename OutType>
   bool DecodeLiteralValues(int32_t num_literals_to_consume, OutType* dict,
-      int64_t dict_len, OutType* values) WARN_UNUSED_RESULT;
+      int64_t dict_len, StrideWriter<OutType>* RESTRICT out) WARN_UNUSED_RESULT;
 
   /// Convenience method to get the next value. Not efficient. Returns true on success
   /// or false if no more values can be read from the input or an error was encountered
@@ -144,16 +146,18 @@ class RleBatchDecoder {
  private:
   BatchedBitReader bit_reader_;
 
-  /// Number of bits needed to encode the value. Must be between 0 and 64.
-  int bit_width_;
+  /// Number of bits needed to encode the value. Must be between 0 and 64 after
+  /// the decoder is initialized with a buffer. -1 indicates the decoder was not
+  /// initialized.
+  int bit_width_ = -1;
 
   /// If a repeated run, the number of repeats remaining in the current run to be read.
   /// If the current run is a literal run, this is 0.
-  int32_t repeat_count_;
+  int32_t repeat_count_ = 0;
 
   /// If a literal run, the number of literals remaining in the current run to be read.
   /// If the current run is a repeated run, this is 0.
-  int32_t literal_count_;
+  int32_t literal_count_ = 0;
 
   /// If a repeated run, the current repeated value.
   T repeated_value_;
@@ -166,8 +170,8 @@ class RleBatchDecoder {
   /// Buffer containing 'num_buffered_literals_' values. 'literal_buffer_pos_' is the
   /// position of the next literal to be read from the buffer.
   T literal_buffer_[LITERAL_BUFFER_LEN];
-  int num_buffered_literals_;
-  int literal_buffer_pos_;
+  int num_buffered_literals_ = 0;
+  int literal_buffer_pos_ = 0;
 
   /// Called when both 'literal_count_' and 'repeat_count_' have been exhausted.
   /// Sets either 'literal_count_' or 'repeat_count_' to the size of the next literal
@@ -191,8 +195,8 @@ class RleBatchDecoder {
   /// 'literal_count_'. Returns the number of literals outputted or 0 if a
   /// decoding error is encountered.
   template <typename OutType>
-  int32_t DecodeBufferedLiterals(
-      int32_t max_to_output, OutType* dict, int64_t dict_len, OutType* values);
+  int32_t DecodeBufferedLiterals(int32_t max_to_output, OutType* dict, int64_t dict_len,
+      StrideWriter<OutType>* RESTRICT out);
 };
 
 /// Class to incrementally build the rle data. This class does not allocate any memory.
@@ -608,7 +612,7 @@ inline int32_t RleBatchDecoder<T>::NextNumRepeats() {
 
 template <typename T>
 inline T RleBatchDecoder<T>::GetRepeatedValue(int32_t num_repeats_to_consume) {
-  DCHECK_GT(num_repeats_to_consume, 0);
+  DCHECK_GE(num_repeats_to_consume, 0);
   DCHECK_GE(repeat_count_, num_repeats_to_consume);
   repeat_count_ -= num_repeats_to_consume;
   return repeated_value_;
@@ -660,19 +664,20 @@ inline bool RleBatchDecoder<T>::GetLiteralValues(
 
 template <typename T>
 template <typename OutType>
-inline bool RleBatchDecoder<T>::DecodeLiteralValues(
-    int32_t num_literals_to_consume, OutType* dict, int64_t dict_len, OutType* values) {
+inline bool RleBatchDecoder<T>::DecodeLiteralValues(int32_t num_literals_to_consume,
+    OutType* dict, int64_t dict_len, StrideWriter<OutType>* RESTRICT out) {
   DCHECK_GE(num_literals_to_consume, 0);
   DCHECK_GE(literal_count_, num_literals_to_consume);
-  int32_t num_consumed = 0;
+
+  int32_t num_remaining = num_literals_to_consume;
   // Decode any buffered literals left over from previous calls.
   if (HaveBufferedLiterals()) {
-    num_consumed =
-        DecodeBufferedLiterals(num_literals_to_consume, dict, dict_len, values);
+    int32_t num_consumed = DecodeBufferedLiterals(num_remaining, dict, dict_len, out);
     if (UNLIKELY(num_consumed == 0)) return false;
+    DCHECK_LE(num_consumed, num_remaining);
+    num_remaining -= num_consumed;
   }
 
-  int32_t num_remaining = num_literals_to_consume - num_consumed;
   // Copy literals directly to the output, bypassing 'literal_buffer_' when possible.
   // Need to round to a batch of 32 if the caller is consuming only part of the current
   // run avoid ending on a non-byte boundery.
@@ -680,20 +685,20 @@ inline bool RleBatchDecoder<T>::DecodeLiteralValues(
       std::min<int32_t>(literal_count_, BitUtil::RoundDownToPowerOf2(num_remaining, 32));
   if (num_to_bypass > 0) {
     int num_read = bit_reader_.UnpackAndDecodeBatch(
-        bit_width_, dict, dict_len, num_to_bypass, values + num_consumed);
+        bit_width_, dict, dict_len, num_to_bypass, out->current, out->stride);
     // If we couldn't read the expected number, that means the input was truncated.
     if (num_read < num_to_bypass) return false;
+    DCHECK_EQ(num_read, num_to_bypass);
     literal_count_ -= num_to_bypass;
-    num_consumed += num_to_bypass;
-    num_remaining = num_literals_to_consume - num_consumed;
+    out->SkipNext(num_to_bypass);
+    num_remaining -= num_to_bypass;
   }
 
   if (num_remaining > 0) {
     // We weren't able to copy all the literals requested directly from the input.
     // Buffer literals and copy over the requested number.
     if (UNLIKELY(!FillLiteralBuffer())) return false;
-    int32_t num_copied =
-        DecodeBufferedLiterals(num_remaining, dict, dict_len, values + num_consumed);
+    int32_t num_copied = DecodeBufferedLiterals(num_remaining, dict, dict_len, out);
     if (UNLIKELY(num_copied == 0)) return false;
     DCHECK_EQ(num_copied, num_remaining) << "Should have buffered enough literals";
   }
@@ -716,6 +721,7 @@ inline bool RleBatchDecoder<T>::GetSingleValue(T* val) {
 
 template <typename T>
 inline void RleBatchDecoder<T>::NextCounts() {
+  DCHECK_GE(bit_width_, 0) << "RleBatchDecoder must be initialised";
   DCHECK_EQ(0, literal_count_);
   DCHECK_EQ(0, repeat_count_);
   // Read the next run's indicator int, it could be a literal or repeated run.
@@ -737,10 +743,10 @@ inline void RleBatchDecoder<T>::NextCounts() {
     literal_count_ = literal_count;
   } else {
     if (UNLIKELY(run_len == 0)) return;
-    bool result =
-        bit_reader_.GetBytes<T>(BitUtil::Ceil(bit_width_, 8), &repeated_value_);
+    bool result = bit_reader_.GetBytes<T>(BitUtil::Ceil(bit_width_, 8), &repeated_value_);
     if (UNLIKELY(!result)) return;
     repeat_count_ = run_len;
+    DCHECK_GE(repeat_count_, 0);
   }
 }
 
@@ -769,14 +775,14 @@ inline int32_t RleBatchDecoder<T>::OutputBufferedLiterals(
 
 template <typename T>
 template <typename OutType>
-inline int32_t RleBatchDecoder<T>::DecodeBufferedLiterals(
-    int32_t max_to_output, OutType* dict, int64_t dict_len, OutType* values) {
+inline int32_t RleBatchDecoder<T>::DecodeBufferedLiterals(int32_t max_to_output,
+    OutType* dict, int64_t dict_len, StrideWriter<OutType>* RESTRICT out) {
   int32_t num_to_output =
       std::min<int32_t>(max_to_output, num_buffered_literals_ - literal_buffer_pos_);
   for (int32_t i = 0; i < num_to_output; ++i) {
     T idx = literal_buffer_[literal_buffer_pos_ + i];
     if (UNLIKELY(idx < 0 || idx >= dict_len)) return 0;
-    memcpy(&values[i], &dict[idx], sizeof(OutType));
+    out->SetNext(dict[idx]);
   }
   literal_buffer_pos_ += num_to_output;
   literal_count_ -= num_to_output;

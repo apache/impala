@@ -73,10 +73,12 @@ void ValidateDict(const vector<InternalType>& values,
   }
   // Test access to dictionary via internal stream
   ASSERT_OK(decoder.SetData(data_buffer, data_len));
-  for (InternalType i: values) {
+  int count = 0;
+  for (InternalType i : values) {
     InternalType j;
     ASSERT_TRUE(decoder.GetNextValue(&j));
-    EXPECT_EQ(i, j);
+    EXPECT_EQ(i, j) << count;
+    ++count;
   }
   pool.FreeAll();
 }

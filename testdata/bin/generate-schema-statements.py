@@ -390,8 +390,11 @@ def avro_schema(columns):
       type = {"type": "bytes", "logicalType": "decimal", "precision": precision,
               "scale": scale}
     else:
-      hive_type = column_spec.split()[1]
-      type = HIVE_TO_AVRO_TYPE_MAP[hive_type.upper()]
+      hive_type = column_spec.split()[1].upper()
+      if hive_type.startswith('CHAR(') or hive_type.startswith('VARCHAR('):
+        type = 'string'
+      else:
+        type = HIVE_TO_AVRO_TYPE_MAP[hive_type]
 
     record["fields"].append(
       {'name': name,

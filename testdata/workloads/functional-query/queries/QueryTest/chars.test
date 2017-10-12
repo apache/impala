@@ -197,3 +197,43 @@ char, char, varchar
 'NULL','b                                                                                                                                           ','NULL'
 'NULL','NULL','NULL'
 ====
+---- QUERY
+# Scan non-NULL CHAR and VARCHAR from larger table.
+select date_char_col, date_varchar_col, count(*)
+from chars_medium
+group by 1, 2
+---- TYPES
+char, string, bigint
+---- HS2_TYPES
+char, varchar, bigint
+---- RESULTS
+'01/01/10','01/01/10',1100
+'01/02/10','01/02/10',1100
+'01/03/10','01/03/10',1100
+'01/10/10','01/10/10',1100
+'01/08/10','01/08/10',1100
+'01/07/10','01/07/10',1100
+'01/04/10','01/04/10',1100
+'01/09/10','01/09/10',1100
+'01/06/10','01/06/10',1100
+'01/05/10','01/05/10',1100
+====
+---- QUERY
+# Scan CHAR and VARCHAR with NULLs from larger table.
+select id, char_col, varchar_col
+from chars_medium
+where id in (3, 1000, 1234, 5678, 1111, 2222, 3333)
+---- TYPES
+int, char, string
+---- HS2_TYPES
+int, char, varchar
+---- RESULTS
+3,'3  ','3'
+1000,'0  ','NULL'
+1111,'111','NULL'
+1234,'234','NULL'
+2222,'NULL','NULL'
+3333,'333','333'
+5678,'NULL','NULL'
+1000,'0  ','NULL'
+====

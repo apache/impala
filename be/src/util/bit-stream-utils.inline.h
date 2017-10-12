@@ -102,9 +102,9 @@ inline int BatchedBitReader::UnpackBatch(int bit_width, int num_values, T* v) {
   return static_cast<int>(num_read);
 }
 
-template<typename T>
+template <typename T>
 inline int BatchedBitReader::UnpackAndDecodeBatch(
-      int bit_width, T* dict, int64_t dict_len, int num_values, T* v){
+    int bit_width, T* dict, int64_t dict_len, int num_values, T* v, int64_t stride) {
   DCHECK(buffer_pos_ != nullptr);
   DCHECK_GE(bit_width, 0);
   DCHECK_LE(bit_width, MAX_BITWIDTH);
@@ -114,7 +114,7 @@ inline int BatchedBitReader::UnpackAndDecodeBatch(
   int64_t num_read;
   bool decode_error = false;
   std::tie(new_buffer_pos, num_read) = BitPacking::UnpackAndDecodeValues(bit_width,
-      buffer_pos_, bytes_left(), dict, dict_len, num_values, v, &decode_error);
+      buffer_pos_, bytes_left(), dict, dict_len, num_values, v, stride, &decode_error);
   if (UNLIKELY(decode_error)) return -1;
   buffer_pos_ = new_buffer_pos;
   DCHECK_LE(buffer_pos_, buffer_end_);

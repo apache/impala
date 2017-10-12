@@ -28,6 +28,7 @@
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.h"
 #include "util/bit-util.h"
+#include "util/mem-util.h"
 #include "util/rle-encoding.h"
 
 namespace impala {
@@ -353,6 +354,11 @@ class DictDecoder : public DictDecoderBase {
   /// the string data is from the dictionary buffer passed into the c'tor.
   bool GetNextValue(T* value) WARN_UNUSED_RESULT;
 
+  /// Batched version of GetNextValue(). Reads the next 'count' values into
+  /// 'first_values'. Returns false if the data was invalid and 'count' values could not
+  /// be successfully read. 'stride' is the stride in bytes between each subsequent value.
+  bool GetNextValues(T* first_value, int64_t stride, int count) WARN_UNUSED_RESULT;
+
   /// This function returns the size in bytes of the dictionary vector.
   /// It is used by dict-test.cc for validation of bytes consumed against
   /// memory tracked.
@@ -372,6 +378,11 @@ class DictDecoder : public DictDecoderBase {
   /// this contains 'num_literal_values_' values, with the next value to be returned at
   /// 'next_literal_idx_'.
   T decoded_values_[DICT_DECODER_BUFFER_SIZE];
+
+  /// Copy as many as possible literal values, up to 'max_to_copy' from 'decoded_values_'
+  /// to '*out'. Return the number copied and advance '*out'.
+  uint32_t CopyLiteralsToOutput(
+      uint32_t max_to_copy, StrideWriter<T>* RESTRICT out) RESTRICT;
 
   /// Slow path for GetNextValue() where we need to decode new values. Should not be
   /// inlined everywhere.
@@ -465,6 +476,77 @@ ALWAYS_INLINE inline bool DictDecoder<T>::GetNextValue(T* value) {
 }
 
 template <typename T>
+ALWAYS_INLINE inline bool DictDecoder<T>::GetNextValues(
+    T* first_value, int64_t stride, int count) {
+  DCHECK_GE(count, 0);
+  StrideWriter<T> out(first_value, stride);
+  if (num_repeats_ > 0) {
+    // Consume any already-decoded repeated value.
+    int num_to_copy = std::min<uint32_t>(num_repeats_, count);
+    T repeated_val = decoded_values_[0];
+    out.SetNext(repeated_val, num_to_copy);
+    count -= num_to_copy;
+    num_repeats_ -= num_to_copy;
+  } else if (next_literal_idx_ < num_literal_values_) {
+    // Consume any already-decoded literal values.
+    count -= CopyLiteralsToOutput(count, &out);
+  }
+  DCHECK_GE(count, 0);
+  while (count > 0) {
+    uint32_t num_repeats = data_decoder_.NextNumRepeats();
+    if (num_repeats > 0) {
+      // Decode repeats directly to the output.
+      uint32_t num_repeats_to_consume = std::min<uint32_t>(num_repeats, count);
+      uint32_t idx = data_decoder_.GetRepeatedValue(num_repeats_to_consume);
+      if (UNLIKELY(idx >= dict_.size())) return false;
+      T repeated_val = dict_[idx];
+      out.SetNext(repeated_val, num_repeats_to_consume);
+      count -= num_repeats_to_consume;
+    } else {
+      // Decode as many literals as possible directly to the output, buffer the rest.
+      uint32_t num_literals = data_decoder_.NextNumLiterals();
+      if (UNLIKELY(num_literals == 0)) return false;
+      // Case 1: decode the whole literal run directly to the output.
+      // Case 2: decode none or some of the run to the output, buffer some remaining.
+      if (count >= num_literals) { // Case 1
+        if (UNLIKELY(!data_decoder_.DecodeLiteralValues(
+                num_literals, dict_.data(), dict_.size(), &out))) {
+          return false;
+        }
+        count -= num_literals;
+      } else { // Case 2
+        uint32_t num_to_decode = BitUtil::RoundDown(count, 32);
+        if (UNLIKELY(!data_decoder_.DecodeLiteralValues(
+                num_to_decode, dict_.data(), dict_.size(), &out))) {
+          return false;
+        }
+        count -= num_to_decode;
+        DCHECK_GE(count, 0);
+        if (count > 0) {
+          if (UNLIKELY(!DecodeNextValue(out.Advance()))) return false;
+          --count;
+          // Consume any already-decoded literal values.
+          count -= CopyLiteralsToOutput(count, &out);
+        }
+        return true;
+      }
+    }
+  }
+  return true;
+}
+
+template <typename T>
+uint32_t DictDecoder<T>::CopyLiteralsToOutput(
+    uint32_t max_to_copy, StrideWriter<T>* out) {
+  uint32_t num_to_copy =
+      std::min<uint32_t>(num_literal_values_ - next_literal_idx_, max_to_copy);
+  for (uint32_t i = 0; i < num_to_copy; ++i) {
+    out->SetNext(decoded_values_[next_literal_idx_++]);
+  }
+  return num_to_copy;
+}
+
+template <typename T>
 bool DictDecoder<T>::DecodeNextValue(T* value) {
   // IMPALA-959: Use memcpy() instead of '=' to set *value: addresses are not always 16
   // byte aligned for Decimal16Values.
@@ -483,8 +565,9 @@ bool DictDecoder<T>::DecodeNextValue(T* value) {
 
     DCHECK_GT(num_literals, 0);
     int32_t num_to_decode = std::min(num_literals, DICT_DECODER_BUFFER_SIZE);
-    if (UNLIKELY(!data_decoder_.DecodeLiteralValues(
-            num_to_decode, dict_.data(), dict_.size(), &decoded_values_[0]))) {
+    StrideWriter<T> dst(&decoded_values_[0], sizeof(T));
+    if (UNLIKELY(!data_decoder_.DecodeLiteralValues(num_to_decode, dict_.data(),
+            dict_.size(), &dst))) {
       return false;
     }
     num_literal_values_ = num_to_decode;
