@@ -35,6 +35,7 @@ import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.PatternMatcher;
+
 import org.apache.log4j.Logger;
 
 /**
@@ -167,7 +168,11 @@ public abstract class Catalog {
     // Remove the old table name from the cache and add the new table.
     Db db = getDb(tableName.getDb_name());
     if (db == null) return null;
-    return db.removeTable(tableName.getTable_name());
+    Table tbl = db.removeTable(tableName.getTable_name());
+    if (tbl != null && !tbl.isStoredInImpaladCatalogCache()) {
+      CatalogUsageMonitor.INSTANCE.removeTable(tbl);
+    }
+    return tbl;
   }
 
   /**

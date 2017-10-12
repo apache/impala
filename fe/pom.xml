@@ -312,6 +312,12 @@ under the License.
       <version>1.6.0.1</version>
     </dependency>
 
+    <dependency>
+      <groupId>io.dropwizard.metrics</groupId>
+      <artifactId>metrics-core</artifactId>
+      <version>3.2.2</version>
+    </dependency>
+
   </dependencies>
 
   <reporting>

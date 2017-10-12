@@ -55,6 +55,8 @@ const string CATALOG_WEB_PAGE = "/catalog";
 const string CATALOG_TEMPLATE = "catalog.tmpl";
 const string CATALOG_OBJECT_WEB_PAGE = "/catalog_object";
 const string CATALOG_OBJECT_TEMPLATE = "catalog_object.tmpl";
+const string TABLE_METRICS_WEB_PAGE = "/table_metrics";
+const string TABLE_METRICS_TEMPLATE = "table_metrics.tmpl";
 
 // Implementation for the CatalogService thrift interface.
 class CatalogServiceThriftIf : public CatalogServiceIf {
@@ -200,16 +202,14 @@ Status CatalogServer::Start() {
 }
 
 void CatalogServer::RegisterWebpages(Webserver* webserver) {
-  Webserver::UrlCallback catalog_callback =
-      bind<void>(mem_fn(&CatalogServer::CatalogUrlCallback), this, _1, _2);
   webserver->RegisterUrlCallback(CATALOG_WEB_PAGE, CATALOG_TEMPLATE,
-      catalog_callback);
-
-  Webserver::UrlCallback catalog_objects_callback =
-      bind<void>(mem_fn(&CatalogServer::CatalogObjectsUrlCallback), this, _1, _2);
+      [this](const auto& args, auto* doc) { this->CatalogUrlCallback(args, doc); });
   webserver->RegisterUrlCallback(CATALOG_OBJECT_WEB_PAGE, CATALOG_OBJECT_TEMPLATE,
-      catalog_objects_callback, false);
-
+      [this](const auto& args, auto* doc) { this->CatalogObjectsUrlCallback(args, doc); },
+      false);
+  webserver->RegisterUrlCallback(TABLE_METRICS_WEB_PAGE, TABLE_METRICS_TEMPLATE,
+      [this](const auto& args, auto* doc) { this->TableMetricsUrlCallback(args, doc); },
+      false);
   RegisterLogLevelCallbacks(webserver, true);
 }
 
@@ -335,11 +335,12 @@ void CatalogServer::BuildTopicUpdates(const vector<TCatalogObject>& catalog_obje
 
 void CatalogServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,
     Document* document) {
+  GetCatalogUsage(document);
   TGetDbsResult get_dbs_result;
   Status status = catalog_->GetDbs(NULL, &get_dbs_result);
   if (!status.ok()) {
     Value error(status.GetDetail().c_str(), document->GetAllocator());
-      document->AddMember("error", error, document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
     return;
   }
   Value databases(kArrayType);
@@ -364,15 +365,76 @@ void CatalogServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,
       table_obj.AddMember("fqtn", fq_name, document->GetAllocator());
       Value table_name(table.c_str(), document->GetAllocator());
       table_obj.AddMember("name", table_name, document->GetAllocator());
+      Value has_metrics;
+      has_metrics.SetBool(true);
+      table_obj.AddMember("has_metrics", has_metrics, document->GetAllocator());
       table_array.PushBack(table_obj, document->GetAllocator());
     }
     database.AddMember("num_tables", table_array.Size(), document->GetAllocator());
     database.AddMember("tables", table_array, document->GetAllocator());
+    Value has_metrics;
+    has_metrics.SetBool(true);
+    database.AddMember("has_metrics", has_metrics, document->GetAllocator());
     databases.PushBack(database, document->GetAllocator());
   }
   document->AddMember("databases", databases, document->GetAllocator());
 }
 
+void CatalogServer::GetCatalogUsage(Document* document) {
+  TGetCatalogUsageResponse catalog_usage_result;
+  Status status = catalog_->GetCatalogUsage(&catalog_usage_result);
+  if (!status.ok()) {
+    Value error(status.GetDetail().c_str(), document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
+    return;
+  }
+  // Collect information about the largest tables in terms of memory requirements
+  Value large_tables(kArrayType);
+  for (int i = 0; i < catalog_usage_result.large_tables.size(); ++i) {
+    Value tbl_obj(kObjectType);
+    const auto& large_table = catalog_usage_result.large_tables[i];
+    Value tbl_name(Substitute("$0.$1", large_table.table_name.db_name,
+        large_table.table_name.table_name).c_str(), document->GetAllocator());
+    tbl_obj.AddMember("name", tbl_name, document->GetAllocator());
+    DCHECK(large_table.__isset.memory_estimate_bytes);
+    Value memory_estimate(PrettyPrinter::Print(large_table.memory_estimate_bytes,
+        TUnit::BYTES).c_str(), document->GetAllocator());
+    tbl_obj.AddMember("mem_estimate", memory_estimate, document->GetAllocator());
+    large_tables.PushBack(tbl_obj, document->GetAllocator());
+  }
+  Value has_large_tables;
+  has_large_tables.SetBool(true);
+  document->AddMember("has_large_tables", has_large_tables, document->GetAllocator());
+  document->AddMember("large_tables", large_tables, document->GetAllocator());
+  Value num_large_tables;
+  num_large_tables.SetInt(catalog_usage_result.large_tables.size());
+  document->AddMember("num_large_tables", num_large_tables, document->GetAllocator());
+
+  // Collect information about the most frequently accessed tables.
+  Value frequent_tables(kArrayType);
+  for (int i = 0; i < catalog_usage_result.frequently_accessed_tables.size(); ++i) {
+    Value tbl_obj(kObjectType);
+    const auto& frequent_table = catalog_usage_result.frequently_accessed_tables[i];
+    Value tbl_name(Substitute("$0.$1", frequent_table.table_name.db_name,
+        frequent_table.table_name.table_name).c_str(), document->GetAllocator());
+    tbl_obj.AddMember("name", tbl_name, document->GetAllocator());
+    Value num_metadata_operations;
+    DCHECK(frequent_table.__isset.num_metadata_operations);
+    num_metadata_operations.SetInt64(frequent_table.num_metadata_operations);
+    tbl_obj.AddMember("num_metadata_ops", num_metadata_operations,
+        document->GetAllocator());
+    frequent_tables.PushBack(tbl_obj, document->GetAllocator());
+  }
+  Value has_frequent_tables;
+  has_frequent_tables.SetBool(true);
+  document->AddMember("has_frequent_tables", has_frequent_tables,
+      document->GetAllocator());
+  document->AddMember("frequent_tables", frequent_tables, document->GetAllocator());
+  Value num_frequent_tables;
+  num_frequent_tables.SetInt(catalog_usage_result.frequently_accessed_tables.size());
+  document->AddMember("num_frequent_tables", num_frequent_tables,
+      document->GetAllocator());
+}
 
 void CatalogServer::CatalogObjectsUrlCallback(const Webserver::ArgumentMap& args,
     Document* document) {
@@ -384,7 +446,8 @@ void CatalogServer::CatalogObjectsUrlCallback(const Webserver::ArgumentMap& args
 
     // Get the object type and name from the topic entry key
     TCatalogObject request;
-    Status status = TCatalogObjectFromObjectName(object_type, object_name_arg->second, &request);
+    Status status =
+        TCatalogObjectFromObjectName(object_type, object_name_arg->second, &request);
 
     // Get the object and dump its contents.
     TCatalogObject result;
@@ -398,6 +461,38 @@ void CatalogServer::CatalogObjectsUrlCallback(const Webserver::ArgumentMap& args
     }
   } else {
     Value error("Please specify values for the object_type and object_name parameters.",
+        document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
+  }
+}
+
+void CatalogServer::TableMetricsUrlCallback(const Webserver::ArgumentMap& args,
+    Document* document) {
+  // TODO: Enable json view of table metrics
+  Webserver::ArgumentMap::const_iterator object_name_arg = args.find("name");
+  if (object_name_arg != args.end()) {
+    // Parse the object name to extract database and table names
+    const string& full_tbl_name = object_name_arg->second;
+    int pos = full_tbl_name.find(".");
+    if (pos == string::npos || pos >= full_tbl_name.size() - 1) {
+      stringstream error_msg;
+      error_msg << "Invalid table name: " << full_tbl_name;
+      Value error(error_msg.str().c_str(), document->GetAllocator());
+      document->AddMember("error", error, document->GetAllocator());
+      return;
+    }
+    string metrics;
+    Status status = catalog_->GetTableMetrics(
+        full_tbl_name.substr(0, pos), full_tbl_name.substr(pos + 1), &metrics);
+    if (status.ok()) {
+      Value metrics_str(metrics.c_str(), document->GetAllocator());
+      document->AddMember("table_metrics", metrics_str, document->GetAllocator());
+    } else {
+      Value error(status.GetDetail().c_str(), document->GetAllocator());
+      document->AddMember("error", error, document->GetAllocator());
+    }
+  } else {
+    Value error("Please specify the value of the name parameter.",
         document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
   }

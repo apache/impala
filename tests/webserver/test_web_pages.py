@@ -29,6 +29,7 @@ class TestWebPage(ImpalaTestSuite):
   RESET_GLOG_LOGLEVEL_URL = "http://localhost:{0}/reset_glog_level"
   CATALOG_URL = "http://localhost:{0}/catalog"
   CATALOG_OBJECT_URL = "http://localhost:{0}/catalog_object"
+  TABLE_METRICS_URL = "http://localhost:{0}/table_metrics"
   QUERY_BACKENDS_URL = "http://localhost:{0}/query_backends"
   THREAD_GROUP_URL = "http://localhost:{0}/thread-group"
   # log4j changes do not apply to the statestore since it doesn't
@@ -37,6 +38,7 @@ class TestWebPage(ImpalaTestSuite):
   # one with it.
   TEST_PORTS_WITHOUT_SS = ["25000", "25020"]
   TEST_PORTS_WITH_SS = ["25000", "25010", "25020"]
+  CATALOG_TEST_PORT = ["25020"]
 
   def test_memz(self):
     """test /memz at impalad / statestored / catalogd"""
@@ -151,6 +153,8 @@ class TestWebPage(ImpalaTestSuite):
     self.__test_catalog_object("functional_parquet", "alltypes")
     self.__test_catalog_object("functional", "alltypesnopart")
     self.__test_catalog_object("functional_kudu", "alltypes")
+    self.__test_table_metrics("functional", "alltypes", "total-file-size-bytes")
+    self.__test_table_metrics("functional_kudu", "alltypes", "alter-duration")
 
   def __test_catalog_object(self, db_name, tbl_name):
     """Tests the /catalog_object endpoint for the given db/table. Runs
@@ -163,6 +167,11 @@ class TestWebPage(ImpalaTestSuite):
     self.get_and_check_status(self.CATALOG_OBJECT_URL +
       "?object_type=TABLE&object_name=%s.%s" % (db_name, tbl_name), tbl_name,
       ports_to_test=self.TEST_PORTS_WITHOUT_SS)
+
+  def __test_table_metrics(self, db_name, tbl_name, metric):
+    self.client.execute("refresh %s.%s" % (db_name, tbl_name))
+    self.get_and_check_status(self.TABLE_METRICS_URL +
+      "?name=%s.%s" % (db_name, tbl_name), metric, ports_to_test=self.CATALOG_TEST_PORT)
 
   def test_query_details(self, unique_database):
     """Test that /query_backends returns the list of backend states for DML or queries;

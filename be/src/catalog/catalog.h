@@ -84,6 +84,15 @@ class Catalog {
   Status GetTableNames(const std::string& db, const std::string* pattern,
       TGetTablesResult* table_names);
 
+  /// Returns the collected metrics of a table. The response contains a
+  /// pretty-printed string representation of table metrics.
+  Status GetTableMetrics(const std::string& db, const std::string& tbl,
+      std::string* metrics);
+
+  /// Returns the current catalog usage that includes the most frequently accessed
+  /// tables as well as the tables with the highest memory requirements.
+  Status GetCatalogUsage(TGetCatalogUsageResponse* response);
+
   /// Gets all functions in the catalog matching the parameters in the given
   /// TFunctionsRequest.
   Status GetFunctions(const TGetFunctionsRequest& request,
@@ -109,8 +118,10 @@ class Catalog {
   jmethodID get_catalog_object_id_;  // JniCatalog.getCatalogObject()
   jmethodID get_catalog_delta_id_;  // JniCatalog.getCatalogDelta()
   jmethodID get_catalog_version_id_;  // JniCatalog.getCatalogVersion()
+  jmethodID get_catalog_usage_id_; // JniCatalog.getCatalogUsage()
   jmethodID get_dbs_id_; // JniCatalog.getDbs()
   jmethodID get_table_names_id_; // JniCatalog.getTableNames()
+  jmethodID get_table_metrics_id_; // JniCatalog.getTableMetrics()
   jmethodID get_functions_id_; // JniCatalog.getFunctions()
   jmethodID prioritize_load_id_; // JniCatalog.prioritizeLoad()
   jmethodID sentry_admin_check_id_; // JniCatalog.checkUserSentryAdmin()

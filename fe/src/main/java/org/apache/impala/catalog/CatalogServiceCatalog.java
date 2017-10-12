@@ -63,10 +63,12 @@ import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCatalogUpdateResult;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TGetCatalogDeltaResponse;
+import org.apache.impala.thrift.TGetCatalogUsageResponse;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.thrift.TTableUsageMetrics;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.SentryProxy;
@@ -74,6 +76,7 @@ import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TCompactProtocol;
 
+import com.codahale.metrics.Timer;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -1434,11 +1437,12 @@ public class CatalogServiceCatalog extends Catalog {
     Preconditions.checkState(!(tbl instanceof IncompleteTable));
     String dbName = tbl.getDb().getName();
     String tblName = tbl.getName();
-
     if (!tryLockTable(tbl)) {
       throw new CatalogException(String.format("Error refreshing metadata for table " +
           "%s due to lock contention", tbl.getFullName()));
     }
+    final Timer.Context context =
+        tbl.getMetrics().getTimer(Table.REFRESH_DURATION_METRIC).time();
     try {
       long newCatalogVersion = incrementAndGetCatalogVersion();
       versionLock_.writeLock().unlock();
@@ -1456,6 +1460,7 @@ public class CatalogServiceCatalog extends Catalog {
       LOG.info(String.format("Refreshed table metadata: %s", tbl.getFullName()));
       return tbl.toTCatalogObject();
     } finally {
+      context.stop();
       Preconditions.checkState(!versionLock_.isWriteLockedByCurrentThread());
       tbl.getLock().unlock();
     }
@@ -1903,5 +1908,60 @@ public class CatalogServiceCatalog extends Catalog {
           Math.max(versionToWaitFor, topicUpdateEntry.getLastSentCatalogUpdate());
     }
     return versionToWaitFor;
+  }
+
+  /**
+   * Retrieves information about the current catalog usage including the most frequently
+   * accessed tables as well as the tables with the highest memory requirements.
+   */
+  public TGetCatalogUsageResponse getCatalogUsage() {
+    TGetCatalogUsageResponse usage = new TGetCatalogUsageResponse();
+    usage.setLarge_tables(Lists.<TTableUsageMetrics>newArrayList());
+    usage.setFrequently_accessed_tables(Lists.<TTableUsageMetrics>newArrayList());
+    for (Table largeTable: CatalogUsageMonitor.INSTANCE.getLargestTables()) {
+      TTableUsageMetrics tableUsageMetrics =
+          new TTableUsageMetrics(largeTable.getTableName().toThrift());
+      tableUsageMetrics.setMemory_estimate_bytes(largeTable.getEstimatedMetadataSize());
+      usage.addToLarge_tables(tableUsageMetrics);
+    }
+    for (Table frequentTable:
+        CatalogUsageMonitor.INSTANCE.getFrequentlyAccessedTables()) {
+      TTableUsageMetrics tableUsageMetrics =
+          new TTableUsageMetrics(frequentTable.getTableName().toThrift());
+      tableUsageMetrics.setNum_metadata_operations(frequentTable.getMetadataOpsCount());
+      usage.addToFrequently_accessed_tables(tableUsageMetrics);
+    }
+    return usage;
+  }
+
+  /**
+   * Retrieves the stored metrics of the specified table and returns a pretty-printed
+   * string representation. Throws an exception if table metrics were not available
+   * because the table was not loaded or because another concurrent operation was holding
+   * the table lock.
+   */
+  public String getTableMetrics(TTableName tTableName) throws CatalogException {
+    String dbName = tTableName.db_name;
+    String tblName = tTableName.table_name;
+    Table tbl = getTable(dbName, tblName);
+    if (tbl == null) {
+      throw new CatalogException("Table " + dbName + "." + tblName + " was not found.");
+    }
+    String result;
+    if (tbl instanceof IncompleteTable) {
+      result = "No metrics available for table " + dbName + "." + tblName +
+          ". Table not yet loaded.";
+      return result;
+    }
+    if (!tbl.getLock().tryLock()) {
+      result = "Metrics for table " + dbName + "." + tblName + "are not available " +
+          "because the table is currently modified by another operation.";
+      return result;
+    }
+    try {
+      return tbl.getMetrics().toString();
+    } finally {
+      tbl.getLock().unlock();
+    }
   }
 }

@@ -45,6 +45,7 @@ import org.apache.impala.thrift.TGetDbsResult;
 import org.apache.impala.thrift.TGetFunctionsRequest;
 import org.apache.impala.thrift.TGetFunctionsResponse;
 import org.apache.impala.thrift.TGetTablesParams;
+import org.apache.impala.thrift.TGetTableMetricsParams;
 import org.apache.impala.thrift.TGetTablesResult;
 import org.apache.impala.thrift.TLogLevel;
 import org.apache.impala.thrift.TPrioritizeLoadRequest;
@@ -197,6 +198,16 @@ public class JniCatalog {
   }
 
   /**
+   * Returns the collected metrics of a table.
+   */
+  public String getTableMetrics(byte[] getTableMetricsParams) throws ImpalaException,
+      TException {
+    TGetTableMetricsParams params = new TGetTableMetricsParams();
+    JniUtil.deserializeThrift(protocolFactory_, params, getTableMetricsParams);
+    return catalog_.getTableMetrics(params.table_name);
+  }
+
+  /**
    * Gets the thrift representation of a catalog object.
    */
   public byte[] getCatalogObject(byte[] thriftParams) throws ImpalaException,
@@ -261,5 +272,13 @@ public class JniCatalog {
     JniUtil.deserializeThrift(protocolFactory_, request, thriftUpdateCatalog);
     TSerializer serializer = new TSerializer(protocolFactory_);
     return serializer.serialize(catalogOpExecutor_.updateCatalog(request));
+  }
+
+  /**
+   * Returns information about the current catalog usage.
+   */
+  public byte[] getCatalogUsage() throws ImpalaException, TException {
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    return serializer.serialize(catalog_.getCatalogUsage());
   }
 }

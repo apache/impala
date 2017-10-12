@@ -931,6 +931,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     thriftHdfsPart.setAccess_level(accessLevel_);
     thriftHdfsPart.setIs_marked_cached(isMarkedCached_);
     thriftHdfsPart.setId(getId());
+    thriftHdfsPart.setHas_incremental_stats(hasIncrementalStats());
     // IMPALA-4902: Shallow-clone the map to avoid concurrent modifications. One thread
     // may try to serialize the returned THdfsPartition after releasing the table's lock,
     // and another thread doing DDL may modify the map.
@@ -938,11 +939,16 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
         includeIncrementalStats ? hmsParameters_ : getFilteredHmsParameters()));
     if (includeFileDesc) {
       // Add block location information
+      long numBlocks = 0;
+      long totalFileBytes = 0;
       for (FileDescriptor fd: fileDescriptors_) {
         thriftHdfsPart.addToFile_desc(fd.toThrift());
+        numBlocks += fd.getNumFileBlocks();
+        totalFileBytes += fd.getFileLength();
       }
+      thriftHdfsPart.setNum_blocks(numBlocks);
+      thriftHdfsPart.setTotal_file_size_bytes(totalFileBytes);
     }
-
     return thriftHdfsPart;
   }
 

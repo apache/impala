@@ -58,6 +58,7 @@ import org.apache.kudu.client.PartitionSchema.RangeSchema;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
+import com.codahale.metrics.Timer;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -215,30 +216,36 @@ public class KuduTable extends Table {
   @Override
   public void load(boolean dummy /* not used */, IMetaStoreClient msClient,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
-    msTable_ = msTbl;
-    kuduTableName_ = msTable_.getParameters().get(KuduTable.KEY_TABLE_NAME);
-    Preconditions.checkNotNull(kuduTableName_);
-    kuduMasters_ = msTable_.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
-    Preconditions.checkNotNull(kuduMasters_);
-    setTableStats(msTable_);
-    // Load metadata from Kudu and HMS
+    final Timer.Context context =
+        getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time();
     try {
-      loadSchemaFromKudu();
-      loadAllColumnStats(msClient);
-    } catch (ImpalaRuntimeException e) {
-      throw new TableLoadingException("Error loading metadata for Kudu table " +
-          kuduTableName_, e);
-    }
+      msTable_ = msTbl;
+      kuduTableName_ = msTable_.getParameters().get(KuduTable.KEY_TABLE_NAME);
+      Preconditions.checkNotNull(kuduTableName_);
+      kuduMasters_ = msTable_.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
+      Preconditions.checkNotNull(kuduMasters_);
+      setTableStats(msTable_);
+      // Load metadata from Kudu and HMS
+      try {
+        loadSchemaFromKudu();
+        loadAllColumnStats(msClient);
+      } catch (ImpalaRuntimeException e) {
+        throw new TableLoadingException("Error loading metadata for Kudu table " +
+            kuduTableName_, e);
+      }
 
-    // Update the table schema in HMS.
-    try {
-      long lastDdlTime = CatalogOpExecutor.calculateDdlTime(msTable_);
-      msTable_.putToParameters("transient_lastDdlTime", Long.toString(lastDdlTime));
-      msTable_.putToParameters(StatsSetupConst.DO_NOT_UPDATE_STATS,
-          StatsSetupConst.TRUE);
-      msClient.alter_table(msTable_.getDbName(), msTable_.getTableName(), msTable_);
-    } catch (TException e) {
-      throw new TableLoadingException(e.getMessage());
+      // Update the table schema in HMS.
+      try {
+        long lastDdlTime = CatalogOpExecutor.calculateDdlTime(msTable_);
+        msTable_.putToParameters("transient_lastDdlTime", Long.toString(lastDdlTime));
+        msTable_.putToParameters(StatsSetupConst.DO_NOT_UPDATE_STATS,
+            StatsSetupConst.TRUE);
+        msClient.alter_table(msTable_.getDbName(), msTable_.getTableName(), msTable_);
+      } catch (TException e) {
+        throw new TableLoadingException(e.getMessage());
+      }
+    } finally {
+      context.stop();
     }
   }
 

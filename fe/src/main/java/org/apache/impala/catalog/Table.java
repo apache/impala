@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.hadoop.hive.common.StatsSetupConst;
@@ -30,6 +31,7 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.thrift.TAccessLevel;
@@ -73,6 +75,18 @@ public abstract class Table extends CatalogObjectImpl {
   // values of -1 indicate an unknown statistic.
   protected TTableStats tableStats_;
 
+  // Estimated size (in bytes) of this table metadata. Stored in an AtomicLong to allow
+  // this field to be accessed without holding the table lock.
+  protected AtomicLong estimatedMetadataSize_ = new AtomicLong(0);
+
+  // Number of metadata operations performed on that table since it was loaded.
+  // Stored in an AtomicLong to allow this field to be accessed without holding the
+  // table lock.
+  protected AtomicLong metadataOpsCount_ = new AtomicLong(0);
+
+  // Metrics for this table
+  protected final Metrics metrics_ = new Metrics();
+
   // colsByPos[i] refers to the ith column in the table. The first numClusteringCols are
   // the clustering columns.
   protected final ArrayList<Column> colsByPos_ = Lists.newArrayList();
@@ -89,6 +103,12 @@ public abstract class Table extends CatalogObjectImpl {
   // True if this object is stored in an Impalad catalog cache.
   protected boolean storedInImpaladCatalogCache_ = false;
 
+  // Table metrics. These metrics are applicable to all table types. Each subclass of
+  // Table can define additional metrics specific to that table type.
+  public static final String REFRESH_DURATION_METRIC = "refresh-duration";
+  public static final String ALTER_DURATION_METRIC = "alter-duration";
+  public static final String LOAD_DURATION_METRIC = "load-duration";
+
   protected Table(org.apache.hadoop.hive.metastore.api.Table msTable, Db db,
       String name, String owner) {
     msTable_ = msTable;
@@ -99,12 +119,36 @@ public abstract class Table extends CatalogObjectImpl {
         CatalogServiceCatalog.getLastDdlTime(msTable_) : -1;
     tableStats_ = new TTableStats(-1);
     tableStats_.setTotal_file_bytes(-1);
+    initMetrics();
   }
 
   public ReentrantLock getLock() { return tableLock_; }
   public abstract TTableDescriptor toThriftDescriptor(
       int tableId, Set<Long> referencedPartitions);
   public abstract TCatalogObjectType getCatalogObjectType();
+  public long getMetadataOpsCount() { return metadataOpsCount_.get(); }
+  public long getEstimatedMetadataSize() { return estimatedMetadataSize_.get(); }
+  public void setEstimatedMetadataSize(long estimatedMetadataSize) {
+    estimatedMetadataSize_.set(estimatedMetadataSize);
+    if (!isStoredInImpaladCatalogCache()) {
+      CatalogUsageMonitor.INSTANCE.updateLargestTables(this);
+    }
+  }
+
+  public void incrementMetadataOpsCount() {
+    metadataOpsCount_.incrementAndGet();
+    if (!isStoredInImpaladCatalogCache()) {
+      CatalogUsageMonitor.INSTANCE.updateFrequentlyAccessedTables(this);
+    }
+  }
+
+  public void initMetrics() {
+    metrics_.addTimer(REFRESH_DURATION_METRIC);
+    metrics_.addTimer(ALTER_DURATION_METRIC);
+    metrics_.addTimer(LOAD_DURATION_METRIC);
+  }
+
+  public Metrics getMetrics() { return metrics_; }
 
   // Returns true if this table reference comes from the impalad catalog cache or if it
   // is loaded from the testing framework. Returns false if this table reference points
@@ -526,5 +570,20 @@ public abstract class Table extends CatalogObjectImpl {
       }
     }
     return new Pair<String, Short>(cachePoolName, cacheReplication);
+  }
+
+  /**
+   * The implementations of hashCode() and equals() functions are using table names as
+   * unique identifiers of tables. Hence, they should be used with caution and not in
+   * cases where truly unique table objects are needed.
+   */
+  @Override
+  public int hashCode() { return getFullName().hashCode(); }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (obj == null) return false;
+    if (!(obj instanceof Table)) return false;
+    return getFullName().equals(((Table) obj).getFullName());
   }
 }

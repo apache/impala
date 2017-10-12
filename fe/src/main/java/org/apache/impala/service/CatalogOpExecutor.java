@@ -56,6 +56,7 @@ import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.catalog.CatalogUsageMonitor;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnNotFoundException;
 import org.apache.impala.catalog.DataSource;
@@ -152,6 +153,7 @@ import org.apache.impala.util.MetaStoreUtil;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
+import com.codahale.metrics.Timer;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -368,6 +370,8 @@ public class CatalogOpExecutor {
       throw new InternalException(String.format("Error altering table %s due to lock " +
           "contention.", tbl.getFullName()));
     }
+    final Timer.Context context
+        = tbl.getMetrics().getTimer(Table.ALTER_DURATION_METRIC).time();
     try {
       if (params.getAlter_type() == TAlterTableType.RENAME_VIEW
           || params.getAlter_type() == TAlterTableType.RENAME_TABLE) {
@@ -544,6 +548,7 @@ public class CatalogOpExecutor {
         response.setResult_set(resultSet);
       }
     } finally {
+      context.stop();
       Preconditions.checkState(!catalog_.getLock().isWriteLockedByCurrentThread());
       tbl.getLock().unlock();
     }
@@ -3165,6 +3170,8 @@ public class CatalogOpExecutor {
     if (!catalog_.tryLockTable(table)) {
       throw new InternalException("Error updating the catalog due to lock contention.");
     }
+    final Timer.Context context
+        = table.getMetrics().getTimer(HdfsTable.CATALOG_UPDATE_DURATION_METRIC).time();
     try {
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
       catalog_.getLock().writeLock().unlock();
@@ -3319,6 +3326,7 @@ public class CatalogOpExecutor {
       loadTableMetadata(table, newCatalogVersion, true, false, partsToLoadMetadata);
       addTableToCatalogUpdate(table, response.result);
     } finally {
+      context.stop();
       Preconditions.checkState(!catalog_.getLock().isWriteLockedByCurrentThread());
       table.getLock().unlock();
     }
@@ -3356,7 +3364,10 @@ public class CatalogOpExecutor {
    * This is to help protect against certain scenarios where the table was
    * modified or dropped between the time analysis completed and the the catalog op
    * started executing. However, even with these checks it is possible the table was
-   * modified or dropped/re-created without us knowing. TODO: Track object IDs to
+   * modified or dropped/re-created without us knowing. This function also updates the
+   * table usage counter.
+   *
+   * TODO: Track object IDs to
    * know when a table has been dropped and re-created with the same name.
    */
   private Table getExistingTable(String dbName, String tblName) throws CatalogException {
@@ -3364,6 +3375,7 @@ public class CatalogOpExecutor {
     if (tbl == null) {
       throw new TableNotFoundException("Table not found: " + dbName + "." + tblName);
     }
+    tbl.incrementMetadataOpsCount();
 
     if (!tbl.isLoaded()) {
       throw new CatalogException(String.format("Table '%s.%s' was modified while " +

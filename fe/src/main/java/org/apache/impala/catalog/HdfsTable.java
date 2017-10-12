@@ -95,6 +95,9 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
+import com.codahale.metrics.Gauge;
+import com.codahale.metrics.Timer;
+
 /**
  * Internal representation of table-related metadata of a file-resident table on a
  * Hadoop filesystem. The table data can be accessed through libHDFS (which is more of
@@ -123,6 +126,24 @@ public class HdfsTable extends Table {
 
   // Table property key for skip.header.line.count
   public static final String TBL_PROP_SKIP_HEADER_LINE_COUNT = "skip.header.line.count";
+
+  // Average memory requirements (in bytes) for storing the metadata of a partition.
+  private static final long PER_PARTITION_MEM_USAGE_BYTES = 2048;
+
+  // Average memory requirements (in bytes) for storing a file descriptor.
+  private static final long PER_FD_MEM_USAGE_BYTES = 500;
+
+  // Average memory requirements (in bytes) for storing a block.
+  private static final long PER_BLOCK_MEM_USAGE_BYTES = 150;
+
+  // Hdfs table specific metrics
+  public static final String CATALOG_UPDATE_DURATION_METRIC = "catalog-update-duration";
+  public static final String NUM_PARTITIONS_METRIC = "num-partitions";
+  public static final String NUM_FILES_METRIC = "num-files";
+  public static final String NUM_BLOCKS_METRIC = "num-blocks";
+  public static final String TOTAL_FILE_BYTES_METRIC = "total-file-size-bytes";
+  public static final String MEMORY_ESTIMATE_METRIC = "memory-estimate-bytes";
+  public static final String HAS_INCREMENTAL_STATS_METRIC = "has-incremental-stats";
 
   // string to indicate NULL. set in load() from table properties
   private String nullColumnValue_;
@@ -172,18 +193,13 @@ public class HdfsTable extends Table {
   // replicas of the block.
   private final ListMap<TNetworkAddress> hostIndex_ = new ListMap<TNetworkAddress>();
 
-  private HdfsPartitionLocationCompressor partitionLocationCompressor_;
-
-  // Total number of Hdfs files in this table. Accounted only in the Impalad catalog
-  // cache. Set to -1 on Catalogd.
-  private long numHdfsFiles_;
-
-  // Sum of sizes of all Hdfs files in this table. Accounted only in the Impalad
-  // catalog cache. Set to -1 on Catalogd.
-  private long totalHdfsBytes_;
+  // True iff this table has incremental stats in any of its partitions.
+  private boolean hasIncrementalStats_ = false;
 
   // True iff the table's partitions are located on more than one filesystem.
   private boolean multipleFileSystems_ = false;
+
+  private HdfsPartitionLocationCompressor partitionLocationCompressor_;
 
   // Base Hdfs directory where files of this table are stored.
   // For unpartitioned tables it is simply the path where all files live.
@@ -199,6 +215,50 @@ public class HdfsTable extends Table {
   // Flag to check if the table schema has been loaded. Used as a precondition
   // for setAvroSchema().
   private boolean isSchemaLoaded_ = false;
+
+  // Represents a set of storage-related statistics aggregated at the table or partition
+  // level.
+  public final static class FileMetadataStats {
+    // Nuber of files in a table/partition.
+    public long numFiles;
+    // Number of blocks in a table/partition.
+    public long numBlocks;
+    // Total size (in bytes) of all files in a table/partition.
+    public long totalFileBytes;
+
+    // Unsets the storage stats to indicate that their values are unknown.
+    public void unset() {
+      numFiles = -1;
+      numBlocks = -1;
+      totalFileBytes = -1;
+    }
+
+    // Initializes the values of the storage stats.
+    public void init() {
+      numFiles = 0;
+      numBlocks = 0;
+      totalFileBytes = 0;
+    }
+
+    public void set(FileMetadataStats stats) {
+      numFiles = stats.numFiles;
+      numBlocks = stats.numBlocks;
+      totalFileBytes = stats.totalFileBytes;
+    }
+  }
+
+  // Table level storage-related statistics. Depending on whether the table is stored in
+  // the catalog server or the impalad catalog cache, these statistics serve different
+  // purposes and, hence, are managed differently.
+  // Table stored in impalad catalog cache:
+  //   - Used in planning.
+  //   - Stats are modified real-time by the operations that modify table metadata
+  //   (e.g. add partition).
+  // Table stored in the the catalog server:
+  //   - Used for reporting through catalog web UI.
+  //   - Stats are reset whenever the table is loaded (due to a metadata operation) and
+  //   are set when the table is serialized to Thrift.
+  private FileMetadataStats fileMetadataStats_ = new FileMetadataStats();
 
   private final static Logger LOG = LoggerFactory.getLogger(HdfsTable.class);
 
@@ -311,17 +371,17 @@ public class HdfsTable extends Table {
   }
 
   /**
-   * Updates numHdfsFiles_ and totalHdfsBytes_ based on the partition information.
+   * Updates the storage stats of this table based on the partition information.
    * This is used only for the frontend tests that do not spawn a separate Catalog
    * instance.
    */
   public void computeHdfsStatsForTesting() {
-    Preconditions.checkState(numHdfsFiles_ == -1 && totalHdfsBytes_ == -1);
-    numHdfsFiles_ = 0;
-    totalHdfsBytes_ = 0;
+    Preconditions.checkState(fileMetadataStats_.numFiles == -1
+        && fileMetadataStats_.totalFileBytes == -1);
+    fileMetadataStats_.init();
     for (HdfsPartition partition: partitionMap_.values()) {
-      numHdfsFiles_ += partition.getNumFileDescriptors();
-      totalHdfsBytes_ += partition.getSize();
+      fileMetadataStats_.numFiles += partition.getNumFileDescriptors();
+      fileMetadataStats_.totalFileBytes += partition.getSize();
     }
   }
 
@@ -681,8 +741,7 @@ public class HdfsTable extends Table {
         nullPartitionIds_.add(Sets.<Long>newHashSet());
       }
     }
-    numHdfsFiles_ = 0;
-    totalHdfsBytes_ = 0;
+    fileMetadataStats_.init();
   }
 
   /**
@@ -1023,8 +1082,8 @@ public class HdfsTable extends Table {
     }
     if (partition.getFileFormat() == HdfsFileFormat.AVRO) hasAvroData_ = true;
     partitionMap_.put(partition.getId(), partition);
-    totalHdfsBytes_ += partition.getSize();
-    numHdfsFiles_ += partition.getNumFileDescriptors();
+    fileMetadataStats_.totalFileBytes += partition.getSize();
+    fileMetadataStats_.numFiles += partition.getNumFileDescriptors();
     updatePartitionMdAndColStats(partition);
   }
 
@@ -1078,8 +1137,8 @@ public class HdfsTable extends Table {
    */
   private HdfsPartition dropPartition(HdfsPartition partition) {
     if (partition == null) return null;
-    totalHdfsBytes_ -= partition.getSize();
-    numHdfsFiles_ -= partition.getNumFileDescriptors();
+    fileMetadataStats_.totalFileBytes -= partition.getSize();
+    fileMetadataStats_.numFiles -= partition.getNumFileDescriptors();
     Preconditions.checkArgument(partition.getPartitionValues().size() ==
         numClusteringCols_);
     Long partitionId = partition.getId();
@@ -1176,49 +1235,54 @@ public class HdfsTable extends Table {
       org.apache.hadoop.hive.metastore.api.Table msTbl,
       boolean loadParitionFileMetadata, boolean loadTableSchema,
       Set<String> partitionsToUpdate) throws TableLoadingException {
-    // turn all exceptions into TableLoadingException
-    msTable_ = msTbl;
+    final Timer.Context context =
+        getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time();
     try {
-      if (loadTableSchema) loadSchema(client, msTbl);
-      if (reuseMetadata && getCatalogVersion() == Catalog.INITIAL_CATALOG_VERSION) {
-        // This is the special case of CTAS that creates a 'temp' table that does not
-        // actually exist in the Hive Metastore.
-        initializePartitionMetadata(msTbl);
-        setTableStats(msTbl);
-        return;
-      }
-      // Load partition and file metadata
-      if (reuseMetadata) {
-        // Incrementally update this table's partitions and file metadata
-        LOG.info("Incrementally loading table metadata for: " + getFullName());
-        Preconditions.checkState(
-            partitionsToUpdate == null || loadParitionFileMetadata);
-        updateMdFromHmsTable(msTbl);
-        if (msTbl.getPartitionKeysSize() == 0) {
-          if (loadParitionFileMetadata) updateUnpartitionedTableFileMd();
-        } else {
-          updatePartitionsFromHms(
-              client, partitionsToUpdate, loadParitionFileMetadata);
+      // turn all exceptions into TableLoadingException
+      msTable_ = msTbl;
+      try {
+        if (loadTableSchema) loadSchema(client, msTbl);
+        if (reuseMetadata && getCatalogVersion() == Catalog.INITIAL_CATALOG_VERSION) {
+          // This is the special case of CTAS that creates a 'temp' table that does not
+          // actually exist in the Hive Metastore.
+          initializePartitionMetadata(msTbl);
+          setTableStats(msTbl);
+          return;
         }
-        LOG.info("Incrementally loaded table metadata for: " + getFullName());
-      } else {
-        // Load all partitions from Hive Metastore, including file metadata.
-        LOG.info("Fetching partition metadata from the Metastore: " + getFullName());
-        List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions =
-            MetaStoreUtil.fetchAllPartitions(
-                client, db_.getName(), name_, NUM_PARTITION_FETCH_RETRIES);
-        LOG.info("Fetched partition metadata from the Metastore: " + getFullName());
-        loadAllPartitions(msPartitions, msTbl);
+        // Load partition and file metadata
+        if (reuseMetadata) {
+          // Incrementally update this table's partitions and file metadata
+          LOG.info("Incrementally loading table metadata for: " + getFullName());
+          Preconditions.checkState(
+              partitionsToUpdate == null || loadParitionFileMetadata);
+          updateMdFromHmsTable(msTbl);
+          if (msTbl.getPartitionKeysSize() == 0) {
+            if (loadParitionFileMetadata) updateUnpartitionedTableFileMd();
+          } else {
+            updatePartitionsFromHms(
+                client, partitionsToUpdate, loadParitionFileMetadata);
+          }
+          LOG.info("Incrementally loaded table metadata for: " + getFullName());
+        } else {
+          // Load all partitions from Hive Metastore, including file metadata.
+          LOG.info("Fetching partition metadata from the Metastore: " + getFullName());
+          List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions =
+              MetaStoreUtil.fetchAllPartitions(
+                  client, db_.getName(), name_, NUM_PARTITION_FETCH_RETRIES);
+          LOG.info("Fetched partition metadata from the Metastore: " + getFullName());
+          loadAllPartitions(msPartitions, msTbl);
+        }
+        if (loadTableSchema) setAvroSchema(client, msTbl);
+        setTableStats(msTbl);
+        fileMetadataStats_.unset();
+      } catch (TableLoadingException e) {
+        throw e;
+      } catch (Exception e) {
+        throw new TableLoadingException("Failed to load metadata for table: "
+            + getFullName(), e);
       }
-      if (loadTableSchema) setAvroSchema(client, msTbl);
-      setTableStats(msTbl);
-      numHdfsFiles_ = -1;
-      totalHdfsBytes_ = -1;
-    } catch (TableLoadingException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new TableLoadingException("Failed to load metadata for table: "
-          + getFullName(), e);
+    } finally {
+      context.stop();
     }
   }
 
@@ -1648,25 +1712,49 @@ public class HdfsTable extends Table {
    * partitions). To prevent the catalog from hitting an OOM error while trying to
    * serialize large partition incremental stats, we estimate the stats size and filter
    * the incremental stats data from partition objects if the estimate exceeds
-   * --inc_stats_size_limit_bytes
+   * --inc_stats_size_limit_bytes. This function also collects storage related statistics
+   *  (e.g. number of blocks, files, etc) in order to compute an estimate of the metadata
+   *  size of this table.
    */
   private THdfsTable getTHdfsTable(boolean includeFileDesc, Set<Long> refPartitions) {
     // includeFileDesc implies all partitions should be included (refPartitions == null).
     Preconditions.checkState(!includeFileDesc || refPartitions == null);
+    long memUsageEstimate = 0;
     int numPartitions =
         (refPartitions == null) ? partitionMap_.values().size() : refPartitions.size();
+    memUsageEstimate += numPartitions * PER_PARTITION_MEM_USAGE_BYTES;
     long statsSizeEstimate =
         numPartitions * getColumns().size() * STATS_SIZE_PER_COLUMN_BYTES;
     boolean includeIncrementalStats =
         (statsSizeEstimate < BackendConfig.INSTANCE.getIncStatsMaxSize());
+    FileMetadataStats stats = new FileMetadataStats();
     Map<Long, THdfsPartition> idToPartition = Maps.newHashMap();
     for (HdfsPartition partition: partitionMap_.values()) {
       long id = partition.getId();
       if (refPartitions == null || refPartitions.contains(id)) {
-        idToPartition.put(id,
-            partition.toThrift(includeFileDesc, includeIncrementalStats));
+        THdfsPartition tHdfsPartition =
+            partition.toThrift(includeFileDesc, includeIncrementalStats);
+        if (tHdfsPartition.isSetHas_incremental_stats() &&
+            tHdfsPartition.isHas_incremental_stats()) {
+          memUsageEstimate += getColumns().size() * STATS_SIZE_PER_COLUMN_BYTES;
+          hasIncrementalStats_ = true;
+        }
+        if (includeFileDesc) {
+          Preconditions.checkState(tHdfsPartition.isSetNum_blocks() &&
+              tHdfsPartition.isSetTotal_file_size_bytes());
+          stats.numBlocks += tHdfsPartition.getNum_blocks();
+          stats.numFiles +=
+              tHdfsPartition.isSetFile_desc() ? tHdfsPartition.getFile_desc().size() : 0;
+          stats.totalFileBytes += tHdfsPartition.getTotal_file_size_bytes();
+        }
+        idToPartition.put(id, tHdfsPartition);
       }
     }
+    if (includeFileDesc) fileMetadataStats_.set(stats);
+
+    memUsageEstimate += fileMetadataStats_.numFiles * PER_FD_MEM_USAGE_BYTES +
+        fileMetadataStats_.numBlocks * PER_BLOCK_MEM_USAGE_BYTES;
+    setEstimatedMetadataSize(memUsageEstimate);
     THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_, getColumnNames(),
         nullPartitionKeyValue_, nullColumnValue_, idToPartition);
     hdfsTable.setAvroSchema(avroSchema_);
@@ -1680,7 +1768,7 @@ public class HdfsTable extends Table {
     return hdfsTable;
   }
 
-  public long getTotalHdfsBytes() { return totalHdfsBytes_; }
+  public long getTotalHdfsBytes() { return fileMetadataStats_.totalFileBytes; }
   public String getHdfsBaseDir() { return hdfsBaseDir_; }
   public Path getHdfsBaseDirPath() { return new Path(hdfsBaseDir_); }
   public boolean isAvroTable() { return avroSchema_ != null; }
@@ -1978,8 +2066,11 @@ public class HdfsTable extends Table {
       // Compute and report the extrapolated row count because the set of files could
       // have changed since we last computed stats for this partition. We also follow
       // this policy during scan-cardinality estimation.
-      if (statsExtrap) rowBuilder.add(getExtrapolatedNumRows(totalHdfsBytes_));
-      rowBuilder.add(numHdfsFiles_).addBytes(totalHdfsBytes_)
+      if (statsExtrap) {
+        rowBuilder.add(getExtrapolatedNumRows(fileMetadataStats_.totalFileBytes));
+      }
+      rowBuilder.add(fileMetadataStats_.numFiles)
+          .addBytes(fileMetadataStats_.totalFileBytes)
           .addBytes(totalCachedBytes).add("").add("").add("").add("");
       result.addToRows(rowBuilder.get());
     }
@@ -2072,13 +2163,13 @@ public class HdfsTable extends Table {
     // Conservative max size for Java arrays. The actual maximum varies
     // from JVM version and sometimes between configurations.
     final long JVM_MAX_ARRAY_SIZE = Integer.MAX_VALUE - 10;
-    if (numHdfsFiles_ > JVM_MAX_ARRAY_SIZE) {
+    if (fileMetadataStats_.numFiles > JVM_MAX_ARRAY_SIZE) {
       throw new IllegalStateException(String.format(
           "Too many files to generate a table sample. " +
           "Table '%s' has %s files, but a maximum of %s files are supported.",
-          getTableName().toString(), numHdfsFiles_, JVM_MAX_ARRAY_SIZE));
+          getTableName().toString(), fileMetadataStats_.numFiles, JVM_MAX_ARRAY_SIZE));
     }
-    int totalNumFiles = (int) numHdfsFiles_;
+    int totalNumFiles = (int) fileMetadataStats_.numFiles;
 
     // Ensure a consistent ordering of files for repeatable runs. The files within a
     // partition are already ordered based on how they are loaded in the catalog.
@@ -2133,5 +2224,38 @@ public class HdfsTable extends Table {
       --numFilesRemaining;
     }
     return result;
+  }
+
+  /**
+   * Registers table metrics.
+   */
+  @Override
+  public void initMetrics() {
+    super.initMetrics();
+    metrics_.addGauge(NUM_PARTITIONS_METRIC, new Gauge<Integer>() {
+      @Override
+      public Integer getValue() { return partitionMap_.values().size(); }
+    });
+    metrics_.addGauge(NUM_FILES_METRIC, new Gauge<Long>() {
+      @Override
+      public Long getValue() { return fileMetadataStats_.numFiles; }
+    });
+    metrics_.addGauge(NUM_BLOCKS_METRIC, new Gauge<Long>() {
+      @Override
+      public Long getValue() { return fileMetadataStats_.numBlocks; }
+    });
+    metrics_.addGauge(TOTAL_FILE_BYTES_METRIC, new Gauge<Long>() {
+      @Override
+      public Long getValue() { return fileMetadataStats_.totalFileBytes; }
+    });
+    metrics_.addGauge(MEMORY_ESTIMATE_METRIC, new Gauge<Long>() {
+      @Override
+      public Long getValue() { return getEstimatedMetadataSize(); }
+    });
+    metrics_.addGauge(HAS_INCREMENTAL_STATS_METRIC, new Gauge<Boolean>() {
+      @Override
+      public Boolean getValue() { return hasIncrementalStats_; }
+    });
+    metrics_.addTimer(CATALOG_UPDATE_DURATION_METRIC);
   }
 }

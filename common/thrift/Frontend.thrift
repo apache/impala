@@ -87,6 +87,17 @@ struct TGetTablesResult {
   1: list<string> tables
 }
 
+// Arguments to getTableMetrics, which returns the metrics of a specific table.
+struct TGetTableMetricsParams {
+  1: required CatalogObjects.TTableName table_name
+}
+
+// Response to a getTableMetrics request. The response contains all the collected metrics
+// pretty-printed into a string.
+struct TGetTableMetricsResponse {
+  1: required string metrics
+}
+
 // Arguments to getDbs, which returns a list of dbs that match an optional pattern
 struct TGetDbsParams {
   // If not set, match every database

@@ -20,6 +20,87 @@ under the License.
 
 <h2>Catalog</h2>
 
+{{?has_large_tables}}
+<div class="panel panel-info">
+  <div class="panel-heading">
+      <h2 class="panel-title">
+      Top-{{num_large_tables}} Tables with Highest Memory Requirements
+      </h2>
+  </div>
+  <div class="panel-body">
+    <table id="large-tables" class='table table-hover table-bordered'>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Estimated memory</th>
+          <th>Metrics</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#large_tables}}
+        <tr>
+          <td><a href="catalog_object?object_type=TABLE&object_name={{name}}">{{name}}</a>
+          </td>
+          <td>{{mem_estimate}}</td>
+          <td><a href="table_metrics?name={{name}}">{{name}}-metrics</a></td>
+        </tr>
+        {{/large_tables}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        $('#large-tables').DataTable({
+            "order": [[ 0, "desc" ]],
+            "pageLength": 10
+        });
+    });
+</script>
+{{/has_large_tables}}
+
+{{?has_frequent_tables}}
+<div class="panel panel-info">
+  <div class="panel-heading">
+      <h2 class="panel-title">
+      Top-{{num_frequent_tables}} Tables with Highest Number of Metadata Operations
+      </h2>
+  </div>
+  <div class="panel-body">
+    <table id="frequent-tables" class='table table-hover table-bordered'>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Metadata Operations (since loaded)</th>
+          <th>Metrics</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#frequent_tables}}
+        <tr>
+          <td><a href="catalog_object?object_type=TABLE&object_name={{name}}">{{name}}</a>
+          </td>
+          <td>{{num_metadata_ops}}</td>
+          <td><a href="table_metrics?name={{name}}">{{name}}-metrics</a></td>
+        </tr>
+        {{/frequent_tables}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        $('#frequent-tables').DataTable({
+            "order": [[ 0, "desc" ]],
+            "pageLength": 10
+        });
+    });
+</script>
+{{/has_frequent_tables}}
+
+<h3>Databases</h3>
 <ol class="breadcrumb">
 {{#databases}}
 <li><a href='#{{name}}'>{{name}}</a></li>
@@ -36,15 +117,37 @@ under the License.
     </a>
   </div>
   <div class="panel-body">
-    <ul>
-      {{#tables}}
-      <li>
-        <a href="catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
-      </li>
-      {{/tables}}
-    </ul>
+    <table id="{{name}}-tables" class='table table-hover table-bordered'>
+      <thead>
+        <tr>
+          <th>Name</th>
+          {{?has_metrics}}
+          <th>Metrics</th>
+          {{/has_metrics}}
+        </tr>
+      </thead>
+      <tbody>
+        {{#tables}}
+        <tr>
+          <td><a href="catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
+          </td>
+          {{?has_metrics}}
+          <td><a href="table_metrics?name={{fqtn}}">{{name}}-metrics</a></td>
+          {{/has_metrics}}
+        </tr>
+        {{/tables}}
+      </tbody>
+    </table>
   </div>
 </div>
+
+<script>
+    $(document).ready(function() {
+        $('#{{name}}-tables').DataTable({
+            "pageLength": 5
+        });
+    });
+</script>
 
 {{/databases}}
 

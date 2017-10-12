@@ -64,6 +64,8 @@ import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.StatsHelper;
 import org.apache.impala.util.TResultRowBuilder;
+
+import com.codahale.metrics.Timer;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -321,6 +323,8 @@ public class HBaseTable extends Table {
   public void load(boolean reuseMetadata, IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
     Preconditions.checkNotNull(getMetaStoreTable());
+    final Timer.Context context =
+        getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time();
     try {
       msTable_ = msTbl;
       hbaseTableName_ = getHBaseTableName(getMetaStoreTable());
@@ -414,6 +418,8 @@ public class HBaseTable extends Table {
     } catch (Exception e) {
       throw new TableLoadingException("Failed to load metadata for HBase table: " +
           name_, e);
+    } finally {
+      context.stop();
     }
   }
 

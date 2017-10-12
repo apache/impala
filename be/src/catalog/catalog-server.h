@@ -185,6 +185,35 @@ class CatalogServer {
   /// <host>:25020/catalog_objects?object_type=TABLE&object_name=foo.bar
   void CatalogObjectsUrlCallback(const Webserver::ArgumentMap& args,
       rapidjson::Document* document);
+
+  /// Retrieves from the FE information about the current catalog usage and populates
+  /// the /catalog debug webpage. The catalog usage includes information about the TOP-N
+  /// frequently used (in terms of number of metadata operations) tables as well as the
+  /// TOP-N tables with the highest memory requirements.
+  ///
+  /// Example output:
+  /// "large_tables": [
+  ///     {
+  ///       "name": "functional.alltypesagg",
+  ///       "mem_estimate": 212434233
+  ///     }
+  ///  ]
+  ///  "frequent_tables": [
+  ///      {
+  ///        "name": "functional.alltypestiny",
+  ///        "frequency": 10
+  ///      }
+  ///  ]
+  void GetCatalogUsage(rapidjson::Document* document);
+
+  /// Debug webpage handler that is used to dump all the registered metrics of a
+  /// table. The caller specifies the "name" parameter which is the fully
+  /// qualified table name and this function retrieves all the metrics of that
+  /// table. For example, to get the table metrics of table "bar" in database
+  /// "foo":
+  /// <host>:25020/table_metrics?name=foo.bar
+  void TableMetricsUrlCallback(const Webserver::ArgumentMap& args,
+      rapidjson::Document* document);
 };
 
 }

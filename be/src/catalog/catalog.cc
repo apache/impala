@@ -58,11 +58,13 @@ Catalog::Catalog() {
     {"execDdl", "([B)[B", &exec_ddl_id_},
     {"resetMetadata", "([B)[B", &reset_metadata_id_},
     {"getTableNames", "([B)[B", &get_table_names_id_},
+    {"getTableMetrics", "([B)Ljava/lang/String;", &get_table_metrics_id_},
     {"getDbs", "([B)[B", &get_dbs_id_},
     {"getFunctions", "([B)[B", &get_functions_id_},
     {"checkUserSentryAdmin", "([B)V", &sentry_admin_check_id_},
     {"getCatalogObject", "([B)[B", &get_catalog_object_id_},
     {"getCatalogDelta", "([B)[B", &get_catalog_delta_id_},
+    {"getCatalogUsage", "()[B", &get_catalog_usage_id_},
     {"getCatalogVersion", "()J", &get_catalog_version_id_},
     {"prioritizeLoad", "([B)V", &prioritize_load_id_}};
 
@@ -129,6 +131,20 @@ Status Catalog::GetTableNames(const string& db, const string* pattern,
   params.__set_db(db);
   if (pattern != NULL) params.__set_pattern(*pattern);
   return JniUtil::CallJniMethod(catalog_, get_table_names_id_, params, table_names);
+}
+
+Status Catalog::GetTableMetrics(const string& db, const string& tbl,
+    string* table_metrics) {
+  TGetTableMetricsParams params;
+  TTableName tblName;
+  tblName.__set_db_name(db);
+  tblName.__set_table_name(tbl);
+  params.__set_table_name(tblName);
+  return JniUtil::CallJniMethod(catalog_, get_table_metrics_id_, params, table_metrics);
+}
+
+Status Catalog::GetCatalogUsage(TGetCatalogUsageResponse* response) {
+  return JniUtil::CallJniMethod(catalog_, get_catalog_usage_id_, response);
 }
 
 Status Catalog::GetFunctions(const TGetFunctionsRequest& request,

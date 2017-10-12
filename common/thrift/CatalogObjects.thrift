@@ -266,6 +266,17 @@ struct THdfsPartition {
 
   // (key,value) pairs stored in the Hive Metastore.
   15: optional map<string, string> hms_parameters
+
+  // The following fields store stats about this partition
+  // which are collected when toThrift() is called.
+  // Total number of blocks in this partition.
+  16: optional i64 num_blocks
+
+  // Total file size in bytes of this partition.
+  17: optional i64 total_file_size_bytes
+
+  // True, if this partition has incremental stats
+  18: optional bool has_incremental_stats
 }
 
 struct THdfsTable {
