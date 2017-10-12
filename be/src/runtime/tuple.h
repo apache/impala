@@ -243,6 +243,14 @@ class Tuple {
     return reinterpret_cast<const char*>(this) + offset;
   }
 
+  bool* GetBoolSlot(int offset) {
+    return static_cast<bool*>(GetSlot(offset));
+  }
+
+  int64_t* GetBigIntSlot(int offset) {
+    return static_cast<int64_t*>(GetSlot(offset));
+  }
+
   StringValue* GetStringSlot(int offset) {
     DCHECK(offset != -1);  // -1 offset indicates non-materialized slot
     return reinterpret_cast<StringValue*>(reinterpret_cast<char*>(this) + offset);

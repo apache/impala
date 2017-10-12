@@ -114,6 +114,8 @@ class BatchedBitReader {
   /// Resets the read to start reading from the start of 'buffer'. The buffer's
   /// length is 'buffer_len'. Does not take ownership of the buffer.
   void Reset(const uint8_t* buffer, int64_t buffer_len) {
+    DCHECK(buffer != nullptr);
+    DCHECK_GE(buffer_len, 0);
     buffer_pos_ = buffer;
     buffer_end_ = buffer + buffer_len;
   }

@@ -232,10 +232,12 @@ class ParquetColumnReader {
   /// true.
   virtual bool NextLevels() = 0;
 
-  /// Should only be called if pos_slot_desc_ is non-NULL. Writes pos_current_value_ to
-  /// 'tuple' (i.e. "reads" the synthetic position field of the parent collection into
-  /// 'tuple') and increments pos_current_value_.
-  void ReadPosition(Tuple* tuple);
+  /// Writes pos_current_value_ (i.e. "reads" the synthetic position field of the
+  /// parent collection) to 'pos' and increments pos_current_value_. Only valid to
+  /// call when doing non-batched reading, i.e. NextLevels() must have been called
+  /// before each call to this function to advance to the next element in the
+  /// collection.
+  void ReadPositionNonBatched(int64_t* pos);
 
   /// Returns true if this column reader has reached the end of the row group.
   inline bool RowGroupAtEnd() {
@@ -251,7 +253,7 @@ class ParquetColumnReader {
  protected:
   HdfsParquetScanner* parent_;
   const SchemaNode& node_;
-  const SlotDescriptor* slot_desc_;
+  const SlotDescriptor* const slot_desc_;
 
   /// The slot descriptor for the position field of the tuple, if there is one. NULL if
   /// there's not. Only one column reader for a given tuple desc will have this set.
@@ -272,17 +274,17 @@ class ParquetColumnReader {
   /// INVALID_LEVEL and ROW_GROUP_END. The maximum values are cached here because they
   /// are accessed in inner loops.
   int16_t rep_level_;
-  int16_t max_rep_level_;
+  const int16_t max_rep_level_;
   int16_t def_level_;
-  int16_t max_def_level_;
+  const int16_t max_def_level_;
 
   // Cache frequently accessed members of slot_desc_ for perf.
 
   /// slot_desc_->tuple_offset(). -1 if slot_desc_ is NULL.
-  int tuple_offset_;
+  const int tuple_offset_;
 
   /// slot_desc_->null_indicator_offset(). Invalid if slot_desc_ is NULL.
-  NullIndicatorOffset null_indicator_offset_;
+  const NullIndicatorOffset null_indicator_offset_;
 
   ParquetColumnReader(HdfsParquetScanner* parent, const SchemaNode& node,
       const SlotDescriptor* slot_desc)
@@ -579,13 +581,12 @@ class CollectionColumnReader : public ParquetColumnReader {
   void UpdateDerivedState();
 
   /// Recursively reads from children_ to assemble a single CollectionValue into
-  /// the appropriate destination slot in 'tuple'. Also advances rep_level_ and
-  /// def_level_ via NextLevels().
+  /// 'slot'. Also advances rep_level_ and def_level_ via NextLevels().
   ///
   /// Returns false if execution should be aborted for some reason, e.g. parse_error_ is
   /// set, the query is cancelled, or the scan node limit was reached. Otherwise returns
   /// true.
-  inline bool ReadSlot(Tuple* tuple, MemPool* pool);
+  inline bool ReadSlot(CollectionValue* slot, MemPool* pool);
 };
 
 }
