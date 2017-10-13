@@ -52,6 +52,7 @@ class TestBreakpadBase(CustomClusterTestSuite):
 
   @classmethod
   def setup_class(cls):
+    super(TestBreakpadBase, cls).setup_class()
     # Disable core dumps for this test
     setrlimit(RLIMIT_CORE, (0, RLIM_INFINITY))
 
