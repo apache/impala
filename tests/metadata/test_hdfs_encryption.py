@@ -160,7 +160,7 @@ class TestHdfsEncryption(ImpalaTestSuite):
     self.client.execute("alter table {0}.t1 add partition(j=3)".format(TEST_DB));
     # Clean up the trash directory to create an encrypted zone
     rc, stdout, stderr = exec_process(
-            "hadoop fs -rmr /user/{0}/.Trash/*".format(getpass.getuser()))
+            "hadoop fs -rm -r /user/{0}/.Trash/*".format(getpass.getuser()))
     assert rc == 0, 'Error deleting Trash: %s %s' % (stdout, stderr)
     # Create the necessary encryption zones
     self.create_encryption_zone("testkey1", "/test-warehouse/{0}.db/t1/j=1"\
@@ -169,8 +169,16 @@ class TestHdfsEncryption(ImpalaTestSuite):
             .format(TEST_DB))
     self.create_encryption_zone("testkey1", "/test-warehouse/{0}.db/t1/j=3"\
             .format(TEST_DB))
-    self.create_encryption_zone("testkey2", "/user/{0}/.Trash/".format(\
-            getpass.getuser()))
+
+    # HDFS 2.8+ behavior is to create individual trash per encryption zone;
+    # don't create an encryption zone on .Trash in that case, otherwise
+    # recursive trash is created.
+    has_own_trash = self.hdfs_client.exists(
+        "/test-warehouse/{0}.db/t1/j=1/.Trash".format(TEST_DB))
+    if not has_own_trash:
+      self.create_encryption_zone("testkey2", "/user/{0}/.Trash/".format(\
+              getpass.getuser()))
+
     # Load sample data into the partition directories
     self.hdfs_client.create_file("test-warehouse/{0}.db/t1/j=1/j1.txt"\
             .format(TEST_DB), file_data='j1')
@@ -178,12 +186,25 @@ class TestHdfsEncryption(ImpalaTestSuite):
             .format(TEST_DB), file_data='j2')
     self.hdfs_client.create_file("test-warehouse/{0}.db/t1/j=3/j3.txt"\
             .format(TEST_DB), file_data='j3')
+
     # Drop the partition (j=1) without purge and make sure partition directory still
     # exists. This behavior is expected due to the difference in encryption zones
-    self.execute_query_expect_failure(self.client, "alter table {0}.t1 drop \
-            partition(j=1)".format(TEST_DB));
-    assert self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=1/j1.txt".format(TEST_DB))
-    assert self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=1".format(TEST_DB))
+    # between the .Trash and the warehouse directory (prior to HDFS 2.8)
+    if not has_own_trash:
+      self.execute_query_expect_failure(self.client, "alter table {0}.t1 drop \
+              partition(j=1)".format(TEST_DB));
+      assert self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=1/j1.txt".format(TEST_DB))
+      assert self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=1".format(TEST_DB))
+    else:
+      # HDFS 2.8+ behavior succeeds the query and creates trash; the partition removal
+      # ends up destroying the directories which moves this back to the user's trash
+      self.client.execute("alter table {0}.t1 drop partition(j=1)".format(TEST_DB));
+      assert self.hdfs_client.exists(
+        "/user/{0}/.Trash/Current/test-warehouse/{1}.db/t1/j=1/j1.txt"\
+        .format(getpass.getuser(), TEST_DB))
+      assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=1/j1.txt".format(TEST_DB))
+      assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=1".format(TEST_DB))
+
     # Drop the partition j=2 (with purge) and make sure the partition directory is deleted
     self.client.execute("alter table {0}.t1 drop partition(j=2) purge".format(TEST_DB))
     assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/j=2/j2.txt".format(TEST_DB))
