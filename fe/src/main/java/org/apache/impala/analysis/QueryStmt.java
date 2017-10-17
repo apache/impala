@@ -260,7 +260,7 @@ public abstract class QueryStmt extends StatementBase {
         analyzer.registerValueTransfer(
             inputSlotRef.getSlotId(), outputSlotRef.getSlotId());
       } else {
-        analyzer.createAuxEquivPredicate(outputSlotRef, inputSlotRef);
+        analyzer.createAuxEqPredicate(outputSlotRef, inputSlotRef);
       }
     }
 

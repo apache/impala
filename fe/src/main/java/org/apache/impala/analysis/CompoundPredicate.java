@@ -89,9 +89,8 @@ public class CompoundPredicate extends Predicate {
   public Operator getOp() { return op_; }
 
   @Override
-  public boolean equals(Object obj) {
-    if (!super.equals(obj)) return false;
-    return ((CompoundPredicate) obj).op_ == op_;
+  public boolean localEquals(Expr that) {
+    return super.localEquals(that) && ((CompoundPredicate) that).op_ == op_;
   }
 
   @Override

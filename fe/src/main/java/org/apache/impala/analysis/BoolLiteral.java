@@ -60,11 +60,8 @@ public class BoolLiteral extends LiteralExpr {
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (!super.equals(obj)) {
-      return false;
-    }
-    return ((BoolLiteral) obj).value_ == value_;
+  public boolean localEquals(Expr that) {
+    return super.localEquals(that) && ((BoolLiteral) that).value_ == value_;
   }
 
   @Override

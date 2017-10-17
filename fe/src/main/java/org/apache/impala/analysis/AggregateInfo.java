@@ -574,7 +574,7 @@ public class AggregateInfo extends AggregateInfoBase {
           new SlotRef(outputTupleDesc_.getSlots().get(i)),
           new SlotRef(intermediateTupleDesc_.getSlots().get(i)));
       if (i < groupingExprs_.size()) {
-        analyzer.createAuxEquivPredicate(
+        analyzer.createAuxEqPredicate(
             new SlotRef(outputTupleDesc_.getSlots().get(i)),
             new SlotRef(intermediateTupleDesc_.getSlots().get(i)));
       }

@@ -128,8 +128,8 @@ public class SingleNodePlanner {
     // Use the stmt's analyzer which is not necessarily the root analyzer
     // to detect empty result sets.
     Analyzer analyzer = queryStmt.getAnalyzer();
-    analyzer.computeEquivClasses();
-    ctx_.getAnalysisResult().getTimeline().markEvent("Equivalence classes computed");
+    analyzer.computeValueTransferGraph();
+    ctx_.getAnalysisResult().getTimeline().markEvent("Value transfer graph computed");
 
     // Mark slots referenced by output exprs as materialized, prior to generating the
     // plan tree.
@@ -1372,25 +1372,15 @@ public class SingleNodePlanner {
     if (!result.isEmpty()) return result;
 
     // Construct join conjuncts derived from equivalence class membership.
+    HashSet<TupleId> lhsTblRefIdsHs = new HashSet<>(lhsTblRefIds);
     for (TupleId rhsId: rhsTblRefIds) {
       TableRef rhsTblRef = analyzer.getTableRef(rhsId);
       Preconditions.checkNotNull(rhsTblRef);
       for (SlotDescriptor slotDesc: rhsTblRef.getDesc().getSlots()) {
         SlotId rhsSid = slotDesc.getId();
-        // List of slots that participate in a value transfer with rhsSid and are belong
-        // to a tuple in lhsTblRefIds. The value transfer is not necessarily mutual.
-        List<SlotId> lhsSlotIds = analyzer.getEquivSlots(rhsSid, lhsTblRefIds);
-        for (SlotId lhsSid: lhsSlotIds) {
-          // A mutual value transfer between lhsSid and rhsSid is required for correctly
-          // generating an inferred predicate. Otherwise, the predicate might incorrectly
-          // eliminate rows that would have been non-matches of an outer or anti join.
-          if (analyzer.hasMutualValueTransfer(lhsSid, rhsSid)) {
-            // construct a BinaryPredicates in order to get correct casting;
-            // we only do this for one of the equivalent slots, all the other implied
-            // equalities are redundant
-            BinaryPredicate pred =
-                analyzer.createInferredEqPred(lhsSid, rhsSid);
-            result.add(pred);
+        for (SlotId lhsSid : analyzer.getEquivClass(rhsSid)) {
+          if (lhsTblRefIdsHs.contains(analyzer.getTupleId(lhsSid))) {
+            result.add(analyzer.createInferredEqPred(lhsSid, rhsSid));
             break;
           }
         }

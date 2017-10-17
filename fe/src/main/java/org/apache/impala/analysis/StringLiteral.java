@@ -60,9 +60,9 @@ public class StringLiteral extends LiteralExpr {
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (!super.equals(obj)) return false;
-    StringLiteral other = (StringLiteral) obj;
+  public boolean localEquals(Expr that) {
+    if (!super.localEquals(that)) return false;
+    StringLiteral other = (StringLiteral) that;
     return needsUnescaping_ == other.needsUnescaping_ && value_.equals(other.value_);
   }
 

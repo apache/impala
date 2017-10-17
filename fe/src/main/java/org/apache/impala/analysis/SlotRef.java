@@ -29,8 +29,6 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 import org.apache.impala.thrift.TSlotRef;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
@@ -182,18 +180,29 @@ public class SlotRef extends Expr {
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (!super.equals(obj)) return false;
-    SlotRef other = (SlotRef) obj;
+  public boolean localEquals(Expr that) {
+    if (!super.localEquals(that)) return false;
+    SlotRef other = (SlotRef) that;
     // check slot ids first; if they're both set we only need to compare those
     // (regardless of how the ref was constructed)
     if (desc_ != null && other.desc_ != null) {
       return desc_.getId().equals(other.desc_.getId());
     }
-    if ((label_ == null) != (other.label_ == null)) return false;
-    if (!label_.equalsIgnoreCase(other.label_)) return false;
-    return true;
+    return label_ == null ? other.label_ == null : label_.equalsIgnoreCase(other.label_);
   }
+
+  /** Used for {@link Expr#matches(Expr, Comparator)} */
+  interface Comparator {
+    boolean matches(SlotRef a, SlotRef b);
+  }
+
+  /**
+   * A wrapper around localEquals() used for {@link #Expr#matches(Expr, Comparator)}.
+   */
+  static final Comparator SLOTREF_EQ_CMP = new Comparator() {
+    @Override
+    public boolean matches(SlotRef a, SlotRef b) { return a.localEquals(b); }
+  };
 
   @Override
   public boolean isBoundByTupleIds(List<TupleId> tids) {

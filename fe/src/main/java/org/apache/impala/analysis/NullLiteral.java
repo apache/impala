@@ -48,12 +48,6 @@ public class NullLiteral extends LiteralExpr {
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (!super.equals(obj)) return false;
-    return obj instanceof NullLiteral;
-  }
-
-  @Override
   public int hashCode() { return 0; }
 
   @Override

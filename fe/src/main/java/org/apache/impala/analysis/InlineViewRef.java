@@ -207,7 +207,7 @@ public class InlineViewRef extends TableRef {
       smap_.put(slotRef, colExpr);
       baseTblSmap_.put(slotRef, queryStmt_.getBaseTblResultExprs().get(i));
       if (createAuxPredicate(colExpr)) {
-        analyzer.createAuxEquivPredicate(new SlotRef(slotDesc), colExpr.clone());
+        analyzer.createAuxEqPredicate(new SlotRef(slotDesc), colExpr.clone());
       }
     }
     if (LOG.isTraceEnabled()) {

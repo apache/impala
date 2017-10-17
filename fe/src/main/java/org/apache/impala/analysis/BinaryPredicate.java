@@ -31,13 +31,13 @@ import org.apache.impala.common.Reference;
 import org.apache.impala.extdatasource.thrift.TComparisonOp;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Most predicates with two operands.
@@ -333,10 +333,8 @@ public class BinaryPredicate extends Predicate {
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (!super.equals(obj)) return false;
-    BinaryPredicate other = (BinaryPredicate) obj;
-    return op_.equals(other.op_);
+  public boolean localEquals(Expr that) {
+    return super.localEquals(that) && op_.equals(((BinaryPredicate)that).op_);
   }
 
   @Override

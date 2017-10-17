@@ -126,9 +126,9 @@ public class AnalyticExpr extends Expr {
   public AnalyticWindow getWindow() { return window_; }
 
   @Override
-  public boolean equals(Object obj) {
-    if (!super.equals(obj)) return false;
-    AnalyticExpr o = (AnalyticExpr)obj;
+  public boolean localEquals(Expr that) {
+    if (!super.localEquals(that)) return false;
+    AnalyticExpr o = (AnalyticExpr)that;
     if (!fnCall_.equals(o.getFnCall())) return false;
     if ((window_ == null) != (o.window_ == null)) return false;
     if (window_ != null) {

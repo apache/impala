@@ -98,9 +98,8 @@ public class LikePredicate extends Predicate {
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (!super.equals(obj)) return false;
-    return ((LikePredicate) obj).op_ == op_;
+  public boolean localEquals(Expr that) {
+    return super.localEquals(that) && ((LikePredicate) that).op_ == op_;
   }
 
   @Override

@@ -310,7 +310,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   /**
    * Perform semantic analysis of node and all of its children.
    * Throws exception if any errors found.
-   * @see org.apache.impala.parser.ParseNode#analyze(org.apache.impala.parser.Analyzer)
+   * @see ParseNode#analyze(Analyzer)
    */
   public final void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed()) return;
@@ -688,23 +688,45 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
+   * Returns true if this expr matches 'that'. Two exprs match if:
+   * 1. The tree structures ignoring implicit casts are the same.
+   * 2. For every pair of corresponding SlotRefs, slotRefCmp.matches() returns true.
+   * 3. For every pair of corresponding non-SlotRef exprs, localEquals() returns true.
+   */
+  public boolean matches(Expr that, SlotRef.Comparator slotRefCmp) {
+    if (that == null) return false;
+    if (this instanceof CastExpr && ((CastExpr)this).isImplicit()) {
+      return children_.get(0).matches(that, slotRefCmp);
+    }
+    if (that instanceof CastExpr && ((CastExpr)that).isImplicit()) {
+      return matches(((CastExpr) that).children_.get(0), slotRefCmp);
+    }
+    if (this instanceof SlotRef && that instanceof SlotRef) {
+      return slotRefCmp.matches((SlotRef)this, (SlotRef)that);
+    }
+    if (!localEquals(that)) return false;
+    if (children_.size() != that.children_.size()) return false;
+    for (int i = 0; i < children_.size(); ++i) {
+      if (!children_.get(i).matches(that.children_.get(i), slotRefCmp)) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Local eq comparator. Returns true if this expr is equal to 'that' ignoring children.
+   */
+  protected boolean localEquals(Expr that) {
+    return getClass() == that.getClass() &&
+        (fn_ == null ? that.fn_ == null : fn_.equals(that.fn_));
+  }
+
+  /**
    * Returns true if two expressions are equal. The equality comparison works on analyzed
-   * as well as unanalyzed exprs by ignoring implicit casts (see CastExpr.equals()).
+   * as well as unanalyzed exprs by ignoring implicit casts.
    */
   @Override
-  public boolean equals(Object obj) {
-    if (obj == null) return false;
-    if (obj.getClass() != this.getClass()) return false;
-    // don't compare type, this could be called pre-analysis
-    Expr expr = (Expr) obj;
-    if (children_.size() != expr.children_.size()) return false;
-    for (int i = 0; i < children_.size(); ++i) {
-      if (!children_.get(i).equals(expr.children_.get(i))) return false;
-    }
-    if (fn_ == null && expr.fn_ == null) return true;
-    if (fn_ == null || expr.fn_ == null) return false; // One null, one not
-    // Both fn_'s are not null
-    return fn_.equals(expr.fn_);
+  public final boolean equals(Object obj) {
+    return obj instanceof Expr && matches((Expr) obj, SlotRef.SLOTREF_EQ_CMP);
   }
 
   /**
@@ -738,7 +760,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * Return the intersection of l1 and l2.599
+   * Return the intersection of l1 and l2.
    */
   public static <C extends Expr> List<C> intersect(List<C> l1, List<C> l2) {
     List<C> result = new ArrayList<C>();
@@ -746,32 +768,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       if (l2.contains(element)) result.add(element);
     }
     return result;
-  }
-
-  /**
-   * Compute the intersection of l1 and l2, given the smap, and
-   * return the intersecting l1 elements in i1 and the intersecting l2 elements in i2.
-   */
-  public static void intersect(Analyzer analyzer,
-      List<Expr> l1, List<Expr> l2, ExprSubstitutionMap smap,
-      List<Expr> i1, List<Expr> i2) {
-    i1.clear();
-    i2.clear();
-    List<Expr> s1List = Expr.substituteList(l1, smap, analyzer, false);
-    Preconditions.checkState(s1List.size() == l1.size());
-    List<Expr> s2List = Expr.substituteList(l2, smap, analyzer, false);
-    Preconditions.checkState(s2List.size() == l2.size());
-    for (int i = 0; i < s1List.size(); ++i) {
-      Expr s1 = s1List.get(i);
-      for (int j = 0; j < s2List.size(); ++j) {
-        Expr s2 = s2List.get(j);
-        if (s1.equals(s2)) {
-          i1.add(l1.get(i));
-          i2.add(l2.get(j));
-          break;
-        }
-      }
-    }
   }
 
   @Override
@@ -951,6 +947,25 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     List<C> origList = Lists.newArrayList(l);
     l.clear();
     for (C expr: origList) if (!l.contains(expr)) l.add(expr);
+  }
+
+  /**
+   * Return a new list without duplicate exprs (according to matches() using cmp).
+   */
+  public static <C extends Expr> List<C> removeDuplicates(List<C> l,
+      SlotRef.Comparator cmp) {
+    List<C> newList = Lists.newArrayList();
+    for (C expr: l) {
+      boolean exists = false;
+      for (C newExpr : newList) {
+        if (newExpr.matches(expr, cmp)) {
+          exists = true;
+          break;
+        }
+      }
+      if (!exists) newList.add(expr);
+    }
+    return newList;
   }
 
   /**

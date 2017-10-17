@@ -131,9 +131,8 @@ public class NumericLiteral extends LiteralExpr {
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (!super.equals(obj)) return false;
-    return ((NumericLiteral) obj).value_.equals(value_);
+  public boolean localEquals(Expr that) {
+    return super.localEquals(that) && ((NumericLiteral) that).value_.equals(value_);
   }
 
   @Override

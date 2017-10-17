@@ -78,9 +78,8 @@ public class IsNullPredicate extends Predicate {
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (!super.equals(obj)) return false;
-    return ((IsNullPredicate) obj).isNotNull_ == isNotNull_;
+  public boolean localEquals(Expr that) {
+    return super.localEquals(that) && ((IsNullPredicate) that).isNotNull_ == isNotNull_;
   }
 
   @Override

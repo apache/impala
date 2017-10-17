@@ -61,9 +61,8 @@ public class ExistsPredicate extends Predicate {
   }
 
   @Override
-  public boolean equals(Object o) {
-    if (!super.equals(o)) return false;
-    return notExists_ == ((ExistsPredicate)o).notExists_;
+  public boolean localEquals(Expr that) {
+    return super.localEquals(that) && notExists_ == ((ExistsPredicate)that).notExists_;
   }
 
   @Override

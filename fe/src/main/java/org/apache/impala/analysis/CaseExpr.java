@@ -188,9 +188,9 @@ public class CaseExpr extends Expr {
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (!super.equals(obj)) return false;
-    CaseExpr expr = (CaseExpr) obj;
+  public boolean localEquals(Expr that) {
+    if (!super.localEquals(that)) return false;
+    CaseExpr expr = (CaseExpr)that;
     return hasCaseExpr_ == expr.hasCaseExpr_
         && hasElseExpr_ == expr.hasElseExpr_
         && isDecode() == expr.isDecode();

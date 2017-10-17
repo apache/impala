@@ -121,9 +121,6 @@ public class AnalyticPlanner {
             i == 0 ? partitionGroup.partitionByExprs : null);
       }
     }
-
-    // create equiv classes for newly added slots
-    analyzer_.createIdentityEquivClasses();
     return root;
   }
 
@@ -197,8 +194,7 @@ public class AnalyticPlanner {
     for (PartitionGroup pg: partitionGroups) {
       List<Expr> l1 = Lists.newArrayList();
       List<Expr> l2 = Lists.newArrayList();
-      Expr.intersect(analyzer_, pg.partitionByExprs, groupingExprs,
-          analyzer_.getEquivClassSmap(), l1, l2);
+      analyzer_.exprIntersect(pg.partitionByExprs, groupingExprs, l1, l2);
       // TODO: also look at l2 and take the max?
       long ndv = Expr.getNumDistinctValues(l1);
       if (ndv < 0 || ndv < numNodes || ndv < maxNdv) continue;

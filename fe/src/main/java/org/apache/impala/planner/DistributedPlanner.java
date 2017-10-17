@@ -26,6 +26,7 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.JoinOperator;
+import static org.apache.impala.analysis.JoinOperator.*;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.common.ImpalaException;
@@ -197,7 +198,8 @@ public class DistributedPlanner {
     // Kudu tables here (IMPALA-5254).
     DataPartition inputPartition = inputFragment.getDataPartition();
     if (!partitionExprs.isEmpty()
-        && analyzer.equivSets(inputPartition.getPartitionExprs(), partitionExprs)
+        && analyzer.setsHaveValueTransfer(inputPartition.getPartitionExprs(),
+        partitionExprs, true)
         && !(insertStmt.getTargetTable() instanceof KuduTable)) {
       return inputFragment;
     }
@@ -394,8 +396,26 @@ public class DistributedPlanner {
 
     // Connect the child fragments in a new fragment, and set the data partition
     // of the new fragment and its child fragments.
+    DataPartition outputPartition;
+    switch(node.getJoinOp()) {
+      // For full outer joins the null values of the lhs/rhs join exprs are not
+      // partitioned so random partition is the best we have now.
+      case FULL_OUTER_JOIN:
+        outputPartition = DataPartition.RANDOM;
+        break;
+      // For right anti and semi joins the lhs join slots does not appear in the output.
+      case RIGHT_ANTI_JOIN:
+      case RIGHT_SEMI_JOIN:
+      // For right outer joins the null values of the lhs join expr are not partitioned.
+      case RIGHT_OUTER_JOIN:
+        outputPartition = rhsJoinPartition;
+        break;
+      // Otherwise we're good to use the lhs partition.
+      default:
+        outputPartition = lhsJoinPartition;
+    }
     PlanFragment joinFragment =
-        new PlanFragment(ctx_.getNextFragmentId(), node, lhsJoinPartition);
+        new PlanFragment(ctx_.getNextFragmentId(), node, outputPartition);
     leftChildFragment.setDestination(lhsExchange);
     leftChildFragment.setOutputPartition(lhsJoinPartition);
     rightChildFragment.setDestination(rhsExchange);
@@ -449,10 +469,10 @@ public class DistributedPlanner {
     boolean rhsHasCompatPartition = false;
     long partitionCost = -1;
     if (lhsTree.getCardinality() != -1 && rhsTree.getCardinality() != -1) {
-      lhsHasCompatPartition = analyzer.equivSets(lhsJoinExprs,
-          leftChildFragment.getDataPartition().getPartitionExprs());
-      rhsHasCompatPartition = analyzer.equivSets(rhsJoinExprs,
-          rightChildFragment.getDataPartition().getPartitionExprs());
+      lhsHasCompatPartition = analyzer.setsHaveValueTransfer(
+          leftChildFragment.getDataPartition().getPartitionExprs(), lhsJoinExprs,false);
+      rhsHasCompatPartition = analyzer.setsHaveValueTransfer(
+          rightChildFragment.getDataPartition().getPartitionExprs(), rhsJoinExprs, false);
 
       Preconditions.checkState(rhsDataSize != -1);
       double lhsNetworkCost = (lhsHasCompatPartition) ? 0.0 :
@@ -567,7 +587,10 @@ public class DistributedPlanner {
     // 3. Each lhs part expr must have an equivalent expr at the same position
     // in the rhs part exprs.
     for (int i = 0; i < lhsPartExprs.size(); ++i) {
-      if (!analyzer.equivExprs(lhsPartExprs.get(i), rhsPartExprs.get(i))) return false;
+      if (!analyzer.exprsHaveValueTransfer(lhsPartExprs.get(i), rhsPartExprs.get(i),
+          true)) {
+        return false;
+      }
     }
     return true;
   }
@@ -594,9 +617,9 @@ public class DistributedPlanner {
     Preconditions.checkState(srcPartition.isHashPartitioned());
     List<Expr> srcPartExprs = srcPartition.getPartitionExprs();
     List<Expr> resultPartExprs = Lists.newArrayList();
-    for (int i = 0; i < srcPartExprs.size(); ++i) {
+    for (Expr srcPartExpr : srcPartExprs) {
       for (int j = 0; j < srcJoinExprs.size(); ++j) {
-        if (analyzer.equivExprs(srcPartExprs.get(i), srcJoinExprs.get(j))) {
+        if (analyzer.exprsHaveValueTransfer(srcPartExpr, srcJoinExprs.get(j), false)) {
           resultPartExprs.add(joinExprs.get(j).clone());
           break;
         }
@@ -785,9 +808,9 @@ public class DistributedPlanner {
     if (hasGrouping) {
       List<Expr> partitionExprs = node.getAggInfo().getPartitionExprs();
       if (partitionExprs == null) partitionExprs = groupingExprs;
-      boolean childHasCompatPartition = ctx_.getRootAnalyzer().equivSets(partitionExprs,
-            childFragment.getDataPartition().getPartitionExprs());
-      if (childHasCompatPartition && !childFragment.refsNullableTupleId(partitionExprs)) {
+      boolean childHasCompatPartition = ctx_.getRootAnalyzer().setsHaveValueTransfer(
+          partitionExprs, childFragment.getDataPartition().getPartitionExprs(), true);
+      if (childHasCompatPartition) {
         // The data is already partitioned on the required expressions. We can do the
         // aggregation in the child fragment without an extra merge step.
         // An exchange+merge step is required if the grouping exprs reference a tuple
@@ -874,8 +897,8 @@ public class DistributedPlanner {
         ctx_.getRootAnalyzer(), false);
 
     PlanFragment firstMergeFragment;
-    boolean childHasCompatPartition = ctx_.getRootAnalyzer().equivSets(partitionExprs,
-        childFragment.getDataPartition().getPartitionExprs());
+    boolean childHasCompatPartition = ctx_.getRootAnalyzer().setsHaveValueTransfer(
+        partitionExprs, childFragment.getDataPartition().getPartitionExprs(), true);
     if (childHasCompatPartition) {
       // The data is already partitioned on the required expressions, we can skip the
       // phase-1 merge step.
@@ -966,12 +989,8 @@ public class DistributedPlanner {
       sortNode.getInputPartition().substitute(
           childFragment.getPlanRoot().getOutputSmap(), ctx_.getRootAnalyzer());
       // Make sure the childFragment's output is partitioned as required by the sortNode.
-      // Even if the fragment and the sort partition exprs are equal, an exchange is
-      // required if the sort partition exprs reference a tuple that is made nullable in
-      // 'childFragment' to bring NULLs from outer-join non-matches together.
       DataPartition sortPartition = sortNode.getInputPartition();
-      if (!childFragment.getDataPartition().equals(sortPartition)
-          || childFragment.refsNullableTupleId(sortPartition.getPartitionExprs())) {
+      if (!childFragment.getDataPartition().equals(sortPartition)) {
         analyticFragment = createParentFragment(childFragment, sortPartition);
       }
     }

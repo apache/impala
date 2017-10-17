@@ -57,9 +57,9 @@ public class TimestampLiteral extends LiteralExpr {
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (!super.equals(obj)) return false;
-    return Arrays.equals(value_, ((TimestampLiteral) obj).value_);
+  public boolean localEquals(Expr that) {
+    return super.localEquals(that) &&
+        Arrays.equals(value_, ((TimestampLiteral) that).value_);
   }
 
   @Override

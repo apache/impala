@@ -496,23 +496,4 @@ public class PlanFragment extends TreeNode<PlanFragment> {
 
     for (PlanFragment child: getChildren()) child.verifyTree();
   }
-
-  /**
-   * Returns true if 'exprs' reference a tuple that is made nullable in this fragment,
-   * but not in any of its input fragments.
-   */
-  public boolean refsNullableTupleId(List<Expr> exprs) {
-    Preconditions.checkNotNull(planRoot_);
-    List<TupleId> tids = Lists.newArrayList();
-    for (Expr e: exprs) e.getIds(tids, null);
-    Set<TupleId> nullableTids = Sets.newHashSet(planRoot_.getNullableTupleIds());
-    // Remove all tuple ids that were made nullable in an input fragment.
-    List<ExchangeNode> exchNodes = Lists.newArrayList();
-    planRoot_.collect(ExchangeNode.class, exchNodes);
-    for (ExchangeNode exchNode: exchNodes) {
-      nullableTids.removeAll(exchNode.getNullableTupleIds());
-    }
-    for (TupleId tid: tids) if (nullableTids.contains(tid)) return true;
-    return false;
-  }
 }

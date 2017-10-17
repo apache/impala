@@ -179,13 +179,13 @@ public class FunctionCallExpr extends Expr {
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (!super.equals(obj)) return false;
-    FunctionCallExpr o = (FunctionCallExpr)obj;
+  public boolean localEquals(Expr that) {
+    if (!super.localEquals(that)) return false;
+    FunctionCallExpr o = (FunctionCallExpr)that;
     return fnName_.equals(o.fnName_) &&
-           params_.isDistinct() == o.params_.isDistinct() &&
-           params_.isIgnoreNulls() == o.params_.isIgnoreNulls() &&
-           params_.isStar() == o.params_.isStar();
+        params_.isDistinct() == o.params_.isDistinct() &&
+        params_.isIgnoreNulls() == o.params_.isIgnoreNulls() &&
+        params_.isStar() == o.params_.isStar();
   }
 
   @Override

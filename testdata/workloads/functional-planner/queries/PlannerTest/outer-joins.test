@@ -1049,3 +1049,108 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
 ====
+# IMPALA-6123: Test the partition compatibility check with consecutive outer joins.
+# In this query the output partition of the right outer join should be the rhs partition
+# t3.id, which is not compatible with the aggregation partition t2.id. There should be
+# an exchange node in the aggregation.
+# The first left outer join is used to ensure 't2' is made nullable before the fragment
+# executing the right outer join.
+select /* +straight_join */ t2.id, count(*)
+from functional.alltypes t1
+left outer join /* +shuffle */ functional.alltypessmall t2
+  on t1.int_col = t2.int_col
+right outer join /* +shuffle */ functional.alltypestiny t3
+  on t2.id = t3.id
+group by t2.id
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+12:EXCHANGE [UNPARTITIONED]
+|
+11:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: t2.id
+|
+10:EXCHANGE [HASH(t2.id)]
+|
+05:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: t2.id
+|
+04:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
+|  hash predicates: t2.id = t3.id
+|  runtime filters: RF000 <- t3.id
+|
+|--09:EXCHANGE [HASH(t3.id)]
+|  |
+|  02:SCAN HDFS [functional.alltypestiny t3]
+|     partitions=4/4 files=4 size=460B
+|
+08:EXCHANGE [HASH(t2.id)]
+|
+03:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
+|  hash predicates: t1.int_col = t2.int_col
+|
+|--07:EXCHANGE [HASH(t2.int_col)]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall t2]
+|     partitions=4/4 files=4 size=6.32KB
+|     runtime filters: RF000 -> t2.id
+|
+06:EXCHANGE [HASH(t1.int_col)]
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+====
+# IMPALA-6123: Test the partition compatibility check with consecutive outer joins.
+# In this query the output partition of the full outer join should be random. There should
+# be an exchange node in the aggregation.
+# The first right outer join is used to ensure 't1' is made nullable before the fragment
+# executing the full outer join.
+select /* +straight_join */ t1.int_col, count(*)
+from functional.alltypes t1
+right outer join /* +shuffle */ functional.alltypes t2
+  on t1.smallint_col = t2.smallint_col
+full outer join /* +shuffle */ functional.alltypes t3
+  on t1.int_col = t3.int_col
+group by t1.int_col
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+12:EXCHANGE [UNPARTITIONED]
+|
+11:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: t1.int_col
+|
+10:EXCHANGE [HASH(t1.int_col)]
+|
+05:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: t1.int_col
+|
+04:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
+|  hash predicates: t1.int_col = t3.int_col
+|
+|--09:EXCHANGE [HASH(t3.int_col)]
+|  |
+|  02:SCAN HDFS [functional.alltypes t3]
+|     partitions=24/24 files=24 size=478.45KB
+|
+08:EXCHANGE [HASH(t1.int_col)]
+|
+03:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
+|  hash predicates: t1.smallint_col = t2.smallint_col
+|  runtime filters: RF000 <- t2.smallint_col
+|
+|--07:EXCHANGE [HASH(t2.smallint_col)]
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|
+06:EXCHANGE [HASH(t1.smallint_col)]
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.smallint_col
+====

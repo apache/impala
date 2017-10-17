@@ -297,17 +297,11 @@ public class CastExpr extends Expr {
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (this == obj) return true;
-    if (obj instanceof CastExpr) {
-      CastExpr other = (CastExpr) obj;
-      return isImplicit_ == other.isImplicit_
-          && type_.equals(other.type_)
-          && super.equals(obj);
-    }
-    // Ignore implicit casts when comparing expr trees.
-    if (isImplicit_) return getChild(0).equals(obj);
-    return false;
+  public boolean localEquals(Expr that) {
+    if (!super.localEquals(that)) return false;
+    CastExpr other = (CastExpr) that;
+    return isImplicit_ == other.isImplicit_
+        && type_.equals(other.type_);
   }
 
   @Override

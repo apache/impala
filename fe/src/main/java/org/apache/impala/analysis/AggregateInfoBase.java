@@ -133,7 +133,7 @@ public abstract class AggregateInfoBase {
         // it'll simply show up as a gratuitous HAVING predicate
         // (which would actually be incorrect if the constant happens to be NULL)
         if (!expr.isConstant()) {
-          analyzer.createAuxEquivPredicate(new SlotRef(slotDesc), expr.clone());
+          analyzer.createAuxEqPredicate(new SlotRef(slotDesc), expr.clone());
         }
       } else {
         Preconditions.checkArgument(expr instanceof FunctionCallExpr);
