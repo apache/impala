@@ -608,20 +608,19 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
   }
 }
 
-Status AdmissionController::ReleaseQuery(QuerySchedule* schedule) {
-  if (!schedule->is_admitted()) return Status::OK(); // No-op if query was not admitted
-  const string& pool_name = schedule->request_pool();
+void AdmissionController::ReleaseQuery(const QuerySchedule& schedule) {
+  if (!schedule.is_admitted()) return; // No-op if query was not admitted
+  const string& pool_name = schedule.request_pool();
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
     PoolStats* stats = GetPoolStats(pool_name);
-    stats->Release(*schedule);
-    UpdateHostMemAdmitted(*schedule, -schedule->GetPerHostMemoryEstimate());
+    stats->Release(schedule);
+    UpdateHostMemAdmitted(schedule, -schedule.GetPerHostMemoryEstimate());
     pools_for_updates_.insert(pool_name);
-    VLOG_RPC << "Released query id=" << schedule->query_id() << " "
+    VLOG_RPC << "Released query id=" << schedule.query_id() << " "
              << stats->DebugString();
   }
   dequeue_cv_.NotifyOne();
-  return Status::OK();
 }
 
 // Statestore subscriber callback for IMPALA_REQUEST_QUEUE_TOPIC.

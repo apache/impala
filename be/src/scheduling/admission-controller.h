@@ -96,12 +96,13 @@ class ExecEnv;
 ///  a) Mem Reserved: the amount of memory that has been reported as reserved by all
 ///     backends, which come from the statestore topic updates. The values that are sent
 ///     come from the pool mem trackers in UpdateMemTrackerStats(), which reflects the
-///     memory reserved by fragments that have begun execution. For queries that have mem
-///     limits, the limit is considered to be its reserved memory, otherwise the current
-///     consumption is used (see MemTracker::GetPoolMemReserved()). The per-pool and
-///     per-host aggregates are computed in UpdateClusterAggregates(). This state, once
-///     all updates are fully distributed and aggregated, provides enough information to
-///     make admission decisions by any impalad. However, this requires waiting for both
+///     memory reserved by fragments that have begun execution. For queries that are
+///     executing and have mem limits, the limit is considered to be its reserved memory
+///     because it may consume up to that limit. Otherwise the query's current consumption
+///     is used (see MemTracker::GetPoolMemReserved()). The per-pool and per-host
+///     aggregates are computed in UpdateClusterAggregates(). This state, once all updates
+///     are fully distributed and aggregated, provides enough information to make
+///     admission decisions by any impalad. However, this requires waiting for both
 ///     admitted requests to start all remote fragments and then for the updated state to
 ///     be distributed via the statestore.
 ///  b) Mem Admitted: the amount of memory required (i.e. the value used in admission,
@@ -196,7 +197,7 @@ class AdmissionController {
   /// been submitted via AdmitQuery(). (If the request was not admitted, this is
   /// a no-op.)
   /// This does not block.
-  Status ReleaseQuery(QuerySchedule* schedule);
+  void ReleaseQuery(const QuerySchedule& schedule);
 
   /// Registers the request queue topic with the statestore.
   Status Init();

@@ -82,6 +82,9 @@ void QueryState::ReleaseExecResources() {
   if (initial_reservations_ != nullptr) initial_reservations_->ReleaseResources();
   if (buffer_reservation_ != nullptr) buffer_reservation_->Close();
   if (desc_tbl_ != nullptr) desc_tbl_->ReleaseResources();
+  // Mark the query as finished on the query MemTracker so that admission control will
+  // not consider the whole query memory limit to be "reserved".
+  query_mem_tracker_->set_query_exec_finished();
   // At this point query execution should not be consuming any resources but some tracked
   // memory may still be used by the ClientRequestState for result caching. The query
   // MemTracker will be closed later when this QueryState is torn down.

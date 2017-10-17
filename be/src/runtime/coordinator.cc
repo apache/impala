@@ -37,6 +37,7 @@
 #include "runtime/coordinator-backend-state.h"
 #include "runtime/debug-options.h"
 #include "runtime/query-state.h"
+#include "scheduling/admission-controller.h"
 #include "scheduling/scheduler.h"
 #include "util/bloom-filter.h"
 #include "util/counting-barrier.h"
@@ -80,6 +81,9 @@ Coordinator::Coordinator(
 Coordinator::~Coordinator() {
   DCHECK(released_exec_resources_)
       << "ReleaseExecResources() must be called before Coordinator is destroyed";
+  DCHECK(released_admission_control_resources_)
+      << "ReleaseAdmissionControlResources() must be called before Coordinator is "
+      << "destroyed";
   if (query_state_ != nullptr) {
     ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(query_state_);
   }
@@ -821,15 +825,16 @@ Status Coordinator::Wait() {
   // Execution of query fragments has finished. We don't need to hold onto query execution
   // resources while we finalize the query.
   ReleaseExecResources();
-
   // Query finalization is required only for HDFS table sinks
   if (needs_finalization_) RETURN_IF_ERROR(FinalizeQuery());
+  // Release admission control resources after we'd done the potentially heavyweight
+  // finalization.
+  ReleaseAdmissionControlResources();
 
   query_profile_->AddInfoString(
       "DML Stats", DataSink::OutputDmlStats(per_partition_status_, "\n"));
   // For DML queries, when Wait is done, the query is complete.
   ComputeQuerySummary();
-
   return status;
 }
 
@@ -860,10 +865,11 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos) {
     returned_all_results_ = true;
     // release query execution resources here, since we won't be fetching more result rows
     ReleaseExecResources();
-
     // wait for all backends to complete before computing the summary
     // TODO: relocate this so GetNext() won't have to wait for backends to complete?
     RETURN_IF_ERROR(WaitForBackendCompletion());
+    // Release admission control resources after backends are finished.
+    ReleaseAdmissionControlResources();
     // if the query completed successfully, compute the summary
     if (query_status_.ok()) ComputeQuerySummary();
   }
@@ -902,7 +908,7 @@ void Coordinator::CancelInternal() {
   backend_completion_cv_.NotifyAll();
 
   ReleaseExecResourcesLocked();
-
+  ReleaseAdmissionControlResourcesLocked();
   // Report the summary with whatever progress the query made before being cancelled.
   ComputeQuerySummary();
 }
@@ -1072,6 +1078,21 @@ void Coordinator::ReleaseExecResourcesLocked() {
   if (query_state_ != nullptr) query_state_->ReleaseExecResourceRefcount();
   // At this point some tracked memory may still be used in the coordinator for result
   // caching. The query MemTracker will be cleaned up later.
+}
+
+void Coordinator::ReleaseAdmissionControlResources() {
+  lock_guard<mutex> l(lock_);
+  ReleaseAdmissionControlResourcesLocked();
+}
+
+void Coordinator::ReleaseAdmissionControlResourcesLocked() {
+  if (released_admission_control_resources_) return;
+  LOG(INFO) << "Release admssion control resources for query "
+            << PrintId(query_ctx_.query_id);
+  AdmissionController* admission_controller =
+      ExecEnv::GetInstance()->admission_controller();
+  if (admission_controller != nullptr) admission_controller->ReleaseQuery(schedule_);
+  released_admission_control_resources_ = true;
 }
 
 void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
