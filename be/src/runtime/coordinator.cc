@@ -77,8 +77,8 @@ Coordinator::Coordinator(
     query_events_(events) {}
 
 Coordinator::~Coordinator() {
-  DCHECK(released_resources_)
-      << "ReleaseResources() must be called before Coordinator is destroyed";
+  DCHECK(released_exec_resources_)
+      << "ReleaseExecResources() must be called before Coordinator is destroyed";
   if (query_state_ != nullptr) {
     ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(query_state_);
   }
@@ -122,6 +122,7 @@ Status Coordinator::Exec() {
   lock_guard<mutex> l(lock_);
 
   query_state_ = ExecEnv::GetInstance()->query_exec_mgr()->CreateQueryState(query_ctx_);
+  query_state_->AcquireExecResourceRefcount(); // Decremented in ReleaseExecResources().
   filter_mem_tracker_ = query_state_->obj_pool()->Add(new MemTracker(
       -1, "Runtime Filter (Coordinator)", query_state_->query_mem_tracker(), false));
 
@@ -813,6 +814,10 @@ Status Coordinator::Wait() {
   Status status = WaitForBackendCompletion();
   if (!needs_finalization_ && !status.ok()) return status;
 
+  // Execution of query fragments has finished. We don't need to hold onto query execution
+  // resources while we finalize the query.
+  ReleaseExecResources();
+
   // Query finalization is required only for HDFS table sinks
   if (needs_finalization_) RETURN_IF_ERROR(FinalizeQuery());
 
@@ -849,11 +854,8 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos) {
 
   if (*eos) {
     returned_all_results_ = true;
-    // release resources here, since we won't be fetching more result rows
-    {
-      lock_guard<mutex> l(lock_);
-      ReleaseResources();
-    }
+    // release query execution resources here, since we won't be fetching more result rows
+    ReleaseExecResources();
 
     // wait for all backends to complete before computing the summary
     // TODO: relocate this so GetNext() won't have to wait for backends to complete?
@@ -895,10 +897,10 @@ void Coordinator::CancelInternal() {
       PrintId(query_id()), num_cancelled);
   backend_completion_cv_.notify_all();
 
+  ReleaseExecResourcesLocked();
+
   // Report the summary with whatever progress the query made before being cancelled.
   ComputeQuerySummary();
-
-  ReleaseResources();
 }
 
 Status Coordinator::UpdateBackendExecStatus(const TReportExecStatusParams& params) {
@@ -1039,9 +1041,14 @@ string Coordinator::GetErrorLog() {
   return PrintErrorMapToString(merged);
 }
 
-void Coordinator::ReleaseResources() {
-  if (released_resources_) return;
-  released_resources_ = true;
+void Coordinator::ReleaseExecResources() {
+  lock_guard<mutex> l(lock_);
+  ReleaseExecResourcesLocked();
+}
+
+void Coordinator::ReleaseExecResourcesLocked() {
+  if (released_exec_resources_) return;
+  released_exec_resources_ = true;
   if (filter_routing_table_.size() > 0) {
     query_profile_->AddInfoString("Final filter table", FilterDebugString());
   }
@@ -1056,9 +1063,11 @@ void Coordinator::ReleaseResources() {
   // This may be NULL while executing UDFs.
   if (filter_mem_tracker_ != nullptr) filter_mem_tracker_->Close();
   // Need to protect against failed Prepare(), where root_sink() would not be set.
-  if (coord_sink_ != nullptr) {
-    coord_sink_->CloseConsumer();
-  }
+  if (coord_sink_ != nullptr) coord_sink_->CloseConsumer();
+  // Now that we've released our own resources, can release query-wide resources.
+  if (query_state_ != nullptr) query_state_->ReleaseExecResourceRefcount();
+  // At this point some tracked memory may still be used in the coordinator for result
+  // caching. The query MemTracker will be cleaned up later.
 }
 
 void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
@@ -1084,12 +1093,14 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
     DCHECK(state->desc().has_remote_targets)
           << "Coordinator received filter that has only local targets";
 
-    // Check if the filter has already been sent, which could happen in three cases:
+    // Check if the filter has already been sent, which could happen in four cases:
     //   * if one local filter had always_true set - no point waiting for other local
     //     filters that can't affect the aggregated global filter
     //   * if this is a broadcast join, and another local filter was already received
     //   * if the filter could not be allocated and so an always_true filter was sent
     //     immediately.
+    //   * query execution finished and resources were released: filters do not need
+    //     to be processed.
     if (state->disabled()) return;
 
     if (filter_updates_received_->value() == 0) {

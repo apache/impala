@@ -139,14 +139,6 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// Only valid to call after Exec().
   QueryState* query_state() const { return query_state_; }
 
-  /// Only valid *after* calling Exec(). Return nullptr if the running query does not
-  /// produce any rows.
-  ///
-  /// TODO: The only dependency on this is QueryExecState, used to track memory for the
-  /// result cache. Remove this dependency, possibly by moving result caching inside this
-  /// class.
-  RuntimeState* runtime_state();
-
   /// Get cumulative profile aggregated over all fragments of the query.
   /// This is a snapshot of the current state of execution and will change in
   /// the future if not all fragments have finished execution.
@@ -286,8 +278,10 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// time.
   /// TODO: clarify to what extent the fields below need to be protected by lock_
   /// Lock ordering is
-  /// 1. lock_
-  /// 2. BackendState::lock_
+  /// 1. wait_lock_
+  /// 2. lock_
+  /// 3. BackendState::lock_
+  /// 4. filter_lock_
   boost::mutex lock_;
 
   /// Overall status of the entire query; set to the first reported fragment error
@@ -349,11 +343,15 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// safe to concurrently read from filter_routing_table_.
   bool filter_routing_table_complete_ = false;
 
-  /// True if and only if ReleaseResources() has been called.
-  bool released_resources_ = false;
+  /// True if and only if ReleaseExecResources() has been called.
+  bool released_exec_resources_ = false;
 
   /// Returns a local object pool.
   ObjectPool* obj_pool() { return obj_pool_.get(); }
+
+  /// Only valid *after* calling Exec(). Return nullptr if the running query does not
+  /// produce any rows.
+  RuntimeState* runtime_state();
 
   /// Returns a pretty-printed table of the current filter state.
   std::string FilterDebugString();
@@ -434,9 +432,11 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// filters that they either produce or consume.
   void InitFilterRoutingTable();
 
-  /// Releases filter resources, unregisters the filter mem tracker, and calls
-  /// CloseConsumer() on coord_sink_. Requires lock_ to be held. Idempotent.
-  void ReleaseResources();
+  /// Releases all resources associated with query execution. Acquires lock_. Idempotent.
+  void ReleaseExecResources();
+
+  /// Same as ReleaseExecResources() except the lock must be held by the caller.
+  void ReleaseExecResourcesLocked();
 };
 
 }

@@ -27,7 +27,6 @@
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Types_types.h"
 #include "runtime/tmp-file-mgr.h"
-#include "util/spinlock.h"
 #include "util/uid-util.h"
 #include "util/promise.h"
 
@@ -55,6 +54,10 @@ class RuntimeState;
 /// structures (contained either in this class or accessible through this class, such
 /// as the FragmentInstanceStates) are guaranteed to be alive.
 ///
+/// Query execution resources (non-control-structure memory, scratch files, threads, etc)
+/// are also managed via a separate resource reference count, which should be released as
+/// soon as the resources are not needed to free resources promptly.
+///
 /// When any fragment instance execution returns with an error status, all
 /// fragment instances are automatically cancelled.
 ///
@@ -66,10 +69,6 @@ class RuntimeState;
 ///
 /// TODO:
 /// - set up kudu clients in Init(), remove related locking
-/// - release resources (those referenced directly or indirectly by the query result
-///   set) automatically when all instances have finished execution
-///   (either by returning all rows or by being cancelled), rather than waiting for an
-///   explicit call to ReleaseResources()
 /// - when ReportExecStatus() encounters an error, query execution at this node
 ///   gets aborted, but it's possible for the coordinator not to find out about that;
 ///   fix the coordinator to periodically ping the backends (should the coordinator
@@ -120,9 +119,10 @@ class QueryState {
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
 
   /// Sets up state required for fragment execution: memory reservations, etc. Fails
-  /// if resources could not be acquired. On success, acquires an initial reservation
-  /// refcount for the caller, which the caller must release by calling
-  /// ReleaseInitialReservationRefcount().
+  /// if resources could not be acquired. Acquires a resource refcount and returns it
+  /// to the caller on both success and failure. The caller must release it by calling
+  /// ReleaseExecResourceRefcount().
+  ///
   /// Uses few cycles and never blocks. Not idempotent, not thread-safe.
   /// The remaining public functions must be called only after Init().
   Status Init(const TExecQueryFInstancesParams& rpc_params) WARN_UNUSED_RESULT;
@@ -149,10 +149,16 @@ class QueryState {
   /// instances have finished their Prepare phase. Idempotent.
   void Cancel();
 
-  /// Called once the query is complete to release any resources.
-  /// Must be called only once and before destroying the QueryState.
-  /// Not idempotent, not thread-safe.
-  void ReleaseResources();
+  /// Increment the resource refcount. Must be decremented before the query state
+  /// reference is released. A refcount should be held by a fragment or other entity
+  /// for as long as it is consuming query execution resources (e.g. memory).
+  void AcquireExecResourceRefcount();
+
+  /// Decrement the execution resource refcount and release resources if it goes to zero.
+  /// All resource refcounts must be released before query state references are released.
+  /// Should be called by the owner of the refcount after it is done consuming query
+  /// execution resources.
+  void ReleaseExecResourceRefcount();
 
   /// Sends a ReportExecStatus rpc to the coordinator. If fis == nullptr, the
   /// status must be an error. If fis is given, the content will depend on whether
@@ -198,10 +204,10 @@ class QueryState {
   /// 'buffer_reservation_'. Owned by 'obj_pool_'. Set in Prepare().
   InitialReservations* initial_reservations_ = nullptr;
 
-  /// Number of fragment instances executing, which may need to claim
-  /// from 'initial_reservations_'.
-  /// TODO: not needed if we call ReleaseResources() in a timely manner (IMPALA-1575).
-  AtomicInt32 initial_reservation_refcnt_;
+  /// Number of active fragment instances and coordinators for this query that may consume
+  /// resources for query execution (i.e. threads, memory) on the Impala daemon.
+  /// Query-wide execution resources for this query are released once this goes to zero.
+  AtomicInt32 exec_resource_refcnt_;
 
   /// Temporary files for this query (owned by obj_pool_). Non-null if spilling is
   /// enabled. Set in Prepare().
@@ -230,8 +236,8 @@ class QueryState {
   /// initiate cancellation exactly once
   AtomicInt32 is_cancelled_;
 
-  /// True if and only if ReleaseResources() has been called.
-  bool released_resources_ = false;
+  /// True if and only if ReleaseExecResources() has been called.
+  bool released_exec_resources_ = false;
 
   /// Whether the query has spilled. 0 if the query has not spilled. Atomically set to 1
   /// when the query first starts to spill. Required to correctly maintain the
@@ -252,9 +258,9 @@ class QueryState {
   /// Called from Init() to set up buffer reservations and the file group.
   Status InitBufferPoolState() WARN_UNUSED_RESULT;
 
-  /// Decrement 'initial_reservation_refcnt_' and release the initial reservation if it
-  /// goes to zero.
-  void ReleaseInitialReservationRefcount();
+  /// Releases resources used for query execution. Guaranteed to be called only once.
+  /// Must be called before destroying the QueryState. Not idempotent and not thread-safe.
+  void ReleaseExecResources();
 
   /// Same behavior as ReportExecStatus().
   /// Cancel on error only if instances_started is true.

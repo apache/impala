@@ -824,8 +824,7 @@ Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
     // Count the cached rows towards the mem limit.
     if (UNLIKELY(!query_mem_tracker->TryConsume(delta_bytes))) {
       string details("Failed to allocate memory for result cache.");
-      return query_mem_tracker->MemLimitExceeded(coord_->runtime_state(), details,
-          delta_bytes);
+      return query_mem_tracker->MemLimitExceeded(nullptr, details, delta_bytes);
     }
     // Append all rows fetched from the coordinator into the cache.
     int num_rows_added = result_cache_->AddRows(

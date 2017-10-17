@@ -347,6 +347,7 @@ class MemTracker {
   /// details of the allocation which caused the limit to be exceeded.
   /// If 'failed_allocation_size' is greater than zero, logs the allocation size. If
   /// 'failed_allocation_size' is zero, nothing about the allocation size is logged.
+  /// If 'state' is non-NULL, logs the error to 'state'.
   Status MemLimitExceeded(RuntimeState* state, const std::string& details,
       int64_t failed_allocation = 0) WARN_UNUSED_RESULT;
 
@@ -375,8 +376,15 @@ class MemTracker {
   static std::string LogUsage(int max_recursive_depth, const std::string& prefix,
       const std::list<MemTracker*>& trackers, int64_t* logged_consumption);
 
+  /// If an ancestor of this tracker is a query MemTracker, return that tracker.
+  /// Otherwise return NULL.
+  MemTracker* GetQueryMemTracker();
+
   /// Lock to protect GcMemory(). This prevents many GCs from occurring at once.
   boost::mutex gc_lock_;
+
+  /// True if this is a Query MemTracker returned from CreateQueryMemTracker().
+  bool is_query_mem_tracker_ = false;
 
   /// Only valid for MemTrackers returned from CreateQueryMemTracker()
   TUniqueId query_id_;
@@ -386,10 +394,13 @@ class MemTracker {
 
   /// Hard limit on memory consumption, in bytes. May not be exceeded. If limit_ == -1,
   /// there is no consumption limit.
-  int64_t limit_;
+  const int64_t limit_;
 
   std::string label_;
-  MemTracker* parent_;
+
+  /// The parent of this tracker. The pointer is never modified, even after this tracker
+  /// is unregistered.
+  MemTracker* const parent_;
 
   /// in bytes; not owned
   RuntimeProfile::HighWaterMarkCounter* consumption_;

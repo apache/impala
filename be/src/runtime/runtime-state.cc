@@ -75,6 +75,8 @@ RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragmentCtx& frag
   Init();
 }
 
+// Constructor for standalone RuntimeState for test execution and fe-support.cc.
+// Sets up a dummy local QueryState to allow evaluating exprs, etc.
 RuntimeState::RuntimeState(
     const TQueryCtx& qctx, ExecEnv* exec_env, DescriptorTbl* desc_tbl)
   : query_state_(new QueryState(qctx, "test-pool")),
@@ -85,6 +87,9 @@ RuntimeState::RuntimeState(
     utc_timestamp_(new TimestampValue(TimestampValue::Parse(qctx.utc_timestamp_string))),
     exec_env_(exec_env),
     profile_(RuntimeProfile::Create(obj_pool(), "<unnamed>")) {
+  // We may use execution resources while evaluating exprs, etc. Decremented in
+  // ReleaseResources() to release resources.
+  local_query_state_->AcquireExecResourceRefcount();
   if (query_ctx().request_pool.empty()) {
     const_cast<TQueryCtx&>(query_ctx()).request_pool = "test-pool";
   }
@@ -251,8 +256,7 @@ void RuntimeState::ReleaseResources() {
   instance_mem_tracker_->Close();
 
   if (local_query_state_.get() != nullptr) {
-    // if we created this QueryState, we must call ReleaseResources()
-    local_query_state_->ReleaseResources();
+    local_query_state_->ReleaseExecResourceRefcount();
   }
   released_resources_ = true;
 }

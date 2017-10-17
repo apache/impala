@@ -193,6 +193,7 @@ MemTracker* MemTracker::CreateQueryMemTracker(const TUniqueId& id,
           pool_name, true);
   MemTracker* tracker = obj_pool->Add(new MemTracker(
       byte_limit, Substitute("Query($0)", lexical_cast<string>(id)), pool_tracker));
+  tracker->is_query_mem_tracker_ = true;
   tracker->query_id_ = id;
   return tracker;
 }
@@ -316,6 +317,14 @@ string MemTracker::LogUsage(int max_recursive_depth, const string& prefix,
   return join(usage_strings, "\n");
 }
 
+MemTracker* MemTracker::GetQueryMemTracker() {
+  MemTracker* tracker = this;
+  while (tracker != nullptr && !tracker->is_query_mem_tracker_) {
+    tracker = tracker->parent_;
+  }
+  return tracker;
+}
+
 Status MemTracker::MemLimitExceeded(RuntimeState* state, const std::string& details,
     int64_t failed_allocation_size) {
   DCHECK_GE(failed_allocation_size, 0);
@@ -336,8 +345,8 @@ Status MemTracker::MemLimitExceeded(RuntimeState* state, const std::string& deta
      << PrettyPrinter::Print(process_capacity, TUnit::BYTES) << endl;
 
   // Always log the query tracker (if available).
-  if (state != nullptr) {
-    MemTracker* query_tracker = state->query_mem_tracker();
+  MemTracker* query_tracker = GetQueryMemTracker();
+  if (query_tracker != nullptr) {
     if (query_tracker->has_limit()) {
       const int64_t query_capacity = query_tracker->limit() - query_tracker->consumption();
       ss << "Memory left in query limit: "
@@ -347,8 +356,8 @@ Status MemTracker::MemLimitExceeded(RuntimeState* state, const std::string& deta
   }
 
   // Log the process level if the process tracker is close to the limit or
-  // if the query tracker was not available.
-  if (process_capacity < failed_allocation_size || state == nullptr) {
+  // if this tracker is not within a query's MemTracker hierarchy.
+  if (process_capacity < failed_allocation_size || query_tracker == nullptr) {
     // IMPALA-5598: For performance reasons, limit the levels of recursion when
     // dumping the process tracker to only two layers.
     ss << process_tracker->LogUsage(PROCESS_MEMTRACKER_LIMITED_DEPTH);

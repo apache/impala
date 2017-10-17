@@ -86,7 +86,7 @@ void TestEnv::TearDownQueries() {
   for (RuntimeState* runtime_state : runtime_states_) runtime_state->ReleaseResources();
   runtime_states_.clear();
   for (QueryState* query_state : query_states_) {
-    query_state->ReleaseInitialReservationRefcount();
+    query_state->ReleaseExecResourceRefcount();
     exec_env_->query_exec_mgr()->ReleaseQueryState(query_state);
   }
   query_states_.clear();
