@@ -470,7 +470,7 @@ Status ImpalaServer::LogAuditRecord(const ClientRequestState& request_state,
   writer.String("session_id");
   writer.String(PrintId(request_state.session_id()).c_str());
   writer.String("start_time");
-  writer.String(request_state.start_time().ToString().c_str());
+  writer.String(ToStringFromUnixMicros(request_state.start_time_us()).c_str());
   writer.String("authorization_failure");
   writer.Bool(Frontend::IsAuthorizationError(request_state.query_status()));
   writer.String("status");
@@ -1005,12 +1005,8 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
 
   request_state->Done();
 
-  double ut_end_time, ut_start_time;
-  double duration_ms = 0.0;
-  if (LIKELY(request_state->end_time().ToSubsecondUnixTime(&ut_end_time))
-      && LIKELY(request_state->start_time().ToSubsecondUnixTime(&ut_start_time))) {
-    duration_ms = 1000 * (ut_end_time - ut_start_time);
-  }
+  int64_t duration_us = request_state->end_time_us() - request_state->start_time_us();
+  int64_t duration_ms = duration_us / MICROS_PER_MILLI;
 
   // duration_ms can be negative when the local timezone changes during query execution.
   if (duration_ms >= 0) {
@@ -1665,8 +1661,8 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const ClientRequestState& reque
   stmt_type = request.stmt_type;
   effective_user = request_state.effective_user();
   default_db = request_state.default_db();
-  start_time = request_state.start_time();
-  end_time = request_state.end_time();
+  start_time_us = request_state.start_time_us();
+  end_time_us = request_state.end_time_us();
   has_coord = false;
 
   Coordinator* coord = request_state.coord();
@@ -1711,8 +1707,8 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const ClientRequestState& reque
 
 bool ImpalaServer::QueryStateRecordLessThan::operator() (
     const QueryStateRecord& lhs, const QueryStateRecord& rhs) const {
-  if (lhs.start_time == rhs.start_time) return lhs.id < rhs.id;
-  return lhs.start_time < rhs.start_time;
+  if (lhs.start_time_us == rhs.start_time_us) return lhs.id < rhs.id;
+  return lhs.start_time_us < rhs.start_time_us;
 }
 
 void ImpalaServer::ConnectionStart(

@@ -103,5 +103,10 @@ std::string ToStringFromUnixMicros(int64_t us,
 std::string ToUtcStringFromUnixMicros(int64_t us,
     TimePrecision p = TimePrecision::Microsecond);
 
+/// Convenience function to convert the current time, derived from UnixMicros(),
+/// to a date-time string in the local time zone.
+inline std::string CurrentTimeString() {
+  return ToStringFromUnixMicros(UnixMicros());
+}
 } // namespace impala
 #endif

@@ -292,21 +292,17 @@ void ImpalaHttpHandler::QueryStateToJson(const ImpalaServer::QueryStateRecord& r
       document->GetAllocator());
   value->AddMember("stmt_type", stmt_type, document->GetAllocator());
 
-  Value start_time(record.start_time.ToString().c_str(), document->GetAllocator());
+  Value start_time(ToStringFromUnixMicros(record.start_time_us).c_str(),
+      document->GetAllocator());
   value->AddMember("start_time", start_time, document->GetAllocator());
 
-  Value end_time(record.end_time.ToString().c_str(), document->GetAllocator());
+  Value end_time(ToStringFromUnixMicros(record.end_time_us).c_str(),
+      document->GetAllocator());
   value->AddMember("end_time", end_time, document->GetAllocator());
 
-  const TimestampValue& end_timestamp =
-      record.end_time.HasDate() ? record.end_time : TimestampValue::LocalTime();
-  double ut_end_time, ut_start_time;
-  double duration = 0.0;
-  if (LIKELY(end_timestamp.ToSubsecondUnixTime(&ut_end_time))
-      && LIKELY(record.start_time.ToSubsecondUnixTime(&ut_start_time))) {
-    duration = ut_end_time - ut_start_time;
-  }
-  const string& printed_duration = PrettyPrinter::Print(duration, TUnit::TIME_S);
+  int64_t duration_us = record.end_time_us - record.start_time_us;
+  const string& printed_duration = PrettyPrinter::Print(duration_us * NANOS_PER_MICRO,
+      TUnit::TIME_NS);
   Value val_duration(printed_duration.c_str(), document->GetAllocator());
   value->AddMember("duration", val_duration, document->GetAllocator());
 
@@ -463,19 +459,14 @@ void ImpalaHttpHandler::SessionsHandler(const Webserver::ArgumentMap& args,
     Value default_db(state->database.c_str(), document->GetAllocator());
     session_json.AddMember("default_database", default_db, document->GetAllocator());
 
-    TimestampValue local_start_time = TimestampValue::FromUnixTime(
-        session.second->start_time_ms / 1000);
-    local_start_time.UtcToLocal();
-    Value start_time(local_start_time.ToString().c_str(), document->GetAllocator());
+    Value start_time(ToStringFromUnixMillis(session.second->start_time_ms,
+        TimePrecision::Second).c_str(), document->GetAllocator());
     session_json.AddMember("start_time", start_time, document->GetAllocator());
     session_json.AddMember(
         "start_time_sort", session.second->start_time_ms, document->GetAllocator());
 
-    TimestampValue local_last_accessed = TimestampValue::FromUnixTime(
-        session.second->last_accessed_ms / 1000);
-    local_last_accessed.UtcToLocal();
-    Value last_accessed(
-        local_last_accessed.ToString().c_str(), document->GetAllocator());
+    Value last_accessed(ToStringFromUnixMillis(session.second->last_accessed_ms,
+        TimePrecision::Second).c_str(), document->GetAllocator());
     session_json.AddMember("last_accessed", last_accessed, document->GetAllocator());
     session_json.AddMember(
         "last_accessed_sort", session.second->last_accessed_ms, document->GetAllocator());

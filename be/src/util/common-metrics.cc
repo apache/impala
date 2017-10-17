@@ -16,7 +16,7 @@
 // under the License.
 
 #include "util/common-metrics.h"
-#include "runtime/timestamp-value.h"
+#include "util/time.h"
 #include <kudu/client/client.h>
 
 namespace impala {
@@ -33,8 +33,7 @@ void CommonMetrics::InitCommonMetrics(MetricGroup* metric_group) {
   KUDU_CLIENT_VERSION = metric_group->AddProperty<string>(
       KUDU_CLIENT_VERSION_METRIC_NAME, kudu::client::GetShortVersionString());
 
-  // TODO: IMPALA-5599: Clean up non-TIMESTAMP usages of TimestampValue
-  PROCESS_START_TIME->set_value(TimestampValue::LocalTime().ToString());
+  PROCESS_START_TIME->set_value(CurrentTimeString());
 }
 
 }

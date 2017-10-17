@@ -106,6 +106,10 @@ class TimestampValue {
     return TimestampValue(temp);
   }
 
+  /// Return the corresponding timestamp in local time zone for the Unix time specified in
+  /// microseconds.
+  static TimestampValue FromUnixTimeMicros(int64_t unix_time_micros);
+
   /// Return the corresponding timestamp in UTC for the Unix time specified in
   /// microseconds.
   static TimestampValue UtcFromUnixTimeMicros(int64_t unix_time_micros);
@@ -118,22 +122,6 @@ class TimestampValue {
     boost::posix_time::ptime temp = UnixTimeToPtime(unix_time_whole);
     temp += boost::posix_time::nanoseconds((unix_time - unix_time_whole) / ONE_BILLIONTH);
     return TimestampValue(temp);
-  }
-
-  /// Returns the current local time with microsecond accuracy. This should not be used
-  /// to time something because it is affected by adjustments to the system clock such
-  /// as a daylight savings or a manual correction by a system admin. For timings, use
-  /// functions in util/time.h.
-  static TimestampValue LocalTime() {
-    return TimestampValue(boost::posix_time::microsec_clock::local_time());
-  }
-
-  /// Returns the current Coordinated Universal Time ("UTC") with microsecond accuracy.
-  /// This should not be used to time something because it is affected by adjustments to
-  /// the system clock such as a manual correction by a system admin. For timings,
-  /// use functions in util/time.h.
-  static TimestampValue UtcTime() {
-    return TimestampValue(boost::posix_time::microsec_clock::universal_time());
   }
 
   /// Returns a TimestampValue converted from a TimestampVal. The caller must ensure

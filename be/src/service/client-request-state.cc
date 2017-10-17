@@ -88,7 +88,7 @@ ClientRequestState::ClientRequestState(
     fetched_rows_(false),
     frontend_(frontend),
     parent_server_(server),
-    start_time_(TimestampValue::LocalTime()) {
+    start_time_us_(UnixMicros()) {
 #ifndef NDEBUG
   profile_->AddInfoString("DEBUG MODE WARNING", "Query profile created while running a "
       "DEBUG build of Impala. Use RELEASE builds to measure query performance.");
@@ -106,7 +106,7 @@ ClientRequestState::ClientRequestState(
     summary_profile_->AddInfoString("HiveServer2 Protocol Version",
         Substitute("V$0", 1 + session->hs2_version));
   }
-  summary_profile_->AddInfoString("Start Time", start_time().ToString());
+  summary_profile_->AddInfoString("Start Time", ToStringFromUnixMicros(start_time_us()));
   summary_profile_->AddInfoString("End Time", "");
   summary_profile_->AddInfoString("Query Type", "N/A");
   summary_profile_->AddInfoString("Query State", PrintQueryState(query_state_));
@@ -564,8 +564,8 @@ void ClientRequestState::Done() {
   }
 
   unique_lock<mutex> l(lock_);
-  end_time_ = TimestampValue::LocalTime();
-  summary_profile_->AddInfoString("End Time", end_time().ToString());
+  end_time_us_ = UnixMicros();
+  summary_profile_->AddInfoString("End Time", ToStringFromUnixMicros(end_time_us()));
   query_events_->MarkEvent("Unregister query");
 
   // Update result set cache metrics, and update mem limit accounting before tearing

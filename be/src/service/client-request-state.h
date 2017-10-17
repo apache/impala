@@ -186,8 +186,8 @@ class ClientRequestState {
   }
   const RuntimeProfile* profile() const { return profile_; }
   const RuntimeProfile* summary_profile() const { return summary_profile_; }
-  const TimestampValue& start_time() const { return start_time_; }
-  const TimestampValue& end_time() const { return end_time_; }
+  int64_t start_time_us() const { return start_time_us_; }
+  int64_t end_time_us() const { return end_time_us_; }
   const std::string& sql_stmt() const { return query_ctx_.client_request.stmt; }
   const TQueryOptions& query_options() const {
     return query_ctx_.client_request.query_options;
@@ -338,8 +338,8 @@ class ClientRequestState {
   /// catalog update request. Not owned.
   ImpalaServer* parent_server_;
 
-  /// Start/end time of the query
-  TimestampValue start_time_, end_time_;
+  /// Start/end time of the query, in Unix microseconds.
+  int64_t start_time_us_, end_time_us_;
 
   /// Executes a local catalog operation (an operation that does not need to execute
   /// against the catalog service). Includes USE, SHOW, DESCRIBE, and EXPLAIN statements.

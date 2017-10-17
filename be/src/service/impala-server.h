@@ -619,8 +619,8 @@ class ImpalaServer : public ImpalaServiceIf,
     /// The state of the query as of this snapshot
     beeswax::QueryState::type query_state;
 
-    /// Start and end time of the query
-    TimestampValue start_time, end_time;
+    /// Start and end time of the query, in Unix microseconds.
+    int64_t start_time_us, end_time_us;
 
     /// Summary of execution for this query.
     TExecSummary exec_summary;

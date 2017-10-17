@@ -51,6 +51,7 @@
 #include "runtime/string-value.h"
 #include "runtime/timestamp-parse-util.h"
 #include "runtime/timestamp-value.h"
+#include "runtime/timestamp-value.inline.h"
 #include "service/fe-support.h"
 #include "service/impala-server.h"
 #include "testutil/impalad-query-executor.h"
@@ -5626,16 +5627,20 @@ TEST_F(ExprTest, TimestampFunctions) {
 
   // Test that the other current time functions are also reasonable.
   TimestampValue timestamp_result;
-  TimestampValue start_time = TimestampValue::LocalTime();
+  TimestampValue start_time = TimestampValue::FromUnixTimeMicros(UnixMicros());
   timestamp_result = ConvertValue<TimestampValue>(GetValue("now()", TYPE_TIMESTAMP));
-  EXPECT_BETWEEN(start_time, timestamp_result, TimestampValue::LocalTime());
+  EXPECT_BETWEEN(start_time, timestamp_result,
+      TimestampValue::FromUnixTimeMicros(UnixMicros()));
   timestamp_result = ConvertValue<TimestampValue>(GetValue("current_timestamp()",
       TYPE_TIMESTAMP));
-  EXPECT_BETWEEN(start_time, timestamp_result, TimestampValue::LocalTime());
-  const TimestampValue utc_start_time = TimestampValue::UtcTime();
+  EXPECT_BETWEEN(start_time, timestamp_result,
+      TimestampValue::FromUnixTimeMicros(UnixMicros()));
+  const TimestampValue utc_start_time =
+      TimestampValue::UtcFromUnixTimeMicros(UnixMicros());
   timestamp_result = ConvertValue<TimestampValue>(GetValue("utc_timestamp()",
       TYPE_TIMESTAMP));
-  EXPECT_BETWEEN(utc_start_time, timestamp_result, TimestampValue::UtcTime());
+  EXPECT_BETWEEN(utc_start_time, timestamp_result,
+      TimestampValue::UtcFromUnixTimeMicros(UnixMicros()));
   // UNIX_TIMESTAMP() has second precision so the comparison start time is shifted back
   // a second to ensure an earlier value.
   unix_start_time =
@@ -5643,7 +5648,7 @@ TEST_F(ExprTest, TimestampFunctions) {
   timestamp_result = ConvertValue<TimestampValue>(GetValue(
       "cast(unix_timestamp() as timestamp)", TYPE_TIMESTAMP));
   EXPECT_BETWEEN(TimestampValue::FromUnixTime(unix_start_time - 1), timestamp_result,
-      TimestampValue::LocalTime());
+      TimestampValue::FromUnixTimeMicros(UnixMicros()));
 
   // Test that UTC and local time represent the same point in time
   {
