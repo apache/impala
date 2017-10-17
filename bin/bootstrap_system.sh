@@ -105,7 +105,7 @@ eval "$SET_IMPALA_HOME"
 
 apt-get --yes install ccache g++ gcc libffi-dev liblzo2-dev libkrb5-dev libsasl2-dev \
         libssl-dev make maven ninja-build ntp ntpdate python-dev python-setuptools \
-        postgresql ssh wget vim-common
+        postgresql ssh wget vim-common psmisc
 
 if ! { service --status-all | grep -E '^ \[ \+ \]  ssh$'; }
 then
