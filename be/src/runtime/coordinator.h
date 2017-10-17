@@ -189,7 +189,8 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   class FilterState;
   class FragmentStats;
 
-  const QuerySchedule schedule_;
+  /// owned by the ClientRequestState that owns this coordinator
+  const QuerySchedule& schedule_;
 
   /// copied from TQueryExecRequest; constant across all fragments
   TQueryCtx query_ctx_;
@@ -346,6 +347,9 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// True if and only if ReleaseExecResources() has been called.
   bool released_exec_resources_ = false;
 
+  /// True if and only if ReleaseAdmissionControlResources() has been called.
+  bool released_admission_control_resources_ = false;
+
   /// Returns a local object pool.
   ObjectPool* obj_pool() { return obj_pool_.get(); }
 
@@ -437,6 +441,38 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 
   /// Same as ReleaseExecResources() except the lock must be held by the caller.
   void ReleaseExecResourcesLocked();
+
+  /// Releases admission control resources for use by other queries.
+  /// This should only be called if one of following preconditions is satisfied for each
+  /// backend on which the query is executing:
+  /// * The backend finished execution.
+  ///   Rationale: the backend isn't consuming resources.
+  //
+  /// * A cancellation RPC was delivered to the backend.
+  ///   Rationale: the backend will be cancelled and release resources soon. By the
+  ///   time a newly admitted query fragment starts up on the backend and starts consuming
+  ///   resources, the resources from this query will probably have been released.
+  //
+  /// * Sending the cancellation RPC to the backend failed
+  ///   Rationale: the backend is either down or will tear itself down when it next tries
+  ///   to send a status RPC to the coordinator. It's possible that the fragment will be
+  ///   slow to tear down and we could overadmit and cause query failures. However, given
+  ///   the communication errors, we need to proceed based on incomplete information about
+  ///   the state of the cluster. We choose to optimistically assume that the backend will
+  ///   tear itself down in a timely manner and admit more queries instead of
+  ///   pessimistically queueing queries while we wait for a response from a backend that
+  ///   may never come.
+  ///
+  /// Calling WaitForBackendCompletion() or CancelInternal() before this function is
+  /// sufficient to satisfy the above preconditions. If the query has an expensive
+  /// finalization step post query execution (e.g. a DML statement), then this should
+  /// be called after that completes to avoid over-admitting queries.
+  ///
+  /// Acquires lock_. Idempotent.
+  void ReleaseAdmissionControlResources();
+
+  /// Same as ReleaseAdmissionControlResources() except lock must be held by caller.
+  void ReleaseAdmissionControlResourcesLocked();
 };
 
 }

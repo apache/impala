@@ -572,17 +572,6 @@ void ClientRequestState::Done() {
   // Update result set cache metrics, and update mem limit accounting before tearing
   // down the coordinator.
   ClearResultCache();
-
-  if (coord_.get() != NULL) {
-    // Release any reserved resources.
-    if (exec_env_->admission_controller() != nullptr) {
-      Status status = exec_env_->admission_controller()->ReleaseQuery(schedule_.get());
-      if (!status.ok()) {
-        LOG(WARNING) << "Failed to release resources of query " << schedule_->query_id()
-                     << " because of error: " << status.GetDetail();
-      }
-    }
-  }
 }
 
 Status ClientRequestState::Exec(const TMetadataOpRequest& exec_request) {
