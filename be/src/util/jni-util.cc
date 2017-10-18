@@ -27,7 +27,8 @@
 
 namespace impala {
 
-Status JniUtfCharGuard::create(JNIEnv *env, jstring jstr, JniUtfCharGuard *out) {
+Status JniUtfCharGuard::create(JNIEnv* env, jstring jstr, JniUtfCharGuard* out) {
+  DCHECK(jstr != nullptr);
   DCHECK(!env->ExceptionCheck());
   const char* utf_chars = env->GetStringUTFChars(jstr, nullptr);
   bool exception_check = static_cast<bool>(env->ExceptionCheck());
@@ -180,17 +181,31 @@ void JniUtil::InitLibhdfs() {
 }
 
 Status JniUtil::GetJniExceptionMsg(JNIEnv* env, bool log_stack, const string& prefix) {
-  jthrowable exc = (env)->ExceptionOccurred();
+  jthrowable exc = env->ExceptionOccurred();
   if (exc == nullptr) return Status::OK();
   env->ExceptionClear();
   DCHECK(throwable_to_string_id() != nullptr);
-  auto msg = static_cast<jstring>(env->CallStaticObjectMethod(jni_util_class(),
+  const char* oom_msg_template = "$0 threw an unchecked exception. The JVM is likely out "
+      "of memory (OOM).";
+  jstring msg = static_cast<jstring>(env->CallStaticObjectMethod(jni_util_class(),
       throwable_to_string_id(), exc));
+  if (env->ExceptionOccurred()) {
+    env->ExceptionClear();
+    string oom_msg = Substitute(oom_msg_template, "throwableToString");
+    LOG(ERROR) << oom_msg;
+    return Status(oom_msg);
+  }
   JniUtfCharGuard msg_str_guard;
   RETURN_IF_ERROR(JniUtfCharGuard::create(env, msg, &msg_str_guard));
   if (log_stack) {
-    auto stack = static_cast<jstring>(env->CallStaticObjectMethod(jni_util_class(),
+    jstring stack = static_cast<jstring>(env->CallStaticObjectMethod(jni_util_class(),
         throwable_to_stack_trace_id(), exc));
+    if (env->ExceptionOccurred()) {
+      env->ExceptionClear();
+      string oom_msg = Substitute(oom_msg_template, "throwableToStackTrace");
+      LOG(ERROR) << oom_msg;
+      return Status(oom_msg);
+    }
     JniUtfCharGuard c_stack_guard;
     RETURN_IF_ERROR(JniUtfCharGuard::create(env, stack, &c_stack_guard));
     VLOG(1) << c_stack_guard.get();

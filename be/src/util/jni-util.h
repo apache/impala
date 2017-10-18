@@ -154,9 +154,9 @@ class JniUtfCharGuard {
     if (utf_chars != nullptr) env->ReleaseStringUTFChars(jstr, utf_chars);
   }
 
-  /// Try to get chars from jstring. If error is returned, utf_chars and get() remain
+  /// Try to get chars from jstr. If error is returned, utf_chars and get() remain
   /// to be nullptr, otherwise they point to a valid char sequence. The char sequence
-  /// lives as long as this guard.
+  /// lives as long as this guard. jstr should not be null.
   static Status create(JNIEnv* env, jstring jstr, JniUtfCharGuard* out);
 
   /// Get the char sequence. Returns nullptr if the guard does hold a char sequence.

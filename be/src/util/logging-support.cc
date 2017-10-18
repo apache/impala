@@ -42,6 +42,7 @@ JNIEXPORT void JNICALL
 Java_org_apache_impala_util_NativeLogger_Log(
     JNIEnv* env, jclass caller_class, int severity, jstring msg, jstring file,
     int line_number) {
+  DCHECK(file != nullptr);
   JniUtfCharGuard filename_guard;
   RETURN_VOID_IF_ERROR(JniUtfCharGuard::create(env, file, &filename_guard));
   JniUtfCharGuard msg_guard;
