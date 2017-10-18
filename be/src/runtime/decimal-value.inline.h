@@ -174,6 +174,20 @@ inline int MinLeadingZerosAfterScaling(int num_lz, int scale_diff) {
   return num_lz - floor_log2[scale_diff] - 1;
 }
 
+// Returns the minimum number of leading zero x or y would have after one of them gets
+// scaled up to match the scale of the other one.
+template<typename RESULT_T>
+inline int MinLeadingZeros(RESULT_T x, int x_scale, RESULT_T y, int y_scale) {
+  int x_lz = BitUtil::CountLeadingZeros(abs(x));
+  int y_lz = BitUtil::CountLeadingZeros(abs(y));
+  if (x_scale < y_scale) {
+    x_lz = detail::MinLeadingZerosAfterScaling(x_lz, y_scale - x_scale);
+  } else if (x_scale > y_scale) {
+    y_lz = detail::MinLeadingZerosAfterScaling(y_lz, x_scale - y_scale);
+  }
+  return std::min(x_lz, y_lz);
+}
+
 // Separates x and y into into fractional and whole parts.
 inline void SeparateFractional(int128_t x, int x_scale, int128_t y, int y_scale,
     int128_t* x_left, int128_t* x_right, int128_t* y_left, int128_t* y_right) {
@@ -311,24 +325,16 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Add(int this_scale,
     return DecimalValue<RESULT_T>(x + y);
   }
 
-  // We compute how many leading zeros x and y would have after one of them gets scaled
+  // Compute how many leading zeros x and y would have after one of them gets scaled
   // up to match the scale of the other one.
-  int x_lz = BitUtil::CountLeadingZeros(abs(value()));
-  int y_lz = BitUtil::CountLeadingZeros(abs(other.value()));
-
-  int result_scale_decrease = this_scale - result_scale;
-  int scale_diff = this_scale - other_scale;
-  if (scale_diff > 0) {
-    y_lz = detail::MinLeadingZerosAfterScaling(y_lz, scale_diff);
-  } else if (scale_diff < 0) {
-    result_scale_decrease = other_scale - result_scale;
-    x_lz = detail::MinLeadingZerosAfterScaling(x_lz, -scale_diff);
-  }
+  int min_lz = detail::MinLeadingZeros(
+      abs(value()), this_scale, abs(other.value()), other_scale);
+  int result_scale_decrease = std::max(
+      this_scale - result_scale, other_scale - result_scale);
   DCHECK_GE(result_scale_decrease, 0);
-  DCHECK_EQ(result_scale_decrease, std::max(this_scale, other_scale) - result_scale);
 
   const int MIN_LZ = 3;
-  if ((x_lz >= MIN_LZ) && (y_lz >= MIN_LZ)) {
+  if (min_lz >= MIN_LZ) {
     // If both numbers have at least MIN_LZ leading zeros, we can add them directly
     // without the risk of overflow.
     // We want the result to have at least 2 leading zeros, which ensures that it fits
@@ -526,17 +532,39 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Mod(int this_scale,
     const DecimalValue& other, int other_scale, int result_precision, int result_scale,
     bool round, bool* is_nan, bool* overflow) const {
   DCHECK_EQ(result_scale, std::max(this_scale, other_scale));
-  if (other.value() == 0) {
-    // Mod by 0.
-    *is_nan = true;
-    return DecimalValue<RESULT_T>();
+  *is_nan = other.value() == 0;
+  if (UNLIKELY(*is_nan)) return DecimalValue<RESULT_T>();
+
+  RESULT_T result;
+  bool ovf = false;
+  // We check if it is possible to compute the result without having to convert the two
+  // inputs to int256_t, which is very slow.
+  if (sizeof(RESULT_T) < 16 ||
+      result_precision < 38 ||
+      // If the scales are the same, there is no danger in overflowing due to scaling up.
+      this_scale == other_scale ||
+      detail::MinLeadingZeros(value(), this_scale, other.value(), other_scale) >= 2) {
+    RESULT_T x, y;
+    ovf = AdjustToSameScale(*this, this_scale, other, other_scale,
+        result_precision, &x, &y);
+    result = x % y;
+    DCHECK(abs(result) < abs(y));
+  } else {
+    int256_t x_256 = ConvertToInt256(value());
+    int256_t y_256 = ConvertToInt256(other.value());
+    if (this_scale < other_scale) {
+      x_256 *= DecimalUtil::GetScaleMultiplier<int256_t>(other_scale - this_scale);
+    } else {
+      y_256 *= DecimalUtil::GetScaleMultiplier<int256_t>(this_scale - other_scale);
+    }
+    int256_t intermediate_result = x_256 % y_256;
+    result = ConvertToInt128(intermediate_result,
+        DecimalUtil::MAX_UNSCALED_DECIMAL16, &ovf);
+    DCHECK(abs(result) <= abs(value()) || abs(result) < abs(other.value()));
   }
-  *is_nan = false;
-  RESULT_T x = 0;
-  RESULT_T y = 1; // Initialize y to avoid mod by 0.
-  *overflow |= AdjustToSameScale(*this, this_scale, other, other_scale,
-      result_precision, &x, &y);
-  return DecimalValue<RESULT_T>(x % y);
+  // An overflow should be impossible.
+  DCHECK(!ovf);
+  return DecimalValue<RESULT_T>(result);
 }
 
 template<typename T>

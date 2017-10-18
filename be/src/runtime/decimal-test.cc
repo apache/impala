@@ -573,8 +573,9 @@ TEST(DecimalTest, Overflow) {
   overflow = false;
   bool is_nan;
   result = d3.Mod<int128_t>(0, d3, 20, 38, 20, false, &is_nan, &overflow);
-  EXPECT_TRUE(overflow);
+  EXPECT_FALSE(overflow);
   EXPECT_FALSE(is_nan);
+  EXPECT_EQ(result.value(), 0);
 
   overflow = false;
   result = d3.Mod<int128_t>(0, two, 0, 38, 0, false, &is_nan, &overflow);
