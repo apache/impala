@@ -223,9 +223,14 @@ public class FrontendTest extends FrontendTestBase {
     final String dbName = "tbls_with_comments_test_db";
     Db testDb = addTestDb(dbName, "Stores tables with comments");
     assertNotNull(testDb);
-    final String commentStr = "this table has a comment";
+    final String tableComment = "this table has a comment";
+    final String columnComment = "this column has a comment";
+    final String columnWithCommentName = "column_with_comment";
+    final String columnWithoutCommentName = "column_without_comment";
     final String tableWithCommentsStmt = String.format(
-        "create table %s.tbl_with_comments (a int) comment '%s'", dbName, commentStr);
+        "create table %s.tbl_with_comments (%s int comment '%s', %s int) comment '%s'",
+         dbName, columnWithCommentName, columnComment, columnWithoutCommentName,
+         tableComment);
     Table tbl = addTestTable(tableWithCommentsStmt);
     assertNotNull(tbl);
     final String tableWithoutCommentsStmt = String.format(
@@ -242,9 +247,25 @@ public class FrontendTest extends FrontendTestBase {
     assertEquals(2, resp.rows.size());
     for (TResultRow row: resp.rows) {
       if (row.colVals.get(2).string_val.toLowerCase().equals("tbl_with_comments")) {
-        assertEquals(commentStr, row.colVals.get(4).string_val.toLowerCase());
+        assertEquals(tableComment, row.colVals.get(4).string_val.toLowerCase());
       } else {
         assertEquals("", row.colVals.get(4).string_val);
+      }
+    }
+
+    // Test column comments
+    req = new TMetadataOpRequest();
+    req.opcode = TMetadataOpcode.GET_COLUMNS;
+    req.get_columns_req = new TGetColumnsReq();
+    req.get_columns_req.setSchemaName(dbName);
+    req.get_columns_req.setTableName("tbl_with_comments");
+    resp = execMetadataOp(req);
+    assertEquals(2, resp.rows.size());
+    for (TResultRow row: resp.rows) {
+      if (row.colVals.get(3).string_val.equals(columnWithCommentName)) {
+        assertEquals(columnComment, row.colVals.get(11).string_val);
+      } else {
+        assertEquals(null, row.colVals.get(11).string_val);
       }
     }
 

@@ -445,6 +445,34 @@ public class JdbcTest {
   }
 
   @Test
+  public void testMetaDataGetColumnComments() throws Exception {
+    addTestTable("create table default.jdbc_column_comments_test (" +
+         "a int comment 'column comment') comment 'table comment'");
+
+    // If a table is not yet loaded before getTables(), then the 'remarks' field
+    // is left empty. getColumns() loads the table metadata, so later getTables()
+    // calls will return 'remarks' correctly.
+    ResultSet rs = con_.getMetaData().getTables(
+        null, "default", "jdbc_column_comments_test", null);
+    assertTrue(rs.next());
+    assertEquals("Incorrect table name", "jdbc_column_comments_test",
+        rs.getString("TABLE_NAME"));
+    assertEquals("Incorrect table comment", "", rs.getString("REMARKS"));
+
+    rs = con_.getMetaData().getColumns(
+        null, "default", "jdbc_column_comments_test", null);
+    assertTrue(rs.next());
+    assertEquals("Incorrect column comment", "column comment", rs.getString("REMARKS"));
+
+    rs = con_.getMetaData().getTables(
+        null, "default", "jdbc_column_comments_test", null);
+    assertTrue(rs.next());
+    assertEquals("Incorrect table name", "jdbc_column_comments_test",
+        rs.getString("TABLE_NAME"));
+    assertEquals("Incorrect table comment", "table comment", rs.getString("REMARKS"));
+  }
+
+  @Test
   public void testDecimalGetColumnTypes() throws SQLException {
     // Table has 5 decimal columns
     ResultSet rs = con_.createStatement().executeQuery(

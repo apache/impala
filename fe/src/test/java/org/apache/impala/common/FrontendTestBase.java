@@ -186,7 +186,8 @@ public class FrontendTestBase {
       columnDefs.addAll(createTableStmt.getColumnDefs());
       for (int i = 0; i < columnDefs.size(); ++i) {
         ColumnDef colDef = columnDefs.get(i);
-        dummyTable.addColumn(new Column(colDef.getColName(), colDef.getType(), i));
+        dummyTable.addColumn(
+            new Column(colDef.getColName(), colDef.getType(), colDef.getComment(), i));
       }
       try {
         HdfsTable hdfsTable = (HdfsTable) dummyTable;

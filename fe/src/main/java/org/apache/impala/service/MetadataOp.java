@@ -400,7 +400,7 @@ public class MetadataOp {
           row.colVals.add(createTColumnValue(colType.getNumPrecRadix()));
           // NULLABLE
           row.colVals.add(createTColumnValue(DatabaseMetaData.columnNullable));
-          row.colVals.add(NULL_COL_VAL); // REMARKS
+          row.colVals.add(createTColumnValue(column.getComment())); // REMARKS
           row.colVals.add(NULL_COL_VAL); // COLUMN_DEF
           row.colVals.add(NULL_COL_VAL); // SQL_DATA_TYPE
           row.colVals.add(NULL_COL_VAL); // SQL_DATETIME_SUB
