@@ -28,6 +28,72 @@ select d1 / d2, d2 / d1, d3 / d4, d5 / d3, d3 / d5 from decimal_tbl;
 DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
 ====
 ---- QUERY
+# Test DECIMAL V1 division by zero.
+set decimal_v2=false;
+select d1 / cast(0 as decimal(7, 2)), d1 / 0, 10.0 / 0 from decimal_tbl;
+---- RESULTS
+NULL,NULL,Infinity
+NULL,NULL,Infinity
+NULL,NULL,Infinity
+NULL,NULL,Infinity
+NULL,NULL,Infinity
+---- TYPES
+DECIMAL,DECIMAL,DOUBLE
+====
+---- QUERY
+# Test DECIMAL V2 division by zero. Verify that Impala throws an error.
+set decimal_v2=true;
+select d1 / cast(0 as decimal(7, 2)) from decimal_tbl;
+---- CATCH
+UDF ERROR: Cannot divide decimal by zero
+====
+---- QUERY
+set decimal_v2=true;
+select d1 / 0 from decimal_tbl;
+---- CATCH
+UDF ERROR: Cannot divide decimal by zero
+====
+---- QUERY
+set decimal_v2=true;
+select 10.0 / 0;
+---- CATCH
+UDF ERROR: Cannot divide decimal by zero
+====
+---- QUERY
+# Test DECIMAL V1 modulo zero.
+set decimal_v2=false;
+select d1 % cast(0 as decimal(7, 2)), d1 % 0, 10.0 % 0 from decimal_tbl;
+---- RESULTS
+NULL,NULL,NULL
+NULL,NULL,NULL
+NULL,NULL,NULL
+NULL,NULL,NULL
+NULL,NULL,NULL
+---- TYPES
+DECIMAL,DECIMAL,DOUBLE
+====
+---- QUERY
+# Test DECIMAL V2 modulo zero. Verify that Impala throws an error.
+set decimal_v2=true;
+select d1 % cast(0 as decimal(7, 2)) from decimal_tbl;
+---- CATCH
+UDF ERROR: Cannot divide decimal by zero
+====
+---- QUERY
+# Test DECIMAL V2 modulo zero. Verify that Impala throws an error.
+set decimal_v2=true;
+select d1 % 0 from decimal_tbl;
+---- CATCH
+UDF ERROR: Cannot divide decimal by zero
+====
+---- QUERY
+# Test DECIMAL V2 modulo zero. Verify that Impala throws an error.
+set decimal_v2=true;
+select 10.0 % 0 from decimal_tbl;
+---- CATCH
+UDF ERROR: Cannot divide decimal by zero
+====
+---- QUERY
 # Test casting behavior without decimal_v2 query option set.
 set decimal_v2=false;
 select cast(d3 as decimal(20, 3)) from decimal_tbl;
