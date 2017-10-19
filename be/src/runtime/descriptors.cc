@@ -101,16 +101,15 @@ SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc,
     tuple_offset_(tdesc.byteOffset),
     null_indicator_offset_(tdesc.nullIndicatorByte, tdesc.nullIndicatorBit),
     slot_idx_(tdesc.slotIdx),
-    slot_size_(type_.GetSlotSize()),
-    llvm_field_idx_(-1) {
+    slot_size_(type_.GetSlotSize()) {
   DCHECK_NE(type_.type, TYPE_STRUCT);
-  DCHECK(parent_ != NULL) << tdesc.parent;
+  DCHECK(parent_ != nullptr) << tdesc.parent;
   if (type_.IsCollectionType()) {
     DCHECK(tdesc.__isset.itemTupleId);
-    DCHECK(collection_item_descriptor_ != NULL) << tdesc.itemTupleId;
+    DCHECK(collection_item_descriptor_ != nullptr) << tdesc.itemTupleId;
   } else {
     DCHECK(!tdesc.__isset.itemTupleId);
-    DCHECK(collection_item_descriptor == NULL);
+    DCHECK(collection_item_descriptor == nullptr);
   }
 }
 
@@ -133,7 +132,7 @@ string SlotDescriptor::DebugString() const {
     out << col_path_[i];
   }
   out << "]";
-  if (collection_item_descriptor_ != NULL) {
+  if (collection_item_descriptor_ != nullptr) {
     out << " collection_item_tuple_id=" << collection_item_descriptor_->id();
   }
   out << " offset=" << tuple_offset_ << " null=" << null_indicator_offset_.DebugString()
@@ -230,6 +229,16 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc, ObjectPo
   avro_schema_ = tdesc.hdfsTable.__isset.avroSchema ? tdesc.hdfsTable.avroSchema : "";
 }
 
+void HdfsTableDescriptor::ReleaseResources() {
+  for (const auto& part_entry: partition_descriptors_) {
+    for (ScalarExprEvaluator* eval :
+           part_entry.second->partition_key_value_evals()) {
+      eval->Close(nullptr);
+      const_cast<ScalarExpr&>(eval->root()).Close();
+    }
+  }
+}
+
 string HdfsTableDescriptor::DebugString() const {
   stringstream out;
   out << "HdfsTable(" << TableDescriptor::DebugString()
@@ -291,11 +300,9 @@ string KuduTableDescriptor::DebugString() const {
 
 TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
   : id_(tdesc.id),
-    table_desc_(NULL),
     byte_size_(tdesc.byteSize),
     num_null_bytes_(tdesc.numNullBytes),
     null_bytes_offset_(tdesc.byteSize - tdesc.numNullBytes),
-    slots_(),
     has_varlen_slots_(false),
     tuple_path_(tdesc.tuplePath) {
 }
@@ -506,31 +513,53 @@ Status DescriptorTbl::CreatePartKeyExprs(
   return Status::OK();
 }
 
+Status DescriptorTbl::CreateHdfsTblDescriptor(const TDescriptorTable& thrift_tbl,
+    TableId tbl_id, ObjectPool* pool, HdfsTableDescriptor** desc) {
+  for (const TTableDescriptor& tdesc: thrift_tbl.tableDescriptors) {
+    if (tdesc.id == tbl_id) {
+      DCHECK(tdesc.__isset.hdfsTable);
+      RETURN_IF_ERROR(CreateTblDescriptorInternal(
+          tdesc, pool, reinterpret_cast<TableDescriptor**>(desc)));
+      return Status::OK();
+    }
+  }
+  string error = Substitute("table $0 not found in descriptor table",  tbl_id);
+  DCHECK(false) << error;
+  return Status(error);
+}
+
+Status DescriptorTbl::CreateTblDescriptorInternal(const TTableDescriptor& tdesc,
+    ObjectPool* pool, TableDescriptor** desc) {
+  *desc = nullptr;
+  switch (tdesc.tableType) {
+    case TTableType::HDFS_TABLE: {
+      HdfsTableDescriptor* hdfs_tbl = pool->Add(new HdfsTableDescriptor(tdesc, pool));
+      *desc = hdfs_tbl;
+      RETURN_IF_ERROR(CreatePartKeyExprs(*hdfs_tbl, pool));
+      break;
+    }
+    case TTableType::HBASE_TABLE:
+      *desc = pool->Add(new HBaseTableDescriptor(tdesc));
+      break;
+    case TTableType::DATA_SOURCE_TABLE:
+      *desc = pool->Add(new DataSourceTableDescriptor(tdesc));
+      break;
+    case TTableType::KUDU_TABLE:
+      *desc = pool->Add(new KuduTableDescriptor(tdesc));
+      break;
+    default:
+      DCHECK(false) << "invalid table type: " << tdesc.tableType;
+  }
+  return Status::OK();
+}
+
 Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tbl,
     DescriptorTbl** tbl) {
   *tbl = pool->Add(new DescriptorTbl());
   // deserialize table descriptors first, they are being referenced by tuple descriptors
-  for (size_t i = 0; i < thrift_tbl.tableDescriptors.size(); ++i) {
-    const TTableDescriptor& tdesc = thrift_tbl.tableDescriptors[i];
-    TableDescriptor* desc = NULL;
-    switch (tdesc.tableType) {
-      case TTableType::HDFS_TABLE:
-        desc = pool->Add(new HdfsTableDescriptor(tdesc, pool));
-        RETURN_IF_ERROR(CreatePartKeyExprs(
-            *static_cast<const HdfsTableDescriptor*>(desc), pool));
-        break;
-      case TTableType::HBASE_TABLE:
-        desc = pool->Add(new HBaseTableDescriptor(tdesc));
-        break;
-      case TTableType::DATA_SOURCE_TABLE:
-        desc = pool->Add(new DataSourceTableDescriptor(tdesc));
-        break;
-      case TTableType::KUDU_TABLE:
-        desc = pool->Add(new KuduTableDescriptor(tdesc));
-        break;
-      default:
-        DCHECK(false) << "invalid table type: " << tdesc.tableType;
-    }
+  for (const TTableDescriptor& tdesc: thrift_tbl.tableDescriptors) {
+    TableDescriptor* desc;
+    RETURN_IF_ERROR(CreateTblDescriptorInternal(tdesc, pool, &desc));
     (*tbl)->tbl_desc_map_[tdesc.id] = desc;
   }
 
@@ -548,9 +577,9 @@ Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tb
     const TSlotDescriptor& tdesc = thrift_tbl.slotDescriptors[i];
     // Tuple descriptors are already populated in tbl
     TupleDescriptor* parent = (*tbl)->GetTupleDescriptor(tdesc.parent);
-    DCHECK(parent != NULL);
+    DCHECK(parent != nullptr);
     TupleDescriptor* collection_item_descriptor = tdesc.__isset.itemTupleId ?
-        (*tbl)->GetTupleDescriptor(tdesc.itemTupleId) : NULL;
+        (*tbl)->GetTupleDescriptor(tdesc.itemTupleId) : nullptr;
     SlotDescriptor* slot_d = pool->Add(
         new SlotDescriptor(tdesc, parent, collection_item_descriptor));
     (*tbl)->slot_desc_map_[tdesc.id] = slot_d;
@@ -563,46 +592,23 @@ void DescriptorTbl::ReleaseResources() {
   // close partition exprs of hdfs tables
   for (auto entry: tbl_desc_map_) {
     if (entry.second->type() != TTableType::HDFS_TABLE) continue;
-    const HdfsTableDescriptor* hdfs_tbl =
-        static_cast<const HdfsTableDescriptor*>(entry.second);
-    for (const auto& part_entry: hdfs_tbl->partition_descriptors()) {
-      for (ScalarExprEvaluator* eval :
-             part_entry.second->partition_key_value_evals()) {
-        eval->Close(nullptr);
-        const_cast<ScalarExpr&>(eval->root()).Close();
-      }
-    }
+    static_cast<HdfsTableDescriptor*>(entry.second)->ReleaseResources();
   }
 }
 
 TableDescriptor* DescriptorTbl::GetTableDescriptor(TableId id) const {
-  // TODO: is there some boost function to do exactly this?
   TableDescriptorMap::const_iterator i = tbl_desc_map_.find(id);
-  if (i == tbl_desc_map_.end()) {
-    return NULL;
-  } else {
-    return i->second;
-  }
+  return i == tbl_desc_map_.end() ? nullptr : i->second;
 }
 
 TupleDescriptor* DescriptorTbl::GetTupleDescriptor(TupleId id) const {
-  // TODO: is there some boost function to do exactly this?
   TupleDescriptorMap::const_iterator i = tuple_desc_map_.find(id);
-  if (i == tuple_desc_map_.end()) {
-    return NULL;
-  } else {
-    return i->second;
-  }
+  return i == tuple_desc_map_.end() ? nullptr : i->second;
 }
 
 SlotDescriptor* DescriptorTbl::GetSlotDescriptor(SlotId id) const {
-  // TODO: is there some boost function to do exactly this?
   SlotDescriptorMap::const_iterator i = slot_desc_map_.find(id);
-  if (i == slot_desc_map_.end()) {
-    return NULL;
-  } else {
-    return i->second;
-  }
+  return i == slot_desc_map_.end() ? nullptr : i->second;
 }
 
 void DescriptorTbl::GetTupleDescs(vector<TupleDescriptor*>* descs) const {
@@ -627,7 +633,7 @@ llvm::Value* SlotDescriptor::CodegenIsNull(
 llvm::Value* SlotDescriptor::CodegenIsNull(LlvmCodeGen* codegen, LlvmBuilder* builder,
     const NullIndicatorOffset& null_indicator_offset, llvm::Value* tuple) {
   llvm::Value* null_byte =
-      CodegenGetNullByte(codegen, builder, null_indicator_offset, tuple, NULL);
+      CodegenGetNullByte(codegen, builder, null_indicator_offset, tuple, nullptr);
   llvm::Constant* mask =
       llvm::ConstantInt::get(codegen->tinyint_type(), null_indicator_offset.bit_mask);
   llvm::Value* null_mask = builder->CreateAnd(null_byte, mask, "null_mask");
@@ -657,8 +663,8 @@ void SlotDescriptor::CodegenSetNullIndicator(
       llvm::ConstantInt::get(codegen->tinyint_type(), ~null_indicator_offset_.bit_mask);
 
   llvm::ConstantInt* constant_is_null = llvm::dyn_cast<llvm::ConstantInt>(is_null);
-  llvm::Value* result = NULL;
-  if (constant_is_null != NULL) {
+  llvm::Value* result = nullptr;
+  if (constant_is_null != nullptr) {
     if (constant_is_null->isOne()) {
       result = builder->CreateOr(null_byte, mask, "null_bit_set");
     } else {
@@ -688,7 +694,7 @@ llvm::Value* SlotDescriptor::CodegenGetNullByte(
   llvm::Value* tuple_bytes = builder->CreateBitCast(tuple, codegen->ptr_type());
   llvm::Value* byte_ptr =
       builder->CreateInBoundsGEP(tuple_bytes, byte_offset, "null_byte_ptr");
-  if (null_byte_ptr != NULL) *null_byte_ptr = byte_ptr;
+  if (null_byte_ptr != nullptr) *null_byte_ptr = byte_ptr;
   return builder->CreateLoad(byte_ptr, "null_byte");
 }
 
@@ -707,7 +713,7 @@ llvm::StructType* TupleDescriptor::GetLlvmStruct(LlvmCodeGen* codegen) const {
   int curr_struct_offset = 0;
   for (SlotDescriptor* slot: sorted_slots) {
     // IMPALA-3207: Codegen for CHAR is not yet implemented: bail out of codegen here.
-    if (slot->type().type == TYPE_CHAR) return NULL;
+    if (slot->type().type == TYPE_CHAR) return nullptr;
     DCHECK_EQ(curr_struct_offset, slot->tuple_offset());
     slot->llvm_field_idx_ = struct_fields.size();
     struct_fields.push_back(codegen->GetType(slot->type()));

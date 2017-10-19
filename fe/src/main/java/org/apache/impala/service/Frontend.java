@@ -1119,7 +1119,7 @@ public class Frontend {
 
     Planner planner = new Planner(analysisResult, queryCtx);
     TQueryExecRequest queryExecRequest = createExecRequest(planner, explainString);
-    queryExecRequest.setDesc_tbl(
+    queryCtx.setDesc_tbl(
         planner.getAnalysisResult().getAnalyzer().getDescTbl().toThrift());
     queryExecRequest.setQuery_ctx(queryCtx);
     queryExecRequest.setHost_list(analysisResult.getAnalyzer().getHostIndex().getList());

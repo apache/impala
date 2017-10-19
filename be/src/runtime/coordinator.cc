@@ -95,9 +95,6 @@ Status Coordinator::Exec() {
              << " stmt=" << request.query_ctx.client_request.stmt;
   stmt_type_ = request.stmt_type;
   query_ctx_ = request.query_ctx;
-  // set descriptor table here globally
-  // TODO: remove TQueryExecRequest.desc_tbl
-  query_ctx_.__set_desc_tbl(request.desc_tbl);
   query_ctx_.__set_request_pool(schedule_.request_pool());
 
   query_profile_ =
@@ -556,14 +553,9 @@ Status Coordinator::FinalizeSuccessfulInsert() {
   // INSERT finalization happens in the five following steps
   // 1. If OVERWRITE, remove all the files in the target directory
   // 2. Create all the necessary partition directories.
-  DescriptorTbl* descriptor_table;
-  // TODO: add DescriptorTbl::CreateTableDescriptor() so we can create a
-  // descriptor for just the output table, calling Create() can be very
-  // expensive.
-  RETURN_IF_ERROR(
-      DescriptorTbl::Create(obj_pool(), query_ctx_.desc_tbl, &descriptor_table));
-  HdfsTableDescriptor* hdfs_table = static_cast<HdfsTableDescriptor*>(
-      descriptor_table->GetTableDescriptor(finalize_params_.table_id));
+  HdfsTableDescriptor* hdfs_table;
+  RETURN_IF_ERROR(DescriptorTbl::CreateHdfsTblDescriptor(query_ctx_.desc_tbl,
+      finalize_params_.table_id, obj_pool(), &hdfs_table));
   DCHECK(hdfs_table != nullptr)
       << "INSERT target table not known in descriptor table: "
       << finalize_params_.table_id;
@@ -671,9 +663,8 @@ Status Coordinator::FinalizeSuccessfulInsert() {
     }
   }
 
-  // Release resources on the descriptor table.
-  descriptor_table->ReleaseResources();
-  descriptor_table = nullptr;
+  // We're done with the HDFS descriptor - free up its resources.
+  hdfs_table->ReleaseResources();
   hdfs_table = nullptr;
 
   {

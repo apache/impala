@@ -363,42 +363,39 @@ struct TPlanExecInfo {
 
 // Result of call to ImpalaPlanService/JniFrontend.CreateQueryRequest()
 struct TQueryExecRequest {
-  // global descriptor tbl for all fragments
-  1: optional Descriptors.TDescriptorTable desc_tbl
-
   // exec info for all plans; the first one materializes the query result
-  2: optional list<TPlanExecInfo> plan_exec_info
+  1: optional list<TPlanExecInfo> plan_exec_info
 
   // Metadata of the query result set (only for select)
-  3: optional Results.TResultSetMetadata result_set_metadata
+  2: optional Results.TResultSetMetadata result_set_metadata
 
   // Set if the query needs finalization after it executes
-  4: optional TFinalizeParams finalize_params
+  3: optional TFinalizeParams finalize_params
 
-  5: required ImpalaInternalService.TQueryCtx query_ctx
+  4: required ImpalaInternalService.TQueryCtx query_ctx
 
   // The same as the output of 'explain <query>'
-  6: optional string query_plan
+  5: optional string query_plan
 
   // The statement type governs when the coordinator can judge a query to be finished.
   // DML queries are complete after Wait(), SELECTs may not be. Generally matches
   // the stmt_type of the parent TExecRequest, but in some cases (such as CREATE TABLE
   // AS SELECT), these may differ.
-  7: required Types.TStmtType stmt_type
+  6: required Types.TStmtType stmt_type
 
   // List of replica hosts.  Used by the host_idx field of TScanRangeLocation.
-  9: required list<Types.TNetworkAddress> host_list
+  7: required list<Types.TNetworkAddress> host_list
 
   // Column lineage graph
-  10: optional LineageGraph.TLineageGraph lineage_graph
+  8: optional LineageGraph.TLineageGraph lineage_graph
 
   // Estimated per-host peak memory consumption in bytes. Used by admission control.
   // TODO: Remove when AC doesn't rely on this any more.
-  8: optional i64 per_host_mem_estimate
+  9: optional i64 per_host_mem_estimate
 
   // Maximum possible (in the case all fragments are scheduled on all hosts with
   // max DOP) minimum reservation required per host, in bytes.
-  11: optional i64 max_per_host_min_reservation;
+  10: optional i64 max_per_host_min_reservation;
 }
 
 enum TCatalogOpType {

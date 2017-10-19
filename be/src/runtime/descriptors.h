@@ -52,6 +52,7 @@ class TDescriptorTable;
 class TSlotDescriptor;
 class TTable;
 class TTupleDescriptor;
+class TTableDescriptor;
 
 /// A path into a table schema (e.g. a vector of ColumnTypes) pointing to a particular
 /// column/field. The i-th element of the path is the ordinal position of the column/field
@@ -75,12 +76,6 @@ class SchemaPathConstants {
   static const int MAP_VALUE = 1;
  private:
   DISALLOW_COPY_AND_ASSIGN(SchemaPathConstants);
-};
-
-struct LlvmTupleStruct {
-  llvm::StructType* tuple_struct;
-  llvm::PointerType* tuple_ptr;
-  std::vector<int> indices;
 };
 
 /// Location information for null indicator bit for particular slot.
@@ -195,7 +190,7 @@ class SlotDescriptor {
   /// The idx of the slot in the llvm codegen'd tuple struct
   /// This is set by TupleDescriptor during codegen and takes into account
   /// any padding bytes.
-  int llvm_field_idx_;
+  int llvm_field_idx_ = -1;
 
   /// collection_item_descriptor should be non-NULL iff this is a collection slot
   SlotDescriptor(const TSlotDescriptor& tdesc, const TupleDescriptor* parent,
@@ -326,6 +321,9 @@ class HdfsTableDescriptor : public TableDescriptor {
     return it->second;
   }
 
+  /// Release resources by closing partition descriptors.
+  void ReleaseResources();
+
   const PartitionIdToDescriptorMap& partition_descriptors() const {
     return partition_descriptors_;
   }
@@ -440,7 +438,7 @@ class TupleDescriptor {
   friend class DescriptorTbl;
 
   const TupleId id_;
-  TableDescriptor* table_desc_;
+  TableDescriptor* table_desc_ = nullptr;
   const int byte_size_;
   const int num_null_bytes_;
   const int null_bytes_offset_;
@@ -473,6 +471,12 @@ class TupleDescriptor {
 
 class DescriptorTbl {
  public:
+  /// Creates an HdfsTableDescriptor (allocated in 'pool' and returned via 'desc') for
+  /// table with id 'table_id' within thrift_tbl. DCHECKs if no such descriptor is
+  /// present.
+  static Status CreateHdfsTblDescriptor(const TDescriptorTable& thrift_tbl,
+      TableId table_id, ObjectPool* pool, HdfsTableDescriptor** desc);
+
   /// Creates a descriptor tbl within 'pool' from thrift_tbl and returns it via 'tbl'.
   /// Returns OK on success, otherwise error (in which case 'tbl' will be unset).
   static Status Create(ObjectPool* pool, const TDescriptorTable& thrift_tbl,
@@ -503,6 +507,11 @@ class DescriptorTbl {
 
   static Status CreatePartKeyExprs(
       const HdfsTableDescriptor& hdfs_tbl, ObjectPool* pool) WARN_UNUSED_RESULT;
+
+  /// Creates a TableDescriptor (allocated in 'pool', returned via 'desc')
+  /// corresponding to tdesc. Returns error status on failure.
+  static Status CreateTblDescriptorInternal(const TTableDescriptor& tdesc,
+    ObjectPool* pool, TableDescriptor** desc);
 };
 
 /// Records positions of tuples within row produced by ExecNode. RowDescriptors are
