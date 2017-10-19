@@ -71,6 +71,7 @@ class ImpalaClient(object):
     self.user, self.ldap_password = user, ldap_password
     self.use_ldap = use_ldap
     self.default_query_options = {}
+    self.query_option_levels = {}
     self.query_state = QueryState._NAMES_TO_VALUES
     self.fetch_batch_size = 1024
 
@@ -93,6 +94,11 @@ class ImpalaClient(object):
       raise RPCException("Unable to retrieve default query options")
     for option in options:
       self.default_query_options[option.key.upper()] = option.value
+      # If connected to an Impala that predates IMPALA-2181 then the received options
+      # wouldn't contain a level attribute. In this case the query_option_levels
+      # map is left empty.
+      if option.level is not None:
+        self.query_option_levels[option.key.upper()] = option.level
 
   def build_summary_table(self, summary, idx, is_fragment_root, indent_level,
       new_indent_level, output):

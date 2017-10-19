@@ -1105,7 +1105,8 @@ public class Frontend {
       result.stmt_type = TStmtType.SET;
       result.setResult_set_metadata(new TResultSetMetadata(Arrays.asList(
           new TColumn("option", Type.STRING.toThrift()),
-          new TColumn("value", Type.STRING.toThrift()))));
+          new TColumn("value", Type.STRING.toThrift()),
+          new TColumn("level", Type.STRING.toThrift()))));
       result.setSet_query_option_request(analysisResult.getSetStmt().toThrift());
       return result;
     }

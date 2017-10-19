@@ -1215,17 +1215,23 @@ void ImpalaServer::InitializeConfigVariables() {
 
   map<string, string> string_map;
   TQueryOptionsToMap(default_query_options_, &string_map);
+  string_map["SUPPORT_START_OVER"] = "false";
+  PopulateQueryOptionLevels(&query_option_levels_);
   map<string, string>::const_iterator itr = string_map.begin();
   for (; itr != string_map.end(); ++itr) {
     ConfigVariable option;
     option.__set_key(itr->first);
     option.__set_value(itr->second);
+    AddOptionLevelToConfig(&option, itr->first);
     default_configs_.push_back(option);
   }
-  ConfigVariable support_start_over;
-  support_start_over.__set_key("support_start_over");
-  support_start_over.__set_value("false");
-  default_configs_.push_back(support_start_over);
+}
+
+void ImpalaServer::AddOptionLevelToConfig(ConfigVariable* config,
+    const string& option_key) const {
+  const auto query_option_level = query_option_levels_.find(option_key);
+  DCHECK(query_option_level != query_option_levels_.end());
+  config->__set_level(query_option_level->second);
 }
 
 void ImpalaServer::SessionState::ToThrift(const TUniqueId& session_id,

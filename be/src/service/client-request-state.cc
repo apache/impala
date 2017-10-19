@@ -205,19 +205,12 @@ Status ClientRequestState::Exec(TExecRequest* exec_request) {
             exec_request_.set_query_option_request.value,
             &session_->set_query_options,
             &session_->set_query_options_mask));
-        SetResultSet({}, {});
+        SetResultSet({}, {}, {});
       } else {
-        // "SET" returns a table of all query options.
-        map<string, string> config;
-        TQueryOptionsToMap(
-            session_->QueryOptions(), &config);
-        vector<string> keys, values;
-        map<string, string>::const_iterator itr = config.begin();
-        for (; itr != config.end(); ++itr) {
-          keys.push_back(itr->first);
-          values.push_back(itr->second);
-        }
-        SetResultSet(keys, values);
+        // "SET" or "SET ALL"
+        bool is_set_all = exec_request_.set_query_option_request.__isset.is_set_all &&
+            exec_request_.set_query_option_request.is_set_all;
+        PopulateResultForSet(is_set_all);
       }
       return Status::OK();
     }
@@ -226,6 +219,27 @@ Status ClientRequestState::Exec(TExecRequest* exec_request) {
       errmsg << "Unknown  exec request stmt type: " << exec_request_.stmt_type;
       return Status(errmsg.str());
   }
+}
+
+void ClientRequestState::PopulateResultForSet(bool is_set_all) {
+  map<string, string> config;
+  TQueryOptionsToMap(session_->QueryOptions(), &config);
+  vector<string> keys, values, levels;
+  map<string, string>::const_iterator itr = config.begin();
+  for (; itr != config.end(); ++itr) {
+    const auto opt_level_id =
+        parent_server_->query_option_levels_[itr->first];
+    if (!is_set_all && (opt_level_id == TQueryOptionLevel::DEVELOPMENT ||
+                        opt_level_id == TQueryOptionLevel::DEPRECATED)) {
+      continue;
+    }
+    keys.push_back(itr->first);
+    values.push_back(itr->second);
+    const auto opt_level = _TQueryOptionLevel_VALUES_TO_NAMES.find(opt_level_id);
+    DCHECK(opt_level !=_TQueryOptionLevel_VALUES_TO_NAMES.end());
+    levels.push_back(opt_level->second);
+  }
+  SetResultSet(keys, values, levels);
 }
 
 Status ClientRequestState::ExecLocalCatalogOp(
@@ -967,6 +981,22 @@ void ClientRequestState::SetResultSet(const vector<string>& col1,
     (*request_result_set_.get())[i].colVals.resize(2);
     (*request_result_set_.get())[i].colVals[0].__set_string_val(col1[i]);
     (*request_result_set_.get())[i].colVals[1].__set_string_val(col2[i]);
+  }
+}
+
+void ClientRequestState::SetResultSet(const vector<string>& col1,
+    const vector<string>& col2, const vector<string>& col3) {
+  DCHECK_EQ(col1.size(), col2.size());
+  DCHECK_EQ(col1.size(), col3.size());
+
+  request_result_set_.reset(new vector<TResultRow>);
+  request_result_set_->resize(col1.size());
+  for (int i = 0; i < col1.size(); ++i) {
+    (*request_result_set_.get())[i].__isset.colVals = true;
+    (*request_result_set_.get())[i].colVals.resize(3);
+    (*request_result_set_.get())[i].colVals[0].__set_string_val(col1[i]);
+    (*request_result_set_.get())[i].colVals[1].__set_string_val(col2[i]);
+    (*request_result_set_.get())[i].colVals[2].__set_string_val(col3[i]);
   }
 }
 

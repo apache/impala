@@ -391,6 +391,8 @@ class ClientRequestState {
   void SetResultSet(const std::vector<std::string>& results);
   void SetResultSet(const std::vector<std::string>& col1,
       const std::vector<std::string>& col2);
+  void SetResultSet(const vector<string>& col1,
+      const vector<string>& col2, const vector<string>& col3);
   void SetResultSet(const std::vector<std::string>& col1,
       const std::vector<std::string>& col2, const std::vector<std::string>& col3,
       const std::vector<std::string>& col4);
@@ -417,6 +419,11 @@ class ClientRequestState {
   /// Does not take lock_, but requires it: caller must ensure lock_
   /// is taken before calling UpdateQueryState.
   void UpdateQueryState(beeswax::QueryState::type query_state);
+
+  /// Gets the query options, their values and levels and populates the result set
+  /// with them. It covers the subset of options for 'SET' and all of them for
+  /// 'SET ALL'
+  void PopulateResultForSet(bool is_set_all);
 };
 
 }

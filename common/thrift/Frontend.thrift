@@ -475,9 +475,11 @@ struct TCatalogOpRequest {
 
 // Parameters for the SET query option command
 struct TSetQueryOptionRequest {
-  // Set for "SET key=value", unset for "SET" statement.
+  // Set for "SET key=value", unset for "SET" and "SET ALL" statements.
   1: optional string key
   2: optional string value
+  // Set true for "SET ALL"
+  3: optional bool is_set_all
 }
 
 // HiveServer2 Metadata operations (JniFrontend.hiveServer2MetadataOperation)
@@ -539,7 +541,7 @@ struct TExecRequest {
   // Set iff stmt_type is QUERY or DML
   3: optional TQueryExecRequest query_exec_request
 
-  // Set iff stmt_type is DDL
+  // Set if stmt_type is DDL
   4: optional TCatalogOpRequest catalog_op_request
 
   // Metadata of the query result set (not set for DML)
@@ -558,7 +560,7 @@ struct TExecRequest {
   // List of warnings that were generated during analysis. May be empty.
   9: required list<string> analysis_warnings
 
-  // Set iff stmt_type is SET
+  // Set if stmt_type is SET
   10: optional TSetQueryOptionRequest set_query_option_request
 
   // Timeline of planner's operation, for profiling

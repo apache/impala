@@ -36,6 +36,7 @@ using boost::algorithm::token_compress_on;
 using boost::algorithm::split;
 using boost::algorithm::trim;
 using std::to_string;
+using beeswax::TQueryOptionLevel;
 using namespace impala;
 using namespace strings;
 
@@ -57,7 +58,7 @@ void impala::OverlayQueryOptions(const TQueryOptions& src, const QueryOptionsMas
     TQueryOptions* dst) {
   DCHECK_GT(mask.size(), _TImpalaQueryOptions_VALUES_TO_NAMES.size()) <<
       "Size of QueryOptionsMask must be increased.";
-#define QUERY_OPT_FN(NAME, ENUM)\
+#define QUERY_OPT_FN(NAME, ENUM, LEVEL)\
   if (src.__isset.NAME && mask[TImpalaQueryOptions::ENUM]) dst->__set_##NAME(src.NAME);
   QUERY_OPTS_TABLE
 #undef QUERY_OPT_FN
@@ -65,7 +66,7 @@ void impala::OverlayQueryOptions(const TQueryOptions& src, const QueryOptionsMas
 
 void impala::TQueryOptionsToMap(const TQueryOptions& query_options,
     map<string, string>* configuration) {
-#define QUERY_OPT_FN(NAME, ENUM)\
+#define QUERY_OPT_FN(NAME, ENUM, LEVEL)\
   {\
     if (query_options.__isset.NAME) { \
       stringstream val;\
@@ -83,7 +84,7 @@ void impala::TQueryOptionsToMap(const TQueryOptions& query_options,
 static void ResetQueryOption(const int option, TQueryOptions* query_options) {
   const static TQueryOptions defaults;
   switch (option) {
-#define QUERY_OPT_FN(NAME, ENUM)\
+#define QUERY_OPT_FN(NAME, ENUM, LEVEL)\
     case TImpalaQueryOptions::ENUM:\
       query_options->__isset.NAME = defaults.__isset.NAME;\
       query_options->NAME = defaults.NAME;\
@@ -97,7 +98,7 @@ string impala::DebugQueryOptions(const TQueryOptions& query_options) {
   const static TQueryOptions defaults;
   int i = 0;
   stringstream ss;
-#define QUERY_OPT_FN(NAME, ENUM)\
+#define QUERY_OPT_FN(NAME, ENUM, LEVEL)\
   if (query_options.__isset.NAME &&\
       (!defaults.__isset.NAME || query_options.NAME != defaults.NAME)) {\
     if (i++ > 0) ss << ",";\
@@ -606,4 +607,15 @@ Status impala::ParseQueryOptions(const string& options, TQueryOptions* query_opt
   }
   if (errorStatus.msg().details().size() > 0) return errorStatus;
   return Status::OK();
+}
+
+void impala::PopulateQueryOptionLevels(QueryOptionLevels* query_option_levels)
+{
+#define QUERY_OPT_FN(NAME, ENUM, LEVEL)\
+  {\
+    (*query_option_levels)[#ENUM] = LEVEL;\
+  }
+  QUERY_OPTS_TABLE
+  QUERY_OPT_FN(support_start_over, SUPPORT_START_OVER, TQueryOptionLevel::ADVANCED)
+#undef QUERY_OPT_FN
 }

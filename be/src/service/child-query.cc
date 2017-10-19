@@ -106,7 +106,7 @@ Status ChildQuery::ExecAndFetch() {
 void ChildQuery::SetQueryOptions(const TQueryOptions& parent_options,
     TExecuteStatementReq* exec_stmt_req) {
   map<string, string> conf;
-#define QUERY_OPT_FN(NAME, ENUM)\
+#define QUERY_OPT_FN(NAME, ENUM, LEVEL)\
   if (parent_options.__isset.NAME) {\
     stringstream val;\
     val << parent_options.NAME;\

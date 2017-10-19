@@ -40,14 +40,14 @@ class TestSetAndUnset(CustomClusterTestSuite, HS2TestSuite):
     so the same test is run in both contexts.
     """
     # Beeswax API:
-    result = self.execute_query_expect_success(self.client, "set")
-    assert "DEBUG_ACTION\tcustom" in result.data, "baseline"
+    result = self.execute_query_expect_success(self.client, "set all")
+    assert "DEBUG_ACTION\tcustom\tDEVELOPMENT" in result.data, "baseline"
     self.execute_query_expect_success(self.client, "set debug_action=hey")
-    assert "DEBUG_ACTION\they" in \
-        self.execute_query_expect_success(self.client, "set").data, "session override"
+    assert "DEBUG_ACTION\they\tDEVELOPMENT" in \
+        self.execute_query_expect_success(self.client, "set all").data, "session override"
     self.execute_query_expect_success(self.client, 'set debug_action=""')
-    assert "DEBUG_ACTION\tcustom" in \
-        self.execute_query_expect_success(self.client, "set").data, "reset"
+    assert "DEBUG_ACTION\tcustom\tDEVELOPMENT" in \
+        self.execute_query_expect_success(self.client, "set all").data, "reset"
     self.execute_query_expect_success(self.client, 'set batch_size=123')
     # Use a "request overlay" to change the option for a specific
     # request within a session. We run a real query and check its
@@ -89,7 +89,7 @@ class TestSetAndUnset(CustomClusterTestSuite, HS2TestSuite):
     Executes a "SET" HiveServer2 query and returns a list
     of key-value tuples.
     """
-    execute_statement_resp = self.execute_statement("set")
+    execute_statement_resp = self.execute_statement("set all")
     fetch_results_req = TCLIService.TFetchResultsReq()
     fetch_results_req.operationHandle = execute_statement_resp.operationHandle
     fetch_results_req.maxRows = 100

@@ -45,34 +45,35 @@ class TestHS2(HS2TestSuite):
     for k, v in open_session_req.configuration.items():
       assert open_session_resp.configuration[k] == v
 
+  def get_session_options(self, setCmd):
+    """Returns dictionary of query options."""
+    execute_statement_resp = self.execute_statement(setCmd)
+
+    fetch_results_req = TCLIService.TFetchResultsReq()
+    fetch_results_req.operationHandle = execute_statement_resp.operationHandle
+    fetch_results_req.maxRows = 1000
+    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
+    TestHS2.check_response(fetch_results_resp)
+
+    # Close the query
+    close_operation_req = TCLIService.TCloseOperationReq()
+    close_operation_req.operationHandle = execute_statement_resp.operationHandle
+    TestHS2.check_response(self.hs2_client.CloseOperation(close_operation_req))
+
+    # Results are returned in a columnar way:
+    cols = fetch_results_resp.results.columns
+    assert len(cols) == 3
+    vals = dict(zip(cols[0].stringVal.values, cols[1].stringVal.values))
+    levels = dict(zip(cols[0].stringVal.values, cols[2].stringVal.values))
+    return vals, levels
+
   @needs_session()
   def test_session_options_via_set(self):
     """
     Tests that session options are returned by a SET
     query and can be updated by a "SET k=v" query.
     """
-    def get_session_options():
-      """Returns dictionary of query options."""
-      execute_statement_resp = self.execute_statement("SET")
-
-      fetch_results_req = TCLIService.TFetchResultsReq()
-      fetch_results_req.operationHandle = execute_statement_resp.operationHandle
-      fetch_results_req.maxRows = 1000
-      fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
-      TestHS2.check_response(fetch_results_resp)
-
-      # Close the query
-      close_operation_req = TCLIService.TCloseOperationReq()
-      close_operation_req.operationHandle = execute_statement_resp.operationHandle
-      TestHS2.check_response(self.hs2_client.CloseOperation(close_operation_req))
-
-      # Results are returned in a columnar way:
-      cols = fetch_results_resp.results.columns
-      assert len(cols) == 2
-      vals = dict(zip(cols[0].stringVal.values, cols[1].stringVal.values))
-      return vals
-
-    vals = get_session_options()
+    vals, levels = self.get_session_options("SET")
 
     # No default; should be empty string.
     assert vals["COMPRESSION_CODEC"] == ""
@@ -82,10 +83,35 @@ class TestHS2(HS2TestSuite):
     # Set an option using SET
     self.execute_statement("SET COMPRESSION_CODEC=gzip")
 
-    vals2 = get_session_options()
+    vals2, levels = self.get_session_options("SET")
     assert vals2["COMPRESSION_CODEC"] == "GZIP"
+    assert levels["COMPRESSION_CODEC"] == "REGULAR"
     # Should be unchanged
     assert vals2["SYNC_DDL"] == "0"
+
+    # Verify that 'DEVELOPMENT' and 'DEPRECATED' options are not returned.
+    assert "MAX_ERRORS" in vals2
+    assert levels["MAX_ERRORS"] == "ADVANCED"
+    assert "DEBUG_ACTION" not in vals2
+    assert "SCAN_NODE_CODEGEN_THRESHOLD" not in vals2
+
+  @needs_session()
+  def test_session_option_levels_via_set_all(self):
+    """
+    Tests the level of session options returned by a SET ALL query.
+    """
+    vals, levels = self.get_session_options("SET ALL")
+
+    assert "COMPRESSION_CODEC" in vals
+    assert "SYNC_DDL" in vals
+    assert "MAX_ERRORS" in vals
+    assert "DEBUG_ACTION" in vals
+    assert "SCAN_NODE_CODEGEN_THRESHOLD" in vals
+    assert levels["COMPRESSION_CODEC"] == "REGULAR"
+    assert levels["SYNC_DDL"] == "REGULAR"
+    assert levels["MAX_ERRORS"] == "ADVANCED"
+    assert levels["DEBUG_ACTION"] == "DEVELOPMENT"
+    assert levels["SCAN_NODE_CODEGEN_THRESHOLD"] == "DEPRECATED"
 
   def test_open_session_http_addr(self):
     """Check that OpenSession returns the coordinator's http address."""

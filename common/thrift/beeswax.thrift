@@ -93,13 +93,24 @@ exception BeeswaxException {
 }
 
 exception QueryNotFoundException {
-} 
+}
+
+// Impala extension:
+// Levels to use when displaying query options from Impala shell
+enum TQueryOptionLevel {
+  REGULAR,
+  ADVANCED,
+  DEVELOPMENT,
+  DEPRECATED
+}
 
 /** Represents a Hadoop-style configuration variable. */
 struct ConfigVariable {
   1: string key,
   2: string value,
-  3: string description
+  3: string description,
+  // For displaying purposes in Impala shell
+  4: optional TQueryOptionLevel level
 }
 
 service BeeswaxService {

@@ -292,7 +292,7 @@ class TestImpalaShellInteractive(object):
   def test_query_option_configuration(self):
     rcfile_path = os.path.join(QUERY_FILE_PATH, 'impalarc_with_query_options')
     args = '-Q MT_dop=1 --query_option=MAX_ERRORS=200 --config_file="%s"' % rcfile_path
-    cmds = "set;"
+    cmds = "set all;"
     result = run_impala_shell_interactive(cmds, shell_args=args)
     assert "\tMT_DOP: 1" in result.stdout
     assert "\tMAX_ERRORS: 200" in result.stdout
@@ -353,6 +353,42 @@ class TestImpalaShellInteractive(object):
     result = run_impala_shell_interactive("select * from functional.alltypes limit 0;")
     assert "Fetched 0 row(s)" in result.stderr
     assert re.search('> \[', result.stdout)
+
+  @pytest.mark.execute_serially
+  def test_set_and_set_all(self):
+    """IMPALA-2181. Tests the outputs of SET and SET ALL commands. SET should contain the
+    REGULAR and ADVANCED options only. SET ALL should contain all the options grouped by
+    display level."""
+    shell1 = ImpalaShell()
+    shell1.send_cmd("set")
+    result = shell1.get_result()
+    assert "Query options (defaults shown in []):" in result.stdout
+    assert "ABORT_ON_ERROR" in result.stdout
+    assert "Advanced Query Options:" in result.stdout
+    assert "APPX_COUNT_DISTINCT" in result.stdout
+    assert "SUPPORT_START_OVER" in result.stdout
+    assert "Development Query Options:" not in result.stdout
+    assert "DEBUG_ACTION" not in result.stdout
+    assert "Deprecated Query Options:" not in result.stdout
+    assert "ABORT_ON_DEFAULT_LIMIT_EXCEEDED" not in result.stdout
+
+    shell2 = ImpalaShell()
+    shell2.send_cmd("set all")
+    result = shell2.get_result()
+    assert "Query options (defaults shown in []):" in result.stdout
+    assert "Advanced Query Options:" in result.stdout
+    assert "Development Query Options:" in result.stdout
+    assert "Deprecated Query Options:" in result.stdout
+    advanced_part_start_idx = result.stdout.find("Advanced Query Options")
+    development_part_start_idx = result.stdout.find("Development Query Options")
+    deprecated_part_start_idx = result.stdout.find("Deprecated Query Options")
+    advanced_part = result.stdout[advanced_part_start_idx:development_part_start_idx]
+    development_part = result.stdout[development_part_start_idx:deprecated_part_start_idx]
+    assert "ABORT_ON_ERROR" in result.stdout[:advanced_part_start_idx]
+    assert "APPX_COUNT_DISTINCT" in advanced_part
+    assert "SUPPORT_START_OVER" in advanced_part
+    assert "DEBUG_ACTION" in development_part
+    assert "ABORT_ON_DEFAULT_LIMIT_EXCEEDED" in result.stdout[deprecated_part_start_idx:]
 
 def run_impala_shell_interactive(input_lines, shell_args=None):
   """Runs a command in the Impala shell interactively."""

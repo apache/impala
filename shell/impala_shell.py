@@ -78,6 +78,18 @@ class ImpalaPrettyTable(prettytable.PrettyTable):
       value = unicode(value, self.encoding, "replace")
     return value
 
+class QueryOptionLevels:
+  """These are the levels used when displaying query options.
+  The values correspond to the ones in TQueryOptionLevel"""
+  REGULAR = 0
+  ADVANCED = 1
+  DEVELOPMENT = 2
+  DEPRECATED = 3
+
+class QueryOptionDisplayModes:
+  REGULAR_OPTIONS_ONLY = 1
+  ALL_OPTIONS = 2
+
 class ImpalaShell(object, cmd.Cmd):
   """ Simple Impala Shell.
 
@@ -214,19 +226,64 @@ class ImpalaShell(object, cmd.Cmd):
     """
     self.readline = None
 
-  def _print_options(self, default_options, set_options):
-    # Prints the current query options
-    # with default values distinguished from set values by brackets [], followed by
-    # shell-local options.
-    if not default_options and not set_options:
+  def _print_options(self, print_mode):
+    """Prints the current query options with default values distinguished from set values
+    by brackets [], followed by shell-local options.
+    The options are displayed in groups based on option levels received in parameter.
+    Input parameter decides whether all groups or just the 'Regular' and 'Advanced'
+    options are displayed."""
+    print "Query options (defaults shown in []):"
+    if not self.imp_client.default_query_options and not self.set_query_options:
       print '\tNo options available.'
     else:
-      for k in sorted(default_options):
-        if k in set_options and set_options[k] != default_options[k]:
-          print '\n'.join(["\t%s: %s" % (k, set_options[k])])
-        else:
-          print '\n'.join(["\t%s: [%s]" % (k, default_options[k])])
+      (regular_options, advanced_options, development_options, deprecated_options) = \
+          self._get_query_option_grouping()
+      self._print_option_group(regular_options)
+      # If the shell is connected to an Impala that predates IMPALA-2181 then
+      # the advanced_options would be empty and only the regular options would
+      # be displayed.
+      if advanced_options:
+        print '\nAdvanced Query Options:'
+        self._print_option_group(advanced_options)
+      if print_mode == QueryOptionDisplayModes.ALL_OPTIONS:
+        if development_options:
+          print '\nDevelopment Query Options:'
+          self._print_option_group(development_options)
+        if deprecated_options:
+          print '\nDeprecated Query Options:'
+          self._print_option_group(deprecated_options)
     self._print_shell_options()
+
+  def _get_query_option_grouping(self):
+    """For all the query options received through rpc this function determines the
+    query option level for display purposes using the received query_option_levels
+    parameters.
+    If the option level can't be determined then it defaults to 'REGULAR'"""
+    regular_options, advanced_options, development_options, deprecated_options = \
+        {}, {}, {}, {}
+    for option_name, option_value in self.imp_client.default_query_options.iteritems():
+      level = self.imp_client.query_option_levels.get(option_name,
+                                                      QueryOptionLevels.REGULAR)
+      if level == QueryOptionLevels.REGULAR:
+        regular_options[option_name] = option_value
+      elif level == QueryOptionLevels.DEVELOPMENT:
+        development_options[option_name] = option_value
+      elif level == QueryOptionLevels.DEPRECATED:
+        deprecated_options[option_name] = option_value
+      else:
+        advanced_options[option_name] = option_value
+    return (regular_options, advanced_options, development_options, deprecated_options)
+
+  def _print_option_group(self, query_options):
+    """Gets query options and prints them. Value is inside [] for the ones having
+    default values.
+    query_options parameter is a subset of the default_query_options map"""
+    for option_name in sorted(query_options):
+      if (option_name in self.set_query_options and
+          self.set_query_options[option_name] != query_options[option_name]):
+        print '\n'.join(["\t%s: %s" % (option_name, self.set_query_options[option_name])])
+      else:
+        print '\n'.join(["\t%s: [%s]" % (option_name, query_options[option_name])])
 
   def _print_variables(self):
     # Prints the currently defined variables.
@@ -552,11 +609,17 @@ class ImpalaShell(object, cmd.Cmd):
         return var_name
     return None
 
+  def _print_with_set(self, print_level):
+    self._print_options(print_level)
+    print "\nVariables:"
+    self._print_variables()
+
   def do_set(self, args):
     """Set or display query options.
 
     Display query options:
-    Usage: SET
+    Usage: SET (to display the Regular options) or
+           SET ALL (to display all the options)
     Set query options:
     Usage: SET <option>=<value>
            OR
@@ -565,20 +628,21 @@ class ImpalaShell(object, cmd.Cmd):
     """
     # TODO: Expand set to allow for setting more than just query options.
     if len(args) == 0:
-      print "Query options (defaults shown in []):"
-      self._print_options(self.imp_client.default_query_options, self.set_query_options)
-      print "\nVariables:"
-      self._print_variables()
+      self._print_with_set(QueryOptionDisplayModes.REGULAR_OPTIONS_ONLY)
       return CmdStatus.SUCCESS
 
     # Remove any extra spaces surrounding the tokens.
     # Allows queries that have spaces around the = sign.
     tokens = [arg.strip() for arg in args.split("=")]
     if len(tokens) != 2:
-      print_to_stderr("Error: SET <option>=<value>")
-      print_to_stderr("       OR")
-      print_to_stderr("       SET VAR:<variable>=<value>")
-      return CmdStatus.ERROR
+      if len(tokens) == 1 and tokens[0].upper() == "ALL":
+        self._print_with_set(QueryOptionDisplayModes.ALL_OPTIONS)
+        return CmdStatus.SUCCESS
+      else:
+        print_to_stderr("Error: SET <option>=<value>")
+        print_to_stderr("       OR")
+        print_to_stderr("       SET VAR:<variable>=<value>")
+        return CmdStatus.ERROR
     option_upper = tokens[0].upper()
     # Check if it's a variable
     var_name = self._get_var_name(option_upper)
@@ -590,7 +654,7 @@ class ImpalaShell(object, cmd.Cmd):
       if option_upper not in self.imp_client.default_query_options.keys():
         print "Unknown query option: %s" % (tokens[0])
         print "Available query options, with their values (defaults shown in []):"
-        self._print_options(self.imp_client.default_query_options, self.set_query_options)
+        self._print_options(QueryOptionDisplayModes.REGULAR_OPTIONS_ONLY)
         return CmdStatus.ERROR
       self.set_query_options[option_upper] = tokens[1]
       self._print_if_verbose('%s set to %s' % (option_upper, tokens[1]))

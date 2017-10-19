@@ -2299,15 +2299,17 @@ select_clause ::=
 
 set_stmt ::=
   KW_SET ident_or_default:key EQUAL literal:l
-  {: RESULT = new SetStmt(key, l.getStringValue()); :}
+  {: RESULT = new SetStmt(key, l.getStringValue(), false); :}
   | KW_SET ident_or_default:key EQUAL SUBTRACT numeric_literal:l
   {:
     l.swapSign();
-    RESULT = new SetStmt(key, l.getStringValue()); :}
+    RESULT = new SetStmt(key, l.getStringValue(), false); :}
   | KW_SET ident_or_default:key EQUAL ident_or_default:ident
-  {: RESULT = new SetStmt(key, ident); :}
+  {: RESULT = new SetStmt(key, ident, false); :}
+  | KW_SET KW_ALL
+  {: RESULT = new SetStmt(null, null, true); :}
   | KW_SET
-  {: RESULT = new SetStmt(null, null); :}
+  {: RESULT = new SetStmt(null, null, false); :}
   ;
 
 select_list ::=

@@ -336,6 +336,9 @@ class ImpalaServer : public ImpalaServiceIf,
   typedef boost::unordered_map<std::string, TBackendDescriptor> BackendDescriptorMap;
   const BackendDescriptorMap& GetKnownBackends();
 
+  // Mapping between query option names and levels
+  QueryOptionLevels query_option_levels_;
+
   /// The prefix of audit event log filename.
   static const string AUDIT_EVENT_LOG_FILE_PREFIX;
 
@@ -534,6 +537,13 @@ class ImpalaServer : public ImpalaServiceIf,
   /// "support_start_over/false" to indicate that Impala does not support start over
   /// in the fetch call.
   void InitializeConfigVariables();
+
+  /// Sets the option level for parameter 'option' based on the mapping stored in
+  /// 'query_option_levels_'. The option level is used by the Impala shell when it
+  /// displays the options. 'option_key' is the key for the 'query_option_levels_'
+  /// to get the level of the query option.
+  void AddOptionLevelToConfig(beeswax::ConfigVariable* option,
+      const string& option_key) const;
 
   /// Checks settings for profile logging, including whether the output
   /// directory exists and is writeable, and initialises the first log file.
