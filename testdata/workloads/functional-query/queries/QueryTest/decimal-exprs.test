@@ -94,6 +94,106 @@ select 10.0 % 0 from decimal_tbl;
 UDF ERROR: Cannot divide decimal by zero
 ====
 ---- QUERY
+# Test DECIMAL V1 decimal overflow
+set decimal_v2=false;
+select
+  cast(9999999999999999999999999999 as decimal(38, 6)) *
+  cast(9999999999999999999999999999 as decimal(38, 6))
+---- RESULTS
+NULL
+---- TYPES
+DECIMAL
+---- ERRORS
+UDF WARNING: Decimal expression overflowed, returning NULL
+====
+---- QUERY
+# Test DECIMAL V2 decimal overflow
+set decimal_v2=true;
+select
+  cast(9999999999999999999999999999 as decimal(38, 6)) *
+  cast(9999999999999999999999999999 as decimal(38, 6))
+---- CATCH
+UDF ERROR: Decimal expression overflowed
+====
+---- QUERY
+# IMPALA-1837: Handle loss of precision when implicitly casting a literal to a decimal.
+# Here "1.8" will be implicitly cast to a decimal(38,38), losing precision.
+set decimal_v2=false;
+select coalesce(1.8, cast(0 as decimal(38,38)));
+---- TYPES
+DECIMAL
+---- RESULTS
+0.00000000000000000000000000000000000000
+---- ERRORS
+UDF WARNING: Decimal expression overflowed, returning NULL
+====
+---- QUERY
+set decimal_v2=true;
+select coalesce(1.8, cast(0 as decimal(38,38)));
+---- CATCH
+UDF ERROR: Decimal expression overflowed
+====
+---- QUERY
+# DECIMAL v1 sum() overflow. A negative number is incorrectly returned due to overflow.
+set decimal_v2=false;
+select sum(d6 * cast(4e37 as decimal(38,0))) from decimal_tbl;
+---- RESULTS
+-40282366920938463463374607431768211456
+---- TYPES
+DECIMAL
+====
+---- QUERY
+# DECIMAL v2 sum() overflow.
+set decimal_v2=true;
+select sum(d6 * cast(4e37 as decimal(38,0))) from decimal_tbl;
+---- CATCH
+UDF ERROR: Sum computation overflowed
+====
+---- QUERY
+# DECIMAL v1 avg() overflow. A negative number is incorrectly returned due to overflow.
+set decimal_v2=false;
+select avg(d6 * cast(4e37 as decimal(38,0))) from decimal_tbl;
+---- RESULTS
+-28056473384187692692674921486353642291
+---- TYPES
+DECIMAL
+====
+---- QUERY
+# DECIMAL v2 avg() overflow.
+set decimal_v2=true;
+select avg(d6 * cast(4e37 as decimal(38,0))) from decimal_tbl;
+---- CATCH
+UDF ERROR: Avg computation overflowed
+====
+---- QUERY
+# DECIMAL v1 avg() and sum() could incorrecly indicate an overflow error if
+# only the absolute values are considered.
+set decimal_v2=false;
+with t as (
+  select cast(99999999999999999999999999999999999999 as decimal(38, 0)) as c
+  union all
+  select cast(-99999999999999999999999999999999999999 as decimal(38, 0)) as c)
+select sum(c), avg(c) from t;
+---- RESULTS
+0,0
+---- TYPES
+DECIMAL,DECIMAL
+====
+---- QUERY
+# DECIMAL v2 avg() and sum() could incorrecly indicate an overflow error if
+# only the absolute values are considered.
+set decimal_v2=true;
+with t as (
+  select cast(99999999999999999999999999999999999999 as decimal(38, 0)) as c
+  union all
+  select cast(-99999999999999999999999999999999999999 as decimal(38, 0)) as c)
+select sum(c), avg(c) from t;
+---- RESULTS
+0,0.000000
+---- TYPES
+DECIMAL,DECIMAL
+====
+---- QUERY
 # Test casting behavior without decimal_v2 query option set.
 set decimal_v2=false;
 select cast(d3 as decimal(20, 3)) from decimal_tbl;

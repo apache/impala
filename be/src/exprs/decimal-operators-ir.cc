@@ -33,11 +33,15 @@
 namespace impala {
 
 #define RETURN_IF_OVERFLOW(ctx, overflow, return_type) \
-  do {\
-    if (UNLIKELY(overflow)) {\
-      ctx->AddWarning("Expression overflowed, returning NULL");\
-      return return_type::null();\
-    }\
+  do { \
+    if (UNLIKELY(overflow)) { \
+      if (ctx->impl()->GetConstFnAttr(FunctionContextImpl::DECIMAL_V2)) { \
+        ctx->SetError("Decimal expression overflowed"); \
+      } else { \
+        ctx->AddWarning("Decimal expression overflowed, returning NULL"); \
+      } \
+      return return_type::null(); \
+    } \
   } while (false)
 
 // Inline in IR module so branches can be optimised out.

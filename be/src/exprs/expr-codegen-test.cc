@@ -324,7 +324,7 @@ TEST_F(ExprCodegenTest, TestInlineConstFnAttrs) {
 
   // Call InlineConstFnAttrs() and rerun verification
   int replaced = InlineConstFnAttrs(expr, codegen.get(), fn);
-  EXPECT_EQ(replaced, 9);
+  EXPECT_EQ(replaced, 19);
   ResetVerification(codegen.get());
   verification_succeeded = VerifyFunction(codegen.get(), fn);
   EXPECT_TRUE(verification_succeeded) << CodeGenUtil::Print(fn);

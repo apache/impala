@@ -441,7 +441,7 @@ class TestHS2(HS2TestSuite):
 
     # Test overflow warning
     log = self.get_log("select cast(1000 as decimal(2, 1))")
-    assert "Expression overflowed, returning NULL" in log
+    assert "Decimal expression overflowed, returning NULL" in log
 
   @needs_session()
   def test_get_exec_summary(self):

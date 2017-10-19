@@ -368,17 +368,6 @@ STRING
 ---- QUERY
 # IMPALA-1837: Handle loss of precision when implicitly casting a literal to a decimal.
 # Here "1.8" will be implicitly cast to a decimal(38,38), losing precision.
-select coalesce(1.8, cast(0 as decimal(38,38)))
----- TYPES
-DECIMAL
----- RESULTS
-0.00000000000000000000000000000000000000
----- ERRORS
-UDF WARNING: Expression overflowed, returning NULL
-====
----- QUERY
-# IMPALA-1837: Handle loss of precision when implicitly casting a literal to a decimal.
-# Here "1.8" will be implicitly cast to a decimal(38,38), losing precision.
 # No error is reported because the overflowed expr is never evaluated.
 select coalesce(cast(0 as decimal(38,38)), 1.8)
 ---- TYPES
