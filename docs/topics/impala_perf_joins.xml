@@ -157,6 +157,10 @@ under the License.
         table is on the left, followed by the next largest, and so on until the smallest table is on the right.
       </p>
 
+      <note>
+        <p conref="../shared/impala_common.xml#common/straight_join_nested_queries"/>
+      </note>
+
       <p>
         In this example, the subselect from the <codeph>BIG</codeph> table produces a very small result set, but
         the table might still be treated as if it were the biggest and placed first in the join order. Using

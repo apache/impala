@@ -2864,6 +2864,13 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
         <codeph>SELECT</codeph> and any <codeph>DISTINCT</codeph> or <codeph>ALL</codeph> keywords.
       </p>
 
+      <p id="straight_join_nested_queries" rev="IMPALA-6083">
+        The <codeph>STRAIGHT_JOIN</codeph> hint affects the join order of table references in the query
+        block containing the hint. It does not affect the join order of nested queries, such as views,
+        inline views, or <codeph>WHERE</codeph>-clause subqueries. To use this hint for performance
+        tuning of complex queries, apply the hint to all query blocks that need a fixed join order.
+      </p>
+
       <p id="catalog_server_124">
         In Impala 1.2.4 and higher, you can specify a table name with <codeph>INVALIDATE METADATA</codeph> after
         the table is created in Hive, allowing you to make individual tables visible to Impala without doing a full

@@ -136,6 +136,8 @@ INSERT <varname>insert_clauses</varname>
       reordering the tables in a way that makes the join-related hints ineffective.
     </p>
 
+    <p conref="../shared/impala_common.xml#common/straight_join_nested_queries"/>
+
     <p>
       To reduce the need to use hints, run the <codeph>COMPUTE STATS</codeph> statement against all tables involved
       in joins, or used as the source tables for <codeph>INSERT ... SELECT</codeph> operations where the
