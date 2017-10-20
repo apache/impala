@@ -13,7 +13,7 @@ you analyze, transform and combine data from a variety of data sources:
 * On-the-fly code generation using [LLVM](http://llvm.org/) to generate CPU-efficient
   code tailored specifically to each individual query.
 * Support for the most commonly-used Hadoop file formats, including the
-  [Apache Parquet](https://parquet.incubator.apache.org/) (incubating) project.
+  [Apache Parquet](https://parquet.apache.org/) project.
 * Apache-licensed, 100% open source.
 
 ## More about Impala
