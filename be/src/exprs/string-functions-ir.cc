@@ -21,7 +21,6 @@
 #include <stdint.h>
 #include <re2/re2.h>
 #include <re2/stringpiece.h>
-#include <bitset>
 
 #include <boost/static_assert.hpp>
 
@@ -400,41 +399,97 @@ StringVal StringFunctions::Translate(FunctionContext* context, const StringVal& 
   return result;
 }
 
-StringVal StringFunctions::Trim(FunctionContext* context, const StringVal& str) {
+void StringFunctions::TrimPrepare(
+    FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+  if (scope != FunctionContext::THREAD_LOCAL) return;
+  // Create a bitset to hold the unique characters to trim.
+  bitset<256>* unique_chars = new bitset<256>();
+  context->SetFunctionState(scope, unique_chars);
+  // If the caller didn't specify the set of characters to trim, it means
+  // that we're only trimming whitespace. Return early in that case.
+  // There can be either 1 or 2 arguments.
+  DCHECK(context->GetNumArgs() == 1 || context->GetNumArgs() == 2);
+  if (context->GetNumArgs() == 1) {
+    unique_chars->set(static_cast<int>(' '), true);
+    return;
+  }
+  if (!context->IsArgConstant(1)) return;
+  DCHECK_EQ(context->GetArgType(1)->type, FunctionContext::TYPE_STRING);
+  StringVal* chars_to_trim = reinterpret_cast<StringVal*>(context->GetConstantArg(1));
+  if (chars_to_trim->is_null) return; // We shouldn't peek into Null StringVals
+  for (int32_t i = 0; i < chars_to_trim->len; ++i) {
+    unique_chars->set(static_cast<int>(chars_to_trim->ptr[i]), true);
+  }
+}
+
+void StringFunctions::TrimClose(
+    FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+  if (scope != FunctionContext::THREAD_LOCAL) return;
+  bitset<256>* unique_chars = reinterpret_cast<bitset<256>*>(
+      context->GetFunctionState(scope));
+  delete unique_chars;
+  context->SetFunctionState(scope, nullptr);
+}
+
+template <StringFunctions::TrimPosition D, bool IS_IMPLICIT_WHITESPACE>
+StringVal StringFunctions::DoTrimString(FunctionContext* ctx,
+    const StringVal& str, const StringVal& chars_to_trim) {
   if (str.is_null) return StringVal::null();
+  bitset<256>* unique_chars = reinterpret_cast<bitset<256>*>(
+      ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
+  // When 'chars_to_trim' is unique for each element (e.g. when 'chars_to_trim'
+  // is each element of a table column), we need to prepare a bitset of unique
+  // characters here instead of using the bitset from function context.
+  if (!IS_IMPLICIT_WHITESPACE && !ctx->IsArgConstant(1)) {
+    if (chars_to_trim.is_null) return str;
+    unique_chars->reset();
+    for (int32_t i = 0; i < chars_to_trim.len; ++i) {
+      unique_chars->set(static_cast<int>(chars_to_trim.ptr[i]), true);
+    }
+  }
   // Find new starting position.
   int32_t begin = 0;
-  while (begin < str.len && str.ptr[begin] == ' ') {
-    ++begin;
+  int32_t end = str.len - 1;
+  if (D == LEADING || D == BOTH) {
+    while (begin < str.len &&
+        unique_chars->test(static_cast<int>(str.ptr[begin]))) {
+      ++begin;
+    }
   }
   // Find new ending position.
-  int32_t end = str.len - 1;
-  while (end > begin && str.ptr[end] == ' ') {
-    --end;
+  if (D == TRAILING || D == BOTH) {
+    while (end >= begin && unique_chars->test(static_cast<int>(str.ptr[end]))) {
+      --end;
+    }
   }
   return StringVal(str.ptr + begin, end - begin + 1);
 }
 
+StringVal StringFunctions::Trim(FunctionContext* context, const StringVal& str) {
+  return DoTrimString<BOTH, true>(context, str, StringVal(" "));
+}
+
 StringVal StringFunctions::Ltrim(FunctionContext* context, const StringVal& str) {
-  if (str.is_null) return StringVal::null();
-  // Find new starting position.
-  int32_t begin = 0;
-  while (begin < str.len && str.ptr[begin] == ' ') {
-    ++begin;
-  }
-  return StringVal(str.ptr + begin, str.len - begin);
+  return DoTrimString<LEADING, true>(context, str, StringVal(" "));
 }
 
 StringVal StringFunctions::Rtrim(FunctionContext* context, const StringVal& str) {
-  if (str.is_null) return StringVal::null();
-  if (str.len == 0) return str;
-  // Find new ending position.
-  int32_t end = str.len - 1;
-  while (end > 0 && str.ptr[end] == ' ') {
-    --end;
-  }
-  DCHECK_GE(end, 0);
-  return StringVal(str.ptr, (str.ptr[end] == ' ') ? end : end + 1);
+  return DoTrimString<TRAILING, true>(context, str, StringVal(" "));
+}
+
+StringVal StringFunctions::LTrimString(FunctionContext* ctx,
+    const StringVal& str, const StringVal& chars_to_trim) {
+  return DoTrimString<LEADING, false>(ctx, str, chars_to_trim);
+}
+
+StringVal StringFunctions::RTrimString(FunctionContext* ctx,
+    const StringVal& str, const StringVal& chars_to_trim) {
+  return DoTrimString<TRAILING, false>(ctx, str, chars_to_trim);
+}
+
+StringVal StringFunctions::BTrimString(FunctionContext* ctx,
+    const StringVal& str, const StringVal& chars_to_trim) {
+  return DoTrimString<BOTH, false>(ctx, str, chars_to_trim);
 }
 
 IntVal StringFunctions::Ascii(FunctionContext* context, const StringVal& str) {
@@ -921,58 +976,6 @@ StringVal StringFunctions::Chr(FunctionContext* ctx, const IntVal& val) {
   if (val.val < 0 || val.val > 255) return "";
   char c = static_cast<char>(val.val);
   return AnyValUtil::FromBuffer(ctx, &c, 1);
-}
-
-void StringFunctions::BTrimPrepare(
-    FunctionContext* context, FunctionContext::FunctionStateScope scope) {
-  if (scope != FunctionContext::THREAD_LOCAL) return;
-  // Create a bitset to hold the unique characters to trim.
-  bitset<256>* unique_chars = new bitset<256>();
-  context->SetFunctionState(scope, unique_chars);
-  if (!context->IsArgConstant(1)) return;
-  DCHECK_EQ(context->GetArgType(1)->type, FunctionContext::TYPE_STRING);
-  StringVal* chars_to_trim = reinterpret_cast<StringVal*>(context->GetConstantArg(1));
-  for (int32_t i = 0; i < chars_to_trim->len; ++i) {
-    unique_chars->set(static_cast<int>(chars_to_trim->ptr[i]), true);
-  }
-}
-
-void StringFunctions::BTrimClose(
-    FunctionContext* context, FunctionContext::FunctionStateScope scope) {
-  if (scope != FunctionContext::THREAD_LOCAL) return;
-  bitset<256>* unique_chars = reinterpret_cast<bitset<256>*>(
-      context->GetFunctionState(scope));
-  delete unique_chars;
-  context->SetFunctionState(scope, nullptr);
-}
-
-StringVal StringFunctions::BTrimString(FunctionContext* ctx,
-    const StringVal& str, const StringVal& chars_to_trim) {
-  if (str.is_null) return StringVal::null();
-  bitset<256>* unique_chars = reinterpret_cast<bitset<256>*>(
-      ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
-  // When 'chars_to_trim' is unique for each element (e.g. when 'chars_to_trim'
-  // is each element of a table column), we need to prepare a bitset of unique
-  // characters here instead of using the bitset from function context.
-  if (!ctx->IsArgConstant(1)) {
-    unique_chars->reset();
-    DCHECK(chars_to_trim.len != 0 || chars_to_trim.is_null);
-    for (int32_t i = 0; i < chars_to_trim.len; ++i) {
-      unique_chars->set(static_cast<int>(chars_to_trim.ptr[i]), true);
-    }
-  }
-  // Find new starting position.
-  int32_t begin = 0;
-  while (begin < str.len &&
-      unique_chars->test(static_cast<int>(str.ptr[begin]))) {
-    ++begin;
-  }
-  // Find new ending position.
-  int32_t end = str.len - 1;
-  while (end > begin && unique_chars->test(static_cast<int>(str.ptr[end]))) {
-    --end;
-  }
-  return StringVal(str.ptr + begin, end - begin + 1);
 }
 
 // Similar to strstr() except that the strings are not null-terminated

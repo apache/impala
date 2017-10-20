@@ -3744,6 +3744,46 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("rtrim('abc  defg')", "abc  defg");
   TestIsNull("rtrim(NULL)", TYPE_STRING);
 
+  TestStringValue("ltrim('%%%%%abcdefg%%%%%', '%')", "abcdefg%%%%%");
+  TestStringValue("ltrim('%%%%%abcdefg', '%')", "abcdefg");
+  TestStringValue("ltrim('abcdefg%%%%%', '%')", "abcdefg%%%%%");
+  TestStringValue("ltrim('%%%%%abc%%defg', '%')", "abc%%defg");
+  TestStringValue("ltrim('abcdefg', 'abc')", "defg");
+  TestStringValue("ltrim('    abcdefg', ' ')", "abcdefg");
+  TestStringValue("ltrim('abacdefg', 'abc')", "defg");
+  TestStringValue("ltrim('abacdefgcab', 'abc')", "defgcab");
+  TestStringValue("ltrim('abcacbbacbcacabcba', 'abc')", "");
+  TestStringValue("ltrim('', 'abc')", "");
+  TestStringValue("ltrim('     ', 'abc')", "     ");
+  TestIsNull("ltrim(NULL, 'abc')", TYPE_STRING);
+  TestStringValue("ltrim('abcdefg', NULL)", "abcdefg");
+  TestStringValue("ltrim('abcdefg', '')", "abcdefg");
+  TestStringValue("ltrim('abcdabcdabc', 'abc')", "dabcdabc");
+  TestStringValue("ltrim('aaaaaaaaa', 'a')", "");
+  TestStringValue("ltrim('abcdefg', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabg')", "cdefg");
+  TestStringValue("ltrim('æeioü','æü')", "eioü");
+  TestStringValue("ltrim('\\\\abcdefg', 'a\\\\')", "bcdefg");
+
+  TestStringValue("rtrim('%%%%%abcdefg%%%%%', '%')", "%%%%%abcdefg");
+  TestStringValue("rtrim('%%%%%abcdefg', '%')", "%%%%%abcdefg");
+  TestStringValue("rtrim('abcdefg%%%%%', '%')", "abcdefg");
+  TestStringValue("rtrim('abc%%defg%%%%%', '%')", "abc%%defg");
+  TestStringValue("rtrim('abcdefg', 'abc')", "abcdefg");
+  TestStringValue("rtrim('abcdefg    ', ' ')", "abcdefg");
+  TestStringValue("rtrim('abacdefg', 'efg')", "abacd");
+  TestStringValue("rtrim('abacdefgcab', 'abc')", "abacdefg");
+  TestStringValue("rtrim('abcacbbacbcacabcba', 'abc')", "");
+  TestStringValue("rtrim('', 'abc')", "");
+  TestStringValue("rtrim('     ', 'abc')", "     ");
+  TestIsNull("rtrim(NULL, 'abc')", TYPE_STRING);
+  TestStringValue("rtrim('abcdefg', NULL)", "abcdefg");
+  TestStringValue("rtrim('abcdefg', '')", "abcdefg");
+  TestStringValue("rtrim('abcdabcdabc', 'abc')", "abcdabcd");
+  TestStringValue("rtrim('aaaaaaaaa', 'a')", "");
+  TestStringValue("rtrim('abcdefg', 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeefg')", "abcd");
+  TestStringValue("rtrim('æeioü','æü')", "æeio");
+  TestStringValue("rtrim('abcdefg\\\\', 'g\\\\')", "abcdef");
+
   TestStringValue("btrim('     abcdefg   ')", "abcdefg");
   TestStringValue("btrim('     abcdefg')", "abcdefg");
   TestStringValue("btrim('abcdefg      ')", "abcdefg");
@@ -3762,11 +3802,14 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("btrim('abacdefgcab', 'abc')", "defg");
   TestStringValue("btrim('abcacbbacbcacabcba', 'abc')", "");
   TestStringValue("btrim('', 'abc')", "");
+  TestStringValue("btrim('     ', 'abc')", "     ");
+  TestIsNull("btrim(NULL, 'abc')", TYPE_STRING);
   TestStringValue("btrim('abcdefg', NULL)", "abcdefg");
   TestStringValue("btrim('abcdabcdabc', 'abc')", "dabcd");
   TestStringValue("btrim('aaaaaaaaa', 'a')", "");
   TestStringValue("btrim('abcdefg', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabg')", "cdef");
   TestStringValue("btrim('æeioü','æü')", "eio");
+  TestStringValue("btrim('\\\\abcdefg\\\\', 'ag\\\\')", "bcdef");
 
   TestStringValue("space(0)", "");
   TestStringValue("space(-1)", "");

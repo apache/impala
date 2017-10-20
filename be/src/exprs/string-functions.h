@@ -20,6 +20,7 @@
 #define IMPALA_EXPRS_STRING_FUNCTIONS_H
 
 #include <re2/re2.h>
+#include <bitset>
 
 #include "runtime/string-value.h"
 #include "runtime/string-search.h"
@@ -47,6 +48,12 @@ class TupleRow;
 
 class StringFunctions {
  public:
+  // String trimming position or direction
+  enum TrimPosition {
+    LEADING, // Trim from the begining, or leading end
+    TRAILING, // Trim from the right, or trailing end
+    BOTH // Trim from both ends of string
+  };
   static StringVal Substring(FunctionContext*, const StringVal& str, const BigIntVal& pos,
       const BigIntVal& len);
   static StringVal Substring(FunctionContext*, const StringVal& str,
@@ -76,6 +83,25 @@ class StringFunctions {
   static StringVal Trim(FunctionContext*, const StringVal& str);
   static StringVal Ltrim(FunctionContext*, const StringVal& str);
   static StringVal Rtrim(FunctionContext*, const StringVal& str);
+
+  /// Sets up arguments and function context for the *TrimString functions below.
+  static void TrimPrepare(FunctionContext*, FunctionContext::FunctionStateScope);
+  /// Cleans up the work done by TrimPrepare above.
+  static void TrimClose(FunctionContext*, FunctionContext::FunctionStateScope);
+
+  /// Trims occurrences of the characters in 'chars_to_trim' string from
+  /// the beginning of string 'str'.
+  static StringVal LTrimString(FunctionContext* ctx, const StringVal& str,
+      const StringVal& chars_to_trim);
+  /// Trims occurrences of the characters in 'chars_to_trim' string from
+  /// the end of string 'str'.
+  static StringVal RTrimString(FunctionContext* ctx, const StringVal& str,
+      const StringVal& chars_to_trim);
+  /// Trims occurrences of the characters in 'chars_to_trim' string from
+  /// both ends of string 'str'.
+  static StringVal BTrimString(FunctionContext* ctx, const StringVal& str,
+      const StringVal& chars_to_trim);
+
   static IntVal Ascii(FunctionContext*, const StringVal& str);
   static IntVal Instr(FunctionContext*, const StringVal& str, const StringVal& substr,
       const BigIntVal& start_position, const BigIntVal& occurrence);
@@ -118,16 +144,18 @@ class StringFunctions {
   /// Converts ASCII 'val' to corresponding character.
   static StringVal Chr(FunctionContext* context, const IntVal& val);
 
-  static void BTrimPrepare(FunctionContext*, FunctionContext::FunctionStateScope);
-  static void BTrimClose(FunctionContext*, FunctionContext::FunctionStateScope);
-
-  /// Trims occurrences of the characters in 'chars_to_trim' string from
-  /// both ends of string 'str'.
-  static StringVal BTrimString(FunctionContext* ctx, const StringVal& str,
-    const StringVal& chars_to_trim);
-
   static StringVal Base64Encode(FunctionContext* ctx, const StringVal& str);
   static StringVal Base64Decode(FunctionContext* ctx, const StringVal& str);
+
+ private:
+  /// Templatized implementation of the actual string trimming function.
+  /// The first parameter, 'D', is one of StringFunctions::TrimPosition values.
+  /// The second parameter, 'IS_IMPLICIT_WHITESPACE', is true when the set of characters
+  /// to trim is implicitly set to ' ', as a result of calling the one-arg
+  /// forms of trim/ltrim/rtrim.
+  template <TrimPosition D, bool IS_IMPLICIT_WHITESPACE>
+  static StringVal DoTrimString(FunctionContext* ctx, const StringVal& str,
+      const StringVal& chars_to_trim);
 };
 }
 #endif
