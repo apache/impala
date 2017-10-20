@@ -523,9 +523,13 @@ def generate_statements(output_name, test_vectors, sections,
       alter = section.get('ALTER')
       create = section['CREATE']
       create_hive = section['CREATE_HIVE']
+      assert not (create and create_hive), "Can't set both CREATE and CREATE_HIVE"
 
       table_properties = section['TABLE_PROPERTIES']
       insert = eval_section(section['DEPENDENT_LOAD'])
+      insert_hive = eval_section(section['DEPENDENT_LOAD_HIVE'])
+      assert not (insert and insert_hive),\
+          "Can't set both DEPENDENT_LOAD and DEPENDENT_LOAD_HIVE"
       load = eval_section(section['LOAD'])
 
       if file_format == 'kudu':
@@ -570,7 +574,8 @@ def generate_statements(output_name, test_vectors, sections,
       # HBASE we need to create these tables with a supported insert format.
       create_file_format = file_format
       create_codec = codec
-      if not (section['LOAD'] or section['LOAD_LOCAL'] or section['DEPENDENT_LOAD']):
+      if not (section['LOAD'] or section['LOAD_LOCAL'] or section['DEPENDENT_LOAD'] \
+              or section['DEPENDENT_LOAD_HIVE']):
         create_codec = 'none'
         create_file_format = file_format
         if file_format not in IMPALA_SUPPORTED_INSERT_FORMATS:
@@ -665,19 +670,23 @@ def generate_statements(output_name, test_vectors, sections,
           else:
             print 'Empty base table load for %s. Skipping load generation' % table_name
         elif file_format in ['kudu', 'parquet']:
-          if insert:
+          if insert_hive:
+            hive_output.load.append(build_insert(insert_hive, db_name, db_suffix,
+                file_format, codec, compression_type, table_name, data_path))
+          elif insert:
             impala_load.load.append(build_insert_into_statement(insert, db_name,
                 db_suffix, table_name, file_format, data_path, for_impala=True))
           else:
             print 'Empty parquet/kudu load for table %s. Skipping insert generation' \
               % table_name
         else:
+          if insert_hive:
+            insert = insert_hive
           if insert:
             hive_output.load.append(build_insert(insert, db_name, db_suffix, file_format,
-                                        codec, compression_type, table_name, data_path,
-                                        create_hive=create_hive))
+                codec, compression_type, table_name, data_path, create_hive=create_hive))
           else:
-              print 'Empty insert for table %s. Skipping insert generation' % table_name
+            print 'Empty insert for table %s. Skipping insert generation' % table_name
 
     impala_output.write_to_file("load-%s-impala-generated-%s-%s-%s.sql" %
         (output_name, file_format, codec, compression_type))
@@ -694,8 +703,9 @@ def generate_statements(output_name, test_vectors, sections,
 def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'COLUMNS', 'PARTITION_COLUMNS',
                          'ROW_FORMAT', 'CREATE', 'CREATE_HIVE', 'CREATE_KUDU',
-                         'DEPENDENT_LOAD', 'DEPENDENT_LOAD_KUDU', 'LOAD',
-                         'LOAD_LOCAL', 'ALTER', 'HBASE_COLUMN_FAMILIES', 'TABLE_PROPERTIES']
+                         'DEPENDENT_LOAD', 'DEPENDENT_LOAD_KUDU', 'DEPENDENT_LOAD_HIVE',
+                         'LOAD', 'LOAD_LOCAL', 'ALTER', 'HBASE_COLUMN_FAMILIES',
+                         'TABLE_PROPERTIES']
   return parse_test_file(file_name, VALID_SECTION_NAMES, skip_unknown_sections=False)
 
 if __name__ == "__main__":
