@@ -41,10 +41,8 @@ if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
 fi
 ${COMPUTE_STATS_SCRIPT} --db_names=tpch,tpch_parquet \
     --table_names=customer,lineitem,nation,orders,part,partsupp,region,supplier
-${COMPUTE_STATS_SCRIPT} --db_names=tpch_nested_parquet
-${COMPUTE_STATS_SCRIPT} --db_names=tpcds,tpcds_parquet
+${COMPUTE_STATS_SCRIPT} --db_names=tpch_nested_parquet,tpcds,tpcds_parquet
 
 if "$KUDU_IS_SUPPORTED"; then
-  ${COMPUTE_STATS_SCRIPT} --db_names=functional_kudu
-  ${COMPUTE_STATS_SCRIPT} --db_names=tpch_kudu
+  ${COMPUTE_STATS_SCRIPT} --db_names=functional_kudu,tpch_kudu
 fi
