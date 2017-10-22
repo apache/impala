@@ -79,6 +79,7 @@ tests/comparison/ORACLE.txt
 bin/distcc/README.md
 tests/comparison/POSTGRES.txt
 docs/README.md
+docker/README.md
 be/src/thirdparty/pcg-cpp-0.98/README.md
 
 # http://www.apache.org/legal/src-headers.html: "Test data for which the addition of a

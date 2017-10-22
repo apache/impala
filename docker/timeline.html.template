@@ -1,0 +1,142 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+<!--
+
+Template/header for a timeline visualization of a multi-container build.
+The timelines represent interesting log lines, with one row per container.
+The charts represent CPU usage within those containers.
+
+To use this, concatenate this with a '<script>' block defining
+a global variable named data.
+
+The expected format of data is exemplified by the following,
+and is tightly coupled with the implementation generating
+it in monitor.py. The intention of this unfriendly file format
+is to do as much munging as plausible in Python.
+
+To make the visualization relative to the start time (i.e., to say that all
+builds start at 00:00), the timestamps are all seconds since the build began.
+To make the visualization work with them, the timestamps are then converted
+into local time, and get displayed reasonably. This is a workaround to the fact
+that the visualization library for the timelines does not accept any data types
+that represent duration, but we still want timestamp-style formatting.
+
+var data = {
+  // max timestamp seen, in seconds since the epoch
+  "max_ts": 8153.0,
+  // map of container name to an array of metrics
+  "metrics": {
+    "i-20180312-140548-ee-test-serial": [
+      // a single metric point is an array of timestamp, user CPU, system CPU
+      // CPU is the percent of 1 CPU used since the previous timestamp.
+      [
+        4572.0,
+        0.11,
+        0.07
+      ]
+    ]
+  },
+  // Array of timelines
+  "timeline": [
+    // a timeline entry contains a name (for the entire row of the timeline),
+    // the message (for a segment of the timeline), and start and end timestamps
+    // for the segment.
+    [
+      "i-20180312-140548",
+      "+ echo '>>> build' '4266 (begin)'",
+      0.0,
+      0.0
+    ]
+  ]
+}
+-->
+
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+
+<script type="text/javascript">
+google.charts.load("current", {packages:["timeline", "corechart"]});
+google.charts.setOnLoadCallback(drawChart);
+
+function ts_to_hms(secs) {
+  var s = secs % 60;
+  var m = Math.floor(secs / 60) % 60;
+  var h = Math.floor(secs / (60 * 60));
+  return [h, m, s];
+}
+
+/* Returns a Date object corresponding to secs seconds since the epoch, in
+ * localtime. Date(x) and Date(0, 0, 0, 0, 0, 0, 0, x) differ in that the
+ * former returns UTC whereas the latter returns the browser local time.
+ * For consistent handling within this visualization, we use localtime.
+ *
+ * Beware that local time can be discontinuous around time changes.
+ */
+function ts_to_date(secs) {
+  // secs may be a float, so we use millis as a common denominator unit
+  var millis = 1000 * secs;
+  return new Date(1970 /* yr; beginning of unix epoch */, 0 /* mo */, 0 /* d */,
+      0 /* hr */, 0 /* min */, 0 /* sec */, millis);
+}
+
+function drawChart() {
+  var container = document.getElementById('container');
+  var timelineContainer = document.createElement("div");
+  container.appendChild(timelineContainer);
+  var chart = new google.visualization.Timeline(timelineContainer);
+  var dataTable = new google.visualization.DataTable();
+  dataTable.addColumn({ type: 'string', id: 'Position' });
+  dataTable.addColumn({ type: 'string', id: 'Name' });
+  // timeofday isn't supported here
+  dataTable.addColumn({ type: 'datetime', id: 'Start' });
+  dataTable.addColumn({ type: 'datetime', id: 'End' });
+  // Timeline
+  for (i = 0; i < data.timeline.length; ++i) {
+    var row = data.timeline[i];
+    dataTable.addRow([ row[0], row[1], ts_to_date(row[2]), ts_to_date(row[3]) ]);
+  }
+  chart.draw(dataTable, { height: "400px" } );
+
+  for (const k of Object.keys(data.metrics)) {
+    var lineChart = document.createElement("div");
+    container.appendChild(lineChart);
+
+    var dataTable = new google.visualization.DataTable();
+    dataTable.addColumn({ type: 'timeofday', id: 'Time' });
+    dataTable.addColumn({ type: 'number', id: 'User' });
+    dataTable.addColumn({ type: 'number', id: 'System' });
+
+    for (const row of data.metrics[k]) {
+      dataTable.addRow([ ts_to_hms(row[0]), row[1], row[2] ]);
+    }
+    var options = {
+      title: 'CPU',
+      legend: { position: 'bottom' },
+      hAxis: {
+        minValue: [0, 0, 0],
+        maxValue: ts_to_hms(data.max_ts)
+      }
+    };
+
+    var chart = new google.visualization.LineChart(lineChart);
+    chart.draw(dataTable, options);
+  }
+}
+</script>
+<div id="container" style="height: 200px;"></div>

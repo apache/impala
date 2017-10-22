@@ -89,9 +89,13 @@ function apt-get {
   return 1
 }
 
+echo ">>> Installing packages"
+
 apt-get update
 apt-get --yes install apt-utils
 apt-get --yes install git
+
+echo ">>> Checking out Impala"
 
 # If there is no Impala git repo, get one now
 if ! [[ -d ~/Impala ]]
@@ -103,6 +107,7 @@ SET_IMPALA_HOME="export IMPALA_HOME=$(pwd)"
 echo "$SET_IMPALA_HOME" >> ~/.bashrc
 eval "$SET_IMPALA_HOME"
 
+echo ">>> Installing build tools"
 apt-get --yes install ccache g++ gcc libffi-dev liblzo2-dev libkrb5-dev \
         krb5-admin-server krb5-kdc krb5-user libsasl2-dev libsasl2-modules \
         libsasl2-modules-gssapi-mit libssl-dev make maven ninja-build ntp \
@@ -121,6 +126,8 @@ fi
 SET_JAVA_HOME="export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64"
 echo "$SET_JAVA_HOME" >> "${IMPALA_HOME}/bin/impala-config-local.sh"
 eval "$SET_JAVA_HOME"
+
+echo ">>> Configuring system"
 
 sudo service ntp stop
 sudo ntpdate us.pool.ntp.org
@@ -191,10 +198,14 @@ sudo chown $(whoami) /var/lib/hadoop-hdfs/
 echo "* - nofile 1048576" | sudo tee -a /etc/security/limits.conf
 
 # LZO is not needed to compile or run Impala, but it is needed for the data load
+echo ">>> Checking out Impala-lzo"
 if ! [[ -d ~/Impala-lzo ]]
 then
   git clone https://github.com/cloudera/impala-lzo.git ~/Impala-lzo
 fi
+
+echo ">>> Checking out and building hadoop-lzo"
+
 if ! [[ -d ~/hadoop-lzo ]]
 then
   git clone https://github.com/cloudera/hadoop-lzo.git ~/hadoop-lzo

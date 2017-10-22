@@ -35,6 +35,8 @@ fi
 
 # Kill and clean data for a clean start.
 echo "Killing running services..."
+# Create log dir, in case there's nothing to kill.
+mkdir -p ${IMPALA_CLUSTER_LOGS_DIR}
 $IMPALA_HOME/testdata/bin/kill-all.sh &>${IMPALA_CLUSTER_LOGS_DIR}/kill-all.log
 
 echo "Starting cluster services..."

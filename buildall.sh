@@ -334,7 +334,7 @@ bootstrap_dependencies() {
     echo "SKIP_TOOLCHAIN_BOOTSTRAP is true, skipping download of Python dependencies."
     echo "SKIP_TOOLCHAIN_BOOTSTRAP is true, skipping toolchain bootstrap."
   else
-    echo "Downloading Python dependencies"
+    echo ">>> Downloading Python dependencies"
     # Download all the Python dependencies we need before doing anything
     # of substance. Does not re-download anything that is already present.
     if ! "$IMPALA_HOME/infra/python/deps/download_requirements"; then
@@ -344,7 +344,7 @@ bootstrap_dependencies() {
       echo "Finished downloading Python dependencies"
     fi
 
-    echo "Downloading and extracting toolchain dependencies."
+    echo ">>> Downloading and extracting toolchain dependencies."
     "$IMPALA_HOME/bin/bootstrap_toolchain.py"
     echo "Toolchain bootstrap complete."
   fi
@@ -357,6 +357,7 @@ build_fe() {
 
 # Build all components.
 build_all_components() {
+  echo ">>> Building all components"
   # Build the Impala frontend, backend and external data source API.
   MAKE_IMPALA_ARGS+=" -fe -cscope -tarballs"
   if [[ -e "$IMPALA_LZO" ]]
@@ -421,6 +422,7 @@ start_test_cluster_dependencies() {
 # This does all data loading, except for the metastore snapshot which must be loaded
 # earlier before the cluster is running.
 load_test_data() {
+  echo ">>> Loading test data"
   "$IMPALA_HOME/bin/create_testdata.sh"
   # We have 4 cases:
   # - test-warehouse and metastore snapshots exists.
