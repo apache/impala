@@ -55,6 +55,8 @@ fi
 # Extra arguments passed to start-impala-cluster for tests. These do not apply to custom
 # cluster tests.
 : ${TEST_START_CLUSTER_ARGS:=}
+# Extra args to pass to run-tests.py
+: ${RUN_TESTS_ARGS:=}
 if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
   # TODO: Remove abort_on_config_error flag from here and create-load-data.sh once
   # checkConfiguration() accepts the local filesystem (see IMPALA-1850).
@@ -188,7 +190,8 @@ do
   if [[ "$EE_TEST" == true ]]; then
     # Run end-to-end tests.
     # KERBEROS TODO - this will need to deal with ${KERB_ARGS}
-    if ! "${IMPALA_HOME}/tests/run-tests.py" ${COMMON_PYTEST_ARGS} ${EE_TEST_FILES}; then
+    if ! "${IMPALA_HOME}/tests/run-tests.py" ${COMMON_PYTEST_ARGS} \
+        ${RUN_TESTS_ARGS} ${EE_TEST_FILES}; then
       #${KERB_ARGS};
       TEST_RET_CODE=1
     fi

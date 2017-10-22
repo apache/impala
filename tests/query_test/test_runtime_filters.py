@@ -26,6 +26,9 @@ from tests.common.skip import SkipIfLocal
 
 WAIT_TIME_MS = specific_build_type_timeout(60000, slow_build_timeout=100000)
 
+# Some of the queries in runtime_filters consume a lot of memory, leading to
+# significant memory reservations in parallel tests.
+@pytest.mark.execute_serially
 @SkipIfLocal.multiple_impalad
 class TestRuntimeFilters(ImpalaTestSuite):
   @classmethod

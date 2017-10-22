@@ -18,8 +18,10 @@
 # under the License.
 #
 # Runs the Impala query tests, first executing the tests that cannot be run in parallel
-# and then executing the remaining tests in parallel. All additional command line options
-# are passed to py.test.
+# (the serial tests), then executing the stress tests, and then
+# executing the remaining tests in parallel. To run only some of
+# these, use --skip-serial, --skip-stress, or --skip-parallel.
+# All additional command line options are passed to py.test.
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_service import ImpaladService
 import itertools
@@ -219,6 +221,15 @@ def print_metrics(substring):
 
 if __name__ == "__main__":
   exit_on_error = '-x' in sys.argv or '--exitfirst' in sys.argv
+  skip_serial = '--skip-serial' in sys.argv
+  if skip_serial:
+    sys.argv.remove("--skip-serial")
+  skip_stress = '--skip-stress' in sys.argv
+  if skip_stress:
+    sys.argv.remove("--skip-stress")
+  skip_parallel = '--skip-parallel' in sys.argv
+  if skip_parallel:
+    sys.argv.remove("--skip-parallel")
   test_executor = TestExecutor(exit_on_error=exit_on_error)
 
   # If the user is just asking for --help, just print the help test and then exit.
@@ -241,18 +252,21 @@ if __name__ == "__main__":
   else:
     print_metrics('connections')
     # First run query tests that need to be executed serially
-    base_args = ['-m', 'execute_serially']
-    test_executor.run_tests(base_args + build_test_args('serial'))
-    print_metrics('connections')
+    if not skip_serial:
+      base_args = ['-m', 'execute_serially']
+      test_executor.run_tests(base_args + build_test_args('serial'))
+      print_metrics('connections')
 
     # Run the stress tests tests
-    base_args = ['-m', 'stress', '-n', NUM_STRESS_CLIENTS]
-    test_executor.run_tests(base_args + build_test_args('stress'))
-    print_metrics('connections')
+    if not skip_stress:
+      base_args = ['-m', 'stress', '-n', NUM_STRESS_CLIENTS]
+      test_executor.run_tests(base_args + build_test_args('stress'))
+      print_metrics('connections')
 
     # Run the remaining query tests in parallel
-    base_args = ['-m', 'not execute_serially and not stress', '-n', NUM_CONCURRENT_TESTS]
-    test_executor.run_tests(base_args + build_test_args('parallel'))
+    if not skip_parallel:
+      base_args = ['-m', 'not execute_serially and not stress', '-n', NUM_CONCURRENT_TESTS]
+      test_executor.run_tests(base_args + build_test_args('parallel'))
 
     # The total number of tests executed at this point is expected to be >0
     # If it is < 0 then the script needs to exit with a non-zero
