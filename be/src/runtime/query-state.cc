@@ -397,12 +397,11 @@ void QueryState::Cancel() {
   for (auto entry: fis_map_) entry.second->Cancel();
 }
 
-void QueryState::PublishFilter(int32_t filter_id, int fragment_idx,
-    const TBloomFilter& thrift_bloom_filter) {
+void QueryState::PublishFilter(const TPublishFilterParams& params) {
   if (!instances_prepared_promise_.Get().ok()) return;
-  DCHECK_EQ(fragment_map_.count(fragment_idx), 1);
-  for (FragmentInstanceState* fis: fragment_map_[fragment_idx]) {
-    fis->PublishFilter(filter_id, thrift_bloom_filter);
+  DCHECK_EQ(fragment_map_.count(params.dst_fragment_idx), 1);
+  for (FragmentInstanceState* fis : fragment_map_[params.dst_fragment_idx]) {
+    fis->PublishFilter(params);
   }
 }
 

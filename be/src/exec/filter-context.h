@@ -21,13 +21,14 @@
 
 #include <boost/unordered_map.hpp>
 #include "exprs/scalar-expr-evaluator.h"
+#include "runtime/runtime-filter.h"
 #include "util/runtime-profile.h"
 
 namespace impala {
 
 class BloomFilter;
 class LlvmCodeGen;
-class RuntimeFilter;
+class MinMaxFilter;
 class ScalarExpr;
 class TupleRow;
 
@@ -94,6 +95,9 @@ struct FilterContext {
   /// Working copy of local bloom filter
   BloomFilter* local_bloom_filter = nullptr;
 
+  /// Working copy of local min-max filter
+  MinMaxFilter* local_min_max_filter = nullptr;
+
   /// Struct name in LLVM IR.
   static const char* LLVM_CLASS_NAME;
 
@@ -107,9 +111,14 @@ struct FilterContext {
   /// a match in 'filter'. Returns false otherwise.
   bool Eval(TupleRow* row) const noexcept;
 
-  /// Evaluates 'row' with 'expr_eval' and hashes the resulting value.
-  /// The hash value is then used for setting some bits in 'local_bloom_filter'.
+  /// Evaluates 'row' with 'expr_eval' and inserts the value into 'local_bloom_filter'
+  /// or 'local_min_max_filter' as appropriate.
   void Insert(TupleRow* row) const noexcept;
+
+  /// Materialize filter values by copying any values stored by filters into memory owned
+  /// by the filter. Filters may assume that the memory for Insert()-ed values stays valid
+  /// until this is called.
+  void MaterializeValues() const;
 
   /// Codegen Eval() by codegen'ing the expression 'filter_expr' and replacing the type
   /// argument to RuntimeFilter::Eval() with a constant. On success, 'fn' is set to
@@ -119,10 +128,14 @@ struct FilterContext {
 
   /// Codegen Insert() by codegen'ing the expression 'filter_expr', replacing the type
   /// argument to RawValue::GetHashValue() with a constant, and calling into the correct
-  /// version of BloomFilter::Insert(), depending on the presence of AVX.  On success,
-  /// 'fn' is set to the generated function. On failure, an error status is returned.
+  /// version of BloomFilter::Insert() or MinMaxFilter::Insert(), depending on the filter
+  /// desc and if 'local_bloom_filter' or 'local_min_max_filter' are null.
+  /// For bloom filters, it also selects the correct Insert() based on the presence of
+  /// AVX, and for min-max filters it selects the correct Insert() based on type.
+  /// On success, 'fn' is set to the generated function. On failure, an error status is
+  /// returned.
   static Status CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_expr,
-      llvm::Function** fn) WARN_UNUSED_RESULT;
+      FilterContext* ctx, llvm::Function** fn) WARN_UNUSED_RESULT;
 
   // Returns if there is any always_false filter in ctxs. If there is, the counter stats
   // is updated.

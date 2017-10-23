@@ -75,12 +75,16 @@ Status ScanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
     filter_ctxs_.emplace_back();
     FilterContext& filter_ctx = filter_ctxs_.back();
     filter_ctx.filter = state->filter_bank()->RegisterFilter(filter_desc, false);
-    string filter_profile_title = Substitute("Filter $0 ($1)", filter_desc.filter_id,
-        PrettyPrinter::Print(filter_ctx.filter->filter_size(), TUnit::BYTES));
-    RuntimeProfile* profile =
-        RuntimeProfile::Create(state->obj_pool(), filter_profile_title);
-    runtime_profile_->AddChild(profile);
-    filter_ctx.stats = state->obj_pool()->Add(new FilterStats(profile));
+    // TODO: Enable stats for min-max filters when Kudu exposes info about filters
+    // (KUDU-2162).
+    if (filter_ctx.filter->is_bloom_filter()) {
+      string filter_profile_title = Substitute("Filter $0 ($1)", filter_desc.filter_id,
+          PrettyPrinter::Print(filter_ctx.filter->filter_size(), TUnit::BYTES));
+      RuntimeProfile* profile =
+          RuntimeProfile::Create(state->obj_pool(), filter_profile_title);
+      runtime_profile_->AddChild(profile);
+      filter_ctx.stats = state->obj_pool()->Add(new FilterStats(profile));
+    }
   }
 
   return Status::OK();

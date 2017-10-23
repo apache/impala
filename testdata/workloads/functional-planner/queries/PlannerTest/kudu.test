@@ -344,6 +344,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id
+|  runtime filters: RF001 <- b.id
 |
 |--01:SCAN KUDU [functional_kudu.alltypessmall b]
 |     predicates: CAST(b.id AS STRING) > '123'
@@ -352,6 +353,7 @@ PLAN-ROOT SINK
 00:SCAN KUDU [functional_kudu.alltypes a]
    predicates: CAST(a.id AS STRING) > '123'
    kudu predicates: a.id > 10
+   runtime filters: RF001 -> a.id
 ====
 # IMPALA-4662: Kudu analysis failure for NULL literal in IN list
 # NULL literal in values list results in applying predicate at scan node

@@ -26,6 +26,8 @@ import java.util.Set;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
+import org.apache.impala.analysis.BinaryPredicate.Operator;
+import org.apache.impala.analysis.CastExpr;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.Predicate;
@@ -35,6 +37,7 @@ import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.TupleIsNullPredicate;
+import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -44,6 +47,7 @@ import org.apache.impala.planner.PlanNode;
 import org.apache.impala.thrift.TRuntimeFilterDesc;
 import org.apache.impala.thrift.TRuntimeFilterMode;
 import org.apache.impala.thrift.TRuntimeFilterTargetDesc;
+import org.apache.impala.thrift.TRuntimeFilterType;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -107,6 +111,8 @@ public final class RuntimeFilterGenerator {
     private final Expr srcExpr_;
     // Expr (lhs of join predicate) from which the targetExprs_ are generated.
     private final Expr origTargetExpr_;
+    // The operator comparing 'srcExpr_' and 'origTargetExpr_'.
+    private final Operator exprCmpOp_;
     // Runtime filter targets
     private final List<RuntimeFilterTarget> targets_ = Lists.newArrayList();
     // Slots from base table tuples that have value transfer from the slots
@@ -131,6 +137,8 @@ public final class RuntimeFilterGenerator {
     // If set, indicates that the filter can't be assigned to another scan node.
     // Once set, it can't be unset.
     private boolean finalized_ = false;
+    // The type of filter to build.
+    private TRuntimeFilterType type_;
 
     /**
      * Internal representation of a runtime filter target.
@@ -165,6 +173,14 @@ public final class RuntimeFilterGenerator {
         tFilterTarget.setTarget_expr_slotids(tSlotIds);
         tFilterTarget.setIs_bound_by_partition_columns(isBoundByPartitionColumns);
         tFilterTarget.setIs_local_target(isLocalTarget);
+        if (node instanceof KuduScanNode) {
+          // assignRuntimeFilters() only assigns KuduScanNode targets if the target expr
+          // is a slot ref, possibly with an implicit cast, pointing to a column.
+          SlotRef slotRef = expr.unwrapSlotRef(true);
+          KuduColumn col = (KuduColumn) slotRef.getDesc().getColumn();
+          tFilterTarget.setKudu_col_name(col.getKuduName());
+          tFilterTarget.setKudu_col_type(col.getType().toThrift());
+        }
         return tFilterTarget;
       }
 
@@ -179,13 +195,16 @@ public final class RuntimeFilterGenerator {
       }
     }
 
-    private RuntimeFilter(RuntimeFilterId filterId, JoinNode filterSrcNode,
-        Expr srcExpr, Expr origTargetExpr, Map<TupleId, List<SlotId>> targetSlots) {
+    private RuntimeFilter(RuntimeFilterId filterId, JoinNode filterSrcNode, Expr srcExpr,
+        Expr origTargetExpr, Operator exprCmpOp, Map<TupleId, List<SlotId>> targetSlots,
+        TRuntimeFilterType type) {
       id_ = filterId;
       src_ = filterSrcNode;
       srcExpr_ = srcExpr;
       origTargetExpr_ = origTargetExpr;
+      exprCmpOp_ = exprCmpOp;
       targetSlotsByTid_ = targetSlots;
+      type_ = type;
       computeNdvEstimate();
     }
 
@@ -221,6 +240,7 @@ public final class RuntimeFilterGenerator {
             appliedOnPartitionColumns && target.isBoundByPartitionColumns;
       }
       tFilter.setApplied_on_partition_columns(appliedOnPartitionColumns);
+      tFilter.setType(type_);
       return tFilter;
     }
 
@@ -230,7 +250,8 @@ public final class RuntimeFilterGenerator {
      * or null if a runtime filter cannot be generated from the specified predicate.
      */
     public static RuntimeFilter create(IdGenerator<RuntimeFilterId> idGen,
-        Analyzer analyzer, Expr joinPredicate, JoinNode filterSrcNode) {
+        Analyzer analyzer, Expr joinPredicate, JoinNode filterSrcNode,
+        TRuntimeFilterType type) {
       Preconditions.checkNotNull(idGen);
       Preconditions.checkNotNull(joinPredicate);
       Preconditions.checkNotNull(filterSrcNode);
@@ -256,8 +277,8 @@ public final class RuntimeFilterGenerator {
       if (LOG.isTraceEnabled()) {
         LOG.trace("Generating runtime filter from predicate " + joinPredicate);
       }
-      return new RuntimeFilter(idGen.getNextId(), filterSrcNode,
-          srcExpr, targetExpr, targetSlots);
+      return new RuntimeFilter(idGen.getNextId(), filterSrcNode, srcExpr, targetExpr,
+          normalizedJoinConjunct.getOp(), targetSlots, type);
     }
 
     /**
@@ -337,6 +358,8 @@ public final class RuntimeFilterGenerator {
     public Expr getOrigTargetExpr() { return origTargetExpr_; }
     public Map<TupleId, List<SlotId>> getTargetSlots() { return targetSlotsByTid_; }
     public RuntimeFilterId getFilterId() { return id_; }
+    public TRuntimeFilterType getType() { return type_; }
+    public Operator getExprCompOp() { return exprCmpOp_; }
 
     /**
      * Estimates the selectivity of a runtime filter as the cardinality of the
@@ -394,14 +417,14 @@ public final class RuntimeFilterGenerator {
   public static void generateRuntimeFilters(PlannerContext ctx, PlanNode plan) {
     Preconditions.checkNotNull(ctx);
     Preconditions.checkNotNull(ctx.getQueryOptions());
-    int maxNumFilters = ctx.getQueryOptions().getMax_num_runtime_filters();
-    Preconditions.checkState(maxNumFilters >= 0);
+    int maxNumBloomFilters = ctx.getQueryOptions().getMax_num_runtime_filters();
+    Preconditions.checkState(maxNumBloomFilters >= 0);
     RuntimeFilterGenerator filterGenerator = new RuntimeFilterGenerator();
     filterGenerator.generateFilters(ctx, plan);
     List<RuntimeFilter> filters = Lists.newArrayList(filterGenerator.getRuntimeFilters());
-    if (filters.size() > maxNumFilters) {
-      // If more than 'maxNumFilters' were generated, sort them by increasing selectivity
-      // and keep the 'maxNumFilters' most selective.
+    if (filters.size() > maxNumBloomFilters) {
+      // If more than 'maxNumBloomFilters' were generated, sort them by increasing
+      // selectivity and keep the 'maxNumBloomFilters' most selective bloom filters.
       Collections.sort(filters, new Comparator<RuntimeFilter>() {
           public int compare(RuntimeFilter a, RuntimeFilter b) {
             double aSelectivity =
@@ -413,8 +436,14 @@ public final class RuntimeFilterGenerator {
         }
       );
     }
-    for (RuntimeFilter filter:
-         filters.subList(0, Math.min(filters.size(), maxNumFilters))) {
+    // We only enforce a limit on the number of bloom filters as they are much more
+    // heavy-weight than the other filter types.
+    int numBloomFilters = 0;
+    for (RuntimeFilter filter : filters) {
+      if (filter.getType() == TRuntimeFilterType.BLOOM) {
+        if (numBloomFilters >= maxNumBloomFilters) continue;
+        ++numBloomFilters;
+      }
       filter.setIsBroadcast(
           filter.src_.getDistributionMode() == DistributionMode.BROADCAST);
       filter.computeHasLocalTargets();
@@ -462,12 +491,14 @@ public final class RuntimeFilterGenerator {
       }
       joinConjuncts.addAll(joinNode.getConjuncts());
       List<RuntimeFilter> filters = Lists.newArrayList();
-      for (Expr conjunct: joinConjuncts) {
-        RuntimeFilter filter = RuntimeFilter.create(filterIdGenerator,
-            ctx.getRootAnalyzer(), conjunct, joinNode);
-        if (filter == null) continue;
-        registerRuntimeFilter(filter);
-        filters.add(filter);
+      for (TRuntimeFilterType type : TRuntimeFilterType.values()) {
+        for (Expr conjunct : joinConjuncts) {
+          RuntimeFilter filter = RuntimeFilter.create(
+              filterIdGenerator, ctx.getRootAnalyzer(), conjunct, joinNode, type);
+          if (filter == null) continue;
+          registerRuntimeFilter(filter);
+          filters.add(filter);
+        }
       }
       generateFilters(ctx, root.getChild(0));
       // Finalize every runtime filter of that join. This is to ensure that we don't
@@ -538,11 +569,14 @@ public final class RuntimeFilterGenerator {
    * 2. If the RUNTIME_FILTER_MODE query option is set to LOCAL, a filter is only assigned
    *    to 'scanNode' if the filter is produced within the same fragment that contains the
    *    scan node.
+   * 3. Only Hdfs and Kudu scan nodes are supported:
+   *     a. If the target is an HdfsScanNode, the filter must be type BLOOM.
+   *     b. If the target is a KuduScanNode, the filter must be type MIN_MAX, the target
+   *         must be a slot ref on a column, and the comp op cannot be 'not distinct'.
    * A scan node may be used as a destination node for multiple runtime filters.
-   * Currently, runtime filters can only be assigned to HdfsScanNodes.
    */
   private void assignRuntimeFilters(PlannerContext ctx, ScanNode scanNode) {
-    if (!(scanNode instanceof HdfsScanNode)) return;
+    if (!(scanNode instanceof HdfsScanNode || scanNode instanceof KuduScanNode)) return;
     TupleId tid = scanNode.getTupleIds().get(0);
     if (!runtimeFiltersByTid_.containsKey(tid)) return;
     Analyzer analyzer = ctx.getRootAnalyzer();
@@ -558,6 +592,26 @@ public final class RuntimeFilterGenerator {
       if (disableRowRuntimeFiltering && !isBoundByPartitionColumns) continue;
       boolean isLocalTarget = isLocalTarget(filter, scanNode);
       if (runtimeFilterMode == TRuntimeFilterMode.LOCAL && !isLocalTarget) continue;
+
+      // Check that the scan node supports applying filters of this type and targetExpr.
+      if (scanNode instanceof HdfsScanNode
+          && filter.getType() != TRuntimeFilterType.BLOOM) {
+        continue;
+      } else if (scanNode instanceof KuduScanNode) {
+        if (filter.getType() != TRuntimeFilterType.MIN_MAX) continue;
+        SlotRef slotRef = targetExpr.unwrapSlotRef(true);
+        // Kudu only supports targeting a single column, not general exprs, so the target
+        // must be a SlotRef pointing to a column. We can allow implicit integer casts
+        // by casting the min/max values before sending them to Kudu.
+        // Kudu also cannot currently return nulls if a filter is applied, so it does not
+        // work with "is not distinct".
+        if (slotRef == null || slotRef.getDesc().getColumn() == null
+            || (targetExpr instanceof CastExpr && !targetExpr.getType().isIntegerType())
+            || filter.getExprCompOp() == Operator.NOT_DISTINCT) {
+          continue;
+        }
+      }
+
       RuntimeFilter.RuntimeFilterTarget target = new RuntimeFilter.RuntimeFilterTarget(
           scanNode, targetExpr, isBoundByPartitionColumns, isLocalTarget);
       filter.addTarget(target);

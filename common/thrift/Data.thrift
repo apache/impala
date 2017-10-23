@@ -28,6 +28,7 @@ struct TColumnValue {
   4: optional double double_val
   5: optional string string_val
   8: optional binary binary_val
+  9: optional binary timestamp_val
 }
 
 struct TResultRow {

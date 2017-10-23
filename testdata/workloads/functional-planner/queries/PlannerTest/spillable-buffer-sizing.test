@@ -20,7 +20,7 @@ Per-Host Resources: mem-estimate=25.94MB mem-reservation=1.94MB
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c_nationkey = n_nationkey
 |  fk/pk conjuncts: c_nationkey = n_nationkey
-|  runtime filters: RF000 <- n_nationkey
+|  runtime filters: RF000[bloom] <- n_nationkey
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=0,1 row-size=355B cardinality=150000
 |
@@ -40,7 +40,7 @@ Per-Host Resources: mem-estimate=25.94MB mem-reservation=1.94MB
 |
 00:SCAN HDFS [tpch_parquet.customer, RANDOM]
    partitions=1/1 files=1 size=12.34MB
-   runtime filters: RF000 -> c_nationkey
+   runtime filters: RF000[bloom] -> c_nationkey
    stats-rows=150000 extrapolated-rows=disabled
    table stats: rows=150000 size=12.34MB
    column stats: all
@@ -65,7 +65,7 @@ Per-Host Resources: mem-estimate=51.88MB mem-reservation=3.88MB
 |  hash-table-id=00
 |  hash predicates: c_nationkey = n_nationkey
 |  fk/pk conjuncts: c_nationkey = n_nationkey
-|  runtime filters: RF000 <- n_nationkey
+|  runtime filters: RF000[bloom] <- n_nationkey
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=0,1 row-size=355B cardinality=150000
 |
@@ -92,7 +92,7 @@ Per-Host Resources: mem-estimate=51.88MB mem-reservation=3.88MB
 |
 00:SCAN HDFS [tpch_parquet.customer, RANDOM]
    partitions=1/1 files=1 size=12.34MB
-   runtime filters: RF000 -> c_nationkey
+   runtime filters: RF000[bloom] -> c_nationkey
    stats-rows=150000 extrapolated-rows=disabled
    table stats: rows=150000 size=12.34MB
    column stats: all
@@ -218,7 +218,7 @@ Per-Host Resources: mem-estimate=34.00MB mem-reservation=34.00MB
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: o_custkey = c_custkey
 |  fk/pk conjuncts: o_custkey = c_custkey
-|  runtime filters: RF000 <- c_custkey
+|  runtime filters: RF000[bloom] <- c_custkey
 |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB
 |  tuple-ids=0,1 row-size=428B cardinality=1500000
 |
@@ -244,7 +244,7 @@ F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
 Per-Host Resources: mem-estimate=40.00MB mem-reservation=0B
 00:SCAN HDFS [tpch_parquet.orders, RANDOM]
    partitions=1/1 files=2 size=54.20MB
-   runtime filters: RF000 -> o_custkey
+   runtime filters: RF000[bloom] -> o_custkey
    stats-rows=1500000 extrapolated-rows=disabled
    table stats: rows=1500000 size=54.20MB
    column stats: all
@@ -269,7 +269,7 @@ Per-Host Resources: mem-estimate=34.00MB mem-reservation=34.00MB
 |  hash-table-id=00
 |  hash predicates: o_custkey = c_custkey
 |  fk/pk conjuncts: o_custkey = c_custkey
-|  runtime filters: RF000 <- c_custkey
+|  runtime filters: RF000[bloom] <- c_custkey
 |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB
 |  tuple-ids=0,1 row-size=428B cardinality=1500000
 |
@@ -302,7 +302,7 @@ F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
 Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
 00:SCAN HDFS [tpch_parquet.orders, RANDOM]
    partitions=1/1 files=2 size=54.20MB
-   runtime filters: RF000 -> o_custkey
+   runtime filters: RF000[bloom] -> o_custkey
    stats-rows=1500000 extrapolated-rows=disabled
    table stats: rows=1500000 size=54.20MB
    column stats: all
@@ -331,7 +331,7 @@ Per-Host Resources: mem-estimate=77.38MB mem-reservation=34.00MB
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: o_custkey = c_custkey
 |  fk/pk conjuncts: o_custkey = c_custkey
-|  runtime filters: RF000 <- c_custkey
+|  runtime filters: RF000[bloom] <- c_custkey
 |  mem-estimate=37.38MB mem-reservation=34.00MB spill-buffer=2.00MB
 |  tuple-ids=0,1 row-size=428B cardinality=1500000
 |
@@ -351,7 +351,7 @@ Per-Host Resources: mem-estimate=77.38MB mem-reservation=34.00MB
 |
 00:SCAN HDFS [tpch_parquet.orders, RANDOM]
    partitions=1/1 files=2 size=54.20MB
-   runtime filters: RF000 -> o_custkey
+   runtime filters: RF000[bloom] -> o_custkey
    stats-rows=1500000 extrapolated-rows=disabled
    table stats: rows=1500000 size=54.20MB
    column stats: all
@@ -376,7 +376,7 @@ Per-Host Resources: mem-estimate=154.76MB mem-reservation=68.00MB
 |  hash-table-id=00
 |  hash predicates: o_custkey = c_custkey
 |  fk/pk conjuncts: o_custkey = c_custkey
-|  runtime filters: RF000 <- c_custkey
+|  runtime filters: RF000[bloom] <- c_custkey
 |  mem-estimate=37.38MB mem-reservation=34.00MB spill-buffer=2.00MB
 |  tuple-ids=0,1 row-size=428B cardinality=1500000
 |
@@ -403,7 +403,7 @@ Per-Host Resources: mem-estimate=154.76MB mem-reservation=68.00MB
 |
 00:SCAN HDFS [tpch_parquet.orders, RANDOM]
    partitions=1/1 files=2 size=54.20MB
-   runtime filters: RF000 -> o_custkey
+   runtime filters: RF000[bloom] -> o_custkey
    stats-rows=1500000 extrapolated-rows=disabled
    table stats: rows=1500000 size=54.20MB
    column stats: all
@@ -639,7 +639,7 @@ Per-Host Resources: mem-estimate=71.12MB mem-reservation=51.00MB
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey
 |  fk/pk conjuncts: l_orderkey = o_orderkey
-|  runtime filters: RF000 <- o_orderkey
+|  runtime filters: RF000[bloom] <- o_orderkey
 |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB
 |  tuple-ids=0,1 row-size=33B cardinality=5757710
 |
@@ -665,7 +665,7 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.92MB
-   runtime filters: RF000 -> l_orderkey
+   runtime filters: RF000[bloom] -> l_orderkey
    stats-rows=6001215 extrapolated-rows=disabled
    table stats: rows=6001215 size=193.92MB
    column stats: all
@@ -709,7 +709,7 @@ Per-Host Resources: mem-estimate=85.00MB mem-reservation=85.00MB
 |  hash-table-id=00
 |  hash predicates: l_orderkey = o_orderkey
 |  fk/pk conjuncts: l_orderkey = o_orderkey
-|  runtime filters: RF000 <- o_orderkey
+|  runtime filters: RF000[bloom] <- o_orderkey
 |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB
 |  tuple-ids=0,1 row-size=33B cardinality=5757710
 |
@@ -742,7 +742,7 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 Per-Host Resources: mem-estimate=160.00MB mem-reservation=0B
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
    partitions=1/1 files=3 size=193.92MB
-   runtime filters: RF000 -> l_orderkey
+   runtime filters: RF000[bloom] -> l_orderkey
    stats-rows=6001215 extrapolated-rows=disabled
    table stats: rows=6001215 size=193.92MB
    column stats: all

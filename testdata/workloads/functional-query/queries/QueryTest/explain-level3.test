@@ -24,7 +24,7 @@ from tpch.lineitem join tpch.orders on l_orderkey = o_orderkey;
 '  02:HASH JOIN [INNER JOIN, BROADCAST]'
 '  |  hash predicates: l_orderkey = o_orderkey'
 '  |  fk/pk conjuncts: l_orderkey = o_orderkey'
-'  |  runtime filters: RF000 <- o_orderkey'
+'  |  runtime filters: RF000[bloom] <- o_orderkey'
 '  |  mem-estimate=300.41MB mem-reservation=34.00MB spill-buffer=2.00MB'
 '  |  tuple-ids=0,1 row-size=454B cardinality=5757710'
 '  |'
@@ -34,7 +34,7 @@ from tpch.lineitem join tpch.orders on l_orderkey = o_orderkey;
 '  |'
 '  00:SCAN HDFS [tpch.lineitem, RANDOM]'
 row_regex:.*partitions=1/1 files=1 size=.*
-'     runtime filters: RF000 -> l_orderkey'
+'     runtime filters: RF000[bloom] -> l_orderkey'
 '     stats-rows=6001215 extrapolated-rows=disabled'
 '     table stats: rows=6001215 size=718.94MB'
 '     column stats: all'

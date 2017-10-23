@@ -75,6 +75,8 @@ Status KuduScanNode::Open(RuntimeState* state) {
         state->query_options().num_scanner_threads);
   }
 
+  if (filter_ctxs_.size() > 0) WaitForRuntimeFilters();
+
   thread_avail_cb_id_ = state->resource_pool()->AddThreadAvailableCb(
       bind<void>(mem_fn(&KuduScanNode::ThreadAvailableCb), this, _1));
   ThreadAvailableCb(state->resource_pool());
@@ -179,8 +181,9 @@ void KuduScanNode::ThreadAvailableCb(ThreadResourceMgr::ResourcePool* pool) {
 }
 
 Status KuduScanNode::ProcessScanToken(KuduScanner* scanner, const string& scan_token) {
-  RETURN_IF_ERROR(scanner->OpenNextScanToken(scan_token));
-  bool eos = false;
+  bool eos;
+  RETURN_IF_ERROR(scanner->OpenNextScanToken(scan_token, &eos));
+  if (eos) return Status::OK();
   while (!eos && !done_) {
     unique_ptr<RowBatch> row_batch = std::make_unique<RowBatch>(row_desc(),
         runtime_state_->batch_size(), mem_tracker());

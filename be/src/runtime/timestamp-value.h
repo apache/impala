@@ -26,6 +26,7 @@
 #include <gflags/gflags.h>
 #include <string>
 
+#include "gen-cpp/Data_types.h"
 #include "udf/udf.h"
 #include "util/hash-util.h"
 
@@ -148,6 +149,20 @@ class TimestampValue {
 
   void ToPtime(boost::posix_time::ptime* ptp) const {
     *ptp = boost::posix_time::ptime(date_, time_);
+  }
+
+  // Store the binary representation of this TimestampValue in 'tvalue'.
+  void ToTColumnValue(TColumnValue* tvalue) const {
+    const uint8_t* data = reinterpret_cast<const uint8_t*>(this);
+    tvalue->timestamp_val.assign(data, data + Size());
+    tvalue->__isset.timestamp_val = true;
+  }
+
+  // Returns a new TimestampValue created from the value in 'tvalue'.
+  static TimestampValue FromTColumnValue(const TColumnValue& tvalue) {
+    TimestampValue value;
+    memcpy(&value, tvalue.timestamp_val.c_str(), Size());
+    return value;
   }
 
   bool HasDate() const { return !date_.is_special(); }

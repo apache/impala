@@ -86,7 +86,7 @@ PLAN-ROOT SINK
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: c.c_nationkey = s.s_nationkey, c_comment = s_comment
-|  runtime filters: RF002 <- s.s_nationkey, RF003 <- s_comment
+|  runtime filters: RF004 <- s.s_nationkey, RF005 <- s_comment
 |
 |--06:SCAN HDFS [tpch_nested_parquet.supplier s]
 |     partitions=1/1 files=1 size=111.08MB
@@ -94,7 +94,7 @@ PLAN-ROOT SINK
 |
 05:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=577.87MB
-   runtime filters: RF000 -> c_nationkey, RF001 -> c.c_comment, RF002 -> c.c_nationkey, RF003 -> c_comment
+   runtime filters: RF000 -> c_nationkey, RF001 -> c.c_comment, RF004 -> c.c_nationkey, RF005 -> c_comment
 ====
 # Test subplans: Cross join of parent and relative ref.
 select a.id, b.item from functional.allcomplextypes a cross join a.int_array_col b
@@ -695,7 +695,7 @@ PLAN-ROOT SINK
 |  |
 |  |--05:HASH JOIN [RIGHT OUTER JOIN]
 |  |  |  hash predicates: b.id = a.id
-|  |  |  runtime filters: RF001 <- a.id
+|  |  |  runtime filters: RF002 <- a.id
 |  |  |
 |  |  |--00:SCAN HDFS [functional.allcomplextypes a]
 |  |  |     partitions=0/0 files=0 size=0B
@@ -704,7 +704,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  01:SCAN HDFS [functional.alltypestiny b]
 |  |     partitions=4/4 files=4 size=460B
-|  |     runtime filters: RF001 -> b.id
+|  |     runtime filters: RF002 -> b.id
 |  |
 |  02:SCAN HDFS [functional.alltypessmall c]
 |     partitions=4/4 files=4 size=6.32KB
@@ -782,7 +782,7 @@ PLAN-ROOT SINK
 |  10:HASH JOIN [RIGHT OUTER JOIN]
 |  |  hash predicates: c.id = b.item
 |  |  other predicates: c.int_col > 30
-|  |  runtime filters: RF001 <- b.item
+|  |  runtime filters: RF002 <- b.item
 |  |
 |  |--01:SUBPLAN
 |  |  |
@@ -800,7 +800,7 @@ PLAN-ROOT SINK
 |  05:SCAN HDFS [functional.alltypessmall c]
 |     partitions=4/4 files=4 size=6.32KB
 |     predicates: c.id < 10, c.int_col > 30
-|     runtime filters: RF001 -> c.id
+|     runtime filters: RF002 -> c.id
 |
 06:SCAN HDFS [functional.alltypes e]
    partitions=24/24 files=24 size=478.45KB
@@ -1966,22 +1966,22 @@ PLAN-ROOT SINK
 |
 |--05:HASH JOIN [INNER JOIN]
 |  |  hash predicates: t3.r_comment = t2.c_address
-|  |  runtime filters: RF001 <- t2.c_address
+|  |  runtime filters: RF002 <- t2.c_address
 |  |
 |  |--04:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: t2.c_custkey = t5.r_regionkey
-|  |  |  runtime filters: RF002 <- t5.r_regionkey
+|  |  |  runtime filters: RF004 <- t5.r_regionkey
 |  |  |
 |  |  |--03:SCAN HDFS [tpch_nested_parquet.region t5]
 |  |  |     partitions=1/1 files=1 size=4.18KB
 |  |  |
 |  |  01:SCAN HDFS [tpch_nested_parquet.customer t2]
 |  |     partitions=1/1 files=4 size=577.87MB
-|  |     runtime filters: RF002 -> t2.c_custkey
+|  |     runtime filters: RF004 -> t2.c_custkey
 |  |
 |  02:SCAN HDFS [tpch_nested_parquet.region t3]
 |     partitions=1/1 files=1 size=4.18KB
-|     runtime filters: RF001 -> t3.r_comment
+|     runtime filters: RF002 -> t3.r_comment
 |
 00:SCAN HDFS [tpch_nested_parquet.region.r_nations t1]
    partitions=1/1 files=1 size=4.18KB

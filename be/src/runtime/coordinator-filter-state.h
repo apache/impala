@@ -43,13 +43,14 @@ struct Coordinator::FilterTarget {
       fragment_idx(f_idx) {}
 };
 
-/// State of filters that are received for aggregation.
+/// State of runtime filters that are received for aggregation. A runtime filter will
+/// contain a bloom or min-max filter.
 ///
 /// A broadcast join filter is published as soon as the first update is received for it
 /// and subsequent updates are ignored (as they will be the same).
-/// Updates for a partitioned join filter are aggregated in 'bloom_filter' and this is
-/// published once 'pending_count' reaches 0 and if the filter was not disabled before
-/// that.
+/// Updates for a partitioned join filter are aggregated and then published once
+/// 'pending_count' reaches 0 and if the filter was not disabled before that.
+///
 ///
 /// A filter is disabled if an always_true filter update is received, an OOM is hit,
 /// filter aggregation is complete or if the query is complete.
@@ -61,9 +62,11 @@ class Coordinator::FilterState {
       completion_time_(0L) {
     // bloom_filter_ is a disjunction so the unit value is always_false.
     bloom_filter_.always_false = true;
+    min_max_filter_.always_false = true;
   }
 
   TBloomFilter& bloom_filter() { return bloom_filter_; }
+  TMinMaxFilter& min_max_filter() { return min_max_filter_; }
   boost::unordered_set<int>* src_fragment_instance_idxs() {
     return &src_fragment_instance_idxs_;
   }
@@ -76,9 +79,18 @@ class Coordinator::FilterState {
   int64_t completion_time() const { return completion_time_; }
   const TPlanNodeId& src() const { return src_; }
   const TRuntimeFilterDesc& desc() const { return desc_; }
+  bool is_bloom_filter() const { return desc_.type == TRuntimeFilterType::BLOOM; }
+  bool is_min_max_filter() const { return desc_.type == TRuntimeFilterType::MIN_MAX; }
   int pending_count() const { return pending_count_; }
   void set_pending_count(int pending_count) { pending_count_ = pending_count; }
-  bool disabled() const { return bloom_filter_.always_true; }
+  bool disabled() const {
+    if (is_bloom_filter()) {
+      return bloom_filter_.always_true;
+    } else {
+      DCHECK(is_min_max_filter());
+      return min_max_filter_.always_true;
+    }
+  }
 
   /// Aggregates partitioned join filters and updates memory consumption.
   /// Disables filter if always_true filter is received or OOM is hit.
@@ -100,13 +112,14 @@ class Coordinator::FilterState {
   /// Number of remaining backends to hear from before filter is complete.
   int pending_count_;
 
-  /// BloomFilter aggregated from all source plan nodes, to be broadcast to all
+  /// Filters aggregated from all source plan nodes, to be broadcast to all
   /// destination plan fragment instances. Only set for partitioned joins (broadcast joins
   /// need no aggregation).
   /// In order to avoid memory spikes, an incoming filter is moved (vs. copied) to the
   /// output structure in the case of a broadcast join. Similarly, for partitioned joins,
   /// the filter is moved from the following member to the output structure.
   TBloomFilter bloom_filter_;
+  TMinMaxFilter min_max_filter_;
 
   /// Time at which first local filter arrived.
   int64_t first_arrival_time_;

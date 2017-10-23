@@ -93,7 +93,7 @@ void ImpalaInternalService::UpdateFilter(TUpdateFilterResult& return_val,
   FAULT_INJECTION_RPC_DELAY(RPC_UPDATEFILTER);
   DCHECK(params.__isset.filter_id);
   DCHECK(params.__isset.query_id);
-  DCHECK(params.__isset.bloom_filter);
+  DCHECK(params.__isset.bloom_filter || params.__isset.min_max_filter);
   impala_server_->UpdateFilter(return_val, params);
 }
 
@@ -103,8 +103,8 @@ void ImpalaInternalService::PublishFilter(TPublishFilterResult& return_val,
   DCHECK(params.__isset.filter_id);
   DCHECK(params.__isset.dst_query_id);
   DCHECK(params.__isset.dst_fragment_idx);
-  DCHECK(params.__isset.bloom_filter);
+  DCHECK(params.__isset.bloom_filter || params.__isset.min_max_filter);
   QueryState::ScopedRef qs(params.dst_query_id);
   if (qs.get() == nullptr) return;
-  qs->PublishFilter(params.filter_id, params.dst_fragment_idx, params.bloom_filter);
+  qs->PublishFilter(params);
 }

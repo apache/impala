@@ -663,6 +663,12 @@ class TestCreateExternalTable(KuduTestSuite):
       assert cursor.fetchall() == [(4, )]
       cursor.execute("select * from %s order by kEY" % (table_name))
       assert cursor.fetchall() == [(1, ), (4, ), (5, )]
+
+      # Do a join with a runtime filter targeting the column.
+      cursor.execute("select count(*) from %s a, %s b where a.key = b.key" %
+          (table_name, table_name))
+      assert cursor.fetchall() == [(3, )]
+
       cursor.execute("alter table %s add range partition 11 < values < 20" % table_name)
 
       new_key = "KEY2"

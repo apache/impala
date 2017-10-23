@@ -160,7 +160,7 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t1.id = t2.id
-|  runtime filters: RF000 <- t2.id
+|  runtime filters: RF000[bloom] <- t2.id
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=0 row-size=4B cardinality=10
 |
@@ -174,7 +174,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
-   runtime filters: RF000 -> t1.id
+   runtime filters: RF000[bloom] -> t1.id
    stats-rows=7300 extrapolated-rows=disabled
    table stats: rows=7300 size=478.45KB
    column stats: all

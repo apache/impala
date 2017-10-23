@@ -98,6 +98,16 @@ struct TRuntimeFilterTargetDesc {
   // Indicates if this target is on the same fragment as the join that
   // produced the runtime filter
   5: required bool is_local_target
+
+  // If the target node is a Kudu scan node, the name, in the case it appears in Kudu, and
+  // type of the targeted column.
+  6: optional string kudu_col_name
+  7: optional Types.TColumnType kudu_col_type;
+}
+
+enum TRuntimeFilterType {
+  BLOOM,
+  MIN_MAX
 }
 
 // Specification of a runtime filter.
@@ -132,6 +142,9 @@ struct TRuntimeFilterDesc {
   // The estimated number of distinct values that the planner expects the filter to hold.
   // Used to compute the size of the filter.
   9: optional i64 ndv_estimate
+
+  // The type of runtime filter to build.
+  10: required TRuntimeFilterType type
 }
 
 // The information contained in subclasses of ScanNode captured in two separate

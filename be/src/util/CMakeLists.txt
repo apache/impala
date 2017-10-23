@@ -55,6 +55,8 @@ add_library(Util
   mem-info.cc
   memory-metrics.cc
   metrics.cc
+  min-max-filter.cc
+  min-max-filter-ir.cc
   minidump.cc
   network-util.cc
   openssl-util.cc
@@ -120,6 +122,7 @@ ADD_BE_TEST(internal-queue-test)
 ADD_BE_TEST(logging-support-test)
 ADD_BE_TEST(lru-cache-test)
 ADD_BE_TEST(metrics-test)
+ADD_BE_TEST(min-max-filter-test)
 ADD_BE_TEST(openssl-util-test)
 ADD_BE_TEST(parse-util-test)
 #ADD_BE_TEST(perf-counters-test)

@@ -18,6 +18,7 @@
 #include "exec/kudu-scanner.h"
 
 #include <kudu/client/row_result.h>
+#include <kudu/client/value.h>
 #include <thrift/protocol/TDebugProtocol.h>
 #include <vector>
 #include <string>
@@ -25,9 +26,11 @@
 #include "exec/kudu-util.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/slot-ref.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
+#include "runtime/runtime-filter.h"
 #include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/string-value.h"
@@ -36,15 +39,18 @@
 #include "gutil/gscoped_ptr.h"
 #include "gutil/strings/substitute.h"
 #include "util/jni-util.h"
+#include "util/min-max-filter.h"
 #include "util/periodic-counter-updater.h"
 #include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
 
 using kudu::client::KuduClient;
+using kudu::client::KuduPredicate;
 using kudu::client::KuduScanBatch;
 using kudu::client::KuduSchema;
 using kudu::client::KuduTable;
+using kudu::client::KuduValue;
 
 DEFINE_string(kudu_read_mode, "READ_LATEST", "(Advanced) Sets the Kudu scan ReadMode. "
     "Supported Kudu read modes are READ_LATEST and READ_AT_SNAPSHOT.");
@@ -136,7 +142,7 @@ void KuduScanner::Close() {
   expr_results_pool_->FreeAll();
 }
 
-Status KuduScanner::OpenNextScanToken(const string& scan_token)  {
+Status KuduScanner::OpenNextScanToken(const string& scan_token, bool* eos) {
   DCHECK(scanner_ == NULL);
   kudu::client::KuduScanner* scanner;
   KUDU_RETURN_IF_ERROR(kudu::client::KuduScanToken::DeserializeIntoScanner(
@@ -164,10 +170,67 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token)  {
     scanner_->SetRowFormatFlags(row_format_flags);
   }
 
+  if (scan_node_->filter_ctxs_.size() > 0) {
+    for (const FilterContext& ctx : scan_node_->filter_ctxs_) {
+      MinMaxFilter* filter = ctx.filter->get_min_max();
+      if (filter != nullptr && !filter->AlwaysTrue()) {
+        if (filter->AlwaysFalse()) {
+          // We can skip this entire scan.
+          CloseCurrentClientScanner();
+          *eos = true;
+          return Status::OK();
+        } else {
+          auto it = ctx.filter->filter_desc().planid_to_target_ndx.find(scan_node_->id());
+          const TRuntimeFilterTargetDesc& target_desc =
+              ctx.filter->filter_desc().targets[it->second];
+          const string& col_name = target_desc.kudu_col_name;
+          DCHECK(col_name != "");
+          ColumnType col_type = ColumnType::FromThrift(target_desc.kudu_col_type);
+
+          void* min = filter->GetMin();
+          void* max = filter->GetMax();
+          // If the type of the filter is not the same as the type of the target column,
+          // there must be an implicit integer cast and we need to ensure the min/max we
+          // pass to Kudu are within the range of the target column.
+          int64_t int_min;
+          int64_t int_max;
+          if (col_type.type != filter->type()) {
+            DCHECK(col_type.IsIntegerType());
+
+            if (!filter->GetCastIntMinMax(col_type, &int_min, &int_max)) {
+              // The min/max for this filter is outside the range for the target column,
+              // so all rows are filtered out and we can skip the scan.
+              CloseCurrentClientScanner();
+              *eos = true;
+              return Status::OK();
+            }
+            min = &int_min;
+            max = &int_max;
+          }
+
+          KuduValue* min_value;
+          RETURN_IF_ERROR(CreateKuduValue(filter->type(), min, &min_value));
+          KUDU_RETURN_IF_ERROR(
+              scanner_->AddConjunctPredicate(scan_node_->table_->NewComparisonPredicate(
+                  col_name, KuduPredicate::ComparisonOp::GREATER_EQUAL, min_value)),
+              "Failed to add min predicate");
+
+          KuduValue* max_value;
+          RETURN_IF_ERROR(CreateKuduValue(filter->type(), max, &max_value));
+          KUDU_RETURN_IF_ERROR(
+              scanner_->AddConjunctPredicate(scan_node_->table_->NewComparisonPredicate(
+                  col_name, KuduPredicate::ComparisonOp::LESS_EQUAL, max_value)),
+              "Failed to add max predicate");
+        }
+      }
+    }
+  }
+
   {
     SCOPED_TIMER(state_->total_storage_wait_timer());
     KUDU_RETURN_IF_ERROR(scanner_->Open(), "Unable to open scanner");
   }
+  *eos = false;
   return Status::OK();
 }
 

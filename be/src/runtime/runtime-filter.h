@@ -29,33 +29,45 @@ namespace impala {
 
 class BloomFilter;
 
-/// RuntimeFilters represent set-membership predicates (implemented with bloom filters)
-/// that are computed during query execution (rather than during planning). They can then
-/// be sent to other operators to reduce their output. For example, a RuntimeFilter might
-/// compute a predicate corresponding to set membership, where the members of that set can
-/// only be computed at runtime (for example, the distinct values of the build side of a
-/// hash table). Other plan nodes can use that predicate by testing for membership of that
-/// set to filter rows early on in the plan tree (e.g. the scan that feeds the probe side
-/// of that join node could eliminate rows from consideration for join matching).
+/// RuntimeFilters represent set-membership predicates that are computed during query
+/// execution (rather than during planning). They can then be sent to other operators to
+/// reduce their output. For example, a RuntimeFilter might compute a predicate
+/// corresponding to set membership, where the members of that set can only be computed at
+/// runtime (for example, the distinct values of the build side of a hash table). Other
+/// plan nodes can use that predicate by testing for membership of that set to filter rows
+/// early on in the plan tree (e.g. the scan that feeds the probe side of that join node
+/// could eliminate rows from consideration for join matching).
+///
+/// A RuntimeFilter may compute its set-membership predicate as a bloom filters or a
+/// min-max filter, depending on its filter description.
 class RuntimeFilter {
  public:
   RuntimeFilter(const TRuntimeFilterDesc& filter, int64_t filter_size)
-      : bloom_filter_(NULL), filter_desc_(filter), arrival_time_(0L),
+      : bloom_filter_(nullptr), min_max_filter_(nullptr), filter_desc_(filter),
+        registration_time_(MonotonicMillis()), arrival_time_(0L),
         filter_size_(filter_size) {
     DCHECK_GT(filter_size_, 0);
-    registration_time_ = MonotonicMillis();
   }
 
-  /// Returns true if SetBloomFilter() has been called.
-  bool HasBloomFilter() const { return arrival_time_ != 0; }
+  /// Returns true if SetFilter() has been called.
+  bool HasFilter() const { return arrival_time_.Load() != 0; }
 
   const TRuntimeFilterDesc& filter_desc() const { return filter_desc_; }
   int32_t id() const { return filter_desc().filter_id; }
   int64_t filter_size() const { return filter_size_; }
+  ColumnType type() const {
+    return ColumnType::FromThrift(filter_desc().src_expr.nodes[0].type);
+  }
+  bool is_bloom_filter() const { return filter_desc().type == TRuntimeFilterType::BLOOM; }
+  bool is_min_max_filter() const {
+    return filter_desc().type == TRuntimeFilterType::MIN_MAX;
+  }
+
+  MinMaxFilter* get_min_max() const { return min_max_filter_.Load(); }
 
   /// Sets the internal filter bloom_filter to 'bloom_filter'. Can only legally be called
   /// once per filter. Does not acquire the memory associated with 'bloom_filter'.
-  inline void SetBloomFilter(BloomFilter* bloom_filter);
+  inline void SetFilter(BloomFilter* bloom_filter, MinMaxFilter* min_max_filter);
 
   /// Returns false iff 'bloom_filter_' has been set via SetBloomFilter() and hash[val] is
   /// not in that 'bloom_filter_'. Otherwise returns true. Is safe to call concurrently
@@ -67,8 +79,8 @@ class RuntimeFilter {
   /// Returns the amount of time waited since registration for the filter to
   /// arrive. Returns 0 if filter has not yet arrived.
   int32_t arrival_delay() const {
-    if (arrival_time_ == 0L) return 0L;
-    return arrival_time_ - registration_time_;
+    if (arrival_time_.Load() == 0L) return 0L;
+    return arrival_time_.Load() - registration_time_;
   }
 
   /// Periodically (every 20ms) checks to see if the global filter has arrived. Waits for
@@ -88,21 +100,26 @@ class RuntimeFilter {
   static const char* LLVM_CLASS_NAME;
 
  private:
-  /// Membership bloom_filter. May be NULL even after arrival_time_ is set. This is a
-  /// compact way of representing a full Bloom filter that contains every element.
-  BloomFilter* bloom_filter_;
+  /// Membership bloom_filter. May be NULL even after arrival_time_ is set, meaning that
+  /// it does not filter any rows, either because it was not created
+  /// (filter_desc_.bloom_filter is false), there was not enough memory, or the false
+  /// positive rate was determined to be too high.
+  AtomicPtr<BloomFilter> bloom_filter_;
+
+  /// May be NULL even after arrival_time_ is set if filter_desc_.min_max_filter is false.
+  AtomicPtr<MinMaxFilter> min_max_filter_;
 
   /// Reference to the filter's thrift descriptor in the thrift Plan tree.
   const TRuntimeFilterDesc& filter_desc_;
 
   /// Time, in ms, that the filter was registered.
-  int64_t registration_time_;
+  const int64_t registration_time_;
 
-  /// Time, in ms, that the global fiter arrived. Set in SetBloomFilter().
-  int64_t arrival_time_;
+  /// Time, in ms, that the global filter arrived. Set in SetFilter().
+  AtomicInt64 arrival_time_;
 
   /// The size of the Bloom filter, in bytes.
-  int64_t filter_size_;
+  const int64_t filter_size_;
 };
 
 }

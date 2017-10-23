@@ -23,6 +23,7 @@ struct tm;
 
 #include <kudu/client/callbacks.h>
 #include <kudu/client/client.h>
+#include <kudu/client/value.h>
 
 #include "common/status.h"
 #include "runtime/string-value.h"
@@ -83,6 +84,11 @@ void LogKuduMessage(kudu::client::KuduLogSeverity severity, const char* filename
 /// is being used.
 Status WriteKuduValue(int col, PrimitiveType type, const void* value,
     bool copy_strings, kudu::KuduPartialRow* row) WARN_UNUSED_RESULT;
+
+/// Casts 'value' according to 'type' and create a new KuduValue containing 'value' which
+/// is returned in 'out'.
+Status CreateKuduValue(
+    PrimitiveType type, void* value, kudu::client::KuduValue** out) WARN_UNUSED_RESULT;
 
 /// Takes a Kudu client DataType and returns the corresponding Impala ColumnType.
 ColumnType KuduDataTypeToColumnType(kudu::client::KuduColumnSchema::DataType type);

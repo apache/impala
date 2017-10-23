@@ -29,9 +29,9 @@ const char* RuntimeFilter::LLVM_CLASS_NAME = "class.impala::RuntimeFilter";
 
 bool RuntimeFilter::WaitForArrival(int32_t timeout_ms) const {
   do {
-    if (HasBloomFilter()) return true;
+    if (HasFilter()) return true;
     SleepForMs(SLEEP_PERIOD_MS);
   } while ((MonotonicMillis() - registration_time_) < timeout_ms);
 
-  return HasBloomFilter();
+  return HasFilter();
 }

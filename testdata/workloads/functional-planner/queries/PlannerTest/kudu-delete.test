@@ -31,13 +31,13 @@ DELETE FROM KUDU [functional_kudu.testtbl]
 |
 |--03:HASH JOIN [INNER JOIN]
 |  |  hash predicates: b.id = a.id
-|  |  runtime filters: RF001 <- a.id
+|  |  runtime filters: RF002 <- a.id
 |  |
 |  |--00:SCAN KUDU [functional_kudu.testtbl a]
 |  |
 |  01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
-|     runtime filters: RF001 -> b.id
+|     runtime filters: RF002 -> b.id
 |
 02:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -53,7 +53,7 @@ DELETE FROM KUDU [functional_kudu.testtbl]
 |  |
 |  03:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: b.id = a.id
-|  |  runtime filters: RF001 <- a.id
+|  |  runtime filters: RF002 <- a.id
 |  |
 |  |--05:EXCHANGE [BROADCAST]
 |  |  |
@@ -61,7 +61,7 @@ DELETE FROM KUDU [functional_kudu.testtbl]
 |  |
 |  01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
-|     runtime filters: RF001 -> b.id
+|     runtime filters: RF002 -> b.id
 |
 06:EXCHANGE [HASH(id)]
 |

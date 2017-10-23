@@ -1,0 +1,126 @@
+====
+---- QUERY
+####################################################
+# Test case 1: bloom filters with high expected FP rate get disabled.
+# To trigger this path, we have to trick the planner into estimating a too-small
+# build-side cardinality, which will cause the BF size to be estimated low (and therefore
+# the FP rate to be high). We do this by using predicates that are completely unselective,
+# but which the planner thinks have relatively high selectivity.
+# Kudu doesn't support bloom filters, so it just doesn't filter anything.
+####################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_MAX_SIZE=4K;
+select STRAIGHT_JOIN count(*) from alltypes a
+    join [BROADCAST]
+    # Build-side needs to be sufficiently large to trigger FP check.
+    (select id, int_col from alltypes UNION ALL select id, int_col from alltypes) b
+        on a.id = b.id
+        # Predicates that are always true (but planner thinks are selective)
+        where (b.id - b.id) < 1 AND (b.int_col - b.int_col) < 1;
+---- RESULTS
+14600
+---- RUNTIME_PROFILE
+row_regex: .*0 of 1 Runtime Filter Published, 1 Disabled.*
+row_regex: .*Rows rejected: 0 .*
+====
+
+
+---- QUERY
+####################################################
+# Test case 2: Filter sizes change according to their NDV
+####################################################
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_MIN_SIZE=4KB;
+with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
+select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
+    join (select * from l LIMIT 1) b on a.l_orderkey = -b.l_orderkey;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: .*Filter 0 \(4.00 KB\).*
+====
+---- QUERY
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_MIN_SIZE=4KB;
+with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
+select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
+    join (select * from l LIMIT 500000) b on a.l_orderkey = -b.l_orderkey;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: .*Filter 0 \(256.00 KB\).*
+====
+---- QUERY
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_MIN_SIZE=4KB;
+with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
+select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
+    join (select * from l LIMIT 1000000) b on a.l_orderkey = -b.l_orderkey;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: .*Filter 0 \(512.00 KB\).*
+====
+---- QUERY
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_MIN_SIZE=4KB;
+with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
+select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
+    join (select * from l LIMIT 2000000) b on a.l_orderkey = -b.l_orderkey;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: .*Filter 0 \(1.00 MB\).*
+====
+
+
+
+---- QUERY
+####################################################
+# Test case 3: Filter sizes respect query options
+####################################################
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_MIN_SIZE=8KB;
+SET RUNTIME_FILTER_MAX_SIZE=8KB;
+# This query would produce a 4KB filter without setting the minimum size.
+select STRAIGHT_JOIN count(*) from alltypes a join [SHUFFLE] alltypes b on a.id = b.id;
+---- RESULTS
+7300
+---- RUNTIME_PROFILE
+row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: .*Filter 0 \(8.00 KB\).*
+====
+---- QUERY
+# Check that filter sizes are rounded up to power-of-two
+SET RUNTIME_FILTER_MIN_SIZE=6000B;
+SET RUNTIME_FILTER_MAX_SIZE=6000B;
+select STRAIGHT_JOIN count(*) from alltypes a join [SHUFFLE] alltypes b on a.id = b.id;
+---- RESULTS
+7300
+---- RUNTIME_PROFILE
+row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: .*Filter 0 \(8.00 KB\).*
+====
+---- QUERY
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_MAX_SIZE=8192;
+# Query would produce a 512KB filter without setting the max
+with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
+select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
+    join (select * from l LIMIT 1000000) b on a.l_orderkey = -b.l_orderkey;
+---- RUNTIME_PROFILE
+row_regex: .*0 of 1 Runtime Filter Published.*
+row_regex: .*Filter 0 \(8.00 KB\).*
+====

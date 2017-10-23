@@ -153,7 +153,7 @@ PLAN-ROOT SINK
 |  |
 |  04:HASH JOIN [INNER JOIN]
 |  |  hash predicates: a.id = b.id
-|  |  runtime filters: RF002 <- b.id
+|  |  runtime filters: RF004 <- b.id
 |  |
 |  |--03:SCAN HDFS [functional.alltypestiny b]
 |  |     partitions=4/4 files=4 size=460B
@@ -161,11 +161,11 @@ PLAN-ROOT SINK
 |  02:SCAN HDFS [functional.alltypesagg a]
 |     partitions=11/11 files=11 size=814.73KB
 |     predicates: a.bigint_col < 50
-|     runtime filters: RF002 -> a.id
+|     runtime filters: RF004 -> a.id
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = int_col
-|  runtime filters: RF001 <- int_col
+|  runtime filters: RF002 <- int_col
 |
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
@@ -175,7 +175,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id > 1
-   runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
+   runtime filters: RF000 -> functional.alltypes.id, RF002 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -207,7 +207,7 @@ PLAN-ROOT SINK
 |  |
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: a.id = b.id
-|  |  runtime filters: RF002 <- b.id
+|  |  runtime filters: RF004 <- b.id
 |  |
 |  |--11:EXCHANGE [BROADCAST]
 |  |  |
@@ -217,11 +217,11 @@ PLAN-ROOT SINK
 |  02:SCAN HDFS [functional.alltypesagg a]
 |     partitions=11/11 files=11 size=814.73KB
 |     predicates: a.bigint_col < 50
-|     runtime filters: RF002 -> a.id
+|     runtime filters: RF004 -> a.id
 |
 07:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: functional.alltypes.id = int_col
-|  runtime filters: RF001 <- int_col
+|  runtime filters: RF002 <- int_col
 |
 |--10:EXCHANGE [HASH(int_col)]
 |  |
@@ -235,7 +235,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id > 1
-   runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
+   runtime filters: RF000 -> functional.alltypes.id, RF002 -> functional.alltypes.id
 ====
 # Self-join of view to make sure the on clause is properly set
 # in the cloned view instances.
@@ -254,7 +254,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
-|  runtime filters: RF001 <- functional.alltypes.id
+|  runtime filters: RF002 <- functional.alltypes.id
 |
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
@@ -262,7 +262,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
+   runtime filters: RF000 -> functional.alltypes.id, RF002 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -279,7 +279,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
-|  runtime filters: RF001 <- functional.alltypes.id
+|  runtime filters: RF002 <- functional.alltypes.id
 |
 |--06:EXCHANGE [HASH(functional.alltypes.id)]
 |  |
@@ -291,7 +291,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
+   runtime filters: RF000 -> functional.alltypes.id, RF002 -> functional.alltypes.id
 ====
 # Self-join views to make sure the using clause is properly set
 # in the cloned view instances.
@@ -310,7 +310,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
-|  runtime filters: RF001 <- functional.alltypes.id
+|  runtime filters: RF002 <- functional.alltypes.id
 |
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
@@ -318,7 +318,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
+   runtime filters: RF000 -> functional.alltypes.id, RF002 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -335,7 +335,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
-|  runtime filters: RF001 <- functional.alltypes.id
+|  runtime filters: RF002 <- functional.alltypes.id
 |
 |--06:EXCHANGE [HASH(functional.alltypes.id)]
 |  |
@@ -347,7 +347,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
+   runtime filters: RF000 -> functional.alltypes.id, RF002 -> functional.alltypes.id
 ====
 # Self-join of view to make sure the join op is properly set
 # in the cloned view instances.
@@ -416,7 +416,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
-|  runtime filters: RF001 <- functional.alltypes.id
+|  runtime filters: RF002 <- functional.alltypes.id
 |
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
@@ -424,7 +424,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
+   runtime filters: RF000 -> functional.alltypes.id, RF002 -> functional.alltypes.id
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -443,7 +443,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
-|  runtime filters: RF001 <- functional.alltypes.id
+|  runtime filters: RF002 <- functional.alltypes.id
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
@@ -453,7 +453,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   runtime filters: RF000 -> functional.alltypes.id, RF001 -> functional.alltypes.id
+   runtime filters: RF000 -> functional.alltypes.id, RF002 -> functional.alltypes.id
 ====
 # Tests that parentheses are preserved when creating a view
 # enabling proper partition pruning for this particular view.

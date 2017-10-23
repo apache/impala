@@ -1245,7 +1245,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey, l_returnflag = o_clerk
-|  runtime filters: RF002 <- o_orderkey, RF003 <- o_clerk
+|  runtime filters: RF004 <- o_orderkey, RF005 <- o_clerk
 |
 |--07:EXCHANGE [HASH(o_orderkey,o_clerk)]
 |  |
@@ -1257,7 +1257,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
    partitions=1/1 files=3 size=193.92MB
-   runtime filters: RF002 -> l_orderkey, RF003 -> l_returnflag
+   runtime filters: RF004 -> l_orderkey, RF005 -> l_returnflag
 ====
 # IMPALA-4263: Grouping agg needs a merge step because the grouping exprs reference a
 # tuple that is made nullable in the join fragment.

@@ -189,7 +189,7 @@ public class HashJoinNode extends JoinNode {
       }
       if (!runtimeFilters_.isEmpty()) {
         output.append(detailPrefix + "runtime filters: ");
-        output.append(getRuntimeFilterExplainString(true));
+        output.append(getRuntimeFilterExplainString(true, detailLevel));
       }
     }
     return output.toString();

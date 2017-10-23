@@ -98,7 +98,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
-|  runtime filters: RF001 <- int_col
+|  runtime filters: RF002 <- int_col
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
@@ -106,7 +106,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   runtime filters: RF000 -> functional.alltypes.int_col, RF001 -> int_col
+   runtime filters: RF000 -> functional.alltypes.int_col, RF002 -> int_col
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -123,7 +123,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: int_col = int_col
-|  runtime filters: RF001 <- int_col
+|  runtime filters: RF002 <- int_col
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
@@ -133,7 +133,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   runtime filters: RF000 -> functional.alltypes.int_col, RF001 -> int_col
+   runtime filters: RF000 -> functional.alltypes.int_col, RF002 -> int_col
 ====
 # Multiple dependent views in with-clause
 with t1 as (
@@ -226,7 +226,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
-|  runtime filters: RF001 <- int_col
+|  runtime filters: RF002 <- int_col
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
@@ -234,7 +234,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
-   runtime filters: RF000 -> functional.alltypestiny.int_col, RF001 -> int_col
+   runtime filters: RF000 -> functional.alltypestiny.int_col, RF002 -> int_col
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -251,7 +251,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
-|  runtime filters: RF001 <- int_col
+|  runtime filters: RF002 <- int_col
 |
 |--06:EXCHANGE [HASH(int_col)]
 |  |
@@ -263,7 +263,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
-   runtime filters: RF000 -> functional.alltypestiny.int_col, RF001 -> int_col
+   runtime filters: RF000 -> functional.alltypestiny.int_col, RF002 -> int_col
 ====
 # Self-join of with-clause table to make sure the using clause is properly set
 # in the cloned inline-view instances.
@@ -281,7 +281,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
-|  runtime filters: RF001 <- int_col
+|  runtime filters: RF002 <- int_col
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
@@ -289,7 +289,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
-   runtime filters: RF000 -> functional.alltypestiny.int_col, RF001 -> int_col
+   runtime filters: RF000 -> functional.alltypestiny.int_col, RF002 -> int_col
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -306,7 +306,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = int_col
-|  runtime filters: RF001 <- int_col
+|  runtime filters: RF002 <- int_col
 |
 |--06:EXCHANGE [HASH(int_col)]
 |  |
@@ -318,7 +318,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
-   runtime filters: RF000 -> functional.alltypestiny.int_col, RF001 -> int_col
+   runtime filters: RF000 -> functional.alltypestiny.int_col, RF002 -> int_col
 ====
 # Self-join of with-clause table to make sure the join op is properly set
 # in the cloned inline-view instances.
@@ -385,7 +385,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
-|  runtime filters: RF001 <- int_col
+|  runtime filters: RF002 <- int_col
 |
 |--01:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 files=4 size=460B
@@ -393,7 +393,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
-   runtime filters: RF000 -> functional.alltypestiny.int_col, RF001 -> int_col
+   runtime filters: RF000 -> functional.alltypestiny.int_col, RF002 -> int_col
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -412,7 +412,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: int_col = int_col
-|  runtime filters: RF001 <- int_col
+|  runtime filters: RF002 <- int_col
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
@@ -422,7 +422,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
-   runtime filters: RF000 -> functional.alltypestiny.int_col, RF001 -> int_col
+   runtime filters: RF000 -> functional.alltypestiny.int_col, RF002 -> int_col
 ====
 # Multiple with clauses. One for the UnionStmt and one for each union operand.
 with t1 as (values('a', 'b'))

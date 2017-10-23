@@ -34,6 +34,7 @@
 #include "runtime/runtime-filter.h"
 #include "runtime/runtime-state.h"
 #include "util/bloom-filter.h"
+#include "util/min-max-filter.h"
 #include "util/runtime-profile-counters.h"
 
 #include "gen-cpp/PlanNodes_types.h"
@@ -469,9 +470,16 @@ void PhjBuilder::AllocateRuntimeFilters() {
       << "Runtime filters not supported with NULL_AWARE_LEFT_ANTI_JOIN";
   DCHECK(ht_ctx_ != NULL);
   for (int i = 0; i < filter_ctxs_.size(); ++i) {
-    filter_ctxs_[i].local_bloom_filter =
-        runtime_state_->filter_bank()->AllocateScratchBloomFilter(
-            filter_ctxs_[i].filter->id());
+    if (filter_ctxs_[i].filter->is_bloom_filter()) {
+      filter_ctxs_[i].local_bloom_filter =
+          runtime_state_->filter_bank()->AllocateScratchBloomFilter(
+              filter_ctxs_[i].filter->id());
+    } else {
+      DCHECK(filter_ctxs_[i].filter->is_min_max_filter());
+      filter_ctxs_[i].local_min_max_filter =
+          runtime_state_->filter_bank()->AllocateScratchMinMaxFilter(
+              filter_ctxs_[i].filter->id(), filter_ctxs_[i].expr_eval->root().type());
+    }
   }
 }
 
@@ -491,12 +499,22 @@ void PhjBuilder::PublishRuntimeFilters(int64_t num_build_rows) {
   for (const FilterContext& ctx : filter_ctxs_) {
     // TODO: Consider checking actual number of bits set in filter to compute FP rate.
     // TODO: Consider checking this every few batches or so.
-    bool fp_rate_too_high = runtime_state_->filter_bank()->FpRateTooHigh(
-        ctx.filter->filter_size(), num_build_rows);
-    runtime_state_->filter_bank()->UpdateFilterFromLocal(ctx.filter->id(),
-        fp_rate_too_high ? BloomFilter::ALWAYS_TRUE_FILTER : ctx.local_bloom_filter);
+    BloomFilter* bloom_filter = nullptr;
+    if (ctx.local_bloom_filter != nullptr) {
+      if (runtime_state_->filter_bank()->FpRateTooHigh(
+              ctx.filter->filter_size(), num_build_rows)) {
+        bloom_filter = BloomFilter::ALWAYS_TRUE_FILTER;
+      } else {
+        bloom_filter = ctx.local_bloom_filter;
+        ++num_enabled_filters;
+      }
+    } else if (ctx.local_min_max_filter != nullptr
+        && !ctx.local_min_max_filter->AlwaysTrue()) {
+      ++num_enabled_filters;
+    }
 
-    num_enabled_filters += !fp_rate_too_high;
+    runtime_state_->filter_bank()->UpdateFilterFromLocal(
+        ctx.filter->id(), bloom_filter, ctx.local_min_max_filter);
   }
 
   if (filter_ctxs_.size() > 0) {
@@ -959,7 +977,8 @@ Status PhjBuilder::CodegenInsertRuntimeFilters(
   int num_filters = filter_exprs.size();
   for (int i = 0; i < num_filters; ++i) {
     llvm::Function* insert_fn;
-    RETURN_IF_ERROR(FilterContext::CodegenInsert(codegen, filter_exprs_[i], &insert_fn));
+    RETURN_IF_ERROR(FilterContext::CodegenInsert(
+        codegen, filter_exprs_[i], &filter_ctxs_[i], &insert_fn));
     llvm::PointerType* filter_context_type =
         codegen->GetPtrType(FilterContext::LLVM_CLASS_NAME);
     llvm::Value* filter_context_ptr =

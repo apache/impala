@@ -59,7 +59,8 @@ Status KuduScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
   RETURN_IF_ERROR(QueryMaintenance(state));
   *eos = false;
 
-  if (scan_token_ == nullptr) {
+  bool scan_token_eos = scan_token_ == nullptr;
+  while (scan_token_eos) {
     scan_token_ = GetNextScanToken();
     if (scan_token_ == nullptr) {
       runtime_profile_->StopPeriodicCounters();
@@ -68,7 +69,7 @@ Status KuduScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
       *eos = true;
       return Status::OK();
     }
-    RETURN_IF_ERROR(scanner_->OpenNextScanToken(*scan_token_));
+    RETURN_IF_ERROR(scanner_->OpenNextScanToken(*scan_token_, &scan_token_eos));
   }
 
   bool scanner_eos = false;

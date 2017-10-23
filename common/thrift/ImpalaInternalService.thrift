@@ -33,6 +33,7 @@ include "DataSinks.thrift"
 include "Results.thrift"
 include "RuntimeProfile.thrift"
 include "ImpalaService.thrift"
+include "Data.thrift"
 
 // constants for TQueryOptions.num_nodes
 const i32 NUM_NODES_ALL = 0
@@ -191,14 +192,14 @@ struct TQueryOptions {
   // be rounded up to the nearest power of two.
   38: optional i32 runtime_bloom_filter_size = 1048576
 
-  // Time in ms to wait until partition filters are delivered. If 0, the default defined
+  // Time in ms to wait until runtime filters are delivered. If 0, the default defined
   // by the startup flag of the same name is used.
   39: optional i32 runtime_filter_wait_time_ms = 0
 
   // If true, per-row runtime filtering is disabled
   40: optional bool disable_row_runtime_filtering = false
 
-  // Maximum number of runtime filters allowed per query
+  // Maximum number of bloom runtime filters allowed per query
   41: optional i32 max_num_runtime_filters = 10
 
   // If true, use UTF-8 annotation for string columns. Note that char and varchar columns
@@ -226,10 +227,10 @@ struct TQueryOptions {
   // the files there.
   45: optional bool s3_skip_insert_staging = true
 
-  // Minimum runtime filter size, in bytes
+  // Minimum runtime bloom filter size, in bytes
   46: optional i32 runtime_filter_min_size = 1048576
 
-  // Maximum runtime filter size, in bytes
+  // Maximum runtime bloom filter size, in bytes
   47: optional i32 runtime_filter_max_size = 16777216
 
   // Prefetching behavior during hash tables' building and probing.
@@ -771,6 +772,16 @@ struct TBloomFilter {
   4: required bool always_false
 }
 
+struct TMinMaxFilter {
+  // If true, filter allows all elements to pass and 'min'/'max' will not be set.
+  1: required bool always_true
+
+  // If true, filter doesn't allow any elements to pass and 'min'/'max' will not be set.
+  2: required bool always_false
+
+  3: optional Data.TColumnValue min
+  4: optional Data.TColumnValue max
+}
 
 // UpdateFilter
 
@@ -787,6 +798,8 @@ struct TUpdateFilterParams {
 
   // required in V1
   4: optional TBloomFilter bloom_filter
+
+  5: optional TMinMaxFilter min_max_filter
 }
 
 struct TUpdateFilterResult {
@@ -812,6 +825,8 @@ struct TPublishFilterParams {
   // Actual bloom_filter payload
   // required in V1
   5: optional TBloomFilter bloom_filter
+
+  6: optional TMinMaxFilter min_max_filter
 }
 
 struct TPublishFilterResult {

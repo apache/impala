@@ -414,13 +414,12 @@ Status FragmentInstanceState::WaitForOpen() {
   return opened_promise_.Get();
 }
 
-void FragmentInstanceState::PublishFilter(
-    int32_t filter_id, const TBloomFilter& thrift_bloom_filter) {
+void FragmentInstanceState::PublishFilter(const TPublishFilterParams& params) {
   VLOG_FILE << "PublishFilter(): instance_id=" << PrintId(instance_id())
-            << " filter_id=" << filter_id;
+            << " filter_id=" << params.filter_id;
   // Wait until Prepare() is done, so we know that the filter bank is set up.
   if (!WaitForPrepare().ok()) return;
-  runtime_state_->filter_bank()->PublishGlobalFilter(filter_id, thrift_bloom_filter);
+  runtime_state_->filter_bank()->PublishGlobalFilter(params);
 }
 
 const TQueryCtx& FragmentInstanceState::query_ctx() const {

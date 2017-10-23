@@ -1,0 +1,121 @@
+====
+---- QUERY
+####################################################
+# Test case 1: Min-max filters of all possible types.
+####################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
+where a.bool_col = (b.bool_col && !b.bool_col)
+---- RESULTS
+29200
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
+where a.tinyint_col = b.tinyint_col
+---- RESULTS
+5840
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
+where a.smallint_col = b.smallint_col
+---- RESULTS
+5840
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
+where a.int_col = b.int_col
+---- RESULTS
+5840
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
+where a.bigint_col = b.bigint_col
+---- RESULTS
+5840
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
+where a.float_col = b.float_col
+---- RESULTS
+5840
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
+where a.double_col = b.double_col
+---- RESULTS
+5840
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
+where a.string_col = b.string_col
+---- RESULTS
+5840
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
+where a.timestamp_col = b.timestamp_col
+---- RESULTS
+8
+====
+
+---- QUERY
+####################################################
+# Test case 2: Min-max filters on a primary key/partition column
+####################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+select STRAIGHT_JOIN a.id, a.tinyint_col, b.id, b.tinyint_col
+from alltypes a join [BROADCAST] alltypestiny b
+where a.id = b.tinyint_col * 2;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,0,4,0
+0,0,2,0
+0,0,0,0
+0,0,6,0
+2,2,3,1
+2,2,7,1
+2,2,5,1
+2,2,1,1
+----TYPES
+INT,TINYINT,INT,TINYINT
+====
+
+
+---- QUERY
+####################################################
+# Test case 3: Target expr has an implicit integer cast
+####################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+select STRAIGHT_JOIN count(*)
+from alltypes a join [BROADCAST] alltypes b
+where a.tinyint_col = b.int_col and b.int_col in (0, 1)
+---- RESULTS
+1065800
+====
+---- QUERY
+# The min/max values in the filter are both above the range of the target col so all rows
+# are filtered.
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+select STRAIGHT_JOIN count(*)
+from alltypes a join [BROADCAST] alltypes b
+where a.tinyint_col = b.int_col + 10000
+---- RESULTS
+0
+====
+---- QUERY
+# The min/max values in the filter are below/above the range for the target col,
+# respectively, so no rows are filtered.
+select STRAIGHT_JOIN count(*)
+from alltypes a join [BROADCAST]
+  (values (min_int() x), (max_int()), (0)) v
+where a.tinyint_col = v.x
+---- RESULTS
+730
+====

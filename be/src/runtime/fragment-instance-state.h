@@ -99,7 +99,7 @@ class FragmentInstanceState {
   Status WaitForOpen();
 
   /// Publishes filter with ID 'filter_id' to this fragment instance's filter bank.
-  void PublishFilter(int32_t filter_id, const TBloomFilter& thrift_bloom_filter);
+  void PublishFilter(const TPublishFilterParams& params);
 
   /// Returns fragment instance's sink if this is the root fragment instance. Valid after
   /// the Prepare phase. May be nullptr.

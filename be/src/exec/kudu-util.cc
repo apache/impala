@@ -35,6 +35,7 @@ using kudu::client::KuduSchema;
 using kudu::client::KuduClient;
 using kudu::client::KuduClientBuilder;
 using kudu::client::KuduColumnSchema;
+using kudu::client::KuduValue;
 using DataType = kudu::client::KuduColumnSchema::DataType;
 
 DECLARE_bool(disable_kudu);
@@ -111,17 +112,14 @@ void InitKuduLogging() {
   kudu::client::SetVerboseLogLevel(std::max(0, FLAGS_v - 1));
 }
 
-Status WriteKuduTimestampValue(int col, const TimestampValue* tv,
-    kudu::KuduPartialRow* row) {
-  int64_t ts_micros;
-  bool success = tv->UtcToUnixTimeMicros(&ts_micros);
+// Converts a TimestampValue to Kudu's representation which is returned in 'ts_micros'.
+static Status ConvertTimestampValue(const TimestampValue* tv, int64_t* ts_micros) {
+  bool success = tv->UtcToUnixTimeMicros(ts_micros);
   DCHECK(success); // If the value was invalid the slot should've been null.
   if (UNLIKELY(!success)) {
     return Status(TErrorCode::RUNTIME_ERROR,
         "Invalid TimestampValue: " + tv->ToString());
   }
-  KUDU_RETURN_IF_ERROR(row->SetUnixTimeMicros(col, ts_micros),
-      "Could not add Kudu WriteOp.");
   return Status::OK();
 }
 
@@ -170,8 +168,11 @@ Status WriteKuduValue(int col, PrimitiveType type, const void* value,
           "Could not set Kudu row value.");
       break;
     case TYPE_TIMESTAMP:
-      RETURN_IF_ERROR(WriteKuduTimestampValue(col,
-          reinterpret_cast<const TimestampValue*>(value), row));
+      int64_t ts_micros;
+      RETURN_IF_ERROR(ConvertTimestampValue(
+          reinterpret_cast<const TimestampValue*>(value), &ts_micros));
+      KUDU_RETURN_IF_ERROR(
+          row->SetUnixTimeMicros(col, ts_micros), "Could not add Kudu WriteOp.");
       break;
     default:
       return Status(TErrorCode::IMPALA_KUDU_TYPE_MISSING, TypeToString(type));
@@ -194,6 +195,49 @@ ColumnType KuduDataTypeToColumnType(DataType type) {
     case DataType::UNIXTIME_MICROS: return ColumnType(PrimitiveType::TYPE_TIMESTAMP);
   }
   return ColumnType(PrimitiveType::INVALID_TYPE);
+}
+
+Status CreateKuduValue(PrimitiveType type, void* value, KuduValue** out) {
+  switch (type) {
+    case TYPE_VARCHAR:
+    case TYPE_STRING: {
+      const StringValue* sv = reinterpret_cast<const StringValue*>(value);
+      kudu::Slice slice(reinterpret_cast<uint8_t*>(sv->ptr), sv->len);
+      *out = KuduValue::CopyString(slice);
+      break;
+    }
+    case TYPE_FLOAT:
+      *out = KuduValue::FromFloat(*reinterpret_cast<const float*>(value));
+      break;
+    case TYPE_DOUBLE:
+      *out = KuduValue::FromDouble(*reinterpret_cast<const double*>(value));
+      break;
+    case TYPE_BOOLEAN:
+      *out = KuduValue::FromBool(*reinterpret_cast<const bool*>(value));
+      break;
+    case TYPE_TINYINT:
+      *out = KuduValue::FromInt(*reinterpret_cast<const int8_t*>(value));
+      break;
+    case TYPE_SMALLINT:
+      *out = KuduValue::FromInt(*reinterpret_cast<const int16_t*>(value));
+      break;
+    case TYPE_INT:
+      *out = KuduValue::FromInt(*reinterpret_cast<const int32_t*>(value));
+      break;
+    case TYPE_BIGINT:
+      *out = KuduValue::FromInt(*reinterpret_cast<const int64_t*>(value));
+      break;
+    case TYPE_TIMESTAMP: {
+      int64_t ts_micros;
+      RETURN_IF_ERROR(ConvertTimestampValue(
+          reinterpret_cast<const TimestampValue*>(value), &ts_micros));
+      *out = KuduValue::FromInt(ts_micros);
+      break;
+    }
+    default:
+      return Status(TErrorCode::IMPALA_KUDU_TYPE_MISSING, TypeToString(type));
+  }
+  return Status::OK();
 }
 
 }  // namespace impala

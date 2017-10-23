@@ -391,7 +391,7 @@ PLAN-ROOT SINK
 |
 |--03:HASH JOIN [INNER JOIN]
 |  |  hash predicates: a.id = functional.alltypestiny.id
-|  |  runtime filters: RF001 <- functional.alltypestiny.id
+|  |  runtime filters: RF002 <- functional.alltypestiny.id
 |  |  limit: 10
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
@@ -399,7 +399,7 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN HDFS [functional.alltypessmall a]
 |     partitions=4/4 files=4 size=6.32KB
-|     runtime filters: RF001 -> a.id
+|     runtime filters: RF002 -> a.id
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -426,7 +426,7 @@ PLAN-ROOT SINK
 |  |
 |  03:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: a.id = functional.alltypestiny.id
-|  |  runtime filters: RF001 <- functional.alltypestiny.id
+|  |  runtime filters: RF002 <- functional.alltypestiny.id
 |  |  limit: 10
 |  |
 |  |--06:EXCHANGE [BROADCAST]
@@ -436,7 +436,7 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN HDFS [functional.alltypessmall a]
 |     partitions=4/4 files=4 size=6.32KB
-|     runtime filters: RF001 -> a.id
+|     runtime filters: RF002 -> a.id
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -470,14 +470,14 @@ PLAN-ROOT SINK
 |  |
 |  03:HASH JOIN [INNER JOIN]
 |  |  hash predicates: a.id = functional.alltypestiny.id
-|  |  runtime filters: RF001 <- functional.alltypestiny.id
+|  |  runtime filters: RF002 <- functional.alltypestiny.id
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
 |  |     partitions=4/4 files=4 size=460B
 |  |
 |  01:SCAN HDFS [functional.alltypessmall a]
 |     partitions=4/4 files=4 size=6.32KB
-|     runtime filters: RF001 -> a.id
+|     runtime filters: RF002 -> a.id
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -508,7 +508,7 @@ PLAN-ROOT SINK
 |  |
 |  03:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: a.id = functional.alltypestiny.id
-|  |  runtime filters: RF001 <- functional.alltypestiny.id
+|  |  runtime filters: RF002 <- functional.alltypestiny.id
 |  |
 |  |--07:EXCHANGE [BROADCAST]
 |  |  |
@@ -517,7 +517,7 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN HDFS [functional.alltypessmall a]
 |     partitions=4/4 files=4 size=6.32KB
-|     runtime filters: RF001 -> a.id
+|     runtime filters: RF002 -> a.id
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB

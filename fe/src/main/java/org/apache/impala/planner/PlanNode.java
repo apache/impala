@@ -705,25 +705,28 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   protected Collection<RuntimeFilter> getRuntimeFilters() { return runtimeFilters_; }
 
-  protected String getRuntimeFilterExplainString(boolean isBuildNode) {
+  protected String getRuntimeFilterExplainString(
+      boolean isBuildNode, TExplainLevel detailLevel) {
     if (runtimeFilters_.isEmpty()) return "";
-    final String applyNodeFilterFormat = "%s -> %s";
-    final String buildNodeFilterFormat = "%s <- %s";
-    String format = isBuildNode ? buildNodeFilterFormat : applyNodeFilterFormat;
-    StringBuilder output = new StringBuilder();
     List<String> filtersStr = Lists.newArrayList();
     for (RuntimeFilter filter: runtimeFilters_) {
-      Expr expr = null;
-      if (isBuildNode) {
-        expr = filter.getSrcExpr();
-      } else {
-        expr = filter.getTargetExpr(getId());
+      StringBuilder filterStr = new StringBuilder();
+      filterStr.append(filter.getFilterId());
+      if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+        filterStr.append("[");
+        filterStr.append(filter.getType().toString().toLowerCase());
+        filterStr.append("]");
       }
-      Preconditions.checkNotNull(expr);
-      filtersStr.add(String.format(format, filter.getFilterId(), expr.toSql()));
+      if (isBuildNode) {
+        filterStr.append(" <- ");
+        filterStr.append(filter.getSrcExpr().toSql());
+      } else {
+        filterStr.append(" -> ");
+        filterStr.append(filter.getTargetExpr(getId()).toSql());
+      }
+      filtersStr.add(filterStr.toString());
     }
-    output.append(Joiner.on(", ").join(filtersStr) + "\n");
-    return output.toString();
+    return Joiner.on(", ").join(filtersStr) + "\n";
   }
 
   /**

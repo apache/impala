@@ -66,6 +66,7 @@ Status PhjBuilder::ProcessBuildBatch(
       return status;
     }
   }
+  for (const FilterContext& ctx : filter_ctxs_) ctx.MaterializeValues();
   return Status::OK();
 }
 

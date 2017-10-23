@@ -43,6 +43,7 @@
 #include "util/hdfs-bulk-ops.h"
 #include "util/hdfs-util.h"
 #include "util/histogram-metric.h"
+#include "util/min-max-filter.h"
 #include "util/table-printer.h"
 
 #include "common/names.h"
@@ -321,7 +322,7 @@ void Coordinator::InitFilterRoutingTable() {
           f->src_fragment_instance_idxs()->insert(src_idxs.begin(), src_idxs.end());
 
         // target plan node of filter
-        } else if (plan_node.__isset.hdfs_scan_node) {
+        } else if (plan_node.__isset.hdfs_scan_node || plan_node.__isset.kudu_scan_node) {
           auto it = filter.planid_to_target_ndx.find(plan_node.node_id);
           DCHECK(it != filter.planid_to_target_ndx.end());
           const TRuntimeFilterTargetDesc& t_target = filter.targets[it->second];
@@ -1125,16 +1126,23 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
       target_fragment_idxs.insert(target.fragment_idx);
     }
 
-    // Assign outgoing bloom filter.
-    TBloomFilter& aggregated_filter = state->bloom_filter();
-    filter_mem_tracker_->Release(aggregated_filter.directory.size());
+    if (state->is_bloom_filter()) {
+      // Assign outgoing bloom filter.
+      TBloomFilter& aggregated_filter = state->bloom_filter();
+      filter_mem_tracker_->Release(aggregated_filter.directory.size());
 
-    // TODO: Track memory used by 'rpc_params'.
-    swap(rpc_params.bloom_filter, aggregated_filter);
-    DCHECK(rpc_params.bloom_filter.always_false || rpc_params.bloom_filter.always_true ||
-        !rpc_params.bloom_filter.directory.empty());
-    DCHECK(aggregated_filter.directory.empty());
-    rpc_params.__isset.bloom_filter = true;
+      // TODO: Track memory used by 'rpc_params'.
+      swap(rpc_params.bloom_filter, aggregated_filter);
+      DCHECK(rpc_params.bloom_filter.always_false || rpc_params.bloom_filter.always_true
+          || !rpc_params.bloom_filter.directory.empty());
+      DCHECK(aggregated_filter.directory.empty());
+      rpc_params.__isset.bloom_filter = true;
+    } else {
+      DCHECK(state->is_min_max_filter());
+      MinMaxFilter::Copy(state->min_max_filter(), &rpc_params.min_max_filter);
+      rpc_params.__isset.min_max_filter = true;
+    }
+
     // Filter is complete, and can be released.
     state->Disable(filter_mem_tracker_);
   }
@@ -1160,27 +1168,40 @@ void Coordinator::FilterState::ApplyUpdate(const TUpdateFilterParams& params,
   }
 
   --pending_count_;
-  if (params.bloom_filter.always_true) {
-    Disable(coord->filter_mem_tracker_);
-  } else if (bloom_filter_.always_false) {
-    int64_t heap_space = params.bloom_filter.directory.size();
-    if (!coord->filter_mem_tracker_->TryConsume(heap_space)) {
-      VLOG_QUERY << "Not enough memory to allocate filter: "
-                 << PrettyPrinter::Print(heap_space, TUnit::BYTES)
-                 << " (query: " << coord->query_id() << ")";
-      // Disable, as one missing update means a correct filter cannot be produced.
+  if (is_bloom_filter()) {
+    DCHECK(params.__isset.bloom_filter);
+    if (params.bloom_filter.always_true) {
       Disable(coord->filter_mem_tracker_);
+    } else if (bloom_filter_.always_false) {
+      int64_t heap_space = params.bloom_filter.directory.size();
+      if (!coord->filter_mem_tracker_->TryConsume(heap_space)) {
+        VLOG_QUERY << "Not enough memory to allocate filter: "
+                   << PrettyPrinter::Print(heap_space, TUnit::BYTES)
+                   << " (query: " << coord->query_id() << ")";
+        // Disable, as one missing update means a correct filter cannot be produced.
+        Disable(coord->filter_mem_tracker_);
+      } else {
+        // Workaround for fact that parameters are const& for Thrift RPCs - yet we want to
+        // move the payload from the request rather than copy it and take double the
+        // memory cost. After this point, params.bloom_filter is an empty filter and
+        // should not be read.
+        TBloomFilter* non_const_filter = &const_cast<TBloomFilter&>(params.bloom_filter);
+        swap(bloom_filter_, *non_const_filter);
+        DCHECK_EQ(non_const_filter->directory.size(), 0);
+      }
     } else {
-      // Workaround for fact that parameters are const& for Thrift RPCs - yet we want to
-      // move the payload from the request rather than copy it and take double the memory
-      // cost. After this point, params.bloom_filter is an empty filter and should not be
-      // read.
-      TBloomFilter* non_const_filter = &const_cast<TBloomFilter&>(params.bloom_filter);
-      swap(bloom_filter_, *non_const_filter);
-      DCHECK_EQ(non_const_filter->directory.size(), 0);
+      BloomFilter::Or(params.bloom_filter, &bloom_filter_);
     }
   } else {
-    BloomFilter::Or(params.bloom_filter, &bloom_filter_);
+    DCHECK(is_min_max_filter());
+    DCHECK(params.__isset.min_max_filter);
+    if (params.min_max_filter.always_true) {
+      Disable(coord->filter_mem_tracker_);
+    } else if (min_max_filter_.always_false) {
+      MinMaxFilter::Copy(params.min_max_filter, &min_max_filter_);
+    } else {
+      MinMaxFilter::Or(params.min_max_filter, &min_max_filter_);
+    }
   }
 
   if (pending_count_ == 0 || disabled()) {
@@ -1189,11 +1210,17 @@ void Coordinator::FilterState::ApplyUpdate(const TUpdateFilterParams& params,
 }
 
 void Coordinator::FilterState::Disable(MemTracker* tracker) {
-  bloom_filter_.always_true = true;
-  bloom_filter_.always_false = false;
-  tracker->Release(bloom_filter_.directory.size());
-  bloom_filter_.directory.clear();
-  bloom_filter_.directory.shrink_to_fit();
+  if (is_bloom_filter()) {
+    bloom_filter_.always_true = true;
+    bloom_filter_.always_false = false;
+    tracker->Release(bloom_filter_.directory.size());
+    bloom_filter_.directory.clear();
+    bloom_filter_.directory.shrink_to_fit();
+  } else {
+    DCHECK(is_min_max_filter());
+    min_max_filter_.always_true = true;
+    min_max_filter_.always_false = false;
+  }
 }
 
 const TUniqueId& Coordinator::query_id() const {

@@ -497,4 +497,11 @@ public class PlannerTest extends PlannerTestBase {
     requestWithDisableSpillOn = frontend_.createExecRequest(queryCtx, explainBuilder);
     Assert.assertNotNull(requestWithDisableSpillOn);
   }
+
+  @Test
+  public void testMinMaxRuntimeFilters() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.EXTENDED);
+    runPlannerTestFile("min-max-runtime-filters", options);
+  }
 }

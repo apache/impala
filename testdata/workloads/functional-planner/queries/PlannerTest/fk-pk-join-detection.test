@@ -12,7 +12,7 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
-|  runtime filters: RF000 <- c_customer_sk
+|  runtime filters: RF000[bloom] <- c_customer_sk
 |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB
 |  tuple-ids=0,1 row-size=355B cardinality=529700
 |
@@ -28,7 +28,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpcds.store_sales]
    partitions=1824/1824 files=1824 size=326.32MB
-   runtime filters: RF000 -> ss_customer_sk
+   runtime filters: RF000[bloom] -> ss_customer_sk
    stats-rows=2880404 extrapolated-rows=disabled
    table stats: rows=2880404 size=326.32MB
    column stats: all
@@ -87,7 +87,7 @@ PLAN-ROOT SINK
 02:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
-|  runtime filters: RF000 <- c_customer_sk
+|  runtime filters: RF000[bloom] <- c_customer_sk
 |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB
 |  tuple-ids=0N,1 row-size=355B cardinality=529700
 |
@@ -103,7 +103,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpcds.store_sales]
    partitions=1824/1824 files=1824 size=326.32MB
-   runtime filters: RF000 -> ss_customer_sk
+   runtime filters: RF000[bloom] -> ss_customer_sk
    stats-rows=2880404 extrapolated-rows=disabled
    table stats: rows=2880404 size=326.32MB
    column stats: all
@@ -124,7 +124,7 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
 |  fk/pk conjuncts: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
-|  runtime filters: RF000 <- sr_item_sk, RF001 <- sr_ticket_number
+|  runtime filters: RF000[bloom] <- sr_item_sk, RF001[bloom] <- sr_ticket_number
 |  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB
 |  tuple-ids=0,1 row-size=188B cardinality=211838
 |
@@ -140,7 +140,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpcds.store_sales]
    partitions=1824/1824 files=1824 size=326.32MB
-   runtime filters: RF000 -> ss_item_sk, RF001 -> ss_ticket_number
+   runtime filters: RF000[bloom] -> ss_item_sk, RF001[bloom] -> ss_ticket_number
    stats-rows=2880404 extrapolated-rows=disabled
    table stats: rows=2880404 size=326.32MB
    column stats: all
@@ -160,7 +160,7 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_sold_time_sk = ws_sold_time_sk
 |  fk/pk conjuncts: none
-|  runtime filters: RF000 <- ws_sold_time_sk
+|  runtime filters: RF000[bloom] <- ws_sold_time_sk
 |  mem-estimate=108.67MB mem-reservation=34.00MB spill-buffer=2.00MB
 |  tuple-ids=0,1 row-size=244B cardinality=44136418
 |
@@ -174,7 +174,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpcds.store_sales]
    partitions=1824/1824 files=1824 size=326.32MB
-   runtime filters: RF000 -> ss_sold_time_sk
+   runtime filters: RF000[bloom] -> ss_sold_time_sk
    stats-rows=2880404 extrapolated-rows=disabled
    table stats: rows=2880404 size=326.32MB
    column stats: all
@@ -195,7 +195,7 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: b.d_date_sk = a.d_date_sk
 |  fk/pk conjuncts: b.d_date_sk = a.d_date_sk
-|  runtime filters: RF000 <- a.d_date_sk
+|  runtime filters: RF000[bloom] <- a.d_date_sk
 |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB
 |  tuple-ids=1,0 row-size=606B cardinality=36525
 |
@@ -211,7 +211,7 @@ PLAN-ROOT SINK
 |
 01:SCAN HDFS [tpcds.date_dim b]
    partitions=1/1 files=1 size=9.84MB
-   runtime filters: RF000 -> b.d_date_sk
+   runtime filters: RF000[bloom] -> b.d_date_sk
    stats-rows=73049 extrapolated-rows=disabled
    table stats: rows=73049 size=9.84MB
    column stats: all
@@ -236,7 +236,7 @@ PLAN-ROOT SINK
 08:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_addr_sk = c_current_addr_sk
 |  fk/pk conjuncts: none
-|  runtime filters: RF000 <- c_current_addr_sk
+|  runtime filters: RF000[bloom] <- c_current_addr_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=1,0,3,4,2 row-size=60B cardinality=19358
 |
@@ -251,7 +251,7 @@ PLAN-ROOT SINK
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: sr_returned_date_sk = d2.d_date_sk
 |  fk/pk conjuncts: sr_returned_date_sk = d2.d_date_sk
-|  runtime filters: RF001 <- d2.d_date_sk
+|  runtime filters: RF002[bloom] <- d2.d_date_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=1,0,3,4 row-size=56B cardinality=8131
 |
@@ -266,14 +266,14 @@ PLAN-ROOT SINK
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: sr_item_sk = ss_item_sk, sr_ticket_number = ss_ticket_number
 |  fk/pk conjuncts: sr_item_sk = ss_item_sk, sr_ticket_number = ss_ticket_number
-|  runtime filters: RF002 <- ss_item_sk, RF003 <- ss_ticket_number
+|  runtime filters: RF004[bloom] <- ss_item_sk, RF005[bloom] <- ss_ticket_number
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=1,0,3 row-size=52B cardinality=8131
 |
 |--05:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_date_sk = d1.d_date_sk
 |  |  fk/pk conjuncts: ss_sold_date_sk = d1.d_date_sk
-|  |  runtime filters: RF004 <- d1.d_date_sk
+|  |  runtime filters: RF008[bloom] <- d1.d_date_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  |  tuple-ids=0,3 row-size=32B cardinality=11055
 |  |
@@ -289,7 +289,7 @@ PLAN-ROOT SINK
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
 |     partitions=1824/1824 files=1824 size=326.32MB
-|     runtime filters: RF000 -> ss_addr_sk, RF004 -> ss_sold_date_sk
+|     runtime filters: RF000[bloom] -> ss_addr_sk, RF008[bloom] -> ss_sold_date_sk
 |     stats-rows=2880404 extrapolated-rows=disabled
 |     table stats: rows=2880404 size=326.32MB
 |     column stats: all
@@ -298,7 +298,7 @@ PLAN-ROOT SINK
 |
 01:SCAN HDFS [tpcds.store_returns]
    partitions=1/1 files=1 size=31.19MB
-   runtime filters: RF001 -> sr_returned_date_sk, RF002 -> sr_item_sk, RF003 -> sr_ticket_number
+   runtime filters: RF002[bloom] -> sr_returned_date_sk, RF004[bloom] -> sr_item_sk, RF005[bloom] -> sr_ticket_number
    stats-rows=287514 extrapolated-rows=disabled
    table stats: rows=287514 size=31.19MB
    column stats: all
@@ -318,7 +318,7 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_customer_sk % 10 = c_customer_sk / 100
 |  fk/pk conjuncts: assumed fk/pk
-|  runtime filters: RF000 <- c_customer_sk / 100
+|  runtime filters: RF000[bloom] <- c_customer_sk / 100
 |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB
 |  tuple-ids=0,1 row-size=355B cardinality=2880404
 |
@@ -332,7 +332,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpcds.store_sales]
    partitions=1824/1824 files=1824 size=326.32MB
-   runtime filters: RF000 -> ss_customer_sk % 10
+   runtime filters: RF000[bloom] -> ss_customer_sk % 10
    stats-rows=2880404 extrapolated-rows=disabled
    table stats: rows=2880404 size=326.32MB
    column stats: all
@@ -353,7 +353,7 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  fk/pk conjuncts: assumed fk/pk
-|  runtime filters: RF000 <- c_customer_sk
+|  runtime filters: RF000[bloom] <- c_customer_sk
 |  mem-estimate=2.00GB mem-reservation=34.00MB spill-buffer=2.00MB
 |  tuple-ids=0,1 row-size=8B cardinality=2880404
 |
@@ -367,7 +367,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpcds.store_sales]
    partitions=1824/1824 files=1824 size=326.32MB
-   runtime filters: RF000 -> ss_customer_sk
+   runtime filters: RF000[bloom] -> ss_customer_sk
    stats-rows=2880404 extrapolated-rows=disabled
    table stats: rows=2880404 size=326.32MB
    column stats: all
@@ -387,7 +387,7 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  fk/pk conjuncts: assumed fk/pk
-|  runtime filters: RF000 <- c_customer_sk
+|  runtime filters: RF000[bloom] <- c_customer_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=0,1 row-size=8B cardinality=unavailable
 |
@@ -401,7 +401,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpcds_seq_snap.store_sales]
    partitions=1824/1824 files=1824 size=207.85MB
-   runtime filters: RF000 -> ss_customer_sk
+   runtime filters: RF000[bloom] -> ss_customer_sk
    stats-rows=unavailable extrapolated-rows=disabled
    table stats: rows=unavailable size=unavailable
    column stats: unavailable
@@ -423,7 +423,7 @@ PLAN-ROOT SINK
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_sold_time_sk = ws_sold_time_sk
 |  fk/pk conjuncts: none
-|  runtime filters: RF000 <- ws_sold_time_sk
+|  runtime filters: RF000[bloom] <- ws_sold_time_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=0,2 row-size=104B cardinality=2440073
 |
@@ -442,7 +442,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpcds.store_sales]
    partitions=1824/1824 files=1824 size=326.32MB
-   runtime filters: RF000 -> ss_sold_time_sk
+   runtime filters: RF000[bloom] -> ss_sold_time_sk
    stats-rows=2880404 extrapolated-rows=disabled
    table stats: rows=2880404 size=326.32MB
    column stats: all

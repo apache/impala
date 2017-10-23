@@ -978,7 +978,7 @@ public class HdfsScanNode extends ScanNode {
       }
       if (!runtimeFilters_.isEmpty()) {
         output.append(detailPrefix + "runtime filters: ");
-        output.append(getRuntimeFilterExplainString(false));
+        output.append(getRuntimeFilterExplainString(false, detailLevel));
       }
     }
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {

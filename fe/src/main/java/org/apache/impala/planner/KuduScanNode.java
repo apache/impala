@@ -295,6 +295,10 @@ public class KuduScanNode extends ScanNode {
           result.append(detailPrefix + "kudu predicates: " + getExplainString(
               kuduConjuncts_) + "\n");
         }
+        if (!runtimeFilters_.isEmpty()) {
+          result.append(detailPrefix + "runtime filters: ");
+          result.append(getRuntimeFilterExplainString(false, detailLevel));
+        }
       }
     }
     return result.toString();

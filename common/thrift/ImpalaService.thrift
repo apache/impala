@@ -199,13 +199,13 @@ enum TImpalaQueryOptions {
   // two.
   RUNTIME_BLOOM_FILTER_SIZE,
 
-  // Time (in ms) to wait in scans for partition filters to arrive.
+  // Time (in ms) to wait in scans for runtime filters to arrive.
   RUNTIME_FILTER_WAIT_TIME_MS,
 
   // If true, disable application of runtime filters to individual rows.
   DISABLE_ROW_RUNTIME_FILTERING,
 
-  // Maximum number of runtime filters allowed per query.
+  // Maximum number of bloom runtime filters allowed per query.
   MAX_NUM_RUNTIME_FILTERS,
 
   // If true, use UTF-8 annotation for string columns. Note that char and varchar columns
@@ -227,10 +227,10 @@ enum TImpalaQueryOptions {
   // TODO: Find a way to get this working for INSERT OVERWRITEs too.
   S3_SKIP_INSERT_STAGING,
 
-  // Maximum runtime filter size, in bytes.
+  // Maximum runtime bloom filter size, in bytes.
   RUNTIME_FILTER_MAX_SIZE,
 
-  // Minimum runtime filter size, in bytes.
+  // Minimum runtime bloom filter size, in bytes.
   RUNTIME_FILTER_MIN_SIZE,
 
   // Prefetching behavior during hash tables' building and probing.

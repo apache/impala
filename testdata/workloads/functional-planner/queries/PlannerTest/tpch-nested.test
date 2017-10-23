@@ -115,7 +115,7 @@ PLAN-ROOT SINK
 |  |
 |  21:HASH JOIN [INNER JOIN]
 |  |  hash predicates: s_nationkey = n_nationkey
-|  |  runtime filters: RF004 <- n_nationkey
+|  |  runtime filters: RF008 <- n_nationkey
 |  |
 |  |--17:SUBPLAN
 |  |  |
@@ -140,11 +140,11 @@ PLAN-ROOT SINK
 |  11:SCAN HDFS [tpch_nested_parquet.supplier s]
 |     partitions=1/1 files=1 size=43.00MB
 |     predicates: !empty(s.s_partsupps)
-|     runtime filters: RF004 -> s_nationkey
+|     runtime filters: RF008 -> s_nationkey
 |
 24:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n_nationkey
-|  runtime filters: RF002 <- n_nationkey
+|  runtime filters: RF004 <- n_nationkey
 |
 |--07:SUBPLAN
 |  |
@@ -177,7 +177,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_nested_parquet.supplier s]
    partitions=1/1 files=1 size=43.00MB
    predicates: !empty(s.s_partsupps)
-   runtime filters: RF002 -> s_nationkey
+   runtime filters: RF004 -> s_nationkey
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -206,7 +206,7 @@ PLAN-ROOT SINK
 |  |
 |  21:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: s_nationkey = n_nationkey
-|  |  runtime filters: RF004 <- n_nationkey
+|  |  runtime filters: RF008 <- n_nationkey
 |  |
 |  |--29:EXCHANGE [BROADCAST]
 |  |  |
@@ -233,11 +233,11 @@ PLAN-ROOT SINK
 |  11:SCAN HDFS [tpch_nested_parquet.supplier s]
 |     partitions=1/1 files=1 size=43.00MB
 |     predicates: !empty(s.s_partsupps)
-|     runtime filters: RF004 -> s_nationkey
+|     runtime filters: RF008 -> s_nationkey
 |
 24:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s_nationkey = n_nationkey
-|  runtime filters: RF002 <- n_nationkey
+|  runtime filters: RF004 <- n_nationkey
 |
 |--28:EXCHANGE [BROADCAST]
 |  |
@@ -274,7 +274,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_nested_parquet.supplier s]
    partitions=1/1 files=1 size=43.00MB
    predicates: !empty(s.s_partsupps)
-   runtime filters: RF002 -> s_nationkey
+   runtime filters: RF004 -> s_nationkey
 ====
 # TPCH-Q3
 # Q3 - Shipping Priority Query
@@ -509,7 +509,7 @@ PLAN-ROOT SINK
 |
 15:HASH JOIN [INNER JOIN]
 |  hash predicates: c.c_nationkey = n.n_nationkey
-|  runtime filters: RF002 <- n.n_nationkey
+|  runtime filters: RF004 <- n.n_nationkey
 |
 |--11:SUBPLAN
 |  |
@@ -543,7 +543,7 @@ PLAN-ROOT SINK
    partitions=1/1 files=4 size=292.36MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
-   runtime filters: RF000 -> c_nationkey, RF002 -> c.c_nationkey
+   runtime filters: RF000 -> c_nationkey, RF004 -> c.c_nationkey
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -574,7 +574,7 @@ PLAN-ROOT SINK
 |
 15:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c.c_nationkey = n.n_nationkey
-|  runtime filters: RF002 <- n.n_nationkey
+|  runtime filters: RF004 <- n.n_nationkey
 |
 |--19:EXCHANGE [BROADCAST]
 |  |
@@ -610,7 +610,7 @@ PLAN-ROOT SINK
    partitions=1/1 files=4 size=292.36MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
-   runtime filters: RF000 -> c_nationkey, RF002 -> c.c_nationkey
+   runtime filters: RF000 -> c_nationkey, RF004 -> c.c_nationkey
 ====
 # TPCH-Q6
 # Q6 - Forecasting Revenue Change Query
@@ -705,7 +705,7 @@ PLAN-ROOT SINK
 |
 13:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n1.n_nationkey
-|  runtime filters: RF001 <- n1.n_nationkey
+|  runtime filters: RF002 <- n1.n_nationkey
 |
 |--10:SCAN HDFS [tpch_nested_parquet.region.r_nations n1]
 |     partitions=1/1 files=1 size=3.24KB
@@ -715,7 +715,7 @@ PLAN-ROOT SINK
 |
 |--09:SCAN HDFS [tpch_nested_parquet.supplier s]
 |     partitions=1/1 files=1 size=43.00MB
-|     runtime filters: RF001 -> s_nationkey
+|     runtime filters: RF002 -> s_nationkey
 |
 01:SUBPLAN
 |
@@ -770,7 +770,7 @@ PLAN-ROOT SINK
 |
 13:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s_nationkey = n1.n_nationkey
-|  runtime filters: RF001 <- n1.n_nationkey
+|  runtime filters: RF002 <- n1.n_nationkey
 |
 |--18:EXCHANGE [BROADCAST]
 |  |
@@ -784,7 +784,7 @@ PLAN-ROOT SINK
 |  |
 |  09:SCAN HDFS [tpch_nested_parquet.supplier s]
 |     partitions=1/1 files=1 size=43.00MB
-|     runtime filters: RF001 -> s_nationkey
+|     runtime filters: RF002 -> s_nationkey
 |
 01:SUBPLAN
 |
@@ -864,7 +864,7 @@ PLAN-ROOT SINK
 |
 19:HASH JOIN [INNER JOIN]
 |  hash predicates: c_nationkey = n1.n_nationkey
-|  runtime filters: RF001 <- n1.n_nationkey
+|  runtime filters: RF002 <- n1.n_nationkey
 |
 |--12:SUBPLAN
 |  |
@@ -912,7 +912,7 @@ PLAN-ROOT SINK
    partitions=1/1 files=4 size=292.36MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate >= '1995-01-01', o_orderdate <= '1996-12-31'
-   runtime filters: RF001 -> c_nationkey
+   runtime filters: RF002 -> c_nationkey
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -943,7 +943,7 @@ PLAN-ROOT SINK
 |
 19:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c_nationkey = n1.n_nationkey
-|  runtime filters: RF001 <- n1.n_nationkey
+|  runtime filters: RF002 <- n1.n_nationkey
 |
 |--25:EXCHANGE [BROADCAST]
 |  |
@@ -997,7 +997,7 @@ PLAN-ROOT SINK
    partitions=1/1 files=4 size=292.36MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate >= '1995-01-01', o_orderdate <= '1996-12-31'
-   runtime filters: RF001 -> c_nationkey
+   runtime filters: RF002 -> c_nationkey
 ====
 # TPCH-Q9
 # Q9 - Product Type Measure Query
@@ -1319,7 +1319,7 @@ PLAN-ROOT SINK
 |  |
 |  14:HASH JOIN [INNER JOIN]
 |  |  hash predicates: s_nationkey = n_nationkey
-|  |  runtime filters: RF001 <- n_nationkey
+|  |  runtime filters: RF002 <- n_nationkey
 |  |
 |  |--13:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
 |  |     partitions=1/1 files=1 size=3.24KB
@@ -1336,7 +1336,7 @@ PLAN-ROOT SINK
 |  08:SCAN HDFS [tpch_nested_parquet.supplier s]
 |     partitions=1/1 files=1 size=43.00MB
 |     predicates: !empty(s.s_partsupps)
-|     runtime filters: RF001 -> s_nationkey
+|     runtime filters: RF002 -> s_nationkey
 |
 07:AGGREGATE [FINALIZE]
 |  output: sum(ps_supplycost * ps_availqty)
@@ -1386,7 +1386,7 @@ PLAN-ROOT SINK
 |  |
 |  14:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: s_nationkey = n_nationkey
-|  |  runtime filters: RF001 <- n_nationkey
+|  |  runtime filters: RF002 <- n_nationkey
 |  |
 |  |--21:EXCHANGE [BROADCAST]
 |  |  |
@@ -1405,7 +1405,7 @@ PLAN-ROOT SINK
 |  08:SCAN HDFS [tpch_nested_parquet.supplier s]
 |     partitions=1/1 files=1 size=43.00MB
 |     predicates: !empty(s.s_partsupps)
-|     runtime filters: RF001 -> s_nationkey
+|     runtime filters: RF002 -> s_nationkey
 |
 20:AGGREGATE [FINALIZE]
 |  output: sum:merge(ps_supplycost * ps_availqty)
@@ -1938,7 +1938,7 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
-|  runtime filters: RF001 <- p_partkey
+|  runtime filters: RF002 <- p_partkey
 |
 |--01:SCAN HDFS [tpch_nested_parquet.part p]
 |     partitions=1/1 files=1 size=6.24MB
@@ -1947,7 +1947,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
    partitions=1/1 files=4 size=292.36MB
-   runtime filters: RF000 -> l.l_partkey, RF001 -> l_partkey
+   runtime filters: RF000 -> l.l_partkey, RF002 -> l_partkey
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -1981,7 +1981,7 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_partkey = p_partkey
-|  runtime filters: RF001 <- p_partkey
+|  runtime filters: RF002 <- p_partkey
 |
 |--07:EXCHANGE [BROADCAST]
 |  |
@@ -1992,7 +1992,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
    partitions=1/1 files=4 size=292.36MB
-   runtime filters: RF000 -> l.l_partkey, RF001 -> l_partkey
+   runtime filters: RF000 -> l.l_partkey, RF002 -> l_partkey
 ====
 # TPCH-Q18
 # Q18 - Large Value Customer Query
@@ -2216,7 +2216,7 @@ PLAN-ROOT SINK
 |  |
 |  09:HASH JOIN [INNER JOIN]
 |  |  hash predicates: s_nationkey = n_nationkey
-|  |  runtime filters: RF003 <- n_nationkey
+|  |  runtime filters: RF006 <- n_nationkey
 |  |
 |  |--05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
 |  |     partitions=1/1 files=1 size=3.24KB
@@ -2233,7 +2233,7 @@ PLAN-ROOT SINK
 |  00:SCAN HDFS [tpch_nested_parquet.supplier s]
 |     partitions=1/1 files=1 size=43.00MB
 |     predicates: !empty(s.s_partsupps)
-|     runtime filters: RF003 -> s_nationkey
+|     runtime filters: RF006 -> s_nationkey
 |
 08:AGGREGATE [FINALIZE]
 |  output: sum(l_quantity)
@@ -2278,7 +2278,7 @@ PLAN-ROOT SINK
 |  |
 |  09:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: s_nationkey = n_nationkey
-|  |  runtime filters: RF003 <- n_nationkey
+|  |  runtime filters: RF006 <- n_nationkey
 |  |
 |  |--16:EXCHANGE [BROADCAST]
 |  |  |
@@ -2297,7 +2297,7 @@ PLAN-ROOT SINK
 |  00:SCAN HDFS [tpch_nested_parquet.supplier s]
 |     partitions=1/1 files=1 size=43.00MB
 |     predicates: !empty(s.s_partsupps)
-|     runtime filters: RF003 -> s_nationkey
+|     runtime filters: RF006 -> s_nationkey
 |
 15:AGGREGATE [FINALIZE]
 |  output: sum:merge(l_quantity)

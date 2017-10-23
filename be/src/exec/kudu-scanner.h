@@ -43,8 +43,10 @@ class KuduScanner {
   /// Does not actually open a kudu::client::KuduScanner.
   Status Open();
 
-  /// Opens a new kudu::client::KuduScanner using 'scan_token'.
-  Status OpenNextScanToken(const std::string& scan_token);
+  /// Opens a new kudu::client::KuduScanner using 'scan_token'. If there are no rows to
+  /// scan (eg. because there is a runtime filter that rejects all rows) 'eos' will
+  /// be set to true, otherwise if the return status is OK it will be false.
+  Status OpenNextScanToken(const std::string& scan_token, bool* eos);
 
   /// Fetches the next batch from the current kudu::client::KuduScanner.
   Status GetNext(RowBatch* row_batch, bool* eos);

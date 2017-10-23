@@ -27,6 +27,7 @@
 #include "service/impala-server.h"
 #include "util/bit-util.h"
 #include "util/bloom-filter.h"
+#include "util/min-max-filter.h"
 
 #include "common/names.h"
 
@@ -41,8 +42,12 @@ const int64_t RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE;
 const int64_t RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE;
 
 RuntimeFilterBank::RuntimeFilterBank(const TQueryCtx& query_ctx, RuntimeState* state)
-    : state_(state), closed_(false) {
-  memory_allocated_ =
+  : state_(state),
+    filter_mem_tracker_(
+        new MemTracker(-1, "Runtime Filter Bank", state->instance_mem_tracker(), false)),
+    mem_pool_(filter_mem_tracker_.get()),
+    closed_(false) {
+  bloom_memory_allocated_ =
       state->runtime_profile()->AddCounter("BloomFilterBytes", TUnit::BYTES);
 
   // Clamp bloom filter size down to the limits {MIN,MAX}_BLOOM_FILTER_SIZE
@@ -66,9 +71,6 @@ RuntimeFilterBank::RuntimeFilterBank(const TQueryCtx& query_ctx, RuntimeState* s
   default_filter_size_ = max<int64_t>(default_filter_size_, min_filter_size_);
   default_filter_size_ =
       BitUtil::RoundUpToPowerOfTwo(min<int64_t>(default_filter_size_, max_filter_size_));
-
-  filter_mem_tracker_.reset(
-      new MemTracker(-1, "Runtime Filter Bank", state->instance_mem_tracker(), false));
 }
 
 RuntimeFilter* RuntimeFilterBank::RegisterFilter(const TRuntimeFilterDesc& filter_desc,
@@ -115,27 +117,28 @@ void SendFilterToCoordinator(TNetworkAddress address, TUpdateFilterParams params
 
 }
 
-void RuntimeFilterBank::UpdateFilterFromLocal(int32_t filter_id,
-    BloomFilter* bloom_filter) {
+void RuntimeFilterBank::UpdateFilterFromLocal(
+    int32_t filter_id, BloomFilter* bloom_filter, MinMaxFilter* min_max_filter) {
   DCHECK_NE(state_->query_options().runtime_filter_mode, TRuntimeFilterMode::OFF)
       << "Should not be calling UpdateFilterFromLocal() if filtering is disabled";
   TUpdateFilterParams params;
   // A runtime filter may have both local and remote targets.
   bool has_local_target = false;
   bool has_remote_target = false;
+  TRuntimeFilterType::type type;
   {
     lock_guard<mutex> l(runtime_filter_lock_);
     RuntimeFilterMap::iterator it = produced_filters_.find(filter_id);
     DCHECK(it != produced_filters_.end()) << "Tried to update unregistered filter: "
                                           << filter_id;
-    it->second->SetBloomFilter(bloom_filter);
+    it->second->SetFilter(bloom_filter, min_max_filter);
     has_local_target = it->second->filter_desc().has_local_targets;
     has_remote_target = it->second->filter_desc().has_remote_targets;
+    type = it->second->filter_desc().type;
   }
 
   if (has_local_target) {
-    // Do a short circuit publication by pushing the same BloomFilter to the consumer
-    // side.
+    // Do a short circuit publication by pushing the same filter to the consumer side.
     RuntimeFilter* filter;
     {
       lock_guard<mutex> l(runtime_filter_lock_);
@@ -143,7 +146,7 @@ void RuntimeFilterBank::UpdateFilterFromLocal(int32_t filter_id,
       if (it == consumed_filters_.end()) return;
       filter = it->second;
     }
-    filter->SetBloomFilter(bloom_filter);
+    filter->SetFilter(bloom_filter, min_max_filter);
     state_->runtime_profile()->AddInfoString(
         Substitute("Filter $0 arrival", filter_id),
         PrettyPrinter::Print(filter->arrival_delay(), TUnit::TIME_MS));
@@ -153,8 +156,14 @@ void RuntimeFilterBank::UpdateFilterFromLocal(int32_t filter_id,
       && state_->query_options().runtime_filter_mode == TRuntimeFilterMode::GLOBAL) {
     params.__set_filter_id(filter_id);
     params.__set_query_id(state_->query_id());
-    BloomFilter::ToThrift(bloom_filter, &params.bloom_filter);
-    params.__isset.bloom_filter = true;
+    if (type == TRuntimeFilterType::BLOOM) {
+      BloomFilter::ToThrift(bloom_filter, &params.bloom_filter);
+      params.__isset.bloom_filter = true;
+    } else {
+      DCHECK(type == TRuntimeFilterType::MIN_MAX);
+      min_max_filter->ToThrift(&params.min_max_filter);
+      params.__isset.min_max_filter = true;
+    }
 
     ExecEnv::GetInstance()->rpc_pool()->Offer(bind<void>(
         SendFilterToCoordinator, state_->query_ctx().coord_address, params,
@@ -162,32 +171,43 @@ void RuntimeFilterBank::UpdateFilterFromLocal(int32_t filter_id,
   }
 }
 
-void RuntimeFilterBank::PublishGlobalFilter(int32_t filter_id,
-    const TBloomFilter& thrift_filter) {
+void RuntimeFilterBank::PublishGlobalFilter(const TPublishFilterParams& params) {
   lock_guard<mutex> l(runtime_filter_lock_);
   if (closed_) return;
-  RuntimeFilterMap::iterator it = consumed_filters_.find(filter_id);
+  RuntimeFilterMap::iterator it = consumed_filters_.find(params.filter_id);
   DCHECK(it != consumed_filters_.end()) << "Tried to publish unregistered filter: "
-                                        << filter_id;
-  if (thrift_filter.always_true) {
-    it->second->SetBloomFilter(BloomFilter::ALWAYS_TRUE_FILTER);
-  } else {
-    int64_t required_space =
-        BloomFilter::GetExpectedHeapSpaceUsed(thrift_filter.log_heap_space);
-    // Silently fail to publish the filter (replacing it with a 0-byte complete one) if
-    // there's not enough memory for it.
-    if (!filter_mem_tracker_->TryConsume(required_space)) {
-      VLOG_QUERY << "No memory for global filter: " << filter_id
-                 << " (fragment instance: " << state_->fragment_instance_id() << ")";
-      it->second->SetBloomFilter(BloomFilter::ALWAYS_TRUE_FILTER);
+                                        << params.filter_id;
+
+  BloomFilter* bloom_filter = nullptr;
+  MinMaxFilter* min_max_filter = nullptr;
+  if (it->second->is_bloom_filter()) {
+    DCHECK(params.__isset.bloom_filter);
+    if (params.bloom_filter.always_true) {
+      bloom_filter = BloomFilter::ALWAYS_TRUE_FILTER;
     } else {
-      BloomFilter* bloom_filter = obj_pool_.Add(new BloomFilter(thrift_filter));
-      DCHECK_EQ(required_space, bloom_filter->GetHeapSpaceUsed());
-      memory_allocated_->Add(bloom_filter->GetHeapSpaceUsed());
-      it->second->SetBloomFilter(bloom_filter);
+      int64_t required_space =
+          BloomFilter::GetExpectedHeapSpaceUsed(params.bloom_filter.log_heap_space);
+      // Silently fail to publish the filter (replacing it with a 0-byte complete one) if
+      // there's not enough memory for it.
+      if (!filter_mem_tracker_->TryConsume(required_space)) {
+        VLOG_QUERY << "No memory for global filter: " << params.filter_id
+                   << " (fragment instance: " << state_->fragment_instance_id() << ")";
+        bloom_filter = BloomFilter::ALWAYS_TRUE_FILTER;
+      } else {
+        bloom_filter = obj_pool_.Add(new BloomFilter(params.bloom_filter));
+        DCHECK_EQ(required_space, bloom_filter->GetHeapSpaceUsed());
+        bloom_memory_allocated_->Add(bloom_filter->GetHeapSpaceUsed());
+      }
     }
+  } else {
+    DCHECK(it->second->is_min_max_filter());
+    DCHECK(params.__isset.min_max_filter);
+    min_max_filter = MinMaxFilter::Create(
+        params.min_max_filter, it->second->type(), &obj_pool_, &mem_pool_);
   }
-  state_->runtime_profile()->AddInfoString(Substitute("Filter $0 arrival", filter_id),
+  it->second->SetFilter(bloom_filter, min_max_filter);
+  state_->runtime_profile()->AddInfoString(
+      Substitute("Filter $0 arrival", params.filter_id),
       PrettyPrinter::Print(it->second->arrival_delay(), TUnit::TIME_MS));
 }
 
@@ -204,8 +224,19 @@ BloomFilter* RuntimeFilterBank::AllocateScratchBloomFilter(int32_t filter_id) {
   if (!filter_mem_tracker_->TryConsume(required_space)) return NULL;
   BloomFilter* bloom_filter = obj_pool_.Add(new BloomFilter(log_filter_size));
   DCHECK_EQ(required_space, bloom_filter->GetHeapSpaceUsed());
-  memory_allocated_->Add(bloom_filter->GetHeapSpaceUsed());
+  bloom_memory_allocated_->Add(bloom_filter->GetHeapSpaceUsed());
   return bloom_filter;
+}
+
+MinMaxFilter* RuntimeFilterBank::AllocateScratchMinMaxFilter(
+    int32_t filter_id, ColumnType type) {
+  lock_guard<mutex> l(runtime_filter_lock_);
+  if (closed_) return nullptr;
+
+  RuntimeFilterMap::iterator it = produced_filters_.find(filter_id);
+  DCHECK(it != produced_filters_.end()) << "Filter ID " << filter_id << " not registered";
+
+  return MinMaxFilter::Create(type, &obj_pool_, &mem_pool_);
 }
 
 int64_t RuntimeFilterBank::GetFilterSizeForNdv(int64_t ndv) {
@@ -227,6 +258,7 @@ void RuntimeFilterBank::Close() {
   lock_guard<mutex> l(runtime_filter_lock_);
   closed_ = true;
   obj_pool_.Clear();
-  filter_mem_tracker_->Release(memory_allocated_->value());
+  mem_pool_.FreeAll();
+  filter_mem_tracker_->Release(bloom_memory_allocated_->value());
   filter_mem_tracker_->Close();
 }

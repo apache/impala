@@ -142,8 +142,7 @@ class QueryState {
   FragmentInstanceState* GetFInstanceState(const TUniqueId& instance_id);
 
   /// Blocks until all fragment instances have finished their Prepare phase.
-  void PublishFilter(int32_t filter_id, int fragment_idx,
-      const TBloomFilter& thrift_bloom_filter);
+  void PublishFilter(const TPublishFilterParams& params);
 
   /// Cancels all actively executing fragment instances. Blocks until all fragment
   /// instances have finished their Prepare phase. Idempotent.

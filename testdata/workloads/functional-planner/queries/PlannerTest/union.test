@@ -3145,25 +3145,25 @@ PLAN-ROOT SINK
 |
 |--10:HASH JOIN [INNER JOIN]
 |  |  hash predicates: t2.bigint_col = t1.bigint_col
-|  |  runtime filters: RF002 <- t1.bigint_col
+|  |  runtime filters: RF004 <- t1.bigint_col
 |  |
 |  |--08:SCAN HDFS [functional.alltypestiny t1]
 |  |     partitions=4/4 files=4 size=460B
 |  |
 |  09:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
-|     runtime filters: RF002 -> t2.bigint_col
+|     runtime filters: RF004 -> t2.bigint_col
 |
 |--07:HASH JOIN [RIGHT OUTER JOIN]
 |  |  hash predicates: t2.bigint_col = t1.bigint_col
-|  |  runtime filters: RF001 <- t1.bigint_col
+|  |  runtime filters: RF002 <- t1.bigint_col
 |  |
 |  |--05:SCAN HDFS [functional.alltypestiny t1]
 |  |     partitions=4/4 files=4 size=460B
 |  |
 |  06:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
-|     runtime filters: RF001 -> t2.bigint_col
+|     runtime filters: RF002 -> t2.bigint_col
 |
 |--04:HASH JOIN [RIGHT SEMI JOIN]
 |  |  hash predicates: t2.bigint_col = t1.bigint_col

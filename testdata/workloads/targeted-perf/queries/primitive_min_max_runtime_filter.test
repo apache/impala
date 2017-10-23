@@ -1,0 +1,9 @@
+====
+---- QUERY: primitive_min_max_runtime_filter
+-- Description: a query that results in a highly selective min-max runtime filter. Will
+-- only see a perf improvement on Kudu as min-max filters are not implemented for other
+-- scanners yet.
+select count(*)
+from lineitem a, lineitem b
+where a.l_orderkey = b.l_orderkey * 2 and b.l_orderkey = 5
+====

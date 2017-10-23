@@ -431,7 +431,13 @@ class ImpalaTestSuite(BaseTestSuite):
         test_section['RESULTS'] = test_section['RESULTS'] \
             .replace(NAMENODE, '$NAMENODE') \
             .replace('$IMPALA_HOME', IMPALA_HOME)
-      if 'RUNTIME_PROFILE' in test_section:
+      if 'RUNTIME_PROFILE_%s' % table_format_info.file_format in test_section:
+        # If this table format has a RUNTIME_PROFILE section specifically for it, evaluate
+        # that section and ignore any general RUNTIME_PROFILE sections.
+        verify_runtime_profile(
+            test_section['RUNTIME_PROFILE_%s' % table_format_info.file_format],
+            result.runtime_profile)
+      elif 'RUNTIME_PROFILE' in test_section:
         verify_runtime_profile(test_section['RUNTIME_PROFILE'], result.runtime_profile)
 
       if 'DML_RESULTS' in test_section:

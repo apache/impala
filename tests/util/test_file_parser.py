@@ -242,6 +242,23 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
         parsed_sections['DML_RESULTS_TABLE'] = subsection_comment
         parsed_sections['VERIFIER'] = 'VERIFY_IS_EQUAL_SORTED'
 
+      # The RUNTIME_PROFILE section is used to specify lines of text that should be
+      # present in the query runtime profile. It takes an option comment containing a
+      # table format. RUNTIME_PROFILE secions with a comment are only evaluated for the
+      # specified format. If there is a RUNTIME_PROFILE section without a comment, it is
+      # evaluated for all formats that don't have a commented section for this query.
+      if subsection_name == 'RUNTIME_PROFILE':
+        if subsection_comment is not None and subsection_comment is not "":
+          allowed_formats = ['kudu']
+          if not subsection_comment.startswith("table_format="):
+            raise RuntimeError, 'RUNTIME_PROFILE comment (%s) must be of the form ' \
+              '"table_format=FORMAT"' % subsection_comment
+          table_format = subsection_comment[13:]
+          if table_format not in allowed_formats:
+            raise RuntimeError, 'RUNTIME_PROFILE table format (%s) must be in: %s' % \
+                (table_format, allowed_formats)
+          subsection_name = 'RUNTIME_PROFILE_%s' % table_format
+
       parsed_sections[subsection_name] = subsection_str
 
     if parsed_sections:

@@ -661,7 +661,7 @@ bool HdfsScanNodeBase::PartitionPassesFilters(int32_t partition_id,
       continue;
     }
 
-    bool has_filter = ctx.filter->HasBloomFilter();
+    bool has_filter = ctx.filter->HasFilter();
     bool passed_filter = !has_filter || ctx.Eval(tuple_row_mem);
     ctx.stats->IncrCounters(stats_name, 1, has_filter, !passed_filter);
     if (!passed_filter) return false;

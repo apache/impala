@@ -25,6 +25,7 @@
 
 #include "runtime/raw-value.inline.h"
 #include "util/bloom-filter.h"
+#include "util/min-max-filter.h"
 #include "util/time.h"
 
 namespace impala {
@@ -36,21 +37,35 @@ inline const RuntimeFilter* RuntimeFilterBank::GetRuntimeFilter(int32_t filter_i
   return it->second;
 }
 
-inline void RuntimeFilter::SetBloomFilter(BloomFilter* bloom_filter) {
-  DCHECK(bloom_filter_ == NULL);
-  // TODO: Barrier required here to ensure compiler does not both inline and re-order
-  // this assignment. Not an issue for correctness (as assignment is atomic), but
-  // potentially confusing.
-  bloom_filter_ = bloom_filter;
-  arrival_time_ = MonotonicMillis();
+inline void RuntimeFilter::SetFilter(
+    BloomFilter* bloom_filter, MinMaxFilter* min_max_filter) {
+  DCHECK(bloom_filter_.Load() == nullptr && min_max_filter_.Load() == nullptr);
+  if (is_bloom_filter()) {
+    bloom_filter_.Store(bloom_filter);
+  } else {
+    DCHECK(is_min_max_filter());
+    min_max_filter_.Store(min_max_filter);
+  }
+  arrival_time_.Store(MonotonicMillis());
 }
 
-inline bool RuntimeFilter::AlwaysTrue() const  {
-  return HasBloomFilter() && bloom_filter_ == BloomFilter::ALWAYS_TRUE_FILTER;
+inline bool RuntimeFilter::AlwaysTrue() const {
+  if (is_bloom_filter()) {
+    return HasFilter() && bloom_filter_.Load() == BloomFilter::ALWAYS_TRUE_FILTER;
+  } else {
+    DCHECK(is_min_max_filter());
+    return HasFilter() && min_max_filter_.Load()->AlwaysTrue();
+  }
 }
 
 inline bool RuntimeFilter::AlwaysFalse() const {
-  return bloom_filter_ != BloomFilter::ALWAYS_TRUE_FILTER && bloom_filter_->AlwaysFalse();
+  if (is_bloom_filter()) {
+    return bloom_filter_.Load() != BloomFilter::ALWAYS_TRUE_FILTER
+        && bloom_filter_.Load()->AlwaysFalse();
+  } else {
+    DCHECK(is_min_max_filter());
+    return min_max_filter_.Load() != nullptr && min_max_filter_.Load()->AlwaysFalse();
+  }
 }
 
 }
