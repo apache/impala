@@ -20,8 +20,11 @@ import pytest
 import re
 import time
 
+from tests.common.environ import specific_build_type_timeout
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
+
+WAIT_TIME_MS = specific_build_type_timeout(60000, slow_build_timeout=100000)
 
 @SkipIfLocal.multiple_impalad
 class TestRuntimeFilters(ImpalaTestSuite):
@@ -71,4 +74,5 @@ class TestRuntimeRowFilters(ImpalaTestSuite):
         v.get_value('table_format').file_format in ['parquet'])
 
   def test_row_filters(self, vector):
-    self.run_test_case('QueryTest/runtime_row_filters', vector)
+    self.run_test_case('QueryTest/runtime_row_filters', vector,
+                       test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS' : str(WAIT_TIME_MS)})
