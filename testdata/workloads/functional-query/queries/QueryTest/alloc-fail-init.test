@@ -43,7 +43,7 @@ FunctionContext::Allocate() failed to allocate 1 bytes.
 ---- QUERY
 select rand() from functional.alltypes;
 ---- CATCH
-FunctionContext::Allocate() failed to allocate 4 bytes.
+FunctionContext::Allocate() failed to allocate 16 bytes.
 ====
 ---- QUERY
 select case when min(int_col) = 0 then 0 end from functional.alltypes

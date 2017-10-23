@@ -79,6 +79,7 @@ tests/comparison/ORACLE.txt
 bin/distcc/README.md
 tests/comparison/POSTGRES.txt
 docs/README.md
+be/src/thirdparty/pcg-cpp-0.98/README.md
 
 # http://www.apache.org/legal/src-headers.html: "Test data for which the addition of a
 # source header would cause the tests to fail."
@@ -139,6 +140,7 @@ NOTICE.txt
 
 # Notices in thirdparty sources included in the Impala repo and called out in /LICENSE.txt
 be/src/thirdparty/squeasel/LICENSE
+be/src/thirdparty/pcg-cpp-0.98/LICENSE.txt
 
 # http://www.apache.org/legal/src-headers.html: 'Snippet' files that are combined as form
 # a larger file where the larger file would have duplicate licensing headers.

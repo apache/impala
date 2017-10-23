@@ -172,6 +172,12 @@ class TestQueriesTextTables(ImpalaTestSuite):
     vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/distinct-estimate', vector)
 
+  def test_random(self, vector):
+    # These results will vary slightly depending on how the values get split up
+    # so only run with 1 node and on text.
+    vector.get_value('exec_option')['num_nodes'] = 1
+    self.run_test_case('QueryTest/random', vector)
+
   def test_mixed_format(self, vector):
     self.run_test_case('QueryTest/mixed-format', vector)
 

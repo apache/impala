@@ -1132,6 +1132,12 @@ int64_t ExprTest::ConvertValue<int64_t>(const string& value) {
 }
 
 template <>
+double ExprTest::ConvertValue<double>(const string& value) {
+  StringParser::ParseResult result;
+  return StringParser::StringToFloat<double>(value.data(), value.size(), &result);
+}
+
+template <>
 TimestampValue ExprTest::ConvertValue<TimestampValue>(const string& value) {
   return TimestampValue::Parse(value.data(), value.size());
 }
@@ -4895,16 +4901,15 @@ TEST_F(ExprTest, MathFunctions) {
   TestValue("dsqrt(81.0)", TYPE_DOUBLE, 9);
 
   // Run twice to test deterministic behavior.
-  uint32_t seed = 0;
-  double expected = static_cast<double>(rand_r(&seed)) / static_cast<double>(RAND_MAX);
-  TestValue("rand()", TYPE_DOUBLE, expected);
-  TestValue("rand()", TYPE_DOUBLE, expected);
-  TestValue("random()", TYPE_DOUBLE, expected); // Test alias
-  seed = 1234;
-  expected = static_cast<double>(rand_r(&seed)) / static_cast<double>(RAND_MAX);
-  TestValue("rand(1234)", TYPE_DOUBLE, expected);
-  TestValue("rand(1234)", TYPE_DOUBLE, expected);
-  TestValue("random(1234)", TYPE_DOUBLE, expected); // Test alias
+  for (uint32_t seed : {0, 1234}) {
+    stringstream rand, random;
+    rand << "rand(" << seed << ")";
+    random << "random(" << seed << ")";
+    const double expected_result = ConvertValue<double>(GetValue(rand.str(),
+      TYPE_DOUBLE));
+    TestValue(rand.str(), TYPE_DOUBLE, expected_result);
+    TestValue(random.str(), TYPE_DOUBLE, expected_result); // Test alias
+  }
 
   // Test bigint param.
   TestValue("pmod(10, 3)", TYPE_BIGINT, 1);

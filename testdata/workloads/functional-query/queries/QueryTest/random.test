@@ -1,0 +1,24 @@
+# These computations take a while so we do not want to add too many test cases
+# They also require a non-trivial amount of data to get reasonable results.
+====
+---- QUERY
+select count(distinct rand()), count(*) from alltypes a;
+---- TYPES
+bigint, bigint
+---- RESULTS
+7300,7300
+====
+---- QUERY
+select count(distinct rand(100)), count(*) from alltypes a;
+---- TYPES
+bigint, bigint
+---- RESULTS
+7300,7300
+====
+---- QUERY
+select count(distinct rand()), count(*) from alltypes a, alltypes b;
+---- TYPES
+bigint, bigint
+---- RESULTS
+53290000,53290000
+====
