@@ -57,7 +57,6 @@ const string ScanNode::NUM_SCANNER_THREADS_STARTED =
 
 Status ScanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Init(tnode, state));
-
   const TQueryOptions& query_options = state->query_options();
   for (const TRuntimeFilterDesc& filter_desc : tnode.runtime_filters) {
     auto it = filter_desc.planid_to_target_ndx.find(tnode.node_id);
@@ -85,8 +84,7 @@ Status ScanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
     RuntimeProfile* profile =
         RuntimeProfile::Create(state->obj_pool(), filter_profile_title);
     runtime_profile_->AddChild(profile);
-    filter_ctx.stats = state->obj_pool()->Add(new FilterStats(profile,
-        target.is_bound_by_partition_columns));
+    filter_ctx.stats = state->obj_pool()->Add(new FilterStats(profile));
   }
 
   return Status::OK();

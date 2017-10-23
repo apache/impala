@@ -33,14 +33,14 @@ const std::string FilterStats::ROWS_KEY = "Rows";
 
 const char* FilterContext::LLVM_CLASS_NAME = "struct.impala::FilterContext";
 
-FilterStats::FilterStats(RuntimeProfile* runtime_profile, bool is_partition_filter) {
+FilterStats::FilterStats(RuntimeProfile* runtime_profile) {
   DCHECK(runtime_profile != nullptr);
   profile = runtime_profile;
   RegisterCounterGroup(FilterStats::SPLITS_KEY);
   RegisterCounterGroup(FilterStats::FILES_KEY);
   // TODO: These only apply to Parquet, so only register them in that case.
   RegisterCounterGroup(FilterStats::ROWS_KEY);
-  if (is_partition_filter) RegisterCounterGroup(FilterStats::ROW_GROUPS_KEY);
+  RegisterCounterGroup(FilterStats::ROW_GROUPS_KEY);
 }
 
 void FilterStats::IncrCounters(const string& key, int32_t total, int32_t processed,

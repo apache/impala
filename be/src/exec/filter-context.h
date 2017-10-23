@@ -41,7 +41,7 @@ class FilterStats {
   /// Constructs a new FilterStats object with a profile that is a child of
   /// 'profile'. 'is_partition_filter' determines whether partition-level counters are
   /// registered.
-  FilterStats(RuntimeProfile* runtime_profile, bool is_partition_filter);
+  FilterStats(RuntimeProfile* runtime_profile);
 
   static const std::string ROW_GROUPS_KEY;
   static const std::string FILES_KEY;
