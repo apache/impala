@@ -172,3 +172,12 @@ DEFINE_bool(redirect_stdout_stderr, true,
 DEFINE_int32(max_log_files, 10, "Maximum number of log files to retain per severity "
     "level. The most recent log files are retained. If set to 0, all log files are "
     "retained.");
+
+// The read size is the preferred size of the reads issued to HDFS or the local FS.
+// There is a trade off of latency and throughout, trying to keep disks busy but
+// not introduce seeks.  The literature seems to agree that with 8 MB reads, random
+// io and sequential io perform similarly.
+DEFINE_int32(read_size, 8 * 1024 * 1024, "(Advanced) The preferred I/O request size in "
+    "bytes to issue to HDFS or the local filesystem. Increasing the read size will "
+    "increase memory requirements. Decreasing the read size may decrease I/O "
+    "throughput.");

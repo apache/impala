@@ -20,11 +20,13 @@
 #include <gperftools/heap-profiler.h>
 #include <gperftools/malloc_extension.h>
 
+#include "common/global-flags.h"
 #include "common/logging.h"
 #include "common/status.h"
 #include "exec/kudu-util.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "gutil/atomicops.h"
+#include "gutil/strings/substitute.h"
 #include "rpc/authentication.h"
 #include "rpc/thrift-util.h"
 #include "runtime/bufferpool/buffer-pool.h"
@@ -192,6 +194,10 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     }
     const string& error_message = SetRedactionRulesFromFile(FLAGS_redaction_rules_file);
     if (!error_message.empty()) CLEAN_EXIT_WITH_ERROR(error_message);
+  }
+  if (FLAGS_read_size < READ_SIZE_MIN_VALUE) {
+    CLEAN_EXIT_WITH_ERROR(Substitute("read_size can not be lower than $0",
+        READ_SIZE_MIN_VALUE));
   }
   impala::InitGoogleLoggingSafe(argv[0]);
   // Breakpad needs flags and logging to initialize.

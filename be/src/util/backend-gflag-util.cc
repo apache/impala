@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "common/global-flags.h"
 #include "util/backend-gflag-util.h"
 
 #include "gen-cpp/BackendGflags_types.h"
@@ -28,7 +29,6 @@ DECLARE_bool(load_catalog_in_background);
 DECLARE_bool(load_auth_to_local_rules);
 DECLARE_bool(enable_stats_extrapolation);
 DECLARE_int32(non_impala_java_vlog);
-DECLARE_int32(read_size);
 DECLARE_int32(num_metadata_loading_threads);
 DECLARE_int32(initial_hms_cnxn_timeout_s);
 DECLARE_int32(kudu_operation_timeout_ms);

@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "common/global-flags.h"
 #include "runtime/disk-io-mgr.h"
 #include "runtime/disk-io-mgr-handle-cache.inline.h"
 #include "runtime/disk-io-mgr-internal.h"
@@ -78,14 +79,7 @@ DEFINE_int32(num_s3_io_threads, 16, "Number of S3 I/O threads");
 // enforced by ADLS for a cluster, which spans between 500-700. For smaller clusters
 // (~10 nodes), 64 threads would be more ideal.
 DEFINE_int32(num_adls_io_threads, 16, "Number of ADLS I/O threads");
-// The read size is the preferred size of the reads issued to HDFS or the local FS.
-// There is a trade off of latency and throughout, trying to keep disks busy but
-// not introduce seeks.  The literature seems to agree that with 8 MB reads, random
-// io and sequential io perform similarly.
-DEFINE_int32(read_size, 8 * 1024 * 1024, "(Advanced) The preferred I/O request size in "
-    "bytes to issue to HDFS or the local filesystem. Increasing the read size will "
-    "increase memory requirements. Decreasing the read size may decrease I/O "
-    "throughput.");
+
 DECLARE_int64(min_buffer_size);
 
 // With 1024B through 8MB buffers, this is up to ~2GB of buffers.
@@ -304,6 +298,7 @@ DiskIoMgr::DiskIoMgr() :
     file_handle_cache_(min(FLAGS_max_cached_file_handles,
         FileSystemUtil::MaxNumFileHandles()),
         FLAGS_unused_file_handle_timeout_sec) {
+  DCHECK_LE(READ_SIZE_MIN_VALUE, FLAGS_read_size);
   int64_t max_buffer_size_scaled = BitUtil::Ceil(max_buffer_size_, min_buffer_size_);
   free_buffers_.resize(BitUtil::Log2Ceiling64(max_buffer_size_scaled) + 1);
   int num_local_disks = DiskInfo::num_disks();
