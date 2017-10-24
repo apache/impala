@@ -96,7 +96,8 @@ Status SystemAllocator::AllocateViaMMap(int64_t len, uint8_t** buffer_mem) {
       map_len -= fixup;
     }
     munmap(mem + len, map_len - len);
-    DCHECK_EQ(reinterpret_cast<uintptr_t>(mem) % HUGE_PAGE_SIZE, 0) << mem;
+    DCHECK_EQ(reinterpret_cast<uintptr_t>(mem) % HUGE_PAGE_SIZE, 0)
+        << std::hex << reinterpret_cast<uintptr_t>(mem);
     // Mark the buffer as a candidate for promotion to huge pages. The Linux Transparent
     // Huge Pages implementation will try to back the memory with a huge page if it is
     // enabled. MADV_HUGEPAGE was introduced in 2.6.38, so we similarly need to skip this
