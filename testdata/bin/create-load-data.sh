@@ -449,15 +449,9 @@ fi
 
 if [ $SKIP_METADATA_LOAD -eq 0 ]; then
   run-step "Loading custom schemas" load-custom-schemas.log load-custom-schemas
-  # Run some steps in parallel, with run-step-backgroundable / run-step-wait-all.
-  # This is effective on steps that take a long time and don't depend on each
-  # other. Functional-query takes about ~35 minutes, and TPC-H and TPC-DS can
-  # finish while functional-query is running.
-  run-step-backgroundable "Loading functional-query data" load-functional-query.log \
+  run-step "Loading functional-query data" load-functional-query.log \
       load-data "functional-query" "exhaustive"
-  run-step-backgroundable "Loading TPC-H data" load-tpch.log load-data "tpch" "core"
-  run-step-backgroundable "Loading TPC-DS data" load-tpcds.log load-data "tpcds" "core"
-  run-step-wait-all
+  run-step "Loading TPC-H data" load-tpch.log load-data "tpch" "core"
   # Load tpch nested data.
   # TODO: Hacky and introduces more complexity into the system, but it is expedient.
   if [[ -n "$CM_HOST" ]]; then
@@ -465,6 +459,7 @@ if [ $SKIP_METADATA_LOAD -eq 0 ]; then
   fi
   run-step "Loading nested data" load-nested.log \
     ${IMPALA_HOME}/testdata/bin/load_nested.py ${LOAD_NESTED_ARGS:-}
+  run-step "Loading TPC-DS data" load-tpcds.log load-data "tpcds" "core"
   run-step "Loading auxiliary workloads" load-aux-workloads.log load-aux-workloads
   run-step "Loading dependent tables" copy-and-load-dependent-tables.log \
       copy-and-load-dependent-tables
