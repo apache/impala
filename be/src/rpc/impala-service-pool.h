@@ -52,10 +52,10 @@ class ImpalaServicePool : public kudu::rpc::RpcService {
   virtual ~ImpalaServicePool();
 
   /// Start up the thread pool.
-  virtual Status Init(int num_threads);
+  Status Init(int num_threads);
 
   /// Shut down the queue and the thread pool.
-  virtual void Shutdown();
+  void Shutdown();
 
   virtual kudu::rpc::RpcMethodInfo* LookupMethod(const kudu::rpc::RemoteMethod& method)
     override;

@@ -136,7 +136,8 @@ IntVal ValidateMem(FunctionContext* context) {
 }
 
 StringVal TimeToString(FunctionContext* context, const TimestampVal& time) {
-  ptime t(*(date*)&time.date);
+  ptime t(*const_cast<date*>(reinterpret_cast<const date*>(&time.date)));
+  // ptime t(*(date*)&time.date); is this conversion correct?
   t += nanoseconds(time.time_of_day);
   stringstream ss;
   ss << to_iso_extended_string(t.date()) << " " << to_simple_string(t.time_of_day());

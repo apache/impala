@@ -56,14 +56,17 @@ class OutboundRowBatch {
   /// Returns the serialized tuple offsets' vector as a kudu::Slice.
   /// The tuple offsets vector is sent as KRPC sidecar.
   kudu::Slice TupleOffsetsAsSlice() const {
-    return kudu::Slice((uint8_t*)tuple_offsets_.data(),
+    return kudu::Slice(
+        const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(tuple_offsets_.data())),
         tuple_offsets_.size() * sizeof(tuple_offsets_[0]));
   }
 
   /// Returns the serialized tuple data's buffer as a kudu::Slice.
   /// The tuple data is sent as KRPC sidecar.
   kudu::Slice TupleDataAsSlice() const {
-    return kudu::Slice((uint8_t*)tuple_data_.data(), tuple_data_.length());
+    return kudu::Slice(
+        const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(tuple_data_.data())),
+        tuple_data_.length());
   }
 
   /// Returns true if the header has been intialized and ready to be sent.

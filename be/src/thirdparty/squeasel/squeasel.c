@@ -1057,6 +1057,7 @@ static int alloc_vprintf2(char **buf, const char *fmt, va_list ap) {
     if (!*buf) break;
     va_copy(ap_copy, ap);
     len = vsnprintf(*buf, size, fmt, ap_copy);
+    va_end(ap_copy);
   }
 
   return len;
@@ -1076,12 +1077,14 @@ static int alloc_vprintf(char **buf, size_t size, const char *fmt, va_list ap) {
   // On second pass, actually print the message.
   va_copy(ap_copy, ap);
   len = vsnprintf(NULL, 0, fmt, ap_copy);
+  va_end(ap_copy);
 
   if (len < 0) {
     // C runtime is not standard compliant, vsnprintf() returned -1.
     // Switch to alternative code path that uses incremental allocations.
     va_copy(ap_copy, ap);
     len = alloc_vprintf2(buf, fmt, ap);
+    va_end(ap_copy);
   } else if (len > (int) size &&
       (size = len + 1) > 0 &&
       (*buf = (char *) malloc(size)) == NULL) {
@@ -1089,6 +1092,7 @@ static int alloc_vprintf(char **buf, size_t size, const char *fmt, va_list ap) {
   } else {
     va_copy(ap_copy, ap);
     vsnprintf(*buf, size, fmt, ap_copy);
+    va_end(ap_copy);
   }
 
   return len;
@@ -1111,7 +1115,9 @@ int sq_vprintf(struct sq_connection *conn, const char *fmt, va_list ap) {
 int sq_printf(struct sq_connection *conn, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
-  return sq_vprintf(conn, fmt, ap);
+  int ret_val = sq_vprintf(conn, fmt, ap);
+  va_end(ap);
+  return ret_val;
 }
 
 int sq_url_decode(const char *src, int src_len, char *dst,
@@ -4476,6 +4482,7 @@ struct sq_connection *sq_download(const char *host, int port, int use_ssl,
     sq_close_connection(conn);
     conn = NULL;
   }
+  va_end(ap);
 
   return conn;
 }

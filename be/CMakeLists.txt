@@ -65,8 +65,20 @@ SET(CXX_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage")
 #        when using ccache as clang thinks it is not called from a terminal.
 #   -Wno-mismatched-tags: ignore harmless class/struct mismatch for forward declarations.
 #        Disabling to be consistent with gcc, which doesn't have this warning.
+#   -Wno-zero-as-null-pointer-constant: We are slowly moving towards the use of nullptr,
+#        but till we switch to it completely, we will ignore the warnings due to use of
+#        NULL as a null pointer constant.
+#   -Wno-c++17-extensions: ignore warnings caused due to the use of [[nodiscard]]
+#        attribute which our current compiler does not support but is used in conjunction
+#        with WARN_UNUSED_RESULT with our current toolchain to be effective.
+#   -Wno-inconsistent-missing-destructor-override: ignore warnings to mark virtual
+#        destructors with 'override' which is enforced by clang by not recommended by c++
+#        core guidelines (read C.128).
 SET(CXX_CLANG_FLAGS "-Qunused-arguments -fcolor-diagnostics -Wno-unused-local-typedef")
 SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -Wno-mismatched-tags")
+SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -Wno-zero-as-null-pointer-constant")
+SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -Wno-c++17-extensions")
+SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -Wno-inconsistent-missing-destructor-override")
 # For any gcc builds:
 #   -g: Enable symbols for profiler tools
 #   -Wno-unused-local-typedefs: Do not warn for local typedefs that are unused.

@@ -24,6 +24,7 @@ create function if not exists foo (string, string) returns string location
 '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE_bad_udf.ll' symbol='MyAwesomeUdf';
 ---- CATCH
 Could not load binary: $FILESYSTEM_PREFIX/test-warehouse/$DATABASE_bad_udf.ll
+Invalid bitcode signature
 ====
 ---- QUERY
 # This test is run with codegen disabled. Interpretation only handles up to 20 arguments.

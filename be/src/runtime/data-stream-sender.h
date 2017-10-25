@@ -116,9 +116,6 @@ class DataStreamSender : public DataSink {
   /// Not valid to call Send() anymore.
   bool flushed_;
 
-  /// If true, this sender has been closed. Not valid to call Send() anymore.
-  bool closed_;
-
   /// serialized batches for broadcasting; we need two so we can write
   /// one while the other one is still being sent
   TRowBatch thrift_batch1_;

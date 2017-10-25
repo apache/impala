@@ -65,8 +65,8 @@ void TSaslClientTransport::handleSaslStartMessage() {
   }
 
   /* These two calls comprise a single message in the thrift-sasl protocol. */
-  sendSaslMessage(TSASL_START,
-      (uint8_t*)sasl_->getMechanismName().c_str(),
+  sendSaslMessage(TSASL_START, const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(
+                                   sasl_->getMechanismName().c_str())),
       sasl_->getMechanismName().length(), false);
   sendSaslMessage(TSASL_OK, initialResponse, resLength);
 

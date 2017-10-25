@@ -716,7 +716,8 @@ TEST_F(RowBatchSerializeTest, DedupPathologicalFull) {
     cv.ptr = pool->Allocate(array_item_desc->byte_size());
     memset(cv.ptr, 0, array_item_desc->byte_size());
     cv.num_tuples = 1;
-    StringValue huge_string_value((char*)huge_string.data(), huge_string_size);
+    StringValue huge_string_value(
+        const_cast<char*>(huge_string.data()), huge_string_size);
     RawValue::Write(&huge_string_value, reinterpret_cast<Tuple*>(cv.ptr),
         string_slot_desc, NULL);
     RawValue::Write(&cv, tuple, array_slot_desc, NULL);
