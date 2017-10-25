@@ -109,7 +109,21 @@ if options.use_kerberos:
   hive_auth = "principal=" + options.principal
 
 HIVE_ARGS = '-n %s -u "jdbc:hive2://%s/default;%s" --verbose=true'\
-      % (getpass.getuser(), options.hive_hs2_hostport, hive_auth)
+    % (getpass.getuser(), options.hive_hs2_hostport, hive_auth)
+
+# When HiveServer2 is configured to use "local" mode (i.e., MR jobs are run
+# in-process rather than on YARN), Hadoop's LocalDistributedCacheManager has a
+# race, wherein it tires to localize jars into
+# /tmp/hadoop-$USER/mapred/local/<millis>. Two simultaneous Hive queries
+# against HS2 can conflict here. Weirdly LocalJobRunner handles a similar issue
+# (with the staging directory) by appending a random number. To over come this,
+# in the case that HS2 is on the local machine (which we conflate with also
+# running MR jobs locally), we move the temporary directory into a unique
+# directory via configuration. This block can be removed when
+# https://issues.apache.org/jira/browse/MAPREDUCE-6441 is resolved.
+if options.hive_hs2_hostport.startswith("localhost:"):
+  HIVE_ARGS += ' --hiveconf "mapreduce.cluster.local.dir=%s"' % (tempfile.mkdtemp(
+    prefix="impala-data-load-"))
 
 HADOOP_CMD = os.path.join(os.environ['HADOOP_HOME'], 'bin/hadoop')
 

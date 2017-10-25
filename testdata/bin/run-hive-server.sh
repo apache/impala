@@ -72,7 +72,7 @@ ${CLUSTER_BIN}/wait-for-metastore.py --transport=${METASTORE_TRANSPORT}
 if [ ${ONLY_METASTORE} -eq 0 ]; then
   # Starts a HiveServer2 instance on the port specified by the HIVE_SERVER2_THRIFT_PORT
   # environment variable.
-  hive --service hiveserver2 > ${LOGDIR}/hive-server2.out 2>&1 &
+  HADOOP_HEAPSIZE="512" hive --service hiveserver2 > ${LOGDIR}/hive-server2.out 2>&1 &
 
   # Wait for the HiveServer2 service to come up because callers of this script
   # may rely on it being available.
