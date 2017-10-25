@@ -559,48 +559,52 @@ namespace impala {
 
 static JNINativeMethod native_methods[] = {
   {
-      (char*)"NativeFeTestInit", (char*)"()V",
+      const_cast<char*>("NativeFeTestInit"), const_cast<char*>("()V"),
       (void*)::Java_org_apache_impala_service_FeSupport_NativeFeTestInit
   },
   {
-      (char*)"NativeEvalExprsWithoutRow", (char*)"([B[B)[B",
+      const_cast<char*>("NativeEvalExprsWithoutRow"), const_cast<char*>("([B[B)[B"),
       (void*)::Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow
   },
   {
-      (char*)"NativeCacheJar", (char*)"([B)[B",
+      const_cast<char*>("NativeCacheJar"), const_cast<char*>("([B)[B"),
       (void*)::Java_org_apache_impala_service_FeSupport_NativeCacheJar
   },
   {
-      (char*)"NativeLookupSymbol", (char*)"([B)[B",
+      const_cast<char*>("NativeLookupSymbol"), const_cast<char*>("([B)[B"),
       (void*)::Java_org_apache_impala_service_FeSupport_NativeLookupSymbol
   },
   {
-      (char*)"NativePrioritizeLoad", (char*)"([B)[B",
+      const_cast<char*>("NativePrioritizeLoad"), const_cast<char*>("([B)[B"),
       (void*)::Java_org_apache_impala_service_FeSupport_NativePrioritizeLoad
   },
   {
-      (char*)"NativeParseQueryOptions", (char*)"(Ljava/lang/String;[B)[B",
+      const_cast<char*>("NativeParseQueryOptions"),
+      const_cast<char*>("(Ljava/lang/String;[B)[B"),
       (void*)::Java_org_apache_impala_service_FeSupport_NativeParseQueryOptions
   },
   {
-      (char*)"NativeAddPendingTopicItem", (char*)"(JLjava/lang/String;J[BZ)Z",
+      const_cast<char*>("NativeAddPendingTopicItem"),
+      const_cast<char*>("(JLjava/lang/String;J[BZ)Z"),
       (void*)::Java_org_apache_impala_service_FeSupport_NativeAddPendingTopicItem
   },
   {
-      (char*)"NativeGetNextCatalogObjectUpdate",
-      (char*)"(J)Lorg/apache/impala/common/Pair;",
+      const_cast<char*>("NativeGetNextCatalogObjectUpdate"),
+      const_cast<char*>("(J)Lorg/apache/impala/common/Pair;"),
       (void*)::Java_org_apache_impala_service_FeSupport_NativeGetNextCatalogObjectUpdate
   },
   {
-      (char*)"NativeLibCacheSetNeedsRefresh", (char*)"(Ljava/lang/String;)Z",
+      const_cast<char*>("NativeLibCacheSetNeedsRefresh"),
+      const_cast<char*>("(Ljava/lang/String;)Z"),
       (void*)::Java_org_apache_impala_service_FeSupport_NativeLibCacheSetNeedsRefresh
   },
   {
-      (char*)"NativeLibCacheRemoveEntry", (char*)"(Ljava/lang/String;)Z",
+      const_cast<char*>("NativeLibCacheRemoveEntry"),
+      const_cast<char*>("(Ljava/lang/String;)Z"),
       (void*)::Java_org_apache_impala_service_FeSupport_NativeLibCacheRemoveEntry
   },
   {
-    (char*)"MinLogSpaceForBloomFilter", (char*)"(JD)I",
+    const_cast<char*>("MinLogSpaceForBloomFilter"), const_cast<char*>("(JD)I"),
     (void*)::Java_org_apache_impala_service_FeSupport_MinLogSpaceForBloomFilter
   },
 };

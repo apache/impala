@@ -46,20 +46,20 @@ llvm::Type* CodegenAnyVal::GetLoweredType(LlvmCodeGen* cg, const ColumnType& typ
     case TYPE_INT: // i64
       return cg->i64_type();
     case TYPE_BIGINT: // { i8, i64 }
-      return llvm::StructType::get(cg->i8_type(), cg->i64_type(), NULL);
+      return llvm::StructType::get(cg->i8_type(), cg->i64_type());
     case TYPE_FLOAT: // i64
       return cg->i64_type();
     case TYPE_DOUBLE: // { i8, double }
-      return llvm::StructType::get(cg->i8_type(), cg->double_type(), NULL);
+      return llvm::StructType::get(cg->i8_type(), cg->double_type());
     case TYPE_STRING: // { i64, i8* }
     case TYPE_VARCHAR: // { i64, i8* }
     case TYPE_FIXED_UDA_INTERMEDIATE: // { i64, i8* }
-      return llvm::StructType::get(cg->i64_type(), cg->ptr_type(), NULL);
+      return llvm::StructType::get(cg->i64_type(), cg->ptr_type());
     case TYPE_CHAR:
       DCHECK(false) << "NYI:" << type.DebugString();
       return NULL;
     case TYPE_TIMESTAMP: // { i64, i64 }
-      return llvm::StructType::get(cg->i64_type(), cg->i64_type(), NULL);
+      return llvm::StructType::get(cg->i64_type(), cg->i64_type());
     case TYPE_DECIMAL: // %"struct.impala_udf::DecimalVal" (isn't lowered)
                        // = { {i8}, [15 x i8], {i128} }
       return cg->GetNamedType(LLVM_DECIMALVAL_NAME);
@@ -805,12 +805,12 @@ llvm::Value* CodegenAnyVal::GetNullVal(LlvmCodeGen* codegen, llvm::Type* val_typ
       llvm::StructType* anyval_struct_type =
           llvm::cast<llvm::StructType>(struct_type->getElementType(0));
       llvm::Type* is_null_type = anyval_struct_type->getElementType(0);
-      llvm::Value* null_anyval = llvm::ConstantStruct::get(
+      llvm::Constant* null_anyval = llvm::ConstantStruct::get(
           anyval_struct_type, llvm::ConstantInt::get(is_null_type, 1));
       llvm::Type* type2 = struct_type->getElementType(1);
       llvm::Type* type3 = struct_type->getElementType(2);
       return llvm::ConstantStruct::get(struct_type, null_anyval,
-          llvm::Constant::getNullValue(type2), llvm::Constant::getNullValue(type3), NULL);
+          llvm::Constant::getNullValue(type2), llvm::Constant::getNullValue(type3));
     }
     // Return the struct { 1, 0 } (the 'is_null' byte, i.e. the first value's first byte,
     // is set to 1, the other bytes don't matter)
@@ -819,7 +819,7 @@ llvm::Value* CodegenAnyVal::GetNullVal(LlvmCodeGen* codegen, llvm::Type* val_typ
     DCHECK(type1->isIntegerTy()) << LlvmCodeGen::Print(type1);
     llvm::Type* type2 = struct_type->getElementType(1);
     return llvm::ConstantStruct::get(struct_type, llvm::ConstantInt::get(type1, 1),
-        llvm::Constant::getNullValue(type2), NULL);
+        llvm::Constant::getNullValue(type2));
   }
   // Return the int 1 ('is_null' byte is 1, other bytes don't matter)
   DCHECK(val_type->isIntegerTy());

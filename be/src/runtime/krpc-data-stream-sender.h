@@ -140,9 +140,6 @@ class KrpcDataStreamSender : public DataSink {
   /// Not valid to call Send() anymore.
   bool flushed_ = false;
 
-  /// If true, this sender has been closed. Not valid to call Send() anymore.
-  bool closed_ = false;
-
   /// List of all channels. One for each destination.
   std::vector<Channel*> channels_;
 

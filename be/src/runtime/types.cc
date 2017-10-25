@@ -366,7 +366,7 @@ llvm::ConstantStruct* ColumnType::ToIR(LlvmCodeGen* codegen) const {
 
   return llvm::cast<llvm::ConstantStruct>(
       llvm::ConstantStruct::get(column_type_type, type_field, len_field, precision_field,
-          scale_field, children_field, field_names_field, NULL));
+          scale_field, children_field, field_names_field));
 }
 
 }

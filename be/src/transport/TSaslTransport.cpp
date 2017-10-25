@@ -225,7 +225,7 @@ namespace apache { namespace thrift { namespace transport {
     const uint8_t* newBuf;
 
     if (shouldWrap_) {
-      newBuf = sasl_->wrap((uint8_t*)buf, 0, len, &len);
+      newBuf = sasl_->wrap(const_cast<uint8_t*>(buf), 0, len, &len);
     } else {
       newBuf = buf;
     }

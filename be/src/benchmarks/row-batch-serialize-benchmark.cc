@@ -128,8 +128,10 @@ class RowBatchSerializeBaseline {
       if (batch->compression_scratch_.size() < compressed_size) {
         batch->compression_scratch_.resize(compressed_size);
       }
-      uint8_t* input = (uint8_t*)output_batch->tuple_data.c_str();
-      uint8_t* compressed_output = (uint8_t*)batch->compression_scratch_.c_str();
+      uint8_t* input = const_cast<uint8_t*>(
+          reinterpret_cast<const uint8_t*>(output_batch->tuple_data.c_str()));
+      uint8_t* compressed_output = const_cast<uint8_t*>(
+          reinterpret_cast<const uint8_t*>(batch->compression_scratch_.c_str()));
       status =
           compressor.ProcessBlock(true, size, input, &compressed_size, &compressed_output);
       DCHECK(status.ok()) << status.GetDetail();
@@ -194,7 +196,8 @@ class RowBatchSerializeBaseline {
     uint8_t* tuple_data;
     if (input_batch.compression_type != THdfsCompression::NONE) {
       // Decompress tuple data into data pool
-      uint8_t* compressed_data = (uint8_t*)input_batch.tuple_data.c_str();
+      uint8_t* compressed_data = const_cast<uint8_t*>(
+          reinterpret_cast<const uint8_t*>(input_batch.tuple_data.c_str()));
       size_t compressed_size = input_batch.tuple_data.size();
 
       Lz4Decompressor decompressor(nullptr, false);

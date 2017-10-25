@@ -309,8 +309,10 @@ Status RowBatch::Serialize(bool full_dedup, vector<int32_t>* tuple_offsets,
     if (compression_scratch_.size() < compressed_size) {
       compression_scratch_.resize(compressed_size);
     }
-    uint8_t* input = (uint8_t*)tuple_data->c_str();
-    uint8_t* compressed_output = (uint8_t*)compression_scratch_.c_str();
+    uint8_t* input =
+        const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(tuple_data->c_str()));
+    uint8_t* compressed_output = const_cast<uint8_t*>(
+        reinterpret_cast<const uint8_t*>(compression_scratch_.c_str()));
     RETURN_IF_ERROR(
         compressor.ProcessBlock(true, size, input, &compressed_size, &compressed_output));
     if (LIKELY(compressed_size < size)) {

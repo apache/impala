@@ -54,8 +54,8 @@ uint8_t* TSasl::unwrap(const uint8_t* incoming,
   uint8_t* output;
   int result;
 
-  result = sasl_decode(conn,
-                      (const char*)incoming, len, (const char**)&output, &outputlen);
+  result = sasl_decode(conn, reinterpret_cast<const char*>(incoming), len,
+      const_cast<const char**>(reinterpret_cast<char**>(&output)), &outputlen);
   if (result != SASL_OK) {
     throw SaslException(sasl_errdetail(conn));
   }
@@ -69,8 +69,8 @@ uint8_t* TSasl::wrap(const uint8_t* outgoing,
   uint8_t* output;
   int result;
 
-  result = sasl_encode(conn, (const char*)outgoing+offset,
-                       len, (const char**)&output, &outputlen);
+  result = sasl_encode(conn, reinterpret_cast<const char*>(outgoing) + offset, len,
+      const_cast<const char**>(reinterpret_cast<char**>(&output)), &outputlen);
   if (result != SASL_OK) {
     throw SaslException(sasl_errdetail(conn));
   }
@@ -158,9 +158,10 @@ uint8_t* TSaslClient::evaluateChallengeOrResponse(
     result=sasl_client_start(conn,
           mechList.c_str(),
           &client_interact, /* filled in if an interaction is needed */
-          (const char**)&out,      /* filled in on success */
+          const_cast<const char**>(
+              reinterpret_cast<char**>(&out)),      /* filled in on success */
           &outlen,   /* filled in on success */
-          (const char**)&mechUsing);
+          const_cast<const char**>(&mechUsing));
     clientStarted = true;
     if (result == SASL_OK || result == SASL_CONTINUE) {
       chosenMech = mechUsing;
@@ -168,10 +169,11 @@ uint8_t* TSaslClient::evaluateChallengeOrResponse(
   } else {
     if (len  > 0) {
       result=sasl_client_step(conn,  /* our context */
-          (const char*)challenge,    /* the data from the server */
+          reinterpret_cast<const char*>(challenge),    /* the data from the server */
           len, /* its length */
           &client_interact,  /* this should be unallocated and NULL */
-          (const char**)&out,     /* filled in on success */
+          const_cast<const char**>(
+              reinterpret_cast<char**>(&out)),     /* filled in on success */
           &outlen); /* filled in on success */
     } else {
       result = SASL_CONTINUE;
@@ -237,11 +239,11 @@ uint8_t* TSaslServer::evaluateChallengeOrResponse(const uint8_t* response,
   uint32_t result;
 
   if (!serverStarted) {
-    result = sasl_server_start(conn,
-        (const char *)response, NULL, 0, (const char **)&out, &outlen);
+    result = sasl_server_start(conn, reinterpret_cast<const char*>(response), NULL, 0,
+        const_cast<const char**>(reinterpret_cast<char**>(&out)), &outlen);
   } else {
-    result = sasl_server_step(conn,
-        (const char*)response, len, (const char**)&out, &outlen);
+    result = sasl_server_step(conn, reinterpret_cast<const char*>(response), len,
+        const_cast<const char**>(reinterpret_cast<char**>(&out)), &outlen);
   }
 
   if (result == SASL_OK) {

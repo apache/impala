@@ -337,7 +337,6 @@ DataStreamSender::DataStreamSender(int sender_id, const RowDescriptor* row_desc,
     partition_type_(sink.output_partition.type),
     current_channel_idx_(0),
     flushed_(false),
-    closed_(false),
     current_thrift_batch_(&thrift_batch1_),
     serialize_batch_timer_(NULL),
     thrift_transmit_timer_(NULL),
@@ -534,7 +533,6 @@ void DataStreamSender::Close(RuntimeState* state) {
   ScalarExprEvaluator::Close(partition_expr_evals_, state);
   ScalarExpr::Close(partition_exprs_);
   DataSink::Close(state);
-  closed_ = true;
 }
 
 Status DataStreamSender::SerializeBatch(

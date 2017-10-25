@@ -30,7 +30,7 @@
 #include <llvm/Analysis/InstructionSimplify.h>
 #include <llvm/Analysis/Passes.h>
 #include <llvm/Analysis/TargetTransformInfo.h>
-#include <llvm/Bitcode/ReaderWriter.h>
+#include <llvm/Bitcode/BitcodeReader.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/IR/Constants.h>
@@ -124,7 +124,7 @@ string LlvmCodeGen::target_features_attr_;
 CodegenCallGraph LlvmCodeGen::shared_call_graph_;
 
 [[noreturn]] static void LlvmCodegenHandleError(
-    void* user_data, const std::string& reason, bool gen_crash_diag) {
+    void* user_data, const string& reason, bool gen_crash_diag) {
   LOG(FATAL) << "LLVM hit fatal error: " << reason.c_str();
 }
 
@@ -217,7 +217,7 @@ Status LlvmCodeGen::CreateFromFile(RuntimeState* state, ObjectPool* pool,
   unique_ptr<llvm::Module> loaded_module;
   Status status = (*codegen)->LoadModuleFromFile(file, &loaded_module);
   if (!status.ok()) goto error;
-  status = (*codegen)->Init(std::move(loaded_module));
+  status = (*codegen)->Init(move(loaded_module));
   if (!status.ok()) goto error;
   return Status::OK();
 error:
@@ -247,10 +247,10 @@ Status LlvmCodeGen::CreateFromMemory(RuntimeState* state, ObjectPool* pool,
   unique_ptr<llvm::MemoryBuffer> module_ir_buf(
       llvm::MemoryBuffer::getMemBuffer(module_ir, "", false));
   unique_ptr<llvm::Module> loaded_module;
-  Status status = (*codegen)->LoadModuleFromMemory(std::move(module_ir_buf),
+  Status status = (*codegen)->LoadModuleFromMemory(move(module_ir_buf),
       module_name, &loaded_module);
   if (!status.ok()) goto error;
-  status = (*codegen)->Init(std::move(loaded_module));
+  status = (*codegen)->Init(move(loaded_module));
   if (!status.ok()) goto error;
   return Status::OK();
 error:
@@ -272,11 +272,11 @@ Status LlvmCodeGen::LoadModuleFromFile(
          << tmp_file_buffer.getError().message();
       return Status(ss.str());
     }
-    file_buffer = std::move(tmp_file_buffer.get());
+    file_buffer = move(tmp_file_buffer.get());
   }
 
   COUNTER_ADD(module_bitcode_size_, file_buffer->getBufferSize());
-  return LoadModuleFromMemory(std::move(file_buffer), file, module);
+  return LoadModuleFromMemory(move(file_buffer), file, module);
 }
 
 Status LlvmCodeGen::LoadModuleFromMemory(unique_ptr<llvm::MemoryBuffer> module_ir_buf,
@@ -284,14 +284,16 @@ Status LlvmCodeGen::LoadModuleFromMemory(unique_ptr<llvm::MemoryBuffer> module_i
   DCHECK(!module_name.empty());
   SCOPED_TIMER(prepare_module_timer_);
   COUNTER_ADD(module_bitcode_size_, module_ir_buf->getMemBufferRef().getBufferSize());
-  llvm::ErrorOr<unique_ptr<llvm::Module>> tmp_module =
-      getLazyBitcodeModule(std::move(module_ir_buf), context(), false);
-  if (!tmp_module) {
-    string diagnostic_err = diagnostic_handler_.GetErrorString();
-    return Status(diagnostic_err);
+  llvm::Expected<unique_ptr<llvm::Module>> tmp_module =
+      getOwningLazyBitcodeModule(move(module_ir_buf), context());
+  if (llvm::Error err = tmp_module.takeError()) {
+    string err_string;
+    llvm::handleAllErrors(
+        move(err), [&](llvm::ErrorInfoBase& eib) { err_string = eib.message(); });
+    return Status(err_string);
   }
 
-  *module = std::move(tmp_module.get());
+  *module = move(tmp_module.get());
 
   // We never run global constructors or destructors so let's strip them out for all
   // modules when we load them.
@@ -324,7 +326,7 @@ Status LlvmCodeGen::LinkModuleFromLocalFs(const string& file) {
     }
   }
 
-  bool error = llvm::Linker::linkModules(*module_, std::move(new_module));
+  bool error = llvm::Linker::linkModules(*module_, move(new_module));
   string diagnostic_err = diagnostic_handler_.GetErrorString();
   if (error) {
     stringstream ss;
@@ -399,7 +401,7 @@ Status LlvmCodeGen::Init(unique_ptr<llvm::Module> module) {
   opt_level = llvm::CodeGenOpt::None;
 #endif
   module_ = module.get();
-  llvm::EngineBuilder builder(std::move(module));
+  llvm::EngineBuilder builder(move(module));
   builder.setEngineKind(llvm::EngineKind::JIT);
   builder.setOptLevel(opt_level);
   unique_ptr<ImpalaMCJITMemoryManager> memory_manager(new ImpalaMCJITMemoryManager);
@@ -622,10 +624,13 @@ Status LlvmCodeGen::MaterializeFunctionHelper(llvm::Function* fn) {
   DCHECK(!is_compiled_);
   if (fn->isIntrinsic() || !fn->isMaterializable()) return Status::OK();
 
-  std::error_code err = module_->materialize(fn);
+  llvm::Error err = module_->materialize(fn);
   if (UNLIKELY(err)) {
+    string err_string;
+    llvm::handleAllErrors(
+        move(err), [&](llvm::ErrorInfoBase& eib) { err_string = eib.message(); });
     return Status(Substitute("Failed to materialize $0: $1",
-        fn->getName().str(), err.message()));
+        fn->getName().str(), err_string));
   }
 
   // Materialized functions are marked as not materializable by LLVM.
@@ -723,8 +728,8 @@ bool LlvmCodeGen::VerifyFunction(llvm::Function* fn) {
 
   if (is_corrupt_) {
     string fn_name = fn->getName(); // llvm has some fancy operator overloading
-    LOG(ERROR) << "Function corrupt: " << fn_name;
-    fn->dump();
+    LOG(ERROR) << "Function corrupt: " << fn_name <<"\nFunction Dump: "
+        << LlvmCodeGen::Print(fn);
     return false;
   }
   return true;
@@ -783,8 +788,8 @@ llvm::Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
   return fn;
 }
 
-Status LlvmCodeGen::LoadFunction(const TFunction& fn, const std::string& symbol,
-    const ColumnType* return_type, const std::vector<ColumnType>& arg_types,
+Status LlvmCodeGen::LoadFunction(const TFunction& fn, const string& symbol,
+    const ColumnType* return_type, const vector<ColumnType>& arg_types,
     int num_fixed_args, bool has_varargs, llvm::Function** llvm_fn,
     LibCacheEntry** cache_entry) {
   DCHECK_GE(arg_types.size(), num_fixed_args);
@@ -1011,15 +1016,21 @@ llvm::Function* LlvmCodeGen::FinalizeFunction(llvm::Function* function) {
     return NULL;
   }
   finalized_functions_.insert(function);
-  if (FLAGS_dump_ir) function->dump();
+  if (FLAGS_dump_ir) {
+    string fn_name = function->getName();
+    LOG(INFO) << "Dump of Function "<< fn_name << ": " << LlvmCodeGen::Print(function);
+  }
   return function;
 }
 
 Status LlvmCodeGen::MaterializeModule() {
-  std::error_code err = module_->materializeAll();
+  llvm::Error err = module_->materializeAll();
   if (UNLIKELY(err)) {
+    string err_string;
+    llvm::handleAllErrors(
+        move(err), [&](llvm::ErrorInfoBase& eib) { err_string = eib.message(); });
     return Status(Substitute("Failed to materialize module $0: $1",
-        module_->getName().str(), err.message()));
+        module_->getName().str(), err_string));
   }
   return Status::OK();
 }

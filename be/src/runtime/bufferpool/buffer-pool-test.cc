@@ -1960,7 +1960,7 @@ void BufferPoolTest::TestRandomInternalMulti(
   }
 
   AtomicInt32 stop_maintenance(0);
-  thread* maintenance_thread = new thread([this, &pool, &stop_maintenance]() {
+  thread* maintenance_thread = new thread([&pool, &stop_maintenance]() {
     while (stop_maintenance.Load() == 0) {
       pool.Maintenance();
       SleepForMs(50);
@@ -2171,7 +2171,7 @@ TEST_F(BufferPoolTest, ConcurrentBufferOperations) {
   // Allocate threads allocate buffers whenever able and enqueue them.
   for (int i = 0; i < ALLOCATE_THREADS; ++i) {
     allocate_threads.add_thread(new thread([&] {
-        for (int i = 0; i < NUM_ALLOCATIONS_PER_THREAD; ++i) {
+        for (int j = 0; j < NUM_ALLOCATIONS_PER_THREAD; ++j) {
           // Try to deduct reservation.
           while (true) {
             int64_t val = available_reservation.Load();
@@ -2182,7 +2182,7 @@ TEST_F(BufferPoolTest, ConcurrentBufferOperations) {
           }
           BufferHandle buffer;
           ASSERT_OK(pool.AllocateBuffer(&client, TEST_BUFFER_LEN, &buffer));
-          uint8_t first_byte = static_cast<uint8_t>(i % 256);
+          uint8_t first_byte = static_cast<uint8_t>(j % 256);
           buffer.data()[0] = first_byte;
           delete_queue.BlockingPut(pair<uint8_t, BufferHandle>(first_byte, move(buffer)));
         }
