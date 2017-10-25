@@ -1262,6 +1262,13 @@ Welcome to the Impala shell.
 """ \
   % (VERSION_STRING, _format_tip(random.choice(TIPS)))
 
+REFRESH_AFTER_CONNECT_DEPRECATION_WARNING = """
++==========================================================================+
+| DEPRECATION WARNING:                                                     |
+| -r/--refresh_after_connect is deprecated and will be removed in a future |
+| version of Impala shell.                                                 |
++==========================================================================+"""
+
 def print_to_stderr(message):
   print >> sys.stderr, message
 
@@ -1442,6 +1449,8 @@ if __name__ == "__main__":
     intro += ("\n\nLDAP authentication is enabled, but the connection to Impala is "
               "not secured by TLS.\nALL PASSWORDS WILL BE SENT IN THE CLEAR TO IMPALA.\n")
 
+  if options.refresh_after_connect:
+    intro += REFRESH_AFTER_CONNECT_DEPRECATION_WARNING
   shell = ImpalaShell(options)
   while shell.is_alive:
     try:
