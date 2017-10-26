@@ -132,4 +132,75 @@ under the License.
     </conbody>
   </concept>
 
+  <concept id="tls_min_version" rev="2.10.0 IMPALA-5743">
+
+    <title>Specifying TLS/SSL Minimum Allowed Version and Ciphers</title>
+
+    <conbody>
+
+      <p>
+        Depending on your cluster configuration and the security practices in your
+        organization, you might need to restrict the allowed versions of TLS/SSL
+        used by Impala. Older TLS/SSL versions might have vulnerabilities or lack
+        certain features. In <keyword keyref="impala210_full"/>, you can use startup
+        options for the <cmdname>impalad</cmdname>, <cmdname>catalogd</cmdname>,
+        and <cmdname>statestored</cmdname> daemons to specify a minimum allowed
+        version of TLS/SSL.
+      </p>
+
+      <p>
+        Specify one of the following values for the <codeph>--ssl_minimum_version</codeph>
+        configuration setting:
+      </p>
+
+      <ul>
+        <li>
+          <p>
+            <codeph>tlsv1</codeph>: Allow any TLS version of 1.0 or higher.
+            This setting is the default when TLS/SSL is enabled.
+          </p>
+        </li>
+        <li>
+          <p>
+            <codeph>tlsv1.1</codeph>: Allow any TLS version of 1.1 or higher.
+          </p>
+        </li>
+        <li>
+          <p>
+            <codeph>tlsv1.2</codeph>: Allow any TLS version of 1.2 or higher.
+          </p>
+        </li>
+      </ul>
+      <note>
+        <p>
+          As of <keyword keyref="impala210_full"/>, TLSv1.2 may not work for Impala on RHEL 6
+          or CentOS 6, even if OpenSSL 1.0.1 is available. The daemons fail to start, with a
+          socket error stating the TLS version is not supported. The underlying cause is related to
+          <xref href="https://bugzilla.redhat.com/show_bug.cgi?id=1497859" scope="external" format="html">Red Hat issue 1497859</xref>.
+          The issue applies if you build on a RHEL 6 or CentOS 6 system with OpenSSL 1.0.0, and
+          run on a RHEL 6 or CentOS 6 system with OpenSSL 1.0.1.
+        </p>
+      </note>
+
+      <p>
+        Along with specifying the version, you can also specify the allowed set of TLS ciphers
+        by using the <codeph>--ssl_cipher_list</codeph> configuration setting. The argument to
+        this option is a list of keywords, separated by colons, commas, or spaces, and
+        optionally including other notation. For example:
+      </p>
+
+<codeblock>
+--ssl_cipher_list="RC4-SHA,RC4-MD5"
+</codeblock>
+
+      <p>
+        By default, the cipher list is empty, and Impala uses the default cipher list for
+        the underlying platform. See the output of <cmdname>man ciphers</cmdname> for the full
+        set of keywords and notation allowed in the argument string.
+      </p>
+
+    </conbody>
+
+  </concept>
+
 </concept>
