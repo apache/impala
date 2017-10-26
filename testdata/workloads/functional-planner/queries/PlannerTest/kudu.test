@@ -426,6 +426,27 @@ INSERT INTO KUDU [functional_kudu.alltypes]
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ====
+# Hint - noclustered should remove the sort node from CTAS.
+create /* +noclustered */ table t
+primary key(id) partition by hash(id) partitions 3 stored as kudu as
+select * from functional.alltypes;
+---- DISTRIBUTEDPLAN
+INSERT INTO KUDU [default.t]
+|
+01:EXCHANGE [KUDU(KuduPartition(functional.alltypes.id))]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+create /* +noclustered,noshuffle */ table t
+primary key(id) partition by hash(id) partitions 3 stored as kudu as
+select * from functional.alltypes;
+---- DISTRIBUTEDPLAN
+INSERT INTO KUDU [default.t]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
 # IMPALA-5602: If a query contains predicates that are all pushed to kudu and there is a
 # limit, then the query should not incorrectly run with 'small query' optimization.
 select * from functional_kudu.alltypesagg where tinyint_col = 9 limit 10;

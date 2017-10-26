@@ -1830,6 +1830,34 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestCreateTableAsSelectWithHints() throws AnalysisException {
+    // Test if CTAS hints are analyzed correctly and that conflicting hints
+    // result in error.
+    // The tests here are minimal, because other tests already cover this logic:
+    // - ParserTests#TestPlanHints tests if hints are set correctly during parsing.
+    // - AnalyzeStmtsTest#TestInsertHints tests the analyzes of insert hints, which
+    //   is the same as the analyzes of CTAS hints.
+    for (String[] hintStyle: hintStyles_) {
+      String prefix = hintStyle[0];
+      String suffix = hintStyle[1];
+      // Test plan hints for partitioned Hdfs tables.
+      AnalyzesOk(String.format("create %sshuffle%s table t " +
+          "partitioned by (year, month) as select * from functional.alltypes",
+          prefix, suffix));
+      // Warn on unrecognized hints.
+      AnalyzesOk(String.format("create %sbadhint%s table t " +
+          "partitioned by (year, month) as select * from functional.alltypes",
+          prefix, suffix),
+          "INSERT hint not recognized: badhint");
+      // Conflicting plan hints.
+      AnalysisError(String.format("create %sshuffle,noshuffle%s table t " +
+          "partitioned by (year, month) as " +
+          "select * from functional.alltypes", prefix, suffix),
+          "Conflicting INSERT hints: shuffle and noshuffle");
+    }
+  }
+
+  @Test
   public void TestCreateTableLike() throws AnalysisException {
     AnalyzesOk("create table if not exists functional.new_tbl like functional.alltypes");
     AnalyzesOk("create table functional.like_view like functional.view_view");

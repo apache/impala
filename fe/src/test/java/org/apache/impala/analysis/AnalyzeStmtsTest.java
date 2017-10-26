@@ -1737,12 +1737,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
   @Test
   public void TestSelectListHints() throws AnalysisException {
-    String[][] hintStyles = new String[][] {
-        new String[] { "/* +", "*/" }, // traditional commented hint
-        new String[] { "\n-- +", "\n" }, // eol commented hint
-        new String[] { "", "" } // without surrounding characters
-    };
-    for (String[] hintStyle: hintStyles) {
+    for (String[] hintStyle: hintStyles_) {
       String prefix = hintStyle[0];
       String suffix = hintStyle[1];
       AnalyzesOk(String.format(
