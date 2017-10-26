@@ -383,7 +383,7 @@ nonterminal Subquery subquery;
 nonterminal JoinOperator join_operator;
 nonterminal opt_inner, opt_outer;
 nonterminal PlanHint plan_hint;
-nonterminal List<PlanHint> opt_plan_hints, plan_hint_list;
+nonterminal List<PlanHint> plan_hints, opt_plan_hints, plan_hint_list;
 nonterminal TypeDef type_def;
 nonterminal Type type;
 nonterminal Expr sign_chain_expr;
@@ -417,6 +417,7 @@ nonterminal DropStatsStmt drop_stats_stmt;
 nonterminal DropTableOrViewStmt drop_tbl_or_view_stmt;
 nonterminal CreateDbStmt create_db_stmt;
 nonterminal CreateTableAsSelectStmt create_tbl_as_select_stmt;
+nonterminal CreateTableAsSelectStmt.CtasParams create_tbl_as_select_params;
 nonterminal CreateTableLikeStmt create_tbl_like_stmt;
 nonterminal CreateTableStmt create_tbl_stmt;
 nonterminal TableDef tbl_def_without_col_defs, tbl_def_with_col_defs;
@@ -1103,13 +1104,30 @@ create_db_stmt ::=
   {: RESULT = new CreateDbStmt(db_name, comment, location, if_not_exists); :}
   ;
 
+
+// Merging the two cases using opt_plan_hints would lead to reduce-reduce conflict,
+// because if there are no hints, CTAS cannot be distinguished from normal CREATE
+// statements until the AS SELECT part, but the decision whether to reduce empty string
+// to opt_plan_hints must happen before reaching that part.
 create_tbl_as_select_stmt ::=
+  KW_CREATE create_tbl_as_select_params:ctas_params
+  {:
+    RESULT = new CreateTableAsSelectStmt(ctas_params, null);
+  :}
+  | KW_CREATE plan_hints:hints create_tbl_as_select_params:ctas_params
+  {:
+    RESULT = new CreateTableAsSelectStmt(ctas_params, hints);
+  :}
+  ;
+
+create_tbl_as_select_params ::=
   tbl_def_without_col_defs:tbl_def
   tbl_options:options
   KW_AS query_stmt:select_stmt
   {:
     tbl_def.setOptions(options);
-    RESULT = new CreateTableAsSelectStmt(new CreateTableStmt(tbl_def), select_stmt, null);
+    RESULT = new CreateTableAsSelectStmt.CtasParams(new CreateTableStmt(tbl_def),
+        select_stmt, null);
   :}
   | tbl_def_without_col_defs:tbl_def
     // An optional clause cannot be used directly below because it would conflict with
@@ -1122,7 +1140,8 @@ create_tbl_as_select_stmt ::=
     tbl_def.getPrimaryKeyColumnNames().addAll(primary_keys);
     tbl_def.getKuduPartitionParams().addAll(partition_params.getKuduPartitionParams());
     tbl_def.setOptions(options);
-    RESULT = new CreateTableAsSelectStmt(new CreateTableStmt(tbl_def), select_stmt, null);
+    RESULT = new CreateTableAsSelectStmt.CtasParams(new CreateTableStmt(tbl_def),
+        select_stmt, null);
   :}
   | tbl_def_without_col_defs:tbl_def
     KW_PARTITIONED KW_BY LPAREN ident_list:partition_cols RPAREN
@@ -1130,19 +1149,19 @@ create_tbl_as_select_stmt ::=
     KW_AS query_stmt:select_stmt
   {:
     tbl_def.setOptions(options);
-    RESULT = new CreateTableAsSelectStmt(new CreateTableStmt(tbl_def),
+    RESULT = new CreateTableAsSelectStmt.CtasParams(new CreateTableStmt(tbl_def),
         select_stmt, partition_cols);
   :}
   ;
 
 create_tbl_stmt ::=
-  tbl_def_without_col_defs:tbl_def
+  KW_CREATE tbl_def_without_col_defs:tbl_def
   tbl_options:options
   {:
     tbl_def.setOptions(options);
     RESULT = new CreateTableStmt(tbl_def);
   :}
-  | tbl_def_without_col_defs:tbl_def
+  | KW_CREATE tbl_def_without_col_defs:tbl_def
     // If "opt_tbl_data_layout" were used instead so that this rule could be combined with
     // the rule above, there would be a conflict with the first rule in
     // "create_tbl_as_select_stmt".
@@ -1154,7 +1173,7 @@ create_tbl_stmt ::=
     create_tbl_stmt.getPartitionColumnDefs().addAll(partition_column_defs);
     RESULT = create_tbl_stmt;
   :}
-  | tbl_def_with_col_defs:tbl_def
+  | KW_CREATE tbl_def_with_col_defs:tbl_def
     opt_tbl_data_layout:data_layout
     tbl_options:options
   {:
@@ -1163,7 +1182,7 @@ create_tbl_stmt ::=
     tbl_def.setOptions(options);
     RESULT = new CreateTableStmt(tbl_def);
   :}
-  | tbl_def_with_col_defs:tbl_def
+  | KW_CREATE tbl_def_with_col_defs:tbl_def
     KW_PRODUCED KW_BY KW_DATA source_ident:is_source_id ident_or_default:data_src_name
     opt_init_string_val:init_string
     opt_comment_val:comment
@@ -1177,7 +1196,7 @@ create_tbl_stmt ::=
     RESULT = new CreateTableDataSrcStmt(new CreateTableStmt(tbl_def),
         data_src_name, init_string);
   :}
-  | tbl_def_without_col_defs:tbl_def
+  | KW_CREATE tbl_def_without_col_defs:tbl_def
     KW_LIKE file_format_val:schema_file_format
     STRING_LITERAL:schema_location
     opt_tbl_data_layout:data_layout
@@ -1197,7 +1216,7 @@ create_tbl_stmt ::=
 // TODO: Refactor the CREATE TABLE statements to improve the grammar and the way we
 // handle table options.
 create_tbl_like_stmt ::=
-  tbl_def_without_col_defs:tbl_def
+  KW_CREATE tbl_def_without_col_defs:tbl_def
   KW_LIKE table_name:other_table
   opt_comment_val:comment
   file_format_create_table_val:file_format location_val:location
@@ -1207,7 +1226,7 @@ create_tbl_like_stmt ::=
   :}
   // This extra production is necessary since without it the parser will not be able to
   // parse "CREATE TABLE A LIKE B".
-  | tbl_def_without_col_defs:tbl_def
+  | KW_CREATE tbl_def_without_col_defs:tbl_def
     opt_sort_cols:sort_cols
     KW_LIKE table_name:other_table
     opt_comment_val:comment
@@ -1221,8 +1240,8 @@ create_tbl_like_stmt ::=
 // Used for creating tables where the schema is inferred externally, e.g., from an Avro
 // schema, Kudu table or query statement.
 tbl_def_without_col_defs ::=
-  KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
-  table_name:table
+  external_val:external KW_TABLE
+  if_not_exists_val:if_not_exists table_name:table
   {: RESULT = new TableDef(table, external, if_not_exists); :}
   ;
 
@@ -2529,6 +2548,13 @@ opt_outer ::=
   ;
 
 opt_plan_hints ::=
+  plan_hints:hints
+  {: RESULT = hints; :}
+  | /* empty */
+  {: RESULT = Lists.newArrayList(); :}
+  ;
+
+plan_hints ::=
   COMMENTED_PLAN_HINT_START plan_hint_list:hints COMMENTED_PLAN_HINT_END
   {: RESULT = hints; :}
   /* legacy straight_join hint style */
@@ -2537,8 +2563,6 @@ opt_plan_hints ::=
   /* legacy plan-hint style */
   | LBRACKET plan_hint_list:hints RBRACKET
   {: RESULT = hints; :}
-  | /* empty */
-  {: RESULT = Lists.newArrayList(); :}
   ;
 
 plan_hint ::=

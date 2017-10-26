@@ -204,6 +204,37 @@ WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ====
+# IMPALA-4167: if no (no)shuffle hint is given for CTAS into partitioned HDFS table, then
+# Impala is free to decide whether to add an exchange node or not. In this example, the
+# planner decides to shuffle. The aim of this test is to have a reference query where
+# noshuffle hint would lead to a different plan.
+# Note that noclustered hint is added to ensure consistent plans on Impala 2.x and 3.x,
+# because IMPALA-5293 changed clustered to be the default on 3.x.
+create /*+ noclustered */table t partitioned by (year, month) as
+select * from functional.alltypes
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
+|  partitions=24
+|
+01:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# IMPALA-4167: non-shuffled CTAS into partitioned table has no exchange node before write.
+# Note that plan hint tests for CTAS are minimal by design, as this logic is covered well
+# in insert.test.
+# Note that noclustered hint is added to ensure consistent plans on Impala 2.x and 3.x,
+# because IMPALA-5293 changed clustered to be the default on 3.x.
+create /*+ noshuffle, noclustered */ table t partitioned by (year, month) as
+select * from functional.alltypes
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
+|  partitions=24
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
 # CTAS with more complex select query
 create table t partitioned by (c_nationkey) sort by (c_custkey) as
 select c_custkey, max(o_totalprice) as maxprice, c_nationkey

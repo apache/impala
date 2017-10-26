@@ -300,11 +300,19 @@ public class ParserTest extends FrontendTestBase {
     assertEquals(Lists.newArrayList(expectedHints), actualHints);
   }
 
-  private void VerifyHints(List<PlanHint> actualHints, String... expectedHints) {
-    List<String> stringHints = Lists.newArrayList();
-    for (PlanHint hint: actualHints) stringHints.add(hint.toString());
-    if (stringHints.isEmpty()) stringHints = Lists.newArrayList((String) null);
-    assertEquals(Lists.newArrayList(expectedHints), stringHints);
+  /**
+   * Creates an insert into, an insert overwrite, and a CTAS statement with
+   * the given hints and checks that the parsed hints are the same as the expected hints.
+   */
+  private void TestInsertAndCtasHints(String insertPart, String ctasPart,
+        String[] hintStyle, String hints, String... expectedHints) {
+    String hintsPart = hintStyle[0] + hints + hintStyle[1];
+    TestInsertStmtHints(String.format("insert %%s into %s %%s select * from t",
+        insertPart), hintsPart, expectedHints);
+    TestInsertStmtHints(String.format("insert %%s overwrite %s %%s select * from t",
+        insertPart), hintsPart, expectedHints);
+    TestCtasHints(String.format("create %s table %s as select * from t",
+        hintsPart, ctasPart), expectedHints);
   }
 
   /**
@@ -313,8 +321,8 @@ public class ParserTest extends FrontendTestBase {
    */
   private void TestInsertStmtHints(String pattern, String hint, String... expectedHints) {
     for (InsertStmt.HintLocation loc: InsertStmt.HintLocation.values()) {
-      VerifyHints(((InsertStmt) ParsesOk(InjectInsertHint(pattern, hint, loc)))
-          .getPlanHints(), expectedHints);
+      InsertStmt insertStmt = (InsertStmt) ParsesOk(InjectInsertHint(pattern, hint, loc));
+      assertEquals(expectedHints, HintsToStrings(insertStmt.getPlanHints()));
     }
   }
 
@@ -328,20 +336,28 @@ public class ParserTest extends FrontendTestBase {
     }
   }
 
+  /**
+   * Parses stmt and checks that the CTAS hints stmt are the expected hints.
+   */
+  private void TestCtasHints(String stmt, String... expectedHints) {
+    CreateTableAsSelectStmt ctasStmt = (CreateTableAsSelectStmt) ParsesOk(stmt);
+    assertEquals(expectedHints, HintsToStrings(ctasStmt.getInsertStmt().getPlanHints()));
+  }
+
+  static private String[] HintsToStrings(List<PlanHint> hints) {
+    if (hints.isEmpty()) return new String[] { null };
+    String[] hintAsStrings = new String[hints.size()];
+    for (int i = 0; i < hints.size(); ++i) hintAsStrings[i] = hints.get(i).toString();
+    return hintAsStrings;
+  }
+
   @Test
   public void TestPlanHints() {
-    // All plan-hint styles embed a comma-separated list of hints.
-    String[][] hintStyles = new String[][] {
-        new String[] { "/* +", "*/" }, // traditional commented hint
-        new String[] { "-- +", "\n" }, // eol commented hint
-        new String[] { "\n-- +", "\n" }, // eol commented hint
-        new String[] { "[", "]" } // legacy style
-    };
     String[][] commentStyles = new String[][] {
         new String[] { "/*", "*/" }, // traditional comment
         new String[] { "--", "\n" } // eol comment
     };
-    for (String[] hintStyle: hintStyles) {
+    for (String[] hintStyle: hintStyles_) {
       String prefix = hintStyle[0];
       String suffix = hintStyle[1];
       // Test join hints.
@@ -389,17 +405,14 @@ public class ParserTest extends FrontendTestBase {
               "join %sshuffle%s functional.alltypes e using(string_col)",
               suffix, suffix, suffix, suffix, prefix, "", "", ""));
 
-      // Test insert hints.
-      TestInsertStmtHints("insert %s into t %s select * from t",
-           String.format("%snoshuffle%s", prefix, suffix), "noshuffle");
-      TestInsertStmtHints("insert %s overwrite t %s select * from t",
-           String.format("%snoshuffle%s", prefix, suffix), "noshuffle");
-      TestInsertStmtHints("insert %s into t partition(x, y) %s select * from t",
-           String.format("%snoshuffle%s", prefix, suffix), "noshuffle");
-      TestInsertStmtHints("insert %s into t(a, b) partition(x, y) %s select * from t",
-           String.format("%sshuffle%s", prefix, suffix), "shuffle");
-      TestInsertStmtHints("insert %s overwrite t(a, b) partition(x, y) %s select * from t",
-           String.format("%sfoo,bar,baz%s", prefix, suffix), "foo", "bar", "baz");
+      // Test insert/CTAS hints.
+      TestInsertAndCtasHints("t", "t", hintStyle, "noshuffle", "noshuffle");
+      TestInsertAndCtasHints("t partition(x, y)", "t partitioned by(x, y)",
+          hintStyle, "noshuffle", "noshuffle");
+      TestInsertAndCtasHints("t(a, b) partition(x, y)", "t partitioned by(x, y)",
+          hintStyle, "shuffle", "shuffle");
+      TestInsertAndCtasHints("t(a, b) partition(x, y)", "t partitioned by(x, y)",
+          hintStyle, "foo,bar,baz", "foo", "bar", "baz");
 
       // Test upsert hints.
       TestInsertStmtHints("upsert %s into t %s select * from t",
@@ -488,14 +501,29 @@ public class ParserTest extends FrontendTestBase {
       ParserErrorOnInsertStmtHints("insert %s into t %s select * from t",
            String.format("%shint_with_args(  a  ,  , ,,, b  )%s", prefix, suffix));
 
-      // Negative tests for hints cannot be specified at the both avilable locations.
+      TestInsertAndCtasHints("t", "t",
+          hintStyle, "hint_with_args(a)", "hint_with_args(a)");
+      TestInsertAndCtasHints("t", "t",
+          hintStyle, "clustered,shuffle,hint_with_args(a)",
+          "clustered", "shuffle", "hint_with_args(a)");
+      TestInsertAndCtasHints("t", "t",
+          hintStyle, "hint_with_args(a,b)", "hint_with_args(a,b)");
+      TestInsertAndCtasHints("t", "t",
+          hintStyle, "hint_with_args(a  , b)", "hint_with_args(a,b)");
+
+      ParserErrorOnInsertStmtHints("insert %s into t %s select * from t",
+          String.format("%shint_with_args(  a  ,  , ,,, b  )%s", prefix, suffix));
+      ParserError(String.format(
+         "create table t %shint_with_args(  a  ,  , ,,, b  )%s as select * from t",
+         prefix, suffix));
+
+      // Negative tests for hints cannot be specified at the both available locations.
       ParserError(String.format("insert %s into t %s select * from t",
            String.format("%sshuffle%s", prefix, suffix),
            String.format("%sclustered%s", prefix, suffix)));
       ParserError(String.format("upsert %s into t %s select * from t",
            String.format("%sshuffle%s", prefix, suffix),
            String.format("%sclustered%s", prefix, suffix)));
-
     }
     // No "+" at the beginning so the comment is not recognized as a hint.
     TestJoinHints("select * from functional.alltypes a join /* comment */" +
@@ -504,6 +532,8 @@ public class ParserTest extends FrontendTestBase {
         (String) null);
     TestInsertStmtHints("insert %s into t(a, b) partition(x, y) %s select 1",
         "/* comment */", (String) null);
+    TestCtasHints("create /* comment */ table t partitioned by (x, y) as select 1",
+        (String) null);
     TestSelectListHints("select /* -- +straight_join */ * from functional.alltypes",
         (String) null);
     TestSelectListHints("select /* abcdef +straight_join */ * from functional.alltypes",

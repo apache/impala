@@ -84,6 +84,11 @@ public class FrontendTestBase {
   // Test-local list of test databases and tables. These are cleaned up in @After.
   protected final List<Db> testDbs_ = Lists.newArrayList();
   protected final List<Table> testTables_ = Lists.newArrayList();
+  protected final String[][] hintStyles_ = new String[][] {
+      new String[] { "/* +", "*/" }, // traditional commented hint
+      new String[] { "\n-- +", "\n" }, // eol commented hint
+      new String[] { "[", "]" } // legacy style
+  };
 
   @BeforeClass
   public static void setUp() throws Exception {
