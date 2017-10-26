@@ -79,35 +79,37 @@ TEST_F(RawValueTest, TypeChar) {
 // IMPALA-2270: "", false, and NULL should hash to distinct values.
 TEST_F(RawValueTest, HashEmptyAndNull) {
   uint32_t seed = 12345;
-  uint32_t null_hash = RawValue::GetHashValue(NULL, TYPE_STRING, seed);
-  uint32_t null_hash_fnv = RawValue::GetHashValueFnv(NULL, TYPE_STRING, seed);
-  StringValue empty(NULL, 0);
-  uint32_t empty_hash = RawValue::GetHashValue(&empty, TYPE_STRING, seed);
-  uint32_t empty_hash_fnv = RawValue::GetHashValueFnv(&empty, TYPE_STRING, seed);
+  uint32_t hash_null = RawValue::GetHashValue(nullptr, TYPE_STRING, seed);
+  uint64_t fast_hash_null = RawValue::GetHashValueFastHash(nullptr, TYPE_STRING, seed);
+  StringValue empty(nullptr, 0);
+  uint32_t hash_empty = RawValue::GetHashValue(&empty, TYPE_STRING, seed);
+  uint64_t fast_hash_empty =
+      RawValue::GetHashValueFastHash(&empty, TYPE_STRING, seed);
   bool false_val = false;
-  uint32_t false_hash = RawValue::GetHashValue(&false_val, TYPE_BOOLEAN, seed);
-  uint32_t false_hash_fnv = RawValue::GetHashValue(&false_val, TYPE_BOOLEAN, seed);
-  EXPECT_NE(seed, null_hash);
-  EXPECT_NE(seed, empty_hash);
-  EXPECT_NE(seed, false_hash);
-  EXPECT_NE(seed, null_hash_fnv);
-  EXPECT_NE(seed, empty_hash_fnv);
-  EXPECT_NE(seed, false_hash_fnv);
-  EXPECT_NE(null_hash, empty_hash);
-  EXPECT_NE(null_hash_fnv, empty_hash_fnv);
-  EXPECT_NE(null_hash, false_hash);
-  EXPECT_NE(false_hash, null_hash_fnv);
+  uint32_t hash_false = RawValue::GetHashValue(&false_val, TYPE_BOOLEAN, seed);
+  uint64_t fast_hash_false =
+      RawValue::GetHashValueFastHash(&false_val, TYPE_BOOLEAN, seed);
+  EXPECT_NE(seed, hash_null);
+  EXPECT_NE(seed, hash_empty);
+  EXPECT_NE(seed, hash_false);
+  EXPECT_NE(seed, fast_hash_null);
+  EXPECT_NE(seed, fast_hash_empty);
+  EXPECT_NE(seed, fast_hash_false);
+  EXPECT_NE(hash_null, hash_empty);
+  EXPECT_NE(fast_hash_null, fast_hash_empty);
+  EXPECT_NE(hash_null, hash_false);
+  EXPECT_NE(hash_false, fast_hash_null);
 }
 
-/// IMPALA-2270: Test that FNV hash of (int, "") is not skewed.
+/// IMPALA-2270: Test that FastHash of (int, "") is not skewed.
 TEST(HashUtil, IntNullSkew) {
   int num_values = 100000;
   int num_buckets = 16;
   vector<int> buckets(num_buckets, 0);
   for (int32_t i = 0; i < num_values; ++i) {
-    uint32_t hash = RawValue::GetHashValueFnv(&i, TYPE_INT, 9999);
-    StringValue empty(NULL, 0);
-    hash = RawValue::GetHashValueFnv(&empty, TYPE_STRING, hash);
+    uint64_t hash = RawValue::GetHashValueFastHash(&i, TYPE_INT, 9999);
+    StringValue empty(nullptr, 0);
+    hash = RawValue::GetHashValueFastHash(&empty, TYPE_STRING, hash);
     ++buckets[hash % num_buckets];
   }
 

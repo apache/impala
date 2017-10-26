@@ -1584,10 +1584,6 @@ static Function* GetLenOptimizedHashFn(
   return codegen->FinalizeFunction(fn);
 }
 
-Function* LlvmCodeGen::GetFnvHashFunction(int len) {
-  return GetLenOptimizedHashFn(this, IRFunction::HASH_FNV, len);
-}
-
 Function* LlvmCodeGen::GetMurmurHashFunction(int len) {
   return GetLenOptimizedHashFn(this, IRFunction::HASH_MURMUR, len);
 }

@@ -464,17 +464,16 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
     int num_channels = channels_.size();
     for (int i = 0; i < batch->num_rows(); ++i) {
       TupleRow* row = batch->GetRow(i);
-      uint32_t hash_val = HashUtil::FNV_SEED;
-      for (int i = 0; i < partition_exprs_.size(); ++i) {
-        ScalarExprEvaluator* eval = partition_expr_evals_[i];
+      uint64_t hash_val = EXCHANGE_HASH_SEED;
+      for (int j = 0; j < partition_exprs_.size(); ++j) {
+        ScalarExprEvaluator* eval = partition_expr_evals_[j];
         void* partition_val = eval->GetValue(row);
-        // We can't use the crc hash function here because it does not result
-        // in uncorrelated hashes with different seeds.  Instead we must use
-        // fnv hash.
+        // We can't use the crc hash function here because it does not result in
+        // uncorrelated hashes with different seeds. Instead we use FastHash.
         // TODO: fix crc hash/GetHashValue()
-        DCHECK(&partition_expr_evals_[i]->root() == partition_exprs_[i]);
-        hash_val = RawValue::GetHashValueFnv(
-            partition_val, partition_exprs_[i]->type(), hash_val);
+        DCHECK(&(eval->root()) == partition_exprs_[j]);
+        hash_val = RawValue::GetHashValueFastHash(
+            partition_val, partition_exprs_[j]->type(), hash_val);
       }
       RETURN_IF_ERROR(channels_[hash_val % num_channels]->AddRow(row));
     }

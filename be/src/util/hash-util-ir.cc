@@ -23,11 +23,6 @@
 using namespace impala;
 
 extern "C"
-uint32_t IrFnvHash(const void* data, int32_t bytes, uint32_t hash) {
-  return HashUtil::FnvHash64to32(data, bytes, hash);
-}
-
-extern "C"
 uint32_t IrMurmurHash(const void* data, int32_t bytes, uint32_t hash) {
   return HashUtil::MurmurHash2_64(data, bytes, hash);
 }

@@ -96,7 +96,6 @@ ir_functions = [
   ["SCALAR_EXPR_GET_DECIMAL_VAL",
    "_ZN6impala10ScalarExpr13GetDecimalValEPS0_PNS_19ScalarExprEvaluatorEPKNS_8TupleRowE"],
   ["HASH_CRC", "IrCrcHash"],
-  ["HASH_FNV", "IrFnvHash"],
   ["HASH_MURMUR", "IrMurmurHash"],
   ["PHJ_PROCESS_BUILD_BATCH",
    "_ZN6impala10PhjBuilder17ProcessBuildBatchEPNS_8RowBatchEPNS_12HashTableCtxEbb"],

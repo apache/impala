@@ -153,6 +153,9 @@ class DataStreamSender : public DataSink {
   /// Used for Kudu partitioning to round-robin rows that don't correspond to a partition
   /// or when errors are encountered.
   int next_unknown_partition_;
+
+  /// An arbitrary hash seed used for exchanges.
+  static constexpr uint64_t EXCHANGE_HASH_SEED = 0x66bd68df22c3ef37;
 };
 
 }

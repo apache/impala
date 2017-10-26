@@ -71,12 +71,10 @@ class RawValue {
   static inline uint32_t GetHashValueNonNull(const T* v, const ColumnType& type,
       uint32_t seed = 0);
 
-  /// Get a 32-bit hash value using the FNV hash function.
-  /// Using different seeds with FNV results in different hash functions.
-  /// GetHashValue() does not have this property and cannot be safely used as the first
-  /// step in data repartitioning. However, GetHashValue() can be significantly faster.
-  /// TODO: fix GetHashValue
-  static uint32_t GetHashValueFnv(const void* v, const ColumnType& type, uint32_t seed);
+  /// Get a 64-bit hash value using the FastHash function.
+  /// https://code.google.com/archive/p/fast-hash/
+  static uint64_t GetHashValueFastHash(const void* v, const ColumnType& type,
+      uint64_t seed);
 
   /// Compares both values.
   /// Return value is < 0  if v1 < v2, 0 if v1 == v2, > 0 if v1 > v2.

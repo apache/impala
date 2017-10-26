@@ -139,16 +139,16 @@ bigint,string,bigint
 ---- QUERY
 # Test several analytic functions with incompatible partition by and order by clauses
 # on top of a subplan that flattens a map.
-select id, key, value, max(key) over(partition by id), row_number() over (order by value)
-from complextypestbl t, t.int_map
+select id, key, value, max(key) over(partition by id), row_number()
+over (order by value, key) from complextypestbl t, t.int_map
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-1,'k1',1,'k2',2
-1,'k2',100,'k2',4
-2,'k1',2,'k2',3
-2,'k2',NULL,'k2',5
-7,'k1',NULL,'k3',6
-7,'k3',NULL,'k3',7
 8,'k1',-1,'k1',1
+1,'k1',1,'k2',2
+2,'k1',2,'k2',3
+1,'k2',100,'k2',4
+7,'k1',NULL,'k3',5
+2,'k2',NULL,'k2',6
+7,'k3',NULL,'k3',7
 ---- TYPES
 bigint,string,int,string,bigint
 ====
