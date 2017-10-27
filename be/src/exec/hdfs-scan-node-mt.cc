@@ -77,7 +77,7 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
       scanner_.reset();
     }
     RETURN_IF_ERROR(
-        runtime_state_->io_mgr()->GetNextRange(reader_context_, &scan_range_));
+        runtime_state_->io_mgr()->GetNextRange(reader_context_.get(), &scan_range_));
     if (scan_range_ == NULL) {
       *eos = true;
       StopAndFinalizeCounters();

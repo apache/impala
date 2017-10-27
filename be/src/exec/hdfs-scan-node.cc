@@ -254,7 +254,7 @@ void HdfsScanNode::AddMaterializedRowBatch(unique_ptr<RowBatch> row_batch) {
 Status HdfsScanNode::AddDiskIoRanges(const vector<DiskIoMgr::ScanRange*>& ranges,
     int num_files_queued) {
   RETURN_IF_ERROR(
-      runtime_state_->io_mgr()->AddScanRanges(reader_context_, ranges));
+      runtime_state_->io_mgr()->AddScanRanges(reader_context_.get(), ranges));
   num_unqueued_files_.Add(-num_files_queued);
   DCHECK_GE(num_unqueued_files_.Load(), 0);
   if (!ranges.empty()) ThreadTokenAvailableCb(runtime_state_->resource_pool());
@@ -428,7 +428,8 @@ void HdfsScanNode::ScannerThread() {
     // TODO: the Load() acts as an acquire barrier.  Is this needed? (i.e. any earlier
     // stores that need to complete?)
     AtomicUtil::MemoryBarrier();
-    Status status = runtime_state_->io_mgr()->GetNextRange(reader_context_, &scan_range);
+    Status status =
+        runtime_state_->io_mgr()->GetNextRange(reader_context_.get(), &scan_range);
 
     if (status.ok() && scan_range != NULL) {
       // Got a scan range. Process the range end to end (in this thread).
@@ -548,8 +549,8 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
 void HdfsScanNode::SetDoneInternal() {
   if (done_) return;
   done_ = true;
-  if (reader_context_ != NULL) {
-    runtime_state_->io_mgr()->CancelContext(reader_context_);
+  if (reader_context_ != nullptr) {
+    runtime_state_->io_mgr()->CancelContext(reader_context_.get());
   }
   materialized_row_batches_->Shutdown();
 }

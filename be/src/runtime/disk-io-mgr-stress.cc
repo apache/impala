@@ -19,6 +19,7 @@
 
 #include "runtime/disk-io-mgr-stress.h"
 
+#include "runtime/disk-io-mgr-reader-context.h"
 #include "util/time.h"
 
 #include "common/names.h"
@@ -57,7 +58,7 @@ string GenerateRandomData() {
 
 struct DiskIoMgrStress::Client {
   boost::mutex lock;
-  DiskIoRequestContext* reader;
+  unique_ptr<DiskIoRequestContext> reader;
   int file_idx;
   vector<DiskIoMgr::ScanRange*> scan_ranges;
   int abort_at_byte;
@@ -108,7 +109,7 @@ void DiskIoMgrStress::ClientThread(int client_id) {
 
     while (!eos) {
       DiskIoMgr::ScanRange* range;
-      Status status = io_mgr_->GetNextRange(client->reader, &range);
+      Status status = io_mgr_->GetNextRange(client->reader.get(), &range);
       CHECK(status.ok() || status.IsCancelled());
       if (range == NULL) break;
 
@@ -156,12 +157,12 @@ void DiskIoMgrStress::ClientThread(int client_id) {
 
     // Unregister the old client and get a new one
     unique_lock<mutex> lock(client->lock);
-    io_mgr_->UnregisterContext(client->reader);
+    io_mgr_->UnregisterContext(client->reader.get());
     NewClient(client_id);
   }
 
   unique_lock<mutex> lock(client->lock);
-  io_mgr_->UnregisterContext(client->reader);
+  io_mgr_->UnregisterContext(client->reader.get());
   client->reader = NULL;
 }
 
@@ -172,7 +173,7 @@ void DiskIoMgrStress::CancelRandomReader() {
   int rand_client = rand() % num_clients_;
 
   unique_lock<mutex> lock(clients_[rand_client].lock);
-  io_mgr_->CancelContext(clients_[rand_client].reader);
+  io_mgr_->CancelContext(clients_[rand_client].reader.get());
 }
 
 void DiskIoMgrStress::Run(int sec) {
@@ -197,7 +198,7 @@ void DiskIoMgrStress::Run(int sec) {
 
   for (int i = 0; i < num_clients_; ++i) {
     unique_lock<mutex> lock(clients_[i].lock);
-    if (clients_[i].reader != NULL) io_mgr_->CancelContext(clients_[i].reader);
+    if (clients_[i].reader != NULL) io_mgr_->CancelContext(clients_[i].reader.get());
   }
 
   readers_.join_all();
@@ -239,7 +240,7 @@ void DiskIoMgrStress::NewClient(int i) {
   }
 
   client_mem_trackers_[i].reset(new MemTracker(-1, "", &mem_tracker_));
-  io_mgr_->RegisterContext(&client.reader, client_mem_trackers_[i].get());
-  Status status = io_mgr_->AddScanRanges(client.reader, client.scan_ranges);
+  client.reader = io_mgr_->RegisterContext(client_mem_trackers_[i].get());
+  Status status = io_mgr_->AddScanRanges(client.reader.get(), client.scan_ranges);
   CHECK(status.ok());
 }

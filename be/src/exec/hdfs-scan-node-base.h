@@ -154,7 +154,7 @@ class HdfsScanNodeBase : public ScanNode {
   const HdfsTableDescriptor* hdfs_table() const { return hdfs_table_; }
   const AvroSchemaElement& avro_schema() const { return *avro_schema_.get(); }
   int skip_header_line_count() const { return skip_header_line_count_; }
-  DiskIoRequestContext* reader_context() const { return reader_context_; }
+  DiskIoRequestContext* reader_context() const { return reader_context_.get(); }
   bool optimize_parquet_count_star() const { return optimize_parquet_count_star_; }
   int parquet_count_star_slot_offset() const { return parquet_count_star_slot_offset_; }
 
@@ -336,7 +336,7 @@ class HdfsScanNodeBase : public ScanNode {
   const int parquet_count_star_slot_offset_;
 
   /// RequestContext object to use with the disk-io-mgr for reads.
-  DiskIoRequestContext* reader_context_ = nullptr;
+  std::unique_ptr<DiskIoRequestContext> reader_context_;
 
   /// Descriptor for tuples this scan node constructs
   const TupleDescriptor* tuple_desc_ = nullptr;

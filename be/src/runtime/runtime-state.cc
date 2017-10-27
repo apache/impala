@@ -223,22 +223,8 @@ Status RuntimeState::CheckQueryState() {
   return GetQueryStatus();
 }
 
-void RuntimeState::AcquireReaderContext(DiskIoRequestContext* reader_context) {
-  boost::lock_guard<SpinLock> l(reader_contexts_lock_);
-  reader_contexts_.push_back(reader_context);
-}
-
-void RuntimeState::UnregisterReaderContexts() {
-  boost::lock_guard<SpinLock> l(reader_contexts_lock_);
-  for (DiskIoRequestContext* context : reader_contexts_) {
-    io_mgr()->UnregisterContext(context);
-  }
-  reader_contexts_.clear();
-}
-
 void RuntimeState::ReleaseResources() {
   DCHECK(!released_resources_);
-  UnregisterReaderContexts();
   if (filter_bank_ != nullptr) filter_bank_->Close();
   if (resource_pool_ != nullptr) {
     exec_env_->thread_mgr()->UnregisterPool(resource_pool_);

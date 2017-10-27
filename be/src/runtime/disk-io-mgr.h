@@ -645,33 +645,27 @@ class DiskIoMgr : public CacheLineAligned {
   Status Init(MemTracker* process_mem_tracker) WARN_UNUSED_RESULT;
 
   /// Allocates tracking structure for a request context.
-  /// Register a new request context which is returned in *request_context.
-  /// The IoMgr owns the allocated DiskIoRequestContext object. The caller must call
+  /// Register a new request context and return it to the caller. The caller must call
   /// UnregisterContext() for each context.
   /// reader_mem_tracker: Is non-null only for readers. IO buffers
   ///    used for this reader will be tracked by this. If the limit is exceeded
   ///    the reader will be cancelled and MEM_LIMIT_EXCEEDED will be returned via
   ///    GetNext().
-  void RegisterContext(DiskIoRequestContext** request_context,
-      MemTracker* reader_mem_tracker);
+  std::unique_ptr<DiskIoRequestContext> RegisterContext(MemTracker* reader_mem_tracker);
 
-  /// Unregisters context from the disk IoMgr. This must be called for every
-  /// RegisterContext() regardless of cancellation and must be called in the
-  /// same thread as GetNext()
-  /// The 'context' cannot be used after this call.
-  /// This call blocks until all the disk threads have finished cleaning up.
-  /// UnregisterContext also cancels the reader/writer from the disk IoMgr.
+  /// Unregisters context from the disk IoMgr by first cancelling it then blocking until
+  /// all references to the context are removed from I/O manager internal data structures.
+  /// This must be called for every RegisterContext() to ensure that the context object
+  /// can be safely destroyed. It is invalid to add more request ranges to 'context' after
+  /// after this call. This call blocks until all the disk threads have finished cleaning
+  /// up.
   void UnregisterContext(DiskIoRequestContext* context);
 
   /// This function cancels the context asychronously. All outstanding requests
   /// are aborted and tracking structures cleaned up. This does not need to be
   /// called if the context finishes normally.
   /// This will also fail any outstanding GetNext()/Read requests.
-  /// If wait_for_disks_completion is true, wait for the number of active disks for this
-  /// context to reach 0. After calling with wait_for_disks_completion = true, the only
-  /// valid API is returning IO buffers that have already been returned.
-  /// Takes context->lock_ if wait_for_disks_completion is true.
-  void CancelContext(DiskIoRequestContext* context, bool wait_for_disks_completion = false);
+  void CancelContext(DiskIoRequestContext* context);
 
   /// Adds the scan ranges to the queues. This call is non-blocking. The caller must
   /// not deallocate the scan range pointers before UnregisterContext().
@@ -825,7 +819,6 @@ class DiskIoMgr : public CacheLineAligned {
   friend class BufferDescriptor;
   friend class DiskIoRequestContext;
   struct DiskQueue;
-  class RequestContextCache;
 
   friend class DiskIoMgrTest_Buffers_Test;
   friend class DiskIoMgrTest_VerifyNumThreadsParameter_Test;
@@ -867,12 +860,6 @@ class DiskIoMgr : public CacheLineAligned {
 
   /// Total time spent in hdfs reading
   RuntimeProfile::Counter read_timer_;
-
-  /// Contains all contexts that the IoMgr is tracking. This includes contexts that are
-  /// active as well as those in the process of being cancelled. This is a cache
-  /// of context objects that get recycled to minimize object allocations and lock
-  /// contention.
-  boost::scoped_ptr<RequestContextCache> request_context_cache_;
 
   /// Protects free_buffers_
   boost::mutex free_buffers_lock_;

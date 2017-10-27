@@ -30,6 +30,12 @@
 #include <gutil/strings/substitute.h>
 
 #include "codegen/llvm-codegen.h"
+#include "common/logging.h"
+#include "common/object-pool.h"
+#include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
+#include "runtime/descriptors.h"
+#include "runtime/disk-io-mgr-reader-context.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
@@ -324,7 +330,7 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
         partition_desc->partition_key_value_evals(), scan_node_pool_.get(), state);
   }
 
-  runtime_state_->io_mgr()->RegisterContext(&reader_context_, mem_tracker());
+  reader_context_ = runtime_state_->io_mgr()->RegisterContext(mem_tracker());
 
   // Initialize HdfsScanNode specific counters
   // TODO: Revisit counters and move the counters specific to multi-threaded scans
@@ -344,12 +350,13 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
   num_scanner_threads_started_counter_ =
       ADD_COUNTER(runtime_profile(), NUM_SCANNER_THREADS_STARTED, TUnit::UNIT);
 
-  runtime_state_->io_mgr()->set_bytes_read_counter(reader_context_, bytes_read_counter());
-  runtime_state_->io_mgr()->set_read_timer(reader_context_, read_timer());
-  runtime_state_->io_mgr()->set_active_read_thread_counter(reader_context_,
-      &active_hdfs_read_thread_counter_);
-  runtime_state_->io_mgr()->set_disks_access_bitmap(reader_context_,
-      &disks_accessed_bitmap_);
+  runtime_state_->io_mgr()->set_bytes_read_counter(
+      reader_context_.get(), bytes_read_counter());
+  runtime_state_->io_mgr()->set_read_timer(reader_context_.get(), read_timer());
+  runtime_state_->io_mgr()->set_active_read_thread_counter(
+      reader_context_.get(), &active_hdfs_read_thread_counter_);
+  runtime_state_->io_mgr()->set_disks_access_bitmap(
+      reader_context_.get(), &disks_accessed_bitmap_);
 
   average_scanner_thread_concurrency_ = runtime_profile()->AddSamplingCounter(
       AVERAGE_SCANNER_THREAD_CONCURRENCY, &active_scanner_thread_counter_);
@@ -393,14 +400,10 @@ Status HdfsScanNodeBase::Reset(RuntimeState* state) {
 void HdfsScanNodeBase::Close(RuntimeState* state) {
   if (is_closed()) return;
 
-  if (reader_context_ != NULL) {
-    // There may still be io buffers used by parent nodes so we can't unregister the
-    // reader context yet. The runtime state keeps a list of all the reader contexts and
-    // they are unregistered when the fragment is closed.
-    state->AcquireReaderContext(reader_context_);
+  if (reader_context_ != nullptr) {
     // Need to wait for all the active scanner threads to finish to ensure there is no
     // more memory tracked by this scan node's mem tracker.
-    state->io_mgr()->CancelContext(reader_context_, true);
+    state->io_mgr()->UnregisterContext(reader_context_.get());
   }
 
   StopAndFinalizeCounters();
@@ -512,9 +515,9 @@ DiskIoMgr::ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char*
       DiskIoMgr::BufferOpts(try_cache, mtime), original_split);
 }
 
-Status HdfsScanNodeBase::AddDiskIoRanges(const vector<DiskIoMgr::ScanRange*>& ranges,
-    int num_files_queued) {
-  RETURN_IF_ERROR(runtime_state_->io_mgr()->AddScanRanges(reader_context_, ranges));
+Status HdfsScanNodeBase::AddDiskIoRanges(
+    const vector<DiskIoMgr::ScanRange*>& ranges, int num_files_queued) {
+  RETURN_IF_ERROR(runtime_state_->io_mgr()->AddScanRanges(reader_context_.get(), ranges));
   num_unqueued_files_.Add(-num_files_queued);
   DCHECK_GE(num_unqueued_files_.Load(), 0);
   return Status::OK();
@@ -808,20 +811,21 @@ void HdfsScanNodeBase::StopAndFinalizeCounters() {
   runtime_profile()->AppendExecOption(
       Substitute("Codegen enabled: $0 out of $1", num_enabled, total));
 
-  if (reader_context_ != NULL) {
-    bytes_read_local_->Set(runtime_state_->io_mgr()->bytes_read_local(reader_context_));
+  if (reader_context_ != nullptr) {
+    bytes_read_local_->Set(
+        runtime_state_->io_mgr()->bytes_read_local(reader_context_.get()));
     bytes_read_short_circuit_->Set(
-        runtime_state_->io_mgr()->bytes_read_short_circuit(reader_context_));
+        runtime_state_->io_mgr()->bytes_read_short_circuit(reader_context_.get()));
     bytes_read_dn_cache_->Set(
-        runtime_state_->io_mgr()->bytes_read_dn_cache(reader_context_));
+        runtime_state_->io_mgr()->bytes_read_dn_cache(reader_context_.get()));
     num_remote_ranges_->Set(static_cast<int64_t>(
-        runtime_state_->io_mgr()->num_remote_ranges(reader_context_)));
+        runtime_state_->io_mgr()->num_remote_ranges(reader_context_.get())));
     unexpected_remote_bytes_->Set(
-        runtime_state_->io_mgr()->unexpected_remote_bytes(reader_context_));
+        runtime_state_->io_mgr()->unexpected_remote_bytes(reader_context_.get()));
     cached_file_handles_hit_count_->Set(
-        runtime_state_->io_mgr()->cached_file_handles_hit_count(reader_context_));
+        runtime_state_->io_mgr()->cached_file_handles_hit_count(reader_context_.get()));
     cached_file_handles_miss_count_->Set(
-        runtime_state_->io_mgr()->cached_file_handles_miss_count(reader_context_));
+        runtime_state_->io_mgr()->cached_file_handles_miss_count(reader_context_.get()));
 
     if (unexpected_remote_bytes_->value() >= UNEXPECTED_REMOTE_BYTES_WARN_THRESHOLD) {
       runtime_state_->LogError(ErrorMsg(TErrorCode::GENERAL, Substitute(

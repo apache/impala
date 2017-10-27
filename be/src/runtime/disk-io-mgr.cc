@@ -123,90 +123,8 @@ static inline bool is_file_handle_caching_enabled() {
 }
 }
 
-// This class provides a cache of DiskIoRequestContext objects.  DiskIoRequestContexts
-// are recycled. This is good for locality as well as lock contention.  The cache has
-// the property that regardless of how many clients get added/removed, the memory
-// locations for existing clients do not change (not the case with std::vector)
-// minimizing the locks we have to take across all readers.
-// All functions on this object are thread safe
-class DiskIoMgr::RequestContextCache {
- public:
-  RequestContextCache(DiskIoMgr* io_mgr) : io_mgr_(io_mgr) {}
-
-  // Returns a context to the cache.  This object can now be reused.
-  void ReturnContext(DiskIoRequestContext* reader) {
-    DCHECK(reader->state_ != DiskIoRequestContext::Inactive);
-    reader->state_ = DiskIoRequestContext::Inactive;
-    lock_guard<mutex> l(lock_);
-    inactive_contexts_.push_back(reader);
-  }
-
-  // Returns a new DiskIoRequestContext object.  Allocates a new object if necessary.
-  DiskIoRequestContext* GetNewContext() {
-    lock_guard<mutex> l(lock_);
-    if (!inactive_contexts_.empty()) {
-      DiskIoRequestContext* reader = inactive_contexts_.front();
-      inactive_contexts_.pop_front();
-      return reader;
-    } else {
-      DiskIoRequestContext* reader =
-          new DiskIoRequestContext(io_mgr_, io_mgr_->num_total_disks());
-      all_contexts_.push_back(reader);
-      return reader;
-    }
-  }
-
-  // This object has the same lifetime as the disk IoMgr.
-  ~RequestContextCache() {
-    for (list<DiskIoRequestContext*>::iterator it = all_contexts_.begin();
-        it != all_contexts_.end(); ++it) {
-      delete *it;
-    }
-  }
-
-  // Validates that all readers are cleaned up and in the inactive state.  No locks
-  // are taken since this is only called from the disk IoMgr destructor.
-  bool ValidateAllInactive() {
-    for (list<DiskIoRequestContext*>::iterator it = all_contexts_.begin();
-        it != all_contexts_.end(); ++it) {
-      if ((*it)->state_ != DiskIoRequestContext::Inactive) {
-        return false;
-      }
-    }
-    DCHECK_EQ(all_contexts_.size(), inactive_contexts_.size());
-    return all_contexts_.size() == inactive_contexts_.size();
-  }
-
-  string DebugString();
-
- private:
-  DiskIoMgr* io_mgr_;
-
-  // lock to protect all members below
-  mutex lock_;
-
-  // List of all request contexts created.  Used for debugging
-  list<DiskIoRequestContext*> all_contexts_;
-
-  // List of inactive readers.  These objects can be used for a new reader.
-  list<DiskIoRequestContext*> inactive_contexts_;
-};
-
-string DiskIoMgr::RequestContextCache::DebugString() {
-  lock_guard<mutex> l(lock_);
-  stringstream ss;
-  for (list<DiskIoRequestContext*>::iterator it = all_contexts_.begin();
-      it != all_contexts_.end(); ++it) {
-    unique_lock<mutex> lock((*it)->lock_);
-    ss << (*it)->DebugString() << endl;
-  }
-  return ss.str();
-}
-
 string DiskIoMgr::DebugString() {
   stringstream ss;
-  ss << "RequestContexts: " << endl << request_context_cache_->DebugString() << endl;
-
   ss << "Disks: " << endl;
   for (int i = 0; i < disk_queues_.size(); ++i) {
     unique_lock<mutex> lock(disk_queues_[i]->lock);
@@ -358,9 +276,6 @@ DiskIoMgr::~DiskIoMgr() {
     }
   }
 
-  DCHECK(request_context_cache_.get() == nullptr ||
-      request_context_cache_->ValidateAllInactive())
-      << endl << DebugString();
   DCHECK_EQ(num_buffers_in_readers_.Load(), 0);
 
   // Delete all allocated buffers
@@ -407,7 +322,6 @@ Status DiskIoMgr::Init(MemTracker* process_mem_tracker) {
       disk_thread_group_.AddThread(move(t));
     }
   }
-  request_context_cache_.reset(new RequestContextCache(this));
   RETURN_IF_ERROR(file_handle_cache_.Init());
 
   cached_read_options_ = hadoopRzOptionsAlloc();
@@ -422,24 +336,13 @@ Status DiskIoMgr::Init(MemTracker* process_mem_tracker) {
   return Status::OK();
 }
 
-void DiskIoMgr::RegisterContext(DiskIoRequestContext** request_context,
-    MemTracker* mem_tracker) {
-  DCHECK(request_context_cache_.get() != nullptr) << "Must call Init() first.";
-  *request_context = request_context_cache_->GetNewContext();
-  (*request_context)->Reset(mem_tracker);
+unique_ptr<DiskIoRequestContext> DiskIoMgr::RegisterContext(MemTracker* mem_tracker) {
+  return unique_ptr<DiskIoRequestContext>(
+      new DiskIoRequestContext(this, num_total_disks(), mem_tracker));
 }
 
 void DiskIoMgr::UnregisterContext(DiskIoRequestContext* reader) {
-  // Blocking cancel (waiting for disks completion).
-  CancelContext(reader, true);
-
-  // All the disks are done with clean, validate nothing is leaking.
-  unique_lock<mutex> reader_lock(reader->lock_);
-  DCHECK_EQ(reader->num_buffers_in_reader_.Load(), 0) << endl << reader->DebugString();
-  DCHECK_EQ(reader->num_used_buffers_.Load(), 0) << endl << reader->DebugString();
-
-  DCHECK(reader->Validate()) << endl << reader->DebugString();
-  request_context_cache_->ReturnContext(reader);
+  reader->CancelAndMarkInactive();
 }
 
 // Cancellation requires coordination from multiple threads.  Each thread that currently
@@ -461,17 +364,8 @@ void DiskIoMgr::UnregisterContext(DiskIoRequestContext* reader) {
 // state, removes the context from the disk queue.  The last thread per disk with an
 // outstanding reference to the context decrements the number of disk queues the context
 // is on.
-// If wait_for_disks_completion is true, wait for the number of active disks to become 0.
-void DiskIoMgr::CancelContext(DiskIoRequestContext* context, bool wait_for_disks_completion) {
+void DiskIoMgr::CancelContext(DiskIoRequestContext* context) {
   context->Cancel(Status::CANCELLED);
-
-  if (wait_for_disks_completion) {
-    unique_lock<mutex> lock(context->lock_);
-    DCHECK(context->Validate()) << endl << context->DebugString();
-    while (context->num_disks_with_ranges_ > 0) {
-      context->disks_complete_cond_var_.Wait(lock);
-    }
-  }
 }
 
 void DiskIoMgr::set_read_timer(DiskIoRequestContext* r, RuntimeProfile::Counter* c) {

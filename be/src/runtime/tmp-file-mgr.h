@@ -19,6 +19,7 @@
 #define IMPALA_RUNTIME_TMP_FILE_MGR_H
 
 #include <functional>
+#include <memory>
 #include <utility>
 
 #include <boost/scoped_ptr.hpp>
@@ -200,7 +201,7 @@ class TmpFileMgr {
     DiskIoMgr* const io_mgr_;
 
     /// I/O context used for all reads and writes. Registered in constructor.
-    DiskIoRequestContext* io_ctx_;
+    std::unique_ptr<DiskIoRequestContext> io_ctx_;
 
     /// Stores scan ranges allocated in Read(). Needed because ScanRange objects may be
     /// touched by DiskIoMgr even after the scan is finished.

@@ -91,6 +91,23 @@ void DiskIoRequestContext::Cancel(const Status& status) {
   ready_to_start_ranges_cv_.NotifyAll();
 }
 
+void DiskIoRequestContext::CancelAndMarkInactive() {
+  Cancel(Status::CANCELLED);
+
+  boost::unique_lock<boost::mutex> l(lock_);
+  DCHECK_NE(state_, Inactive);
+  DCHECK(Validate()) << endl << DebugString();
+
+  // Wait until the ranges finish up.
+  while (num_disks_with_ranges_ > 0) disks_complete_cond_var_.Wait(l);
+
+  // Validate that no buffers were leaked from this context.
+  DCHECK_EQ(num_buffers_in_reader_.Load(), 0) << endl << DebugString();
+  DCHECK_EQ(num_used_buffers_.Load(), 0) << endl << DebugString();
+  DCHECK(Validate()) << endl << DebugString();
+  state_ = Inactive;
+}
+
 void DiskIoRequestContext::AddRequestRange(
     DiskIoMgr::RequestRange* range, bool schedule_immediately) {
   // DCHECK(lock_.is_locked()); // TODO: boost should have this API
@@ -129,51 +146,9 @@ void DiskIoRequestContext::AddRequestRange(
   ++state.num_remaining_ranges();
 }
 
-DiskIoRequestContext::DiskIoRequestContext(DiskIoMgr* parent, int num_disks)
-  : parent_(parent),
-    bytes_read_counter_(NULL),
-    read_timer_(NULL),
-    active_read_thread_counter_(NULL),
-    disks_accessed_bitmap_(NULL),
-    state_(Inactive),
-    disk_states_(num_disks) {
-}
-
-// Resets this object.
-void DiskIoRequestContext::Reset(MemTracker* tracker) {
-  DCHECK_EQ(state_, Inactive);
-  status_ = Status::OK();
-
-  bytes_read_counter_ = NULL;
-  read_timer_ = NULL;
-  active_read_thread_counter_ = NULL;
-  disks_accessed_bitmap_ = NULL;
-
-  state_ = Active;
-  mem_tracker_ = tracker;
-
-  num_unstarted_scan_ranges_.Store(0);
-  num_disks_with_ranges_ = 0;
-  num_used_buffers_.Store(0);
-  num_buffers_in_reader_.Store(0);
-  num_ready_buffers_.Store(0);
-  num_finished_ranges_.Store(0);
-  num_remote_ranges_.Store(0);
-  bytes_read_local_.Store(0);
-  bytes_read_short_circuit_.Store(0);
-  bytes_read_dn_cache_.Store(0);
-  unexpected_remote_bytes_.Store(0);
-  cached_file_handles_hit_count_.Store(0);
-  cached_file_handles_miss_count_.Store(0);
-
-  DCHECK(ready_to_start_ranges_.empty());
-  DCHECK(blocked_ranges_.empty());
-  DCHECK(cached_ranges_.empty());
-
-  for (int i = 0; i < disk_states_.size(); ++i) {
-    disk_states_[i].Reset();
-  }
-}
+DiskIoRequestContext::DiskIoRequestContext(
+    DiskIoMgr* parent, int num_disks, MemTracker* tracker)
+  : parent_(parent), mem_tracker_(tracker), disk_states_(num_disks) {}
 
 // Dumps out request context information. Lock should be taken by caller
 string DiskIoRequestContext::DebugString() const {
@@ -306,4 +281,12 @@ bool DiskIoRequestContext::Validate() const {
   }
 
   return true;
+}
+
+void DiskIoRequestContext::PerDiskState::ScheduleContext(
+    DiskIoRequestContext* context, int disk_id) {
+  if (!is_on_queue_ && !done_) {
+    is_on_queue_ = true;
+    context->parent_->disk_queues_[disk_id]->EnqueueContext(context);
+  }
 }

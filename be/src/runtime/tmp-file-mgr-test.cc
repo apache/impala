@@ -132,7 +132,7 @@ class TmpFileMgrTest : public ::testing::Test {
 
   /// Helper to cancel the FileGroup DiskIoRequestContext.
   static void CancelIoContext(TmpFileMgr::FileGroup* group) {
-    group->io_mgr_->CancelContext(group->io_ctx_);
+    group->io_mgr_->CancelContext(group->io_ctx_.get());
   }
 
   /// Helper to get the # of bytes allocated by the group. Validates that the sum across

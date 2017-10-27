@@ -26,6 +26,7 @@
 #include <gutil/strings/join.h>
 #include <gutil/strings/substitute.h>
 
+#include "runtime/disk-io-mgr-reader-context.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tmp-file-mgr-internal.h"
 #include "util/bit-util.h"
@@ -240,7 +241,7 @@ TmpFileMgr::FileGroup::FileGroup(TmpFileMgr* tmp_file_mgr, DiskIoMgr* io_mgr,
     next_allocation_index_(0),
     free_ranges_(64) {
   DCHECK(tmp_file_mgr != nullptr);
-  io_mgr_->RegisterContext(&io_ctx_, nullptr);
+  io_ctx_ = io_mgr_->RegisterContext(nullptr);
 }
 
 TmpFileMgr::FileGroup::~FileGroup() {
@@ -282,8 +283,7 @@ Status TmpFileMgr::FileGroup::CreateFiles() {
 void TmpFileMgr::FileGroup::Close() {
   // Cancel writes before deleting the files, since in-flight writes could re-create
   // deleted files.
-  if (io_ctx_ != nullptr) io_mgr_->UnregisterContext(io_ctx_);
-  io_ctx_ = nullptr;
+  if (io_ctx_ != nullptr) io_mgr_->UnregisterContext(io_ctx_.get());
   for (std::unique_ptr<TmpFileMgr::File>& file : tmp_files_) {
     Status status = file->Remove();
     if (!status.ok()) {
@@ -361,7 +361,7 @@ Status TmpFileMgr::FileGroup::Write(
   DiskIoMgr::WriteRange::WriteDoneCallback callback = [this, tmp_handle_ptr](
       const Status& write_status) { WriteComplete(tmp_handle_ptr, write_status); };
   RETURN_IF_ERROR(
-      tmp_handle->Write(io_mgr_, io_ctx_, tmp_file, file_offset, buffer, callback));
+      tmp_handle->Write(io_mgr_, io_ctx_.get(), tmp_file, file_offset, buffer, callback));
   write_counter_->Add(1);
   bytes_written_counter_->Add(buffer.len());
   *handle = move(tmp_handle);
@@ -394,7 +394,7 @@ Status TmpFileMgr::FileGroup::ReadAsync(WriteHandle* handle, MemRange buffer) {
       DiskIoMgr::BufferOpts::ReadInto(buffer.data(), buffer.len()));
   read_counter_->Add(1);
   bytes_read_counter_->Add(buffer.len());
-  RETURN_IF_ERROR(io_mgr_->AddScanRange(io_ctx_, handle->read_range_, true));
+  RETURN_IF_ERROR(io_mgr_->AddScanRange(io_ctx_.get(), handle->read_range_, true));
   return Status::OK();
 }
 
@@ -489,7 +489,7 @@ Status TmpFileMgr::FileGroup::RecoverWriteError(
   // Choose another file to try. Blacklisting ensures we don't retry the same file.
   // If this fails, the status will include all the errors in 'scratch_errors_'.
   RETURN_IF_ERROR(AllocateSpace(handle->len(), &tmp_file, &file_offset));
-  return handle->RetryWrite(io_mgr_, io_ctx_, tmp_file, file_offset);
+  return handle->RetryWrite(io_mgr_, io_ctx_.get(), tmp_file, file_offset);
 }
 
 string TmpFileMgr::FileGroup::DebugString() {

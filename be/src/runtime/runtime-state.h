@@ -36,7 +36,6 @@ class BufferPool;
 class DataStreamRecvr;
 class DescriptorTbl;
 class DiskIoMgr;
-class DiskIoRequestContext;
 class Expr;
 class LlvmCodeGen;
 class MemTracker;
@@ -194,14 +193,6 @@ class RuntimeState {
   inline bool ShouldCodegen() const {
     return !CodegenDisabledByQueryOption() && !CodegenDisabledByHint();
   }
-
-  /// Takes ownership of a scan node's reader context and plan fragment executor will call
-  /// UnregisterReaderContexts() to unregister it when the fragment is closed. The IO
-  /// buffers may still be in use and thus the deferred unregistration.
-  void AcquireReaderContext(DiskIoRequestContext* reader_context);
-
-  /// Unregisters all reader contexts acquired through AcquireReaderContext().
-  void UnregisterReaderContexts();
 
   inline Status GetQueryStatus() {
     // Do a racy check for query_status_ to avoid unnecessary spinlock acquisition.
@@ -388,12 +379,6 @@ class RuntimeState {
   /// will not necessarily be set in all error cases.
   SpinLock query_status_lock_;
   Status query_status_;
-
-  /// Reader contexts that need to be closed when the fragment is closed.
-  /// Synchronization is needed if there are multiple scan nodes in a plan fragment and
-  /// Close() may be called on them concurrently (see IMPALA-4180).
-  SpinLock reader_contexts_lock_;
-  std::vector<DiskIoRequestContext*> reader_contexts_;
 
   /// This is the node id of the root node for this plan fragment. This is used as the
   /// hash seed and has two useful properties:
