@@ -1124,12 +1124,12 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
 
     // Assign outgoing bloom filter.
     TBloomFilter& aggregated_filter = state->bloom_filter();
-    filter_mem_tracker_->Release(aggregated_filter.directory.capacity());
+    filter_mem_tracker_->Release(aggregated_filter.directory.size());
     swap(rpc_params.bloom_filter, aggregated_filter);
     DCHECK(rpc_params.bloom_filter.always_false || rpc_params.bloom_filter.always_true ||
-        rpc_params.bloom_filter.directory.size() != 0);
+        !rpc_params.bloom_filter.directory.empty());
+    DCHECK(aggregated_filter.directory.empty());
     rpc_params.__isset.bloom_filter = true;
-    DCHECK_EQ(aggregated_filter.directory.capacity(), 0);
     // Filter is complete, and can be released.
     state->Disable(filter_mem_tracker_);
   }
@@ -1158,7 +1158,7 @@ void Coordinator::FilterState::ApplyUpdate(const TUpdateFilterParams& params,
   if (params.bloom_filter.always_true) {
     Disable(coord->filter_mem_tracker_);
   } else if (bloom_filter_.always_false) {
-    int64_t heap_space = params.bloom_filter.directory.capacity();
+    int64_t heap_space = params.bloom_filter.directory.size();
     if (!coord->filter_mem_tracker_->TryConsume(heap_space)) {
       VLOG_QUERY << "Not enough memory to allocate filter: "
                  << PrettyPrinter::Print(heap_space, TUnit::BYTES)
@@ -1186,9 +1186,9 @@ void Coordinator::FilterState::ApplyUpdate(const TUpdateFilterParams& params,
 void Coordinator::FilterState::Disable(MemTracker* tracker) {
   bloom_filter_.always_true = true;
   bloom_filter_.always_false = false;
-  int64_t capacity = bloom_filter_.directory.capacity();
+  tracker->Release(bloom_filter_.directory.size());
   bloom_filter_.directory.clear();
-  tracker->Release(capacity);
+  bloom_filter_.directory.shrink_to_fit();
 }
 
 const TUniqueId& Coordinator::query_id() const {
