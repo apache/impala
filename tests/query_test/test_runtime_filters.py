@@ -48,7 +48,7 @@ class TestRuntimeFilters(ImpalaTestSuite):
     now = time.time()
     self.run_test_case('QueryTest/runtime_filters_wait', vector)
     duration = time.time() - now
-    assert duration < 60, \
+    assert duration < WAIT_TIME_MS, \
       "Query took too long (%ss, possibly waiting for missing filters?)" % str(duration)
 
   def test_file_filtering(self, vector):
