@@ -223,7 +223,8 @@ TEST(QueryOptions, SetIntOptions) {
       {MAKE_OPTIONDEF(runtime_filter_wait_time_ms),    {0, I32_MAX}},
       {MAKE_OPTIONDEF(mt_dop),                         {0, 64}},
       {MAKE_OPTIONDEF(disable_codegen_rows_threshold), {0, I32_MAX}},
-      {MAKE_OPTIONDEF(max_num_runtime_filters),        {0, I32_MAX}}
+      {MAKE_OPTIONDEF(max_num_runtime_filters),        {0, I32_MAX}},
+      {MAKE_OPTIONDEF(batch_size),                     {0, 65536}}
   };
   for (const auto& test_case : case_set) {
     const OptionDef<int32_t>& option_def = test_case.first;

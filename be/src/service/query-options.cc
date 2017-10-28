@@ -148,9 +148,17 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_disable_codegen(
             iequals(value, "true") || iequals(value, "1"));
         break;
-      case TImpalaQueryOptions::BATCH_SIZE:
-        query_options->__set_batch_size(atoi(value.c_str()));
+      case TImpalaQueryOptions::BATCH_SIZE: {
+        StringParser::ParseResult status;
+        int val = StringParser::StringToInt<int>(value.c_str(),
+            static_cast<int>(value.size()), &status);
+        if (status != StringParser::PARSE_SUCCESS || val < 0 || val > 65536) {
+          return Status(Substitute("Invalid batch size '$0'. Valid sizes are in"
+              "[0, 65536]", value));
+        }
+        query_options->__set_batch_size(val);
         break;
+      }
       case TImpalaQueryOptions::MEM_LIMIT: {
         // Parse the mem limit spec and validate it.
         int64_t bytes_limit;
