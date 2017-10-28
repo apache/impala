@@ -2148,7 +2148,6 @@ public class CatalogOpExecutor {
               " ifExists is true.", e, tableName));
         }
       }
-      updateLastDdlTime(msTbl, msClient);
     } catch (TException e) {
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "dropPartition"), e);
@@ -2628,7 +2627,6 @@ public class CatalogOpExecutor {
           MetastoreShim.alterPartitions(msClient.getHiveClient(), tableName.getDb(),
               tableName.getTbl(), hmsAddedPartitions);
         }
-        updateLastDdlTime(msTbl, msClient);
       }
     } catch (TException e) {
       throw new ImpalaRuntimeException(
@@ -3264,7 +3262,6 @@ public class CatalogOpExecutor {
                   }
                 }
               }
-              updateLastDdlTime(msTbl, msClient);
             }
           } catch (AlreadyExistsException e) {
             throw new InternalException(

@@ -49,12 +49,12 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
 
     # add/drop partitions
     self.run_test("alter table %s add partition (j=1, s='2012')" % FQ_TBL_NAME,
-                  unique_database, TBL_NAME, True)
+                  unique_database, TBL_NAME, False)
     self.run_test("alter table %s add if not exists "
                   "partition (j=1, s='2012')" % FQ_TBL_NAME,
                   unique_database, TBL_NAME, False)
     self.run_test("alter table %s drop partition (j=1, s='2012')" % FQ_TBL_NAME,
-                  unique_database, TBL_NAME, True)
+                  unique_database, TBL_NAME, False)
     self.run_test("alter table %s drop if exists "
                   "partition (j=2, s='2012')" % FQ_TBL_NAME,
                   unique_database, TBL_NAME, False)
@@ -78,10 +78,10 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
                        "partitioned by (j int, s string)" % FQ_TBL_NAME)
     # static partition insert
     self.run_test("insert into %s partition(j=1, s='2012') "
-                  "select 10" % FQ_TBL_NAME, unique_database, TBL_NAME, True)
+                  "select 10" % FQ_TBL_NAME, unique_database, TBL_NAME, False)
     # dynamic partition insert
     self.run_test("insert into %s partition(j, s) "
-                  "select 10, 2, '2013'" % FQ_TBL_NAME, unique_database, TBL_NAME, True)
+                  "select 10, 2, '2013'" % FQ_TBL_NAME, unique_database, TBL_NAME, False)
     # dynamic partition insert changing no partitions (empty input)
     self.run_test("insert into %s partition(j, s) "
                   "select * from (select 10 as i, 2 as j, '2013' as s) as t "
@@ -116,7 +116,7 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
     afterDdlTime = table.parameters[HIVE_LAST_DDL_TIME_PARAM_KEY]
 
     if expect_changed:
-      # check that the time difference is within 20s
-      assert long(afterDdlTime) - long(beforeDdlTime) <= 20
+      # check that the new ddlTime is strictly greater than the old one.
+      assert long(afterDdlTime) > long(beforeDdlTime)
     else:
       assert long(afterDdlTime) == long(beforeDdlTime)
