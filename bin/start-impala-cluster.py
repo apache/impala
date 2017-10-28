@@ -26,7 +26,6 @@ import sys
 from getpass import getuser
 from time import sleep, time
 from optparse import OptionParser
-from testdata.common import cgroups
 
 KUDU_MASTER_HOSTS = os.getenv('KUDU_MASTER_HOSTS', '127.0.0.1')
 DEFAULT_IMPALA_MAX_LOG_FILES = os.environ.get('IMPALA_MAX_LOG_FILES', 10)
@@ -395,5 +394,11 @@ if __name__ == "__main__":
     print 'Error starting cluster: %s' % e
     sys.exit(1)
 
-  print 'Impala Cluster Running with %d nodes and %d coordinators.' % (
-      options.cluster_size, options.num_coordinators)
+  if options.use_exclusive_coordinators == True:
+    executors = options.cluster_size - options.num_coordinators
+  else:
+    executors = options.cluster_size
+  print 'Impala Cluster Running with %d nodes (%d coordinators, %d executors).' % (
+      options.cluster_size,
+      min(options.cluster_size, options.num_coordinators),
+      executors)
