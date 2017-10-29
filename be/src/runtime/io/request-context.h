@@ -24,9 +24,7 @@
 namespace impala {
 namespace io {
 /// A request context is used to group together I/O requests belonging to a client of the
-/// I/O manager for management and scheduling. For most I/O manager clients it is an
-/// opaque pointer, but some clients may need to include this header, e.g. to make the
-/// unique_ptr<DiskIoRequestContext> destructor work correctly.
+/// I/O manager for management and scheduling.
 ///
 /// Implementation Details
 /// ======================
@@ -83,7 +81,51 @@ namespace io {
 /// behind at most one write range.
 class RequestContext {
  public:
-  ~RequestContext() { DCHECK_EQ(state_, Inactive) << "Must be unregistered."; }
+  ~RequestContext() {
+    DCHECK_EQ(state_, Inactive) << "Must be unregistered. " << DebugString();
+  }
+
+  /// Cancel the context asynchronously. All outstanding requests are cancelled
+  /// asynchronously. This does not need to be called if the context finishes normally.
+  /// Calling GetNext() on any scan ranges belonging to this RequestContext will return
+  /// CANCELLED (or another error, if an error was encountered for that scan range before
+  /// it is cancelled).
+  void Cancel();
+
+  bool IsCancelled() {
+    boost::unique_lock<boost::mutex> lock(lock_);
+    return state_ == Cancelled;
+  }
+
+  int64_t queue_size() const { return num_ready_buffers_.Load(); }
+  int64_t bytes_read_local() const { return bytes_read_local_.Load(); }
+  int64_t bytes_read_short_circuit() const { return bytes_read_short_circuit_.Load(); }
+  int64_t bytes_read_dn_cache() const { return bytes_read_dn_cache_.Load(); }
+  int num_remote_ranges() const { return num_remote_ranges_.Load(); }
+  int64_t unexpected_remote_bytes() const { return unexpected_remote_bytes_.Load(); }
+
+  int cached_file_handles_hit_count() const {
+    return cached_file_handles_hit_count_.Load();
+  }
+
+  int cached_file_handles_miss_count() const {
+    return cached_file_handles_miss_count_.Load();
+  }
+
+  void set_bytes_read_counter(RuntimeProfile::Counter* bytes_read_counter) {
+    bytes_read_counter_ = bytes_read_counter;
+  }
+
+  void set_read_timer(RuntimeProfile::Counter* read_timer) { read_timer_ = read_timer; }
+
+  void set_active_read_thread_counter(
+      RuntimeProfile::Counter* active_read_thread_counter) {
+   active_read_thread_counter_ = active_read_thread_counter;
+  }
+
+  void set_disks_accessed_bitmap(RuntimeProfile::Counter* disks_accessed_bitmap) {
+    disks_accessed_bitmap_ = disks_accessed_bitmap;
+  }
 
  private:
   DISALLOW_COPY_AND_ASSIGN(RequestContext);
@@ -108,11 +150,24 @@ class RequestContext {
 
   RequestContext(DiskIoMgr* parent, int num_disks, MemTracker* tracker);
 
+  /// Allocates a buffer to read into with size between
+  /// max('buffer_size', 'min_buffer_size_') and 'max_buffer_size_'.
+  /// Does not acquire 'lock_'.
+  /// TODO: allocate using the buffer pool client associated with this reader.
+  Status AllocBuffer(ScanRange* range, int64_t buffer_size,
+      std::unique_ptr<BufferDescriptor>* buffer);
+
+  /// Cleans up a buffer. If the buffer was allocated with AllocBuffer(), frees the buffer
+  /// memory and release the consumption to the client MemTracker. Otherwise (e.g. a
+  /// client or HDFS cache buffer), just prepares the descriptor to be destroyed.
+  /// After this is called, buffer->buffer() is NULL. Does not acquire 'lock_'.
+  void FreeBuffer(BufferDescriptor* buffer);
+
   /// Decrements the number of active disks for this reader.  If the disk count
   /// goes to 0, the disk complete condition variable is signaled.
-  /// Reader lock must be taken before this call.
-  void DecrementDiskRefCount() {
-    // boost doesn't let us dcheck that the reader lock is taken
+  /// 'lock_' must be held via 'lock'.
+  void DecrementDiskRefCount(const boost::unique_lock<boost::mutex>& lock) {
+    DCHECK(lock.mutex() == &lock_ && lock.owns_lock());
     DCHECK_GT(num_disks_with_ranges_, 0);
     if (--num_disks_with_ranges_ == 0) {
       disks_complete_cond_var_.NotifyAll();
@@ -129,17 +184,15 @@ class RequestContext {
 
   /// Adds range to in_flight_ranges, scheduling this reader on the disk threads
   /// if necessary.
-  /// Reader lock must be taken before this.
-  void ScheduleScanRange(ScanRange* range) {
+  /// 'lock_' must be held via 'lock'
+  void ScheduleScanRange(const boost::unique_lock<boost::mutex>& lock, ScanRange* range) {
+    DCHECK(lock.mutex() == &lock_ && lock.owns_lock());
     DCHECK_EQ(state_, Active);
     DCHECK(range != NULL);
     RequestContext::PerDiskState& state = disk_states_[range->disk_id()];
     state.in_flight_ranges()->Enqueue(range);
-    state.ScheduleContext(this, range->disk_id());
+    state.ScheduleContext(lock, this, range->disk_id());
   }
-
-  /// Cancels the context with status code 'status'
-  void Cancel(const Status& status);
 
   /// Cancel the context if not already cancelled, wait for all scan ranges to finish
   /// and mark the context as inactive, after which it cannot be used.
@@ -147,7 +200,9 @@ class RequestContext {
 
   /// Adds request range to disk queue for this request context. Currently,
   /// schedule_immediately must be false is RequestRange is a write range.
-  void AddRequestRange(RequestRange* range, bool schedule_immediately);
+  /// Caller must hold 'lock_' via 'lock'.
+  void AddRequestRange(const boost::unique_lock<boost::mutex>& lock,
+      RequestRange* range, bool schedule_immediately);
 
   /// Validates invariants of reader.  Reader lock must be taken beforehand.
   bool Validate() const;
@@ -159,6 +214,7 @@ class RequestContext {
   DiskIoMgr* const parent_;
 
   /// Memory used for this reader.  This is unowned by this object.
+  /// TODO: replace with bp client
   MemTracker* const mem_tracker_;
 
   /// Total bytes read for this reader
@@ -187,7 +243,7 @@ class RequestContext {
   /// Total number of bytes from remote reads that were expected to be local.
   AtomicInt64 unexpected_remote_bytes_{0};
 
-  /// The number of buffers that have been returned to the reader (via GetNext) that the
+  /// The number of buffers that have been returned to the reader (via GetNext()) that the
   /// reader has not returned. Only included for debugging and diagnostics.
   AtomicInt32 num_buffers_in_reader_{0};
 
@@ -227,9 +283,6 @@ class RequestContext {
   /// Current state of the reader
   State state_ = Active;
 
-  /// Status of this reader.  Set to non-ok if cancelled.
-  Status status_;
-
   /// The number of disks with scan ranges remaining (always equal to the sum of
   /// disks with ranges).
   int num_disks_with_ranges_ = 0;
@@ -237,7 +290,7 @@ class RequestContext {
   /// This is the list of ranges that are expected to be cached on the DN.
   /// When the reader asks for a new range (GetNextScanRange()), we first
   /// return ranges from this list.
-  InternalQueue<ScanRange> cached_ranges_;
+  InternalList<ScanRange> cached_ranges_;
 
   /// A list of ranges that should be returned in subsequent calls to
   /// GetNextRange.
@@ -246,11 +299,11 @@ class RequestContext {
   /// Populating it preemptively means we make worse scheduling decisions.
   /// We currently populate one range per disk.
   /// TODO: think about this some more.
-  InternalQueue<ScanRange> ready_to_start_ranges_;
+  InternalList<ScanRange> ready_to_start_ranges_;
   ConditionVariable ready_to_start_ranges_cv_; // used with lock_
 
   /// Ranges that are blocked due to back pressure on outgoing buffers.
-  InternalQueue<ScanRange> blocked_ranges_;
+  InternalList<ScanRange> blocked_ranges_;
 
   /// Condition variable for UnregisterContext() to wait for all disks to complete
   ConditionVariable disks_complete_cond_var_;
@@ -270,21 +323,9 @@ class RequestContext {
       next_scan_range_to_start_ = range;
     }
 
-    /// We need to have a memory barrier to prevent this load from being reordered
-    /// with num_threads_in_op(), since these variables are set without the reader
-    /// lock taken
-    bool is_on_queue() const {
-      bool b = is_on_queue_;
-      __sync_synchronize();
-      return b;
-    }
+    bool is_on_queue() const { return is_on_queue_.Load() != 0; }
 
-    int num_threads_in_op() const {
-      int v = num_threads_in_op_.Load();
-      // TODO: determine whether this barrier is necessary for any callsites.
-      AtomicUtil::MemoryBarrier();
-      return v;
-    }
+    int num_threads_in_op() const { return num_threads_in_op_.Load(); }
 
     const InternalQueue<ScanRange>* unstarted_scan_ranges() const {
       return &unstarted_scan_ranges_;
@@ -303,26 +344,41 @@ class RequestContext {
     InternalQueue<RequestRange>* in_flight_ranges() { return &in_flight_ranges_; }
 
     /// Schedules the request context on this disk if it's not already on the queue.
-    /// Context lock must be taken before this.
-    void ScheduleContext(RequestContext* context, int disk_id);
+    /// context->lock_ must be held by the caller via 'context_lock'.
+    void ScheduleContext(const boost::unique_lock<boost::mutex>& context_lock,
+        RequestContext* context, int disk_id);
 
-    /// Increment the ref count on reader.  We need to track the number of threads per
-    /// reader per disk that are in the unlocked hdfs read code section. This is updated
-    /// by multiple threads without a lock so we need to use an atomic int.
-    void IncrementRequestThreadAndDequeue() {
+    /// Increment the count of disk threads that have a reference to this context. These
+    /// threads do not hold any locks while reading from HDFS, so we need to prevent the
+    /// RequestContext from being destroyed underneath them.
+    ///
+    /// The caller does not need to hold 'lock_', so this can execute concurrently with
+    /// itself and DecrementDiskThread().
+    void IncrementDiskThreadAndDequeue() {
+      /// Incrementing 'num_threads_in_op_' first so that there is no window when other
+      /// threads see 'is_on_queue_ == num_threads_in_op_ == 0' and think there are no
+      /// references left to this context.
       num_threads_in_op_.Add(1);
-      is_on_queue_ = false;
+      is_on_queue_.Store(0);
     }
 
-    void DecrementRequestThread() { num_threads_in_op_.Add(-1); }
+    /// Decrement the count of disks threads with a reference to this context. Does final
+    /// cleanup if the context is cancelled and this is the last thread for the disk.
+    /// context->lock_ must be held by the caller via 'context_lock'.
+    void DecrementDiskThread(const boost::unique_lock<boost::mutex>& context_lock,
+        RequestContext* context) {
+      DCHECK(context_lock.mutex() == &context->lock_ && context_lock.owns_lock());
+      num_threads_in_op_.Add(-1);
 
-    /// Decrement request thread count and do final cleanup if this is the last
-    /// thread. RequestContext lock must be taken before this.
-    void DecrementRequestThreadAndCheckDone(RequestContext* context) {
-      num_threads_in_op_.Add(-1); // Also acts as a barrier.
-      if (!is_on_queue_ && num_threads_in_op_.Load() == 0 && !done_) {
-        // This thread is the last one for this reader on this disk, do final cleanup
-        context->DecrementDiskRefCount();
+      if (context->state_ != Cancelled) {
+        DCHECK_EQ(context->state_, Active);
+        return;
+      }
+      // The state is cancelled, check to see if we're the last thread to touch the
+      // context on this disk. We need to load 'is_on_queue_' and 'num_threads_in_op_'
+      // in this order to avoid a race with IncrementDiskThreadAndDequeue().
+      if (is_on_queue_.Load() == 0 && num_threads_in_op_.Load() == 0 && !done_) {
+        context->DecrementDiskRefCount(context_lock);
         done_ = true;
       }
     }
@@ -335,7 +391,12 @@ class RequestContext {
     bool done_ = true;
 
     /// For each disk, keeps track if the context is on this disk's queue, indicating
-    /// the disk must do some work for this context. The disk needs to do work in 4 cases:
+    /// the disk must do some work for this context. 1 means that the context is on the
+    /// disk queue, 0 means that it's not on the queue (either because it has on ranges
+    /// active for the disk or because a disk thread dequeued the context and is
+    /// currently processing a request).
+    ///
+    /// The disk needs to do work in 4 cases:
     ///  1) in_flight_ranges is not empty, the disk needs to read for this reader.
     ///  2) next_range_to_start is NULL, the disk needs to prepare a scan range to be
     ///     read next.
@@ -346,7 +407,15 @@ class RequestContext {
     /// useful that can be done. If there's nothing useful, the disk queue will wake up
     /// and then remove the reader from the queue. Doing this causes thrashing of the
     /// threads.
-    bool is_on_queue_ = false;
+    ///
+    /// This variable is important during context cancellation because it indicates
+    /// whether a queue has a reference to the context that must be released before
+    /// the context is considered unregistered. Atomically set to false after
+    /// incrementing 'num_threads_in_op_' when dequeueing so that there is no window
+    /// when other threads see 'is_on_queue_ == num_threads_in_op_ == 0' and think there
+    /// are no references left to this context.
+    /// TODO: this could be combined with 'num_threads_in_op_' to be a single refcount.
+    AtomicInt32 is_on_queue_{0};
 
     /// For each disks, the number of request ranges that have not been fully read.
     /// In the non-cancellation path, this will hit 0, and done will be set to true
@@ -376,11 +445,11 @@ class RequestContext {
     /// range to ready_to_start_ranges_.
     ScanRange* next_scan_range_to_start_ = nullptr;
 
-    /// For each disk, the number of threads issuing the underlying read/write on behalf
-    /// of this context. There are a few places where we release the context lock, do some
-    /// work, and then grab the lock again.  Because we don't hold the lock for the
-    /// entire operation, we need this ref count to keep track of which thread should do
-    /// final resource cleanup during cancellation.
+    /// For each disk, the number of disk threads issuing the underlying read/write on
+    /// behalf of this context. There are a few places where we release the context lock,
+    /// do some work, and then grab the lock again.  Because we don't hold the lock for
+    /// the entire operation, we need this ref count to keep track of which thread should
+    /// do final resource cleanup during cancellation.
     /// Only the thread that sees the count at 0 should do the final cleanup.
     AtomicInt32 num_threads_in_op_{0};
 

@@ -143,8 +143,10 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
     ScanRange* range = parent_->scan_node_->AllocateScanRange(
         scan_range_->fs(), filename(), read_past_buffer_size, offset, partition_id,
         scan_range_->disk_id(), false, BufferOpts::Uncached());
-    RETURN_IF_ERROR(parent_->state_->io_mgr()->Read(
-        parent_->scan_node_->reader_context(), range, &io_buffer_));
+    RETURN_IF_ERROR(parent_->state_->io_mgr()->AddScanRange(
+        parent_->scan_node_->reader_context(), range, true));
+    RETURN_IF_ERROR(range->GetNext(&io_buffer_));
+    DCHECK(io_buffer_->eosr());
   }
 
   DCHECK(io_buffer_ != nullptr);
@@ -324,7 +326,8 @@ Status ScannerContext::Stream::CopyIoToBoundary(int64_t num_bytes) {
 
 void ScannerContext::Stream::ReturnIoBuffer() {
   DCHECK(io_buffer_ != nullptr);
-  ExecEnv::GetInstance()->disk_io_mgr()->ReturnBuffer(move(io_buffer_));
+  ScanRange* range = io_buffer_->scan_range();
+  range->ReturnBuffer(move(io_buffer_));
   io_buffer_pos_ = nullptr;
   io_buffer_bytes_left_ = 0;
 }

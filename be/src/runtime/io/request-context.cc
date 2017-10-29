@@ -22,20 +22,88 @@
 using namespace impala;
 using namespace impala::io;
 
-void RequestContext::Cancel(const Status& status) {
-  DCHECK(!status.ok());
+BufferDescriptor::BufferDescriptor(DiskIoMgr* io_mgr,
+    RequestContext* reader, ScanRange* scan_range, uint8_t* buffer,
+    int64_t buffer_len)
+  : io_mgr_(io_mgr),
+    reader_(reader),
+    scan_range_(scan_range),
+    buffer_(buffer),
+    buffer_len_(buffer_len) {
+  DCHECK(io_mgr != nullptr);
+  DCHECK(scan_range != nullptr);
+  DCHECK(buffer != nullptr);
+  DCHECK_GE(buffer_len, 0);
+}
 
+Status RequestContext::AllocBuffer(ScanRange* range, int64_t buffer_size,
+    unique_ptr<BufferDescriptor>* buffer_desc) {
+  DCHECK(range->external_buffer_tag_ == ScanRange::ExternalBufferTag::NO_BUFFER)
+      << static_cast<int>(range->external_buffer_tag_);
+  DCHECK_LE(buffer_size, parent_->max_buffer_size_);
+  DCHECK_GT(buffer_size, 0);
+  buffer_size = BitUtil::RoundUpToPowerOfTwo(
+      max(parent_->min_buffer_size_, min(parent_->max_buffer_size_, buffer_size)));
+
+  DCHECK(mem_tracker_ != nullptr);
+  if (!mem_tracker_->TryConsume(buffer_size)) {
+    return mem_tracker_->MemLimitExceeded(nullptr, "disk I/O buffer", buffer_size);
+  }
+
+  uint8_t* buffer = reinterpret_cast<uint8_t*>(malloc(buffer_size));
+  if (buffer == nullptr) {
+    mem_tracker_->Release(buffer_size);
+    return Status(TErrorCode::INTERNAL_ERROR,
+        Substitute("Could not malloc buffer of $0 bytes"));
+  }
+  buffer_desc->reset(new BufferDescriptor(parent_, this, range, buffer, buffer_size));
+  return Status::OK();
+}
+
+void RequestContext::FreeBuffer(BufferDescriptor* buffer) {
+  DCHECK(buffer->buffer_ != nullptr);
+  if (!buffer->is_cached() && !buffer->is_client_buffer()) {
+    // Only buffers that were not allocated by DiskIoMgr need to have memory freed.
+    free(buffer->buffer_);
+    mem_tracker_->Release(buffer->buffer_len_);
+  }
+  buffer->buffer_ = nullptr;
+}
+
+// Cancellation of a RequestContext requires coordination from multiple threads that may
+// hold references to the context:
+//  1. Disk threads that are currently processing a range for this context.
+//  2. Caller threads that are waiting in GetNext().
+//
+// Each thread that currently has a reference to the request context must notice the
+// cancel, cancel any pending operations involving the context and remove the contxt from
+// tracking structures. Once no more operations are pending on the context and no more
+// I/O mgr threads hold references to the context, the context can be marked inactive
+// (see CancelAndMarkInactive()), after which the owner of the context object can free
+// it.
+//
+// The steps are:
+// 1. Cancel() will immediately set the context in the Cancelled state. This prevents any
+// other thread from adding more ready buffers to the context (they all take a lock and
+// check the state before doing so), or any write ranges to the context.
+// 2. Cancel() will call Cancel() on each ScanRange that is not yet complete, unblocking
+// any threads in GetNext(). If there was no prior error for a scan range, any reads from
+// that scan range will return a CANCELLED Status. Cancel() also invokes callbacks for
+// all WriteRanges with a CANCELLED Status.
+// 3. Disk threads notice the context is cancelled either when picking the next context
+// to process or when they try to enqueue a ready buffer. Upon noticing the cancelled
+// state, removes the context from the disk queue. The last thread per disk then calls
+// DecrementDiskRefCount(). After the last disk thread has called DecrementDiskRefCount(),
+// cancellation is done and it is safe to unregister the context.
+void RequestContext::Cancel() {
   // Callbacks are collected in this vector and invoked while no lock is held.
   vector<WriteRange::WriteDoneCallback> write_callbacks;
   {
-    lock_guard<mutex> lock(lock_);
+    unique_lock<mutex> lock(lock_);
     DCHECK(Validate()) << endl << DebugString();
 
     // Already being cancelled
     if (state_ == RequestContext::Cancelled) return;
-
-    DCHECK(status_.ok());
-    status_ = status;
 
     // The reader will be put into a cancelled state until call cleanup is complete.
     state_ = RequestContext::Cancelled;
@@ -43,11 +111,11 @@ void RequestContext::Cancel(const Status& status) {
     // Cancel all scan ranges for this reader. Each range could be one one of
     // four queues.
     for (int i = 0; i < disk_states_.size(); ++i) {
-      RequestContext::PerDiskState& state = disk_states_[i];
-      RequestRange* range = NULL;
-      while ((range = state.in_flight_ranges()->Dequeue()) != NULL) {
+      PerDiskState& state = disk_states_[i];
+      RequestRange* range = nullptr;
+      while ((range = state.in_flight_ranges()->Dequeue()) != nullptr) {
         if (range->request_type() == RequestType::READ) {
-          static_cast<ScanRange*>(range)->Cancel(status);
+          static_cast<ScanRange*>(range)->Cancel(Status::CANCELLED);
         } else {
           DCHECK(range->request_type() == RequestType::WRITE);
           write_callbacks.push_back(static_cast<WriteRange*>(range)->callback_);
@@ -55,36 +123,36 @@ void RequestContext::Cancel(const Status& status) {
       }
 
       ScanRange* scan_range;
-      while ((scan_range = state.unstarted_scan_ranges()->Dequeue()) != NULL) {
-        scan_range->Cancel(status);
+      while ((scan_range = state.unstarted_scan_ranges()->Dequeue()) != nullptr) {
+        scan_range->Cancel(Status::CANCELLED);
       }
       WriteRange* write_range;
-      while ((write_range = state.unstarted_write_ranges()->Dequeue()) != NULL) {
+      while ((write_range = state.unstarted_write_ranges()->Dequeue()) != nullptr) {
         write_callbacks.push_back(write_range->callback_);
       }
     }
 
-    ScanRange* range = NULL;
-    while ((range = ready_to_start_ranges_.Dequeue()) != NULL) {
-      range->Cancel(status);
+    ScanRange* range = nullptr;
+    while ((range = ready_to_start_ranges_.Dequeue()) != nullptr) {
+      range->Cancel(Status::CANCELLED);
     }
-    while ((range = blocked_ranges_.Dequeue()) != NULL) {
-      range->Cancel(status);
+    while ((range = blocked_ranges_.Dequeue()) != nullptr) {
+      range->Cancel(Status::CANCELLED);
     }
-    while ((range = cached_ranges_.Dequeue()) != NULL) {
-      range->Cancel(status);
+    while ((range = cached_ranges_.Dequeue()) != nullptr) {
+      range->Cancel(Status::CANCELLED);
     }
 
-    // Schedule reader on all disks. The disks will notice it is cancelled and do any
-    // required cleanup
+    // Ensure that the reader is scheduled on all disks (it may already be scheduled on
+    // some). The disk threads will notice that the context is cancelled and do any
+    // required cleanup for the disk state.
     for (int i = 0; i < disk_states_.size(); ++i) {
-      RequestContext::PerDiskState& state = disk_states_[i];
-      state.ScheduleContext(this, i);
+      disk_states_[i].ScheduleContext(lock, this, i);
     }
   }
 
   for (const WriteRange::WriteDoneCallback& write_callback: write_callbacks) {
-    write_callback(status_);
+    write_callback(Status::CANCELLED);
   }
 
   // Signal reader and unblock the GetNext/Read thread.  That read will fail with
@@ -93,7 +161,7 @@ void RequestContext::Cancel(const Status& status) {
 }
 
 void RequestContext::CancelAndMarkInactive() {
-  Cancel(Status::CANCELLED);
+  Cancel();
 
   boost::unique_lock<boost::mutex> l(lock_);
   DCHECK_NE(state_, Inactive);
@@ -105,14 +173,22 @@ void RequestContext::CancelAndMarkInactive() {
   // Validate that no buffers were leaked from this context.
   DCHECK_EQ(num_buffers_in_reader_.Load(), 0) << endl << DebugString();
   DCHECK_EQ(num_used_buffers_.Load(), 0) << endl << DebugString();
+
+  // Validate that no threads are active and the context is not queued.
+  for (const PerDiskState& disk_state : disk_states_) {
+    DCHECK_EQ(0, disk_state.in_flight_ranges()->size()) << endl << DebugString();
+    DCHECK_EQ(0, disk_state.unstarted_scan_ranges()->size()) << endl << DebugString();
+    DCHECK_EQ(0, disk_state.num_threads_in_op()) << endl << DebugString();
+    DCHECK(!disk_state.is_on_queue()) << endl << DebugString();
+  }
   DCHECK(Validate()) << endl << DebugString();
   state_ = Inactive;
 }
 
-void RequestContext::AddRequestRange(
+void RequestContext::AddRequestRange(const unique_lock<mutex>& lock,
     RequestRange* range, bool schedule_immediately) {
-  // DCHECK(lock_.is_locked()); // TODO: boost should have this API
-  RequestContext::PerDiskState& state = disk_states_[range->disk_id()];
+  DCHECK(lock.mutex() == &lock_ && lock.owns_lock());
+  PerDiskState& state = disk_states_[range->disk_id()];
   if (state.done()) {
     DCHECK_EQ(state.num_remaining_ranges(), 0);
     state.set_done(false);
@@ -123,7 +199,7 @@ void RequestContext::AddRequestRange(
   if (range->request_type() == RequestType::READ) {
     ScanRange* scan_range = static_cast<ScanRange*>(range);
     if (schedule_immediately) {
-      ScheduleScanRange(scan_range);
+      ScheduleScanRange(lock, scan_range);
     } else {
       state.unstarted_scan_ranges()->Enqueue(scan_range);
       num_unstarted_scan_ranges_.Add(1);
@@ -143,7 +219,7 @@ void RequestContext::AddRequestRange(
     schedule_context = true;
   }
 
-  if (schedule_context) state.ScheduleContext(this, range->disk_id());
+  if (schedule_context) state.ScheduleContext(lock, this, range->disk_id());
   ++state.num_remaining_ranges();
 }
 
@@ -159,8 +235,7 @@ string RequestContext::DebugString() const {
   if (state_ == RequestContext::Cancelled) ss << "Cancelled";
   if (state_ == RequestContext::Active) ss << "Active";
   if (state_ != RequestContext::Inactive) {
-    ss << " status_=" << (status_.ok() ? "OK" : status_.GetDetail())
-       << " #ready_buffers=" << num_ready_buffers_.Load()
+    ss << " #ready_buffers=" << num_ready_buffers_.Load()
        << " #used_buffers=" << num_used_buffers_.Load()
        << " #num_buffers_in_reader=" << num_buffers_in_reader_.Load()
        << " #finished_scan_ranges=" << num_finished_ranges_.Load()
@@ -284,10 +359,11 @@ bool RequestContext::Validate() const {
   return true;
 }
 
-void RequestContext::PerDiskState::ScheduleContext(
+void RequestContext::PerDiskState::ScheduleContext(const unique_lock<mutex>& context_lock,
     RequestContext* context, int disk_id) {
-  if (!is_on_queue_ && !done_) {
-    is_on_queue_ = true;
+  DCHECK(context_lock.mutex() == &context->lock_ && context_lock.owns_lock());
+  if (is_on_queue_.Load() == 0 && !done_) {
+    is_on_queue_.Store(1);
     context->parent_->disk_queues_[disk_id]->EnqueueContext(context);
   }
 }

@@ -352,13 +352,10 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
   num_scanner_threads_started_counter_ =
       ADD_COUNTER(runtime_profile(), NUM_SCANNER_THREADS_STARTED, TUnit::UNIT);
 
-  runtime_state_->io_mgr()->set_bytes_read_counter(
-      reader_context_.get(), bytes_read_counter());
-  runtime_state_->io_mgr()->set_read_timer(reader_context_.get(), read_timer());
-  runtime_state_->io_mgr()->set_active_read_thread_counter(
-      reader_context_.get(), &active_hdfs_read_thread_counter_);
-  runtime_state_->io_mgr()->set_disks_access_bitmap(
-      reader_context_.get(), &disks_accessed_bitmap_);
+  reader_context_->set_bytes_read_counter(bytes_read_counter());
+  reader_context_->set_read_timer(read_timer());
+  reader_context_->set_active_read_thread_counter(&active_hdfs_read_thread_counter_);
+  reader_context_->set_disks_accessed_bitmap(&disks_accessed_bitmap_);
 
   average_scanner_thread_concurrency_ = runtime_profile()->AddSamplingCounter(
       AVERAGE_SCANNER_THREAD_CONCURRENCY, &active_scanner_thread_counter_);
@@ -824,20 +821,14 @@ void HdfsScanNodeBase::StopAndFinalizeCounters() {
       Substitute("Codegen enabled: $0 out of $1", num_enabled, total));
 
   if (reader_context_ != nullptr) {
-    bytes_read_local_->Set(
-        runtime_state_->io_mgr()->bytes_read_local(reader_context_.get()));
-    bytes_read_short_circuit_->Set(
-        runtime_state_->io_mgr()->bytes_read_short_circuit(reader_context_.get()));
-    bytes_read_dn_cache_->Set(
-        runtime_state_->io_mgr()->bytes_read_dn_cache(reader_context_.get()));
-    num_remote_ranges_->Set(static_cast<int64_t>(
-        runtime_state_->io_mgr()->num_remote_ranges(reader_context_.get())));
-    unexpected_remote_bytes_->Set(
-        runtime_state_->io_mgr()->unexpected_remote_bytes(reader_context_.get()));
-    cached_file_handles_hit_count_->Set(
-        runtime_state_->io_mgr()->cached_file_handles_hit_count(reader_context_.get()));
+    bytes_read_local_->Set(reader_context_->bytes_read_local());
+    bytes_read_short_circuit_->Set(reader_context_->bytes_read_short_circuit());
+    bytes_read_dn_cache_->Set(reader_context_->bytes_read_dn_cache());
+    num_remote_ranges_->Set(reader_context_->num_remote_ranges());
+    unexpected_remote_bytes_->Set(reader_context_->unexpected_remote_bytes());
+    cached_file_handles_hit_count_->Set(reader_context_->cached_file_handles_hit_count());
     cached_file_handles_miss_count_->Set(
-        runtime_state_->io_mgr()->cached_file_handles_miss_count(reader_context_.get()));
+        reader_context_->cached_file_handles_miss_count());
 
     if (unexpected_remote_bytes_->value() >= UNEXPECTED_REMOTE_BYTES_WARN_THRESHOLD) {
       runtime_state_->LogError(ErrorMsg(TErrorCode::GENERAL, Substitute(
