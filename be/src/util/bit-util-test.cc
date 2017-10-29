@@ -258,6 +258,17 @@ TEST(BitUtil, Log2) {
   EXPECT_EQ(BitUtil::Log2CeilingNonZero64(ULLONG_MAX), 64);
 }
 
+TEST(BitUtil, RoundToPowerOfTwo) {
+  EXPECT_EQ(16, BitUtil::RoundUpToPowerOfTwo(9));
+  EXPECT_EQ(16, BitUtil::RoundUpToPowerOfTwo(15));
+  EXPECT_EQ(16, BitUtil::RoundUpToPowerOfTwo(16));
+  EXPECT_EQ(32, BitUtil::RoundUpToPowerOfTwo(17));
+  EXPECT_EQ(8, BitUtil::RoundDownToPowerOfTwo(9));
+  EXPECT_EQ(8, BitUtil::RoundDownToPowerOfTwo(15));
+  EXPECT_EQ(16, BitUtil::RoundDownToPowerOfTwo(16));
+  EXPECT_EQ(16, BitUtil::RoundDownToPowerOfTwo(17));
+}
+
 TEST(BitUtil, RoundUpToPowerOf2) {
   EXPECT_EQ(BitUtil::RoundUpToPowerOf2(7, 8), 8);
   EXPECT_EQ(BitUtil::RoundUpToPowerOf2(8, 8), 8);

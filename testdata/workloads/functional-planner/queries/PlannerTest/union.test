@@ -3233,7 +3233,7 @@ PLAN-ROOT SINK
 |  tuple-ids=2 row-size=4B cardinality=7300
 |
 F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=128.00MB mem-reservation=0B
+Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB
 00:UNION
 |  pass-through-operands: all
 |  mem-estimate=0B mem-reservation=0B
@@ -3246,7 +3246,7 @@ Per-Host Resources: mem-estimate=128.00MB mem-reservation=0B
 |       partitions: 24/24 rows=7300
 |       columns: all
 |     extrapolated-rows=disabled
-|     mem-estimate=128.00MB mem-reservation=0B
+|     mem-estimate=128.00MB mem-reservation=32.00KB
 |     tuple-ids=1 row-size=4B cardinality=7300
 |
 01:SCAN HDFS [functional.emptytable, RANDOM]
@@ -3277,7 +3277,7 @@ PLAN-ROOT SINK
 |  tuple-ids=2 row-size=4B cardinality=7300
 |
 F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=128.00MB mem-reservation=0B
+Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB
 00:UNION
 |  pass-through-operands: all
 |  mem-estimate=0B mem-reservation=0B
@@ -3300,6 +3300,6 @@ Per-Host Resources: mem-estimate=128.00MB mem-reservation=0B
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=0B
+   mem-estimate=128.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=4B cardinality=7300
 ====

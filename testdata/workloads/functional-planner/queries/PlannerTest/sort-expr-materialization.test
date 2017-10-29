@@ -2,7 +2,7 @@
 select * from functional.alltypes order by random()
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.00MB
+|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.03MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -19,14 +19,14 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=0B
+   mem-estimate=128.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=97B cardinality=7300
 ====
 # sort on a deterministic expr that exceeds the cost threshold
 select * from functional.alltypes order by abs(id) + abs(id)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.00MB
+|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.03MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -43,14 +43,14 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=0B
+   mem-estimate=128.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=97B cardinality=7300
 ====
 # sort on a deterministic expr that doesn't exceed the cost threshold
 select * from functional.alltypes order by tinyint_col + 1
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.00MB
+|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.03MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -66,7 +66,7 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=0B
+   mem-estimate=128.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=97B cardinality=7300
 ====
 # sort on multiple exprs, subset is materialized
@@ -74,7 +74,7 @@ select * from functional.alltypes
 order by dayofweek(timestamp_col), true, id + 1, string_col = date_string_col, id = tinyint_col
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.00MB
+|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.03MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -91,7 +91,7 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=0B
+   mem-estimate=128.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=97B cardinality=7300
 ====
 # expensive analytic order by expr gets materialized
@@ -99,7 +99,7 @@ select last_value(id) over (order by to_date(timestamp_col), bool_col is null)
 from functional.alltypes
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=16.00MB
+|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=16.03MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -123,7 +123,7 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=0B
+   mem-estimate=128.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=21B cardinality=7300
 ====
 # expensive order by expr in top-n gets materialized
@@ -131,7 +131,7 @@ select id from functional.alltypes order by string_col like 'a.*b', id * bigint_
 regexp_replace(string_col, 'a.*b', 'c') limit 10
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=128.00MB mem-reservation=0B
+|  Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -148,14 +148,14 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=0B
+   mem-estimate=128.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=29B cardinality=7300
 ====
 # sort on udf, gets materialized
 select * from functional.alltypes order by TestFn(double_col)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.00MB
+|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.03MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -172,14 +172,14 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=0B
+   mem-estimate=128.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=97B cardinality=7300
 ====
 # sort expr contains SlotRefs that don't need to be materialized separately
 select concat(date_string_col, string_col) c from functional.alltypes order by c
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.00MB
+|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.03MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -196,7 +196,7 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=0B
+   mem-estimate=128.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=41B cardinality=7300
 ====
 # IMPALA-5270: Rand() and udf inside inline view referenced by analytic function.
@@ -237,6 +237,6 @@ PLAN-ROOT SINK
      partitions: 4/4 rows=8
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=32.00MB mem-reservation=0B
+   mem-estimate=32.00MB mem-reservation=8.00KB
    tuple-ids=0 row-size=12B cardinality=8
 ====

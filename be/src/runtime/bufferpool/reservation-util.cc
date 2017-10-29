@@ -24,7 +24,7 @@ namespace impala {
 // Most operators that accumulate memory use reservations, so the majority of memory
 // should be allocated to buffer reservations, as a heuristic.
 const double ReservationUtil::RESERVATION_MEM_FRACTION = 0.8;
-const int64_t ReservationUtil::RESERVATION_MEM_MIN_REMAINING = 75 * 1024 * 1024;
+const int64_t ReservationUtil::RESERVATION_MEM_MIN_REMAINING = 32 * 1024 * 1024;
 
 int64_t ReservationUtil::GetReservationLimitFromMemLimit(int64_t mem_limit) {
   int64_t max_reservation = std::min<int64_t>(
