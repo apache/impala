@@ -13,7 +13,7 @@
 # except:
 # * even-numbered l_orderkey values, because there is a NULL on the build side.
 # * l_orderkey values > 5500000, because there is a NULL on the probe side
-set buffer_pool_limit=12m;
+set buffer_pool_limit=110m;
 select l_orderkey, l_partkey, l_suppkey, l_linenumber
 from lineitem
 where l_suppkey = 4162 and l_shipmode = 'AIR' and l_returnflag = 'A' and
@@ -54,8 +54,9 @@ order by 1,2,3,4
 BIGINT,BIGINT,BIGINT,INT
 ====
 ---- QUERY
-set buffer_pool_limit=7m;
-# Execute NAAJ query 1 without enough memory to fit the null build rows in memory.
+set debug_action="-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0";
+# Execute NAAJ query 1 with a debug action so that it can not get enough memory to fit
+# the null build rows in memory.
 select l_orderkey, l_partkey, l_suppkey, l_linenumber
 from lineitem
 where l_suppkey = 4162 and l_shipmode = 'AIR' and l_returnflag = 'A' and

@@ -37,7 +37,9 @@ from tests.common.skip import (
     SkipIfADLS,
     SkipIfIsilon,
     SkipIfLocal)
-from tests.common.test_dimensions import create_single_exec_option_dimension
+from tests.common.test_dimensions import (
+    create_single_exec_option_dimension,
+    create_exec_option_dimension)
 from tests.common.test_result_verifier import (
     parse_column_types,
     parse_column_labels,
@@ -49,6 +51,11 @@ from tests.util.hdfs_util import NAMENODE
 from tests.util.get_parquet_metadata import get_parquet_metadata
 from tests.util.test_file_parser import QueryTestSectionReader
 
+# Test scanners with denial of reservations at varying frequency. This will affect the
+# number of scanner threads that can be spun up.
+DEBUG_ACTION_DIMS = [None,
+  '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@0.5',
+  '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0']
 
 class TestScannersAllTableFormats(ImpalaTestSuite):
   BATCH_SIZES = [0, 1, 16]
@@ -66,18 +73,20 @@ class TestScannersAllTableFormats(ImpalaTestSuite):
       cls.ImpalaTestMatrix.add_dimension(cls.create_table_info_dimension('pairwise'))
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('batch_size', *TestScannersAllTableFormats.BATCH_SIZES))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('debug_action', *DEBUG_ACTION_DIMS))
 
   def test_scanners(self, vector):
     new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
+    new_vector.get_value('exec_option')['debug_action'] = vector.get_value('debug_action')
     self.run_test_case('QueryTest/scanners', new_vector)
 
   def test_hdfs_scanner_profile(self, vector):
-    if vector.get_value('table_format').file_format in ('kudu', 'hbase'):
+    if vector.get_value('table_format').file_format in ('kudu', 'hbase') or \
+       vector.get_value('exec_option')['num_nodes'] != 0:
       pytest.skip()
-    new_vector = deepcopy(vector)
-    new_vector.get_value('exec_option')['num_nodes'] = 0
-    self.run_test_case('QueryTest/hdfs_scanner_profile', new_vector)
+    self.run_test_case('QueryTest/hdfs_scanner_profile', vector)
 
 # Test all the scanners with a simple limit clause. The limit clause triggers
 # cancellation in the scanner code paths.
@@ -171,6 +180,8 @@ class TestWideRow(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestWideRow, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(
+        create_exec_option_dimension(debug_action_options=DEBUG_ACTION_DIMS))
     # I can't figure out how to load a huge row into hbase
     cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format != 'hbase')
@@ -202,6 +213,8 @@ class TestWideTable(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestWideTable, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(
+        create_exec_option_dimension(debug_action_options=DEBUG_ACTION_DIMS))
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension("num_cols", *cls.NUM_COLS))
     # To cut down on test execution time, only run in exhaustive.
     if cls.exploration_strategy() != 'exhaustive':
@@ -244,6 +257,8 @@ class TestParquet(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestParquet, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(
+        create_exec_option_dimension(debug_action_options=DEBUG_ACTION_DIMS))
     cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format == 'parquet')
 

@@ -34,9 +34,25 @@
 #include "util/filesystem-util.h"
 #include "util/hdfs-util.h"
 #include "util/impalad-metrics.h"
+#include "util/runtime-profile-counters.h"
 
 /// This file contains internal structures shared between submodules of the IoMgr. Users
 /// of the IoMgr do not need to include this file.
+
+// Macros to work around counters sometimes not being provided.
+// TODO: fix things so that counters are always non-NULL.
+#define COUNTER_ADD_IF_NOT_NULL(c, v) \
+  do { \
+    ::impala::RuntimeProfile::Counter* __ctr__ = (c); \
+    if (__ctr__ != nullptr) __ctr__->Add(v); \
+ } while (false);
+
+#define COUNTER_BITOR_IF_NOT_NULL(c, v) \
+  do { \
+    ::impala::RuntimeProfile::Counter* __ctr__ = (c); \
+    if (__ctr__ != nullptr) __ctr__->BitOr(v); \
+ } while (false);
+
 namespace impala {
 namespace io {
 

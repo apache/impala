@@ -80,7 +80,7 @@ class HdfsOrcScanner : public HdfsScanner {
     }
 
     uint64_t getNaturalReadSize() const {
-      return scanner_->state_->io_mgr()->max_read_buffer_size();
+      return scanner_->state_->io_mgr()->max_buffer_size();
     }
 
     void read(void* buf, uint64_t length, uint64_t offset);

@@ -21,6 +21,7 @@
 
 #include "exec/scanner-context.inline.h"
 #include "exprs/expr.h"
+#include "runtime/exec-env.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/tuple-row.h"
 #include "util/decompress.h"
@@ -35,6 +36,7 @@ DEFINE_bool(enable_orc_scanner, true,
 
 Status HdfsOrcScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const vector<HdfsFileDesc*>& files) {
+  DCHECK(!files.empty());
   for (HdfsFileDesc* file : files) {
     // If the file size is less than 10 bytes, it is an invalid ORC file.
     if (file->file_length < 10) {
@@ -112,10 +114,12 @@ void HdfsOrcScanner::ScanRangeInputStream::read(void* buf, uint64_t length,
   Status status;
   {
     SCOPED_TIMER(scanner_->state_->total_storage_wait_timer());
-    status = scanner_->state_->io_mgr()->Read(
-        scanner_->scan_node_->reader_context(), range, &io_buffer);
+    bool needs_buffers;
+    status = ExecEnv::GetInstance()->disk_io_mgr()->StartScanRange(
+          scanner_->scan_node_->reader_context(), range, &needs_buffers);
+    DCHECK(!status.ok() || !needs_buffers) << "Already provided a buffer";
   }
-  if (io_buffer != nullptr) scanner_->state_->io_mgr()->ReturnBuffer(move(io_buffer));
+  if (io_buffer != nullptr) range->ReturnBuffer(move(io_buffer));
   if (!status.ok()) throw ResourceError(status);
 }
 

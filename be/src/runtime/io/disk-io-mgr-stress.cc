@@ -19,6 +19,8 @@
 
 #include "runtime/io/disk-io-mgr-stress.h"
 
+#include "runtime/bufferpool/reservation-tracker.h"
+#include "runtime/exec-env.h"
 #include "runtime/io/request-context.h"
 #include "util/time.h"
 
@@ -27,18 +29,20 @@
 using namespace impala;
 using namespace impala::io;
 
-static const float ABORT_CHANCE = .10f;
-static const int MIN_READ_LEN = 1;
-static const int MAX_READ_LEN = 20;
+constexpr float DiskIoMgrStress::ABORT_CHANCE;
+const int DiskIoMgrStress::MIN_READ_LEN;
+const int DiskIoMgrStress::MAX_READ_LEN;
 
-static const int MIN_FILE_LEN = 10;
-static const int MAX_FILE_LEN = 1024;
+const int DiskIoMgrStress::MIN_FILE_LEN;
+const int DiskIoMgrStress::MAX_FILE_LEN;
 
 // Make sure this is between MIN/MAX FILE_LEN to test more cases
-static const int MIN_READ_BUFFER_SIZE = 64;
-static const int MAX_READ_BUFFER_SIZE = 128;
+const int DiskIoMgrStress::MIN_READ_BUFFER_SIZE;
+const int DiskIoMgrStress::MAX_READ_BUFFER_SIZE;
 
-static const int CANCEL_READER_PERIOD_MS = 20;  // in ms
+const int DiskIoMgrStress::MAX_BUFFER_BYTES_PER_SCAN_RANGE;
+
+const int DiskIoMgrStress::CANCEL_READER_PERIOD_MS;
 
 static void CreateTempFile(const char* filename, const char* data) {
   FILE* file = fopen(filename, "w");
@@ -47,7 +51,7 @@ static void CreateTempFile(const char* filename, const char* data) {
   fclose(file);
 }
 
-string GenerateRandomData() {
+string DiskIoMgrStress::GenerateRandomData() {
   int rand_len = rand() % (MAX_FILE_LEN - MIN_FILE_LEN) + MIN_FILE_LEN;
   stringstream ss;
   for (int i = 0; i < rand_len; ++i) {
@@ -59,6 +63,8 @@ string GenerateRandomData() {
 
 struct DiskIoMgrStress::Client {
   boost::mutex lock;
+  /// Pool for objects that is cleared when the client is (re-)initialized in NewClient().
+  ObjectPool obj_pool;
   unique_ptr<RequestContext> reader;
   int file_idx;
   vector<ScanRange*> scan_ranges;
@@ -77,7 +83,7 @@ DiskIoMgrStress::DiskIoMgrStress(int num_disks, int num_threads_per_disk,
 
   io_mgr_.reset(new DiskIoMgr(num_disks, num_threads_per_disk, num_threads_per_disk,
       MIN_READ_BUFFER_SIZE, MAX_READ_BUFFER_SIZE));
-  Status status = io_mgr_->Init(&mem_tracker_);
+  Status status = io_mgr_->Init();
   CHECK(status.ok());
 
   // Initialize some data files.  It doesn't really matter how many there are.
@@ -92,6 +98,7 @@ DiskIoMgrStress::DiskIoMgrStress(int num_disks, int num_threads_per_disk,
 
   clients_ = new Client[num_clients_];
   client_mem_trackers_.resize(num_clients_);
+  buffer_pool_clients_.reset(new BufferPool::ClientHandle[num_clients_]);
   for (int i = 0; i < num_clients_; ++i) {
     NewClient(i);
   }
@@ -110,9 +117,16 @@ void DiskIoMgrStress::ClientThread(int client_id) {
 
     while (!eos) {
       ScanRange* range;
-      Status status = io_mgr_->GetNextRange(client->reader.get(), &range);
+      bool needs_buffers;
+      Status status =
+          io_mgr_->GetNextUnstartedRange(client->reader.get(), &range, &needs_buffers);
       CHECK(status.ok() || status.IsCancelled());
       if (range == NULL) break;
+      if (needs_buffers) {
+        status = io_mgr_->AllocateBuffersForRange(client->reader.get(),
+            &buffer_pool_clients_[client_id], range, MAX_BUFFER_BYTES_PER_SCAN_RANGE);
+        CHECK(status.ok()) << status.GetDetail();
+      }
 
       while (true) {
         unique_ptr<BufferDescriptor> buffer;
@@ -137,7 +151,7 @@ void DiskIoMgrStress::ClientThread(int client_id) {
 
         // Copy the bytes from this read into the result buffer.
         memcpy(read_buffer + file_offset, buffer->buffer(), buffer->len());
-        io_mgr_->ReturnBuffer(move(buffer));
+        range->ReturnBuffer(move(buffer));
         bytes_read += len;
 
         CHECK_GE(bytes_read, 0);
@@ -159,6 +173,7 @@ void DiskIoMgrStress::ClientThread(int client_id) {
     // Unregister the old client and get a new one
     unique_lock<mutex> lock(client->lock);
     io_mgr_->UnregisterContext(client->reader.get());
+    client->reader.reset();
     NewClient(client_id);
   }
 
@@ -170,11 +185,9 @@ void DiskIoMgrStress::ClientThread(int client_id) {
 // Cancel a random reader
 void DiskIoMgrStress::CancelRandomReader() {
   if (!includes_cancellation_) return;
-
-  int rand_client = rand() % num_clients_;
-
-  unique_lock<mutex> lock(clients_[rand_client].lock);
-  io_mgr_->CancelContext(clients_[rand_client].reader.get());
+  Client* rand_client = &clients_[rand() % num_clients_];
+  unique_lock<mutex> lock(rand_client->lock);
+  rand_client->reader->Cancel();
 }
 
 void DiskIoMgrStress::Run(int sec) {
@@ -199,10 +212,18 @@ void DiskIoMgrStress::Run(int sec) {
 
   for (int i = 0; i < num_clients_; ++i) {
     unique_lock<mutex> lock(clients_[i].lock);
-    if (clients_[i].reader != NULL) io_mgr_->CancelContext(clients_[i].reader.get());
+    if (clients_[i].reader != NULL) clients_[i].reader->Cancel();
   }
-
   readers_.join_all();
+
+  for (int i = 0; i < num_clients_; ++i) {
+    if (clients_[i].reader != nullptr) {
+      io_mgr_->UnregisterContext(clients_[i].reader.get());
+    }
+    ExecEnv::GetInstance()->buffer_pool()->DeregisterClient(&buffer_pool_clients_[i]);
+    client_mem_trackers_[i]->Close();
+  }
+  mem_tracker_.Close();
 }
 
 // Initialize a client to read one of the files at random.  The scan ranges are
@@ -223,25 +244,41 @@ void DiskIoMgrStress::NewClient(int i) {
     }
   }
 
-  for (int i = 0; i < client.scan_ranges.size(); ++i) {
-    delete client.scan_ranges[i];
-  }
+  // Clean up leftover state from the previous client (if any).
   client.scan_ranges.clear();
+  ExecEnv* exec_env = ExecEnv::GetInstance();
+  exec_env->buffer_pool()->DeregisterClient(&buffer_pool_clients_[i]);
+  if (client_mem_trackers_[i] != nullptr) client_mem_trackers_[i]->Close();
+  client.obj_pool.Clear();
 
   int assigned_len = 0;
   while (assigned_len < file_len) {
     int range_len = rand() % (MAX_READ_LEN - MIN_READ_LEN) + MIN_READ_LEN;
     range_len = min(range_len, file_len - assigned_len);
 
-    ScanRange* range = new ScanRange();
+    ScanRange* range = client.obj_pool.Add(new ScanRange);
     range->Reset(NULL, files_[client.file_idx].filename.c_str(), range_len, assigned_len,
         0, false, BufferOpts::Uncached());
     client.scan_ranges.push_back(range);
     assigned_len += range_len;
   }
 
-  client_mem_trackers_[i].reset(new MemTracker(-1, "", &mem_tracker_));
-  client.reader = io_mgr_->RegisterContext(client_mem_trackers_[i].get());
-  Status status = io_mgr_->AddScanRanges(client.reader.get(), client.scan_ranges);
+  string client_name = Substitute("Client $0", i);
+  client_mem_trackers_[i].reset(new MemTracker(-1, client_name, &mem_tracker_));
+  Status status = exec_env->buffer_pool()->RegisterClient(client_name, nullptr,
+      exec_env->buffer_reservation(), client_mem_trackers_[i].get(),
+      numeric_limits<int64_t>::max(), RuntimeProfile::Create(&client.obj_pool, client_name),
+      &buffer_pool_clients_[i]);
+  CHECK(status.ok());
+  // Reserve enough memory for 3 buffers per range, which should be enough to guarantee
+  // progress.
+  CHECK(buffer_pool_clients_[i].IncreaseReservationToFit(
+      MAX_BUFFER_BYTES_PER_SCAN_RANGE * client.scan_ranges.size()))
+      << buffer_pool_clients_[i].DebugString() << "\n"
+      << exec_env->buffer_pool()->DebugString() << "\n"
+      << exec_env->buffer_reservation()->DebugString();
+
+  client.reader = io_mgr_->RegisterContext();
+  status = io_mgr_->AddScanRanges(client.reader.get(), client.scan_ranges);
   CHECK(status.ok());
 }

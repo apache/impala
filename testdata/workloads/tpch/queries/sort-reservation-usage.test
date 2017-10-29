@@ -1,17 +1,18 @@
 ====
 ---- QUERY
 # Test that in-mem sorts incrementally give up memory when emitting output.
-# This query and the limit is calibrated to fail if the first sort does not
-# give up memory to the second sort.
+# This query and scratch limit are chosen so that the query fails if the first sort
+# does not give up memory to the second sort. Scans the text formatted file so that
+# the scan uses less reservation.
 set num_nodes=1;
 set scratch_limit=0;
-set buffer_pool_limit=15m;
+set buffer_pool_limit=35m;
 set default_spillable_buffer_size=64kb;
 SELECT *
 FROM   (SELECT
         Rank() OVER(ORDER BY  l_orderkey) AS rank,
         Rank() OVER(ORDER BY  l_partkey) AS rank2
-        FROM lineitem
+        FROM tpch.lineitem
         WHERE l_shipdate < '1992-05-09') a
 WHERE rank < 10
 ORDER BY rank;

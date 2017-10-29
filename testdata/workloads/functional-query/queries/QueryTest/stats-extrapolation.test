@@ -52,14 +52,14 @@ STRING,STRING,BIGINT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING
 # Stats are available now.
 explain select id from alltypes;
 ---- RESULTS: VERIFY_IS_EQUAL
-'Max Per-Host Resource Reservation: Memory=0B'
-'Per-Host Resource Estimates: Memory=16.00MB'
+row_regex:.*Max Per-Host Resource Reservation: Memory=.*
+row_regex:.*Per-Host Resource Estimates: Memory=.*
 'Codegen disabled by planner'
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
-'|  Per-Host Resources: mem-estimate=16.00MB mem-reservation=0B'
+row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
 'PLAN-ROOT SINK'
-'|  mem-estimate=0B mem-reservation=0B'
+row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
 '00:SCAN HDFS [$DATABASE.alltypes]'
 row_regex:.*partitions=12/12 files=12 size=.*
@@ -77,14 +77,14 @@ STRING
 # Select a subset of partitions.
 explain select id from alltypes where month in (1, 2, 3);
 ---- RESULTS: VERIFY_IS_EQUAL
-'Max Per-Host Resource Reservation: Memory=0B'
-'Per-Host Resource Estimates: Memory=16.00MB'
+row_regex:.*Max Per-Host Resource Reservation: Memory=.*
+row_regex:.*Per-Host Resource Estimates: Memory=.*
 'Codegen disabled by planner'
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
-'|  Per-Host Resources: mem-estimate=16.00MB mem-reservation=0B'
+row_regex:.*mem-estimate=.* mem-reservation=.*
 'PLAN-ROOT SINK'
-'|  mem-estimate=0B mem-reservation=0B'
+row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
 '00:SCAN HDFS [$DATABASE.alltypes]'
 row_regex:.*partitions=3/12 files=3 size=.*
@@ -104,13 +104,13 @@ insert into alltypes partition(year, month)
 select * from functional_parquet.alltypes where year = 2009;
 explain select id from alltypes;
 ---- RESULTS: VERIFY_IS_EQUAL
-'Max Per-Host Resource Reservation: Memory=0B'
-'Per-Host Resource Estimates: Memory=16.00MB'
+row_regex:.*Max Per-Host Resource Reservation: Memory=.*
+row_regex:.*Per-Host Resource Estimates: Memory=.*
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
-'|  Per-Host Resources: mem-estimate=16.00MB mem-reservation=0B'
+row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
 'PLAN-ROOT SINK'
-'|  mem-estimate=0B mem-reservation=0B'
+row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
 '00:SCAN HDFS [$DATABASE.alltypes]'
 row_regex:.*partitions=12/12 files=24 size=.*
@@ -130,14 +130,14 @@ insert into alltypes partition(year, month)
 select * from functional_parquet.alltypes where year = 2010;
 explain select id from alltypes where year = 2010;
 ---- RESULTS: VERIFY_IS_EQUAL
-'Max Per-Host Resource Reservation: Memory=0B'
-'Per-Host Resource Estimates: Memory=16.00MB'
+row_regex:.*Max Per-Host Resource Reservation: Memory=.*
+row_regex:.*Per-Host Resource Estimates: Memory=16.00MB'
 'Codegen disabled by planner'
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
-'|  Per-Host Resources: mem-estimate=16.00MB mem-reservation=0B'
+row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
 'PLAN-ROOT SINK'
-'|  mem-estimate=0B mem-reservation=0B'
+row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
 '00:SCAN HDFS [$DATABASE.alltypes]'
 row_regex:.*partitions=12/24 files=12 size=.*
@@ -156,14 +156,14 @@ STRING
 compute stats alltypes;
 explain select id from alltypes where year = 2010;
 ---- RESULTS: VERIFY_IS_EQUAL
-'Max Per-Host Resource Reservation: Memory=0B'
-'Per-Host Resource Estimates: Memory=16.00MB'
+row_regex:.*Max Per-Host Resource Reservation: Memory=.*
+row_regex:.*Per-Host Resource Estimates: Memory=16.00MB'
 'Codegen disabled by planner'
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
-'|  Per-Host Resources: mem-estimate=16.00MB mem-reservation=0B'
+row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
 'PLAN-ROOT SINK'
-'|  mem-estimate=0B mem-reservation=0B'
+row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
 '00:SCAN HDFS [$DATABASE.alltypes]'
 row_regex:.*partitions=12/24 files=12 size=.*

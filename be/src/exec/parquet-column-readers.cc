@@ -30,6 +30,7 @@
 #include "exec/scanner-context.inline.h"
 #include "rpc/thrift-util.h"
 #include "runtime/collection-value-builder.h"
+#include "runtime/exec-env.h"
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
 #include "runtime/runtime-state.h"
@@ -49,6 +50,10 @@ DEFINE_bool(convert_legacy_hive_parquet_utc_timestamps, false,
 
 static const int BITPACKED_DEPRECATION_WARNING_FREQUENCY = 100;
 
+// Max dictionary page header size in bytes. This is an estimate and only needs to be an
+// upper bound.
+static const int MAX_DICT_HEADER_SIZE = 100;
+
 // Max data page header size in bytes. This is an estimate and only needs to be an upper
 // bound. It is theoretically possible to have a page header of any size due to string
 // value statistics, but in practice we'll have trouble reading string values this large.
@@ -67,6 +72,8 @@ static int debug_count = 0;
 #else
 #define SHOULD_TRIGGER_DEBUG_ACTION(x) (false)
 #endif
+
+using namespace impala::io;
 
 namespace impala {
 
@@ -848,8 +855,98 @@ static bool RequiresSkippedDictionaryHeaderCheck(
   return v.VersionEq(1,1,0) || (v.VersionEq(1,2,0) && v.is_impala_internal);
 }
 
+Status BaseScalarColumnReader::Reset(const HdfsFileDesc& file_desc,
+    const parquet::ColumnChunk& col_chunk, int row_group_idx) {
+  // Ensure metadata is valid before using it to initialize the reader.
+  RETURN_IF_ERROR(ParquetMetadataUtils::ValidateRowGroupColumn(parent_->file_metadata_,
+      parent_->filename(), row_group_idx, col_idx(), schema_element(),
+      parent_->state_));
+  num_buffered_values_ = 0;
+  data_ = nullptr;
+  data_end_ = nullptr;
+  stream_ = nullptr;
+  io_reservation_ = 0;
+  metadata_ = &col_chunk.meta_data;
+  num_values_read_ = 0;
+  def_level_ = HdfsParquetScanner::INVALID_LEVEL;
+  // See ColumnReader constructor.
+  rep_level_ = max_rep_level() == 0 ? 0 : HdfsParquetScanner::INVALID_LEVEL;
+  pos_current_value_ = HdfsParquetScanner::INVALID_POS;
+
+  if (metadata_->codec != parquet::CompressionCodec::UNCOMPRESSED) {
+    RETURN_IF_ERROR(Codec::CreateDecompressor(
+        nullptr, false, ConvertParquetToImpalaCodec(metadata_->codec), &decompressor_));
+  }
+  int64_t col_start = col_chunk.meta_data.data_page_offset;
+  if (col_chunk.meta_data.__isset.dictionary_page_offset) {
+    // Already validated in ValidateColumnOffsets()
+    DCHECK_LT(col_chunk.meta_data.dictionary_page_offset, col_start);
+    col_start = col_chunk.meta_data.dictionary_page_offset;
+  }
+  int64_t col_len = col_chunk.meta_data.total_compressed_size;
+  if (col_len <= 0) {
+    return Status(Substitute("File '$0' contains invalid column chunk size: $1",
+        filename(), col_len));
+  }
+  int64_t col_end = col_start + col_len;
+
+  // Already validated in ValidateColumnOffsets()
+  DCHECK_GT(col_end, 0);
+  DCHECK_LT(col_end, file_desc.file_length);
+  const ParquetFileVersion& file_version = parent_->file_version_;
+  if (file_version.application == "parquet-mr" && file_version.VersionLt(1, 2, 9)) {
+    // The Parquet MR writer had a bug in 1.2.8 and below where it didn't include the
+    // dictionary page header size in total_compressed_size and total_uncompressed_size
+    // (see IMPALA-694). We pad col_len to compensate.
+    int64_t bytes_remaining = file_desc.file_length - col_end;
+    int64_t pad = min<int64_t>(MAX_DICT_HEADER_SIZE, bytes_remaining);
+    col_len += pad;
+  }
+
+  // TODO: this will need to change when we have co-located files and the columns
+  // are different files.
+  if (!col_chunk.file_path.empty() && col_chunk.file_path != filename()) {
+    return Status(Substitute("Expected parquet column file path '$0' to match "
+        "filename '$1'", col_chunk.file_path, filename()));
+  }
+
+  const ScanRange* metadata_range = parent_->metadata_range_;
+  int64_t partition_id = parent_->context_->partition_descriptor()->id();
+  const ScanRange* split_range =
+      static_cast<ScanRangeMetadata*>(metadata_range->meta_data())->original_split;
+  // Determine if the column is completely contained within a local split.
+  bool col_range_local = split_range->expected_local()
+      && col_start >= split_range->offset()
+      && col_end <= split_range->offset() + split_range->len();
+  scan_range_ = parent_->scan_node_->AllocateScanRange(metadata_range->fs(),
+      filename(), col_len, col_start, partition_id, split_range->disk_id(),
+      col_range_local,
+      BufferOpts(split_range->try_cache(), file_desc.mtime));
+  ClearDictionaryDecoder();
+  return Status::OK();
+}
+
+Status BaseScalarColumnReader::StartScan() {
+  DCHECK(scan_range_ != nullptr) << "Must Reset() before starting scan.";
+  DiskIoMgr* io_mgr = ExecEnv::GetInstance()->disk_io_mgr();
+  ScannerContext* context = parent_->context_;
+  DCHECK_GT(io_reservation_, 0);
+  bool needs_buffers;
+  RETURN_IF_ERROR(io_mgr->StartScanRange(
+      parent_->scan_node_->reader_context(), scan_range_, &needs_buffers));
+  if (needs_buffers) {
+    RETURN_IF_ERROR(io_mgr->AllocateBuffersForRange(
+        parent_->scan_node_->reader_context(), context->bp_client(),
+        scan_range_, io_reservation_));
+  }
+  stream_ = parent_->context_->AddStream(scan_range_, io_reservation_);
+  DCHECK(stream_ != nullptr);
+  return Status::OK();
+}
+
 Status BaseScalarColumnReader::ReadPageHeader(bool peek,
     parquet::PageHeader* next_page_header, uint32_t* next_header_size, bool* eos) {
+  DCHECK(stream_ != nullptr);
   *eos = false;
 
   uint8_t* buffer;
@@ -933,7 +1030,7 @@ Status BaseScalarColumnReader::InitDictionary() {
   bool eos;
   parquet::PageHeader next_page_header;
   uint32_t next_header_size;
-
+  DCHECK(stream_ != nullptr);
   DCHECK(!HasDictionaryDecoder());
 
   RETURN_IF_ERROR(ReadPageHeader(true /* peek */, &next_page_header,
@@ -1042,6 +1139,14 @@ Status BaseScalarColumnReader::InitDictionary() {
                              dict_header->num_values, dict_decoder->num_entries()));
   }
 
+  return Status::OK();
+}
+
+Status BaseScalarColumnReader::InitDictionaries(
+    const vector<BaseScalarColumnReader*> readers) {
+  for (BaseScalarColumnReader* reader : readers) {
+    RETURN_IF_ERROR(reader->InitDictionary());
+  }
   return Status::OK();
 }
 
