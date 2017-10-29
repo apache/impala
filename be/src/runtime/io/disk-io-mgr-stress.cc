@@ -77,7 +77,7 @@ DiskIoMgrStress::DiskIoMgrStress(int num_disks, int num_threads_per_disk,
 
   io_mgr_.reset(new DiskIoMgr(num_disks, num_threads_per_disk, num_threads_per_disk,
       MIN_READ_BUFFER_SIZE, MAX_READ_BUFFER_SIZE));
-  Status status = io_mgr_->Init(&mem_tracker_);
+  Status status = io_mgr_->Init();
   CHECK(status.ok());
 
   // Initialize some data files.  It doesn't really matter how many there are.
@@ -137,7 +137,7 @@ void DiskIoMgrStress::ClientThread(int client_id) {
 
         // Copy the bytes from this read into the result buffer.
         memcpy(read_buffer + file_offset, buffer->buffer(), buffer->len());
-        io_mgr_->ReturnBuffer(move(buffer));
+        range->ReturnBuffer(move(buffer));
         bytes_read += len;
 
         CHECK_GE(bytes_read, 0);
@@ -159,6 +159,7 @@ void DiskIoMgrStress::ClientThread(int client_id) {
     // Unregister the old client and get a new one
     unique_lock<mutex> lock(client->lock);
     io_mgr_->UnregisterContext(client->reader.get());
+    client->reader.reset();
     NewClient(client_id);
   }
 
@@ -170,11 +171,9 @@ void DiskIoMgrStress::ClientThread(int client_id) {
 // Cancel a random reader
 void DiskIoMgrStress::CancelRandomReader() {
   if (!includes_cancellation_) return;
-
-  int rand_client = rand() % num_clients_;
-
-  unique_lock<mutex> lock(clients_[rand_client].lock);
-  io_mgr_->CancelContext(clients_[rand_client].reader.get());
+  Client* rand_client = &clients_[rand() % num_clients_];
+  unique_lock<mutex> lock(rand_client->lock);
+  rand_client->reader->Cancel();
 }
 
 void DiskIoMgrStress::Run(int sec) {
@@ -199,10 +198,12 @@ void DiskIoMgrStress::Run(int sec) {
 
   for (int i = 0; i < num_clients_; ++i) {
     unique_lock<mutex> lock(clients_[i].lock);
-    if (clients_[i].reader != NULL) io_mgr_->CancelContext(clients_[i].reader.get());
+    if (clients_[i].reader != NULL) clients_[i].reader->Cancel();
   }
-
   readers_.join_all();
+
+  for (unique_ptr<MemTracker>& mem_tracker : client_mem_trackers_) mem_tracker->Close();
+  mem_tracker_.Close();
 }
 
 // Initialize a client to read one of the files at random.  The scan ranges are
@@ -240,6 +241,7 @@ void DiskIoMgrStress::NewClient(int i) {
     assigned_len += range_len;
   }
 
+  if (client_mem_trackers_[i] != nullptr) client_mem_trackers_[i]->Close();
   client_mem_trackers_[i].reset(new MemTracker(-1, "", &mem_tracker_));
   client.reader = io_mgr_->RegisterContext(client_mem_trackers_[i].get());
   Status status = io_mgr_->AddScanRanges(client.reader.get(), client.scan_ranges);

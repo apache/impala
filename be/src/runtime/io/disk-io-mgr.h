@@ -144,8 +144,8 @@ namespace io {
 ///
 /// As a caller reads from a scan range, these buffers are wrapped in BufferDescriptors
 /// and returned to the caller. The caller must always call ReturnBuffer() on the buffer
-/// descriptor to allow recycling of the associated buffer (if there is an
-/// IoMgr-allocated or HDFS cached buffer).
+/// descriptor to allow freeing of the associated buffer (if there is an IoMgr-allocated
+/// or HDFS cached buffer).
 ///
 /// Caching support:
 /// Scan ranges contain metadata on whether or not it is cached on the DN. In that
@@ -207,7 +207,7 @@ class DiskIoMgr : public CacheLineAligned {
   ///  - min_buffer_size: minimum io buffer size (in bytes)
   ///  - max_buffer_size: maximum io buffer size (in bytes). Also the max read size.
   DiskIoMgr(int num_disks, int threads_per_rotational_disk,
-      int threads_per_solid_state_disk, int min_buffer_size, int max_buffer_size);
+      int threads_per_solid_state_disk, int64_t min_buffer_size, int64_t max_buffer_size);
 
   /// Create DiskIoMgr with default configs.
   DiskIoMgr();
@@ -217,7 +217,8 @@ class DiskIoMgr : public CacheLineAligned {
   ~DiskIoMgr();
 
   /// Initialize the IoMgr. Must be called once before any of the other APIs.
-  Status Init(MemTracker* process_mem_tracker) WARN_UNUSED_RESULT;
+  Status Init() WARN_UNUSED_RESULT;
+
 
   /// Allocates tracking structure for a request context.
   /// Register a new request context and return it to the caller. The caller must call
@@ -235,12 +236,6 @@ class DiskIoMgr : public CacheLineAligned {
   /// after this call. This call blocks until all the disk threads have finished cleaning
   /// up.
   void UnregisterContext(RequestContext* context);
-
-  /// This function cancels the context asychronously. All outstanding requests
-  /// are aborted and tracking structures cleaned up. This does not need to be
-  /// called if the context finishes normally.
-  /// This will also fail any outstanding GetNext()/Read requests.
-  void CancelContext(RequestContext* context);
 
   /// Adds the scan ranges to the queues. This call is non-blocking. The caller must
   /// not deallocate the scan range pointers before UnregisterContext().
@@ -266,52 +261,14 @@ class DiskIoMgr : public CacheLineAligned {
   /// This call is blocking.
   Status GetNextRange(RequestContext* reader, ScanRange** range) WARN_UNUSED_RESULT;
 
-  /// Reads the range and returns the result in buffer.
-  /// This behaves like the typical synchronous read() api, blocking until the data
-  /// is read. This can be called while there are outstanding ScanRanges and is
-  /// thread safe. Multiple threads can be calling Read() per reader at a time.
-  /// range *cannot* have already been added via AddScanRanges.
-  /// This can only be used if the scan range fits in a single IO buffer (i.e. is smaller
-  /// than max_read_buffer_size()) or if reading into a client-provided buffer.
-  Status Read(RequestContext* reader, ScanRange* range,
-      std::unique_ptr<BufferDescriptor>* buffer) WARN_UNUSED_RESULT;
-
-  /// Returns the buffer to the IoMgr. This must be called for every buffer
-  /// returned by GetNext()/Read() that did not return an error. This is non-blocking.
-  /// After calling this, the buffer descriptor is invalid and cannot be accessed.
-  void ReturnBuffer(std::unique_ptr<BufferDescriptor> buffer);
-
   /// Determine which disk queue this file should be assigned to.  Returns an index into
   /// disk_queues_.  The disk_id is the volume ID for the local disk that holds the
   /// files, or -1 if unknown.  Flag expected_local is true iff this impalad is
   /// co-located with the datanode for this file.
   int AssignQueue(const char* file, int disk_id, bool expected_local);
 
-  /// TODO: The functions below can be moved to RequestContext.
-  /// Returns the current status of the context.
-  Status context_status(RequestContext* context) const WARN_UNUSED_RESULT;
-
-  void set_bytes_read_counter(RequestContext*, RuntimeProfile::Counter*);
-  void set_read_timer(RequestContext*, RuntimeProfile::Counter*);
-  void set_active_read_thread_counter(RequestContext*, RuntimeProfile::Counter*);
-  void set_disks_access_bitmap(RequestContext*, RuntimeProfile::Counter*);
-
-  int64_t queue_size(RequestContext* reader) const;
-  int64_t bytes_read_local(RequestContext* reader) const;
-  int64_t bytes_read_short_circuit(RequestContext* reader) const;
-  int64_t bytes_read_dn_cache(RequestContext* reader) const;
-  int num_remote_ranges(RequestContext* reader) const;
-  int64_t unexpected_remote_bytes(RequestContext* reader) const;
-  int cached_file_handles_hit_count(RequestContext* reader) const;
-  int cached_file_handles_miss_count(RequestContext* reader) const;
-
-  /// Returns the read throughput across all readers.
-  /// TODO: should this be a sliding window?  This should report metrics for the
-  /// last minute, hour and since the beginning.
-  int64_t GetReadThroughput();
-
   /// Returns the maximum read buffer size
-  int max_read_buffer_size() const { return max_buffer_size_; }
+  int64_t max_read_buffer_size() const { return max_buffer_size_; }
 
   /// Returns the total number of disk queues (both local and remote).
   int num_total_disks() const { return disk_queues_.size(); }
@@ -361,10 +318,6 @@ class DiskIoMgr : public CacheLineAligned {
   Status ReopenCachedHdfsFileHandle(const hdfsFS& fs, std::string* fname, int64_t mtime,
       CachedHdfsFileHandle** fid);
 
-  /// Garbage collect unused I/O buffers up to 'bytes_to_free', or all the buffers if
-  /// 'bytes_to_free' is -1.
-  void GcIoBuffers(int64_t bytes_to_free = -1);
-
   /// The maximum number of ready buffers that can be queued in a scan range. Having two
   /// queued buffers (plus the buffer that is returned to the client) gives good
   /// performance in most scenarios:
@@ -403,14 +356,6 @@ class DiskIoMgr : public CacheLineAligned {
   friend class DiskIoMgrTest_Buffers_Test;
   friend class DiskIoMgrTest_VerifyNumThreadsParameter_Test;
 
-  /// Memory tracker for unused I/O buffers owned by DiskIoMgr.
-  boost::scoped_ptr<MemTracker> free_buffer_mem_tracker_;
-
-  /// Memory tracker for I/O buffers where the RequestContext has no MemTracker.
-  /// TODO: once IMPALA-3200 is fixed, there should be no more cases where readers don't
-  /// provide a MemTracker.
-  boost::scoped_ptr<MemTracker> unowned_buffer_mem_tracker_;
-
   /// Number of worker(read) threads per rotational disk. Also the max depth of queued
   /// work to the disk.
   const int num_io_threads_per_rotational_disk_;
@@ -420,10 +365,10 @@ class DiskIoMgr : public CacheLineAligned {
   const int num_io_threads_per_solid_state_disk_;
 
   /// Maximum read size. This is also the maximum size of each allocated buffer.
-  const int max_buffer_size_;
+  const int64_t max_buffer_size_;
 
   /// The minimum size of each read buffer.
-  const int min_buffer_size_;
+  const int64_t min_buffer_size_;
 
   /// Thread group containing all the worker threads.
   ThreadGroup disk_thread_group_;
@@ -441,28 +386,6 @@ class DiskIoMgr : public CacheLineAligned {
   /// Total time spent in hdfs reading
   RuntimeProfile::Counter read_timer_;
 
-  /// Protects free_buffers_
-  boost::mutex free_buffers_lock_;
-
-  /// Free buffers that can be handed out to clients. There is one list for each buffer
-  /// size, indexed by the Log2 of the buffer size in units of min_buffer_size_. The
-  /// maximum buffer size is max_buffer_size_, so the maximum index is
-  /// Log2(max_buffer_size_ / min_buffer_size_).
-  //
-  /// E.g. if min_buffer_size_ = 1024 bytes:
-  ///  free_buffers_[0]  => list of free buffers with size 1024 B
-  ///  free_buffers_[1]  => list of free buffers with size 2048 B
-  ///  free_buffers_[10] => list of free buffers with size 1 MB
-  ///  free_buffers_[13] => list of free buffers with size 8 MB
-  ///  free_buffers_[n]  => list of free buffers with size 2^n * 1024 B
-  std::vector<std::deque<uint8_t*>> free_buffers_;
-
-  /// Total number of allocated buffers, used for debugging.
-  AtomicInt32 num_allocated_buffers_;
-
-  /// Total number of buffers in readers
-  AtomicInt32 num_buffers_in_readers_;
-
   /// Per disk queues. This is static and created once at Init() time.  One queue is
   /// allocated for each local disk on the system and for each remote filesystem type.
   /// It is indexed by disk id.
@@ -478,23 +401,6 @@ class DiskIoMgr : public CacheLineAligned {
   // handles are closed.
   FileHandleCache file_handle_cache_;
 
-  /// Returns the index into free_buffers_ for a given buffer size
-  int free_buffers_idx(int64_t buffer_size);
-
-  /// Returns a buffer to read into with size between 'buffer_size' and
-  /// 'max_buffer_size_', If there is an appropriately-sized free buffer in the
-  /// 'free_buffers_', that is returned, otherwise a new one is allocated.
-  /// The returned *buffer_size must be between 0 and 'max_buffer_size_'.
-  /// The buffer memory is tracked against reader's mem tracker, or
-  /// 'unowned_buffer_mem_tracker_' if the reader does not have one.
-  std::unique_ptr<BufferDescriptor> GetFreeBuffer(
-      RequestContext* reader, ScanRange* range, int64_t buffer_size);
-
-  /// Disassociates the desc->buffer_ memory from 'desc' (which cannot be nullptr), either
-  /// freeing it or returning it to 'free_buffers_'. Memory tracking is updated to
-  /// reflect the transfer of ownership from desc->mem_tracker_ to the disk I/O mgr.
-  void FreeBufferMemory(BufferDescriptor* desc);
-
   /// Disk worker thread loop. This function retrieves the next range to process on
   /// the disk queue and invokes ReadRange() or Write() depending on the type of Range().
   /// There can be multiple threads per disk running this loop.
@@ -508,10 +414,12 @@ class DiskIoMgr : public CacheLineAligned {
   bool GetNextRequestRange(DiskQueue* disk_queue, RequestRange** range,
       RequestContext** request_context);
 
-  /// Updates disk queue and reader state after a read is complete. The read result
-  /// is captured in the buffer descriptor.
+  /// Updates disk queue and reader state after a read is complete. If the read
+  /// was successful, 'read_status' is ok and 'buffer' contains the result of the
+  /// read. If the read failed with an error, 'read_status' contains the error and
+  /// 'buffer' has the buffer that was meant to hold the result of the read.
   void HandleReadFinished(DiskQueue* disk_queue, RequestContext* reader,
-      std::unique_ptr<BufferDescriptor> buffer);
+      Status read_status, std::unique_ptr<BufferDescriptor> buffer);
 
   /// Invokes write_range->callback_  after the range has been written and
   /// updates per-disk state and handle state. The status of the write OK/RUNTIME_ERROR
@@ -534,13 +442,15 @@ class DiskIoMgr : public CacheLineAligned {
   /// Does not open or close the file that is written.
   Status WriteRangeHelper(FILE* file_handle, WriteRange* write_range) WARN_UNUSED_RESULT;
 
-  /// Reads the specified scan range and calls HandleReadFinished when done.
+  /// Reads the specified scan range and calls HandleReadFinished() when done.
   void ReadRange(DiskQueue* disk_queue, RequestContext* reader, ScanRange* range);
 
   /// Try to allocate the next buffer for the scan range, returning the new buffer
   /// if successful. If 'reader' is cancelled, cancels the range and returns nullptr.
   /// If there is memory pressure and buffers are already queued, adds the range
-  /// to the blocked ranges and returns nullptr.
+  /// to the blocked ranges and returns nullptr. If buffers are not queued and no more
+  /// buffers can be allocated, cancels the range with a MEM_LIMIT_EXCEEDED error and
+  /// returns nullptr.
   std::unique_ptr<BufferDescriptor> TryAllocateNextBufferForRange(DiskQueue* disk_queue,
       RequestContext* reader, ScanRange* range, int64_t buffer_size);
 };

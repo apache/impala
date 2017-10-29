@@ -23,6 +23,7 @@
 
 #include <boost/thread/mutex.hpp>
 
+#include "common/atomic.h"
 #include "common/hdfs.h"
 #include "common/status.h"
 #include "util/condition-variable.h"
@@ -55,14 +56,6 @@ class BufferDescriptor {
   /// Returns the offset within the scan range that this buffer starts at
   int64_t scan_range_offset() const { return scan_range_offset_; }
 
-  /// Transfer ownership of buffer memory from 'mem_tracker_' to 'dst' and set
-  /// 'mem_tracker_' to 'dst'. 'mem_tracker_' and 'dst' must be non-NULL. Does not
-  /// check memory limits on 'dst': the caller should check the memory limit if a
-  /// different memory limit may apply to 'dst'. If the buffer was a client-provided
-  /// buffer, transferring is not allowed.
-  /// TODO: IMPALA-3209: revisit this as part of scanner memory usage revamp.
-  void TransferOwnership(MemTracker* dst);
-
  private:
   friend class DiskIoMgr;
   friend class ScanRange;
@@ -71,8 +64,7 @@ class BufferDescriptor {
   /// Create a buffer descriptor for a new reader, range and data buffer. The buffer
   /// memory should already be accounted against 'mem_tracker'.
   BufferDescriptor(DiskIoMgr* io_mgr, RequestContext* reader,
-      ScanRange* scan_range, uint8_t* buffer, int64_t buffer_len,
-      MemTracker* mem_tracker);
+      ScanRange* scan_range, uint8_t* buffer, int64_t buffer_len);
 
   /// Return true if this is a cached buffer owned by HDFS.
   bool is_cached() const;
@@ -86,14 +78,11 @@ class BufferDescriptor {
   /// Reader that this buffer is for.
   RequestContext* const reader_;
 
-  /// The current tracker this buffer is associated with. After initialisation,
-  /// NULL for cached buffers and non-NULL for all other buffers.
-  MemTracker* mem_tracker_;
-
   /// Scan range that this buffer is for. Non-NULL when initialised.
   ScanRange* const scan_range_;
 
-  /// buffer with the read contents
+  /// Buffer for the read contents. Must be set to NULL in RequestContext::FreeBuffer()
+  /// before destruction of the descriptor.
   uint8_t* buffer_;
 
   /// length of buffer_. For buffers from cached reads, the length is 0.
@@ -104,9 +93,6 @@ class BufferDescriptor {
 
   /// true if the current scan range is complete
   bool eosr_ = false;
-
-  /// Status of the read to this buffer. if status is not ok, 'buffer' is nullptr
-  Status status_;
 
   int64_t scan_range_offset_ = 0;
 };
@@ -236,10 +222,17 @@ class ScanRange : public RequestRange {
   /// Only one thread can be in GetNext() at any time.
   Status GetNext(std::unique_ptr<BufferDescriptor>* buffer) WARN_UNUSED_RESULT;
 
-  /// Cancel this scan range. This cleans up all queued buffers and
-  /// wakes up any threads blocked on GetNext().
-  /// Status is the reason the range was cancelled. Must not be ok().
-  /// Status is returned to the user in GetNext().
+  /// Returns the buffer to the scan range. This must be called for every buffer
+  /// returned by GetNext(). After calling this, the buffer descriptor is invalid
+  /// and cannot be accessed.
+  void ReturnBuffer(std::unique_ptr<BufferDescriptor> buffer);
+
+  /// Cancel this scan range. This cleans up all queued buffers and wakes up any threads
+  /// blocked on GetNext(). Status is a non-ok status with the reason the range was
+  /// cancelled, e.g. CANCELLED if the range was cancelled because it was not needed, or
+  /// another error if an error was encountered while scanning the range. Status is
+  /// returned to the any callers of GetNext(). If a thread is currently blocked in
+  /// GetNext(), it is woken up.
   void Cancel(const Status& status);
 
   /// return a descriptive string for debug.
@@ -263,10 +256,6 @@ class ScanRange : public RequestRange {
   bool EnqueueBuffer(const boost::unique_lock<boost::mutex>& reader_lock,
       std::unique_ptr<BufferDescriptor> buffer);
 
-  /// Cleanup any queued buffers (i.e. due to cancellation). This cannot
-  /// be called with any locks taken.
-  void CleanupQueuedBuffers();
-
   /// Validates the internal state of this range. lock_ must be taken
   /// before calling this.
   bool Validate();
@@ -283,6 +272,10 @@ class ScanRange : public RequestRange {
   /// exclusive use by this scan range. The scan range is the exclusive owner of the
   /// file handle, and the file handle is destroyed in Close().
   /// All local OS files are opened using normal OS file APIs.
+  ///
+  /// If an error is encountered during opening, returns a status describing the error.
+  /// If the scan range was cancelled, returns the reason for cancellation. Otherwise, on
+  /// success, returns OK.
   Status Open(bool use_file_handle_cache) WARN_UNUSED_RESULT;
 
   /// Closes the file for this range. This function only modifies state in this range.
@@ -290,6 +283,10 @@ class ScanRange : public RequestRange {
 
   /// Reads from this range into 'buffer', which has length 'buffer_len' bytes. Returns
   /// the number of bytes read. The read position in this scan range is updated.
+  ///
+  /// If an error is encountered during reading, returns a status describing the error.
+  /// If the scan range was cancelled, returns the reason for cancellation. Otherwise, on
+  /// success, returns OK.
   Status Read(uint8_t* buffer, int64_t buffer_len, int64_t* bytes_read,
       bool* eosr) WARN_UNUSED_RESULT;
 
@@ -307,6 +304,23 @@ class ScanRange : public RequestRange {
   Status ReadFromCache(const boost::unique_lock<boost::mutex>& reader_lock,
       bool* read_succeeded) WARN_UNUSED_RESULT;
 
+  /// Cleans up a buffer that was not returned to the client.
+  /// Either ReturnBuffer() or CleanUpBuffer() is called for every BufferDescriptor.
+  /// This function will acquire 'lock_' and may acquire 'hdfs_lock_'.
+  void CleanUpBuffer(std::unique_ptr<BufferDescriptor> buffer);
+
+  /// Same as CleanUpBuffer() except the caller must already hold 'lock_' via
+  /// 'scan_range_lock'.
+  void CleanUpBufferLocked(const boost::unique_lock<boost::mutex>& scan_range_lock,
+      std::unique_ptr<BufferDescriptor> buffer);
+
+  /// Returns true if no more buffers will be returned to clients in the future,
+  /// either because of hitting eosr or cancellation.
+  bool all_buffers_returned(const boost::unique_lock<boost::mutex>& lock) const {
+    DCHECK(lock.mutex() == &lock_ && lock.owns_lock());
+    return !cancel_status_.ok() || (eosr_queued_ && ready_buffers_.empty());
+  }
+
   /// Pointer to caller specified metadata. This is untouched by the io manager
   /// and the caller can put whatever auxiliary data in here.
   void* meta_data_ = nullptr;
@@ -322,6 +336,9 @@ class ScanRange : public RequestRange {
   /// local.
   /// TODO: we can do more with this
   bool expected_local_ = false;
+
+  /// Last modified time of the file associated with the scan range. Set in Reset().
+  int64_t mtime_;
 
   /// Total number of bytes read remotely. This is necessary to maintain a count of
   /// the number of remote scan ranges. Since IO statistics can be collected multiple
@@ -378,25 +395,28 @@ class ScanRange : public RequestRange {
   /// Number of bytes read so far for this scan range
   int bytes_read_;
 
-  /// Status for this range. This is non-ok if is_cancelled_ is true.
-  /// Note: an individual range can fail without the RequestContext being
-  /// cancelled. This allows us to skip individual ranges.
-  Status status_;
+  /// The number of buffers that have been returned to a client via GetNext() that have
+  /// not yet been returned with ReturnBuffer().
+  int num_buffers_in_reader_ = 0;
 
   /// If true, the last buffer for this scan range has been queued.
+  /// If this is true and 'ready_buffers_' is empty, then no more buffers will be
+  /// returned to the caller by this scan range.
   bool eosr_queued_ = false;
-
-  /// If true, the last buffer for this scan range has been returned.
-  bool eosr_returned_ = false;
 
   /// If true, this scan range has been removed from the reader's in_flight_ranges
   /// queue because the ready_buffers_ queue is full.
   bool blocked_on_queue_ = false;
 
-  /// IO buffers that are queued for this scan range.
-  /// Condition variable for GetNext
-  ConditionVariable buffer_ready_cv_;
+  /// IO buffers that are queued for this scan range. When Cancel() is called
+  /// this is drained by the cancelling thread. I.e. this is always empty if
+  /// 'cancel_status_' is not OK.
   std::deque<std::unique_ptr<BufferDescriptor>> ready_buffers_;
+
+  /// Condition variable for threads in GetNext() that are waiting for the next buffer.
+  /// Signalled when a buffer is enqueued in 'ready_buffers_' or the scan range is
+  /// cancelled.
+  ConditionVariable buffer_ready_cv_;
 
   /// Lock that should be taken during hdfs calls. Only one thread (the disk reading
   /// thread) calls into hdfs at a time so this lock does not have performance impact.
@@ -406,11 +426,16 @@ class ScanRange : public RequestRange {
   /// If this lock and lock_ need to be taken, lock_ must be taken first.
   boost::mutex hdfs_lock_;
 
-  /// If true, this scan range has been cancelled.
-  bool is_cancelled_ = false;
-
-  /// Last modified time of the file associated with the scan range
-  int64_t mtime_;
+  /// If non-OK, this scan range has been cancelled. This status is the reason for
+  /// cancellation - CANCELLED if cancelled without error, or another status if an
+  /// error caused cancellation. Note that a range can be cancelled without cancelling
+  /// the owning context. This means that ranges can be cancelled or hit errors without
+  /// aborting all scan ranges.
+  //
+  /// Writers must hold both 'lock_' and 'hdfs_lock_'. Readers must hold either 'lock_'
+  /// or 'hdfs_lock_'. This prevents the range from being cancelled while any thread
+  /// is inside a critical section.
+  Status cancel_status_;
 };
 
 /// Used to specify data to be written to a file and offset.

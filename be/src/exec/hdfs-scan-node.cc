@@ -26,6 +26,7 @@
 #include "exec/scanner-context.h"
 #include "runtime/descriptors.h"
 #include "runtime/fragment-instance-state.h"
+#include "runtime/io/request-context.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
 #include "runtime/mem-tracker.h"
@@ -549,9 +550,7 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
 void HdfsScanNode::SetDoneInternal() {
   if (done_) return;
   done_ = true;
-  if (reader_context_ != nullptr) {
-    runtime_state_->io_mgr()->CancelContext(reader_context_.get());
-  }
+  if (reader_context_ != nullptr) reader_context_->Cancel();
   materialized_row_batches_->Shutdown();
 }
 

@@ -1440,11 +1440,12 @@ Status HdfsParquetScanner::ProcessFooter() {
 
     unique_ptr<BufferDescriptor> io_buffer;
     RETURN_IF_ERROR(
-        io_mgr->Read(scan_node_->reader_context(), metadata_range, &io_buffer));
+        io_mgr->AddScanRange(scan_node_->reader_context(), metadata_range, true));
+    RETURN_IF_ERROR(metadata_range->GetNext(&io_buffer));
     DCHECK_EQ(io_buffer->buffer(), metadata_buffer.buffer());
     DCHECK_EQ(io_buffer->len(), metadata_size);
     DCHECK(io_buffer->eosr());
-    io_mgr->ReturnBuffer(move(io_buffer));
+    metadata_range->ReturnBuffer(move(io_buffer));
   }
 
   // Deserialize file header
