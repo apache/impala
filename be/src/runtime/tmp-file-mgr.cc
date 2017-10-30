@@ -26,7 +26,8 @@
 #include <gutil/strings/join.h>
 #include <gutil/strings/substitute.h>
 
-#include "runtime/disk-io-mgr-reader-context.h"
+#include "runtime/io/disk-io-mgr.h"
+#include "runtime/io/request-context.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tmp-file-mgr-internal.h"
 #include "util/bit-util.h"
@@ -52,6 +53,7 @@ using boost::algorithm::token_compress_on;
 using boost::filesystem::absolute;
 using boost::filesystem::path;
 using boost::uuids::random_generator;
+using namespace impala::io;
 using namespace strings;
 
 namespace impala {
@@ -358,7 +360,7 @@ Status TmpFileMgr::FileGroup::Write(
 
   unique_ptr<WriteHandle> tmp_handle(new WriteHandle(encryption_timer_, cb));
   WriteHandle* tmp_handle_ptr = tmp_handle.get(); // Pass ptr by value into lambda.
-  DiskIoMgr::WriteRange::WriteDoneCallback callback = [this, tmp_handle_ptr](
+  WriteRange::WriteDoneCallback callback = [this, tmp_handle_ptr](
       const Status& write_status) { WriteComplete(tmp_handle_ptr, write_status); };
   RETURN_IF_ERROR(
       tmp_handle->Write(io_mgr_, io_ctx_.get(), tmp_file, file_offset, buffer, callback));
@@ -387,11 +389,11 @@ Status TmpFileMgr::FileGroup::ReadAsync(WriteHandle* handle, MemRange buffer) {
   DCHECK(handle->write_range_ != nullptr);
   // Don't grab handle->write_state_lock_, it is safe to touch all of handle's state
   // since the write is not in flight.
-  handle->read_range_ = scan_range_pool_.Add(new DiskIoMgr::ScanRange);
+  handle->read_range_ = scan_range_pool_.Add(new ScanRange);
   handle->read_range_->Reset(nullptr, handle->write_range_->file(),
       handle->write_range_->len(), handle->write_range_->offset(),
       handle->write_range_->disk_id(), false,
-      DiskIoMgr::BufferOpts::ReadInto(buffer.data(), buffer.len()));
+      BufferOpts::ReadInto(buffer.data(), buffer.len()));
   read_counter_->Add(1);
   bytes_read_counter_->Add(buffer.len());
   RETURN_IF_ERROR(io_mgr_->AddScanRange(io_ctx_.get(), handle->read_range_, true));
@@ -403,7 +405,7 @@ Status TmpFileMgr::FileGroup::WaitForAsyncRead(WriteHandle* handle, MemRange buf
   // Don't grab handle->write_state_lock_, it is safe to touch all of handle's state
   // since the write is not in flight.
   SCOPED_TIMER(disk_read_timer_);
-  unique_ptr<DiskIoMgr::BufferDescriptor> io_mgr_buffer;
+  unique_ptr<BufferDescriptor> io_mgr_buffer;
   Status status = handle->read_range_->GetNext(&io_mgr_buffer);
   if (!status.ok()) goto exit;
   DCHECK(io_mgr_buffer != NULL);
@@ -525,9 +527,9 @@ string TmpFileMgr::WriteHandle::TmpFilePath() const {
   return file_->path();
 }
 
-Status TmpFileMgr::WriteHandle::Write(DiskIoMgr* io_mgr, DiskIoRequestContext* io_ctx,
+Status TmpFileMgr::WriteHandle::Write(DiskIoMgr* io_mgr, RequestContext* io_ctx,
     File* file, int64_t offset, MemRange buffer,
-    DiskIoMgr::WriteRange::WriteDoneCallback callback) {
+    WriteRange::WriteDoneCallback callback) {
   DCHECK(!write_in_flight_);
 
   if (FLAGS_disk_spill_encryption) RETURN_IF_ERROR(EncryptAndHash(buffer));
@@ -536,7 +538,7 @@ Status TmpFileMgr::WriteHandle::Write(DiskIoMgr* io_mgr, DiskIoRequestContext* i
   // WriteComplete() may be called concurrently with the remainder of this function.
   file_ = file;
   write_range_.reset(
-      new DiskIoMgr::WriteRange(file->path(), offset, file->AssignDiskQueue(), callback));
+      new WriteRange(file->path(), offset, file->AssignDiskQueue(), callback));
   write_range_->SetData(buffer.data(), buffer.len());
   write_in_flight_ = true;
   Status status = io_mgr->AddWriteRange(io_ctx, write_range_.get());
@@ -553,7 +555,7 @@ Status TmpFileMgr::WriteHandle::Write(DiskIoMgr* io_mgr, DiskIoRequestContext* i
 }
 
 Status TmpFileMgr::WriteHandle::RetryWrite(
-    DiskIoMgr* io_mgr, DiskIoRequestContext* io_ctx, File* file, int64_t offset) {
+    DiskIoMgr* io_mgr, RequestContext* io_ctx, File* file, int64_t offset) {
   DCHECK(write_in_flight_);
   file_ = file;
   write_range_->SetRange(file->path(), offset, file->AssignDiskQueue());

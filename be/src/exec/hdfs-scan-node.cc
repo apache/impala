@@ -43,6 +43,7 @@ DECLARE_bool(skip_file_runtime_filtering);
 #endif
 
 using namespace impala;
+using namespace impala::io;
 
 // Amount of memory that we approximate a scanner thread will use not including IoBuffers.
 // The memory used does not vary considerably between file formats (just a couple of MBs).
@@ -251,7 +252,7 @@ void HdfsScanNode::AddMaterializedRowBatch(unique_ptr<RowBatch> row_batch) {
   materialized_row_batches_->AddBatch(move(row_batch));
 }
 
-Status HdfsScanNode::AddDiskIoRanges(const vector<DiskIoMgr::ScanRange*>& ranges,
+Status HdfsScanNode::AddDiskIoRanges(const vector<ScanRange*>& ranges,
     int num_files_queued) {
   RETURN_IF_ERROR(
       runtime_state_->io_mgr()->AddScanRanges(reader_context_.get(), ranges));
@@ -420,7 +421,7 @@ void HdfsScanNode::ScannerThread() {
     // to return if there's an error.
     ranges_issued_barrier_.Wait(SCANNER_THREAD_WAIT_TIME_MS, &unused);
 
-    DiskIoMgr::ScanRange* scan_range;
+    ScanRange* scan_range;
     // Take a snapshot of num_unqueued_files_ before calling GetNextRange().
     // We don't want num_unqueued_files_ to go to zero between the return from
     // GetNextRange() and the check for when all ranges are complete.
@@ -480,7 +481,7 @@ exit:
 }
 
 Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
-    MemPool* expr_results_pool, DiskIoMgr::ScanRange* scan_range) {
+    MemPool* expr_results_pool, ScanRange* scan_range) {
   DCHECK(scan_range != NULL);
 
   ScanRangeMetadata* metadata = static_cast<ScanRangeMetadata*>(scan_range->meta_data());

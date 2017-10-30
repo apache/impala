@@ -260,7 +260,7 @@ CatalogServiceClientCache* RuntimeState::catalogd_client_cache() {
   return exec_env_->catalogd_client_cache();
 }
 
-DiskIoMgr* RuntimeState::io_mgr() {
+io::DiskIoMgr* RuntimeState::io_mgr() {
   return exec_env_->disk_io_mgr();
 }
 

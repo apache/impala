@@ -29,7 +29,7 @@
 #include "kudu/util/slice.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/descriptors.h"
-#include "runtime/disk-io-mgr.h"
+#include "runtime/io/disk-io-mgr.h"
 #include "runtime/mem-pool.h"
 
 namespace kudu {

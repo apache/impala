@@ -27,6 +27,7 @@
 #include "exec/parquet-column-stats.h"
 #include "exec/scanner-context.inline.h"
 #include "runtime/collection-value-builder.h"
+#include "runtime/io/disk-io-mgr.h"
 #include "runtime/runtime-state.h"
 #include "runtime/runtime-filter.inline.h"
 #include "rpc/thrift-util.h"
@@ -35,6 +36,7 @@
 
 using std::move;
 using namespace impala;
+using namespace impala::io;
 
 DEFINE_double(parquet_min_filter_reject_ratio, 0.1, "(Advanced) If the percentage of "
     "rows rejected by a runtime filter drops below this value, the filter is disabled.");
@@ -67,7 +69,7 @@ const string PARQUET_MEM_LIMIT_EXCEEDED =
 
 Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const std::vector<HdfsFileDesc*>& files) {
-  vector<DiskIoMgr::ScanRange*> footer_ranges;
+  vector<ScanRange*> footer_ranges;
   for (int i = 0; i < files.size(); ++i) {
     // If the file size is less than 12 bytes, it is an invalid Parquet file.
     if (files[i]->file_length < 12) {
@@ -80,10 +82,10 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     DCHECK_GE(footer_start, 0);
 
     // Try to find the split with the footer.
-    DiskIoMgr::ScanRange* footer_split = FindFooterSplit(files[i]);
+    ScanRange* footer_split = FindFooterSplit(files[i]);
 
     for (int j = 0; j < files[i]->splits.size(); ++j) {
-      DiskIoMgr::ScanRange* split = files[i]->splits[j];
+      ScanRange* split = files[i]->splits[j];
 
       DCHECK_LE(split->offset() + split->len(), files[i]->file_length);
       // If there are no materialized slots (such as count(*) over the table), we can
@@ -98,19 +100,19 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
         // is done here, followed by scan ranges for the columns of each row group within
         // the actual split (in InitColumns()). The original split is stored in the
         // metadata associated with the footer range.
-        DiskIoMgr::ScanRange* footer_range;
+        ScanRange* footer_range;
         if (footer_split != NULL) {
           footer_range = scan_node->AllocateScanRange(files[i]->fs,
               files[i]->filename.c_str(), footer_size, footer_start,
               split_metadata->partition_id, footer_split->disk_id(),
               footer_split->expected_local(),
-              DiskIoMgr::BufferOpts(footer_split->try_cache(), files[i]->mtime), split);
+              BufferOpts(footer_split->try_cache(), files[i]->mtime), split);
         } else {
           // If we did not find the last split, we know it is going to be a remote read.
           footer_range =
               scan_node->AllocateScanRange(files[i]->fs, files[i]->filename.c_str(),
                   footer_size, footer_start, split_metadata->partition_id, -1, false,
-                  DiskIoMgr::BufferOpts::Uncached(), split);
+                  BufferOpts::Uncached(), split);
         }
 
         footer_ranges.push_back(footer_range);
@@ -125,10 +127,10 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
   return Status::OK();
 }
 
-DiskIoMgr::ScanRange* HdfsParquetScanner::FindFooterSplit(HdfsFileDesc* file) {
+ScanRange* HdfsParquetScanner::FindFooterSplit(HdfsFileDesc* file) {
   DCHECK(file != NULL);
   for (int i = 0; i < file->splits.size(); ++i) {
-    DiskIoMgr::ScanRange* split = file->splits[i];
+    ScanRange* split = file->splits[i];
     if (split->offset() + split->len() == file->file_length) return split;
   }
   return NULL;
@@ -341,7 +343,7 @@ static int64_t GetRowGroupMidOffset(const parquet::RowGroup& row_group) {
 
 // Returns true if 'row_group' overlaps with 'split_range'.
 static bool CheckRowGroupOverlapsSplit(const parquet::RowGroup& row_group,
-    const DiskIoMgr::ScanRange* split_range) {
+    const ScanRange* split_range) {
   int64_t row_group_start = GetColumnStartOffset(row_group.columns[0].meta_data);
 
   const parquet::ColumnMetaData& last_column =
@@ -598,7 +600,7 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
 }
 
 Status HdfsParquetScanner::NextRowGroup() {
-  const DiskIoMgr::ScanRange* split_range = static_cast<ScanRangeMetadata*>(
+  const ScanRange* split_range = static_cast<ScanRangeMetadata*>(
       metadata_range_->meta_data())->original_split;
   int64_t split_offset = split_range->offset();
   int64_t split_length = split_range->len();
@@ -1377,12 +1379,12 @@ Status HdfsParquetScanner::ProcessFooter() {
     DiskIoMgr* io_mgr = scan_node_->runtime_state()->io_mgr();
 
     // Read the header into the metadata buffer.
-    DiskIoMgr::ScanRange* metadata_range = scan_node_->AllocateScanRange(
+    ScanRange* metadata_range = scan_node_->AllocateScanRange(
         metadata_range_->fs(), filename(), metadata_size, metadata_start, partition_id,
         metadata_range_->disk_id(), metadata_range_->expected_local(),
-        DiskIoMgr::BufferOpts::ReadInto(metadata_buffer.buffer(), metadata_size));
+        BufferOpts::ReadInto(metadata_buffer.buffer(), metadata_size));
 
-    unique_ptr<DiskIoMgr::BufferDescriptor> io_buffer;
+    unique_ptr<BufferDescriptor> io_buffer;
     RETURN_IF_ERROR(
         io_mgr->Read(scan_node_->reader_context(), metadata_range, &io_buffer));
     DCHECK_EQ(io_buffer->buffer(), metadata_buffer.buffer());
@@ -1589,7 +1591,7 @@ Status HdfsParquetScanner::InitColumns(
   parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx];
 
   // All the scan ranges (one for each column).
-  vector<DiskIoMgr::ScanRange*> col_ranges;
+  vector<ScanRange*> col_ranges;
   // Used to validate that the number of values in each reader in column_readers_ is the
   // same.
   int num_values = -1;
@@ -1656,17 +1658,17 @@ Status HdfsParquetScanner::InitColumns(
           "filename '$1'", col_chunk.file_path, filename()));
     }
 
-    const DiskIoMgr::ScanRange* split_range =
+    const ScanRange* split_range =
         static_cast<ScanRangeMetadata*>(metadata_range_->meta_data())->original_split;
 
     // Determine if the column is completely contained within a local split.
     bool col_range_local = split_range->expected_local()
         && col_start >= split_range->offset()
         && col_end <= split_range->offset() + split_range->len();
-    DiskIoMgr::ScanRange* col_range = scan_node_->AllocateScanRange(metadata_range_->fs(),
+    ScanRange* col_range = scan_node_->AllocateScanRange(metadata_range_->fs(),
         filename(), col_len, col_start, partition_id, split_range->disk_id(),
         col_range_local,
-        DiskIoMgr::BufferOpts(split_range->try_cache(), file_desc->mtime));
+        BufferOpts(split_range->try_cache(), file_desc->mtime));
     col_ranges.push_back(col_range);
 
     // Get the stream that will be used for this column

@@ -16,6 +16,7 @@
 # under the License.
 
 add_subdirectory(bufferpool)
+add_subdirectory(io)
 
 # where to put generated libraries
 set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime")
@@ -36,10 +37,6 @@ add_library(Runtime
   data-stream-sender.cc
   debug-options.cc
   descriptors.cc
-  disk-io-mgr.cc
-  disk-io-mgr-reader-context.cc
-  disk-io-mgr-scan-range.cc
-  disk-io-mgr-stress.cc
   exec-env.cc
   fragment-instance-state.cc
   hbase-table.cc
@@ -78,16 +75,11 @@ add_library(Runtime
 )
 add_dependencies(Runtime gen-deps)
 
-# This test runs forever so should not be part of 'make test'
-add_executable(disk-io-mgr-stress-test disk-io-mgr-stress-test.cc)
-target_link_libraries(disk-io-mgr-stress-test ${IMPALA_TEST_LINK_LIBS})
-
 ADD_BE_TEST(mem-pool-test)
 ADD_BE_TEST(free-pool-test)
 ADD_BE_TEST(string-buffer-test)
 ADD_BE_TEST(data-stream-test)
 ADD_BE_TEST(timestamp-test)
-ADD_BE_TEST(disk-io-mgr-test)
 ADD_BE_TEST(raw-value-test)
 ADD_BE_TEST(string-compare-test)
 ADD_BE_TEST(string-search-test)

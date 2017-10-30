@@ -40,6 +40,7 @@
 using boost::algorithm::ends_with;
 using boost::algorithm::to_lower;
 using namespace impala;
+using namespace impala::io;
 using namespace strings;
 
 const char* HdfsTextScanner::LLVM_CLASS_NAME = "class.impala::HdfsTextScanner";
@@ -74,7 +75,7 @@ HdfsTextScanner::~HdfsTextScanner() {
 
 Status HdfsTextScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const vector<HdfsFileDesc*>& files) {
-  vector<DiskIoMgr::ScanRange*> compressed_text_scan_ranges;
+  vector<ScanRange*> compressed_text_scan_ranges;
   int compressed_text_files = 0;
   vector<HdfsFileDesc*> lzo_text_files;
   for (int i = 0; i < files.size(); ++i) {
@@ -95,7 +96,7 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
           // In order to decompress gzip-, snappy- and bzip2-compressed text files, we
           // need to read entire files. Only read a file if we're assigned the first split
           // to avoid reading multi-block files with multiple scanners.
-          DiskIoMgr::ScanRange* split = files[i]->splits[j];
+          ScanRange* split = files[i]->splits[j];
 
           // We only process the split that starts at offset 0.
           if (split->offset() != 0) {
@@ -114,10 +115,10 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
           DCHECK_GT(files[i]->file_length, 0);
           ScanRangeMetadata* metadata =
               static_cast<ScanRangeMetadata*>(split->meta_data());
-          DiskIoMgr::ScanRange* file_range = scan_node->AllocateScanRange(files[i]->fs,
+          ScanRange* file_range = scan_node->AllocateScanRange(files[i]->fs,
               files[i]->filename.c_str(), files[i]->file_length, 0,
               metadata->partition_id, split->disk_id(), split->expected_local(),
-              DiskIoMgr::BufferOpts(split->try_cache(), files[i]->mtime));
+              BufferOpts(split->try_cache(), files[i]->mtime));
           compressed_text_scan_ranges.push_back(file_range);
           scan_node->max_compressed_text_file_length()->Set(files[i]->file_length);
         }

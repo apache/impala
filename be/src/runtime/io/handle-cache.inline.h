@@ -17,7 +17,7 @@
 
 #include <tuple>
 
-#include "runtime/disk-io-mgr-handle-cache.h"
+#include "runtime/io/handle-cache.h"
 #include "util/hash-util.h"
 #include "util/time.h"
 
@@ -25,6 +25,7 @@
 #define IMPALA_RUNTIME_DISK_IO_MGR_HANDLE_CACHE_INLINE_H
 
 namespace impala {
+namespace io {
 
 HdfsFileHandle::HdfsFileHandle(const hdfsFS& fs, const char* fname,
     int64_t mtime)
@@ -226,6 +227,6 @@ void FileHandleCache<NUM_PARTITIONS>::EvictHandles(
     --p.size;
   }
 }
-
+}
 }
 #endif

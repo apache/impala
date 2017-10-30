@@ -21,6 +21,7 @@
 
 #include "exec/hdfs-scan-node-base.h"
 #include "exec/hdfs-scan-node.h"
+#include "runtime/io/disk-io-mgr.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-pool.h"
 #include "runtime/row-batch.h"
@@ -32,6 +33,7 @@
 #include "common/names.h"
 
 using namespace impala;
+using namespace impala::io;
 using namespace strings;
 
 static const int64_t INIT_READ_PAST_SIZE_BYTES = 64 * 1024;
@@ -43,7 +45,7 @@ static const int64_t INIT_READ_PAST_SIZE_BYTES = 64 * 1024;
 static const int64_t OUTPUT_BUFFER_BYTES_LEFT_INIT = 0;
 
 ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNodeBase* scan_node,
-    HdfsPartitionDescriptor* partition_desc, DiskIoMgr::ScanRange* scan_range,
+    HdfsPartitionDescriptor* partition_desc, ScanRange* scan_range,
     const vector<FilterContext>& filter_ctxs, MemPool* expr_results_pool)
   : state_(state),
     scan_node_(scan_node),
@@ -75,7 +77,7 @@ ScannerContext::Stream::Stream(ScannerContext* parent)
     boundary_buffer_(new StringBuffer(boundary_pool_.get())) {
 }
 
-ScannerContext::Stream* ScannerContext::AddStream(DiskIoMgr::ScanRange* range) {
+ScannerContext::Stream* ScannerContext::AddStream(ScanRange* range) {
   std::unique_ptr<Stream> stream(new Stream(this));
   stream->scan_range_ = range;
   stream->file_desc_ = scan_node_->GetFileDesc(partition_desc_->id(), stream->filename());
@@ -105,7 +107,7 @@ void ScannerContext::Stream::ReleaseCompletedResources(bool done) {
     scan_range_->Cancel(Status::CANCELLED);
   }
 
-  for (unique_ptr<DiskIoMgr::BufferDescriptor>& buffer : completed_io_buffers_) {
+  for (unique_ptr<BufferDescriptor>& buffer : completed_io_buffers_) {
     ExecEnv::GetInstance()->disk_io_mgr()->ReturnBuffer(move(buffer));
   }
   parent_->num_completed_io_buffers_ -= completed_io_buffers_.size();
@@ -164,9 +166,9 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
       return Status::OK();
     }
     int64_t partition_id = parent_->partition_descriptor()->id();
-    DiskIoMgr::ScanRange* range = parent_->scan_node_->AllocateScanRange(
+    ScanRange* range = parent_->scan_node_->AllocateScanRange(
         scan_range_->fs(), filename(), read_past_buffer_size, offset, partition_id,
-        scan_range_->disk_id(), false, DiskIoMgr::BufferOpts::Uncached());
+        scan_range_->disk_id(), false, BufferOpts::Uncached());
     RETURN_IF_ERROR(parent_->state_->io_mgr()->Read(
         parent_->scan_node_->reader_context(), range, &io_buffer_));
   }

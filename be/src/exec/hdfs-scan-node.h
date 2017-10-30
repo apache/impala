@@ -29,7 +29,7 @@
 
 #include "exec/filter-context.h"
 #include "exec/hdfs-scan-node-base.h"
-#include "runtime/disk-io-mgr.h"
+#include "runtime/io/disk-io-mgr.h"
 #include "util/counting-barrier.h"
 #include "util/thread.h"
 
@@ -79,7 +79,7 @@ class HdfsScanNode : public HdfsScanNodeBase {
   bool done() const { return done_; }
 
   /// Adds ranges to the io mgr queue and starts up new scanner threads if possible.
-  virtual Status AddDiskIoRanges(const std::vector<DiskIoMgr::ScanRange*>& ranges,
+  virtual Status AddDiskIoRanges(const std::vector<io::ScanRange*>& ranges,
       int num_files_queued) WARN_UNUSED_RESULT;
 
   /// Adds a materialized row batch for the scan node.  This is called from scanner
@@ -166,7 +166,7 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// thread. 'filter_ctxs' is a clone of the class-wide filter_ctxs_, used to filter rows
   /// in this split.
   Status ProcessSplit(const std::vector<FilterContext>& filter_ctxs,
-      MemPool* expr_results_pool, DiskIoMgr::ScanRange* scan_range) WARN_UNUSED_RESULT;
+      MemPool* expr_results_pool, io::ScanRange* scan_range) WARN_UNUSED_RESULT;
 
   /// Returns true if there is enough memory (against the mem tracker limits) to
   /// have a scanner thread.

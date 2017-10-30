@@ -33,6 +33,7 @@
 #include "util/thread.h"
 
 namespace impala {
+namespace io {
 
 /// This class is a small wrapper around the hdfsFile handle and the file system
 /// instance which is needed to close the file handle. The handle incorporates
@@ -190,7 +191,7 @@ class FileHandleCache {
   std::unique_ptr<Thread> eviction_thread_;
   Promise<bool> shut_down_promise_;
 };
-
+}
 }
 
 #endif

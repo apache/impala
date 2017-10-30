@@ -27,7 +27,7 @@
 #include "common/compiler-util.h"
 #include "common/status.h"
 #include "exec/filter-context.h"
-#include "runtime/disk-io-mgr.h"
+#include "runtime/io/request-ranges.h"
 
 namespace impala {
 
@@ -65,7 +65,7 @@ class ScannerContext {
   /// get pushed to) and the scan range to process.
   /// This context starts with 1 stream.
   ScannerContext(RuntimeState*, HdfsScanNodeBase*, HdfsPartitionDescriptor*,
-      DiskIoMgr::ScanRange* scan_range, const std::vector<FilterContext>& filter_ctxs,
+      io::ScanRange* scan_range, const std::vector<FilterContext>& filter_ctxs,
       MemPool* expr_results_pool);
 
   /// Destructor verifies that all stream objects have been released.
@@ -125,7 +125,7 @@ class ScannerContext {
     bool eof() const { return file_offset() == file_len_; }
 
     const char* filename() { return scan_range_->file(); }
-    const DiskIoMgr::ScanRange* scan_range() { return scan_range_; }
+    const io::ScanRange* scan_range() { return scan_range_; }
     const HdfsFileDesc* file_desc() { return file_desc_; }
 
     /// Returns the buffer's current offset in the file.
@@ -176,7 +176,7 @@ class ScannerContext {
    private:
     friend class ScannerContext;
     ScannerContext* parent_;
-    DiskIoMgr::ScanRange* scan_range_;
+    io::ScanRange* scan_range_;
     const HdfsFileDesc* file_desc_;
 
     /// Total number of bytes returned from GetBytes()
@@ -195,7 +195,7 @@ class ScannerContext {
     int64_t next_read_past_size_bytes_;
 
     /// The current io buffer. This starts as NULL before we've read any bytes.
-    std::unique_ptr<DiskIoMgr::BufferDescriptor> io_buffer_;
+    std::unique_ptr<io::BufferDescriptor> io_buffer_;
 
     /// Next byte to read in io_buffer_
     uint8_t* io_buffer_pos_;
@@ -227,7 +227,7 @@ class ScannerContext {
     /// On the next GetBytes() call, these buffers are released (the caller by calling
     /// GetBytes() signals it is done with its previous bytes).  At this point the
     /// buffers are returned to the I/O manager.
-    std::deque<std::unique_ptr<DiskIoMgr::BufferDescriptor>> completed_io_buffers_;
+    std::deque<std::unique_ptr<io::BufferDescriptor>> completed_io_buffers_;
 
     Stream(ScannerContext* parent);
 
@@ -290,7 +290,7 @@ class ScannerContext {
 
   /// Add a stream to this ScannerContext for 'range'. Returns the added stream.
   /// The stream is created in the runtime state's object pool
-  Stream* AddStream(DiskIoMgr::ScanRange* range);
+  Stream* AddStream(io::ScanRange* range);
 
   /// Returns false if scan_node_ is multi-threaded and has been cancelled.
   /// Always returns false if the scan_node_ is not multi-threaded.

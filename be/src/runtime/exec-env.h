@@ -43,7 +43,6 @@ class BufferPool;
 class CallableThreadPool;
 class DataStreamMgrBase;
 class DataStreamMgr;
-class DiskIoMgr;
 class QueryExecMgr;
 class Frontend;
 class HBaseTableFactory;
@@ -64,6 +63,10 @@ class StatestoreSubscriber;
 class ThreadResourceMgr;
 class TmpFileMgr;
 class Webserver;
+
+namespace io {
+  class DiskIoMgr;
+}
 
 /// Execution environment for Impala daemon. Contains all required global structures, and
 /// handles to singleton services. Clients must call StartServices() exactly once to
@@ -116,7 +119,7 @@ class ExecEnv {
     return catalogd_client_cache_.get();
   }
   HBaseTableFactory* htable_factory() { return htable_factory_.get(); }
-  DiskIoMgr* disk_io_mgr() { return disk_io_mgr_.get(); }
+  io::DiskIoMgr* disk_io_mgr() { return disk_io_mgr_.get(); }
   Webserver* webserver() { return webserver_.get(); }
   MetricGroup* metrics() { return metrics_.get(); }
   MemTracker* process_mem_tracker() { return mem_tracker_.get(); }
@@ -174,7 +177,7 @@ class ExecEnv {
   boost::scoped_ptr<ImpalaBackendClientCache> impalad_client_cache_;
   boost::scoped_ptr<CatalogServiceClientCache> catalogd_client_cache_;
   boost::scoped_ptr<HBaseTableFactory> htable_factory_;
-  boost::scoped_ptr<DiskIoMgr> disk_io_mgr_;
+  boost::scoped_ptr<io::DiskIoMgr> disk_io_mgr_;
   boost::scoped_ptr<Webserver> webserver_;
   boost::scoped_ptr<MemTracker> mem_tracker_;
   boost::scoped_ptr<PoolMemTrackerRegistry> pool_mem_trackers_;

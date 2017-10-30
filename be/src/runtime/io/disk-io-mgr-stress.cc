@@ -17,14 +17,15 @@
 
 #include <boost/thread/mutex.hpp>
 
-#include "runtime/disk-io-mgr-stress.h"
+#include "runtime/io/disk-io-mgr-stress.h"
 
-#include "runtime/disk-io-mgr-reader-context.h"
+#include "runtime/io/request-context.h"
 #include "util/time.h"
 
 #include "common/names.h"
 
 using namespace impala;
+using namespace impala::io;
 
 static const float ABORT_CHANCE = .10f;
 static const int MIN_READ_LEN = 1;
@@ -58,9 +59,9 @@ string GenerateRandomData() {
 
 struct DiskIoMgrStress::Client {
   boost::mutex lock;
-  unique_ptr<DiskIoRequestContext> reader;
+  unique_ptr<RequestContext> reader;
   int file_idx;
-  vector<DiskIoMgr::ScanRange*> scan_ranges;
+  vector<ScanRange*> scan_ranges;
   int abort_at_byte;
   int files_processed;
 };
@@ -108,13 +109,13 @@ void DiskIoMgrStress::ClientThread(int client_id) {
     const string& expected = files_[client->file_idx].data;
 
     while (!eos) {
-      DiskIoMgr::ScanRange* range;
+      ScanRange* range;
       Status status = io_mgr_->GetNextRange(client->reader.get(), &range);
       CHECK(status.ok() || status.IsCancelled());
       if (range == NULL) break;
 
       while (true) {
-        unique_ptr<DiskIoMgr::BufferDescriptor> buffer;
+        unique_ptr<BufferDescriptor> buffer;
         status = range->GetNext(&buffer);
         CHECK(status.ok() || status.IsCancelled());
         if (buffer == NULL) break;
@@ -232,9 +233,9 @@ void DiskIoMgrStress::NewClient(int i) {
     int range_len = rand() % (MAX_READ_LEN - MIN_READ_LEN) + MIN_READ_LEN;
     range_len = min(range_len, file_len - assigned_len);
 
-    DiskIoMgr::ScanRange* range = new DiskIoMgr::ScanRange();
+    ScanRange* range = new ScanRange();
     range->Reset(NULL, files_[client.file_idx].filename.c_str(), range_len, assigned_len,
-        0, false, DiskIoMgr::BufferOpts::Uncached());
+        0, false, BufferOpts::Uncached());
     client.scan_ranges.push_back(range);
     assigned_len += range_len;
   }

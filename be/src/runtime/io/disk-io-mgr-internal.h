@@ -24,8 +24,8 @@
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
-#include "runtime/disk-io-mgr-reader-context.h"
-#include "runtime/disk-io-mgr.h"
+#include "runtime/io/request-context.h"
+#include "runtime/io/disk-io-mgr.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/thread-resource-mgr.h"
 #include "util/condition-variable.h"
@@ -39,6 +39,7 @@
 /// This file contains internal structures shared between submodules of the IoMgr. Users
 /// of the IoMgr do not need to include this file.
 namespace impala {
+namespace io {
 
 /// Per disk state
 struct DiskIoMgr::DiskQueue {
@@ -55,10 +56,10 @@ struct DiskIoMgr::DiskQueue {
   ConditionVariable work_available;
 
   /// list of all request contexts that have work queued on this disk
-  std::list<DiskIoRequestContext*> request_contexts;
+  std::list<RequestContext*> request_contexts;
 
   /// Enqueue the request context to the disk queue.  The DiskQueue lock must not be taken.
-  inline void EnqueueContext(DiskIoRequestContext* worker) {
+  inline void EnqueueContext(RequestContext* worker) {
     {
       boost::unique_lock<boost::mutex> disk_lock(lock);
       /// Check that the reader is not already on the queue
@@ -71,6 +72,7 @@ struct DiskIoMgr::DiskQueue {
 
   DiskQueue(int id) : disk_id(id) {}
 };
+}
 }
 
 #endif

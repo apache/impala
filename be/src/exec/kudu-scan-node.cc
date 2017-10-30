@@ -52,7 +52,7 @@ KuduScanNode::KuduScanNode(ObjectPool* pool, const TPlanNode& tnode,
     // This value is built the same way as it assumes that the scan node runs co-located
     // with a Kudu tablet server and that the tablet server is using disks similarly as
     // a datanode would.
-    max_row_batches = 10 * (DiskInfo::num_disks() + DiskIoMgr::REMOTE_NUM_DISKS);
+    max_row_batches = 10 * (DiskInfo::num_disks() + io::DiskIoMgr::REMOTE_NUM_DISKS);
   }
   materialized_row_batches_.reset(new RowBatchQueue(max_row_batches));
 }

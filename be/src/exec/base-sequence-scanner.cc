@@ -32,6 +32,7 @@
 #include "common/names.h"
 
 using namespace impala;
+using namespace impala::io;
 
 const int BaseSequenceScanner::HEADER_SIZE = 1024;
 const int BaseSequenceScanner::SYNC_MARKER = -1;
@@ -48,7 +49,7 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
   // Issue just the header range for each file.  When the header is complete,
   // we'll issue the splits for that file.  Splits cannot be processed until the
   // header is parsed (the header object is then shared across splits for that file).
-  vector<DiskIoMgr::ScanRange*> header_ranges;
+  vector<ScanRange*> header_ranges;
   for (int i = 0; i < files.size(); ++i) {
     ScanRangeMetadata* metadata =
         static_cast<ScanRangeMetadata*>(files[i]->splits[0]->meta_data());
@@ -57,9 +58,9 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     // it is not cached.
     // TODO: add remote disk id and plumb that through to the io mgr.  It should have
     // 1 queue for each NIC as well?
-    DiskIoMgr::ScanRange* header_range = scan_node->AllocateScanRange(files[i]->fs,
+    ScanRange* header_range = scan_node->AllocateScanRange(files[i]->fs,
         files[i]->filename.c_str(), header_size, 0, metadata->partition_id, -1, false,
-        DiskIoMgr::BufferOpts::Uncached());
+        BufferOpts::Uncached());
     header_ranges.push_back(header_range);
   }
   // Issue the header ranges only. GetNextInternal() will issue the files' scan ranges
@@ -310,7 +311,7 @@ void BaseSequenceScanner::CloseFileRanges(const char* filename) {
   DCHECK(only_parsing_header_);
   HdfsFileDesc* desc = scan_node_->GetFileDesc(
       context_->partition_descriptor()->id(), filename);
-  const vector<DiskIoMgr::ScanRange*>& splits = desc->splits;
+  const vector<ScanRange*>& splits = desc->splits;
   for (int i = 0; i < splits.size(); ++i) {
     COUNTER_ADD(bytes_skipped_counter_, splits[i]->len());
     scan_node_->RangeComplete(file_format(), THdfsCompression::NONE);

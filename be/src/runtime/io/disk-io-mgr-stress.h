@@ -24,11 +24,12 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 
-#include "runtime/disk-io-mgr.h"
+#include "runtime/io/disk-io-mgr.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/thread-resource-mgr.h"
 
 namespace impala {
+namespace io {
 
 /// Test utility to stress the disk io mgr.  It allows for a configurable
 /// number of clients.  The clients continuously issue work to the io mgr and
@@ -88,7 +89,7 @@ class DiskIoMgrStress {
   /// Possibly cancels a random reader.
   void CancelRandomReader();
 };
-
+}
 }
 
 #endif

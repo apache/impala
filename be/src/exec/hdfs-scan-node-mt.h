@@ -50,7 +50,7 @@ class HdfsScanNodeMt : public HdfsScanNodeBase {
 
  private:
   /// Current scan range and corresponding scanner.
-  DiskIoMgr::ScanRange* scan_range_;
+  io::ScanRange* scan_range_;
   boost::scoped_ptr<ScannerContext> scanner_ctx_;
   boost::scoped_ptr<HdfsScanner> scanner_;
 };

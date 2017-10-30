@@ -361,6 +361,7 @@ set (IMPALA_LINK_LIBS
   GlobalFlags
   histogram_proto
   ImpalaThrift
+  Io
   kudu_util
   krpc
   Rpc
@@ -386,6 +387,7 @@ set (IMPALA_LINK_LIBS
 if (BUILD_SHARED_LIBS)
   set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
     BufferPool
+    Io
     Runtime
     Exec
     CodeGen

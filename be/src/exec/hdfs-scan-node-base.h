@@ -31,11 +31,11 @@
 #include "exec/filter-context.h"
 #include "exec/scan-node.h"
 #include "runtime/descriptors.h"
-#include "runtime/disk-io-mgr.h"
+#include "runtime/io/request-ranges.h"
 #include "util/avro-util.h"
+#include "util/container-util.h"
 #include "util/progress-updater.h"
 #include "util/spinlock.h"
-#include "util/container-util.h"
 
 namespace impala {
 
@@ -72,7 +72,7 @@ struct HdfsFileDesc {
   THdfsCompression::type file_compression;
 
   /// Splits (i.e. raw byte ranges) for this file, assigned to this scan node.
-  std::vector<DiskIoMgr::ScanRange*> splits;
+  std::vector<io::ScanRange*> splits;
 };
 
 /// Struct for additional metadata for scan ranges. This contains the partition id
@@ -84,9 +84,9 @@ struct ScanRangeMetadata {
   /// For parquet scan ranges we initially create a request for the file footer for each
   /// split; we store a pointer to the actual split so that we can recover its information
   /// for the scanner to process.
-  const DiskIoMgr::ScanRange* original_split;
+  const io::ScanRange* original_split;
 
-  ScanRangeMetadata(int64_t partition_id, const DiskIoMgr::ScanRange* original_split)
+  ScanRangeMetadata(int64_t partition_id, const io::ScanRange* original_split)
       : partition_id(partition_id), original_split(original_split) { }
 };
 
@@ -154,7 +154,7 @@ class HdfsScanNodeBase : public ScanNode {
   const HdfsTableDescriptor* hdfs_table() const { return hdfs_table_; }
   const AvroSchemaElement& avro_schema() const { return *avro_schema_.get(); }
   int skip_header_line_count() const { return skip_header_line_count_; }
-  DiskIoRequestContext* reader_context() const { return reader_context_.get(); }
+  io::RequestContext* reader_context() const { return reader_context_.get(); }
   bool optimize_parquet_count_star() const { return optimize_parquet_count_star_; }
   int parquet_count_star_slot_offset() const { return parquet_count_star_slot_offset_; }
 
@@ -204,22 +204,22 @@ class HdfsScanNodeBase : public ScanNode {
   /// If not NULL, the 'original_split' pointer is stored for reference in the scan range
   /// metadata of the scan range that is to be allocated.
   /// This is thread safe.
-  DiskIoMgr::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
+  io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
       int64_t offset, int64_t partition_id, int disk_id, bool expected_local,
-      const DiskIoMgr::BufferOpts& buffer_opts,
-      const DiskIoMgr::ScanRange* original_split = NULL);
+      const io::BufferOpts& buffer_opts,
+      const io::ScanRange* original_split = NULL);
 
   /// Old API for compatibility with text scanners (e.g. LZO text scanner).
-  DiskIoMgr::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
+  io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
       int64_t offset, int64_t partition_id, int disk_id, bool try_cache,
-      bool expected_local, int mtime, const DiskIoMgr::ScanRange* original_split = NULL);
+      bool expected_local, int mtime, const io::ScanRange* original_split = NULL);
 
   /// Adds ranges to the io mgr queue. 'num_files_queued' indicates how many file's scan
   /// ranges have been added completely.  A file's scan ranges are added completely if no
   /// new scanner threads will be needed to process that file besides the additional
   /// threads needed to process those in 'ranges'.
   /// Can be overridden to add scan-node specific actions like starting scanner threads.
-  virtual Status AddDiskIoRanges(const std::vector<DiskIoMgr::ScanRange*>& ranges,
+  virtual Status AddDiskIoRanges(const std::vector<io::ScanRange*>& ranges,
       int num_files_queued) WARN_UNUSED_RESULT;
 
   /// Adds all splits for file_desc to the io mgr queue and indicates one file has
@@ -336,7 +336,7 @@ class HdfsScanNodeBase : public ScanNode {
   const int parquet_count_star_slot_offset_;
 
   /// RequestContext object to use with the disk-io-mgr for reads.
-  std::unique_ptr<DiskIoRequestContext> reader_context_;
+  std::unique_ptr<io::RequestContext> reader_context_;
 
   /// Descriptor for tuples this scan node constructs
   const TupleDescriptor* tuple_desc_ = nullptr;

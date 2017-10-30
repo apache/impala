@@ -442,7 +442,7 @@ class HdfsParquetScanner : public HdfsScanner {
   ParquetFileVersion file_version_;
 
   /// Scan range for the metadata.
-  const DiskIoMgr::ScanRange* metadata_range_;
+  const io::ScanRange* metadata_range_;
 
   /// Pool to copy dictionary page buffer into. This pool is shared across all the
   /// pages in a column chunk.
@@ -585,7 +585,7 @@ class HdfsParquetScanner : public HdfsScanner {
 
   /// Find and return the last split in the file if it is assigned to this scan node.
   /// Returns NULL otherwise.
-  static DiskIoMgr::ScanRange* FindFooterSplit(HdfsFileDesc* file);
+  static io::ScanRange* FindFooterSplit(HdfsFileDesc* file);
 
   /// Process the file footer and parse file_metadata_.  This should be called with the
   /// last FOOTER_SIZE bytes in context_.

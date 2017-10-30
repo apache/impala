@@ -15,13 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "runtime/disk-io-mgr-internal.h"
+#include "runtime/io/disk-io-mgr-internal.h"
 
 #include "common/names.h"
 
 using namespace impala;
+using namespace impala::io;
 
-void DiskIoRequestContext::Cancel(const Status& status) {
+void RequestContext::Cancel(const Status& status) {
   DCHECK(!status.ok());
 
   // Callbacks are collected in this vector and invoked while no lock is held.
@@ -31,18 +32,18 @@ void DiskIoRequestContext::Cancel(const Status& status) {
     DCHECK(Validate()) << endl << DebugString();
 
     // Already being cancelled
-    if (state_ == DiskIoRequestContext::Cancelled) return;
+    if (state_ == RequestContext::Cancelled) return;
 
     DCHECK(status_.ok());
     status_ = status;
 
     // The reader will be put into a cancelled state until call cleanup is complete.
-    state_ = DiskIoRequestContext::Cancelled;
+    state_ = RequestContext::Cancelled;
 
     // Cancel all scan ranges for this reader. Each range could be one one of
     // four queues.
     for (int i = 0; i < disk_states_.size(); ++i) {
-      DiskIoRequestContext::PerDiskState& state = disk_states_[i];
+      RequestContext::PerDiskState& state = disk_states_[i];
       RequestRange* range = NULL;
       while ((range = state.in_flight_ranges()->Dequeue()) != NULL) {
         if (range->request_type() == RequestType::READ) {
@@ -77,7 +78,7 @@ void DiskIoRequestContext::Cancel(const Status& status) {
     // Schedule reader on all disks. The disks will notice it is cancelled and do any
     // required cleanup
     for (int i = 0; i < disk_states_.size(); ++i) {
-      DiskIoRequestContext::PerDiskState& state = disk_states_[i];
+      RequestContext::PerDiskState& state = disk_states_[i];
       state.ScheduleContext(this, i);
     }
   }
@@ -91,7 +92,7 @@ void DiskIoRequestContext::Cancel(const Status& status) {
   ready_to_start_ranges_cv_.NotifyAll();
 }
 
-void DiskIoRequestContext::CancelAndMarkInactive() {
+void RequestContext::CancelAndMarkInactive() {
   Cancel(Status::CANCELLED);
 
   boost::unique_lock<boost::mutex> l(lock_);
@@ -108,10 +109,10 @@ void DiskIoRequestContext::CancelAndMarkInactive() {
   state_ = Inactive;
 }
 
-void DiskIoRequestContext::AddRequestRange(
-    DiskIoMgr::RequestRange* range, bool schedule_immediately) {
+void RequestContext::AddRequestRange(
+    RequestRange* range, bool schedule_immediately) {
   // DCHECK(lock_.is_locked()); // TODO: boost should have this API
-  DiskIoRequestContext::PerDiskState& state = disk_states_[range->disk_id()];
+  RequestContext::PerDiskState& state = disk_states_[range->disk_id()];
   if (state.done()) {
     DCHECK_EQ(state.num_remaining_ranges(), 0);
     state.set_done(false);
@@ -120,21 +121,21 @@ void DiskIoRequestContext::AddRequestRange(
 
   bool schedule_context;
   if (range->request_type() == RequestType::READ) {
-    DiskIoMgr::ScanRange* scan_range = static_cast<DiskIoMgr::ScanRange*>(range);
+    ScanRange* scan_range = static_cast<ScanRange*>(range);
     if (schedule_immediately) {
       ScheduleScanRange(scan_range);
     } else {
       state.unstarted_scan_ranges()->Enqueue(scan_range);
       num_unstarted_scan_ranges_.Add(1);
     }
-    // If next_scan_range_to_start is NULL, schedule this DiskIoRequestContext so that it will
+    // If next_scan_range_to_start is NULL, schedule this RequestContext so that it will
     // be set. If it's not NULL, this context will be scheduled when GetNextRange() is
     // invoked.
     schedule_context = state.next_scan_range_to_start() == NULL;
   } else {
     DCHECK(range->request_type() == RequestType::WRITE);
     DCHECK(!schedule_immediately);
-    DiskIoMgr::WriteRange* write_range = static_cast<DiskIoMgr::WriteRange*>(range);
+    WriteRange* write_range = static_cast<WriteRange*>(range);
     state.unstarted_write_ranges()->Enqueue(write_range);
 
     // ScheduleContext() has no effect if the context is already scheduled,
@@ -146,18 +147,18 @@ void DiskIoRequestContext::AddRequestRange(
   ++state.num_remaining_ranges();
 }
 
-DiskIoRequestContext::DiskIoRequestContext(
+RequestContext::RequestContext(
     DiskIoMgr* parent, int num_disks, MemTracker* tracker)
   : parent_(parent), mem_tracker_(tracker), disk_states_(num_disks) {}
 
 // Dumps out request context information. Lock should be taken by caller
-string DiskIoRequestContext::DebugString() const {
+string RequestContext::DebugString() const {
   stringstream ss;
-  ss << endl << "  DiskIoRequestContext: " << (void*)this << " (state=";
-  if (state_ == DiskIoRequestContext::Inactive) ss << "Inactive";
-  if (state_ == DiskIoRequestContext::Cancelled) ss << "Cancelled";
-  if (state_ == DiskIoRequestContext::Active) ss << "Active";
-  if (state_ != DiskIoRequestContext::Inactive) {
+  ss << endl << "  RequestContext: " << (void*)this << " (state=";
+  if (state_ == RequestContext::Inactive) ss << "Inactive";
+  if (state_ == RequestContext::Cancelled) ss << "Cancelled";
+  if (state_ == RequestContext::Active) ss << "Active";
+  if (state_ != RequestContext::Inactive) {
     ss << " status_=" << (status_.ok() ? "OK" : status_.GetDetail())
        << " #ready_buffers=" << num_ready_buffers_.Load()
        << " #used_buffers=" << num_used_buffers_.Load()
@@ -181,9 +182,9 @@ string DiskIoRequestContext::DebugString() const {
   return ss.str();
 }
 
-bool DiskIoRequestContext::Validate() const {
-  if (state_ == DiskIoRequestContext::Inactive) {
-    LOG(WARNING) << "state_ == DiskIoRequestContext::Inactive";
+bool RequestContext::Validate() const {
+  if (state_ == RequestContext::Inactive) {
+    LOG(WARNING) << "state_ == RequestContext::Inactive";
     return false;
   }
 
@@ -212,7 +213,7 @@ bool DiskIoRequestContext::Validate() const {
       return false;
     }
 
-    if (state_ != DiskIoRequestContext::Cancelled) {
+    if (state_ != RequestContext::Cancelled) {
       if (state.unstarted_scan_ranges()->size() + state.in_flight_ranges()->size() >
           state.num_remaining_ranges()) {
         LOG(WARNING) << "disk_id=" << i
@@ -263,7 +264,7 @@ bool DiskIoRequestContext::Validate() const {
     }
   }
 
-  if (state_ != DiskIoRequestContext::Cancelled) {
+  if (state_ != RequestContext::Cancelled) {
     if (total_unstarted_ranges != num_unstarted_scan_ranges_.Load()) {
       LOG(WARNING) << "total_unstarted_ranges=" << total_unstarted_ranges
                    << " sum_in_states=" << num_unstarted_scan_ranges_.Load();
@@ -283,8 +284,8 @@ bool DiskIoRequestContext::Validate() const {
   return true;
 }
 
-void DiskIoRequestContext::PerDiskState::ScheduleContext(
-    DiskIoRequestContext* context, int disk_id) {
+void RequestContext::PerDiskState::ScheduleContext(
+    RequestContext* context, int disk_id) {
   if (!is_on_queue_ && !done_) {
     is_on_queue_ = true;
     context->parent_->disk_queues_[disk_id]->EnqueueContext(context);

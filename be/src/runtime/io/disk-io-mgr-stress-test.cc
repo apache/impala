@@ -15,13 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "runtime/disk-io-mgr-stress.h"
+#include "runtime/io/disk-io-mgr-stress.h"
 #include "util/cpu-info.h"
 #include "util/string-parser.h"
 
 #include "common/names.h"
 
 using namespace impala;
+using namespace impala::io;
 
 // Simple utility to run the disk io stress test.  A optional second parameter
 // can be passed to control how long to run this test (0 for forever).

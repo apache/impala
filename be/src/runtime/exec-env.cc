@@ -36,7 +36,7 @@
 #include "runtime/client-cache.h"
 #include "runtime/coordinator.h"
 #include "runtime/data-stream-mgr.h"
-#include "runtime/disk-io-mgr.h"
+#include "runtime/io/disk-io-mgr.h"
 #include "runtime/hbase-table-factory.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/krpc-data-stream-mgr.h"
@@ -164,7 +164,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int krpc_port,
             FLAGS_catalog_client_rpc_timeout_ms, FLAGS_catalog_client_rpc_timeout_ms, "",
             !FLAGS_ssl_client_ca_certificate.empty())),
     htable_factory_(new HBaseTableFactory()),
-    disk_io_mgr_(new DiskIoMgr()),
+    disk_io_mgr_(new io::DiskIoMgr()),
     webserver_(new Webserver(webserver_port)),
     pool_mem_trackers_(new PoolMemTrackerRegistry),
     thread_mgr_(new ThreadResourceMgr),

@@ -28,10 +28,10 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "gen-cpp/Types_types.h" // for TUniqueId
-#include "runtime/disk-io-mgr.h"
-#include "util/mem-range.h"
+#include "runtime/io/request-ranges.h"
 #include "util/collection-metrics.h"
 #include "util/condition-variable.h"
+#include "util/mem-range.h"
 #include "util/openssl-util.h"
 #include "util/runtime-profile.h"
 #include "util/spinlock.h"
@@ -100,7 +100,7 @@ class TmpFileMgr {
     /// space used. 'unique_id' is a unique ID that is used to prefix any scratch file
     /// names. It is an error to create multiple FileGroups with the same 'unique_id'.
     /// 'bytes_limit' is the limit on the total file space to allocate.
-    FileGroup(TmpFileMgr* tmp_file_mgr, DiskIoMgr* io_mgr, RuntimeProfile* profile,
+    FileGroup(TmpFileMgr* tmp_file_mgr, io::DiskIoMgr* io_mgr, RuntimeProfile* profile,
         const TUniqueId& unique_id, int64_t bytes_limit = -1);
 
     ~FileGroup();
@@ -198,10 +198,10 @@ class TmpFileMgr {
     TmpFileMgr* const tmp_file_mgr_;
 
     /// DiskIoMgr used for all I/O to temporary files.
-    DiskIoMgr* const io_mgr_;
+    io::DiskIoMgr* const io_mgr_;
 
     /// I/O context used for all reads and writes. Registered in constructor.
-    std::unique_ptr<DiskIoRequestContext> io_ctx_;
+    std::unique_ptr<io::RequestContext> io_ctx_;
 
     /// Stores scan ranges allocated in Read(). Needed because ScanRange objects may be
     /// touched by DiskIoMgr even after the scan is finished.
@@ -303,14 +303,14 @@ class TmpFileMgr {
     /// Starts a write of 'buffer' to 'offset' of 'file'. 'write_in_flight_' must be false
     /// before calling. After returning, 'write_in_flight_' is true on success or false on
     /// failure and 'is_cancelled_' is set to true on failure.
-    Status Write(DiskIoMgr* io_mgr, DiskIoRequestContext* io_ctx, File* file,
+    Status Write(io::DiskIoMgr* io_mgr, io::RequestContext* io_ctx, File* file,
         int64_t offset, MemRange buffer,
-        DiskIoMgr::WriteRange::WriteDoneCallback callback) WARN_UNUSED_RESULT;
+        io::WriteRange::WriteDoneCallback callback) WARN_UNUSED_RESULT;
 
     /// Retry the write after the initial write failed with an error, instead writing to
     /// 'offset' of 'file'. 'write_in_flight_' must be true before calling.
     /// After returning, 'write_in_flight_' is true on success or false on failure.
-    Status RetryWrite(DiskIoMgr* io_mgr, DiskIoRequestContext* io_ctx, File* file,
+    Status RetryWrite(io::DiskIoMgr* io_mgr, io::RequestContext* io_ctx, File* file,
         int64_t offset) WARN_UNUSED_RESULT;
 
     /// Called when the write has completed successfully or not. Sets 'write_in_flight_'
@@ -340,7 +340,7 @@ class TmpFileMgr {
     RuntimeProfile::Counter* encryption_timer_;
 
     /// The DiskIoMgr write range for this write.
-    boost::scoped_ptr<DiskIoMgr::WriteRange> write_range_;
+    boost::scoped_ptr<io::WriteRange> write_range_;
 
     /// The temporary file being written to.
     File* file_;
@@ -355,7 +355,7 @@ class TmpFileMgr {
 
     /// The scan range for the read that is currently in flight. NULL when no read is in
     /// flight.
-    DiskIoMgr::ScanRange* read_range_;
+    io::ScanRange* read_range_;
 
     /// Protects all fields below while 'write_in_flight_' is true. At other times, it is
     /// invalid to call WriteRange/FileGroup methods concurrently from multiple threads,

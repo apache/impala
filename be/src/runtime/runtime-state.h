@@ -35,7 +35,6 @@ namespace impala {
 class BufferPool;
 class DataStreamRecvr;
 class DescriptorTbl;
-class DiskIoMgr;
 class Expr;
 class LlvmCodeGen;
 class MemTracker;
@@ -52,6 +51,10 @@ class HBaseTableFactory;
 class TPlanFragmentCtx;
 class TPlanFragmentInstanceCtx;
 class QueryState;
+
+namespace io {
+  class DiskIoMgr;
+}
 
 /// TODO: move the typedefs into a separate .h (and fix the includes for that)
 
@@ -124,7 +127,7 @@ class RuntimeState {
   HBaseTableFactory* htable_factory();
   ImpalaBackendClientCache* impalad_client_cache();
   CatalogServiceClientCache* catalogd_client_cache();
-  DiskIoMgr* io_mgr();
+  io::DiskIoMgr* io_mgr();
   MemTracker* instance_mem_tracker() { return instance_mem_tracker_.get(); }
   MemTracker* query_mem_tracker();  // reference to the query_state_'s memtracker
   ReservationTracker* instance_buffer_reservation() {

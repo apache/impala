@@ -15,14 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RUNTIME_DISK_IO_MGR_READER_CONTEXT_H
-#define IMPALA_RUNTIME_DISK_IO_MGR_READER_CONTEXT_H
+#ifndef IMPALA_RUNTIME_IO_REQUEST_CONTEXT_H
+#define IMPALA_RUNTIME_IO_REQUEST_CONTEXT_H
 
-#include "runtime/disk-io-mgr.h"
+#include "runtime/io/disk-io-mgr.h"
 #include "util/condition-variable.h"
 
 namespace impala {
-
+namespace io {
 /// A request context is used to group together I/O requests belonging to a client of the
 /// I/O manager for management and scheduling. For most I/O manager clients it is an
 /// opaque pointer, but some clients may need to include this header, e.g. to make the
@@ -37,14 +37,14 @@ namespace impala {
 /// A scan range for the reader is on one of five states:
 /// 1) PerDiskState's unstarted_ranges: This range has only been queued
 ///    and nothing has been read from it.
-/// 2) DiskIoRequestContext's ready_to_start_ranges_: This range is about to be started.
+/// 2) RequestContext's ready_to_start_ranges_: This range is about to be started.
 ///    As soon as the reader picks it up, it will move to the in_flight_ranges
 ///    queue.
 /// 3) PerDiskState's in_flight_ranges: This range is being processed and will
 ///    be read from the next time a disk thread picks it up in GetNextRequestRange()
 /// 4) ScanRange's outgoing ready buffers is full. We can't read for this range
 ///    anymore. We need the caller to pull a buffer off which will put this in
-///    the in_flight_ranges queue. These ranges are in the DiskIoRequestContext's
+///    the in_flight_ranges queue. These ranges are in the RequestContext's
 ///    blocked_ranges_ queue.
 /// 5) ScanRange is cached and in the cached_ranges_ queue.
 //
@@ -73,7 +73,7 @@ namespace impala {
 /// the entire range is written when the write request is handled. (In other words, writes
 /// are not broken up.)
 //
-/// When a DiskIoRequestContext is processed by a disk thread in GetNextRequestRange(),
+/// When a RequestContext is processed by a disk thread in GetNextRequestRange(),
 /// a write range is always removed from the list of unstarted write ranges and appended
 /// to the in_flight_ranges_ queue. This is done to alternate reads and writes - a read
 /// that is scheduled (by calling GetNextRange()) is always followed by a write (if one
@@ -81,18 +81,14 @@ namespace impala {
 /// time (once a write range is returned from GetNetxRequestRange() it is completed an
 /// not re-enqueued), a scan range scheduled via a call to GetNextRange() can be queued up
 /// behind at most one write range.
-class DiskIoRequestContext {
-  using RequestRange = DiskIoMgr::RequestRange;
-  using ScanRange = DiskIoMgr::ScanRange;
-  using WriteRange = DiskIoMgr::WriteRange;
-  using RequestType = DiskIoMgr::RequestType;
-
+class RequestContext {
  public:
-  ~DiskIoRequestContext() { DCHECK_EQ(state_, Inactive) << "Must be unregistered."; }
+  ~RequestContext() { DCHECK_EQ(state_, Inactive) << "Must be unregistered."; }
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(DiskIoRequestContext);
+  DISALLOW_COPY_AND_ASSIGN(RequestContext);
   friend class DiskIoMgr;
+  friend class ScanRange;
 
   class PerDiskState;
 
@@ -110,7 +106,7 @@ class DiskIoRequestContext {
     Inactive,
   };
 
-  DiskIoRequestContext(DiskIoMgr* parent, int num_disks, MemTracker* tracker);
+  RequestContext(DiskIoMgr* parent, int num_disks, MemTracker* tracker);
 
   /// Decrements the number of active disks for this reader.  If the disk count
   /// goes to 0, the disk complete condition variable is signaled.
@@ -137,7 +133,7 @@ class DiskIoRequestContext {
   void ScheduleScanRange(ScanRange* range) {
     DCHECK_EQ(state_, Active);
     DCHECK(range != NULL);
-    DiskIoRequestContext::PerDiskState& state = disk_states_[range->disk_id()];
+    RequestContext::PerDiskState& state = disk_states_[range->disk_id()];
     state.in_flight_ranges()->Enqueue(range);
     state.ScheduleContext(this, range->disk_id());
   }
@@ -308,7 +304,7 @@ class DiskIoRequestContext {
 
     /// Schedules the request context on this disk if it's not already on the queue.
     /// Context lock must be taken before this.
-    void ScheduleContext(DiskIoRequestContext* context, int disk_id);
+    void ScheduleContext(RequestContext* context, int disk_id);
 
     /// Increment the ref count on reader.  We need to track the number of threads per
     /// reader per disk that are in the unlocked hdfs read code section. This is updated
@@ -322,7 +318,7 @@ class DiskIoRequestContext {
 
     /// Decrement request thread count and do final cleanup if this is the last
     /// thread. RequestContext lock must be taken before this.
-    void DecrementRequestThreadAndCheckDone(DiskIoRequestContext* context) {
+    void DecrementRequestThreadAndCheckDone(RequestContext* context) {
       num_threads_in_op_.Add(-1); // Also acts as a barrier.
       if (!is_on_queue_ && num_threads_in_op_.Load() == 0 && !done_) {
         // This thread is the last one for this reader on this disk, do final cleanup
@@ -355,7 +351,7 @@ class DiskIoRequestContext {
     /// For each disks, the number of request ranges that have not been fully read.
     /// In the non-cancellation path, this will hit 0, and done will be set to true
     /// by the disk thread. This is undefined in the cancellation path (the various
-    /// threads notice by looking at the DiskIoRequestContext's state_).
+    /// threads notice by looking at the RequestContext's state_).
     int num_remaining_ranges_ = 0;
 
     /// Queue of ranges that have not started being read.  This list is exclusive
@@ -401,6 +397,7 @@ class DiskIoRequestContext {
   /// context.
   std::vector<PerDiskState> disk_states_;
 };
+}
 }
 
 #endif
