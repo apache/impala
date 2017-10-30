@@ -106,6 +106,10 @@ template <class T> class ThriftTestBase : public T {
   virtual void TearDown() {}
 };
 
+// The path of the current executable file that is required for passing into the SASL
+// library as the 'application name'.
+string current_executable_path;
+
 // This class allows us to run all the tests that derive from this in the modes enumerated
 // in 'KerberosSwitch'.
 // If the mode is USE_KUDU_KERBEROS or USE_IMPALA_KERBEROS, the MiniKdc which is a wrapper
@@ -135,8 +139,9 @@ class ThriftParamsTest : public ThriftTestBase<testing::TestWithParam<KerberosSw
       FLAGS_principal = Substitute("$0@$1", spn, realm);
 
     }
-    string current_executable_path;
-    KUDU_ASSERT_OK(kudu::Env::Default()->GetExecutablePath(&current_executable_path));
+
+    // Make sure that we have a valid string in the 'current_executable_path'.
+    ASSERT_FALSE(current_executable_path.empty());
     ASSERT_OK(InitAuth(current_executable_path));
   }
 
@@ -617,4 +622,11 @@ TEST(NoPasswordPemFile, BadServerCertificate) {
   }, TSSLException);
 }
 
-IMPALA_TEST_MAIN();
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
+
+  // Fill in the path of the current binary for use by the tests.
+  current_executable_path = argv[0];
+  return RUN_ALL_TESTS();
+}
