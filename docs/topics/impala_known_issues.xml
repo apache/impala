@@ -534,6 +534,27 @@ https://issues.apache.org/jira/browse/IMPALA-2144 - Don't have
 
     </conbody>
 
+    <concept id="IMPALA-5638">
+      <title>Malicious user can gain unauthorized access to Kudu table data via Impala</title>
+      <conbody>
+        <p>
+          A malicious user with <codeph>ALTER</codeph> permissions on an Impala table can access any
+          other Kudu table data by altering the table properties to make it <q>external</q>
+          and then changing the underlying table mapping to point to other Kudu tables.
+          This violates and works around the authorization requirement that creating a
+          Kudu external table via Impala requires an <codeph>ALL</codeph> privilege at the server scope.
+          This privilege requirement for <codeph>CREATE</codeph> commands is enforced to precisely avoid
+          this scenario where a malicious user can change the underlying Kudu table
+          mapping. The fix is to enforce the same privilege requirement for <codeph>ALTER</codeph>
+          commands that would make existing non-external Kudu tables external.
+        </p>
+        <p><b>Bug:</b> <xref keyref="IMPALA-5638">IMPALA-5638</xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Workaround:</b> A temporary workaround is to revoke <codeph>ALTER</codeph> permissions on Impala tables.</p>
+        <p><b>Resolution:</b> Upgrade to an Impala version containing the fix for <xref keyref="IMPALA-5638">IMPALA-5638</xref>.</p>
+      </conbody>
+    </concept>
+
     <concept id="renewable_kerberos_tickets">
 
 <!-- Not part of Alex's spreadsheet. Not associated with a JIRA number AFAIK. -->
