@@ -29,14 +29,15 @@
 #include "rpc/thrift-server.h"
 #include "runtime/mem-tracker.h"
 #include "service/fe-support.h"
+#include "util/common-metrics.h"
 #include "util/debug-util.h"
 #include "util/jni-util.h"
-#include "util/metrics.h"
-#include "util/common-metrics.h"
-#include "util/network-util.h"
-#include "util/memory-metrics.h"
-#include "util/webserver.h"
 #include "util/default-path-handlers.h"
+#include "util/memory-metrics.h"
+#include "util/metrics.h"
+#include "util/network-util.h"
+#include "util/openssl-util.h"
+#include "util/webserver.h"
 
 DECLARE_string(classpath);
 DECLARE_string(principal);
@@ -95,7 +96,7 @@ int CatalogdMain(int argc, char** argv) {
   ThriftServer* server;
   ThriftServerBuilder builder("CatalogService", processor, FLAGS_catalog_service_port);
 
-  if (EnableInternalSslConnections()) {
+  if (IsInternalTlsConfigured()) {
     SSLProtocol ssl_version;
     ABORT_IF_ERROR(
         SSLProtoVersions::StringToProtocol(FLAGS_ssl_minimum_version, &ssl_version));

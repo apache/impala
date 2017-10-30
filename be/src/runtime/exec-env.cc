@@ -58,6 +58,7 @@
 #include "util/memory-metrics.h"
 #include "util/metrics.h"
 #include "util/network-util.h"
+#include "util/openssl-util.h"
 #include "util/parse-util.h"
 #include "util/pretty-printer.h"
 #include "util/thread-pool.h"
@@ -180,7 +181,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int krpc_port,
     VLOG_QUERY << "Using KRPC.";
     // KRPC relies on resolved IP address. It's set in StartServices().
     krpc_address_.__set_port(krpc_port);
-    rpc_mgr_.reset(new RpcMgr());
+    rpc_mgr_.reset(new RpcMgr(IsInternalTlsConfigured()));
     stream_mgr_.reset(new KrpcDataStreamMgr(metrics_.get()));
   } else {
     stream_mgr_.reset(new DataStreamMgr(metrics_.get()));

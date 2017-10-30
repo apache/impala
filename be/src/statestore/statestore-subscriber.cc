@@ -32,8 +32,9 @@
 #include "rpc/rpc-trace.h"
 #include "rpc/thrift-util.h"
 #include "statestore/statestore-service-client-wrapper.h"
-#include "util/time.h"
 #include "util/debug-util.h"
+#include "util/openssl-util.h"
+#include "util/time.h"
 
 #include "common/names.h"
 
@@ -197,7 +198,7 @@ Status StatestoreSubscriber::Start() {
 
     ThriftServerBuilder builder(
         "StatestoreSubscriber", processor, heartbeat_address_.port);
-    if (EnableInternalSslConnections()) {
+    if (IsInternalTlsConfigured()) {
       SSLProtocol ssl_version;
       RETURN_IF_ERROR(
           SSLProtoVersions::StringToProtocol(FLAGS_ssl_minimum_version, &ssl_version));

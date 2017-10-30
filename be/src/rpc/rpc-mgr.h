@@ -97,6 +97,8 @@ namespace impala {
 /// port is configurable via FLAGS_acceptor_threads.
 class RpcMgr {
  public:
+  RpcMgr(bool use_tls = false) : use_tls_(use_tls) {}
+
   /// Initializes the reactor threads, and prepares for sending outbound RPC requests.
   Status Init() WARN_UNUSED_RESULT;
 
@@ -176,6 +178,10 @@ class RpcMgr {
 
   /// True after StartServices() completes.
   bool services_started_ = false;
+
+  /// True if TLS is configured for communication between Impala backends. messenger_ will
+  /// be configured to use TLS if this is set.
+  const bool use_tls_;
 };
 
 } // namespace impala

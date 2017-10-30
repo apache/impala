@@ -27,6 +27,7 @@
 #include "util/webserver.h"
 #include "util/default-path-handlers.h"
 #include "util/metrics.h"
+#include "util/openssl-util.h"
 #include "runtime/exec-env.h"
 #include "service/impala-server.h"
 
@@ -149,7 +150,7 @@ Status InProcessStatestore::Start() {
       new StatestoreServiceProcessor(statestore_->thrift_iface()));
 
   ThriftServerBuilder builder("StatestoreService", processor, statestore_port_);
-  if (EnableInternalSslConnections()) {
+  if (IsInternalTlsConfigured()) {
     LOG(INFO) << "Enabling SSL for Statestore";
     builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key);
   }

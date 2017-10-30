@@ -31,6 +31,11 @@
 
 #include "common/names.h"
 
+DECLARE_string(ssl_client_ca_certificate);
+DECLARE_string(ssl_server_certificate);
+DECLARE_string(ssl_private_key);
+DECLARE_string(ssl_cipher_list);
+
 namespace impala {
 
 // Counter to track the number of encryption keys generated. Incremented before each key
@@ -45,6 +50,24 @@ static const int RNG_RESEED_BYTES = 512;
 
 int MaxSupportedTlsVersion() {
   return SSLv23_method()->version;
+}
+
+bool IsInternalTlsConfigured() {
+  // Enable SSL between servers only if both the client validation certificate and the
+  // server certificate are specified. 'Client' here means clients that are used by Impala
+  // services to contact other Impala services (as distinct from user clients of Impala
+  // like the shell), and 'servers' are the processes that serve those clients. The server
+  // needs a certificate (FLAGS_ssl_server_certificate) to demonstrate it is who the
+  // client thinks it is; the client needs a certificate (FLAGS_ssl_client_ca_certificate)
+  // to validate that assertion from the server.
+  return !FLAGS_ssl_client_ca_certificate.empty() &&
+      !FLAGS_ssl_server_certificate.empty() && !FLAGS_ssl_private_key.empty();
+}
+
+bool IsExternalTlsConfigured() {
+  // If the ssl_server_certificate is set, then external TLS is configured, i.e. external
+  // clients can talk to Impala at least over unauthenticated TLS.
+  return !FLAGS_ssl_server_certificate.empty() && !FLAGS_ssl_private_key.empty();
 }
 
 // Callback used by OpenSSLErr() - write the error given to us through buf to the

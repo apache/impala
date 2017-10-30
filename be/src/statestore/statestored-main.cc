@@ -31,6 +31,7 @@
 #include "util/common-metrics.h"
 #include "util/debug-util.h"
 #include "util/metrics.h"
+#include "util/openssl-util.h"
 #include "util/memory-metrics.h"
 #include "util/webserver.h"
 #include "util/default-path-handlers.h"
@@ -91,7 +92,7 @@ int StatestoredMain(int argc, char** argv) {
 
   ThriftServer* server;
   ThriftServerBuilder builder("StatestoreService", processor, FLAGS_state_store_port);
-  if (EnableInternalSslConnections()) {
+  if (IsInternalTlsConfigured()) {
     SSLProtocol ssl_version;
     ABORT_IF_ERROR(
         SSLProtoVersions::StringToProtocol(FLAGS_ssl_minimum_version, &ssl_version));

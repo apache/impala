@@ -341,10 +341,6 @@ struct SSLProtoVersions {
   static bool IsSupported(const apache::thrift::transport::SSLProtocol& protocol);
 };
 
-// Returns true if, per the process configuration flags, server<->server communications
-// should use SSL.
-bool EnableInternalSslConnections();
-
 }
 
 #endif
