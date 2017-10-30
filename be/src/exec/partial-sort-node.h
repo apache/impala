@@ -19,7 +19,6 @@
 #define IMPALA_EXEC_PARTIAL_SORT_NODE_H
 
 #include "exec/exec-node.h"
-#include "runtime/buffered-block-mgr.h"
 #include "runtime/sorter.h"
 
 namespace impala {
@@ -55,13 +54,9 @@ class PartialSortNode : public ExecNode {
   virtual void Close(RuntimeState* state);
 
  protected:
-  virtual Status QueryMaintenance(RuntimeState* state);
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
-  /// Compares tuples according to 'ordering_exprs'.
-  boost::scoped_ptr<TupleRowComparator> less_than_;
-
   /// Expressions and parameters used for tuple comparison.
   std::vector<ScalarExpr*> ordering_exprs_;
 

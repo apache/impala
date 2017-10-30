@@ -66,7 +66,7 @@ Status NestedLoopJoinNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(BlockingJoinNode::Open(state));
   RETURN_IF_ERROR(ScalarExprEvaluator::Open(join_conjunct_evals_, state));
 
-  // Check for errors and free local allocations before opening children.
+  // Check for errors and free expr result allocations before opening children.
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
 
@@ -99,7 +99,7 @@ Status NestedLoopJoinNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(join_conjuncts_, state,
-      pool_, expr_mem_pool(), &join_conjunct_evals_));
+      pool_, expr_perm_pool(), expr_results_pool(), &join_conjunct_evals_));
   builder_.reset(new NljBuilder(child(1)->row_desc(), state));
   RETURN_IF_ERROR(builder_->Prepare(state, mem_tracker()));
   runtime_profile()->PrependChild(builder_->profile());
@@ -138,10 +138,7 @@ void NestedLoopJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   ScalarExprEvaluator::Close(join_conjunct_evals_, state);
   ScalarExpr::Close(join_conjuncts_);
-  if (builder_ != NULL) {
-    builder_->Close(state);
-    builder_.reset();
-  }
+  if (builder_ != NULL) builder_->Close(state);
   build_batches_ = NULL;
   if (matching_build_rows_ != NULL) {
     mem_tracker()->Release(matching_build_rows_->MemUsage());
@@ -183,11 +180,6 @@ Status NestedLoopJoinNode::ResetMatchingBuildRows(RuntimeState* state, int64_t n
     }
     matching_build_rows_->Reset(num_bits);
   }
-  return Status::OK();
-}
-
-Status NestedLoopJoinNode::ProcessBuildInput(RuntimeState* state) {
-  DCHECK(false) << "Should not be called, NLJ uses the BuildSink API";
   return Status::OK();
 }
 

@@ -230,6 +230,10 @@ void TestTimestampTokens(vector<TimestampToken>* toks, int year, int month,
 }
 
 TEST(TimestampTest, Basic) {
+  // Fix current time to determine the behavior parsing 2-digit year format
+  // Set it to 03/01 to test 02/29 edge cases.
+  TimestampValue now(date(1980, 3, 1), time_duration(16, 14, 24));
+
   char s1[] = "2012-01-20 01:10:01";
   char s2[] = "1990-10-20 10:10:10.123456789  ";
   char s3[] = "  1990-10-20 10:10:10.123456789";
@@ -423,6 +427,19 @@ TEST(TimestampTest, Basic) {
   }
   // Test parsing/formatting of complex date/time formats
   vector<TimestampTC> test_cases = boost::assign::list_of
+    // Test year upper/lower bound
+    (TimestampTC("yyyy-MM-dd HH:mm:ss", "1400-01-01 00:00:00",
+        false, true, false, 1400, 1, 1))
+    (TimestampTC("yyyy-MM-dd HH:mm:ss", "1399-12-31 23:59:59",
+        false, true))
+    (TimestampTC("yyyy-MM-dd HH:mm:ss", "9999-12-31 23:59:59",
+        false, true, false, 9999, 12, 31, 23, 59, 59))
+    (TimestampTC("yyyy-MM-dd HH:mm:ss +hh", "1400-01-01 01:00:00 +01", false, true, false,
+        1400, 1, 1, 0, 0, 0))
+    (TimestampTC("yyyy-MM-dd HH:mm:ss +hh", "1400-01-01 01:00:00 +02", false, true))
+    (TimestampTC("yyyy-MM-dd HH:mm:ss +hh", "9999-12-31 22:00:00 -01", false, true, false,
+        9999, 12, 31, 23, 0, 0))
+    (TimestampTC("yyyy-MM-dd HH:mm:ss +hh", "9999-12-31 22:00:00 -02", false, true))
     // Test case on literal short months
     (TimestampTC("yyyy-MMM-dd", "2013-OCT-01", false, true, false, 2013, 10, 1))
     // Test case on literal short months
@@ -467,11 +484,32 @@ TEST(TimestampTest, Basic) {
     (TimestampTC("MMdd", "1201", false, true))
     // Test missing month
     (TimestampTC("yyyydd", "201301", false, true))
-    // Test missing month
-    (TimestampTC("yyyymm", "201301", false, true))
+    (TimestampTC("yydd", "1301", false, true))
+    // Test missing day
+    (TimestampTC("yyyyMM", "201301", false, true))
+    (TimestampTC("yyMM", "8512", false, true))
+    // Test missing month and day
+    (TimestampTC("yyyy", "2013", false, true))
+    (TimestampTC("yy", "13", false, true))
     // Test short year token
     (TimestampTC("y-MM-dd", "2013-11-13", false, true, false, 2013, 11, 13))
-    (TimestampTC("y-MM-dd", "13-11-13", false, true, false, 2013, 11, 13))
+    (TimestampTC("y-MM-dd", "13-11-13", false, true, false, 1913, 11, 13))
+    // Test 2-digit year format
+    (TimestampTC("yy-MM-dd", "17-08-31", false, true, false, 1917, 8, 31))
+    (TimestampTC("yy-MM-dd", "99-08-31", false, true, false, 1999, 8, 31))
+    // Test 02/29 edge cases of 2-digit year format
+    (TimestampTC("yy-MM-dd", "00-02-28", false, true, false, 2000, 2, 28))
+    (TimestampTC("yy-MM-dd", "00-02-29", false, true, false, 2000, 2, 29))
+    (TimestampTC("yy-MM-dd", "00-03-01", false, true, false, 2000, 3, 1))
+    (TimestampTC("yy-MM-dd", "00-03-02", false, true, false, 1900, 3, 2))
+    (TimestampTC("yy-MM-dd", "04-02-29", false, true, false, 1904, 2, 29))
+    (TimestampTC("yy-MM-dd", "99-02-29", false, true))
+    // Test 1-digit year format with time to show the exact boundary
+    // Before the cutoff. Year should be 2000
+    (TimestampTC("y-MM-dd HH:mm:ss", "00-02-29 16:14:23", false, true, false,
+        2000, 2, 29, 16, 14, 23))
+    // After the cutoff but 02/29/1900 is invalid
+    (TimestampTC("y-MM-dd HH:mm:ss", "00-02-29 16:14:24", false, true))
     // Test short month token
     (TimestampTC("yyyy-M-dd", "2013-11-13", false, true, false, 2013, 11, 13))
     (TimestampTC("yyyy-M-dd", "2013-1-13", false, true, false, 2013, 1, 13))
@@ -480,7 +518,7 @@ TEST(TimestampTest, Basic) {
     (TimestampTC("yyyy-MM-d", "2013-11-3", false, true, false, 2013, 11, 3))
     // Test short all date tokens
     (TimestampTC("y-M-d", "2013-11-13", false, true, false, 2013, 11, 13))
-    (TimestampTC("y-M-d", "13-1-3", false, true, false, 2013, 1, 3))
+    (TimestampTC("y-M-d", "13-1-3", false, true, false, 1913, 1, 3))
     // Test short hour token
     (TimestampTC("H:mm:ss", "14:24:34", false, false, true, 0, 0, 0, 14, 24, 34))
     (TimestampTC("H:mm:ss", "4:24:34", false, false, true, 0, 0, 0, 4, 24, 34))
@@ -501,6 +539,7 @@ TEST(TimestampTest, Basic) {
   for (int i = 0; i < test_cases.size(); ++i) {
     TimestampTC test_case = test_cases[i];
     DateTimeFormatContext dt_ctx(test_case.fmt, strlen(test_case.fmt));
+    dt_ctx.SetCenturyBreak(now);
     bool parse_result = TimestampParser::ParseFormatTokens(&dt_ctx);
     if (test_case.fmt_should_fail) {
       EXPECT_FALSE(parse_result) << "TC: " << i;
@@ -622,6 +661,16 @@ TEST(TimestampTest, Basic) {
   EXPECT_FALSE(too_early.HasTime());
   EXPECT_FALSE(too_early.UtcToUnixTimeMicros(&tm_min_micros));
 
+  // Sub-second FromUnixTime functions incorrectly accepted the last second of 1399
+  // as valid, because validation logic checked the nearest second rounded towards 0
+  // (IMPALA-5664).
+  EXPECT_FALSE(TimestampValue::FromSubsecondUnixTime(
+      MIN_DATE_AS_UNIX_TIME - 0.1).HasDate());
+  EXPECT_FALSE(TimestampValue::UtcFromUnixTimeMicros(
+      MIN_DATE_AS_UNIX_TIME * MICROS_PER_SEC - 2000).HasDate());
+  EXPECT_FALSE(TimestampValue::FromUnixTimeNanos(
+      MIN_DATE_AS_UNIX_TIME, -NANOS_PER_MICRO * 100).HasDate());
+
   // Test the max supported date that can be represented in seconds.
   const int64_t MAX_DATE_AS_UNIX_TIME = 253402300799;
   TimestampValue max_date =
@@ -660,6 +709,22 @@ TEST(TimestampTest, Basic) {
   TimestampValue too_late = TimestampValue::FromUnixTime(MAX_DATE_AS_UNIX_TIME + 1);
   EXPECT_FALSE(too_late.HasDate());
   EXPECT_FALSE(too_late.HasTime());
+
+  // Checking sub-second FromUnixTime functions near 10000.01.01
+  EXPECT_TRUE(TimestampValue::FromSubsecondUnixTime(
+      MAX_DATE_AS_UNIX_TIME + 0.99).HasDate());
+  EXPECT_FALSE(TimestampValue::FromSubsecondUnixTime(
+      MAX_DATE_AS_UNIX_TIME + 1).HasDate());
+
+  EXPECT_TRUE(TimestampValue::UtcFromUnixTimeMicros(
+      MAX_DATE_AS_UNIX_TIME * MICROS_PER_SEC + MICROS_PER_SEC - 1).HasDate());
+  EXPECT_FALSE(TimestampValue::UtcFromUnixTimeMicros(
+      MAX_DATE_AS_UNIX_TIME * MICROS_PER_SEC + MICROS_PER_SEC).HasDate());
+
+  EXPECT_TRUE(TimestampValue::FromUnixTimeNanos(
+      MAX_DATE_AS_UNIX_TIME, NANOS_PER_SEC - 1).HasDate());
+  EXPECT_FALSE(TimestampValue::FromUnixTimeNanos(
+      MAX_DATE_AS_UNIX_TIME, NANOS_PER_SEC).HasDate());
 
   // Regression tests for IMPALA-1676, Unix times overflow int32 during year 2038
   EXPECT_EQ("2038-01-19 03:14:08",

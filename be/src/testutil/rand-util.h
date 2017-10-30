@@ -37,10 +37,19 @@ class RandTestUtil {
     if (seed_str != nullptr) {
       seed = atoi(seed_str);
     } else {
-      seed = time(nullptr);
+      seed = std::random_device()();
     }
     LOG(INFO) << "Random seed (overridable with " << env_var << "): " << seed;
     rng->seed(seed);
+  }
+
+  /// Create 'num_threads' rngs, seeded using 'seed_rng'. Used when we want each thread
+  /// to have its own RNG (since they are not thread-safe).
+  static vector<std::mt19937> CreateThreadLocalRngs(
+      int num_threads, std::mt19937* seed_rng) {
+    vector<std::mt19937> rngs(num_threads);
+    for (std::mt19937& rng : rngs) rng.seed((*seed_rng)());
+    return rngs;
   }
 };
 }

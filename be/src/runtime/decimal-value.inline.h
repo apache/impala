@@ -27,6 +27,7 @@
 #include <sstream>
 
 #include "common/logging.h"
+#include "util/bit-util.h"
 #include "util/decimal-util.h"
 #include "util/hash-util.h"
 
@@ -204,7 +205,7 @@ inline RESULT_T ScaleDownAndRound(RESULT_T value, int delta_scale, bool round) {
     RESULT_T remainder = value % multiplier;
     // In general, shifting down the multiplier is not safe, but we know
     // here that it is a multiple of two.
-    if (abs(remainder) > (multiplier >> 1)) {
+    if (abs(remainder) >= (multiplier >> 1)) {
       // Bias at zero must be corrected by sign of dividend.
       result += BitUtil::Sign(value);
     }
@@ -213,44 +214,6 @@ inline RESULT_T ScaleDownAndRound(RESULT_T value, int delta_scale, bool round) {
 }
 }
 
-// Use __builtin_mul_overflow on GCC if available.
-// Avoid using on Clang: it requires a function __muloti present in the Clang runtime
-// library but not the GCC runtime library and regresses performance.
-#if 5 <= __GNUC__
-template<typename T>
-template<typename RESULT_T>
-inline DecimalValue<RESULT_T> DecimalValue<T>::Multiply(int this_scale,
-    const DecimalValue& other, int other_scale, int result_precision, int result_scale,
-    bool round, bool* overflow) const {
-  // In the non-overflow case, we don't need to adjust by the scale since
-  // that is already handled by the FE when it computes the result decimal type.
-  // e.g. 1.23 * .2 (scale 2, scale 1 respectively) is identical to:
-  // 123 * 2 with a resulting scale 3. We can do the multiply on the unscaled values.
-  // The result scale in this case is the sum of the input scales.
-  RESULT_T x = value();
-  RESULT_T y = other.value();
-  RESULT_T result = 0;
-  if (result_precision == ColumnType::MAX_PRECISION) {
-    DCHECK_EQ(sizeof(RESULT_T), 16);
-    *overflow |= __builtin_mul_overflow(x, y, &result);
-  } else {
-    result = x * y;
-  }
-  int delta_scale = this_scale + other_scale - result_scale;
-  if (UNLIKELY(delta_scale != 0)) {
-    // In this case, the required resulting scale is larger than the max we support.
-    // We cap the resulting scale to the max supported scale (e.g. truncate) in the FE.
-    // TODO: we could also return NULL.
-    result = detail::ScaleDownAndRound<T, RESULT_T>(result, delta_scale, round);
-
-    // Check overflow again after rounding since +/-1 could cause decimal overflow
-    if (round && result_precision == ColumnType::MAX_PRECISION) {
-      *overflow |= abs(result) > DecimalUtil::MAX_UNSCALED_DECIMAL16;
-    }
-  }
-  return DecimalValue<RESULT_T>(result);
-}
-#else
 template<typename T>
 template<typename RESULT_T>
 DecimalValue<RESULT_T> DecimalValue<T>::Multiply(int this_scale,
@@ -267,26 +230,72 @@ DecimalValue<RESULT_T> DecimalValue<T>::Multiply(int this_scale,
     // Handle zero to avoid divide by zero in the overflow check below.
     return DecimalValue<RESULT_T>(0);
   }
+  RESULT_T result = 0;
+  bool needs_int256 = false;
+  int delta_scale = this_scale + other_scale - result_scale;
   if (result_precision == ColumnType::MAX_PRECISION) {
     DCHECK_EQ(sizeof(RESULT_T), 16);
-    // Check overflow
-    *overflow |= DecimalUtil::MAX_UNSCALED_DECIMAL16 / abs(y) < abs(x);
-  }
-  RESULT_T result = x * y;
-  int delta_scale = this_scale + other_scale - result_scale;
-  if (UNLIKELY(delta_scale != 0)) {
-    // In this case, the required resulting scale is larger than the max we support.
-    // We cap the resulting scale to the max supported scale (e.g. truncate) in the FE.
-    // TODO: we could also return NULL.
-    result = detail::ScaleDownAndRound<T, RESULT_T>(result, delta_scale, round);
-    // Check overflow again after rounding since +/-1 could cause decimal overflow
-    if (result_precision == ColumnType::MAX_PRECISION) {
-      *overflow |= abs(result) > DecimalUtil::MAX_UNSCALED_DECIMAL16;
+    int total_leading_zeros = BitUtil::CountLeadingZeros(abs(x)) +
+        BitUtil::CountLeadingZeros(abs(y));
+    // This check is quick, but conservative. In some cases it will indicate that
+    // converting to 256 bits is necessary, when it's not actually the case.
+    needs_int256 = total_leading_zeros <= 128;
+    if (UNLIKELY(needs_int256 && delta_scale == 0)) {
+      if (LIKELY(abs(x) > DecimalUtil::MAX_UNSCALED_DECIMAL16 / abs(y))) {
+        // If the intermediate value does not fit into 128 bits, we indicate overflow
+        // because the final value would also not fit into 128 bits since delta_scale is
+        // zero.
+        *overflow = true;
+      } else {
+        // We've verified that the intermediate (and final) value will fit into 128 bits.
+        needs_int256 = false;
+      }
     }
   }
+  if (UNLIKELY(needs_int256)) {
+    if (delta_scale == 0) {
+      DCHECK(*overflow);
+    } else {
+      int256_t intermediate_result = ConvertToInt256(x) * ConvertToInt256(y);
+      intermediate_result = detail::ScaleDownAndRound<int256_t, int256_t>(
+          intermediate_result, delta_scale, round);
+      result = ConvertToInt128(
+          intermediate_result, DecimalUtil::MAX_UNSCALED_DECIMAL16, overflow);
+    }
+  } else {
+    if (delta_scale == 0) {
+      result = x * y;
+      if (UNLIKELY(result_precision == ColumnType::MAX_PRECISION &&
+          abs(result) > DecimalUtil::MAX_UNSCALED_DECIMAL16)) {
+        // An overflow is possible here, if, for example, x = (2^64 - 1) and
+        // y = (2^63 - 1).
+        *overflow = true;
+      }
+    } else if (LIKELY(delta_scale <= 38)) {
+      result = x * y;
+      // The largest value that result can have here is (2^64 - 1) * (2^63 - 1), which is
+      // greater than MAX_UNSCALED_DECIMAL16.
+      result = detail::ScaleDownAndRound<T, RESULT_T>(result, delta_scale, round);
+      // Since delta_scale is greater than zero, result can now be at most
+      // ((2^64 - 1) * (2^63 - 1)) / 10, which is less than MAX_UNSCALED_DECIMAL16, so
+      // there is no need to check for overflow.
+    } else {
+      // We are multiplying decimal(38, 38) by decimal(38, 38). The result should be a
+      // decimal(38, 37), so delta scale = 38 + 38 - 37 = 39. Since we are not in the
+      // 256 bit intermediate value case and we are scaling down by 39, then we are
+      // guaranteed that the result is 0 (even if we try to round). The largest possible
+      // intermediate result is 38 "9"s. If we scale down by 39, the leftmost 9 is now
+      // two digits to the right of the rightmost "visible" one. The reason why we have
+      // to handle this case separately is because a scale multiplier with a delta_scale
+      // 39 does not fit into int128.
+      DCHECK_EQ(delta_scale, 39);
+      DCHECK(round);
+      result = 0;
+    }
+  }
+  DCHECK(*overflow || abs(result) <= DecimalUtil::MAX_UNSCALED_DECIMAL16);
   return DecimalValue<RESULT_T>(result);
 }
-#endif
 
 template<typename T>
 template<typename RESULT_T>

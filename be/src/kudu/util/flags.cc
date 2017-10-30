@@ -55,28 +55,25 @@ using strings::Substitute;
 
 // Because every binary initializes its flags here, we use it as a convenient place
 // to offer some global flags as well.
-DEFINE_bool(dump_metrics_json, false,
+DEFINE_bool_hidden(dump_metrics_json, false,
             "Dump a JSON document describing all of the metrics which may be emitted "
             "by this binary.");
 TAG_FLAG(dump_metrics_json, hidden);
 
-DEFINE_bool(enable_process_lifetime_heap_profiling, false, "Enables heap "
-    "profiling for the lifetime of the process. Profile output will be stored in the "
-    "directory specified by -heap_profile_path. Enabling this option will disable the "
-    "on-demand/remote server profile handlers.");
+DECLARE_bool(enable_process_lifetime_heap_profiling);
 TAG_FLAG(enable_process_lifetime_heap_profiling, stable);
 TAG_FLAG(enable_process_lifetime_heap_profiling, advanced);
 
-DEFINE_string(heap_profile_path, "", "Output path to store heap profiles. If not set " \
+DEFINE_string_hidden(heap_profile_path, "", "Output path to store heap profiles. If not set " \
     "profiles are stored in /tmp/<process-name>.<pid>.<n>.heap.");
 TAG_FLAG(heap_profile_path, stable);
 TAG_FLAG(heap_profile_path, advanced);
 
-DEFINE_bool(disable_core_dumps, false, "Disable core dumps when this process crashes.");
+DEFINE_bool_hidden(disable_core_dumps, false, "Disable core dumps when this process crashes.");
 TAG_FLAG(disable_core_dumps, advanced);
 TAG_FLAG(disable_core_dumps, evolving);
 
-DEFINE_string(umask, "077",
+DEFINE_string_hidden(umask, "077",
               "The umask that will be used when creating files and directories. "
               "Permissions of top-level data directories will also be modified at "
               "start-up to conform to the given umask. Changing this value may "
@@ -101,21 +98,21 @@ static bool ValidateUmask(const char* /*flagname*/, const string& value) {
 
 DEFINE_validator(umask, &ValidateUmask);
 
-DEFINE_bool(unlock_experimental_flags, false,
+DEFINE_bool_hidden(unlock_experimental_flags, false,
             "Unlock flags marked as 'experimental'. These flags are not guaranteed to "
             "be maintained across releases of Kudu, and may enable features or behavior "
             "known to be unstable. Use at your own risk.");
 TAG_FLAG(unlock_experimental_flags, advanced);
 TAG_FLAG(unlock_experimental_flags, stable);
 
-DEFINE_bool(unlock_unsafe_flags, false,
+DEFINE_bool_hidden(unlock_unsafe_flags, false,
             "Unlock flags marked as 'unsafe'. These flags are not guaranteed to "
             "be maintained across releases of Kudu, and enable features or behavior "
             "known to be unsafe. Use at your own risk.");
 TAG_FLAG(unlock_unsafe_flags, advanced);
 TAG_FLAG(unlock_unsafe_flags, stable);
 
-DEFINE_string(redact, "all",
+DEFINE_string_hidden(redact, "all",
               "Comma-separated list of redactions. Supported options are 'flag', "
               "'log', 'all', and 'none'. If 'flag' is specified, configuration flags which may "
               "include sensitive data will be redacted whenever server configuration "

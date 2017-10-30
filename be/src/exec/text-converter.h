@@ -70,7 +70,8 @@ class TextConverter {
   void UnescapeString(const char* src, char* dest, int* len, int64_t maxlen = -1);
 
   /// Codegen the function to write a slot for slot_desc.
-  /// Returns NULL if codegen was not succesful.
+  /// Returns Status::OK() if codegen was successful. If codegen was successful
+  /// llvm::Function** fn points to the codegen'd function
   /// The signature of the generated function is:
   /// bool WriteSlot(Tuple* tuple, const char* data, int len);
   /// The codegen function returns true if the slot could be written and false
@@ -81,8 +82,8 @@ class TextConverter {
   /// be used for partitions that contain escapes.
   /// strict_mode: If set, numerical overflow/underflow are considered to be parse
   /// errors.
-  static llvm::Function* CodegenWriteSlot(LlvmCodeGen* codegen,
-      TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc,
+  static Status CodegenWriteSlot(LlvmCodeGen* codegen,
+      TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc, llvm::Function** fn,
       const char* null_col_val, int len, bool check_null, bool strict_mode = false);
 
  private:

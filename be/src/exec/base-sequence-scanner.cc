@@ -68,6 +68,12 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
   return Status::OK();
 }
 
+bool BaseSequenceScanner::FileFormatIsSequenceBased(THdfsFileFormat::type format) {
+  return format == THdfsFileFormat::SEQUENCE_FILE ||
+         format == THdfsFileFormat::RC_FILE ||
+         format == THdfsFileFormat::AVRO;
+}
+
 BaseSequenceScanner::BaseSequenceScanner(HdfsScanNodeBase* node, RuntimeState* state)
   : HdfsScanner(node, state) {
 }
@@ -86,7 +92,8 @@ Status BaseSequenceScanner::Open(ScannerContext* context) {
       scan_node_->runtime_profile(), "BytesSkipped", TUnit::BYTES);
 
   header_ = reinterpret_cast<FileHeader*>(
-      scan_node_->GetFileMetadata(stream_->filename()));
+      scan_node_->GetFileMetadata(
+          context->partition_descriptor()->id(), stream_->filename()));
   if (header_ == nullptr) {
     only_parsing_header_ = true;
     return Status::OK();
@@ -157,8 +164,9 @@ Status BaseSequenceScanner::GetNextInternal(RowBatch* row_batch) {
     }
     // Header is parsed, set the metadata in the scan node and issue more ranges.
     static_cast<HdfsScanNodeBase*>(scan_node_)->SetFileMetadata(
-        stream_->filename(), header_);
-    HdfsFileDesc* desc = scan_node_->GetFileDesc(stream_->filename());
+        context_->partition_descriptor()->id(), stream_->filename(), header_);
+    HdfsFileDesc* desc = scan_node_->GetFileDesc(
+        context_->partition_descriptor()->id(), stream_->filename());
     RETURN_IF_ERROR(scan_node_->AddDiskIoRanges(desc));
     return Status::OK();
   }
@@ -172,18 +180,19 @@ Status BaseSequenceScanner::GetNextInternal(RowBatch* row_batch) {
 
   Status status = ProcessRange(row_batch);
   if (!status.ok()) {
-    if (status.IsCancelled() || status.IsMemLimitExceeded()) return status;
-
     // Log error from file format parsing.
-    state_->LogError(ErrorMsg(TErrorCode::SEQUENCE_SCANNER_PARSE_ERROR,
-        stream_->filename(), stream_->file_offset(),
-        (stream_->eof() ? "(EOF)" : "")));
+    // TODO(IMPALA-5922): Include the file and offset in errors inside the scanners.
+    if (!status.IsCancelled() &&
+        !status.IsMemLimitExceeded() &&
+        !status.IsInternalError() &&
+        !status.IsDiskIoError()) {
+      state_->LogError(ErrorMsg(TErrorCode::SEQUENCE_SCANNER_PARSE_ERROR,
+          stream_->filename(), stream_->file_offset(),
+          (stream_->eof() ? "(EOF)" : "")));
+    }
 
-    // Make sure errors specified in the status are logged as well
-    state_->LogError(status.msg());
-
-    // If abort on error then return, otherwise try to recover.
-    if (state_->abort_on_error()) return status;
+    // This checks for abort_on_error.
+    RETURN_IF_ERROR(state_->LogOrReturnError(status.msg()));
 
     // Recover by skipping to the next sync.
     parse_status_ = Status::OK();
@@ -303,7 +312,8 @@ Status BaseSequenceScanner::SkipToSync(const uint8_t* sync, int sync_size) {
 
 void BaseSequenceScanner::CloseFileRanges(const char* filename) {
   DCHECK(only_parsing_header_);
-  HdfsFileDesc* desc = scan_node_->GetFileDesc(filename);
+  HdfsFileDesc* desc = scan_node_->GetFileDesc(
+      context_->partition_descriptor()->id(), filename);
   const vector<DiskIoMgr::ScanRange*>& splits = desc->splits;
   for (int i = 0; i < splits.size(); ++i) {
     COUNTER_ADD(bytes_skipped_counter_, splits[i]->len());

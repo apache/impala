@@ -222,7 +222,8 @@ Status DataSourceScanNode::MaterializeNextRow(MemPool* tuple_pool, Tuple* tuple)
           }
           const string& val = col.string_vals[val_idx];
           size_t val_size = val.size();
-          char* buffer = reinterpret_cast<char*>(tuple_pool->TryAllocate(val_size));
+          char* buffer = reinterpret_cast<char*>(
+              tuple_pool->TryAllocateUnaligned(val_size));
           if (UNLIKELY(buffer == NULL)) {
             string details = Substitute(ERROR_MEM_LIMIT_EXCEEDED, "MaterializeNextRow",
                 val_size, "string slot");
@@ -365,15 +366,13 @@ Status DataSourceScanNode::Reset(RuntimeState* state) {
 void DataSourceScanNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   SCOPED_TIMER(runtime_profile_->total_time_counter());
-  PeriodicCounterUpdater::StopRateCounter(total_throughput_counter());
-  PeriodicCounterUpdater::StopTimeSeriesCounter(bytes_read_timeseries_counter_);
   input_batch_.reset();
   TCloseParams params;
   params.__set_scan_handle(scan_handle_);
   TCloseResult result;
   Status status = data_source_executor_->Close(params, &result);
   if (!status.ok()) state->LogError(status.msg());
-  ExecNode::Close(state);
+  ScanNode::Close(state);
 }
 
 void DataSourceScanNode::DebugString(int indentation_level, stringstream* out) const {

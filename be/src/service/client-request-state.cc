@@ -57,7 +57,6 @@ namespace impala {
 // Keys into the info string map of the runtime profile referring to specific
 // items used by CM for monitoring purposes.
 static const string PER_HOST_MEM_KEY = "Estimated Per-Host Mem";
-static const string PER_HOST_MEMORY_RESERVATION_KEY = "Per-Host Memory Reservation";
 static const string TABLES_MISSING_STATS_KEY = "Tables Missing Stats";
 static const string TABLES_WITH_CORRUPT_STATS_KEY = "Tables With Corrupt Table Stats";
 static const string TABLES_WITH_MISSING_DISK_IDS_KEY = "Tables With Missing Disk Ids";
@@ -75,9 +74,10 @@ ClientRequestState::ClientRequestState(
     schedule_(NULL),
     coord_(NULL),
     result_cache_max_size_(-1),
-    profile_(&profile_pool_, "Query"), // assign name w/ id after planning
-    server_profile_(&profile_pool_, "ImpalaServer"),
-    summary_profile_(&profile_pool_, "Summary"),
+    // Profile is assigned name w/ id after planning
+    profile_(RuntimeProfile::Create(&profile_pool_, "Query")),
+    server_profile_(RuntimeProfile::Create(&profile_pool_, "ImpalaServer")),
+    summary_profile_(RuntimeProfile::Create(&profile_pool_, "Summary")),
     is_cancelled_(false),
     eos_(false),
     query_state_(beeswax::QueryState::CREATED),
@@ -88,38 +88,38 @@ ClientRequestState::ClientRequestState(
     fetched_rows_(false),
     frontend_(frontend),
     parent_server_(server),
-    start_time_(TimestampValue::LocalTime()) {
+    start_time_us_(UnixMicros()) {
 #ifndef NDEBUG
-  profile_.AddInfoString("DEBUG MODE WARNING", "Query profile created while running a "
+  profile_->AddInfoString("DEBUG MODE WARNING", "Query profile created while running a "
       "DEBUG build of Impala. Use RELEASE builds to measure query performance.");
 #endif
-  row_materialization_timer_ = ADD_TIMER(&server_profile_, "RowMaterializationTimer");
-  client_wait_timer_ = ADD_TIMER(&server_profile_, "ClientFetchWaitTimer");
-  query_events_ = summary_profile_.AddEventSequence("Query Timeline");
+  row_materialization_timer_ = ADD_TIMER(server_profile_, "RowMaterializationTimer");
+  client_wait_timer_ = ADD_TIMER(server_profile_, "ClientFetchWaitTimer");
+  query_events_ = summary_profile_->AddEventSequence("Query Timeline");
   query_events_->Start();
-  profile_.AddChild(&summary_profile_);
+  profile_->AddChild(summary_profile_);
 
-  profile_.set_name("Query (id=" + PrintId(query_id()) + ")");
-  summary_profile_.AddInfoString("Session ID", PrintId(session_id()));
-  summary_profile_.AddInfoString("Session Type", PrintTSessionType(session_type()));
+  profile_->set_name("Query (id=" + PrintId(query_id()) + ")");
+  summary_profile_->AddInfoString("Session ID", PrintId(session_id()));
+  summary_profile_->AddInfoString("Session Type", PrintTSessionType(session_type()));
   if (session_type() == TSessionType::HIVESERVER2) {
-    summary_profile_.AddInfoString("HiveServer2 Protocol Version",
+    summary_profile_->AddInfoString("HiveServer2 Protocol Version",
         Substitute("V$0", 1 + session->hs2_version));
   }
-  summary_profile_.AddInfoString("Start Time", start_time().ToString());
-  summary_profile_.AddInfoString("End Time", "");
-  summary_profile_.AddInfoString("Query Type", "N/A");
-  summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
-  summary_profile_.AddInfoString("Query Status", "OK");
-  summary_profile_.AddInfoString("Impala Version", GetVersionString(/* compact */ true));
-  summary_profile_.AddInfoString("User", effective_user());
-  summary_profile_.AddInfoString("Connected User", connected_user());
-  summary_profile_.AddInfoString("Delegated User", do_as_user());
-  summary_profile_.AddInfoString("Network Address",
+  summary_profile_->AddInfoString("Start Time", ToStringFromUnixMicros(start_time_us()));
+  summary_profile_->AddInfoString("End Time", "");
+  summary_profile_->AddInfoString("Query Type", "N/A");
+  summary_profile_->AddInfoString("Query State", PrintQueryState(query_state_));
+  summary_profile_->AddInfoString("Query Status", "OK");
+  summary_profile_->AddInfoString("Impala Version", GetVersionString(/* compact */ true));
+  summary_profile_->AddInfoString("User", effective_user());
+  summary_profile_->AddInfoString("Connected User", connected_user());
+  summary_profile_->AddInfoString("Delegated User", do_as_user());
+  summary_profile_->AddInfoString("Network Address",
       lexical_cast<string>(session_->network_address));
-  summary_profile_.AddInfoString("Default Db", default_db());
-  summary_profile_.AddInfoString("Sql Statement", query_ctx_.client_request.stmt);
-  summary_profile_.AddInfoString("Coordinator",
+  summary_profile_->AddInfoString("Default Db", default_db());
+  summary_profile_->AddInfoString("Sql Statement", query_ctx_.client_request.stmt);
+  summary_profile_->AddInfoString("Coordinator",
       TNetworkAddressToString(exec_env->backend_address()));
 }
 
@@ -145,9 +145,11 @@ Status ClientRequestState::Exec(TExecRequest* exec_request) {
   MarkActive();
   exec_request_ = *exec_request;
 
-  profile_.AddChild(&server_profile_);
-  summary_profile_.AddInfoString("Query Type", PrintTStmtType(stmt_type()));
-  summary_profile_.AddInfoString("Query Options (non default)",
+  profile_->AddChild(server_profile_);
+  summary_profile_->AddInfoString("Query Type", PrintTStmtType(stmt_type()));
+  summary_profile_->AddInfoString("Query Options (set by configuration)",
+      DebugQueryOptions(query_ctx_.client_request.query_options));
+  summary_profile_->AddInfoString("Query Options (set by configuration and planner)",
       DebugQueryOptions(exec_request_.query_options));
 
   switch (exec_request->stmt_type) {
@@ -181,7 +183,7 @@ Status ClientRequestState::Exec(TExecRequest* exec_request) {
       reset_req.reset_metadata_params.__set_table_name(
           exec_request_.load_data_request.table_name);
       catalog_op_executor_.reset(
-          new CatalogOpExecutor(exec_env_, frontend_, &server_profile_));
+          new CatalogOpExecutor(exec_env_, frontend_, server_profile_));
       RETURN_IF_ERROR(catalog_op_executor_->Exec(reset_req));
       RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(
           *catalog_op_executor_->update_catalog_result(),
@@ -197,14 +199,14 @@ Status ClientRequestState::Exec(TExecRequest* exec_request) {
         RETURN_IF_ERROR(SetQueryOption(
             exec_request_.set_query_option_request.key,
             exec_request_.set_query_option_request.value,
-            &session_->default_query_options,
+            &session_->set_query_options,
             &session_->set_query_options_mask));
         SetResultSet({}, {});
       } else {
         // "SET" returns a table of all query options.
         map<string, string> config;
         TQueryOptionsToMap(
-            session_->default_query_options, &config);
+            session_->QueryOptions(), &config);
         vector<string> keys, values;
         map<string, string>::const_iterator itr = config.begin();
         for (; itr != config.end(); ++itr) {
@@ -297,7 +299,7 @@ Status ClientRequestState::ExecLocalCatalogOp(
         // Verify the user has privileges to perform this operation by checking against
         // the Sentry Service (via the Catalog Server).
         catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_, frontend_,
-            &server_profile_));
+            server_profile_));
 
         TSentryAdminCheckRequest req;
         req.__set_header(TCatalogServiceRequestHeader());
@@ -318,7 +320,7 @@ Status ClientRequestState::ExecLocalCatalogOp(
         // Verify the user has privileges to perform this operation by checking against
         // the Sentry Service (via the Catalog Server).
         catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_, frontend_,
-            &server_profile_));
+            server_profile_));
 
         TSentryAdminCheckRequest req;
         req.__set_header(TCatalogServiceRequestHeader());
@@ -391,18 +393,13 @@ Status ClientRequestState::ExecQueryOrDmlRequest(
     plan_ss << "\n----------------\n"
             << query_exec_request.query_plan
             << "----------------";
-    summary_profile_.AddInfoString("Plan", plan_ss.str());
+    summary_profile_->AddInfoString("Plan", plan_ss.str());
   }
   // Add info strings consumed by CM: Estimated mem and tables missing stats.
   if (query_exec_request.__isset.per_host_mem_estimate) {
     stringstream ss;
     ss << query_exec_request.per_host_mem_estimate;
-    summary_profile_.AddInfoString(PER_HOST_MEM_KEY, ss.str());
-  }
-  if (query_exec_request.__isset.per_host_min_reservation) {
-    stringstream ss;
-    ss << query_exec_request.per_host_min_reservation;
-    summary_profile_.AddInfoString(PER_HOST_MEMORY_RESERVATION_KEY, ss.str());
+    summary_profile_->AddInfoString(PER_HOST_MEM_KEY, ss.str());
   }
   if (!query_exec_request.query_ctx.__isset.parent_query_id &&
       query_exec_request.query_ctx.__isset.tables_missing_stats &&
@@ -413,7 +410,7 @@ Status ClientRequestState::ExecQueryOrDmlRequest(
       if (i != 0) ss << ",";
       ss << tbls[i].db_name << "." << tbls[i].table_name;
     }
-    summary_profile_.AddInfoString(TABLES_MISSING_STATS_KEY, ss.str());
+    summary_profile_->AddInfoString(TABLES_MISSING_STATS_KEY, ss.str());
   }
 
   if (!query_exec_request.query_ctx.__isset.parent_query_id &&
@@ -426,7 +423,7 @@ Status ClientRequestState::ExecQueryOrDmlRequest(
       if (i != 0) ss << ",";
       ss << tbls[i].db_name << "." << tbls[i].table_name;
     }
-    summary_profile_.AddInfoString(TABLES_WITH_CORRUPT_STATS_KEY, ss.str());
+    summary_profile_->AddInfoString(TABLES_WITH_CORRUPT_STATS_KEY, ss.str());
   }
 
   if (query_exec_request.query_ctx.__isset.tables_missing_diskids &&
@@ -438,7 +435,7 @@ Status ClientRequestState::ExecQueryOrDmlRequest(
       if (i != 0) ss << ",";
       ss << tbls[i].db_name << "." << tbls[i].table_name;
     }
-    summary_profile_.AddInfoString(TABLES_WITH_MISSING_DISK_IDS_KEY, ss.str());
+    summary_profile_->AddInfoString(TABLES_WITH_MISSING_DISK_IDS_KEY, ss.str());
   }
 
   {
@@ -446,7 +443,7 @@ Status ClientRequestState::ExecQueryOrDmlRequest(
     // Don't start executing the query if Cancel() was called concurrently with Exec().
     if (is_cancelled_) return Status::CANCELLED;
     schedule_.reset(new QuerySchedule(query_id(), query_exec_request,
-        exec_request_.query_options, &summary_profile_, query_events_));
+        exec_request_.query_options, summary_profile_, query_events_));
   }
   Status status = exec_env_->scheduler()->Schedule(schedule_.get());
   {
@@ -469,14 +466,14 @@ Status ClientRequestState::ExecQueryOrDmlRequest(
     RETURN_IF_ERROR(UpdateQueryStatus(status));
   }
 
-  profile_.AddChild(coord_->query_profile());
+  profile_->AddChild(coord_->query_profile());
   return Status::OK();
 }
 
 Status ClientRequestState::ExecDdlRequest() {
   string op_type = catalog_op_type() == TCatalogOpType::DDL ?
       PrintTDdlType(ddl_type()) : PrintTCatalogOpType(catalog_op_type());
-  summary_profile_.AddInfoString("DDL Type", op_type);
+  summary_profile_->AddInfoString("DDL Type", op_type);
 
   if (catalog_op_type() != TCatalogOpType::DDL &&
       catalog_op_type() != TCatalogOpType::RESET_METADATA) {
@@ -499,12 +496,14 @@ Status ClientRequestState::ExecDdlRequest() {
           ChildQuery(compute_stats_params.col_stats_query, this, parent_server_));
     }
 
-    if (child_queries.size() > 0) child_query_executor_->ExecAsync(move(child_queries));
+    if (child_queries.size() > 0) {
+      RETURN_IF_ERROR(child_query_executor_->ExecAsync(move(child_queries)));
+    }
     return Status::OK();
   }
 
   catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_, frontend_,
-      &server_profile_));
+      server_profile_));
   Status status = catalog_op_executor_->Exec(exec_request_.catalog_op_request);
   {
     lock_guard<mutex> l(lock_);
@@ -565,8 +564,8 @@ void ClientRequestState::Done() {
   }
 
   unique_lock<mutex> l(lock_);
-  end_time_ = TimestampValue::LocalTime();
-  summary_profile_.AddInfoString("End Time", end_time().ToString());
+  end_time_us_ = UnixMicros();
+  summary_profile_->AddInfoString("End Time", ToStringFromUnixMicros(end_time_us()));
   query_events_->MarkEvent("Unregister query");
 
   // Update result set cache metrics, and update mem limit accounting before tearing
@@ -588,7 +587,7 @@ void ClientRequestState::Done() {
 Status ClientRequestState::Exec(const TMetadataOpRequest& exec_request) {
   TResultSet metadata_op_result;
   // Like the other Exec(), fill out as much profile information as we're able to.
-  summary_profile_.AddInfoString("Query Type", PrintTStmtType(TStmtType::DDL));
+  summary_profile_->AddInfoString("Query Type", PrintTStmtType(TStmtType::DDL));
   RETURN_IF_ERROR(frontend_->ExecHiveServer2MetadataOp(exec_request,
       &metadata_op_result));
   result_metadata_ = metadata_op_result.schema;
@@ -596,9 +595,9 @@ Status ClientRequestState::Exec(const TMetadataOpRequest& exec_request) {
   return Status::OK();
 }
 
-void ClientRequestState::WaitAsync() {
-  wait_thread_.reset(new Thread(
-      "query-exec-state", "wait-thread", &ClientRequestState::Wait, this));
+Status ClientRequestState::WaitAsync() {
+  return Thread::Create("query-exec-state", "wait-thread",
+      &ClientRequestState::Wait, this, &wait_thread_, true);
 }
 
 void ClientRequestState::BlockOnWait() {
@@ -633,7 +632,7 @@ void ClientRequestState::Wait() {
     } else {
       query_events()->MarkEvent("Request finished");
     }
-    (void) UpdateQueryStatus(status);
+    discard_result(UpdateQueryStatus(status));
   }
   if (status.ok()) {
     UpdateNonErrorQueryState(beeswax::QueryState::FINISHED);
@@ -687,7 +686,7 @@ Status ClientRequestState::FetchRows(const int32_t max_rows,
   MarkActive();
 
   // ImpalaServer::FetchInternal has already taken our lock_
-  (void) UpdateQueryStatus(FetchRowsInternal(max_rows, fetched_rows));
+  discard_result(UpdateQueryStatus(FetchRowsInternal(max_rows, fetched_rows)));
 
   MarkInactive();
   return query_status_;
@@ -724,7 +723,7 @@ Status ClientRequestState::UpdateQueryStatus(const Status& status) {
   if (!status.ok() && query_status_.ok()) {
     UpdateQueryState(beeswax::QueryState::EXCEPTION);
     query_status_ = status;
-    summary_profile_.AddInfoString("Query Status", query_status_.GetDetail());
+    summary_profile_->AddInfoString("Query Status", query_status_.GetDetail());
   }
 
   return status;
@@ -743,7 +742,7 @@ Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
     // max_rows <= 0 means no limit
     while ((num_rows < max_rows || max_rows <= 0)
         && num_rows_fetched_ < all_rows.size()) {
-      fetched_rows->AddOneRow(all_rows[num_rows_fetched_]);
+      RETURN_IF_ERROR(fetched_rows->AddOneRow(all_rows[num_rows_fetched_]));
       ++num_rows_fetched_;
       ++num_rows;
     }
@@ -825,8 +824,7 @@ Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
     // Count the cached rows towards the mem limit.
     if (UNLIKELY(!query_mem_tracker->TryConsume(delta_bytes))) {
       string details("Failed to allocate memory for result cache.");
-      return query_mem_tracker->MemLimitExceeded(coord_->runtime_state(), details,
-          delta_bytes);
+      return query_mem_tracker->MemLimitExceeded(nullptr, details, delta_bytes);
     }
     // Append all rows fetched from the coordinator into the cache.
     int num_rows_added = result_cache_->AddRows(
@@ -873,7 +871,7 @@ Status ClientRequestState::Cancel(bool check_inflight, const Status* cause) {
     bool already_done = eos_ || query_state_ == beeswax::QueryState::EXCEPTION;
     if (!already_done && cause != NULL) {
       DCHECK(!cause->ok());
-      (void) UpdateQueryStatus(*cause);
+      discard_result(UpdateQueryStatus(*cause));
       query_events_->MarkEvent("Cancelled");
       DCHECK_EQ(query_state_, beeswax::QueryState::EXCEPTION);
     }
@@ -900,7 +898,7 @@ Status ClientRequestState::UpdateCatalog() {
   }
 
   query_events_->MarkEvent("DML data written");
-  SCOPED_TIMER(ADD_TIMER(&server_profile_, "MetastoreUpdateTimer"));
+  SCOPED_TIMER(ADD_TIMER(server_profile_, "MetastoreUpdateTimer"));
 
   TQueryExecRequest query_exec_request = exec_request().query_exec_request;
   if (query_exec_request.__isset.finalize_params) {
@@ -1033,7 +1031,7 @@ Status ClientRequestState::UpdateTableAndColumnStats(
   DCHECK_GE(child_queries.size(), 1);
   DCHECK_LE(child_queries.size(), 2);
   catalog_op_executor_.reset(
-      new CatalogOpExecutor(exec_env_, frontend_, &server_profile_));
+      new CatalogOpExecutor(exec_env_, frontend_, server_profile_));
 
   // If there was no column stats query, pass in empty thrift structures to
   // ExecComputeStats(). Otherwise pass in the column stats result.
@@ -1080,7 +1078,7 @@ void ClientRequestState::ClearResultCache() {
 void ClientRequestState::UpdateQueryState(
     beeswax::QueryState::type query_state) {
   query_state_ = query_state;
-  summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
+  summary_profile_->AddInfoString("Query State", PrintQueryState(query_state_));
 }
 
 }

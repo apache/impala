@@ -28,6 +28,7 @@
 
 #include "common/status.h"
 #include "common/object-pool.h"
+#include "runtime/data-stream-mgr-base.h"
 #include "runtime/descriptors.h"  // for PlanNodeId
 #include "util/metrics.h"
 #include "util/promise.h"
@@ -63,9 +64,10 @@ class TRowBatch;
 ///
 /// TODO: The recv buffers used in DataStreamRecvr should count against
 /// per-query memory limits.
-class DataStreamMgr {
+class DataStreamMgr : public DataStreamMgrBase {
  public:
   DataStreamMgr(MetricGroup* metrics);
+  virtual ~DataStreamMgr() override;
 
   /// Create a receiver for a specific fragment_instance_id/node_id destination;
   /// If is_merging is true, the receiver maintains a separate queue of incoming row
@@ -73,10 +75,10 @@ class DataStreamMgr {
   /// single stream.
   /// Ownership of the receiver is shared between this DataStream mgr instance and the
   /// caller.
-  std::shared_ptr<DataStreamRecvr> CreateRecvr(RuntimeState* state,
+  std::shared_ptr<DataStreamRecvrBase> CreateRecvr(RuntimeState* state,
       const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
-      PlanNodeId dest_node_id, int num_senders, int buffer_size, RuntimeProfile* profile,
-      bool is_merging);
+      PlanNodeId dest_node_id, int num_senders, int64_t buffer_size,
+      RuntimeProfile* profile, bool is_merging) override;
 
   /// Adds a row batch to the recvr identified by fragment_instance_id/dest_node_id
   /// if the recvr has not been cancelled. sender_id identifies the sender instance
@@ -94,10 +96,10 @@ class DataStreamMgr {
   /// sender has closed.
   /// Returns OK if successful, error status otherwise.
   Status CloseSender(const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id,
-      int sender_id);
+      int sender_id) override;
 
   /// Closes all receivers registered for fragment_instance_id immediately.
-  void Cancel(const TUniqueId& fragment_instance_id);
+  void Cancel(const TUniqueId& fragment_instance_id) override;
 
  private:
   friend class DataStreamRecvr;

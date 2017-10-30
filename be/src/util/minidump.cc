@@ -44,6 +44,7 @@ using boost::filesystem::path;
 using boost::filesystem::remove;
 
 DECLARE_string(log_dir);
+DECLARE_bool(enable_minidumps);
 DECLARE_string(minidump_path);
 DECLARE_int32(max_minidumps);
 DECLARE_int32(minidump_size_limit_hint_kb);
@@ -100,19 +101,22 @@ static void HandleSignal(int signal) {
   minidump_exception_handler->WriteMinidump(FLAGS_minidump_path, DumpCallback, NULL);
 }
 
-/// Register our signal handler to write minidumps on SIGUSR1.
-static void SetupSignalHandler() {
-  DCHECK(minidump_exception_handler != NULL);
+/// Register our signal handler to write minidumps on SIGUSR1. Will make us ignore the
+/// signal if 'minidumps_enabled' is false.
+static void SetupSigUSR1Handler(bool minidumps_enabled) {
   struct sigaction sig_action;
   memset(&sig_action, 0, sizeof(sig_action));
   sigemptyset(&sig_action.sa_mask);
-  sig_action.sa_handler = &HandleSignal;
+  if (minidumps_enabled) {
+    DCHECK(minidump_exception_handler != NULL);
+    sig_action.sa_handler = &HandleSignal;
+  } else {
+    sig_action.sa_handler = SIG_IGN;
+  }
   sigaction(SIGUSR1, &sig_action, NULL);
 }
 
-/// Check the number of minidump files and removes the oldest ones to maintain an upper
-/// bound on the number of files.
-static void CheckAndRemoveMinidumps(int max_minidumps) {
+void CheckAndRotateMinidumps(int max_minidumps) {
   // Disable rotation if 0 or wrong input
   if (max_minidumps <= 0) return;
 
@@ -193,7 +197,10 @@ Status RegisterMinidump(const char* cmd_line_path) {
   DCHECK(!registered);
   registered = true;
 
-  if (FLAGS_minidump_path.empty()) return Status::OK();
+  if (!FLAGS_enable_minidumps || FLAGS_minidump_path.empty()) {
+    SetupSigUSR1Handler(false);
+    return Status::OK();
+  }
 
   if (path(FLAGS_minidump_path).is_relative()) {
     path log_dir(FLAGS_log_dir);
@@ -216,11 +223,6 @@ Status RegisterMinidump(const char* cmd_line_path) {
     return Status(ss.str());
   }
 
-  // Rotate old minidump files. We only need to do this on startup (in contrast to
-  // periodically) because only process crashes will trigger the creation of new minidump
-  // files.
-  CheckAndRemoveMinidumps(FLAGS_max_minidumps);
-
   google_breakpad::MinidumpDescriptor desc(FLAGS_minidump_path.c_str());
 
   // Limit filesize if configured.
@@ -236,7 +238,7 @@ Status RegisterMinidump(const char* cmd_line_path) {
       desc, FilterCallback, DumpCallback, NULL, true, -1);
 
   // Setup signal handler for SIGUSR1.
-  SetupSignalHandler();
+  SetupSigUSR1Handler(true);
 
   return Status::OK();
 }

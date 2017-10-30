@@ -219,7 +219,7 @@ class AdmissionController {
   MetricGroup* metrics_group_;
 
   /// Thread dequeuing and admitting queries.
-  boost::scoped_ptr<Thread> dequeue_thread_;
+  std::unique_ptr<Thread> dequeue_thread_;
 
   // The local impalad's host/port id, used to construct topic keys.
   const std::string host_id_;
@@ -426,12 +426,9 @@ class AdmissionController {
   void AddPoolUpdates(std::vector<TTopicDelta>* subscriber_topic_updates);
 
   /// Updates the remote stats with per-host topic_updates coming from the statestore.
-  /// Called by UpdatePoolStats(). Must hold admission_ctrl_lock_.
+  /// Removes remote stats identified by topic deletions coming from the
+  /// statestore. Called by UpdatePoolStats(). Must hold admission_ctrl_lock_.
   void HandleTopicUpdates(const std::vector<TTopicItem>& topic_updates);
-
-  /// Removes remote stats identified by the topic_deletions coming from the statestore.
-  /// Called by UpdatePoolStats(). Must hold admission_ctrl_lock_.
-  void HandleTopicDeletions(const std::vector<std::string>& topic_deletions);
 
   /// Re-computes the per-pool aggregate stats and the per-host aggregates in
   /// host_mem_reserved_ using each pool's remote_stats_ and local_stats_.
@@ -460,10 +457,12 @@ class AdmissionController {
   /// admission_ctrl_lock_.
   void UpdateHostMemAdmitted(const QuerySchedule& schedule, int64_t per_node_mem);
 
-  /// Returns an error status if this request must be rejected immediately, e.g. requires
-  /// more memory than possible to reserve or the queue is already full.
+  /// Returns true if this request must be rejected immediately, e.g. requires more
+  /// memory than possible to reserve or the queue is already full. If true,
+  /// rejection_reason is set to a explanation of why the request was rejected.
   /// Must hold admission_ctrl_lock_.
-  Status RejectImmediately(QuerySchedule* schedule, const TPoolConfig& pool_cfg);
+  bool RejectImmediately(QuerySchedule* schedule, const TPoolConfig& pool_cfg,
+      std::string* rejection_reason);
 
   /// Gets or creates the PoolStats for pool_name. Must hold admission_ctrl_lock_.
   PoolStats* GetPoolStats(const std::string& pool_name);

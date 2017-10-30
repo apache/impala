@@ -32,12 +32,14 @@ namespace impala {
 DEFINE_int32(periodic_counter_update_period_ms, 500, "Period to update rate counters and"
     " sampling counters in ms");
 
-PeriodicCounterUpdater PeriodicCounterUpdater::state_;
+PeriodicCounterUpdater* PeriodicCounterUpdater::instance_ = nullptr;
 
-PeriodicCounterUpdater::PeriodicCounterUpdater() {
-  DCHECK_EQ(this, &state_);
-  state_.update_thread_.reset(
-      new thread(&PeriodicCounterUpdater::UpdateLoop, this));
+void PeriodicCounterUpdater::Init() {
+  DCHECK(instance_ == nullptr);
+  // Create the singleton, which will live until the process terminates.
+  instance_ = new PeriodicCounterUpdater;
+  instance_->update_thread_.reset(
+      new thread(&PeriodicCounterUpdater::UpdateLoop, instance_));
 }
 
 void PeriodicCounterUpdater::RegisterPeriodicCounter(
@@ -52,8 +54,8 @@ void PeriodicCounterUpdater::RegisterPeriodicCounter(
       counter.src_counter = src_counter;
       counter.sample_fn = sample_fn;
       counter.elapsed_ms = 0;
-      lock_guard<SpinLock> ratelock(state_.rate_lock_);
-      state_.rate_counters_[dst_counter] = counter;
+      lock_guard<SpinLock> ratelock(instance_->rate_lock_);
+      instance_->rate_counters_[dst_counter] = counter;
       break;
     }
     case SAMPLING_COUNTER: {
@@ -62,8 +64,8 @@ void PeriodicCounterUpdater::RegisterPeriodicCounter(
       counter.sample_fn = sample_fn;
       counter.num_sampled = 0;
       counter.total_sampled_value = 0;
-      lock_guard<SpinLock> samplinglock(state_.sampling_lock_);
-      state_.sampling_counters_[dst_counter] = counter;
+      lock_guard<SpinLock> samplinglock(instance_->sampling_lock_);
+      instance_->sampling_counters_[dst_counter] = counter;
       break;
     }
     default:
@@ -72,13 +74,13 @@ void PeriodicCounterUpdater::RegisterPeriodicCounter(
 }
 
 void PeriodicCounterUpdater::StopRateCounter(RuntimeProfile::Counter* counter) {
-  lock_guard<SpinLock> ratelock(state_.rate_lock_);
-  state_.rate_counters_.erase(counter);
+  lock_guard<SpinLock> ratelock(instance_->rate_lock_);
+  instance_->rate_counters_.erase(counter);
 }
 
 void PeriodicCounterUpdater::StopSamplingCounter(RuntimeProfile::Counter* counter) {
-  lock_guard<SpinLock> samplinglock(state_.sampling_lock_);
-  state_.sampling_counters_.erase(counter);
+  lock_guard<SpinLock> samplinglock(instance_->sampling_lock_);
+  instance_->sampling_counters_.erase(counter);
 }
 
 void PeriodicCounterUpdater::RegisterBucketingCounters(
@@ -86,26 +88,25 @@ void PeriodicCounterUpdater::RegisterBucketingCounters(
   BucketCountersInfo info;
   info.src_counter = src_counter;
   info.num_sampled = 0;
-  lock_guard<SpinLock> bucketinglock(state_.bucketing_lock_);
-  state_.bucketing_counters_[buckets] = info;
+  lock_guard<SpinLock> bucketinglock(instance_->bucketing_lock_);
+  instance_->bucketing_counters_[buckets] = info;
 }
 
 void PeriodicCounterUpdater::StopBucketingCounters(
-    vector<RuntimeProfile::Counter*>* buckets, bool convert) {
+    vector<RuntimeProfile::Counter*>* buckets) {
   int64_t num_sampled = 0;
   {
-    lock_guard<SpinLock> bucketinglock(state_.bucketing_lock_);
+    lock_guard<SpinLock> bucketinglock(instance_->bucketing_lock_);
     BucketCountersMap::iterator itr =
-        state_.bucketing_counters_.find(buckets);
-    if (itr != state_.bucketing_counters_.end()) {
-      num_sampled = itr->second.num_sampled;
-      state_.bucketing_counters_.erase(itr);
-    }
+        instance_->bucketing_counters_.find(buckets);
+    // If not registered, we have nothing to do.
+    if (itr == instance_->bucketing_counters_.end()) return;
+    num_sampled = itr->second.num_sampled;
+    instance_->bucketing_counters_.erase(itr);
   }
 
-  if (convert && num_sampled > 0) {
-    for (int i = 0; i < buckets->size(); ++i) {
-      RuntimeProfile::Counter* counter = (*buckets)[i];
+  if (num_sampled > 0) {
+    for (RuntimeProfile::Counter* counter : *buckets) {
       double perc = 100 * counter->value() / (double)num_sampled;
       counter->Set(perc);
     }
@@ -114,14 +115,14 @@ void PeriodicCounterUpdater::StopBucketingCounters(
 
 void PeriodicCounterUpdater::RegisterTimeSeriesCounter(
     RuntimeProfile::TimeSeriesCounter* counter) {
-  lock_guard<SpinLock> timeserieslock(state_.time_series_lock_);
-  state_.time_series_counters_.insert(counter);
+  lock_guard<SpinLock> timeserieslock(instance_->time_series_lock_);
+  instance_->time_series_counters_.insert(counter);
 }
 
 void PeriodicCounterUpdater::StopTimeSeriesCounter(
     RuntimeProfile::TimeSeriesCounter* counter) {
-  lock_guard<SpinLock> timeserieslock(state_.time_series_lock_);
-  state_.time_series_counters_.erase(counter);
+  lock_guard<SpinLock> timeserieslock(instance_->time_series_lock_);
+  instance_->time_series_counters_.erase(counter);
 }
 
 void PeriodicCounterUpdater::UpdateLoop() {
@@ -132,7 +133,7 @@ void PeriodicCounterUpdater::UpdateLoop() {
     int elapsed_ms = elapsed.total_milliseconds();
 
     {
-      lock_guard<SpinLock> ratelock(state_.rate_lock_);
+      lock_guard<SpinLock> ratelock(instance_->rate_lock_);
       for (RateCounterMap::iterator it = rate_counters_.begin();
            it != rate_counters_.end(); ++it) {
         it->second.elapsed_ms += elapsed_ms;
@@ -149,7 +150,7 @@ void PeriodicCounterUpdater::UpdateLoop() {
     }
 
     {
-      lock_guard<SpinLock> samplinglock(state_.sampling_lock_);
+      lock_guard<SpinLock> samplinglock(instance_->sampling_lock_);
       for (SamplingCounterMap::iterator it = sampling_counters_.begin();
            it != sampling_counters_.end(); ++it) {
         ++it->second.num_sampled;
@@ -168,7 +169,7 @@ void PeriodicCounterUpdater::UpdateLoop() {
     }
 
     {
-      lock_guard<SpinLock> bucketinglock(state_.bucketing_lock_);
+      lock_guard<SpinLock> bucketinglock(instance_->bucketing_lock_);
       for (BucketCountersMap::iterator it = bucketing_counters_.begin();
            it != bucketing_counters_.end(); ++it) {
         int64_t val = it->second.src_counter->value();
@@ -179,7 +180,7 @@ void PeriodicCounterUpdater::UpdateLoop() {
     }
 
     {
-      lock_guard<SpinLock> timeserieslock(state_.time_series_lock_);
+      lock_guard<SpinLock> timeserieslock(instance_->time_series_lock_);
       for (TimeSeriesCounters::iterator it = time_series_counters_.begin();
            it != time_series_counters_.end(); ++it) {
         (*it)->AddSample(elapsed_ms);

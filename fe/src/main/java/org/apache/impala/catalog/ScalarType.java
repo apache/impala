@@ -39,7 +39,8 @@ import com.google.common.base.Preconditions;
 public class ScalarType extends Type {
   private final PrimitiveType type_;
 
-  // Only used for type CHAR.
+  // Used for fixed-length types parameterized by size, i.e. CHAR, VARCHAR and
+  // FIXED_UDA_INTERMEDIATE.
   private int len_;
 
   // Only used if type is DECIMAL. -1 (for both) is used to represent a
@@ -94,6 +95,12 @@ public class ScalarType extends Type {
 
   public static ScalarType createCharType(int len) {
     ScalarType type = new ScalarType(PrimitiveType.CHAR);
+    type.len_ = len;
+    return type;
+  }
+
+  public static ScalarType createFixedUdaIntermediateType(int len) {
+    ScalarType type = new ScalarType(PrimitiveType.FIXED_UDA_INTERMEDIATE);
     type.len_ = len;
     return type;
   }
@@ -182,6 +189,8 @@ public class ScalarType extends Type {
     } else if (type_ == PrimitiveType.VARCHAR) {
       if (isWildcardVarchar()) return "VARCHAR(*)";
       return "VARCHAR(" + len_ + ")";
+    } else if (type_ == PrimitiveType.FIXED_UDA_INTERMEDIATE) {
+      return "FIXED_UDA_INTERMEDIATE(" + len_ + ")";
     }
     return type_.toString();
   }
@@ -193,6 +202,7 @@ public class ScalarType extends Type {
       case BINARY: return type_.toString();
       case VARCHAR:
       case CHAR:
+      case FIXED_UDA_INTERMEDIATE:
          return type_.toString() + "(" + len_ + ")";
       case DECIMAL:
         return String.format("%s(%s,%s)", type_.toString(), precision_, scale_);
@@ -211,7 +221,8 @@ public class ScalarType extends Type {
     container.types.add(node);
     switch(type_) {
       case VARCHAR:
-      case CHAR: {
+      case CHAR:
+      case FIXED_UDA_INTERMEDIATE: {
         node.setType(TTypeNodeType.SCALAR);
         TScalarType scalarType = new TScalarType();
         scalarType.setType(type_.toThrift());
@@ -287,7 +298,8 @@ public class ScalarType extends Type {
         || type_ == PrimitiveType.BIGINT || type_ == PrimitiveType.FLOAT
         || type_ == PrimitiveType.DOUBLE || type_ == PrimitiveType.DATE
         || type_ == PrimitiveType.DATETIME || type_ == PrimitiveType.TIMESTAMP
-        || type_ == PrimitiveType.CHAR || type_ == PrimitiveType.DECIMAL;
+        || type_ == PrimitiveType.CHAR || type_ == PrimitiveType.DECIMAL
+        || type_ == PrimitiveType.FIXED_UDA_INTERMEDIATE;
   }
 
   @Override
@@ -307,6 +319,7 @@ public class ScalarType extends Type {
   public int getSlotSize() {
     switch (type_) {
       case CHAR:
+      case FIXED_UDA_INTERMEDIATE:
         return len_;
       case DECIMAL: return TypesUtil.getDecimalSlotSize(this);
       default:
@@ -344,7 +357,9 @@ public class ScalarType extends Type {
     if (!(o instanceof ScalarType)) return false;
     ScalarType other = (ScalarType)o;
     if (type_ != other.type_) return false;
-    if (type_ == PrimitiveType.CHAR) return len_ == other.len_;
+    if (type_ == PrimitiveType.CHAR || type_ == PrimitiveType.FIXED_UDA_INTERMEDIATE) {
+      return len_ == other.len_;
+    }
     if (type_ == PrimitiveType.VARCHAR) return len_ == other.len_;
     if (type_ == PrimitiveType.DECIMAL) {
       return precision_ == other.precision_ && scale_ == other.scale_;

@@ -43,7 +43,6 @@ MemPool::MemPool(MemTracker* mem_tracker)
   : current_chunk_idx_(-1),
     next_chunk_size_(INITIAL_CHUNK_SIZE),
     total_allocated_bytes_(0),
-    peak_allocated_bytes_(0),
     total_reserved_bytes_(0),
     mem_tracker_(mem_tracker) {
   DCHECK(mem_tracker != NULL);
@@ -75,9 +74,9 @@ MemPool::~MemPool() {
 
 void MemPool::Clear() {
   current_chunk_idx_ = -1;
-  for (std::vector<ChunkInfo>::iterator chunk = chunks_.begin();
-       chunk != chunks_.end(); ++chunk) {
-    chunk->allocated_bytes = 0;
+  for (auto& chunk: chunks_) {
+    chunk.allocated_bytes = 0;
+    ASAN_POISON_MEMORY_REGION(chunk.data, chunk.size);
   }
   total_allocated_bytes_ = 0;
   DCHECK(CheckIntegrity(false));
@@ -85,9 +84,9 @@ void MemPool::Clear() {
 
 void MemPool::FreeAll() {
   int64_t total_bytes_released = 0;
-  for (size_t i = 0; i < chunks_.size(); ++i) {
-    total_bytes_released += chunks_[i].size;
-    free(chunks_[i].data);
+  for (auto& chunk: chunks_) {
+    total_bytes_released += chunk.size;
+    free(chunk.data);
   }
   chunks_.clear();
   next_chunk_size_ = INITIAL_CHUNK_SIZE;
@@ -152,6 +151,8 @@ bool MemPool::FindChunk(int64_t min_size, bool check_limits) noexcept {
     return false;
   }
 
+  ASAN_POISON_MEMORY_REGION(buf, chunk_size);
+
   // Put it before the first free chunk. If no free chunks, it goes at the end.
   if (first_free_idx == static_cast<int>(chunks_.size())) {
     chunks_.push_back(ChunkInfo(chunk_size, buf));
@@ -215,7 +216,6 @@ void MemPool::AcquireData(MemPool* src, bool keep_current) {
     total_allocated_bytes_ += src->total_allocated_bytes_;
     src->total_allocated_bytes_ = 0;
   }
-  peak_allocated_bytes_ = std::max(total_allocated_bytes_, peak_allocated_bytes_);
 
   if (!keep_current) src->FreeAll();
   DCHECK(src->CheckIntegrity(false));

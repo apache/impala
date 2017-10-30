@@ -129,16 +129,12 @@ class MemTracker;
 /// To have multiple reading threads, the caller would simply spin up the threads
 /// and each would process the loops above.
 //
-/// To control the number of IO buffers, each scan range has a soft max capacity for
-/// the number of queued buffers. If the number of buffers is at capacity, the IoMgr
-/// will no longer read for that scan range until the caller has processed a buffer.
-/// This capacity does not need to be fixed, and the caller can dynamically adjust
-/// it if necessary.
-//
-/// As an example: If we allowed 5 buffers per range on a 24 core, 72 thread
-/// (we default to allowing 3x threads) machine, we should see at most
-/// 72 * 5 * 8MB = 2.8GB in io buffers memory usage. This should remain roughly constant
-/// regardless of how many concurrent readers are running.
+/// To control the number of IO buffers, each scan range has a limit of two queued
+/// buffers (SCAN_RANGE_READY_BUFFER_LIMIT). If the number of buffers is at capacity,
+/// the IoMgr will no longer read for that scan range until the caller has processed
+/// a buffer. Assuming the client returns each buffer before requesting the next one
+/// from the scan range, then this will consume up to 3 * 8MB = 24MB of I/O buffers per
+/// scan range.
 //
 /// Buffer Management:
 /// Buffers for reads are either a) allocated by the IoMgr and transferred to the caller,
@@ -382,8 +378,7 @@ class DiskIoMgr : public CacheLineAligned {
   /// the IoMgr.
   class ScanRange : public RequestRange {
    public:
-    /// The initial queue capacity for this.  Specify -1 to use IoMgr default.
-    ScanRange(int initial_capacity = -1);
+    ScanRange();
 
     virtual ~ScanRange();
 
@@ -401,7 +396,6 @@ class DiskIoMgr : public CacheLineAligned {
     void* meta_data() const { return meta_data_; }
     bool try_cache() const { return try_cache_; }
     bool expected_local() const { return expected_local_; }
-    int ready_buffers_capacity() const { return ready_buffers_capacity_; }
 
     /// Returns the next buffer for this scan range. buffer is an output parameter.
     /// This function blocks until a buffer is ready or an error occurred. If this is
@@ -431,8 +425,10 @@ class DiskIoMgr : public CacheLineAligned {
     /// Enqueues a buffer for this range. This does not block.
     /// Returns true if this scan range has hit the queue capacity, false otherwise.
     /// The caller passes ownership of buffer to the scan range and it is not
-    /// valid to access buffer after this call.
-    bool EnqueueBuffer(std::unique_ptr<BufferDescriptor> buffer);
+    /// valid to access buffer after this call. The reader lock must be held by the
+    /// caller.
+    bool EnqueueBuffer(const boost::unique_lock<boost::mutex>& reader_lock,
+        std::unique_ptr<BufferDescriptor> buffer);
 
     /// Cleanup any queued buffers (i.e. due to cancellation). This cannot
     /// be called with any locks taken.
@@ -475,7 +471,9 @@ class DiskIoMgr : public CacheLineAligned {
     /// and *read_succeeded to true.
     /// If the data is not cached, returns ok() and *read_succeeded is set to false.
     /// Returns a non-ok status if it ran into a non-continuable error.
-    Status ReadFromCache(bool* read_succeeded) WARN_UNUSED_RESULT;
+    ///  The reader lock must be held by the caller.
+    Status ReadFromCache(const boost::unique_lock<boost::mutex>& reader_lock,
+        bool* read_succeeded) WARN_UNUSED_RESULT;
 
     /// Pointer to caller specified metadata. This is untouched by the io manager
     /// and the caller can put whatever auxiliary data in here.
@@ -540,7 +538,9 @@ class DiskIoMgr : public CacheLineAligned {
     };
 
     /// Lock protecting fields below.
-    /// This lock should not be taken during Open/Read/Close.
+    /// This lock should not be taken during Open()/Read()/Close().
+    /// If DiskIoRequestContext::lock_ and this lock need to be held simultaneously,
+    /// DiskIoRequestContext::lock_ must be taken first.
     boost::mutex lock_;
 
     /// Number of bytes read so far for this scan range
@@ -565,12 +565,6 @@ class DiskIoMgr : public CacheLineAligned {
     /// Condition variable for GetNext
     boost::condition_variable buffer_ready_cv_;
     std::deque<std::unique_ptr<BufferDescriptor>> ready_buffers_;
-
-    /// The soft capacity limit for ready_buffers_. ready_buffers_ can exceed
-    /// the limit temporarily as the capacity is adjusted dynamically.
-    /// In that case, the capcity is only realized when the caller removes buffers
-    /// from ready_buffers_.
-    int ready_buffers_capacity_;
 
     /// Lock that should be taken during hdfs calls. Only one thread (the disk reading
     /// thread) calls into hdfs at a time so this lock does not have performance impact.
@@ -799,9 +793,24 @@ class DiskIoMgr : public CacheLineAligned {
   /// 'bytes_to_free' is -1.
   void GcIoBuffers(int64_t bytes_to_free = -1);
 
-  /// Default ready buffer queue capacity. This constant doesn't matter too much
-  /// since the system dynamically adjusts.
-  static const int DEFAULT_QUEUE_CAPACITY;
+  /// The maximum number of ready buffers that can be queued in a scan range. Having two
+  /// queued buffers (plus the buffer that is returned to the client) gives good
+  /// performance in most scenarios:
+  /// 1. If the consumer is consuming data faster than we can read from disk, then the
+  ///    queue will be empty most of the time because the buffer will be immediately
+  ///    pulled off the queue as soon as it is added. There will always be an I/O request
+  ///    in the disk queue to maximize I/O throughput, which is the bottleneck in this
+  ///    case.
+  /// 2. If we can read from disk faster than the consumer is consuming data, the queue
+  ///    will fill up and there will always be a buffer available for the consumer to
+  ///    read, so the consumer will not block and we maximize consumer throughput, which
+  ///    is the bottleneck in this case.
+  /// 3. If the consumer is consuming data at approximately the same rate as we are
+  ///    reading from disk, then the steady state is that the consumer is processing one
+  ///    buffer and one buffer is in the disk queue. The additional buffer can absorb
+  ///    bursts where the producer runs faster than the consumer or the consumer runs
+  ///    faster than the producer without blocking either the producer or consumer.
+  static const int SCAN_RANGE_READY_BUFFER_LIMIT = 2;
 
   /// "Disk" queue offsets for remote accesses.  Offset 0 corresponds to
   /// disk ID (i.e. disk_queue_ index) of num_local_disks().

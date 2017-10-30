@@ -181,6 +181,10 @@ public class KuduCatalogOpExecutor {
       if (!hasRangePartitioning) {
         tableOpts.setRangePartitionColumns(Collections.<String>emptyList());
       }
+    } else {
+      // This table is unpartitioned, which Kudu represents as a table range partitioned
+      // on no columns.
+      tableOpts.setRangePartitionColumns(Collections.<String>emptyList());
     }
 
     // Set the number of table replicas, if specified.

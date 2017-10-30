@@ -29,7 +29,6 @@ import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.common.InternalException;
-import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
@@ -255,7 +254,7 @@ public class SortNode extends PlanNode {
     if (type_ == TSortType.TOPN) {
       long perInstanceMemEstimate =
               (long) Math.ceil((cardinality_ + offset_) * avgRowSize_);
-      nodeResourceProfile_ = new ResourceProfile(perInstanceMemEstimate, 0);
+      nodeResourceProfile_ = ResourceProfile.noReservation(perInstanceMemEstimate);
       return;
     }
 
@@ -265,44 +264,44 @@ public class SortNode extends PlanNode {
     // size sqrt(N) blocks, and we could merge sqrt(N) such runs with sqrt(N) blocks
     // of memory.
     double fullInputSize = getChild(0).cardinality_ * avgRowSize_;
-    boolean hasVarLenSlots = false;
+    boolean usesVarLenBlocks = false;
     for (SlotDescriptor slotDesc: info_.getSortTupleDescriptor().getSlots()) {
       if (slotDesc.isMaterialized() && !slotDesc.getType().isFixedLengthType()) {
-        hasVarLenSlots = true;
+        usesVarLenBlocks = true;
         break;
       }
     }
 
-    // The block size used by the sorter is the same as the configured I/O read size.
-    long blockSize = BackendConfig.INSTANCE.getReadSize();
-    // The external sorter writes fixed-len and var-len data in separate sequences of
-    // blocks on disk and reads from both sequences when merging. This effectively
-    // doubles the block size when there are var-len columns present.
-    if (hasVarLenSlots) blockSize *= 2;
+    // Sort uses a single buffer size - either the default spillable buffer size or the
+    // smallest buffer size required to fit the maximum row size.
+    long bufferSize = computeMaxSpillableBufferSize(
+        queryOptions.getDefault_spillable_buffer_size(), queryOptions.getMax_row_size());
 
+    // The external sorter writes fixed-len and var-len data in separate sequences of
+    // pages on disk and reads from both sequences when merging. This effectively
+    // doubles the number of pages required when there are var-len columns present.
+    // Must be kept in sync with ComputeMinReservation() in Sorter in be.
+    int pageMultiplier = usesVarLenBlocks ? 2 : 1;
+    long perInstanceMemEstimate;
+    long perInstanceMinReservation;
     if (type_ == TSortType.PARTIAL) {
       // The memory limit cannot be less than the size of the required blocks.
-      long mem_limit =
-          PARTIAL_SORT_MEM_LIMIT > blockSize ? PARTIAL_SORT_MEM_LIMIT : blockSize;
+      long mem_limit = Math.max(PARTIAL_SORT_MEM_LIMIT, bufferSize * pageMultiplier);
       // 'fullInputSize' will be negative if stats are missing, just use the limit.
-      long perInstanceMemEstimate = fullInputSize < 0 ?
+      perInstanceMemEstimate = fullInputSize < 0 ?
           mem_limit :
           Math.min((long) Math.ceil(fullInputSize), mem_limit);
-      nodeResourceProfile_ = new ResourceProfile(perInstanceMemEstimate, blockSize);
+      perInstanceMinReservation = bufferSize * pageMultiplier;
     } else {
-      Preconditions.checkState(type_ == TSortType.TOTAL);
-      double numInputBlocks = Math.ceil(fullInputSize / blockSize);
-      long perInstanceMemEstimate =
-          blockSize * (long) Math.ceil(Math.sqrt(numInputBlocks));
-
-      // Must be kept in sync with min_buffers_required in Sorter in be.
-      long perInstanceMinReservation = 3 * getDefaultSpillableBufferBytes();
-      if (info_.getSortTupleDescriptor().hasVarLenSlots()) {
-        perInstanceMinReservation *= 2;
-      }
-      nodeResourceProfile_ =
-          new ResourceProfile(perInstanceMemEstimate, perInstanceMinReservation);
+      double numInputBlocks = Math.ceil(fullInputSize / (bufferSize * pageMultiplier));
+      perInstanceMemEstimate =
+          bufferSize * (long) Math.ceil(Math.sqrt(numInputBlocks));
+      perInstanceMinReservation = 3 * bufferSize * pageMultiplier;
     }
+    nodeResourceProfile_ = new ResourceProfileBuilder()
+        .setMemEstimateBytes(perInstanceMemEstimate)
+        .setMinReservationBytes(perInstanceMinReservation)
+        .setSpillableBufferBytes(bufferSize).setMaxRowBufferBytes(bufferSize).build();
   }
 
   private static String getDisplayName(TSortType type) {

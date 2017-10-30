@@ -29,6 +29,12 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+
 
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
@@ -112,6 +118,9 @@ public class HdfsTable extends Table {
 
   // Number of times to retry fetching the partitions from the HMS should an error occur.
   private final static int NUM_PARTITION_FETCH_RETRIES = 5;
+
+  // Maximum number of errors logged when loading partitioned tables.
+  private static final int MAX_PATH_METADATA_LOADING_ERRORS_TO_LOG = 100;
 
   // Table property key for skip.header.line.count
   public static final String TBL_PROP_SKIP_HEADER_LINE_COUNT = "skip.header.line.count";
@@ -200,6 +209,75 @@ public class HdfsTable extends Table {
   // and its usage in getFileSystem suggests it should be.
   private static final Configuration CONF = new Configuration();
 
+  private static final int MAX_HDFS_PARTITIONS_PARALLEL_LOAD =
+      BackendConfig.INSTANCE.maxHdfsPartsParallelLoad();
+
+  private static final int MAX_NON_HDFS_PARTITIONS_PARALLEL_LOAD =
+      BackendConfig.INSTANCE.maxNonHdfsPartsParallelLoad();
+
+  // File/Block metadata loading stats for a single HDFS path.
+  private class FileMetadataLoadStats {
+    // Path corresponding to this metadata load request.
+    private Path hdfsPath;
+
+    // Number of files for which the metadata was loaded.
+    public int loadedFiles = 0;
+
+    // Number of hidden files excluded from file metadata loading. More details at
+    // isValidDataFile().
+    public int hiddenFiles = 0;
+
+    // Number of files skipped from file metadata loading because the files have not
+    // changed since the last load. More details at hasFileChanged().
+    public int skippedFiles = 0;
+
+    // Number of unknown disk IDs encountered while loading block
+    // metadata for this path.
+    public long unknownDiskIds = 0;
+
+    public FileMetadataLoadStats(Path path) { hdfsPath = path; }
+
+    public String debugString() {
+      Preconditions.checkNotNull(hdfsPath);
+      return String.format("Path: %s: Loaded files: %s Hidden files: %s " +
+          "Skipped files: %s Unknown diskIDs: %s", hdfsPath, loadedFiles, hiddenFiles,
+          skippedFiles, unknownDiskIds);
+    }
+  }
+
+  // A callable implementation of file metadata loading request for a given
+  // HDFS path.
+  public class FileMetadataLoadRequest
+      implements Callable<FileMetadataLoadStats> {
+    private final Path hdfsPath_;
+    // All the partitions mapped to the above path
+    private final List<HdfsPartition> partitionList_;
+    // If set to true, reloads the file metadata only when the files in this path
+    // have changed since last load (more details in hasFileChanged()).
+    private final boolean reuseFileMd_;
+
+    public FileMetadataLoadRequest(Path path, List<HdfsPartition> partitions,
+       boolean reuseFileMd) {
+      hdfsPath_ = path;
+      partitionList_ = partitions;
+      reuseFileMd_ = reuseFileMd;
+    }
+
+    @Override
+    public FileMetadataLoadStats call() throws IOException {
+      FileMetadataLoadStats loadingStats =
+          reuseFileMd_ ? refreshFileMetadata(hdfsPath_, partitionList_) :
+          resetAndLoadFileMetadata(hdfsPath_, partitionList_);
+      return loadingStats;
+    }
+
+    public String debugString() {
+      String loadType = reuseFileMd_? "Refreshed" : "Loaded";
+      return String.format("%s file metadata for path: %s", loadType,
+          hdfsPath_.toString());
+    }
+  }
+
   public HdfsTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
       Db db, String name, String owner) {
     super(msTbl, db, name, owner);
@@ -249,147 +327,168 @@ public class HdfsTable extends Table {
   }
 
   /**
-   * Drops and re-loads the block metadata for all partitions in 'partsByPath' whose
-   * location is under the given 'dirPath'. It involves the following steps:
-   * - Clear the current block metadata of the partitions.
-   * - Call FileSystem.listStatus() on 'dirPath' to fetch the BlockLocations for each
-   *   file under it recursively.
-   * - For every valid data file, map it to a partition from 'partsByPath' (if one exists)
-   *   and enumerate all its blocks and their corresponding hosts and disk IDs.
-   * Requires that 'dirPath' and all paths in 'partsByPath' have consistent qualification
-   * (either fully qualified or unqualified), for isDescendantPath().
-   * TODO: Split this method into more logical methods for cleaner code.
-   */
-  private void loadBlockMetadata(Path dirPath,
-      HashMap<Path, List<HdfsPartition>> partsByPath) {
-    try {
-      // No need to load blocks for empty partitions list.
-      if (partsByPath.size() == 0) return;
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("Loading block md for " + name_ + " directory " + dirPath.toString());
-      }
-
-      // Clear the state of partitions under dirPath since they are going to be updated
-      // based on the current snapshot of files in the directory.
-      List<HdfsPartition> dirPathPartitions = partsByPath.get(dirPath);
-      if (dirPathPartitions != null) {
-        // The dirPath is a partition directory. This means the path is the root of an
-        // unpartitioned table, or the path of at least one partition.
-        for (HdfsPartition partition: dirPathPartitions) {
-          partition.setFileDescriptors(new ArrayList<FileDescriptor>());
-        }
-      } else {
-        // The dirPath is not a partition directory. We expect it to be an ancestor of
-        // partition paths (e.g., the table root). Clear all partitions whose paths are
-        // a descendant of dirPath.
-        for (Map.Entry<Path, List<HdfsPartition>> entry: partsByPath.entrySet()) {
-          Path partDir = entry.getKey();
-          if (!FileSystemUtil.isDescendantPath(partDir, dirPath)) continue;
-          for (HdfsPartition partition: entry.getValue()) {
-            partition.setFileDescriptors(new ArrayList<FileDescriptor>());
-          }
-        }
-      }
-
-      FileSystem fs = dirPath.getFileSystem(CONF);
-      // For file systems that do not support BlockLocation API, we manually synthesize
-      // block location metadata based on file formats.
-      if (!FileSystemUtil.supportsStorageIds(fs)) {
-        synthesizeBlockMetadata(fs, dirPath, partsByPath);
-        return;
-      }
-
-      RemoteIterator<LocatedFileStatus> fileStatusIter =
-          FileSystemUtil.listFiles(fs, dirPath, true);
-      if (fileStatusIter == null) return;
-      Reference<Long> numUnknownDiskIds = new Reference<Long>(Long.valueOf(0));
-      while (fileStatusIter.hasNext()) {
-        LocatedFileStatus fileStatus = fileStatusIter.next();
-        if (!FileSystemUtil.isValidDataFile(fileStatus)) continue;
-        // Find the partition that this file belongs (if any).
-        Path partPathDir = fileStatus.getPath().getParent();
-        Preconditions.checkNotNull(partPathDir);
-
-        List<HdfsPartition> partitions = partsByPath.get(partPathDir);
-        // Skip if this file does not belong to any known partition.
-        if (partitions == null) {
-          if (LOG.isTraceEnabled()) {
-            LOG.trace("File " + fileStatus.getPath().toString() + " doesn't correspond " +
-                " to a known partition. Skipping metadata load for this file.");
-          }
-          continue;
-        }
-
-        FileDescriptor fd = FileDescriptor.create(fileStatus,
-            fileStatus.getBlockLocations(), fs, hostIndex_, numUnknownDiskIds);
-        // Update the partitions' metadata that this file belongs to.
-        for (HdfsPartition partition: partitions) {
-          partition.getFileDescriptors().add(fd);
-        }
-      }
-
-      long unknownDiskIdCount = numUnknownDiskIds.getRef();
-      if (unknownDiskIdCount > 0) {
-        if (LOG.isWarnEnabled()) {
-          LOG.warn("Unknown disk id count for filesystem " + fs + ":" +
-              unknownDiskIdCount);
-        }
-      }
-    } catch (IOException e) {
-      throw new RuntimeException("Error loading block metadata for directory "
-          + dirPath.toString() + ": " + e.getMessage(), e);
-    }
-  }
-
-  /**
-   * Synthesize the block metadata for a given HdfsPartition object. Should only
-   * be called for FileSystems that do not support storage IDs.
-   */
-  private void synthesizeBlockMetadata(FileSystem fs, HdfsPartition partition)
-      throws IOException {
-    Preconditions.checkState(!FileSystemUtil.supportsStorageIds(fs));
-    HashMap<Path, List<HdfsPartition>> partsByPath = Maps.newHashMap();
-    Path partitionPath = partition.getLocationPath();
-    partition.setFileDescriptors(new ArrayList<FileDescriptor>());
-    partsByPath.put(partitionPath, Lists.newArrayList(partition));
-    synthesizeBlockMetadata(fs, partitionPath, partsByPath);
-  }
-
-  /**
+   * Drops and re-loads the file metadata of all the partitions in 'partitions' that
+   * map to the path 'partDir'. 'partDir' may belong to any file system that
+   * implements the hadoop's FileSystem interface (like HDFS, S3, ADLS etc.). It involves
+   * the following steps:
+   * - Clear the current file metadata of the partitions.
+   * - Call FileSystem.listFiles() on 'partDir' to fetch the FileStatus and BlockLocations
+   *   for each file under it.
+   * - For every valid data file, enumerate all its blocks and their corresponding hosts
+   *   and disk IDs if the underlying file system supports the block locations API
+   *   (for ex: HDFS). For other file systems (like S3) we synthesize the file metadata
+   *   manually by splitting the file ranges into fixed size blocks.
    * For filesystems that don't support BlockLocation API, synthesize file blocks
    * by manually splitting the file range into fixed-size blocks.  That way, scan
    * ranges can be derived from file blocks as usual.  All synthesized blocks are given
    * an invalid network address so that the scheduler will treat them as remote.
    */
-  private void synthesizeBlockMetadata(FileSystem fs, Path dirPath, HashMap<Path,
-      List<HdfsPartition>> partsByPath) throws IOException {
+  private FileMetadataLoadStats resetAndLoadFileMetadata(
+      Path partDir, List<HdfsPartition> partitions) throws IOException {
+    FileMetadataLoadStats loadStats = new FileMetadataLoadStats(partDir);
+    // No need to load blocks for empty partitions list.
+    if (partitions == null || partitions.isEmpty()) return loadStats;
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Loading block md for " + getFullName() + " path: " + partDir.toString());
+    }
+
+    FileSystem fs = partDir.getFileSystem(CONF);
+    boolean synthesizeFileMd = !FileSystemUtil.supportsStorageIds(fs);
     RemoteIterator<LocatedFileStatus> fileStatusIter =
-        FileSystemUtil.listFiles(fs, dirPath, true);
-    if (fileStatusIter == null) return;
+        FileSystemUtil.listFiles(fs, partDir, false);
+    if (fileStatusIter == null) return loadStats;
+    Reference<Long> numUnknownDiskIds = new Reference<Long>(Long.valueOf(0));
+    List<FileDescriptor> newFileDescs = Lists.newArrayList();
     while (fileStatusIter.hasNext()) {
       LocatedFileStatus fileStatus = fileStatusIter.next();
-      if (!FileSystemUtil.isValidDataFile(fileStatus)) continue;
-      Path partPathDir = fileStatus.getPath().getParent();
-      Preconditions.checkNotNull(partPathDir);
-      List<HdfsPartition> partitions = partsByPath.get(partPathDir);
-      // Skip if this file does not belong to any known partition.
-      if (partitions == null) {
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("File " + fileStatus.getPath().toString() + " doesn't correspond " +
-              " to a known partition. Skipping metadata load for this file.");
-        }
+      if (!FileSystemUtil.isValidDataFile(fileStatus)) {
+        ++loadStats.hiddenFiles;
         continue;
       }
-
-      Preconditions.checkState(partitions.size() > 0);
-      // For the purpose of synthesizing block metadata, we assume that all partitions
-      // with the same location have the same file format.
-      FileDescriptor fd = FileDescriptor.createWithSynthesizedBlockMd(fileStatus,
-          partitions.get(0).getFileFormat(), hostIndex_);
-      // Update the partitions' metadata that this file belongs to.
-      for (HdfsPartition partition: partitions) {
-        partition.getFileDescriptors().add(fd);
+      FileDescriptor fd;
+      // Block locations are manually synthesized if the underlying fs does not support
+      // the block location API.
+      if (synthesizeFileMd) {
+        fd = FileDescriptor.createWithSynthesizedBlockMd(fileStatus,
+            partitions.get(0).getFileFormat(), hostIndex_);
+      } else {
+        fd = FileDescriptor.create(fileStatus,
+            fileStatus.getBlockLocations(), fs, hostIndex_, numUnknownDiskIds);
       }
+      newFileDescs.add(fd);
+      ++loadStats.loadedFiles;
+    }
+    for (HdfsPartition partition: partitions) partition.setFileDescriptors(newFileDescs);
+    loadStats.unknownDiskIds += numUnknownDiskIds.getRef();
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Loaded file metadata for " + getFullName() + " " +
+          loadStats.debugString());
+    }
+    return loadStats;
+  }
+
+  /**
+   * Refreshes file metadata information for 'path'. This method is optimized for
+   * the case where the files in the partition have not changed dramatically. It first
+   * uses a listStatus() call on the partition directory to detect the modified files
+   * (look at hasFileChanged()) and fetches their block locations using the
+   * getFileBlockLocations() method. Our benchmarks suggest that the listStatus() call
+   * is much faster then the listFiles() (up to ~40x faster in some cases).
+   */
+  private FileMetadataLoadStats refreshFileMetadata(
+      Path partDir, List<HdfsPartition> partitions) throws IOException {
+    FileMetadataLoadStats loadStats = new FileMetadataLoadStats(partDir);
+    // No need to load blocks for empty partitions list.
+    if (partitions == null || partitions.isEmpty()) return loadStats;
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Refreshing block md for " + getFullName() + " path: " +
+          partDir.toString());
+    }
+
+    // Index the partition file descriptors by their file names for O(1) look ups.
+    // We just pick the first partition to generate the fileDescByName lookup table
+    // since all the partitions map to the same partDir.
+    ImmutableMap<String, FileDescriptor> fileDescsByName = Maps.uniqueIndex(
+          partitions.get(0).getFileDescriptors(), new Function<FileDescriptor, String>() {
+            @Override
+            public String apply(FileDescriptor desc) { return desc.getFileName(); }
+          });
+
+    FileSystem fs = partDir.getFileSystem(CONF);
+    FileStatus[] fileStatuses = FileSystemUtil.listStatus(fs, partDir);
+    if (fileStatuses == null) return loadStats;
+    boolean synthesizeFileMd = !FileSystemUtil.supportsStorageIds(fs);
+    Reference<Long> numUnknownDiskIds = new Reference<Long>(Long.valueOf(0));
+    List<FileDescriptor> newFileDescs = Lists.newArrayList();
+    HdfsFileFormat fileFormat = partitions.get(0).getFileFormat();
+    // If there is a cached partition mapped to this path, we recompute the block
+    // locations even if the underlying files have not changed (hasFileChanged()).
+    // This is done to keep the cached block metadata up to date.
+    boolean isPartitionMarkedCached = false;
+    for (HdfsPartition partition: partitions) {
+      if (partition.isMarkedCached()) {
+        isPartitionMarkedCached = true;
+        break;
+      }
+    }
+    for (FileStatus fileStatus: fileStatuses) {
+      if (!FileSystemUtil.isValidDataFile(fileStatus)) {
+        ++loadStats.hiddenFiles;
+        continue;
+      }
+      String fileName = fileStatus.getPath().getName().toString();
+      FileDescriptor fd = fileDescsByName.get(fileName);
+      if (isPartitionMarkedCached || hasFileChanged(fd, fileStatus)) {
+        if (synthesizeFileMd) {
+          fd = FileDescriptor.createWithSynthesizedBlockMd(fileStatus,
+              fileFormat, hostIndex_);
+        } else {
+          BlockLocation[] locations =
+            fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
+          fd = FileDescriptor.create(fileStatus, locations, fs, hostIndex_,
+              numUnknownDiskIds);
+        }
+        ++loadStats.loadedFiles;
+      } else {
+        ++loadStats.skippedFiles;
+      }
+      Preconditions.checkNotNull(fd);
+      newFileDescs.add(fd);
+    }
+    loadStats.unknownDiskIds += numUnknownDiskIds.getRef();
+    for (HdfsPartition partition: partitions) partition.setFileDescriptors(newFileDescs);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Refreshed file metadata for " + getFullName() + " "
+          + loadStats.debugString());
+    }
+    return loadStats;
+  }
+
+  /**
+   * Compares the modification time and file size between the FileDescriptor and the
+   * FileStatus to determine if the file has changed. Returns true if the file has changed
+   * and false otherwise.
+   */
+  private static boolean hasFileChanged(FileDescriptor fd, FileStatus status) {
+    return (fd == null) || (fd.getFileLength() != status.getLen()) ||
+      (fd.getModificationTime() != status.getModificationTime());
+  }
+
+  /**
+   * Helper method to reload the file metadata of a single partition.
+   */
+  private void refreshPartitionFileMetadata(HdfsPartition partition)
+      throws CatalogException {
+    try {
+      Path partDir = partition.getLocationPath();
+      FileMetadataLoadStats stats = refreshFileMetadata(partDir,
+          Lists.newArrayList(partition));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(String.format("Refreshed file metadata for %s %s",
+              getFullName(), stats.debugString()));
+      }
+    } catch (IOException e) {
+      throw new CatalogException("Encountered invalid partition path", e);
     }
   }
 
@@ -610,8 +709,7 @@ public class HdfsTable extends Table {
    * Create HdfsPartition objects corresponding to 'msPartitions' and add them to this
    * table's partition list. Any partition metadata will be reset and loaded from
    * scratch. For each partition created, we load the block metadata for each data file
-   * under it. We optimize the block metadata loading by grouping together the name node
-   * requests for all the partitions under the table base directory into a single RPC.
+   * under it.
    *
    * If there are no partitions in the Hive metadata, a single partition is added with no
    * partition keys.
@@ -626,17 +724,6 @@ public class HdfsTable extends Table {
     // using createPartition() calls. A single partition path can correspond to multiple
     // partitions.
     HashMap<Path, List<HdfsPartition>> partsByPath = Maps.newHashMap();
-    // Qualify to ensure isDescendantPath() works correctly.
-    Path tblLocation = FileSystemUtil.createFullyQualifiedPath(getHdfsBaseDirPath());
-    // List of directories that we scan for block locations. We optimize the block metadata
-    // loading to reduce the number of RPCs to the NN by separately loading partitions
-    // with default directory paths (under the base table directory) and non-default
-    // directory paths. For the former we issue a single RPC to the NN to load all the
-    // blocks from hdfsBaseDir_ and for the latter we load each of the partition directory
-    // separately.
-    // TODO: We can still do some advanced optimization by grouping all the partition
-    // directories under the same ancestor path up the tree.
-    Set<Path> dirsToLoad = Sets.newHashSet(tblLocation);
 
     if (msTbl.getPartitionKeysSize() == 0) {
       Preconditions.checkArgument(msPartitions == null || msPartitions.isEmpty());
@@ -644,6 +731,7 @@ public class HdfsTable extends Table {
       // We model partitions slightly differently to Hive - every file must exist in a
       // partition, so add a single partition with no keys which will get all the
       // files in the table's root directory.
+      Path tblLocation = FileSystemUtil.createFullyQualifiedPath(getHdfsBaseDirPath());
       HdfsPartition part = createPartition(msTbl.getSd(), null);
       partsByPath.put(tblLocation, Lists.newArrayList(part));
       if (isMarkedCached_) part.markCached();
@@ -670,7 +758,6 @@ public class HdfsTable extends Table {
           accessLevel_ = TAccessLevel.READ_ONLY;
         }
 
-        // Qualify to ensure isDescendantPath() works correctly.
         Path partDir = FileSystemUtil.createFullyQualifiedPath(
             new Path(msPartition.getSd().getLocation()));
         List<HdfsPartition> parts = partsByPath.get(partDir);
@@ -679,99 +766,113 @@ public class HdfsTable extends Table {
         } else {
           parts.add(partition);
         }
-
-        if (!dirsToLoad.contains(partDir) &&
-            !FileSystemUtil.isDescendantPath(partDir, tblLocation)) {
-          // This partition has a custom filesystem location. Load its file/block
-          // metadata separately by adding it to the list of dirs to load.
-          dirsToLoad.add(partDir);
-        }
       }
     }
-
-    loadMetadataAndDiskIds(dirsToLoad, partsByPath);
-  }
-
-  /**
-   * Refreshes block metadata information for 'partition'. This method is optimized for
-   * the case where the files in the partition have not changed dramatically. It first
-   * uses a listStatus() call on the partition directory to detect files with changed
-   * mtime and fetches their block locations using the getFileBlockLocations() method.
-   * Our benchmarks suggest that the listStatus() call is much faster then the listFiles()
-   * (up to ~40x faster in some cases). The initial table load still uses the listFiles()
-   * on the data directory that fetches both the FileStatus as well as BlockLocations in
-   * a single call.
-   */
-  private void refreshFileMetadata(HdfsPartition partition) throws CatalogException {
-    Path partDir = partition.getLocationPath();
-    Preconditions.checkNotNull(partDir);
-    try {
-      FileSystem fs = partDir.getFileSystem(CONF);
-      if (!FileSystemUtil.supportsStorageIds(fs)) {
-        synthesizeBlockMetadata(fs, partition);
-        return;
-      }
-      // Index the partition file descriptors by their file names for O(1) look ups.
-      ImmutableMap<String, FileDescriptor> fileDescsByName = Maps.uniqueIndex(
-          partition.getFileDescriptors(), new Function<FileDescriptor, String>() {
-            public String apply(FileDescriptor desc) {
-              return desc.getFileName();
-            }
-          });
-      // Iterate through the current snapshot of the partition directory listing to
-      // figure out files that were newly added/modified.
-      List<FileDescriptor> newFileDescs = Lists.newArrayList();
-      FileStatus[] pathStatus = FileSystemUtil.listStatus(fs, partDir);
-      if (pathStatus != null) {
-        for (FileStatus fileStatus: pathStatus) {
-          if (!FileSystemUtil.isValidDataFile(fileStatus)) continue;
-          String fileName = fileStatus.getPath().getName().toString();
-          FileDescriptor fd = fileDescsByName.get(fileName);
-          if (fd == null || partition.isMarkedCached() ||
-              fd.getFileLength() != fileStatus.getLen() ||
-              fd.getModificationTime() != fileStatus.getModificationTime()) {
-            BlockLocation[] locations =
-                fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
-            fd = FileDescriptor.create(fileStatus, locations, fs, hostIndex_,
-                new Reference<Long>(Long.valueOf(0)));
-          }
-          newFileDescs.add(fd);
-        }
-      }
-      partition.setFileDescriptors(newFileDescs);
-    } catch(IOException e) {
-      throw new CatalogException("Error loading block metadata for partition " +
-          partition.toString(), e);
-    }
+    // Load the file metadata from scratch.
+    loadMetadataAndDiskIds(partsByPath, false);
   }
 
   /**
    * Helper method to load the partition file metadata from scratch. This method is
    * optimized for loading newly added partitions. For refreshing existing partitions
-   * use refreshFileMetadata(HdfsPartition).
+   * use refreshPartitionFileMetadata(HdfsPartition).
    */
-  private void loadFileMetadataFromScratch(HdfsPartition partition) {
-    Path partitionDirPath = partition.getLocationPath();
-    Set<Path> dirsToLoad = Sets.newHashSet(partitionDirPath);
-    HashMap<Path, List<HdfsPartition>> partsByPath = Maps.newHashMap();
-    partsByPath.put(partitionDirPath, Lists.newArrayList(partition));
-    loadMetadataAndDiskIds(dirsToLoad, partsByPath);
+  private void resetAndLoadPartitionFileMetadata(HdfsPartition partition) {
+    Path partDir = partition.getLocationPath();
+    try {
+      FileMetadataLoadStats stats =
+          resetAndLoadFileMetadata(partDir, Lists.newArrayList(partition));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(String.format("Loaded file metadata for %s %s", getFullName(),
+            stats.debugString()));
+      }
+    } catch (Exception e) {
+        LOG.error("Error loading file metadata for path: " + partDir.toString() +
+            ". Partitions file metadata could be partially loaded.", e);
+    }
   }
 
   /**
-   * Helper method to load the block locations from each directory in 'locations'
-   * and filtering only the paths from 'partsByPath'. Also loads the disk IDs
-   * corresponding to these block locations.
+   * Returns the thread pool size to load the file metadata of this table.
+   * 'numPaths' is the number of paths for which the file metadata should be loaded.
+   *
+   * We use different thread pool sizes for HDFS and non-HDFS tables since the latter
+   * supports much higher throughput of RPC calls for listStatus/listFiles. For
+   * simplicity, the filesystem type is determined based on the table's root path and
+   * not for each partition individually. Based on our experiments, S3 showed a linear
+   * speed up (up to ~100x) with increasing number of loading threads where as the HDFS
+   * throughput was limited to ~5x in un-secure clusters and up to ~3.7x in secure
+   * clusters. We narrowed it down to scalability bottlenecks in HDFS RPC implementation
+   * (HADOOP-14558) on both the server and the client side.
    */
-  private void loadMetadataAndDiskIds(Set<Path> locations,
-      HashMap<Path, List<HdfsPartition>> partsByPath) {
-    LOG.info(String.format(
-        "Loading file and block metadata for %s partitions from %s paths: %s",
-        partsByPath.size(), locations.size(), getFullName()));
-    for (Path location: locations) loadBlockMetadata(location, partsByPath);
-    LOG.info(String.format(
-        "Loaded file and block metadata for %s partitions from %s paths: %s",
-        partsByPath.size(), locations.size(), getFullName()));
+  private int getLoadingThreadPoolSize(int numPaths) throws CatalogException {
+    Preconditions.checkState(numPaths > 0);
+    FileSystem tableFs;
+    try {
+      tableFs  = (new Path(getLocation())).getFileSystem(CONF);
+    } catch (IOException e) {
+      throw new CatalogException("Invalid table path for table: " + getFullName(), e);
+    }
+    int threadPoolSize = FileSystemUtil.supportsStorageIds(tableFs) ?
+        MAX_HDFS_PARTITIONS_PARALLEL_LOAD : MAX_NON_HDFS_PARTITIONS_PARALLEL_LOAD;
+    // Thread pool size need not exceed the number of paths to be loaded.
+    return Math.min(numPaths, threadPoolSize);
+  }
+
+  /**
+   * Helper method to load the block locations for each partition directory in
+   * partsByPath using a thread pool. 'partsByPath' maps each partition directory to
+   * the corresponding HdfsPartition objects. If 'reuseFileMd' is true, the block
+   * metadata is incrementally refreshed, else it is reloaded from scratch.
+   */
+  private void loadMetadataAndDiskIds(Map<Path, List<HdfsPartition>> partsByPath,
+      boolean reuseFileMd) throws CatalogException {
+    int numPathsToLoad = partsByPath.size();
+    // For tables without partitions we have no file metadata to load.
+    if (numPathsToLoad == 0)  return;
+
+    int threadPoolSize = getLoadingThreadPoolSize(numPathsToLoad);
+    LOG.info(String.format("Loading file and block metadata for %s paths for table %s " +
+        "using a thread pool of size %s", numPathsToLoad, getFullName(),
+        threadPoolSize));
+    ExecutorService partitionLoadingPool = Executors.newFixedThreadPool(threadPoolSize);
+    try {
+      List<Future<FileMetadataLoadStats>> pendingMdLoadTasks = Lists.newArrayList();
+      for (Path p: partsByPath.keySet()) {
+        FileMetadataLoadRequest blockMdLoadReq =
+            new FileMetadataLoadRequest(p, partsByPath.get(p), reuseFileMd);
+        pendingMdLoadTasks.add(partitionLoadingPool.submit(blockMdLoadReq));
+      }
+      // Wait for the partition load tasks to finish.
+      int failedLoadTasks = 0;
+      for (Future<FileMetadataLoadStats> task: pendingMdLoadTasks) {
+        try {
+          FileMetadataLoadStats loadStats = task.get();
+          if (LOG.isTraceEnabled()) LOG.trace(loadStats.debugString());
+        } catch (ExecutionException | InterruptedException e) {
+          ++failedLoadTasks;
+          if (failedLoadTasks <= MAX_PATH_METADATA_LOADING_ERRORS_TO_LOG) {
+            LOG.error("Encountered an error loading block metadata for table: " +
+                getFullName(), e);
+          }
+        }
+      }
+      if (failedLoadTasks > 0) {
+        int errorsNotLogged = failedLoadTasks - MAX_PATH_METADATA_LOADING_ERRORS_TO_LOG;
+        if (errorsNotLogged > 0) {
+          LOG.error(String.format("Error loading file metadata for %s paths for table " +
+              "%s. Only the first %s errors were logged.", failedLoadTasks, getFullName(),
+              MAX_PATH_METADATA_LOADING_ERRORS_TO_LOG));
+        }
+        throw new TableLoadingException(String.format("Failed to load file metadata "
+            + "for %s paths for table %s. Table's file metadata could be partially "
+            + "loaded. Check the Catalog server log for more details.", failedLoadTasks,
+            getFullName()));
+      }
+    } finally {
+      partitionLoadingPool.shutdown();
+    }
+    LOG.info(String.format("Loaded file and block metadata for %s", getFullName()));
   }
 
   /**
@@ -824,19 +925,45 @@ public class HdfsTable extends Table {
    * Creates a new HdfsPartition object to be added to HdfsTable's partition list.
    * Partitions may be empty, or may not even exist in the filesystem (a partition's
    * location may have been changed to a new path that is about to be created by an
-   * INSERT). Also loads the block metadata for this partition. Returns new partition
+   * INSERT). Also loads the file metadata for this partition. Returns new partition
    * if successful or null if none was created.
    *
    * Throws CatalogException if the supplied storage descriptor contains metadata that
    * Impala can't understand.
    */
-  public HdfsPartition createAndLoadPartition(StorageDescriptor storageDescriptor,
+  public HdfsPartition createAndLoadPartition(
       org.apache.hadoop.hive.metastore.api.Partition msPartition)
       throws CatalogException {
-    HdfsPartition hdfsPartition = createPartition(storageDescriptor, msPartition);
-    loadFileMetadataFromScratch(hdfsPartition);
+    HdfsPartition hdfsPartition = createPartition(msPartition.getSd(), msPartition);
+    resetAndLoadPartitionFileMetadata(hdfsPartition);
     return hdfsPartition;
   }
+
+  /**
+   * Same as createAndLoadPartition() but is optimized for loading file metadata of
+   * newly created HdfsPartitions in parallel.
+   */
+  public List<HdfsPartition> createAndLoadPartitions(
+      List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions)
+      throws CatalogException {
+    HashMap<Path, List<HdfsPartition>> partsByPath = Maps.newHashMap();
+    List<HdfsPartition> addedParts = Lists.newArrayList();
+    for (org.apache.hadoop.hive.metastore.api.Partition partition: msPartitions) {
+      HdfsPartition hdfsPartition = createPartition(partition.getSd(), partition);
+      Preconditions.checkNotNull(hdfsPartition);
+      addedParts.add(hdfsPartition);
+      Path partitionPath = hdfsPartition.getLocationPath();
+      List<HdfsPartition> hdfsPartitions = partsByPath.get(partitionPath);
+      if (hdfsPartitions == null) {
+        partsByPath.put(partitionPath, Lists.newArrayList(hdfsPartition));
+      } else {
+        hdfsPartitions.add(hdfsPartition);
+      }
+    }
+    loadMetadataAndDiskIds(partsByPath, false);
+    return addedParts;
+  }
+
 
   /**
    * Creates a new HdfsPartition from a specified StorageDescriptor and an HMS partition
@@ -1032,9 +1159,9 @@ public class HdfsTable extends Table {
    * list of partitions for which metadata should be updated. Otherwise, all partition
    * metadata will be updated from the Hive Metastore.
    *
-   * If 'loadFileMetadata' is true, file metadata of the specified partitions are
-   * reloaded from scratch. If 'partitionsToUpdate' is not specified, file metadata of all
-   * the partitions are loaded.
+   * If 'loadParitionFileMetadata' is true, file metadata of the specified partitions
+   * are reloaded from scratch. If 'partitionsToUpdate' is not specified, file metadata
+   * of all the partitions are loaded.
    *
    * If 'loadTableSchema' is true, the table schema is loaded from the Hive Metastore.
    *
@@ -1047,9 +1174,9 @@ public class HdfsTable extends Table {
    * metadata cache of the table and trigger a fresh load.
    */
   public void load(boolean reuseMetadata, IMetaStoreClient client,
-      org.apache.hadoop.hive.metastore.api.Table msTbl, boolean loadFileMetadata,
-      boolean loadTableSchema, Set<String> partitionsToUpdate)
-      throws TableLoadingException {
+      org.apache.hadoop.hive.metastore.api.Table msTbl,
+      boolean loadParitionFileMetadata, boolean loadTableSchema,
+      Set<String> partitionsToUpdate) throws TableLoadingException {
     // turn all exceptions into TableLoadingException
     msTable_ = msTbl;
     try {
@@ -1065,12 +1192,14 @@ public class HdfsTable extends Table {
       if (reuseMetadata) {
         // Incrementally update this table's partitions and file metadata
         LOG.info("Incrementally loading table metadata for: " + getFullName());
-        Preconditions.checkState(partitionsToUpdate == null || loadFileMetadata);
+        Preconditions.checkState(
+            partitionsToUpdate == null || loadParitionFileMetadata);
         updateMdFromHmsTable(msTbl);
         if (msTbl.getPartitionKeysSize() == 0) {
-          if (loadFileMetadata) updateUnpartitionedTableFileMd();
+          if (loadParitionFileMetadata) updateUnpartitionedTableFileMd();
         } else {
-          updatePartitionsFromHms(client, partitionsToUpdate, loadFileMetadata);
+          updatePartitionsFromHms(
+              client, partitionsToUpdate, loadParitionFileMetadata);
         }
         LOG.info("Incrementally loaded table metadata for: " + getFullName());
       } else {
@@ -1089,7 +1218,8 @@ public class HdfsTable extends Table {
     } catch (TableLoadingException e) {
       throw e;
     } catch (Exception e) {
-      throw new TableLoadingException("Failed to load metadata for table: " + name_, e);
+      throw new TableLoadingException("Failed to load metadata for table: "
+          + getFullName(), e);
     }
   }
 
@@ -1114,9 +1244,9 @@ public class HdfsTable extends Table {
   /**
    * Updates the file metadata of an unpartitioned HdfsTable.
    */
-  private void updateUnpartitionedTableFileMd() throws CatalogException {
+  private void updateUnpartitionedTableFileMd() throws Exception {
     if (LOG.isTraceEnabled()) {
-      LOG.trace("update unpartitioned table: " + name_);
+      LOG.trace("update unpartitioned table: " + getFullName());
     }
     resetPartitions();
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
@@ -1125,7 +1255,7 @@ public class HdfsTable extends Table {
     HdfsPartition part = createPartition(msTbl.getSd(), null);
     addPartition(part);
     if (isMarkedCached_) part.markCached();
-    refreshFileMetadata(part);
+    refreshPartitionFileMetadata(part);
   }
 
   /**
@@ -1133,17 +1263,18 @@ public class HdfsTable extends Table {
    * Metastore. It reloads partitions that were marked 'dirty' by doing a DROP + CREATE.
    * It removes from this table partitions that no longer exist in the Hive Metastore and
    * adds partitions that were added externally (e.g. using Hive) to the Hive Metastore
-   * but do not exist in this table. If 'loadFileMetadata' is true, it triggers
+   * but do not exist in this table. If 'loadParitionFileMetadata' is true, it triggers
    * file/block metadata reload for the partitions specified in 'partitionsToUpdate', if
    * any, or for all the table partitions if 'partitionsToUpdate' is null.
    */
   private void updatePartitionsFromHms(IMetaStoreClient client,
-      Set<String> partitionsToUpdate, boolean loadFileMetadata) throws Exception {
-    if (LOG.isTraceEnabled()) LOG.trace("Sync table partitions: " + name_);
+      Set<String> partitionsToUpdate, boolean loadParitionFileMetadata)
+      throws Exception {
+    if (LOG.isTraceEnabled()) LOG.trace("Sync table partitions: " + getFullName());
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
     Preconditions.checkNotNull(msTbl);
     Preconditions.checkState(msTbl.getPartitionKeysSize() != 0);
-    Preconditions.checkState(loadFileMetadata || partitionsToUpdate == null);
+    Preconditions.checkState(loadParitionFileMetadata || partitionsToUpdate == null);
 
     // Retrieve all the partition names from the Hive Metastore. We need this to
     // identify the delta between partitions of the local HdfsTable and the table entry
@@ -1154,8 +1285,8 @@ public class HdfsTable extends Table {
         client.listPartitionNames(db_.getName(), name_, (short) -1));
     // Names of loaded partitions in this table
     Set<String> partitionNames = Sets.newHashSet();
-    // Partitions for which file metadata must be loaded
-    List<HdfsPartition> partitionsToUpdateFileMd = Lists.newArrayList();
+    // Partitions for which file metadata must be loaded, grouped by partition paths.
+    Map<Path, List<HdfsPartition>> partitionsToUpdateFileMdByPath = Maps.newHashMap();
     // Partitions that need to be dropped and recreated from scratch
     List<HdfsPartition> dirtyPartitions = Lists.newArrayList();
     // Partitions that need to be removed from this table. That includes dirty
@@ -1176,8 +1307,16 @@ public class HdfsTable extends Table {
         // list and loading them from the Hive Metastore.
         dirtyPartitions.add(partition);
       } else {
-        if (partitionsToUpdate == null && loadFileMetadata) {
-          partitionsToUpdateFileMd.add(partition);
+        if (partitionsToUpdate == null && loadParitionFileMetadata) {
+          Path partitionPath = partition.getLocationPath();
+          List<HdfsPartition> partitions =
+            partitionsToUpdateFileMdByPath.get(partitionPath);
+          if (partitions == null) {
+            partitionsToUpdateFileMdByPath.put(
+                partitionPath, Lists.newArrayList(partition));
+          } else {
+            partitions.add(partition);
+          }
         }
       }
       Preconditions.checkNotNull(partition.getCachedMsPartitionDescriptor());
@@ -1202,33 +1341,40 @@ public class HdfsTable extends Table {
     // Load file metadata. Until we have a notification mechanism for when a
     // file changes in hdfs, it is sometimes required to reload all the file
     // descriptors and block metadata of a table (e.g. REFRESH statement).
-    if (loadFileMetadata) {
+    if (loadParitionFileMetadata) {
       if (partitionsToUpdate != null) {
         // Only reload file metadata of partitions specified in 'partitionsToUpdate'
-        Preconditions.checkState(partitionsToUpdateFileMd.isEmpty());
-        partitionsToUpdateFileMd = getPartitionsByName(partitionsToUpdate);
+        Preconditions.checkState(partitionsToUpdateFileMdByPath.isEmpty());
+        partitionsToUpdateFileMdByPath = getPartitionsByPath(partitionsToUpdate);
       }
-      loadPartitionFileMetadata(partitionsToUpdateFileMd);
+      loadMetadataAndDiskIds(partitionsToUpdateFileMdByPath, true);
     }
   }
 
   /**
-   * Returns the HdfsPartition objects associated with the specified list of partition
-   * names.
+   * Given a set of partition names, returns the corresponding HdfsPartition
+   * objects grouped by their base directory path.
    */
-  private List<HdfsPartition> getPartitionsByName(Collection<String> partitionNames) {
-    List<HdfsPartition> partitions = Lists.newArrayList();
+  private HashMap<Path, List<HdfsPartition>> getPartitionsByPath(
+      Collection<String> partitionNames) {
+    HashMap<Path, List<HdfsPartition>> partsByPath = Maps.newHashMap();
     for (String partitionName: partitionNames) {
       String partName = DEFAULT_PARTITION_NAME;
       if (partitionName.length() > 0) {
         // Trim the last trailing char '/' from each partition name
         partName = partitionName.substring(0, partitionName.length()-1);
       }
-      Preconditions.checkState(nameToPartitionMap_.containsKey(partName),
-          "Invalid partition name: " + partName);
-      partitions.add(nameToPartitionMap_.get(partName));
+      HdfsPartition partition = nameToPartitionMap_.get(partName);
+      Preconditions.checkNotNull(partition, "Invalid partition name: " + partName);
+      Path partitionPath = partition.getLocationPath();
+      List<HdfsPartition> partitions = partsByPath.get(partitionPath);
+      if (partitions == null) {
+        partsByPath.put(partitionPath, Lists.newArrayList(partition));
+      } else {
+        partitions.add(partition);
+      }
     }
-    return partitions;
+    return partsByPath;
   }
 
   public void setTableStats(org.apache.hadoop.hive.metastore.api.Table msTbl) {
@@ -1249,10 +1395,9 @@ public class HdfsTable extends Table {
    * Returns whether the table has the 'skip.header.line.count' property set.
    */
   private boolean hasSkipHeaderLineCount() {
-    String key = TBL_PROP_SKIP_HEADER_LINE_COUNT;
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
     if (msTbl == null) return false;
-    return msTbl.getParameters().containsKey(key);
+    return msTbl.getParameters().containsKey(TBL_PROP_SKIP_HEADER_LINE_COUNT);
   }
 
   /**
@@ -1274,13 +1419,12 @@ public class HdfsTable extends Table {
   public static int parseSkipHeaderLineCount(Map<String, String> tblProperties,
       StringBuilder error) {
     Preconditions.checkState(tblProperties != null);
-    String key = TBL_PROP_SKIP_HEADER_LINE_COUNT;
-    Preconditions.checkState(tblProperties.containsKey(key));
+    Preconditions.checkState(tblProperties.containsKey(TBL_PROP_SKIP_HEADER_LINE_COUNT));
     // Try to parse.
-    String string_value = tblProperties.get(key);
+    String string_value = tblProperties.get(TBL_PROP_SKIP_HEADER_LINE_COUNT);
     int skipHeaderLineCount = 0;
     String error_msg = String.format("Invalid value for table property %s: %s (value " +
-        "must be an integer >= 0)", key, string_value);
+        "must be an integer >= 0)", TBL_PROP_SKIP_HEADER_LINE_COUNT, string_value);
     try {
       skipHeaderLineCount = Integer.parseInt(string_value);
     } catch (NumberFormatException exc) {
@@ -1435,53 +1579,8 @@ public class HdfsTable extends Table {
         // WRITE_ONLY the table's access level should be NONE.
         accessLevel_ = TAccessLevel.READ_ONLY;
       }
-      refreshFileMetadata(partition);
+      refreshPartitionFileMetadata(partition);
     }
-  }
-
-  /**
-   * Loads the file descriptors and block metadata of a list of partitions. This function
-   * is optimized for incremental loading of the partition file metadata. To load it from
-   * scratch, use loadFileMetadataFromScratch(HdfsPartition).
-   */
-  private void loadPartitionFileMetadata(List<HdfsPartition> partitions)
-      throws Exception {
-    Preconditions.checkNotNull(partitions);
-    if (LOG.isTraceEnabled()) {
-      LOG.trace(String.format("loading file metadata for %d partitions",
-          partitions.size()));
-    }
-    org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
-    Preconditions.checkNotNull(msTbl);
-    for (HdfsPartition partition: partitions) {
-      org.apache.hadoop.hive.metastore.api.Partition msPart =
-          partition.toHmsPartition();
-      if (msPart != null) {
-        HdfsCachingUtil.validateCacheParams(msPart.getParameters());
-      }
-      StorageDescriptor sd = null;
-      if (msPart == null) {
-        // If this partition is not stored in the Hive Metastore (e.g. default partition
-        // of an unpartitioned table), use the table's storage descriptor to load file
-        // metadata.
-        sd = msTbl.getSd();
-      } else {
-        sd = msPart.getSd();
-      }
-      loadPartitionFileMetadata(sd, partition);
-    }
-  }
-
-  /**
-   * Loads the file descriptors and block metadata of a partition from its
-   * StorageDescriptor. If 'partition' does not have an entry in the Hive Metastore,
-   * 'storageDescriptor' is the StorageDescriptor of the associated table.
-   */
-  private void loadPartitionFileMetadata(StorageDescriptor storageDescriptor,
-      HdfsPartition partition) throws Exception {
-    Preconditions.checkNotNull(storageDescriptor);
-    Preconditions.checkNotNull(partition);
-    refreshFileMetadata(partition);
   }
 
   @Override
@@ -1499,15 +1598,13 @@ public class HdfsTable extends Table {
       throws TableLoadingException {
     super.loadFromThrift(thriftTable);
     THdfsTable hdfsTable = thriftTable.getHdfs_table();
-    Preconditions.checkState(hdfsTable.getPartition_prefixes() instanceof ArrayList<?>);
     partitionLocationCompressor_ = new HdfsPartitionLocationCompressor(
-        numClusteringCols_, (ArrayList<String>)hdfsTable.getPartition_prefixes());
+        numClusteringCols_, hdfsTable.getPartition_prefixes());
     hdfsBaseDir_ = hdfsTable.getHdfsBaseDir();
     nullColumnValue_ = hdfsTable.nullColumnValue;
     nullPartitionKeyValue_ = hdfsTable.nullPartitionKeyValue;
     multipleFileSystems_ = hdfsTable.multiple_filesystems;
-    Preconditions.checkState(hdfsTable.getNetwork_addresses() instanceof ArrayList<?>);
-    hostIndex_.populate((ArrayList<TNetworkAddress>)hdfsTable.getNetwork_addresses());
+    hostIndex_.populate(hdfsTable.getNetwork_addresses());
     resetPartitions();
     try {
       for (Map.Entry<Long, THdfsPartition> part: hdfsTable.getPartitions().entrySet()) {
@@ -1524,7 +1621,8 @@ public class HdfsTable extends Table {
   }
 
   @Override
-  public TTableDescriptor toThriftDescriptor(int tableId, Set<Long> referencedPartitions) {
+  public TTableDescriptor toThriftDescriptor(int tableId,
+      Set<Long> referencedPartitions) {
     // Create thrift descriptors to send to the BE.  The BE does not
     // need any information below the THdfsPartition level.
     TTableDescriptor tableDesc = new TTableDescriptor(tableId, TTableType.HDFS_TABLE,
@@ -1950,7 +2048,7 @@ public class HdfsTable extends Table {
       throws CatalogException {
     HdfsPartition refreshedPartition = createPartition(
         hmsPartition.getSd(), hmsPartition);
-    refreshFileMetadata(refreshedPartition);
+    refreshPartitionFileMetadata(refreshedPartition);
     Preconditions.checkArgument(oldPartition == null
         || oldPartition.compareTo(refreshedPartition) == 0);
     dropPartition(oldPartition);

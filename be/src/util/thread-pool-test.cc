@@ -46,6 +46,7 @@ TEST(ThreadPoolTest, BasicTest) {
   }
 
   ThreadPool<int> thread_pool("thread-pool", "worker", 5, 250, Count);
+  ASSERT_OK(thread_pool.Init());
   for (int i = 0; i <= OFFERED_RANGE; ++i) {
     ASSERT_TRUE(thread_pool.Offer(i));
   }

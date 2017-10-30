@@ -36,7 +36,6 @@ from tests.common.skip import (
     SkipIfS3,
     SkipIfADLS,
     SkipIfIsilon,
-    SkipIfOldAggsJoins,
     SkipIfLocal)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_result_verifier import (
@@ -74,10 +73,10 @@ class TestScannersAllTableFormats(ImpalaTestSuite):
     self.run_test_case('QueryTest/scanners', new_vector)
 
   def test_hdfs_scanner_profile(self, vector):
-    new_vector = deepcopy(vector)
-    new_vector.get_value('exec_option')['num_nodes'] = 1
-    if new_vector.get_value('table_format').file_format in ('kudu', 'hbase'):
+    if vector.get_value('table_format').file_format in ('kudu', 'hbase'):
       pytest.skip()
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['num_nodes'] = 0
     self.run_test_case('QueryTest/hdfs_scanner_profile', new_vector)
 
 # Test all the scanners with a simple limit clause. The limit clause triggers
@@ -251,7 +250,6 @@ class TestParquet(ImpalaTestSuite):
   def test_parquet(self, vector):
     self.run_test_case('QueryTest/parquet', vector)
 
-  @SkipIfOldAggsJoins.nested_types
   def test_corrupt_files(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = 0
     self.run_test_case('QueryTest/parquet-continue-on-error', vector)
@@ -300,6 +298,20 @@ class TestParquet(ImpalaTestSuite):
     vector.get_value('exec_option')['abort_on_error'] = 1
     self.run_test_case('QueryTest/parquet-zero-rows', vector, unique_database)
 
+  def test_repeated_root_schema(self, vector, unique_database):
+    """IMPALA-4826: Tests that running a scan on a schema where the root schema's
+       repetetion level is set to REPEATED succeeds without errors."""
+    self.client.execute("create table %s.repeated_root_schema (i int) "
+        "stored as parquet" % unique_database)
+    repeated_root_schema_loc = get_fs_path(
+        "/test-warehouse/%s.db/%s" % (unique_database, "repeated_root_schema"))
+    check_call(['hdfs', 'dfs', '-copyFromLocal',
+        os.environ['IMPALA_HOME'] + "/testdata/data/repeated_root_schema.parquet",
+        repeated_root_schema_loc])
+
+    result = self.client.execute("select * from %s.repeated_root_schema" % unique_database)
+    assert len(result.data) == 300
+
   def test_huge_num_rows(self, vector, unique_database):
     """IMPALA-5021: Tests that a zero-slot scan on a file with a huge num_rows in the
     footer succeeds without errors."""
@@ -314,6 +326,43 @@ class TestParquet(ImpalaTestSuite):
       % unique_database)
     assert len(result.data) == 1
     assert "4294967294" in result.data
+
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  @SkipIfS3.hive
+  def test_multi_compression_types(self, vector, unique_database):
+    """IMPALA-5448: Tests that parquet splits with multi compression types are counted
+    correctly. Cases tested:
+    - parquet file with columns using the same compression type
+    - parquet files using snappy and gzip compression types
+    """
+    self.client.execute("create table %s.alltypes_multi_compression like"
+        " functional_parquet.alltypes" % unique_database)
+    hql_format = "set parquet.compression={codec};" \
+        "insert into table %s.alltypes_multi_compression" \
+        "  partition (year = {year}, month = {month})" \
+        "  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col," \
+        "    float_col, double_col,date_string_col,string_col,timestamp_col" \
+        "  from functional_parquet.alltypes" \
+        "  where year = {year} and month = {month}" % unique_database
+    check_call(['hive', '-e', hql_format.format(codec="snappy", year=2010, month=1)])
+    check_call(['hive', '-e', hql_format.format(codec="gzip", year=2010, month=2)])
+
+    self.client.execute("create table %s.multi_compression (a string, b string)"
+        " stored as parquet" % unique_database)
+    multi_compression_tbl_loc =\
+        get_fs_path("/test-warehouse/%s.db/%s" % (unique_database, "multi_compression"))
+    check_call(['hdfs', 'dfs', '-copyFromLocal', os.environ['IMPALA_HOME'] +
+        "/testdata/multi_compression_parquet_data/tinytable_0_gzip_snappy.parq",
+        multi_compression_tbl_loc])
+    check_call(['hdfs', 'dfs', '-copyFromLocal', os.environ['IMPALA_HOME'] +
+        "/testdata/multi_compression_parquet_data/tinytable_1_snappy_gzip.parq",
+        multi_compression_tbl_loc])
+
+    vector.get_value('exec_option')['num_nodes'] = 1
+    self.run_test_case('QueryTest/hdfs_parquet_scan_node_profile',
+                       vector, unique_database)
 
   def test_corrupt_rle_counts(self, vector, unique_database):
     """IMPALA-3646: Tests that a certain type of file corruption for plain
@@ -536,7 +585,6 @@ class TestParquet(ImpalaTestSuite):
     assert c_schema_elt.converted_type == ConvertedType.UTF8
     assert d_schema_elt.converted_type == None
 
-  @SkipIfOldAggsJoins.nested_types
   def test_resolution_by_name(self, vector, unique_database):
     self.run_test_case('QueryTest/parquet-resolution-by-name', vector,
                        use_db=unique_database)

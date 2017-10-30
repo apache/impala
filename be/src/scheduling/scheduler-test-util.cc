@@ -16,12 +16,16 @@
 // under the License.
 
 #include "scheduling/scheduler-test-util.h"
-#include "scheduling/scheduler.h"
+
+#include <boost/unordered_set.hpp>
 
 #include "common/names.h"
+#include "scheduling/scheduler.h"
 
 using namespace impala;
 using namespace impala::test;
+
+DECLARE_int32(krpc_port);
 
 /// Sample 'n' elements without replacement from the set [0..N-1].
 /// This is an implementation of "Algorithm R" by J. Vitter.
@@ -474,7 +478,10 @@ void SchedulerWrapper::RemoveBackend(const Host& host) {
   TTopicDelta delta;
   delta.topic_name = Scheduler::IMPALA_MEMBERSHIP_TOPIC;
   delta.is_delta = true;
-  delta.topic_deletions.push_back(host.ip);
+  TTopicItem item;
+  item.__set_deleted(true);
+  item.__set_key(host.ip);
+  delta.topic_entries.push_back(item);
   SendTopicDelta(delta);
 }
 
@@ -501,13 +508,15 @@ void SchedulerWrapper::InitializeScheduler() {
                                            << "hosts.";
   const Host& scheduler_host = plan_.cluster().hosts()[0];
   string scheduler_backend_id = scheduler_host.ip;
-  TNetworkAddress scheduler_backend_address;
-  scheduler_backend_address.hostname = scheduler_host.ip;
-  scheduler_backend_address.port = scheduler_host.be_port;
-
-  scheduler_.reset(new Scheduler(nullptr, scheduler_backend_id, scheduler_backend_address,
+  TNetworkAddress scheduler_backend_address =
+      MakeNetworkAddress(scheduler_host.ip, scheduler_host.be_port);
+  TNetworkAddress scheduler_krpc_address =
+      MakeNetworkAddress(scheduler_host.ip, FLAGS_krpc_port);
+  scheduler_.reset(new Scheduler(nullptr, scheduler_backend_id,
       &metrics_, nullptr, nullptr));
-  scheduler_->Init();
+  const Status status = scheduler_->Init(scheduler_backend_address,
+      scheduler_krpc_address, scheduler_host.ip);
+  DCHECK(status.ok()) << "Scheduler init failed in test";
   // Initialize the scheduler backend maps.
   SendFullMembershipMap();
 }

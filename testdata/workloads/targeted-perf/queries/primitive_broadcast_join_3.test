@@ -13,5 +13,7 @@ WHERE s_name='Supplier#001880004'
   AND p_brand < 'Brand#30'
   AND o_orderdate < '1994-01-01';
 ---- RESULTS
+0
 ---- TYPES
+BIGINT
 ====

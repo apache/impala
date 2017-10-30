@@ -234,11 +234,10 @@ order by c_custkey
 bigint, bigint
 ====
 ---- QUERY
-# IMPALA-5446: dropped status from Sorter::Reset() when sort cannot get reserved buffer.
-# This query is designed to allow the initial subplan iterations to succeed, but have
-# later iterations fail because the aggregation outside the subplan has accumulated all
-# the memory.
-set max_block_mgr_memory=100m;
+# This was originally a regression test for IMPALA-5446: dropped status from
+# Sorter::Reset() when sort cannot get reserved buffer. However with the
+# IMPALA-3200 changes it now succeeds.
+set buffer_pool_limit=100m;
 select c_custkey, c_name, c_address, c_phone, c_acctbal, c_mktsegment, c_comment,
        o_orderdate, sum(o_totalprice), min(rnum)
 from customer c,
@@ -247,6 +246,17 @@ from customer c,
 group by 1, 2, 3, 4, 5, 6, 7, 8
 order by 9, 10 desc
 limit 10
----- CATCH
-Memory limit exceeded: Query did not have enough memory to get the minimum required buffers in the block manager.
+---- RESULTS
+3115,'Customer#000003115','oB 75yHls7ptt5zCheWJLQ','22-291-864-7521',8889.56,'BUILDING','ts are quickly across the bold deposits. carefully spe','1998-04-23',857.71,3
+53551,'Customer#000053551','e,fT3URuJDH,tE6a6Z3Pjg0DZMFSqWbtYgd','15-429-275-5686',1137.38,'FURNITURE',' detect evenly along the blithely pending asymptotes. furiously even notornis detect carefu','1992-04-18',866.90,25
+64043,'Customer#000064043','Snyi GOB00','22-446-332-2750',4627.24,'FURNITURE','the quickly express asymptotes are around the pe','1992-01-31',870.88,11
+107698,'Customer#000107698','stUoykCwpTBAO3OC3lw','33-686-199-1188',698.89,'AUTOMOBILE',' accounts eat carefully express packages. slyly even id','1993-11-21',875.52,15
+1351,'Customer#000001351','NYMFfkNlCGoTeaDrNO9nn','11-916-210-6616',3106.00,'FURNITURE',' accounts after the final deposits sleep fluffily ironic accoun','1994-01-14',877.30,13
+85468,'Customer#000085468','EuFCX4qk4k0O4bV3UHoNVBTP','23-876-106-3120',8926.31,'AUTOMOBILE','kages. slyly even requests according to the ironic, ironic accounts cajole furiou','1997-04-12',884.52,4
+148522,'Customer#000148522','PIDMm8ulW4oam3VsoZL4f ,dpAf3LEV','16-597-824-4946',-133.27,'BUILDING','ly quickly express deposits. regularly regular requests cajole carefully slyly even noto','1995-03-20',885.75,12
+83222,'Customer#000083222','vI3tUuqtUYGPfrXAYeonVD9','27-599-263-5978',289.66,'BUILDING','ost quietly idle foxes. packages at the slyly pending pa','1993-05-02',891.74,5
+25090,'Customer#000025090','92GyVjZZiCBUmn','23-396-651-8663',8497.56,'BUILDING','osits. slyly final pinto beans sleep carefully fluffily express deposits. packages affix. carefully spe','1995-08-12',895.39,15
+27490,'Customer#000027490','jRzZQ1z7T,nrX5F58P,ZH','26-121-240-6744',7512.30,'AUTOMOBILE','slyly quickly even pinto beans: pend','1995-07-25',896.59,14
+---- TYPES
+bigint,string,string,string,decimal,string,string,string,decimal,bigint
 ====

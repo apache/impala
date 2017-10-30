@@ -114,14 +114,7 @@ function clean_cmake_files {
     echo IMPALA_HOME=$IMPALA_HOME is not valid. 1>&2
     return 1
   fi
-  # Copied from $IMPALA_HOME/bin/clean.sh.
-  FIND_ARGS=("$IMPALA_HOME" -iname '*cmake*' -not -name CMakeLists.txt \
-      -not -path "$IMPALA_HOME/cmake_modules*" \
-      -not -path "$IMPALA_HOME/thirdparty*")
-  if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
-    FIND_ARGS+=(-not -path "$IMPALA_TOOLCHAIN/*")
-  fi
-  find "${FIND_ARGS[@]}" -exec rm -Rf {} +
+  $IMPALA_HOME/bin/clean-cmake.sh
 }
 
 function switch_compiler {

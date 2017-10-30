@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from copy import copy
+
 from tests.common.impala_test_suite import ImpalaTestSuite
 
 def transpose_results(result, map_fn=lambda x: x):
@@ -46,7 +48,7 @@ class TestQueryFullSort(ImpalaTestSuite):
        takes about a minute"""
     query = """select l_comment, l_partkey, l_orderkey, l_suppkey, l_commitdate
             from lineitem order by l_comment limit 100000"""
-    exec_option = vector.get_value('exec_option')
+    exec_option = copy(vector.get_value('exec_option'))
     exec_option['disable_outermost_topn'] = 1
     table_format = vector.get_value('table_format')
 
@@ -63,16 +65,18 @@ class TestQueryFullSort(ImpalaTestSuite):
     query = """select o_orderdate, o_custkey, o_comment
       from orders
       order by o_orderdate"""
-    exec_option = vector.get_value('exec_option')
+    exec_option = copy(vector.get_value('exec_option'))
     table_format = vector.get_value('table_format')
 
-    max_block_mgr_memory_values = ['-1', '48M'] # Unlimited and minimum memory.
+    # The below memory value assume 8M pages.
+    exec_option['default_spillable_buffer_size'] = '8M'
+    buffer_pool_limit_values = ['-1', '48M'] # Unlimited and minimum memory.
     if self.exploration_strategy() == 'exhaustive' and \
         table_format.file_format == 'parquet':
       # Test some intermediate values for parquet on exhaustive.
-      max_block_mgr_memory_values += ['64M', '128M', '256M']
-    for max_block_mgr_memory in max_block_mgr_memory_values:
-      exec_option['max_block_mgr_memory'] = max_block_mgr_memory
+      buffer_pool_limit_values += ['64M', '128M', '256M']
+    for buffer_pool_limit in buffer_pool_limit_values:
+      exec_option['buffer_pool_limit'] = buffer_pool_limit
       result = transpose_results(self.execute_query(
         query, exec_option, table_format=table_format).data)
       assert(result[0] == sorted(result[0]))
@@ -83,7 +87,7 @@ class TestQueryFullSort(ImpalaTestSuite):
     query = """select o1.o_orderdate, o2.o_custkey, o1.o_comment from orders o1 join
     orders o2 on (o1.o_orderkey = o2.o_orderkey) order by o1.o_orderdate limit 100000"""
 
-    exec_option = vector.get_value('exec_option')
+    exec_option = copy(vector.get_value('exec_option'))
     exec_option['disable_outermost_topn'] = 1
     exec_option['mem_limit'] = "1200m"
     table_format = vector.get_value('table_format')
@@ -97,7 +101,7 @@ class TestQueryFullSort(ImpalaTestSuite):
     select * from orders union all select * from orders) as i
     order by o_orderdate limit 100000"""
 
-    exec_option = vector.get_value('exec_option')
+    exec_option = copy(vector.get_value('exec_option'))
     exec_option['disable_outermost_topn'] = 1
     exec_option['mem_limit'] = "3000m"
     table_format = vector.get_value('table_format')
@@ -120,7 +124,7 @@ class TestQueryFullSort(ImpalaTestSuite):
       select * from lineitem limit 300000) t
     order by l_orderkey"""
 
-    exec_option = vector.get_value('exec_option')
+    exec_option = copy(vector.get_value('exec_option'))
     exec_option['disable_outermost_topn'] = 1
     # Run with a single scanner thread so that the input doesn't get reordered.
     exec_option['num_nodes'] = "1"
@@ -145,15 +149,19 @@ class TestQueryFullSort(ImpalaTestSuite):
     limit 100000
     """
 
-    exec_option = vector.get_value('exec_option')
+    exec_option = copy(vector.get_value('exec_option'))
     exec_option['disable_outermost_topn'] = 1
-    exec_option['max_block_mgr_memory'] = "256m"
+    exec_option['buffer_pool_limit'] = "256m"
     exec_option['num_nodes'] = "1"
     table_format = vector.get_value('table_format')
 
     result = transpose_results(self.execute_query(
       query, exec_option, table_format=table_format).data)
     assert(result[0] == sorted(result[0]))
+
+  def test_sort_reservation_usage(self, vector):
+    """Tests for sorter reservation usage."""
+    self.run_test_case('sort-reservation-usage', vector)
 
 class TestRandomSort(ImpalaTestSuite):
   @classmethod

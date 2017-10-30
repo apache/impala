@@ -170,7 +170,7 @@ Status ScalarFnCall::OpenEvaluator(FunctionContext::FunctionStateScope scope,
     vector<AnyVal*>* input_vals = fn_ctx->impl()->staging_input_vals();
     for (int i = 0; i < NumFixedArgs(); ++i) {
       AnyVal* input_val;
-      RETURN_IF_ERROR(AllocateAnyVal(state, eval->mem_pool(), children_[i]->type(),
+      RETURN_IF_ERROR(AllocateAnyVal(state, eval->expr_perm_pool(), children_[i]->type(),
           "Could not allocate expression value", &input_val));
       input_vals->push_back(input_val);
     }
@@ -296,12 +296,12 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
     return Status::OK();
   }
   if (type_.type == TYPE_CHAR) {
-    return Status("ScalarFnCall Codegen not supported for CHAR");
+    return Status::Expected("ScalarFnCall Codegen not supported for CHAR");
   }
   for (int i = 0; i < GetNumChildren(); ++i) {
     if (children_[i]->type().type == TYPE_CHAR) {
       *fn = NULL;
-      return Status("ScalarFnCall Codegen not supported for CHAR");
+      return Status::Expected("ScalarFnCall Codegen not supported for CHAR");
     }
   }
 

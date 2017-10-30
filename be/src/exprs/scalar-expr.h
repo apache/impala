@@ -198,7 +198,6 @@ class ScalarExpr : public Expr {
   friend class IsNullExpr;
   friend class KuduPartitionExpr;
   friend class Literal;
-  friend class NullIfExpr;
   friend class NullLiteral;
   friend class OrPredicate;
   friend class Predicate;

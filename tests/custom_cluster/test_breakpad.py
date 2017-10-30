@@ -32,21 +32,13 @@ from tests.common.skip import SkipIfBuildType
 DAEMONS = ['impalad', 'statestored', 'catalogd']
 DAEMON_ARGS = ['impalad_args', 'state_store_args', 'catalogd_args']
 
-class TestBreakpad(CustomClusterTestSuite):
-  """Check that breakpad integration into the daemons works as expected. This includes
-  writing minidump files on unhandled signals and rotating old minidumps on startup. The
-  tests kill the daemons by sending a SIGSEGV signal.
-  """
-  # Limit for the number of minidumps that gets passed to the daemons as a startup flag.
-  MAX_MINIDUMPS = 2
-
+class TestBreakpadBase(CustomClusterTestSuite):
+  """Base class with utility methods for all breakpad tests."""
   @classmethod
   def get_workload(cls):
     return 'functional-query'
 
   def setup_method(self, method):
-    if self.exploration_strategy() != 'exhaustive':
-      pytest.skip()
     # Override parent
     # The temporary directory gets removed in teardown_method() after each test.
     self.tmp_dir = tempfile.mkdtemp()
@@ -60,8 +52,7 @@ class TestBreakpad(CustomClusterTestSuite):
 
   @classmethod
   def setup_class(cls):
-    if cls.exploration_strategy() != 'exhaustive':
-      pytest.skip('breakpad tests only run in exhaustive')
+    super(TestBreakpadBase, cls).setup_class()
     # Disable core dumps for this test
     setrlimit(RLIMIT_CORE, (0, RLIM_INFINITY))
 
@@ -80,11 +71,7 @@ class TestBreakpad(CustomClusterTestSuite):
     self._start_impala_cluster(cluster_options)
 
   def start_cluster(self):
-    self.start_cluster_with_args(minidump_path=self.tmp_dir,
-                                 max_minidumps=self.MAX_MINIDUMPS)
-
-  def start_cluster_without_minidumps(self):
-    self.start_cluster_with_args(minidump_path='', max_minidumps=self.MAX_MINIDUMPS)
+    self.start_cluster_with_args(minidump_path=self.tmp_dir)
 
   def kill_cluster(self, signal):
     self.cluster.refresh()
@@ -120,7 +107,7 @@ class TestBreakpad(CustomClusterTestSuite):
       return self.cluster.statestored and 1 or 0
     raise RuntimeError("Unknown daemon name: %s" % daemon)
 
-  def wait_for_num_processes(self, daemon, num_expected, timeout=60):
+  def wait_for_num_processes(self, daemon, num_expected, timeout=5):
     end = time.time() + timeout
     self.cluster.refresh()
     num_processes = self.get_num_processes(daemon)
@@ -149,16 +136,46 @@ class TestBreakpad(CustomClusterTestSuite):
     assert self.count_minidumps('statestored', base_dir) == 1
     assert self.count_minidumps('catalogd', base_dir) == 1
 
-
   def assert_num_logfile_entries(self, expected_count):
     self.assert_impalad_log_contains('INFO', 'Wrote minidump to ',
         expected_count=expected_count)
     self.assert_impalad_log_contains('ERROR', 'Wrote minidump to ',
         expected_count=expected_count)
 
+class TestBreakpadCore(TestBreakpadBase):
+  """Core tests to check that the breakpad integration into the daemons works as
+  expected. This includes writing minidump when the daemons call abort(). Add tests here
+  that depend on functionality of Impala other than the breakpad integration itself.
+  """
+  @pytest.mark.execute_serially
+  def test_abort_writes_minidump(self):
+    """Check that abort() (e.g. hitting a DCHECK macro) writes a minidump."""
+    assert self.count_all_minidumps() == 0
+    failed_to_start = False
+    try:
+      # Calling with an unresolvable hostname will abort.
+      self.start_cluster_with_args(minidump_path=self.tmp_dir,
+          hostname="jhzvlthd")
+    except CalledProcessError:
+      failed_to_start = True
+    assert failed_to_start
+    assert self.count_minidumps('impalad') > 0
+
+
+class TestBreakpadExhaustive(TestBreakpadBase):
+  """Exhaustive tests to check that the breakpad integration into the daemons works as
+  expected. This includes writing minidump files on unhandled signals and rotating old
+  minidumps on startup.
+  """
+  @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('These breakpad tests only run in exhaustive')
+    super(TestBreakpadExhaustive, cls).setup_class()
+
   @pytest.mark.execute_serially
   def test_minidump_creation(self):
-    """Check that when a daemon crashes it writes a minidump file."""
+    """Check that when a daemon crashes, it writes a minidump file."""
     assert self.count_all_minidumps() == 0
     self.start_cluster()
     assert self.count_all_minidumps() == 0
@@ -168,22 +185,39 @@ class TestBreakpad(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   def test_sigusr1_writes_minidump(self):
-    """Check that when a daemon receives SIGUSR1 it writes a minidump file."""
+    """Check that when a daemon receives SIGUSR1, it writes a minidump file."""
     assert self.count_all_minidumps() == 0
     self.start_cluster()
     assert self.count_all_minidumps() == 0
     cluster_size = self.get_num_processes('impalad')
     self.kill_cluster(SIGUSR1)
     # Breakpad forks to write its minidump files, wait for all the clones to terminate.
-    assert self.wait_for_num_processes('impalad', cluster_size, 5) == cluster_size
-    assert self.wait_for_num_processes('catalogd', 1, 5) == 1
-    assert self.wait_for_num_processes('statestored', 1, 5) == 1
+    assert self.wait_for_num_processes('impalad', cluster_size) == cluster_size
+    assert self.wait_for_num_processes('catalogd', 1) == 1
+    assert self.wait_for_num_processes('statestored', 1) == 1
     # Make sure impalad still answers queries.
     client = self.create_impala_client()
     self.execute_query_expect_success(client, "SELECT COUNT(*) FROM functional.alltypes")
     # Kill the cluster. Sending SIGKILL will not trigger minidumps to be written.
     self.kill_cluster(SIGKILL)
     self.assert_num_minidumps_for_all_daemons(cluster_size)
+
+  @pytest.mark.execute_serially
+  def test_sigusr1_doesnt_kill(self):
+    """Check that when minidumps are disabled and a daemon receives SIGUSR1, it does not
+    die.
+    """
+    assert self.count_all_minidumps() == 0
+    self.start_cluster_with_args(enable_minidumps=False)
+    cluster_size = self.get_num_processes('impalad')
+    self.kill_cluster(SIGUSR1)
+    # Check that no minidumps have been written.
+    self.assert_num_logfile_entries(0)
+    assert self.count_all_minidumps() == 0
+    # Check that all daemons are still alive.
+    assert self.get_num_processes('impalad') == cluster_size
+    assert self.get_num_processes('catalogd') == 1
+    assert self.get_num_processes('statestored') == 1
 
   @pytest.mark.execute_serially
   def test_minidump_relative_path(self):
@@ -206,20 +240,58 @@ class TestBreakpad(CustomClusterTestSuite):
     """Check that a limited number of minidumps is preserved during startup."""
     assert self.count_all_minidumps() == 0
     self.start_cluster()
+    cluster_size = self.get_num_processes('impalad')
     self.kill_cluster(SIGSEGV)
     self.assert_num_logfile_entries(1)
-    self.start_cluster()
-    expected_impalads = min(self.get_num_processes('impalad'), self.MAX_MINIDUMPS)
-    assert self.count_minidumps('impalad') == expected_impalads
+    # Maximum number of minidumps that the impalads should keep for this test.
+    max_minidumps = 2
+    self.start_cluster_with_args(minidump_path=self.tmp_dir,
+                                 max_minidumps=max_minidumps)
+    assert self.count_minidumps('impalad') == min(cluster_size, max_minidumps)
     assert self.count_minidumps('statestored') == 1
     assert self.count_minidumps('catalogd') == 1
 
   @pytest.mark.execute_serially
+  def test_minidump_cleanup_thread(self):
+    """Check that periodic rotation preserves a limited number of minidumps."""
+    assert self.count_all_minidumps() == 0
+    # Maximum number of minidumps that the impalads should keep for this test.
+    max_minidumps = 2
+    # Sleep interval for the log rotation thread.
+    rotation_interval = 1
+    self.start_cluster_with_args(minidump_path=self.tmp_dir,
+                                 max_minidumps=max_minidumps,
+                                 logbufsecs=rotation_interval)
+    cluster_size = self.get_num_processes('impalad')
+    # We trigger several rounds of minidump creation to make sure that all daemons wrote
+    # enough files to trigger rotation.
+    for i in xrange(max_minidumps + 1):
+      self.kill_cluster(SIGUSR1)
+      # Breakpad forks to write its minidump files, wait for all the clones to terminate.
+      assert self.wait_for_num_processes('impalad', cluster_size) == cluster_size
+      assert self.wait_for_num_processes('catalogd', 1) == 1
+      assert self.wait_for_num_processes('statestored', 1) == 1
+      self.assert_num_logfile_entries(i + 1)
+    # Sleep long enough for log cleaning to take effect.
+    time.sleep(rotation_interval + 1)
+    assert self.count_minidumps('impalad') == min(cluster_size, max_minidumps)
+    assert self.count_minidumps('statestored') == max_minidumps
+    assert self.count_minidumps('catalogd') == max_minidumps
+
+  @pytest.mark.execute_serially
   def test_disable_minidumps(self):
+    """Check that setting enable_minidumps to false disables minidump creation."""
+    assert self.count_all_minidumps() == 0
+    self.start_cluster_with_args(enable_minidumps=False)
+    self.kill_cluster(SIGSEGV)
+    self.assert_num_logfile_entries(0)
+
+  @pytest.mark.execute_serially
+  def test_empty_minidump_path_disables_breakpad(self):
     """Check that setting the minidump_path to an empty value disables minidump creation.
     """
     assert self.count_all_minidumps() == 0
-    self.start_cluster_without_minidumps()
+    self.start_cluster_with_args(minidump_path='')
     self.kill_cluster(SIGSEGV)
     self.assert_num_logfile_entries(0)
 
@@ -258,17 +330,3 @@ class TestBreakpad(CustomClusterTestSuite):
     reduced_minidump_size = self.trigger_single_minidump_and_get_size()
     # Check that the minidump file size has been reduced.
     assert reduced_minidump_size < full_minidump_size
-
-  @SkipIfBuildType.not_dev_build
-  @pytest.mark.execute_serially
-  def test_dcheck_writes_minidump(self):
-    """Check that hitting a DCHECK macro writes a minidump."""
-    assert self.count_all_minidumps() == 0
-    failed_to_start = False
-    try:
-      self.start_cluster_with_args(minidump_path=self.tmp_dir,
-          beeswax_port=1)
-    except CalledProcessError:
-      failed_to_start = True
-    assert failed_to_start
-    assert self.count_minidumps('impalad') > 0

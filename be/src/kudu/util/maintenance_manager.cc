@@ -40,38 +40,38 @@ using std::pair;
 using std::shared_ptr;
 using strings::Substitute;
 
-DEFINE_int32(maintenance_manager_num_threads, 1,
+DEFINE_int32_hidden(maintenance_manager_num_threads, 1,
              "Size of the maintenance manager thread pool. "
              "For spinning disks, the number of threads should "
              "not be above the number of devices.");
 TAG_FLAG(maintenance_manager_num_threads, stable);
 
-DEFINE_int32(maintenance_manager_polling_interval_ms, 250,
+DEFINE_int32_hidden(maintenance_manager_polling_interval_ms, 250,
        "Polling interval for the maintenance manager scheduler, "
        "in milliseconds.");
 TAG_FLAG(maintenance_manager_polling_interval_ms, hidden);
 
-DEFINE_int32(maintenance_manager_history_size, 8,
+DEFINE_int32_hidden(maintenance_manager_history_size, 8,
        "Number of completed operations the manager is keeping track of.");
 TAG_FLAG(maintenance_manager_history_size, hidden);
 
-DEFINE_bool(enable_maintenance_manager, true,
+DEFINE_bool_hidden(enable_maintenance_manager, true,
        "Enable the maintenance manager, runs compaction and tablet cleaning tasks.");
 TAG_FLAG(enable_maintenance_manager, unsafe);
 
-DEFINE_int64(log_target_replay_size_mb, 1024,
+DEFINE_int64_hidden(log_target_replay_size_mb, 1024,
              "The target maximum size of logs to be replayed at startup. If a tablet "
              "has in-memory operations that are causing more than this size of logs "
              "to be retained, then the maintenance manager will prioritize flushing "
              "these operations to disk.");
 TAG_FLAG(log_target_replay_size_mb, experimental);
 
-DEFINE_int64(data_gc_min_size_mb, 0,
+DEFINE_int64_hidden(data_gc_min_size_mb, 0,
              "The (exclusive) minimum number of megabytes of ancient data on "
              "disk, per tablet, needed to prioritize deletion of that data.");
 TAG_FLAG(data_gc_min_size_mb, experimental);
 
-DEFINE_double(data_gc_prioritization_prob, 0.5,
+DEFINE_double_hidden(data_gc_prioritization_prob, 0.5,
              "The probability that we will prioritize data GC over performance "
              "improvement operations. If set to 1.0, we will always prefer to "
              "delete old data before running performance improvement operations "
@@ -111,7 +111,7 @@ void MaintenanceOp::Unregister() {
   manager_->UnregisterOp(this);
 }
 
-const MaintenanceManager::Options MaintenanceManager::DEFAULT_OPTIONS = {
+const MaintenanceManager::Options MaintenanceManager::kDefaultOptions = {
   .num_threads = 0,
   .polling_interval_ms = 0,
   .history_size = 0,

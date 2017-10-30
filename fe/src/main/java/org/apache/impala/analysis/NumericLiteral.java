@@ -90,7 +90,6 @@ public class NumericLiteral extends LiteralExpr {
   public NumericLiteral(BigInteger value, Type type) {
     value_ = new BigDecimal(value);
     type_ = type;
-    evalCost_ = LITERAL_COST;
     explicitlyCast_ = true;
     analysisDone();
   }
@@ -98,7 +97,6 @@ public class NumericLiteral extends LiteralExpr {
   public NumericLiteral(BigDecimal value, Type type) {
     value_ = value;
     type_ = type;
-    evalCost_ = LITERAL_COST;
     explicitlyCast_ = true;
     analysisDone();
   }
@@ -222,7 +220,6 @@ public class NumericLiteral extends LiteralExpr {
         }
       }
     }
-    evalCost_ = LITERAL_COST;
   }
 
   /**

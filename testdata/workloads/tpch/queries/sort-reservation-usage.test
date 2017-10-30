@@ -1,0 +1,30 @@
+====
+---- QUERY
+# Test that in-mem sorts incrementally give up memory when emitting output.
+# This query and the limit is calibrated to fail if the first sort does not
+# give up memory to the second sort.
+set num_nodes=1;
+set scratch_limit=0;
+set buffer_pool_limit=15m;
+set default_spillable_buffer_size=64kb;
+SELECT *
+FROM   (SELECT
+        Rank() OVER(ORDER BY  l_orderkey) AS rank,
+        Rank() OVER(ORDER BY  l_partkey) AS rank2
+        FROM lineitem
+        WHERE l_shipdate < '1992-05-09') a
+WHERE rank < 10
+ORDER BY rank;
+---- RESULTS
+1,118035
+2,55836
+2,141809
+2,155407
+5,84064
+5,129763
+7,10725
+7,31340
+7,155173
+---- TYPES
+BIGINT,BIGINT
+====

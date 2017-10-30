@@ -72,15 +72,15 @@ fi
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=426-d9b44a854b
+export IMPALA_TOOLCHAIN_BUILD_ID=474-6c406b4a88
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p4
 export IMPALA_BINUTILS_VERSION=2.26.1
 export IMPALA_BOOST_VERSION=1.57.0-p3
-export IMPALA_BREAKPAD_VERSION=ffe3e478657dc7126fca6329dfcedc49f4c726d9-p2
+export IMPALA_BREAKPAD_VERSION=1b704857f1e78a864e6942e613457e55f1aecb60-p3
 export IMPALA_BZIP2_VERSION=1.0.6-p2
-export IMPALA_CMAKE_VERSION=3.2.3-p1
+export IMPALA_CMAKE_VERSION=3.8.2-p1
 export IMPALA_CRCUTIL_VERSION=440ba7babeff77ffad992df3a10c767f184e946e-p1
 export IMPALA_CYRUS_SASL_VERSION=2.1.23
 export IMPALA_FLATBUFFERS_VERSION=1.6.0
@@ -90,14 +90,14 @@ export IMPALA_GLOG_VERSION=0.3.4-p2
 export IMPALA_GPERFTOOLS_VERSION=2.5
 export IMPALA_GTEST_VERSION=1.6.0
 export IMPALA_LIBEV_VERSION=4.20
-export IMPALA_LLVM_VERSION=3.8.0-p1
-export IMPALA_LLVM_ASAN_VERSION=3.8.0-p1
+export IMPALA_LLVM_VERSION=3.9.1
+export IMPALA_LLVM_ASAN_VERSION=3.9.1
 # Debug builds should use the release+asserts build to get additional coverage.
 # Don't use the LLVM debug build because the binaries are too large to distribute.
-export IMPALA_LLVM_DEBUG_VERSION=3.8.0-asserts-p1
+export IMPALA_LLVM_DEBUG_VERSION=3.9.1-asserts
 export IMPALA_LZ4_VERSION=1.7.5
 export IMPALA_OPENLDAP_VERSION=2.4.25
-export IMPALA_OPENSSL_VERSION=0.9.8zf
+export IMPALA_OPENSSL_VERSION=1.0.2l
 export IMPALA_PROTOBUF_VERSION=2.6.1
 export IMPALA_POSTGRES_JDBC_DRIVER_VERSION=9.0-801
 export IMPALA_RAPIDJSON_VERSION=0.11
@@ -107,7 +107,7 @@ export IMPALA_SQUEASEL_VERSION=3.3
 # TPC utilities used for test/benchmark data generation.
 export IMPALA_TPC_DS_VERSION=2.1.0
 export IMPALA_TPC_H_VERSION=2.17.0
-export IMPALA_THRIFT_VERSION=0.9.0-p9
+export IMPALA_THRIFT_VERSION=0.9.0-p11
 export IMPALA_THRIFT_JAVA_VERSION=0.9.0
 export IMPALA_ZLIB_VERSION=1.2.8
 
@@ -120,19 +120,19 @@ if [[ $OSTYPE == "darwin"* ]]; then
 fi
 
 # Kudu version in the toolchain; provides libkudu_client.so and minicluster binaries.
-export IMPALA_KUDU_VERSION=27854fd
+export IMPALA_KUDU_VERSION=bec2a24
 
 # Kudu version used to identify Java client jar from maven
-export KUDU_JAVA_VERSION=1.5.0-cdh5.13.0-SNAPSHOT
+export KUDU_JAVA_VERSION=1.6.0-cdh5.14.0-SNAPSHOT
 
 # Versions of Hadoop ecosystem dependencies.
 # ------------------------------------------
 export CDH_MAJOR_VERSION=5
-export IMPALA_HADOOP_VERSION=2.6.0-cdh5.13.0-SNAPSHOT
-export IMPALA_HBASE_VERSION=1.2.0-cdh5.13.0-SNAPSHOT
-export IMPALA_HIVE_VERSION=1.1.0-cdh5.13.0-SNAPSHOT
-export IMPALA_SENTRY_VERSION=1.5.1-cdh5.13.0-SNAPSHOT
-export IMPALA_PARQUET_VERSION=1.5.0-cdh5.13.0-SNAPSHOT
+export IMPALA_HADOOP_VERSION=2.6.0-cdh5.14.0-SNAPSHOT
+export IMPALA_HBASE_VERSION=1.2.0-cdh5.14.0-SNAPSHOT
+export IMPALA_HIVE_VERSION=1.1.0-cdh5.14.0-SNAPSHOT
+export IMPALA_SENTRY_VERSION=1.5.1-cdh5.14.0-SNAPSHOT
+export IMPALA_PARQUET_VERSION=1.5.0-cdh5.14.0-SNAPSHOT
 export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
 
 # Source the branch and local config override files here to override any
@@ -334,17 +334,12 @@ export IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR="${IMPALA_LOGS_DIR}/custom_cluster_te
 # List of all Impala log dirs so they can be created by buildall.sh
 export IMPALA_ALL_LOGS_DIRS="${IMPALA_CLUSTER_LOGS_DIR}
   ${IMPALA_DATA_LOADING_LOGS_DIR} ${IMPALA_DATA_LOADING_SQL_DIR}
-  ${IMPALA_EE_TEST_LOGS_DIR} ${IMPALA_FE_TEST_COVERAGE_DIR}
+  ${IMPALA_FE_TEST_LOGS_DIR} ${IMPALA_FE_TEST_COVERAGE_DIR}
   ${IMPALA_BE_TEST_LOGS_DIR} ${IMPALA_EE_TEST_LOGS_DIR}
   ${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR}"
 
 # Reduce the concurrency for local tests to half the number of cores in the system.
-# Note than nproc may not be available on older distributions (centos5.5)
-if type nproc >/dev/null 2>&1; then
-  CORES=$(($(nproc) / 2))
-else
-  CORES=4
-fi
+CORES=$(($(getconf _NPROCESSORS_ONLN) / 2))
 export NUM_CONCURRENT_TESTS="${NUM_CONCURRENT_TESTS-${CORES}}"
 
 export KUDU_MASTER_HOSTS="${KUDU_MASTER_HOSTS:-127.0.0.1}"
@@ -448,31 +443,23 @@ export USER="${USER-`id -un`}"
 # Enable if you suspect a JNI issue
 # TODO: figure out how to turn this off only the stuff that can't run with it.
 #LIBHDFS_OPTS="-Xcheck:jni -Xcheck:nabounds"
-# - Points to the location of libbackend.so.
 export LIBHDFS_OPTS="${LIBHDFS_OPTS:-} -Djava.library.path=${HADOOP_LIB_DIR}/native/"
-# READER BEWARE: This always points to the debug build.
-# TODO: Consider having cmake scripts change this value depending on
-# the build type.
-LIBHDFS_OPTS="${LIBHDFS_OPTS}:${IMPALA_HOME}/be/build/debug/service"
+
 # IMPALA-5080: Our use of PermGen space sometimes exceeds the default maximum while
 # running tests that load UDF jars.
 LIBHDFS_OPTS="${LIBHDFS_OPTS} -XX:MaxPermSize=128m"
-
-export ARTISTIC_STYLE_OPTIONS="$IMPALA_BE_DIR/.astylerc"
 
 export IMPALA_SNAPPY_PATH="${IMPALA_TOOLCHAIN}/snappy-${IMPALA_SNAPPY_VERSION}/lib"
 
 export JAVA_LIBRARY_PATH="${IMPALA_SNAPPY_PATH}"
 
-# So that the frontend tests and PlanService can pick up libbackend.so
-# and other required libraries
+# So that the frontend tests and PlanService can pick up required libraries
 LIB_JAVA=`find "${JAVA_HOME}/"   -name libjava.so | head -1`
 LIB_JSIG=`find "${JAVA_HOME}/"   -name libjsig.so | head -1`
 LIB_JVM=` find "${JAVA_HOME}/"   -name libjvm.so  | head -1`
 export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}:`dirname ${LIB_JAVA}`:`dirname ${LIB_JSIG}`"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JVM}`"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${HADOOP_LIB_DIR}/native"
-LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/be/build/debug/service"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_SNAPPY_PATH}"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_LZO}/build"
 
@@ -487,10 +474,6 @@ export CLASSPATH="$IMPALA_FE_DIR/target/dependency:${CLASSPATH-}"
 CLASSPATH="$IMPALA_FE_DIR/target/classes:$CLASSPATH"
 CLASSPATH="$IMPALA_FE_DIR/src/test/resources:$CLASSPATH"
 CLASSPATH="$LZO_JAR_PATH:$CLASSPATH"
-
-# Setup aliases
-# Helper alias to script that verifies and merges Gerrit changes
-alias gerrit-verify-only="${IMPALA_AUX_TEST_HOME}/jenkins/gerrit-verify-only.sh"
 
 # A marker in the environment to prove that we really did source this file
 export IMPALA_CONFIG_SOURCED=1

@@ -20,6 +20,8 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <unordered_set>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/thread/mutex.hpp>
 #include <gutil/strings/substitute.h>
@@ -33,6 +35,8 @@
 #include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
+#include <llvm/IR/DiagnosticInfo.h>
+#include <llvm/IR/DiagnosticPrinter.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/InstIterator.h>
@@ -160,6 +164,7 @@ Status LlvmCodeGen::InitializeLlvm(bool load_backend) {
 
   // Initialize the global shared call graph.
   shared_call_graph_.Init(init_codegen->module_);
+  init_codegen->Close();
   return Status::OK();
 }
 
@@ -167,8 +172,8 @@ LlvmCodeGen::LlvmCodeGen(RuntimeState* state, ObjectPool* pool,
     MemTracker* parent_mem_tracker, const string& id)
   : state_(state),
     id_(id),
-    profile_(pool, "CodeGen"),
-    mem_tracker_(new MemTracker(&profile_, -1, "CodeGen", parent_mem_tracker)),
+    profile_(RuntimeProfile::Create(pool, "CodeGen")),
+    mem_tracker_(pool->Add(new MemTracker(profile_, -1, "CodeGen", parent_mem_tracker))),
     optimizations_enabled_(false),
     is_corrupt_(false),
     is_compiled_(false),
@@ -178,21 +183,22 @@ LlvmCodeGen::LlvmCodeGen(RuntimeState* state, ObjectPool* pool,
     loaded_functions_(IRFunction::FN_END, NULL) {
   DCHECK(llvm_initialized_) << "Must call LlvmCodeGen::InitializeLlvm first.";
 
-  load_module_timer_ = ADD_TIMER(&profile_, "LoadTime");
-  prepare_module_timer_ = ADD_TIMER(&profile_, "PrepareTime");
-  module_bitcode_size_ = ADD_COUNTER(&profile_, "ModuleBitcodeSize", TUnit::BYTES);
-  codegen_timer_ = ADD_TIMER(&profile_, "CodegenTime");
-  optimization_timer_ = ADD_TIMER(&profile_, "OptimizationTime");
-  compile_timer_ = ADD_TIMER(&profile_, "CompileTime");
-  num_functions_ = ADD_COUNTER(&profile_, "NumFunctions", TUnit::UNIT);
-  num_instructions_ = ADD_COUNTER(&profile_, "NumInstructions", TUnit::UNIT);
+  context_->setDiagnosticHandler(&DiagnosticHandler::DiagnosticHandlerFn, this);
+  load_module_timer_ = ADD_TIMER(profile_, "LoadTime");
+  prepare_module_timer_ = ADD_TIMER(profile_, "PrepareTime");
+  module_bitcode_size_ = ADD_COUNTER(profile_, "ModuleBitcodeSize", TUnit::BYTES);
+  codegen_timer_ = ADD_TIMER(profile_, "CodegenTime");
+  optimization_timer_ = ADD_TIMER(profile_, "OptimizationTime");
+  compile_timer_ = ADD_TIMER(profile_, "CompileTime");
+  num_functions_ = ADD_COUNTER(profile_, "NumFunctions", TUnit::UNIT);
+  num_instructions_ = ADD_COUNTER(profile_, "NumInstructions", TUnit::UNIT);
 }
 
 Status LlvmCodeGen::CreateFromFile(RuntimeState* state, ObjectPool* pool,
     MemTracker* parent_mem_tracker, const string& file, const string& id,
     scoped_ptr<LlvmCodeGen>* codegen) {
   codegen->reset(new LlvmCodeGen(state, pool, parent_mem_tracker, id));
-  SCOPED_TIMER((*codegen)->profile_.total_time_counter());
+  SCOPED_TIMER((*codegen)->profile_->total_time_counter());
 
   unique_ptr<Module> loaded_module;
   RETURN_IF_ERROR((*codegen)->LoadModuleFromFile(file, &loaded_module));
@@ -203,7 +209,7 @@ Status LlvmCodeGen::CreateFromFile(RuntimeState* state, ObjectPool* pool,
 Status LlvmCodeGen::CreateFromMemory(RuntimeState* state, ObjectPool* pool,
     MemTracker* parent_mem_tracker, const string& id, scoped_ptr<LlvmCodeGen>* codegen) {
   codegen->reset(new LlvmCodeGen(state, pool, parent_mem_tracker, id));
-  SCOPED_TIMER((*codegen)->profile_.total_time_counter());
+  SCOPED_TIMER((*codegen)->profile_->total_time_counter());
 
   // Select the appropriate IR version. We cannot use LLVM IR with SSE4.2 instructions on
   // a machine without SSE4.2 support.
@@ -250,9 +256,9 @@ Status LlvmCodeGen::LoadModuleFromMemory(unique_ptr<MemoryBuffer> module_ir_buf,
     string module_name, unique_ptr<Module>* module) {
   DCHECK(!module_name.empty());
   SCOPED_TIMER(prepare_module_timer_);
-  ErrorOr<unique_ptr<Module>> tmp_module(NULL);
   COUNTER_ADD(module_bitcode_size_, module_ir_buf->getMemBufferRef().getBufferSize());
-  tmp_module = getLazyBitcodeModule(std::move(module_ir_buf), context(), false);
+  ErrorOr<unique_ptr<Module>> tmp_module =
+      getLazyBitcodeModule(std::move(module_ir_buf), context(), false);
   if (!tmp_module) {
     stringstream ss;
     ss << "Could not parse module " << module_name << ": " << tmp_module.getError();
@@ -273,7 +279,7 @@ Status LlvmCodeGen::LoadModuleFromMemory(unique_ptr<MemoryBuffer> module_ir_buf,
 Status LlvmCodeGen::LinkModule(const string& file) {
   if (linked_modules_.find(file) != linked_modules_.end()) return Status::OK();
 
-  SCOPED_TIMER(profile_.total_time_counter());
+  SCOPED_TIMER(profile_->total_time_counter());
   unique_ptr<Module> new_module;
   RETURN_IF_ERROR(LoadModuleFromFile(file, &new_module));
 
@@ -295,9 +301,11 @@ Status LlvmCodeGen::LinkModule(const string& file) {
   }
 
   bool error = Linker::linkModules(*module_, std::move(new_module));
+  string diagnostic_err = diagnostic_handler_.GetErrorString();
   if (error) {
     stringstream ss;
     ss << "Problem linking " << file << " to main module.";
+    if (!diagnostic_err.empty()) ss << " " << diagnostic_err;
     return Status(ss.str());
   }
   linked_modules_.insert(file);
@@ -321,19 +329,19 @@ Status LlvmCodeGen::CreateImpalaCodegen(RuntimeState* state,
   LlvmCodeGen* codegen = codegen_ret->get();
 
   // Parse module for cross compiled functions and types
-  SCOPED_TIMER(codegen->profile_.total_time_counter());
+  SCOPED_TIMER(codegen->profile_->total_time_counter());
   SCOPED_TIMER(codegen->prepare_module_timer_);
 
   // Get type for StringValue
-  codegen->string_val_type_ = codegen->GetType(StringValue::LLVM_CLASS_NAME);
+  codegen->string_value_type_ = codegen->GetType(StringValue::LLVM_CLASS_NAME);
 
   // Get type for TimestampValue
-  codegen->timestamp_val_type_ = codegen->GetType(TimestampValue::LLVM_CLASS_NAME);
+  codegen->timestamp_value_type_ = codegen->GetType(TimestampValue::LLVM_CLASS_NAME);
 
   // Verify size is correct
   const DataLayout& data_layout = codegen->execution_engine()->getDataLayout();
   const StructLayout* layout =
-      data_layout.getStructLayout(static_cast<StructType*>(codegen->string_val_type_));
+      data_layout.getStructLayout(static_cast<StructType*>(codegen->string_value_type_));
   if (layout->getSizeInBytes() != sizeof(StringValue)) {
     DCHECK_EQ(layout->getSizeInBytes(), sizeof(StringValue));
     return Status("Could not create llvm struct type for StringVal");
@@ -405,13 +413,20 @@ void LlvmCodeGen::SetupJITListeners() {
 }
 
 LlvmCodeGen::~LlvmCodeGen() {
-  if (memory_manager_ != NULL) mem_tracker_->Release(memory_manager_->bytes_tracked());
-  if (mem_tracker_->parent() != NULL) mem_tracker_->UnregisterFromParent();
-  mem_tracker_.reset();
+  DCHECK(execution_engine_ == nullptr) << "Must Close() before destruction";
+}
+
+void LlvmCodeGen::Close() {
+  if (memory_manager_ != nullptr) {
+    mem_tracker_->Release(memory_manager_->bytes_tracked());
+    memory_manager_ = nullptr;
+  }
+  if (mem_tracker_ != nullptr) mem_tracker_->Close();
 
   // Execution engine executes callback on event listener, so tear down engine first.
   execution_engine_.reset();
   symbol_emitter_.reset();
+  module_ = nullptr;
 }
 
 void LlvmCodeGen::EnableOptimizations(bool enable) {
@@ -436,7 +451,7 @@ string LlvmCodeGen::GetIR(bool full_module) const {
     module_->print(stream, NULL);
   } else {
     for (int i = 0; i < codegend_functions_.size(); ++i) {
-      codegend_functions_[i]->print(stream, true);
+      codegend_functions_[i]->print(stream, nullptr, false, true);
     }
   }
   return str;
@@ -462,14 +477,17 @@ Type* LlvmCodeGen::GetType(const ColumnType& type) {
       return Type::getDoubleTy(context());
     case TYPE_STRING:
     case TYPE_VARCHAR:
-      return string_val_type_;
+      return string_value_type_;
+    case TYPE_FIXED_UDA_INTERMEDIATE:
+      // Represent this as an array of bytes.
+      return ArrayType::get(GetType(TYPE_TINYINT), type.len);
     case TYPE_CHAR:
       // IMPALA-3207: Codegen for CHAR is not yet implemented, this should not
       // be called for TYPE_CHAR.
       DCHECK(false) << "NYI";
       return NULL;
     case TYPE_TIMESTAMP:
-      return timestamp_val_type_;
+      return timestamp_value_type_;
     case TYPE_DECIMAL:
       return Type::getIntNTy(context(), type.GetByteSize() * 8);
     default:
@@ -607,7 +625,7 @@ Status LlvmCodeGen::MaterializeFunctionHelper(Function *fn) {
 }
 
 Status LlvmCodeGen::MaterializeFunction(Function *fn) {
-  SCOPED_TIMER(profile_.total_time_counter());
+  SCOPED_TIMER(profile_->total_time_counter());
   SCOPED_TIMER(prepare_module_timer_);
   return MaterializeFunctionHelper(fn);
 }
@@ -959,9 +977,8 @@ Function* LlvmCodeGen::CloneFunction(Function* fn) {
   // GetFunction() to obtain the Function object.
   DCHECK(!fn->isMaterializable());
   // CloneFunction() automatically gives the new function a unique name
-  Function* fn_clone = llvm::CloneFunction(fn, dummy_vmap, false);
+  Function* fn_clone = llvm::CloneFunction(fn, dummy_vmap);
   fn_clone->copyAttributesFrom(fn);
-  module_->getFunctionList().push_back(fn_clone);
   return fn_clone;
 }
 
@@ -1025,7 +1042,7 @@ Status LlvmCodeGen::FinalizeModule() {
   }
 
   if (is_corrupt_) return Status("Module is corrupt.");
-  SCOPED_TIMER(profile_.total_time_counter());
+  SCOPED_TIMER(profile_->total_time_counter());
 
   // Don't waste time optimizing module if there are no functions to JIT. This can happen
   // if the codegen object is created but no functions are successfully codegen'd.
@@ -1106,13 +1123,16 @@ Status LlvmCodeGen::OptimizeModule() {
   // global dead code elimination pass. This causes all functions not registered to be
   // JIT'd to be marked as internal, and any internal functions that are not used are
   // deleted by DCE pass. This greatly decreases compile time by removing unused code.
-  vector<const char*> exported_fn_names;
-  for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
-    exported_fn_names.push_back(fns_to_jit_compile_[i].first->getName().data());
+  unordered_set<string> exported_fn_names;
+  for (auto& entry : fns_to_jit_compile_) {
+    exported_fn_names.insert(entry.first->getName().str());
   }
   unique_ptr<legacy::PassManager> module_pass_manager(new legacy::PassManager());
   module_pass_manager->add(createTargetTransformInfoWrapperPass(target_analysis));
-  module_pass_manager->add(createInternalizePass(exported_fn_names));
+  module_pass_manager->add(
+      createInternalizePass([&exported_fn_names] (const GlobalValue &gv) {
+        return exported_fn_names.find(gv.getName().str()) != exported_fn_names.end();
+      }));
   module_pass_manager->add(createGlobalDCEPass());
   module_pass_manager->run(*module_);
 
@@ -1242,6 +1262,7 @@ Status LlvmCodeGen::GetSymbols(const string& file, const string& module_id,
   for (const Function& fn: codegen->module_->functions()) {
     if (fn.isMaterializable()) symbols->insert(fn.getName());
   }
+  codegen->Close();
   return Status::OK();
 }
 
@@ -1592,6 +1613,29 @@ Constant* LlvmCodeGen::ConstantToGVPtr(Type* type, Constant* ir_constant,
       GlobalValue::PrivateLinkage, ir_constant, name);
   return ConstantExpr::getGetElementPtr(NULL, gv,
       ArrayRef<Constant*>({GetIntConstant(TYPE_INT, 0)}));
+}
+
+void LlvmCodeGen::DiagnosticHandler::DiagnosticHandlerFn(const DiagnosticInfo &info,
+    void *context){
+  if (info.getSeverity() == DiagnosticSeverity::DS_Error) {
+    LlvmCodeGen* codegen = reinterpret_cast<LlvmCodeGen*>(context);
+    codegen->diagnostic_handler_.error_str_.clear();
+    raw_string_ostream error_msg(codegen->diagnostic_handler_.error_str_);
+    DiagnosticPrinterRawOStream diagnostic_printer(error_msg);
+    diagnostic_printer << "LLVM diagnostic error: ";
+    info.print(diagnostic_printer);
+    error_msg.flush();
+    LOG(INFO) << "Query " << codegen->state_->query_id() << " encountered a "
+        << codegen->diagnostic_handler_.error_str_;
+  }
+}
+
+string LlvmCodeGen::DiagnosticHandler::GetErrorString() {
+  if (!error_str_.empty()) {
+    string return_msg(move(error_str_)); // Also clears error_str_.
+    return return_msg;
+  }
+  return "";
 }
 
 }

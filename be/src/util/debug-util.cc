@@ -78,6 +78,7 @@ THRIFT_ENUM_OUTPUT_FN(TDdlType);
 THRIFT_ENUM_OUTPUT_FN(TCatalogOpType);
 THRIFT_ENUM_OUTPUT_FN(THdfsFileFormat);
 THRIFT_ENUM_OUTPUT_FN(THdfsCompression);
+THRIFT_ENUM_OUTPUT_FN(TReplicaPreference);
 THRIFT_ENUM_OUTPUT_FN(TSessionType);
 THRIFT_ENUM_OUTPUT_FN(TStmtType);
 THRIFT_ENUM_OUTPUT_FN(QueryState);
@@ -91,6 +92,7 @@ THRIFT_ENUM_OUTPUT_FN(TImpalaQueryOptions);
 THRIFT_ENUM_PRINT_FN(TCatalogObjectType);
 THRIFT_ENUM_PRINT_FN(TDdlType);
 THRIFT_ENUM_PRINT_FN(TCatalogOpType);
+THRIFT_ENUM_PRINT_FN(TReplicaPreference);
 THRIFT_ENUM_PRINT_FN(TSessionType);
 THRIFT_ENUM_PRINT_FN(TStmtType);
 THRIFT_ENUM_PRINT_FN(QueryState);
@@ -108,15 +110,6 @@ ostream& operator<<(ostream& os, const TUniqueId& id) {
 string PrintId(const TUniqueId& id, const string& separator) {
   stringstream out;
   out << hex << id.hi << separator << id.lo;
-  return out.str();
-}
-
-string PrintAsHex(const char* bytes, int64_t len) {
-  stringstream out;
-  out << hex << std::setfill('0');
-  for (int i = 0; i < len; ++i) {
-    out << setw(2) << static_cast<uint16_t>(bytes[i]);
-  }
   return out.str();
 }
 

@@ -20,6 +20,7 @@
 #define IMPALA_EXEC_HDFS_PARQUET_SCANNER_H
 
 #include "codegen/impala-ir.h"
+#include "common/global-flags.h"
 #include "exec/hdfs-scanner.h"
 #include "exec/parquet-common.h"
 #include "exec/parquet-scratch-tuple-batch.h"
@@ -359,6 +360,10 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Size of the file footer.  This is a guess.  If this value is too little, we will
   /// need to issue another read.
   static const int64_t FOOTER_SIZE = 1024 * 100;
+  static_assert(FOOTER_SIZE <= READ_SIZE_MIN_VALUE,
+      "FOOTER_SIZE can not be greater than READ_SIZE_MIN_VALUE.\n"
+      "You can increase FOOTER_SIZE if you want, "
+      "just don't forget to increase READ_SIZE_MIN_VALUE as well.");
 
   /// Class name in LLVM IR.
   static const char* LLVM_CLASS_NAME;
@@ -474,6 +479,12 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Number of row groups skipped due to dictionary filter
   RuntimeProfile::Counter* num_dict_filtered_row_groups_counter_;
 
+  /// Number of collection items read in current row batch. It is a scanner-local counter
+  /// used to reduce the frequency of updating HdfsScanNode counter. It is updated by the
+  /// callees of AssembleRows() and is merged into the HdfsScanNode counter at the end of
+  /// AssembleRows() and then is reset to 0.
+  int64_t coll_items_read_counter_;
+
   typedef int (*ProcessScratchBatchFn)(HdfsParquetScanner*, RowBatch*);
   /// The codegen'd version of ProcessScratchBatch() if available, NULL otherwise.
   ProcessScratchBatchFn codegend_process_scratch_batch_fn_;
@@ -545,7 +556,8 @@ class HdfsParquetScanner : public HdfsScanner {
       WARN_UNUSED_RESULT;
 
   /// Reads data using 'column_readers' to materialize the tuples of a CollectionValue
-  /// allocated from 'coll_value_builder'.
+  /// allocated from 'coll_value_builder'. Increases 'coll_items_read_counter_' by the
+  /// number of items in this collection and descendant collections.
   ///
   /// 'new_collection_rep_level' indicates when the end of the collection has been
   /// reached, namely when current_rep_level <= new_collection_rep_level.

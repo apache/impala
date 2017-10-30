@@ -44,6 +44,7 @@ import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.ImpaladCatalog;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Table;
@@ -165,9 +166,9 @@ public class FrontendTestBase {
   }
 
   /**
-   * Add a new dummy table to the catalog based on the given CREATE TABLE sql.
-   * The dummy table only has the column definitions and the metastore table set, but no
-   * other metadata.
+   * Add a new dummy table to the catalog based on the given CREATE TABLE sql. The
+   * returned table only has its metadata partially set, but is capable of being planned.
+   * Only HDFS tables and external Kudu tables are supported.
    * Returns the new dummy table.
    * The test tables are registered in testTables_ and removed in the @After method.
    */
@@ -177,21 +178,37 @@ public class FrontendTestBase {
     Preconditions.checkNotNull(db, "Test tables must be created in an existing db.");
     org.apache.hadoop.hive.metastore.api.Table msTbl =
         CatalogOpExecutor.createMetaStoreTable(createTableStmt.toThrift());
-    HdfsTable dummyTable = new HdfsTable(msTbl, db,
-        createTableStmt.getTbl(), createTableStmt.getOwner());
-    List<ColumnDef> columnDefs = Lists.newArrayList(
-        createTableStmt.getPartitionColumnDefs());
-    dummyTable.setNumClusteringCols(columnDefs.size());
-    columnDefs.addAll(createTableStmt.getColumnDefs());
-    for (int i = 0; i < columnDefs.size(); ++i) {
-      ColumnDef colDef = columnDefs.get(i);
-      dummyTable.addColumn(new Column(colDef.getColName(), colDef.getType(), i));
-    }
-    try {
-    dummyTable.addDefaultPartition(msTbl.getSd());
-    } catch (CatalogException e) {
-      e.printStackTrace();
-      fail("Failed to add test table:\n" + createTableSql);
+    Table dummyTable = Table.fromMetastoreTable(db, msTbl);
+    if (dummyTable instanceof HdfsTable) {
+      List<ColumnDef> columnDefs = Lists.newArrayList(
+          createTableStmt.getPartitionColumnDefs());
+      dummyTable.setNumClusteringCols(columnDefs.size());
+      columnDefs.addAll(createTableStmt.getColumnDefs());
+      for (int i = 0; i < columnDefs.size(); ++i) {
+        ColumnDef colDef = columnDefs.get(i);
+        dummyTable.addColumn(
+            new Column(colDef.getColName(), colDef.getType(), colDef.getComment(), i));
+      }
+      try {
+        HdfsTable hdfsTable = (HdfsTable) dummyTable;
+        hdfsTable.addDefaultPartition(msTbl.getSd());
+      } catch (CatalogException e) {
+        e.printStackTrace();
+        fail("Failed to add test table:\n" + createTableSql);
+      }
+    } else if (dummyTable instanceof KuduTable) {
+      if (!Table.isExternalTable(msTbl)) {
+        fail("Failed to add table, external kudu table expected:\n" + createTableSql);
+      }
+      try {
+        KuduTable kuduTable = (KuduTable) dummyTable;
+        kuduTable.loadSchemaFromKudu();
+      } catch (ImpalaRuntimeException e) {
+        e.printStackTrace();
+        fail("Failed to add test table:\n" + createTableSql);
+      }
+    } else {
+      fail("Test table type not supported:\n" + createTableSql);
     }
     db.addTable(dummyTable);
     testTables_.add(dummyTable);

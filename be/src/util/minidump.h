@@ -30,6 +30,10 @@ Status RegisterMinidump(const char* cmd_line_path);
 /// tests that deliberately trigger DCHECKs. Returns true if minidumps were previously
 /// enabled or false otherwise.
 bool EnableMinidumpsForTest(bool enabled);
+
+/// Checks the number of minidump files and removes the oldest ones to maintain an upper
+/// bound on the number of files.
+void CheckAndRotateMinidumps(int max_minidumps);
 }
 
 #endif

@@ -169,7 +169,6 @@ class HdfsParquetTableWriter::BaseColumnWriter {
     data_encoding_stats_.clear();
     // Repetition/definition level encodings are constant. Incorporate them here.
     column_encodings_.insert(Encoding::RLE);
-    column_encodings_.insert(Encoding::BIT_PACKED);
   }
 
   // Close this writer. This is only called after Flush() and no more rows will
@@ -386,7 +385,8 @@ class HdfsParquetTableWriter::ColumnWriter :
   // Temporary string value to hold CHAR(N)
   StringValue temp_;
 
-  // Tracks statistics per page.
+  // Tracks statistics per page. These are not written out currently but are merged into
+  // the row group stats. TODO(IMPALA-5841): Write these to the page index.
   scoped_ptr<ColumnStats<T>> page_stats_;
 
   // Tracks statistics per row group. This gets reset when starting a new row group.
@@ -454,7 +454,8 @@ class HdfsParquetTableWriter::BoolColumnWriter :
   // Used to encode bools as single bit values. This is reused across pages.
   BitWriter* bool_values_;
 
-  // Tracks statistics per page.
+  // Tracks statistics per page. These are not written out currently but are merged into
+  // the row group stats. TODO(IMPALA-5841): Write these to the page index.
   ColumnStats<bool> page_stats_;
 
   // Tracks statistics per row group. This gets reset when starting a new file.
@@ -696,15 +697,9 @@ Status HdfsParquetTableWriter::BaseColumnWriter::FinalizeCurrentPage() {
         max_compressed_size - header.compressed_page_size);
   }
 
-  // Build page statistics and add them to the header.
-  DCHECK(page_stats_base_ != nullptr);
-  if (page_stats_base_->BytesNeeded() <= MAX_COLUMN_STATS_SIZE) {
-    page_stats_base_->EncodeToThrift(&header.data_page_header.statistics);
-    header.data_page_header.__isset.statistics = true;
-  }
-
   // Update row group statistics from page statistics.
   DCHECK(row_group_stats_base_ != nullptr);
+  DCHECK(page_stats_base_ != nullptr);
   row_group_stats_base_->Merge(*page_stats_base_);
 
   // Add the size of the data page header
@@ -738,7 +733,7 @@ void HdfsParquetTableWriter::BaseColumnWriter::NewPage() {
     // relies on these specific values for the definition/repetition level
     // encodings.
     header.definition_level_encoding = Encoding::RLE;
-    header.repetition_level_encoding = Encoding::BIT_PACKED;
+    header.repetition_level_encoding = Encoding::RLE;
     current_page_->header.__set_data_page_header(header);
   }
   current_encoding_ = next_page_encoding_;

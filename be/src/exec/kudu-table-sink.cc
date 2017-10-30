@@ -17,6 +17,7 @@
 
 #include "exec/kudu-table-sink.h"
 
+#include <kudu/client/write_op.h>
 #include <sstream>
 #include <thrift/protocol/TDebugProtocol.h>
 
@@ -137,6 +138,25 @@ Status KuduTableSink::Open(RuntimeState* state) {
   KUDU_RETURN_IF_ERROR(client_->OpenTable(table_desc_->table_name(), &table_),
       "Unable to open Kudu table");
 
+  // Verify the KuduTable's schema is what we expect, in case it was modified since
+  // analysis. If the underlying schema is changed after this point but before the write
+  // completes, the KuduTable's schema will stay the same and we'll get an error back from
+  // the Kudu server.
+  for (int i = 0; i < output_expr_evals_.size(); ++i) {
+    int col_idx = kudu_table_sink_.referenced_columns.empty() ?
+        i : kudu_table_sink_.referenced_columns[i];
+    if (col_idx >= table_->schema().num_columns()) {
+      return Status(strings::Substitute(
+          "Table $0 has fewer columns than expected.", table_desc_->name()));
+    }
+    ColumnType type = KuduDataTypeToColumnType(table_->schema().Column(col_idx).type());
+    if (type != output_expr_evals_[i]->root().type()) {
+      return Status(strings::Substitute("Column $0 has unexpected type. ($1 vs. $2)",
+          table_->schema().Column(col_idx).name(), type.DebugString(),
+          output_expr_evals_[i]->root().type().DebugString()));
+    }
+  }
+
   session_ = client_->NewSession();
   session_->SetTimeoutMillis(FLAGS_kudu_operation_timeout_ms);
 
@@ -193,7 +213,7 @@ kudu::client::KuduWriteOperation* KuduTableSink::NewWriteOp() {
 
 Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
   SCOPED_TIMER(profile()->total_time_counter());
-  ScalarExprEvaluator::FreeLocalAllocations(output_expr_evals_);
+  expr_results_pool_->Clear();
   RETURN_IF_ERROR(state->CheckQueryState());
   const KuduSchema& table_schema = table_->schema();
 
@@ -237,7 +257,13 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
       }
 
       PrimitiveType type = output_expr_evals_[j]->root().type().type;
-      WriteKuduValue(col, type, value, true, write->mutable_row());
+      Status s = WriteKuduValue(col, type, value, true, write->mutable_row());
+      // This can only fail if we set a col to an incorrect type, which would be a bug in
+      // planning, so we can DCHECK.
+      DCHECK(s.ok()) << "WriteKuduValue failed for col = "
+                     << table_schema.Column(col).name() << " and type = "
+                     << output_expr_evals_[j]->root().type() << ": " << s.GetDetail();
+      RETURN_IF_ERROR(s);
     }
     if (add_row) write_ops.push_back(move(write));
   }

@@ -21,12 +21,12 @@
 
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
-#include "exec/aggregation-node.h"
 #include "exprs/aggregate-functions.h"
 #include "exprs/anyval-util.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-fn-call.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/lib-cache.h"
 #include "runtime/raw-value.h"
 #include "runtime/runtime-state.h"
@@ -71,10 +71,9 @@ typedef AnyVal (*FinalizeFn)(FunctionContext*, const AnyVal&);
 
 const char* AggFnEvaluator::LLVM_CLASS_NAME = "class.impala::AggFnEvaluator";
 
-AggFnEvaluator::AggFnEvaluator(const AggFn& agg_fn, MemPool* mem_pool, bool is_clone)
+AggFnEvaluator::AggFnEvaluator(const AggFn& agg_fn, bool is_clone)
   : is_clone_(is_clone),
-    agg_fn_(agg_fn),
-    mem_pool_(mem_pool) {
+    agg_fn_(agg_fn) {
 }
 
 AggFnEvaluator::~AggFnEvaluator() {
@@ -90,26 +89,27 @@ const ColumnType& AggFnEvaluator::intermediate_type() const {
 }
 
 Status AggFnEvaluator::Create(const AggFn& agg_fn, RuntimeState* state, ObjectPool* pool,
-    MemPool* mem_pool, AggFnEvaluator** result) {
+    MemPool* expr_perm_pool, MemPool* expr_results_pool, AggFnEvaluator** result) {
   *result = nullptr;
 
   // Create a new AggFn evaluator.
-  AggFnEvaluator* agg_fn_eval = pool->Add(new AggFnEvaluator(agg_fn, mem_pool, false));
-  agg_fn_eval->agg_fn_ctx_.reset(FunctionContextImpl::CreateContext(state, mem_pool,
-      agg_fn.GetIntermediateTypeDesc(), agg_fn.GetOutputTypeDesc(),
+  AggFnEvaluator* agg_fn_eval = pool->Add(new AggFnEvaluator(agg_fn, false));
+  agg_fn_eval->agg_fn_ctx_.reset(FunctionContextImpl::CreateContext(state, expr_perm_pool,
+      expr_results_pool, agg_fn.GetIntermediateTypeDesc(), agg_fn.GetOutputTypeDesc(),
       agg_fn.arg_type_descs()));
 
   Status status;
   // Create the evaluators for the input expressions.
   for (const ScalarExpr* input_expr : agg_fn.children()) {
     ScalarExprEvaluator* input_eval;
-    status = ScalarExprEvaluator::Create(*input_expr, state, pool, mem_pool, &input_eval);
+    status = ScalarExprEvaluator::Create(
+        *input_expr, state, pool, expr_perm_pool, expr_results_pool, &input_eval);
     if (UNLIKELY(!status.ok())) goto cleanup;
     agg_fn_eval->input_evals_.push_back(input_eval);
     DCHECK(&input_eval->root() == input_expr);
 
     AnyVal* staging_input_val;
-    status = AllocateAnyVal(state, mem_pool, input_expr->type(),
+    status = AllocateAnyVal(state, expr_perm_pool, input_expr->type(),
         "Could not allocate aggregate expression input value", &staging_input_val);
     agg_fn_eval->staging_input_vals_.push_back(staging_input_val);
     if (UNLIKELY(!status.ok())) goto cleanup;
@@ -117,11 +117,11 @@ Status AggFnEvaluator::Create(const AggFn& agg_fn, RuntimeState* state, ObjectPo
   DCHECK_EQ(agg_fn.GetNumChildren(), agg_fn_eval->input_evals_.size());
   DCHECK_EQ(agg_fn_eval->staging_input_vals_.size(), agg_fn_eval->input_evals_.size());
 
-  status = AllocateAnyVal(state, mem_pool, agg_fn.intermediate_type(),
+  status = AllocateAnyVal(state, expr_perm_pool, agg_fn.intermediate_type(),
       "Could not allocate aggregate expression intermediate value",
       &(agg_fn_eval->staging_intermediate_val_));
   if (UNLIKELY(!status.ok())) goto cleanup;
-  status = AllocateAnyVal(state, mem_pool, agg_fn.intermediate_type(),
+  status = AllocateAnyVal(state, expr_perm_pool, agg_fn.intermediate_type(),
       "Could not allocate aggregate expression merge input value",
       &(agg_fn_eval->staging_merge_input_val_));
   if (UNLIKELY(!status.ok())) goto cleanup;
@@ -140,10 +140,12 @@ cleanup:
 }
 
 Status AggFnEvaluator::Create(const vector<AggFn*>& agg_fns, RuntimeState* state,
-    ObjectPool* pool, MemPool* mem_pool, vector<AggFnEvaluator*>* evals) {
+    ObjectPool* pool, MemPool* expr_perm_pool, MemPool* expr_results_pool,
+    vector<AggFnEvaluator*>* evals) {
   for (const AggFn* agg_fn : agg_fns) {
     AggFnEvaluator* agg_fn_eval;
-    RETURN_IF_ERROR(AggFnEvaluator::Create(*agg_fn, state, pool, mem_pool, &agg_fn_eval));
+    RETURN_IF_ERROR(AggFnEvaluator::Create(*agg_fn, state, pool, expr_perm_pool,
+        expr_results_pool, &agg_fn_eval));
     evals->push_back(agg_fn_eval);
   }
   return Status::OK();
@@ -176,7 +178,6 @@ void AggFnEvaluator::Close(RuntimeState* state) {
   if (closed_) return;
   closed_ = true;
   if (!is_clone_) ScalarExprEvaluator::Close(input_evals_, state);
-  FreeLocalAllocations();
   agg_fn_ctx_->impl()->Close();
   agg_fn_ctx_.reset();
   input_evals_.clear();
@@ -226,8 +227,10 @@ void AggFnEvaluator::SetDstSlot(const AnyVal* src, const SlotDescriptor& dst_slo
           StringValue::FromStringVal(*reinterpret_cast<const StringVal*>(src));
       return;
     case TYPE_CHAR:
-      if (slot != reinterpret_cast<const StringVal*>(src)->ptr) {
-        agg_fn_ctx_->SetError("UDA should not set pointer of CHAR(N) intermediate");
+    case TYPE_FIXED_UDA_INTERMEDIATE:
+      if (UNLIKELY(slot != reinterpret_cast<const StringVal*>(src)->ptr)) {
+        agg_fn_ctx_->SetError(Substitute("UDA should not set pointer of $0 intermediate",
+              dst_slot_desc.type().DebugString()).c_str());
       }
       return;
     case TYPE_TIMESTAMP:
@@ -273,9 +276,10 @@ void AggFnEvaluator::Init(Tuple* dst) {
 
   const ColumnType& type = intermediate_type();
   const SlotDescriptor& slot_desc = intermediate_slot_desc();
-  if (type.type == TYPE_CHAR) {
-    // For type char, we want to initialize the staging_intermediate_val_ with
-    // a pointer into the tuple (the UDA should not be allocating it).
+  if (type.type == TYPE_CHAR || type.type == TYPE_FIXED_UDA_INTERMEDIATE) {
+    // The intermediate value is represented as a fixed-length buffer inline in the tuple.
+    // The aggregate function writes to this buffer directly. staging_intermediate_val_
+    // is a StringVal with a pointer to the slot and the length of the slot.
     void* slot = dst->GetSlot(slot_desc.tuple_offset());
     StringVal* sv = reinterpret_cast<StringVal*>(staging_intermediate_val_);
     sv->is_null = dst->IsNull(slot_desc.null_indicator_offset());
@@ -472,16 +476,31 @@ void AggFnEvaluator::SerializeOrFinalize(Tuple* src,
       SetDstSlot(&v, dst_slot_desc, dst);
       break;
     }
+    case TYPE_CHAR:
+    case TYPE_FIXED_UDA_INTERMEDIATE: {
+      // Serialize() or Finalize() may rewrite the data in place, but must return the
+      // same pointer.
+      typedef StringVal(*Fn)(FunctionContext*, AnyVal*);
+      StringVal v = reinterpret_cast<Fn>(fn)(
+          agg_fn_ctx_.get(), staging_intermediate_val_);
+      if (UNLIKELY(dst->GetSlot(dst_slot_desc.tuple_offset()) != v.ptr)) {
+        agg_fn_ctx_->SetError(Substitute("UDA Serialize() and Finalize() must return "
+            "same pointer as input for $0 intermediate",
+            dst_slot_desc.type().DebugString()).c_str());
+      }
+      break;
+    }
     default:
       DCHECK(false) << "NYI";
   }
 }
 
-void AggFnEvaluator::ShallowClone(ObjectPool* pool, MemPool* mem_pool,
-    AggFnEvaluator** cloned_eval) const {
+void AggFnEvaluator::ShallowClone(ObjectPool* pool, MemPool* expr_perm_pool,
+    MemPool* expr_results_pool, AggFnEvaluator** cloned_eval) const {
   DCHECK(opened_);
-  *cloned_eval = pool->Add(new AggFnEvaluator(agg_fn_, mem_pool, true));
-  (*cloned_eval)->agg_fn_ctx_.reset(agg_fn_ctx_->impl()->Clone(mem_pool));
+  *cloned_eval = pool->Add(new AggFnEvaluator(agg_fn_, true));
+  (*cloned_eval)->agg_fn_ctx_.reset(
+      agg_fn_ctx_->impl()->Clone(expr_perm_pool, expr_results_pool));
   DCHECK_EQ((*cloned_eval)->input_evals_.size(), 0);
   (*cloned_eval)->input_evals_ = input_evals_;
   (*cloned_eval)->staging_input_vals_ = staging_input_vals_;
@@ -490,21 +509,22 @@ void AggFnEvaluator::ShallowClone(ObjectPool* pool, MemPool* mem_pool,
   (*cloned_eval)->opened_ = true;
 }
 
-void AggFnEvaluator::ShallowClone(ObjectPool* pool, MemPool* mem_pool,
-    const vector<AggFnEvaluator*>& evals,
+void AggFnEvaluator::ShallowClone(ObjectPool* pool, MemPool* expr_perm_pool,
+    MemPool* expr_results_pool, const vector<AggFnEvaluator*>& evals,
     vector<AggFnEvaluator*>* cloned_evals) {
   for (const AggFnEvaluator* eval : evals) {
     AggFnEvaluator* cloned_eval;
-    eval->ShallowClone(pool, mem_pool, &cloned_eval);
+    eval->ShallowClone(pool, expr_perm_pool, expr_results_pool, &cloned_eval);
     cloned_evals->push_back(cloned_eval);
   }
 }
 
-void AggFnEvaluator::FreeLocalAllocations() {
-  ScalarExprEvaluator::FreeLocalAllocations(input_evals_);
-  agg_fn_ctx_->impl()->FreeLocalAllocations();
-}
-
-void AggFnEvaluator::FreeLocalAllocations(const vector<AggFnEvaluator*>& evals) {
-  for (AggFnEvaluator* eval : evals) eval->FreeLocalAllocations();
+vector<ScopedResultsPool> ScopedResultsPool::Create(
+      const vector<AggFnEvaluator*>& evals, MemPool* new_results_pool) {
+  vector<ScopedResultsPool> result;
+  result.reserve(evals.size());
+  for (AggFnEvaluator* eval : evals) {
+    result.emplace_back(eval, new_results_pool);
+  }
+  return result;
 }

@@ -18,7 +18,6 @@
 #include <boost/static_assert.hpp>
 
 #include "common/hdfs.h"
-#include "runtime/buffered-tuple-stream.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
 #include "udf/udf.h"
@@ -37,7 +36,6 @@ class UnusedClass {
   BOOST_STATIC_ASSERT(sizeof(boost::gregorian::date) == 4);
   BOOST_STATIC_ASSERT(sizeof(hdfsFS) == sizeof(void*));
   BOOST_STATIC_ASSERT(sizeof(hdfsFile) == sizeof(void*));
-  BOOST_STATIC_ASSERT(sizeof(BufferedTupleStream::RowIdx) == sizeof(void*));
 
   // If the memory layout of any of these types changes, it will be necessary to change
   // LlvmCodeGen::GetUdfValType(), and we may also run into calling convention problems

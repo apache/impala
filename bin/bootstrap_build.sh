@@ -17,7 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# This script builds Impala from scratch. It is known to work on Ubuntu 14.04. To run it
+# This script builds Impala from scratch. It is known to work on Ubuntu 16.04. To run it
 # you need to have:
 #
 # 1. At least 8GB of free disk space
@@ -29,10 +29,20 @@
 # Set up some logging and exit conditions:
 set -euxo pipefail
 
-# Install dependencies:
+# Install non-java dependencies:
 sudo apt-get update
-sudo apt-get --yes install g++ gcc git libsasl2-dev libssl-dev make maven openjdk-7-jdk \
-    python-dev python-setuptools libffi-dev
+sudo apt-get --yes install g++ gcc git libsasl2-dev libssl-dev make maven \
+    python-dev python-setuptools libffi-dev libkrb5-dev
 
-export JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64/
+
+source /etc/lsb-release
+
+JDK_VERSION=8
+if [[ $DISTRIB_RELEASE = 14.04 ]]
+then
+  JDK_VERSION=7
+fi
+sudo apt-get --yes install openjdk-${JDK_VERSION}-jdk openjdk-${JDK_VERSION}-source
+export JAVA_HOME=/usr/lib/jvm/java-${JDK_VERSION}-openjdk-amd64
+
 ./buildall.sh -notests -so

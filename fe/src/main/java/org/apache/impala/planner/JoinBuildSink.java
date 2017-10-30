@@ -87,6 +87,6 @@ public class JoinBuildSink extends DataSink {
   @Override
   public void computeResourceProfile(TQueryOptions queryOptions) {
     // The memory consumption is counted against the join PlanNode.
-    resourceProfile_ = new ResourceProfile(0, 0);
+    resourceProfile_ = ResourceProfile.noReservation(0);
   }
 }

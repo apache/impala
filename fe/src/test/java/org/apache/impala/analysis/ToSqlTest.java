@@ -314,8 +314,8 @@ public class ToSqlTest extends FrontendTestBase {
         "CREATE TABLE default.p ( a BIGINT PRIMARY KEY, b TIMESTAMP " +
         "DEFAULT '1987-05-19' ) PARTITION BY HASH (a) PARTITIONS 3 " +
         "STORED AS KUDU TBLPROPERTIES ('kudu.master_addresses'='foo', " +
-        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-        "'kudu.table_name'='impala::default.p')", true);
+        "'kudu.table_name'='impala::default.p', " +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler')", true);
   }
 
   @Test
@@ -347,8 +347,8 @@ public class ToSqlTest extends FrontendTestBase {
         "CREATE TABLE default.p PRIMARY KEY (a, b) PARTITION BY HASH (a) PARTITIONS 3, " +
         "RANGE (b) (PARTITION VALUE = 1) STORED AS KUDU TBLPROPERTIES " +
         "('kudu.master_addresses'='foo', " +
-        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
-        "'kudu.table_name'='impala::default.p') AS " +
+        "'kudu.table_name'='impala::default.p', " +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler') AS " +
         "SELECT int_col a, bigint_col b FROM functional.alltypes", true);
   }
 
@@ -1254,6 +1254,16 @@ public class ToSqlTest extends FrontendTestBase {
     // IsNullPredicate.
     testToSql("select 5 is null, (5 is null), 10 is not null, (10 is not null)",
         "SELECT 5 IS NULL, (5 IS NULL), 10 IS NOT NULL, (10 IS NOT NULL)");
+    // Boolean test expression (expanded to istrue/false).
+    testToSql("select (true is true)", "SELECT (istrue(TRUE))");
+    testToSql("select (true is not true)", "SELECT (isnottrue(TRUE))");
+    testToSql("select (true is false)", "SELECT (isfalse(TRUE))");
+    testToSql("select (true is unknown)", "SELECT (TRUE IS NULL)");
+    testToSql("select (true is not unknown)", "SELECT (TRUE IS NOT NULL)");
+    testToSql("select not(true is true)", "SELECT NOT (istrue(TRUE))");
+    testToSql("select (false is false)", "SELECT (isfalse(FALSE))");
+    testToSql("select (null is unknown)", "SELECT (NULL IS NULL)");
+    testToSql("select (1 > 1 is true is unknown)", "SELECT (istrue(1 > 1) IS NULL)");
     // LikePredicate.
     testToSql("select 'a' LIKE '%b.', ('a' LIKE '%b.'), " +
         "'a' ILIKE '%b.', ('a' ILIKE '%b.'), " +

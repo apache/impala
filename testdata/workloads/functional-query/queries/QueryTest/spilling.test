@@ -1,140 +1,6 @@
 ====
 ---- QUERY
-set max_block_mgr_memory=25m;
-select l_orderkey, count(*)
-from lineitem
-group by 1
-order by 1 limit 10
----- RESULTS
-1,6
-2,1
-3,6
-4,1
-5,3
-6,1
-7,7
-32,6
-33,4
-34,3
----- TYPES
-BIGINT, BIGINT
----- RUNTIME_PROFILE
-# Verify that spilling and passthrough were activated.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
-row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
-====
----- QUERY
-# Test query with string grouping column and string agg columns
-# Could only get it to spill reliably with num_nodes=1.
-# TODO: revisit with new buffer pool.
-set num_nodes=1;
-set max_block_mgr_memory=25m;
-select l_returnflag, l_orderkey, avg(l_tax), min(l_shipmode)
-from lineitem
-group by 1,2
-order by 1,2 limit 3
----- RESULTS
-'A',3,0.05,'RAIL'
-'A',5,0.03,'AIR'
-'A',6,0.03,'TRUCK'
----- TYPES
-STRING, BIGINT, DECIMAL, STRING
----- RUNTIME_PROFILE
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
-====
----- QUERY
-set max_block_mgr_memory=25m;
-select l_orderkey, count(*)
-from lineitem
-group by 1
-order by 1 limit 10;
----- RESULTS
-1,6
-2,1
-3,6
-4,1
-5,3
-6,1
-7,7
-32,6
-33,4
-34,3
----- TYPES
-BIGINT, BIGINT
----- RUNTIME_PROFILE
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
-row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
-====
----- QUERY
-# Test query with string grouping column
-# Could only get it to spill reliably with num_nodes=1.
-# TODO: revisit with new buffer pool.
-set num_nodes=1;
-set max_block_mgr_memory=25m;
-select l_comment, count(*)
-from lineitem
-group by 1
-order by count(*) desc limit 5
----- RESULTS
-' furiously',943
-' carefully',893
-' carefully ',875
-'carefully ',854
-' furiously ',845
----- TYPES
-STRING, BIGINT
----- RUNTIME_PROFILE
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
-====
----- QUERY
-# Test query with string grouping column and string agg columns
-# Could only get it to spill reliably with num_nodes=1.
-# TODO: revisit with new buffer pool.
-set num_nodes=1;
-set max_block_mgr_memory=25m;
-select l_returnflag, l_orderkey, round(avg(l_tax),2), min(l_shipmode)
-from lineitem
-group by 1,2
-order by 1,2 limit 3;
----- RESULTS
-'A',3,0.05,'RAIL'
-'A',5,0.03,'AIR'
-'A',6,0.03,'TRUCK'
----- TYPES
-STRING, BIGINT, DECIMAL, STRING
----- RUNTIME_PROFILE
-# Verify that spilling happened in the agg.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
-====
----- QUERY
-# Test with string intermediate state (avg() uses string intermediate value).
-set max_block_mgr_memory=25m;
-select l_orderkey, avg(l_orderkey)
-from lineitem
-group by 1
-order by 1 limit 5
----- RESULTS
-1,1
-2,2
-3,3
-4,4
-5,5
----- TYPES
-BIGINT, DOUBLE
----- RUNTIME_PROFILE
-# Verify that passthrough and spilling happened in the pre and merge agg.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
-row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
-====
----- QUERY
-set num_nodes=0;
-set max_block_mgr_memory=100m;
+set buffer_pool_limit=15m;
 select count(l1.l_tax)
 from
 lineitem l1,
@@ -156,8 +22,7 @@ BIGINT
 row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
-set num_nodes=0;
-set max_block_mgr_memory=40m;
+set buffer_pool_limit=2m;
 select max(t1.total_count), max(t1.l_shipinstruct), max(t1.l_comment) from
 (select l_shipinstruct, l_comment, count(*) over () total_count from lineitem) t1
 ---- RESULTS
@@ -165,13 +30,12 @@ select max(t1.total_count), max(t1.l_shipinstruct), max(t1.l_comment) from
 ---- TYPES
 BIGINT, STRING, STRING
 ---- RUNTIME_PROFILE
-# Indirectly verify that the analytic spilled: if it spills a block, it must repin it.
-row_regex: .*PinTime: [1-9][0-9]*.*
+# Verify that the analytic spilled
+row_regex: .*PeakUnpinnedBytes: [1-9][0-9]*.*
 ====
 ---- QUERY
-# Run this query with very low memory. Since the tables are small, the PA/PHJ should be
-# using buffers much smaller than the io buffer.
-set max_block_mgr_memory=10m;
+# Run this query with very low memory, but enough not to spill.
+set buffer_pool_limit=20m;
 select a.int_col, count(*)
 from functional.alltypessmall a, functional.alltypessmall b, functional.alltypessmall c
 where a.id = b.id and b.id = c.id group by a.int_col
@@ -192,12 +56,11 @@ INT, BIGINT
 # This query is not meant to spill.
 row_regex: .*SpilledPartitions: 0 .*
 ====
----- QUERY: TPCH-Q21
+---- QUERY: TPCH-Q22
 # Adding TPCH-Q21 in the spilling test to check for IMPALA-1471 (spilling left anti
 # and left outer joins were returning wrong results).
 # Q21 - Suppliers Who Kept Orders Waiting Query
-set num_nodes=0;
-set max_block_mgr_memory=65m;
+set buffer_pool_limit=20m;
 select
   s_name,
   count(*) as numwait
@@ -346,255 +209,9 @@ string, bigint
 row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
-# Test aggregation spill with group_concat distinct
-set num_nodes=1;
-set max_block_mgr_memory=100m;
-select l_orderkey, count(*), group_concat(distinct l_linestatus, '|')
-from lineitem
-group by 1
-order by 1 limit 10
----- RESULTS
-1,6,'O'
-2,1,'O'
-3,6,'F'
-4,1,'O'
-5,3,'F'
-6,1,'F'
-7,7,'O'
-32,6,'O'
-33,4,'F'
-34,3,'O'
----- TYPES
-BIGINT, BIGINT, STRING
----- RUNTIME_PROFILE
-# Verify that at least one of the aggs spilled.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-====
----- QUERY
-# Regression test for IMPALA-2612. The following query will cause CastToChar
-# to be invoked when building the hash tables in partitioned aggregation
-# nodes. CastToChar will do "local" memory allocation. Without the fix of
-# IMPALA-2612, the peak memory consumption will be higher.
-set mem_limit=800m;
-set num_nodes=1;
-set num_scanner_threads=1;
-select count(distinct concat(cast(l_comment as char(120)), cast(l_comment as char(120)),
-                             cast(l_comment as char(120)), cast(l_comment as char(120)),
-                             cast(l_comment as char(120)), cast(l_comment as char(120))))
-from lineitem
----- RESULTS
-4502054
----- TYPES
-BIGINT
----- RUNTIME_PROFILE
-# Verify that the agg spilled.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-====
----- QUERY
-# Test sort with small char column materialized by exprs.
-# Set low memory limit to force spilling.
-# IMPALA-3332: comparator makes local allocations that cause runaway memory consumption.
-set num_nodes=0;
-set max_block_mgr_memory=4m;
-set mem_limit=200m;
-set disable_outermost_topn=1;
-select cast(l_comment as char(50))
-from lineitem
-order by 1
-limit 20;
----- RESULTS
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias about the en                            '
-' Tiresias about the slyly ironic dinos ca         '
-' Tiresias about the slyly unus                    '
-' Tiresias above                                   '
-' Tiresias above the fox                           '
-' Tiresias above the furiously final th            '
-' Tiresias above the slyly expr                    '
-' Tiresias above the stealthily p                  '
----- TYPES
-CHAR
----- RUNTIME_PROFILE
-# Verify that the sort actually spilled
-row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
-row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
-====
----- QUERY
-# Test sort with small input char column materialized before sort.
-set num_nodes=0;
-set mem_limit=200m;
-set max_block_mgr_memory=4m;
-set disable_outermost_topn=1;
-select char_col
-from (select cast(l_comment as char(50)) char_col
-      from lineitem) subquery
-order by 1
-limit 20;
----- RESULTS
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias                                         '
-' Tiresias about the en                            '
-' Tiresias about the slyly ironic dinos ca         '
-' Tiresias about the slyly unus                    '
-' Tiresias above                                   '
-' Tiresias above the fox                           '
-' Tiresias above the furiously final th            '
-' Tiresias above the slyly expr                    '
-' Tiresias above the stealthily p                  '
----- TYPES
-CHAR
----- RUNTIME_PROFILE
-# Verify that the sort actually spilled
-row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
-row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
-====
----- QUERY
-# Test sort with large input char column materialized before sort.
-# Set low memory limit to force spilling.
-set num_nodes=0;
-set mem_limit=200m;
-set max_block_mgr_memory=4m;
-set disable_outermost_topn=1;
-select char_col
-from (select cast(l_comment as char(200)) char_col
-      from lineitem) subquery
-order by 1
-limit 20;
----- RESULTS
-' Tiresias                                                                                                                                                                                               '
-' Tiresias                                                                                                                                                                                               '
-' Tiresias                                                                                                                                                                                               '
-' Tiresias                                                                                                                                                                                               '
-' Tiresias                                                                                                                                                                                               '
-' Tiresias                                                                                                                                                                                               '
-' Tiresias                                                                                                                                                                                               '
-' Tiresias                                                                                                                                                                                               '
-' Tiresias                                                                                                                                                                                               '
-' Tiresias                                                                                                                                                                                               '
-' Tiresias                                                                                                                                                                                               '
-' Tiresias                                                                                                                                                                                               '
-' Tiresias about the en                                                                                                                                                                                  '
-' Tiresias about the slyly ironic dinos ca                                                                                                                                                               '
-' Tiresias about the slyly unus                                                                                                                                                                          '
-' Tiresias above                                                                                                                                                                                         '
-' Tiresias above the fox                                                                                                                                                                                 '
-' Tiresias above the furiously final th                                                                                                                                                                  '
-' Tiresias above the slyly expr                                                                                                                                                                          '
-' Tiresias above the stealthily p                                                                                                                                                                        '
----- TYPES
-CHAR
----- RUNTIME_PROFILE
-# Verify that the sort actually spilled
-row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
-row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
-====
----- QUERY
-# Test sort with varchar column materialized by exprs.
-# Set low memory limit to force spilling.
-set num_nodes=0;
-set max_block_mgr_memory=4m;
-# IMPALA-3332: comparator makes local allocations that cause runaway memory consumption.
-set mem_limit=200m;
-set disable_outermost_topn=1;
-select cast(l_comment as varchar(50))
-from lineitem
-order by 1
-limit 20;
----- RESULTS
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias about the en'
-' Tiresias about the slyly ironic dinos ca'
-' Tiresias about the slyly unus'
-' Tiresias above'
-' Tiresias above the fox'
-' Tiresias above the furiously final th'
-' Tiresias above the slyly expr'
-' Tiresias above the stealthily p'
----- TYPES
-STRING
----- RUNTIME_PROFILE
-# Verify that the sort actually spilled
-row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
-row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
-====
----- QUERY
-# Test sort with input varchar column materialized before sort.
-# Set low memory limit to force spilling.
-set num_nodes=0;
-set mem_limit=200m;
-set max_block_mgr_memory=4m;
-set disable_outermost_topn=1;
-select char_col
-from (select cast(l_comment as varchar(50)) char_col
-      from lineitem) subquery
-order by 1
-limit 20;
----- RESULTS
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias '
-' Tiresias about the en'
-' Tiresias about the slyly ironic dinos ca'
-' Tiresias about the slyly unus'
-' Tiresias above'
-' Tiresias above the fox'
-' Tiresias above the furiously final th'
-' Tiresias above the slyly expr'
-' Tiresias above the stealthily p'
----- TYPES
-STRING
----- RUNTIME_PROFILE
-# Verify that the sort actually spilled
-row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
-row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
-====
----- QUERY
 # IMPALA-1346/IMPALA-1546: fix sorter memory management so that it can complete
 # successfully when in same pipeline as a spilling join.
-set num_nodes=0;
-set mem_limit=200m;
-set max_block_mgr_memory=50m;
+set buffer_pool_limit=50m;
 set disable_outermost_topn=1;
 select * from lineitem
   inner join orders on l_orderkey = o_orderkey
@@ -632,7 +249,7 @@ row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 # Tests for the case where a spilled partition has 0 probe rows and so we don't build the
 # hash table in a partitioned hash join.
 # INNER JOIN
-set max_block_mgr_memory=10m;
+set buffer_pool_limit=10m;
 select straight_join count(*)
 from
 lineitem a, lineitem b
@@ -648,7 +265,7 @@ row_regex: .*NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # spilled partition with 0 probe rows, NULL AWARE LEFT ANTI JOIN
-set max_block_mgr_memory=10m;
+set buffer_pool_limit=10m;
 select straight_join count(*)
 from
 lineitem a
@@ -664,7 +281,7 @@ row_regex: .*NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # spilled partition with 0 probe rows, RIGHT OUTER JOIN
-set max_block_mgr_memory=10m;
+set buffer_pool_limit=10m;
 select straight_join count(*)
 from
 supplier right outer join lineitem on s_suppkey = l_suppkey
@@ -678,7 +295,7 @@ row_regex: .*NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # spilled partition with 0 probe rows, RIGHT ANTI JOIN
-set max_block_mgr_memory=30m;
+set buffer_pool_limit=30m;
 with x as (select * from supplier limit 10)
 select straight_join count(*)
 from
@@ -698,7 +315,7 @@ row_regex: .*NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
 #   where l1.l_quantity = 31.0 and l1.l_tax = 0.03 and l1.l_orderkey <= 100000
 # order by l_orderkey, l_partkey, l_suppkey, l_linenumber
 # limit 5
-set max_block_mgr_memory=7m;
+set buffer_pool_limit=7m;
 set num_nodes=1;
 select straight_join l.*
 from
@@ -725,4 +342,26 @@ bigint,bigint,bigint,int,decimal,decimal,decimal,decimal,string,string,string,st
 482,61141,6154,3,31.00,34166.34,0.04,0.03,'N','O','1996-06-01','1996-05-06','1996-06-17','NONE','MAIL',' blithe pin'
 1382,156162,6163,5,31.00,37762.96,0.07,0.03,'R','F','1993-10-26','1993-10-15','1993-11-09','TAKE BACK RETURN','FOB','hely regular dependencies. f'
 1509,186349,3904,6,31.00,44495.54,0.04,0.03,'A','F','1993-07-14','1993-08-21','1993-08-06','COLLECT COD','SHIP','ic deposits cajole carefully. quickly bold '
+====
+---- QUERY
+# Test spilling aggregation when grouping by nondeterministic expression
+set buffer_pool_limit=5m;
+set num_nodes=1;
+select l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
+from tpch_parquet.lineitem
+group by 1, 2, 3, 4, 5, random()
+limit 5
+---- RUNTIME_PROFILE
+row_regex: .*Query State: FINISHED.*
+row_regex: .*Query Status: OK.*
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Test spilling join with many duplicates in join key. We don't expect this to succeed
+# with a memory constraint: see IMPALA-4857.
+set buffer_pool_limit=20m;
+select *
+from lineitem l1 join lineitem l2 on l1.l_linenumber = l2.l_linenumber
+---- CATCH
+Repartitioning did not reduce the size of a spilled partition
 ====

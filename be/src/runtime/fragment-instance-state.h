@@ -133,7 +133,7 @@ class FragmentInstanceState {
   RuntimeState* runtime_state_ = nullptr;  // lives in obj_pool()
 
   /// profile reporting-related
-  boost::scoped_ptr<Thread> report_thread_;
+  std::unique_ptr<Thread> report_thread_;
   boost::mutex report_thread_lock_;
 
   /// Indicates that profile reporting thread should stop.

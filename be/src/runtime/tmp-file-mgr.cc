@@ -212,8 +212,7 @@ void TmpFileMgr::File::Blacklist(const ErrorMsg& msg) {
 
 Status TmpFileMgr::File::Remove() {
   // Remove the file if present (it may not be present if no writes completed).
-  FileSystemUtil::RemovePaths({path_});
-  return Status::OK();
+  return FileSystemUtil::RemovePaths({path_});
 }
 
 string TmpFileMgr::File::DebugString() {
@@ -270,7 +269,8 @@ Status TmpFileMgr::FileGroup::CreateFiles() {
   }
   DCHECK_EQ(tmp_files_.size(), files_allocated);
   if (tmp_files_.size() == 0) {
-    Status err_status(TErrorCode::SCRATCH_ALLOCATION_FAILED);
+    Status err_status(TErrorCode::SCRATCH_ALLOCATION_FAILED,
+        join(tmp_file_mgr_->tmp_dirs_, ","), GetBackendString());
     for (Status& err : scratch_errors_) err_status.MergeStatus(err);
     return err_status;
   }
@@ -308,7 +308,7 @@ Status TmpFileMgr::FileGroup::AllocateSpace(
 
   if (bytes_limit_ != -1
       && current_bytes_allocated_ + scratch_range_bytes > bytes_limit_) {
-    return Status(TErrorCode::SCRATCH_LIMIT_EXCEEDED, bytes_limit_);
+    return Status(TErrorCode::SCRATCH_LIMIT_EXCEEDED, bytes_limit_, GetBackendString());
   }
 
   // Lazily create the files on the first write.
@@ -332,7 +332,8 @@ Status TmpFileMgr::FileGroup::AllocateSpace(
                  << ". Will try another scratch file.";
     scratch_errors_.push_back(status);
   }
-  Status err_status(TErrorCode::SCRATCH_ALLOCATION_FAILED);
+  Status err_status(TErrorCode::SCRATCH_ALLOCATION_FAILED,
+      join(tmp_file_mgr_->tmp_dirs_, ","), GetBackendString());
   // Include all previous errors that may have caused the failure.
   for (Status& err : scratch_errors_) err_status.MergeStatus(err);
   return err_status;
@@ -411,7 +412,7 @@ Status TmpFileMgr::FileGroup::WaitForAsyncRead(WriteHandle* handle, MemRange buf
   if (io_mgr_buffer->len() < buffer.len()) {
     // The read was truncated - this is an error.
     status = Status(TErrorCode::SCRATCH_READ_TRUNCATED, buffer.len(),
-        handle->write_range_->file(), handle->write_range_->offset(),
+        handle->write_range_->file(), GetBackendString(), handle->write_range_->offset(),
         io_mgr_buffer->len());
     goto exit;
   }

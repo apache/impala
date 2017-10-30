@@ -64,13 +64,13 @@ add_library(Exprs
   utility-functions.cc
   utility-functions-ir.cc
 )
-add_dependencies(Exprs thrift-deps gen_ir_descriptions)
+add_dependencies(Exprs gen-deps gen_ir_descriptions)
 
 ADD_BE_TEST(expr-test)
 ADD_BE_TEST(expr-codegen-test)
 
 # expr-codegen-test includes test IR functions
 COMPILE_TO_IR(expr-codegen-test.cc)
-add_dependencies(expr-codegen-test-ir thrift-deps)
+add_dependencies(expr-codegen-test-ir gen-deps)
 
 ADD_UDF_TEST(aggregate-functions-test)

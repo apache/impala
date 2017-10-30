@@ -84,25 +84,35 @@ public class FunctionCallExpr extends Expr {
    */
   public static Expr createExpr(FunctionName fnName, FunctionParams params) {
     FunctionCallExpr functionCallExpr = new FunctionCallExpr(fnName, params);
-    if (fnName.getFnNamePath().size() == 1
-            && fnName.getFnNamePath().get(0).equalsIgnoreCase("decode")
-        || fnName.getFnNamePath().size() == 2
-            && fnName.getFnNamePath().get(0).equalsIgnoreCase(Catalog.BUILTINS_DB)
-            && fnName.getFnNamePath().get(1).equalsIgnoreCase("decode")) {
+    if (functionNameEqualsBuiltin(fnName, "decode")) {
       return new CaseExpr(functionCallExpr);
     }
-    if (fnName.getFnNamePath().size() == 1
-            && fnName.getFnNamePath().get(0).equalsIgnoreCase("nvl2")
-        || fnName.getFnNamePath().size() == 2
-            && fnName.getFnNamePath().get(0).equalsIgnoreCase(Catalog.BUILTINS_DB)
-            && fnName.getFnNamePath().get(1).equalsIgnoreCase("nvl2")) {
+    if (functionNameEqualsBuiltin(fnName, "nvl2")) {
       List<Expr> plist = Lists.newArrayList(params.exprs());
       if (!plist.isEmpty()) {
         plist.set(0, new IsNullPredicate(plist.get(0), true));
       }
       return new FunctionCallExpr("if", plist);
     }
+    // nullif(x, y) -> if(x DISTINCT FROM y, x, NULL)
+    if (functionNameEqualsBuiltin(fnName, "nullif") && params.size() == 2) {
+      return new FunctionCallExpr("if", Lists.newArrayList(
+          new BinaryPredicate(BinaryPredicate.Operator.DISTINCT_FROM, params.exprs().get(0),
+            params.exprs().get(1)), // x IS DISTINCT FROM y
+          params.exprs().get(0), // x
+          new NullLiteral() // NULL
+      ));
+    }
     return functionCallExpr;
+  }
+
+  /** Returns true if fnName is a built-in with given name. */
+  private static boolean functionNameEqualsBuiltin(FunctionName fnName, String name) {
+    return fnName.getFnNamePath().size() == 1
+           && fnName.getFnNamePath().get(0).equalsIgnoreCase(name)
+        || fnName.getFnNamePath().size() == 2
+           && fnName.getFnNamePath().get(0).equals(Catalog.BUILTINS_DB)
+           && fnName.getFnNamePath().get(1).equalsIgnoreCase(name);
   }
 
   /**
@@ -394,6 +404,7 @@ public class FunctionCallExpr extends Expr {
       digitsAfter = 0;
     } else if (fnName_.getFunction().equalsIgnoreCase("truncate") ||
                fnName_.getFunction().equalsIgnoreCase("dtrunc") ||
+               fnName_.getFunction().equalsIgnoreCase("trunc") ||
                fnName_.getFunction().equalsIgnoreCase("round") ||
                fnName_.getFunction().equalsIgnoreCase("dround")) {
       if (children_.size() > 1) {
@@ -568,9 +579,12 @@ public class FunctionCallExpr extends Expr {
     if (type_.isWildcardChar() || type_.isWildcardVarchar()) {
       type_ = ScalarType.STRING;
     }
+  }
 
+  @Override
+  protected float computeEvalCost() {
     // TODO(tmarshall): Differentiate based on the specific function.
-    if (hasChildCosts()) evalCost_ = getChildCosts() + FUNCTION_CALL_COST;
+    return hasChildCosts() ? getChildCosts() + FUNCTION_CALL_COST : UNKNOWN_COST;
   }
 
   public FunctionCallExpr getMergeAggInputFn() { return mergeAggInputFn_; }
@@ -614,8 +628,7 @@ public class FunctionCallExpr extends Expr {
   public Expr clone() { return new FunctionCallExpr(this); }
 
   @Override
-  protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer)
-      throws AnalysisException {
+  protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer) {
     Expr e = super.substituteImpl(smap, analyzer);
     if (!(e instanceof FunctionCallExpr)) return e;
     FunctionCallExpr fn = (FunctionCallExpr) e;

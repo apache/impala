@@ -46,6 +46,8 @@ from thrift.Thrift import TException
 
 VERSION_FORMAT = "Impala Shell v%(version)s (%(git_hash)s) built on %(build_date)s"
 VERSION_STRING = "build version not available"
+READLINE_UNAVAILABLE_ERROR = "The readline module was either not found or disabled. " \
+                             "Command history will not be collected."
 
 # Tarball / packaging build makes impala_build_version available
 try:
@@ -76,7 +78,7 @@ class ImpalaPrettyTable(prettytable.PrettyTable):
       value = unicode(value, self.encoding, "replace")
     return value
 
-class ImpalaShell(cmd.Cmd):
+class ImpalaShell(object, cmd.Cmd):
   """ Simple Impala Shell.
 
   Basic usage: type connect <host:port> to connect to an impalad
@@ -1068,15 +1070,40 @@ class ImpalaShell(cmd.Cmd):
 
   def do_history(self, args):
     """Display command history"""
-    # Deal with readline peculiarity. When history does not exists,
+    # Deal with readline peculiarity. When history does not exist,
     # readline returns 1 as the history length and stores 'None' at index 0.
     if self.readline and self.readline.get_current_history_length() > 0:
       for index in xrange(1, self.readline.get_current_history_length() + 1):
         cmd = self.readline.get_history_item(index)
         print_to_stderr('[%d]: %s' % (index, cmd))
     else:
-      print_to_stderr("The readline module was either not found or disabled. Command "
-                      "history will not be collected.")
+      print_to_stderr(READLINE_UNAVAILABLE_ERROR)
+
+  def do_rerun(self, args):
+    """Rerun a command with an command index in history
+    Example: @1;
+    """
+    history_len = self.readline.get_current_history_length()
+    # Rerun command shouldn't appear in history
+    self.readline.remove_history_item(history_len - 1)
+    history_len -= 1
+    if not self.readline:
+      print_to_stderr(READLINE_UNAVAILABLE_ERROR)
+      return CmdStatus.ERROR
+    try:
+      cmd_idx = int(args)
+    except ValueError:
+      print_to_stderr("Command index to be rerun must be an integer.")
+      return CmdStatus.ERROR
+    if not (0 < cmd_idx <= history_len or -history_len <= cmd_idx < 0):
+      print_to_stderr("Command index out of range. Valid range: [1, {0}] and [-{0}, -1]"
+                      .format(history_len))
+      return CmdStatus.ERROR
+    if cmd_idx < 0:
+      cmd_idx += history_len + 1
+    cmd = self.readline.get_history_item(cmd_idx)
+    print_to_stderr("Rerunning " + cmd)
+    return self.onecmd(cmd.rstrip(";"))
 
   def do_tip(self, args):
     """Print a random tip"""
@@ -1124,6 +1151,20 @@ class ImpalaShell(cmd.Cmd):
         # The history file is not writable, disable readline.
         self._disable_readline()
 
+  def parseline(self, line):
+    """Parse the line into a command name and a string containing
+    the arguments.  Returns a tuple containing (command, args, line).
+    'command' and 'args' may be None if the line couldn't be parsed.
+    'line' in return tuple is the rewritten original line, with leading
+    and trailing space removed and special characters transformed into
+    their aliases.
+    """
+    line = line.strip()
+    if line and line[0] == '@':
+      line = 'rerun ' + line[1:]
+    return super(ImpalaShell, self).parseline(line)
+
+
   def _replace_history_delimiters(self, src_delim, tgt_delim):
     """Replaces source_delim with target_delim for all items in history.
 
@@ -1167,7 +1208,7 @@ class ImpalaShell(cmd.Cmd):
     if not self.imp_client.connected:
       print_to_stderr('Not connected to Impala, could not execute queries.')
       return False
-    queries = [ self.sanitise_input(q) for q in self.cmdqueue + queries ]
+    queries = [self.sanitise_input(q) for q in queries]
     for q in queries:
       if self.onecmd(q) is CmdStatus.ERROR:
         print_to_stderr('Could not execute command: %s' % q)
@@ -1220,6 +1261,13 @@ Welcome to the Impala shell.
 ***********************************************************************************\
 """ \
   % (VERSION_STRING, _format_tip(random.choice(TIPS)))
+
+REFRESH_AFTER_CONNECT_DEPRECATION_WARNING = """
++==========================================================================+
+| DEPRECATION WARNING:                                                     |
+| -r/--refresh_after_connect is deprecated and will be removed in a future |
+| version of Impala shell.                                                 |
++==========================================================================+"""
 
 def print_to_stderr(message):
   print >> sys.stderr, message
@@ -1280,7 +1328,9 @@ def execute_queries_non_interactive_mode(options):
     return
 
   queries = parse_query_text(query_text)
-  if not ImpalaShell(options).execute_query_list(queries):
+  shell = ImpalaShell(options)
+  if not (shell.execute_query_list(shell.cmdqueue) and
+          shell.execute_query_list(queries)):
     sys.exit(1)
 
 if __name__ == "__main__":
@@ -1399,6 +1449,8 @@ if __name__ == "__main__":
     intro += ("\n\nLDAP authentication is enabled, but the connection to Impala is "
               "not secured by TLS.\nALL PASSWORDS WILL BE SENT IN THE CLEAR TO IMPALA.\n")
 
+  if options.refresh_after_connect:
+    intro += REFRESH_AFTER_CONNECT_DEPRECATION_WARNING
   shell = ImpalaShell(options)
   while shell.is_alive:
     try:

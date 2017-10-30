@@ -45,6 +45,48 @@ class TestHS2(HS2TestSuite):
     for k, v in open_session_req.configuration.items():
       assert open_session_resp.configuration[k] == v
 
+  @needs_session()
+  def test_session_options_via_set(self):
+    """
+    Tests that session options are returned by a SET
+    query and can be updated by a "SET k=v" query.
+    """
+    def get_session_options():
+      """Returns dictionary of query options."""
+      execute_statement_resp = self.execute_statement("SET")
+
+      fetch_results_req = TCLIService.TFetchResultsReq()
+      fetch_results_req.operationHandle = execute_statement_resp.operationHandle
+      fetch_results_req.maxRows = 1000
+      fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
+      TestHS2.check_response(fetch_results_resp)
+
+      # Close the query
+      close_operation_req = TCLIService.TCloseOperationReq()
+      close_operation_req.operationHandle = execute_statement_resp.operationHandle
+      TestHS2.check_response(self.hs2_client.CloseOperation(close_operation_req))
+
+      # Results are returned in a columnar way:
+      cols = fetch_results_resp.results.columns
+      assert len(cols) == 2
+      vals = dict(zip(cols[0].stringVal.values, cols[1].stringVal.values))
+      return vals
+
+    vals = get_session_options()
+
+    # No default; should be empty string.
+    assert vals["COMPRESSION_CODEC"] == ""
+    # Has default of 0
+    assert vals["SYNC_DDL"] == "0"
+
+    # Set an option using SET
+    self.execute_statement("SET COMPRESSION_CODEC=gzip")
+
+    vals2 = get_session_options()
+    assert vals2["COMPRESSION_CODEC"] == "GZIP"
+    # Should be unchanged
+    assert vals2["SYNC_DDL"] == "0"
+
   def test_open_session_http_addr(self):
     """Check that OpenSession returns the coordinator's http address."""
     open_session_req = TCLIService.TOpenSessionReq()
@@ -172,11 +214,8 @@ class TestHS2(HS2TestSuite):
   @needs_session()
   def test_get_operation_status(self):
     """Tests that GetOperationStatus returns a valid result for a running query"""
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = "SELECT COUNT(*) FROM functional.alltypes"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    TestHS2.check_response(execute_statement_resp)
+    statement = "SELECT COUNT(*) FROM functional.alltypes"
+    execute_statement_resp = self.execute_statement(statement)
 
     get_operation_status_resp = \
         self.get_operation_status(execute_statement_resp.operationHandle)
@@ -213,11 +252,8 @@ class TestHS2(HS2TestSuite):
   def test_get_operation_status_error(self):
     """Tests that GetOperationStatus returns a valid result for a query that encountered
     an error"""
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = "SELECT * FROM functional.alltypeserror"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    TestHS2.check_response(execute_statement_resp)
+    statement = "SELECT * FROM functional.alltypeserror"
+    execute_statement_resp = self.execute_statement(statement)
 
     get_operation_status_resp = self.wait_for_operation_state( \
         execute_statement_resp.operationHandle, TCLIService.TOperationState.ERROR_STATE)
@@ -262,9 +298,18 @@ class TestHS2(HS2TestSuite):
     TestHS2.check_response(get_operation_status_resp, \
         TCLIService.TStatusCode.ERROR_STATUS)
 
-    print get_operation_status_resp.status.errorMessage
     err_msg = "Invalid query handle: efcdab8967452301:3031323334353637"
     assert err_msg in get_operation_status_resp.status.errorMessage
+
+    get_result_set_metadata_req = TCLIService.TGetResultSetMetadataReq()
+    get_result_set_metadata_req.operationHandle = operation_handle
+    get_result_set_metadata_resp = \
+        self.hs2_client.GetResultSetMetadata(get_result_set_metadata_req)
+    TestHS2.check_response(get_result_set_metadata_resp, \
+        TCLIService.TStatusCode.ERROR_STATUS)
+
+    err_msg = "Invalid query handle: efcdab8967452301:3031323334353637"
+    assert err_msg in get_result_set_metadata_resp.status.errorMessage
 
   @pytest.mark.execute_serially
   def test_socket_close_forces_session_close(self):
@@ -323,17 +368,15 @@ class TestHS2(HS2TestSuite):
     assert "Sql Statement: GET_SCHEMAS" in profile_page
     assert "Query Type: DDL" in profile_page
 
+
   @needs_session(conf_overlay={"idle_session_timeout": "5"})
   def test_get_operation_status_session_timeout(self):
     """Regression test for IMPALA-4488: GetOperationStatus() would not keep a session
     alive"""
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
     # Choose a long-running query so that it can't finish before the session timeout.
-    execute_statement_req.statement = """select * from functional.alltypes a
+    statement = """select * from functional.alltypes a
     join functional.alltypes b join functional.alltypes c"""
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    TestHS2.check_response(execute_statement_resp)
+    execute_statement_resp = self.execute_statement(statement)
 
     now = time.time()
     # Loop until the session would be timed-out if IMPALA-4488 had not been fixed.
@@ -345,11 +388,7 @@ class TestHS2(HS2TestSuite):
       time.sleep(0.1)
 
   def get_log(self, query_stmt):
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = query_stmt
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    TestHS2.check_response(execute_statement_resp)
+    execute_statement_resp = self.execute_statement(query_stmt)
 
     # Fetch results to make sure errors are generated. Errors are only guaranteed to be
     # seen by the coordinator after FetchResults() returns eos.
@@ -380,11 +419,8 @@ class TestHS2(HS2TestSuite):
 
   @needs_session()
   def test_get_exec_summary(self):
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = "SELECT COUNT(1) FROM functional.alltypes"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    TestHS2.check_response(execute_statement_resp)
+    statement = "SELECT COUNT(1) FROM functional.alltypes"
+    execute_statement_resp = self.execute_statement(statement)
 
     exec_summary_req = ImpalaHiveServer2Service.TGetExecSummaryReq()
     exec_summary_req.operationHandle = execute_statement_resp.operationHandle
@@ -406,18 +442,15 @@ class TestHS2(HS2TestSuite):
 
   @needs_session()
   def test_get_profile(self):
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = "SELECT COUNT(2) FROM functional.alltypes"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    TestHS2.check_response(execute_statement_resp)
+    statement = "SELECT COUNT(2) FROM functional.alltypes"
+    execute_statement_resp = self.execute_statement(statement)
 
     get_profile_req = ImpalaHiveServer2Service.TGetRuntimeProfileReq()
     get_profile_req.operationHandle = execute_statement_resp.operationHandle
     get_profile_req.sessionHandle = self.session_handle
     get_profile_resp = self.hs2_client.GetRuntimeProfile(get_profile_req)
     TestHS2.check_response(get_profile_resp)
-    assert execute_statement_req.statement in get_profile_resp.profile
+    assert statement in get_profile_resp.profile
     # If ExecuteStatement() has completed but the results haven't been fetched yet, the
     # query must have at least reached RUNNING.
     assert "Query State: RUNNING" in get_profile_resp.profile or \
@@ -430,7 +463,7 @@ class TestHS2(HS2TestSuite):
 
     get_profile_resp = self.hs2_client.GetRuntimeProfile(get_profile_req)
     TestHS2.check_response(get_profile_resp)
-    assert execute_statement_req.statement in get_profile_resp.profile
+    assert statement in get_profile_resp.profile
     # After fetching the results, we must be in state FINISHED.
     assert "Query State: FINISHED" in get_profile_resp.profile, get_profile_resp.profile
 
@@ -440,26 +473,20 @@ class TestHS2(HS2TestSuite):
 
     get_profile_resp = self.hs2_client.GetRuntimeProfile(get_profile_req)
     TestHS2.check_response(get_profile_resp)
-    assert execute_statement_req.statement in get_profile_resp.profile
+    assert statement in get_profile_resp.profile
     assert "Query State: FINISHED" in get_profile_resp.profile, get_profile_resp.profile
 
   @needs_session(conf_overlay={"use:database": "functional"})
   def test_change_default_database(self):
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = "SELECT 1 FROM alltypes LIMIT 1"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    statement = "SELECT 1 FROM alltypes LIMIT 1"
     # Will fail if there's no table called 'alltypes' in the database
-    TestHS2.check_response(execute_statement_resp)
+    self.execute_statement(statement)
 
   @needs_session(conf_overlay={"use:database": "FUNCTIONAL"})
   def test_change_default_database_case_insensitive(self):
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = "SELECT 1 FROM alltypes LIMIT 1"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    statement = "SELECT 1 FROM alltypes LIMIT 1"
     # Will fail if there's no table called 'alltypes' in the database
-    TestHS2.check_response(execute_statement_resp)
+    self.execute_statement(statement)
 
   @needs_session(conf_overlay={"use:database": "doesnt-exist"})
   def test_bad_default_database(self):

@@ -603,4 +603,33 @@ SELECT COUNT(*) FROM sales_table WHERE year IN (2005, 2010, 2015);
 
   </concept>
 
+  <concept id="partition_stats">
+    <title>Keeping Statistics Up to Date for Partitioned Tables</title>
+    <conbody>
+
+      <p>
+        Because the <codeph>COMPUTE STATS</codeph> statement can be resource-intensive to run on a partitioned table
+        as new partitions are added, Impala includes a variation of this statement that allows computing statistics
+        on a per-partition basis such that stats can be incrementally updated when new partitions are added.
+      </p>
+
+      <note type="important">
+        <p conref="../shared/impala_common.xml#common/cs_or_cis"/>
+        <p conref="../shared/impala_common.xml#common/incremental_stats_after_full"/>
+        <p conref="../shared/impala_common.xml#common/incremental_stats_caveats"/>
+      </note>
+
+      <p rev="2.1.0">
+        The <codeph>COMPUTE INCREMENTAL STATS</codeph> variation computes statistics only for partitions that were
+        added or changed since the last <codeph>COMPUTE INCREMENTAL STATS</codeph> statement, rather than the entire
+        table. It is typically used for tables where a full <codeph>COMPUTE STATS</codeph>
+        operation takes too long to be practical each time a partition is added or dropped. See
+        <xref href="impala_perf_stats.xml#perf_stats_incremental"/> for full usage details.
+      </p>
+
+<codeblock conref="../shared/impala_common.xml#common/compute_stats_walkthrough"/>
+
+    </conbody>
+  </concept>
+
 </concept>

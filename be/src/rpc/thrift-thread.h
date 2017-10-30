@@ -93,7 +93,7 @@ class ThriftThread : public apache::thrift::concurrency::Thread {
 
   /// Impala thread that runs the runnable and registers itself with the global
   /// ThreadManager.
-  boost::scoped_ptr<impala::Thread> impala_thread_;
+  std::unique_ptr<impala::Thread> impala_thread_;
 
   /// Thrift thread ID, set by RunRunnable.
   apache::thrift::concurrency::Thread::id_t tid_;

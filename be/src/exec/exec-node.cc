@@ -29,17 +29,15 @@
 #include "common/status.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
-#include "exec/aggregation-node.h"
 #include "exec/analytic-eval-node.h"
 #include "exec/data-source-scan-node.h"
 #include "exec/empty-set-node.h"
 #include "exec/exchange-node.h"
-#include "exec/hash-join-node.h"
 #include "exec/hbase-scan-node.h"
-#include "exec/hdfs-scan-node.h"
 #include "exec/hdfs-scan-node-mt.h"
-#include "exec/kudu-scan-node.h"
+#include "exec/hdfs-scan-node.h"
 #include "exec/kudu-scan-node-mt.h"
+#include "exec/kudu-scan-node.h"
 #include "exec/kudu-util.h"
 #include "exec/nested-loop-join-node.h"
 #include "exec/partial-sort-node.h"
@@ -52,21 +50,29 @@
 #include "exec/topn-node.h"
 #include "exec/union-node.h"
 #include "exec/unnest-node.h"
+#include "exprs/expr.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/descriptors.h"
-#include "runtime/mem-tracker.h"
+#include "runtime/exec-env.h"
+#include "runtime/initial-reservations.h"
 #include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
+#include "runtime/query-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
+#include "util/string-parser.h"
 
 #include "common/names.h"
 
 using namespace llvm;
+using strings::Substitute;
 
-// TODO: remove when we remove hash-join-node.cc and aggregation-node.cc
-DEFINE_bool(enable_partitioned_hash_join, true, "Enable partitioned hash join");
-DEFINE_bool(enable_partitioned_aggregation, true, "Enable partitioned hash agg");
+DECLARE_int32(be_port);
+DECLARE_string(hostname);
+DEFINE_bool_hidden(enable_partitioned_hash_join, true, "Deprecated - has no effect");
+DEFINE_bool_hidden(enable_partitioned_aggregation, true, "Deprecated - has no effect");
 
 namespace impala {
 
@@ -119,16 +125,19 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
     type_(tnode.node_type),
     pool_(pool),
     row_descriptor_(descs, tnode.row_tuples, tnode.nullable_tuples),
+    resource_profile_(tnode.resource_profile),
     debug_phase_(TExecNodePhase::INVALID),
     debug_action_(TDebugAction::WAIT),
     limit_(tnode.limit),
     num_rows_returned_(0),
+    runtime_profile_(RuntimeProfile::Create(pool_,
+        Substitute("$0 (id=$1)", PrintPlanNodeType(tnode.node_type), id_))),
     rows_returned_counter_(NULL),
     rows_returned_rate_(NULL),
     containing_subplan_(NULL),
     disable_codegen_(tnode.disable_codegen),
     is_closed_(false) {
-  InitRuntimeProfile(PrintPlanNodeType(tnode.node_type));
+  runtime_profile_->set_metadata(id_);
 }
 
 ExecNode::~ExecNode() {
@@ -142,20 +151,20 @@ Status ExecNode::Init(const TPlanNode& tnode, RuntimeState* state) {
 
 Status ExecNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::PREPARE, state));
-  DCHECK(runtime_profile_.get() != NULL);
-  mem_tracker_.reset(new MemTracker(runtime_profile_.get(), -1, runtime_profile_->name(),
+  DCHECK(runtime_profile_ != NULL);
+  mem_tracker_.reset(new MemTracker(runtime_profile_, -1, runtime_profile_->name(),
       state->instance_mem_tracker()));
   expr_mem_tracker_.reset(new MemTracker(-1, "Exprs", mem_tracker_.get(), false));
-  expr_mem_pool_.reset(new MemPool(expr_mem_tracker_.get()));
+  expr_perm_pool_.reset(new MemPool(expr_mem_tracker_.get()));
+  expr_results_pool_.reset(new MemPool(expr_mem_tracker_.get()));
   rows_returned_counter_ = ADD_COUNTER(runtime_profile_, "RowsReturned", TUnit::UNIT);
   rows_returned_rate_ = runtime_profile()->AddDerivedCounter(
       ROW_THROUGHPUT_COUNTER, TUnit::UNIT_PER_SECOND,
       bind<int64_t>(&RuntimeProfile::UnitsPerSecond, rows_returned_counter_,
           runtime_profile()->total_time_counter()));
-  RETURN_IF_ERROR(ScalarExprEvaluator::Create(conjuncts_, state, pool_, expr_mem_pool(),
-      &conjunct_evals_));
+  RETURN_IF_ERROR(ScalarExprEvaluator::Create(conjuncts_, state, pool_, expr_perm_pool(),
+      expr_results_pool(), &conjunct_evals_));
   DCHECK_EQ(conjunct_evals_.size(), conjuncts_.size());
-  AddEvaluatorsToFree(conjunct_evals_);
   for (int i = 0; i < children_.size(); ++i) {
     RETURN_IF_ERROR(children_[i]->Prepare(state));
   }
@@ -197,14 +206,75 @@ void ExecNode::Close(RuntimeState* state) {
 
   ScalarExprEvaluator::Close(conjunct_evals_, state);
   ScalarExpr::Close(conjuncts_);
-  if (expr_mem_pool() != nullptr) expr_mem_pool_->FreeAll();
-
-  if (mem_tracker() != NULL && mem_tracker()->consumption() != 0) {
-    LOG(WARNING) << "Query " << state->query_id() << " may have leaked memory." << endl
-                 << state->instance_mem_tracker()->LogUsage();
-    DCHECK_EQ(mem_tracker()->consumption(), 0)
-        << "Leaked memory." << endl << state->instance_mem_tracker()->LogUsage();
+  if (expr_perm_pool() != nullptr) expr_perm_pool_->FreeAll();
+  if (expr_results_pool() != nullptr) expr_results_pool_->FreeAll();
+  if (buffer_pool_client_.is_registered()) {
+    VLOG_FILE << id_ << " returning reservation " << resource_profile_.min_reservation;
+    state->query_state()->initial_reservations()->Return(
+        &buffer_pool_client_, resource_profile_.min_reservation);
+    state->exec_env()->buffer_pool()->DeregisterClient(&buffer_pool_client_);
   }
+  if (expr_mem_tracker_ != nullptr) expr_mem_tracker_->Close();
+  if (mem_tracker_ != nullptr) {
+    if (mem_tracker()->consumption() != 0) {
+      LOG(WARNING) << "Query " << state->query_id() << " may have leaked memory." << endl
+          << state->instance_mem_tracker()->LogUsage(MemTracker::UNLIMITED_DEPTH);
+      DCHECK_EQ(mem_tracker()->consumption(), 0)
+          << "Leaked memory." << endl
+          << state->instance_mem_tracker()->LogUsage(MemTracker::UNLIMITED_DEPTH);
+    }
+    mem_tracker_->Close();
+  }
+}
+
+Status ExecNode::ClaimBufferReservation(RuntimeState* state) {
+  DCHECK(!buffer_pool_client_.is_registered());
+  BufferPool* buffer_pool = ExecEnv::GetInstance()->buffer_pool();
+  // Check the minimum buffer size in case the minimum buffer size used by the planner
+  // doesn't match this backend's.
+  if (resource_profile_.__isset.spillable_buffer_size &&
+      resource_profile_.spillable_buffer_size < buffer_pool->min_buffer_len()) {
+    return Status(Substitute("Spillable buffer size for node $0 of $1 bytes is less "
+                             "than the minimum buffer pool buffer size of $2 bytes",
+        id_, resource_profile_.spillable_buffer_size, buffer_pool->min_buffer_len()));
+  }
+
+  RETURN_IF_ERROR(buffer_pool->RegisterClient(
+      Substitute("$0 id=$1 ptr=$2", PrintPlanNodeType(type_), id_, this),
+      state->query_state()->file_group(), state->instance_buffer_reservation(),
+      mem_tracker(), resource_profile_.max_reservation, runtime_profile(),
+      &buffer_pool_client_));
+  VLOG_FILE << id_ << " claiming reservation " << resource_profile_.min_reservation;
+  state->query_state()->initial_reservations()->Claim(
+      &buffer_pool_client_, resource_profile_.min_reservation);
+  if (debug_action_ == TDebugAction::SET_DENY_RESERVATION_PROBABILITY &&
+      (debug_phase_ == TExecNodePhase::PREPARE || debug_phase_ == TExecNodePhase::OPEN)) {
+    // We may not have been able to enable the debug action at the start of Prepare() or
+    // Open() because the client is not registered then. Do it now to be sure that it is
+    // effective.
+    RETURN_IF_ERROR(EnableDenyReservationDebugAction());
+  }
+  return Status::OK();
+}
+
+Status ExecNode::ReleaseUnusedReservation() {
+  return buffer_pool_client_.DecreaseReservationTo(resource_profile_.min_reservation);
+}
+
+Status ExecNode::EnableDenyReservationDebugAction() {
+  DCHECK_EQ(debug_action_, TDebugAction::SET_DENY_RESERVATION_PROBABILITY);
+  DCHECK(buffer_pool_client_.is_registered());
+  // Parse [0.0, 1.0] probability.
+  StringParser::ParseResult parse_result;
+  double probability = StringParser::StringToFloat<double>(
+      debug_action_param_.c_str(), debug_action_param_.size(), &parse_result);
+  if (parse_result != StringParser::PARSE_SUCCESS || probability < 0.0
+      || probability > 1.0) {
+    return Status(Substitute(
+        "Invalid SET_DENY_RESERVATION_PROBABILITY param: '$0'", debug_action_param_));
+  }
+  buffer_pool_client_.SetDebugDenyIncreaseReservation(probability);
+  return Status::OK();
 }
 
 Status ExecNode::CreateTree(
@@ -299,24 +369,10 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       }
       break;
     case TPlanNodeType::AGGREGATION_NODE:
-      if (FLAGS_enable_partitioned_aggregation) {
-        *node = pool->Add(new PartitionedAggregationNode(pool, tnode, descs));
-      } else {
-        *node = pool->Add(new AggregationNode(pool, tnode, descs));
-      }
+      *node = pool->Add(new PartitionedAggregationNode(pool, tnode, descs));
       break;
     case TPlanNodeType::HASH_JOIN_NODE:
-      // The (old) HashJoinNode does not support left-anti, right-semi, and right-anti
-      // joins.
-      if (tnode.hash_join_node.join_op == TJoinOp::LEFT_ANTI_JOIN ||
-          tnode.hash_join_node.join_op == TJoinOp::RIGHT_SEMI_JOIN ||
-          tnode.hash_join_node.join_op == TJoinOp::RIGHT_ANTI_JOIN ||
-          tnode.hash_join_node.join_op == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN ||
-          FLAGS_enable_partitioned_hash_join) {
-        *node = pool->Add(new PartitionedHashJoinNode(pool, tnode, descs));
-      } else {
-        *node = pool->Add(new HashJoinNode(pool, tnode, descs));
-      }
+      *node = pool->Add(new PartitionedHashJoinNode(pool, tnode, descs));
       break;
     case TPlanNodeType::NESTED_LOOP_JOIN_NODE:
       *node = pool->Add(new NestedLoopJoinNode(pool, tnode, descs));
@@ -350,13 +406,6 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       *node = pool->Add(new SingularRowSrcNode(pool, tnode, descs));
       break;
     case TPlanNodeType::SUBPLAN_NODE:
-      if (!FLAGS_enable_partitioned_hash_join || !FLAGS_enable_partitioned_aggregation) {
-        error_msg << "Query referencing nested types is not supported because the "
-            << "--enable_partitioned_hash_join and/or --enable_partitioned_aggregation "
-            << "Impala Daemon start-up flags are set to false.\nTo enable nested types "
-            << "support please set those flags to true (they are enabled by default).";
-        return Status(error_msg.str());
-      }
       *node = pool->Add(new SubplanNode(pool, tnode, descs));
       break;
     case TPlanNodeType::UNNEST_NODE:
@@ -379,10 +428,10 @@ void ExecNode::SetDebugOptions(const TDebugOptions& debug_options, ExecNode* roo
   DCHECK(debug_options.__isset.node_id);
   DCHECK(debug_options.__isset.phase);
   DCHECK(debug_options.__isset.action);
-  if (root->id_ == debug_options.node_id) {
+  if (debug_options.node_id == -1 || root->id_ == debug_options.node_id) {
     root->debug_phase_ = debug_options.phase;
     root->debug_action_ = debug_options.action;
-    return;
+    root->debug_action_param_ = debug_options.action_param;
   }
   for (int i = 0; i < root->children_.size(); ++i) {
     SetDebugOptions(debug_options, root->children_[i]);
@@ -416,32 +465,30 @@ void ExecNode::CollectScanNodes(vector<ExecNode*>* nodes) {
   CollectNodes(TPlanNodeType::KUDU_SCAN_NODE, nodes);
 }
 
-void ExecNode::InitRuntimeProfile(const string& name) {
-  stringstream ss;
-  ss << name << " (id=" << id_ << ")";
-  runtime_profile_.reset(new RuntimeProfile(pool_, ss.str()));
-  runtime_profile_->set_metadata(id_);
-}
-
-Status ExecNode::ExecDebugAction(TExecNodePhase::type phase, RuntimeState* state) {
-  DCHECK(phase != TExecNodePhase::INVALID);
-  if (debug_phase_ != phase) return Status::OK();
+Status ExecNode::ExecDebugActionImpl(TExecNodePhase::type phase, RuntimeState* state) {
+  DCHECK_EQ(debug_phase_, phase);
   if (debug_action_ == TDebugAction::FAIL) {
     return Status(TErrorCode::INTERNAL_ERROR, "Debug Action: FAIL");
-  }
-  if (debug_action_ == TDebugAction::WAIT) {
+  } else if (debug_action_ == TDebugAction::WAIT) {
     while (!state->is_cancelled()) {
       sleep(1);
     }
     return Status::CANCELLED;
-  }
-  if (debug_action_ == TDebugAction::INJECT_ERROR_LOG) {
+  } else if (debug_action_ == TDebugAction::INJECT_ERROR_LOG) {
     state->LogError(
         ErrorMsg(TErrorCode::INTERNAL_ERROR, "Debug Action: INJECT_ERROR_LOG"));
     return Status::OK();
-  }
-  if (debug_action_ == TDebugAction::MEM_LIMIT_EXCEEDED) {
+  } else if (debug_action_ == TDebugAction::MEM_LIMIT_EXCEEDED) {
     return mem_tracker()->MemLimitExceeded(state, "Debug Action: MEM_LIMIT_EXCEEDED");
+  } else {
+    DCHECK_EQ(debug_action_, TDebugAction::SET_DENY_RESERVATION_PROBABILITY);
+    // We can only enable the debug action right if the buffer pool client is registered.
+    // If the buffer client is not registered at this point (e.g. if phase is PREPARE or
+    // OPEN), then we will enable the debug action at the time when the client is
+    // registered.
+    if (buffer_pool_client_.is_registered()) {
+      RETURN_IF_ERROR(EnableDenyReservationDebugAction());
+    }
   }
   return Status::OK();
 }
@@ -455,16 +502,8 @@ bool ExecNode::EvalConjuncts(
 }
 
 Status ExecNode::QueryMaintenance(RuntimeState* state) {
-  ScalarExprEvaluator::FreeLocalAllocations(evals_to_free_);
+  expr_results_pool_->Clear();
   return state->CheckQueryState();
-}
-
-void ExecNode::AddEvaluatorToFree(ScalarExprEvaluator* eval) {
-  evals_to_free_.push_back(eval);
-}
-
-void ExecNode::AddEvaluatorsToFree(const vector<ScalarExprEvaluator*>& evals) {
-  for (ScalarExprEvaluator* eval : evals) AddEvaluatorToFree(eval);
 }
 
 void ExecNode::AddCodegenDisabledMessage(RuntimeState* state) {

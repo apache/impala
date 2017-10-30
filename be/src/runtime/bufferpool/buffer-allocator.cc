@@ -30,7 +30,15 @@
 
 #include "common/names.h"
 
+DECLARE_bool(disable_mem_pools);
+
 namespace impala {
+
+/// Decrease 'bytes_remaining' by up to 'max_decrease', down to a minimum of 0.
+/// If 'require_full_decrease' is true, only decrease if we can decrease it
+/// 'max_decrease'. Returns the amount it was decreased by.
+static int64_t DecreaseBytesRemaining(
+    int64_t max_decrease, bool require_full_decrease, AtomicInt64* bytes_remaining);
 
 /// An arena containing free buffers and clean pages that are associated with a
 /// particular core. All public methods are thread-safe.
@@ -96,10 +104,6 @@ class BufferPool::FreeBufferArena : public CacheLineAligned {
   /// it doesn't acquire the arena lock.
   int64_t GetNumCleanPages();
 
-  /// Return the total bytes of clean pages in the arena. May be approximate since
-  /// it doesn't acquire the arena lock.
-  int64_t GetCleanPageBytes();
-
   string DebugString();
 
  private:
@@ -107,6 +111,15 @@ class BufferPool::FreeBufferArena : public CacheLineAligned {
   /// All members are protected by FreeBufferArena::lock_ unless otherwise mentioned.
   struct PerSizeLists {
     PerSizeLists() : num_free_buffers(0), low_water_mark(0), num_clean_pages(0) {}
+
+    /// Helper to add a free buffer and increment the counter.
+    /// FreeBufferArena::lock_ must be held by the caller.
+    void AddFreeBuffer(BufferHandle&& buffer) {
+      DCHECK_EQ(num_free_buffers.Load(), free_buffers.Size());
+      num_free_buffers.Add(1);
+      free_buffers.AddFreeBuffer(move(buffer));
+    }
+
     /// The number of entries in 'free_buffers'. Can be read without holding a lock to
     /// allow threads to quickly skip over empty lists when trying to find a buffer.
     AtomicInt64 num_free_buffers;
@@ -168,7 +181,8 @@ int64_t BufferPool::BufferAllocator::CalcMaxBufferLen(
 }
 
 BufferPool::BufferAllocator::BufferAllocator(
-    BufferPool* pool, int64_t min_buffer_len, int64_t system_bytes_limit)
+    BufferPool* pool, int64_t min_buffer_len, int64_t system_bytes_limit,
+    int64_t clean_page_bytes_limit)
   : pool_(pool),
     system_allocator_(new SystemAllocator(min_buffer_len)),
     min_buffer_len_(min_buffer_len),
@@ -177,6 +191,8 @@ BufferPool::BufferAllocator::BufferAllocator(
     log_max_buffer_len_(BitUtil::Log2Ceiling64(max_buffer_len_)),
     system_bytes_limit_(system_bytes_limit),
     system_bytes_remaining_(system_bytes_limit),
+    clean_page_bytes_limit_(clean_page_bytes_limit),
+    clean_page_bytes_remaining_(clean_page_bytes_limit),
     per_core_arenas_(CpuInfo::GetMaxNumCores()),
     max_scavenge_attempts_(MAX_SCAVENGE_ATTEMPTS) {
   DCHECK(BitUtil::IsPowerOf2(min_buffer_len_)) << min_buffer_len_;
@@ -195,6 +211,7 @@ BufferPool::BufferAllocator::~BufferAllocator() {
   per_core_arenas_.clear(); // Release all the memory.
   // Check for accounting leaks.
   DCHECK_EQ(system_bytes_limit_, system_bytes_remaining_.Load());
+  DCHECK_EQ(clean_page_bytes_limit_, clean_page_bytes_remaining_.Load());
 }
 
 Status BufferPool::BufferAllocator::Allocate(
@@ -229,7 +246,7 @@ Status BufferPool::BufferAllocator::AllocateInternal(int64_t len, BufferHandle* 
   if (current_core_arena->PopFreeBuffer(len, buffer)) return Status::OK();
 
   // Fast-ish path: allocate a new buffer if there is room in 'system_bytes_remaining_'.
-  int64_t delta = DecreaseSystemBytesRemaining(len, true);
+  int64_t delta = DecreaseBytesRemaining(len, true, &system_bytes_remaining_);
   if (delta != len) {
     DCHECK_EQ(0, delta);
     const vector<int>& numa_node_cores = CpuInfo::GetCoresOfSameNumaNode(current_core);
@@ -283,14 +300,14 @@ Status BufferPool::BufferAllocator::AllocateInternal(int64_t len, BufferHandle* 
   return Status::OK();
 }
 
-int64_t BufferPool::BufferAllocator::DecreaseSystemBytesRemaining(
-    int64_t max_decrease, bool require_full_decrease) {
+int64_t DecreaseBytesRemaining(
+    int64_t max_decrease, bool require_full_decrease, AtomicInt64* bytes_remaining) {
   while (true) {
-    int64_t old_value = system_bytes_remaining_.Load();
+    int64_t old_value = bytes_remaining->Load();
     if (require_full_decrease && old_value < max_decrease) return 0;
     int64_t decrease = min(old_value, max_decrease);
     int64_t new_value = old_value - decrease;
-    if (system_bytes_remaining_.CompareAndSwap(old_value, new_value)) {
+    if (bytes_remaining->CompareAndSwap(old_value, new_value)) {
       return decrease;
     }
   }
@@ -309,11 +326,12 @@ int64_t BufferPool::BufferAllocator::ScavengeBuffers(
   //    examined (or from 'system_bytes_available_') because in order to do so, it would
   //    have had to return the equivalent amount of memory to an earlier arena or added
   //    it back into 'systems_bytes_reamining_'. The former can't happen since we're
-  //    still holding those locks, and the latter is solved by trying
-  //    DecreaseSystemBytesRemaining() at the end.
+  //    still holding those locks, and the latter is solved by trying to decrease
+  //    system_bytes_remaining_ with DecreaseBytesRemaining() at the end.
   DCHECK_GT(target_bytes, 0);
   // First make sure we've used up all the headroom in the buffer limit.
-  int64_t bytes_found = DecreaseSystemBytesRemaining(target_bytes, false);
+  int64_t bytes_found =
+      DecreaseBytesRemaining(target_bytes, false, &system_bytes_remaining_);
   if (bytes_found == target_bytes) return bytes_found;
 
   // In 'slow_but_sure' mode, we will hold locks for multiple arenas at the same time and
@@ -339,7 +357,8 @@ int64_t BufferPool::BufferAllocator::ScavengeBuffers(
   // thread holds the lock while decrementing 'system_bytes_remaining_' in the cases
   // where it may not have reservation corresponding to that memory.
   if (slow_but_sure && bytes_found < target_bytes) {
-    bytes_found += DecreaseSystemBytesRemaining(target_bytes - bytes_found, true);
+    bytes_found += DecreaseBytesRemaining(
+        target_bytes - bytes_found, true, &system_bytes_remaining_);
     DCHECK_EQ(bytes_found, target_bytes) << DebugString();
   }
   return bytes_found;
@@ -349,6 +368,7 @@ void BufferPool::BufferAllocator::Free(BufferHandle&& handle) {
   DCHECK(handle.is_open());
   handle.client_ = nullptr; // Buffer is no longer associated with a client.
   FreeBufferArena* arena = per_core_arenas_[handle.home_core_].get();
+  handle.Poison();
   arena->AddFreeBuffer(move(handle));
 }
 
@@ -396,6 +416,8 @@ int64_t BufferPool::BufferAllocator::FreeToSystem(vector<BufferHandle>&& buffers
   int64_t bytes_freed = 0;
   for (BufferHandle& buffer : buffers) {
     bytes_freed += buffer.len();
+    // Ensure that the memory is unpoisoned when it's next allocated by the system.
+    buffer.Unpoison();
     system_allocator_->Free(move(buffer));
   }
   return bytes_freed;
@@ -423,15 +445,21 @@ int64_t BufferPool::BufferAllocator::GetNumCleanPages() const {
   return SumOverArenas([](FreeBufferArena* arena) { return arena->GetNumCleanPages(); });
 }
 
+int64_t BufferPool::BufferAllocator::GetCleanPageBytesLimit() const {
+  return clean_page_bytes_limit_;
+}
+
 int64_t BufferPool::BufferAllocator::GetCleanPageBytes() const {
-  return SumOverArenas([](FreeBufferArena* arena) { return arena->GetCleanPageBytes(); });
+  return clean_page_bytes_limit_ - clean_page_bytes_remaining_.Load();
 }
 
 string BufferPool::BufferAllocator::DebugString() {
   stringstream ss;
   ss << "<BufferAllocator> " << this << " min_buffer_len: " << min_buffer_len_
      << " system_bytes_limit: " << system_bytes_limit_
-     << " system_bytes_remaining: " << system_bytes_remaining_.Load() << "\n";
+     << " system_bytes_remaining: " << system_bytes_remaining_.Load() << "\n"
+     << " clean_page_bytes_limit: " << clean_page_bytes_limit_
+     << " clean_page_bytes_remaining: " << clean_page_bytes_remaining_.Load() << "\n";
   for (int i = 0; i < per_core_arenas_.size(); ++i) {
     ss << "  Arena " << i << " " << per_core_arenas_[i]->DebugString() << "\n";
   }
@@ -454,11 +482,14 @@ BufferPool::FreeBufferArena::~FreeBufferArena() {
 
 void BufferPool::FreeBufferArena::AddFreeBuffer(BufferHandle&& buffer) {
   lock_guard<SpinLock> al(lock_);
+  if (FLAGS_disable_mem_pools) {
+    int64_t len = buffer.len();
+    parent_->system_allocator_->Free(move(buffer));
+    parent_->system_bytes_remaining_.Add(len);
+    return;
+  }
   PerSizeLists* lists = GetListsForSize(buffer.len());
-  FreeList* list = &lists->free_buffers;
-  DCHECK_EQ(lists->num_free_buffers.Load(), list->Size());
-  lists->num_free_buffers.Add(1);
-  list->AddFreeBuffer(move(buffer));
+  lists->AddFreeBuffer(move(buffer));
 }
 
 bool BufferPool::FreeBufferArena::RemoveCleanPage(bool claim_buffer, Page* page) {
@@ -467,14 +498,14 @@ bool BufferPool::FreeBufferArena::RemoveCleanPage(bool claim_buffer, Page* page)
   DCHECK_EQ(lists->num_clean_pages.Load(), lists->clean_pages.size());
   if (!lists->clean_pages.Remove(page)) return false;
   lists->num_clean_pages.Add(-1);
+  parent_->clean_page_bytes_remaining_.Add(page->len);
   if (!claim_buffer) {
     BufferHandle buffer;
     {
       lock_guard<SpinLock> pl(page->buffer_lock);
       buffer = move(page->buffer);
     }
-    lists->free_buffers.AddFreeBuffer(move(buffer));
-    lists->num_free_buffers.Add(1);
+    lists->AddFreeBuffer(move(buffer));
   }
   return true;
 }
@@ -489,6 +520,7 @@ bool BufferPool::FreeBufferArena::PopFreeBuffer(
   FreeList* list = &lists->free_buffers;
   DCHECK_EQ(lists->num_free_buffers.Load(), list->Size());
   if (!list->PopFreeBuffer(buffer)) return false;
+  buffer->Unpoison();
   lists->num_free_buffers.Add(-1);
   lists->low_water_mark = min<int>(lists->low_water_mark, list->Size());
   return true;
@@ -505,6 +537,7 @@ bool BufferPool::FreeBufferArena::EvictCleanPage(
   Page* page = lists->clean_pages.Dequeue();
   if (page == nullptr) return false;
   lists->num_clean_pages.Add(-1);
+  parent_->clean_page_bytes_remaining_.Add(buffer_len);
   lock_guard<SpinLock> pl(page->buffer_lock);
   *buffer = move(page->buffer);
   return true;
@@ -548,10 +581,11 @@ pair<int64_t, int64_t> BufferPool::FreeBufferArena::FreeSystemMemory(
     // Evict clean pages by moving their buffers to the free page list before freeing
     // them. This ensures that they are freed based on memory address in the expected
     // order.
+    int num_pages_evicted = 0;
+    int64_t page_bytes_evicted = 0;
     while (bytes_freed + buffer_bytes_to_free < target_bytes_to_free) {
       Page* page = clean_pages->Dequeue();
       if (page == nullptr) break;
-      lists->num_clean_pages.Add(-1);
       BufferHandle page_buffer;
       {
         lock_guard<SpinLock> pl(page->buffer_lock);
@@ -559,9 +593,14 @@ pair<int64_t, int64_t> BufferPool::FreeBufferArena::FreeSystemMemory(
       }
       ++buffers_to_free;
       buffer_bytes_to_free += page_buffer.len();
+      ++num_pages_evicted;
+      page_bytes_evicted += page_buffer.len();
       free_buffers->AddFreeBuffer(move(page_buffer));
-      lists->num_free_buffers.Add(1);
     }
+    lists->num_free_buffers.Add(num_pages_evicted);
+    lists->num_clean_pages.Add(-num_pages_evicted);
+    parent_->clean_page_bytes_remaining_.Add(page_bytes_evicted);
+
     if (buffers_to_free > 0) {
       int64_t buffer_bytes_freed =
           parent_->FreeToSystem(free_buffers->GetBuffersToFree(buffers_to_free));
@@ -586,11 +625,31 @@ pair<int64_t, int64_t> BufferPool::FreeBufferArena::FreeSystemMemory(
 }
 
 void BufferPool::FreeBufferArena::AddCleanPage(Page* page) {
+  bool eviction_needed = FLAGS_disable_mem_pools
+    || DecreaseBytesRemaining(
+        page->len, true, &parent_->clean_page_bytes_remaining_) == 0;
   lock_guard<SpinLock> al(lock_);
   PerSizeLists* lists = GetListsForSize(page->len);
   DCHECK_EQ(lists->num_clean_pages.Load(), lists->clean_pages.size());
-  lists->clean_pages.Enqueue(page);
-  lists->num_clean_pages.Add(1);
+  if (eviction_needed) {
+    if (lists->clean_pages.empty()) {
+      // No other pages to evict, must evict 'page' instead of adding it.
+      lists->AddFreeBuffer(move(page->buffer));
+    } else {
+      // Evict an older page (FIFO eviction) to make space for this one.
+      Page* page_to_evict = lists->clean_pages.Dequeue();
+      lists->clean_pages.Enqueue(page);
+      BufferHandle page_to_evict_buffer;
+      {
+        lock_guard<SpinLock> pl(page_to_evict->buffer_lock);
+        page_to_evict_buffer = move(page_to_evict->buffer);
+      }
+      lists->AddFreeBuffer(move(page_to_evict_buffer));
+    }
+  } else {
+    lists->clean_pages.Enqueue(page);
+    lists->num_clean_pages.Add(1);
+  }
 }
 
 void BufferPool::FreeBufferArena::Maintenance() {
@@ -643,12 +702,6 @@ int64_t BufferPool::FreeBufferArena::GetFreeBufferBytes() {
 int64_t BufferPool::FreeBufferArena::GetNumCleanPages() {
   return SumOverSizes([](PerSizeLists* lists, int64_t buffer_size) {
     return lists->num_clean_pages.Load();
-  });
-}
-
-int64_t BufferPool::FreeBufferArena::GetCleanPageBytes() {
-  return SumOverSizes([](PerSizeLists* lists, int64_t buffer_size) {
-    return lists->num_clean_pages.Load() * buffer_size;
   });
 }
 

@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "kudu/util/faststring.h"
+#include "kudu/util/status.h"
 
 using std::unique_ptr;
 

@@ -23,6 +23,7 @@ import org.apache.impala.catalog.Catalog;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
+import org.apache.impala.rewrite.SimplifyDistinctFromRule;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -35,12 +36,29 @@ import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.junit.Assert;
 import org.junit.Test;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 /**
  * Tests ExprRewriteRules.
  */
 public class ExprRewriteRulesTest extends FrontendTestBase {
+
+  /** Wraps an ExprRewriteRule to count how many times it's been applied. */
+  private static class CountingRewriteRuleWrapper implements ExprRewriteRule {
+    int rewrites;
+    ExprRewriteRule wrapped;
+
+    CountingRewriteRuleWrapper(ExprRewriteRule wrapped) {
+      this.wrapped = wrapped;
+    }
+
+    public Expr apply(Expr expr, Analyzer analyzer) throws AnalysisException {
+      Expr ret = wrapped.apply(expr, analyzer);
+      if (expr != ret) rewrites++;
+      return ret;
+    }
+  }
 
   public Expr RewritesOk(String exprStr, ExprRewriteRule rule, String expectedExprStr)
       throws AnalysisException {
@@ -78,11 +96,6 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     return RewritesOkWhereExpr(tableName, exprStr, Lists.newArrayList(rule), expectedExprStr);
   }
 
-  public Expr RewritesOkWhereExpr(String exprStr, List<ExprRewriteRule> rules, String expectedExprStr)
-      throws AnalysisException {
-    return RewritesOkWhereExpr("functional.alltypessmall", exprStr, rules, expectedExprStr);
-  }
-
   public Expr RewritesOkWhereExpr(String tableName, String exprStr, List<ExprRewriteRule> rules,
       String expectedExprStr) throws AnalysisException {
     String stmtStr = "select count(1)  from " + tableName + " where " + exprStr;
@@ -98,12 +111,27 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   private Expr verifyExprEquivalence(Expr origExpr, String expectedExprStr,
       List<ExprRewriteRule> rules, Analyzer analyzer) throws AnalysisException {
     String origSql = origExpr.toSql();
-    ExprRewriter rewriter = new ExprRewriter(rules);
+
+    List<ExprRewriteRule> wrappedRules = Lists.newArrayList();
+    for (ExprRewriteRule r : rules) {
+      wrappedRules.add(new CountingRewriteRuleWrapper(r));
+    }
+    ExprRewriter rewriter = new ExprRewriter(wrappedRules);
+
     Expr rewrittenExpr = rewriter.rewrite(origExpr, analyzer);
     String rewrittenSql = rewrittenExpr.toSql();
     boolean expectChange = expectedExprStr != null;
     if (expectedExprStr != null) {
       assertEquals(expectedExprStr, rewrittenSql);
+      // Asserts that all specified rules fired at least once. This makes sure that the
+      // rules being tested are, in fact, being executed. A common mistake is to write
+      // an expression that's re-written by the constant folder before getting to the
+      // rule that is intended for the test.
+      for (ExprRewriteRule r : wrappedRules) {
+        CountingRewriteRuleWrapper w = (CountingRewriteRuleWrapper) r;
+        Assert.assertTrue("Rule " + w.wrapped.toString() + " didn't fire.",
+          w.rewrites > 0);
+      }
     } else {
       assertEquals(origSql, rewrittenSql);
     }
@@ -292,6 +320,19 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("if(null, id, id+1)", rule, "id + 1");
     RewritesOk("if(id = 0, true, false)", rule, null);
 
+    // IFNULL and its aliases
+    for (String f : ImmutableList.of("ifnull", "isnull", "nvl")) {
+      RewritesOk(f + "(null, id)", rule, "id");
+      RewritesOk(f + "(null, null)", rule, "NULL");
+      RewritesOk(f + "(id, id + 1)", rule, null);
+
+      RewritesOk(f + "(1, 2)", rule, "1");
+      RewritesOk(f + "(0, id)", rule, "0");
+      // non literal constants shouldn't be simplified by the rule
+      RewritesOk(f + "(1 + 1, id)", rule, null);
+      RewritesOk(f + "(NULL + 1, id)", rule, null);
+    }
+
     // CompoundPredicate
     RewritesOk("false || id = 0", rule, "id = 0");
     RewritesOk("true || id = 0", rule, "TRUE");
@@ -306,51 +347,51 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     rules.add(rule);
     // CASE with caseExpr
     // Single TRUE case with no preceding non-constant cases.
-    RewritesOk("case 1 when 0 then id when 1 then id + 1 when 2 then id + 2 end", rules,
+    RewritesOk("case 1 when 0 then id when 1 then id + 1 when 2 then id + 2 end", rule,
         "id + 1");
     // SINGLE TRUE case with preceding non-constant case.
-    RewritesOk("case 1 when id then id when 1 then id + 1 end", rules,
+    RewritesOk("case 1 when id then id when 1 then id + 1 end", rule,
         "CASE 1 WHEN id THEN id ELSE id + 1 END");
     // Single FALSE case.
-    RewritesOk("case 0 when 1 then 1 when id then id + 1 end", rules,
+    RewritesOk("case 0 when 1 then 1 when id then id + 1 end", rule,
         "CASE 0 WHEN id THEN id + 1 END");
     // All FALSE, return ELSE.
-    RewritesOk("case 2 when 0 then id when 1 then id * 2 else 0 end", rules, "0");
+    RewritesOk("case 2 when 0 then id when 1 then id * 2 else 0 end", rule, "0");
     // All FALSE, return implicit NULL ELSE.
-    RewritesOk("case 3 when 0 then id when 1 then id + 1 end", rules, "NULL");
+    RewritesOk("case 3 when 0 then id when 1 then id + 1 end", rule, "NULL");
     // Multiple TRUE, first one becomes ELSE.
     RewritesOk("case 1 when id then id when 2 - 1 then id + 1 when 1 then id + 2 end",
         rules, "CASE 1 WHEN id THEN id ELSE id + 1 END");
     // When NULL.
-    RewritesOk("case 0 when null then 0 else 1 end", rules, "1");
+    RewritesOk("case 0 when null then id else 1 end", rule, "1");
     // All non-constant, don't rewrite.
-    RewritesOk("case id when 1 then 1 when 2 then 2 else 3 end", rules, null);
+    RewritesOk("case id when 1 then 1 when 2 then 2 else 3 end", rule, null);
 
     // CASE without caseExpr
     // Single TRUE case with no predecing non-constant case.
-    RewritesOk("case when FALSE then 0 when TRUE then 1 end", rules, "1");
+    RewritesOk("case when FALSE then 0 when TRUE then 1 end", rule, "1");
     // Single TRUE case with preceding non-constant case.
-    RewritesOk("case when id = 0 then 0 when true then 1 when id = 2 then 2 end", rules,
+    RewritesOk("case when id = 0 then 0 when true then 1 when id = 2 then 2 end", rule,
         "CASE WHEN id = 0 THEN 0 ELSE 1 END");
     // Single FALSE case.
-    RewritesOk("case when id = 0 then 0 when false then 1 when id = 2 then 2 end", rules,
+    RewritesOk("case when id = 0 then 0 when false then 1 when id = 2 then 2 end", rule,
         "CASE WHEN id = 0 THEN 0 WHEN id = 2 THEN 2 END");
     // All FALSE, return ELSE.
     RewritesOk(
-        "case when false then 1 when false then 2 else id + 1 end", rules, "id + 1");
+        "case when false then 1 when false then 2 else id + 1 end", rule, "id + 1");
     // All FALSE, return implicit NULL ELSE.
-    RewritesOk("case when false then 0 end", rules, "NULL");
+    RewritesOk("case when false then 0 end", rule, "NULL");
     // Multiple TRUE, first one becomes ELSE.
     RewritesOk("case when id = 1 then 0 when 2 = 1 + 1 then 1 when true then 2 end",
         rules, "CASE WHEN id = 1 THEN 0 ELSE 1 END");
     // When NULL.
-    RewritesOk("case when id = 0 then 0 when null then 1 else 2 end", rules,
+    RewritesOk("case when id = 0 then 0 when null then 1 else 2 end", rule,
         "CASE WHEN id = 0 THEN 0 ELSE 2 END");
     // All non-constant, don't rewrite.
-    RewritesOk("case when id = 0 then 0 when id = 1 then 1 end", rules, null);
+    RewritesOk("case when id = 0 then 0 when id = 1 then 1 end", rule, null);
 
     // DECODE
-    // SIngle TRUE case with no preceding non-constant case.
+    // Single TRUE case with no preceding non-constant case.
     RewritesOk("decode(1, 0, id, 1, id + 1, 2, id + 2)", rules, "id + 1");
     // Single TRUE case with predecing non-constant case.
     RewritesOk("decode(1, id, id, 1, id + 1, 0)", rules,
@@ -359,9 +400,9 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("decode(1, 0, id, tinyint_col, id + 1)", rules,
         "CASE WHEN 1 = tinyint_col THEN id + 1 END");
     // All FALSE, return ELSE.
-    RewritesOk("decode(1, 0, 0, 2, 2, 3)", rules, "3");
+    RewritesOk("decode(1, 0, id, 2, 2, 3)", rules, "3");
     // All FALSE, return implicit NULL ELSE.
-    RewritesOk("decode(1, 1 + 1, 2, 1 + 2, 3)", rules, "NULL");
+    RewritesOk("decode(1, 1 + 1, id, 1 + 2, 3)", rules, "NULL");
     // Multiple TRUE, first one becomes ELSE.
     RewritesOk("decode(1, id, id, 1 + 1, 0, 1 * 1, 1, 2 - 1, 2)", rules,
         "CASE WHEN 1 = id THEN id ELSE 1 END");
@@ -376,6 +417,8 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("if(true, 0, sum(id))", rule, null);
     RewritesOk("if(false, max(id), min(id))", rule, "min(id)");
     RewritesOk("true || sum(id) = 0", rule, null);
+    RewritesOk("ifnull(null, max(id))", rule, "max(id)");
+    RewritesOk("ifnull(1, max(id))", rule, null);
     RewritesOk("case when true then 0 when false then sum(id) end", rule, null);
     RewritesOk(
         "case when true then count(id) when false then sum(id) end", rule, "count(id)");
@@ -398,20 +441,9 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("coalesce(1 + 2, id, year)", rules, "3");
     RewritesOk("coalesce(null is null, bool_col)", rules, "TRUE");
     RewritesOk("coalesce(10 + null, id, year)", rules, "coalesce(id, year)");
-    // If the leading parameter is partition column, try to rewrite with partition metadata.
-    RewritesOk("coalesce(year, id)", rule, "year");
-    RewritesOk("coalesce(year, bigint_col)", rule, "year");
-    RewritesOk("coalesce(cast(year as string), string_col)", rule, "CAST(year AS STRING)");
-    RewritesOk("coalesce(id, year)", rule, null);
-    RewritesOk("coalesce(null, year, id)", rule, "year");
-    // If the leading partition column has NULL value, do not rewrite.
-    RewritesOk("functional.alltypesagg", "coalesce(year, id)", rule, "year");
-    RewritesOk("functional.alltypesagg", "coalesce(day, id)", rule, null);
-    // If the leading column is not nullable, rewrite to the column.
-    RewritesOk("functional_kudu.alltypessmall", "coalesce(id, year)", rule, "id");
-    RewritesOk("functional_kudu.alltypessmall", "coalesce(cast(id as string), string_col)", rule,
-        "CAST(id AS STRING)");
-    RewritesOk("functional_kudu.alltypessmall", "coalesce(null, id, year)", rule, "id");
+    // Don't rewrite based on nullability of slots. TODO (IMPALA-5753).
+    RewritesOk("coalesce(year, id)", rule, null);
+    RewritesOk("functional_kudu.alltypessmall", "coalesce(id, year)", rule, null);
   }
 
   @Test
@@ -524,5 +556,47 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("count(id)", rule, null);
     RewritesOk("count(1 + 1)", rule, null);
     RewritesOk("count(1 + null)", rule, null);
+  }
+
+  @Test
+  public void TestSimplifyDistinctFromRule() throws AnalysisException {
+    ExprRewriteRule rule = SimplifyDistinctFromRule.INSTANCE;
+
+    // Can be simplified
+    RewritesOk("bool_col IS DISTINCT FROM bool_col", rule, "FALSE");
+    RewritesOk("bool_col IS NOT DISTINCT FROM bool_col", rule, "TRUE");
+    RewritesOk("bool_col <=> bool_col", rule, "TRUE");
+
+    // Verify nothing happens
+    RewritesOk("bool_col IS NOT DISTINCT FROM int_col", rule, null);
+    RewritesOk("bool_col IS DISTINCT FROM int_col", rule, null);
+
+    // IF with distinct and distinct from
+    List<ExprRewriteRule> rules = Lists.newArrayList(
+        SimplifyConditionalsRule.INSTANCE,
+        SimplifyDistinctFromRule.INSTANCE);
+    RewritesOk("if(bool_col is distinct from bool_col, 1, 2)", rules, "2");
+    RewritesOk("if(bool_col is not distinct from bool_col, 1, 2)", rules, "1");
+    RewritesOk("if(bool_col <=> bool_col, 1, 2)", rules, "1");
+    RewritesOk("if(bool_col <=> NULL, 1, 2)", rules, null);
+  }
+
+  /**
+   * NULLIF gets converted to an IF, and has cases where
+   * it can be further simplified via SimplifyDistinctFromRule.
+   */
+  @Test
+  public void TestNullif() throws AnalysisException {
+    List<ExprRewriteRule> rules = Lists.newArrayList(
+        SimplifyConditionalsRule.INSTANCE,
+        SimplifyDistinctFromRule.INSTANCE);
+
+    // nullif: converted to if and simplified
+    RewritesOk("nullif(bool_col, bool_col)", rules, "NULL");
+
+    // works because the expression tree is identical;
+    // more complicated things like nullif(int_col + 1, 1 + int_col)
+    // are not simplified
+    RewritesOk("nullif(1 + int_col, 1 + int_col)", rules, "NULL");
   }
 }

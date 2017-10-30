@@ -215,8 +215,9 @@ class ImpalaBeeswaxClient(object):
 
   def __build_summary_table(self, summary, idx, is_fragment_root, indent_level,
       new_indent_level, output):
-    """NOTE: This was taken impala_shell.py. This method will be a placed in a library
-    that is shared between impala_shell and this file.
+    """NOTE: This was taken from impala_shell.py. Changes made here must be made there as
+    well. TODO: This method will be a placed in a library that is shared between
+    impala_shell and this file. (IMPALA-5792)
 
     Direct translation of Coordinator::PrintExecSummary() to recursively build a list
     of rows of summary statistics, one per exec node
@@ -248,18 +249,25 @@ class ImpalaBeeswaxClient(object):
       setattr(agg_stats, attr, 0)
       setattr(max_stats, attr, 0)
 
+    row = {}
     node = summary.nodes[idx]
-    for stats in node.exec_stats:
-      for attr in attrs:
-        val = getattr(stats, attr)
-        if val is not None:
-          setattr(agg_stats, attr, getattr(agg_stats, attr) + val)
-          setattr(max_stats, attr, max(getattr(max_stats, attr), val))
+    # exec_stats may not be set even if the query is FINISHED if there are fragments that
+    # are still executing or that were cancelled before sending a status report.
+    if node.exec_stats is not None:
+      for stats in node.exec_stats:
+        for attr in attrs:
+          val = getattr(stats, attr)
+          if val is not None:
+            setattr(agg_stats, attr, getattr(agg_stats, attr) + val)
+            setattr(max_stats, attr, max(getattr(max_stats, attr), val))
 
-    if len(node.exec_stats) > 0:
-      avg_time = agg_stats.latency_ns / len(node.exec_stats)
-    else:
-      avg_time = 0
+      if len(node.exec_stats) > 0:
+        avg_time = agg_stats.latency_ns / len(node.exec_stats)
+      else:
+        avg_time = 0
+
+      row["num_hosts"] = len(node.exec_stats)
+      row["avg_time"] = avg_time
 
     # If the node is a broadcast-receiving exchange node, the cardinality of rows produced
     # is the max over all instances (which should all have received the same number of
@@ -281,11 +289,8 @@ class ImpalaBeeswaxClient(object):
       else:
         label_prefix += "  "
 
-    row = {}
     row["prefix"] = label_prefix
     row["operator"] = node.label
-    row["num_hosts"] = len(node.exec_stats)
-    row["avg_time"] = avg_time
     row["max_time"] = max_stats.latency_ns
     row["num_rows"] = cardinality
     row["est_num_rows"] = est_stats.cardinality
@@ -294,14 +299,11 @@ class ImpalaBeeswaxClient(object):
     row["detail"] = node.label_detail
     output.append(row)
 
-    try:
+    if summary.exch_to_sender_map is not None and idx in summary.exch_to_sender_map:
       sender_idx = summary.exch_to_sender_map[idx]
       # This is an exchange node, so the sender is a fragment root, and should be printed
       # next.
       self.__build_summary_table(summary, sender_idx, True, indent_level, False, output)
-    except (KeyError, TypeError):
-      # Fall through if idx not in map, or if exch_to_sender_map itself is not set
-      pass
 
     idx += 1
     if node.num_children > 0:

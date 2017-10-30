@@ -42,7 +42,7 @@ class InProcessImpalaServer {
  public:
   /// Initialises the server, but does not start any network-attached
   /// services or run any threads.
-  InProcessImpalaServer(const std::string& hostname, int backend_port,
+  InProcessImpalaServer(const std::string& hostname, int backend_port, int krpc_port,
                         int subscriber_port, int webserver_port,
                         const std::string& statestore_host, int statestore_port);
 
@@ -60,10 +60,6 @@ class InProcessImpalaServer {
   /// servers.
   Status StartWithClientServers(int beeswax_port, int hs2_port);
 
-  /// Starts only the backend server; useful when running a cluster of
-  /// InProcessImpalaServers and only one is to serve client requests.
-  Status StartAsBackendOnly();
-
   /// Blocks until the backend server exits. Returns Status::OK unless
   /// there was an error joining.
   Status Join();
@@ -74,7 +70,7 @@ class InProcessImpalaServer {
 
   /// Sets the catalog on this impalad to be initialized. If we don't
   /// start up a catalogd, then there is no one to initialize it otherwise.
-  void SetCatalogInitialized();
+  Status SetCatalogInitialized();
 
   uint32_t beeswax_port() const { return beeswax_port_; }
 
@@ -91,22 +87,11 @@ class InProcessImpalaServer {
 
   uint32_t hs2_port_;
 
-  /// The ImpalaServer that handles client and backend requests. Ownership is shared via
-  /// shared_ptrs with the ThriftServers. See CreateImpalaServer for details.
+  /// The ImpalaServer that handles client and backend requests.
   boost::shared_ptr<ImpalaServer> impala_server_;
 
   /// ExecEnv holds much of the per-service state
   boost::scoped_ptr<ExecEnv> exec_env_;
-
-  /// Backend Thrift server
-  boost::scoped_ptr<ThriftServer> be_server_;
-
-  /// Frontend HiveServer2 server
-  boost::scoped_ptr<ThriftServer> hs2_server_;
-
-  /// Frontend Beeswax server.
-  boost::scoped_ptr<ThriftServer> beeswax_server_;
-
 };
 
 /// An in-process statestore, with webserver and metrics.
@@ -141,7 +126,7 @@ class InProcessStatestore {
   /// Statestore Thrift server
   boost::scoped_ptr<ThriftServer> statestore_server_;
 
-  boost::scoped_ptr<Thread> statestore_main_loop_;
+  std::unique_ptr<Thread> statestore_main_loop_;
 };
 
 }

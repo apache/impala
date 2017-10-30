@@ -1,0 +1,18 @@
+# IMPALA-5336: Test partition pruning when the string partition col is implicitly cast
+# to TIMESTAMP
+select * from functional.stringpartitionkey
+where string_col=cast("2009-01-01 00:00:00" as timestamp);
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+00:SCAN HDFS [functional.stringpartitionkey]
+   partitions=1/2 files=1 size=2B
+   stats-rows=1 extrapolated-rows=disabled
+   table stats: rows=1 size=2B
+   column stats: all
+   mem-estimate=32.00MB mem-reservation=0B
+   tuple-ids=0 row-size=20B cardinality=1
+====

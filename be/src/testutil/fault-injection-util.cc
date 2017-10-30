@@ -19,6 +19,8 @@
 
 #include "testutil/fault-injection-util.h"
 
+#include <random>
+
 #include <thrift/transport/TSSLSocket.h>
 #include <thrift/transport/TTransportException.h>
 

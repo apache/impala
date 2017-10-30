@@ -101,6 +101,9 @@ void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver) {
   webserver->RegisterUrlCallback("/query_memory", "query_memory.tmpl",
       MakeCallback(this, &ImpalaHttpHandler::QueryMemoryHandler), false);
 
+  webserver->RegisterUrlCallback("/query_backends", "query_backends.tmpl",
+      MakeCallback(this, &ImpalaHttpHandler::QueryBackendsHandler), false);
+
   webserver->RegisterUrlCallback("/cancel_query", "common-pre.tmpl",
       MakeCallback(this, &ImpalaHttpHandler::CancelQueryHandler), false);
 
@@ -261,7 +264,7 @@ void ImpalaHttpHandler::QueryMemoryHandler(const Webserver::ArgumentMap& args,
   string mem_usage_text;
   // Only in-flight queries have a MemTracker to get usage from.
   if (qs.get() != nullptr) {
-    mem_usage_text = qs->query_mem_tracker()->LogUsage();
+    mem_usage_text = qs->query_mem_tracker()->LogUsage(MemTracker::UNLIMITED_DEPTH);
   } else {
     mem_usage_text =
         "The query is finished, current memory consumption is not available.";
@@ -289,21 +292,17 @@ void ImpalaHttpHandler::QueryStateToJson(const ImpalaServer::QueryStateRecord& r
       document->GetAllocator());
   value->AddMember("stmt_type", stmt_type, document->GetAllocator());
 
-  Value start_time(record.start_time.ToString().c_str(), document->GetAllocator());
+  Value start_time(ToStringFromUnixMicros(record.start_time_us).c_str(),
+      document->GetAllocator());
   value->AddMember("start_time", start_time, document->GetAllocator());
 
-  Value end_time(record.end_time.ToString().c_str(), document->GetAllocator());
+  Value end_time(ToStringFromUnixMicros(record.end_time_us).c_str(),
+      document->GetAllocator());
   value->AddMember("end_time", end_time, document->GetAllocator());
 
-  const TimestampValue& end_timestamp =
-      record.end_time.HasDate() ? record.end_time : TimestampValue::LocalTime();
-  double ut_end_time, ut_start_time;
-  double duration = 0.0;
-  if (LIKELY(end_timestamp.ToSubsecondUnixTime(&ut_end_time))
-      && LIKELY(record.start_time.ToSubsecondUnixTime(&ut_start_time))) {
-    duration = ut_end_time - ut_start_time;
-  }
-  const string& printed_duration = PrettyPrinter::Print(duration, TUnit::TIME_S);
+  int64_t duration_us = record.end_time_us - record.start_time_us;
+  const string& printed_duration = PrettyPrinter::Print(duration_us * NANOS_PER_MICRO,
+      TUnit::TIME_NS);
   Value val_duration(printed_duration.c_str(), document->GetAllocator());
   value->AddMember("duration", val_duration, document->GetAllocator());
 
@@ -460,19 +459,14 @@ void ImpalaHttpHandler::SessionsHandler(const Webserver::ArgumentMap& args,
     Value default_db(state->database.c_str(), document->GetAllocator());
     session_json.AddMember("default_database", default_db, document->GetAllocator());
 
-    TimestampValue local_start_time = TimestampValue::FromUnixTime(
-        session.second->start_time_ms / 1000);
-    local_start_time.UtcToLocal();
-    Value start_time(local_start_time.ToString().c_str(), document->GetAllocator());
+    Value start_time(ToStringFromUnixMillis(session.second->start_time_ms,
+        TimePrecision::Second).c_str(), document->GetAllocator());
     session_json.AddMember("start_time", start_time, document->GetAllocator());
     session_json.AddMember(
         "start_time_sort", session.second->start_time_ms, document->GetAllocator());
 
-    TimestampValue local_last_accessed = TimestampValue::FromUnixTime(
-        session.second->last_accessed_ms / 1000);
-    local_last_accessed.UtcToLocal();
-    Value last_accessed(
-        local_last_accessed.ToString().c_str(), document->GetAllocator());
+    Value last_accessed(ToStringFromUnixMillis(session.second->last_accessed_ms,
+        TimePrecision::Second).c_str(), document->GetAllocator());
     session_json.AddMember("last_accessed", last_accessed, document->GetAllocator());
     session_json.AddMember(
         "last_accessed_sort", session.second->last_accessed_ms, document->GetAllocator());
@@ -547,11 +541,12 @@ void ImpalaHttpHandler::CatalogObjectsHandler(const Webserver::ArgumentMap& args
 
     // Get the object type and name from the topic entry key
     TCatalogObject request;
-    TCatalogObjectFromObjectName(object_type, object_name_arg->second, &request);
-
-    // Get the object and dump its contents.
     TCatalogObject result;
-    Status status = server_->exec_env_->frontend()->GetCatalogObject(request, &result);
+    Status status = TCatalogObjectFromObjectName(object_type, object_name_arg->second, &request);
+    if (status.ok()) {
+      // Get the object and dump its contents.
+      status = server_->exec_env_->frontend()->GetCatalogObject(request, &result);
+    }
     if (status.ok()) {
       Value debug_string(ThriftDebugString(result).c_str(), document->GetAllocator());
       document->AddMember("thrift_string", debug_string, document->GetAllocator());
@@ -688,6 +683,25 @@ void PlanToJson(const vector<TPlanFragment>& fragments, const TExecSummary& summ
   value->AddMember("plan_nodes", nodes, document->GetAllocator());
 }
 
+}
+
+void ImpalaHttpHandler::QueryBackendsHandler(
+    const Webserver::ArgumentMap& args, Document* document) {
+  TUniqueId query_id;
+  Status status = ParseIdFromArguments(args, &query_id, "query_id");
+  Value query_id_val(PrintId(query_id).c_str(), document->GetAllocator());
+  document->AddMember("query_id", query_id_val, document->GetAllocator());
+  if (!status.ok()) {
+    // Redact the error message, it may contain part or all of the query.
+    Value json_error(RedactCopy(status.GetDetail()).c_str(), document->GetAllocator());
+    document->AddMember("error", json_error, document->GetAllocator());
+    return;
+  }
+
+  shared_ptr<ClientRequestState> request_state = server_->GetClientRequestState(query_id);
+  if (request_state.get() == nullptr || request_state->coord() == nullptr) return;
+
+  request_state->coord()->BackendsToJson(document);
 }
 
 void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include_summary,

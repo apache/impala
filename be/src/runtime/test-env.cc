@@ -20,7 +20,6 @@
 #include <limits>
 #include <memory>
 
-#include "runtime/buffered-block-mgr.h"
 #include "runtime/query-exec-mgr.h"
 #include "runtime/tmp-file-mgr.h"
 #include "runtime/query-state.h"
@@ -38,8 +37,8 @@ scoped_ptr<MetricGroup> TestEnv::static_metrics_;
 
 TestEnv::TestEnv()
   : have_tmp_file_mgr_args_(false),
-    buffer_pool_min_buffer_len_(-1),
-    buffer_pool_capacity_(-1) {}
+    buffer_pool_min_buffer_len_(64 * 1024),
+    buffer_pool_capacity_(0) {}
 
 Status TestEnv::Init() {
   if (static_metrics_ == NULL) {
@@ -59,9 +58,8 @@ Status TestEnv::Init() {
   } else {
     RETURN_IF_ERROR(tmp_file_mgr()->Init(metrics()));
   }
-  if (buffer_pool_min_buffer_len_ != -1 && buffer_pool_capacity_ != -1) {
-    exec_env_->InitBufferPool(buffer_pool_min_buffer_len_, buffer_pool_capacity_);
-  }
+  exec_env_->InitBufferPool(buffer_pool_min_buffer_len_, buffer_pool_capacity_,
+      static_cast<int64_t>(0.1 * buffer_pool_capacity_));
   return Status::OK();
 }
 
@@ -88,6 +86,7 @@ void TestEnv::TearDownQueries() {
   for (RuntimeState* runtime_state : runtime_states_) runtime_state->ReleaseResources();
   runtime_states_.clear();
   for (QueryState* query_state : query_states_) {
+    query_state->ReleaseExecResourceRefcount();
     exec_env_->query_exec_mgr()->ReleaseQueryState(query_state);
   }
   query_states_.clear();
@@ -135,19 +134,6 @@ Status TestEnv::CreateQueryState(
   runtime_states_.push_back(rs);
 
   *runtime_state = rs;
-  return Status::OK();
-}
-
-Status TestEnv::CreateQueryStateWithBlockMgr(int64_t query_id, int max_buffers,
-    int block_size, const TQueryOptions* query_options, RuntimeState** runtime_state) {
-  RETURN_IF_ERROR(CreateQueryState(query_id, query_options, runtime_state));
-
-  shared_ptr<BufferedBlockMgr> mgr;
-  RETURN_IF_ERROR(BufferedBlockMgr::Create(*runtime_state,
-      (*runtime_state)->query_state()->query_mem_tracker(),
-      (*runtime_state)->runtime_profile(), tmp_file_mgr(),
-      CalculateMemLimit(max_buffers, block_size), block_size, &mgr));
-  (*runtime_state)->set_block_mgr(mgr);
   return Status::OK();
 }
 }

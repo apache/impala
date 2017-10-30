@@ -70,8 +70,6 @@ class DecompressorTest : public ::testing::Test {
           sizeof(input_), input_);
       CompressAndDecompressNoOutputAllocated(compressor.get(), decompressor.get(),
           0, NULL);
-      DecompressInsufficientOutputBuffer(compressor.get(), decompressor.get(),
-          sizeof(input_), input_);
     } else {
       CompressAndDecompress(compressor.get(), decompressor.get(), sizeof(input_), input_);
       // Test with odd-length input (to test the calculation of block-sizes in
@@ -88,10 +86,9 @@ class DecompressorTest : public ::testing::Test {
         // bzip does not allow NULL input
         CompressAndDecompress(compressor.get(), decompressor.get(), 0, input_);
       }
-      DecompressInsufficientOutputBuffer(compressor.get(), decompressor.get(),
-          sizeof(input_), input_);
     }
-
+    DecompressOverUnderSizedOutputBuffer(compressor.get(), decompressor.get(),
+        sizeof(input_), input_);
     compressor->Close();
     decompressor->Close();
   }
@@ -151,10 +148,11 @@ class DecompressorTest : public ::testing::Test {
     EXPECT_EQ(memcmp(input, output, input_len), 0);
   }
 
-  // Test the behavior when the decompressor is given too little space to produce
-  // the decompressed output. Verify that the decompressor returns an error and
-  // does not overflow the provided buffer.
-  void DecompressInsufficientOutputBuffer(Codec* compressor, Codec* decompressor,
+  // Test the behavior when the decompressor is given too little / too much space.
+  // Verify that the decompressor returns an error when the space is not enough, gives
+  // the correct output size when the space is enough, and does not write beyond the
+  // output size it claims.
+  void DecompressOverUnderSizedOutputBuffer(Codec* compressor, Codec* decompressor,
       int64_t input_len, uint8_t* input) {
     uint8_t* compressed;
     int64_t compressed_length;
@@ -180,9 +178,18 @@ class DecompressorTest : public ::testing::Test {
     u_int32_t *canary = (u_int32_t *) &output[output_len];
     *canary = 0x66aa77bb;
     Status status = decompressor->ProcessBlock(true, compressed_length, compressed,
-                                               &output_len, &output);
+        &output_len, &output);
     EXPECT_EQ(*canary, 0x66aa77bb);
     EXPECT_FALSE(status.ok());
+    EXPECT_EQ(output_len, 0);
+
+    // Check that the output length is the same as input when the decompressor is provided
+    // with abundant space.
+    output_len = input_len * 2;
+    output = mem_pool_.Allocate(output_len);
+    EXPECT_TRUE(decompressor->ProcessBlock(true, compressed_length, compressed,
+        &output_len, &output).ok());
+    EXPECT_EQ(output_len, input_len);
   }
 
   void Compress(Codec* compressor, int64_t input_len, uint8_t* input,
@@ -416,6 +423,22 @@ TEST_F(DecompressorTest, Impala1506) {
   EXPECT_GE(output_len, 0);
 
   pool.FreeAll();
+}
+
+TEST_F(DecompressorTest, Impala5250) {
+  // Regression test for IMPALA-5250. It tests that SnappyDecompressor handles an input
+  // buffer with a zero byte correctly. It should set the output_length to 0.
+  MemTracker trax;
+  MemPool pool(&trax);
+  scoped_ptr<Codec> decompressor;
+  EXPECT_OK(Codec::CreateDecompressor(&pool, true, impala::THdfsCompression::SNAPPY,
+      &decompressor));
+  uint8_t buf[1]{0};
+  uint8_t out_buf[1];
+  int64_t output_length = 1;
+  uint8_t* output = out_buf;
+  EXPECT_OK(decompressor->ProcessBlock(true, 1, buf, &output_length, &output));
+  EXPECT_EQ(output_length, 0);
 }
 
 }

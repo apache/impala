@@ -1,0 +1,15 @@
+====
+---- QUERY
+set buffer_pool_limit=10m;
+set default_spillable_buffer_size=64k;
+select count(*)
+from (select distinct o_orderdate, o_custkey, o_comment
+      from tpch_parquet.orders) v;
+---- RESULTS
+1500000
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+# Verify that spilling was activated.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+====

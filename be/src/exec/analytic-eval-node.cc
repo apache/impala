@@ -26,6 +26,7 @@
 #include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/query-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "udf/udf-internal.h"
@@ -34,13 +35,14 @@
 #include "common/names.h"
 
 static const int MAX_TUPLE_POOL_SIZE = 8 * 1024 * 1024; // 8MB
+static const int MIN_REQUIRED_BUFFERS = 2;
 
 using namespace strings;
 
 namespace impala {
 
-AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
-    const DescriptorTbl& descs)
+AnalyticEvalNode::AnalyticEvalNode(
+    ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
     window_(tnode.analytic_node.window),
     intermediate_tuple_desc_(
@@ -51,7 +53,6 @@ AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
     rows_end_offset_(0),
     has_first_val_null_offset_(false),
     first_val_null_offset_(0),
-    client_(nullptr),
     child_tuple_cmp_row_(nullptr),
     last_result_idx_(-1),
     prev_pool_last_result_idx_(-1),
@@ -110,6 +111,7 @@ AnalyticEvalNode::~AnalyticEvalNode() {
 Status AnalyticEvalNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Init(tnode, state));
   DCHECK_EQ(conjunct_evals_.size(), 0);
+  state_ = state;
   const TAnalyticNode& analytic_node = tnode.analytic_node;
   bool has_lead_fn = false;
 
@@ -154,33 +156,26 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   DCHECK(child(0)->row_desc()->IsPrefixOf(*row_desc()));
+  DCHECK_GE(resource_profile_.min_reservation,
+      resource_profile_.spillable_buffer_size * MIN_REQUIRED_BUFFERS);
   curr_tuple_pool_.reset(new MemPool(mem_tracker()));
   prev_tuple_pool_.reset(new MemPool(mem_tracker()));
   mem_pool_.reset(new MemPool(mem_tracker()));
-  fn_pool_.reset(new MemPool(expr_mem_tracker()));
   evaluation_timer_ = ADD_TIMER(runtime_profile(), "EvaluationTime");
 
   DCHECK_EQ(result_tuple_desc_->slots().size(), analytic_fns_.size());
-  RETURN_IF_ERROR(AggFnEvaluator::Create(analytic_fns_, state, pool_, fn_pool_.get(),
-      &analytic_fn_evals_));
+  RETURN_IF_ERROR(AggFnEvaluator::Create(analytic_fns_, state, pool_, expr_perm_pool(),
+      expr_results_pool(), &analytic_fn_evals_));
 
   if (partition_by_eq_expr_ != nullptr) {
     RETURN_IF_ERROR(ScalarExprEvaluator::Create(*partition_by_eq_expr_, state, pool_,
-        fn_pool_.get(), &partition_by_eq_expr_eval_));
-    AddEvaluatorToFree(partition_by_eq_expr_eval_);
+        expr_perm_pool(), expr_results_pool(), &partition_by_eq_expr_eval_));
   }
 
   if (order_by_eq_expr_ != nullptr) {
     RETURN_IF_ERROR(ScalarExprEvaluator::Create(*order_by_eq_expr_, state, pool_,
-        fn_pool_.get(), &order_by_eq_expr_eval_));
-    AddEvaluatorToFree(order_by_eq_expr_eval_);
+        expr_perm_pool(), expr_results_pool(), &order_by_eq_expr_eval_));
   }
-
-  // Must be kept in sync with AnalyticEvalNode.computeResourceProfile() in fe.
-  const int MIN_REQUIRED_BUFFERS = 2;
-  RETURN_IF_ERROR(state->block_mgr()->RegisterClient(
-      Substitute("AnalyticEvalNode id=$0 ptr=$1", id_, this),
-      MIN_REQUIRED_BUFFERS, false, mem_tracker(), state, &client_));
   return Status::OK();
 }
 
@@ -190,22 +185,20 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
   RETURN_IF_ERROR(child(0)->Open(state));
-  DCHECK(client_ != nullptr);
+
+  // Claim reservation after the child has been opened to reduce the peak reservation
+  // requirement.
+  if (!buffer_pool_client_.is_registered()) {
+    RETURN_IF_ERROR(ClaimBufferReservation(state));
+  }
   DCHECK(input_stream_ == nullptr);
-  input_stream_.reset(
-      new BufferedTupleStream(state, child(0)->row_desc(), state->block_mgr(), client_,
-          false /* use_initial_small_buffers */, true /* read_write */));
-  RETURN_IF_ERROR(input_stream_->Init(id(), runtime_profile(), true));
-  bool got_write_buffer;
-  RETURN_IF_ERROR(input_stream_->PrepareForWrite(&got_write_buffer));
-  if (!got_write_buffer) {
-    return state->block_mgr()->MemLimitTooLowError(client_, id());
-  }
-  bool got_read_buffer;
-  RETURN_IF_ERROR(input_stream_->PrepareForRead(true, &got_read_buffer));
-  if (!got_read_buffer) {
-    return state->block_mgr()->MemLimitTooLowError(client_, id());
-  }
+  input_stream_.reset(new BufferedTupleStream(state, child(0)->row_desc(),
+      &buffer_pool_client_, resource_profile_.spillable_buffer_size,
+      resource_profile_.spillable_buffer_size));
+  RETURN_IF_ERROR(input_stream_->Init(id(), true));
+  bool success;
+  RETURN_IF_ERROR(input_stream_->PrepareForReadWrite(true, &success));
+  DCHECK(success) << "Had reservation: " << buffer_pool_client_.DebugString();
 
   for (int i = 0; i < analytic_fn_evals_.size(); ++i) {
     RETURN_IF_ERROR(analytic_fn_evals_[i]->Open(state));
@@ -366,8 +359,8 @@ inline Status AnalyticEvalNode::AddRow(int64_t stream_idx, TupleRow* row) {
     // the stream and continue writing/reading in unpinned mode.
     // TODO: Consider re-pinning later if the output stream is fully consumed.
     RETURN_IF_ERROR(status);
-    RETURN_IF_ERROR(
-        input_stream_->UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
+    RETURN_IF_ERROR(state_->StartSpilling(mem_tracker()));
+    input_stream_->UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
     VLOG_FILE << id() << " Unpin input stream while adding row idx=" << stream_idx;
     if (!input_stream_->AddRow(row, &status)) {
       // Rows should be added in unpinned mode unless an error occurs.
@@ -386,13 +379,15 @@ Status AnalyticEvalNode::AddResultTuple(int64_t stream_idx) {
   Tuple* result_tuple = Tuple::Create(result_tuple_desc_->byte_size(), cur_tuple_pool);
 
   AggFnEvaluator::GetValue(analytic_fn_evals_, curr_tuple_, result_tuple);
-  // Copy any string data in 'result_tuple' into 'cur_tuple_pool_'.
-  for (const SlotDescriptor* slot_desc : result_tuple_desc_->slots()) {
-    if (!slot_desc->type().IsVarLenStringType()) continue;
-    StringValue* sv = reinterpret_cast<StringValue*>(
-        result_tuple->GetSlot(slot_desc->tuple_offset()));
-    if (sv == nullptr || sv->len == 0) continue;
-    char* new_ptr = reinterpret_cast<char*>(cur_tuple_pool->TryAllocate(sv->len));
+  // Copy any string data in 'result_tuple' into 'cur_tuple_pool'. The var-len data
+  // returned by GetValue() may be backed by an allocation from
+  // 'expr_results_pool_' that will be recycled so it must be copied out.
+  for (const SlotDescriptor* slot_desc : result_tuple_desc_->string_slots()) {
+    if (result_tuple->IsNull(slot_desc->null_indicator_offset())) continue;
+    StringValue* sv = result_tuple->GetStringSlot(slot_desc->tuple_offset());
+    if (sv->len == 0) continue;
+    char* new_ptr = reinterpret_cast<char*>(
+        cur_tuple_pool->TryAllocateUnaligned(sv->len));
     if (UNLIKELY(new_ptr == nullptr)) {
       return cur_tuple_pool->mem_tracker()->MemLimitExceeded(nullptr,
           "Failed to allocate memory for analytic function's result.", sv->len);
@@ -857,7 +852,6 @@ Status AnalyticEvalNode::Reset(RuntimeState* state) {
 
 void AnalyticEvalNode::Close(RuntimeState* state) {
   if (is_closed()) return;
-  if (client_ != nullptr) state->block_mgr()->ClearReservations(client_);
   // We may need to clean up input_stream_ if an error occurred at some point.
   if (input_stream_ != nullptr) {
     input_stream_->Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
@@ -893,7 +887,6 @@ void AnalyticEvalNode::Close(RuntimeState* state) {
   if (curr_tuple_pool_.get() != nullptr) curr_tuple_pool_->FreeAll();
   if (prev_tuple_pool_.get() != nullptr) prev_tuple_pool_->FreeAll();
   if (mem_pool_.get() != nullptr) mem_pool_->FreeAll();
-  if (fn_pool_.get() != nullptr) fn_pool_->FreeAll();
   ExecNode::Close(state);
 }
 
@@ -911,10 +904,4 @@ void AnalyticEvalNode::DebugString(int indentation_level, stringstream* out) con
   ExecNode::DebugString(indentation_level, out);
   *out << ")";
 }
-
-Status AnalyticEvalNode::QueryMaintenance(RuntimeState* state) {
-  AggFnEvaluator::FreeLocalAllocations(analytic_fn_evals_);
-  return ExecNode::QueryMaintenance(state);
-}
-
 }

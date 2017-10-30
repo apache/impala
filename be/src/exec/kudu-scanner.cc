@@ -63,7 +63,8 @@ const string MODE_READ_AT_SNAPSHOT = "READ_AT_SNAPSHOT";
 KuduScanner::KuduScanner(KuduScanNodeBase* scan_node, RuntimeState* state)
   : scan_node_(scan_node),
     state_(state),
-    expr_mem_pool_(new MemPool(scan_node->expr_mem_tracker())),
+    expr_perm_pool_(new MemPool(scan_node->expr_mem_tracker())),
+    expr_results_pool_(new MemPool(scan_node->expr_mem_tracker())),
     cur_kudu_batch_num_read_(0),
     last_alive_time_micros_(0) {
 }
@@ -74,8 +75,8 @@ Status KuduScanner::Open() {
     if (slot->type().type != TYPE_TIMESTAMP) continue;
     timestamp_slots_.push_back(slot);
   }
-  return ScalarExprEvaluator::Clone(&obj_pool_, state_, expr_mem_pool_.get(),
-      scan_node_->conjunct_evals(), &conjunct_evals_);
+  return ScalarExprEvaluator::Clone(&obj_pool_, state_, expr_perm_pool_.get(),
+      expr_results_pool_.get(), scan_node_->conjunct_evals(), &conjunct_evals_);
 }
 
 void KuduScanner::KeepKuduScannerAlive() {
@@ -131,7 +132,8 @@ Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {
 void KuduScanner::Close() {
   if (scanner_) CloseCurrentClientScanner();
   ScalarExprEvaluator::Close(conjunct_evals_, state_);
-  expr_mem_pool_->FreeAll();
+  expr_perm_pool_->FreeAll();
+  expr_results_pool_->FreeAll();
 }
 
 Status KuduScanner::OpenNextScanToken(const string& scan_token)  {
@@ -245,7 +247,7 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_me
     // Move to the next tuple in the tuple buffer.
     *tuple_mem = next_tuple(*tuple_mem);
   }
-  ScalarExprEvaluator::FreeLocalAllocations(conjunct_evals_);
+  expr_results_pool_->Clear();
 
   // Check the status in case an error status was set during conjunct evaluation.
   return state_->GetQueryStatus();

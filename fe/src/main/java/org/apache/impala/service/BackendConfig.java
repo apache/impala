@@ -64,10 +64,13 @@ public class BackendConfig {
     return backendCfg_.sentry_catalog_polling_frequency_s;
   }
 
-  public boolean isPartitionedHashJoinEnabled() {
-    return backendCfg_.enable_partitioned_hash_join;
+  public int maxHdfsPartsParallelLoad() {
+    return backendCfg_.max_hdfs_partitions_parallel_load;
   }
 
+  public int maxNonHdfsPartsParallelLoad() {
+    return backendCfg_.max_nonhdfs_partitions_parallel_load;
+  }
   // Inits the auth_to_local configuration in the static KerberosName class.
   private static void initAuthToLocal() {
     // If auth_to_local is enabled, we read the configuration hadoop.security.auth_to_local

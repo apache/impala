@@ -37,6 +37,8 @@
 
 #include "common/names.h"
 
+DECLARE_bool(use_krpc);
+
 using strings::Substitute;
 
 namespace impala {
@@ -58,6 +60,8 @@ Status DataSink::Create(const TPlanFragmentCtx& fragment_ctx,
     case TDataSinkType::DATA_STREAM_SINK:
       if (!thrift_sink.__isset.stream_sink) return Status("Missing data stream sink.");
 
+      // TODO: Remove DCHECK when KRPC is supported.
+      DCHECK(!FLAGS_use_krpc);
       // TODO: figure out good buffer size based on size of output row
       *sink = pool->Add(new DataStreamSender(fragment_instance_ctx.sender_id, row_desc,
           thrift_sink.stream_sink, fragment_ctx.destinations, 16 * 1024));
@@ -171,14 +175,15 @@ string DataSink::OutputDmlStats(const PartitionStatusMap& stats,
 
 Status DataSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   DCHECK(parent_mem_tracker != NULL);
-  profile_ = state->obj_pool()->Add(new RuntimeProfile(state->obj_pool(), GetName()));
+  profile_ = RuntimeProfile::Create(state->obj_pool(), GetName());
   const string& name = GetName();
   mem_tracker_.reset(new MemTracker(profile_, -1, name, parent_mem_tracker));
   expr_mem_tracker_.reset(
       new MemTracker(-1, Substitute("$0 Exprs", name), mem_tracker_.get(), false));
-  expr_mem_pool_.reset(new MemPool(expr_mem_tracker_.get()));
+  expr_perm_pool_.reset(new MemPool(expr_mem_tracker_.get()));
+  expr_results_pool_.reset(new MemPool(expr_mem_tracker_.get()));
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(output_exprs_, state, state->obj_pool(),
-      expr_mem_pool(), &output_expr_evals_));
+      expr_perm_pool_.get(), expr_results_pool_.get(), &output_expr_evals_));
   return Status::OK();
 }
 
@@ -191,15 +196,10 @@ void DataSink::Close(RuntimeState* state) {
   if (closed_) return;
   ScalarExprEvaluator::Close(output_expr_evals_, state);
   ScalarExpr::Close(output_exprs_);
-  if (expr_mem_pool() != nullptr) expr_mem_pool_->FreeAll();
-  if (expr_mem_tracker_ != NULL) {
-    expr_mem_tracker_->UnregisterFromParent();
-    expr_mem_tracker_.reset();
-  }
-  if (mem_tracker_ != NULL) {
-    mem_tracker_->UnregisterFromParent();
-    mem_tracker_.reset();
-  }
+  if (expr_perm_pool_ != nullptr) expr_perm_pool_->FreeAll();
+  if (expr_results_pool_.get() != nullptr) expr_results_pool_->FreeAll();
+  if (expr_mem_tracker_ != nullptr) expr_mem_tracker_->Close();
+  if (mem_tracker_ != nullptr) mem_tracker_->Close();
   closed_ = true;
 }
 

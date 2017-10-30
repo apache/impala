@@ -30,12 +30,13 @@ add_library(CodeGen
   codegen-anyval.cc
   codegen-callgraph.cc
   codegen-symbol-emitter.cc
+  codegen-util.cc
   llvm-codegen.cc
   instruction-counter.cc
   ${IR_SSE_C_FILE}
   ${IR_NO_SSE_C_FILE}
 )
-add_dependencies(CodeGen thrift-deps gen_ir_descriptions)
+add_dependencies(CodeGen gen-deps gen_ir_descriptions)
 
 # output cross compile to ir metadata
 set(IR_DESC_GEN_OUTPUT

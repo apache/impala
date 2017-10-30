@@ -56,52 +56,54 @@ class ScalarExpr;
 class FunctionContextImpl {
  public:
   /// Create a FunctionContext for a UDF. Caller is responsible for deleting it.
-  static impala_udf::FunctionContext* CreateContext(RuntimeState* state, MemPool* pool,
+  /// UDF-managed allocations (i.e. Allocate()) are backed by 'perm_pool' and
+  /// allocations that may hold expr results (i.e. AllocateForResults()) are backed
+  /// by 'results_pool'.
+  static impala_udf::FunctionContext* CreateContext(RuntimeState* state,
+      MemPool* perm_pool, MemPool* results_pool,
       const impala_udf::FunctionContext::TypeDesc& return_type,
       const std::vector<impala_udf::FunctionContext::TypeDesc>& arg_types,
       int varargs_buffer_size = 0, bool debug = false);
 
   /// Create a FunctionContext for a UDA. Identical to the UDF version except for the
   /// intermediate type. Caller is responsible for deleting it.
-  static impala_udf::FunctionContext* CreateContext(RuntimeState* state, MemPool* pool,
+  static impala_udf::FunctionContext* CreateContext(RuntimeState* state,
+      MemPool* perm_pool, MemPool* results_pool,
       const impala_udf::FunctionContext::TypeDesc& intermediate_type,
       const impala_udf::FunctionContext::TypeDesc& return_type,
       const std::vector<impala_udf::FunctionContext::TypeDesc>& arg_types,
       int varargs_buffer_size = 0, bool debug = false);
 
   FunctionContextImpl(impala_udf::FunctionContext* parent);
+  ~FunctionContextImpl();
 
-  /// Checks for any outstanding memory allocations. If there is unfreed memory, adds a
-  /// warning and frees the allocations. Note that local allocations are freed with the
-  /// MemPool backing pool_.
+  /// Checks for any outstanding memory allocations. If there is (non-result) memory that
+  /// was allocated by the UDF via this FunctionContext but not freed, adds a warning
+  /// and frees the allocations.
   void Close();
 
   /// Returns a new FunctionContext with the same constant args, fragment-local state, and
   /// debug flag as this FunctionContext. The caller is responsible for calling delete on
   /// it. The cloned FunctionContext cannot be used after the original FunctionContext is
   /// destroyed because it may reference fragment-local state from the original.
-  impala_udf::FunctionContext* Clone(MemPool* pool);
+  impala_udf::FunctionContext* Clone(MemPool* perm_pool, MemPool* results_pool);
 
-  /// Allocates a buffer of 'byte_size' with "local" memory management.
-  /// If the new allocation causes the memory limit to be exceeded, the error will be set
-  /// in this object causing the query to fail.
+  /// Allocates a buffer of 'byte_size' to hold expr results. If the new allocation
+  /// causes the memory limit to be exceeded, the error will be set in this object
+  /// causing the query to fail.
   ///
-  /// These allocations are not freed one by one but freed as a pool by
-  /// FreeLocalAllocations(). This is used where the lifetime of the allocation is clear.
-  /// For UDFs, the allocations can be freed at the row level.
-  /// TODO: free them at the batch level and save some copies?
-  uint8_t* AllocateLocal(int64_t byte_size) noexcept;
+  /// These allocations live in the 'results_pool' passed into the constructor.
+  /// 'results_pool' is managed by the Impala runtime and can be safely cleared
+  /// whenever memory returned by the expression is no longer referenced.
+  uint8_t* AllocateForResults(int64_t byte_size) noexcept;
 
-  /// Resize a local allocation.
-  /// If the new allocation causes the memory limit to be exceeded, the error will be set
-  /// in this object causing the query to fail.
-  uint8_t* ReallocateLocal(uint8_t* ptr, int64_t byte_size) noexcept;
-
-  /// Frees all allocations returned by AllocateLocal().
-  void FreeLocalAllocations() noexcept;
-
-  /// Returns true if there are any allocations returned by AllocateLocal().
-  bool HasLocalAllocations() const { return !local_allocations_.empty(); }
+  /// Replaces the current 'results_pool_' for  'new_results_pool' to be used for
+  /// AllocateForResults(). Returns a pointer to the pool that was replaced.
+  MemPool* SwapResultsPool(MemPool* new_results_pool) {
+    MemPool* old_results_pool = results_pool_;
+    results_pool_ = new_results_pool;
+    return old_results_pool;
+  }
 
   /// Sets the constant arg list. The vector should contain one entry per argument,
   /// with a non-NULL entry if the argument is constant. The AnyVal* values are
@@ -189,14 +191,14 @@ class FunctionContextImpl {
   friend class ScalarExprEvaluator;
 
   /// A utility function which checks for memory limits and null pointers returned by
-  /// Allocate(), Reallocate() and AllocateLocal() and sets the appropriate error status
+  /// Allocate(), Reallocate() and AllocateForResults() and sets the appropriate error status
   /// if necessary.
   ///
   /// Return false if 'buf' is null; returns true otherwise.
   bool CheckAllocResult(const char* fn_name, uint8_t* buf, int64_t byte_size);
 
   /// A utility function which checks for memory limits that may have been exceeded by
-  /// Allocate(), Reallocate(), AllocateLocal() or TrackAllocation(). Sets the
+  /// Allocate(), Reallocate(), AllocateForResults() or TrackAllocation(). Sets the
   /// appropriate error status if necessary.
   void CheckMemLimit(const char* fn_name, int64_t byte_size);
 
@@ -209,8 +211,18 @@ class FunctionContextImpl {
   /// Parent context object. Not owned
   impala_udf::FunctionContext* context_;
 
-  /// Pool to service allocations from.
-  FreePool* pool_;
+  /// Pool used for allocations made via Allocate(). Allocations are explicitly freed and
+  /// returned to this pool with Free(). The memory allocated in this pool is effectively
+  /// owned by the UDF.
+  /// Owned and freed in destructor. Uses raw pointer to avoid pulling headers into SDK.
+  FreePool* udf_pool_;
+
+  /// Pool used for allocations made via AllocateForResults(). Not owned by this
+  /// FunctionContext. Allocations made from the pool are used temporarily during
+  /// expression evaluation. Var-len values returned from an expression may reference
+  /// memory in this pool - the caller is responsible for ensuring that the pool is
+  /// not cleared while that memory is still referenced.
+  MemPool* results_pool_;
 
   /// We use the query's runtime state to report errors and warnings. NULL for test
   /// contexts.
@@ -234,8 +246,6 @@ class FunctionContextImpl {
   /// Allocations made and still owned by the user function. Only used if debug_ is true
   /// because it is very expensive to maintain.
   std::map<uint8_t*, int> allocations_;
-  /// Allocations owned by Impala.
-  std::vector<uint8_t*> local_allocations_;
 
   /// The function state accessed via FunctionContext::Get/SetFunctionState()
   void* thread_local_fn_state_;

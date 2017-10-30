@@ -20,7 +20,7 @@
 
 #include <deque>
 
-#include "runtime/buffered-block-mgr.h"
+#include "runtime/bufferpool/buffer-pool.h"
 #include "util/tuple-row-compare.h"
 
 namespace impala {
@@ -31,8 +31,7 @@ class RowBatch;
 
 /// Sorter contains the external sort implementation. Its purpose is to sort arbitrarily
 /// large input data sets with a fixed memory budget by spilling data to disk if
-/// necessary. BufferedBlockMgr is used to allocate and manage blocks of data to be
-/// sorted.
+/// necessary.
 //
 /// The client API for Sorter is as follows:
 /// AddBatch() is used to add input rows to be sorted. Multiple tuples in an input row are
@@ -52,20 +51,20 @@ class RowBatch;
 /// GetNext() is used to retrieve sorted rows. It can be called multiple times.
 /// AddBatch()/AddBatchNoSpill(), InputDone() and GetNext() must be called in that order.
 //
-/// Batches of input rows are collected into a sequence of pinned BufferedBlockMgr blocks
-/// called a run. The maximum size of a run is determined by the number of blocks that
+/// Batches of input rows are collected into a sequence of pinned BufferPool pages
+/// called a run. The maximum size of a run is determined by the number of pages that
 /// can be pinned by the Sorter. After the run is full, it is sorted in memory, unpinned
 /// and the next run is constructed. The variable-length column data (e.g. string slots)
-/// in the materialized sort tuples are stored in a separate sequence of blocks from the
-/// tuples themselves.  When the blocks containing tuples in a run are unpinned, the
+/// in the materialized sort tuples are stored in a separate sequence of pages from the
+/// tuples themselves.  When the pages containing tuples in a run are unpinned, the
 /// var-len slot pointers are converted to offsets from the start of the first var-len
-/// data block. When a block is read back, these offsets are converted back to pointers.
+/// data page. When a page is read back, these offsets are converted back to pointers.
 /// The in-memory sorter sorts the fixed-length tuples in-place. The output rows have the
 /// same schema as the materialized sort tuples.
 //
 /// After the input is consumed, the sorter is left with one or more sorted runs. If
 /// there are multiple runs, the runs are merged using SortedRunMerger. At least one
-/// block per run (two if there are var-length slots) must be pinned in memory during
+/// page per run (two if there are var-length slots) must be pinned in memory during
 /// a merge, so multiple merges may be necessary if the number of runs is too large.
 /// First a series of intermediate merges are performed, until the number of runs is
 /// small enough to do a single final merge that returns batches of sorted rows to the
@@ -73,7 +72,7 @@ class RowBatch;
 ///
 /// If there is a single sorted run (i.e. no merge required), only tuple rows are
 /// copied into the output batch supplied by GetNext(), and the data itself is left in
-/// pinned blocks held by the sorter.
+/// pinned pages held by the sorter.
 ///
 /// When merges are performed, one input batch is created to hold tuple rows for each
 /// input run, and one batch is created to hold deep copied rows (i.e. ptrs + data) from
@@ -84,7 +83,7 @@ class RowBatch;
 /// During a merge, one row batch is created for each input run, and one batch is created
 /// for the output of the merge (if is not the final merge). It is assumed that the memory
 /// for these batches have already been accounted for in the memory budget for the sort.
-/// That is, the memory for these batches does not come out of the block buffer manager.
+/// That is, the memory for these batches does not come out of the buffer pool.
 //
 /// TODO: Not necessary to actually copy var-len data - instead take ownership of the
 /// var-length data in the input batch. Copying can be deferred until a run is unpinned.
@@ -94,22 +93,31 @@ class RowBatch;
 class Sorter {
  public:
   /// 'sort_tuple_exprs' are the slot exprs used to materialize the tuples to be
-  /// sorted. 'compare_less_than' is a comparator for the sort tuples (returns true if
-  /// lhs < rhs). 'merge_batch_size_' is the size of the batches created to provide rows
-  /// to the merger and retrieve rows from an intermediate merger. 'enable_spilling'
-  /// should be set to false to reduce the number of requested buffers if the caller will
-  /// use AddBatchNoSpill().
-  Sorter(const TupleRowComparator& compare_less_than,
+  /// sorted. 'ordering_exprs', 'is_asc_order' and 'nulls_first' are parameters
+  /// for the comparator for the sort tuples.
+  /// 'node_id' is the ID of the exec node using the sorter for error reporting.
+  /// 'enable_spilling' should be set to false to reduce the number of requested buffers
+  /// if the caller will use AddBatchNoSpill().
+  ///
+  /// The Sorter assumes that it has exclusive use of the client's
+  /// reservations for sorting, and may increase the size of the client's reservation.
+  /// The caller is responsible for ensuring that the minimum reservation (returned from
+  /// ComputeMinReservation()) is available.
+  Sorter(const std::vector<ScalarExpr*>& ordering_exprs,
+      const std::vector<bool>& is_asc_order, const std::vector<bool>& nulls_first,
       const std::vector<ScalarExpr*>& sort_tuple_exprs, RowDescriptor* output_row_desc,
-      MemTracker* mem_tracker, RuntimeProfile* profile, RuntimeState* state,
-      bool enable_spilling = true);
-
+      MemTracker* mem_tracker, BufferPool::ClientHandle* client, int64_t page_len,
+      RuntimeProfile* profile, RuntimeState* state, int node_id,
+      bool enable_spilling);
   ~Sorter();
 
-  /// Initial set-up of the sorter for execution. Registers with the block mgr.
+  /// Initial set-up of the sorter for execution.
   /// The evaluators for 'sort_tuple_exprs_' will be created and stored in 'obj_pool'.
-  /// All allocation from the evaluators will be from 'expr_mem_pool'.
-  Status Prepare(ObjectPool* obj_pool, MemPool* expr_mem_pool) WARN_UNUSED_RESULT;
+  Status Prepare(ObjectPool* obj_pool) WARN_UNUSED_RESULT;
+
+  /// Do codegen for the Sorter. Called after Prepare() if codegen is desired. Returns OK
+  /// if successful or a Status describing the reason why Codegen failed otherwise.
+  Status Codegen(RuntimeState* state);
 
   /// Opens the sorter for adding rows and initializes the evaluators for materializing
   /// the tuples. Must be called after Prepare() or Reset() and before calling AddBatch().
@@ -132,9 +140,6 @@ class Sorter {
   /// Get the next batch of sorted output rows from the sorter.
   Status GetNext(RowBatch* batch, bool* eos) WARN_UNUSED_RESULT;
 
-  /// Free any local allocations made when materializing and sorting the tuples.
-  void FreeLocalAllocations();
-
   /// Resets all internal state like ExecNode::Reset().
   /// Init() must have been called, AddBatch()/GetNext()/InputDone()
   /// may or may not have been called.
@@ -143,24 +148,32 @@ class Sorter {
   /// Close the Sorter and free resources.
   void Close(RuntimeState* state);
 
+  /// Compute the minimum amount of buffer memory in bytes required to execute a
+  /// sort with the current sorter.
+  int64_t ComputeMinReservation();
+
+  /// Return true if the sorter has any spilled runs.
+  bool HasSpilledRuns() const;
+
  private:
+  class Page;
   class Run;
   class TupleIterator;
   class TupleSorter;
 
   /// Create a SortedRunMerger from sorted runs in 'sorted_runs_' and assign it to
   /// 'merger_'. Attempts to set up merger with 'max_num_runs' runs but may set it
-  /// up with fewer if it cannot pin the initial blocks of all of the runs. Fails
+  /// up with fewer if it cannot pin the initial pages of all of the runs. Fails
   /// if it cannot merge at least two runs. The runs to be merged are removed from
   /// 'sorted_runs_'.  The Sorter sets the 'deep_copy_input' flag to true for the
-  /// merger, since the blocks containing input run data will be deleted as input
+  /// merger, since the pages containing input run data will be deleted as input
   /// runs are read.
   Status CreateMerger(int max_num_runs) WARN_UNUSED_RESULT;
 
   /// Repeatedly replaces multiple smaller runs in sorted_runs_ with a single larger
   /// merged run until there are few enough runs to be merged with a single merger.
   /// Returns when 'merger_' is set up to merge the final runs.
-  /// At least 1 (2 if var-len slots) block from each sorted run must be pinned for
+  /// At least 1 (2 if var-len slots) page from each sorted run must be pinned for
   /// a merge. If the number of sorted runs is too large, merge sets of smaller runs
   /// into large runs until a final merge can be performed. An intermediate row batch
   /// containing deep copied rows is used for the output of each intermediate merge.
@@ -177,18 +190,28 @@ class Sorter {
   /// Helper that cleans up all runs in the sorter.
   void CleanupAllRuns();
 
+  /// ID of the ExecNode that owns the sorter, used for error reporting.
+  const int node_id_;
+
   /// Runtime state instance used to check for cancellation. Not owned.
   RuntimeState* const state_;
 
+  /// MemPool for allocating data structures used by expression evaluators in the sorter.
+  MemPool expr_perm_pool_;
+
+  /// MemPool for allocations that hold results of expression evaluation in the sorter.
+  /// Cleared periodically during sorting to prevent memory accumulating.
+  MemPool expr_results_pool_;
+
   /// In memory sorter and less-than comparator.
-  const TupleRowComparator& compare_less_than_;
+  TupleRowComparator compare_less_than_;
   boost::scoped_ptr<TupleSorter> in_mem_tuple_sorter_;
 
-  /// Block manager object used to allocate, pin and release runs. Not owned by Sorter.
-  BufferedBlockMgr* block_mgr_;
+  /// Client used to allocate pages from the buffer pool. Not owned.
+  BufferPool::ClientHandle* const buffer_pool_client_;
 
-  /// Handle to block mgr to make allocations from.
-  BufferedBlockMgr::Client* block_mgr_client_;
+  /// The length of page to use.
+  const int64_t page_len_;
 
   /// True if the tuples to be sorted have var-length slots.
   bool has_var_len_slots_;
@@ -211,7 +234,7 @@ class Sorter {
   /// BEGIN: Members that must be Reset()
 
   /// The current unsorted run that is being collected. Is sorted and added to
-  /// sorted_runs_ after it is full (i.e. number of blocks allocated == max available
+  /// sorted_runs_ after it is full (i.e. number of pages allocated == max available
   /// buffers) or after the input is complete. Owned and placed in obj_pool_.
   /// When it is added to sorted_runs_, it is set to NULL.
   Run* unsorted_run_;
@@ -226,7 +249,7 @@ class Sorter {
   /// memory.
   boost::scoped_ptr<SortedRunMerger> merger_;
 
-  /// Runs that are currently processed by the merge_.
+  /// Spilled runs that are currently processed by the merge_.
   /// These runs can be deleted when we are done with the current merge.
   std::deque<Run*> merging_runs_;
 
@@ -235,13 +258,16 @@ class Sorter {
   Run* merge_output_run_;
 
   /// Pool of owned Run objects. Maintains Runs objects across non-freeing Reset() calls.
-  ObjectPool obj_pool_;
+  ObjectPool run_pool_;
 
   /// END: Members that must be Reset()
   /////////////////////////////////////////
 
   /// Runtime profile and counters for this sorter instance.
   RuntimeProfile* profile_;
+
+  /// Pool of objects (e.g. exprs) that are not freed during Reset() calls.
+  ObjectPool obj_pool_;
 
   /// Number of initial runs created.
   RuntimeProfile::Counter* initial_runs_counter_;

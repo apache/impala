@@ -26,9 +26,11 @@
 #include <boost/thread/mutex.hpp>
 
 #include "common/hdfs.h"
+#include "common/status.h"
 #include "util/aligned-new.h"
 #include "util/impalad-metrics.h"
 #include "util/spinlock.h"
+#include "util/thread.h"
 
 namespace impala {
 
@@ -73,19 +75,29 @@ class HdfsFileHandle {
 /// of concurrent connections, and file handles in the cache would be counted towards
 /// that limit.
 ///
-/// TODO: If there is a file handle in the cache and the underlying file is deleted,
+/// If there is a file handle in the cache and the underlying file is deleted,
 /// the file handle might keep the file from being deleted at the OS level. This can
-/// take up disk space and impact correctness. The cache should check periodically to
-/// evict file handles older than some configurable threshold. The cache should also
-/// evict file handles more aggressively if the file handle's mtime is older than the
-/// file's current mtime.
+/// take up disk space and impact correctness. To avoid this, the cache will evict any
+/// file handle that has been unused for longer than threshold specified by
+/// `unused_handle_timeout_secs`. Eviction is disabled when the threshold is 0.
+///
+/// TODO: The cache should also evict file handles more aggressively if the file handle's
+/// mtime is older than the file's current mtime.
 template <size_t NUM_PARTITIONS>
 class FileHandleCache {
  public:
   /// Instantiates the cache with `capacity` split evenly across NUM_PARTITIONS
   /// partitions. If the capacity does not split evenly, then the capacity is rounded
-  /// up.
-  FileHandleCache(size_t capacity);
+  /// up. The cache will age out any file handle that is unused for
+  /// `unused_handle_timeout_secs` seconds. Age out is disabled if this is set to zero.
+  FileHandleCache(size_t capacity, uint64_t unused_handle_timeout_secs);
+
+  /// Destructor is only called for backend tests
+  ~FileHandleCache();
+
+  /// Starts up a thread that monitors the age of file handles and evicts any that
+  /// exceed the limit.
+  Status Init() WARN_UNUSED_RESULT;
 
   /// Get a file handle from the cache for the specified filename (fname) and
   /// last modification time (mtime). This will hash the filename to determine
@@ -112,18 +124,26 @@ class FileHandleCache {
  private:
   struct FileHandleEntry;
   typedef std::multimap<std::string, FileHandleEntry> MapType;
-  typedef std::list<typename MapType::iterator> LruListType;
+
+  struct LruListEntry {
+    LruListEntry(typename MapType::iterator map_entry_in);
+    typename MapType::iterator map_entry;
+    uint64_t timestamp_seconds;
+  };
+  typedef std::list<LruListEntry> LruListType;
 
   struct FileHandleEntry {
-    FileHandleEntry(HdfsFileHandle *fh_in) : fh(fh_in) {}
+    FileHandleEntry(HdfsFileHandle* fh_in, LruListType& lru_list)
+    : fh(fh_in), lru_entry(lru_list.end()) {}
     std::unique_ptr<HdfsFileHandle> fh;
 
     /// in_use is true for a file handle checked out via GetFileHandle() that has not
     /// been returned via ReleaseFileHandle().
     bool in_use = false;
 
-    /// Iterator to this element's location in the LRU list. This only has a valid value
-    /// if in_use is false.
+    /// Iterator to this element's location in the LRU list. This only points to a
+    /// valid location when in_use is true. For error-checking, this is set to
+    /// lru_list.end() when in_use is false.
     typename LruListType::iterator lru_entry;
   };
 
@@ -151,11 +171,24 @@ class FileHandleCache {
     size_t size;
   };
 
+  /// Periodic check to evict unused file handles. Only executed by eviction_thread_.
+  void EvictHandlesLoop();
+  static const int64_t EVICT_HANDLES_PERIOD_MS = 1000;
+
   /// If the partition is above its capacity, evict the oldest unused file handles to
   /// enforce the capacity.
   void EvictHandles(FileHandleCachePartition& p);
 
   std::array<FileHandleCachePartition, NUM_PARTITIONS> cache_partitions_;
+
+  /// Maximum time before an unused file handle is aged out of the cache.
+  /// Aging out is disabled if this is set to 0.
+  uint64_t unused_handle_timeout_secs_;
+
+  /// Thread to check for unused file handles to evict. This thread will exit when
+  /// the shut_down_promise_ is set.
+  std::unique_ptr<Thread> eviction_thread_;
+  Promise<bool> shut_down_promise_;
 };
 
 }

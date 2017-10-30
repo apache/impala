@@ -44,6 +44,7 @@ import org.apache.impala.thrift.TExprBatch;
 import org.apache.impala.thrift.TPrioritizeLoadRequest;
 import org.apache.impala.thrift.TPrioritizeLoadResponse;
 import org.apache.impala.thrift.TQueryCtx;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TSymbolLookupParams;
@@ -83,6 +84,18 @@ public class FeSupport {
   // we make make all RPCs in the BE layer instead of calling the Catalog Server
   // using Java Thrift bindings.
   public native static byte[] NativePrioritizeLoad(byte[] thriftReq);
+
+  // Parses a string of comma-separated key=value query options ('csvQueryOptions'),
+  // updates the existing query options ('queryOptions') with them and returns the
+  // resulting serialized TQueryOptions object.
+  // A note about the function's interface: ideally we wouldn't have to pass in the
+  // existing query options. We could just return the newly set query options to the
+  // caller and let the caller update the existing query options with the new ones.
+  // Unfortunately due to a bug in the thrift-generated TQueryOptions class, in some cases
+  // it is impossible to figure out whether a query option has been set explicitly or left
+  // at its default setting, therefore this approach would not work.
+  public native static byte[] NativeParseQueryOptions(String csvQueryOptions,
+      byte[] queryOptions);
 
   /**
    * Locally caches the jar at the specified HDFS location.
@@ -258,6 +271,38 @@ public class FeSupport {
     } catch (TException e) {
       // this should never happen
       throw new InternalException("Error processing request: " + e.getMessage(), e);
+    }
+  }
+
+  private static byte[] ParseQueryOptions(String csvQueryOptions, byte[] queryOptions) {
+    try {
+      return NativeParseQueryOptions(csvQueryOptions, queryOptions);
+    } catch (UnsatisfiedLinkError e) {
+      loadLibrary();
+    }
+    return NativeParseQueryOptions(csvQueryOptions, queryOptions);
+  }
+
+  /**
+   * Parses a string of comma-separated key=value query options. Returns a TQueryOptions
+   * object that contains the updated query options.
+   */
+  public static TQueryOptions ParseQueryOptions(String csvQueryOptions,
+      TQueryOptions queryOptions) throws InternalException {
+    Preconditions.checkNotNull(csvQueryOptions);
+    Preconditions.checkNotNull(queryOptions);
+
+    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
+    try {
+      byte[] result = ParseQueryOptions(csvQueryOptions,
+          serializer.serialize(queryOptions));
+      Preconditions.checkNotNull(result);
+      TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
+      TQueryOptions updatedQueryOptions = new TQueryOptions();
+      deserializer.deserialize(updatedQueryOptions, result);
+      return updatedQueryOptions;
+    } catch (TException e) {
+      throw new InternalException("Could not parse query options: " + e.getMessage(), e);
     }
   }
 

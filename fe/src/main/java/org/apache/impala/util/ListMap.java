@@ -19,28 +19,29 @@ package org.apache.impala.util;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.Collections;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Lists;
+import com.google.common.collect.ImmutableList;
 
 /**
- * Implementation of a bi-directional map between an index of type
- * Integer and an object of type T.  The indices are allocated on
- * demand when a reverse lookup occurs for an object not already in
- * the map.
+ * Thread-safe implementation of a bi-directional map between an
+ * index of type Integer and an object of type T.  The indices are
+ * allocated on demand when a reverse lookup occurs for an object
+ * not already in the map.
  *
  * The forward mapping is implemented as a List<> so that it can be
  * directly used as a Thrift structure.
  */
 public class ListMap<T> {
   // Maps from Integer to T.
-  private ArrayList<T> list_ = Lists.newArrayList();
+  private List<T> list_ = Collections.synchronizedList(new ArrayList<T>());
   // Maps from T to Integer.
-  private final Map<T, Integer> map_ = Maps.newHashMap();
+  private final ConcurrentHashMap<T, Integer> map_ =
+      new ConcurrentHashMap<T, Integer> ();
 
-  public ArrayList<T> getList() { return list_; }
+  public List<T> getList() { return ImmutableList.copyOf(list_); }
   public int size() { return list_.size(); }
 
   /**
@@ -54,8 +55,13 @@ public class ListMap<T> {
    */
   public int getIndex(T t) {
     Integer index = map_.get(t);
-    if (index == null) {
-      // No match was found, add a new entry.
+    if (index != null) return index;
+    // No match was found, add a new entry.
+    synchronized (this) {
+      // Another thread may have generated the new index, if yes
+      // return that.
+      index = map_.get(t);
+      if (index !=null) return index;
       list_.add(t);
       index = list_.size() - 1;
       map_.put(t, index);
@@ -67,9 +73,9 @@ public class ListMap<T> {
    * Populate the bi-map from the given list.  Does not perform a copy
    * of the list.
    */
-  public void populate(ArrayList<T> list) {
+  public synchronized void populate(List<T> list) {
     Preconditions.checkState(list_.isEmpty() && map_.isEmpty());
-    list_ = list;
+    list_ = Collections.synchronizedList(list);
     for (int i = 0; i < list_.size(); ++i) {
       map_.put(list_.get(i), i);
     }

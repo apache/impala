@@ -315,7 +315,7 @@ class QueryExecutor(object):
         SET DISABLE_STREAMING_PREAGGREGATIONS={disable_streaming_preaggregations};
         SET DISABLE_UNSAFE_SPILLS={disable_unsafe_spills};
         SET EXEC_SINGLE_NODE_ROWS_THRESHOLD={exec_single_node_rows_threshold};
-        SET MAX_BLOCK_MGR_MEMORY={max_block_mgr_memory};
+        SET BUFFER_POOL_LIMIT={buffer_pool_limit};
         SET MAX_IO_BUFFERS={max_io_buffers};
         SET MAX_SCAN_RANGE_LENGTH={max_scan_range_length};
         SET NUM_NODES={num_nodes};
@@ -333,7 +333,7 @@ class QueryExecutor(object):
             disable_streaming_preaggregations=choice((0, 1)),
             disable_unsafe_spills=choice((0, 1)),
             exec_single_node_rows_threshold=randint(1, 100000000),
-            max_block_mgr_memory=randint(1, 100000000),
+            buffer_pool_limit=randint(1, 100000000),
             max_io_buffers=randint(1, 100000000),
             max_scan_range_length=randint(1, 100000000),
             num_nodes=randint(3, 3),

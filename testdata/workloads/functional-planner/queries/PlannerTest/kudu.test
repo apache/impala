@@ -90,19 +90,25 @@ INSERT INTO KUDU [functional_kudu.testtbl]
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.testtbl]
 |
-06:PARTIAL SORT
+08:PARTIAL SORT
 |  order by: KuduPartition(count(id)) ASC NULLS LAST, count(id) ASC NULLS LAST
 |
-05:EXCHANGE [KUDU(KuduPartition(count(id)))]
+07:EXCHANGE [KUDU(KuduPartition(count(id)))]
 |
-02:AGGREGATE [FINALIZE]
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(id)
+|  group by: name
+|
+05:EXCHANGE [HASH(name)]
+|
+02:AGGREGATE [STREAMING]
 |  output: count(id)
 |  group by: name
 |
 04:AGGREGATE
 |  group by: name, id
 |
-03:EXCHANGE [HASH(name)]
+03:EXCHANGE [HASH(name,id)]
 |
 01:AGGREGATE [STREAMING]
 |  group by: name, id
@@ -417,4 +423,31 @@ INSERT INTO KUDU [functional_kudu.alltypes]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+====
+# IMPALA-5602: If a query contains predicates that are all pushed to kudu and there is a
+# limit, then the query should not incorrectly run with 'small query' optimization.
+select * from functional_kudu.alltypesagg where tinyint_col = 9 limit 10;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|  limit: 10
+|
+00:SCAN KUDU [functional_kudu.alltypesagg_idx]
+   kudu predicates: functional_kudu.alltypesagg_idx.tinyint_col = 9
+   limit: 10
+====
+# IMPALA-5602: If a query contains predicates that are all pushed to kudu, there is a
+# limit, and no table stats, then the query should not incorrectly run with 'small query'
+# optimization.
+select * from kudu_planner_test.no_stats where tinyint_col = 9 limit 10;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|  limit: 10
+|
+00:SCAN KUDU [kudu_planner_test.no_stats]
+   kudu predicates: tinyint_col = 9
+   limit: 10
 ====

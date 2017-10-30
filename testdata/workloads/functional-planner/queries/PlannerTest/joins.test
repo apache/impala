@@ -211,31 +211,34 @@ PLAN-ROOT SINK
 |
 09:EXCHANGE [UNPARTITIONED]
 |
-04:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
-|  hash predicates: c.id = a.id, c.string_col = b.string_col
+04:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
+|  hash predicates: a.id = c.id, b.string_col = c.string_col
 |  other predicates: a.tinyint_col = 15, b.string_col = '15', a.day >= 6, b.month > 2, a.float_col - c.double_col < 0, a.tinyint_col + b.tinyint_col < 15, (b.double_col * c.tinyint_col > 1000 OR c.tinyint_col < 1000)
+|  runtime filters: RF000 <- c.id, RF001 <- c.string_col
 |
-|--08:EXCHANGE [HASH(a.id,b.string_col)]
+|--08:EXCHANGE [HASH(c.id,c.string_col)]
 |  |
-|  03:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
-|  |  hash predicates: a.id = b.id, a.int_col = b.int_col
-|  |
-|  |--06:EXCHANGE [HASH(b.id,b.int_col)]
-|  |  |
-|  |  01:SCAN HDFS [functional.alltypessmall b]
-|  |     partitions=2/4 files=2 size=3.17KB
-|  |     predicates: b.string_col = '15'
-|  |
-|  05:EXCHANGE [HASH(a.id,a.int_col)]
-|  |
-|  00:SCAN HDFS [functional.alltypesagg a]
-|     partitions=5/11 files=5 size=372.38KB
-|     predicates: a.tinyint_col = 15
+|  02:SCAN HDFS [functional.alltypesaggnonulls c]
+|     partitions=2/10 files=2 size=148.10KB
 |
-07:EXCHANGE [HASH(c.id,c.string_col)]
+07:EXCHANGE [HASH(a.id,b.string_col)]
 |
-02:SCAN HDFS [functional.alltypesaggnonulls c]
-   partitions=2/10 files=2 size=148.10KB
+03:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
+|  hash predicates: a.id = b.id, a.int_col = b.int_col
+|
+|--06:EXCHANGE [HASH(b.id,b.int_col)]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=2/4 files=2 size=3.17KB
+|     predicates: b.string_col = '15'
+|     runtime filters: RF001 -> b.string_col
+|
+05:EXCHANGE [HASH(a.id,a.int_col)]
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   partitions=5/11 files=5 size=372.38KB
+   predicates: a.tinyint_col = 15
+   runtime filters: RF000 -> a.id
 ====
 # equi join with constants in the on clause are not supported
 select a.id, b.id from
@@ -1334,30 +1337,31 @@ where b.id < 5
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-06:EXCHANGE [UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |
-04:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: id = b.id
-|  runtime filters: RF000 <- b.id
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: b.id = id
+|  runtime filters: RF000 <- id
 |
-|--05:EXCHANGE [BROADCAST]
+|--06:EXCHANGE [HASH(id)]
 |  |
-|  03:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 files=4 size=460B
-|     predicates: b.id < 5
-|
-00:UNION
-|  constant-operands=1
-|
-|--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=1/4 files=1 size=1.58KB
+|  00:UNION
+|  |  constant-operands=1
+|  |
+|  |--02:SCAN HDFS [functional.alltypessmall]
+|  |     partitions=1/4 files=1 size=1.58KB
+|  |     predicates: functional.alltypessmall.id < 5
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=1/4 files=1 size=1.57KB
 |     predicates: functional.alltypessmall.id < 5
-|     runtime filters: RF000 -> functional.alltypessmall.id
 |
-01:SCAN HDFS [functional.alltypessmall]
-   partitions=1/4 files=1 size=1.57KB
-   predicates: functional.alltypessmall.id < 5
-   runtime filters: RF000 -> functional.alltypessmall.id
+05:EXCHANGE [HASH(b.id)]
+|
+03:SCAN HDFS [functional.alltypestiny b]
+   partitions=4/4 files=4 size=460B
+   predicates: b.id < 5
+   runtime filters: RF000 -> b.id
 ====
 # Test joins with union inputs. One input is a union.
 select a.id, b.id, a.string_col, b.string_col
@@ -1378,30 +1382,27 @@ PLAN-ROOT SINK
 |
 07:EXCHANGE [UNPARTITIONED]
 |
-04:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
-|  hash predicates: id = b.id
-|  runtime filters: RF000 <- b.id
+04:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
+|  hash predicates: b.id = id
 |
-|--06:EXCHANGE [HASH(b.id)]
+|--06:EXCHANGE [HASH(id)]
 |  |
-|  00:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 files=4 size=460B
-|     predicates: b.id < 5
-|
-05:EXCHANGE [HASH(id)]
-|
-01:UNION
-|  constant-operands=1
-|
-|--03:SCAN HDFS [functional.alltypessmall]
-|     partitions=1/4 files=1 size=1.58KB
+|  01:UNION
+|  |  constant-operands=1
+|  |
+|  |--03:SCAN HDFS [functional.alltypessmall]
+|  |     partitions=1/4 files=1 size=1.58KB
+|  |     predicates: functional.alltypessmall.id < 5
+|  |
+|  02:SCAN HDFS [functional.alltypessmall]
+|     partitions=1/4 files=1 size=1.57KB
 |     predicates: functional.alltypessmall.id < 5
-|     runtime filters: RF000 -> functional.alltypessmall.id
 |
-02:SCAN HDFS [functional.alltypessmall]
-   partitions=1/4 files=1 size=1.57KB
-   predicates: functional.alltypessmall.id < 5
-   runtime filters: RF000 -> functional.alltypessmall.id
+05:EXCHANGE [HASH(b.id)]
+|
+00:SCAN HDFS [functional.alltypestiny b]
+   partitions=4/4 files=4 size=460B
+   predicates: b.id < 5
 ====
 # Test joins with union inputs. Both inputs are a union.
 select a.id, b.id, a.string_col, b.string_col

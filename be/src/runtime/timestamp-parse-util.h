@@ -20,6 +20,7 @@
 
 #include <cstddef>
 #include <vector>
+#include <boost/date_time/posix_time/ptime.hpp>
 
 namespace boost {
   namespace gregorian {
@@ -33,6 +34,7 @@ namespace boost {
 namespace impala {
 
 struct DateTimeParseResult;
+class TimestampValue;
 
 /// Add support for dealing with custom date/time formats in Impala. The following
 /// date/time tokens are supported:
@@ -134,6 +136,9 @@ struct DateTimeFormatContext {
   std::vector<DateTimeFormatToken> toks;
   bool has_date_toks;
   bool has_time_toks;
+  /// Current time - 80 years to determine the actual year when
+  /// parsing 1 or 2-digit year token.
+  boost::posix_time::ptime century_break_ptime;
 
   DateTimeFormatContext() {
     Reset(NULL, 0);
@@ -143,6 +148,11 @@ struct DateTimeFormatContext {
     Reset(fmt, fmt_len);
   }
 
+  /// Set the century break when parsing 1 or 2-digit year format.
+  /// When parsing 1 or 2-digit year, the year should be in the interval
+  /// [now - 80 years, now + 20 years), according to Hive.
+  void SetCenturyBreak(const TimestampValue &now);
+
   void Reset(const char* fmt, int fmt_len) {
     this->fmt = fmt;
     this->fmt_len = fmt_len;
@@ -150,6 +160,7 @@ struct DateTimeFormatContext {
     this->has_date_toks = false;
     this->has_time_toks = false;
     this->toks.clear();
+    this->century_break_ptime = boost::posix_time::not_a_date_time;
   }
 };
 
@@ -207,6 +218,16 @@ class TimestampParser {
  private:
   static bool ParseDateTime(const char* str, int str_len,
       const DateTimeFormatContext& dt_ctx, DateTimeParseResult* dt_result);
+
+  /// Helper function finding the correct century for 1 or 2 digit year according to
+  /// century break. Throws bad_year, bad_day_of_month, or bad_day_month if the date is
+  /// invalid. The century break behavior is copied from Java SimpleDateFormat in order to
+  /// be consistent with Hive.
+  /// In SimpleDateFormat, the century for 2-digit-year breaks at current_time - 80 years.
+  /// https://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
+  static boost::gregorian::date RealignYear(const DateTimeParseResult& dt_result,
+      const DateTimeFormatContext& dt_ctx, int day_offset,
+      const boost::posix_time::time_duration& t);
 
   /// Check if the string is a TimeZone offset token.
   /// Valid offset token format are 'hh:mm', 'hhmm', 'hh'.

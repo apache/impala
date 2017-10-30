@@ -36,6 +36,14 @@ inline TimestampValue TimestampValue::UtcFromUnixTimeMicros(int64_t unix_time_mi
   return TimestampValue(temp);
 }
 
+inline TimestampValue TimestampValue::FromUnixTimeMicros(int64_t unix_time_micros) {
+  int64_t ts_seconds = unix_time_micros / MICROS_PER_SEC;
+  int64_t micros_part = unix_time_micros - (ts_seconds * MICROS_PER_SEC);
+  boost::posix_time::ptime temp = UnixTimeToLocalPtime(ts_seconds);
+  temp += boost::posix_time::microseconds(micros_part);
+  return TimestampValue(temp);
+}
+
 /// Interpret 'this' as a timestamp in UTC and convert to unix time.
 /// Returns false if the conversion failed ('unix_time' will be undefined), otherwise
 /// true.

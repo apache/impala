@@ -46,6 +46,23 @@ under the License.
 
   </conbody>
 
+<!-- All 2.10.x new features go under here -->
+
+  <concept rev="2.10.0" id="new_features_2100">
+
+    <title>New Features in <keyword keyref="impala210_full"/></title>
+
+    <conbody>
+
+      <p>
+        For the full list of issues closed in this release, including the issues
+        marked as <q>new features</q> or <q>improvements</q>, see the
+        <xref keyref="changelog_210">changelog for <keyword keyref="impala210"/></xref>.
+      </p>
+
+    </conbody>
+  </concept>
+
 <!-- All 2.9.x new features go under here -->
 
   <concept rev="2.9.0" id="new_features_290">
@@ -56,7 +73,7 @@ under the License.
 
       <p>
         For the full list of issues closed in this release, including the issues
-        marked as <q>new features</q>, see the
+        marked as <q>new features</q> or <q>improvements</q>, see the
         <xref keyref="changelog_29">changelog for <keyword keyref="impala29"/></xref>.
       </p>
 

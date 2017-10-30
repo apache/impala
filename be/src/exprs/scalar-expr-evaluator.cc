@@ -62,21 +62,21 @@ using namespace impala_udf;
 
 const char* ScalarExprEvaluator::LLVM_CLASS_NAME = "class.impala::ScalarExprEvaluator";
 
-ScalarExprEvaluator::ScalarExprEvaluator(const ScalarExpr& root, MemPool* mem_pool)
-  : mem_pool_(mem_pool),
-    root_(root) {
-}
+ScalarExprEvaluator::ScalarExprEvaluator(
+    const ScalarExpr& root, MemPool* expr_perm_pool, MemPool* expr_results_pool)
+  : expr_perm_pool_(expr_perm_pool), root_(root) {}
 
 ScalarExprEvaluator::~ScalarExprEvaluator() {
   DCHECK(!initialized_ || closed_);
 }
 
 Status ScalarExprEvaluator::Create(const ScalarExpr& root, RuntimeState* state,
-    ObjectPool* pool, MemPool* mem_pool, ScalarExprEvaluator** eval) {
-  *eval = pool->Add(new ScalarExprEvaluator(root, mem_pool));
+    ObjectPool* pool, MemPool* expr_perm_pool, MemPool* expr_results_pool,
+    ScalarExprEvaluator** eval) {
+  *eval = pool->Add(new ScalarExprEvaluator(root, expr_perm_pool, expr_results_pool));
   if (root.fn_ctx_idx_end_ > 0) {
     (*eval)->fn_ctxs_.resize(root.fn_ctx_idx_end_, nullptr);
-    (*eval)->CreateFnCtxs(state, root);
+    (*eval)->CreateFnCtxs(state, root, expr_perm_pool, expr_results_pool);
     DCHECK_EQ((*eval)->fn_ctxs_.size(), root.fn_ctx_idx_end_);
     for (FunctionContext* fn_ctx : (*eval)->fn_ctxs_) DCHECK(fn_ctx != nullptr);
     (*eval)->fn_ctxs_ptr_ = (*eval)->fn_ctxs_.data();
@@ -91,10 +91,11 @@ Status ScalarExprEvaluator::Create(const ScalarExpr& root, RuntimeState* state,
 }
 
 Status ScalarExprEvaluator::Create(const vector<ScalarExpr*>& exprs, RuntimeState* state,
-    ObjectPool* pool, MemPool* mem_pool, vector<ScalarExprEvaluator*>* evals) {
+    ObjectPool* pool, MemPool* expr_perm_pool, MemPool* expr_results_pool,
+    vector<ScalarExprEvaluator*>* evals) {
   for (const ScalarExpr* expr : exprs) {
     ScalarExprEvaluator* eval;
-    Status status = Create(*expr, state, pool, mem_pool, &eval);
+    Status status = Create(*expr, state, pool, expr_perm_pool, expr_results_pool, &eval);
     // Always add the evaluator to the vector so it can be cleaned up.
     evals->push_back(eval);
     RETURN_IF_ERROR(status);
@@ -102,12 +103,13 @@ Status ScalarExprEvaluator::Create(const vector<ScalarExpr*>& exprs, RuntimeStat
   return Status::OK();
 }
 
-void ScalarExprEvaluator::CreateFnCtxs(RuntimeState* state, const ScalarExpr& expr) {
+void ScalarExprEvaluator::CreateFnCtxs(RuntimeState* state, const ScalarExpr& expr,
+    MemPool* expr_perm_pool, MemPool* expr_results_pool) {
   const int fn_ctx_idx = expr.fn_ctx_idx();
   const bool has_fn_ctx = fn_ctx_idx != -1;
   vector<FunctionContext::TypeDesc> arg_types;
   for (const ScalarExpr* child : expr.children()) {
-    CreateFnCtxs(state, *child);
+    CreateFnCtxs(state, *child, expr_perm_pool, expr_results_pool);
     if (has_fn_ctx) arg_types.push_back(AnyValUtil::ColumnTypeToTypeDesc(child->type()));
   }
   if (has_fn_ctx) {
@@ -117,8 +119,8 @@ void ScalarExprEvaluator::CreateFnCtxs(RuntimeState* state, const ScalarExpr& ex
     DCHECK_GE(fn_ctx_idx, 0);
     DCHECK_LT(fn_ctx_idx, fn_ctxs_.size());
     DCHECK(fn_ctxs_[fn_ctx_idx] == nullptr);
-    fn_ctxs_[fn_ctx_idx] = FunctionContextImpl::CreateContext(
-        state, mem_pool_, return_type, arg_types, varargs_buffer_size);
+    fn_ctxs_[fn_ctx_idx] = FunctionContextImpl::CreateContext(state, expr_perm_pool,
+        expr_results_pool, return_type, arg_types, varargs_buffer_size);
   }
 }
 
@@ -151,8 +153,8 @@ void ScalarExprEvaluator::Close(RuntimeState* state) {
     delete fn_ctxs_[i];
   }
   fn_ctxs_.clear();
-  // Memory allocated by 'fn_ctx_' is still in 'mem_pool_'. It's the responsibility of
-  // the owner of 'mem_pool_' to free it.
+  // Memory allocated by 'fn_ctx_' is still in the MemPools. It's the responsibility of
+  // the owners of those pools to free it.
   closed_ = true;
 }
 
@@ -162,12 +164,15 @@ void ScalarExprEvaluator::Close(
 }
 
 Status ScalarExprEvaluator::Clone(ObjectPool* pool, RuntimeState* state,
-    MemPool* mem_pool, ScalarExprEvaluator** cloned_eval) const {
+    MemPool* expr_perm_pool, MemPool* expr_results_pool,
+    ScalarExprEvaluator** cloned_eval) const {
   DCHECK(initialized_);
   DCHECK(opened_);
-  *cloned_eval = pool->Add(new ScalarExprEvaluator(root_, mem_pool));
+  *cloned_eval = pool->Add(
+      new ScalarExprEvaluator(root_, expr_perm_pool, expr_results_pool));
   for (int i = 0; i < fn_ctxs_.size(); ++i) {
-    (*cloned_eval)->fn_ctxs_.push_back(fn_ctxs_[i]->impl()->Clone(mem_pool));
+    (*cloned_eval)->fn_ctxs_.push_back(
+        fn_ctxs_[i]->impl()->Clone(expr_perm_pool, expr_results_pool));
   }
   (*cloned_eval)->fn_ctxs_ptr_ = (*cloned_eval)->fn_ctxs_.data();
   (*cloned_eval)->is_clone_ = true;
@@ -178,44 +183,18 @@ Status ScalarExprEvaluator::Clone(ObjectPool* pool, RuntimeState* state,
 }
 
 Status ScalarExprEvaluator::Clone(ObjectPool* pool, RuntimeState* state,
-    MemPool* mem_pool, const vector<ScalarExprEvaluator*>& evals,
+    MemPool* expr_perm_pool, MemPool* expr_results_pool,
+    const vector<ScalarExprEvaluator*>& evals,
     vector<ScalarExprEvaluator*>* cloned_evals) {
   DCHECK(cloned_evals != nullptr);
   DCHECK(cloned_evals->empty());
   for (int i = 0; i < evals.size(); ++i) {
     ScalarExprEvaluator* cloned_eval;
-    RETURN_IF_ERROR(evals[i]->Clone(pool, state, mem_pool, &cloned_eval));
+    RETURN_IF_ERROR(
+        evals[i]->Clone(pool, state, expr_perm_pool, expr_results_pool, &cloned_eval));
     cloned_evals->push_back(cloned_eval);
   }
   return Status::OK();
-}
-
-bool ScalarExprEvaluator::HasLocalAllocations() const {
-  for (int i = 0; i < fn_ctxs_.size(); ++i) {
-    if (fn_ctxs_[i]->impl()->closed()) continue;
-    if (fn_ctxs_[i]->impl()->HasLocalAllocations()) return true;
-  }
-  return false;
-}
-
-bool ScalarExprEvaluator::HasLocalAllocations(
-    const vector<ScalarExprEvaluator*>& evals) {
-  for (int i = 0; i < evals.size(); ++i) {
-    if (evals[i]->HasLocalAllocations()) return true;
-  }
-  return false;
-}
-
-void ScalarExprEvaluator::FreeLocalAllocations() {
-  for (int i = 0; i < fn_ctxs_.size(); ++i) {
-    if (fn_ctxs_[i]->impl()->closed()) continue;
-    fn_ctxs_[i]->impl()->FreeLocalAllocations();
-  }
-}
-
-void ScalarExprEvaluator::FreeLocalAllocations(
-    const vector<ScalarExprEvaluator*>& evals) {
-  for (int i = 0; i < evals.size(); ++i) evals[i]->FreeLocalAllocations();
 }
 
 Status ScalarExprEvaluator::GetError(int start_idx, int end_idx) const {
@@ -241,9 +220,9 @@ Status ScalarExprEvaluator::GetConstValue(RuntimeState* state, const ScalarExpr&
 
   // A constant expression shouldn't have any SlotRefs expr in it.
   DCHECK_EQ(expr.GetSlotIds(), 0);
-  DCHECK(mem_pool_ != nullptr);
+  DCHECK(expr_perm_pool_ != nullptr);
   const ColumnType& result_type = expr.type();
-  RETURN_IF_ERROR(AllocateAnyVal(state, mem_pool_, result_type,
+  RETURN_IF_ERROR(AllocateAnyVal(state, expr_perm_pool_, result_type,
       "Could not allocate constant expression value", const_val));
 
   void* result = ScalarExprEvaluator::GetValue(expr, nullptr);
@@ -252,9 +231,10 @@ Status ScalarExprEvaluator::GetConstValue(RuntimeState* state, const ScalarExpr&
     StringVal* sv = reinterpret_cast<StringVal*>(*const_val);
     if (!sv->is_null && sv->len > 0) {
       // Make sure the memory is owned by this evaluator.
-      char* ptr_copy = reinterpret_cast<char*>(mem_pool_->TryAllocate(sv->len));
+      char* ptr_copy =
+          reinterpret_cast<char*>(expr_perm_pool_->TryAllocateUnaligned(sv->len));
       if (ptr_copy == nullptr) {
-        return mem_pool_->mem_tracker()->MemLimitExceeded(
+        return expr_perm_pool_->mem_tracker()->MemLimitExceeded(
             state, "Could not allocate constant string value", sv->len);
       }
       memcpy(ptr_copy, sv->ptr, sv->len);
@@ -320,7 +300,8 @@ void* ScalarExprEvaluator::GetValue(const ScalarExpr& expr, const TupleRow* row)
       result_.string_val.len = v.len;
       return &result_.string_val;
     }
-    case TYPE_CHAR: {
+    case TYPE_CHAR:
+    case TYPE_FIXED_UDA_INTERMEDIATE: {
       impala_udf::StringVal v = expr.GetStringVal(this, row);
       if (v.is_null) return nullptr;
       result_.string_val.ptr = reinterpret_cast<char*>(v.ptr);

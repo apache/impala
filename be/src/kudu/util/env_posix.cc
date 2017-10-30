@@ -53,14 +53,27 @@
 #include "kudu/util/thread_restrictions.h"
 #include "kudu/util/trace.h"
 
+// Compile-time checks for fallocate(), pread(), pwritev() etc.
+#include "common/config.h"
+
 #if defined(__APPLE__)
 #include <mach-o/dyld.h>
 #include <sys/sysctl.h>
 #else
 #include <linux/falloc.h>
+
+// On RHEL5 this header causes compilation errors, due to issues with linux/types.h. There
+// is not an obvious good way to detect this issue at compile time, so instead use
+// IMPALA_HAVE_FALLOCATE as a proxy for RHEL5, and disable fiemap.h usage if fallocate()
+// is not available.
+#if defined(IMPALA_HAVE_FALLOCATE)
 #include <linux/fiemap.h>
+#endif
+
 #include <linux/fs.h>
+#if defined HAVE_MAGIC_H
 #include <linux/magic.h>
+#endif
 #include <sys/ioctl.h>
 #include <sys/sysinfo.h>
 #include <sys/vfs.h>
@@ -100,30 +113,30 @@
 } while ((nread) == 0 && ferror(stream) == EINTR)
 
 // See KUDU-588 for details.
-DEFINE_bool(env_use_fsync, false,
+DEFINE_bool_hidden(env_use_fsync, false,
             "Use fsync(2) instead of fdatasync(2) for synchronizing dirty "
             "data to disk.");
 TAG_FLAG(env_use_fsync, advanced);
 TAG_FLAG(env_use_fsync, evolving);
 
-DEFINE_bool(suicide_on_eio, true,
+DEFINE_bool_hidden(suicide_on_eio, true,
             "Kill the process if an I/O operation results in EIO");
 TAG_FLAG(suicide_on_eio, advanced);
 
-DEFINE_bool(never_fsync, false,
+DEFINE_bool_hidden(never_fsync, false,
             "Never fsync() anything to disk. This is used by certain test cases to "
             "speed up runtime. This is very unsafe to use in production.");
 TAG_FLAG(never_fsync, advanced);
 TAG_FLAG(never_fsync, unsafe);
 
-DEFINE_double(env_inject_io_error, 0.0,
+DEFINE_double_hidden(env_inject_io_error, 0.0,
               "Fraction of the time that certain I/O operations will fail");
 TAG_FLAG(env_inject_io_error, hidden);
 
-DEFINE_int32(env_inject_short_read_bytes, 0,
+DEFINE_int32_hidden(env_inject_short_read_bytes, 0,
              "The number of bytes less than the requested bytes to read");
 TAG_FLAG(env_inject_short_read_bytes, hidden);
-DEFINE_int32(env_inject_short_write_bytes, 0,
+DEFINE_int32_hidden(env_inject_short_write_bytes, 0,
              "The number of bytes less than the requested bytes to write");
 TAG_FLAG(env_inject_short_write_bytes, hidden);
 
@@ -179,7 +192,13 @@ int fallocate(int fd, int mode, off_t offset, off_t len) {
   }
   return 0;
 }
+#elif !defined(IMPALA_HAVE_FALLOCATE)
+int fallocate(int fd, int mode, off_t offset, off_t len) {
+  return EOPNOTSUPP;
+}
+#endif
 
+#if !defined(HAVE_PREADV)
 // Simulates Linux's preadv API on OS X.
 ssize_t preadv(int fd, const struct iovec* iovec, int count, off_t offset) {
   ssize_t total_read_bytes = 0;
@@ -607,7 +626,7 @@ class PosixWritableFile : public WritableFile {
                          Status::IOError(Env::kInjectedFailureStatusMsg));
     TRACE_EVENT1("io", "PosixWritableFile::Flush", "path", filename_);
     ThreadRestrictions::AssertIOAllowed();
-#if defined(__linux__)
+#if defined(HAVE_SYNC_FILE_RANGE)
     int flags = SYNC_FILE_RANGE_WRITE;
     if (mode == FLUSH_SYNC) {
       flags |= SYNC_FILE_RANGE_WAIT_BEFORE;
@@ -743,7 +762,7 @@ class PosixRWFile : public RWFile {
                          Status::IOError(Env::kInjectedFailureStatusMsg));
     TRACE_EVENT1("io", "PosixRWFile::Flush", "path", filename_);
     ThreadRestrictions::AssertIOAllowed();
-#if defined(__linux__)
+#if defined(HAVE_SYNC_FILE_RANGE)
     int flags = SYNC_FILE_RANGE_WRITE;
     if (mode == FLUSH_SYNC) {
       flags |= SYNC_FILE_RANGE_WAIT_AFTER;
@@ -811,7 +830,7 @@ class PosixRWFile : public RWFile {
   }
 
   virtual Status GetExtentMap(ExtentMap* out) const OVERRIDE {
-#if !defined(__linux__)
+#if !defined(__linux__) || !defined(IMPALA_HAVE_FALLOCATE)
     return Status::NotSupported("GetExtentMap not supported on this platform");
 #else
     TRACE_EVENT1("io", "PosixRWFile::GetExtentMap", "path", filename_);
@@ -1466,7 +1485,7 @@ class PosixEnv : public Env {
     TRACE_EVENT0("io", "PosixEnv::IsOnExtFilesystem");
     ThreadRestrictions::AssertIOAllowed();
 
-#ifdef __APPLE__
+#if defined __APPLE__ || !defined HAVE_MAGIC_H
     *result = false;
 #else
     struct statfs buf;

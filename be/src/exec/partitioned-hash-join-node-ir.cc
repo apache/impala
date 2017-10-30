@@ -314,7 +314,7 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::NextProbeRow(
           // Skip the current row if we manage to append to the spilled partition's BTS.
           // Otherwise, we need to bail out and report the failure.
           BufferedTupleStream* probe_rows = probe_partition->probe_rows();
-          if (UNLIKELY(!AppendProbeRow(probe_rows, current_probe_row_, status))) {
+          if (UNLIKELY(!AppendSpilledProbeRow(probe_rows, current_probe_row_, status))) {
             DCHECK(!status->ok());
             return false;
           }
@@ -437,12 +437,18 @@ int PartitionedHashJoinNode::ProcessProbeBatch(TPrefetchMode::type prefetch_mode
   return num_rows_added;
 }
 
-inline bool PartitionedHashJoinNode::AppendProbeRow(
+inline bool PartitionedHashJoinNode::AppendSpilledProbeRow(
     BufferedTupleStream* stream, TupleRow* row, Status* status) {
-  DCHECK(stream->has_write_block());
-  DCHECK(!stream->using_small_buffers());
+  DCHECK(stream->has_write_iterator());
   DCHECK(!stream->is_pinned());
   return stream->AddRow(row, status);
+}
+
+inline bool PartitionedHashJoinNode::AppendProbeRow(
+    BufferedTupleStream* stream, TupleRow* row, Status* status) {
+  DCHECK(stream->has_write_iterator());
+  if (LIKELY(stream->AddRow(row, status))) return true;
+  return AppendProbeRowSlow(stream, row, status); // Don't cross-compile the slow path.
 }
 
 template int PartitionedHashJoinNode::ProcessProbeBatch<TJoinOp::INNER_JOIN>(

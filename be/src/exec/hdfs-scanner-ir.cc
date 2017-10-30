@@ -80,40 +80,79 @@ ScalarExprEvaluator* HdfsScanner::GetConjunctEval(int idx) const {
   return (*conjunct_evals_)[idx];
 }
 
+void StringToDecimalSymbolDummy() {
+  // Force linker to to link the object file containing these functions.
+  StringToDecimal4(nullptr, 0, 0, 0, nullptr);
+  StringToDecimal8(nullptr, 0, 0, 0, nullptr);
+  StringToDecimal16(nullptr, 0, 0, 0, nullptr);
+}
+
 // Define the string parsing functions for llvm.  Stamp out the templated functions
 #ifdef IR_COMPILE
+using ParseResult = StringParser::ParseResult;
 extern "C"
-bool IrStringToBool(const char* s, int len, StringParser::ParseResult* result) {
+bool IrStringToBool(const char* s, int len, ParseResult* result) {
   return StringParser::StringToBool(s, len, result);
 }
 
-int8_t IrStringToInt8(const char* s, int len, StringParser::ParseResult* result) {
+extern "C"
+int8_t IrStringToInt8(const char* s, int len, ParseResult* result) {
   return StringParser::StringToInt<int8_t>(s, len, result);
 }
 
 extern "C"
-int16_t IrStringToInt16(const char* s, int len, StringParser::ParseResult* result) {
+int16_t IrStringToInt16(const char* s, int len, ParseResult* result) {
   return StringParser::StringToInt<int16_t>(s, len, result);
 }
 
 extern "C"
-int32_t IrStringToInt32(const char* s, int len, StringParser::ParseResult* result) {
+int32_t IrStringToInt32(const char* s, int len, ParseResult* result) {
   return StringParser::StringToInt<int32_t>(s, len, result);
 }
 
 extern "C"
-int64_t IrStringToInt64(const char* s, int len, StringParser::ParseResult* result) {
+int64_t IrStringToInt64(const char* s, int len, ParseResult* result) {
   return StringParser::StringToInt<int64_t>(s, len, result);
 }
 
 extern "C"
-float IrStringToFloat(const char* s, int len, StringParser::ParseResult* result) {
+float IrStringToFloat(const char* s, int len, ParseResult* result) {
   return StringParser::StringToFloat<float>(s, len, result);
 }
 
 extern "C"
-double IrStringToDouble(const char* s, int len, StringParser::ParseResult* result) {
+double IrStringToDouble(const char* s, int len, ParseResult* result) {
   return StringParser::StringToFloat<double>(s, len, result);
+}
+
+extern "C"
+void IrStringToTimestamp(TimestampValue* out, const char* s, int len,
+    ParseResult* result) {
+  *out = StringParser::StringToTimestamp(s, len, result);
+}
+
+extern "C"
+Decimal4Value IrStringToDecimal4(const char* s, int len, int type_precision,
+    int type_scale, ParseResult* result)  {
+  auto ret = StringToDecimal4(s, len, type_precision, type_scale, result);
+  if (*result != ParseResult::PARSE_SUCCESS) *result = ParseResult::PARSE_FAILURE;
+  return ret;
+}
+
+extern "C"
+Decimal8Value IrStringToDecimal8(const char* s, int len, int type_precision,
+    int type_scale, ParseResult* result)  {
+  auto ret = StringToDecimal8(s, len, type_precision, type_scale, result);
+  if (*result != ParseResult::PARSE_SUCCESS) *result = ParseResult::PARSE_FAILURE;
+  return ret;
+}
+
+extern "C"
+Decimal16Value IrStringToDecimal16(const char* s, int len, int type_precision,
+    int type_scale, ParseResult* result)  {
+  auto ret = StringToDecimal16(s, len, type_precision, type_scale, result);
+  if (*result != ParseResult::PARSE_SUCCESS) *result = ParseResult::PARSE_FAILURE;
+  return ret;
 }
 
 extern "C"

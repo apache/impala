@@ -36,7 +36,7 @@
 #include "kudu/util/locks.h"
 #include "kudu/util/status.h"
 
-DEFINE_int32(metrics_retirement_age_ms, 120 * 1000,
+DEFINE_int32_hidden(metrics_retirement_age_ms, 120 * 1000,
              "The minimum number of milliseconds a metric will be kept for after it is "
              "no longer active. (Advanced option)");
 TAG_FLAG(metrics_retirement_age_ms, runtime);

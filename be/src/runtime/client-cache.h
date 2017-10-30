@@ -80,14 +80,15 @@ class ClientCacheHelper {
   //
   /// If there is an error creating the new client, *client_key will be NULL.
   Status GetClient(const TNetworkAddress& address, ClientFactory factory_method,
-      ClientKey* client_key);
+      ClientKey* client_key) WARN_UNUSED_RESULT;
 
   /// Returns a newly-opened client in client_key. May reopen the existing client, or may
   /// replace it with a new one (created using 'factory_method').
   //
   /// Returns an error status and sets 'client_key' to NULL if a new client cannot
   /// created.
-  Status ReopenClient(ClientFactory factory_method, ClientKey* client_key);
+  Status ReopenClient(
+      ClientFactory factory_method, ClientKey* client_key) WARN_UNUSED_RESULT;
 
   /// Returns a client to the cache. Upon return, *client_key will be NULL, and the
   /// associated client will be available in the per-host cache.
@@ -190,7 +191,7 @@ class ClientCacheHelper {
 
   /// Create a new client for specific address in 'client' and put it in client_map_
   Status CreateClient(const TNetworkAddress& address, ClientFactory factory_method,
-      ClientKey* client_key);
+      ClientKey* client_key) WARN_UNUSED_RESULT;
 };
 
 /// A scoped client connection to help manage clients from a client cache. Clients of this
@@ -216,9 +217,7 @@ class ClientConnection {
     }
   }
 
-  Status Reopen() {
-    return client_cache_->ReopenClient(&client_);
-  }
+  Status Reopen() WARN_UNUSED_RESULT { return client_cache_->ReopenClient(&client_); }
 
   T* operator->() const { return client_; }
 
@@ -393,18 +392,18 @@ class ClientCache {
   /// Obtains a pointer to a Thrift interface object (of type T),
   /// backed by a live transport which is already open. Returns
   /// Status::OK unless there was an error opening the transport.
-  Status GetClient(const TNetworkAddress& address, T** iface) {
-    return client_cache_helper_.GetClient(address, client_factory_,
-        reinterpret_cast<ClientKey*>(iface));
+  Status GetClient(const TNetworkAddress& address, T** iface) WARN_UNUSED_RESULT {
+    return client_cache_helper_.GetClient(
+        address, client_factory_, reinterpret_cast<ClientKey*>(iface));
   }
 
   /// Close and delete the underlying transport. Return a new client connecting to the
   /// same host/port.
   /// Returns an error status if a new connection cannot be established and *client will
   /// be unaffected in that case.
-  Status ReopenClient(T** client) {
-    return client_cache_helper_.ReopenClient(client_factory_,
-        reinterpret_cast<ClientKey*>(client));
+  Status ReopenClient(T** client) WARN_UNUSED_RESULT {
+    return client_cache_helper_.ReopenClient(
+        client_factory_, reinterpret_cast<ClientKey*>(client));
   }
 
   /// Return the client to the cache and set *client to NULL.

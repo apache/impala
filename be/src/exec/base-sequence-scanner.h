@@ -52,6 +52,9 @@ class BaseSequenceScanner : public HdfsScanner {
                                    const std::vector<HdfsFileDesc*>& files)
                                    WARN_UNUSED_RESULT;
 
+  /// Returns true if 'format' uses a scanner derived from BaseSequenceScanner.
+  static bool FileFormatIsSequenceBased(THdfsFileFormat::type format);
+
   virtual Status Open(ScannerContext* context) WARN_UNUSED_RESULT;
   virtual void Close(RowBatch* row_batch);
 

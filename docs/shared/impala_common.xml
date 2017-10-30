@@ -765,6 +765,131 @@ select concat('abc','mno','xyz');</codeblock>
         they are primarily used in new SQL syntax topics underneath that parent topic.
       </p>
 
+      <p id="tablesample_caveat" rev="IMPALA-5309">
+        The <codeph>TABLESAMPLE</codeph> clause of the <codeph>SELECT</codeph>
+        statement does not apply to a table reference derived from a view, a subquery,
+        or anything other than a real base table. This clause only works for tables
+        backed by HDFS or HDFS-like data files, therefore it does not apply to Kudu or
+        HBase tables.
+      </p>
+
+      <p id="base64_charset">
+        The set of characters that can be generated as output
+        from <codeph>base64encode()</codeph>, or specified in
+        the argument string to <codeph>base64decode()</codeph>,
+        are the ASCII uppercase and lowercase letters (A-Z, a-z),
+        digits (0-9), and the punctuation characters
+        <codeph>+</codeph>, <codeph>/</codeph>, and <codeph>=</codeph>.
+      </p>
+
+      <p id="base64_error_handling">
+        If the argument string to <codeph>base64decode()</codeph> does
+        not represent a valid base64-encoded value, subject to the
+        constraints of the Impala implementation such as the allowed
+        character set, the function returns <codeph>NULL</codeph>.
+      </p>
+
+      <p id="base64_use_cases">
+        The functions <codeph>base64encode()</codeph> and
+        <codeph>base64decode()</codeph> are typically used
+        in combination, to store in an Impala table string data that is
+        problematic to store or transmit. For example, you could use
+        these functions to store string data that uses an encoding
+        other than UTF-8, or to transform the values in contexts that
+        require ASCII values, such as for partition key columns.
+        Keep in mind that base64-encoded values produce different results
+        for string functions such as <codeph>LENGTH()</codeph>,
+        <codeph>MAX()</codeph>, and <codeph>MIN()</codeph> than when
+        those functions are called with the unencoded string values.
+      </p>
+
+      <p id="base64_alignment">
+        All return values produced by <codeph>base64encode()</codeph>
+        are a multiple of 4 bytes in length. All argument values
+        supplied to <codeph>base64decode()</codeph> must also be a
+        multiple of 4 bytes in length. If a base64-encoded value
+        would otherwise have a different length, it can be padded
+        with trailing <codeph>=</codeph> characters to reach a length
+        that is a multiple of 4 bytes.
+      </p>
+
+      <p id="base64_examples">
+        The following examples show how to use <codeph>base64encode()</codeph>
+        and <codeph>base64decode()</codeph> together to store and retrieve
+        string values:
+<codeblock>
+-- An arbitrary string can be encoded in base 64.
+-- The length of the output is a multiple of 4 bytes,
+-- padded with trailing = characters if necessary.
+select base64encode('hello world') as encoded,
+  length(base64encode('hello world')) as length;
++------------------+--------+
+| encoded          | length |
++------------------+--------+
+| aGVsbG8gd29ybGQ= | 16     |
++------------------+--------+
+
+-- Passing an encoded value to base64decode() produces
+-- the original value.
+select base64decode('aGVsbG8gd29ybGQ=') as decoded;
++-------------+
+| decoded     |
++-------------+
+| hello world |
++-------------+
+</codeblock>
+
+      These examples demonstrate incorrect encoded values that
+      produce <codeph>NULL</codeph> return values when decoded:
+
+<codeblock>
+-- The input value to base64decode() must be a multiple of 4 bytes.
+-- In this case, leaving off the trailing = padding character
+-- produces a NULL return value.
+select base64decode('aGVsbG8gd29ybGQ') as decoded;
++---------+
+| decoded |
++---------+
+| NULL    |
++---------+
+WARNINGS: UDF WARNING: Invalid base64 string; input length is 15,
+  which is not a multiple of 4.
+
+-- The input to base64decode() can only contain certain characters.
+-- The $ character in this case causes a NULL return value.
+select base64decode('abc$');
++----------------------+
+| base64decode('abc$') |
++----------------------+
+| NULL                 |
++----------------------+
+WARNINGS: UDF WARNING: Could not base64 decode input in space 4; actual output length 0
+</codeblock>
+
+      These examples demonstrate <q>round-tripping</q> of an original string to an
+      encoded string, and back again. This technique is applicable if the original
+      source is in an unknown encoding, or if some intermediate processing stage
+      might cause national characters to be misrepresented:
+
+<codeblock>
+select 'circumflex accents: â, ê, î, ô, û' as original,
+  base64encode('circumflex accents: â, ê, î, ô, û') as encoded;
++-----------------------------------+------------------------------------------------------+
+| original                          | encoded                                              |
++-----------------------------------+------------------------------------------------------+
+| circumflex accents: â, ê, î, ô, û | Y2lyY3VtZmxleCBhY2NlbnRzOiDDoiwgw6osIMOuLCDDtCwgw7s= |
++-----------------------------------+------------------------------------------------------+
+
+select base64encode('circumflex accents: â, ê, î, ô, û') as encoded,
+  base64decode(base64encode('circumflex accents: â, ê, î, ô, û')) as decoded;
++------------------------------------------------------+-----------------------------------+
+| encoded                                              | decoded                           |
++------------------------------------------------------+-----------------------------------+
+| Y2lyY3VtZmxleCBhY2NlbnRzOiDDoiwgw6osIMOuLCDDtCwgw7s= | circumflex accents: â, ê, î, ô, û |
++------------------------------------------------------+-----------------------------------+
+</codeblock>
+      </p>
+
 <codeblock id="parquet_fallback_schema_resolution_example"><![CDATA[
 create database schema_evolution;
 use schema_evolution;
@@ -1197,7 +1322,6 @@ drop database temp;
         <ph conref="../shared/impala_common.xml#common/cast_int_to_timestamp"/>
       </p>
 
-
       <p>
         <ph id="cast_int_to_timestamp">Casting an integer or floating-point value <codeph>N</codeph> to
         <codeph>TIMESTAMP</codeph> produces a value that is <codeph>N</codeph> seconds past the start of the epoch
@@ -1212,6 +1336,31 @@ drop database temp;
         other administrative contexts. See <xref keyref="sg_redaction"/> for details.
       </p>
 
+      <p id="cs_or_cis">
+        For a particular table, use either <codeph>COMPUTE STATS</codeph> or
+        <codeph>COMPUTE INCREMENTAL STATS</codeph>, but never combine the two or alternate
+        between them. If you switch from <codeph>COMPUTE STATS</codeph> to
+        <codeph>COMPUTE INCREMENTAL STATS</codeph> during the lifetime of a table, or vice
+        versa, drop all statistics (by running both <codeph>DROP STATS</codeph> and
+        <codeph>DROP INCREMENTAL STATS</codeph>) before making the switch.
+      </p>
+
+      <p id="incremental_stats_after_full">
+        When you run <codeph>COMPUTE INCREMENTAL STATS</codeph> on a table for the first time,
+        the statistics are computed again from scratch regardless of whether the table already
+        has statistics. Therefore, expect a one-time resource-intensive operation
+        for scanning the entire table when running <codeph>COMPUTE INCREMENTAL STATS</codeph>
+        for the first time on a given table.
+      </p>
+
+      <p id="incremental_stats_caveats">
+        For a table with a huge number of partitions and many columns, the approximately 400 bytes
+        of metadata per column per partition can add up to significant memory overhead, as it must
+        be cached on the <cmdname>catalogd</cmdname> host and on every <cmdname>impalad</cmdname> host
+        that is eligible to be a coordinator. If this metadata for all tables combined exceeds 2 GB,
+        you might experience service downtime.
+      </p>
+
       <p id="incremental_partition_spec">
         The <codeph>PARTITION</codeph> clause is only allowed in combination with the <codeph>INCREMENTAL</codeph>
         clause. It is optional for <codeph>COMPUTE INCREMENTAL STATS</codeph>, and required for <codeph>DROP
@@ -1220,6 +1369,108 @@ drop database temp;
         <codeph>DROP INCREMENTAL STATS</codeph> statement, you must include all the partitioning columns in the
         specification, and specify constant values for all the partition key columns.
       </p>
+
+<codeblock id="compute_stats_walkthrough">-- Initially the table has no incremental stats, as indicated
+-- 'false' under Incremental stats.
+show table stats item_partitioned;
++-------------+-------+--------+----------+--------------+---------+------------------
+| i_category  | #Rows | #Files | Size     | Bytes Cached | Format  | Incremental stats
++-------------+-------+--------+----------+--------------+---------+------------------
+| Books       | -1    | 1      | 223.74KB | NOT CACHED   | PARQUET | false
+| Children    | -1    | 1      | 230.05KB | NOT CACHED   | PARQUET | false
+| Electronics | -1    | 1      | 232.67KB | NOT CACHED   | PARQUET | false
+| Home        | -1    | 1      | 232.56KB | NOT CACHED   | PARQUET | false
+| Jewelry     | -1    | 1      | 223.72KB | NOT CACHED   | PARQUET | false
+| Men         | -1    | 1      | 231.25KB | NOT CACHED   | PARQUET | false
+| Music       | -1    | 1      | 237.90KB | NOT CACHED   | PARQUET | false
+| Shoes       | -1    | 1      | 234.90KB | NOT CACHED   | PARQUET | false
+| Sports      | -1    | 1      | 227.97KB | NOT CACHED   | PARQUET | false
+| Women       | -1    | 1      | 226.27KB | NOT CACHED   | PARQUET | false
+| Total       | -1    | 10     | 2.25MB   | 0B           |         |
++-------------+-------+--------+----------+--------------+---------+------------------
+
+-- After the first COMPUTE INCREMENTAL STATS,
+-- all partitions have stats. The first
+-- COMPUTE INCREMENTAL STATS scans the whole
+-- table, discarding any previous stats from
+-- a traditional COMPUTE STATS statement.
+compute incremental stats item_partitioned;
++-------------------------------------------+
+| summary                                   |
++-------------------------------------------+
+| Updated 10 partition(s) and 21 column(s). |
++-------------------------------------------+
+show table stats item_partitioned;
++-------------+-------+--------+----------+--------------+---------+------------------
+| i_category  | #Rows | #Files | Size     | Bytes Cached | Format  | Incremental stats
++-------------+-------+--------+----------+--------------+---------+------------------
+| Books       | 1733  | 1      | 223.74KB | NOT CACHED   | PARQUET | true
+| Children    | 1786  | 1      | 230.05KB | NOT CACHED   | PARQUET | true
+| Electronics | 1812  | 1      | 232.67KB | NOT CACHED   | PARQUET | true
+| Home        | 1807  | 1      | 232.56KB | NOT CACHED   | PARQUET | true
+| Jewelry     | 1740  | 1      | 223.72KB | NOT CACHED   | PARQUET | true
+| Men         | 1811  | 1      | 231.25KB | NOT CACHED   | PARQUET | true
+| Music       | 1860  | 1      | 237.90KB | NOT CACHED   | PARQUET | true
+| Shoes       | 1835  | 1      | 234.90KB | NOT CACHED   | PARQUET | true
+| Sports      | 1783  | 1      | 227.97KB | NOT CACHED   | PARQUET | true
+| Women       | 1790  | 1      | 226.27KB | NOT CACHED   | PARQUET | true
+| Total       | 17957 | 10     | 2.25MB   | 0B           |         |
++-------------+-------+--------+----------+--------------+---------+------------------
+
+-- Add a new partition...
+alter table item_partitioned add partition (i_category='Camping');
+-- Add or replace files in HDFS outside of Impala,
+-- rendering the stats for a partition obsolete.
+!import_data_into_sports_partition.sh
+refresh item_partitioned;
+drop incremental stats item_partitioned partition (i_category='Sports');
+-- Now some partitions have incremental stats
+-- and some do not.
+show table stats item_partitioned;
++-------------+-------+--------+----------+--------------+---------+------------------
+| i_category  | #Rows | #Files | Size     | Bytes Cached | Format  | Incremental stats
++-------------+-------+--------+----------+--------------+---------+------------------
+| Books       | 1733  | 1      | 223.74KB | NOT CACHED   | PARQUET | true
+| Camping     | -1    | 1      | 408.02KB | NOT CACHED   | PARQUET | false
+| Children    | 1786  | 1      | 230.05KB | NOT CACHED   | PARQUET | true
+| Electronics | 1812  | 1      | 232.67KB | NOT CACHED   | PARQUET | true
+| Home        | 1807  | 1      | 232.56KB | NOT CACHED   | PARQUET | true
+| Jewelry     | 1740  | 1      | 223.72KB | NOT CACHED   | PARQUET | true
+| Men         | 1811  | 1      | 231.25KB | NOT CACHED   | PARQUET | true
+| Music       | 1860  | 1      | 237.90KB | NOT CACHED   | PARQUET | true
+| Shoes       | 1835  | 1      | 234.90KB | NOT CACHED   | PARQUET | true
+| Sports      | -1    | 1      | 227.97KB | NOT CACHED   | PARQUET | false
+| Women       | 1790  | 1      | 226.27KB | NOT CACHED   | PARQUET | true
+| Total       | 17957 | 11     | 2.65MB   | 0B           |         |
++-------------+-------+--------+----------+--------------+---------+------------------
+
+-- After another COMPUTE INCREMENTAL STATS,
+-- all partitions have incremental stats, and only the 2
+-- partitions without incremental stats were scanned.
+compute incremental stats item_partitioned;
++------------------------------------------+
+| summary                                  |
++------------------------------------------+
+| Updated 2 partition(s) and 21 column(s). |
++------------------------------------------+
+show table stats item_partitioned;
++-------------+-------+--------+----------+--------------+---------+------------------
+| i_category  | #Rows | #Files | Size     | Bytes Cached | Format  | Incremental stats
++-------------+-------+--------+----------+--------------+---------+------------------
+| Books       | 1733  | 1      | 223.74KB | NOT CACHED   | PARQUET | true
+| Camping     | 5328  | 1      | 408.02KB | NOT CACHED   | PARQUET | true
+| Children    | 1786  | 1      | 230.05KB | NOT CACHED   | PARQUET | true
+| Electronics | 1812  | 1      | 232.67KB | NOT CACHED   | PARQUET | true
+| Home        | 1807  | 1      | 232.56KB | NOT CACHED   | PARQUET | true
+| Jewelry     | 1740  | 1      | 223.72KB | NOT CACHED   | PARQUET | true
+| Men         | 1811  | 1      | 231.25KB | NOT CACHED   | PARQUET | true
+| Music       | 1860  | 1      | 237.90KB | NOT CACHED   | PARQUET | true
+| Shoes       | 1835  | 1      | 234.90KB | NOT CACHED   | PARQUET | true
+| Sports      | 1783  | 1      | 227.97KB | NOT CACHED   | PARQUET | true
+| Women       | 1790  | 1      | 226.27KB | NOT CACHED   | PARQUET | true
+| Total       | 17957 | 11     | 2.65MB   | 0B           |         |
++-------------+-------+--------+----------+--------------+---------+------------------
+</codeblock>
 
       <p id="udf_persistence_restriction" rev="2.5.0 IMPALA-1748">
         In <keyword keyref="impala25_full"/> and higher, Impala UDFs and UDAs written in C++ are persisted in the metastore database.
@@ -1613,6 +1864,10 @@ explain select s from yy2 where year in (select year from yy where year between 
         <b>Type:</b> integer
       </p>
 
+      <p id="default_blurb">
+        <b>Default:</b>
+      </p>
+
       <p id="default_false">
         <b>Default:</b> <codeph>false</codeph>
       </p>
@@ -1627,6 +1882,12 @@ explain select s from yy2 where year in (select year from yy where year between 
 
       <p id="default_true_1">
         <b>Default:</b> <codeph>true</codeph> (shown as 1 in output of <codeph>SET</codeph> statement)
+      </p>
+
+      <p id="units_blurb">
+        <b>Units:</b> A numeric argument represents a size in bytes; you can also use a suffix of <codeph>m</codeph>
+        or <codeph>mb</codeph> for megabytes, or <codeph>g</codeph> or <codeph>gb</codeph> for gigabytes. If you
+        specify a value with unrecognized formats, subsequent queries fail with an error.
       </p>
 
       <p id="odd_return_type_string">
@@ -2526,6 +2787,9 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
         each value.
       </p>
 
+      <p rev="2.9.0" id="added_in_2100">
+        <b>Added in:</b> <keyword keyref="impala2100"/>
+      </p>
       <p rev="2.9.0" id="added_in_290">
         <b>Added in:</b> <keyword keyref="impala290"/>
       </p>
@@ -2597,7 +2861,14 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
         are supported in all Impala versions. The <codeph>CROSS JOIN</codeph> operator is available in Impala 1.2.2
         and higher. During performance tuning, you can override the reordering of join clauses that Impala does
         internally by including the keyword <codeph>STRAIGHT_JOIN</codeph> immediately after the
-        <codeph>SELECT</codeph> keyword
+        <codeph>SELECT</codeph> and any <codeph>DISTINCT</codeph> or <codeph>ALL</codeph> keywords.
+      </p>
+
+      <p id="straight_join_nested_queries" rev="IMPALA-6083">
+        The <codeph>STRAIGHT_JOIN</codeph> hint affects the join order of table references in the query
+        block containing the hint. It does not affect the join order of nested queries, such as views,
+        inline views, or <codeph>WHERE</codeph>-clause subqueries. To use this hint for performance
+        tuning of complex queries, apply the hint to all query blocks that need a fixed join order.
       </p>
 
       <p id="catalog_server_124">

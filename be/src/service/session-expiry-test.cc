@@ -42,6 +42,8 @@ DECLARE_int32(beeswax_port);
 // that doesn't depend upon being rescheduled in a timely fashion.
 
 TEST(SessionTest, TestExpiry) {
+  const int NUM_SESSIONS = 5;
+  const int MAX_IDLE_TIMEOUT_MS = 4000;
   FLAGS_idle_session_timeout = 1;
   InProcessStatestore* ips = InProcessStatestore::StartWithEphemeralPorts();
   InProcessImpalaServer* impala =
@@ -60,11 +62,11 @@ TEST(SessionTest, TestExpiry) {
   EXPECT_EQ(beeswax_session_metric->value(), 0L);
 
   {
-    scoped_ptr<ThriftClient<ImpalaServiceClient>> beeswax_clients[5];
-    scoped_ptr<ThriftClient<ImpalaHiveServer2ServiceClient>> hs2_clients[5];
+    scoped_ptr<ThriftClient<ImpalaServiceClient>> beeswax_clients[NUM_SESSIONS];
+    scoped_ptr<ThriftClient<ImpalaHiveServer2ServiceClient>> hs2_clients[NUM_SESSIONS];
 
     // Create five Beeswax clients and five HS2 clients (each HS2 gets one session each)
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < NUM_SESSIONS; ++i) {
       beeswax_clients[i].reset(new ThriftClient<ImpalaServiceClient>(
               "localhost", impala->beeswax_port()));
       EXPECT_OK(beeswax_clients[i]->Open());
@@ -78,14 +80,16 @@ TEST(SessionTest, TestExpiry) {
     }
 
     int64_t start = UnixMillis();
-    while (expired_metric->value() != 10 && UnixMillis() - start < 5000) {
+    while (expired_metric->value() != NUM_SESSIONS * 2 &&
+      UnixMillis() - start < MAX_IDLE_TIMEOUT_MS) {
       SleepForMs(100);
     }
 
-    ASSERT_EQ(expired_metric->value(), 10L) << "Sessions did not expire within 5s";
-    ASSERT_EQ(beeswax_session_metric->value(), 5L)
+    ASSERT_EQ(expired_metric->value(), NUM_SESSIONS * 2)
+        << "Sessions did not expire within "<< MAX_IDLE_TIMEOUT_MS / 1000 <<" secs";
+    ASSERT_EQ(beeswax_session_metric->value(), NUM_SESSIONS)
         << "Beeswax sessions unexpectedly closed after expiration";
-    ASSERT_EQ(hs2_session_metric->value(), 5L)
+    ASSERT_EQ(hs2_session_metric->value(), NUM_SESSIONS)
         << "HiveServer2 sessions unexpectedly closed after expiration";
 
     TPingImpalaServiceResp resp;

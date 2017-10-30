@@ -215,7 +215,7 @@ PLAN-ROOT SINK
 |
 |--01:SCAN HDFS [functional.alltypessmall]
 |     partitions=2/4 files=2 size=3.17KB
-|     predicates: functional.alltypessmall.id + 15 = 27, functional.alltypessmall.string_col = '15'
+|     predicates: functional.alltypessmall.string_col = '15', functional.alltypessmall.id + 15 = 27
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=5/11 files=5 size=372.38KB
@@ -235,7 +235,7 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
 |     partitions=2/4 files=2 size=3.17KB
-|     predicates: functional.alltypessmall.id + 15 = 27, functional.alltypessmall.string_col = '15'
+|     predicates: functional.alltypessmall.string_col = '15', functional.alltypessmall.id + 15 = 27
 |
 03:EXCHANGE [HASH(id,int_col)]
 |
@@ -367,31 +367,33 @@ NODE 2:
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-08:EXCHANGE [UNPARTITIONED]
+09:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: c.id = a.tinyint_col
 |  other predicates: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000
 |  runtime filters: RF000 <- a.tinyint_col
 |
-|--07:EXCHANGE [HASH(a.tinyint_col)]
+|--08:EXCHANGE [HASH(a.tinyint_col)]
 |  |
-|  03:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: a.smallint_col = b.id
-|  |  runtime filters: RF001 <- b.id
+|  03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  |  hash predicates: b.id = a.smallint_col
+|  |  runtime filters: RF001 <- a.smallint_col
 |  |
-|  |--05:EXCHANGE [BROADCAST]
+|  |--06:EXCHANGE [HASH(a.smallint_col)]
 |  |  |
-|  |  02:SCAN HDFS [functional.alltypessmall b]
-|  |     partitions=4/4 files=4 size=6.32KB
-|  |     predicates: b.float_col > 4.5
+|  |  01:SCAN HDFS [functional.alltypesagg a]
+|  |     partitions=1/11 files=1 size=73.39KB
+|  |     predicates: a.int_col > 899
 |  |
-|  01:SCAN HDFS [functional.alltypesagg a]
-|     partitions=1/11 files=1 size=73.39KB
-|     predicates: a.int_col > 899
-|     runtime filters: RF001 -> a.smallint_col
+|  05:EXCHANGE [HASH(b.id)]
+|  |
+|  02:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 files=4 size=6.32KB
+|     predicates: b.float_col > 4.5
+|     runtime filters: RF001 -> b.id
 |
-06:EXCHANGE [HASH(c.id)]
+07:EXCHANGE [HASH(c.id)]
 |
 00:SCAN HDFS [functional.alltypessmall c]
    partitions=4/4 files=4 size=6.32KB
@@ -839,31 +841,33 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-08:EXCHANGE [UNPARTITIONED]
+09:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: c.id = a.tinyint_col
 |  other predicates: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000
 |  runtime filters: RF000 <- a.tinyint_col
 |
-|--07:EXCHANGE [HASH(a.tinyint_col)]
+|--08:EXCHANGE [HASH(a.tinyint_col)]
 |  |
-|  02:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: a.smallint_col = b.id
-|  |  runtime filters: RF001 <- b.id
+|  02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  |  hash predicates: b.id = a.smallint_col
+|  |  runtime filters: RF001 <- a.smallint_col
 |  |
-|  |--05:EXCHANGE [BROADCAST]
+|  |--06:EXCHANGE [HASH(a.smallint_col)]
 |  |  |
-|  |  01:SCAN HDFS [functional.alltypessmall b]
-|  |     partitions=4/4 files=4 size=6.32KB
-|  |     predicates: b.float_col > 4.5
+|  |  00:SCAN HDFS [functional.alltypesagg a]
+|  |     partitions=1/11 files=1 size=73.39KB
+|  |     predicates: a.int_col > 899
 |  |
-|  00:SCAN HDFS [functional.alltypesagg a]
-|     partitions=1/11 files=1 size=73.39KB
-|     predicates: a.int_col > 899
-|     runtime filters: RF001 -> a.smallint_col
+|  05:EXCHANGE [HASH(b.id)]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 files=4 size=6.32KB
+|     predicates: b.float_col > 4.5
+|     runtime filters: RF001 -> b.id
 |
-06:EXCHANGE [HASH(c.id)]
+07:EXCHANGE [HASH(c.id)]
 |
 03:SCAN HDFS [functional.alltypessmall c]
    partitions=4/4 files=4 size=6.32KB

@@ -386,26 +386,19 @@ struct TQueryExecRequest {
   // AS SELECT), these may differ.
   7: required Types.TStmtType stmt_type
 
-  // Estimated per-host peak memory consumption in bytes. Used for resource management.
-  8: optional i64 per_host_mem_estimate
-
-  // Minimum query-wide buffer reservation required per host in bytes. This is the peak
-  // minimum reservation that may be required by the concurrently-executing operators at
-  // any point in query execution. It may be less than the initial reservation total
-  // claims (below) if execution of some operators never overlaps, which allows reuse of
-  // reservations.
-  9: optional i64 per_host_min_reservation;
-
-  // Total of the initial buffer reservations that we expect to be claimed per host.
-  // I.e. the sum over all operators in all fragment instances that execute on that host.
-  // Measured in bytes.
-  10: optional i64 per_host_initial_reservation_total_claims;
-
   // List of replica hosts.  Used by the host_idx field of TScanRangeLocation.
-  11: required list<Types.TNetworkAddress> host_list
+  9: required list<Types.TNetworkAddress> host_list
 
   // Column lineage graph
-  12: optional LineageGraph.TLineageGraph lineage_graph
+  10: optional LineageGraph.TLineageGraph lineage_graph
+
+  // Estimated per-host peak memory consumption in bytes. Used by admission control.
+  // TODO: Remove when AC doesn't rely on this any more.
+  8: optional i64 per_host_mem_estimate
+
+  // Maximum possible (in the case all fragments are scheduled on all hosts with
+  // max DOP) minimum reservation required per host, in bytes.
+  11: optional i64 max_per_host_min_reservation;
 }
 
 enum TCatalogOpType {

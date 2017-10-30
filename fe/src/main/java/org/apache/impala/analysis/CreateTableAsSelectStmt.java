@@ -49,8 +49,6 @@ import com.google.common.collect.Lists;
  * select statement.
  */
 public class CreateTableAsSelectStmt extends StatementBase {
-  private final CreateTableStmt createStmt_;
-
   // List of partition columns from the PARTITIONED BY (...) clause. Set to null if no
   // partition was given.
   private final List<String> partitionKeys_;
@@ -58,6 +56,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
   /////////////////////////////////////////
   // BEGIN: Members that need to be reset()
 
+  private final CreateTableStmt createStmt_;
   private final InsertStmt insertStmt_;
 
   // END: Members that need to be reset()
@@ -234,6 +233,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
   @Override
   public void reset() {
     super.reset();
+    createStmt_.reset();
     insertStmt_.reset();
   }
 }

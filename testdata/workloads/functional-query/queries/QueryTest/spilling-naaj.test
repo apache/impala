@@ -1,0 +1,102 @@
+====
+---- QUERY
+# Also see related tests in spilling-naaj-no-deny-reservation.test
+#
+# =======================================================================================
+# NAAJ QUERY 2: many probe rows with NULLs in the join key.
+# =======================================================================================
+# This produces the same results as:
+#   select l_orderkey, l_partkey, l_suppkey, l_linenumber
+#   from lineitem
+#   where l_orderkey % 2 = 1 and l_partkey not in (
+#       select p_partkey
+#       from part
+#       where p_retailprice != l_extendedprice * l_tax)
+#   order by 1,2,3,4 limit 5
+#
+# Which produces the same results as:
+#   select l_orderkey, l_partkey, l_suppkey, l_linenumber
+#   from lineitem
+#   join part on l_partkey = p_partkey
+#   where l_orderkey % 2 = 1 and p_retailprice = l_extendedprice * l_tax
+#   order by 1,2,3,4 limit 5
+#
+set buffer_pool_limit=10m;
+select l_orderkey, l_partkey, l_suppkey, l_linenumber
+from lineitem
+where if(l_orderkey % 2 = 0, NULL, l_partkey) not in (
+  select p_partkey
+  from part
+  where p_retailprice != l_extendedprice * l_tax)
+order by 1,2,3,4 limit 5
+---- RESULTS
+965,107207,9718,1
+1351,107227,7228,1
+1505,122702,5215,2
+1601,174374,1926,2
+1767,22387,4890,4
+---- TYPES
+BIGINT,BIGINT,BIGINT,INT
+====
+---- QUERY
+# Execute NAAJ query 2 in-memory only without enough memory to complete.
+set scratch_limit=0;
+set buffer_pool_limit=10m;
+select l_orderkey, l_partkey, l_suppkey, l_linenumber
+from lineitem
+where if(l_orderkey % 2 = 0, NULL, l_partkey) not in (
+  select p_partkey
+    from part
+      where p_retailprice != l_extendedprice * l_tax)
+      order by 1,2,3,4 limit 5
+---- CATCH
+Could not free memory by spilling to disk: scratch_limit is 0
+====
+---- QUERY
+# =======================================================================================
+# NAAJ QUERY 3: many non-NULL probe rows that didn't match a build row.
+# =======================================================================================
+# The correlated subquery includes a NULL when l_extended_price * l_tax != p_retailprice
+# and all the even p_partkey values except 2. Thus this query returns the same results:
+#
+#   select l_orderkey, l_partkey, l_suppkey, l_linenumber
+#   from lineitem
+#   join part on l_extendedprice * l_tax = p_retailprice
+#   where p_partkey = 2 and l_partkey % 2 = 1
+#   order by 1,2,3,4
+#
+set buffer_pool_limit=10m;
+select l_orderkey, l_partkey, l_suppkey, l_linenumber
+from lineitem
+where l_partkey not in (
+  select if(p_partkey = 2, NULL, p_partkey)
+  from part
+  where p_partkey % 2 = 0 and p_retailprice != l_extendedprice * l_tax)
+order by 1,2,3,4
+---- RESULTS
+3178597,1001,3502,1
+4801283,199001,9002,1
+4958784,116009,1032,2
+---- TYPES
+BIGINT,BIGINT,BIGINT,INT
+====
+---- QUERY
+# =======================================================================================
+# NAAJ QUERY 4: many of both kinds of probe rows (NULL and non-NULL/unmatched)
+# =======================================================================================
+# This returns one less row than the previous query because l_partkey=116009 is
+# replaced with a NULL.
+set buffer_pool_limit=10m;
+select l_orderkey, l_partkey, l_suppkey, l_linenumber
+from lineitem
+where if(l_partkey % 5 != 1, NULL, l_partkey) not in (
+  select if(p_partkey = 2, NULL, p_partkey)
+  from part
+  where p_partkey % 2 = 0 and p_retailprice != l_extendedprice * l_tax)
+order by 1,2,3,4
+---- RESULTS
+3178597,1001,3502,1
+4801283,199001,9002,1
+---- TYPES
+BIGINT,BIGINT,BIGINT,INT
+====

@@ -41,7 +41,7 @@ class FilterStats {
   /// Constructs a new FilterStats object with a profile that is a child of
   /// 'profile'. 'is_partition_filter' determines whether partition-level counters are
   /// registered.
-  FilterStats(RuntimeProfile* runtime_profile, bool is_partition_filter);
+  FilterStats(RuntimeProfile* runtime_profile);
 
   static const std::string ROW_GROUPS_KEY;
   static const std::string FILES_KEY;
@@ -100,7 +100,7 @@ struct FilterContext {
   /// Clones this FilterContext for use in a multi-threaded context (i.e. by scanner
   /// threads).
   Status CloneFrom(const FilterContext& from, ObjectPool* pool, RuntimeState* state,
-      MemPool* mem_pool);
+      MemPool* expr_perm_pool, MemPool* expr_results_pool);
 
   /// Evaluates 'row' with 'expr_eval' with the resulting value being checked
   /// against runtime filter 'filter' for matches. Returns true if 'row' finds
@@ -115,7 +115,19 @@ struct FilterContext {
   /// argument to RuntimeFilter::Eval() with a constant. On success, 'fn' is set to
   /// the generated function. On failure, an error status is returned.
   static Status CodegenEval(LlvmCodeGen* codegen, ScalarExpr* filter_expr,
-     llvm::Function** fn) WARN_UNUSED_RESULT;
+      llvm::Function** fn) WARN_UNUSED_RESULT;
+
+  /// Codegen Insert() by codegen'ing the expression 'filter_expr', replacing the type
+  /// argument to RawValue::GetHashValue() with a constant, and calling into the correct
+  /// version of BloomFilter::Insert(), depending on the presence of AVX.  On success,
+  /// 'fn' is set to the generated function. On failure, an error status is returned.
+  static Status CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_expr,
+      llvm::Function** fn) WARN_UNUSED_RESULT;
+
+  // Returns if there is any always_false filter in ctxs. If there is, the counter stats
+  // is updated.
+  static bool CheckForAlwaysFalse(const std::string& stats_name,
+      const std::vector<FilterContext>& ctxs);
 };
 
 }

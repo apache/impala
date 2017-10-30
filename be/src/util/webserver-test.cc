@@ -20,11 +20,13 @@
 #include <boost/bind.hpp>
 #include <boost/lexical_cast.hpp>
 #include <gutil/strings/substitute.h>
+#include <openssl/ssl.h>
 
+#include "common/init.h"
 #include "testutil/gtest-util.h"
+#include "testutil/scoped-flag-setter.h"
 #include "util/webserver.h"
 #include "util/default-path-handlers.h"
-#include "common/init.h"
 
 DECLARE_int32(webserver_port);
 DECLARE_string(webserver_password_file);
@@ -32,6 +34,8 @@ DECLARE_string(webserver_certificate_file);
 DECLARE_string(webserver_private_key_file);
 DECLARE_string(webserver_private_key_password_cmd);
 DECLARE_string(webserver_x_frame_options);
+DECLARE_string(ssl_cipher_list);
+DECLARE_string(ssl_minimum_version);
 
 #include "common/names.h"
 
@@ -201,25 +205,10 @@ TEST(Webserver, EscapeErrorUriTest) {
       string::npos);
 }
 
-template<typename T>
-struct ScopedFlagSetter {
-  T* flag;
-  T old_val;
-  ScopedFlagSetter(T* f, T new_val) {
-    flag = f;
-    old_val = *f;
-    *f = new_val;
-  }
-
-  ~ScopedFlagSetter() {
-    *flag = old_val;
-  }
-};
-
 TEST(Webserver, SslTest) {
-  ScopedFlagSetter<string> certificate(&FLAGS_webserver_certificate_file,
+  auto cert = ScopedFlagSetter<string>::Make(&FLAGS_webserver_certificate_file,
       Substitute("$0/be/src/testutil/server-cert.pem", getenv("IMPALA_HOME")));
-  ScopedFlagSetter<string> private_key(&FLAGS_webserver_private_key_file,
+  auto key = ScopedFlagSetter<string>::Make(&FLAGS_webserver_private_key_file,
       Substitute("$0/be/src/testutil/server-key.pem", getenv("IMPALA_HOME")));
 
   Webserver webserver(FLAGS_webserver_port);
@@ -227,9 +216,9 @@ TEST(Webserver, SslTest) {
 }
 
 TEST(Webserver, SslBadCertTest) {
-  ScopedFlagSetter<string> certificate(&FLAGS_webserver_certificate_file,
+  auto cert = ScopedFlagSetter<string>::Make(&FLAGS_webserver_certificate_file,
       Substitute("$0/be/src/testutil/invalid-server-cert.pem", getenv("IMPALA_HOME")));
-  ScopedFlagSetter<string> private_key(&FLAGS_webserver_private_key_file,
+  auto key = ScopedFlagSetter<string>::Make(&FLAGS_webserver_private_key_file,
       Substitute("$0/be/src/testutil/server-key.pem", getenv("IMPALA_HOME")));
 
   Webserver webserver(FLAGS_webserver_port);
@@ -237,11 +226,11 @@ TEST(Webserver, SslBadCertTest) {
 }
 
 TEST(Webserver, SslWithPrivateKeyPasswordTest) {
-  ScopedFlagSetter<string> certificate(&FLAGS_webserver_certificate_file,
+  auto cert = ScopedFlagSetter<string>::Make(&FLAGS_webserver_certificate_file,
       Substitute("$0/be/src/testutil/server-cert.pem", getenv("IMPALA_HOME")));
-  ScopedFlagSetter<string> private_key(&FLAGS_webserver_private_key_file,
+  auto key = ScopedFlagSetter<string>::Make(&FLAGS_webserver_private_key_file,
       Substitute("$0/be/src/testutil/server-key-password.pem", getenv("IMPALA_HOME")));
-  ScopedFlagSetter<string> password_cmd(
+  auto cmd = ScopedFlagSetter<string>::Make(
       &FLAGS_webserver_private_key_password_cmd, "echo password");
 
   Webserver webserver(FLAGS_webserver_port);
@@ -249,22 +238,92 @@ TEST(Webserver, SslWithPrivateKeyPasswordTest) {
 }
 
 TEST(Webserver, SslBadPrivateKeyPasswordTest) {
-  ScopedFlagSetter<string> certificate(&FLAGS_webserver_certificate_file,
+  auto cert = ScopedFlagSetter<string>::Make(&FLAGS_webserver_certificate_file,
       Substitute("$0/be/src/testutil/server-cert.pem", getenv("IMPALA_HOME")));
-  ScopedFlagSetter<string> private_key(&FLAGS_webserver_private_key_file,
+  auto key = ScopedFlagSetter<string>::Make(&FLAGS_webserver_private_key_file,
       Substitute("$0/be/src/testutil/server-key-password.pem", getenv("IMPALA_HOME")));
-  ScopedFlagSetter<string> password_cmd(
+  auto cmd = ScopedFlagSetter<string>::Make(
       &FLAGS_webserver_private_key_password_cmd, "echo wrongpassword");
 
   Webserver webserver(FLAGS_webserver_port);
   ASSERT_FALSE(webserver.Start().ok());
 }
 
+TEST(Webserver, SslCipherSuite) {
+  auto cert = ScopedFlagSetter<string>::Make(&FLAGS_webserver_certificate_file,
+      Substitute("$0/be/src/testutil/server-cert.pem", getenv("IMPALA_HOME")));
+  auto key = ScopedFlagSetter<string>::Make(&FLAGS_webserver_private_key_file,
+      Substitute("$0/be/src/testutil/server-key-password.pem", getenv("IMPALA_HOME")));
+  auto cmd = ScopedFlagSetter<string>::Make(
+      &FLAGS_webserver_private_key_password_cmd, "echo password");
+
+  {
+    auto ciphers = ScopedFlagSetter<string>::Make(
+        &FLAGS_ssl_cipher_list, "not_a_cipher");
+    Webserver webserver(FLAGS_webserver_port);
+    ASSERT_FALSE(webserver.Start().ok());
+  }
+
+  {
+    auto ciphers = ScopedFlagSetter<string>::Make(
+        &FLAGS_ssl_cipher_list, "RC4-SHA");
+    Webserver webserver(FLAGS_webserver_port);
+    ASSERT_OK(webserver.Start());
+  }
+}
+
+TEST(Webserver, SslBadTlsVersion) {
+  auto cert = ScopedFlagSetter<string>::Make(&FLAGS_webserver_certificate_file,
+      Substitute("$0/be/src/testutil/server-cert.pem", getenv("IMPALA_HOME")));
+  auto key = ScopedFlagSetter<string>::Make(&FLAGS_webserver_private_key_file,
+      Substitute("$0/be/src/testutil/server-key-password.pem", getenv("IMPALA_HOME")));
+  auto cmd = ScopedFlagSetter<string>::Make(
+      &FLAGS_webserver_private_key_password_cmd, "echo password");
+
+  auto ssl_version = ScopedFlagSetter<string>::Make(
+      &FLAGS_ssl_minimum_version, "not_a_version");
+
+  Webserver webserver(FLAGS_webserver_port);
+  ASSERT_FALSE(webserver.Start().ok());
+}
+
+TEST(Webserver, SslGoodTlsVersion) {
+  auto cert = ScopedFlagSetter<string>::Make(&FLAGS_webserver_certificate_file,
+      Substitute("$0/be/src/testutil/server-cert.pem", getenv("IMPALA_HOME")));
+  auto key = ScopedFlagSetter<string>::Make(&FLAGS_webserver_private_key_file,
+      Substitute("$0/be/src/testutil/server-key-password.pem", getenv("IMPALA_HOME")));
+  auto cmd = ScopedFlagSetter<string>::Make(
+      &FLAGS_webserver_private_key_password_cmd, "echo password");
+
+#if OPENSSL_VERSION_NUMBER >= 0x10001000L
+  auto versions = {"tlsv1", "tlsv1.1", "tlsv1.2"};
+  vector<string> unsupported_versions = {};
+#else
+  auto versions = {"tlsv1"};
+  auto unsupported_versions = {"tlsv1.1", "tlsv1.2"};
+#endif
+  for (auto v: versions) {
+    auto ssl_version = ScopedFlagSetter<string>::Make(
+        &FLAGS_ssl_minimum_version, v);
+
+    Webserver webserver(FLAGS_webserver_port);
+    ASSERT_OK(webserver.Start());
+  }
+
+  for (auto v : unsupported_versions) {
+    auto ssl_version = ScopedFlagSetter<string>::Make(&FLAGS_ssl_minimum_version, v);
+
+    Webserver webserver(FLAGS_webserver_port);
+    EXPECT_FALSE(webserver.Start().ok()) << "Version: " << v;
+  }
+}
+
+
 TEST(Webserver, StartWithPasswordFileTest) {
   stringstream password_file;
   password_file << getenv("IMPALA_HOME") << "/be/src/testutil/htpasswd";
-  ScopedFlagSetter<string> password_flag(&FLAGS_webserver_password_file,
-      password_file.str());
+  auto password =
+      ScopedFlagSetter<string>::Make(&FLAGS_webserver_password_file, password_file.str());
 
   Webserver webserver(FLAGS_webserver_port);
   ASSERT_OK(webserver.Start());
@@ -277,8 +336,8 @@ TEST(Webserver, StartWithPasswordFileTest) {
 TEST(Webserver, StartWithMissingPasswordFileTest) {
   stringstream password_file;
   password_file << getenv("IMPALA_HOME") << "/be/src/testutil/doesntexist";
-  ScopedFlagSetter<string> password_flag(&FLAGS_webserver_password_file,
-      password_file.str());
+  auto password =
+      ScopedFlagSetter<string>::Make(&FLAGS_webserver_password_file, password_file.str());
 
   Webserver webserver(FLAGS_webserver_port);
   ASSERT_FALSE(webserver.Start().ok());
@@ -314,8 +373,8 @@ TEST(Webserver, NoFrameEmbeddingTest) {
 }
 TEST(Webserver, FrameAllowEmbeddingTest) {
   const string FRAME_TEST_PATH = "/frames_test";
-  ScopedFlagSetter<string> webserver_x_frame_options(&FLAGS_webserver_x_frame_options,
-      "ALLOWALL");
+  auto x_frame_opt =
+      ScopedFlagSetter<string>::Make(&FLAGS_webserver_x_frame_options, "ALLOWALL");
   Webserver webserver(FLAGS_webserver_port);
   Webserver::UrlCallback callback = bind<void>(FrameCallback, _1, _2);
   webserver.RegisterUrlCallback(FRAME_TEST_PATH, "raw_text.tmpl", callback);

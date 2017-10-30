@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "runtime/bufferpool/reservation-tracker.h"
+#include "runtime/bufferpool/reservation-util.h"
 #include "common/init.h"
 #include "common/object-pool.h"
 #include "runtime/mem-tracker.h"
@@ -43,7 +44,7 @@ class ReservationTrackerTest : public ::testing::Test {
 
  protected:
   RuntimeProfile* NewProfile() {
-    return obj_pool_.Add(new RuntimeProfile(&obj_pool_, "test profile"));
+    return RuntimeProfile::Create(&obj_pool_, "test profile");
   }
 
   ObjectPool obj_pool_;
@@ -284,8 +285,8 @@ TEST_F(ReservationTrackerTest, MemTrackerIntegrationTwoLevel) {
   ASSERT_EQ(0, child_mem_tracker2.consumption());
   ASSERT_EQ(0, root_mem_tracker.consumption());
   ASSERT_EQ(0, root_.GetUsedReservation());
-  child_mem_tracker1.UnregisterFromParent();
-  child_mem_tracker2.UnregisterFromParent();
+  child_mem_tracker1.Close();
+  child_mem_tracker2.Close();
 }
 
 TEST_F(ReservationTrackerTest, MemTrackerIntegrationMultiLevel) {
@@ -330,7 +331,7 @@ TEST_F(ReservationTrackerTest, MemTrackerIntegrationMultiLevel) {
           ASSERT_EQ(amount, mem_trackers[ancestor]->consumption());
         }
 
-        LOG(INFO) << "\n" << mem_trackers[0]->LogUsage();
+        LOG(INFO) << "\n" << mem_trackers[0]->LogUsage(MemTracker::UNLIMITED_DEPTH);
         reservations[level].Close();
       } else {
         ASSERT_FALSE(increased);
@@ -364,7 +365,7 @@ TEST_F(ReservationTrackerTest, MemTrackerIntegrationMultiLevel) {
 
   for (int i = HIERARCHY_DEPTH - 1; i >= 0; --i) {
     reservations[i].Close();
-    if (i != 0) mem_trackers[i]->UnregisterFromParent();
+    if (i != 0) mem_trackers[i]->Close();
   }
 }
 
@@ -469,13 +470,35 @@ TEST_F(ReservationTrackerTest, TransferReservation) {
   EXPECT_EQ(GRANDPARENT_LIMIT, root_.GetReservation());
 
   child->Close();
-  child_mem_tracker->UnregisterFromParent();
+  child_mem_tracker->Close();
   aunt->Close();
   parent->Close();
-  parent_mem_tracker->UnregisterFromParent();
+  parent_mem_tracker->Close();
   grandparent->Close();
-  grandparent_mem_tracker->UnregisterFromParent();
+  grandparent_mem_tracker->Close();
 }
+
+TEST_F(ReservationTrackerTest, ReservationUtil) {
+  const int64_t MEG = 1024 * 1024;
+  const int64_t GIG = 1024 * 1024 * 1024;
+  EXPECT_EQ(75 * MEG, ReservationUtil::RESERVATION_MEM_MIN_REMAINING);
+
+  EXPECT_EQ(0, ReservationUtil::GetReservationLimitFromMemLimit(0));
+  EXPECT_EQ(0, ReservationUtil::GetReservationLimitFromMemLimit(-1));
+  EXPECT_EQ(0, ReservationUtil::GetReservationLimitFromMemLimit(75 * MEG));
+  EXPECT_EQ(8 * GIG, ReservationUtil::GetReservationLimitFromMemLimit(10 * GIG));
+
+  EXPECT_EQ(75 * MEG, ReservationUtil::GetMinMemLimitFromReservation(0));
+  EXPECT_EQ(75 * MEG, ReservationUtil::GetMinMemLimitFromReservation(-1));
+  EXPECT_EQ(500 * MEG, ReservationUtil::GetMinMemLimitFromReservation(400 * MEG));
+  EXPECT_EQ(5 * GIG, ReservationUtil::GetMinMemLimitFromReservation(4 * GIG));
+
+  EXPECT_EQ(0, ReservationUtil::GetReservationLimitFromMemLimit(
+      ReservationUtil::GetMinMemLimitFromReservation(0)));
+  EXPECT_EQ(4 * GIG, ReservationUtil::GetReservationLimitFromMemLimit(
+      ReservationUtil::GetMinMemLimitFromReservation(4 * GIG)));
+}
+
 }
 
 IMPALA_TEST_MAIN();

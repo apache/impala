@@ -235,12 +235,14 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   ///     ReadAvroChar() which can exceed memory limit during allocation from MemPool.
   /// - this_val, pool_val, tuple_val, data_val, data_end_val: arguments to
   ///     MaterializeTuple()
+  /// - child_start / child_end: specifies to only generate a subset of the record
+  ///     schema's children
   static Status CodegenReadRecord(
-      const SchemaPath& path, const AvroSchemaElement& record, HdfsScanNodeBase* node,
-      LlvmCodeGen* codegen, void* builder, llvm::Function* fn,
-      llvm::BasicBlock* insert_before, llvm::BasicBlock* bail_out, llvm::Value* this_val,
-      llvm::Value* pool_val, llvm::Value* tuple_val, llvm::Value* data_val,
-      llvm::Value* data_end_val) WARN_UNUSED_RESULT;
+      const SchemaPath& path, const AvroSchemaElement& record, int child_start,
+      int child_end, HdfsScanNodeBase* node, LlvmCodeGen* codegen, void* builder,
+      llvm::Function* fn, llvm::BasicBlock* insert_before, llvm::BasicBlock* bail_out,
+      llvm::Value* this_val, llvm::Value* pool_val, llvm::Value* tuple_val,
+      llvm::Value* data_val, llvm::Value* data_end_val) WARN_UNUSED_RESULT;
 
   /// Creates the IR for reading an Avro scalar at builder's current insert point.
   static Status CodegenReadScalar(const AvroSchemaElement& element,

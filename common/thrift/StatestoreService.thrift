@@ -50,7 +50,7 @@ struct TPoolStats {
 // all other Impalads in the cluster. Impalads can act as coordinators, executors or
 // both.
 struct TBackendDescriptor {
-  // Network address of the Impala service on this backend
+  // Network address of the thrift based ImpalaInternalService on this backend
   1: required Types.TNetworkAddress address;
 
   // IP address corresponding to address.hostname. Explicitly including this saves the
@@ -68,6 +68,9 @@ struct TBackendDescriptor {
 
   // True if the debug webserver is secured (for correctly generating links)
   6: optional bool secure_webserver;
+
+  // IP address + port of KRPC based ImpalaInternalService on this backend
+  7: optional Types.TNetworkAddress krpc_address;
 }
 
 // Description of a single entry in a topic
@@ -76,8 +79,15 @@ struct TTopicItem {
   1: required string key;
 
   // Byte-string value for this topic entry. May not be null-terminated (in that it may
-  // contain null bytes)
+  // contain null bytes). It can be non-empty when deleted is true. This is needed when
+  // subscribers need additional information in order to process the deleted topics that
+  // is not included in the topic key (e.g. catalog version of deleted catalog objects).
   2: required string value;
+
+  // If true, this item was deleted. When false, this TTopicItem need not be included in
+  // non-delta TTopicDelta's (since the latest version of every still-present topic will
+  // be included).
+  3: required bool deleted = false;
 }
 
 // Set of changes to a single topic, sent from the statestore to a subscriber as well as
@@ -86,15 +96,14 @@ struct TTopicDelta {
   // Name of the topic this delta applies to
   1: required string topic_name;
 
-  // List of changes to topic entries
+  // When is_delta=true, a list of changes to topic entries, including deletions, within
+  // [from_version, to_version].
+  // When is_delta=false, this is the list of all non-delete topic entries for
+  // [0, to_version], which can be used to reconstruct the topic from scratch.
   2: required list<TTopicItem> topic_entries;
 
-  // List of topic item keys whose entries have been deleted
-  3: required list<string> topic_deletions;
-
-  // True if entries / deletions are to be applied to in-memory state,
-  // otherwise topic_entries contains entire topic state.
-  4: required bool is_delta;
+  // True if entries / deletions are relative to the topic at versions [0, from_version].
+  3: required bool is_delta;
 
   // The Topic version range this delta covers. If there have been changes to the topic,
   // the update will include all changes in the range: [from_version, to_version).
@@ -102,16 +111,17 @@ struct TTopicDelta {
   // to_version. The from_version will always be 0 for non-delta updates.
   // If this is an update being sent from a subscriber to the statestore, the from_version
   // is set only when recovering from an inconsistent state, to the last version of the
-  // topic the subscriber successfully processed.
-  5: optional i64 from_version
-  6: optional i64 to_version
+  // topic the subscriber successfully processed. The value of to_version doesn't depend
+  // on whether the update is delta or not.
+  4: optional i64 from_version
+  5: optional i64 to_version
 
   // The minimum topic version of all subscribers to the topic. This can be used to
   // determine when all subscribers have successfully processed a specific update.
   // This is guaranteed because no subscriber will ever be sent a topic containing
   // keys with a version < min_subscriber_topic_version. Only used when sending an update
   // from the statestore to a subscriber.
-  7: optional i64 min_subscriber_topic_version
+  6: optional i64 min_subscriber_topic_version
 }
 
 // Description of a topic to subscribe to as part of a RegisterSubscriber call

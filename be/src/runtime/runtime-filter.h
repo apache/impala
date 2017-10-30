@@ -23,6 +23,7 @@
 #include "runtime/runtime-filter-bank.h"
 #include "util/bloom-filter.h"
 #include "util/spinlock.h"
+#include "util/time.h"
 
 namespace impala {
 
@@ -75,9 +76,10 @@ class RuntimeFilter {
   /// false otherwise.
   bool WaitForArrival(int32_t timeout_ms) const;
 
-  /// Returns true if the filter returns true for all elements, i.e. Eval(v) returns true
-  /// for all v.
+  /// Returns true if the filter returns true/false for all elements, i.e. Eval(v) returns
+  /// true/false for all v.
   inline bool AlwaysTrue() const;
+  inline bool AlwaysFalse() const;
 
   /// Frequency with which to check for filter arrival in WaitForArrival()
   static const int SLEEP_PERIOD_MS;

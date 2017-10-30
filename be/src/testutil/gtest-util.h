@@ -37,6 +37,10 @@ namespace impala {
     ASSERT_TRUE(status_.ok()) << "Error: " << status_.GetDetail(); \
   } while (0)
 
+// Substring matches.
+#define EXPECT_STR_CONTAINS(str, substr) \
+  EXPECT_PRED_FORMAT2(testing::IsSubstring, substr, str)
+
 #define EXPECT_ERROR(status, err)                                       \
   do {                                                                  \
     const Status& status_ = (status);                                   \

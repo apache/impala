@@ -190,7 +190,6 @@ public class ArithmeticExpr extends Expr {
       Preconditions.checkState(children_.size() == 2);
       t1 = getChild(1).getType();
     }
-    if (hasChildCosts()) evalCost_ = getChildCosts() + ARITHMETIC_OP_COST;
 
     String fnName = op_.getName();
     switch (op_) {
@@ -260,6 +259,11 @@ public class ArithmeticExpr extends Expr {
           "for '%s' with operand types %s and %s", toSql(), t0, t1));
     }
     Preconditions.checkState(type_.matchesType(fn_.getReturnType()));
+  }
+
+  @Override
+  protected float computeEvalCost() {
+    return hasChildCosts() ? getChildCosts() + ARITHMETIC_OP_COST : UNKNOWN_COST;
   }
 
   @Override

@@ -28,14 +28,11 @@ import org.apache.impala.analysis.CaseWhenClause;
 import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
-import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.NullLiteral;
-import org.apache.impala.analysis.SlotDescriptor;
-import org.apache.impala.analysis.SlotRef;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.AnalysisException;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 /***
@@ -49,9 +46,17 @@ import com.google.common.collect.Lists;
  * false AND id = 1 -> false
  * case when false then 0 when true then 1 end -> 1
  * coalesce(1, 0) -> 1
+ *
+ * Unary functions like isfalse, isnotfalse, istrue, isnottrue, nullvalue,
+ * and nonnullvalue don't need special handling as the fold constants rule
+ * will handle them.  nullif and nvl2 are converted to an if in FunctionCallExpr,
+ * and therefore don't need handling here.
  */
 public class SimplifyConditionalsRule implements ExprRewriteRule {
   public static ExprRewriteRule INSTANCE = new SimplifyConditionalsRule();
+
+  private static List<String> IFNULL_ALIASES = ImmutableList.of(
+      "ifnull", "isnull", "nvl");
 
   @Override
   public Expr apply(Expr expr, Analyzer analyzer) throws AnalysisException {
@@ -100,11 +105,23 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
   }
 
   /**
+   * Simplifies IFNULL if the condition is a literal, using the
+   * following transformations:
+   *   IFNULL(NULL, x) -> x
+   *   IFNULL(a, x) -> a, if a is a non-null literal
+   */
+  private Expr simplifyIfNullFunctionCallExpr(FunctionCallExpr expr) {
+    Preconditions.checkState(expr.getChildren().size() == 2);
+    Expr child0 = expr.getChild(0);
+    if (child0 instanceof NullLiteral) return expr.getChild(1);
+    if (child0.isLiteral()) return child0;
+    return expr;
+  }
+
+  /**
    * Simplify COALESCE by skipping leading nulls and applying the following transformations:
    * COALESCE(null, a, b) -> COALESCE(a, b);
    * COALESCE(<literal>, a, b) -> <literal>, when literal is not NullLiteral;
-   * COALESCE(<partition-slotref>, a, b) -> <partition-slotref>,
-   * when the partition column does not contain NULL.
    */
   private Expr simplifyCoalesceFunctionCallExpr(FunctionCallExpr expr) {
     int numChildren = expr.getChildren().size();
@@ -113,7 +130,7 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
       Expr childExpr = expr.getChildren().get(i);
       // Skip leading nulls.
       if (childExpr.isNullLiteral()) continue;
-      if ((i == numChildren - 1) || canSimplifyCoalesceUsingChild(childExpr)) {
+      if ((i == numChildren - 1) || childExpr.isLiteral()) {
         result = childExpr;
       } else if (i == 0) {
         result = expr;
@@ -126,40 +143,15 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
     return result;
   }
 
-  /**
-   * Checks if the given child expr is nullable. Returns true if one of the following holds:
-   * child is a non-NULL literal;
-   * child is a possibly cast SlotRef against a non-nullable slot;
-   * child is a possible cast SlotRef against a partition column that does not contain NULL.
-   */
-  private boolean canSimplifyCoalesceUsingChild(Expr child) {
-    if (child.isLiteral() && !child.isNullLiteral()) return true;
-
-    SlotRef slotRef = child.unwrapSlotRef(false);
-    if (slotRef == null) return false;
-    SlotDescriptor slotDesc = slotRef.getDesc();
-    if (!slotDesc.getIsNullable()) return true;
-    // Check partition column using partition metadata.
-    if (slotDesc.getParent().getTable() instanceof HdfsTable
-        && slotDesc.getColumn() != null
-        && slotDesc.getParent().getTable().isClusteringColumn(slotDesc.getColumn())) {
-      HdfsTable table = (HdfsTable) slotDesc.getParent().getTable();
-      // Return true if the partition column does not have a NULL value.
-      if (table.getNullPartitionIds(slotDesc.getColumn().getPosition()).isEmpty()) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   private Expr simplifyFunctionCallExpr(FunctionCallExpr expr) {
-    FunctionName fnName = expr.getFnName();
+    String fnName = expr.getFnName().getFunction();
 
-    // TODO: Add the other conditional functions, eg. ifnull, istrue, etc.
-    if (fnName.getFunction().equals("if")) {
+    if (fnName.equals("if")) {
       return simplifyIfFunctionCallExpr(expr);
-    } else if (fnName.getFunction().equals("coalesce")) {
+    } else if (fnName.equals("coalesce")) {
       return simplifyCoalesceFunctionCallExpr(expr);
+    } else if (IFNULL_ALIASES.contains(fnName)) {
+      return simplifyIfNullFunctionCallExpr(expr);
     }
     return expr;
   }
@@ -203,10 +195,13 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
   }
 
   /**
-   * Simpilfies CASE and DECODE. If any of the 'when's have constant FALSE/NULL values,
+   * Simplifies CASE and DECODE. If any of the 'when's have constant FALSE/NULL values,
    * they are removed. If all of the 'when's are removed, just the ELSE is returned. If
    * any of the 'when's have constant TRUE values, the leftmost one becomes the ELSE
    * clause and all following cases are removed.
+   *
+   * Note that FunctionalCallExpr.createExpr() converts "nvl2" into "if",
+   * "decode" into "case", and "nullif" into "if".
    */
   private Expr simplifyCaseExpr(CaseExpr expr, Analyzer analyzer)
       throws AnalysisException {

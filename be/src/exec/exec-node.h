@@ -26,6 +26,8 @@
 #include "common/status.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "gen-cpp/PlanNodes_types.h"
+#include "runtime/bufferpool/buffer-pool.h"
+#include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/descriptors.h" // for RowDescriptor
 #include "util/blocking-queue.h"
 #include "util/runtime-profile.h"
@@ -206,10 +208,11 @@ class ExecNode {
   int64_t limit() const { return limit_; }
   bool ReachedLimit() { return limit_ != -1 && num_rows_returned_ >= limit_; }
 
-  RuntimeProfile* runtime_profile() { return runtime_profile_.get(); }
+  RuntimeProfile* runtime_profile() { return runtime_profile_; }
   MemTracker* mem_tracker() { return mem_tracker_.get(); }
   MemTracker* expr_mem_tracker() { return expr_mem_tracker_.get(); }
-  MemPool* expr_mem_pool() { return expr_mem_pool_.get(); }
+  MemPool* expr_perm_pool() { return expr_perm_pool_.get(); }
+  MemPool* expr_results_pool() { return expr_results_pool_.get(); }
 
   /// Return true if codegen was disabled by the planner for this ExecNode. Does not
   /// check to see if codegen was enabled for the enclosing fragment.
@@ -226,6 +229,26 @@ class ExecNode {
 
  protected:
   friend class DataSink;
+
+  /// Initialize 'buffer_pool_client_' and claim the initial reservation for this
+  /// ExecNode. Only needs to be called by ExecNodes that will use the client.
+  /// The client is automatically cleaned up in Close(). Should not be called if
+  /// the client is already open.
+  ///
+  /// The ExecNode must return the initial reservation to
+  /// QueryState::initial_reservations(), which is done automatically in Close() as long
+  /// as the initial reservation is not released before Close().
+  Status ClaimBufferReservation(RuntimeState* state) WARN_UNUSED_RESULT;
+
+  /// Release any unused reservation in excess of the node's initial reservation. Returns
+  /// an error if releasing the reservation requires flushing pages to disk, and that
+  /// fails.
+  Status ReleaseUnusedReservation() WARN_UNUSED_RESULT;
+
+  /// Enable the increase reservation denial probability on 'buffer_pool_client_' based on
+  /// the 'debug_action_' set on this node. Returns an error if 'debug_action_param_' is
+  /// invalid.
+  Status EnableDenyReservationDebugAction();
 
   /// Extends blocking queue for row batches. Row batches have a property that
   /// they must be processed in the order they were produced, even in cancellation
@@ -276,27 +299,45 @@ class ExecNode {
   std::vector<ExecNode*> children_;
   RowDescriptor row_descriptor_;
 
+  /// Resource information sent from the frontend.
+  const TBackendResourceProfile resource_profile_;
+
   /// debug-only: if debug_action_ is not INVALID, node will perform action in
   /// debug_phase_
   TExecNodePhase::type debug_phase_;
   TDebugAction::type debug_action_;
+  std::string debug_action_param_;
 
   int64_t limit_;  // -1: no limit
   int64_t num_rows_returned_;
 
-  boost::scoped_ptr<RuntimeProfile> runtime_profile_;
+  /// Runtime profile for this node. Owned by the QueryState's ObjectPool.
+  RuntimeProfile* const runtime_profile_;
   RuntimeProfile::Counter* rows_returned_counter_;
   RuntimeProfile::Counter* rows_returned_rate_;
 
   /// Account for peak memory used by this node
   boost::scoped_ptr<MemTracker> mem_tracker_;
 
-  /// MemTracker used by 'expr_mem_pool_'.
+  /// MemTracker used by 'expr_perm_pool_' and 'expr_results_pool_'.
   boost::scoped_ptr<MemTracker> expr_mem_tracker_;
 
-  /// MemPool for allocating data structures used by expression evaluators in this node.
-  /// Created in Prepare().
-  boost::scoped_ptr<MemPool> expr_mem_pool_;
+  /// MemPool for allocations made by expression evaluators in this node that are
+  /// "permanent" and live until Close() is called. Created in Prepare().
+  boost::scoped_ptr<MemPool> expr_perm_pool_;
+
+  /// MemPool for allocations made by expression evaluators in this node that hold
+  /// intermediate or final results of expression evaluation. Should be cleared
+  /// periodically to free accumulated memory. QueryMaintenance() clears this pool, but
+  /// it may be appropriate for ExecNode implementation to clear it at other points in
+  /// execution where the memory is not needed.
+  boost::scoped_ptr<MemPool> expr_results_pool_;
+
+  /// Buffer pool client for this node. Initialized with the node's minimum reservation
+  /// in ClaimBufferReservation(). After initialization, the client must hold onto at
+  /// least the minimum reservation so that it can be returned to the initial
+  /// reservations pool in Close().
+  BufferPool::ClientHandle buffer_pool_client_;
 
   bool is_closed() const { return is_closed_; }
 
@@ -322,38 +363,31 @@ class ExecNode {
 
   virtual bool IsScanNode() const { return false; }
 
-  void InitRuntimeProfile(const std::string& name);
-
-  /// Executes debug_action_ if phase matches debug_phase_.
+  /// Executes 'debug_action_' if 'phase' matches 'debug_phase_'.
   /// 'phase' must not be INVALID.
   Status ExecDebugAction(
-      TExecNodePhase::type phase, RuntimeState* state) WARN_UNUSED_RESULT;
+      TExecNodePhase::type phase, RuntimeState* state) WARN_UNUSED_RESULT {
+    DCHECK_NE(phase, TExecNodePhase::INVALID);
+    // Fast path for the common case when an action is not enabled for this phase.
+    if (LIKELY(debug_phase_ != phase)) return Status::OK();
+    return ExecDebugActionImpl(phase, state);
+  }
 
-  /// Frees any local allocations made by evals_to_free_ and returns the result of
-  /// state->CheckQueryState(). Nodes should call this periodically, e.g. once per input
-  /// row batch. This should not be called outside the main execution thread.
-  //
-  /// Nodes may override this to add extra periodic cleanup, e.g. freeing other local
-  /// allocations. ExecNodes overriding this function should return
-  /// ExecNode::QueryMaintenance().
-  virtual Status QueryMaintenance(RuntimeState* state) WARN_UNUSED_RESULT;
-
-  /// Add an expr evaluator to have its local allocations freed by QueryMaintenance().
-  /// Exprs that are evaluated in the main execution thread should be added. Exprs
-  /// evaluated in a separate thread are generally not safe to add, since a local
-  /// allocation may be freed while it's being used. Rather than using this mechanism,
-  /// threads should call FreeLocalAllocations() on local evaluators periodically.
-  void AddEvaluatorToFree(ScalarExprEvaluator* eval);
-  void AddEvaluatorsToFree(const std::vector<ScalarExprEvaluator*>& evals);
+  /// Clears 'expr_results_pool_' and returns the result of state->CheckQueryState().
+  /// Nodes should call this periodically, e.g. once per input row batch. This should
+  /// not be called outside the main execution thread.
+  /// TODO: IMPALA-2399: replace QueryMaintenance() - see JIRA for more details.
+  Status QueryMaintenance(RuntimeState* state) WARN_UNUSED_RESULT;
 
  private:
+  /// Implementation of ExecDebugAction(). This is the slow path we take when there is
+  /// actually a debug action enabled for 'phase'.
+  Status ExecDebugActionImpl(
+      TExecNodePhase::type phase, RuntimeState* state) WARN_UNUSED_RESULT;
+
   /// Set in ExecNode::Close(). Used to make Close() idempotent. This is not protected
   /// by a lock, it assumes all calls to Close() are made by the same thread.
   bool is_closed_;
-
-  /// Expr evaluators whose local allocations are safe to free in the main execution
-  /// thread.
-  std::vector<ScalarExprEvaluator*> evals_to_free_;
 };
 
 inline bool ExecNode::EvalPredicate(ScalarExprEvaluator* eval, TupleRow* row) {

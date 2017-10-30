@@ -18,6 +18,7 @@
 # under the License.
 
 import re
+import ssl
 
 from thrift.transport import TSSLSocket
 from thrift.transport.TTransport import TTransportException
@@ -42,6 +43,12 @@ class TSSLSocketWithWildcardSAN(TSSLSocket.TSSLSocket):
       ca_certs=None,
       unix_socket=None):
     TSSLSocket.TSSLSocket.__init__(self, host, port, validate, ca_certs, unix_socket)
+    # Set client protocol choice to be very permissive, as we rely on servers to enforce
+    # good protocol selection. This value is forwarded to the ssl.wrap_socket() API during
+    # open(). See https://docs.python.org/2/library/ssl.html#socket-creation for a table
+    # that shows a better option is not readily available for sockets that use
+    # wrap_socket().
+    self.SSL_VERSION = ssl.PROTOCOL_SSLv23
 
   def _validate_cert(self):
     cert = self.handle.getpeercert()

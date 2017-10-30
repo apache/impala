@@ -42,12 +42,11 @@ enum TPrimitiveType {
   DATETIME,
   TIMESTAMP,
   STRING,
-  // Unsupported types
-  BINARY,
+  BINARY, // Unsupported
   DECIMAL,
-  // CHAR(n). Currently only supported in UDAs
   CHAR,
-  VARCHAR
+  VARCHAR,
+  FIXED_UDA_INTERMEDIATE,
 }
 
 enum TTypeNodeType {

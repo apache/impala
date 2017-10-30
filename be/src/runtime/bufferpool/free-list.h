@@ -70,6 +70,7 @@ class FreeList {
 
   /// Adds a free buffer to the list.
   void AddFreeBuffer(BufferHandle&& buffer) {
+    buffer.Poison();
     free_list_.emplace_back(std::move(buffer));
     std::push_heap(free_list_.begin(), free_list_.end(), HeapCompare);
   }

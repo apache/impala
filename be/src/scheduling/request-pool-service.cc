@@ -23,6 +23,7 @@
 #include <string>
 #include <gutil/strings/substitute.h>
 
+#include "common/constant-strings.h"
 #include "common/logging.h"
 #include "rpc/jni-thrift-util.h"
 #include "service/query-options.h"
@@ -56,12 +57,12 @@ DEFINE_int64(default_pool_max_requests, -1, "Maximum number of concurrent outsta
     "requests allowed to run before queueing incoming requests. A negative value "
     "indicates no limit. 0 indicates no requests will be admitted. Ignored if "
     "fair_scheduler_config_path and llama_site_path are set.");
-DEFINE_string(default_pool_mem_limit, "", "Maximum amount of memory that all "
-    "outstanding requests in this pool may use before new requests to this pool"
-    " are queued. Specified as a number of bytes ('<int>[bB]?'), megabytes "
-    "('<float>[mM]'), gigabytes ('<float>[gG]'), or percentage of the physical memory "
-    "('<int>%'). 0 or not setting indicates no limit. Defaults to bytes if no unit is "
-    "given. Ignored if fair_scheduler_config_path and llama_site_path are set.");
+
+static const string default_pool_mem_limit_help_msg = "Maximum amount of memory that all "
+    "outstanding requests in this pool may use before new requests to this pool "
+    "are queued. " + Substitute(MEM_UNITS_HELP_MSG, "the physical memory") + " "
+    "Ignored if fair_scheduler_config_path and llama_site_path are set.";
+DEFINE_string(default_pool_mem_limit, "", default_pool_mem_limit_help_msg.c_str());
 DEFINE_int64(default_pool_max_queued, 200, "Maximum number of requests allowed to be "
     "queued before rejecting requests. A negative value or 0 indicates requests "
     "will always be rejected once the maximum number of concurrent requests are "

@@ -44,12 +44,13 @@ static const int64_t OUTPUT_BUFFER_BYTES_LEFT_INIT = 0;
 
 ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNodeBase* scan_node,
     HdfsPartitionDescriptor* partition_desc, DiskIoMgr::ScanRange* scan_range,
-    const vector<FilterContext>& filter_ctxs)
+    const vector<FilterContext>& filter_ctxs, MemPool* expr_results_pool)
   : state_(state),
     scan_node_(scan_node),
     partition_desc_(partition_desc),
     num_completed_io_buffers_(0),
-    filter_ctxs_(filter_ctxs) {
+    filter_ctxs_(filter_ctxs),
+    expr_results_pool_(expr_results_pool) {
   AddStream(scan_range);
 }
 
@@ -77,7 +78,7 @@ ScannerContext::Stream::Stream(ScannerContext* parent)
 ScannerContext::Stream* ScannerContext::AddStream(DiskIoMgr::ScanRange* range) {
   std::unique_ptr<Stream> stream(new Stream(this));
   stream->scan_range_ = range;
-  stream->file_desc_ = scan_node_->GetFileDesc(stream->filename());
+  stream->file_desc_ = scan_node_->GetFileDesc(partition_desc_->id(), stream->filename());
   stream->file_len_ = stream->file_desc_->file_length;
   stream->total_bytes_returned_ = 0;
   stream->io_buffer_pos_ = NULL;
@@ -151,7 +152,9 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
 
   if (!eosr) {
     SCOPED_TIMER(parent_->state_->total_storage_wait_timer());
-    RETURN_IF_ERROR(scan_range_->GetNext(&io_buffer_));
+    Status status = scan_range_->GetNext(&io_buffer_);
+    DCHECK(!status.ok() || io_buffer_ != NULL);
+    RETURN_IF_ERROR(status);
   } else {
     SCOPED_TIMER(parent_->state_->total_storage_wait_timer());
 
@@ -175,14 +178,24 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
       // TODO: We are leaving io_buffer_ = NULL, revisit.
       return Status::OK();
     }
+    int64_t partition_id = parent_->partition_descriptor()->id();
     DiskIoMgr::ScanRange* range = parent_->scan_node_->AllocateScanRange(
-        scan_range_->fs(), filename(), read_past_buffer_size, offset, -1,
+        scan_range_->fs(), filename(), read_past_buffer_size, offset, partition_id,
         scan_range_->disk_id(), false, DiskIoMgr::BufferOpts::Uncached());
     RETURN_IF_ERROR(parent_->state_->io_mgr()->Read(
         parent_->scan_node_->reader_context(), range, &io_buffer_));
   }
 
   DCHECK(io_buffer_ != NULL);
+  if (UNLIKELY(io_buffer_ == NULL)) {
+    // This has bitten us before, so we defend against NULL in release builds here. It
+    // indicates an error in the IoMgr, which did not return a valid buffer.
+    // TODO(IMPALA-5914): Remove this check once we're confident we're not hitting it.
+    return Status(TErrorCode::INTERNAL_ERROR, Substitute("Internal error: "
+        "Failed to receive buffer from scan range for file $0 at offset $1",
+        filename(), offset));
+  }
+
   parent_->scan_node_->num_owned_io_buffers_.Add(1);
   io_buffer_pos_ = reinterpret_cast<uint8_t*>(io_buffer_->buffer());
   io_buffer_bytes_left_ = io_buffer_->len();
@@ -206,7 +219,7 @@ Status ScannerContext::Stream::GetBuffer(bool peek, uint8_t** out_buffer, int64_
   }
 
   if (boundary_buffer_bytes_left_ > 0) {
-    DCHECK_EQ(output_buffer_pos_, &boundary_buffer_pos_);
+    DCHECK(ValidateBufferPointers());
     DCHECK_EQ(output_buffer_bytes_left_, &boundary_buffer_bytes_left_);
     *out_buffer = boundary_buffer_pos_;
     // Don't return more bytes past eosr
@@ -224,6 +237,9 @@ Status ScannerContext::Stream::GetBuffer(bool peek, uint8_t** out_buffer, int64_
     // We're at the end of the boundary buffer and the current IO buffer. Get a new IO
     // buffer and set the current buffer to it.
     RETURN_IF_ERROR(GetNextBuffer());
+    // Check that we're not pointing to the IO buffer if there are bytes left in the
+    // boundary buffer.
+    DCHECK_EQ(boundary_buffer_bytes_left_, 0);
     output_buffer_pos_ = &io_buffer_pos_;
     output_buffer_bytes_left_ = &io_buffer_bytes_left_;
   }
@@ -237,6 +253,7 @@ Status ScannerContext::Stream::GetBuffer(bool peek, uint8_t** out_buffer, int64_
     total_bytes_returned_ += *len;
   }
   DCHECK_GE(bytes_left(), 0);
+  DCHECK(ValidateBufferPointers());
   return Status::OK();
 }
 
@@ -253,6 +270,8 @@ Status ScannerContext::Stream::GetBytesInternal(int64_t requested_len,
     }
   }
 
+  DCHECK(ValidateBufferPointers());
+
   while (requested_len > boundary_buffer_bytes_left_ + io_buffer_bytes_left_) {
     // We must copy the remainder of 'io_buffer_' to 'boundary_buffer_' before advancing
     // to handle the case when the read straddles a block boundary. Preallocate
@@ -261,6 +280,11 @@ Status ScannerContext::Stream::GetBytesInternal(int64_t requested_len,
       RETURN_IF_ERROR(boundary_buffer_->GrowBuffer(requested_len));
       RETURN_IF_ERROR(boundary_buffer_->Append(io_buffer_pos_, io_buffer_bytes_left_));
       boundary_buffer_bytes_left_ += io_buffer_bytes_left_;
+
+      // Make state consistent in case we return early with an error below.
+      io_buffer_bytes_left_ = 0;
+      output_buffer_pos_ = &boundary_buffer_pos_;
+      output_buffer_bytes_left_ = &boundary_buffer_bytes_left_;
     }
 
     int64_t remaining_requested_len = requested_len - boundary_buffer_->len();
@@ -305,12 +329,22 @@ Status ScannerContext::Stream::GetBytesInternal(int64_t requested_len,
     }
   }
 
+
+  DCHECK(ValidateBufferPointers());
   return Status::OK();
 }
 
 bool ScannerContext::cancelled() const {
   if (!scan_node_->HasRowBatchQueue()) return false;
   return static_cast<HdfsScanNode*>(scan_node_)->done();
+}
+
+bool ScannerContext::Stream::ValidateBufferPointers() const {
+  // If there are bytes left in the boundary buffer, the output buffer pointers must point
+  // to it.
+  return boundary_buffer_bytes_left_ == 0 ||
+      (output_buffer_pos_ == &boundary_buffer_pos_ &&
+      output_buffer_bytes_left_ == &boundary_buffer_bytes_left_);
 }
 
 Status ScannerContext::Stream::ReportIncompleteRead(int64_t length, int64_t bytes_read) {

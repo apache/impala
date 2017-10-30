@@ -15,45 +15,42 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RUNTIME_TUPLE_BUFFERED_STREAM_INLINE_H
-#define IMPALA_RUNTIME_TUPLE_BUFFERED_STREAM_INLINE_H
+#ifndef IMPALA_RUNTIME_BUFFERED_TUPLE_STREAM_INLINE_H
+#define IMPALA_RUNTIME_BUFFERED_TUPLE_STREAM_INLINE_H
 
 #include "runtime/buffered-tuple-stream.h"
 
 #include "runtime/descriptors.h"
 #include "runtime/tuple-row.h"
+#include "util/bit-util.h"
 
 namespace impala {
 
-inline bool BufferedTupleStream::AddRow(TupleRow* row, Status* status) noexcept {
-  DCHECK(!closed_);
-  if (LIKELY(DeepCopy(row))) return true;
-  return AddRowSlow(row, status);
+inline int BufferedTupleStream::NullIndicatorBytesPerRow() const {
+  DCHECK(has_nullable_tuple_);
+  return BitUtil::RoundUpNumBytes(fixed_tuple_sizes_.size());
 }
 
-inline uint8_t* BufferedTupleStream::AllocateRow(int fixed_size, int varlen_size,
-    uint8_t** varlen_data, Status* status) {
+inline uint8_t* BufferedTupleStream::AddRowCustomBegin(int64_t size, Status* status) {
   DCHECK(!closed_);
-  DCHECK(!has_nullable_tuple_) << "AllocateRow does not support nullable tuples";
-  const int total_size = fixed_size + varlen_size;
-  if (UNLIKELY(write_block_ == NULL || write_block_bytes_remaining() < total_size)) {
-    bool got_block;
-    *status = NewWriteBlockForRow(total_size, &got_block);
-    if (!status->ok() || !got_block) return NULL;
+  DCHECK(has_write_iterator());
+  if (UNLIKELY(write_page_ == nullptr || write_ptr_ + size > write_end_ptr_)) {
+    return AddRowCustomBeginSlow(size, status);
   }
-  DCHECK(write_block_ != NULL);
-  DCHECK(write_block_->is_pinned());
-  DCHECK_GE(write_block_bytes_remaining(), total_size);
+  DCHECK(write_page_ != nullptr);
+  DCHECK(write_page_->is_pinned());
+  DCHECK_LE(write_ptr_ + size, write_end_ptr_);
   ++num_rows_;
-  write_block_->AddRow();
+  ++write_page_->num_rows;
 
-  uint8_t* fixed_data = write_ptr_;
-  write_ptr_ += fixed_size;
-  *varlen_data = write_ptr_;
-  write_ptr_ += varlen_size;
-  return fixed_data;
+  uint8_t* data = write_ptr_;
+  write_ptr_ += size;
+  return data;
 }
 
+inline void BufferedTupleStream::AddRowCustomEnd(int64_t size) {
+  if (UNLIKELY(size > default_page_len_)) AddLargeRowCustomEnd(size);
+}
 }
 
 #endif

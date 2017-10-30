@@ -42,11 +42,16 @@ JNIEXPORT void JNICALL
 Java_org_apache_impala_util_NativeLogger_Log(
     JNIEnv* env, jclass caller_class, int severity, jstring msg, jstring file,
     int line_number) {
-  // Unused required argument to GetStringUTFChars
-  jboolean dummy;
-  const char* filename = env->GetStringUTFChars(file, &dummy);
+  DCHECK(file != nullptr);
+  JniUtfCharGuard filename_guard;
+  RETURN_VOID_IF_ERROR(JniUtfCharGuard::create(env, file, &filename_guard));
+  JniUtfCharGuard msg_guard;
   const char* str = "";
-  if (msg != NULL) str = env->GetStringUTFChars(msg, &dummy);
+  if (msg != nullptr) {
+    RETURN_VOID_IF_ERROR(JniUtfCharGuard::create(env, msg, &msg_guard));
+    str = msg_guard.get();
+  }
+
   int log_level = google::INFO;
   switch (severity) {
     case TLogLevel::VLOG:
@@ -69,9 +74,7 @@ Java_org_apache_impala_util_NativeLogger_Log(
     default:
       DCHECK(false) << "Unrecognised TLogLevel: " << log_level;
   }
-  google::LogMessage(filename, line_number, log_level).stream() << string(str);
-  if (msg != NULL) env->ReleaseStringUTFChars(msg, str);
-  env->ReleaseStringUTFChars(file, filename);
+  google::LogMessage(filename_guard.get(), line_number, log_level).stream() << str;
 }
 
 namespace {

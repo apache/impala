@@ -279,3 +279,39 @@ void CountNullsUpdate(FunctionContext* context, const BigIntVal& val, BigIntVal*
 void CountNullsMerge(FunctionContext* context, const BigIntVal& src, BigIntVal* dst) {
   dst->val += src.val;
 }
+
+// Defines AggCharIntermediate(INT) returns INT with CHAR(10) intermediate.
+// The function computes the sum of the input.
+static void ValidateCharIntermediateFunctionContext(const FunctionContext* context) {
+  assert(context->GetNumArgs() == 1);
+  assert(context->GetArgType(0)->type == FunctionContext::TYPE_INT);
+  assert(context->GetIntermediateType().type == FunctionContext::TYPE_FIXED_BUFFER);
+  assert(context->GetIntermediateType().len == 10);
+  assert(context->GetReturnType().type == FunctionContext::TYPE_INT);
+}
+void AggCharIntermediateInit(FunctionContext* context, StringVal* dst) {
+  ValidateCharIntermediateFunctionContext(context);
+  assert(dst->len == 10);
+  memset(dst->ptr, 0, 10);
+}
+void AggCharIntermediateUpdate(
+    FunctionContext* context, const IntVal& val, StringVal* dst) {
+  ValidateCharIntermediateFunctionContext(context);
+  assert(dst->len == 10);
+  int* dst_val = reinterpret_cast<int*>(dst->ptr);
+  if (!val.is_null) *dst_val += val.val;
+}
+void AggCharIntermediateMerge(FunctionContext* context, const StringVal& src, StringVal* dst) {
+  ValidateCharIntermediateFunctionContext(context);
+  int* dst_val = reinterpret_cast<int*>(dst->ptr);
+  *dst_val += *reinterpret_cast<int*>(src.ptr);
+}
+StringVal AggCharIntermediateSerialize(FunctionContext* context, const StringVal& in) {
+  ValidateCharIntermediateFunctionContext(context);
+  return in;
+}
+IntVal AggCharIntermediateFinalize(FunctionContext* context, const StringVal& src) {
+  ValidateCharIntermediateFunctionContext(context);
+  return IntVal(*reinterpret_cast<int*>(src.ptr));
+}
+

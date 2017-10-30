@@ -18,15 +18,17 @@
 #ifndef IMPALA_RUNTIME_DATA_STREAM_RECVR_H
 #define IMPALA_RUNTIME_DATA_STREAM_RECVR_H
 
+#include "data-stream-recvr-base.h"
+
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 
+#include "common/atomic.h"
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "gen-cpp/Types_types.h"   // for TUniqueId
-#include "gen-cpp/Results_types.h" // for TRowBatch
 #include "runtime/descriptors.h"
-#include "util/tuple-row-compare.h"
+#include "util/runtime-profile.h"
 
 namespace impala {
 
@@ -34,9 +36,12 @@ class DataStreamMgr;
 class SortedRunMerger;
 class MemTracker;
 class RowBatch;
-class RuntimeProfile;
+class TRowBatch;
+class TupleRowCompare;
 
 /// Single receiver of an m:n data stream.
+/// This is for use by the DataStreamMgr, which is the implementation of the abstract
+/// class DataStreamMgrBase that depends on Thrift.
 /// DataStreamRecvr maintains one or more queues of row batches received by a
 /// DataStreamMgr from one or more sender fragment instances.
 /// Receivers are created via DataStreamMgr::CreateRecvr().
@@ -60,9 +65,9 @@ class RuntimeProfile;
 //
 /// DataStreamRecvr::Close() must be called by the caller of CreateRecvr() to remove the
 /// recvr instance from the tracking structure of its DataStreamMgr in all cases.
-class DataStreamRecvr {
+class DataStreamRecvr : public DataStreamRecvrBase {
  public:
-  ~DataStreamRecvr();
+  virtual ~DataStreamRecvr() override;
 
   /// Returns next row batch in data stream; blocks if there aren't any.
   /// Retains ownership of the returned batch. The caller must acquire data from the
@@ -70,23 +75,23 @@ class DataStreamRecvr {
   /// eos. Must only be called if is_merging_ is false.
   /// TODO: This is currently only exposed to the non-merging version of the exchange.
   /// Refactor so both merging and non-merging exchange use GetNext(RowBatch*, bool* eos).
-  Status GetBatch(RowBatch** next_batch);
+  Status GetBatch(RowBatch** next_batch) override;
 
   /// Deregister from DataStreamMgr instance, which shares ownership of this instance.
-  void Close();
+  void Close() override;
 
   /// Create a SortedRunMerger instance to merge rows from multiple sender according to the
   /// specified row comparator. Fetches the first batches from the individual sender
   /// queues. The exprs used in less_than must have already been prepared and opened.
-  Status CreateMerger(const TupleRowComparator& less_than);
+  Status CreateMerger(const TupleRowComparator& less_than) override;
 
   /// Fill output_batch with the next batch of rows obtained by merging the per-sender
   /// input streams. Must only be called if is_merging_ is true.
-  Status GetNext(RowBatch* output_batch, bool* eos);
+  Status GetNext(RowBatch* output_batch, bool* eos) override;
 
   /// Transfer all resources from the current batches being processed from each sender
   /// queue to the specified batch.
-  void TransferAllResources(RowBatch* transfer_batch);
+  void TransferAllResources(RowBatch* transfer_batch) override;
 
   const TUniqueId& fragment_instance_id() const { return fragment_instance_id_; }
   PlanNodeId dest_node_id() const { return dest_node_id_; }
@@ -99,8 +104,8 @@ class DataStreamRecvr {
 
   DataStreamRecvr(DataStreamMgr* stream_mgr, MemTracker* parent_tracker,
       const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
-      PlanNodeId dest_node_id, int num_senders, bool is_merging, int total_buffer_limit,
-      RuntimeProfile* profile);
+      PlanNodeId dest_node_id, int num_senders, bool is_merging,
+      int64_t total_buffer_limit, RuntimeProfile* parent_profile);
 
   /// Add a new batch of rows to the appropriate sender queue, blocking if the queue is
   /// full. Called from DataStreamMgr.
@@ -115,7 +120,7 @@ class DataStreamRecvr {
 
   /// Return true if the addition of a new batch of size 'batch_size' would exceed the
   /// total buffer limit.
-  bool ExceedsLimit(int batch_size) {
+  bool ExceedsLimit(int64_t batch_size) {
     return num_buffered_bytes_.Load() + batch_size > total_buffer_limit_;
   }
 
@@ -139,7 +144,7 @@ class DataStreamRecvr {
   bool is_merging_;
 
   /// total number of bytes held across all sender queues.
-  AtomicInt32 num_buffered_bytes_;
+  AtomicInt64 num_buffered_bytes_;
 
   /// Memtracker for batches in the sender queue(s).
   boost::scoped_ptr<MemTracker> mem_tracker_;
@@ -156,8 +161,9 @@ class DataStreamRecvr {
   /// Pool of sender queues.
   ObjectPool sender_queue_pool_;
 
-  /// Runtime profile storing the counters below.
-  RuntimeProfile* profile_;
+  /// Runtime profile storing the counters below. Child of 'parent_profile' passed into
+  /// constructor.
+  RuntimeProfile* const profile_;
 
   /// Number of bytes received
   RuntimeProfile::Counter* bytes_received_counter_;

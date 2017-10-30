@@ -28,7 +28,7 @@
 #include "common/compiler-util.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gutil/macros.h"
-#include "runtime/buffered-block-mgr.h"
+#include "util/cpu-info.h"
 #include "util/hash-util.h"
 
 namespace impala {
@@ -69,6 +69,8 @@ class BloomFilter {
   /// is NULL, it is interpreted as a complete filter which contains all elements.
   static void ToThrift(const BloomFilter* filter, TBloomFilter* thrift);
 
+  bool AlwaysFalse() const { return always_false_; }
+
   /// Adds an element to the BloomFilter. The function used to generate 'hash' need not
   /// have good uniformity, but it should have low collision probability. For instance, if
   /// the set of values is 32-bit ints, the identity function is a valid hash function for
@@ -106,6 +108,9 @@ class BloomFilter {
   }
 
  private:
+  // always_false_ is true when the bloom filter hasn't had any elements inserted.
+  bool always_false_;
+
   /// The BloomFilter is divided up into Buckets
   static const uint64_t BUCKET_WORDS = 8;
   typedef uint32_t BucketWord;
@@ -130,6 +135,12 @@ class BloomFilter {
   const uint32_t directory_mask_;
 
   Bucket* directory_;
+
+  // Same as Insert(), but skips the CPU check and assumes that AVX is not available.
+  void InsertNoAvx2(const uint32_t hash) noexcept;
+
+  // Same as Insert(), but skips the CPU check and assumes that AVX is available.
+  void InsertAvx2(const uint32_t hash) noexcept;
 
   /// Does the actual work of Insert(). bucket_idx is the index of the bucket to insert
   /// into and 'hash' is the value passed to Insert().
@@ -176,6 +187,7 @@ class BloomFilter {
 // a split Bloom filter, but log2(256) * 8 = 64 random bits for a standard Bloom filter.
 
 inline void ALWAYS_INLINE BloomFilter::Insert(const uint32_t hash) noexcept {
+  always_false_ = false;
   const uint32_t bucket_idx = HashUtil::Rehash32to32(hash) & directory_mask_;
   if (CpuInfo::IsSupported(CpuInfo::AVX2)) {
     BucketInsertAVX2(bucket_idx, hash);
@@ -185,6 +197,7 @@ inline void ALWAYS_INLINE BloomFilter::Insert(const uint32_t hash) noexcept {
 }
 
 inline bool ALWAYS_INLINE BloomFilter::Find(const uint32_t hash) const noexcept {
+  if (always_false_) return false;
   const uint32_t bucket_idx = HashUtil::Rehash32to32(hash) & directory_mask_;
   if (CpuInfo::IsSupported(CpuInfo::AVX2)) {
     return BucketFindAVX2(bucket_idx, hash);

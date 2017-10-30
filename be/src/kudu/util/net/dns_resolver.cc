@@ -27,7 +27,7 @@
 #include "kudu/util/net/net_util.h"
 #include "kudu/util/net/sockaddr.h"
 
-DEFINE_int32(dns_num_resolver_threads, 1, "The number of threads to use for DNS resolution");
+DEFINE_int32_hidden(dns_num_resolver_threads, 1, "The number of threads to use for DNS resolution");
 TAG_FLAG(dns_num_resolver_threads, advanced);
 
 using std::vector;

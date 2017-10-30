@@ -67,6 +67,10 @@ public class TableLoadingMgr {
     public Table get() {
       Table tbl;
       try {
+        LOG.info("Loading metadata for table: " +
+            tblName_.db_name + "." + tblName_.table_name);
+        LOG.info(String.format("Remaining items in queue: %s. Loads in progress: %s",
+            tableLoadingDeque_.size(), loadingTables_.size()));
         tbl = tblTask_.get();
       } catch (Exception e) {
         tbl = IncompleteTable.createFailedMetadataLoadTable(
@@ -282,15 +286,12 @@ public class TableLoadingMgr {
   private void loadNextTable() throws InterruptedException {
     // Always get the next table from the head of the deque.
     final TTableName tblName = tableLoadingDeque_.takeFirst();
-    LOG.info("Loading next table from queue: " +
-        tblName.db_name + "." + tblName.table_name);
-    LOG.info(String.format("Remaining items in queue: %s. Loads in progress: %s",
-        tableLoadingDeque_.size(), loadingTables_.size()));
-
     AtomicBoolean isLoading = tableLoadingBarrier_.get(tblName);
     if (isLoading == null || !isLoading.compareAndSet(false, true)) {
       // Another thread has already completed the load or the load is still in progress.
       // Return so this thread can work on another table in the queue.
+      LOG.info("Metadata load request already in progress for table: " +
+          tblName.db_name + "." + tblName.table_name);
       return;
     }
     try {

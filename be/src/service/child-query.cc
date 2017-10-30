@@ -128,9 +128,17 @@ void ChildQuery::Cancel() {
     if (!is_running_) return;
     is_running_ = false;
   }
-  VLOG_QUERY << "Cancelling and closing child query with operation id: "
-             << hs2_handle_.operationId.guid;
+  TUniqueId session_id;
+  TUniqueId secret_unused;
   // Ignore return statuses because they are not actionable.
+  Status status = ImpalaServer::THandleIdentifierToTUniqueId(hs2_handle_.operationId,
+      &session_id, &secret_unused);
+  if (status.ok()) {
+    VLOG_QUERY << "Cancelling and closing child query with operation id: " << session_id;
+  } else {
+    VLOG_QUERY << "Cancelling and closing child query. Failed to get query id: " <<
+        status;
+  }
   TCancelOperationResp cancel_resp;
   TCancelOperationReq cancel_req;
   cancel_req.operationHandle = hs2_handle_;
@@ -152,16 +160,17 @@ ChildQueryExecutor::~ChildQueryExecutor() {
   DCHECK(!is_running_);
 }
 
-void ChildQueryExecutor::ExecAsync(vector<ChildQuery>&& child_queries) {
+Status ChildQueryExecutor::ExecAsync(vector<ChildQuery>&& child_queries) {
   DCHECK(!child_queries.empty());
   lock_guard<SpinLock> lock(lock_);
   DCHECK(child_queries_.empty());
   DCHECK(child_queries_thread_.get() == NULL);
-  if (is_cancelled_) return;
+  if (is_cancelled_) return Status::OK();
   child_queries_ = move(child_queries);
-  child_queries_thread_.reset(new Thread("query-exec-state", "async child queries",
-      bind(&ChildQueryExecutor::ExecChildQueries, this)));
+  RETURN_IF_ERROR(Thread::Create("query-exec-state", "async child queries",
+      bind(&ChildQueryExecutor::ExecChildQueries, this), &child_queries_thread_));
   is_running_ = true;
+  return Status::OK();
 }
 
 void ChildQueryExecutor::ExecChildQueries() {

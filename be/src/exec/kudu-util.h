@@ -18,6 +18,9 @@
 #ifndef IMPALA_UTIL_KUDU_UTIL_H_
 #define IMPALA_UTIL_KUDU_UTIL_H_
 
+// TODO: Remove when toolchain callbacks.h properly defines ::tm.
+struct tm;
+
 #include <kudu/client/callbacks.h>
 #include <kudu/client/client.h>
 
@@ -36,6 +39,13 @@ namespace impala {
     } \
   } while (0)
 
+
+#define KUDU_ASSERT_OK(status)                                     \
+  do {                                                             \
+    const Status& status_ = FromKuduStatus(status);                \
+    ASSERT_TRUE(status_.ok()) << "Error: " << status_.GetDetail(); \
+  } while (0)
+
 class TimestampValue;
 
 /// Returns false when running on an operating system that Kudu doesn't support. If this
@@ -45,7 +55,7 @@ bool KuduClientIsSupported();
 /// Returns OK if Kudu is available or an error status containing the reason Kudu is not
 /// available. Kudu may not be available if no Kudu client is available for the platform
 /// or if Kudu was disabled by the startup flag --disable_kudu.
-Status CheckKuduAvailability();
+Status CheckKuduAvailability() WARN_UNUSED_RESULT;
 
 /// Convenience function for the bool equivalent of CheckKuduAvailability().
 bool KuduIsAvailable();
@@ -53,7 +63,7 @@ bool KuduIsAvailable();
 /// Creates a new KuduClient using the specified master adresses. If any error occurs,
 /// 'client' is not set and an error status is returned.
 Status CreateKuduClient(const std::vector<std::string>& master_addrs,
-    kudu::client::sp::shared_ptr<kudu::client::KuduClient>* client);
+    kudu::client::sp::shared_ptr<kudu::client::KuduClient>* client) WARN_UNUSED_RESULT;
 
 /// Returns a debug string for the KuduSchema.
 std::string KuduSchemaDebugString(const kudu::client::KuduSchema& schema);
@@ -73,7 +83,23 @@ void LogKuduMessage(kudu::client::KuduLogSeverity severity, const char* filename
 /// into memory owned by the row. If false, string data must remain valid while the row
 /// is being used.
 Status WriteKuduValue(int col, PrimitiveType type, const void* value,
-    bool copy_strings, kudu::KuduPartialRow* row);
+    bool copy_strings, kudu::KuduPartialRow* row) WARN_UNUSED_RESULT;
+
+/// Takes a Kudu client DataType and returns the corresponding Impala ColumnType.
+ColumnType KuduDataTypeToColumnType(kudu::client::KuduColumnSchema::DataType type);
+
+/// Utility function for creating an Impala Status object based on a kudu::Status object.
+/// 'k_status' is the kudu::Status object.
+/// 'prepend' is a string to be prepended to details of 'k_status' when creating the
+/// Impala Status object.
+/// Note that we don't translate the kudu::Status error code to Impala error code
+/// so the returned status' type is always of TErrorCode::GENERAL.
+inline Status FromKuduStatus(
+    const kudu::Status& k_status, const std::string prepend = "") {
+  if (LIKELY(k_status.ok())) return Status::OK();
+  if (prepend.empty()) return Status(k_status.ToString());
+  return Status(strings::Substitute("$0: $1", prepend, k_status.ToString()));
+}
 
 } /// namespace impala
 #endif

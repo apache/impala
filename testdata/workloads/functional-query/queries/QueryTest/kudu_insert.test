@@ -287,20 +287,33 @@ NumRowErrors: 7299
 ---- QUERY
 # Table with all supported types as primary key and distribution columns
 create table allkeytypes (i1 tinyint, i2 smallint, i3 int, i4 bigint, name string,
-  valf float, vald double, primary key (i1, i2, i3, i4, name)) partition by
-  hash partitions 3, range (partition value = (1,1,1,1,'1'),
-  partition value = (2,2,2,2,'2'), partition value = (3,3,3,3,'3')) stored as kudu
+  valt timestamp, valf float, vald double, primary key (i1, i2, i3, i4, name, valt))
+  partition by hash partitions 3, range
+  (partition value = (1,1,1,1,'1','2009-01-01 00:01:00'),
+  partition value = (2,2,2,2,'2','2009-01-01 00:02:00.100000000'),
+  partition value = (3,3,3,3,'3','2009-01-01 00:03:00.300000000')) stored as kudu
 ---- RESULTS
 ====
 ---- QUERY
 insert into allkeytypes select cast(id as tinyint), smallint_col, int_col,
-  cast (bigint_col/10 as bigint), string_col, float_col, double_col
-  from functional.alltypes where id > 0 and id < 10
+  cast (bigint_col/10 as bigint), string_col, timestamp_col, float_col, double_col
+  from functional.alltypes where id > 1 and id < 10
 ---- RESULTS
-: 3
+: 2
 ---- RUNTIME_PROFILE
-NumModifiedRows: 3
+NumModifiedRows: 2
 NumRowErrors: 6
+====
+---- QUERY
+# IMPALA-5871 - test that a cast is correctly added when inserting a string into a Kudu
+# timestamp partition column with distributed exec.
+set exec_single_node_rows_threshold=0;
+insert into allkeytypes values (1,1,1,1,'1','2009-01-01 00:01:00',null,null)
+---- RESULTS
+: 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
 ====
 ---- QUERY
 # Table with default values
@@ -436,5 +449,5 @@ set mem_limit=400m;
 create table kudu_test primary key(a, b) partition by hash(a, b) partitions 8 stored as kudu as
 select l_orderkey a, concat(l_comment, l_comment, l_comment) b from tpch.lineitem
 ---- RUNTIME_PROFILE
-row_regex: .*SpilledRuns: 0 \(0\)
+row_regex: .*SortType: Partial
 ====

@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="max_row_size" rev="2.10.0 IMPALA-3200">
+
+  <title>MAX_ROW_SIZE Query Option</title>
+  <titlealts audience="PDF"><navtitle>MAX_ROW_SIZE</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="hidden">MAX_ROW_SIZE query option</indexterm>
+      Ensures that Impala can process rows of at least the specified size. (Larger
+      rows might be successfully processed, but that is not guaranteed.) Applies when
+      constructing intermediate or final rows in the result set. This setting prevents
+      out-of-control memory use when accessing columns containing huge strings.
+    </p>
+
+<!--  MAX_ROW_SIZE: [524288] -->
+
+    <p conref="../shared/impala_common.xml#common/type_integer"/>
+
+    <p conref="../shared/impala_common.xml#common/default_blurb"/>
+    <p>
+      <codeph>524288</codeph> (512 KB)
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/units_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/added_in_2100"/>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+    <p>
+      If a query fails because it involves rows with long strings and/or
+      many columns, causing the total row size to exceed <codeph>MAX_ROW_SIZE</codeph>
+      bytes, increase the <codeph>MAX_ROW_SIZE</codeph> setting to accommodate
+      the total bytes stored in the largest row. Examine the error messages for any
+      failed queries to see the size of the row that caused the problem.
+    </p>
+    <p>
+      Impala attempts to handle rows that exceed the <codeph>MAX_ROW_SIZE</codeph>
+      value where practical, so in many cases, queries succeed despite having rows
+      that are larger than this setting.
+    </p>
+    <p>
+      Specifying a value that is substantially higher than actually needed can cause
+      Impala to reserve more memory than is necessary to execute the query.
+    </p>
+    <p>
+      In a Hadoop cluster with highly concurrent workloads and queries that process
+      high volumes of data, traditional SQL tuning advice about minimizing wasted memory
+      is worth remembering. For example, if a table has <codeph>STRING</codeph> columns
+      where a single value might be multiple megabytes, make sure that the
+      <codeph>SELECT</codeph> lists in queries only refer to columns that are actually
+      needed in the result set, instead of using the <codeph>SELECT *</codeph> shorthand.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      The following examples show the kinds of situations where it is necessary to
+      adjust the <codeph>MAX_ROW_SIZE</codeph> setting. First, we create a table
+      containing some very long values in <codeph>STRING</codeph> columns:
+    </p>
+
+<codeblock><![CDATA[
+create table big_strings (s1 string, s2 string, s3 string) stored as parquet;
+
+-- Turn off compression to more easily reason about data volume by doing SHOW TABLE STATS.
+-- Does not actually affect query success or failure, because MAX_ROW_SIZE applies when
+-- column values are materialized in memory.
+set compression_codec=none;
+set;
+...
+  MAX_ROW_SIZE: [524288]
+...
+
+-- A very small row.
+insert into big_strings values ('one', 'two', 'three');
+-- A row right around the default MAX_ROW_SIZE limit: a 500 KiB string and a 30 KiB string.
+insert into big_strings values (repeat('12345',100000), 'short', repeat('123',10000));
+-- A row that is too big if the query has to materialize both S1 and S3.
+insert into big_strings values (repeat('12345',100000), 'short', repeat('12345',100000));
+]]>
+</codeblock>
+
+    <p>
+      With the default <codeph>MAX_ROW_SIZE</codeph> setting, different queries succeed
+      or fail based on which column values have to be materialized during query processing:
+    </p>
+
+<codeblock><![CDATA[
+-- All the S1 values can be materialized within the 512 KB MAX_ROW_SIZE buffer.
+select count(distinct s1) from big_strings;
++--------------------+
+| count(distinct s1) |
++--------------------+
+| 2                  |
++--------------------+
+
+-- A row where even the S1 value is too large to materialize within MAX_ROW_SIZE.
+insert into big_strings values (repeat('12345',1000000), 'short', repeat('12345',1000000));
+
+-- The 5 MiB string is too large to materialize. The message explains the size of the result
+-- set row the query is attempting to materialize.
+select count(distinct(s1)) from big_strings;
+WARNINGS: Row of size 4.77 MB could not be materialized in plan node with id 1.
+  Increase the max_row_size query option (currently 512.00 KB) to process larger rows.
+
+-- If more columns are involved, the result set row being materialized is bigger.
+select count(distinct s1, s2, s3) from big_strings;
+WARNINGS: Row of size 9.54 MB could not be materialized in plan node with id 1.
+  Increase the max_row_size query option (currently 512.00 KB) to process larger rows.
+
+-- Column S2, containing only short strings, can still be examined.
+select count(distinct(s2)) from big_strings;
++----------------------+
+| count(distinct (s2)) |
++----------------------+
+| 2                    |
++----------------------+
+
+-- Queries that do not materialize the big column values are OK.
+select count(*) from big_strings;
++----------+
+| count(*) |
++----------+
+| 4        |
++----------+
+]]>
+</codeblock>
+
+    <p>
+      The following examples show how adjusting <codeph>MAX_ROW_SIZE</codeph> upward
+      allows queries involving the long string columns to succeed:
+    </p>
+
+<codeblock><![CDATA[
+-- Boosting MAX_ROW_SIZE moderately allows all S1 values to be materialized.
+set max_row_size=7mb;
+
+select count(distinct s1) from big_strings;
++--------------------+
+| count(distinct s1) |
++--------------------+
+| 3                  |
++--------------------+
+
+-- But the combination of S1 + S3 strings is still too large.
+select count(distinct s1, s2, s3) from big_strings;
+WARNINGS: Row of size 9.54 MB could not be materialized in plan node with id 1. Increase the max_row_size query option (currently 7.00 MB) to process larger rows.
+
+-- Boosting MAX_ROW_SIZE to larger than the largest row in the table allows
+-- all queries to complete successfully.
+set max_row_size=12mb;
+
+select count(distinct s1, s2, s3) from big_strings;
++----------------------------+
+| count(distinct s1, s2, s3) |
++----------------------------+
+| 4                          |
++----------------------------+
+]]>
+</codeblock>
+
+    <p>
+      The following examples show how to reason about appropriate values for
+      <codeph>MAX_ROW_SIZE</codeph>, based on the characteristics of the
+      columns containing the long values:
+    </p>
+
+<codeblock><![CDATA[
+-- With a large MAX_ROW_SIZE in place, we can examine the columns to
+-- understand the practical lower limit for MAX_ROW_SIZE based on the
+-- table structure and column values.
+select max(length(s1) + length(s2) + length(s3)) / 1e6 as megabytes from big_strings;
++-----------+
+| megabytes |
++-----------+
+| 10.000005 |
++-----------+
+
+-- We can also examine the 'Max Size' for each column after computing stats.
+compute stats big_strings;
+show column stats big_strings;
++--------+--------+------------------+--------+----------+-----------+
+| Column | Type   | #Distinct Values | #Nulls | Max Size | Avg Size  |
++--------+--------+------------------+--------+----------+-----------+
+| s1     | STRING | 2                | -1     | 5000000  | 2500002.5 |
+| s2     | STRING | 2                | -1     | 10       | 7.5       |
+| s3     | STRING | 2                | -1     | 5000000  | 2500005   |
++--------+--------+------------------+--------+----------+-----------+
+]]>
+</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref keyref="buffer_pool_limit"/>,
+      <xref keyref="default_spillable_buffer_size"/>,
+      <xref keyref="min_spillable_buffer_size"/>,
+      <xref keyref="scalability_buffer_pool"/>
+    </p>
+
+  </conbody>
+</concept>

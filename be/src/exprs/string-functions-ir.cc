@@ -294,7 +294,7 @@ StringVal StringFunctions::Replace(FunctionContext* context, const StringVal& st
   }
 
   StringVal result(context, buffer_space);
-  // If the result went over MAX_LENGTH, we can get a null result back
+  // result may be NULL if we went over MAX_LENGTH or the allocation failed.
   if (UNLIKELY(result.is_null)) return result;
 
   uint8_t* ptr = result.ptr;
@@ -333,23 +333,22 @@ StringVal StringFunctions::Replace(FunctionContext* context, const StringVal& st
       // Also no overflow: min_output <= MAX_LENGTH and delta <= MAX_LENGTH - 1
       const int64_t space_needed = min_output + delta;
       if (UNLIKELY(space_needed > buffer_space)) {
-        // Double at smaller sizes, but don't grow more than a megabyte a
-        // time at larger sizes.  Reasoning: let the allocator do its job
-        // and don't depend on policy here.
-        static_assert(StringVal::MAX_LENGTH % (1 << 20) == 0,
-            "Math requires StringVal::MAX_LENGTH to be a multiple of 1MB");
-        // Must compute next power of two using 64-bit math to avoid signed overflow
-        // The following DCHECK was supposed to be a static assertion, but C++11 is
-        // broken and doesn't declare std::min or std::max to be constexpr.  Fix this
-        // when eventually the minimum supported standard is raised to at least C++14
-        DCHECK_EQ(static_cast<int>(std::min<int64_t>(
-            BitUtil::RoundUpToPowerOfTwo(StringVal::MAX_LENGTH+1),
-            StringVal::MAX_LENGTH + (1 << 20))),
-            StringVal::MAX_LENGTH + (1 << 20));
-        buffer_space = static_cast<int>(std::min<int64_t>(
-            BitUtil::RoundUpToPowerOfTwo(space_needed),
-            space_needed + (1 << 20)));
-        if (UNLIKELY(!result.Resize(context, buffer_space))) return StringVal::null();
+        // Check to see if we can allocate a large enough buffer.
+        if (space_needed > StringVal::MAX_LENGTH) {
+          context->SetError(
+              "String length larger than allowed limit of 1 GB character data.");
+          return StringVal::null();
+        }
+        // Double the buffer size whenever it fills up to amortise cost of resizing.
+        // Must compute next power of two using 64-bit math to avoid signed overflow.
+        buffer_space = min<int>(StringVal::MAX_LENGTH,
+            static_cast<int>(BitUtil::RoundUpToPowerOfTwo(space_needed)));
+
+        // Give up if the allocation fails or we hit an error. This prevents us from
+        // continuing to blow past the mem limit.
+        if (UNLIKELY(!result.Resize(context, buffer_space) || context->has_error())) {
+          return StringVal::null();
+        }
         // Don't forget to move the pointer
         ptr = result.ptr + bytes_produced;
       }
@@ -814,7 +813,7 @@ IntVal StringFunctions::FindInSet(FunctionContext* context, const StringVal& str
   do {
     end = start;
     // Position end.
-    while(str_set.ptr[end] != ',' && end < str_set.len) ++end;
+    while (end < str_set.len && str_set.ptr[end] != ',') ++end;
     StringValue token(reinterpret_cast<char*>(str_set.ptr) + start, end - start);
     if (str_sv.Eq(token)) return IntVal(token_index);
 

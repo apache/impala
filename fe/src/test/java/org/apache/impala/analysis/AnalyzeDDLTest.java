@@ -44,7 +44,6 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.RuntimeEnv;
-import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TDescribeTableParams;
 import org.apache.impala.util.MetaStoreUtil;
@@ -305,24 +304,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           " 'file:///test-warehouse/alltypes/y2050m12' uncached",
           "The specified cache pool does not exist: nonExistentTestPool");
     }
-
-    // Test the limit for the number of partitions
-    StringBuilder stmt = new StringBuilder("alter table functional.alltypes add");
-    int year;
-    int month;
-    for (int i = 0; i < CatalogOpExecutor.MAX_PARTITION_UPDATES_PER_RPC; ++i) {
-      year = i/12 + 2050;
-      month = i%12 + 1;
-      stmt.append(String.format(" partition(year=%d, month=%d)", year, month));
-    }
-    AnalyzesOk(stmt.toString());
-    // Over the limit by one partition
-    year = CatalogOpExecutor.MAX_PARTITION_UPDATES_PER_RPC/12 + 2050;
-    month = CatalogOpExecutor.MAX_PARTITION_UPDATES_PER_RPC%12 + 1;
-    stmt.append(String.format(" partition(year=%d, month=%d)", year, month));
-    AnalysisError(stmt.toString(),
-        String.format("One ALTER TABLE ADD PARTITION cannot add more than %d partitions.",
-        CatalogOpExecutor.MAX_PARTITION_UPDATES_PER_RPC));
 
     // If 'IF NOT EXISTS' is not used, ALTER TABLE ADD PARTITION cannot add a preexisting
     // partition to a table.
@@ -1587,6 +1568,13 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "partition value = 30) stored as kudu as select id, bool_col, tinyint_col, " +
         "smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, " +
         "string_col from functional.alltypestiny");
+    // Creating unpartitioned table results in a warning.
+    AnalyzesOk("create table t primary key(id) stored as kudu as select id, bool_col " +
+        "from functional.alltypestiny",
+        "Unpartitioned Kudu tables are inefficient for large data sizes.");
+    // IMPALA-5796: CTAS into a Kudu table with expr rewriting.
+    AnalyzesOk("create table t primary key(id) stored as kudu as select id, bool_col " +
+        "from functional.alltypestiny where id between 0 and 10");
     // CTAS in an external Kudu table
     AnalysisError("create external table t stored as kudu " +
         "tblproperties('kudu.table_name'='t') as select id, int_col from " +
@@ -2197,9 +2185,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table tab (x int) tblproperties (" +
         "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler')",
         CreateTableStmt.KUDU_STORAGE_HANDLER_ERROR_MESSAGE);
-    AnalysisError("create table tab (x int primary key) stored as kudu tblproperties (" +
+    // Creating unpartitioned table results in a warning.
+    AnalyzesOk("create table tab (x int primary key) stored as kudu tblproperties (" +
         "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler')",
-        "Table partitioning must be specified for managed Kudu tables.");
+        "Unpartitioned Kudu tables are inefficient for large data sizes.");
     // Invalid value for number of replicas
     AnalysisError("create table t (x int primary key) stored as kudu tblproperties (" +
         "'kudu.num_tablet_replicas'='1.1')",
@@ -2211,9 +2200,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table tab (a int primary key) partition by hash (a) " +
         "partitions 3 stored as kudu location '/test-warehouse/'",
         "LOCATION cannot be specified for a Kudu table.");
-    // PARTITION BY is required for managed tables.
-    AnalysisError("create table tab (a int, primary key (a)) stored as kudu",
-        "Table partitioning must be specified for managed Kudu tables.");
+    // Creating unpartitioned table results in a warning.
+    AnalyzesOk("create table tab (a int, primary key (a)) stored as kudu",
+        "Unpartitioned Kudu tables are inefficient for large data sizes.");
     AnalysisError("create table tab (a int) stored as kudu",
         "A primary key is required for a Kudu table.");
     // Using ROW FORMAT with a Kudu table
@@ -2228,7 +2217,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Test unsupported Kudu types
     List<String> unsupportedTypes = Lists.newArrayList(
         "DECIMAL(9,0)", "VARCHAR(20)", "CHAR(20)",
-        "STRUCT<F1:INT,F2:STRING>", "ARRAY<INT>", "MAP<STRING,STRING>");
+        "STRUCT<f1:INT,f2:STRING>", "ARRAY<INT>", "MAP<STRING,STRING>");
     for (String t: unsupportedTypes) {
       String expectedError = String.format(
           "Cannot create table 'tab': Type %s is not supported in Kudu", t);
@@ -3122,6 +3111,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create aggregate function foo(int) RETURNS struct<f:int> " +
         loc + "UPDATE_FN='AggUpdate'",
         "Type 'STRUCT<f:INT>' is not supported in UDFs/UDAs.");
+    AnalysisError("create aggregate function foo(int) RETURNS int " +
+        "INTERMEDIATE fixed_uda_intermediate(10) " + loc + " UPDATE_FN='foo'",
+        "Syntax error in line 1");
 
     // Test missing .ll file. TODO: reenable when we can run IR UDAs
     AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +

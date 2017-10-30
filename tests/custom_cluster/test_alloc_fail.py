@@ -29,7 +29,7 @@ class TestAllocFail(CustomClusterTestSuite):
     return 'functional-query'
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--stress_free_pool_alloc=1")
+  @CustomClusterTestSuite.with_args("--stress_fn_ctx_alloc=1")
   def test_alloc_fail_init(self, vector):
     self.run_test_case('QueryTest/alloc-fail-init', vector)
 
@@ -37,7 +37,7 @@ class TestAllocFail(CustomClusterTestSuite):
   @pytest.mark.xfail(run=True, reason="IMPALA-2925: the execution is not deterministic "
                      "so some tests sometimes don't fail as expected")
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--stress_free_pool_alloc=3")
+  @CustomClusterTestSuite.with_args("--stress_fn_ctx_alloc=3")
   def test_alloc_fail_update(self, vector, unique_database):
     # Note that this test relies on pre-aggregation to exercise the Serialize() path so
     # query option 'num_nodes' must not be 1. CustomClusterTestSuite.add_test_dimensions()

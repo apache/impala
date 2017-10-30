@@ -2364,3 +2364,73 @@ PLAN-ROOT SINK
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> t1.id
 ====
+# IMPALA-1882: Confirm that first_value function used without a partition by and order
+# by clause does not need a sort node
+select first_value(tinyint_col ignore nulls) over () from functional.alltypesagg
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:ANALYTIC
+|  functions: first_value_ignore_nulls(tinyint_col)
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 files=11 size=814.73KB
+====
+# IMPALA-1882: Confirm that last_value function used without a partition by and order
+# by clause does not need a sort node
+select last_value(tinyint_col ignore nulls) over () from functional.alltypesagg
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:ANALYTIC
+|  functions: last_value_ignore_nulls(tinyint_col)
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 files=11 size=814.73KB
+====
+# IMPALA-1882: Confirm that first_value function using only a partition by clause
+# sorts over partition column
+select *, first_value(id) over (partition by bool_col) first_val from
+functional.alltypessmall;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:ANALYTIC
+|  functions: first_value(id)
+|  partition by: bool_col
+|
+01:SORT
+|  order by: bool_col ASC NULLS FIRST
+|
+03:EXCHANGE [HASH(bool_col)]
+|
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 files=4 size=6.32KB
+====
+# IMPALA-1882: Confirm that last_value function using only a partition by clause
+# sorts over partition column
+select *, last_value(id) over (partition by bool_col) first_val from
+functional.alltypessmall;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:ANALYTIC
+|  functions: last_value(id)
+|  partition by: bool_col
+|
+01:SORT
+|  order by: bool_col ASC NULLS FIRST
+|
+03:EXCHANGE [HASH(bool_col)]
+|
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 files=4 size=6.32KB
+====

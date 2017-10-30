@@ -202,6 +202,8 @@ Therefore, this is not an efficient construct to use with Impala queries for HBa
 <codeblock>SELECT * FROM t1 one WHERE id IN (SELECT parent FROM t1 two WHERE t1.parent = t2.id);
 </codeblock>
 
+    <p conref="../shared/impala_common.xml#common/straight_join_nested_queries"/>
+
     <p conref="../shared/impala_common.xml#common/internals_blurb"/>
 
     <p>
@@ -312,6 +314,9 @@ Therefore, this is not an efficient construct to use with Impala queries for HBa
           <codeph><varname>database_name</varname>.<varname>table_name</varname>.<varname>column_name</varname></codeph>)
           when referring to any column from the outer query block within a subquery.
         </p>
+      </li>
+      <li>
+        <p conref="../shared/impala_common.xml#common/tablesample_caveat"/>
       </li>
     </ul>
 

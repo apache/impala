@@ -20,6 +20,10 @@
 #include "gen-cpp/Types_types.h"
 #include <vector>
 
+namespace kudu {
+class Sockaddr;
+} // namespace kudu
+
 namespace impala {
 
 /// Type to store hostnames, which can be rfc1123 hostnames or IPv4 addresses.
@@ -28,11 +32,14 @@ typedef std::string Hostname;
 /// Type to store IPv4 addresses.
 typedef std::string IpAddr;
 
+/// Returns true if 'addr' is a fully resolved IP address, rather than a fqdn + port.
+bool IsResolvedAddress(const TNetworkAddress& addr);
+
 /// Looks up all IP addresses associated with a given hostname and returns one of them via
 /// 'address'. If the IP addresses of a host don't change, then subsequent calls will
 /// always return the same address. Returns an error status if any system call failed,
 /// otherwise OK. Even if OK is returned, addresses may still be of zero length.
-Status HostnameToIpAddr(const Hostname& hostname, IpAddr* ip);
+Status HostnameToIpAddr(const Hostname& hostname, IpAddr* ip) WARN_UNUSED_RESULT;
 
 /// Finds the first non-localhost IP address in the given list. Returns
 /// true if such an address was found, false otherwise.
@@ -40,7 +47,7 @@ bool FindFirstNonLocalhost(const std::vector<std::string>& addresses, std::strin
 
 /// Sets the output argument to the system defined hostname.
 /// Returns OK if a hostname can be found, false otherwise.
-Status GetHostname(std::string* hostname);
+Status GetHostname(std::string* hostname) WARN_UNUSED_RESULT;
 
 /// Utility method because Thrift does not supply useful constructors
 TNetworkAddress MakeNetworkAddress(const std::string& hostname, int port);
@@ -61,6 +68,11 @@ bool IsWildcardAddress(const std::string& ipaddress);
 /// Utility method to print address as address:port
 std::string TNetworkAddressToString(const TNetworkAddress& address);
 
+/// Utility method to convert TNetworkAddress to Kudu sock addr.
+/// Note that 'address' has to contain a resolved IP address.
+Status TNetworkAddressToSockaddr(const TNetworkAddress& address,
+    kudu::Sockaddr* sockaddr);
+
 /// Prints a hostport as ipaddress:port
 std::ostream& operator<<(std::ostream& out, const TNetworkAddress& hostport);
 
@@ -68,4 +80,5 @@ std::ostream& operator<<(std::ostream& out, const TNetworkAddress& hostport);
 /// a free ephemeral port can't be found after 100 tries. If 'used_ports' is non-NULL,
 /// does not select those ports and adds the selected port to 'used_ports'.
 int FindUnusedEphemeralPort(std::vector<int>* used_ports);
-}
+
+} // namespace impala

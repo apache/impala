@@ -49,7 +49,7 @@ namespace impala {
 /// TYPE_BIGINT/BigIntVal: { i8, i64 }
 /// TYPE_FLOAT/FloatVal: i64
 /// TYPE_DOUBLE/DoubleVal: { i8, double }
-/// TYPE_STRING/StringVal: { i64, i8* }
+/// TYPE_STRING,TYPE_VARCHAR,TYPE_CHAR,TYPE_FIXED_UDA_INTERMEDIATE/StringVal: { i64, i8* }
 /// TYPE_TIMESTAMP/TimestampVal: { i64, i64 }
 /// TYPE_DECIMAL/DecimalVal (isn't lowered):
 /// %"struct.impala_udf::DecimalVal" { {i8}, [15 x i8], {i128} }
@@ -190,26 +190,26 @@ class CodegenAnyVal {
   /// unlowered type. This *Val should be non-null. The output variable is called 'name'.
   llvm::Value* GetUnloweredPtr(const std::string& name = "") const;
 
-  /// Set this *Val's value based on 'raw_val'. 'raw_val' should be a native type,
-  /// StringValue, or TimestampValue.
-  void SetFromRawValue(llvm::Value* raw_val);
+  /// Load this *Val's value from 'raw_val_ptr', which must be a pointer to the matching
+  /// native type, e.g. a StringValue or TimestampValue slot in a tuple.
+  void LoadFromNativePtr(llvm::Value* raw_val_ptr);
 
-  /// Converts this *Val's value to a native type, StringValue, TimestampValue, etc.
+  /// Stores this *Val's value into a native slot, e.g. a StringValue or TimestampValue.
   /// This should only be used if this *Val is not null.
   ///
-  /// If 'pool_val' is non-NULL, var-len data will be copied into 'pool_val'.
-  /// 'pool_val' has to be of type MemPool*.
-  llvm::Value* ToNativeValue(llvm::Value* pool_val = nullptr);
-
-  /// Sets 'native_ptr' to this *Val's value. If non-NULL, 'native_ptr' should be a
-  /// pointer to a native type, StringValue, TimestampValue, etc. If NULL, a pointer is
-  /// alloca'd. In either case the pointer is returned. This should only be used if this
-  /// *Val is not null.
+  /// Not valid to call for FIXED_UDA_INTERMEDIATE: in that case the StringVal must be
+  /// set up to point directly to the underlying slot, e.g. by LoadFromNativePtr().
   ///
   /// If 'pool_val' is non-NULL, var-len data will be copied into 'pool_val'.
   /// 'pool_val' has to be of type MemPool*.
-  llvm::Value* ToNativePtr(
-      llvm::Value* native_ptr = nullptr, llvm::Value* pool_val = nullptr);
+  void StoreToNativePtr(llvm::Value* raw_val_ptr, llvm::Value* pool_val = nullptr);
+
+  /// Creates a pointer, e.g. StringValue* to an alloca() allocation with the
+  /// equivalent of this value. This should only be used if this Val is not null.
+  ///
+  /// If 'pool_val' is non-NULL, var-len data will be copied into 'pool_val'.
+  /// 'pool_val' has to be of type MemPool*.
+  llvm::Value* ToNativePtr(llvm::Value* pool_val = nullptr);
 
   /// Writes this *Val's value to the appropriate slot in 'tuple' if non-null, or sets the
   /// appropriate null bit if null. This assumes null bits are initialized to 0. Analogous
@@ -230,9 +230,9 @@ class CodegenAnyVal {
   llvm::Value* Eq(CodegenAnyVal* other);
 
   /// Compares this *Val to the value of 'native_ptr'. 'native_ptr' should be a pointer to
-  /// a native type, StringValue, or TimestampValue. This *Val should match 'native_ptr's
-  /// type (e.g. if this is an IntVal, 'native_ptr' should have type i32*). Returns the i1
-  /// result of the equality comparison.
+  /// a native type, e.g. StringValue, or TimestampValue. This *Val should match
+  /// 'native_ptr's type (e.g. if this is an IntVal, 'native_ptr' should have type i32*).
+  /// Returns the i1 result of the equality comparison.
   llvm::Value* EqToNativePtr(llvm::Value* native_ptr);
 
   /// Returns the i32 result of comparing this value to 'other' (similar to

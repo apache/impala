@@ -79,9 +79,3 @@ class TestKuduClientTimeout(CustomClusterTestSuite, KuduTestSuite):
   def test_impalad_timeout(self, vector):
     """Check impalad behavior when -kudu_operation_timeout_ms is too low."""
     self.run_test_case('QueryTest/kudu-timeouts-impalad', vector)
-
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(catalogd_args="-kudu_operation_timeout_ms=1")
-  def test_catalogd_timeout(self, vector):
-    """Check catalogd behavior when -kudu_operation_timeout_ms is too low."""
-    self.run_test_case('QueryTest/kudu-timeouts-catalogd', vector)

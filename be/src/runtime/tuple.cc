@@ -233,8 +233,7 @@ void Tuple::MaterializeExprs(TupleRow* row, const TupleDescriptor& desc,
 }
 
 // Codegens an unrolled version of MaterializeExprs(). Uses codegen'd exprs and slot
-// writes. If 'pool' is non-NULL, string data is copied into it. Note that the generated
-// function ignores its 'pool' arg; instead we hardcode the pointer in the IR.
+// writes. If 'pool' is non-NULL, string data is copied into it.
 //
 // Example IR for materializing a string column with non-NULL 'pool':
 //
@@ -306,9 +305,8 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_
     Status status = slot_materialize_exprs[i]->GetCodegendComputeFn(codegen,
         &materialize_expr_fns[i]);
     if (!status.ok()) {
-      stringstream ss;
-      ss << "Could not codegen CodegenMaterializeExprs: " << status.GetDetail();
-      return Status(ss.str());
+      return Status::Expected(Substitute("Could not codegen CodegenMaterializeExprs: $0",
+            status.GetDetail()));
     }
   }
 

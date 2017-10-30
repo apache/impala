@@ -127,6 +127,12 @@ public class HdfsScanNode extends ScanNode {
   // scan ranges than would have been estimated assuming a uniform distribution.
   private final static double SCAN_RANGE_SKEW_FACTOR = 1.2;
 
+  // The minimum amount of memory we estimate a scan will use. The number is
+  // derived experimentally: running metadata-only Parquet count(*) scans on TPC-H
+  // lineitem and TPC-DS store_sales of different sizes resulted in memory consumption
+  // between 128kb and 1.1mb.
+  private final static long MIN_MEMORY_ESTIMATE = 1 * 1024 * 1024;
+
   private final HdfsTable tbl_;
 
   // List of partitions to be scanned. Partitions have been pruned.
@@ -1021,7 +1027,7 @@ public class HdfsScanNode extends ScanNode {
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     Preconditions.checkNotNull(scanRanges_, "Cost estimation requires scan ranges.");
     if (scanRanges_.isEmpty()) {
-      nodeResourceProfile_ = new ResourceProfile(0, 0);
+      nodeResourceProfile_ = ResourceProfile.noReservation(0);
       return;
     }
     Preconditions.checkState(0 < numNodes_ && numNodes_ <= scanRanges_.size());
@@ -1031,9 +1037,11 @@ public class HdfsScanNode extends ScanNode {
     int perHostScanRanges;
     if (table.getMajorityFormat() == HdfsFileFormat.PARQUET) {
       // For the purpose of this estimation, the number of per-host scan ranges for
-      // Parquet files are equal to the number of non-partition columns scanned.
+      // Parquet files are equal to the number of columns read from the file. I.e.
+      // excluding partition columns and columns that are populated from file metadata.
       perHostScanRanges = 0;
       for (SlotDescriptor slot: desc_.getSlots()) {
+        if (!slot.isMaterialized() || slot == countStarSlot_) continue;
         if (slot.getColumn() == null ||
             slot.getColumn().getPosition() >= table.getNumClusteringCols()) {
           ++perHostScanRanges;
@@ -1075,7 +1083,8 @@ public class HdfsScanNode extends ScanNode {
           PrintUtils.printBytes(perHostUpperBound)));
       perInstanceMemEstimate = perHostUpperBound;
     }
-    nodeResourceProfile_ = new ResourceProfile(perInstanceMemEstimate, 0);
+    perInstanceMemEstimate = Math.max(perInstanceMemEstimate, MIN_MEMORY_ESTIMATE);
+    nodeResourceProfile_ = ResourceProfile.noReservation(perInstanceMemEstimate);
   }
 
   /**

@@ -97,9 +97,10 @@ Status PlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
       RETURN_IF_ERROR(results_->AddOneRow(result_row, scales));
       ++current_batch_row;
     }
+    // Prevent expr result allocations from accumulating.
+    expr_results_pool_->Clear();
     // Signal the consumer.
     results_ = nullptr;
-    ScalarExprEvaluator::FreeLocalAllocations(output_expr_evals_);
     consumer_cv_.notify_all();
   }
   return Status::OK();

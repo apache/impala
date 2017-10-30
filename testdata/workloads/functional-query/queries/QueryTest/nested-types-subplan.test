@@ -657,3 +657,16 @@ where c_custkey % 100 = 0 and order_cnt != union_cnt - 3;
 ---- TYPES
 bigint,bigint,bigint
 ====
+---- QUERY
+# IMPALA-2368: Resetting nested subplans works correctly with an analytic sort.
+select count(o_orderkey)
+from tpch_nested_parquet.customer c
+inner join c.c_orders o
+where c_custkey < 10 and c_custkey in
+ (select lead(l.l_linenumber) over (partition by l.l_shipdate order by l.l_linenumber)
+  from o.o_lineitems l)
+---- RESULTS
+3
+---- TYPES
+bigint
+====

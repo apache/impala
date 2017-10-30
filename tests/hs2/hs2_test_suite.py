@@ -124,7 +124,6 @@ class HS2TestSuite(ImpalaTestSuite):
     fetch_results_req.maxRows = size
     fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
     HS2TestSuite.check_response(fetch_results_resp)
-    num_rows = size
     if expected_num_rows is not None:
       assert self.get_num_rows(fetch_results_resp.results) == expected_num_rows
     return fetch_results_resp
@@ -228,3 +227,14 @@ class HS2TestSuite(ImpalaTestSuite):
       sleep(interval)
     assert False, 'Did not reach expected operation state %s in time, actual state was ' \
         '%s' % (expected_state, get_operation_status_resp.operationState)
+
+  def execute_statement(self, statement, conf_overlay=None):
+    """Executes statement and returns response, which is checked."""
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = statement
+    if conf_overlay:
+      execute_statement_req.confOverlay = conf_overlay
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    HS2TestSuite.check_response(execute_statement_resp)
+    return execute_statement_resp

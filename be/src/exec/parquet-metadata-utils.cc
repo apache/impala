@@ -339,6 +339,7 @@ Status ParquetSchemaResolver::CreateSchemaTree(
     return Status(Substitute("File '$0' corrupt: could not reconstruct schema tree from "
             "flattened schema in file metadata", filename_));
   }
+  bool is_root_schema = (*idx == 0);
   node->element = &schema[*idx];
   ++(*idx);
 
@@ -363,7 +364,8 @@ Status ParquetSchemaResolver::CreateSchemaTree(
 
   if (node->element->repetition_type == parquet::FieldRepetitionType::OPTIONAL) {
     ++max_def_level;
-  } else if (node->element->repetition_type == parquet::FieldRepetitionType::REPEATED) {
+  } else if (node->element->repetition_type == parquet::FieldRepetitionType::REPEATED &&
+             !is_root_schema /*PARQUET-843*/) {
     ++max_rep_level;
     // Repeated fields add a definition level. This is used to distinguish between an
     // empty list and a list with an item in it.

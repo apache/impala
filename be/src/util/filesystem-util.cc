@@ -158,4 +158,16 @@ uint64_t FileSystemUtil::MaxNumFileHandles() {
   return 0ul;
 }
 
+Status FileSystemUtil::CopyFile(const string& from_path, const string& to_path) {
+  error_code errcode;
+  filesystem::copy_file(from_path, to_path, filesystem::copy_option::overwrite_if_exists,
+      errcode);
+  if (errcode != errc::success) {
+    return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute(
+        "Encountered exception while copying file from path $0 to $1: $2",
+        from_path, to_path, errcode.message())));
+  }
+  return Status::OK();
+}
+
 } // namespace impala

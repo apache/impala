@@ -32,6 +32,7 @@ add_library(Util
   bitmap.cc
   bit-util.cc
   bloom-filter.cc
+  bloom-filter-ir.cc
   coding-util.cc
   codec.cc
   common-metrics.cc
@@ -70,6 +71,7 @@ add_library(Util
   redactor.cc
   runtime-profile.cc
   simple-logger.cc
+  string-parser.cc
   symbols-util.cc
   static-asserts.cc
   summary-util.cc
@@ -83,7 +85,7 @@ add_library(Util
   webserver.cc
   ${MUSTACHE_SRC_DIR}/mustache.cc
 )
-add_dependencies(Util thrift-deps gen_ir_descriptions)
+add_dependencies(Util gen-deps gen_ir_descriptions)
 
 # Squeasel requires C99 compatibility to build.
 SET_SOURCE_FILES_PROPERTIES(${SQUEASEL_SRC_DIR}/squeasel.c
@@ -132,5 +134,6 @@ ADD_BE_TEST(runtime-profile-test)
 ADD_BE_TEST(string-parser-test)
 ADD_BE_TEST(symbols-util-test)
 ADD_BE_TEST(thread-pool-test)
+ADD_BE_TEST(time-test)
 ADD_BE_TEST(uid-util-test)
 ADD_BE_TEST(webserver-test)

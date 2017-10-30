@@ -345,18 +345,24 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-07:EXCHANGE [UNPARTITIONED]
+09:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
-04:AGGREGATE [FINALIZE]
-|  output: count(int_col)
+08:AGGREGATE [FINALIZE]
+|  output: count:merge(int_col)
 |  group by: t.bigint_col
 |  limit: 10
+|
+07:EXCHANGE [HASH(t.bigint_col)]
+|
+04:AGGREGATE [STREAMING]
+|  output: count(int_col)
+|  group by: t.bigint_col
 |
 06:AGGREGATE
 |  group by: t.bigint_col, int_col
 |
-05:EXCHANGE [HASH(t.bigint_col)]
+05:EXCHANGE [HASH(t.bigint_col,int_col)]
 |
 03:AGGREGATE [STREAMING]
 |  group by: bigint_col, int_col
@@ -458,19 +464,25 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-07:EXCHANGE [UNPARTITIONED]
+09:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
-04:AGGREGATE [FINALIZE]
-|  output: count(int_col), count:merge(smallint_col)
+08:AGGREGATE [FINALIZE]
+|  output: count:merge(int_col), count:merge(smallint_col)
 |  group by: t.bigint_col
 |  limit: 10
+|
+07:EXCHANGE [HASH(t.bigint_col)]
+|
+04:AGGREGATE [STREAMING]
+|  output: count(int_col), count:merge(smallint_col)
+|  group by: t.bigint_col
 |
 06:AGGREGATE
 |  output: count:merge(smallint_col)
 |  group by: t.bigint_col, int_col
 |
-05:EXCHANGE [HASH(t.bigint_col)]
+05:EXCHANGE [HASH(t.bigint_col,int_col)]
 |
 03:AGGREGATE [STREAMING]
 |  output: count(smallint_col)
@@ -519,19 +531,25 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-10:EXCHANGE [UNPARTITIONED]
+12:EXCHANGE [UNPARTITIONED]
 |  limit: 10
 |
-05:AGGREGATE [FINALIZE]
-|  output: count(int_col), count:merge(smallint_col)
+11:AGGREGATE [FINALIZE]
+|  output: count:merge(int_col), count:merge(smallint_col)
 |  group by: t.bigint_col
 |  limit: 10
+|
+10:EXCHANGE [HASH(t.bigint_col)]
+|
+05:AGGREGATE [STREAMING]
+|  output: count(int_col), count:merge(smallint_col)
+|  group by: t.bigint_col
 |
 09:AGGREGATE
 |  output: count:merge(smallint_col)
 |  group by: t.bigint_col, int_col
 |
-08:EXCHANGE [HASH(t.bigint_col)]
+08:EXCHANGE [HASH(t.bigint_col,int_col)]
 |
 04:AGGREGATE [STREAMING]
 |  output: count(smallint_col)
@@ -569,7 +587,7 @@ PLAN-ROOT SINK
 |  group by: l_partkey
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   partitions=1/1 files=3 size=193.74MB
+   partitions=1/1 files=3 size=193.92MB
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -592,7 +610,7 @@ PLAN-ROOT SINK
 |  group by: l_partkey
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   partitions=1/1 files=3 size=193.74MB
+   partitions=1/1 files=3 size=193.92MB
 ====
 # test that aggregations are not placed below an unpartitioned exchange with a limit
 select count(*) from (select * from functional.alltypes limit 10) t
@@ -883,16 +901,22 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-05:EXCHANGE [UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |
-02:AGGREGATE [FINALIZE]
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(CAST(timestamp_col AS STRING)), group_concat:merge(CAST(timestamp_col AS STRING))
+|  group by: year
+|
+05:EXCHANGE [HASH(year)]
+|
+02:AGGREGATE [STREAMING]
 |  output: count(CAST(timestamp_col AS STRING)), group_concat(CAST(timestamp_col AS STRING))
 |  group by: year
 |
 04:AGGREGATE
 |  group by: year, CAST(timestamp_col AS STRING)
 |
-03:EXCHANGE [HASH(year)]
+03:EXCHANGE [HASH(year,CAST(timestamp_col AS STRING))]
 |
 01:AGGREGATE [STREAMING]
 |  group by: year, CAST(timestamp_col AS STRING)
@@ -998,9 +1022,15 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-05:EXCHANGE [UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |
-02:AGGREGATE [FINALIZE]
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(date_string_col), group_concat:merge(date_string_col, '-'), count:merge(*)
+|  group by: month, year
+|
+05:EXCHANGE [HASH(month,year)]
+|
+02:AGGREGATE [STREAMING]
 |  output: count(date_string_col), group_concat(date_string_col, '-'), count:merge(*)
 |  group by: month, year
 |
@@ -1008,7 +1038,7 @@ PLAN-ROOT SINK
 |  output: count:merge(*)
 |  group by: month, year, date_string_col
 |
-03:EXCHANGE [HASH(month,year)]
+03:EXCHANGE [HASH(month,year,date_string_col)]
 |
 01:AGGREGATE [STREAMING]
 |  output: count(*)
@@ -1093,12 +1123,12 @@ PLAN-ROOT SINK
 |--05:EXCHANGE [HASH(o_custkey)]
 |  |
 |  01:SCAN HDFS [tpch_parquet.orders]
-|     partitions=1/1 files=2 size=54.00MB
+|     partitions=1/1 files=2 size=54.20MB
 |
 04:EXCHANGE [HASH(c_custkey)]
 |
 00:SCAN HDFS [tpch_parquet.customer]
-   partitions=1/1 files=1 size=12.27MB
+   partitions=1/1 files=1 size=12.34MB
    predicates: c_nationkey = 16
    runtime filters: RF000 -> c_custkey
 ====
@@ -1133,12 +1163,12 @@ PLAN-ROOT SINK
 |--06:EXCHANGE [HASH(c_custkey)]
 |  |
 |  01:SCAN HDFS [tpch_parquet.customer]
-|     partitions=1/1 files=1 size=12.27MB
+|     partitions=1/1 files=1 size=12.34MB
 |
 05:EXCHANGE [HASH(o_custkey)]
 |
 00:SCAN HDFS [tpch_parquet.orders]
-   partitions=1/1 files=2 size=54.00MB
+   partitions=1/1 files=2 size=54.20MB
    runtime filters: RF000 -> o_custkey
 ====
 # Distinct grouping aggregation where input is partitioned on distinct and grouping exprs.
@@ -1150,9 +1180,15 @@ group by 1
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-07:EXCHANGE [UNPARTITIONED]
+09:EXCHANGE [UNPARTITIONED]
 |
-04:AGGREGATE [FINALIZE]
+08:AGGREGATE [FINALIZE]
+|  output: count:merge(c_custkey)
+|  group by: c_custkey
+|
+07:EXCHANGE [HASH(c_custkey)]
+|
+04:AGGREGATE [STREAMING]
 |  output: count(c_custkey)
 |  group by: c_custkey
 |
@@ -1166,12 +1202,12 @@ PLAN-ROOT SINK
 |--06:EXCHANGE [HASH(c_custkey)]
 |  |
 |  01:SCAN HDFS [tpch_parquet.customer]
-|     partitions=1/1 files=1 size=12.27MB
+|     partitions=1/1 files=1 size=12.34MB
 |
 05:EXCHANGE [HASH(o_custkey)]
 |
 00:SCAN HDFS [tpch_parquet.orders]
-   partitions=1/1 files=2 size=54.00MB
+   partitions=1/1 files=2 size=54.20MB
    runtime filters: RF000 -> o_custkey
 ====
 # Complex aggregation when two joins and an agg end up in same fragment.
@@ -1205,7 +1241,7 @@ PLAN-ROOT SINK
 |--08:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpch_parquet.customer]
-|     partitions=1/1 files=1 size=12.27MB
+|     partitions=1/1 files=1 size=12.34MB
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey, l_returnflag = o_clerk
@@ -1214,13 +1250,13 @@ PLAN-ROOT SINK
 |--07:EXCHANGE [HASH(o_orderkey,o_clerk)]
 |  |
 |  01:SCAN HDFS [tpch_parquet.orders]
-|     partitions=1/1 files=2 size=54.00MB
+|     partitions=1/1 files=2 size=54.20MB
 |     runtime filters: RF000 -> o_custkey, RF001 -> o_comment
 |
 06:EXCHANGE [HASH(l_orderkey,l_returnflag)]
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   partitions=1/1 files=3 size=193.61MB
+   partitions=1/1 files=3 size=193.92MB
    runtime filters: RF002 -> l_orderkey, RF003 -> l_returnflag
 ====
 # IMPALA-4263: Grouping agg needs a merge step because the grouping exprs reference a

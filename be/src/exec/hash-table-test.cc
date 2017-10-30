@@ -17,24 +17,27 @@
 
 #include <boost/scoped_ptr.hpp>
 
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <iostream>
+#include <limits>
 #include <vector>
 
-#include "testutil/gtest-util.h"
 #include "common/compiler-util.h"
 #include "common/init.h"
 #include "exec/hash-table.inline.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/slot-ref.h"
+#include "runtime/bufferpool/buffer-pool.h"
+#include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/string-value.h"
 #include "runtime/test-env.h"
 #include "runtime/tuple-row.h"
 #include "service/fe-support.h"
+#include "testutil/gtest-util.h"
 #include "util/cpu-info.h"
 #include "util/runtime-profile-counters.h"
 #include "util/test-info.h"
@@ -51,9 +54,16 @@ class HashTableTest : public testing::Test {
   HashTableTest() : mem_pool_(&tracker_) {}
 
  protected:
+  /// Temporary runtime environment for the hash table.
   scoped_ptr<TestEnv> test_env_;
   RuntimeState* runtime_state_;
+
+  /// Hash tables and associated clients - automatically closed in TearDown().
+  vector<BufferPool::ClientHandle*> clients_;
+  vector<HashTable*> hash_tables_;
+
   ObjectPool pool_;
+  /// A dummy MemTracker used for exprs and other things we don't need to have limits on.
   MemTracker tracker_;
   MemPool mem_pool_;
   vector<ScalarExpr*> build_exprs_;
@@ -74,15 +84,17 @@ class HashTableTest : public testing::Test {
     ASSERT_OK(build_expr->Init(desc, nullptr));
     build_exprs_.push_back(build_expr);
     ASSERT_OK(ScalarExprEvaluator::Create(build_exprs_, nullptr, &pool_, &mem_pool_,
-        &build_expr_evals_));
+        &mem_pool_, &build_expr_evals_));
     ASSERT_OK(ScalarExprEvaluator::Open(build_expr_evals_, nullptr));
 
     ScalarExpr* probe_expr = pool_.Add(new SlotRef(TYPE_INT, 1, true /* nullable */));
     ASSERT_OK(probe_expr->Init(desc, nullptr));
     probe_exprs_.push_back(probe_expr);
     ASSERT_OK(ScalarExprEvaluator::Create(probe_exprs_, nullptr, &pool_, &mem_pool_,
-        &probe_expr_evals_));
+        &mem_pool_, &probe_expr_evals_));
     ASSERT_OK(ScalarExprEvaluator::Open(probe_expr_evals_, nullptr));
+
+    CreateTestEnv();
   }
 
   virtual void TearDown() {
@@ -90,9 +102,34 @@ class HashTableTest : public testing::Test {
     ScalarExprEvaluator::Close(probe_expr_evals_, nullptr);
     ScalarExpr::Close(build_exprs_);
     ScalarExpr::Close(probe_exprs_);
+
+    for (HashTable* hash_table : hash_tables_) hash_table->Close();
+    hash_tables_.clear();
+
+    for (BufferPool::ClientHandle* client : clients_) {
+      test_env_->exec_env()->buffer_pool()->DeregisterClient(client);
+    }
+    clients_.clear();
+
     runtime_state_ = nullptr;
     test_env_.reset();
     mem_pool_.FreeAll();
+    pool_.Clear();
+  }
+
+  /// Initialize test_env_ and runtime_state_ with the given page size and capacity
+  /// for the given number of pages. If test_env_ was already created, then re-creates it.
+  void CreateTestEnv(int64_t min_page_size = 64 * 1024,
+      int64_t buffer_bytes_limit = 4L * 1024 * 1024 * 1024) {
+    test_env_.reset(new TestEnv());
+    test_env_->SetBufferPoolArgs(min_page_size, buffer_bytes_limit);
+    ASSERT_OK(test_env_->Init());
+
+    TQueryOptions query_options;
+    query_options.__set_default_spillable_buffer_size(min_page_size);
+    query_options.__set_min_spillable_buffer_size(min_page_size);
+    query_options.__set_buffer_pool_limit(buffer_bytes_limit);
+    ASSERT_OK(test_env_->CreateQueryState(0, &query_options, &runtime_state_));
   }
 
   TupleRow* CreateTupleRow(int32_t val) {
@@ -116,8 +153,9 @@ class HashTableTest : public testing::Test {
 
   // Wrapper to call private methods on HashTable
   // TODO: understand google testing, there must be a more natural way to do this
-  void ResizeTable(HashTable* table, int64_t new_size, HashTableCtx* ht_ctx) {
-    table->ResizeBuckets(new_size, ht_ctx);
+  Status ResizeTable(
+      HashTable* table, int64_t new_size, HashTableCtx* ht_ctx, bool* success) {
+    return table->ResizeBuckets(new_size, ht_ctx, success);
   }
 
   // Do a full table scan on table.  All values should be between [min,max).  If
@@ -188,24 +226,41 @@ class HashTableTest : public testing::Test {
     }
   }
 
-  // Construct hash table with custom block manager. Returns result of HashTable::Init()
-  bool CreateHashTable(bool quadratic, int64_t initial_num_buckets,
-      scoped_ptr<HashTable>* table, int block_size = 8 * 1024 * 1024,
-      int max_num_blocks = 100, int reserved_blocks = 10) {
-    EXPECT_OK(test_env_->CreateQueryStateWithBlockMgr(
-        next_query_id_++, max_num_blocks, block_size, nullptr, &runtime_state_));
+  /// Construct hash table and buffer pool client.
+  /// Returns true if HashTable::Init() was successful. Created objects
+  /// and resources (e.g. reservations) are automatically freed in TearDown().
+  bool CreateHashTable(bool quadratic, int64_t initial_num_buckets, HashTable** table,
+      int64_t block_size = 8 * 1024 * 1024, int max_num_blocks = 100,
+      int initial_reserved_blocks = 10, int64_t suballocator_buffer_len = 64 * 1024) {
+    BufferPool* buffer_pool = test_env_->exec_env()->buffer_pool();
+    RuntimeProfile* profile = RuntimeProfile::Create(&pool_, "ht");
+
+    // Set up memory tracking for the hash table.
     MemTracker* client_tracker =
         pool_.Add(new MemTracker(-1, "client", runtime_state_->instance_mem_tracker()));
-    BufferedBlockMgr::Client* client;
-    EXPECT_OK(runtime_state_->block_mgr()->RegisterClient(
-        "", reserved_blocks, false, client_tracker, runtime_state_, &client));
+    int64_t initial_reservation_bytes = block_size * initial_reserved_blocks;
+    int64_t max_reservation_bytes = block_size * max_num_blocks;
+
+    // Set up the memory allocator.
+    BufferPool::ClientHandle* client = pool_.Add(new BufferPool::ClientHandle);
+    clients_.push_back(client);
+    EXPECT_OK(buffer_pool->RegisterClient("", nullptr,
+        runtime_state_->instance_buffer_reservation(), client_tracker,
+        max_reservation_bytes, profile, client));
+    EXPECT_TRUE(client->IncreaseReservation(initial_reservation_bytes));
+    Suballocator* allocator =
+        pool_.Add(new Suballocator(buffer_pool, client, suballocator_buffer_len));
 
     // Initial_num_buckets must be a power of two.
     EXPECT_EQ(initial_num_buckets, BitUtil::RoundUpToPowerOfTwo(initial_num_buckets));
     int64_t max_num_buckets = 1L << 31;
-    table->reset(new HashTable(quadratic, runtime_state_, client, true, 1, nullptr,
-          max_num_buckets, initial_num_buckets));
-    return (*table)->Init();
+    *table = pool_.Add(new HashTable(
+        quadratic, allocator, true, 1, nullptr, max_num_buckets, initial_num_buckets));
+    hash_tables_.push_back(*table);
+    bool success;
+    Status status = (*table)->Init(&success);
+    EXPECT_OK(status);
+    return status.ok() && success;
   }
 
   // Constructs and closes a hash table.
@@ -229,14 +284,12 @@ class HashTableTest : public testing::Test {
     EXPECT_EQ(*val_row4, 4);
 
     // Create and close the hash table.
-    scoped_ptr<HashTable> hash_table;
+    HashTable* hash_table;
     bool initialized = CreateHashTable(quadratic, initial_num_buckets, &hash_table);
     EXPECT_EQ(too_big, !initialized);
     if (initialized && initial_num_buckets > 0) {
       EXPECT_NE(hash_table->ByteSize(), 0);
     }
-
-    hash_table->Close();
   }
 
   // IMPALA-2897: Build rows that are equivalent (where nullptrs are counted as equivalent)
@@ -246,23 +299,26 @@ class HashTableTest : public testing::Test {
     for (int i = 0; i < 2; ++i) build_rows[i] = CreateNullTupleRow();
 
     // Create the hash table and insert the build rows
-    scoped_ptr<HashTable> hash_table;
+    HashTable* hash_table;
     ASSERT_TRUE(CreateHashTable(true, 1024, &hash_table));
     scoped_ptr<HashTableCtx> ht_ctx;
     EXPECT_OK(HashTableCtx::Create(&pool_, runtime_state_,
         build_exprs_, probe_exprs_, true /* stores_nulls_ */,
-        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_, &ht_ctx));
+        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_, &mem_pool_,
+        &mem_pool_, &ht_ctx));
     EXPECT_OK(ht_ctx->Open(runtime_state_));
 
     for (int i = 0; i < 2; ++i) {
       if (!ht_ctx->EvalAndHashBuild(build_rows[i])) continue;
-      BufferedTupleStream::RowIdx dummy_row_idx;
+      BufferedTupleStream::FlatRowPtr dummy_flat_row = nullptr;
       EXPECT_TRUE(hash_table->stores_tuples_);
-      bool inserted = hash_table->Insert(ht_ctx.get(), dummy_row_idx, build_rows[i]);
+      Status status;
+      bool inserted =
+          hash_table->Insert(ht_ctx.get(), dummy_flat_row, build_rows[i], &status);
       EXPECT_TRUE(inserted);
+      ASSERT_OK(status);
     }
     EXPECT_EQ(hash_table->num_buckets() - hash_table->EmptyBuckets(), 1);
-    hash_table->Close();
     ht_ctx->Close(runtime_state_);
   }
 
@@ -282,84 +338,93 @@ class HashTableTest : public testing::Test {
     }
 
     // Create the hash table and insert the build rows
-    scoped_ptr<HashTable> hash_table;
+    HashTable* hash_table;
     ASSERT_TRUE(CreateHashTable(quadratic, initial_num_buckets, &hash_table));
     scoped_ptr<HashTableCtx> ht_ctx;
     Status status = HashTableCtx::Create(&pool_, runtime_state_, build_exprs_,
         probe_exprs_, false /* !stores_nulls_ */,
-        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_, &ht_ctx);
+        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_, &mem_pool_,
+        &mem_pool_, &ht_ctx);
     EXPECT_OK(status);
     EXPECT_OK(ht_ctx->Open(runtime_state_));
-    bool success = hash_table->CheckAndResize(5, ht_ctx.get());
+    bool success;
+    EXPECT_OK(hash_table->CheckAndResize(5, ht_ctx.get(), &success));
     ASSERT_TRUE(success);
     for (int i = 0; i < 5; ++i) {
       if (!ht_ctx->EvalAndHashBuild(build_rows[i])) continue;
-      BufferedTupleStream::RowIdx dummy_row_idx;
+      BufferedTupleStream::FlatRowPtr dummy_flat_row = nullptr;
       EXPECT_TRUE(hash_table->stores_tuples_);
-      bool inserted = hash_table->Insert(ht_ctx.get(), dummy_row_idx, build_rows[i]);
+      bool inserted =
+          hash_table->Insert(ht_ctx.get(), dummy_flat_row, build_rows[i], &status);
       EXPECT_TRUE(inserted);
+      ASSERT_OK(status);
     }
     EXPECT_EQ(hash_table->size(), 5);
 
     // Do a full table scan and validate returned pointers
-    FullScan(hash_table.get(), ht_ctx.get(), 0, 5, true, scan_rows, build_rows);
-    ProbeTest(hash_table.get(), ht_ctx.get(), probe_rows, 10, false);
+    FullScan(hash_table, ht_ctx.get(), 0, 5, true, scan_rows, build_rows);
+    ProbeTest(hash_table, ht_ctx.get(), probe_rows, 10, false);
 
     // Double the size of the hash table and scan again.
-    ResizeTable(hash_table.get(), 2048, ht_ctx.get());
+    EXPECT_OK(ResizeTable(hash_table, 2048, ht_ctx.get(), &success));
+    EXPECT_TRUE(success);
     EXPECT_EQ(hash_table->num_buckets(), 2048);
     EXPECT_EQ(hash_table->size(), 5);
     memset(scan_rows, 0, sizeof(scan_rows));
-    FullScan(hash_table.get(), ht_ctx.get(), 0, 5, true, scan_rows, build_rows);
-    ProbeTest(hash_table.get(), ht_ctx.get(), probe_rows, 10, false);
+    FullScan(hash_table, ht_ctx.get(), 0, 5, true, scan_rows, build_rows);
+    ProbeTest(hash_table, ht_ctx.get(), probe_rows, 10, false);
 
     // Try to shrink and scan again.
-    ResizeTable(hash_table.get(), 64, ht_ctx.get());
+    EXPECT_OK(ResizeTable(hash_table, 64, ht_ctx.get(), &success));
+    EXPECT_TRUE(success);
     EXPECT_EQ(hash_table->num_buckets(), 64);
     EXPECT_EQ(hash_table->size(), 5);
     memset(scan_rows, 0, sizeof(scan_rows));
-    FullScan(hash_table.get(), ht_ctx.get(), 0, 5, true, scan_rows, build_rows);
-    ProbeTest(hash_table.get(), ht_ctx.get(), probe_rows, 10, false);
+    FullScan(hash_table, ht_ctx.get(), 0, 5, true, scan_rows, build_rows);
+    ProbeTest(hash_table, ht_ctx.get(), probe_rows, 10, false);
 
     // Resize to 8, which is the smallest value to fit the number of filled buckets.
-    ResizeTable(hash_table.get(), 8, ht_ctx.get());
+    EXPECT_OK(ResizeTable(hash_table, 8, ht_ctx.get(), &success));
+    EXPECT_TRUE(success);
     EXPECT_EQ(hash_table->num_buckets(), 8);
     EXPECT_EQ(hash_table->size(), 5);
     memset(scan_rows, 0, sizeof(scan_rows));
-    FullScan(hash_table.get(), ht_ctx.get(), 0, 5, true, scan_rows, build_rows);
-    ProbeTest(hash_table.get(), ht_ctx.get(), probe_rows, 10, false);
+    FullScan(hash_table, ht_ctx.get(), 0, 5, true, scan_rows, build_rows);
+    ProbeTest(hash_table, ht_ctx.get(), probe_rows, 10, false);
 
-    hash_table->Close();
     ht_ctx->Close(runtime_state_);
   }
 
-  void ScanTest(bool quadratic, int initial_size, int rows_to_insert,
-                int additional_rows) {
-    scoped_ptr<HashTable> hash_table;
+  void ScanTest(
+      bool quadratic, int initial_size, int rows_to_insert, int additional_rows) {
+    HashTable* hash_table;
     ASSERT_TRUE(CreateHashTable(quadratic, initial_size, &hash_table));
 
     int total_rows = rows_to_insert + additional_rows;
     scoped_ptr<HashTableCtx> ht_ctx;
     Status status = HashTableCtx::Create(&pool_, runtime_state_, build_exprs_,
         probe_exprs_, false /* !stores_nulls_ */,
-        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_, &ht_ctx);
+        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_, &mem_pool_,
+        &mem_pool_, &ht_ctx);
     EXPECT_OK(status);
     EXPECT_OK(ht_ctx->Open(runtime_state_));
 
     // Add 1 row with val 1, 2 with val 2, etc.
+    bool success;
     vector<TupleRow*> build_rows;
     ProbeTestData* probe_rows = new ProbeTestData[total_rows];
     probe_rows[0].probe_row = CreateTupleRow(0);
     for (int val = 1; val <= rows_to_insert; ++val) {
-      bool success = hash_table->CheckAndResize(val, ht_ctx.get());
+      EXPECT_OK(hash_table->CheckAndResize(val, ht_ctx.get(), &success));
       EXPECT_TRUE(success) << " failed to resize: " << val;
       probe_rows[val].probe_row = CreateTupleRow(val);
       for (int i = 0; i < val; ++i) {
         TupleRow* row = CreateTupleRow(val);
         if (!ht_ctx->EvalAndHashBuild(row)) continue;
-        BufferedTupleStream::RowIdx dummy_row_idx;
+        BufferedTupleStream::FlatRowPtr dummy_flat_row = nullptr;
         EXPECT_TRUE(hash_table->stores_tuples_);
-        hash_table->Insert(ht_ctx.get(), dummy_row_idx, row);
+        ASSERT_TRUE(hash_table->Insert(ht_ctx.get(), dummy_flat_row, row, &status));
+        ASSERT_OK(status);
         build_rows.push_back(row);
         probe_rows[val].expected_build_rows.push_back(row);
       }
@@ -371,21 +436,22 @@ class HashTableTest : public testing::Test {
     }
 
     // Test that all the builds were found.
-    ProbeTest(hash_table.get(), ht_ctx.get(), probe_rows, total_rows, true);
+    ProbeTest(hash_table, ht_ctx.get(), probe_rows, total_rows, true);
 
     // Resize and try again.
     int target_size = BitUtil::RoundUpToPowerOfTwo(2 * total_rows);
-    ResizeTable(hash_table.get(), target_size, ht_ctx.get());
+    EXPECT_OK(ResizeTable(hash_table, target_size, ht_ctx.get(), &success));
+    EXPECT_TRUE(success);
     EXPECT_EQ(hash_table->num_buckets(), target_size);
-    ProbeTest(hash_table.get(), ht_ctx.get(), probe_rows, total_rows, true);
+    ProbeTest(hash_table, ht_ctx.get(), probe_rows, total_rows, true);
 
     target_size = BitUtil::RoundUpToPowerOfTwo(total_rows + 1);
-    ResizeTable(hash_table.get(), target_size, ht_ctx.get());
+    EXPECT_OK(ResizeTable(hash_table, target_size, ht_ctx.get(), &success));
+    EXPECT_TRUE(success);
     EXPECT_EQ(hash_table->num_buckets(), target_size);
-    ProbeTest(hash_table.get(), ht_ctx.get(), probe_rows, total_rows, true);
+    ProbeTest(hash_table, ht_ctx.get(), probe_rows, total_rows, true);
 
     delete [] probe_rows;
-    hash_table->Close();
     ht_ctx->Close(runtime_state_);
   }
 
@@ -395,40 +461,48 @@ class HashTableTest : public testing::Test {
     uint64_t num_to_add = 4;
     int expected_size = 0;
 
-    MemTracker tracker(100 * 1024 * 1024);
-    scoped_ptr<HashTable> hash_table;
-    ASSERT_TRUE(CreateHashTable(quadratic, num_to_add, &hash_table));
+    // Need enough memory for two hash table bucket directories during resize.
+    const int64_t mem_limit_mb = 128 + 64;
+    HashTable* hash_table;
+    ASSERT_TRUE(
+        CreateHashTable(quadratic, num_to_add, &hash_table, 1024 * 1024, mem_limit_mb));
     scoped_ptr<HashTableCtx> ht_ctx;
     Status status = HashTableCtx::Create(&pool_, runtime_state_, build_exprs_,
         probe_exprs_, false /* !stores_nulls_ */,
-        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_, &ht_ctx);
+        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_, &mem_pool_,
+        &mem_pool_, &ht_ctx);
     EXPECT_OK(status);
 
     // Inserts num_to_add + (num_to_add^2) + (num_to_add^4) + ... + (num_to_add^20)
     // entries. When num_to_add == 4, then the total number of inserts is 4194300.
     int build_row_val = 0;
     for (int i = 0; i < 20; ++i) {
-      // Currently the mem used for the bucket is not being tracked by the mem tracker.
-      // Thus the resize is expected to be successful.
-      // TODO: Keep track of the mem used for the buckets and test cases where we actually
-      // hit OOM.
-      // TODO: Insert duplicates to also hit OOM.
-      bool success = hash_table->CheckAndResize(num_to_add, ht_ctx.get());
-      EXPECT_TRUE(success) << " failed to resize: " << num_to_add;
+      bool success;
+      EXPECT_OK(hash_table->CheckAndResize(num_to_add, ht_ctx.get(), &success));
+      EXPECT_TRUE(success) << " failed to resize: " << num_to_add << "\n"
+                           << tracker_.LogUsage(MemTracker::UNLIMITED_DEPTH) << "\n"
+                           << clients_.back()->DebugString();
       for (int j = 0; j < num_to_add; ++build_row_val, ++j) {
         TupleRow* row = CreateTupleRow(build_row_val);
         if (!ht_ctx->EvalAndHashBuild(row)) continue;
-        BufferedTupleStream::RowIdx dummy_row_idx;
+        BufferedTupleStream::FlatRowPtr dummy_flat_row = nullptr;
         EXPECT_TRUE(hash_table->stores_tuples_);
-        bool inserted = hash_table->Insert(ht_ctx.get(), dummy_row_idx, row);
+        bool inserted = hash_table->Insert(ht_ctx.get(), dummy_flat_row, row, &status);
+        ASSERT_OK(status);
         if (!inserted) goto done_inserting;
       }
       expected_size += num_to_add;
       num_to_add *= 2;
     }
- done_inserting:
-    EXPECT_FALSE(tracker.LimitExceeded());
+  done_inserting:
     EXPECT_EQ(hash_table->size(), 4194300);
+
+    // The next allocation should put us over the limit, since we'll need 128MB for
+    // the old buckets and 256MB for the new buckets.
+    bool success;
+    EXPECT_OK(hash_table->CheckAndResize(num_to_add * 2, ht_ctx.get(), &success));
+    EXPECT_FALSE(success);
+
     // Validate that we can find the entries before we went over the limit
     for (int i = 0; i < expected_size * 5; i += 100000) {
       TupleRow* probe_row = CreateTupleRow(i);
@@ -441,7 +515,34 @@ class HashTableTest : public testing::Test {
         EXPECT_TRUE(iter.AtEnd()) << " i: " << i;
       }
     }
-    hash_table->Close();
+
+    // Insert duplicates to also hit OOM.
+    int64_t num_duplicates_inserted = 0;
+    const int DUPLICATE_VAL = 1234;
+    while (true) {
+      TupleRow* duplicate_row = CreateTupleRow(DUPLICATE_VAL);
+      if (!ht_ctx->EvalAndHashBuild(duplicate_row)) continue;
+      BufferedTupleStream::FlatRowPtr dummy_flat_row = nullptr;
+      bool inserted =
+          hash_table->Insert(ht_ctx.get(), dummy_flat_row, duplicate_row, &status);
+      ASSERT_OK(status);
+      if (!inserted) break;
+      ++num_duplicates_inserted;
+    }
+
+    // Check that the duplicates that we successfully inserted are all present.
+    TupleRow* duplicate_row = CreateTupleRow(DUPLICATE_VAL);
+    ASSERT_TRUE(ht_ctx->EvalAndHashProbe(duplicate_row));
+    HashTable::Iterator iter = hash_table->FindProbeRow(ht_ctx.get());
+    ValidateMatch(duplicate_row, iter.GetRow());
+    for (int64_t i = 0; i < num_duplicates_inserted; ++i) {
+      ASSERT_FALSE(iter.AtEnd());
+      iter.NextDuplicate();
+      ValidateMatch(duplicate_row, iter.GetRow());
+    }
+    iter.NextDuplicate();
+    EXPECT_TRUE(iter.AtEnd());
+
     ht_ctx->Close(runtime_state_);
   }
 
@@ -450,13 +551,14 @@ class HashTableTest : public testing::Test {
   // enough space in the hash table (it is also expected to be slow). It also expects that
   // a probe for a N+1 element will return BUCKET_NOT_FOUND.
   void InsertFullTest(bool quadratic, int table_size) {
-    scoped_ptr<HashTable> hash_table;
+    HashTable* hash_table;
     ASSERT_TRUE(CreateHashTable(quadratic, table_size, &hash_table));
     EXPECT_EQ(hash_table->EmptyBuckets(), table_size);
     scoped_ptr<HashTableCtx> ht_ctx;
     Status status = HashTableCtx::Create(&pool_, runtime_state_, build_exprs_,
         probe_exprs_, false /* !stores_nulls_ */,
-        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_, &ht_ctx);
+        vector<bool>(build_exprs_.size(), false), 1, 0, 1, &mem_pool_,
+        &mem_pool_, &mem_pool_, &ht_ctx);
     EXPECT_OK(status);
 
     // Insert and probe table_size different tuples. All of them are expected to be
@@ -472,10 +574,11 @@ class HashTableTest : public testing::Test {
 
       // Insert using both Insert() and FindBucket() methods.
       if (build_row_val % 2 == 0) {
-        BufferedTupleStream::RowIdx dummy_row_idx;
+        BufferedTupleStream::FlatRowPtr dummy_flat_row = nullptr;
         EXPECT_TRUE(hash_table->stores_tuples_);
-        bool inserted = hash_table->Insert(ht_ctx.get(), dummy_row_idx, row);
+        bool inserted = hash_table->Insert(ht_ctx.get(), dummy_flat_row, row, &status);
         EXPECT_TRUE(inserted);
+        ASSERT_OK(status);
       } else {
         iter = hash_table->FindBuildRowBucket(ht_ctx.get(), &found);
         EXPECT_FALSE(iter.AtEnd());
@@ -511,28 +614,27 @@ class HashTableTest : public testing::Test {
     EXPECT_TRUE(iter.AtEnd());
     EXPECT_FALSE(found);
 
-    hash_table->Close();
     ht_ctx->Close(runtime_state_);
   }
 
   // This test makes sure we can tolerate the low memory case where we do not have enough
   // memory to allocate the array of buckets for the hash table.
   void VeryLowMemTest(bool quadratic) {
-    const int block_size = 2 * 1024;
+    const int64_t block_size = 2 * 1024;
     const int max_num_blocks = 1;
-    const int reserved_blocks = 0;
     const int table_size = 1024;
-    scoped_ptr<HashTable> hash_table;
-    ASSERT_FALSE(CreateHashTable(quadratic, table_size, &hash_table, block_size,
-          max_num_blocks, reserved_blocks));
+    CreateTestEnv(block_size, block_size * max_num_blocks);
+
+    HashTable* hash_table;
+    ASSERT_FALSE(CreateHashTable(
+        quadratic, table_size, &hash_table, block_size, max_num_blocks, 0, 1024));
     scoped_ptr<HashTableCtx> ht_ctx;
     Status status = HashTableCtx::Create(&pool_, runtime_state_, build_exprs_,
         probe_exprs_, false /* !stores_nulls_ */, vector<bool>(build_exprs_.size(), false), 1, 0, 1,
-        &mem_pool_, &ht_ctx);
+        &mem_pool_, &mem_pool_, &mem_pool_, &ht_ctx);
     EXPECT_OK(status);
     HashTable::Iterator iter = hash_table->Begin(ht_ctx.get());
     EXPECT_TRUE(iter.AtEnd());
-    hash_table->Close();
     ht_ctx->Close(runtime_state_);
   }
 };
@@ -612,12 +714,11 @@ TEST_F(HashTableTest, QuadraticInsertFullTest) {
 
 // Test that hashing empty string updates hash value.
 TEST_F(HashTableTest, HashEmpty) {
-  EXPECT_OK(test_env_->CreateQueryStateWithBlockMgr(
-      0, 100, 8 * 1024 * 1024, nullptr, &runtime_state_));
   scoped_ptr<HashTableCtx> ht_ctx;
   Status status = HashTableCtx::Create(&pool_, runtime_state_, build_exprs_,
       probe_exprs_, false /* !stores_nulls_ */,
-      vector<bool>(build_exprs_.size(), false), 1, 2, 1, &mem_pool_, &ht_ctx);
+      vector<bool>(build_exprs_.size(), false), 1, 2, 1, &mem_pool_, &mem_pool_,
+      &mem_pool_, &ht_ctx);
   EXPECT_OK(status);
   EXPECT_OK(ht_ctx->Open(runtime_state_));
 

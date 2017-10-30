@@ -42,6 +42,9 @@ def create_transport(host, port, service, transport_type="buffered", user=None,
       sock = TSSLSocket.TSSLSocket(host, port, validate=False)
     else:
       sock = TSSLSocket.TSSLSocket(host, port, validate=True, ca_certs=ssl_cert)
+    # Set allowed SSL / TLS protocols to a permissive set to connect to any Impala server.
+    import ssl
+    sock.SSL_VERSION = ssl.PROTOCOL_SSLv23
   else:
     sock = TSocket(host, port)
   if transport_type.lower() == "buffered":

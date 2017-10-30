@@ -20,15 +20,36 @@ class TestScratchLimit(ImpalaTestSuite):
   This class tests the functionality of setting the scratch limit as a query option
   """
 
-  spill_query = """
+  spilling_sort_query = """
       select o_orderdate, o_custkey, o_comment
       from tpch.orders
       order by o_orderdate
       """
+  spilling_agg_query = """
+      select count(*) from (
+        select distinct o_orderdate, o_custkey, o_comment
+        from tpch_parquet.orders) v;
+      """
+  spilling_join_query = """
+      select count(*)
+      from tpch_parquet.lineitem join tpch_parquet.orders on l_orderkey = o_orderkey
+      """
+  # The analytic function in this query spills, but the sort generally spills first.
+  # Ideally we would have a spilling analytic without a sort to exercise it in isolation.
+  spilling_analytic_query = """
+      SELECT i_item_sk, i_current_price,
+        SUM (i_current_price)
+        OVER (ORDER BY i_item_sk rows between 500000 preceding and 500000 following) running_total
+      FROM tpcds_parquet.item
+      ORDER BY i_brand, i_item_sk;
+      """
 
-  # Block manager memory limit that is low enough to
-  # force Impala to spill to disk when executing 'spill_query'
-  max_block_mgr_memory = "64m"
+  spilling_queries = [spilling_sort_query, spilling_agg_query, spilling_join_query,
+      spilling_analytic_query]
+
+  # Buffer pool limit that is low enough to force Impala to spill to disk when executing
+  # spill_query.
+  buffer_pool_limit = "32m"
 
   @classmethod
   def get_workload(self):
@@ -44,62 +65,64 @@ class TestScratchLimit(ImpalaTestSuite):
 
   def test_with_high_scratch_limit(self, vector):
     """
-    Query runs to completion with a scratch limit well above
+    Sort query runs to completion with a scratch limit well above
     its required scratch space which in this case is 128m.
     """
     exec_option = vector.get_value('exec_option')
-    exec_option['max_block_mgr_memory'] = self.max_block_mgr_memory
+    exec_option['buffer_pool_limit'] = self.buffer_pool_limit
     exec_option['scratch_limit'] = '500m'
-    self.execute_query_expect_success(self.client, self.spill_query, exec_option)
+    self.execute_query_expect_success(self.client, self.spilling_sort_query, exec_option)
 
   def test_with_low_scratch_limit(self, vector):
     """
-    Query throws the appropriate exception with a scratch limit well below
+    Sort query throws the appropriate exception with a scratch limit well below
     its required scratch space which in this case is 128m.
     """
     exec_option = vector.get_value('exec_option')
-    exec_option['max_block_mgr_memory'] = self.max_block_mgr_memory
+    exec_option['buffer_pool_limit'] = self.buffer_pool_limit
     exec_option['scratch_limit'] = '24m'
     expected_error = 'Scratch space limit of %s bytes exceeded'
     scratch_limit_in_bytes = 24 * 1024 * 1024
     try:
-      self.execute_query(self.spill_query, exec_option)
+      self.execute_query(self.spilling_sort_query, exec_option)
       assert False, "Query was expected to fail"
     except ImpalaBeeswaxException as e:
       assert expected_error % scratch_limit_in_bytes in str(e)
 
   def test_with_zero_scratch_limit(self, vector):
     """
-    Query throws the appropriate exception with a scratch limit of
+    Queries throws the appropriate exception with a scratch limit of
     zero which means no scratch space can be allocated.
     """
     exec_option = vector.get_value('exec_option')
-    exec_option['max_block_mgr_memory'] = self.max_block_mgr_memory
+    exec_option['buffer_pool_limit'] = self.buffer_pool_limit
     exec_option['scratch_limit'] = '0'
-    self.execute_query_expect_failure(self.spill_query, exec_option)
+    for query in self.spilling_queries:
+      self.execute_query_expect_failure(query, exec_option)
 
   def test_with_unlimited_scratch_limit(self, vector):
     """
-    Query runs to completion with a scratch Limit of -1 means default/no limit.
+    Sort query runs to completion with a scratch Limit of -1 means default/no limit.
     """
     exec_option = vector.get_value('exec_option')
-    exec_option['max_block_mgr_memory'] = self.max_block_mgr_memory
+    exec_option['buffer_pool_limit'] = self.buffer_pool_limit
     exec_option['scratch_limit'] = '-1'
-    self.execute_query_expect_success(self.client, self.spill_query, exec_option)
+    self.execute_query_expect_success(self.client, self.spilling_sort_query, exec_option)
 
   def test_without_specifying_scratch_limit(self, vector):
     """
-    Query runs to completion with the default setting of no scratch limit.
+    Sort query runs to completion with the default setting of no scratch limit.
     """
     exec_option = vector.get_value('exec_option')
-    exec_option['max_block_mgr_memory'] = self.max_block_mgr_memory
-    self.execute_query_expect_success(self.client, self.spill_query, exec_option)
+    exec_option['buffer_pool_limit'] = self.buffer_pool_limit
+    self.execute_query_expect_success(self.client, self.spilling_sort_query, exec_option)
 
   def test_with_zero_scratch_limit_no_memory_limit(self, vector):
     """
-    Query runs to completion without spilling as there is no limit on block memory manger.
+    Queries run to completion without spilling as there is no limit on block memory manger.
     Scratch limit of zero ensures spilling is disabled.
     """
     exec_option = vector.get_value('exec_option')
     exec_option['scratch_limit'] = '0'
-    self.execute_query_expect_success(self.client, self.spill_query, exec_option)
+    for query in self.spilling_queries:
+      self.execute_query_expect_success(self.client, query, exec_option)

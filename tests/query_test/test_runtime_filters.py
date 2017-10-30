@@ -17,10 +17,14 @@
 #
 
 import pytest
+import re
 import time
 
+from tests.common.environ import specific_build_type_timeout
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfLocal, SkipIfOldAggsJoins
+from tests.common.skip import SkipIfLocal
+
+WAIT_TIME_MS = specific_build_type_timeout(60000, slow_build_timeout=100000)
 
 @SkipIfLocal.multiple_impalad
 class TestRuntimeFilters(ImpalaTestSuite):
@@ -47,6 +51,15 @@ class TestRuntimeFilters(ImpalaTestSuite):
     assert duration < 60, \
       "Query took too long (%ss, possibly waiting for missing filters?)" % str(duration)
 
+  def test_file_filtering(self, vector):
+    self.change_database(self.client, vector.get_value('table_format'))
+    self.execute_query("SET RUNTIME_FILTER_MODE=GLOBAL")
+    self.execute_query("SET RUNTIME_FILTER_WAIT_TIME_MS=10000")
+    result = self.execute_query("""select STRAIGHT_JOIN * from alltypes inner join
+                                (select * from alltypessmall where smallint_col=-1) v
+                                on v.year = alltypes.year""")
+    assert re.search("Files rejected: 8 \(8\)", result.runtime_profile) is not None
+    assert re.search("Splits rejected: [^0] \([^0]\)", result.runtime_profile) is None
 
 @SkipIfLocal.multiple_impalad
 class TestRuntimeRowFilters(ImpalaTestSuite):
@@ -61,9 +74,5 @@ class TestRuntimeRowFilters(ImpalaTestSuite):
         v.get_value('table_format').file_format in ['parquet'])
 
   def test_row_filters(self, vector):
-    self.run_test_case('QueryTest/runtime_row_filters', vector)
-
-  @SkipIfOldAggsJoins.requires_spilling
-  @SkipIfOldAggsJoins.nested_types
-  def test_row_filters_phj_only(self, vector):
-    self.run_test_case('QueryTest/runtime_row_filters_phj', vector)
+    self.run_test_case('QueryTest/runtime_row_filters', vector,
+                       test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS' : str(WAIT_TIME_MS)})

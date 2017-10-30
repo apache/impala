@@ -44,6 +44,10 @@ class PeriodicCounterUpdater {
     SAMPLING_COUNTER,
   };
 
+  // Sets up data structures and starts the counter update thread. Should only be called
+  // once during process startup and must be called before other methods.
+  static void Init();
+
   /// Registers a periodic counter to be updated by the update thread.
   /// Either sample_fn or dst_counter must be non-NULL.  When the periodic counter
   /// is updated, it either gets the value from the dst_counter or calls the sample
@@ -66,12 +70,11 @@ class PeriodicCounterUpdater {
   /// Stops updating the value of 'counter'.
   static void StopSamplingCounter(RuntimeProfile::Counter* counter);
 
-  /// Stops updating the bucket counter.
-  /// If convert is true, convert the buckets from count to percentage.
-  /// Sampling counters are updated periodically so should be removed as soon as the
+  /// If the bucketing counters 'buckets' are registered, stops updating the counters and
+  /// convert the buckets from count to percentage. If not registered, has no effect.
+  /// Perioidic counters are updated periodically so should be removed as soon as the
   /// underlying counter is no longer going to change.
-  static void StopBucketingCounters(std::vector<RuntimeProfile::Counter*>* buckets,
-      bool convert);
+  static void StopBucketingCounters(std::vector<RuntimeProfile::Counter*>* buckets);
 
   /// Stops 'counter' from receiving any more samples.
   static void StopTimeSeriesCounter(RuntimeProfile::TimeSeriesCounter* counter);
@@ -95,10 +98,6 @@ class PeriodicCounterUpdater {
     int64_t num_sampled; // number of samples taken
     /// TODO: customize bucketing
   };
-
-  // Starts the counter update thread. We only have a single static object, so this
-  // is executed automatically when the process starts up.
-  PeriodicCounterUpdater();
 
   /// Loop for periodic counter update thread.  This thread wakes up once in a while
   /// and updates all the added rate counters and sampling counters.
@@ -140,7 +139,7 @@ class PeriodicCounterUpdater {
 
   /// Singleton object that keeps track of all rate counters and the thread
   /// for updating them.
-  static PeriodicCounterUpdater state_;
+  static PeriodicCounterUpdater* instance_;
 };
 
 }

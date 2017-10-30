@@ -65,7 +65,8 @@ class ScannerContext {
   /// get pushed to) and the scan range to process.
   /// This context starts with 1 stream.
   ScannerContext(RuntimeState*, HdfsScanNodeBase*, HdfsPartitionDescriptor*,
-      DiskIoMgr::ScanRange* scan_range, const std::vector<FilterContext>& filter_ctxs);
+      DiskIoMgr::ScanRange* scan_range, const std::vector<FilterContext>& filter_ctxs,
+      MemPool* expr_results_pool);
 
   /// Destructor verifies that all stream objects have been released.
   ~ScannerContext();
@@ -87,7 +88,7 @@ class ScannerContext {
     ///    If the requested buffer straddles io buffers, a copy is done here.
     ///  - *out_len is the number of bytes returned.
     ///  - *status is set if there is an error.
-    /// Returns true if the call was success (i.e. status->ok())
+    /// Returns true if the call was successful (i.e. status->ok())
     /// This should only be called from the scanner thread.
     /// Note that this will return bytes past the end of the scan range until the end of
     /// the file.
@@ -174,6 +175,14 @@ class ScannerContext {
     /// Skip this text object.
     bool SkipText(Status*);
 
+    /// If 'batch' is not NULL and 'contains_tuple_data_' is true, attaches all completed
+    /// io buffers and the boundary mem pool to 'batch'. If 'done' is set, all in-flight
+    /// resources are also attached or released.
+    /// If 'batch' is NULL then 'done' must be true or 'contains_tuple_data_' false. Such
+    /// a call will release all completed resources. If 'done' is true all in-flight
+    /// resources are also freed.
+    void ReleaseCompletedResources(RowBatch* batch, bool done);
+
    private:
     friend class ScannerContext;
     ScannerContext* parent_;
@@ -256,13 +265,8 @@ class ScannerContext {
     /// never set to NULL, even if it contains 0 bytes.
     Status GetNextBuffer(int64_t read_past_size = 0);
 
-    /// If 'batch' is not NULL and 'contains_tuple_data_' is true, attaches all completed
-    /// io buffers and the boundary mem pool to 'batch'. If 'done' is set, all in-flight
-    /// resources are also attached or released.
-    /// If 'batch' is NULL then 'done' must be true or 'contains_tuple_data_' false. Such
-    /// a call will release all completed resources. If 'done' is true all in-flight
-    /// resources are also freed.
-    void ReleaseCompletedResources(RowBatch* batch, bool done);
+    /// Validates that the output buffer pointers point to the correct buffer.
+    bool ValidateBufferPointers() const;
 
     /// Error-reporting functions.
     Status ReportIncompleteRead(int64_t length, int64_t bytes_read);
@@ -301,14 +305,14 @@ class ScannerContext {
   /// The stream is created in the runtime state's object pool
   Stream* AddStream(DiskIoMgr::ScanRange* range);
 
-  /// Returns false it scan_node_ is multi-threaded and has been cancelled.
+  /// Returns false if scan_node_ is multi-threaded and has been cancelled.
   /// Always returns false if the scan_node_ is not multi-threaded.
   bool cancelled() const;
 
   int num_completed_io_buffers() const { return num_completed_io_buffers_; }
   HdfsPartitionDescriptor* partition_descriptor() { return partition_desc_; }
   const std::vector<FilterContext>& filter_ctxs() const { return filter_ctxs_; }
-
+  MemPool* expr_results_pool() const { return expr_results_pool_; }
  private:
   friend class Stream;
 
@@ -326,6 +330,18 @@ class ScannerContext {
   /// Filter contexts for all filters applicable to this scan. Memory attached to the
   /// context is owned by the scan node.
   std::vector<FilterContext> filter_ctxs_;
+
+  /// MemPool used for allocations that hold results of expression evaluation in the
+  /// scanner and 'filter_ctxs_'. Must be thread-local since MemPool is not thread-safe.
+  /// Owned by ScannerThread() in the multi-threaded scan node and by the ExecNode in the
+  /// single-threaded scan node implementation.
+  ///
+  /// The scanner is responsible for clearing the MemPool periodically after expression
+  /// evaluation to prevent memory from accumulating.
+  ///
+  /// TODO: IMPALA-6015: it should be possible to simplify the lifecycle of this pool and
+  /// filter_ctxs_ once the multithreaded scan node is removed.
+  MemPool* const expr_results_pool_;
 };
 
 }

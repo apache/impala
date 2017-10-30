@@ -488,15 +488,6 @@ public class DistributedPlanner {
           lhsHasCompatPartition, rhsHasCompatPartition, leftChildFragment,
           rightChildFragment, lhsJoinExprs, rhsJoinExprs, fragments);
     }
-
-    for (RuntimeFilter filter: node.getRuntimeFilters()) {
-      filter.setIsBroadcast(distrMode == DistributionMode.BROADCAST);
-      filter.computeHasLocalTargets();
-      // Work around IMPALA-3450, where cardinalities might be wrong in single-node plans
-      // with UNION and LIMITs.
-      // TODO: Remove.
-      filter.computeNdvEstimate();
-    }
     return hjFragment;
  }
 
@@ -855,98 +846,87 @@ public class DistributedPlanner {
 
   /**
    * Returns a fragment that materialises the final result of a distinct aggregation
-   * where 'childFragment' is a partitioned fragment with the first phase aggregation
-   * as its root and 'node' is the second phase of the distinct aggregation.
+   * where 'childFragment' is a partitioned fragment with the phase-1 aggregation
+   * as its root.
    */
-  private PlanFragment createPhase2DistinctAggregationFragment(AggregationNode node,
-      PlanFragment childFragment, ArrayList<PlanFragment> fragments)
-      throws ImpalaException {
-    ArrayList<Expr> groupingExprs = node.getAggInfo().getGroupingExprs();
-    boolean hasGrouping = !groupingExprs.isEmpty();
+  private PlanFragment createPhase2DistinctAggregationFragment(
+      AggregationNode phase2AggNode, PlanFragment childFragment,
+      ArrayList<PlanFragment> fragments) throws ImpalaException {
+    // The phase-1 aggregation node is already in the child fragment.
+    Preconditions.checkState(phase2AggNode.getChild(0) == childFragment.getPlanRoot());
 
-    // The first-phase aggregation node is already in the child fragment.
-    Preconditions.checkState(node.getChild(0) == childFragment.getPlanRoot());
+    AggregateInfo phase1AggInfo = ((AggregationNode) phase2AggNode.getChild(0))
+        .getAggInfo();
+    // We need to do
+    // - child fragment:
+    //   * phase-1 aggregation
+    // - first merge fragment, hash-partitioned on grouping and distinct exprs:
+    //   * merge agg of phase-1
+    //   * phase-2 agg
+    // - second merge fragment, partitioned on grouping exprs or unpartitioned
+    //   without grouping exprs
+    //   * merge agg of phase-2
+    // With grouping, the output partition exprs of the child are the (input) grouping
+    // exprs of the parent. The grouping exprs reference the output tuple of phase-1
+    // but the partitioning happens on the intermediate tuple of the phase-1.
+    ArrayList<Expr> partitionExprs = Expr.substituteList(
+        phase1AggInfo.getGroupingExprs(), phase1AggInfo.getIntermediateSmap(),
+        ctx_.getRootAnalyzer(), false);
 
-    AggregateInfo firstPhaseAggInfo = ((AggregationNode) node.getChild(0)).getAggInfo();
-    List<Expr> partitionExprs = null;
-    if (hasGrouping) {
-      // We need to do
-      // - child fragment:
-      //   * phase-1 aggregation
-      // - merge fragment, hash-partitioned on grouping exprs:
-      //   * merge agg of phase 1
-      //   * phase 2 agg
-      // The output partition exprs of the child are the (input) grouping exprs of the
-      // parent. The grouping exprs reference the output tuple of the 1st phase, but the
-      // partitioning happens on the intermediate tuple of the 1st phase.
-      partitionExprs = Expr.substituteList(
-          groupingExprs, firstPhaseAggInfo.getOutputToIntermediateSmap(),
-          ctx_.getRootAnalyzer(), false);
-    } else {
-      // We need to do
-      // - child fragment:
-      //   * phase-1 aggregation
-      // - merge fragment 1, hash-partitioned on distinct exprs:
-      //   * merge agg of phase 1
-      //   * phase 2 agg
-      // - merge fragment 2, unpartitioned:
-      //   * merge agg of phase 2
-      partitionExprs = Expr.substituteList(firstPhaseAggInfo.getGroupingExprs(),
-          firstPhaseAggInfo.getIntermediateSmap(), ctx_.getRootAnalyzer(), false);
-    }
-
-    PlanFragment mergeFragment = null;
+    PlanFragment firstMergeFragment;
     boolean childHasCompatPartition = ctx_.getRootAnalyzer().equivSets(partitionExprs,
         childFragment.getDataPartition().getPartitionExprs());
     if (childHasCompatPartition) {
       // The data is already partitioned on the required expressions, we can skip the
-      // phase 1 merge step.
-      childFragment.addPlanRoot(node);
-      mergeFragment = childFragment;
+      // phase-1 merge step.
+      childFragment.addPlanRoot(phase2AggNode);
+      firstMergeFragment = childFragment;
     } else {
       DataPartition mergePartition = DataPartition.hashPartitioned(partitionExprs);
       // Convert the existing node to a preaggregation.
-      AggregationNode preaggNode = (AggregationNode)node.getChild(0);
+      AggregationNode preaggNode = (AggregationNode)phase2AggNode.getChild(0);
       preaggNode.setIsPreagg(ctx_);
 
-      // place a merge aggregation step for the 1st phase in a new fragment
-      mergeFragment = createParentFragment(childFragment, mergePartition);
-      AggregateInfo phase1MergeAggInfo = firstPhaseAggInfo.getMergeAggInfo();
+      // place phase-1 merge aggregation step in a new fragment
+      firstMergeFragment = createParentFragment(childFragment, mergePartition);
+      AggregateInfo phase1MergeAggInfo = phase1AggInfo.getMergeAggInfo();
       AggregationNode phase1MergeAggNode =
           new AggregationNode(ctx_.getNextNodeId(), preaggNode, phase1MergeAggInfo);
       phase1MergeAggNode.init(ctx_.getRootAnalyzer());
       phase1MergeAggNode.unsetNeedsFinalize();
       phase1MergeAggNode.setIntermediateTuple();
-      mergeFragment.addPlanRoot(phase1MergeAggNode);
+      firstMergeFragment.addPlanRoot(phase1MergeAggNode);
 
-      // the 2nd-phase aggregation consumes the output of the merge agg;
-      // if there is a limit, it had already been placed with the 2nd aggregation
+      // the phase-2 aggregation consumes the output of the phase-1 merge agg;
+      // if there is a limit, it had already been placed with the phase-2 aggregation
       // step (which is where it should be)
-      mergeFragment.addPlanRoot(node);
+      firstMergeFragment.addPlanRoot(phase2AggNode);
+      fragments.add(firstMergeFragment);
     }
+    phase2AggNode.unsetNeedsFinalize();
+    phase2AggNode.setIntermediateTuple();
+    // Limit should be applied at the final merge aggregation node
+    long limit = phase2AggNode.getLimit();
+    phase2AggNode.unsetLimit();
 
-    if (!hasGrouping) {
-      // place the merge aggregation of the 2nd phase in an unpartitioned fragment;
-      // add preceding merge fragment at end
-      if (mergeFragment != childFragment) fragments.add(mergeFragment);
-
-      node.unsetNeedsFinalize();
-      node.setIntermediateTuple();
-      // Any limit should be placed in the final merge aggregation node
-      long limit = node.getLimit();
-      node.unsetLimit();
-      mergeFragment = createParentFragment(mergeFragment, DataPartition.UNPARTITIONED);
-      AggregateInfo phase2MergeAggInfo = node.getAggInfo().getMergeAggInfo();
-      AggregationNode phase2MergeAggNode = new AggregationNode(ctx_.getNextNodeId(), node,
-          phase2MergeAggInfo);
-      phase2MergeAggNode.init(ctx_.getRootAnalyzer());
-      // Transfer having predicates. If hasGrouping == true, the predicates should
-      // instead be evaluated by the 2nd phase agg (the predicates are already there).
-      node.transferConjuncts(phase2MergeAggNode);
-      phase2MergeAggNode.setLimit(limit);
-      mergeFragment.addPlanRoot(phase2MergeAggNode);
+    DataPartition mergePartition;
+    if (phase2AggNode.getAggInfo().getGroupingExprs().isEmpty()) {
+      mergePartition = DataPartition.UNPARTITIONED;
+    } else {
+      phase2AggNode.setIsPreagg(ctx_);
+      mergePartition = DataPartition.hashPartitioned(
+          phase2AggNode.getAggInfo().getMergeAggInfo().getGroupingExprs());
     }
-    return mergeFragment;
+    PlanFragment secondMergeFragment =
+        createParentFragment(firstMergeFragment, mergePartition);
+    AggregationNode phase2MergeAggNode = new AggregationNode(ctx_.getNextNodeId(),
+        phase2AggNode, phase2AggNode.getAggInfo().getMergeAggInfo());
+    phase2MergeAggNode.init(ctx_.getRootAnalyzer());
+    phase2MergeAggNode.setLimit(limit);
+    // Transfer having predicates to final merge agg node
+    phase2AggNode.transferConjuncts(phase2MergeAggNode);
+    secondMergeFragment.addPlanRoot(phase2MergeAggNode);
+    return secondMergeFragment;
   }
 
   /**

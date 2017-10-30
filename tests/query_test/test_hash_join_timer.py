@@ -18,12 +18,15 @@
 import pytest
 import re
 
+from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_vector import ImpalaTestDimension
+from tests.verifiers.metric_verifier import MetricVerifier
+
 
 class TestHashJoinTimer(ImpalaTestSuite):
   """Tests that the local time in hash join is correct in the ExecSummary, average
-   reporting and invidiaul fragment reporting."""
+   reporting and individual fragment reporting."""
 
   # There are two cases that we are interested in verifying that the profile is returning
   # a correct timing:
@@ -60,7 +63,7 @@ class TestHashJoinTimer(ImpalaTestSuite):
               " where a.id>b.id and a.id=99",
               "NESTED LOOP JOIN"]
              ]
-  # IMPALA-2973: For non-code-coverage builds, 1000 milliseconds are sufficent, but more
+  # IMPALA-2973: For non-code-coverage builds, 1000 milliseconds are sufficient, but more
   # time is needed in code-coverage builds.
   HASH_JOIN_UPPER_BOUND_MS = 2000
   # IMPALA-2973: Temporary workaround: when timers are using Linux COARSE clockid_t, very
@@ -90,10 +93,16 @@ class TestHashJoinTimer(ImpalaTestSuite):
   def test_hash_join_timer(self, vector):
     # This test runs serially because it requires the query to come back within
     # some amount of time. Running this with other tests makes it hard to bound
-    # that time.
+    # that time. It also assumes that it will be able to get a thread token to
+    # execute the join build in parallel.
     test_case = vector.get_value('test cases')
     query = test_case[0]
     join_type = test_case[1]
+
+    # Ensure that the cluster is idle before starting the test query.
+    for impalad in ImpalaCluster().impalads:
+      verifier = MetricVerifier(impalad.service)
+      verifier.wait_for_metric("impala-server.num-fragments-in-flight", 0)
 
     # Execute async to get a handle. Wait until the query has completed.
     handle = self.execute_query_async(query, vector.get_value('exec_option'))
@@ -111,6 +120,7 @@ class TestHashJoinTimer(ImpalaTestSuite):
     profile = self.client.get_runtime_profile(handle)
     check_execsummary_count = 0
     check_fragment_count = 0
+    asyn_build = False
 
     for line in profile.split("\n"):
         # Matching for ExecSummary
@@ -137,9 +147,11 @@ class TestHashJoinTimer(ImpalaTestSuite):
         if ("Join Build-Side Prepared Asynchronously" in line):
             asyn_build = True;
 
-    assert (asyn_build), "Join is not prepared asynchronously"
-    assert (check_fragment_count > 1), "Unable to verify Fragment or Average Fragment"
-    assert (check_execsummary_count == 1), "Unable to verify ExecSummary" % profile
+    assert (asyn_build), "Join is not prepared asynchronously: {0}".format(profile)
+    assert (check_fragment_count > 1), \
+        "Unable to verify Fragment or Average Fragment: {0}".format(profile)
+    assert (check_execsummary_count == 1), \
+        "Unable to verify ExecSummary: {0}".format(profile)
 
   def __verify_join_time(self, duration, comment):
     duration_ms = self.__parse_duration_ms(duration)

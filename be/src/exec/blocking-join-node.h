@@ -114,20 +114,9 @@ class BlockingJoinNode : public ExecNode {
   /// SendBuildInputToSink is called to allocate resources for this ExecNode.
   virtual Status AcquireResourcesForBuild(RuntimeState* state) { return Status::OK(); }
 
-  /// Processes the build-side input.
-  /// Called from ProcessBuildInputAndOpenProbe() if the subclass does not provide a
-  /// DataSink to consume the build input. The build-side input is already open when
-  /// this is called.
-  /// Note that this can be called concurrently with Open'ing the left child to
-  /// increase parallelism. If, for example, the left child is another join node,
-  /// it can start its own build at the same time.
-  /// TODO: move all subclasses to use the DataSink interface and remove this method.
-  virtual Status ProcessBuildInput(RuntimeState* state) = 0;
-
-  /// Processes the build-side input, which should be already open, and opens the probe
-  /// side. Will do both concurrently if not in a subplan and an extra thread token is
-  /// available. If 'build_sink' is non-NULL, sends the build-side input to 'build_sink'.
-  /// Otherwise calls ProcessBuildInput on the subclass.
+  /// Processes the build-side input, which should be already open, by sending it to
+  /// 'build_sink', wand opens the probe side. Will do both concurrently if not in a
+  /// subplan and an extra thread token is available.
   Status ProcessBuildInputAndOpenProbe(RuntimeState* state, DataSink* build_sink);
 
   /// Set up 'current_probe_row_' to point to the first input row from the left child

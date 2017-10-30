@@ -74,10 +74,12 @@ class TupleRowComparator {
     for (bool null_first : nulls_first) nulls_first_.push_back(null_first ? -1 : 1);
   }
 
-  /// Create the evaluators for the ordering expressions and store them in 'pool'. Any
-  /// allocation during initialization of the evaluators will come from 'expr_mem_pool'.
-  /// 'state' is passed in for initialization of the evaluator.
-  Status Open(ObjectPool* pool, RuntimeState* state, MemPool* expr_mem_pool);
+  /// Create the evaluators for the ordering expressions and store them in 'pool'. The
+  /// evaluators use 'expr_perm_pool' and 'expr_results_pool' for permanent and result
+  /// allocations made by exprs respectively. 'state' is passed in for initialization
+  /// of the evaluator.
+  Status Open(ObjectPool* pool, RuntimeState* state, MemPool* expr_perm_pool,
+      MemPool* expr_results_pool);
 
   /// Release resources held by the ordering expressions' evaluators.
   void Close(RuntimeState* state);
@@ -109,12 +111,6 @@ class TupleRowComparator {
     TupleRow* lhs_row = reinterpret_cast<TupleRow*>(&lhs);
     TupleRow* rhs_row = reinterpret_cast<TupleRow*>(&rhs);
     return Less(lhs_row, rhs_row);
-  }
-
-  /// Free any local allocations made during expression evaluations in Compare().
-  void FreeLocalAllocations() const {
-    ScalarExprEvaluator::FreeLocalAllocations(ordering_expr_evals_lhs_);
-    ScalarExprEvaluator::FreeLocalAllocations(ordering_expr_evals_rhs_);
   }
 
  private:

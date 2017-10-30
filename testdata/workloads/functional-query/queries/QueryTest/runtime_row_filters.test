@@ -8,7 +8,7 @@
 # With filtering, expect 618 / 3 = 206 rows.
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=OFF;
 select STRAIGHT_JOIN count(*) from alltypes p join [BROADCAST] alltypestiny b
 on p.id = b.id and b.month = 1 and b.string_col = "1"
@@ -19,7 +19,7 @@ row_regex: .*RowsRead: 2.43K .*
 ====
 ---- QUERY
 # Now turn on local filtering: we expect to see a reduction in scan volume.
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes p join [BROADCAST] alltypestiny b
 on p.id = b.id and b.month = 1 and b.string_col = "1"
@@ -39,7 +39,7 @@ row_regex: .*Rows rejected: 2.43K .*
 
 # Local mode. Filters won't be propagated to scan, so scans will read all rows.
 # Still give enough time for filters to show up (even if they won't)
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes p join [SHUFFLE] alltypestiny b
 on p.id = b.int_col and b.month = 1 and b.string_col = "1"
@@ -50,7 +50,7 @@ row_regex: .*RowsRead: 2.43K .*
 ====
 ---- QUERY
 # Shuffle join, global mode. Expect filters to be propagated.
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes p join [SHUFFLE] alltypestiny b
 on p.id = b.int_col and b.month = 1 and b.string_col = "1"
@@ -71,7 +71,7 @@ row_regex: .*Rows rejected: 2.43K .*
 
 # Local mode. Only the left-most scan will receive its filter, but since the scan of 'b'
 # will not, the lack of predicates means there is no filter effect.
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] alltypes b
@@ -85,7 +85,7 @@ row_regex: .*Files rejected: 0 .*
 ---- QUERY
 # Global mode. Scan of 'b' will receive highly effective filter, and will propagate that
 # to left-most scan.
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] alltypes b
@@ -106,7 +106,7 @@ row_regex: .*Files rejected: 8 .*
 # With filtering, expect 0 rows.
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=10000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] alltypestiny b
@@ -124,7 +124,7 @@ row_regex: .*Rows rejected: 2.43K .*
 ####################################################
 
 # Local mode. Coordinator should report 0 filter updates received.
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] alltypestiny b
@@ -137,7 +137,7 @@ row_regex: .*Rows rejected: 2.43K .*
 ====
 ---- QUERY
 # Global mode. Coordinator should report 0 filter updates received.
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] alltypestiny b
@@ -156,7 +156,7 @@ row_regex: .*Rows rejected: 2.43K .*
 ####################################################
 
 # Local mode. Coordinator should report 0 filter updates received.
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [SHUFFLE] alltypestiny b
@@ -168,7 +168,7 @@ row_regex: .*FiltersReceived: 0 .*
 ====
 ---- QUERY
 # Global mode. Coordinator should report 1 filter updates per backend.
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [SHUFFLE] alltypestiny b
@@ -184,7 +184,7 @@ row_regex: .*FiltersReceived: 3 .*
 # Test case 7: filters with target exprs bound by > 1 slotref
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] alltypestiny b
@@ -201,7 +201,7 @@ row_regex: .*Rows rejected: 2.43K .*
 # Test case 8: filters do not pass through LOJ.
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     LEFT OUTER join alltypestiny b
@@ -218,7 +218,7 @@ row_regex: .*RowsReturned: 2.43K .*
 # Test case 9: filters do pass through ROJ.
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     RIGHT OUTER join alltypestiny b
@@ -235,7 +235,7 @@ row_regex: .*Rows rejected: 2.43K .*
 # Test case 10: filters do not pass through FOJ.
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     FULL OUTER join alltypestiny b
@@ -254,7 +254,7 @@ row_regex: .*RowsReturned: 2.43K .*
 ####################################################
 
 SET RUNTIME_FILTER_MODE=GLOBAL;
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 with l as (select l_orderkey from tpch_parquet.lineitem UNION ALL
            select l_orderkey from tpch_parquet.lineitem UNION ALL
            select l_orderkey from tpch_parquet.lineitem UNION ALL
@@ -276,7 +276,7 @@ row_regex: .*Filter 0 \(16.00 MB\).*
 # Test case 12: filter with both remote and local targets
 ###################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select straight_join count(*)
 from alltypes a join [BROADCAST] alltypessmall c
@@ -292,7 +292,7 @@ from alltypes a join [BROADCAST] alltypessmall c
 # Test case 13: filter with multiple remote targets
 ###################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select straight_join count(*)
 from alltypes a join [SHUFFLE] alltypessmall c
@@ -300,4 +300,132 @@ from alltypes a join [SHUFFLE] alltypessmall c
     on a.id = b.id where b.int_col < 100;
 ---- RESULTS
 108
+====
+
+
+---- QUERY
+###################################################
+# Test case 14: filter with expression that uses local allocations.
+# IMPALA-5885: the parquet scanner should free local allocations from upper()/lower().
+# mem_limit is calibrated so that the query fails if allocations are not freed.
+###################################################
+
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET MEM_LIMIT=200MB;
+select straight_join count(*)
+from tpch_parquet.lineitem l1 join tpch_parquet.lineitem l2
+    on lower(upper(lower(upper(lower(l1.l_comment))))) = concat(l2.l_comment, 'foo')
+---- RESULTS
+0
+====
+
+
+---- QUERY
+####################################################
+# Test case 15: filter with a predicate that has different decimal precision between
+# lhs expr and rhs expr.
+# IMPALA-5597: Runtime filter should be generated and assigned successfully when the
+# source expr and target expr have different decimal types.
+####################################################
+
+select count(*)
+from tpch_parquet.lineitem
+left join tpch_parquet.part on if(l_orderkey % 2 = 0, NULL, l_partkey) = p_partkey
+where l_orderkey = 965 and l_extendedprice * l_tax = p_retailprice;
+---- RESULTS
+1
+====
+
+
+---- QUERY
+####################################################
+# Test case 16: PHJ nodes that spill should still produce filters.
+# Run this for Parquet only to avoid variable memory
+# consumption / spilling behaviour.
+####################################################
+
+SET BUFFER_POOL_LIMIT=40m;
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SET RUNTIME_BLOOM_FILTER_SIZE=16M;
+select STRAIGHT_JOIN count(a.l_comment)
+    from tpch_parquet.lineitem a join tpch_parquet.lineitem b
+        on a.l_comment = b.l_comment;
+---- RESULTS
+51495713
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+row_regex: .*SpilledPartitions: [1-9]\d* .*
+row_regex: .*Rows processed: 16.38K.*
+row_regex: .*Rows rejected: 0 .*
+row_regex: .*1 of 1 Runtime Filter Published.*
+====
+
+
+---- QUERY
+####################################################
+# Test case 17: Filters are still effective inside subplans
+# (in certain cases). The query has a HJ-scan pair inside a
+# subplan (on the LHS).
+####################################################
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select straight_join count(1)
+    from alltypes a join complextypestbl b
+        # b.id + 10 confuses planner, so it doesn't think it
+        # can transitively push a.id < 20 to scan of a.
+        on a.id = b.id + 10 join b.int_array where b.id < 10
+---- RESULTS
+10
+---- RUNTIME_PROFILE
+row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: .*Rows rejected: 2.43K \(2432\).*
+====
+
+
+---- QUERY
+####################################################
+# Test case 18: Filters will not be used if they exceed
+# the configured memory limit on the coordinator.
+# To test this, we need to construct a query where memory
+# consumption on the coordinator exceeds MEM_LIMIT, but
+# not on the backends (because otherwise they will disable
+# the filters through another path). We set MEM_LIMIT to
+# the minimum possible then set filter size to be roughly
+# half that: since the coordinator must aggregate two of
+# these filters (and indeed must create one as well), it
+# will exceed the memory limit. This is checked for
+# indirectly by confirming that the filter had no effect
+# (when usually it would be selective).
+####################################################
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SET RUNTIME_FILTER_MIN_SIZE=128MB;
+SET RUNTIME_FILTER_MAX_SIZE=500MB;
+SET MEM_LIMIT=140MB;
+select STRAIGHT_JOIN * from alltypes a join [SHUFFLE] alltypes b
+    on a.month = b.id and b.int_col = -3
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*Filter 0 \(128.00 MB\).*
+row_regex: .*Files processed: 8.*
+row_regex: .*Files rejected: 0.*
+====
+---- QUERY
+# Confirm that with broadcast join, memory limit is not hit.
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SET RUNTIME_FILTER_MIN_SIZE=128MB;
+SET RUNTIME_FILTER_MAX_SIZE=500MB;
+# Allocate enough memory for the join + filter + scan
+SET MEM_LIMIT=170MB;
+select STRAIGHT_JOIN * from alltypes a join [BROADCAST] alltypes b
+    on a.month = b.id and b.int_col = -3
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: .*Filter 0 \(128.00 MB\).*
+row_regex: .*Files processed: 8.*
+row_regex: .*Files rejected: 8.*
 ====

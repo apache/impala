@@ -46,7 +46,8 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch,
   // will end up to the same partition.
   // TODO: Once we have a histogram with the number of rows per partition, we will have
   // accurate resize calls.
-  RETURN_IF_ERROR(CheckAndResizeHashPartitions(batch->num_rows(), ht_ctx));
+  RETURN_IF_ERROR(
+      CheckAndResizeHashPartitions(AGGREGATED_ROWS, batch->num_rows(), ht_ctx));
 
   HashTableCtx::ExprValuesCache* expr_vals_cache = ht_ctx->expr_values_cache();
   const int cache_size = expr_vals_cache->capacity();
@@ -108,6 +109,7 @@ Status PartitionedAggregationNode::ProcessRow(TupleRow* __restrict__ row,
   // so we can try again to insert the row.
   HashTable* hash_tbl = GetHashTable(partition_idx);
   Partition* dst_partition = hash_partitions_[partition_idx];
+  DCHECK(dst_partition != nullptr);
   DCHECK_EQ(dst_partition->is_spilled(), hash_tbl == NULL);
   if (hash_tbl == NULL) {
     // This partition is already spilled, just append the row.
@@ -155,22 +157,11 @@ Status PartitionedAggregationNode::AddIntermediateTuple(Partition* __restrict__ 
     }
 
     // We did not have enough memory to add intermediate_tuple to the stream.
-    RETURN_IF_ERROR(SpillPartition());
+    RETURN_IF_ERROR(SpillPartition(AGGREGATED_ROWS));
     if (partition->is_spilled()) {
       return AppendSpilledRow<AGGREGATED_ROWS>(partition, row);
     }
   }
-}
-
-template<bool AGGREGATED_ROWS>
-Status PartitionedAggregationNode::AppendSpilledRow(Partition* __restrict__ partition,
-    TupleRow* __restrict__ row) {
-  DCHECK(!is_streaming_preagg_);
-  DCHECK(partition->is_spilled());
-  BufferedTupleStream* stream = AGGREGATED_ROWS ?
-      partition->aggregated_row_stream.get() :
-      partition->unaggregated_row_stream.get();
-  return AppendSpilledRow(stream, row);
 }
 
 Status PartitionedAggregationNode::ProcessBatchStreaming(bool needs_serialize,

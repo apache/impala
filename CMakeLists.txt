@@ -17,6 +17,11 @@
 
 cmake_minimum_required(VERSION 3.2.3)
 
+# This is a Kudu-specific flag that disables Kudu targets that are test-only.
+set(NO_TESTS 1)
+# Kudu-specific, disable NVM support so that libvmem is not a dependency.
+set(NO_NVM_SUPPORT 1)
+
 # Explicitly define project() to allow modifying the compiler before the project is
 # initialized.
 project(Impala)
@@ -90,9 +95,6 @@ set_dep_root(RAPIDJSON)
 set_dep_root(SNAPPY)
 set_dep_root(THRIFT)
 set_dep_root(ZLIB)
-if (APPLE)
-  set_dep_root(OPENSSL)
-endif()
 
 # The boost-cmake project hasn't been maintained for years. Let's make sure we
 # don't accidentally use it if it can be found.
@@ -142,11 +144,28 @@ endfunction()
 
 
 find_package(Boost REQUIRED COMPONENTS thread regex filesystem system date_time)
-include_directories(${Boost_INCLUDE_DIRS})
+# Mark Boost as a system header to avoid compile warnings.
+include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 message(STATUS "Boost include dir: " ${Boost_INCLUDE_DIRS})
 message(STATUS "Boost libraries: " ${Boost_LIBRARIES})
 
-find_package(OpenSSL REQUIRED)
+# If at all possible, try to link with system OpenSSL in an attempt to match what the
+# platform that this build might ultimately be deployed on. If no suitable OpenSSL is
+# found, use the toolchain version - but beware that Impala will then fail to start if
+# deployed on a system with a lower version.
+find_package(OpenSSL 1.0.0 QUIET)
+if (NOT ${OPENSSL_FOUND})
+  set_dep_root(OPENSSL)
+  set(OPENSSL_FOUND ON)
+  set(OPENSSL_INCLUDE_DIR ${OPENSSL_ROOT}/include)
+  set(OPENSSL_SSL_LIBRARY ${OPENSSL_ROOT}/lib/libssl.so)
+  set(OPENSSL_CRYPTO_LIBRARY ${OPENSSL_ROOT}/lib/libcrypto.so)
+  set(OPENSSL_VERSION $ENV{IMPALA_OPENSSL_VERSION})
+  message(STATUS "System OpenSSL not found. Defaulting to toolchain version in"
+    " ${OPENSSL_ROOT_DIR}")
+endif()
+
+# OpenSSL, being a security dependency, is always dynamically linked.
 IMPALA_ADD_THIRDPARTY_LIB(openssl_ssl ${OPENSSL_INCLUDE_DIR} "" ${OPENSSL_SSL_LIBRARY})
 IMPALA_ADD_THIRDPARTY_LIB(openssl_crypto "" "" ${OPENSSL_CRYPTO_LIBRARY})
 
@@ -190,7 +209,8 @@ find_package(LlvmBinaries REQUIRED)
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG"
     OR "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER"
     OR "${CMAKE_BUILD_TYPE}" STREQUAL "TIDY"
-    OR "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN")
+    OR "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN"
+    OR "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN")
   # Use the LLVM libaries with assertions for debug builds.
   set(LLVM_ROOT ${LLVM_DEBUG_ROOT})
 endif()
@@ -273,7 +293,19 @@ IMPALA_ADD_THIRDPARTY_LIB(java_jvm "${JNI_INCLUDE_DIRS}" ${JAVA_JVM_LIBRARY} "")
 
 # find breakpad headers and libs
 find_package(Breakpad REQUIRED)
-IMPALA_ADD_THIRDPARTY_LIB(breakpad ${BREAKPAD_INCLUDE_DIR} ${BREAKPAD_STATIC_LIB} "")
+IMPALA_ADD_THIRDPARTY_LIB(breakpad_client ${BREAKPAD_INCLUDE_DIR} ${BREAKPAD_STATIC_LIB}
+  "")
+
+# Be careful with Kerberos: we do not statically link against it as it is a security
+# dependency.
+find_package(Kerberos REQUIRED)
+IMPALA_ADD_THIRDPARTY_LIB(krb5 ${KERBEROS_INCLUDE_DIR} "" ${KERBEROS_LIBRARY})
+
+# We require certain binaries from the kerberos project for our automated kerberos
+# testing.
+find_package(KerberosPrograms REQUIRED)
+
+###################################################################
 
 # System dependencies
 if (NOT APPLE)
@@ -293,6 +325,10 @@ if (NOT APPLE)
 endif()
 
 ###################################################################
+
+# Required for KRPC_GENERATE, which converts protobuf to stubs.
+find_package(KRPC REQUIRED)
+
 # KuduClient can use GLOG
 add_definitions(-DKUDU_HEADERS_USE_GLOG)
 if(NOT $ENV{KUDU_CLIENT_DIR} EQUAL "")
@@ -314,13 +350,18 @@ include_directories(SYSTEM ${KUDU_CLIENT_INCLUDE_DIR})
 add_subdirectory(common/function-registry)
 add_subdirectory(common/thrift)
 add_subdirectory(common/fbs)
+add_subdirectory(common/yarn-extras)
+add_subdirectory(common/protobuf)
 add_subdirectory(be)
 add_subdirectory(fe)
 add_subdirectory(ext-data-source)
 
+# Build target for all generated files which most backend code depends on
+add_custom_target(gen-deps ALL DEPENDS thrift-deps proto-deps)
+
 add_custom_target(tarballs ALL DEPENDS shell_tarball)
 
-add_custom_target(shell_tarball DEPENDS thrift-deps
+add_custom_target(shell_tarball DEPENDS gen-deps
   COMMAND "${CMAKE_SOURCE_DIR}/shell/make_shell_tarball.sh"
 )
 
@@ -329,7 +370,7 @@ add_custom_target(cscope ALL
 )
 
 if (DEFINED ENV{IMPALA_LZO} AND EXISTS $ENV{IMPALA_LZO})
-  add_custom_target(impala-lzo ALL DEPENDS thrift-deps
+  add_custom_target(impala-lzo ALL DEPENDS gen-deps
     COMMAND $ENV{IMPALA_LZO}/build.sh ${CMAKE_BUILD_TYPE} ${CMAKE_SOURCE_DIR}
     $ENV{IMPALA_TOOLCHAIN}
   )

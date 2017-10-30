@@ -1,0 +1,8 @@
+These Parquet files were created by modifying Impala's HdfsParquetTableWriter.
+
+String Data
+-----------
+These files have two string columns 'a' and 'b'. Each columns using different compression types.
+
+tinytable_0_gzip_snappy.parq: column 'a' is compressed by gzip, column 'b' is compressed by snappy
+tinytable_1_gzip_snappy.parq: column 'a' is compressed by snappy, column 'b' is compressed by gzip

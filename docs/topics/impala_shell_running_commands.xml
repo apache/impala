@@ -280,4 +280,69 @@ Fetched 5 row(s) in 0.01s
 </codeblock>
 
   </conbody>
+
+  <concept id="rerun" rev="2.10.0 IMPALA-992">
+    <title>Rerunning impala-shell Commands</title>
+    <conbody>
+
+      <p>
+        In <keyword keyref="impala210_full"/> and higher, you can use the
+        <codeph>rerun</codeph> command, or its abbreviation <codeph>@</codeph>,
+        to re-execute commands from the history list. The argument can be
+        a positive integer (reflecting the number shown in <codeph>history</codeph>
+        output) or a negative integer (reflecting the N'th last command in the
+        <codeph>history</codeph> output. For example:
+      </p>
+
+<codeblock><![CDATA[
+[localhost:21000] > select * from p1 order by t limit 5;
+...
+[localhost:21000] > show table stats p1;
++-----------+--------+--------+------------------------------------------------------------+
+| #Rows     | #Files | Size   | Location                                                   |
++-----------+--------+--------+------------------------------------------------------------+
+| 134217728 | 50     | 4.66MB | hdfs://test.example.com:8020/user/hive/warehouse/jdr.db/p1 |
++-----------+--------+--------+------------------------------------------------------------+
+[localhost:21000] > compute stats p1;
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 1 partition(s) and 3 column(s). |
++-----------------------------------------+
+[localhost:21000] > history;
+[1]: use jdr;
+[2]: history;
+[3]: show tables;
+[4]: select * from p1 order by t limit 5;
+[5]: show table stats p1;
+[6]: compute stats p1;
+[7]: history;
+[localhost:21000] > @-2; <- Rerun the 2nd last command in the history list
+Rerunning compute stats p1;
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 1 partition(s) and 3 column(s). |
++-----------------------------------------+
+[localhost:21000] > history; <- History list is not updated by rerunning commands
+                                or by repeating the last command, in this case 'history'.
+[1]: use jdr;
+[2]: history;
+[3]: show tables;
+[4]: select * from p1 order by t limit 5;
+[5]: show table stats p1;
+[6]: compute stats p1;
+[7]: history;
+[localhost:21000] > @4; <- Rerun command #4 in the history list using short form '@'.
+Rerunning select * from p1 order by t limit 5;
+...
+[localhost:21000] > rerun 4; <- Rerun command #4 using long form 'rerun'.
+Rerunning select * from p1 order by t limit 5;
+...
+]]>
+</codeblock>
+
+    </conbody>
+  </concept>
+
 </concept>

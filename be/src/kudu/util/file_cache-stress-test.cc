@@ -64,13 +64,13 @@
   } while (0);
 
 // This default value is friendly to many n-CPU configurations.
-DEFINE_int32(test_max_open_files, 192, "Maximum number of open files enforced "
+DEFINE_int32_hidden(test_max_open_files, 192, "Maximum number of open files enforced "
              "by the cache. Should be a multiple of the number of CPUs on the "
              "system.");
 
-DEFINE_int32(test_num_producer_threads, 1, "Number of producer threads");
-DEFINE_int32(test_num_consumer_threads, 4, "Number of consumer threads");
-DEFINE_int32(test_duration_secs, 2, "Number of seconds to run the test");
+DEFINE_int32_hidden(test_num_producer_threads, 1, "Number of producer threads");
+DEFINE_int32_hidden(test_num_consumer_threads, 4, "Number of consumer threads");
+DEFINE_int32_hidden(test_duration_secs, 2, "Number of seconds to run the test");
 
 using std::deque;
 using std::shared_ptr;

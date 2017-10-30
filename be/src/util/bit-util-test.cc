@@ -17,9 +17,11 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <iostream>
-#include <algorithm>
 #include <limits.h>
+
+#include <algorithm>
+#include <iostream>
+#include <numeric>
 
 #include <boost/utility.hpp>
 

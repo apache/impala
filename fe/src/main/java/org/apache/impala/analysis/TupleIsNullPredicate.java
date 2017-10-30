@@ -60,7 +60,11 @@ public class TupleIsNullPredicate extends Predicate {
   protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     super.analyzeImpl(analyzer);
     analyzer_ = analyzer;
-    evalCost_ = tupleIds_.size() * IS_NULL_COST;
+  }
+
+  @Override
+  protected float computeEvalCost() {
+    return tupleIds_.size() * IS_NULL_COST;
   }
 
   @Override

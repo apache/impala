@@ -59,7 +59,19 @@ under the License.
 ALTER TABLE <varname>name</varname> ADD COLUMNS (<varname>col_spec</varname>[, <varname>col_spec</varname> ...])
 ALTER TABLE <varname>name</varname> DROP [COLUMN] <varname>column_name</varname>
 ALTER TABLE <varname>name</varname> CHANGE <varname>column_name</varname> <varname>new_name</varname> <varname>new_type</varname>
+
 ALTER TABLE <varname>name</varname> REPLACE COLUMNS (<varname>col_spec</varname>[, <varname>col_spec</varname> ...])
+
+<ph rev="2.10.0 IMPALA-4622">-- Kudu tables only.
+ALTER TABLE <varname>name</varname> ALTER [COLUMN] <varname>column_name</varname>
+  { SET <varname>kudu_storage_attr</varname> <varname>attr_value</varname>
+    | DROP DEFAULT }
+
+kudu_storage_attr ::= { DEFAULT | BLOCK_SIZE | ENCODING | COMPRESSION }</ph>
+
+<ph rev="2.10.0 IMPALA-4622">-- Non-Kudu tables only.
+ALTER TABLE <varname>name</varname> ALTER [COLUMN] <varname>column_name</varname>
+  SET COMMENT '<varname>comment_text</varname>'</ph>
 
 ALTER TABLE <varname>name</varname> ADD [IF NOT EXISTS] PARTITION (<varname>partition_spec</varname>)
   <ph rev="IMPALA-4390">[<varname>location_spec</varname>]</ph>
@@ -949,8 +961,14 @@ alter table sales_data add partition (zipcode = cast(9021 * 10 as string));</cod
         </li>
         <li>
           <p>
-            You cannot change the default value, nullability, encoding, compression, or block size
-            of existing columns in a Kudu table.
+            You cannot change the nullability of existing columns in a Kudu table.
+          </p>
+        </li>
+        <li>
+          <p rev="2.10.0 IMPALA-4622">
+            In <keyword keyref="impala210_full"/>, you can change the default value, encoding,
+            compression, or block size of existing columns in a Kudu table by using the
+            <codeph>SET</codeph> clause.
           </p>
         </li>
         <li>
@@ -982,6 +1000,55 @@ CREATE TABLE t1 ( x INT, PRIMARY KEY (x) )
 ALTER TABLE t1 ADD COLUMNS (y STRING ENCODING prefix_encoding);
 ALTER TABLE t1 ADD COLUMNS (z INT DEFAULT 10);
 ALTER TABLE t1 ADD COLUMNS (a STRING NOT NULL DEFAULT '', t TIMESTAMP COMPRESSION default_compression);
+</codeblock>
+
+    <p rev="2.10.0 IMPALA-4622">
+      The following are some examples of modifying column defaults and storage attributes for a Kudu table:
+    </p>
+
+<codeblock rev="2.10.0 IMPALA-4622">
+create table kt (x bigint primary key, s string default 'yes', t timestamp)
+  stored as kudu;
+
+-- You can change the default value for a column, which affects any rows
+-- inserted after this change is made.
+alter table kt alter column s set default 'no';
+
+-- You can remove the default value for a column, which affects any rows
+-- inserted after this change is made. If the column is nullable, any
+-- future inserts default to NULL for this column. If the column is marked
+-- NOT NULL, any future inserts must specify a value for the column.
+alter table kt alter column s drop default;
+
+insert into kt values (1, 'foo', now());
+-- Because of the DROP DEFAULT above, omitting S from the insert
+-- gives it a value of NULL.
+insert into kt (x, t) values (2, now());
+
+select * from kt;
++---+------+-------------------------------+
+| x | s    | t                             |
++---+------+-------------------------------+
+| 2 | NULL | 2017-10-02 00:03:40.652156000 |
+| 1 | foo  | 2017-10-02 00:03:04.346185000 |
++---+------+-------------------------------+
+
+-- Other storage-related attributes can also be changed for columns.
+-- These changes take effect for any newly inserted rows, or rows
+-- rearranged due to compaction after deletes or updates.
+alter table kt alter column s set encoding prefix_encoding;
+-- The COLUMN keyword is optional in the syntax.
+alter table kt alter x set block_size 2048;
+alter table kt alter column t set compression zlib;
+
+desc kt;
++------+-----------+---------+-------------+----------+---------------+-----------------+---------------------+------------+
+| name | type      | comment | primary_key | nullable | default_value | encoding        | compression         | block_size |
++------+-----------+---------+-------------+----------+---------------+-----------------+---------------------+------------+
+| x    | bigint    |         | true        | false    |               | AUTO_ENCODING   | DEFAULT_COMPRESSION | 2048       |
+| s    | string    |         | false       | true     |               | PREFIX_ENCODING | DEFAULT_COMPRESSION | 0          |
+| t    | timestamp |         | false       | true     |               | AUTO_ENCODING   | ZLIB                | 0          |
++------+-----------+---------+-------------+----------+---------------+-----------------+---------------------+------------+
 </codeblock>
 
     <p rev="kudu">

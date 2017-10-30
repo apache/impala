@@ -1,0 +1,204 @@
+====
+---- QUERY
+set buffer_pool_limit=10m;
+select l_orderkey, count(*)
+from lineitem
+group by 1
+order by 1 limit 10
+---- RESULTS
+1,6
+2,1
+3,6
+4,1
+5,3
+6,1
+7,7
+32,6
+33,4
+34,3
+---- TYPES
+BIGINT, BIGINT
+---- RUNTIME_PROFILE
+# Verify that spilling and passthrough were activated.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Test query with string grouping column and string agg columns
+set buffer_pool_limit=10m;
+set num_nodes=1;
+select l_returnflag, l_orderkey, avg(l_tax), min(l_shipmode)
+from lineitem
+group by 1,2
+order by 1,2 limit 3
+---- RESULTS
+'A',3,0.05,'RAIL'
+'A',5,0.03,'AIR'
+'A',6,0.03,'TRUCK'
+---- TYPES
+STRING, BIGINT, DECIMAL, STRING
+---- RUNTIME_PROFILE
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
+====
+---- QUERY
+set buffer_pool_limit=10m;
+select l_orderkey, count(*)
+from lineitem
+group by 1
+order by 1 limit 10;
+---- RESULTS
+1,6
+2,1
+3,6
+4,1
+5,3
+6,1
+7,7
+32,6
+33,4
+34,3
+---- TYPES
+BIGINT, BIGINT
+---- RUNTIME_PROFILE
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Test query with string grouping column
+set buffer_pool_limit=10m;
+set num_nodes=1;
+select l_comment, count(*)
+from lineitem
+group by 1
+order by count(*) desc limit 5
+---- RESULTS
+' furiously',943
+' carefully',893
+' carefully ',875
+'carefully ',854
+' furiously ',845
+---- TYPES
+STRING, BIGINT
+---- RUNTIME_PROFILE
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Test query with string grouping column and string agg columns
+set buffer_pool_limit=10m;
+set num_nodes=1;
+select l_returnflag, l_orderkey, round(avg(l_tax),2), min(l_shipmode)
+from lineitem
+group by 1,2
+order by 1,2 limit 3;
+---- RESULTS
+'A',3,0.05,'RAIL'
+'A',5,0.03,'AIR'
+'A',6,0.03,'TRUCK'
+---- TYPES
+STRING, BIGINT, DECIMAL, STRING
+---- RUNTIME_PROFILE
+# Verify that spilling happened in the agg.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Test with non-scalar intermediate state (avg() uses fixed intermediate value).
+set buffer_pool_limit=10m;
+select l_orderkey, avg(l_orderkey)
+from lineitem
+group by 1
+order by 1 limit 5
+---- RESULTS
+1,1
+2,2
+3,3
+4,4
+5,5
+---- TYPES
+BIGINT, DOUBLE
+---- RUNTIME_PROFILE
+# Verify that passthrough and spilling happened in the pre and merge agg.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Test aggregation spill with group_concat distinct
+set buffer_pool_limit=30m;
+select l_orderkey, count(*), group_concat(distinct l_linestatus, '|')
+from lineitem
+group by 1
+order by 1 limit 10
+---- RESULTS
+1,6,'O'
+2,1,'O'
+3,6,'F'
+4,1,'O'
+5,3,'F'
+6,1,'F'
+7,7,'O'
+32,6,'O'
+33,4,'F'
+34,3,'O'
+---- TYPES
+BIGINT, BIGINT, STRING
+---- RUNTIME_PROFILE
+# Verify that at least one of the aggs spilled.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Regression test for IMPALA-2612. The following query will cause CastToChar
+# to be invoked when building the hash tables in partitioned aggregation
+# nodes. CastToChar will do "local" memory allocation. Without the fix of
+# IMPALA-2612, the peak memory consumption will be higher.
+set mem_limit=800m;
+set num_scanner_threads=1;
+select count(distinct concat(cast(l_comment as char(120)), cast(l_comment as char(120)),
+                             cast(l_comment as char(120)), cast(l_comment as char(120)),
+                             cast(l_comment as char(120)), cast(l_comment as char(120))))
+from lineitem
+---- RESULTS
+4502054
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+# Verify that the agg spilled.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Test aggregation with minimum required reservation to exercise IMPALA-2708.
+# Merge aggregation requires 17 buffers and preaggregation requires 16 buffers
+# plus 1mb of hash tables. The buffer size is 256k for this test.
+set max_row_size=256k;
+set buffer_pool_limit=9472k;
+select count(*)
+from (select distinct * from orders) t
+---- TYPES
+BIGINT
+---- RESULTS
+1500000
+---- RUNTIME_PROFILE
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# IMPALA-3304: test that avg() can spill with a query mem limit.
+# This test only covers that use FIXED_UDA_INTERMEDIATE, not functions that allocate
+# strings for intermediate values.
+set mem_limit=150m;
+select l_orderkey, avg(l_tax), avg(l_quantity), avg(l_discount), avg(l_extendedprice)
+from tpch_parquet.lineitem
+group by 1
+order by avg(l_extendedprice) desc, avg(l_discount)
+limit 5
+---- TYPES
+BIGINT,DECIMAL,DECIMAL,DECIMAL,DECIMAL
+---- RESULTS
+3811460,0.05,50.00,0.05,104899.50
+1744195,0.04,50.00,0.09,104649.50
+5151266,0.07,50.00,0.00,104449.50
+4571042,0.03,50.00,0.09,104399.50
+1198304,0.01,50.00,0.02,104299.50
+---- RUNTIME_PROFILE
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+====

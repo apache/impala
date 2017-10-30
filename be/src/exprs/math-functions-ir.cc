@@ -59,12 +59,25 @@ DoubleVal MathFunctions::E(FunctionContext* ctx) {
     return RET_TYPE(FN(v1.val, v2.val)); \
   }
 
-ONE_ARG_MATH_FN(Abs, BigIntVal, BigIntVal, llabs);
+// N.B. - for integer math, we have to promote ABS() to the next highest integer type
+// because in two's complement arithmetic, the largest negative value for any bit width
+// is not representable as a positive value within the same width.  For the largest width,
+// we simply overflow.  In the unlikely event a workaround is needed, one can simply
+// cast to a higher precision decimal type.
+BigIntVal MathFunctions::Abs(FunctionContext* ctx, const BigIntVal& v) {
+  if (v.is_null) return BigIntVal::null();
+  if (UNLIKELY(v.val == std::numeric_limits<BigIntVal::underlying_type_t>::min())) {
+      ctx->AddWarning("abs() overflowed, returning NULL");
+      return BigIntVal::null();
+  }
+  return BigIntVal(llabs(v.val));
+}
+
+ONE_ARG_MATH_FN(Abs, BigIntVal, IntVal, llabs);
+ONE_ARG_MATH_FN(Abs, IntVal, SmallIntVal, abs);
+ONE_ARG_MATH_FN(Abs, SmallIntVal, TinyIntVal, abs);
 ONE_ARG_MATH_FN(Abs, DoubleVal, DoubleVal, fabs);
 ONE_ARG_MATH_FN(Abs, FloatVal, FloatVal, fabs);
-ONE_ARG_MATH_FN(Abs, IntVal, IntVal, abs);
-ONE_ARG_MATH_FN(Abs, SmallIntVal, SmallIntVal, abs);
-ONE_ARG_MATH_FN(Abs, TinyIntVal, TinyIntVal, abs);
 ONE_ARG_MATH_FN(Sin, DoubleVal, DoubleVal, sin);
 ONE_ARG_MATH_FN(Asin, DoubleVal, DoubleVal, asin);
 ONE_ARG_MATH_FN(Cos, DoubleVal, DoubleVal, cos);

@@ -35,6 +35,13 @@ DEFINE_bool(load_catalog_in_background, false,
 DEFINE_int32(num_metadata_loading_threads, 16,
     "(Advanced) The number of metadata loading threads (degree of parallelism) to use "
     "when loading catalog metadata.");
+DEFINE_int32(max_hdfs_partitions_parallel_load, 5,
+    "(Advanced) Number of threads used to load block metadata for HDFS based partitioned "
+    "tables. Due to HDFS architectural limitations, it is unlikely to get a linear "
+    "speed up beyond 5 threads.");
+DEFINE_int32(max_nonhdfs_partitions_parallel_load, 20,
+    "(Advanced) Number of threads used to load block metadata for tables that do not "
+    "support the notion of blocks/storage IDs. Currently supported for S3/ADLS.");
 DEFINE_int32(initial_hms_cnxn_timeout_s, 120,
     "Number of seconds catalogd will wait to establish an initial connection to the HMS "
     "before exiting.");
@@ -55,7 +62,7 @@ Catalog::Catalog() {
     {"getFunctions", "([B)[B", &get_functions_id_},
     {"checkUserSentryAdmin", "([B)V", &sentry_admin_check_id_},
     {"getCatalogObject", "([B)[B", &get_catalog_object_id_},
-    {"getCatalogObjects", "(J)[B", &get_catalog_objects_id_},
+    {"getCatalogDelta", "([B)[B", &get_catalog_delta_id_},
     {"getCatalogVersion", "()J", &get_catalog_version_id_},
     {"prioritizeLoad", "([B)V", &prioritize_load_id_}};
 
@@ -90,19 +97,10 @@ Status Catalog::GetCatalogVersion(long* version) {
   return Status::OK();
 }
 
-Status Catalog::GetAllCatalogObjects(long from_version,
-    TGetAllCatalogObjectsResponse* resp) {
-  JNIEnv* jni_env = getJNIEnv();
-  JniLocalFrame jni_frame;
-  RETURN_IF_ERROR(jni_frame.push(jni_env));
-  jvalue requested_from_version;
-  requested_from_version.j = from_version;
-  jbyteArray result_bytes = static_cast<jbyteArray>(
-      jni_env->CallObjectMethod(catalog_, get_catalog_objects_id_,
-      requested_from_version));
-  RETURN_ERROR_IF_EXC(jni_env);
-  RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, resp));
-  return Status::OK();
+Status Catalog::GetCatalogDelta(long from_version, TGetCatalogDeltaResponse* resp) {
+  TGetCatalogDeltaRequest request;
+  request.__set_from_version(from_version);
+  return JniUtil::CallJniMethod(catalog_, get_catalog_delta_id_, request, resp);
 }
 
 Status Catalog::ExecDdl(const TDdlExecRequest& req, TDdlExecResponse* resp) {

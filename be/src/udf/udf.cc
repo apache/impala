@@ -41,7 +41,6 @@
 // in the main binary, which does include FreePool.
 
 #define VLOG_ROW while(false) std::cout
-#define VLOG_ROW_IS_ON (false)
 
 namespace impala {
 
@@ -77,6 +76,13 @@ class FreePool {
   int64_t net_allocations_;
 };
 
+class MemPool {
+ public:
+  uint8_t* Allocate(int byte_size) {
+    return reinterpret_cast<uint8_t*>(malloc(byte_size));
+  }
+};
+
 class RuntimeState {
  public:
   void SetQueryStatus(const std::string& error_msg) {
@@ -105,8 +111,10 @@ class RuntimeState {
 }
 
 #else
+#include "common/atomic.h"
 #include "exprs/anyval-util.h"
 #include "runtime/free-pool.h"
+#include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/runtime-state.h"
 #endif
@@ -129,26 +137,44 @@ static const int MAX_WARNINGS = 1000;
 static_assert(__BYTE_ORDER == __LITTLE_ENDIAN,
     "DecimalVal memory layout assumes little-endianness");
 
-FunctionContext* FunctionContextImpl::CreateContext(RuntimeState* state, MemPool* pool,
+#if !defined(NDEBUG) && !defined(IMPALA_UDF_SDK_BUILD)
+DECLARE_int32(stress_fn_ctx_alloc);
+
+namespace {
+/// Counter for tracking the number of allocations. Used only if the
+/// the stress flag FLAGS_stress_fn_ctx_alloc is set.
+AtomicInt32 alloc_counts(0);
+
+bool FailNextAlloc() {
+  return FLAGS_stress_fn_ctx_alloc > 0 &&
+      (alloc_counts.Add(1) % FLAGS_stress_fn_ctx_alloc) == 0;
+}
+}
+#endif
+
+FunctionContext* FunctionContextImpl::CreateContext(RuntimeState* state,
+    MemPool* udf_mem_pool, MemPool* results_pool,
     const FunctionContext::TypeDesc& return_type,
-    const vector<FunctionContext::TypeDesc>& arg_types,
-    int varargs_buffer_size, bool debug) {
+    const vector<FunctionContext::TypeDesc>& arg_types, int varargs_buffer_size,
+    bool debug) {
   FunctionContext::TypeDesc invalid_type;
   invalid_type.type = FunctionContext::INVALID_TYPE;
   invalid_type.precision = 0;
   invalid_type.scale = 0;
-  return FunctionContextImpl::CreateContext(state, pool, invalid_type, return_type,
-      arg_types, varargs_buffer_size, debug);
+  return FunctionContextImpl::CreateContext(state, udf_mem_pool, results_pool,
+      invalid_type, return_type, arg_types, varargs_buffer_size, debug);
 }
 
-FunctionContext* FunctionContextImpl::CreateContext(RuntimeState* state, MemPool* pool,
+FunctionContext* FunctionContextImpl::CreateContext(RuntimeState* state,
+    MemPool* udf_mem_pool, MemPool* results_pool,
     const FunctionContext::TypeDesc& intermediate_type,
     const FunctionContext::TypeDesc& return_type,
-    const vector<FunctionContext::TypeDesc>& arg_types,
-    int varargs_buffer_size, bool debug) {
+    const vector<FunctionContext::TypeDesc>& arg_types, int varargs_buffer_size,
+    bool debug) {
   impala_udf::FunctionContext* ctx = new impala_udf::FunctionContext();
+  ctx->impl_->udf_pool_ = new FreePool(udf_mem_pool);
+  ctx->impl_->results_pool_ = results_pool;
   ctx->impl_->state_ = state;
-  ctx->impl_->pool_ = new FreePool(pool);
   ctx->impl_->intermediate_type_ = intermediate_type;
   ctx->impl_->return_type_ = return_type;
   ctx->impl_->arg_types_ = arg_types;
@@ -156,14 +182,15 @@ FunctionContext* FunctionContextImpl::CreateContext(RuntimeState* state, MemPool
       aligned_malloc(varargs_buffer_size, VARARGS_BUFFER_ALIGNMENT));
   ctx->impl_->varargs_buffer_size_ = varargs_buffer_size;
   ctx->impl_->debug_ = debug;
-  VLOG_ROW << "Created FunctionContext: " << ctx << " with pool " << ctx->impl_->pool_;
+  VLOG_ROW << "Created FunctionContext: " << ctx;
   return ctx;
 }
 
-FunctionContext* FunctionContextImpl::Clone(MemPool* pool) {
+FunctionContext* FunctionContextImpl::Clone(
+    MemPool* udf_mem_pool, MemPool* results_pool) {
   impala_udf::FunctionContext* new_context =
-      CreateContext(state_, pool, intermediate_type_, return_type_, arg_types_,
-          varargs_buffer_size_, debug_);
+      CreateContext(state_, udf_mem_pool, results_pool, intermediate_type_,
+          return_type_, arg_types_, varargs_buffer_size_, debug_);
   new_context->impl_->constant_args_ = constant_args_;
   new_context->impl_->fragment_local_fn_state_ = fragment_local_fn_state_;
   return new_context;
@@ -174,7 +201,6 @@ FunctionContext::FunctionContext() : impl_(new FunctionContextImpl(this)) {
 
 FunctionContext::~FunctionContext() {
   assert(impl_->closed_ && "FunctionContext wasn't closed!");
-  delete impl_->pool_;
   delete impl_;
 }
 
@@ -182,7 +208,8 @@ FunctionContextImpl::FunctionContextImpl(FunctionContext* parent)
   : varargs_buffer_(NULL),
     varargs_buffer_size_(0),
     context_(parent),
-    pool_(NULL),
+    udf_pool_(NULL),
+    results_pool_(NULL),
     state_(NULL),
     debug_(false),
     version_(FunctionContext::v1_3),
@@ -192,22 +219,20 @@ FunctionContextImpl::FunctionContextImpl(FunctionContext* parent)
     thread_local_fn_state_(NULL),
     fragment_local_fn_state_(NULL),
     external_bytes_tracked_(0),
-    closed_(false) {
+    closed_(false) {}
+
+FunctionContextImpl::~FunctionContextImpl() {
+  delete udf_pool_;
 }
 
 void FunctionContextImpl::Close() {
   if (closed_) return;
 
-  // Free local allocations first so we can detect leaks through any remaining allocations
-  // (local allocations cannot be leaked, at least not by the UDF)
-  FreeLocalAllocations();
-
   stringstream error_ss;
   if (!debug_) {
-    if (pool_->net_allocations() > 0) {
-      error_ss << "Memory leaked via FunctionContext::Allocate() "
-               << "or FunctionContext::AllocateLocal()";
-    } else if (pool_->net_allocations() < 0) {
+    if (udf_pool_->net_allocations() > 0) {
+      error_ss << "Memory leaked via FunctionContext::Allocate()";
+    } else if (udf_pool_->net_allocations() < 0) {
       error_ss << "FunctionContext::Free() called on buffer that was already freed or "
                   "was not allocated.";
     }
@@ -293,10 +318,9 @@ inline bool FunctionContextImpl::CheckAllocResult(const char* fn_name,
   return true;
 }
 
-inline void FunctionContextImpl::CheckMemLimit(const char* fn_name,
-    int64_t byte_size) {
+inline void FunctionContextImpl::CheckMemLimit(const char* fn_name, int64_t byte_size) {
 #ifndef IMPALA_UDF_SDK_BUILD
-  MemTracker* mem_tracker = pool_->mem_tracker();
+  MemTracker* mem_tracker = udf_pool_->mem_tracker();
   if (mem_tracker->AnyLimitExceeded()) {
     ErrorMsg msg = ErrorMsg(TErrorCode::UDF_MEM_LIMIT_EXCEEDED, string(fn_name));
     state_->SetMemLimitExceeded(mem_tracker, byte_size, &msg);
@@ -306,7 +330,11 @@ inline void FunctionContextImpl::CheckMemLimit(const char* fn_name,
 
 uint8_t* FunctionContext::Allocate(int byte_size) noexcept {
   assert(!impl_->closed_);
-  uint8_t* buffer = impl_->pool_->Allocate(byte_size);
+#if !defined(NDEBUG) && !defined(IMPALA_UDF_SDK_BUILD)
+  uint8_t* buffer = FailNextAlloc() ? nullptr : impl_->udf_pool_->Allocate(byte_size);
+#else
+  uint8_t* buffer = impl_->udf_pool_->Allocate(byte_size);
+#endif
   if (UNLIKELY(!impl_->CheckAllocResult("FunctionContext::Allocate",
       buffer, byte_size))) {
     return NULL;
@@ -323,10 +351,14 @@ uint8_t* FunctionContext::Allocate(int byte_size) noexcept {
 
 uint8_t* FunctionContext::Reallocate(uint8_t* ptr, int byte_size) noexcept {
   assert(!impl_->closed_);
-  VLOG_ROW << "Reallocate: FunctionContext=" << this
-           << " size=" << byte_size
+  VLOG_ROW << "Reallocate: FunctionContext=" << this << " size=" << byte_size
            << " ptr=" << reinterpret_cast<void*>(ptr);
-  uint8_t* new_ptr = impl_->pool_->Reallocate(ptr, byte_size);
+#if !defined(NDEBUG) && !defined(IMPALA_UDF_SDK_BUILD)
+  uint8_t* new_ptr =
+      FailNextAlloc() ? nullptr : impl_->udf_pool_->Reallocate(ptr, byte_size);
+#else
+  uint8_t* new_ptr = impl_->udf_pool_->Reallocate(ptr, byte_size);
+#endif
   if (UNLIKELY(!impl_->CheckAllocResult("FunctionContext::Reallocate",
       new_ptr, byte_size))) {
     return NULL;
@@ -351,20 +383,20 @@ void FunctionContext::Free(uint8_t* buffer) noexcept {
       // fill in garbage value into the buffer to increase the chance of detecting misuse
       memset(buffer, 0xff, it->second);
       impl_->allocations_.erase(it);
-      impl_->pool_->Free(buffer);
+      impl_->udf_pool_->Free(buffer);
     } else {
       SetError("FunctionContext::Free() called on buffer that is already freed or was "
                "not allocated.");
     }
   } else {
-    impl_->pool_->Free(buffer);
+    impl_->udf_pool_->Free(buffer);
   }
 }
 
 void FunctionContext::TrackAllocation(int64_t bytes) {
   assert(!impl_->closed_);
   impl_->external_bytes_tracked_ += bytes;
-  impl_->pool_->mem_tracker()->Consume(bytes);
+  impl_->udf_pool_->mem_tracker()->Consume(bytes);
   impl_->CheckMemLimit("FunctionContext::TrackAllocation", bytes);
 }
 
@@ -379,7 +411,7 @@ void FunctionContext::Free(int64_t bytes) {
     return;
   }
   impl_->external_bytes_tracked_ -= bytes;
-  impl_->pool_->mem_tracker()->Release(bytes);
+  impl_->udf_pool_->mem_tracker()->Release(bytes);
 }
 
 void FunctionContext::SetError(const char* error_msg) {
@@ -435,58 +467,21 @@ void FunctionContext::SetFunctionState(FunctionStateScope scope, void* ptr) {
   }
 }
 
-uint8_t* FunctionContextImpl::AllocateLocal(int64_t byte_size) noexcept {
+uint8_t* FunctionContextImpl::AllocateForResults(int64_t byte_size) noexcept {
   assert(!closed_);
-  uint8_t* buffer = pool_->Allocate(byte_size);
-  if (UNLIKELY(!CheckAllocResult("FunctionContextImpl::AllocateLocal",
-      buffer, byte_size))) {
+#if !defined(NDEBUG) && !defined(IMPALA_UDF_SDK_BUILD)
+  uint8_t* buffer = FailNextAlloc() ? nullptr : results_pool_->Allocate(byte_size);
+#else
+  uint8_t* buffer = results_pool_->Allocate(byte_size);
+#endif
+  if (UNLIKELY(
+          !CheckAllocResult("FunctionContextImpl::AllocateForResults", buffer, byte_size))) {
     return NULL;
   }
-  local_allocations_.push_back(buffer);
-  VLOG_ROW << "Allocate Local: FunctionContext=" << context_
+  VLOG_ROW << "Allocate Results: FunctionContext=" << context_
            << " size=" << byte_size
            << " result=" << reinterpret_cast<void*>(buffer);
   return buffer;
-}
-
-uint8_t* FunctionContextImpl::ReallocateLocal(uint8_t* ptr, int64_t byte_size) noexcept {
-  assert(!closed_);
-  uint8_t* new_ptr  = pool_->Reallocate(ptr, byte_size);
-  if (UNLIKELY(!CheckAllocResult("FunctionContextImpl::ReallocateLocal",
-      new_ptr, byte_size))) {
-    return NULL;
-  }
-  if (new_ptr != ptr) {
-    auto v = std::find(local_allocations_.rbegin(), local_allocations_.rend(), ptr);
-    assert(v != local_allocations_.rend());
-    // Avoid perf issue; move to end of local allocations on any reallocation and
-    // always start the search from there.
-    if (v != local_allocations_.rbegin()) {
-      *v = *local_allocations_.rbegin();
-    }
-    *local_allocations_.rbegin() = new_ptr;
-  }
-  VLOG_ROW << "Reallocate Local: FunctionContext=" << context_
-           << " ptr=" << reinterpret_cast<void*>(ptr) << " size=" << byte_size
-           << " result=" << reinterpret_cast<void*>(new_ptr);
-  return new_ptr;
-}
-
-void FunctionContextImpl::FreeLocalAllocations() noexcept {
-  assert(!closed_);
-  if (VLOG_ROW_IS_ON) {
-    stringstream ss;
-    ss << "Free local allocations: FunctionContext=" << context_
-       << " pool=" << pool_ << endl;
-    for (int i = 0; i < local_allocations_.size(); ++i) {
-      ss << "  " << reinterpret_cast<void*>(local_allocations_[i]) << endl;
-    }
-    VLOG_ROW << ss.str();
-  }
-  for (int i = 0; i < local_allocations_.size(); ++i) {
-    pool_->Free(local_allocations_[i]);
-  }
-  local_allocations_.clear();
 }
 
 void FunctionContextImpl::SetConstantArgs(vector<AnyVal*>&& constant_args) {
@@ -499,15 +494,16 @@ void FunctionContextImpl::SetNonConstantArgs(NonConstantArgsVector&& non_constan
 
 // Note: this function crashes LLVM's JIT in expr-test if it's xcompiled. Do not move to
 // expr-ir.cc. This could probably use further investigation.
-StringVal::StringVal(FunctionContext* context, int len) noexcept : len(len), ptr(NULL) {
-  if (UNLIKELY(len > StringVal::MAX_LENGTH)) {
+StringVal::StringVal(FunctionContext* context, int str_len) noexcept : len(str_len),
+                                                                       ptr(NULL) {
+  if (UNLIKELY(str_len > StringVal::MAX_LENGTH)) {
     context->SetError("String length larger than allowed limit of "
                       "1 GB character data.");
     len = 0;
     is_null = true;
   } else {
-    ptr = context->impl()->AllocateLocal(len);
-    if (UNLIKELY(ptr == NULL && len > 0)) {
+    ptr = context->impl()->AllocateForResults(str_len);
+    if (UNLIKELY(ptr == NULL && str_len > 0)) {
 #ifndef IMPALA_UDF_SDK_BUILD
       assert(!context->impl()->state()->GetQueryStatus().ok());
 #endif
@@ -526,14 +522,20 @@ StringVal StringVal::CopyFrom(FunctionContext* ctx, const uint8_t* buf, size_t l
 }
 
 bool StringVal::Resize(FunctionContext* ctx, int new_len) noexcept {
+  if (new_len <= len) {
+    len = new_len;
+    return true;
+  }
+
   if (UNLIKELY(new_len > StringVal::MAX_LENGTH)) {
     ctx->SetError("String length larger than allowed limit of 1 GB character data.");
     len = 0;
     is_null = true;
     return false;
   }
-  auto* new_ptr = ctx->impl()->ReallocateLocal(ptr, new_len);
+  auto* new_ptr = ctx->impl()->AllocateForResults(new_len);
   if (new_ptr != nullptr) {
+    memcpy(new_ptr, ptr, len);
     ptr = new_ptr;
     len = new_len;
     return true;

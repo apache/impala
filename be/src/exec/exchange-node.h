@@ -24,7 +24,7 @@
 
 namespace impala {
 
-class DataStreamRecvr;
+class DataStreamRecvrBase;
 class RowBatch;
 class ScalarExpr;
 class TupleRowComparator;
@@ -34,12 +34,12 @@ class TupleRowComparator;
 /// is_merging is set to indicate that rows from different senders must be merged
 /// according to the sort parameters in sort_exec_exprs_. (It is assumed that the rows
 /// received from the senders themselves are sorted.)
-/// If is_merging_ is true, the exchange node creates a DataStreamRecvr with the
+/// If is_merging_ is true, the exchange node creates a DataStreamRecvrBase with the
 /// is_merging_ flag and retrieves retrieves rows from the receiver via calls to
-/// DataStreamRecvr::GetNext(). It also prepares, opens and closes the ordering exprs in
-/// its SortExecExprs member that are used to compare rows.
+/// DataStreamRecvrBase::GetNext(). It also prepares, opens and closes the ordering exprs
+/// in its SortExecExprs member that are used to compare rows.
 /// If is_merging_ is false, the exchange node directly retrieves batches from the row
-/// batch queue of the DataStreamRecvr via calls to DataStreamRecvr::GetBatch().
+/// batch queue of the DataStreamRecvrBase via calls to DataStreamRecvrBase::GetBatch().
 class ExchangeNode : public ExecNode {
  public:
   ExchangeNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
@@ -58,12 +58,11 @@ class ExchangeNode : public ExecNode {
   void set_num_senders(int num_senders) { num_senders_ = num_senders; }
 
  protected:
-  virtual Status QueryMaintenance(RuntimeState* state);
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
   /// Implements GetNext() for the case where is_merging_ is true. Delegates the GetNext()
-  /// call to the underlying DataStreamRecvr.
+  /// call to the underlying DataStreamRecvrBase.
   Status GetNextMerging(RuntimeState* state, RowBatch* output_batch, bool* eos);
 
   /// Resets input_batch_ to the next batch from the from stream_recvr_'s queue.
@@ -72,10 +71,10 @@ class ExchangeNode : public ExecNode {
 
   int num_senders_;  // needed for stream_recvr_ construction
 
-  /// The underlying DataStreamRecvr instance. Ownership is shared between this
+  /// The underlying DataStreamRecvrBase instance. Ownership is shared between this
   /// exchange node instance and the DataStreamMgr used to create the receiver.
   /// stream_recvr_->Close() must be called before this instance is destroyed.
-  std::shared_ptr<DataStreamRecvr> stream_recvr_;
+  std::shared_ptr<DataStreamRecvrBase> stream_recvr_;
 
   /// our input rows are a prefix of the rows we produce
   RowDescriptor input_row_desc_;

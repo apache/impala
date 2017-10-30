@@ -15,28 +15,24 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 #ifndef IMPALA_EXEC_PARTITIONED_HASH_JOIN_NODE_H
 #define IMPALA_EXEC_PARTITIONED_HASH_JOIN_NODE_H
 
-#include <boost/scoped_ptr.hpp>
-#include <boost/thread.hpp>
 #include <list>
 #include <memory>
 #include <string>
+#include <boost/scoped_ptr.hpp>
+#include <boost/thread.hpp>
 
 #include "exec/blocking-join-node.h"
 #include "exec/exec-node.h"
 #include "exec/partitioned-hash-join-builder.h"
-#include "runtime/buffered-block-mgr.h"
 
 #include "gen-cpp/Types_types.h"
 
 namespace impala {
 
 class BloomFilter;
-class BufferedBlockMgr;
-class BufferedTupleStream;
 class MemPool;
 class RowBatch;
 class RuntimeFilter;
@@ -100,8 +96,6 @@ class TupleRow;
 /// NULLs into several different streams, which are processed in a separate step to
 /// produce additional output rows. The NAAJ algorithm is documented in more detail in
 /// header comments for the null aware functions and data structures.
-///
-/// TODO: don't copy tuple rows so often.
 class PartitionedHashJoinNode : public BlockingJoinNode {
  public:
   PartitionedHashJoinNode(ObjectPool* pool, const TPlanNode& tnode,
@@ -117,10 +111,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   virtual void Close(RuntimeState* state) override;
 
  protected:
-  virtual Status QueryMaintenance(RuntimeState* state) override;
   virtual void AddToDebugString(
       int indentation_level, std::stringstream* out) const override;
-  virtual Status ProcessBuildInput(RuntimeState* state) override;
 
   // Safe to close the build side early because we rematerialize the build rows always.
   virtual bool CanCloseBuildEarly() const override { return true; }
@@ -176,8 +168,19 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// Returns false and sets 'status' to an error if an error is encountered. This odd
   /// return convention is used to avoid emitting unnecessary code for ~Status in perf-
   /// critical code.
+  bool AppendSpilledProbeRow(
+      BufferedTupleStream* stream, TupleRow* row, Status* status) WARN_UNUSED_RESULT;
+
+  /// Append the probe row 'row' to 'stream'. The stream may be pinned or unpinned and
+  /// and must have a write buffer allocated. Unpins the stream if needed to append the
+  /// row, so this will succeed unless an error is encountered. Returns false and sets
+  /// 'status' to an error if an error is encountered. This odd return convention is
+  /// used to avoid emitting unnecessary code for ~Status in perf-critical code.
   bool AppendProbeRow(
       BufferedTupleStream* stream, TupleRow* row, Status* status) WARN_UNUSED_RESULT;
+
+  /// Slow path for AppendProbeRow() where appending fails initially.
+  bool AppendProbeRowSlow(BufferedTupleStream* stream, TupleRow* row, Status* status);
 
   /// Probes the hash table for rows matching the current probe row and appends
   /// all the matching build rows (with probe row) to output batch. Returns true
@@ -375,6 +378,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   Status PrepareSpilledPartitionForProbe(
       RuntimeState* state, bool* got_partition) WARN_UNUSED_RESULT;
 
+  /// Construct an error status for the null-aware anti-join when it could not fit 'rows'
+  /// from the build side in memory.
+  Status NullAwareAntiJoinError(BufferedTupleStream* rows);
+
   /// Calls Close() on every probe partition, destroys the partitions and cleans up any
   /// references to the partitions. Also closes and destroys 'null_probe_rows_'.
   void CloseAndDeletePartitions();
@@ -414,6 +421,11 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// This owns the evaluators for the build and probe expressions used during insertion
   /// and probing of the hash tables.
   boost::scoped_ptr<HashTableCtx> ht_ctx_;
+
+  /// MemPool that stores allocations that hold results from evaluation of probe
+  /// exprs by 'ht_ctx_'. Cached probe expression values may reference memory in this
+  /// pool.
+  boost::scoped_ptr<MemPool> probe_expr_results_pool_;
 
   /// The iterator that corresponds to the look up of current_probe_row_.
   HashTable::Iterator hash_tbl_iterator_;
@@ -466,19 +478,22 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// This list is populated at CleanUpHashPartitions().
   std::list<PhjBuilder::Partition*> output_build_partitions_;
 
-  /// Used while processing null_aware_partition_. It contains all the build tuple rows
-  /// with a NULL when evaluating the hash table expr.
-  boost::scoped_ptr<RowBatch> nulls_build_batch_;
+  /// Whether this join is in a state outputting rows from OutputNullAwareProbeRows().
+  bool output_null_aware_probe_rows_running_;
 
   /// Partition used if 'null_aware_' is set. During probing, rows from the probe
   /// side that did not have a match in the hash table are appended to this partition.
   /// At the very end, we then iterate over the partition's probe rows. For each probe
   /// row, we return the rows that did not match any of the partition's build rows. This
   /// is NULL if this join is not null aware or we are done processing this partition.
+  /// The probe stream starts off in memory but is unpinned if there is memory pressure,
+  /// specifically if any partitions spilled or appending to the pinned stream failed.
   boost::scoped_ptr<ProbePartition> null_aware_probe_partition_;
 
   /// For NAAJ, this stream contains all probe rows that had NULL on the hash table
   /// conjuncts. Must be unique_ptr so we can release it and transfer to output batches.
+  /// The stream starts off in memory but is unpinned if there is memory pressure,
+  /// specifically if any partitions spilled or appending to the pinned stream failed.
   std::unique_ptr<BufferedTupleStream> null_probe_rows_;
 
   /// For each row in null_probe_rows_, true if this row has matched any build row
@@ -530,8 +545,6 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     inline bool IsClosed() const { return probe_rows_ == NULL; }
 
    private:
-    PartitionedHashJoinNode* parent_;
-
     /// The corresponding build partition. Not NULL. Owned by PhjBuilder.
     PhjBuilder::Partition* build_partition_;
 

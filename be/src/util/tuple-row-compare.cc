@@ -30,17 +30,17 @@ using namespace impala;
 using namespace llvm;
 using namespace strings;
 
-Status TupleRowComparator::Open(
-    ObjectPool* pool, RuntimeState* state, MemPool* expr_mem_pool) {
+Status TupleRowComparator::Open(ObjectPool* pool, RuntimeState* state,
+    MemPool* expr_perm_pool, MemPool* expr_results_pool) {
   if (ordering_expr_evals_lhs_.empty()) {
     RETURN_IF_ERROR(ScalarExprEvaluator::Create(ordering_exprs_, state, pool,
-        expr_mem_pool, &ordering_expr_evals_lhs_));
+        expr_perm_pool, expr_results_pool, &ordering_expr_evals_lhs_));
     RETURN_IF_ERROR(ScalarExprEvaluator::Open(ordering_expr_evals_lhs_, state));
   }
   DCHECK_EQ(ordering_exprs_.size(), ordering_expr_evals_lhs_.size());
   if (ordering_expr_evals_rhs_.empty()) {
-    RETURN_IF_ERROR(ScalarExprEvaluator::Clone(pool, state, expr_mem_pool,
-        ordering_expr_evals_lhs_, &ordering_expr_evals_rhs_));
+    RETURN_IF_ERROR(ScalarExprEvaluator::Clone(pool, state, expr_perm_pool,
+        expr_results_pool, ordering_expr_evals_lhs_, &ordering_expr_evals_rhs_));
   }
   DCHECK_EQ(ordering_expr_evals_lhs_.size(), ordering_expr_evals_rhs_.size());
   return Status::OK();
@@ -211,8 +211,8 @@ Status TupleRowComparator::CodegenCompare(LlvmCodeGen* codegen, Function** fn) {
   for (int i = 0; i < ordering_exprs.size(); ++i) {
     Status status = ordering_exprs[i]->GetCodegendComputeFn(codegen, &key_fns[i]);
     if (!status.ok()) {
-      return Status(Substitute("Could not codegen TupleRowComparator::Compare(): $0",
-          status.GetDetail()));
+      return Status::Expected(Substitute(
+            "Could not codegen TupleRowComparator::Compare(): $0", status.GetDetail()));
     }
   }
 

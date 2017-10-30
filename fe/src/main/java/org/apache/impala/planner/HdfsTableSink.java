@@ -99,7 +99,7 @@ public class HdfsTableSink extends TableSink {
           PlanNode.checkedMultiply(numPartitionsPerInstance, perPartitionMemReq);
       perInstanceMemEstimate = Math.min(perInstanceInputBytes, perInstanceMemReq);
     }
-    resourceProfile_ = new ResourceProfile(perInstanceMemEstimate, 0);
+    resourceProfile_ = ResourceProfile.noReservation(perInstanceMemEstimate);
   }
 
   /**

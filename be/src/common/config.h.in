@@ -19,8 +19,16 @@
 #ifndef IMPALA_COMMON_CONFIG_H
 #define IMPALA_COMMON_CONFIG_H
 
-/// This is a template that is populated by CMake with config information
+/// This is a template that is populated by CMake with config information.
+/// See be/CMakeLists.txt for the definition of the CMake symbols.
 
 #cmakedefine HAVE_SCHED_GETCPU
+#cmakedefine IMPALA_HAVE_FALLOCATE
+#cmakedefine HAVE_PREADV
+#cmakedefine HAVE_PIPE2
+#cmakedefine HAVE_MAGIC_H
+#cmakedefine HAVE_KRB5_IS_CONFIG_PRINCIPAL
+#cmakedefine HAVE_KRB5_GET_INIT_CREDS_OPT_SET_OUT_CCACHE
+#cmakedefine HAVE_SYNC_FILE_RANGE
 
 #endif

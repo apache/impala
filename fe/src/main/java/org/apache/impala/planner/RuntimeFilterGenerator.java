@@ -36,10 +36,15 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.TupleIsNullPredicate;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.IdGenerator;
+import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.thrift.TRuntimeFilterDesc;
+import org.apache.impala.thrift.TRuntimeFilterMode;
 import org.apache.impala.thrift.TRuntimeFilterTargetDesc;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -136,14 +141,17 @@ public final class RuntimeFilterGenerator {
       // Expr on which the filter is applied
       public Expr expr;
       // Indicates if 'expr' is bound only by partition columns
-      public boolean isBoundByPartitionColumns = false;
-      // Indicates if 'node' is in the same fragment as the join that produces the
-      // filter
-      public boolean isLocalTarget = false;
+      public final boolean isBoundByPartitionColumns;
+      // Indicates if 'node' is in the same fragment as the join that produces the filter
+      public final boolean isLocalTarget;
 
-      public RuntimeFilterTarget(ScanNode targetNode, Expr targetExpr) {
+      public RuntimeFilterTarget(ScanNode targetNode, Expr targetExpr,
+          boolean isBoundByPartitionColumns, boolean isLocalTarget) {
+        Preconditions.checkState(targetExpr.isBoundByTupleIds(targetNode.getTupleIds()));
         node = targetNode;
         expr = targetExpr;
+        this.isBoundByPartitionColumns = isBoundByPartitionColumns;
+        this.isLocalTarget = isLocalTarget;
       }
 
       public TRuntimeFilterTargetDesc toThrift() {
@@ -344,25 +352,7 @@ public final class RuntimeFilterGenerator {
       return src_.getCardinality() / (double) src_.getChild(0).getCardinality();
     }
 
-    public void addTarget(ScanNode node, Analyzer analyzer, Expr targetExpr) {
-      Preconditions.checkState(targetExpr.isBoundByTupleIds(node.getTupleIds()));
-      RuntimeFilterTarget target = new RuntimeFilterTarget(node, targetExpr);
-      targets_.add(target);
-      // Check if all the slots of targetExpr_ are bound by partition columns
-      TupleDescriptor baseTblDesc = node.getTupleDesc();
-      Table tbl = baseTblDesc.getTable();
-      if (tbl.getNumClusteringCols() == 0) return;
-      List<SlotId> sids = Lists.newArrayList();
-      targetExpr.getIds(null, sids);
-      for (SlotId sid: sids) {
-        SlotDescriptor slotDesc = analyzer.getSlotDesc(sid);
-        if (slotDesc.getColumn() == null
-            || slotDesc.getColumn().getPosition() >= tbl.getNumClusteringCols()) {
-          return;
-        }
-      }
-      target.isBoundByPartitionColumns = true;
-    }
+    public void addTarget(RuntimeFilterTarget target) { targets_.add(target); }
 
     public void setIsBroadcast(boolean isBroadcast) { isBroadcastJoin_ = isBroadcast; }
 
@@ -373,11 +363,8 @@ public final class RuntimeFilterGenerator {
       Preconditions.checkState(hasTargets());
       for (RuntimeFilterTarget target: targets_) {
         Preconditions.checkNotNull(target.node.getFragment());
-        boolean isLocal =
-            src_.getFragment().getId().equals(target.node.getFragment().getId());
-        target.isLocalTarget = isLocal;
-        hasLocalTargets_ = hasLocalTargets_ || isLocal;
-        hasRemoteTargets_ = hasRemoteTargets_ || !isLocal;
+        hasLocalTargets_ = hasLocalTargets_ || target.isLocalTarget;
+        hasRemoteTargets_ = hasRemoteTargets_ || !target.isLocalTarget;
       }
     }
 
@@ -404,11 +391,13 @@ public final class RuntimeFilterGenerator {
   /**
    * Generates and assigns runtime filters to a query plan tree.
    */
-  public static void generateRuntimeFilters(Analyzer analyzer, PlanNode plan,
-      int maxNumFilters) {
-    Preconditions.checkArgument(maxNumFilters >= 0);
+  public static void generateRuntimeFilters(PlannerContext ctx, PlanNode plan) {
+    Preconditions.checkNotNull(ctx);
+    Preconditions.checkNotNull(ctx.getQueryOptions());
+    int maxNumFilters = ctx.getQueryOptions().getMax_num_runtime_filters();
+    Preconditions.checkState(maxNumFilters >= 0);
     RuntimeFilterGenerator filterGenerator = new RuntimeFilterGenerator();
-    filterGenerator.generateFilters(analyzer, plan);
+    filterGenerator.generateFilters(ctx, plan);
     List<RuntimeFilter> filters = Lists.newArrayList(filterGenerator.getRuntimeFilters());
     if (filters.size() > maxNumFilters) {
       // If more than 'maxNumFilters' were generated, sort them by increasing selectivity
@@ -426,6 +415,9 @@ public final class RuntimeFilterGenerator {
     }
     for (RuntimeFilter filter:
          filters.subList(0, Math.min(filters.size(), maxNumFilters))) {
+      filter.setIsBroadcast(
+          filter.src_.getDistributionMode() == DistributionMode.BROADCAST);
+      filter.computeHasLocalTargets();
       if (LOG.isTraceEnabled()) LOG.trace("Runtime filter: " + filter.debugString());
       filter.assignToPlanNodes();
     }
@@ -450,13 +442,13 @@ public final class RuntimeFilterGenerator {
   }
 
   /**
-   * Generates the runtime filters for a query by recursively traversing the single-node
+   * Generates the runtime filters for a query by recursively traversing the distributed
    * plan tree rooted at 'root'. In the top-down traversal of the plan tree, candidate
    * runtime filters are generated from equi-join predicates assigned to hash-join nodes.
    * In the bottom-up traversal of the plan tree, the filters are assigned to destination
    * (scan) nodes. Filters that cannot be assigned to a scan node are discarded.
    */
-  private void generateFilters(Analyzer analyzer, PlanNode root) {
+  private void generateFilters(PlannerContext ctx, PlanNode root) {
     if (root instanceof HashJoinNode) {
       HashJoinNode joinNode = (HashJoinNode) root;
       List<Expr> joinConjuncts = Lists.newArrayList();
@@ -471,23 +463,23 @@ public final class RuntimeFilterGenerator {
       joinConjuncts.addAll(joinNode.getConjuncts());
       List<RuntimeFilter> filters = Lists.newArrayList();
       for (Expr conjunct: joinConjuncts) {
-        RuntimeFilter filter = RuntimeFilter.create(filterIdGenerator, analyzer,
-            conjunct, joinNode);
+        RuntimeFilter filter = RuntimeFilter.create(filterIdGenerator,
+            ctx.getRootAnalyzer(), conjunct, joinNode);
         if (filter == null) continue;
         registerRuntimeFilter(filter);
         filters.add(filter);
       }
-      generateFilters(analyzer, root.getChild(0));
+      generateFilters(ctx, root.getChild(0));
       // Finalize every runtime filter of that join. This is to ensure that we don't
       // assign a filter to a scan node from the right subtree of joinNode or ancestor
       // join nodes in case we don't find a destination node in the left subtree.
       for (RuntimeFilter runtimeFilter: filters) finalizeRuntimeFilter(runtimeFilter);
-      generateFilters(analyzer, root.getChild(1));
+      generateFilters(ctx, root.getChild(1));
     } else if (root instanceof ScanNode) {
-      assignRuntimeFilters(analyzer, (ScanNode) root);
+      assignRuntimeFilters(ctx, (ScanNode) root);
     } else {
       for (PlanNode childNode: root.getChildren()) {
-        generateFilters(analyzer, childNode);
+        generateFilters(ctx, childNode);
       }
     }
   }
@@ -538,20 +530,66 @@ public final class RuntimeFilterGenerator {
 
   /**
    * Assigns runtime filters to a specific scan node 'scanNode'.
-   * The assigned filters are the ones for which 'scanNode' can be used a destination
-   * node. A scan node may be used as a destination node for multiple runtime filters.
+   * The assigned filters are the ones for which 'scanNode' can be used as a destination
+   * node. The following constraints are enforced when assigning filters to 'scanNode':
+   * 1. If the DISABLE_ROW_RUNTIME_FILTERING query option is set, a filter is only
+   *    assigned to 'scanNode' if the filter target expression is bound by partition
+   *    columns.
+   * 2. If the RUNTIME_FILTER_MODE query option is set to LOCAL, a filter is only assigned
+   *    to 'scanNode' if the filter is produced within the same fragment that contains the
+   *    scan node.
+   * A scan node may be used as a destination node for multiple runtime filters.
    * Currently, runtime filters can only be assigned to HdfsScanNodes.
    */
-  private void assignRuntimeFilters(Analyzer analyzer, ScanNode scanNode) {
+  private void assignRuntimeFilters(PlannerContext ctx, ScanNode scanNode) {
     if (!(scanNode instanceof HdfsScanNode)) return;
     TupleId tid = scanNode.getTupleIds().get(0);
     if (!runtimeFiltersByTid_.containsKey(tid)) return;
+    Analyzer analyzer = ctx.getRootAnalyzer();
+    boolean disableRowRuntimeFiltering =
+        ctx.getQueryOptions().isDisable_row_runtime_filtering();
+    TRuntimeFilterMode runtimeFilterMode = ctx.getQueryOptions().getRuntime_filter_mode();
     for (RuntimeFilter filter: runtimeFiltersByTid_.get(tid)) {
       if (filter.isFinalized()) continue;
       Expr targetExpr = computeTargetExpr(filter, tid, analyzer);
       if (targetExpr == null) continue;
-      filter.addTarget(scanNode, analyzer, targetExpr);
+      boolean isBoundByPartitionColumns = isBoundByPartitionColumns(analyzer, targetExpr,
+          scanNode);
+      if (disableRowRuntimeFiltering && !isBoundByPartitionColumns) continue;
+      boolean isLocalTarget = isLocalTarget(filter, scanNode);
+      if (runtimeFilterMode == TRuntimeFilterMode.LOCAL && !isLocalTarget) continue;
+      RuntimeFilter.RuntimeFilterTarget target = new RuntimeFilter.RuntimeFilterTarget(
+          scanNode, targetExpr, isBoundByPartitionColumns, isLocalTarget);
+      filter.addTarget(target);
     }
+  }
+
+  /**
+   * Check if 'targetNode' is local to the source node of 'filter'.
+   */
+  static private boolean isLocalTarget(RuntimeFilter filter, ScanNode targetNode) {
+    return targetNode.getFragment().getId().equals(filter.src_.getFragment().getId());
+  }
+
+  /**
+   * Check if all the slots of 'targetExpr' are bound by partition columns.
+   */
+  static private boolean isBoundByPartitionColumns(Analyzer analyzer, Expr targetExpr,
+      ScanNode targetNode) {
+    Preconditions.checkState(targetExpr.isBoundByTupleIds(targetNode.getTupleIds()));
+    TupleDescriptor baseTblDesc = targetNode.getTupleDesc();
+    Table tbl = baseTblDesc.getTable();
+    if (tbl.getNumClusteringCols() == 0) return false;
+    List<SlotId> sids = Lists.newArrayList();
+    targetExpr.getIds(null, sids);
+    for (SlotId sid : sids) {
+      SlotDescriptor slotDesc = analyzer.getSlotDesc(sid);
+      if (slotDesc.getColumn() == null
+          || slotDesc.getColumn().getPosition() >= tbl.getNumClusteringCols()) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
@@ -581,20 +619,21 @@ public final class RuntimeFilterGenerator {
       }
       Preconditions.checkState(exprSlots.size() == smap.size());
       try {
-        targetExpr = targetExpr.substitute(smap, analyzer, true);
+        targetExpr = targetExpr.substitute(smap, analyzer, false);
       } catch (Exception e) {
-        // An exception is thrown if we cannot generate a target expr from this
-        // scan node that has the same type as the lhs expr of the join predicate
-        // from which the runtime filter was generated. We skip that scan node and will
-        // try to assign the filter to a different scan node.
-        //
-        // TODO: Investigate if we can generate a type-compatible source/target expr
-        // pair from that scan node instead of skipping it.
         return null;
       }
     }
-    Preconditions.checkState(
-        targetExpr.getType().matchesType(filter.getSrcExpr().getType()));
+    Type srcType = filter.getSrcExpr().getType();
+    // Types of targetExpr and srcExpr must be exactly the same since runtime filters are
+    // based on hashing.
+    if (!targetExpr.getType().equals(srcType)) {
+      try {
+        targetExpr = targetExpr.castTo(srcType);
+      } catch (Exception e) {
+        return null;
+      }
+    }
     return targetExpr;
   }
 }

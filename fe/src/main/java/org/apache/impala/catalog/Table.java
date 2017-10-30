@@ -129,7 +129,7 @@ public abstract class Table implements CatalogObject {
    */
   public void setTableStats(org.apache.hadoop.hive.metastore.api.Table msTbl) {
     tableStats_ = new TTableStats(getRowCount(msTbl.getParameters()));
-    tableStats_.setTotal_file_bytes(getRawDataSize(msTbl.getParameters()));
+    tableStats_.setTotal_file_bytes(getTotalSize(msTbl.getParameters()));
   }
 
   public void addColumn(Column col) {
@@ -213,8 +213,8 @@ public abstract class Table implements CatalogObject {
     return getLongParam(StatsSetupConst.ROW_COUNT, parameters);
   }
 
-  protected static long getRawDataSize(Map<String, String> parameters) {
-    return getLongParam(StatsSetupConst.RAW_DATA_SIZE, parameters);
+  protected static long getTotalSize(Map<String, String> parameters) {
+    return getLongParam(StatsSetupConst.TOTAL_SIZE, parameters);
   }
 
   private static long getLongParam(String key, Map<String, String> parameters) {

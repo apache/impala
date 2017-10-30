@@ -80,7 +80,7 @@ namespace impala {
 /// TODO: macros:
 /// RETURN_IF_ERROR(status) << "msg"
 /// MAKE_ERROR() << "msg"
-class Status {
+class NODISCARD Status {
  public:
   typedef strings::internal::SubstituteArg ArgType;
 
@@ -201,9 +201,19 @@ class Status {
         && msg_->error() == TErrorCode::MEM_LIMIT_EXCEEDED;
   }
 
+  bool IsInternalError() const {
+    return msg_ != NULL
+        && msg_->error() == TErrorCode::INTERNAL_ERROR;
+  }
+
   bool IsRecoverableError() const {
     return msg_ != NULL
         && msg_->error() == TErrorCode::RECOVERABLE_ERROR;
+  }
+
+  bool IsDiskIoError() const {
+    return msg_ != NULL
+        && msg_->error() == TErrorCode::DISK_IO_ERROR;
   }
 
   /// Returns the error message associated with a non-successful status.
@@ -265,13 +275,18 @@ std::ostream& operator<<(std::ostream& os, const Status& status);
 /// some generally useful macros
 #define RETURN_IF_ERROR(stmt)                          \
   do {                                                 \
-    Status __status__ = (stmt);                        \
+    ::impala::Status __status__ = (stmt);              \
     if (UNLIKELY(!__status__.ok())) return __status__; \
+  } while (false)
+
+#define RETURN_VOID_IF_ERROR(stmt)                     \
+  do {                                                 \
+    if (UNLIKELY(!(stmt).ok())) return;                \
   } while (false)
 
 #define ABORT_IF_ERROR(stmt) \
   do { \
-    Status __status__ = (stmt); \
+    ::impala::Status __status__ = (stmt); \
     if (UNLIKELY(!__status__.ok())) { \
       ABORT_WITH_ERROR(__status__.GetDetail()); \
     } \

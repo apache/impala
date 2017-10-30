@@ -68,12 +68,16 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
   request_state->UpdateNonErrorQueryState(beeswax::QueryState::RUNNING);
   // start thread to wait for results to become available, which will allow
   // us to advance query state to FINISHED or EXCEPTION
-  request_state->WaitAsync();
+  Status status = request_state->WaitAsync();
+  if (!status.ok()) {
+    discard_result(UnregisterQuery(request_state->query_id(), false, &status));
+    RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
+  }
   // Once the query is running do a final check for session closure and add it to the
   // set of in-flight queries.
-  Status status = SetQueryInflight(session, request_state);
+  status = SetQueryInflight(session, request_state);
   if (!status.ok()) {
-    (void) UnregisterQuery(request_state->query_id(), false, &status);
+    discard_result(UnregisterQuery(request_state->query_id(), false, &status));
     RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
   TUniqueIdToQueryHandle(request_state->query_id(), &query_handle);
@@ -111,7 +115,7 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
   // set of in-flight queries.
   Status status = SetQueryInflight(session, request_state);
   if (!status.ok()) {
-    (void) UnregisterQuery(request_state->query_id(), false, &status);
+    discard_result(UnregisterQuery(request_state->query_id(), false, &status));
     RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
   // block until results are ready
@@ -121,7 +125,7 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
     status = request_state->query_status();
   }
   if (!status.ok()) {
-    (void) UnregisterQuery(request_state->query_id(), false, &status);
+    discard_result(UnregisterQuery(request_state->query_id(), false, &status));
     RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
 
@@ -171,7 +175,7 @@ void ImpalaServer::fetch(Results& query_results, const QueryHandle& query_handle
   VLOG_ROW << "fetch result: #results=" << query_results.data.size()
            << " has_more=" << (query_results.has_more ? "true" : "false");
   if (!status.ok()) {
-    (void) UnregisterQuery(query_id, false, &status);
+    discard_result(UnregisterQuery(query_id, false, &status));
     RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
 }
@@ -432,7 +436,7 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
       // set yet, set it now.
       lock_guard<mutex> l(session->lock);
       if (session->connected_user.empty()) session->connected_user = query.hadoop_user;
-      query_ctx->client_request.query_options = session->default_query_options;
+      query_ctx->client_request.query_options = session->QueryOptions();
       set_query_options_mask = session->set_query_options_mask;
     }
     session->ToThrift(session_id, &query_ctx->session);
@@ -440,10 +444,13 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
 
   // Override default query options with Query.Configuration
   if (query.__isset.configuration) {
+    TQueryOptions overlay;
+    QueryOptionsMask overlay_mask;
     for (const string& option: query.configuration) {
-      RETURN_IF_ERROR(ParseQueryOptions(option, &query_ctx->client_request.query_options,
-          &set_query_options_mask));
+      RETURN_IF_ERROR(ParseQueryOptions(option, &overlay, &overlay_mask));
     }
+    OverlayQueryOptions(overlay, overlay_mask, &query_ctx->client_request.query_options);
+    set_query_options_mask |= overlay_mask;
   }
 
   // Only query options not set in the session or confOverlay can be overridden by the

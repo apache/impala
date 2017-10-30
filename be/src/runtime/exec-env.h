@@ -27,15 +27,21 @@
 #include "common/status.h"
 #include "runtime/client-cache-types.h"
 #include "util/hdfs-bulk-ops-defs.h" // For declaration of HdfsOpThreadPool
+#include "util/network-util.h"
 #include "util/spinlock.h"
 
-namespace kudu { namespace client { class KuduClient; } }
+namespace kudu {
+namespace client {
+class KuduClient;
+} // namespace client
+} // namespace kudu
 
 namespace impala {
 
 class AdmissionController;
 class BufferPool;
 class CallableThreadPool;
+class DataStreamMgrBase;
 class DataStreamMgr;
 class DiskIoMgr;
 class QueryExecMgr;
@@ -43,6 +49,7 @@ class Frontend;
 class HBaseTableFactory;
 class HdfsFsCache;
 class ImpalaServer;
+class KrpcDataStreamMgr;
 class LibCache;
 class MemTracker;
 class MetricGroup;
@@ -51,6 +58,7 @@ class ObjectPool;
 class QueryResourceMgr;
 class RequestPoolService;
 class ReservationTracker;
+class RpcMgr;
 class Scheduler;
 class StatestoreSubscriber;
 class ThreadResourceMgr;
@@ -67,8 +75,9 @@ class ExecEnv {
  public:
   ExecEnv();
 
-  ExecEnv(const std::string& hostname, int backend_port, int subscriber_port,
-      int webserver_port, const std::string& statestore_host, int statestore_port);
+  ExecEnv(const std::string& hostname, int backend_port, int krpc_port,
+      int subscriber_port, int webserver_port, const std::string& statestore_host,
+      int statestore_port);
 
   /// Returns the first created exec env instance. In a normal impalad, this is
   /// the only instance. In test setups with multiple ExecEnv's per process,
@@ -78,13 +87,24 @@ class ExecEnv {
   /// Destructor - only used in backend tests that create new environment per test.
   ~ExecEnv();
 
+  /// Initialize the exec environment, including parsing memory limits and initializing
+  /// subsystems like the webserver, scheduler etc.
+  Status Init();
+
   /// Starts any dependent services in their correct order
-  Status StartServices();
+  Status StartServices() WARN_UNUSED_RESULT;
 
   /// TODO: Should ExecEnv own the ImpalaServer as well?
   void SetImpalaServer(ImpalaServer* server) { impala_server_ = server; }
 
-  DataStreamMgr* stream_mgr() { return stream_mgr_.get(); }
+  DataStreamMgrBase* stream_mgr() { return stream_mgr_.get(); }
+
+  /// TODO: Remove once a single DataStreamMgrBase implementation is standardized on.
+  /// Clients of DataStreamMgrBase should use stream_mgr() unless they need to access
+  /// members that are not a part of the DataStreamMgrBase interface.
+  DataStreamMgr* ThriftStreamMgr();
+  KrpcDataStreamMgr* KrpcStreamMgr();
+
   ImpalaBackendClientCache* impalad_client_cache() {
     return impalad_client_cache_.get();
   }
@@ -117,8 +137,12 @@ class ExecEnv {
 
   const TNetworkAddress& backend_address() const { return backend_address_; }
 
+  const IpAddr& ip_address() const { return ip_address_; }
+
+  const TNetworkAddress& krpc_address() const { return krpc_address_; }
+
   /// Initializes the exec env for running FE tests.
-  Status InitForFeTests();
+  Status InitForFeTests() WARN_UNUSED_RESULT;
 
   /// Returns true if this environment was created from the FE tests. This makes the
   /// environment special since the JVM is started first and libraries are loaded
@@ -126,19 +150,19 @@ class ExecEnv {
   bool is_fe_tests() { return is_fe_tests_; }
 
   /// Returns the configured defaultFs set in core-site.xml
-  string default_fs() { return default_fs_; }
+  const string& default_fs() { return default_fs_; }
 
   /// Gets a KuduClient for this list of master addresses. It will look up and share
   /// an existing KuduClient if possible. Otherwise, it will create a new KuduClient
   /// internally and return a pointer to it. All KuduClients accessed through this
   /// interface are owned by the ExecEnv. Thread safe.
-  Status GetKuduClient(
-      const std::vector<std::string>& master_addrs, kudu::client::KuduClient** client);
+  Status GetKuduClient(const std::vector<std::string>& master_addrs,
+      kudu::client::KuduClient** client) WARN_UNUSED_RESULT;
 
  private:
   boost::scoped_ptr<ObjectPool> obj_pool_;
   boost::scoped_ptr<MetricGroup> metrics_;
-  boost::scoped_ptr<DataStreamMgr> stream_mgr_;
+  boost::scoped_ptr<DataStreamMgrBase> stream_mgr_;
   boost::scoped_ptr<Scheduler> scheduler_;
   boost::scoped_ptr<AdmissionController> admission_controller_;
   boost::scoped_ptr<StatestoreSubscriber> statestore_subscriber_;
@@ -150,17 +174,26 @@ class ExecEnv {
   boost::scoped_ptr<MemTracker> mem_tracker_;
   boost::scoped_ptr<PoolMemTrackerRegistry> pool_mem_trackers_;
   boost::scoped_ptr<ThreadResourceMgr> thread_mgr_;
+
+  // Thread pool for running HdfsOp operations. Only used by the coordinator, so it's
+  // only started if FLAGS_is_coordinator is 'true'.
   boost::scoped_ptr<HdfsOpThreadPool> hdfs_op_thread_pool_;
+
   boost::scoped_ptr<TmpFileMgr> tmp_file_mgr_;
   boost::scoped_ptr<RequestPoolService> request_pool_service_;
   boost::scoped_ptr<Frontend> frontend_;
+
+  // Thread pool for the ExecQueryFInstances RPC. Only used by the coordinator, so it's
+  // only started if FLAGS_is_coordinator is 'true'.
   boost::scoped_ptr<CallableThreadPool> exec_rpc_thread_pool_;
+
   boost::scoped_ptr<CallableThreadPool> async_rpc_pool_;
   boost::scoped_ptr<QueryExecMgr> query_exec_mgr_;
+  boost::scoped_ptr<RpcMgr> rpc_mgr_;
 
   /// Query-wide buffer pool and the root reservation tracker for the pool. The
-  /// reservation limit is equal to the maximum capacity of the pool.
-  /// For now this is only used by backend tests that create them via InitBufferPool();
+  /// reservation limit is equal to the maximum capacity of the pool. Created in
+  /// InitBufferPool();
   boost::scoped_ptr<ReservationTracker> buffer_reservation_;
   boost::scoped_ptr<BufferPool> buffer_pool_;
 
@@ -175,8 +208,14 @@ class ExecEnv {
   static ExecEnv* exec_env_;
   bool is_fe_tests_ = false;
 
-  /// Address of the Impala backend server instance
+  /// Address of the thrift based ImpalaInternalService
   TNetworkAddress backend_address_;
+
+  /// Resolved IP address of the host name.
+  IpAddr ip_address_;
+
+  /// Address of the KRPC-based ImpalaInternalService
+  TNetworkAddress krpc_address_;
 
   /// fs.defaultFs value set in core-site.xml
   std::string default_fs_;
@@ -197,7 +236,7 @@ class ExecEnv {
   KuduClientMap kudu_client_map_;
 
   /// Initialise 'buffer_pool_' and 'buffer_reservation_' with given capacity.
-  void InitBufferPool(int64_t min_page_len, int64_t capacity);
+  void InitBufferPool(int64_t min_page_len, int64_t capacity, int64_t clean_pages_limit);
 };
 
 } // namespace impala

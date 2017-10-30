@@ -2,14 +2,14 @@
 select * from functional.alltypes order by random()
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=48.00MB
+|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
 01:SORT
 |  order by: random() ASC
 |  materialized: random()
-|  mem-estimate=16.00MB mem-reservation=48.00MB
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB
 |  tuple-ids=1 row-size=105B cardinality=7300
 |
 00:SCAN HDFS [functional.alltypes]
@@ -24,14 +24,14 @@ PLAN-ROOT SINK
 select * from functional.alltypes order by abs(id) + abs(id)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=48.00MB
+|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
 01:SORT
 |  order by: abs(id) + abs(id) ASC
 |  materialized: abs(id) + abs(id)
-|  mem-estimate=16.00MB mem-reservation=48.00MB
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB
 |  tuple-ids=1 row-size=105B cardinality=7300
 |
 00:SCAN HDFS [functional.alltypes]
@@ -46,13 +46,13 @@ PLAN-ROOT SINK
 select * from functional.alltypes order by tinyint_col + 1
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=48.00MB
+|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
 01:SORT
 |  order by: tinyint_col + 1 ASC
-|  mem-estimate=16.00MB mem-reservation=48.00MB
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB
 |  tuple-ids=1 row-size=97B cardinality=7300
 |
 00:SCAN HDFS [functional.alltypes]
@@ -68,14 +68,14 @@ select * from functional.alltypes
 order by dayofweek(timestamp_col), true, id + 1, string_col = date_string_col, id = tinyint_col
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=48.00MB
+|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
 01:SORT
 |  order by: dayofweek(timestamp_col) ASC, TRUE ASC, id + 1 ASC, string_col = date_string_col ASC, id = tinyint_col ASC
 |  materialized: dayofweek(timestamp_col), string_col = date_string_col
-|  mem-estimate=16.00MB mem-reservation=48.00MB
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB
 |  tuple-ids=1 row-size=102B cardinality=7300
 |
 00:SCAN HDFS [functional.alltypes]
@@ -91,7 +91,7 @@ select last_value(id) over (order by to_date(timestamp_col), bool_col is null)
 from functional.alltypes
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=64.00MB
+|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=16.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -99,13 +99,13 @@ PLAN-ROOT SINK
 |  functions: last_value(id)
 |  order by: to_date(timestamp_col) ASC, bool_col IS NULL ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  mem-estimate=0B mem-reservation=16.00MB
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB
 |  tuple-ids=3,2 row-size=41B cardinality=7300
 |
 01:SORT
 |  order by: to_date(timestamp_col) ASC, bool_col IS NULL ASC
 |  materialized: to_date(timestamp_col)
-|  mem-estimate=16.00MB mem-reservation=48.00MB
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB
 |  tuple-ids=3 row-size=37B cardinality=7300
 |
 00:SCAN HDFS [functional.alltypes]
@@ -143,14 +143,14 @@ PLAN-ROOT SINK
 select * from functional.alltypes order by TestFn(double_col)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=48.00MB
+|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
 01:SORT
 |  order by: default.testfn(double_col) ASC
 |  materialized: default.testfn(double_col)
-|  mem-estimate=16.00MB mem-reservation=48.00MB
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB
 |  tuple-ids=1 row-size=101B cardinality=7300
 |
 00:SCAN HDFS [functional.alltypes]
@@ -165,14 +165,14 @@ PLAN-ROOT SINK
 select concat(date_string_col, string_col) c from functional.alltypes order by c
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=48.00MB
+|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
 01:SORT
 |  order by: concat(date_string_col, string_col) ASC
 |  materialized: concat(date_string_col, string_col)
-|  mem-estimate=16.00MB mem-reservation=48.00MB
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB
 |  tuple-ids=1 row-size=16B cardinality=7300
 |
 00:SCAN HDFS [functional.alltypes]

@@ -60,11 +60,14 @@ FROM <i>table_reference</i> [, <i>table_reference</i> ...]
   JOIN <i>table_reference</i>
   [ON <i>join_equality_clauses</i> | USING (<varname>col1</varname>[, <varname>col2</varname> ...]] ...
 WHERE <i>conditions</i>
-GROUP BY { <i>column</i> | <i>expression</i> [ASC | DESC] [NULLS FIRST | NULLS LAST] [, ...] }
+GROUP BY { <i>column</i> | <i>expression</i> [, ...] }
 HAVING <codeph>conditions</codeph>
-GROUP BY { <i>column</i> | <i>expression</i> [ASC | DESC] [, ...] }
+ORDER BY { <i>column</i> | <i>expression</i> [ASC | DESC] [NULLS FIRST | NULLS LAST] [, ...] }
 LIMIT <i>expression</i> [OFFSET <i>expression</i>]
 [UNION [ALL] <i>select_statement</i>] ...]
+
+table_reference := { <varname>table_name</varname> | (<varname>subquery</varname>) }
+  <ph rev="IMPALA-5309">[ TABLESAMPLE SYSTEM(<varname>percentage</varname>) [REPEATABLE(<varname>seed</varname>)] ]</ph>
 </codeblock>
 
     <p>
@@ -165,6 +168,12 @@ LIMIT <i>expression</i> [OFFSET <i>expression</i>]
         Common SQL built-in functions such as <codeph>COUNT</codeph>, <codeph>SUM</codeph>, <codeph>CAST</codeph>,
         <codeph>LIKE</codeph>, <codeph>IN</codeph>, <codeph>BETWEEN</codeph>, and <codeph>COALESCE</codeph>. Impala
         specifically supports built-ins described in <xref href="impala_functions.xml#builtins"/>.
+      </li>
+
+      <li rev="IMPALA-5309">
+        In <keyword keyref="impala29_full"/> and higher, an optional <codeph>TABLESAMPLE</codeph>
+        clause immediately after a table reference, to specify that the query only processes a
+        specified percentage of the table data. See <xref keyref="tablesample"/> for details.
       </li>
     </ul>
 

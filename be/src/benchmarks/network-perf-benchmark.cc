@@ -27,6 +27,7 @@
 #include "gen-cpp/NetworkTest_types.h"
 #include "gen-cpp/NetworkTestService.h"
 
+#include "common/init.h"
 #include "common/logging.h"
 #include "util/cpu-info.h"
 #include "util/stopwatch.h"
@@ -81,7 +82,7 @@ class TestServer : public NetworkTestServiceIf {
   }
 
   void Server(ThriftServer* server) {
-    server->Start();
+    ABORT_IF_ERROR(server->Start());
     server->Join();
   }
 };
@@ -203,7 +204,7 @@ bool ProcessCommand(const vector<string>& tokens) {
 
 int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
-  CpuInfo::Init();
+  impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
 
   if (argc != 1) {
     // Just run client from command line args
@@ -221,8 +222,10 @@ int main(int argc, char** argv) {
   boost::shared_ptr<ThreadFactory> thread_factory(
       new ThriftThreadFactory("test", "test"));
   boost::shared_ptr<TProcessor> processor(new NetworkTestServiceProcessor(handler));
-  ThriftServer* server = new ThriftServer("Network Test Server", processor,
-      FLAGS_port, NULL, NULL, 100, ThriftServer::ThreadPool);
+  ThriftServer* server;
+  ABORT_IF_ERROR(ThriftServerBuilder("Network Test Server", processor, FLAGS_port)
+                     .max_concurrent_connections(100)
+                     .Build(&server));
   thread* server_thread = new thread(&TestServer::Server, handler.get(), server);
 
   string input;

@@ -1,0 +1,148 @@
+====
+---- QUERY: TPCDS-Q22A
+-- RESULT MISMATCH FROM ORIGINAL in LSD of AVG() values
+-- FIXED, HAND_ROUNDED AVG() VALUES IN RESULT SET
+set decimal_v2=1;
+with results as
+(select  i_product_name
+             ,i_brand
+             ,i_class
+             ,i_category
+             ,inv_quantity_on_hand qoh
+       from inventory
+           ,date_dim
+           ,item
+           ,warehouse
+       where  inv_date_sk=d_date_sk
+              and inv_item_sk=i_item_sk
+              and inv_warehouse_sk = w_warehouse_sk
+              and d_month_seq between 1200 and 1200 + 11
+       -- group by i_product_name,i_brand,i_class,i_category
+),
+results_rollup as
+(select i_product_name, i_brand, i_class, i_category,avg(qoh) qoh
+from results
+group by i_product_name,i_brand,i_class,i_category
+union all
+select i_product_name, i_brand, i_class, null i_category,avg(qoh) qoh
+from results
+group by i_product_name,i_brand,i_class
+union all
+select i_product_name, i_brand, null i_class, null i_category,avg(qoh) qoh
+from results
+group by i_product_name,i_brand
+union all
+select i_product_name, null i_brand, null i_class, null i_category,avg(qoh)  qoh
+from results
+group by i_product_name
+union all
+select null i_product_name, null i_brand, null i_class, null i_category,avg(qoh) qoh
+from results)
+ select  i_product_name, i_brand, i_class, i_category, cast(qoh as decimal(12, 2))
+      from results_rollup
+      order by qoh, i_product_name, i_brand, i_class, i_category
+limit 100;
+---- RESULTS
+'ationbarn station','amalgbrand #8','bathroom','Home',430.36
+'ationbarn station','amalgbrand #8','bathroom','NULL',430.36
+'ationbarn station','amalgbrand #8','NULL','NULL',430.36
+'ationbarn station','NULL','NULL','NULL',430.36
+'ationoughtn stn st','edu packimporto #2','sports-apparel','Men',435.27
+'ationoughtn stn st','edu packimporto #2','sports-apparel','NULL',435.27
+'ationoughtn stn st','edu packimporto #2','NULL','NULL',435.27
+'ationoughtn stn st','NULL','NULL','NULL',435.27
+'ationationprin st','amalgexporti #2','newborn','Children',435.51
+'ationationprin st','amalgexporti #2','newborn','NULL',435.51
+'ationationprin st','amalgexporti #2','NULL','NULL',435.51
+'ationationprin st','NULL','NULL','NULL',435.51
+'oughtcallyn stantiought','corpcorp #2','rings','Jewelry',436.49
+'oughtcallyn stantiought','corpcorp #2','rings','NULL',436.49
+'oughtcallyn stantiought','corpcorp #2','NULL','NULL',436.49
+'oughtcallyn stantiought','NULL','NULL','NULL',436.49
+'callyesebaration','namelesscorp #7','mens watch','Jewelry',437.39
+'callyesebaration','namelesscorp #7','mens watch','NULL',437.39
+'callyesebaration','namelesscorp #7','NULL','NULL',437.39
+'callyesebaration','NULL','NULL','NULL',437.39
+'n stprieingationought','namelesscorp #8','mens watch','Jewelry',439.06
+'n stprieingationought','namelesscorp #8','mens watch','NULL',439.06
+'n stprieingationought','namelesscorp #8','NULL','NULL',439.06
+'n stprieingationought','NULL','NULL','NULL',439.06
+'priationn stn st','importoscholar #2','country','Music',439.10
+'priationn stn st','importoscholar #2','country','NULL',439.10
+'priationn stn st','importoscholar #2','NULL','NULL',439.10
+'priationn stn st','NULL','NULL','NULL',439.10
+'n stcallyableoughtought','amalgimporto #2','accessories','Men',439.72
+'n stcallyableoughtought','amalgimporto #2','accessories','NULL',439.72
+'n stcallyableoughtought','amalgimporto #2','NULL','NULL',439.72
+'n stcallyableoughtought','NULL','NULL','NULL',439.72
+'n stbarought','corpbrand #10','rugs','Home',440.31
+'n stbarought','corpbrand #10','rugs','NULL',440.31
+'n stbarought','corpbrand #10','NULL','NULL',440.31
+'n stbarought','NULL','NULL','NULL',440.31
+'n stn stantioughtought','exportimaxi #8','computers','Books',440.93
+'n stn stantioughtought','exportimaxi #8','computers','NULL',440.93
+'n stn stantioughtought','exportimaxi #8','NULL','NULL',440.93
+'n stn stantioughtought','NULL','NULL','NULL',440.93
+'n stcallyesepriought','edu packscholar #2','classical','Music',441.54
+'n stcallyesepriought','edu packscholar #2','classical','NULL',441.54
+'n stcallyesepriought','edu packscholar #2','NULL','NULL',441.54
+'n stcallyesepriought','NULL','NULL','NULL',441.54
+'priantiationation','importoimporto #2','shirts','Men',441.67
+'priantiationation','importoimporto #2','shirts','NULL',441.67
+'priantiationation','importoimporto #2','NULL','NULL',441.67
+'priantiationation','NULL','NULL','NULL',441.67
+'oughtbarantiese','exportiedu pack #2','kids','Shoes',441.75
+'oughtbarantiese','exportiedu pack #2','kids','NULL',441.75
+'oughtbarantiese','exportiedu pack #2','NULL','NULL',441.75
+'oughtbarantiese','NULL','NULL','NULL',441.75
+'oughtbarprin st','edu packscholar #2','classical','Music',442.07
+'oughtbarprin st','edu packscholar #2','classical','NULL',442.07
+'oughtbarprin st','edu packscholar #2','NULL','NULL',442.07
+'oughtbarprin st','NULL','NULL','NULL',442.07
+'ationeingation','amalgexporti #2','newborn','Children',443.78
+'ationeingation','amalgexporti #2','newborn','NULL',443.78
+'ationeingation','amalgexporti #2','NULL','NULL',443.78
+'ationeingation','NULL','NULL','NULL',443.78
+'ationbarn stableought','corpbrand #8','rugs','Home',444.09
+'ationbarn stableought','corpbrand #8','rugs','NULL',444.09
+'ationbarn stableought','corpbrand #8','NULL','NULL',444.09
+'ationbarn stableought','NULL','NULL','NULL',444.09
+'eseationcallyableought','importoexporti #1','infants','Children',444.54
+'eseationcallyableought','importoexporti #1','infants','NULL',444.54
+'eseationcallyableought','importoexporti #1','NULL','NULL',444.54
+'eseationcallyableought','NULL','NULL','NULL',444.54
+'eingableableationought','amalgimporto #1','accessories','Men',444.71
+'eingableableationought','amalgimporto #1','accessories','NULL',444.71
+'eingableableationought','amalgimporto #1','NULL','NULL',444.71
+'eingableableationought','NULL','NULL','NULL',444.71
+'n steseantiation','univmaxi #10','pools','Sports',445.33
+'n steseantiation','univmaxi #10','pools','NULL',445.33
+'n steseantiation','univmaxi #10','NULL','NULL',445.33
+'n steseantiation','NULL','NULL','NULL',445.33
+'antibareingantiought','importoimporto #2','shirts','Men',445.41
+'antibareingantiought','importoimporto #2','shirts','NULL',445.41
+'antibareingantiought','importoimporto #2','NULL','NULL',445.41
+'antibareingantiought','NULL','NULL','NULL',445.41
+'ationantibarationought','univmaxi #8','pools','Sports',445.42
+'ationantibarationought','univmaxi #8','pools','NULL',445.42
+'ationantibarationought','univmaxi #8','NULL','NULL',445.42
+'ationantibarationought','NULL','NULL','NULL',445.42
+'oughtpricallybarought','edu packexporti #2','school-uniforms','Children',445.49
+'oughtpricallybarought','edu packexporti #2','school-uniforms','NULL',445.49
+'oughtpricallybarought','edu packexporti #2','NULL','NULL',445.49
+'oughtpricallybarought','NULL','NULL','NULL',445.49
+'ableationprieing','amalgamalg #1','dresses','Women',446.00
+'ableationprieing','amalgamalg #1','dresses','NULL',446.00
+'ableationprieing','amalgamalg #1','NULL','NULL',446.00
+'ableationprieing','NULL','NULL','NULL',446.00
+'pribarpribarought','edu packimporto #2','sports-apparel','Men',446.04
+'pribarpribarought','edu packimporto #2','sports-apparel','NULL',446.04
+'pribarpribarought','edu packimporto #2','NULL','NULL',446.04
+'pribarpribarought','NULL','NULL','NULL',446.04
+'oughtn stprin st','exportiamalgamalg #8','stereo','Electronics',447.27
+'oughtn stprin st','exportiamalgamalg #8','stereo','NULL',447.27
+'oughtn stprin st','exportiamalgamalg #8','NULL','NULL',447.27
+'oughtn stprin st','NULL','NULL','NULL',447.27
+---- TYPES
+STRING, STRING, STRING, STRING, DECIMAL
+====

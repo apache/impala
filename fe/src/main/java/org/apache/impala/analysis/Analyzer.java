@@ -58,6 +58,7 @@ import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
+import org.apache.impala.rewrite.SimplifyDistinctFromRule;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -83,7 +84,6 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -344,6 +344,7 @@ public class Analyzer {
         rules.add(SimplifyConditionalsRule.INSTANCE);
         rules.add(EqualityDisjunctsToInRule.INSTANCE);
         rules.add(NormalizeCountStarRule.INSTANCE);
+        rules.add(SimplifyDistinctFromRule.INSTANCE);
       }
       exprRewriter_ = new ExprRewriter(rules);
     }
@@ -1223,6 +1224,10 @@ public class Analyzer {
     return result;
   }
 
+  public TableRef getOjRef(Expr e) {
+    return globalState_.ojClauseByConjunct.get(e.getId());
+  }
+
   public boolean isOjConjunct(Expr e) {
     return globalState_.ojClauseByConjunct.containsKey(e.getId());
   }
@@ -1375,9 +1380,14 @@ public class Analyzer {
    * evaluate 'e' at a node materializing 'tids'. Returns true otherwise.
    */
   public boolean canEvalFullOuterJoinedConjunct(Expr e, List<TupleId> tids) {
-    TableRef fullOuterJoin = getFullOuterJoinRef(e);
-    if (fullOuterJoin == null) return true;
-    return tids.containsAll(fullOuterJoin.getAllTableRefIds());
+    TableRef fullOjRef = getFullOuterJoinRef(e);
+    if (fullOjRef == null) return true;
+    // 'ojRef' represents the outer-join On-clause that 'e' originates from (if any).
+    // Might be the same as 'fullOjRef'. If different from 'fullOjRef' it means that
+    // 'e' should be assigned to the node materializing the 'ojRef' tuple ids.
+    TableRef ojRef = getOjRef(e);
+    TableRef targetRef = (ojRef != null && ojRef != fullOjRef) ? ojRef : fullOjRef;
+    return tids.containsAll(targetRef.getAllTableRefIds());
   }
 
   /**
@@ -1385,7 +1395,7 @@ public class Analyzer {
    * evaluate 'e' at a node materializing 'tids'. Returns true otherwise.
    */
   public boolean canEvalOuterJoinedConjunct(Expr e, List<TupleId> tids) {
-    TableRef outerJoin = globalState_.ojClauseByConjunct.get(e.getId());
+    TableRef outerJoin = getOjRef(e);
     if (outerJoin == null) return true;
     return tids.containsAll(outerJoin.getAllTableRefIds());
   }
@@ -2610,7 +2620,7 @@ public class Analyzer {
      *    This step partitions the value transfers into disjoint sets.
      * 4. Compute the transitive closure of each partition from (3) in the new slot
      *    domain separately. Hopefully, the partitions are small enough to afford
-     *    the O(N^3) complexity of the brute-force transitive closure computation.
+     *    the O(N^3) complexity of the Floyd-Warshall transitive closure computation.
      * The condensed graph is not transformed back into the original slot domain because
      * of the potential performance penalty. Instead, hasValueTransfer() consults
      * coalescedSlots_, valueTransfer_, and completeSubGraphs_ which can together
@@ -2685,24 +2695,15 @@ public class Analyzer {
           p[numPartitionSlots++] = slotId;
         }
         // Compute the transitive closure of this graph partition.
-        // TODO: Since we are operating on a DAG the performance can be improved if
-        // necessary (e.g., topological sort + backwards propagation of the transitive
-        // closure).
-        boolean changed = false;
-        do {
-          changed = false;
+        for (int j = 0; j < numPartitionSlots; ++j) {
           for (int i = 0; i < numPartitionSlots; ++i) {
-            for (int j = 0; j < numPartitionSlots; ++j) {
-              for (int k = 0; k < numPartitionSlots; ++k) {
-                if (valueTransfer_[p[i]][p[j]] && valueTransfer_[p[j]][p[k]]
-                    && !valueTransfer_[p[i]][p[k]]) {
-                  valueTransfer_[p[i]][p[k]] = true;
-                  changed = true;
-                }
-              }
+            // Our graphs are typically sparse so this filters out a lot of iterations.
+            if (!valueTransfer_[p[i]][p[j]]) continue;
+            for (int k = 0; k < numPartitionSlots; ++k) {
+              valueTransfer_[p[i]][p[k]] |= valueTransfer_[p[j]][p[k]];
             }
           }
-        } while (changed);
+        }
       }
 
       long end = System.currentTimeMillis();

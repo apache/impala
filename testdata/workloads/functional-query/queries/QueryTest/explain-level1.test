@@ -5,7 +5,7 @@ explain
 select *
 from tpch.lineitem join tpch.orders on l_orderkey = o_orderkey;
 ---- RESULTS: VERIFY_IS_EQUAL
-'Per-Host Resource Reservation: Memory=136.00MB'
+'Max Per-Host Resource Reservation: Memory=34.00MB'
 'Per-Host Resource Estimates: Memory=476.41MB'
 ''
 'PLAN-ROOT SINK'

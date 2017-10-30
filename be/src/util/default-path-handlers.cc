@@ -31,6 +31,7 @@
 #include "service/impala-server.h"
 #include "util/common-metrics.h"
 #include "util/debug-util.h"
+#include "util/mem-info.h"
 #include "util/pprof-path-handlers.h"
 #include "util/mem-info.h"
 #include "util/cpu-info.h"
@@ -134,8 +135,8 @@ void MemUsageHandler(MemTracker* mem_tracker, MetricGroup* metric_group,
   document->AddMember("consumption", consumption, document->GetAllocator());
 
   stringstream ss;
-#ifdef ADDRESS_SANITIZER
-  ss << "Memory tracking is not available with address sanitizer builds.";
+#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
+  ss << "Memory tracking is not available with address or thread sanitizer builds.";
 #else
   char buf[2048];
   MallocExtension::instance()->GetStats(buf, 2048);
@@ -146,10 +147,21 @@ void MemUsageHandler(MemTracker* mem_tracker, MetricGroup* metric_group,
   document->AddMember("overview", overview, document->GetAllocator());
 
   // Dump all mem trackers.
-  Value detailed(mem_tracker->LogUsage().c_str(), document->GetAllocator());
+  Value detailed(mem_tracker->LogUsage(MemTracker::UNLIMITED_DEPTH).c_str(),
+      document->GetAllocator());
   document->AddMember("detailed", detailed, document->GetAllocator());
 
+  Value systeminfo(MemInfo::DebugString().c_str(), document->GetAllocator());
+  document->AddMember("systeminfo", systeminfo, document->GetAllocator());
+
   if (metric_group != nullptr) {
+    MetricGroup* aggregate_group = metric_group->FindChildGroup("memory");
+    if (aggregate_group != nullptr) {
+      Value json_metrics(kObjectType);
+      aggregate_group->ToJson(false, document, &json_metrics);
+      document->AddMember(
+          "aggregate_metrics", json_metrics["metrics"], document->GetAllocator());
+    }
     MetricGroup* jvm_group = metric_group->FindChildGroup("jvm");
     if (jvm_group != nullptr) {
       Value jvm(kObjectType);
@@ -226,7 +238,7 @@ void AddDefaultUrlCallbacks(
     webserver->RegisterUrlCallback("/memz", "memz.tmpl", callback);
   }
 
-#ifndef ADDRESS_SANITIZER
+#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
   // Remote (on-demand) profiling is disabled if the process is already being profiled.
   if (!FLAGS_enable_process_lifetime_heap_profiling) {
     AddPprofUrlCallbacks(webserver);

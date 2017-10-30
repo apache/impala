@@ -107,16 +107,22 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-05:EXCHANGE [UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |
-02:AGGREGATE [FINALIZE]
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(if(int_col IS NULL, NULL, bigint_col))
+|  group by: tinyint_col
+|
+05:EXCHANGE [HASH(tinyint_col)]
+|
+02:AGGREGATE [STREAMING]
 |  output: count(if(int_col IS NULL, NULL, bigint_col))
 |  group by: tinyint_col
 |
 04:AGGREGATE
 |  group by: tinyint_col, int_col, bigint_col
 |
-03:EXCHANGE [HASH(tinyint_col)]
+03:EXCHANGE [HASH(tinyint_col,int_col,bigint_col)]
 |
 01:AGGREGATE [STREAMING]
 |  group by: tinyint_col, int_col, bigint_col
@@ -143,16 +149,22 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-05:EXCHANGE [UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |
-02:AGGREGATE [FINALIZE]
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(int_col), sum:merge(int_col)
+|  group by: tinyint_col
+|
+05:EXCHANGE [HASH(tinyint_col)]
+|
+02:AGGREGATE [STREAMING]
 |  output: count(int_col), sum(int_col)
 |  group by: tinyint_col
 |
 04:AGGREGATE
 |  group by: tinyint_col, int_col
 |
-03:EXCHANGE [HASH(tinyint_col)]
+03:EXCHANGE [HASH(tinyint_col,int_col)]
 |
 01:AGGREGATE [STREAMING]
 |  group by: tinyint_col, int_col
@@ -217,9 +229,15 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-05:EXCHANGE [UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |
-02:AGGREGATE [FINALIZE]
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(int_col), min:merge(smallint_col), max:merge(string_col)
+|  group by: tinyint_col
+|
+05:EXCHANGE [HASH(tinyint_col)]
+|
+02:AGGREGATE [STREAMING]
 |  output: count(int_col), min:merge(smallint_col), max:merge(string_col)
 |  group by: tinyint_col
 |
@@ -227,7 +245,7 @@ PLAN-ROOT SINK
 |  output: min:merge(smallint_col), max:merge(string_col)
 |  group by: tinyint_col, int_col
 |
-03:EXCHANGE [HASH(tinyint_col)]
+03:EXCHANGE [HASH(tinyint_col,int_col)]
 |
 01:AGGREGATE [STREAMING]
 |  output: min(smallint_col), max(string_col)
@@ -256,9 +274,15 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-05:EXCHANGE [UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |
-02:AGGREGATE [FINALIZE]
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(int_col), sum:merge(int_col), count:merge(*), sum:merge(int_col), min:merge(smallint_col), max:merge(bigint_col)
+|  group by: tinyint_col
+|
+05:EXCHANGE [HASH(tinyint_col)]
+|
+02:AGGREGATE [STREAMING]
 |  output: count(int_col), sum(int_col), count:merge(*), sum:merge(int_col), min:merge(smallint_col), max:merge(bigint_col)
 |  group by: tinyint_col
 |
@@ -266,7 +290,7 @@ PLAN-ROOT SINK
 |  output: count:merge(*), sum:merge(int_col), min:merge(smallint_col), max:merge(bigint_col)
 |  group by: tinyint_col, int_col
 |
-03:EXCHANGE [HASH(tinyint_col)]
+03:EXCHANGE [HASH(tinyint_col,int_col)]
 |
 01:AGGREGATE [STREAMING]
 |  output: count(*), sum(int_col), min(smallint_col), max(bigint_col)
@@ -508,16 +532,22 @@ select * from (select count(distinct int_col) cd from functional.alltypes group 
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-05:EXCHANGE [UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |
-02:AGGREGATE [FINALIZE]
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(int_col)
+|  group by: bool_col
+|
+05:EXCHANGE [HASH(bool_col)]
+|
+02:AGGREGATE [STREAMING]
 |  output: count(int_col)
 |  group by: bool_col
 |
 04:AGGREGATE
 |  group by: bool_col, int_col
 |
-03:EXCHANGE [HASH(bool_col)]
+03:EXCHANGE [HASH(bool_col,int_col)]
 |
 01:AGGREGATE [STREAMING]
 |  group by: bool_col, int_col

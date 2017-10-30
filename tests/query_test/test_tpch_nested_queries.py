@@ -18,10 +18,8 @@
 # Functional tests running the TPCH workload.
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfOldAggsJoins
 from tests.common.test_dimensions import create_single_exec_option_dimension
 
-@SkipIfOldAggsJoins.nested_types
 class TestTpchNestedQuery(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -36,67 +34,67 @@ class TestTpchNestedQuery(ImpalaTestSuite):
         v.get_value('table_format').file_format in ['parquet'])
 
   def test_tpch_q1(self, vector):
-    self.run_test_case('tpch-q1', vector)
+    self.run_test_case(self.get_workload() + '-q1', vector)
 
   def test_tpch_q2(self, vector):
-    self.run_test_case('tpch-q2', vector)
+    self.run_test_case(self.get_workload() + '-q2', vector)
 
   def test_tpch_q3(self, vector):
-    self.run_test_case('tpch-q3', vector)
+    self.run_test_case(self.get_workload() + '-q3', vector)
 
   def test_tpch_q4(self, vector):
-    self.run_test_case('tpch-q4', vector)
+    self.run_test_case(self.get_workload() + '-q4', vector)
 
   def test_tpch_q5(self, vector):
-    self.run_test_case('tpch-q5', vector)
+    self.run_test_case(self.get_workload() + '-q5', vector)
 
   def test_tpch_q6(self, vector):
-    self.run_test_case('tpch-q6', vector)
+    self.run_test_case(self.get_workload() + '-q6', vector)
 
   def test_tpch_q7(self, vector):
-    self.run_test_case('tpch-q7', vector)
+    self.run_test_case(self.get_workload() + '-q7', vector)
 
   def test_tpch_q8(self, vector):
-    self.run_test_case('tpch-q8', vector)
+    self.run_test_case(self.get_workload() + '-q8', vector)
 
   def test_tpch_q9(self, vector):
-    self.run_test_case('tpch-q9', vector)
+    self.run_test_case(self.get_workload() + '-q9', vector)
 
   def test_tpch_q10(self, vector):
-    self.run_test_case('tpch-q10', vector)
+    self.run_test_case(self.get_workload() + '-q10', vector)
 
   def test_tpch_q11(self, vector):
-    self.run_test_case('tpch-q11', vector)
+    self.run_test_case(self.get_workload() + '-q11', vector)
 
   def test_tpch_q12(self, vector):
-    self.run_test_case('tpch-q12', vector)
+    self.run_test_case(self.get_workload() + '-q12', vector)
 
   def test_tpch_q13(self, vector):
-    self.run_test_case('tpch-q13', vector)
+    self.run_test_case(self.get_workload() + '-q13', vector)
 
   def test_tpch_q14(self, vector):
-    self.run_test_case('tpch-q14', vector)
+    self.run_test_case(self.get_workload() + '-q14', vector)
 
   def test_tpch_q15(self, vector):
-    self.run_test_case('tpch-q15', vector)
+    self.run_test_case(self.get_workload() + '-q15', vector)
 
   def test_tpch_q16(self, vector):
-    self.run_test_case('tpch-q16', vector)
+    self.run_test_case(self.get_workload() + '-q16', vector)
 
   def test_tpch_q17(self, vector):
-    self.run_test_case('tpch-q17', vector)
+    self.run_test_case(self.get_workload() + '-q17', vector)
 
   def test_tpch_q18(self, vector):
-    self.run_test_case('tpch-q18', vector)
+    self.run_test_case(self.get_workload() + '-q18', vector)
 
   def test_tpch_q19(self, vector):
-    self.run_test_case('tpch-q19', vector)
+    self.run_test_case(self.get_workload() + '-q19', vector)
 
   def test_tpch_q20(self, vector):
-    self.run_test_case('tpch-q20', vector)
+    self.run_test_case(self.get_workload() + '-q20', vector)
 
   def test_tpch_q21(self, vector):
-    self.run_test_case('tpch-q21', vector)
+    self.run_test_case(self.get_workload() + '-q21', vector)
 
   def test_tpch_q22(self, vector):
-    self.run_test_case('tpch-q22', vector)
+    self.run_test_case(self.get_workload() + '-q22', vector)

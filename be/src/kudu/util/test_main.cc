@@ -30,10 +30,10 @@
 #include "kudu/util/status.h"
 #include "kudu/util/test_util.h"
 
-DEFINE_int32(test_timeout_after, 0,
+DEFINE_int32_hidden(test_timeout_after, 0,
              "Maximum total seconds allowed for all unit tests in the suite. Default: disabled");
 
-DEFINE_int32(stress_cpu_threads, 0,
+DEFINE_int32_hidden(stress_cpu_threads, 0,
              "Number of threads to start that burn CPU in an attempt to "
              "stimulate race conditions");
 

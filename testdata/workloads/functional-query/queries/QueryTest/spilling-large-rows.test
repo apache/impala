@@ -1,0 +1,188 @@
+====
+---- QUERY
+# Create a temporary table with 10MB strings for the following tests.
+create table bigstrs stored as parquet as
+select *, repeat(string_col, 10000000) as bigstr
+from functional.alltypes
+order by id
+limit 25
+---- RESULTS
+'Inserted 25 row(s)'
+====
+---- QUERY
+# Row is too big to process in agg.
+select id, count(distinct bigstr)
+from bigstrs
+group by id
+---- CATCH
+Row of size 9.54 MB could not be materialized in plan node
+====
+---- QUERY
+# Agg should be able to process the large strings if we increase the row size.
+set max_row_size=10m;
+select id, count(distinct bigstr)
+from bigstrs
+group by id
+order by id
+---- TYPES
+int,bigint
+---- RESULTS
+0,1
+1,1
+2,1
+3,1
+4,1
+5,1
+6,1
+7,1
+8,1
+9,1
+10,1
+11,1
+12,1
+13,1
+14,1
+15,1
+16,1
+17,1
+18,1
+19,1
+20,1
+21,1
+22,1
+23,1
+24,1
+====
+---- QUERY
+# Row is too big to process in right side of hash join.
+select straight_join at.id, bs.id, at.string_col
+from functional.alltypes at
+  join bigstrs bs on repeat(at.string_col, 10000) = substring(bs.bigstr, 5000000, 10000) and at.id = bs.id
+where at.id < 100
+---- CATCH
+Row of size 9.54 MB could not be materialized in plan node with id 2. Increase the max_row_size query option (currently 512.00 KB) to process larger rows.
+====
+---- QUERY
+# Row is too big to process in right side of hash join.
+set max_row_size=18m;
+select straight_join at.id, bs.id, at.string_col
+from functional.alltypes at
+  join bigstrs bs on repeat(at.string_col, 10000) = substring(bs.bigstr, 5000000, 10000) and at.id = bs.id
+where at.id < 100
+---- TYPES
+int,int,string
+---- RESULTS
+0,0,'0'
+1,1,'1'
+2,2,'2'
+3,3,'3'
+4,4,'4'
+5,5,'5'
+6,6,'6'
+7,7,'7'
+8,8,'8'
+9,9,'9'
+10,10,'0'
+11,11,'1'
+12,12,'2'
+13,13,'3'
+14,14,'4'
+15,15,'5'
+16,16,'6'
+17,17,'7'
+18,18,'8'
+19,19,'9'
+20,20,'0'
+21,21,'1'
+22,22,'2'
+23,23,'3'
+24,24,'4'
+====
+---- QUERY
+# Row is too big to process in sort.
+select id, substr(bigstr, 1, 5)
+from bigstrs
+order by bigstr, id
+---- CATCH
+Row of size 9.54 MB could not be materialized in plan node with id 1. Increase the max_row_size query option (currently 512.00 KB) to process larger rows.
+====
+---- QUERY
+# Sort should be able to process the large strings if we increase the row size.
+set max_row_size=10m;
+select id, substr(bigstr, 1, 5)
+from bigstrs
+where id < 15
+order by bigstr, id
+---- TYPES
+int,string
+---- RESULTS
+0,'00000'
+10,'00000'
+1,'11111'
+11,'11111'
+2,'22222'
+12,'22222'
+3,'33333'
+13,'33333'
+4,'44444'
+14,'44444'
+5,'55555'
+6,'66666'
+7,'77777'
+8,'88888'
+9,'99999'
+====
+---- QUERY
+# Row is too big to process in sort or analytic.
+SELECT id, int_col, substring(bigstr, 1, 10), substring(bigstr, 9999999, 1), rank
+FROM (
+  SELECT id, int_col, bigstr, Rank() OVER (
+      ORDER BY int_col
+      ) AS rank
+  FROM bigstrs
+  ) a
+ORDER BY id
+---- CATCH
+Row of size 9.54 MB could not be materialized in plan node with id 1. Increase the max_row_size query option (currently 512.00 KB) to process larger rows.
+====
+---- QUERY
+# Sort and analytic should be able to process the large strings if we increase the row
+# size.
+set max_row_size=10m;
+SELECT id, int_col, substring(bigstr, 1, 10), substring(bigstr, 9999999, 1), rank
+FROM (
+  SELECT id, int_col, bigstr, Rank() OVER (
+      ORDER BY int_col
+      ) AS rank
+  FROM bigstrs
+  ) a
+ORDER BY id
+---- TYPES
+int,int,string,string,bigint
+---- RESULTS
+0,0,'0000000000','0',1
+1,1,'1111111111','1',4
+2,2,'2222222222','2',7
+3,3,'3333333333','3',10
+4,4,'4444444444','4',13
+5,5,'5555555555','5',16
+6,6,'6666666666','6',18
+7,7,'7777777777','7',20
+8,8,'8888888888','8',22
+9,9,'9999999999','9',24
+10,0,'0000000000','0',1
+11,1,'1111111111','1',4
+12,2,'2222222222','2',7
+13,3,'3333333333','3',10
+14,4,'4444444444','4',13
+15,5,'5555555555','5',16
+16,6,'6666666666','6',18
+17,7,'7777777777','7',20
+18,8,'8888888888','8',22
+19,9,'9999999999','9',24
+20,0,'0000000000','0',1
+21,1,'1111111111','1',4
+22,2,'2222222222','2',7
+23,3,'3333333333','3',10
+24,4,'4444444444','4',13
+====

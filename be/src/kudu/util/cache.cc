@@ -31,7 +31,7 @@
 #endif
 
 // Useful in tests that require accurate cache capacity accounting.
-DEFINE_bool(cache_force_single_shard, false,
+DEFINE_bool_hidden(cache_force_single_shard, false,
             "Override all cache implementations to use just one shard");
 TAG_FLAG(cache_force_single_shard, hidden);
 
@@ -500,7 +500,7 @@ Cache* NewLRUCache(CacheType type, size_t capacity, const string& id) {
   switch (type) {
     case DRAM_CACHE:
       return new ShardedLRUCache(capacity, id);
-#if !defined(__APPLE__)
+#if !defined(__APPLE__) && !defined(NO_NVM_SUPPORT)
     case NVM_CACHE:
       return NewLRUNvmCache(capacity, id);
 #endif

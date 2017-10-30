@@ -22,15 +22,25 @@ include "CatalogObjects.thrift"
 
 // Contains structures used internally by the Catalog Server.
 
-// Response from a call to GetAllCatalogObjects. Contains all known Catalog objects
-// (databases, tables/views, and functions) from the CatalogService's cache.
-// What metadata is included for each object is based on the parameters used in
-// the request.
-struct TGetAllCatalogObjectsResponse {
+// Arguments to a GetCatalogDelta call.
+struct TGetCatalogDeltaRequest {
+  // The base catalog version from which the delta is computed.
+  1: required i64 from_version
+}
+
+// Response from a call to GetCatalogDelta. Contains a delta of catalog objects
+// (databases, tables/views, and functions) from the CatalogService's cache relative (>)
+// to the catalog version specified in TGetCatalogDelta.from_version.
+struct TGetCatalogDeltaResponse {
   // The maximum catalog version of all objects in this response or 0 if the Catalog
   // contained no objects.
   1: required i64 max_catalog_version
 
-  // List of catalog objects (empty list if no objects detected in the Catalog).
-  2: required list<CatalogObjects.TCatalogObject> objects
+  // List of updated (new and modified) catalog objects for which the catalog verion is
+  // larger than TGetCatalotDeltaRequest.from_version.
+  2: required list<CatalogObjects.TCatalogObject> updated_objects
+
+  // List of deleted catalog objects for which the catalog version is larger than
+  // TGetCatalogDelta.from_version.
+  3: required list<CatalogObjects.TCatalogObject> deleted_objects
 }

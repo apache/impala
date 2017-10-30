@@ -102,7 +102,7 @@ having 1024 * 1024 * count(*) % 2 = 0
   and (sm between 5 and 10)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=264.00MB
+|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=1.94MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -110,7 +110,7 @@ PLAN-ROOT SINK
 |  output: sum(2 + id), count(*)
 |  group by: timestamp_col = TIMESTAMP '2016-11-15 00:00:00'
 |  having: sum(2 + id) <= 10, sum(2 + id) > 1, sum(2 + id) >= 5, 1048576 * count(*) % 2 = 0
-|  mem-estimate=10.00MB mem-reservation=264.00MB
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=1 row-size=17B cardinality=0
 |
 00:SCAN HDFS [functional.alltypes]
@@ -129,7 +129,7 @@ left outer join functional.alltypes b
 where round(1.11 + 2.22 + 3.33 + 4.44, 1) < cast(b.double_col as decimal(3, 2))
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=256.02MB mem-reservation=136.00MB
+|  Per-Host Resources: mem-estimate=257.94MB mem-reservation=1.94MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -138,7 +138,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: assumed fk/pk
 |  other join predicates: a.int_col <= b.bigint_col + 97, a.int_col >= 0 + b.bigint_col
 |  other predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
-|  mem-estimate=15.68KB mem-reservation=136.00MB
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=0,1N row-size=28B cardinality=7300
 |
 |--01:SCAN HDFS [functional.alltypes b]
@@ -203,7 +203,7 @@ group by timestamp_col = cast('2015-11-15' as timestamp) + interval 1 year
 having 1024 * 1024 * count(*) % 2 = 0
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=528.00MB
+|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=3.88MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -211,13 +211,13 @@ PLAN-ROOT SINK
 |  output: sum(2 + id), count:merge(*)
 |  group by: timestamp_col = TIMESTAMP '2016-11-15 00:00:00'
 |  having: 1048576 * count(*) % 2 = 0
-|  mem-estimate=10.00MB mem-reservation=264.00MB
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=2 row-size=17B cardinality=0
 |
 01:AGGREGATE
 |  output: count(*)
 |  group by: timestamp_col = TIMESTAMP '2016-11-15 00:00:00', 2 + id
-|  mem-estimate=10.00MB mem-reservation=264.00MB
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=1 row-size=17B cardinality=7300
 |
 00:SCAN HDFS [functional.alltypes]
@@ -234,20 +234,20 @@ from functional.alltypes
 having 1024 * 1024 * count(*) % 2 = 0
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=264.00MB
+|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=1.94MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
 02:AGGREGATE [FINALIZE]
 |  output: sum(2 + id), count:merge(*)
 |  having: 1048576 * zeroifnull(count(*)) % 2 = 0
-|  mem-estimate=10.00MB mem-reservation=0B
+|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB
 |  tuple-ids=2 row-size=16B cardinality=0
 |
 01:AGGREGATE
 |  output: count(*)
 |  group by: 2 + id
-|  mem-estimate=10.00MB mem-reservation=264.00MB
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=1 row-size=16B cardinality=7300
 |
 00:SCAN HDFS [functional.alltypes]
@@ -265,7 +265,7 @@ select first_value(1 + 1 + int_col - (1 - 1)) over
 from functional.alltypes
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=64.00MB
+|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=16.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -274,13 +274,13 @@ PLAN-ROOT SINK
 |  partition by: concat('ab', string_col)
 |  order by: greatest(20, bigint_col) ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  mem-estimate=0B mem-reservation=16.00MB
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB
 |  tuple-ids=3,2 row-size=61B cardinality=7300
 |
 01:SORT
 |  order by: concat('ab', string_col) ASC NULLS FIRST, greatest(20, bigint_col) ASC
 |  materialized: concat('ab', string_col), greatest(20, bigint_col)
-|  mem-estimate=16.00MB mem-reservation=48.00MB
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB
 |  tuple-ids=3 row-size=53B cardinality=7300
 |
 00:SCAN HDFS [functional.alltypes]
@@ -296,13 +296,13 @@ select int_col from functional.alltypes
 order by id * abs((factorial(5) / power(2, 4)))
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=136.00MB mem-reservation=24.00MB
+|  Per-Host Resources: mem-estimate=134.00MB mem-reservation=6.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
 01:SORT
 |  order by: id * 7.5 ASC
-|  mem-estimate=8.00MB mem-reservation=24.00MB
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB
 |  tuple-ids=1 row-size=8B cardinality=7300
 |
 00:SCAN HDFS [functional.alltypes]
@@ -347,7 +347,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum(id + 10 + 20 + 30)
-|  mem-estimate=10.00MB mem-reservation=0B
+|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB
 |  tuple-ids=4 row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]

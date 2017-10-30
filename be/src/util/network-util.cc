@@ -28,6 +28,8 @@
 #include <vector>
 #include <boost/algorithm/string.hpp>
 
+#include "exec/kudu-util.h"
+#include "kudu/util/net/sockaddr.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
 #include <util/string-parser.h>
@@ -111,6 +113,11 @@ Status HostnameToIpAddr(const Hostname& hostname, IpAddr* ip){
     VLOG(3) << "Only localhost addresses found for " << hostname;
   }
   return Status::OK();
+}
+
+bool IsResolvedAddress(const TNetworkAddress& addr) {
+  kudu::Sockaddr sock;
+  return sock.ParseString(addr.hostname, addr.port).ok();
 }
 
 bool FindFirstNonLocalhost(const vector<string>& addresses, string* addr) {
@@ -206,4 +213,14 @@ int FindUnusedEphemeralPort(vector<int>* used_ports) {
   close(sockfd);
   return -1;
 }
+
+Status TNetworkAddressToSockaddr(const TNetworkAddress& address,
+    kudu::Sockaddr* sockaddr) {
+  DCHECK(IsResolvedAddress(address));
+  KUDU_RETURN_IF_ERROR(
+      sockaddr->ParseString(TNetworkAddressToString(address), address.port),
+      "Failed to parse address to Kudu Sockaddr.");
+  return Status::OK();
+}
+
 }

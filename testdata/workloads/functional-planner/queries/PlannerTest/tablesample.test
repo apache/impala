@@ -154,14 +154,14 @@ select id from functional.alltypes t1 where exists (
   where t1.id = t2.id)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=160.00MB mem-reservation=136.00MB
+|  Per-Host Resources: mem-estimate=161.94MB mem-reservation=1.94MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
 02:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t1.id = t2.id
 |  runtime filters: RF000 <- t2.id
-|  mem-estimate=44B mem-reservation=136.00MB
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB
 |  tuple-ids=0 row-size=4B cardinality=10
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]

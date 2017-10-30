@@ -35,6 +35,7 @@
 DECLARE_string(ssl_server_certificate);
 DECLARE_string(ssl_private_key);
 DECLARE_int32(be_port);
+DECLARE_int32(krpc_port);
 
 using namespace apache::thrift;
 using namespace impala;
@@ -49,6 +50,10 @@ InProcessImpalaServer* InProcessImpalaServer::StartWithEphemeralPorts(
     // backend interface.
     FLAGS_be_port = backend_port;
 
+    int krpc_port = FindUnusedEphemeralPort(&used_ports);
+    if (krpc_port == -1) continue;
+    FLAGS_krpc_port = krpc_port;
+
     int subscriber_port = FindUnusedEphemeralPort(&used_ports);
     if (subscriber_port == -1) continue;
 
@@ -61,14 +66,15 @@ InProcessImpalaServer* InProcessImpalaServer::StartWithEphemeralPorts(
     int hs2_port = FindUnusedEphemeralPort(&used_ports);
     if (hs2_port == -1) continue;
 
-    InProcessImpalaServer* impala =
-        new InProcessImpalaServer("localhost", backend_port, subscriber_port,
-            webserver_port, statestore_host, statestore_port);
+    InProcessImpalaServer* impala = new InProcessImpalaServer(FLAGS_hostname,
+        backend_port, krpc_port, subscriber_port, webserver_port, statestore_host,
+        statestore_port);
     // Start the daemon and check if it works, if not delete the current server object and
     // pick a new set of ports
     Status started = impala->StartWithClientServers(beeswax_port, hs2_port);
     if (started.ok()) {
-      impala->SetCatalogInitialized();
+      const Status status = impala->SetCatalogInitialized();
+      if (!status.ok()) LOG(WARNING) << status.GetDetail();
       return impala;
     }
     delete impala;
@@ -78,56 +84,37 @@ InProcessImpalaServer* InProcessImpalaServer::StartWithEphemeralPorts(
 }
 
 InProcessImpalaServer::InProcessImpalaServer(const string& hostname, int backend_port,
-    int subscriber_port, int webserver_port, const string& statestore_host,
+    int krpc_port, int subscriber_port, int webserver_port, const string& statestore_host,
     int statestore_port)
     : hostname_(hostname), backend_port_(backend_port),
       beeswax_port_(0),
       hs2_port_(0),
       impala_server_(NULL),
-      exec_env_(new ExecEnv(hostname, backend_port, subscriber_port, webserver_port,
-          statestore_host, statestore_port)) {
+      exec_env_(new ExecEnv(hostname, backend_port, krpc_port, subscriber_port,
+          webserver_port, statestore_host, statestore_port)) {
 }
 
-void InProcessImpalaServer::SetCatalogInitialized() {
+Status InProcessImpalaServer::SetCatalogInitialized() {
   DCHECK(impala_server_ != NULL) << "Call Start*() first.";
-  exec_env_->frontend()->SetCatalogInitialized();
+  return exec_env_->frontend()->SetCatalogInitialized();
 }
 
 Status InProcessImpalaServer::StartWithClientServers(int beeswax_port, int hs2_port) {
-  RETURN_IF_ERROR(exec_env_->StartServices());
+  RETURN_IF_ERROR(exec_env_->Init());
   beeswax_port_ = beeswax_port;
   hs2_port_ = hs2_port;
-  ThriftServer* be_server;
-  ThriftServer* hs2_server;
-  ThriftServer* beeswax_server;
-  RETURN_IF_ERROR(CreateImpalaServer(exec_env_.get(), beeswax_port, hs2_port,
-                                     backend_port_, &beeswax_server, &hs2_server,
-                                     &be_server, &impala_server_));
-  be_server_.reset(be_server);
-  hs2_server_.reset(hs2_server);
-  beeswax_server_.reset(beeswax_server);
 
-  RETURN_IF_ERROR(be_server_->Start());
-  RETURN_IF_ERROR(hs2_server_->Start());
-  RETURN_IF_ERROR(beeswax_server_->Start());
+  impala_server_.reset(new ImpalaServer(exec_env_.get()));
+  RETURN_IF_ERROR(impala_server_->Init(backend_port_, beeswax_port, hs2_port));
+  RETURN_IF_ERROR(impala_server_->Start());
 
   // Wait for up to 1s for the backend server to start
   RETURN_IF_ERROR(WaitForServer(hostname_, backend_port_, 10, 100));
   return Status::OK();
 }
 
-Status InProcessImpalaServer::StartAsBackendOnly() {
-  RETURN_IF_ERROR(exec_env_->StartServices());
-  ThriftServer* be_server;
-  RETURN_IF_ERROR(CreateImpalaServer(exec_env_.get(), 0, 0, backend_port_, NULL, NULL,
-                                     &be_server, &impala_server_));
-  be_server_.reset(be_server);
-  RETURN_IF_ERROR(be_server_->Start());
-  return Status::OK();
-}
-
 Status InProcessImpalaServer::Join() {
-  be_server_->Join();
+  impala_server_->Join();
   return Status::OK();
 }
 
@@ -158,19 +145,21 @@ InProcessStatestore::InProcessStatestore(int statestore_port, int webserver_port
 }
 
 Status InProcessStatestore::Start() {
-  webserver_->Start();
+  RETURN_IF_ERROR(statestore_->Init());
+  RETURN_IF_ERROR(webserver_->Start());
   boost::shared_ptr<TProcessor> processor(
       new StatestoreServiceProcessor(statestore_->thrift_iface()));
 
-  statestore_server_.reset(new ThriftServer("StatestoreService", processor,
-      statestore_port_, NULL, metrics_.get(), 5));
+  ThriftServerBuilder builder("StatestoreService", processor, statestore_port_);
   if (EnableInternalSslConnections()) {
     LOG(INFO) << "Enabling SSL for Statestore";
-    ABORT_IF_ERROR(statestore_server_->EnableSsl(
-        FLAGS_ssl_server_certificate, FLAGS_ssl_private_key));
+    builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key);
   }
-  statestore_main_loop_.reset(
-      new Thread("statestore", "main-loop", &Statestore::MainLoop, statestore_.get()));
+  ThriftServer* server;
+  ABORT_IF_ERROR(builder.metrics(metrics_.get()).Build(&server));
+  statestore_server_.reset(server);
+  RETURN_IF_ERROR(Thread::Create("statestore", "main-loop",
+      &Statestore::MainLoop, statestore_.get(), &statestore_main_loop_));
 
   RETURN_IF_ERROR(statestore_server_->Start());
   return WaitForServer("localhost", statestore_port_, 10, 100);

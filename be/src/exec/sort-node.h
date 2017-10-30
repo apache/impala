@@ -20,13 +20,12 @@
 
 #include "exec/exec-node.h"
 #include "runtime/sorter.h"
-#include "runtime/buffered-block-mgr.h"
 
 namespace impala {
 
 /// Node that implements a full sort of its input with a fixed memory budget, spilling
 /// to disk if the input is larger than available memory.
-/// Uses Sorter and BufferedBlockMgr for the external sort implementation.
+/// Uses Sorter for the external sort implementation.
 /// Input rows to SortNode are materialized by the Sorter into a single tuple
 /// using the expressions specified in sort_tuple_exprs_.
 /// In GetNext(), SortNode passes in the output batch to the sorter instance created
@@ -47,7 +46,6 @@ class SortNode : public ExecNode {
   virtual void Close(RuntimeState* state);
 
  protected:
-  virtual Status QueryMaintenance(RuntimeState* state);
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
@@ -56,9 +54,6 @@ class SortNode : public ExecNode {
 
   /// Number of rows to skip.
   int64_t offset_;
-
-  /// Compares tuples according to 'ordering_exprs'.
-  boost::scoped_ptr<TupleRowComparator> less_than_;
 
   /// Expressions and parameters used for tuple comparison.
   std::vector<ScalarExpr*> ordering_exprs_;
@@ -69,6 +64,10 @@ class SortNode : public ExecNode {
 
   std::vector<bool> is_asc_order_;
   std::vector<bool> nulls_first_;
+
+  /// Whether the previous call to GetNext() returned a buffer attached to the RowBatch.
+  /// Used to avoid unnecessary calls to ReleaseUnusedReservation().
+  bool returned_buffer_ = false;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()

@@ -65,11 +65,8 @@ class SchedulerWrapper;
 /// TODO: Inject global dependencies into the class (for example ExecEnv::GetInstance(),
 ///       RNG used during scheduling, FLAGS_*)
 ///       to make it testable.
-/// TODO: Benchmark the performance of the scheduler. The tests need to include setups
-///       with:
-///         - Small and large number of executors.
-///         - Small and large query plans.
-///         - Scheduling query plans with concurrent updates to the internal executor
+/// TODO: Extend the benchmarks of the scheduler. The tests need to include setups with:
+///         - Scheduling query plans with concurrent updates to the internal backend
 ///           configuration.
 class Scheduler {
  public:
@@ -81,19 +78,22 @@ class Scheduler {
   /// Initialize with a subscription manager that we can register with for updates to the
   /// set of available backends.
   ///  - backend_id - unique identifier for this Impala backend (usually a host:port)
-  ///  - backend_address - the address that this backend listens on
   Scheduler(StatestoreSubscriber* subscriber, const std::string& backend_id,
-      const TNetworkAddress& backend_address, MetricGroup* metrics, Webserver* webserver,
+      MetricGroup* metrics, Webserver* webserver,
       RequestPoolService* request_pool_service);
 
-  /// Initialises the scheduler, acquiring all resources needed to make scheduling
+  /// Initializes the scheduler, acquiring all resources needed to make scheduling
   /// decisions once this method returns. Register with the subscription manager if
-  /// required.
-  impala::Status Init();
+  /// required. Also initializes the local backend descriptor. Returns error status
+  /// on failure. 'backend_address' is the address of thrift based ImpalaInternalService
+  /// of this backend. If FLAGS_use_krpc is true, 'krpc_address' contains IP-address:port
+  /// on which KRPC based ImpalaInternalService is exported. 'ip' is the resolved
+  /// IP address of this backend.
+  Status Init(const TNetworkAddress& backend_address,
+      const TNetworkAddress& krpc_address, const IpAddr& ip);
 
   /// Populates given query schedule and assigns fragments to hosts based on scan
-  /// ranges in the query exec request. Submits schedule to admission control before
-  /// returning.
+  /// ranges in the query exec request.
   Status Schedule(QuerySchedule* schedule);
 
  private:
@@ -304,14 +304,14 @@ class Scheduler {
   ThriftSerializer thrift_serializer_;
 
   /// Locality metrics
-  IntCounter* total_assignments_;
-  IntCounter* total_local_assignments_;
+  IntCounter* total_assignments_ = nullptr;
+  IntCounter* total_local_assignments_ = nullptr;
 
   /// Initialization metric
-  BooleanProperty* initialized_;
+  BooleanProperty* initialized_ = nullptr;
 
   /// Current number of executors
-  IntGauge* num_fragment_instances_metric_;
+  IntGauge* num_fragment_instances_metric_ = nullptr;
 
   /// Used for user-to-pool resolution and looking up pool configurations. Not owned by
   /// us.
@@ -321,6 +321,12 @@ class Scheduler {
   /// protecting the access with executors_config_lock_.
   ExecutorsConfigPtr GetExecutorsConfig() const;
   void SetExecutorsConfig(const ExecutorsConfigPtr& executors_config);
+
+  /// Returns the backend descriptor corresponding to 'host' which could be a remote
+  /// backend or the local host itself. The returned descriptor should not be retained
+  /// beyond the lifetime of 'executor_config'.
+  const TBackendDescriptor& LookUpBackendDesc(
+      const BackendConfig& executor_config, const TNetworkAddress& host);
 
   /// Called asynchronously when an update is received from the subscription manager
   void UpdateMembership(const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
@@ -334,7 +340,10 @@ class Scheduler {
   /// the schedule's TQueryExecRequest.plan_exec_info.
   /// Unpartitioned fragments are assigned to the coordinator. Populate the schedule's
   /// fragment_exec_params_ with the resulting scan range assignment.
-  Status ComputeScanRangeAssignment(QuerySchedule* schedule);
+  /// We have a benchmark for this method in be/src/benchmarks/scheduler-benchmark.cc.
+  /// 'executor_config' is the executor configuration to use for scheduling.
+  Status ComputeScanRangeAssignment(const BackendConfig& executor_config,
+      QuerySchedule* schedule);
 
   /// Process the list of scan ranges of a single plan node and compute scan range
   /// assignments (returned in 'assignment'). The result is a mapping from hosts to their
@@ -402,11 +411,17 @@ class Scheduler {
       const TQueryOptions& query_options, RuntimeProfile::Counter* timer,
       FragmentScanRangeAssignment* assignment);
 
+  /// Computes BackendExecParams for all backends assigned in the query. Must be called
+  /// after ComputeFragmentExecParams().
+  void ComputeBackendExecParams(QuerySchedule* schedule);
+
   /// Compute the FragmentExecParams for all plans in the schedule's
   /// TQueryExecRequest.plan_exec_info.
   /// This includes the routing information (destinations, per_exch_num_senders,
   /// sender_id)
-  void ComputeFragmentExecParams(QuerySchedule* schedule);
+  /// 'executor_config' is the executor configuration to use for scheduling.
+  void ComputeFragmentExecParams(const BackendConfig& executor_config,
+      QuerySchedule* schedule);
 
   /// Recursively create FInstanceExecParams and set per_node_scan_ranges for
   /// fragment_params and its input fragments via a depth-first traversal.

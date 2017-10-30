@@ -41,6 +41,8 @@ namespace impala {
 template<typename T>
 class DecimalValue {
  public:
+  typedef T StorageType;
+
   DecimalValue() : value_(0) { }
   DecimalValue(const T& s) : value_(s) { }
 

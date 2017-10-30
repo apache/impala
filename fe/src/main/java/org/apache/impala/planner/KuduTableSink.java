@@ -60,7 +60,7 @@ public class KuduTableSink extends TableSink {
   @Override
   public void computeResourceProfile(TQueryOptions queryOptions) {
     // TODO: add a memory estimate
-    resourceProfile_ = new ResourceProfile(0, 0);
+    resourceProfile_ = ResourceProfile.noReservation(0);
   }
 
   @Override

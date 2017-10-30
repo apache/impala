@@ -97,9 +97,14 @@ WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 HDFS_CONF = HdfsConfig(pytest.config.option.minicluster_xml_conf)
 TARGET_FILESYSTEM = os.getenv("TARGET_FILESYSTEM") or "hdfs"
 IMPALA_HOME = os.getenv("IMPALA_HOME")
+EE_TEST_LOGS_DIR = os.getenv("IMPALA_EE_TEST_LOGS_DIR")
 # Match any SET statement. Assume that query options' names
-# only contain alphabets and underscores.
-SET_PATTERN = re.compile(r'\s*set\s*([a-zA-Z_]+)=*', re.I)
+# only contain alphabets, underscores and digits after position 1.
+# The statement may include SQL line comments starting with --, which we need to
+# strip out. The test file parser already strips out comments starting with #.
+COMMENT_LINES_REGEX = r'(?:\s*--.*\n)*'
+SET_PATTERN = re.compile(
+    COMMENT_LINES_REGEX + r'\s*set\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=*', re.I)
 
 # Base class for Impala tests. All impala test cases should inherit from this class
 class ImpalaTestSuite(BaseTestSuite):
@@ -210,7 +215,7 @@ class ImpalaTestSuite(BaseTestSuite):
       if not query_option in self.default_query_options:
         continue
       default_val = self.default_query_options[query_option]
-      query_str = 'SET '+ query_option + '=' + default_val + ';'
+      query_str = 'SET ' + query_option + '="' + default_val + '"'
       try:
         impalad_client.execute(query_str)
       except Exception as e:
@@ -440,7 +445,8 @@ class ImpalaTestSuite(BaseTestSuite):
             vector.get_value('table_format').file_format,
             pytest.config.option.update_results, result_section='DML_RESULTS')
     if pytest.config.option.update_results:
-      output_file = os.path.join('/tmp', test_file_name.replace('/','_') + ".test")
+      output_file = os.path.join(EE_TEST_LOGS_DIR,
+                                 test_file_name.replace('/','_') + ".test")
       write_test_file(output_file, sections, encoding=encoding)
 
   def execute_test_case_setup(self, setup_section, table_format):

@@ -35,7 +35,7 @@ class TQueryOptions;
 // the DCHECK.
 #define QUERY_OPTS_TABLE\
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),\
-      TImpalaQueryOptions::DISABLE_CODEGEN_ROWS_THRESHOLD + 1);\
+      TImpalaQueryOptions::MAX_ROW_SIZE + 1);\
   QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED)\
   QUERY_OPT_FN(abort_on_error, ABORT_ON_ERROR)\
   QUERY_OPT_FN(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS)\
@@ -62,7 +62,7 @@ class TQueryOptions;
   QUERY_OPT_FN(v_cpu_cores, V_CPU_CORES)\
   QUERY_OPT_FN(rm_initial_mem, RM_INITIAL_MEM)\
   QUERY_OPT_FN(query_timeout_s, QUERY_TIMEOUT_S)\
-  QUERY_OPT_FN(max_block_mgr_memory, MAX_BLOCK_MGR_MEMORY)\
+  QUERY_OPT_FN(buffer_pool_limit, BUFFER_POOL_LIMIT)\
   QUERY_OPT_FN(appx_count_distinct, APPX_COUNT_DISTINCT)\
   QUERY_OPT_FN(disable_unsafe_spills, DISABLE_UNSAFE_SPILLS)\
   QUERY_OPT_FN(seq_compression_mode, SEQ_COMPRESSION_MODE)\
@@ -93,10 +93,15 @@ class TQueryOptions;
   QUERY_OPT_FN(parquet_read_statistics, PARQUET_READ_STATISTICS)\
   QUERY_OPT_FN(default_join_distribution_mode, DEFAULT_JOIN_DISTRIBUTION_MODE)\
   QUERY_OPT_FN(disable_codegen_rows_threshold, DISABLE_CODEGEN_ROWS_THRESHOLD)\
+  QUERY_OPT_FN(default_spillable_buffer_size, DEFAULT_SPILLABLE_BUFFER_SIZE)\
+  QUERY_OPT_FN(min_spillable_buffer_size, MIN_SPILLABLE_BUFFER_SIZE)\
+  QUERY_OPT_FN(max_row_size, MAX_ROW_SIZE)\
   ;
 
 
-/// Converts a TQueryOptions struct into a map of key, value pairs.
+/// Converts a TQueryOptions struct into a map of key, value pairs.  Options that
+/// aren't set and lack defaults in common/thrift/ImpalaInternalService.thrift are
+/// mapped to the empty string.
 void TQueryOptionsToMap(const TQueryOptions& query_options,
     std::map<std::string, std::string>* configuration);
 
@@ -119,7 +124,7 @@ void OverlayQueryOptions(const TQueryOptions& src, const QueryOptionsMask& mask,
 
 /// Set the key/value pair in TQueryOptions. It will override existing setting in
 /// query_options. The bit corresponding to query option 'key' in set_query_options_mask
-/// is set.
+/// is set. An empty string value will reset the key to its default value.
 Status SetQueryOption(const std::string& key, const std::string& value,
     TQueryOptions* query_options, QueryOptionsMask* set_query_options_mask);
 

@@ -19,18 +19,20 @@
 
 #include <boost/assign/list_of.hpp>
 #include <boost/date_time/gregorian/gregorian.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/unordered_map.hpp>
 
 #include "runtime/string-value.inline.h"
+#include "runtime/timestamp-value.h"
 #include "util/string-parser.h"
 
 namespace assign = boost::assign;
 using boost::unordered_map;
 using boost::gregorian::date;
 using boost::gregorian::date_duration;
+using boost::gregorian::gregorian_calendar;
 using boost::posix_time::hours;
 using boost::posix_time::not_a_date_time;
+using boost::posix_time::ptime;
 using boost::posix_time::time_duration;
 
 namespace impala {
@@ -45,6 +47,8 @@ struct DateTimeParseResult {
   int second;
   int32_t fraction;
   boost::posix_time::time_duration tz_offset;
+  // Whether to realign the year for 2-digit year format
+  bool realign_year;
 
   DateTimeParseResult()
     : year(0),
@@ -54,9 +58,23 @@ struct DateTimeParseResult {
       minute(0),
       second(0),
       fraction(0),
-      tz_offset(0,0,0,0) {
+      tz_offset(0,0,0,0),
+      realign_year(false) {
   }
 };
+
+void DateTimeFormatContext::SetCenturyBreak(const TimestampValue &now) {
+  auto& now_date = now.date();
+  // If the century break is at an invalid 02/29, set it to 02/28 for consistency with
+  // Hive.
+  if (now_date.month() == 2 && now_date.day() == 29 &&
+      !gregorian_calendar::is_leap_year(now_date.year() - 80)) {
+    century_break_ptime = ptime(date(now_date.year() - 80, 2, 28), now.time());
+  } else {
+    century_break_ptime = ptime(
+        date(now_date.year() - 80, now_date.month(), now_date.day()), now.time());
+  }
+}
 
 bool TimestampParser::initialized_ = false;
 
@@ -295,6 +313,32 @@ bool TimestampParser::Parse(const char* str, int len, boost::gregorian::date* d,
   }
 }
 
+date TimestampParser::RealignYear(const DateTimeParseResult& dt_result,
+    const DateTimeFormatContext& dt_ctx, int day_offset, const time_duration& t) {
+  DCHECK(!dt_ctx.century_break_ptime.is_special());
+  // Let the century start at AABB and the year parsed be YY, this gives us AAYY.
+  int year = dt_result.year + (dt_ctx.century_break_ptime.date().year() / 100) * 100;
+  date unshifted_date;
+  // The potential actual date (02/29 in unshifted year + 100 years) might be valid
+  // even if unshifted date is not, so try to make unshifted date valid by adding 1 day.
+  // This makes the behavior closer to Hive.
+  if (dt_result.month == 2 && dt_result.day == 29 &&
+      !gregorian_calendar::is_leap_year(year)) {
+    unshifted_date = date(year, 3, 1);
+  } else {
+    unshifted_date = date(year, dt_result.month, dt_result.day);
+  }
+  unshifted_date += date_duration(day_offset);
+  // Advance 100 years if parsed time is before the century break.
+  // For example if the century breaks at 1937 but dt_result->year = 1936,
+  // the correct year would be 2036.
+  if (ptime(unshifted_date, t) < dt_ctx.century_break_ptime) {
+    return date(year + 100, dt_result.month, dt_result.day) + date_duration(day_offset);
+  } else {
+    return date(year, dt_result.month, dt_result.day) + date_duration(day_offset);
+  }
+}
+
 bool TimestampParser::Parse(const char* str, int len, const DateTimeFormatContext& dt_ctx,
     date* d, time_duration* t) {
   DCHECK(TimestampParser::initialized_);
@@ -324,25 +368,23 @@ bool TimestampParser::Parse(const char* str, int len, const DateTimeFormatContex
     *t = time_duration(0, 0, 0, 0);
   }
   if (dt_ctx.has_date_toks) {
-    bool is_valid_date = true;
     try {
       DCHECK(-1 <= day_offset && day_offset <= 1);
-      if ((dt_result.year == 1400 && dt_result.month == 1 && dt_result.day == 1 &&
-           day_offset == -1) ||
-          (dt_result.year == 9999 && dt_result.month == 12 && dt_result.day == 31 &&
-           day_offset == 1)) {
-        // Have to check lower/upper bound explicitly.
-        // Tried date::is_not_a_date_time() but it doesn't complain value is out of range
-        // for "'1400-01-01' - 1 day" and "'9999-12-31' + 1 day".
-        is_valid_date = false;
+      if (dt_result.realign_year) {
+        *d = RealignYear(dt_result, dt_ctx, day_offset, *t);
       } else {
-        *d = date(dt_result.year, dt_result.month, dt_result.day);
-        *d += date_duration(day_offset);
+        *d = date(dt_result.year, dt_result.month, dt_result.day)
+             + date_duration(day_offset);
+      }
+      // Have to check year lower/upper bound [1400, 9999] here because
+      // operator + (date, date_duration) won't throw an exception even if the result is
+      // out-of-range.
+      if (d->year() < 1400 || d->year() > 9999) {
+        // Calling year() on out-of-range date throws an exception itself. This branch is
+        // to describe the checking logic but is never taken.
+        DCHECK(false);
       }
     } catch (boost::exception&) {
-      is_valid_date = false;
-    }
-    if (!is_valid_date) {
       VLOG_ROW << "Invalid date: " << dt_result.year << "-" << dt_result.month << "-"
                << dt_result.day;
       *d = date();
@@ -441,8 +483,10 @@ bool TimestampParser::ParseDateTime(const char* str, int str_len,
       case YEAR: {
         dt_result->year = StringParser::StringToInt<int>(tok_val, tok_len, &status);
         if (UNLIKELY(StringParser::PARSE_SUCCESS != status)) return false;
-        if (UNLIKELY(dt_result->year < 1 || dt_result->year > 9999)) return false;
-        if (tok_len < 4 && dt_result->year < 99) dt_result->year += 2000;
+        if (UNLIKELY(dt_result->year < 0 || dt_result->year > 9999)) return false;
+        // Year in "Y" and "YY" format should be in the interval
+        // [current time - 80 years, current time + 20 years)
+        if (tok_len <= 2) dt_result->realign_year = true;
         break;
       }
       case MONTH_IN_YEAR: {

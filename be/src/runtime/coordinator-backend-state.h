@@ -32,7 +32,6 @@
 namespace impala {
 
 class ProgressUpdater;
-class FInstanceExecParams;
 class ObjectPool;
 class DebugOptions;
 class CountingBarrier;
@@ -40,6 +39,7 @@ class TUniqueId;
 class TQueryCtx;
 class TReportExecStatusParams;
 class ExecSummary;
+struct FInstanceExecParams;
 
 /// This class manages all aspects of the execution of all fragment instances of a
 /// single query on a particular backend.
@@ -49,11 +49,11 @@ class Coordinator::BackendState {
   BackendState(const TUniqueId& query_id, int state_idx,
       TRuntimeFilterMode::type filter_mode);
 
-  /// Creates InstanceStats for all entries in instance_params_list in obj_pool
+  /// Creates InstanceStats for all instance in backend_exec_params in obj_pool
   /// and installs the instance profiles as children of the corresponding FragmentStats'
   /// root profile.
   /// Separated from c'tor to simplify future handling of out-of-mem errors.
-  void Init(const vector<const FInstanceExecParams*>& instance_params_list,
+  void Init(const BackendExecParams& backend_exec_params,
       const std::vector<FragmentStats*>& fragment_stats, ObjectPool* obj_pool);
 
   /// Starts query execution at this backend by issuing an ExecQueryFInstances rpc and
@@ -67,31 +67,39 @@ class Coordinator::BackendState {
       CountingBarrier* rpc_complete_barrier);
 
   /// Update overall execution status, including the instances' exec status/profiles
-  /// and the error log. Updates the fragment instances' TExecStats in exec_summary
-  /// (exec_summary->nodes.exec_stats) and updates progress_update, and sets
-  /// done to true if all fragment instances completed, regardless of status.
-  /// If any instance reports an error, the overall execution status becomes the first
-  /// reported error status and 'done' is set to true.
-  void ApplyExecStatusReport(const TReportExecStatusParams& backend_exec_status,
-      ExecSummary* exec_summary, ProgressUpdater* scan_range_progress, bool* done);
+  /// and the error log, if this backend is not already done. Updates the fragment
+  /// instances' TExecStats in exec_summary (exec_summary->nodes.exec_stats) and updates
+  /// progress_update. If any instance reports an error, the overall execution status
+  /// becomes the first reported error status. Returns true iff this update changed
+  /// IsDone() from false to true, either because it was the last fragment to complete or
+  /// because it was the first error received.
+  bool ApplyExecStatusReport(const TReportExecStatusParams& backend_exec_status,
+      ExecSummary* exec_summary, ProgressUpdater* scan_range_progress);
 
   /// Update completion_times, rates, and avg_profile for all fragment_stats.
   void UpdateExecStats(const std::vector<FragmentStats*>& fragment_stats);
 
   /// Make a PublishFilter rpc with given params if this backend has instances of the
   /// fragment with idx == rpc_params->dst_fragment_idx, otherwise do nothing.
-  /// This takes by-value parameters because we cannot guarantee that the originating
-  /// coordinator won't be destroyed while this executes.
-  /// TODO: switch to references when we fix the lifecycle problems of coordinators.
-  void PublishFilter(std::shared_ptr<TPublishFilterParams> rpc_params);
+  void PublishFilter(const TPublishFilterParams& rpc_params);
 
   /// Cancel execution at this backend if anything is running. Returns true
   /// if cancellation was attempted, false otherwise.
   bool Cancel();
 
-  /// Return the overall execution status. For an error status, also return the id
-  /// of the instance that caused that status, if failed_instance_id != nullptr.
-  Status GetStatus(TUniqueId* failed_instance_id = nullptr) WARN_UNUSED_RESULT;
+  /// Return the overall execution status. For an error status, the error could come
+  /// from the fragment instance level or it can be a general error from the backend
+  /// (with no specific fragment responsible). For a caller to distinguish between
+  /// these errors and to determine the specific fragment instance (if applicable),
+  /// both 'is_fragment_failure' and 'failed_instance_id' must be non-null.
+  /// A general error will set *is_fragment_failure to false and leave
+  /// failed_instance_id untouched.
+  /// A fragment-specific error will set *is_fragment_failure to true and set
+  /// *failed_instance_id to the id of the fragment instance that failed.
+  /// If the caller does not need this information, both 'is_fragment_failure' and
+  /// 'failed_instance_id' must be omitted (using the default value of nullptr).
+  Status GetStatus(bool* is_fragment_failure = nullptr,
+      TUniqueId* failed_instance_id = nullptr) WARN_UNUSED_RESULT;
 
   /// Return peak memory consumption.
   int64_t GetPeakConsumption();
@@ -102,11 +110,19 @@ class Coordinator::BackendState {
   const TNetworkAddress& impalad_address() const { return host_; }
   int state_idx() const { return state_idx_; }
 
-  /// only valid after Exec()
+  /// Valid after Init().
+  const BackendExecParams* exec_params() const { return backend_exec_params_; }
+
+  /// Only valid after Exec().
   int64_t rpc_latency() const { return rpc_latency_; }
 
-  /// Return true if execution at this backend is done.
-  bool IsDone();
+  /// Print host/port info for the first backend that's still in progress as a
+  /// debugging aid for backend deadlocks.
+  static void LogFirstInProgress(std::vector<BackendState*> backend_states);
+
+  /// Serializes backend state to JSON by adding members to 'value', including total
+  /// number of instances, peak memory consumption, host and status amongst others.
+  void ToJson(rapidjson::Value* value, rapidjson::Document* doc);
 
  private:
   /// Execution stats for a single fragment instance.
@@ -166,9 +182,8 @@ class Coordinator::BackendState {
   const int state_idx_;  /// index of 'this' in Coordinator::backend_states_
   const TRuntimeFilterMode::type filter_mode_;
 
-  /// all instances of a particular fragment are contiguous in this vector;
-  /// query lifetime
-  std::vector<const FInstanceExecParams*> instance_params_list_;
+  /// Backend exec params, owned by the QuerySchedule and has query lifetime.
+  const BackendExecParams* backend_exec_params_;
 
   /// map from instance idx to InstanceStats, the latter live in the obj_pool parameter
   /// of Init()
@@ -191,6 +206,11 @@ class Coordinator::BackendState {
   /// initiated; either way, execution must not be cancelled.
   Status status_;
 
+  /// Used to distinguish between errors reported by a specific fragment instance,
+  /// which would set failed_instance_id_, rather than an error independent of any
+  /// specific fragment.
+  bool is_fragment_failure_ = false;
+
   /// Id of the first fragment instance that reports an error status.
   /// Invalid if no fragment instance has reported an error status.
   TUniqueId failed_instance_id_;
@@ -209,14 +229,17 @@ class Coordinator::BackendState {
   /// peak_consumption()
   int64_t peak_consumption_;
 
+  /// Set in ApplyExecStatusReport(). Uses MonotonicMillis().
+  int64_t last_report_time_ms_ = 0;
+
   /// Fill in rpc_params based on state. Uses filter_routing_table to remove filters
   /// that weren't selected during its construction.
   void SetRpcParams(const DebugOptions& debug_options,
       const FilterRoutingTable& filter_routing_table,
       TExecQueryFInstancesParams* rpc_params);
 
-  /// Return true if execution at this backend is done. Doesn't acquire lock.
-  bool IsDoneInternal() const;
+  /// Return true if execution at this backend is done. Caller must hold lock_.
+  bool IsDone() const;
 };
 
 /// Per fragment execution statistics.

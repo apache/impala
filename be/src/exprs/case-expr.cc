@@ -59,11 +59,11 @@ Status CaseExpr::OpenEvaluator(FunctionContext::FunctionStateScope scope,
   fn_ctx->SetFunctionState(FunctionContext::THREAD_LOCAL, case_state);
 
   const ColumnType& case_val_type = has_case_expr_ ? GetChild(0)->type() : TYPE_BOOLEAN;
-  RETURN_IF_ERROR(AllocateAnyVal(state, eval->mem_pool(), case_val_type,
+  RETURN_IF_ERROR(AllocateAnyVal(state, eval->expr_perm_pool(), case_val_type,
       "Could not allocate expression value", &case_state->case_val));
   const ColumnType& when_val_type =
       has_case_expr_ ? GetChild(1)->type() : GetChild(0)->type();
-  RETURN_IF_ERROR(AllocateAnyVal(state, eval->mem_pool(), when_val_type,
+  RETURN_IF_ERROR(AllocateAnyVal(state, eval->expr_perm_pool(), when_val_type,
       "Could not allocate expression value", &case_state->when_val));
   return Status::OK();
 }

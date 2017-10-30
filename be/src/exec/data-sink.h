@@ -99,7 +99,6 @@ class DataSink {
 
   MemTracker* mem_tracker() const { return mem_tracker_.get(); }
   RuntimeProfile* profile() const { return profile_; }
-  MemPool* expr_mem_pool() const { return expr_mem_pool_.get(); }
   const std::vector<ScalarExprEvaluator*>& output_expr_evals() const {
     return output_expr_evals_;
   }
@@ -122,8 +121,14 @@ class DataSink {
   /// A child of 'mem_tracker_' that tracks expr allocations. Initialized in Prepare().
   boost::scoped_ptr<MemTracker> expr_mem_tracker_;
 
-  /// MemPool for backing data structures in expressions and their evaluators.
-  boost::scoped_ptr<MemPool> expr_mem_pool_;
+  /// MemPool for allocations made by expression evaluators in this sink that are
+  /// "permanent" and live until Close() is called.
+  boost::scoped_ptr<MemPool> expr_perm_pool_;
+
+  /// MemPool for allocations made by expression evaluators in this sink that hold
+  /// intermediate or final results of expression evaluation. Should be cleared
+  /// periodically to free accumulated memory.
+  boost::scoped_ptr<MemPool> expr_results_pool_;
 
   /// Output expressions to convert row batches onto output values.
   /// Not used in some sub-classes.

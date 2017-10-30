@@ -52,6 +52,8 @@
 #include "kudu/util/stopwatch.h"
 #include "kudu/util/status.h"
 
+#include "common/config.h"
+
 using std::string;
 using std::unique_ptr;
 using std::vector;
@@ -81,6 +83,11 @@ static const char* kProcSelfFd =
 #else
 #define READDIR readdir
 #define DIRENT dirent
+#endif
+
+// Disable O_CLOEXEC if not available on very old kernels.
+#if !defined(O_CLOEXEC)
+#define O_CLOEXEC 0
 #endif
 
 // Since opendir() calls malloc(), this must be called before fork().
@@ -285,7 +292,7 @@ void Subprocess::DisableStdout() {
   fd_state_[STDOUT_FILENO] = DISABLED;
 }
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) || !defined(HAVE_PIPE2)
 static int pipe2(int pipefd[2], int flags) {
   DCHECK_EQ(O_CLOEXEC, flags);
 

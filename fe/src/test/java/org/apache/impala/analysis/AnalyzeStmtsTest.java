@@ -1355,6 +1355,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "join functional.alltypes b on (a.bigint_col = " +
         "lag(b.int_col) over(order by a.bigint_col))",
         "analytic expression not allowed in ON clause");
+    AnalysisError(
+        "select a.int_col from functional.alltypes a " +
+        "join functional.alltypes b on (a.id = b.id) and " +
+        "a.int_col < (select min(id) from functional.alltypes c)",
+        "Subquery is not allowed in ON clause");
     // unknown column
     AnalysisError(
         "select a.int_col from functional.alltypes a " +
@@ -1935,6 +1940,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select functional.alltypes.*, max(string_col) from " +
         "functional.alltypes", "cannot combine '*' in select list with grouping or " +
         "aggregation");
+    AnalysisError("select * from functional.alltypes order by count(*)",
+        "select list expression not produced by aggregation output " +
+        "(missing from GROUP BY clause?): *");
 
     // only count() allows '*'
     AnalysisError("select avg(*) from functional.testtbl",

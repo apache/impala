@@ -1,0 +1,122 @@
+====
+---- QUERY
+# Also see related tests in spilling-naaj.test
+#
+# =======================================================================================
+# NAAJ QUERY 1: many nulls on build side.
+# =======================================================================================
+# The hash join must spill the null-aware build rows to make progress.
+# This returns the same rows as:
+#   select * from lineitem
+#   where l_suppkey = 4162 and l_shipmode = 'AIR'
+#         and l_returnflag = 'A' and l_shipdate > '1993-01-01'
+# except:
+# * even-numbered l_orderkey values, because there is a NULL on the build side.
+# * l_orderkey values > 5500000, because there is a NULL on the probe side
+set buffer_pool_limit=12m;
+select l_orderkey, l_partkey, l_suppkey, l_linenumber
+from lineitem
+where l_suppkey = 4162 and l_shipmode = 'AIR' and l_returnflag = 'A' and
+  l_shipdate > '1993-01-01' and
+  if(l_orderkey > 5500000, NULL, l_orderkey) not in (
+      select if(o_orderkey % 2 = 0, NULL, o_orderkey + 1)
+      from orders
+      where l_orderkey = o_orderkey)
+order by 1,2,3,4
+---- RESULTS
+4013537,46649,4162,1
+4298819,16658,4162,2
+4431651,81653,4162,1
+5081287,119139,4162,1
+5187203,49153,4162,1
+---- TYPES
+BIGINT,BIGINT,BIGINT,INT
+====
+---- QUERY
+set scratch_limit=0;
+# Execute NAAJ query 1 with unlimited memory and spilling disabled. The query should succeed.
+select l_orderkey, l_partkey, l_suppkey, l_linenumber
+from lineitem
+where l_suppkey = 4162 and l_shipmode = 'AIR' and l_returnflag = 'A' and
+  l_shipdate > '1993-01-01' and
+  if(l_orderkey > 5500000, NULL, l_orderkey) not in (
+      select if(o_orderkey % 2 = 0, NULL, o_orderkey + 1)
+      from orders
+      where l_orderkey = o_orderkey)
+order by 1,2,3,4
+---- RESULTS
+4013537,46649,4162,1
+4298819,16658,4162,2
+4431651,81653,4162,1
+5081287,119139,4162,1
+5187203,49153,4162,1
+---- TYPES
+BIGINT,BIGINT,BIGINT,INT
+====
+---- QUERY
+set buffer_pool_limit=7m;
+# Execute NAAJ query 1 without enough memory to fit the null build rows in memory.
+select l_orderkey, l_partkey, l_suppkey, l_linenumber
+from lineitem
+where l_suppkey = 4162 and l_shipmode = 'AIR' and l_returnflag = 'A' and
+  l_shipdate > '1993-01-01' and
+  if(l_orderkey > 5500000, NULL, l_orderkey) not in (
+      select if(o_orderkey % 2 = 0, NULL, o_orderkey + 1)
+      from orders
+      where l_orderkey = o_orderkey)
+order by 1,2,3,4
+---- CATCH
+Unable to perform Null-Aware Anti-Join. Could not get enough reservation to fit all rows with NULLs from the build side in memory
+====
+---- QUERY
+# Execute NAAJ query 2 execute in-memory only.
+set scratch_limit=0;
+select l_orderkey, l_partkey, l_suppkey, l_linenumber
+from lineitem
+where if(l_orderkey % 2 = 0, NULL, l_partkey) not in (
+  select p_partkey
+    from part
+      where p_retailprice != l_extendedprice * l_tax)
+      order by 1,2,3,4 limit 5
+---- RESULTS
+965,107207,9718,1
+1351,107227,7228,1
+1505,122702,5215,2
+1601,174374,1926,2
+1767,22387,4890,4
+---- TYPES
+BIGINT,BIGINT,BIGINT,INT
+====
+---- QUERY
+# Test that we can execute NAAJ query 3 with spilling disabled.
+set scratch_limit=0;
+select l_orderkey, l_partkey, l_suppkey, l_linenumber
+from lineitem
+where l_partkey not in (
+  select if(p_partkey = 2, NULL, p_partkey)
+  from part
+  where p_partkey % 2 = 0 and p_retailprice != l_extendedprice * l_tax)
+order by 1,2,3,4
+---- RESULTS
+3178597,1001,3502,1
+4801283,199001,9002,1
+4958784,116009,1032,2
+---- TYPES
+BIGINT,BIGINT,BIGINT,INT
+====
+---- QUERY
+# Test that we can execute NAAJ query 4 with spilling disabled.
+set scratch_limit=0;
+select l_orderkey, l_partkey, l_suppkey, l_linenumber
+from lineitem
+where if(l_partkey % 5 != 1, NULL, l_partkey) not in (
+  select if(p_partkey = 2, NULL, p_partkey)
+  from part
+  where p_partkey % 2 = 0 and p_retailprice != l_extendedprice * l_tax)
+order by 1,2,3,4
+---- RESULTS
+3178597,1001,3502,1
+4801283,199001,9002,1
+---- TYPES
+BIGINT,BIGINT,BIGINT,INT
+====

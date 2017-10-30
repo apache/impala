@@ -19,6 +19,7 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include "exprs/scalar-expr.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/data-stream-recvr.h"
 #include "runtime/runtime-state.h"
@@ -27,6 +28,8 @@
 #include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
 #include "util/time.h"
+#include "util/tuple-row-compare.h"
+
 #include "gen-cpp/PlanNodes_types.h"
 
 #include "common/names.h"
@@ -35,8 +38,8 @@ DECLARE_int32(stress_datastream_recvr_delay_ms);
 
 using namespace impala;
 
-DEFINE_int32(exchg_node_buffer_size_bytes, 1024 * 1024 * 10,
-             "(Advanced) Maximum size of per-query receive-side buffer");
+DEFINE_int64(exchg_node_buffer_size_bytes, 1024 * 1024 * 10,
+    "(Advanced) Maximum size of per-query receive-side buffer");
 
 ExchangeNode::ExchangeNode(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
@@ -106,7 +109,8 @@ Status ExchangeNode::Open(RuntimeState* state) {
   if (is_merging_) {
     // CreateMerger() will populate its merging heap with batches from the stream_recvr_,
     // so it is not necessary to call FillInputRowBatch().
-    RETURN_IF_ERROR(less_than_->Open(pool_, state, expr_mem_pool()));
+    RETURN_IF_ERROR(
+        less_than_->Open(pool_, state, expr_perm_pool(), expr_results_pool()));
     RETURN_IF_ERROR(stream_recvr_->CreateMerger(*less_than_.get()));
   } else {
     RETURN_IF_ERROR(FillInputRowBatch(state));
@@ -123,14 +127,8 @@ void ExchangeNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (less_than_.get() != nullptr) less_than_->Close(state);
   if (stream_recvr_ != nullptr) stream_recvr_->Close();
-  stream_recvr_.reset();
   ScalarExpr::Close(ordering_exprs_);
   ExecNode::Close(state);
-}
-
-Status ExchangeNode::QueryMaintenance(RuntimeState* state) {
-  if (less_than_.get() != nullptr) less_than_->FreeLocalAllocations();
-  return ExecNode::QueryMaintenance(state);
 }
 
 Status ExchangeNode::FillInputRowBatch(RuntimeState* state) {
@@ -206,6 +204,8 @@ Status ExchangeNode::GetNextMerging(RuntimeState* state, RowBatch* output_batch,
   DCHECK_EQ(output_batch->num_rows(), 0);
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
+  // Clear any expr result allocations made by the merger.
+  expr_results_pool_->Clear();
   RETURN_IF_ERROR(stream_recvr_->GetNext(output_batch, eos));
 
   while (num_rows_skipped_ < offset_) {

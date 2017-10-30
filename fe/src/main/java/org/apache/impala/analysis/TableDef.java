@@ -71,9 +71,6 @@ class TableDef {
   // mean no primary keys were specified as the columnDefs_ could contain primary keys.
   private final List<String> primaryKeyColNames_ = Lists.newArrayList();
 
-  // Authoritative list of primary key column definitions populated during analysis.
-  private final List<ColumnDef> primaryKeyColDefs_ = Lists.newArrayList();
-
   // If true, the table's data will be preserved if dropped.
   private final boolean isExternal_;
 
@@ -83,8 +80,17 @@ class TableDef {
   // Partitioning parameters.
   private final TableDataLayout dataLayout_;
 
+  /////////////////////////////////////////
+  // BEGIN: Members that need to be reset()
+
+  // Authoritative list of primary key column definitions populated during analysis.
+  private final List<ColumnDef> primaryKeyColDefs_ = Lists.newArrayList();
+
   // True if analyze() has been called.
   private boolean isAnalyzed_ = false;
+
+  // END: Members that need to be reset()
+  /////////////////////////////////////////
 
   /**
    * Set of table options. These options are grouped together for convenience while
@@ -150,6 +156,11 @@ class TableDef {
     dataLayout_ = TableDataLayout.createEmptyLayout();
   }
 
+  public void reset() {
+    primaryKeyColDefs_.clear();
+    isAnalyzed_ = false;
+  }
+
   public TableName getTblName() {
     return fqTableName_ != null ? fqTableName_ : tableName_;
   }
@@ -191,6 +202,7 @@ class TableDef {
    * Analyzes the parameters of a CREATE TABLE statement.
    */
   void analyze(Analyzer analyzer) throws AnalysisException {
+    if (isAnalyzed_) return;
     Preconditions.checkState(tableName_ != null && !tableName_.isEmpty());
     fqTableName_ = analyzer.getFqTableName(getTblName());
     fqTableName_.analyze();

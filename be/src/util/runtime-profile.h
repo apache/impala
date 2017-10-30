@@ -101,13 +101,13 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
 
   typedef boost::function<int64_t ()> DerivedCounterFunction;
 
-  /// Create a runtime profile object with 'name'.  Counters and merged profile are
-  /// allocated from pool.
-  /// If is_averaged_profile is true, the counters in this profile will be derived
+  /// Create a runtime profile object with 'name'. The profile, counters and any other
+  /// structures owned by the profile are allocated from 'pool'.
+  /// If 'is_averaged_profile' is true, the counters in this profile will be derived
   /// averages (of unit AveragedCounter) from other profiles, so the counter map will
   /// be left empty Otherwise, the counter map is initialized with a single entry for
   /// TotalTime.
-  RuntimeProfile(ObjectPool* pool, const std::string& name,
+  static RuntimeProfile* Create(ObjectPool* pool, const std::string& name,
       bool is_averaged_profile = false);
 
   ~RuntimeProfile();
@@ -247,6 +247,12 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// the key does not exist.
   const std::string* GetInfoString(const std::string& key) const;
 
+  /// Stops updating all counters in this profile that are periodically updated by a
+  /// background thread (i.e. sampling, rate, bucketing and time series counters).
+  /// Must be called before the profile is destroyed if any such counters are active.
+  /// Does not stop counters on descendant profiles.
+  void StopPeriodicCounters();
+
   /// Returns the counter for the total elapsed time.
   Counter* total_time_counter() { return counter_map_[TOTAL_TIME_COUNTER_NAME]; }
   Counter* inactive_timer() { return counter_map_[INACTIVE_TIME_COUNTER_NAME]; }
@@ -265,8 +271,8 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// object using thrift compact binary format, then gzip compresses it and
   /// finally encodes it as base64.  This is not a lightweight operation and
   /// should not be in the hot path.
-  std::string SerializeToArchiveString() const;
-  void SerializeToArchiveString(std::stringstream* out) const;
+  Status SerializeToArchiveString(std::string* out) const WARN_UNUSED_RESULT;
+  Status SerializeToArchiveString(std::stringstream* out) const WARN_UNUSED_RESULT;
 
   /// Divides all counters by n
   void Divide(int n);
@@ -299,8 +305,9 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// Add a rate counter to the current profile based on src_counter with name.
   /// The rate counter is updated periodically based on the src counter.
   /// The rate counter has units in src_counter unit per second.
-  /// Rate counters should be stopped (by calling PeriodicCounterUpdater::StopRateCounter)
-  /// as soon as the src_counter stops changing.
+  /// StopPeriodicCounters() must be called to stop the periodic updating before this
+  /// profile is destroyed. The periodic updating can be stopped earlier by calling
+  /// PeriodicCounterUpdater::StopRateCounter() if 'src_counter' stops changing.
   Counter* AddRateCounter(const std::string& name, Counter* src_counter);
 
   /// Same as 'AddRateCounter' above except values are taken by calling fn.
@@ -312,27 +319,40 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// The sampling counter is updated periodically based on the src counter by averaging
   /// the samples taken from the src counter.
   /// The sampling counter has the same unit as src_counter unit.
-  /// Sampling counters should be stopped (by calling
-  /// PeriodicCounterUpdater::StopSamplingCounter) as soon as the src_counter stops
-  /// changing.
+  /// StopPeriodicCounters() must be called to stop the periodic updating before this
+  /// profile is destroyed. The periodic updating can be stopped earlier by calling
+  /// PeriodicCounterUpdater::StopSamplingCounter() if 'src_counter' stops changing.
   Counter* AddSamplingCounter(const std::string& name, Counter* src_counter);
 
   /// Same as 'AddSamplingCounter' above except the samples are taken by calling fn.
   Counter* AddSamplingCounter(const std::string& name, DerivedCounterFunction fn);
 
-  /// Register a bucket of counters to store the sampled value of src_counter.
-  /// The src_counter is sampled periodically and the buckets are updated.
-  void RegisterBucketingCounters(Counter* src_counter, std::vector<Counter*>* buckets);
+  /// Create a set of counters, one per bucket, to store the sampled value of src_counter.
+  /// The 'src_counter' is sampled periodically to obtain the index of the bucket to
+  /// increment. E.g. if the value of 'src_counter' is 3, the bucket at index 3 is
+  /// updated. If the index exceeds the index of the last bucket, the last bucket is
+  /// updated.
+  ///
+  /// The created counters do not appear in the profile when serialized or
+  /// pretty-printed. The caller must do its own processing of the counter value
+  /// (e.g. converting it to an info string).
+  /// TODO: make this interface more consistent and sane.
+  ///
+  /// StopPeriodicCounters() must be called to stop the periodic updating before this
+  /// profile is destroyed. The periodic updating can be stopped earlier by calling
+  /// PeriodicCounterUpdater::StopBucketingCounters() if 'buckets' stops changing.
+  std::vector<Counter*>* AddBucketingCounters(Counter* src_counter, int num_buckets);
 
   /// Create a time series counter. This begins sampling immediately. This counter
   /// contains a number of samples that are collected periodically by calling sample_fn().
+  /// StopPeriodicCounters() must be called to stop the periodic updating before this
+  /// profile is destroyed. The periodic updating can be stopped earlier by calling
+  /// PeriodicCounterUpdater::StopTimeSeriesCounter() if the input stops changing.
   /// Note: these counters don't get merged (to make average profiles)
   TimeSeriesCounter* AddTimeSeriesCounter(const std::string& name,
       TUnit::type unit, DerivedCounterFunction sample_fn);
 
-  /// Create a time series counter that samples the source counter. Sampling begins
-  /// immediately.
-  /// Note: these counters don't get merged (to make average profiles)
+  /// Same as above except the samples are collected from 'src_counter'.
   TimeSeriesCounter* AddTimeSeriesCounter(const std::string& name, Counter* src_counter);
 
   /// Recursively compute the fraction of the 'total_time' spent in this profile and
@@ -344,9 +364,6 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// Pool for allocated counters. Usually owned by the creator of this
   /// object, but occasionally allocated in the constructor.
   ObjectPool* pool_;
-
-  /// True if we have to delete the pool_ on destruction.
-  bool own_pool_;
 
   /// Name for this runtime profile.
   std::string name_;
@@ -369,9 +386,27 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   ChildCounterMap child_counter_map_;
 
   /// A set of bucket counters registered in this runtime profile.
-  std::set<std::vector<Counter*>* > bucketing_counters_;
+  std::set<std::vector<Counter*>*> bucketing_counters_;
 
-  /// Protects counter_map_, counter_child_map_ and bucketing_counters_.
+  /// Rate counters, which also appear in 'counter_map_'. Tracked separately to enable
+  /// stopping the counters.
+  std::vector<Counter*> rate_counters_;
+
+  /// Sampling counters, which also appear in 'counter_map_'. Tracked separately to enable
+  /// stopping the counters.
+  std::vector<Counter*> sampling_counters_;
+
+  /// Time series counters. These do not appear in 'counter_map_'. Tracked separately
+  /// because they are displayed separately in the profile and need to be stopped.
+  typedef std::map<std::string, TimeSeriesCounter*> TimeSeriesCounterMap;
+  TimeSeriesCounterMap time_series_counter_map_;
+
+  /// True if this profile has active periodic counters, including bucketing, rate,
+  /// sampling and time series counters.
+  bool has_active_periodic_counters_ = false;
+
+  /// Protects counter_map_, child_counter_map_, bucketing_counters_, rate_counters_,
+  /// sampling_counters_, time_series_counter_map_, and has_active_periodic_counters_.
   mutable SpinLock counter_map_lock_;
 
   /// Child profiles.  Does not own memory.
@@ -403,12 +438,6 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// Protects event_sequence_map_.
   mutable SpinLock event_sequence_lock_;
 
-  typedef std::map<std::string, TimeSeriesCounter*> TimeSeriesCounterMap;
-  TimeSeriesCounterMap time_series_counter_map_;
-
-  /// Protects time_series_counter_map_.
-  mutable SpinLock time_series_counter_map_lock_;
-
   typedef std::map<std::string, SummaryStatsCounter*> SummaryStatsCounterMap;
   SummaryStatsCounterMap summary_stats_map_;
 
@@ -429,6 +458,9 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// Time spent in this node (not including the children). Computed in
   /// ComputeTimeInProfile()
   int64_t local_time_ns_;
+
+  /// Constructor used by Create().
+  RuntimeProfile(ObjectPool* pool, const std::string& name, bool is_averaged_profile);
 
   /// Update a subtree of profiles from nodes, rooted at *idx.
   /// On return, *idx points to the node immediately following this subtree.
@@ -453,6 +485,16 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// On return, *node_idx is the index one past the end of this subtree
   static RuntimeProfile* CreateFromThrift(
       ObjectPool* pool, const std::vector<TRuntimeProfileNode>& nodes, int* node_idx);
+
+  /// Internal implementations of the Add*Counter() functions for use when the caller
+  /// holds counter_map_lock_. Also returns 'created', which is true if a new counter was
+  /// created and false if a counter with the given name already existed.
+  Counter* AddCounterLocked(const std::string& name, TUnit::type unit,
+      const std::string& parent_counter_name, bool* created);
+  HighWaterMarkCounter* AddHighWaterMarkCounterLocked(const std::string& name,
+      TUnit::type unit, const std::string& parent_counter_name, bool* created);
+  ConcurrentTimerCounter* AddConcurrentTimerCounterLocked(const std::string& name,
+      TUnit::type unit, const std::string& parent_counter_name, bool* created);
 
   ///  Inserts 'child' before the iterator 'insert_pos' in 'children_'.
   /// 'children_lock_' must be held by the caller.

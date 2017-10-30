@@ -143,6 +143,9 @@ under the License.
   <keydef href="http://www.lzop.org/" scope="external" format="html" keys="lzop.org"/>
 
 <!-- Links to Wikipedia pages for background on industry terminology. -->
+  <keydef href="https://en.wikipedia.org/wiki/Base64" scope="external" format="html" keys="base64">
+    <topicmeta><linktext>Base64 article on Wikipedia</linktext></topicmeta>
+  </keydef>
   <keydef href="http://en.wikipedia.org/wiki/.htpasswd" scope="external" format="html" keys=".htpasswd"/>
   <keydef href="http://en.wikipedia.org/wiki/Coordinated_Universal_Time" scope="external" format="html" keys="Coordinated_Universal_Time"/>
   <keydef href="http://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function" scope="external" format="html" keys="wiki_fnv"/>
@@ -10513,6 +10516,7 @@ under the License.
   <keydef href="https://issues.apache.org/jira/browse/IMPALA-9999" scope="external" format="html" keys="IMPALA-9999"/>
 
 <!-- Short form of mapping from Impala release to vendor-specific releases, for use in headings. -->
+  <keydef keys="impala210"><topicmeta><keywords><keyword>Impala 2.10</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala29"><topicmeta><keywords><keyword>Impala 2.9</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala28"><topicmeta><keywords><keyword>Impala 2.8</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala27"><topicmeta><keywords><keyword>Impala 2.7</keyword></keywords></topicmeta></keydef>
@@ -10527,6 +10531,7 @@ under the License.
   <keydef keys="impala13"><topicmeta><keywords><keyword>Impala 1.3</keyword></keywords></topicmeta></keydef>
 
 <!-- 3-part forms of version numbers, for use in release notes. -->
+  <keydef keys="impala2100"><topicmeta><keywords><keyword>Impala 2.10.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala290"><topicmeta><keywords><keyword>Impala 2.9.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala280"><topicmeta><keywords><keyword>Impala 2.8.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala270"><topicmeta><keywords><keyword>Impala 2.7.0</keyword></keywords></topicmeta></keydef>
@@ -10556,13 +10561,16 @@ under the License.
   <keydef keys="impala220"><topicmeta><keywords><keyword>Impala 2.2.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala2110"><topicmeta><keywords><keyword>Impala 2.1.10</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala217"><topicmeta><keywords><keyword>Impala 2.1.7</keyword></keywords></topicmeta></keydef>
-  <keydef keys="impala210"><topicmeta><keywords><keyword>Impala 2.1.0</keyword></keywords></topicmeta></keydef>
+<!-- This 3-part lookup key was defined for completeness, but never referenced.
+     Commenting out to avoid a conflict with the short key for Impala 2.10. -->
+<!--  <keydef keys="impala210"><topicmeta><keywords><keyword>Impala 2.1.0</keyword></keywords></topicmeta></keydef> -->
   <keydef keys="impala200"><topicmeta><keywords><keyword>Impala 2.0.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala140"><topicmeta><keywords><keyword>Impala 1.4.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala132"><topicmeta><keywords><keyword>Impala 1.3.2</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala130"><topicmeta><keywords><keyword>Impala 1.3.0</keyword></keywords></topicmeta></keydef>
 
 <!-- Long form of mapping from Impala release to vendor-specific releases, for use in running text. -->
+  <keydef keys="impala210_full"><topicmeta><keywords><keyword>Impala 2.10</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala29_full"><topicmeta><keywords><keyword>Impala 2.9</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala28_full"><topicmeta><keywords><keyword>Impala 2.8</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala27_full"><topicmeta><keywords><keyword>Impala 2.7</keyword></keywords></topicmeta></keydef>
@@ -10578,6 +10586,7 @@ under the License.
   <keydef keys="impala13_full"><topicmeta><keywords><keyword>Impala 1.3</keyword></keywords></topicmeta></keydef>
 
 <!-- Pointers to changelog pages -->
+  <keydef keys="changelog_210" href="https://impala.incubator.apache.org/docs/changelog-2.10.html" scope="external" format="html"/>
   <keydef keys="changelog_29" href="https://impala.incubator.apache.org/docs/changelog-2.9.html" scope="external" format="html"/>
   <keydef keys="changelog_28" href="https://impala.incubator.apache.org/docs/changelog-2.8.html" scope="external" format="html"/>
 
@@ -10732,6 +10741,7 @@ under the License.
   <keydef href="topics/impala_joins.xml" keys="joins"/>
   <keydef href="topics/impala_order_by.xml" keys="order_by"/>
   <keydef href="topics/impala_group_by.xml" keys="group_by"/>
+  <keydef rev="IMPALA-5309" href="topics/impala_tablesample.xml" keys="tablesample"/>
   <keydef href="topics/impala_having.xml" keys="having"/>
   <keydef href="topics/impala_limit.xml" keys="limit"/>
   <keydef href="topics/impala_offset.xml" keys="offset"/>
@@ -10747,10 +10757,12 @@ under the License.
   <keydef href="topics/impala_allow_unsupported_formats.xml" keys="allow_unsupported_formats"/>
   <keydef href="topics/impala_appx_count_distinct.xml" keys="appx_count_distinct"/>
   <keydef href="topics/impala_batch_size.xml" keys="batch_size"/>
+  <keydef rev="2.10.0 IMPALA-3200" href="topics/impala_buffer_pool_limit.xml" keys="buffer_pool_limit"/>
   <keydef href="topics/impala_compression_codec.xml" keys="compression_codec"/>
   <keydef href="topics/impala_debug_action.xml" keys="debug_action"/>
   <keydef href="topics/impala_default_join_distribution_mode.xml" keys="default_join_distribution_mode"/>
   <keydef href="topics/impala_default_order_by_limit.xml" keys="default_order_by_limit"/>
+  <keydef rev="2.10.0 IMPALA-3200" href="topics/impala_default_spillable_buffer_size.xml" keys="default_spillable_buffer_size"/>
   <keydef href="topics/impala_disable_cached_reads.xml" keys="disable_cached_reads"/>
   <keydef href="topics/impala_disable_codegen.xml" keys="disable_codegen"/>
   <keydef href="topics/impala_disable_outermost_topn.xml" keys="disable_outermost_topn"/>
@@ -10765,9 +10777,11 @@ under the License.
   <keydef href="topics/impala_live_summary.xml" keys="live_summary"/>
   <keydef href="topics/impala_max_errors.xml" keys="max_errors"/>
   <keydef href="topics/impala_max_io_buffers.xml" keys="max_io_buffers"/>
+  <keydef rev="2.10.0 IMPALA-3200" href="topics/impala_max_row_size.xml" keys="max_row_size"/>
   <keydef href="topics/impala_max_scan_range_length.xml" keys="max_scan_range_length"/>
   <keydef href="topics/impala_max_num_runtime_filters.xml" keys="max_num_runtime_filters"/>
   <keydef href="topics/impala_mem_limit.xml" keys="mem_limit"/>
+  <keydef rev="2.10.0 IMPALA-3200" href="topics/impala_min_spillable_buffer_size.xml" keys="min_spillable_buffer_size"/>
   <keydef href="topics/impala_mt_dop.xml" keys="mt_dop"/>
   <keydef href="topics/impala_num_nodes.xml" keys="num_nodes"/>
   <keydef href="topics/impala_num_scanner_threads.xml" keys="num_scanner_threads"/>
@@ -10886,6 +10900,7 @@ under the License.
   <keydef href="topics/impala_shell_options.xml#shell_config_file" keys="shell_config_file"/>
   <keydef href="topics/impala_connecting.xml" keys="connecting"/>
   <keydef href="topics/impala_shell_running_commands.xml" keys="shell_running_commands"/>
+  <keydef href="topics/impala_shell_running_commands.xml#rerun" keys="rerun"/>
   <keydef href="topics/impala_shell_commands.xml" keys="shell_commands"/>
 
   <keydef href="topics/impala_performance.xml" keys="performance"/>
@@ -10929,6 +10944,7 @@ under the License.
   <keydef href="topics/impala_scalability.xml#scalability_catalog" keys="scalability_catalog"/>
   <keydef href="topics/impala_scalability.xml#scalability_coordinator" keys="scalability_coordinator"/>
   <keydef href="topics/impala_scalability.xml#statestore_scalability" keys="statestore_scalability"/>
+  <keydef href="topics/impala_scalability.xml#scalability_buffer_pool" keys="scalability_buffer_pool"/>
   <keydef audience="hidden" href="topics/impala_scalability.xml#scalability_cluster_size" keys="scalability_cluster_size"/>
   <keydef audience="hidden" href="topics/impala_scalability.xml#concurrent_connections" keys="concurrent_connections"/>
   <keydef href="topics/impala_scalability.xml#spill_to_disk" keys="spill_to_disk"/>
@@ -10937,6 +10953,7 @@ under the License.
   <keydef href="topics/impala_scalability.xml#big_tables" keys="big_tables"/>
   <keydef href="topics/impala_scalability.xml#kerberos_overhead_cluster_size" keys="kerberos_overhead_cluster_size"/>
   <keydef href="topics/impala_scalability.xml#scalability_hotspots" keys="scalability_hotspots"/>
+  <keydef href="topics/impala_scalability.xml#scalability_file_handle_cache" keys="scalability_file_handle_cache"/>
 
   <keydef href="topics/impala_partitioning.xml" keys="partitioning"/>
   <keydef href="topics/impala_partitioning.xml#partitioning_choosing" keys="partitioning_choosing"/>

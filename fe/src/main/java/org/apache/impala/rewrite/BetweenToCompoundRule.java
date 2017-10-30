@@ -23,7 +23,6 @@ import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.Predicate;
-import org.apache.impala.common.AnalysisException;
 
 /**
  * Rewrites BetweenPredicates into an equivalent conjunctive/disjunctive
@@ -38,7 +37,7 @@ public class BetweenToCompoundRule implements ExprRewriteRule {
   public static ExprRewriteRule INSTANCE = new BetweenToCompoundRule();
 
   @Override
-  public Expr apply(Expr expr, Analyzer analyzer) throws AnalysisException {
+  public Expr apply(Expr expr, Analyzer analyzer) {
     if (!(expr instanceof BetweenPredicate)) return expr;
     BetweenPredicate bp = (BetweenPredicate) expr;
     Expr result = null;

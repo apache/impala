@@ -50,7 +50,13 @@ public enum PrimitiveType {
   DECIMAL("DECIMAL", 16, TPrimitiveType.DECIMAL),
 
   // Fixed length char array.
-  CHAR("CHAR", -1, TPrimitiveType.CHAR);
+  CHAR("CHAR", -1, TPrimitiveType.CHAR),
+
+  // Fixed length binary array, stored inline in the tuple. Currently only used
+  // internally for intermediate results of builtin aggregate functions. Not exposed
+  // in SQL in any way.
+  FIXED_UDA_INTERMEDIATE("FIXED_UDA_INTERMEDIATE", -1,
+      TPrimitiveType.FIXED_UDA_INTERMEDIATE);
 
   private final String description_;
   private final int slotSize_;  // size of tuple slot for this type
@@ -86,6 +92,7 @@ public enum PrimitiveType {
       case CHAR: return CHAR;
       case DECIMAL: return DECIMAL;
       case BINARY: return BINARY;
+      case FIXED_UDA_INTERMEDIATE: return FIXED_UDA_INTERMEDIATE;
     }
     return INVALID_TYPE;
   }

@@ -33,12 +33,12 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
-import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExecStats;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlan;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.util.BitUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -408,6 +408,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       msg.addToRuntime_filters(filter.toThrift());
     }
     msg.setDisable_codegen(disableCodegen_);
+    Preconditions.checkState(nodeResourceProfile_.isValid());
+    msg.resource_profile = nodeResourceProfile_.toThrift();
     toThrift(msg);
     container.addToNodes(msg);
     // For the purpose of the BE consider ExchangeNodes to have no children.
@@ -677,13 +679,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   /**
-   * The default size of buffer used in spilling nodes. Used in
-   * computeNodeResourceProfile().
+   * Compute the buffer size that will be used to fit the maximum-sized row - either the
+   * default buffer size provided or the smallest buffer that fits a maximum-sized row.
    */
-  protected final static long getDefaultSpillableBufferBytes() {
-    // BufferedBlockMgr uses --read_size to determine buffer size.
-    // TODO: IMPALA-3200: get from query option
-    return BackendConfig.INSTANCE.getReadSize();
+  protected static long computeMaxSpillableBufferSize(long defaultBufferSize,
+      long maxRowSize) {
+    return Math.max(defaultBufferSize, BitUtil.roundUpToPowerOf2(maxRowSize));
   }
 
   /**

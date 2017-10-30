@@ -297,6 +297,11 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testRuntimeFilterQueryOptions() {
+    runPlannerTestFile("runtime-filter-query-options");
+  }
+
+  @Test
   public void testConjunctOrdering() {
     runPlannerTestFile("conjunct-ordering");
   }
@@ -314,6 +319,9 @@ public class PlannerTest extends PlannerTestBase {
   @Test
   public void testKudu() {
     Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
+    addTestDb("kudu_planner_test", "Test DB for Kudu Planner.");
+    addTestTable("CREATE EXTERNAL TABLE kudu_planner_test.no_stats STORED AS KUDU " +
+        "TBLPROPERTIES ('kudu.table_name' = 'impala::functional_kudu.alltypes');");
     runPlannerTestFile("kudu");
   }
 
@@ -425,9 +433,18 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = defaultQueryOptions();
     options.setExplain_level(TExplainLevel.EXTENDED);
     options.setNum_scanner_threads(1); // Required so that output doesn't vary by machine
-    // TODO: IMPALA-3200 - this should become a query option.
-    RuntimeEnv.INSTANCE.setMinSpillableBufferBytes(64 * 1024);
     runPlannerTestFile("spillable-buffer-sizing", options, false);
+  }
+
+  @Test
+  public void testMaxRowSize() {
+    // Tests that an increased value of 'max_row_size' is correctly factored into the
+    // resource calculations by the planner.
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.EXTENDED);
+    options.setNum_scanner_threads(1); // Required so that output doesn't vary by machine
+    options.setMax_row_size(8L * 1024L * 1024L);
+    runPlannerTestFile("max-row-size", options, false);
   }
 
   @Test
@@ -453,6 +470,13 @@ public class PlannerTest extends PlannerTestBase {
     runPlannerTestFile("default-join-distr-mode-broadcast", options);
     options.setDefault_join_distribution_mode(TJoinDistributionMode.SHUFFLE);
     runPlannerTestFile("default-join-distr-mode-shuffle", options);
+  }
+
+  @Test
+  public void testPartitionPruning() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.EXTENDED);
+    runPlannerTestFile("partition-pruning", options);
   }
 
   @Test

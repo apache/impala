@@ -73,10 +73,13 @@ public class KuduPartitionExpr extends Expr {
     // IMPALA-5294: If one of the children is a NullLiteral, it has to be cast to a type
     // to be passed to the BE.
     for (int i = 0; i < children_.size(); ++i) {
-      children_.get(i).castTo(
-          targetTable_.getColumns().get(partitionColPos_.get(i)).getType());
+      children_.set(i, children_.get(i).castTo(
+          targetTable_.getColumns().get(partitionColPos_.get(i)).getType()));
     }
   }
+
+  @Override
+  protected float computeEvalCost() { return UNKNOWN_COST; }
 
   @Override
   protected String toSqlImpl() {

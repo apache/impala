@@ -25,6 +25,37 @@
 
 namespace impala {
 
+/// Information obtained from /proc/<pid>/smaps.
+struct MappedMemInfo {
+  // Number of memory maps.
+  int64_t num_maps = 0;
+
+  // Total size of memory maps (i.e. virtual memory size) in kilobytes.
+  int64_t size_kb = 0;
+
+  // RSS in kilobytes
+  int64_t rss_kb = 0;
+
+  // Kilobytes of anonymous huge pages.
+  int64_t anon_huge_pages_kb = 0;
+
+  std::string DebugString() const;
+};
+
+/// Information about the system transparent huge pages config.
+struct ThpConfig {
+  // Whether THP is enabled. Just contains the raw string, e.g. "[always] madvise never".
+  std::string enabled;
+
+  // Whether synchronous THP defrag is enabled, e.g. "[always] madvise never".
+  std::string defrag;
+
+  // Whether THP defrag via khugepaged is enabled. Usually "0"/"1".
+  std::string khugepaged_defrag;
+
+  std::string DebugString() const;
+};
+
 /// Provides the amount of physical memory available.
 /// Populated from /proc/meminfo.
 /// TODO: Allow retrieving of cgroup memory limits,
@@ -54,11 +85,26 @@ class MemInfo {
     return commit_limit_;
   }
 
+  /// Return true if the /proc/<pid>/smaps file is present and can be opened.
+  static bool HaveSmaps();
+
+  /// Parse /proc/<pid>/smaps for this process and extract relevant information.
+  /// Logs a warning if the file could not be opened or had an unexpected format.
+  static MappedMemInfo ParseSmaps();
+
+  /// Parse the transparent huge pages configs.
+  /// Logs a warning if a file could not be opened or had an unexpected format.
+  static ThpConfig ParseThpConfig();
+
   static std::string DebugString();
 
  private:
-
   static void ParseOvercommit();
+
+  /// Get the config value from a file, trying the path relative to both
+  /// /sys/kernel/mm/transparent_hugepage and /sys/kernel/mm/redhat_transparent_hugepage.
+  /// Assumes the file has a single line only.
+  static std::string GetThpConfigVal(const std::string& relative_path);
 
   static bool initialized_;
   static int64_t physical_mem_;

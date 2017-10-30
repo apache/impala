@@ -77,7 +77,7 @@ class DataStreamSender::Channel : public CacheLineAligned {
       dest_node_id_(dest_node_id),
       num_data_bytes_sent_(0),
       rpc_thread_("DataStreamSender", "SenderThread", 1, 1,
-          bind<void>(mem_fn(&Channel::TransmitData), this, _1, _2)),
+          bind<void>(mem_fn(&Channel::TransmitData), this, _1, _2), true),
       rpc_in_flight_(false) {}
 
   // Initialize channel.
@@ -156,6 +156,7 @@ class DataStreamSender::Channel : public CacheLineAligned {
 };
 
 Status DataStreamSender::Channel::Init(RuntimeState* state) {
+  RETURN_IF_ERROR(rpc_thread_.Init());
   runtime_state_ = state;
   // TODO: figure out how to size batch_
   int capacity = max(1, buffer_size_ / max(row_desc_->GetRowSize(), 1));
@@ -218,7 +219,7 @@ void DataStreamSender::Channel::TransmitDataHelper(const TRowBatch* batch) {
   if (res.status.status_code != TErrorCode::OK) {
     rpc_status_ = res.status;
   } else {
-    num_data_bytes_sent_ += RowBatch::GetBatchSize(*batch);
+    num_data_bytes_sent_ += RowBatch::GetSerializedSize(*batch);
     VLOG_ROW << "incremented #data_bytes_sent="
              << num_data_bytes_sent_;
   }
@@ -389,7 +390,8 @@ Status DataStreamSender::Prepare(RuntimeState* state, MemTracker* parent_mem_tra
   state_ = state;
   SCOPED_TIMER(profile_->total_time_counter());
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(partition_exprs_, state,
-      state->obj_pool(), expr_mem_pool(), &partition_expr_evals_));
+      state->obj_pool(), expr_perm_pool_.get(), expr_results_pool_.get(),
+      &partition_expr_evals_));
   bytes_sent_counter_ = ADD_COUNTER(profile(), "BytesSent", TUnit::BYTES);
   uncompressed_bytes_counter_ =
       ADD_COUNTER(profile(), "UncompressedRowBatchSize", TUnit::BYTES);
@@ -478,7 +480,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
     }
   }
   COUNTER_ADD(total_sent_rows_counter_, batch->num_rows());
-  ScalarExprEvaluator::FreeLocalAllocations(partition_expr_evals_);
+  expr_results_pool_->Clear();
   RETURN_IF_ERROR(state->CheckQueryState());
   return Status::OK();
 }
@@ -507,17 +509,15 @@ void DataStreamSender::Close(RuntimeState* state) {
   closed_ = true;
 }
 
-Status DataStreamSender::SerializeBatch(RowBatch* src, TRowBatch* dest, int num_receivers) {
+Status DataStreamSender::SerializeBatch(
+    RowBatch* src, TRowBatch* dest, int num_receivers) {
   VLOG_ROW << "serializing " << src->num_rows() << " rows";
   {
     SCOPED_TIMER(profile_->total_time_counter());
     SCOPED_TIMER(serialize_batch_timer_);
     RETURN_IF_ERROR(src->Serialize(dest));
-    int bytes = RowBatch::GetBatchSize(*dest);
-    int uncompressed_bytes = bytes - dest->tuple_data.size() + dest->uncompressed_size;
-    // The size output_batch would be if we didn't compress tuple_data (will be equal to
-    // actual batch size if tuple_data isn't compressed)
-
+    int64_t bytes = RowBatch::GetSerializedSize(*dest);
+    int64_t uncompressed_bytes = RowBatch::GetDeserializedSize(*dest);
     COUNTER_ADD(bytes_sent_counter_, bytes * num_receivers);
     COUNTER_ADD(uncompressed_bytes_counter_, uncompressed_bytes * num_receivers);
   }

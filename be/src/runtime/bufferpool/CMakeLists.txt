@@ -25,10 +25,11 @@ add_library(BufferPool
   buffer-allocator.cc
   buffer-pool.cc
   reservation-tracker.cc
+  reservation-util.cc
   suballocator.cc
   system-allocator.cc
 )
-add_dependencies(BufferPool thrift-deps)
+add_dependencies(BufferPool gen-deps)
 
 ADD_BE_TEST(buffer-allocator-test)
 ADD_BE_TEST(buffer-pool-test)

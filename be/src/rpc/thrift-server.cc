@@ -24,22 +24,21 @@
 #include <thrift/concurrency/Thread.h>
 #include <thrift/concurrency/ThreadManager.h>
 #include <thrift/protocol/TBinaryProtocol.h>
-#include <thrift/server/TThreadPoolServer.h>
-#include <thrift/server/TThreadedServer.h>
 #include <thrift/transport/TSocket.h>
 #include <thrift/transport/TSSLServerSocket.h>
 #include <thrift/transport/TSSLSocket.h>
-#include <thrift/server/TThreadPoolServer.h>
 #include <thrift/transport/TServerSocket.h>
 #include <gflags/gflags.h>
 
 #include <sstream>
 #include "gen-cpp/Types_types.h"
 #include "rpc/TAcceptQueueServer.h"
+#include "rpc/auth-provider.h"
 #include "rpc/authentication.h"
 #include "rpc/thrift-server.h"
 #include "rpc/thrift-thread.h"
 #include "util/debug-util.h"
+#include "util/metrics.h"
 #include "util/network-util.h"
 #include "util/os-util.h"
 #include "util/uid-util.h"
@@ -58,16 +57,44 @@ using namespace apache::thrift::server;
 using namespace apache::thrift::transport;
 using namespace apache::thrift;
 
-DEFINE_int32(rpc_cnxn_attempts, 10, "Deprecated");
-DEFINE_int32(rpc_cnxn_retry_interval_ms, 2000, "Deprecated");
+DEFINE_int32_hidden(rpc_cnxn_attempts, 10, "Deprecated");
+DEFINE_int32_hidden(rpc_cnxn_retry_interval_ms, 2000, "Deprecated");
 
-DECLARE_bool(enable_accept_queue_server);
 DECLARE_string(principal);
 DECLARE_string(keytab_file);
 DECLARE_string(ssl_client_ca_certificate);
 DECLARE_string(ssl_server_certificate);
+DECLARE_string(ssl_cipher_list);
 
 namespace impala {
+
+// Specifies the allowed set of values for --ssl_minimum_version. To keep consistent with
+// Apache Kudu, specifying a single version enables all versions including and succeeding
+// that one (e.g. TLSv1.1 enables v1.1 and v1.2). Specifying TLSv1.1_only enables only
+// v1.1.
+map<string, SSLProtocol> SSLProtoVersions::PROTO_MAP = {
+    {"tlsv1.2", TLSv1_2_plus}, {"tlsv1.1", TLSv1_1_plus}, {"tlsv1", TLSv1_0_plus}};
+
+Status SSLProtoVersions::StringToProtocol(const string& in, SSLProtocol* protocol) {
+  for (const auto& proto : SSLProtoVersions::PROTO_MAP) {
+    if (iequals(in, proto.first)) {
+      *protocol = proto.second;
+      return Status::OK();
+    }
+  }
+
+  return Status(Substitute("Unknown TLS version: '$0'", in));
+}
+
+#define OPENSSL_MIN_VERSION_WITH_TLS_1_1 0x10001000L
+
+bool SSLProtoVersions::IsSupported(const SSLProtocol& protocol) {
+  bool is_openssl_1_0_0_or_lower = (SSLeay() < OPENSSL_MIN_VERSION_WITH_TLS_1_1);
+  if (is_openssl_1_0_0_or_lower) return (protocol == TLSv1_0_plus);
+
+  // All other versions supported by OpenSSL 1.0.1 and later.
+  return true;
+}
 
 bool EnableInternalSslConnections() {
   // Enable SSL between servers only if both the client validation certificate and the
@@ -141,9 +168,9 @@ Status ThriftServer::ThriftServerEventProcessor::StartAndWaitForServer() {
 
   stringstream name;
   name << "supervise-" << thrift_server_->name_;
-  thrift_server_->server_thread_.reset(
-      new Thread("thrift-server", name.str(),
-                 &ThriftServer::ThriftServerEventProcessor::Supervise, this));
+  RETURN_IF_ERROR(Thread::Create("thrift-server", name.str(),
+      &ThriftServer::ThriftServerEventProcessor::Supervise, this,
+      &thrift_server_->server_thread_));
 
   system_time deadline = get_system_time() +
       posix_time::milliseconds(ThriftServer::ThriftServerEventProcessor::TIMEOUT_MS);
@@ -297,14 +324,12 @@ void ThriftServer::ThriftServerEventProcessor::deleteContext(void* serverContext
 
 ThriftServer::ThriftServer(const string& name,
     const boost::shared_ptr<TProcessor>& processor, int port, AuthProvider* auth_provider,
-    MetricGroup* metrics, int num_worker_threads, ServerType server_type)
+    MetricGroup* metrics, int max_concurrent_connections)
   : started_(false),
     port_(port),
     ssl_enabled_(false),
-    num_worker_threads_(num_worker_threads),
-    server_type_(server_type),
+    max_concurrent_connections_(max_concurrent_connections),
     name_(name),
-    server_thread_(NULL),
     server_(NULL),
     processor_(processor),
     connection_handler_(NULL),
@@ -327,11 +352,14 @@ ThriftServer::ThriftServer(const string& name,
   }
 }
 
+namespace {
+
 /// Factory subclass to override getPassword() which provides a password string to Thrift
 /// to decrypt the private key file.
 class ImpalaSslSocketFactory : public TSSLSocketFactory {
  public:
-  ImpalaSslSocketFactory(const string& password) : password_(password) { }
+  ImpalaSslSocketFactory(SSLProtocol version, const string& password)
+    : TSSLSocketFactory(version), password_(password) {}
 
  protected:
   virtual void getPassword(string& output, int size) {
@@ -343,15 +371,22 @@ class ImpalaSslSocketFactory : public TSSLSocketFactory {
   /// The password string.
   const string password_;
 };
-
+}
 Status ThriftServer::CreateSocket(boost::shared_ptr<TServerTransport>* socket) {
   if (ssl_enabled()) {
-    // This 'factory' is only called once, since CreateSocket() is only called from
-    // Start()
-    boost::shared_ptr<TSSLSocketFactory> socket_factory(
-        new ImpalaSslSocketFactory(key_password_));
-    socket_factory->overrideDefaultPasswordCallback();
+    if (!SSLProtoVersions::IsSupported(version_)) {
+      return Status(TErrorCode::SSL_SOCKET_CREATION_FAILED,
+          Substitute("TLS ($0) version not supported (linked OpenSSL version is $1)",
+                        version_, SSLeay()));
+    }
     try {
+      // This 'factory' is only called once, since CreateSocket() is only called from
+      // Start(). The c'tor may throw if there is an error initializing the SSL context.
+      boost::shared_ptr<TSSLSocketFactory> socket_factory(
+          new ImpalaSslSocketFactory(version_, key_password_));
+      socket_factory->overrideDefaultPasswordCallback();
+
+      if (!cipher_list_.empty()) socket_factory->ciphers(cipher_list_);
       socket_factory->loadCertificate(certificate_path_.c_str());
       socket_factory->loadPrivateKey(private_key_path_.c_str());
       socket->reset(new TSSLServerSocket(port_, socket_factory));
@@ -365,8 +400,9 @@ Status ThriftServer::CreateSocket(boost::shared_ptr<TServerTransport>* socket) {
   }
 }
 
-Status ThriftServer::EnableSsl(const string& certificate, const string& private_key,
-    const string& pem_password_cmd) {
+Status ThriftServer::EnableSsl(SSLProtocol version, const string& certificate,
+    const string& private_key, const string& pem_password_cmd,
+    const std::string& ciphers) {
   DCHECK(!started_);
   if (certificate.empty()) return Status(TErrorCode::SSL_CERTIFICATE_PATH_BLANK);
   if (private_key.empty()) return Status(TErrorCode::SSL_PRIVATE_KEY_PATH_BLANK);
@@ -383,6 +419,8 @@ Status ThriftServer::EnableSsl(const string& certificate, const string& private_
   ssl_enabled_ = true;
   certificate_path_ = certificate;
   private_key_path_ = private_key;
+  cipher_list_ = ciphers;
+  version_ = version;
 
   if (!pem_password_cmd.empty()) {
     if (!RunShellProcess(pem_password_cmd, &key_password_, true)) {
@@ -408,37 +446,11 @@ Status ThriftServer::Start() {
   boost::shared_ptr<TTransportFactory> transport_factory;
   RETURN_IF_ERROR(CreateSocket(&server_socket));
   RETURN_IF_ERROR(auth_provider_->GetServerTransportFactory(&transport_factory));
-  switch (server_type_) {
-    case ThreadPool:
-      {
-        boost::shared_ptr<ThreadManager> thread_mgr(
-            ThreadManager::newSimpleThreadManager(num_worker_threads_));
-        thread_mgr->threadFactory(thread_factory);
-        thread_mgr->start();
-        server_.reset(new TThreadPoolServer(processor_, server_socket,
-                transport_factory, protocol_factory, thread_mgr));
-      }
-      break;
-    case Threaded:
-      if (FLAGS_enable_accept_queue_server) {
-        server_.reset(new TAcceptQueueServer(processor_, server_socket, transport_factory,
-            protocol_factory, thread_factory));
-        if (metrics_ != NULL) {
-          stringstream key_prefix_ss;
-          key_prefix_ss << "impala.thrift-server." << name_;
-          (static_cast<TAcceptQueueServer*>(server_.get()))
-              ->InitMetrics(metrics_, key_prefix_ss.str());
-        }
-      } else {
-        server_.reset(new TThreadedServer(processor_, server_socket, transport_factory,
-            protocol_factory, thread_factory));
-      }
-      break;
-    default:
-      stringstream error_msg;
-      error_msg << "Unsupported server type: " << server_type_;
-      LOG(ERROR) << error_msg.str();
-      return Status(error_msg.str());
+  server_.reset(new TAcceptQueueServer(processor_, server_socket, transport_factory,
+        protocol_factory, thread_factory, max_concurrent_connections_));
+  if (metrics_ != NULL) {
+    (static_cast<TAcceptQueueServer*>(server_.get()))->InitMetrics(metrics_,
+        Substitute("impala.thrift-server.$0", name_));
   }
   boost::shared_ptr<ThriftServer::ThriftServerEventProcessor> event_processor(
       new ThriftServer::ThriftServerEventProcessor(this));
@@ -461,7 +473,6 @@ void ThriftServer::Join() {
 void ThriftServer::StopForTesting() {
   DCHECK(server_thread_ != NULL);
   DCHECK(server_);
-  DCHECK_EQ(server_type_, Threaded);
   server_->stop();
   if (started_) Join();
 }

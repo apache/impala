@@ -27,6 +27,24 @@
 
 namespace impala {
 
+Status JniUtfCharGuard::create(JNIEnv* env, jstring jstr, JniUtfCharGuard* out) {
+  DCHECK(jstr != nullptr);
+  DCHECK(!env->ExceptionCheck());
+  const char* utf_chars = env->GetStringUTFChars(jstr, nullptr);
+  bool exception_check = static_cast<bool>(env->ExceptionCheck());
+  if (utf_chars == nullptr || exception_check) {
+    if (exception_check) env->ExceptionClear();
+    if (utf_chars != nullptr) env->ReleaseStringUTFChars(jstr, utf_chars);
+    auto fail_message = "GetStringUTFChars failed. Probable OOM on JVM side";
+    LOG(ERROR) << fail_message;
+    return Status(fail_message);
+  }
+  out->env = env;
+  out->jstr = jstr;
+  out->utf_chars = utf_chars;
+  return Status::OK();
+}
+
 jclass JniUtil::jni_util_cl_ = NULL;
 jclass JniUtil::internal_exc_cl_ = NULL;
 jmethodID JniUtil::get_jvm_metrics_id_ = NULL;
@@ -79,12 +97,6 @@ Status JniUtil::GetGlobalClassRef(JNIEnv* env, const char* class_str, jclass* cl
 
 Status JniUtil::LocalToGlobalRef(JNIEnv* env, jobject local_ref, jobject* global_ref) {
   *global_ref = env->NewGlobalRef(local_ref);
-  RETURN_ERROR_IF_EXC(env);
-  return Status::OK();
-}
-
-Status JniUtil::FreeGlobalRef(JNIEnv* env, jobject global_ref) {
-  env->DeleteGlobalRef(global_ref);
   RETURN_ERROR_IF_EXC(env);
   return Status::OK();
 }
@@ -169,30 +181,38 @@ void JniUtil::InitLibhdfs() {
 }
 
 Status JniUtil::GetJniExceptionMsg(JNIEnv* env, bool log_stack, const string& prefix) {
-  jthrowable exc = (env)->ExceptionOccurred();
-  if (exc == NULL) return Status::OK();
+  jthrowable exc = env->ExceptionOccurred();
+  if (exc == nullptr) return Status::OK();
   env->ExceptionClear();
-  DCHECK(throwable_to_string_id() != NULL);
-  jstring msg = (jstring) env->CallStaticObjectMethod(jni_util_class(),
-      throwable_to_string_id(), exc);
-  jboolean is_copy;
-  string error_msg =
-      (reinterpret_cast<const char*>(env->GetStringUTFChars(msg, &is_copy)));
-
+  DCHECK(throwable_to_string_id() != nullptr);
+  const char* oom_msg_template = "$0 threw an unchecked exception. The JVM is likely out "
+      "of memory (OOM).";
+  jstring msg = static_cast<jstring>(env->CallStaticObjectMethod(jni_util_class(),
+      throwable_to_string_id(), exc));
+  if (env->ExceptionOccurred()) {
+    env->ExceptionClear();
+    string oom_msg = Substitute(oom_msg_template, "throwableToString");
+    LOG(ERROR) << oom_msg;
+    return Status(oom_msg);
+  }
+  JniUtfCharGuard msg_str_guard;
+  RETURN_IF_ERROR(JniUtfCharGuard::create(env, msg, &msg_str_guard));
   if (log_stack) {
-    jstring stack = (jstring) env->CallStaticObjectMethod(jni_util_class(),
-        throwable_to_stack_trace_id(), exc);
-    const char* c_stack =
-      reinterpret_cast<const char*>(env->GetStringUTFChars(stack, &is_copy));
-    VLOG(1) << string(c_stack);
+    jstring stack = static_cast<jstring>(env->CallStaticObjectMethod(jni_util_class(),
+        throwable_to_stack_trace_id(), exc));
+    if (env->ExceptionOccurred()) {
+      env->ExceptionClear();
+      string oom_msg = Substitute(oom_msg_template, "throwableToStackTrace");
+      LOG(ERROR) << oom_msg;
+      return Status(oom_msg);
+    }
+    JniUtfCharGuard c_stack_guard;
+    RETURN_IF_ERROR(JniUtfCharGuard::create(env, stack, &c_stack_guard));
+    VLOG(1) << c_stack_guard.get();
   }
 
-  env->ExceptionClear();
   env->DeleteLocalRef(exc);
-
-  stringstream ss;
-  ss << prefix << error_msg;
-  return Status(ss.str());
+  return Status(Substitute("$0$1", prefix, msg_str_guard.get()));
 }
 
 Status JniUtil::GetJvmMetrics(const TGetJvmMetricsRequest& request,
@@ -220,5 +240,4 @@ Status JniUtil::LoadStaticJniMethod(JNIEnv* env, const jclass& jni_class,
   RETURN_ERROR_IF_EXC(env);
   return Status::OK();
 }
-
 }

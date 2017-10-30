@@ -30,6 +30,7 @@ import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.SortInfo;
+import org.apache.impala.analysis.TupleId;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
@@ -63,7 +64,8 @@ public class Planner {
   public static final long MIN_PER_HOST_MEM_ESTIMATE_BYTES = 10 * 1024 * 1024;
 
   public static final ResourceProfile MIN_PER_HOST_RESOURCES =
-      new ResourceProfile(MIN_PER_HOST_MEM_ESTIMATE_BYTES, 0);
+      new ResourceProfileBuilder().setMemEstimateBytes(MIN_PER_HOST_MEM_ESTIMATE_BYTES)
+      .setMinReservationBytes(0).build();
 
   private final PlannerContext ctx_;
 
@@ -103,15 +105,6 @@ public class Planner {
     invertJoins(singleNodePlan, ctx_.isSingleNodeExec());
     singleNodePlan = useNljForSingularRowBuilds(singleNodePlan, ctx_.getRootAnalyzer());
 
-    // create runtime filters
-    if (ctx_.getQueryOptions().getRuntime_filter_mode() != TRuntimeFilterMode.OFF) {
-      // Always compute filters, even if the BE won't always use all of them.
-      RuntimeFilterGenerator.generateRuntimeFilters(ctx_.getRootAnalyzer(),
-          singleNodePlan, ctx_.getQueryOptions().getMax_num_runtime_filters());
-      ctx_.getAnalysisResult().getTimeline().markEvent(
-          "Runtime filters computed");
-    }
-
     singleNodePlanner.validatePlan(singleNodePlan);
 
     if (ctx_.isSingleNodeExec()) {
@@ -123,7 +116,13 @@ public class Planner {
       fragments = distributedPlanner.createPlanFragments(singleNodePlan);
     }
 
+    // Create runtime filters.
     PlanFragment rootFragment = fragments.get(fragments.size() - 1);
+    if (ctx_.getQueryOptions().getRuntime_filter_mode() != TRuntimeFilterMode.OFF) {
+      RuntimeFilterGenerator.generateRuntimeFilters(ctx_, rootFragment.getPlanRoot());
+      ctx_.getAnalysisResult().getTimeline().markEvent("Runtime filters computed");
+    }
+
     rootFragment.verifyTree();
     ExprSubstitutionMap rootNodeSmap = rootFragment.getPlanRoot().getOutputSmap();
     List<Expr> resultExprs = null;
@@ -262,9 +261,9 @@ public class Planner {
       TQueryExecRequest request, TExplainLevel explainLevel) {
     StringBuilder str = new StringBuilder();
     boolean hasHeader = false;
-    if (request.isSetPer_host_min_reservation()) {
-      str.append(String.format("Per-Host Resource Reservation: Memory=%s\n",
-              PrintUtils.printBytes(request.getPer_host_min_reservation()))) ;
+    if (request.isSetMax_per_host_min_reservation()) {
+      str.append(String.format("Max Per-Host Resource Reservation: Memory=%s\n",
+          PrintUtils.printBytes(request.getMax_per_host_min_reservation())));
       hasHeader = true;
     }
     if (request.isSetPer_host_mem_estimate()) {
@@ -344,18 +343,16 @@ public class Planner {
    * per-host resource values in 'request'.
    */
   public void computeResourceReqs(List<PlanFragment> planRoots,
-      TQueryExecRequest request) {
+      TQueryCtx queryCtx, TQueryExecRequest request) {
     Preconditions.checkState(!planRoots.isEmpty());
     Preconditions.checkNotNull(request);
     TQueryOptions queryOptions = ctx_.getRootAnalyzer().getQueryOptions();
     int mtDop = queryOptions.getMt_dop();
 
-    // Peak per-host peak resources for all plan fragments.
-    ResourceProfile perHostPeakResources = ResourceProfile.invalid();
-    // Total of initial reservation claims in bytes by all operators in all fragment
-    // instances per host. Computed by summing the per-host minimum reservations of
-    // all plan nodes and sinks.
-    long perHostInitialReservationTotal = 0;
+    // Peak per-host peak resources for all plan fragments, assuming that all fragments
+    // are scheduled on all nodes. The actual per-host resource requirements are computed
+    // after scheduling.
+    ResourceProfile maxPerHostPeakResources = ResourceProfile.invalid();
 
     // Do a pass over all the fragments to compute resource profiles. Compute the
     // profiles bottom-up since a fragment's profile may depend on its descendants.
@@ -367,48 +364,43 @@ public class Planner {
       // Different fragments do not synchronize their Open() and Close(), so the backend
       // does not provide strong guarantees about whether one fragment instance releases
       // resources before another acquires them. Conservatively assume that all fragment
-      // instances can consume their peak resources at the same time, i.e. that the
-      // query-wide peak resources is the sum of the per-fragment-instance peak
-      // resources.
-      perHostPeakResources =
-          perHostPeakResources.sum(fragment.getPerHostResourceProfile());
-      perHostInitialReservationTotal += fragment.getNumInstancesPerHost(mtDop)
-          * fragment.getSink().getResourceProfile().getMinReservationBytes();
-
-      for (PlanNode node: fragment.collectPlanNodes()) {
-        perHostInitialReservationTotal += fragment.getNumInstances(mtDop)
-            * node.getNodeResourceProfile().getMinReservationBytes();
-      }
+      // instances run on all backends with max DOP, and can consume their peak resources
+      // at the same time, i.e. that the query-wide peak resources is the sum of the
+      // per-fragment-instance peak resources.
+      maxPerHostPeakResources = maxPerHostPeakResources.sum(
+          fragment.getResourceProfile().multiply(fragment.getNumInstancesPerHost(mtDop)));
     }
 
-    Preconditions.checkState(perHostPeakResources.getMemEstimateBytes() >= 0,
-        perHostPeakResources.getMemEstimateBytes());
-    Preconditions.checkState(perHostPeakResources.getMinReservationBytes() >= 0,
-        perHostPeakResources.getMinReservationBytes());
+    Preconditions.checkState(maxPerHostPeakResources.getMemEstimateBytes() >= 0,
+        maxPerHostPeakResources.getMemEstimateBytes());
+    Preconditions.checkState(maxPerHostPeakResources.getMinReservationBytes() >= 0,
+        maxPerHostPeakResources.getMinReservationBytes());
 
-    perHostPeakResources = MIN_PER_HOST_RESOURCES.max(perHostPeakResources);
+    maxPerHostPeakResources = MIN_PER_HOST_RESOURCES.max(maxPerHostPeakResources);
 
-    request.setPer_host_mem_estimate(perHostPeakResources.getMemEstimateBytes());
-    request.setPer_host_min_reservation(perHostPeakResources.getMinReservationBytes());
-    request.setPer_host_initial_reservation_total_claims(perHostInitialReservationTotal);
+    // TODO: Remove per_host_mem_estimate from the TQueryExecRequest when AC no longer
+    // needs it.
+    request.setPer_host_mem_estimate(maxPerHostPeakResources.getMemEstimateBytes());
+    request.setMax_per_host_min_reservation(
+        maxPerHostPeakResources.getMinReservationBytes());
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Per-host min buffer : " + perHostPeakResources.getMinReservationBytes());
-      LOG.trace(
-          "Estimated per-host memory: " + perHostPeakResources.getMemEstimateBytes());
-      LOG.trace("Per-host initial reservation total: " + perHostInitialReservationTotal);
+      LOG.trace("Max per-host min reservation: " +
+          maxPerHostPeakResources.getMinReservationBytes());
+      LOG.trace("Max estimated per-host memory: " +
+          maxPerHostPeakResources.getMemEstimateBytes());
     }
   }
 
 
   /**
-   * Traverses the plan tree rooted at 'root' and inverts outer and semi joins
-   * in the following situations:
+   * Traverses the plan tree rooted at 'root' and inverts joins in the following
+   * situations:
    * 1. If the left-hand side is a SingularRowSrcNode then we invert the join because
    *    then the build side is guaranteed to have only a single row.
    * 2. There is no backend support for distributed non-equi right outer/semi joins,
    *    so we invert them (any distributed left semi/outer join is ok).
-   * 3. Invert semi/outer joins if the right-hand size is estimated to have a higher
-   *    cardinality*avgSerializedSize. Do not invert if relevant stats are missing.
+   * 3. If we estimate that the inverted join is cheaper (see isInvertedJoinCheaper()).
+   *    Do not invert if relevant stats are missing.
    * The first two inversion rules are independent of the presence/absence of stats.
    * Left Null Aware Anti Joins are never inverted due to lack of backend support.
    * Joins that originate from query blocks with a straight join hint are not inverted.
@@ -427,12 +419,9 @@ public class Planner {
       JoinNode joinNode = (JoinNode) root;
       JoinOperator joinOp = joinNode.getJoinOp();
 
-      // 1. No inversion allowed due to straight join.
-      // 2. The null-aware left anti-join operator is not considered for inversion.
-      //    There is no backend support for a null-aware right anti-join because
-      //    we cannot execute it efficiently.
-      if (joinNode.isStraightJoin() || joinOp.isNullAwareLeftAntiJoin()) {
-        // Re-compute tuple ids since their order must correspond to the order of children.
+      if (!joinNode.isInvertible(isLocalPlan)) {
+        // Re-compute tuple ids since their order must correspond to the order
+        // of children.
         root.computeTupleIds();
         return;
       }
@@ -446,24 +435,98 @@ public class Planner {
         // The current join is a distributed non-equi right outer or semi join
         // which has no backend support. Invert the join to make it executable.
         joinNode.invertJoin();
-      } else {
-        // Invert the join if doing so reduces the size of the materialized rhs
-        // (may also reduce network costs depending on the join strategy).
-        // Only consider this optimization if both the lhs/rhs cardinalities are known.
-        long lhsCard = joinNode.getChild(0).getCardinality();
-        long rhsCard = joinNode.getChild(1).getCardinality();
-        float lhsAvgRowSize = joinNode.getChild(0).getAvgRowSize();
-        float rhsAvgRowSize = joinNode.getChild(1).getAvgRowSize();
-        if (lhsCard != -1 && rhsCard != -1 &&
-            lhsCard * lhsAvgRowSize < rhsCard * rhsAvgRowSize) {
-          joinNode.invertJoin();
-        }
+      } else if (isInvertedJoinCheaper(joinNode, isLocalPlan)) {
+        joinNode.invertJoin();
       }
     }
 
     // Re-compute tuple ids because the backend assumes that their order corresponds to
     // the order of children.
     root.computeTupleIds();
+  }
+
+  /**
+   * Return true if we estimate that 'joinNode' will be cheaper to execute after
+   * inversion. Returns false if any join input is missing relevant stats.
+   *
+   * For nested loop joins, we simply assume that the cost is determined by the size of
+   * the build side.
+   *
+   * For hash joins, the cost model is more nuanced and depends on:
+   * - est. number of rows in the build and probe: lhsCard and rhsCard
+   * - est. size of the rows in the build and probe: lhsAvgRowSize and rhsAvgRowSize
+   * - est. parallelism with which the lhs and rhs trees execute: lhsNumNodes
+   *   and rhsNumNodes. The parallelism of the join is determined by the lhs.
+   *
+   * The assumptions are:
+   * - the join strategy is PARTITIONED and rows are distributed evenly. We don't know
+   *   what join strategy will be chosen until later in planning so this assumption
+   *   simplifies the analysis. Generally if one input is small enough that broadcast
+   *   join is viable then this formula will prefer to put that input on the right side
+   *   anyway.
+   * - processing a build row is twice as expensive as processing a probe row of the
+   *   same size.
+   * - the cost of processing each byte of a row has a fixed component (C) (e.g.
+   *   hashing and comparing the row) and a variable component (e.g. looking up the
+   *   hash table).
+   * - The variable component grows proportionally to the log of the build side, to
+   *   approximate the effect of accesses to the the hash table hitting slower levels
+   *   of the memory hierarchy.
+   *
+   * The estimated per-host cost of a hash join before and after inversion, measured in
+   * an arbitrary unit of time, is then:
+   *
+   *    (log_b(rhsBytes) + C) * (lhsBytes + 2 * rhsBytes) / lhsNumNodes
+   *    vs.
+   *    (log_b(lhsBytes) + C) * (rhsBytes + 2 * lhsBytes) / rhsNumNodes
+   *
+   * where lhsBytes = lhsCard * lhsAvgRowSize and rhsBytes = rhsCard * rhsAvgRowSize
+   *
+   * We choose b = 10 and C = 5 empirically because it seems to give reasonable
+   * results for a range of inputs. The model is not particularly sensitive to the
+   * parameters.
+   *
+   * If the parallelism of both sides is the same then this reduces to comparing
+   * the size of input on both sides. Otherwise, if inverting a hash join reduces
+   * parallelism significantly, then a significant difference between lhs and rhs
+   * bytes is needed to justify inversion.
+   */
+  private boolean isInvertedJoinCheaper(JoinNode joinNode, boolean isLocalPlan) {
+    long lhsCard = joinNode.getChild(0).getCardinality();
+    long rhsCard = joinNode.getChild(1).getCardinality();
+    // Need cardinality estimates to make a decision.
+    if (lhsCard == -1 || rhsCard == -1) return false;
+    double lhsBytes = lhsCard * joinNode.getChild(0).getAvgRowSize();
+    double rhsBytes = rhsCard * joinNode.getChild(1).getAvgRowSize();
+    if (joinNode instanceof NestedLoopJoinNode) {
+      // For NLJ, simply try to minimize the size of the build side, since it needs to
+      // be broadcast to all participating nodes.
+      return lhsBytes < rhsBytes;
+    }
+    Preconditions.checkState(joinNode instanceof HashJoinNode);
+    int lhsNumNodes = isLocalPlan ? 1 : joinNode.getChild(0).getNumNodes();
+    int rhsNumNodes = isLocalPlan ? 1 : joinNode.getChild(1).getNumNodes();
+    // Need parallelism to determine whether inverting a hash join is profitable.
+    if (lhsNumNodes <= 0 || rhsNumNodes <= 0) return false;
+
+    final long CONSTANT_COST_PER_BYTE = 5;
+    // Add 1 to the log argument to avoid taking log of 0.
+    double totalCost =
+        (Math.log10(rhsBytes + 1) + CONSTANT_COST_PER_BYTE) * (lhsBytes + 2 * rhsBytes);
+    double invertedTotalCost =
+        (Math.log10(lhsBytes + 1) + CONSTANT_COST_PER_BYTE) * (rhsBytes + 2 * lhsBytes);
+    double perNodeCost = totalCost / lhsNumNodes;
+    double invertedPerNodeCost = invertedTotalCost / rhsNumNodes;
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("isInvertedJoinCheaper() " + TupleId.printIds(joinNode.getTupleIds()));
+      LOG.trace("lhsCard " + lhsCard + " lhsBytes " + lhsBytes +
+          " lhsNumNodes " + lhsNumNodes);
+      LOG.trace("rhsCard " + rhsCard + " rhsBytes " + rhsBytes +
+          " rhsNumNodes " + rhsNumNodes);
+      LOG.trace("cost " + perNodeCost + " invCost " + invertedPerNodeCost);
+      LOG.trace("INVERT? " + (invertedPerNodeCost < perNodeCost));
+    }
+    return invertedPerNodeCost < perNodeCost;
   }
 
   /**

@@ -25,9 +25,9 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
-import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.TreeNode;
+import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.planner.PlanNode.ExecPhaseResourceProfiles;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPartitionType;
@@ -38,7 +38,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -105,10 +104,14 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   // if the output is UNPARTITIONED, it is being broadcast
   private DataPartition outputPartition_;
 
-  // Resource requirements and estimates for all instances of this plan fragment running
-  // on a host. Initialized with a dummy value. Gets set correctly in
+  // Resource requirements and estimates for an instance of this plan fragment.
+  // Initialized with a dummy value. Gets set correctly in
   // computeResourceProfile().
-  private ResourceProfile perHostResourceProfile_ = ResourceProfile.invalid();
+  private ResourceProfile resourceProfile_ = ResourceProfile.invalid();
+
+  // The total of initial reservations (in bytes) that will be claimed over the lifetime
+  // of this fragment. Computed in computeResourceProfile().
+  private long initialReservationTotalClaims_ = -1;
 
   /**
    * C'tor for fragment with specific partition; the output is by default broadcast.
@@ -156,13 +159,12 @@ public class PlanFragment extends TreeNode<PlanFragment> {
 
   /**
    * Do any final work to set up the ExchangeNodes and DataStreamSinks for this fragment.
-   * If this fragment is hash partitioned, ensures that the corresponding partition
-   * exprs of all hash-partitioning senders are cast to identical types.
+   * If this fragment has partitioned joins, ensures that the corresponding partition
+   * exprs of all hash-partitioning senders are cast to appropriate types.
    * Otherwise, the hashes generated for identical partition values may differ
    * among senders if the partition-expr types are not identical.
    */
-  public void finalizeExchanges(Analyzer analyzer)
-      throws InternalException, NotImplementedException {
+  public void finalizeExchanges(Analyzer analyzer) throws InternalException {
     if (destNode_ != null) {
       Preconditions.checkState(sink_ == null);
       // we're streaming to an exchange node
@@ -171,43 +173,51 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       sink_ = streamSink;
     }
 
-    if (!dataPartition_.isHashPartitioned()) return;
+    // Must be called regardless of this fragment's data partition. This fragment might
+    // be RANDOM partitioned due to a union. The union could still have partitioned joins
+    // in its child subtrees for which casts on the exchange senders are needed.
+    castPartitionedJoinExchanges(planRoot_, analyzer);
+  }
 
-    // This fragment is hash partitioned. Gather all exchange nodes and ensure
-    // that all hash-partitioning senders hash on exprs-values of the same type.
-    List<ExchangeNode> exchNodes = Lists.newArrayList();
-    planRoot_.collect(Predicates.instanceOf(ExchangeNode.class), exchNodes);
+  /**
+   * Recursively traverses the plan tree rooted at 'node' and casts the partition exprs
+   * of all senders feeding into a series of partitioned joins to compatible types.
+   */
+  private void castPartitionedJoinExchanges(PlanNode node, Analyzer analyzer) {
+    if (node instanceof HashJoinNode
+        && ((JoinNode) node).getDistributionMode() == DistributionMode.PARTITIONED) {
+      // Contains all exchange nodes in this fragment below the current join node.
+      List<ExchangeNode> exchNodes = Lists.newArrayList();
+      node.collect(ExchangeNode.class, exchNodes);
 
-    // Contains partition-expr lists of all hash-partitioning sender fragments.
-    List<List<Expr>> senderPartitionExprs = Lists.newArrayList();
-    for (ExchangeNode exchNode: exchNodes) {
-      Preconditions.checkState(!exchNode.getChildren().isEmpty());
-      PlanFragment senderFragment = exchNode.getChild(0).getFragment();
-      Preconditions.checkNotNull(senderFragment);
-      if (!senderFragment.getOutputPartition().isHashPartitioned()) continue;
-      List<Expr> partExprs = senderFragment.getOutputPartition().getPartitionExprs();
-      // All hash-partitioning senders must have compatible partition exprs, otherwise
-      // this fragment's data partition must not be hash partitioned.
-      Preconditions.checkState(
-          partExprs.size() == dataPartition_.getPartitionExprs().size());
-      senderPartitionExprs.add(partExprs);
-    }
+      // Contains partition-expr lists of all hash-partitioning sender fragments.
+      List<List<Expr>> senderPartitionExprs = Lists.newArrayList();
+      for (ExchangeNode exchNode: exchNodes) {
+        Preconditions.checkState(!exchNode.getChildren().isEmpty());
+        PlanFragment senderFragment = exchNode.getChild(0).getFragment();
+        Preconditions.checkNotNull(senderFragment);
+        if (!senderFragment.getOutputPartition().isHashPartitioned()) continue;
+        List<Expr> partExprs = senderFragment.getOutputPartition().getPartitionExprs();
+        senderPartitionExprs.add(partExprs);
+      }
 
-    // Cast all corresponding hash partition exprs of all hash-partitioning senders
-    // to their compatible types. Also cast the data partition's exprs for consistency,
-    // although not strictly necessary. They should already be type identical to the
-    // exprs of one of the senders and they are not directly used for hashing in the BE.
-    senderPartitionExprs.add(dataPartition_.getPartitionExprs());
-    try {
-      analyzer.castToUnionCompatibleTypes(senderPartitionExprs);
-    } catch (AnalysisException e) {
-      // Should never happen. Analysis should have ensured type compatibility already.
-      throw new IllegalStateException(e);
+      // Cast partition exprs of all hash-partitioning senders to their compatible types.
+      try {
+        analyzer.castToUnionCompatibleTypes(senderPartitionExprs);
+      } catch (AnalysisException e) {
+        // Should never happen. Analysis should have ensured type compatibility already.
+        throw new IllegalStateException(e);
+      }
+    } else {
+      // Recursively traverse plan nodes in this fragment.
+      for (PlanNode child: node.getChildren()) {
+        if (child.getFragment() == this) castPartitionedJoinExchanges(child, analyzer);
+      }
     }
   }
 
   /**
-   * Compute the peak resource profile for all instances of this fragment per host. Must
+   * Compute the peak resource profile for an instance of this fragment. Must
    * be called after all the plan nodes and sinks are added to the fragment and resource
    * profiles of all children fragments are computed.
    */
@@ -222,7 +232,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       // Resource consumption of fragments with join build sinks is included in the
       // parent fragment because the join node blocks waiting for the join build to
       // finish - see JoinNode.computeTreeResourceProfiles().
-      perHostResourceProfile_ = ResourceProfile.invalid();
+      resourceProfile_ = ResourceProfile.invalid();
       return;
     }
 
@@ -231,15 +241,17 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     // The sink is opened after the plan tree.
     ResourceProfile fInstancePostOpenProfile =
         planTreeProfile.postOpenProfile.sum(sink_.getResourceProfile());
-    ResourceProfile fInstanceProfile =
+    resourceProfile_ =
         planTreeProfile.duringOpenProfile.max(fInstancePostOpenProfile);
-    int numInstances = getNumInstancesPerHost(analyzer.getQueryOptions().getMt_dop());
-    perHostResourceProfile_ = fInstanceProfile.multiply(numInstances);
+
+    initialReservationTotalClaims_ = sink_.getResourceProfile().getMinReservationBytes();
+    for (PlanNode node: collectPlanNodes()) {
+      initialReservationTotalClaims_ +=
+          node.getNodeResourceProfile().getMinReservationBytes();
+    }
   }
 
-  public ResourceProfile getPerHostResourceProfile() {
-    return perHostResourceProfile_;
-  }
+  public ResourceProfile getResourceProfile() { return resourceProfile_; }
 
   /**
    * Return the number of nodes on which the plan fragment will execute.
@@ -306,6 +318,14 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     }
     if (sink_ != null) result.setOutput_sink(sink_.toThrift());
     result.setPartition(dataPartition_.toThrift());
+    if (resourceProfile_.isValid()) {
+      Preconditions.checkArgument(initialReservationTotalClaims_ > -1);
+      result.setMin_reservation_bytes(resourceProfile_.getMinReservationBytes());
+      result.setInitial_reservation_total_claims(initialReservationTotalClaims_);
+    } else {
+      result.setMin_reservation_bytes(0);
+      result.setInitial_reservation_total_claims(0);
+    }
     return result;
   }
 
@@ -386,7 +406,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     if (sink_ instanceof JoinBuildSink) {
       builder.append("included in parent fragment");
     } else {
-      builder.append(perHostResourceProfile_.getExplainString());
+      builder.append(resourceProfile_.multiply(getNumInstancesPerHost(mt_dop))
+          .getExplainString());
     }
     builder.append("\n");
     return builder.toString();

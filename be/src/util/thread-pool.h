@@ -38,24 +38,23 @@ class ThreadPool : public CacheLineAligned {
   /// process.
   typedef boost::function<void (int thread_id, const T& workitem)> WorkFunction;
 
-  /// Creates a new thread pool and start num_threads threads.
+  /// Creates a new thread pool without starting any threads. Code must call
+  /// Init() on this thread pool before any calls to Offer().
   ///  -- num_threads: how many threads are part of this pool
   ///  -- queue_size: the maximum size of the queue on which work items are offered. If the
   ///     queue exceeds this size, subsequent calls to Offer will block until there is
   ///     capacity available.
   ///  -- work_function: the function to run every time an item is consumed from the queue
+  ///  -- fault_injection_eligible - If set to true, allow fault injection at this
+  ///     callsite (see thread_creation_fault_injection). If set to false, fault
+  ///     injection is diabled at this callsite. Thread creation sites that crash
+  ///     Impala or abort startup must have this set to false.
   ThreadPool(const std::string& group, const std::string& thread_prefix,
-      uint32_t num_threads, uint32_t queue_size, const WorkFunction& work_function)
-    : work_function_(work_function),
-      work_queue_(queue_size),
-      shutdown_(false) {
-    for (int i = 0; i < num_threads; ++i) {
-      std::stringstream threadname;
-      threadname << thread_prefix << "(" << i + 1 << ":" << num_threads << ")";
-      threads_.AddThread(new Thread(group, threadname.str(),
-          boost::bind<void>(boost::mem_fn(&ThreadPool<T>::WorkerThread), this, i)));
-    }
-  }
+      uint32_t num_threads, uint32_t queue_size, const WorkFunction& work_function,
+      bool fault_injection_eligible = false)
+    : group_(group), thread_prefix_(thread_prefix), num_threads_(num_threads),
+      work_function_(work_function), work_queue_(queue_size),
+      fault_injection_eligible_(fault_injection_eligible) {}
 
   /// Destructor ensures that all threads are terminated before this object is freed
   /// (otherwise they may continue to run and reference member variables)
@@ -64,8 +63,32 @@ class ThreadPool : public CacheLineAligned {
     Join();
   }
 
+  /// Create the threads needed for this ThreadPool. Returns an error on any
+  /// error spawning the threads.
+  Status Init() {
+    for (int i = 0; i < num_threads_; ++i) {
+      std::stringstream threadname;
+      threadname << thread_prefix_ << "(" << i + 1 << ":" << num_threads_ << ")";
+      std::unique_ptr<Thread> t;
+      Status status = Thread::Create(group_, threadname.str(),
+          boost::bind<void>(boost::mem_fn(&ThreadPool<T>::WorkerThread), this, i), &t,
+          fault_injection_eligible_);
+      if (!status.ok()) {
+        // The thread pool initialization failed. Shutdown any threads that were
+        // spawned. Note: Shutdown() and Join() are safe to call multiple times.
+        Shutdown();
+        Join();
+        return status;
+      }
+      threads_.AddThread(std::move(t));
+    }
+    initialized_ = true;
+    return Status::OK();
+  }
+
   /// Blocking operation that puts a work item on the queue. If the queue is full, blocks
-  /// until there is capacity available.
+  /// until there is capacity available. The ThreadPool must be initialized before
+  /// calling this method.
   //
   /// 'work' is copied into the work queue, but may be referenced at any time in the
   /// future. Therefore the caller needs to ensure that any data referenced by work (if T
@@ -77,6 +100,7 @@ class ThreadPool : public CacheLineAligned {
   /// (which typically means that the thread pool has already been shut down).
   template <typename V>
   bool Offer(V&& work) {
+    DCHECK(initialized_);
     return work_queue_.BlockingPut(std::forward<V>(work));
   }
 
@@ -108,6 +132,8 @@ class ThreadPool : public CacheLineAligned {
   void DrainAndShutdown() {
     {
       boost::unique_lock<boost::mutex> l(lock_);
+      // If the ThreadPool is not initialized, then the queue must be empty.
+      DCHECK(initialized_ || work_queue_.Size() == 0);
       while (work_queue_.Size() != 0) {
         empty_cv_.wait(l);
       }
@@ -141,6 +167,15 @@ class ThreadPool : public CacheLineAligned {
     return shutdown_;
   }
 
+  /// Group string to tag threads for this pool
+  const std::string group_;
+
+  /// Thread name prefix
+  const std::string thread_prefix_;
+
+  /// The number of threads to start in this pool
+  uint32_t num_threads_;
+
   /// User-supplied method to call to process each work item.
   WorkFunction work_function_;
 
@@ -148,14 +183,21 @@ class ThreadPool : public CacheLineAligned {
   /// FIFO order.
   BlockingQueue<T> work_queue_;
 
+  /// Whether this ThreadPool will tolerate failure by aborting a query. This means
+  /// it is safe to inject errors for Init().
+  bool fault_injection_eligible_;
+
   /// Collection of worker threads that process work from the queue.
   ThreadGroup threads_;
 
   /// Guards shutdown_ and empty_cv_
   boost::mutex lock_;
 
+  /// Set to true when Init() has finished spawning the threads.
+  bool initialized_ = false;
+
   /// Set to true when threads should stop doing work and terminate.
-  bool shutdown_;
+  bool shutdown_ = false;
 
   /// Signalled when the queue becomes empty
   boost::condition_variable empty_cv_;

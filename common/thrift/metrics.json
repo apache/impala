@@ -702,6 +702,16 @@
     "key": "impala.thrift-server.beeswax-frontend.total-connections"
   },
   {
+    "description": "The number of Beeswax API connections to this Impala Daemon that have been accepted and are waiting to be setup.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Beeswax API Connections Queued for Setup",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.beeswax-frontend.connection-setup-queue-size"
+  },
+  {
     "description": "The number of active HiveServer2 API connections to this Impala Daemon.",
     "contexts": [
       "IMPALAD"
@@ -720,6 +730,16 @@
     "units": "UNIT",
     "kind": "COUNTER",
     "key": "impala.thrift-server.hiveserver2-frontend.total-connections"
+  },
+  {
+    "description": "The number of HiveServer2 API connections to this Impala Daemon that have been accepted and are waiting to be setup.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HiveServer2 API Connections Queued for Setup",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.hiveserver2-frontend.connection-setup-queue-size"
   },
   {
     "description": "The amount of memory freed by the last memory tracker garbage collection.",
@@ -1114,16 +1134,16 @@
     "key": "tcmalloc.total-bytes-reserved"
   },
   {
-    "description": "Bytes allocated from Address Sanitizer's malloc (Address Sanitizer debug builds only)",
+    "description": "Bytes allocated from the sanitizer malloc (Sanitizer debug builds only)",
     "contexts": [
       "STATESTORE",
       "CATALOGSERVER",
       "IMPALAD"
     ],
-    "label": "Address Sanitizer Malloc Bytes Allocated",
+    "label": "Sanitizer Malloc Bytes Allocated",
     "units": "BYTES",
     "kind": "GAUGE",
-    "key": "asan-total-bytes-allocated"
+    "key": "sanitizer-total-bytes-allocated"
   },
   {
     "description": "Maximum allowed bytes allocated by the buffer pool.",
@@ -1156,6 +1176,16 @@
     "key": "buffer-pool.reserved"
   },
   {
+    "description": "Total bytes of buffer reservations by Impala subsystems that are currently unused",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool Unused Reservation Bytes.",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "buffer-pool.unused-reservation-bytes"
+  },
+  {
     "description": "Total number of free buffers cached in the buffer pool.",
     "contexts": [
       "IMPALAD"
@@ -1174,6 +1204,16 @@
     "units": "BYTES",
     "kind": "GAUGE",
     "key": "buffer-pool.free-buffer-bytes"
+  },
+  {
+    "description": "Limit on number of clean pages cached in the buffer pool.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool Clean Pages Limit.",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "buffer-pool.clean-pages-limit"
   },
   {
     "description": "Total number of clean pages cached in the buffer pool.",
@@ -1206,6 +1246,90 @@
     "units": "BYTES",
     "kind": "GAUGE",
     "key": "memory.total-used"
+  },
+  {
+    "description": "Total number of memory mappings in this process.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Number of memory mappings.",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "memory.num-maps"
+  },
+  {
+    "description": "Total bytes of memory mappings in this process (the virtual memory size).",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Total Virtual Memory.",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "memory.mapped-bytes"
+  },
+  {
+    "description": "Resident set size (RSS) of this process, including TCMalloc, buffer pool and Jvm.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Resident set size.",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "memory.rss"
+  },
+  {
+    "description": "Total bytes of anonymous (a.k.a. transparent) huge pages used by this process.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Anonymous Huge Pages.",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "memory.anon-huge-page-bytes"
+  },
+  {
+    "description": "The system-wide 'enabled' setting for Transparent Huge Pages.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Transparent Huge Pages Enabled.",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "memory.thp.enabled"
+  },
+  {
+    "description": "The system-wide 'defrag' setting for Transparent Huge Pages.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Transparent Huge Pages Defrag Enabled.",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "memory.thp.defrag"
+  },
+  {
+    "description": "The system-wide 'defrag' setting for khugepaged.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Khugepaged Defrag Enabled.",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "memory.thp.khugepaged-defrag"
   },
   {
     "description": "The number of running threads in this process.",
@@ -1438,5 +1562,17 @@
     "units": "NONE",
     "kind": "COUNTER",
     "key": "total-senders-timedout-waiting-for-recvr-creation"
+  },
+  {
+    "description": "A version string identifying the Kudu client",
+    "contexts": [
+      "IMPALAD",
+      "CATALOGSERVER",
+      "STATESTORE"
+    ],
+    "label": "Kudu Client Version",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "kudu-client.version"
   }
 ]

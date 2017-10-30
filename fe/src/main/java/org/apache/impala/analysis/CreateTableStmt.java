@@ -51,8 +51,14 @@ public class CreateTableStmt extends StatementBase {
   final static String KUDU_STORAGE_HANDLER_ERROR_MESSAGE = "Kudu tables must be"
       + " specified using 'STORED AS KUDU'.";
 
+  /////////////////////////////////////////
+  // BEGIN: Members that need to be reset()
+
   // Table parameters specified in a CREATE TABLE statement
   private final TableDef tableDef_;
+
+  // END: Members that need to be reset()
+  /////////////////////////////////////////
 
   // Table owner. Set during analysis
   private String owner_;
@@ -68,6 +74,12 @@ public class CreateTableStmt extends StatementBase {
   CreateTableStmt(CreateTableStmt other) {
     this(other.tableDef_);
     owner_ = other.owner_;
+  }
+
+  @Override
+  public void reset() {
+    super.reset();
+    tableDef_.reset();
   }
 
   @Override
@@ -320,8 +332,8 @@ public class CreateTableStmt extends StatementBase {
     if (!getKuduPartitionParams().isEmpty()) {
       analyzeKuduPartitionParams(analyzer);
     } else {
-      throw new AnalysisException("Table partitioning must be specified for " +
-          "managed Kudu tables.");
+      analyzer.addWarning(
+          "Unpartitioned Kudu tables are inefficient for large data sizes.");
     }
   }
 

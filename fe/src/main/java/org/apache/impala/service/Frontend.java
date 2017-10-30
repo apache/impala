@@ -58,6 +58,7 @@ import org.apache.impala.analysis.TableName;
 import org.apache.impala.analysis.TruncateStmt;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizeableTable;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
@@ -670,7 +671,7 @@ public class Frontend {
       return true;
     }
     PrivilegeRequest request = new PrivilegeRequestBuilder()
-        .any().onAnyTable(db.getName()).toRequest();
+        .any().onAnyColumn(db.getName(), AuthorizeableTable.ANY_TABLE_NAME).toRequest();
     return authzChecker_.get().hasAccess(user, request);
   }
 
@@ -1005,7 +1006,7 @@ public class Frontend {
     }
 
     // Compute resource requirements of the final plans.
-    planner.computeResourceReqs(planRoots, result);
+    planner.computeResourceReqs(planRoots, queryCtx, result);
 
     // create per-plan exec info;
     // also assemble list of names of tables with missing or corrupt stats for

@@ -21,6 +21,7 @@
 
 #include <string>
 #include "exec/exec-node.h"
+#include "exec/filter-context.h"
 #include "util/runtime-profile.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 
@@ -82,10 +83,15 @@ class ScanNode : public ExecNode {
   ScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
     : ExecNode(pool, tnode, descs),
       scan_range_params_(NULL),
-      active_scanner_thread_counter_(TUnit::UNIT, 0),
-      active_hdfs_read_thread_counter_(TUnit::UNIT, 0) {}
+      active_scanner_thread_counter_(TUnit::UNIT, 0) {}
 
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) WARN_UNUSED_RESULT;
   virtual Status Prepare(RuntimeState* state) WARN_UNUSED_RESULT;
+  virtual Status Open(RuntimeState* state) WARN_UNUSED_RESULT;
+
+  /// Stops all periodic counters and calls ExecNode::Close(). Subclasses of ScanNode can
+  /// start periodic counters and rely on this function stopping them.
+  virtual void Close(RuntimeState* state);
 
   /// This should be called before Prepare(), and the argument must be not destroyed until
   /// after Prepare().
@@ -95,8 +101,12 @@ class ScanNode : public ExecNode {
 
   virtual bool IsScanNode() const { return true; }
 
+  RuntimeState* runtime_state() { return runtime_state_; }
   RuntimeProfile::Counter* bytes_read_counter() const { return bytes_read_counter_; }
   RuntimeProfile::Counter* rows_read_counter() const { return rows_read_counter_; }
+  RuntimeProfile::Counter* collection_items_read_counter() const {
+    return collection_items_read_counter_;
+  }
   RuntimeProfile::Counter* read_timer() const { return read_timer_; }
   RuntimeProfile::Counter* total_throughput_counter() const {
     return total_throughput_counter_;
@@ -123,6 +133,7 @@ class ScanNode : public ExecNode {
   /// names of ScanNode common counters
   static const std::string BYTES_READ_COUNTER;
   static const std::string ROWS_READ_COUNTER;
+  static const std::string COLLECTION_ITEMS_READ_COUNTER;
   static const std::string TOTAL_HDFS_READ_TIMER;
   static const std::string TOTAL_HBASE_READ_TIMER;
   static const std::string TOTAL_THROUGHPUT_COUNTER;
@@ -136,15 +147,26 @@ class ScanNode : public ExecNode {
   static const std::string AVERAGE_HDFS_READ_THREAD_CONCURRENCY;
   static const std::string NUM_SCANNER_THREADS_STARTED;
 
+  const std::vector<ScalarExpr*>& filter_exprs() const { return filter_exprs_; }
+
+  const std::vector<FilterContext>& filter_ctxs() const { return filter_ctxs_; }
+
  protected:
+  RuntimeState* runtime_state_ = nullptr;
+
   /// The scan ranges this scan node is responsible for. Not owned.
   const std::vector<TScanRangeParams>* scan_range_params_;
 
   RuntimeProfile::Counter* bytes_read_counter_; // # bytes read from the scanner
   /// Time series of the bytes_read_counter_
   RuntimeProfile::TimeSeriesCounter* bytes_read_timeseries_counter_;
-  /// # rows/tuples read from the scanner (including those discarded by EvalConjucts())
+  /// # top-level rows/tuples read from the scanner
+  /// (including those discarded by EvalConjucts())
   RuntimeProfile::Counter* rows_read_counter_;
+  /// # items the scanner read into CollectionValues. For example, for schema
+  /// array<struct<B: INT, array<C: INT>> and tuple
+  /// [(2, [(3)]), (4, [])] this counter will be 3: (2, [(3)]), (3) and (4, [])
+  RuntimeProfile::Counter* collection_items_read_counter_;
   RuntimeProfile::Counter* read_timer_; // total read time
   /// Wall based aggregate read throughput [bytes/sec]
   RuntimeProfile::Counter* total_throughput_counter_;
@@ -163,18 +185,21 @@ class ScanNode : public ExecNode {
   /// This should be created in Open and stopped when all the scanner threads are done.
   RuntimeProfile::Counter* average_scanner_thread_concurrency_;
 
-  /// The number of active hdfs reading threads reading for this node.
-  RuntimeProfile::Counter active_hdfs_read_thread_counter_;
-
-  /// Average number of active hdfs reading threads
-  /// This should be created in Open and stopped when all the scanner threads are done.
-  RuntimeProfile::Counter* average_hdfs_read_thread_concurrency_;
-
   RuntimeProfile::Counter* num_scanner_threads_started_counter_;
 
-  /// HDFS read thread concurrency bucket: bucket[i] refers to the number of sample
-  /// taken where there are i concurrent hdfs read thread running
-  std::vector<RuntimeProfile::Counter*> hdfs_read_thread_concurrency_bucket_;
+  /// Expressions to evaluate the input rows for filtering against runtime filters.
+  std::vector<ScalarExpr*> filter_exprs_;
+
+  /// List of contexts for expected runtime filters for this scan node. These contexts are
+  /// cloned by individual scanners to be used in multi-threaded contexts, passed through
+  /// the per-scanner ScannerContext. Correspond to exprs in 'filter_exprs_'.
+  std::vector<FilterContext> filter_ctxs_;
+
+  /// Waits for runtime filters to arrive, checking every 20ms. Max wait time is specified
+  /// by the 'runtime_filter_wait_time_ms' flag, which is overridden by the query option
+  /// of the same name. Returns true if all filters arrived within the time limit (as
+  /// measured from the time of RuntimeFilterBank::RegisterFilter()), false otherwise.
+  bool WaitForRuntimeFilters();
 };
 
 }

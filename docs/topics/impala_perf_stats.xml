@@ -354,15 +354,6 @@ show column stats year_month_day;
 +-----------+---------+------------------+--------+----------+-------------------+
 </codeblock>
 
-      <note>
-        Partitioned tables can grow so large that scanning the entire table, as the <codeph>COMPUTE STATS</codeph>
-        statement does, is impractical just to update the statistics for a new partition. The standard
-        <codeph>COMPUTE STATS</codeph> statement might take hours, or even days. That situation is where you switch
-        to using incremental statistics, a feature available in <keyword keyref="impala21_full"/> and higher.
-        See <xref href="impala_perf_stats.xml#perf_stats_incremental"/> for details about this feature
-        and the <codeph>COMPUTE INCREMENTAL STATS</codeph> syntax.
-      </note>
-
       <p conref="../shared/impala_common.xml#common/hive_column_stats_caveat"/>
     </conbody>
   </concept>
@@ -387,6 +378,12 @@ show column stats year_month_day;
         entire table each time.
       </p>
 
+      <note type="important">
+        <p conref="../shared/impala_common.xml#common/cs_or_cis"/>
+        <p conref="../shared/impala_common.xml#common/incremental_stats_after_full"/>
+        <p conref="../shared/impala_common.xml#common/incremental_stats_caveats"/>
+      </note>
+
       <p>
         You can also compute or drop statistics for a single partition by including a <codeph>PARTITION</codeph>
         clause in the <codeph>COMPUTE INCREMENTAL STATS</codeph> or <codeph>DROP INCREMENTAL STATS</codeph>
@@ -400,9 +397,9 @@ show column stats year_month_day;
       <ul>
         <li>
           <p>
-            If you have an existing partitioned table for which you have already computed statistics, issuing
-            <codeph>COMPUTE INCREMENTAL STATS</codeph> without a partition clause causes Impala to rescan the
-            entire table. Once the incremental statistics are computed, any future <codeph>COMPUTE INCREMENTAL
+            If you have a partitioned table for which you have already run a regular <codeph>COMPUTE STATS</codeph>
+            statement, issuing <codeph>COMPUTE INCREMENTAL STATS</codeph> without a partition clause causes Impala
+            to rescan the entire table. Once the incremental statistics are computed, any future <codeph>COMPUTE INCREMENTAL
             STATS</codeph> statements only scan any new partitions and any partitions where you performed
             <codeph>DROP INCREMENTAL STATS</codeph>.
           </p>

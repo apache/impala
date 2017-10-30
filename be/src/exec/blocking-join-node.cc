@@ -153,13 +153,7 @@ void BlockingJoinNode::ProcessBuildInputAsync(
     *status = child(1)->Open(state);
   }
   if (status->ok()) *status = AcquireResourcesForBuild(state);
-  if (status->ok()) {
-    if (build_sink == nullptr){
-      *status = ProcessBuildInput(state);
-    } else {
-      *status = SendBuildInputToSink<true>(state, build_sink);
-    }
-  }
+  if (status->ok()) *status = SendBuildInputToSink<true>(state, build_sink);
   // IMPALA-1863: If the build-side thread failed, then we need to close the right
   // (build-side) child to avoid a potential deadlock between fragment instances.  This
   // is safe to do because while the build may have partially completed, it will not be
@@ -199,10 +193,15 @@ Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
     runtime_profile()->AppendExecOption("Join Build-Side Prepared Asynchronously");
     string thread_name = Substitute("join-build-thread (finst:$0, plan-node-id:$1)",
         PrintId(state->fragment_instance_id()), id());
-    Thread build_thread(FragmentInstanceState::FINST_THREAD_GROUP_NAME, thread_name,
-        [this, state, build_sink, status=&build_side_status]() {
+    unique_ptr<Thread> build_thread;
+    Status thread_status = Thread::Create(FragmentInstanceState::FINST_THREAD_GROUP_NAME,
+        thread_name, [this, state, build_sink, status=&build_side_status]() {
           ProcessBuildInputAsync(state, build_sink, status);
-        });
+        }, &build_thread, true);
+    if (!thread_status.ok()) {
+      state->resource_pool()->ReleaseThreadToken(false);
+      return thread_status;
+    }
     // Open the left child so that it may perform any initialisation in parallel.
     // Don't exit even if we see an error, we still need to wait for the build thread
     // to finish.
@@ -213,7 +212,7 @@ Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
 
     // Blocks until ProcessBuildInput has returned, after which the build side structures
     // are fully constructed.
-    build_thread.Join();
+    build_thread->Join();
     RETURN_IF_ERROR(build_side_status);
     RETURN_IF_ERROR(open_status);
   } else if (IsInSubplan()) {
@@ -226,11 +225,7 @@ Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
     RETURN_IF_ERROR(child(0)->Open(state));
     RETURN_IF_ERROR(child(1)->Open(state));
     RETURN_IF_ERROR(AcquireResourcesForBuild(state));
-    if (build_sink == NULL) {
-      RETURN_IF_ERROR(ProcessBuildInput(state));
-    } else {
-      RETURN_IF_ERROR(SendBuildInputToSink<false>(state, build_sink));
-    }
+    RETURN_IF_ERROR(SendBuildInputToSink<false>(state, build_sink));
   } else {
     // The left/right child never overlap. The overlap stops here.
     built_probe_overlap_stop_watch_.SetTimeCeiling();
@@ -238,11 +233,7 @@ Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
     // can release any resources only used during its Open().
     RETURN_IF_ERROR(child(1)->Open(state));
     RETURN_IF_ERROR(AcquireResourcesForBuild(state));
-    if (build_sink == NULL) {
-      RETURN_IF_ERROR(ProcessBuildInput(state));
-    } else {
-      RETURN_IF_ERROR(SendBuildInputToSink<false>(state, build_sink));
-    }
+    RETURN_IF_ERROR(SendBuildInputToSink<false>(state, build_sink));
     if (CanCloseBuildEarly()) child(1)->Close(state);
     RETURN_IF_ERROR(child(0)->Open(state));
   }

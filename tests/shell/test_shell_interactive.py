@@ -232,6 +232,42 @@ class TestImpalaShellInteractive(object):
       assert query in result.stderr, "'%s' not in '%s'" % (query, result.stderr)
 
   @pytest.mark.execute_serially
+  def test_rerun(self):
+    """Smoke test for the 'rerun' command"""
+    # Clear history first.
+    if os.path.exists(SHELL_HISTORY_FILE):
+      os.remove(SHELL_HISTORY_FILE)
+    assert not os.path.exists(SHELL_HISTORY_FILE)
+    child_proc = pexpect.spawn(SHELL_CMD)
+    child_proc.expect(":21000] >")
+    self._expect_with_cmd(child_proc, "@1", ("Command index out of range"))
+    self._expect_with_cmd(child_proc, "rerun -1", ("Command index out of range"))
+    self._expect_with_cmd(child_proc, "select 'first_command'", ("first_command"))
+    self._expect_with_cmd(child_proc, "rerun 1", ("first_command"))
+    self._expect_with_cmd(child_proc, "@ -1", ("first_command"))
+    self._expect_with_cmd(child_proc, "select 'second_command'", ("second_command"))
+    child_proc.sendline('history;')
+    child_proc.expect(":21000] >")
+    assert '[1]: select \'first_command\';' in child_proc.before;
+    assert '[2]: select \'second_command\';' in child_proc.before;
+    assert '[3]: history;' in child_proc.before;
+    # Rerunning command should not add an entry into history.
+    assert '[4]' not in child_proc.before;
+    self._expect_with_cmd(child_proc, "@0", ("Command index out of range"))
+    self._expect_with_cmd(child_proc, "rerun   4", ("Command index out of range"))
+    self._expect_with_cmd(child_proc, "@-4", ("Command index out of range"))
+    self._expect_with_cmd(child_proc, " @ 3 ", ("second_command"))
+    self._expect_with_cmd(child_proc, "@-3", ("first_command"))
+    self._expect_with_cmd(child_proc, "@",
+                          ("Command index to be rerun must be an integer."))
+    self._expect_with_cmd(child_proc, "@1foo",
+                          ("Command index to be rerun must be an integer."))
+    self._expect_with_cmd(child_proc, "@1 2",
+                          ("Command index to be rerun must be an integer."))
+    self._expect_with_cmd(child_proc, "rerun1", ("Syntax error"))
+    child_proc.sendline('quit;')
+
+  @pytest.mark.execute_serially
   def test_tip(self):
     """Smoke test for the TIP command"""
     # Temporarily add impala_shell module to path to get at TIPS list for verification
@@ -258,14 +294,18 @@ class TestImpalaShellInteractive(object):
     try:
       # Change working dir so that SOURCE command in shell.cmds can find shell2.cmds.
       os.chdir("%s/tests/shell/" % os.environ['IMPALA_HOME'])
-      result = run_impala_shell_interactive("source shell.cmds;")
+      # IMPALA-5416: Test that a command following 'source' won't be run twice.
+      result = run_impala_shell_interactive("source shell.cmds;select \"second command\";")
       assert "Query: use FUNCTIONAL" in result.stderr
       assert "Query: show TABLES" in result.stderr
       assert "alltypes" in result.stdout
-
       # This is from shell2.cmds, the result of sourcing a file from a sourced file.
       assert "select VERSION()" in result.stderr
       assert "version()" in result.stdout
+      assert len(re.findall("'second command'", result.stdout)) == 1
+      # IMPALA-5416: Test that two source commands on a line won't crash the shell.
+      result = run_impala_shell_interactive("source shell.cmds;source shell.cmds;")
+      assert len(re.findall("version\(\)", result.stdout)) == 2
     finally:
       os.chdir(cwd)
 

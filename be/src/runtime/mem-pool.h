@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "common/logging.h"
+#include "gutil/dynamic_annotations.h"
 #include "util/bit-util.h"
 
 namespace impala {
@@ -68,8 +69,7 @@ class MemTracker;
 /// 28K of chunks have been allocated (chunk sizes: 4K, 8K, 16K)
 /// We track total and peak allocated bytes. At this point they would be the same:
 /// 28k bytes.  A call to Clear will return the allocated memory so
-/// total_allocate_bytes_
-/// becomes 0 while peak_allocate_bytes_ remains at 28k.
+/// total_allocated_bytes_ becomes 0.
 ///     p->Clear();
 /// the entire 1st chunk is returned:
 ///     .. = p->Allocate(4 * 1024);
@@ -81,8 +81,7 @@ class MemTracker;
 ///      MemPool* p2 = new MemPool();
 /// the new mempool receives all chunks containing data from p
 ///      p2->AcquireData(p, false);
-/// At this point p.total_allocated_bytes_ would be 0 while p.peak_allocated_bytes_
-/// remains unchanged.
+/// At this point p.total_allocated_bytes_ would be 0.
 /// The one remaining (empty) chunk is released:
 ///    delete p;
 
@@ -119,6 +118,13 @@ class MemPool {
     return Allocate<true>(size, alignment);
   }
 
+  /// Same as TryAllocate() except returned memory is not aligned at all.
+  uint8_t* TryAllocateUnaligned(int64_t size) noexcept {
+    // Call templated implementation directly so that it is inlined here and the
+    // alignment logic can be optimised out.
+    return Allocate<true>(size, 1);
+  }
+
   /// Returns 'byte_size' to the current chunk back to the mem pool. This can
   /// only be used to return either all or part of the previous allocation returned
   /// by Allocate().
@@ -128,6 +134,7 @@ class MemPool {
     ChunkInfo& info = chunks_[current_chunk_idx_];
     DCHECK_GE(info.allocated_bytes, byte_size);
     info.allocated_bytes -= byte_size;
+    ASAN_POISON_MEMORY_REGION(info.data + info.allocated_bytes, byte_size);
     total_allocated_bytes_ -= byte_size;
   }
 
@@ -151,7 +158,6 @@ class MemPool {
   std::string DebugString();
 
   int64_t total_allocated_bytes() const { return total_allocated_bytes_; }
-  int64_t peak_allocated_bytes() const { return peak_allocated_bytes_; }
   int64_t total_reserved_bytes() const { return total_reserved_bytes_; }
   MemTracker* mem_tracker() { return mem_tracker_; }
 
@@ -206,9 +212,6 @@ class MemPool {
   /// sum of allocated_bytes_
   int64_t total_allocated_bytes_;
 
-  /// Maximum number of bytes allocated from this pool at one time.
-  int64_t peak_allocated_bytes_;
-
   /// sum of all bytes allocated in chunks_
   int64_t total_reserved_bytes_;
 
@@ -238,39 +241,41 @@ class MemPool {
   }
 
   template <bool CHECK_LIMIT_FIRST>
-  uint8_t* Allocate(int64_t size, int alignment) noexcept {
+  uint8_t* ALWAYS_INLINE Allocate(int64_t size, int alignment) noexcept {
     DCHECK_GE(size, 0);
     if (UNLIKELY(size == 0)) return reinterpret_cast<uint8_t*>(&zero_length_region_);
 
-    bool fits_in_chunk = false;
     if (current_chunk_idx_ != -1) {
+      ChunkInfo& info = chunks_[current_chunk_idx_];
       int64_t aligned_allocated_bytes = BitUtil::RoundUpToPowerOf2(
-          chunks_[current_chunk_idx_].allocated_bytes, alignment);
-      if (aligned_allocated_bytes + size <= chunks_[current_chunk_idx_].size) {
+          info.allocated_bytes, alignment);
+      if (aligned_allocated_bytes + size <= info.size) {
         // Ensure the requested alignment is respected.
-        total_allocated_bytes_ +=
-            aligned_allocated_bytes - chunks_[current_chunk_idx_].allocated_bytes;
-        chunks_[current_chunk_idx_].allocated_bytes = aligned_allocated_bytes;
-        fits_in_chunk = true;
+        int64_t padding = aligned_allocated_bytes - info.allocated_bytes;
+        uint8_t* result = info.data + aligned_allocated_bytes;
+        ASAN_UNPOISON_MEMORY_REGION(result, size);
+        DCHECK_LE(info.allocated_bytes + size, info.size);
+        info.allocated_bytes += padding + size;
+        total_allocated_bytes_ += padding + size;
+        DCHECK_LE(current_chunk_idx_, chunks_.size() - 1);
+        return result;
       }
     }
 
-    if (!fits_in_chunk) {
-      // If we couldn't allocate a new chunk, return NULL. malloc() guarantees alignment
-      // of alignof(std::max_align_t), so we do not need to do anything additional to
-      // guarantee alignment.
-      static_assert(
-          INITIAL_CHUNK_SIZE >= alignof(std::max_align_t), "Min chunk size too low");
-      if (UNLIKELY(!FindChunk(size, CHECK_LIMIT_FIRST))) return NULL;
-    }
+    // If we couldn't allocate a new chunk, return NULL. malloc() guarantees alignment
+    // of alignof(std::max_align_t), so we do not need to do anything additional to
+    // guarantee alignment.
+    static_assert(
+        INITIAL_CHUNK_SIZE >= alignof(std::max_align_t), "Min chunk size too low");
+    if (UNLIKELY(!FindChunk(size, CHECK_LIMIT_FIRST))) return NULL;
 
     ChunkInfo& info = chunks_[current_chunk_idx_];
     uint8_t* result = info.data + info.allocated_bytes;
+    ASAN_UNPOISON_MEMORY_REGION(result, size);
     DCHECK_LE(info.allocated_bytes + size, info.size);
     info.allocated_bytes += size;
     total_allocated_bytes_ += size;
     DCHECK_LE(current_chunk_idx_, chunks_.size() - 1);
-    peak_allocated_bytes_ = std::max(total_allocated_bytes_, peak_allocated_bytes_);
     return result;
   }
 };

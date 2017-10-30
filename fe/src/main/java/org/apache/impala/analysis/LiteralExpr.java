@@ -43,6 +43,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
   private final static Logger LOG = LoggerFactory.getLogger(LiteralExpr.class);
 
   public LiteralExpr() {
+    evalCost_ = LITERAL_COST;
     numDistinctValues_ = 1;
   }
 
@@ -99,6 +100,11 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
   @Override
   protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     // Literals require no analysis.
+  }
+
+  @Override
+  protected float computeEvalCost() {
+    return LITERAL_COST;
   }
 
   /**

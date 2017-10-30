@@ -64,6 +64,16 @@ struct TNetworkAddressPtrEquals : public std::unary_function<TNetworkAddress*, b
 };
 
 
+struct pair_hash {
+  template <class T1, class T2>
+  std::size_t operator () (const std::pair<T1, T2> &p) const {
+    size_t seed = 0;
+    boost::hash_combine(seed, std::hash<T1>{}(p.first));
+    boost::hash_combine(seed, std::hash<T2>{}(p.second));
+    return seed;
+  }
+};
+
 /// FindOrInsert(): if the key is present, return the value; if the key is not present,
 /// create a new entry (key, default_val) and return default_val.
 /// TODO: replace with single template which takes a template param

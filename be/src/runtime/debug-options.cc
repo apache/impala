@@ -37,16 +37,25 @@ DebugOptions::DebugOptions(const TQueryOptions& query_options)
   vector<string> components;
   split(components, query_options.debug_action, is_any_of(":"), token_compress_on);
   if (components.size() < 3 || components.size() > 4) return;
+
+  const string* phase_str;
+  const string* action_str;
   if (components.size() == 3) {
     instance_idx_ = -1;
     node_id_ = atoi(components[0].c_str());
-    phase_ = GetExecNodePhase(components[1]);
-    action_ = GetDebugAction(components[2]);
+    phase_str = &components[1];
+    action_str = &components[2];
   } else {
     instance_idx_ = atoi(components[0].c_str());
     node_id_ = atoi(components[1].c_str());
-    phase_ = GetExecNodePhase(components[2]);
-    action_ = GetDebugAction(components[3]);
+    phase_str = &components[2];
+    action_str = &components[3];
+  }
+  phase_ = GetExecNodePhase(*phase_str);
+  if (!GetDebugAction(*action_str, &action_, &action_param_)) {
+    LOG(WARNING) << "Invalid debug action " << *action_str;
+    phase_ = TExecNodePhase::INVALID;
+    return;
   }
   DCHECK(!(phase_ == TExecNodePhase::CLOSE && action_ == TDebugAction::WAIT))
       << "Do not use CLOSE:WAIT debug actions because nodes cannot be cancelled in "
@@ -64,13 +73,20 @@ TExecNodePhase::type DebugOptions::GetExecNodePhase(const string& key) {
   return TExecNodePhase::INVALID;
 }
 
-TDebugAction::type DebugOptions::GetDebugAction(const string& key) {
-  for (auto entry: _TDebugAction_VALUES_TO_NAMES) {
-    if (iequals(key, entry.second)) {
-      return static_cast<TDebugAction::type>(entry.first);
+bool DebugOptions::GetDebugAction(
+    const string& action, TDebugAction::type* type, string* action_param) {
+  // Either "ACTION_TYPE" or "ACTION_TYPE@<integer value>".
+  vector<string> tokens;
+  split(tokens, action, is_any_of("@"), token_compress_on);
+  if (tokens.size() < 1 || tokens.size() > 2) return false;
+  if (tokens.size() == 2) *action_param = tokens[1];
+  for (auto& entry : _TDebugAction_VALUES_TO_NAMES) {
+    if (iequals(tokens[0], entry.second)) {
+      *type = static_cast<TDebugAction::type>(entry.first);
+      return true;
     }
   }
-  return TDebugAction::WAIT;
+  return false;
 }
 
 
@@ -79,5 +95,6 @@ TDebugOptions DebugOptions::ToThrift() const {
   result.__set_node_id(node_id_);
   result.__set_phase(phase_);
   result.__set_action(action_);
+  result.__set_action_param(action_param_);
   return result;
 }

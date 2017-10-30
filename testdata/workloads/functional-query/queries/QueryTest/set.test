@@ -1,11 +1,17 @@
 ====
 ---- QUERY
+# Set an option explicitly; the test infrastructure should clear it before the next test.
+# The next test tests that buffer_pool_limit is unset ("").
+set buffer_pool_limit=7;
+====
+---- QUERY
 set
 ---- RESULTS: VERIFY_IS_SUBSET
 'ABORT_ON_DEFAULT_LIMIT_EXCEEDED','0'
 'ABORT_ON_ERROR','0'
 'ALLOW_UNSUPPORTED_FORMATS','0'
 'BATCH_SIZE','0'
+'BUFFER_POOL_LIMIT',''
 'DEBUG_ACTION',''
 'DEFAULT_ORDER_BY_LIMIT','-1'
 'DISABLE_CACHED_READS','0'
@@ -20,13 +26,13 @@ set
 'MEM_LIMIT','0'
 'NUM_NODES','0'
 'NUM_SCANNER_THREADS','0'
-'COMPRESSION_CODEC','NONE'
+'COMPRESSION_CODEC',''
 'PARQUET_FILE_SIZE','0'
 'REQUEST_POOL',''
-'RESERVATION_REQUEST_TIMEOUT','0'
+'RESERVATION_REQUEST_TIMEOUT',''
 'RM_INITIAL_MEM','0'
 'SYNC_DDL','0'
-'V_CPU_CORES','0'
+'V_CPU_CORES',''
 ---- TYPES
 STRING, STRING
 ====
@@ -52,13 +58,13 @@ set;
 'MEM_LIMIT','0'
 'NUM_NODES','0'
 'NUM_SCANNER_THREADS','0'
-'COMPRESSION_CODEC','NONE'
+'COMPRESSION_CODEC',''
 'PARQUET_FILE_SIZE','0'
 'REQUEST_POOL',''
-'RESERVATION_REQUEST_TIMEOUT','0'
+'RESERVATION_REQUEST_TIMEOUT',''
 'RM_INITIAL_MEM','0'
 'SYNC_DDL','0'
-'V_CPU_CORES','0'
+'V_CPU_CORES',''
 ---- TYPES
 STRING, STRING
 ====
@@ -84,46 +90,13 @@ set;
 'MEM_LIMIT','0'
 'NUM_NODES','0'
 'NUM_SCANNER_THREADS','0'
-'COMPRESSION_CODEC','NONE'
+'COMPRESSION_CODEC',''
 'PARQUET_FILE_SIZE','0'
 'REQUEST_POOL',''
-'RESERVATION_REQUEST_TIMEOUT','0'
+'RESERVATION_REQUEST_TIMEOUT',''
 'RM_INITIAL_MEM','0'
 'SYNC_DDL','0'
-'V_CPU_CORES','0'
----- TYPES
-STRING, STRING
-====
----- QUERY
-# IMPALA-1906: Test that SET changes PARQUET_FILE_SIZE only if it's less than 2GB.
-set parquet_file_size='1.5g';
-set;
----- RESULTS: VERIFY_IS_SUBSET
-'ABORT_ON_DEFAULT_LIMIT_EXCEEDED','0'
-'ABORT_ON_ERROR','0'
-'ALLOW_UNSUPPORTED_FORMATS','0'
-'BATCH_SIZE','0'
-'DEBUG_ACTION',''
-'DEFAULT_ORDER_BY_LIMIT','-1'
-'DISABLE_CACHED_READS','0'
-'DISABLE_CODEGEN','0'
-'DISABLE_OUTERMOST_TOPN','0'
-'EXPLAIN_LEVEL','1'
-'HBASE_CACHE_BLOCKS','0'
-'HBASE_CACHING','0'
-'MAX_ERRORS','100'
-'MAX_IO_BUFFERS','0'
-'MAX_SCAN_RANGE_LENGTH','0'
-'MEM_LIMIT','0'
-'NUM_NODES','0'
-'NUM_SCANNER_THREADS','0'
-'COMPRESSION_CODEC','NONE'
-'PARQUET_FILE_SIZE','1610612736'
-'REQUEST_POOL',''
-'RESERVATION_REQUEST_TIMEOUT','0'
-'RM_INITIAL_MEM','0'
-'SYNC_DDL','0'
-'V_CPU_CORES','0'
+'V_CPU_CORES',''
 ---- TYPES
 STRING, STRING
 ====
@@ -257,6 +230,12 @@ explain select count(distinct double_col) from functional.alltypesagg;
 '00:SCAN HDFS [functional.alltypesagg]'
 ====
 ---- QUERY
-# IMPALA-5591: This shouldn't throw an error.
-set scratch_limit=-1;
+set max_row_size=-1;
+---- CATCH
+Max row size must be a positive number of bytes: -1
+====
+---- QUERY
+set max_row_size=0;
+---- CATCH
+Max row size must be a positive number of bytes: 0
 ====

@@ -21,7 +21,13 @@
 // a main()), or flags that are referenced from multiple places and having them here
 // calms the linker errors that would otherwise ensue.
 
+#include <string>
+
+#include "common/constant-strings.h"
 #include "common/logging.h"
+#include "gutil/strings/substitute.h"
+
+#include "common/names.h"
 
 // This will be defaulted to the host name returned by the OS.
 // This name is used in the principal generated for Kerberos authorization.
@@ -29,7 +35,10 @@ DEFINE_string(hostname, "", "Hostname to use for this daemon, also used as part 
               "the Kerberos principal, if enabled. If not set, the system default will be"
               " used");
 
-DEFINE_int32(be_port, 22000, "port on which ImpalaInternalService is exported");
+DEFINE_int32(be_port, 22000,
+    "port on which thrift based ImpalaInternalService is exported");
+DEFINE_int32_hidden(krpc_port, 29000,
+    "port on which KRPC based ImpalaInternalService is exported");
 
 // Kerberos is enabled if and only if principal is set.
 DEFINE_string(principal, "", "Kerberos principal. If set, both client and backend network"
@@ -41,10 +50,24 @@ DEFINE_string(krb5_conf, "", "Absolute path to Kerberos krb5.conf if in a non-st
     "location. Does not normally need to be set.");
 DEFINE_string(krb5_debug_file, "", "Turn on Kerberos debugging and output to this file");
 
-DEFINE_string(mem_limit, "80%", "Process memory limit specified as number of bytes "
-              "('<int>[bB]?'), megabytes ('<float>[mM]'), gigabytes ('<float>[gG]'), "
-              "or percentage of the physical memory ('<int>%'). "
-              "Defaults to bytes if no unit is given");
+static const string mem_limit_help_msg = "Limit on process memory consumption, "
+    "excluding the JVM's memory consumption. "
+    + Substitute(MEM_UNITS_HELP_MSG, "the physical memory");
+DEFINE_string(mem_limit, "80%",  mem_limit_help_msg.c_str());
+
+static const string buffer_pool_limit_help_msg = "(Advanced) Limit on buffer pool size. "
+     + Substitute(MEM_UNITS_HELP_MSG, "the process memory limit") + " "
+    "The default value and behaviour of this flag may change between releases.";
+DEFINE_string(buffer_pool_limit, "80%", buffer_pool_limit_help_msg.c_str());
+
+static const string buffer_pool_clean_pages_limit_help_msg = "(Advanced) Limit on bytes "
+    "of clean pages that will be accumulated in the buffer pool. "
+     + Substitute(MEM_UNITS_HELP_MSG, "the buffer pool limit") + ".";
+DEFINE_string(buffer_pool_clean_pages_limit, "10%",
+    buffer_pool_clean_pages_limit_help_msg.c_str());
+
+DEFINE_int64(min_buffer_size, 64 * 1024,
+    "(Advanced) The minimum buffer size to use in the buffer pool");
 
 DEFINE_bool(enable_process_lifetime_heap_profiling, false, "(Advanced) Enables heap "
     "profiling for the lifetime of the process. Profile output will be stored in the "
@@ -70,13 +93,17 @@ DEFINE_string(redaction_rules_file, "", "Absolute path to sensitive data redacti
     "Web UI and audit records. Query results will not be affected. Refer to the "
     "documentation for the rule file format.");
 
+DEFINE_bool(enable_minidumps, true, "Whether to enable minidump generation upon process "
+    "crash or SIGUSR1.");
+
 DEFINE_string(minidump_path, "minidumps", "Directory to write minidump files to. This "
     "can be either an absolute path or a path relative to log_dir. Each daemon will "
     "create an additional sub-directory to prevent naming conflicts and to make it "
     "easier to identify a crashing daemon. Minidump files contain crash-related "
-    "information in a compressed format and will only be written when a daemon exits "
-    "unexpectedly, for example on an unhandled exception or signal. Set to empty to "
-    "disable writing minidump files.");
+    "information in a compressed format and will be written when a daemon exits "
+    "unexpectedly, for example on an unhandled exception or signal. It is also possible "
+    "to create minidumps on demand without exiting the process by sending SIGUSR1. "
+    "Set to empty to disable writing minidump files.");
 
 DEFINE_int32(max_minidumps, 9, "Maximum number of minidump files to keep per daemon. "
     "Older files are removed first. Set to 0 to keep all minidump files.");
@@ -93,14 +120,13 @@ DEFINE_bool(load_auth_to_local_rules, false, "If true, load auth_to_local config
 
 // Stress options that are only enabled in debug builds for testing.
 #ifndef NDEBUG
-DEFINE_int32(stress_free_pool_alloc, 0, "A stress option which causes memory allocations "
-    "to fail once every n allocations where n is the value of this flag. Effective in "
-    "debug builds only.");
+DEFINE_int32(stress_fn_ctx_alloc, 0, "A stress option which causes memory allocations "
+    "in function contexts to fail once every n allocations where n is the value of this "
+    "flag. Effective in debug builds only.");
 DEFINE_int32(stress_datastream_recvr_delay_ms, 0, "A stress option that causes data "
     "stream receiver registration to be delayed. Effective in debug builds only.");
-DEFINE_bool(skip_file_runtime_filtering, false, "Skips file-based runtime filtering in "
-    "order to provide a regression test for IMPALA-3798. Effective in debug builds "
-    "only.");
+DEFINE_bool(skip_file_runtime_filtering, false, "Skips file-based runtime filtering for"
+    "testing purposes. Effective in debug builds only.");
 DEFINE_int32(fault_injection_rpc_delay_ms, 0, "A fault injection option that causes "
     "rpc server handling to be delayed to trigger an RPC timeout on the caller side. "
     "Effective in debug builds only.");
@@ -111,6 +137,9 @@ DEFINE_int32(fault_injection_rpc_exception_type, 0, "A fault injection option th
     "in debug builds only");
 DEFINE_int32(stress_scratch_write_delay_ms, 0, "A stress option which causes writes to "
     "scratch files to be to be delayed to simulate slow writes.");
+DEFINE_bool(thread_creation_fault_injection, false, "A fault injection option that "
+    " causes calls to Thread::Create() to fail randomly 1% of the time on eligible "
+    " codepaths. Effective in debug builds only.");
 #endif
 
 // Used for testing the path where the Kudu client is stubbed.
@@ -123,11 +152,7 @@ DEFINE_int32(kudu_operation_timeout_ms, 3 * 60 * 1000, "Timeout (milliseconds) s
     "all Kudu operations. This must be a positive value, and there is no way to disable "
     "timeouts.");
 
-DEFINE_bool(enable_accept_queue_server, true,
-    "If true, uses a modified version of "
-    "TThreadedServer that accepts connections as quickly as possible and hands them off "
-    "to a thread pool to finish setup, reducing the chances that connections time out "
-    "waiting to be accepted.");
+DEFINE_bool_hidden(enable_accept_queue_server, true, "Deprecated");
 
 DEFINE_int64(inc_stats_size_limit_bytes, 200 * (1LL<<20), "Maximum size of "
     "incremental stats the catalog is allowed to serialize per table. "
@@ -138,3 +163,21 @@ DEFINE_int64(inc_stats_size_limit_bytes, 200 * (1LL<<20), "Maximum size of "
 DEFINE_bool(enable_stats_extrapolation, false,
     "If true, uses table statistics computed with COMPUTE STATS "
     "to extrapolate the row counts of partitions.");
+
+DEFINE_string(log_filename, "",
+    "Prefix of log filename - "
+    "full path is <log_dir>/<log_filename>.[INFO|WARN|ERROR|FATAL]");
+DEFINE_bool(redirect_stdout_stderr, true,
+    "If true, redirects stdout/stderr to INFO/ERROR log.");
+DEFINE_int32(max_log_files, 10, "Maximum number of log files to retain per severity "
+    "level. The most recent log files are retained. If set to 0, all log files are "
+    "retained.");
+
+// The read size is the preferred size of the reads issued to HDFS or the local FS.
+// There is a trade off of latency and throughout, trying to keep disks busy but
+// not introduce seeks.  The literature seems to agree that with 8 MB reads, random
+// io and sequential io perform similarly.
+DEFINE_int32(read_size, 8 * 1024 * 1024, "(Advanced) The preferred I/O request size in "
+    "bytes to issue to HDFS or the local filesystem. Increasing the read size will "
+    "increase memory requirements. Decreasing the read size may decrease I/O "
+    "throughput.");

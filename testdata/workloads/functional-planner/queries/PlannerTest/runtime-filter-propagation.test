@@ -1434,3 +1434,25 @@ PLAN-ROOT SINK
    partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> b.id
 ====
+# IMPALA-5597: Runtime filter should be generated and assigned successfully when the
+# source expr and target expr have different decimal types.
+select *
+from tpch_parquet.lineitem
+left join tpch_parquet.part on if(l_orderkey % 2 = 0, NULL, l_partkey) = p_partkey
+where l_orderkey = 965 and l_extendedprice * l_tax = p_retailprice;
+---- Plan
+PLAN-ROOT SINK
+|
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: p_partkey = if(l_orderkey % 2 = 0, NULL, l_partkey)
+|  other predicates: p_retailprice = l_extendedprice * l_tax
+|  runtime filters: RF000 <- if(l_orderkey % 2 = 0, NULL, l_partkey), RF001 <- l_extendedprice * l_tax
+|
+|--00:SCAN HDFS [tpch_parquet.lineitem]
+|     partitions=1/1 files=3 size=193.71MB
+|     predicates: l_orderkey = 965
+|
+01:SCAN HDFS [tpch_parquet.part]
+   partitions=1/1 files=1 size=6.23MB
+   runtime filters: RF000 -> p_partkey, RF001 -> p_retailprice
+====

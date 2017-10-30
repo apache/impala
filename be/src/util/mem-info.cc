@@ -19,14 +19,16 @@
 #include "util/debug-util.h"
 #include "util/string-parser.h"
 
-#include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
-#include <iostream>
-#include <fstream>
-#include <sstream>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <cctype>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+
+#include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "util/pretty-printer.h"
 
@@ -34,6 +36,7 @@
 
 using boost::algorithm::is_any_of;
 using boost::algorithm::split;
+using boost::algorithm::trim;
 using boost::algorithm::token_compress_on;
 
 namespace impala {
@@ -96,13 +99,98 @@ void MemInfo::ParseOvercommit() {
   overcommit_s >> vm_overcommit_;
 }
 
+bool MemInfo::HaveSmaps() {
+  MappedMemInfo result;
+  ifstream smaps("/proc/self/smaps", ios::in);
+  return smaps.good();
+}
+
+MappedMemInfo MemInfo::ParseSmaps() {
+  MappedMemInfo result;
+  ifstream smaps("/proc/self/smaps", ios::in);
+  if (!smaps) {
+    LOG_FIRST_N(INFO, 1) << "Could not open smaps";
+    return result;
+  }
+  while (smaps) {
+    string line;
+    getline(smaps, line);
+    if (line.empty()) continue;
+    if (isdigit(line[0])) {
+      // Line is the start of a new mapping, of form:
+      // 561ceff9c000-561ceffa1000 rw-p 00000000 00:00 0
+      ++result.num_maps;
+      continue;
+    }
+    // Line is in the form of <Name>: <value>, e.g.:
+    // Size: 1084 kB
+    // VmFlags: rd ex mr mw me dw
+    size_t colon_pos = line.find(':');
+    if (colon_pos == string::npos) continue;
+    string name = line.substr(0, colon_pos);
+    string value = line.substr(colon_pos + 1, string::npos);
+    trim(value);
+
+    // Use atol() to parse the value, ignoring " kB" suffix.
+    if (name == "Size") {
+      result.size_kb += atol(value.c_str());
+    } else if (name == "Rss") {
+      result.rss_kb += atol(value.c_str());
+    } else if (name == "AnonHugePages") {
+      result.anon_huge_pages_kb += atol(value.c_str());
+    }
+  }
+  return result;
+}
+
+ThpConfig MemInfo::ParseThpConfig() {
+  ThpConfig result;
+  result.enabled = GetThpConfigVal("enabled");
+  result.defrag = GetThpConfigVal("defrag");
+  result.khugepaged_defrag = GetThpConfigVal("khugepaged/defrag");
+  return result;
+}
+
+string MemInfo::GetThpConfigVal(const string& relative_path) {
+  // This is the standard location for the configs.
+  ifstream file("/sys/kernel/mm/transparent_hugepage/" + relative_path);
+  if (!file) {
+    // Some earlier versions of CentOS/RHEL put the configs in a different place.
+    file.open("/sys/kernel/mm/redhat_transparent_hugepage/" + relative_path);
+    if (!file) {
+      LOG_FIRST_N(INFO, 1) << "Could not open thp config: " << relative_path;
+      return "<unknown>";
+    }
+  }
+  string result;
+  getline(file, result);
+  return result;
+}
+
 string MemInfo::DebugString() {
   DCHECK(initialized_);
   stringstream stream;
-  stream << "Physical Memory: "
-         << PrettyPrinter::Print(physical_mem_, TUnit::BYTES)
+  stream << "Physical Memory: " << PrettyPrinter::Print(physical_mem_, TUnit::BYTES)
          << endl;
+  stream << ParseThpConfig().DebugString();
   return stream.str();
 }
 
+string MappedMemInfo::DebugString() const {
+  stringstream stream;
+  stream << "Number of mappings: " << num_maps << endl;
+  stream << "Total mapping (kB): " << size_kb << endl;
+  stream << "RSS (kB): " << rss_kb << endl;
+  stream << "Anon huge pages (kB): " << anon_huge_pages_kb << endl;
+  return stream.str();
+}
+
+string ThpConfig::DebugString() const {
+  stringstream stream;
+  stream << "Transparent Huge Pages Config:" << endl;
+  stream << "  enabled: " << enabled << endl;
+  stream << "  defrag: " << defrag << endl;
+  stream << "  khugepaged defrag: " << khugepaged_defrag << endl;
+  return stream.str();
+}
 }

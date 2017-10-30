@@ -48,9 +48,9 @@ class MathFunctions {
   static BigIntVal Abs(FunctionContext*, const BigIntVal&);
   static DoubleVal Abs(FunctionContext*, const DoubleVal&);
   static FloatVal Abs(FunctionContext*, const FloatVal&);
-  static IntVal Abs(FunctionContext*, const IntVal&);
-  static SmallIntVal Abs(FunctionContext*, const SmallIntVal&);
-  static TinyIntVal Abs(FunctionContext*, const TinyIntVal&);
+  static BigIntVal Abs(FunctionContext*, const IntVal&);
+  static IntVal Abs(FunctionContext*, const SmallIntVal&);
+  static SmallIntVal Abs(FunctionContext*, const TinyIntVal&);
   static DoubleVal Sin(FunctionContext*, const DoubleVal&);
   static DoubleVal Asin(FunctionContext*, const DoubleVal&);
   static DoubleVal Cos(FunctionContext*, const DoubleVal&);

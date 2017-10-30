@@ -24,6 +24,7 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/bind.hpp>
 #include <boost/mem_fn.hpp>
+#include <boost/unordered_set.hpp>
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
@@ -42,8 +43,7 @@ using boost::algorithm::join;
 using namespace apache::thrift;
 using namespace strings;
 
-DECLARE_int32(be_port);
-DECLARE_string(hostname);
+DECLARE_bool(use_krpc);
 
 namespace impala {
 
@@ -55,37 +55,31 @@ static const string NUM_BACKENDS_KEY("simple-scheduler.num-backends");
 const string Scheduler::IMPALA_MEMBERSHIP_TOPIC("impala-membership");
 
 Scheduler::Scheduler(StatestoreSubscriber* subscriber, const string& backend_id,
-    const TNetworkAddress& backend_address, MetricGroup* metrics, Webserver* webserver,
-    RequestPoolService* request_pool_service)
+    MetricGroup* metrics, Webserver* webserver, RequestPoolService* request_pool_service)
   : executors_config_(std::make_shared<const BackendConfig>()),
     metrics_(metrics->GetOrCreateChildGroup("scheduler")),
     webserver_(webserver),
     statestore_subscriber_(subscriber),
     local_backend_id_(backend_id),
     thrift_serializer_(false),
-    total_assignments_(nullptr),
-    total_local_assignments_(nullptr),
-    initialized_(nullptr),
     request_pool_service_(request_pool_service) {
-  local_backend_descriptor_.address = backend_address;
 }
 
-Status Scheduler::Init() {
+Status Scheduler::Init(const TNetworkAddress& backend_address,
+    const TNetworkAddress& krpc_address, const IpAddr& ip) {
   LOG(INFO) << "Starting scheduler";
-
-  // Figure out what our IP address is, so that each subscriber
-  // doesn't have to resolve it on every heartbeat.
-  IpAddr ip;
-  const Hostname& hostname = local_backend_descriptor_.address.hostname;
-  Status status = HostnameToIpAddr(hostname, &ip);
-  if (!status.ok()) {
-    VLOG(1) << status.GetDetail();
-    status.AddDetail("Scheduler failed to start");
-    return status;
-  }
-
+  local_backend_descriptor_.address = backend_address;
+  // Store our IP address so that each subscriber doesn't have to resolve
+  // it on every heartbeat. May as well do it up front to avoid frequent DNS
+  // requests.
   local_backend_descriptor_.ip_address = ip;
   LOG(INFO) << "Scheduler using " << ip << " as IP address";
+  if (FLAGS_use_krpc) {
+    // KRPC relies on resolved IP address.
+    DCHECK(IsResolvedAddress(krpc_address));
+    DCHECK_EQ(krpc_address.hostname, ip);
+    local_backend_descriptor_.__set_krpc_address(krpc_address);
+  }
 
   coord_only_backend_config_.AddBackend(local_backend_descriptor_);
 
@@ -137,9 +131,7 @@ void Scheduler::UpdateMembership(
 
   // If the delta transmitted by the statestore is empty we can skip processing
   // altogether and avoid making a copy of executors_config_.
-  if (delta.is_delta && delta.topic_entries.empty() && delta.topic_deletions.empty()) {
-    return;
-  }
+  if (delta.is_delta && delta.topic_entries.empty()) return;
 
   // This function needs to handle both delta and non-delta updates. To minimize the
   // time needed to hold locks, all updates are applied to a copy of
@@ -156,10 +148,17 @@ void Scheduler::UpdateMembership(
     new_executors_config = std::make_shared<BackendConfig>(*executors_config_);
   }
 
-  // Process new entries to the topic. Update executors_config_ and
+  // Process new and removed entries to the topic. Update executors_config_ and
   // current_executors_ to match the set of executors given by the
   // subscriber_topic_updates.
   for (const TTopicItem& item : delta.topic_entries) {
+    if (item.deleted) {
+      if (current_executors_.find(item.key) != current_executors_.end()) {
+        new_executors_config->RemoveBackend(current_executors_[item.key]);
+        current_executors_.erase(item.key);
+      }
+      continue;
+    }
     TBackendDescriptor be_desc;
     // Benchmarks have suggested that this method can deserialize
     // ~10m messages per second, so no immediate need to consider optimization.
@@ -184,7 +183,9 @@ void Scheduler::UpdateMembership(
       // will try to re-register (i.e. overwrite their subscription), but there is
       // likely a configuration problem.
       LOG_EVERY_N(WARNING, 30) << "Duplicate subscriber registration from address: "
-                               << be_desc.address;
+                               << be_desc.address
+                               << " (we are: " << local_backend_descriptor_.address
+                               << ")";
       continue;
     }
     if (be_desc.is_executor) {
@@ -192,15 +193,6 @@ void Scheduler::UpdateMembership(
       current_executors_.insert(make_pair(item.key, be_desc));
     }
   }
-
-  // Process deletions from the topic
-  for (const string& backend_id : delta.topic_deletions) {
-    if (current_executors_.find(backend_id) != current_executors_.end()) {
-      new_executors_config->RemoveBackend(current_executors_[backend_id]);
-      current_executors_.erase(backend_id);
-    }
-  }
-
   SetExecutorsConfig(new_executors_config);
 
   if (metrics_ != nullptr) {
@@ -221,10 +213,22 @@ void Scheduler::SetExecutorsConfig(const ExecutorsConfigPtr& executors_config) {
   executors_config_ = executors_config;
 }
 
-Status Scheduler::ComputeScanRangeAssignment(QuerySchedule* schedule) {
+const TBackendDescriptor& Scheduler::LookUpBackendDesc(
+    const BackendConfig& executor_config, const TNetworkAddress& host) {
+  const TBackendDescriptor* desc = executor_config.LookUpBackendDesc(host);
+  if (desc == nullptr) {
+    // Local host may not be in executor_config if it's a dedicated coordinator.
+    DCHECK_EQ(host, local_backend_descriptor_.address);
+    DCHECK(!local_backend_descriptor_.is_executor);
+    desc = &local_backend_descriptor_;
+  }
+  return *desc;
+}
+
+Status Scheduler::ComputeScanRangeAssignment(
+    const BackendConfig& executor_config, QuerySchedule* schedule) {
   RuntimeProfile::Counter* total_assignment_timer =
       ADD_TIMER(schedule->summary_profile(), "ComputeScanRangeAssignmentTimer");
-  ExecutorsConfigPtr executor_config = GetExecutorsConfig();
   const TQueryExecRequest& exec_request = schedule->request();
   for (const TPlanExecInfo& plan_exec_info : exec_request.plan_exec_info) {
     for (const auto& entry : plan_exec_info.per_node_scan_ranges) {
@@ -247,7 +251,7 @@ Status Scheduler::ComputeScanRangeAssignment(QuerySchedule* schedule) {
       FragmentScanRangeAssignment* assignment =
           &schedule->GetFragmentExecParams(fragment.idx)->scan_range_assignment;
       RETURN_IF_ERROR(
-          ComputeScanRangeAssignment(*executor_config, node_id, node_replica_preference,
+          ComputeScanRangeAssignment(executor_config, node_id, node_replica_preference,
               node_random_replica, entry.second, exec_request.host_list, exec_at_coord,
               schedule->query_options(), total_assignment_timer, assignment));
       schedule->IncNumScanRanges(entry.second.size());
@@ -256,7 +260,8 @@ Status Scheduler::ComputeScanRangeAssignment(QuerySchedule* schedule) {
   return Status::OK();
 }
 
-void Scheduler::ComputeFragmentExecParams(QuerySchedule* schedule) {
+void Scheduler::ComputeFragmentExecParams(
+    const BackendConfig& executor_config, QuerySchedule* schedule) {
   const TQueryExecRequest& exec_request = schedule->request();
 
   // for each plan, compute the FInstanceExecParams for the tree of fragments
@@ -281,7 +286,14 @@ void Scheduler::ComputeFragmentExecParams(QuerySchedule* schedule) {
       for (int i = 0; i < dest_params->instance_exec_params.size(); ++i) {
         TPlanFragmentDestination& dest = src_params->destinations[i];
         dest.__set_fragment_instance_id(dest_params->instance_exec_params[i].instance_id);
-        dest.__set_server(dest_params->instance_exec_params[i].host);
+        const TNetworkAddress& host = dest_params->instance_exec_params[i].host;
+        dest.__set_server(host);
+        if (FLAGS_use_krpc) {
+          const TBackendDescriptor& desc = LookUpBackendDesc(executor_config, host);
+          DCHECK(desc.__isset.krpc_address);
+          DCHECK(IsResolvedAddress(desc.krpc_address));
+          dest.__set_krpc_server(desc.krpc_address);
+        }
       }
 
       // enumerate senders consecutively;
@@ -678,27 +690,52 @@ void Scheduler::GetScanHosts(TPlanNodeId scan_id, const FragmentExecParams& para
 }
 
 Status Scheduler::Schedule(QuerySchedule* schedule) {
+  // Make a copy of the executor_config upfront to avoid using inconsistent views
+  // between ComputeScanRangeAssignment() and ComputeFragmentExecParams().
+  ExecutorsConfigPtr config_ptr = GetExecutorsConfig();
+  RETURN_IF_ERROR(ComputeScanRangeAssignment(*config_ptr, schedule));
+  ComputeFragmentExecParams(*config_ptr, schedule);
+  ComputeBackendExecParams(schedule);
+#ifndef NDEBUG
+  schedule->Validate();
+#endif
+
+  // TODO: Move to admission control, it doesn't need to be in the Scheduler.
   string resolved_pool;
   RETURN_IF_ERROR(request_pool_service_->ResolveRequestPool(
       schedule->request().query_ctx, &resolved_pool));
   schedule->set_request_pool(resolved_pool);
   schedule->summary_profile()->AddInfoString("Request Pool", resolved_pool);
+  return Status::OK();
+}
 
-  RETURN_IF_ERROR(ComputeScanRangeAssignment(schedule));
-  ComputeFragmentExecParams(schedule);
-#ifndef NDEBUG
-  schedule->Validate();
-#endif
-
-  // compute unique hosts
-  unordered_set<TNetworkAddress> unique_hosts;
+void Scheduler::ComputeBackendExecParams(QuerySchedule* schedule) {
+  PerBackendExecParams per_backend_params;
   for (const FragmentExecParams& f : schedule->fragment_exec_params()) {
     for (const FInstanceExecParams& i : f.instance_exec_params) {
-      unique_hosts.insert(i.host);
+      BackendExecParams& be_params = per_backend_params[i.host];
+      be_params.instance_params.push_back(&i);
+      // Different fragments do not synchronize their Open() and Close(), so the backend
+      // does not provide strong guarantees about whether one fragment instance releases
+      // resources before another acquires them. Conservatively assume that all fragment
+      // instances on this backend can consume their peak resources at the same time,
+      // i.e. that this backend's peak resources is the sum of the per-fragment-instance
+      // peak resources for the instances executing on this backend.
+      be_params.min_reservation_bytes += f.fragment.min_reservation_bytes;
+      be_params.initial_reservation_total_claims +=
+          f.fragment.initial_reservation_total_claims;
     }
   }
-  schedule->SetUniqueHosts(unique_hosts);
-  return Status::OK();
+  schedule->set_per_backend_exec_params(per_backend_params);
+
+  stringstream min_reservation_ss;
+  for (const auto& e: per_backend_params) {
+    min_reservation_ss << e.first << "("
+         << PrettyPrinter::Print(e.second.min_reservation_bytes, TUnit::BYTES)
+         << ") ";
+  }
+  schedule->summary_profile()->AddInfoString("Per Host Min Reservation",
+      min_reservation_ss.str());
 }
 
 Scheduler::AssignmentCtx::AssignmentCtx(const BackendConfig& executor_config,

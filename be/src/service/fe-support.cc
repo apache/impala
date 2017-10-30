@@ -41,6 +41,7 @@
 #include "runtime/raw-value.h"
 #include "runtime/runtime-state.h"
 #include "service/impala-server.h"
+#include "service/query-options.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
@@ -65,13 +66,15 @@ JNIEXPORT void JNICALL
 Java_org_apache_impala_service_FeSupport_NativeFeTestInit(
     JNIEnv* env, jclass caller_class) {
   DCHECK(ExecEnv::GetInstance() == NULL) << "This should only be called once from the FE";
+  char* env_logs_dir_str = std::getenv("IMPALA_FE_TEST_LOGS_DIR");
+  if (env_logs_dir_str != nullptr) FLAGS_log_dir = env_logs_dir_str;
   char* name = const_cast<char*>("FeSupport");
   // Init the JVM to load the classes in JniUtil that are needed for returning
   // exceptions to the FE.
   InitCommonRuntime(1, &name, true, TestInfo::FE_TEST);
-  LlvmCodeGen::InitializeLlvm(true);
+  THROW_IF_ERROR(LlvmCodeGen::InitializeLlvm(true), env, JniUtil::internal_exc_class());
   ExecEnv* exec_env = new ExecEnv(); // This also caches it from the process.
-  exec_env->InitForFeTests();
+  THROW_IF_ERROR(exec_env->InitForFeTests(), env, JniUtil::internal_exc_class());
 }
 
 // Serializes expression value 'value' to thrift structure TColumnValue 'col_val'.
@@ -168,9 +171,12 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
   vector<TColumnValue> results;
   ObjectPool obj_pool;
 
-  DeserializeThriftMsg(env, thrift_expr_batch, &expr_batch);
-  DeserializeThriftMsg(env, thrift_query_ctx_bytes, &query_ctx);
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_expr_batch, &expr_batch), env,
+     JniUtil::internal_exc_class(), nullptr);
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_query_ctx_bytes, &query_ctx), env,
+     JniUtil::internal_exc_class(), nullptr);
   vector<TExpr>& texprs = expr_batch.exprs;
+
   // Disable codegen advisorily to avoid unnecessary latency. For testing purposes
   // (expr-test.cc), fe_support_disable_codegen may be set to false.
   query_ctx.disable_codegen_hint = fe_support_disable_codegen;
@@ -201,7 +207,7 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
     exprs.push_back(expr);
     ScalarExprEvaluator* eval;
     status = ScalarExprEvaluator::Create(*expr, &state, &obj_pool, &expr_mem_pool,
-        &eval);
+        &expr_mem_pool, &eval);
     evals.push_back(eval);
     if (!status.ok()) goto error;
   }
@@ -377,7 +383,8 @@ JNIEXPORT jbyteArray JNICALL
 Java_org_apache_impala_service_FeSupport_NativeCacheJar(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_struct) {
   TCacheJarParams params;
-  DeserializeThriftMsg(env, thrift_struct, &params);
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_struct, &params), env,
+      JniUtil::internal_exc_class(), nullptr);
 
   TCacheJarResult result;
   string local_path;
@@ -397,7 +404,8 @@ JNIEXPORT jbyteArray JNICALL
 Java_org_apache_impala_service_FeSupport_NativeLookupSymbol(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_struct) {
   TSymbolLookupParams lookup;
-  DeserializeThriftMsg(env, thrift_struct, &lookup);
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_struct, &lookup), env,
+      JniUtil::internal_exc_class(), nullptr);
 
   vector<ColumnType> arg_types;
   for (int i = 0; i < lookup.arg_types.size(); ++i) {
@@ -420,22 +428,46 @@ JNIEXPORT jbyteArray JNICALL
 Java_org_apache_impala_service_FeSupport_NativePrioritizeLoad(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_struct) {
   TPrioritizeLoadRequest request;
-  DeserializeThriftMsg(env, thrift_struct, &request);
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_struct, &request), env,
+      JniUtil::internal_exc_class(), nullptr);
 
   CatalogOpExecutor catalog_op_executor(ExecEnv::GetInstance(), NULL, NULL);
   TPrioritizeLoadResponse result;
   Status status = catalog_op_executor.PrioritizeLoad(request, &result);
   if (!status.ok()) {
     LOG(ERROR) << status.GetDetail();
-    // Create a new Status, copy in this error, then update the result.
-    Status catalog_service_status(result.status);
-    catalog_service_status.MergeStatus(status);
+    status.AddDetail("Error making an RPC call to Catalog server.");
     status.ToThrift(&result.status);
   }
 
   jbyteArray result_bytes = NULL;
   THROW_IF_ERROR_RET(SerializeThriftMsg(env, &result, &result_bytes), env,
                      JniUtil::internal_exc_class(), result_bytes);
+  return result_bytes;
+}
+
+// Used to call native code from the FE to parse and set comma-delimited key=value query
+// options.
+extern "C"
+JNIEXPORT jbyteArray JNICALL
+Java_org_apache_impala_service_FeSupport_NativeParseQueryOptions(
+    JNIEnv* env, jclass caller_class, jstring csv_query_options,
+    jbyteArray tquery_options) {
+  TQueryOptions options;
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, tquery_options, &options), env,
+      JniUtil::internal_exc_class(), nullptr);
+
+  JniUtfCharGuard csv_query_options_guard;
+  THROW_IF_ERROR_RET(
+      JniUtfCharGuard::create(env, csv_query_options, &csv_query_options_guard), env,
+      JniUtil::internal_exc_class(), nullptr);
+  THROW_IF_ERROR_RET(
+      impala::ParseQueryOptions(csv_query_options_guard.get(), &options, NULL), env,
+      JniUtil::internal_exc_class(), nullptr);
+
+  jbyteArray result_bytes = NULL;
+  THROW_IF_ERROR_RET(SerializeThriftMsg(env, &options, &result_bytes), env,
+      JniUtil::internal_exc_class(), result_bytes);
   return result_bytes;
 }
 
@@ -461,6 +493,10 @@ static JNINativeMethod native_methods[] = {
   {
     (char*)"NativePrioritizeLoad", (char*)"([B)[B",
     (void*)::Java_org_apache_impala_service_FeSupport_NativePrioritizeLoad
+  },
+  {
+    (char*)"NativeParseQueryOptions", (char*)"(Ljava/lang/String;[B)[B",
+    (void*)::Java_org_apache_impala_service_FeSupport_NativeParseQueryOptions
   },
 };
 

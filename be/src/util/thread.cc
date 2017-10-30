@@ -33,8 +33,11 @@
 
 #include "common/names.h"
 
+#ifndef NDEBUG
+DECLARE_bool(thread_creation_fault_injection);
+#endif
+
 namespace this_thread = boost::this_thread;
-using boost::ptr_vector;
 using namespace rapidjson;
 
 namespace impala {
@@ -287,22 +290,41 @@ void ThreadMgr::ThreadGroupUrlCallback(const Webserver::ArgumentMap& args,
   document->AddMember("threads", lst, document->GetAllocator());
 }
 
-void Thread::StartThread(const ThreadFunctor& functor) {
+Status Thread::StartThread(const std::string& category, const std::string& name,
+    const ThreadFunctor& functor, unique_ptr<Thread>* thread,
+    bool fault_injection_eligible) {
   DCHECK(thread_manager.get() != nullptr)
       << "Thread created before InitThreading called";
-  DCHECK(tid_ == UNINITIALISED_THREAD_ID) << "StartThread called twice";
+  DCHECK(thread->get() == nullptr);
 
+#ifndef NDEBUG
+  if (fault_injection_eligible && FLAGS_thread_creation_fault_injection) {
+    // Fail roughly 1% of the time on eligible codepaths.
+    if ((rand() % 100) == 1) {
+      return Status(Substitute("Fake thread creation failure (category: $0, name: $1)",
+          category, name));
+    }
+  }
+#endif
+
+  unique_ptr<Thread> t(new Thread(category, name));
   Promise<int64_t> thread_started;
-  thread_.reset(
-      new thread(&Thread::SuperviseThread, name_, category_, functor, &thread_started));
-
+  try {
+    t->thread_.reset(
+        new boost::thread(&Thread::SuperviseThread, t->name_, t->category_, functor,
+            &thread_started));
+  } catch (boost::thread_resource_error& e) {
+    return Status(TErrorCode::THREAD_CREATION_FAILED, name, category, e.what());
+  }
   // TODO: This slows down thread creation although not enormously. To make this faster,
   // consider delaying thread_started.Get() until the first call to tid(), but bear in
   // mind that some coordination is required between SuperviseThread() and this to make
   // sure that the thread is still available to have its tid set.
-  tid_ = thread_started.Get();
+  t->tid_ = thread_started.Get();
 
-  VLOG(2) << "Started thread " << tid_ << " - " << category_ << ":" << name_;
+  VLOG(2) << "Started thread " << t->tid() << " - " << category << ":" << name;
+  *thread = move(t);
+  return Status::OK();
 }
 
 void Thread::SuperviseThread(const string& name, const string& category,
@@ -331,13 +353,12 @@ void Thread::SuperviseThread(const string& name, const string& category,
   thread_mgr_ref->RemoveThread(this_thread::get_id(), category_copy);
 }
 
-Status ThreadGroup::AddThread(Thread* thread) {
-  threads_.push_back(thread);
-  return Status::OK();
+void ThreadGroup::AddThread(unique_ptr<Thread>&& thread) {
+  threads_.emplace_back(move(thread));
 }
 
 void ThreadGroup::JoinAll() {
-  for (const Thread& thread: threads_) thread.Join();
+  for (auto& thread : threads_) thread->Join();
 }
 
 int ThreadGroup::Size() const {

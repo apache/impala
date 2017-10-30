@@ -1,0 +1,535 @@
+# Default query options
+select /* +straight_join */ count(*) from functional.alltypes a
+  join /* +broadcast */ functional.alltypes b on b.id = a.id and
+    b.date_string_col = a.date_string_col
+  join /* +broadcast */ functional.alltypes c on c.month = a.month and
+    c.int_col = a.int_col
+  join /* +shuffle */ functional.alltypes d on d.bool_col = a.bool_col and d.year = a.year
+---- PLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: a.bool_col = d.bool_col, a.year = d.year
+|  runtime filters: RF000 <- d.bool_col, RF001 <- d.year
+|
+|--03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: a.int_col = c.int_col, a.month = c.month
+|  runtime filters: RF002 <- c.int_col, RF003 <- c.month
+|
+|--02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id, a.date_string_col = b.date_string_col
+|  runtime filters: RF004 <- b.id, RF005 <- b.date_string_col
+|
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.bool_col, RF001 -> a.year, RF002 -> a.int_col, RF003 -> a.month, RF004 -> a.id, RF005 -> a.date_string_col
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+13:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|
+12:EXCHANGE [UNPARTITIONED]
+|
+07:AGGREGATE
+|  output: count(*)
+|
+06:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: a.bool_col = d.bool_col, a.year = d.year
+|  runtime filters: RF000 <- d.bool_col, RF001 <- d.year
+|
+|--11:EXCHANGE [HASH(d.bool_col,d.year)]
+|  |
+|  03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+10:EXCHANGE [HASH(a.bool_col,a.year)]
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.int_col = c.int_col, a.month = c.month
+|  runtime filters: RF002 <- c.int_col, RF003 <- c.month
+|
+|--09:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.id = b.id, a.date_string_col = b.date_string_col
+|  runtime filters: RF004 <- b.id, RF005 <- b.date_string_col
+|
+|--08:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.bool_col, RF001 -> a.year, RF002 -> a.int_col, RF003 -> a.month, RF004 -> a.id, RF005 -> a.date_string_col
+====
+# Keep only MAX_NUM_RUNTIME_FILTERS most selective filters, remove the rest.
+# In this query RF000 (<- d.bool_col) and RF001 (<- d.year) are the least selective
+# filters.
+select /* +straight_join */ count(*) from functional.alltypes a
+  join /* +broadcast */ functional.alltypes b on b.id = a.id and
+    b.date_string_col = a.date_string_col
+  join /* +broadcast */ functional.alltypes c on c.month = a.month and
+    c.int_col = a.int_col
+  join /* +shuffle */ functional.alltypes d on d.bool_col = a.bool_col and d.year = a.year
+---- QUERYOPTIONS
+MAX_NUM_RUNTIME_FILTERS=4
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+13:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|
+12:EXCHANGE [UNPARTITIONED]
+|
+07:AGGREGATE
+|  output: count(*)
+|
+06:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: a.bool_col = d.bool_col, a.year = d.year
+|
+|--11:EXCHANGE [HASH(d.bool_col,d.year)]
+|  |
+|  03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+10:EXCHANGE [HASH(a.bool_col,a.year)]
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.int_col = c.int_col, a.month = c.month
+|  runtime filters: RF002 <- c.int_col, RF003 <- c.month
+|
+|--09:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.id = b.id, a.date_string_col = b.date_string_col
+|  runtime filters: RF004 <- b.id, RF005 <- b.date_string_col
+|
+|--08:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF004 -> a.id, RF005 -> a.date_string_col, RF002 -> a.int_col, RF003 -> a.month
+====
+# DISABLE_ROW_RUNTIME_FILTERING is set: only partition column filters are applied.
+select /* +straight_join */ count(*) from functional.alltypes a
+  join /* +broadcast */ functional.alltypes b on b.id = a.id and
+    b.date_string_col = a.date_string_col
+  join /* +broadcast */ functional.alltypes c on c.month = a.month and
+    c.int_col = a.int_col
+  join /* +shuffle */ functional.alltypes d on d.bool_col = a.bool_col and d.year = a.year
+---- QUERYOPTIONS
+DISABLE_ROW_RUNTIME_FILTERING=true
+---- PLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: a.bool_col = d.bool_col, a.year = d.year
+|  runtime filters: RF001 <- d.year
+|
+|--03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: a.int_col = c.int_col, a.month = c.month
+|  runtime filters: RF003 <- c.month
+|
+|--02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id, a.date_string_col = b.date_string_col
+|
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF001 -> a.year, RF003 -> a.month
+====
+# DISABLE_ROW_RUNTIME_FILTERING is set and MAX_NUM_RUNTIME_FILTERS is set to 2: only the 2
+# partition column filters are applied
+select /* +straight_join */ count(*) from functional.alltypes a
+  join /* +broadcast */ functional.alltypes b on b.id = a.id and
+    b.date_string_col = a.date_string_col
+  join /* +broadcast */ functional.alltypes c on c.month = a.month and
+    c.int_col = a.int_col
+  join /* +shuffle */ functional.alltypes d on d.bool_col = a.bool_col and d.year = a.year
+---- QUERYOPTIONS
+DISABLE_ROW_RUNTIME_FILTERING=true
+MAX_NUM_RUNTIME_FILTERS=2
+---- PLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: a.bool_col = d.bool_col, a.year = d.year
+|  runtime filters: RF001 <- d.year
+|
+|--03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: a.int_col = c.int_col, a.month = c.month
+|  runtime filters: RF003 <- c.month
+|
+|--02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id, a.date_string_col = b.date_string_col
+|
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF001 -> a.year, RF003 -> a.month
+====
+# RUNTIME_FILTER_MODE is set to LOCAL: only local filters are applied
+select /* +straight_join */ count(*) from functional.alltypes a
+  join /* +broadcast */ functional.alltypes b on b.id = a.id and
+    b.date_string_col = a.date_string_col
+  join /* +broadcast */ functional.alltypes c on c.month = a.month and
+    c.int_col = a.int_col
+  join /* +shuffle */ functional.alltypes d on d.bool_col = a.bool_col and d.year = a.year
+---- QUERYOPTIONS
+RUNTIME_FILTER_MODE=LOCAL
+---- PLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: a.bool_col = d.bool_col, a.year = d.year
+|  runtime filters: RF000 <- d.bool_col, RF001 <- d.year
+|
+|--03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: a.int_col = c.int_col, a.month = c.month
+|  runtime filters: RF002 <- c.int_col, RF003 <- c.month
+|
+|--02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id, a.date_string_col = b.date_string_col
+|  runtime filters: RF004 <- b.id, RF005 <- b.date_string_col
+|
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.bool_col, RF001 -> a.year, RF002 -> a.int_col, RF003 -> a.month, RF004 -> a.id, RF005 -> a.date_string_col
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+13:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|
+12:EXCHANGE [UNPARTITIONED]
+|
+07:AGGREGATE
+|  output: count(*)
+|
+06:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: a.bool_col = d.bool_col, a.year = d.year
+|
+|--11:EXCHANGE [HASH(d.bool_col,d.year)]
+|  |
+|  03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+10:EXCHANGE [HASH(a.bool_col,a.year)]
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.int_col = c.int_col, a.month = c.month
+|  runtime filters: RF002 <- c.int_col, RF003 <- c.month
+|
+|--09:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.id = b.id, a.date_string_col = b.date_string_col
+|  runtime filters: RF004 <- b.id, RF005 <- b.date_string_col
+|
+|--08:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF002 -> a.int_col, RF003 -> a.month, RF004 -> a.id, RF005 -> a.date_string_col
+====
+# RUNTIME_FILTER_MODE is set to LOCAL and MAX_NUM_RUNTIME_FILTERS is set to 3: only 3
+# local filters are kept, which means that both local and non-local filters are removed
+# from the distributed plan.
+select /* +straight_join */ count(*) from functional.alltypes a
+  join /* +broadcast */ functional.alltypes b on b.id = a.id and
+    b.date_string_col = a.date_string_col
+  join /* +broadcast */ functional.alltypes c on c.month = a.month and
+    c.int_col = a.int_col
+  join /* +shuffle */ functional.alltypes d on d.bool_col = a.bool_col and d.year = a.year
+---- QUERYOPTIONS
+RUNTIME_FILTER_MODE=LOCAL
+MAX_NUM_RUNTIME_FILTERS=3
+---- PLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: a.bool_col = d.bool_col, a.year = d.year
+|
+|--03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: a.int_col = c.int_col, a.month = c.month
+|  runtime filters: RF002 <- c.int_col
+|
+|--02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id, a.date_string_col = b.date_string_col
+|  runtime filters: RF004 <- b.id, RF005 <- b.date_string_col
+|
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF004 -> a.id, RF005 -> a.date_string_col, RF002 -> a.int_col
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+13:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|
+12:EXCHANGE [UNPARTITIONED]
+|
+07:AGGREGATE
+|  output: count(*)
+|
+06:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: a.bool_col = d.bool_col, a.year = d.year
+|
+|--11:EXCHANGE [HASH(d.bool_col,d.year)]
+|  |
+|  03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+10:EXCHANGE [HASH(a.bool_col,a.year)]
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.int_col = c.int_col, a.month = c.month
+|  runtime filters: RF002 <- c.int_col
+|
+|--09:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.id = b.id, a.date_string_col = b.date_string_col
+|  runtime filters: RF004 <- b.id, RF005 <- b.date_string_col
+|
+|--08:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF004 -> a.id, RF005 -> a.date_string_col, RF002 -> a.int_col
+====
+# DISABLE_ROW_RUNTIME_FILTERING is set and RUNTIME_FILTER_MODE is set to LOCAL: only local
+# partition column filters are applied
+select /* +straight_join */ count(*) from functional.alltypes a
+  join /* +broadcast */ functional.alltypes b on b.id = a.id and
+    b.date_string_col = a.date_string_col
+  join /* +broadcast */ functional.alltypes c on c.month = a.month and
+    c.int_col = a.int_col
+  join /* +shuffle */ functional.alltypes d on d.bool_col = a.bool_col and d.year = a.year
+---- QUERYOPTIONS
+DISABLE_ROW_RUNTIME_FILTERING=true
+RUNTIME_FILTER_MODE=LOCAL
+---- PLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: a.bool_col = d.bool_col, a.year = d.year
+|  runtime filters: RF001 <- d.year
+|
+|--03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: a.int_col = c.int_col, a.month = c.month
+|  runtime filters: RF003 <- c.month
+|
+|--02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id, a.date_string_col = b.date_string_col
+|
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF001 -> a.year, RF003 -> a.month
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+13:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|
+12:EXCHANGE [UNPARTITIONED]
+|
+07:AGGREGATE
+|  output: count(*)
+|
+06:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: a.bool_col = d.bool_col, a.year = d.year
+|
+|--11:EXCHANGE [HASH(d.bool_col,d.year)]
+|  |
+|  03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+10:EXCHANGE [HASH(a.bool_col,a.year)]
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.int_col = c.int_col, a.month = c.month
+|  runtime filters: RF003 <- c.month
+|
+|--09:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.id = b.id, a.date_string_col = b.date_string_col
+|
+|--08:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF003 -> a.month
+====
+# RUNTIME_FILTER_MODE is OFF: no filters are applied
+select /* +straight_join */ count(*) from functional.alltypes a
+  join /* +broadcast */ functional.alltypes b on b.id = a.id and
+    b.date_string_col = a.date_string_col
+  join /* +broadcast */ functional.alltypes c on c.month = a.month and
+    c.int_col = a.int_col
+  join /* +shuffle */ functional.alltypes d on d.bool_col = a.bool_col and d.year = a.year
+---- QUERYOPTIONS
+RUNTIME_FILTER_MODE=OFF
+---- PLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: a.bool_col = d.bool_col, a.year = d.year
+|
+|--03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: a.int_col = c.int_col, a.month = c.month
+|
+|--02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id, a.date_string_col = b.date_string_col
+|
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+====
+# MAX_NUM_RUNTIME_FILTERS is 0: no filters are applied
+select /* +straight_join */ count(*) from functional.alltypes a
+  join /* +broadcast */ functional.alltypes b on b.id = a.id and
+    b.date_string_col = a.date_string_col
+  join /* +broadcast */ functional.alltypes c on c.month = a.month and
+    c.int_col = a.int_col
+  join /* +shuffle */ functional.alltypes d on d.bool_col = a.bool_col and d.year = a.year
+---- QUERYOPTIONS
+MAX_NUM_RUNTIME_FILTERS=0
+---- PLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: a.bool_col = d.bool_col, a.year = d.year
+|
+|--03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: a.int_col = c.int_col, a.month = c.month
+|
+|--02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id, a.date_string_col = b.date_string_col
+|
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+====

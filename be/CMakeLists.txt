@@ -70,6 +70,16 @@ SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -Wno-mismatched-tags")
 #   -g: Enable symbols for profiler tools
 #   -Wno-unused-local-typedefs: Do not warn for local typedefs that are unused.
 SET(CXX_GCC_FLAGS "-g -Wno-unused-local-typedefs")
+if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
+  # We need to add additional arguments for GCC 7+. We go down this branch if building
+  # with a non-GCC compiler of version 7+, but in that case CXX_GCC_FLAGS is not used,
+  # so it is inconsequential. TODO: IMPALA-5490: make this non-conditional when we
+  # upgrade GCC.
+  #  -faligned-new: new will automatically align types. Otherwise "new Counter()" in the
+  #       Kudu util code produces a warning (see KUDU-2094).
+  #   TODO: -faligned-new is part of C++17, remove flag when we bump language version.
+  SET(CXX_GCC_FLAGS "${CXX_GCC_FLAGS} -faligned-new")
+endif()
 
 # compiler flags for different build types (run 'cmake -DCMAKE_BUILD_TYPE=<type> .')
 # For CMAKE_BUILD_TYPE=Debug
@@ -100,6 +110,11 @@ SET(CXX_FLAGS_UBSAN "${CXX_FLAGS_UBSAN} -fno-wrapv")
 # To ease debugging, turn off all optimizations:
 SET(CXX_FLAGS_UBSAN "${CXX_FLAGS_UBSAN} -O0")
 
+# Set the flags to the thread sanitizer, also known as "tsan"
+# Turn on sanitizer and debug symbols to get stack traces:
+SET(CXX_FLAGS_TSAN "${CXX_CLANG_FLAGS} -O1 -ggdb3 -fno-omit-frame-pointer")
+SET(CXX_FLAGS_TSAN "${CXX_FLAGS_TSAN} -fsanitize=thread -DTHREAD_SANITIZER")
+
 SET(CXX_FLAGS_TIDY "${CXX_CLANG_FLAGS}")
 # Catching unused variables requires an optimization level greater than 0
 SET(CXX_FLAGS_TIDY "${CXX_FLAGS_TIDY} -O1")
@@ -126,6 +141,8 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "TIDY")
   SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_TIDY}")
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN")
   SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_UBSAN}")
+elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "TSAN")
+  SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_TSAN}")
 else()
   message(FATAL_ERROR "Unknown build type: ${CMAKE_BUILD_TYPE}")
 endif()
@@ -149,7 +166,8 @@ if (CCACHE AND NOT DEFINED ENV{DISABLE_CCACHE})
   set(RULE_LAUNCH_PREFIX ccache)
   if ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER"
       OR "${CMAKE_BUILD_TYPE}" STREQUAL "TIDY"
-      OR "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN")
+      OR "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN"
+      OR "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN")
     # Need to set CCACHE_CPP so that ccache calls clang with the original source file for
     # both preprocessing and compilation. Otherwise, ccache will use clang to preprocess
     # the file and then call clang with the preprocessed output if not cached. However,
@@ -172,6 +190,12 @@ set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ${RULE_LAUNCH_PREFIX})
 # Thrift requires these definitions for some types that we use
 add_definitions(-DHAVE_INTTYPES_H -DHAVE_NETINET_IN_H -DHAVE_NETDB_H)
 
+# Kudu flags. 1. Enable non KUDU_* prefixes for status macros to allow Kudu code to
+# compile without changing the macro. 2. Enable full support for all backing types of
+# kudu::Slices. 3. Don't include stubs.h
+add_definitions(-DKUDU_HEADERS_USE_SHORT_STATUS_MACROS -DKUDU_HEADERS_USE_RICH_SLICE
+  -DKUDU_HEADERS_NO_STUBS)
+
 # Set clang flags for cross-compiling to IR.
 # IR_COMPILE is #defined for the cross compile to remove code that bloats the IR.
 # We enable basic optimizations (-O1) to reduce the IR size and speed up runtime JIT.
@@ -187,6 +211,10 @@ set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-c" "-std=c++14" "-DIR_COMPILE" "-DNDEBUG"
   "-Wno-return-type-c-linkage" "-O1")
 # -Werror: compile warnings should be errors when using the toolchain compiler.
 set(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-Werror")
+
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
+  SET(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-DADDRESS_SANITIZER")
+endif()
 
 IF($ENV{ENABLE_IMPALA_IR_DEBUG_INFO} STREQUAL "true")
   # -g: emit debug symbols in IR. These increase IR size and memory overhead of LLVM, but
@@ -254,7 +282,8 @@ set(CLANG_INCLUDE_FLAGS
   "-I${GFLAGS_INCLUDE_DIR}"
   "-I${RAPIDJSON_INCLUDE_DIR}"
   "-I${AVRO_INCLUDE_DIR}"
-  "-I${BOOST_INCLUDEDIR}"
+  # Include Boost as a system directory to suppress warnings from headers.
+  "-isystem${BOOST_INCLUDEDIR}"
   # Required so that jni.h can be found during Clang compilation
   "-I${JAVA_INCLUDE_PATH}"
   "-I${JAVA_INCLUDE_PATH2}"
@@ -273,7 +302,8 @@ add_definitions(-fPIC)
 # set compile output directory
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG" OR
     "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER" OR
-    "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN")
+    "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN" OR
+    "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN")
   set(BUILD_OUTPUT_ROOT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/debug/")
 else()
   set(BUILD_OUTPUT_ROOT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/release/")
@@ -290,6 +320,21 @@ EXECUTE_PROCESS(COMMAND ln ${MORE_ARGS} -sf ${BUILD_OUTPUT_ROOT_DIRECTORY}
 # Determine what functions are available on the current platform.
 INCLUDE(CheckFunctionExists)
 CHECK_FUNCTION_EXISTS(sched_getcpu HAVE_SCHED_GETCPU)
+CHECK_FUNCTION_EXISTS(pipe2 HAVE_PIPE2)
+CHECK_FUNCTION_EXISTS(sync_file_range HAVE_SYNC_FILE_RANGE)
+
+# linux/fs.h defines HAVE_FALLOCATE whether or not the function is available,
+# which is why we use IMPALA_HAVE_FALLOCATE here.
+CHECK_FUNCTION_EXISTS(fallocate IMPALA_HAVE_FALLOCATE)
+CHECK_FUNCTION_EXISTS(preadv HAVE_PREADV)
+INCLUDE(CheckIncludeFiles)
+CHECK_INCLUDE_FILES(linux/magic.h HAVE_MAGIC_H)
+
+include(CheckLibraryExists)
+CHECK_LIBRARY_EXISTS("krb5" krb5_is_config_principal
+  ${KERBEROS_LIBRARY} HAVE_KRB5_IS_CONFIG_PRINCIPAL)
+CHECK_LIBRARY_EXISTS("krb5" krb5_get_init_creds_opt_set_out_ccache
+  ${KERBEROS_LIBRARY} HAVE_KRB5_GET_INIT_CREDS_OPT_SET_OUT_CCACHE)
 
 # This is a list of impala library dependencies. Individual libraries
 # must not specify library dependencies in their own CMakeLists.txt file.
@@ -314,14 +359,22 @@ set (IMPALA_LINK_LIBS
   Exec
   Exprs
   GlobalFlags
+  histogram_proto
   ImpalaThrift
+  kudu_util
+  krpc
   Rpc
+  rpc_header_proto
+  rpc_introspection_proto
+  pb_util_proto
   Runtime
   Scheduling
+  security
   Service
   Statestore
   TestUtil
   ThriftSaslTransport
+  token_proto
   Udf
   Util
   ${WL_END_GROUP}
@@ -339,6 +392,7 @@ if (BUILD_SHARED_LIBS)
     Exprs
     Rpc
     Service
+    security
     Statestore
     Scheduling
     Catalog
@@ -362,11 +416,14 @@ set (IMPALA_DEPENDENCIES
   ThriftSaslTransport
   openssl_ssl
   openssl_crypto
+  crcutil
   gutil
   glog
   gflags
+  krb5
+  libev
   pprof
-  breakpad
+  breakpad_client
   hdfs
   zlib
   bzip2
@@ -388,7 +445,8 @@ set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
 # sanitizer build. Address sanitizer is incompatible with tcmalloc (they both intercept
 # malloc/free)
 set (IMPALA_LINK_LIBS_NO_TCMALLOC ${IMPALA_LINK_LIBS})
-if (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
+if (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER" AND
+    NOT "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN")
   set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} tcmallocstatic)
 endif()
 
@@ -471,6 +529,9 @@ add_subdirectory(src/codegen)
 add_subdirectory(src/common)
 add_subdirectory(src/exec)
 add_subdirectory(src/exprs)
+add_subdirectory(src/kudu/security)
+add_subdirectory(src/kudu/rpc)
+add_subdirectory(src/kudu/util)
 add_subdirectory(src/runtime)
 add_subdirectory(src/scheduling)
 add_subdirectory(src/statestore)

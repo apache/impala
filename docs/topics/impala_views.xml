@@ -173,6 +173,8 @@ select * from top_10_days;</codeblock>
 
     <p conref="../shared/impala_common.xml#common/complex_types_views"/>
 
+    <p conref="../shared/impala_common.xml#common/straight_join_nested_queries"/>
+
     <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
 
     <ul>
@@ -191,6 +193,9 @@ select * from top_10_days;</codeblock>
 
       <li rev="1.4.0">
         <p conref="../shared/impala_common.xml#common/order_by_view_restriction"/>
+      </li>
+      <li>
+        <p conref="../shared/impala_common.xml#common/tablesample_caveat"/>
       </li>
     </ul>
 

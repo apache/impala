@@ -65,6 +65,7 @@ Status TopNNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   nulls_first_ = tnode.sort_node.sort_info.nulls_first;
   DCHECK_EQ(conjuncts_.size(), 0)
       << "TopNNode should never have predicates to evaluate.";
+  runtime_profile()->AddInfoString("SortType", "TopN");
   return Status::OK();
 }
 
@@ -74,8 +75,7 @@ Status TopNNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   tuple_pool_.reset(new MemPool(mem_tracker()));
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(output_tuple_exprs_, state, pool_,
-      expr_mem_pool(), &output_tuple_expr_evals_));
-  AddEvaluatorsToFree(output_tuple_expr_evals_);
+      expr_perm_pool(), expr_results_pool(), &output_tuple_expr_evals_));
   tuple_row_less_than_.reset(
       new TupleRowComparator(ordering_exprs_, is_asc_order_, nulls_first_));
   output_tuple_desc_ = row_descriptor_.tuple_descriptors()[0];
@@ -138,7 +138,8 @@ void TopNNode::Codegen(RuntimeState* state) {
 Status TopNNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Open(state));
-  RETURN_IF_ERROR(tuple_row_less_than_->Open(pool_, state, expr_mem_pool()));
+  RETURN_IF_ERROR(
+      tuple_row_less_than_->Open(pool_, state, expr_perm_pool(), expr_results_pool()));
   RETURN_IF_ERROR(ScalarExprEvaluator::Open(output_tuple_expr_evals_, state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
@@ -228,11 +229,6 @@ void TopNNode::Close(RuntimeState* state) {
   ScalarExpr::Close(ordering_exprs_);
   ScalarExpr::Close(output_tuple_exprs_);
   ExecNode::Close(state);
-}
-
-Status TopNNode::QueryMaintenance(RuntimeState* state) {
-  tuple_row_less_than_->FreeLocalAllocations();
-  return ExecNode::QueryMaintenance(state);
 }
 
 // Reverse the order of the tuples in the priority queue

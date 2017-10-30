@@ -1,7 +1,7 @@
 ====
 ---- QUERY
 # This memory limit causes a spill to happen for this query
-set max_block_mgr_memory=250m;
+set buffer_pool_limit=250m;
 # This query forces many joins and aggregations with spilling
 # and can expose race conditions in the spilling code if run in parallel
 select

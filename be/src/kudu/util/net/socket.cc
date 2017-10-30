@@ -43,13 +43,13 @@
 #include "kudu/util/random_util.h"
 #include "kudu/util/subprocess.h"
 
-DEFINE_string(local_ip_for_outbound_sockets, "",
+DEFINE_string_hidden(local_ip_for_outbound_sockets, "",
               "IP to bind to when making outgoing socket connections. "
               "This must be an IP address of the form A.B.C.D, not a hostname. "
               "Advanced parameter, subject to change.");
 TAG_FLAG(local_ip_for_outbound_sockets, experimental);
 
-DEFINE_bool(socket_inject_short_recvs, false,
+DEFINE_bool_hidden(socket_inject_short_recvs, false,
             "Inject short recv() responses which return less data than "
             "requested");
 TAG_FLAG(socket_inject_short_recvs, hidden);
@@ -120,7 +120,7 @@ bool Socket::IsTemporarySocketError(int err) {
   return ((err == EAGAIN) || (err == EWOULDBLOCK) || (err == EINTR));
 }
 
-#if defined(__linux__)
+#if defined(__linux__) && defined(SOCK_NONBLOCK) && defined(SOCK_CLOEXEC)
 
 Status Socket::Init(int flags) {
   int nonblocking_flag = (flags & FLAG_NONBLOCKING) ? SOCK_NONBLOCK : 0;
@@ -146,6 +146,7 @@ Status Socket::Init(int flags) {
   RETURN_NOT_OK(SetNonBlocking(flags & FLAG_NONBLOCKING));
   RETURN_NOT_OK(SetCloseOnExec());
 
+#if !defined(__linux__)
   // Disable SIGPIPE.
   int set = 1;
   if (setsockopt(fd_, SOL_SOCKET, SO_NOSIGPIPE, &set, sizeof(set)) == -1) {
@@ -153,6 +154,7 @@ Status Socket::Init(int flags) {
     return Status::NetworkError(std::string("failed to set SO_NOSIGPIPE: ") +
                                 ErrnoToString(err), Slice(), err);
   }
+#endif
 
   return Status::OK();
 }
@@ -332,7 +334,7 @@ Status Socket::Accept(Socket *new_conn, Sockaddr *remote, int flags) {
   struct sockaddr_in addr;
   socklen_t olen = sizeof(addr);
   DCHECK_GE(fd_, 0);
-#if defined(__linux__)
+#if defined(__linux__) && defined(SOCK_NONBLOCK) && defined(SOCK_CLOEXEC)
   int accept_flags = SOCK_CLOEXEC;
   if (flags & FLAG_NONBLOCKING) {
     accept_flags |= SOCK_NONBLOCK;

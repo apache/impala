@@ -96,6 +96,13 @@ class KuduScanNode : public KuduScanNodeBase {
   /// in 'materialized_row_batches_' until the scanner reports eos, an error occurs, or
   /// the limit is reached.
   Status ProcessScanToken(KuduScanner* scanner, const std::string& scan_token);
+
+  /// Sets done_ to true and triggers threads to cleanup. Must be called with lock_
+  /// taken. Calling it repeatedly ignores subsequent calls.
+  void SetDoneInternal();
+
+  /// Gets lock_ and calls SetDoneInternal()
+  void SetDone();
 };
 
 }

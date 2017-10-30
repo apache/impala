@@ -1583,18 +1583,10 @@ from functional.alltypestiny order by id
 int, bigint, bigint, double
 ====
 ---- QUERY
-# Regression test for IMPALA-2265, IMPALA-2559. The max_block_mgr_memory is tuned to
-# reproduce the issue when running this query against functional_parquet.
-SET max_block_mgr_memory=16m;
-SELECT lag(-180, 13) over (ORDER BY t1.int_col ASC, t2.int_col ASC) AS int_col
-FROM functional_parquet.alltypes t1 CROSS JOIN functional_parquet.alltypes t2 LIMIT 10;
----- CATCH
-Memory limit exceeded
-====
----- QUERY
-# Check that the above query can succeed with the minimum buffers (3 buffers for sort,
-# 1 buffer for analytic).
-SET max_block_mgr_memory=32m;
+# Check that the a large analytic query can succeed with the minimum buffers (3 buffers
+# for sort, 2 buffer for analytic).
+SET default_spillable_buffer_size=8m;
+SET buffer_pool_limit=40m;
 SELECT lag(-180, 13) over (ORDER BY t1.int_col ASC, t2.int_col ASC) AS int_col
 FROM functional_parquet.alltypes t1 CROSS JOIN functional_parquet.alltypes t2 LIMIT 10;
 ---- TYPES
@@ -1955,3 +1947,137 @@ TINYINT
 4
 4
 ====
+---- QUERY
+# Test for IMPALA-1882: first_value works without order by clause. Therefore, output of
+# function depends on order of input rows, which in this case is DESC
+select id, bool_col, first_value(id) over (partition by bool_col) from
+(select * from functional.alltypessmall order by id desc limit 5) as t1
+---- TYPES
+INT, BOOLEAN, INT
+---- RESULTS
+99,false,99
+97,false,99
+95,false,99
+98,true,98
+96,true,98
+====
+---- QUERY
+# Test for IMPALA-1882: first_value works without order by clause. Therefore, output of
+# function depends on order of input rows, which in this case is ASC
+select id, bool_col, first_value(id) over (partition by bool_col) from
+(select * from functional.alltypessmall order by id asc limit 5) as t1
+---- TYPES
+INT, BOOLEAN, INT
+---- RESULTS
+1,false,1
+3,false,1
+0,true,0
+2,true,0
+4,true,0
+---- QUERY
+# Test for IMPALA-1882: last_value works without order by clause. Therefore, output of
+# function depends on order of input rows, which in this case is DESC
+select id, bool_col, last_value(id) over (partition by bool_col) from
+(select * from functional.alltypessmall order by id desc limit 5) as t1
+---- TYPES
+INT, BOOLEAN, INT
+---- RESULTS
+99,false,95
+97,false,95
+95,false,95
+98,true,96
+96,true,96
+====
+---- QUERY
+# Test for IMPALA-1882: last_value works without order by clause. Therefore, output of
+# function depends on order of input rows, which in this case is ASC
+select id, bool_col, last_value(id) over (partition by bool_col) from
+(select * from functional.alltypessmall order by id asc limit 5) as t1
+---- TYPES
+INT, BOOLEAN, INT
+---- RESULTS
+1,false,3
+3,false,3
+0,true,4
+2,true,4
+4,true,4
+====
+---- QUERY
+# Test for IMPALA-1882: first_value works with ignore nulls and without order by clause.
+# Therefore, output of function depends on order of input rows, which in this case is ASC
+select bool_col, smallint_col, first_value(smallint_col ignore nulls) over
+(partition by bool_col) from (select * from functional.alltypesagg where
+id > 99 order by id asc limit 10) as t1
+---- TYPES
+BOOLEAN, SMALLINT, SMALLINT
+---- RESULTS
+false,1,1
+false,3,1
+false,5,1
+false,7,1
+true,NULL,2
+true,NULL,2
+true,2,2
+true,4,2
+true,6,2
+true,8,2
+====
+---- QUERY
+# Test for IMPALA-1882: first_value works with ignore nulls and without order by clause.
+# Therefore, output of function depends on order of input rows, which in this case is DESC
+select bool_col, smallint_col, first_value(smallint_col ignore nulls) over
+(partition by bool_col) from (select * from functional.alltypesagg where
+id < 101 order by id desc limit 10) as t1;
+---- TYPES
+BOOLEAN, SMALLINT, SMALLINT
+---- RESULTS
+false,99,99
+false,97,99
+false,95,99
+false,93,99
+true,NULL,98
+true,NULL,98
+true,98,98
+true,96,98
+true,94,98
+true,92,98
+====
+---- QUERY
+# Test for IMPALA-1882: last_value works with ignore nulls and without order by clause.
+# Therefore, output of function depends on order of input rows, which in this case is ASC
+select bool_col, smallint_col, last_value(smallint_col ignore nulls) over
+(partition by bool_col) from (select * from functional.alltypesagg where
+id > 99 order by id asc limit 10) as t1;
+---- TYPES
+BOOLEAN, SMALLINT, SMALLINT
+---- RESULTS
+false,1,7
+false,3,7
+false,5,7
+false,7,7
+true,NULL,8
+true,NULL,8
+true,2,8
+true,4,8
+true,6,8
+true,8,8
+====
+---- QUERY
+# Test for IMPALA-1882: last_value works with ignore nulls and without order by clause.
+# Therefore, output of function depends on order of input rows, which in this case is DESC
+select bool_col, smallint_col, last_value(smallint_col ignore nulls) over
+(partition by bool_col) from (select * from functional.alltypesagg where
+id < 110 order by id desc limit 10) as t1;
+---- TYPES
+BOOLEAN, SMALLINT, SMALLINT
+---- RESULTS
+false,9,1
+false,7,1
+false,5,1
+false,3,1
+false,1,1
+true,8,2
+true,6,2
+true,4,2
+true,2,2
+true,NULL,2

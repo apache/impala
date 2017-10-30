@@ -81,7 +81,7 @@ TimestampVal TimestampFunctions::FromUtc(FunctionContext* context,
     const TimestampVal& ts_val, const StringVal& tz_string_val) {
   if (ts_val.is_null || tz_string_val.is_null) return TimestampVal::null();
   const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
-  if (!ts_value.HasDateOrTime()) return TimestampVal::null();
+  if (!ts_value.HasDateAndTime()) return TimestampVal::null();
 
   const StringValue& tz_string_value = StringValue::FromStringVal(tz_string_val);
   time_zone_ptr timezone = TimezoneDatabase::FindTimezone(
@@ -119,7 +119,7 @@ TimestampVal TimestampFunctions::ToUtc(FunctionContext* context,
     const TimestampVal& ts_val, const StringVal& tz_string_val) {
   if (ts_val.is_null || tz_string_val.is_null) return TimestampVal::null();
   const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
-  if (!ts_value.HasDateOrTime()) return TimestampVal::null();
+  if (!ts_value.HasDateAndTime()) return TimestampVal::null();
 
   const StringValue& tz_string_value = StringValue::FromStringVal(tz_string_val);
   time_zone_ptr timezone = TimezoneDatabase::FindTimezone(
@@ -184,6 +184,7 @@ void TimestampFunctions::UnixAndFromUnixPrepare(
     // This is much cheaper vs alloc/dealloc'ing a context for each evaluation.
     dt_ctx = new DateTimeFormatContext();
   }
+  dt_ctx->SetCenturyBreak(*context->impl()->state()->now());
   context->SetFunctionState(scope, dt_ctx);
 }
 

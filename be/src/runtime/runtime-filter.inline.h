@@ -49,6 +49,10 @@ inline bool RuntimeFilter::AlwaysTrue() const  {
   return HasBloomFilter() && bloom_filter_ == BloomFilter::ALWAYS_TRUE_FILTER;
 }
 
+inline bool RuntimeFilter::AlwaysFalse() const {
+  return bloom_filter_ != BloomFilter::ALWAYS_TRUE_FILTER && bloom_filter_->AlwaysFalse();
+}
+
 }
 
 #endif

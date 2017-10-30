@@ -28,6 +28,6 @@ add_library(Statestore
   statestore-subscriber.cc
   statestored-main.cc
 )
-add_dependencies(Statestore thrift-deps)
+add_dependencies(Statestore gen-deps)
 
 ADD_BE_TEST(statestore-test)

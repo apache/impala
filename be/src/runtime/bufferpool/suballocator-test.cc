@@ -45,7 +45,7 @@ class SuballocatorTest : public ::testing::Test {
  public:
   virtual void SetUp() override {
     RandTestUtil::SeedRng("SUBALLOCATOR_TEST_SEED", &rng_);
-    profile_.reset(new RuntimeProfile(&obj_pool_, "test profile"));
+    profile_ = RuntimeProfile::Create(&obj_pool_, "test profile");
   }
 
   virtual void TearDown() override {
@@ -55,7 +55,6 @@ class SuballocatorTest : public ::testing::Test {
     clients_.clear();
     buffer_pool_.reset();
     global_reservation_.Close();
-    profile_.reset();
     obj_pool_.Clear();
   }
 
@@ -68,7 +67,7 @@ class SuballocatorTest : public ::testing::Test {
   /// bytes of buffers of minimum length 'min_buffer_len'.
   void InitPool(int64_t min_buffer_len, int total_mem) {
     global_reservation_.InitRootTracker(nullptr, total_mem);
-    buffer_pool_.reset(new BufferPool(min_buffer_len, total_mem));
+    buffer_pool_.reset(new BufferPool(min_buffer_len, total_mem, 0));
   }
 
   /// Register a client with 'buffer_pool_'. The client is automatically deregistered
@@ -78,7 +77,7 @@ class SuballocatorTest : public ::testing::Test {
     clients_.push_back(make_unique<BufferPool::ClientHandle>());
     *client = clients_.back().get();
     ASSERT_OK(buffer_pool_->RegisterClient("test client", NULL, parent_reservation, NULL,
-        numeric_limits<int64_t>::max(), profile(), *client));
+        numeric_limits<int64_t>::max(), profile_, *client));
   }
 
   /// Assert that the memory for all of the suballocations is writable and disjoint by
@@ -97,7 +96,6 @@ class SuballocatorTest : public ::testing::Test {
     EXPECT_EQ(client->GetUsedReservation(), 0) << client->DebugString();
   }
 
-  RuntimeProfile* profile() { return profile_.get(); }
   BufferPool* buffer_pool() { return buffer_pool_.get(); }
 
   /// Pool for objects with per-test lifetime. Cleared after every test.
@@ -114,7 +112,7 @@ class SuballocatorTest : public ::testing::Test {
   vector<unique_ptr<BufferPool::ClientHandle>> clients_;
 
   /// Global profile - recreated for every test.
-  scoped_ptr<RuntimeProfile> profile_;
+  RuntimeProfile* profile_;
 
   /// Per-test random number generator. Seeded before every test.
   mt19937 rng_;

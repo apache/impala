@@ -99,6 +99,9 @@ public class Subquery extends Expr {
   }
 
   @Override
+  protected float computeEvalCost() { return UNKNOWN_COST; }
+
+  @Override
   protected boolean isConstantImpl() { return false; }
 
   /**

@@ -149,7 +149,8 @@ then
 
       if [[ ("$TARGET_BUILD_TYPE" == "ADDRESS_SANITIZER") \
                 || ("$TARGET_BUILD_TYPE" == "TIDY") \
-                || ("$TARGET_BUILD_TYPE" == "UBSAN") ]]
+                || ("$TARGET_BUILD_TYPE" == "UBSAN") \
+                || ("$TARGET_BUILD_TYPE" == "TSAN") ]]
       then
         CMAKE_ARGS+=(-DCMAKE_TOOLCHAIN_FILE=$IMPALA_HOME/cmake_modules/clang_toolchain.cmake)
       else

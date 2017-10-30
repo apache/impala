@@ -26,7 +26,6 @@ import java.util.ListIterator;
 import java.util.Set;
 
 import org.apache.impala.analysis.BinaryPredicate.Operator;
-import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
@@ -45,6 +44,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -85,6 +85,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public final static float LITERAL_COST = 1;
   public final static float SLOT_REF_COST = 1;
   public final static float TIMESTAMP_ARITHMETIC_COST = 5;
+  public final static float UNKNOWN_COST = -1;
 
   // To be used when estimating the cost of Exprs of type string where we don't otherwise
   // have an estimate of how long the strings produced by that Expr are.
@@ -169,6 +170,16 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       new com.google.common.base.Predicate<Expr>() {
         @Override
         public boolean apply(Expr arg) { return BinaryPredicate.getEqSlots(arg) != null; }
+      };
+
+  public final static com.google.common.base.Predicate<Expr> IS_NOT_EQ_BINARY_PREDICATE =
+      new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) {
+          return arg instanceof BinaryPredicate
+              && ((BinaryPredicate) arg).getOp() != Operator.EQ
+              && ((BinaryPredicate) arg).getOp() != Operator.NOT_DISTINCT;
+        }
       };
 
   public final static com.google.common.base.Predicate<Expr> IS_BINARY_PREDICATE =
@@ -330,6 +341,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
     // Do all the analysis for the expr subclass before marking the Expr analyzed.
     analyzeImpl(analyzer);
+    evalCost_ = computeEvalCost();
     analysisDone();
   }
 
@@ -351,6 +363,12 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       throw new IllegalStateException(e);
     }
   }
+
+  /**
+   * Compute and return evalcost of this expr given the evalcost of all children has been
+   * computed. Should be called bottom-up whenever the structure of subtree is modified.
+   */
+  abstract protected float computeEvalCost();
 
   protected void computeNumDistinctValues() {
     if (isConstant()) {
@@ -492,8 +510,12 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * Converts numeric literal in the expr tree rooted at this expr to return floating
-   * point types instead of decimals, if possible.
+   * DECIMAL_V1:
+   * ----------
+   * This function applies a heuristic that casts literal child exprs of this expr from
+   * decimal to floating point in certain circumstances to reduce processing cost. In
+   * earlier versions of Impala's decimal support, it was much slower than floating point
+   * arithmetic. The original rationale for the automatic casting follows.
    *
    * Decimal has a higher processing cost than floating point and we should not pay
    * the cost if the user does not require the accuracy. For example:
@@ -506,14 +528,19 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    *
    * Another way to think about it is that DecimalLiterals are analyzed as returning
    * decimals (of the narrowest precision/scale) and we later convert them to a floating
-   * point type when it is consistent with the user's intent.
+   * point type according to a heuristic that attempts to guess what the user intended.
    *
-   * TODO: another option is to do constant folding in the FE and then apply this rule.
+   * DECIMAL_V2:
+   * ----------
+   * This function does nothing. All decimal numeric literals are interpreted as decimals
+   * and the normal expression typing rules apply.
    */
   protected void convertNumericLiteralsFromDecimal(Analyzer analyzer)
       throws AnalysisException {
     Preconditions.checkState(this instanceof ArithmeticExpr ||
         this instanceof BinaryPredicate);
+    // This heuristic conversion is not part of DECIMAL_V2.
+    if (analyzer.getQueryOptions().isDecimal_v2()) return;
     if (children_.size() == 1) return; // Do not attempt to convert for unary ops
     Preconditions.checkState(children_.size() == 2);
     Type t0 = getChild(0).getType();
@@ -844,8 +871,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Exprs that have non-child exprs which should be affected by substitutions must
    * override this method and apply the substitution to such exprs as well.
    */
-  protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer)
-      throws AnalysisException {
+  protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer) {
     if (isImplicitCast()) return getChild(0).substituteImpl(smap, analyzer);
     if (smap != null) {
       Expr substExpr = smap.get(this);
@@ -1397,5 +1423,20 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       // function calls that return string.
       return DEFAULT_AVG_STRING_LENGTH;
     }
+  }
+
+  /**
+   * Generates a comma-separated string from the toSql() string representations of
+   * 'exprs'.
+   */
+  public static String listToSql(List<Expr> exprs) {
+    com.google.common.base.Function<Expr, String> toSql =
+        new com.google.common.base.Function<Expr, String>() {
+        @Override
+        public String apply(Expr arg) {
+          return arg.toSql();
+        }
+    };
+    return Joiner.on(",").join(Iterables.transform(exprs, toSql));
   }
 }

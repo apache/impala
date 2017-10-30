@@ -36,10 +36,10 @@
 #include "runtime/backend-client.h"
 #include "runtime/runtime-filter-bank.h"
 #include "runtime/client-cache.h"
+#include "runtime/data-stream-mgr.h"
 #include "runtime/runtime-state.h"
 #include "runtime/query-state.h"
 #include "runtime/query-state.h"
-#include "runtime/data-stream-mgr.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "scheduling/query-schedule.h"
@@ -97,7 +97,9 @@ done:
 }
 
 void FragmentInstanceState::Cancel() {
-  WaitForPrepare();  // make sure Prepare() finished
+  // Make sure Prepare() finished. We don't care about the status since the query is
+  // being cancelled.
+  discard_result(WaitForPrepare());
 
   // Ensure that the sink is closed from both sides. Although in ordinary executions we
   // rely on the consumer to do this, in error cases the consumer may not be able to send
@@ -121,13 +123,11 @@ Status FragmentInstanceState::Prepare() {
 
   // total_time_counter() is in the runtime_state_ so start it up now.
   SCOPED_TIMER(profile()->total_time_counter());
-  timings_profile_ = obj_pool()->Add(
-      new RuntimeProfile(obj_pool(), "Fragment Instance Lifecycle Timings"));
+  timings_profile_ =
+      RuntimeProfile::Create(obj_pool(), "Fragment Instance Lifecycle Timings");
   profile()->AddChild(timings_profile_);
   SCOPED_TIMER(ADD_TIMER(timings_profile_, PREPARE_TIMER_NAME));
 
-  // TODO: move this into a RuntimeState::Init()
-  RETURN_IF_ERROR(runtime_state_->CreateBlockMgr());
   runtime_state_->InitFilterBank();
 
   // Reserve one main thread from the pool
@@ -226,9 +226,8 @@ Status FragmentInstanceState::Prepare() {
   if (FLAGS_status_report_interval > 0) {
     string thread_name = Substitute("profile-report (finst:$0)", PrintId(instance_id()));
     unique_lock<mutex> l(report_thread_lock_);
-    report_thread_.reset(
-        new Thread(FragmentInstanceState::FINST_THREAD_GROUP_NAME, thread_name,
-            [this]() { this->ReportProfileThread(); }));
+    RETURN_IF_ERROR(Thread::Create(FragmentInstanceState::FINST_THREAD_GROUP_NAME,
+        thread_name, [this]() { this->ReportProfileThread(); }, &report_thread_, true));
     // Make sure the thread started up, otherwise ReportProfileThread() might get into
     // a race with StopReportThread().
     while (!report_thread_active_) report_thread_started_cv_.wait(l);
@@ -290,12 +289,8 @@ void FragmentInstanceState::Close() {
   // guard against partially-finished Prepare()
   if (sink_ != nullptr) sink_->Close(runtime_state_);
 
-  // disconnect mem_usage_sampled_counter_ from the periodic updater before
-  // RuntimeState::ReleaseResources(), it references the instance memtracker
-  if (mem_usage_sampled_counter_ != nullptr) {
-    PeriodicCounterUpdater::StopTimeSeriesCounter(mem_usage_sampled_counter_);
-    mem_usage_sampled_counter_ = nullptr;
-  }
+  // Stop updating profile counters in background.
+  profile()->StopPeriodicCounters();
 
   // We need to delete row_batch_ here otherwise we can't delete the instance_mem_tracker_
   // in runtime_state_->ReleaseResources().

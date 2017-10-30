@@ -31,26 +31,31 @@ class FileSystemUtil {
   /// Create the specified directory and any ancestor directories that do not exist yet.
   /// The directory and its contents are destroyed if it already exists.
   /// Returns Status::OK if successful, or a runtime error with a message otherwise.
-  static Status RemoveAndCreateDirectory(const std::string& directory);
+  static Status RemoveAndCreateDirectory(const std::string& directory) WARN_UNUSED_RESULT;
 
   /// Create a file at the specified path.
-  static Status CreateFile(const std::string& file_path);
+  static Status CreateFile(const std::string& file_path) WARN_UNUSED_RESULT;
 
   /// Remove the specified paths and their enclosing files/directories.
-  static Status RemovePaths(const std::vector<std::string>& directories);
+  static Status RemovePaths(
+      const std::vector<std::string>& directories) WARN_UNUSED_RESULT;
 
   /// Verify that the specified path is an existing directory.
   /// Returns Status::OK if it is, or a runtime error with a message otherwise.
-  static Status VerifyIsDirectory(const std::string& directory_path);
+  static Status VerifyIsDirectory(const std::string& directory_path) WARN_UNUSED_RESULT;
 
   /// Returns the space available on the file system containing 'directory_path'
   /// in 'available_bytes'
-  static Status GetSpaceAvailable(const std::string& directory_path,
-      uint64_t* available_bytes);
+  static Status GetSpaceAvailable(
+      const std::string& directory_path, uint64_t* available_bytes) WARN_UNUSED_RESULT;
 
   /// Returns the currently allowed maximum of possible file descriptors. In case of an
   /// error returns 0.
   static uint64_t MaxNumFileHandles();
+
+  /// Copy the specified file to the specified 'to_path'. Overwrite the file if it
+  /// already exists.
+  static Status CopyFile(const string& from_path, const string& to_path);
 };
 
 }

@@ -50,15 +50,24 @@ Status QueryExecMgr::StartQuery(const TExecQueryFInstancesParams& params) {
   QueryState* qs = GetOrCreateQueryState(params.query_ctx, &dummy);
   Status status = qs->Init(params);
   if (!status.ok()) {
+    qs->ReleaseExecResourceRefcount(); // Release refcnt acquired in Init().
     ReleaseQueryState(qs);
     return status;
   }
   // avoid blocking the rpc handler thread for too long by starting a new thread for
   // query startup (which takes ownership of the QueryState reference)
-  Thread t("query-exec-mgr",
+  unique_ptr<Thread> t;
+  status = Thread::Create("query-exec-mgr",
       Substitute("start-query-finstances-$0", PrintId(query_id)),
-      &QueryExecMgr::StartQueryHelper, this, qs);
-  t.Detach();
+          &QueryExecMgr::StartQueryHelper, this, qs, &t, true);
+  if (!status.ok()) {
+    // decrement refcount taken in QueryState::Init()
+    qs->ReleaseExecResourceRefcount();
+    // decrement refcount taken in GetOrCreateQueryState()
+    ReleaseQueryState(qs);
+    return status;
+  }
+  t->Detach();
   return Status::OK();
 }
 
@@ -111,8 +120,8 @@ QueryState* QueryExecMgr::GetOrCreateQueryState(
 void QueryExecMgr::StartQueryHelper(QueryState* qs) {
   qs->StartFInstances();
 
-#ifndef ADDRESS_SANITIZER
-  // tcmalloc and address sanitizer cannot be used together
+#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
+  // tcmalloc and address or thread sanitizer cannot be used together
   if (FLAGS_log_mem_usage_interval > 0) {
     uint64_t num_complete = ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS->value();
     if (num_complete % FLAGS_log_mem_usage_interval == 0) {
@@ -124,6 +133,8 @@ void QueryExecMgr::StartQueryHelper(QueryState* qs) {
   }
 #endif
 
+  // decrement refcount taken in QueryState::Init();
+  qs->ReleaseExecResourceRefcount();
   // decrement refcount taken in StartQuery()
   ReleaseQueryState(qs);
 }
@@ -156,6 +167,5 @@ void QueryExecMgr::ReleaseQueryState(QueryState* qs) {
     qs_map_.erase(it);
   }
   // TODO: send final status report during gc, but do this from a different thread
-  qs_from_map->ReleaseResources();
   delete qs_from_map;
 }

@@ -24,7 +24,7 @@ import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Column;
@@ -57,7 +57,8 @@ public class MetadataOp {
   // Static column values
   private static final TColumnValue NULL_COL_VAL = new TColumnValue();
   private static final TColumnValue EMPTY_COL_VAL = createTColumnValue("");
-  private static final TColumnValue TABLE_TYPE_COL_VAL = createTColumnValue("TABLE");
+  private static final String TABLE_TYPE_TABLE = "TABLE";
+  private static final String TABLE_TYPE_VIEW = "VIEW";
 
   // Result set schema for each of the metadata operations.
   private final static TResultSetMetadata GET_CATALOGS_MD = new TResultSetMetadata();
@@ -71,7 +72,7 @@ public class MetadataOp {
   // GetTypeInfo contains all primitive types supported by Impala.
   private static final List<TResultRow> GET_TYPEINFO_RESULTS = Lists.newArrayList();
 
-  // GetTableTypes only returns a single value: "TABLE".
+  // GetTableTypes returns values: "TABLE", "VIEW"
   private static final List<TResultRow> GET_TABLE_TYPES_RESULTS = Lists.newArrayList();
 
   // Initialize result set schemas and static result set
@@ -215,6 +216,9 @@ public class MetadataOp {
     // tableNames[i] are the tables within dbs[i]
     public List<List<String>> tableNames = Lists.newArrayList();
 
+    // tableTypes[i] are the type of tables within dbs[i]
+    public List<List<String>> tableTypes = Lists.newArrayList();
+
     // comments[i][j] is the comment of tableNames[j] in dbs[i].
     public List<List<String>> comments = Lists.newArrayList();
 
@@ -271,6 +275,7 @@ public class MetadataOp {
         List<String> tableList = Lists.newArrayList();
         List<List<Column>> tablesColumnsList = Lists.newArrayList();
         List<String> tableComments = Lists.newArrayList();
+        List<String> tableTypes = Lists.newArrayList();
         for (String tabName: fe.getTableNames(db.getName(), tablePatternMatcher, user)) {
           Table table = null;
           try {
@@ -284,23 +289,51 @@ public class MetadataOp {
           List<Column> columns = Lists.newArrayList();
           // If the table is not yet loaded, the columns will be unknown. Add it
           // to the set of missing tables.
+          String tableType = TABLE_TYPE_TABLE;
           if (!table.isLoaded()) {
             result.missingTbls.add(new TableName(db.getName(), tabName));
           } else {
-            comment = table.getMetaStoreTable().getParameters().get("comment");
+            if (table.getMetaStoreTable() != null) {
+              comment = table.getMetaStoreTable().getParameters().get("comment");
+              tableType = mapToInternalTableType(table.getMetaStoreTable().getTableType());
+            }
             columns.addAll(fe.getColumns(table, columnPatternMatcher, user));
           }
           tableList.add(tabName);
           tablesColumnsList.add(columns);
           tableComments.add(Strings.nullToEmpty(comment));
+          tableTypes.add(tableType);
         }
         result.dbs.add(db.getName());
         result.tableNames.add(tableList);
         result.comments.add(tableComments);
         result.columns.add(tablesColumnsList);
+        result.tableTypes.add(tableTypes);
       }
     }
     return result;
+  }
+
+  private static String mapToInternalTableType(String typeStr) {
+    String defaultTableType = TABLE_TYPE_TABLE;
+    TableType tType;
+
+    if (typeStr == null) return defaultTableType;
+    try {
+      tType = TableType.valueOf(typeStr.toUpperCase());
+    } catch (Exception e) {
+      return defaultTableType;
+    }
+    switch (tType) {
+      case EXTERNAL_TABLE:
+      case MANAGED_TABLE:
+      case INDEX_TABLE:
+        return TABLE_TYPE_TABLE;
+      case VIRTUAL_VIEW:
+        return TABLE_TYPE_VIEW;
+      default:
+        return defaultTableType;
+    }
   }
 
   /**
@@ -367,7 +400,7 @@ public class MetadataOp {
           row.colVals.add(createTColumnValue(colType.getNumPrecRadix()));
           // NULLABLE
           row.colVals.add(createTColumnValue(DatabaseMetaData.columnNullable));
-          row.colVals.add(NULL_COL_VAL); // REMARKS
+          row.colVals.add(createTColumnValue(column.getComment())); // REMARKS
           row.colVals.add(NULL_COL_VAL); // COLUMN_DEF
           row.colVals.add(NULL_COL_VAL); // SQL_DATA_TYPE
           row.colVals.add(NULL_COL_VAL); // SQL_DATETIME_SUB
@@ -455,19 +488,17 @@ public class MetadataOp {
           throws ImpalaException{
     TResultSet result = createEmptyResultSet(GET_TABLES_MD);
 
-    // Impala catalog only contains TABLE. Returns an empty set if the search does not
-    // include TABLE.
+    List<String> upperCaseTableTypes = null;
     if (tableTypes != null && !tableTypes.isEmpty()) {
-      boolean hasTableType = false;
-      for (String tableType: tableTypes) {
-        if (tableType.toLowerCase().equals("table")) {
-          hasTableType = true;
-          break;
-        }
+      boolean hasValidTableType = false;
+      upperCaseTableTypes = Lists.newArrayList();
+      for (String tableType : tableTypes) {
+        tableType = tableType.toUpperCase();
+        upperCaseTableTypes.add(tableType);
+        if (tableType.equals(TABLE_TYPE_TABLE)) hasValidTableType = true;
+        if (tableType.equals(TABLE_TYPE_VIEW)) hasValidTableType = true;
       }
-      if (!hasTableType) {
-        return result;
-      }
+      if (!hasValidTableType) return result;
     }
 
     // Get the list of schemas, tables that satisfy the search conditions.
@@ -481,12 +512,15 @@ public class MetadataOp {
       String dbName = dbsMetadata.dbs.get(i);
       for (int j = 0; j < dbsMetadata.tableNames.get(i).size(); ++j) {
         String tabName = dbsMetadata.tableNames.get(i).get(j);
+        String tableType = dbsMetadata.tableTypes.get(i).get(j);
+        if (upperCaseTableTypes != null && !upperCaseTableTypes.contains(tableType)) continue;
+
         TResultRow row = new TResultRow();
         row.colVals = Lists.newArrayList();
         row.colVals.add(EMPTY_COL_VAL);
         row.colVals.add(createTColumnValue(dbName));
         row.colVals.add(createTColumnValue(tabName));
-        row.colVals.add(TABLE_TYPE_COL_VAL);
+        row.colVals.add(createTColumnValue(tableType));
         row.colVals.add(createTColumnValue(dbsMetadata.comments.get(i).get(j)));
         result.rows.add(row);
       }
@@ -569,7 +603,8 @@ public class MetadataOp {
           ptype.equals(PrimitiveType.DATETIME) ||
           ptype.equals(PrimitiveType.DECIMAL) ||
           ptype.equals(PrimitiveType.CHAR) ||
-          ptype.equals(PrimitiveType.VARCHAR)) {
+          ptype.equals(PrimitiveType.VARCHAR) ||
+          ptype.equals(PrimitiveType.FIXED_UDA_INTERMEDIATE)) {
         continue;
       }
       Type type = ScalarType.createType(ptype);
@@ -598,12 +633,16 @@ public class MetadataOp {
   }
 
   /**
-   * Fills the GET_TYPEINFO_RESULTS with "TABLE".
+   * Fills the GET_TYPEINFO_RESULTS with "TABLE", "VIEW".
    */
   private static void createGetTableTypesResults() {
     TResultRow row = new TResultRow();
     row.colVals = Lists.newArrayList();
-    row.colVals.add(createTColumnValue("TABLE"));
+    row.colVals.add(createTColumnValue(TABLE_TYPE_TABLE));
+    GET_TABLE_TYPES_RESULTS.add(row);
+    row = new TResultRow();
+    row.colVals = Lists.newArrayList();
+    row.colVals.add(createTColumnValue(TABLE_TYPE_VIEW));
     GET_TABLE_TYPES_RESULTS.add(row);
   }
 

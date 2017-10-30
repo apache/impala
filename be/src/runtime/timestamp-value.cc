@@ -112,6 +112,13 @@ ostream& operator<<(ostream& os, const TimestampValue& timestamp_value) {
   return os << timestamp_value.ToString();
 }
 
+void TimestampValue::Validate() {
+    if (HasDate() && UNLIKELY(!IsValidDate(date_))) {
+      time_ = boost::posix_time::time_duration(boost::posix_time::not_a_date_time);
+      date_ = boost::gregorian::date(boost::gregorian::not_a_date_time);
+    }
+}
+
 /// Return a ptime representation of the given Unix time (seconds since the Unix epoch).
 /// The time zone of the resulting ptime is local time. This is called by
 /// UnixTimeToPtime.

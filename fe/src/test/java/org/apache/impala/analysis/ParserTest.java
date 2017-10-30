@@ -1211,6 +1211,11 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("select f1(distinct col)");
     ParsesOk("select f1(distinct col, col2)");
     ParsesOk("select decode(col, col2, col3)");
+    // nullif should rewrite to if
+    assertEquals("SELECT if(col IS DISTINCT FROM col2, col, NULL) FROM t",
+        ParsesOk("select nullif(col, col2) from t").toSql());
+    assertEquals("SELECT if(col IS DISTINCT FROM col2, col, NULL) FROM t",
+        ParsesOk("select _impala_builtins.nullif(col, col2) from t").toSql());
     ParserError("select f( from t");
     ParserError("select f(5.0 5.0) from t");
   }
@@ -1441,17 +1446,27 @@ public class ParserTest extends FrontendTestBase {
     operations.add("regexp");
     operations.add("iregexp");
 
-    for (String lop: operands_) {
-      for (String rop: operands_) {
+    ArrayList<String> boolTestVals = new ArrayList<String>();
+    boolTestVals.add("null");
+    boolTestVals.add("unknown");
+    boolTestVals.add("true");
+    boolTestVals.add("false");
+
+    for (String lop : operands_) {
+      for (String rop : operands_) {
         for (String op : operations) {
           String expr = String.format("%s %s %s", lop, op.toString(), rop);
           ParsesOk(String.format("select %s from t where %s", expr, expr));
         }
       }
-      String isNullExr = String.format("%s is null", lop);
-      String isNotNullExr = String.format("%s is not null", lop);
-      ParsesOk(String.format("select %s from t where %s", isNullExr, isNullExr));
-      ParsesOk(String.format("select %s from t where %s", isNotNullExr, isNotNullExr));
+      for (String val : boolTestVals) {
+        String isExpr = String.format("%s is %s", lop, val);
+        String isNotExpr = String.format("%s is not %s", lop, val);
+        ParsesOk(String.format("select %s from t where %s", isExpr, isExpr));
+        ParsesOk(String.format("select %s from t where %s", isNotExpr, isNotExpr));
+      }
+      ParserError(String.format("select %s is nonsense", lop));
+      ParserError(String.format("select %s is not nonsense", lop));
     }
   }
 

@@ -104,18 +104,64 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError(String.format("select %s1", Double.toString(Double.MIN_VALUE)),
       "Numeric literal '4.9E-3241' underflows minimum resolution of doubles.");
 
+    // Test edge cases near the upper limits of decimal precision - 38 digits.
+    // Integer literal.
+    checkDecimalReturnType("select 12345678901234567890123456789012345678",
+        ScalarType.createDecimalType(38, 0));
+    // Decimal point at front.
     testNumericLiteral("0.99999999999999999999999999999999999999",
         ScalarType.createDecimalType(38,38));
+    // Decimal point at back.
     testNumericLiteral("99999999999999999999999999999999999999.",
         ScalarType.createDecimalType(38,0));
+    // Negative values.
     testNumericLiteral("-0.99999999999999999999999999999999999999",
         ScalarType.createDecimalType(38,38));
     testNumericLiteral("-99999999999999999999999999999999999999.",
         ScalarType.createDecimalType(38,0));
+    // Decimal point in middle.
     testNumericLiteral("999999999999999999999.99999999999999999",
         ScalarType.createDecimalType(38,17));
     testNumericLiteral("-999999999999999999.99999999999999999999",
         ScalarType.createDecimalType(38,20));
+
+    // Test literals that do not fit into a decimal and are treated as DOUBLE.
+    // Edge cases that have 39 digits.
+    testNumericLiteral("123456789012345678901234567890123456789", Type.DOUBLE);
+    testNumericLiteral("123456789012345678901234567890123456789.", Type.DOUBLE);
+    testNumericLiteral("1234567890123.45678901234567890123456789", Type.DOUBLE);
+    testNumericLiteral(".123456789012345678901234567890123456789", Type.DOUBLE);
+
+    // Really huge literals are always interpreted as DOUBLE.
+    testNumericLiteral("12345678901234567890123456789012345678123455555555555555555555"
+        + "55559999999999999999999999999999999999999999999999999999999", Type.DOUBLE);
+    testNumericLiteral("1234567890123456789012345678901234567812.345555555555555555555"
+        + "555559999999999999999999999999999999999999999999999999999999", Type.DOUBLE);
+    testNumericLiteral(".1234567890123456789012345678901234567812345555555555555555555"
+        + "555559999999999999999999999999999999999999999999999999999999", Type.DOUBLE);
+  }
+
+  /**
+   * Test scientific notation typing. Values in scientific notation are expanded to
+   * decimal or integer literals and the same typing rules then apply.
+   */
+  @Test
+  public void TestScientificNumericLiterals() {
+    checkDecimalReturnType("select 1e9", Type.INT);
+    checkDecimalReturnType("select 1.123456789e9", Type.INT);
+    checkDecimalReturnType("select 1.1234567891e9",
+        ScalarType.createDecimalType(11, 1));
+    checkDecimalReturnType("select 1.1234567891e6",
+        ScalarType.createDecimalType(11, 4));
+    checkDecimalReturnType("select 9e9", Type.BIGINT);
+    checkDecimalReturnType("select 1e-2", ScalarType.createDecimalType(2, 2));
+    checkDecimalReturnType("select 1.123e-2", ScalarType.createDecimalType(5, 5));
+
+    // Scientific notation - edge cases between decimal and double.
+    checkDecimalReturnType("select 1e37", ScalarType.createDecimalType(38, 0));
+    checkDecimalReturnType("select 1.23456e37", ScalarType.createDecimalType(38, 0));
+    checkDecimalReturnType("select 1e38", Type.DOUBLE);
+    checkDecimalReturnType("select 1.23456e38", Type.DOUBLE);
   }
 
   /**
@@ -303,7 +349,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "Decimal precision must be > 0: 0");
 
     // IMPALA-2264: decimal is implicitly cast to lower-precision integer in edge cases.
-    checkReturnType("select CAST(999 AS DECIMAL(3,0))", ScalarType.createDecimalType(3,0));
+    checkDecimalReturnType(
+        "select CAST(999 AS DECIMAL(3,0))", ScalarType.createDecimalType(3,0));
     AnalysisError("insert into functional.alltypesinsert (tinyint_col, year, month) " +
         "values(CAST(999 AS DECIMAL(3,0)), 1, 1)",
         "Possible loss of precision for target table 'functional.alltypesinsert'.\n" +
@@ -566,6 +613,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select * from functional.alltypes where int_col is null");
     AnalyzesOk("select * from functional.alltypes where string_col is not null");
     AnalyzesOk("select * from functional.alltypes where null is not null");
+
     AnalysisError("select 1 from functional.allcomplextypes where int_map_col is null",
         "IS NULL predicate does not support complex types: int_map_col IS NULL");
     AnalysisError("select * from functional.allcomplextypes where complex_struct_col " +
@@ -574,6 +622,45 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select * from functional.allcomplextypes where nested_struct_col " +
         "is not null", "IS NOT NULL predicate does not support complex types: " +
             "nested_struct_col IS NOT NULL");
+  }
+
+  @Test
+  public void TestBoolTestExpression() throws AnalysisException {
+    String[] rhsOptions = new String[] {"true", "false", "unknown"};
+    String[] lhsOptions = new String[] {
+        "bool_col",      // column reference
+        "1>1",           // boolean expression
+        "istrue(false)", // function
+        "(1>1 is true)"  // nested expression
+        };
+
+    // Bool test in both the select and where clauses. Includes negated IS clauses.
+    for (String rhsVal : rhsOptions) {
+      String template = "select (%s is %s) from functional.alltypes where (%s is %s)";
+      String lhsVal = rhsVal == "unknown" ? "null" : rhsVal;
+      String negatedRhsVal = "not " + rhsVal;
+
+      // Tests for lhs being one of true, false or null.
+      AnalyzesOk(String.format(template, lhsVal, rhsVal, lhsVal, rhsVal));
+      AnalyzesOk(String.format(template, lhsVal, negatedRhsVal, lhsVal, negatedRhsVal));
+
+      // Tests for lhs being one lhsOptions expressions.
+      for (String lhs : lhsOptions) {
+        AnalyzesOk(String.format(template, lhs, rhsVal, lhs, rhsVal));
+        AnalyzesOk(String.format(template, lhs, negatedRhsVal, lhs, negatedRhsVal));
+      }
+    }
+
+    AnalysisError("select ('foo' is true)",
+        "No matching function with signature: istrue(STRING).");
+    AnalysisError("select (10 is true)",
+        "No matching function with signature: istrue(TINYINT).");
+    AnalysisError("select (10 is not true)",
+        "No matching function with signature: isnottrue(TINYINT).");
+    AnalysisError("select (10 is false)",
+        "No matching function with signature: isfalse(TINYINT).");
+    AnalysisError("select (10 is not false)",
+        "No matching function with signature: isnotfalse(TINYINT).");
   }
 
   @Test
@@ -734,6 +821,17 @@ public class AnalyzeExprsTest extends AnalyzerTest {
                "last_value(tinyint_col ignore nulls) over (order by id)" +
                "from functional.alltypesagg a " +
                "where exists (select 1 from functional.alltypes b where a.id = b.id)");
+
+    // last_value/first_value without using order by
+    AnalyzesOk("select first_value(tinyint_col) over () from functional.alltypesagg");
+    AnalyzesOk("select last_value(tinyint_col) over () from functional.alltypesagg");
+    AnalyzesOk("select first_value(tinyint_col ignore nulls) over () from "
+        + "functional.alltypesagg");
+    AnalyzesOk("select last_value(tinyint_col ignore nulls) over () from "
+        + "functional.alltypesagg");
+    AnalyzesOk("select first_value(tinyint_col ignore nulls) over ()," +
+        "last_value(tinyint_col ignore nulls) over () from functional.alltypesagg a " +
+        "where exists (select 1 from functional.alltypes b where a.id = b.id)");
 
     // legal combinations of analytic and agg functions
     AnalyzesOk("select sum(count(id)) over (partition by min(int_col) "
@@ -1268,80 +1366,183 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     }
   }
 
-  private void checkReturnType(String stmt, Type resultType) {
-    SelectStmt select = (SelectStmt) AnalyzesOk(stmt);
+  /**
+   * Get the result type of a select statement with a single select list element.
+   */
+  Type getReturnType(String stmt, Analyzer analyzer) {
+    SelectStmt select = (SelectStmt) AnalyzesOk(stmt, analyzer, null);
     List<Expr> selectListExprs = select.getResultExprs();
     assertNotNull(selectListExprs);
     assertEquals(selectListExprs.size(), 1);
     // check the first expr in select list
     Expr expr = selectListExprs.get(0);
-    assertEquals("Expected: " + resultType + " != " + expr.getType(),
-        resultType, expr.getType());
+    return expr.getType();
+  }
+
+  private void checkReturnType(String stmt, Type resultType, Analyzer analyzer) {
+    Type exprType = getReturnType(stmt, analyzer);
+    assertEquals("Expected: " + resultType + " != " + exprType, resultType, exprType);
+  }
+
+  private void checkReturnType(String stmt, Type resultType) {
+    checkReturnType(stmt, resultType, createAnalyzer(Catalog.DEFAULT_DB));
+  }
+
+  /**
+   * Test expressions involving decimal types that return different numeric types
+   * depending on the DECIMAL_V2 setting.
+   */
+  private void checkDecimalReturnType(String stmt, Type decimalV1ResultType,
+      Type decimalV2ResultType) {
+    Analyzer analyzer = createAnalyzer(Catalog.DEFAULT_DB);
+    analyzer.getQueryOptions().setDecimal_v2(false);
+    checkReturnType(stmt, decimalV1ResultType, analyzer);
+    analyzer = createAnalyzer(Catalog.DEFAULT_DB);
+    analyzer.getQueryOptions().setDecimal_v2(true);
+    checkReturnType(stmt, decimalV2ResultType, analyzer);
+  }
+
+  /**
+   * Test expressions that return the same type with either DECIMAL_V2 setting.
+   */
+  private void checkDecimalReturnType(String stmt, Type resultType) {
+    checkDecimalReturnType(stmt, resultType, resultType);
   }
 
   @Test
   public void TestNumericLiteralTypeResolution() throws AnalysisException {
     checkReturnType("select 1", Type.TINYINT);
-    checkReturnType("select 1.1", ScalarType.createDecimalType(2,1));
-    checkReturnType("select 01.1", ScalarType.createDecimalType(2,1));
-    checkReturnType("select 1 + 1.1", Type.DOUBLE);
-    checkReturnType("select 0.23 + 1.1", ScalarType.createDecimalType(4,2));
+    checkDecimalReturnType("select 1.1", ScalarType.createDecimalType(2,1));
+    checkDecimalReturnType("select 01.1", ScalarType.createDecimalType(2,1));
+    checkDecimalReturnType("select 1 + 1.1",
+        Type.DOUBLE, ScalarType.createDecimalType(5, 1));
+    checkDecimalReturnType("select 0.23 + 1.1", ScalarType.createDecimalType(4,2));
 
     checkReturnType("select float_col + float_col from functional.alltypestiny",
         Type.DOUBLE);
     checkReturnType("select int_col + int_col from functional.alltypestiny",
         Type.BIGINT);
 
-    // floating point + numeric literal = floating point
-    checkReturnType("select float_col + 1.1 from functional.alltypestiny",
+    // All arithmetic operators except multiplication involving floating point follow the
+    // same rules for deciding whether the output is a decimal or floating point.
+    //
+    // DECIMAL_V1: floating point + any numeric literal = floating point
+    // DECIMAL_V2: floating point + any expr of type decimal = decimal
+    checkDecimalReturnType("select float_col + 1.1 from functional.alltypestiny",
+        Type.DOUBLE, ScalarType.createDecimalType(38, 9));
+    checkDecimalReturnType("select float_col - 1.1 from functional.alltypestiny",
+        Type.DOUBLE, ScalarType.createDecimalType(38, 9));
+    checkDecimalReturnType("select float_col / 1.1 from functional.alltypestiny",
+        Type.DOUBLE, ScalarType.createDecimalType(38, 8));
+    checkDecimalReturnType("select float_col % 1.1 from functional.alltypestiny",
+        Type.FLOAT, ScalarType.createDecimalType(10, 9));
+    // BOTH: decimal + decimal literal = decimal
+    checkDecimalReturnType("select d1 + 1.1 from functional.decimal_tbl",
+        ScalarType.createDecimalType(11, 1));
+    checkDecimalReturnType("select d1 - 1.1 from functional.decimal_tbl",
+        ScalarType.createDecimalType(11, 1));
+    checkDecimalReturnType("select d1 * 1.1 from functional.decimal_tbl",
+        ScalarType.createDecimalType(11, 1), ScalarType.createDecimalType(12, 1));
+    checkDecimalReturnType("select d1 / 1.1 from functional.decimal_tbl",
+        ScalarType.createDecimalType(14, 4), ScalarType.createDecimalType(16, 6));
+    checkDecimalReturnType("select d1 % 1.1 from functional.decimal_tbl",
+        ScalarType.createDecimalType(2, 1));
+    // BOTH: decimal + int literal = decimal
+    checkDecimalReturnType("select d1 + 2 from functional.decimal_tbl",
+        ScalarType.createDecimalType(10, 0));
+    checkDecimalReturnType("select d1 - 2 from functional.decimal_tbl",
+        ScalarType.createDecimalType(10, 0));
+    checkDecimalReturnType("select d1 * 2 from functional.decimal_tbl",
+        ScalarType.createDecimalType(12, 0), ScalarType.createDecimalType(13, 0));
+    checkDecimalReturnType("select d1 / 2 from functional.decimal_tbl",
+        ScalarType.createDecimalType(13, 4), ScalarType.createDecimalType(15, 6));
+    checkDecimalReturnType("select d1 % 2 from functional.decimal_tbl",
+        ScalarType.createDecimalType(3, 0));
+    // DECIMAL_V1: int + numeric literal = floating point
+    // DECIMAL_V2: int + decimal expr = decimal
+    checkDecimalReturnType("select int_col + 1.1 from functional.alltypestiny",
+        Type.DOUBLE, ScalarType.createDecimalType(12, 1));
+    checkDecimalReturnType("select int_col - 1.1 from functional.alltypestiny",
+        Type.DOUBLE, ScalarType.createDecimalType(12, 1));
+    checkDecimalReturnType("select int_col * 1.1 from functional.alltypestiny",
+        Type.DOUBLE, ScalarType.createDecimalType(13, 1));
+    checkDecimalReturnType("select int_col / 1.1 from functional.alltypestiny",
+        Type.DOUBLE, ScalarType.createDecimalType(17, 6));
+    checkDecimalReturnType("select int_col % 1.1 from functional.alltypestiny",
+        Type.DOUBLE, ScalarType.createDecimalType(2, 1));
+
+    // Multiplying a floating point type with any other type always results in a double.
+    checkDecimalReturnType("select float_col * d1 from functional.alltypestiny " +
+         "join functional.decimal_tbl", Type.DOUBLE);
+    checkDecimalReturnType("select d1 * float_col from functional.alltypestiny " +
+         "join functional.decimal_tbl", Type.DOUBLE);
+    checkDecimalReturnType("select double_col * d1 from functional.alltypestiny " +
+         "join functional.decimal_tbl", Type.DOUBLE);
+    checkDecimalReturnType("select float_col * 10 from functional.alltypestiny",
         Type.DOUBLE);
-    // decimal + numeric literal = decimal
-    checkReturnType("select d1 + 1.1 from functional.decimal_tbl",
-        ScalarType.createDecimalType(11,1));
-    // int + numeric literal = floating point
-    checkReturnType("select int_col + 1.1 from functional.alltypestiny",
+    checkDecimalReturnType("select 10 * float_col from functional.alltypestiny",
+        Type.DOUBLE);
+    checkDecimalReturnType("select double_col * 10 from functional.alltypestiny",
+        Type.DOUBLE);
+    checkDecimalReturnType("select float_col * 10.0 from functional.alltypestiny",
+        Type.DOUBLE);
+    checkDecimalReturnType("select 10.0 * float_col from functional.alltypestiny",
+        Type.DOUBLE);
+    checkDecimalReturnType("select double_col * 10.0 from functional.alltypestiny",
         Type.DOUBLE);
 
-    // IMPALA-3439: Non-trivial constant expression with decimal + double = double.
-    // Tests that only the decimal literals in the constant decimal expr are cast
-    // to double. The second argument of round() must be an integer.
-    checkReturnType("select round(1.2345, 2) * pow(10, 10)", Type.DOUBLE);
+    // IMPALA-3439: constant expression involving a function with mixed decimal and
+    // integer inputs. Regression tests to make sure that only the decimal literals
+    // in the constant decimal expr are cast to double. The second argument of round()
+    // must be an integer.
+    checkDecimalReturnType("select round(1.2345, 2) * pow(10, 10)", Type.DOUBLE);
+    checkDecimalReturnType("select round(1.2345, 2) + pow(10, 10)",
+        Type.DOUBLE, ScalarType.createDecimalType(38, 17));
 
-    // Explicitly casting the literal to a decimal will override the behavior
-    checkReturnType("select int_col + cast(1.1 as decimal(2,1)) from "
-        + " functional.alltypestiny", ScalarType.createDecimalType(12,1));
-    checkReturnType("select float_col + cast(1.1 as decimal(2,1)) from "
-        + " functional.alltypestiny", ScalarType.createDecimalType(38,9));
-    checkReturnType("select float_col + cast(1.1*1.2+1.3 as decimal(2,1)) from "
-        + " functional.alltypestiny", ScalarType.createDecimalType(38,9));
+    // Explicitly casting the literal to a decimal or float changes the type of the
+    // literal. This is independent of the DECIMAL_V2 setting.
+    checkDecimalReturnType("select int_col + cast(1.1 as decimal(2,1)) from "
+        + " functional.alltypestiny", ScalarType.createDecimalType(12, 1));
+    checkDecimalReturnType("select float_col + cast(1.1 as decimal(2,1)) from "
+        + " functional.alltypestiny", ScalarType.createDecimalType(38, 9));
+    checkDecimalReturnType("select float_col + cast(1.1*1.2+1.3 as decimal(2,1)) from "
+        + " functional.alltypestiny", ScalarType.createDecimalType(38, 9));
+    checkDecimalReturnType("select float_col + cast(1.1 as float) from "
+        + " functional.alltypestiny", Type.DOUBLE);
+    checkDecimalReturnType("select float_col + cast(1.1 as float) from "
+        + " functional.alltypestiny", Type.DOUBLE);
+    checkDecimalReturnType("select float_col + cast(1.1 as double) from "
+        + " functional.alltypestiny", Type.DOUBLE);
 
-    // The location and complexity of the expr should not matter.
-    checkReturnType("select 1.0 + float_col + 1.1 from functional.alltypestiny",
-        Type.DOUBLE);
-    checkReturnType("select 1.0 + 2.0 + float_col from functional.alltypestiny",
-        Type.DOUBLE);
-    checkReturnType("select 1.0 + 2.0 + pi() * float_col from functional.alltypestiny",
-        Type.DOUBLE);
-    checkReturnType("select 1.0 + d1 + 1.1 from functional.decimal_tbl",
-        ScalarType.createDecimalType(12,1));
-    checkReturnType("select 1.0 + 2.0 + d1 from functional.decimal_tbl",
-        ScalarType.createDecimalType(11,1));
-    checkReturnType("select 1.0 + 2.0 + pi()*d1 from functional.decimal_tbl",
-        Type.DOUBLE);
+    // Test behavior of compound expressions with a single slot ref and many literals.
+    checkDecimalReturnType("select 1.0 + float_col + 1.1 from functional.alltypestiny",
+        Type.DOUBLE, ScalarType.createDecimalType(38, 9));
+    checkDecimalReturnType("select 1.0 + 2.0 + float_col from functional.alltypestiny",
+        Type.DOUBLE, ScalarType.createDecimalType(38, 9));
+    checkDecimalReturnType("select 1.0 + 2.0 + pi() * float_col from functional.alltypestiny",
+        Type.DOUBLE, ScalarType.createDecimalType(38, 17));
+    checkDecimalReturnType("select 1.0 + d1 + 1.1 from functional.decimal_tbl",
+        ScalarType.createDecimalType(12, 1));
+    checkDecimalReturnType("select 1.0 + 2.0 + d1 from functional.decimal_tbl",
+        ScalarType.createDecimalType(11, 1));
+    checkDecimalReturnType("select 1.0 + 2.0 + pi() * d1 from functional.decimal_tbl",
+        Type.DOUBLE, ScalarType.createDecimalType(38, 17));
 
-    // Test with multiple cols
-    checkReturnType("select double_col + 1.23 + float_col + 1.0 " +
-        " from functional.alltypestiny", Type.DOUBLE);
-    checkReturnType("select double_col + 1.23 + float_col + 1.0 + int_col " +
-        " + bigint_col from functional.alltypestiny", Type.DOUBLE);
-    checkReturnType("select d1 + 1.23 + d2 + 1.0 " +
-        " from functional.decimal_tbl", ScalarType.createDecimalType(14,2));
+    // Test behavior of compound expressions with multiple slot refs and literals.
+    checkDecimalReturnType("select double_col + 1.23 + float_col + 1.0 " +
+        " from functional.alltypestiny", Type.DOUBLE, ScalarType.createDecimalType(38, 17));
+    checkDecimalReturnType("select double_col + 1.23 + float_col + 1.0 + int_col " +
+        " + bigint_col from functional.alltypestiny", Type.DOUBLE,
+        ScalarType.createDecimalType(38, 17));
+    checkDecimalReturnType("select d1 + 1.23 + d2 + 1.0 " +
+        " from functional.decimal_tbl", ScalarType.createDecimalType(14, 2));
 
-    // Test with slot of both decimal and non-decimal
-    checkReturnType("select t1.int_col + t2.c1 from functional.alltypestiny t1 " +
-        " cross join functional.decimal_tiny t2", ScalarType.createDecimalType(15,4));
-    checkReturnType("select 1.1 + t1.int_col + t2.c1 from functional.alltypestiny t1 " +
-        " cross join functional.decimal_tiny t2", ScalarType.createDecimalType(38,17));
+    // Test with slot refs of both decimal and non-decimal
+    checkDecimalReturnType("select t1.int_col + t2.c1 from functional.alltypestiny t1 " +
+        " cross join functional.decimal_tiny t2", ScalarType.createDecimalType(15, 4));
+    checkDecimalReturnType("select 1.1 + t1.int_col + t2.c1 from functional.alltypestiny t1 " +
+        " cross join functional.decimal_tiny t2", ScalarType.createDecimalType(38, 17),
+        ScalarType.createDecimalType(16, 4));
   }
 
   /**
@@ -1620,6 +1821,17 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select nvl2(now(), true)", "No matching function with signature: " +
         "if(BOOLEAN, BOOLEAN).");
     AnalysisError("select nvl2()", "No matching function with signature: if().");
+
+    // IFNULL() is converted to IF() before analysis.
+    AnalyzesOk("select nullif(1, 1)");
+    AnalyzesOk("select nullif(NULL, 'not null')");
+    AnalyzesOk("select nullif('not null', null)");
+    AnalyzesOk("select nullif(int_col, int_col) from functional.alltypesagg");
+    // Because of conversion, nullif() isn't found rather than having no
+    // matching function with the signature.
+    AnalysisError("select nullif(1,2,3)", "default.nullif() unknown");
+    AnalysisError("select nullif('x', 1)",
+        "operands of type STRING and TINYINT are not comparable: 'x' IS DISTINCT FROM 1");
   }
 
   @Test
@@ -2182,6 +2394,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
   @Test
   public void TestDecimalFunctions() throws AnalysisException {
+    final String [] aliasesOfTruncate = new String[]{"truncate", "dtrunc", "trunc"};
     AnalyzesOk("select abs(cast(1 as decimal))");
     AnalyzesOk("select abs(cast(-1.1 as decimal(10,3)))");
 
@@ -2194,18 +2407,25 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select round(cast(1.123 as decimal(10,3)), 5)");
     AnalyzesOk("select round(cast(1.123 as decimal(10,3)), -2)");
 
-    AnalyzesOk("select truncate(cast(1.123 as decimal(10,3)))");
-    AnalyzesOk("select truncate(cast(1.123 as decimal(10,3)), 0)");
-    AnalyzesOk("select truncate(cast(1.123 as decimal(10,3)), 2)");
-    AnalyzesOk("select truncate(cast(1.123 as decimal(10,3)), 5)");
-    AnalyzesOk("select truncate(cast(1.123 as decimal(10,3)), -1)");
+    for (final String alias : aliasesOfTruncate) {
+        AnalyzesOk(String.format("select %s(cast(1.123 as decimal(10,3)))", alias));
+        AnalyzesOk(String.format("select %s(cast(1.123 as decimal(10,3)), 0)", alias));
+        AnalyzesOk(String.format("select %s(cast(1.123 as decimal(10,3)), 2)", alias));
+        AnalyzesOk(String.format("select %s(cast(1.123 as decimal(10,3)), 5)", alias));
+        AnalyzesOk(String.format("select %s(cast(1.123 as decimal(10,3)), -1)", alias));
+    }
 
     AnalysisError("select round(cast(1.123 as decimal(10,3)), 5.1)",
         "No matching function with signature: round(DECIMAL(10,3), DECIMAL(2,1))");
     AnalysisError("select round(cast(1.123 as decimal(30,20)), 40)",
         "Cannot round/truncate to scales greater than 38.");
-    AnalysisError("select truncate(cast(1.123 as decimal(10,3)), 40)",
-        "Cannot round/truncate to scales greater than 38.");
+    for (final String alias : aliasesOfTruncate) {
+        AnalysisError(String.format("select truncate(cast(1.123 as decimal(10,3)), 40)",
+            alias), "Cannot round/truncate to scales greater than 38.");
+        AnalyzesOk(String.format("select %s(NULL)", alias));
+        AnalysisError(String.format("select %s(NULL, 1)", alias),
+            "Cannot resolve DECIMAL precision and scale from NULL type.");
+    }
     AnalysisError("select round(cast(1.123 as decimal(10,3)), NULL)",
         "round() cannot be called with a NULL second argument.");
 
@@ -2233,12 +2453,20 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testDecimalExpr("ceil(123.45)", ScalarType.createDecimalType(4, 0));
     testDecimalExpr("floor(12.345)", ScalarType.createDecimalType(3, 0));
 
-    testDecimalExpr("truncate(1.23)", ScalarType.createDecimalType(1, 0));
-    testDecimalExpr("truncate(1.23, 1)", ScalarType.createDecimalType(2, 1));
-    testDecimalExpr("truncate(1.23, 0)", ScalarType.createDecimalType(1, 0));
-    testDecimalExpr("truncate(1.23, 3)", ScalarType.createDecimalType(4, 3));
-    testDecimalExpr("truncate(1.23, -1)", ScalarType.createDecimalType(1, 0));
-    testDecimalExpr("truncate(1.23, -2)", ScalarType.createDecimalType(1, 0));
+    for (final String alias : aliasesOfTruncate) {
+        testDecimalExpr(String.format("%s(1.23)", alias),
+            ScalarType.createDecimalType(1, 0));
+        testDecimalExpr(String.format("%s(1.23, 1)", alias),
+            ScalarType.createDecimalType(2, 1));
+        testDecimalExpr(String.format("%s(1.23, 0)", alias),
+            ScalarType.createDecimalType(1, 0));
+        testDecimalExpr(String.format("%s(1.23, 3)", alias),
+            ScalarType.createDecimalType(4, 3));
+        testDecimalExpr(String.format("%s(1.23, -1)", alias),
+            ScalarType.createDecimalType(1, 0));
+        testDecimalExpr(String.format("%s(1.23, -2)", alias),
+            ScalarType.createDecimalType(1, 0));
+    }
   }
 
   /**

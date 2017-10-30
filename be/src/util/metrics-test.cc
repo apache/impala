@@ -215,12 +215,12 @@ TEST_F(MetricsTest, StatsMetricsSingle) {
 }
 
 TEST_F(MetricsTest, MemMetric) {
-#ifndef ADDRESS_SANITIZER
+#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
   MetricGroup metrics("MemMetrics");
-  RegisterMemoryMetrics(&metrics, false, nullptr, nullptr);
+  ASSERT_OK(RegisterMemoryMetrics(&metrics, false, nullptr, nullptr));
   // Smoke test to confirm that tcmalloc metrics are returning reasonable values.
-  UIntGauge* bytes_in_use =
-      metrics.FindMetricForTesting<UIntGauge>("tcmalloc.bytes-in-use");
+  IntGauge* bytes_in_use =
+      metrics.FindMetricForTesting<IntGauge>("tcmalloc.bytes-in-use");
   ASSERT_TRUE(bytes_in_use != NULL);
 
   uint64_t cur_in_use = bytes_in_use->value();
@@ -232,31 +232,31 @@ TEST_F(MetricsTest, MemMetric) {
   scoped_ptr<vector<uint64_t>> chunk(new vector<uint64_t>(100 * 1024 * 1024));
   EXPECT_GT(bytes_in_use->value(), cur_in_use);
 
-  UIntGauge* total_bytes_reserved =
-      metrics.FindMetricForTesting<UIntGauge>("tcmalloc.total-bytes-reserved");
+  IntGauge* total_bytes_reserved =
+      metrics.FindMetricForTesting<IntGauge>("tcmalloc.total-bytes-reserved");
   ASSERT_TRUE(total_bytes_reserved != NULL);
   ASSERT_GT(total_bytes_reserved->value(), 0);
 
-  UIntGauge* pageheap_free_bytes =
-      metrics.FindMetricForTesting<UIntGauge>("tcmalloc.pageheap-free-bytes");
+  IntGauge* pageheap_free_bytes =
+      metrics.FindMetricForTesting<IntGauge>("tcmalloc.pageheap-free-bytes");
   ASSERT_TRUE(pageheap_free_bytes != NULL);
 
-  UIntGauge* pageheap_unmapped_bytes =
-      metrics.FindMetricForTesting<UIntGauge>("tcmalloc.pageheap-unmapped-bytes");
+  IntGauge* pageheap_unmapped_bytes =
+      metrics.FindMetricForTesting<IntGauge>("tcmalloc.pageheap-unmapped-bytes");
   EXPECT_TRUE(pageheap_unmapped_bytes != NULL);
 #endif
 }
 
 TEST_F(MetricsTest, JvmMetrics) {
   MetricGroup metrics("JvmMetrics");
-  RegisterMemoryMetrics(&metrics, true, nullptr, nullptr);
-  UIntGauge* jvm_total_used =
-      metrics.GetOrCreateChildGroup("jvm")->FindMetricForTesting<UIntGauge>(
+  ASSERT_OK(RegisterMemoryMetrics(&metrics, true, nullptr, nullptr));
+  IntGauge* jvm_total_used =
+      metrics.GetOrCreateChildGroup("jvm")->FindMetricForTesting<IntGauge>(
           "jvm.total.current-usage-bytes");
   ASSERT_TRUE(jvm_total_used != NULL);
   EXPECT_GT(jvm_total_used->value(), 0);
-  UIntGauge* jvm_peak_total_used =
-      metrics.GetOrCreateChildGroup("jvm")->FindMetricForTesting<UIntGauge>(
+  IntGauge* jvm_peak_total_used =
+      metrics.GetOrCreateChildGroup("jvm")->FindMetricForTesting<IntGauge>(
           "jvm.total.peak-current-usage-bytes");
   ASSERT_TRUE(jvm_peak_total_used != NULL);
   EXPECT_GT(jvm_peak_total_used->value(), 0);

@@ -758,6 +758,9 @@ set hbase_caching=1000;
         <li>
           <p conref="../shared/impala_common.xml#common/hbase_no_load_data"/>
         </li>
+        <li>
+          <p conref="../shared/impala_common.xml#common/tablesample_caveat"/>
+        </li>
       </ul>
     </conbody>
   </concept>

@@ -88,11 +88,6 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
       throw new AnalysisException("ALTER TABLE ADD PARTITION is not supported for " +
           "Kudu tables: " + table.getTableName());
     }
-    if (partitions_.size() > CatalogOpExecutor.MAX_PARTITION_UPDATES_PER_RPC) {
-      throw new AnalysisException(
-          String.format("One ALTER TABLE ADD PARTITION cannot add more than %d " +
-          "partitions.", CatalogOpExecutor.MAX_PARTITION_UPDATES_PER_RPC));
-    }
     Set<String> partitionSpecs = Sets.newHashSet();
     for (PartitionDef p: partitions_) {
       p.analyze(analyzer);

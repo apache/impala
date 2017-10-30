@@ -40,19 +40,16 @@
 
 #include "common/names.h"
 
-DEFINE_string(log_filename, "",
-    "Prefix of log filename - "
-    "full path is <log_dir>/<log_filename>.[INFO|WARN|ERROR|FATAL]");
-DEFINE_bool(redirect_stdout_stderr, true,
-    "If true, redirects stdout/stderr to INFO/ERROR log.");
-
 DECLARE_string(redaction_rules_file);
-
+DECLARE_string(log_filename);
+DECLARE_bool(redirect_stdout_stderr);
 DECLARE_string(audit_event_log_dir);
 
 using boost::uuids::random_generator;
 
+namespace {
 bool logging_initialized = false;
+}
 
 mutex logging_mutex;
 

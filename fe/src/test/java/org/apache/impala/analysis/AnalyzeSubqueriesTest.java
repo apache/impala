@@ -732,12 +732,26 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         AnalyzesOk(String.format("select count(*) from functional.alltypes a where " +
             "id %s (select %s from functional.alltypestiny t where t.bool_col = false " +
             "and a.int_col = t.int_col) and a.bigint_col < 10", cmpOp, aggFn));
+        AnalyzesOk(String.format("select count(*) from functional.alltypes a where " +
+            "id %s (select %s from functional.alltypestiny t where " +
+            "t.int_col = a.int_col and a.id < 10)", cmpOp, aggFn));
         // TODO: The rewrite of this query is correct, but could be improved by using a
         // semi join instead of an outer join.
-        AnalyzesOk(String.format(
-            "select id from functional.allcomplextypes t where id %s " +
-            "(select %s from (select f1 as id, f2 from t.struct_array_col) v " +
+        AnalyzesOk(String.format("select id from functional.allcomplextypes t where id " +
+            " %s (select %s from (select f1 as id, f2 from t.struct_array_col) v " +
             "where t.int_struct_col.f1 < v.id)", cmpOp, aggFn));
+        // Correlated with inequality predicate
+        AnalysisError(String.format("select id from functional.alltypes t1 where " +
+            "id %s (select %s from functional.alltypestiny t2 where " +
+            "t1.int_col = t2.int_col and t1.tinyint_col < t2.tinyint_col)", cmpOp, aggFn),
+            String.format("Unsupported aggregate subquery with non-equality " +
+            "correlated predicates: t1.tinyint_col < t2.tinyint_col", aggFn));
+        AnalysisError(String.format("select id from functional.alltypes t1 where " +
+            "id %s (select %s from functional.alltypestiny t2 where " +
+            "t1.int_col = t2.int_col and t1.tinyint_col + 1 < t2.tinyint_col - 1)", cmpOp,
+            aggFn), String.format("Unsupported aggregate subquery with non-equality " +
+            "correlated predicates: t1.tinyint_col + 1 < t2.tinyint_col - 1",
+            aggFn));
         // Correlated with constant expr
         AnalyzesOk(String.format("select count(*) from functional.alltypes a where " +
             "10 %s (select %s from functional.alltypestiny t where t.bool_col = false " +
@@ -828,9 +842,17 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
           String.format("operands of type INT and TIMESTAMP are not comparable: " +
           "int_col %s (SELECT max(timestamp_col) FROM functional.alltypessmall)", cmpOp));
       // Distinct in the outer select block
-      AnalyzesOk(String.format("select distinct id from functional.alltypes a " +
-          "where 100 %s (select count(*) from functional.alltypesagg g where " +
-          "a.int_col %s g.int_col) and a.bool_col = false", cmpOp, cmpOp));
+      if (cmpOp == "=") {
+        AnalyzesOk(String.format("select distinct id from functional.alltypes a " +
+            "where 100 %s (select count(*) from functional.alltypesagg g where " +
+            "a.int_col %s g.int_col) and a.bool_col = false", cmpOp, cmpOp));
+      } else {
+        AnalysisError(String.format("select distinct id from functional.alltypes a " +
+            "where 100 %s (select count(*) from functional.alltypesagg g where " +
+            "a.int_col %s g.int_col) and a.bool_col = false", cmpOp, cmpOp),
+            String.format("Unsupported aggregate subquery with non-equality " +
+            "correlated predicates: a.int_col %s g.int_col", cmpOp));
+      }
     }
 
     // Subquery returns multiple rows

@@ -64,6 +64,9 @@ DataStreamMgr::DataStreamMgr(MetricGroup* metrics) {
       "total-senders-timedout-waiting-for-recvr-creation", 0L);
 }
 
+DataStreamMgr::~DataStreamMgr() {
+}
+
 inline uint32_t DataStreamMgr::GetHashValue(
     const TUniqueId& fragment_instance_id, PlanNodeId node_id) {
   uint32_t value = RawValue::GetHashValue(&fragment_instance_id.lo, TYPE_BIGINT, 0);
@@ -72,10 +75,10 @@ inline uint32_t DataStreamMgr::GetHashValue(
   return value;
 }
 
-shared_ptr<DataStreamRecvr> DataStreamMgr::CreateRecvr(RuntimeState* state,
+shared_ptr<DataStreamRecvrBase> DataStreamMgr::CreateRecvr(RuntimeState* state,
     const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
-    PlanNodeId dest_node_id, int num_senders, int buffer_size, RuntimeProfile* profile,
-    bool is_merging) {
+    PlanNodeId dest_node_id, int num_senders, int64_t buffer_size,
+    RuntimeProfile* profile, bool is_merging) {
   DCHECK(profile != NULL);
   VLOG_FILE << "creating receiver for fragment="
             << fragment_instance_id << ", node=" << dest_node_id;
@@ -169,7 +172,7 @@ Status DataStreamMgr::AddData(const TUniqueId& fragment_instance_id,
     PlanNodeId dest_node_id, const TRowBatch& thrift_batch, int sender_id) {
   VLOG_ROW << "AddData(): fragment_instance_id=" << fragment_instance_id
            << " node=" << dest_node_id
-           << " size=" << RowBatch::GetBatchSize(thrift_batch);
+           << " size=" << RowBatch::GetDeserializedSize(thrift_batch);
   bool already_unregistered;
   shared_ptr<DataStreamRecvr> recvr = FindRecvrOrWait(fragment_instance_id, dest_node_id,
       &already_unregistered);
@@ -194,10 +197,19 @@ Status DataStreamMgr::CloseSender(const TUniqueId& fragment_instance_id,
     PlanNodeId dest_node_id, int sender_id) {
   VLOG_FILE << "CloseSender(): fragment_instance_id=" << fragment_instance_id
             << ", node=" << dest_node_id;
-  bool unused;
+  Status status;
+  bool already_unregistered;
   shared_ptr<DataStreamRecvr> recvr = FindRecvrOrWait(fragment_instance_id, dest_node_id,
-      &unused);
-  if (recvr.get() != NULL) recvr->RemoveSender(sender_id);
+      &already_unregistered);
+  if (recvr == nullptr) {
+    // Was not able to notify the receiver that this was the end of stream. Notify the
+    // sender that this failed so that they can take appropriate action (i.e. failing
+    // the query).
+    status = already_unregistered ? Status::OK() :
+        Status(TErrorCode::DATASTREAM_SENDER_TIMEOUT, PrintId(fragment_instance_id));
+  } else {
+    recvr->RemoveSender(sender_id);
+  }
 
   {
     // Remove any closed streams that have been in the cache for more than
@@ -218,7 +230,7 @@ Status DataStreamMgr::CloseSender(const TUniqueId& fragment_instance_id,
                  << PrettyPrinter::Print(MonotonicMillis() - now, TUnit::TIME_MS);
     }
   }
-  return Status::OK();
+  return status;
 }
 
 Status DataStreamMgr::DeregisterRecvr(

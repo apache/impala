@@ -57,8 +57,9 @@ under the License.
     <p>
       If statistics are not available for all the tables in the join query, or if Impala chooses a join order that
       is not the most efficient, you can override the automatic join order optimization by specifying the
-      <codeph>STRAIGHT_JOIN</codeph> keyword immediately after the <codeph>SELECT</codeph> keyword. In this case,
-      Impala uses the order the tables appear in the query to guide how the joins are processed.
+      <codeph>STRAIGHT_JOIN</codeph> keyword immediately after the <codeph>SELECT</codeph> and any <codeph>DISTINCT</codeph>
+      or <codeph>ALL</codeph> keywords. In this case, Impala uses the order the tables appear in the query to guide how the
+      joins are processed.
     </p>
 
     <p>
@@ -149,11 +150,16 @@ under the License.
       <p>
         If an Impala join query is inefficient because of outdated statistics or unexpected data distribution, you
         can keep Impala from reordering the joined tables by using the <codeph>STRAIGHT_JOIN</codeph> keyword
-        immediately after the <codeph>SELECT</codeph> keyword. The <codeph>STRAIGHT_JOIN</codeph> keyword turns off
+        immediately after the <codeph>SELECT</codeph> and any <codeph>DISTINCT</codeph> or <codeph>ALL</codeph>
+        keywords. The <codeph>STRAIGHT_JOIN</codeph> keyword turns off
         the reordering of join clauses that Impala does internally, and produces a plan that relies on the join
         clauses being ordered optimally in the query text. In this case, rewrite the query so that the largest
         table is on the left, followed by the next largest, and so on until the smallest table is on the right.
       </p>
+
+      <note>
+        <p conref="../shared/impala_common.xml#common/straight_join_nested_queries"/>
+      </note>
 
       <p>
         In this example, the subselect from the <codeph>BIG</codeph> table produces a very small result set, but
@@ -163,6 +169,10 @@ under the License.
       </p>
 
 <codeblock>select straight_join x from medium join small join (select * from big where c1 &lt; 10) as big
+  where medium.id = small.id and small.id = big.id;
+
+-- If the query contains [DISTINCT | ALL], the hint goes after those keywords.
+select distinct straight_join x from medium join small join (select * from big where c1 &lt; 10) as big
   where medium.id = small.id and small.id = big.id;</codeblock>
     </conbody>
   </concept>

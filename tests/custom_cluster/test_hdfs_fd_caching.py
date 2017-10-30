@@ -23,6 +23,7 @@ from tests.util.filesystem_utils import (
     IS_ISILON,
     IS_S3,
     IS_ADLS)
+from time import sleep
 
 @SkipIfLocal.hdfs_fd_caching
 class TestHdfsFdCaching(CustomClusterTestSuite):
@@ -59,7 +60,8 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
     super(TestHdfsFdCaching, self).teardown_method(method)
     self.client.execute("drop database if exists cachefd cascade")
 
-  def run_fd_caching_test(self, vector, caching_expected, cache_capacity):
+  def run_fd_caching_test(self, vector, caching_expected, cache_capacity,
+      eviction_timeout_secs):
     """
     Tests that HDFS file handles are cached as expected. This is used both
     for the positive and negative test cases. If caching_expected is true,
@@ -103,26 +105,52 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
     # Read all the files of the table and make sure no FD leak
     for x in range(10):
       self.execute_query("select count(*) from cachefd.simple;", vector=vector)
-      assert self.max_cached_handles() <= 16
+      assert self.max_cached_handles() <= cache_capacity
       if not caching_expected:
         assert self.cached_handles() == num_handles_start
     assert self.outstanding_handles() == 0
 
+    if caching_expected and eviction_timeout_secs is not None:
+      # To test unused file handle eviction, sleep for longer than the timeout.
+      # All the cached handles should be evicted.
+      sleep(eviction_timeout_secs + 5)
+      assert self.cached_handles() == 0
+
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args="--max_cached_file_handles=16",
+      impalad_args="--max_cached_file_handles=16 " +
+          " --unused_file_handle_timeout_sec=18446744073709551600",
       catalogd_args="--load_catalog_in_background=false")
   def test_caching_enabled(self, vector):
-    """Test of the HDFS file handle cache with the parameter specified"""
+    """
+    Test of the HDFS file handle cache with the parameter specified and a very
+    large file handle timeout
+    """
+
     cache_capacity = 16
 
     # Caching only applies to local HDFS files. If this is local HDFS, then verify
     # that caching works. Otherwise, verify that file handles are not cached.
-    if (IS_S3 or IS_ADLS or IS_ISILON or pytest.config.option.testing_remote_cluster):
+    if IS_S3 or IS_ADLS or IS_ISILON or pytest.config.option.testing_remote_cluster:
       caching_expected = False
     else:
       caching_expected = True
-    self.run_fd_caching_test(vector, caching_expected, cache_capacity)
+    self.run_fd_caching_test(vector, caching_expected, cache_capacity, None)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--max_cached_file_handles=16 --unused_file_handle_timeout_sec=5",
+      catalogd_args="--load_catalog_in_background=false")
+  def test_caching_with_eviction(self, vector):
+    """Test of the HDFS file handle cache with unused file handle eviction enabled"""
+    cache_capacity = 16
+    handle_timeout = 5
+
+    # Only test eviction on platforms where caching is enabled.
+    if IS_S3 or IS_ADLS or IS_ISILON or pytest.config.option.testing_remote_cluster:
+      return
+    caching_expected = True
+    self.run_fd_caching_test(vector, caching_expected, cache_capacity, handle_timeout)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -132,7 +160,7 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
     """Test that the HDFS file handle cache is disabled when the parameter is zero"""
     cache_capacity = 0
     caching_expected = False
-    self.run_fd_caching_test(vector, caching_expected, cache_capacity)
+    self.run_fd_caching_test(vector, caching_expected, cache_capacity, None)
 
   def cached_handles(self):
     return self.get_agg_metric("impala-server.io.mgr.num-cached-file-handles")

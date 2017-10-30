@@ -14,7 +14,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  mem-estimate=10.00MB mem-reservation=0B
+|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB
 |  tuple-ids=1 row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
@@ -44,7 +44,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  mem-estimate=10.00MB mem-reservation=0B
+|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB
 |  tuple-ids=1 row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
@@ -75,7 +75,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  mem-estimate=10.00MB mem-reservation=0B
+|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB
 |  tuple-ids=1 row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]

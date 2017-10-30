@@ -20,6 +20,11 @@ from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import WAREHOUSE
 
+# Map from the test dimension file_format string to the SQL "STORED AS"
+# argument.
+STORED_AS_ARGS = { 'text': 'textfile', 'parquet': 'parquet', 'avro': 'avro',
+    'seq': 'sequencefile' }
+
 # Tests specific to partition metadata.
 # TODO: Split up the DDL tests and move some of the partition-specific tests
 # here.
@@ -33,10 +38,15 @@ class TestPartitionMetadata(ImpalaTestSuite):
     super(TestPartitionMetadata, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
 
-    # There is no reason to run these tests using all dimensions.
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text' and\
-        v.get_value('table_format').compression_codec == 'none')
+    # Run one variation of the test with each file formats that we support writing.
+    # The compression shouldn't affect the partition handling so restrict to the core
+    # compression codecs.
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        (v.get_value('table_format').file_format in ('text', 'parquet') and
+         v.get_value('table_format').compression_codec == 'none') or
+        (v.get_value('table_format').file_format in ('seq', 'avro') and
+         v.get_value('table_format').compression_codec == 'snap' and
+         v.get_value('table_format').compression_type == 'block'))
 
   @SkipIfLocal.hdfs_client
   def test_multiple_partitions_same_location(self, vector, unique_database):
@@ -46,11 +56,13 @@ class TestPartitionMetadata(ImpalaTestSuite):
     TBL_NAME = "same_loc_test"
     FQ_TBL_NAME = unique_database + "." + TBL_NAME
     TBL_LOCATION = '%s/%s.db/%s' % (WAREHOUSE, unique_database, TBL_NAME)
+    file_format = vector.get_value('table_format').file_format
     # Cleanup any existing data in the table directory.
     self.filesystem_client.delete_file_dir(TBL_NAME, recursive=True)
     # Create the table
-    self.client.execute("create table %s (i int) partitioned by(j int) location '%s'"
-        % (FQ_TBL_NAME, TBL_LOCATION))
+    self.client.execute(
+        "create table %s (i int) partitioned by(j int) stored as %s location '%s'"
+        % (FQ_TBL_NAME, STORED_AS_ARGS[file_format], TBL_LOCATION))
 
     # Point multiple partitions to the same location and use partition locations that
     # do not contain a key=value path.
@@ -62,20 +74,41 @@ class TestPartitionMetadata(ImpalaTestSuite):
     self.client.execute("alter table %s add partition (j=2) location '%s/p'"
         % (FQ_TBL_NAME, TBL_LOCATION))
 
+    # Allow unsupported avro and sequence file writer.
+    self.client.execute("set allow_unsupported_formats=true")
+
     # Insert some data. This will only update partition j=1 (IMPALA-1480).
     self.client.execute("insert into table %s partition(j=1) select 1" % FQ_TBL_NAME)
-    # Refresh to update file metadata of both partitions.
+    # Refresh to update file metadata of both partitions
     self.client.execute("refresh %s" % FQ_TBL_NAME)
 
     # The data will be read twice because each partition points to the same location.
     data = self.execute_scalar("select sum(i), sum(j) from %s" % FQ_TBL_NAME)
-    assert data.split('\t') == ['2', '3']
+    if file_format == 'avro':
+      # Avro writer is broken and produces nulls. Only check partition column.
+      assert data.split('\t')[1] == '3'
+    else:
+      assert data.split('\t') == ['2', '3']
 
     self.client.execute("insert into %s partition(j) select 1, 1" % FQ_TBL_NAME)
     self.client.execute("insert into %s partition(j) select 1, 2" % FQ_TBL_NAME)
     self.client.execute("refresh %s" % FQ_TBL_NAME)
     data = self.execute_scalar("select sum(i), sum(j) from %s" % FQ_TBL_NAME)
-    assert data.split('\t') == ['6', '9']
+    if file_format == 'avro':
+      # Avro writer is broken and produces nulls. Only check partition column.
+      assert data.split('\t')[1] == '9'
+    else:
+      assert data.split('\t') == ['6', '9']
+
+    # Force all scan ranges to be on the same node. It should produce the same
+    # result as above. See IMPALA-5412.
+    self.client.execute("set num_nodes=1")
+    data = self.execute_scalar("select sum(i), sum(j) from %s" % FQ_TBL_NAME)
+    if file_format == 'avro':
+      # Avro writer is broken and produces nulls. Only check partition column.
+      assert data.split('\t')[1] == '9'
+    else:
+      assert data.split('\t') == ['6', '9']
 
   @SkipIfS3.hive
   @SkipIfADLS.hive

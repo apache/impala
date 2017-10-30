@@ -61,7 +61,7 @@ void CodegenSymbolEmitter::NotifyObjectEmitted(const ObjectFile &obj,
     if (asm_file.fail()) {
       // Log error and continue if we can't write the disassembly to a file. Note that
       // fstream operations don't throw exceptions by default unless configured to do so.
-      LOG(ERROR) << "Could not save disassembly to: " << asm_file;
+      LOG(ERROR) << "Could not save disassembly to: " << asm_path_;
     }
   }
 
@@ -95,15 +95,16 @@ void CodegenSymbolEmitter::NotifyFreeingObject(const ObjectFile &obj) {
 void CodegenSymbolEmitter::ProcessSymbol(DIContext* debug_ctx,
     const SymbolRef& symbol, uint64_t size, vector<PerfMapEntry>* perf_map_entries,
     ofstream& asm_file) {
-  if (symbol.getType() != SymbolRef::ST_Function) return;
+  Expected<SymbolRef::Type> symType = symbol.getType();
+  if (!symType || symType.get() != SymbolRef::ST_Function) return;
 
-  ErrorOr<StringRef> name_or_err = symbol.getName();
-  ErrorOr<uint64_t> addr_or_err = symbol.getAddress();
+  Expected<StringRef> name_or_err = symbol.getName();
+  Expected<uint64_t> addr_or_err = symbol.getAddress();
   if (!name_or_err || !addr_or_err) return;
 
-  uint64_t addr = *addr_or_err;
+  uint64_t addr = addr_or_err.get();
   // Append id to symbol to disambiguate different instances of jitted functions.
-  string fn_symbol = Substitute("$0:$1", name_or_err->data(), id_);
+  string fn_symbol = Substitute("$0:$1", name_or_err.get().data(), id_);
 
   if (emit_perf_map_) {
     PerfMapEntry entry;

@@ -18,63 +18,35 @@
 # under the License.
 
 # This script bootstraps a development environment from almost nothing; it is known to
-# work on Ubuntu 14.04, and it definitely clobbers some local environment, so it's best to
-# run this in a sandbox first, like a VM or docker.
+# work on Ubuntu 14.04 and 16.04. It clobbers some local environment and system
+# configurations, so it is best to run this in a fresh install. It also sets up the
+# ~/.bashrc for the calling user and impala-config-local.sh with some environment
+# variables to make Impala compile and run after this script is complete.
 #
 # The intended user is a person who wants to start contributing code to Impala. This
-# script serves as an executable reference point for how to get started.
+# script serves as an executable reference point for how to get started. It takes about
+# two hours to complete.
 #
-# At this time, it completes in about 6.5 hours. It generates and loads the test data and
-# metadata without using a snapshot (which takes about 3 hours) and it then runs the full
-# testsuite (frontend, backend, end-to-end, JDBC, and custom cluster) in "core"
-# exploration mode.
+# To run this in a Docker container:
+#
+#   1. Run with --privileged
+#   2. Give the container a non-root sudoer wih NOPASSWD:
+#      apt-get update
+#      apt-get install sudo
+#      adduser --disabled-password --gecos '' impdev
+#      echo 'impdev ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+#   3. Run this script as that user: su - impdev -c /bootstrap_development.sh
 
-set -eux -o pipefail
+set -eu -o pipefail
 
-HOMEDIR="/home/$(whoami)/"
+BINDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-if [[ ! -d "${HOMEDIR}" ]]
-then
-    echo "${HOMEDIR} is needed for installing Impala dependencies"
-    exit 1
-fi
+source "${BINDIR}/bootstrap_system.sh"
 
-if [[ -z "${JAVA_HOME}" ]]
-then
-    echo "JAVA_HOME must be set to install Impala dependencies"
-    exit 1
-fi
-
-if ! sudo true
-then
-    echo "Passwordless sudo is needed for this script"
-    exit 1
-fi
-
-IMPALA_SETUP_REPO_URL="https://github.com/awleblang/impala-setup"
-
-# Place to download setup scripts
-TMPDIR=$(mktemp -d)
-function cleanup {
-    rm -rf "${TMPDIR}"
-}
-trap cleanup EXIT
-
-# Install build and test pre-reqs
-pushd "${TMPDIR}"
-git clone "${IMPALA_SETUP_REPO_URL}" impala-setup
-cd impala-setup
-chmod +x ./install.sh
-sudo ./install.sh
-popd
-
-# HDFS bug workaround
-echo "127.0.0.1 $(hostname -s) $(hostname)" | sudo tee -a /etc/hosts
-echo "NoHostAuthenticationForLocalhost yes" >> ~/.ssh/config
-
-pushd "$(dirname $0)/.."
-export IMPALA_HOME="$(pwd)"
 export MAX_PYTEST_FAILURES=0
 source bin/impala-config.sh
-./buildall.sh -noclean -format -testdata -build_shared_libs
-popd
+export NUM_CONCURRENT_TESTS=$(nproc)
+time -p ./buildall.sh -noclean -format -testdata -skiptests
+
+# To then run the tests:
+# time -p bin/run-all-tests.sh

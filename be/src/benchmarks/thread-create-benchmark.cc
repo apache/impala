@@ -87,14 +87,16 @@ void NativeThreadStarter(int num_threads, const function<void ()>& f) {
 
 // Runs N Impala Threads, each executing 'f'
 void ImpalaThreadStarter(int num_threads, const function<void ()>& f) {
-  vector<Thread*> threads;
+  vector<unique_ptr<Thread>> threads;
   threads.reserve(num_threads);
   for (int i=0; i < num_threads; ++i) {
-    threads.push_back(new Thread("mythreadgroup", "thread", f));
+    unique_ptr<Thread> thread;
+    Status s = Thread::Create("mythreadgroup", "thread", f, &thread);
+    DCHECK(s.ok());
+    threads.push_back(move(thread));
   }
-  for (Thread* thread: threads) {
+  for (unique_ptr<Thread>& thread: threads) {
     thread->Join();
-    delete thread;
   }
 }
 

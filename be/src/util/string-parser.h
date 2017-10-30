@@ -25,6 +25,8 @@
 
 #include "common/logging.h"
 #include "runtime/decimal-value.h"
+#include "runtime/timestamp-parse-util.h"
+#include "runtime/timestamp-value.h"
 #include "util/decimal-util.h"
 
 namespace impala {
@@ -95,6 +97,15 @@ class StringParser {
     return StringToBoolInternal(s + i, len - i, result);
   }
 
+  /// Parse a TimestampValue from s.
+  static inline TimestampValue StringToTimestamp(const char* s, int len,
+      ParseResult* result) {
+    boost::gregorian::date d;
+    boost::posix_time::time_duration t;
+    *result = TimestampParser::Parse(s, len, &d, &t) ? PARSE_SUCCESS : PARSE_FAILURE;
+    return {d, t};
+  }
+
   /// Parses a decimal from s, returning the result.
   /// The parse status is returned in *result.
   /// On overflow or invalid values, the return value is undefined.
@@ -142,7 +153,7 @@ class StringParser {
       --len;
     }
 
-    // Ignore leading zeros even after a dot. This allows for differetiating between
+    // Ignore leading zeros even after a dot. This allows for differentiating between
     // cases like 0.01e2, which would fit in a DECIMAL(1, 0), and 0.10e2, which would
     // overflow.
     int scale = 0;
@@ -182,7 +193,12 @@ class StringParser {
       } else if ((c == 'e' || c == 'E') && LIKELY(!found_exponent)) {
         found_exponent = true;
         exponent = StringToIntInternal<int8_t>(s + i + 1, len - i - 1, result);
-        if (UNLIKELY(*result != StringParser::PARSE_SUCCESS)) return DecimalValue<T>(0);
+        if (UNLIKELY(*result != StringParser::PARSE_SUCCESS)) {
+          if (*result == StringParser::PARSE_OVERFLOW && exponent < 0) {
+            *result = StringParser::PARSE_UNDERFLOW;
+          }
+          return DecimalValue<T>(0);
+        }
         break;
       } else {
         *result = StringParser::PARSE_FAILURE;
@@ -216,9 +232,17 @@ class StringParser {
     } else if (UNLIKELY(scale > type_scale)) {
       *result = StringParser::PARSE_UNDERFLOW;
       int shift = scale - type_scale;
-      if (truncated_digit_count > 0) shift -= truncated_digit_count;
-      if (shift > 0) value /= DecimalUtil::GetScaleMultiplier<T>(shift);
-      DCHECK(value >= 0);
+      if (UNLIKELY(truncated_digit_count > 0)) shift -= truncated_digit_count;
+      if (shift > 0) {
+        T divisor = DecimalUtil::GetScaleMultiplier<T>(shift);
+        if (LIKELY(divisor >= 0)) {
+          value /= divisor;
+        } else {
+          DCHECK(divisor == -1); // DCHECK_EQ doesn't work with int128_t.
+          value = 0;
+        }
+      }
+      DCHECK(value >= 0); // DCHECK_GE doesn't work with int128_t.
     } else if (UNLIKELY(!found_value && !found_dot)) {
       *result = StringParser::PARSE_FAILURE;
     }
@@ -574,6 +598,15 @@ inline int StringParser::StringParseTraits<int32_t>::max_ascii_len() { return 10
 template<>
 inline int StringParser::StringParseTraits<int64_t>::max_ascii_len() { return 19; }
 
-}
+// These functions are too large to benefit from inlining.
+Decimal4Value StringToDecimal4(const char* s, int len, int type_precision,
+    int type_scale, StringParser::ParseResult* result);
 
+Decimal8Value StringToDecimal8(const char* s, int len, int type_precision,
+    int type_scale, StringParser::ParseResult* result);
+
+Decimal16Value StringToDecimal16(const char* s, int len, int type_precision,
+    int type_scale, StringParser::ParseResult* result);
+
+}
 #endif

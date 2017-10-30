@@ -47,6 +47,7 @@ namespace llvm {
   class AllocaInst;
   class BasicBlock;
   class ConstantFolder;
+  class DiagnosticInfo;
   class ExecutionEngine;
   class Function;
   class LLVMContext;
@@ -62,10 +63,9 @@ namespace llvm {
     class PassManager;
   }
 
-  template<bool B, typename T, typename I>
+  template<typename T, typename I>
   class IRBuilder;
 
-  template<bool preserveName>
   class IRBuilderDefaultInserter;
 }
 
@@ -154,10 +154,13 @@ class LlvmCodeGen {
   static Status CreateImpalaCodegen(RuntimeState* state, MemTracker* parent_mem_tracker,
       const std::string& id, boost::scoped_ptr<LlvmCodeGen>* codegen);
 
-  /// Removes all jit compiled dynamically linked functions from the process.
   ~LlvmCodeGen();
 
-  RuntimeProfile* runtime_profile() { return &profile_; }
+  /// Releases all resources associated with the codegen object. It is invalid to call
+  /// any other API methods after calling close.
+  void Close();
+
+  RuntimeProfile* runtime_profile() { return profile_; }
   RuntimeProfile::Counter* codegen_timer() { return codegen_timer_; }
 
   /// Turns on/off optimization passes
@@ -189,6 +192,9 @@ class LlvmCodeGen {
 
     /// Returns name of function
     const std::string& name() const { return name_; }
+
+    /// (Re-)sets name of function
+    void SetName(const std::string& name) { name_ = name; }
 
     /// Add argument
     void AddArgument(const NamedVariable& var) {
@@ -234,7 +240,8 @@ class LlvmCodeGen {
   /// Return a pointer to pointer type for 'name' type.
   llvm::PointerType* GetPtrPtrType(const std::string& name);
 
-  /// Returns llvm type for the column type
+  /// Returns llvm type for Impala's internal representation of this column type,
+  /// i.e. the way Impala represents this type in a Tuple.
   llvm::Type* GetType(const ColumnType& type);
 
   /// Return a pointer type to 'type' (e.g. int16_t*)
@@ -306,7 +313,9 @@ class LlvmCodeGen {
       LibCacheEntry** cache_entry);
 
   /// Replaces all instructions in 'caller' that call 'target_name' with a call
-  /// instruction to 'new_fn'. Returns the number of call sites updated.
+  /// instruction to 'new_fn'. The argument types of 'new_fn' must exactly match
+  /// the argument types of the function to be replaced. Returns the number of
+  /// call sites updated.
   ///
   /// 'target_name' must be a substring of the mangled symbol of the function to be
   /// replaced. This usually means that the unmangled function name is sufficient.
@@ -471,7 +480,6 @@ class LlvmCodeGen {
   llvm::Type* bigint_type() { return GetType(TYPE_BIGINT); }
   llvm::Type* float_type() { return GetType(TYPE_FLOAT); }
   llvm::Type* double_type() { return GetType(TYPE_DOUBLE); }
-  llvm::Type* string_val_type() { return string_val_type_; }
   llvm::PointerType* ptr_type() { return ptr_type_; }
   llvm::Type* void_type() { return void_type_; }
   llvm::Type* i128_type() { return llvm::Type::getIntNTy(context(), 128); }
@@ -665,11 +673,12 @@ class LlvmCodeGen {
   std::string id_;
 
   /// Codegen counters
-  RuntimeProfile profile_;
+  RuntimeProfile* const profile_;
 
   /// MemTracker used for tracking memory consumed by codegen. Connected to a parent
-  /// MemTracker if one was provided during initialization.
-  boost::scoped_ptr<MemTracker> mem_tracker_;
+  /// MemTracker if one was provided during initialization. Owned by the ObjectPool
+  /// provided in the constructor.
+  MemTracker* mem_tracker_;
 
   /// Time spent reading the .ir file from the file system.
   RuntimeProfile::Counter* load_module_timer_;
@@ -760,8 +769,8 @@ class LlvmCodeGen {
   /// llvm representation of a few common types.  Owned by context.
   llvm::PointerType* ptr_type_;             // int8_t*
   llvm::Type* void_type_;                   // void
-  llvm::Type* string_val_type_;             // StringValue
-  llvm::Type* timestamp_val_type_;          // TimestampValue
+  llvm::Type* string_value_type_;           // StringValue
+  llvm::Type* timestamp_value_type_;        // TimestampValue
 
   /// llvm constants to help with code gen verbosity
   llvm::Value* true_value_;
@@ -771,6 +780,29 @@ class LlvmCodeGen {
   /// 'symbol_emitter_' are called by 'execution_engine_' when code is emitted or freed.
   /// The lifetime of the symbol emitter must be longer than 'execution_engine_'.
   boost::scoped_ptr<CodegenSymbolEmitter> symbol_emitter_;
+
+  /// Provides an implementation of a LLVM diagnostic handler and maintains the error
+  /// information from its callbacks.
+  class DiagnosticHandler {
+   public:
+    /// Returns the last error that was reported via DiagnosticHandlerFn() and then
+    /// clears it. Returns an empty string otherwise. This should be called after any
+    /// LLVM API call that can fail but returns error info via this mechanism.
+    /// TODO: IMPALA-6038: use this to check and handle errors wherever needed.
+    std::string GetErrorString();
+
+    /// Handler function that sets the state on an instance of this class which is
+    /// accessible via the LlvmCodeGen object passed to it using the 'context'
+    /// input parameter.
+    static void DiagnosticHandlerFn(const llvm::DiagnosticInfo &info, void *context);
+
+   private:
+    /// Contains the last error that was reported via DiagnosticHandlerFn().
+    /// Is cleared by a call to GetErrorString().
+    std::string error_str_;
+  };
+
+  DiagnosticHandler diagnostic_handler_;
 
   /// Very rough estimate of memory in bytes that the IR and the intermediate data
   /// structures used by the optimizer may consume per LLVM IR instruction to be

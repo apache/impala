@@ -28,6 +28,7 @@
 #include <boost/unordered_map.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 
+#include "common/status.h"
 #include "gen-cpp/StatestoreService.h"
 #include "gen-cpp/StatestoreSubscriber.h"
 #include "gen-cpp/Types_types.h"
@@ -97,6 +98,10 @@ class Statestore : public CacheLineAligned {
   /// The only constructor; initialises member variables only.
   Statestore(MetricGroup* metrics);
 
+  /// Initialize the ThreadPools used for updates and heartbeats. Returns an error if
+  /// ThreadPool initialization fails.
+  Status Init() WARN_UNUSED_RESULT;
+
   /// Registers a new subscriber with the given unique subscriber ID, running a subscriber
   /// service at the given location, with the provided list of topic subscriptions.
   /// The registration_id output parameter is the unique ID for this registration, used to
@@ -108,14 +113,12 @@ class Statestore : public CacheLineAligned {
   Status RegisterSubscriber(const SubscriberId& subscriber_id,
       const TNetworkAddress& location,
       const std::vector<TTopicRegistration>& topic_registrations,
-      TUniqueId* registration_id);
+      TUniqueId* registration_id) WARN_UNUSED_RESULT;
 
   void RegisterWebpages(Webserver* webserver);
 
   /// The main processing loop. Blocks until the exit flag is set.
-  //
-  /// Returns OK unless there is an unrecoverable error.
-  Status MainLoop();
+  void MainLoop();
 
   /// Returns the Thrift API interface that proxies requests onto the local Statestore.
   const boost::shared_ptr<StatestoreServiceIf>& thrift_iface() const {
@@ -128,8 +131,7 @@ class Statestore : public CacheLineAligned {
 
  private:
   /// A TopicEntry is a single entry in a topic, and logically is a <string, byte string>
-  /// pair. If the byte string is NULL, the entry has been deleted, but may be retained to
-  /// track changes to send to subscribers.
+  /// pair.
   class TopicEntry {
    public:
     /// A Value is a string of bytes, for which std::string is a convenient representation.
@@ -143,30 +145,38 @@ class Statestore : public CacheLineAligned {
     /// The Version value used to initialize a new TopicEntry.
     static const Version TOPIC_ENTRY_INITIAL_VERSION = 1L;
 
-    /// Representation of an empty Value. Must have size() == 0.
-    static const Value NULL_VALUE;
-
-    /// Sets the value of this entry to the byte / length pair. NULL_VALUE implies this
-    /// entry has been deleted.  The caller is responsible for ensuring, if required, that
-    /// the version parameter is larger than the current version() TODO: Consider enforcing
-    /// version monotonicity here.
+    /// Sets the value of this entry to the byte / length pair. The caller is responsible
+    /// for ensuring, if required, that the version parameter is larger than the
+    /// current version() TODO: Consider enforcing version monotonicity here.
     void SetValue(const Value& bytes, Version version);
 
-    TopicEntry() : value_(NULL_VALUE), version_(TOPIC_ENTRY_INITIAL_VERSION) { }
+    /// Sets a new version for this entry.
+    void SetVersion(Version version) { version_ = version; }
+
+    /// Sets the is_deleted_ flag for this entry.
+    void SetDeleted(bool is_deleted) { is_deleted_ = is_deleted; }
+
+    TopicEntry() : version_(TOPIC_ENTRY_INITIAL_VERSION),
+        is_deleted_(false) { }
 
     const Value& value() const { return value_; }
     uint64_t version() const { return version_; }
     uint32_t length() const { return value_.size(); }
+    bool is_deleted() const { return is_deleted_; }
 
    private:
-    /// Byte string value, owned by this TopicEntry. The value is opaque to the statestore,
-    /// and is interpreted only by subscribers.
+    /// Byte string value, owned by this TopicEntry. The value is opaque to the
+    /// statestore, and is interpreted only by subscribers.
     Value value_;
 
     /// The version of this entry. Every update is assigned a monotonically increasing
     /// version number so that only the minimal set of changes can be sent from the
     /// statestore to a subscriber.
     Version version_;
+
+    /// Indicates if the entry has been deleted. If true, the entry will still be
+    /// retained to track changes to send to subscribers.
+    bool is_deleted_;
   };
 
   /// Map from TopicEntryKey to TopicEntry, maintained by a Topic object.
@@ -189,19 +199,21 @@ class Statestore : public CacheLineAligned {
           total_value_size_bytes_(0L), key_size_metric_(key_size_metric),
           value_size_metric_(value_size_metric), topic_size_metric_(topic_size_metric) { }
 
-    /// Adds an entry with the given key. If bytes == NULL_VALUE, the entry is considered
-    /// deleted, and may be garbage collected in the future. The entry is assigned a new
-    /// version number by the Topic, and that version number is returned.
+    /// Adds an entry with the given key and value (bytes). If is_deleted is
+    /// true the entry is considered deleted, and may be garbage collected in the future.
+    /// The entry is assigned a new version number by the Topic, and that version number
+    /// is returned.
     //
     /// Must be called holding the topic lock
-    TopicEntry::Version Put(const TopicEntryKey& key, const TopicEntry::Value& bytes);
+    TopicEntry::Version Put(const TopicEntryKey& key, const TopicEntry::Value& bytes,
+        bool is_deleted);
 
     /// Utility method to support removing transient entries. We track the version numbers
     /// of entries added by subscribers, and remove entries with the same version number
     /// when that subscriber fails (the same entry may exist, but may have been updated by
     /// another subscriber giving it a new version number)
     //
-    /// Deletion means setting the entry's value to NULL and incrementing its version
+    /// Deletion means marking the entry as deleted and incrementing its version
     /// number.
     //
     /// Must be called holding the topic lock
@@ -439,10 +451,10 @@ class Statestore : public CacheLineAligned {
   /// Utility method to add an update to the given thread pool, and to fail if the thread
   /// pool is already at capacity.
   Status OfferUpdate(const ScheduledSubscriberUpdate& update,
-      ThreadPool<ScheduledSubscriberUpdate>* thread_pool);
+      ThreadPool<ScheduledSubscriberUpdate>* thread_pool) WARN_UNUSED_RESULT;
 
-  /// Sends either a heartbeat or topic update message to the subscriber in 'update' at the
-  /// closest possible time to the first member of 'update'.  If is_heartbeat is true,
+  /// Sends either a heartbeat or topic update message to the subscriber in 'update' at
+  /// the closest possible time to the first member of 'update'. If is_heartbeat is true,
   /// sends a heartbeat update, otherwise the set of pending topic updates is sent. Once
   /// complete, the next update is scheduled and added to the appropriate queue.
   void DoSubscriberUpdate(bool is_heartbeat, int thread_id,
@@ -458,14 +470,15 @@ class Statestore : public CacheLineAligned {
   /// will return OK (since there was no error) and the output parameter update_skipped is
   /// set to true. Otherwise, any updates returned by the subscriber are applied to their
   /// target topics.
-  Status SendTopicUpdate(Subscriber* subscriber, bool* update_skipped);
+  Status SendTopicUpdate(Subscriber* subscriber, bool* update_skipped) WARN_UNUSED_RESULT;
 
   /// Sends a heartbeat message to subscriber. Returns false if there was some error
   /// performing the RPC.
-  Status SendHeartbeat(Subscriber* subscriber);
+  Status SendHeartbeat(Subscriber* subscriber) WARN_UNUSED_RESULT;
 
   /// Unregister a subscriber, removing all of its transient entries and evicting it from
-  /// the subscriber map. Callers must hold subscribers_lock_ prior to calling this method.
+  /// the subscriber map. Callers must hold subscribers_lock_ prior to calling this
+  /// method.
   void UnregisterSubscriber(Subscriber* subscriber);
 
   /// Populates a TUpdateStateRequest with the update state for this subscriber. Iterates

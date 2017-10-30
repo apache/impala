@@ -109,11 +109,28 @@ class ClientRequestState;
 /// TODO: The same doesn't apply to the execution state of an individual plan
 /// fragment: the originating coordinator might die, but we can get notified of
 /// that via the statestore. This still needs to be implemented.
-class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
-                     public ThriftServer::ConnectionHandlerIf {
+class ImpalaServer : public ImpalaServiceIf,
+                     public ImpalaHiveServer2ServiceIf,
+                     public ThriftServer::ConnectionHandlerIf,
+                     public boost::enable_shared_from_this<ImpalaServer> {
  public:
   ImpalaServer(ExecEnv* exec_env);
   ~ImpalaServer();
+
+  /// Initializes RPC services and other subsystems (like audit logging). Returns an error
+  /// if initialization failed. If any ports are <= 0, their respective service will not
+  /// be started.
+  Status Init(int32_t thrift_be_port, int32_t beeswax_port, int32_t hs2_port);
+
+  /// Starts client and internal services. Does not block. Returns an error if any service
+  /// failed to start.
+  Status Start();
+
+  /// Blocks until the server shuts down (by calling Shutdown()).
+  void Join();
+
+  /// Triggers service shutdown, by unblocking Join().
+  void Shutdown() { shutdown_promise_.Set(true); }
 
   /// ImpalaService rpcs: Beeswax API (implemented in impala-beeswax-server.cc)
   virtual void query(beeswax::QueryHandle& query_handle, const beeswax::Query& query);
@@ -343,13 +360,17 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     /// The default database (changed as a result of 'use' query execution).
     std::string database;
 
-    /// The default query options of this session. When the session is created, the
-    /// session inherits the global defaults from ImpalaServer::default_query_options_.
-    TQueryOptions default_query_options;
+    /// Reference to the ImpalaServer's query options
+    TQueryOptions* server_default_query_options;
 
-    /// BitSet indicating which query options in default_query_options have been
+    /// Query options that have been explicitly set in this session.
+    TQueryOptions set_query_options;
+
+    /// BitSet indicating which query options in set_query_options have been
     /// explicitly set in the session. Updated when a query option is specified using a
     /// SET command: the bit corresponding to the TImpalaQueryOptions enum is set.
+    /// If the option is subsequently reset via a SET with an empty value, the bit
+    /// is cleared.
     QueryOptionsMask set_query_options_mask;
 
     /// For HS2 only, the protocol version this session is expecting.
@@ -382,6 +403,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     /// Builds a Thrift representation of this SessionState for serialisation to
     /// the frontend.
     void ToThrift(const TUniqueId& session_id, TSessionState* session_state);
+
+    /// Builds the overlay of the default server query options and the options
+    /// explicitly set in this session.
+    TQueryOptions QueryOptions();
   };
 
  private:
@@ -399,10 +424,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   /// Return exec state for given query_id, or NULL if not found.
   std::shared_ptr<ClientRequestState> GetClientRequestState(
       const TUniqueId& query_id);
-
-  /// Writes the session id, if found, for the given query to the output
-  /// parameter. Returns false if no query with the given ID is found.
-  bool GetSessionIdForQuery(const TUniqueId& query_id, TUniqueId* session_id);
 
   /// Updates the number of databases / tables metrics from the FE catalog
   Status UpdateCatalogMetrics() WARN_UNUSED_RESULT;
@@ -598,8 +619,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     /// The state of the query as of this snapshot
     beeswax::QueryState::type query_state;
 
-    /// Start and end time of the query
-    TimestampValue start_time, end_time;
+    /// Start and end time of the query, in Unix microseconds.
+    int64_t start_time_us, end_time_us;
 
     /// Summary of execution for this query.
     TExecSummary exec_summary;
@@ -749,13 +770,13 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   boost::scoped_ptr<SimpleLogger> lineage_logger_;
 
   /// If profile logging is enabled, wakes once every 5s to flush query profiles to disk
-  boost::scoped_ptr<Thread> profile_log_file_flush_thread_;
+  std::unique_ptr<Thread> profile_log_file_flush_thread_;
 
   /// If audit event logging is enabled, wakes once every 5s to flush audit events to disk
-  boost::scoped_ptr<Thread> audit_event_logger_flush_thread_;
+  std::unique_ptr<Thread> audit_event_logger_flush_thread_;
 
   /// If lineage logging is enabled, wakes once every 5s to flush lineage events to disk
-  boost::scoped_ptr<Thread> lineage_logger_flush_thread_;
+  std::unique_ptr<Thread> lineage_logger_flush_thread_;
 
   /// global, per-server state
   ExecEnv* exec_env_;  // not owned
@@ -766,7 +787,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   /// Thread that runs ExpireSessions. It will wake up periodically to check for sessions
   /// which are idle for more their timeout values.
-  boost::scoped_ptr<Thread> session_timeout_thread_;
+  std::unique_ptr<Thread> session_timeout_thread_;
 
   /// Contains all the non-zero idle session timeout values.
   std::multiset<int32_t> session_timeout_set_;
@@ -970,7 +991,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   ExpirationQueue queries_by_timestamp_;
 
   /// Container for a thread that runs ExpireQueries() if FLAGS_idle_query_timeout is set.
-  boost::scoped_ptr<Thread> query_expiration_thread_;
+  std::unique_ptr<Thread> query_expiration_thread_;
 
   /// Serializes TBackendDescriptors when creating topic updates
   ThriftSerializer thrift_serializer_;
@@ -981,25 +1002,19 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   /// True if this ImpalaServer can execute query fragments.
   bool is_executor_;
+
+  /// Containers for client and internal services. May not be set if the ports passed to
+  /// Init() were <= 0.
+  /// Note that these hold a shared pointer to 'this', and so need to be reset()
+  /// explicitly.
+  boost::scoped_ptr<ThriftServer> beeswax_server_;
+  boost::scoped_ptr<ThriftServer> hs2_server_;
+  boost::scoped_ptr<ThriftServer> thrift_be_server_;
+
+  /// Set to true when this ImpalaServer should shut down.
+  Promise<bool> shutdown_promise_;
 };
 
-/// Create an ImpalaServer and Thrift servers.
-/// If beeswax_port != 0 (and fe_server != NULL), creates a ThriftServer exporting
-/// ImpalaService (Beeswax) on beeswax_port (returned via beeswax_server).
-/// If hs2_port != 0 (and hs2_server != NULL), creates a ThriftServer exporting
-/// ImpalaHiveServer2Service on hs2_port (returned via hs2_server).
-/// ImpalaService and ImpalaHiveServer2Service are initialized only if this
-/// Impala server is a coordinator (indicated by the is_coordinator flag).
-/// If be_port != 0 (and be_server != NULL), create a ThriftServer exporting
-/// ImpalaInternalService on be_port (returned via be_server).
-/// Returns created ImpalaServer. The caller owns fe_server and be_server.
-/// The returned ImpalaServer is referenced by both of these via shared_ptrs and will be
-/// deleted automatically.
-/// Returns OK unless there was some error creating the servers, in
-/// which case none of the output parameters can be assumed to be valid.
-Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
-    int be_port, ThriftServer** beeswax_server, ThriftServer** hs2_server,
-    ThriftServer** be_server, boost::shared_ptr<ImpalaServer>* impala_server);
 
 }
 

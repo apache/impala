@@ -17,13 +17,7 @@
 
 #include "util/bloom-filter.h"
 
-#include <stdlib.h>
-
-#include <algorithm>
-
-#include "common/logging.h"
 #include "runtime/runtime-state.h"
-#include "util/hash-util.h"
 
 using namespace std;
 
@@ -32,7 +26,8 @@ namespace impala {
 constexpr uint32_t BloomFilter::REHASH[8] __attribute__((aligned(32)));
 
 BloomFilter::BloomFilter(const int log_heap_space)
-  : // Since log_heap_space is in bytes, we need to convert it to the number of tiny Bloom
+  : always_false_(true),
+    // Since log_heap_space is in bytes, we need to convert it to the number of tiny Bloom
     // filters we will use.
     log_num_buckets_(std::max(1, log_heap_space - LOG_BUCKET_BYTE_SIZE)),
     // Don't use log_num_buckets_ if it will lead to undefined behavior by a shift
@@ -55,8 +50,11 @@ BloomFilter::BloomFilter(const int log_heap_space)
 
 BloomFilter::BloomFilter(const TBloomFilter& thrift)
     : BloomFilter(thrift.log_heap_space) {
-  DCHECK_EQ(thrift.directory.size(), directory_size());
-  memcpy(directory_, &thrift.directory[0], thrift.directory.size());
+  if (!thrift.always_false) {
+    always_false_ = false;
+    DCHECK_EQ(thrift.directory.size(), directory_size());
+    memcpy(directory_, &thrift.directory[0], thrift.directory.size());
+  }
 }
 
 BloomFilter::~BloomFilter() {
@@ -68,15 +66,22 @@ BloomFilter::~BloomFilter() {
 
 void BloomFilter::ToThrift(TBloomFilter* thrift) const {
   thrift->log_heap_space = log_num_buckets_ + LOG_BUCKET_BYTE_SIZE;
-  string tmp(reinterpret_cast<const char*>(directory_), directory_size());
-  thrift->directory.swap(tmp);
+  if (always_false_) {
+    thrift->always_false = true;
+    thrift->always_true = false;
+    return;
+  }
+  thrift->directory.assign(reinterpret_cast<const char*>(directory_),
+      static_cast<unsigned long>(directory_size()));
+  thrift->always_false = false;
   thrift->always_true = false;
 }
 
 void BloomFilter::ToThrift(const BloomFilter* filter, TBloomFilter* thrift) {
-  DCHECK(thrift != NULL);
-  if (filter == NULL) {
+  DCHECK(thrift != nullptr);
+  if (filter == nullptr) {
     thrift->always_true = true;
+    DCHECK_EQ(thrift->always_false, false);
     return;
   }
   filter->ToThrift(thrift);
@@ -171,14 +176,15 @@ OrEqualArrayAvx(size_t n, const char* __restrict__ in, char* __restrict__ out) {
 } //namespace
 
 void BloomFilter::Or(const TBloomFilter& in, TBloomFilter* out) {
-  DCHECK(out != NULL);
+  DCHECK(out != nullptr);
+  DCHECK(&in != out);
+  // These cases are impossible in current code. If they become possible in the future,
+  // memory usage should be tracked accordingly.
+  DCHECK(!out->always_false);
+  DCHECK(!out->always_true);
+  DCHECK(!in.always_true);
+  if (in.always_false) return;
   DCHECK_EQ(in.log_heap_space, out->log_heap_space);
-  if (&in == out) return;
-  out->always_true |= in.always_true;
-  if (out->always_true) {
-    out->directory.resize(0);
-    return;
-  }
   DCHECK_EQ(in.directory.size(), out->directory.size())
       << "Equal log heap space " << in.log_heap_space
       << ", but different directory sizes: " << in.directory.size() << ", "

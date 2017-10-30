@@ -1378,6 +1378,8 @@ kudu.table_name  | impala::some_database.table_name_demo
         the predicate pushdown for a specific query against a Kudu table.
       </p>
 
+      <p conref="../shared/impala_common.xml#common/tablesample_caveat"/>
+
       <!-- Hide until subtopics are ready to display. -->
       <p outputclass="toc inpage" audience="hidden"/>
 

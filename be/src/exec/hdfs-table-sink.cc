@@ -94,7 +94,8 @@ Status HdfsTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracke
   unique_id_str_ = PrintId(state->fragment_instance_id(), "-");
   SCOPED_TIMER(profile()->total_time_counter());
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(partition_key_exprs_, state,
-      state->obj_pool(), expr_mem_pool(), &partition_key_expr_evals_));
+      state->obj_pool(), expr_perm_pool_.get(), expr_results_pool_.get(),
+      &partition_key_expr_evals_));
 
   // TODO: Consider a system-wide random number generator, initialised in a single place.
   ptime now = microsec_clock::local_time();
@@ -599,8 +600,7 @@ inline Status HdfsTableSink::GetOutputPartition(RuntimeState* state, const Tuple
 
 Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch) {
   SCOPED_TIMER(profile()->total_time_counter());
-  ScalarExprEvaluator::FreeLocalAllocations(output_expr_evals_);
-  ScalarExprEvaluator::FreeLocalAllocations(partition_key_expr_evals_);
+  expr_results_pool_->Clear();
   RETURN_IF_ERROR(state->CheckQueryState());
   // We don't do any work for an empty batch.
   if (batch->num_rows() == 0) return Status::OK();

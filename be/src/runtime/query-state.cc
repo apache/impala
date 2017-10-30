@@ -21,11 +21,13 @@
 #include <boost/thread/locks.hpp>
 
 #include "exprs/expr.h"
+#include "runtime/backend-client.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
-#include "runtime/backend-client.h"
+#include "runtime/bufferpool/reservation-util.h"
 #include "runtime/exec-env.h"
 #include "runtime/fragment-instance-state.h"
+#include "runtime/initial-reservations.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-exec-mgr.h"
 #include "runtime/runtime-state.h"
@@ -49,8 +51,10 @@ QueryState::ScopedRef::~ScopedRef() {
 
 QueryState::QueryState(const TQueryCtx& query_ctx, const string& request_pool)
   : query_ctx_(query_ctx),
+    exec_resource_refcnt_(0),
     refcnt_(0),
-    is_cancelled_(0) {
+    is_cancelled_(0),
+    query_spilled_(0) {
   if (query_ctx_.request_pool.empty()) {
     // fix up pool name for tests
     DCHECK(!request_pool.empty());
@@ -70,24 +74,39 @@ QueryState::QueryState(const TQueryCtx& query_ctx, const string& request_pool)
   InitMemTrackers();
 }
 
-void QueryState::ReleaseResources() {
-  DCHECK(!released_resources_);
+void QueryState::ReleaseExecResources() {
+  DCHECK(!released_exec_resources_);
   // Clean up temporary files.
   if (file_group_ != nullptr) file_group_->Close();
   // Release any remaining reservation.
+  if (initial_reservations_ != nullptr) initial_reservations_->ReleaseResources();
   if (buffer_reservation_ != nullptr) buffer_reservation_->Close();
-  // Avoid dangling reference from the parent of 'query_mem_tracker_'.
-  if (query_mem_tracker_ != nullptr) query_mem_tracker_->UnregisterFromParent();
   if (desc_tbl_ != nullptr) desc_tbl_->ReleaseResources();
-  released_resources_ = true;
+  // At this point query execution should not be consuming any resources but some tracked
+  // memory may still be used by the ClientRequestState for result caching. The query
+  // MemTracker will be closed later when this QueryState is torn down.
+  released_exec_resources_ = true;
 }
 
 QueryState::~QueryState() {
-  DCHECK(released_resources_);
   DCHECK_EQ(refcnt_.Load(), 0);
+  DCHECK_EQ(exec_resource_refcnt_.Load(), 0);
+  DCHECK(released_exec_resources_);
+  if (query_mem_tracker_ != nullptr) {
+    // Disconnect the query MemTracker hierarchy from the global hierarchy. After this
+    // point nothing must touch this query's MemTracker and all tracked memory associated
+    // with the query must be released. The whole query subtree of MemTrackers can
+    // therefore be safely destroyed.
+    query_mem_tracker_->CloseAndUnregisterFromParent();
+  }
 }
 
 Status QueryState::Init(const TExecQueryFInstancesParams& rpc_params) {
+  // Decremented in QueryExecMgr::StartQueryHelper() on success or by the caller of
+  // Init() on failure. We need to do this before any returns because Init() always
+  // returns a resource refcount to its caller.
+  AcquireExecResourceRefcount();
+
   // Starting a new query creates threads and consumes a non-trivial amount of memory.
   // If we are already starved for memory, fail as early as possible to avoid consuming
   // more resources.
@@ -99,9 +118,8 @@ Status QueryState::Init(const TExecQueryFInstancesParams& rpc_params) {
         "is over its memory limit", PrintId(query_id()));
     RETURN_IF_ERROR(process_mem_tracker->MemLimitExceeded(NULL, msg, 0));
   }
-  // Do buffer-pool-related setup if running in a backend test that explicitly created
-  // the pool.
-  if (exec_env->buffer_pool() != nullptr) RETURN_IF_ERROR(InitBufferPoolState());
+
+  RETURN_IF_ERROR(InitBufferPoolState());
 
   // don't copy query_ctx, it's large and we already did that in the c'tor
   rpc_params_.__set_coord_state_idx(rpc_params.coord_state_idx);
@@ -112,6 +130,13 @@ Status QueryState::Init(const TExecQueryFInstancesParams& rpc_params) {
   rpc_params_.fragment_instance_ctxs.swap(non_const_params.fragment_instance_ctxs);
   rpc_params_.__isset.fragment_instance_ctxs = true;
 
+  // Claim the query-wide minimum reservation. Do this last so that we don't need
+  // to handle releasing it if a later step fails.
+  initial_reservations_ = obj_pool_.Add(new InitialReservations(&obj_pool_,
+      buffer_reservation_, query_mem_tracker_,
+      rpc_params.initial_reservation_total_claims));
+  RETURN_IF_ERROR(
+      initial_reservations_->Init(query_id(), rpc_params.min_reservation_bytes));
   return Status::OK();
 }
 
@@ -129,26 +154,28 @@ void QueryState::InitMemTrackers() {
 
 Status QueryState::InitBufferPoolState() {
   ExecEnv* exec_env = ExecEnv::GetInstance();
-  int64_t query_mem_limit = query_mem_tracker_->limit();
-  if (query_mem_limit == -1) query_mem_limit = numeric_limits<int64_t>::max();
-
-  // TODO: IMPALA-3200: add a default upper bound to buffer pool memory derived from
-  // query_mem_limit.
-  int64_t max_reservation = numeric_limits<int64_t>::max();
-  if (query_options().__isset.max_block_mgr_memory
-      && query_options().max_block_mgr_memory > 0) {
-    max_reservation = query_options().max_block_mgr_memory;
+  int64_t mem_limit = query_mem_tracker_->lowest_limit();
+  int64_t max_reservation;
+  if (query_options().__isset.buffer_pool_limit
+      && query_options().buffer_pool_limit > 0) {
+    max_reservation = query_options().buffer_pool_limit;
+  } else if (mem_limit == -1) {
+    // No query mem limit. The process-wide reservation limit is the only limit on
+    // reservations.
+    max_reservation = numeric_limits<int64_t>::max();
+  } else {
+    DCHECK_GE(mem_limit, 0);
+    max_reservation = ReservationUtil::GetReservationLimitFromMemLimit(mem_limit);
   }
+  VLOG_QUERY << "Buffer pool limit for " << PrintId(query_id()) << ": " << max_reservation;
 
-  // TODO: IMPALA-3748: claim the query-wide minimum reservation.
-  // For now, rely on exec nodes to grab their minimum reservation during Prepare().
   buffer_reservation_ = obj_pool_.Add(new ReservationTracker);
   buffer_reservation_->InitChildTracker(
       NULL, exec_env->buffer_reservation(), query_mem_tracker_, max_reservation);
 
   // TODO: once there's a mechanism for reporting non-fragment-local profiles,
   // should make sure to report this profile so it's not going into a black hole.
-  RuntimeProfile* dummy_profile = obj_pool_.Add(new RuntimeProfile(&obj_pool_, "dummy"));
+  RuntimeProfile* dummy_profile = RuntimeProfile::Create(&obj_pool_, "dummy");
   // Only create file group if spilling is enabled.
   if (query_options().scratch_limit != 0 && !query_ctx_.disable_spilling) {
     file_group_ = obj_pool_.Add(
@@ -186,6 +213,7 @@ void QueryState::ReportExecStatusAux(bool done, const Status& status,
   params.__set_query_id(query_ctx().query_id);
   DCHECK(rpc_params().__isset.coord_state_idx);
   params.__set_coord_state_idx(rpc_params().coord_state_idx);
+  status.SetTStatus(&params);
 
   if (fis != nullptr) {
     // create status for 'fis'
@@ -256,6 +284,7 @@ void QueryState::StartFInstances() {
   VLOG_QUERY << "StartFInstances(): query_id=" << PrintId(query_id())
       << " #instances=" << rpc_params_.fragment_instance_ctxs.size();
   DCHECK_GT(refcnt_.Load(), 0);
+  DCHECK_GT(exec_resource_refcnt_.Load(), 0) << "Should have been taken in Init()";
 
   // set up desc tbl
   DCHECK(query_ctx().__isset.desc_tbl);
@@ -268,6 +297,7 @@ void QueryState::StartFInstances() {
   VLOG_QUERY << "descriptor table for query=" << PrintId(query_id())
              << "\n" << desc_tbl_->DebugString();
 
+  Status thread_create_status;
   DCHECK_GT(rpc_params_.fragment_ctxs.size(), 0);
   TPlanFragmentCtx* fragment_ctx = &rpc_params_.fragment_ctxs[0];
   int fragment_ctx_idx = 0;
@@ -282,24 +312,35 @@ void QueryState::StartFInstances() {
     }
     FragmentInstanceState* fis = obj_pool_.Add(
         new FragmentInstanceState(this, *fragment_ctx, instance_ctx));
-    fis_map_.emplace(fis->instance_id(), fis);
 
+    // start new thread to execute instance
+    refcnt_.Add(1); // decremented in ExecFInstance()
+    AcquireExecResourceRefcount(); // decremented in ExecFInstance()
+    string thread_name = Substitute(
+        "exec-finstance (finst:$0)", PrintId(instance_ctx.fragment_instance_id));
+    unique_ptr<Thread> t;
+    thread_create_status = Thread::Create(FragmentInstanceState::FINST_THREAD_GROUP_NAME,
+        thread_name, [this, fis]() { this->ExecFInstance(fis); }, &t, true);
+    if (!thread_create_status.ok()) {
+      // Undo refcnt increments done immediately prior to Thread::Create(). The
+      // reference counts were both greater than zero before the increments, so
+      // neither of these decrements will free any structures.
+      ReleaseExecResourceRefcount();
+      ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(this);
+      break;
+    }
+    // Fragment instance successfully started
+    fis_map_.emplace(fis->instance_id(), fis);
     // update fragment_map_
     vector<FragmentInstanceState*>& fis_list = fragment_map_[instance_ctx.fragment_idx];
     fis_list.push_back(fis);
-
-    // start new thread to execute instance
-    refcnt_.Add(1);  // decremented in ExecFInstance()
-    string thread_name = Substitute(
-        "exec-finstance (finst:$0)", PrintId(instance_ctx.fragment_instance_id));
-    Thread t(FragmentInstanceState::FINST_THREAD_GROUP_NAME, thread_name,
-        [this, fis]() { this->ExecFInstance(fis); });
-    t.Detach();
+    t->Detach();
   }
 
   // don't return until every instance is prepared and record the first non-OK
-  // (non-CANCELLED if available) status
-  Status prepare_status;
+  // (non-CANCELLED if available) status (including any error from thread creation
+  // above).
+  Status prepare_status = thread_create_status;
   for (auto entry: fis_map_) {
     Status instance_status = entry.second->WaitForPrepare();
     // don't wipe out an error in one instance with the resulting CANCELLED from
@@ -309,6 +350,23 @@ void QueryState::StartFInstances() {
     }
   }
   instances_prepared_promise_.Set(prepare_status);
+  // If this is aborting due to failure in thread creation, report status to the
+  // coordinator to start query cancellation. (Other errors are reported by the
+  // fragment instance itself.)
+  if (!thread_create_status.ok()) {
+    ReportExecStatusAux(true, thread_create_status, nullptr, true);
+  }
+}
+
+void QueryState::AcquireExecResourceRefcount() {
+  DCHECK(!released_exec_resources_);
+  exec_resource_refcnt_.Add(1);
+}
+
+void QueryState::ReleaseExecResourceRefcount() {
+  int32_t new_val = exec_resource_refcnt_.Add(-1);
+  DCHECK_GE(new_val, 0);
+  if (new_val == 0) ReleaseExecResources();
 }
 
 void QueryState::ExecFInstance(FragmentInstanceState* fis) {
@@ -327,6 +385,8 @@ void QueryState::ExecFInstance(FragmentInstanceState* fis) {
   // initiate cancellation if nobody has done so yet
   if (!status.ok()) Cancel();
   // decrement refcount taken in StartFInstances()
+  ReleaseExecResourceRefcount();
+  // decrement refcount taken in StartFInstances()
   ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(this);
 }
 
@@ -344,4 +404,22 @@ void QueryState::PublishFilter(int32_t filter_id, int fragment_idx,
   for (FragmentInstanceState* fis: fragment_map_[fragment_idx]) {
     fis->PublishFilter(filter_id, thrift_bloom_filter);
   }
+}
+
+Status QueryState::StartSpilling(RuntimeState* runtime_state, MemTracker* mem_tracker) {
+  // Return an error message with the root cause of why spilling is disabled.
+  if (query_options().scratch_limit == 0) {
+    return mem_tracker->MemLimitExceeded(
+        runtime_state, "Could not free memory by spilling to disk: scratch_limit is 0");
+  } else if (query_ctx_.disable_spilling) {
+    return mem_tracker->MemLimitExceeded(runtime_state,
+        "Could not free memory by spilling to disk: spilling was disabled by planner. "
+        "Re-enable spilling by setting the query option DISABLE_UNSAFE_SPILLS=false");
+  }
+  // 'file_group_' must be non-NULL for spilling to be enabled.
+  DCHECK(file_group_ != nullptr);
+  if (query_spilled_.CompareAndSwap(0, 1)) {
+    ImpaladMetrics::NUM_QUERIES_SPILLED->Increment(1);
+  }
+  return Status::OK();
 }

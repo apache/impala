@@ -23,6 +23,7 @@
 
 #include <kudu/client/callbacks.h>
 #include <kudu/client/schema.h>
+#include <kudu/common/partial_row.h>
 
 #include "common/logging.h"
 #include "common/names.h"
@@ -34,6 +35,7 @@ using kudu::client::KuduSchema;
 using kudu::client::KuduClient;
 using kudu::client::KuduClientBuilder;
 using kudu::client::KuduColumnSchema;
+using DataType = kudu::client::KuduColumnSchema::DataType;
 
 DECLARE_bool(disable_kudu);
 DECLARE_int32(kudu_operation_timeout_ms);
@@ -177,4 +179,21 @@ Status WriteKuduValue(int col, PrimitiveType type, const void* value,
 
   return Status::OK();
 }
+
+ColumnType KuduDataTypeToColumnType(DataType type) {
+  switch (type) {
+    case DataType::INT8: return ColumnType(PrimitiveType::TYPE_TINYINT);
+    case DataType::INT16: return ColumnType(PrimitiveType::TYPE_SMALLINT);
+    case DataType::INT32: return ColumnType(PrimitiveType::TYPE_INT);
+    case DataType::INT64: return ColumnType(PrimitiveType::TYPE_BIGINT);
+    case DataType::STRING: return ColumnType(PrimitiveType::TYPE_STRING);
+    case DataType::BOOL: return ColumnType(PrimitiveType::TYPE_BOOLEAN);
+    case DataType::FLOAT: return ColumnType(PrimitiveType::TYPE_FLOAT);
+    case DataType::DOUBLE: return ColumnType(PrimitiveType::TYPE_DOUBLE);
+    case DataType::BINARY: return ColumnType(PrimitiveType::TYPE_BINARY);
+    case DataType::UNIXTIME_MICROS: return ColumnType(PrimitiveType::TYPE_TIMESTAMP);
+  }
+  return ColumnType(PrimitiveType::INVALID_TYPE);
+}
+
 }  // namespace impala

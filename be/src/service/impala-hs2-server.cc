@@ -154,7 +154,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
 
   Status exec_status = request_state->Exec(*request);
   if (!exec_status.ok()) {
-    (void) UnregisterQuery(request_state->query_id(), false, &exec_status);
+    discard_result(UnregisterQuery(request_state->query_id(), false, &exec_status));
     status->__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
     status->__set_errorMessage(exec_status.GetDetail());
     status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
@@ -165,7 +165,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
 
   Status inflight_status = SetQueryInflight(session, request_state);
   if (!inflight_status.ok()) {
-    (void) UnregisterQuery(request_state->query_id(), false, &inflight_status);
+    discard_result(UnregisterQuery(request_state->query_id(), false, &inflight_status));
     status->__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
     status->__set_errorMessage(inflight_status.GetDetail());
     status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
@@ -241,11 +241,13 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
     RETURN_IF_ERROR(GetSessionState(session_id, &session_state));
     session_state->ToThrift(session_id, &query_ctx->session);
     lock_guard<mutex> l(session_state->lock);
-    query_ctx->client_request.query_options = session_state->default_query_options;
+    query_ctx->client_request.query_options = session_state->QueryOptions();
     set_query_options_mask = session_state->set_query_options_mask;
   }
 
   if (execute_request.__isset.confOverlay) {
+    TQueryOptions overlay;
+    QueryOptionsMask overlay_mask;
     map<string, string>::const_iterator conf_itr = execute_request.confOverlay.begin();
     for (; conf_itr != execute_request.confOverlay.end(); ++conf_itr) {
       if (conf_itr->first == IMPALA_RESULT_CACHING_OPT) continue;
@@ -256,8 +258,10 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
         continue;
       }
       RETURN_IF_ERROR(SetQueryOption(conf_itr->first, conf_itr->second,
-          &query_ctx->client_request.query_options, &set_query_options_mask));
+          &overlay, &overlay_mask));
     }
+    OverlayQueryOptions(overlay, overlay_mask, &query_ctx->client_request.query_options);
+    set_query_options_mask |= overlay_mask;
   }
   // Only query options not set in the session or confOverlay can be overridden by the
   // pool options.
@@ -313,7 +317,7 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   // Process the supplied configuration map.
   state->database = "default";
   state->session_timeout = FLAGS_idle_session_timeout;
-  state->default_query_options = default_query_options_;
+  state->server_default_query_options = &default_query_options_;
   if (request.__isset.configuration) {
     typedef map<string, string> ConfigurationMap;
     for (const ConfigurationMap::value_type& v: request.configuration) {
@@ -340,13 +344,13 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
       } else {
         // Normal configuration key. Use it to set session default query options.
         // Ignore failure (failures will be logged in SetQueryOption()).
-        SetQueryOption(v.first, v.second, &state->default_query_options,
-            &state->set_query_options_mask);
+        discard_result(SetQueryOption(v.first, v.second, &state->set_query_options,
+            &state->set_query_options_mask));
       }
     }
   }
   RegisterSessionTimeout(state->session_timeout);
-  TQueryOptionsToMap(state->default_query_options, &return_val.configuration);
+  TQueryOptionsToMap(state->QueryOptions(), &return_val.configuration);
 
   // OpenSession() should return the coordinator's HTTP server address.
   const string& http_addr = lexical_cast<string>(
@@ -464,21 +468,16 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
         QueryResultSet::CreateHS2ResultSet(
             session->hs2_version, *request_state->result_metadata(), nullptr),
         cache_num_rows);
-    if (!status.ok()) {
-      (void) UnregisterQuery(request_state->query_id(), false, &status);
-      HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
-    }
+    if (!status.ok()) goto return_error;
   }
   request_state->UpdateNonErrorQueryState(beeswax::QueryState::RUNNING);
   // Start thread to wait for results to become available.
-  request_state->WaitAsync();
+  status = request_state->WaitAsync();
+  if (!status.ok()) goto return_error;
   // Once the query is running do a final check for session closure and add it to the
   // set of in-flight queries.
   status = SetQueryInflight(session, request_state);
-  if (!status.ok()) {
-    (void) UnregisterQuery(request_state->query_id(), false, &status);
-    HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
-  }
+  if (!status.ok()) goto return_error;
   return_val.__isset.operationHandle = true;
   return_val.operationHandle.__set_operationType(TOperationType::EXECUTE_STATEMENT);
   return_val.operationHandle.__set_hasResultSet(request_state->returns_result_set());
@@ -489,6 +488,11 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
       apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
 
   VLOG_QUERY << "ExecuteStatement(): return_val=" << ThriftDebugString(return_val);
+  return;
+
+ return_error:
+  discard_result(UnregisterQuery(request_state->query_id(), false, &status));
+  HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
 }
 
 void ImpalaServer::GetTypeInfo(TGetTypeInfoResp& return_val,
@@ -720,19 +724,6 @@ void ImpalaServer::GetResultSetMetadata(TGetResultSetMetadataResp& return_val,
       request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
   VLOG_QUERY << "GetResultSetMetadata(): query_id=" << PrintId(query_id);
 
-  // Look up the session ID (which takes session_state_map_lock_) before taking the query
-  // exec state lock.
-  TUniqueId session_id;
-  if (UNLIKELY(!GetSessionIdForQuery(query_id, &session_id))) {
-    // No handle was found
-    HS2_RETURN_ERROR(return_val,
-      Substitute("Unable to find session ID for query handle: $0", PrintId(query_id)),
-      SQLSTATE_GENERAL_ERROR);
-  }
-  ScopedSessionState session_handle(this);
-  HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id),
-      SQLSTATE_GENERAL_ERROR);
-
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state.get() == nullptr)) {
     VLOG_QUERY << "GetResultSetMetadata(): invalid query handle";
@@ -740,6 +731,10 @@ void ImpalaServer::GetResultSetMetadata(TGetResultSetMetadataResp& return_val,
     HS2_RETURN_ERROR(return_val,
       Substitute("Invalid query handle: $0", PrintId(query_id)), SQLSTATE_GENERAL_ERROR);
   }
+  ScopedSessionState session_handle(this);
+  const TUniqueId session_id = request_state->session_id();
+  HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id),
+      SQLSTATE_GENERAL_ERROR);
   {
     lock_guard<mutex> l(*request_state->lock());
 
@@ -795,7 +790,7 @@ void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
     if (status.IsRecoverableError()) {
       DCHECK(fetch_first);
     } else {
-      (void) UnregisterQuery(query_id, false, &status);
+      discard_result(UnregisterQuery(query_id, false, &status));
     }
     HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }

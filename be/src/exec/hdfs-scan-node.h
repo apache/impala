@@ -93,7 +93,7 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// batch queue. Otherwise, we may lose the last batch due to racing with shutting down
   /// the RowBatch queue.
   virtual void RangeComplete(const THdfsFileFormat::type& file_type,
-      const std::vector<THdfsCompression::type>& compression_type);
+      const std::vector<THdfsCompression::type>& compression_type, bool skipped = false);
 
   /// Transfers all memory from 'pool' to 'scan_node_pool_'.
   virtual void TransferToScanNodePool(MemPool* pool);
@@ -166,7 +166,7 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// thread. 'filter_ctxs' is a clone of the class-wide filter_ctxs_, used to filter rows
   /// in this split.
   Status ProcessSplit(const std::vector<FilterContext>& filter_ctxs,
-      DiskIoMgr::ScanRange* scan_range) WARN_UNUSED_RESULT;
+      MemPool* expr_results_pool, DiskIoMgr::ScanRange* scan_range) WARN_UNUSED_RESULT;
 
   /// Returns true if there is enough memory (against the mem tracker limits) to
   /// have a scanner thread.
@@ -180,8 +180,11 @@ class HdfsScanNode : public HdfsScanNodeBase {
   Status GetNextInternal(RuntimeState* state, RowBatch* row_batch, bool* eos)
       WARN_UNUSED_RESULT;
 
-  /// sets done_ to true and triggers threads to cleanup. Cannot be called with
-  /// any locks taken. Calling it repeatedly ignores subsequent calls.
+  /// Sets done_ to true and triggers threads to cleanup. Must be called with lock_
+  /// taken. Calling it repeatedly ignores subsequent calls.
+  void SetDoneInternal();
+
+  /// Gets lock_ and calls SetDoneInternal()
   void SetDone();
 };
 

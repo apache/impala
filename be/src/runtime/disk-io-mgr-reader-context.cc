@@ -157,7 +157,6 @@ void DiskIoRequestContext::Reset(MemTracker* tracker) {
   num_used_buffers_.Store(0);
   num_buffers_in_reader_.Store(0);
   num_ready_buffers_.Store(0);
-  total_range_queue_capacity_.Store(0);
   num_finished_ranges_.Store(0);
   num_remote_ranges_.Store(0);
   bytes_read_local_.Store(0);
@@ -166,7 +165,6 @@ void DiskIoRequestContext::Reset(MemTracker* tracker) {
   unexpected_remote_bytes_.Store(0);
   cached_file_handles_hit_count_.Store(0);
   cached_file_handles_miss_count_.Store(0);
-  initial_queue_capacity_ = DiskIoMgr::DEFAULT_QUEUE_CAPACITY;
 
   DCHECK(ready_to_start_ranges_.empty());
   DCHECK(blocked_ranges_.empty());

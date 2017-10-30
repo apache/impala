@@ -32,15 +32,6 @@ class Status;
 /// TCatalogObjectType::UNKNOWN if no match was found.
 TCatalogObjectType::type TCatalogObjectTypeFromName(const std::string& name);
 
-/// Parses the given IMPALA_CATALOG_TOPIC topic entry key to determine the
-/// TCatalogObjectType and unique object name. Populates catalog_object with the result.
-/// This is used to reconstruct type information when an item is deleted from the
-/// topic. At that time the only context available about the object being deleted is its
-/// its topic entry key which contains only the type and object name. The resulting
-/// TCatalogObject can then be used to removing a matching item from the catalog.
-Status TCatalogObjectFromEntryKey(const std::string& key,
-    TCatalogObject* catalog_object);
-
 /// Populates a TCatalogObject based on the given object type (TABLE, DATABASE, etc) and
 /// object name string.
 Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,

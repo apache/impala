@@ -17,23 +17,23 @@
 
 #include "runtime/runtime-state.h"
 
-#include <iostream>
 #include <jni.h>
+#include <iostream>
 #include <sstream>
 #include <string>
 
-#include "common/logging.h"
 #include <boost/algorithm/string/join.hpp>
 #include <gutil/strings/substitute.h>
+#include "common/logging.h"
 
 #include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-fn-call.h"
-#include "runtime/buffered-block-mgr.h"
+#include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
-#include "runtime/data-stream-mgr.h"
+#include "runtime/data-stream-mgr-base.h"
 #include "runtime/data-stream-recvr.h"
 #include "runtime/descriptors.h"
 #include "runtime/exec-env.h"
@@ -54,21 +54,9 @@
 #include "common/names.h"
 
 using namespace llvm;
+using strings::Substitute;
 
 DECLARE_int32(max_errors);
-
-// The fraction of the query mem limit that is used for the block mgr. Operators
-// that accumulate memory all use the block mgr so the majority of the memory should
-// be allocated to the block mgr. The remaining memory is used by the non-spilling
-// operators and should be independent of data size.
-static const float BLOCK_MGR_MEM_FRACTION = 0.8f;
-
-// The minimum amount of memory that must be left after the block mgr reserves the
-// BLOCK_MGR_MEM_FRACTION. The block limit is:
-// min(query_limit * BLOCK_MGR_MEM_FRACTION, query_limit - BLOCK_MGR_MEM_MIN_REMAINING)
-// TODO: this value was picked arbitrarily and the tests are written to rely on this
-// for the minimum memory required to run the query. Revisit.
-static const int64_t BLOCK_MGR_MEM_MIN_REMAINING = 100 * 1024 * 1024;
 
 namespace impala {
 
@@ -81,13 +69,14 @@ RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragmentCtx& frag
     utc_timestamp_(new TimestampValue(TimestampValue::Parse(
         query_state->query_ctx().utc_timestamp_string))),
     exec_env_(exec_env),
-    profile_(obj_pool(), "Fragment " + PrintId(instance_ctx.fragment_instance_id)),
-    instance_buffer_reservation_(nullptr),
-    is_cancelled_(false),
-    root_node_id_(-1) {
+    profile_(RuntimeProfile::Create(
+          obj_pool(), "Fragment " + PrintId(instance_ctx.fragment_instance_id))),
+    instance_buffer_reservation_(new ReservationTracker) {
   Init();
 }
 
+// Constructor for standalone RuntimeState for test execution and fe-support.cc.
+// Sets up a dummy local QueryState to allow evaluating exprs, etc.
 RuntimeState::RuntimeState(
     const TQueryCtx& qctx, ExecEnv* exec_env, DescriptorTbl* desc_tbl)
   : query_state_(new QueryState(qctx, "test-pool")),
@@ -97,10 +86,10 @@ RuntimeState::RuntimeState(
     now_(new TimestampValue(TimestampValue::Parse(qctx.now_string))),
     utc_timestamp_(new TimestampValue(TimestampValue::Parse(qctx.utc_timestamp_string))),
     exec_env_(exec_env),
-    profile_(obj_pool(), "<unnamed>"),
-    instance_buffer_reservation_(nullptr),
-    is_cancelled_(false),
-    root_node_id_(-1) {
+    profile_(RuntimeProfile::Create(obj_pool(), "<unnamed>")) {
+  // We may use execution resources while evaluating exprs, etc. Decremented in
+  // ReleaseResources() to release resources.
+  local_query_state_->AcquireExecResourceRefcount();
   if (query_ctx().request_pool.empty()) {
     const_cast<TQueryCtx&>(query_ctx()).request_pool = "test-pool";
   }
@@ -109,11 +98,11 @@ RuntimeState::RuntimeState(
 }
 
 RuntimeState::~RuntimeState() {
-  DCHECK(instance_mem_tracker_ == nullptr) << "Must call ReleaseResources()";
+  DCHECK(released_resources_) << "Must call ReleaseResources()";
 }
 
 void RuntimeState::Init() {
-  SCOPED_TIMER(profile_.total_time_counter());
+  SCOPED_TIMER(profile_->total_time_counter());
 
   // Register with the thread mgr
   resource_pool_ = exec_env_->thread_mgr()->RegisterPool();
@@ -127,9 +116,8 @@ void RuntimeState::Init() {
   instance_mem_tracker_.reset(new MemTracker(
       runtime_profile(), -1, runtime_profile()->name(), query_mem_tracker()));
 
-  if (query_state_ != nullptr && exec_env_->buffer_pool() != nullptr) {
-    instance_buffer_reservation_ = obj_pool()->Add(new ReservationTracker);
-    instance_buffer_reservation_->InitChildTracker(&profile_,
+  if (instance_buffer_reservation_ != nullptr) {
+    instance_buffer_reservation_->InitChildTracker(profile_,
         query_state_->buffer_reservation(), instance_mem_tracker_.get(),
         numeric_limits<int64_t>::max());
   }
@@ -139,35 +127,13 @@ void RuntimeState::InitFilterBank() {
   filter_bank_.reset(new RuntimeFilterBank(query_ctx(), this));
 }
 
-Status RuntimeState::CreateBlockMgr() {
-  DCHECK(block_mgr_.get() == NULL);
-
-  // Compute the max memory the block mgr will use.
-  int64_t block_mgr_limit = query_mem_tracker()->lowest_limit();
-  if (block_mgr_limit < 0) block_mgr_limit = numeric_limits<int64_t>::max();
-  block_mgr_limit = min(static_cast<int64_t>(block_mgr_limit * BLOCK_MGR_MEM_FRACTION),
-      block_mgr_limit - BLOCK_MGR_MEM_MIN_REMAINING);
-  if (block_mgr_limit < 0) block_mgr_limit = 0;
-  if (query_options().__isset.max_block_mgr_memory &&
-      query_options().max_block_mgr_memory > 0) {
-    block_mgr_limit = query_options().max_block_mgr_memory;
-    LOG(WARNING) << "Block mgr mem limit: "
-                 << PrettyPrinter::Print(block_mgr_limit, TUnit::BYTES);
-  }
-
-  RETURN_IF_ERROR(BufferedBlockMgr::Create(this, query_mem_tracker(),
-      runtime_profile(), exec_env()->tmp_file_mgr(), block_mgr_limit,
-      io_mgr()->max_read_buffer_size(), &block_mgr_));
-  return Status::OK();
-}
-
 Status RuntimeState::CreateCodegen() {
   if (codegen_.get() != NULL) return Status::OK();
   // TODO: add the fragment ID to the codegen ID as well
   RETURN_IF_ERROR(LlvmCodeGen::CreateImpalaCodegen(this,
       instance_mem_tracker_.get(), PrintId(fragment_instance_id()), &codegen_));
   codegen_->EnableOptimizations(true);
-  profile_.AddChild(codegen_->runtime_profile());
+  profile_->AddChild(codegen_->runtime_profile());
   return Status::OK();
 }
 
@@ -177,6 +143,10 @@ Status RuntimeState::CodegenScalarFns() {
     RETURN_IF_ERROR(scalar_fn->GetCodegendComputeFn(codegen_.get(), &fn));
   }
   return Status::OK();
+}
+
+Status RuntimeState::StartSpilling(MemTracker* mem_tracker) {
+  return query_state_->StartSpilling(this, mem_tracker);
 }
 
 string RuntimeState::ErrorLog() {
@@ -215,8 +185,10 @@ Status RuntimeState::LogOrReturnError(const ErrorMsg& message) {
   // If either abort_on_error=true or the error necessitates execution stops
   // immediately, return an error status.
   if (abort_on_error() ||
+      message.error() == TErrorCode::CANCELLED ||
       message.error() == TErrorCode::MEM_LIMIT_EXCEEDED ||
-      message.error() == TErrorCode::CANCELLED) {
+      message.error() == TErrorCode::INTERNAL_ERROR ||
+      message.error() == TErrorCode::DISK_IO_ERROR) {
     return Status(message);
   }
   // Otherwise, add the error to the error log and continue.
@@ -264,34 +236,29 @@ void RuntimeState::UnregisterReaderContexts() {
 }
 
 void RuntimeState::ReleaseResources() {
-  // TODO: IMPALA-5587: control structures (e.g. MemTrackers) shouldn't be destroyed here.
+  DCHECK(!released_resources_);
   UnregisterReaderContexts();
   if (filter_bank_ != nullptr) filter_bank_->Close();
   if (resource_pool_ != nullptr) {
     exec_env_->thread_mgr()->UnregisterPool(resource_pool_);
   }
-  block_mgr_.reset(); // Release any block mgr memory, if this is the last reference.
-  codegen_.reset(); // Release any memory associated with codegen.
+  // Release any memory associated with codegen.
+  if (codegen_ != nullptr) codegen_->Close();
 
   // Release the reservation, which should be unused at the point.
   if (instance_buffer_reservation_ != nullptr) instance_buffer_reservation_->Close();
 
-  // 'query_mem_tracker()' must be valid as long as 'instance_mem_tracker_' is so
-  // delete 'instance_mem_tracker_' first.
-  // LogUsage() walks the MemTracker tree top-down when the memory limit is exceeded, so
-  // break the link between 'instance_mem_tracker_' and its parent before
-  // 'instance_mem_tracker_' and its children are destroyed.
-  instance_mem_tracker_->UnregisterFromParent();
+  // No more memory should be tracked for this instance at this point.
   if (instance_mem_tracker_->consumption() != 0) {
     LOG(WARNING) << "Query " << query_id() << " may have leaked memory." << endl
-                 << instance_mem_tracker_->LogUsage();
+                 << instance_mem_tracker_->LogUsage(MemTracker::UNLIMITED_DEPTH);
   }
-  instance_mem_tracker_.reset();
+  instance_mem_tracker_->Close();
 
   if (local_query_state_.get() != nullptr) {
-    // if we created this QueryState, we must call ReleaseResources()
-    local_query_state_->ReleaseResources();
+    local_query_state_->ReleaseExecResourceRefcount();
   }
+  released_resources_ = true;
 }
 
 const std::string& RuntimeState::GetEffectiveUser() const {
@@ -310,7 +277,7 @@ DiskIoMgr* RuntimeState::io_mgr() {
   return exec_env_->disk_io_mgr();
 }
 
-DataStreamMgr* RuntimeState::stream_mgr() {
+DataStreamMgrBase* RuntimeState::stream_mgr() {
   return exec_env_->stream_mgr();
 }
 

@@ -771,14 +771,15 @@ invalidate metadata $DATABASE2.mv2
 ---- RESULTS
 ====
 ---- QUERY
-show tables in $DATABASE like '%mv%'
+show tables in $DATABASE like '*mv*'
 ---- RESULTS
 ---- TYPES
 STRING
 ====
 ---- QUERY
-show tables in $DATABASE2 like '%mv%'
+show tables in $DATABASE2 like '*mv*'
 ---- RESULTS
+'mv2'
 ---- TYPES
 STRING
 ====
@@ -802,7 +803,61 @@ drop table $DATABASE2.mv2
 ---- RESULTS
 ====
 ---- QUERY
-show tables in $DATABASE2 like '%mv%'
+show tables in $DATABASE2 like '*mv*'
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+# Tests that renaming a partitioned table with column stats across databases
+# succeeds and preserves table and column stats, and allows the renamed table
+# to be dropped (IMPALA-2810).
+create table $DATABASE.mv (x int) partitioned by (y string);
+insert into $DATABASE.mv partition(y='a') values(1);
+insert into $DATABASE.mv partition(y='b') values(2);
+insert into $DATABASE.mv partition(y=NULL) values(NULL);
+compute stats $DATABASE.mv;
+alter table $DATABASE.mv rename to $DATABASE2.mv2;
+invalidate metadata $DATABASE2.mv2
+---- RESULTS
+====
+---- QUERY
+show tables in $DATABASE like '*mv*'
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+show tables in $DATABASE2 like '*mv*'
+---- RESULTS
+'mv2'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats $DATABASE2.mv2
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'NULL',1,1,'3B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'a',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'b',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'Total',3,3,'7B','0B','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+show column stats $DATABASE2.mv2
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'x','INT',2,-1,4,4
+'y','STRING',3,1,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+====
+---- QUERY
+drop table $DATABASE2.mv2
+---- RESULTS
+====
+---- QUERY
+show tables in $DATABASE2 like '*mv*'
 ---- RESULTS
 ---- TYPES
 STRING

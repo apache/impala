@@ -75,21 +75,20 @@ int ImpaladMain(int argc, char** argv) {
     LOG(WARNING) << "*****************************************************************";
   }
 
-  // start backend service for the coordinator on be_port
   ExecEnv exec_env;
-  StartThreadInstrumentation(exec_env.metrics(), exec_env.webserver(), true);
+  ABORT_IF_ERROR(exec_env.Init());
+  CommonMetrics::InitCommonMetrics(exec_env.metrics());
+  ABORT_IF_ERROR(StartMemoryMaintenanceThread()); // Memory metrics are created in Init().
+  ABORT_IF_ERROR(
+      StartThreadInstrumentation(exec_env.metrics(), exec_env.webserver(), true));
   InitRpcEventTracing(exec_env.webserver());
 
-  CommonMetrics::InitCommonMetrics(exec_env.metrics());
+  boost::shared_ptr<ImpalaServer> impala_server(new ImpalaServer(&exec_env));
+  ABORT_IF_ERROR(impala_server->Init(FLAGS_be_port, FLAGS_beeswax_port, FLAGS_hs2_port));
 
-  ThriftServer* beeswax_server = NULL;
-  ThriftServer* hs2_server = NULL;
-  ThriftServer* be_server = NULL;
-  boost::shared_ptr<ImpalaServer> server;
-  ABORT_IF_ERROR(CreateImpalaServer(&exec_env, FLAGS_beeswax_port, FLAGS_hs2_port,
-      FLAGS_be_port, &beeswax_server, &hs2_server, &be_server, &server));
-
-  Status status = exec_env.StartServices();
+  DCHECK(exec_env.process_mem_tracker() != nullptr)
+      << "ExecEnv::StartServices() must be called before starting RPC services";
+  Status status = impala_server->Start();
   if (!status.ok()) {
     LOG(ERROR) << "Impalad services did not start correctly, exiting.  Error: "
                << status.GetDetail();
@@ -97,28 +96,10 @@ int ImpaladMain(int argc, char** argv) {
     exit(1);
   }
 
-  DCHECK(exec_env.process_mem_tracker() != nullptr)
-      << "ExecEnv::StartServices() must be called before starting RPC services";
-  ABORT_IF_ERROR(be_server->Start());
-
-  if (FLAGS_is_coordinator) {
-    ABORT_IF_ERROR(beeswax_server->Start());
-    ABORT_IF_ERROR(hs2_server->Start());
-  }
-
   ImpaladMetrics::IMPALA_SERVER_READY->set_value(true);
   LOG(INFO) << "Impala has started.";
 
-  be_server->Join();
-  delete be_server;
-
-  if (FLAGS_is_coordinator) {
-    // this blocks until the beeswax and hs2 servers terminate
-    beeswax_server->Join();
-    hs2_server->Join();
-    delete beeswax_server;
-    delete hs2_server;
-  }
+  impala_server->Join();
 
   return 0;
 }

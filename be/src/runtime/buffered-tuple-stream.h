@@ -18,62 +18,100 @@
 #ifndef IMPALA_RUNTIME_BUFFERED_TUPLE_STREAM_H
 #define IMPALA_RUNTIME_BUFFERED_TUPLE_STREAM_H
 
-#include <vector>
 #include <set>
+#include <vector>
+#include <boost/scoped_ptr.hpp>
+#include <boost/function.hpp>
 
+#include "common/global-types.h"
 #include "common/status.h"
-#include "runtime/buffered-block-mgr.h"
+#include "gutil/macros.h"
+#include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/row-batch.h"
 
 namespace impala {
 
-class BufferedBlockMgr;
-class RuntimeProfile;
+class MemTracker;
 class RuntimeState;
 class RowDescriptor;
 class SlotDescriptor;
+class Tuple;
 class TupleRow;
 
-/// Class that provides an abstraction for a stream of tuple rows. Rows can be
-/// added to the stream and returned. Rows are returned in the order they are added.
+/// Class that provides an abstraction for a stream of tuple rows backed by BufferPool
+/// Pages. Rows can be added to the stream and read back. Rows are returned in the order
+/// they are added.
 ///
-/// The underlying memory management is done by the BufferedBlockMgr.
+/// The BufferedTupleStream is *not* thread safe from the caller's point of view.
+/// Different threads should not concurrently call methods of the same BufferedTupleStream
+/// object.
 ///
-/// The tuple stream consists of a number of small (less than IO-sized blocks) before
-/// an arbitrary number of IO-sized blocks. The smaller blocks do not spill and are
-/// there to lower the minimum buffering requirements. For example, an operator that
-/// needs to maintain 64 streams (1 buffer per partition) would need, by default,
-/// 64 * 8MB = 512MB of buffering. A query with 5 of these operators would require
-/// 2.56GB just to run, regardless of how much of that is used. This is
-/// problematic for small queries. Instead we will start with a fixed number of small
-/// buffers (currently 2 small buffers: one 64KB and one 512KB) and only start using IO
-/// sized buffers when those fill up. The small buffers never spill.
-/// The stream will *not* automatically switch from using small buffers to IO-sized
-/// buffers when all the small buffers for this stream have been used.
+/// Reading and writing the stream:
+/// The stream supports two modes of reading/writing, depending on whether
+/// PrepareForWrite() is called to initialize a write iterator only or
+/// PrepareForReadWrite() is called to initialize both read and write iterators to enable
+/// interleaved reads and writes.
 ///
-/// The BufferedTupleStream is *not* thread safe from the caller's point of view. It is
-/// expected that all the APIs are called from a single thread. Internally, the
-/// object is thread safe wrt to the underlying block mgr.
+/// To use write-only mode, PrepareForWrite() is called once and AddRow()/AddRowCustom*()
+/// are called repeatedly to initialize then advance a write iterator through the stream.
+/// Once the stream is fully written, it can be read back by calling PrepareForRead()
+/// then GetNext() repeatedly to advance a read iterator through the stream.
+///
+/// To use read/write mode, PrepareForReadWrite() is called once to initialize the read
+/// and write iterators. AddRow()/AddRowCustom*() then advance a write iterator through
+/// the stream, and GetNext() advances a trailing read iterator through the stream.
 ///
 /// Buffer management:
-/// The stream is either pinned or unpinned, set via PinStream() and UnpinStream().
-/// Blocks are optionally deleted as they are read, set with the delete_on_read argument
-/// to PrepareForRead().
+/// The tuple stream is backed by a sequence of BufferPool Pages. The tuple stream uses
+/// the client's reservation to pin pages in memory. It will automatically try to
+/// increase the client's reservation whenever it needs to do so to make progress.
 ///
-/// Block layout:
-/// If the stream's tuples are nullable (i.e. has_nullable_tuple_ is true), there is a
-/// bitstring at the start of each block with null indicators for all tuples in each row
-/// in the block. The length of the  bitstring is a function of the block size. Row data
-/// is stored after the null indicators if present, or at the start of the block
-/// otherwise. Rows are stored back to back in the stream, with no interleaving of data
-/// from different rows. There is no padding or alignment between rows.
+/// Normally pages are all of the same default page length, but larger pages up to the
+/// max page length are used if needed to store rows that are too large for a
+/// default-length page.
 ///
-/// Null tuples:
-/// The order of bits in the null indicators bitstring corresponds to the order of
-/// tuples in the block. The NULL tuples are not stored in the row iself, only as set
-/// bits in the null indicators bitstring.
+/// The stream has both pinned and unpinned modes. In the pinned mode all pages are
+/// pinned for reading. The pinned mode avoids I/O by keeping all pages pinned in memory
+/// and allows clients to save pointers to rows in the stream and randomly access them.
+/// E.g. hash tables can be backed by a BufferedTupleStream. In the unpinned mode, only
+/// pages currently being read and written are pinned and other pages are unpinned and
+/// therefore do not use the client's reservation and can be spilled to disk. The stream
+/// always holds onto a default page's worth of reservation for the read and write
+/// iterators (i.e. two page's worth if the stream is in read/write mode), even if that
+/// many pages are not currently pinned. This means that UnpinStream() always succeeds,
+/// and moving to the next default-length write page or read page on an unpinned stream
+/// does not require additional reservation. This is implemented by saving reservations
+/// in SubReservations.
+///
+/// To read or write a row larger than the default page size to/from an unpinned stream,
+/// the client must have max_page_len - default_page_len unused reservation. Writing a
+/// large row to an unpinned stream only uses the reservation for the duration of the
+/// AddRow()/AddRowCustom*() call. Reading a large row from an unpinned stream uses the
+/// reservation until the next call to GetNext(). E.g. to partition a single unpinned
+/// stream into n unpinned streams, the reservation needed is (n - 1) *
+/// default_page_len + 2 * max_page_len: one large read buffer and one large write
+/// buffer is needed to keep the row being processed in-memory, but only default-sized
+/// buffers are needed for the other streams being written.
+///
+/// The tuple stream also supports a 'delete_on_read' mode, enabled by passing a flag
+/// to PrepareForRead() which deletes the stream's pages as it does a final read
+/// pass over the stream.
+///
+/// TODO: IMPALA-4179: the buffer management can be simplified once we can attach
+/// buffers to RowBatches.
+///
+/// Page layout:
+/// Rows are stored back to back starting at the first byte of each page's buffer, with
+/// no interleaving of data from different rows. There is no padding or alignment
+/// between rows. Rows larger than the default page length are stored on their own
+/// page.
 ///
 /// Tuple row layout:
+/// If the stream's tuples are nullable (i.e. has_nullable_tuple_ is true), there is a
+/// bitstring at the start of each row with null indicators for all tuples in each row
+/// (including non-nullable tuples). The bitstring occupies ceil(num_tuples_per_row / 8)
+/// bytes. A 1 indicates the tuple is null.
+///
 /// The fixed length parts of the row's tuples are stored first, followed by var len data
 /// for inlined_string_slots_ and inlined_coll_slots_. Other "external" var len slots can
 /// point to var len data outside the stream. When reading the stream, the length of each
@@ -81,14 +119,14 @@ class TupleRow;
 ///
 /// The tuple stream supports reading from the stream into RowBatches without copying
 /// out any data: the RowBatches' Tuple pointers will point directly into the stream's
-/// blocks. The fixed length parts follow Impala's internal tuple format, so for the
-/// tuple to be valid, we only need to update pointers to point to the var len data
+/// pages' buffers. The fixed length parts follow Impala's internal tuple format, so for
+/// the tuple to be valid, we only need to update pointers to point to the var len data
 /// in the stream. These pointers need to be updated by the stream because a spilled
-/// block may be relocated to a different location in memory. The pointers are updated
-/// lazily upon reading the stream via GetNext() or GetRows().
+/// page's data may be relocated to a different buffer. The pointers are updated lazily
+/// upon reading the stream via GetNext().
 ///
-/// Example layout for a row with two tuples ((1, "hello"), (2, "world")) with all var
-/// len data stored in the stream:
+/// Example layout for a row with two non-nullable tuples ((1, "hello"), (2, "world"))
+/// with all var len data stored in the stream:
 ///  <---- tuple 1 -----> <------ tuple 2 ------> <- var len -> <- next row ...
 /// +--------+-----------+-----------+-----------+-------------+
 /// | IntVal | StringVal | BigIntVal | StringVal |             | ...
@@ -97,9 +135,20 @@ class TupleRow;
 /// |        | ptr: 0x.. |           | ptr: 0x.. |             | ...
 /// +--------+-----------+-----------+-----------+-------------+
 ///  <--4b--> <---12b---> <----8b---> <---12b---> <----10b---->
-//
-/// Example layout for a row with a single tuple (("hello", "world")) with the second
-/// string slot stored externally to the stream:
+///
+/// Example layout for a row with the second tuple nullable ((1, "hello"), NULL)
+/// with all var len data stored in the stream:
+/// <- null tuple bitstring -> <---- tuple 1 -----> <- var len -> <- next row ...
+/// +-------------------------+--------+-----------+------------+
+/// |                         | IntVal | StringVal |            | ...
+/// +-------------------------+--------+-----------+------------+
+/// | 0000 0010               | val: 1 | len: 5    | hello      | ...
+/// |                         |        | ptr: 0x.. |            | ...
+/// +-------------------------+--------+-----------+------------+
+///  <---------1b------------> <--4b--> <---12b---> <----5b---->
+///
+/// Example layout for a row with a single non-nullable tuple (("hello", "world")) with
+/// the second string slot stored externally to the stream:
 ///  <------ tuple 1 ------> <- var len ->  <- next row ...
 /// +-----------+-----------+-------------+
 /// | StringVal | StringVal |             | ...
@@ -111,204 +160,181 @@ class TupleRow;
 ///
 /// The behavior of reads and writes is as follows:
 /// Read:
-///   1. Delete on read (delete_on_read_): Blocks are deleted as we go through the stream.
-///   The data returned by the tuple stream is valid until the next read call so the
-///   caller does not need to copy if it is streaming.
-///   2. Unpinned: Blocks remain in blocks_ and are unpinned after reading.
-///   3. Pinned: Blocks remain in blocks_ and are left pinned after reading. If the next
-///   block in the stream cannot be pinned, the read call will fail and the caller needs
-///   to free memory from the underlying block mgr.
+///   1. Unpinned: Only a single read page is pinned at a time. This means that only
+///     enough reservation to pin a single page is needed to read the stream, regardless
+///     of the stream's size. Each page is deleted or unpinned (if delete on read is true
+///     or false respectively) before advancing to the next page.
+///   2. Pinned: All pages in the stream are pinned so do not need to be pinned or
+///     unpinned when reading from the stream. If delete on read is true, pages are
+///     deleted after being read. If the stream was previously unpinned, the page's data
+///     may not yet be in memory - reading from the stream can block on I/O or fail with
+///     an I/O error.
 /// Write:
-///   1. Unpinned: Unpin blocks as they fill up. This means only a single (i.e. the
-///   current) block needs to be in memory regardless of the input size (if read_write is
-///   true, then two blocks need to be in memory).
-///   2. Pinned: Blocks are left pinned. If we run out of blocks, the write will fail and
-///   the caller needs to free memory from the underlying block mgr.
+///   1. Unpinned: Unpin pages as they fill up. This means that only a enough reservation
+///     to pin a single write page is required to write to the stream, regardless of the
+///     stream's size.
+///   2. Pinned: Pages are left pinned. If the next page in the stream cannot be pinned
+///     because the client's reservation is insufficient (and could not be increased by
+///     the stream), the read call will fail and the client can either unpin the stream
+///     or free up other memory before retrying.
 ///
 /// Memory lifetime of rows read from stream:
-/// If the stream is pinned, it is valid to access any tuples returned via
-/// GetNext() or GetRows() until the stream is unpinned. If the stream is unpinned, and
-/// the batch returned from GetNext() has the needs_deep_copy flag set, any tuple memory
-/// returned so far from the stream may be freed on the next call to GetNext().
+/// If the stream is pinned and delete on read is false, it is valid to access any tuples
+/// returned via GetNext() until the stream is unpinned. If the stream is unpinned or
+/// delete on read is true, then the batch returned from GetNext() may have the
+/// needs_deep_copy flag set, which means that any tuple memory returned so far from the
+/// stream may be freed on the next call to GetNext().
+/// TODO: IMPALA-4179, instead of needs_deep_copy, attach the pages' buffers to the batch.
 ///
-/// Manual construction of rows with AllocateRow():
-/// The BufferedTupleStream supports allocation of uninitialized rows with AllocateRow().
-/// The caller of AllocateRow() is responsible for writing the row with exactly the
-/// layout described above.
+/// Manual construction of rows with AddRowCustomBegin()/AddRowCustomEnd():
+/// The BufferedTupleStream supports allocation of uninitialized rows with
+/// AddRowCustom*(). AddRowCustomBegin() is called instead of AddRow() if the client wants
+/// to manually construct a row. The caller of AddRowCustomBegin() is responsible for
+/// writing the row with exactly the layout described above then calling
+/// AddRowCustomEnd() when done.
 ///
 /// If a caller constructs a tuple in this way, the caller can set the pointers and they
-/// will not be modified until the stream is read via GetNext() or GetRows().
+/// will not be modified until the stream is read via GetNext().
+/// TODO: IMPALA-5007: try to remove AddRowCustom*() by unifying with AddRow().
 ///
-/// TODO: we need to be able to do read ahead in the BufferedBlockMgr. It currently
-/// only has PinAllBlocks() which is blocking. We need a non-blocking version of this or
-/// some way to indicate a block will need to be pinned soon.
-/// TODO: see if this can be merged with Sorter::Run. The key difference is that this
-/// does not need to return rows in the order they were added, which allows it to be
-/// simpler.
-/// TODO: we could compact the small buffers when we need to spill but they use very
-/// little memory so ths might not be very useful.
-/// TODO: improvements:
-///   - It would be good to allocate the null indicators at the end of each block and grow
-///     this array as new rows are inserted in the block. If we do so, then there will be
-///     fewer gaps in case of many rows with NULL tuples.
-///   - We will want to multithread this. Add a AddBlock() call so the synchronization
-///     happens at the block level. This is a natural extension.
-///   - Instead of allocating all blocks from the block_mgr, allocate some blocks that
-///     are much smaller (e.g. 16K and doubling up to the block size). This way, very
-///     small streams (a common case) will use very little memory. This small blocks
-///     are always in memory since spilling them frees up negligible memory.
-///   - Return row batches in GetNext() instead of filling one in
+/// TODO: we need to be able to do read ahead for pages. We need some way to indicate a
+/// page will need to be pinned soon.
 class BufferedTupleStream {
  public:
-  /// Ordinal index into the stream to retrieve a row in O(1) time. This index can
-  /// only be used if the stream is pinned.
-  /// To read a row from a stream we need three pieces of information that we squeeze in
-  /// 64 bits:
-  ///  - The index of the block. The block id is stored in 16 bits. We can have up to
-  ///    64K blocks per tuple stream. With 8MB blocks that is 512GB per stream.
-  ///  - The offset of the start of the row (data) within the block. Since blocks are 8MB
-  ///    we use 24 bits for the offsets. (In theory we could use 23 bits.)
-  ///  - The idx of the row in the block. We need this for retrieving the null indicators.
-  ///    We use 24 bits for this index as well.
-  struct RowIdx {
-    static const uint64_t BLOCK_MASK  = 0xFFFF;
-    static const uint64_t BLOCK_SHIFT = 0;
-    static const uint64_t OFFSET_MASK  = 0xFFFFFF0000;
-    static const uint64_t OFFSET_SHIFT = 16;
-    static const uint64_t IDX_MASK  = 0xFFFFFF0000000000;
-    static const uint64_t IDX_SHIFT = 40;
-
-    uint64_t block() const {
-      return (data & BLOCK_MASK);
-    }
-
-    uint64_t offset() const {
-      return (data & OFFSET_MASK) >> OFFSET_SHIFT;
-    }
-
-    uint64_t idx() const {
-      return (data & IDX_MASK) >> IDX_SHIFT;
-    }
-
-    uint64_t set(uint64_t block, uint64_t offset, uint64_t idx) {
-      DCHECK_LE(block, BLOCK_MASK)
-          << "Cannot have more than 2^16 = 64K blocks in a tuple stream.";
-      DCHECK_LE(offset, OFFSET_MASK >> OFFSET_SHIFT)
-          << "Cannot have blocks larger than 2^24 = 16MB";
-      DCHECK_LE(idx, IDX_MASK >> IDX_SHIFT)
-          << "Cannot have more than 2^24 = 16M rows in a block.";
-      data = block | (offset << OFFSET_SHIFT) | (idx << IDX_SHIFT);
-      return data;
-    }
-
-    std::string DebugString() const;
-
-    uint64_t data;
-  };
+  /// A pointer to the start of a flattened TupleRow in the stream.
+  typedef uint8_t* FlatRowPtr;
 
   /// row_desc: description of rows stored in the stream. This is the desc for rows
   /// that are added and the rows being returned.
-  /// block_mgr: Underlying block mgr that owns the data blocks.
-  /// use_initial_small_buffers: If true, the initial N buffers allocated for the
-  /// tuple stream use smaller than IO-sized buffers.
-  /// read_write: Stream allows interchanging read and write operations. Requires at
-  /// least two blocks may be pinned.
+  /// page_len: the size of pages to use in the stream
   /// ext_varlen_slots: set of varlen slots with data stored externally to the stream
   BufferedTupleStream(RuntimeState* state, const RowDescriptor* row_desc,
-      BufferedBlockMgr* block_mgr, BufferedBlockMgr::Client* client,
-      bool use_initial_small_buffers, bool read_write,
+      BufferPool::ClientHandle* buffer_pool_client, int64_t default_page_len,
+      int64_t max_page_len,
       const std::set<SlotId>& ext_varlen_slots = std::set<SlotId>());
 
-  ~BufferedTupleStream();
+  virtual ~BufferedTupleStream();
 
   /// Initializes the tuple stream object on behalf of node 'node_id'. Must be called
   /// once before any of the other APIs.
-  /// If 'pinned' is true, the tuple stream starts of pinned, otherwise it is unpinned.
-  /// If 'profile' is non-NULL, counters are created.
+  /// If 'pinned' is true, the tuple stream starts off pinned, otherwise it is unpinned.
   /// 'node_id' is only used for error reporting.
-  Status Init(int node_id, RuntimeProfile* profile, bool pinned);
+  Status Init(int node_id, bool pinned) WARN_UNUSED_RESULT;
 
-  /// Prepares the stream for writing by attempting to allocate a write block.
-  /// Called after Init() and before the first AddRow() call.
-  /// 'got_buffer': set to true if the first write block was successfully pinned, or
-  ///     false if the block could not be pinned and no error was encountered. Undefined
-  ///     if an error status is returned.
-  Status PrepareForWrite(bool* got_buffer);
+  /// Prepares the stream for writing by saving enough reservation for a default-size
+  /// write page. Tries to increase reservation if there is not enough unused reservation
+  /// for a page. Called after Init() and before the first AddRow() or
+  /// AddRowCustomBegin() call.
+  /// 'got_reservation': set to true if there was enough reservation to initialize the
+  ///     first write page and false if there was not enough reservation and no other
+  ///     error was encountered. Undefined if an error status is returned.
+  Status PrepareForWrite(bool* got_reservation) WARN_UNUSED_RESULT;
 
-  /// Must be called for streams using small buffers to switch to IO-sized buffers.
-  /// If it fails to get a buffer (i.e. the switch fails) it resets the use_small_buffers_
-  /// back to false.
-  /// TODO: IMPALA-3200: remove this when small buffers are removed.
-  Status SwitchToIoBuffers(bool* got_buffer);
+  /// Prepares the stream for interleaved reads and writes by saving enough reservation
+  /// for default-sized read and write pages. Called after Init() and before the first
+  /// AddRow() or AddRowCustomBegin() call.
+  /// 'delete_on_read': Pages are deleted after they are read.
+  /// 'got_reservation': set to true if there was enough reservation to initialize the
+  ///     read and write pages and false if there was not enough reservation and no other
+  ///     error was encountered. Undefined if an error status is returned.
+  Status PrepareForReadWrite(
+      bool delete_on_read, bool* got_reservation) WARN_UNUSED_RESULT;
 
-  /// Adds a single row to the stream. Returns true if the append succeeded, returns false
-  /// and sets 'status' to OK if appending failed but can be retried or returns false and
-  /// sets 'status' to an error if an error occurred.
+  /// Prepares the stream for reading, invalidating the write iterator (if there is one).
+  /// Therefore must be called after the last AddRow() or AddRowCustomEnd() and before
+  /// GetNext(). PrepareForRead() can be called multiple times to do multiple read passes
+  /// over the stream, unless rows were read from the stream after PrepareForRead() or
+  /// PrepareForReadWrite() was called with delete_on_read = true.
+  /// 'delete_on_read': Pages are deleted after they are read.
+  /// 'got_reservation': set to true if there was enough reservation to initialize the
+  ///     first read page and false if there was not enough reservation and no other
+  ///     error was encountered. Undefined if an error status is returned.
+  Status PrepareForRead(bool delete_on_read, bool* got_reservation) WARN_UNUSED_RESULT;
+
+  /// Adds a single row to the stream. There are three possible outcomes:
+  /// a) The append succeeds. True is returned.
+  /// b) The append fails because the unused reservation was not sufficient to add
+  ///   a new page to the stream large enough to fit 'row' and the stream could not
+  ///   increase the reservation to get enough unused reservation. Returns false and
+  ///   sets 'status' to OK. The append can be retried after freeing up memory or
+  ///   unpinning the stream.
+  /// c) The append fails with a runtime error. Returns false and sets 'status' to an
+  ///   error.
+  /// d) The append fails becase the row is too large to fit in a page of a stream.
+  ///   Returns false and sets 'status' to an error.
+  ///
+  /// Unpinned streams can only encounter case b) when appending a row larger than
+  /// the default page size and the reservation could not be increased sufficiently.
+  /// Otherwise enough memory is automatically freed up by unpinning the current write
+  /// page.
+  ///
   /// BufferedTupleStream will do a deep copy of the memory in the row. After AddRow()
-  /// returns an error, it should not be called again. If appending failed without an
-  /// error and the stream is using small buffers, it is valid to call
-  /// SwitchToIoBuffers() then AddRow() again.
-  bool AddRow(TupleRow* row, Status* status) noexcept;
+  /// returns an error, it should not be called again.
+  bool AddRow(TupleRow* row, Status* status) noexcept WARN_UNUSED_RESULT;
 
-  /// Allocates space to store a row of with fixed length 'fixed_size' and variable
-  /// length data 'varlen_size'. If successful, returns the pointer where fixed length
-  /// data should be stored and assigns 'varlen_data' to where var-len data should
-  /// be stored. Returns NULL if there is not enough memory or an error occurred.
-  /// Sets *status if an error occurred. The returned memory is guaranteed to all
-  /// be allocated in the same block. AllocateRow does not currently support nullable
-  /// tuples.
-  uint8_t* AllocateRow(int fixed_size, int varlen_size, uint8_t** varlen_data,
-      Status* status);
+  /// Allocates space to store a row of 'size' bytes (including fixed and variable length
+  /// data). If successful, returns a pointer to the allocated row. The caller then must
+  /// writes valid data to the row and call AddRowCustomEnd().
+  ///
+  /// If unsuccessful, returns nullptr. The failure modes are the same as described in the
+  /// AddRow() comment.
+  ALWAYS_INLINE uint8_t* AddRowCustomBegin(int64_t size, Status* status);
 
-  /// Populates 'row' with the row at 'idx'. The stream must be pinned. The row must have
-  /// been allocated with the stream's row desc.
-  void GetTupleRow(const RowIdx& idx, TupleRow* row) const;
+  /// Called after AddRowCustomBegin() when done writing the row. Only should be called
+  /// if AddRowCustomBegin() succeeded. See the AddRowCustomBegin() comment for
+  /// explanation.
+  /// 'size': the size passed into AddRowCustomBegin().
+  void AddRowCustomEnd(int64_t size);
 
-  /// Prepares the stream for reading. If read_write_, this can be called at any time to
-  /// begin reading. Otherwise this must be called after the last AddRow() and
-  /// before GetNext().
-  /// delete_on_read: Blocks are deleted after they are read.
-  /// got_buffer: set to true if the first read block was successfully pinned, or
-  ///     false if the block could not be pinned and no error was encountered.
-  Status PrepareForRead(bool delete_on_read, bool* got_buffer);
+  /// Unflattens 'flat_row' into a regular TupleRow 'row'. Only valid to call if the
+  /// stream is pinned. The row must have been allocated with the stream's row desc.
+  /// The returned 'row' is backed by memory from the stream so is only valid as long
+  /// as the stream is pinned.
+  void GetTupleRow(FlatRowPtr flat_row, TupleRow* row) const;
 
-  /// Pins all blocks in this stream and switches to pinned mode.
-  /// If there is not enough memory, *pinned is set to false and the stream is unmodified.
-  /// If already_reserved is true, the caller has already made a reservation on
-  /// block_mgr_client_ to pin the stream.
-  Status PinStream(bool already_reserved, bool* pinned);
+  /// Pins all pages in this stream and switches to pinned mode. Has no effect if the
+  /// stream is already pinned.
+  /// If the current unused reservation is not sufficient to pin the stream in memory,
+  /// this will try to increase the reservation. If that fails, 'pinned' is set to false
+  /// and the stream is left unpinned. Otherwise 'pinned' is set to true.
+  Status PinStream(bool* pinned) WARN_UNUSED_RESULT;
 
   /// Modes for UnpinStream().
   enum UnpinMode {
-    /// All blocks in the stream are unpinned and the read/write positions in the stream
+    /// All pages in the stream are unpinned and the read/write positions in the stream
     /// are reset. No more rows can be written to the stream after this. The stream can
     /// be re-read from the beginning by calling PrepareForRead().
     UNPIN_ALL,
-    /// All blocks are unpinned aside from the current read and write blocks (if any),
+    /// All pages are unpinned aside from the current read and write pages (if any),
     /// which is left in the same state. The unpinned stream can continue being read
     /// or written from the current read or write positions.
     UNPIN_ALL_EXCEPT_CURRENT,
   };
 
   /// Unpins stream with the given 'mode' as described above.
-  Status UnpinStream(UnpinMode mode);
+  void UnpinStream(UnpinMode mode);
 
-  /// Get the next batch of output rows. Memory is still owned by the BufferedTupleStream
-  /// and must be copied out by the caller.
-  Status GetNext(RowBatch* batch, bool* eos);
+  /// Get the next batch of output rows, which are backed by the stream's memory.
+  /// If the stream is unpinned or 'delete_on_read' is true, the 'needs_deep_copy'
+  /// flag may be set on 'batch' to signal that memory will be freed on the next
+  /// call to GetNext() and that the caller should copy out any data it needs from
+  /// rows in 'batch' or in previous batches returned from GetNext().
+  ///
+  /// If the stream is pinned and 'delete_on_read' is false, the memory backing the
+  /// rows will remain valid until the stream is unpinned, destroyed, etc.
+  /// TODO: IMPALA-4179: update when we simplify the memory transfer model.
+  Status GetNext(RowBatch* batch, bool* eos) WARN_UNUSED_RESULT;
 
-  /// Same as above, but also populate 'indices' with the index of each returned row.
-  Status GetNext(RowBatch* batch, bool* eos, std::vector<RowIdx>* indices);
-
-  /// Returns all the rows in the stream in batch. This pins the entire stream in the
-  /// process.
-  /// *got_rows is false if the stream could not be pinned.
-  Status GetRows(boost::scoped_ptr<RowBatch>* batch, bool* got_rows);
+  /// Same as above, but populate 'flat_rows' with a pointer to the flat version of
+  /// each returned row in the pinned stream. The pointers in 'flat_rows' are only
+  /// valid as long as the stream remains pinned.
+  Status GetNext(
+      RowBatch* batch, bool* eos, std::vector<FlatRowPtr>* flat_rows) WARN_UNUSED_RESULT;
 
   /// Must be called once at the end to cleanup all resources. If 'batch' is non-NULL,
-  /// attaches any pinned blocks to the batch and deletes unpinned blocks. Otherwise
-  /// deletes all blocks. Does nothing if the stream was already closed. The 'flush'
-  /// mode is forwarded to RowBatch::AddBlock() when attaching blocks.
+  /// attaches buffers from pinned pages that rows returned from GetNext() may reference.
+  /// Otherwise deletes all pages. Does nothing if the stream was already closed. The
+  /// 'flush' mode is forwarded to RowBatch::AddBuffer() when attaching buffers.
   void Close(RowBatch* batch, RowBatch::FlushMode flush);
 
   /// Number of rows in the stream.
@@ -320,31 +346,52 @@ class BufferedTupleStream {
   /// Returns the byte size necessary to store the entire stream in memory.
   int64_t byte_size() const { return total_byte_size_; }
 
-  /// Returns the byte size of the stream that is currently pinned in memory.
-  /// If ignore_current is true, the write_block_ memory is not included.
-  int64_t bytes_in_mem(bool ignore_current) const;
+  /// Returns the number of bytes currently pinned in memory by the stream.
+  /// If ignore_current is true, the write_page_ memory is not included.
+  int64_t BytesPinned(bool ignore_current) const {
+    if (ignore_current && write_page_ != nullptr && write_page_->is_pinned()) {
+      return bytes_pinned_ - write_page_->len();
+    }
+    return bytes_pinned_;
+  }
 
   bool is_closed() const { return closed_; }
   bool is_pinned() const { return pinned_; }
-  int blocks_pinned() const { return num_pinned_; }
-  int blocks_unpinned() const { return blocks_.size() - num_pinned_ - num_small_blocks_; }
-  bool has_read_block() const { return read_block_ != blocks_.end(); }
-  bool has_write_block() const { return write_block_ != NULL; }
-  bool using_small_buffers() const { return use_small_buffers_; }
-
-  /// Returns true if the row consumes any memory. If false, the stream only needs to
-  /// store the count of rows.
-  bool RowConsumesMemory() const {
-    return fixed_tuple_row_size_ > 0 || has_nullable_tuple_;
-  }
+  bool has_read_iterator() const { return has_read_iterator_; }
+  bool has_write_iterator() const { return has_write_iterator_; }
 
   std::string DebugString() const;
 
  private:
+  DISALLOW_COPY_AND_ASSIGN(BufferedTupleStream);
   friend class ArrayTupleStreamTest_TestArrayDeepCopy_Test;
   friend class ArrayTupleStreamTest_TestComputeRowSize_Test;
   friend class MultiNullableTupleStreamTest_TestComputeRowSize_Test;
-  friend class SimpleTupleStreamTest_TestGetRowsOverflow_Test;
+
+  /// Wrapper around BufferPool::PageHandle that tracks additional info about the page.
+  struct Page {
+    Page() : num_rows(0), retrieved_buffer(true) {}
+
+    inline int len() const { return handle.len(); }
+    inline bool is_pinned() const { return handle.is_pinned(); }
+    inline int pin_count() const { return handle.pin_count(); }
+    Status GetBuffer(const BufferPool::BufferHandle** buffer) {
+      RETURN_IF_ERROR(handle.GetBuffer(buffer));
+      retrieved_buffer = true;
+      return Status::OK();
+    }
+    std::string DebugString() const;
+
+    BufferPool::PageHandle handle;
+
+    /// Number of rows written to the page.
+    int num_rows;
+
+    /// Whether we called GetBuffer() on the page since it was last pinned. This means
+    /// that GetBuffer() and ExtractBuffer() cannot fail and that GetNext() may have
+    /// returned rows referencing the page's buffer.
+    bool retrieved_buffer;
+  };
 
   /// Runtime state instance used to check for cancellation. Not owned.
   RuntimeState* const state_;
@@ -352,23 +399,11 @@ class BufferedTupleStream {
   /// Description of rows stored in the stream.
   const RowDescriptor* desc_;
 
-  /// Sum of the fixed length portion of all the tuples in desc_.
-  int fixed_tuple_row_size_;
+  /// Plan node ID, used for error reporting.
+  int node_id_;
 
   /// The size of the fixed length portion for each tuple in the row.
   std::vector<int> fixed_tuple_sizes_;
-
-  /// Max size (in bytes) of null indicators bitmap in the current read and write
-  /// blocks. If 0, it means that there is no need to store null indicators for this
-  /// RowDesc. We calculate this value based on the block's size and the
-  /// fixed_tuple_row_size_. When not 0, this value is also an upper bound for the number
-  /// of (rows * tuples_per_row) in this block.
-  int read_block_null_indicators_size_;
-  int write_block_null_indicators_size_;
-
-  /// Size (in bytes) of the null indicators bitmap reserved in a block of maximum
-  /// size (i.e. IO block size). 0 if no tuple is nullable.
-  int max_null_indicators_size_;
 
   /// Vectors of all the strings slots that have their varlen data stored in stream
   /// grouped by tuple_idx.
@@ -378,151 +413,254 @@ class BufferedTupleStream {
   /// stream, grouped by tuple_idx.
   std::vector<std::pair<int, std::vector<SlotDescriptor*>>> inlined_coll_slots_;
 
-  /// Block manager and client used to allocate, pin and release blocks. Not owned.
-  BufferedBlockMgr* block_mgr_;
-  BufferedBlockMgr::Client* block_mgr_client_;
+  /// Buffer pool and client used to allocate, pin and release pages. Not owned.
+  BufferPool* buffer_pool_;
+  BufferPool::ClientHandle* buffer_pool_client_;
 
-  /// List of blocks in the stream.
-  std::list<BufferedBlockMgr::Block*> blocks_;
+  /// List of pages in the stream.
+  /// Empty iff one of two cases applies:
+  /// * before the first row has been added with AddRow() or AddRowCustom().
+  /// * after the stream has been destructively read in 'delete_on_read' mode
+  std::list<Page> pages_;
+  // IMPALA-5629: avoid O(n) list.size() call by explicitly tracking the number of pages.
+  // TODO: remove when we switch to GCC5+, where list.size() is O(1). See GCC bug #49561.
+  int64_t num_pages_;
 
-  /// Total size of blocks_, including small blocks.
+  /// Total size of pages_, including any pages already deleted in 'delete_on_read'
+  /// mode.
   int64_t total_byte_size_;
 
-  /// Iterator pointing to the current block for read. Equal to list.end() until
-  /// PrepareForRead() is called.
-  std::list<BufferedBlockMgr::Block*>::iterator read_block_;
+  /// True if there is currently an active read iterator for the stream.
+  bool has_read_iterator_;
 
-  /// For each block in the stream, the buffer of the start of the block. This is only
-  /// valid when the stream is pinned, giving random access to data in the stream.
-  /// This is not maintained for delete_on_read_.
-  std::vector<uint8_t*> block_start_idx_;
+  /// The current page being read. When no read iterator is active, equal to list.end().
+  /// When a read iterator is active, either points to the current read page, or equals
+  /// list.end() if no rows have yet been read.  GetNext() does not advance this past
+  /// the end of the stream, so upon eos 'read_page_' points to the last page and
+  /// rows_returned_ == num_rows_. Always pinned, unless a Pin() call failed and an error
+  /// status was returned.
+  std::list<Page>::iterator read_page_;
 
-  /// Current idx of the tuple read from the read_block_ buffer.
-  uint32_t read_tuple_idx_;
+  /// Saved reservation for read iterator. 'default_page_len_' reservation is saved if
+  /// there is a read iterator, no pinned read page, and the possibility that the read
+  /// iterator will advance to a valid page.
+  BufferPool::SubReservation read_page_reservation_;
 
-  /// Current offset in read_block_ of the end of the last data read.
+  /// Number of rows returned from the current read_page_.
+  uint32_t read_page_rows_returned_;
+
+  /// Pointer into read_page_ to the byte after the last row read.
   uint8_t* read_ptr_;
 
-  /// Pointer to one byte past the end of read_block_.
-  uint8_t* read_end_ptr_;
+  /// Pointer to one byte past the end of read_page_. Used to detect overruns.
+  const uint8_t* read_end_ptr_;
 
-  /// Current idx of the tuple written at the write_block_ buffer.
-  uint32_t write_tuple_idx_;
+  /// Pointer into write_page_ to the byte after the last row written.
+  uint8_t* write_ptr_;
 
-  /// Pointer into write_block_ of the end of the last data written.
-  uint8_t*  write_ptr_;
+  /// Pointer to one byte past the end of write_page_. Cached to speed up computation
+  const uint8_t* write_end_ptr_;
 
-  /// Pointer to one byte past the end of write_block_.
-  uint8_t* write_end_ptr_;
-
-  /// Number of rows returned to the caller from GetNext().
+  /// Number of rows returned to the caller from GetNext() since the last
+  /// PrepareForRead() call.
   int64_t rows_returned_;
 
-  /// The block index of the current read block in blocks_.
-  int read_block_idx_;
+  /// True if there is currently an active write iterator into the stream.
+  bool has_write_iterator_;
 
-  /// The current block for writing. NULL if there is no available block to write to.
-  /// The entire write_block_ buffer is marked as allocated, so any data written into
-  /// the buffer will be spilled without having to allocate additional space.
-  BufferedBlockMgr::Block* write_block_;
+  /// The current page for writing. NULL if there is no write iterator or no current
+  /// write page. Always pinned. Size is 'default_page_len_', except temporarily while
+  /// appending a larger row between AddRowCustomBegin() and AddRowCustomEnd().
+  Page* write_page_;
 
-  /// Number of pinned blocks in blocks_, stored to avoid iterating over the list
-  /// to compute bytes_in_mem and bytes_unpinned.
-  /// This does not include small blocks.
-  int num_pinned_;
+  /// Saved reservation for write iterator. 'default_page_len_' reservation is saved if
+  /// there is a write iterator, no page currently pinned for writing and the possibility
+  /// that a pin count will be needed for the write iterator in future. Specifically if:
+  /// * no rows have been appended to the stream and 'pages_' is empty, or
+  /// * the stream is unpinned, 'write_page_' is null and and the last page in 'pages_'
+  ///   is a large page that we advanced past, or
+  /// * there is only one pinned page in the stream and it is already pinned for reading.
+  BufferPool::SubReservation write_page_reservation_;
 
-  /// The total number of small blocks in blocks_;
-  int num_small_blocks_;
+  /// Total bytes of pinned pages in pages_, stored to avoid iterating over the list
+  /// to compute it.
+  int64_t bytes_pinned_;
 
-  /// Number of rows stored in the stream.
+  /// Number of rows stored in the stream. Includes rows that were already deleted during
+  /// a destructive 'delete_on_read' pass over the stream.
   int64_t num_rows_;
 
-  /// Counters added by this object to the parent runtime profile.
-  RuntimeProfile::Counter* pin_timer_;
-  RuntimeProfile::Counter* unpin_timer_;
-  RuntimeProfile::Counter* get_new_block_timer_;
+  /// The default length in bytes of pages used to store the stream's rows. All rows that
+  /// fit in a default-sized page are stored in default-sized page.
+  const int64_t default_page_len_;
 
-  /// If true, read and write operations may be interleaved. Otherwise all calls
-  /// to AddRow() must occur before calling PrepareForRead() and subsequent calls to
-  /// GetNext().
-  const bool read_write_;
+  /// The maximum length in bytes of pages used to store the stream's rows. This is a
+  /// hard limit on the maximum size of row that can be stored in the stream and the
+  /// amount of reservation required to read or write to an unpinned stream.
+  const int64_t max_page_len_;
 
   /// Whether any tuple in the rows is nullable.
   const bool has_nullable_tuple_;
 
-  /// If true, this stream is still using small buffers.
-  bool use_small_buffers_;
-
-  /// If true, blocks are deleted after they are read.
+  /// If true, pages are deleted after they are read during this read pass. Once rows
+  /// have been read from a stream with 'delete_on_read_' true, this is always true.
   bool delete_on_read_;
 
   bool closed_; // Used for debugging.
 
-  /// If true, this stream has been explicitly pinned by the caller. This changes the
-  /// memory management of the stream. The blocks are not unpinned until the caller calls
-  /// UnpinAllBlocks(). If false, only the write_block_ and/or read_block_ are pinned
-  /// (both are if read_write_ is true).
+  /// If true, this stream has been explicitly pinned by the caller and all pages are
+  /// kept pinned until the caller calls UnpinStream().
   bool pinned_;
 
+  bool is_read_page(const Page* page) const {
+    return read_page_ != pages_.end() && &*read_page_ == page;
+  }
+
+  bool is_write_page(const Page* page) const { return write_page_ == page; }
+
+  /// Return true if the read and write page are the same.
+  bool has_read_write_page() const {
+    return write_page_ != nullptr && is_read_page(write_page_);
+  }
+
   /// The slow path for AddRow() that is called if there is not sufficient space in
-  /// the current block.
+  /// the current page.
   bool AddRowSlow(TupleRow* row, Status* status) noexcept;
 
-  /// Copies 'row' into write_block_. Returns false if there is not enough space in
-  /// 'write_block_'. After returning false, write_ptr_ may be left pointing to the
-  /// partially-written row, and no more data can be written to write_block_.
-  template <bool HAS_NULLABLE_TUPLE>
-  bool DeepCopyInternal(TupleRow* row) noexcept;
+  /// The slow path for AddRowCustomBegin() that is called if there is not sufficient space in
+  /// the current page.
+  uint8_t* AddRowCustomBeginSlow(int64_t size, Status* status) noexcept;
 
-  /// Helper function to copy strings in string_slots from tuple into write_block_.
-  /// Updates write_ptr_ to the end of the string data added. Returns false if the data
-  /// does not fit in the current write block. After returning false, write_ptr_ is left
-  /// pointing to the partially-written row, and no more data can be written to
-  /// write_block_.
-  bool CopyStrings(const Tuple* tuple, const std::vector<SlotDescriptor*>& string_slots);
+  /// The slow path for AddRowCustomEnd() that is called for large pages.
+  void AddLargeRowCustomEnd(int64_t size) noexcept;
+
+  /// Copies 'row' into the buffer starting at *data and ending at the byte before
+  /// 'data_end'. On success, returns true and updates *data to point after the last
+  /// byte written. Returns false if there is not enough space in the buffer provided.
+  bool DeepCopy(TupleRow* row, uint8_t** data, const uint8_t* data_end) noexcept;
+
+  /// Templated implementation of DeepCopy().
+  template <bool HAS_NULLABLE_TUPLE>
+  bool DeepCopyInternal(TupleRow* row, uint8_t** data, const uint8_t* data_end) noexcept;
+
+  /// Helper function to copy strings in string_slots from tuple into *data.
+  /// Updates *data to the end of the string data added. Returns false if the data
+  /// does not fit in the buffer [*data, data_end).
+  static bool CopyStrings(const Tuple* tuple,
+      const std::vector<SlotDescriptor*>& string_slots, uint8_t** data,
+      const uint8_t* data_end);
 
   /// Helper function to deep copy collections in collection_slots from tuple into
-  /// write_block_. Updates write_ptr_ to the end of the collection data added. Returns
-  /// false if the data does not fit in the current write block.. After returning false,
-  /// write_ptr_ is left pointing to the partially-written row, and no more data can be
-  /// written to write_block_.
-  bool CopyCollections(const Tuple* tuple,
-      const std::vector<SlotDescriptor*>& collection_slots);
+  /// the buffer [*data, data_end). Updates *data to the end of the collection data
+  /// added. Returns false if the data does not fit in the buffer.
+  static bool CopyCollections(const Tuple* tuple,
+      const std::vector<SlotDescriptor*>& collection_slots, uint8_t** data,
+      const uint8_t* data_end);
 
-  /// Wrapper of the templated DeepCopyInternal() function.
-  bool DeepCopy(TupleRow* row) noexcept;
+  /// Gets a new page of 'page_len' bytes from buffer_pool_, updating write_page_,
+  /// write_ptr_ and write_end_ptr_. The caller must ensure there is 'page_len' unused
+  /// reservation. The caller must reset the write page (if there is one) before calling.
+  Status NewWritePage(int64_t page_len) noexcept WARN_UNUSED_RESULT;
 
-  /// Gets a new block of 'block_len' bytes from the block_mgr_, updating write_block_,
-  /// write_tuple_idx_, write_ptr_ and write_end_ptr_. 'null_indicators_size' is the
-  /// number of bytes that will be reserved in the block for the null indicators bitmap.
-  /// *got_block is set to true if a block was successfully acquired. Null indicators
-  /// (if any) will also be reserved and initialized. If there are no blocks available,
-  /// *got_block is set to false and write_block_ is unchanged.
-  Status NewWriteBlock(
-      int64_t block_len, int64_t null_indicators_size, bool* got_block) noexcept;
+  /// Determines what page size is needed to fit a row of 'row_size' bytes.
+  /// Returns an error if the row cannot fit in a page.
+  Status CalcPageLenForRow(int64_t row_size, int64_t* page_len);
 
-  /// A wrapper around NewWriteBlock(). 'row_size' is the size of the tuple row to be
-  /// appended to this block. This function determines the block size required in order
-  /// to fit the row and null indicators.
-  Status NewWriteBlockForRow(int64_t row_size, bool* got_block) noexcept;
+  /// Wrapper around NewWritePage() that allocates a new write page that fits a row of
+  /// 'row_size' bytes. Increases reservation if needed to allocate the next page.
+  /// Returns OK and sets 'got_reservation' to true if the write page was successfully
+  /// allocated. Returns an error if the row cannot fit in a page. Returns OK and sets
+  /// 'got_reservation' to false if the reservation could not be increased and no other
+  /// error was encountered.
+  Status AdvanceWritePage(
+      int64_t row_size, bool* got_reservation) noexcept WARN_UNUSED_RESULT;
 
-  /// Reads the next block from the block_mgr_. This blocks if necessary.
-  /// Updates read_block_, read_ptr_, read_tuple_idx_ and read_end_ptr_.
-  Status NextReadBlock();
+  /// Reset the write page, if there is one, and unpin pages accordingly. If there
+  /// is an active write iterator, the next row will be appended to a new page.
+  void ResetWritePage();
 
-  /// Returns the total additional bytes that this row will consume in write_block_ if
-  /// appended to the block. This includes the fixed length part of the row and the
-  /// data for inlined_string_slots_ and inlined_coll_slots_.
+  /// Invalidate the write iterator and release any resources associated with it. After
+  /// calling this, no more rows can be appended to the stream.
+  void InvalidateWriteIterator();
+
+  /// Same as PrepareForRead(), except the iterators are not invalidated and
+  /// the caller is assumed to have checked there is sufficient unused reservation.
+  Status PrepareForReadInternal(bool delete_on_read) WARN_UNUSED_RESULT;
+
+  /// Pins the next read page. This blocks reading from disk if necessary to bring the
+  /// page's data into memory. Updates read_page_, read_ptr_, and
+  /// read_page_rows_returned_.
+  Status NextReadPage() WARN_UNUSED_RESULT;
+
+  /// Invalidate the read iterator, and release any resources associated with the active
+  /// iterator.
+  void InvalidateReadIterator();
+
+  /// Returns the total additional bytes that this row will consume in write_page_ if
+  /// appended to the page. This includes the row's null indicators, the fixed length
+  /// part of the row and the data for inlined_string_slots_ and inlined_coll_slots_.
   int64_t ComputeRowSize(TupleRow* row) const noexcept;
 
-  /// Unpins block if it is an IO-sized block and updates tracking stats.
-  Status UnpinBlock(BufferedBlockMgr::Block* block);
+  /// Pins page and updates tracking stats.
+  Status PinPage(Page* page) WARN_UNUSED_RESULT;
+
+  /// Increment the page's pin count if this page needs a higher pin count given the
+  /// current read and write iterator positions and whether the stream will be pinned
+  /// ('stream_pinned'). Assumes that no scenarios occur when the pin count needs to
+  /// be incremented multiple times. The caller is responsible for ensuring sufficient
+  /// reservation is available.
+  Status PinPageIfNeeded(Page* page, bool stream_pinned) WARN_UNUSED_RESULT;
+
+  /// Decrement the page's pin count if this page needs a lower pin count given the
+  /// current read and write iterator positions and whether the stream will be pinned
+  /// ('stream_pinned'). Assumes that no scenarios occur when the pin count needs to
+  /// be decremented multiple times.
+  void UnpinPageIfNeeded(Page* page, bool stream_pinned);
+
+  /// Return the expected pin count for 'page' in the current stream based on the current
+  /// read and write pages and whether the stream is pinned.
+  int ExpectedPinCount(bool stream_pinned, const Page* page) const;
+
+  /// Return true if the stream in its current state needs to have a reservation for
+  /// a write page stored in 'write_page_reservation_'.
+  bool NeedWriteReservation() const;
+
+  /// Same as above, except assume the stream's 'pinned_' state is 'stream_pinned'.
+  bool NeedWriteReservation(bool stream_pinned) const;
+
+  /// Same as above, except assume the stream has 'num_pages' pages and different
+  /// iterator state.
+  static bool NeedWriteReservation(bool stream_pinned, int64_t num_pages,
+      bool has_write_iterator, bool has_write_page, bool has_read_write_page);
+
+  /// Return true if the stream in its current state needs to have a reservation for
+  /// a read page stored in 'read_page_reservation_'.
+  bool NeedReadReservation() const;
+
+  /// Same as above, except assume the stream's 'pinned_' state is 'stream_pinned'.
+  bool NeedReadReservation(bool stream_pinned) const;
+
+  /// Same as above, except assume the stream has 'num_pages' pages and a different
+  /// read iterator state.
+  bool NeedReadReservation(bool stream_pinned, int64_t num_pages, bool has_read_iterator,
+      bool has_read_page) const;
+
+  /// Same as above, except assume the stream has 'num_pages' pages and a different
+  /// write iterator state.
+  static bool NeedReadReservation(bool stream_pinned, int64_t num_pages,
+      bool has_read_iterator, bool has_read_page, bool has_write_iterator,
+      bool has_write_page);
 
   /// Templated GetNext implementations.
-  template <bool FILL_INDICES>
-  Status GetNextInternal(RowBatch* batch, bool* eos, std::vector<RowIdx>* indices);
-  template <bool FILL_INDICES, bool HAS_NULLABLE_TUPLE>
-  Status GetNextInternal(RowBatch* batch, bool* eos, std::vector<RowIdx>* indices);
+  template <bool FILL_FLAT_ROWS>
+  Status GetNextInternal(RowBatch* batch, bool* eos, std::vector<FlatRowPtr>* flat_rows);
+  template <bool FILL_FLAT_ROWS, bool HAS_NULLABLE_TUPLE>
+  Status GetNextInternal(RowBatch* batch, bool* eos, std::vector<FlatRowPtr>* flat_rows);
+
+  /// Helper function to convert a flattened TupleRow stored starting at '*data' into
+  /// 'row'. *data is updated to point to the first byte past the end of the row.
+  template <bool HAS_NULLABLE_TUPLE>
+  void UnflattenTupleRow(uint8_t** data, TupleRow* row) const;
 
   /// Helper function for GetNextInternal(). For each string slot in string_slots,
   /// update StringValue's ptr field to point to the corresponding string data stored
@@ -534,28 +672,25 @@ class BufferedTupleStream {
   /// recursively update any pointers in the CollectionValue to point to the corresponding
   /// var len data stored inline in the stream, advancing read_ptr_ as data is read.
   /// Assumes that the collection was serialized to the stream in DeepCopy()'s format.
-  void FixUpCollectionsForRead(const vector<SlotDescriptor*>& collection_slots,
-      Tuple* tuple);
+  void FixUpCollectionsForRead(
+      const vector<SlotDescriptor*>& collection_slots, Tuple* tuple);
 
-  /// Computes the number of bytes needed for null indicators for a block of 'block_size'.
-  /// Return 0 if no tuple is nullable. Return -1 if a single row of fixed-size tuples
-  /// plus its null indicator (if any) cannot fit in the block.
-  int ComputeNumNullIndicatorBytes(int block_size) const;
+  /// Returns the number of null indicator bytes per row. Only valid if this stream has
+  /// nullable tuples.
+  int NullIndicatorBytesPerRow() const;
 
-  uint32_t read_block_bytes_remaining() const {
-    DCHECK_GE(read_end_ptr_, read_ptr_);
-    DCHECK_LE(read_end_ptr_ - read_ptr_, (*read_block_)->buffer_len());
-    return read_end_ptr_ - read_ptr_;
-  }
+  /// Returns the total bytes pinned. Only called in DCHECKs to validate bytes_pinned_.
+  int64_t CalcBytesPinned() const;
 
-  uint32_t write_block_bytes_remaining() const {
-    DCHECK_GE(write_end_ptr_, write_ptr_);
-    DCHECK_LE(write_end_ptr_ - write_ptr_, write_block_->buffer_len());
-    return write_end_ptr_ - write_ptr_;
-  }
-
+  /// DCHECKs if the stream is internally inconsistent. The stream should always be in
+  /// a consistent state after returning success from a public API call. The Fast version
+  /// has constant runtime and does not check all of 'pages_'. The Full version includes
+  /// O(n) checks that require iterating over the whole 'pages_' list (e.g. checking that
+  /// each page is in a valid state).
+  void CheckConsistencyFast() const;
+  void CheckConsistencyFull() const;
+  void CheckPageConsistency(const Page* page) const;
 };
-
 }
 
 #endif

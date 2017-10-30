@@ -79,7 +79,8 @@ namespace impala {
 ///
 class BufferPool::BufferAllocator {
  public:
-  BufferAllocator(BufferPool* pool, int64_t min_buffer_len, int64_t system_bytes_limit);
+  BufferAllocator(BufferPool* pool, int64_t min_buffer_len, int64_t system_bytes_limit,
+      int64_t clean_page_bytes_limit);
   ~BufferAllocator();
 
   /// Allocate a buffer with a power-of-two length 'len'. This function may acquire
@@ -135,6 +136,9 @@ class BufferPool::BufferAllocator {
   /// Return the total bytes of free buffers in the allocator.
   int64_t GetFreeBufferBytes() const;
 
+  /// Return the limit on bytes of clean pages in the allocator.
+  int64_t GetCleanPageBytesLimit() const;
+
   /// Return the total number of clean pages in the allocator.
   int64_t GetNumCleanPages() const;
 
@@ -168,11 +172,6 @@ class BufferPool::BufferAllocator {
   /// Same as Allocate() but leaves 'buffer->client_' NULL and does not update counters.
   Status AllocateInternal(
       int64_t len, BufferPool::BufferHandle* buffer) WARN_UNUSED_RESULT;
-
-  /// Decrease 'system_bytes_remaining_' by up to 'max_decrease', down to a minimum of 0.
-  /// If 'require_full_decrease' is true, only decrease if we can decrease it
-  /// 'max_decrease'. Returns the amount it was decreased by.
-  int64_t DecreaseSystemBytesRemaining(int64_t max_decrease, bool require_full_decrease);
 
   /// Tries to reclaim enough memory from various sources so that the caller can allocate
   /// a buffer of 'target_bytes' from the system allocator. Scavenges buffers from the
@@ -218,6 +217,16 @@ class BufferPool::BufferAllocator {
   /// allocating new buffers. Must be updated atomically before a new buffer is
   /// allocated or after an existing buffer is freed with the system allocator.
   AtomicInt64 system_bytes_remaining_;
+
+  /// The maximum bytes of clean pages that can accumulate across all arenas before
+  /// they will be evicted.
+  const int64_t clean_page_bytes_limit_;
+
+  /// The number of bytes of 'clean_page_bytes_limit_' not used by clean pages. I.e.
+  /// (clean_page_bytes_limit - bytes of clean pages in the BufferAllocator).
+  /// 'clean_pages_bytes_limit_' is enforced by increasing this value before a
+  /// clean page is added and decreasing it after a clean page is reclaimed or evicted.
+  AtomicInt64 clean_page_bytes_remaining_;
 
   /// Free and clean pages. One arena per core.
   std::vector<std::unique_ptr<FreeBufferArena>> per_core_arenas_;

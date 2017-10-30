@@ -169,8 +169,6 @@ Status ScalarExpr::CreateNode(
       // TODO: is there a better way to do this?
       if (texpr_node.fn.name.function_name == "if") {
         *expr = pool->Add(new IfExpr(texpr_node));
-      } else if (texpr_node.fn.name.function_name == "nullif") {
-        *expr = pool->Add(new NullIfExpr(texpr_node));
       } else if (texpr_node.fn.name.function_name == "isnull" ||
                  texpr_node.fn.name.function_name == "ifnull" ||
                  texpr_node.fn.name.function_name == "nvl") {

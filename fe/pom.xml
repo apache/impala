@@ -47,6 +47,8 @@ under the License.
     <impala.extdatasrc.api.version>1.0-SNAPSHOT</impala.extdatasrc.api.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <kudu.version>${env.KUDU_JAVA_VERSION}</kudu.version>
+    <yarn-extras.version>${project.version}</yarn-extras.version>
+    <eclipse.output.directory>eclipse-classes</eclipse.output.directory>
   </properties>
 
   <dependencies>
@@ -97,21 +99,15 @@ under the License.
     </dependency>
 
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-yarn-api</artifactId>
-      <version>${hadoop.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
-      <version>${hadoop.version}</version>
-    </dependency>
-
-    <dependency>
       <groupId>org.apache.sentry</groupId>
       <artifactId>sentry-core-common</artifactId>
       <version>${sentry.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.impala</groupId>
+      <artifactId>yarn-extras</artifactId>
+      <version>${yarn-extras.version}</version>
     </dependency>
 
     <dependency>
@@ -624,6 +620,45 @@ under the License.
                 </pluginExecution>
               </pluginExecutions>
             </lifecycleMappingMetadata>
+          </configuration>
+        </plugin>
+        <!-- mvn eclipse:eclipse generates Eclipse .project and .classpath files -->
+        <plugin>
+          <groupId>org.apache.maven.plugins </groupId>
+          <artifactId>maven-eclipse-plugin</artifactId>
+          <version>2.10</version>
+          <configuration>
+            <!-- By default, we separate Eclipse-built files from Maven-built
+                 files. Otherwise, they are both in target/classes, and Eclipse
+                 and Maven may clobber each other, complicating attaching to
+                 a running process. -->
+            <buildOutputDirectory>${eclipse.output.directory}</buildOutputDirectory>
+            <downloadSources>true</downloadSources>
+            <downloadJavadocs>false</downloadJavadocs>
+            <additionalConfig>
+              <file>
+                <!-- Saved "launch configuration" for attaching Eclipse debugger to port 30000 -->
+                <name>impala-fe-30000.launch</name>
+                <content><![CDATA[<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<launchConfiguration type="org.eclipse.jdt.launching.remoteJavaApplication">
+<listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_PATHS">
+<listEntry value="/impala-frontend"/>
+</listAttribute>
+<listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_TYPES">
+<listEntry value="4"/>
+</listAttribute>
+<booleanAttribute key="org.eclipse.jdt.launching.ALLOW_TERMINATE" value="false"/>
+<mapAttribute key="org.eclipse.jdt.launching.CONNECT_MAP">
+<mapEntry key="hostname" value="localhost"/>
+<mapEntry key="port" value="30000"/>
+</mapAttribute>
+<stringAttribute key="org.eclipse.jdt.launching.PROJECT_ATTR" value="impala-frontend"/>
+<stringAttribute key="org.eclipse.jdt.launching.VM_CONNECTOR_ID" value="org.eclipse.jdt.launching.socketAttachConnector"/>
+</launchConfiguration>
+]]>
+                </content>
+              </file>
+            </additionalConfig>
           </configuration>
         </plugin>
       </plugins>

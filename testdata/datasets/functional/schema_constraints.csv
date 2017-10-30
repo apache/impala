@@ -11,6 +11,7 @@ table_name:hbasealltypeserror, constraint:restrict_to, table_format:hbase/none/n
 table_name:hbasealltypeserrornonulls, constraint:restrict_to, table_format:hbase/none/none
 
 table_name:alltypesinsert, constraint:restrict_to, table_format:text/none/none
+table_name:stringpartitionkey, constraint:restrict_to, table_format:text/none/none
 table_name:alltypesnopart_insert, constraint:restrict_to, table_format:text/none/none
 table_name:insert_overwrite_nopart, constraint:restrict_to, table_format:text/none/none
 table_name:insert_overwrite_partitioned, constraint:restrict_to, table_format:text/none/none

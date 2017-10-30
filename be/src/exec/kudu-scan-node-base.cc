@@ -52,7 +52,6 @@ KuduScanNodeBase::KuduScanNodeBase(ObjectPool* pool, const TPlanNode& tnode,
     : ScanNode(pool, tnode, descs),
       tuple_id_(tnode.kudu_scan_node.tuple_id),
       client_(nullptr),
-      counters_running_(false),
       next_scan_token_idx_(0) {
   DCHECK(KuduIsAvailable());
 }
@@ -63,13 +62,11 @@ KuduScanNodeBase::~KuduScanNodeBase() {
 
 Status KuduScanNodeBase::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ScanNode::Prepare(state));
-  runtime_state_ = state;
 
   scan_ranges_complete_counter_ =
       ADD_COUNTER(runtime_profile(), SCAN_RANGES_COMPLETE_COUNTER, TUnit::UNIT);
   kudu_round_trips_ = ADD_COUNTER(runtime_profile(), KUDU_ROUND_TRIPS, TUnit::UNIT);
   kudu_remote_tokens_ = ADD_COUNTER(runtime_profile(), KUDU_REMOTE_TOKENS, TUnit::UNIT);
-  counters_running_ = true;
 
   DCHECK(state->desc_tbl().GetTupleDescriptor(tuple_id_) != NULL);
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
@@ -108,12 +105,6 @@ Status KuduScanNodeBase::Open(RuntimeState* state) {
   return Status::OK();
 }
 
-void KuduScanNodeBase::Close(RuntimeState* state) {
-  if (is_closed()) return;
-  StopAndFinalizeCounters();
-  ExecNode::Close(state);
-}
-
 void KuduScanNodeBase::DebugString(int indentation_level, stringstream* out) const {
   string indent(indentation_level * 2, ' ');
   *out << indent << "KuduScanNode(tupleid=" << tuple_id_ << ")";
@@ -129,12 +120,5 @@ const string* KuduScanNodeBase::GetNextScanToken() {
   return token;
 }
 
-void KuduScanNodeBase::StopAndFinalizeCounters() {
-  if (!counters_running_) return;
-  counters_running_ = false;
-
-  PeriodicCounterUpdater::StopRateCounter(total_throughput_counter());
-  PeriodicCounterUpdater::StopTimeSeriesCounter(bytes_read_timeseries_counter_);
-}
 
 }  // namespace impala

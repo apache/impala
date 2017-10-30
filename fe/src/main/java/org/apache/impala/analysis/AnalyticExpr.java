@@ -35,8 +35,6 @@ import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.util.TColumnValueUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
@@ -225,6 +223,12 @@ public class AnalyticExpr extends Expr {
   static private boolean isRankingFn(Function fn) {
     return isAnalyticFn(fn, RANK) || isAnalyticFn(fn, DENSERANK) ||
         isAnalyticFn(fn, ROWNUMBER);
+  }
+
+  static private boolean isFirstOrLastValueFn(Function fn) {
+    return isAnalyticFn(fn, LAST_VALUE) || isAnalyticFn(fn, FIRST_VALUE) ||
+        isAnalyticFn(fn, LAST_VALUE_IGNORE_NULLS) ||
+        isAnalyticFn(fn, FIRST_VALUE_IGNORE_NULLS);
   }
 
   /**
@@ -447,16 +451,13 @@ public class AnalyticExpr extends Expr {
           "DISTINCT not allowed in analytic function: " + getFnCall().toSql());
     }
 
-    if (getFnCall().getParams().isIgnoreNulls()) {
-      String fnName = getFnCall().getFnName().getFunction();
-      if (!fnName.equals(LAST_VALUE) && !fnName.equals(FIRST_VALUE)) {
-        throw new AnalysisException("Function " + fnName.toUpperCase()
-            + " does not accept the keyword IGNORE NULLS.");
-      }
+    Function fn = getFnCall().getFn();
+    if (getFnCall().getParams().isIgnoreNulls() && !isFirstOrLastValueFn(fn)) {
+      throw new AnalysisException("Function " + fn.functionName().toUpperCase()
+          + " does not accept the keyword IGNORE NULLS.");
     }
 
     // check for correct composition of analytic expr
-    Function fn = getFnCall().getFn();
     if (!(fn instanceof AggregateFunction)) {
         throw new AnalysisException(
             "OVER clause requires aggregate or analytic function: "
@@ -471,7 +472,7 @@ public class AnalyticExpr extends Expr {
     }
 
     if (isAnalyticFn(fn) && !isAggregateFn(fn)) {
-      if (orderByElements_.isEmpty()) {
+      if (!isFirstOrLastValueFn(fn) && orderByElements_.isEmpty()) {
         throw new AnalysisException(
             "'" + getFnCall().toSql() + "' requires an ORDER BY clause");
       }
@@ -550,6 +551,9 @@ public class AnalyticExpr extends Expr {
 
     setChildren();
   }
+
+  @Override
+  protected float computeEvalCost() { return UNKNOWN_COST; }
 
   /**
    * If necessary, rewrites the analytic function, window, and/or order-by elements into
@@ -826,8 +830,7 @@ public class AnalyticExpr extends Expr {
   }
 
   @Override
-  protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer)
-      throws AnalysisException {
+  protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer) {
     Expr e = super.substituteImpl(smap, analyzer);
     if (!(e instanceof AnalyticExpr)) return e;
     // Re-sync state after possible child substitution.

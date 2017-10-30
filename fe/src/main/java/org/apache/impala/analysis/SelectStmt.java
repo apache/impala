@@ -725,11 +725,10 @@ public class SelectStmt extends QueryStmt {
     for (int i = 0; i < selectList_.getItems().size(); ++i) {
       if (!resultExprs_.get(i).isBound(finalAggInfo.getOutputTupleId())) {
         SelectListItem selectListItem = selectList_.getItems().get(i);
-        Preconditions.checkState(!selectListItem.isStar());
         throw new AnalysisException(
             "select list expression not produced by aggregation output "
             + "(missing from GROUP BY clause?): "
-            + selectListItem.getExpr().toSql());
+            + selectListItem.toSql());
       }
     }
     if (orderByElements_ != null) {

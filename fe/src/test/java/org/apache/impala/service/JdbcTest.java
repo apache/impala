@@ -190,10 +190,11 @@ public class JdbcTest {
 
   @Test
   public void testMetaDataGetTableTypes() throws SQLException {
-    // There is only one table type: "table".
     ResultSet rs = con_.getMetaData().getTableTypes();
     assertTrue(rs.next());
     assertEquals(rs.getString(1).toLowerCase(), "table");
+    assertTrue(rs.next());
+    assertEquals(rs.getString(1).toLowerCase(), "view");
     assertFalse(rs.next());
     rs.close();
   }
@@ -441,6 +442,34 @@ public class JdbcTest {
     assertEquals(0, rs.getInt("DECIMAL_DIGITS"));
     assertEquals(0, rs.getInt("NUM_PREC_RADIX"));
     rs.close();
+  }
+
+  @Test
+  public void testMetaDataGetColumnComments() throws Exception {
+    addTestTable("create table default.jdbc_column_comments_test (" +
+         "a int comment 'column comment') comment 'table comment'");
+
+    // If a table is not yet loaded before getTables(), then the 'remarks' field
+    // is left empty. getColumns() loads the table metadata, so later getTables()
+    // calls will return 'remarks' correctly.
+    ResultSet rs = con_.getMetaData().getTables(
+        null, "default", "jdbc_column_comments_test", null);
+    assertTrue(rs.next());
+    assertEquals("Incorrect table name", "jdbc_column_comments_test",
+        rs.getString("TABLE_NAME"));
+    assertEquals("Incorrect table comment", "", rs.getString("REMARKS"));
+
+    rs = con_.getMetaData().getColumns(
+        null, "default", "jdbc_column_comments_test", null);
+    assertTrue(rs.next());
+    assertEquals("Incorrect column comment", "column comment", rs.getString("REMARKS"));
+
+    rs = con_.getMetaData().getTables(
+        null, "default", "jdbc_column_comments_test", null);
+    assertTrue(rs.next());
+    assertEquals("Incorrect table name", "jdbc_column_comments_test",
+        rs.getString("TABLE_NAME"));
+    assertEquals("Incorrect table comment", "table comment", rs.getString("REMARKS"));
   }
 
   @Test

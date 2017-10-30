@@ -18,20 +18,21 @@
 #ifndef IMPALA_RUNTIME_COORDINATOR_H
 #define IMPALA_RUNTIME_COORDINATOR_H
 
-#include <vector>
 #include <string>
-#include <boost/scoped_ptr.hpp>
+#include <vector>
 #include <boost/accumulators/accumulators.hpp>
-#include <boost/accumulators/statistics/stats.hpp>
-#include <boost/accumulators/statistics/min.hpp>
+#include <boost/accumulators/statistics/max.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/accumulators/statistics/median.hpp>
-#include <boost/accumulators/statistics/max.hpp>
+#include <boost/accumulators/statistics/min.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
+#include <boost/scoped_ptr.hpp>
+#include <boost/thread/condition_variable.hpp>
+#include <boost/thread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/condition_variable.hpp>
+#include <rapidjson/document.h>
 
 #include "common/global-types.h"
 #include "common/hdfs.h"
@@ -138,18 +139,10 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// Only valid to call after Exec().
   QueryState* query_state() const { return query_state_; }
 
-  /// Only valid *after* calling Exec(). Return nullptr if the running query does not
-  /// produce any rows.
-  ///
-  /// TODO: The only dependency on this is QueryExecState, used to track memory for the
-  /// result cache. Remove this dependency, possibly by moving result caching inside this
-  /// class.
-  RuntimeState* runtime_state();
-
   /// Get cumulative profile aggregated over all fragments of the query.
   /// This is a snapshot of the current state of execution and will change in
   /// the future if not all fragments have finished execution.
-  RuntimeProfile* query_profile() const { return query_profile_.get(); }
+  RuntimeProfile* query_profile() const { return query_profile_; }
 
   const TUniqueId& query_id() const;
 
@@ -185,6 +178,10 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// filter ID have been received (may be 1 or more per filter), broadcast the global
   /// filter to fragment instances.
   void UpdateFilter(const TUpdateFilterParams& params);
+
+  /// Adds to 'document' a serialized array of all backends in a member named
+  /// 'backend_states'.
+  void BackendsToJson(rapidjson::Document* document);
 
  private:
   class BackendState;
@@ -249,8 +246,9 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   TRuntimeFilterMode::type filter_mode_;
 
   /// Tracks the memory consumed by runtime filters during aggregation. Child of
-  /// the query mem tracker in 'query_state_' and set in Exec().
-  std::unique_ptr<MemTracker> filter_mem_tracker_;
+  /// the query mem tracker in 'query_state_' and set in Exec(). Stored in
+  /// query_state_->obj_pool() so it has same lifetime as other MemTrackers.
+  MemTracker* filter_mem_tracker_ = nullptr;
 
   /// Object pool owned by the coordinator.
   boost::scoped_ptr<ObjectPool> obj_pool_;
@@ -272,16 +270,18 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 
   ExecSummary exec_summary_;
 
-  /// Aggregate counters for the entire query.
-  boost::scoped_ptr<RuntimeProfile> query_profile_;
+  /// Aggregate counters for the entire query. Lives in 'obj_pool_'.
+  RuntimeProfile* query_profile_ = nullptr;
 
   /// Protects all fields below. This is held while making RPCs, so this lock should
   /// only be acquired if the acquiring thread is prepared to wait for a significant
   /// time.
   /// TODO: clarify to what extent the fields below need to be protected by lock_
   /// Lock ordering is
-  /// 1. lock_
-  /// 2. BackendState::lock_
+  /// 1. wait_lock_
+  /// 2. lock_
+  /// 3. BackendState::lock_
+  /// 4. filter_lock_
   boost::mutex lock_;
 
   /// Overall status of the entire query; set to the first reported fragment error
@@ -343,11 +343,15 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// safe to concurrently read from filter_routing_table_.
   bool filter_routing_table_complete_ = false;
 
-  /// True if and only if ReleaseResources() has been called.
-  bool released_resources_ = false;
+  /// True if and only if ReleaseExecResources() has been called.
+  bool released_exec_resources_ = false;
 
   /// Returns a local object pool.
   ObjectPool* obj_pool() { return obj_pool_.get(); }
+
+  /// Only valid *after* calling Exec(). Return nullptr if the running query does not
+  /// produce any rows.
+  RuntimeState* runtime_state();
 
   /// Returns a pretty-printed table of the current filter state.
   std::string FilterDebugString();
@@ -357,12 +361,17 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   void CancelInternal();
 
   /// Acquires lock_ and updates query_status_ with 'status' if it's not already
-  /// an error status, and returns the current query_status_.
+  /// an error status, and returns the current query_status_. The status may be
+  /// due to an error in a specific fragment instance, or it can be a general error
+  /// not tied to a specific fragment instance.
   /// Calls CancelInternal() when switching to an error status.
-  /// failed_fragment is the fragment_id that has failed, used for error reporting along
-  /// with instance_hostname.
-  Status UpdateStatus(const Status& status, const TUniqueId& failed_fragment,
-      const std::string& instance_hostname) WARN_UNUSED_RESULT;
+  /// When an error is due to a specific fragment instance, 'is_fragment_failure' must
+  /// be true and 'failed_fragment' is the fragment_id that has failed, used for error
+  /// reporting. For a general error not tied to a specific instance,
+  /// 'is_fragment_failure' must be false and 'failed_fragment' will be ignored.
+  /// 'backend_hostname' is used for error reporting in either case.
+  Status UpdateStatus(const Status& status, const std::string& backend_hostname,
+      bool is_fragment_failure, const TUniqueId& failed_fragment) WARN_UNUSED_RESULT;
 
   /// Update per_partition_status_ and files_to_move_.
   void UpdateInsertExecStatus(const TInsertExecStatus& insert_exec_status);
@@ -423,9 +432,11 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// filters that they either produce or consume.
   void InitFilterRoutingTable();
 
-  /// Releases filter resources, unregisters the filter mem tracker, and calls
-  /// CloseConsumer() on coord_sink_. Requires lock_ to be held. Idempotent.
-  void ReleaseResources();
+  /// Releases all resources associated with query execution. Acquires lock_. Idempotent.
+  void ReleaseExecResources();
+
+  /// Same as ReleaseExecResources() except the lock must be held by the caller.
+  void ReleaseExecResourcesLocked();
 };
 
 }

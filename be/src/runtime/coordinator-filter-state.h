@@ -58,9 +58,12 @@ class Coordinator::FilterState {
  public:
   FilterState(const TRuntimeFilterDesc& desc, const TPlanNodeId& src)
     : desc_(desc), src_(src), pending_count_(0), first_arrival_time_(0L),
-      completion_time_(0L), disabled_(false) { }
+      completion_time_(0L) {
+    // bloom_filter_ is a disjunction so the unit value is always_false.
+    bloom_filter_.always_false = true;
+  }
 
-  TBloomFilter* bloom_filter() { return bloom_filter_.get(); }
+  TBloomFilter& bloom_filter() { return bloom_filter_; }
   boost::unordered_set<int>* src_fragment_instance_idxs() {
     return &src_fragment_instance_idxs_;
   }
@@ -75,7 +78,7 @@ class Coordinator::FilterState {
   const TRuntimeFilterDesc& desc() const { return desc_; }
   int pending_count() const { return pending_count_; }
   void set_pending_count(int pending_count) { pending_count_ = pending_count; }
-  bool disabled() const { return disabled_; }
+  bool disabled() const { return bloom_filter_.always_true; }
 
   /// Aggregates partitioned join filters and updates memory consumption.
   /// Disables filter if always_true filter is received or OOM is hit.
@@ -98,22 +101,18 @@ class Coordinator::FilterState {
   int pending_count_;
 
   /// BloomFilter aggregated from all source plan nodes, to be broadcast to all
-  /// destination plan fragment instances. Owned by this object so that it can be
-  /// deallocated once finished with. Only set for partitioned joins (broadcast joins
+  /// destination plan fragment instances. Only set for partitioned joins (broadcast joins
   /// need no aggregation).
   /// In order to avoid memory spikes, an incoming filter is moved (vs. copied) to the
   /// output structure in the case of a broadcast join. Similarly, for partitioned joins,
   /// the filter is moved from the following member to the output structure.
-  std::unique_ptr<TBloomFilter> bloom_filter_;
+  TBloomFilter bloom_filter_;
 
   /// Time at which first local filter arrived.
   int64_t first_arrival_time_;
 
   /// Time at which all local filters arrived.
   int64_t completion_time_;
-
-  /// True if the filter is permanently disabled for this query.
-  bool disabled_;
 
   /// TODO: Add a per-object lock so that we can avoid holding the global filter_lock_
   /// for every filter update.

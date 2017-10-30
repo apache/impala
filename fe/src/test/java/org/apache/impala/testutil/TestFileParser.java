@@ -28,9 +28,14 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Scanner;
 
+import org.apache.impala.common.InternalException;
+import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.TErrorCode;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.log4j.Logger;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -40,6 +45,10 @@ import com.google.common.collect.Maps;
  * A test file has the following format:
  *
  * <QUERY STRING>
+ * ---- QUERYOPTIONS
+ * <QUERYOPTION1>=<VALUE1>
+ * <QUERYOPTION2>=<VALUE2>
+ * ..
  * ---- <SECTION NAME 1>
  * <EXPECTED CONTENTS 1>
  * ---- <SECTION NAME 2>
@@ -48,6 +57,10 @@ import com.google.common.collect.Maps;
  * <EXPECTED CONTENTS 3>
  * ====
  * <QUERY STRING>
+ * ---- QUERYOPTIONS
+ * <QUERYOPTION1>=<VALUE1>
+ * <QUERYOPTION2>=<VALUE2>
+ * ..
  * ---- <SECTION NAME 1>
  * <EXPECTED CONTENTS 1>
  * ---- <SECTION NAME 2>
@@ -61,7 +74,7 @@ import com.google.common.collect.Maps;
  * without these lines included.
  *
  * Note that <QUERY STRING> and <EXPECTED CONTENTS> sections can consist of multiple
- * lines.
+ * lines. QUERYOPTIONS sections may contain multiple <QUERYOPTION>=<VALUE> lines.
  */
 public class TestFileParser {
   private static final Logger LOG = Logger.getLogger(TestCase.class);
@@ -82,7 +95,8 @@ public class TestFileParser {
     SETUP,
     ERRORS,
     SCANRANGELOCATIONS,
-    LINEAGE;
+    LINEAGE,
+    QUERYOPTIONS;
 
     // Return header line for this section
     public String getHeader() {
@@ -101,14 +115,18 @@ public class TestFileParser {
 
     // Line number in the test case file where this case started
     private final int startLineNum;
+    private TQueryOptions options;
 
-    public TestCase(int lineNum) {
-      startLineNum = lineNum;
+    public TestCase(int lineNum, TQueryOptions options) {
+      this.startLineNum = lineNum;
+      this.options = options;
     }
 
-    public int getStartingLineNum() {
-      return startLineNum;
-    }
+    public int getStartingLineNum() { return startLineNum; }
+
+    public TQueryOptions getOptions() { return this.options; }
+
+    public void setOptions(TQueryOptions options) { this.options = options; }
 
     protected void addSection(Section section, ArrayList<String> contents) {
       expectedResultSections.put(section, contents);
@@ -210,6 +228,7 @@ public class TestFileParser {
   private BufferedReader reader;
   private Scanner scanner;
   private boolean hasSetupSection = false;
+  private TQueryOptions options;
 
   /**
    * For backwards compatibility, if no title is found this is the order in which
@@ -218,8 +237,9 @@ public class TestFileParser {
   static private final ArrayList<Section> defaultSectionOrder =
     Lists.newArrayList(Section.QUERY, Section.TYPES, Section.RESULTS);
 
-  public TestFileParser(String fileName) {
+  public TestFileParser(String fileName, TQueryOptions options) {
     this.fileName = fileName;
+    this.options = options;
   }
 
   public List<TestCase> getTestCases() {
@@ -255,7 +275,8 @@ public class TestFileParser {
   private TestCase parseOneTestCase() {
     Section currentSection = Section.QUERY;
     ArrayList<String> sectionContents = Lists.newArrayList();
-    TestCase currentTestCase = new TestCase(lineNum);
+    // Each test case in the test file has its own copy of query options.
+    TestCase currentTestCase = new TestCase(lineNum, options.deepCopy());
     int sectionCount = 0;
 
     while (scanner.hasNextLine()) {
@@ -263,6 +284,7 @@ public class TestFileParser {
       ++lineNum;
       if (line.startsWith("====") && sectionCount > 0) {
         currentTestCase.addSection(currentSection, sectionContents);
+        parseQueryOptions(currentTestCase);
         if (!currentTestCase.isValid()) {
           throw new IllegalStateException("Invalid test case" +
               " at line " + currentTestCase.startLineNum + " detected.");
@@ -302,6 +324,10 @@ public class TestFileParser {
           LOG.warn("No section header found. Guessing: " + currentSection);
         }
 
+        if (!currentTestCase.getSectionContents(currentSection).isEmpty()) {
+          throw new IllegalStateException("Duplicate sections are not allowed: "
+              + currentSection);
+        }
         sectionContents = Lists.newArrayList();
       } else {
         sectionContents.add(line);
@@ -314,6 +340,25 @@ public class TestFileParser {
     }
 
     return currentTestCase;
+  }
+
+  /**
+   * Parses QUERYOPTIONS section. Adds the parsed query options to "testCase.options".
+   * Throws an IllegalStateException if parsing failed.
+   */
+  private void parseQueryOptions(TestCase testCase) {
+    String optionsStr = testCase.getSectionAsString(Section.QUERYOPTIONS, false, ",");
+    if (optionsStr == null || optionsStr.isEmpty()) return;
+
+    TQueryOptions result = null;
+    try {
+      result = FeSupport.ParseQueryOptions(optionsStr, testCase.getOptions());
+    } catch (InternalException e) {
+      throw new IllegalStateException("Failed to parse query options: " + optionsStr +
+          " - " + e.getMessage(), e);
+    }
+    Preconditions.checkNotNull(result);
+    testCase.setOptions(result);
   }
 
   /**

@@ -55,9 +55,11 @@ struct TBackendGflags {
 
   17: required i32 initial_hms_cnxn_timeout_s
 
-  18: required bool enable_partitioned_hash_join
+  18: required bool enable_stats_extrapolation
 
-  19: required bool enable_stats_extrapolation
+  19: required i64 sentry_catalog_polling_frequency_s
 
-  20: required i64 sentry_catalog_polling_frequency_s
+  20: required i32 max_hdfs_partitions_parallel_load
+
+  21: required i32 max_nonhdfs_partitions_parallel_load
 }

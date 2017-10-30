@@ -20,6 +20,7 @@ import logging
 import os
 import pytest
 import signal
+import ssl
 import socket
 import time
 
@@ -27,6 +28,17 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_service import ImpaladService
 from tests.shell.util import run_impala_shell_cmd, run_impala_shell_cmd_no_expect, \
     ImpalaShell
+
+REQUIRED_MIN_OPENSSL_VERSION = 0x10001000L
+HAS_LEGACY_OPENSSL = True
+SKIP_SSL_MSG = "Legacy OpenSSL module detected"
+try:
+  HAS_LEGACY_OPENSSL = ssl.OPENSSL_VERSION_NUMBER < REQUIRED_MIN_OPENSSL_VERSION
+  SKIP_SSL_MSG = "Only have OpenSSL version %X, but test requires %X" % (
+    ssl.OPENSSL_VERSION_NUMBER, REQUIRED_MIN_OPENSSL_VERSION)
+except AttributeError:
+  # Old ssl module versions don't even have OPENSSL_VERSION_NUMBER as a member.
+  pass
 
 class TestClientSsl(CustomClusterTestSuite):
   """Tests for a client using SSL (particularly, the Impala Shell) """
@@ -49,10 +61,15 @@ class TestClientSsl(CustomClusterTestSuite):
                           "--ssl_private_key=%s/wildcard-san-cert.key"
                           % (CERT_DIR, CERT_DIR, CERT_DIR))
 
+  SSL_ARGS = ("--ssl_client_ca_certificate=%s/server-cert.pem "
+              "--ssl_server_certificate=%s/server-cert.pem "
+              "--ssl_private_key=%s/server-key.pem "
+              "--hostname=localhost " # Required to match hostname in certificate
+              % (CERT_DIR, CERT_DIR, CERT_DIR))
+
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--ssl_server_certificate=%s/server-cert.pem "
-                                    "--ssl_private_key=%s/server-key.pem"
-                                    % (CERT_DIR, CERT_DIR))
+  @CustomClusterTestSuite.with_args(impalad_args=SSL_ARGS, statestored_args=SSL_ARGS,
+                                    catalogd_args=SSL_ARGS)
   def test_ssl(self, vector):
 
     self._verify_negative_cases()
@@ -92,11 +109,30 @@ class TestClientSsl(CustomClusterTestSuite):
     assert "Query Status: Cancelled" in result.stdout
     assert impalad.wait_for_num_in_flight_queries(0)
 
+  # Test that the shell can connect to a TLS1.2 only cluster, and for good measure
+  # restrict the cipher suite to just one choice.
+  TLS_V12_ARGS = ("--ssl_client_ca_certificate=%s/server-cert.pem "
+                  "--ssl_server_certificate=%s/server-cert.pem "
+                  "--ssl_private_key=%s/server-key.pem "
+                  "--hostname=localhost " # Required to match hostname in certificate"
+                  "--ssl_minimum_version=tlsv1.2 "
+                  "--ssl_cipher_list=AES128-GCM-SHA256 "
+                  % (CERT_DIR, CERT_DIR, CERT_DIR))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(impalad_args=TLS_V12_ARGS,
+                                    statestored_args=TLS_V12_ARGS,
+                                    catalogd_args=TLS_V12_ARGS)
+  @pytest.mark.skipif(HAS_LEGACY_OPENSSL, reason=SKIP_SSL_MSG)
+  def test_tls_v12(self, vector):
+    self._validate_positive_cases("%s/server-cert.pem" % self.CERT_DIR)
+
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=SSL_WILDCARD_ARGS,
                                     statestored_args=SSL_WILDCARD_ARGS,
                                     catalogd_args=SSL_WILDCARD_ARGS)
-  @pytest.mark.xfail(run=True, reason="IMPALA-4295 on Centos6")
+  @pytest.mark.skipif(HAS_LEGACY_OPENSSL, reason=SKIP_SSL_MSG)
+  @pytest.mark.xfail(run=True, reason="Inconsistent wildcard support on target platforms")
   def test_wildcard_ssl(self, vector):
     """ Test for IMPALA-3159: Test with a certificate which has a wildcard for the
     CommonName.
@@ -109,7 +145,8 @@ class TestClientSsl(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(impalad_args=SSL_WILDCARD_SAN_ARGS,
                                     statestored_args=SSL_WILDCARD_SAN_ARGS,
                                     catalogd_args=SSL_WILDCARD_SAN_ARGS)
-  @pytest.mark.xfail(run=True, reason="IMPALA-4295")
+  @pytest.mark.skipif(HAS_LEGACY_OPENSSL, reason=SKIP_SSL_MSG)
+  @pytest.mark.xfail(run=True, reason="Inconsistent wildcard support on target platforms")
   def test_wildcard_san_ssl(self, vector):
     """ Test for IMPALA-3159: Test with a certificate which has a wildcard as a SAN. """
 

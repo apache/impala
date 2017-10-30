@@ -25,12 +25,14 @@ namespace impala {
 class CommonMetrics {
 public:
   static StringProperty* PROCESS_START_TIME;
+  static StringProperty* KUDU_CLIENT_VERSION;
 
   /// Registers and initializes the commnon metrics
   static void InitCommonMetrics(MetricGroup* metric_group);
 
 private:
   static string PROCESS_START_TIME_METRIC_NAME;
+  static string KUDU_CLIENT_VERSION_METRIC_NAME;
 };
 
 }

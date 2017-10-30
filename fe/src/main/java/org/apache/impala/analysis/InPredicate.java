@@ -184,11 +184,13 @@ public class InPredicate extends Predicate {
       }
       selectivity_ = Math.max(0.0, Math.min(1.0, selectivity_));
     }
+  }
 
-    if (hasChildCosts()) {
-      // BINARY_PREDICATE_COST accounts for the cost of performing the comparison.
-      evalCost_ = getChildCosts() + BINARY_PREDICATE_COST * (children_.size() - 1);
-    }
+  @Override
+  protected float computeEvalCost() {
+    if (!hasChildCosts()) return UNKNOWN_COST;
+    // BINARY_PREDICATE_COST accounts for the cost of performing the comparison.
+    return getChildCosts() + BINARY_PREDICATE_COST * (children_.size() - 1);
   }
 
   @Override

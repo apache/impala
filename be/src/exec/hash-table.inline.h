@@ -90,7 +90,8 @@ inline int64_t HashTable::Probe(Bucket* buckets, int64_t num_buckets,
   return Iterator::BUCKET_NOT_FOUND;
 }
 
-inline HashTable::HtData* HashTable::InsertInternal(HashTableCtx* ht_ctx) {
+inline HashTable::HtData* HashTable::InsertInternal(
+    HashTableCtx* ht_ctx, Status* status) {
   ++num_probes_;
   bool found = false;
   uint32_t hash = ht_ctx->expr_values_cache()->CurExprValuesHash();
@@ -98,7 +99,7 @@ inline HashTable::HtData* HashTable::InsertInternal(HashTableCtx* ht_ctx) {
   DCHECK_NE(bucket_idx, Iterator::BUCKET_NOT_FOUND);
   if (found) {
     // We need to insert a duplicate node, note that this may fail to allocate memory.
-    DuplicateNode* new_node = InsertDuplicateNode(bucket_idx);
+    DuplicateNode* new_node = InsertDuplicateNode(bucket_idx, status);
     if (UNLIKELY(new_node == NULL)) return NULL;
     return &new_node->htdata;
   } else {
@@ -108,14 +109,14 @@ inline HashTable::HtData* HashTable::InsertInternal(HashTableCtx* ht_ctx) {
 }
 
 inline bool HashTable::Insert(HashTableCtx* ht_ctx,
-    const BufferedTupleStream::RowIdx& idx, TupleRow* row) {
-  HtData* htdata = InsertInternal(ht_ctx);
+    BufferedTupleStream::FlatRowPtr flat_row, TupleRow* row, Status* status) {
+  HtData* htdata = InsertInternal(ht_ctx, status);
   // If successful insert, update the contents of the newly inserted entry with 'idx'.
   if (LIKELY(htdata != NULL)) {
     if (stores_tuples()) {
       htdata->tuple = row->GetTuple(0);
     } else {
-      htdata->idx = idx;
+      htdata->flat_row = flat_row;
     }
     return true;
   }
@@ -213,7 +214,8 @@ inline HashTable::DuplicateNode* HashTable::AppendNextNode(Bucket* bucket) {
   return next_node_++;
 }
 
-inline HashTable::DuplicateNode* HashTable::InsertDuplicateNode(int64_t bucket_idx) {
+inline HashTable::DuplicateNode* HashTable::InsertDuplicateNode(
+    int64_t bucket_idx, Status* status) {
   DCHECK_GE(bucket_idx, 0);
   DCHECK_LT(bucket_idx, num_buckets_);
   Bucket* bucket = &buckets_[bucket_idx];
@@ -222,12 +224,12 @@ inline HashTable::DuplicateNode* HashTable::InsertDuplicateNode(int64_t bucket_i
   // Allocate one duplicate node for the new data and one for the preexisting data,
   // if needed.
   while (node_remaining_current_page_ < 1 + !bucket->hasDuplicates) {
-    if (UNLIKELY(!GrowNodeArray())) return NULL;
+    if (UNLIKELY(!GrowNodeArray(status))) return NULL;
   }
   if (!bucket->hasDuplicates) {
     // This is the first duplicate in this bucket. It means that we need to convert
     // the current entry in the bucket to a node and link it from the bucket.
-    next_node_->htdata.idx = bucket->bucketData.htdata.idx;
+    next_node_->htdata.flat_row = bucket->bucketData.htdata.flat_row;
     DCHECK(!bucket->matched);
     next_node_->matched = false;
     next_node_->next = NULL;
@@ -246,7 +248,7 @@ inline TupleRow* IR_ALWAYS_INLINE HashTable::GetRow(HtData& htdata, TupleRow* ro
     return reinterpret_cast<TupleRow*>(&htdata.tuple);
   } else {
     // TODO: GetTupleRow() has interpreted code that iterates over the row's descriptor.
-    tuple_stream_->GetTupleRow(htdata.idx, row);
+    tuple_stream_->GetTupleRow(htdata.flat_row, row);
     return row;
   }
 }

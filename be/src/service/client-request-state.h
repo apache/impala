@@ -78,7 +78,7 @@ class ClientRequestState {
   void Wait();
 
   /// Calls Wait() asynchronously in a thread and returns immediately.
-  void WaitAsync();
+  Status WaitAsync();
 
   /// BlockOnWait() may be called after WaitAsync() has been called in order to wait
   /// for the asynchronous thread (wait_thread_) to complete. It is safe to call this
@@ -184,10 +184,10 @@ class ClientRequestState {
   void set_user_profile_access(bool user_has_profile_access) {
     user_has_profile_access_ = user_has_profile_access;
   }
-  const RuntimeProfile& profile() const { return profile_; }
-  const RuntimeProfile& summary_profile() const { return summary_profile_; }
-  const TimestampValue& start_time() const { return start_time_; }
-  const TimestampValue& end_time() const { return end_time_; }
+  const RuntimeProfile* profile() const { return profile_; }
+  const RuntimeProfile* summary_profile() const { return summary_profile_; }
+  int64_t start_time_us() const { return start_time_us_; }
+  int64_t end_time_us() const { return end_time_us_; }
   const std::string& sql_stmt() const { return query_ctx_.client_request.stmt; }
   const TQueryOptions& query_options() const {
     return query_ctx_.client_request.query_options;
@@ -211,7 +211,7 @@ class ClientRequestState {
   }
 
   RuntimeProfile::EventSequence* query_events() const { return query_events_; }
-  RuntimeProfile* summary_profile() { return &summary_profile_; }
+  RuntimeProfile* summary_profile() { return summary_profile_; }
 
  private:
   const TQueryCtx query_ctx_;
@@ -250,7 +250,7 @@ class ClientRequestState {
   ExecEnv* exec_env_;
 
   /// Thread for asynchronously running Wait().
-  boost::scoped_ptr<Thread> wait_thread_;
+  std::unique_ptr<Thread> wait_thread_;
 
   /// Condition variable to make BlockOnWait() thread-safe. One thread joins
   /// wait_thread_, and all other threads block on this cv. Used with lock_.
@@ -299,9 +299,9 @@ class ClientRequestState {
   /// There's a fourth profile which is not built here (but is a
   /// child of profile_); the execution profile which tracks the
   /// actual fragment execution.
-  RuntimeProfile profile_;
-  RuntimeProfile server_profile_;
-  RuntimeProfile summary_profile_;
+  RuntimeProfile* const profile_;
+  RuntimeProfile* const server_profile_;
+  RuntimeProfile* const summary_profile_;
   RuntimeProfile::Counter* row_materialization_timer_;
 
   /// Tracks how long we are idle waiting for a client to fetch rows.
@@ -338,8 +338,8 @@ class ClientRequestState {
   /// catalog update request. Not owned.
   ImpalaServer* parent_server_;
 
-  /// Start/end time of the query
-  TimestampValue start_time_, end_time_;
+  /// Start/end time of the query, in Unix microseconds.
+  int64_t start_time_us_, end_time_us_;
 
   /// Executes a local catalog operation (an operation that does not need to execute
   /// against the catalog service). Includes USE, SHOW, DESCRIBE, and EXPLAIN statements.

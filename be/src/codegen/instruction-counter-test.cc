@@ -34,6 +34,8 @@ using namespace llvm;
 namespace impala {
 
 class InstructionCounterTest : public testing:: Test {
+ protected:
+  LLVMContext context_;
 };
 
 // IR output from CodegenMullAdd
@@ -71,7 +73,7 @@ Module* CodegenMulAdd(LLVMContext* context) {
 }
 
 TEST_F(InstructionCounterTest, Count) {
-  Module* MulAddModule = CodegenMulAdd(&getGlobalContext());
+  Module* MulAddModule = CodegenMulAdd(&context_);
   InstructionCounter* instruction_counter = new InstructionCounter();
   instruction_counter->visit(*MulAddModule);
   instruction_counter->PrintCounters();
@@ -149,7 +151,7 @@ Module* CodegenGcd(LLVMContext* context) {
 }
 
 TEST_F(InstructionCounterTest, TestMemInstrCount) {
-  Module* GcdModule = CodegenGcd(&getGlobalContext());
+  Module* GcdModule = CodegenGcd(&context_);
   InstructionCounter* instruction_counter = new InstructionCounter();
   instruction_counter->visit(*GcdModule);
   std::cout << instruction_counter->PrintCounters();

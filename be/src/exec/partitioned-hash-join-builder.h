@@ -26,8 +26,9 @@
 #include "exec/data-sink.h"
 #include "exec/filter-context.h"
 #include "exec/hash-table.h"
-#include "runtime/buffered-block-mgr.h"
 #include "runtime/buffered-tuple-stream.h"
+#include "runtime/bufferpool/buffer-pool.h"
+#include "runtime/bufferpool/suballocator.h"
 
 #include "gen-cpp/PlanNodes_types.h"
 
@@ -56,7 +57,7 @@ class ScalarExprEvaluator;
 /// RepartitionBuildInput() to repartition a level n partition into multiple level n + 1
 /// partitions.
 ///
-/// Both the PartitionedHashJoinNode and the builder share a BufferedBlockMgr client
+/// Both the PartitionedHashJoinNode and the builder share a BufferPool client
 /// and the corresponding reservations. Different stages of the spilling algorithm
 /// require different mixes of build and probe buffers and hash tables, so we can
 /// share the reservation to minimize the combined memory requirement. Initial probe-side
@@ -72,7 +73,9 @@ class PhjBuilder : public DataSink {
   class Partition;
 
   PhjBuilder(int join_node_id, TJoinOp::type join_op, const RowDescriptor* probe_row_desc,
-      const RowDescriptor* build_row_desc, RuntimeState* state);
+      const RowDescriptor* build_row_desc, RuntimeState* state,
+      BufferPool::ClientHandle* buffer_pool_client, int64_t spillable_buffer_size,
+      int64_t max_row_buffer_size);
 
   Status InitExprsAndFilters(RuntimeState* state,
       const std::vector<TEqJoinCondition>& eq_join_conjuncts,
@@ -132,7 +135,6 @@ class PhjBuilder : public DataSink {
   bool HashTableStoresNulls() const;
 
   /// Accessor functions, mainly required to expose state to PartitionedHashJoinNode.
-  inline BufferedBlockMgr::Client* block_mgr_client() const { return block_mgr_client_; }
   inline bool non_empty_build() const { return non_empty_build_; }
   inline const std::vector<bool>& is_not_distinct_from() const {
     return is_not_distinct_from_;
@@ -199,25 +201,39 @@ class PhjBuilder : public DataSink {
     Status BuildHashTable(bool* built) WARN_UNUSED_RESULT;
 
     /// Spills this partition, the partition's stream is unpinned with 'mode' and
-    /// its hash table is destroyed if it was built.
+    /// its hash table is destroyed if it was built. Calling with 'mode' UNPIN_ALL
+    /// unpins all pages and frees all buffers associated with the partition so that
+    /// the partition does not use any reservation. Calling with 'mode'
+    /// UNPIN_ALL_EXCEPT_CURRENT may leave the read or write pages of the unpinned stream
+    /// pinned and therefore using reservation. If the partition was previously
+    /// spilled with mode UNPIN_ALL_EXCEPT_CURRENT, then calling Spill() again with
+    /// UNPIN_ALL may release more reservation by unpinning the read or write page
+    /// in the stream.
     Status Spill(BufferedTupleStream::UnpinMode mode) WARN_UNUSED_RESULT;
+
+    std::string DebugString();
 
     bool ALWAYS_INLINE IsClosed() const { return build_rows_ == NULL; }
     BufferedTupleStream* ALWAYS_INLINE build_rows() { return build_rows_.get(); }
     HashTable* ALWAYS_INLINE hash_tbl() const { return hash_tbl_.get(); }
     bool ALWAYS_INLINE is_spilled() const { return is_spilled_; }
     int ALWAYS_INLINE level() const { return level_; }
+    /// Return true if the partition can be spilled - is not closed and is not spilled.
+    bool CanSpill() const { return !IsClosed() && !is_spilled(); }
 
    private:
-    /// Inserts each row in 'batch' into 'hash_tbl_' using 'ctx'. 'indices' is an array
-    /// containing the index of each row's index into the hash table's tuple stream.
+    /// Inserts each row in 'batch' into 'hash_tbl_' using 'ctx'. 'flat_rows' is an array
+    /// containing the rows in the hash table's tuple stream.
     /// 'prefetch_mode' is the prefetching mode in use. If it's not PREFETCH_NONE, hash
     /// table buckets which the rows hashes to will be prefetched. This parameter is
     /// replaced with a constant during codegen time. This function may be replaced with
     /// a codegen'd version. Returns true if all rows in 'batch' are successfully
-    /// inserted.
+    /// inserted and false otherwise. If inserting failed, 'status' indicates why it
+    /// failed: if 'status' is ok, inserting failed because not enough reservation
+    /// was available and if 'status' is an error, inserting failed because of that error.
     bool InsertBatch(TPrefetchMode::type prefetch_mode, HashTableCtx* ctx,
-        RowBatch* batch, const std::vector<BufferedTupleStream::RowIdx>& indices);
+        RowBatch* batch, const std::vector<BufferedTupleStream::FlatRowPtr>& flat_rows,
+        Status* status);
 
     const PhjBuilder* parent_;
 
@@ -238,14 +254,7 @@ class PhjBuilder : public DataSink {
     std::unique_ptr<BufferedTupleStream> build_rows_;
   };
 
- protected:
-  /// Init() function inherited from DataSink. Overridden to be a no-op for now.
-  /// TODO: Merge with InitExprsAndFilters() once this class becomes a true data sink.
-  virtual Status Init(const std::vector<TExpr>& thrift_output_exprs,
-      const TDataSink& tsink, RuntimeState* state) override;
-
- private:
-  /// Computes the minimum number of buffers required to execute the spilling partitioned
+  /// Computes the minimum reservation required to execute the spilling partitioned
   /// hash algorithm successfully for any input size (assuming enough disk space is
   /// available for spilled rows). The buffers are used for buffering both build and
   /// probe rows at different times, so the total requirement is the peak sum of build
@@ -254,16 +263,21 @@ class PhjBuilder : public DataSink {
   /// need one additional buffer for the input while repartitioning the build or probe.
   /// For NAAJ, we need 3 additional buffers for 'null_aware_partition_',
   /// 'null_aware_probe_partition_' and 'null_probe_rows_'.
-  int MinRequiredBuffers() const {
-    // Must be kept in sync with HashJoinNode.computeResourceProfile() in fe.
+  int64_t MinReservation() const {
+    // Must be kept in sync with HashJoinNode.computeNodeResourceProfile() in fe.
     int num_reserved_buffers = PARTITION_FANOUT + 1;
     if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) num_reserved_buffers += 3;
-    return num_reserved_buffers;
+    // Two of the buffers must fit the maximum row.
+    return spillable_buffer_size_ * (num_reserved_buffers - 2) + max_row_buffer_size_ * 2;
   }
 
-  /// Free local allocations made from expr evaluators during hash table construction.
-  void FreeLocalAllocations() const;
+ protected:
+  /// Init() function inherited from DataSink. Overridden to be a no-op for now.
+  /// TODO: Merge with InitExprsAndFilters() once this class becomes a true data sink.
+  virtual Status Init(const std::vector<TExpr>& thrift_output_exprs,
+      const TDataSink& tsink, RuntimeState* state) override;
 
+ private:
   /// Create and initialize a set of hash partitions for partitioning level 'level'.
   /// The previous hash partitions must have been cleared with ClearHashPartitions().
   /// After calling this, batches are added to the new partitions by calling Send().
@@ -273,9 +287,11 @@ class PhjBuilder : public DataSink {
   Status CreateAndPreparePartition(int level, Partition** partition) WARN_UNUSED_RESULT;
 
   /// Reads the rows in build_batch and partitions them into hash_partitions_. If
-  /// 'build_filters' is true, runtime filters are populated.
+  /// 'build_filters' is true, runtime filters are populated. 'is_null_aware' is
+  /// set to true if the join type is a null aware join.
   Status ProcessBuildBatch(
-      RowBatch* build_batch, HashTableCtx* ctx, bool build_filters) WARN_UNUSED_RESULT;
+      RowBatch* build_batch, HashTableCtx* ctx, bool build_filters,
+      bool is_null_aware) WARN_UNUSED_RESULT;
 
   /// Append 'row' to 'stream'. In the common case, appending the row to the stream
   /// immediately succeeds. Otherwise this function falls back to the slower path of
@@ -295,8 +311,11 @@ class PhjBuilder : public DataSink {
 
   /// Frees memory by spilling one of the hash partitions. The 'mode' argument is passed
   /// to the Spill() call for the selected partition. The current policy is to spill the
-  /// largest partition. Returns non-ok status if we couldn't spill a partition.
-  Status SpillPartition(BufferedTupleStream::UnpinMode mode) WARN_UNUSED_RESULT;
+  /// null-aware partition first (if a NAAJ), then the largest partition. Returns non-ok
+  /// status if we couldn't spill a partition. If 'spilled_partition' is non-NULL, set
+  /// to the partition that was the one spilled.
+  Status SpillPartition(BufferedTupleStream::UnpinMode mode,
+      Partition** spilled_partition = nullptr) WARN_UNUSED_RESULT;
 
   /// Tries to build hash tables for all unspilled hash partitions. Called after
   /// FlushFinal() when all build rows have been partitioned and added to the appropriate
@@ -326,6 +345,10 @@ class PhjBuilder : public DataSink {
   /// phase.
   void AllocateRuntimeFilters();
 
+  /// Iterates over the runtime filters in filters_ and inserts each row into each filter.
+  /// This is replaced at runtime with code generated by CodegenInsertRuntimeFilters().
+  void InsertRuntimeFilters(TupleRow* build_row) noexcept;
+
   /// Publish the runtime filters to the fragment-local RuntimeFilterBank.
   /// 'num_build_rows' is used to determine whether the computed filters have an
   /// unacceptably high false-positive rate.
@@ -334,13 +357,19 @@ class PhjBuilder : public DataSink {
   /// Codegen processing build batches. Identical signature to ProcessBuildBatch().
   /// Returns non-OK status if codegen was not possible.
   Status CodegenProcessBuildBatch(LlvmCodeGen* codegen, llvm::Function* hash_fn,
-      llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn) WARN_UNUSED_RESULT;
+      llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn,
+      llvm::Function* insert_filters_fn) WARN_UNUSED_RESULT;
 
   /// Codegen inserting batches into a partition's hash table. Identical signature to
   /// Partition::InsertBatch(). Returns non-OK if codegen was not possible.
   Status CodegenInsertBatch(LlvmCodeGen* codegen, llvm::Function* hash_fn,
       llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn,
       TPrefetchMode::type prefetch_mode) WARN_UNUSED_RESULT;
+
+  /// Codegen inserting rows into runtime filters. Identical signature to
+  /// InsertRuntimeFilters(). Returns non-OK if codegen was not possible.
+  Status CodegenInsertRuntimeFilters(
+      LlvmCodeGen* codegen, const vector<ScalarExpr*>& filter_exprs, llvm::Function** fn);
 
   RuntimeState* const runtime_state_;
 
@@ -356,16 +385,23 @@ class PhjBuilder : public DataSink {
   const RowDescriptor* probe_row_desc_;
 
   /// Pool for objects with same lifetime as builder.
-  ObjectPool pool_;
+  ObjectPool obj_pool_;
 
-  /// Client to the buffered block mgr, used to allocate build partition buffers and hash
-  /// tables. When probing, the spilling algorithm keeps some build partitions in memory
-  /// while using memory for probe buffers for spilled partitions. To support dynamically
-  /// dividing memory between build and probe, this client is owned by the builder but
-  /// shared with the PartitionedHashJoinNode.
+  /// Client to the buffer pool, used to allocate build partition buffers and hash tables.
+  /// When probing, the spilling algorithm keeps some build partitions in memory while
+  /// using memory for probe buffers for spilled partitions. To support dynamically
+  /// dividing memory between build and probe, this client is shared between the builder
+  /// and the PartitionedHashJoinNode.
   /// TODO: this approach to sharing will not work for spilling broadcast joins with a
   /// 1:N relationship from builders to join nodes.
-  BufferedBlockMgr::Client* block_mgr_client_;
+  BufferPool::ClientHandle* buffer_pool_client_;
+
+  /// The default and max buffer sizes to use in the build and probe streams.
+  const int64_t spillable_buffer_size_;
+  const int64_t max_row_buffer_size_;
+
+  /// Allocator for hash table memory.
+  boost::scoped_ptr<Suballocator> ht_allocator_;
 
   /// If true, the build side has at least one row.
   bool non_empty_build_;
@@ -439,6 +475,7 @@ class PhjBuilder : public DataSink {
   /// store all the rows for which 'build_expr_evals_' evaluated over the row returns
   /// NULL (i.e. it has a NULL on the eq join slot).
   /// NULL if the join is not null aware or we are done processing this partition.
+  /// This partitions starts off in memory but can be spilled.
   Partition* null_aware_partition_;
 
   /// Populated during the hash table building phase if any partitions spilled.
@@ -463,16 +500,19 @@ class PhjBuilder : public DataSink {
   /// and is used when the partition level is 0, otherwise xxx_fn_ uses murmur hash and is
   /// used for subsequent levels.
   typedef Status (*ProcessBuildBatchFn)(
-      PhjBuilder*, RowBatch*, HashTableCtx*, bool build_filters);
+      PhjBuilder*, RowBatch*, HashTableCtx*, bool build_filters, bool is_null_aware);
   /// Jitted ProcessBuildBatch function pointers.  NULL if codegen is disabled.
   ProcessBuildBatchFn process_build_batch_fn_;
   ProcessBuildBatchFn process_build_batch_fn_level0_;
 
   typedef bool (*InsertBatchFn)(Partition*, TPrefetchMode::type, HashTableCtx*, RowBatch*,
-      const std::vector<BufferedTupleStream::RowIdx>&);
+      const std::vector<BufferedTupleStream::FlatRowPtr>&, Status*);
   /// Jitted Partition::InsertBatch() function pointers. NULL if codegen is disabled.
   InsertBatchFn insert_batch_fn_;
   InsertBatchFn insert_batch_fn_level0_;
+
+  /// Class name in LLVM IR.
+  static const char* LLVM_CLASS_NAME;
 };
 }
 

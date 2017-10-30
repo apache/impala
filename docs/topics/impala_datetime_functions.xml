@@ -772,6 +772,68 @@ select now() as right_now,
 
       </dlentry>
 
+      <dlentry id="from_timestamp" rev="2.3.0 IMPALA-2190">
+
+        <dt>
+          <codeph>from_timestamp(datetime timestamp, pattern string)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="hidden">from_timestamp() function</indexterm>
+          <b>Purpose:</b> Converts a <codeph>TIMESTAMP</codeph> value into a
+          string representing the same value.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/added_in_230"/>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            The <codeph>from_timestamp()</codeph> function provides a flexible way to convert <codeph>TIMESTAMP</codeph>
+            values into arbitrary string formats for reporting purposes.
+          </p>
+          <p>
+            Because Impala implicitly converts string values into <codeph>TIMESTAMP</codeph>, you can
+            pass date/time values represented as strings (in the standard <codeph>yyyy-MM-dd HH:mm:ss.SSS</codeph> format)
+            to this function. The result is a string using different separator characters, order of fields, spelled-out month
+            names, or other variation of the date/time string representation.
+          </p>
+          <p>
+            The allowed tokens for the pattern string are the same as for the <codeph>from_unixtime()</codeph> function.
+          </p>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            The following examples show different ways to format a <codeph>TIMESTAMP</codeph>
+            value as a string:
+          </p>
+<codeblock>
+-- Reformat arbitrary TIMESTAMP value.
+select from_timestamp(now(), 'yyyy/MM/dd');
++-------------------------------------+
+| from_timestamp(now(), 'yyyy/mm/dd') |
++-------------------------------------+
+| 2017/10/01                          |
++-------------------------------------+
+
+-- Reformat string literal representing date/time.
+select from_timestamp('1984-09-25', 'yyyy/MM/dd');
++--------------------------------------------+
+| from_timestamp('1984-09-25', 'yyyy/mm/dd') |
++--------------------------------------------+
+| 1984/09/25                                 |
++--------------------------------------------+
+
+-- Alternative format for reporting purposes.
+select from_timestamp('1984-09-25 16:45:30.125', 'MMM dd, yyyy HH:mm:ss.SSS');
++------------------------------------------------------------------------+
+| from_timestamp('1984-09-25 16:45:30.125', 'mmm dd, yyyy hh:mm:ss.sss') |
++------------------------------------------------------------------------+
+| Sep 25, 1984 16:45:30.125                                              |
++------------------------------------------------------------------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
       <dlentry id="from_unixtime">
 
         <dt>
@@ -1077,6 +1139,68 @@ select int_months_between('2015-03-31', '2015-01-30');
 +------------------------------------------------+
 | 2                                              |
 +------------------------------------------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="last_day" rev="2.9.0 IMPALA-5316">
+
+        <dt>
+          <codeph>last_day(timestamp t)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="hidden">last_day() function</indexterm>
+          <b>Purpose:</b> Returns a <codeph>TIMESTAMP</codeph> corresponding to
+          the beginning of the last calendar day in the same month as the
+          <codeph>TIMESTAMP</codeph> argument.
+          <p>
+            <b>Return type:</b> <codeph>timestamp</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/added_in_290"/>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            If the input argument does not represent a valid Impala <codeph>TIMESTAMP</codeph>
+            including both date and time portions, the function returns <codeph>NULL</codeph>.
+            For example, if the input argument is a string that cannot be implicitly cast to
+            <codeph>TIMESTAMP</codeph>, does not include a date portion, or is out of the
+            allowed range for Impala <codeph>TIMESTAMP</codeph> values, the function returns
+            <codeph>NULL</codeph>.
+          </p>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            The following example shows how to examine the current date, and dates around the
+            end of the month, as <codeph>TIMESTAMP</codeph> values with any time portion removed:
+          </p>
+<codeblock>
+select
+    now() as right_now
+  , trunc(now(),'dd') as today
+  , last_day(now()) as last_day_of_month
+  , last_day(now()) + interval 1 day as first_of_next_month;
++-------------------------------+---------------------+---------------------+---------------------+
+| right_now                     | today               | last_day_of_month   | first_of_next_month |
++-------------------------------+---------------------+---------------------+---------------------+
+| 2017-08-15 15:07:58.823812000 | 2017-08-15 00:00:00 | 2017-08-31 00:00:00 | 2017-09-01 00:00:00 |
++-------------------------------+---------------------+---------------------+---------------------+
+</codeblock>
+          <p>
+            The following example shows how to examine the current date and dates around the
+            end of the month as integers representing the day of the month:
+          </p>
+<codeblock>
+select
+    now() as right_now
+  , dayofmonth(now()) as day
+  , extract(day from now()) as also_day
+  , dayofmonth(last_day(now())) as last_day
+  , extract(day from last_day(now())) as also_last_day;
++-------------------------------+-----+----------+----------+---------------+
+| right_now                     | day | also_day | last_day | also_last_day |
++-------------------------------+-----+----------+----------+---------------+
+| 2017-08-15 15:07:59.417755000 | 15  | 15       | 31       | 31            |
++-------------------------------+-----+----------+----------+---------------+
 </codeblock>
         </dd>
 
@@ -2039,6 +2163,88 @@ select now() as right_now,
 
       </dlentry>
 
+      <dlentry id="to_timestamp" rev="2.3.0 IMPALA-2190">
+
+        <dt>
+          <codeph>to_timestamp(bigint unixtime)</codeph>,
+          <codeph>to_timestamp(string date, string pattern)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="hidden">to_timestamp() function</indexterm>
+          <b>Purpose:</b> Converts an integer or string representing
+          a date/time value into the corresponding <codeph>TIMESTAMP</codeph>
+          value.
+          <p>
+            <b>Return type:</b> <codeph>timestamp</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/added_in_230"/>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            An integer argument represents the number of seconds past the epoch (midnight
+            on January 1, 1970). It is the converse of the <codeph>unix_timestamp()</codeph>
+            function, which produces a <codeph>BIGINT</codeph> representing the number of
+            seconds past the epoch.
+          </p>
+          <p>
+            A string argument, plus another string argument representing the
+            pattern, turns an arbitrary string representation of a date and time
+            into a true <codeph>TIMESTAMP</codeph> value. The ability to parse
+            many kinds of date and time formats allows you to deal with temporal
+            data from diverse sources, and if desired to convert to efficient
+            <codeph>TIMESTAMP</codeph> values during your ETL process. Using
+            <codeph>TIMESTAMP</codeph> directly in queries and expressions lets you
+            perform date and time calculations without the overhead of extra
+            function calls and conversions each time you reference the applicable
+            columns.
+          </p>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            The following examples demonstrate how to convert an arbitrary string
+            representation to <codeph>TIMESTAMP</codeph> based on a pattern string:
+          </p>
+<codeblock>
+select to_timestamp('Sep 25, 1984', 'MMM dd, yyyy');
++----------------------------------------------+
+| to_timestamp('sep 25, 1984', 'mmm dd, yyyy') |
++----------------------------------------------+
+| 1984-09-25 00:00:00                          |
++----------------------------------------------+
+
+select to_timestamp('1984/09/25', 'yyyy/MM/dd');
++------------------------------------------+
+| to_timestamp('1984/09/25', 'yyyy/mm/dd') |
++------------------------------------------+
+| 1984-09-25 00:00:00                      |
++------------------------------------------+
+</codeblock>
+          <p>
+            The following examples show how to convert a <codeph>BIGINT</codeph>
+            representing seconds past epoch into a <codeph>TIMESTAMP</codeph> value:
+          </p>
+<codeblock>
+-- One day past the epoch.
+select to_timestamp(24 * 60 * 60);
++----------------------------+
+| to_timestamp(24 * 60 * 60) |
++----------------------------+
+| 1970-01-02 00:00:00        |
++----------------------------+
+
+-- 60 seconds in the past.
+select now() as 'current date/time',
+  unix_timestamp(now()) 'now in seconds',
+  to_timestamp(unix_timestamp(now()) - 60) as '60 seconds ago';
++-------------------------------+----------------+---------------------+
+| current date/time             | now in seconds | 60 seconds ago      |
++-------------------------------+----------------+---------------------+
+| 2017-10-01 22:03:46.885624000 | 1506895426     | 2017-10-01 22:02:46 |
++-------------------------------+----------------+---------------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
       <dlentry id="to_utc_timestamp">
 
         <dt>
@@ -2107,7 +2313,7 @@ select now() as 'Current time in California USA',
 
       <dlentry rev="1.4.0" id="trunc">
 
-        <dt>
+        <dt id="trunc_timestamp">
           <codeph>trunc(timestamp, string unit)</codeph>
         </dt>
 
@@ -2115,7 +2321,8 @@ select now() as 'Current time in California USA',
           <indexterm audience="hidden">trunc() function</indexterm>
           <b>Purpose:</b> Strips off fields from a <codeph>TIMESTAMP</codeph> value.
           <p>
-            <b>Unit argument:</b> The <codeph>unit</codeph> argument value is case-sensitive. This argument string
+            <b>Unit argument:</b> The <codeph>unit</codeph> argument value for truncating
+            <codeph>TIMESTAMP</codeph> values is case-sensitive. This argument string
             can be one of:
 <!-- Some but not all of the arguments from http://docs.oracle.com/cd/B19306_01/server.102/b14200/functions230.htm#i1002084 are supported here.
      Impala doesn't support 2-digit years or ISO-related years or values derived from ISO years.
@@ -2158,12 +2365,16 @@ select now() as 'Current time in California USA',
               </li>
             </ul>
           </p>
+          <p>
+            <b>Added in:</b> The ability to truncate numeric values is new starting in
+            <keyword keyref="impala210_full"/>.
+          </p>
           <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
           <p>
-            Typically used in <codeph>GROUP BY</codeph> queries to aggregate results from the
-            same hour, day, week, month, quarter, and so on. You can also use this function in an <codeph>INSERT
-            ... SELECT</codeph> into a partitioned table to divide <codeph>TIMESTAMP</codeph> values into the
-            correct partition.
+            The <codeph>TIMESTAMP</codeph> form is typically used in <codeph>GROUP BY</codeph>
+            queries to aggregate results from the same hour, day, week, month, quarter, and so on.
+            You can also use this function in an <codeph>INSERT ... SELECT</codeph> into a
+            partitioned table to divide <codeph>TIMESTAMP</codeph> values into the correct partition.
           </p>
           <p>
             Because the return value is a <codeph>TIMESTAMP</codeph>, if you cast the result of
@@ -2172,6 +2383,13 @@ select now() as 'Current time in California USA',
             month, or year, use the <codeph>EXTRACT()</codeph> function instead. If you need the individual units
             from a truncated <codeph>TIMESTAMP</codeph> value, run the <codeph>TRUNCATE()</codeph> function on the
             original value, then run <codeph>EXTRACT()</codeph> on the result.
+          </p>
+          <p>
+            The <codeph>trunc()</codeph> function also has a signature that applies to
+            <codeph>DOUBLE</codeph> or <codeph>DECIMAL</codeph>values. <codeph>truncate()</codeph>,
+            <codeph>trunc()</codeph>, and <codeph>dtrunc()</codeph> are all aliased to the
+            same function. See <codeph>truncate()</codeph> under <xref keyref="math_functions"/>
+            for details.
           </p>
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
@@ -2305,6 +2523,62 @@ select unix_timestamp
 +------------+
 | 1431716400 |
 +------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="utc_timestamp" rev="2.10.0 IMPALA-3504">
+
+        <dt>
+          <codeph>utc_timestamp()</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="hidden">utc_timestamp() function</indexterm>
+          <b>Purpose:</b> Returns a <codeph>TIMESTAMP</codeph> corresponding to the current
+          date and time in the UTC time zone.
+          <p>
+            <b>Return type:</b> <codeph>timestamp</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/added_in_210"/>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            Similar to the <codeph>now()</codeph> or <codeph>current_timestamp()</codeph> functions,
+            but does not use the local time zone as those functions do. Use <codeph>utc_timestamp()</codeph>
+            to record <codeph>TIMESTAMP</codeph> values that are interoperable with
+            servers around the world, in arbitrary time zones, without the need for
+            additional conversion functions to standardize the time zone of each
+            value representing a date/time.
+          </p>
+          <p>
+            For working with date/time values represented as integer values, you can convert
+            back and forth between <codeph>TIMESTAMP</codeph> and <codeph>BIGINT</codeph>
+            with the <codeph>unix_micros_to_utc_timestamp()</codeph> and
+            <codeph>utc_to_unix_micros()</codeph> functions. The integer values represent
+            the number of microseconds since the Unix epoch (midnight on January 1, 1970).
+          </p>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            The following example shows how <codeph>now()</codeph> and <codeph>current_timestamp()</codeph>
+            represent the current date/time in the local time zone (in this case, UTC-7), while
+            <codeph>utc_timestamp()</codeph> represents the same date/time in the standardized UTC
+            time zone:
+          </p>
+<codeblock>
+select now(), utc_timestamp();
++-------------------------------+-------------------------------+
+| now()                         | utc_timestamp()               |
++-------------------------------+-------------------------------+
+| 2017-10-01 23:33:58.919688000 | 2017-10-02 06:33:58.919688000 |
++-------------------------------+-------------------------------+
+
+select current_timestamp(), utc_timestamp();
++-------------------------------+-------------------------------+
+| current_timestamp()           | utc_timestamp()               |
++-------------------------------+-------------------------------+
+| 2017-10-01 23:34:07.400642000 | 2017-10-02 06:34:07.400642000 |
++-------------------------------+-------------------------------+
 </codeblock>
         </dd>
 

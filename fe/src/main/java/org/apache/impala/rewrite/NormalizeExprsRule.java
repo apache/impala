@@ -21,7 +21,6 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
-import org.apache.impala.common.AnalysisException;
 
 /**
  * Normalizes CompoundPredicates by ensuring that if either child of AND or OR is a
@@ -34,7 +33,7 @@ public class NormalizeExprsRule implements ExprRewriteRule {
   public static ExprRewriteRule INSTANCE = new NormalizeExprsRule();
 
   @Override
-  public Expr apply(Expr expr, Analyzer analyzer) throws AnalysisException {
+  public Expr apply(Expr expr, Analyzer analyzer) {
     if (!expr.isAnalyzed()) return expr;
 
     // TODO: add normalization for other expr types.

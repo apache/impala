@@ -31,12 +31,10 @@ public class BoolLiteral extends LiteralExpr {
   public BoolLiteral(boolean value) {
     this.value_ = value;
     type_ = Type.BOOLEAN;
-    evalCost_ = LITERAL_COST;
   }
 
   public BoolLiteral(String value) throws AnalysisException {
     type_ = Type.BOOLEAN;
-    evalCost_ = LITERAL_COST;
     if (value.toLowerCase().equals("true")) {
       this.value_ = true;
     } else if (value.toLowerCase().equals("false")) {

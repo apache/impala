@@ -143,7 +143,7 @@ class StatestoreSubscriber {
   boost::scoped_ptr<impala::TimeoutFailureDetector> failure_detector_;
 
   /// Thread in which RecoveryModeChecker runs.
-  boost::scoped_ptr<Thread> recovery_mode_thread_;
+  std::unique_ptr<Thread> recovery_mode_thread_;
 
   /// Class-wide lock. Protects all subsequent members. Most private methods must
   /// be called holding this lock; this is noted in the method comments.

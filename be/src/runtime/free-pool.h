@@ -23,13 +23,13 @@
 #include <string.h>
 #include <string>
 #include <sstream>
+#include <unordered_map>
 
-#include "common/atomic.h"
 #include "common/logging.h"
+#include "gutil/dynamic_annotations.h"
 #include "runtime/mem-pool.h"
 #include "util/bit-util.h"
 
-DECLARE_int32(stress_free_pool_alloc);
 DECLARE_bool(disable_mem_pools);
 
 namespace impala {
@@ -58,38 +58,42 @@ class FreePool {
   }
 
   /// Allocates a buffer of size between [0, 2^62 - 1 - sizeof(FreeListNode)] bytes.
-  uint8_t* Allocate(int64_t size) {
-    DCHECK_GE(size, 0);
-#ifndef NDEBUG
-    if (FLAGS_stress_free_pool_alloc > 0 &&
-        (alloc_counts_.Add(1) % FLAGS_stress_free_pool_alloc) == 0) {
-      return NULL;
-    }
-#endif
-    /// Return a non-NULL dummy pointer. NULL is reserved for failures.
-    if (UNLIKELY(size == 0)) return mem_pool_->EmptyAllocPtr();
+  uint8_t* Allocate(const int64_t requested_size) {
+    DCHECK_GE(requested_size, 0);
+    /// Return a non-nullptr dummy pointer. nullptr is reserved for failures.
+    if (UNLIKELY(requested_size == 0)) return mem_pool_->EmptyAllocPtr();
     ++net_allocations_;
-    if (FLAGS_disable_mem_pools) return reinterpret_cast<uint8_t*>(malloc(size));
+    if (FLAGS_disable_mem_pools) {
+      return reinterpret_cast<uint8_t*>(malloc(requested_size));
+    }
     /// MemPool allocations are 8-byte aligned, so making allocations < 8 bytes
     /// doesn't save memory and eliminates opportunities to recycle allocations.
-    size = std::max<int64_t>(8, size);
-    int free_list_idx = BitUtil::Log2Ceiling64(size);
+    int64_t actual_size = std::max<int64_t>(8, requested_size);
+    int free_list_idx = BitUtil::Log2Ceiling64(actual_size);
     DCHECK_LT(free_list_idx, NUM_LISTS);
     FreeListNode* allocation = lists_[free_list_idx].next;
-    if (allocation == NULL) {
+    if (allocation == nullptr) {
       // There wasn't an existing allocation of the right size, allocate a new one.
-      size = 1LL << free_list_idx;
+      actual_size = 1LL << free_list_idx;
       allocation = reinterpret_cast<FreeListNode*>(
-          mem_pool_->Allocate(size + sizeof(FreeListNode)));
-      if (UNLIKELY(allocation == NULL)) {
+          mem_pool_->Allocate(actual_size + sizeof(FreeListNode)));
+      if (UNLIKELY(allocation == nullptr)) {
         --net_allocations_;
-        return NULL;
+        return nullptr;
       }
+      // Memory will be returned unpoisoned from MemPool. Poison the whole range and then
+      // deal with unpoisoning both allocation paths in one place below.
+      ASAN_POISON_MEMORY_REGION(allocation, sizeof(FreeListNode) + actual_size);
     } else {
       // Remove this allocation from the list.
       lists_[free_list_idx].next = allocation->next;
     }
-    DCHECK(allocation != NULL);
+    DCHECK(allocation != nullptr);
+#ifdef ADDRESS_SANITIZER
+    uint8_t* ptr = reinterpret_cast<uint8_t*>(allocation);
+    ASAN_UNPOISON_MEMORY_REGION(ptr, sizeof(FreeListNode) + requested_size);
+    alloc_to_size_[ptr + sizeof(FreeListNode)] = requested_size;
+#endif
     // Set the back node to point back to the list it came from so know where
     // to add it on Free().
     allocation->list = &lists_[free_list_idx];
@@ -97,7 +101,7 @@ class FreePool {
   }
 
   void Free(uint8_t* ptr) {
-    if (UNLIKELY(ptr == NULL || ptr == mem_pool_->EmptyAllocPtr())) return;
+    if (UNLIKELY(ptr == nullptr || ptr == mem_pool_->EmptyAllocPtr())) return;
     --net_allocations_;
     if (FLAGS_disable_mem_pools) {
       free(ptr);
@@ -111,22 +115,24 @@ class FreePool {
     // Add node to front of list.
     node->next = list->next;
     list->next = node;
+
+#ifdef ADDRESS_SANITIZER
+    int bucket_idx = (list - &lists_[0]);
+    DCHECK_LT(bucket_idx, NUM_LISTS);
+    int64_t allocation_size = 1LL << bucket_idx;
+    ASAN_POISON_MEMORY_REGION(ptr, allocation_size);
+    alloc_to_size_.erase(ptr);
+#endif
   }
 
   /// Returns an allocation that is at least 'size'. If the current allocation backing
   /// 'ptr' is big enough, 'ptr' is returned. Otherwise a new one is made and the contents
   /// of ptr are copied into it.
   ///
-  /// NULL will be returned on allocation failure. It's the caller's responsibility to
+  /// nullptr will be returned on allocation failure. It's the caller's responsibility to
   /// free the memory buffer pointed to by "ptr" in this case.
   uint8_t* Reallocate(uint8_t* ptr, int64_t size) {
-#ifndef NDEBUG
-    if (FLAGS_stress_free_pool_alloc > 0 &&
-        (alloc_counts_.Add(1) % FLAGS_stress_free_pool_alloc) == 0) {
-      return NULL;
-    }
-#endif
-    if (UNLIKELY(ptr == NULL || ptr == mem_pool_->EmptyAllocPtr())) return Allocate(size);
+    if (UNLIKELY(ptr == nullptr || ptr == mem_pool_->EmptyAllocPtr())) return Allocate(size);
     if (FLAGS_disable_mem_pools) {
       return reinterpret_cast<uint8_t*>(realloc(reinterpret_cast<void*>(ptr), size));
     }
@@ -141,12 +147,34 @@ class FreePool {
     int64_t allocation_size = 1LL << bucket_idx;
 
     // If it's already big enough, just return the ptr.
-    if (allocation_size >= size) return ptr;
+    if (allocation_size >= size) {
+      // Ensure that only first size bytes are unpoisoned. Need to poison whole region
+      // first in case size is smaller than original allocation's size.
+#ifdef ADDRESS_SANITIZER
+      DCHECK(alloc_to_size_.find(ptr) != alloc_to_size_.end());
+      int64_t prev_allocation_size = alloc_to_size_[ptr];
+      if (prev_allocation_size > size) {
+        // Allocation is shrinking: poison the 'freed' bytes.
+        ASAN_POISON_MEMORY_REGION(ptr + size, prev_allocation_size - size);
+      } else {
+        // Allocation is growing: unpoison the newly allocated bytes.
+        ASAN_UNPOISON_MEMORY_REGION(
+            ptr + prev_allocation_size, size - prev_allocation_size);
+      }
+      alloc_to_size_[ptr] = size;
+#endif
+      return ptr;
+    }
 
     // Make a new one. Since Allocate() already rounds up to powers of 2, this effectively
     // doubles for the caller.
     uint8_t* new_ptr = Allocate(size);
-    if (LIKELY(new_ptr != NULL)) {
+    if (LIKELY(new_ptr != nullptr)) {
+#ifdef ADDRESS_SANITIZER
+      DCHECK(alloc_to_size_.find(ptr) != alloc_to_size_.end());
+      // Unpoison the region so that we can copy the old allocation to the new one.
+      ASAN_UNPOISON_MEMORY_REGION(ptr, allocation_size);
+#endif
       memcpy(new_ptr, ptr, allocation_size);
       Free(ptr);
     }
@@ -184,14 +212,14 @@ class FreePool {
     ss << "FreePool: " << this << std::endl;
     for (int i = 0; i < NUM_LISTS; ++i) {
       FreeListNode* n = lists_[i].next;
-      if (n == NULL) continue;
+      if (n == nullptr) continue;
       ss << i << ": ";
-      while (n != NULL) {
+      while (n != nullptr) {
         uint8_t* ptr = reinterpret_cast<uint8_t*>(n);
         ptr += sizeof(FreeListNode);
         ss << reinterpret_cast<void*>(ptr);
         n = n->next;
-        if (n != NULL) ss << "->";
+        if (n != nullptr) ss << "->";
       }
       ss << std::endl;
     }
@@ -206,14 +234,16 @@ class FreePool {
   /// allocations, it makes the indexing easy.
   FreeListNode lists_[NUM_LISTS];
 
+#ifdef ADDRESS_SANITIZER
+  // For ASAN only: keep track of used bytes for each allocation (not including
+  // FreeListNode header for each chunk). This allows us to poison each byte in a chunk
+  // exactly once when reallocating from an existing chunk, rather than having to poison
+  // the entire chunk each time.
+  std::unordered_map<uint8_t*, int64_t> alloc_to_size_;
+#endif
+
   /// Diagnostic counter that tracks (# Allocates - # Frees)
   int64_t net_allocations_;
-
-#ifndef NDEBUG
-  /// Counter for tracking the number of allocations. Used only if the
-  /// the stress flag FLAGS_stress_free_pool_alloc is set.
-  static AtomicInt32 alloc_counts_;
-#endif
 };
 
 }

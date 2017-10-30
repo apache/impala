@@ -589,17 +589,17 @@ PLAN-ROOT SINK
 |  group by: o_orderpriority
 |
 02:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
-|  hash predicates: o_orderkey = l_orderkey
+|  hash predicates: l_orderkey = o_orderkey
 |
-|--06:EXCHANGE [HASH(l_orderkey)]
+|--06:EXCHANGE [HASH(o_orderkey)]
 |  |
-|  01:SCAN HDFS [tpch.lineitem]
-|     partitions=1/1 files=1 size=718.94MB
+|  00:SCAN HDFS [tpch.orders]
+|     partitions=1/1 files=1 size=162.56MB
 |
-05:EXCHANGE [HASH(o_orderkey)]
+05:EXCHANGE [HASH(l_orderkey)]
 |
-00:SCAN HDFS [tpch.orders]
-   partitions=1/1 files=1 size=162.56MB
+01:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 files=1 size=718.94MB
 ====
 # the largest input is prevented from becoming the leftmost input by the right outer join
 select o_orderpriority, count(*) as order_count
@@ -648,20 +648,18 @@ PLAN-ROOT SINK
 |  output: count(*)
 |  group by: o_orderpriority
 |
-02:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
-|  hash predicates: o_orderkey = l_orderkey
-|  runtime filters: RF000 <- l_orderkey
+02:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
+|  hash predicates: l_orderkey = o_orderkey
 |
-|--06:EXCHANGE [HASH(l_orderkey)]
+|--06:EXCHANGE [HASH(o_orderkey)]
 |  |
-|  01:SCAN HDFS [tpch.lineitem]
-|     partitions=1/1 files=1 size=718.94MB
+|  00:SCAN HDFS [tpch.orders]
+|     partitions=1/1 files=1 size=162.56MB
 |
-05:EXCHANGE [HASH(o_orderkey)]
+05:EXCHANGE [HASH(l_orderkey)]
 |
-00:SCAN HDFS [tpch.orders]
-   partitions=1/1 files=1 size=162.56MB
-   runtime filters: RF000 -> o_orderkey
+01:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 files=1 size=718.94MB
 ====
 # order does not become the leftmost input because of the outer join;
 # the join with nation is done first because it reduces the intermediate output

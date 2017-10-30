@@ -177,7 +177,7 @@ public class ImpaladCatalog extends Catalog {
     // its child tables/functions is fine. If that happens, the removal of the child
     // object will be a no-op.
     for (TCatalogObject catalogObject: req.getRemoved_objects()) {
-      removeCatalogObject(catalogObject, newCatalogVersion);
+      removeCatalogObject(catalogObject);
     }
     lastSyncedCatalogVersion_ = newCatalogVersion;
     // Cleanup old entries in the log.
@@ -319,24 +319,10 @@ public class ImpaladCatalog extends Catalog {
   /**
    *  Removes the matching TCatalogObject from the catalog, if one exists and its
    *  catalog version is < the catalog version of this drop operation.
-   *  Note that drop operations that come from statestore heartbeats always have a
-   *  version of 0. To determine the drop version for statestore updates,
-   *  the catalog version from the current update is used. This is okay because there
-   *  can never be a catalog update from the statestore that contains a drop
-   *  and an addition of the same object. For more details on how drop
-   *  versioning works, see CatalogServerCatalog.java
    */
-  private void removeCatalogObject(TCatalogObject catalogObject,
-      long currentCatalogUpdateVersion) {
-    // The TCatalogObject associated with a drop operation from a state store
-    // heartbeat will always have a version of zero. Because no update from
-    // the state store can contain both a drop and an addition of the same object,
-    // we can assume the drop version is the current catalog version of this update.
-    // If the TCatalogObject contains a version that != 0, it indicates the drop
-    // came from a direct update.
-    long dropCatalogVersion = catalogObject.getCatalog_version() == 0 ?
-        currentCatalogUpdateVersion : catalogObject.getCatalog_version();
-
+  private void removeCatalogObject(TCatalogObject catalogObject) {
+    Preconditions.checkState(catalogObject.getCatalog_version() != 0);
+    long dropCatalogVersion = catalogObject.getCatalog_version();
     switch(catalogObject.getType()) {
       case DATABASE:
         removeDb(catalogObject.getDb(), dropCatalogVersion);

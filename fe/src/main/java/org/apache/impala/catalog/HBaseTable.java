@@ -697,16 +697,16 @@ public class HBaseTable extends Table {
   }
 
   /**
-   * This is copied from org.apache.hadoop.hbase.client.HTable. The only difference is
-   * that it does not use cache when calling getRegionLocation.
-   * TODO: Remove this function and use HTable.getRegionsInRange (IMPALA-4082).
    * Get the corresponding regions for an arbitrary range of keys.
-   * <p>
+   * This is copied from org.apache.hadoop.hbase.client.HTable in HBase 0.95. The
+   * differences are:
+   * 1. It does not use cache when calling getRegionLocation.
+   * 2. It is synchronized on hbaseTbl.
    *
-   * @param startRow
-   *          Starting row in range, inclusive
-   * @param endRow
-   *          Ending row in range, exclusive
+   * @param startKey
+   *          Starting key in range, inclusive
+   * @param endKey
+   *          Ending key in range, exclusive
    * @return A list of HRegionLocations corresponding to the regions that
    *         contain the specified range
    * @throws IOException

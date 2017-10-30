@@ -32,7 +32,7 @@ COMPUTE_STATS_SCRIPT="${IMPALA_HOME}/tests/util/compute_table_stats.py --impalad
 # Run compute stats over as many of the tables used in the Planner tests as possible.
 ${COMPUTE_STATS_SCRIPT} --db_names=functional\
     --table_names="alltypes,alltypesagg,alltypesaggmultifilesnopart,alltypesaggnonulls,
-    alltypessmall,alltypestiny,jointbl,dimtbl"
+    alltypessmall,alltypestiny,jointbl,dimtbl,stringpartitionkey"
 
 # We cannot load HBase on s3 and isilon yet.
 if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
@@ -41,10 +41,8 @@ if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
 fi
 ${COMPUTE_STATS_SCRIPT} --db_names=tpch,tpch_parquet \
     --table_names=customer,lineitem,nation,orders,part,partsupp,region,supplier
-${COMPUTE_STATS_SCRIPT} --db_names=tpch_nested_parquet
-${COMPUTE_STATS_SCRIPT} --db_names=tpcds,tpcds_parquet
+${COMPUTE_STATS_SCRIPT} --db_names=tpch_nested_parquet,tpcds,tpcds_parquet
 
 if "$KUDU_IS_SUPPORTED"; then
-  ${COMPUTE_STATS_SCRIPT} --db_names=functional_kudu
-  ${COMPUTE_STATS_SCRIPT} --db_names=tpch_kudu
+  ${COMPUTE_STATS_SCRIPT} --db_names=functional_kudu,tpch_kudu
 fi

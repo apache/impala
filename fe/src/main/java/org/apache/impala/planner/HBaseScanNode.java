@@ -497,7 +497,7 @@ public class HBaseScanNode extends ScanNode {
   @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     // TODO: What's a good estimate of memory consumption?
-    nodeResourceProfile_ =  new ResourceProfile(1024L * 1024L * 1024L, 0);
+    nodeResourceProfile_ =  ResourceProfile.noReservation(1024L * 1024L * 1024L);
   }
 
   /**
@@ -508,4 +508,7 @@ public class HBaseScanNode extends ScanNode {
     // TODO: What's a good estimate of memory consumption?
     return 1024L * 1024L * 1024L;
   }
+
+  @Override
+  public boolean hasStorageLayerConjuncts() { return !filters_.isEmpty(); }
 }

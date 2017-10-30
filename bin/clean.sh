@@ -22,36 +22,37 @@
 # branch to a non-toolchain branch due to caching in CMake generated files.
 
 set -euo pipefail
-trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
+trap 'echo Error in ${0} at line ${LINENO}: $(cd "'${PWD}'" && awk "NR == ${LINENO}" \
+  ${0})' ERR
 
 # If the project was never build, no Makefile will exist and thus make clean will fail.
 # Combine the make command with the bash noop to always return true.
 "${MAKE_CMD:-make}" clean || :
 
 # clean the external data source project
-pushd ${IMPALA_HOME}/ext-data-source
+pushd "${IMPALA_HOME}/ext-data-source"
 rm -rf api/generated-sources/*
 ${IMPALA_HOME}/bin/mvn-quiet.sh clean
 popd
 
 # clean fe
 # don't use git clean because we need to retain Eclipse conf files
-pushd $IMPALA_FE_DIR
+pushd "${IMPALA_FE_DIR}"
 rm -rf target
 rm -f src/test/resources/{core,hbase,hive}-site.xml
 rm -rf generated-sources/*
-[ -z "$IMPALA_LOGS_DIR" ] || rm -rf "${IMPALA_LOGS_DIR}"/*
-mkdir -p $IMPALA_ALL_LOGS_DIRS
+[ -z "${IMPALA_LOGS_DIR}" ] || rm -rf "${IMPALA_LOGS_DIR}"/*
+mkdir -p "${IMPALA_ALL_LOGS_DIRS}"
 popd
 
 # clean be
-pushd "$IMPALA_HOME/be"
+pushd "${IMPALA_HOME}/be"
 # remove everything listed in .gitignore
 git rev-parse 2>/dev/null && git clean -Xdfq
 popd
 
 # clean shell build artifacts
-pushd "$IMPALA_HOME/shell"
+pushd "${IMPALA_HOME}/shell"
 # remove everything listed in .gitignore
 git rev-parse 2>/dev/null && git clean -Xdfq
 popd
@@ -63,21 +64,15 @@ find . -type d -name "__pycache__" -delete
 popd
 
 # clean llvm
-rm -f "$IMPALA_HOME/llvm-ir/"impala*.ll
-rm -f "$IMPALA_HOME/be/generated-sources/impala-ir/"*
+rm -f "${IMPALA_HOME}/llvm-ir/"impala*.ll
+rm -f "${IMPALA_HOME}/be/generated-sources/impala-ir/"*
 
 # Cleanup Impala-lzo
-if [ -e "$IMPALA_LZO" ]; then
-  pushd "$IMPALA_LZO"
+if [ -e "${IMPALA_LZO}" ]; then
+  pushd "${IMPALA_LZO}"
   git rev-parse 2>/dev/null && git clean -fdx
   popd
 fi
 
 # When switching to and from toolchain, make sure to remove all CMake generated files
-FIND_ARGS=("$IMPALA_HOME" -iname '*cmake*' -not -name CMakeLists.txt \
-    -not -path "$IMPALA_HOME/cmake_modules*" \
-    -not -path "$IMPALA_HOME/thirdparty*")
-if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
-  FIND_ARGS+=(-not -path "$IMPALA_TOOLCHAIN/*")
-fi
-find "${FIND_ARGS[@]}" -exec rm -Rf {} +
+"${IMPALA_HOME}/bin/clean-cmake.sh"

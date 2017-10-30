@@ -21,7 +21,6 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
-#include <boost/unordered_set.hpp>
 #include <boost/scoped_ptr.hpp>
 
 #include "common/global-types.h"
@@ -36,6 +35,7 @@ namespace impala {
 
 class Coordinator;
 struct FragmentExecParams;
+struct FInstanceExecParams;
 
 /// map from scan node id to a list of scan ranges
 typedef std::map<TPlanNodeId, std::vector<TScanRangeParams>> PerNodeScanRanges;
@@ -44,6 +44,31 @@ typedef std::map<TPlanNodeId, std::vector<TScanRangeParams>> PerNodeScanRanges;
 /// records scan range assignment for a single fragment
 typedef std::unordered_map<TNetworkAddress, PerNodeScanRanges>
     FragmentScanRangeAssignment;
+
+/// Execution parameters for a single backend. Computed by Scheduler::Schedule(), set
+/// via QuerySchedule::set_per_backend_exec_params(). Used as an input to a BackendState.
+struct BackendExecParams {
+  /// The fragment instance params assigned to this backend. All instances of a
+  /// particular fragment are contiguous in this vector. Query lifetime;
+  /// FInstanceExecParams are owned by QuerySchedule::fragment_exec_params_.
+  std::vector<const FInstanceExecParams*> instance_params;
+
+  // The minimum query-wide buffer reservation size (in bytes) required for this backend.
+  // This is the peak minimum reservation that may be required by the
+  // concurrently-executing operators at any point in query execution. It may be less
+  // than the initial reservation total claims (below) if execution of some operators
+  // never overlaps, which allows reuse of reservations.
+  int64_t min_reservation_bytes;
+
+  // Total of the initial buffer reservations that we expect to be claimed on this
+  // backend for all fragment instances in instance_params. I.e. the sum over all
+  // operators in all fragment instances that execute on this backend. This is used for
+  // an optimization in InitialReservation. Measured in bytes.
+  int64_t initial_reservation_total_claims;
+};
+
+/// map from an impalad host address to the list of assigned fragment instance params.
+typedef std::map<TNetworkAddress, BackendExecParams> PerBackendExecParams;
 
 /// execution parameters for a single fragment instance; used to assemble the
 /// TPlanFragmentInstanceCtx
@@ -167,6 +192,9 @@ class QuerySchedule {
     return fragment.plan.nodes[plan_node_to_plan_node_idx_[id]];
   }
 
+  const PerBackendExecParams& per_backend_exec_params() const {
+    return per_backend_exec_params_;
+  }
   const std::vector<FragmentExecParams>& fragment_exec_params() const {
     return fragment_exec_params_;
   }
@@ -179,15 +207,14 @@ class QuerySchedule {
 
   const FInstanceExecParams& GetCoordInstanceExecParams() const;
 
-  const boost::unordered_set<TNetworkAddress>& unique_hosts() const {
-    return unique_hosts_;
-  }
   bool is_admitted() const { return is_admitted_; }
   void set_is_admitted(bool is_admitted) { is_admitted_ = is_admitted; }
   RuntimeProfile* summary_profile() { return summary_profile_; }
   RuntimeProfile::EventSequence* query_events() { return query_events_; }
 
-  void SetUniqueHosts(const boost::unordered_set<TNetworkAddress>& unique_hosts);
+  void set_per_backend_exec_params(const PerBackendExecParams& params) {
+    per_backend_exec_params_ = params;
+  }
 
  private:
   /// These references are valid for the lifetime of this query schedule because they
@@ -213,8 +240,9 @@ class QuerySchedule {
   // (TPlanFragment.idx)
   std::vector<FragmentExecParams> fragment_exec_params_;
 
-  /// The set of hosts that the query will run on including the coordinator.
-  boost::unordered_set<TNetworkAddress> unique_hosts_;
+  // Map of host address to list of assigned FInstanceExecParams*, which
+  // reference fragment_exec_params_. Computed in Scheduler::Schedule().
+  PerBackendExecParams per_backend_exec_params_;
 
   /// Total number of scan ranges of this query.
   int64_t num_scan_ranges_;

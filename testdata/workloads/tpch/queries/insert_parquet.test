@@ -67,6 +67,8 @@ insert overwrite table test_insert_huge_vals
 ---- QUERY
 # Verify the values written to test_insert_huge_vals were as expected by counting
 # the results of an inner join of that table with the same query used in the insert.
+# Increase spillable buffer size to fit the large values on right side of hash join.
+set min_spillable_buffer_size=1m;
 select count(*) from
   (select cast(l_orderkey as string) s from tpch.lineitem union
    select group_concat(concat(s_name, s_address, s_phone)) from tpch.supplier union

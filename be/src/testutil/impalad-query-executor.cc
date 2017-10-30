@@ -44,7 +44,7 @@ ImpaladQueryExecutor::ImpaladQueryExecutor(const string& hostname, uint32_t port
 }
 
 ImpaladQueryExecutor::~ImpaladQueryExecutor() {
-  Close();
+  discard_result(Close());
 }
 
 Status ImpaladQueryExecutor::Setup() {
@@ -71,7 +71,7 @@ Status ImpaladQueryExecutor::Close() {
 Status ImpaladQueryExecutor::Exec(
     const string& query_string, vector<FieldSchema>* col_schema) {
   // close anything that ran previously
-  Close();
+  discard_result(Close());
   Query query;
   query.query = query_string;
   query.configuration = exec_options_;

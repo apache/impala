@@ -25,7 +25,6 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.Subquery;
-import org.apache.impala.common.AnalysisException;
 
 /**
  * Coalesces disjunctive equality predicates to an IN predicate, and merges compatible
@@ -41,7 +40,7 @@ public class EqualityDisjunctsToInRule implements ExprRewriteRule {
   public static ExprRewriteRule INSTANCE = new EqualityDisjunctsToInRule();
 
   @Override
-  public Expr apply(Expr expr, Analyzer analyzer) throws AnalysisException {
+  public Expr apply(Expr expr, Analyzer analyzer) {
     if (!Expr.IS_OR_PREDICATE.apply(expr)) return expr;
 
     Expr inAndOtherExpr = rewriteInAndOtherExpr(expr.getChild(0), expr.getChild(1));

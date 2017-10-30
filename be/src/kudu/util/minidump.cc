@@ -26,8 +26,8 @@
 #include <string>
 
 #if defined(__linux__)
-#include <breakpad/client/linux/handler/exception_handler.h>
-#include <breakpad/common/linux/linux_libc_support.h>
+#include <client/linux/handler/exception_handler.h>
+#include <common/linux/linux_libc_support.h>
 #endif // defined(__linux__)
 
 #include <gflags/gflags.h>
@@ -54,7 +54,7 @@ static constexpr bool kMinidumpPlatformSupported = false;
 
 DECLARE_string(log_dir);
 
-DEFINE_bool(enable_minidumps, kMinidumpPlatformSupported,
+DEFINE_bool_hidden(enable_minidumps, kMinidumpPlatformSupported,
             "Whether to enable minidump generation upon process crash or SIGUSR1. "
             "Currently only supported on Linux systems.");
 TAG_FLAG(enable_minidumps, advanced);
@@ -67,13 +67,7 @@ static bool ValidateMinidumpEnabled(const char* /*flagname*/, bool value) {
 }
 DEFINE_validator(enable_minidumps, &ValidateMinidumpEnabled);
 
-DEFINE_string(minidump_path, "minidumps", "Directory to write minidump files to. This "
-    "can be either an absolute path or a path relative to --log_dir. Each daemon will "
-    "create an additional sub-directory to prevent naming conflicts and to make it "
-    "easier to identify a crashing daemon. Minidump files contain crash-related "
-    "information in a compressed format. Minidumps will be written when a daemon exits "
-    "unexpectedly, for example on an unhandled exception or signal, or when a "
-    "SIGUSR1 signal is sent to the process. Cannot be set to an empty value.");
+DECLARE_string(minidump_path);
 TAG_FLAG(minidump_path, evolving);
 // The minidump path cannot be empty.
 static bool ValidateMinidumpPath(const char* /*flagname*/, const string& value) {
@@ -81,14 +75,10 @@ static bool ValidateMinidumpPath(const char* /*flagname*/, const string& value) 
 }
 DEFINE_validator(minidump_path, &ValidateMinidumpPath);
 
-DEFINE_int32(max_minidumps, 9, "Maximum number of minidump files to keep per daemon. "
-    "Older files are removed first. Set to 0 to keep all minidump files.");
+DECLARE_int32(max_minidumps);
 TAG_FLAG(max_minidumps, evolving);
 
-DEFINE_int32(minidump_size_limit_hint_kb, 20480, "Size limit hint for minidump files in "
-    "KB. If a minidump exceeds this value, then breakpad will reduce the stack memory it "
-    "collects for each thread from 8KB to 2KB. However it will always include the full "
-    "stack memory for the first 20 threads, including the thread that crashed.");
+DECLARE_int32(minidump_size_limit_hint_kb);
 TAG_FLAG(minidump_size_limit_hint_kb, advanced);
 TAG_FLAG(minidump_size_limit_hint_kb, evolving);
 

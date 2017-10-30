@@ -51,7 +51,7 @@ public class DataStreamSink extends DataSink {
 
   @Override
   public void computeResourceProfile(TQueryOptions queryOptions) {
-    resourceProfile_ = new ResourceProfile(0, 0);
+    resourceProfile_ = ResourceProfile.noReservation(0);
   }
 
   @Override
