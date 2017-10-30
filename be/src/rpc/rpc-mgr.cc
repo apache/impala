@@ -27,6 +27,7 @@
 #include "util/auth-util.h"
 #include "util/cpu-info.h"
 #include "util/network-util.h"
+#include "util/openssl-util.h"
 
 #include "common/names.h"
 
@@ -43,6 +44,15 @@ using kudu::Sockaddr;
 DECLARE_string(hostname);
 DECLARE_string(principal);
 DECLARE_string(be_principal);
+DECLARE_string(keytab_file);
+
+// Impala's TLS flags.
+DECLARE_string(ssl_client_ca_certificate);
+DECLARE_string(ssl_server_certificate);
+DECLARE_string(ssl_private_key);
+DECLARE_string(ssl_private_key_password_cmd);
+DECLARE_string(ssl_cipher_list);
+DECLARE_string(ssl_minimum_version);
 
 // Defined in kudu/rpc/rpcz_store.cc
 DECLARE_int32(rpc_duration_too_long_ms);
@@ -82,9 +92,23 @@ Status RpcMgr::Init() {
     RETURN_IF_ERROR(ParseKerberosPrincipal(internal_principal, &service_name,
         &unused_hostname, &unused_realm));
     bld.set_sasl_proto_name(service_name);
-    // TODO: Once the Messenger can take more options pertaining to 'rpc_authentication'
-    // and more, we need to explicitly set those options here. (KUDU-2228)
+    bld.set_rpc_authentication("required");
+    bld.set_keytab_file(FLAGS_keytab_file);
   }
+
+  if (use_tls_) {
+    LOG (INFO) << "Initing RpcMgr with TLS";
+    bld.set_epki_cert_key_files(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key);
+    bld.set_epki_certificate_authority_file(FLAGS_ssl_client_ca_certificate);
+    bld.set_epki_private_password_key_cmd(FLAGS_ssl_private_key_password_cmd);
+    if (!FLAGS_ssl_cipher_list.empty()) {
+      bld.set_rpc_tls_ciphers(FLAGS_ssl_cipher_list);
+    }
+    bld.set_rpc_tls_min_protocol(FLAGS_ssl_minimum_version);
+    bld.set_rpc_encryption("required");
+    bld.enable_inbound_tls();
+  }
+
   KUDU_RETURN_IF_ERROR(bld.Build(&messenger_), "Could not build messenger");
   return Status::OK();
 }
@@ -97,8 +121,7 @@ Status RpcMgr::RegisterService(int32_t num_service_threads, int32_t service_queu
       new ImpalaServicePool(std::move(service_ptr),
           messenger_->metric_entity(), service_queue_depth);
   // Start the thread pool first before registering the service in case the startup fails.
-  RETURN_IF_ERROR(
-      service_pool->Init(num_service_threads));
+  RETURN_IF_ERROR(service_pool->Init(num_service_threads));
   KUDU_RETURN_IF_ERROR(
       messenger_->RegisterService(service_pool->service_name(), service_pool),
       "Could not register service");

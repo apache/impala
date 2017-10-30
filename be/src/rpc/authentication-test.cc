@@ -22,6 +22,7 @@
 #include "rpc/thrift-server.h"
 #include "util/auth-util.h"
 #include "util/network-util.h"
+#include "util/openssl-util.h"
 #include "util/thread.h"
 
 #include <ldap.h>
@@ -32,6 +33,7 @@ DECLARE_string(keytab_file);
 DECLARE_string(principal);
 DECLARE_string(ssl_client_ca_certificate);
 DECLARE_string(ssl_server_certificate);
+DECLARE_string(ssl_private_key);
 DECLARE_string(internal_principals_whitelist);
 
 // These are here so that we can grab them early in main() - the kerberos
@@ -172,7 +174,8 @@ TEST(Auth, KerbAndSslEnabled) {
   ASSERT_OK(GetHostname(&hostname));
   FLAGS_ssl_client_ca_certificate = "some_path";
   FLAGS_ssl_server_certificate = "some_path";
-  ASSERT_TRUE(EnableInternalSslConnections());
+  FLAGS_ssl_private_key = "some_path";
+  ASSERT_TRUE(IsInternalTlsConfigured());
   SaslAuthProvider sa_internal(true);
   ASSERT_OK(
       sa_internal.InitKerberos("service_name/_HOST@some.realm", "/etc/hosts"));

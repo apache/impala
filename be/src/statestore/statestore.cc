@@ -29,6 +29,7 @@
 #include "statestore/statestore-subscriber-client-wrapper.h"
 #include "util/debug-util.h"
 #include "util/logging-support.h"
+#include "util/openssl-util.h"
 #include "util/time.h"
 #include "util/uid-util.h"
 #include "util/webserver.h"
@@ -225,11 +226,11 @@ Statestore::Statestore(MetricGroup* metrics)
     update_state_client_cache_(new StatestoreSubscriberClientCache(1, 0,
         FLAGS_statestore_update_tcp_timeout_seconds * 1000,
         FLAGS_statestore_update_tcp_timeout_seconds * 1000, "",
-        EnableInternalSslConnections())),
+        IsInternalTlsConfigured())),
     heartbeat_client_cache_(new StatestoreSubscriberClientCache(1, 0,
         FLAGS_statestore_heartbeat_tcp_timeout_seconds * 1000,
         FLAGS_statestore_heartbeat_tcp_timeout_seconds * 1000, "",
-        EnableInternalSslConnections())),
+        IsInternalTlsConfigured())),
     thrift_iface_(new StatestoreThriftIf(this)),
     failure_detector_(new MissedHeartbeatFailureDetector(
         FLAGS_statestore_max_missed_heartbeats,

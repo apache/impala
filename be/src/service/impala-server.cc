@@ -67,6 +67,7 @@
 #include "util/impalad-metrics.h"
 #include "util/lineage-util.h"
 #include "util/network-util.h"
+#include "util/openssl-util.h"
 #include "util/parse-util.h"
 #include "util/redactor.h"
 #include "util/runtime-profile-counters.h"
@@ -2025,7 +2026,7 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port,
   if (FLAGS_is_coordinator) exec_env_->frontend()->WaitForCatalog();
 
   SSLProtocol ssl_version = SSLProtocol::TLSv1_0;
-  if (!FLAGS_ssl_server_certificate.empty() || EnableInternalSslConnections()) {
+  if (IsExternalTlsConfigured() || IsInternalTlsConfigured()) {
     RETURN_IF_ERROR(
         SSLProtoVersions::StringToProtocol(FLAGS_ssl_minimum_version, &ssl_version));
   }
@@ -2041,7 +2042,7 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port,
 
     ThriftServerBuilder be_builder("backend", be_processor, thrift_be_port);
 
-    if (EnableInternalSslConnections()) {
+    if (IsInternalTlsConfigured()) {
       LOG(INFO) << "Enabling SSL for backend";
       be_builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
           .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
@@ -2067,7 +2068,7 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port,
       beeswax_processor->setEventHandler(event_handler);
       ThriftServerBuilder builder(BEESWAX_SERVER_NAME, beeswax_processor, beeswax_port);
 
-      if (!FLAGS_ssl_server_certificate.empty()) {
+      if (IsExternalTlsConfigured()) {
         LOG(INFO) << "Enabling SSL for Beeswax";
         builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
               .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
@@ -2094,7 +2095,7 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port,
 
       ThriftServerBuilder builder(HS2_SERVER_NAME, hs2_fe_processor, hs2_port);
 
-      if (!FLAGS_ssl_server_certificate.empty()) {
+      if (IsExternalTlsConfigured()) {
         LOG(INFO) << "Enabling SSL for HiveServer2";
         builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
               .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)

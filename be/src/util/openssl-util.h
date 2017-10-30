@@ -47,6 +47,14 @@ namespace impala {
 /// Returns the maximum supported TLS version available in the linked OpenSSL library.
 int MaxSupportedTlsVersion();
 
+/// Returns true if, per the process configuration flags, server<->server communications
+/// should use TLS.
+bool IsInternalTlsConfigured();
+
+/// Returns true if, per the process configuration flags, client<->server communications
+/// should use TLS.
+bool IsExternalTlsConfigured();
+
 /// Add entropy from the system RNG to OpenSSL's global RNG. Called at system startup
 /// and again periodically to add new entropy.
 void SeedOpenSSLRNG();
@@ -138,6 +146,7 @@ class EncryptionKey {
   /// Cipher Mode
   AES_CIPHER_MODE mode_;
 };
+
 }
 
 #endif
