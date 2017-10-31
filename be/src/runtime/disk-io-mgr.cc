@@ -343,7 +343,7 @@ DiskIoMgr::~DiskIoMgr() {
       // to shut_down_ are protected.
       unique_lock<mutex> disk_lock(disk_queues_[i]->lock);
     }
-    disk_queues_[i]->work_available.notify_all();
+    disk_queues_[i]->work_available.NotifyAll();
   }
   disk_thread_group_.JoinAll();
 
@@ -469,7 +469,7 @@ void DiskIoMgr::CancelContext(DiskIoRequestContext* context, bool wait_for_disks
     unique_lock<mutex> lock(context->lock_);
     DCHECK(context->Validate()) << endl << context->DebugString();
     while (context->num_disks_with_ranges_ > 0) {
-      context->disks_complete_cond_var_.wait(lock);
+      context->disks_complete_cond_var_.Wait(lock);
     }
   }
 }
@@ -639,7 +639,7 @@ Status DiskIoMgr::GetNextRange(DiskIoRequestContext* reader, ScanRange** range) 
     }
 
     if (reader->ready_to_start_ranges_.empty()) {
-      reader->ready_to_start_ranges_cv_.wait(reader_lock);
+      reader->ready_to_start_ranges_cv_.Wait(reader_lock);
     } else {
       *range = reader->ready_to_start_ranges_.Dequeue();
       DCHECK(*range != nullptr);
@@ -846,7 +846,7 @@ bool DiskIoMgr::GetNextRequestRange(DiskQueue* disk_queue, RequestRange** range,
 
       while (!shut_down_ && disk_queue->request_contexts.empty()) {
         // wait if there are no readers on the queue
-        disk_queue->work_available.wait(disk_lock);
+        disk_queue->work_available.Wait(disk_lock);
       }
       if (shut_down_) break;
       DCHECK(!disk_queue->request_contexts.empty());
@@ -909,9 +909,9 @@ bool DiskIoMgr::GetNextRequestRange(DiskQueue* disk_queue, RequestRange** range,
         // All the ranges have been started, notify everyone blocked on GetNextRange.
         // Only one of them will get work so make sure to return nullptr to the other
         // caller threads.
-        (*request_context)->ready_to_start_ranges_cv_.notify_all();
+        (*request_context)->ready_to_start_ranges_cv_.NotifyAll();
       } else {
-        (*request_context)->ready_to_start_ranges_cv_.notify_one();
+        (*request_context)->ready_to_start_ranges_cv_.NotifyOne();
       }
     }
 

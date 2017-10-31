@@ -24,6 +24,7 @@
 #include <boost/bind/mem_fn.hpp>
 
 #include "util/aligned-new.h"
+#include "util/condition-variable.h"
 #include "util/thread.h"
 
 namespace impala {
@@ -135,7 +136,7 @@ class ThreadPool : public CacheLineAligned {
       // If the ThreadPool is not initialized, then the queue must be empty.
       DCHECK(initialized_ || work_queue_.Size() == 0);
       while (work_queue_.Size() != 0) {
-        empty_cv_.wait(l);
+        empty_cv_.Wait(l);
       }
     }
     Shutdown();
@@ -156,7 +157,7 @@ class ThreadPool : public CacheLineAligned {
         /// GetSize() and wait()'ing when the condition variable is notified.
         /// (It will hang if we notify right before calling wait().)
         boost::unique_lock<boost::mutex> l(lock_);
-        empty_cv_.notify_all();
+        empty_cv_.NotifyAll();
       }
     }
   }
@@ -200,7 +201,7 @@ class ThreadPool : public CacheLineAligned {
   bool shutdown_ = false;
 
   /// Signalled when the queue becomes empty
-  boost::condition_variable empty_cv_;
+  ConditionVariable empty_cv_;
 };
 
 /// Utility thread-pool that accepts callable work items, and simply invokes them.

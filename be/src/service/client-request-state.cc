@@ -602,12 +602,12 @@ void ClientRequestState::BlockOnWait() {
     l.lock();
     is_block_on_wait_joining_ = false;
     wait_thread_.reset();
-    block_on_wait_cv_.notify_all();
+    block_on_wait_cv_.NotifyAll();
   } else {
     // Another thread is already joining with wait_thread_.  Block on the cond-var
     // until the Join() executed in the other thread has completed.
     do {
-      block_on_wait_cv_.wait(l);
+      block_on_wait_cv_.Wait(l);
     } while (is_block_on_wait_joining_);
   }
 }

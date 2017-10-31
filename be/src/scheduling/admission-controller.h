@@ -31,6 +31,7 @@
 #include "scheduling/request-pool-service.h"
 #include "scheduling/query-schedule.h"
 #include "statestore/statestore-subscriber.h"
+#include "util/condition-variable.h"
 #include "util/internal-queue.h"
 #include "util/thread.h"
 
@@ -409,7 +410,7 @@ class AdmissionController {
 
   /// Notifies the dequeuing thread that pool stats have changed and it may be
   /// possible to dequeue and admit queries.
-  boost::condition_variable dequeue_cv_;
+  ConditionVariable dequeue_cv_;
 
   /// If true, tear down the dequeuing thread. This only happens in unit tests.
   bool done_;

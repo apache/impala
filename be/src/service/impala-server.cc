@@ -1123,7 +1123,7 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
     multiset<int32_t>::const_iterator itr = session_timeout_set_.find(session_timeout);
     DCHECK(itr != session_timeout_set_.end());
     session_timeout_set_.erase(itr);
-    session_timeout_cv_.notify_one();
+    session_timeout_cv_.NotifyOne();
   }
   return Status::OK();
 }
@@ -1448,7 +1448,7 @@ void ImpalaServer::CatalogUpdateCallback(
     unique_lock<mutex> unique_lock(catalog_version_lock_);
     min_subscriber_catalog_topic_version_ = delta.min_subscriber_topic_version;
   }
-  catalog_version_update_cv_.notify_all();
+  catalog_version_update_cv_.NotifyAll();
 }
 
 Status ImpalaServer::ProcessCatalogUpdateResult(
@@ -1487,7 +1487,7 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
              << " current version: " << catalog_update_info_.catalog_version;
   while (catalog_update_info_.catalog_version < min_req_catalog_version &&
          catalog_update_info_.catalog_service_id == catalog_service_id) {
-    catalog_version_update_cv_.wait(unique_lock);
+    catalog_version_update_cv_.Wait(unique_lock);
   }
 
   if (!wait_for_all_subscribers) return Status::OK();
@@ -1502,7 +1502,7 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
              << min_subscriber_catalog_topic_version_;
   while (min_subscriber_catalog_topic_version_ < min_req_subscriber_topic_version &&
          catalog_update_info_.catalog_service_id == catalog_service_id) {
-    catalog_version_update_cv_.wait(unique_lock);
+    catalog_version_update_cv_.Wait(unique_lock);
   }
   return Status::OK();
 }
@@ -1786,7 +1786,7 @@ void ImpalaServer::RegisterSessionTimeout(int32_t session_timeout) {
   if (session_timeout <= 0) return;
   lock_guard<mutex> l(session_timeout_lock_);
   session_timeout_set_.insert(session_timeout);
-  session_timeout_cv_.notify_one();
+  session_timeout_cv_.NotifyOne();
 }
 
 [[noreturn]] void ImpalaServer::ExpireSessions() {
@@ -1794,12 +1794,10 @@ void ImpalaServer::RegisterSessionTimeout(int32_t session_timeout) {
     {
       unique_lock<mutex> timeout_lock(session_timeout_lock_);
       if (session_timeout_set_.empty()) {
-        session_timeout_cv_.wait(timeout_lock);
+        session_timeout_cv_.Wait(timeout_lock);
       } else {
         // Sleep for a second before checking whether an active session can be expired.
-        const int64_t SLEEP_TIME_MS = 1000;
-        system_time deadline = get_system_time() + milliseconds(SLEEP_TIME_MS);
-        session_timeout_cv_.timed_wait(timeout_lock, deadline);
+        session_timeout_cv_.WaitFor(timeout_lock, seconds(1));
       }
     }
 

@@ -23,12 +23,11 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/sorted-run-merger.h"
+#include "util/condition-variable.h"
 #include "util/runtime-profile-counters.h"
 #include "util/periodic-counter-updater.h"
 
 #include "common/names.h"
-
-using boost::condition_variable;
 
 namespace impala {
 
@@ -83,10 +82,10 @@ class DataStreamRecvr::SenderQueue {
   int num_remaining_senders_;
 
   // signal arrival of new batch or the eos/cancelled condition
-  condition_variable data_arrival_cv_;
+  ConditionVariable data_arrival_cv_;
 
   // signal removal of data by stream consumer
-  condition_variable data_removal__cv_;
+  ConditionVariable data_removal__cv_;
 
   // queue of (batch length, batch) pairs.  The SenderQueue block owns memory to
   // these batches. They are handed off to the caller via GetBatch.
@@ -120,7 +119,7 @@ Status DataStreamRecvr::SenderQueue::GetBatch(RowBatch** next_batch) {
     CANCEL_SAFE_SCOPED_TIMER(
         received_first_batch_ ? NULL : recvr_->first_batch_wait_total_timer_,
         &is_cancelled_);
-    data_arrival_cv_.wait(l);
+    data_arrival_cv_.Wait(l);
   }
 
   // cur_batch_ must be replaced with the returned batch.
@@ -140,7 +139,7 @@ Status DataStreamRecvr::SenderQueue::GetBatch(RowBatch** next_batch) {
   recvr_->num_buffered_bytes_.Add(-batch_queue_.front().first);
   VLOG_ROW << "fetched #rows=" << result->num_rows();
   batch_queue_.pop_front();
-  data_removal__cv_.notify_one();
+  data_removal__cv_.NotifyOne();
   current_batch_.reset(result);
   *next_batch = current_batch_.get();
   return Status::OK();
@@ -175,10 +174,10 @@ void DataStreamRecvr::SenderQueue::AddBatch(const TRowBatch& thrift_batch) {
       try_mutex::scoped_try_lock timer_lock(recvr_->buffer_wall_timer_lock_);
       if (timer_lock) {
         CANCEL_SAFE_SCOPED_TIMER(recvr_->buffer_full_wall_timer_, &is_cancelled_);
-        data_removal__cv_.wait(l);
+        data_removal__cv_.Wait(l);
         got_timer_lock = true;
       } else {
-        data_removal__cv_.wait(l);
+        data_removal__cv_.Wait(l);
         got_timer_lock = false;
       }
     }
@@ -197,7 +196,7 @@ void DataStreamRecvr::SenderQueue::AddBatch(const TRowBatch& thrift_batch) {
     // time it takes this thread to finish (and yield lock_) and the
     // notified thread to be woken up and to acquire the try_lock. In
     // practice, this time is small relative to the total wait time.
-    if (got_timer_lock) data_removal__cv_.notify_one();
+    if (got_timer_lock) data_removal__cv_.NotifyOne();
   }
 
   if (!is_cancelled_) {
@@ -213,7 +212,7 @@ void DataStreamRecvr::SenderQueue::AddBatch(const TRowBatch& thrift_batch) {
              << " batch_size=" << batch_size << "\n";
     batch_queue_.push_back(make_pair(batch_size, batch));
     recvr_->num_buffered_bytes_.Add(batch_size);
-    data_arrival_cv_.notify_one();
+    data_arrival_cv_.NotifyOne();
   }
 }
 
@@ -225,7 +224,7 @@ void DataStreamRecvr::SenderQueue::DecrementSenders() {
             << recvr_->fragment_instance_id()
             << " node_id=" << recvr_->dest_node_id()
             << " #senders=" << num_remaining_senders_;
-  if (num_remaining_senders_ == 0) data_arrival_cv_.notify_one();
+  if (num_remaining_senders_ == 0) data_arrival_cv_.NotifyOne();
 }
 
 void DataStreamRecvr::SenderQueue::Cancel() {
@@ -239,8 +238,8 @@ void DataStreamRecvr::SenderQueue::Cancel() {
   }
   // Wake up all threads waiting to produce/consume batches.  They will all
   // notice that the stream is cancelled and handle it.
-  data_arrival_cv_.notify_all();
-  data_removal__cv_.notify_all();
+  data_arrival_cv_.NotifyAll();
+  data_removal__cv_.NotifyAll();
 }
 
 void DataStreamRecvr::SenderQueue::Close() {

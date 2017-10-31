@@ -35,6 +35,7 @@
 #include "common/status.h"
 #include "service/frontend.h"
 #include "service/query-options.h"
+#include "util/condition-variable.h"
 #include "util/metrics.h"
 #include "util/runtime-profile.h"
 #include "util/simple-logger.h"
@@ -800,7 +801,7 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// session_timeout_thread_ relies on the following conditional variable to wake up
   /// on every poll period expiration or when the poll period changes.
-  boost::condition_variable session_timeout_cv_;
+  ConditionVariable session_timeout_cv_;
 
   /// map from query id to exec state; ClientRequestState is owned by us and referenced
   /// as a shared_ptr to allow asynchronous deletion
@@ -922,7 +923,7 @@ class ImpalaServer : public ImpalaServiceIf,
   boost::mutex catalog_version_lock_;
 
   /// Variable to signal when the catalog version has been modified
-  boost::condition_variable catalog_version_update_cv_;
+  ConditionVariable catalog_version_update_cv_;
 
   /// Contains details on the version information of a catalog update.
   struct CatalogUpdateVersionInfo {

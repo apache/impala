@@ -230,7 +230,7 @@ Status FragmentInstanceState::Prepare() {
         thread_name, [this]() { this->ReportProfileThread(); }, &report_thread_, true));
     // Make sure the thread started up, otherwise ReportProfileThread() might get into
     // a race with StopReportThread().
-    while (!report_thread_active_) report_thread_started_cv_.wait(l);
+    while (!report_thread_active_) report_thread_started_cv_.Wait(l);
   }
 
   return Status::OK();
@@ -322,28 +322,26 @@ void FragmentInstanceState::ReportProfileThread() {
   unique_lock<mutex> l(report_thread_lock_);
   // tell Prepare() that we started
   report_thread_active_ = true;
-  report_thread_started_cv_.notify_one();
+  report_thread_started_cv_.NotifyOne();
 
   // Jitter the reporting time of remote fragments by a random amount between
   // 0 and the report_interval.  This way, the coordinator doesn't get all the
   // updates at once so its better for contention as well as smoother progress
   // reporting.
   int report_fragment_offset = rand() % FLAGS_status_report_interval;
-  boost::system_time timeout = boost::get_system_time()
-      + boost::posix_time::seconds(report_fragment_offset);
+  boost::posix_time::seconds wait_duration(report_fragment_offset);
   // We don't want to wait longer than it takes to run the entire fragment.
-  stop_report_thread_cv_.timed_wait(l, timeout);
+  stop_report_thread_cv_.WaitFor(l, wait_duration);
 
   while (report_thread_active_) {
-    boost::system_time timeout = boost::get_system_time()
-        + boost::posix_time::seconds(FLAGS_status_report_interval);
+    boost::posix_time::seconds loop_wait_duration(FLAGS_status_report_interval);
 
     // timed_wait can return because the timeout occurred or the condition variable
     // was signaled.  We can't rely on its return value to distinguish between the
     // two cases (e.g. there is a race here where the wait timed out but before grabbing
     // the lock, the condition variable was signaled).  Instead, we will use an external
     // flag, report_thread_active_, to coordinate this.
-    stop_report_thread_cv_.timed_wait(l, timeout);
+    stop_report_thread_cv_.WaitFor(l, loop_wait_duration);
 
     if (!report_thread_active_) break;
     SendReport(false, Status::OK());
@@ -378,7 +376,7 @@ void FragmentInstanceState::StopReportThread() {
     lock_guard<mutex> l(report_thread_lock_);
     report_thread_active_ = false;
   }
-  stop_report_thread_cv_.notify_one();
+  stop_report_thread_cv_.NotifyOne();
   report_thread_->Join();
 }
 

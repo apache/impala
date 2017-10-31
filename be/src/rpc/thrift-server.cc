@@ -18,7 +18,6 @@
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/thread/condition_variable.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
 #include <thrift/concurrency/Thread.h>
@@ -37,6 +36,7 @@
 #include "rpc/authentication.h"
 #include "rpc/thrift-server.h"
 #include "rpc/thrift-thread.h"
+#include "util/condition-variable.h"
 #include "util/debug-util.h"
 #include "util/metrics.h"
 #include "util/network-util.h"
@@ -139,13 +139,13 @@ class ThriftServer::ThriftServerEventProcessor : public TServerEventHandler {
 
  private:
   // Lock used to ensure that there are no missed notifications between starting the
-  // supervision thread and calling signal_cond_.timed_wait. Also used to ensure
+  // supervision thread and calling signal_cond_.WaitUntil. Also used to ensure
   // thread-safe access to members of thrift_server_
   boost::mutex signal_lock_;
 
   // Condition variable that is notified by the supervision thread once either
   // a) all is well or b) an error occurred.
-  boost::condition_variable signal_cond_;
+  ConditionVariable signal_cond_;
 
   // The ThriftServer under management. This class is a friend of ThriftServer, and
   // reaches in to change member variables at will.
@@ -179,7 +179,7 @@ Status ThriftServer::ThriftServerEventProcessor::StartAndWaitForServer() {
   // visibility.
   while (!signal_fired_) {
     // Yields lock and allows supervision thread to continue and signal
-    if (!signal_cond_.timed_wait(lock, deadline)) {
+    if (!signal_cond_.WaitUntil(lock, deadline)) {
       stringstream ss;
       ss << "ThriftServer '" << thrift_server_->name_ << "' (on port: "
          << thrift_server_->port_ << ") did not start within "
@@ -220,7 +220,7 @@ void ThriftServer::ThriftServerEventProcessor::Supervise() {
     // failure, for example.
     signal_fired_ = true;
   }
-  signal_cond_.notify_all();
+  signal_cond_.NotifyAll();
 }
 
 void ThriftServer::ThriftServerEventProcessor::preServe() {
@@ -234,7 +234,7 @@ void ThriftServer::ThriftServerEventProcessor::preServe() {
   thrift_server_->started_ = true;
 
   // Should only be one thread waiting on signal_cond_, but wake all just in case.
-  signal_cond_.notify_all();
+  signal_cond_.NotifyAll();
 }
 
 // This thread-local variable contains the current connection context for whichever

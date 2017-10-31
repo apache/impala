@@ -67,7 +67,7 @@ bool DiskIoMgr::ScanRange::EnqueueBuffer(
     blocked_on_queue_ = ready_buffers_.size() == SCAN_RANGE_READY_BUFFER_LIMIT;
   }
 
-  buffer_ready_cv_.notify_one();
+  buffer_ready_cv_.NotifyOne();
 
   return blocked_on_queue_;
 }
@@ -81,7 +81,7 @@ Status DiskIoMgr::ScanRange::GetNext(unique_ptr<BufferDescriptor>* buffer) {
     DCHECK(Validate()) << DebugString();
 
     while (ready_buffers_.empty() && !is_cancelled_) {
-      buffer_ready_cv_.wait(scan_range_lock);
+      buffer_ready_cv_.Wait(scan_range_lock);
     }
 
     if (is_cancelled_) {
@@ -153,7 +153,7 @@ void DiskIoMgr::ScanRange::Cancel(const Status& status) {
     is_cancelled_ = true;
     status_ = status;
   }
-  buffer_ready_cv_.notify_all();
+  buffer_ready_cv_.NotifyAll();
   CleanupQueuedBuffers();
 
   // For cached buffers, we can't close the range until the cached buffer is returned.

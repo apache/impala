@@ -796,7 +796,7 @@ Status Coordinator::WaitForBackendCompletion() {
   while (num_remaining_backends_ > 0 && query_status_.ok()) {
     VLOG_QUERY << "Coordinator waiting for backends to finish, "
                << num_remaining_backends_ << " remaining";
-    backend_completion_cv_.wait(l);
+    backend_completion_cv_.Wait(l);
   }
   if (query_status_.ok()) {
     VLOG_QUERY << "All backends finished successfully.";
@@ -913,7 +913,7 @@ void Coordinator::CancelInternal() {
   VLOG_QUERY << Substitute(
       "CancelBackends() query_id=$0, tried to cancel $1 backends",
       PrintId(query_id()), num_cancelled);
-  backend_completion_cv_.notify_all();
+  backend_completion_cv_.NotifyAll();
 
   ReleaseExecResourcesLocked();
   ReleaseAdmissionControlResourcesLocked();
@@ -966,7 +966,7 @@ Status Coordinator::UpdateBackendExecStatus(const TReportExecStatusParams& param
       BackendState::LogFirstInProgress(backend_states_);
     }
     if (--num_remaining_backends_ == 0 || !status.ok()) {
-      backend_completion_cv_.notify_all();
+      backend_completion_cv_.NotifyAll();
     }
     return Status::OK();
   }

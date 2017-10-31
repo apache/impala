@@ -25,7 +25,6 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/unordered_set.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/thread/condition_variable.hpp>
 
 #include "common/atomic.h"
 #include "common/hdfs.h"
@@ -35,6 +34,7 @@
 #include "runtime/thread-resource-mgr.h"
 #include "util/aligned-new.h"
 #include "util/bit-util.h"
+#include "util/condition-variable.h"
 #include "util/error-util.h"
 #include "util/internal-queue.h"
 #include "util/runtime-profile.h"
@@ -563,7 +563,7 @@ class DiskIoMgr : public CacheLineAligned {
 
     /// IO buffers that are queued for this scan range.
     /// Condition variable for GetNext
-    boost::condition_variable buffer_ready_cv_;
+    ConditionVariable buffer_ready_cv_;
     std::deque<std::unique_ptr<BufferDescriptor>> ready_buffers_;
 
     /// Lock that should be taken during hdfs calls. Only one thread (the disk reading

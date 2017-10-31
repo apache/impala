@@ -33,6 +33,7 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/backend-client.h"
 #include "util/aligned-new.h"
+#include "util/condition-variable.h"
 #include "util/debug-util.h"
 #include "util/network-util.h"
 #include "util/thread-pool.h"
@@ -45,7 +46,6 @@
 
 #include "common/names.h"
 
-using boost::condition_variable;
 using namespace apache::thrift;
 using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
@@ -133,7 +133,7 @@ class DataStreamSender::Channel : public CacheLineAligned {
   // TODO: if the order of row batches does not matter, we can consider increasing
   // the number of threads.
   ThreadPool<TRowBatch*> rpc_thread_; // sender thread.
-  condition_variable rpc_done_cv_;   // signaled when rpc_in_flight_ is set to true.
+  ConditionVariable rpc_done_cv_;   // signaled when rpc_in_flight_ is set to true.
   mutex rpc_thread_lock_; // Lock with rpc_done_cv_ protecting rpc_in_flight_
   bool rpc_in_flight_;  // true if the rpc_thread_ is busy sending.
 
@@ -188,7 +188,7 @@ void DataStreamSender::Channel::TransmitData(int thread_id, const TRowBatch* bat
     unique_lock<mutex> l(rpc_thread_lock_);
     rpc_in_flight_ = false;
   }
-  rpc_done_cv_.notify_one();
+  rpc_done_cv_.NotifyOne();
 }
 
 void DataStreamSender::Channel::TransmitDataHelper(const TRowBatch* batch) {
@@ -239,7 +239,7 @@ void DataStreamSender::Channel::WaitForRpc() {
   SCOPED_TIMER(parent_->state_->total_network_send_timer());
   unique_lock<mutex> l(rpc_thread_lock_);
   while (rpc_in_flight_) {
-    rpc_done_cv_.wait(l);
+    rpc_done_cv_.Wait(l);
   }
 }
 

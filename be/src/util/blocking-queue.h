@@ -19,7 +19,6 @@
 #ifndef IMPALA_UTIL_BLOCKING_QUEUE_H
 #define IMPALA_UTIL_BLOCKING_QUEUE_H
 
-#include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <deque>
@@ -141,12 +140,11 @@ class BlockingQueue : public CacheLineAligned {
     boost::unique_lock<boost::mutex> write_lock(put_lock_);
     boost::system_time wtime = boost::get_system_time() +
         boost::posix_time::microseconds(timeout_micros);
-    const struct timespec timeout = boost::detail::to_timespec(wtime);
     bool notified = true;
     while (SizeLocked(write_lock) >= max_elements_ && !shutdown_ && notified) {
       timer.Start();
       // Wait until we're notified or until the timeout expires.
-      notified = put_cv_.TimedWait(write_lock, &timeout);
+      notified = put_cv_.WaitUntil(write_lock, wtime);
       timer.Stop();
     }
     total_put_wait_time_ += timer.ElapsedTime();

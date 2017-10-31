@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <boost/thread.hpp>
 
+#include "util/condition-variable.h"
 #include "util/time.h"
 #include "common/atomic.h"
 #include "common/logging.h"
@@ -53,9 +54,9 @@ class Promise {
     ///   p.get();
     /// }
     /// < promise object gets destroyed >
-    /// Calling notify_all() with the val_lock_ guarantees that the thread calling
+    /// Calling NotifyAll() with the val_lock_ guarantees that the thread calling
     /// Set() is done and the promise is safe to delete.
-    val_set_cond_.notify_all();
+    val_set_cond_.NotifyAll();
   }
 
   /// Blocks until a value is set, and then returns a reference to that value. Once Get()
@@ -63,7 +64,7 @@ class Promise {
   const T& Get() {
     boost::unique_lock<boost::mutex> l(val_lock_);
     while (!val_is_set_) {
-      val_set_cond_.wait(l);
+      val_set_cond_.Wait(l);
     }
     return val_;
   }
@@ -86,7 +87,7 @@ class Promise {
       boost::posix_time::microseconds wait_time =
           boost::posix_time::microseconds(std::max<int64_t>(
               1, timeout_micros - (now - start)));
-      val_set_cond_.timed_wait(l, wait_time);
+      val_set_cond_.WaitFor(l, wait_time);
       now = MonotonicMicros();
     }
     *timed_out = !val_is_set_;
@@ -102,7 +103,7 @@ class Promise {
  private:
   /// These variables deal with coordination between consumer and producer, and protect
   /// access to val_;
-  boost::condition_variable val_set_cond_;
+  ConditionVariable val_set_cond_;
   bool val_is_set_;
   boost::mutex val_lock_;
 

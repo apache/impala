@@ -88,7 +88,7 @@ void DiskIoRequestContext::Cancel(const Status& status) {
 
   // Signal reader and unblock the GetNext/Read thread.  That read will fail with
   // a cancelled status.
-  ready_to_start_ranges_cv_.notify_all();
+  ready_to_start_ranges_cv_.NotifyAll();
 }
 
 void DiskIoRequestContext::AddRequestRange(

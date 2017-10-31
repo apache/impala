@@ -28,6 +28,7 @@
 #include "runtime/disk-io-mgr.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/thread-resource-mgr.h"
+#include "util/condition-variable.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
@@ -51,7 +52,7 @@ struct DiskIoMgr::DiskQueue {
   /// thread should shut down.  A disk thread will be woken up when there is a reader
   /// added to the queue. A reader is only on the queue when it has at least one
   /// scan range that is not blocked on available buffers.
-  boost::condition_variable work_available;
+  ConditionVariable work_available;
 
   /// list of all request contexts that have work queued on this disk
   std::list<DiskIoRequestContext*> request_contexts;
@@ -65,7 +66,7 @@ struct DiskIoMgr::DiskQueue {
           request_contexts.end());
       request_contexts.push_back(worker);
     }
-    work_available.notify_all();
+    work_available.NotifyAll();
   }
 
   DiskQueue(int id) : disk_id(id) { }
@@ -157,7 +158,7 @@ class DiskIoRequestContext {
     // boost doesn't let us dcheck that the reader lock is taken
     DCHECK_GT(num_disks_with_ranges_, 0);
     if (--num_disks_with_ranges_ == 0) {
-      disks_complete_cond_var_.notify_all();
+      disks_complete_cond_var_.NotifyAll();
     }
     DCHECK(Validate()) << std::endl << DebugString();
   }
@@ -289,13 +290,13 @@ class DiskIoRequestContext {
   /// We currently populate one range per disk.
   /// TODO: think about this some more.
   InternalQueue<ScanRange> ready_to_start_ranges_;
-  boost::condition_variable ready_to_start_ranges_cv_;  // used with lock_
+  ConditionVariable ready_to_start_ranges_cv_;  // used with lock_
 
   /// Ranges that are blocked due to back pressure on outgoing buffers.
   InternalQueue<ScanRange> blocked_ranges_;
 
   /// Condition variable for UnregisterContext() to wait for all disks to complete
-  boost::condition_variable disks_complete_cond_var_;
+  ConditionVariable disks_complete_cond_var_;
 
   /// Struct containing state per disk. See comments in the disk read loop on how
   /// they are used.

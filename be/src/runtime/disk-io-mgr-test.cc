@@ -27,6 +27,7 @@
 #include "runtime/disk-io-mgr-stress.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/thread-resource-mgr.h"
+#include "util/condition-variable.h"
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
 #include "util/thread.h"
@@ -36,8 +37,6 @@
 DECLARE_int32(num_remote_hdfs_io_threads);
 DECLARE_int32(num_s3_io_threads);
 DECLARE_int32(num_adls_io_threads);
-
-using boost::condition_variable;
 
 const int MIN_BUFFER_SIZE = 512;
 const int MAX_BUFFER_SIZE = 1024;
@@ -72,7 +71,7 @@ class DiskIoMgrTest : public testing::Test {
     {
       lock_guard<mutex> l(written_mutex_);
       ++num_ranges_written_;
-      if (num_ranges_written_ == num_writes) writes_done_.notify_one();
+      if (num_ranges_written_ == num_writes) writes_done_.NotifyOne();
     }
   }
 
@@ -81,7 +80,7 @@ class DiskIoMgrTest : public testing::Test {
     {
       lock_guard<mutex> l(written_mutex_);
       ++num_ranges_written_;
-      if (num_ranges_written_ == num_writes) writes_done_.notify_all();
+      if (num_ranges_written_ == num_writes) writes_done_.NotifyAll();
     }
   }
 
@@ -179,7 +178,7 @@ class DiskIoMgrTest : public testing::Test {
   ObjectPool pool_;
 
   mutex written_mutex_;
-  condition_variable writes_done_;
+  ConditionVariable writes_done_;
   int num_ranges_written_;
 };
 
@@ -229,7 +228,7 @@ TEST_F(DiskIoMgrTest, SingleWriter) {
 
       {
         unique_lock<mutex> lock(written_mutex_);
-        while (num_ranges_written_ < num_ranges) writes_done_.wait(lock);
+        while (num_ranges_written_ < num_ranges) writes_done_.Wait(lock);
       }
       num_ranges_written_ = 0;
       io_mgr.UnregisterContext(writer);
@@ -283,7 +282,7 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
 
   {
     unique_lock<mutex> lock(written_mutex_);
-    while (num_ranges_written_ < 2) writes_done_.wait(lock);
+    while (num_ranges_written_ < 2) writes_done_.Wait(lock);
   }
   num_ranges_written_ = 0;
   io_mgr.UnregisterContext(writer);
@@ -342,7 +341,7 @@ TEST_F(DiskIoMgrTest, SingleWriterCancel) {
 
       {
         unique_lock<mutex> lock(written_mutex_);
-        while (num_ranges_written_ < num_ranges_before_cancel) writes_done_.wait(lock);
+        while (num_ranges_written_ < num_ranges_before_cancel) writes_done_.Wait(lock);
       }
       num_ranges_written_ = 0;
       io_mgr.UnregisterContext(writer);
@@ -810,7 +809,7 @@ TEST_F(DiskIoMgrTest, MultipleReaderWriter) {
 
             {
               unique_lock<mutex> lock(written_mutex_);
-              while (num_ranges_written_ < num_write_ranges) writes_done_.wait(lock);
+              while (num_ranges_written_ < num_write_ranges) writes_done_.Wait(lock);
             }
 
             threads.join_all();

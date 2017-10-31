@@ -29,6 +29,7 @@
 #include "gen-cpp/Types_types.h"
 #include "catalog/catalog.h"
 #include "statestore/statestore-subscriber.h"
+#include "util/condition-variable.h"
 #include "util/metrics.h"
 #include "rapidjson/rapidjson.h"
 
@@ -95,7 +96,7 @@ class CatalogServer {
   /// fetch its next set of updates from the JniCatalog. At the end of each statestore
   /// heartbeat, this CV is signaled and the catalog_update_gathering_thread_ starts
   /// querying the JniCatalog for catalog objects. Protected by the catalog_lock_.
-  boost::condition_variable catalog_update_cv_;
+  ConditionVariable catalog_update_cv_;
 
   /// The latest available set of catalog topic updates (additions/modifications, and
   /// deletions). Set by the catalog_update_gathering_thread_ and protected by

@@ -233,7 +233,7 @@ AdmissionController::~AdmissionController() {
     // Lock to ensure the dequeue thread will see the update to done_
     lock_guard<mutex> l(admission_ctrl_lock_);
     done_ = true;
-    dequeue_cv_.notify_one();
+    dequeue_cv_.NotifyOne();
   }
   dequeue_thread_->Join();
 }
@@ -620,7 +620,7 @@ void AdmissionController::ReleaseQuery(const QuerySchedule& schedule) {
     VLOG_RPC << "Released query id=" << schedule.query_id() << " "
              << stats->DebugString();
   }
-  dequeue_cv_.notify_one();
+  dequeue_cv_.NotifyOne();
 }
 
 // Statestore subscriber callback for IMPALA_REQUEST_QUEUE_TOPIC.
@@ -648,7 +648,7 @@ void AdmissionController::UpdatePoolStats(
     }
     UpdateClusterAggregates();
   }
-  dequeue_cv_.notify_one(); // Dequeue and admit queries on the dequeue thread
+  dequeue_cv_.NotifyOne(); // Dequeue and admit queries on the dequeue thread
 }
 
 void AdmissionController::PoolStats::UpdateRemoteStats(const string& host_id,
@@ -821,7 +821,7 @@ void AdmissionController::DequeueLoop() {
   while (true) {
     unique_lock<mutex> lock(admission_ctrl_lock_);
     if (done_) break;
-    dequeue_cv_.wait(lock);
+    dequeue_cv_.Wait(lock);
     for (const PoolConfigMap::value_type& entry: pool_config_map_) {
       const string& pool_name = entry.first;
       const TPoolConfig& pool_config = entry.second;

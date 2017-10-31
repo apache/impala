@@ -22,7 +22,6 @@
 #include <list>
 #include <set>
 #include <boost/thread/mutex.hpp>
-#include <boost/thread/condition_variable.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 

@@ -28,7 +28,6 @@
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
@@ -41,6 +40,7 @@
 #include "gen-cpp/Types_types.h"
 #include "runtime/runtime-state.h" // for PartitionStatusMap; TODO: disentangle
 #include "scheduling/query-schedule.h"
+#include "util/condition-variable.h"
 #include "util/progress-updater.h"
 
 namespace impala {
@@ -298,7 +298,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// If there is no coordinator fragment, Wait() simply waits until all
   /// backends report completion by notifying on backend_completion_cv_.
   /// Tied to lock_.
-  boost::condition_variable backend_completion_cv_;
+  ConditionVariable backend_completion_cv_;
 
   /// Count of the number of backends for which done != true. When this
   /// hits 0, any Wait()'ing thread is notified

@@ -194,7 +194,7 @@ Status CatalogServer::Start() {
   // Notify the thread to start for the first time.
   {
     lock_guard<mutex> l(catalog_lock_);
-    catalog_update_cv_.notify_one();
+    catalog_update_cv_.NotifyOne();
   }
   return Status::OK();
 }
@@ -253,7 +253,7 @@ void CatalogServer::UpdateCatalogTopicCallback(
 
   // Signal the catalog update gathering thread to start.
   topic_updates_ready_ = false;
-  catalog_update_cv_.notify_one();
+  catalog_update_cv_.NotifyOne();
 }
 
 [[noreturn]] void CatalogServer::GatherCatalogUpdatesThread() {
@@ -264,7 +264,7 @@ void CatalogServer::UpdateCatalogTopicCallback(
     // when topic_updates_ready_ is false, otherwise we may be in the middle of
     // processing a heartbeat.
     while (topic_updates_ready_) {
-      catalog_update_cv_.wait(unique_lock);
+      catalog_update_cv_.Wait(unique_lock);
     }
 
     MonotonicStopWatch sw;

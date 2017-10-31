@@ -28,6 +28,7 @@
 
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "runtime/row-batch.h"
+#include "util/condition-variable.h"
 #include "util/promise.h"
 #include "util/runtime-profile.h"
 
@@ -138,11 +139,11 @@ class FragmentInstanceState {
 
   /// Indicates that profile reporting thread should stop.
   /// Tied to report_thread_lock_.
-  boost::condition_variable stop_report_thread_cv_;
+  ConditionVariable stop_report_thread_cv_;
 
   /// Indicates that profile reporting thread started.
   /// Tied to report_thread_lock_.
-  boost::condition_variable report_thread_started_cv_;
+  ConditionVariable report_thread_started_cv_;
 
   /// When the report thread starts, it sets report_thread_active_ to true and signals
   /// report_thread_started_cv_. The report thread is shut down by setting

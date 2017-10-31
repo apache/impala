@@ -25,6 +25,7 @@
 #include "service/child-query.h"
 #include "service/impala-server.h"
 #include "util/auth-util.h"
+#include "util/condition-variable.h"
 #include "util/runtime-profile.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/Frontend_types.h"
@@ -254,7 +255,7 @@ class ClientRequestState {
 
   /// Condition variable to make BlockOnWait() thread-safe. One thread joins
   /// wait_thread_, and all other threads block on this cv. Used with lock_.
-  boost::condition_variable block_on_wait_cv_;
+  ConditionVariable block_on_wait_cv_;
 
   /// Used in conjunction with block_on_wait_cv_ to make BlockOnWait() thread-safe.
   bool is_block_on_wait_joining_;
