@@ -339,6 +339,9 @@ class ClientRequestState {
   ImpalaServer* parent_server_;
 
   /// Start/end time of the query, in Unix microseconds.
+  /// end_time_us_ is initialized to 0 in the constructor, which is used to indicate
+  /// that the query is not yet done. It is assinged the final value in
+  /// ClientRequestState::Done().
   int64_t start_time_us_, end_time_us_;
 
   /// Executes a local catalog operation (an operation that does not need to execute

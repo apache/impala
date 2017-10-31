@@ -300,7 +300,11 @@ void ImpalaHttpHandler::QueryStateToJson(const ImpalaServer::QueryStateRecord& r
       document->GetAllocator());
   value->AddMember("end_time", end_time, document->GetAllocator());
 
-  int64_t duration_us = record.end_time_us - record.start_time_us;
+  // record.end_time_us might still be zero if the query is not yet done
+  // Use the current Unix time in that case. Note that the duration can be
+  // negative if a system clock reset happened after the query was initiated.
+  int64_t end_time_us = record.end_time_us > 0LL ? record.end_time_us : UnixMicros();
+  int64_t duration_us = end_time_us - record.start_time_us;
   const string& printed_duration = PrettyPrinter::Print(duration_us * NANOS_PER_MICRO,
       TUnit::TIME_NS);
   Value val_duration(printed_duration.c_str(), document->GetAllocator());

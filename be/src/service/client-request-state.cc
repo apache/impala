@@ -88,7 +88,8 @@ ClientRequestState::ClientRequestState(
     fetched_rows_(false),
     frontend_(frontend),
     parent_server_(server),
-    start_time_us_(UnixMicros()) {
+    start_time_us_(UnixMicros()),
+    end_time_us_(0LL) {
 #ifndef NDEBUG
   profile_->AddInfoString("DEBUG MODE WARNING", "Query profile created while running a "
       "DEBUG build of Impala. Use RELEASE builds to measure query performance.");

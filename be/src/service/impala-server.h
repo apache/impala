@@ -620,6 +620,9 @@ class ImpalaServer : public ImpalaServiceIf,
     beeswax::QueryState::type query_state;
 
     /// Start and end time of the query, in Unix microseconds.
+    /// A query whose end_time_us is 0 indicates that it is an in-flight query.
+    /// These two variables are initialized with the corresponding values from
+    /// ClientRequestState.
     int64_t start_time_us, end_time_us;
 
     /// Summary of execution for this query.
