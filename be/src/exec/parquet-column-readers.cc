@@ -978,16 +978,41 @@ Status BaseScalarColumnReader::InitDictionary() {
   if (!stream_->ReadBytes(data_size, &data_, &status)) return status;
   data_end_ = data_ + data_size;
 
+  // The size of dictionary can be 0, if every value is null. The dictionary still has to
+  // be reset in this case.
+  DictDecoderBase* dict_decoder;
+  if (current_page_header_.uncompressed_page_size == 0) {
+    return CreateDictionaryDecoder(nullptr, 0, &dict_decoder);
+  }
+
+  // There are 3 different cases from the aspect of memory management:
+  // 1. If the column type is string, the dictionary will contain pointers to a buffer,
+  //    so the buffer's lifetime must be as long as any row batch that references it.
+  // 2. If the column type is not string, and the dictionary page is compressed, then a
+  //    temporary buffer is needed for the uncompressed values.
+  // 3. If the column type is not string, and the dictionary page is not compressed,
+  //    then no buffer is necessary.
+  ScopedBuffer uncompressed_buffer(parent_->dictionary_pool_->mem_tracker());
   uint8_t* dict_values = nullptr;
-  if (decompressor_.get() != nullptr) {
-    int uncompressed_size = current_page_header_.uncompressed_page_size;
-    dict_values = parent_->dictionary_pool_->TryAllocate(uncompressed_size);
+  if (decompressor_.get() != nullptr || slot_desc_->type().IsStringType()) {
+    int buffer_size = current_page_header_.uncompressed_page_size;
+    if (slot_desc_->type().IsStringType()) {
+      dict_values = parent_->dictionary_pool_->TryAllocate(buffer_size); // case 1.
+    } else if (uncompressed_buffer.TryAllocate(buffer_size)) {
+      dict_values = uncompressed_buffer.buffer(); // case 2
+    }
     if (UNLIKELY(dict_values == nullptr)) {
       string details = Substitute(PARQUET_COL_MEM_LIMIT_EXCEEDED, "InitDictionary",
-                                  uncompressed_size, "dictionary");
+          buffer_size, "dictionary");
       return parent_->dictionary_pool_->mem_tracker()->MemLimitExceeded(
-               parent_->state_, details, uncompressed_size);
+               parent_->state_, details, buffer_size);
     }
+  } else {
+    dict_values = data_; // case 3.
+  }
+
+  if (decompressor_.get() != nullptr) {
+    int uncompressed_size = current_page_header_.uncompressed_page_size;
     RETURN_IF_ERROR(decompressor_->ProcessBlock32(true, data_size, data_,
                     &uncompressed_size, &dict_values));
     VLOG_FILE << "Decompressed " << data_size << " to " << uncompressed_size;
@@ -996,27 +1021,17 @@ Status BaseScalarColumnReader::InitDictionary() {
                "Expected $1 uncompressed bytes but got $2", filename(),
                current_page_header_.uncompressed_page_size, uncompressed_size));
     }
-    data_size = uncompressed_size;
   } else {
     if (current_page_header_.uncompressed_page_size != data_size) {
       return Status(Substitute("Error reading dictionary page in file '$0'. "
                                "Expected $1 bytes but got $2", filename(),
                                current_page_header_.uncompressed_page_size, data_size));
     }
-    // Copy dictionary from io buffer (which will be recycled as we read
-    // more data) to a new buffer
-    dict_values = parent_->dictionary_pool_->TryAllocate(data_size);
-    if (UNLIKELY(dict_values == nullptr)) {
-      string details = Substitute(PARQUET_COL_MEM_LIMIT_EXCEEDED, "InitDictionary",
-                                  data_size, "dictionary");
-      return parent_->dictionary_pool_->mem_tracker()->MemLimitExceeded(
-               parent_->state_, details, data_size);
-    }
-    memcpy(dict_values, data_, data_size);
+    if (slot_desc_->type().IsStringType()) memcpy(dict_values, data_, data_size);
   }
 
-  DictDecoderBase* dict_decoder;
-  RETURN_IF_ERROR(CreateDictionaryDecoder(dict_values, data_size, &dict_decoder));
+  RETURN_IF_ERROR(CreateDictionaryDecoder(
+      dict_values, current_page_header_.uncompressed_page_size, &dict_decoder));
   if (dict_header != nullptr &&
       dict_header->num_values != dict_decoder->num_entries()) {
     return Status(TErrorCode::PARQUET_CORRUPT_DICTIONARY, filename(),
