@@ -242,7 +242,7 @@ PLAN-ROOT SINK
    stats-rows=150000 extrapolated-rows=disabled
    table stats: rows=150000 size=292.35MB
    columns missing stats: c_orders
-   parquet statistics predicates: c_custkey < 10
+   parquet statistics predicates: c_custkey < 10, o_orderkey < 5, l_linenumber < 3
    parquet dictionary predicates: c_custkey < 10
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=254B cardinality=15000
@@ -302,7 +302,7 @@ Per-Host Resources: mem-estimate=264.00MB mem-reservation=0B
    stats-rows=150000 extrapolated-rows=disabled
    table stats: rows=150000 size=292.35MB
    columns missing stats: c_orders
-   parquet statistics predicates: c_custkey < 10
+   parquet statistics predicates: c_custkey < 10, o_orderkey < 5, l_linenumber < 3
    parquet dictionary predicates: c_custkey < 10
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=254B cardinality=15000
@@ -353,6 +353,7 @@ PLAN-ROOT SINK
    stats-rows=150000 extrapolated-rows=disabled
    table stats: rows=150000 size=292.35MB
    columns missing stats: c_orders, c_orders
+   parquet statistics predicates: o1.o_orderkey < 5
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=270B cardinality=150000
 ---- PARALLELPLANS
@@ -403,6 +404,7 @@ Per-Host Resources: mem-estimate=269.81MB mem-reservation=5.81MB
    stats-rows=150000 extrapolated-rows=disabled
    table stats: rows=150000 size=292.35MB
    columns missing stats: c_orders, c_orders
+   parquet statistics predicates: o1.o_orderkey < 5
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=270B cardinality=150000
 ====

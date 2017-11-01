@@ -80,9 +80,6 @@ class TestNestedTypes(ImpalaTestSuite):
 
   def test_parquet_stats(self, vector):
     """Queries that test evaluation of Parquet row group statistics."""
-    # The test makes assumptions about the number of row groups that are processed and
-    # skipped inside a fragment, so we ensure that the tests run in a single fragment.
-    vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/nested-types-parquet-stats', vector)
 
   @SkipIfIsilon.hive

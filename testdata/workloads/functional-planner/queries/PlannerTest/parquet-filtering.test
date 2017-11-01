@@ -88,3 +88,278 @@ PLAN-ROOT SINK
    mem-estimate=48.00MB mem-reservation=0B
    tuple-ids=0 row-size=24B cardinality=unavailable
 ====
+# Test collection types where all collections on the path are required (inner
+# join descent). Expect the scan node to include !empty checks for both collections and
+# the min-max filtering for the leaf predicate.
+select id from functional_parquet.complextypestbl c, c.nested_struct.c.d cn, cn.item a
+where a.item.e < -10;
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+01:SUBPLAN
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=2,1,0 row-size=44B cardinality=unavailable
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |  mem-estimate=24B mem-reservation=0B
+|  |  tuple-ids=2,1,0 row-size=44B cardinality=100
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     parent-subplan=01
+|  |     mem-estimate=0B mem-reservation=0B
+|  |     tuple-ids=0 row-size=24B cardinality=1
+|  |
+|  04:SUBPLAN
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=2,1 row-size=20B cardinality=100
+|  |
+|  |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |  mem-estimate=16B mem-reservation=0B
+|  |  |  tuple-ids=2,1 row-size=20B cardinality=10
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |     parent-subplan=04
+|  |  |     mem-estimate=0B mem-reservation=0B
+|  |  |     tuple-ids=1 row-size=16B cardinality=1
+|  |  |
+|  |  06:UNNEST [cn.item a]
+|  |     parent-subplan=04
+|  |     mem-estimate=0B mem-reservation=0B
+|  |     tuple-ids=2 row-size=0B cardinality=10
+|  |
+|  03:UNNEST [c.nested_struct.c.d cn]
+|     parent-subplan=01
+|     mem-estimate=0B mem-reservation=0B
+|     tuple-ids=1 row-size=0B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypestbl c]
+   partitions=1/1 files=2 size=6.92KB
+   predicates: !empty(c.nested_struct.c.d)
+   predicates on cn: !empty(cn.item)
+   predicates on a: a.item.e < -10
+   stats-rows=unavailable extrapolated-rows=disabled
+   table stats: rows=unavailable size=6.92KB
+   columns missing stats: id
+   parquet statistics predicates: a.item.e < -10
+   mem-estimate=32.00MB mem-reservation=0B
+   tuple-ids=0 row-size=24B cardinality=unavailable
+====
+# Test collection types where the lower collection in the path is optional
+# (outer join descent) and the upper is required (inner join descent).
+# Expect the scan node to include !empty test for the root, but no min-max
+# filter for the leaf (since it does not have a !empty check).
+select id from functional_parquet.complextypestbl c, c.nested_struct.c.d cn
+left outer join cn.item a
+where a.item.e < -10;
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+01:SUBPLAN
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=2N,1,0 row-size=44B cardinality=unavailable
+|
+|--08:SUBPLAN
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=2N,1,0 row-size=44B cardinality=10
+|  |
+|  |--06:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  |  predicates: a.item.e < -10
+|  |  |  mem-estimate=40B mem-reservation=0B
+|  |  |  tuple-ids=2N,1,0 row-size=44B cardinality=1
+|  |  |
+|  |  |--04:SINGULAR ROW SRC
+|  |  |     parent-subplan=08
+|  |  |     mem-estimate=0B mem-reservation=0B
+|  |  |     tuple-ids=1,0 row-size=40B cardinality=1
+|  |  |
+|  |  05:UNNEST [cn.item a]
+|  |     parent-subplan=08
+|  |     mem-estimate=0B mem-reservation=0B
+|  |     tuple-ids=2 row-size=0B cardinality=10
+|  |
+|  07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  mem-estimate=24B mem-reservation=0B
+|  |  tuple-ids=1,0 row-size=40B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     parent-subplan=01
+|  |     mem-estimate=0B mem-reservation=0B
+|  |     tuple-ids=0 row-size=24B cardinality=1
+|  |
+|  03:UNNEST [c.nested_struct.c.d cn]
+|     parent-subplan=01
+|     mem-estimate=0B mem-reservation=0B
+|     tuple-ids=1 row-size=0B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypestbl c]
+   partitions=1/1 files=2 size=6.92KB
+   predicates: !empty(c.nested_struct.c.d)
+   predicates on a: a.item.e < -10
+   stats-rows=unavailable extrapolated-rows=disabled
+   table stats: rows=unavailable size=6.92KB
+   columns missing stats: id
+   mem-estimate=32.00MB mem-reservation=0B
+   tuple-ids=0 row-size=24B cardinality=unavailable
+====
+# Tests collection types where the outer is optional (outer join descent)
+# and the inner is required (inner join descent). In this case, !empty is
+# not pushed for either collection, so there is no min-max pruning either.
+select id from functional_parquet.complextypestbl c
+left outer join c.nested_struct.c.d cn, cn.item a where a.item.e < -10;
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+01:SUBPLAN
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=2,1N,0 row-size=44B cardinality=unavailable
+|
+|--08:SUBPLAN
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=2,1N,0 row-size=44B cardinality=10
+|  |
+|  |--06:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |  mem-estimate=40B mem-reservation=0B
+|  |  |  tuple-ids=2,1N,0 row-size=44B cardinality=10
+|  |  |
+|  |  |--04:SINGULAR ROW SRC
+|  |  |     parent-subplan=08
+|  |  |     mem-estimate=0B mem-reservation=0B
+|  |  |     tuple-ids=1N,0 row-size=40B cardinality=1
+|  |  |
+|  |  05:UNNEST [cn.item a]
+|  |     parent-subplan=08
+|  |     mem-estimate=0B mem-reservation=0B
+|  |     tuple-ids=2 row-size=0B cardinality=10
+|  |
+|  07:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  mem-estimate=24B mem-reservation=0B
+|  |  tuple-ids=1N,0 row-size=40B cardinality=1
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     parent-subplan=01
+|  |     mem-estimate=0B mem-reservation=0B
+|  |     tuple-ids=0 row-size=24B cardinality=1
+|  |
+|  03:UNNEST [c.nested_struct.c.d cn]
+|     parent-subplan=01
+|     mem-estimate=0B mem-reservation=0B
+|     tuple-ids=1 row-size=0B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypestbl c]
+   partitions=1/1 files=2 size=6.92KB
+   predicates on a: a.item.e < -10
+   stats-rows=unavailable extrapolated-rows=disabled
+   table stats: rows=unavailable size=6.92KB
+   columns missing stats: id
+   mem-estimate=32.00MB mem-reservation=0B
+   tuple-ids=0 row-size=24B cardinality=unavailable
+====
+# Test collections so that each level has a filter applied.
+select c_custkey from tpch_nested_parquet.customer c, c.c_orders o,
+o.o_lineitems l where c_custkey > 0 and o.o_orderkey > 0 and l.l_partkey > 0;
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=176.00MB mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+01:SUBPLAN
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=2,1,0 row-size=56B cardinality=1500000
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |  mem-estimate=24B mem-reservation=0B
+|  |  tuple-ids=2,1,0 row-size=56B cardinality=100
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     parent-subplan=01
+|  |     mem-estimate=0B mem-reservation=0B
+|  |     tuple-ids=0 row-size=24B cardinality=1
+|  |
+|  04:SUBPLAN
+|  |  mem-estimate=0B mem-reservation=0B
+|  |  tuple-ids=2,1 row-size=32B cardinality=100
+|  |
+|  |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |  mem-estimate=24B mem-reservation=0B
+|  |  |  tuple-ids=2,1 row-size=32B cardinality=10
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |     parent-subplan=04
+|  |  |     mem-estimate=0B mem-reservation=0B
+|  |  |     tuple-ids=1 row-size=24B cardinality=1
+|  |  |
+|  |  06:UNNEST [o.o_lineitems l]
+|  |     parent-subplan=04
+|  |     mem-estimate=0B mem-reservation=0B
+|  |     tuple-ids=2 row-size=0B cardinality=10
+|  |
+|  03:UNNEST [c.c_orders o]
+|     parent-subplan=01
+|     mem-estimate=0B mem-reservation=0B
+|     tuple-ids=1 row-size=0B cardinality=10
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=292.36MB
+   predicates: c_custkey > 0, !empty(c.c_orders)
+   predicates on o: !empty(o.o_lineitems), o.o_orderkey > 0
+   predicates on l: l.l_partkey > 0
+   stats-rows=150000 extrapolated-rows=disabled
+   table stats: rows=150000 size=292.36MB
+   columns missing stats: c_orders
+   parquet statistics predicates: c_custkey > 0, o.o_orderkey > 0, l.l_partkey > 0
+   parquet dictionary predicates: c_custkey > 0
+   mem-estimate=176.00MB mem-reservation=0B
+   tuple-ids=0 row-size=24B cardinality=15000
+====
+# Test collections in a way that would incorrectly apply a min-max
+# filter at the scan. Expect no min-max filter and no !empty tests.
+select count(*) from functional_parquet.complextypestbl c left outer join
+(select * from c.int_array where item > 10) v;
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=26.00MB mem-reservation=0B
+PLAN-ROOT SINK
+|  mem-estimate=0B mem-reservation=0B
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB
+|  tuple-ids=3 row-size=8B cardinality=1
+|
+01:SUBPLAN
+|  mem-estimate=0B mem-reservation=0B
+|  tuple-ids=1N,0 row-size=20B cardinality=unavailable
+|
+|--04:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  mem-estimate=16B mem-reservation=0B
+|  |  tuple-ids=1N,0 row-size=20B cardinality=1
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     parent-subplan=01
+|  |     mem-estimate=0B mem-reservation=0B
+|  |     tuple-ids=0 row-size=16B cardinality=1
+|  |
+|  03:UNNEST [c.int_array]
+|     parent-subplan=01
+|     mem-estimate=0B mem-reservation=0B
+|     tuple-ids=1 row-size=4B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypestbl c]
+   partitions=1/1 files=2 size=6.92KB
+   predicates on int_array: item > 10
+   stats-rows=unavailable extrapolated-rows=disabled
+   table stats: rows=unavailable size=6.92KB
+   column stats: unavailable
+   mem-estimate=16.00MB mem-reservation=0B
+   tuple-ids=0 row-size=16B cardinality=unavailable
+====

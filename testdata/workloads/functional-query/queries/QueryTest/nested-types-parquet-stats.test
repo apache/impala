@@ -5,8 +5,8 @@ select count(*) from functional_parquet.complextypestbl where id < 1
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 2 .*
-row_regex: .*NumStatsFilteredRowGroups: 2 .*
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 2
 ====
 ---- QUERY
 # Filter root-level scalar column in file with nested types.
@@ -15,16 +15,290 @@ from   functional_parquet.complextypestbl, complextypestbl.int_array
 where  id < 0;
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 2 .*
-row_regex: .*NumStatsFilteredRowGroups: 2 .*
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 2
 ====
 ---- QUERY
-# Nested columns do not support stats based filtering.
+# Row-group skipping based on min-max stats for collection types.
+# Cases tested:
+# - collection required vs. not required (use outer joins)
+# - collection type: array, map, struct
+#
+# Array collection.
 select id, int_array.item
 from   functional_parquet.complextypestbl, functional_parquet.complextypestbl.int_array
 where  int_array.item < -1;
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*NumRowGroups: 2 .*
-row_regex: .*NumStatsFilteredRowGroups: 0 .*
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 2
+====
+---- QUERY
+# Map collection
+select id, int_map.key
+from   functional_parquet.complextypestbl, functional_parquet.complextypestbl.int_map
+where  int_map.value < -1;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 2
+====
+---- QUERY
+# Multiple nesting, all filtered
+select id from functional_parquet.complextypestbl c, c.int_array_array cn, cn.item bottom
+where bottom.item < -2;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 2
+====
+---- QUERY
+# Multiple nesting, some filtered. Expect some groups filtered, not all. < filter.
+select id from functional_parquet.complextypestbl c, c.int_array_array cn, cn.item bottom
+where bottom.item < -1;
+---- RESULTS
+8
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+# Multiple nesting, some filtered. Expect some groups filtered, not all. = filter.
+select id from functional_parquet.complextypestbl c, c.int_array_array cn, cn.item bottom
+where bottom.item = -2;
+---- RESULTS
+8
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+# Multiple nesting, some filtered. Expect some groups filtered, not all. IN filter.
+select id from functional_parquet.complextypestbl c, c.int_array_array cn, cn.item bottom
+where bottom.item in (5,6);
+---- RESULTS
+7
+7
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+# Multiple nesting, some filtered. Expect some groups filtered, not all. complex filter.
+select id from functional_parquet.complextypestbl c, c.int_array_array cn, cn.item bottom
+where bottom.item > -2 and bottom.item in (-2, -1);
+---- RESULTS
+8
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+# Multiple nesting, some filtered. Expect some groups filtered, not all. complex filter.
+select distinct id from functional_parquet.complextypestbl c, c.int_array_array cn, cn.item bottom
+where bottom.item > 2 and bottom.item not in (4,5,6);
+---- RESULTS
+1
+2
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+# Multiple nesting, mixed collection type
+select id from functional_parquet.complextypestbl c, c.int_map_array cn, cn.item m
+where m.value < -2;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 2
+====
+---- QUERY
+# Scalar in struct
+select id from functional_parquet.complextypestbl c where c.nested_struct.a < -10;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 2
+====
+---- QUERY
+# Collection in struct
+select id from functional_parquet.complextypestbl c, c.nested_struct.b a
+where a.item < -1;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 2
+====
+---- QUERY
+# Collection in struct
+select id from functional_parquet.complextypestbl c, c.nested_struct.b a
+where -1 > a.item;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 2
+====
+---- QUERY
+# Deeply nested collection, all required.
+select id from functional_parquet.complextypestbl c, c.nested_struct.c.d cn, cn.item a
+where a.item.e < -10;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 2
+====
+---- QUERY
+# Deeply nested collection, top required, bottom not required.
+# TODO: with more aggressive pruning, this should skip groups as well.
+#       see the false pruning example below for a case that needs the
+#       more restrictive !empty guard. See org.apache.impala.planner.HdfsScanNode
+#       for more details on when/why !empty guards are inserted during analysis.
+select id from functional_parquet.complextypestbl c, c.nested_struct.c.d cn
+left outer join cn.item a
+where a.item.e < -10;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+====
+---- QUERY
+# Deeply nested collection, top not required, bottom required (no !empty guard)
+select id from functional_parquet.complextypestbl c
+left outer join c.nested_struct.c.d cn, cn.item a where a.item.e < -10;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+====
+---- QUERY
+# Multiple collections, all required.
+select id from functional_parquet.complextypestbl c, c.nested_struct.c.d a, a.item aa,
+c.nested_struct.g.value.h.i b where aa.e < -10;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 2
+====
+---- QUERY
+# Multiple collections, all required just on filtering path.
+select id from functional_parquet.complextypestbl c, c.nested_struct.c.d a,
+a.item aa left outer join c.nested_struct.g.value.h.i b where aa.e < -10;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 2
+====
+---- QUERY
+# Multiple collections, not required on filtering path.
+select id from functional_parquet.complextypestbl c, c.nested_struct.c.d a
+left outer join a.item aa, c.nested_struct.g.value.h.i b where aa.e < -10;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+====
+---- QUERY
+# False pruning example. There is one table that's scanned (complextypestbl).
+# As a result, there is one scan. The predicate on the complex type is pushed
+# down to the scan, but the field is not required. If we erronenously prune,
+# nothing will be returned instead of the expected left-outer-join result.
+select count(*) from functional_parquet.complextypestbl c left outer join
+(select * from c.int_array where item > 10) v;
+---- RESULTS
+8
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+====
+---- QUERY
+# Similar, but filter is not selective, so the outer nested type is repeated for
+# several tuples. Again, no pruning is expected.
+select count(*) from functional_parquet.complextypestbl c left outer join
+(select * from c.int_array where item > -10) v;
+---- RESULTS
+12
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+====
+---- QUERY
+#
+# Min-max collection filtering for tpch data.
+#
+# Array, single level, struct type:
+select c.c_custkey from tpch_nested_parquet.customer c, c.c_orders o
+where o.o_orderkey < 0;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
+====
+---- QUERY
+# Array, multi-level, all required.
+select c.c_custkey from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems l
+where l.l_partkey < 0;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
+====
+---- QUERY
+# Array, single level, optional
+select c.c_custkey from tpch_nested_parquet.customer c left outer join c.c_orders o
+where o.o_orderkey < 0;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+====
+---- QUERY
+# Array, multi-level, all optional
+select c.c_custkey from tpch_nested_parquet.customer c left outer join c.c_orders o
+left outer join o.o_lineitems l where l.l_partkey < 0;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+====
+---- QUERY
+# Array, multi-level, optional top
+select c.c_custkey from tpch_nested_parquet.customer c left outer join c.c_orders o,
+o.o_lineitems l where l.l_partkey < 0;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+====
+---- QUERY
+# Array, multi-level, optional bottom, filter bottom
+select c.c_custkey from tpch_nested_parquet.customer c, c.c_orders o left outer join
+o.o_lineitems l where l.l_partkey < 0;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+====
+---- QUERY
+# Array, multi-level, optional bottom, filter top
+select c.c_custkey from tpch_nested_parquet.customer c, c.c_orders o left outer join
+o.o_lineitems l where o.o_orderkey < 0;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 4
 ====

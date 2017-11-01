@@ -188,7 +188,7 @@ class BoolColumnReader;
 ///   0), but we don't distinguish between these two cases yet.
 ///   TODO: fix this (IMPALA-2272)
 ///
-///   The column readers that materialize this structure form a tree analagous to the
+///   The column readers that materialize this structure form a tree analogous to the
 ///   materialized output:
 ///     CollectionColumnReader slot_id=0 node="repeated group list (d=2 r=1)"
 ///       CollectionColumnReader slot_id=1 node="repeated group list (d=4 r=2)"

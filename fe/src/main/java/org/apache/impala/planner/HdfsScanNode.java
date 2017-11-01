@@ -37,6 +37,7 @@ import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.FunctionParams;
 import org.apache.impala.analysis.InPredicate;
+import org.apache.impala.analysis.IsNotEmptyPredicate;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.SlotDescriptor;
@@ -172,6 +173,10 @@ public class HdfsScanNode extends ScanNode {
   // tuple. Uses a linked hash map for consistent display in explain.
   private final Map<TupleDescriptor, List<Expr>> collectionConjuncts_ =
       Maps.newLinkedHashMap();
+
+  // TupleDescriptors of collection slots that have an IsNotEmptyPredicate. See
+  // SelectStmt#registerIsNotEmptyPredicates.
+  private final Set<TupleDescriptor> notEmptyCollections_ = Sets.newHashSet();
 
   // Map from SlotIds to indices in PlanNodes.conjuncts_ that are eligible for
   // dictionary filtering
@@ -398,6 +403,7 @@ public class HdfsScanNode extends ScanNode {
    */
   private void assignCollectionConjuncts(Analyzer analyzer) {
     collectionConjuncts_.clear();
+    addNotEmptyCollections(conjuncts_);
     assignCollectionConjuncts(desc_, analyzer);
   }
 
@@ -426,13 +432,13 @@ public class HdfsScanNode extends ScanNode {
     // We only support slot refs on the left hand side of the predicate, a rewriting
     // rule makes sure that all compatible exprs are rewritten into this form. Only
     // implicit casts are supported.
-    SlotRef slot = binaryPred.getChild(0).unwrapSlotRef(true);
-    if (slot == null) return;
+    SlotRef slotRef = binaryPred.getChild(0).unwrapSlotRef(true);
+    if (slotRef == null) return;
 
     // This node is a table scan, so this must be a scanning slot.
-    Preconditions.checkState(slot.getDesc().isScanSlot());
-    // If the column is null, then this can be a 'pos' scanning slot of a nested type.
-    if (slot.getDesc().getColumn() == null) return;
+    Preconditions.checkState(slotRef.getDesc().isScanSlot());
+    // Skip the slot ref if it refers to an array's "pos" field.
+    if (slotRef.isArrayPosRef()) return;
 
     Expr constExpr = binaryPred.getChild(1);
     // Only constant exprs can be evaluated against parquet::Statistics. This includes
@@ -444,24 +450,23 @@ public class HdfsScanNode extends ScanNode {
     if (op == BinaryPredicate.Operator.LT || op == BinaryPredicate.Operator.LE ||
         op == BinaryPredicate.Operator.GE || op == BinaryPredicate.Operator.GT) {
       minMaxOriginalConjuncts_.add(binaryPred);
-      buildStatsPredicate(analyzer, slot, binaryPred, op);
+      buildStatsPredicate(analyzer, slotRef, binaryPred, op);
     } else if (op == BinaryPredicate.Operator.EQ) {
       minMaxOriginalConjuncts_.add(binaryPred);
       // TODO: this could be optimized for boolean columns.
-      buildStatsPredicate(analyzer, slot, binaryPred, BinaryPredicate.Operator.LE);
-      buildStatsPredicate(analyzer, slot, binaryPred, BinaryPredicate.Operator.GE);
+      buildStatsPredicate(analyzer, slotRef, binaryPred, BinaryPredicate.Operator.LE);
+      buildStatsPredicate(analyzer, slotRef, binaryPred, BinaryPredicate.Operator.GE);
     }
   }
 
   private void tryComputeInListMinMaxPredicate(Analyzer analyzer, InPredicate inPred) {
-    // Retrieve the left side of the IN predicate. It must be a simple slot to
-    // proceed.
-    SlotRef slot = inPred.getBoundSlot();
-    if (slot == null) return;
+    // Retrieve the left side of the IN predicate. It must be a simple slot to proceed.
+    SlotRef slotRef = inPred.getBoundSlot();
+    if (slotRef == null) return;
     // This node is a table scan, so this must be a scanning slot.
-    Preconditions.checkState(slot.getDesc().isScanSlot());
-    // If the column is null, then this can be a 'pos' scanning slot of a nested type.
-    if (slot.getDesc().getColumn() == null) return;
+    Preconditions.checkState(slotRef.getDesc().isScanSlot());
+    // Skip the slot ref if it refers to an array's "pos" field.
+    if (slotRef.isArrayPosRef()) return;
     if (inPred.isNotIn()) return;
 
     ArrayList<Expr> children = inPred.getChildren();
@@ -488,8 +493,30 @@ public class HdfsScanNode extends ScanNode {
         children.get(0).clone(), max.clone());
 
     minMaxOriginalConjuncts_.add(inPred);
-    buildStatsPredicate(analyzer, slot, minBound, minBound.getOp());
-    buildStatsPredicate(analyzer, slot, maxBound, maxBound.getOp());
+    buildStatsPredicate(analyzer, slotRef, minBound, minBound.getOp());
+    buildStatsPredicate(analyzer, slotRef, maxBound, maxBound.getOp());
+  }
+
+  private void tryComputeMinMaxPredicate(Analyzer analyzer, Expr pred) {
+    if (pred instanceof BinaryPredicate) {
+      tryComputeBinaryMinMaxPredicate(analyzer, (BinaryPredicate) pred);
+    } else if (pred instanceof InPredicate) {
+      tryComputeInListMinMaxPredicate(analyzer, (InPredicate) pred);
+    }
+  }
+
+  /**
+   * Populates notEmptyCollections_ based on IsNotEmptyPredicates in the given conjuncts.
+   */
+  private void addNotEmptyCollections(List<Expr> conjuncts) {
+    for (Expr expr : conjuncts) {
+      if (expr instanceof IsNotEmptyPredicate) {
+        SlotRef ref = (SlotRef)((IsNotEmptyPredicate)expr).getChild(0);
+        Preconditions.checkState(ref.getDesc().getType().isComplexType());
+        Preconditions.checkState(ref.getDesc().getItemTupleDesc() != null);
+        notEmptyCollections_.add(ref.getDesc().getItemTupleDesc());
+      }
+    }
   }
 
   /**
@@ -505,11 +532,17 @@ public class HdfsScanNode extends ScanNode {
     minMaxTuple_ = descTbl.createTupleDescriptor(tupleName);
     minMaxTuple_.setPath(desc_.getPath());
 
-    for (Expr pred: conjuncts_) {
-      if (pred instanceof BinaryPredicate) {
-        tryComputeBinaryMinMaxPredicate(analyzer, (BinaryPredicate) pred);
-      } else if (pred instanceof InPredicate) {
-        tryComputeInListMinMaxPredicate(analyzer, (InPredicate) pred);
+    // Adds predicates for scalar, top-level columns.
+    for (Expr pred: conjuncts_) tryComputeMinMaxPredicate(analyzer, pred);
+
+    // Adds predicates for collections.
+    for (Map.Entry<TupleDescriptor, List<Expr>> entry: collectionConjuncts_.entrySet()) {
+      // Adds only predicates for collections that are filtered by an IsNotEmptyPredicate.
+      // It is assumed that analysis adds these filters such that they are correct, but
+      // potentially conservative. See the tests for examples that could benefit from
+      // being more aggressive (yet still correct).
+      if (notEmptyCollections_.contains(entry.getKey())) {
+        for (Expr pred: entry.getValue()) tryComputeMinMaxPredicate(analyzer, pred);
       }
     }
     minMaxTuple_.computeMemLayout();
@@ -517,7 +550,7 @@ public class HdfsScanNode extends ScanNode {
 
   /**
    * Recursively collects and assigns conjuncts bound by tuples materialized in a
-   * collection-typed slot.
+   * collection-typed slot. As conjuncts are seen, collect non-empty nested collections.
    *
    * Limitation: Conjuncts that must first be migrated into inline views and that cannot
    * be captured by slot binding will not be assigned here, but in an UnnestNode.
@@ -525,7 +558,7 @@ public class HdfsScanNode extends ScanNode {
    * non-SlotRef exprs in the inline-view's select list. We only capture value transfers
    * between slots, and not between arbitrary exprs.
    *
-   * TODO for 2.3: The logic for gathering conjuncts and deciding which ones should be
+   * TODO: The logic for gathering conjuncts and deciding which ones should be
    * marked as assigned needs to be clarified and consolidated in one place. The code
    * below is rather different from the code for assigning the top-level conjuncts in
    * init() although the performed tasks is conceptually identical. Refactoring the
@@ -560,6 +593,7 @@ public class HdfsScanNode extends ScanNode {
       if (!collectionConjuncts.isEmpty()) {
         analyzer.materializeSlots(collectionConjuncts);
         collectionConjuncts_.put(itemTupleDesc, collectionConjuncts);
+        addNotEmptyCollections(collectionConjuncts);
       }
       // Recursively look for collection-typed slots in nested tuple descriptors.
       assignCollectionConjuncts(itemTupleDesc, analyzer);

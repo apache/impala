@@ -291,6 +291,14 @@ public class SelectStmt extends QueryStmt {
    * - collection table ref represents the rhs of an inner/cross/semi join
    * - collection table ref's parent tuple is not outer joined
    *
+   * Example: table T has field A which is of type array<array<int>>.
+   * 1) ... T join T.A a join a.item a_nest ... : all nodes on the path T -> a -> a_nest
+   *                                              are required so are checked for !empty.
+   * 2) ... T left outer join T.A a join a.item a_nest ... : no !empty.
+   * 3) ... T join T.A a left outer join a.item a_nest ... : a checked for !empty.
+   * 4) ... T left outer join T.A a left outer join a.item a_nest ... : no !empty.
+   *
+   *
    * TODO: In some cases, it is possible to generate !empty() predicates for a correlated
    * table ref, but in general, that is not correct for non-trivial query blocks.
    * For example, if the block with the correlated ref has an aggregation then adding a
