@@ -162,7 +162,7 @@ class StatestoreSubscriber {
   /// registration_id_ will change after Register() is called again. This allows the
   /// subscriber to reject communication from the statestore that pertains to a previous
   /// registration.
-  TUniqueId registration_id_;
+  RegistrationId registration_id_;
 
   struct Callbacks {
     /// Owned by the MetricGroup instance. Tracks how long callbacks took to process this
@@ -250,11 +250,11 @@ class StatestoreSubscriber {
   /// update was being processed, or if the subscriber currently believes it is
   /// recovering). Doing so indicates that no topics were updated during this call.
   Status UpdateState(const TopicDeltaMap& incoming_topic_deltas,
-      const TUniqueId& registration_id,
+      const RegistrationId& registration_id,
       std::vector<TTopicDelta>* subscriber_topic_updates, bool* skipped);
 
   /// Called when the statestore sends a heartbeat message. Updates the failure detector.
-  void Heartbeat(const TUniqueId& registration_id);
+  void Heartbeat(const RegistrationId& registration_id);
 
   /// Run in a separate thread. In a loop, check failure_detector_ to see if the statestore
   /// is still sending heartbeat messages. If not, enter 'recovery mode' where a
@@ -274,7 +274,7 @@ class StatestoreSubscriber {
   /// Returns OK if registration_id == registration_id_, or if registration_id_ is not yet
   /// set, an error otherwise. Used to confirm that RPCs from the statestore are intended
   /// for the current registration epoch.
-  Status CheckRegistrationId(const TUniqueId& registration_id);
+  Status CheckRegistrationId(const RegistrationId& registration_id);
 };
 
 }

@@ -110,7 +110,7 @@ class StatestoreThriftIf : public StatestoreServiceIf {
 
   virtual void RegisterSubscriber(TRegisterSubscriberResponse& response,
       const TRegisterSubscriberRequest& params) {
-    TUniqueId registration_id;
+    RegistrationId registration_id;
     Status status = statestore_->RegisterSubscriber(params.subscriber_id,
         params.subscriber_location, params.topic_registrations, &registration_id);
     status.ToThrift(&response.status);
@@ -175,7 +175,7 @@ void Statestore::Topic::DeleteIfVersionsMatch(TopicEntry::Version version,
 }
 
 Statestore::Subscriber::Subscriber(const SubscriberId& subscriber_id,
-    const TUniqueId& registration_id, const TNetworkAddress& network_address,
+    const RegistrationId& registration_id, const TNetworkAddress& network_address,
     const vector<TTopicRegistration>& subscribed_topics)
     : subscriber_id_(subscriber_id),
       registration_id_(registration_id),
@@ -288,7 +288,8 @@ void Statestore::TopicsHandler(const Webserver::ArgumentMap& args,
     topic_json.AddMember("num_entries",
         static_cast<uint64_t>(topic.second.entries().size()),
         document->GetAllocator());
-    topic_json.AddMember("version", topic.second.last_version(), document->GetAllocator());
+    topic_json.AddMember(
+        "version", topic.second.last_version(), document->GetAllocator());
 
     SubscriberId oldest_subscriber_id;
     TopicEntry::Version oldest_subscriber_version =
@@ -353,7 +354,7 @@ Status Statestore::OfferUpdate(const ScheduledSubscriberUpdate& update,
     stringstream ss;
     ss << "Maximum subscriber limit reached: " << STATESTORE_MAX_SUBSCRIBERS;
     lock_guard<mutex> l(subscribers_lock_);
-    SubscriberMap::iterator subscriber_it = subscribers_.find(update.second);
+    SubscriberMap::iterator subscriber_it = subscribers_.find(update.subscriber_id);
     DCHECK(subscriber_it != subscribers_.end());
     subscribers_.erase(subscriber_it);
     LOG(ERROR) << ss.str();
@@ -365,7 +366,8 @@ Status Statestore::OfferUpdate(const ScheduledSubscriberUpdate& update,
 
 Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
     const TNetworkAddress& location,
-    const vector<TTopicRegistration>& topic_registrations, TUniqueId* registration_id) {
+    const vector<TTopicRegistration>& topic_registrations,
+    RegistrationId* registration_id) {
   if (subscriber_id.empty()) return Status("Subscriber ID cannot be empty string");
 
   // Create any new topics first, so that when the subscriber is first sent a topic update
@@ -401,13 +403,24 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
   }
 
   // Add the subscriber to the update queue, with an immediate schedule.
-  ScheduledSubscriberUpdate update = make_pair(0, subscriber_id);
+  ScheduledSubscriberUpdate update(0, subscriber_id, *registration_id);
   RETURN_IF_ERROR(OfferUpdate(update, &subscriber_topic_update_threadpool_));
   RETURN_IF_ERROR(OfferUpdate(update, &subscriber_heartbeat_threadpool_));
 
   LOG(INFO) << "Subscriber '" << subscriber_id << "' registered (registration id: "
             << PrintId(*registration_id) << ")";
   return Status::OK();
+}
+
+bool Statestore::FindSubscriber(const SubscriberId& subscriber_id,
+    const RegistrationId& registration_id, shared_ptr<Subscriber>* subscriber) {
+  DCHECK(subscriber != nullptr);
+  lock_guard<mutex> l(subscribers_lock_);
+  SubscriberMap::iterator it = subscribers_.find(subscriber_id);
+  if (it == subscribers_.end() ||
+      it->second->registration_id() != registration_id) return false;
+  *subscriber = it->second;
+  return true;
 }
 
 Status Statestore::SendTopicUpdate(Subscriber* subscriber, bool* update_skipped) {
@@ -614,7 +627,13 @@ Status Statestore::SendHeartbeat(Subscriber* subscriber) {
 
 void Statestore::DoSubscriberUpdate(bool is_heartbeat, int thread_id,
     const ScheduledSubscriberUpdate& update) {
-  int64_t update_deadline = update.first;
+  int64_t update_deadline = update.deadline;
+  shared_ptr<Subscriber> subscriber;
+  // Check if the subscriber has re-registered, in which case we can ignore
+  // this scheduled update.
+  if (!FindSubscriber(update.subscriber_id, update.registration_id, &subscriber)) {
+    return;
+  }
   const string hb_type = is_heartbeat ? "heartbeat" : "topic update";
   if (update_deadline != 0) {
     // Wait until deadline.
@@ -623,9 +642,15 @@ void Statestore::DoSubscriberUpdate(bool is_heartbeat, int thread_id,
       SleepForMs(diff_ms);
       diff_ms = update_deadline - UnixMillis();
     }
+    // The subscriber can potentially reconnect by the time this thread wakes
+    // up. In such case, we can ignore this update.
+    if (UNLIKELY(!FindSubscriber(
+        subscriber->id(), subscriber->registration_id(), &subscriber))) {
+      return;
+    }
     diff_ms = std::abs(diff_ms);
-    VLOG(3) << "Sending " << hb_type << " message to: " << update.second
-            << " (deadline accuracy: " << diff_ms << "ms)";
+    VLOG(3) << "Sending " << hb_type << " message to: " << update.subscriber_id
+        << " (deadline accuracy: " << diff_ms << "ms)";
 
     if (diff_ms > DEADLINE_MISS_THRESHOLD_MS && is_heartbeat) {
       const string& msg = Substitute(
@@ -633,7 +658,8 @@ void Statestore::DoSubscriberUpdate(bool is_heartbeat, int thread_id,
           "consider increasing --statestore_heartbeat_frequency_ms (currently $3) on "
           "this Statestore, and --statestore_subscriber_timeout_seconds "
           "on subscribers (Impala daemons and the Catalog Server)",
-          update.second, hb_type, diff_ms, FLAGS_statestore_heartbeat_frequency_ms);
+          update.subscriber_id, hb_type, diff_ms,
+          FLAGS_statestore_heartbeat_frequency_ms);
       LOG(WARNING) << msg;
     }
     // Don't warn for topic updates - they can be slow and still correct. Recommending an
@@ -643,15 +669,9 @@ void Statestore::DoSubscriberUpdate(bool is_heartbeat, int thread_id,
   } else {
     // The first update is scheduled immediately and has a deadline of 0. There's no need
     // to wait.
-    VLOG(3) << "Initial " << hb_type << " message for: " << update.second;
+    VLOG(3) << "Initial " << hb_type << " message for: " << update.subscriber_id;
   }
-  shared_ptr<Subscriber> subscriber;
-  {
-    lock_guard<mutex> l(subscribers_lock_);
-    SubscriberMap::iterator it = subscribers_.find(update.second);
-    if (it == subscribers_.end()) return;
-    subscriber = it->second;
-  }
+
   // Send the right message type, and compute the next deadline
   int64_t deadline_ms = 0;
   Status status;
@@ -686,31 +706,32 @@ void Statestore::DoSubscriberUpdate(bool is_heartbeat, int thread_id,
     lock_guard<mutex> l(subscribers_lock_);
     // Check again if this registration has been removed while we were processing the
     // message.
-    SubscriberMap::iterator it = subscribers_.find(update.second);
-    if (it == subscribers_.end()) return;
+    SubscriberMap::iterator it = subscribers_.find(update.subscriber_id);
+    if (it == subscribers_.end() ||
+        it->second->registration_id() != update.registration_id) return;
     if (!status.ok()) {
       LOG(INFO) << "Unable to send " << hb_type << " message to subscriber "
-                << update.second << ", received error: " << status.GetDetail();
+                << update.subscriber_id << ", received error: " << status.GetDetail();
     }
 
-    const string& registration_id = PrintId(subscriber->registration_id());
     FailureDetector::PeerState state = is_heartbeat ?
-        failure_detector_->UpdateHeartbeat(registration_id, status.ok()) :
-        failure_detector_->GetPeerState(registration_id);
+        failure_detector_->UpdateHeartbeat(update.subscriber_id, status.ok()) :
+        failure_detector_->GetPeerState(update.subscriber_id);
 
     if (state == FailureDetector::FAILED) {
       if (is_heartbeat) {
         // TODO: Consider if a metric to track the number of failures would be useful.
         LOG(INFO) << "Subscriber '" << subscriber->id() << "' has failed, disconnected "
-                  << "or re-registered (last known registration ID: " << update.second
-                  << ")";
+                  << "or re-registered (last known registration ID: "
+                  << update.registration_id << ")";
         UnregisterSubscriber(subscriber.get());
       }
     } else {
       // Schedule the next message.
       VLOG(3) << "Next " << (is_heartbeat ? "heartbeat" : "update") << " deadline for: "
               << subscriber->id() << " is in " << deadline_ms << "ms";
-      status = OfferUpdate(make_pair(deadline_ms, subscriber->id()), is_heartbeat ?
+      status = OfferUpdate(ScheduledSubscriberUpdate(deadline_ms, subscriber->id(),
+          subscriber->registration_id()), is_heartbeat ?
           &subscriber_heartbeat_threadpool_ : &subscriber_topic_update_threadpool_);
       if (!status.ok()) {
         LOG(INFO) << "Unable to send next " << (is_heartbeat ? "heartbeat" : "update")

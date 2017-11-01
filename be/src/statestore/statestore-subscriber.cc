@@ -282,13 +282,13 @@ void StatestoreSubscriber::RecoveryModeChecker() {
   }
 }
 
-Status StatestoreSubscriber::CheckRegistrationId(const TUniqueId& registration_id) {
+Status StatestoreSubscriber::CheckRegistrationId(const RegistrationId& registration_id) {
   {
     lock_guard<mutex> r(registration_id_lock_);
     // If this subscriber has just started, the registration_id_ may not have been set
-    // despite the statestore starting to send updates. The 'unset' TUniqueId is 0:0, so
-    // we can differentiate between a) an early message from an eager statestore, and b)
-    // a message that's targeted to a previous registration.
+    // despite the statestore starting to send updates. The 'unset' RegistrationId is 0:0,
+    // so we can differentiate between a) an early message from an eager statestore, and
+    // b) a message that's targeted to a previous registration.
     if (registration_id_ != TUniqueId() && registration_id != registration_id_) {
       return Status(Substitute("Unexpected registration ID: $0, was expecting $1",
           PrintId(registration_id), PrintId(registration_id_)));
@@ -298,7 +298,7 @@ Status StatestoreSubscriber::CheckRegistrationId(const TUniqueId& registration_i
   return Status::OK();
 }
 
-void StatestoreSubscriber::Heartbeat(const TUniqueId& registration_id) {
+void StatestoreSubscriber::Heartbeat(const RegistrationId& registration_id) {
   const Status& status = CheckRegistrationId(registration_id);
   if (status.ok()) {
     heartbeat_interval_metric_->Update(
@@ -310,7 +310,7 @@ void StatestoreSubscriber::Heartbeat(const TUniqueId& registration_id) {
 }
 
 Status StatestoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_deltas,
-    const TUniqueId& registration_id, vector<TTopicDelta>* subscriber_topic_updates,
+    const RegistrationId& registration_id, vector<TTopicDelta>* subscriber_topic_updates,
     bool* skipped) {
   // We don't want to block here because this is an RPC, and delaying the return causes
   // the statestore to delay sending further messages. The only time that lock_ might be

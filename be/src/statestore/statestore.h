@@ -47,6 +47,7 @@ namespace impala {
 class Status;
 
 typedef ClientCache<StatestoreSubscriberClientWrapper> StatestoreSubscriberClientCache;
+typedef TUniqueId RegistrationId;
 
 /// The Statestore is a soft-state key-value store that maintains a set of Topics, which
 /// are maps from string keys to byte array values.
@@ -112,7 +113,7 @@ class Statestore : public CacheLineAligned {
   Status RegisterSubscriber(const SubscriberId& subscriber_id,
       const TNetworkAddress& location,
       const std::vector<TTopicRegistration>& topic_registrations,
-      TUniqueId* registration_id) WARN_UNUSED_RESULT;
+      RegistrationId* registration_id) WARN_UNUSED_RESULT;
 
   void RegisterWebpages(Webserver* webserver);
 
@@ -282,7 +283,7 @@ class Statestore : public CacheLineAligned {
   /// subscriber's ID and network location.
   class Subscriber {
    public:
-    Subscriber(const SubscriberId& subscriber_id, const TUniqueId& registration_id,
+    Subscriber(const SubscriberId& subscriber_id, const RegistrationId& registration_id,
         const TNetworkAddress& network_address,
         const std::vector<TTopicRegistration>& subscribed_topics);
 
@@ -304,7 +305,7 @@ class Statestore : public CacheLineAligned {
     const Topics& subscribed_topics() const { return subscribed_topics_; }
     const TNetworkAddress& network_address() const { return network_address_; }
     const SubscriberId& id() const { return subscriber_id_; }
-    const TUniqueId& registration_id() const { return registration_id_; }
+    const RegistrationId& registration_id() const { return registration_id_; }
 
     /// Records the fact that an update to this topic is owned by this subscriber.  The
     /// version number of the update is saved so that only those updates which are made
@@ -340,7 +341,7 @@ class Statestore : public CacheLineAligned {
     /// registration ID is handed out every time a subscriber successfully calls
     /// RegisterSubscriber() to distinguish between distinct connections from subscribers
     /// with the same subscriber_id_.
-    const TUniqueId registration_id_;
+    const RegistrationId registration_id_;
 
     /// The location of the subscriber service that this subscriber runs.
     const TNetworkAddress network_address_;
@@ -375,10 +376,22 @@ class Statestore : public CacheLineAligned {
   /// Used to generated unique IDs for each new registration.
   boost::uuids::random_generator subscriber_uuid_generator_;
 
-  /// Work item passed to both kinds of subscriber update threads. First entry is the
-  /// *earliest* time (in microseconds since epoch) that the next message should be sent,
-  /// the second entry is the subscriber to send it to.
-  typedef std::pair<int64_t, SubscriberId> ScheduledSubscriberUpdate;
+  /// Work item passed to both kinds of subscriber update threads.
+  struct ScheduledSubscriberUpdate {
+    /// *Earliest* time (in Unix time) that the next message should be sent.
+    int64_t deadline;
+
+    /// SubscriberId and RegistrationId of the registered subscriber instance this message
+    /// is intended for.
+    SubscriberId subscriber_id;
+    RegistrationId registration_id;
+
+    ScheduledSubscriberUpdate() {}
+
+    ScheduledSubscriberUpdate(int64_t next_update_time, SubscriberId s_id,
+        RegistrationId r_id): deadline(next_update_time), subscriber_id(s_id),
+        registration_id(r_id) {}
+  };
 
   /// The statestore has two pools of threads that send messages to subscribers
   /// one-by-one. One pool deals with 'heartbeat' messages that update failure detection
@@ -474,6 +487,13 @@ class Statestore : public CacheLineAligned {
   /// Sends a heartbeat message to subscriber. Returns false if there was some error
   /// performing the RPC.
   Status SendHeartbeat(Subscriber* subscriber) WARN_UNUSED_RESULT;
+
+  /// Returns true (and sets subscriber to the corresponding Subscriber object) if a
+  /// registered subscriber exists in the subscribers_ map with the given subscriber_id
+  /// and registration_id. False otherwise.
+  bool FindSubscriber(const SubscriberId& subscriber_id,
+      const RegistrationId& registration_id, std::shared_ptr<Subscriber>* subscriber)
+      WARN_UNUSED_RESULT;
 
   /// Unregister a subscriber, removing all of its transient entries and evicting it from
   /// the subscriber map. Callers must hold subscribers_lock_ prior to calling this
