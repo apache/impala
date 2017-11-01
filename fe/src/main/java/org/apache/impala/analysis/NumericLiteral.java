@@ -132,7 +132,13 @@ public class NumericLiteral extends LiteralExpr {
 
   @Override
   public boolean localEquals(Expr that) {
-    return super.localEquals(that) && ((NumericLiteral) that).value_.equals(value_);
+    if (!super.localEquals(that)) return false;
+
+    NumericLiteral tmp = (NumericLiteral) that;
+    if (!tmp.value_.equals(value_)) return false;
+    // Analyzed Numeric literals of different types are distinct.
+    if ((isAnalyzed() && tmp.isAnalyzed()) && (!getType().equals(tmp.getType()))) return false;
+    return true;
   }
 
   @Override

@@ -2052,6 +2052,10 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select tinyint_col, count(distinct int_col),"
         + "min(distinct smallint_col), max(distinct string_col) "
         + "from functional.alltypesagg group by 1");
+
+    // IMPALA-6114: Test that numeric literals having the same value, but different types are
+    // considered distinct.
+    AnalyzesOk("select distinct cast(0 as decimal(14)), 0 from functional.alltypes");
   }
 
   @Test
