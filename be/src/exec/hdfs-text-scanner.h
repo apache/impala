@@ -85,6 +85,17 @@ class HdfsTextScanner : public HdfsScanner {
   /// Actual bytes received from last file read.
   int64_t byte_buffer_read_size_;
 
+  /// Last character of the last byte buffer filled, i.e. byte_buffer_end_[-1] when the
+  /// buffer was last filled with data. Set in FillByteBufferWrapper() and used in
+  /// CheckForSplitDelimiter(). Copied out of the byte buffer so that it can be
+  /// referenced after the byte buffer is freed or transferred, e.g. in CommitRows().
+  /// Valid if 'byte_buffer_filled_' is true.
+  char byte_buffer_last_byte_;
+
+  /// True if the byte buffer was filled with at least a byte of data since the last time
+  /// the scanner was reset. Set in FillByteBufferWrapper().
+  bool byte_buffer_filled_;
+
   /// True if we are parsing the header for this scanner.
   bool only_parsing_header_;
 
@@ -127,6 +138,14 @@ class HdfsTextScanner : public HdfsScanner {
   /// advances the scan state to DONE. Only valid to call in state PAST_SCAN_RANGE.
   Status FinishScanRange(RowBatch* row_batch) WARN_UNUSED_RESULT;
 
+  /// Wrapper around FillByteBuffer() that also updates 'byte_buffer_last_byte_'
+  /// and 'byte_buffer_filled_'. Callers should call this instead of calling
+  /// FillByteBuffer() directly.
+  /// TODO: IMPALA-6146: this is a workaround that could be removed if FillByteBuffer()
+  /// was a cleaner interface.
+  Status FillByteBufferWrapper(MemPool* pool, bool* eosr, int num_bytes = 0)
+      WARN_UNUSED_RESULT;
+
   /// Fills the next byte buffer from the context.  This will block if there are no bytes
   /// ready.  Updates byte_buffer_ptr_, byte_buffer_end_ and byte_buffer_read_size_.
   /// If num_bytes is 0, the scanner will read whatever is the io mgr buffer size,
@@ -136,6 +155,10 @@ class HdfsTextScanner : public HdfsScanner {
   /// If applicable, attaches decompression buffers from previous calls that might still
   /// be referenced by returned batches to 'pool'. If 'pool' is nullptr the buffers are
   /// freed instead.
+  ///
+  /// Subclasses can override this function to implement different behaviour.
+  /// TODO: IMPALA-6146: rethink this interface - having subclasses modify member
+  /// variables is brittle.
   virtual Status FillByteBuffer(MemPool* pool, bool* eosr, int num_bytes = 0)
       WARN_UNUSED_RESULT;
 

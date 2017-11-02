@@ -57,6 +57,7 @@ HdfsTextScanner::HdfsTextScanner(HdfsScanNodeBase* scan_node, RuntimeState* stat
       byte_buffer_ptr_(nullptr),
       byte_buffer_end_(nullptr),
       byte_buffer_read_size_(0),
+      byte_buffer_filled_(false),
       only_parsing_header_(false),
       scan_state_(CONSTRUCTED),
       boundary_pool_(new MemPool(scan_node->mem_tracker())),
@@ -234,6 +235,7 @@ Status HdfsTextScanner::ResetScanner() {
   boundary_row_.Clear();
   delimited_text_parser_->ParserReset();
   byte_buffer_ptr_ = byte_buffer_end_ = nullptr;
+  byte_buffer_filled_ = false;
   partial_tuple_ = nullptr;
 
   // Initialize codegen fn
@@ -271,7 +273,8 @@ Status HdfsTextScanner::FinishScanRange(RowBatch* row_batch) {
     // TODO: calling FillByteBuffer() at eof() can cause
     // ScannerContext::Stream::GetNextBuffer to DCHECK. Fix this.
     if (decompressor_.get() == nullptr && !stream_->eof()) {
-      status = FillByteBuffer(row_batch->tuple_data_pool(), &eosr, NEXT_BLOCK_READ_SIZE);
+      status =
+        FillByteBufferWrapper(row_batch->tuple_data_pool(), &eosr, NEXT_BLOCK_READ_SIZE);
     }
 
     if (!status.ok() || byte_buffer_read_size_ == 0) {
@@ -342,7 +345,7 @@ Status HdfsTextScanner::ProcessRange(RowBatch* row_batch, int* num_tuples) {
   bool eosr = stream_->eosr() || scan_state_ == PAST_SCAN_RANGE;
   while (true) {
     if (!eosr && byte_buffer_ptr_ == byte_buffer_end_) {
-      RETURN_IF_ERROR(FillByteBuffer(pool, &eosr));
+      RETURN_IF_ERROR(FillByteBufferWrapper(pool, &eosr));
     }
 
     TupleRow* tuple_row_mem = row_batch->GetRow(row_batch->AddRow());
@@ -458,6 +461,16 @@ Status HdfsTextScanner::GetNextInternal(RowBatch* row_batch) {
     RETURN_IF_ERROR(FinishScanRange(row_batch));
     DCHECK_EQ(scan_state_, DONE);
     eos_ = true;
+  }
+  return Status::OK();
+}
+
+Status HdfsTextScanner::FillByteBufferWrapper(
+    MemPool* pool, bool* eosr, int num_bytes) {
+  RETURN_IF_ERROR(FillByteBuffer(pool, eosr, num_bytes));
+  if (byte_buffer_read_size_ > 0) {
+    byte_buffer_filled_ = true;
+    byte_buffer_last_byte_ = byte_buffer_end_[-1];
   }
   return Status::OK();
 }
@@ -648,7 +661,7 @@ Status HdfsTextScanner::FindFirstTuple(MemPool* pool) {
     // Offset maybe not point to a tuple boundary, skip ahead to the first tuple start in
     // this scan range (if one exists).
     do {
-      RETURN_IF_ERROR(FillByteBuffer(nullptr, &eosr));
+      RETURN_IF_ERROR(FillByteBufferWrapper(nullptr, &eosr));
 
       delimited_text_parser_->ParserReset();
       SCOPED_TIMER(parse_delimiter_timer_);
@@ -678,7 +691,7 @@ Status HdfsTextScanner::FindFirstTuple(MemPool* pool) {
         } else {
           // Split delimiter at the end of the current buffer, but not eosr. Advance to
           // the correct position in the next buffer.
-          RETURN_IF_ERROR(FillByteBuffer(pool, &eosr));
+          RETURN_IF_ERROR(FillByteBufferWrapper(pool, &eosr));
           DCHECK_GT(byte_buffer_read_size_, 0);
           DCHECK_EQ(*byte_buffer_ptr_, '\n');
           byte_buffer_ptr_ += 1;
@@ -703,13 +716,13 @@ Status HdfsTextScanner::CheckForSplitDelimiter(bool* split_delimiter) {
   DCHECK_EQ(byte_buffer_ptr_, byte_buffer_end_);
   *split_delimiter = false;
 
-  // Nothing in buffer
-  if (byte_buffer_read_size_ == 0) return Status::OK();
+  // Nothing was ever read for this scan range.
+  if (!byte_buffer_filled_) return Status::OK();
 
   // If the line delimiter is "\n" (meaning we also accept "\r" and "\r\n" as delimiters)
   // and the current buffer ends with '\r', this could be a "\r\n" delimiter.
   bool split_delimiter_possible = context_->partition_descriptor()->line_delim() == '\n'
-      && *(byte_buffer_end_ - 1) == '\r';
+      && byte_buffer_last_byte_ == '\r';
   if (!split_delimiter_possible) return Status::OK();
 
   // The '\r' may be escaped. If it's not the text parser will report a complete tuple.
