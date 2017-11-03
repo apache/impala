@@ -487,6 +487,7 @@ class ImpalaShell(object, cmd.Cmd):
     except TException:
       print_to_stderr("Connection lost, reconnecting...")
       self._connect()
+      self._validate_database(immediately=True)
     return args.encode('utf-8')
 
   def onecmd(self, line):
@@ -730,10 +731,21 @@ class ImpalaShell(object, cmd.Cmd):
     self._connect()
     self._validate_database()
 
-  def _validate_database(self):
+  def _validate_database(self, immediately=False):
+    """ Issues a "USE <db>" command where <db> is the current database.
+    It is typically needed after the connection is (re-)established to the Impala daemon.
+
+    If immediately is False, it appends the USE command to self.cmdqueue.
+    If immediately is True, it executes the USE command right away.
+    """
     if self.current_db:
       self.current_db = self.current_db.strip('`')
-      self.cmdqueue.append(('use `%s`' % self.current_db) + ImpalaShell.CMD_DELIM)
+      use_current_db = ('use `%s`' % self.current_db)
+
+      if immediately:
+        self.onecmd(use_current_db)
+      else:
+        self.cmdqueue.append(use_current_db + ImpalaShell.CMD_DELIM)
 
   def _print_if_verbose(self, message):
     if self.verbose:

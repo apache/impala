@@ -22,12 +22,14 @@ import os
 import pytest
 import re
 import shlex
+import shutil
 from subprocess import Popen, PIPE
 
 IMPALAD_HOST_PORT_LIST = pytest.config.option.impalad.split(',')
 assert len(IMPALAD_HOST_PORT_LIST) > 0, 'Must specify at least 1 impalad to target'
 IMPALAD = IMPALAD_HOST_PORT_LIST[0]
 SHELL_CMD = "%s/bin/impala-shell.sh -i %s" % (os.environ['IMPALA_HOME'], IMPALAD)
+SHELL_HISTORY_FILE = os.path.expanduser("~/.impalahistory")
 
 def assert_var_substitution(result):
   assert_pattern(r'\bfoo_number=.*$', 'foo_number= 123123', result.stdout, \
@@ -109,6 +111,17 @@ def run_impala_shell_cmd_no_expect(shell_args, stdin_input=None):
   result = p.get_result(stdin_input)
   cmd = "%s %s" % (SHELL_CMD, shell_args)
   return result
+
+def move_shell_history(filepath):
+  """ Moves history file to given filepath.
+      If there is no history file, this function has no effect. """
+  if os.path.exists(SHELL_HISTORY_FILE):
+    shutil.move(SHELL_HISTORY_FILE, filepath)
+
+def restore_shell_history(filepath):
+  """ Moves back history file from given filepath.
+      If 'filepath' doesn't exist in the filesystem, this function has no effect. """
+  if os.path.exists(filepath): shutil.move(filepath, SHELL_HISTORY_FILE)
 
 class ImpalaShellResult(object):
   def __init__(self):

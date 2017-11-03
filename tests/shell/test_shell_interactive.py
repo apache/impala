@@ -22,19 +22,19 @@ import os
 import pexpect
 import pytest
 import re
-import shutil
 import signal
 import socket
 import sys
+import tempfile
 from time import sleep
 
 from tests.common.impala_service import ImpaladService
 from tests.common.skip import SkipIfLocal
 from util import assert_var_substitution, ImpalaShell
+from util import move_shell_history, restore_shell_history
 
 SHELL_CMD = "%s/bin/impala-shell.sh" % os.environ['IMPALA_HOME']
 SHELL_HISTORY_FILE = os.path.expanduser("~/.impalahistory")
-TMP_HISTORY_FILE = os.path.expanduser("~/.impalahistorytmp")
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
 class TestImpalaShellInteractive(object):
@@ -42,12 +42,12 @@ class TestImpalaShellInteractive(object):
 
   @classmethod
   def setup_class(cls):
-    if os.path.exists(SHELL_HISTORY_FILE):
-      shutil.move(SHELL_HISTORY_FILE, TMP_HISTORY_FILE)
+    cls.tempfile_name = tempfile.mktemp()
+    move_shell_history(cls.tempfile_name)
 
   @classmethod
   def teardown_class(cls):
-    if os.path.exists(TMP_HISTORY_FILE): shutil.move(TMP_HISTORY_FILE, SHELL_HISTORY_FILE)
+    restore_shell_history(cls.tempfile_name)
 
   def _expect_with_cmd(self, proc, cmd, expectations=()):
     """Executes a command on the expect process instance and verifies a set of
