@@ -1125,6 +1125,8 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
     // Assign outgoing bloom filter.
     TBloomFilter& aggregated_filter = state->bloom_filter();
     filter_mem_tracker_->Release(aggregated_filter.directory.size());
+
+    // TODO: Track memory used by 'rpc_params'.
     swap(rpc_params.bloom_filter, aggregated_filter);
     DCHECK(rpc_params.bloom_filter.always_false || rpc_params.bloom_filter.always_true ||
         !rpc_params.bloom_filter.directory.empty());

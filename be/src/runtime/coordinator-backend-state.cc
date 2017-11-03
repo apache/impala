@@ -391,6 +391,13 @@ bool Coordinator::BackendState::Cancel() {
 
 void Coordinator::BackendState::PublishFilter(const TPublishFilterParams& rpc_params) {
   DCHECK_EQ(rpc_params.dst_query_id, query_id_);
+  {
+    // If the backend is already done, it's not waiting for this filter, so we skip
+    // sending it in this case.
+    lock_guard<mutex> l(lock_);
+    if (IsDone()) return;
+  }
+
   if (fragments_.count(rpc_params.dst_fragment_idx) == 0) return;
   Status status;
   ImpalaBackendConnection backend_client(
