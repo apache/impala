@@ -187,6 +187,7 @@ void Coordinator::InitFragmentStats() {
   vector<const TPlanFragment*> fragments;
   schedule_.GetTPlanFragments(&fragments);
   const TPlanFragment* coord_fragment = schedule_.GetCoordFragment();
+  int64_t total_num_finstances = 0;
 
   for (const TPlanFragment* fragment: fragments) {
     string root_profile_name =
@@ -197,6 +198,7 @@ void Coordinator::InitFragmentStats() {
         Substitute("Averaged Fragment $0", fragment->display_name);
     int num_instances =
         schedule_.GetFragmentExecParams(fragment->idx).instance_exec_params.size();
+    total_num_finstances += num_instances;
     // TODO: special-case the coordinator fragment?
     FragmentStats* fragment_stats = obj_pool()->Add(
         new FragmentStats(
@@ -205,12 +207,22 @@ void Coordinator::InitFragmentStats() {
     query_profile_->AddChild(fragment_stats->avg_profile(), true);
     query_profile_->AddChild(fragment_stats->root_profile());
   }
+  RuntimeProfile::Counter* num_fragments =
+      ADD_COUNTER(query_profile_, "NumFragments", TUnit::UNIT);
+  num_fragments->Set(static_cast<int64_t>(fragments.size()));
+  RuntimeProfile::Counter* num_finstances =
+      ADD_COUNTER(query_profile_, "NumFragmentInstances", TUnit::UNIT);
+  num_finstances->Set(total_num_finstances);
 }
 
 void Coordinator::InitBackendStates() {
   int num_backends = schedule_.per_backend_exec_params().size();
   DCHECK_GT(num_backends, 0);
   backend_states_.resize(num_backends);
+
+  RuntimeProfile::Counter* num_backends_counter =
+      ADD_COUNTER(query_profile_, "NumBackends", TUnit::UNIT);
+  num_backends_counter->Set(num_backends);
 
   // create BackendStates
   bool has_coord_fragment = schedule_.GetCoordFragment() != nullptr;

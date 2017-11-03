@@ -28,10 +28,10 @@ namespace impala {
 // be separated by '-'.
 const char* ImpaladMetricKeys::IMPALA_SERVER_VERSION =
     "impala-server.version";
-const char* ImpaladMetricKeys::IMPALA_SERVER_READY =
-    "impala-server.ready";
-const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES =
-    "impala-server.num-queries";
+const char* ImpaladMetricKeys::IMPALA_SERVER_READY = "impala-server.ready";
+const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES = "impala-server.num-queries";
+const char* ImpaladMetricKeys::NUM_QUERIES_REGISTERED =
+    "impala-server.num-queries-registered";
 const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS =
     "impala-server.num-fragments";
 const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT =
@@ -138,6 +138,7 @@ IntGauge* ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT = NULL;
 IntGauge* ImpaladMetrics::IO_MGR_TOTAL_BYTES = NULL;
 IntGauge* ImpaladMetrics::MEM_POOL_TOTAL_BYTES = NULL;
 IntGauge* ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT = NULL;
+IntGauge* ImpaladMetrics::NUM_QUERIES_REGISTERED = NULL;
 IntGauge* ImpaladMetrics::RESULTSET_CACHE_TOTAL_NUM_ROWS = NULL;
 IntGauge* ImpaladMetrics::RESULTSET_CACHE_TOTAL_BYTES = NULL;
 
@@ -163,6 +164,7 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
 
   IMPALA_SERVER_NUM_QUERIES = m->AddCounter<int64_t>(
       ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES, 0);
+  NUM_QUERIES_REGISTERED = m->AddGauge<int64_t>(ImpaladMetricKeys::NUM_QUERIES_REGISTERED, 0);
   NUM_QUERIES_EXPIRED = m->AddCounter<int64_t>(
       ImpaladMetricKeys::NUM_QUERIES_EXPIRED, 0);
   NUM_QUERIES_SPILLED = m->AddCounter<int64_t>(

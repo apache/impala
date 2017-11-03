@@ -127,6 +127,10 @@ class ImpaladMetricKeys {
   /// Number of queries expired due to inactivity
   static const char* NUM_QUERIES_EXPIRED;
 
+  /// Number of queries currently registered on this server, i.e. that have been
+  /// registered but are not yet unregistered.
+  static const char* NUM_QUERIES_REGISTERED;
+
   /// Number of queries that spilled.
   static const char* NUM_QUERIES_SPILLED;
 
@@ -188,6 +192,7 @@ class ImpaladMetrics {
   static IntGauge* IO_MGR_TOTAL_BYTES;
   static IntGauge* MEM_POOL_TOTAL_BYTES;
   static IntGauge* NUM_FILES_OPEN_FOR_INSERT;
+  static IntGauge* NUM_QUERIES_REGISTERED;
   static IntGauge* RESULTSET_CACHE_TOTAL_NUM_ROWS;
   static IntGauge* RESULTSET_CACHE_TOTAL_BYTES;
   // Properties

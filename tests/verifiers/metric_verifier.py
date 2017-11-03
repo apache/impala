@@ -19,6 +19,7 @@
 
 # List of metrics that should be equal to zero when there are no outstanding queries.
 METRIC_LIST = [
+               "impala-server.num-queries-registered",
                # TODO (IMPALA-3377): Re-enable
                # "impala-server.backends.client-cache.clients-in-use", disabled as a
                # work-around due to IMPALA-3327.

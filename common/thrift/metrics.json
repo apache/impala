@@ -470,6 +470,16 @@
     "key": "impala-server.num-queries"
   },
   {
+    "description": "The total number of queries registered on this Impala server instance. Includes queries that are in flight and waiting to be closed",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Queries Registered",
+    "units": "UNIT",
+    "kind": "GAUGE",
+    "key": "impala-server.num-queries-registered"
+  },
+  {
     "description": "Number of queries expired due to inactivity.",
     "contexts": [
       "IMPALAD"

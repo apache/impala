@@ -869,7 +869,6 @@ Status ImpalaServer::ExecuteInternal(
     RETURN_IF_ERROR(RegisterQuery(session_state, *request_state));
     *registered_request_state = true;
 
-
 #ifndef NDEBUG
     // Inject a sleep to simulate metadata loading pauses for tables. This
     // is only used for testing.
@@ -950,6 +949,8 @@ Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
     }
     client_request_state_map_.insert(make_pair(query_id, request_state));
   }
+  // Metric is decremented in UnregisterQuery().
+  ImpaladMetrics::NUM_QUERIES_REGISTERED->Increment(1L);
   return Status::OK();
 }
 
@@ -1049,6 +1050,7 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
     }
   }
   ArchiveQuery(*request_state);
+  ImpaladMetrics::NUM_QUERIES_REGISTERED->Increment(-1L);
   return Status::OK();
 }
 
