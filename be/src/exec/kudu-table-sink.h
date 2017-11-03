@@ -102,6 +102,9 @@ class KuduTableSink : public DataSink {
   /// Captures parameters passed down from the frontend
   TKuduTableSink kudu_table_sink_;
 
+  /// The amount consumed from 'mem_tracker_' to account for the mem used by 'client_'.
+  int64_t client_tracked_bytes_;
+
   /// Time spent applying Kudu operations. In normal circumstances, Apply() should be
   /// negligible because it is asynchronous with AUTO_FLUSH_BACKGROUND enabled.
   /// Significant time spent in Apply() may indicate that Kudu cannot buffer and send

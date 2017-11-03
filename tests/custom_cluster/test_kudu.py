@@ -62,6 +62,24 @@ class TestKuduOperations(CustomClusterTestSuite, KuduTestSuite):
           """ % (table_name, KUDU_MASTER_HOSTS, kudu_table.name))
       cursor.execute("DROP TABLE %s" % table_name)
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(impalad_args="-kudu_error_buffer_size=1024")
+  def test_error_buffer_size(self, cursor, unique_database):
+    """Check that queries fail if the size of the Kudu client errors they generate is
+    greater than kudu_error_buffer_size."""
+    table_name = "%s.test_error_buffer_size" % unique_database
+    cursor.execute("create table %s (a bigint primary key) stored as kudu" % table_name)
+    # Insert a large number of a constant value into the table to generate many "Key
+    # already present" errors. 50 errors should fit inside the 1024 byte limit.
+    cursor.execute(
+        "insert into %s select 1 from functional.alltypes limit 50" % table_name)
+    try:
+      # 200 errors should overflow the 1024 byte limit.
+      cursor.execute(
+          "insert into %s select 1 from functional.alltypes limit 200" % table_name)
+      assert False, "Expected: 'Error overflow in Kudu session.'"
+    except Exception as e:
+      assert "Error overflow in Kudu session." in str(e)
 
 class TestKuduClientTimeout(CustomClusterTestSuite, KuduTestSuite):
   """Kudu tests that set the Kudu client operation timeout to 1ms and expect

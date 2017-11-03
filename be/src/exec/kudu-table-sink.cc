@@ -34,24 +34,19 @@
 #include "common/names.h"
 
 #define DEFAULT_KUDU_MUTATION_BUFFER_SIZE 10 * 1024 * 1024
+#define DEFAULT_KUDU_ERROR_BUFFER_SIZE 10 * 1024 * 1024
 
 DEFINE_int32(kudu_mutation_buffer_size, DEFAULT_KUDU_MUTATION_BUFFER_SIZE,
     "The size (bytes) of the Kudu client buffer for mutations.");
 
-// The memory (bytes) that this node needs to consume in order to operate. This is
-// necessary because the KuduClient allocates non-trivial amounts of untracked memory,
-// and is potentially unbounded due to how Kudu's async error reporting works.
-// Until Kudu's client memory usage can be bounded (KUDU-1752), we estimate that 2x the
-// mutation buffer size is enough memory, and that seems to provide acceptable results in
+// We estimate that 10MB is enough memory, and that seems to provide acceptable results in
 // testing. This is still exposed as a flag for now though, because it may be possible
 // that in some cases this is always too high (in which case tracked mem >> RSS and the
 // memory is underutilized), or this may not be high enough (e.g. we underestimate the
-// size of error strings, and RSS grows until the process is killed).
-// TODO: Handle DML w/ small or known resource requirements (e.g. VALUES specified or
-// query has LIMIT) specially to avoid over-consumption.
-DEFINE_int32(kudu_sink_mem_required, 2 * DEFAULT_KUDU_MUTATION_BUFFER_SIZE,
-    "(Advanced) The memory required (bytes) for a KuduTableSink. The default value is "
-    " 2x the kudu_mutation_buffer_size. This flag is subject to change or removal.");
+// size of error strings, and queries are failed).
+DEFINE_int32(kudu_error_buffer_size, DEFAULT_KUDU_ERROR_BUFFER_SIZE,
+    "The size (bytes) of the Kudu client buffer for returning errors, with a min of 1KB."
+    "If the actual errors exceed this size the query will fail.");
 
 DECLARE_int32(kudu_operation_timeout_ms);
 
@@ -76,7 +71,8 @@ KuduTableSink::KuduTableSink(const RowDescriptor* row_desc, const TDataSink& tsi
   : DataSink(row_desc),
     table_id_(tsink.table_sink.target_table_id),
     sink_action_(tsink.table_sink.action),
-    kudu_table_sink_(tsink.table_sink.kudu_table_sink) {
+    kudu_table_sink_(tsink.table_sink.kudu_table_sink),
+    client_tracked_bytes_(0) {
   DCHECK(tsink.__isset.table_sink);
   DCHECK(KuduIsAvailable());
 }
@@ -120,21 +116,20 @@ Status KuduTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracke
 Status KuduTableSink::Open(RuntimeState* state) {
   RETURN_IF_ERROR(DataSink::Open(state));
 
-  int64_t required_mem = FLAGS_kudu_sink_mem_required;
+  // Account for the memory used by the Kudu client. This is necessary because the
+  // KuduClient allocates non-trivial amounts of untracked memory,
+  // TODO: Handle DML w/ small or known resource requirements (e.g. VALUES specified or
+  // query has LIMIT) specially to avoid over-consumption.
+  int64_t error_buffer_size = max<int64_t>(1024, FLAGS_kudu_error_buffer_size);
+  int64_t required_mem = FLAGS_kudu_mutation_buffer_size + error_buffer_size;
   if (!mem_tracker_->TryConsume(required_mem)) {
     return mem_tracker_->MemLimitExceeded(state,
         "Could not allocate memory for KuduTableSink", required_mem);
   }
+  client_tracked_bytes_ = required_mem;
 
-  Status s =
-      state->exec_env()->GetKuduClient(table_desc_->kudu_master_addresses(), &client_);
-  if (!s.ok()) {
-    // Close() releases memory if client_ is not NULL, but since the memory was consumed
-    // and the client failed to be created, it must be released.
-    DCHECK(client_ == nullptr);
-    mem_tracker_->Release(required_mem);
-    return s;
-  }
+  RETURN_IF_ERROR(
+      state->exec_env()->GetKuduClient(table_desc_->kudu_master_addresses(), &client_));
   KUDU_RETURN_IF_ERROR(client_->OpenTable(table_desc_->table_name(), &table_),
       "Unable to open Kudu table");
 
@@ -194,6 +189,10 @@ Status KuduTableSink::Open(RuntimeState* state) {
   // number of these buffers; there are a few ways to accomplish similar behaviors.
   KUDU_RETURN_IF_ERROR(session_->SetMutationBufferMaxNum(0),
       "Couldn't set mutation buffer count");
+
+  KUDU_RETURN_IF_ERROR(session_->SetErrorBufferSpace(error_buffer_size),
+      "Failed to set error buffer space");
+
   return Status::OK();
 }
 
@@ -347,10 +346,9 @@ Status KuduTableSink::FlushFinal(RuntimeState* state) {
 
 void KuduTableSink::Close(RuntimeState* state) {
   if (closed_) return;
-  if (client_ != nullptr) {
-    mem_tracker_->Release(FLAGS_kudu_sink_mem_required);
-    client_ = nullptr;
-  }
+  session_.reset();
+  mem_tracker_->Release(client_tracked_bytes_);
+  client_ = nullptr;
   SCOPED_TIMER(profile()->total_time_counter());
   DataSink::Close(state);
   closed_ = true;
