@@ -22,7 +22,17 @@
 #
 # When one hash is given, measures the performance on the specified workloads.
 # When two hashes are given, compares their performance. Output is in
-# $IMPALA_HOME/perf_results/latest.
+# $IMPALA_HOME/perf_results/latest. In the performance_result.txt file,
+# git_hash_A is referred to as the "Base" result. For example, if you run with
+# git_hash_A = aBad1dea... and git_hash_B = 8675309... the
+# performance_result.txt will say at the top:
+#
+#   Run Description: "aBad1dea... vs 8675309..."
+#
+# The different queries will have their run time statistics in columns
+# "Avg(s)", "StdDev(%)", "BaseAvg(s)", "Base StdDev(%)". The first two refer
+# to git_hash_B, the second two refer to git_hash_A. The column "Delta(Avg)"
+# is negative if git_hash_B is faster and is positive if git_hash_A is faster.
 #
 # WARNING: This script will run git checkout. You should not touch the tree
 # while the script is running. You should start the script from a clean git
@@ -266,7 +276,17 @@ def parse_options():
 
     When one hash is given, measures the performance on the specified workloads.
     When two hashes are given, compares their performance. Output is in
-    $IMPALA_HOME/perf_results/latest.
+    $IMPALA_HOME/perf_results/latest. In the performance_result.txt file,
+    git_hash_A is referred to as the "Base" result. For example, if you run with
+    git_hash_A = aBad1dea... and git_hash_B = 8675309... the
+    performance_result.txt will say at the top:
+
+      Run Description: "aBad1dea... vs 8675309..."
+
+    The different queries will have their run time statistics in columns
+    "Avg(s)", "StdDev(%)", "BaseAvg(s)", "Base StdDev(%)". The first two refer
+    to git_hash_B, the second two refer to git_hash_A. The column "Delta(Avg)"
+    is negative if git_hash_B is faster and is positive if git_hash_A is faster.
 
     WARNING: This script will run git checkout. You should not touch the tree
     while the script is running. You should start the script from a clean git
