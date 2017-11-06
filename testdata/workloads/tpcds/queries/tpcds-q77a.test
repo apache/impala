@@ -117,7 +117,7 @@ with ss as
 ) foo
 order by channel, id
  limit 100;
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 'catalog channel',1,132885061.65,2050279.74,-12674076.58
 'catalog channel',2,140503047.65,2050279.74,-14906564.08
 'catalog channel',5,130483795.90,2050279.74,-13798294.43
