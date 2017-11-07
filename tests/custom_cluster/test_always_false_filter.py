@@ -42,13 +42,16 @@ class TestAlwaysFalseFilter(CustomClusterTestSuite):
     for table_suffix in ['_avro', '_rc', '_seq']:
       cursor.execute("use functional" + table_suffix)
       cursor.execute(query)
+      # Fetch all rows to finalize the query profile.
+      cursor.fetchall()
       profile = cursor.get_profile()
       assert re.search("Files rejected: [^0] \([^0]\)", profile) is None
       assert re.search("Splits rejected: [^0] \([^0]\)", profile) is None
     for table_suffix in ['', '_parquet']:
       cursor.execute("use functional" + table_suffix)
       cursor.execute(query)
+      # Fetch all rows to finalize the query profile.
+      cursor.fetchall()
       profile = cursor.get_profile()
       assert re.search("Files rejected: [^0] \([^0]\)", profile) is None
       assert re.search("Splits rejected: 8 \(8\)", profile) is not None
-

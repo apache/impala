@@ -195,9 +195,11 @@ bool Base64DecodeBufLen(const char* in, int64_t in_len, int64_t* out_max) {
 
 bool Base64Decode(const char* in, int64_t in_len, int64_t out_max, char* out,
     int64_t* out_len) {
+  uint32_t out_len_u32 = 0;
   if (UNLIKELY((in_len & 3) != 0)) return false;
   const int decode_result = sasl_decode64(in, static_cast<unsigned>(in_len), out,
-      static_cast<unsigned>(out_max), reinterpret_cast<unsigned*>(out_len));
+      static_cast<unsigned>(out_max), &out_len_u32);
+  *out_len = out_len_u32;
   if (UNLIKELY(decode_result != SASL_OK || *out_len != out_max - 1)) return false;
   return true;
 }
