@@ -42,9 +42,50 @@ class TestSessionExpiration(CustomClusterTestSuite):
     sleep(3)
     assert num_expired == impalad.service.get_metric_value(
       "impala-server.num-sessions-expired")
-    # Wait for session expiration. Session timeout was set for 6 seconds, so Impala
-    # will poll the session expiry queue every 3 seconds. So, as long as the sleep in
-    # ImpalaSever::ExpireSessions() is not late, the session will expire in at most 9
-    # seconds. The test has already waited 3 seconds.
+    # Wait for session expiration. Impala will poll the session expiry queue every second
     impalad.service.wait_for_metric_value(
       "impala-server.num-sessions-expired", num_expired + 1, 20)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--idle_session_timeout=3")
+  def test_session_expiration_with_set(self, vector):
+    impalad = self.cluster.get_any_impalad()
+    self.client.close()
+    num_expired = impalad.service.get_metric_value("impala-server.num-sessions-expired")
+
+    # Test if we can set a shorter timeout than the process-wide option
+    client = impalad.service.create_beeswax_client()
+    client.execute("SET IDLE_SESSION_TIMEOUT=1")
+    sleep(2.5)
+    assert num_expired + 1 == impalad.service.get_metric_value(
+      "impala-server.num-sessions-expired")
+
+    # Test if we can set a longer timeout than the process-wide option
+    client = impalad.service.create_beeswax_client()
+    client.execute("SET IDLE_SESSION_TIMEOUT=10")
+    sleep(5)
+    assert num_expired + 1 == impalad.service.get_metric_value(
+      "impala-server.num-sessions-expired")
+
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--idle_session_timeout=5")
+  def test_unsetting_session_expiration(self, vector):
+    impalad = self.cluster.get_any_impalad()
+    self.client.close()
+    num_expired = impalad.service.get_metric_value("impala-server.num-sessions-expired")
+
+    # Test unsetting IDLE_SESSION_TIMEOUT
+    client = impalad.service.create_beeswax_client()
+    client.execute("SET IDLE_SESSION_TIMEOUT=1")
+
+    # Unset to 5 sec
+    client.execute('SET IDLE_SESSION_TIMEOUT=""')
+    sleep(2)
+    # client session should be alive at this point
+    assert num_expired == impalad.service.get_metric_value(
+      "impala-server.num-sessions-expired")
+    sleep(5)
+    # now client should have expired
+    assert num_expired + 1 == impalad.service.get_metric_value(
+      "impala-server.num-sessions-expired")

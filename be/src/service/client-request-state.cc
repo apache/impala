@@ -17,6 +17,7 @@
 
 #include "service/client-request-state.h"
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <limits>
 #include <gutil/strings/substitute.h>
 
@@ -42,6 +43,7 @@
 
 #include "common/names.h"
 
+using boost::algorithm::iequals;
 using boost::algorithm::join;
 using namespace apache::hive::service::cli::thrift;
 using namespace apache::thrift;
@@ -200,12 +202,18 @@ Status ClientRequestState::Exec(TExecRequest* exec_request) {
       if (exec_request_.set_query_option_request.__isset.key) {
         // "SET key=value" updates the session query options.
         DCHECK(exec_request_.set_query_option_request.__isset.value);
-        RETURN_IF_ERROR(SetQueryOption(
-            exec_request_.set_query_option_request.key,
-            exec_request_.set_query_option_request.value,
-            &session_->set_query_options,
-            &session_->set_query_options_mask));
+        const auto& key = exec_request_.set_query_option_request.key;
+        const auto& value = exec_request_.set_query_option_request.value;
+        RETURN_IF_ERROR(SetQueryOption(key, value, &session_->set_query_options,
+              &session_->set_query_options_mask));
         SetResultSet({}, {}, {});
+        if (iequals(key, "idle_session_timeout")) {
+          // IMPALA-2248: Session timeout is set as a query option
+          session_->last_accessed_ms = UnixMillis(); // do not expire session immediately
+          session_->UpdateTimeout();
+          VLOG_QUERY << "ClientRequestState::Exec() SET: idle_session_timeout="
+                     << PrettyPrinter::Print(session_->session_timeout, TUnit::TIME_S);
+        }
       } else {
         // "SET" or "SET ALL"
         bool is_set_all = exec_request_.set_query_option_request.__isset.is_set_all &&

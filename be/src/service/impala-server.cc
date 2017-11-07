@@ -188,7 +188,8 @@ DEFINE_string(ssl_minimum_version, "tlsv1", SSL_MIN_VERSION_HELP.c_str());
 
 DEFINE_int32(idle_session_timeout, 0, "The time, in seconds, that a session may be idle"
     " for before it is closed (and all running queries cancelled) by Impala. If 0, idle"
-    " sessions are never expired.");
+    " sessions are never expired. It can be overridden by the query option"
+    " 'idle_session_timeout' for specific sessions");
 DEFINE_int32(idle_query_timeout, 0, "The time, in seconds, that a query may be idle for"
     " (i.e. no processing work is done and no updates are received from the client) "
     "before it is cancelled. If 0, idle queries are never expired. The query option "
@@ -1118,14 +1119,7 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
     discard_result(UnregisterQuery(query_id, false, &status));
   }
   // Reconfigure the poll period of session_timeout_thread_ if necessary.
-  int32_t session_timeout = session_state->session_timeout;
-  if (session_timeout > 0) {
-    lock_guard<mutex> l(session_timeout_lock_);
-    multiset<int32_t>::const_iterator itr = session_timeout_set_.find(session_timeout);
-    DCHECK(itr != session_timeout_set_.end());
-    session_timeout_set_.erase(itr);
-    session_timeout_cv_.NotifyOne();
-  }
+  UnregisterSessionTimeout(session_state->session_timeout);
   return Status::OK();
 }
 
@@ -1203,6 +1197,9 @@ void ImpalaServer::TransmitData(
 }
 
 void ImpalaServer::InitializeConfigVariables() {
+  // Set idle_session_timeout here to let the SET command return the value of
+  // the command line option FLAGS_idle_session_timeout
+  default_query_options_.__set_idle_session_timeout(FLAGS_idle_session_timeout);
   QueryOptionsMask set_query_options; // unused
   Status status = ParseQueryOptions(FLAGS_default_query_options,
       &default_query_options_, &set_query_options);
@@ -1224,6 +1221,20 @@ void ImpalaServer::InitializeConfigVariables() {
     option.__set_value(itr->second);
     AddOptionLevelToConfig(&option, itr->first);
     default_configs_.push_back(option);
+  }
+}
+
+void ImpalaServer::SessionState::UpdateTimeout() {
+  DCHECK(impala_server != nullptr);
+  int32_t old_timeout = session_timeout;
+  if (set_query_options.__isset.idle_session_timeout) {
+    session_timeout = set_query_options.idle_session_timeout;
+  } else {
+    session_timeout = server_default_query_options->idle_session_timeout;
+  }
+  if (old_timeout != session_timeout) {
+    impala_server->UnregisterSessionTimeout(old_timeout);
+    impala_server->RegisterSessionTimeout(session_timeout);
   }
 }
 
@@ -1742,8 +1753,7 @@ void ImpalaServer::ConnectionStart(
     // Beeswax only allows for one session per connection, so we can share the session ID
     // with the connection ID
     const TUniqueId& session_id = connection_context.connection_id;
-    shared_ptr<SessionState> session_state;
-    session_state.reset(new SessionState);
+    shared_ptr<SessionState> session_state = make_shared<SessionState>(this);
     session_state->closed = false;
     session_state->start_time_ms = UnixMillis();
     session_state->last_accessed_ms = UnixMillis();
@@ -1807,9 +1817,20 @@ void ImpalaServer::ConnectionEnd(
 
 void ImpalaServer::RegisterSessionTimeout(int32_t session_timeout) {
   if (session_timeout <= 0) return;
-  lock_guard<mutex> l(session_timeout_lock_);
-  session_timeout_set_.insert(session_timeout);
+  {
+    lock_guard<mutex> l(session_timeout_lock_);
+    session_timeout_set_.insert(session_timeout);
+  }
   session_timeout_cv_.NotifyOne();
+}
+
+void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
+  if (session_timeout > 0) {
+    lock_guard<mutex> l(session_timeout_lock_);
+    auto itr = session_timeout_set_.find(session_timeout);
+    DCHECK(itr != session_timeout_set_.end());
+    session_timeout_set_.erase(itr);
+  }
 }
 
 [[noreturn]] void ImpalaServer::ExpireSessions() {

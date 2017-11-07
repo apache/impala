@@ -296,7 +296,7 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   // query options.
   // TODO: put secret in session state map and check it
   // TODO: Fix duplication of code between here and ConnectionStart().
-  shared_ptr<SessionState> state = make_shared<SessionState>();
+  shared_ptr<SessionState> state = make_shared<SessionState>(this);
   state->closed = false;
   state->start_time_ms = UnixMillis();
   state->session_type = TSessionType::HIVESERVER2;
@@ -316,8 +316,8 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
 
   // Process the supplied configuration map.
   state->database = "default";
-  state->session_timeout = FLAGS_idle_session_timeout;
   state->server_default_query_options = &default_query_options_;
+  state->session_timeout = FLAGS_idle_session_timeout;
   if (request.__isset.configuration) {
     typedef map<string, string> ConfigurationMap;
     for (const ConfigurationMap::value_type& v: request.configuration) {
@@ -330,22 +330,16 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
         HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
       } else if (iequals(v.first, "use:database")) {
         state->database = v.second;
-      } else if (iequals(v.first, "idle_session_timeout")) {
-        int32_t requested_timeout = atoi(v.second.c_str());
-        if (requested_timeout > 0) {
-          if (FLAGS_idle_session_timeout > 0) {
-            state->session_timeout = min(FLAGS_idle_session_timeout, requested_timeout);
-          } else {
-            state->session_timeout = requested_timeout;
-          }
-        }
-        VLOG_QUERY << "OpenSession(): idle_session_timeout="
-                   << PrettyPrinter::Print(state->session_timeout, TUnit::TIME_S);
       } else {
         // Normal configuration key. Use it to set session default query options.
         // Ignore failure (failures will be logged in SetQueryOption()).
-        discard_result(SetQueryOption(v.first, v.second, &state->set_query_options,
-            &state->set_query_options_mask));
+        Status status = SetQueryOption(v.first, v.second, &state->set_query_options,
+            &state->set_query_options_mask);
+        if (status.ok() && iequals(v.first, "idle_session_timeout")) {
+          state->session_timeout = state->set_query_options.idle_session_timeout;
+          VLOG_QUERY << "OpenSession(): idle_session_timeout="
+                     << PrettyPrinter::Print(state->session_timeout, TUnit::TIME_S);
+        }
       }
     }
   }

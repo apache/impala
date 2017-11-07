@@ -40,6 +40,8 @@ using beeswax::TQueryOptionLevel;
 using namespace impala;
 using namespace strings;
 
+DECLARE_int32(idle_session_timeout);
+
 // Utility method to wrap ParseUtil::ParseMemSpec() by returning a Status instead of an
 // int.
 static Status ParseMemValue(const string& value, const string& key, int64_t* result) {
@@ -94,8 +96,15 @@ static void ResetQueryOption(const int option, TQueryOptions* query_options) {
   }
 }
 
+static TQueryOptions DefaultQueryOptions() {
+  TQueryOptions defaults;
+  // default value of idle_session_timeout is set by a command line flag.
+  defaults.__set_idle_session_timeout(FLAGS_idle_session_timeout);
+  return defaults;
+}
+
 string impala::DebugQueryOptions(const TQueryOptions& query_options) {
-  const static TQueryOptions defaults;
+  const static TQueryOptions defaults = DefaultQueryOptions();
   int i = 0;
   stringstream ss;
 #define QUERY_OPT_FN(NAME, ENUM, LEVEL)\
@@ -567,6 +576,18 @@ Status impala::SetQueryOption(const string& key, const string& value,
               "Max row size must be a positive number of bytes: $0", value));
         }
         query_options->__set_max_row_size(max_row_size_bytes);
+        break;
+      }
+      case TImpalaQueryOptions::IDLE_SESSION_TIMEOUT: {
+        StringParser::ParseResult result;
+        const int32_t requested_timeout =
+            StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS || requested_timeout < 0) {
+          return Status(
+              Substitute("Invalid idle session timeout: '$0'. "
+                         "Only positive numbers are allowed.", value));
+        }
+        query_options->__set_idle_session_timeout(requested_timeout);
         break;
       }
       default:

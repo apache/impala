@@ -30,6 +30,8 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,11 +40,12 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-
 import org.apache.impala.analysis.CreateTableStmt;
 import org.apache.impala.analysis.SqlParser;
 import org.apache.impala.analysis.SqlScanner;
 import org.apache.impala.testutil.ImpalaJdbcClient;
+import org.apache.impala.util.Metrics;
+
 import com.google.common.collect.Lists;
 
 /**
@@ -60,13 +63,7 @@ public class JdbcTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    ImpalaJdbcClient client = ImpalaJdbcClient.createClientUsingHiveJdbcDriver();
-    client.connect();
-    con_ = client.getConnection();
-    assertNotNull("Connection is null", con_);
-    assertFalse("Connection should not be closed", con_.isClosed());
-    Statement stmt = con_.createStatement();
-    assertNotNull("Statement is null", stmt);
+    con_ = createConnection();
   }
 
   @AfterClass
@@ -83,6 +80,19 @@ public class JdbcTest {
 
     assertNotNull("createStatement() on closed connection should throw exception",
         expectedException);
+  }
+
+  private static Connection createConnection() throws Exception {
+    ImpalaJdbcClient client = ImpalaJdbcClient.createClientUsingHiveJdbcDriver();
+    client.connect();
+    Connection connection = client.getConnection();
+
+    assertNotNull("Connection is null", connection);
+    assertFalse("Connection should not be closed", connection.isClosed());
+    Statement stmt = connection.createStatement();
+    assertNotNull("Statement is null", stmt);
+
+    return connection;
   }
 
   protected void addTestTable(String createTableSql) throws Exception {
@@ -574,6 +584,87 @@ public class JdbcTest {
       assertFalse(rs.next());
     } finally {
       rs.close();
+    }
+  }
+
+  @Test
+  public void testConcurrentSessionMixedIdleTimeout() throws Exception {
+    // Test for concurrent idle sessions' expiration with mixed timeout durations.
+    Metrics metrics = new Metrics();
+
+    List<Integer> timeoutPeriods = Arrays.asList(0, 3, 15);
+    List<Connection> connections = new ArrayList<>();
+    List<Long> lastTimeSessionActive = new ArrayList<>();
+
+    for (int timeout : timeoutPeriods) {
+      connections.add(createConnection());
+    }
+
+    Long numOpenSessions = (Long)metrics.getMetric(
+        "impala-server.num-open-hiveserver2-sessions");
+    Long numExpiredSessions = (Long)metrics.getMetric(
+        "impala-server.num-sessions-expired");
+
+    for (int i = 0; i < connections.size(); ++i) {
+      Connection connection = connections.get(i);
+      Integer timeout = timeoutPeriods.get(i);
+
+      connection.createStatement().executeQuery("SELECT 1+2");
+      connection.createStatement().executeQuery("SET IDLE_SESSION_TIMEOUT=" +
+          Integer.toString(timeout));
+
+      lastTimeSessionActive.add(System.currentTimeMillis() / 1000);
+    }
+
+    assertEquals(numOpenSessions, (Long)metrics.getMetric(
+        "impala-server.num-open-hiveserver2-sessions"));
+    assertEquals(numExpiredSessions, (Long)metrics.getMetric(
+        "impala-server.num-sessions-expired"));
+
+    for (int timeout : timeoutPeriods) {
+      // Let's expire a session by sleeping,
+      // while renewing the remainders by issuing a query
+      // (except for the 0 timeout, which should never expire)
+      int timeoutToleranceMs = 1500;
+      int sleepPeriodMs = timeout * 1000 + timeoutToleranceMs;
+      Thread.sleep(sleepPeriodMs);
+
+      for (int i = 0; i < connections.size(); ++i) {
+        Connection connection = connections.get(i);
+
+        if (connection != null) {
+          Integer timeoutPeriod = timeoutPeriods.get(i);
+          long now = System.currentTimeMillis() / 1000;
+
+          boolean sessionIsValid = timeoutPeriod == 0 ||
+              timeoutPeriod > now - lastTimeSessionActive.get(i);
+
+          try (ResultSet rs = connection.createStatement().executeQuery("SELECT 1+2")) {
+            assertTrue(sessionIsValid);
+            lastTimeSessionActive.set(i, now);
+          }
+          catch (SQLException exception) {
+            assertFalse(sessionIsValid);
+            connection.close();
+            connections.set(i, null);
+            numOpenSessions -= 1;
+            numExpiredSessions += 1;
+          }
+        }
+      }
+
+      assertEquals(numOpenSessions, (Long)metrics.getMetric(
+          "impala-server.num-open-hiveserver2-sessions"));
+      assertEquals(numExpiredSessions, (Long)metrics.getMetric(
+          "impala-server.num-sessions-expired"));
+    }
+
+    assertNotNull("Connection with 0 timeout should not be null", connections.get(0));
+    connections.get(0).close();
+    connections.set(0, null);
+
+    for (Connection connection : connections) {
+      assertNull("Connection is not null", connection);
     }
   }
 }

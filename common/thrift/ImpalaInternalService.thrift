@@ -287,6 +287,11 @@ struct TQueryOptions {
   // sophisticated strategies - e.g. reserving a small number of buffers large enough to
   // fit maximum-sized rows.
   60: optional i64 max_row_size = 524288;
+
+  // The time, in seconds, that a session may be idle for before it is closed (and all
+  // running queries cancelled) by Impala. If 0, idle sessions never expire.
+  // The default session timeout is set by the command line flag of the same name.
+  61: optional i32 idle_session_timeout;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

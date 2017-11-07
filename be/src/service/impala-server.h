@@ -350,10 +350,14 @@ class ImpalaServer : public ImpalaServiceIf,
     /// run as children of Beeswax sessions) get results back in the expected format -
     /// child queries inherit the HS2 version from their parents, and a Beeswax session
     /// will never update the HS2 version from the default.
-    SessionState() : closed(false), expired(false),
-        hs2_version(apache::hive::service::cli::thrift::
+    SessionState(ImpalaServer* impala_server) : impala_server(impala_server),
+        closed(false), expired(false), hs2_version(apache::hive::service::cli::thrift::
         TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V1), total_queries(0), ref_count(0) {
+      DCHECK(this->impala_server != nullptr);
     }
+
+    /// Pointer to the Impala server of this session
+    ImpalaServer* impala_server;
 
     TSessionType::type session_type;
 
@@ -421,9 +425,14 @@ class ImpalaServer : public ImpalaServiceIf,
     uint32_t ref_count;
 
     /// Per-session idle timeout in seconds. Default value is FLAGS_idle_session_timeout.
-    /// It can be overridden with a smaller value via the option "idle_session_timeout"
-    /// when opening a HS2 session.
-    int32_t session_timeout;
+    /// It can be overridden with the query option "idle_session_timeout" when opening a
+    /// HS2 session, or using the SET command.
+    int32_t session_timeout = 0;
+
+    /// Updates the session timeout based on the query option idle_session_timeout.
+    /// It registers/unregisters the session timeout to the Impala server.
+    /// The lock must be owned by the caller of this function.
+    void UpdateTimeout();
 
     /// Builds a Thrift representation of this SessionState for serialisation to
     /// the frontend.
@@ -437,6 +446,7 @@ class ImpalaServer : public ImpalaServiceIf,
  private:
   friend class ChildQuery;
   friend class ImpalaHttpHandler;
+  friend class SessionState;
 
   boost::scoped_ptr<ImpalaHttpHandler> http_handler_;
 
@@ -766,11 +776,13 @@ class ImpalaServer : public ImpalaServiceIf,
       const QueryOptionsMask& override_options_mask);
 
   /// Register timeout value upon opening a new session. This will wake up
-  /// session_timeout_thread_ to update its poll period.
+  /// session_timeout_thread_.
   void RegisterSessionTimeout(int32_t timeout);
 
-  /// To be run in a thread which wakes up every x / 2 seconds in which x is the minimum
-  /// non-zero idle session timeout value of all sessions. This function checks all
+  /// Unregister timeout value.
+  void UnregisterSessionTimeout(int32_t timeout);
+
+  /// To be run in a thread which wakes up every second. This function checks all
   /// sessions for their last-idle times. Those that have been idle for longer than
   /// their configured timeout values are 'expired': they will no longer accept queries
   /// and any running queries associated with those sessions are unregistered.
@@ -831,7 +843,7 @@ class ImpalaServer : public ImpalaServiceIf,
   boost::mutex session_timeout_lock_;
 
   /// session_timeout_thread_ relies on the following conditional variable to wake up
-  /// on every poll period expiration or when the poll period changes.
+  /// when there are sessions that have a timeout.
   ConditionVariable session_timeout_cv_;
 
   /// map from query id to exec state; ClientRequestState is owned by us and referenced

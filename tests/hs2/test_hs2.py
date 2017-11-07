@@ -213,7 +213,7 @@ class TestHS2(HS2TestSuite):
         "impala-server.num-sessions-expired")
 
     for timeout in timeout_periods:
-      sleep_period = timeout * 1.5
+      sleep_period = timeout + 1.5
       time.sleep(sleep_period)
       for i, session_handle in enumerate(session_handles):
         if session_handle is not None:

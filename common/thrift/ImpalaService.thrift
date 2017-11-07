@@ -288,6 +288,10 @@ enum TImpalaQueryOptions {
 
   // The maximum row size that memory is reserved for, in bytes.
   MAX_ROW_SIZE,
+
+  // The time, in seconds, that a session may be idle for before it is closed (and all
+  // running queries cancelled) by Impala. If 0, idle sessions never expire.
+  IDLE_SESSION_TIMEOUT,
 }
 
 // The summary of a DML statement.
