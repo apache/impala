@@ -99,10 +99,5 @@ under the License.
         <enabled>false</enabled>
       </snapshots>
     </repository>
-    <repository>
-      <id>com.google.libphonenumber</id>
-      <url>http://repo1.maven.org/maven2/com/googlecode/libphonenumber</url>
-      <name>Google phone number library</name>
-    </repository>
   </repositories>
 </project>

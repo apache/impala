@@ -743,17 +743,6 @@ under the License.
       </snapshots>
     </pluginRepository>
 
-    <pluginRepository>
-      <id>dtrott</id>
-      <url>http://maven.davidtrott.com/repository</url>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </pluginRepository>
-
     <!-- This is needed for the cup maven plugin. TODO add the plugin to our maven repo -->
     <pluginRepository>
       <id>sonatype-nexus-snapshots</id>
