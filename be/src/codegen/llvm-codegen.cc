@@ -276,9 +276,7 @@ Status LlvmCodeGen::LoadModuleFromMemory(unique_ptr<MemoryBuffer> module_ir_buf,
 }
 
 // TODO: Create separate counters/timers (file size, load time) for each module linked
-Status LlvmCodeGen::LinkModule(const string& file) {
-  if (linked_modules_.find(file) != linked_modules_.end()) return Status::OK();
-
+Status LlvmCodeGen::LinkModuleFromLocalFs(const string& file) {
   SCOPED_TIMER(profile_->total_time_counter());
   unique_ptr<Module> new_module;
   RETURN_IF_ERROR(LoadModuleFromFile(file, &new_module));
@@ -308,8 +306,16 @@ Status LlvmCodeGen::LinkModule(const string& file) {
     if (!diagnostic_err.empty()) ss << " " << diagnostic_err;
     return Status(ss.str());
   }
-  linked_modules_.insert(file);
+  return Status::OK();
+}
 
+Status LlvmCodeGen::LinkModuleFromHdfs(const string& hdfs_location) {
+  if (linked_modules_.find(hdfs_location) != linked_modules_.end()) return Status::OK();
+  string local_path;
+  RETURN_IF_ERROR(LibCache::instance()->GetLocalLibPath(hdfs_location, LibCache::TYPE_IR,
+      &local_path));
+  RETURN_IF_ERROR(LinkModuleFromLocalFs(local_path));
+  linked_modules_.insert(hdfs_location);
   return Status::OK();
 }
 
@@ -852,12 +858,9 @@ Status LlvmCodeGen::LoadFunction(const TFunction& fn, const std::string& symbol,
     // We're running an IR UDF.
     DCHECK_EQ(fn.binary_type, TFunctionBinaryType::IR);
 
-    string local_path;
-    RETURN_IF_ERROR(LibCache::instance()->GetLocalLibPath(
-        fn.hdfs_location, LibCache::TYPE_IR, &local_path));
     // Link the UDF module into this query's main module so the UDF's functions are
     // available in the main module.
-    RETURN_IF_ERROR(LinkModule(local_path));
+    RETURN_IF_ERROR(LinkModuleFromHdfs(fn.hdfs_location));
 
     *llvm_fn = GetFunction(symbol, true);
     if (*llvm_fn == NULL) {

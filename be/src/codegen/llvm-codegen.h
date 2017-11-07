@@ -579,9 +579,13 @@ class LlvmCodeGen {
   Status LoadModuleFromMemory(std::unique_ptr<llvm::MemoryBuffer> module_ir_buf,
       std::string module_name, std::unique_ptr<llvm::Module>* module);
 
-  /// Loads a module at 'file' and links it to the module associated with
-  /// this LlvmCodeGen object. The module must be on the local filesystem.
-  Status LinkModule(const std::string& file);
+  /// Loads a module at 'file' and links it to the module associated with this
+  /// LlvmCodeGen object. The 'file' must be on the local filesystem.
+  Status LinkModuleFromLocalFs(const std::string& file);
+
+  /// Same as 'LinkModuleFromLocalFs', but takes an hdfs file location instead and makes
+  /// sure that the same hdfs file is not linked twice.
+  Status LinkModuleFromHdfs(const std::string& hdfs_file);
 
   /// Strip global constructors and destructors from an LLVM module. We never run them
   /// anyway (they must be explicitly invoked) so it is dead code.
@@ -761,8 +765,8 @@ class LlvmCodeGen {
   /// we can codegen a loop unrolled hash function.
   std::map<int, llvm::Function*> hash_fns_;
 
-  /// The locations of modules that have been linked. Used to avoid linking the same module
-  /// twice, which causes symbol collision errors.
+  /// The locations of modules that have been linked. Uses hdfs file location as the key.
+  /// Used to avoid linking the same module twice, which causes symbol collision errors.
   std::set<std::string> linked_modules_;
 
   /// The vector of functions to automatically JIT compile after FinalizeModule().

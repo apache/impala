@@ -97,8 +97,12 @@ class LlvmCodeGenTest : public testing:: Test {
 
   static Status FinalizeModule(LlvmCodeGen* codegen) { return codegen->FinalizeModule(); }
 
-  static Status LinkModule(LlvmCodeGen* codegen, const string& file) {
-    return codegen->LinkModule(file);
+  static Status LinkModuleFromLocalFs(LlvmCodeGen* codegen, const string& file) {
+    return codegen->LinkModuleFromLocalFs(file);
+  }
+
+  static Status LinkModuleFromHdfs(LlvmCodeGen* codegen, const string& hdfs_file) {
+    return codegen->LinkModuleFromHdfs(hdfs_file);
   }
 };
 
@@ -465,15 +469,24 @@ TEST_F(LlvmCodeGenTest, HashTest) {
 // captured by impala. An error is induced by asking Llvm to link the same lib twice.
 TEST_F(LlvmCodeGenTest, HandleLinkageError) {
   string ir_file_path("llvm-ir/test-loop.bc");
-  string temp_copy_path("/tmp/test-loop.bc");
   string module_file;
   PathBuilder::GetFullPath(ir_file_path, &module_file);
-  ASSERT_OK(FileSystemUtil::CopyFile(module_file, temp_copy_path));
   scoped_ptr<LlvmCodeGen> codegen;
   ASSERT_OK(CreateFromFile(module_file.c_str(), &codegen));
-  EXPECT_TRUE(codegen.get() != NULL);
-  Status status = LinkModule(codegen.get(), temp_copy_path);
+  EXPECT_TRUE(codegen.get() != nullptr);
+  Status status = LinkModuleFromLocalFs(codegen.get(), module_file);
   EXPECT_STR_CONTAINS(status.GetDetail(), "symbol multiply defined");
+  codegen->Close();
+}
+
+// Test that Impala does not return error when trying to link the same lib file twice.
+TEST_F(LlvmCodeGenTest, LinkageTest) {
+  scoped_ptr<LlvmCodeGen> codegen;
+  ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(runtime_state_, nullptr, "test", &codegen));
+  EXPECT_TRUE(codegen.get() != nullptr);
+  string hdfs_file_path("/test-warehouse/test-udfs.ll");
+  ASSERT_OK(LinkModuleFromHdfs(codegen.get(), hdfs_file_path));
+  ASSERT_OK(LinkModuleFromHdfs(codegen.get(), hdfs_file_path));
   codegen->Close();
 }
 
