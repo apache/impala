@@ -32,7 +32,6 @@
 #include "common/names.h"
 
 using namespace impala;
-using namespace llvm;
 
 const char* const HdfsSequenceScanner::SEQFILE_VALUE_CLASS_NAME =
     "org.apache.hadoop.io.Text";
@@ -50,12 +49,12 @@ HdfsSequenceScanner::~HdfsSequenceScanner() {
 
 // Codegen for materialized parsed data into tuples.
 Status HdfsSequenceScanner::Codegen(HdfsScanNodeBase* node,
-    const vector<ScalarExpr*>& conjuncts, Function** write_aligned_tuples_fn) {
+    const vector<ScalarExpr*>& conjuncts, llvm::Function** write_aligned_tuples_fn) {
   *write_aligned_tuples_fn = nullptr;
   DCHECK(node->runtime_state()->ShouldCodegen());
   LlvmCodeGen* codegen = node->runtime_state()->codegen();
   DCHECK(codegen != nullptr);
-  Function* write_complete_tuple_fn;
+  llvm::Function* write_complete_tuple_fn;
   RETURN_IF_ERROR(CodegenWriteCompleteTuple(node, codegen, conjuncts,
       &write_complete_tuple_fn));
   DCHECK(write_complete_tuple_fn != nullptr);

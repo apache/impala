@@ -35,7 +35,6 @@
 #include "common/names.h"
 
 using namespace impala_udf;
-using namespace llvm;
 
 namespace impala {
 
@@ -178,42 +177,44 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   int64_t unique_slot_id = slot_id_ | ((int64_t)tuple_idx_) << 32;
   DCHECK_EQ(unique_slot_id & TUPLE_NULLABLE_MASK, 0);
   if (tuple_is_nullable_) unique_slot_id |= TUPLE_NULLABLE_MASK;
-  Function* ir_compute_fn_ = codegen->GetRegisteredExprFn(unique_slot_id);
+  llvm::Function* ir_compute_fn_ = codegen->GetRegisteredExprFn(unique_slot_id);
   if (ir_compute_fn_ != NULL) {
     *fn = ir_compute_fn_;
     return Status::OK();
   }
 
-  LLVMContext& context = codegen->context();
-  Value* args[2];
+  llvm::LLVMContext& context = codegen->context();
+  llvm::Value* args[2];
   *fn = CreateIrFunctionPrototype("GetSlotRef", codegen, &args);
-  Value* row_ptr = args[1];
+  llvm::Value* row_ptr = args[1];
 
-  Value* tuple_offset = ConstantInt::get(codegen->int_type(), tuple_idx_);
-  Value* slot_offset = ConstantInt::get(codegen->int_type(), slot_offset_);
-  Value* zero = ConstantInt::get(codegen->GetType(TYPE_TINYINT), 0);
-  Value* one = ConstantInt::get(codegen->GetType(TYPE_TINYINT), 1);
+  llvm::Value* tuple_offset = llvm::ConstantInt::get(codegen->int_type(), tuple_idx_);
+  llvm::Value* slot_offset = llvm::ConstantInt::get(codegen->int_type(), slot_offset_);
+  llvm::Value* zero = llvm::ConstantInt::get(codegen->GetType(TYPE_TINYINT), 0);
+  llvm::Value* one = llvm::ConstantInt::get(codegen->GetType(TYPE_TINYINT), 1);
 
-  BasicBlock* entry_block = BasicBlock::Create(context, "entry", *fn);
+  llvm::BasicBlock* entry_block = llvm::BasicBlock::Create(context, "entry", *fn);
   bool slot_is_nullable = null_indicator_offset_.bit_mask != 0;
-  BasicBlock* check_slot_null_indicator_block = NULL;
+  llvm::BasicBlock* check_slot_null_indicator_block = NULL;
   if (slot_is_nullable) {
-    check_slot_null_indicator_block = BasicBlock::Create(context, "check_slot_null", *fn);
+    check_slot_null_indicator_block =
+        llvm::BasicBlock::Create(context, "check_slot_null", *fn);
   }
-  BasicBlock* get_slot_block = BasicBlock::Create(context, "get_slot", *fn);
-  BasicBlock* ret_block = BasicBlock::Create(context, "ret", *fn);
+  llvm::BasicBlock* get_slot_block = llvm::BasicBlock::Create(context, "get_slot", *fn);
+  llvm::BasicBlock* ret_block = llvm::BasicBlock::Create(context, "ret", *fn);
 
   LlvmBuilder builder(entry_block);
   // Get the tuple offset addr from the row
-  Value* cast_row_ptr = builder.CreateBitCast(
-      row_ptr, PointerType::get(codegen->ptr_type(), 0), "cast_row_ptr");
-  Value* tuple_addr = builder.CreateInBoundsGEP(cast_row_ptr, tuple_offset, "tuple_addr");
+  llvm::Value* cast_row_ptr = builder.CreateBitCast(
+      row_ptr, llvm::PointerType::get(codegen->ptr_type(), 0), "cast_row_ptr");
+  llvm::Value* tuple_addr =
+      builder.CreateInBoundsGEP(cast_row_ptr, tuple_offset, "tuple_addr");
   // Load the tuple*
-  Value* tuple_ptr = builder.CreateLoad(tuple_addr, "tuple_ptr");
+  llvm::Value* tuple_ptr = builder.CreateLoad(tuple_addr, "tuple_ptr");
 
   // Check if tuple* is null only if the tuple is nullable
   if (tuple_is_nullable_) {
-    Value* tuple_is_null = builder.CreateIsNull(tuple_ptr, "tuple_is_null");
+    llvm::Value* tuple_is_null = builder.CreateIsNull(tuple_ptr, "tuple_is_null");
     // Check slot is null only if the null indicator bit is set
     if (slot_is_nullable) {
       builder.CreateCondBr(tuple_is_null, ret_block, check_slot_null_indicator_block);
@@ -231,39 +232,42 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   // Branch for tuple* != NULL.  Need to check if null-indicator is set
   if (slot_is_nullable) {
     builder.SetInsertPoint(check_slot_null_indicator_block);
-    Value* is_slot_null = SlotDescriptor::CodegenIsNull(
+    llvm::Value* is_slot_null = SlotDescriptor::CodegenIsNull(
         codegen, &builder, null_indicator_offset_, tuple_ptr);
     builder.CreateCondBr(is_slot_null, ret_block, get_slot_block);
   }
 
   // Branch for slot != NULL
   builder.SetInsertPoint(get_slot_block);
-  Value* slot_ptr = builder.CreateInBoundsGEP(tuple_ptr, slot_offset, "slot_addr");
-  Value* val_ptr = builder.CreateBitCast(slot_ptr, codegen->GetPtrType(type_), "val_ptr");
+  llvm::Value* slot_ptr = builder.CreateInBoundsGEP(tuple_ptr, slot_offset, "slot_addr");
+  llvm::Value* val_ptr =
+      builder.CreateBitCast(slot_ptr, codegen->GetPtrType(type_), "val_ptr");
   // Depending on the type, load the values we need
-  Value* val = NULL;
-  Value* ptr = NULL;
-  Value* len = NULL;
-  Value* time_of_day = NULL;
-  Value* date = NULL;
+  llvm::Value* val = NULL;
+  llvm::Value* ptr = NULL;
+  llvm::Value* len = NULL;
+  llvm::Value* time_of_day = NULL;
+  llvm::Value* date = NULL;
   if (type_.IsStringType()) {
-    Value* ptr_ptr = builder.CreateStructGEP(NULL, val_ptr, 0, "ptr_ptr");
+    llvm::Value* ptr_ptr = builder.CreateStructGEP(NULL, val_ptr, 0, "ptr_ptr");
     ptr = builder.CreateLoad(ptr_ptr, "ptr");
-    Value* len_ptr = builder.CreateStructGEP(NULL, val_ptr, 1, "len_ptr");
+    llvm::Value* len_ptr = builder.CreateStructGEP(NULL, val_ptr, 1, "len_ptr");
     len = builder.CreateLoad(len_ptr, "len");
   } else if (type_.type == TYPE_FIXED_UDA_INTERMEDIATE) {
     // ptr and len are the slot and its fixed length.
     ptr = builder.CreateBitCast(val_ptr, codegen->ptr_type());
     len = codegen->GetIntConstant(TYPE_INT, type_.len);
   } else if (type_.type == TYPE_TIMESTAMP) {
-    Value* time_of_day_ptr = builder.CreateStructGEP(NULL, val_ptr, 0, "time_of_day_ptr");
+    llvm::Value* time_of_day_ptr =
+        builder.CreateStructGEP(NULL, val_ptr, 0, "time_of_day_ptr");
     // Cast boost::posix_time::time_duration to i64
-    Value* time_of_day_cast =
+    llvm::Value* time_of_day_cast =
         builder.CreateBitCast(time_of_day_ptr, codegen->GetPtrType(TYPE_BIGINT));
     time_of_day = builder.CreateLoad(time_of_day_cast, "time_of_day");
-    Value* date_ptr = builder.CreateStructGEP(NULL, val_ptr, 1, "date_ptr");
+    llvm::Value* date_ptr = builder.CreateStructGEP(NULL, val_ptr, 1, "date_ptr");
     // Cast boost::gregorian::date to i32
-    Value* date_cast = builder.CreateBitCast(date_ptr, codegen->GetPtrType(TYPE_INT));
+    llvm::Value* date_cast =
+        builder.CreateBitCast(date_ptr, codegen->GetPtrType(TYPE_INT));
     date = builder.CreateLoad(date_cast, "date");
   } else {
     // val_ptr is a native type
@@ -273,7 +277,8 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
 
   // Return block
   builder.SetInsertPoint(ret_block);
-  PHINode* is_null_phi = builder.CreatePHI(codegen->tinyint_type(), 2, "is_null_phi");
+  llvm::PHINode* is_null_phi =
+      builder.CreatePHI(codegen->tinyint_type(), 2, "is_null_phi");
   if (tuple_is_nullable_) is_null_phi->addIncoming(one, entry_block);
   if (check_slot_null_indicator_block != NULL) {
     is_null_phi->addIncoming(one, check_slot_null_indicator_block);
@@ -287,8 +292,8 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   if (type_.IsVarLenStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE) {
     DCHECK(ptr != NULL);
     DCHECK(len != NULL);
-    PHINode* ptr_phi = builder.CreatePHI(ptr->getType(), 2, "ptr_phi");
-    Value* null = Constant::getNullValue(ptr->getType());
+    llvm::PHINode* ptr_phi = builder.CreatePHI(ptr->getType(), 2, "ptr_phi");
+    llvm::Value* null = llvm::Constant::getNullValue(ptr->getType());
     if (tuple_is_nullable_) {
       ptr_phi->addIncoming(null, entry_block);
     }
@@ -297,8 +302,8 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
     }
     ptr_phi->addIncoming(ptr, get_slot_block);
 
-    PHINode* len_phi = builder.CreatePHI(len->getType(), 2, "len_phi");
-    null = ConstantInt::get(len->getType(), 0);
+    llvm::PHINode* len_phi = builder.CreatePHI(len->getType(), 2, "len_phi");
+    null = llvm::ConstantInt::get(len->getType(), 0);
     if (tuple_is_nullable_) {
       len_phi->addIncoming(null, entry_block);
     }
@@ -316,9 +321,9 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   } else if (type_.type == TYPE_TIMESTAMP) {
     DCHECK(time_of_day != NULL);
     DCHECK(date != NULL);
-    PHINode* time_of_day_phi =
+    llvm::PHINode* time_of_day_phi =
         builder.CreatePHI(time_of_day->getType(), 2, "time_of_day_phi");
-    Value* null = ConstantInt::get(time_of_day->getType(), 0);
+    llvm::Value* null = llvm::ConstantInt::get(time_of_day->getType(), 0);
     if (tuple_is_nullable_) {
       time_of_day_phi->addIncoming(null, entry_block);
     }
@@ -327,8 +332,8 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
     }
     time_of_day_phi->addIncoming(time_of_day, get_slot_block);
 
-    PHINode* date_phi = builder.CreatePHI(date->getType(), 2, "date_phi");
-    null = ConstantInt::get(date->getType(), 0);
+    llvm::PHINode* date_phi = builder.CreatePHI(date->getType(), 2, "date_phi");
+    null = llvm::ConstantInt::get(date->getType(), 0);
     if (tuple_is_nullable_) {
       date_phi->addIncoming(null, entry_block);
     }
@@ -345,8 +350,8 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
     builder.CreateRet(result.GetLoweredValue());
   } else {
     DCHECK(val != NULL);
-    PHINode* val_phi = builder.CreatePHI(val->getType(), 2, "val_phi");
-    Value* null = Constant::getNullValue(val->getType());
+    llvm::PHINode* val_phi = builder.CreatePHI(val->getType(), 2, "val_phi");
+    llvm::Value* null = llvm::Constant::getNullValue(val->getType());
     if (tuple_is_nullable_) {
       val_phi->addIncoming(null, entry_block);
     }

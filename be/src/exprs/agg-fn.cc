@@ -26,7 +26,6 @@
 #include "common/names.h"
 
 using namespace impala_udf;
-using namespace llvm;
 
 namespace impala {
 
@@ -148,7 +147,8 @@ FunctionContext::TypeDesc AggFn::GetOutputTypeDesc() const {
   return AnyValUtil::ColumnTypeToTypeDesc(output_slot_desc_.type());
 }
 
-Status AggFn::CodegenUpdateOrMergeFunction(LlvmCodeGen* codegen, Function** uda_fn) {
+Status AggFn::CodegenUpdateOrMergeFunction(
+    LlvmCodeGen* codegen, llvm::Function** uda_fn) {
   const string& symbol =
       is_merge_ ? fn_.aggregate_fn.merge_fn_symbol : fn_.aggregate_fn.update_fn_symbol;
   vector<ColumnType> fn_arg_types;

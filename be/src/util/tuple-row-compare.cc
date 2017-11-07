@@ -27,7 +27,6 @@
 #include "util/runtime-profile-counters.h"
 
 using namespace impala;
-using namespace llvm;
 using namespace strings;
 
 Status TupleRowComparator::Open(ObjectPool* pool, RuntimeState* state,
@@ -73,7 +72,7 @@ int TupleRowComparator::CompareInterpreted(
 }
 
 Status TupleRowComparator::Codegen(RuntimeState* state) {
-  Function* fn;
+  llvm::Function* fn;
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != NULL);
   RETURN_IF_ERROR(CodegenCompare(codegen, &fn));
@@ -203,11 +202,11 @@ Status TupleRowComparator::Codegen(RuntimeState* state) {
 // next_key2:                                        ; preds = %rhs_non_null12, %next_key
 //   ret i32 0
 // }
-Status TupleRowComparator::CodegenCompare(LlvmCodeGen* codegen, Function** fn) {
+Status TupleRowComparator::CodegenCompare(LlvmCodeGen* codegen, llvm::Function** fn) {
   SCOPED_TIMER(codegen->codegen_timer());
-  LLVMContext& context = codegen->context();
+  llvm::LLVMContext& context = codegen->context();
   const vector<ScalarExpr*>& ordering_exprs = ordering_exprs_;
-  Function* key_fns[ordering_exprs.size()];
+  llvm::Function* key_fns[ordering_exprs.size()];
   for (int i = 0; i < ordering_exprs.size(); ++i) {
     Status status = ordering_exprs[i]->GetCodegendComputeFn(codegen, &key_fns[i]);
     if (!status.ok()) {
@@ -221,9 +220,9 @@ Status TupleRowComparator::CodegenCompare(LlvmCodeGen* codegen, Function** fn) {
   // int Compare(ScalarExprEvaluator** ordering_expr_evals_lhs,
   //     ScalarExprEvaluator** ordering_expr_evals_rhs,
   //     TupleRow* lhs, TupleRow* rhs)
-  PointerType* expr_evals_type =
+  llvm::PointerType* expr_evals_type =
       codegen->GetPtrPtrType(ScalarExprEvaluator::LLVM_CLASS_NAME);
-  PointerType* tuple_row_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
+  llvm::PointerType* tuple_row_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
   LlvmCodeGen::FnPrototype prototype(codegen, "Compare", codegen->int_type());
   prototype.AddArgument("ordering_expr_evals_lhs", expr_evals_type);
   prototype.AddArgument("ordering_expr_evals_rhs", expr_evals_type);
@@ -231,69 +230,69 @@ Status TupleRowComparator::CodegenCompare(LlvmCodeGen* codegen, Function** fn) {
   prototype.AddArgument("rhs", tuple_row_type);
 
   LlvmBuilder builder(context);
-  Value* args[4];
+  llvm::Value* args[4];
   *fn = prototype.GeneratePrototype(&builder, args);
-  Value* lhs_evals_arg = args[0];
-  Value* rhs_evals_arg = args[1];
-  Value* lhs_arg = args[2];
-  Value* rhs_arg = args[3];
+  llvm::Value* lhs_evals_arg = args[0];
+  llvm::Value* rhs_evals_arg = args[1];
+  llvm::Value* lhs_arg = args[2];
+  llvm::Value* rhs_arg = args[3];
 
   // Unrolled loop over each key expr
   for (int i = 0; i < ordering_exprs.size(); ++i) {
     // The start of the next key expr after this one. Used to implement "continue" logic
     // in the unrolled loop.
-    BasicBlock* next_key_block = BasicBlock::Create(context, "next_key", *fn);
+    llvm::BasicBlock* next_key_block = llvm::BasicBlock::Create(context, "next_key", *fn);
 
     // Call key_fns[i](ordering_expr_evals_lhs[i], lhs_arg)
-    Value* lhs_eval = codegen->CodegenArrayAt(&builder, lhs_evals_arg, i);
-    Value* lhs_args[] = { lhs_eval, lhs_arg };
+    llvm::Value* lhs_eval = codegen->CodegenArrayAt(&builder, lhs_evals_arg, i);
+    llvm::Value* lhs_args[] = {lhs_eval, lhs_arg};
     CodegenAnyVal lhs_value = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
         ordering_exprs[i]->type(), key_fns[i], lhs_args, "lhs_value");
 
     // Call key_fns[i](ordering_expr_evals_rhs[i], rhs_arg)
-    Value* rhs_eval = codegen->CodegenArrayAt(&builder, rhs_evals_arg, i);
-    Value* rhs_args[] = { rhs_eval, rhs_arg };
+    llvm::Value* rhs_eval = codegen->CodegenArrayAt(&builder, rhs_evals_arg, i);
+    llvm::Value* rhs_args[] = {rhs_eval, rhs_arg};
     CodegenAnyVal rhs_value = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
         ordering_exprs[i]->type(), key_fns[i], rhs_args, "rhs_value");
 
     // Handle NULLs if necessary
-    Value* lhs_null = lhs_value.GetIsNull();
-    Value* rhs_null = rhs_value.GetIsNull();
+    llvm::Value* lhs_null = lhs_value.GetIsNull();
+    llvm::Value* rhs_null = rhs_value.GetIsNull();
     // if (lhs_value == NULL && rhs_value == NULL) continue;
-    Value* both_null = builder.CreateAnd(lhs_null, rhs_null, "both_null");
-    BasicBlock* non_null_block =
-        BasicBlock::Create(context, "non_null", *fn, next_key_block);
+    llvm::Value* both_null = builder.CreateAnd(lhs_null, rhs_null, "both_null");
+    llvm::BasicBlock* non_null_block =
+        llvm::BasicBlock::Create(context, "non_null", *fn, next_key_block);
     builder.CreateCondBr(both_null, next_key_block, non_null_block);
     // if (lhs_value == NULL && rhs_value != NULL) return nulls_first_[i];
     builder.SetInsertPoint(non_null_block);
-    BasicBlock* lhs_null_block =
-        BasicBlock::Create(context, "lhs_null", *fn, next_key_block);
-    BasicBlock* lhs_non_null_block =
-        BasicBlock::Create(context, "lhs_non_null", *fn, next_key_block);
+    llvm::BasicBlock* lhs_null_block =
+        llvm::BasicBlock::Create(context, "lhs_null", *fn, next_key_block);
+    llvm::BasicBlock* lhs_non_null_block =
+        llvm::BasicBlock::Create(context, "lhs_non_null", *fn, next_key_block);
     builder.CreateCondBr(lhs_null, lhs_null_block, lhs_non_null_block);
     builder.SetInsertPoint(lhs_null_block);
     builder.CreateRet(builder.getInt32(nulls_first_[i]));
     // if (lhs_value != NULL && rhs_value == NULL) return -nulls_first_[i];
     builder.SetInsertPoint(lhs_non_null_block);
-    BasicBlock* rhs_null_block =
-        BasicBlock::Create(context, "rhs_null", *fn, next_key_block);
-    BasicBlock* rhs_non_null_block =
-        BasicBlock::Create(context, "rhs_non_null", *fn, next_key_block);
+    llvm::BasicBlock* rhs_null_block =
+        llvm::BasicBlock::Create(context, "rhs_null", *fn, next_key_block);
+    llvm::BasicBlock* rhs_non_null_block =
+        llvm::BasicBlock::Create(context, "rhs_non_null", *fn, next_key_block);
     builder.CreateCondBr(rhs_null, rhs_null_block, rhs_non_null_block);
     builder.SetInsertPoint(rhs_null_block);
     builder.CreateRet(builder.getInt32(-nulls_first_[i]));
 
     // int result = RawValue::Compare(lhs_value, rhs_value, <type>)
     builder.SetInsertPoint(rhs_non_null_block);
-    Value* result = lhs_value.Compare(&rhs_value, "result");
+    llvm::Value* result = lhs_value.Compare(&rhs_value, "result");
 
     // if (!is_asc_[i]) result = -result;
     if (!is_asc_[i]) result = builder.CreateSub(builder.getInt32(0), result, "result");
     // if (result != 0) return result;
     // Otherwise, try the next Expr
-    Value* result_nonzero = builder.CreateICmpNE(result, builder.getInt32(0));
-    BasicBlock* result_nonzero_block =
-        BasicBlock::Create(context, "result_nonzero", *fn, next_key_block);
+    llvm::Value* result_nonzero = builder.CreateICmpNE(result, builder.getInt32(0));
+    llvm::BasicBlock* result_nonzero_block =
+        llvm::BasicBlock::Create(context, "result_nonzero", *fn, next_key_block);
     builder.CreateCondBr(result_nonzero, result_nonzero_block, next_key_block);
     builder.SetInsertPoint(result_nonzero_block);
     builder.CreateRet(result);

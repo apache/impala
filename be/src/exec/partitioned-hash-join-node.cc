@@ -47,14 +47,6 @@ static const string PREPARE_FOR_READ_FAILED_ERROR_MSG =
     "successfully.";
 
 using namespace impala;
-using llvm::BasicBlock;
-using llvm::ConstantInt;
-using llvm::Function;
-using llvm::GlobalValue;
-using llvm::LLVMContext;
-using llvm::PointerType;
-using llvm::Type;
-using llvm::Value;
 using strings::Substitute;
 
 PartitionedHashJoinNode::PartitionedHashJoinNode(
@@ -1301,19 +1293,20 @@ string PartitionedHashJoinNode::NodeDebugString() const {
 //   store i8* null, i8** %dst_tuple_ptr
 //   ret void
 // }
-Status PartitionedHashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen,
-    Function** fn) {
-  Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
+Status PartitionedHashJoinNode::CodegenCreateOutputRow(
+    LlvmCodeGen* codegen, llvm::Function** fn) {
+  llvm::Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
   DCHECK(tuple_row_type != NULL);
-  PointerType* tuple_row_ptr_type = PointerType::get(tuple_row_type, 0);
+  llvm::PointerType* tuple_row_ptr_type = llvm::PointerType::get(tuple_row_type, 0);
 
-  Type* this_type = codegen->GetType(BlockingJoinNode::LLVM_CLASS_NAME);
+  llvm::Type* this_type = codegen->GetType(BlockingJoinNode::LLVM_CLASS_NAME);
   DCHECK(this_type != NULL);
-  PointerType* this_ptr_type = PointerType::get(this_type, 0);
+  llvm::PointerType* this_ptr_type = llvm::PointerType::get(this_type, 0);
 
   // TupleRows are really just an array of pointers.  Easier to work with them
   // this way.
-  PointerType* tuple_row_working_type = PointerType::get(codegen->ptr_type(), 0);
+  llvm::PointerType* tuple_row_working_type =
+      llvm::PointerType::get(codegen->ptr_type(), 0);
 
   // Construct function signature to match CreateOutputRow()
   LlvmCodeGen::FnPrototype prototype(codegen, "CreateOutputRow", codegen->void_type());
@@ -1322,33 +1315,37 @@ Status PartitionedHashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen,
   prototype.AddArgument(LlvmCodeGen::NamedVariable("probe_arg", tuple_row_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("build_arg", tuple_row_ptr_type));
 
-  LLVMContext& context = codegen->context();
+  llvm::LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
-  Value* args[4];
+  llvm::Value* args[4];
   *fn = prototype.GeneratePrototype(&builder, args);
-  Value* out_row_arg = builder.CreateBitCast(args[1], tuple_row_working_type, "out");
-  Value* probe_row_arg = builder.CreateBitCast(args[2], tuple_row_working_type, "probe");
-  Value* build_row_arg = builder.CreateBitCast(args[3], tuple_row_working_type, "build");
+  llvm::Value* out_row_arg =
+      builder.CreateBitCast(args[1], tuple_row_working_type, "out");
+  llvm::Value* probe_row_arg =
+      builder.CreateBitCast(args[2], tuple_row_working_type, "probe");
+  llvm::Value* build_row_arg =
+      builder.CreateBitCast(args[3], tuple_row_working_type, "build");
 
   int num_probe_tuples = child(0)->row_desc()->tuple_descriptors().size();
   int num_build_tuples = child(1)->row_desc()->tuple_descriptors().size();
 
   // Copy probe row
   codegen->CodegenMemcpy(&builder, out_row_arg, probe_row_arg, probe_tuple_row_size_);
-  Value* build_row_idx[] = {codegen->GetIntConstant(TYPE_INT, num_probe_tuples)};
-  Value* build_row_dst =
+  llvm::Value* build_row_idx[] = {codegen->GetIntConstant(TYPE_INT, num_probe_tuples)};
+  llvm::Value* build_row_dst =
       builder.CreateInBoundsGEP(out_row_arg, build_row_idx, "build_dst_ptr");
 
   // Copy build row.
-  BasicBlock* build_not_null_block = BasicBlock::Create(context, "build_not_null", *fn);
-  BasicBlock* build_null_block = NULL;
+  llvm::BasicBlock* build_not_null_block =
+      llvm::BasicBlock::Create(context, "build_not_null", *fn);
+  llvm::BasicBlock* build_null_block = NULL;
 
   if (join_op_ == TJoinOp::LEFT_ANTI_JOIN || join_op_ == TJoinOp::LEFT_OUTER_JOIN ||
       join_op_ == TJoinOp::FULL_OUTER_JOIN ||
       join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
     // build tuple can be null
-    build_null_block = BasicBlock::Create(context, "build_null", *fn);
-    Value* is_build_null = builder.CreateIsNull(build_row_arg, "is_build_null");
+    build_null_block = llvm::BasicBlock::Create(context, "build_null", *fn);
+    llvm::Value* is_build_null = builder.CreateIsNull(build_row_arg, "is_build_null");
     builder.CreateCondBr(is_build_null, build_null_block, build_not_null_block);
 
     // Set tuple build ptrs to NULL
@@ -1356,8 +1353,10 @@ Status PartitionedHashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen,
     // to work.
     builder.SetInsertPoint(build_null_block);
     for (int i = 0; i < num_build_tuples; ++i) {
-      Value* array_idx[] = {codegen->GetIntConstant(TYPE_INT, i + num_probe_tuples)};
-      Value* dst = builder.CreateInBoundsGEP(out_row_arg, array_idx, "dst_tuple_ptr");
+      llvm::Value* array_idx[] = {
+          codegen->GetIntConstant(TYPE_INT, i + num_probe_tuples)};
+      llvm::Value* dst =
+          builder.CreateInBoundsGEP(out_row_arg, array_idx, "dst_tuple_ptr");
       builder.CreateStore(codegen->null_ptr_value(), dst);
     }
     builder.CreateRetVoid();
@@ -1382,8 +1381,8 @@ Status PartitionedHashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen,
 Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
     LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) {
   // Codegen for hashing rows
-  Function* hash_fn;
-  Function* murmur_hash_fn;
+  llvm::Function* hash_fn;
+  llvm::Function* murmur_hash_fn;
   RETURN_IF_ERROR(ht_ctx_->CodegenHashRow(codegen, false, &hash_fn));
   RETURN_IF_ERROR(ht_ctx_->CodegenHashRow(codegen, true, &murmur_hash_fn));
 
@@ -1420,41 +1419,41 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
     default:
       DCHECK(false);
   }
-  Function* process_probe_batch_fn = codegen->GetFunction(ir_fn, true);
+  llvm::Function* process_probe_batch_fn = codegen->GetFunction(ir_fn, true);
   DCHECK(process_probe_batch_fn != NULL);
   process_probe_batch_fn->setName("ProcessProbeBatch");
 
   // Verifies that ProcessProbeBatch() has weak_odr linkage so it's not discarded even
   // if it's not referenced. See http://llvm.org/docs/LangRef.html#linkage-types
-  DCHECK(process_probe_batch_fn->getLinkage() == GlobalValue::WeakODRLinkage)
+  DCHECK(process_probe_batch_fn->getLinkage() == llvm::GlobalValue::WeakODRLinkage)
       << LlvmCodeGen::Print(process_probe_batch_fn);
 
   // Replace the parameter 'prefetch_mode' with constant.
-  Value* prefetch_mode_arg = codegen->GetArgument(process_probe_batch_fn, 1);
+  llvm::Value* prefetch_mode_arg = codegen->GetArgument(process_probe_batch_fn, 1);
   DCHECK_GE(prefetch_mode, TPrefetchMode::NONE);
   DCHECK_LE(prefetch_mode, TPrefetchMode::HT_BUCKET);
   prefetch_mode_arg->replaceAllUsesWith(
-      ConstantInt::get(Type::getInt32Ty(codegen->context()), prefetch_mode));
+      llvm::ConstantInt::get(llvm::Type::getInt32Ty(codegen->context()), prefetch_mode));
 
   // Codegen HashTable::Equals
-  Function* probe_equals_fn;
+  llvm::Function* probe_equals_fn;
   RETURN_IF_ERROR(ht_ctx_->CodegenEquals(codegen, false, &probe_equals_fn));
 
   // Codegen for evaluating probe rows
-  Function* eval_row_fn;
+  llvm::Function* eval_row_fn;
   RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(codegen, false, &eval_row_fn));
 
   // Codegen CreateOutputRow
-  Function* create_output_row_fn;
+  llvm::Function* create_output_row_fn;
   RETURN_IF_ERROR(CodegenCreateOutputRow(codegen, &create_output_row_fn));
 
   // Codegen evaluating other join conjuncts
-  Function* eval_other_conjuncts_fn;
+  llvm::Function* eval_other_conjuncts_fn;
   RETURN_IF_ERROR(ExecNode::CodegenEvalConjuncts(codegen, other_join_conjuncts_,
       &eval_other_conjuncts_fn, "EvalOtherConjuncts"));
 
   // Codegen evaluating conjuncts
-  Function* eval_conjuncts_fn;
+  llvm::Function* eval_conjuncts_fn;
   RETURN_IF_ERROR(ExecNode::CodegenEvalConjuncts(codegen, conjuncts_,
       &eval_conjuncts_fn));
 
@@ -1512,7 +1511,7 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
   DCHECK_GE(replaced_constants.stores_tuples, 1);
   DCHECK_GE(replaced_constants.quadratic_probing, 1);
 
-  Function* process_probe_batch_fn_level0 =
+  llvm::Function* process_probe_batch_fn_level0 =
       codegen->CloneFunction(process_probe_batch_fn);
 
   // process_probe_batch_fn_level0 uses CRC hash if available,

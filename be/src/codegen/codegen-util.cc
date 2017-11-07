@@ -21,17 +21,16 @@
 
 #include "common/names.h"
 
-using namespace llvm;
 using std::isdigit;
 
 namespace impala {
 
-CallInst* CodeGenUtil::CreateCallWithBitCasts(LlvmBuilder* builder,
-    Function *callee, ArrayRef<Value*> args, const Twine& name) {
-  vector<Value*> bitcast_args;
+llvm::CallInst* CodeGenUtil::CreateCallWithBitCasts(LlvmBuilder* builder,
+    llvm::Function* callee, llvm::ArrayRef<llvm::Value*> args, const llvm::Twine& name) {
+  vector<llvm::Value*> bitcast_args;
   bitcast_args.reserve(args.size());
-  Function::arg_iterator fn_arg = callee->arg_begin();
-  for (Value* arg: args) {
+  llvm::Function::arg_iterator fn_arg = callee->arg_begin();
+  for (llvm::Value* arg : args) {
     bitcast_args.push_back(
         CheckedBitCast(builder, arg, fn_arg->getType(), "create_call_bitcast"));
     ++fn_arg;
@@ -39,14 +38,14 @@ CallInst* CodeGenUtil::CreateCallWithBitCasts(LlvmBuilder* builder,
   return builder->CreateCall(callee, bitcast_args, name);
 }
 
-Value* CodeGenUtil::CheckedBitCast(LlvmBuilder* builder, Value* value,
-    Type* dst_type, const Twine& name) {
+llvm::Value* CodeGenUtil::CheckedBitCast(LlvmBuilder* builder, llvm::Value* value,
+    llvm::Type* dst_type, const llvm::Twine& name) {
   DCHECK(TypesAreStructurallyIdentical(value->getType(), dst_type))
       << Print(value->getType()) << " " << Print(dst_type);
   return builder->CreateBitCast(value, dst_type, name);
 }
 
-bool CodeGenUtil::TypesAreStructurallyIdentical(Type* t1, Type* t2) {
+bool CodeGenUtil::TypesAreStructurallyIdentical(llvm::Type* t1, llvm::Type* t2) {
   // All primitive types are deduplicated by LLVM, so we can just compare the pointers.
   if (t1 == t2) return true;
   // Derived types are structurally identical if they are the same kind of compound type

@@ -53,7 +53,6 @@
 
 #include "common/names.h"
 
-using namespace llvm;
 using strings::Substitute;
 
 DECLARE_int32(max_errors);
@@ -141,7 +140,7 @@ Status RuntimeState::CreateCodegen() {
 
 Status RuntimeState::CodegenScalarFns() {
   for (ScalarFnCall* scalar_fn : scalar_fns_to_codegen_) {
-    Function* fn;
+    llvm::Function* fn;
     RETURN_IF_ERROR(scalar_fn->GetCodegendComputeFn(codegen_.get(), &fn));
   }
   return Status::OK();

@@ -28,8 +28,6 @@
 
 #include "common/names.h"
 
-using namespace llvm;
-
 namespace impala {
 
 struct CaseExprState {
@@ -177,42 +175,42 @@ string CaseExpr::DebugString() const {
 //                                   %"class.impala::TupleRow"* %row)
 //   ret i16 %else_val
 // }
-Status CaseExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
+Status CaseExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
   if (ir_compute_fn_ != nullptr) {
     *fn = ir_compute_fn_;
     return Status::OK();
   }
 
   const int num_children = GetNumChildren();
-  Function* child_fns[num_children];
+  llvm::Function* child_fns[num_children];
   for (int i = 0; i < num_children; ++i) {
     RETURN_IF_ERROR(GetChild(i)->GetCodegendComputeFn(codegen, &child_fns[i]));
   }
 
-  LLVMContext& context = codegen->context();
+  llvm::LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
 
-  Value* args[2];
-  Function* function = CreateIrFunctionPrototype("CaseExpr", codegen, &args);
-  BasicBlock* eval_case_expr_block = nullptr;
+  llvm::Value* args[2];
+  llvm::Function* function = CreateIrFunctionPrototype("CaseExpr", codegen, &args);
+  llvm::BasicBlock* eval_case_expr_block = nullptr;
 
   // This is the block immediately after the when/then exprs. It will either point to a
   // block which returns the else expr, or returns NULL if no else expr is specified.
-  BasicBlock* default_value_block = BasicBlock::Create(
+  llvm::BasicBlock* default_value_block = llvm::BasicBlock::Create(
       context, has_else_expr() ? "return_else_expr" : "return_null", function);
 
   // If there is a case expression, create a block to evaluate it.
   CodegenAnyVal case_val;
-  BasicBlock* eval_first_when_expr_block = BasicBlock::Create(
+  llvm::BasicBlock* eval_first_when_expr_block = llvm::BasicBlock::Create(
       context, "eval_first_when_expr", function, default_value_block);
-  BasicBlock* current_when_expr_block = eval_first_when_expr_block;
+  llvm::BasicBlock* current_when_expr_block = eval_first_when_expr_block;
   if (has_case_expr()) {
     // Need at least case, when and then expr, and optionally an else expr
     DCHECK_GE(num_children, has_else_expr() ? 4 : 3);
     // If there is a case expr, create block eval_case_expr to evaluate the
     // case expr. Place this block before eval_first_when_expr_block
-    eval_case_expr_block = BasicBlock::Create(context, "eval_case_expr",
-        function, eval_first_when_expr_block);
+    eval_case_expr_block = llvm::BasicBlock::Create(
+        context, "eval_case_expr", function, eval_first_when_expr_block);
     builder.SetInsertPoint(eval_case_expr_block);
     case_val = CodegenAnyVal::CreateCallWrapped(
         codegen, &builder, children()[0]->type(), child_fns[0], args, "case_val");
@@ -228,18 +226,18 @@ Status CaseExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
   // pair. Both when and then subexpressions are single children. If there is a case expr
   // start loop at index 1. (case expr is GetChild(0) and has already be evaluated.
   for (int i = has_case_expr() ? 1 : 0; i < loop_end; i += 2) {
-    BasicBlock* check_when_expr_block = BasicBlock::Create(
+    llvm::BasicBlock* check_when_expr_block = llvm::BasicBlock::Create(
         context, "check_when_expr_block", function, default_value_block);
-    BasicBlock* return_then_expr_block =
-        BasicBlock::Create(context, "return_then_expr", function, default_value_block);
+    llvm::BasicBlock* return_then_expr_block = llvm::BasicBlock::Create(
+        context, "return_then_expr", function, default_value_block);
 
     // continue_or_exit_block either points to the next eval_next_when_expr block,
     // or points to the defaut_value_block if there are no more when/then expressions.
-    BasicBlock* continue_or_exit_block = nullptr;
+    llvm::BasicBlock* continue_or_exit_block = nullptr;
     if (i == last_loop_iter) {
       continue_or_exit_block = default_value_block;
     } else {
-      continue_or_exit_block = BasicBlock::Create(
+      continue_or_exit_block = llvm::BasicBlock::Create(
           context, "eval_next_when_expr", function, default_value_block);
     }
 
@@ -254,7 +252,7 @@ Status CaseExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
     builder.SetInsertPoint(check_when_expr_block);
     if (has_case_expr()) {
       // Compare for equality
-      Value* is_equal = case_val.Eq(&when_val);
+      llvm::Value* is_equal = case_val.Eq(&when_val);
       builder.CreateCondBr(is_equal, return_then_expr_block, continue_or_exit_block);
     } else {
       builder.CreateCondBr(
@@ -264,8 +262,8 @@ Status CaseExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
     builder.SetInsertPoint(return_then_expr_block);
 
     // Eval and return then value
-    Value* then_val = CodegenAnyVal::CreateCall(
-        codegen, &builder, child_fns[i+1], args, "then_val");
+    llvm::Value* then_val =
+        CodegenAnyVal::CreateCall(codegen, &builder, child_fns[i + 1], args, "then_val");
     builder.CreateRet(then_val);
 
     current_when_expr_block = continue_or_exit_block;
@@ -273,7 +271,7 @@ Status CaseExpr::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
 
   builder.SetInsertPoint(default_value_block);
   if (has_else_expr()) {
-    Value* else_val = CodegenAnyVal::CreateCall(
+    llvm::Value* else_val = CodegenAnyVal::CreateCall(
         codegen, &builder, child_fns[num_children - 1], args, "else_val");
     builder.CreateRet(else_val);
   } else {

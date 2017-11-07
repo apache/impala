@@ -28,7 +28,6 @@
 
 #include "common/names.h"
 
-using namespace llvm;
 using namespace impala;
 
 UnionNode::UnionNode(ObjectPool* pool, const TPlanNode& tnode,
@@ -118,7 +117,7 @@ void UnionNode::Codegen(RuntimeState* state) {
 
     // Get a copy of the function. This function will be modified and added to the
     // vector of functions.
-    Function* union_materialize_batch_fn =
+    llvm::Function* union_materialize_batch_fn =
         codegen->GetFunction(IRFunction::UNION_MATERIALIZE_BATCH, true);
     DCHECK(union_materialize_batch_fn != nullptr);
 

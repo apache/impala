@@ -46,12 +46,6 @@ static const string PREPARE_FOR_READ_FAILED_ERROR_MSG =
     "the memory limit may help this query to complete successfully.";
 
 using namespace impala;
-using llvm::ConstantInt;
-using llvm::Function;
-using llvm::LLVMContext;
-using llvm::PointerType;
-using llvm::Type;
-using llvm::Value;
 using strings::Substitute;
 
 const char* PhjBuilder::LLVM_CLASS_NAME = "class.impala::PhjBuilder";
@@ -746,16 +740,16 @@ void PhjBuilder::Codegen(LlvmCodeGen* codegen) {
   Status codegen_status;
 
   // Codegen for hashing rows with the builder's hash table context.
-  Function* hash_fn;
+  llvm::Function* hash_fn;
   codegen_status = ht_ctx_->CodegenHashRow(codegen, false, &hash_fn);
-  Function* murmur_hash_fn;
+  llvm::Function* murmur_hash_fn;
   codegen_status.MergeStatus(ht_ctx_->CodegenHashRow(codegen, true, &murmur_hash_fn));
 
   // Codegen for evaluating build rows
-  Function* eval_build_row_fn;
+  llvm::Function* eval_build_row_fn;
   codegen_status.MergeStatus(ht_ctx_->CodegenEvalRow(codegen, true, &eval_build_row_fn));
 
-  Function* insert_filters_fn;
+  llvm::Function* insert_filters_fn;
   codegen_status.MergeStatus(
       CodegenInsertRuntimeFilters(codegen, filter_exprs_, &insert_filters_fn));
 
@@ -786,9 +780,10 @@ string PhjBuilder::DebugString() const {
   return ss.str();
 }
 
-Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen, Function* hash_fn,
-    Function* murmur_hash_fn, Function* eval_row_fn, Function* insert_filters_fn) {
-  Function* process_build_batch_fn =
+Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen, llvm::Function* hash_fn,
+    llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn,
+    llvm::Function* insert_filters_fn) {
+  llvm::Function* process_build_batch_fn =
       codegen->GetFunction(IRFunction::PHJ_PROCESS_BUILD_BATCH, true);
   DCHECK(process_build_batch_fn != NULL);
 
@@ -813,19 +808,20 @@ Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen, Function* hash
   DCHECK_EQ(replaced_constants.stores_tuples, 0);
   DCHECK_EQ(replaced_constants.quadratic_probing, 0);
 
-  Value* is_null_aware_arg = codegen->GetArgument(process_build_batch_fn, 5);
+  llvm::Value* is_null_aware_arg = codegen->GetArgument(process_build_batch_fn, 5);
   is_null_aware_arg->replaceAllUsesWith(
-      ConstantInt::get(Type::getInt1Ty(codegen->context()),
-      join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN));
+      llvm::ConstantInt::get(llvm::Type::getInt1Ty(codegen->context()),
+          join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN));
 
-  Function* process_build_batch_fn_level0 =
+  llvm::Function* process_build_batch_fn_level0 =
       codegen->CloneFunction(process_build_batch_fn);
 
   // Always build runtime filters at level0 (if there are any).
   // Note that the first argument of this function is the return value.
-  Value* build_filter_l0_arg = codegen->GetArgument(process_build_batch_fn_level0, 4);
-  build_filter_l0_arg->replaceAllUsesWith(
-      ConstantInt::get(Type::getInt1Ty(codegen->context()), filter_ctxs_.size() > 0));
+  llvm::Value* build_filter_l0_arg =
+      codegen->GetArgument(process_build_batch_fn_level0, 4);
+  build_filter_l0_arg->replaceAllUsesWith(llvm::ConstantInt::get(
+      llvm::Type::getInt1Ty(codegen->context()), filter_ctxs_.size() > 0));
 
   // process_build_batch_fn_level0 uses CRC hash if available,
   replaced =
@@ -840,9 +836,9 @@ Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen, Function* hash
   // Never build filters after repartitioning, as all rows have already been added to the
   // filters during the level0 build. Note that the first argument of this function is the
   // return value.
-  Value* build_filter_arg = codegen->GetArgument(process_build_batch_fn, 4);
+  llvm::Value* build_filter_arg = codegen->GetArgument(process_build_batch_fn, 4);
   build_filter_arg->replaceAllUsesWith(
-      ConstantInt::get(Type::getInt1Ty(codegen->context()), false));
+      llvm::ConstantInt::get(llvm::Type::getInt1Ty(codegen->context()), false));
 
   // Finalize ProcessBuildBatch functions
   process_build_batch_fn = codegen->FinalizeFunction(process_build_batch_fn);
@@ -867,18 +863,20 @@ Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen, Function* hash
   return Status::OK();
 }
 
-Status PhjBuilder::CodegenInsertBatch(LlvmCodeGen* codegen, Function* hash_fn,
-    Function* murmur_hash_fn, Function* eval_row_fn, TPrefetchMode::type prefetch_mode) {
-  Function* insert_batch_fn = codegen->GetFunction(IRFunction::PHJ_INSERT_BATCH, true);
-  Function* build_equals_fn;
+Status PhjBuilder::CodegenInsertBatch(LlvmCodeGen* codegen, llvm::Function* hash_fn,
+    llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn,
+    TPrefetchMode::type prefetch_mode) {
+  llvm::Function* insert_batch_fn =
+      codegen->GetFunction(IRFunction::PHJ_INSERT_BATCH, true);
+  llvm::Function* build_equals_fn;
   RETURN_IF_ERROR(ht_ctx_->CodegenEquals(codegen, true, &build_equals_fn));
 
   // Replace the parameter 'prefetch_mode' with constant.
-  Value* prefetch_mode_arg = codegen->GetArgument(insert_batch_fn, 1);
+  llvm::Value* prefetch_mode_arg = codegen->GetArgument(insert_batch_fn, 1);
   DCHECK_GE(prefetch_mode, TPrefetchMode::NONE);
   DCHECK_LE(prefetch_mode, TPrefetchMode::HT_BUCKET);
   prefetch_mode_arg->replaceAllUsesWith(
-      ConstantInt::get(Type::getInt32Ty(codegen->context()), prefetch_mode));
+      llvm::ConstantInt::get(llvm::Type::getInt32Ty(codegen->context()), prefetch_mode));
 
   // Use codegen'd EvalBuildRow() function
   int replaced = codegen->ReplaceCallSites(insert_batch_fn, eval_row_fn, "EvalBuildRow");
@@ -900,7 +898,7 @@ Status PhjBuilder::CodegenInsertBatch(LlvmCodeGen* codegen, Function* hash_fn,
   DCHECK_GE(replaced_constants.stores_tuples, 1);
   DCHECK_GE(replaced_constants.quadratic_probing, 1);
 
-  Function* insert_batch_fn_level0 = codegen->CloneFunction(insert_batch_fn);
+  llvm::Function* insert_batch_fn_level0 = codegen->CloneFunction(insert_batch_fn);
 
   // Use codegen'd hash functions
   replaced = codegen->ReplaceCallSites(insert_batch_fn_level0, hash_fn, "HashRow");
@@ -942,32 +940,32 @@ Status PhjBuilder::CodegenInsertBatch(LlvmCodeGen* codegen, Function* hash_fn,
 //   ret void
 // }
 Status PhjBuilder::CodegenInsertRuntimeFilters(
-    LlvmCodeGen* codegen, const vector<ScalarExpr*>& filter_exprs, Function** fn) {
-  LLVMContext& context = codegen->context();
+    LlvmCodeGen* codegen, const vector<ScalarExpr*>& filter_exprs, llvm::Function** fn) {
+  llvm::LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
 
   *fn = nullptr;
-  Type* this_type = codegen->GetPtrType(PhjBuilder::LLVM_CLASS_NAME);
-  PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
+  llvm::Type* this_type = codegen->GetPtrType(PhjBuilder::LLVM_CLASS_NAME);
+  llvm::PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
   LlvmCodeGen::FnPrototype prototype(
       codegen, "InsertRuntimeFilters", codegen->void_type());
   prototype.AddArgument(LlvmCodeGen::NamedVariable("this", this_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
 
-  Value* args[2];
-  Function* insert_runtime_filters_fn = prototype.GeneratePrototype(&builder, args);
-  Value* row_arg = args[1];
+  llvm::Value* args[2];
+  llvm::Function* insert_runtime_filters_fn = prototype.GeneratePrototype(&builder, args);
+  llvm::Value* row_arg = args[1];
 
   int num_filters = filter_exprs.size();
   for (int i = 0; i < num_filters; ++i) {
-    Function* insert_fn;
+    llvm::Function* insert_fn;
     RETURN_IF_ERROR(FilterContext::CodegenInsert(codegen, filter_exprs_[i], &insert_fn));
-    PointerType* filter_context_type =
+    llvm::PointerType* filter_context_type =
         codegen->GetPtrType(FilterContext::LLVM_CLASS_NAME);
-    Value* filter_context_ptr =
+    llvm::Value* filter_context_ptr =
         codegen->CastPtrToLlvmPtr(filter_context_type, &filter_ctxs_[i]);
 
-    Value* insert_args[] = {filter_context_ptr, row_arg};
+    llvm::Value* insert_args[] = {filter_context_ptr, row_arg};
     builder.CreateCall(insert_fn, insert_args);
   }
 

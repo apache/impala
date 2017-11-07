@@ -27,8 +27,6 @@
 
 #include "common/names.h"
 
-using llvm::Function;
-
 namespace impala {
 
 SelectNode::SelectNode(
@@ -58,10 +56,11 @@ void SelectNode::Codegen(RuntimeState* state) {
 Status SelectNode::CodegenCopyRows(RuntimeState* state) {
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != nullptr);
-  Function* copy_rows_fn = codegen->GetFunction(IRFunction::SELECT_NODE_COPY_ROWS, true);
+  llvm::Function* copy_rows_fn =
+      codegen->GetFunction(IRFunction::SELECT_NODE_COPY_ROWS, true);
   DCHECK(copy_rows_fn != nullptr);
 
-  Function* eval_conjuncts_fn;
+  llvm::Function* eval_conjuncts_fn;
   RETURN_IF_ERROR(
       ExecNode::CodegenEvalConjuncts(codegen, conjuncts_, &eval_conjuncts_fn));
 

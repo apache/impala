@@ -26,7 +26,6 @@
 #include "common/names.h"
 
 using namespace impala_udf;
-using namespace llvm;
 
 namespace impala {
 
@@ -110,12 +109,13 @@ Status NullLiteral::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** 
   }
 
   DCHECK_EQ(GetNumChildren(), 0);
-  Value* args[2];
+  llvm::Value* args[2];
   *fn = CreateIrFunctionPrototype("NullLiteral", codegen, &args);
-  BasicBlock* entry_block = BasicBlock::Create(codegen->context(), "entry", *fn);
+  llvm::BasicBlock* entry_block =
+      llvm::BasicBlock::Create(codegen->context(), "entry", *fn);
   LlvmBuilder builder(entry_block);
 
-  Value* v = CodegenAnyVal::GetNullVal(codegen, type());
+  llvm::Value* v = CodegenAnyVal::GetNullVal(codegen, type());
   builder.CreateRet(v);
   *fn = codegen->FinalizeFunction(*fn);
   if (UNLIKELY(*fn == nullptr)) {

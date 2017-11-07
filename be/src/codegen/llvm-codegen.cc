@@ -82,7 +82,6 @@
 
 #include "common/names.h"
 
-using namespace llvm;
 using namespace strings;
 using std::fstream;
 using std::move;
@@ -200,7 +199,7 @@ Status LlvmCodeGen::CreateFromFile(RuntimeState* state, ObjectPool* pool,
   codegen->reset(new LlvmCodeGen(state, pool, parent_mem_tracker, id));
   SCOPED_TIMER((*codegen)->profile_->total_time_counter());
 
-  unique_ptr<Module> loaded_module;
+  unique_ptr<llvm::Module> loaded_module;
   RETURN_IF_ERROR((*codegen)->LoadModuleFromFile(file, &loaded_module));
 
   return (*codegen)->Init(std::move(loaded_module));
@@ -213,32 +212,34 @@ Status LlvmCodeGen::CreateFromMemory(RuntimeState* state, ObjectPool* pool,
 
   // Select the appropriate IR version. We cannot use LLVM IR with SSE4.2 instructions on
   // a machine without SSE4.2 support.
-  StringRef module_ir;
+  llvm::StringRef module_ir;
   string module_name;
   if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
-    module_ir = StringRef(reinterpret_cast<const char*>(impala_sse_llvm_ir),
-        impala_sse_llvm_ir_len);
+    module_ir = llvm::StringRef(
+        reinterpret_cast<const char*>(impala_sse_llvm_ir), impala_sse_llvm_ir_len);
     module_name = "Impala IR with SSE 4.2 support";
   } else {
-    module_ir = StringRef(reinterpret_cast<const char*>(impala_no_sse_llvm_ir),
-        impala_no_sse_llvm_ir_len);
+    module_ir = llvm::StringRef(
+        reinterpret_cast<const char*>(impala_no_sse_llvm_ir), impala_no_sse_llvm_ir_len);
     module_name = "Impala IR with no SSE 4.2 support";
   }
 
-  unique_ptr<MemoryBuffer> module_ir_buf(
-      MemoryBuffer::getMemBuffer(module_ir, "", false));
-  unique_ptr<Module> loaded_module;
+  unique_ptr<llvm::MemoryBuffer> module_ir_buf(
+      llvm::MemoryBuffer::getMemBuffer(module_ir, "", false));
+  unique_ptr<llvm::Module> loaded_module;
   RETURN_IF_ERROR((*codegen)->LoadModuleFromMemory(std::move(module_ir_buf),
       module_name, &loaded_module));
   return (*codegen)->Init(std::move(loaded_module));
 }
 
-Status LlvmCodeGen::LoadModuleFromFile(const string& file, unique_ptr<Module>* module) {
-  unique_ptr<MemoryBuffer> file_buffer;
+Status LlvmCodeGen::LoadModuleFromFile(
+    const string& file, unique_ptr<llvm::Module>* module) {
+  unique_ptr<llvm::MemoryBuffer> file_buffer;
   {
     SCOPED_TIMER(load_module_timer_);
 
-    ErrorOr<unique_ptr<MemoryBuffer>> tmp_file_buffer = MemoryBuffer::getFile(file);
+    llvm::ErrorOr<unique_ptr<llvm::MemoryBuffer>> tmp_file_buffer =
+        llvm::MemoryBuffer::getFile(file);
     if (!tmp_file_buffer) {
       stringstream ss;
       ss << "Could not load module " << file << ": "
@@ -252,12 +253,12 @@ Status LlvmCodeGen::LoadModuleFromFile(const string& file, unique_ptr<Module>* m
   return LoadModuleFromMemory(std::move(file_buffer), file, module);
 }
 
-Status LlvmCodeGen::LoadModuleFromMemory(unique_ptr<MemoryBuffer> module_ir_buf,
-    string module_name, unique_ptr<Module>* module) {
+Status LlvmCodeGen::LoadModuleFromMemory(unique_ptr<llvm::MemoryBuffer> module_ir_buf,
+    string module_name, unique_ptr<llvm::Module>* module) {
   DCHECK(!module_name.empty());
   SCOPED_TIMER(prepare_module_timer_);
   COUNTER_ADD(module_bitcode_size_, module_ir_buf->getMemBufferRef().getBufferSize());
-  ErrorOr<unique_ptr<Module>> tmp_module =
+  llvm::ErrorOr<unique_ptr<llvm::Module>> tmp_module =
       getLazyBitcodeModule(std::move(module_ir_buf), context(), false);
   if (!tmp_module) {
     stringstream ss;
@@ -278,7 +279,7 @@ Status LlvmCodeGen::LoadModuleFromMemory(unique_ptr<MemoryBuffer> module_ir_buf,
 // TODO: Create separate counters/timers (file size, load time) for each module linked
 Status LlvmCodeGen::LinkModuleFromLocalFs(const string& file) {
   SCOPED_TIMER(profile_->total_time_counter());
-  unique_ptr<Module> new_module;
+  unique_ptr<llvm::Module> new_module;
   RETURN_IF_ERROR(LoadModuleFromFile(file, &new_module));
 
   // The module data layout must match the one selected by the execution engine.
@@ -290,15 +291,15 @@ Status LlvmCodeGen::LinkModuleFromLocalFs(const string& file) {
   // the linker will choose. Materialize these functions in the main module in case they
   // are chosen by the linker or referenced by functions in the new module. Note that
   // linkModules() will materialize functions defined only in the new module.
-  for (Function& fn: new_module->functions()) {
+  for (llvm::Function& fn : new_module->functions()) {
     const string& fn_name = fn.getName();
     if (shared_call_graph_.GetCallees(fn_name) != nullptr) {
-      Function* local_fn = module_->getFunction(fn_name);
+      llvm::Function* local_fn = module_->getFunction(fn_name);
       RETURN_IF_ERROR(MaterializeFunction(local_fn));
     }
   }
 
-  bool error = Linker::linkModules(*module_, std::move(new_module));
+  bool error = llvm::Linker::linkModules(*module_, std::move(new_module));
   string diagnostic_err = diagnostic_handler_.GetErrorString();
   if (error) {
     stringstream ss;
@@ -320,9 +321,9 @@ Status LlvmCodeGen::LinkModuleFromHdfs(const string& hdfs_location) {
 }
 
 void LlvmCodeGen::StripGlobalCtorsDtors(llvm::Module* module) {
-  GlobalVariable* constructors = module->getGlobalVariable("llvm.global_ctors");
+  llvm::GlobalVariable* constructors = module->getGlobalVariable("llvm.global_ctors");
   if (constructors != NULL) constructors->eraseFromParent();
-  GlobalVariable* destructors = module->getGlobalVariable("llvm.global_dtors");
+  llvm::GlobalVariable* destructors = module->getGlobalVariable("llvm.global_dtors");
   if (destructors != NULL) destructors->eraseFromParent();
 }
 
@@ -345,9 +346,9 @@ Status LlvmCodeGen::CreateImpalaCodegen(RuntimeState* state,
   codegen->timestamp_value_type_ = codegen->GetType(TimestampValue::LLVM_CLASS_NAME);
 
   // Verify size is correct
-  const DataLayout& data_layout = codegen->execution_engine()->getDataLayout();
-  const StructLayout* layout =
-      data_layout.getStructLayout(static_cast<StructType*>(codegen->string_value_type_));
+  const llvm::DataLayout& data_layout = codegen->execution_engine()->getDataLayout();
+  const llvm::StructLayout* layout = data_layout.getStructLayout(
+      static_cast<llvm::StructType*>(codegen->string_value_type_));
   if (layout->getSizeInBytes() != sizeof(StringValue)) {
     DCHECK_EQ(layout->getSizeInBytes(), sizeof(StringValue));
     return Status("Could not create llvm struct type for StringVal");
@@ -355,26 +356,26 @@ Status LlvmCodeGen::CreateImpalaCodegen(RuntimeState* state,
 
   // Materialize functions referenced by the global variables.
   for (const string& fn_name : shared_call_graph_.fns_referenced_by_gv()) {
-    Function* fn = codegen->module_->getFunction(fn_name);
+    llvm::Function* fn = codegen->module_->getFunction(fn_name);
     DCHECK(fn != nullptr);
     RETURN_IF_ERROR(codegen->MaterializeFunction(fn));
   }
   return Status::OK();
 }
 
-Status LlvmCodeGen::Init(unique_ptr<Module> module) {
+Status LlvmCodeGen::Init(unique_ptr<llvm::Module> module) {
   DCHECK(module != NULL);
 
-  llvm::CodeGenOpt::Level opt_level = CodeGenOpt::Aggressive;
+  llvm::CodeGenOpt::Level opt_level = llvm::CodeGenOpt::Aggressive;
 #ifndef NDEBUG
   // For debug builds, don't generate JIT compiled optimized assembly.
   // This takes a non-neglible amount of time (~.5 ms per function) and
   // blows up the fe tests (which take ~10-20 ms each).
-  opt_level = CodeGenOpt::None;
+  opt_level = llvm::CodeGenOpt::None;
 #endif
   module_ = module.get();
-  EngineBuilder builder(std::move(module));
-  builder.setEngineKind(EngineKind::JIT);
+  llvm::EngineBuilder builder(std::move(module));
+  builder.setEngineKind(llvm::EngineKind::JIT);
   builder.setOptLevel(opt_level);
   unique_ptr<ImpalaMCJITMemoryManager> memory_manager(new ImpalaMCJITMemoryManager);
   memory_manager_ = memory_manager.get();
@@ -394,10 +395,10 @@ Status LlvmCodeGen::Init(unique_ptr<Module> module) {
   // The module data layout must match the one selected by the execution engine.
   module_->setDataLayout(execution_engine_->getDataLayout());
 
-  void_type_ = Type::getVoidTy(context());
-  ptr_type_ = PointerType::get(GetType(TYPE_TINYINT), 0);
-  true_value_ = ConstantInt::get(context(), APInt(1, true, true));
-  false_value_ = ConstantInt::get(context(), APInt(1, false, true));
+  void_type_ = llvm::Type::getVoidTy(context());
+  ptr_type_ = llvm::PointerType::get(GetType(TYPE_TINYINT), 0);
+  true_value_ = llvm::ConstantInt::get(context(), llvm::APInt(1, true, true));
+  false_value_ = llvm::ConstantInt::get(context(), llvm::APInt(1, false, true));
 
   SetupJITListeners();
 
@@ -442,9 +443,9 @@ void LlvmCodeGen::EnableOptimizations(bool enable) {
 void LlvmCodeGen::GetHostCPUAttrs(vector<string>* attrs) {
   // LLVM's ExecutionEngine expects features to be enabled or disabled with a list
   // of strings like ["+feature1", "-feature2"].
-  StringMap<bool> cpu_features;
+  llvm::StringMap<bool> cpu_features;
   llvm::sys::getHostCPUFeatures(cpu_features);
-  for (const StringMapEntry<bool>& entry: cpu_features) {
+  for (const llvm::StringMapEntry<bool>& entry : cpu_features) {
     attrs->emplace_back(
         Substitute("$0$1", entry.second ? "+" : "-", entry.first().data()));
   }
@@ -452,7 +453,7 @@ void LlvmCodeGen::GetHostCPUAttrs(vector<string>* attrs) {
 
 string LlvmCodeGen::GetIR(bool full_module) const {
   string str;
-  raw_string_ostream stream(str);
+  llvm::raw_string_ostream stream(str);
   if (full_module) {
     module_->print(stream, NULL);
   } else {
@@ -463,30 +464,30 @@ string LlvmCodeGen::GetIR(bool full_module) const {
   return str;
 }
 
-Type* LlvmCodeGen::GetType(const ColumnType& type) {
+llvm::Type* LlvmCodeGen::GetType(const ColumnType& type) {
   switch (type.type) {
     case TYPE_NULL:
-      return Type::getInt1Ty(context());
+      return llvm::Type::getInt1Ty(context());
     case TYPE_BOOLEAN:
-      return Type::getInt1Ty(context());
+      return llvm::Type::getInt1Ty(context());
     case TYPE_TINYINT:
-      return Type::getInt8Ty(context());
+      return llvm::Type::getInt8Ty(context());
     case TYPE_SMALLINT:
-      return Type::getInt16Ty(context());
+      return llvm::Type::getInt16Ty(context());
     case TYPE_INT:
-      return Type::getInt32Ty(context());
+      return llvm::Type::getInt32Ty(context());
     case TYPE_BIGINT:
-      return Type::getInt64Ty(context());
+      return llvm::Type::getInt64Ty(context());
     case TYPE_FLOAT:
-      return Type::getFloatTy(context());
+      return llvm::Type::getFloatTy(context());
     case TYPE_DOUBLE:
-      return Type::getDoubleTy(context());
+      return llvm::Type::getDoubleTy(context());
     case TYPE_STRING:
     case TYPE_VARCHAR:
       return string_value_type_;
     case TYPE_FIXED_UDA_INTERMEDIATE:
       // Represent this as an array of bytes.
-      return ArrayType::get(GetType(TYPE_TINYINT), type.len);
+      return llvm::ArrayType::get(GetType(TYPE_TINYINT), type.len);
     case TYPE_CHAR:
       // IMPALA-3207: Codegen for CHAR is not yet implemented, this should not
       // be called for TYPE_CHAR.
@@ -495,85 +496,88 @@ Type* LlvmCodeGen::GetType(const ColumnType& type) {
     case TYPE_TIMESTAMP:
       return timestamp_value_type_;
     case TYPE_DECIMAL:
-      return Type::getIntNTy(context(), type.GetByteSize() * 8);
+      return llvm::Type::getIntNTy(context(), type.GetByteSize() * 8);
     default:
       DCHECK(false) << "Invalid type: " << type;
       return NULL;
   }
 }
 
-PointerType* LlvmCodeGen::GetPtrType(const ColumnType& type) {
-  return PointerType::get(GetType(type), 0);
+llvm::PointerType* LlvmCodeGen::GetPtrType(const ColumnType& type) {
+  return llvm::PointerType::get(GetType(type), 0);
 }
 
-Type* LlvmCodeGen::GetType(const string& name) {
-  Type* type = module_->getTypeByName(name);
+llvm::Type* LlvmCodeGen::GetType(const string& name) {
+  llvm::Type* type = module_->getTypeByName(name);
   DCHECK(type != NULL) << name;
   return type;
 }
 
-PointerType* LlvmCodeGen::GetPtrType(const string& name) {
-  Type* type = GetType(name);
+llvm::PointerType* LlvmCodeGen::GetPtrType(const string& name) {
+  llvm::Type* type = GetType(name);
   DCHECK(type != NULL) << name;
-  return PointerType::get(type, 0);
+  return llvm::PointerType::get(type, 0);
 }
 
-PointerType* LlvmCodeGen::GetPtrType(Type* type) {
-  return PointerType::get(type, 0);
+llvm::PointerType* LlvmCodeGen::GetPtrType(llvm::Type* type) {
+  return llvm::PointerType::get(type, 0);
 }
 
-PointerType* LlvmCodeGen::GetPtrPtrType(Type* type) {
-  return PointerType::get(PointerType::get(type, 0), 0);
+llvm::PointerType* LlvmCodeGen::GetPtrPtrType(llvm::Type* type) {
+  return llvm::PointerType::get(llvm::PointerType::get(type, 0), 0);
 }
 
-PointerType* LlvmCodeGen::GetPtrPtrType(const string& name) {
-  return PointerType::get(GetPtrType(name), 0);
+llvm::PointerType* LlvmCodeGen::GetPtrPtrType(const string& name) {
+  return llvm::PointerType::get(GetPtrType(name), 0);
 }
 
 // Llvm doesn't let you create a PointerValue from a c-side ptr.  Instead
 // cast it to an int and then to 'type'.
-Value* LlvmCodeGen::CastPtrToLlvmPtr(Type* type, const void* ptr) {
-  Constant* const_int = ConstantInt::get(Type::getInt64Ty(context()), (int64_t)ptr);
-  return ConstantExpr::getIntToPtr(const_int, type);
+llvm::Value* LlvmCodeGen::CastPtrToLlvmPtr(llvm::Type* type, const void* ptr) {
+  llvm::Constant* const_int =
+      llvm::ConstantInt::get(llvm::Type::getInt64Ty(context()), (int64_t)ptr);
+  return llvm::ConstantExpr::getIntToPtr(const_int, type);
 }
 
-Constant* LlvmCodeGen::GetIntConstant(PrimitiveType type, uint64_t val) {
+llvm::Constant* LlvmCodeGen::GetIntConstant(PrimitiveType type, uint64_t val) {
   switch (type) {
     case TYPE_TINYINT:
-      return ConstantInt::get(context(), APInt(8, val));
+      return llvm::ConstantInt::get(context(), llvm::APInt(8, val));
     case TYPE_SMALLINT:
-      return ConstantInt::get(context(), APInt(16, val));
+      return llvm::ConstantInt::get(context(), llvm::APInt(16, val));
     case TYPE_INT:
-      return ConstantInt::get(context(), APInt(32, val));
+      return llvm::ConstantInt::get(context(), llvm::APInt(32, val));
     case TYPE_BIGINT:
-      return ConstantInt::get(context(), APInt(64, val));
+      return llvm::ConstantInt::get(context(), llvm::APInt(64, val));
     default:
       DCHECK(false);
       return NULL;
   }
 }
 
-Constant* LlvmCodeGen::GetIntConstant(int num_bytes, uint64_t low_bits, uint64_t high_bits) {
+llvm::Constant* LlvmCodeGen::GetIntConstant(
+    int num_bytes, uint64_t low_bits, uint64_t high_bits) {
   DCHECK_GE(num_bytes, 1);
   DCHECK_LE(num_bytes, 16);
   DCHECK(BitUtil::IsPowerOf2(num_bytes));
   vector<uint64_t> vals({low_bits, high_bits});
-  return ConstantInt::get(context(), APInt(8 * num_bytes, vals));
+  return llvm::ConstantInt::get(context(), llvm::APInt(8 * num_bytes, vals));
 }
 
-Value* LlvmCodeGen::GetStringConstant(LlvmBuilder* builder, char* data, int len) {
+llvm::Value* LlvmCodeGen::GetStringConstant(LlvmBuilder* builder, char* data, int len) {
   // Create a global string with private linkage.
-  Constant* const_string =
-      ConstantDataArray::getString(context(), StringRef(data, len), false);
-  GlobalVariable* gv = new GlobalVariable(
-      *module_, const_string->getType(), true, GlobalValue::PrivateLinkage, const_string);
+  llvm::Constant* const_string =
+      llvm::ConstantDataArray::getString(context(), llvm::StringRef(data, len), false);
+  llvm::GlobalVariable* gv = new llvm::GlobalVariable(*module_, const_string->getType(),
+      true, llvm::GlobalValue::PrivateLinkage, const_string);
   // Get a pointer to the first element of the string.
   return builder->CreateConstInBoundsGEP2_32(NULL, gv, 0, 0, "");
 }
 
-AllocaInst* LlvmCodeGen::CreateEntryBlockAlloca(Function* f, const NamedVariable& var) {
-  IRBuilder<> tmp(&f->getEntryBlock(), f->getEntryBlock().begin());
-  AllocaInst* alloca = tmp.CreateAlloca(var.type, NULL, var.name.c_str());
+llvm::AllocaInst* LlvmCodeGen::CreateEntryBlockAlloca(
+    llvm::Function* f, const NamedVariable& var) {
+  llvm::IRBuilder<> tmp(&f->getEntryBlock(), f->getEntryBlock().begin());
+  llvm::AllocaInst* alloca = tmp.CreateAlloca(var.type, NULL, var.name.c_str());
   if (var.type == GetType(CodegenAnyVal::LLVM_DECIMALVAL_NAME)) {
     // Generated functions may manipulate DecimalVal arguments via SIMD instructions such
     // as 'movaps' that require 16-byte memory alignment. LLVM uses 8-byte alignment by
@@ -583,30 +587,30 @@ AllocaInst* LlvmCodeGen::CreateEntryBlockAlloca(Function* f, const NamedVariable
   return alloca;
 }
 
-AllocaInst* LlvmCodeGen::CreateEntryBlockAlloca(
-    const LlvmBuilder& builder, Type* type, const char* name) {
+llvm::AllocaInst* LlvmCodeGen::CreateEntryBlockAlloca(
+    const LlvmBuilder& builder, llvm::Type* type, const char* name) {
   return CreateEntryBlockAlloca(
       builder.GetInsertBlock()->getParent(), NamedVariable(name, type));
 }
 
-AllocaInst* LlvmCodeGen::CreateEntryBlockAlloca(const LlvmBuilder& builder, Type* type,
-    int num_entries, int alignment, const char* name) {
-  Function* fn = builder.GetInsertBlock()->getParent();
-  IRBuilder<> tmp(&fn->getEntryBlock(), fn->getEntryBlock().begin());
-  AllocaInst* alloca =
+llvm::AllocaInst* LlvmCodeGen::CreateEntryBlockAlloca(const LlvmBuilder& builder,
+    llvm::Type* type, int num_entries, int alignment, const char* name) {
+  llvm::Function* fn = builder.GetInsertBlock()->getParent();
+  llvm::IRBuilder<> tmp(&fn->getEntryBlock(), fn->getEntryBlock().begin());
+  llvm::AllocaInst* alloca =
       tmp.CreateAlloca(type, GetIntConstant(TYPE_INT, num_entries), name);
   alloca->setAlignment(alignment);
   return alloca;
 }
 
-void LlvmCodeGen::CreateIfElseBlocks(Function* fn, const string& if_name,
-    const string& else_name, BasicBlock** if_block, BasicBlock** else_block,
-    BasicBlock* insert_before) {
-  *if_block = BasicBlock::Create(context(), if_name, fn, insert_before);
-  *else_block = BasicBlock::Create(context(), else_name, fn, insert_before);
+void LlvmCodeGen::CreateIfElseBlocks(llvm::Function* fn, const string& if_name,
+    const string& else_name, llvm::BasicBlock** if_block, llvm::BasicBlock** else_block,
+    llvm::BasicBlock* insert_before) {
+  *if_block = llvm::BasicBlock::Create(context(), if_name, fn, insert_before);
+  *else_block = llvm::BasicBlock::Create(context(), else_name, fn, insert_before);
 }
 
-Status LlvmCodeGen::MaterializeFunctionHelper(Function *fn) {
+Status LlvmCodeGen::MaterializeFunctionHelper(llvm::Function* fn) {
   DCHECK(!is_compiled_);
   if (fn->isIntrinsic() || !fn->isMaterializable()) return Status::OK();
 
@@ -622,7 +626,7 @@ Status LlvmCodeGen::MaterializeFunctionHelper(Function *fn) {
   const unordered_set<string>* callees = shared_call_graph_.GetCallees(fn->getName());
   if (callees != nullptr) {
     for (const string& callee : *callees) {
-      Function* callee_fn = module_->getFunction(callee);
+      llvm::Function* callee_fn = module_->getFunction(callee);
       DCHECK(callee_fn != nullptr);
       RETURN_IF_ERROR(MaterializeFunctionHelper(callee_fn));
     }
@@ -630,14 +634,14 @@ Status LlvmCodeGen::MaterializeFunctionHelper(Function *fn) {
   return Status::OK();
 }
 
-Status LlvmCodeGen::MaterializeFunction(Function *fn) {
+Status LlvmCodeGen::MaterializeFunction(llvm::Function* fn) {
   SCOPED_TIMER(profile_->total_time_counter());
   SCOPED_TIMER(prepare_module_timer_);
   return MaterializeFunctionHelper(fn);
 }
 
-Function* LlvmCodeGen::GetFunction(const string& symbol, bool clone) {
-  Function* fn = module_->getFunction(symbol.c_str());
+llvm::Function* LlvmCodeGen::GetFunction(const string& symbol, bool clone) {
+  llvm::Function* fn = module_->getFunction(symbol.c_str());
   if (fn == NULL) {
     LOG(ERROR) << "Unable to locate function " << symbol;
     return NULL;
@@ -648,8 +652,8 @@ Function* LlvmCodeGen::GetFunction(const string& symbol, bool clone) {
   return fn;
 }
 
-Function* LlvmCodeGen::GetFunction(IRFunction::Type ir_type, bool clone) {
-  Function* fn = loaded_functions_[ir_type];
+llvm::Function* LlvmCodeGen::GetFunction(IRFunction::Type ir_type, bool clone) {
+  llvm::Function* fn = loaded_functions_[ir_type];
   if (fn == NULL) {
     DCHECK(FN_MAPPINGS[ir_type].fn == ir_type);
     const string& fn_name = FN_MAPPINGS[ir_type].fn_name;
@@ -667,16 +671,16 @@ Function* LlvmCodeGen::GetFunction(IRFunction::Type ir_type, bool clone) {
 }
 
 // TODO: this should return a Status
-bool LlvmCodeGen::VerifyFunction(Function* fn) {
+bool LlvmCodeGen::VerifyFunction(llvm::Function* fn) {
   if (is_corrupt_) return false;
 
   // Check that there are no calls to FunctionContextImpl::GetConstFnAttr(). These should all
   // have been inlined via InlineConstFnAttrs().
-  for (inst_iterator iter = inst_begin(fn); iter != inst_end(fn); ++iter) {
-    Instruction* instr = &*iter;
-    if (!isa<CallInst>(instr)) continue;
-    CallInst* call_instr = reinterpret_cast<CallInst*>(instr);
-    Function* called_fn = call_instr->getCalledFunction();
+  for (llvm::inst_iterator iter = inst_begin(fn); iter != inst_end(fn); ++iter) {
+    llvm::Instruction* instr = &*iter;
+    if (!llvm::isa<llvm::CallInst>(instr)) continue;
+    llvm::CallInst* call_instr = reinterpret_cast<llvm::CallInst*>(instr);
+    llvm::Function* called_fn = call_instr->getCalledFunction();
 
     // Look for call to FunctionContextImpl::GetConstFnAttr().
     if (called_fn != nullptr &&
@@ -694,7 +698,7 @@ bool LlvmCodeGen::VerifyFunction(Function* fn) {
   // will copy that step here and not abort on error. Adapted from the pre-verifier
   // function pass.
   // TODO: doesn't seem there is much traction in getting this fixed but we'll see
-  for (Function::iterator i = fn->begin(), e = fn->end(); i != e; ++i) {
+  for (llvm::Function::iterator i = fn->begin(), e = fn->end(); i != e; ++i) {
     if (i->empty() || !i->back().isTerminator()) {
       LOG(ERROR) << "Basic block must end with terminator: \n" << Print(&(*i));
       is_corrupt_ = true;
@@ -704,7 +708,7 @@ bool LlvmCodeGen::VerifyFunction(Function* fn) {
 
   if (!is_corrupt_) {
     string str;
-    raw_string_ostream stream(str);
+    llvm::raw_string_ostream stream(str);
     is_corrupt_ = verifyFunction(*fn, &stream);
     if (is_corrupt_) LOG(ERROR) << str;
   }
@@ -735,33 +739,34 @@ void LlvmCodeGen::SetCPUAttrs(llvm::Function* function) {
 }
 
 LlvmCodeGen::FnPrototype::FnPrototype(
-    LlvmCodeGen* codegen, const string& name, Type* ret_type)
+    LlvmCodeGen* codegen, const string& name, llvm::Type* ret_type)
   : codegen_(codegen), name_(name), ret_type_(ret_type) {
   DCHECK(!codegen_->is_compiled_) << "Not valid to add additional functions";
 }
 
-Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
-    LlvmBuilder* builder, Value** params, bool print_ir) {
-  vector<Type*> arguments;
+llvm::Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
+    LlvmBuilder* builder, llvm::Value** params, bool print_ir) {
+  vector<llvm::Type*> arguments;
   for (int i = 0; i < args_.size(); ++i) {
     arguments.push_back(args_[i].type);
   }
-  FunctionType* prototype = FunctionType::get(ret_type_, arguments, false);
+  llvm::FunctionType* prototype = llvm::FunctionType::get(ret_type_, arguments, false);
 
-  Function* fn = Function::Create(
-      prototype, GlobalValue::ExternalLinkage, name_, codegen_->module_);
+  llvm::Function* fn = llvm::Function::Create(
+      prototype, llvm::GlobalValue::ExternalLinkage, name_, codegen_->module_);
   DCHECK(fn != NULL);
 
   // Name the arguments
   int idx = 0;
-  for (Function::arg_iterator iter = fn->arg_begin();
-      iter != fn->arg_end(); ++iter, ++idx) {
+  for (llvm::Function::arg_iterator iter = fn->arg_begin(); iter != fn->arg_end();
+       ++iter, ++idx) {
     iter->setName(args_[idx].name);
     if (params != NULL) params[idx] = &*iter;
   }
 
   if (builder != NULL) {
-    BasicBlock* entry_block = BasicBlock::Create(codegen_->context(), "entry", fn);
+    llvm::BasicBlock* entry_block =
+        llvm::BasicBlock::Create(codegen_->context(), "entry", fn);
     builder->SetInsertPoint(entry_block);
   }
 
@@ -771,7 +776,7 @@ Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
 
 Status LlvmCodeGen::LoadFunction(const TFunction& fn, const std::string& symbol,
     const ColumnType* return_type, const std::vector<ColumnType>& arg_types,
-    int num_fixed_args, bool has_varargs, Function** llvm_fn,
+    int num_fixed_args, bool has_varargs, llvm::Function** llvm_fn,
     LibCacheEntry** cache_entry) {
   DCHECK_GE(arg_types.size(), num_fixed_args);
   DCHECK(has_varargs || arg_types.size() == num_fixed_args);
@@ -801,7 +806,7 @@ Status LlvmCodeGen::LoadFunction(const TFunction& fn, const std::string& symbol,
     // Per the x64 ABI, DecimalVals are returned via a DecimalVal* output argument.
     // So, the return type is void.
     bool is_decimal = return_type != NULL && return_type->type == TYPE_DECIMAL;
-    Type* llvm_return_type = return_type == NULL || is_decimal ?
+    llvm::Type* llvm_return_type = return_type == NULL || is_decimal ?
         void_type() :
         CodegenAnyVal::GetLoweredType(this, *return_type);
 
@@ -811,7 +816,7 @@ Status LlvmCodeGen::LoadFunction(const TFunction& fn, const std::string& symbol,
 
     if (is_decimal) {
       // Per the x64 ABI, DecimalVals are returned via a DecmialVal* output argument
-      Type* output_type = CodegenAnyVal::GetUnloweredPtrType(this, *return_type);
+      llvm::Type* output_type = CodegenAnyVal::GetUnloweredPtrType(this, *return_type);
       prototype.AddArgument("output", output_type);
     }
 
@@ -821,7 +826,7 @@ Status LlvmCodeGen::LoadFunction(const TFunction& fn, const std::string& symbol,
     // The "fixed" arguments for the UDF function, followed by the variable arguments,
     // if any.
     for (int i = 0; i < num_fixed_args; ++i) {
-      Type* arg_type = CodegenAnyVal::GetUnloweredPtrType(this, arg_types[i]);
+      llvm::Type* arg_type = CodegenAnyVal::GetUnloweredPtrType(this, arg_types[i]);
       prototype.AddArgument(Substitute("fixed_arg_$0", i), arg_type);
     }
 
@@ -875,16 +880,16 @@ Status LlvmCodeGen::LoadFunction(const TFunction& fn, const std::string& symbol,
 }
 
 int LlvmCodeGen::ReplaceCallSites(
-    Function* caller, Function* new_fn, const string& target_name) {
+    llvm::Function* caller, llvm::Function* new_fn, const string& target_name) {
   DCHECK(!is_compiled_);
   DCHECK(caller->getParent() == module_);
   DCHECK(caller != NULL);
   DCHECK(new_fn != NULL);
 
-  vector<CallInst*> call_sites;
+  vector<llvm::CallInst*> call_sites;
   FindCallSites(caller, target_name, &call_sites);
   int replaced = 0;
-  for (CallInst* call_instr: call_sites) {
+  for (llvm::CallInst* call_instr : call_sites) {
     // Replace the called function
     call_instr->setCalledFunction(new_fn);
     ++replaced;
@@ -892,17 +897,17 @@ int LlvmCodeGen::ReplaceCallSites(
   return replaced;
 }
 
-int LlvmCodeGen::ReplaceCallSitesWithValue(Function* caller, Value* replacement,
-    const string& target_name) {
+int LlvmCodeGen::ReplaceCallSitesWithValue(
+    llvm::Function* caller, llvm::Value* replacement, const string& target_name) {
   DCHECK(!is_compiled_);
   DCHECK(caller->getParent() == module_);
   DCHECK(caller != NULL);
   DCHECK(replacement != NULL);
 
-  vector<CallInst*> call_sites;
+  vector<llvm::CallInst*> call_sites;
   FindCallSites(caller, target_name, &call_sites);
   int replaced = 0;
-  for (CallInst* call_instr: call_sites) {
+  for (llvm::CallInst* call_instr : call_sites) {
     call_instr->replaceAllUsesWith(replacement);
     ++replaced;
   }
@@ -911,21 +916,22 @@ int LlvmCodeGen::ReplaceCallSitesWithValue(Function* caller, Value* replacement,
 
 int LlvmCodeGen::ReplaceCallSitesWithBoolConst(llvm::Function* caller, bool constant,
     const string& target_name) {
-  Value* replacement = ConstantInt::get(Type::getInt1Ty(context()), constant);
+  llvm::Value* replacement =
+      llvm::ConstantInt::get(llvm::Type::getInt1Ty(context()), constant);
   return ReplaceCallSitesWithValue(caller, replacement, target_name);
 }
 
 int LlvmCodeGen::InlineConstFnAttrs(const FunctionContext::TypeDesc& ret_type,
-    const vector<FunctionContext::TypeDesc>& arg_types, Function* fn) {
+    const vector<FunctionContext::TypeDesc>& arg_types, llvm::Function* fn) {
   int replaced = 0;
-  for (inst_iterator iter = inst_begin(fn), end = inst_end(fn); iter != end; ) {
+  for (llvm::inst_iterator iter = inst_begin(fn), end = inst_end(fn); iter != end;) {
     // Increment iter now so we don't mess it up modifying the instruction below
-    Instruction* instr = &*(iter++);
+    llvm::Instruction* instr = &*(iter++);
 
     // Look for call instructions
-    if (!isa<CallInst>(instr)) continue;
-    CallInst* call_instr = cast<CallInst>(instr);
-    Function* called_fn = call_instr->getCalledFunction();
+    if (!llvm::isa<llvm::CallInst>(instr)) continue;
+    llvm::CallInst* call_instr = llvm::cast<llvm::CallInst>(instr);
+    llvm::Function* called_fn = call_instr->getCalledFunction();
 
     // Look for call to FunctionContextImpl::GetConstFnAttr().
     if (called_fn == nullptr ||
@@ -934,8 +940,10 @@ int LlvmCodeGen::InlineConstFnAttrs(const FunctionContext::TypeDesc& ret_type,
     }
 
     // 't' and 'i' arguments must be constant
-    ConstantInt* t_arg = dyn_cast<ConstantInt>(call_instr->getArgOperand(1));
-    ConstantInt* i_arg = dyn_cast<ConstantInt>(call_instr->getArgOperand(2));
+    llvm::ConstantInt* t_arg =
+        llvm::dyn_cast<llvm::ConstantInt>(call_instr->getArgOperand(1));
+    llvm::ConstantInt* i_arg =
+        llvm::dyn_cast<llvm::ConstantInt>(call_instr->getArgOperand(2));
     // This optimization is only applied to built-ins which should have constant args.
     DCHECK(t_arg != nullptr)
         << "Non-constant 't' argument to FunctionContextImpl::GetConstFnAttr()";
@@ -948,7 +956,7 @@ int LlvmCodeGen::InlineConstFnAttrs(const FunctionContext::TypeDesc& ret_type,
     int i_val = static_cast<int>(i_arg->getSExtValue());
     DCHECK(state_ != nullptr);
     // All supported constants are currently integers.
-    call_instr->replaceAllUsesWith(ConstantInt::get(GetType(TYPE_INT),
+    call_instr->replaceAllUsesWith(llvm::ConstantInt::get(GetType(TYPE_INT),
         FunctionContextImpl::GetConstFnAttr(state_, ret_type, arg_types, t_val, i_val)));
     call_instr->eraseFromParent();
     ++replaced;
@@ -956,15 +964,15 @@ int LlvmCodeGen::InlineConstFnAttrs(const FunctionContext::TypeDesc& ret_type,
   return replaced;
 }
 
-void LlvmCodeGen::FindCallSites(Function* caller, const string& target_name,
-      vector<CallInst*>* results) {
-  for (inst_iterator iter = inst_begin(caller); iter != inst_end(caller); ++iter) {
-    Instruction* instr = &*iter;
+void LlvmCodeGen::FindCallSites(
+    llvm::Function* caller, const string& target_name, vector<llvm::CallInst*>* results) {
+  for (llvm::inst_iterator iter = inst_begin(caller); iter != inst_end(caller); ++iter) {
+    llvm::Instruction* instr = &*iter;
     // Look for call instructions. Note that we'll ignore invoke and other related
     // instructions that are not a plain function call.
-    if (CallInst::classof(instr)) {
-      CallInst* call_instr = reinterpret_cast<CallInst*>(instr);
-      Function* callee = call_instr->getCalledFunction();
+    if (llvm::CallInst::classof(instr)) {
+      llvm::CallInst* call_instr = reinterpret_cast<llvm::CallInst*>(instr);
+      llvm::Function* callee = call_instr->getCalledFunction();
       // Check for substring match.
       if (callee != NULL && callee->getName().find(target_name) != string::npos) {
         results->push_back(call_instr);
@@ -973,19 +981,19 @@ void LlvmCodeGen::FindCallSites(Function* caller, const string& target_name,
   }
 }
 
-Function* LlvmCodeGen::CloneFunction(Function* fn) {
+llvm::Function* LlvmCodeGen::CloneFunction(llvm::Function* fn) {
   DCHECK(!is_compiled_);
-  ValueToValueMapTy dummy_vmap;
+  llvm::ValueToValueMapTy dummy_vmap;
   // Verifies that 'fn' has been materialized already. Callers are expected to use
   // GetFunction() to obtain the Function object.
   DCHECK(!fn->isMaterializable());
   // CloneFunction() automatically gives the new function a unique name
-  Function* fn_clone = llvm::CloneFunction(fn, dummy_vmap);
+  llvm::Function* fn_clone = llvm::CloneFunction(fn, dummy_vmap);
   fn_clone->copyAttributesFrom(fn);
   return fn_clone;
 }
 
-Function* LlvmCodeGen::FinalizeFunction(Function* function) {
+llvm::Function* LlvmCodeGen::FinalizeFunction(llvm::Function* function) {
   SetCPUAttrs(function);
   if (!VerifyFunction(function)) {
     function->eraseFromParent(); // deletes function
@@ -1007,12 +1015,12 @@ Status LlvmCodeGen::MaterializeModule() {
 // It's okay to call this function even if the module has been materialized.
 Status LlvmCodeGen::FinalizeLazyMaterialization() {
   SCOPED_TIMER(prepare_module_timer_);
-  for (Function& fn: module_->functions()) {
+  for (llvm::Function& fn : module_->functions()) {
     if (fn.isMaterializable()) {
       DCHECK(!module_->isMaterialized());
       // Unmaterialized functions can still have their declarations around. LLVM asserts
       // these unmaterialized functions' linkage types are external / external weak.
-      fn.setLinkage(Function::ExternalLinkage);
+      fn.setLinkage(llvm::Function::ExternalLinkage);
       // DCE may claim the personality function is still referenced by unmaterialized
       // functions when it is deleted by DCE. Similarly, LLVM may complain if comdats
       // reference unmaterialized functions but their definition cannot be found.
@@ -1078,7 +1086,7 @@ Status LlvmCodeGen::FinalizeModule() {
 
   // Get pointers to all codegen'd functions
   for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
-    Function* function = fns_to_jit_compile_[i].first;
+    llvm::Function* function = fns_to_jit_compile_[i].first;
     void* jitted_function = execution_engine_->getPointerToFunction(function);
     DCHECK(jitted_function != NULL) << "Failed to jit " << function->getName().data();
     *fns_to_jit_compile_[i].second = jitted_function;
@@ -1105,7 +1113,7 @@ Status LlvmCodeGen::OptimizeModule() {
   // TODO: we can likely muck with this to get better compile speeds or write
   // our own passes.  Our subexpression elimination optimization can be rolled into
   // a pass.
-  PassManagerBuilder pass_builder;
+  llvm::PassManagerBuilder pass_builder;
   // 2 maps to -O2
   // TODO: should we switch to 3? (3 may not produce different IR than 2 while taking
   // longer, but we should check)
@@ -1114,11 +1122,11 @@ Status LlvmCodeGen::OptimizeModule() {
   pass_builder.SizeLevel = 0;
   // Use a threshold equivalent to adding InlineHint on all functions.
   // This results in slightly better performance than the default threshold (225).
-  pass_builder.Inliner = createFunctionInliningPass(325);
+  pass_builder.Inliner = llvm::createFunctionInliningPass(325);
 
   // The TargetIRAnalysis pass is required to provide information about the target
   // machine to optimisation passes, e.g. the cost model.
-  TargetIRAnalysis target_analysis =
+  llvm::TargetIRAnalysis target_analysis =
       execution_engine_->getTargetMachine()->getTargetIRAnalysis();
 
   // Before running any other optimization passes, run the internalize pass, giving it
@@ -1130,13 +1138,14 @@ Status LlvmCodeGen::OptimizeModule() {
   for (auto& entry : fns_to_jit_compile_) {
     exported_fn_names.insert(entry.first->getName().str());
   }
-  unique_ptr<legacy::PassManager> module_pass_manager(new legacy::PassManager());
-  module_pass_manager->add(createTargetTransformInfoWrapperPass(target_analysis));
+  unique_ptr<llvm::legacy::PassManager> module_pass_manager(
+      new llvm::legacy::PassManager());
+  module_pass_manager->add(llvm::createTargetTransformInfoWrapperPass(target_analysis));
   module_pass_manager->add(
-      createInternalizePass([&exported_fn_names] (const GlobalValue &gv) {
+      llvm::createInternalizePass([&exported_fn_names](const llvm::GlobalValue& gv) {
         return exported_fn_names.find(gv.getName().str()) != exported_fn_names.end();
       }));
-  module_pass_manager->add(createGlobalDCEPass());
+  module_pass_manager->add(llvm::createGlobalDCEPass());
   module_pass_manager->run(*module_);
 
   // Update counters before final optimization, but after removing unused functions. This
@@ -1155,19 +1164,20 @@ Status LlvmCodeGen::OptimizeModule() {
   }
 
   // Create and run function pass manager
-  unique_ptr<legacy::FunctionPassManager> fn_pass_manager(
-      new legacy::FunctionPassManager(module_));
-  fn_pass_manager->add(createTargetTransformInfoWrapperPass(target_analysis));
+  unique_ptr<llvm::legacy::FunctionPassManager> fn_pass_manager(
+      new llvm::legacy::FunctionPassManager(module_));
+  fn_pass_manager->add(llvm::createTargetTransformInfoWrapperPass(target_analysis));
   pass_builder.populateFunctionPassManager(*fn_pass_manager);
   fn_pass_manager->doInitialization();
-  for (Module::iterator it = module_->begin(), end = module_->end(); it != end ; ++it) {
+  for (llvm::Module::iterator it = module_->begin(), end = module_->end(); it != end;
+       ++it) {
     if (!it->isDeclaration()) fn_pass_manager->run(*it);
   }
   fn_pass_manager->doFinalization();
 
   // Create and run module pass manager
-  module_pass_manager.reset(new legacy::PassManager());
-  module_pass_manager->add(createTargetTransformInfoWrapperPass(target_analysis));
+  module_pass_manager.reset(new llvm::legacy::PassManager());
+  module_pass_manager->add(llvm::createTargetTransformInfoWrapperPass(target_analysis));
   pass_builder.populateModulePassManager(*module_pass_manager);
   module_pass_manager->run(*module_);
   if (FLAGS_print_llvm_ir_instruction_count) {
@@ -1196,8 +1206,8 @@ void LlvmCodeGen::DestroyModule() {
   module_ = NULL;
 }
 
-void LlvmCodeGen::AddFunctionToJit(Function* fn, void** fn_ptr) {
-  Type* decimal_val_type = GetType(CodegenAnyVal::LLVM_DECIMALVAL_NAME);
+void LlvmCodeGen::AddFunctionToJit(llvm::Function* fn, void** fn_ptr) {
+  llvm::Type* decimal_val_type = GetType(CodegenAnyVal::LLVM_DECIMALVAL_NAME);
   if (fn->getReturnType() == decimal_val_type) {
     // Per the x86 calling convention ABI, DecimalVals should be returned via an extra
     // first DecimalVal* argument. We generate non-compliant functions that return the
@@ -1210,18 +1220,19 @@ void LlvmCodeGen::AddFunctionToJit(Function* fn, void** fn_ptr) {
     // Add return argument
     prototype.AddArgument(NamedVariable("result", decimal_val_type->getPointerTo()));
     // Add regular arguments
-    for (Function::arg_iterator arg = fn->arg_begin(); arg != fn->arg_end(); ++arg) {
+    for (llvm::Function::arg_iterator arg = fn->arg_begin(); arg != fn->arg_end();
+         ++arg) {
       prototype.AddArgument(NamedVariable(arg->getName(), arg->getType()));
     }
     LlvmBuilder builder(context());
-    Value* args[fn->arg_size() + 1];
-    Function* fn_wrapper = prototype.GeneratePrototype(&builder, &args[0]);
+    llvm::Value* args[fn->arg_size() + 1];
+    llvm::Function* fn_wrapper = prototype.GeneratePrototype(&builder, &args[0]);
     fn_wrapper->addFnAttr(llvm::Attribute::AlwaysInline);
     // Mark first argument as sret (not sure if this is necessary but it can't hurt)
-    fn_wrapper->addAttribute(1, Attribute::StructRet);
+    fn_wrapper->addAttribute(1, llvm::Attribute::StructRet);
     // Call 'fn' and store the result in the result argument
-    Value* result =
-        builder.CreateCall(fn, ArrayRef<Value*>({&args[1], fn->arg_size()}), "result");
+    llvm::Value* result = builder.CreateCall(
+        fn, llvm::ArrayRef<llvm::Value*>({&args[1], fn->arg_size()}), "result");
     builder.CreateStore(result, args[0]);
     builder.CreateRetVoid();
     fn = FinalizeFunction(fn_wrapper);
@@ -1231,13 +1242,13 @@ void LlvmCodeGen::AddFunctionToJit(Function* fn, void** fn_ptr) {
   AddFunctionToJitInternal(fn, fn_ptr);
 }
 
-void LlvmCodeGen::AddFunctionToJitInternal(Function* fn, void** fn_ptr) {
+void LlvmCodeGen::AddFunctionToJitInternal(llvm::Function* fn, void** fn_ptr) {
   DCHECK(!is_compiled_);
   fns_to_jit_compile_.push_back(make_pair(fn, fn_ptr));
 }
 
-void LlvmCodeGen::CodegenDebugTrace(LlvmBuilder* builder, const char* str,
-    Value* v1) {
+void LlvmCodeGen::CodegenDebugTrace(
+    LlvmBuilder* builder, const char* str, llvm::Value* v1) {
   LOG(ERROR) << "Remove IR codegen debug traces before checking in.";
 
   // Make a copy of str into memory owned by this object.  This is no guarantee that str is
@@ -1245,13 +1256,13 @@ void LlvmCodeGen::CodegenDebugTrace(LlvmBuilder* builder, const char* str,
   debug_strings_.push_back(Substitute("LLVM Trace: $0", str));
   str = debug_strings_.back().c_str();
 
-  Function* printf = module_->getFunction("printf");
+  llvm::Function* printf = module_->getFunction("printf");
   DCHECK(printf != NULL);
 
   // Call printf by turning 'str' into a constant ptr value
-  Value* str_ptr = CastPtrToLlvmPtr(ptr_type_, const_cast<char*>(str));
+  llvm::Value* str_ptr = CastPtrToLlvmPtr(ptr_type_, const_cast<char*>(str));
 
-  vector<Value*> calling_args;
+  vector<llvm::Value*> calling_args;
   calling_args.push_back(str_ptr);
   if (v1 != NULL) calling_args.push_back(v1);
   builder->CreateCall(printf, calling_args);
@@ -1262,7 +1273,7 @@ Status LlvmCodeGen::GetSymbols(const string& file, const string& module_id,
   ObjectPool pool;
   scoped_ptr<LlvmCodeGen> codegen;
   RETURN_IF_ERROR(CreateFromFile(nullptr, &pool, nullptr, file, module_id, &codegen));
-  for (const Function& fn: codegen->module_->functions()) {
+  for (const llvm::Function& fn : codegen->module_->functions()) {
     if (fn.isMaterializable()) symbols->insert(fn.getName());
   }
   codegen->Close();
@@ -1283,16 +1294,16 @@ Status LlvmCodeGen::GetSymbols(const string& file, const string& module_id,
 // ret_v2:                                           ; preds = %entry
 //   ret i32 %v2
 // }
-Function* LlvmCodeGen::CodegenMinMax(const ColumnType& type, bool min) {
+llvm::Function* LlvmCodeGen::CodegenMinMax(const ColumnType& type, bool min) {
   LlvmCodeGen::FnPrototype prototype(this, min ? "Min" : "Max", GetType(type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("v1", GetType(type)));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("v2", GetType(type)));
 
-  Value* params[2];
+  llvm::Value* params[2];
   LlvmBuilder builder(context());
-  Function* fn = prototype.GeneratePrototype(&builder, &params[0]);
+  llvm::Function* fn = prototype.GeneratePrototype(&builder, &params[0]);
 
-  Value* compare = NULL;
+  llvm::Value* compare = NULL;
   switch (type.type) {
     case TYPE_NULL:
       compare = false_value();
@@ -1332,7 +1343,7 @@ Function* LlvmCodeGen::CodegenMinMax(const ColumnType& type, bool min) {
   if (type.type == TYPE_BOOLEAN) {
     builder.CreateRet(compare);
   } else {
-    BasicBlock* ret_v1, *ret_v2;
+    llvm::BasicBlock *ret_v1, *ret_v2;
     CreateIfElseBlocks(fn, "ret_v1", "ret_v2", &ret_v1, &ret_v2);
 
     builder.CreateCondBr(compare, ret_v1, ret_v2);
@@ -1352,30 +1363,31 @@ Function* LlvmCodeGen::CodegenMinMax(const ColumnType& type, bool min) {
 Status LlvmCodeGen::LoadIntrinsics() {
   // Load memcpy
   {
-    Type* types[] = { ptr_type(), ptr_type(), GetType(TYPE_INT) };
-    Function* fn = Intrinsic::getDeclaration(module_, Intrinsic::memcpy, types);
+    llvm::Type* types[] = {ptr_type(), ptr_type(), GetType(TYPE_INT)};
+    llvm::Function* fn =
+        llvm::Intrinsic::getDeclaration(module_, llvm::Intrinsic::memcpy, types);
     if (fn == NULL) {
       return Status("Could not find memcpy intrinsic.");
     }
-    llvm_intrinsics_[Intrinsic::memcpy] = fn;
+    llvm_intrinsics_[llvm::Intrinsic::memcpy] = fn;
   }
 
   // TODO: where is the best place to put this?
   struct {
-    Intrinsic::ID id;
+    llvm::Intrinsic::ID id;
     const char* error;
   } non_overloaded_intrinsics[] = {
-    { Intrinsic::x86_sse42_crc32_32_8, "sse4.2 crc32_u8" },
-    { Intrinsic::x86_sse42_crc32_32_16, "sse4.2 crc32_u16" },
-    { Intrinsic::x86_sse42_crc32_32_32, "sse4.2 crc32_u32" },
-    { Intrinsic::x86_sse42_crc32_64_64, "sse4.2 crc32_u64" },
+      {llvm::Intrinsic::x86_sse42_crc32_32_8, "sse4.2 crc32_u8"},
+      {llvm::Intrinsic::x86_sse42_crc32_32_16, "sse4.2 crc32_u16"},
+      {llvm::Intrinsic::x86_sse42_crc32_32_32, "sse4.2 crc32_u32"},
+      {llvm::Intrinsic::x86_sse42_crc32_64_64, "sse4.2 crc32_u64"},
   };
   const int num_intrinsics =
       sizeof(non_overloaded_intrinsics) / sizeof(non_overloaded_intrinsics[0]);
 
   for (int i = 0; i < num_intrinsics; ++i) {
-    Intrinsic::ID id = non_overloaded_intrinsics[i].id;
-    Function* fn = Intrinsic::getDeclaration(module_, id);
+    llvm::Intrinsic::ID id = non_overloaded_intrinsics[i].id;
+    llvm::Function* fn = llvm::Intrinsic::getDeclaration(module_, id);
     if (fn == NULL) {
       stringstream ss;
       ss << "Could not find " << non_overloaded_intrinsics[i].error << " intrinsic";
@@ -1387,40 +1399,42 @@ Status LlvmCodeGen::LoadIntrinsics() {
   return Status::OK();
 }
 
-void LlvmCodeGen::CodegenMemcpy(LlvmBuilder* builder, Value* dst, Value* src, int size) {
+void LlvmCodeGen::CodegenMemcpy(
+    LlvmBuilder* builder, llvm::Value* dst, llvm::Value* src, int size) {
   DCHECK_GE(size, 0);
   if (size == 0) return;
-  Value* size_val = GetIntConstant(TYPE_BIGINT, size);
+  llvm::Value* size_val = GetIntConstant(TYPE_BIGINT, size);
   CodegenMemcpy(builder, dst, src, size_val);
 }
 
-void LlvmCodeGen::CodegenMemcpy(LlvmBuilder* builder, Value* dst, Value* src,
-    Value* size) {
+void LlvmCodeGen::CodegenMemcpy(
+    LlvmBuilder* builder, llvm::Value* dst, llvm::Value* src, llvm::Value* size) {
   DCHECK(dst->getType()->isPointerTy()) << Print(dst);
   DCHECK(src->getType()->isPointerTy()) << Print(src);
   builder->CreateMemCpy(dst, src, size, /* no alignment */ 0);
 }
 
-void LlvmCodeGen::CodegenMemset(LlvmBuilder* builder, Value* dst, int value, int size) {
+void LlvmCodeGen::CodegenMemset(
+    LlvmBuilder* builder, llvm::Value* dst, int value, int size) {
   DCHECK(dst->getType()->isPointerTy()) << Print(dst);
   DCHECK_GE(size, 0);
   if (size == 0) return;
-  Value* value_const = GetIntConstant(TYPE_TINYINT, value);
+  llvm::Value* value_const = GetIntConstant(TYPE_TINYINT, value);
   builder->CreateMemSet(dst, value_const, size, /* no alignment */ 0);
 }
 
-void LlvmCodeGen::CodegenClearNullBits(LlvmBuilder* builder, Value* tuple_ptr,
-    const TupleDescriptor& tuple_desc) {
-  Value* int8_ptr = builder->CreateBitCast(tuple_ptr, ptr_type(), "int8_ptr");
-  Value* null_bytes_offset =
-      ConstantInt::get(int_type(), tuple_desc.null_bytes_offset());
-  Value* null_bytes_ptr =
+void LlvmCodeGen::CodegenClearNullBits(
+    LlvmBuilder* builder, llvm::Value* tuple_ptr, const TupleDescriptor& tuple_desc) {
+  llvm::Value* int8_ptr = builder->CreateBitCast(tuple_ptr, ptr_type(), "int8_ptr");
+  llvm::Value* null_bytes_offset =
+      llvm::ConstantInt::get(int_type(), tuple_desc.null_bytes_offset());
+  llvm::Value* null_bytes_ptr =
       builder->CreateInBoundsGEP(int8_ptr, null_bytes_offset, "null_bytes_ptr");
   CodegenMemset(builder, null_bytes_ptr, 0, tuple_desc.num_null_bytes());
 }
 
-Value* LlvmCodeGen::CodegenMemPoolAllocate(LlvmBuilder* builder, Value* pool_val,
-    Value* size_val, const char* name) {
+llvm::Value* LlvmCodeGen::CodegenMemPoolAllocate(LlvmBuilder* builder,
+    llvm::Value* pool_val, llvm::Value* size_val, const char* name) {
   DCHECK(pool_val != nullptr);
   DCHECK(size_val->getType()->isIntegerTy());
   DCHECK_LE(size_val->getType()->getIntegerBitWidth(), 64);
@@ -1429,23 +1443,23 @@ Value* LlvmCodeGen::CodegenMemPoolAllocate(LlvmBuilder* builder, Value* pool_val
   if (size_val->getType()->getIntegerBitWidth() < 64) {
     size_val = builder->CreateSExt(size_val, bigint_type());
   }
-  Function* allocate_fn = GetFunction(IRFunction::MEMPOOL_ALLOCATE, false);
-  Value* alignment = GetIntConstant(TYPE_INT, MemPool::DEFAULT_ALIGNMENT);
-  Value* fn_args[] = {pool_val, size_val, alignment};
+  llvm::Function* allocate_fn = GetFunction(IRFunction::MEMPOOL_ALLOCATE, false);
+  llvm::Value* alignment = GetIntConstant(TYPE_INT, MemPool::DEFAULT_ALIGNMENT);
+  llvm::Value* fn_args[] = {pool_val, size_val, alignment};
   return builder->CreateCall(allocate_fn, fn_args, name);
 }
 
-Value* LlvmCodeGen::CodegenArrayAt(LlvmBuilder* builder, Value* array, int idx,
-    const char* name) {
+llvm::Value* LlvmCodeGen::CodegenArrayAt(
+    LlvmBuilder* builder, llvm::Value* array, int idx, const char* name) {
   DCHECK(array->getType()->isPointerTy() || array->getType()->isArrayTy())
       << Print(array->getType());
-  Value* ptr = builder->CreateConstGEP1_32(array, idx);
+  llvm::Value* ptr = builder->CreateConstGEP1_32(array, idx);
   return builder->CreateLoad(ptr, name);
 }
 
-Value* LlvmCodeGen::CodegenCallFunction(LlvmBuilder* builder,
-    IRFunction::Type ir_type, ArrayRef<Value*> args, const char* name) {
-  Function* fn = GetFunction(ir_type, false);
+llvm::Value* LlvmCodeGen::CodegenCallFunction(LlvmBuilder* builder,
+    IRFunction::Type ir_type, llvm::ArrayRef<llvm::Value*> args, const char* name) {
+  llvm::Function* fn = GetFunction(ir_type, false);
   DCHECK(fn != nullptr);
   return builder->CreateCall(fn, args, name);
 }
@@ -1477,7 +1491,7 @@ void LlvmCodeGen::ClearHashFns() {
 //   %12 = call i32 @llvm.x86.sse42.crc32.32.8(i32 %9, i8 %11)
 //   ret i32 %12
 // }
-Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
+llvm::Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
   if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
     if (num_bytes == -1) {
       // -1 indicates variable length, just return the generic loop based
@@ -1485,7 +1499,7 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
       return GetFunction(IRFunction::HASH_CRC, false);
     }
 
-    map<int, Function*>::iterator cached_fn = hash_fns_.find(num_bytes);
+    map<int, llvm::Function*>::iterator cached_fn = hash_fns_.find(num_bytes);
     if (cached_fn != hash_fns_.end()) {
       return cached_fn->second;
     }
@@ -1498,65 +1512,66 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
     prototype.AddArgument(LlvmCodeGen::NamedVariable("len", GetType(TYPE_INT)));
     prototype.AddArgument(LlvmCodeGen::NamedVariable("seed", GetType(TYPE_INT)));
 
-    Value* args[3];
+    llvm::Value* args[3];
     LlvmBuilder builder(context());
-    Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
-    Value* data = args[0];
-    Value* result = args[2];
+    llvm::Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
+    llvm::Value* data = args[0];
+    llvm::Value* result = args[2];
 
-    Function* crc8_fn = llvm_intrinsics_[Intrinsic::x86_sse42_crc32_32_8];
-    Function* crc16_fn = llvm_intrinsics_[Intrinsic::x86_sse42_crc32_32_16];
-    Function* crc32_fn = llvm_intrinsics_[Intrinsic::x86_sse42_crc32_32_32];
-    Function* crc64_fn = llvm_intrinsics_[Intrinsic::x86_sse42_crc32_64_64];
+    llvm::Function* crc8_fn = llvm_intrinsics_[llvm::Intrinsic::x86_sse42_crc32_32_8];
+    llvm::Function* crc16_fn = llvm_intrinsics_[llvm::Intrinsic::x86_sse42_crc32_32_16];
+    llvm::Function* crc32_fn = llvm_intrinsics_[llvm::Intrinsic::x86_sse42_crc32_32_32];
+    llvm::Function* crc64_fn = llvm_intrinsics_[llvm::Intrinsic::x86_sse42_crc32_64_64];
 
     // Generate the crc instructions starting with the highest number of bytes
     if (num_bytes >= 8) {
-      Value* result_64 = builder.CreateZExt(result, GetType(TYPE_BIGINT));
-      Value* ptr = builder.CreateBitCast(data, GetPtrType(TYPE_BIGINT));
+      llvm::Value* result_64 = builder.CreateZExt(result, GetType(TYPE_BIGINT));
+      llvm::Value* ptr = builder.CreateBitCast(data, GetPtrType(TYPE_BIGINT));
       int i = 0;
       while (num_bytes >= 8) {
-        Value* index[] = {GetIntConstant(TYPE_INT, i++)};
-        Value* d = builder.CreateLoad(builder.CreateInBoundsGEP(ptr, index));
-        result_64 = builder.CreateCall(crc64_fn, ArrayRef<Value*>({result_64, d}));
+        llvm::Value* index[] = {GetIntConstant(TYPE_INT, i++)};
+        llvm::Value* d = builder.CreateLoad(builder.CreateInBoundsGEP(ptr, index));
+        result_64 =
+            builder.CreateCall(crc64_fn, llvm::ArrayRef<llvm::Value*>({result_64, d}));
         num_bytes -= 8;
       }
       result = builder.CreateTrunc(result_64, GetType(TYPE_INT));
-      Value* index[] = {GetIntConstant(TYPE_INT, i * 8)};
+      llvm::Value* index[] = {GetIntConstant(TYPE_INT, i * 8)};
       // Update data to past the 8-byte chunks
       data = builder.CreateInBoundsGEP(data, index);
     }
 
     if (num_bytes >= 4) {
       DCHECK_LT(num_bytes, 8);
-      Value* ptr = builder.CreateBitCast(data, GetPtrType(TYPE_INT));
-      Value* d = builder.CreateLoad(ptr);
-      result = builder.CreateCall(crc32_fn, ArrayRef<Value*>({result, d}));
-      Value* index[] = {GetIntConstant(TYPE_INT, 4)};
+      llvm::Value* ptr = builder.CreateBitCast(data, GetPtrType(TYPE_INT));
+      llvm::Value* d = builder.CreateLoad(ptr);
+      result = builder.CreateCall(crc32_fn, llvm::ArrayRef<llvm::Value*>({result, d}));
+      llvm::Value* index[] = {GetIntConstant(TYPE_INT, 4)};
       data = builder.CreateInBoundsGEP(data, index);
       num_bytes -= 4;
     }
 
     if (num_bytes >= 2) {
       DCHECK_LT(num_bytes, 4);
-      Value* ptr = builder.CreateBitCast(data, GetPtrType(TYPE_SMALLINT));
-      Value* d = builder.CreateLoad(ptr);
-      result = builder.CreateCall(crc16_fn, ArrayRef<Value*>({result, d}));
-      Value* index[] = {GetIntConstant(TYPE_INT, 2)};
+      llvm::Value* ptr = builder.CreateBitCast(data, GetPtrType(TYPE_SMALLINT));
+      llvm::Value* d = builder.CreateLoad(ptr);
+      result = builder.CreateCall(crc16_fn, llvm::ArrayRef<llvm::Value*>({result, d}));
+      llvm::Value* index[] = {GetIntConstant(TYPE_INT, 2)};
       data = builder.CreateInBoundsGEP(data, index);
       num_bytes -= 2;
     }
 
     if (num_bytes > 0) {
       DCHECK_EQ(num_bytes, 1);
-      Value* d = builder.CreateLoad(data);
-      result = builder.CreateCall(crc8_fn, ArrayRef<Value*>({result, d}));
+      llvm::Value* d = builder.CreateLoad(data);
+      result = builder.CreateCall(crc8_fn, llvm::ArrayRef<llvm::Value*>({result, d}));
       --num_bytes;
     }
     DCHECK_EQ(num_bytes, 0);
 
-    Value* shift_16 = GetIntConstant(TYPE_INT, 16);
-    Value* upper_bits = builder.CreateShl(result, shift_16);
-    Value* lower_bits = builder.CreateLShr(result, shift_16);
+    llvm::Value* shift_16 = GetIntConstant(TYPE_INT, 16);
+    llvm::Value* upper_bits = builder.CreateShl(result, shift_16);
+    llvm::Value* lower_bits = builder.CreateLShr(result, shift_16);
     result = builder.CreateOr(upper_bits, lower_bits);
     builder.CreateRet(result);
 
@@ -1570,64 +1585,65 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
   }
 }
 
-static Function* GetLenOptimizedHashFn(
+static llvm::Function* GetLenOptimizedHashFn(
     LlvmCodeGen* codegen, IRFunction::Type f, int len) {
-  Function* fn = codegen->GetFunction(f, false);
+  llvm::Function* fn = codegen->GetFunction(f, false);
   DCHECK(fn != NULL);
   if (len != -1) {
     // Clone this function since we're going to modify it by replacing the
     // length with num_bytes.
     fn = codegen->CloneFunction(fn);
-    Value* len_arg = codegen->GetArgument(fn, 1);
+    llvm::Value* len_arg = codegen->GetArgument(fn, 1);
     len_arg->replaceAllUsesWith(codegen->GetIntConstant(TYPE_INT, len));
   }
   return codegen->FinalizeFunction(fn);
 }
 
-Function* LlvmCodeGen::GetMurmurHashFunction(int len) {
+llvm::Function* LlvmCodeGen::GetMurmurHashFunction(int len) {
   return GetLenOptimizedHashFn(this, IRFunction::HASH_MURMUR, len);
 }
 
-void LlvmCodeGen::ReplaceInstWithValue(Instruction* from, Value* to) {
-  BasicBlock::iterator iter(from);
+void LlvmCodeGen::ReplaceInstWithValue(llvm::Instruction* from, llvm::Value* to) {
+  llvm::BasicBlock::iterator iter(from);
   llvm::ReplaceInstWithValue(from->getParent()->getInstList(), iter, to);
 }
 
-Argument* LlvmCodeGen::GetArgument(Function* fn, int i) {
+llvm::Argument* LlvmCodeGen::GetArgument(llvm::Function* fn, int i) {
   DCHECK_LE(i, fn->arg_size());
-  Function::arg_iterator iter = fn->arg_begin();
+  llvm::Function::arg_iterator iter = fn->arg_begin();
   for (int j = 0; j < i; ++j) ++iter;
   return &*iter;
 }
 
-Value* LlvmCodeGen::GetPtrTo(LlvmBuilder* builder, Value* v, const char* name) {
-  Value* ptr = CreateEntryBlockAlloca(*builder, v->getType(), name);
+llvm::Value* LlvmCodeGen::GetPtrTo(
+    LlvmBuilder* builder, llvm::Value* v, const char* name) {
+  llvm::Value* ptr = CreateEntryBlockAlloca(*builder, v->getType(), name);
   builder->CreateStore(v, ptr);
   return ptr;
 }
 
-Constant* LlvmCodeGen::ConstantToGVPtr(Type* type, Constant* ir_constant,
-    const string& name) {
-  GlobalVariable* gv = new GlobalVariable(*module_, type, true,
-      GlobalValue::PrivateLinkage, ir_constant, name);
-  return ConstantExpr::getGetElementPtr(NULL, gv,
-      ArrayRef<Constant*>({GetIntConstant(TYPE_INT, 0)}));
+llvm::Constant* LlvmCodeGen::ConstantToGVPtr(
+    llvm::Type* type, llvm::Constant* ir_constant, const string& name) {
+  llvm::GlobalVariable* gv = new llvm::GlobalVariable(
+      *module_, type, true, llvm::GlobalValue::PrivateLinkage, ir_constant, name);
+  return llvm::ConstantExpr::getGetElementPtr(
+      NULL, gv, llvm::ArrayRef<llvm::Constant*>({GetIntConstant(TYPE_INT, 0)}));
 }
 
-Constant* LlvmCodeGen::ConstantsToGVArrayPtr(Type* element_type,
-      ArrayRef<Constant*> ir_constants, const string& name) {
-  ArrayType* array_type = ArrayType::get(element_type, ir_constants.size());
-  Constant* array_const = ConstantArray::get(array_type, ir_constants);
+llvm::Constant* LlvmCodeGen::ConstantsToGVArrayPtr(llvm::Type* element_type,
+    llvm::ArrayRef<llvm::Constant*> ir_constants, const string& name) {
+  llvm::ArrayType* array_type = llvm::ArrayType::get(element_type, ir_constants.size());
+  llvm::Constant* array_const = llvm::ConstantArray::get(array_type, ir_constants);
   return ConstantToGVPtr(array_type, array_const, name);
 }
 
-void LlvmCodeGen::DiagnosticHandler::DiagnosticHandlerFn(const DiagnosticInfo &info,
-    void *context){
-  if (info.getSeverity() == DiagnosticSeverity::DS_Error) {
+void LlvmCodeGen::DiagnosticHandler::DiagnosticHandlerFn(
+    const llvm::DiagnosticInfo& info, void* context) {
+  if (info.getSeverity() == llvm::DiagnosticSeverity::DS_Error) {
     LlvmCodeGen* codegen = reinterpret_cast<LlvmCodeGen*>(context);
     codegen->diagnostic_handler_.error_str_.clear();
-    raw_string_ostream error_msg(codegen->diagnostic_handler_.error_str_);
-    DiagnosticPrinterRawOStream diagnostic_printer(error_msg);
+    llvm::raw_string_ostream error_msg(codegen->diagnostic_handler_.error_str_);
+    llvm::DiagnosticPrinterRawOStream diagnostic_printer(error_msg);
     diagnostic_printer << "LLVM diagnostic error: ";
     info.print(diagnostic_printer);
     error_msg.flush();

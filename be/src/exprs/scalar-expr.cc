@@ -56,7 +56,6 @@
 #include "common/names.h"
 
 using namespace impala_udf;
-using namespace llvm;
 
 namespace impala {
 
@@ -331,7 +330,8 @@ int ScalarExpr::GetSlotIds(vector<SlotId>* slot_ids) const {
   return n;
 }
 
-Function* ScalarExpr::GetStaticGetValWrapper(ColumnType type, LlvmCodeGen* codegen) {
+llvm::Function* ScalarExpr::GetStaticGetValWrapper(
+    ColumnType type, LlvmCodeGen* codegen) {
   switch (type.type) {
     case TYPE_BOOLEAN:
       return codegen->GetFunction(IRFunction::SCALAR_EXPR_GET_BOOLEAN_VAL, false);
@@ -361,37 +361,38 @@ Function* ScalarExpr::GetStaticGetValWrapper(ColumnType type, LlvmCodeGen* codeg
   }
 }
 
-Function* ScalarExpr::CreateIrFunctionPrototype(const string& name,
-    LlvmCodeGen* codegen, Value* (*args)[2]) {
-  Type* return_type = CodegenAnyVal::GetLoweredType(codegen, type());
+llvm::Function* ScalarExpr::CreateIrFunctionPrototype(
+    const string& name, LlvmCodeGen* codegen, llvm::Value* (*args)[2]) {
+  llvm::Type* return_type = CodegenAnyVal::GetLoweredType(codegen, type());
   LlvmCodeGen::FnPrototype prototype(codegen, name, return_type);
   prototype.AddArgument(
       LlvmCodeGen::NamedVariable(
           "eval", codegen->GetPtrType(ScalarExprEvaluator::LLVM_CLASS_NAME)));
   prototype.AddArgument(
       LlvmCodeGen::NamedVariable("row", codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME)));
-  Function* function = prototype.GeneratePrototype(NULL, args[0]);
+  llvm::Function* function = prototype.GeneratePrototype(NULL, args[0]);
   DCHECK(function != NULL);
   return function;
 }
 
-Status ScalarExpr::GetCodegendComputeFnWrapper(LlvmCodeGen* codegen, Function** fn) {
+Status ScalarExpr::GetCodegendComputeFnWrapper(
+    LlvmCodeGen* codegen, llvm::Function** fn) {
   if (ir_compute_fn_ != nullptr) {
     *fn = ir_compute_fn_;
     return Status::OK();
   }
-  Function* static_getval_fn = GetStaticGetValWrapper(type(), codegen);
+  llvm::Function* static_getval_fn = GetStaticGetValWrapper(type(), codegen);
 
   // Call it passing this as the additional first argument.
-  Value* args[2];
+  llvm::Value* args[2];
   ir_compute_fn_ = CreateIrFunctionPrototype("CodegenComputeFnWrapper", codegen, &args);
-  BasicBlock* entry_block =
-      BasicBlock::Create(codegen->context(), "entry", ir_compute_fn_);
+  llvm::BasicBlock* entry_block =
+      llvm::BasicBlock::Create(codegen->context(), "entry", ir_compute_fn_);
   LlvmBuilder builder(entry_block);
-  Value* this_ptr =
+  llvm::Value* this_ptr =
       codegen->CastPtrToLlvmPtr(codegen->GetPtrType(ScalarExpr::LLVM_CLASS_NAME), this);
-  Value* compute_fn_args[] = {this_ptr, args[0], args[1]};
-  Value* ret = CodegenAnyVal::CreateCall(
+  llvm::Value* compute_fn_args[] = {this_ptr, args[0], args[1]};
+  llvm::Value* ret = CodegenAnyVal::CreateCall(
       codegen, &builder, static_getval_fn, compute_fn_args, "ret");
   builder.CreateRet(ret);
   *fn = codegen->FinalizeFunction(ir_compute_fn_);

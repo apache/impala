@@ -40,7 +40,6 @@
 
 using namespace impala;
 using namespace impala_udf;
-using namespace llvm;
 using std::move;
 
 // typedef for builtin aggregate functions. Unfortunately, these type defs don't

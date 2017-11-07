@@ -119,7 +119,7 @@ class LlvmBuilder : public llvm::IRBuilder<> {
 /// TODO: look into diagnostic output and debuggability
 /// TODO: confirm that the multi-threaded usage is correct
 //
-/// llvm::Function objects in the module are materialized lazily to save the cost of
+/// Function objects in the module are materialized lazily to save the cost of
 /// parsing IR of functions which are dead code. An unmaterialized function is similar
 /// to a function declaration which only contains the function signature and needs to
 /// be materialized before optimization and compilation happen if it's not dead code.

@@ -38,7 +38,6 @@
 
 using std::priority_queue;
 using namespace impala;
-using namespace llvm;
 
 TopNNode::TopNNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
@@ -97,15 +96,15 @@ void TopNNode::Codegen(RuntimeState* state) {
   // TODO: inline tuple_row_less_than_->Compare()
   Status codegen_status = tuple_row_less_than_->Codegen(state);
   if (codegen_status.ok()) {
-    Function* insert_batch_fn =
+    llvm::Function* insert_batch_fn =
         codegen->GetFunction(IRFunction::TOPN_NODE_INSERT_BATCH, true);
     DCHECK(insert_batch_fn != NULL);
 
     // Generate two MaterializeExprs() functions, one using tuple_pool_ and
     // one with no pool.
     DCHECK(output_tuple_desc_ != NULL);
-    Function* materialize_exprs_tuple_pool_fn;
-    Function* materialize_exprs_no_pool_fn;
+    llvm::Function* materialize_exprs_tuple_pool_fn;
+    llvm::Function* materialize_exprs_no_pool_fn;
 
     codegen_status = Tuple::CodegenMaterializeExprs(codegen, false,
         *output_tuple_desc_, output_tuple_exprs_,

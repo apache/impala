@@ -66,7 +66,6 @@
 
 #include "common/names.h"
 
-using namespace llvm;
 using strings::Substitute;
 
 DECLARE_int32(be_port);
@@ -555,8 +554,8 @@ bool ExecNode::IsNodeCodegenDisabled() const {
 // }
 //
 Status ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen,
-    const vector<ScalarExpr*>& conjuncts, Function** fn, const char* name) {
-  Function* conjunct_fns[conjuncts.size()];
+    const vector<ScalarExpr*>& conjuncts, llvm::Function** fn, const char* name) {
+  llvm::Function* conjunct_fns[conjuncts.size()];
   for (int i = 0; i < conjuncts.size(); ++i) {
     RETURN_IF_ERROR(conjuncts[i]->GetCodegendComputeFn(codegen, &conjunct_fns[i]));
     if (i >= LlvmCodeGen::CODEGEN_INLINE_EXPRS_THRESHOLD) {
@@ -567,8 +566,8 @@ Status ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen,
 
   // Construct function signature to match
   // bool EvalConjuncts(ScalarExprEvaluator**, int, TupleRow*)
-  PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
-  Type* eval_type = codegen->GetType(ScalarExprEvaluator::LLVM_CLASS_NAME);
+  llvm::PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
+  llvm::Type* eval_type = codegen->GetType(ScalarExprEvaluator::LLVM_CLASS_NAME);
 
   LlvmCodeGen::FnPrototype prototype(codegen, name, codegen->GetType(TYPE_BOOLEAN));
   prototype.AddArgument(
@@ -578,20 +577,21 @@ Status ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen,
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
 
   LlvmBuilder builder(codegen->context());
-  Value* args[3];
+  llvm::Value* args[3];
   *fn = prototype.GeneratePrototype(&builder, args);
-  Value* evals_arg = args[0];
-  Value* tuple_row_arg = args[2];
+  llvm::Value* evals_arg = args[0];
+  llvm::Value* tuple_row_arg = args[2];
 
   if (conjuncts.size() > 0) {
-    LLVMContext& context = codegen->context();
-    BasicBlock* false_block = BasicBlock::Create(context, "false", *fn);
+    llvm::LLVMContext& context = codegen->context();
+    llvm::BasicBlock* false_block = llvm::BasicBlock::Create(context, "false", *fn);
 
     for (int i = 0; i < conjuncts.size(); ++i) {
-      BasicBlock* true_block = BasicBlock::Create(context, "continue", *fn, false_block);
-      Value* eval_arg_ptr = builder.CreateInBoundsGEP(NULL, evals_arg,
-          codegen->GetIntConstant(TYPE_INT, i), "eval_ptr");
-      Value* eval_arg = builder.CreateLoad(eval_arg_ptr, "eval");
+      llvm::BasicBlock* true_block =
+          llvm::BasicBlock::Create(context, "continue", *fn, false_block);
+      llvm::Value* eval_arg_ptr = builder.CreateInBoundsGEP(
+          NULL, evals_arg, codegen->GetIntConstant(TYPE_INT, i), "eval_ptr");
+      llvm::Value* eval_arg = builder.CreateLoad(eval_arg_ptr, "eval");
 
       // Call conjunct_fns[i]
       CodegenAnyVal result = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
@@ -599,9 +599,9 @@ Status ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen,
           "result");
 
       // Return false if result.is_null || !result
-      Value* is_null = result.GetIsNull();
-      Value* is_false = builder.CreateNot(result.GetVal(), "is_false");
-      Value* return_false = builder.CreateOr(is_null, is_false, "return_false");
+      llvm::Value* is_null = result.GetIsNull();
+      llvm::Value* is_false = builder.CreateNot(result.GetVal(), "is_false");
+      llvm::Value* return_false = builder.CreateOr(is_null, is_false, "return_false");
       builder.CreateCondBr(return_false, false_block, true_block);
 
       // Set insertion point for continue/end

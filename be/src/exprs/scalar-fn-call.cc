@@ -43,13 +43,6 @@
 using namespace impala;
 using namespace impala_udf;
 using namespace strings;
-using llvm::ArrayType;
-using llvm::BasicBlock;
-using llvm::Function;
-using llvm::GlobalVariable;
-using llvm::PointerType;
-using llvm::Type;
-using llvm::Value;
 using std::move;
 using std::pair;
 
@@ -290,7 +283,7 @@ void ScalarFnCall::CloseEvaluator(FunctionContext::FunctionStateScope scope,
 //        i32 4,
 //        i64* inttoptr (i64 89111072 to i64*))
 //   ret { i8, double } %result
-Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
+Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) {
   if (ir_compute_fn_ != NULL) {
     *fn = ir_compute_fn_;
     return Status::OK();
@@ -307,7 +300,7 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
 
   vector<ColumnType> arg_types;
   for (const Expr* child : children_) arg_types.push_back(child->type());
-  Function* udf;
+  llvm::Function* udf;
   RETURN_IF_ERROR(codegen->LoadFunction(fn_, fn_.scalar_fn.symbol, &type_, arg_types,
       NumFixedArgs(), vararg_start_idx_ != -1, &udf, &cache_entry_));
   // Inline constants into the function if it has an IR body.
@@ -331,32 +324,33 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
   stringstream fn_name;
   fn_name << udf->getName().str() << "Wrapper";
 
-  Value* args[2];
+  llvm::Value* args[2];
   *fn = CreateIrFunctionPrototype(fn_name.str(), codegen, &args);
-  Value* eval = args[0];
-  Value* row = args[1];
-  BasicBlock* block = BasicBlock::Create(codegen->context(), "entry", *fn);
+  llvm::Value* eval = args[0];
+  llvm::Value* row = args[1];
+  llvm::BasicBlock* block = llvm::BasicBlock::Create(codegen->context(), "entry", *fn);
   LlvmBuilder builder(block);
 
   // Populate UDF arguments
-  vector<Value*> udf_args;
+  vector<llvm::Value*> udf_args;
 
   // First argument is always FunctionContext*.
   // Index into our registered offset in the ScalarFnEvaluator.
-  Value* eval_gep = builder.CreateStructGEP(NULL, eval, 1, "eval_gep");
-  Value* fn_ctxs_base = builder.CreateLoad(eval_gep, "fn_ctxs_base");
+  llvm::Value* eval_gep = builder.CreateStructGEP(NULL, eval, 1, "eval_gep");
+  llvm::Value* fn_ctxs_base = builder.CreateLoad(eval_gep, "fn_ctxs_base");
   // Use GEP to add our index to the base pointer
-  Value* fn_ctx_ptr = builder.CreateConstGEP1_32(fn_ctxs_base, fn_ctx_idx_, "fn_ctx_ptr");
-  Value* fn_ctx = builder.CreateLoad(fn_ctx_ptr, "fn_ctx");
+  llvm::Value* fn_ctx_ptr =
+      builder.CreateConstGEP1_32(fn_ctxs_base, fn_ctx_idx_, "fn_ctx_ptr");
+  llvm::Value* fn_ctx = builder.CreateLoad(fn_ctx_ptr, "fn_ctx");
   udf_args.push_back(fn_ctx);
 
   // Allocate a varargs array. The array's entry type is the appropriate AnyVal subclass.
   // E.g. if the vararg type is STRING, and the function is called with 10 arguments, we
   // allocate a StringVal[10] array. We allocate the buffer with Alloca so that LLVM can
   // optimise out the buffer once the function call is inlined.
-  Value* varargs_buffer = NULL;
+  llvm::Value* varargs_buffer = NULL;
   if (vararg_start_idx_ != -1) {
-    Type* unlowered_varargs_type =
+    llvm::Type* unlowered_varargs_type =
         CodegenAnyVal::GetUnloweredType(codegen, VarArgsType());
     varargs_buffer = codegen->CreateEntryBlockAlloca(builder, unlowered_varargs_type,
         NumVarArgs(), FunctionContextImpl::VARARGS_BUFFER_ALIGNMENT, "varargs_buffer");
@@ -364,8 +358,8 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
 
   // Call children to populate remaining arguments
   for (int i = 0; i < GetNumChildren(); ++i) {
-    Function* child_fn = NULL;
-    vector<Value*> child_fn_args;
+    llvm::Function* child_fn = NULL;
+    vector<llvm::Value*> child_fn_args;
     // Set 'child_fn' to the codegen'd function, sets child_fn == NULL if codegen fails
     Status status = children_[i]->GetCodegendComputeFn(codegen, &child_fn);
     if (UNLIKELY(!status.ok())) {
@@ -373,7 +367,7 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
       // Set 'child_fn' to the interpreted function
       child_fn = GetStaticGetValWrapper(children_[i]->type(), codegen);
       // First argument to interpreted function is children_[i]
-      Type* expr_ptr_type = codegen->GetPtrType(ScalarExpr::LLVM_CLASS_NAME);
+      llvm::Type* expr_ptr_type = codegen->GetPtrType(ScalarExpr::LLVM_CLASS_NAME);
       child_fn_args.push_back(codegen->CastPtrToLlvmPtr(expr_ptr_type, children_[i]));
     }
     child_fn_args.push_back(eval);
@@ -381,8 +375,8 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
 
     // Call 'child_fn', adding the result to either 'udf_args' or 'varargs_buffer'
     DCHECK(child_fn != NULL);
-    Type* arg_type = CodegenAnyVal::GetUnloweredType(codegen, children_[i]->type());
-    Value* arg_val_ptr;
+    llvm::Type* arg_type = CodegenAnyVal::GetUnloweredType(codegen, children_[i]->type());
+    llvm::Value* arg_val_ptr;
     if (i < NumFixedArgs()) {
       // Allocate space to store 'child_fn's result so we can pass the pointer to the UDF.
       arg_val_ptr = codegen->CreateEntryBlockAlloca(builder, arg_type, "arg_val_ptr");
@@ -394,7 +388,7 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
     }
     DCHECK_EQ(arg_val_ptr->getType(), arg_type->getPointerTo());
     // The result of the call must be stored in a lowered AnyVal
-    Value* lowered_arg_val_ptr = builder.CreateBitCast(arg_val_ptr,
+    llvm::Value* lowered_arg_val_ptr = builder.CreateBitCast(arg_val_ptr,
         CodegenAnyVal::GetLoweredPtrType(codegen, children_[i]->type()),
         "lowered_arg_val_ptr");
     CodegenAnyVal::CreateCall(
@@ -408,12 +402,13 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, Function** fn) {
     // Add the number of varargs
     udf_args.push_back(codegen->GetIntConstant(TYPE_INT, NumVarArgs()));
     // Add all the accumulated vararg inputs as one input argument.
-    PointerType* vararg_type = CodegenAnyVal::GetUnloweredPtrType(codegen, VarArgsType());
+    llvm::PointerType* vararg_type =
+        CodegenAnyVal::GetUnloweredPtrType(codegen, VarArgsType());
     udf_args.push_back(builder.CreateBitCast(varargs_buffer, vararg_type, "varargs"));
   }
 
   // Call UDF
-  Value* result_val =
+  llvm::Value* result_val =
       CodegenAnyVal::CreateCall(codegen, &builder, udf, udf_args, "result");
   builder.CreateRet(result_val);
 
@@ -436,7 +431,7 @@ Status ScalarFnCall::GetFunction(LlvmCodeGen* codegen, const string& symbol, voi
   } else {
     DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::IR);
     DCHECK(codegen != NULL);
-    Function* ir_fn = codegen->GetFunction(symbol, false);
+    llvm::Function* ir_fn = codegen->GetFunction(symbol, false);
     if (ir_fn == NULL) {
       stringstream ss;
       ss << "Unable to locate function " << symbol << " from LLVM module "

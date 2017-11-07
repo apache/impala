@@ -40,8 +40,6 @@
 
 #include "common/names.h"
 
-using namespace llvm;
-using namespace llvm::object;
 using std::hex;
 using std::rename;
 
@@ -51,8 +49,8 @@ SpinLock CodegenSymbolEmitter::perf_map_lock_;
 unordered_map<const void*, vector<CodegenSymbolEmitter::PerfMapEntry>>
     CodegenSymbolEmitter::perf_map_;
 
-void CodegenSymbolEmitter::NotifyObjectEmitted(const ObjectFile &obj,
-   const RuntimeDyld::LoadedObjectInfo &loaded_obj) {
+void CodegenSymbolEmitter::NotifyObjectEmitted(const llvm::object::ObjectFile& obj,
+    const llvm::RuntimeDyld::LoadedObjectInfo& loaded_obj) {
   vector<PerfMapEntry> perf_map_entries;
 
   ofstream asm_file;
@@ -65,12 +63,14 @@ void CodegenSymbolEmitter::NotifyObjectEmitted(const ObjectFile &obj,
     }
   }
 
-  OwningBinary<ObjectFile> debug_obj_owner = loaded_obj.getObjectForDebug(obj);
-  const ObjectFile &debug_obj = *debug_obj_owner.getBinary();
-  DWARFContextInMemory dwarf_ctx(debug_obj);
+  llvm::object::OwningBinary<llvm::object::ObjectFile> debug_obj_owner =
+      loaded_obj.getObjectForDebug(obj);
+  const llvm::object::ObjectFile& debug_obj = *debug_obj_owner.getBinary();
+  llvm::DWARFContextInMemory dwarf_ctx(debug_obj);
 
   // Use symbol info to iterate functions in the object.
-  for (const std::pair<SymbolRef, uint64_t> &pair: computeSymbolSizes(debug_obj)) {
+  for (const std::pair<llvm::object::SymbolRef, uint64_t>& pair :
+      computeSymbolSizes(debug_obj)) {
     ProcessSymbol(&dwarf_ctx, pair.first, pair.second, &perf_map_entries, asm_file);
   }
 
@@ -85,21 +85,21 @@ void CodegenSymbolEmitter::NotifyObjectEmitted(const ObjectFile &obj,
   }
 }
 
-void CodegenSymbolEmitter::NotifyFreeingObject(const ObjectFile &obj) {
+void CodegenSymbolEmitter::NotifyFreeingObject(const llvm::object::ObjectFile& obj) {
   lock_guard<SpinLock> perf_map_lock(perf_map_lock_);
   DCHECK(perf_map_.find(obj.getData().data()) != perf_map_.end());
   perf_map_.erase(obj.getData().data());
   WritePerfMapLocked();
 }
 
-void CodegenSymbolEmitter::ProcessSymbol(DIContext* debug_ctx,
-    const SymbolRef& symbol, uint64_t size, vector<PerfMapEntry>* perf_map_entries,
-    ofstream& asm_file) {
-  Expected<SymbolRef::Type> symType = symbol.getType();
-  if (!symType || symType.get() != SymbolRef::ST_Function) return;
+void CodegenSymbolEmitter::ProcessSymbol(llvm::DIContext* debug_ctx,
+    const llvm::object::SymbolRef& symbol, uint64_t size,
+    vector<PerfMapEntry>* perf_map_entries, ofstream& asm_file) {
+  llvm::Expected<llvm::object::SymbolRef::Type> symType = symbol.getType();
+  if (!symType || symType.get() != llvm::object::SymbolRef::ST_Function) return;
 
-  Expected<StringRef> name_or_err = symbol.getName();
-  Expected<uint64_t> addr_or_err = symbol.getAddress();
+  llvm::Expected<llvm::StringRef> name_or_err = symbol.getName();
+  llvm::Expected<uint64_t> addr_or_err = symbol.getAddress();
   if (!name_or_err || !addr_or_err) return;
 
   uint64_t addr = addr_or_err.get();
@@ -153,14 +153,14 @@ void CodegenSymbolEmitter::WritePerfMapLocked() {
   }
 }
 
-void CodegenSymbolEmitter::EmitFunctionAsm(DIContext* debug_ctx,
+void CodegenSymbolEmitter::EmitFunctionAsm(llvm::DIContext* debug_ctx,
     const string& fn_symbol, uint64_t addr, uint64_t size, ofstream& asm_file) {
   DCHECK(asm_file.is_open());
-  DILineInfoTable di_lines = debug_ctx->getLineInfoForAddressRange(addr, size);
+  llvm::DILineInfoTable di_lines = debug_ctx->getLineInfoForAddressRange(addr, size);
   auto di_line_it = di_lines.begin();
 
   // LLVM's C disassembler API is much simpler than the C++ API, so let's use it.
-  string triple = sys::getProcessTriple();
+  string triple = llvm::sys::getProcessTriple();
   LLVMDisasmContextRef disasm = LLVMCreateDisasm(triple.c_str(), NULL, 0, NULL, NULL);
   if (disasm == NULL) {
     LOG(WARNING) << "Could not create LLVM disassembler for target triple " << triple;
@@ -178,7 +178,7 @@ void CodegenSymbolEmitter::EmitFunctionAsm(DIContext* debug_ctx,
     uint64_t inst_addr = reinterpret_cast<uint64_t>(code);
     // Emit any debug symbols before instruction.
     for (; di_line_it != di_lines.end() && di_line_it->first <= inst_addr; ++di_line_it) {
-      DILineInfo line = di_line_it->second;
+      llvm::DILineInfo line = di_line_it->second;
       asm_file << "\t" << line.FileName << ":" << line.FileName << ":"
                << line.FunctionName << ":" << line.Line << ":" << line.Column << "\n";
     }
@@ -196,7 +196,7 @@ void CodegenSymbolEmitter::EmitFunctionAsm(DIContext* debug_ctx,
   }
 
   for (; di_line_it != di_lines.end(); ++di_line_it) {
-    DILineInfo line = di_line_it->second;
+    llvm::DILineInfo line = di_line_it->second;
     asm_file << "\t" << line.FileName << ":" << line.FileName << ":"
              << line.FunctionName << ":" << line.Line << ":" << line.Column << "\n";
   }

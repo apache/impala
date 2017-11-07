@@ -29,13 +29,12 @@
 #include "testutil/gtest-util.h"
 
 #include "common/names.h"
-using namespace llvm;
 
 namespace impala {
 
 class InstructionCounterTest : public testing:: Test {
  protected:
-  LLVMContext context_;
+  llvm::LLVMContext context_;
 };
 
 // IR output from CodegenMullAdd
@@ -47,33 +46,33 @@ class InstructionCounterTest : public testing:: Test {
 // }
 // Create a module with one function, which multiplies two arguments, add a third and
 // then returns the result.
-Module* CodegenMulAdd(LLVMContext* context) {
-  Module* mod = new Module("test", *context);
-  Constant* c = mod->getOrInsertFunction("mul_add", IntegerType::get(*context, 32),
-      IntegerType::get(*context, 32), IntegerType::get(*context, 32),
-      IntegerType::get(*context, 32), NULL);
-  Function* mul_add = cast<Function>(c);
-  mul_add->setCallingConv(CallingConv::C);
-  Function::arg_iterator args = mul_add->arg_begin();
-  Value* x = &*args;
+llvm::Module* CodegenMulAdd(llvm::LLVMContext* context) {
+  llvm::Module* mod = new llvm::Module("test", *context);
+  llvm::Constant* c = mod->getOrInsertFunction("mul_add",
+      llvm::IntegerType::get(*context, 32), llvm::IntegerType::get(*context, 32),
+      llvm::IntegerType::get(*context, 32), llvm::IntegerType::get(*context, 32), NULL);
+  llvm::Function* mul_add = llvm::cast<llvm::Function>(c);
+  mul_add->setCallingConv(llvm::CallingConv::C);
+  llvm::Function::arg_iterator args = mul_add->arg_begin();
+  llvm::Value* x = &*args;
   ++args;
   x->setName("x");
-  Value* y = &*args;
+  llvm::Value* y = &*args;
   ++args;
   y->setName("y");
-  Value* z = &*args;
+  llvm::Value* z = &*args;
   ++args;
   z->setName("z");
-  BasicBlock* block = BasicBlock::Create(*context, "entry", mul_add);
-  IRBuilder<> builder(block);
-  Value* tmp = builder.CreateBinOp(Instruction::Mul, x, y, "tmp");
-  Value* tmp2 = builder.CreateBinOp(Instruction::Add, tmp, z, "tmp2");
+  llvm::BasicBlock* block = llvm::BasicBlock::Create(*context, "entry", mul_add);
+  llvm::IRBuilder<> builder(block);
+  llvm::Value* tmp = builder.CreateBinOp(llvm::Instruction::Mul, x, y, "tmp");
+  llvm::Value* tmp2 = builder.CreateBinOp(llvm::Instruction::Add, tmp, z, "tmp2");
   builder.CreateRet(tmp2);
   return mod;
 }
 
 TEST_F(InstructionCounterTest, Count) {
-  Module* MulAddModule = CodegenMulAdd(&context_);
+  llvm::Module* MulAddModule = CodegenMulAdd(&context_);
   InstructionCounter* instruction_counter = new InstructionCounter();
   instruction_counter->visit(*MulAddModule);
   instruction_counter->PrintCounters();
@@ -113,45 +112,46 @@ TEST_F(InstructionCounterTest, Count) {
 //   ret i32 %tmp6
 // LLVM IR module which contains one function to return the GCD of two numbers
 // }
-Module* CodegenGcd(LLVMContext* context) {
-  Module* mod = new Module("gcd", *context);
-  Constant* c = mod->getOrInsertFunction("gcd", IntegerType::get(*context, 32),
-      IntegerType::get(*context, 32), IntegerType::get(*context, 32), NULL);
-  Function* gcd = cast<Function>(c);
-  Function::arg_iterator args = gcd->arg_begin();
-  Value* x = &*args;
+llvm::Module* CodegenGcd(llvm::LLVMContext* context) {
+  llvm::Module* mod = new llvm::Module("gcd", *context);
+  llvm::Constant* c = mod->getOrInsertFunction("gcd",
+      llvm::IntegerType::get(*context, 32), llvm::IntegerType::get(*context, 32),
+      llvm::IntegerType::get(*context, 32), NULL);
+  llvm::Function* gcd = llvm::cast<llvm::Function>(c);
+  llvm::Function::arg_iterator args = gcd->arg_begin();
+  llvm::Value* x = &*args;
   ++args;
   x->setName("x");
-  Value* y = &*args;
+  llvm::Value* y = &*args;
   ++args;
   y->setName("y");
-  BasicBlock* entry = BasicBlock::Create(*context, "entry", gcd);
-  BasicBlock* ret = BasicBlock::Create(*context, "return", gcd);
-  BasicBlock* cond_false = BasicBlock::Create(*context, "cond_false", gcd);
-  BasicBlock* cond_true = BasicBlock::Create(*context, "cond_true", gcd);
-  BasicBlock* cond_false_2 = BasicBlock::Create(*context, "cond_false", gcd);
-  IRBuilder<> builder(entry);
-  Value* xEqualsY = builder.CreateICmpEQ(x, y, "tmp");
+  llvm::BasicBlock* entry = llvm::BasicBlock::Create(*context, "entry", gcd);
+  llvm::BasicBlock* ret = llvm::BasicBlock::Create(*context, "return", gcd);
+  llvm::BasicBlock* cond_false = llvm::BasicBlock::Create(*context, "cond_false", gcd);
+  llvm::BasicBlock* cond_true = llvm::BasicBlock::Create(*context, "cond_true", gcd);
+  llvm::BasicBlock* cond_false_2 = llvm::BasicBlock::Create(*context, "cond_false", gcd);
+  llvm::IRBuilder<> builder(entry);
+  llvm::Value* xEqualsY = builder.CreateICmpEQ(x, y, "tmp");
   builder.CreateCondBr(xEqualsY, ret, cond_false);  builder.SetInsertPoint(ret);
   builder.CreateRet(x);
   builder.SetInsertPoint(cond_false);
-  Value* xLessThanY = builder.CreateICmpULT(x, y, "tmp");
+  llvm::Value* xLessThanY = builder.CreateICmpULT(x, y, "tmp");
   builder.CreateCondBr(xLessThanY, cond_true, cond_false_2);
   builder.SetInsertPoint(cond_true);
-  Value* yMinusX = builder.CreateSub(y, x, "tmp");
-  Value* args1[2] =  {x , yMinusX};
-  Value* recur_1 = builder.CreateCall(gcd, args1, "tmp");
+  llvm::Value* yMinusX = builder.CreateSub(y, x, "tmp");
+  llvm::Value* args1[2] = {x, yMinusX};
+  llvm::Value* recur_1 = builder.CreateCall(gcd, args1, "tmp");
   builder.CreateRet(recur_1);
   builder.SetInsertPoint(cond_false_2);
-  Value* xMinusY = builder.CreateSub(x, y, "tmp");
-  Value* args2[2] = {xMinusY, y};
-  Value* recur_2 = builder.CreateCall(gcd, args2,  "tmp");
+  llvm::Value* xMinusY = builder.CreateSub(x, y, "tmp");
+  llvm::Value* args2[2] = {xMinusY, y};
+  llvm::Value* recur_2 = builder.CreateCall(gcd, args2, "tmp");
   builder.CreateRet(recur_2);
   return mod;
 }
 
 TEST_F(InstructionCounterTest, TestMemInstrCount) {
-  Module* GcdModule = CodegenGcd(&context_);
+  llvm::Module* GcdModule = CodegenGcd(&context_);
   InstructionCounter* instruction_counter = new InstructionCounter();
   instruction_counter->visit(*GcdModule);
   std::cout << instruction_counter->PrintCounters();

@@ -53,7 +53,6 @@
 #include "common/names.h"
 
 using namespace impala;
-using namespace llvm;
 using namespace strings;
 
 namespace impala {
@@ -1476,17 +1475,17 @@ void PartitionedAggregationNode::ClosePartitions() {
 //   ret void
 // }
 //
-Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
-    int agg_fn_idx, SlotDescriptor* slot_desc, Function** fn) {
-  PointerType* agg_fn_eval_type =
+Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen, int agg_fn_idx,
+    SlotDescriptor* slot_desc, llvm::Function** fn) {
+  llvm::PointerType* agg_fn_eval_type =
       codegen->GetPtrType(AggFnEvaluator::LLVM_CLASS_NAME);
-  StructType* tuple_struct = intermediate_tuple_desc_->GetLlvmStruct(codegen);
+  llvm::StructType* tuple_struct = intermediate_tuple_desc_->GetLlvmStruct(codegen);
   if (tuple_struct == NULL) {
     return Status("PartitionedAggregationNode::CodegenUpdateSlot(): failed to generate "
                   "intermediate tuple desc");
   }
-  PointerType* tuple_ptr_type = codegen->GetPtrType(tuple_struct);
-  PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
+  llvm::PointerType* tuple_ptr_type = codegen->GetPtrType(tuple_struct);
+  llvm::PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
 
   LlvmCodeGen::FnPrototype prototype(codegen, "UpdateSlot", codegen->void_type());
   prototype.AddArgument(
@@ -1495,14 +1494,14 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
 
   LlvmBuilder builder(codegen->context());
-  Value* args[3];
+  llvm::Value* args[3];
   *fn = prototype.GeneratePrototype(&builder, &args[0]);
-  Value* agg_fn_eval_arg = args[0];
-  Value* agg_tuple_arg = args[1];
-  Value* row_arg = args[2];
+  llvm::Value* agg_fn_eval_arg = args[0];
+  llvm::Value* agg_tuple_arg = args[1];
+  llvm::Value* row_arg = args[2];
 
   // Get the vector of input expressions' evaluators.
-  Value* input_evals_vector = codegen->CodegenCallFunction(&builder,
+  llvm::Value* input_evals_vector = codegen->CodegenCallFunction(&builder,
       IRFunction::AGG_FN_EVALUATOR_INPUT_EVALUATORS, agg_fn_eval_arg,
       "input_evals_vector");
 
@@ -1512,17 +1511,17 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
   vector<CodegenAnyVal> input_vals;
   for (int i = 0; i < num_inputs; ++i) {
     ScalarExpr* input_expr = agg_fn->GetChild(i);
-    Function* input_expr_fn;
+    llvm::Function* input_expr_fn;
     RETURN_IF_ERROR(input_expr->GetCodegendComputeFn(codegen, &input_expr_fn));
     DCHECK(input_expr_fn != NULL);
 
     // Call input expr function with the matching evaluator to get src slot value.
-    Value* input_eval =
+    llvm::Value* input_eval =
         codegen->CodegenArrayAt(&builder, input_evals_vector, i, "input_eval");
     string input_name = Substitute("input$0", i);
     CodegenAnyVal input_val = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
-        input_expr->type(), input_expr_fn, ArrayRef<Value*>({input_eval, row_arg}),
-        input_name.c_str());
+        input_expr->type(), input_expr_fn,
+        llvm::ArrayRef<llvm::Value*>({input_eval, row_arg}), input_name.c_str());
     input_vals.push_back(input_val);
   }
 
@@ -1532,7 +1531,7 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
       || dst_type.IsFloatingPointType() || dst_type.IsBooleanType();
   bool dst_is_numeric_or_bool = dst_is_int_or_float_or_bool || dst_type.IsDecimalType();
 
-  BasicBlock* ret_block = BasicBlock::Create(codegen->context(), "ret", *fn);
+  llvm::BasicBlock* ret_block = llvm::BasicBlock::Create(codegen->context(), "ret", *fn);
 
   // Emit the code to compute 'result' and set the NULL indicator if needed. First check
   // for special cases where we can emit a very simple instruction sequence, then fall
@@ -1540,25 +1539,25 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
   CodegenAnyVal& src = input_vals[0];
 
   // 'dst_slot_ptr' points to the slot in the aggregate tuple to update.
-  Value* dst_slot_ptr = builder.CreateStructGEP(
+  llvm::Value* dst_slot_ptr = builder.CreateStructGEP(
       NULL, agg_tuple_arg, slot_desc->llvm_field_idx(), "dst_slot_ptr");
   // TODO: consider moving the following codegen logic to AggFn.
   if (agg_op == AggFn::COUNT) {
     src.CodegenBranchIfNull(&builder, ret_block);
-    Value* dst_value = builder.CreateLoad(dst_slot_ptr, "dst_val");
-    Value* result = agg_fn->is_merge()
-        ? builder.CreateAdd(dst_value, src.GetVal(), "count_sum")
-        : builder.CreateAdd(
+    llvm::Value* dst_value = builder.CreateLoad(dst_slot_ptr, "dst_val");
+    llvm::Value* result = agg_fn->is_merge() ?
+        builder.CreateAdd(dst_value, src.GetVal(), "count_sum") :
+        builder.CreateAdd(
             dst_value, codegen->GetIntConstant(TYPE_BIGINT, 1), "count_inc");
     builder.CreateStore(result, dst_slot_ptr);
     DCHECK(!slot_desc->is_nullable());
   } else if ((agg_op == AggFn::MIN || agg_op == AggFn::MAX) && dst_is_numeric_or_bool) {
     bool is_min = agg_op == AggFn::MIN;
     src.CodegenBranchIfNull(&builder, ret_block);
-    Function* min_max_fn = codegen->CodegenMinMax(slot_desc->type(), is_min);
-    Value* dst_value = builder.CreateLoad(dst_slot_ptr, "dst_val");
-    Value* min_max_args[] = {dst_value, src.GetVal()};
-    Value* result =
+    llvm::Function* min_max_fn = codegen->CodegenMinMax(slot_desc->type(), is_min);
+    llvm::Value* dst_value = builder.CreateLoad(dst_slot_ptr, "dst_val");
+    llvm::Value* min_max_args[] = {dst_value, src.GetVal()};
+    llvm::Value* result =
         builder.CreateCall(min_max_fn, min_max_args, is_min ? "min_value" : "max_value");
     builder.CreateStore(result, dst_slot_ptr);
     // Dst may have been NULL, make sure to unset the NULL bit.
@@ -1567,10 +1566,10 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
         codegen, &builder, agg_tuple_arg, codegen->false_value());
   } else if (agg_op == AggFn::SUM && dst_is_int_or_float_or_bool) {
     src.CodegenBranchIfNull(&builder, ret_block);
-    Value* dst_value = builder.CreateLoad(dst_slot_ptr, "dst_val");
-    Value* result = dst_type.IsFloatingPointType()
-        ? builder.CreateFAdd(dst_value, src.GetVal())
-        : builder.CreateAdd(dst_value, src.GetVal());
+    llvm::Value* dst_value = builder.CreateLoad(dst_slot_ptr, "dst_val");
+    llvm::Value* result = dst_type.IsFloatingPointType() ?
+        builder.CreateFAdd(dst_value, src.GetVal()) :
+        builder.CreateAdd(dst_value, src.GetVal());
     builder.CreateStore(result, dst_slot_ptr);
 
     if (slot_desc->is_nullable()) {
@@ -1608,10 +1607,10 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
     dst.LoadFromNativePtr(dst_slot_ptr);
 
     // Get the FunctionContext object for the AggFnEvaluator.
-    Function* get_agg_fn_ctx_fn =
+    llvm::Function* get_agg_fn_ctx_fn =
         codegen->GetFunction(IRFunction::AGG_FN_EVALUATOR_AGG_FN_CTX, false);
     DCHECK(get_agg_fn_ctx_fn != NULL);
-    Value* agg_fn_ctx_val =
+    llvm::Value* agg_fn_ctx_val =
         builder.CreateCall(get_agg_fn_ctx_fn, {agg_fn_eval_arg}, "agg_fn_ctx");
 
     // Call the UDA to update/merge 'src' into 'dst', with the result stored in
@@ -1627,7 +1626,7 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
 
     if (slot_desc->is_nullable() && !special_null_handling) {
       // Set NULL bit in the slot based on the return value.
-      Value* result_is_null = updated_dst_val.GetIsNull("result_is_null");
+      llvm::Value* result_is_null = updated_dst_val.GetIsNull("result_is_null");
       slot_desc->CodegenSetNullIndicator(
           codegen, &builder, agg_tuple_arg, result_is_null);
     }
@@ -1654,15 +1653,15 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen,
 }
 
 Status PartitionedAggregationNode::CodegenCallUda(LlvmCodeGen* codegen,
-    LlvmBuilder* builder, AggFn* agg_fn, Value* agg_fn_ctx_val,
+    LlvmBuilder* builder, AggFn* agg_fn, llvm::Value* agg_fn_ctx_val,
     const vector<CodegenAnyVal>& input_vals, const CodegenAnyVal& dst_val,
     CodegenAnyVal* updated_dst_val) {
-  Function* uda_fn;
+  llvm::Function* uda_fn;
   RETURN_IF_ERROR(agg_fn->CodegenUpdateOrMergeFunction(codegen, &uda_fn));
 
   // Set up arguments for call to UDA, which are the FunctionContext*, followed by
   // pointers to all input values, followed by a pointer to the destination value.
-  vector<Value*> uda_fn_args;
+  vector<llvm::Value*> uda_fn_args;
   uda_fn_args.push_back(agg_fn_ctx_val);
 
   // Create pointers to input args to pass to uda_fn. We must use the unlowered type,
@@ -1675,10 +1674,11 @@ Status PartitionedAggregationNode::CodegenCallUda(LlvmCodeGen* codegen,
 
   // Create pointer to dst to pass to uda_fn. We must use the unlowered type for the
   // same reason as above.
-  Value* dst_lowered_ptr = dst_val.GetLoweredPtr("dst_lowered_ptr");
+  llvm::Value* dst_lowered_ptr = dst_val.GetLoweredPtr("dst_lowered_ptr");
   const ColumnType& dst_type = agg_fn->intermediate_type();
-  Type* dst_unlowered_ptr_type = CodegenAnyVal::GetUnloweredPtrType(codegen, dst_type);
-  Value* dst_unlowered_ptr = builder->CreateBitCast(
+  llvm::Type* dst_unlowered_ptr_type =
+      CodegenAnyVal::GetUnloweredPtrType(codegen, dst_type);
+  llvm::Value* dst_unlowered_ptr = builder->CreateBitCast(
       dst_lowered_ptr, dst_unlowered_ptr_type, "dst_unlowered_ptr");
   uda_fn_args.push_back(dst_unlowered_ptr);
 
@@ -1686,7 +1686,7 @@ Status PartitionedAggregationNode::CodegenCallUda(LlvmCodeGen* codegen,
   builder->CreateCall(uda_fn, uda_fn_args);
 
   // Convert intermediate 'dst_arg' back to the native type.
-  Value* anyval_result = builder->CreateLoad(dst_lowered_ptr, "anyval_result");
+  llvm::Value* anyval_result = builder->CreateLoad(dst_lowered_ptr, "anyval_result");
 
   *updated_dst_val = CodegenAnyVal(codegen, builder, dst_type, anyval_result);
   return Status::OK();
@@ -1724,7 +1724,7 @@ Status PartitionedAggregationNode::CodegenCallUda(LlvmCodeGen* codegen,
 // }
 //
 Status PartitionedAggregationNode::CodegenUpdateTuple(
-    LlvmCodeGen* codegen, Function** fn) {
+    LlvmCodeGen* codegen, llvm::Function** fn) {
   SCOPED_TIMER(codegen->codegen_timer());
 
   for (const SlotDescriptor* slot_desc : intermediate_tuple_desc_->slots()) {
@@ -1740,17 +1740,18 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(
   }
 
   // Get the types to match the UpdateTuple signature
-  Type* agg_node_type = codegen->GetType(PartitionedAggregationNode::LLVM_CLASS_NAME);
-  Type* tuple_type = codegen->GetType(Tuple::LLVM_CLASS_NAME);
-  Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
+  llvm::Type* agg_node_type =
+      codegen->GetType(PartitionedAggregationNode::LLVM_CLASS_NAME);
+  llvm::Type* tuple_type = codegen->GetType(Tuple::LLVM_CLASS_NAME);
+  llvm::Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
 
-  PointerType* agg_node_ptr_type = codegen->GetPtrType(agg_node_type);
-  PointerType* evals_type = codegen->GetPtrPtrType(AggFnEvaluator::LLVM_CLASS_NAME);
-  PointerType* tuple_ptr_type = codegen->GetPtrType(tuple_type);
-  PointerType* tuple_row_ptr_type = codegen->GetPtrType(tuple_row_type);
+  llvm::PointerType* agg_node_ptr_type = codegen->GetPtrType(agg_node_type);
+  llvm::PointerType* evals_type = codegen->GetPtrPtrType(AggFnEvaluator::LLVM_CLASS_NAME);
+  llvm::PointerType* tuple_ptr_type = codegen->GetPtrType(tuple_type);
+  llvm::PointerType* tuple_row_ptr_type = codegen->GetPtrType(tuple_row_type);
 
-  StructType* tuple_struct = intermediate_tuple_desc_->GetLlvmStruct(codegen);
-  PointerType* tuple_ptr = codegen->GetPtrType(tuple_struct);
+  llvm::StructType* tuple_struct = intermediate_tuple_desc_->GetLlvmStruct(codegen);
+  llvm::PointerType* tuple_ptr = codegen->GetPtrType(tuple_struct);
   LlvmCodeGen::FnPrototype prototype(codegen, "UpdateTuple", codegen->void_type());
   prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", agg_node_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("agg_fn_evals", evals_type));
@@ -1759,11 +1760,11 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(
   prototype.AddArgument(LlvmCodeGen::NamedVariable("is_merge", codegen->boolean_type()));
 
   LlvmBuilder builder(codegen->context());
-  Value* args[5];
+  llvm::Value* args[5];
   *fn = prototype.GeneratePrototype(&builder, &args[0]);
-  Value* agg_fn_evals_arg = args[1];
-  Value* tuple_arg = args[2];
-  Value* row_arg = args[3];
+  llvm::Value* agg_fn_evals_arg = args[1];
+  llvm::Value* tuple_arg = args[2];
+  llvm::Value* row_arg = args[3];
 
   // Cast the parameter types to the internal llvm runtime types.
   // TODO: get rid of this by using right type in function signature
@@ -1779,21 +1780,23 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(
       // TODO: we should be able to hoist this up to the loop over the batch and just
       // increment the slot by the number of rows in the batch.
       int field_idx = slot_desc->llvm_field_idx();
-      Value* const_one = codegen->GetIntConstant(TYPE_BIGINT, 1);
-      Value* slot_ptr = builder.CreateStructGEP(NULL, tuple_arg, field_idx, "src_slot");
-      Value* slot_loaded = builder.CreateLoad(slot_ptr, "count_star_val");
-      Value* count_inc = builder.CreateAdd(slot_loaded, const_one, "count_star_inc");
+      llvm::Value* const_one = codegen->GetIntConstant(TYPE_BIGINT, 1);
+      llvm::Value* slot_ptr =
+          builder.CreateStructGEP(NULL, tuple_arg, field_idx, "src_slot");
+      llvm::Value* slot_loaded = builder.CreateLoad(slot_ptr, "count_star_val");
+      llvm::Value* count_inc =
+          builder.CreateAdd(slot_loaded, const_one, "count_star_inc");
       builder.CreateStore(count_inc, slot_ptr);
     } else {
-      Function* update_slot_fn;
+      llvm::Function* update_slot_fn;
       RETURN_IF_ERROR(CodegenUpdateSlot(codegen, i, slot_desc, &update_slot_fn));
 
       // Load agg_fn_evals_[i]
-      Value* agg_fn_eval_val =
+      llvm::Value* agg_fn_eval_val =
           codegen->CodegenArrayAt(&builder, agg_fn_evals_arg, i, "agg_fn_eval");
 
       // Call UpdateSlot(agg_fn_evals_[i], tuple, row);
-      Value* update_slot_args[] = {agg_fn_eval_val, tuple_arg, row_arg};
+      llvm::Value* update_slot_args[] = {agg_fn_eval_val, tuple_arg, row_arg};
       builder.CreateCall(update_slot_fn, update_slot_args);
     }
   }
@@ -1818,14 +1821,14 @@ Status PartitionedAggregationNode::CodegenProcessBatch(LlvmCodeGen* codegen,
     TPrefetchMode::type prefetch_mode) {
   SCOPED_TIMER(codegen->codegen_timer());
 
-  Function* update_tuple_fn;
+  llvm::Function* update_tuple_fn;
   RETURN_IF_ERROR(CodegenUpdateTuple(codegen, &update_tuple_fn));
 
   // Get the cross compiled update row batch function
   IRFunction::Type ir_fn = (!grouping_exprs_.empty() ?
       IRFunction::PART_AGG_NODE_PROCESS_BATCH_UNAGGREGATED :
       IRFunction::PART_AGG_NODE_PROCESS_BATCH_NO_GROUPING);
-  Function* process_batch_fn = codegen->GetFunction(ir_fn, true);
+  llvm::Function* process_batch_fn = codegen->GetFunction(ir_fn, true);
   DCHECK(process_batch_fn != NULL);
 
   int replaced;
@@ -1833,21 +1836,21 @@ Status PartitionedAggregationNode::CodegenProcessBatch(LlvmCodeGen* codegen,
     // Codegen for grouping using hash table
 
     // Replace prefetch_mode with constant so branches can be optimised out.
-    Value* prefetch_mode_arg = codegen->GetArgument(process_batch_fn, 3);
-    prefetch_mode_arg->replaceAllUsesWith(
-        ConstantInt::get(Type::getInt32Ty(codegen->context()), prefetch_mode));
+    llvm::Value* prefetch_mode_arg = codegen->GetArgument(process_batch_fn, 3);
+    prefetch_mode_arg->replaceAllUsesWith(llvm::ConstantInt::get(
+        llvm::Type::getInt32Ty(codegen->context()), prefetch_mode));
 
     // The codegen'd ProcessBatch function is only used in Open() with level_ = 0,
     // so don't use murmur hash
-    Function* hash_fn;
+    llvm::Function* hash_fn;
     RETURN_IF_ERROR(ht_ctx_->CodegenHashRow(codegen, /* use murmur */ false, &hash_fn));
 
     // Codegen HashTable::Equals<true>
-    Function* build_equals_fn;
+    llvm::Function* build_equals_fn;
     RETURN_IF_ERROR(ht_ctx_->CodegenEquals(codegen, true, &build_equals_fn));
 
     // Codegen for evaluating input rows
-    Function* eval_grouping_expr_fn;
+    llvm::Function* eval_grouping_expr_fn;
     RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(codegen, false, &eval_grouping_expr_fn));
 
     // Replace call sites
@@ -1893,32 +1896,32 @@ Status PartitionedAggregationNode::CodegenProcessBatchStreaming(
   SCOPED_TIMER(codegen->codegen_timer());
 
   IRFunction::Type ir_fn = IRFunction::PART_AGG_NODE_PROCESS_BATCH_STREAMING;
-  Function* process_batch_streaming_fn = codegen->GetFunction(ir_fn, true);
+  llvm::Function* process_batch_streaming_fn = codegen->GetFunction(ir_fn, true);
   DCHECK(process_batch_streaming_fn != NULL);
 
   // Make needs_serialize arg constant so dead code can be optimised out.
-  Value* needs_serialize_arg = codegen->GetArgument(process_batch_streaming_fn, 2);
-  needs_serialize_arg->replaceAllUsesWith(
-      ConstantInt::get(Type::getInt1Ty(codegen->context()), needs_serialize_));
+  llvm::Value* needs_serialize_arg = codegen->GetArgument(process_batch_streaming_fn, 2);
+  needs_serialize_arg->replaceAllUsesWith(llvm::ConstantInt::get(
+      llvm::Type::getInt1Ty(codegen->context()), needs_serialize_));
 
   // Replace prefetch_mode with constant so branches can be optimised out.
-  Value* prefetch_mode_arg = codegen->GetArgument(process_batch_streaming_fn, 3);
+  llvm::Value* prefetch_mode_arg = codegen->GetArgument(process_batch_streaming_fn, 3);
   prefetch_mode_arg->replaceAllUsesWith(
-      ConstantInt::get(Type::getInt32Ty(codegen->context()), prefetch_mode));
+      llvm::ConstantInt::get(llvm::Type::getInt32Ty(codegen->context()), prefetch_mode));
 
-  Function* update_tuple_fn;
+  llvm::Function* update_tuple_fn;
   RETURN_IF_ERROR(CodegenUpdateTuple(codegen, &update_tuple_fn));
 
   // We only use the top-level hash function for streaming aggregations.
-  Function* hash_fn;
+  llvm::Function* hash_fn;
   RETURN_IF_ERROR(ht_ctx_->CodegenHashRow(codegen, false, &hash_fn));
 
   // Codegen HashTable::Equals
-  Function* equals_fn;
+  llvm::Function* equals_fn;
   RETURN_IF_ERROR(ht_ctx_->CodegenEquals(codegen, true, &equals_fn));
 
   // Codegen for evaluating input rows
-  Function* eval_grouping_expr_fn;
+  llvm::Function* eval_grouping_expr_fn;
   RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(codegen, false, &eval_grouping_expr_fn));
 
   // Replace call sites

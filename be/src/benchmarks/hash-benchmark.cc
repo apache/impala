@@ -33,7 +33,6 @@
 using boost::hash_combine;
 using boost::hash_range;
 using namespace impala;
-using namespace llvm;
 
 
 // Benchmark tests for hashing tuples.  There are two sets of inputs
@@ -381,7 +380,7 @@ int NumCollisions(TestData* data, int num_buckets) {
 // exit:                                             ; preds = %loop, %entry
 //   ret void
 // }
-Function* CodegenCrcHash(LlvmCodeGen* codegen, bool mixed) {
+llvm::Function* CodegenCrcHash(LlvmCodeGen* codegen, bool mixed) {
   string name = mixed ? "HashMixed" : "HashInt";
   LlvmCodeGen::FnPrototype prototype(codegen, name, codegen->void_type());
   prototype.AddArgument(
@@ -392,62 +391,65 @@ Function* CodegenCrcHash(LlvmCodeGen* codegen, bool mixed) {
       LlvmCodeGen::NamedVariable("results", codegen->GetPtrType(TYPE_INT)));
 
   LlvmBuilder builder(codegen->context());
-  Value* args[3];
-  Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
+  llvm::Value* args[3];
+  llvm::Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
 
-  BasicBlock* loop_start = builder.GetInsertBlock();
-  BasicBlock* loop_body = BasicBlock::Create(codegen->context(), "loop", fn);
-  BasicBlock* loop_exit = BasicBlock::Create(codegen->context(), "exit", fn);
+  llvm::BasicBlock* loop_start = builder.GetInsertBlock();
+  llvm::BasicBlock* loop_body = llvm::BasicBlock::Create(codegen->context(), "loop", fn);
+  llvm::BasicBlock* loop_exit = llvm::BasicBlock::Create(codegen->context(), "exit", fn);
 
   int fixed_byte_size = mixed ?
     sizeof(int8_t) + sizeof(int32_t) + sizeof(int64_t) : sizeof(int32_t) * 4;
 
-  Function* fixed_fn = codegen->GetHashFunction(fixed_byte_size);
-  Function* string_hash_fn = codegen->GetHashFunction();
+  llvm::Function* fixed_fn = codegen->GetHashFunction(fixed_byte_size);
+  llvm::Function* string_hash_fn = codegen->GetHashFunction();
 
-  Value* row_size = NULL;
+  llvm::Value* row_size = NULL;
   if (mixed) {
     row_size = codegen->GetIntConstant(TYPE_INT,
       sizeof(int8_t) + sizeof(int32_t) + sizeof(int64_t) + sizeof(StringValue));
   } else {
     row_size = codegen->GetIntConstant(TYPE_INT, fixed_byte_size);
   }
-  Value* dummy_len = codegen->GetIntConstant(TYPE_INT, 0);
+  llvm::Value* dummy_len = codegen->GetIntConstant(TYPE_INT, 0);
 
   // Check loop counter
-  Value* counter_check =
+  llvm::Value* counter_check =
       builder.CreateICmpSGT(args[0], codegen->GetIntConstant(TYPE_INT, 0));
   builder.CreateCondBr(counter_check, loop_body, loop_exit);
 
   // Loop body
   builder.SetInsertPoint(loop_body);
-  PHINode* counter = builder.CreatePHI(codegen->GetType(TYPE_INT), 2, "counter");
+  llvm::PHINode* counter = builder.CreatePHI(codegen->GetType(TYPE_INT), 2, "counter");
   counter->addIncoming(codegen->GetIntConstant(TYPE_INT, 0), loop_start);
 
-  Value* next_counter = builder.CreateAdd(counter, codegen->GetIntConstant(TYPE_INT, 1));
+  llvm::Value* next_counter =
+      builder.CreateAdd(counter, codegen->GetIntConstant(TYPE_INT, 1));
   counter->addIncoming(next_counter, loop_body);
 
   // Hash the current data
-  Value* offset = builder.CreateMul(counter, row_size);
-  Value* data = builder.CreateGEP(args[1], offset);
+  llvm::Value* offset = builder.CreateMul(counter, row_size);
+  llvm::Value* data = builder.CreateGEP(args[1], offset);
 
-  Value* seed = codegen->GetIntConstant(TYPE_INT, HashUtil::FNV_SEED);
-  seed = builder.CreateCall(fixed_fn, ArrayRef<Value*>({data, dummy_len, seed}));
+  llvm::Value* seed = codegen->GetIntConstant(TYPE_INT, HashUtil::FNV_SEED);
+  seed =
+      builder.CreateCall(fixed_fn, llvm::ArrayRef<llvm::Value*>({data, dummy_len, seed}));
 
   // Get the string data
   if (mixed) {
-    Value* string_data = builder.CreateGEP(
-        data, codegen->GetIntConstant(TYPE_INT, fixed_byte_size));
-    Value* string_val =
+    llvm::Value* string_data =
+        builder.CreateGEP(data, codegen->GetIntConstant(TYPE_INT, fixed_byte_size));
+    llvm::Value* string_val =
         builder.CreateBitCast(string_data, codegen->GetPtrType(TYPE_STRING));
-    Value* str_ptr = builder.CreateStructGEP(NULL, string_val, 0);
-    Value* str_len = builder.CreateStructGEP(NULL, string_val, 1);
+    llvm::Value* str_ptr = builder.CreateStructGEP(NULL, string_val, 0);
+    llvm::Value* str_len = builder.CreateStructGEP(NULL, string_val, 1);
     str_ptr = builder.CreateLoad(str_ptr);
     str_len = builder.CreateLoad(str_len);
-    seed = builder.CreateCall(string_hash_fn, ArrayRef<Value*>({str_ptr, str_len, seed}));
+    seed = builder.CreateCall(
+        string_hash_fn, llvm::ArrayRef<llvm::Value*>({str_ptr, str_len, seed}));
   }
 
-  Value* result = builder.CreateGEP(args[2], counter);
+  llvm::Value* result = builder.CreateGEP(args[2], counter);
   builder.CreateStore(seed, result);
 
   counter_check = builder.CreateICmpSLT(next_counter, args[0]);
@@ -497,11 +499,11 @@ int main(int argc, char **argv) {
   }
   codegen->EnableOptimizations(true);
 
-  Function* hash_ints = CodegenCrcHash(codegen.get(), false);
+  llvm::Function* hash_ints = CodegenCrcHash(codegen.get(), false);
   void* jitted_hash_ints;
   codegen->AddFunctionToJit(hash_ints, &jitted_hash_ints);
 
-  Function* hash_mixed = CodegenCrcHash(codegen.get(), true);
+  llvm::Function* hash_mixed = CodegenCrcHash(codegen.get(), true);
   void* jitted_hash_mixed;
   codegen->AddFunctionToJit(hash_mixed, &jitted_hash_mixed);
 

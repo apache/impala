@@ -22,7 +22,6 @@
 #include "common/names.h"
 
 using namespace impala;
-using namespace llvm;
 using std::make_pair;
 using std::max;
 
@@ -41,9 +40,9 @@ InstructionCounter::InstructionCounter() {
   counters_.insert(make_pair(TOTAL_BLOCKS, 0));
   counters_.insert(make_pair(TOTAL_FUNCTIONS, 0));
 
-  // Create all instruction counter and put them into counters_. Any InstructionCount that
-  // has instructions delegated to it in InstructionCounter::visit(const Instruction &I)
-  // must be created and inserted into counters_ here.
+  // Create all instruction counter and put them into counters_. Any InstructionCount
+  // that has instructions delegated to it in InstructionCounter::visit(const
+  // Instruction &I) must be created and inserted into counters_ here.
   counters_.insert(make_pair(TERMINATOR_INSTS, 0));
   counters_.insert(make_pair(BINARY_INSTS, 0));
   counters_.insert(make_pair(MEMORY_INSTS, 0));
@@ -51,16 +50,16 @@ InstructionCounter::InstructionCounter() {
   counters_.insert(make_pair(OTHER_INSTS, 0));
 }
 
-void InstructionCounter::visit(const Module& M) {
+void InstructionCounter::visit(const llvm::Module& M) {
   visit(M.begin(), M.end());
 }
 
-void InstructionCounter::visit(const Function& F) {
+void InstructionCounter::visit(const llvm::Function& F) {
   IncrementCount(TOTAL_FUNCTIONS);
   visit(F.begin(), F.end());
 }
 
-void InstructionCounter::visit(const BasicBlock& BB) {
+void InstructionCounter::visit(const llvm::BasicBlock& BB) {
   IncrementCount(TOTAL_BLOCKS);
   visit(BB.begin(), BB.end());
 }
@@ -71,7 +70,7 @@ int InstructionCounter::GetCount(const char* name) {
   return counter->second;
 }
 
-void InstructionCounter::visit(const Instruction& I) {
+void InstructionCounter::visit(const llvm::Instruction& I) {
   IncrementCount(TOTAL_INSTS);
   switch (I.getOpcode()) {
     case llvm::Instruction::Ret:

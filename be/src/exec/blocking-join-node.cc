@@ -35,7 +35,6 @@
 #include "common/names.h"
 
 using namespace impala;
-using namespace llvm;
 
 const char* BlockingJoinNode::LLVM_CLASS_NAME = "class.impala::BlockingJoinNode";
 

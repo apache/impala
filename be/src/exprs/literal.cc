@@ -30,7 +30,6 @@
 
 #include "common/names.h"
 
-using namespace llvm;
 using namespace impala_udf;
 
 namespace impala {
@@ -358,9 +357,10 @@ Status Literal::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   }
 
   DCHECK_EQ(GetNumChildren(), 0);
-  Value* args[2];
+  llvm::Value* args[2];
   *fn = CreateIrFunctionPrototype("Literal", codegen, &args);
-  BasicBlock* entry_block = BasicBlock::Create(codegen->context(), "entry", *fn);
+  llvm::BasicBlock* entry_block =
+      llvm::BasicBlock::Create(codegen->context(), "entry", *fn);
   LlvmBuilder builder(entry_block);
 
   CodegenAnyVal v = CodegenAnyVal::GetNonNullVal(codegen, &builder, type_);

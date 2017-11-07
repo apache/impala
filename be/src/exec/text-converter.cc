@@ -31,7 +31,6 @@
 #include "common/names.h"
 
 using namespace impala;
-using namespace llvm;
 
 TextConverter::TextConverter(char escape_char, const string& null_col_val,
     bool check_null, bool strict_mode)
@@ -106,7 +105,7 @@ void TextConverter::UnescapeString(const char* src, char* dest, int* len,
 // TODO: convert this function to use cross-compilation + constant substitution in whole
 // or part. It is currently too complex and doesn't implement the full functionality.
 Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
-    TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc, Function** fn,
+    TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc, llvm::Function** fn,
     const char* null_col_val, int len, bool check_null, bool strict_mode) {
   DCHECK(fn != nullptr);
   if (slot_desc->type().type == TYPE_CHAR) {
@@ -117,7 +116,7 @@ Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
 
   // Codegen is_null_string
   bool is_default_null = (len == 2 && null_col_val[0] == '\\' && null_col_val[1] == 'N');
-  Function* is_null_string_fn;
+  llvm::Function* is_null_string_fn;
   if (is_default_null) {
     is_null_string_fn = codegen->GetFunction(IRFunction::IS_NULL_STRING, false);
   } else {
@@ -126,12 +125,12 @@ Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
 
   DCHECK(is_null_string_fn != NULL);
 
-  StructType* tuple_type = tuple_desc->GetLlvmStruct(codegen);
+  llvm::StructType* tuple_type = tuple_desc->GetLlvmStruct(codegen);
   if (tuple_type == NULL) {
     return Status("TextConverter::CodegenWriteSlot(): Failed to generate "
         "tuple type");
   }
-  PointerType* tuple_ptr_type = tuple_type->getPointerTo();
+  llvm::PointerType* tuple_ptr_type = tuple_type->getPointerTo();
 
   LlvmCodeGen::FnPrototype prototype(
       codegen, "WriteSlot", codegen->GetType(TYPE_BOOLEAN));
@@ -140,27 +139,29 @@ Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
   prototype.AddArgument(LlvmCodeGen::NamedVariable("len", codegen->GetType(TYPE_INT)));
 
   LlvmBuilder builder(codegen->context());
-  Value* args[3];
+  llvm::Value* args[3];
   *fn = prototype.GeneratePrototype(&builder, &args[0]);
 
-  BasicBlock* set_null_block, *parse_slot_block, *check_zero_block = NULL;
+  llvm::BasicBlock *set_null_block, *parse_slot_block, *check_zero_block = NULL;
   codegen->CreateIfElseBlocks(*fn, "set_null", "parse_slot",
       &set_null_block, &parse_slot_block);
 
   if (!slot_desc->type().IsVarLenStringType()) {
-    check_zero_block = BasicBlock::Create(codegen->context(), "check_zero", *fn);
+    check_zero_block = llvm::BasicBlock::Create(codegen->context(), "check_zero", *fn);
   }
 
   // Check if the data matches the configured NULL string.
-  Value* is_null;
+  llvm::Value* is_null;
   if (check_null) {
     if (is_default_null) {
-      is_null = builder.CreateCall(is_null_string_fn,
-          ArrayRef<Value*>({args[1], args[2]}));
+      is_null = builder.CreateCall(
+          is_null_string_fn, llvm::ArrayRef<llvm::Value*>({args[1], args[2]}));
     } else {
-      is_null = builder.CreateCall(is_null_string_fn, ArrayRef<Value*>({args[1], args[2],
-          codegen->CastPtrToLlvmPtr(codegen->ptr_type(), const_cast<char*>(null_col_val)),
-          codegen->GetIntConstant(TYPE_INT, len)}));
+      is_null = builder.CreateCall(is_null_string_fn,
+          llvm::ArrayRef<llvm::Value*>(
+              {args[1], args[2], codegen->CastPtrToLlvmPtr(codegen->ptr_type(),
+                                     const_cast<char*>(null_col_val)),
+                  codegen->GetIntConstant(TYPE_INT, len)}));
     }
   } else {
     // Constant FALSE as branch condition. We rely on later optimization passes
@@ -173,29 +174,30 @@ Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
   if (!slot_desc->type().IsVarLenStringType()) {
     builder.SetInsertPoint(check_zero_block);
     // If len == 0 and it is not a string col, set slot to NULL
-    Value* null_len = builder.CreateICmpEQ(
-        args[2], codegen->GetIntConstant(TYPE_INT, 0));
+    llvm::Value* null_len =
+        builder.CreateICmpEQ(args[2], codegen->GetIntConstant(TYPE_INT, 0));
     builder.CreateCondBr(null_len, set_null_block, parse_slot_block);
   }
 
   // Codegen parse slot block
   builder.SetInsertPoint(parse_slot_block);
-  Value* slot = builder.CreateStructGEP(NULL, args[0], slot_desc->llvm_field_idx(),
-      "slot");
+  llvm::Value* slot =
+      builder.CreateStructGEP(NULL, args[0], slot_desc->llvm_field_idx(), "slot");
 
   if (slot_desc->type().IsVarLenStringType()) {
-    Value* ptr = builder.CreateStructGEP(NULL, slot, 0, "string_ptr");
-    Value* len = builder.CreateStructGEP(NULL, slot, 1, "string_len");
+    llvm::Value* ptr = builder.CreateStructGEP(NULL, slot, 0, "string_ptr");
+    llvm::Value* len = builder.CreateStructGEP(NULL, slot, 1, "string_len");
 
     builder.CreateStore(args[1], ptr);
     // TODO codegen memory allocation for CHAR
     DCHECK(slot_desc->type().type != TYPE_CHAR);
     if (slot_desc->type().type == TYPE_VARCHAR) {
       // determine if we need to truncate the string
-      Value* maxlen = codegen->GetIntConstant(TYPE_INT, slot_desc->type().len);
-      Value* len_lt_maxlen = builder.CreateICmpSLT(args[2], maxlen, "len_lt_maxlen");
-      Value* minlen = builder.CreateSelect(len_lt_maxlen, args[2], maxlen,
-                                           "select_min_len");
+      llvm::Value* maxlen = codegen->GetIntConstant(TYPE_INT, slot_desc->type().len);
+      llvm::Value* len_lt_maxlen =
+          builder.CreateICmpSLT(args[2], maxlen, "len_lt_maxlen");
+      llvm::Value* minlen =
+          builder.CreateSelect(len_lt_maxlen, args[2], maxlen, "select_min_len");
       builder.CreateStore(minlen, len);
     } else {
       builder.CreateStore(args[2], len);
@@ -203,7 +205,7 @@ Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     builder.CreateRet(codegen->true_value());
   } else {
     IRFunction::Type parse_fn_enum;
-    Function* parse_fn = NULL;
+    llvm::Function* parse_fn = NULL;
     switch (slot_desc->type().type) {
       case TYPE_BOOLEAN:
         parse_fn_enum = IRFunction::STRING_TO_BOOL;
@@ -255,13 +257,13 @@ Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     DCHECK(parse_fn != NULL);
 
     // Set up trying to parse the string to the slot type
-    BasicBlock* parse_success_block, *parse_failed_block;
+    llvm::BasicBlock *parse_success_block, *parse_failed_block;
     codegen->CreateIfElseBlocks(*fn, "parse_success", "parse_fail",
         &parse_success_block, &parse_failed_block);
     LlvmCodeGen::NamedVariable parse_result("parse_result", codegen->GetType(TYPE_INT));
-    Value* parse_result_ptr = codegen->CreateEntryBlockAlloca(*fn, parse_result);
+    llvm::Value* parse_result_ptr = codegen->CreateEntryBlockAlloca(*fn, parse_result);
 
-    CallInst* parse_return;
+    llvm::CallInst* parse_return;
     // Call Impala's StringTo* function
     // Function implementations in exec/hdfs-scanner-ir.cc
     if (slot_desc->type().type == TYPE_DECIMAL) {
@@ -278,17 +280,19 @@ Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     } else {
       parse_return = builder.CreateCall(parse_fn, {args[1], args[2], parse_result_ptr});
     }
-    Value* parse_result_val = builder.CreateLoad(parse_result_ptr, "parse_result");
-    Value* failed_value = codegen->GetIntConstant(TYPE_INT, StringParser::PARSE_FAILURE);
+    llvm::Value* parse_result_val = builder.CreateLoad(parse_result_ptr, "parse_result");
+    llvm::Value* failed_value =
+        codegen->GetIntConstant(TYPE_INT, StringParser::PARSE_FAILURE);
 
     // Check for parse error.
-    Value* parse_failed = builder.CreateICmpEQ(parse_result_val, failed_value, "failed");
+    llvm::Value* parse_failed =
+        builder.CreateICmpEQ(parse_result_val, failed_value, "failed");
     if (strict_mode) {
       // In strict_mode, also check if parse_result is PARSE_OVERFLOW.
-      Value* overflow_value = codegen->GetIntConstant(TYPE_INT,
-          StringParser::PARSE_OVERFLOW);
-      Value* parse_overflow = builder.CreateICmpEQ(parse_result_val, overflow_value,
-          "overflowed");
+      llvm::Value* overflow_value =
+          codegen->GetIntConstant(TYPE_INT, StringParser::PARSE_OVERFLOW);
+      llvm::Value* parse_overflow =
+          builder.CreateICmpEQ(parse_result_val, overflow_value, "overflowed");
       parse_failed = builder.CreateOr(parse_failed, parse_overflow, "failed_or");
     }
     builder.CreateCondBr(parse_failed, parse_failed_block, parse_success_block);
@@ -299,8 +303,8 @@ Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     if (slot_desc->type().type == TYPE_DECIMAL) {
       // For Decimal values, the return type generated by Clang is struct type rather than
       // integer so casting is necessary
-      Value* cast_slot = builder.CreateBitCast(slot,
-          parse_return->getType()->getPointerTo());
+      llvm::Value* cast_slot =
+          builder.CreateBitCast(slot, parse_return->getType()->getPointerTo());
       builder.CreateStore(parse_return, cast_slot);
     } else if (slot_desc->type().type != TYPE_TIMESTAMP) {
       builder.CreateStore(parse_return, slot);

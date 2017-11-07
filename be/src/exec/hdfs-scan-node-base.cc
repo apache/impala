@@ -48,7 +48,6 @@ DECLARE_bool(skip_file_runtime_filtering);
 
 namespace filesystem = boost::filesystem;
 using namespace impala;
-using namespace llvm;
 using namespace strings;
 
 const string HdfsScanNodeBase::HDFS_SPLIT_STATS_DESC =
@@ -270,7 +269,7 @@ void HdfsScanNodeBase::Codegen(RuntimeState* state) {
 
     // Create reusable codegen'd functions for each file type type needed
     // TODO: do this for conjuncts_map_
-    Function* fn;
+    llvm::Function* fn;
     Status status;
     switch (format) {
       case THdfsFileFormat::TEXT:

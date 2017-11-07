@@ -77,7 +77,6 @@ using boost::posix_time::to_tm;
 using std::numeric_limits;
 using namespace Apache::Hadoop::Hive;
 using namespace impala;
-using namespace llvm;
 
 namespace impala {
 ImpaladQueryExecutor* executor_;

@@ -24,7 +24,6 @@
 
 using namespace impala;
 using namespace strings;
-using namespace llvm;
 
 const std::string FilterStats::ROW_GROUPS_KEY = "RowGroups";
 const std::string FilterStats::FILES_KEY = "Files";
@@ -126,83 +125,84 @@ void FilterContext::Insert(TupleRow* row) const noexcept {
 //       %"struct.impala::ColumnType"* @expr_type_arg)
 //   ret i1 %passed_filter
 // }
-Status FilterContext::CodegenEval(LlvmCodeGen* codegen, ScalarExpr* filter_expr,
-    Function** fn) {
-  LLVMContext& context = codegen->context();
+Status FilterContext::CodegenEval(
+    LlvmCodeGen* codegen, ScalarExpr* filter_expr, llvm::Function** fn) {
+  llvm::LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
 
   *fn = nullptr;
-  PointerType* this_type = codegen->GetPtrType(FilterContext::LLVM_CLASS_NAME);
-  PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
+  llvm::PointerType* this_type = codegen->GetPtrType(FilterContext::LLVM_CLASS_NAME);
+  llvm::PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
   LlvmCodeGen::FnPrototype prototype(codegen, "FilterContextEval",
       codegen->boolean_type());
   prototype.AddArgument(LlvmCodeGen::NamedVariable("this", this_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
 
-  Value* args[2];
-  Function* eval_filter_fn = prototype.GeneratePrototype(&builder, args);
-  Value* this_arg = args[0];
-  Value* row_arg = args[1];
+  llvm::Value* args[2];
+  llvm::Function* eval_filter_fn = prototype.GeneratePrototype(&builder, args);
+  llvm::Value* this_arg = args[0];
+  llvm::Value* row_arg = args[1];
 
-  BasicBlock* not_null_block = BasicBlock::Create(context, "not_null", eval_filter_fn);
-  BasicBlock* is_null_block = BasicBlock::Create(context, "is_null", eval_filter_fn);
-  BasicBlock* eval_filter_block =
-      BasicBlock::Create(context, "eval_filter", eval_filter_fn);
+  llvm::BasicBlock* not_null_block =
+      llvm::BasicBlock::Create(context, "not_null", eval_filter_fn);
+  llvm::BasicBlock* is_null_block =
+      llvm::BasicBlock::Create(context, "is_null", eval_filter_fn);
+  llvm::BasicBlock* eval_filter_block =
+      llvm::BasicBlock::Create(context, "eval_filter", eval_filter_fn);
 
-  Function* compute_fn;
+  llvm::Function* compute_fn;
   RETURN_IF_ERROR(filter_expr->GetCodegendComputeFn(codegen, &compute_fn));
   DCHECK(compute_fn != nullptr);
 
   // The function for checking against the bloom filter for match.
-  Function* runtime_filter_fn =
+  llvm::Function* runtime_filter_fn =
       codegen->GetFunction(IRFunction::RUNTIME_FILTER_EVAL, false);
   DCHECK(runtime_filter_fn != nullptr);
 
   // Load 'expr_eval' from 'this_arg' FilterContext object.
-  Value* expr_eval_ptr =
+  llvm::Value* expr_eval_ptr =
       builder.CreateStructGEP(nullptr, this_arg, 0, "expr_eval_ptr");
-  Value* expr_eval_arg =
-      builder.CreateLoad(expr_eval_ptr, "expr_eval_arg");
+  llvm::Value* expr_eval_arg = builder.CreateLoad(expr_eval_ptr, "expr_eval_arg");
 
   // Evaluate the row against the filter's expression.
-  Value* compute_fn_args[] = {expr_eval_arg, row_arg};
+  llvm::Value* compute_fn_args[] = {expr_eval_arg, row_arg};
   CodegenAnyVal result = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
       filter_expr->type(), compute_fn, compute_fn_args, "result");
 
   // Check if the result is NULL
-  Value* is_null = result.GetIsNull();
+  llvm::Value* is_null = result.GetIsNull();
   builder.CreateCondBr(is_null, is_null_block, not_null_block);
 
   // Set the pointer to NULL in case it evaluates to NULL.
   builder.SetInsertPoint(is_null_block);
-  Value* null_ptr = codegen->null_ptr_value();
+  llvm::Value* null_ptr = codegen->null_ptr_value();
   builder.CreateBr(eval_filter_block);
 
   // Saves 'result' on the stack and passes a pointer to it to 'runtime_filter_fn'.
   builder.SetInsertPoint(not_null_block);
-  Value* native_ptr = result.ToNativePtr();
+  llvm::Value* native_ptr = result.ToNativePtr();
   native_ptr = builder.CreatePointerCast(native_ptr, codegen->ptr_type(), "native_ptr");
   builder.CreateBr(eval_filter_block);
 
   // Get the arguments in place to call 'runtime_filter_fn' to see if the row passes.
   builder.SetInsertPoint(eval_filter_block);
-  PHINode* val_ptr_phi = builder.CreatePHI(codegen->ptr_type(), 2, "val_ptr_phi");
+  llvm::PHINode* val_ptr_phi = builder.CreatePHI(codegen->ptr_type(), 2, "val_ptr_phi");
   val_ptr_phi->addIncoming(native_ptr, not_null_block);
   val_ptr_phi->addIncoming(null_ptr, is_null_block);
 
   // Create a global constant of the filter expression's ColumnType. It needs to be a
   // constant for constant propagation and dead code elimination in 'runtime_filter_fn'.
-  Type* col_type = codegen->GetType(ColumnType::LLVM_CLASS_NAME);
-  Constant* expr_type_arg = codegen->ConstantToGVPtr(col_type,
-      filter_expr->type().ToIR(codegen), "expr_type_arg");
+  llvm::Type* col_type = codegen->GetType(ColumnType::LLVM_CLASS_NAME);
+  llvm::Constant* expr_type_arg = codegen->ConstantToGVPtr(
+      col_type, filter_expr->type().ToIR(codegen), "expr_type_arg");
 
   // Load 'filter' from 'this_arg' FilterContext object.
-  Value* filter_ptr = builder.CreateStructGEP(nullptr, this_arg, 1, "filter_ptr");
-  Value* filter_arg = builder.CreateLoad(filter_ptr, "filter_arg");
+  llvm::Value* filter_ptr = builder.CreateStructGEP(nullptr, this_arg, 1, "filter_ptr");
+  llvm::Value* filter_arg = builder.CreateLoad(filter_ptr, "filter_arg");
 
-  Value* run_filter_args[] = {filter_arg, val_ptr_phi, expr_type_arg};
-  Value* passed_filter =
-       builder.CreateCall(runtime_filter_fn, run_filter_args, "passed_filter");
+  llvm::Value* run_filter_args[] = {filter_arg, val_ptr_phi, expr_type_arg};
+  llvm::Value* passed_filter =
+      builder.CreateCall(runtime_filter_fn, run_filter_args, "passed_filter");
   builder.CreateRet(passed_filter);
 
   *fn = codegen->FinalizeFunction(eval_filter_fn);
@@ -262,100 +262,102 @@ Status FilterContext::CodegenEval(LlvmCodeGen* codegen, ScalarExpr* filter_expr,
 //   ret void
 // }
 Status FilterContext::CodegenInsert(
-    LlvmCodeGen* codegen, ScalarExpr* filter_expr, Function** fn) {
-  LLVMContext& context = codegen->context();
+    LlvmCodeGen* codegen, ScalarExpr* filter_expr, llvm::Function** fn) {
+  llvm::LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
 
   *fn = nullptr;
-  PointerType* this_type = codegen->GetPtrType(FilterContext::LLVM_CLASS_NAME);
-  PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
+  llvm::PointerType* this_type = codegen->GetPtrType(FilterContext::LLVM_CLASS_NAME);
+  llvm::PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
   LlvmCodeGen::FnPrototype prototype(
       codegen, "FilterContextInsert", codegen->void_type());
   prototype.AddArgument(LlvmCodeGen::NamedVariable("this", this_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
 
-  Value* args[2];
-  Function* insert_filter_fn = prototype.GeneratePrototype(&builder, args);
-  Value* this_arg = args[0];
-  Value* row_arg = args[1];
+  llvm::Value* args[2];
+  llvm::Function* insert_filter_fn = prototype.GeneratePrototype(&builder, args);
+  llvm::Value* this_arg = args[0];
+  llvm::Value* row_arg = args[1];
 
   // Load 'local_bloom_filter' from 'this_arg' FilterContext object.
-  Value* local_bloom_filter_ptr =
+  llvm::Value* local_bloom_filter_ptr =
       builder.CreateStructGEP(nullptr, this_arg, 3, "local_bloom_filter_ptr");
-  Value* local_bloom_filter_arg =
+  llvm::Value* local_bloom_filter_arg =
       builder.CreateLoad(local_bloom_filter_ptr, "local_bloom_filter_arg");
 
   // Check if 'local_bloom_filter' is NULL and return if so.
-  Value* bloom_is_null = builder.CreateIsNull(local_bloom_filter_arg, "bloom_is_null");
-  BasicBlock* bloom_not_null_block =
-      BasicBlock::Create(context, "bloom_not_null", insert_filter_fn);
-  BasicBlock* bloom_is_null_block =
-      BasicBlock::Create(context, "bloom_is_null", insert_filter_fn);
+  llvm::Value* bloom_is_null =
+      builder.CreateIsNull(local_bloom_filter_arg, "bloom_is_null");
+  llvm::BasicBlock* bloom_not_null_block =
+      llvm::BasicBlock::Create(context, "bloom_not_null", insert_filter_fn);
+  llvm::BasicBlock* bloom_is_null_block =
+      llvm::BasicBlock::Create(context, "bloom_is_null", insert_filter_fn);
   builder.CreateCondBr(bloom_is_null, bloom_is_null_block, bloom_not_null_block);
   builder.SetInsertPoint(bloom_is_null_block);
   builder.CreateRetVoid();
   builder.SetInsertPoint(bloom_not_null_block);
 
-  BasicBlock* val_not_null_block =
-      BasicBlock::Create(context, "val_not_null", insert_filter_fn);
-  BasicBlock* val_is_null_block =
-      BasicBlock::Create(context, "val_is_null", insert_filter_fn);
-  BasicBlock* insert_filter_block =
-      BasicBlock::Create(context, "insert_filter", insert_filter_fn);
+  llvm::BasicBlock* val_not_null_block =
+      llvm::BasicBlock::Create(context, "val_not_null", insert_filter_fn);
+  llvm::BasicBlock* val_is_null_block =
+      llvm::BasicBlock::Create(context, "val_is_null", insert_filter_fn);
+  llvm::BasicBlock* insert_filter_block =
+      llvm::BasicBlock::Create(context, "insert_filter", insert_filter_fn);
 
-  Function* compute_fn;
+  llvm::Function* compute_fn;
   RETURN_IF_ERROR(filter_expr->GetCodegendComputeFn(codegen, &compute_fn));
   DCHECK(compute_fn != nullptr);
 
   // Load 'expr_eval' from 'this_arg' FilterContext object.
-  Value* expr_eval_ptr = builder.CreateStructGEP(nullptr, this_arg, 0, "expr_eval_ptr");
-  Value* expr_eval_arg = builder.CreateLoad(expr_eval_ptr, "expr_eval_arg");
+  llvm::Value* expr_eval_ptr =
+      builder.CreateStructGEP(nullptr, this_arg, 0, "expr_eval_ptr");
+  llvm::Value* expr_eval_arg = builder.CreateLoad(expr_eval_ptr, "expr_eval_arg");
 
   // Evaluate the row against the filter's expression.
-  Value* compute_fn_args[] = {expr_eval_arg, row_arg};
+  llvm::Value* compute_fn_args[] = {expr_eval_arg, row_arg};
   CodegenAnyVal result = CodegenAnyVal::CreateCallWrapped(
       codegen, &builder, filter_expr->type(), compute_fn, compute_fn_args, "result");
 
   // Check if the result is NULL
-  Value* val_is_null = result.GetIsNull();
+  llvm::Value* val_is_null = result.GetIsNull();
   builder.CreateCondBr(val_is_null, val_is_null_block, val_not_null_block);
 
   // Set the pointer to NULL in case it evaluates to NULL.
   builder.SetInsertPoint(val_is_null_block);
-  Value* null_ptr = codegen->null_ptr_value();
+  llvm::Value* null_ptr = codegen->null_ptr_value();
   builder.CreateBr(insert_filter_block);
 
   // Saves 'result' on the stack and passes a pointer to it to 'insert_bloom_filter_fn'.
   builder.SetInsertPoint(val_not_null_block);
-  Value* native_ptr = result.ToNativePtr();
+  llvm::Value* native_ptr = result.ToNativePtr();
   native_ptr = builder.CreatePointerCast(native_ptr, codegen->ptr_type(), "native_ptr");
   builder.CreateBr(insert_filter_block);
 
   // Get the arguments in place to call 'get_hash_value_fn'.
   builder.SetInsertPoint(insert_filter_block);
-  PHINode* val_ptr_phi = builder.CreatePHI(codegen->ptr_type(), 2, "val_ptr_phi");
+  llvm::PHINode* val_ptr_phi = builder.CreatePHI(codegen->ptr_type(), 2, "val_ptr_phi");
   val_ptr_phi->addIncoming(native_ptr, val_not_null_block);
   val_ptr_phi->addIncoming(null_ptr, val_is_null_block);
 
   // Create a global constant of the filter expression's ColumnType. It needs to be a
   // constant for constant propagation and dead code elimination in 'get_hash_value_fn'.
-  Type* col_type = codegen->GetType(ColumnType::LLVM_CLASS_NAME);
-  Constant* expr_type_arg = codegen->ConstantToGVPtr(
+  llvm::Type* col_type = codegen->GetType(ColumnType::LLVM_CLASS_NAME);
+  llvm::Constant* expr_type_arg = codegen->ConstantToGVPtr(
       col_type, filter_expr->type().ToIR(codegen), "expr_type_arg");
 
   // Call RawValue::GetHashValue() on the result of the filter's expression.
-  Value* seed_arg =
+  llvm::Value* seed_arg =
       codegen->GetIntConstant(TYPE_INT, RuntimeFilterBank::DefaultHashSeed());
-  Value* get_hash_value_args[] = {val_ptr_phi, expr_type_arg, seed_arg};
-  Function* get_hash_value_fn =
+  llvm::Value* get_hash_value_args[] = {val_ptr_phi, expr_type_arg, seed_arg};
+  llvm::Function* get_hash_value_fn =
       codegen->GetFunction(IRFunction::RAW_VALUE_GET_HASH_VALUE, false);
   DCHECK(get_hash_value_fn != nullptr);
-  Value* hash_value =
+  llvm::Value* hash_value =
       builder.CreateCall(get_hash_value_fn, get_hash_value_args, "hash_value");
 
   // Call Insert() on the bloom filter.
-  Value* insert_args[] = {local_bloom_filter_arg, hash_value};
-  Function* insert_bloom_filter_fn;
+  llvm::Value* insert_args[] = {local_bloom_filter_arg, hash_value};
+  llvm::Function* insert_bloom_filter_fn;
   if (CpuInfo::IsSupported(CpuInfo::AVX2)) {
     insert_bloom_filter_fn =
         codegen->GetFunction(IRFunction::BLOOM_FILTER_INSERT_AVX2, false);
