@@ -32,7 +32,7 @@ fi
 cd $IMPALA_HOME/testdata
 ${IMPALA_HOME}/bin/mvn-quiet.sh clean
 ${IMPALA_HOME}/bin/mvn-quiet.sh package
-mvn -q dependency:copy-dependencies
+mvn $IMPALA_MAVEN_OPTIONS -q dependency:copy-dependencies
 
 . ${IMPALA_HOME}/bin/set-classpath.sh
 export CLASSPATH=$IMPALA_HOME/testdata/target/impala-testdata-0.1-SNAPSHOT.jar:$CLASSPATH

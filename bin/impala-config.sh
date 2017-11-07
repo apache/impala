@@ -210,6 +210,9 @@ export USE_GOLD_LINKER=${USE_GOLD_LINKER-true}
 # IMPALA_BUILD_THREADS to increase parallelism.
 export IMPALA_CXX_COMPILER=${IMPALA_CXX_COMPILER-default}
 
+# Add options to 'mvn'; useful for configuring a settings file (-s).
+export IMPALA_MAVEN_OPTIONS=${IMPALA_MAVEN_OPTIONS-}
+
 # If enabled, debug symbols are added to cross-compiled IR.
 export ENABLE_IMPALA_IR_DEBUG_INFO=${ENABLE_IMPALA_IR_DEBUG_INFO-false}
 
@@ -547,6 +550,7 @@ echo "LD_PRELOAD              = $LD_PRELOAD"
 echo "POSTGRES_JDBC_DRIVER    = $POSTGRES_JDBC_DRIVER"
 echo "IMPALA_TOOLCHAIN        = $IMPALA_TOOLCHAIN"
 echo "DOWNLOAD_CDH_COMPONENTS = $DOWNLOAD_CDH_COMPONENTS"
+echo "IMPALA_MAVEN_OPTIONS    = $IMPALA_MAVEN_OPTIONS"
 
 # Kerberos things.  If the cluster exists and is kerberized, source
 # the required environment.  This is required for any hadoop tool to
