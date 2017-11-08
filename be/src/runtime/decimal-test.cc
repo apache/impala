@@ -45,16 +45,32 @@ void VerifyEquals(const DecimalValue<T>& t1, const DecimalValue<T>& t2) {
 }
 
 template <typename T>
-void VerifyParse(const string& s, int precision, int scale,
+void VerifyParse(const string& s, int precision, int scale, bool round,
     const DecimalValue<T>& expected_val, StringParser::ParseResult expected_result) {
   StringParser::ParseResult parse_result;
   DecimalValue<T> val = StringParser::StringToDecimal<T>(
-      s.c_str(), s.size(), precision, scale, &parse_result);
+      s.c_str(), s.size(), precision, scale, round, &parse_result);
   EXPECT_EQ(expected_result, parse_result) << "Failed test string: " << s;
   if (expected_result == StringParser::PARSE_SUCCESS ||
       expected_result == StringParser::PARSE_UNDERFLOW) {
     VerifyEquals(expected_val, val);
   }
+}
+
+template <typename T>
+void VerifyParse(const string& s, int precision, int scale,
+    const DecimalValue<T>& expected_val, StringParser::ParseResult expected_result) {
+  VerifyParse(s, precision, scale, false, expected_val, expected_result);
+  VerifyParse(s, precision, scale, true, expected_val, expected_result);
+}
+
+template <typename T>
+void VerifyParse(const string& s, int precision, int scale,
+    const DecimalValue<T>& expected_val_v1, StringParser::ParseResult expected_result_v1,
+    const DecimalValue<T>& expected_val_v2, StringParser::ParseResult expected_result_v2)
+{
+  VerifyParse(s, precision, scale, false, expected_val_v1, expected_result_v1);
+  VerifyParse(s, precision, scale, true, expected_val_v2, expected_result_v2);
 }
 
 template<typename T>
@@ -67,6 +83,17 @@ void StringToAllDecimals(const string& s, int precision, int scale, int32_t val,
   VerifyParse(s, precision, scale, Decimal4Value(val), result);
   VerifyParse(s, precision, scale, Decimal8Value(val), result);
   VerifyParse(s, precision, scale, Decimal16Value(val), result);
+}
+
+void StringToAllDecimals(const string& s, int precision, int scale,
+    int32_t val_v1, StringParser::ParseResult result_v1,
+    int32_t val_v2, StringParser::ParseResult result_v2) {
+  VerifyParse(s, precision, scale,
+      Decimal4Value(val_v1), result_v1, Decimal4Value(val_v2), result_v2);
+  VerifyParse(s, precision, scale,
+      Decimal8Value(val_v1), result_v1, Decimal8Value(val_v2), result_v2);
+  VerifyParse(s, precision, scale,
+      Decimal16Value(val_v1), result_v1, Decimal16Value(val_v2), result_v2);
 }
 
 TEST(IntToDecimal, Basic) {
@@ -271,13 +298,27 @@ TEST(StringToDecimal, Basic) {
   StringToAllDecimals(".1", 10, 2, 10, StringParser::PARSE_SUCCESS);
   StringToAllDecimals("00012.3", 10, 2, 1230, StringParser::PARSE_SUCCESS);
   StringToAllDecimals("-00012.3", 10, 2, -1230, StringParser::PARSE_SUCCESS);
+  StringToAllDecimals("0.00000", 6, 5, 0, StringParser::PARSE_SUCCESS);
+  StringToAllDecimals("1.00000", 6, 5, 100000, StringParser::PARSE_SUCCESS);
+  StringToAllDecimals("0.000000", 6, 5, 0, StringParser::PARSE_UNDERFLOW);
+  StringToAllDecimals("1.000000", 6, 5, 100000, StringParser::PARSE_UNDERFLOW);
+  StringToAllDecimals("1.000004", 6, 5, 100000, StringParser::PARSE_UNDERFLOW);
+  StringToAllDecimals("1.000005", 6, 5,
+      100000, StringParser::PARSE_UNDERFLOW,
+      100001, StringParser::PARSE_UNDERFLOW);
+  StringToAllDecimals("0.4", 5, 0, 0, StringParser::PARSE_UNDERFLOW);
+  StringToAllDecimals("0.5", 5, 0,
+      0, StringParser::PARSE_UNDERFLOW,
+      1, StringParser::PARSE_UNDERFLOW);
 
   StringToAllDecimals("123.45", 10, 2, 12345, StringParser::PARSE_SUCCESS);
   StringToAllDecimals(".45", 10, 2, 45, StringParser::PARSE_SUCCESS);
   StringToAllDecimals("-.45", 10, 2, -45, StringParser::PARSE_SUCCESS);
   StringToAllDecimals(" 123.4 ", 10, 5, 12340000, StringParser::PARSE_SUCCESS);
   StringToAllDecimals("-123.45", 10, 5, -12345000, StringParser::PARSE_SUCCESS);
-  StringToAllDecimals("-123.456", 10, 2, -12345, StringParser::PARSE_UNDERFLOW);
+  StringToAllDecimals("-123.456", 10, 2,
+      -12345, StringParser::PARSE_UNDERFLOW,
+      -12346, StringParser::PARSE_UNDERFLOW);
 
   StringToAllDecimals("e", 2, 0, 0, StringParser::PARSE_FAILURE);
   StringToAllDecimals("E", 2, 0, 0, StringParser::PARSE_FAILURE);
@@ -347,7 +388,8 @@ TEST(StringToDecimal, LargeDecimals) {
   VerifyParse("123456.78", 8, 3,
       Decimal8Value(12345678L), StringParser::PARSE_OVERFLOW);
   VerifyParse("1234.5678", 8, 3,
-      Decimal8Value(1234567L), StringParser::PARSE_UNDERFLOW);
+      Decimal8Value(1234567L), StringParser::PARSE_UNDERFLOW,
+      Decimal8Value(1234568L), StringParser::PARSE_UNDERFLOW);
   VerifyParse("12345.678", 8, 3,
       Decimal16Value(12345678L), StringParser::PARSE_SUCCESS);
   VerifyParse("-12345.678", 8, 3,
@@ -355,7 +397,8 @@ TEST(StringToDecimal, LargeDecimals) {
   VerifyParse("123456.78", 8, 3,
       Decimal16Value(12345678L), StringParser::PARSE_OVERFLOW);
   VerifyParse("1234.5678", 8, 3,
-      Decimal16Value(1234567L), StringParser::PARSE_UNDERFLOW);
+      Decimal16Value(1234567L), StringParser::PARSE_UNDERFLOW,
+      Decimal16Value(1234568L), StringParser::PARSE_UNDERFLOW);
 
   // Test max unscaled value for each of the decimal types.
   VerifyParse("999999999", 9, 0,
@@ -411,16 +454,68 @@ TEST(StringToDecimal, LargeDecimals) {
       38, 38, Decimal16Value(-result), StringParser::PARSE_SUCCESS);
   VerifyParse("-.99999999999999999999999999999999999999e1",
       38, 38, Decimal16Value(-result), StringParser::PARSE_OVERFLOW);
-  VerifyParse("-.999999999999999999999999999999999999990e-1",
-      38, 38, Decimal16Value(-result / 10), StringParser::PARSE_UNDERFLOW);
-  VerifyParse("-.999999999999999999999999999999999999990000000000000000e-20",
-      38, 38,
+  VerifyParse("-.999999999999999999999999999999999999990e-1", 38, 38,
+      Decimal16Value(-result / 10), StringParser::PARSE_UNDERFLOW,
+      Decimal16Value(-result / 10 - 1), StringParser::PARSE_UNDERFLOW);
+  VerifyParse("-.999999999999999999999999999999999999990000000000000000e-20", 38, 38,
       Decimal16Value(-result / DecimalUtil::GetScaleMultiplier<int128_t>(20)),
+      StringParser::PARSE_UNDERFLOW,
+      Decimal16Value(-result / DecimalUtil::GetScaleMultiplier<int128_t>(20) - 1),
       StringParser::PARSE_UNDERFLOW);
   VerifyParse("100000000000000000000000000000000000000",
       38, 0, Decimal16Value(0), StringParser::PARSE_OVERFLOW);
   VerifyParse("-100000000000000000000000000000000000000",
       38, 0, Decimal16Value(0), StringParser::PARSE_OVERFLOW);
+
+  // Rounding tests.
+  VerifyParse("555.554", 5, 2, Decimal4Value(55555), StringParser::PARSE_UNDERFLOW);
+  VerifyParse("555.555", 5, 2,
+      Decimal4Value(55555), StringParser::PARSE_UNDERFLOW,
+      Decimal4Value(55556), StringParser::PARSE_UNDERFLOW);
+  // Too many digits to the left of the dot so we overflow.
+  VerifyParse("555.555e1", 5, 2, Decimal4Value(0), StringParser::PARSE_OVERFLOW);
+  VerifyParse("-555.555e1", 5, 2, Decimal4Value(0), StringParser::PARSE_OVERFLOW);
+  VerifyParse("5555.555", 5, 2, Decimal16Value(0), StringParser::PARSE_OVERFLOW);
+  VerifyParse("-555.555", 5, 2,
+        Decimal4Value(-55555), StringParser::PARSE_UNDERFLOW,
+        Decimal4Value(-55556), StringParser::PARSE_UNDERFLOW);
+  VerifyParse("-5555.555", 5, 2, Decimal16Value(0), StringParser::PARSE_OVERFLOW);
+  VerifyParse("5555.555e-1", 5, 2,
+          Decimal4Value(55555), StringParser::PARSE_UNDERFLOW,
+          Decimal4Value(55556), StringParser::PARSE_UNDERFLOW);
+  VerifyParse("55555.555e-1", 5, 2, Decimal16Value(0), StringParser::PARSE_OVERFLOW);
+  // Too many digits to the right of the dot and not enough to the left. Rounding via
+  // ScaleDownAndRound().
+  VerifyParse("5.55444", 5, 2, Decimal4Value(555), StringParser::PARSE_UNDERFLOW);
+  VerifyParse("5.55555", 5, 2,
+        Decimal4Value(555), StringParser::PARSE_UNDERFLOW,
+        Decimal4Value(556), StringParser::PARSE_UNDERFLOW);
+  VerifyParse("5.555e-9", 5, 2, Decimal4Value(0), StringParser::PARSE_UNDERFLOW);
+  // The number of digits to the left of the dot equals to precision - scale. Rounding
+  // by adding 1 if the first truncated digit is greater or equal to 5.
+  VerifyParse("555.554", 5, 2, Decimal4Value(55555), StringParser::PARSE_UNDERFLOW);
+  VerifyParse("555.555", 5, 2,
+      Decimal4Value(55555), StringParser::PARSE_UNDERFLOW,
+      Decimal4Value(55556), StringParser::PARSE_UNDERFLOW);
+  VerifyParse("5.55554e2", 5, 2, Decimal4Value(55555), StringParser::PARSE_UNDERFLOW);
+  VerifyParse("5.55555e2", 5, 2,
+      Decimal4Value(55555), StringParser::PARSE_UNDERFLOW,
+      Decimal4Value(55556), StringParser::PARSE_UNDERFLOW);
+  VerifyParse("55555.4e-2", 5, 2, Decimal4Value(55555), StringParser::PARSE_UNDERFLOW);
+  VerifyParse("55555.5e-2", 5, 2,
+          Decimal4Value(55555), StringParser::PARSE_UNDERFLOW,
+          Decimal4Value(55556), StringParser::PARSE_UNDERFLOW);
+  // Rounding causes overflow.
+  VerifyParse("999.994", 5, 2, Decimal4Value(99999), StringParser::PARSE_UNDERFLOW);
+  VerifyParse("999.995", 5, 2,
+        Decimal4Value(99999), StringParser::PARSE_UNDERFLOW,
+        Decimal4Value(0), StringParser::PARSE_OVERFLOW);
+  VerifyParse("9.99995e2", 5, 2,
+          Decimal4Value(99999), StringParser::PARSE_UNDERFLOW,
+          Decimal4Value(0), StringParser::PARSE_OVERFLOW);
+  VerifyParse("99999.5e-2", 5, 2,
+            Decimal4Value(99999), StringParser::PARSE_UNDERFLOW,
+            Decimal4Value(0), StringParser::PARSE_OVERFLOW);
 }
 
 TEST(DecimalTest, Overflow) {
@@ -780,7 +875,7 @@ TEST(DecimalArithmetic, DivideLargeScales) {
   StringParser::ParseResult result;
   const char* data = "319391280635.61476055";
   Decimal16Value x =
-      StringParser::StringToDecimal<int128_t>(data, strlen(data), t1, &result);
+      StringParser::StringToDecimal<int128_t>(data, strlen(data), t1, false, &result);
   Decimal16Value y(10000);
   bool is_nan = false;
   bool is_overflow = false;

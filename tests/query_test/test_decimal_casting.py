@@ -159,7 +159,7 @@ class TestDecimalCasting(ImpalaTestSuite):
           .format(val, precision, scale)
       res = Decimal(self.execute_scalar(cast, vector.get_value('exec_option')))
       # TODO: Remove check for cast_from once string to decimal is supported in decimal_v2.
-      if is_decimal_v2 and cast_from != 'string':
+      if is_decimal_v2:
         expected_val = val.quantize(Decimal('0e-%s' % scale), rounding=ROUND_HALF_UP)
       else:
         expected_val = val.quantize(Decimal('0e-%s' % scale), rounding=ROUND_DOWN)

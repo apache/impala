@@ -84,7 +84,7 @@ void AddTestData(TestData* data, int n) {
     string str = ss.str();
     StringParser::ParseResult dummy;
     val = StringParser::StringToDecimal<int128_t>(
-        str.c_str(), str.length(), column_type, &dummy);
+        str.c_str(), str.length(), column_type, false, &dummy);
     data->values.push_back(val);
     data->int128_values.push_back(numeric_limits<int128_t>::max() * Rand());
   }

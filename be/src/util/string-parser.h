@@ -112,13 +112,13 @@ class StringParser {
   /// On underflow, the truncated value is returned.
   template <typename T>
   static inline DecimalValue<T> StringToDecimal(const char* s, int len,
-      const ColumnType& type, StringParser::ParseResult* result) {
-    return StringToDecimal<T>(s, len, type.precision, type.scale, result);
+      const ColumnType& type, bool round, StringParser::ParseResult* result) {
+    return StringToDecimal<T>(s, len, type.precision, type.scale, round, result);
   }
 
   template <typename T>
   static inline DecimalValue<T> StringToDecimal(const char* s, int len,
-      int type_precision, int type_scale, StringParser::ParseResult* result) {
+      int type_precision, int type_scale, bool round, StringParser::ParseResult* result) {
     // Special cases:
     //   1) '' == Fail, an empty string fails to parse.
     //   2) '   #   ' == #, leading and trailing white space is ignored.
@@ -156,7 +156,7 @@ class StringParser {
     // Ignore leading zeros even after a dot. This allows for differentiating between
     // cases like 0.01e2, which would fit in a DECIMAL(1, 0), and 0.10e2, which would
     // overflow.
-    int scale = 0;
+    int digits_after_dot_count = 0;
     int found_dot = 0;
     if (len > 0 && *s == '.') {
       found_dot = 1;
@@ -164,30 +164,36 @@ class StringParser {
       --len;
       while (len > 0 && UNLIKELY(*s == '0')) {
         found_value = true;
-        ++scale;
+        ++digits_after_dot_count;
         ++s;
         --len;
       }
     }
 
-    int precision = 0;
+    int total_digits_count = 0;
     bool found_exponent = false;
     int8_t exponent = 0;
+    int first_truncated_digit = 0;
     T value = 0;
     for (int i = 0; i < len; ++i) {
-      const char& c = s[i];
+      const char c = s[i];
       if (LIKELY('0' <= c && c <= '9')) {
         found_value = true;
         // Ignore digits once the type's precision limit is reached. This avoids
         // overflowing the underlying storage while handling a string like
         // 10000000000e-10 into a DECIMAL(1, 0). Adjustments for ignored digits and
         // an exponent will be made later.
-        if (LIKELY(type_precision > precision)) {
-          value = (value * 10) + (c - '0');  // Benchmarks are faster with parenthesis...
+        if (LIKELY(total_digits_count < type_precision)) {
+          // Benchmarks are faster with parenthesis.
+          T new_value = (value * 10) + (c - '0');
+          DCHECK(new_value >= value);
+          value = new_value;
+        } else if (UNLIKELY(round && total_digits_count == type_precision)) {
+          first_truncated_digit = c - '0';
         }
-        DCHECK(value >= 0);  // For some reason DCHECK_GE doesn't work with int128_t.
-        ++precision;
-        scale += found_dot;
+        DCHECK(value >= 0); // DCHECK_GE does not work with int128_t
+        ++total_digits_count;
+        digits_after_dot_count += found_dot;
       } else if (c == '.' && LIKELY(!found_dot)) {
         found_dot = 1;
       } else if ((c == 'e' || c == 'E') && LIKELY(!found_exponent)) {
@@ -207,48 +213,56 @@ class StringParser {
     }
 
     // Find the number of truncated digits before adjusting the precision for an exponent.
-    int truncated_digit_count = precision - type_precision;
-    if (exponent > scale) {
-      // Ex: 0.1e3 (which at this point would have precision == 1 and scale == 1), the
-      //     scale must be set to 0 and the value set to 100 which means a precision of 3.
-      precision += exponent - scale;
-      value *= DecimalUtil::GetScaleMultiplier<T>(exponent - scale);
-      scale = 0;
-    } else {
-      // Ex: 100e-4, the scale must be set to 4 but no adjustment to the value is needed,
-      //     the precision must also be set to 4 but that will be done below for the
-      //     non-exponent case anyways.
-      scale -= exponent;
-    }
-    // Ex: 0.001, at this point would have precision 1 and scale 3 since leading zeros
-    //     were ignored during previous parsing.
-    if (scale > precision) precision = scale;
+    int truncated_digit_count = std::max(total_digits_count - type_precision, 0);
+    // 'scale' and 'precision' refer to the scale and precision of the number that
+    // is contained the string that we are parsing. The scale of 'value' may be
+    // different because some digits may have been truncated.
+    int scale, precision;
+    ApplyExponent(total_digits_count, digits_after_dot_count,
+        exponent, &value, &precision, &scale);
 
     // Microbenchmarks show that beyond this point, returning on parse failure is slower
     // than just letting the function run out.
     *result = StringParser::PARSE_SUCCESS;
     if (UNLIKELY(precision - scale > type_precision - type_scale)) {
+      // The number in the string has too many digits to the left of the dot,
+      // so we overflow.
       *result = StringParser::PARSE_OVERFLOW;
     } else if (UNLIKELY(scale > type_scale)) {
+      // There are too many digits to the right of the dot in the string we are parsing.
       *result = StringParser::PARSE_UNDERFLOW;
-      int shift = scale - type_scale;
-      if (UNLIKELY(truncated_digit_count > 0)) shift -= truncated_digit_count;
+      // The scale of 'value'.
+      int value_scale = scale - truncated_digit_count;
+      int shift = value_scale - type_scale;
       if (shift > 0) {
-        T divisor = DecimalUtil::GetScaleMultiplier<T>(shift);
-        if (LIKELY(divisor >= 0)) {
-          value /= divisor;
-        } else {
-          DCHECK(divisor == -1); // DCHECK_EQ doesn't work with int128_t.
-          value = 0;
+        // There are less than maximum number of digits to the left of the dot.
+        value = DecimalUtil::ScaleDownAndRound<T>(value, shift, round);
+        DCHECK(value >= 0);
+        DCHECK(value < DecimalUtil::GetScaleMultiplier<int128_t>(type_precision));
+      } else {
+        // There are a maximum number of digits to the left of the dot. We round by
+        // looking at the first truncated digit.
+        DCHECK_EQ(shift, 0);
+        DCHECK(0 <= first_truncated_digit && first_truncated_digit <= 9);
+        DCHECK(first_truncated_digit == 0 || truncated_digit_count != 0);
+        DCHECK(first_truncated_digit == 0 || round);
+        // Apply the rounding.
+        value += (first_truncated_digit >= 5);
+        DCHECK(value >= 0);
+        DCHECK(value <= DecimalUtil::GetScaleMultiplier<int128_t>(type_precision));
+        if (UNLIKELY(value == DecimalUtil::GetScaleMultiplier<T>(type_precision))) {
+          // Overflow due to rounding.
+          *result = StringParser::PARSE_OVERFLOW;
         }
       }
-      DCHECK(value >= 0); // DCHECK_GE doesn't work with int128_t.
     } else if (UNLIKELY(!found_value && !found_dot)) {
       *result = StringParser::PARSE_FAILURE;
-    }
-
-    if (type_scale > scale) {
+    } else if (type_scale > scale) {
+      // There were not enough digits after the dot, so we have scale up the value.
+      DCHECK_EQ(truncated_digit_count, 0);
       value *= DecimalUtil::GetScaleMultiplier<T>(type_scale - scale);
+      // Overflow should be impossible.
+      DCHECK(value < DecimalUtil::GetScaleMultiplier<int128_t>(type_precision));
     }
 
     return DecimalValue<T>(is_negative ? -value : value);
@@ -370,6 +384,30 @@ class StringParser {
     }
     *result = PARSE_SUCCESS;
     return static_cast<T>(negative ? -val : val);
+  }
+
+  /// Helper function that applies the exponent to the value. Also computes and
+  /// sets the precision and scale.
+  template <typename T>
+  static inline void ApplyExponent(int total_digits_count,
+      int digits_after_dot_count,int8_t exponent, T* value, int* precision, int* scale) {
+    if (exponent > digits_after_dot_count) {
+      // Ex: 0.1e3 (which at this point would have precision == 1 and scale == 1), the
+      //     scale must be set to 0 and the value set to 100 which means a precision of 3.
+      *value *= DecimalUtil::GetScaleMultiplier<T>(exponent - digits_after_dot_count);
+      *precision = total_digits_count + (exponent - digits_after_dot_count);
+      *scale = 0;
+    } else {
+      // Ex: 100e-4, the scale must be set to 4 but no adjustment to the value is needed,
+      //     the precision must also be set to 4 but that will be done below for the
+      //     non-exponent case anyways.
+      *precision = total_digits_count;
+      *scale = digits_after_dot_count - exponent;
+      // Ex: 0.001, at this point would have precision 1 and scale 3 since leading zeros
+      //     were ignored during previous parsing.
+      if (*precision < *scale) *precision = *scale;
+    }
+    DCHECK_GE(*precision, *scale);
   }
 
   /// Checks if "inf" or "infinity" matches 's' in a case-insensitive manner. The match
@@ -580,7 +618,7 @@ class StringParser {
     return val;
   }
 
-  static inline bool IsWhitespace(const char& c) {
+  static inline bool IsWhitespace(const char c) {
     return c == ' ' || UNLIKELY(c == '\t' || c == '\n' || c == '\v' || c == '\f'
         || c == '\r');
   }
@@ -600,13 +638,13 @@ inline int StringParser::StringParseTraits<int64_t>::max_ascii_len() { return 19
 
 // These functions are too large to benefit from inlining.
 Decimal4Value StringToDecimal4(const char* s, int len, int type_precision,
-    int type_scale, StringParser::ParseResult* result);
+    int type_scale, bool round, StringParser::ParseResult* result);
 
 Decimal8Value StringToDecimal8(const char* s, int len, int type_precision,
-    int type_scale, StringParser::ParseResult* result);
+    int type_scale, bool round, StringParser::ParseResult* result);
 
 Decimal16Value StringToDecimal16(const char* s, int len, int type_precision,
-    int type_scale, StringParser::ParseResult* result);
+    int type_scale, bool round, StringParser::ParseResult* result);
 
 }
 #endif

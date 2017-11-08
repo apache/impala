@@ -21,20 +21,20 @@ namespace impala {
 
 using ParseResult = StringParser::ParseResult;
 Decimal4Value StringToDecimal4(const char* s, int len, int type_precision,
-    int type_scale, StringParser::ParseResult* result) {
+    int type_scale, bool round, StringParser::ParseResult* result) {
   return StringParser::StringToDecimal<int32_t>(s, len, type_precision,
-      type_scale, result);
+      type_scale, round, result);
 }
 
 Decimal8Value StringToDecimal8(const char* s, int len, int type_precision,
-    int type_scale, StringParser::ParseResult* result) {
+    int type_scale, bool round, StringParser::ParseResult* result) {
   return StringParser::StringToDecimal<int64_t>(s, len, type_precision,
-      type_scale, result);
+      type_scale, round, result);
 }
 
 Decimal16Value StringToDecimal16(const char* s, int len, int type_precision,
-    int type_scale, StringParser::ParseResult* result) {
+    int type_scale, bool round, StringParser::ParseResult* result) {
   return StringParser::StringToDecimal<int128_t>(s, len, type_precision,
-      type_scale, result);
+      type_scale, round, result);
 }
 }

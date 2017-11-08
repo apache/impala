@@ -494,15 +494,15 @@ class ExprTest : public testing::Test {
     switch (expected_type.GetByteSize()) {
       case 4:
         EXPECT_EQ(expected_result.value(), StringParser::StringToDecimal<int32_t>(
-            value.data(), value.size(), expected_type, &result).value()) << query;
+            value.data(), value.size(), expected_type, false, &result).value()) << query;
         break;
       case 8:
         EXPECT_EQ(expected_result.value(), StringParser::StringToDecimal<int64_t>(
-            value.data(), value.size(), expected_type, &result).value()) << query;
+            value.data(), value.size(), expected_type, false, &result).value()) << query;
         break;
       case 16:
         EXPECT_EQ(expected_result.value(), StringParser::StringToDecimal<int128_t>(
-            value.data(), value.size(), expected_type, &result).value()) << query;
+            value.data(), value.size(), expected_type, false, &result).value()) << query;
         break;
       default:
         EXPECT_TRUE(false) << expected_type << " " << expected_type.GetByteSize();

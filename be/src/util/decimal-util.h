@@ -69,6 +69,31 @@ class DecimalUtil {
     return result;
   }
 
+  /// Helper function to scale down values by 10^delta_scale, truncating if
+  /// round is false or rounding otherwise.
+  template<typename T>
+  static inline T ScaleDownAndRound(T value, int delta_scale, bool round) {
+    DCHECK_GT(delta_scale, 0);
+    T divisor = DecimalUtil::GetScaleMultiplier<T>(delta_scale);
+    if (divisor > 0) {
+      DCHECK(divisor % 2 == 0);
+      T result = value / divisor;
+      if (round) {
+        T remainder = value % divisor;
+        // In general, shifting down the multiplier is not safe, but we know
+        // here that it is a multiple of two.
+        if (abs(remainder) >= (divisor >> 1)) {
+          // Bias at zero must be corrected by sign of dividend.
+          result += BitUtil::Sign(value);
+        }
+      }
+      return result;
+    } else {
+      DCHECK(divisor == -1);
+      return 0;
+    }
+  }
+
   /// Write decimals as big endian (byte comparable) in fixed_len_size bytes.
   template<typename T>
   static inline void EncodeToFixedLenByteArray(

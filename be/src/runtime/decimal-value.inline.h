@@ -140,27 +140,6 @@ inline DecimalValue<T> DecimalValue<T>::ScaleTo(int src_scale, int dst_scale,
 
 namespace detail {
 
-// Helper function to scale down over multiplied values back into result type,
-// truncating if round is false or rounding otherwise.
-template<typename T, typename RESULT_T>
-inline RESULT_T ScaleDownAndRound(RESULT_T value, int delta_scale, bool round) {
-  DCHECK_GT(delta_scale, 0);
-  // Multiplier can always be computed in potentially smaller type T
-  T multiplier = DecimalUtil::GetScaleMultiplier<T>(delta_scale);
-  DCHECK(multiplier > 1 && multiplier % 2 == 0);
-  RESULT_T result = value / multiplier;
-  if (round) {
-    RESULT_T remainder = value % multiplier;
-    // In general, shifting down the multiplier is not safe, but we know
-    // here that it is a multiple of two.
-    if (abs(remainder) >= (multiplier >> 1)) {
-      // Bias at zero must be corrected by sign of dividend.
-      result += BitUtil::Sign(value);
-    }
-  }
-  return result;
-}
-
 // If we have a number with 'num_lz' leading zeros, and we scale it up by 10^scale_diff,
 // this function returns the minimum number of leading zeros the result would have.
 inline int MinLeadingZerosAfterScaling(int num_lz, int scale_diff) {
@@ -232,7 +211,7 @@ inline int128_t AddLarge(int128_t x, int x_scale, int128_t y, int y_scale,
     right = x_right + y_right;
   }
   if (result_scale_decrease > 0) {
-    right = detail::ScaleDownAndRound<int128_t, int128_t>(
+    right = DecimalUtil::ScaleDownAndRound<int128_t>(
         right, result_scale_decrease, round);
   }
   DCHECK(right >= 0);
@@ -288,7 +267,7 @@ inline int128_t SubtractLarge(int128_t x, int x_scale, int128_t y, int y_scale,
   if (result_scale_decrease > 0) {
     // At this point, the scale of the fractional part is either x_scale or y_scale,
     // whichever is greater. We scale down the fractional part to result_scale here.
-    right = detail::ScaleDownAndRound<int128_t, int128_t>(
+    right = DecimalUtil::ScaleDownAndRound<int128_t>(
         right, result_scale_decrease, round);
   }
 
@@ -351,7 +330,7 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Add(int this_scale,
     if (result_scale_decrease > 0) {
       // After first adjusting x and y to the same scale and adding them together, we now
       // need scale down the result to result_scale.
-      x = detail::ScaleDownAndRound<T, RESULT_T>(x, result_scale_decrease, round);
+      x = DecimalUtil::ScaleDownAndRound<RESULT_T>(x, result_scale_decrease, round);
     }
     return DecimalValue<RESULT_T>(x);
   }
@@ -418,7 +397,7 @@ DecimalValue<RESULT_T> DecimalValue<T>::Multiply(int this_scale,
       DCHECK(*overflow);
     } else {
       int256_t intermediate_result = ConvertToInt256(x) * ConvertToInt256(y);
-      intermediate_result = detail::ScaleDownAndRound<int256_t, int256_t>(
+      intermediate_result = DecimalUtil::ScaleDownAndRound<int256_t>(
           intermediate_result, delta_scale, round);
       result = ConvertToInt128(
           intermediate_result, DecimalUtil::MAX_UNSCALED_DECIMAL16, overflow);
@@ -436,7 +415,7 @@ DecimalValue<RESULT_T> DecimalValue<T>::Multiply(int this_scale,
       result = x * y;
       // The largest value that result can have here is (2^64 - 1) * (2^63 - 1), which is
       // greater than MAX_UNSCALED_DECIMAL16.
-      result = detail::ScaleDownAndRound<T, RESULT_T>(result, delta_scale, round);
+      result = DecimalUtil::ScaleDownAndRound<RESULT_T>(result, delta_scale, round);
       // Since delta_scale is greater than zero, result can now be at most
       // ((2^64 - 1) * (2^63 - 1)) / 10, which is less than MAX_UNSCALED_DECIMAL16, so
       // there is no need to check for overflow.

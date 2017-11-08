@@ -90,9 +90,9 @@ ScalarExprEvaluator* HdfsScanner::GetConjunctEval(int idx) const {
 
 void StringToDecimalSymbolDummy() {
   // Force linker to to link the object file containing these functions.
-  StringToDecimal4(nullptr, 0, 0, 0, nullptr);
-  StringToDecimal8(nullptr, 0, 0, 0, nullptr);
-  StringToDecimal16(nullptr, 0, 0, 0, nullptr);
+  StringToDecimal4(nullptr, 0, 0, 0, false, nullptr);
+  StringToDecimal8(nullptr, 0, 0, 0, false, nullptr);
+  StringToDecimal16(nullptr, 0, 0, 0, false, nullptr);
 }
 
 // Define the string parsing functions for llvm.  Stamp out the templated functions
@@ -142,7 +142,7 @@ void IrStringToTimestamp(TimestampValue* out, const char* s, int len,
 extern "C"
 Decimal4Value IrStringToDecimal4(const char* s, int len, int type_precision,
     int type_scale, ParseResult* result)  {
-  auto ret = StringToDecimal4(s, len, type_precision, type_scale, result);
+  auto ret = StringToDecimal4(s, len, type_precision, type_scale, false, result);
   if (*result != ParseResult::PARSE_SUCCESS) *result = ParseResult::PARSE_FAILURE;
   return ret;
 }
@@ -150,7 +150,7 @@ Decimal4Value IrStringToDecimal4(const char* s, int len, int type_precision,
 extern "C"
 Decimal8Value IrStringToDecimal8(const char* s, int len, int type_precision,
     int type_scale, ParseResult* result)  {
-  auto ret = StringToDecimal8(s, len, type_precision, type_scale, result);
+  auto ret = StringToDecimal8(s, len, type_precision, type_scale, false, result);
   if (*result != ParseResult::PARSE_SUCCESS) *result = ParseResult::PARSE_FAILURE;
   return ret;
 }
@@ -158,7 +158,7 @@ Decimal8Value IrStringToDecimal8(const char* s, int len, int type_precision,
 extern "C"
 Decimal16Value IrStringToDecimal16(const char* s, int len, int type_precision,
     int type_scale, ParseResult* result)  {
-  auto ret = StringToDecimal16(s, len, type_precision, type_scale, result);
+  auto ret = StringToDecimal16(s, len, type_precision, type_scale, false, result);
   if (*result != ParseResult::PARSE_SUCCESS) *result = ParseResult::PARSE_FAILURE;
   return ret;
 }

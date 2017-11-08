@@ -141,12 +141,12 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
         case 4:
           *reinterpret_cast<Decimal4Value*>(slot) =
               StringParser::StringToDecimal<int32_t>(
-                  data, len, slot_desc->type(), &parse_result);
+                  data, len, slot_desc->type(), false, &parse_result);
           break;
         case 8:
           *reinterpret_cast<Decimal8Value*>(slot) =
               StringParser::StringToDecimal<int64_t>(
-                  data, len, slot_desc->type(), &parse_result);
+                  data, len, slot_desc->type(), false, &parse_result);
           break;
         case 12:
           DCHECK(false) << "Planner should not generate this.";
@@ -154,7 +154,7 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
         case 16:
           *reinterpret_cast<Decimal16Value*>(slot) =
               StringParser::StringToDecimal<int128_t>(
-                  data, len, slot_desc->type(), &parse_result);
+                  data, len, slot_desc->type(), false, &parse_result);
           break;
         default:
           DCHECK(false) << "Decimal slots can't be this size.";

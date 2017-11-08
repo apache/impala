@@ -534,22 +534,26 @@ IR_ALWAYS_INLINE DecimalVal DecimalOperators::CastToDecimalVal(
   DecimalVal dv;
   int precision = ctx->impl()->GetConstFnAttr(FunctionContextImpl::RETURN_TYPE_PRECISION);
   int scale = ctx->impl()->GetConstFnAttr(FunctionContextImpl::RETURN_TYPE_SCALE);
+  bool is_decimal_v2 = ctx->impl()->GetConstFnAttr(FunctionContextImpl::DECIMAL_V2);
   switch (ColumnType::GetDecimalByteSize(precision)) {
     case 4: {
       Decimal4Value dv4 = StringParser::StringToDecimal<int32_t>(
-          reinterpret_cast<char*>(val.ptr), val.len, precision, scale, &result);
+          reinterpret_cast<char*>(val.ptr), val.len, precision, scale,
+          is_decimal_v2, &result);
       dv = DecimalVal(dv4.value());
       break;
     }
     case 8: {
       Decimal8Value dv8 = StringParser::StringToDecimal<int64_t>(
-          reinterpret_cast<char*>(val.ptr), val.len, precision, scale, &result);
+          reinterpret_cast<char*>(val.ptr), val.len, precision, scale,
+          is_decimal_v2, &result);
       dv = DecimalVal(dv8.value());
       break;
     }
     case 16: {
       Decimal16Value dv16 = StringParser::StringToDecimal<int128_t>(
-          reinterpret_cast<char*>(val.ptr), val.len, precision, scale, &result);
+          reinterpret_cast<char*>(val.ptr), val.len, precision, scale,
+          is_decimal_v2, &result);
       dv = DecimalVal(dv16.value());
       break;
     }
