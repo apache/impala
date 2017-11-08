@@ -21,11 +21,7 @@
 # on the git hash.
 
 import os
-import time;
-import filecmp
-from subprocess import PIPE, call
-from commands import getstatusoutput
-from time import localtime, strftime
+from subprocess import call
 
 IMPALA_HOME = os.environ['IMPALA_HOME']
 SAVE_VERSION_SCRIPT = os.path.join(IMPALA_HOME, 'bin/save-version.sh')
@@ -35,8 +31,11 @@ VERSION_CC_FILE_NAME = os.path.join(IMPALA_HOME, 'be/src/common/version.cc')
 # Redirecting stdout and stderr to os.devnull as we don't want unnecessary output.
 devnull = open(os.devnull, 'w')
 try:
+  # Force git to look at a git directory relative to IMPALA_HOME,
+  # so as to avoid accidentally getting another repo's git hashes.
   can_obtain_git_hash = \
-      call(['git', 'rev-parse', 'HEAD'], stdout=devnull, stderr=devnull) == 0
+      call(['git', '--git-dir', os.path.join(IMPALA_HOME, ".git"), 'rev-parse', 'HEAD'],
+          stdout=devnull, stderr=devnull) == 0
 finally:
   devnull.close()
 
