@@ -805,6 +805,18 @@ class TestShowCreateTable(KuduTestSuite):
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
+    self.assert_show_create_equals(cursor,
+        """
+        CREATE TABLE {table} (c INT PRIMARY KEY) STORED AS KUDU""",
+        """
+        CREATE TABLE {db}.{{table}} (
+          c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
+          PRIMARY KEY (c)
+        )
+        STORED AS KUDU
+        TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
+            db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
+
 
   def test_timestamp_default_value(self, cursor):
     create_sql_fmt = """
