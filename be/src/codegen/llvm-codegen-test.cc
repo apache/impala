@@ -479,17 +479,6 @@ TEST_F(LlvmCodeGenTest, HandleLinkageError) {
   codegen->Close();
 }
 
-// Test that Impala does not return error when trying to link the same lib file twice.
-TEST_F(LlvmCodeGenTest, LinkageTest) {
-  scoped_ptr<LlvmCodeGen> codegen;
-  ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(runtime_state_, nullptr, "test", &codegen));
-  EXPECT_TRUE(codegen.get() != nullptr);
-  string hdfs_file_path("/test-warehouse/test-udfs.ll");
-  ASSERT_OK(LinkModuleFromHdfs(codegen.get(), hdfs_file_path));
-  ASSERT_OK(LinkModuleFromHdfs(codegen.get(), hdfs_file_path));
-  codegen->Close();
-}
-
 }
 
 int main(int argc, char **argv) {
