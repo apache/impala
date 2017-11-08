@@ -141,13 +141,11 @@ int64_t MemTracker::GetPoolMemReserved() {
   lock_guard<SpinLock> l(child_trackers_lock_);
   for (MemTracker* child : child_trackers_) {
     int64_t child_limit = child->limit();
-    bool query_exec_finished = child->query_exec_finished_.Load() != 0;
-    if (child_limit > 0 && !query_exec_finished) {
+    if (child_limit > 0) {
       // Make sure we don't overflow if the query limits are set to ridiculous values.
       mem_reserved += std::min(child_limit, MemInfo::physical_mem());
     } else {
-      DCHECK(query_exec_finished || child_limit == -1)
-          << child->LogUsage(UNLIMITED_DEPTH);
+      DCHECK_EQ(child_limit, -1) << child->LogUsage(UNLIMITED_DEPTH);
       mem_reserved += child->consumption();
     }
   }

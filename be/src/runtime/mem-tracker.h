@@ -294,9 +294,8 @@ class MemTracker {
 
   /// Returns the memory 'reserved' by this resource pool mem tracker, which is the sum
   /// of the memory reserved by the queries in it (i.e. its child trackers). The mem
-  /// reserved for a query that is currently executing is its limit_, if set (which
-  /// should be the common case with admission control). Otherwise, if the query has
-  /// no limit or the query is finished executing, the current consumption is used.
+  /// reserved for a query is its limit_, if set (which should be the common case with
+  /// admission control). Otherwise the current consumption is used.
   int64_t GetPoolMemReserved();
 
   /// Returns the memory consumed in bytes.
@@ -352,11 +351,6 @@ class MemTracker {
   Status MemLimitExceeded(RuntimeState* state, const std::string& details,
       int64_t failed_allocation = 0) WARN_UNUSED_RESULT;
 
-  void set_query_exec_finished() {
-    DCHECK(is_query_mem_tracker_);
-    query_exec_finished_.Store(1);
-  }
-
   static const std::string COUNTER_NAME;
 
  private:
@@ -391,12 +385,6 @@ class MemTracker {
 
   /// True if this is a Query MemTracker returned from CreateQueryMemTracker().
   bool is_query_mem_tracker_ = false;
-
-  /// Only used if 'is_query_mem_tracker_' is true.
-  /// 0 if the query is still executing or 1 if it has finished executing. Before
-  /// it has finished executing, the tracker limit is treated as "reserved memory"
-  /// for the purpose of admission control - see GetPoolMemReserved().
-  AtomicInt32 query_exec_finished_{0};
 
   /// Only valid for MemTrackers returned from CreateQueryMemTracker()
   TUniqueId query_id_;
