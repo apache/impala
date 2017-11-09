@@ -63,6 +63,276 @@
 
       
 
+        <dt class="dt dlterm" id="string_functions__base64decode">
+          <code class="ph codeph">base64decode(string str)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong>
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+          <p class="p">
+            For general information about Base64 encoding, see
+            <a class="xref" href="https://en.wikipedia.org/wiki/Base64" target="_blank">Base64 article on Wikipedia</a>.
+          </p>
+          <p class="p">
+        The functions <code class="ph codeph">base64encode()</code> and
+        <code class="ph codeph">base64decode()</code> are typically used
+        in combination, to store in an Impala table string data that is
+        problematic to store or transmit. For example, you could use
+        these functions to store string data that uses an encoding
+        other than UTF-8, or to transform the values in contexts that
+        require ASCII values, such as for partition key columns.
+        Keep in mind that base64-encoded values produce different results
+        for string functions such as <code class="ph codeph">LENGTH()</code>,
+        <code class="ph codeph">MAX()</code>, and <code class="ph codeph">MIN()</code> than when
+        those functions are called with the unencoded string values.
+      </p>
+          <p class="p">
+        The set of characters that can be generated as output
+        from <code class="ph codeph">base64encode()</code>, or specified in
+        the argument string to <code class="ph codeph">base64decode()</code>,
+        are the ASCII uppercase and lowercase letters (A-Z, a-z),
+        digits (0-9), and the punctuation characters
+        <code class="ph codeph">+</code>, <code class="ph codeph">/</code>, and <code class="ph codeph">=</code>.
+      </p>
+          <p class="p">
+        All return values produced by <code class="ph codeph">base64encode()</code>
+        are a multiple of 4 bytes in length. All argument values
+        supplied to <code class="ph codeph">base64decode()</code> must also be a
+        multiple of 4 bytes in length. If a base64-encoded value
+        would otherwise have a different length, it can be padded
+        with trailing <code class="ph codeph">=</code> characters to reach a length
+        that is a multiple of 4 bytes.
+      </p>
+          <p class="p">
+        If the argument string to <code class="ph codeph">base64decode()</code> does
+        not represent a valid base64-encoded value, subject to the
+        constraints of the Impala implementation such as the allowed
+        character set, the function returns <code class="ph codeph">NULL</code>.
+      </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+          <div class="p">
+        The following examples show how to use <code class="ph codeph">base64encode()</code>
+        and <code class="ph codeph">base64decode()</code> together to store and retrieve
+        string values:
+<pre class="pre codeblock"><code>
+-- An arbitrary string can be encoded in base 64.
+-- The length of the output is a multiple of 4 bytes,
+-- padded with trailing = characters if necessary.
+select base64encode('hello world') as encoded,
+  length(base64encode('hello world')) as length;
++------------------+--------+
+| encoded          | length |
++------------------+--------+
+| aGVsbG8gd29ybGQ= | 16     |
++------------------+--------+
+
+-- Passing an encoded value to base64decode() produces
+-- the original value.
+select base64decode('aGVsbG8gd29ybGQ=') as decoded;
++-------------+
+| decoded     |
++-------------+
+| hello world |
++-------------+
+</code></pre>
+
+      These examples demonstrate incorrect encoded values that
+      produce <code class="ph codeph">NULL</code> return values when decoded:
+
+<pre class="pre codeblock"><code>
+-- The input value to base64decode() must be a multiple of 4 bytes.
+-- In this case, leaving off the trailing = padding character
+-- produces a NULL return value.
+select base64decode('aGVsbG8gd29ybGQ') as decoded;
++---------+
+| decoded |
++---------+
+| NULL    |
++---------+
+WARNINGS: UDF WARNING: Invalid base64 string; input length is 15,
+  which is not a multiple of 4.
+
+-- The input to base64decode() can only contain certain characters.
+-- The $ character in this case causes a NULL return value.
+select base64decode('abc$');
++----------------------+
+| base64decode('abc$') |
++----------------------+
+| NULL                 |
++----------------------+
+WARNINGS: UDF WARNING: Could not base64 decode input in space 4; actual output length 0
+</code></pre>
+
+      These examples demonstrate <span class="q">"round-tripping"</span> of an original string to an
+      encoded string, and back again. This technique is applicable if the original
+      source is in an unknown encoding, or if some intermediate processing stage
+      might cause national characters to be misrepresented:
+
+<pre class="pre codeblock"><code>
+select 'circumflex accents: â, ê, î, ô, û' as original,
+  base64encode('circumflex accents: â, ê, î, ô, û') as encoded;
++-----------------------------------+------------------------------------------------------+
+| original                          | encoded                                              |
++-----------------------------------+------------------------------------------------------+
+| circumflex accents: â, ê, î, ô, û | Y2lyY3VtZmxleCBhY2NlbnRzOiDDoiwgw6osIMOuLCDDtCwgw7s= |
++-----------------------------------+------------------------------------------------------+
+
+select base64encode('circumflex accents: â, ê, î, ô, û') as encoded,
+  base64decode(base64encode('circumflex accents: â, ê, î, ô, û')) as decoded;
++------------------------------------------------------+-----------------------------------+
+| encoded                                              | decoded                           |
++------------------------------------------------------+-----------------------------------+
+| Y2lyY3VtZmxleCBhY2NlbnRzOiDDoiwgw6osIMOuLCDDtCwgw7s= | circumflex accents: â, ê, î, ô, û |
++------------------------------------------------------+-----------------------------------+
+</code></pre>
+      </div>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__base64encode">
+          <code class="ph codeph">base64encode(string str)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong>
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+          <p class="p">
+            For general information about Base64 encoding, see
+            <a class="xref" href="https://en.wikipedia.org/wiki/Base64" target="_blank">Base64 article on Wikipedia</a>.
+          </p>
+          <p class="p">
+        The functions <code class="ph codeph">base64encode()</code> and
+        <code class="ph codeph">base64decode()</code> are typically used
+        in combination, to store in an Impala table string data that is
+        problematic to store or transmit. For example, you could use
+        these functions to store string data that uses an encoding
+        other than UTF-8, or to transform the values in contexts that
+        require ASCII values, such as for partition key columns.
+        Keep in mind that base64-encoded values produce different results
+        for string functions such as <code class="ph codeph">LENGTH()</code>,
+        <code class="ph codeph">MAX()</code>, and <code class="ph codeph">MIN()</code> than when
+        those functions are called with the unencoded string values.
+      </p>
+          <p class="p">
+        The set of characters that can be generated as output
+        from <code class="ph codeph">base64encode()</code>, or specified in
+        the argument string to <code class="ph codeph">base64decode()</code>,
+        are the ASCII uppercase and lowercase letters (A-Z, a-z),
+        digits (0-9), and the punctuation characters
+        <code class="ph codeph">+</code>, <code class="ph codeph">/</code>, and <code class="ph codeph">=</code>.
+      </p>
+          <p class="p">
+        All return values produced by <code class="ph codeph">base64encode()</code>
+        are a multiple of 4 bytes in length. All argument values
+        supplied to <code class="ph codeph">base64decode()</code> must also be a
+        multiple of 4 bytes in length. If a base64-encoded value
+        would otherwise have a different length, it can be padded
+        with trailing <code class="ph codeph">=</code> characters to reach a length
+        that is a multiple of 4 bytes.
+      </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+          <div class="p">
+        The following examples show how to use <code class="ph codeph">base64encode()</code>
+        and <code class="ph codeph">base64decode()</code> together to store and retrieve
+        string values:
+<pre class="pre codeblock"><code>
+-- An arbitrary string can be encoded in base 64.
+-- The length of the output is a multiple of 4 bytes,
+-- padded with trailing = characters if necessary.
+select base64encode('hello world') as encoded,
+  length(base64encode('hello world')) as length;
++------------------+--------+
+| encoded          | length |
++------------------+--------+
+| aGVsbG8gd29ybGQ= | 16     |
++------------------+--------+
+
+-- Passing an encoded value to base64decode() produces
+-- the original value.
+select base64decode('aGVsbG8gd29ybGQ=') as decoded;
++-------------+
+| decoded     |
++-------------+
+| hello world |
++-------------+
+</code></pre>
+
+      These examples demonstrate incorrect encoded values that
+      produce <code class="ph codeph">NULL</code> return values when decoded:
+
+<pre class="pre codeblock"><code>
+-- The input value to base64decode() must be a multiple of 4 bytes.
+-- In this case, leaving off the trailing = padding character
+-- produces a NULL return value.
+select base64decode('aGVsbG8gd29ybGQ') as decoded;
++---------+
+| decoded |
++---------+
+| NULL    |
++---------+
+WARNINGS: UDF WARNING: Invalid base64 string; input length is 15,
+  which is not a multiple of 4.
+
+-- The input to base64decode() can only contain certain characters.
+-- The $ character in this case causes a NULL return value.
+select base64decode('abc$');
++----------------------+
+| base64decode('abc$') |
++----------------------+
+| NULL                 |
++----------------------+
+WARNINGS: UDF WARNING: Could not base64 decode input in space 4; actual output length 0
+</code></pre>
+
+      These examples demonstrate <span class="q">"round-tripping"</span> of an original string to an
+      encoded string, and back again. This technique is applicable if the original
+      source is in an unknown encoding, or if some intermediate processing stage
+      might cause national characters to be misrepresented:
+
+<pre class="pre codeblock"><code>
+select 'circumflex accents: â, ê, î, ô, û' as original,
+  base64encode('circumflex accents: â, ê, î, ô, û') as encoded;
++-----------------------------------+------------------------------------------------------+
+| original                          | encoded                                              |
++-----------------------------------+------------------------------------------------------+
+| circumflex accents: â, ê, î, ô, û | Y2lyY3VtZmxleCBhY2NlbnRzOiDDoiwgw6osIMOuLCDDtCwgw7s= |
++-----------------------------------+------------------------------------------------------+
+
+select base64encode('circumflex accents: â, ê, î, ô, û') as encoded,
+  base64decode(base64encode('circumflex accents: â, ê, î, ô, û')) as decoded;
++------------------------------------------------------+-----------------------------------+
+| encoded                                              | decoded                           |
++------------------------------------------------------+-----------------------------------+
+| Y2lyY3VtZmxleCBhY2NlbnRzOiDDoiwgw6osIMOuLCDDtCwgw7s= | circumflex accents: â, ê, î, ô, û |
++------------------------------------------------------+-----------------------------------+
+</code></pre>
+      </div>
+        </dd>
+
+      
+
+      
+
         <dt class="dt dlterm" id="string_functions__btrim">
           <code class="ph codeph">btrim(string a)</code>,
           <code class="ph codeph">btrim(string a, string chars_to_trim)</code>

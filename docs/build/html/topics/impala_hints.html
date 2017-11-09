@@ -111,9 +111,17 @@ INSERT <var class="keyword varname">insert_clauses</var>
 
     <p class="p">
       With both forms of hint syntax, include the <code class="ph codeph">STRAIGHT_JOIN</code>
-      keyword immediately after the <code class="ph codeph">SELECT</code> keyword to prevent Impala from
+      keyword immediately after the <code class="ph codeph">SELECT</code> and any
+      <code class="ph codeph">DISTINCT</code> or <code class="ph codeph">ALL</code> keywords to prevent Impala from
       reordering the tables in a way that makes the join-related hints ineffective.
     </p>
+
+    <p class="p">
+        The <code class="ph codeph">STRAIGHT_JOIN</code> hint affects the join order of table references in the query
+        block containing the hint. It does not affect the join order of nested queries, such as views,
+        inline views, or <code class="ph codeph">WHERE</code>-clause subqueries. To use this hint for performance
+        tuning of complex queries, apply the hint to all query blocks that need a fixed join order.
+      </p>
 
     <p class="p">
       To reduce the need to use hints, run the <code class="ph codeph">COMPUTE STATS</code> statement against all tables involved

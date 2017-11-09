@@ -612,6 +612,15 @@ set hbase_caching=1000;
         The <code class="ph codeph">LOAD DATA</code> statement cannot be used with HBase tables.
       </p>
         </li>
+        <li class="li">
+          <p class="p">
+        The <code class="ph codeph">TABLESAMPLE</code> clause of the <code class="ph codeph">SELECT</code>
+        statement does not apply to a table reference derived from a view, a subquery,
+        or anything other than a real base table. This clause only works for tables
+        backed by HDFS or HDFS-like data files, therefore it does not apply to Kudu or
+        HBase tables.
+      </p>
+        </li>
       </ul>
     </div>
   </article>

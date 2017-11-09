@@ -769,6 +769,74 @@ select now() as right_now,
 
       
 
+        <dt class="dt dlterm" id="datetime_functions__from_timestamp">
+          <code class="ph codeph">from_timestamp(datetime timestamp, pattern string)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Converts a <code class="ph codeph">TIMESTAMP</code> value into a
+          string representing the same value.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+          <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
+      </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+          <p class="p">
+            The <code class="ph codeph">from_timestamp()</code> function provides a flexible way to convert <code class="ph codeph">TIMESTAMP</code>
+            values into arbitrary string formats for reporting purposes.
+          </p>
+          <p class="p">
+            Because Impala implicitly converts string values into <code class="ph codeph">TIMESTAMP</code>, you can
+            pass date/time values represented as strings (in the standard <code class="ph codeph">yyyy-MM-dd HH:mm:ss.SSS</code> format)
+            to this function. The result is a string using different separator characters, order of fields, spelled-out month
+            names, or other variation of the date/time string representation.
+          </p>
+          <p class="p">
+            The allowed tokens for the pattern string are the same as for the <code class="ph codeph">from_unixtime()</code> function.
+          </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+          <p class="p">
+            The following examples show different ways to format a <code class="ph codeph">TIMESTAMP</code>
+            value as a string:
+          </p>
+<pre class="pre codeblock"><code>
+-- Reformat arbitrary TIMESTAMP value.
+select from_timestamp(now(), 'yyyy/MM/dd');
++-------------------------------------+
+| from_timestamp(now(), 'yyyy/mm/dd') |
++-------------------------------------+
+| 2017/10/01                          |
++-------------------------------------+
+
+-- Reformat string literal representing date/time.
+select from_timestamp('1984-09-25', 'yyyy/MM/dd');
++--------------------------------------------+
+| from_timestamp('1984-09-25', 'yyyy/mm/dd') |
++--------------------------------------------+
+| 1984/09/25                                 |
++--------------------------------------------+
+
+-- Alternative format for reporting purposes.
+select from_timestamp('1984-09-25 16:45:30.125', 'MMM dd, yyyy HH:mm:ss.SSS');
++------------------------------------------------------------------------+
+| from_timestamp('1984-09-25 16:45:30.125', 'mmm dd, yyyy hh:mm:ss.sss') |
++------------------------------------------------------------------------+
+| Sep 25, 1984 16:45:30.125                                              |
++------------------------------------------------------------------------+
+</code></pre>
+        </dd>
+
+      
+
+      
+
         <dt class="dt dlterm" id="datetime_functions__from_unixtime">
           <code class="ph codeph">from_unixtime(bigint unixtime[, string format])</code>
         </dt>
@@ -1122,6 +1190,74 @@ select int_months_between('2015-03-31', '2015-01-30');
 +------------------------------------------------+
 | 2                                              |
 +------------------------------------------------+
+</code></pre>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="datetime_functions__last_day">
+          <code class="ph codeph">last_day(timestamp t)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns a <code class="ph codeph">TIMESTAMP</code> corresponding to
+          the beginning of the last calendar day in the same month as the
+          <code class="ph codeph">TIMESTAMP</code> argument.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">timestamp</code>
+          </p>
+          <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.9.0</span>
+      </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+          <p class="p">
+            If the input argument does not represent a valid Impala <code class="ph codeph">TIMESTAMP</code>
+            including both date and time portions, the function returns <code class="ph codeph">NULL</code>.
+            For example, if the input argument is a string that cannot be implicitly cast to
+            <code class="ph codeph">TIMESTAMP</code>, does not include a date portion, or is out of the
+            allowed range for Impala <code class="ph codeph">TIMESTAMP</code> values, the function returns
+            <code class="ph codeph">NULL</code>.
+          </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+          <p class="p">
+            The following example shows how to examine the current date, and dates around the
+            end of the month, as <code class="ph codeph">TIMESTAMP</code> values with any time portion removed:
+          </p>
+<pre class="pre codeblock"><code>
+select
+    now() as right_now
+  , trunc(now(),'dd') as today
+  , last_day(now()) as last_day_of_month
+  , last_day(now()) + interval 1 day as first_of_next_month;
++-------------------------------+---------------------+---------------------+---------------------+
+| right_now                     | today               | last_day_of_month   | first_of_next_month |
++-------------------------------+---------------------+---------------------+---------------------+
+| 2017-08-15 15:07:58.823812000 | 2017-08-15 00:00:00 | 2017-08-31 00:00:00 | 2017-09-01 00:00:00 |
++-------------------------------+---------------------+---------------------+---------------------+
+</code></pre>
+          <p class="p">
+            The following example shows how to examine the current date and dates around the
+            end of the month as integers representing the day of the month:
+          </p>
+<pre class="pre codeblock"><code>
+select
+    now() as right_now
+  , dayofmonth(now()) as day
+  , extract(day from now()) as also_day
+  , dayofmonth(last_day(now())) as last_day
+  , extract(day from last_day(now())) as also_last_day;
++-------------------------------+-----+----------+----------+---------------+
+| right_now                     | day | also_day | last_day | also_last_day |
++-------------------------------+-----+----------+----------+---------------+
+| 2017-08-15 15:07:59.417755000 | 15  | 15       | 31       | 31            |
++-------------------------------+-----+----------+----------+---------------+
 </code></pre>
         </dd>
 
@@ -2162,6 +2298,94 @@ select now() as right_now,
 
       
 
+        <dt class="dt dlterm" id="datetime_functions__to_timestamp">
+          <code class="ph codeph">to_timestamp(bigint unixtime)</code>,
+          <code class="ph codeph">to_timestamp(string date, string pattern)</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Converts an integer or string representing
+          a date/time value into the corresponding <code class="ph codeph">TIMESTAMP</code>
+          value.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">timestamp</code>
+          </p>
+          <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
+      </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+          <p class="p">
+            An integer argument represents the number of seconds past the epoch (midnight
+            on January 1, 1970). It is the converse of the <code class="ph codeph">unix_timestamp()</code>
+            function, which produces a <code class="ph codeph">BIGINT</code> representing the number of
+            seconds past the epoch.
+          </p>
+          <p class="p">
+            A string argument, plus another string argument representing the
+            pattern, turns an arbitrary string representation of a date and time
+            into a true <code class="ph codeph">TIMESTAMP</code> value. The ability to parse
+            many kinds of date and time formats allows you to deal with temporal
+            data from diverse sources, and if desired to convert to efficient
+            <code class="ph codeph">TIMESTAMP</code> values during your ETL process. Using
+            <code class="ph codeph">TIMESTAMP</code> directly in queries and expressions lets you
+            perform date and time calculations without the overhead of extra
+            function calls and conversions each time you reference the applicable
+            columns.
+          </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+          <p class="p">
+            The following examples demonstrate how to convert an arbitrary string
+            representation to <code class="ph codeph">TIMESTAMP</code> based on a pattern string:
+          </p>
+<pre class="pre codeblock"><code>
+select to_timestamp('Sep 25, 1984', 'MMM dd, yyyy');
++----------------------------------------------+
+| to_timestamp('sep 25, 1984', 'mmm dd, yyyy') |
++----------------------------------------------+
+| 1984-09-25 00:00:00                          |
++----------------------------------------------+
+
+select to_timestamp('1984/09/25', 'yyyy/MM/dd');
++------------------------------------------+
+| to_timestamp('1984/09/25', 'yyyy/mm/dd') |
++------------------------------------------+
+| 1984-09-25 00:00:00                      |
++------------------------------------------+
+</code></pre>
+          <p class="p">
+            The following examples show how to convert a <code class="ph codeph">BIGINT</code>
+            representing seconds past epoch into a <code class="ph codeph">TIMESTAMP</code> value:
+          </p>
+<pre class="pre codeblock"><code>
+-- One day past the epoch.
+select to_timestamp(24 * 60 * 60);
++----------------------------+
+| to_timestamp(24 * 60 * 60) |
++----------------------------+
+| 1970-01-02 00:00:00        |
++----------------------------+
+
+-- 60 seconds in the past.
+select now() as 'current date/time',
+  unix_timestamp(now()) 'now in seconds',
+  to_timestamp(unix_timestamp(now()) - 60) as '60 seconds ago';
++-------------------------------+----------------+---------------------+
+| current date/time             | now in seconds | 60 seconds ago      |
++-------------------------------+----------------+---------------------+
+| 2017-10-01 22:03:46.885624000 | 1506895426     | 2017-10-01 22:02:46 |
++-------------------------------+----------------+---------------------+
+</code></pre>
+        </dd>
+
+      
+
+      
+
         <dt class="dt dlterm" id="datetime_functions__to_utc_timestamp">
           <code class="ph codeph">to_utc_timestamp(timestamp, string timezone)</code>
         </dt>
@@ -2232,7 +2456,7 @@ select now() as 'Current time in California USA',
 
       
 
-        <dt class="dt dlterm" id="datetime_functions__trunc">
+        <dt class="dt dlterm" id="datetime_functions__trunc_timestamp"><a id="datetime_functions__trunc"></a>
           <code class="ph codeph">trunc(timestamp, string unit)</code>
         </dt>
 
@@ -2240,7 +2464,8 @@ select now() as 'Current time in California USA',
           
           <strong class="ph b">Purpose:</strong> Strips off fields from a <code class="ph codeph">TIMESTAMP</code> value.
           <div class="p">
-            <strong class="ph b">Unit argument:</strong> The <code class="ph codeph">unit</code> argument value is case-sensitive. This argument string
+            <strong class="ph b">Unit argument:</strong> The <code class="ph codeph">unit</code> argument value for truncating
+            <code class="ph codeph">TIMESTAMP</code> values is case-sensitive. This argument string
             can be one of:
 
             <ul class="ul">
@@ -2282,13 +2507,17 @@ select now() as 'Current time in California USA',
             </ul>
           </div>
           <p class="p">
+            <strong class="ph b">Added in:</strong> The ability to truncate numeric values is new starting in
+            <span class="keyword">Impala 2.10</span>.
+          </p>
+          <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
           <p class="p">
-            Typically used in <code class="ph codeph">GROUP BY</code> queries to aggregate results from the
-            same hour, day, week, month, quarter, and so on. You can also use this function in an <code class="ph codeph">INSERT
-            ... SELECT</code> into a partitioned table to divide <code class="ph codeph">TIMESTAMP</code> values into the
-            correct partition.
+            The <code class="ph codeph">TIMESTAMP</code> form is typically used in <code class="ph codeph">GROUP BY</code>
+            queries to aggregate results from the same hour, day, week, month, quarter, and so on.
+            You can also use this function in an <code class="ph codeph">INSERT ... SELECT</code> into a
+            partitioned table to divide <code class="ph codeph">TIMESTAMP</code> values into the correct partition.
           </p>
           <p class="p">
             Because the return value is a <code class="ph codeph">TIMESTAMP</code>, if you cast the result of
@@ -2297,6 +2526,13 @@ select now() as 'Current time in California USA',
             month, or year, use the <code class="ph codeph">EXTRACT()</code> function instead. If you need the individual units
             from a truncated <code class="ph codeph">TIMESTAMP</code> value, run the <code class="ph codeph">TRUNCATE()</code> function on the
             original value, then run <code class="ph codeph">EXTRACT()</code> on the result.
+          </p>
+          <p class="p">
+            The <code class="ph codeph">trunc()</code> function also has a signature that applies to
+            <code class="ph codeph">DOUBLE</code> or <code class="ph codeph">DECIMAL</code>values. <code class="ph codeph">truncate()</code>,
+            <code class="ph codeph">trunc()</code>, and <code class="ph codeph">dtrunc()</code> are all aliased to the
+            same function. See <code class="ph codeph">truncate()</code> under <a class="xref" href="impala_math_functions.html">Impala Mathematical Functions</a>
+            for details.
           </p>
           <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">timestamp</code>
@@ -2462,6 +2698,68 @@ select unix_timestamp
 +------------+
 | 1431716400 |
 +------------+
+</code></pre>
+        </dd>
+
+      
+
+      
+
+        <dt class="dt dlterm" id="datetime_functions__utc_timestamp">
+          <code class="ph codeph">utc_timestamp()</code>
+        </dt>
+
+        <dd class="dd">
+          
+          <strong class="ph b">Purpose:</strong> Returns a <code class="ph codeph">TIMESTAMP</code> corresponding to the current
+          date and time in the UTC time zone.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">timestamp</code>
+          </p>
+          <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.10</span>
+      </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+          <p class="p">
+            Similar to the <code class="ph codeph">now()</code> or <code class="ph codeph">current_timestamp()</code> functions,
+            but does not use the local time zone as those functions do. Use <code class="ph codeph">utc_timestamp()</code>
+            to record <code class="ph codeph">TIMESTAMP</code> values that are interoperable with
+            servers around the world, in arbitrary time zones, without the need for
+            additional conversion functions to standardize the time zone of each
+            value representing a date/time.
+          </p>
+          <p class="p">
+            For working with date/time values represented as integer values, you can convert
+            back and forth between <code class="ph codeph">TIMESTAMP</code> and <code class="ph codeph">BIGINT</code>
+            with the <code class="ph codeph">unix_micros_to_utc_timestamp()</code> and
+            <code class="ph codeph">utc_to_unix_micros()</code> functions. The integer values represent
+            the number of microseconds since the Unix epoch (midnight on January 1, 1970).
+          </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+          <p class="p">
+            The following example shows how <code class="ph codeph">now()</code> and <code class="ph codeph">current_timestamp()</code>
+            represent the current date/time in the local time zone (in this case, UTC-7), while
+            <code class="ph codeph">utc_timestamp()</code> represents the same date/time in the standardized UTC
+            time zone:
+          </p>
+<pre class="pre codeblock"><code>
+select now(), utc_timestamp();
++-------------------------------+-------------------------------+
+| now()                         | utc_timestamp()               |
++-------------------------------+-------------------------------+
+| 2017-10-01 23:33:58.919688000 | 2017-10-02 06:33:58.919688000 |
++-------------------------------+-------------------------------+
+
+select current_timestamp(), utc_timestamp();
++-------------------------------+-------------------------------+
+| current_timestamp()           | utc_timestamp()               |
++-------------------------------+-------------------------------+
+| 2017-10-01 23:34:07.400642000 | 2017-10-02 06:34:07.400642000 |
++-------------------------------+-------------------------------+
 </code></pre>
         </dd>
 

@@ -30,8 +30,9 @@
     <p class="p">
       If statistics are not available for all the tables in the join query, or if Impala chooses a join order that
       is not the most efficient, you can override the automatic join order optimization by specifying the
-      <code class="ph codeph">STRAIGHT_JOIN</code> keyword immediately after the <code class="ph codeph">SELECT</code> keyword. In this case,
-      Impala uses the order the tables appear in the query to guide how the joins are processed.
+      <code class="ph codeph">STRAIGHT_JOIN</code> keyword immediately after the <code class="ph codeph">SELECT</code> and any <code class="ph codeph">DISTINCT</code>
+      or <code class="ph codeph">ALL</code> keywords. In this case, Impala uses the order the tables appear in the query to guide how the
+      joins are processed.
     </p>
 
     <p class="p">
@@ -118,11 +119,21 @@
       <p class="p">
         If an Impala join query is inefficient because of outdated statistics or unexpected data distribution, you
         can keep Impala from reordering the joined tables by using the <code class="ph codeph">STRAIGHT_JOIN</code> keyword
-        immediately after the <code class="ph codeph">SELECT</code> keyword. The <code class="ph codeph">STRAIGHT_JOIN</code> keyword turns off
+        immediately after the <code class="ph codeph">SELECT</code> and any <code class="ph codeph">DISTINCT</code> or <code class="ph codeph">ALL</code>
+        keywords. The <code class="ph codeph">STRAIGHT_JOIN</code> keyword turns off
         the reordering of join clauses that Impala does internally, and produces a plan that relies on the join
         clauses being ordered optimally in the query text. In this case, rewrite the query so that the largest
         table is on the left, followed by the next largest, and so on until the smallest table is on the right.
       </p>
+
+      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+        <p class="p">
+        The <code class="ph codeph">STRAIGHT_JOIN</code> hint affects the join order of table references in the query
+        block containing the hint. It does not affect the join order of nested queries, such as views,
+        inline views, or <code class="ph codeph">WHERE</code>-clause subqueries. To use this hint for performance
+        tuning of complex queries, apply the hint to all query blocks that need a fixed join order.
+      </p>
+      </div>
 
       <p class="p">
         In this example, the subselect from the <code class="ph codeph">BIG</code> table produces a very small result set, but
@@ -132,6 +143,10 @@
       </p>
 
 <pre class="pre codeblock"><code>select straight_join x from medium join small join (select * from big where c1 &lt; 10) as big
+  where medium.id = small.id and small.id = big.id;
+
+-- If the query contains [DISTINCT | ALL], the hint goes after those keywords.
+select distinct straight_join x from medium join small join (select * from big where c1 &lt; 10) as big
   where medium.id = small.id and small.id = big.id;</code></pre>
     </div>
   </article>

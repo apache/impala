@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_joins.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_order_by.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_group_by.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_having.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_limit.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_offset.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_union.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_subqueries.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_with.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_distinct.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_hints.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="select"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>SELECT Statement</title></head><body id="select"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_joins.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_order_by.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_group_by.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_having.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_limit.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_offset.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_union.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_subqueries.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_tablesample.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_with.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_distinct.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_hints.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="select"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>SELECT Statement</title></head><body id="select"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1">SELECT Statement</h1>
   
@@ -33,11 +33,14 @@ FROM <em class="ph i">table_reference</em> [, <em class="ph i">table_reference</
   JOIN <em class="ph i">table_reference</em>
   [ON <em class="ph i">join_equality_clauses</em> | USING (<var class="keyword varname">col1</var>[, <var class="keyword varname">col2</var> ...]] ...
 WHERE <em class="ph i">conditions</em>
-GROUP BY { <em class="ph i">column</em> | <em class="ph i">expression</em> [ASC | DESC] [NULLS FIRST | NULLS LAST] [, ...] }
+GROUP BY { <em class="ph i">column</em> | <em class="ph i">expression</em> [, ...] }
 HAVING <code class="ph codeph">conditions</code>
-GROUP BY { <em class="ph i">column</em> | <em class="ph i">expression</em> [ASC | DESC] [, ...] }
+ORDER BY { <em class="ph i">column</em> | <em class="ph i">expression</em> [ASC | DESC] [NULLS FIRST | NULLS LAST] [, ...] }
 LIMIT <em class="ph i">expression</em> [OFFSET <em class="ph i">expression</em>]
 [UNION [ALL] <em class="ph i">select_statement</em>] ...]
+
+table_reference := { <var class="keyword varname">table_name</var> | (<var class="keyword varname">subquery</var>) }
+  <span class="ph">[ TABLESAMPLE SYSTEM(<var class="keyword varname">percentage</var>) [REPEATABLE(<var class="keyword varname">seed</var>)] ]</span>
 </code></pre>
 
     <p class="p">
@@ -107,7 +110,7 @@ LIMIT <em class="ph i">expression</em> [OFFSET <em class="ph i">expression</em>]
         are supported in all Impala versions. The <code class="ph codeph">CROSS JOIN</code> operator is available in Impala 1.2.2
         and higher. During performance tuning, you can override the reordering of join clauses that Impala does
         internally by including the keyword <code class="ph codeph">STRAIGHT_JOIN</code> immediately after the
-        <code class="ph codeph">SELECT</code> keyword
+        <code class="ph codeph">SELECT</code> and any <code class="ph codeph">DISTINCT</code> or <code class="ph codeph">ALL</code> keywords.
       </p>
         <p class="p">
           See <a class="xref" href="impala_joins.html#joins">Joins in Impala SELECT Statements</a> for details and examples of join queries.
@@ -144,6 +147,12 @@ LIMIT <em class="ph i">expression</em> [OFFSET <em class="ph i">expression</em>]
         Common SQL built-in functions such as <code class="ph codeph">COUNT</code>, <code class="ph codeph">SUM</code>, <code class="ph codeph">CAST</code>,
         <code class="ph codeph">LIKE</code>, <code class="ph codeph">IN</code>, <code class="ph codeph">BETWEEN</code>, and <code class="ph codeph">COALESCE</code>. Impala
         specifically supports built-ins described in <a class="xref" href="impala_functions.html#builtins">Impala Built-In Functions</a>.
+      </li>
+
+      <li class="li">
+        In <span class="keyword">Impala 2.9</span> and higher, an optional <code class="ph codeph">TABLESAMPLE</code>
+        clause immediately after a table reference, to specify that the query only processes a
+        specified percentage of the table data. See <a class="xref" href="impala_tablesample.html">TABLESAMPLE Clause</a> for details.
       </li>
     </ul>
 
@@ -224,4 +233,4 @@ LIMIT <em class="ph i">expression</em> [OFFSET <em class="ph i">expression</em>]
   </div>
 
   
-<nav role="navigation" class="related-links"><ul class="ullinks"><li class="link ulchildlink"><strong><a href="../topics/impala_joins.html">Joins in Impala SELECT Statements</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_order_by.html">ORDER BY Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_group_by.html">GROUP BY Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_having.html">HAVING Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_limit.html">LIMIT Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_offset.html">OFFSET Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_union.html">UNION Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_subqueries.html">Subqueries in Impala SELECT Statements</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_with.html">WITH Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_distinct.html">DISTINCT Operator</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_hints.html">Query Hints in Impala SELECT Statements</a></strong><br></li></ul><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>
+<nav role="navigation" class="related-links"><ul class="ullinks"><li class="link ulchildlink"><strong><a href="../topics/impala_joins.html">Joins in Impala SELECT Statements</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_order_by.html">ORDER BY Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_group_by.html">GROUP BY Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_having.html">HAVING Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_limit.html">LIMIT Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_offset.html">OFFSET Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_union.html">UNION Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_subqueries.html">Subqueries in Impala SELECT Statements</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_tablesample.html">TABLESAMPLE Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_with.html">WITH Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_distinct.html">DISTINCT Operator</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_hints.html">Query Hints in Impala SELECT Statements</a></strong><br></li></ul><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>

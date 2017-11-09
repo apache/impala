@@ -116,4 +116,75 @@
     </div>
   </article>
 
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="ssl__tls_min_version">
+
+    <h2 class="title topictitle2" id="ariaid-title4">Specifying TLS/SSL Minimum Allowed Version and Ciphers</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Depending on your cluster configuration and the security practices in your
+        organization, you might need to restrict the allowed versions of TLS/SSL
+        used by Impala. Older TLS/SSL versions might have vulnerabilities or lack
+        certain features. In <span class="keyword">Impala 2.10</span>, you can use startup
+        options for the <span class="keyword cmdname">impalad</span>, <span class="keyword cmdname">catalogd</span>,
+        and <span class="keyword cmdname">statestored</span> daemons to specify a minimum allowed
+        version of TLS/SSL.
+      </p>
+
+      <p class="p">
+        Specify one of the following values for the <code class="ph codeph">--ssl_minimum_version</code>
+        configuration setting:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          <p class="p">
+            <code class="ph codeph">tlsv1</code>: Allow any TLS version of 1.0 or higher.
+            This setting is the default when TLS/SSL is enabled.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            <code class="ph codeph">tlsv1.1</code>: Allow any TLS version of 1.1 or higher.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            <code class="ph codeph">tlsv1.2</code>: Allow any TLS version of 1.2 or higher.
+          </p>
+        </li>
+      </ul>
+      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+        <p class="p">
+          As of <span class="keyword">Impala 2.10</span>, TLSv1.2 may not work for Impala on RHEL 6
+          or CentOS 6, even if OpenSSL 1.0.1 is available. The daemons fail to start, with a
+          socket error stating the TLS version is not supported. The underlying cause is related to
+          <a class="xref" href="https://bugzilla.redhat.com/show_bug.cgi?id=1497859" target="_blank">Red Hat issue 1497859</a>.
+          The issue applies if you build on a RHEL 6 or CentOS 6 system with OpenSSL 1.0.0, and
+          run on a RHEL 6 or CentOS 6 system with OpenSSL 1.0.1.
+        </p>
+      </div>
+
+      <p class="p">
+        Along with specifying the version, you can also specify the allowed set of TLS ciphers
+        by using the <code class="ph codeph">--ssl_cipher_list</code> configuration setting. The argument to
+        this option is a list of keywords, separated by colons, commas, or spaces, and
+        optionally including other notation. For example:
+      </p>
+
+<pre class="pre codeblock"><code>
+--ssl_cipher_list="RC4-SHA,RC4-MD5"
+</code></pre>
+
+      <p class="p">
+        By default, the cipher list is empty, and Impala uses the default cipher list for
+        the underlying platform. See the output of <span class="keyword cmdname">man ciphers</span> for the full
+        set of keywords and notation allowed in the argument string.
+      </p>
+
+    </div>
+
+  </article>
+
 </article></main></body></html>

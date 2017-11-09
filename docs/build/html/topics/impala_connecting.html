@@ -59,8 +59,7 @@
         Use the <code class="ph codeph">-i</code> option to the
         <span class="keyword cmdname">impala-shell</span> interpreter to specify the connection information for
         that instance of <span class="keyword cmdname">impalad</span>:
-<pre class="pre codeblock"><code>
-# When you are logged into the same machine running impalad.
+<pre class="pre codeblock"><code># When you are logged into the same machine running impalad.
 # The prompt will reflect the current hostname.
 $ impala-shell
 
@@ -138,8 +137,7 @@ $ impala-shell -i <var class="keyword varname">some.other.hostname</var>:<var cl
         <span class="keyword cmdname">impala-shell</span> interpreter to connect and immediately
         switch to the specified database, without the need for a <code class="ph codeph">USE</code>
         statement or fully qualified names:
-<pre class="pre codeblock"><code>
-# Subsequent queries with unqualified names operate on
+<pre class="pre codeblock"><code># Subsequent queries with unqualified names operate on
 # tables, views, and so on inside the database named 'staging'.
 $ impala-shell -i localhost -d staging
 
@@ -174,8 +172,7 @@ $ impala-shell -i localhost -d parquet_gzip_compression
         the <code class="ph codeph">-f</code> option to run a sequence of statements from a file.
         The <span class="keyword cmdname">impala-shell</span> command returns immediately, without going into
         the interactive interpreter.
-<pre class="pre codeblock"><code>
-# A utility command that you might run while developing shell scripts
+<pre class="pre codeblock"><code># A utility command that you might run while developing shell scripts
 # to manipulate HDFS files.
 $ impala-shell -i localhost -d database_of_interest -q 'show tables'
 

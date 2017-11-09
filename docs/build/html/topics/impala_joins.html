@@ -25,7 +25,7 @@
         are supported in all Impala versions. The <code class="ph codeph">CROSS JOIN</code> operator is available in Impala 1.2.2
         and higher. During performance tuning, you can override the reordering of join clauses that Impala does
         internally by including the keyword <code class="ph codeph">STRAIGHT_JOIN</code> immediately after the
-        <code class="ph codeph">SELECT</code> keyword
+        <code class="ph codeph">SELECT</code> and any <code class="ph codeph">DISTINCT</code> or <code class="ph codeph">ALL</code> keywords.
       </p>
 
 <pre class="pre codeblock"><code>SELECT <var class="keyword varname">select_list</var> FROM

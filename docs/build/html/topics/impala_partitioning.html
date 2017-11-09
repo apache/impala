@@ -650,4 +650,152 @@ explain select s from yy2 where year in (select year from yy where year between 
 
   </article>
 
+  <article class="topic concept nested1" aria-labelledby="ariaid-title15" id="partitioning__partition_stats">
+    <h2 class="title topictitle2" id="ariaid-title15">Keeping Statistics Up to Date for Partitioned Tables</h2>
+    <div class="body conbody">
+
+      <p class="p">
+        Because the <code class="ph codeph">COMPUTE STATS</code> statement can be resource-intensive to run on a partitioned table
+        as new partitions are added, Impala includes a variation of this statement that allows computing statistics
+        on a per-partition basis such that stats can be incrementally updated when new partitions are added.
+      </p>
+
+      <div class="note important note_important"><span class="note__title importanttitle">Important:</span> 
+        <p class="p">
+        For a particular table, use either <code class="ph codeph">COMPUTE STATS</code> or
+        <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>, but never combine the two or alternate
+        between them. If you switch from <code class="ph codeph">COMPUTE STATS</code> to
+        <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> during the lifetime of a table, or vice
+        versa, drop all statistics (by running both <code class="ph codeph">DROP STATS</code> and
+        <code class="ph codeph">DROP INCREMENTAL STATS</code>) before making the switch.
+      </p>
+        <p class="p">
+        When you run <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> on a table for the first time,
+        the statistics are computed again from scratch regardless of whether the table already
+        has statistics. Therefore, expect a one-time resource-intensive operation
+        for scanning the entire table when running <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>
+        for the first time on a given table.
+      </p>
+        <p class="p">
+        For a table with a huge number of partitions and many columns, the approximately 400 bytes
+        of metadata per column per partition can add up to significant memory overhead, as it must
+        be cached on the <span class="keyword cmdname">catalogd</span> host and on every <span class="keyword cmdname">impalad</span> host
+        that is eligible to be a coordinator. If this metadata for all tables combined exceeds 2 GB,
+        you might experience service downtime.
+      </p>
+      </div>
+
+      <p class="p">
+        The <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> variation computes statistics only for partitions that were
+        added or changed since the last <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> statement, rather than the entire
+        table. It is typically used for tables where a full <code class="ph codeph">COMPUTE STATS</code>
+        operation takes too long to be practical each time a partition is added or dropped. See
+        <a class="xref" href="impala_perf_stats.html#perf_stats_incremental">Overview of Incremental Statistics</a> for full usage details.
+      </p>
+
+<pre class="pre codeblock"><code>-- Initially the table has no incremental stats, as indicated
+-- 'false' under Incremental stats.
+show table stats item_partitioned;
++-------------+-------+--------+----------+--------------+---------+------------------
+| i_category  | #Rows | #Files | Size     | Bytes Cached | Format  | Incremental stats
++-------------+-------+--------+----------+--------------+---------+------------------
+| Books       | -1    | 1      | 223.74KB | NOT CACHED   | PARQUET | false
+| Children    | -1    | 1      | 230.05KB | NOT CACHED   | PARQUET | false
+| Electronics | -1    | 1      | 232.67KB | NOT CACHED   | PARQUET | false
+| Home        | -1    | 1      | 232.56KB | NOT CACHED   | PARQUET | false
+| Jewelry     | -1    | 1      | 223.72KB | NOT CACHED   | PARQUET | false
+| Men         | -1    | 1      | 231.25KB | NOT CACHED   | PARQUET | false
+| Music       | -1    | 1      | 237.90KB | NOT CACHED   | PARQUET | false
+| Shoes       | -1    | 1      | 234.90KB | NOT CACHED   | PARQUET | false
+| Sports      | -1    | 1      | 227.97KB | NOT CACHED   | PARQUET | false
+| Women       | -1    | 1      | 226.27KB | NOT CACHED   | PARQUET | false
+| Total       | -1    | 10     | 2.25MB   | 0B           |         |
++-------------+-------+--------+----------+--------------+---------+------------------
+
+-- After the first COMPUTE INCREMENTAL STATS,
+-- all partitions have stats. The first
+-- COMPUTE INCREMENTAL STATS scans the whole
+-- table, discarding any previous stats from
+-- a traditional COMPUTE STATS statement.
+compute incremental stats item_partitioned;
++-------------------------------------------+
+| summary                                   |
++-------------------------------------------+
+| Updated 10 partition(s) and 21 column(s). |
++-------------------------------------------+
+show table stats item_partitioned;
++-------------+-------+--------+----------+--------------+---------+------------------
+| i_category  | #Rows | #Files | Size     | Bytes Cached | Format  | Incremental stats
++-------------+-------+--------+----------+--------------+---------+------------------
+| Books       | 1733  | 1      | 223.74KB | NOT CACHED   | PARQUET | true
+| Children    | 1786  | 1      | 230.05KB | NOT CACHED   | PARQUET | true
+| Electronics | 1812  | 1      | 232.67KB | NOT CACHED   | PARQUET | true
+| Home        | 1807  | 1      | 232.56KB | NOT CACHED   | PARQUET | true
+| Jewelry     | 1740  | 1      | 223.72KB | NOT CACHED   | PARQUET | true
+| Men         | 1811  | 1      | 231.25KB | NOT CACHED   | PARQUET | true
+| Music       | 1860  | 1      | 237.90KB | NOT CACHED   | PARQUET | true
+| Shoes       | 1835  | 1      | 234.90KB | NOT CACHED   | PARQUET | true
+| Sports      | 1783  | 1      | 227.97KB | NOT CACHED   | PARQUET | true
+| Women       | 1790  | 1      | 226.27KB | NOT CACHED   | PARQUET | true
+| Total       | 17957 | 10     | 2.25MB   | 0B           |         |
++-------------+-------+--------+----------+--------------+---------+------------------
+
+-- Add a new partition...
+alter table item_partitioned add partition (i_category='Camping');
+-- Add or replace files in HDFS outside of Impala,
+-- rendering the stats for a partition obsolete.
+!import_data_into_sports_partition.sh
+refresh item_partitioned;
+drop incremental stats item_partitioned partition (i_category='Sports');
+-- Now some partitions have incremental stats
+-- and some do not.
+show table stats item_partitioned;
++-------------+-------+--------+----------+--------------+---------+------------------
+| i_category  | #Rows | #Files | Size     | Bytes Cached | Format  | Incremental stats
++-------------+-------+--------+----------+--------------+---------+------------------
+| Books       | 1733  | 1      | 223.74KB | NOT CACHED   | PARQUET | true
+| Camping     | -1    | 1      | 408.02KB | NOT CACHED   | PARQUET | false
+| Children    | 1786  | 1      | 230.05KB | NOT CACHED   | PARQUET | true
+| Electronics | 1812  | 1      | 232.67KB | NOT CACHED   | PARQUET | true
+| Home        | 1807  | 1      | 232.56KB | NOT CACHED   | PARQUET | true
+| Jewelry     | 1740  | 1      | 223.72KB | NOT CACHED   | PARQUET | true
+| Men         | 1811  | 1      | 231.25KB | NOT CACHED   | PARQUET | true
+| Music       | 1860  | 1      | 237.90KB | NOT CACHED   | PARQUET | true
+| Shoes       | 1835  | 1      | 234.90KB | NOT CACHED   | PARQUET | true
+| Sports      | -1    | 1      | 227.97KB | NOT CACHED   | PARQUET | false
+| Women       | 1790  | 1      | 226.27KB | NOT CACHED   | PARQUET | true
+| Total       | 17957 | 11     | 2.65MB   | 0B           |         |
++-------------+-------+--------+----------+--------------+---------+------------------
+
+-- After another COMPUTE INCREMENTAL STATS,
+-- all partitions have incremental stats, and only the 2
+-- partitions without incremental stats were scanned.
+compute incremental stats item_partitioned;
++------------------------------------------+
+| summary                                  |
++------------------------------------------+
+| Updated 2 partition(s) and 21 column(s). |
++------------------------------------------+
+show table stats item_partitioned;
++-------------+-------+--------+----------+--------------+---------+------------------
+| i_category  | #Rows | #Files | Size     | Bytes Cached | Format  | Incremental stats
++-------------+-------+--------+----------+--------------+---------+------------------
+| Books       | 1733  | 1      | 223.74KB | NOT CACHED   | PARQUET | true
+| Camping     | 5328  | 1      | 408.02KB | NOT CACHED   | PARQUET | true
+| Children    | 1786  | 1      | 230.05KB | NOT CACHED   | PARQUET | true
+| Electronics | 1812  | 1      | 232.67KB | NOT CACHED   | PARQUET | true
+| Home        | 1807  | 1      | 232.56KB | NOT CACHED   | PARQUET | true
+| Jewelry     | 1740  | 1      | 223.72KB | NOT CACHED   | PARQUET | true
+| Men         | 1811  | 1      | 231.25KB | NOT CACHED   | PARQUET | true
+| Music       | 1860  | 1      | 237.90KB | NOT CACHED   | PARQUET | true
+| Shoes       | 1835  | 1      | 234.90KB | NOT CACHED   | PARQUET | true
+| Sports      | 1783  | 1      | 227.97KB | NOT CACHED   | PARQUET | true
+| Women       | 1790  | 1      | 226.27KB | NOT CACHED   | PARQUET | true
+| Total       | 17957 | 11     | 2.65MB   | 0B           |         |
++-------------+-------+--------+----------+--------------+---------+------------------
+</code></pre>
+
+    </div>
+  </article>
+
 </article></main></body></html>

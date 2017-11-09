@@ -1,0 +1,71 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="buffer_pool_limit"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>BUFFER_POOL_LIMIT Query Option</title></head><body id="buffer_pool_limit"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">BUFFER_POOL_LIMIT Query Option</h1>
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      Defines a limit on the amount of memory that a query can allocate from the
+      internal buffer pool. The value for this limit applies to the memory on each host,
+      not the aggregate memory across the cluster. Typically not changed by users, except
+      during diagnosis of out-of-memory errors during queries.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Type:</strong> integer
+      </p>
+
+
+
+    <p class="p">
+        <strong class="ph b">Default:</strong>
+      </p>
+    <p class="p">
+      The default setting for this option is the lower of 80% of the
+      <code class="ph codeph">MEM_LIMIT</code> setting, or the <code class="ph codeph">MEM_LIMIT</code>
+      setting minus 100 MB.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.10.0</span>
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+    <p class="p">
+      If queries encounter out-of-memory errors, consider decreasing the
+      <code class="ph codeph">BUFFER_POOL_LIMIT</code> setting to less than 80% of the
+      <code class="ph codeph">MEM_LIMIT setting</code>.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>
+-- Set an absolute value.
+set buffer_pool_limit=8GB;
+
+-- Set a relative value based on the MEM_LIMIT setting.
+set buffer_pool_limit=80%;
+
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+    <p class="p">
+      <a class="xref" href="impala_default_spillable_buffer_size.html">DEFAULT_SPILLABLE_BUFFER_SIZE Query Option</a>,
+      <a class="xref" href="impala_max_row_size.html">MAX_ROW_SIZE Query Option</a>,
+      <a class="xref" href="impala_min_spillable_buffer_size.html">MIN_SPILLABLE_BUFFER_SIZE Query Option</a>,
+      <a class="xref" href="impala_scalability.html">Scalability Considerations for Impala</a>
+    </p>
+
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>

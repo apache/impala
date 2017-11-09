@@ -1389,6 +1389,14 @@ kudu.table_name  | impala::some_database.table_name_demo
         the predicate pushdown for a specific query against a Kudu table.
       </p>
 
+      <p class="p">
+        The <code class="ph codeph">TABLESAMPLE</code> clause of the <code class="ph codeph">SELECT</code>
+        statement does not apply to a table reference derived from a view, a subquery,
+        or anything other than a real base table. This clause only works for tables
+        backed by HDFS or HDFS-like data files, therefore it does not apply to Kudu or
+        HBase tables.
+      </p>
+
       
       
 

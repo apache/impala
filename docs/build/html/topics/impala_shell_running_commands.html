@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_impala_shell.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="shell_running_commands"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Running Commands and SQL Statements in impala-shell</title></head><body id="shell_running_commands"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_impala_shell.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="shell_running_commands"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Running Commands and SQL Statements in impala-shell</title></head><body id="shell_running_commands"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1">Running Commands and SQL Statements in impala-shell</h1>
   
@@ -254,4 +254,69 @@ Fetched 5 row(s) in 0.01s
 </code></pre>
 
   </div>
-<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_impala_shell.html">Using the Impala Shell (impala-shell Command)</a></div></div></nav></article></main></body></html>
+
+  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_impala_shell.html">Using the Impala Shell (impala-shell Command)</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="shell_running_commands__rerun">
+    <h2 class="title topictitle2" id="ariaid-title2">Rerunning impala-shell Commands</h2>
+    <div class="body conbody">
+
+      <p class="p">
+        In <span class="keyword">Impala 2.10</span> and higher, you can use the
+        <code class="ph codeph">rerun</code> command, or its abbreviation <code class="ph codeph">@</code>,
+        to re-execute commands from the history list. The argument can be
+        a positive integer (reflecting the number shown in <code class="ph codeph">history</code>
+        output) or a negative integer (reflecting the N'th last command in the
+        <code class="ph codeph">history</code> output. For example:
+      </p>
+
+<pre class="pre codeblock"><code>
+[localhost:21000] &gt; select * from p1 order by t limit 5;
+...
+[localhost:21000] &gt; show table stats p1;
++-----------+--------+--------+------------------------------------------------------------+
+| #Rows     | #Files | Size   | Location                                                   |
++-----------+--------+--------+------------------------------------------------------------+
+| 134217728 | 50     | 4.66MB | hdfs://test.example.com:8020/user/hive/warehouse/jdr.db/p1 |
++-----------+--------+--------+------------------------------------------------------------+
+[localhost:21000] &gt; compute stats p1;
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 1 partition(s) and 3 column(s). |
++-----------------------------------------+
+[localhost:21000] &gt; history;
+[1]: use jdr;
+[2]: history;
+[3]: show tables;
+[4]: select * from p1 order by t limit 5;
+[5]: show table stats p1;
+[6]: compute stats p1;
+[7]: history;
+[localhost:21000] &gt; @-2; &lt;- Rerun the 2nd last command in the history list
+Rerunning compute stats p1;
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 1 partition(s) and 3 column(s). |
++-----------------------------------------+
+[localhost:21000] &gt; history; &lt;- History list is not updated by rerunning commands
+                                or by repeating the last command, in this case 'history'.
+[1]: use jdr;
+[2]: history;
+[3]: show tables;
+[4]: select * from p1 order by t limit 5;
+[5]: show table stats p1;
+[6]: compute stats p1;
+[7]: history;
+[localhost:21000] &gt; @4; &lt;- Rerun command #4 in the history list using short form '@'.
+Rerunning select * from p1 order by t limit 5;
+...
+[localhost:21000] &gt; rerun 4; &lt;- Rerun command #4 using long form 'rerun'.
+Rerunning select * from p1 order by t limit 5;
+...
+
+</code></pre>
+
+    </div>
+  </article>
+
+</article></main></body></html>

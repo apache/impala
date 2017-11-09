@@ -160,7 +160,7 @@ data_type:
     [, ...]
     [PRIMARY KEY (<var class="keyword varname">col_name</var>[, ...])]
   )
-  <span class="ph">[PARTITION BY <var class="keyword varname">kudu_partition_clause</var></span>
+  <span class="ph">[PARTITION BY <var class="keyword varname">kudu_partition_clause</var>]</span>
   [COMMENT '<var class="keyword varname">table_comment</var>']
   STORED AS KUDU
   [TBLPROPERTIES ('<var class="keyword varname">key1</var>'='<var class="keyword varname">value1</var>', '<var class="keyword varname">key2</var>'='<var class="keyword varname">value2</var>', ...)]
@@ -181,7 +181,7 @@ data_type:
     <div class="p">
       <strong class="ph b">kudu_partition_clause:</strong>
 <pre class="pre codeblock"><code>
-kudu_partition_clause ::= PARTITION BY [<var class="keyword varname">hash_clause</var>] [, <var class="keyword varname">range_clause</var> [ , <var class="keyword varname">range_clause</var> ] ]
+kudu_partition_clause ::= [<var class="keyword varname">hash_clause</var>] [, <var class="keyword varname">range_clause</var> [ , <var class="keyword varname">range_clause</var> ] ]
 
 hash_clause ::=
   HASH [ (<var class="keyword varname">pk_col</var> [, ...]) ]
@@ -217,7 +217,7 @@ range_comparison_operator ::= { &lt; | &lt;= }
 
 <pre class="pre codeblock"><code>CREATE TABLE [IF NOT EXISTS] <var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var>
   [PRIMARY KEY (<var class="keyword varname">col_name</var>[, ...])]
-  [PARTITION BY <var class="keyword varname">kudu_partition_clause</var>
+  [PARTITION BY <var class="keyword varname">kudu_partition_clause</var>]
   [COMMENT '<var class="keyword varname">table_comment</var>']
   STORED AS KUDU
   [TBLPROPERTIES ('<var class="keyword varname">key1</var>'='<var class="keyword varname">value1</var>', '<var class="keyword varname">key2</var>'='<var class="keyword varname">value2</var>', ...)]
@@ -337,6 +337,14 @@ AS
         tables. See the <code class="ph codeph">PARTITION BY</code> clause, rather than <code class="ph codeph">PARTITIONED
         BY</code>, for Kudu tables.
       </p>
+      <p class="p">
+        In <span class="keyword">Impala 2.10</span> and higher, the <code class="ph codeph">PARTITION BY</code>
+        clause is optional for Kudu tables. If the clause is omitted, Impala automatically
+        constructs a single partition that is not connected to any column. Because such a
+        table cannot take advantage of Kudu features for parallelized queries and
+        query optimizations, omitting the <code class="ph codeph">PARTITION BY</code> clause is only
+        appropriate for small lookup tables.
+      </p>
     </div>
 
     <p class="p">
@@ -434,9 +442,9 @@ AS
       partitioning mechanisms, the syntax associated with the <code class="ph codeph">STORED AS KUDU</code>
       clause is shown separately in the above syntax descriptions. Kudu tables have their own
       syntax for <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">CREATE EXTERNAL TABLE</code>, and
-      <code class="ph codeph">CREATE TABLE AS SELECT</code>. All internal Kudu tables require a
-      <code class="ph codeph">PARTITION BY</code> clause, different than the <code class="ph codeph">PARTITIONED BY</code>
-      clause for HDFS-backed tables.
+      <code class="ph codeph">CREATE TABLE AS SELECT</code>. <span class="ph">Prior to <span class="keyword">Impala 2.10</span>,
+      all internal Kudu tables require a <code class="ph codeph">PARTITION BY</code> clause, different than
+      the <code class="ph codeph">PARTITIONED BY</code> clause for HDFS-backed tables.</span>
     </p>
 
     <p class="p">
@@ -444,6 +452,14 @@ AS
     </p>
 
 <pre class="pre codeblock"><code>
+<span class="ph">-- Single partition. Only for <span class="keyword">Impala 2.10</span> and higher.
+-- Only suitable for small lookup tables.
+CREATE TABLE kudu_no_partition_by_clause
+  (
+    id bigint PRIMARY KEY, s STRING, b BOOLEAN
+  )
+  STORED AS KUDU;</span>
+
 -- Single-column primary key.
 CREATE TABLE kudu_t1 (id BIGINT PRIMARY key, s STRING, b BOOLEAN)
   PARTITION BY HASH (id) PARTITIONS 20 STORED AS KUDU;

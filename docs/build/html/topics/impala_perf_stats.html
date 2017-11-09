@@ -300,15 +300,6 @@ show column stats year_month_day;
 +-----------+---------+------------------+--------+----------+-------------------+
 </code></pre>
 
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
-        Partitioned tables can grow so large that scanning the entire table, as the <code class="ph codeph">COMPUTE STATS</code>
-        statement does, is impractical just to update the statistics for a new partition. The standard
-        <code class="ph codeph">COMPUTE STATS</code> statement might take hours, or even days. That situation is where you switch
-        to using incremental statistics, a feature available in <span class="keyword">Impala 2.1</span> and higher.
-        See <a class="xref" href="impala_perf_stats.html#perf_stats_incremental">Overview of Incremental Statistics</a> for details about this feature
-        and the <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> syntax.
-      </div>
-
       <p class="p">
         If you run the Hive statement <code class="ph codeph">ANALYZE TABLE COMPUTE STATISTICS FOR COLUMNS</code>,
         Impala can only use the resulting column statistics if the table is unpartitioned.
@@ -337,6 +328,31 @@ show column stats year_month_day;
         entire table each time.
       </p>
 
+      <div class="note important note_important"><span class="note__title importanttitle">Important:</span> 
+        <p class="p">
+        For a particular table, use either <code class="ph codeph">COMPUTE STATS</code> or
+        <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>, but never combine the two or alternate
+        between them. If you switch from <code class="ph codeph">COMPUTE STATS</code> to
+        <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> during the lifetime of a table, or vice
+        versa, drop all statistics (by running both <code class="ph codeph">DROP STATS</code> and
+        <code class="ph codeph">DROP INCREMENTAL STATS</code>) before making the switch.
+      </p>
+        <p class="p">
+        When you run <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> on a table for the first time,
+        the statistics are computed again from scratch regardless of whether the table already
+        has statistics. Therefore, expect a one-time resource-intensive operation
+        for scanning the entire table when running <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>
+        for the first time on a given table.
+      </p>
+        <p class="p">
+        For a table with a huge number of partitions and many columns, the approximately 400 bytes
+        of metadata per column per partition can add up to significant memory overhead, as it must
+        be cached on the <span class="keyword cmdname">catalogd</span> host and on every <span class="keyword cmdname">impalad</span> host
+        that is eligible to be a coordinator. If this metadata for all tables combined exceeds 2 GB,
+        you might experience service downtime.
+      </p>
+      </div>
+
       <p class="p">
         You can also compute or drop statistics for a single partition by including a <code class="ph codeph">PARTITION</code>
         clause in the <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> or <code class="ph codeph">DROP INCREMENTAL STATS</code>
@@ -350,9 +366,9 @@ show column stats year_month_day;
       <ul class="ul">
         <li class="li">
           <p class="p">
-            If you have an existing partitioned table for which you have already computed statistics, issuing
-            <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> without a partition clause causes Impala to rescan the
-            entire table. Once the incremental statistics are computed, any future <code class="ph codeph">COMPUTE INCREMENTAL
+            If you have a partitioned table for which you have already run a regular <code class="ph codeph">COMPUTE STATS</code>
+            statement, issuing <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> without a partition clause causes Impala
+            to rescan the entire table. Once the incremental statistics are computed, any future <code class="ph codeph">COMPUTE INCREMENTAL
             STATS</code> statements only scan any new partitions and any partitions where you performed
             <code class="ph codeph">DROP INCREMENTAL STATS</code>.
           </p>
