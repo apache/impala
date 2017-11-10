@@ -23,7 +23,7 @@ class Query(object):
   """Represents a query and all the information neede to execute it
 
   Attributes:
-    query_str (str): The SQL query string.
+    query_str (str): SQL query string; contains 1 or more ;-delimited SQL statements.
     name (str): query name?
     scale_factor (str): for example 300gb, used to determine the database.
     test_vector (?): Specifies some parameters

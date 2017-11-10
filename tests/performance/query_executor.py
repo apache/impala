@@ -31,6 +31,7 @@
 
 import logging
 import os
+import re
 
 from tests.performance.query import Query
 
@@ -39,8 +40,16 @@ logging.basicConfig(level=logging.INFO, format='[%(name)s] %(threadName)s: %(mes
 LOG = logging.getLogger('query_executor')
 LOG.setLevel(level=logging.INFO)
 
-# globals.
+# Globals.
 hive_result_regex = 'Time taken: (\d*).(\d*) seconds'
+# Match any CRUD statement that can follow EXPLAIN.
+# The statement may begin with SQL line comments starting with --
+COMMENT_LINES_REGEX = r'(?:\s*--.*\n)*'
+DDL_CRUD_PATTERN = \
+  re.compile(COMMENT_LINES_REGEX +
+      r'\s*((CREATE|DELETE|INSERT|SELECT|UPDATE|UPSERT|WITH)\s|VALUES\s*\()',
+      re.IGNORECASE)
+
 
 ## TODO: Split executors into their own modules.
 class QueryExecConfig(object):
@@ -173,21 +182,21 @@ class BeeswaxQueryExecConfig(ImpalaQueryExecConfig):
 
 
 class QueryExecutor(object):
-  """Executes a query.
+  """Executes one or more queries.
 
   Args:
     name (str): eg. "hive"
-    query (Query): SQL query to be executed
+    query (Query): Container holding 1 or more ;-delimited SQL statements to be executed
     func (function): Function that accepts a QueryExecOption parameter and returns a
       ImpalaQueryResult. Eg. execute_using_impala_beeswax
     config (QueryExecOption)
     exit_on_error (boolean): Exit right after an error encountered.
 
   Attributes:
-    exec_func (function): Function that accepts a QueryExecOption parameter and returns a
-      ImpalaQueryResult.
+    exec_func (function): Function that accepts a QueryExecOption parameter and returns
+      an ImpalaQueryResult.
     exec_config (QueryExecOption)
-    query (Query): SQL query to be executed
+    query (Query): Container holding 1 or more ;-delimited SQL statements to be executed
     exit_on_error (boolean): Exit right after an error encountered.
     executor_name (str): eg. "hive"
     result (ImpalaQueryResult): Contains the result after execute method is called.
@@ -211,26 +220,52 @@ class QueryExecutor(object):
       self.exec_config.impalad = impalad
 
   def execute(self, plan_first=False):
-    """Execute the query using the given execution function.
+    """Execute a set of SQL statements using the given execution function,
+    and return a result object.  SQL statements can be the familiar SELECT, INSERT,
+    DELETE, UPDATE and UPSERT DML commands as well as utilities like SET, SHOW,
+    VERSION, etc.
 
-    If plan_first is true, EXPLAIN the query first so timing does not include the initial
-    metadata loading required for planning.
+    If plan_first is true, EXPLAIN the "explainable" queries in the set
+    first so timing does not include the initial metadata loading
+    required for planning.
+
+    This function furnishes a query result object in self._result, for the last
+    query in the batch ONLY.
     """
-    if plan_first:
-      LOG.debug('Planning %s' % self.query)
-      assert isinstance(self.query, Query)
-      self.query.query_str = 'EXPLAIN ' + self.query.query_str
-      try:
-        self.exec_func(self.query, self.exec_config)
-      finally:
-        self.query.query_str = self.query.query_str[len('EXPLAIN '):]
-    LOG.debug('Executing %s' % self.query)
-    self._result = self.exec_func(self.query, self.exec_config)
-    if not self._result.success:
-      if self.exit_on_error:
-        raise RuntimeError(self._result.query_error)
-      else:
-        LOG.info("Continuing execution")
+    assert isinstance(self.query, Query)
+    orig_query_str = self.query.query_str
+    try:
+      statements = self.query.query_str.split(';')
+
+      if plan_first:
+        # Break out multiple statements in self.query
+        for stmt in statements:
+          ddl_crud_match = DDL_CRUD_PATTERN.match(stmt)
+          if not ddl_crud_match:
+            # Don't EXPLAIN this statement
+            continue
+
+          self.query.query_str = 'EXPLAIN ' + stmt + ';'
+          LOG.debug('Planning %s' % self.query.query_str)
+          self.exec_func(self.query, self.exec_config)
+
+      # Now actually execute
+      for stmt in statements:
+        self.query.query_str = stmt + ';'
+        LOG.debug('Executing %s' % self.query.query_str)
+        self._result = self.exec_func(self.query, self.exec_config)
+
+        if not self._result.success:
+          if self.exit_on_error:
+            raise RuntimeError(self._result.query_error)
+          else:
+            LOG.info("Continuing execution")
+    finally:
+      self.query.query_str = orig_query_str
+
+    # We do not need to restore the SET options we changed for the next batch
+    # (Query object) because the scheduler runs each Query on its own connection
+    # (XXX pretty strange for a performance test. :)
 
   @property
   def result(self):
