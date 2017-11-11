@@ -204,7 +204,7 @@ under the License.
       </p>
 
       <p>
-        Impala utilizes the <xref href="http://sentry.incubator.apache.org/" scope="external" format="html">Apache
+        Impala utilizes the <xref keyref="sentry">Apache
         Sentry </xref> authorization framework, which provides fine-grained role-based access control
         to protect data against unauthorized access or tampering.
       </p>
