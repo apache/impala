@@ -20,7 +20,7 @@ under the License.
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
 <concept rev="ver" id="known_issues">
 
-  <title><ph audience="standalone">Known Issues and Workarounds in Impala</ph><ph audience="integrated">Apache Impala (incubating) Known Issues</ph></title>
+  <title><ph audience="standalone">Known Issues and Workarounds in Impala</ph><ph audience="integrated">Apache Impala Known Issues</ph></title>
 
   <prolog>
     <metadata>

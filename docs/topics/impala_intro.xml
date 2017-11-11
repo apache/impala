@@ -20,7 +20,7 @@ under the License.
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
 <concept id="intro">
 
-  <title id="impala"><ph audience="standalone">Introducing Apache Impala (incubating)</ph><ph audience="integrated">Apache Impala (incubating) Overview</ph></title>
+  <title id="impala"><ph audience="standalone">Introducing Apache Impala</ph><ph audience="integrated">Apache Impala Overview</ph></title>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
@@ -52,7 +52,7 @@ under the License.
       <note>
         Impala was accepted into the Apache incubator on December 2, 2015.
         In places where the documentation formerly referred to <q>Cloudera Impala</q>,
-        now the official name is <q>Apache Impala (incubating)</q>.
+        now the official name is <q>Apache Impala</q>.
       </note>
 
   </conbody>

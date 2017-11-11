@@ -20,7 +20,7 @@ under the License.
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
 <concept id="about_impala">
 
-  <title>Apache Impala (incubating) - Interactive SQL</title>
+  <title>Apache Impala - Interactive SQL</title>
   <titlealts audience="PDF"><navtitle>Impala Guide</navtitle></titlealts>
   <prolog>
     <metadata>

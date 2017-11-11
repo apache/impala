@@ -3227,7 +3227,7 @@ Query finished, fetching results ...
       </p>
 
       <p id="impala_mission_statement">
-        The Apache Impala (incubating) project provides high-performance, low-latency SQL queries on data stored in popular Apache Hadoop
+        The Apache Impala project provides high-performance, low-latency SQL queries on data stored in popular Apache Hadoop
         file formats. The fast response for queries enables interactive exploration and fine-tuning of analytic
         queries, rather than long batch jobs traditionally associated with SQL-on-Hadoop technologies. (You will
         often see the term <q>interactive</q> applied to these kinds of fast queries with human-scale response

@@ -26,7 +26,7 @@ under the License.
   <version>0.1-SNAPSHOT</version>
   <packaging>jar</packaging>
 
-  <name>Apache Impala (Incubating) Query Engine Frontend</name>
+  <name>Apache Impala Query Engine Frontend</name>
 
   <properties>
     <surefire.reports.dir>${env.IMPALA_LOGS_DIR}/fe_tests</surefire.reports.dir>

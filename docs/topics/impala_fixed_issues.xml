@@ -19,7 +19,7 @@ under the License.
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
 <concept rev="ver" id="fixed_issues">
 
-  <title><ph audience="standalone">Fixed Issues in Apache Impala (incubating)</ph><ph audience="integrated">Fixed Issues in Apache Impala (incubating)</ph></title>
+  <title><ph audience="standalone">Fixed Issues in Apache Impala</ph><ph audience="integrated">Fixed Issues in Apache Impala</ph></title>
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>

@@ -1,4 +1,4 @@
-# Generating HTML or a PDF of Apache Impala (Incubating) Documentation
+# Generating HTML or a PDF of Apache Impala Documentation
 
 ## Prerequisites
 

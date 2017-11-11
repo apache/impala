@@ -19,7 +19,7 @@ under the License.
 -->
 <!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">
 <map id="impala_keydefs">
-  <title>Apache Impala (incubating) Key Definitions</title>
+  <title>Apache Impala Key Definitions</title>
 
 <!-- Definitions for substitution variables, particularly for upstream/downstream differences in terminology and versioning. -->
   <keydef keys="hadoop_distro"><topicmeta><keywords><keyword>Apache Hadoop</keyword></keywords></topicmeta></keydef>

@@ -22,7 +22,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.impala</groupId>
   <artifactId>impala-data-source</artifactId>
-  <name>Apache Impala (Incubating) External Data Source</name>
+  <name>Apache Impala External Data Source</name>
   <version>1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
 

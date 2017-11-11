@@ -28,7 +28,7 @@
   <groupId>org.apache.impala</groupId>
   <artifactId>impala-data-source-test</artifactId>
   <version>0.1-SNAPSHOT</version>
-  <name>Apache Impala (Incubating) External Data Source Test Library</name>
+  <name>Apache Impala External Data Source Test Library</name>
   <description>Test External Data Source</description>
   <packaging>jar</packaging>
   <url>.</url>

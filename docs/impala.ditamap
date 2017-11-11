@@ -19,7 +19,7 @@ under the License.
 -->
 <!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">
 <map id="impala">
-  <title>Apache Impala (incubating) Guide</title>
+  <title>Apache Impala Guide</title>
   <topicmeta>
     <prodinfo audience="PDF" conref="shared/ImpalaVariables.xml#impala_vars/prodinfo_for_html">
       <prodname/>
