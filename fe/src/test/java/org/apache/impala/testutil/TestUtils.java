@@ -93,7 +93,7 @@ public class TestUtils {
   static class FileSizeFilter implements ResultFilter {
     private final static String BYTE_FILTER = "[KMGT]?B";
     private final static String NUMBER_FILTER = "\\d+(\\.\\d+)?";
-    private final static String FILTER_KEY = "size=";
+    private final static String FILTER_KEY = " size=";
 
     public boolean matches(String input) { return input.contains(FILTER_KEY); }
 
