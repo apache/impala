@@ -42,7 +42,7 @@ class RuntimeState;
 /// Locking strategy: We don't want to grab a big lock across all operations since
 /// one of the operations is copying a file from HDFS. With one lock that would
 /// prevent any UDFs from running on the system. Instead, we have a global lock
-/// that is taken when doing the cache lookup, but is not taking during any blocking calls.
+/// that is taken when doing the cache lookup, but is not taken during any blocking calls.
 /// During the block calls, we take the per-lib lock.
 //
 /// Entry lifetime management: We cannot delete the entry while a query is
@@ -140,7 +140,7 @@ class LibCache {
   /// Returns the cache entry for 'hdfs_lib_file'. If this library has not been
   /// copied locally, it will copy it and add a new LibCacheEntry to 'lib_cache_'.
   /// Result is returned in *entry.
-  /// No locks should be take before calling this. On return the entry's lock is
+  /// No locks should be taken before calling this. On return the entry's lock is
   /// taken and returned in *entry_lock.
   /// If an error is returned, there will be no entry in lib_cache_ and *entry is NULL.
   Status GetCacheEntry(const std::string& hdfs_lib_file, LibType type,

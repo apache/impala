@@ -621,7 +621,7 @@ public class UdfExecutor {
         .append(Joiner.on("\n    ").join(signatures));
       throw new ImpalaRuntimeException(sb.toString());
     } catch (MalformedURLException e) {
-      throw new ImpalaRuntimeException("Unable load jar.", e);
+      throw new ImpalaRuntimeException("Unable to load jar.", e);
     } catch (SecurityException e) {
       throw new ImpalaRuntimeException("Unable to load function.", e);
     } catch (ClassNotFoundException e) {

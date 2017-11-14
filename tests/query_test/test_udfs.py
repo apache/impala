@@ -404,15 +404,22 @@ class TestUdfTargeted(TestUdfBase):
   def test_udf_invalid_symbol(self, vector, unique_database):
     """ IMPALA-1642: Impala crashes if the symbol for a Hive UDF doesn't exist
         Crashing is non-deterministic so we run the UDF several times."""
+    src_udf_path = os.path.join(
+        os.environ['IMPALA_HOME'], 'testdata/udfs/impala-hive-udfs.jar')
+    tgt_udf_path = get_fs_path(
+        '/test-warehouse/{0}.db/impala-hive-udfs.jar'.format(unique_database))
     drop_fn_stmt = (
         "drop function if exists `{0}`.fn_invalid_symbol(STRING)".format(unique_database))
     create_fn_stmt = (
         "create function `{0}`.fn_invalid_symbol(STRING) returns "
         "STRING LOCATION '{1}' SYMBOL='not.a.Symbol'".format(
-            unique_database,
-            get_fs_path('/test-warehouse/impala-hive-udfs.jar')))
+            unique_database, tgt_udf_path))
     query = "select `{0}`.fn_invalid_symbol('test')".format(unique_database)
 
+    # Dropping the function can interact with other tests whose Java classes are in
+    # the same jar. Use a copy of the jar to avoid unintended interactions.
+    # See IMPALA-6215 and IMPALA-6092 for examples.
+    check_call(["hadoop", "fs", "-put", "-f", src_udf_path, tgt_udf_path])
     self.client.execute(drop_fn_stmt)
     self.client.execute(create_fn_stmt)
     for _ in xrange(5):
@@ -425,7 +432,8 @@ class TestUdfTargeted(TestUdfBase):
     """ IMPALA-2365: Impalad shouldn't crash if the udf jar isn't present
     on HDFS"""
     # Copy hive-exec.jar to a temporary file
-    jar_path = get_fs_path("/test-warehouse/" + get_random_id(5) + ".jar")
+    jar_path = get_fs_path("/test-warehouse/{0}.db/".format(unique_database)
+                           + get_random_id(5) + ".jar")
     hive_jar = get_fs_path("/test-warehouse/hive-exec.jar")
     check_call(["hadoop", "fs", "-cp", hive_jar, jar_path])
     drop_fn_stmt = (
@@ -474,7 +482,7 @@ class TestUdfTargeted(TestUdfBase):
     new_udf = os.path.join(
         os.environ['IMPALA_HOME'], 'tests/test-hive-udfs/target/test-hive-udfs-1.0.jar')
     udf_dst = get_fs_path(
-        '/test-warehouse/impala-hive-udfs2-{0}.jar'.format(unique_database))
+        '/test-warehouse/{0}.db/impala-hive-udfs.jar'.format(unique_database))
 
     drop_fn_stmt = (
         'drop function if exists `{0}`.`udf_update_test_drop`()'.format(unique_database))
@@ -507,7 +515,7 @@ class TestUdfTargeted(TestUdfBase):
     new_udf = os.path.join(
         os.environ['IMPALA_HOME'], 'tests/test-hive-udfs/target/test-hive-udfs-1.0.jar')
     udf_dst = get_fs_path(
-        '/test-warehouse/impala-hive-udfs3-{0}.jar'.format(unique_database))
+        '/test-warehouse/{0}.db/impala-hive-udfs.jar'.format(unique_database))
     old_function_name = "udf_update_test_create1"
     new_function_name = "udf_update_test_create2"
 
@@ -570,4 +578,3 @@ class TestUdfTargeted(TestUdfBase):
     results = self.client.fetch(query, handle, -1)
     assert results.success
     assert len(results.data) == 9999
-
