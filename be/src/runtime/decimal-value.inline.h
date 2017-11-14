@@ -505,7 +505,7 @@ inline std::string DecimalValue<T>::ToString(int precision, int scale) const {
 
 template<typename T>
 inline double DecimalValue<T>::ToDouble(int scale) const {
-  return static_cast<double>(value_) / powf(10.0, scale);
+  return static_cast<double>(value_) / pow(10.0, scale);
 }
 
 template<typename T>

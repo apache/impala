@@ -272,3 +272,29 @@ from decimal_tiny where c2 < 112
 ---- TYPES
 DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
 ====
+---- QUERY
+# IMPALA-6183: Make sure precision is not lost when converting decimal to double
+# with DECIMAL_V1
+set decimal_v2=false;
+select
+  cast(cast(1.01234567890123456789 as decimal(21,20)) as double),
+  cast(cast(1.01234567890123456789 as decimal(38,37)) as double),
+  cast(cast(1.01234567890123456789 as decimal(11,10)) as double)
+---- RESULTS
+1.0123456789012345,1.0123456789012345,1.0123456789
+---- TYPES
+DOUBLE,DOUBLE,DOUBLE
+====
+---- QUERY
+# IMPALA-6183: Make sure precision is not lost when converting decimal to double
+# with DECIMAL_V2
+set decimal_v2=true;
+select
+  cast(cast(1.01234567890123456789 as decimal(21,20)) as double),
+  cast(cast(1.01234567890123456789 as decimal(38,37)) as double),
+  cast(cast(1.01234567890123456789 as decimal(11,10)) as double)
+---- RESULTS
+1.0123456789012345,1.0123456789012345,1.0123456789
+---- TYPES
+DOUBLE,DOUBLE,DOUBLE
+====
