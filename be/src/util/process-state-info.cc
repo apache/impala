@@ -24,6 +24,7 @@
 #include <fstream>
 #include <sstream>
 #include <boost/algorithm/string.hpp>
+#include <dirent.h>
 #include <gutil/strings/substitute.h>
 
 #include "util/pretty-printer.h"
@@ -37,6 +38,7 @@ using boost::algorithm::join;
 using boost::algorithm::split;
 using boost::algorithm::token_compress_on;
 using boost::algorithm::trim;
+using std::to_string;
 
 using namespace strings;
 
@@ -83,8 +85,7 @@ int64_t ProcessStateInfo::GetBytes(const string& state_key) const {
 }
 
 void ProcessStateInfo::ReadProcIO() {
-  const string& path = Substitute("/proc/$0/io", getpid());
-  ifstream ioinfo(path.c_str(), ios::in);
+  ifstream ioinfo("/proc/self/io", ios::in);
   string line;
   while (ioinfo.good() && !ioinfo.eof()) {
     getline(ioinfo, line);
@@ -99,8 +100,7 @@ void ProcessStateInfo::ReadProcIO() {
 }
 
 void ProcessStateInfo::ReadProcCgroup() {
-  const string& path = Substitute("/proc/$0/cgroup", getpid());
-  ifstream cgroupinfo(path.c_str(), ios::in);
+  ifstream cgroupinfo("/proc/self/cgroup", ios::in);
   string line;
   while (cgroupinfo.good() && !cgroupinfo.eof()) {
     getline(cgroupinfo, line);
@@ -117,8 +117,7 @@ void ProcessStateInfo::ReadProcCgroup() {
 }
 
 void ProcessStateInfo::ReadProcSched() {
-  const string& path = Substitute("/proc/$0/sched", getpid());
-  ifstream schedinfo(path.c_str(), ios::in);
+  ifstream schedinfo("/proc/self/sched", ios::in);
   string line;
   while (schedinfo.good() && !schedinfo.eof()) {
     getline(schedinfo, line);
@@ -134,8 +133,7 @@ void ProcessStateInfo::ReadProcSched() {
 }
 
 void ProcessStateInfo::ReadProcStatus() {
-  const string& path = Substitute("/proc/$0/status", getpid());
-  ifstream statusinfo(path.c_str(), ios::in);
+  ifstream statusinfo("/proc/self/status", ios::in);
   string line;
   while (statusinfo.good() && !statusinfo.eof()) {
     getline(statusinfo, line);
@@ -150,25 +148,21 @@ void ProcessStateInfo::ReadProcStatus() {
   if (statusinfo.is_open()) statusinfo.close();
 }
 
-void ProcessStateInfo::ReadProcFileDescriptorInfo() {
-  const string& command = Substitute("ls -l /proc/$0/fd | awk '{print $$(NF-2), $$NF}'",
-      getpid());
-  FILE* fp = popen(command.c_str(), "r");
-  if (fp) {
-    int max_buffer = 1024;
-    char buf[max_buffer];
-    while (!feof(fp)) {
-      if (fgets(buf, max_buffer, fp) != NULL) {
-        string line;
-        line.append(buf);
-        vector<string> fields;
-        split(fields, line, is_any_of(" "), token_compress_on);
-        if (fields.size() < 2) continue;
-        fd_desc_[atoi(fields[0].c_str())] = fields[1];
-      }
+void ProcessStateInfo::ReadProcFileDescriptorCount() {
+  int fd_count = 0;
+  DIR *dir_stream = opendir("/proc/self/fd");
+  if (dir_stream != nullptr)
+  {
+    dirent *dir_entry;
+    // readdir() is not thread-safe according to its man page, but in glibc
+    // calling readdir() on different directory streams is thread-safe.
+    // see: www.gnu.org/software/libc/manual/html_node/Reading_002fClosing-Directory.html
+    while ((dir_entry = readdir(dir_stream)) != nullptr) {
+      if(dir_entry->d_name[0] != '.') ++fd_count; // . and .. do not count
     }
-    pclose(fp);
+    closedir(dir_stream);
   }
+  process_state_map_["fd/count"] = to_string(fd_count);
 }
 
 ProcessStateInfo::ProcessStateInfo() {
@@ -176,7 +170,7 @@ ProcessStateInfo::ProcessStateInfo() {
   ReadProcCgroup();
   ReadProcSched();
   ReadProcStatus();
-  ReadProcFileDescriptorInfo();
+  ReadProcFileDescriptorCount();
 }
 
 string ProcessStateInfo::DebugString() const {
@@ -239,7 +233,7 @@ string ProcessStateInfo::DebugString() const {
          << "    Cpus Allowed List: " << GetString("status/Cpus_allowed_list") << endl
          << "    Mems Allowed List: " << GetString("status/Mems_allowed_list") << endl
          << "  File Descriptors: " << endl
-         << "    Number of File Descriptors: " << fd_desc_.size() << endl;
+         << "    Number of File Descriptors: " << GetInt("fd/count") << endl;
   stream << endl;
   return stream.str();
 }

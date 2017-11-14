@@ -44,6 +44,7 @@ TEST(ProcessStateInfo, Basic) {
   ASSERT_GE(process_state_info.GetBytes("io/read_bytes"), 0);
   ASSERT_GE(process_state_info.GetInt("sched/prio"), 0);
   ASSERT_GE(process_state_info.GetInt("status/Threads"), 0);
+  ASSERT_GT(process_state_info.GetInt("fd/count"), 0);
 }
 
 }
