@@ -36,7 +36,8 @@ import textwrap
 import time
 
 from impala_client import (ImpalaClient, DisconnectedException, QueryStateException,
-                           RPCException, TApplicationException)
+                           RPCException, TApplicationException,
+                           QueryCancelledByShellException)
 from impala_shell_config_defaults import impala_shell_defaults
 from option_parser import get_option_parser, get_config_from_file
 from shell_output import DelimitedOutputFormatter, OutputStream, PrettyOutputFormatter
@@ -484,13 +485,13 @@ class ImpalaShell(object, cmd.Cmd):
     # Create a new connection to the impalad and cancel the query.
     for cancel_try in xrange(ImpalaShell.CANCELLATION_TRIES):
       try:
+        self.imp_client.is_query_cancelled = True
         self.query_handle_closed = True
         print_to_stderr(ImpalaShell.CANCELLATION_MESSAGE)
         new_imp_client = self._new_impala_client()
         new_imp_client.connect()
         new_imp_client.cancel_query(self.last_query_handle, False)
         self.imp_client.close_query(self.last_query_handle)
-        self._validate_database()
         break
       except Exception, e:
         # Suppress harmless errors.
@@ -1037,6 +1038,8 @@ class ImpalaShell(object, cmd.Cmd):
         self.print_runtime_profile(profile)
       except RPCException, e:
         if self.show_profiles: raise e
+      return CmdStatus.SUCCESS
+    except QueryCancelledByShellException, e:
       return CmdStatus.SUCCESS
     except RPCException, e:
       # could not complete the rpc successfully

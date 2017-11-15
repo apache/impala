@@ -325,6 +325,36 @@ class TestImpalaShell(ImpalaTestSuite):
 
     assert "Cancelling Query" in result.stderr, result.stderr
 
+  def test_query_cancellation_during_fetch(self):
+    """IMPALA-1144: Test cancellation (CTRL+C) while results are being
+    fetched"""
+    # A select query where fetch takes several seconds
+    args = '-q "with v as (values (1 as x), (2), (3), (4)) ' + \
+        'select * from v, v v2, v v3, v v4, v v5, v v6, v v7, v v8, ' + \
+        'v v9, v v10, v v11;"'
+    # Kill happens when the results are being fetched
+    self.run_and_verify_query_cancellation_test(args)
+
+  def test_query_cancellation_during_wait_to_finish(self):
+    """IMPALA-1144: Test cancellation (CTRL+C) while the query is in the
+    wait_to_finish state"""
+    # A select where wait_to_finish takes several seconds
+    args = '-q "select * from tpch.customer c1, tpch.customer c2, ' + \
+           'tpch.customer c3 order by c1.c_name"'
+    # Kill happens in wait_to_finish state
+    self.run_and_verify_query_cancellation_test(args)
+
+  def run_and_verify_query_cancellation_test(self, args):
+    """Starts the execution of the received query, waits until the query
+    execution in fact starts and then cancels it. Expects the query
+    cancellation to succeed."""
+    p = ImpalaShell(args)
+    sleep(2.0)
+    os.kill(p.pid(), signal.SIGINT)
+    result = p.get_result()
+    assert "Cancelling Query" in result.stderr
+    assert "Invalid query handle" not in result.stderr
+
   def test_get_log_once(self, empty_table):
     """Test that get_log() is always called exactly once."""
     # Query with fetch
