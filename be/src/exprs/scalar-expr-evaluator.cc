@@ -190,9 +190,11 @@ Status ScalarExprEvaluator::Clone(ObjectPool* pool, RuntimeState* state,
   DCHECK(cloned_evals->empty());
   for (int i = 0; i < evals.size(); ++i) {
     ScalarExprEvaluator* cloned_eval;
-    RETURN_IF_ERROR(
-        evals[i]->Clone(pool, state, expr_perm_pool, expr_results_pool, &cloned_eval));
+    Status status =
+        evals[i]->Clone(pool, state, expr_perm_pool, expr_results_pool, &cloned_eval);
+    // Always add the evaluator to the vector so it can be cleaned up.
     cloned_evals->push_back(cloned_eval);
+    RETURN_IF_ERROR(status);
   }
   return Status::OK();
 }

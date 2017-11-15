@@ -63,6 +63,40 @@ select nine_args_ir(1,2,3,4,5,6,7,8,9);
 Cannot interpret LLVM IR UDF 'nine_args_ir': Codegen is needed. Please set DISABLE_CODEGEN to false.
 ====
 ---- QUERY
+create function if not exists bad_expr(double) returns boolean
+location '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so'
+symbol='BadExpr' prepare_fn='BadExprPrepare' close_fn='BadExprClose';
+---- RESULTS
+====
+---- QUERY
+create function if not exists bad_expr2(double) returns boolean
+location '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so'
+symbol='BadExpr' prepare_fn='BadExpr2Prepare' close_fn='BadExprClose';
+---- RESULTS
+====
+---- QUERY
+select count(t1.int_col) from functional.alltypes t1 join functional.alltypes t2
+on (bad_expr(rand()) = (t2.bool_col && t1.bool_col));
+---- CATCH
+BadExpr prepare error
+====
+---- QUERY
+select count(t1.int_col) from functional.alltypes t1 join functional.alltypes t2
+on (bad_expr2(rand()) = (t2.bool_col && t1.bool_col));
+---- CATCH
+BadExpr error
+====
+---- QUERY
+select count(int_col) from functional.alltypes where bad_expr(rand());
+---- CATCH
+BadExpr prepare error
+====
+---- QUERY
+select count(int_col) from functional.alltypes where bad_expr2(rand());
+---- CATCH
+BadExpr2 prepare error
+====
+---- QUERY
 use default;
 drop database $DATABASE;
 ---- CATCH
@@ -76,5 +110,7 @@ drop function twenty_args(int, int, int, int, int, int, int, int,
 drop function twenty_one_args(int, int, int, int, int, int, int, int,
     int, int, int, int, int, int, int, int, int, int, int, int, int);
 drop function nine_args_ir(int, int, int, int, int, int, int, int, int);
+drop function bad_expr(double);
+drop function bad_expr2(double);
 ---- RESULTS
 ====
