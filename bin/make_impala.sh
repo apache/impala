@@ -35,8 +35,8 @@ MAKE_CMD=make
 MAKE_ARGS="-j${IMPALA_BUILD_THREADS:-4} ${IMPALA_MAKE_FLAGS}"
 
 # The minimal make targets if BUILD_EVERYTHING is 0.
-MAKE_TARGETS="impalad statestored catalogd fesupport loggingsupport ImpalaUdf"
-
+MAKE_TARGETS="impalad statestored catalogd fesupport loggingsupport ImpalaUdf \
+    udasample udfsample"
 # parse command line options
 for ARG in $*
 do
