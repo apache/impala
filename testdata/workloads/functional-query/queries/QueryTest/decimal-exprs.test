@@ -298,3 +298,18 @@ select
 ---- TYPES
 DOUBLE,DOUBLE,DOUBLE
 ====
+---- QUERY
+# IMPALA-5936: big decimal numbers with % operator
+set decimal_v2=true;
+select
+cast(42607032167 as decimal(18, 0)) % 3,
+cast(42606774111 as decimal(18, 0)) % 3,
+cast(42363009429 as decimal(18, 0)) % 3,
+cast(42603003271 as decimal(18, 0)) % 3,
+cast(42606961501 as decimal(18, 0)) % 3,
+cast(42608445511 as decimal(18, 0)) % 3
+---- RESULTS
+2,0,0,1,1,1
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
+====
