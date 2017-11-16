@@ -226,7 +226,7 @@ class TestTopNReclaimQuery(ImpalaTestSuite):
 
   # Mem limit empirically selected so that the query fails if tuple pool reclamation
   # is not implemented for TopN
-  MEM_LIMIT = "50m"
+  MEM_LIMIT = "60m"
 
   @classmethod
   def get_workload(self):
@@ -243,6 +243,7 @@ class TestTopNReclaimQuery(ImpalaTestSuite):
   def test_top_n_reclaim(self, vector):
     exec_options = vector.get_value('exec_option')
     exec_options['mem_limit'] = self.MEM_LIMIT
+    exec_options['num_scanner_threads'] = 1
     result = self.execute_query(self.QUERY, exec_options)
     runtime_profile = str(result.runtime_profile)
     num_of_times_tuple_pool_reclaimed = re.findall(
