@@ -192,9 +192,9 @@ LlvmCodeGen::LlvmCodeGen(RuntimeState* state, ObjectPool* pool,
     is_corrupt_(false),
     is_compiled_(false),
     context_(new llvm::LLVMContext()),
-    module_(NULL),
-    memory_manager_(NULL),
-    loaded_functions_(IRFunction::FN_END, NULL) {
+    module_(nullptr),
+    memory_manager_(nullptr),
+    cross_compiled_functions_(IRFunction::FN_END, nullptr) {
   DCHECK(llvm_initialized_) << "Must call LlvmCodeGen::InitializeLlvm first.";
 
   context_->setDiagnosticHandler(&DiagnosticHandler::DiagnosticHandlerFn, this);
@@ -472,8 +472,8 @@ string LlvmCodeGen::GetIR(bool full_module) const {
   if (full_module) {
     module_->print(stream, NULL);
   } else {
-    for (int i = 0; i < codegend_functions_.size(); ++i) {
-      codegend_functions_[i]->print(stream, nullptr, false, true);
+    for (int i = 0; i < handcrafted_functions_.size(); ++i) {
+      handcrafted_functions_[i]->print(stream, nullptr, false, true);
     }
   }
   return str;
@@ -668,16 +668,16 @@ llvm::Function* LlvmCodeGen::GetFunction(const string& symbol, bool clone) {
 }
 
 llvm::Function* LlvmCodeGen::GetFunction(IRFunction::Type ir_type, bool clone) {
-  llvm::Function* fn = loaded_functions_[ir_type];
+  llvm::Function* fn = cross_compiled_functions_[ir_type];
   if (fn == NULL) {
-    DCHECK(FN_MAPPINGS[ir_type].fn == ir_type);
+    DCHECK_EQ(FN_MAPPINGS[ir_type].fn, ir_type);
     const string& fn_name = FN_MAPPINGS[ir_type].fn_name;
     fn = module_->getFunction(fn_name);
     if (fn == NULL) {
       LOG(ERROR) << "Unable to locate function " << fn_name;
       return NULL;
     }
-    loaded_functions_[ir_type] = fn;
+    cross_compiled_functions_[ir_type] = fn;
   }
   Status status = MaterializeFunction(fn);
   if (UNLIKELY(!status.ok())) return NULL;
@@ -760,7 +760,7 @@ LlvmCodeGen::FnPrototype::FnPrototype(
 }
 
 llvm::Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
-    LlvmBuilder* builder, llvm::Value** params, bool print_ir) {
+    LlvmBuilder* builder, llvm::Value** params) {
   vector<llvm::Type*> arguments;
   for (int i = 0; i < args_.size(); ++i) {
     arguments.push_back(args_[i].type);
@@ -782,10 +782,11 @@ llvm::Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
   if (builder != NULL) {
     llvm::BasicBlock* entry_block =
         llvm::BasicBlock::Create(codegen_->context(), "entry", fn);
+    // Add it to the llvm module via the builder and to the list of handcrafted functions
+    // that are a part of the module.
     builder->SetInsertPoint(entry_block);
+    codegen_->handcrafted_functions_.push_back(fn);
   }
-
-  if (print_ir) codegen_->codegend_functions_.push_back(fn);
   return fn;
 }
 
@@ -855,7 +856,7 @@ Status LlvmCodeGen::LoadFunction(const TFunction& fn, const std::string& symbol,
     // Create a Function* with the generated type. This is only a function
     // declaration, not a definition, since we do not create any basic blocks or
     // instructions in it.
-    *llvm_fn = prototype.GeneratePrototype(NULL, NULL, false);
+    *llvm_fn = prototype.GeneratePrototype(nullptr, nullptr);
 
     // Associate the dynamically loaded function pointer with the Function* we defined.
     // This tells LLVM where the compiled function definition is located in memory.
@@ -900,6 +901,9 @@ int LlvmCodeGen::ReplaceCallSites(
   DCHECK(caller->getParent() == module_);
   DCHECK(caller != NULL);
   DCHECK(new_fn != NULL);
+  DCHECK(find(handcrafted_functions_.begin(), handcrafted_functions_.end(), new_fn)
+          == handcrafted_functions_.end()
+      || finalized_functions_.find(new_fn) != finalized_functions_.end());
 
   vector<llvm::CallInst*> call_sites;
   FindCallSites(caller, target_name, &call_sites);
@@ -1014,6 +1018,7 @@ llvm::Function* LlvmCodeGen::FinalizeFunction(llvm::Function* function) {
     function->eraseFromParent(); // deletes function
     return NULL;
   }
+  finalized_functions_.insert(function);
   if (FLAGS_dump_ir) function->dump();
   return function;
 }
@@ -1069,6 +1074,24 @@ Status LlvmCodeGen::FinalizeModule() {
 
   if (is_corrupt_) return Status("Module is corrupt.");
   SCOPED_TIMER(profile_->total_time_counter());
+
+  // Clean up handcrafted functions that have not been finalized. Clean up is done by
+  // deleting the function from the module. Any reference to deleted functions in the
+  // module will crash LLVM and thus Impala during finalization of the module.
+  stringstream ss;
+  for (llvm::Function* fn : handcrafted_functions_) {
+    if (finalized_functions_.find(fn) == finalized_functions_.end()) {
+      ss << fn->getName().str() << "\n";
+      fn->eraseFromParent();
+    }
+  }
+  string non_finalized_fns_str = ss.str();
+  if (!non_finalized_fns_str.empty()) {
+    LOG(INFO) << "For query " << state_->query_id()
+              << " the following functions were not finalized and have been removed from "
+                 "the module:\n"
+              << non_finalized_fns_str;
+  }
 
   // Don't waste time optimizing module if there are no functions to JIT. This can happen
   // if the codegen object is created but no functions are successfully codegen'd.
@@ -1210,8 +1233,8 @@ Status LlvmCodeGen::OptimizeModule() {
 
 void LlvmCodeGen::DestroyModule() {
   // Clear all references to LLVM objects owned by the module.
-  loaded_functions_.clear();
-  codegend_functions_.clear();
+  cross_compiled_functions_.clear();
+  handcrafted_functions_.clear();
   registered_exprs_map_.clear();
   registered_exprs_.clear();
   llvm_intrinsics_.clear();
@@ -1222,6 +1245,8 @@ void LlvmCodeGen::DestroyModule() {
 }
 
 void LlvmCodeGen::AddFunctionToJit(llvm::Function* fn, void** fn_ptr) {
+  DCHECK(finalized_functions_.find(fn) != finalized_functions_.end())
+      << "Attempted to add a non-finalized function to Jit: " << fn->getName().str();
   llvm::Type* decimal_val_type = GetType(CodegenAnyVal::LLVM_DECIMALVAL_NAME);
   if (fn->getReturnType() == decimal_val_type) {
     // Per the x86 calling convention ABI, DecimalVals should be returned via an extra

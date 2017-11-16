@@ -438,6 +438,7 @@ Status ScalarFnCall::GetFunction(LlvmCodeGen* codegen, const string& symbol, voi
          << fn_.hdfs_location;
       return Status(ss.str());
     }
+    ir_fn = codegen->FinalizeFunction(ir_fn);
     codegen->AddFunctionToJit(ir_fn, fn);
     return Status::OK();
   }

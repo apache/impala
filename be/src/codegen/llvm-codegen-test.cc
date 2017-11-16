@@ -106,6 +106,11 @@ class LlvmCodeGenTest : public testing:: Test {
   static Status LinkModuleFromHdfs(LlvmCodeGen* codegen, const string& hdfs_file) {
     return codegen->LinkModuleFromHdfs(hdfs_file);
   }
+
+  static bool ContainsHandcraftedFn(LlvmCodeGen* codegen, llvm::Function* function) {
+    const auto& hf = codegen->handcrafted_functions_;
+    return find(hf.begin(), hf.end(), function) != hf.end();
+  }
 };
 
 // Simple test to just make and destroy llvmcodegen objects.  LLVM
@@ -163,7 +168,7 @@ llvm::Function* CodegenInnerLoop(
   builder.CreateStore(incremented_value, counter_ptr);
   builder.CreateRetVoid();
 
-  return jitted_loop_call;
+  return codegen->FinalizeFunction(jitted_loop_call);
 }
 
 // This test loads a precompiled IR file (compiled from testdata/llvm/test-loop.cc).
@@ -303,7 +308,7 @@ llvm::Function* CodegenStringTest(LlvmCodeGen* codegen) {
   builder.CreateStore(codegen->GetIntConstant(TYPE_INT, 1), len_ptr);
   builder.CreateRet(len);
 
-  return interop_fn;
+  return codegen->FinalizeFunction(interop_fn);
 }
 
 // This test validates that the llvm StringValue struct matches the c++ stringvalue
@@ -324,7 +329,6 @@ TEST_F(LlvmCodeGenTest, StringValue) {
 
   llvm::Function* string_test_fn = CodegenStringTest(codegen.get());
   EXPECT_TRUE(string_test_fn != NULL);
-  EXPECT_TRUE(VerifyFunction(codegen.get(), string_test_fn));
 
   // Jit compile function
   void* jitted_fn = NULL;
@@ -505,6 +509,28 @@ TEST_F(LlvmCodeGenTest, CpuAttrWhitelist) {
          "+avx512cd", "+avx512vbmi", "+avx512pf"}));
 }
 
+// Test that exercises the code path that deletes non-finalized methods before it
+// finalizes the llvm module.
+TEST_F(LlvmCodeGenTest, CleanupNonFinalizedMethodsTest) {
+  scoped_ptr<LlvmCodeGen> codegen;
+  ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(runtime_state_, nullptr, "test", &codegen));
+  ASSERT_TRUE(codegen.get() != nullptr);
+  const auto close_codegen = MakeScopeExitTrigger([&codegen]() { codegen->Close(); });
+  LlvmBuilder builder(codegen->context());
+  LlvmCodeGen::FnPrototype incomplete_prototype(
+      codegen.get(), "IncompleteFn", codegen->void_type());
+  LlvmCodeGen::FnPrototype complete_prototype(
+      codegen.get(), "CompleteFn", codegen->void_type());
+  llvm::Function* incomplete_fn =
+      incomplete_prototype.GeneratePrototype(&builder, nullptr);
+  llvm::Function* complete_fn = complete_prototype.GeneratePrototype(&builder, nullptr);
+  builder.CreateRetVoid();
+  complete_fn = codegen->FinalizeFunction(complete_fn);
+  EXPECT_TRUE(complete_fn != nullptr);
+  ASSERT_TRUE(ContainsHandcraftedFn(codegen.get(), incomplete_fn));
+  ASSERT_TRUE(ContainsHandcraftedFn(codegen.get(), complete_fn));
+  ASSERT_OK(FinalizeModule(codegen.get()));
+}
 }
 
 int main(int argc, char **argv) {

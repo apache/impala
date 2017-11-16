@@ -736,7 +736,7 @@ Status HdfsTextScanner::CheckForSplitDelimiter(bool* split_delimiter) {
 }
 
 // Codegen for materializing parsed data into tuples.  The function WriteCompleteTuple is
-// codegen'd using the IRBuilder for the specific tuple description.  This function
+// handcrafted using the IRBuilder for the specific tuple description.  This function
 // is then injected into the cross-compiled driving function, WriteAlignedTuples().
 Status HdfsTextScanner::Codegen(HdfsScanNodeBase* node,
     const vector<ScalarExpr*>& conjuncts, llvm::Function** write_aligned_tuples_fn) {
