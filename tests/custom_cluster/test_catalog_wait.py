@@ -19,7 +19,9 @@ import pytest
 
 from time import sleep
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import SkipIfBuildType
 
+@SkipIfBuildType.not_dev_build
 class TestCatalogWait(CustomClusterTestSuite):
   """Impalad coordinators must wait for their local replica of the catalog to be
      initialized from the statestore prior to opening up client ports.
