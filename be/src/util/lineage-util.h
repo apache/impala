@@ -79,6 +79,8 @@ class LineageUtil {
       writer.StartObject();
       writer.String("queryText");
       writer.String(lineage.query_text.c_str());
+      writer.String("queryId");
+      writer.String(PrintId(lineage.query_id).c_str());
       writer.String("hash");
       writer.String(lineage.hash.c_str());
       writer.String("user");

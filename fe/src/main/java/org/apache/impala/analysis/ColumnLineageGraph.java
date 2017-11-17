@@ -40,7 +40,9 @@ import org.apache.impala.thrift.TEdgeType;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TMultiEdge;
+import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TVertex;
+import org.apache.impala.util.TUniqueIdUtil;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -287,6 +289,8 @@ public class ColumnLineageGraph {
   // Query statement
   private String queryStr_;
 
+  private TUniqueId queryId_;
+
   // Name of the user that issued this query
   private String user_;
 
@@ -320,8 +324,10 @@ public class ColumnLineageGraph {
   /**
    * Private c'tor, used only for testing.
    */
-  private ColumnLineageGraph(String stmt, String user, long timestamp) {
+  private ColumnLineageGraph(String stmt, TUniqueId queryId, String user, long timestamp)
+  {
     queryStr_ = stmt;
+    queryId_ = queryId;
     user_ = user;
     timestamp_ = timestamp;
   }
@@ -394,6 +400,7 @@ public class ColumnLineageGraph {
     timestamp_ = queryCtx.start_unix_millis / 1000;
     descTbl_ = analyzer.getDescTbl();
     user_ = analyzer.getUser().getName();
+    queryId_ = queryCtx.query_id;
   }
 
   private void computeProjectionDependencies(List<Expr> resultExprs) {
@@ -525,6 +532,7 @@ public class ColumnLineageGraph {
     if (Strings.isNullOrEmpty(queryStr_)) return "";
     Map obj = new LinkedHashMap();
     obj.put("queryText", queryStr_);
+    obj.put("queryId", TUniqueIdUtil.PrintId(queryId_));
     obj.put("hash", getQueryHash(queryStr_));
     obj.put("user", user_);
     obj.put("timestamp", timestamp_);
@@ -551,6 +559,7 @@ public class ColumnLineageGraph {
     TLineageGraph graph = new TLineageGraph();
     if (Strings.isNullOrEmpty(queryStr_)) return graph;
     graph.setQuery_text(queryStr_);
+    graph.setQuery_id(queryId_);
     graph.setHash(getQueryHash(queryStr_));
     graph.setUser(user_);
     graph.setStarted(timestamp_);
@@ -575,7 +584,7 @@ public class ColumnLineageGraph {
    */
   public static ColumnLineageGraph fromThrift(TLineageGraph obj) {
     ColumnLineageGraph lineage =
-        new ColumnLineageGraph(obj.query_text, obj.user, obj.started);
+        new ColumnLineageGraph(obj.query_text, obj.query_id, obj.user, obj.started);
     TreeSet<Vertex> vertices = Sets.newTreeSet();
     for (TVertex vertex: obj.vertices) {
       vertices.add(Vertex.fromThrift(vertex));
@@ -611,10 +620,10 @@ public class ColumnLineageGraph {
     if (!(obj instanceof JSONObject)) return null;
     JSONObject jsonObj = (JSONObject) obj;
     String stmt = (String) jsonObj.get("queryText");
-    String hash = (String) jsonObj.get("hash");
+    TUniqueId queryId = TUniqueIdUtil.ParseId((String) jsonObj.get("queryId"));
     String user = (String) jsonObj.get("user");
     long timestamp = (Long) jsonObj.get("timestamp");
-    ColumnLineageGraph graph = new ColumnLineageGraph(stmt, user, timestamp);
+    ColumnLineageGraph graph = new ColumnLineageGraph(stmt, queryId, user, timestamp);
     JSONArray serializedVertices = (JSONArray) jsonObj.get("vertices");
     Set<Vertex> vertices = Sets.newHashSet();
     for (int i = 0; i < serializedVertices.size(); ++i) {

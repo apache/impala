@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import pytest
+import re
 import shutil
 import stat
 import tempfile
@@ -33,7 +34,7 @@ LOG = logging.getLogger(__name__)
 
 class TestLineage(CustomClusterTestSuite):
 
-  lineage_log_dir = tempfile.mkdtemp();
+  lineage_log_dir = tempfile.mkdtemp()
 
   query = """
       select count(*) from functional.alltypes
@@ -45,7 +46,7 @@ class TestLineage(CustomClusterTestSuite):
 
   @classmethod
   def teardown_class(cls):
-    shutil.rmtree(cls.lineage_log_dir);
+    shutil.rmtree(cls.lineage_log_dir)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--lineage_event_log_dir=%s" % lineage_log_dir)
@@ -54,7 +55,8 @@ class TestLineage(CustomClusterTestSuite):
        UNIX times."""
     LOG.info("lineage_event_log_dir is " + self.lineage_log_dir)
     before_time = int(time.time())
-    self.execute_query_expect_success(self.client, self.query)
+    result = self.execute_query_expect_success(self.client, self.query)
+    profile_query_id = re.search("Query \(id=(.*)\):", result.runtime_profile).group(1)
     after_time = int(time.time())
     LOG.info("before_time " + str(before_time) + " after_time " + str(after_time))
 
@@ -68,6 +70,7 @@ class TestLineage(CustomClusterTestSuite):
         LOG.info("examining file: " + log_path)
         with open(log_path) as log_file:
           lineage_json = json.load(log_file)
+          assert lineage_json["queryId"] == profile_query_id
           timestamp = int(lineage_json["timestamp"])
           end_time = int(lineage_json["endTime"])
           assert before_time <= timestamp

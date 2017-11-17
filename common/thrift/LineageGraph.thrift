@@ -18,6 +18,8 @@
 namespace cpp impala
 namespace java org.apache.impala.thrift
 
+include "Types.thrift"
+
 struct TVertex {
   // Vertex id
   1: required i64 id
@@ -62,4 +64,7 @@ struct TLineageGraph {
   6: list<TMultiEdge> edges
 
   7: list<TVertex> vertices
+
+  // Query id in TQueryCtx
+  8: required Types.TUniqueId query_id
 }
