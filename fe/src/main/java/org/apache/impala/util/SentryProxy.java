@@ -134,15 +134,22 @@ public class SentryProxy {
             } else {
               role = catalog_.addRole(sentryRole.getRoleName(), grantGroups);
             }
-
             // Assume all privileges should be removed. Privileges that still exist are
             // deleted from this set and we are left with the set of privileges that need
             // to be removed.
             Set<String> privilegesToRemove = role.getPrivilegeNames();
+            List<TSentryPrivilege> sentryPrivlist = Lists.newArrayList();
+
+            try {
+              sentryPrivlist =
+                sentryPolicyService_.listRolePrivileges(processUser_, role.getName());
+            } catch (ImpalaException e) {
+              String roleName = role.getName() != null ? role.getName(): "null";
+              LOG.error("Error listing the Role name: " + roleName, e);
+            }
 
             // Check all the privileges that are part of this role.
-            for (TSentryPrivilege sentryPriv:
-                sentryPolicyService_.listRolePrivileges(processUser_, role.getName())) {
+            for (TSentryPrivilege sentryPriv: sentryPrivlist) {
               TPrivilege thriftPriv =
                   SentryPolicyService.sentryPrivilegeToTPrivilege(sentryPriv);
               thriftPriv.setRole_id(role.getId());
