@@ -375,6 +375,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
         // TODO: add a fast path here if there's a run of repeated values.
         parent_->parse_status_.MergeStatus(
             def_levels_.CacheNextBatch(num_buffered_values_));
+        if (UNLIKELY(!parent_->parse_status_.ok())) return false;
       }
 
       // Read data page and cached levels to materialize values.
