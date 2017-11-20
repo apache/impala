@@ -47,7 +47,7 @@ class IntegrityHash {
 /// The key and initialization vector (IV) required to encrypt and decrypt a buffer of
 /// data. This should be regenerated for each buffer of data.
 ///
-/// We use AES with a 256-bit key and CTR cipher block mode, which gives us a stream
+/// We use AES with a 256-bit key and CFB cipher block mode, which gives us a stream
 /// cipher that can support arbitrary-length ciphertexts. The IV is used as an input to
 /// the cipher as the "block to supply before the first block of plaintext". This is
 /// required because all ciphers (except the weak ECB) are built such that each block
@@ -59,7 +59,7 @@ class EncryptionKey {
   EncryptionKey() : initialized_(false) {}
 
   /// Initialize a key for temporary use with randomly generated data. Reinitializes with
-  /// new random values if the key was already initialized. We use AES-CTR mode so key/IV
+  /// new random values if the key was already initialized. We use AES-CFB mode so key/IV
   /// pairs should not be reused. This function automatically reseeds the RNG
   /// periodically, so callers do not need to do it.
   void InitializeRandom();
@@ -83,9 +83,6 @@ class EncryptionKey {
   /// otherwise the buffers must not overlap.
   Status EncryptInternal(bool encrypt, const uint8_t* data, int64_t len,
       uint8_t* out) const WARN_UNUSED_RESULT;
-
-  /// check if CTR mode is supported at runtime
-  bool IsCtrSupported() const;
 
   /// Track whether this key has been initialized, to avoid accidentally using
   /// uninitialized keys.

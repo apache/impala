@@ -99,15 +99,13 @@ Status EncryptionKey::EncryptInternal(
   EVP_CIPHER_CTX_init(&ctx);
   EVP_CIPHER_CTX_set_padding(&ctx, 0);
 
-  // Start encryption/decryption.  We use a 256-bit AES key, and the cipher block mode
-  // is CTR. CTR is a stream cipher, which supports
-  //   (1). arbitrary length ciphertexts - it doesn't have to be a multiple of 16 bytes.
-  //   (2). well-optimized(instruction level parallelism) with
-  //        hardware acceleration on x86 or PowerPC
-  const EVP_CIPHER* evpCipher = IsCtrSupported() ? EVP_aes_256_ctr() : EVP_aes_256_cfb();
-  int success = encrypt ? EVP_EncryptInit_ex(&ctx, evpCipher, NULL, key_, iv_) :
-                          EVP_DecryptInit_ex(&ctx, evpCipher, NULL, key_, iv_);
+  int success;
 
+  // Start encryption/decryption.  We use a 256-bit AES key, and the cipher block mode
+  // is CFB because this gives us a stream cipher, which supports arbitrary
+  // length ciphertexts - it doesn't have to be a multiple of 16 bytes.
+  success = encrypt ? EVP_EncryptInit_ex(&ctx, EVP_aes_256_cfb(), NULL, key_, iv_) :
+                      EVP_DecryptInit_ex(&ctx, EVP_aes_256_cfb(), NULL, key_, iv_);
   if (success != 1) {
     return OpenSSLErr(encrypt ? "EVP_EncryptInit_ex" : "EVP_DecryptInit_ex");
   }
@@ -124,7 +122,7 @@ Status EncryptionKey::EncryptInternal(
     if (success != 1) {
       return OpenSSLErr(encrypt ? "EVP_EncryptUpdate" : "EVP_DecryptUpdate");
     }
-    // This is safe because we're using CTR mode without padding.
+    // This is safe because we're using CFB mode without padding.
     DCHECK_EQ(in_len, out_len);
     offset += in_len;
   }
@@ -136,14 +134,8 @@ Status EncryptionKey::EncryptInternal(
   if (success != 1) {
     return OpenSSLErr(encrypt ? "EVP_EncryptFinal" : "EVP_DecryptFinal");
   }
-  // Again safe due to CTR with no padding
+  // Again safe due to CFB with no padding
   DCHECK_EQ(final_out_len, 0);
   return Status::OK();
-}
-
-#define OPENSSL_VERSION_1_0_1 0x1000100L
-bool EncryptionKey::IsCtrSupported() const {
-  // aes_256_ctr was supported since v1.0.1
-  return (SSLeay() >= OPENSSL_VERSION_1_0_1);
 }
 }
