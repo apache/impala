@@ -111,6 +111,9 @@ testdata/data/widerow.txt
 testdata/data/local_tbl/00000.txt
 testdata/datasets/functional/functional_schema_template.sql
 testdata/hive_benchmark/grepTiny/part-00000
+testdata/tzdb/2017c.zip
+testdata/tzdb/2017c-corrupt.zip
+testdata/tzdb_tiny/*
 tests/pytest.ini
 tests/shell/bad_impalarc
 tests/shell/good_impalarc

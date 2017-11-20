@@ -180,6 +180,7 @@ set (SRC_FILES
   Results.thrift
   RuntimeProfile.thrift
   StatestoreService.thrift
+  Zip.thrift
   ${TCLI_SERVICE_THRIFT}
   ${EXT_DATA_SRC_FILES}
 )

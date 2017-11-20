@@ -87,6 +87,7 @@ add_library(Util
   url-parser.cc
   ${SQUEASEL_SRC_DIR}/squeasel.c
   webserver.cc
+  zip-util.cc
   ${MUSTACHE_SRC_DIR}/mustache.cc
   ${MPFIT_SRC_DIR}/mpfit.c
 )
@@ -144,3 +145,4 @@ ADD_BE_LSAN_TEST(thread-pool-test)
 ADD_BE_LSAN_TEST(time-test)
 ADD_BE_LSAN_TEST(uid-util-test)
 ADD_BE_LSAN_TEST(webserver-test)
+ADD_BE_LSAN_TEST(zip-util-test)

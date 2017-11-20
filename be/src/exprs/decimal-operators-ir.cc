@@ -24,6 +24,7 @@
 #include "codegen/impala-ir.h"
 #include "exprs/anyval-util.h"
 #include "exprs/scalar-expr.h"
+#include "exprs/timezone_db.h"
 #include "runtime/decimal-value.inline.h"
 #include "util/decimal-util.h"
 #include "util/string-parser.h"
@@ -633,7 +634,7 @@ IR_ALWAYS_INLINE int32_t DecimalOperators::ConvertToNanoseconds(
 
 template <typename T>
 TimestampVal DecimalOperators::ConvertToTimestampVal(
-    const T& decimal_value, int scale, bool round) {
+    const T& decimal_value, int scale, bool round, const Timezone& local_tz) {
   typename T::StorageType seconds = decimal_value.whole_part(scale);
   if (seconds < numeric_limits<int64_t>::min() ||
       seconds > numeric_limits<int64_t>::max()) {
@@ -644,7 +645,8 @@ TimestampVal DecimalOperators::ConvertToTimestampVal(
       ConvertToNanoseconds(decimal_value.fractional_part(scale), scale, round);
   if (decimal_value.is_negative()) nanoseconds *= -1;
   TimestampVal result;
-  TimestampValue::FromUnixTimeNanos(seconds, nanoseconds).ToTimestampVal(&result);
+  TimestampValue::FromUnixTimeNanos(
+      seconds, nanoseconds, local_tz).ToTimestampVal(&result);
   return result;
 }
 
@@ -655,14 +657,18 @@ TimestampVal DecimalOperators::CastToTimestampVal(
   int precision = ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_PRECISION, 0);
   int scale = ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_SCALE, 0);
   bool is_decimal_v2 = ctx->impl()->GetConstFnAttr(FunctionContextImpl::DECIMAL_V2);
+  const Timezone& local_tz = ctx->impl()->state()->local_time_zone();
   TimestampVal result;
   switch (ColumnType::GetDecimalByteSize(precision)) {
     case 4:
-      return ConvertToTimestampVal(Decimal4Value(val.val4), scale, is_decimal_v2);
+      return ConvertToTimestampVal(Decimal4Value(val.val4), scale, is_decimal_v2,
+          local_tz);
     case 8:
-      return ConvertToTimestampVal(Decimal8Value(val.val8), scale, is_decimal_v2);
+      return ConvertToTimestampVal(Decimal8Value(val.val8), scale, is_decimal_v2,
+          local_tz);
     case 16:
-      return ConvertToTimestampVal(Decimal16Value(val.val16), scale, is_decimal_v2);
+      return ConvertToTimestampVal(Decimal16Value(val.val16), scale, is_decimal_v2,
+          local_tz);
     default:
       DCHECK(false);
       return TimestampVal::null();

@@ -54,6 +54,7 @@
 #include "util/test-info.h"
 #include "util/thread.h"
 #include "util/time.h"
+#include "util/zip-util.h"
 
 #include "common/names.h"
 
@@ -256,6 +257,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   if (init_jvm) {
     ABORT_IF_ERROR(JniUtil::Init());
     InitJvmLoggingSupport();
+    ZipUtil::InitJvm();
   }
 
   if (argc == -1) {

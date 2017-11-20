@@ -21,6 +21,7 @@
 #include <sstream>
 #include <cstdlib>
 
+#include "exprs/timezone_db.h"
 #include "util/time.h"
 
 using namespace impala;
@@ -30,14 +31,36 @@ void impala::SleepForMs(const int64_t duration_ms) {
   this_thread::sleep_for(chrono::milliseconds(duration_ms));
 }
 
-// Convert the given time_point, 't', into a date-time string in the
+static inline time_t GetSecond(const chrono::system_clock::time_point& t) {
+  return chrono::system_clock::to_time_t(t);
+}
+
+static inline int64_t GetSubSecond(const chrono::system_clock::time_point& t,
+    TimePrecision p) {
+  auto frac = t.time_since_epoch();
+  if (p == TimePrecision::Millisecond) {
+    auto subsec = chrono::duration_cast<chrono::milliseconds>(frac) % MILLIS_PER_SEC;
+    return subsec.count();
+  } else if (p == TimePrecision::Microsecond) {
+    auto subsec = chrono::duration_cast<chrono::microseconds>(frac) % MICROS_PER_SEC;
+    return subsec.count();
+  } else if (p == TimePrecision::Nanosecond) {
+    auto subsec = chrono::duration_cast<chrono::nanoseconds>(frac) % NANOS_PER_SEC;
+    return subsec.count();
+  } else {
+    return 0;
+  }
+}
+
+// Convert the given 'second' unix timestamp, into a date-time string in the
 // UTC time zone if 'utc' is true, or the local time zone if it is false.
 // The returned string is of the form yyy-MM-dd HH::mm::SS.
-static string TimepointToString(const chrono::system_clock::time_point& t,
-    bool utc) {
+// Note that for time points before the Unix epoch, 'subsecond' might have a negative
+// value. In this case 'second' has to be adjusted.
+static string FormatSecond(time_t second, int64_t subsecond, bool utc) {
   char buf[256];
   struct tm tmp;
-  auto input_time = chrono::system_clock::to_time_t(t);
+  auto input_time = (subsecond < 0) ? second - 1 : second;
 
   // gcc 4.9 does not support C++14 get_time and put_time functions, so we're
   // stuck with strftime() for now.
@@ -49,24 +72,21 @@ static string TimepointToString(const chrono::system_clock::time_point& t,
   return string(buf);
 }
 
-// Format the sub-second part of the input time point object 't', at the
-// precision specified by 'p'. The returned string is meant to be appended to
-// the string returned by TimePointToString() above.
-// Note the use of abs(). This is to make sure we correctly format negative times,
-// i.e., times before the Unix epoch.
-static string FormatSubSecond(const chrono::system_clock::time_point& t,
-    TimePrecision p) {
+// Format the sub-second part of a time point, at the precision specified by 'p'. The
+// returned string is meant to be appended to the string returned by FormatSecond()
+// above. Note that for time points before the Unix epoch 'subsecond' might have a
+// negative value. In this case 'subsecond' has to be adjusted based on the precision.
+static string FormatSubSecond(int64_t subsecond, TimePrecision p) {
   stringstream ss;
-  auto frac = t.time_since_epoch();
   if (p == TimePrecision::Millisecond) {
-    auto subsec = chrono::duration_cast<chrono::milliseconds>(frac) % MILLIS_PER_SEC;
-    ss << "." << std::setfill('0') << std::setw(3) << abs(subsec.count());
+    if (subsecond < 0) subsecond = 1000 + subsecond;
+    ss << "." << std::setfill('0') << std::setw(3) << subsecond;
   } else if (p == TimePrecision::Microsecond) {
-    auto subsec = chrono::duration_cast<chrono::microseconds>(frac) % MICROS_PER_SEC;
-    ss << "." << std::setfill('0') << std::setw(6) << abs(subsec.count());
+    if (subsecond < 0) subsecond = 1000000 + subsecond;
+    ss << "." << std::setfill('0') << std::setw(6) << subsecond;
   } else if (p == TimePrecision::Nanosecond) {
-    auto subsec = chrono::duration_cast<chrono::nanoseconds>(frac) % NANOS_PER_SEC;
-    ss << "." << std::setfill('0') << std::setw(9) << abs(subsec.count());
+    if (subsecond < 0) subsecond = 1000000000 + subsecond;
+    ss << "." << std::setfill('0') << std::setw(9) << subsecond;
   } else {
     // 1-second precision or unknown unit. Return empty string.
     DCHECK_EQ(TimePrecision::Second, p);
@@ -79,11 +99,12 @@ static string FormatSubSecond(const chrono::system_clock::time_point& t,
 // Output string is in UTC time zone if 'utc' is true, else it is in the
 // local time zone.
 static string ToString(const chrono::system_clock::time_point& t, TimePrecision p,
-    bool utc)
-{
+    bool utc) {
   stringstream ss;
-  ss << TimepointToString(t, utc);
-  ss << FormatSubSecond(t, p);
+  time_t second = GetSecond(t);
+  int64_t subsecond = GetSubSecond(t, p);
+  ss << FormatSecond(second, subsecond, utc);
+  ss << FormatSubSecond(subsecond, p);
   return ss.str();
 }
 
@@ -133,4 +154,24 @@ string impala::ToStringFromUnixMicros(int64_t us, TimePrecision p) {
 string impala::ToUtcStringFromUnixMicros(int64_t us, TimePrecision p) {
   chrono::system_clock::time_point t = TimepointFromUnixMicros(us);
   return ToString(t, p, true);
+}
+
+string impala::ToStringFromUnixMicros(int64_t us, const Timezone& tz,
+    TimePrecision p) {
+  chrono::system_clock::time_point t = TimepointFromUnixMicros(us);
+  const char* fmt;
+  switch (p) {
+    case TimePrecision::Millisecond:
+      fmt = "%Y-%m-%d %H:%M:%E3S";
+      break;
+    case TimePrecision::Microsecond:
+      fmt = "%Y-%m-%d %H:%M:%E6S";
+      break;
+    case TimePrecision::Nanosecond:
+      fmt = "%Y-%m-%d %H:%M:%E9S";
+      break;
+    default:
+      fmt = "%Y-%m-%d %H:%M:%S";
+  }
+  return cctz::format(fmt, t, tz);
 }

@@ -68,6 +68,7 @@ add_dependencies(Exprs gen-deps gen_ir_descriptions)
 
 ADD_BE_LSAN_TEST(expr-test)
 ADD_BE_LSAN_TEST(expr-codegen-test)
+ADD_BE_LSAN_TEST(timezone_db-test)
 
 # expr-codegen-test includes test IR functions
 COMPILE_TO_IR(expr-codegen-test.cc)

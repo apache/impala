@@ -422,6 +422,11 @@ struct TQueryCtx {
   // String containing a timestamp (in UTC) set as the query submission time. It
   // represents the same point in time as now_string
   17: required string utc_timestamp_string
+
+  // String containing name of the local timezone.
+  // It is guaranteed to be a valid timezone on the coordinator (but not necessarily on
+  // the executor, since in theory the executor could have a different timezone db).
+  18: required string local_time_zone
 }
 
 // Specification of one output destination of a plan fragment

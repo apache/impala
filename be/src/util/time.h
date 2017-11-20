@@ -22,6 +22,7 @@
 #include <time.h>
 #include <string>
 
+#include "common/global-types.h"
 #include "gutil/walltime.h"
 
 /// Utilities for collecting timings.
@@ -114,6 +115,11 @@ std::string ToStringFromUnixMicros(int64_t us,
 
 /// Converts input microseconds-since-epoch to date-time string in UTC time zone.
 std::string ToUtcStringFromUnixMicros(int64_t us,
+    TimePrecision p = TimePrecision::Microsecond);
+
+/// Converts input microseconds-since-epoch to date-time string in 'tz' time zone.
+/// In the returned string fractional seconds are padded to precision 'p'.
+std::string ToStringFromUnixMicros(int64_t us, const Timezone& tz,
     TimePrecision p = TimePrecision::Microsecond);
 
 /// Convenience function to convert the current time, derived from UnixMicros(),

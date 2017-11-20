@@ -25,6 +25,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/regex.hpp>
+#include <boost/scoped_ptr.hpp>
 #include <boost/unordered_map.hpp>
 
 #include "testutil/gtest-util.h"
@@ -67,6 +68,7 @@
 DECLARE_bool(abort_on_config_error);
 DECLARE_bool(disable_optimization_passes);
 DECLARE_bool(use_utc_for_unix_timestamp_conversions);
+DECLARE_string(hdfs_zone_info_zip);
 
 namespace posix_time = boost::posix_time;
 using boost::bad_lexical_cast;
@@ -135,23 +137,30 @@ string StringToOctalLiteral(const string& s) {
 // and no special permissions are needed. This is not thread-safe.
 class ScopedTimeZoneOverride {
  public:
-  ScopedTimeZoneOverride(string time_zone) {
-    original_time_zone_ = getenv("TZ");
-    setenv("TZ", time_zone.c_str(), /*overwrite*/ true);
+  ScopedTimeZoneOverride(const char* tz_name)
+      : original_tz_name_(getenv("TZ")),
+        new_tz_name_(tz_name),
+        new_tz_(TimezoneDatabase::FindTimezone(new_tz_name_)) {
+    EXPECT_NE(nullptr, new_tz_) << "Could not find " << new_tz_name_ << " time zone.";
+    setenv("TZ", new_tz_name_, true);
     tzset();
   }
 
   ~ScopedTimeZoneOverride() {
-    if (original_time_zone_ == NULL) {
+    if (original_tz_name_ == nullptr) {
       unsetenv("TZ");
     } else {
-      setenv("TZ", original_time_zone_, /*overwrite*/ true);
+      setenv("TZ", original_tz_name_, true);
     }
     tzset();
   }
 
+  const Timezone& GetTimezone() const { return *new_tz_; }
+
  private:
-  char* original_time_zone_;
+  const char* const original_tz_name_;
+  const char* const new_tz_name_;
+  const Timezone* new_tz_;
 };
 
 // Enable FLAGS_use_local_tz_for_unix_timestamp_conversions for the duration of the scope.
@@ -216,7 +225,8 @@ class ExprTest : public testing::Test {
     default_decimal_str_ = "1.23";
     default_bool_val_ = false;
     default_string_val_ = "abc";
-    default_timestamp_val_ = TimestampValue::FromUnixTime(1293872461);
+    default_timestamp_val_ = TimestampValue::FromUnixTime(1293872461,
+        TimezoneDatabase::GetUtcTimezone());
     default_type_strs_[TYPE_TINYINT] =
         lexical_cast<string>(min_int_values_[TYPE_TINYINT]);
     default_type_strs_[TYPE_SMALLINT] =
@@ -1074,22 +1084,22 @@ TimestampValue ExprTest::CreateTestTimestamp(const string& val) {
 
 template<>
 TimestampValue ExprTest::CreateTestTimestamp(float val) {
-  return TimestampValue::FromSubsecondUnixTime(val);
+  return TimestampValue::FromSubsecondUnixTime(val, TimezoneDatabase::GetUtcTimezone());
 }
 
 template<>
 TimestampValue ExprTest::CreateTestTimestamp(double val) {
-  return TimestampValue::FromSubsecondUnixTime(val);
+  return TimestampValue::FromSubsecondUnixTime(val, TimezoneDatabase::GetUtcTimezone());
 }
 
 template<>
 TimestampValue ExprTest::CreateTestTimestamp(int val) {
-  return TimestampValue::FromUnixTime(val);
+  return TimestampValue::FromUnixTime(val, TimezoneDatabase::GetUtcTimezone());
 }
 
 template<>
 TimestampValue ExprTest::CreateTestTimestamp(int64_t val) {
-  return TimestampValue::FromUnixTime(val);
+  return TimestampValue::FromUnixTime(val, TimezoneDatabase::GetUtcTimezone());
 }
 
 // Test casting 'stmt' to each of the native types.  The result should be 'val'
@@ -6370,7 +6380,7 @@ TEST_F(ExprTest, TimestampFunctions) {
 
   // These return NULL because timezone conversion makes the value out
   // of range.
-  TestIsNull("to_utc_timestamp(CAST(\"1400-01-01 05:00:00\" as TIMESTAMP), \"AEST\")",
+  TestIsNull("to_utc_timestamp(CAST(\"1400-01-01 05:00:00\" as TIMESTAMP), \"AET\")",
       TYPE_TIMESTAMP);
   TestIsNull("from_utc_timestamp(CAST(\"1400-01-01 05:00:00\" as TIMESTAMP), \"PST\")",
       TYPE_TIMESTAMP);
@@ -6380,8 +6390,8 @@ TEST_F(ExprTest, TimestampFunctions) {
       TYPE_TIMESTAMP);
 
   // With support of date strings this generates a date and 0 time.
-  TestStringValue(
-      "cast(cast('1999-01-10' as timestamp) as string)", "1999-01-10 00:00:00");
+  TestStringValue("cast(cast('1999-01-10' as timestamp) as string)",
+      "1999-01-10 00:00:00");
 
   // Test functions with unknown expected value.
   TestValidTimestampValue("now()");
@@ -6413,33 +6423,51 @@ TEST_F(ExprTest, TimestampFunctions) {
         static_cast<int64_t>(mktime(&after)));
   }
 
-  // Test that the other current time functions are also reasonable.
-  TimestampValue timestamp_result;
-  TimestampValue start_time = TimestampValue::FromUnixTimeMicros(UnixMicros());
-  timestamp_result = ConvertValue<TimestampValue>(GetValue("now()", TYPE_TIMESTAMP));
-  EXPECT_BETWEEN(start_time, timestamp_result,
-      TimestampValue::FromUnixTimeMicros(UnixMicros()));
-  timestamp_result = ConvertValue<TimestampValue>(GetValue("current_timestamp()",
-      TYPE_TIMESTAMP));
-  EXPECT_BETWEEN(start_time, timestamp_result,
-      TimestampValue::FromUnixTimeMicros(UnixMicros()));
+  // Test that now() and current_timestamp() are reasonable.
+  {
+    ScopedTimeZoneOverride time_zone("PST8PDT");
+    const Timezone& local_tz = time_zone.GetTimezone();
+
+    const TimestampValue start_time =
+        TimestampValue::FromUnixTimeMicros(UnixMicros(), local_tz);
+    TimestampValue timestamp_result =
+        ConvertValue<TimestampValue>(GetValue("now()", TYPE_TIMESTAMP));
+    EXPECT_BETWEEN(start_time, timestamp_result,
+        TimestampValue::FromUnixTimeMicros(UnixMicros(), local_tz));
+    timestamp_result = ConvertValue<TimestampValue>(GetValue("current_timestamp()",
+        TYPE_TIMESTAMP));
+    EXPECT_BETWEEN(start_time, timestamp_result,
+        TimestampValue::FromUnixTimeMicros(UnixMicros(), local_tz));
+  }
+
+  // Test that utc_timestamp() is reasonable.
   const TimestampValue utc_start_time =
       TimestampValue::UtcFromUnixTimeMicros(UnixMicros());
-  timestamp_result = ConvertValue<TimestampValue>(GetValue("utc_timestamp()",
-      TYPE_TIMESTAMP));
+  TimestampValue timestamp_result =
+      ConvertValue<TimestampValue>(GetValue("utc_timestamp()", TYPE_TIMESTAMP));
   EXPECT_BETWEEN(utc_start_time, timestamp_result,
       TimestampValue::UtcFromUnixTimeMicros(UnixMicros()));
-  // UNIX_TIMESTAMP() has second precision so the comparison start time is shifted back
-  // a second to ensure an earlier value.
-  unix_start_time =
-      (posix_time::microsec_clock::local_time() - from_time_t(0)).total_seconds();
-  timestamp_result = ConvertValue<TimestampValue>(GetValue(
-      "cast(unix_timestamp() as timestamp)", TYPE_TIMESTAMP));
-  EXPECT_BETWEEN(TimestampValue::FromUnixTime(unix_start_time - 1), timestamp_result,
-      TimestampValue::FromUnixTimeMicros(UnixMicros()));
+
+  // Test cast(unix_timestamp() as timestamp).
+  {
+    ScopedTimeZoneOverride time_zone("PST8PDT");
+    const Timezone& local_tz = time_zone.GetTimezone();
+
+    // UNIX_TIMESTAMP() has second precision so the comparison start time is shifted back
+    // a second to ensure an earlier value.
+    unix_start_time =
+        (posix_time::microsec_clock::local_time() - from_time_t(0)).total_seconds();
+    timestamp_result = ConvertValue<TimestampValue>(GetValue(
+        "cast(unix_timestamp() as timestamp)", TYPE_TIMESTAMP));
+    EXPECT_BETWEEN(TimestampValue::FromUnixTime(unix_start_time - 1, local_tz),
+        timestamp_result,
+        TimestampValue::FromUnixTimeMicros(UnixMicros(), local_tz));
+  }
 
   // Test that UTC and local time represent the same point in time
   {
+    ScopedTimeZoneOverride time_zone_override("PST8PDT");
+
     const string stmt = "select now(), utc_timestamp()";
     vector<FieldSchema> result_types;
     Status status = executor_->Exec(stmt, &result_types);
@@ -6458,8 +6486,9 @@ TEST_F(ExprTest, TimestampFunctions) {
     DCHECK(result_cols.size() == 2);
     const TimestampValue local_time = ConvertValue<TimestampValue>(result_cols[0]);
     const TimestampValue utc_timestamp = ConvertValue<TimestampValue>(result_cols[1]);
+
     TimestampValue utc_converted_to_local(utc_timestamp);
-    utc_converted_to_local.UtcToLocal();
+    utc_converted_to_local.UtcToLocal(time_zone_override.GetTimezone());
     EXPECT_EQ(utc_converted_to_local, local_time);
   }
 
@@ -6982,8 +7011,10 @@ TEST_F(ExprTest, ConditionalFunctions) {
   TestValue("if(FALSE, cast(5.5 as double), cast(8.8 as double))", TYPE_DOUBLE, 8.8);
   TestStringValue("if(TRUE, 'abc', 'defgh')", "abc");
   TestStringValue("if(FALSE, 'abc', 'defgh')", "defgh");
-  TimestampValue then_val = TimestampValue::FromUnixTime(1293872461);
-  TimestampValue else_val = TimestampValue::FromUnixTime(929387245);
+  TimestampValue then_val = TimestampValue::FromUnixTime(1293872461,
+      TimezoneDatabase::GetUtcTimezone());
+  TimestampValue else_val = TimestampValue::FromUnixTime(929387245,
+      TimezoneDatabase::GetUtcTimezone());
   TestTimestampValue("if(TRUE, cast('2011-01-01 09:01:01' as timestamp), "
       "cast('1999-06-14 19:07:25' as timestamp))", then_val);
   TestTimestampValue("if(FALSE, cast('2011-01-01 09:01:01' as timestamp), "
@@ -7000,8 +7031,10 @@ TEST_F(ExprTest, ConditionalFunctions) {
   TestValue("nvl2(NULL, cast(5.5 as double), cast(8.8 as double))", TYPE_DOUBLE, 8.8);
   TestStringValue("nvl2('some string', 'abc', 'defgh')", "abc");
   TestStringValue("nvl2(NULL, 'abc', 'defgh')", "defgh");
-  TimestampValue first_val = TimestampValue::FromUnixTime(1293872461);
-  TimestampValue second_val = TimestampValue::FromUnixTime(929387245);
+  TimestampValue first_val = TimestampValue::FromUnixTime(1293872461,
+      TimezoneDatabase::GetUtcTimezone());
+  TimestampValue second_val = TimestampValue::FromUnixTime(929387245,
+      TimezoneDatabase::GetUtcTimezone());
   TestTimestampValue("nvl2(FALSE, cast('2011-01-01 09:01:01' as timestamp), "
       "cast('1999-06-14 19:07:25' as timestamp))", first_val);
   TestTimestampValue("nvl2(NULL, cast('2011-01-01 09:01:01' as timestamp), "
@@ -7027,7 +7060,8 @@ TEST_F(ExprTest, ConditionalFunctions) {
   TestStringValue("nullif('abc', NULL)", "abc");
   TestIsNull("nullif(cast('2011-01-01 09:01:01' as timestamp), "
       "cast('2011-01-01 09:01:01' as timestamp))", TYPE_TIMESTAMP);
-  TimestampValue testlhs = TimestampValue::FromUnixTime(1293872461);
+  TimestampValue testlhs = TimestampValue::FromUnixTime(1293872461,
+      TimezoneDatabase::GetUtcTimezone());
   TestTimestampValue("nullif(cast('2011-01-01 09:01:01' as timestamp), "
       "cast('1999-06-14 19:07:25' as timestamp))", testlhs);
   TestIsNull("nullif(NULL, "
@@ -7090,8 +7124,10 @@ TEST_F(ExprTest, ConditionalFunctions) {
   TestStringValue("coalesce(NULL, 'abc', NULL)", "abc");
   TestStringValue("coalesce('defgh', NULL, 'abc', NULL)", "defgh");
   TestStringValue("coalesce(NULL, NULL, NULL, 'abc', NULL, NULL)", "abc");
-  TimestampValue ats = TimestampValue::FromUnixTime(1293872461);
-  TimestampValue bts = TimestampValue::FromUnixTime(929387245);
+  TimestampValue ats = TimestampValue::FromUnixTime(1293872461,
+      TimezoneDatabase::GetUtcTimezone());
+  TimestampValue bts = TimestampValue::FromUnixTime(929387245,
+      TimezoneDatabase::GetUtcTimezone());
   TestTimestampValue("coalesce(cast('2011-01-01 09:01:01' as timestamp))", ats);
   TestTimestampValue("coalesce(NULL, cast('2011-01-01 09:01:01' as timestamp),"
       "NULL)", ats);
@@ -8671,9 +8707,15 @@ TEST_F(ExprTest, DateTruncTest) {
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
-  ABORT_IF_ERROR(TimezoneDatabase::Initialize());
   InitFeSupport(false);
   ABORT_IF_ERROR(impala::LlvmCodeGen::InitializeLlvm());
+
+  // The host running this test might have an out-of-date tzdata package installed.
+  // To avoid tzdata related issues, we will load time-zone db from the testdata
+  // directory.
+  FLAGS_hdfs_zone_info_zip = Substitute("file://$0/testdata/tzdb/2017c.zip",
+      getenv("IMPALA_HOME"));
+  ABORT_IF_ERROR(TimezoneDatabase::Initialize());
 
   // Disable llvm optimization passes if the env var is no set to true. Running without
   // the optimizations makes the tests run much faster.

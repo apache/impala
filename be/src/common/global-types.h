@@ -18,7 +18,13 @@
 //
 /// This file contains type definitions that are used throughout the code base.
 
+namespace cctz {
+class time_zone;
+};
+
 namespace impala {
+
+typedef cctz::time_zone Timezone;
 
 /// for now, these are simply ints; if we find we need to generate ids in the
 /// backend, we can also introduce separate classes for these to make them
@@ -28,5 +34,4 @@ typedef int SlotId;
 typedef int TableId;
 typedef int PlanNodeId;
 typedef int FragmentIdx;
-
 };

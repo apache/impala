@@ -1675,5 +1675,15 @@
     "units": "BYTES",
     "kind": "GAUGE",
     "key": "mem-tracker.$0.peak_usage_bytes"
+  },
+  {
+    "description": "Path to the time-zone database",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Path to the time-zone database",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "tzdata-path"
   }
 ]

@@ -74,6 +74,44 @@ TEST(HdfsUtilTest, CheckFilesystemsMatch) {
                                 "temp_dir/temp_path"));
 }
 
+TEST(HdfsUtilTest, CheckGetBaseName) {
+  // We do not want to start the webserver.
+  FLAGS_enable_webserver = false;
+
+  EXPECT_EQ(".", GetBaseName("s3a://"));
+  EXPECT_EQ(".", GetBaseName("s3a://dummybucket"));
+  EXPECT_EQ(".", GetBaseName("s3a://dummybucket/"));
+  EXPECT_EQ(".", GetBaseName("s3a://dummybucket//"));
+  EXPECT_EQ("c", GetBaseName("s3a://dummybucket/c/"));
+  EXPECT_EQ("c", GetBaseName("s3a://dummybucket/a/b/c"));
+  EXPECT_EQ("c", GetBaseName("s3a://dummybucket/a/b/c///"));
+
+  EXPECT_EQ(".", GetBaseName("s3a:///"));
+  EXPECT_EQ("c", GetBaseName("s3a:///c"));
+  EXPECT_EQ("c", GetBaseName("s3a:///a/b//c/"));
+
+  EXPECT_EQ(".", GetBaseName("hdfs://"));
+  EXPECT_EQ(".", GetBaseName("hdfs://localhost"));
+  EXPECT_EQ(".", GetBaseName("hdfs://localhost:8020"));
+  EXPECT_EQ(".", GetBaseName("hdfs://localhost:8020/"));
+  EXPECT_EQ(".", GetBaseName("hdfs://localhost:8020//"));
+  EXPECT_EQ("c", GetBaseName("hdfs://localhost:8020/c"));
+  EXPECT_EQ("c", GetBaseName("hdfs://localhost:8020/c/"));
+  EXPECT_EQ("c", GetBaseName("hdfs://localhost:8020/a//b/c"));
+  EXPECT_EQ("c", GetBaseName("hdfs://localhost:8020//a//b/c/"));
+  EXPECT_EQ("c", GetBaseName("hdfs://localhost:8020//a//b/c///"));
+
+  EXPECT_EQ(".", GetBaseName("hdfs:///"));
+  EXPECT_EQ("c", GetBaseName("hdfs:///c"));
+  EXPECT_EQ("c", GetBaseName("hdfs:///a/b//c/"));
+
+  EXPECT_EQ(".", GetBaseName(""));
+  EXPECT_EQ(".", GetBaseName("/"));
+  EXPECT_EQ("c", GetBaseName("c"));
+  EXPECT_EQ("c", GetBaseName("/c"));
+  EXPECT_EQ("c", GetBaseName("/a//b/c/"));
+}
+
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);

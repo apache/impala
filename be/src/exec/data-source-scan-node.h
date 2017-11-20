@@ -22,6 +22,7 @@
 #include <string>
 #include <boost/scoped_ptr.hpp>
 
+#include "common/global-types.h"
 #include "exec/scan-node.h"
 #include "exec/external-data-source-executor.h"
 #include "runtime/descriptors.h"
@@ -96,8 +97,9 @@ class DataSourceScanNode : public ScanNode {
   /// the next row batch.
   std::vector<int> cols_next_val_idx_;
 
-  /// Materializes the next row (next_row_idx_) into tuple.
-  Status MaterializeNextRow(MemPool* mem_pool, Tuple* tuple);
+  /// Materializes the next row (next_row_idx_) into tuple. 'local_tz' is used as the
+  /// local time-zone for materializing 'TYPE_TIMESTAMP' slots.
+  Status MaterializeNextRow(const Timezone& local_tz, MemPool* mem_pool, Tuple* tuple);
 
   /// Gets the next batch from the data source, stored in input_batch_.
   Status GetNextInputBatch();

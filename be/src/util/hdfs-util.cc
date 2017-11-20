@@ -24,6 +24,7 @@
 
 #include "common/names.h"
 #include "runtime/exec-env.h"
+#include "kudu/util/path_util.h"
 
 namespace impala {
 
@@ -131,6 +132,16 @@ bool FilesystemsMatch(const char* path_a, const char* path_b) {
   // Both fully qualified: check the filesystem prefix.
   if (fs_a_name_length != fs_b_name_length) return false;
   return strncmp(path_a, path_b, fs_a_name_length) == 0;
+}
+
+string GetBaseName(const char* path) {
+  int fs_name_length = GetFilesystemNameLength(path);
+  if (fs_name_length >= strlen(path)) return ".";
+
+  string bname = kudu::BaseName(&(path[fs_name_length]));
+  if (bname.empty() || bname == "/") return ".";
+
+  return bname;
 }
 
 }

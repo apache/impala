@@ -98,6 +98,7 @@ set_dep_root(RAPIDJSON)
 set_dep_root(SNAPPY)
 set_dep_root(THRIFT)
 set_dep_root(ZLIB)
+set_dep_root(CCTZ)
 
 # The boost-cmake project hasn't been maintained for years. Let's make sure we
 # don't accidentally use it if it can be found.
@@ -276,6 +277,10 @@ IMPALA_ADD_THIRDPARTY_LIB(avro ${AVRO_INCLUDE_DIR} ${AVRO_STATIC_LIB} "")
 # find ORC headers and libs
 find_package(Orc REQUIRED)
 IMPALA_ADD_THIRDPARTY_LIB(orc ${ORC_INCLUDE_DIR} ${ORC_STATIC_LIB} "")
+
+# find CCTZ headers and libs
+find_package(Cctz REQUIRED)
+IMPALA_ADD_THIRDPARTY_LIB(cctz ${CCTZ_INCLUDE_DIR} ${CCTZ_STATIC_LIB} "")
 
 # find protobuf headers, libs and compiler
 find_package(Protobuf REQUIRED)

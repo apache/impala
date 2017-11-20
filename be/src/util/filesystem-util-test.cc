@@ -64,4 +64,58 @@ TEST(FilesystemUtil, RemoveAndCreateDirectory) {
   filesystem::remove_all(dir);
 }
 
+TEST(FilesystemUtil, Paths) {
+  // Canonical path must not be empty
+  EXPECT_FALSE(FileSystemUtil::IsCanonicalPath(""));
+  // Canonical paths must be absolute
+  EXPECT_FALSE(FileSystemUtil::IsCanonicalPath("a/b"));
+  // Canonical paths must not contain "//", "..", "." components
+  EXPECT_FALSE(FileSystemUtil::IsCanonicalPath(".."));
+  EXPECT_FALSE(FileSystemUtil::IsCanonicalPath("/.."));
+  EXPECT_FALSE(FileSystemUtil::IsCanonicalPath("/a/b/.."));
+  EXPECT_FALSE(FileSystemUtil::IsCanonicalPath("/a/b/../c"));
+  EXPECT_FALSE(FileSystemUtil::IsCanonicalPath("."));
+  EXPECT_FALSE(FileSystemUtil::IsCanonicalPath("/."));
+  EXPECT_FALSE(FileSystemUtil::IsCanonicalPath("/a/b/."));
+  EXPECT_FALSE(FileSystemUtil::IsCanonicalPath("/a/b/./c"));
+  EXPECT_FALSE(FileSystemUtil::IsCanonicalPath("/a//b"));
+  // Canonical paths must not end with '/'
+  EXPECT_FALSE(FileSystemUtil::IsCanonicalPath("/a/b/"));
+
+  // The following are valid canonical paths
+  EXPECT_TRUE(FileSystemUtil::IsCanonicalPath("/"));
+  EXPECT_TRUE(FileSystemUtil::IsCanonicalPath("/a"));
+  EXPECT_TRUE(FileSystemUtil::IsCanonicalPath("/ab/cd/efg"));
+
+  // The following should fail as "/a/b" is not a prefix of "/a/bc"
+  EXPECT_FALSE(FileSystemUtil::IsPrefixPath("/a/b", "/a/bc"));
+
+  // The following calls should succed.
+  EXPECT_TRUE(FileSystemUtil::IsPrefixPath("/", "/"));
+  EXPECT_TRUE(FileSystemUtil::IsPrefixPath("/", "/a/bc/def"));
+  EXPECT_TRUE(FileSystemUtil::IsPrefixPath("/a", "/a/bc/def"));
+  EXPECT_TRUE(FileSystemUtil::IsPrefixPath("/a/bc", "/a/bc/def"));
+  EXPECT_TRUE(FileSystemUtil::IsPrefixPath("/a/bc/def", "/a/bc/def"));
+
+  // 'relpath' should be empty if path equals to the start directory.
+  string relpath;
+  EXPECT_TRUE(FileSystemUtil::GetRelativePath("/", "/", &relpath));
+  EXPECT_EQ(string(""), relpath);
+  EXPECT_TRUE(FileSystemUtil::GetRelativePath("/a/bc/def", "/a/bc/def", &relpath));
+  EXPECT_EQ(string(""), relpath);
+
+  // The following should fail as "/a/b" is not a prefix of "/a/bc" path.
+  EXPECT_FALSE(FileSystemUtil::GetRelativePath("/a/bc", "/a/b", &relpath));
+
+  // The following calls should succeed.
+  EXPECT_TRUE(FileSystemUtil::GetRelativePath("/a/bc/def", "/", &relpath));
+  EXPECT_EQ(string("a/bc/def"), relpath);
+
+  EXPECT_TRUE(FileSystemUtil::GetRelativePath("/a/bc/def", "/a", &relpath));
+  EXPECT_EQ(string("bc/def"), relpath);
+
+  EXPECT_TRUE(FileSystemUtil::GetRelativePath("/a/bc/def", "/a/bc", &relpath));
+  EXPECT_EQ(string("def"), relpath);
+}
+
 IMPALA_TEST_MAIN();

@@ -421,7 +421,7 @@ if __name__ == "__main__":
   # LLVM and Kudu are the largest packages. Sort them first so that
   # their download starts as soon as possible.
   packages = map(Package, ["llvm", "kudu",
-      "avro", "binutils", "boost", "breakpad", "bzip2", "cmake", "crcutil",
+      "avro", "binutils", "boost", "breakpad", "bzip2", "cctz", "cmake", "crcutil",
       "flatbuffers", "gcc", "gflags", "glog", "gperftools", "gtest", "libev",
       "lz4", "openldap", "openssl", "orc", "protobuf",
       "rapidjson", "re2", "snappy", "thrift", "tpc-h", "tpc-ds", "zlib"])

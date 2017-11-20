@@ -371,13 +371,17 @@ class ScalarColumnReader : public BaseScalarColumnReader {
   /// The size of this column with plain encoding for FIXED_LEN_BYTE_ARRAY, or
   /// the max length for VARCHAR columns. Unused otherwise.
   int fixed_len_size_;
+
+  /// Query-global timezone used as local timezone when executing the query.
+  const Timezone& local_time_zone_;
 };
 
 template <typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
 ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ScalarColumnReader(
     HdfsParquetScanner* parent, const SchemaNode& node, const SlotDescriptor* slot_desc)
   : BaseScalarColumnReader(parent, node, slot_desc),
-    dict_decoder_(parent->scan_node_->mem_tracker()) {
+    dict_decoder_(parent->scan_node_->mem_tracker()),
+    local_time_zone_(parent->state_->local_time_zone()) {
   if (!MATERIALIZED) {
     // We're not materializing any values, just counting them. No need (or ability) to
     // initialize state used to materialize values.
@@ -680,7 +684,7 @@ bool ScalarColumnReader<TimestampValue, parquet::Type::INT96, true>::ConvertSlot
   DCHECK(FLAGS_convert_legacy_hive_parquet_utc_timestamps);
   TimestampValue* dst_ts = reinterpret_cast<TimestampValue*>(slot);
   *dst_ts = *src;
-  if (dst_ts->HasDateAndTime()) dst_ts->UtcToLocal();
+  if (dst_ts->HasDateAndTime()) dst_ts->UtcToLocal(local_time_zone_);
   return true;
 }
 

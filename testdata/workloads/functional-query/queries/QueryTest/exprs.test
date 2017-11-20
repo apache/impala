@@ -2710,7 +2710,7 @@ TIMESTAMP
 UDF WARNING: Timestamp '1400-01-01 05:00:00' did not convert to a valid local time in timezone 'PST'
 ====
 ---- QUERY
-# Test from_utc_timestamp() returning out-of-range result.
+# Test to_utc_timestamp() returning out-of-range result.
 select to_utc_timestamp(CAST("1400-01-01 05:00:00" as TIMESTAMP), "JST")
 from alltypes
 limit 1

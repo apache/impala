@@ -21,6 +21,7 @@
 
 #include <stdint.h>
 
+#include "common/global-types.h"
 #include "runtime/decimal-value.h"
 #include "udf/udf.h"
 
@@ -163,11 +164,12 @@ class DecimalOperators {
   static T RoundDelta(const DecimalValue<T>& v, int src_scale,
       int target_scale, const DecimalRoundOp& op);
 
-  /// Converts a decimal value (interpreted as unix time) to TimestampVal. Rounds
-  /// instead of truncating if 'round' is true.
+  /// Converts a decimal value (interpreted as unix time) to TimestampVal (interpreted as
+  /// local time in 'local_tz' time-zone). Rounds instead of truncating if 'round' is
+  /// true.
   template <typename T>
   static TimestampVal ConvertToTimestampVal(
-      const T& decimal_value, int scale, bool round);
+      const T& decimal_value, int scale, bool round, const Timezone& local_tz);
 
   /// Converts fractional 'val' with the given 'scale' to nanoseconds. Rounds
   /// instead of truncating if 'round' is true.

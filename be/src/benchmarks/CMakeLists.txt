@@ -58,5 +58,6 @@ ADD_BE_BENCHMARK(string-compare-benchmark)
 ADD_BE_BENCHMARK(string-search-benchmark)
 ADD_BE_BENCHMARK(thread-create-benchmark)
 ADD_BE_BENCHMARK(tuple-layout-benchmark)
+ADD_BE_BENCHMARK(convert-timestamp-benchmark)
 
 target_link_libraries(hash-benchmark Experiments)

@@ -716,7 +716,7 @@ inline Status HdfsOrcScanner::ReadRow(const orc::StructVectorBatch& batch, int r
         int64_t secs = ts_batch->data.data()[row_idx];
         int64_t nanos = ts_batch->nanoseconds.data()[row_idx];
         *reinterpret_cast<TimestampValue*>(slot_val_ptr) =
-            TimestampValue::FromUnixTimeNanos(secs, nanos);
+            TimestampValue::FromUnixTimeNanos(secs, nanos, state_->local_time_zone());
         break;
       }
       case orc::TypeKind::DECIMAL: {

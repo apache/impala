@@ -203,7 +203,8 @@ inline Status SetDecimalVal(const ColumnType& type, char* bytes, int len,
   return Status::OK();
 }
 
-Status DataSourceScanNode::MaterializeNextRow(MemPool* tuple_pool, Tuple* tuple) {
+Status DataSourceScanNode::MaterializeNextRow(const Timezone& local_tz,
+    MemPool* tuple_pool, Tuple* tuple) {
   const vector<TColumnData>& cols = input_batch_->rows.cols;
   tuple->Init(tuple_desc_->byte_size());
 
@@ -289,7 +290,8 @@ Status DataSourceScanNode::MaterializeNextRow(MemPool* tuple_pool, Tuple* tuple)
         const uint8_t* bytes = reinterpret_cast<const uint8_t*>(val.data());
         *reinterpret_cast<TimestampValue*>(slot) = TimestampValue::FromUnixTimeNanos(
             ReadWriteUtil::GetInt<uint64_t>(bytes),
-            ReadWriteUtil::GetInt<uint32_t>(bytes + sizeof(int64_t)));
+            ReadWriteUtil::GetInt<uint32_t>(bytes + sizeof(int64_t)),
+            local_tz);
         break;
       }
       case TYPE_DECIMAL: {
@@ -335,7 +337,7 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
       SCOPED_TIMER(materialize_tuple_timer());
       // copy rows until we hit the limit/capacity or until we exhaust input_batch_
       while (!ReachedLimit() && !row_batch->AtCapacity() && InputBatchHasNext()) {
-        RETURN_IF_ERROR(MaterializeNextRow(tuple_pool, tuple));
+        RETURN_IF_ERROR(MaterializeNextRow(state->local_time_zone(), tuple_pool, tuple));
         int row_idx = row_batch->AddRow();
         TupleRow* tuple_row = row_batch->GetRow(row_idx);
         tuple_row->SetTuple(tuple_idx_, tuple);

@@ -308,6 +308,7 @@ set(CLANG_INCLUDE_FLAGS
   "-I${OPENSSL_INCLUDE_DIR}"
   "-I${LDAP_INCLUDE_DIR}"
   "-I${PROTOBUF_INCLUDE_DIR}"
+  "-I${CCTZ_INCLUDE_DIR}"
 )
 
 # allow linking of static libs into dynamic lib
@@ -450,7 +451,8 @@ set (IMPALA_DEPENDENCIES
   avro
   orc
   java_jvm
-  kudu_client)
+  kudu_client
+  cctz)
 
 # Add all external dependencies. They should come after the impala libs.
 set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}

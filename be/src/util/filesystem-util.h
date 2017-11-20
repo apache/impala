@@ -18,6 +18,7 @@
 #ifndef IMPALA_UTIL_FILESYSTEM_UTIL_H
 #define IMPALA_UTIL_FILESYSTEM_UTIL_H
 
+#include <dirent.h>
 #include "common/status.h"
 
 namespace impala {
@@ -52,6 +53,70 @@ class FileSystemUtil {
   /// Returns the currently allowed maximum of possible file descriptors. In case of an
   /// error returns 0.
   static uint64_t MaxNumFileHandles();
+
+  /// Finds the canonicalized absolute pathname for 'file_path' and returns it in
+  /// *canonical_path.
+  static Status GetCanonicalPath(
+      const std::string& file_path, std::string* canonical_path) WARN_UNUSED_RESULT;
+
+  /// Checks if 'file_path' is a symbolic link. If it is, 'is_symbolic_link' is set to
+  /// 'true' and *canonical_path is set to the resolved canonicalized path.
+  static Status IsSymbolicLink(const std::string& file_path, bool* is_symbolic_link,
+      std::string* canonical_path) WARN_UNUSED_RESULT;
+
+  /// Returns 'true' iff 'path' is a canonicalized path. 'path' doesn't have to be an
+  /// existing path.
+  /// Always returns 'true' for the *canonical_path returned by GetCanonicalPath() and
+  /// IsSymbolicLink().
+  static bool IsCanonicalPath(const std::string& path);
+
+  /// Returns 'true' iff path 'prefix' is a non-empty prefix of path 'path'.
+  /// This is a string computation: the filesystem is not accessed to confirm the
+  /// existance of 'path' or 'prefix'. It is assumed that 'prefix' and 'path' are both
+  /// canonicalized paths.
+  static bool IsPrefixPath(const std::string& prefix, const std::string& path);
+
+  /// - If 'start' is a prefix of 'path', it constructs relative filepath to 'path' from
+  /// the 'start' directory and sets 'relpath' to the resulting path. 'true' is returned.
+  /// - Otherwise, 'relpath' is left intact  and 'false' is returned.
+  /// This is a string computation: the filesystem is not accessed to confirm the
+  /// existance of 'path' or 'start'. It is assumed that 'path' and 'start' are both
+  /// canonicalized paths.
+  static bool GetRelativePath(const std::string& path, const std::string& start,
+      std::string* relpath);
+
+  class Directory {
+   public:
+    /// Opens 'path' directory for iteration. Directory entries "." and ".." will be
+    /// skipped while iterating through the entries.
+    Directory(const string& path);
+
+    /// Closes the directory.
+    ~Directory();
+
+    /// Reads the next directory entry and sets 'entry_name' to the entry name.
+    /// Returns 'false' if an error occured or no more entries were found in the
+    /// directory. Return 'true' on success.
+    bool GetNextEntryName(std::string* entry_name);
+
+    /// Returns the status of the previous directory operation.
+    const Status& GetLastStatus() const { return status_; }
+
+    /// Reads no more than 'max_result_size' directory entries from 'path' and returns
+    /// their names in 'entry_names' vector. If 'max_result_size' <= 0, every directory
+    /// entry is returned. Directory entries "." and ".." will be skipped.
+    static Status GetEntryNames(const string& path, std::vector<std::string>* entry_names,
+        int max_result_size = 0);
+
+   private:
+    DIR* dir_stream_;
+    std::string dir_path_;
+    Status status_;
+
+    // Do not allow making copies.
+    Directory(const Directory&);
+    Directory& operator=(const Directory&);
+  };
 };
 
 }
