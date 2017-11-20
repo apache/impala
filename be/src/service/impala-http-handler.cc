@@ -292,12 +292,12 @@ void ImpalaHttpHandler::QueryStateToJson(const ImpalaServer::QueryStateRecord& r
       document->GetAllocator());
   value->AddMember("stmt_type", stmt_type, document->GetAllocator());
 
-  Value start_time(ToStringFromUnixMicros(record.start_time_us).c_str(),
-      document->GetAllocator());
+  Value start_time(ToStringFromUnixMicros(record.start_time_us,
+      TimePrecision::Nanosecond).c_str(), document->GetAllocator());
   value->AddMember("start_time", start_time, document->GetAllocator());
 
-  Value end_time(ToStringFromUnixMicros(record.end_time_us).c_str(),
-      document->GetAllocator());
+  Value end_time(ToStringFromUnixMicros(record.end_time_us,
+      TimePrecision::Nanosecond).c_str(), document->GetAllocator());
   value->AddMember("end_time", end_time, document->GetAllocator());
 
   // record.end_time_us might still be zero if the query is not yet done

@@ -107,7 +107,10 @@ ClientRequestState::ClientRequestState(
     summary_profile_->AddInfoString("HiveServer2 Protocol Version",
         Substitute("V$0", 1 + session->hs2_version));
   }
-  summary_profile_->AddInfoString("Start Time", ToStringFromUnixMicros(start_time_us()));
+  // Certain API clients expect Start Time and End Time to be date-time strings
+  // of nanosecond precision, so we explicitly specify the precision here.
+  summary_profile_->AddInfoString("Start Time", ToStringFromUnixMicros(start_time_us(),
+      TimePrecision::Nanosecond));
   summary_profile_->AddInfoString("End Time", "");
   summary_profile_->AddInfoString("Query Type", "N/A");
   summary_profile_->AddInfoString("Query State", PrintQueryState(query_state_));
@@ -566,7 +569,10 @@ void ClientRequestState::Done() {
 
   unique_lock<mutex> l(lock_);
   end_time_us_ = UnixMicros();
-  summary_profile_->AddInfoString("End Time", ToStringFromUnixMicros(end_time_us()));
+  // Certain API clients expect Start Time and End Time to be date-time strings
+  // of nanosecond precision, so we explicitly specify the precision here.
+  summary_profile_->AddInfoString("End Time", ToStringFromUnixMicros(end_time_us(),
+      TimePrecision::Nanosecond));
   query_events_->MarkEvent("Unregister query");
 
   // Update result set cache metrics, and update mem limit accounting before tearing
