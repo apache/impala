@@ -140,3 +140,12 @@ order by id;
 ---- TYPES
 INT, TIMESTAMP
 ====
+---- QUERY
+# Regression test for IMPALA-6187. Make sure count(*) queries with partition columns only
+# won't miss conjuncts evaluation. 'id' is the partition column here.
+select count(*) from functional_kudu.alltypes where rand() + id < 0.0;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====

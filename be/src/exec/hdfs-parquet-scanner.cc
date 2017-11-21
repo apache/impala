@@ -461,7 +461,7 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
     Status status = CommitRows(row_batch, num_to_commit);
     assemble_rows_timer_.Stop();
     RETURN_IF_ERROR(status);
-    row_group_rows_read_ += num_to_commit;
+    row_group_rows_read_ += max_tuples;
     COUNTER_ADD(scan_node_->rows_read_counter(), row_group_rows_read_);
     return Status::OK();
   }

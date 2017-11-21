@@ -244,8 +244,19 @@ Status KuduScanner::HandleEmptyProjection(RowBatch* row_batch) {
   int num_rows_remaining = cur_kudu_batch_.NumRows() - cur_kudu_batch_num_read_;
   int rows_to_add = std::min(row_batch->capacity() - row_batch->num_rows(),
       num_rows_remaining);
+  int num_to_commit = 0;
+  if (LIKELY(conjunct_evals_.empty())) {
+    num_to_commit = rows_to_add;
+  } else {
+    for (int i = 0; i < rows_to_add; ++i) {
+      if (ExecNode::EvalConjuncts(conjunct_evals_.data(),
+              conjunct_evals_.size(), nullptr)) {
+        ++num_to_commit;
+      }
+    }
+  }
   cur_kudu_batch_num_read_ += rows_to_add;
-  row_batch->CommitRows(rows_to_add);
+  row_batch->CommitRows(num_to_commit);
   return Status::OK();
 }
 

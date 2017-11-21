@@ -64,6 +64,8 @@ class KuduScanner {
  private:
   /// Handles the case where the projection is empty (e.g. count(*)).
   /// Does this by adding sets of rows to 'row_batch' instead of adding one-by-one.
+  /// If in the rare case where there is any conjunct, evaluate them once for each row
+  /// and add a row to the row batch only when the conjuncts evaluate to true.
   Status HandleEmptyProjection(RowBatch* row_batch);
 
   /// Decodes rows previously fetched from kudu, now in 'cur_rows_' into a RowBatch.

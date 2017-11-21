@@ -341,7 +341,7 @@ Status HdfsSequenceScanner::ProcessRange(RowBatch* row_batch) {
         }
       }
     } else {
-      add_row = WriteTemplateTuples(tuple_row_mem, 1);
+      add_row = WriteTemplateTuples(tuple_row_mem, 1) > 0;
     }
     num_rows_read++;
     if (add_row) RETURN_IF_ERROR(CommitRows(1, row_batch));

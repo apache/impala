@@ -328,8 +328,12 @@ class HdfsScanner {
     return ExecNode::EvalConjuncts(conjunct_evals_->data(), conjunct_evals_->size(), row);
   }
 
-  /// Sets 'num_tuples' template tuples in the batch that 'row' points to. Assumes the
-  /// 'tuple_row' only has a single tuple. Returns the number of tuples set.
+  /// Handles the case when there are no slots materialized (e.g. count(*)) by adding
+  /// up to 'num_tuples' rows to the row batch which 'row' points to. Assumes each tuple
+  /// row only has one tuple. Set the added tuples in the row batch with the template
+  /// tuple if it's not NULL. In the rare case when there are conjuncts, evaluate them
+  /// once for each row and only add a row when they evaluate to true. Returns the number
+  /// of tuple rows added.
   int WriteTemplateTuples(TupleRow* row, int num_tuples);
 
   /// Processes batches of fields and writes them out to tuple_row_mem.

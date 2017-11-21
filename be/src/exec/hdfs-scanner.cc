@@ -207,12 +207,25 @@ Status HdfsScanner::CommitRows(int num_rows, RowBatch* row_batch) {
 int HdfsScanner::WriteTemplateTuples(TupleRow* row, int num_tuples) {
   DCHECK_GE(num_tuples, 0);
   DCHECK_EQ(scan_node_->tuple_idx(), 0);
-  DCHECK_EQ(conjunct_evals_->size(), 0);
-  if (num_tuples == 0 || template_tuple_ == NULL) return num_tuples;
-
-  Tuple** row_tuple = reinterpret_cast<Tuple**>(row);
-  for (int i = 0; i < num_tuples; ++i) row_tuple[i] = template_tuple_;
-  return num_tuples;
+  DCHECK_EQ(scan_node_->materialized_slots().size(), 0);
+  int num_to_commit = 0;
+  if (LIKELY(conjunct_evals_->size() == 0)) {
+    num_to_commit = num_tuples;
+  } else {
+    TupleRow template_tuple_row;
+    template_tuple_row.SetTuple(0, template_tuple_);
+    // Evaluate any conjuncts which may reference the partition columns.
+    for (int i = 0; i < num_tuples; ++i) {
+      if (EvalConjuncts(&template_tuple_row)) ++num_to_commit;
+    }
+  }
+  if (template_tuple_ != nullptr) {
+    Tuple** row_tuple = reinterpret_cast<Tuple**>(row);
+    for (int i = 0; i < num_to_commit; ++i) row_tuple[i] = template_tuple_;
+  } else {
+    DCHECK_EQ(scan_node_->tuple_desc()->byte_size(), 0);
+  }
+  return num_to_commit;
 }
 
 bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,

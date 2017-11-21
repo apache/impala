@@ -74,3 +74,27 @@ from nulltable where b = ''
 ---- TYPES
 STRING, STRING
 ====
+---- QUERY
+# The following 3 tests are regression tests for IMPALA-6187. Make sure the conjuncts are
+# evaluated when there are no materialized slots or only partition columns are accessed.
+select count(*) from alltypes where rand() * 10 >= 0.0;
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from alltypes where rand() * 10 < 0.0;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# 'year' and 'month' are partition columns.
+select count(*) from alltypes where rand() - year > month;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
