@@ -300,9 +300,10 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
       // Refresh the library if necessary.
       LibCache::instance()->SetNeedsRefresh(params.location);
     }
+    LibCacheEntryHandle handle;
     string dummy_local_path;
-    Status status = LibCache::instance()->GetLocalLibPath(
-        params.location, type, -1, &dummy_local_path);
+    Status status = LibCache::instance()->GetLocalPath(
+        params.location, type, -1, &handle, &dummy_local_path);
     if (!status.ok()) {
       result->__set_result_code(TSymbolLookupResultCode::BINARY_NOT_FOUND);
       result->__set_error_msg(status.GetDetail());
@@ -397,10 +398,11 @@ Java_org_apache_impala_service_FeSupport_NativeCacheJar(
       JniUtil::internal_exc_class(), nullptr);
 
   TCacheJarResult result;
+  LibCacheEntryHandle handle;
   string local_path;
   // TODO(IMPALA-6727): used for external data sources; add proper mtime.
-  Status status = LibCache::instance()->GetLocalLibPath(
-      params.hdfs_location, LibCache::TYPE_JAR, -1, &local_path);
+  Status status = LibCache::instance()->GetLocalPath(
+      params.hdfs_location, LibCache::TYPE_JAR, -1, &handle, &local_path);
   status.ToThrift(&result.status);
   if (status.ok()) result.__set_local_path(local_path);
 
