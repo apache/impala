@@ -19,6 +19,7 @@
 
 #include <sstream>
 
+#include "common/thread-debug-info.h"
 #include "exec/data-sink.h"
 #include "exprs/scalar-expr.h"
 #include "runtime/fragment-instance-state.h"
@@ -195,6 +196,7 @@ Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
     unique_ptr<Thread> build_thread;
     Status thread_status = Thread::Create(FragmentInstanceState::FINST_THREAD_GROUP_NAME,
         thread_name, [this, state, build_sink, status=&build_side_status]() {
+          GetThreadDebugInfo()->SetInstanceId(state->fragment_instance_id());
           ProcessBuildInputAsync(state, build_sink, status);
         }, &build_thread, true);
     if (!thread_status.ok()) {

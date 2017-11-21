@@ -26,6 +26,7 @@
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 
 #include "common/names.h"
+#include "common/thread-debug-info.h"
 #include "codegen/llvm-codegen.h"
 #include "exec/plan-root-sink.h"
 #include "exec/exec-node.h"
@@ -227,7 +228,10 @@ Status FragmentInstanceState::Prepare() {
     string thread_name = Substitute("profile-report (finst:$0)", PrintId(instance_id()));
     unique_lock<mutex> l(report_thread_lock_);
     RETURN_IF_ERROR(Thread::Create(FragmentInstanceState::FINST_THREAD_GROUP_NAME,
-        thread_name, [this]() { this->ReportProfileThread(); }, &report_thread_, true));
+        thread_name, [this]() {
+          GetThreadDebugInfo()->SetInstanceId(this->instance_id());
+          this->ReportProfileThread();
+        }, &report_thread_, true));
     // Make sure the thread started up, otherwise ReportProfileThread() might get into
     // a race with StopReportThread().
     while (!report_thread_active_) report_thread_started_cv_.Wait(l);

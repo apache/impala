@@ -23,6 +23,7 @@
 #include <sys/syscall.h>
 #include <sys/types.h>
 
+#include "common/thread-debug-info.h"
 #include "util/coding-util.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
@@ -344,6 +345,9 @@ void Thread::SuperviseThread(const string& name, const string& category,
 
   thread_mgr_ref->AddThread(this_thread::get_id(), name_copy, category_copy, system_tid);
   thread_started->Set(system_tid);
+
+  ThreadDebugInfo thread_debug_info;
+  thread_debug_info.SetThreadName(name_copy);
 
   // Any reference to any parameter not copied in by value may no longer be valid after
   // this point, since the caller that is waiting on *tid != 0 may wake, take the lock and

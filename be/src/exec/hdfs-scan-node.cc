@@ -21,6 +21,7 @@
 #include <sstream>
 
 #include "common/logging.h"
+#include "common/thread-debug-info.h"
 #include "exec/base-sequence-scanner.h"
 #include "exec/hdfs-scanner.h"
 #include "exec/scanner-context.h"
@@ -347,7 +348,11 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
         PrintId(runtime_state_->fragment_instance_id()), id(),
         num_scanner_threads_started_counter_->value());
 
-    auto fn = [this]() { this->ScannerThread(); };
+    auto fn = [this]() {
+      RuntimeState* state = this->runtime_state();
+      GetThreadDebugInfo()->SetInstanceId(state->fragment_instance_id());
+      this->ScannerThread();
+    };
     std::unique_ptr<Thread> t;
     status =
       Thread::Create(FragmentInstanceState::FINST_THREAD_GROUP_NAME, name, fn, &t, true);

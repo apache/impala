@@ -20,6 +20,7 @@
 #include <boost/thread/lock_guard.hpp>
 #include <boost/thread/locks.hpp>
 
+#include "common/thread-debug-info.h"
 #include "exprs/expr.h"
 #include "runtime/backend-client.h"
 #include "runtime/bufferpool/buffer-pool.h"
@@ -372,6 +373,8 @@ void QueryState::ReleaseExecResourceRefcount() {
 }
 
 void QueryState::ExecFInstance(FragmentInstanceState* fis) {
+  GetThreadDebugInfo()->SetInstanceId(fis->instance_id());
+
   ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->Increment(1L);
   ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS->Increment(1L);
   VLOG_QUERY << "Executing instance. instance_id=" << PrintId(fis->instance_id())
