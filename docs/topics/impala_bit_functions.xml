@@ -768,14 +768,14 @@ select shiftleft(-1,4); /* 11111111 -> 11110000 */
           <p conref="../shared/impala_common.xml#common/return_type_same"/>
           <p conref="../shared/impala_common.xml#common/added_in_230"/>
           <p conref="../shared/impala_common.xml#common/example_blurb"/>
-<codeblock>select shiftright(16,0); /* 00010000 -> 00000000 */
+<codeblock>select shiftright(16,0); /* 00010000 -> 00010000 */
 +-------------------+
 | shiftright(16, 0) |
 +-------------------+
 | 16                |
 +-------------------+
 
-select shiftright(16,4); /* 00010000 -> 00000000 */
+select shiftright(16,4); /* 00010000 -> 00000001 */
 +-------------------+
 | shiftright(16, 4) |
 +-------------------+
