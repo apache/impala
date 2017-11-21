@@ -39,8 +39,9 @@ PROJECT(ASSEMBLER)
 #  -Wno-vla: we use C99-style variable-length arrays
 #  -pthread: enable multithreaded malloc
 #  -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG: enable nanosecond precision for boost
+#  -fno-omit-frame-pointers: Keep frame pointer for functions in register
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wall -Wno-sign-compare -Wno-unknown-pragmas -pthread")
-SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fno-strict-aliasing")
+SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fno-strict-aliasing -fno-omit-frame-pointer")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -std=c++14")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated -Wno-vla")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
