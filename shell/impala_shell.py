@@ -1417,6 +1417,21 @@ def execute_queries_non_interactive_mode(options, query_options):
           shell.execute_query_list(queries)):
     sys.exit(1)
 
+def get_intro(options):
+  """Get introduction message for start-up. The last character should not be a return."""
+  if not options.verbose:
+    return ""
+
+  intro = WELCOME_STRING
+
+  if not options.ssl and options.creds_ok_in_clear and options.use_ldap:
+    intro += ("\n\nLDAP authentication is enabled, but the connection to Impala is "
+              "not secured by TLS.\nALL PASSWORDS WILL BE SENT IN THE CLEAR TO IMPALA.")
+
+  if options.refresh_after_connect:
+    intro += '\n'.join(REFRESH_AFTER_CONNECT_DEPRECATION_WARNING)
+  return intro
+
 if __name__ == "__main__":
   """
   There are two types of options: shell options and query_options. Both can be set in the
@@ -1481,8 +1496,9 @@ if __name__ == "__main__":
     sys.exit(1)
 
   if options.use_kerberos:
-    print_to_stderr("Starting Impala Shell using Kerberos authentication")
-    print_to_stderr("Using service name '%s'" % options.kerberos_service_name)
+    if options.verbose:
+      print_to_stderr("Starting Impala Shell using Kerberos authentication")
+      print_to_stderr("Using service name '%s'" % options.kerberos_service_name)
     # Check if the user has a ticket in the credentials cache
     try:
       if call(['klist', '-s']) != 0:
@@ -1493,9 +1509,11 @@ if __name__ == "__main__":
       print_to_stderr('klist not found on the system, install kerberos clients')
       sys.exit(1)
   elif options.use_ldap:
-    print_to_stderr("Starting Impala Shell using LDAP-based authentication")
+    if options.verbose:
+      print_to_stderr("Starting Impala Shell using LDAP-based authentication")
   else:
-    print_to_stderr("Starting Impala Shell without Kerberos authentication")
+    if options.verbose:
+      print_to_stderr("Starting Impala Shell without Kerberos authentication")
 
   options.ldap_password = None
   if options.use_ldap and options.ldap_password_cmd:
@@ -1514,10 +1532,12 @@ if __name__ == "__main__":
 
   if options.ssl:
     if options.ca_cert is None:
-      print_to_stderr("SSL is enabled. Impala server certificates will NOT be verified"\
-                      " (set --ca_cert to change)")
+      if options.verbose:
+        print_to_stderr("SSL is enabled. Impala server certificates will NOT be verified"\
+                        " (set --ca_cert to change)")
     else:
-      print_to_stderr("SSL is enabled")
+      if options.verbose:
+        print_to_stderr("SSL is enabled")
 
   if options.output_file:
     try:
@@ -1542,13 +1562,7 @@ if __name__ == "__main__":
     execute_queries_non_interactive_mode(options, query_options)
     sys.exit(0)
 
-  intro = WELCOME_STRING
-  if not options.ssl and options.creds_ok_in_clear and options.use_ldap:
-    intro += ("\n\nLDAP authentication is enabled, but the connection to Impala is "
-              "not secured by TLS.\nALL PASSWORDS WILL BE SENT IN THE CLEAR TO IMPALA.\n")
-
-  if options.refresh_after_connect:
-    intro += REFRESH_AFTER_CONNECT_DEPRECATION_WARNING
+  intro = get_intro(options)
 
   shell = ImpalaShell(options, query_options)
   while shell.is_alive:
