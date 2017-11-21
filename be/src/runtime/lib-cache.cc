@@ -131,6 +131,10 @@ LibCacheEntry::~LibCacheEntry() {
   unlink(local_path.c_str());
 }
 
+LibCacheEntryHandle::~LibCacheEntryHandle() {
+  if (entry_ != nullptr) LibCache::instance()->DecrementUseCount(entry_);
+}
+
 Status LibCache::GetSoFunctionPtr(const string& hdfs_lib_file, const string& symbol,
     time_t exp_mtime, void** fn_ptr, LibCacheEntry** ent, bool quiet) {
   if (hdfs_lib_file.empty()) {
@@ -181,14 +185,16 @@ void LibCache::DecrementUseCount(LibCacheEntry* entry) {
   if (can_delete) delete entry;
 }
 
-Status LibCache::GetLocalLibPath(
-    const string& hdfs_lib_file, LibType type, time_t exp_mtime, string* local_path) {
-  unique_lock<mutex> lock;
+Status LibCache::GetLocalPath(const std::string& hdfs_lib_file, LibType type,
+    time_t exp_mtime, LibCacheEntryHandle* handle, string* path) {
+  DCHECK(handle != nullptr && handle->entry() == nullptr);
   LibCacheEntry* entry = nullptr;
+  unique_lock<mutex> lock;
   RETURN_IF_ERROR(GetCacheEntry(hdfs_lib_file, type, exp_mtime, &lock, &entry));
   DCHECK(entry != nullptr);
-  DCHECK_EQ(entry->type, type);
-  *local_path = entry->local_path;
+  ++entry->use_count;
+  handle->SetEntry(entry);
+  *path = entry->local_path;
   return Status::OK();
 }
 
@@ -422,7 +428,7 @@ Status LibCache::RefreshCacheEntry(const string& hdfs_lib_file, LibType type,
 
     // Let the caller propagate any error that occurred when loading the entry.
     RETURN_IF_ERROR((*entry)->copy_file_status);
-    DCHECK_EQ((*entry)->type, type);
+    DCHECK_EQ((*entry)->type, type) << (*entry)->local_path;
     DCHECK(!(*entry)->local_path.empty());
   }
   return Status::OK();

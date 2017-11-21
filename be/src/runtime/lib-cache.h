@@ -49,11 +49,16 @@ class RuntimeState;
 /// using the library. When the caller requests a ptr into the library, they
 /// are given the entry handle and must decrement the ref count when they
 /// are done.
+/// Note: Explicitly managing this reference count at the client is error-prone. See the
+/// api for accessing a path, GetLocalPath(), that uses the handle's scope to manage the
+/// reference count.
 //
 /// TODO:
 /// - refresh libraries
-/// - better cached module management.
+/// - better cached module management
+/// - improve the api to be less error-prone (IMPALA-6439)
 struct LibCacheEntry;
+class LibCacheEntryHandle;
 
 class LibCache {
  public:
@@ -71,15 +76,19 @@ class LibCache {
   /// Initializes the libcache. Must be called before any other APIs.
   static Status Init();
 
-  /// Gets the local file system path for the library at 'hdfs_lib_file'. If
+  /// Gets the local 'path' used to cache the file stored at the global 'hdfs_lib_file'. If
   /// this file is not already on the local fs, or if the cached entry's last modified
   /// is older than expected mtime, 'exp_mtime', it copies it and caches the result.
   /// An 'exp_mtime' of -1 makes the mtime check a no-op.
+  ///
+  /// 'handle' must remain in scope while 'path' is used. The reference count to the
+  /// underlying cache entry is decremented when 'handle' goes out-of-scope.
+  ///
   /// Returns an error if 'hdfs_lib_file' cannot be copied to the local fs or if
   /// exp_mtime differs from the mtime on the file system.
   /// If error is due to refresh, then the entry will be removed from the cache.
-  Status GetLocalLibPath(const std::string& hdfs_lib_file, LibType type, time_t exp_mtime,
-      std::string* local_path);
+  Status GetLocalPath(const std::string& hdfs_lib_file, LibType type, time_t exp_mtime,
+      LibCacheEntryHandle* handle, string* path);
 
   /// Returns status.ok() if the symbol exists in 'hdfs_lib_file', non-ok otherwise.
   /// If status.ok() is true, 'mtime' is set to the cache entry's last modified time.
@@ -107,6 +116,7 @@ class LibCache {
   /// An 'exp_mtime' of -1 makes the mtime check a no-op.
   /// An error is returned if exp_mtime differs from the mtime on the file system.
   /// If error is due to refresh, then the entry will be removed from the cache.
+  /// TODO: api is error-prone. upgrade to LibCacheEntryHandle (see IMPALA-6439).
   Status GetSoFunctionPtr(const std::string& hdfs_lib_file, const std::string& symbol,
       time_t exp_mtime, void** fn_ptr, LibCacheEntry** entry, bool quiet = false);
 
@@ -202,6 +212,27 @@ class LibCache {
   /// lock_ must be held. The entry's lock should not be held.
   void RemoveEntryInternal(
       const std::string& hdfs_lib_file, const LibMap::iterator& entry_iterator);
+};
+
+/// Handle for a LibCacheEntry that decrements its reference count when the handle is
+/// destroyed or re-used for another entry.
+class LibCacheEntryHandle {
+ public:
+  LibCacheEntryHandle() {}
+  ~LibCacheEntryHandle();
+
+ private:
+  friend class LibCache;
+
+  LibCacheEntry* entry() const { return entry_; }
+  void SetEntry(LibCacheEntry* entry) {
+    if (entry_ != nullptr) LibCache::instance()->DecrementUseCount(entry);
+    entry_ = entry;
+  }
+
+  LibCacheEntry* entry_ = nullptr;
+
+  DISALLOW_COPY_AND_ASSIGN(LibCacheEntryHandle);
 };
 
 }
