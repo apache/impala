@@ -40,18 +40,60 @@ from TCLIService import TCLIService
 
 LOG = logging.getLogger('admission_test')
 
-# The query used for testing. It is important that this query be able to fetch many
-# rows. This allows a thread to stay active by fetching one row at a time. The
+# The query used for testing. It is important that this query returns many rows
+# while keeping fragments active on all backends. This allows a thread to keep
+# the query active and consuming resources by fetching one row at a time. The
 # where clause is for debugging purposes; each thread will insert its id so
 # that running queries can be correlated with the thread that submitted them.
-QUERY = "select * from alltypes where id != %s"
+QUERY = """
+select * from alltypesagg where id != {0}
+union all
+select * from alltypesagg where id != {0}
+union all
+select * from alltypesagg where id != {0}
+union all
+select * from alltypesagg where id != {0}
+union all
+select * from alltypesagg where id != {0}
+union all
+select * from alltypesagg where id != {0}
+union all
+select * from alltypesagg where id != {0}
+union all
+select * from alltypesagg where id != {0}
+union all
+select * from alltypesagg where id != {0}
+union all
+select * from alltypesagg where id != {0}
+union all
+select * from alltypesagg where id != {0}
+union all
+select * from alltypesagg where id != {0}
+union all
+select * from alltypesagg where id != {0}
+union all
+select * from alltypesagg where id != {0}
+union all
+select * from alltypesagg where id != {0}
+union all
+select * from alltypesagg where id != {0}
+union all
+select * from alltypesagg where id != {0}
+union all
+select * from alltypesagg where id != {0}
+union all
+select * from alltypesagg where id != {0}
+"""
 
-# Time to sleep (in milliseconds) between issuing queries. The default statestore
-# heartbeat is 500ms, so the lower the delay the more we can submit before the global
-# state is updated. When the delay is at least the statestore heartbeat frequency, all
-# state should be visible by every impalad by the time the next query is submitted.
-SUBMISSION_DELAY_MS = [0, 50, 100, 600]
+# The statestore heartbeat and topic update frequency (ms). Set low for testing.
+STATESTORE_RPC_FREQUENCY_MS = 100
 
+# Time to sleep (in milliseconds) between issuing queries. When the delay is at least
+# the statestore heartbeat frequency, all state should be visible by every impalad by
+# the time the next query is submitted. Otherwise the different impalads will see stale
+# state for some admission decisions.
+SUBMISSION_DELAY_MS = \
+    [0, STATESTORE_RPC_FREQUENCY_MS / 2, STATESTORE_RPC_FREQUENCY_MS * 3 / 2]
 
 # The number of queries to submit. The test does not support fewer queries than
 # MAX_NUM_CONCURRENT_QUERIES + MAX_NUM_QUEUED_QUERIES to keep some validation logic
@@ -65,12 +107,9 @@ ROUND_ROBIN_SUBMISSION = [True, False]
 # pool with the parameters below.
 POOL_NAME = "default-pool"
 
-# The statestore heartbeat and topic update frequency (ms). Set low for testing.
-STATESTORE_RPC_FREQUENCY_MS = 100
-
 # Stress test timeout (seconds). The timeout needs to be significantly higher in code
 # coverage builds (IMPALA-3790).
-STRESS_TIMEOUT = specific_build_type_timeout(30, code_coverage_build_timeout=600)
+STRESS_TIMEOUT = specific_build_type_timeout(60, code_coverage_build_timeout=600)
 
 # The number of queries that can execute concurrently in the pool POOL_NAME.
 MAX_NUM_CONCURRENT_QUERIES = 5
@@ -91,16 +130,20 @@ PROFILE_QUERY_OPTIONS_KEY = "Query Options (set by configuration): "
 # The different ways that a query thread can end its query.
 QUERY_END_BEHAVIORS = ['EOS', 'CLIENT_CANCEL', 'QUERY_TIMEOUT', 'CLIENT_CLOSE']
 
+# The timeout used for the QUERY_TIMEOUT end behaviour
+QUERY_END_TIMEOUT_S = 1
+
 def impalad_admission_ctrl_flags(max_requests, max_queued, pool_max_mem,
-    proc_mem_limit = None):
+    proc_mem_limit = None, queue_wait_timeout_ms=None):
+  extra_flags = ""
   if proc_mem_limit is not None:
-    proc_limit_flag = "-mem_limit=%s" % (proc_mem_limit)
-  else:
-    proc_limit_flag = ""
-  return ("-vmodule admission-controller=3 -default_pool_max_requests %s "
-      "-default_pool_max_queued %s -default_pool_mem_limit %s "
-      "-disable_admission_control=false %s" %\
-      (max_requests, max_queued, pool_max_mem, proc_limit_flag))
+    extra_flags += " -mem_limit={0}".format(proc_mem_limit)
+  if queue_wait_timeout_ms is not None:
+    extra_flags += " -queue_wait_timeout_ms={0}".format(queue_wait_timeout_ms)
+  return ("-vmodule admission-controller=3 -default_pool_max_requests {0} "
+      "-default_pool_max_queued {1} -default_pool_mem_limit {2} "
+      "-disable_admission_control=false {3}".format(
+      max_requests, max_queued, pool_max_mem, extra_flags))
 
 
 def impalad_admission_ctrl_config_args(additional_args=""):
@@ -118,9 +161,9 @@ def log_metrics(log_prefix, metrics, log_level=logging.DEBUG):
       metrics['dequeued'], metrics['rejected'], metrics['released'],
       metrics['timed-out'])
 
-def compute_metric_deltas(m2, m1, metric_names):
+def compute_metric_deltas(m2, m1):
   """Returns a dictionary of the differences of metrics in m2 and m1 (m2 - m1)"""
-  return dict((n, m2.get(n, 0) - m1.get(n, 0)) for n in metric_names)
+  return dict((n, m2.get(n, 0) - m1.get(n, 0)) for n in m2.keys())
 
 def metric_key(pool_name, metric_name):
   """Helper method to construct the admission controller metric keys"""
@@ -494,7 +537,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     while True:
       current = self.get_admission_metrics()
       log_metrics("wait_for_metric_changes, current=", current)
-      deltas = compute_metric_deltas(current, initial, metric_names)
+      deltas = compute_metric_deltas(current, initial)
       delta_sum = sum([ deltas[x] for x in metric_names ])
       LOG.debug("DeltaSum=%s Deltas=%s (Expected=%s for metrics=%s)",\
           delta_sum, deltas, expected_delta, metric_names)
@@ -503,7 +546,9 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
             round(time() - start_time, 1))
         return (deltas, current)
       assert (time() - start_time < STRESS_TIMEOUT),\
-          "Timed out waiting %s seconds for metrics" % (STRESS_TIMEOUT,)
+          "Timed out waiting {0} seconds for metrics {1} delta {2} "\
+          "current {3} initial {4}" .format(
+              STRESS_TIMEOUT, ','.join(metric_names), expected_delta, str(current), str(initial))
       sleep(1)
 
   def wait_for_statestore_updates(self, heartbeats):
@@ -542,9 +587,9 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     # lock to synchronize before checking the list length (on which another thread
     # may call append() concurrently).
     while len(self.executing_threads) < num_threads:
-      assert (time() - start_time < STRESS_TIMEOUT),\
-          "Timed out waiting %s seconds for %s admitted client rpcs to return" %\
-              (STRESS_TIMEOUT, num_threads)
+      assert (time() - start_time < STRESS_TIMEOUT), ("Timed out waiting %s seconds for "
+          "%s admitted client rpcs to return. Only %s executing " % (
+          STRESS_TIMEOUT, num_threads, len(self.executing_threads)))
       sleep(0.1)
     LOG.debug("Found all %s admitted threads after %s seconds", num_threads,
         round(time() - start_time, 1))
@@ -616,14 +661,14 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
 
           exec_options = self.vector.get_value('exec_option')
           exec_options.update(self.additional_query_options)
-          query = QUERY % (self.query_num,)
+          query = QUERY.format(self.query_num)
           self.query_state = 'SUBMITTING'
           client = self.impalad.service.create_beeswax_client()
           ImpalaTestSuite.change_database(client, self.vector.get_value('table_format'))
           client.set_configuration(exec_options)
 
           if self.query_end_behavior == 'QUERY_TIMEOUT':
-            client.execute("SET QUERY_TIMEOUT_S=5")
+            client.execute("SET QUERY_TIMEOUT_S={0}".format(QUERY_END_TIMEOUT_S))
 
           LOG.debug("Submitting query %s", self.query_num)
           self.query_handle = client.execute_async(query)
@@ -650,17 +695,18 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
         # query. It needs to wait until the main thread requests it to end its query.
         while not self.shutdown:
           # The QUERY_TIMEOUT needs to stay active until the main thread requests it
-          # to end. Otherwise, the query may get cancelled early. Fetch a row every
-          # second to avoid going idle.
+          # to end. Otherwise, the query may get cancelled early. Fetch rows 5 times
+          # per QUERY_TIMEOUT interval to keep the query active.
           if self.query_end_behavior == 'QUERY_TIMEOUT' and \
              self.query_state != 'COMPLETED':
-            client.fetch(query, self.query_handle, 1)
+            fetch_result = client.fetch(query, self.query_handle, 1)
+            assert len(fetch_result.data) == 1, str(fetch_result)
           if self.query_state == 'REQUEST_QUERY_END':
             self._end_query(client, query)
             # The query has released admission control resources
             self.query_state = 'COMPLETED'
             self.query_handle = None
-          sleep(1)
+          sleep(QUERY_END_TIMEOUT_S * 0.2)
       except Exception as e:
         LOG.exception(e)
         # Unknown errors will be raised later
@@ -674,6 +720,8 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     def _end_query(self, client, query):
       """Bring the query to the appropriate end state defined by self.query_end_behaviour.
       Returns once the query has reached that state."""
+      LOG.debug("Ending query %s by %s",
+          str(self.query_handle.get_handle()), self.query_end_behavior)
       if self.query_end_behavior == 'QUERY_TIMEOUT':
         # Sleep and wait for the query to be cancelled. The cancellation will
         # set the state to EXCEPTION.
@@ -741,24 +789,36 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       self.all_threads.append(thread)
       sleep(submission_delay_ms / 1000.0)
 
-    # Wait for all of the queries to be admitted, queued, or rejected (as reported
-    # by the impalad metrics).
+    # Wait for the admission control to make the initial admission decision for all of
+    # the queries. They should either be admitted immediately, queued, or rejected.
+    # The test query is chosen that it with remain active on all backends until the test
+    # ends the query. This prevents queued queries from being dequeued in the background
+    # without this thread explicitly ending them, so that the test can admit queries in
+    # discrete waves.
     LOG.debug("Wait for initial admission decisions")
     (metric_deltas, curr_metrics) = self.wait_for_metric_changes(\
         ['admitted', 'queued', 'rejected'], initial_metrics, num_queries)
-    # Also wait for the threads that submitted the queries to start executing
+    # Also wait for the test threads that submitted the queries to start executing.
     self.wait_for_admitted_threads(metric_deltas['admitted'])
 
     # Check that the admission decisions are reasonable given the test parameters
     # The number of admitted and queued requests should be at least the configured limits
     # but less than or equal to those limits times the number of impalads.
-    assert metric_deltas['admitted'] >= MAX_NUM_CONCURRENT_QUERIES
-    assert metric_deltas['admitted'] <= MAX_NUM_CONCURRENT_QUERIES * len(self.impalads)
+    assert metric_deltas['dequeued'] == 0,\
+        "Queued queries should not run until others are made to finish"
+    assert metric_deltas['admitted'] >= MAX_NUM_CONCURRENT_QUERIES,\
+        "Admitted fewer than expected queries"
+    assert metric_deltas['admitted'] <= MAX_NUM_CONCURRENT_QUERIES * len(self.impalads),\
+        "Admitted more than expected queries: at least one daemon over-admitted"
     assert metric_deltas['queued'] >=\
-        min(num_queries - metric_deltas['admitted'], MAX_NUM_QUEUED_QUERIES)
-    assert metric_deltas['queued'] <= MAX_NUM_QUEUED_QUERIES * len(self.impalads)
-    assert metric_deltas['rejected'] ==\
-        num_queries - metric_deltas['admitted'] - metric_deltas['queued']
+        min(num_queries - metric_deltas['admitted'], MAX_NUM_QUEUED_QUERIES),\
+        "Should have queued more queries before rejecting them"
+    assert metric_deltas['queued'] <= MAX_NUM_QUEUED_QUERIES * len(self.impalads),\
+        "Queued too many queries: at least one daemon queued too many"
+    assert metric_deltas['rejected'] + metric_deltas['admitted'] +\
+        metric_deltas['queued'] == num_queries ,\
+        "Initial admission decisions don't add up to {0}: {1}".format(
+        num_queries, str(metric_deltas))
     initial_metric_deltas = metric_deltas
 
     # Like above, check that the count from the queries webpage json is reasonable.
@@ -768,6 +828,8 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     assert queries_page_num_queued <= MAX_NUM_QUEUED_QUERIES * len(self.impalads)
     self._check_queries_page_resource_pools()
 
+    # Admit queries in waves until all queries are done. A new wave of admission
+    # is started by killing some of the running queries.
     while len(self.executing_threads) > 0:
       curr_metrics = self.get_admission_metrics();
       log_metrics("Main loop, curr_metrics: ", curr_metrics);
@@ -779,8 +841,13 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       num_queued_remaining =\
           curr_metrics['queued'] - curr_metrics['dequeued'] - curr_metrics['timed-out']
       expected_admitted = min(num_queued_remaining, MAX_NUM_CONCURRENT_QUERIES)
-      (metric_deltas, _) = self.wait_for_metric_changes(['admitted'], curr_metrics,
-          expected_admitted)
+      (metric_deltas, _) = self.wait_for_metric_changes(
+          ['admitted', 'timed-out'], curr_metrics, expected_admitted)
+
+      # The queue timeout is set high for these tests, so we don't expect any queries to
+      # time out.
+      assert metric_deltas['admitted'] >= expected_admitted
+      assert metric_deltas['timed-out'] == 0
       self.wait_for_admitted_threads(metric_deltas['admitted'])
       # Wait a few topic updates to ensure the admission controllers have reached a steady
       # state or we may find an impalad dequeue more requests after we capture metrics.
@@ -788,8 +855,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
 
     final_metrics = self.get_admission_metrics();
     log_metrics("Final metrics: ", final_metrics, logging.INFO);
-    metric_deltas = compute_metric_deltas(final_metrics, initial_metrics,
-        final_metrics.keys())
+    metric_deltas = compute_metric_deltas(final_metrics, initial_metrics)
     assert metric_deltas['timed-out'] == 0
 
     if round_robin_submission:
@@ -821,7 +887,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(max_requests=MAX_NUM_CONCURRENT_QUERIES,
-        max_queued=MAX_NUM_QUEUED_QUERIES, pool_max_mem=-1),
+        max_queued=MAX_NUM_QUEUED_QUERIES, pool_max_mem=-1, queue_wait_timeout_ms=600000),
       statestored_args=_STATESTORED_ARGS)
   def test_admission_controller_with_flags(self, vector):
     self.pool_name = 'default-pool'
@@ -854,7 +920,8 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(
         max_requests=MAX_NUM_CONCURRENT_QUERIES * 30, max_queued=MAX_NUM_QUEUED_QUERIES,
-        pool_max_mem=MEM_TEST_LIMIT, proc_mem_limit=MEM_TEST_LIMIT),
+        pool_max_mem=MEM_TEST_LIMIT, proc_mem_limit=MEM_TEST_LIMIT,
+        queue_wait_timeout_ms=600000),
       statestored_args=_STATESTORED_ARGS)
   def test_mem_limit(self, vector):
     # Impala may set the proc mem limit lower than we think depending on the overcommit

@@ -37,7 +37,7 @@
   </property>
   <property>
     <name>impala.admission-control.pool-queue-timeout-ms.root.queueB</name>
-    <value>60000</value>
+    <value>600000</value>
   </property>
   <property>
     <name>impala.admission-control.pool-default-query-options.root.queueA</name>
