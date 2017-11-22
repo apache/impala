@@ -2515,7 +2515,7 @@ set EXEC_SINGLE_NODE_ROWS_THRESHOLD=0;
 select min(from_unixtime(ts))
 from (values (1429705108399870 as ts), (1429704907057354)) invalid_timestamps;
 ---- RESULTS
-''
+'NULL'
 ---- TYPES
 STRING
 ====

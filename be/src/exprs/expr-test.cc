@@ -5637,6 +5637,8 @@ TEST_F(ExprTest, TimestampFunctions) {
   }
 
   TestIsNull("from_unixtime(NULL, 'yyyy-MM-dd')", TYPE_STRING);
+  TestIsNull("from_unixtime(999999999999999)", TYPE_STRING);
+  TestIsNull("from_unixtime(999999999999999, 'yyyy-MM-dd')", TYPE_STRING);
   TestStringValue("from_unixtime(unix_timestamp('1999-01-01 10:10:10'), \
       'yyyy-MM-dd')", "1999-01-01");
   TestStringValue("from_unixtime(unix_timestamp('1999-01-01 10:10:10'), \

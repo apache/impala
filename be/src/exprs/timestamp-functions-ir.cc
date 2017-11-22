@@ -79,8 +79,9 @@ StringVal TimestampFunctions::StringValFromTimestamp(FunctionContext* context,
 template <class TIME>
 StringVal TimestampFunctions::FromUnix(FunctionContext* context, const TIME& intp) {
   if (intp.is_null) return StringVal::null();
-  return AnyValUtil::FromString(context,
-      TimestampValue::FromUnixTime(intp.val).ToString());
+  const TimestampValue tv = TimestampValue::FromUnixTime(intp.val);
+  if (!tv.HasDateAndTime()) return StringVal::null();
+  return AnyValUtil::FromString(context, tv.ToString());
 }
 
 template <class TIME>
