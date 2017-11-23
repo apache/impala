@@ -94,7 +94,7 @@ git clone https://git-wip-us.apache.org/repos/asf/incubator-impala.git
       </p>
 
       <p>
-        The Impala package installs these binaries:
+        Impala primarily consists of these executables, which should be available after you build from source:
       </p>
 
       <ul>
@@ -141,7 +141,7 @@ git clone https://git-wip-us.apache.org/repos/asf/incubator-impala.git
       </ul>
 
       <p>
-        Before doing the installation, ensure that you have all necessary prerequisites. See
+        Before starting working with Impala, ensure that you have all necessary prerequisites. See
         <xref href="impala_prereqs.xml#prereqs"/> for details.
       </p>
     </conbody>
