@@ -130,7 +130,7 @@ boost::optional<large_type> CallOptional(bool good) {
 
 void TestCallOptional(int batch_size, void* d) {
   bool g = ((data*)d)->good;
-  BODY_1K( global_large = CallOptional(g).get(); );
+  BODY_1K( if (auto v = CallOptional(g)) global_large = v.get(); );
 }
 
 
