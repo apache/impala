@@ -56,24 +56,29 @@ TEST_F(OpenSSLUtilTest, Encryption) {
   vector<uint8_t> decrypted(buffer_size);
   GenerateRandomData(original.data(), buffer_size);
 
-  // Iterate multiple times to ensure that key regeneration works correctly.
-  EncryptionKey key;
-  for (int i = 0; i < 2; ++i) {
-    key.InitializeRandom(); // Generate a new key for each iteration.
+  // Check both CTR & CFB
+  AES_CIPHER_MODE modes[] = {AES_256_CTR, AES_256_CFB};
+  for (auto m : modes) {
+    // Iterate multiple times to ensure that key regeneration works correctly.
+    EncryptionKey key;
+    for (int i = 0; i < 2; ++i) {
+      key.InitializeRandom(); // Generate a new key for each iteration.
+      key.SetCipherMode(m);
 
-    // Check that OpenSSL is happy with the amount of entropy we're feeding it.
-    DCHECK_EQ(1, RAND_status());
+      // Check that OpenSSL is happy with the amount of entropy we're feeding it.
+      DCHECK_EQ(1, RAND_status());
 
-    ASSERT_OK(key.Encrypt(original.data(), buffer_size, encrypted.data()));
-    if (i > 0) {
-      // Check that we're not somehow reusing the same key.
-      ASSERT_NE(0, memcmp(encrypted.data(), prev_encrypted.data(), buffer_size));
+      ASSERT_OK(key.Encrypt(original.data(), buffer_size, encrypted.data()));
+      if (i > 0) {
+        // Check that we're not somehow reusing the same key.
+        ASSERT_NE(0, memcmp(encrypted.data(), prev_encrypted.data(), buffer_size));
+      }
+      memcpy(prev_encrypted.data(), encrypted.data(), buffer_size);
+
+      // We should get the original data by decrypting it.
+      ASSERT_OK(key.Decrypt(encrypted.data(), buffer_size, decrypted.data()));
+      ASSERT_EQ(0, memcmp(original.data(), decrypted.data(), buffer_size));
     }
-    memcpy(prev_encrypted.data(), encrypted.data(), buffer_size);
-
-    // We should get the original data by decrypting it.
-    ASSERT_OK(key.Decrypt(encrypted.data(), buffer_size, decrypted.data()));
-    ASSERT_EQ(0, memcmp(original.data(), decrypted.data(), buffer_size));
   }
 }
 
@@ -83,17 +88,23 @@ TEST_F(OpenSSLUtilTest, EncryptInPlace) {
   vector<uint8_t> original(buffer_size);
   vector<uint8_t> scratch(buffer_size); // Scratch buffer for in-place encryption.
 
-  GenerateRandomData(original.data(), buffer_size);
-  memcpy(scratch.data(), original.data(), buffer_size);
-
   EncryptionKey key;
-  key.InitializeRandom();
-  ASSERT_OK(key.Encrypt(scratch.data(), buffer_size, scratch.data()));
-  // Check that encryption did something
-  ASSERT_NE(0, memcmp(original.data(), scratch.data(), buffer_size));
-  ASSERT_OK(key.Decrypt(scratch.data(), buffer_size, scratch.data()));
-  // Check that we get the original data back.
-  ASSERT_EQ(0, memcmp(original.data(), scratch.data(), buffer_size));
+  // Check both CTR & CFB
+  AES_CIPHER_MODE modes[] = {AES_256_CTR, AES_256_CFB};
+  for (auto m : modes) {
+    GenerateRandomData(original.data(), buffer_size);
+    memcpy(scratch.data(), original.data(), buffer_size);
+
+    key.InitializeRandom();
+    key.SetCipherMode(m);
+
+    ASSERT_OK(key.Encrypt(scratch.data(), buffer_size, scratch.data()));
+    // Check that encryption did something
+    ASSERT_NE(0, memcmp(original.data(), scratch.data(), buffer_size));
+    ASSERT_OK(key.Decrypt(scratch.data(), buffer_size, scratch.data()));
+    // Check that we get the original data back.
+    ASSERT_EQ(0, memcmp(original.data(), scratch.data(), buffer_size));
+  }
 }
 
 /// Test that encryption works with buffer lengths that don't fit in a 32-bit integer.

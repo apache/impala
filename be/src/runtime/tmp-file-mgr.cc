@@ -612,8 +612,8 @@ void TmpFileMgr::WriteHandle::WaitForWrite() {
 Status TmpFileMgr::WriteHandle::EncryptAndHash(MemRange buffer) {
   DCHECK(FLAGS_disk_spill_encryption);
   SCOPED_TIMER(encryption_timer_);
-  // Since we're using AES-CFB mode, we must take care not to reuse a key/IV pair.
-  // Regenerate a new key and IV for every data buffer we write.
+  // Since we're using AES-CTR/AES-CFB mode, we must take care not to reuse a
+  // key/IV pair. Regenerate a new key and IV for every data buffer we write.
   key_.InitializeRandom();
   RETURN_IF_ERROR(key_.Encrypt(buffer.data(), buffer.len(), buffer.data()));
   hash_.Compute(buffer.data(), buffer.len());
