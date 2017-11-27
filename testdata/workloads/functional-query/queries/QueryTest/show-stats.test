@@ -82,11 +82,11 @@ BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 show table stats alltypesmixedformat
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
----- RESULTS
-'2009','1',-1,1,'19.59KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypesmixedformat/year=2009/month=1'
-'2009','2',-1,1,'21.35KB','NOT CACHED','NOT CACHED','SEQUENCE_FILE','false','$NAMENODE/test-warehouse/alltypesmixedformat/year=2009/month=2'
-'2009','3',-1,1,'17.42KB','NOT CACHED','NOT CACHED','RC_FILE','false','$NAMENODE/test-warehouse/alltypesmixedformat/year=2009/month=3'
-'Total','',-1,3,'58.36KB','0B','','','',''
+---- RESULTS: VERIFY_IS_EQUAL
+'2009','1',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypesmixedformat/year=2009/month=1'
+'2009','2',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','SEQUENCE_FILE','false','$NAMENODE/test-warehouse/alltypesmixedformat/year=2009/month=2'
+'2009','3',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','RC_FILE','false','$NAMENODE/test-warehouse/alltypesmixedformat/year=2009/month=3'
+'Total','',-1,3,regex:.+KB,'0B','','','',''
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
