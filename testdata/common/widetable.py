@@ -19,8 +19,7 @@
 
 # Functions for creating wide (i.e. many-column) tables. When run from the command line,
 # specify either --get_columns to generate column descriptors, or --create_data to
-# generate a CSV data file and prints a SQL load statement to incorporate
-# into dataload SQL script generation.
+# generate a CSV data file.
 
 from datetime import datetime, timedelta
 import itertools
@@ -122,7 +121,7 @@ if __name__ == "__main__":
     print '\n'.join(get_columns(options.num_columns))
 
   if options.create_data:
-    # Generate data locally, and output the SQL load command for use in dataload
+    # Generate data locally, and output the command template to load it into HDFS
     if not options.output_file:
       parser.error("--output_file option must be specified")
 
