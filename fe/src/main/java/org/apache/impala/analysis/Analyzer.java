@@ -56,6 +56,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
+import org.apache.impala.rewrite.RemoveRedundantStringCast;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -335,6 +336,7 @@ public class Analyzer {
         rules.add(EqualityDisjunctsToInRule.INSTANCE);
         rules.add(NormalizeCountStarRule.INSTANCE);
         rules.add(SimplifyDistinctFromRule.INSTANCE);
+        rules.add(RemoveRedundantStringCast.INSTANCE);
       }
       exprRewriter_ = new ExprRewriter(rules);
     }

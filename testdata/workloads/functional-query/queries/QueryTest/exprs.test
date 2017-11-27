@@ -2910,3 +2910,12 @@ where id = case cast('nan' as double) when cast('nan' as double) then 0 else 1 e
 ---- TYPES
 INT
 ====
+---- QUERY
+# Test expr rewrite behavior of RemoveRedundantStringCast with timestamp column
+select id, timestamp_col from functional.alltypestiny
+where cast(timestamp_col as string) = '2009-02-01 00:00:00'
+---- RESULTS
+2,2009-02-01 00:00:00
+---- TYPES
+int, timestamp
+====

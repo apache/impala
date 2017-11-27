@@ -23,6 +23,7 @@ import org.apache.impala.catalog.Catalog;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
+import org.apache.impala.rewrite.RemoveRedundantStringCast;
 import org.apache.impala.rewrite.SimplifyDistinctFromRule;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
@@ -579,6 +580,96 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("if(bool_col is not distinct from bool_col, 1, 2)", rules, "1");
     RewritesOk("if(bool_col <=> bool_col, 1, 2)", rules, "1");
     RewritesOk("if(bool_col <=> NULL, 1, 2)", rules, null);
+  }
+
+  @Test
+  public void TestRemoveRedundantStringCastRule() throws AnalysisException {
+    ExprRewriteRule removeRule = RemoveRedundantStringCast.INSTANCE;
+    ExprRewriteRule foldConstantRule = FoldConstantsRule.INSTANCE;
+    List<ExprRewriteRule> comboRules = Lists.newArrayList(removeRule, foldConstantRule);
+
+    // Can be simplified.
+    RewritesOk("cast(tinyint_col as string) = '100'", comboRules, "tinyint_col = 100");
+    RewritesOk("cast(smallint_col as string) = '1000'", comboRules,
+        "smallint_col = 1000");
+    RewritesOk("cast(int_col as string) = '123456'", comboRules, "int_col = 123456");
+    RewritesOk("cast(bigint_col as string) = '9223372036854775807'", comboRules,
+        "bigint_col = 9223372036854775807");
+    RewritesOk("cast(float_col as string) = '1000.5'", comboRules, "float_col = 1000.5");
+    RewritesOk("cast(double_col as string) = '1000.5'", comboRules,
+        "double_col = 1000.5");
+    RewritesOk("cast(timestamp_col as string) = '2009-01-01 00:01:00'", comboRules,
+        "timestamp_col = TIMESTAMP '2009-01-01 00:01:00'");
+    RewritesOk("functional.decimal_tiny", "cast(c1 as string) = '2.2222'", comboRules,
+        "c1 = 2.2222");
+
+    RewritesOk("cast(tinyint_col as string) = '-100'", comboRules, "tinyint_col = -100");
+    RewritesOk("cast(smallint_col as string) = '-1000'", comboRules,
+        "smallint_col = -1000");
+    RewritesOk("cast(int_col as string) = '-123456'", comboRules, "int_col = -123456");
+    RewritesOk("cast(bigint_col as string) = '-9223372036854775807'", comboRules,
+        "bigint_col = -9223372036854775807");
+    RewritesOk("cast(float_col as string) = '-1000.5'", comboRules,
+        "float_col = -1000.5");
+    RewritesOk("cast(double_col as string) = '-1000.5'", comboRules,
+        "double_col = -1000.5");
+    RewritesOk("functional.decimal_tiny", "cast(c1 as string) = '-2.2222'", comboRules,
+        "c1 = -2.2222");
+
+    // Works for VARCHAR/CHAR.
+    RewritesOk("cast(tinyint_col as char(3)) = '100'", comboRules, "tinyint_col = 100");
+    RewritesOk("cast(tinyint_col as varchar(3)) = '100'", comboRules,
+        "tinyint_col = 100");
+    RewritesOk("functional.chars_tiny", "cast(cs as string) = 'abc'",
+        comboRules, "cs = 'abc  '"); // column 'cs' is char(5), hence the trailing spaces.
+    RewritesOk("functional.chars_tiny", "cast(vc as string) = 'abc'",
+        comboRules, "vc = 'abc'");
+
+    // Works with complex expressions on both sides.
+    RewritesOk("cast(cast(int_col + 1 as double) as string) = '123456'", comboRules,
+        "CAST(int_col + 1 AS DOUBLE) = 123456");
+    RewritesOk("cast(int_col + 1 as string) = concat('123', '456')", comboRules,
+        "int_col + 1 = 123456");
+    RewritesOk("cast(int_col as string) = ltrim(concat('     123', '456'))", comboRules,
+        "int_col = 123456");
+    RewritesOk("cast(int_col as string) = strleft('123456789', 6)", comboRules,
+        "int_col = 123456");
+    RewritesOk("cast(tinyint_col as char(3)) = cast(100 as char(3))", comboRules,
+        "tinyint_col = 100");
+    RewritesOk("cast(tinyint_col as char(3)) = cast(100 as varchar(3))", comboRules,
+        "tinyint_col = 100");
+
+    // Verify nothing happens.
+    RewritesOk("cast(tinyint_col as string) = '0100'", comboRules, null);
+    RewritesOk("cast(tinyint_col as string) = '01000'", comboRules, null);
+    RewritesOk("cast(smallint_col as string) = '01000'", comboRules, null);
+    RewritesOk("cast(smallint_col as string) = '1000000000'", comboRules, null);
+    RewritesOk("cast(int_col as string) = '02147483647'", comboRules, null);
+    RewritesOk("cast(int_col as string) = '21474836470'", comboRules, null);
+    RewritesOk("cast(bigint_col as string) = '09223372036854775807'", comboRules, null);
+    RewritesOk("cast(bigint_col as string) = '92233720368547758070'", comboRules, null);
+    RewritesOk("cast(float_col as string) = '01000.5'", comboRules, null);
+    RewritesOk("cast(double_col as string) = '01000.5'", comboRules, null);
+    RewritesOk("functional.decimal_tiny", "cast(c1 as string) = '02.2222'", comboRules,
+        null);
+    RewritesOk("functional.decimal_tiny", "cast(c1 as string) = '2.22'",
+        comboRules, null);
+    RewritesOk("cast(timestamp_col as string) = '2009-15-01 00:01:00'", comboRules, null);
+    RewritesOk("cast(tinyint_col as char(4)) = '0100'", comboRules, null);
+    RewritesOk("cast(tinyint_col as varchar(4)) = '0100'", comboRules, null);
+    RewritesOk("cast(tinyint_col as char(2)) = '100'", comboRules, null);
+    RewritesOk("cast(tinyint_col as varchar(2)) = '100'", comboRules, null);
+
+    // 'NULL' is treated like any other string, so no conversion should take place.
+    RewritesOk("cast(tinyint_col as string) = 'NULL'", comboRules, null);
+    RewritesOk("cast(smallint_col as string) = 'NULL'", comboRules, null);
+    RewritesOk("cast(int_col as string) = 'NULL'", comboRules, null);
+    RewritesOk("cast(bigint_col as string) = 'NULL'", comboRules, null);
+    RewritesOk("cast(float_col as string) = 'NULL'", comboRules, null);
+    RewritesOk("cast(double_col as string) = 'NULL'", comboRules, null);
+    RewritesOk("functional.decimal_tiny", "cast(c1 as string) = 'NULL'",
+        comboRules, null);
+    RewritesOk("cast(timestamp_col as string) = 'NULL'", comboRules, null);
   }
 
   /**
