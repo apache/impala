@@ -40,7 +40,8 @@ class TestRuntimeFilters(ImpalaTestSuite):
         lambda v: v.get_value('table_format').file_format not in ['hbase'])
 
   def test_basic_filters(self, vector):
-    self.run_test_case('QueryTest/runtime_filters', vector)
+    self.run_test_case('QueryTest/runtime_filters', vector,
+        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS' : str(WAIT_TIME_MS)})
 
   def test_wait_time(self, vector):
     """Test that a query that has global filters does not wait for them if run in LOCAL

@@ -19,7 +19,7 @@ row_regex: .*RowsRead: 2.43K .*
 ---- QUERY
 # Now turn on local filtering: we expect to see a reduction in scan volume.
 # TODO: improve the Kudu profile output once KUDU-2162 is fixed.
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes p join [BROADCAST] alltypestiny b
 on p.month = b.int_col and b.month = 1 and b.string_col = "1"
@@ -41,7 +41,7 @@ row_regex: .*RowsRead: 206 .*
 
 # Local mode. Filters won't be propagated to scan, so scans will read all rows.
 # Still give enough time for filters to show up (even if they won't)
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes p join [SHUFFLE] alltypestiny b
 on p.month = b.int_col and b.month = 1 and b.string_col = "1"
@@ -52,7 +52,7 @@ row_regex: .*RowsRead: 2.43K .*
 ====
 ---- QUERY
 # Shuffle join, global mode. Expect filters to be propagated.
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes p join [SHUFFLE] alltypestiny b
 on p.month = b.int_col and b.month = 1 and b.string_col = "1"
@@ -76,7 +76,7 @@ row_regex: .*RowsRead: 206 .*
 
 # Local mode. Only the left-most scan will receive its filter, but since the scan of 'b'
 # will not, the lack of predicates means there is no filter effect.
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] alltypes b
@@ -92,7 +92,7 @@ row_regex: .*RowsRead: 2.43K .*
 ---- QUERY
 # Global mode. Scan of 'b' will receive highly effective filter, and will propagate that
 # to left-most scan.
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] alltypes b
@@ -116,7 +116,7 @@ row_regex: .*ScanRangesComplete: 0 .*
 # For Kudu, the target is not a single column, so no filters will be created.
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] alltypestiny b
@@ -137,7 +137,7 @@ row_regex: .*RowsRead: 2.43K .*
 ####################################################
 
 # Local mode. Coordinator should report 0 filter updates received.
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] alltypestiny b
@@ -149,7 +149,7 @@ row_regex: .*FiltersReceived: 0 .*
 ====
 ---- QUERY
 # Global mode. Coordinator should report 0 filter updates received.
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] alltypestiny b
@@ -171,7 +171,7 @@ row_regex: .*RowsRead: 0 .*
 ####################################################
 
 # Local mode. Coordinator should report 0 filter updates received.
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [SHUFFLE] alltypestiny b
@@ -183,7 +183,7 @@ row_regex: .*FiltersReceived: 0 .*
 ====
 ---- QUERY
 # Global mode. Coordinator should report 1 filter update per backend.
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [SHUFFLE] alltypestiny b
@@ -202,7 +202,7 @@ row_regex: .*FiltersReceived: 3 .*
 # For Kudu, the target is not a single column, so no filters will be created.
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=LOCAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] alltypestiny b
@@ -221,7 +221,7 @@ row_regex: .*RowsRead: 2.43K .*
 # Test case 8: filters do not pass through LOJ.
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     LEFT OUTER join alltypestiny b
@@ -239,7 +239,7 @@ row_regex: .*RowsReturned: 2.43K .*
 # All partitions will be filtered out by the join condition.
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     RIGHT OUTER join alltypestiny b
@@ -257,7 +257,7 @@ row_regex: .*RowsRead: 0 .*
 # Test case 10: filters do not pass through FOJ.
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
     FULL OUTER join alltypestiny b
@@ -281,7 +281,7 @@ row_regex: .*RowsReturned: 2.43K .*
 # For Kudu, 'IS NOT DISTINCT' is not supported for runtime filters.
 ####################################################
 
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypesagg a
     join alltypesagg b
@@ -303,7 +303,7 @@ row_regex: .*RowsRead: 3.67K .*
 # join in its root, which produces filters for the scan of t1.
 ####################################################
 
-set RUNTIME_FILTER_WAIT_TIME_MS=30000;
+set RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 set RUNTIME_FILTER_MODE=GLOBAL;
 with t1 as (select month x, bigint_col y from alltypes limit 7300),
      t2 as (select distinct int_col x, bigint_col y from alltypestiny limit 2)
@@ -337,7 +337,7 @@ select STRAIGHT_JOIN count(a.id) from alltypes a
 # In this three-way join the filter produced by the top-level
 # join has both a local and a remote target.
 ####################################################
-set RUNTIME_FILTER_WAIT_TIME_MS=30000;
+set RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 set RUNTIME_FILTER_MODE=GLOBAL;
 select straight_join count(*)
 from alltypes a join [BROADCAST] alltypessmall c
@@ -352,7 +352,7 @@ from alltypes a join [BROADCAST] alltypessmall c
 ####################################################
 # Test case 15: Runtime filter pushed to all union operands
 ####################################################
-set RUNTIME_FILTER_WAIT_TIME_MS=30000;
+set RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 set RUNTIME_FILTER_MODE=GLOBAL;
 select straight_join count(*)
 from (select month, year from alltypes
@@ -370,7 +370,7 @@ where b.int_col = 1;
 # Test case 16: Both HDFS and Kudu targets results in both bloom and min-max filters
 # being generated
 ####################################################
-set RUNTIME_FILTER_WAIT_TIME_MS=30000;
+set RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 set RUNTIME_FILTER_MODE=GLOBAL;
 select straight_join count(*)
 from functional_parquet.alltypes a join [BROADCAST] functional_kudu.alltypes b
