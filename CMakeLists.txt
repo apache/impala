@@ -49,6 +49,8 @@ endif(NOT CMAKE_BUILD_TYPE)
 STRING (TOUPPER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE)
 
 message(STATUS "Build type is ${CMAKE_BUILD_TYPE}")
+# Write the build type to a file so that tests can determine the current build type.
+file(WRITE "${CMAKE_SOURCE_DIR}/.cmake_build_type" ${CMAKE_BUILD_TYPE})
 
 set(ENABLE_CODE_COVERAGE false)
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE_DEBUG")

@@ -42,12 +42,10 @@ hdfs == 2.0.2
   docopt == 0.6.2
   execnet == 1.4.0
 kazoo == 2.2.1
-monkeypatch == 0.1rc3
 ordereddict == 1.1
 pexpect == 3.3
 pg8000 == 1.10.2
 prettytable == 0.7.2
-pyelftools == 0.23
 pyparsing == 2.0.3
 pytest == 2.9.2
   py == 1.4.32

@@ -34,3 +34,4 @@ for loc in "${ROOT_DIR}/ -maxdepth 1" "${ROOT_DIR}/be/" "${ROOT_DIR}/fe/" "${ROO
   find ${loc} \( -iname CMakeCache.txt -o -iname CMakeFiles \
        -o -iname CTestTestfile.cmake -o -iname cmake_install.cmake \) -exec rm -Rf {} +
 done
+rm -f ${IMPALA_HOME}/.cmake_build_type

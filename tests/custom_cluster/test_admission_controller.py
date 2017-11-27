@@ -107,9 +107,9 @@ ROUND_ROBIN_SUBMISSION = [True, False]
 # pool with the parameters below.
 POOL_NAME = "default-pool"
 
-# Stress test timeout (seconds). The timeout needs to be significantly higher in code
-# coverage builds (IMPALA-3790).
-STRESS_TIMEOUT = specific_build_type_timeout(60, code_coverage_build_timeout=600)
+# Stress test timeout (seconds). The timeout needs to be significantly higher for
+# slow builds like code coverage and ASAN (IMPALA-3790, IMPALA-6241).
+STRESS_TIMEOUT = specific_build_type_timeout(60, slow_build_timeout=600)
 
 # The number of queries that can execute concurrently in the pool POOL_NAME.
 MAX_NUM_CONCURRENT_QUERIES = 5

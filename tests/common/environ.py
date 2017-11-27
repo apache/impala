@@ -19,30 +19,14 @@ import logging
 import os
 import re
 
-try:
-  from elftools.elf.elffile import ELFFile
-except ImportError as e:
-  # Handle pre-python2.7s' lack of collections.OrderedDict, which we include in
-  # impala-python as ordereddict.OrderedDict.
-  if 'cannot import name OrderedDict' == str(e):
-    import monkeypatch
-    from ordereddict import OrderedDict
-    monkeypatch.patch(OrderedDict, 'collections', 'OrderedDict')
-    from elftools.elf.elffile import ELFFile
-  else:
-    raise e
-
-
 LOG = logging.getLogger('tests.common.environ')
-
 test_start_cluster_args = os.environ.get("TEST_START_CLUSTER_ARGS", "")
+IMPALA_HOME = os.environ.get("IMPALA_HOME", "")
 
 # Find the likely BuildType of the running Impala. Assume it's found through the path
 # $IMPALA_HOME/be/build/latest as a fallback.
-impala_home = os.environ.get("IMPALA_HOME", "")
 build_type_arg_regex = re.compile(r'--build_type=(\w+)', re.I)
 build_type_arg_search_result = re.search(build_type_arg_regex, test_start_cluster_args)
-
 if build_type_arg_search_result is not None:
   build_type_dir = build_type_search_result.groups()[0].lower()
 else:
@@ -50,48 +34,64 @@ else:
 
 # Resolve any symlinks in the path.
 impalad_basedir = \
-    os.path.realpath(os.path.join(impala_home, 'be/build', build_type_dir)).rstrip('/')
-
-IMPALAD_PATH = os.path.join(impalad_basedir, 'service', 'impalad')
-
+    os.path.realpath(os.path.join(IMPALA_HOME, 'be/build', build_type_dir)).rstrip('/')
 
 class SpecificImpaladBuildTypes:
   """
-  Represent a specific build type. These specific build types are needed by Python test
-  code.
-
-  The specific build types and their *most distinguishing* compiler options are:
-
-  1. ADDRESS_SANITIZER (clang -fsanitize=address)
-  2. DEBUG (gcc -ggdb)
-  3. DEBUG_CODE_COVERAGE (gcc -ggdb -ftest-coverage)
-  4. RELEASE (gcc)
-  5. RELEASE_CODE_COVERAGE (gcc -ftest-coverage)
-  6. THREAD_SANITIZER (clang -fsanitize=thread)
+  Represents the possible CMAKE_BUILD_TYPE values. These specific build types are needed
+  by Python test code, e.g. to set different timeouts for different builds. All values
+  are lower-cased to enable case-insensitive comparison.
   """
   # ./buildall.sh -asan
   ADDRESS_SANITIZER = 'address_sanitizer'
   # ./buildall.sh
   DEBUG = 'debug'
-  # ./buildall.sh -codecoverage
-  DEBUG_CODE_COVERAGE = 'debug_code_coverage'
   # ./buildall.sh -release
   RELEASE = 'release'
+  # ./buildall.sh -codecoverage
+  CODE_COVERAGE_DEBUG = 'code_coverage_debug'
   # ./buildall.sh -release -codecoverage
-  RELEASE_CODE_COVERAGE = 'release_code_coverage'
+  CODE_COVERAGE_RELEASE = 'code_coverage_release'
   # ./buildall.sh -tsan
-  THREAD_SANITIZER = 'thread_sanitizer'
+  TSAN = 'tsan'
+  # ./buildall.sh -ubsan
+  UBSAN = 'ubsan'
+
+  VALID_BUILD_TYPES = [ADDRESS_SANITIZER, DEBUG, CODE_COVERAGE_DEBUG, RELEASE,
+      CODE_COVERAGE_RELEASE, TSAN, UBSAN]
+
+  @classmethod
+  def detect(cls, impala_build_root):
+    """
+    Determine the build type based on the .cmake_build_type file created by
+    ${IMPALA_HOME}/CMakeLists.txt. impala_build_root should be the path of the
+    Impala source checkout, i.e. ${IMPALA_HOME}.
+    """
+    build_type_path = os.path.join(impala_build_root, ".cmake_build_type")
+    try:
+      with open(build_type_path) as build_type_file:
+        build_type = build_type_file.read().strip().lower()
+    except IOError:
+      LOG.error("Could not open %s assuming DEBUG", build_type_path)
+      return cls.DEBUG
+
+    if build_type not in cls.VALID_BUILD_TYPES:
+      raise Exception("Unknown build type {0}".format(build_type))
+    LOG.debug("Build type detected: %s", build_type)
+    return build_type
+
 
 
 class ImpaladBuild(object):
   """
   Acquires and provides characteristics about the way the Impala under test was compiled
-  and its likely effects on its responsiveness to automated test timings.
+  and its likely effects on its responsiveness to automated test timings. Currently
+  assumes that the Impala daemon under test was built in our current source checkout.
+  TODO: we could get this information for remote cluster tests if we exposed the build
+  type via a metric or the Impalad web UI.
   """
-  def __init__(self, impalad_path):
-    self.impalad_path = impalad_path
-    die_name, die_producer = self._get_impalad_dwarf_info()
-    self._set_impalad_build_type(die_name, die_producer)
+  def __init__(self, impala_build_root):
+    self._specific_build_type = SpecificImpaladBuildTypes.detect(impala_build_root)
 
   @property
   def specific_build_type(self):
@@ -104,8 +104,8 @@ class ImpaladBuild(object):
     """
     Return whether the Impala under test was compiled with code coverage enabled.
     """
-    return self.specific_build_type in (SpecificImpaladBuildTypes.DEBUG_CODE_COVERAGE,
-                                        SpecificImpaladBuildTypes.RELEASE_CODE_COVERAGE)
+    return self.specific_build_type in (SpecificImpaladBuildTypes.CODE_COVERAGE_DEBUG,
+                                        SpecificImpaladBuildTypes.CODE_COVERAGE_RELEASE)
 
   def is_asan(self):
     """
@@ -117,7 +117,13 @@ class ImpaladBuild(object):
     """
     Return whether the Impala under test was compiled with TSAN.
     """
-    return self.specific_build_type == SpecificImpaladBuildTypes.THREAD_SANITIZER
+    return self.specific_build_type == SpecificImpaladBuildTypes.TSAN
+
+  def is_ubsan(self):
+    """
+    Return whether the Impala under test was compiled with UBSAN.
+    """
+    return self.specific_build_type == SpecificImpaladBuildTypes.UBSAN
 
   def is_dev(self):
     """
@@ -126,97 +132,18 @@ class ImpaladBuild(object):
     """
     return self.specific_build_type in (
         SpecificImpaladBuildTypes.ADDRESS_SANITIZER, SpecificImpaladBuildTypes.DEBUG,
-        SpecificImpaladBuildTypes.DEBUG_CODE_COVERAGE,
-        SpecificImpaladBuildTypes.THREAD_SANITIZER)
+        SpecificImpaladBuildTypes.CODE_COVERAGE_DEBUG,
+        SpecificImpaladBuildTypes.TSAN, SpecificImpaladBuildTypes.UBSAN)
 
   def runs_slowly(self):
     """
     Return whether the Impala under test "runs slowly". For our purposes this means
-    either compiled with code coverage enabled, ASAN or TSAN.
+    either compiled with code coverage enabled or one of the sanitizers.
     """
-    return self.has_code_coverage() or self.is_asan() or self.is_tsan()
-
-  def _get_impalad_dwarf_info(self):
-    """
-    Read the impalad_path ELF binary, which is supposed to contain DWARF, and read the
-    DWARF to understand the compiler options. Return a 2-tuple of the two useful DIE
-    attributes of the first compile unit: the DW_AT_name and DW_AT_producer. If
-    something goes wrong doing this, log a warning and return nothing.
-    """
-    # Some useful references:
-    # - be/CMakeLists.txt
-    # - gcc(1), especially -grecord-gcc-switches, -g, -ggdb, -gdwarf-2
-    # - readelf(1)
-    # - general reading about DWARF
-    # A useful command for exploration without having to wade through many bytes is:
-    # readelf --debug-dump=info --dwarf-depth=1 impalad
-    # The DWARF lines are long, raw, and nasty; I'm hesitant to paste them here, so
-    # curious readers are highly encouraged to try the above, or read IMPALA-3501.
-    die_name = None
-    die_producer = None
-    try:
-      with open(self.impalad_path, 'rb') as fh:
-        impalad_elf = ELFFile(fh)
-        if impalad_elf.has_dwarf_info():
-          dwarf_info = impalad_elf.get_dwarf_info()
-          # We only need the first CU, hence the unconventional use of the iterator
-          # protocol.
-          cu_iterator = dwarf_info.iter_CUs()
-          first_cu = next(cu_iterator)
-          top_die = first_cu.get_top_DIE()
-          die_name = top_die.attributes['DW_AT_name'].value
-          die_producer = top_die.attributes['DW_AT_producer'].value
-    except Exception as e:
-      LOG.warn('Failure to read DWARF info from {0}: {1}'.format(self.impalad_path,
-                                                                 str(e)))
-    return die_name, die_producer
-
-  def _set_impalad_build_type(self, die_name, die_producer):
-    """
-    Use a heuristic based on the DW_AT_producer and DW_AT_name of the first compile
-    unit, as returned by _get_impalad_dwarf_info(), to figure out which of 5 supported
-    builds of impalad we're dealing with. If the heuristic can't determine, fall back to
-    assuming a debug build and log a warning.
-    """
-    ASAN_CU_NAME = 'asan_preinit.cc'
-    TSAN_CU_NAME = 'tsan_clock.cc'
-    DEFAULT_CU_NAME = 'daemon-main.cc'
-    GDB_FLAG = '-ggdb'
-    CODE_COVERAGE_FLAG = '-ftest-coverage'
-
-    if die_name is None or die_producer is None:
-      LOG.warn('Not enough DWARF info in {0} to determine build type; choosing '
-               'DEBUG'.format(self.impalad_path))
-      self._specific_build_type = SpecificImpaladBuildTypes.DEBUG
-      return
-
-    is_debug = GDB_FLAG in die_producer
-    specific_build_type = SpecificImpaladBuildTypes.DEBUG
-
-    if die_name.endswith(ASAN_CU_NAME):
-      specific_build_type = SpecificImpaladBuildTypes.ADDRESS_SANITIZER
-    if die_name.endswith(TSAN_CU_NAME):
-      specific_build_type = SpecificImpaladBuildTypes.THREAD_SANITIZER
-    elif not die_name.endswith(DEFAULT_CU_NAME):
-      LOG.warn('Unexpected DW_AT_name in first CU: {0}; choosing '
-               'DEBUG'.format(die_name))
-      specific_build_type = SpecificImpaladBuildTypes.DEBUG
-    elif CODE_COVERAGE_FLAG in die_producer:
-      if is_debug:
-        specific_build_type = SpecificImpaladBuildTypes.DEBUG_CODE_COVERAGE
-      else:
-        specific_build_type = SpecificImpaladBuildTypes.RELEASE_CODE_COVERAGE
-    else:
-      if is_debug:
-        specific_build_type = SpecificImpaladBuildTypes.DEBUG
-      else:
-        specific_build_type = SpecificImpaladBuildTypes.RELEASE
-
-    self._specific_build_type = specific_build_type
+    return self.has_code_coverage() or self.is_asan() or self.is_tsan() or self.is_ubsan()
 
 
-IMPALAD_BUILD = ImpaladBuild(IMPALAD_PATH)
-
+IMPALAD_BUILD = ImpaladBuild(IMPALA_HOME)
 
 def specific_build_type_timeout(
     default_timeout, slow_build_timeout=None, asan_build_timeout=None,

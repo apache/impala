@@ -29,6 +29,7 @@ CMakeFiles
 cmake_install.cmake
 CTestTestfile.cmake
 !CMakeLists.txt
+.cmake_build_type
 .ninja_deps
 .ninja_log
 build.ninja
