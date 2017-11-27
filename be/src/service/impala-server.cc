@@ -1372,7 +1372,7 @@ void ImpalaServer::CatalogUpdateCallback(
             catalog_object.catalog.catalog_service_id);
         new_catalog_version = catalog_object.catalog_version;
       }
-      VLOG(3) << (item.deleted ? "Deleted " : "Added ") << "item: " << item.key
+      VLOG(1) << (item.deleted ? "Deleted " : "Added ") << "item: " << item.key
           << " version: " << catalog_object.catalog_version << " of size: " << len;
 
       if (!item.deleted) {
