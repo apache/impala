@@ -20,7 +20,6 @@ package org.apache.impala.catalog;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -68,7 +67,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.primitives.Ints;
-import com.google.common.primitives.Shorts;
 import com.google.flatbuffers.FlatBufferBuilder;
 
 /**
@@ -308,10 +306,10 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
         fbb.addShort(replicaIdx);
       }
       int fbReplicaHostIdxOffset = fbb.endVector();
-
-      // disk ids
       short[] diskIds = createDiskIds(loc, numUnknownDiskIds);
-      Preconditions.checkState(diskIds.length != 0);
+      Preconditions.checkState(diskIds.length == loc.getNames().length,
+          "Mismatch detected between number of diskIDs and block locations for block: " +
+          loc.toString());
       int fbDiskIdsOffset = FbFileBlock.createDiskIdsVector(fbb, diskIds);
       FbFileBlock.startFbFileBlock(fbb);
       FbFileBlock.addOffset(fbb, loc.getOffset());
@@ -345,20 +343,17 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
      * disk ids and populates 'numUnknownDiskIds' with the number of unknown disk ids.
      */
     private static short[] createDiskIds(BlockLocation location,
-        Reference<Long> numUnknownDiskIds) {
+        Reference<Long> numUnknownDiskIds) throws IOException {
       long unknownDiskIdCount = 0;
       String[] storageIds = location.getStorageIds();
-      String[] hosts;
-      try {
-        hosts = location.getHosts();
-      } catch (IOException e) {
-        LOG.error("Couldn't get hosts for block: " + location.toString(), e);
-        return new short[0];
-      }
+      String[] hosts = location.getHosts();
       if (storageIds.length != hosts.length) {
-        LOG.error("Number of storage IDs and number of hosts for block: " + location
-            .toString() + " mismatch. Skipping disk ID loading for this block.");
-        return Shorts.toArray(Collections.<Short>emptyList());
+        if (LOG.isTraceEnabled()) {
+          LOG.trace(String.format("Number of storage IDs and number of hosts for block " +
+              "%s mismatch (storageIDs:hosts) %d:%d. Skipping disk ID loading for this " +
+              "block.", location.toString(), storageIds.length, hosts.length));
+        }
+        storageIds = new String[hosts.length];
       }
       short[] diskIDs = new short[storageIds.length];
       for (int i = 0; i < storageIds.length; ++i) {
