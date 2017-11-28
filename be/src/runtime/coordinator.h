@@ -183,6 +183,10 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// 'backend_states'.
   void BackendsToJson(rapidjson::Document* document);
 
+  /// Adds to 'document' a serialized array of all backend names and stats of all fragment
+  /// instances running on each backend in a member named 'backend_instances'.
+  void FInstanceStatsToJson(rapidjson::Document* document);
+
  private:
   class BackendState;
   struct FilterTarget;

@@ -50,7 +50,7 @@ enum TParquetFallbackSchemaResolution {
   NAME
 }
 
-// The order of the enum values needs to be kepy in sync with
+// The order of the enum values needs to be kept in sync with
 // ParquetMetadataUtils::ORDERED_ARRAY_ENCODINGS in parquet-metadata-utils.cc.
 enum TParquetArrayResolution {
   THREE_LEVEL,
@@ -606,6 +606,21 @@ struct TErrorLogEntry {
   2: list<string> messages
 }
 
+// Represents the states that a fragment instance goes through during its execution. The
+// current state gets sent back to the coordinator and will be presented to users through
+// the debug webpages.
+enum TFInstanceExecState {
+  WAITING_FOR_EXEC,
+  WAITING_FOR_CODEGEN,
+  WAITING_FOR_PREPARE,
+  WAITING_FOR_OPEN,
+  WAITING_FOR_FIRST_BATCH,
+  FIRST_BATCH_PRODUCED,
+  PRODUCING_DATA,
+  LAST_BATCH_SENT,
+  FINISHED
+}
+
 struct TFragmentInstanceExecStatus {
   // required in V1
   1: optional Types.TUniqueId fragment_instance_id
@@ -621,6 +636,10 @@ struct TFragmentInstanceExecStatus {
   // cumulative profile
   // required in V1
   4: optional RuntimeProfile.TRuntimeProfileTree profile
+
+  // The current state of this fragment instance's execution.
+  // required in V1
+  5: optional TFInstanceExecState current_state
 }
 
 struct TReportExecStatusParams {

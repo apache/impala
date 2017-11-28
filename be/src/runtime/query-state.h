@@ -109,7 +109,7 @@ class QueryState {
   }
   MemTracker* query_mem_tracker() const { return query_mem_tracker_; }
 
-  // the following getters are only valid after Prepare()
+  // the following getters are only valid after Init()
   ReservationTracker* buffer_reservation() const { return buffer_reservation_; }
   InitialReservations* initial_reservations() const { return initial_reservations_; }
   TmpFileMgr::FileGroup* file_group() const { return file_group_; }
@@ -117,6 +117,7 @@ class QueryState {
 
   // the following getters are only valid after StartFInstances()
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
+  int64_t fragment_events_start_time() const { return fragment_events_start_time_; }
 
   /// Sets up state required for fragment execution: memory reservations, etc. Fails
   /// if resources could not be acquired. Acquires a resource refcount and returns it
@@ -242,6 +243,10 @@ class QueryState {
   /// when the query first starts to spill. Required to correctly maintain the
   /// "num-queries-spilled" metric.
   AtomicInt32 query_spilled_;
+
+  /// Records the point in time when fragment instances are started up. Set in
+  /// StartFInstances().
+  int64_t fragment_events_start_time_ = 0;
 
   /// Create QueryState w/ refcnt of 0.
   /// The query is associated with the resource pool query_ctx.request_pool or
