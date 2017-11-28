@@ -1091,7 +1091,6 @@ public class CatalogOpExecutor {
     removedObject.setCatalog_version(dataSource.getCatalogVersion());
     resp.result.addToRemoved_catalog_objects(removedObject);
     resp.result.setVersion(dataSource.getCatalogVersion());
-    catalog_.getDeleteLog().addRemovedObject(removedObject);
   }
 
   /**
@@ -1274,7 +1273,6 @@ public class CatalogOpExecutor {
     removedObject.getDb().setDb_name(params.getDb());
     resp.result.setVersion(removedObject.getCatalog_version());
     resp.result.addToRemoved_catalog_objects(removedObject);
-    catalog_.getDeleteLog().addRemovedObject(removedObject);
   }
 
   /**
@@ -1396,7 +1394,6 @@ public class CatalogOpExecutor {
     removedObject.getTable().setTbl_name(tableName.getTbl());
     removedObject.getTable().setDb_name(tableName.getDb());
     removedObject.setCatalog_version(resp.result.getVersion());
-    catalog_.getDeleteLog().addRemovedObject(removedObject);
     resp.result.addToRemoved_catalog_objects(removedObject);
   }
 
@@ -1524,9 +1521,6 @@ public class CatalogOpExecutor {
 
       if (!removedFunctions.isEmpty()) {
         resp.result.setRemoved_catalog_objects(removedFunctions);
-        for (TCatalogObject removedFnObject: removedFunctions) {
-          catalog_.getDeleteLog().addRemovedObject(removedFnObject);
-        }
       }
       resp.result.setVersion(catalog_.getCatalogVersion());
     }
@@ -2223,7 +2217,6 @@ public class CatalogOpExecutor {
     removedObject.setTable(new TTable(tableName.getDb(), tableName.getTbl()));
     removedObject.setCatalog_version(addedObject.getCatalog_version());
     response.result.addToRemoved_catalog_objects(removedObject);
-    catalog_.getDeleteLog().addRemovedObject(removedObject);
     response.result.addToUpdated_catalog_objects(addedObject);
     response.result.setVersion(addedObject.getCatalog_version());
   }
@@ -2816,7 +2809,6 @@ public class CatalogOpExecutor {
     catalogObject.setCatalog_version(role.getCatalogVersion());
     if (createDropRoleParams.isIs_drop()) {
       resp.result.addToRemoved_catalog_objects(catalogObject);
-      catalog_.getDeleteLog().addRemovedObject(catalogObject);
     } else {
       resp.result.addToUpdated_catalog_objects(catalogObject);
     }
@@ -2879,9 +2871,6 @@ public class CatalogOpExecutor {
       catalogObject.setPrivilege(rolePriv.toThrift());
       catalogObject.setCatalog_version(rolePriv.getCatalogVersion());
       updatedPrivs.add(catalogObject);
-      if (!grantRevokePrivParams.isIs_grant() && !privileges.get(0).isHas_grant_opt()) {
-        catalog_.getDeleteLog().addRemovedObject(catalogObject);
-      }
     }
 
     // TODO: Currently we only support sending back 1 catalog object in a "direct DDL"
@@ -3053,9 +3042,6 @@ public class CatalogOpExecutor {
           resp.result.setUpdated_catalog_objects(addedFuncs);
           resp.result.setRemoved_catalog_objects(removedFuncs);
           resp.result.setVersion(catalog_.getCatalogVersion());
-          for (TCatalogObject removedFn: removedFuncs) {
-            catalog_.getDeleteLog().addRemovedObject(removedFn);
-          }
         }
       }
     } else if (req.isSetTable_name()) {
@@ -3093,7 +3079,6 @@ public class CatalogOpExecutor {
         // processed as a direct DDL operation.
         if (tblWasRemoved.getRef()) {
           resp.getResult().addToRemoved_catalog_objects(updatedThriftTable);
-          catalog_.getDeleteLog().addRemovedObject(updatedThriftTable);
         } else {
           resp.getResult().addToUpdated_catalog_objects(updatedThriftTable);
         }

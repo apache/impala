@@ -228,10 +228,13 @@ void CatalogServer::UpdateCatalogTopicCallback(
 
   const TTopicDelta& delta = topic->second;
 
-  // If not generating a delta update and 'pending_topic_updates_' doesn't already contain
-  // the full catalog (beginning with version 0), then force GatherCatalogUpdatesThread()
-  // to reload the full catalog.
-  if (delta.from_version == 0 && catalog_objects_min_version_ != 0) {
+  // If this is not a delta update, clear all catalog objects and request an update
+  // from version 0 from the local catalog. There is an optimization that checks if
+  // pending_topic_updates_ was just reloaded from version 0, if they have then skip this
+  // step and use that data.
+  if (delta.from_version == 0 && delta.to_version == 0 &&
+      catalog_objects_min_version_ != 0) {
+    catalog_topic_entry_keys_.clear();
     last_sent_catalog_version_ = 0L;
   } else {
     // Process the pending topic update.
@@ -281,17 +284,14 @@ void CatalogServer::UpdateCatalogTopicCallback(
     } else if (current_catalog_version != last_sent_catalog_version_) {
       // If there has been a change since the last time the catalog was queried,
       // call into the Catalog to find out what has changed.
-      TGetCatalogDeltaResponse catalog_objects;
-      status = catalog_->GetCatalogDelta(last_sent_catalog_version_, &catalog_objects);
+      TGetAllCatalogObjectsResponse catalog_objects;
+      status = catalog_->GetAllCatalogObjects(last_sent_catalog_version_,
+          &catalog_objects);
       if (!status.ok()) {
         LOG(ERROR) << status.GetDetail();
       } else {
-        // Use the catalog objects to build a topic update list. These include
-        // objects added to the catalog, 'updated_objects', and objects deleted
-        // from the catalog, 'deleted_objects'. The order in which we process
-        // these two disjoint sets of catalog objects does not matter.
-        BuildTopicUpdates(catalog_objects.updated_objects, false);
-        BuildTopicUpdates(catalog_objects.deleted_objects, true);
+        // Use the catalog objects to build a topic update list.
+        BuildTopicUpdates(catalog_objects.objects);
         catalog_objects_min_version_ = last_sent_catalog_version_;
         catalog_objects_max_version_ = catalog_objects.max_catalog_version;
       }
@@ -302,19 +302,31 @@ void CatalogServer::UpdateCatalogTopicCallback(
   }
 }
 
-void CatalogServer::BuildTopicUpdates(const vector<TCatalogObject>& catalog_objects,
-    bool topic_deletions) {
+void CatalogServer::BuildTopicUpdates(const vector<TCatalogObject>& catalog_objects) {
+  unordered_set<string> current_entry_keys;
+  // Add any new/updated catalog objects to the topic.
   for (const TCatalogObject& catalog_object: catalog_objects) {
-    DCHECK_GT(catalog_object.catalog_version, last_sent_catalog_version_);
     const string& entry_key = TCatalogObjectToEntryKey(catalog_object);
     if (entry_key.empty()) {
       LOG_EVERY_N(WARNING, 60) << "Unable to build topic entry key for TCatalogObject: "
                                << ThriftDebugString(catalog_object);
     }
+
+    current_entry_keys.insert(entry_key);
+    // Remove this entry from catalog_topic_entry_keys_. At the end of this loop, we will
+    // be left with the set of keys that were in the last update, but not in this
+    // update, indicating which objects have been removed/dropped.
+    catalog_topic_entry_keys_.erase(entry_key);
+
+    // This isn't a new or an updated item, skip it.
+    if (catalog_object.catalog_version <= last_sent_catalog_version_) continue;
+
+    VLOG(1) << "Publishing update: " << entry_key << "@"
+            << catalog_object.catalog_version;
+
     pending_topic_updates_.push_back(TTopicItem());
     TTopicItem& item = pending_topic_updates_.back();
     item.key = entry_key;
-    item.deleted = topic_deletions;
     Status status = thrift_serializer_.Serialize(&catalog_object, &item.value);
     if (!status.ok()) {
       LOG(ERROR) << "Error serializing topic value: " << status.GetDetail();
@@ -328,9 +340,18 @@ void CatalogServer::BuildTopicUpdates(const vector<TCatalogObject>& catalog_obje
         pending_topic_updates_.pop_back();
       }
     }
-    VLOG(1) << "Publishing " << (topic_deletions ? "deletion " : "update ")
-        << ": " << entry_key << "@" << catalog_object.catalog_version;
   }
+
+  // Any remaining items in catalog_topic_entry_keys_ indicate the object was removed
+  // since the last update.
+  for (const string& key: catalog_topic_entry_keys_) {
+    pending_topic_updates_.push_back(TTopicItem());
+    TTopicItem& item = pending_topic_updates_.back();
+    item.key = key;
+    VLOG(1) << "Publishing deletion: " << key;
+    // Don't set a value to mark this item as deleted.
+  }
+  catalog_topic_entry_keys_.swap(current_entry_keys);
 }
 
 void CatalogServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,

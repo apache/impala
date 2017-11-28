@@ -428,9 +428,12 @@ class AdmissionController {
   void AddPoolUpdates(std::vector<TTopicDelta>* subscriber_topic_updates);
 
   /// Updates the remote stats with per-host topic_updates coming from the statestore.
-  /// Removes remote stats identified by topic deletions coming from the
-  /// statestore. Called by UpdatePoolStats(). Must hold admission_ctrl_lock_.
+  /// Called by UpdatePoolStats(). Must hold admission_ctrl_lock_.
   void HandleTopicUpdates(const std::vector<TTopicItem>& topic_updates);
+
+  /// Removes remote stats identified by the topic_deletions coming from the statestore.
+  /// Called by UpdatePoolStats(). Must hold admission_ctrl_lock_.
+  void HandleTopicDeletions(const std::vector<std::string>& topic_deletions);
 
   /// Re-computes the per-pool aggregate stats and the per-host aggregates in
   /// host_mem_reserved_ using each pool's remote_stats_ and local_stats_.
