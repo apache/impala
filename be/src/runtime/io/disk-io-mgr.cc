@@ -38,6 +38,8 @@ using namespace impala;
 using namespace impala::io;
 using namespace strings;
 
+using std::to_string;
+
 // Control the number of disks on the machine.  If 0, this comes from the system
 // settings.
 DEFINE_int32(num_disks, 0, "Number of disks on data node.");
@@ -303,20 +305,28 @@ Status DiskIoMgr::Init(MemTracker* process_mem_tracker) {
   for (int i = 0; i < disk_queues_.size(); ++i) {
     disk_queues_[i] = new DiskQueue(i);
     int num_threads_per_disk;
+    string device_name;
     if (i == RemoteDfsDiskId()) {
       num_threads_per_disk = FLAGS_num_remote_hdfs_io_threads;
+      device_name = "HDFS remote";
     } else if (i == RemoteS3DiskId()) {
       num_threads_per_disk = FLAGS_num_s3_io_threads;
+      device_name = "S3 remote";
     } else if (i == RemoteAdlsDiskId()) {
       num_threads_per_disk = FLAGS_num_adls_io_threads;
+      device_name = "ADLS remote";
     } else if (DiskInfo::is_rotational(i)) {
       num_threads_per_disk = num_io_threads_per_rotational_disk_;
+      // During tests, i may not point to an existing disk.
+      device_name = i < DiskInfo::num_disks() ? DiskInfo::device_name(i) : to_string(i);
     } else {
       num_threads_per_disk = num_io_threads_per_solid_state_disk_;
+      // During tests, i may not point to an existing disk.
+      device_name = i < DiskInfo::num_disks() ? DiskInfo::device_name(i) : to_string(i);
     }
     for (int j = 0; j < num_threads_per_disk; ++j) {
       stringstream ss;
-      ss << "work-loop(Disk: " << i << ", Thread: " << j << ")";
+      ss << "work-loop(Disk: " << device_name << ", Thread: " << j << ")";
       std::unique_ptr<Thread> t;
       RETURN_IF_ERROR(Thread::Create("disk-io-mgr", ss.str(), &DiskIoMgr::WorkLoop,
           this, disk_queues_[i], &t));

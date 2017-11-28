@@ -30,6 +30,7 @@ class TestWebPage(ImpalaTestSuite):
   CATALOG_URL = "http://localhost:{0}/catalog"
   CATALOG_OBJECT_URL = "http://localhost:{0}/catalog_object"
   QUERY_BACKENDS_URL = "http://localhost:{0}/query_backends"
+  THREAD_GROUP_URL = "http://localhost:{0}/thread-group"
   # log4j changes do not apply to the statestore since it doesn't
   # have an embedded JVM. So we make two sets of ports to test the
   # log level endpoints, one without the statestore port and the
@@ -185,3 +186,16 @@ class TestWebPage(ImpalaTestSuite):
           assert 'backend_states' not in response_json
       finally:
         self.client.cancel(query_handle)
+
+  def test_io_mgr_threads(self):
+    """Test that IoMgr threads have readable names. This test assumed that all systems we
+    support have a disk called 'sda'."""
+    response = self.get_and_check_status(
+        self.THREAD_GROUP_URL + "?group=disk-io-mgr&json", ports_to_test=[25000])
+    response_json = json.loads(response)
+    thread_names = [t["name"] for t in response_json['threads']]
+    expected_name_patterns = ["ADLS remote", "S3 remote", "HDFS remote", "sda"]
+    for pattern in expected_name_patterns:
+      assert any(pattern in t for t in thread_names), \
+           "Could not find thread matching '%s'" % pattern
+
