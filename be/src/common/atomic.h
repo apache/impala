@@ -132,6 +132,23 @@ class AtomicPtr {
   internal::AtomicInt<intptr_t> ptr_;
 };
 
+/// Atomic enum. Operations have the same semantics as AtomicInt.
+template<typename T>
+class AtomicEnum {
+  static_assert(std::is_enum<T>::value, "Type must be enum");
+  static_assert(sizeof(typename std::underlying_type<T>::type) <= sizeof(int32_t),
+      "Underlying enum type must fit into 4 bytes");
+
+ public:
+  /// Atomic load with "acquire" memory-ordering semantic.
+  ALWAYS_INLINE T Load() const { return static_cast<T>(enum_.Load()); }
+
+  /// Atomic store with "release" memory-ordering semantic.
+  ALWAYS_INLINE void Store(T val) { enum_.Store(val); }
+
+ private:
+  internal::AtomicInt<int32_t> enum_;
+};
 
 }
 

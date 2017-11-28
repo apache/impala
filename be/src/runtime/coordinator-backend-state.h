@@ -124,6 +124,10 @@ class Coordinator::BackendState {
   /// number of instances, peak memory consumption, host and status amongst others.
   void ToJson(rapidjson::Value* value, rapidjson::Document* doc);
 
+  /// Serializes the InstanceStats of all instances of this backend state to JSON by
+  /// adding members to 'value', including the remote host name.
+  void InstanceStatsToJson(rapidjson::Value* value, rapidjson::Document* doc);
+
  private:
   /// Execution stats for a single fragment instance.
   /// Not thread-safe.
@@ -132,9 +136,9 @@ class Coordinator::BackendState {
     InstanceStats(const FInstanceExecParams& exec_params, FragmentStats* fragment_stats,
         ObjectPool* obj_pool);
 
-    /// Update 'this' with exec_status, the fragment instances' TExecStats in
-    /// exec_summary, and 'progress_updater' with the number of
-    /// newly completed scan ranges. Also updates the instance's avg profile.
+    /// Updates 'this' with exec_status, the fragment instances' TExecStats in
+    /// exec_summary, and 'progress_updater' with the number of newly completed scan
+    /// ranges. Also updates the instance's avg profile.
     void Update(const TFragmentInstanceExecStatus& exec_status,
         ExecSummary* exec_summary, ProgressUpdater* scan_range_progress);
 
@@ -142,11 +146,19 @@ class Coordinator::BackendState {
       return exec_params_.per_fragment_instance_idx;
     }
 
+    /// Serializes instance stats to JSON by adding members to 'value', including its
+    /// instance id, plan fragment name, and the last event that was recorded during
+    /// execution of the instance.
+    void ToJson(rapidjson::Value* value, rapidjson::Document* doc);
+
    private:
     friend class BackendState;
 
     /// query lifetime
     const FInstanceExecParams& exec_params_;
+
+    /// Set in Update(). Uses MonotonicMillis().
+    int64_t last_report_time_ms_ = 0;
 
     /// owned by coordinator object pool provided in the c'tor, created in Update()
     RuntimeProfile* profile_;
@@ -172,9 +184,13 @@ class Coordinator::BackendState {
     std::vector<RuntimeProfile::Counter*> scan_ranges_complete_counters_;
 
     /// PER_HOST_PEAK_MEM_COUNTER
-    RuntimeProfile::Counter* peak_mem_counter_;
+    RuntimeProfile::Counter* peak_mem_counter_ = nullptr;
 
-    /// Extract scan_ranges_complete_counters_ and peak_mem_counter_ from profile_.
+    /// The current state of this fragment instance's execution. This gets serialized in
+    /// ToJson() and is displayed in the debug webpages.
+    TFInstanceExecState::type current_state_ = TFInstanceExecState::WAITING_FOR_EXEC;
+
+    /// Extracts scan_ranges_complete_counters_ and peak_mem_counter_ from profile_.
     void InitCounters();
   };
 

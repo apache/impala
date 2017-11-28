@@ -31,6 +31,7 @@ class TestWebPage(ImpalaTestSuite):
   CATALOG_OBJECT_URL = "http://localhost:{0}/catalog_object"
   TABLE_METRICS_URL = "http://localhost:{0}/table_metrics"
   QUERY_BACKENDS_URL = "http://localhost:{0}/query_backends"
+  QUERY_FINSTANCES_URL = "http://localhost:{0}/query_finstances"
   THREAD_GROUP_URL = "http://localhost:{0}/thread-group"
   # log4j changes do not apply to the statestore since it doesn't
   # have an embedded JVM. So we make two sets of ports to test the
@@ -173,7 +174,21 @@ class TestWebPage(ImpalaTestSuite):
     self.get_and_check_status(self.TABLE_METRICS_URL +
       "?name=%s.%s" % (db_name, tbl_name), metric, ports_to_test=self.CATALOG_TEST_PORT)
 
-  def test_query_details(self, unique_database):
+  def __run_query_and_get_debug_page(self, query, page_url):
+    """Runs a query to obtain the content of the debug page pointed to by page_url, then
+    cancels the query."""
+    query_handle =  self.client.execute_async(query)
+    response_json = ""
+    try:
+      response = self.get_and_check_status(
+        page_url + "?query_id=%s&json" % query_handle.get_handle().id,
+        ports_to_test=[25000])
+      response_json = json.loads(response)
+    finally:
+      self.client.cancel(query_handle)
+    return response_json
+
+  def test_backend_states(self, unique_database):
     """Test that /query_backends returns the list of backend states for DML or queries;
     nothing for DDL statements"""
     CROSS_JOIN = ("select count(*) from functional.alltypes a "
@@ -181,20 +196,27 @@ class TestWebPage(ImpalaTestSuite):
     for q in [CROSS_JOIN,
               "CREATE TABLE {0}.foo AS {1}".format(unique_database, CROSS_JOIN),
               "DESCRIBE functional.alltypes"]:
-      query_handle =  self.client.execute_async(q)
-      try:
-        response = self.get_and_check_status(
-          self.QUERY_BACKENDS_URL + "?query_id=%s&json" % query_handle.get_handle().id,
-          ports_to_test=[25000])
+      response_json = self.__run_query_and_get_debug_page(q, self.QUERY_BACKENDS_URL)
 
-        response_json = json.loads(response)
+      if "DESCRIBE" not in q:
+        assert len(response_json['backend_states']) > 0
+      else:
+        assert 'backend_states' not in response_json
 
-        if "DESCRIBE" not in q:
-          assert len(response_json['backend_states']) > 0
-        else:
-          assert 'backend_states' not in response_json
-      finally:
-        self.client.cancel(query_handle)
+  def test_backend_instances(self, unique_database):
+    """Test that /query_finstances returns the list of fragment instances for DML or
+    queries; nothing for DDL statements"""
+    CROSS_JOIN = ("select count(*) from functional.alltypes a "
+                  "CROSS JOIN functional.alltypes b CROSS JOIN functional.alltypes c")
+    for q in [CROSS_JOIN,
+              "CREATE TABLE {0}.foo AS {1}".format(unique_database, CROSS_JOIN),
+              "DESCRIBE functional.alltypes"]:
+      response_json = self.__run_query_and_get_debug_page(q, self.QUERY_FINSTANCES_URL)
+
+      if "DESCRIBE" not in q:
+        assert len(response_json['backend_instances']) > 0
+      else:
+        assert 'backend_instances' not in response_json
 
   def test_io_mgr_threads(self):
     """Test that IoMgr threads have readable names. This test assumed that all systems we
@@ -207,4 +229,3 @@ class TestWebPage(ImpalaTestSuite):
     for pattern in expected_name_patterns:
       assert any(pattern in t for t in thread_names), \
            "Could not find thread matching '%s'" % pattern
-

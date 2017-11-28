@@ -459,8 +459,8 @@ Status Coordinator::GetStatus() {
   return query_status_;
 }
 
-  Status Coordinator::UpdateStatus(const Status& status, const string& backend_hostname,
-     bool is_fragment_failure, const TUniqueId& instance_id) {
+Status Coordinator::UpdateStatus(const Status& status, const string& backend_hostname,
+    bool is_fragment_failure, const TUniqueId& instance_id) {
   {
     lock_guard<mutex> l(lock_);
 
@@ -1258,13 +1258,28 @@ MemTracker* Coordinator::query_mem_tracker() const {
 }
 
 void Coordinator::BackendsToJson(Document* doc) {
-  lock_guard<mutex> l(lock_);
   Value states(kArrayType);
-  for (BackendState* state : backend_states_) {
-    Value val(kObjectType);
-    state->ToJson(&val, doc);
-    states.PushBack(val, doc->GetAllocator());
+  {
+    lock_guard<mutex> l(lock_);
+    for (BackendState* state : backend_states_) {
+      Value val(kObjectType);
+      state->ToJson(&val, doc);
+      states.PushBack(val, doc->GetAllocator());
+    }
   }
   doc->AddMember("backend_states", states, doc->GetAllocator());
+}
+
+void Coordinator::FInstanceStatsToJson(Document* doc) {
+  Value states(kArrayType);
+  {
+    lock_guard<mutex> l(lock_);
+    for (BackendState* state : backend_states_) {
+      Value val(kObjectType);
+      state->InstanceStatsToJson(&val, doc);
+      states.PushBack(val, doc->GetAllocator());
+    }
+  }
+  doc->AddMember("backend_instances", states, doc->GetAllocator());
 }
 }

@@ -291,9 +291,22 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
       if (it == time_series_counter_map_.end()) {
         time_series_counter_map_[c.name] =
             pool_->Add(new TimeSeriesCounter(c.name, c.unit, c.period_ms, c.values));
-        it = time_series_counter_map_.find(c.name);
       } else {
         it->second->samples_.SetSamples(c.period_ms, c.values);
+      }
+    }
+  }
+
+  {
+    lock_guard<SpinLock> l(event_sequence_lock_);
+    for (int i = 0; i < node.event_sequences.size(); ++i) {
+      const TEventSequence& seq = node.event_sequences[i];
+      EventSequenceMap::iterator it = event_sequence_map_.find(seq.name);
+      if (it == event_sequence_map_.end()) {
+        event_sequence_map_[seq.name] =
+            pool_->Add(new EventSequence(seq.timestamps, seq.labels));
+      } else {
+        it->second->AddNewerEvents(seq.timestamps, seq.labels);
       }
     }
   }
@@ -1058,7 +1071,11 @@ string RuntimeProfile::TimeSeriesCounter::DebugString() const {
   return ss.str();
 }
 
-void RuntimeProfile::EventSequence::ToThrift(TEventSequence* seq) const {
+void RuntimeProfile::EventSequence::ToThrift(TEventSequence* seq) {
+  lock_guard<SpinLock> l(lock_);
+  /// It's possible that concurrent events can be logged out of sequence so we sort the
+  /// events before serializing them.
+  SortEvents();
   for (const EventSequence::Event& ev: events_) {
     seq->labels.push_back(ev.first);
     seq->timestamps.push_back(ev.second);

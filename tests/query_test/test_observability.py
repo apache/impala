@@ -181,3 +181,16 @@ class TestObservability(ImpalaTestSuite):
     dbg_str = "Debug thrift profile for query {0} not available in {1} seconds".format(
       query_id, MAX_WAIT)
     assert False, dbg_str
+
+  def test_query_profile_contains_instance_events(self, unique_database):
+    """Test that /query_profile_encoded contains an event timeline for fragment
+    instances, even when there are errors."""
+    events = ["Fragment Instance Lifecycle Event Timeline",
+              "Prepare Finished",
+              "First Batch Produced",
+              "First Batch Sent",
+              "ExecInternal Finished"]
+    query = "select count(*) from functional.alltypes"
+    runtime_profile = self.execute_query(query).runtime_profile
+    for event in events:
+      assert event in runtime_profile

@@ -1,0 +1,129 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+{{> www/common-header.tmpl }}
+{{> www/query_detail_tabs.tmpl }}
+<br/>
+{{?backend_instances}}
+<div>
+  <label>
+    <input type="checkbox" checked="true" id="toggle" onClick="toggleRefresh()"/>
+    <span id="refresh_on">Auto-refresh on</span>
+  </label>  Last updated: <span id="last-updated"></span>
+</div>
+
+<br/>
+<table id="finstances" class='table table-hover table-bordered'>
+  <thead>
+    <tr>
+      <th>Host</th>
+      <th>Fragment<br/>Name</th>
+      <th>Instance ID</th>
+      <th>Current state</th>
+      <th>Done</th>
+      <th>Time since last report (ms)</th>
+    </tr>
+  </thead>
+  <tbody>
+
+  </tbody>
+</table>
+
+<script>
+document.getElementById("finstances-tab").className = "active";
+
+var intervalId = 0;
+var table = null;
+var refresh = function () {
+    table.ajax.reload();
+    document.getElementById("last-updated").textContent = new Date();
+};
+
+// Unpack Json backend_states by merging the backend host name into every instance stats
+// row. Also clears the last report timestamp field for instances that have not started or
+// have already finished execution.
+function unpackJson(json) {
+    var result = new Array();
+    if (typeof json.backend_instances === "undefined") {
+        // Table will be empty, remove it.
+        table.table().destroy(true);
+        $("#finstances").remove();
+        // Display completion message.
+        $("#query_finished_alert").css("visibility", "visible");
+        // Stop auto refresh
+        $("#toggle").prop("checked", false);
+        toggleRefresh();
+        return json;
+    }
+    for (var i = 0; i < json.backend_instances.length; ++i) {
+        var backend_state = json.backend_instances[i];
+        var instance_stats = backend_state.instance_stats;
+        for (var j = 0; j < instance_stats.length; ++j) {
+            var instance = instance_stats[j];
+            instance.host = backend_state.host;
+            if (instance.done) instance.time_since_last_heard_from = "";
+            if (!instance.first_status_update_received) {
+              instance.time_since_last_heard_from = "";
+            }
+            delete instance.first_status_update_received;
+            result.push(instance);
+        }
+    }
+    return result;
+}
+
+$(document).ready(function() {
+    table = $('#finstances').DataTable({
+        ajax: { url: "/query_finstances?query_id={{query_id}}&json",
+                dataSrc: unpackJson,
+              },
+        "columns": [ {data: 'host'},
+                     {data: 'fragment_name'},
+                     {data: 'instance_id'},
+                     {data: 'current_state'},
+                     {data: 'done'},
+                     {data: 'time_since_last_heard_from'}],
+        "order": [[ 0, "desc" ]],
+        "pageLength": 100
+    });
+    intervalId = setInterval(refresh, 1000);
+});
+
+function toggleRefresh() {
+    if (document.getElementById("toggle").checked == true) {
+        intervalId = setInterval(refresh, 1000);
+        document.getElementById("refresh_on").textContent = "Auto-refresh on";
+    } else {
+        clearInterval(intervalId);
+        document.getElementById("refresh_on").textContent = "Auto-refresh off";
+    }
+}
+
+</script>
+{{/backend_instances}}
+
+<div class="alert alert-info" role="alert" id="query_finished_alert"
+     style="visibility:hidden">
+Query <strong>{{query_id}}</strong> has completed, or has not started any backends, yet.
+</div>
+{{^backend_instances}}
+<script>$("#query_finished_alert").css("visibility", "visible");</script>
+{{/backend_instances}}
+
+{{> www/common-footer.tmpl }}

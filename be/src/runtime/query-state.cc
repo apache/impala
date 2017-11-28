@@ -227,6 +227,7 @@ void QueryState::ReportExecStatusAux(bool done, const Status& status,
     instance_status.__set_fragment_instance_id(fis->instance_id());
     status.SetTStatus(&instance_status);
     instance_status.__set_done(done);
+    instance_status.__set_current_state(fis->current_state());
 
     DCHECK(fis->profile() != nullptr);
     fis->profile()->ToThrift(&instance_status.profile);
@@ -304,6 +305,7 @@ void QueryState::StartFInstances() {
   DCHECK_GT(rpc_params_.fragment_ctxs.size(), 0);
   TPlanFragmentCtx* fragment_ctx = &rpc_params_.fragment_ctxs[0];
   int fragment_ctx_idx = 0;
+  fragment_events_start_time_ = MonotonicStopWatch::Now();
   for (const TPlanFragmentInstanceCtx& instance_ctx: rpc_params_.fragment_instance_ctxs) {
     // determine corresponding TPlanFragmentCtx
     if (fragment_ctx->fragment.idx != instance_ctx.fragment_idx) {

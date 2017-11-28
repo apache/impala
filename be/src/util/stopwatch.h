@@ -145,20 +145,8 @@ class MonotonicStopWatch {
     return total_time_;
   }
 
- private:
-  /// Start epoch value.
-  uint64_t start_;
-
-  /// Total elapsed time in nanoseconds.
-  uint64_t total_time_;
-
-  /// Upper bound of the running time as a epoch value. If the value is larger than 0,
-  /// the stopwatch interprets this as a time ceiling is set.
-  uint64_t time_ceiling_;
-
-  /// True if stopwatch is running.
-  bool running_;
-
+  /// Returns an representation of the current time in nanoseconds. It can be used to
+  /// measure time durations by repeatedly calling this function and comparing the result.
   /// While this function returns nanoseconds, its resolution may be as large as
   /// milliseconds, depending on OsInfo::fast_clock().
   static inline int64_t Now() {
@@ -173,6 +161,20 @@ class MonotonicStopWatch {
     return ts.tv_sec * NANOS_PER_SEC + ts.tv_nsec;
 #endif
   }
+
+ private:
+  /// Start epoch value.
+  uint64_t start_;
+
+  /// Total elapsed time in nanoseconds.
+  uint64_t total_time_;
+
+  /// Upper bound of the running time as a epoch value. If the value is larger than 0,
+  /// the stopwatch interprets this as a time ceiling is set.
+  uint64_t time_ceiling_;
+
+  /// True if stopwatch is running.
+  bool running_;
 
   /// Returns the time since start.
   /// If time_ceiling_ is set, the stop watch won't run pass the ceiling.
