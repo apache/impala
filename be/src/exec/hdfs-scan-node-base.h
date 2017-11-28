@@ -393,7 +393,8 @@ class HdfsScanNodeBase : public ScanNode {
   ConjunctsMap conjuncts_map_;
   ConjunctEvaluatorsMap conjunct_evals_map_;
 
-  /// Dictionary filtering eligible conjuncts for each slot.
+  /// Dictionary filtering eligible conjuncts for each slot. Set to nullptr when there
+  /// are no dictionary filters.
   const TDictFilterConjunctsMap* thrift_dict_filter_conjuncts_map_;
 
   /// Set to true when the initial scan ranges are issued to the IoMgr. This happens on

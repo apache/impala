@@ -25,7 +25,7 @@
 
 namespace impala {
 
-/// Class for constructing an CollectionValue when the total size isn't known
+/// Class for constructing a CollectionValue when the total size isn't known
 /// up-front. This class handles allocating the buffer backing the collection from a
 /// MemPool, and uses a doubling strategy for growing the collection.
 class CollectionValueBuilder {

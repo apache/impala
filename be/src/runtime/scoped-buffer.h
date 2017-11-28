@@ -24,6 +24,7 @@ namespace impala {
 
 /// A scoped memory allocation that is tracked against a MemTracker.
 /// The allocation is automatically freed when the ScopedBuffer object goes out of scope.
+/// NOTE: if multiple allocations share the same lifetime, prefer to use MemPool.
 class ScopedBuffer {
  public:
   ScopedBuffer(MemTracker* mem_tracker) : mem_tracker_(mem_tracker),

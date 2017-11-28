@@ -48,6 +48,8 @@ import com.google.common.collect.Lists;
  * The list of slots tracks the named slots that are actually referenced in a query, as
  * well as all anonymous slots. Although not required, a tuple descriptor typically
  * only has named or anonymous slots and not a mix of both.
+ * Each tuple and slot descriptor has an associated unique id (within the scope of a
+ * query). A given slot descriptor is owned by exactly one tuple descriptor.
  *
  * For example, every table reference has a corresponding tuple descriptor. The columns
  * of the table are represented by the tuple descriptor's type (struct type with one

@@ -1,0 +1,12 @@
+This file is created to test IMPALA-4993. The file contains a subset
+of tpch_nested_parquet.customer, but written out using multiple row
+groups. The file was created by following the instructions in
+testdata/bin/load_nested.py to create the table, tmp_customer, which
+is then written out in parquet format using hive:
+
+SET parquet.block.size=8192;
+
+CREATE TABLE customer
+STORED AS PARQUET
+TBLPROPERTIES('parquet.compression'='SNAPPY')
+AS SELECT * FROM tmp_customer where c_custkey < 200;

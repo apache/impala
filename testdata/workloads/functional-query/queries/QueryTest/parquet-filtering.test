@@ -1,7 +1,4 @@
-# This tests parquet dictionary filtering. It is mirrored with mt_dop
-# in mt-dop-parquet-filtering.test. Since the two rely on counting
-# the number of row groups filtered, differing parallelism changes
-# the counts seen in the output.
+# This tests parquet dictionary filtering.
 ====
 ---- QUERY
 # id: All values pass
@@ -259,3 +256,233 @@ select count(*) from functional_parquet.alltypes where mod(id,10000) = 7301;
 aggregation(SUM, NumRowGroups): 24
 aggregation(SUM, NumDictFilteredRowGroups): 0
 ====
+---- QUERY
+# Nested dictionary filtering.
+#
+# Test coverage includes the following dimensions:
+# - nested collection type: map, array, struct
+# - number of filters and their nesting depth
+# - number of projections and their nesting depth
+# - required vs. non-required collections (outer vs. inner joins)
+# - filter matches: some, none
+# - count(*) optimization (exercises special code path)
+# - multiple row-groups per file
+#
+# Map key at depth 1. All required. No matches. Only one row-group is dictionary filtered
+# since only one (of two) row-groups is dictionary encoded for that column.
+select id from functional_parquet.complextypestbl f, f.int_map m where m.key = 'k5'
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumDictFilteredRowGroups): 1
+====
+---- QUERY
+select count(*) from functional_parquet.complextypestbl.int_map m where m.key = 'k5'
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumDictFilteredRowGroups): 1
+====
+---- QUERY
+# Map key at depth 1. All required. Matches.
+select id from functional_parquet.complextypestbl f, f.int_map m where m.key = 'k1'
+---- RESULTS
+8
+1
+2
+7
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumDictFilteredRowGroups): 0
+====
+---- QUERY
+# Map key at depth 1. None required. No matches.
+select id from functional_parquet.complextypestbl f left outer join f.int_map m
+where m.key = 'k5'
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumDictFilteredRowGroups): 0
+====
+---- QUERY
+# Map key at depth 1. None required. Matches.
+select id from functional_parquet.complextypestbl f left outer join f.int_map m
+where m.key = 'k1'
+---- RESULTS
+8
+1
+2
+7
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumDictFilteredRowGroups): 0
+====
+---- QUERY
+# Map key at depth 1. All required. No matches. count(*).
+select count(*) from functional_parquet.complextypestbl f, f.int_map m where m.key = 'k5'
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumDictFilteredRowGroups): 1
+---- QUERY
+# Map key at depth 1. All required. Matches. count(*)
+select count(*) from functional_parquet.complextypestbl f, f.int_map m where m.key = 'k1'
+---- RESULTS
+4
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumDictFilteredRowGroups): 0
+====
+---- QUERY
+# Map key at depth 1. None required. No matches. count(*)
+select count(*) from functional_parquet.complextypestbl f left outer join f.int_map m
+where m.key = 'k5'
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumDictFilteredRowGroups): 0
+====
+---- QUERY
+# Map key at depth 1. None required. Matches. count(*)
+select count(*) from functional_parquet.complextypestbl f left outer join f.int_map m
+where m.key = 'k1'
+---- RESULTS
+4
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumDictFilteredRowGroups): 0
+====
+---- QUERY
+# Array struct value at depth 2. All required. Matches.
+select r_name from tpch_nested_parquet.region r, r.r_nations n where n.n_name = 'FRANCE'
+---- RESULTS
+'EUROPE'
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumDictFilteredRowGroups): 0
+====
+---- QUERY
+# Array struct value at depth 3. All required. No matches.
+select c_name from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems l
+where l.l_returnflag = 'foo'
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumDictFilteredRowGroups): 4
+====
+---- QUERY
+# Array struct value at depth 3. All required. No matches.
+# Multiple nested values projected.
+select c_name, o.o_clerk from tpch_nested_parquet.customer c,
+c.c_orders o, o.o_lineitems l
+where l.l_returnflag = 'foo'
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumDictFilteredRowGroups): 4
+====
+---- QUERY
+# Array struct value at depth 3. Bottom not required. No matches.
+# Multiple nested values projected.
+select c_name, o.o_clerk from tpch_nested_parquet.customer c,
+c.c_orders o left outer join o.o_lineitems l
+where l.l_returnflag = 'foo'
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumDictFilteredRowGroups): 0
+====
+---- QUERY
+# Array struct value at depth 3. Top not required. No matches.
+# Multiple nested values projected.
+select c_name, o.o_clerk from tpch_nested_parquet.customer c left outer join c.c_orders o,
+o.o_lineitems l
+where l.l_returnflag = 'foo'
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumDictFilteredRowGroups): 0
+====
+---- QUERY
+# Array struct value at depth 3. All required. Multiple filters, multiple projections.
+# Matches.
+select c_name, o.o_clerk from tpch_nested_parquet.customer c,
+c.c_orders o, o.o_lineitems l
+where l.l_shipdate = '1994-08-19' and
+l.l_receiptdate = '1994-08-24' and l.l_shipmode = 'RAIL' and l.l_returnflag = 'R'
+---- RESULTS
+'Customer#000013873','Clerk#000000554'
+'Customer#000049757','Clerk#000000156'
+'Customer#000037490','Clerk#000000026'
+'Customer#000002836','Clerk#000000577'
+'Customer#000004897','Clerk#000000112'
+'Customer#000107891','Clerk#000000576'
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumDictFilteredRowGroups): 0
+---- QUERY
+# Array struct value at depth 3. All required. No matches, count(*).
+select count(*) from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems l
+where l.l_returnflag = 'foo'
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumDictFilteredRowGroups): 4
+====
+---- QUERY
+# Array struct values at depths 2 and 3. All required.
+# Matches, multiple nested values projected.
+select c_name, o.o_comment from tpch_nested_parquet.customer c,
+c.c_orders o, o.o_lineitems l
+where l.l_returnflag = 'foo' and o.o_clerk = 'foo'
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumDictFilteredRowGroups): 4
+====
+---- QUERY
+# Array struct value at depth 2. Not required. No match.
+# Illustrates a case that should not be pruned.
+select count(*) from tpch_nested_parquet.customer c left outer join
+(select * from c.c_orders o where o.o_orderstatus = 'foo') v
+---- RESULTS
+150000
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumDictFilteredRowGroups): 0
+====
+---- QUERY
+# Tests dictionary filtering with files with multiple row-groups.
+# Expect all results to be filtered.
+select l.l_linenumber from functional_parquet.customer_multiblock c,
+c.c_orders o, o.o_lineitems l
+where l.l_linenumber + 1 < 0;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumDictFilteredRowGroups): 2
+---- QUERY
+# Tests dictionary filtering with files with multiple row-groups and count(*).
+# Expect all results to be filtered.
+select count(*) from functional_parquet.customer_multiblock c,
+c.c_orders o, o.o_lineitems l
+where l.l_linenumber + 1 < 0;
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumDictFilteredRowGroups): 2
+---- QUERY
+# Tests dictionary filtering with files with multiple row-groups and count(*).
+# Expect same result as obtained with dictionary filtering disabled.
+select count(*) from functional_parquet.customer_multiblock c,
+c.c_orders o, o.o_lineitems l
+where l.l_linenumber > 0;
+---- RESULTS
+7786
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumDictFilteredRowGroups): 0

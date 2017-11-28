@@ -1159,14 +1159,14 @@ Status BaseScalarColumnReader::ReadDataPage() {
     // Initialize the repetition level data
     RETURN_IF_ERROR(rep_levels_.Init(filename(),
         current_page_header_.data_page_header.repetition_level_encoding,
-        parent_->level_cache_pool_.get(), parent_->state_->batch_size(),
+        parent_->perm_pool_.get(), parent_->state_->batch_size(),
         max_rep_level(), num_buffered_values_,
         &data_, &data_size));
 
     // Initialize the definition level data
     RETURN_IF_ERROR(def_levels_.Init(filename(),
         current_page_header_.data_page_header.definition_level_encoding,
-        parent_->level_cache_pool_.get(), parent_->state_->batch_size(),
+        parent_->perm_pool_.get(), parent_->state_->batch_size(),
         max_def_level(), num_buffered_values_, &data_, &data_size));
 
     // Data can be empty if the column contains all NULLs

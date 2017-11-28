@@ -83,12 +83,20 @@ Status HdfsScanner::Open(ScannerContext* context) {
   // Set up the scan node's dictionary filtering conjuncts map.
   if (scan_node_->thrift_dict_filter_conjuncts_map() != nullptr) {
     for (auto& entry : *(scan_node_->thrift_dict_filter_conjuncts_map())) {
+      SlotDescriptor* slot_desc = state_->desc_tbl().GetSlotDescriptor(entry.first);
+      TupleId tuple_id = (slot_desc->type().IsCollectionType() ?
+          slot_desc->collection_item_descriptor()->id() :
+          slot_desc->parent()->id());
+      auto conjunct_evals_it = conjunct_evals_map_.find(tuple_id);
+      DCHECK(conjunct_evals_it != conjunct_evals_map_.end());
+      const vector<ScalarExprEvaluator*>& conjunct_evals = conjunct_evals_it->second;
+
       // Convert this slot's list of conjunct indices into a list of pointers
       // into conjunct_evals_.
       for (int conjunct_idx : entry.second) {
-        DCHECK_LT(conjunct_idx, conjunct_evals_->size());
-        DCHECK((*conjunct_evals_)[conjunct_idx] != nullptr);
-        dict_filter_map_[entry.first].push_back((*conjunct_evals_)[conjunct_idx]);
+        DCHECK_LT(conjunct_idx, conjunct_evals.size());
+        DCHECK((conjunct_evals)[conjunct_idx] != nullptr);
+        dict_filter_map_[entry.first].push_back((conjunct_evals)[conjunct_idx]);
       }
     }
   }

@@ -217,8 +217,9 @@ class HdfsScanner {
   // scanners that do not support nested types.
   const std::vector<ScalarExprEvaluator*>* conjunct_evals_ = nullptr;
 
-  // Clones of the conjuncts' evaluators in scan_node_->dict_filter_conjuncts_map().
-  typedef std::map<SlotId, std::vector<ScalarExprEvaluator*>> DictFilterConjunctsMap;
+  // Clones of the conjuncts' evaluators in scan_node_->thrift_dict_filter_conjuncts().
+  typedef std::map<SlotId, std::vector<ScalarExprEvaluator*>>
+      DictFilterConjunctsMap;
   DictFilterConjunctsMap dict_filter_map_;
 
   /// Holds memory for template tuples. The memory in this pool must remain valid as long

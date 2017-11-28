@@ -253,6 +253,8 @@ PLAN-ROOT SINK
    extrapolated-rows=disabled
    parquet statistics predicates: c_custkey < 10, o_orderkey < 5, l_linenumber < 3
    parquet dictionary predicates: c_custkey < 10
+   parquet dictionary predicates on o: o_orderkey < 5
+   parquet dictionary predicates on o_lineitems: l_linenumber < 3
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=254B cardinality=15000
 ---- PARALLELPLANS
@@ -314,6 +316,8 @@ Per-Host Resources: mem-estimate=264.00MB mem-reservation=0B
    extrapolated-rows=disabled
    parquet statistics predicates: c_custkey < 10, o_orderkey < 5, l_linenumber < 3
    parquet dictionary predicates: c_custkey < 10
+   parquet dictionary predicates on o: o_orderkey < 5
+   parquet dictionary predicates on o_lineitems: l_linenumber < 3
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=254B cardinality=15000
 ====
@@ -365,6 +369,7 @@ PLAN-ROOT SINK
      columns missing stats: c_orders, c_orders
    extrapolated-rows=disabled
    parquet statistics predicates: o1.o_orderkey < 5
+   parquet dictionary predicates on o1: o1.o_orderkey < 5
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=270B cardinality=150000
 ---- PARALLELPLANS
@@ -417,6 +422,7 @@ Per-Host Resources: mem-estimate=269.81MB mem-reservation=5.81MB
      columns missing stats: c_orders, c_orders
    extrapolated-rows=disabled
    parquet statistics predicates: o1.o_orderkey < 5
+   parquet dictionary predicates on o1: o1.o_orderkey < 5
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=270B cardinality=150000
 ====

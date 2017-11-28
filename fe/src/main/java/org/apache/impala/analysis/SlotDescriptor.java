@@ -69,12 +69,16 @@ public class SlotDescriptor {
   private ColumnStats stats_;  // only set if 'column' isn't set
 
   SlotDescriptor(SlotId id, TupleDescriptor parent) {
+    Preconditions.checkNotNull(id);
+    Preconditions.checkNotNull(parent);
     id_ = id;
     parent_ = parent;
     byteOffset_ = -1;  // invalid
   }
 
   SlotDescriptor(SlotId id, TupleDescriptor parent, SlotDescriptor src) {
+    Preconditions.checkNotNull(id);
+    Preconditions.checkNotNull(parent);
     id_ = id;
     parent_ = parent;
     type_ = src.type_;
