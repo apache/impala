@@ -319,6 +319,48 @@ class TestDdlStatements(TestDdlBase):
     self.run_test_case('QueryTest/views-ddl', vector, use_db=unique_database,
         multiple_impalad=self._use_multiple_impalad(vector))
 
+  @UniqueDatabase.parametrize()
+  def test_view_hints(self, vector, unique_database):
+    # Test that plan hints are stored in the view's comment field; this should work
+    # regardless of how Hive formats the output.  Getting this to work with the
+    # automated test case runner is rather difficult, so verify directly.  There
+    # should be two # of each join hint, one for the original text, one for the expanded
+    self.client.execute("""
+        create view {0}.hints_test as
+        select /* +straight_join */ a.* from functional.alltypestiny a
+        inner join /* +broadcast */ functional.alltypes b on a.id = b.id
+        inner join /* +shuffle */ functional.alltypessmall c on b.id = c.id
+        """.format(unique_database))
+    results = self.execute_query("describe formatted %s.hints_test" % unique_database)
+    sj, bc, shuf = 0,0,0
+    for row in results.data:
+        sj += '-- +straight_join' in row
+        bc += '-- +broadcast' in row
+        shuf += '-- +shuffle' in row
+    assert sj == 2
+    assert bc == 2
+    assert shuf == 2
+
+    # Test querying the hinted view.
+    results = self.execute_query("select count(*) from %s.hints_test" % unique_database)
+    assert results.success
+    assert len(results.data) == 1
+    assert results.data[0] == '8'
+
+    # Test the plan to make sure hints were applied correctly
+    plan = self.execute_query("explain select * from %s.hints_test" % unique_database,
+        query_options={'explain_level':0})
+    assert """PLAN-ROOT SINK
+08:EXCHANGE [UNPARTITIONED]
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|--07:EXCHANGE [HASH(c.id)]
+|  02:SCAN HDFS [functional.alltypessmall c]
+06:EXCHANGE [HASH(b.id)]
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|--05:EXCHANGE [BROADCAST]
+|  01:SCAN HDFS [functional.alltypes b]
+00:SCAN HDFS [functional.alltypestiny a]""" in '\n'.join(plan.data)
+
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_functions_ddl(self, vector, unique_database):
     self.run_test_case('QueryTest/functions-ddl', vector, use_db=unique_database,
