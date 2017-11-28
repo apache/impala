@@ -185,7 +185,7 @@ TEST(CountersTest, MergeAndUpdate) {
       EXPECT_EQ(3, profile->num_counters());
       ValidateCounter(profile, "Child3", 30);
     } else {
-      EXPECT_TRUE(false);
+      FAIL();
     }
   }
 
@@ -217,7 +217,7 @@ TEST(CountersTest, MergeAndUpdate) {
       EXPECT_EQ(3, profile->num_counters());
       ValidateCounter(profile, "Child3", 30);
     } else {
-      EXPECT_TRUE(false);
+      FAIL();
     }
   }
 
@@ -627,8 +627,8 @@ class TimerCounterTest {
       SleepForMs(10);
       // Each test case should be no more than one second.
       // Consider test failed if timer is more than 3 seconds.
-      if (csw_.TotalRunningTime() > 3000000000) {
-        EXPECT_FALSE(false);
+      if (csw_.TotalRunningTime() > 6000000000) {
+        FAIL();
       }
     }
   }
@@ -660,8 +660,8 @@ class TimerCounterTest {
     workers_.clear();
   }
 
-  // Allow some timer inaccuracy (15ms) since thread join could take some time.
-  static const int MAX_TIMER_ERROR_NS = 15000000;
+  // Allow some timer inaccuracy (30ms) since thread join could take some time.
+  static const int MAX_TIMER_ERROR_NS = 30000000;
   vector<DummyWorker> workers_;
   ConcurrentStopWatch csw_;
   RuntimeProfile::ConcurrentTimerCounter timercounter_;
@@ -692,7 +692,7 @@ TEST(TimerCounterTest, CountersTestOneThread) {
   TimerCounterTest tester;
   uint64_t start = MonotonicNanos();
   tester.StartWorkers(1, 0);
-  SleepForMs(250);
+  SleepForMs(500);
   ValidateTimerValue(tester, start);
   tester.StopWorkers(-1);
   ValidateTimerValue(tester, start);
@@ -701,8 +701,8 @@ TEST(TimerCounterTest, CountersTestOneThread) {
 TEST(TimerCounterTest, CountersTestTwoThreads) {
   TimerCounterTest tester;
   uint64_t start = MonotonicNanos();
-  tester.StartWorkers(2, 5);
-  SleepForMs(250);
+  tester.StartWorkers(2, 10);
+  SleepForMs(500);
   ValidateTimerValue(tester, start);
   tester.StopWorkers(-1);
   ValidateTimerValue(tester, start);
@@ -713,15 +713,15 @@ TEST(TimerCounterTest, CountersTestRandom) {
   uint64_t start = MonotonicNanos();
   ValidateTimerValue(tester, start);
   // First working period
-  tester.StartWorkers(5, 5);
+  tester.StartWorkers(5, 10);
   ValidateTimerValue(tester, start);
-  SleepForMs(200);
+  SleepForMs(400);
   tester.StopWorkers(2);
   ValidateTimerValue(tester, start);
-  SleepForMs(50);
+  SleepForMs(100);
   tester.StopWorkers(4);
   ValidateTimerValue(tester, start);
-  SleepForMs(300);
+  SleepForMs(600);
   tester.StopWorkers(-1);
   ValidateTimerValue(tester, start);
   tester.Reset();
@@ -729,7 +729,7 @@ TEST(TimerCounterTest, CountersTestRandom) {
   ValidateLapTime(&tester, MonotonicNanos() - start);
   uint64_t first_run_end = MonotonicNanos();
   // Adding some idle time. concurrent stopwatch and timer should not count the idle time.
-  SleepForMs(100);
+  SleepForMs(200);
   start += MonotonicNanos() - first_run_end;
 
   // Second working period
@@ -737,9 +737,9 @@ TEST(TimerCounterTest, CountersTestRandom) {
   // We just get lap time after first run finish. so at start of second run, expect lap time == 0
   ValidateLapTime(&tester, 0);
   uint64_t lap_time_start = MonotonicNanos();
-  SleepForMs(100);
+  SleepForMs(200);
   ValidateTimerValue(tester, start);
-  SleepForMs(100);
+  SleepForMs(200);
   tester.StopWorkers(-1);
   ValidateTimerValue(tester, start);
   ValidateLapTime(&tester, MonotonicNanos() - lap_time_start);
