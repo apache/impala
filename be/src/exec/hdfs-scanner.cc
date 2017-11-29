@@ -107,8 +107,8 @@ Status HdfsScanner::ProcessSplit() {
   DCHECK(scan_node_->HasRowBatchQueue());
   HdfsScanNode* scan_node = static_cast<HdfsScanNode*>(scan_node_);
   do {
-    // IMPALA-3798: Split-level runtime filtering is disabled with sequence-based file
-    // formats.
+    // IMPALA-3798, IMPALA-3804: For sequence-based files, the filters are only
+    // applied in HdfsScanNode::ProcessSplit()
     bool is_sequence_based = BaseSequenceScanner::FileFormatIsSequenceBased(
         context_->partition_descriptor()->file_format());
     if (!is_sequence_based && FilterContext::CheckForAlwaysFalse(FilterStats::SPLITS_KEY,

@@ -478,10 +478,7 @@ bool HdfsScanNodeBase::FilePassesFilterPredicates(
       static_cast<ScanRangeMetadata*>(file->splits[0]->meta_data());
   if (!PartitionPassesFilters(metadata->partition_id, FilterStats::FILES_KEY,
           filter_ctxs)) {
-    for (int j = 0; j < file->splits.size(); ++j) {
-      // Mark range as complete to ensure progress.
-      RangeComplete(format, file->file_compression, true);
-    }
+    SkipFile(format, file);
     return false;
   }
   return true;
@@ -491,6 +488,15 @@ ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
     int64_t len, int64_t offset, int64_t partition_id, int disk_id, bool expected_local,
     const BufferOpts& buffer_opts,
     const ScanRange* original_split) {
+  ScanRangeMetadata* metadata = runtime_state_->obj_pool()->Add(
+        new ScanRangeMetadata(partition_id, original_split));
+  return AllocateScanRange(fs, file, len, offset, metadata, disk_id, expected_local,
+      buffer_opts);
+}
+
+ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
+    int64_t len, int64_t offset, ScanRangeMetadata* metadata, int disk_id, bool expected_local,
+    const BufferOpts& buffer_opts) {
   DCHECK_GE(disk_id, -1);
   // Require that the scan range is within [0, file_length). While this cannot be used
   // to guarantee safety (file_length metadata may be stale), it avoids different
@@ -498,12 +504,10 @@ ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
   // beyond the end of the file).
   DCHECK_GE(offset, 0);
   DCHECK_GE(len, 0);
-  DCHECK_LE(offset + len, GetFileDesc(partition_id, file)->file_length)
+  DCHECK_LE(offset + len, GetFileDesc(metadata->partition_id, file)->file_length)
       << "Scan range beyond end of file (offset=" << offset << ", len=" << len << ")";
   disk_id = runtime_state_->io_mgr()->AssignQueue(file, disk_id, expected_local);
 
-  ScanRangeMetadata* metadata = runtime_state_->obj_pool()->Add(
-        new ScanRangeMetadata(partition_id, original_split));
   ScanRange* range = runtime_state_->obj_pool()->Add(new ScanRange);
   range->Reset(fs, file, len, offset, disk_id, expected_local, buffer_opts, metadata);
   return range;
@@ -687,6 +691,13 @@ void HdfsScanNodeBase::RangeComplete(const THdfsFileFormat::type& file_type,
     compression_set.AddType(compression_types[i]);
   }
   ++file_type_counts_[std::make_tuple(file_type, skipped, compression_set)];
+}
+
+void HdfsScanNodeBase::SkipFile(const THdfsFileFormat::type& file_type,
+    HdfsFileDesc* file) {
+  for (int i = 0; i < file->splits.size(); ++i) {
+    RangeComplete(file_type, file->file_compression, true);
+  }
 }
 
 void HdfsScanNodeBase::ComputeSlotMaterializationOrder(vector<int>* order) const {

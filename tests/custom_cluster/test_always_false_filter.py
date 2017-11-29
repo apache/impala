@@ -31,7 +31,7 @@ class TestAlwaysFalseFilter(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args("--skip_file_runtime_filtering=true")
   def test_skip_split(self, cursor):
     """IMPALA-5789: Test that always false filter filters out splits when file-level
-    filtering is disabled. The filtering is not enabled in seq-based file formats."""
+    filtering is disabled."""
     cursor.execute("SET RUNTIME_FILTER_MODE=GLOBAL")
     cursor.execute("SET RUNTIME_FILTER_WAIT_TIME_MS=10000")
     query = """select STRAIGHT_JOIN * from alltypes inner join
@@ -39,15 +39,7 @@ class TestAlwaysFalseFilter(CustomClusterTestSuite):
             on v.year = alltypes.year"""
     # Manually iterate through file formats instead of creating a test matrix to prevent
     # the cluster from restarting multiple times.
-    for table_suffix in ['_avro', '_rc', '_seq']:
-      cursor.execute("use functional" + table_suffix)
-      cursor.execute(query)
-      # Fetch all rows to finalize the query profile.
-      cursor.fetchall()
-      profile = cursor.get_profile()
-      assert re.search("Files rejected: [^0] \([^0]\)", profile) is None
-      assert re.search("Splits rejected: [^0] \([^0]\)", profile) is None
-    for table_suffix in ['', '_parquet']:
+    for table_suffix in ['', '_avro', '_parquet', '_rc', '_seq']:
       cursor.execute("use functional" + table_suffix)
       cursor.execute(query)
       # Fetch all rows to finalize the query profile.

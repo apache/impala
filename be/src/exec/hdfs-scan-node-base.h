@@ -86,6 +86,10 @@ struct ScanRangeMetadata {
   /// for the scanner to process.
   const io::ScanRange* original_split;
 
+  /// True, if this object belongs to a scan range which is the header of a
+  /// sequence-based file
+  bool is_sequence_header = false;
+
   ScanRangeMetadata(int64_t partition_id, const io::ScanRange* original_split)
       : partition_id(partition_id), original_split(original_split) { }
 };
@@ -209,6 +213,12 @@ class HdfsScanNodeBase : public ScanNode {
       const io::BufferOpts& buffer_opts,
       const io::ScanRange* original_split = NULL);
 
+  /// Same as above, but it takes a pointer to a ScanRangeMetadata object which contains
+  /// the partition_id, original_splits, and other information about the scan range.
+  io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
+      int64_t offset, ScanRangeMetadata* metadata, int disk_id, bool expected_local,
+      const io::BufferOpts& buffer_opts);
+
   /// Old API for compatibility with text scanners (e.g. LZO text scanner).
   io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
       int64_t offset, int64_t partition_id, int disk_id, bool try_cache,
@@ -261,6 +271,9 @@ class HdfsScanNodeBase : public ScanNode {
   /// 2. scan range is a metadata read only(e.x. count(*) on parquet files)
   virtual void RangeComplete(const THdfsFileFormat::type& file_type,
       const std::vector<THdfsCompression::type>& compression_type, bool skipped = false);
+
+  /// Calls RangeComplete() with skipped=true for all the splits of the file
+  void SkipFile(const THdfsFileFormat::type& file_type, HdfsFileDesc* file);
 
   /// Utility function to compute the order in which to materialize slots to allow for
   /// computing conjuncts as slots get materialized (on partial tuples).

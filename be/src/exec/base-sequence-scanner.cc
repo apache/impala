@@ -53,13 +53,16 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
   for (int i = 0; i < files.size(); ++i) {
     ScanRangeMetadata* metadata =
         static_cast<ScanRangeMetadata*>(files[i]->splits[0]->meta_data());
+    ScanRangeMetadata* header_metadata =
+        scan_node->runtime_state()->obj_pool()->Add(new ScanRangeMetadata(*metadata));
+    header_metadata->is_sequence_header = true;
     int64_t header_size = min<int64_t>(HEADER_SIZE, files[i]->file_length);
     // The header is almost always a remote read. Set the disk id to -1 and indicate
     // it is not cached.
     // TODO: add remote disk id and plumb that through to the io mgr.  It should have
     // 1 queue for each NIC as well?
     ScanRange* header_range = scan_node->AllocateScanRange(files[i]->fs,
-        files[i]->filename.c_str(), header_size, 0, metadata->partition_id, -1, false,
+        files[i]->filename.c_str(), header_size, 0, header_metadata, -1, false,
         BufferOpts::Uncached());
     header_ranges.push_back(header_range);
   }

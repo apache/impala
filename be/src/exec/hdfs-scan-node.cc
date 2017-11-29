@@ -491,20 +491,19 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
                             << " partition_id=" << partition_id
                             << "\n" << PrintThrift(runtime_state_->instance_ctx());
 
-  // IMPALA-3798: Filtering before the scanner is created can cause hangs if a header
-  // split is filtered out, for sequence-based file formats. If the scanner does not
-  // process the header split, the remaining scan ranges in the file will not be marked as
-  // done. See FilePassesFilterPredicates() for the correct logic to mark all splits in a
-  // file as done; the correct fix here is to do that for every file in a thread-safe way.
-  if (!BaseSequenceScanner::FileFormatIsSequenceBased(partition->file_format())) {
-    if (!PartitionPassesFilters(partition_id, FilterStats::SPLITS_KEY, filter_ctxs)) {
-      // Avoid leaking unread buffers in scan_range.
-      scan_range->Cancel(Status::CANCELLED);
-      // Mark scan range as done.
-      scan_ranges_complete_counter()->Add(1);
-      progress_.Update(1);
-      return Status::OK();
+  if (!PartitionPassesFilters(partition_id, FilterStats::SPLITS_KEY, filter_ctxs)) {
+    // Avoid leaking unread buffers in scan_range.
+    scan_range->Cancel(Status::CANCELLED);
+    HdfsFileDesc* desc = GetFileDesc(partition_id, *scan_range->file_string());
+    if (metadata->is_sequence_header) {
+      // File ranges haven't been issued yet, skip entire file
+      SkipFile(partition->file_format(), desc);
+    } else {
+      // Mark this scan range as done.
+      HdfsScanNodeBase::RangeComplete(partition->file_format(), desc->file_compression,
+          true);
     }
+    return Status::OK();
   }
 
   ScannerContext context(
