@@ -26,8 +26,10 @@
 #include "common/atomic.h"
 #include "common/hdfs.h"
 #include "common/status.h"
+#include "runtime/bufferpool/buffer-pool.h"
 #include "util/condition-variable.h"
 #include "util/internal-queue.h"
+#include "util/mem-range.h"
 
 namespace impala {
 class MemTracker;
@@ -202,11 +204,11 @@ class ScanRange : public RequestRange {
 
   /// Resets this scan range object with the scan range description. The scan range
   /// is for bytes [offset, offset + len) in 'file' on 'fs' (which is nullptr for the
-  /// local filesystem). The scan range must fall within the file bounds (offset >= 0
-  /// and offset + len <= file_length). 'disk_id' is the disk queue to add the range
-  /// to. If 'expected_local' is true, a warning is generated if the read did not
-  /// come from a local disk. 'buffer_opts' specifies buffer management options -
-  /// see the DiskIoMgr class comment and the BufferOpts comments for details.
+  /// local filesystem). The scan range must be non-empty and fall within the file bounds
+  /// (len > 0 and offset >= 0 and offset + len <= file_length). 'disk_id' is the disk
+  /// queue to add the range to. If 'expected_local' is true, a warning is generated if
+  /// the read did not come from a local disk. 'buffer_opts' specifies buffer management
+  /// options - see the DiskIoMgr class comment and the BufferOpts comments for details.
   /// 'meta_data' is an arbitrary client-provided pointer for any auxiliary data.
   void Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset, int disk_id,
       bool expected_local, const BufferOpts& buffer_opts, void* meta_data = nullptr);
@@ -248,12 +250,11 @@ class ScanRange : public RequestRange {
   /// Initialize internal fields
   void InitInternal(DiskIoMgr* io_mgr, RequestContext* reader);
 
-  /// Enqueues a buffer for this range. This does not block.
-  /// Returns true if this scan range has hit the queue capacity, false otherwise.
+  /// Enqueues a ready buffer with valid data for this range. This does not block.
   /// The caller passes ownership of buffer to the scan range and it is not
   /// valid to access buffer after this call. The reader lock must be held by the
-  /// caller.
-  bool EnqueueBuffer(const boost::unique_lock<boost::mutex>& reader_lock,
+  /// caller. Returns false if the scan range was cancelled.
+  bool EnqueueReadyBuffer(const boost::unique_lock<boost::mutex>& reader_lock,
       std::unique_ptr<BufferDescriptor> buffer);
 
   /// Validates the internal state of this range. lock_ must be taken
@@ -304,15 +305,50 @@ class ScanRange : public RequestRange {
   Status ReadFromCache(const boost::unique_lock<boost::mutex>& reader_lock,
       bool* read_succeeded) WARN_UNUSED_RESULT;
 
+  /// Add buffers for the range to read data into and schedule the range if blocked.
+  /// If 'returned' is true, the buffers returned from GetNext() that are being recycled
+  /// via ReturnBuffer(). Otherwise the buffers are newly allocated buffers to be added.
+  void AddUnusedBuffers(
+      std::vector<std::unique_ptr<BufferDescriptor>>&& buffers, bool returned);
+
+  /// Remove a buffer from 'unused_iomgr_buffers_' and update
+  /// 'unused_iomgr_buffer_bytes_'. If 'unused_iomgr_buffers_' is empty, return NULL.
+  /// 'lock_' must be held by the caller via 'scan_range_lock'.
+  std::unique_ptr<BufferDescriptor> GetUnusedBuffer(
+      const boost::unique_lock<boost::mutex>& scan_range_lock);
+
+  /// Get the next buffer for this scan range for a disk thread to read into. Returns
+  /// the new buffer if successful.  If no buffers are available, marks the range
+  /// as blocked and returns nullptr. Called must not hold 'lock_'.
+  std::unique_ptr<BufferDescriptor> GetNextUnusedBufferForRange();
+
   /// Cleans up a buffer that was not returned to the client.
   /// Either ReturnBuffer() or CleanUpBuffer() is called for every BufferDescriptor.
-  /// This function will acquire 'lock_' and may acquire 'hdfs_lock_'.
-  void CleanUpBuffer(std::unique_ptr<BufferDescriptor> buffer);
-
-  /// Same as CleanUpBuffer() except the caller must already hold 'lock_' via
-  /// 'scan_range_lock'.
-  void CleanUpBufferLocked(const boost::unique_lock<boost::mutex>& scan_range_lock,
+  /// The caller must hold 'lock_' via 'scan_range_lock'.
+  /// This function may acquire 'hdfs_lock_'
+  void CleanUpBuffer(const boost::unique_lock<boost::mutex>& scan_range_lock,
       std::unique_ptr<BufferDescriptor> buffer);
+
+  /// Same as CleanUpBuffer() except cleans up multiple buffers and caller must not
+  /// hold 'lock_'.
+  void CleanUpBuffers(std::vector<std::unique_ptr<BufferDescriptor>>&& buffers);
+
+  /// Clean up all buffers in 'unused_iomgr_buffers_'. Only valid to call when the scan
+  /// range is cancelled or at eos. The caller must hold 'lock_' via 'scan_range_lock'.
+  void CleanUpUnusedBuffers(const boost::unique_lock<boost::mutex>& scan_range_lock);
+
+  /// Same as Cancel() except reader_->lock must be held by the caller.
+  void CancelFromReader(const boost::unique_lock<boost::mutex>& reader_lock,
+      const Status& status);
+
+  /// Same as Cancel() except doesn't remove the scan range from
+  /// reader_->active_scan_ranges_. This is invoked by RequestContext::Cancel(),
+  /// which removes the range itself to avoid invalidating its active_scan_ranges_
+  /// iterator.
+  void CancelInternal(const Status& status);
+
+  /// Marks the scan range as blocked waiting for a buffer. Caller must not hold 'lock_'.
+  void SetBlockedOnBuffer();
 
   /// Returns true if no more buffers will be returned to clients in the future,
   /// either because of hitting eosr or cancellation.
@@ -386,6 +422,10 @@ class ScanRange : public RequestRange {
     struct hadoopRzBuffer* cached_buffer_ = nullptr;
   };
 
+  /// The number of buffers that have been returned to a client via GetNext() that have
+  /// not yet been returned with ReturnBuffer().
+  AtomicInt32 num_buffers_in_reader_{0};
+
   /// Lock protecting fields below.
   /// This lock should not be taken during Open()/Read()/Close().
   /// If RequestContext::lock_ and this lock need to be held simultaneously,
@@ -395,18 +435,30 @@ class ScanRange : public RequestRange {
   /// Number of bytes read so far for this scan range
   int bytes_read_;
 
-  /// The number of buffers that have been returned to a client via GetNext() that have
-  /// not yet been returned with ReturnBuffer().
-  int num_buffers_in_reader_ = 0;
+  /// Buffers to read into, used if the 'external_buffer_tag_' is NO_BUFFER. These are
+  /// initially populated when the client calls AllocateBuffersForRange() and
+  /// and are used to read scanned data into. Buffers are taken from this vector for
+  /// every read and added back, if needed, when the client calls ReturnBuffer().
+  std::vector<std::unique_ptr<BufferDescriptor>> unused_iomgr_buffers_;
+
+  /// Total number of bytes of buffers in 'unused_iomgr_buffers_'.
+  int64_t unused_iomgr_buffer_bytes_ = 0;
+
+  /// Number of bytes of buffers returned from GetNextUnusedBufferForRange(). Used to
+  /// infer how many bytes of buffers need to be held onto to read the rest of the scan
+  /// range.
+  int64_t iomgr_buffer_bytes_returned_ = 0;
 
   /// If true, the last buffer for this scan range has been queued.
   /// If this is true and 'ready_buffers_' is empty, then no more buffers will be
   /// returned to the caller by this scan range.
   bool eosr_queued_ = false;
 
-  /// If true, this scan range has been removed from the reader's in_flight_ranges
-  /// queue because the ready_buffers_ queue is full.
-  bool blocked_on_queue_ = false;
+  /// If true, this scan range is not scheduled because a buffer is not available for
+  /// the next I/O in the range. This can happen when the scan range is initially created
+  /// or if the buffers added to the range have all been filled with data an not yet
+  /// returned.
+  bool blocked_on_buffer_ = false;
 
   /// IO buffers that are queued for this scan range. When Cancel() is called
   /// this is drained by the cancelling thread. I.e. this is always empty if

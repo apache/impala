@@ -449,18 +449,27 @@ Status HdfsScanNodeBase::IssueInitialScanRanges(RuntimeState* state) {
     }
   }
 
-  // Issue initial ranges for all file types.
-  RETURN_IF_ERROR(HdfsParquetScanner::IssueInitialRanges(this,
-      matching_per_type_files[THdfsFileFormat::PARQUET]));
-  RETURN_IF_ERROR(HdfsTextScanner::IssueInitialRanges(this,
-      matching_per_type_files[THdfsFileFormat::TEXT]));
-  RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
-      matching_per_type_files[THdfsFileFormat::SEQUENCE_FILE]));
-  RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
-      matching_per_type_files[THdfsFileFormat::RC_FILE]));
-  RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
-      matching_per_type_files[THdfsFileFormat::AVRO]));
-
+  // Issue initial ranges for all file types. Only call functions for file types that
+  // actually exist - trying to add empty lists of ranges can result in spurious
+  // CANCELLED errors - see IMPALA-6564.
+  for (const auto& entry : matching_per_type_files) {
+    if (entry.second.empty()) continue;
+    switch (entry.first) {
+      case THdfsFileFormat::PARQUET:
+        RETURN_IF_ERROR(HdfsParquetScanner::IssueInitialRanges(this, entry.second));
+        break;
+      case THdfsFileFormat::TEXT:
+        RETURN_IF_ERROR(HdfsTextScanner::IssueInitialRanges(this, entry.second));
+        break;
+      case THdfsFileFormat::SEQUENCE_FILE:
+      case THdfsFileFormat::RC_FILE:
+      case THdfsFileFormat::AVRO:
+        RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this, entry.second));
+        break;
+      default:
+        DCHECK(false) << "Unexpected file type " << entry.first;
+    }
+  }
   return Status::OK();
 }
 
@@ -519,6 +528,7 @@ ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
 
 Status HdfsScanNodeBase::AddDiskIoRanges(
     const vector<ScanRange*>& ranges, int num_files_queued) {
+  DCHECK(!progress_.done()) << "Don't call AddScanRanges() after all ranges finished.";
   RETURN_IF_ERROR(runtime_state_->io_mgr()->AddScanRanges(reader_context_.get(), ranges));
   num_unqueued_files_.Add(-num_files_queued);
   DCHECK_GE(num_unqueued_files_.Load(), 0);

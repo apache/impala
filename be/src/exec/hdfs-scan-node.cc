@@ -179,10 +179,10 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   if (per_type_files_[THdfsFileFormat::PARQUET].size() > 0) {
     // Parquet files require buffers per column
     scanner_thread_bytes_required_ =
-        materialized_slots_.size() * 3 * runtime_state_->io_mgr()->max_read_buffer_size();
+        materialized_slots_.size() * 3 * runtime_state_->io_mgr()->max_buffer_size();
   } else {
     scanner_thread_bytes_required_ =
-        3 * runtime_state_->io_mgr()->max_read_buffer_size();
+        3 * runtime_state_->io_mgr()->max_buffer_size();
   }
   // scanner_thread_bytes_required_ now contains the IoBuffer requirement.
   // Next we add in the other memory the scanner thread will use.
@@ -376,6 +376,7 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
 void HdfsScanNode::ScannerThread() {
   SCOPED_THREAD_COUNTER_MEASUREMENT(scanner_thread_counters());
   SCOPED_THREAD_COUNTER_MEASUREMENT(runtime_state_->total_thread_statistics());
+  DiskIoMgr* io_mgr = runtime_state_->io_mgr();
 
   // Make thread-local copy of filter contexts to prune scan ranges, and to pass to the
   // scanner for finer-grained filtering. Use a thread-local MemPool for the filter
@@ -422,21 +423,28 @@ void HdfsScanNode::ScannerThread() {
     // to return if there's an error.
     ranges_issued_barrier_.Wait(SCANNER_THREAD_WAIT_TIME_MS, &unused);
 
-    ScanRange* scan_range;
-    // Take a snapshot of num_unqueued_files_ before calling GetNextRange().
+    // Take a snapshot of num_unqueued_files_ before calling GetNextUnstartedRange().
     // We don't want num_unqueued_files_ to go to zero between the return from
-    // GetNextRange() and the check for when all ranges are complete.
+    // GetNextUnstartedRange() and the check for when all ranges are complete.
     int num_unqueued_files = num_unqueued_files_.Load();
     // TODO: the Load() acts as an acquire barrier.  Is this needed? (i.e. any earlier
     // stores that need to complete?)
     AtomicUtil::MemoryBarrier();
+    ScanRange* scan_range;
+    bool needs_buffers;
     Status status =
-        runtime_state_->io_mgr()->GetNextRange(reader_context_.get(), &scan_range);
+        io_mgr->GetNextUnstartedRange(reader_context_.get(), &scan_range, &needs_buffers);
 
-    if (status.ok() && scan_range != NULL) {
-      // Got a scan range. Process the range end to end (in this thread).
-      status = ProcessSplit(filter_status.ok() ? filter_ctxs : vector<FilterContext>(),
-          &expr_results_pool, scan_range);
+    if (status.ok() && scan_range != nullptr) {
+      if (needs_buffers) {
+        status = io_mgr->AllocateBuffersForRange(
+            reader_context_.get(), scan_range, 3 * io_mgr->max_buffer_size());
+      }
+      if (status.ok()) {
+        // Got a scan range. Process the range end to end (in this thread).
+        status = ProcessSplit(filter_status.ok() ? filter_ctxs : vector<FilterContext>(),
+            &expr_results_pool, scan_range);
+      }
     }
 
     if (!status.ok()) {
@@ -466,8 +474,8 @@ void HdfsScanNode::ScannerThread() {
       // TODO: Based on the usage pattern of all_ranges_started_, it looks like it is not
       // needed to acquire the lock in x86.
       unique_lock<mutex> l(lock_);
-      // All ranges have been queued and GetNextRange() returned NULL. This means that
-      // every range is either done or being processed by another thread.
+      // All ranges have been queued and GetNextUnstartedRange() returned NULL. This means
+      // that every range is either done or being processed by another thread.
       all_ranges_started_ = true;
       break;
     }

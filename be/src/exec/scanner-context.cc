@@ -101,6 +101,7 @@ void ScannerContext::Stream::ReleaseCompletedResources(bool done) {
 
 Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
   DCHECK_EQ(0, io_buffer_bytes_left_);
+  DiskIoMgr* io_mgr = parent_->state_->io_mgr();
   if (UNLIKELY(parent_->cancelled())) return Status::CANCELLED;
   if (io_buffer_ != nullptr) ReturnIoBuffer();
 
@@ -121,7 +122,7 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
     SCOPED_TIMER(parent_->state_->total_storage_wait_timer());
 
     int64_t read_past_buffer_size = 0;
-    int64_t max_buffer_size = parent_->state_->io_mgr()->max_read_buffer_size();
+    int64_t max_buffer_size = io_mgr->max_buffer_size();
     if (!read_past_size_cb_.empty()) read_past_buffer_size = read_past_size_cb_(offset);
     if (read_past_buffer_size <= 0) {
       // Either no callback was set or the callback did not return an estimate. Use
@@ -143,8 +144,16 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
     ScanRange* range = parent_->scan_node_->AllocateScanRange(
         scan_range_->fs(), filename(), read_past_buffer_size, offset, partition_id,
         scan_range_->disk_id(), false, BufferOpts::Uncached());
-    RETURN_IF_ERROR(parent_->state_->io_mgr()->AddScanRange(
-        parent_->scan_node_->reader_context(), range, true));
+    bool needs_buffers;
+    RETURN_IF_ERROR(io_mgr->StartScanRange(
+        parent_->scan_node_->reader_context(), range, &needs_buffers));
+    if (needs_buffers) {
+      // Allocate fresh buffers. The buffers for 'scan_range_' should be released now
+      // since we hit EOS.
+      RETURN_IF_ERROR(io_mgr->AllocateBuffersForRange(
+          parent_->scan_node_->reader_context(), range,
+          3 * io_mgr->max_buffer_size()));
+    }
     RETURN_IF_ERROR(range->GetNext(&io_buffer_));
     DCHECK(io_buffer_->eosr());
   }

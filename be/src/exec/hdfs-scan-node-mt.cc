@@ -26,6 +26,7 @@
 
 #include "gen-cpp/PlanNodes_types.h"
 
+using namespace impala::io;
 using std::stringstream;
 
 namespace impala {
@@ -76,12 +77,18 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
       scanner_->Close(row_batch);
       scanner_.reset();
     }
-    RETURN_IF_ERROR(
-        runtime_state_->io_mgr()->GetNextRange(reader_context_.get(), &scan_range_));
-    if (scan_range_ == NULL) {
+    DiskIoMgr* io_mgr = runtime_state_->io_mgr();
+    bool needs_buffers;
+    RETURN_IF_ERROR(io_mgr->GetNextUnstartedRange(
+        reader_context_.get(), &scan_range_, &needs_buffers));
+    if (scan_range_ == nullptr) {
       *eos = true;
       StopAndFinalizeCounters();
       return Status::OK();
+    }
+    if (needs_buffers) {
+      RETURN_IF_ERROR(io_mgr->AllocateBuffersForRange(reader_context_.get(), scan_range_,
+          3 * io_mgr->max_buffer_size()));
     }
     ScanRangeMetadata* metadata =
         static_cast<ScanRangeMetadata*>(scan_range_->meta_data());

@@ -38,6 +38,9 @@ static const int MAX_FILE_LEN = 1024;
 static const int MIN_READ_BUFFER_SIZE = 64;
 static const int MAX_READ_BUFFER_SIZE = 128;
 
+// Maximum bytes to allocate per scan range.
+static const int MAX_BUFFER_BYTES_PER_SCAN_RANGE = MAX_READ_BUFFER_SIZE * 3;
+
 static const int CANCEL_READER_PERIOD_MS = 20;  // in ms
 
 static void CreateTempFile(const char* filename, const char* data) {
@@ -110,9 +113,16 @@ void DiskIoMgrStress::ClientThread(int client_id) {
 
     while (!eos) {
       ScanRange* range;
-      Status status = io_mgr_->GetNextRange(client->reader.get(), &range);
+      bool needs_buffers;
+      Status status =
+          io_mgr_->GetNextUnstartedRange(client->reader.get(), &range, &needs_buffers);
       CHECK(status.ok() || status.IsCancelled());
       if (range == NULL) break;
+      if (needs_buffers) {
+        status = io_mgr_->AllocateBuffersForRange(
+            client->reader.get(), range, MAX_BUFFER_BYTES_PER_SCAN_RANGE);
+        CHECK(status.ok()) << status.GetDetail();
+      }
 
       while (true) {
         unique_ptr<BufferDescriptor> buffer;

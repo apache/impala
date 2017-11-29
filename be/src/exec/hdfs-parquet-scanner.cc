@@ -69,6 +69,7 @@ const string PARQUET_MEM_LIMIT_EXCEEDED =
 
 Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const vector<HdfsFileDesc*>& files) {
+  DCHECK(!files.empty());
   vector<ScanRange*> footer_ranges;
   for (int i = 0; i < files.size(); ++i) {
     // If the file size is less than 12 bytes, it is an invalid Parquet file.
@@ -1439,8 +1440,10 @@ Status HdfsParquetScanner::ProcessFooter() {
         BufferOpts::ReadInto(metadata_buffer.buffer(), metadata_size));
 
     unique_ptr<BufferDescriptor> io_buffer;
-    RETURN_IF_ERROR(
-        io_mgr->AddScanRange(scan_node_->reader_context(), metadata_range, true));
+    bool needs_buffers;
+    RETURN_IF_ERROR(io_mgr->StartScanRange(
+          scan_node_->reader_context(), metadata_range, &needs_buffers));
+    DCHECK(!needs_buffers) << "Already provided a buffer";
     RETURN_IF_ERROR(metadata_range->GetNext(&io_buffer));
     DCHECK_EQ(io_buffer->buffer(), metadata_buffer.buffer());
     DCHECK_EQ(io_buffer->len(), metadata_size);
@@ -1735,12 +1738,18 @@ Status HdfsParquetScanner::InitScalarColumns(
   }
   DCHECK_EQ(col_ranges.size(), num_scalar_readers);
 
-  // Issue all the column chunks to the io mgr and have them scheduled immediately.
-  // This means these ranges aren't returned via DiskIoMgr::GetNextRange and
-  // instead are scheduled to be read immediately.
-  RETURN_IF_ERROR(scan_node_->runtime_state()->io_mgr()->AddScanRanges(
-      scan_node_->reader_context(), col_ranges, true));
-
+  DiskIoMgr* io_mgr = scan_node_->runtime_state()->io_mgr();
+  // Issue all the column chunks to the IoMgr. We scan through all columns at the same
+  // time so need to read from all of them concurrently.
+  for (ScanRange* col_range : col_ranges) {
+    bool needs_buffers;
+    RETURN_IF_ERROR(io_mgr->StartScanRange(
+        scan_node_->reader_context(), col_range, &needs_buffers));
+    if (needs_buffers) {
+      RETURN_IF_ERROR(io_mgr->AllocateBuffersForRange(
+          scan_node_->reader_context(), col_range, 3 * io_mgr->max_buffer_size()));
+    }
+  }
   return Status::OK();
 }
 

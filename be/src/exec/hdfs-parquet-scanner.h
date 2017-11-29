@@ -69,8 +69,8 @@ class BoolColumnReader;
 /// the split size, the mid point guarantees that we have at least 50% of the row group in
 /// the current split. ProcessSplit() then computes the column ranges for these row groups
 /// and submits them to the IoMgr for immediate scheduling (so they don't surface in
-/// DiskIoMgr::GetNextRange()). Scheduling them immediately also guarantees they are all
-/// read at once.
+/// DiskIoMgr::GetNextUnstartedRange()). Scheduling them immediately also guarantees they
+/// are all read at once.
 ///
 /// Like the other scanners, each parquet scanner object is one to one with a
 /// ScannerContext. Unlike the other scanners though, the context will have multiple
@@ -328,7 +328,7 @@ class HdfsParquetScanner : public HdfsScanner {
   virtual ~HdfsParquetScanner() {}
 
   /// Issue just the footer range for each file.  We'll then parse the footer and pick
-  /// out the columns we want.
+  /// out the columns we want. 'files' must not be empty.
   static Status IssueInitialRanges(HdfsScanNodeBase* scan_node,
                                    const std::vector<HdfsFileDesc*>& files)
                                    WARN_UNUSED_RESULT;
