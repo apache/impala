@@ -23,6 +23,11 @@
 
 namespace impala {
 namespace io {
+
+// Mode argument for AddRangeToDisk().
+enum class ScheduleMode {
+  IMMEDIATELY, UPON_GETNEXT, BY_CALLER
+};
 /// A request context is used to group together I/O requests belonging to a client of the
 /// I/O manager for management and scheduling.
 ///
@@ -32,53 +37,59 @@ namespace io {
 /// maintains state across all disks as well as per disk state.
 /// The unit for an IO request is a RequestRange, which may be a ScanRange or a
 /// WriteRange.
-/// A scan range for the reader is on one of five states:
-/// 1) PerDiskState's unstarted_ranges: This range has only been queued
+/// A scan range for the reader is on one of six states:
+/// 1) PerDiskState's 'unstarted_scan_ranges_': This range has only been queued
 ///    and nothing has been read from it.
-/// 2) RequestContext's ready_to_start_ranges_: This range is about to be started.
-///    As soon as the reader picks it up, it will move to the in_flight_ranges
+/// 2) RequestContext's 'ready_to_start_ranges_': This range is about to be started.
+///    As soon as the reader picks it up, it will move to the 'in_flight_ranges_'
 ///    queue.
-/// 3) PerDiskState's in_flight_ranges: This range is being processed and will
+/// 3) PerDiskState's 'in_flight_ranges_': This range is being processed and will
 ///    be read from the next time a disk thread picks it up in GetNextRequestRange()
-/// 4) ScanRange's outgoing ready buffers is full. We can't read for this range
-///    anymore. We need the caller to pull a buffer off which will put this in
-///    the in_flight_ranges queue. These ranges are in the RequestContext's
-///    blocked_ranges_ queue.
-/// 5) ScanRange is cached and in the cached_ranges_ queue.
-//
-/// If the scan range is read and does not get blocked on the outgoing queue, the
+/// 4) The ScanRange is blocked waiting for buffers because it does not have any unused
+///    buffers to read data into. It is unblocked when a client adds new buffers via
+///    AllocateBuffersForRange() or returns existing buffers via ReturnBuffer().
+///    ScanRanges in this state are identified by 'blocked_on_buffer_' == true.
+/// 5) ScanRange is cached and in the 'cached_ranges_' queue.
+/// 6) Inactive - either all the data for the range was returned or the range was
+///    cancelled. I.e. ScanRange::eosr_ is true or ScanRange::cancel_status_ != OK.
+///
+/// If the scan range is read and does not get blocked waiting for buffers, the
 /// transitions are: 1 -> 2 -> 3.
 /// If the scan range does get blocked, the transitions are
 /// 1 -> 2 -> 3 -> (4 -> 3)*
-//
-/// In the case of a cached scan range, the range is immediately put in cached_ranges_.
+///
+/// In the case of a cached scan range, the range is immediately put in 'cached_ranges_'.
 /// When the caller asks for the next range to process, we first pull ranges from
-/// the cache_ranges_ queue. If the range was cached, the range is removed and
+/// the 'cache_ranges_' queue. If the range was cached, the range is removed and
 /// done (ranges are either entirely cached or not at all). If the cached read attempt
 /// fails, we put the range in state 1.
-//
-/// A write range for a context may be in one of two lists:
-/// 1) unstarted_write_ranges_ : Ranges that have been queued but not processed.
-/// 2) in_flight_ranges_: The write range is ready to be processed by the next disk thread
-///    that picks it up in GetNextRequestRange().
-//
+///
+/// All scan ranges in states 1-5 are tracked in 'active_scan_ranges_' so that they can be
+/// cancelled when the RequestContext is cancelled. Scan ranges are removed from
+/// 'active_scan_ranges_' during their transition to state 6.
+///
+/// A write range for a context may be in one of two queues:
+/// 1) 'unstarted_write_ranges_': Ranges that have been queued but not processed.
+/// 2) 'in_flight_ranges_': The write range is ready to be processed by the next disk
+///    thread that picks it up in GetNextRequestRange().
+///
 /// AddWriteRange() adds WriteRanges for a disk.
 /// It is the responsibility of the client to pin the data to be written via a WriteRange
 /// in memory. After a WriteRange has been written, a callback is invoked to inform the
 /// client that the write has completed.
-//
+///
 /// An important assumption is that write does not exceed the maximum read size and that
 /// the entire range is written when the write request is handled. (In other words, writes
 /// are not broken up.)
-//
+///
 /// When a RequestContext is processed by a disk thread in GetNextRequestRange(),
 /// a write range is always removed from the list of unstarted write ranges and appended
 /// to the in_flight_ranges_ queue. This is done to alternate reads and writes - a read
-/// that is scheduled (by calling GetNextRange()) is always followed by a write (if one
-/// exists).  And since at most one WriteRange can be present in in_flight_ranges_ at any
-/// time (once a write range is returned from GetNetxRequestRange() it is completed an
-/// not re-enqueued), a scan range scheduled via a call to GetNextRange() can be queued up
-/// behind at most one write range.
+/// that is scheduled (by calling GetNextUnstartedRange()) is always followed by a write
+/// (if one exists). And since at most one WriteRange can be present in in_flight_ranges_
+/// at any time (once a write range is returned from GetNetxRequestRange() it is completed
+/// and not re-enqueued), a scan range scheduled via a call to GetNextUnstartedRange() can
+/// be queued up behind at most one write range.
 class RequestContext {
  public:
   ~RequestContext() {
@@ -97,7 +108,6 @@ class RequestContext {
     return state_ == Cancelled;
   }
 
-  int64_t queue_size() const { return num_ready_buffers_.Load(); }
   int64_t bytes_read_local() const { return bytes_read_local_.Load(); }
   int64_t bytes_read_short_circuit() const { return bytes_read_short_circuit_.Load(); }
   int64_t bytes_read_dn_cache() const { return bytes_read_dn_cache_.Load(); }
@@ -150,13 +160,6 @@ class RequestContext {
 
   RequestContext(DiskIoMgr* parent, int num_disks, MemTracker* tracker);
 
-  /// Allocates a buffer to read into with size between
-  /// max('buffer_size', 'min_buffer_size_') and 'max_buffer_size_'.
-  /// Does not acquire 'lock_'.
-  /// TODO: allocate using the buffer pool client associated with this reader.
-  Status AllocBuffer(ScanRange* range, int64_t buffer_size,
-      std::unique_ptr<BufferDescriptor>* buffer);
-
   /// Cleans up a buffer. If the buffer was allocated with AllocBuffer(), frees the buffer
   /// memory and release the consumption to the client MemTracker. Otherwise (e.g. a
   /// client or HDFS cache buffer), just prepares the descriptor to be destroyed.
@@ -184,11 +187,11 @@ class RequestContext {
 
   /// Adds range to in_flight_ranges, scheduling this reader on the disk threads
   /// if necessary.
-  /// 'lock_' must be held via 'lock'
+  /// 'lock_' must be held via 'lock'. Only valid to call if this context is active.
   void ScheduleScanRange(const boost::unique_lock<boost::mutex>& lock, ScanRange* range) {
     DCHECK(lock.mutex() == &lock_ && lock.owns_lock());
     DCHECK_EQ(state_, Active);
-    DCHECK(range != NULL);
+    DCHECK(range != nullptr);
     RequestContext::PerDiskState& state = disk_states_[range->disk_id()];
     state.in_flight_ranges()->Enqueue(range);
     state.ScheduleContext(lock, this, range->disk_id());
@@ -198,11 +201,34 @@ class RequestContext {
   /// and mark the context as inactive, after which it cannot be used.
   void CancelAndMarkInactive();
 
-  /// Adds request range to disk queue for this request context. Currently,
-  /// schedule_immediately must be false is RequestRange is a write range.
-  /// Caller must hold 'lock_' via 'lock'.
-  void AddRequestRange(const boost::unique_lock<boost::mutex>& lock,
-      RequestRange* range, bool schedule_immediately);
+  /// Adds a request range to the appropriate disk state. 'schedule_mode' controls which
+  /// queue the range is placed in. This RequestContext is scheduled on the disk state
+  /// if required by 'schedule_mode'.
+  ///
+  /// Write ranges must always have 'schedule_mode' IMMEDIATELY and are added to the
+  /// 'unstarted_write_ranges_' queue, from which they will be asynchronously moved to the
+  /// 'in_flight_ranges_' queue.
+  ///
+  /// Scan ranges can have different 'schedule_mode' values. If IMMEDIATELY, the range is
+  /// immediately added to the 'in_flight_ranges_' queue where it will be processed
+  /// asynchronously by disk threads. If UPON_GETNEXT, the range is added to the
+  /// 'unstarted_ranges_' queue, from which it can be returned to a client by
+  /// DiskIoMgr::GetNextUnstartedRange(). If BY_CALLER, the scan range is not added to
+  /// any queues. The range will be scheduled later as a separate step, e.g. when it is
+  /// unblocked by adding buffers to it. Caller must hold 'lock_' via 'lock'.
+  void AddRangeToDisk(const boost::unique_lock<boost::mutex>& lock, RequestRange* range,
+      ScheduleMode schedule_mode);
+
+  /// Adds an active range to 'active_scan_ranges_'
+  void AddActiveScanRangeLocked(
+      const boost::unique_lock<boost::mutex>& lock, ScanRange* range);
+
+  /// Removes the range from 'active_scan_ranges_'. Called by ScanRange after eos or
+  /// cancellation. If calling the Locked version, the caller must hold
+  /// 'lock_'. Otherwise the function will acquire 'lock_'.
+  void RemoveActiveScanRange(ScanRange* range);
+  void RemoveActiveScanRangeLocked(
+      const boost::unique_lock<boost::mutex>& lock, ScanRange* range);
 
   /// Validates invariants of reader.  Reader lock must be taken beforehand.
   bool Validate() const;
@@ -243,13 +269,6 @@ class RequestContext {
   /// Total number of bytes from remote reads that were expected to be local.
   AtomicInt64 unexpected_remote_bytes_{0};
 
-  /// The number of buffers that have been returned to the reader (via GetNext()) that the
-  /// reader has not returned. Only included for debugging and diagnostics.
-  AtomicInt32 num_buffers_in_reader_{0};
-
-  /// The number of scan ranges that have been completed for this reader.
-  AtomicInt32 num_finished_ranges_{0};
-
   /// The number of scan ranges that required a remote read, updated at the end of each
   /// range scan. Only used for diagnostics.
   AtomicInt32 num_remote_ranges_{0};
@@ -264,17 +283,6 @@ class RequestContext {
   /// Total number of file handle opens where the file handle was not in the cache
   AtomicInt32 cached_file_handles_miss_count_{0};
 
-  /// The number of buffers that are being used for this reader. This is the sum
-  /// of all buffers in ScanRange queues and buffers currently being read into (i.e. about
-  /// to be queued). This includes both IOMgr-allocated buffers and client-provided
-  /// buffers.
-  AtomicInt32 num_used_buffers_{0};
-
-  /// The total number of ready buffers across all ranges.  Ready buffers are buffers
-  /// that have been read from disk but not retrieved by the caller.
-  /// This is the sum of all queued buffers in all ranges for this reader context.
-  AtomicInt32 num_ready_buffers_{0};
-
   /// All fields below are accessed by multiple threads and the lock needs to be
   /// taken before accessing them. Must be acquired before ScanRange::lock_ if both
   /// are held simultaneously.
@@ -282,6 +290,17 @@ class RequestContext {
 
   /// Current state of the reader
   State state_ = Active;
+
+  /// Scan ranges that have been added to the IO mgr for this context. Ranges can only
+  /// be added when 'state_' is Active. When this context is cancelled, Cancel() is
+  /// called for all the active ranges. If a client attempts to add a range while
+  /// 'state_' is Cancelled, the range is not added to this list and Status::CANCELLED
+  /// is returned to the client. This ensures that all active ranges are cancelled as a
+  /// result of RequestContext cancellation.
+  /// Ranges can be cancelled or hit eos non-atomically with their removal from this set,
+  /// so eos or cancelled ranges may be temporarily present here. Cancelling these ranges
+  /// a second time or cancelling after eos is safe and has no effect.
+  boost::unordered_set<ScanRange*> active_scan_ranges_;
 
   /// The number of disks with scan ranges remaining (always equal to the sum of
   /// disks with ranges).
@@ -293,17 +312,14 @@ class RequestContext {
   InternalList<ScanRange> cached_ranges_;
 
   /// A list of ranges that should be returned in subsequent calls to
-  /// GetNextRange.
+  /// GetNextUnstartedRange().
   /// There is a trade-off with when to populate this list.  Populating it on
-  /// demand means consumers need to wait (happens in DiskIoMgr::GetNextRange()).
+  /// demand means consumers need to wait (happens in DiskIoMgr::GetNextUnstartedRange()).
   /// Populating it preemptively means we make worse scheduling decisions.
   /// We currently populate one range per disk.
   /// TODO: think about this some more.
   InternalList<ScanRange> ready_to_start_ranges_;
   ConditionVariable ready_to_start_ranges_cv_; // used with lock_
-
-  /// Ranges that are blocked due to back pressure on outgoing buffers.
-  InternalList<ScanRange> blocked_ranges_;
 
   /// Condition variable for UnregisterContext() to wait for all disks to complete
   ConditionVariable disks_complete_cond_var_;
@@ -429,7 +445,7 @@ class RequestContext {
 
     /// Queue of pending IO requests for this disk in the order that they will be
     /// processed. A ScanRange is added to this queue when it is returned in
-    /// GetNextRange(), or when it is added with schedule_immediately = true.
+    /// GetNextUnstartedRange(), or when it is added with schedule_mode == IMMEDIATELY.
     /// A WriteRange is added to this queue from unstarted_write_ranges_ for each
     /// invocation of GetNextRequestRange() in WorkLoop().
     /// The size of this queue is always less than or equal to num_remaining_ranges.
@@ -458,7 +474,8 @@ class RequestContext {
     /// unstarted_read_ranges_ and unstarted_write_ranges_ to alternate between reads
     /// and writes. (Otherwise, since next_scan_range_to_start is set
     /// in GetNextRequestRange() whenever it is null, repeated calls to
-    /// GetNextRequestRange() and GetNextRange() may result in only reads being processed)
+    /// GetNextRequestRange() and GetNextUnstartedRange() may result in only reads being
+    /// processed)
     InternalQueue<WriteRange> unstarted_write_ranges_;
   };
 

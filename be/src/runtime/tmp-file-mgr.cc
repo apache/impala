@@ -396,7 +396,10 @@ Status TmpFileMgr::FileGroup::ReadAsync(WriteHandle* handle, MemRange buffer) {
       BufferOpts::ReadInto(buffer.data(), buffer.len()));
   read_counter_->Add(1);
   bytes_read_counter_->Add(buffer.len());
-  RETURN_IF_ERROR(io_mgr_->AddScanRange(io_ctx_.get(), handle->read_range_, true));
+  bool needs_buffers;
+  RETURN_IF_ERROR(io_mgr_->StartScanRange(
+      io_ctx_.get(), handle->read_range_, &needs_buffers));
+  DCHECK(!needs_buffers) << "Already provided a buffer";
   return Status::OK();
 }
 
@@ -522,9 +525,18 @@ TmpFileMgr::WriteHandle::WriteHandle(
     is_cancelled_(false),
     write_in_flight_(false) {}
 
+TmpFileMgr::WriteHandle::~WriteHandle() {
+  DCHECK(!write_in_flight_);
+  DCHECK(read_range_ == nullptr);
+}
+
 string TmpFileMgr::WriteHandle::TmpFilePath() const {
   if (file_ == nullptr) return "";
   return file_->path();
+}
+
+int64_t TmpFileMgr::WriteHandle::len() const {
+  return write_range_->len();
 }
 
 Status TmpFileMgr::WriteHandle::Write(DiskIoMgr* io_mgr, RequestContext* io_ctx,

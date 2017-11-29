@@ -48,15 +48,15 @@ namespace io {
 /// Manager object that schedules IO for all queries on all disks and remote filesystems
 /// (such as S3). Each query maps to one or more RequestContext objects, each of which
 /// has its own queue of scan ranges and/or write ranges.
-//
+///
 /// The API splits up requesting scan/write ranges (non-blocking) and reading the data
 /// (blocking). The DiskIoMgr has worker threads that will read from and write to
 /// disk/hdfs/remote-filesystems, allowing interleaving of IO and CPU. This allows us to
 /// keep all disks and all cores as busy as possible.
-//
+///
 /// All public APIs are thread-safe. It is not valid to call any of the APIs after
 /// UnregisterContext() returns.
-//
+///
 /// For Readers:
 /// We can model this problem as a multiple producer (threads for each disk), multiple
 /// consumer (scan ranges) problem. There are multiple queues that need to be
@@ -68,84 +68,101 @@ namespace io {
 /// Readers map to scan nodes. The reader then contains a queue of scan ranges. The caller
 /// asks the IoMgr for the next range to process. The IoMgr then selects the best range
 /// to read based on disk activity and begins reading and queuing buffers for that range.
-/// TODO: We should map readers to queries. A reader is the unit of scheduling and queries
-/// that have multiple scan nodes shouldn't have more 'turns'.
-//
+///
 /// For Writers:
 /// Data is written via AddWriteRange(). This is non-blocking and adds a WriteRange to a
 /// per-disk queue. After the write is complete, a callback in WriteRange is invoked.
 /// No memory is allocated within IoMgr for writes and no copies are made. It is the
 /// responsibility of the client to ensure that the data to be written is valid and that
 /// the file to be written to exists until the callback is invoked.
-//
-/// The IoMgr provides three key APIs.
-///  1. AddScanRanges: this is non-blocking and tells the IoMgr all the ranges that
-///     will eventually need to be read.
-///  2. GetNextRange: returns to the caller the next scan range it should process.
-///     This is based on disk load. This also begins reading the data in this scan
-///     range. This is blocking.
-///  3. ScanRange::GetNext: returns the next buffer for this range.  This is blocking.
-//
+///
+/// There are several key methods for scanning data with the IoMgr.
+///  1. StartScanRange(): adds range to the IoMgr to start immediately.
+///  2. AddScanRanges(): adds ranges to the IoMgr that the reader wants to scan, but does
+///     not start them until GetNextUnstartedRange() is called.
+///  3. GetNextUnstartedRange(): returns to the caller the next scan range it should
+///     process.
+///  4. ScanRange::GetNext(): returns the next buffer for this range, blocking until
+///     data is available.
+///
 /// The disk threads do not synchronize with each other. The readers and writers don't
 /// synchronize with each other. There is a lock and condition variable for each request
 /// context queue and each disk queue.
 /// IMPORTANT: whenever both locks are needed, the lock order is to grab the context lock
 /// before the disk lock.
-//
+///
 /// Scheduling: If there are multiple request contexts with work for a single disk, the
 /// request contexts are scheduled in round-robin order. Multiple disk threads can
 /// operate on the same request context. Exactly one request range is processed by a
-/// disk thread at a time. If there are multiple scan ranges scheduled via
-/// GetNextRange() for a single context, these are processed in round-robin order.
+/// disk thread at a time. If there are multiple scan ranges scheduled for a single
+/// context, these are processed in round-robin order.
 /// If there are multiple scan and write ranges for a disk, a read is always followed
 /// by a write, and a write is followed by a read, i.e. reads and writes alternate.
 /// If multiple write ranges are enqueued for a single disk, they will be processed
 /// by the disk threads in order, but may complete in any order. No guarantees are made
 /// on ordering of writes across disks.
-//
-/// Resource Management: effective resource management in the IoMgr is key to good
-/// performance. The IoMgr helps coordinate two resources: CPU and disk. For CPU,
-/// spinning up too many threads causes thrashing.
-/// Memory usage in the IoMgr comes from queued read buffers.  If we queue the minimum
-/// (i.e. 1), then the disks are idle while we are processing the buffer. If we don't
-/// limit the queue, then it possible we end up queueing the entire data set (i.e. CPU
-/// is slower than disks) and run out of memory.
-/// For both CPU and memory, we want to model the machine as having a fixed amount of
-/// resources.  If a single query is running, it should saturate either CPU or Disk
-/// as well as using as little memory as possible. With multiple queries, each query
-/// should get less CPU. In that case each query will need fewer queued buffers and
-/// therefore have less memory usage.
-//
-/// The IoMgr defers CPU management to the caller. The IoMgr provides a GetNextRange
-/// API which will return the next scan range the caller should process. The caller
-/// can call this from the desired number of reading threads. Once a scan range
-/// has been returned via GetNextRange, the IoMgr will start to buffer reads for
-/// that range and it is expected the caller will pull those buffers promptly. For
-/// example, if the caller would like to have 1 scanner thread, the read loop
-/// would look like:
+///
+/// Resource Management: the IoMgr is designed to share the available disk I/O capacity
+/// between many clients and to help use the available I/O capacity efficiently. The IoMgr
+/// interfaces are designed to let clients manage their own CPU and memory usage while the
+/// IoMgr manages the allocation of the I/O capacity of different I/O devices to scan
+/// ranges of different clients.
+///
+/// IoMgr clients may want to work on multiple scan ranges at a time to maximize CPU and
+/// I/O utilization. Clients can call GetNextUnstartedRange() to start as many concurrent
+/// scan ranges as required, e.g. from each parallel scanner thread. Once a scan range has
+/// been returned via GetNextUnstartedRange(), the caller must allocate any memory needed
+/// for buffering reads, after which the IoMgr wil start to fill the buffers with data
+/// while the caller concurrently consumes and processes the data. For example, the logic
+/// in a scanner thread might look like:
 ///   while (more_ranges)
-///     range = GetNextRange()
+///     range = GetNextUnstartedRange()
 ///     while (!range.eosr)
 ///       buffer = range.GetNext()
-/// To have multiple reading threads, the caller would simply spin up the threads
-/// and each would process the loops above.
-//
-/// To control the number of IO buffers, each scan range has a limit of two queued
-/// buffers (SCAN_RANGE_READY_BUFFER_LIMIT). If the number of buffers is at capacity,
-/// the IoMgr will no longer read for that scan range until the caller has processed
-/// a buffer. Assuming the client returns each buffer before requesting the next one
-/// from the scan range, then this will consume up to 3 * 8MB = 24MB of I/O buffers per
-/// scan range.
-//
-/// Buffer Management:
-/// Buffers for reads are either a) allocated by the IoMgr and transferred to the caller,
-/// b) cached HDFS buffers if the scan range uses HDFS caching, or c) provided by the
-/// caller when constructing the scan range.
 ///
-/// As a caller reads from a scan range, these buffers are wrapped in BufferDescriptors
-/// and returned to the caller. The caller must always call ReturnBuffer() on the buffer
-/// descriptor to allow freeing of the associated buffer (if there is an IoMgr-allocated
-/// or HDFS cached buffer).
+/// Note that the IoMgr rather than the client is responsible for choosing which scan
+/// range to process next, which allows optimizations like distributing load across disks.
+///
+/// Buffer Management:
+/// Buffers for reads are either a) allocated on behalf of the caller with
+/// AllocateBuffersForRange() ("IoMgr-allocated"), b) cached HDFS buffers if the scan
+/// range was read from the HDFS cache, or c) a client buffer, large enough to fit the
+/// whole scan range's data, that is provided by the caller when constructing the
+/// scan range.
+///
+/// All three kinds of buffers are wrapped in BufferDescriptors before returning to the
+/// caller. The caller must always call ReturnBuffer() on the buffer descriptor to allow
+/// recycling of the buffer memory and to release any resources associated with the buffer
+/// or scan range.
+///
+/// In case a), ReturnBuffer() may re-enqueue the buffer for GetNext() to return again if
+/// needed. E.g. if 24MB of buffers were allocated to read a 64MB scan range, each buffer
+/// must be returned multiple times. Callers must be careful to call ReturnBuffer() with
+/// the previous buffer returned from the range before calling before GetNext() so that
+/// at least one buffer is available for the I/O mgr to read data into. Calling GetNext()
+/// when the scan range has no buffers to read data into causes a resource deadlock.
+/// NB: if the scan range was allocated N buffers, then it's always ok for the caller
+/// to hold onto N - 1 buffers, but currently the IoMgr doesn't give the caller a way
+/// to determine the value of N.
+///
+/// If the caller wants to maximize I/O throughput, it can give the range enough memory
+/// for 3 max-sized buffers per scan range. Having two queued buffers (plus the buffer
+/// that is currently being processed by the client) gives good performance in most
+/// scenarios:
+/// 1. If the consumer is consuming data faster than we can read from disk, then the
+///    queue will be empty most of the time because the buffer will be immediately
+///    pulled off the queue as soon as it is added. There will always be an I/O request
+///    in the disk queue to maximize I/O throughput, which is the bottleneck in this
+///    case.
+/// 2. If we can read from disk faster than the consumer is consuming data, the queue
+///    will fill up and there will always be a buffer available for the consumer to
+///    read, so the consumer will not block and we maximize consumer throughput, which
+///    is the bottleneck in this case.
+/// 3. If the consumer is consuming data at approximately the same rate as we are
+///    reading from disk, then the steady state is that the consumer is processing one
+///    buffer and one buffer is in the disk queue. The additional buffer can absorb
+///    bursts where the producer runs faster than the consumer or the consumer runs
+///    faster than the producer without blocking either the producer or consumer.
 ///
 /// Caching support:
 /// Scan ranges contain metadata on whether or not it is cached on the DN. In that
@@ -161,13 +178,13 @@ namespace io {
 ///   - HDFS will time us out if we hold onto the mlock for too long
 ///   - Holding the lock prevents uncaching this file due to a caching policy change.
 /// Therefore, we only issue the cached read when the caller is ready to process the
-/// range (GetNextRange()) instead of when the ranges are issued. This guarantees that
-/// there will be a CPU available to process the buffer and any throttling we do with
+/// range (GetNextUnstartedRange()) instead of when the ranges are issued. This guarantees
+/// that there will be a CPU available to process the buffer and any throttling we do with
 /// the number of scanner threads properly controls the amount of files we mlock.
 /// With cached scan ranges, we cannot close the scan range until the cached buffer
 /// is returned (HDFS does not allow this). We therefore need to defer the close until
 /// the cached buffer is returned (ReturnBuffer()).
-//
+///
 /// Remote filesystem support (e.g. S3):
 /// Remote filesystems are modeled as "remote disks". That is, there is a seperate disk
 /// queue for each supported remote filesystem type. In order to maximize throughput,
@@ -176,12 +193,13 @@ namespace io {
 /// intensive than local disk/hdfs because of non-direct I/O and SSL processing, and can
 /// be CPU bottlenecked especially if not enough I/O threads for these queues are
 /// started.
-//
+///
+/// TODO: We should implement more sophisticated resource management. Currently readers
+/// are the unit of scheduling and we attempt to distribute IOPS between them. Instead
+/// it would be better to have policies based on queries, resource pools, etc.
 /// TODO: IoMgr should be able to request additional scan ranges from the coordinator
 /// to help deal with stragglers.
-/// TODO: look into using a lock free queue
-/// TODO: simplify the common path (less locking, memory allocations).
-//
+///
 /// Structure of the Implementation:
 ///  - All client APIs are defined in this file, request-ranges.h and request-context.h.
 ///    Clients can include only the files that they need.
@@ -204,8 +222,10 @@ class DiskIoMgr : public CacheLineAligned {
   ///    disk. This is also the max queue depth.
   ///  - threads_per_solid_state_disk: number of read threads to create per solid state
   ///    disk. This is also the max queue depth.
-  ///  - min_buffer_size: minimum io buffer size (in bytes)
-  ///  - max_buffer_size: maximum io buffer size (in bytes). Also the max read size.
+  ///  - min_buffer_size: minimum io buffer size (in bytes). Will be rounded down to the
+  //     nearest power-of-two.
+  ///  - max_buffer_size: maximum io buffer size (in bytes). Will be rounded up to the
+  ///    nearest power-of-two. Also the max read size.
   DiskIoMgr(int num_disks, int threads_per_rotational_disk,
       int threads_per_solid_state_disk, int64_t min_buffer_size, int64_t max_buffer_size);
 
@@ -237,29 +257,61 @@ class DiskIoMgr : public CacheLineAligned {
   /// up.
   void UnregisterContext(RequestContext* context);
 
-  /// Adds the scan ranges to the queues. This call is non-blocking. The caller must
-  /// not deallocate the scan range pointers before UnregisterContext().
-  /// If schedule_immediately, the ranges are immediately put on the read queue
-  /// (i.e. the caller should not/cannot call GetNextRange for these ranges).
-  /// This can be used to do synchronous reads as well as schedule dependent ranges,
-  /// as in the case for columnar formats.
-  Status AddScanRanges(RequestContext* reader,
-      const std::vector<ScanRange*>& ranges,
-      bool schedule_immediately = false) WARN_UNUSED_RESULT;
-  Status AddScanRange(RequestContext* reader, ScanRange* range,
-      bool schedule_immediately = false) WARN_UNUSED_RESULT;
+  /// Adds the scan ranges to reader's queues, but does not start scheduling it. The range
+  /// can be scheduled by a thread calling GetNextUnstartedRange(). This call is
+  /// non-blocking. The caller must not deallocate the scan range pointers before
+  /// UnregisterContext().
+  Status AddScanRanges(
+      RequestContext* reader, const std::vector<ScanRange*>& ranges) WARN_UNUSED_RESULT;
+
+  /// Adds the scan range to the queues, as with AddScanRanges(), but immediately
+  /// start scheduling the scan range. This can be used to do synchronous reads as well
+  /// as schedule dependent ranges, e.g. for columnar formats. This call is non-blocking.
+  /// The caller must not deallocate the scan range pointers before UnregisterContext().
+  ///
+  /// If this returns true in '*needs_buffers', the caller must then call
+  /// AllocateBuffersForRange() to add buffers for the data to be read into before the
+  /// range can be scheduled. Otherwise, the range is scheduled and the IoMgr will
+  /// asynchronously read the data for the range and the caller can call
+  /// ScanRange::GetNext() to read the data.
+  Status StartScanRange(
+      RequestContext* reader, ScanRange* range, bool* needs_buffers) WARN_UNUSED_RESULT;
 
   /// Add a WriteRange for the writer. This is non-blocking and schedules the context
   /// on the IoMgr disk queue. Does not create any files.
   Status AddWriteRange(
       RequestContext* writer, WriteRange* write_range) WARN_UNUSED_RESULT;
 
-  /// Returns the next unstarted scan range for this reader. When the range is returned,
-  /// the disk threads in the IoMgr will already have started reading from it. The
-  /// caller is expected to call ScanRange::GetNext on the returned range.
-  /// If there are no more unstarted ranges, nullptr is returned.
-  /// This call is blocking.
-  Status GetNextRange(RequestContext* reader, ScanRange** range) WARN_UNUSED_RESULT;
+  /// Tries to get an unstarted scan range that was added to 'reader' with
+  /// AddScanRanges(). On success, returns OK and returns the range in '*range'.
+  /// If 'reader' was cancelled, returns CANCELLED. If another error is encountered,
+  /// an error status is returned. Otherwise, if error or cancellation wasn't encountered
+  /// and there are no unstarted ranges for 'reader', returns OK and sets '*range' to
+  /// nullptr.
+  ///
+  /// If '*needs_buffers' is returned as true, the caller must call
+  /// AllocateBuffersForRange() to add buffers for the data to be read into before the
+  /// range can be scheduled. Otherwise, the range is scheduled and the IoMgr will
+  /// asynchronously read the data for the range and the caller can call
+  /// ScanRange::GetNext() to read the data.
+  Status GetNextUnstartedRange(RequestContext* reader, ScanRange** range,
+      bool* needs_buffers) WARN_UNUSED_RESULT;
+
+  /// Allocates up to 'max_bytes' buffers to read the data from 'range' into and schedules
+  /// the range. Called after StartScanRange() or GetNextUnstartedRange() returns
+  /// *needs_buffers=true.
+  ///
+  /// The buffer sizes are chosen based on range->len(). 'max_bytes' must be >=
+  /// min_read_buffer_size() so that at least one buffer can be allocated. Returns ok
+  /// if the buffers were successfully allocated and the range was scheduled. Fails with
+  /// MEM_LIMIT_EXCEEDED if the buffers could not be allocated. On failure, any allocated
+  /// buffers are freed and the state of 'range' is unmodified so that allocation can be
+  /// retried.  Setting 'max_bytes' to 3 * max_buffer_size() will typically maximize I/O
+  /// throughput. See Buffer management" section of the class comment for explanation.
+  /// TODO: error handling contract will change with reservations. The caller needs to
+  /// to guarantee that there is sufficient reservation.
+  Status AllocateBuffersForRange(RequestContext* reader, ScanRange* range,
+      int64_t max_bytes);
 
   /// Determine which disk queue this file should be assigned to.  Returns an index into
   /// disk_queues_.  The disk_id is the volume ID for the local disk that holds the
@@ -267,8 +319,8 @@ class DiskIoMgr : public CacheLineAligned {
   /// co-located with the datanode for this file.
   int AssignQueue(const char* file, int disk_id, bool expected_local);
 
-  /// Returns the maximum read buffer size
-  int64_t max_read_buffer_size() const { return max_buffer_size_; }
+  int64_t min_buffer_size() const { return min_buffer_size_; }
+  int64_t max_buffer_size() const { return max_buffer_size_; }
 
   /// Returns the total number of disk queues (both local and remote).
   int num_total_disks() const { return disk_queues_.size(); }
@@ -318,25 +370,6 @@ class DiskIoMgr : public CacheLineAligned {
   Status ReopenCachedHdfsFileHandle(const hdfsFS& fs, std::string* fname, int64_t mtime,
       CachedHdfsFileHandle** fid);
 
-  /// The maximum number of ready buffers that can be queued in a scan range. Having two
-  /// queued buffers (plus the buffer that is returned to the client) gives good
-  /// performance in most scenarios:
-  /// 1. If the consumer is consuming data faster than we can read from disk, then the
-  ///    queue will be empty most of the time because the buffer will be immediately
-  ///    pulled off the queue as soon as it is added. There will always be an I/O request
-  ///    in the disk queue to maximize I/O throughput, which is the bottleneck in this
-  ///    case.
-  /// 2. If we can read from disk faster than the consumer is consuming data, the queue
-  ///    will fill up and there will always be a buffer available for the consumer to
-  ///    read, so the consumer will not block and we maximize consumer throughput, which
-  ///    is the bottleneck in this case.
-  /// 3. If the consumer is consuming data at approximately the same rate as we are
-  ///    reading from disk, then the steady state is that the consumer is processing one
-  ///    buffer and one buffer is in the disk queue. The additional buffer can absorb
-  ///    bursts where the producer runs faster than the consumer or the consumer runs
-  ///    faster than the producer without blocking either the producer or consumer.
-  static const int SCAN_RANGE_READY_BUFFER_LIMIT = 2;
-
   /// "Disk" queue offsets for remote accesses.  Offset 0 corresponds to
   /// disk ID (i.e. disk_queue_ index) of num_local_disks().
   enum {
@@ -354,6 +387,7 @@ class DiskIoMgr : public CacheLineAligned {
   struct DiskQueue;
 
   friend class DiskIoMgrTest_Buffers_Test;
+  friend class DiskIoMgrTest_BufferSizeSelection_Test;
   friend class DiskIoMgrTest_VerifyNumThreadsParameter_Test;
 
   /// Number of worker(read) threads per rotational disk. Also the max depth of queued
@@ -442,17 +476,14 @@ class DiskIoMgr : public CacheLineAligned {
   /// Does not open or close the file that is written.
   Status WriteRangeHelper(FILE* file_handle, WriteRange* write_range) WARN_UNUSED_RESULT;
 
-  /// Reads the specified scan range and calls HandleReadFinished() when done.
+  /// Reads the specified scan range and calls HandleReadFinished() when done. If no
+  /// buffer is available to read the range's data into, the read cannot proceed, the
+  /// range becomes blocked and this function returns without doing I/O.
   void ReadRange(DiskQueue* disk_queue, RequestContext* reader, ScanRange* range);
 
-  /// Try to allocate the next buffer for the scan range, returning the new buffer
-  /// if successful. If 'reader' is cancelled, cancels the range and returns nullptr.
-  /// If there is memory pressure and buffers are already queued, adds the range
-  /// to the blocked ranges and returns nullptr. If buffers are not queued and no more
-  /// buffers can be allocated, cancels the range with a MEM_LIMIT_EXCEEDED error and
-  /// returns nullptr.
-  std::unique_ptr<BufferDescriptor> TryAllocateNextBufferForRange(DiskQueue* disk_queue,
-      RequestContext* reader, ScanRange* range, int64_t buffer_size);
+  /// Helper for AllocateBuffersForRange() to compute the buffer sizes for a scan range
+  /// with length 'scan_range_len', given that 'max_bytes' of memory should be allocated.
+  std::vector<int64_t> ChooseBufferSizes(int64_t scan_range_len, int64_t max_bytes);
 };
 }
 }

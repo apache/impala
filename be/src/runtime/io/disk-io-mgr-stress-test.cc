@@ -16,7 +16,10 @@
 // under the License.
 
 #include "runtime/io/disk-io-mgr-stress.h"
-#include "util/cpu-info.h"
+
+#include "common/init.h"
+#include "runtime/test-env.h"
+#include "service/fe-support.h"
 #include "util/string-parser.h"
 
 #include "common/names.h"
@@ -35,10 +38,10 @@ const int NUM_CLIENTS = 10;
 const bool TEST_CANCELLATION = true;
 
 int main(int argc, char** argv) {
-  google::InitGoogleLogging(argv[0]);
-  CpuInfo::Init();
-  OsInfo::Init();
-  impala::InitThreading();
+  InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
+  InitFeSupport();
+  TestEnv test_env;
+  ABORT_IF_ERROR(test_env.Init());
   int duration_sec = DEFAULT_DURATION_SEC;
 
   if (argc == 2) {

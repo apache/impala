@@ -46,6 +46,7 @@ static const int MIN_SYNC_READ_SIZE = 64 * 1024; // bytes
 
 Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const vector<HdfsFileDesc*>& files) {
+  DCHECK(!files.empty());
   // Issue just the header range for each file.  When the header is complete,
   // we'll issue the splits for that file.  Splits cannot be processed until the
   // header is parsed (the header object is then shared across splits for that file).

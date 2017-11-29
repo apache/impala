@@ -41,7 +41,7 @@ DECLARE_int32(num_remote_hdfs_io_threads);
 DECLARE_int32(num_s3_io_threads);
 DECLARE_int32(num_adls_io_threads);
 
-const int MIN_BUFFER_SIZE = 512;
+const int MIN_BUFFER_SIZE = 128;
 const int MAX_BUFFER_SIZE = 1024;
 const int LARGE_MEM_LIMIT = 1024 * 1024 * 1024;
 
@@ -122,7 +122,12 @@ class DiskIoMgrTest : public testing::Test {
   static void ValidateSyncRead(DiskIoMgr* io_mgr, RequestContext* reader,
       ScanRange* range, const char* expected, int expected_len = -1) {
     unique_ptr<BufferDescriptor> buffer;
-    ASSERT_OK(io_mgr->AddScanRange(reader, range, true));
+    bool needs_buffers;
+    ASSERT_OK(io_mgr->StartScanRange(reader, range, &needs_buffers));
+    if (needs_buffers) {
+      ASSERT_OK(io_mgr->AllocateBuffersForRange(
+          reader, range, io_mgr->max_buffer_size()));
+    }
     ASSERT_OK(range->GetNext(&buffer));
     ASSERT_TRUE(buffer != nullptr);
     EXPECT_EQ(buffer->len(), range->len());
@@ -161,9 +166,14 @@ class DiskIoMgrTest : public testing::Test {
     int num_ranges = 0;
     while (max_ranges == 0 || num_ranges < max_ranges) {
       ScanRange* range;
-      Status status = io_mgr->GetNextRange(reader, &range);
+      bool needs_buffers;
+      Status status = io_mgr->GetNextUnstartedRange(reader, &range, &needs_buffers);
       ASSERT_TRUE(status.ok() || status.code() == expected_status.code());
       if (range == nullptr) break;
+      if (needs_buffers) {
+        ASSERT_OK(io_mgr->AllocateBuffersForRange(
+            reader, range, io_mgr->max_buffer_size() * 3));
+      }
       ValidateScanRange(io_mgr, range, expected_result, expected_len, expected_status);
       num_ranges_processed->Add(1);
       ++num_ranges;
@@ -509,7 +519,6 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
       // Issue some reads before the async ones are issued
       ValidateSyncRead(&io_mgr, reader.get(), complete_range, data);
       ValidateSyncRead(&io_mgr, reader.get(), complete_range, data);
-
       vector<ScanRange*> ranges;
       for (int i = 0; i < len; ++i) {
         int disk_id = i % num_disks;
@@ -641,15 +650,23 @@ TEST_F(DiskIoMgrTest, MemLimits) {
 
     bool hit_mem_limit_exceeded = false;
     char result[strlen(data) + 1];
-    // Keep reading new ranges without returning buffers. This forces us
-    // to go over the limit eventually.
+    // Keep starting new ranges without returning buffers. This forces us to go over
+    // the limit eventually.
     while (true) {
       memset(result, 0, strlen(data) + 1);
       ScanRange* range = nullptr;
-      Status status = io_mgr.GetNextRange(reader.get(), &range);
+      bool needs_buffers;
+      Status status = io_mgr.GetNextUnstartedRange(reader.get(), &range, &needs_buffers);
       ASSERT_TRUE(status.ok() || status.IsMemLimitExceeded());
       hit_mem_limit_exceeded |= status.IsMemLimitExceeded();
       if (range == nullptr) break;
+      DCHECK(needs_buffers);
+      status = io_mgr.AllocateBuffersForRange(reader.get(), range, MAX_BUFFER_SIZE * 3);
+      ASSERT_TRUE(status.ok() || status.IsMemLimitExceeded());
+      if (status.IsMemLimitExceeded()) {
+        hit_mem_limit_exceeded = true;
+        continue;
+      }
 
       while (true) {
         unique_ptr<BufferDescriptor> buffer;
@@ -925,34 +942,140 @@ TEST_F(DiskIoMgrTest, PartialRead) {
   const char* data = "the quick brown fox jumped over the lazy dog";
   int len = strlen(data);
   int read_len = len + 1000; // Read past end of file.
+  // Test with various buffer sizes to exercise different code paths, e.g.
+  // * the truncated data ends exactly on a buffer boundary
+  // * the data is split between many buffers
+  // * the data fits in one buffer
+  const int64_t MIN_BUFFER_SIZE = 2;
+  vector<int64_t> max_buffer_sizes{4, 16, 32, 128, 1024, 4096};
   CreateTempFile(tmp_file, data);
 
   // Get mtime for file
   struct stat stat_val;
   stat(tmp_file, &stat_val);
 
-  scoped_ptr<DiskIoMgr> io_mgr(new DiskIoMgr(1, 1, 1, read_len, read_len));
+  for (int64_t max_buffer_size : max_buffer_sizes) {
+    DiskIoMgr io_mgr(1, 1, 1, MIN_BUFFER_SIZE, max_buffer_size);
 
-  ASSERT_OK(io_mgr->Init());
+    ASSERT_OK(io_mgr.Init());
+    MemTracker reader_mem_tracker;
+    unique_ptr<RequestContext> reader;
+    reader = io_mgr.RegisterContext(&reader_mem_tracker);
+
+    // We should not read past the end of file.
+    ScanRange* range = InitRange(tmp_file, 0, read_len, 0, stat_val.st_mtime);
+    unique_ptr<BufferDescriptor> buffer;
+    bool needs_buffers;
+    ASSERT_OK(io_mgr.StartScanRange(reader.get(), range, &needs_buffers));
+    if (needs_buffers) {
+      ASSERT_OK(io_mgr.AllocateBuffersForRange(reader.get(), range, 3 * max_buffer_size));
+    }
+
+    int64_t bytes_read = 0;
+    bool eosr = false;
+    do {
+      ASSERT_OK(range->GetNext(&buffer));
+      ASSERT_GE(buffer->buffer_len(), MIN_BUFFER_SIZE);
+      ASSERT_LE(buffer->buffer_len(), max_buffer_size);
+      ASSERT_LE(buffer->len(), len - bytes_read);
+      ASSERT_TRUE(memcmp(buffer->buffer(), data + bytes_read, buffer->len()) == 0);
+      bytes_read += buffer->len();
+      eosr = buffer->eosr();
+      // Should see eosr if we've read past the end of the file. If the data is an exact
+      // multiple of the max buffer size then we may read to the end of the file without
+      // noticing that it is eosr. Eosr will be returned on the next read in that case.
+      ASSERT_TRUE(bytes_read < len || buffer->eosr()
+          || (buffer->len() == max_buffer_size && len % max_buffer_size == 0))
+          << "max_buffer_size " << max_buffer_size << " bytes_read " << bytes_read
+          << "len " << len << " buffer->len() " << buffer->len()
+          << " buffer->buffer_len() " << buffer->buffer_len();
+      ASSERT_TRUE(buffer->len() > 0 || buffer->eosr());
+      range->ReturnBuffer(move(buffer));
+    } while (!eosr);
+
+    io_mgr.UnregisterContext(reader.get());
+    EXPECT_EQ(reader_mem_tracker.consumption(), 0);
+    EXPECT_EQ(mem_tracker.consumption(), 0);
+    pool_.Clear();
+  }
+}
+
+// Test zero-length scan range.
+TEST_F(DiskIoMgrTest, ZeroLengthScanRange) {
+  MemTracker mem_tracker(LARGE_MEM_LIMIT);
+  const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
+  const char* data = "the quick brown fox jumped over the lazy dog";
+  const int64_t MIN_BUFFER_SIZE = 2;
+  const int64_t MAX_BUFFER_SIZE = 1024;
+  CreateTempFile(tmp_file, data);
+
+  // Get mtime for file
+  struct stat stat_val;
+  stat(tmp_file, &stat_val);
+
+  DiskIoMgr io_mgr(1, 1, 1, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
+
+  ASSERT_OK(io_mgr.Init());
   MemTracker reader_mem_tracker;
   unique_ptr<RequestContext> reader;
-  reader = io_mgr->RegisterContext(&reader_mem_tracker);
+  reader = io_mgr.RegisterContext(&reader_mem_tracker);
 
   // We should not read past the end of file.
-  ScanRange* range = InitRange(tmp_file, 0, read_len, 0, stat_val.st_mtime);
-  unique_ptr<BufferDescriptor> buffer;
-  ASSERT_OK(io_mgr->AddScanRange(reader.get(), range, true));
-  ASSERT_OK(range->GetNext(&buffer));
-  ASSERT_TRUE(buffer->eosr());
-  ASSERT_EQ(len, buffer->len());
-  ASSERT_TRUE(memcmp(buffer->buffer(), data, len) == 0);
-  range->ReturnBuffer(move(buffer));
+  ScanRange* range = InitRange(tmp_file, 0, 0, 0, stat_val.st_mtime);
+  bool needs_buffers;
+  Status status = io_mgr.StartScanRange(reader.get(), range, &needs_buffers);
+  ASSERT_EQ(TErrorCode::DISK_IO_ERROR, status.code());
 
-  io_mgr->UnregisterContext(reader.get());
-  pool_.Clear();
-  io_mgr.reset();
-  EXPECT_EQ(reader_mem_tracker.consumption(), 0);
-  EXPECT_EQ(mem_tracker.consumption(), 0);
+  status = io_mgr.AddScanRanges(reader.get(), vector<ScanRange*>({range}));
+  ASSERT_EQ(TErrorCode::DISK_IO_ERROR, status.code());
+
+  io_mgr.UnregisterContext(reader.get());
+}
+
+// Test what happens if don't call AllocateBuffersForRange() after trying to start a
+// range.
+TEST_F(DiskIoMgrTest, SkipAllocateBuffers) {
+  MemTracker mem_tracker(LARGE_MEM_LIMIT);
+  const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
+  const char* data = "the quick brown fox jumped over the lazy dog";
+  int len = strlen(data);
+  const int64_t MIN_BUFFER_SIZE = 2;
+  const int64_t MAX_BUFFER_SIZE = 1024;
+  CreateTempFile(tmp_file, data);
+
+  // Get mtime for file
+  struct stat stat_val;
+  stat(tmp_file, &stat_val);
+
+  DiskIoMgr io_mgr(1, 1, 1, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
+
+  ASSERT_OK(io_mgr.Init());
+  MemTracker reader_mem_tracker;
+  unique_ptr<RequestContext> reader;
+  reader = io_mgr.RegisterContext(&reader_mem_tracker);
+
+  // We should not read past the end of file.
+  vector<ScanRange*> ranges;
+  for (int i = 0; i < 4; ++i) {
+    ranges.push_back(InitRange(tmp_file, 0, len, 0, stat_val.st_mtime));
+  }
+  bool needs_buffers;
+  // Test StartScanRange().
+  ASSERT_OK(io_mgr.StartScanRange(reader.get(), ranges[0], &needs_buffers));
+  EXPECT_TRUE(needs_buffers);
+  ASSERT_OK(io_mgr.StartScanRange(reader.get(), ranges[1], &needs_buffers));
+  EXPECT_TRUE(needs_buffers);
+
+  // Test AddScanRanges()/GetNextUnstartedRange().
+  ASSERT_OK(
+      io_mgr.AddScanRanges(reader.get(), vector<ScanRange*>({ranges[2], ranges[3]})));
+
+  // Cancel two directly, cancel the other two indirectly via the context.
+  ranges[0]->Cancel(Status::CANCELLED);
+  ranges[2]->Cancel(Status::CANCELLED);
+  reader->Cancel();
+
+  io_mgr.UnregisterContext(reader.get());
 }
 
 // Test reading into a client-allocated buffer.
@@ -978,7 +1101,9 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBuffer) {
     ScanRange* range = AllocateRange();
     range->Reset(nullptr, tmp_file, scan_len, 0, 0, true,
         BufferOpts::ReadInto(client_buffer.data(), buffer_len));
-    ASSERT_OK(io_mgr->AddScanRange(reader.get(), range, true));
+    bool needs_buffers;
+    ASSERT_OK(io_mgr->StartScanRange(reader.get(), range, &needs_buffers));
+    ASSERT_FALSE(needs_buffers);
 
     unique_ptr<BufferDescriptor> io_buffer;
     ASSERT_OK(range->GetNext(&io_buffer));
@@ -1016,7 +1141,9 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBufferError) {
     ScanRange* range = AllocateRange();
     range->Reset(nullptr, tmp_file, SCAN_LEN, 0, 0, true,
         BufferOpts::ReadInto(client_buffer.data(), SCAN_LEN));
-    ASSERT_OK(io_mgr->AddScanRange(reader.get(), range, true));
+    bool needs_buffers;
+    ASSERT_OK(io_mgr->StartScanRange(reader.get(), range, &needs_buffers));
+    ASSERT_FALSE(needs_buffers);
 
     /// Also test the cancellation path. Run multiple iterations since it is racy whether
     /// the read fails before the cancellation.
@@ -1052,6 +1179,61 @@ TEST_F(DiskIoMgrTest, VerifyNumThreadsParameter) {
   const int num_io_threads = io_mgr.disk_thread_group_.Size();
   ASSERT_TRUE(num_io_threads ==
       num_io_threads_per_rotational_or_ssd + num_io_threads_for_remote_disks);
+}
+
+// Test to verify that the correct buffer sizes are chosen given different
+// of scan range lengths and max_bytes values.
+TEST_F(DiskIoMgrTest, BufferSizeSelection) {
+  DiskIoMgr io_mgr(1, 1, 1, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
+  ASSERT_OK(io_mgr.Init());
+
+  // Scan range doesn't fit in max_bytes - allocate as many max-sized buffers as possible.
+  EXPECT_EQ(vector<int64_t>(3, MAX_BUFFER_SIZE),
+      io_mgr.ChooseBufferSizes(10 * MAX_BUFFER_SIZE, 3 * MAX_BUFFER_SIZE));
+  EXPECT_EQ(vector<int64_t>({MAX_BUFFER_SIZE}),
+      io_mgr.ChooseBufferSizes(10 * MAX_BUFFER_SIZE, MAX_BUFFER_SIZE));
+  EXPECT_EQ(vector<int64_t>(4, MAX_BUFFER_SIZE),
+      io_mgr.ChooseBufferSizes(10 * MAX_BUFFER_SIZE, 4 * MAX_BUFFER_SIZE));
+
+  // Scan range fits in max_bytes - allocate as many max-sized buffers as possible, then
+  // a smaller buffer to fit the remainder.
+  EXPECT_EQ(vector<int64_t>(2, MAX_BUFFER_SIZE),
+      io_mgr.ChooseBufferSizes(2 * MAX_BUFFER_SIZE, 3 * MAX_BUFFER_SIZE));
+  EXPECT_EQ(vector<int64_t>({MAX_BUFFER_SIZE, MAX_BUFFER_SIZE, MIN_BUFFER_SIZE}),
+      io_mgr.ChooseBufferSizes(2 * MAX_BUFFER_SIZE + 1, 3 * MAX_BUFFER_SIZE));
+  EXPECT_EQ(vector<int64_t>({MAX_BUFFER_SIZE, MAX_BUFFER_SIZE, 2 * MIN_BUFFER_SIZE}),
+      io_mgr.ChooseBufferSizes(
+        2 * MAX_BUFFER_SIZE + MIN_BUFFER_SIZE + 1, 3 * MAX_BUFFER_SIZE));
+  EXPECT_EQ(vector<int64_t>({MAX_BUFFER_SIZE, MAX_BUFFER_SIZE, 2 * MIN_BUFFER_SIZE}),
+      io_mgr.ChooseBufferSizes(
+        2 * MAX_BUFFER_SIZE + 2 * MIN_BUFFER_SIZE, 3 * MAX_BUFFER_SIZE));
+
+  // Scan range is smaller than max buffer size - allocate a single buffer that fits
+  // the range.
+  EXPECT_EQ(vector<int64_t>({MAX_BUFFER_SIZE}),
+      io_mgr.ChooseBufferSizes(MAX_BUFFER_SIZE - 1, 3 * MAX_BUFFER_SIZE));
+  EXPECT_EQ(vector<int64_t>({MAX_BUFFER_SIZE / 2}),
+      io_mgr.ChooseBufferSizes(MAX_BUFFER_SIZE - 1, MAX_BUFFER_SIZE / 2));
+  EXPECT_EQ(vector<int64_t>({MAX_BUFFER_SIZE / 2}),
+      io_mgr.ChooseBufferSizes(MAX_BUFFER_SIZE / 2 - 1, 3 * MAX_BUFFER_SIZE));
+  EXPECT_EQ(vector<int64_t>({MAX_BUFFER_SIZE / 2}),
+      io_mgr.ChooseBufferSizes(MAX_BUFFER_SIZE / 2- 1, MAX_BUFFER_SIZE / 2));
+  EXPECT_EQ(vector<int64_t>({MIN_BUFFER_SIZE}),
+      io_mgr.ChooseBufferSizes(MIN_BUFFER_SIZE, 3 * MAX_BUFFER_SIZE));
+  EXPECT_EQ(vector<int64_t>({MIN_BUFFER_SIZE}),
+      io_mgr.ChooseBufferSizes(MIN_BUFFER_SIZE, MIN_BUFFER_SIZE));
+
+  // Scan range is smaller than max buffer size and max bytes is smaller still -
+  // should allocate a single smaller buffer.
+  EXPECT_EQ(vector<int64_t>({MAX_BUFFER_SIZE / 4}),
+      io_mgr.ChooseBufferSizes(MAX_BUFFER_SIZE / 2, MAX_BUFFER_SIZE / 2 - 1));
+
+  // Non power-of-two size > max buffer size.
+  EXPECT_EQ(vector<int64_t>({MAX_BUFFER_SIZE, MIN_BUFFER_SIZE}),
+      io_mgr.ChooseBufferSizes(MAX_BUFFER_SIZE + 7, 3 * MAX_BUFFER_SIZE));
+  // Non power-of-two size < min buffer size.
+  EXPECT_EQ(vector<int64_t>({MIN_BUFFER_SIZE}),
+      io_mgr.ChooseBufferSizes(MIN_BUFFER_SIZE - 7, 3 * MAX_BUFFER_SIZE));
 }
 }
 }
