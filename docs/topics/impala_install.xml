@@ -73,7 +73,7 @@ under the License.
         <p>
           Developers interested in working on Impala can clone the Impala source repository:
 <codeblock>
-git clone https://git-wip-us.apache.org/repos/asf/incubator-impala.git
+git clone https://git-wip-us.apache.org/repos/asf/impala.git
 </codeblock>
         </p>
       </li>

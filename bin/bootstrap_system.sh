@@ -96,7 +96,7 @@ apt-get --yes install git
 # If there is no Impala git repo, get one now
 if ! [[ -d ~/Impala ]]
 then
-  time -p git clone https://git-wip-us.apache.org/repos/asf/incubator-impala.git ~/Impala
+  time -p git clone https://git-wip-us.apache.org/repos/asf/impala.git ~/Impala
 fi
 cd ~/Impala
 SET_IMPALA_HOME="export IMPALA_HOME=$(pwd)"

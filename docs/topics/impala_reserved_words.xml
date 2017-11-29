@@ -62,10 +62,10 @@ under the License.
 <title>List of Current Reserved Words</title>
 <conbody>
 <!-- This list is derived from the source code at:
-     https://github.com/apache/incubator-impala/blob/master/fe/src/main/jflex/sql-scanner.flex
+     https://github.com/apache/impala/blob/master/fe/src/main/jflex/sql-scanner.flex
 
 See the history, any recent changes, here:
-     https://github.com/apache/incubator-impala/commits/master/fe/src/main/jflex/sql-scanner.flex
+     https://github.com/apache/impala/commits/master/fe/src/main/jflex/sql-scanner.flex
 -->
 
 <codeblock rev="ver">add

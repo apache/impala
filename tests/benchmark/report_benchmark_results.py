@@ -246,7 +246,7 @@ def all_query_results(grouped):
 def get_commit_date(commit_sha):
   import urllib2
 
-  url = 'https://api.github.com/repos/apache/incubator-impala/commits/' + commit_sha
+  url = 'https://api.github.com/repos/apache/impala/commits/' + commit_sha
   try:
     request = urllib2.Request(url)
     response = urllib2.urlopen(request).read()

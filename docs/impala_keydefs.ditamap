@@ -57,10 +57,10 @@ under the License.
     <topicmeta><linktext>the Security chapter in the Apache HBase documentation</linktext></topicmeta>
   </keydef>
 
-  <keydef href="https://github.com/apache/incubator-impala/blob/master/tests/query_test/test_udfs.py" scope="external" format="html" keys="test_udfs.py">
+  <keydef href="https://github.com/apache/impala/blob/master/tests/query_test/test_udfs.py" scope="external" format="html" keys="test_udfs.py">
     <topicmeta><linktext>test_udfs.py</linktext></topicmeta>
   </keydef>
-  <keydef href="https://github.com/apache/incubator-impala/blob/master/be/src/exprs/timezone_db.cc" scope="external" format="html" keys="timezone_db.cc">
+  <keydef href="https://github.com/apache/impala/blob/master/be/src/exprs/timezone_db.cc" scope="external" format="html" keys="timezone_db.cc">
     <topicmeta><linktext>timezone_db.cc</linktext></topicmeta>
   </keydef>
   <keydef href="https://github.com/cloudera/impala-tpcds-kit" scope="external" format="html" keys="impala-tpcds-kit">
@@ -78,7 +78,7 @@ under the License.
   <keydef href="" scope="external" format="html" keys="uda-sample.h">
     <topicmeta><linktext>uda-sample.h</linktext></topicmeta>
   </keydef>
-  <keydef href="https://github.com/apache/incubator-impala/blob/master/be/src/testutil/test-udas.cc" scope="external" format="html" keys="test-udas.cc">
+  <keydef href="https://github.com/apache/impala/blob/master/be/src/testutil/test-udas.cc" scope="external" format="html" keys="test-udas.cc">
     <topicmeta><linktext>test-udas.cc</linktext></topicmeta>
   </keydef>
   <keydef href="" scope="external" format="html" keys="udf_samples">
@@ -95,7 +95,7 @@ under the License.
     <topicmeta><linktext>Getting Started with Impala</linktext></topicmeta>
   </keydef>
 
-  <keydef href="https://mail-archives.apache.org/mod_mbox/incubator-impala-user/" scope="external" format="html" keys="impala-user"/>
+  <keydef href="https://mail-archives.apache.org/mod_mbox/impala-user/" scope="external" format="html" keys="impala-user"/>
   <keydef href="https://issues.apache.org/jira/browse/IMPALA" scope="external" format="html" keys="impala-jira"/>
 
   <keydef href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" scope="external" format="html" keys="FairScheduler"/>

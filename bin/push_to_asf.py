@@ -42,7 +42,7 @@ import re
 import subprocess
 import sys
 
-APACHE_REPO = "https://git-wip-us.apache.org/repos/asf/incubator-impala.git"
+APACHE_REPO = "https://git-wip-us.apache.org/repos/asf/impala.git"
 GERRIT_URL_RE = re.compile(r"ssh://.+@gerrit.cloudera.org:29418/Impala-ASF")
 
 # Parsed options, filled in by main().
