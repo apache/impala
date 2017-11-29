@@ -447,8 +447,18 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ====
-# same as above but with traditional commented hint
+# same as above but with traditional commented hint at default hint location
 insert into table functional.alltypes partition(year, month) /* +noshuffle */
+select * from functional.alltypes
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
+|  partitions=24
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# same as above but with traditional commented hint at Oracle hint location
+insert /* +noshuffle */ into table functional.alltypes partition(year, month)
 select * from functional.alltypes
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]

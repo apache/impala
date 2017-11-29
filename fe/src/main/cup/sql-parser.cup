@@ -541,6 +541,8 @@ precedence left KW_FINALIZE_FN;
 precedence left KW_INIT_FN;
 precedence left KW_MERGE_FN;
 precedence left KW_SERIALIZE_FN;
+precedence left KW_OVERWRITE;
+precedence left KW_INTO;
 
 precedence left KW_OVER;
 
@@ -712,29 +714,62 @@ explain_stmt ::=
 // Insert statements have two optional clauses: the column permutation (INSERT into
 // tbl(col1,...) etc) and the PARTITION clause. If the column permutation is present, the
 // query statement clause is optional as well.
+// Note: when extending INSERT/UPSERT syntax, hinting is supported at the beginning of
+// the statement and before the query.
 insert_stmt ::=
   opt_with_clause:w KW_INSERT KW_OVERWRITE opt_kw_table table_name:table
   LPAREN opt_ident_list:col_perm RPAREN partition_clause:list opt_plan_hints:hints
   opt_query_stmt:query
   {:
-    RESULT = InsertStmt.createInsert(w, table, true, list, hints, query, col_perm);
+    RESULT = InsertStmt.createInsert(w, table, true, list, hints,
+        InsertStmt.HintLocation.End, query, col_perm);
   :}
   | opt_with_clause:w KW_INSERT KW_OVERWRITE
   opt_kw_table table_name:table
   partition_clause:list opt_plan_hints:hints query_stmt:query
   {:
-    RESULT = InsertStmt.createInsert(w, table, true, list, hints, query, null);
+    RESULT = InsertStmt.createInsert(w, table, true, list, hints,
+        InsertStmt.HintLocation.End, query, null);
   :}
   | opt_with_clause:w KW_INSERT KW_INTO opt_kw_table table_name:table
   LPAREN opt_ident_list:col_perm RPAREN
   partition_clause:list opt_plan_hints:hints opt_query_stmt:query
   {:
-    RESULT = InsertStmt.createInsert(w, table, false, list, hints, query, col_perm);
+    RESULT = InsertStmt.createInsert(w, table, false, list, hints,
+        InsertStmt.HintLocation.End, query, col_perm);
   :}
   | opt_with_clause:w KW_INSERT KW_INTO opt_kw_table table_name:table
   partition_clause:list opt_plan_hints:hints query_stmt:query
   {:
-    RESULT = InsertStmt.createInsert(w, table, false, list, hints, query, null);
+    RESULT = InsertStmt.createInsert(w, table, false, list, hints,
+        InsertStmt.HintLocation.End, query, null);
+  :}
+  | opt_with_clause:w KW_INSERT opt_plan_hints:hints KW_OVERWRITE opt_kw_table
+  table_name:table LPAREN opt_ident_list:col_perm RPAREN partition_clause:list
+  opt_query_stmt:query
+  {:
+    RESULT = InsertStmt.createInsert(w, table, true, list, hints,
+        InsertStmt.HintLocation.Start, query, col_perm);
+  :}
+  | opt_with_clause:w KW_INSERT opt_plan_hints:hints KW_OVERWRITE
+  opt_kw_table table_name:table
+  partition_clause:list query_stmt:query
+  {:
+    RESULT = InsertStmt.createInsert(w, table, true, list, hints,
+        InsertStmt.HintLocation.Start, query, null);
+  :}
+  | opt_with_clause:w KW_INSERT opt_plan_hints:hints KW_INTO opt_kw_table
+  table_name:table LPAREN opt_ident_list:col_perm RPAREN
+  partition_clause:list opt_query_stmt:query
+  {:
+    RESULT = InsertStmt.createInsert(w, table, false, list, hints,
+        InsertStmt.HintLocation.Start, query, col_perm);
+  :}
+  | opt_with_clause:w KW_INSERT opt_plan_hints:hints KW_INTO opt_kw_table
+  table_name:table partition_clause:list query_stmt:query
+  {:
+    RESULT = InsertStmt.createInsert(w, table, false, list, hints,
+        InsertStmt.HintLocation.Start, query, null);
   :}
   ;
 
@@ -769,13 +804,25 @@ update_set_expr_list ::=
 
 // Upsert statements have an optional column permutation clause. If the column permutation
 // is present, the query statement clause is optional as well.
+// Note: when extending INSERT/UPSERT syntax, hinting is supported at the beginning of
+// the statement and before the query.
 upsert_stmt ::=
   opt_with_clause:w KW_UPSERT KW_INTO opt_kw_table table_name:table
     LPAREN opt_ident_list:col_perm RPAREN opt_plan_hints:hints opt_query_stmt:query
-  {: RESULT = InsertStmt.createUpsert(w, table, hints, query, col_perm); :}
+  {: RESULT = InsertStmt.createUpsert(w, table, hints, InsertStmt.HintLocation.End,
+         query, col_perm); :}
   | opt_with_clause:w KW_UPSERT KW_INTO opt_kw_table table_name:table
     opt_plan_hints:hints query_stmt:query
-  {: RESULT = InsertStmt.createUpsert(w, table, hints, query, null); :}
+  {: RESULT = InsertStmt.createUpsert(w, table, hints, InsertStmt.HintLocation.End,
+         query, null); :}
+  | opt_with_clause:w KW_UPSERT opt_plan_hints:hints KW_INTO opt_kw_table table_name:table
+    LPAREN opt_ident_list:col_perm RPAREN opt_query_stmt:query
+  {: RESULT = InsertStmt.createUpsert(w, table, hints, InsertStmt.HintLocation.Start,
+         query, col_perm); :}
+  | opt_with_clause:w KW_UPSERT opt_plan_hints:hints KW_INTO opt_kw_table table_name:table
+    query_stmt:query
+  {: RESULT = InsertStmt.createUpsert(w, table, hints, InsertStmt.HintLocation.Start,
+         query, null); :}
   ;
 
 // A DELETE statement comes in two main representations, the DELETE keyword with a path

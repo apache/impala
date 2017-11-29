@@ -300,16 +300,32 @@ public class ParserTest extends FrontendTestBase {
     assertEquals(Lists.newArrayList(expectedHints), actualHints);
   }
 
+  private void VerifyHints(List<PlanHint> actualHints, String... expectedHints) {
+    List<String> stringHints = Lists.newArrayList();
+    for (PlanHint hint: actualHints) stringHints.add(hint.toString());
+    if (stringHints.isEmpty()) stringHints = Lists.newArrayList((String) null);
+    assertEquals(Lists.newArrayList(expectedHints), stringHints);
+  }
+
   /**
-   * Parses stmt and checks that the insert hints stmt are the expected hints.
+   * Injects hints into pattern and checks that the injected hints match the expected
+   * hints. This function covers both insert and upsert statements.
    */
-  private void TestInsertHints(String stmt, String... expectedHints) {
-    InsertStmt insertStmt = (InsertStmt) ParsesOk(stmt);
-    List<String> actualHints = Lists.newArrayList();
-    List<PlanHint> hints = insertStmt.getPlanHints();
-    for (PlanHint hint: hints) actualHints.add(hint.toString());
-    if (actualHints.isEmpty()) actualHints = Lists.newArrayList((String) null);
-    assertEquals(Lists.newArrayList(expectedHints), actualHints);
+  private void TestInsertStmtHints(String pattern, String hint, String... expectedHints) {
+    for (InsertStmt.HintLocation loc: InsertStmt.HintLocation.values()) {
+      VerifyHints(((InsertStmt) ParsesOk(InjectInsertHint(pattern, hint, loc)))
+          .getPlanHints(), expectedHints);
+    }
+  }
+
+  /**
+   * Injects hints into pattern and expect parser error on the injected hints.
+   * It covers both insert and upsert statements.
+   */
+  private void ParserErrorOnInsertStmtHints(String pattern, String hint) {
+    for (InsertStmt.HintLocation loc: InsertStmt.HintLocation.values()) {
+      ParserError(InjectInsertHint(pattern, hint, loc));
+    }
   }
 
   @Test
@@ -374,27 +390,22 @@ public class ParserTest extends FrontendTestBase {
               suffix, suffix, suffix, suffix, prefix, "", "", ""));
 
       // Test insert hints.
-      TestInsertHints(String.format(
-          "insert into t %snoshuffle%s select * from t", prefix, suffix),
-          "noshuffle");
-      TestInsertHints(String.format(
-          "insert overwrite t %snoshuffle%s select * from t", prefix, suffix),
-          "noshuffle");
-      TestInsertHints(String.format(
-          "insert into t partition(x, y) %snoshuffle%s select * from t",
-          prefix, suffix), "noshuffle");
-      TestInsertHints(String.format(
-          "insert into t(a, b) partition(x, y) %sshuffle%s select * from t",
-          prefix, suffix), "shuffle");
-      TestInsertHints(String.format(
-          "insert overwrite t(a, b) partition(x, y) %sfoo,bar,baz%s select * from t",
-          prefix, suffix), "foo", "bar", "baz");
+      TestInsertStmtHints("insert %s into t %s select * from t",
+           String.format("%snoshuffle%s", prefix, suffix), "noshuffle");
+      TestInsertStmtHints("insert %s overwrite t %s select * from t",
+           String.format("%snoshuffle%s", prefix, suffix), "noshuffle");
+      TestInsertStmtHints("insert %s into t partition(x, y) %s select * from t",
+           String.format("%snoshuffle%s", prefix, suffix), "noshuffle");
+      TestInsertStmtHints("insert %s into t(a, b) partition(x, y) %s select * from t",
+           String.format("%sshuffle%s", prefix, suffix), "shuffle");
+      TestInsertStmtHints("insert %s overwrite t(a, b) partition(x, y) %s select * from t",
+           String.format("%sfoo,bar,baz%s", prefix, suffix), "foo", "bar", "baz");
 
       // Test upsert hints.
-      ParsesOk(String.format("upsert into t %sshuffle%s select * from t", prefix,
-          suffix));
-      ParsesOk(String.format("upsert into t (x, y) %sshuffle%s select * from t", prefix,
-          suffix));
+      TestInsertStmtHints("upsert %s into t %s select * from t",
+           String.format("%sshuffle%s", prefix, suffix), "shuffle");
+      TestInsertStmtHints("upsert %s into t (x, y) %s select * from t",
+           String.format("%sshuffle%s", prefix, suffix), "shuffle");
 
       // Test TableRef hints.
       TestTableHints(String.format(
@@ -460,29 +471,39 @@ public class ParserTest extends FrontendTestBase {
       }
 
       // Tests for hints with arguments.
-      TestInsertHints(String.format(
-          "insert into t %shint_with_args(a)%s select * from t", prefix, suffix),
-          "hint_with_args(a)");
-      TestInsertHints(String.format(
-          "insert into t %sclustered,shuffle,hint_with_args(a)%s select * from t", prefix,
-          suffix), "clustered", "shuffle", "hint_with_args(a)");
-      TestInsertHints(String.format(
-          "insert into t %shint_with_args(a,b)%s select * from t", prefix, suffix),
-          "hint_with_args(a,b)");
-      TestInsertHints(String.format(
-          "insert into t %shint_with_args(a  , b)%s select * from t", prefix, suffix),
-          "hint_with_args(a,b)");
-      ParserError(String.format(
-          "insert into t %shint_with_args(  a  ,  , ,,, b  )%s select * from t",
-          prefix, suffix));
+      TestInsertStmtHints("insert %s into t %s select * from t",
+           String.format("%shint_with_args(a)%s", prefix, suffix), "hint_with_args(a)");
+      TestInsertStmtHints("insert %s into t %s select * from t",
+           String.format("%sclustered,shuffle,hint_with_args(a)%s", prefix, suffix),
+           "clustered", "shuffle", "hint_with_args(a)");
+      TestInsertStmtHints("insert %s into t %s select * from t",
+           String.format("%shint_with_args(a,b)%s", prefix, suffix),
+           "hint_with_args(a,b)");
+      TestInsertStmtHints("insert %s into t %s select * from t",
+           String.format("%shint_with_args(a  , b)%s", prefix, suffix),
+           "hint_with_args(a,b)");
+      TestInsertStmtHints("insert %s into t %s select * from t",
+           String.format("%shint_with_args(  a  , b , c  , d, e, f    )%s", prefix,
+             suffix), "hint_with_args(a,b,c,d,e,f)");
+      ParserErrorOnInsertStmtHints("insert %s into t %s select * from t",
+           String.format("%shint_with_args(  a  ,  , ,,, b  )%s", prefix, suffix));
+
+      // Negative tests for hints cannot be specified at the both avilable locations.
+      ParserError(String.format("insert %s into t %s select * from t",
+           String.format("%sshuffle%s", prefix, suffix),
+           String.format("%sclustered%s", prefix, suffix)));
+      ParserError(String.format("upsert %s into t %s select * from t",
+           String.format("%sshuffle%s", prefix, suffix),
+           String.format("%sclustered%s", prefix, suffix)));
+
     }
     // No "+" at the beginning so the comment is not recognized as a hint.
     TestJoinHints("select * from functional.alltypes a join /* comment */" +
         "functional.alltypes b using (int_col)", (String) null);
     TestSelectListHints("select /* comment */ * from functional.alltypes",
         (String) null);
-    TestInsertHints("insert into t(a, b) partition(x, y) /* comment */ select 1",
-        (String) null);
+    TestInsertStmtHints("insert %s into t(a, b) partition(x, y) %s select 1",
+        "/* comment */", (String) null);
     TestSelectListHints("select /* -- +straight_join */ * from functional.alltypes",
         (String) null);
     TestSelectListHints("select /* abcdef +straight_join */ * from functional.alltypes",

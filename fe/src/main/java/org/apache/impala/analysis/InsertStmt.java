@@ -53,6 +53,15 @@ import com.google.common.collect.Sets;
  * whose results are to be inserted.
  */
 public class InsertStmt extends StatementBase {
+  // Determines the location of optional hints. The "Start" option is motivated by
+  // Oracle's hint placement at the start of the statement and the "End" option places
+  // the hint right before the query (if specified).
+  //
+  // Examples:
+  //   Start: INSERT /* +my hint */ <tablename> ... SELECT ...
+  //   End:   INSERT <tablename> /* +my hint */ SELECT ...
+  public enum HintLocation { Start, End };
+
   // Target table name as seen by the parser
   private final TableName originalTableName_;
 
@@ -65,6 +74,9 @@ public class InsertStmt extends StatementBase {
 
   // User-supplied hints to control hash partitioning before the table sink in the plan.
   private List<PlanHint> planHints_ = Lists.newArrayList();
+
+  // The location of given hints.
+  private HintLocation hintLoc_;
 
   // False if the original insert statement had a query statement, true if we need to
   // auto-generate one (for insert into tbl()) during analysis.
@@ -177,20 +189,23 @@ public class InsertStmt extends StatementBase {
 
   public static InsertStmt createInsert(WithClause withClause, TableName targetTable,
       boolean overwrite, List<PartitionKeyValue> partitionKeyValues,
-      List<PlanHint> planHints, QueryStmt queryStmt, List<String> columnPermutation) {
+      List<PlanHint> planHints, HintLocation hintLoc, QueryStmt queryStmt,
+      List<String> columnPermutation) {
     return new InsertStmt(withClause, targetTable, overwrite, partitionKeyValues,
-        planHints, queryStmt, columnPermutation, false);
+        planHints, hintLoc, queryStmt, columnPermutation, false);
   }
 
   public static InsertStmt createUpsert(WithClause withClause, TableName targetTable,
-      List<PlanHint> planHints, QueryStmt queryStmt, List<String> columnPermutation) {
-    return new InsertStmt(withClause, targetTable, false, null, planHints, queryStmt,
-        columnPermutation, true);
+      List<PlanHint> planHints, HintLocation hintLoc, QueryStmt queryStmt,
+      List<String> columnPermutation) {
+    return new InsertStmt(withClause, targetTable, false, null, planHints, hintLoc,
+        queryStmt, columnPermutation, true);
   }
 
   protected InsertStmt(WithClause withClause, TableName targetTable, boolean overwrite,
       List<PartitionKeyValue> partitionKeyValues, List<PlanHint> planHints,
-      QueryStmt queryStmt, List<String> columnPermutation, boolean isUpsert) {
+      HintLocation hintLoc, QueryStmt queryStmt, List<String> columnPermutation,
+      boolean isUpsert) {
     Preconditions.checkState(!isUpsert || (!overwrite && partitionKeyValues == null));
     withClause_ = withClause;
     targetTableName_ = targetTable;
@@ -198,6 +213,7 @@ public class InsertStmt extends StatementBase {
     overwrite_ = overwrite;
     partitionKeyValues_ = partitionKeyValues;
     planHints_ = (planHints != null) ? planHints : new ArrayList<PlanHint>();
+    hintLoc_ = (hintLoc != null) ? hintLoc : HintLocation.End;
     queryStmt_ = queryStmt;
     needsGeneratedQueryStatement_ = (queryStmt == null);
     columnPermutation_ = columnPermutation;
@@ -216,6 +232,7 @@ public class InsertStmt extends StatementBase {
     overwrite_ = other.overwrite_;
     partitionKeyValues_ = other.partitionKeyValues_;
     planHints_ = other.planHints_;
+    hintLoc_ = other.hintLoc_;
     queryStmt_ = other.queryStmt_ != null ? other.queryStmt_.clone() : null;
     needsGeneratedQueryStatement_ = other.needsGeneratedQueryStatement_;
     columnPermutation_ = other.columnPermutation_;
@@ -893,13 +910,16 @@ public class InsertStmt extends StatementBase {
 
     if (withClause_ != null) strBuilder.append(withClause_.toSql() + " ");
 
-    strBuilder.append(getOpName() + " ");
-    if (overwrite_) {
-      strBuilder.append("OVERWRITE ");
-    } else {
-      strBuilder.append("INTO ");
+    strBuilder.append(getOpName());
+    if (!planHints_.isEmpty() && hintLoc_ == HintLocation.Start) {
+      strBuilder.append(" " + ToSqlUtils.getPlanHintsSql(getPlanHints()));
     }
-    strBuilder.append("TABLE " + originalTableName_);
+    if (overwrite_) {
+      strBuilder.append(" OVERWRITE");
+    } else {
+      strBuilder.append(" INTO");
+    }
+    strBuilder.append(" TABLE " + originalTableName_);
     if (columnPermutation_ != null) {
       strBuilder.append("(");
       strBuilder.append(Joiner.on(", ").join(columnPermutation_));
@@ -913,7 +933,7 @@ public class InsertStmt extends StatementBase {
       }
       strBuilder.append(" PARTITION (" + Joiner.on(", ").join(values) + ")");
     }
-    if (!planHints_.isEmpty()) {
+    if (!planHints_.isEmpty() && hintLoc_ == HintLocation.End) {
       strBuilder.append(" " + ToSqlUtils.getPlanHintsSql(getPlanHints()));
     }
     if (!needsGeneratedQueryStatement_) {

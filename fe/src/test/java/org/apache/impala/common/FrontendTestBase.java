@@ -31,6 +31,7 @@ import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.CreateTableStmt;
 import org.apache.impala.analysis.CreateViewStmt;
 import org.apache.impala.analysis.FunctionName;
+import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.ParseNode;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.SqlParser;
@@ -247,6 +248,21 @@ public class FrontendTestBase {
     for (Table testTable: testTables_) {
       testTable.getDb().removeTable(testTable.getName());
     }
+  }
+
+  /**
+   * Inject the hint into the pattern using hint location.
+   *
+   * Example:
+   *   pattern: insert %s into t %s select * from t
+   *   hint: <token_hint_begin> hint_with_args(a) <token_hint_end>
+   *   loc: Start(=oracle style) | End(=traditional style)
+   */
+  protected String InjectInsertHint(String pattern, String hint,
+      InsertStmt.HintLocation loc) {
+    final String oracleHint = (loc == InsertStmt.HintLocation.Start) ? hint : "";
+    final String defaultHint  = (loc == InsertStmt.HintLocation.End) ? hint : "";
+    return String.format(pattern, oracleHint, defaultHint);
   }
 
   @After

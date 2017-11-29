@@ -102,7 +102,8 @@ public class ToSqlTest extends FrontendTestBase {
         actual = actual.replace('\n', ' ').replaceAll(" +", " ").trim();
       }
       if (!actual.equals(expected)) {
-        String msg = "Expected: " + expected + "\n  Actual: " + actual + "\n";
+        String msg = "\n<<< Expected(length:" + expected.length() + "): [" + expected
+          + "]\n>>> Actual(length:" + actual.length() + "): [" + actual + "]\n";
         System.err.println(msg);
         fail(msg);
       }
@@ -501,6 +502,46 @@ public class ToSqlTest extends FrontendTestBase {
         joinTypes_, joinConditions_);
   }
 
+  private void planHintsTestForInsertAndUpsert(String prefix, String suffix) {
+    for (InsertStmt.HintLocation loc: InsertStmt.HintLocation.values()) {
+      // Insert hint.
+      testToSql(InjectInsertHint(
+            "insert%s into functional.alltypes(int_col, bool_col) " +
+            "partition(year, month)%s" +
+            "select int_col, bool_col, year, month from functional.alltypes",
+          String.format(" %snoshuffle%s", prefix, suffix), loc),
+          InjectInsertHint("INSERT%s INTO TABLE functional.alltypes(int_col, " +
+            "bool_col) PARTITION (year, month)%s " +
+            "SELECT int_col, bool_col, year, month FROM functional.alltypes",
+            " \n-- +noshuffle\n", loc));
+      testToSql(InjectInsertHint(
+            "insert%s into functional.alltypes(int_col, bool_col) " +
+            "partition(year, month)%s" +
+            "select int_col, bool_col, year, month from functional.alltypes",
+          String.format(" %sshuffle,clustered%s", prefix, suffix), loc),
+          InjectInsertHint("INSERT%s INTO TABLE functional.alltypes(int_col, " +
+            "bool_col) PARTITION (year, month)%s " +
+            "SELECT int_col, bool_col, year, month FROM functional.alltypes",
+            " \n-- +shuffle,clustered\n", loc));
+
+      // Upsert hint.
+      testToSql(InjectInsertHint(
+            "upsert%s into functional_kudu.alltypes(id, int_col)%s" +
+            "select id, int_col from functional_kudu.alltypes",
+          String.format(" %snoshuffle%s", prefix, suffix), loc),
+          InjectInsertHint("UPSERT%s INTO TABLE functional_kudu.alltypes(id, int_col)" +
+            "%s SELECT id, int_col FROM functional_kudu.alltypes",
+            " \n-- +noshuffle\n", loc));
+      testToSql(InjectInsertHint(
+            "upsert%s into functional_kudu.alltypes(id, int_col)%s" +
+            "select id, int_col from functional_kudu.alltypes",
+          String.format(" %sshuffle,clustered%s", prefix, suffix), loc),
+          InjectInsertHint("UPSERT%s INTO TABLE functional_kudu.alltypes(id, int_col)" +
+            "%s SELECT id, int_col FROM functional_kudu.alltypes",
+            " \n-- +shuffle,clustered\n", loc));
+    }
+  }
+
   /**
    * Tests that the toSql() of plan hints use the end-of-line commented hint style
    * (for view compatibility with Hive) regardless of what style was used in the
@@ -517,30 +558,15 @@ public class ToSqlTest extends FrontendTestBase {
       String prefix = hintStyle[0];
       String suffix = hintStyle[1];
 
+      // Hint in Insert/Upsert.
+      planHintsTestForInsertAndUpsert(prefix, suffix);
+
       // Join hint.
       testToSql(String.format(
           "select * from functional.alltypes a join %sbroadcast%s " +
           "functional.alltypes b on a.id = b.id", prefix, suffix),
           "SELECT * FROM functional.alltypes a INNER JOIN \n-- +broadcast\n " +
           "functional.alltypes b ON a.id = b.id");
-
-      // Insert hint.
-      testToSql(String.format(
-          "insert into functional.alltypes(int_col, bool_col) " +
-          "partition(year, month) %snoshuffle%s " +
-          "select int_col, bool_col, year, month from functional.alltypes",
-          prefix, suffix),
-          "INSERT INTO TABLE functional.alltypes(int_col, bool_col) " +
-              "PARTITION (year, month) \n-- +noshuffle\n " +
-          "SELECT int_col, bool_col, year, month FROM functional.alltypes");
-      testToSql(String.format(
-          "insert into functional.alltypes(int_col, bool_col) " +
-          "partition(year, month) %sshuffle,clustered%s " +
-          "select int_col, bool_col, year, month from functional.alltypes",
-          prefix, suffix),
-          "INSERT INTO TABLE functional.alltypes(int_col, bool_col) " +
-              "PARTITION (year, month) \n-- +shuffle,clustered\n " +
-          "SELECT int_col, bool_col, year, month FROM functional.alltypes");
 
       // Table hint
       testToSql(String.format(
