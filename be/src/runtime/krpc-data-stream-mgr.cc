@@ -198,8 +198,8 @@ void KrpcDataStreamMgr::AddData(const TransmitDataRequestPB* request,
     // FindRecvr() may return nullptr even though the receiver was once present. We
     // detect this case by checking already_unregistered - if true then the receiver was
     // already closed deliberately, and there's no unexpected error here.
-    Status(TErrorCode::DATASTREAM_RECVR_CLOSED, PrintId(finst_id), dest_node_id)
-        .ToProto(response->mutable_status());
+    ErrorMsg msg(TErrorCode::DATASTREAM_RECVR_CLOSED, PrintId(finst_id), dest_node_id);
+    Status::Expected(msg).ToProto(response->mutable_status());
     rpc_context->RespondSuccess();
     return;
   }
@@ -335,8 +335,9 @@ void KrpcDataStreamMgr::RespondToTimedOutSender(const std::unique_ptr<ContextTyp
   finst_id.__set_lo(request->dest_fragment_instance_id().lo());
   finst_id.__set_hi(request->dest_fragment_instance_id().hi());
 
-  Status(TErrorCode::DATASTREAM_SENDER_TIMEOUT, PrintId(finst_id)).ToProto(
-      ctx->response->mutable_status());
+  ErrorMsg msg(TErrorCode::DATASTREAM_SENDER_TIMEOUT, PrintId(finst_id));
+  VLOG_QUERY << msg.msg();
+  Status::Expected(msg).ToProto(ctx->response->mutable_status());
   ctx->rpc_context->RespondSuccess();
   num_senders_waiting_->Increment(-1);
   num_senders_timedout_->Increment(1);

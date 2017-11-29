@@ -185,8 +185,10 @@ Status DataStreamMgr::AddData(const TUniqueId& fragment_instance_id,
     // and there's no unexpected error here. If already_unregistered is false,
     // FindRecvrOrWait() timed out, which is unexpected and suggests a query setup error;
     // we return DATASTREAM_SENDER_TIMEOUT to trigger tear-down of the query.
-    return already_unregistered ? Status::OK() :
-        Status(TErrorCode::DATASTREAM_SENDER_TIMEOUT, PrintId(fragment_instance_id));
+    if (already_unregistered) return Status::OK();
+    ErrorMsg msg(TErrorCode::DATASTREAM_SENDER_TIMEOUT, PrintId(fragment_instance_id));
+    VLOG_QUERY << "DataStreamMgr::AddData(): " << msg.msg();
+    return Status::Expected(msg);
   }
   DCHECK(!already_unregistered);
   recvr->AddBatch(thrift_batch, sender_id);
@@ -202,11 +204,16 @@ Status DataStreamMgr::CloseSender(const TUniqueId& fragment_instance_id,
   shared_ptr<DataStreamRecvr> recvr = FindRecvrOrWait(fragment_instance_id, dest_node_id,
       &already_unregistered);
   if (recvr == nullptr) {
-    // Was not able to notify the receiver that this was the end of stream. Notify the
-    // sender that this failed so that they can take appropriate action (i.e. failing
-    // the query).
-    status = already_unregistered ? Status::OK() :
-        Status(TErrorCode::DATASTREAM_SENDER_TIMEOUT, PrintId(fragment_instance_id));
+    if (already_unregistered) {
+      status = Status::OK();
+    } else {
+      // Was not able to notify the receiver that this was the end of stream. Notify the
+      // sender that this failed so that they can take appropriate action (i.e. failing
+      // the query).
+      ErrorMsg msg(TErrorCode::DATASTREAM_SENDER_TIMEOUT, PrintId(fragment_instance_id));
+      VLOG_QUERY << "DataStreamMgr::CloseSender(): " << msg.msg();
+      status = Status::Expected(msg);
+    }
   } else {
     recvr->RemoveSender(sender_id);
   }
