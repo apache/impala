@@ -256,22 +256,21 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
         instance_exec_status.fragment_instance_id);
     // Ignore duplicate or out-of-order messages.
     if (instance_stats->done_) continue;
-    if (instance_status.ok()) {
-      instance_stats->Update(instance_exec_status, exec_summary, scan_range_progress);
-      if (instance_stats->peak_mem_counter_ != nullptr) {
-        // protect against out-of-order status updates
-        peak_consumption_ =
-            max(peak_consumption_, instance_stats->peak_mem_counter_->value());
-      }
-    } else {
-      // if a query is aborted due to an error encountered by a single fragment instance,
-      // all other fragment instances will report a cancelled status; make sure not
-      // to mask the original error status
-      if (status_.ok() || status_.IsCancelled()) {
-        status_ = instance_status;
-        failed_instance_id_ = instance_exec_status.fragment_instance_id;
-        is_fragment_failure_ = true;
-      }
+
+    instance_stats->Update(instance_exec_status, exec_summary, scan_range_progress);
+    if (instance_stats->peak_mem_counter_ != nullptr) {
+      // protect against out-of-order status updates
+      peak_consumption_ =
+        max(peak_consumption_, instance_stats->peak_mem_counter_->value());
+    }
+
+    // If a query is aborted due to an error encountered by a single fragment instance,
+    // all other fragment instances will report a cancelled status; make sure not to mask
+    // the original error status.
+    if (!instance_status.ok() && (status_.ok() || status_.IsCancelled())) {
+      status_ = instance_status;
+      failed_instance_id_ = instance_exec_status.fragment_instance_id;
+      is_fragment_failure_ = true;
     }
     DCHECK_GT(num_remaining_instances_, 0);
     if (instance_exec_status.done) {
@@ -454,7 +453,6 @@ void Coordinator::BackendState::InstanceStats::InitCounters() {
 void Coordinator::BackendState::InstanceStats::Update(
     const TFragmentInstanceExecStatus& exec_status,
     ExecSummary* exec_summary, ProgressUpdater* scan_range_progress) {
-  DCHECK(Status(exec_status.status).ok());
   if (exec_status.done) stopwatch_.Stop();
   profile_->Update(exec_status.profile);
   if (!profile_created_) {

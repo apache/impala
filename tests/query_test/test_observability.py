@@ -108,3 +108,22 @@ class TestObservability(ImpalaTestSuite):
     assert "Query Options (set by configuration and planner): MEM_LIMIT=8589934592," \
         "NUM_NODES=1,NUM_SCANNER_THREADS=1,RUNTIME_FILTER_MODE=0,MT_DOP=0\n" \
         in runtime_profile
+
+  def test_profile_fragment_instances(self):
+    """IMPALA-6081: Test that the expected number of fragment instances and their exec
+    nodes appear in the runtime profile, even when fragments may be quickly cancelled when
+    all results are already returned."""
+    results = self.execute_query("""
+        with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
+        select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
+        join (select * from l LIMIT 2000000) b on a.l_orderkey = -b.l_orderkey;""")
+    # There are 3 scan nodes and each appears in the profile 4 times (for 3 fragment
+    # instances + the averaged fragment).
+    assert results.runtime_profile.count("HDFS_SCAN_NODE") == 12
+    # There are 3 exchange nodes and each appears in the profile 2 times (for 1 fragment
+    # instance + the averaged fragment).
+    assert results.runtime_profile.count("EXCHANGE_NODE") == 6
+    # The following appear only in the root fragment which has 1 instance.
+    assert results.runtime_profile.count("HASH_JOIN_NODE") == 2
+    assert results.runtime_profile.count("AGGREGATION_NODE") == 2
+    assert results.runtime_profile.count("PLAN_ROOT_SINK") == 2

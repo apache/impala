@@ -227,10 +227,9 @@ void QueryState::ReportExecStatusAux(bool done, const Status& status,
     status.SetTStatus(&instance_status);
     instance_status.__set_done(done);
 
-    if (fis->profile() != nullptr) {
-      fis->profile()->ToThrift(&instance_status.profile);
-      instance_status.__isset.profile = true;
-    }
+    DCHECK(fis->profile() != nullptr);
+    fis->profile()->ToThrift(&instance_status.profile);
+    instance_status.__isset.profile = true;
 
     // Only send updates to insert status if fragment is finished, the coordinator waits
     // until query execution is done to use them anyhow.
