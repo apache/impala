@@ -712,13 +712,12 @@ CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   a array<int>,
   m map<string,bigint>)
 STORED AS {file_format};
----- ALTER
--- This INSERT is placed in the ALTER section and not in the DEPENDENT_LOAD section because
--- it must always be executed in Hive. The DEPENDENT_LOAD section is sometimes executed in
--- Impala, but Impala currently does not support inserting into tables with complex types.
-INSERT OVERWRITE TABLE {table_name} SELECT * FROM functional.{table_name};
 ---- LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT id, named_struct("f1",string_col,"f2",int_col), array(1, 2, 3), map("k", cast(0 as bigint)) FROM functional.alltypestiny;
+---- DEPENDENT_LOAD_HIVE
+-- This INSERT must run in Hive, because Impala doesn't support inserting into tables
+-- with complex types.
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM functional.{table_name};
 ====
 ---- DATASET
 functional
@@ -1477,8 +1476,9 @@ old_rcfile_table
 ---- COLUMNS
 key INT
 value STRING
----- DEPENDENT_LOAD
-LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/data/oldrcfile.rc' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/oldrcfile.rc'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1486,9 +1486,10 @@ functional
 bad_text_lzo
 ---- COLUMNS
 field STRING
----- DEPENDENT_LOAD
+---- DEPENDENT_LOAD_HIVE
 -- Error recovery test data for LZO compression.
-LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/bad_text_lzo/bad_text.lzo' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/bad_text_lzo/bad_text.lzo'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1497,8 +1498,9 @@ bad_text_gzip
 ---- COLUMNS
 s STRING
 i INT
----- DEPENDENT_LOAD
-LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/bad_text_gzip/file_not_finished.gz' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/bad_text_gzip/file_not_finished.gz'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1506,9 +1508,10 @@ functional
 bad_seq_snap
 ---- COLUMNS
 field STRING
----- DEPENDENT_LOAD
+---- DEPENDENT_LOAD_HIVE
 -- This data file contains format errors and is accessed by the unit test: sequence-file-recover-test.
-LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/bad_seq_snap/bad_file' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/bad_seq_snap/bad_file'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1516,10 +1519,13 @@ functional
 bad_avro_snap_strings
 ---- COLUMNS
 s STRING
----- DEPENDENT_LOAD
-LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/bad_avro_snap/negative_string_len.avro' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
-LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/bad_avro_snap/invalid_union.avro' INTO TABLE {db_name}{db_suffix}.{table_name};
-LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/bad_avro_snap/truncated_string.avro' INTO TABLE {db_name}{db_suffix}.{table_name};
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/bad_avro_snap/negative_string_len.avro'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/bad_avro_snap/invalid_union.avro'
+INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/bad_avro_snap/truncated_string.avro'
+INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1527,8 +1533,9 @@ functional
 bad_avro_snap_floats
 ---- COLUMNS
 c1 FLOAT
----- DEPENDENT_LOAD
-LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/bad_avro_snap/truncated_float.avro' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/bad_avro_snap/truncated_float.avro'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1537,8 +1544,9 @@ bad_avro_decimal_schema
 ---- COLUMNS
 name STRING
 value DECIMAL(5,2)
----- DEPENDENT_LOAD
-LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/bad_avro_snap/invalid_decimal_schema.avro' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/bad_avro_snap/invalid_decimal_schema.avro'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 -- IMPALA-694: uses data file produced by parquet-mr version 1.2.5-cdh4.5.0
@@ -1802,8 +1810,8 @@ avro_decimal_tbl
 ---- COLUMNS
 name STRING
 value DECIMAL(5,2)
----- DEPENDENT_LOAD
-LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/data/avro_decimal_tbl.avro'
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/avro_decimal_tbl.avro'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2094,9 +2102,11 @@ delimited fields terminated by ','  escaped by '\\'
 ---- ALTER
 ALTER TABLE {table_name} SET TBLPROPERTIES('skip.header.line.count'='1');
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
----- DEPENDENT_LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header.gz' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header.csv'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header.gz'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -2110,9 +2120,11 @@ delimited fields terminated by ','  escaped by '\\'
 ---- ALTER
 ALTER TABLE {table_name} SET TBLPROPERTIES('skip.header.line.count'='2');
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header_2.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
----- DEPENDENT_LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header_2.gz' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header_2.csv'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header_2.gz'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
