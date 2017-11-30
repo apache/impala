@@ -52,5 +52,10 @@ under the License.
     <p>
       <b>Default:</b> 0 (meaning the predefined default of 1024)
     </p>
+
+    <p rev="2.11.0 IMPALA-5541">
+      <b>Range:</b> 0-65536. The value of 0 still has the special meaning of <q>use the default</q>,
+      so the effective range is 1-65536. The maximum applies in <keyword keyref="impala211_full"/> and higher.
+    </p>
   </conbody>
 </concept>
