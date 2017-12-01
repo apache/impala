@@ -325,31 +325,58 @@ class TestImpalaShell(ImpalaTestSuite):
 
     assert "Cancelling Query" in result.stderr, result.stderr
 
+  @pytest.mark.execute_serially
   def test_query_cancellation_during_fetch(self):
     """IMPALA-1144: Test cancellation (CTRL+C) while results are being
     fetched"""
     # A select query where fetch takes several seconds
-    args = '-q "with v as (values (1 as x), (2), (3), (4)) ' + \
-        'select * from v, v v2, v v3, v v4, v v5, v v6, v v7, v v8, ' + \
-        'v v9, v v10, v v11;"'
+    stmt = "with v as (values (1 as x), (2), (3), (4)) " + \
+        "select * from v, v v2, v v3, v v4, v v5, v v6, v v7, v v8, " + \
+        "v v9, v v10, v v11"
     # Kill happens when the results are being fetched
-    self.run_and_verify_query_cancellation_test(args)
+    self.run_and_verify_query_cancellation_test(stmt, "FINISHED")
 
+  @pytest.mark.execute_serially
   def test_query_cancellation_during_wait_to_finish(self):
     """IMPALA-1144: Test cancellation (CTRL+C) while the query is in the
     wait_to_finish state"""
     # A select where wait_to_finish takes several seconds
-    args = '-q "select * from tpch.customer c1, tpch.customer c2, ' + \
-           'tpch.customer c3 order by c1.c_name"'
+    stmt = "select * from tpch.customer c1, tpch.customer c2, " + \
+           "tpch.customer c3 order by c1.c_name"
     # Kill happens in wait_to_finish state
-    self.run_and_verify_query_cancellation_test(args)
+    self.run_and_verify_query_cancellation_test(stmt, "RUNNING")
 
-  def run_and_verify_query_cancellation_test(self, args):
+  def wait_for_query_state(self, stmt, state, max_retry=15):
+    """Checks the in flight queries on Impala debug page. Polls the state of
+    the query statement from parameter every second until the query gets to
+    a state given via parameter or a maximum retry count is reached.
+    Restriction: Only works if there is only one in flight query."""
+    impalad_service = ImpaladService(IMPALAD.split(':')[0])
+    if not impalad_service.wait_for_num_in_flight_queries(1):
+      raise Exception("No in flight query found")
+
+    retry_count = 0
+    while retry_count <= max_retry:
+      query_info = impalad_service.get_in_flight_queries()[0]
+      if query_info['stmt'] != stmt:
+        exc_text = "The found in flight query is not the one under test: " + \
+            query_info['stmt']
+        raise Exception(exc_text)
+      if query_info['state'] == state:
+        return
+      retry_count += 1
+      sleep(1.0)
+    raise Exception("Query didn't reach desired state: " + state)
+
+  def run_and_verify_query_cancellation_test(self, stmt, cancel_at_state):
     """Starts the execution of the received query, waits until the query
     execution in fact starts and then cancels it. Expects the query
     cancellation to succeed."""
+    args = "-q \"" + stmt + ";\""
     p = ImpalaShell(args)
-    sleep(2.0)
+
+    self.wait_for_query_state(stmt, cancel_at_state)
+
     os.kill(p.pid(), signal.SIGINT)
     result = p.get_result()
     assert "Cancelling Query" in result.stderr
