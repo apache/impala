@@ -356,6 +356,7 @@ add_subdirectory(common/yarn-extras)
 add_subdirectory(common/protobuf)
 add_subdirectory(be)
 add_subdirectory(fe)
+add_subdirectory(impala-parent)
 add_subdirectory(ext-data-source)
 
 # Build target for all generated files which most backend code depends on

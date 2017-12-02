@@ -19,6 +19,12 @@ under the License.
 
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <parent>
+    <groupId>org.apache.impala</groupId>
+    <artifactId>impala-parent</artifactId>
+    <version>0.1-SNAPSHOT</version>
+    <relativePath>../../impala-parent/pom.xml</relativePath>
+  </parent>
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>org.apache.impala</groupId>
@@ -65,39 +71,4 @@ under the License.
       </plugin>
     </plugins>
   </build>
-
-  <repositories>
-    <repository>
-      <id>cdh.rcs.releases.repo</id>
-      <url>https://repository.cloudera.com/content/groups/cdh-releases-rcs</url>
-      <name>CDH Releases Repository</name>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-    </repository>
-    <repository>
-      <id>cdh.releases.repo</id>
-      <url>https://repository.cloudera.com/content/repositories/releases</url>
-      <name>CDH Releases Repository</name>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </repository>
-    <repository>
-      <id>cdh.snapshots.repo</id>
-      <url>https://repository.cloudera.com/content/repositories/snapshots</url>
-      <name>CDH Snapshots Repository</name>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-    </repository>
-    <repository>
-      <id>cloudera.thirdparty.repo</id>
-      <url>https://repository.cloudera.com/content/repositories/third-party</url>
-      <name>Cloudera Third Party Repository</name>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </repository>
-  </repositories>
 </project>

@@ -20,6 +20,12 @@ under the License.
 -->
 
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <parent>
+    <groupId>org.apache.impala</groupId>
+    <artifactId>impala-parent</artifactId>
+    <version>0.1-SNAPSHOT</version>
+    <relativePath>../impala-parent/pom.xml</relativePath>
+  </parent>
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.impala</groupId>
   <artifactId>impala-frontend</artifactId>
@@ -27,29 +33,6 @@ under the License.
   <packaging>jar</packaging>
 
   <name>Apache Impala Query Engine Frontend</name>
-
-  <properties>
-    <surefire.reports.dir>${env.IMPALA_LOGS_DIR}/fe_tests</surefire.reports.dir>
-    <jacoco.skip>true</jacoco.skip>
-    <jacoco.data.file>${env.IMPALA_FE_TEST_COVERAGE_DIR}/jacoco.exec</jacoco.data.file>
-    <jacoco.report.dir>${env.IMPALA_FE_TEST_COVERAGE_DIR}</jacoco.report.dir>
-    <test.hive.testdata>${project.basedir}/../testdata/target/AllTypes.txt</test.hive.testdata>
-    <backend.library.path>${env.IMPALA_HOME}/be/build/debug/service:${env.IMPALA_HOME}/be/build/release/service</backend.library.path>
-    <beeswax_port>21000</beeswax_port>
-    <impalad>localhost</impalad>
-    <testExecutionMode>reduced</testExecutionMode>
-    <hadoop.version>${env.IMPALA_HADOOP_VERSION}</hadoop.version>
-    <hive.version>${env.IMPALA_HIVE_VERSION}</hive.version>
-    <hive.major.version>${env.IMPALA_HIVE_MAJOR_VERSION}</hive.major.version>
-    <sentry.version>${env.IMPALA_SENTRY_VERSION}</sentry.version>
-    <hbase.version>${env.IMPALA_HBASE_VERSION}</hbase.version>
-    <parquet.version>${env.IMPALA_PARQUET_VERSION}</parquet.version>
-    <impala.extdatasrc.api.version>1.0-SNAPSHOT</impala.extdatasrc.api.version>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <kudu.version>${env.KUDU_JAVA_VERSION}</kudu.version>
-    <yarn-extras.version>${project.version}</yarn-extras.version>
-    <eclipse.output.directory>eclipse-classes</eclipse.output.directory>
-  </properties>
 
   <dependencies>
     <dependency>
@@ -664,98 +647,6 @@ under the License.
       </plugins>
     </pluginManagement>
   </build>
-
-  <repositories>
-    <repository>
-       <id>apache.snapshots</id>
-       <name>Apache Development Snapshot Repository</name>
-        <url>https://repository.apache.org/content/repositories/snapshots/</url>
-        <releases>
-            <enabled>false</enabled>
-        </releases>
-        <snapshots>
-            <enabled>true</enabled>
-        </snapshots>
-    </repository>
-
-    <repository>
-      <id>cdh.rcs.releases.repo</id>
-      <url>https://repository.cloudera.com/content/groups/cdh-releases-rcs</url>
-      <name>CDH Releases Repository</name>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-    </repository>
-    <repository>
-      <id>cdh.releases.repo</id>
-      <url>https://repository.cloudera.com/content/repositories/releases</url>
-      <name>CDH Releases Repository</name>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </repository>
-    <repository>
-      <id>cdh.snapshots.repo</id>
-      <url>https://repository.cloudera.com/content/repositories/snapshots</url>
-      <name>CDH Snapshots Repository</name>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-    </repository>
-    <repository>
-      <id>cloudera.thirdparty.repo</id>
-      <url>https://repository.cloudera.com/content/repositories/third-party</url>
-      <name>Cloudera Third Party Repository</name>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </repository>
-
-    <!-- This is needed for java-cup. TODO add the plugin to our maven repo -->
-    <repository>
-      <id>sonatype-nexus-snapshots</id>
-      <name>Sonatype Nexus Snapshots</name>
-      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-      <releases>
-        <enabled>false</enabled>
-      </releases>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-    </repository>
-  </repositories>
-
-  <pluginRepositories>
-    <pluginRepository>
-      <id>cloudera.thirdparty.repo</id>
-      <url>https://repository.cloudera.com/content/repositories/third-party</url>
-      <name>Cloudera Third Party Repository</name>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </pluginRepository>
-    <pluginRepository>
-      <id>cloudera.snapshot.repo</id>
-      <url>https://repository.cloudera.com/content/repositories/snapshots</url>
-      <name>Cloudera Snapshot Repository</name>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-    </pluginRepository>
-
-    <!-- This is needed for the cup maven plugin. TODO add the plugin to our maven repo -->
-    <pluginRepository>
-      <id>sonatype-nexus-snapshots</id>
-      <name>Sonatype Nexus Snapshots</name>
-      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-      <releases>
-        <enabled>false</enabled>
-      </releases>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-    </pluginRepository>
-  </pluginRepositories>
 
   <profiles>
     <profile>

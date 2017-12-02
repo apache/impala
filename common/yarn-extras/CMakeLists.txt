@@ -15,6 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-add_custom_target(yarn-extras ALL
+add_custom_target(yarn-extras ALL DEPENDS impala-parent
   COMMAND $ENV{IMPALA_HOME}/bin/mvn-quiet.sh install -DskipTests
 )

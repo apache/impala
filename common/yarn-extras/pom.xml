@@ -19,6 +19,12 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <parent>
+    <groupId>org.apache.impala</groupId>
+    <artifactId>impala-parent</artifactId>
+    <version>0.1-SNAPSHOT</version>
+    <relativePath>../../impala-parent/pom.xml</relativePath>
+  </parent>
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.impala</groupId>
   <artifactId>yarn-extras</artifactId>
@@ -27,51 +33,6 @@
   <description>Extra Hadoop classes from YARN needed by Impala</description>
   <packaging>jar</packaging>
   <url>.</url>
-
-  <properties>
-    <hadoop.version>${env.IMPALA_HADOOP_VERSION}</hadoop.version>
-  </properties>
-
-  <repositories>
-    <repository>
-       <id>apache.snapshots</id>
-       <name>Apache Development Snapshot Repository</name>
-        <url>https://repository.apache.org/content/repositories/snapshots/</url>
-        <releases>
-            <enabled>false</enabled>
-        </releases>
-        <snapshots>
-            <enabled>true</enabled>
-        </snapshots>
-    </repository>
-
-    <repository>
-      <id>cdh.rcs.releases.repo</id>
-      <url>https://repository.cloudera.com/content/groups/cdh-releases-rcs</url>
-      <name>CDH Releases Repository</name>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-    </repository>
-
-    <repository>
-      <id>cdh.snapshots.repo</id>
-      <url>https://repository.cloudera.com/content/repositories/snapshots</url>
-      <name>CDH Snapshots Repository</name>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-    </repository>
-
-    <repository>
-      <id>cdh.repo</id>
-      <url>https://repository.cloudera.com/content/groups/cloudera-repos</url>
-      <name>Cloudera Repositories</name>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </repository>
-  </repositories>
 
   <dependencies>
     <dependency>
