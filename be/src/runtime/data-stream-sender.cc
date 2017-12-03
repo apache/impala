@@ -275,7 +275,8 @@ Status DataStreamSender::Channel::SendCurrentBatch() {
 Status DataStreamSender::Channel::GetSendStatus() {
   WaitForRpc();
   if (!rpc_status_.ok()) {
-    LOG(ERROR) << "channel send status: " << rpc_status_.GetDetail();
+    LOG(ERROR) << "channel send to " << TNetworkAddressToString(address_) << " failed: "
+               << rpc_status_.GetDetail();
   }
   return rpc_status_;
 }

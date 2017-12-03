@@ -224,8 +224,8 @@ error_codes = (
   ("COMPRESSED_FILE_TRUNCATED", 70,
    "Unexpected end of compressed file. File may be truncated. file=$0"),
 
-  ("DATASTREAM_SENDER_TIMEOUT", 71, "Sender timed out waiting for receiver fragment "
-   "instance: $0"),
+  ("DATASTREAM_SENDER_TIMEOUT", 71, "Sender$0 timed out waiting for receiver fragment "
+   "instance: $1, dest node: $2"),
 
   ("KUDU_IMPALA_TYPE_MISSING", 72, "Kudu type $0 is not available in Impala."),
 

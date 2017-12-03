@@ -334,8 +334,9 @@ void KrpcDataStreamMgr::RespondToTimedOutSender(const std::unique_ptr<ContextTyp
   TUniqueId finst_id;
   finst_id.__set_lo(request->dest_fragment_instance_id().lo());
   finst_id.__set_hi(request->dest_fragment_instance_id().hi());
-
-  ErrorMsg msg(TErrorCode::DATASTREAM_SENDER_TIMEOUT, PrintId(finst_id));
+  string remote_addr = Substitute(" $0", ctx->rpc_context->remote_address().host());
+  ErrorMsg msg(TErrorCode::DATASTREAM_SENDER_TIMEOUT, remote_addr, PrintId(finst_id),
+      ctx->request->dest_node_id());
   VLOG_QUERY << msg.msg();
   Status::Expected(msg).ToProto(ctx->response->mutable_status());
   ctx->rpc_context->RespondSuccess();

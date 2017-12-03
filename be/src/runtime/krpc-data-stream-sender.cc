@@ -331,7 +331,8 @@ Status KrpcDataStreamSender::Channel::WaitForRpc(std::unique_lock<SpinLock>* loc
 
   DCHECK(!rpc_in_flight_);
   if (UNLIKELY(!rpc_status_.ok())) {
-    LOG(ERROR) << "channel send status: " << rpc_status_.GetDetail();
+    LOG(ERROR) << "channel send to " << TNetworkAddressToString(address_) << " failed: "
+               << rpc_status_.GetDetail();
     return rpc_status_;
   }
   return Status::OK();

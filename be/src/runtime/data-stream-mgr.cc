@@ -186,7 +186,8 @@ Status DataStreamMgr::AddData(const TUniqueId& fragment_instance_id,
     // FindRecvrOrWait() timed out, which is unexpected and suggests a query setup error;
     // we return DATASTREAM_SENDER_TIMEOUT to trigger tear-down of the query.
     if (already_unregistered) return Status::OK();
-    ErrorMsg msg(TErrorCode::DATASTREAM_SENDER_TIMEOUT, PrintId(fragment_instance_id));
+    ErrorMsg msg(TErrorCode::DATASTREAM_SENDER_TIMEOUT, "", PrintId(fragment_instance_id),
+        dest_node_id);
     VLOG_QUERY << "DataStreamMgr::AddData(): " << msg.msg();
     return Status::Expected(msg);
   }
@@ -210,7 +211,8 @@ Status DataStreamMgr::CloseSender(const TUniqueId& fragment_instance_id,
       // Was not able to notify the receiver that this was the end of stream. Notify the
       // sender that this failed so that they can take appropriate action (i.e. failing
       // the query).
-      ErrorMsg msg(TErrorCode::DATASTREAM_SENDER_TIMEOUT, PrintId(fragment_instance_id));
+      ErrorMsg msg(TErrorCode::DATASTREAM_SENDER_TIMEOUT, "",
+          PrintId(fragment_instance_id), dest_node_id);
       VLOG_QUERY << "DataStreamMgr::CloseSender(): " << msg.msg();
       status = Status::Expected(msg);
     }
