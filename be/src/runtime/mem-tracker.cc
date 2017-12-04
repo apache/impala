@@ -34,6 +34,8 @@
 #include "common/names.h"
 
 using boost::algorithm::join;
+using std::priority_queue;
+using std::greater;
 using namespace strings;
 
 namespace impala {
@@ -301,7 +303,6 @@ string MemTracker::LogUsage(int max_recursive_depth, const string& prefix,
        << new_prefix << "Untracked Memory: Total="
        << PrettyPrinter::Print(untracked_bytes, TUnit::BYTES);
   }
-
   return ss.str();
 }
 
@@ -317,6 +318,37 @@ string MemTracker::LogUsage(int max_recursive_depth, const string& prefix,
     *logged_consumption += tracker_consumption;
   }
   return join(usage_strings, "\n");
+}
+
+string MemTracker::LogTopNQueries(int limit) {
+  if (limit == 0) return "";
+  if (this->is_query_mem_tracker_) return LogUsage(0);
+  priority_queue<pair<int64_t, string>, vector<pair<int64_t, string>>,
+      std::greater<pair<int64_t, string>>>
+      min_pq;
+  GetTopNQueries(min_pq, limit);
+  vector<string> usage_strings(min_pq.size());
+  while (!min_pq.empty()) {
+    usage_strings.push_back(min_pq.top().second);
+    min_pq.pop();
+  }
+  std::reverse(usage_strings.begin(), usage_strings.end());
+  return join(usage_strings, "\n");
+}
+
+void MemTracker::GetTopNQueries(
+    priority_queue<pair<int64_t, string>, vector<pair<int64_t, string>>,
+        greater<pair<int64_t, string>>>& min_pq,
+    int limit) {
+  lock_guard<SpinLock> l(child_trackers_lock_);
+  for (MemTracker* tracker : child_trackers_) {
+    if (!tracker->is_query_mem_tracker_) {
+      tracker->GetTopNQueries(min_pq, limit);
+    } else {
+      min_pq.push(pair<int64_t, string>(tracker->consumption(), tracker->LogUsage(0)));
+      if (min_pq.size() > limit) min_pq.pop();
+    }
+  }
 }
 
 MemTracker* MemTracker::GetQueryMemTracker() {

@@ -22,6 +22,7 @@
 
 #include "common/object-pool.h"
 #include "gutil/strings/substitute.h"
+#include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "util/dummy-runtime-profile.h"
 #include "util/runtime-profile-counters.h"
@@ -129,18 +130,18 @@ void ReservationTracker::Close() {
   initialized_ = false;
 }
 
-bool ReservationTracker::IncreaseReservation(int64_t bytes) {
+bool ReservationTracker::IncreaseReservation(int64_t bytes, Status* error_status) {
   lock_guard<SpinLock> l(lock_);
-  return IncreaseReservationInternalLocked(bytes, false, false);
+  return IncreaseReservationInternalLocked(bytes, false, false, error_status);
 }
 
-bool ReservationTracker::IncreaseReservationToFit(int64_t bytes) {
+bool ReservationTracker::IncreaseReservationToFit(int64_t bytes, Status* error_status) {
   lock_guard<SpinLock> l(lock_);
-  return IncreaseReservationInternalLocked(bytes, true, false);
+  return IncreaseReservationInternalLocked(bytes, true, false, error_status);
 }
 
-bool ReservationTracker::IncreaseReservationInternalLocked(
-    int64_t bytes, bool use_existing_reservation, bool is_child_reservation) {
+bool ReservationTracker::IncreaseReservationInternalLocked(int64_t bytes,
+    bool use_existing_reservation, bool is_child_reservation, Status* error_status) {
   DCHECK(initialized_);
   int64_t reservation_increase =
       use_existing_reservation ? max<int64_t>(0, bytes - unused_reservation()) : bytes;
@@ -156,18 +157,53 @@ bool ReservationTracker::IncreaseReservationInternalLocked(
     // Should be good enough. If the probability is 0.0, this never triggers. If it is 1.0
     // it always triggers.
     granted = false;
+    if (error_status != nullptr) {
+      *error_status = Status::Expected(
+          Substitute("Debug random failure mode is turned on: Reservation of $0 denied.",
+              PrettyPrinter::Print(bytes, TUnit::BYTES)));
+    }
   } else if (reservation_ + reservation_increase > reservation_limit_) {
     granted = false;
+    if (error_status != nullptr) {
+      MemTracker* mem_tracker = mem_tracker_;
+      if (mem_tracker == nullptr) {
+        // The ReservationTracker at the root does not have a reference to the top
+        // level(process) MemTracker.
+        mem_tracker = ExecEnv::GetInstance()->process_mem_tracker();
+      }
+      string error_msg = Substitute(
+          "Failed to increase reservation by $0 because it would exceed the applicable "
+          "reservation limit for the \"$1\" ReservationTracker: reservation_limit=$2 "
+          "reservation=$3 used_reservation=$4 child_reservations=$5",
+          PrettyPrinter::Print(bytes, TUnit::BYTES),
+          mem_tracker == nullptr ? "Process" : mem_tracker->label(),
+          PrettyPrinter::Print(reservation_limit_, TUnit::BYTES),
+          PrettyPrinter::Print(reservation_, TUnit::BYTES),
+          PrettyPrinter::Print(used_reservation_, TUnit::BYTES),
+          PrettyPrinter::Print(child_reservations_, TUnit::BYTES));
+      string top_n_queries = mem_tracker->LogTopNQueries(5);
+      if (!top_n_queries.empty()) {
+        error_msg = Substitute(
+            "$0\nThe top 5 queries that allocated memory under this tracker are:\n$1",
+            error_msg, top_n_queries);
+      }
+      *error_status = Status::Expected(error_msg);
+    }
   } else {
     if (parent_ == nullptr) {
       granted = true;
     } else {
       lock_guard<SpinLock> l(parent_->lock_);
-      granted =
-          parent_->IncreaseReservationInternalLocked(reservation_increase, true, true);
+      granted = parent_->IncreaseReservationInternalLocked(
+          reservation_increase, true, true, error_status);
     }
     if (granted && !TryConsumeFromMemTracker(reservation_increase)) {
       granted = false;
+      if (error_status != nullptr) {
+        *error_status = mem_tracker_->MemLimitExceeded(nullptr,
+            "Could not allocate memory while trying to increase reservation.",
+            reservation_increase);
+      }
       // Roll back changes to ancestors if MemTracker update fails.
       parent_->DecreaseReservation(reservation_increase, true);
     }

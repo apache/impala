@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include <map>
 #include <memory>
+#include <queue>
 #include <vector>
 #include <boost/thread/mutex.hpp>
 #include <boost/unordered_map.hpp>
@@ -344,6 +345,10 @@ class MemTracker {
   /// are not performance sensitive
   static const int UNLIMITED_DEPTH = INT_MAX;
 
+  /// Logs the usage of 'limit' number of queries based on maximum total memory
+  /// consumption.
+  std::string LogTopNQueries(int limit);
+
   /// Log the memory usage when memory limit is exceeded and return a status object with
   /// details of the allocation which caused the limit to be exceeded.
   /// If 'failed_allocation_size' is greater than zero, logs the allocation size. If
@@ -381,6 +386,14 @@ class MemTracker {
   /// of children to include in the dump. If it is zero, then no children are dumped.
   static std::string LogUsage(int max_recursive_depth, const std::string& prefix,
       const std::list<MemTracker*>& trackers, int64_t* logged_consumption);
+
+  /// Helper function for LogTopNQueries that iterates through the MemTracker hierarchy
+  /// and populates 'min_pq' with 'limit' number of elements (that contain state related
+  /// to query MemTrackers) based on maximum total memory consumption.
+  void GetTopNQueries(
+      std::priority_queue<pair<int64_t, string>,
+          vector<pair<int64_t, string>>, std::greater<pair<int64_t, string>>>& min_pq,
+      int limit);
 
   /// If an ancestor of this tracker is a query MemTracker, return that tracker.
   /// Otherwise return NULL.

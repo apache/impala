@@ -117,15 +117,20 @@ class ReservationTracker {
   /// ancestors' reservations if needed to fit the increased reservation.
   /// Returns true if the reservation increase is granted, or false if not granted.
   /// If the reservation is not granted, no modifications are made to the state of
-  /// any ReservationTrackers.
-  bool IncreaseReservation(int64_t bytes) WARN_UNUSED_RESULT;
+  /// any ReservationTrackers and if 'error_status' is non-null, it returns an
+  /// appropriate status message in it.
+  bool IncreaseReservation(int64_t bytes, Status* error_status = nullptr)
+      WARN_UNUSED_RESULT;
 
   /// Tries to ensure that 'bytes' of unused reservation is available. If not already
   /// available, tries to increase the reservation such that the unused reservation is
   /// exactly equal to 'bytes'. Uses any unused reservation on ancestors and increase
   /// ancestors' reservations if needed to fit the increased reservation.
-  /// Returns true if the reservation increase was successful or not necessary.
-  bool IncreaseReservationToFit(int64_t bytes) WARN_UNUSED_RESULT;
+  /// Returns true if the reservation increase was successful or not necessary. Otherwise
+  /// returns false and if 'error_status' is non-null, it returns an appropriate status
+  /// message in it.
+  bool IncreaseReservationToFit(int64_t bytes, Status* error_status = nullptr)
+      WARN_UNUSED_RESULT;
 
   /// Decrease reservation by 'bytes' on this tracker and all ancestors. This tracker's
   /// reservation must be at least 'bytes' before calling this method.
@@ -190,10 +195,18 @@ class ReservationTracker {
   /// Internal helper for IncreaseReservation(). If 'use_existing_reservation' is true,
   /// increase by the minimum amount so that 'bytes' fits in the reservation, otherwise
   /// just increase by 'bytes'. If 'is_child_reservation' is true, also increase
-  /// 'child_reservations_' by 'bytes'.
+  /// 'child_reservations_' by 'bytes'. If 'error_status' is not null and reservation
+  /// increase fails then an appropriate status message is returned in it.
   /// 'lock_' must be held by caller.
-  bool IncreaseReservationInternalLocked(
-      int64_t bytes, bool use_existing_reservation, bool is_child_reservation);
+  /// Example error message if a reservation tracker hits its limit:
+  /// Failed to increase reservation by 2.12 GB because it would exceed the applicable
+  /// reservation limit for the "Process" ReservationTracker: reservation_limit=2.00 GB
+  /// reservation=0 used_reservation=0 child_reservations=0
+  /// The top 5 queries that allocated memory under this tracker are:
+  /// Query(20449659107d67ce:2e9058b500000000): Reservation=0 ReservationLimit=6.67 GB
+  /// OtherMemory=0 Total=0 Peak=0
+  bool IncreaseReservationInternalLocked(int64_t bytes, bool use_existing_reservation,
+      bool is_child_reservation, Status* error_status = nullptr);
 
   /// Increase consumption on linked MemTracker to reflect an increase in reservation
   /// of 'reservation_increase'. For the topmost link, return false if this failed
@@ -248,12 +261,16 @@ class ReservationTracker {
   /// based on a post-order traversal of the tree, with children visited in order of the
   /// memory address of the ReservationTracker object. The following rules can be applied
   /// to determine the relative positions of two trackers t1 and t2 in the lock order:
-  /// * If t1 is a descendent of t2, t1's lock must be acquired before t2's lock (i.e.
+  /// * If t1 is a descendant of t2, t1's lock must be acquired before t2's lock (i.e.
   ///   locks are acquired bottom-up).
   /// * If neither t1 or t2 is a descendant of the other, they must be in subtrees of
   ///   under a common ancestor. If the memory address of t1's subtree's root is less
   ///   than the memory address of t2's subtree's root, t1's lock must be acquired before
   ///   t2's lock. This check is implemented in lock_sibling_subtree_first().
+  /// Since MemTracker::child_trackers_lock_ objects are acquired in a top-down lock
+  /// order, if a MemTracker::child_trackers_lock_ is acquired while holding a lock_, any
+  /// more calls to acquire a lock_ should not be made to avoid any deadlock that might
+  /// occur due to ReservationTracker's bottom-up lock order.
   SpinLock lock_;
 
   /// True if the tracker is initialized.

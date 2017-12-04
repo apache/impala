@@ -50,12 +50,12 @@ InitialReservations::InitialReservations(ObjectPool* obj_pool,
 Status InitialReservations::Init(
     const TUniqueId& query_id, int64_t query_min_reservation) {
   DCHECK_EQ(0, initial_reservations_.GetReservation()) << "Already inited";
-  if (!initial_reservations_.IncreaseReservation(query_min_reservation)) {
+  Status reservation_status;
+  if (!initial_reservations_.IncreaseReservation(
+          query_min_reservation, &reservation_status)) {
     return Status(TErrorCode::MINIMUM_RESERVATION_UNAVAILABLE,
         PrettyPrinter::Print(query_min_reservation, TUnit::BYTES), FLAGS_hostname,
-        FLAGS_be_port, PrintId(query_id),
-        ExecEnv::GetInstance()->process_mem_tracker()->LogUsage(
-            MemTracker::PROCESS_MEMTRACKER_LIMITED_DEPTH));
+        FLAGS_be_port, PrintId(query_id), reservation_status.GetDetail());
   }
   VLOG_QUERY << "Successfully claimed initial reservations ("
             << PrettyPrinter::Print(query_min_reservation, TUnit::BYTES) << ") for"

@@ -323,9 +323,9 @@ error_codes = (
    "Failed to verify generated IR function $0, see log for more details."),
 
   ("MINIMUM_RESERVATION_UNAVAILABLE", 106, "Failed to get minimum memory reservation of "
-     "$0 on daemon $1:$2 for query $3 because it would exceed an applicable memory "
-     "limit. Memory is likely oversubscribed. Reducing query concurrency or configuring "
-     "admission control may help avoid this error. Memory usage:\\n$4"),
+     "$0 on daemon $1:$2 for query $3 due to following error: $4Memory is likely "
+     "oversubscribed. Reducing query concurrency or configuring admission control may "
+     "help avoid this error."),
 
   ("ADMISSION_REJECTED", 107, "Rejected query from pool $0: $1"),
 
