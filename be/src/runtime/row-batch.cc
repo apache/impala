@@ -265,6 +265,7 @@ Status RowBatch::Serialize(bool full_dedup, vector<int32_t>* tuple_offsets,
         MakeScopeExitTrigger([&compressor]() { compressor.Close(); });
 
     int64_t compressed_size = compressor.MaxOutputLen(size);
+    DCHECK_GT(compressed_size, 0);
     if (compression_scratch_.size() < compressed_size) {
       compression_scratch_.resize(compressed_size);
     }

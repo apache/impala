@@ -311,6 +311,9 @@ Status Lz4Compressor::ProcessBlock(bool output_preallocated, int64_t input_lengt
   DCHECK_GE(input_length, 0);
   CHECK(output_preallocated) << "Output was not allocated for Lz4 Codec";
   if (input_length == 0) return Status::OK();
+  if (MaxOutputLen(input_length, input) == 0) {
+    return Status(TErrorCode::LZ4_COMPRESSION_INPUT_TOO_LARGE, input_length);
+  }
   *output_length = LZ4_compress_default(reinterpret_cast<const char*>(input),
       reinterpret_cast<char*>(*output), input_length, *output_length);
   return Status::OK();

@@ -195,6 +195,7 @@ Status CompressCatalogObject(string* catalog_object) {
       &compressor));
   string output_buffer;
   int64_t compressed_data_len = compressor->MaxOutputLen(catalog_object->size());
+  DCHECK_GT(compressed_data_len, 0);
   int64_t output_buffer_len = compressed_data_len + sizeof(uint32_t);
   output_buffer.resize(output_buffer_len);
   uint8_t* output_buffer_ptr =

@@ -341,6 +341,9 @@ error_codes = (
 
   ("BAD_PRINCIPAL_FORMAT", 112,
     "Kerberos principal should be of the form: <service>/<hostname>@<realm> - got: $0"),
+
+  ("LZ4_COMPRESSION_INPUT_TOO_LARGE", 113,
+   "The input size is too large for LZ4 compression: $0"),
 )
 
 import sys

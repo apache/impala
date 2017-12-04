@@ -149,6 +149,7 @@ class Codec {
   /// a buffer.
   /// This must be an O(1) operation (i.e. cannot read all of input).  Codecs that
   /// don't support this should return -1.
+  /// Return value 0 means error, the input size is too large.
   virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = nullptr) = 0;
 
   /// Must be called on codec before destructor for final cleanup.

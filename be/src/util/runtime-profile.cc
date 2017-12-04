@@ -758,7 +758,9 @@ Status RuntimeProfile::SerializeToArchiveString(stringstream* out) const {
       MakeScopeExitTrigger([&compressor]() { compressor->Close(); });
 
   vector<uint8_t> compressed_buffer;
-  compressed_buffer.resize(compressor->MaxOutputLen(serialized_buffer.size()));
+  int64_t max_compressed_size = compressor->MaxOutputLen(serialized_buffer.size());
+  DCHECK_GT(max_compressed_size, 0);
+  compressed_buffer.resize(max_compressed_size);
   int64_t result_len = compressed_buffer.size();
   uint8_t* compressed_buffer_ptr = compressed_buffer.data();
   RETURN_IF_ERROR(compressor->ProcessBlock(true, serialized_buffer.size(),

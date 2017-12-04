@@ -251,6 +251,7 @@ class DecompressorTest : public ::testing::Test {
       Codec* decompressor, int64_t input_len, uint8_t* input) {
     // Preallocated output buffers for compressor
     int64_t max_compressed_length = compressor->MaxOutputLen(input_len, input);
+    ASSERT_GT(max_compressed_length, 0);
     uint8_t* compressed = mem_pool_.Allocate(max_compressed_length);
     int64_t compressed_length = max_compressed_length;
 
@@ -439,6 +440,31 @@ TEST_F(DecompressorTest, Impala5250) {
   uint8_t* output = out_buf;
   EXPECT_OK(decompressor->ProcessBlock(true, 1, buf, &output_length, &output));
   EXPECT_EQ(output_length, 0);
+}
+
+TEST_F(DecompressorTest, LZ4Huge) {
+  // IMPALA-5987: When Lz4Compressor::MaxOutputLen() returns 0,
+  // it means that the input is too large to compress, therefore trying
+  // to compress it should fail.
+
+  // Generate a big random payload.
+  int payload_len = numeric_limits<int>::max();
+  uint8_t* payload = new uint8_t[payload_len];
+  for (int i = 0 ; i < payload_len; ++i) payload[i] = rand();
+
+  scoped_ptr<Codec> compressor;
+  EXPECT_OK(Codec::CreateCompressor(nullptr, true, impala::THdfsCompression::LZ4,
+      &compressor));
+
+  // The returned max_size is 0 because the payload is too big.
+  int64_t max_size = compressor->MaxOutputLen(payload_len);
+  ASSERT_EQ(max_size, 0);
+
+  // Trying to compress it should give an error
+  int64_t compressed_len = max_size;
+  uint8_t* compressed = new uint8_t[max_size];
+  EXPECT_ERROR(compressor->ProcessBlock(true, payload_len, payload,
+      &compressed_len, &compressed), TErrorCode::LZ4_COMPRESSION_INPUT_TOO_LARGE);
 }
 
 }
