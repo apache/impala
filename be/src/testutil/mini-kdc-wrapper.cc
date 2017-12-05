@@ -34,6 +34,7 @@ DECLARE_bool(use_kudu_kinit);
 
 DECLARE_string(keytab_file);
 DECLARE_string(principal);
+DECLARE_string(be_principal);
 DECLARE_string(krb5_conf);
 
 Status MiniKdcWrapper::StartKdc(string keytab_dir) {
@@ -79,7 +80,11 @@ Status MiniKdcWrapper::SetupAndStartMiniKDC(KerberosSwitch k) {
     // Set the appropriate flags based on how we've set up the kerberos environment.
     FLAGS_krb5_conf = strings::Substitute("$0/$1", keytab_dir, "krb5.conf");
     FLAGS_keytab_file = kt_path;
-    FLAGS_principal = strings::Substitute("$0@$1", spn_, realm_);
+
+    // We explicitly set 'principal' and 'be_principal' even though 'principal' won't be
+    // used to test IMPALA-6256.
+    FLAGS_principal = "dummy-service/host@realm";
+    FLAGS_be_principal = strings::Substitute("$0@$1", spn_, realm_);
   }
   return Status::OK();
 }
@@ -91,6 +96,7 @@ Status MiniKdcWrapper::TearDownMiniKDC(KerberosSwitch k) {
     // Clear the flags so we don't step on other tests that may run in the same process.
     FLAGS_keytab_file.clear();
     FLAGS_principal.clear();
+    FLAGS_be_principal.clear();
     FLAGS_krb5_conf.clear();
 
     // Remove test directory.

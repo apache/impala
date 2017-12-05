@@ -833,8 +833,8 @@ Status SaslAuthProvider::Start() {
     if (FLAGS_use_kudu_kinit) {
       // Starts a thread that periodically does a 'kinit'. The thread lives as long as the
       // process does.
-      KUDU_RETURN_IF_ERROR(kudu::security::InitKerberosForServer(KRB5CCNAME_PATH, false),
-          "Could not init kerberos");
+      KUDU_RETURN_IF_ERROR(kudu::security::InitKerberosForServer(principal_,
+          KRB5CCNAME_PATH, false), "Could not init kerberos");
     } else {
       Promise<Status> first_kinit;
       stringstream thread_name;
