@@ -82,7 +82,6 @@ class PhjBuilder : public DataSink {
       const std::vector<TRuntimeFilterDesc>& filters) WARN_UNUSED_RESULT;
 
   /// Implementations of DataSink interface methods.
-  virtual std::string GetName() override;
   virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) override;
   virtual Status Open(RuntimeState* state) override;
   virtual Status Send(RuntimeState* state, RowBatch* batch) override;
@@ -270,12 +269,6 @@ class PhjBuilder : public DataSink {
     // Two of the buffers must fit the maximum row.
     return spillable_buffer_size_ * (num_reserved_buffers - 2) + max_row_buffer_size_ * 2;
   }
-
- protected:
-  /// Init() function inherited from DataSink. Overridden to be a no-op for now.
-  /// TODO: Merge with InitExprsAndFilters() once this class becomes a true data sink.
-  virtual Status Init(const std::vector<TExpr>& thrift_output_exprs,
-      const TDataSink& tsink, RuntimeState* state) override;
 
  private:
   /// Create and initialize a set of hash partitions for partitioning level 'level'.

@@ -35,8 +35,8 @@ namespace impala {
 /// eventually be written into an HBase table.
 class HBaseTableSink : public DataSink {
  public:
-  HBaseTableSink(const RowDescriptor* row_desc, const TDataSink& tsink);
-  virtual std::string GetName() { return "HBaseTableSink"; }
+  HBaseTableSink(const RowDescriptor* row_desc, const TDataSink& tsink,
+      RuntimeState* state);
   virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker);
   virtual Status Send(RuntimeState* state, RowBatch* batch);
   virtual Status FlushFinal(RuntimeState* state);

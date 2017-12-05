@@ -60,11 +60,9 @@ class DataStreamSender : public DataSink {
   DataStreamSender(int sender_id, const RowDescriptor* row_desc,
       const TDataStreamSink& tsink,
       const std::vector<TPlanFragmentDestination>& destinations,
-      int per_channel_buffer_size);
+      int per_channel_buffer_size, RuntimeState* state);
 
   virtual ~DataStreamSender();
-
-  virtual std::string GetName();
 
   /// Must be called before other API calls, and before the codegen'd IR module is
   /// compiled (i.e. in an ExecNode's Prepare() function).

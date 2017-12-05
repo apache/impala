@@ -67,8 +67,9 @@ const static string& ROOT_PARTITION_KEY =
 // Send 7MB buffers to Kudu, matching a hard-coded size in Kudu (KUDU-1693).
 const static int INDIVIDUAL_BUFFER_SIZE = 7 * 1024 * 1024;
 
-KuduTableSink::KuduTableSink(const RowDescriptor* row_desc, const TDataSink& tsink)
-  : DataSink(row_desc),
+KuduTableSink::KuduTableSink(const RowDescriptor* row_desc, const TDataSink& tsink,
+    RuntimeState* state)
+  : DataSink(row_desc, "KuduTableSink", state),
     table_id_(tsink.table_sink.target_table_id),
     sink_action_(tsink.table_sink.action),
     kudu_table_sink_(tsink.table_sink.kudu_table_sink),

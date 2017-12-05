@@ -55,7 +55,8 @@ PhjBuilder::PhjBuilder(int join_node_id, TJoinOp::type join_op,
     const RowDescriptor* probe_row_desc, const RowDescriptor* build_row_desc,
     RuntimeState* state, BufferPool::ClientHandle* buffer_pool_client,
     int64_t spillable_buffer_size, int64_t max_row_buffer_size)
-  : DataSink(build_row_desc),
+  : DataSink(build_row_desc,
+        Substitute("Hash Join Builder (join_node_id=$0)", join_node_id), state),
     runtime_state_(state),
     join_node_id_(join_node_id),
     join_op_(join_op),
@@ -80,11 +81,6 @@ PhjBuilder::PhjBuilder(int join_node_id, TJoinOp::type join_op,
     process_build_batch_fn_level0_(NULL),
     insert_batch_fn_(NULL),
     insert_batch_fn_level0_(NULL) {}
-
-Status PhjBuilder::Init(const vector<TExpr>& thrift_output_exprs,
-    const TDataSink& tsink, RuntimeState* state) {
-  return Status::OK();
-}
 
 Status PhjBuilder::InitExprsAndFilters(RuntimeState* state,
     const vector<TEqJoinCondition>& eq_join_conjuncts,
@@ -112,10 +108,6 @@ Status PhjBuilder::InitExprsAndFilters(RuntimeState* state,
     filter_ctxs_.back().filter = state->filter_bank()->RegisterFilter(filter_desc, true);
   }
   return Status::OK();
-}
-
-string PhjBuilder::GetName() {
-  return Substitute("Hash Join Builder (join_node_id=$0)", join_node_id_);
 }
 
 Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {

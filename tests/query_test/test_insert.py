@@ -49,13 +49,13 @@ class TestInsertQueries(ImpalaTestSuite):
     # tables for each test case to resolve the concurrency problems.
     if cls.exploration_strategy() == 'core':
       cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
-          cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0],
+          cluster_sizes=[0], disable_codegen_options=[True, False], batch_sizes=[0],
           sync_ddl=[0]))
       cls.ImpalaTestMatrix.add_dimension(
           create_uncompressed_text_dimension(cls.get_workload()))
     else:
       cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
-          cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0, 1, 16],
+          cluster_sizes=[0], disable_codegen_options=[True, False], batch_sizes=[0, 1, 16],
           sync_ddl=[0, 1]))
       cls.ImpalaTestMatrix.add_dimension(
           ImpalaTestDimension("compression_codec", *PARQUET_CODECS));
@@ -121,6 +121,14 @@ class TestInsertQueries(ImpalaTestSuite):
   def test_insert_overwrite(self, vector):
     self.run_test_case('QueryTest/insert_overwrite', vector,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
+
+  @pytest.mark.execute_serially
+  def test_insert_bad_expr(self, vector):
+    # The test currently relies on codegen being disabled to trigger an error in
+    # the output expression of the table sink.
+    if vector.get_value('exec_option')['disable_codegen']:
+      self.run_test_case('QueryTest/insert_bad_expr', vector,
+          multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
 
 class TestInsertWideTable(ImpalaTestSuite):
   @classmethod

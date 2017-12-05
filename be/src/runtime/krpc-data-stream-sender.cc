@@ -561,8 +561,9 @@ void KrpcDataStreamSender::Channel::Teardown(RuntimeState* state) {
 
 KrpcDataStreamSender::KrpcDataStreamSender(int sender_id, const RowDescriptor* row_desc,
     const TDataStreamSink& sink, const vector<TPlanFragmentDestination>& destinations,
-    int per_channel_buffer_size)
-  : DataSink(row_desc),
+    int per_channel_buffer_size, RuntimeState* state)
+  : DataSink(row_desc,
+        Substitute("KrpcDataStreamSender (dst_id=$0)", sink.dest_node_id), state),
     sender_id_(sender_id),
     partition_type_(sink.output_partition.type),
     per_channel_buffer_size_(per_channel_buffer_size),
@@ -587,10 +588,6 @@ KrpcDataStreamSender::KrpcDataStreamSender(int sender_id, const RowDescriptor* r
     srand(reinterpret_cast<uint64_t>(this));
     random_shuffle(channels_.begin(), channels_.end());
   }
-}
-
-string KrpcDataStreamSender::GetName() {
-  return Substitute("KrpcDataStreamSender (dst_id=$0)", dest_node_id_);
 }
 
 KrpcDataStreamSender::~KrpcDataStreamSender() {

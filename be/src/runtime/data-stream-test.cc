@@ -495,7 +495,7 @@ class DataStreamTest : public testing::Test {
     VLOG_QUERY << "create sender " << sender_num;
     const TDataSink& sink = GetSink(partition_type);
     DataStreamSender sender(
-        sender_num, row_desc_, sink.stream_sink, dest_, channel_buffer_size);
+        sender_num, row_desc_, sink.stream_sink, dest_, channel_buffer_size, &state);
 
     TExprNode expr_node;
     expr_node.node_type = TExprNodeType::SLOT_REF;

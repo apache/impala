@@ -28,7 +28,8 @@
 using namespace impala;
 
 NljBuilder::NljBuilder(const RowDescriptor* row_desc, RuntimeState* state)
-  : DataSink(row_desc), build_batch_cache_(row_desc, state->batch_size()) {}
+  : DataSink(row_desc, "Nested Loop Join Builder", state),
+    build_batch_cache_(row_desc, state->batch_size()) {}
 
 Status NljBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));

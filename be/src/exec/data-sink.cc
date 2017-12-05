@@ -44,8 +44,10 @@ using strings::Substitute;
 
 namespace impala {
 
-DataSink::DataSink(const RowDescriptor* row_desc)
-  : closed_(false), row_desc_(row_desc), mem_tracker_(NULL) {}
+DataSink::DataSink(const RowDescriptor* row_desc, const string& name, RuntimeState* state)
+  : closed_(false), row_desc_(row_desc), name_(name) {
+  profile_ = RuntimeProfile::Create(state->obj_pool(), name);
+}
 
 DataSink::~DataSink() {
   DCHECK(closed_);
@@ -63,25 +65,26 @@ Status DataSink::Create(const TPlanFragmentCtx& fragment_ctx,
 
       if (FLAGS_use_krpc) {
         *sink = pool->Add(new KrpcDataStreamSender(fragment_instance_ctx.sender_id,
-            row_desc, thrift_sink.stream_sink, fragment_ctx.destinations, 16 * 1024));
+            row_desc, thrift_sink.stream_sink, fragment_ctx.destinations, 16 * 1024,
+            state));
       } else {
         // TODO: figure out good buffer size based on size of output row
         *sink = pool->Add(new DataStreamSender(fragment_instance_ctx.sender_id, row_desc,
-            thrift_sink.stream_sink, fragment_ctx.destinations, 16 * 1024));
+            thrift_sink.stream_sink, fragment_ctx.destinations, 16 * 1024, state));
       }
       break;
     case TDataSinkType::TABLE_SINK:
       if (!thrift_sink.__isset.table_sink) return Status("Missing table sink.");
       switch (thrift_sink.table_sink.type) {
         case TTableSinkType::HDFS:
-          *sink = pool->Add(new HdfsTableSink(row_desc, thrift_sink));
+          *sink = pool->Add(new HdfsTableSink(row_desc, thrift_sink, state));
           break;
         case TTableSinkType::HBASE:
-          *sink = pool->Add(new HBaseTableSink(row_desc, thrift_sink));
+          *sink = pool->Add(new HBaseTableSink(row_desc, thrift_sink, state));
           break;
         case TTableSinkType::KUDU:
           RETURN_IF_ERROR(CheckKuduAvailability());
-          *sink = pool->Add(new KuduTableSink(row_desc, thrift_sink));
+          *sink = pool->Add(new KuduTableSink(row_desc, thrift_sink, state));
           break;
         default:
           stringstream error_msg;
@@ -94,7 +97,7 @@ Status DataSink::Create(const TPlanFragmentCtx& fragment_ctx,
       }
       break;
     case TDataSinkType::PLAN_ROOT_SINK:
-      *sink = pool->Add(new PlanRootSink(row_desc));
+      *sink = pool->Add(new PlanRootSink(row_desc, state));
       break;
     default:
       stringstream error_msg;
@@ -178,12 +181,11 @@ string DataSink::OutputDmlStats(const PartitionStatusMap& stats,
 }
 
 Status DataSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
-  DCHECK(parent_mem_tracker != NULL);
-  profile_ = RuntimeProfile::Create(state->obj_pool(), GetName());
-  const string& name = GetName();
-  mem_tracker_.reset(new MemTracker(profile_, -1, name, parent_mem_tracker));
+  DCHECK(parent_mem_tracker != nullptr);
+  DCHECK(profile_ != nullptr);
+  mem_tracker_.reset(new MemTracker(profile_, -1, name_, parent_mem_tracker));
   expr_mem_tracker_.reset(
-      new MemTracker(-1, Substitute("$0 Exprs", name), mem_tracker_.get(), false));
+      new MemTracker(-1, Substitute("$0 Exprs", name_), mem_tracker_.get(), false));
   expr_perm_pool_.reset(new MemPool(expr_mem_tracker_.get()));
   expr_results_pool_.reset(new MemPool(expr_mem_tracker_.get()));
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(output_exprs_, state, state->obj_pool(),

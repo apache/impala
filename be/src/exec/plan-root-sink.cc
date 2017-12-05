@@ -32,9 +32,8 @@ using boost::mutex;
 
 namespace impala {
 
-const string PlanRootSink::NAME = "PLAN_ROOT_SINK";
-
-PlanRootSink::PlanRootSink(const RowDescriptor* row_desc) : DataSink(row_desc) {}
+PlanRootSink::PlanRootSink(const RowDescriptor* row_desc, RuntimeState* state)
+  : DataSink(row_desc, "PLAN_ROOT_SINK", state) {}
 
 namespace {
 

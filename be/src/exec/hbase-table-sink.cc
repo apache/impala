@@ -34,8 +34,9 @@ namespace impala {
 const static string& ROOT_PARTITION_KEY =
     g_ImpalaInternalService_constants.ROOT_PARTITION_KEY;
 
-HBaseTableSink::HBaseTableSink(const RowDescriptor* row_desc, const TDataSink& tsink)
-  : DataSink(row_desc),
+HBaseTableSink::HBaseTableSink(const RowDescriptor* row_desc, const TDataSink& tsink,
+    RuntimeState* state)
+  : DataSink(row_desc, "HBaseTableSink", state),
     table_id_(tsink.table_sink.target_table_id),
     table_desc_(NULL),
     hbase_table_writer_(NULL) {
