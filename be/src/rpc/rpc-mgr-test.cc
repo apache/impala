@@ -191,11 +191,11 @@ class ScanMemServiceImpl : public ScanMemServiceIf {
   }
 };
 
+// TODO: Disabled 'USE_KUDU_KERBEROS' and 'USE_IMPALA_KERBEROS' due to IMPALA-6268.
+// Reenable after fixing.
 INSTANTIATE_TEST_CASE_P(KerberosOnAndOff,
                         RpcMgrKerberizedTest,
-                        ::testing::Values(KERBEROS_OFF,
-                                          USE_KUDU_KERBEROS,
-                                          USE_IMPALA_KERBEROS));
+                        ::testing::Values(KERBEROS_OFF));
 
 TEST_P(RpcMgrKerberizedTest, MultipleServices) {
   // Test that a service can be started, and will respond to requests.
