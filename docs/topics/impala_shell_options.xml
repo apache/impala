@@ -278,6 +278,27 @@ under the License.
                 </p>
               </entry>
             </row>
+            <row rev="2.11.0 IMPALA-5736">
+              <entry>
+                <p>
+                  --query_option="<varname>option</varname>=<varname>value</varname>"
+                  -Q "<varname>option</varname>=<varname>value</varname>"
+                </p>
+              </entry>
+              <entry rev="2.0.0">
+                <p>
+                 Header line <codeph>[impala.query_options]</codeph>,
+                 followed on subsequent lines by <varname>option</varname>=<varname>value</varname>, one option per line.
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  Sets default query options for an invocation of the <cmdname>impala-shell</cmdname> command.
+                  To set multiple query options at once, use more than one instance of this command-line option.
+                  The query option names are not case-sensitive.
+                </p>
+              </entry>
+            </row>
             <row>
               <entry>
                 <p>
@@ -594,9 +615,14 @@ output_file=/home/tester1/benchmark_results.csv
 show_profiles=true
 </codeblock>
 
-      <p>
+      <p rev="2.11.0 IMPALA-5736">
         The following example shows a configuration file that connects to a specific remote Impala node, runs a
-        single query within a particular database, then exits. You would typically use this kind of single-purpose
+        single query within a particular database, then exits. Any query options predefined under the
+        <codeph>[impala.query_options]</codeph> section in the configuration file take effect during the session.
+      </p>
+
+      <p>
+        You would typically use this kind of single-purpose
         configuration setting with the <cmdname>impala-shell</cmdname> command-line option
         <codeph>--config_file=<varname>path_to_config_file</varname></codeph>, to easily select between many
         predefined queries that could be run against different databases, hosts, or even different clusters. To run
@@ -609,6 +635,9 @@ impalad=impala-test-node1.example.com
 default_db=site_stats
 # Issue a predefined query and immediately exit.
 query=select count(*) from web_traffic where event_date = trunc(now(),'dd')
+
+<ph rev="2.11.0 IMPALA-5736">[impala.query_options]
+mem_limit=32g</ph>
 </codeblock>
     </conbody>
   </concept>

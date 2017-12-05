@@ -122,6 +122,17 @@ under the License.
     </p>
 
     <p>
+      <b>Setting query options during impala-shell invocation:</b>
+    </p>
+
+    <p rev="2.11.0 IMPALA-5736">
+      In <keyword keyref="impala211_full"/> and higher, you can use one or more command-line options
+      of the form <codeph>--query_option=<varname>option</varname>=<varname>value</varname></codeph>
+      when running the <cmdname>impala-shell</cmdname> command. The corresponding query option settings
+      take effect for that <cmdname>impala-shell</cmdname> session.
+    </p>
+
+    <p>
       <b>User-specified substitution variables:</b>
     </p>
 

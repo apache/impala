@@ -61,6 +61,12 @@ under the License.
         <codeph>SET</codeph> statement. Formerly, <codeph>SET</codeph> was only available as a command within the
         <cmdname>impala-shell</cmdname> interpreter.
       </p>
+      <p rev="2.11.0">
+        In <keyword keyref="impala211_full"/> and later, you can set query options for an <cmdname>impala-shell</cmdname> session
+        by specifying one or more command-line arguments of the form
+        <codeph>--query_option=<varname>option</varname>=<varname>value</varname></codeph>.
+        See <xref keyref="shell_options"/> for details.
+      </p>
     </note>
 
 <!-- This is the list including defaults from the pre-release 1.2 impala-shell:
