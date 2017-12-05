@@ -175,6 +175,7 @@ class ImpalaShell(object, cmd.Cmd):
     self._populate_command_list()
 
     self.imp_client = None;
+    self.orig_cmd = None
 
     # Tracks query handle of the last query executed. Used by the 'profile' command.
     self.last_query_handle = None;
@@ -300,6 +301,18 @@ class ImpalaShell(object, cmd.Cmd):
     for x in self.VALID_SHELL_OPTIONS:
       print "\t%s: %s" % (x, self.__dict__[self.VALID_SHELL_OPTIONS[x][1]])
 
+  def _create_beeswax_query(self, args):
+    """Original command should be stored before running the method. The method is usually
+    used in do_* methods and the command is kept at precmd()."""
+    command = self.orig_cmd
+    self.orig_cmd = None
+    if not command:
+      print_to_stderr("Unexpected error: Failed to execute query due to command "\
+                      "is missing")
+      sys.exit(1)
+    return self.imp_client.create_beeswax_query("%s %s" % (command, args),
+                                                 self.set_query_options)
+
   def do_shell(self, args):
     """Run a command on the shell
     Usage: shell <cmd>
@@ -323,19 +336,16 @@ class ImpalaShell(object, cmd.Cmd):
     return regexp.sub(ImpalaShell.COMMENTS_BEFORE_SET_REPLACEMENT, line, 1)
 
   def sanitise_input(self, args):
-    """Convert the command to lower case, so it's recognized"""
     # A command terminated by a semi-colon is legal. Check for the trailing
     # semi-colons and strip them from the end of the command.
     if not self.interactive:
       # Strip all the non-interactive commands of the delimiter.
       args = self._remove_comments_before_set(args)
       tokens = args.strip().split(' ')
-      tokens[0] = tokens[0].lower()
       return ' '.join(tokens).rstrip(ImpalaShell.CMD_DELIM)
     # Handle EOF if input is interactive
     tokens = args.strip().split(' ')
-    tokens[0] = tokens[0].lower()
-    if tokens[0] == 'eof':
+    if tokens[0].lower() == 'eof':
       if not self.partial_cmd:
         # The first token is the command.
         # If it's EOF, call do_quit()
@@ -350,14 +360,9 @@ class ImpalaShell(object, cmd.Cmd):
         # been cancelled.
         print '\n'
         return str()
-    # The first token is converted into lower case to route it to the
-    # appropriate command handler. This only applies to the first line of user input.
-    # Modifying tokens in subsequent lines may change the semantics of the command,
-    # so do not modify the text.
     args = self._check_for_command_completion(args)
     args = self._remove_comments_before_set(args)
     tokens = args.strip().split(' ')
-    tokens[0] = tokens[0].lower()
     args = ' '.join(tokens).strip()
     return args.rstrip(ImpalaShell.CMD_DELIM)
 
@@ -561,7 +566,29 @@ class ImpalaShell(object, cmd.Cmd):
     if line == None:
       return CmdStatus.ERROR
     else:
-      return cmd.Cmd.onecmd(self, line)
+      # This code is based on the code from the standard Python library package cmd.py:
+      # https://github.com/python/cpython/blob/master/Lib/cmd.py#L192
+      # One change is lowering command before getting a function. The lowering
+      # is necessary to find a proper function and here is a right place
+      # because the lowering command in front of the finding can avoid a
+      # side effect.
+      command, arg, line = self.parseline(line)
+      if not line:
+        return self.emptyline()
+      if command is None:
+        return self.default(line)
+      self.lastcmd = line
+      if line == 'EOF' :
+        self.lastcmd = ''
+      if command == '':
+        return self.default(line)
+      else:
+        try:
+          func = getattr(self, 'do_' + command.lower())
+          self.orig_cmd = command
+        except AttributeError:
+          return self.default(line)
+        return func(arg)
 
   def postcmd(self, status, args):
     # status conveys to shell how the shell should continue execution
@@ -843,25 +870,21 @@ class ImpalaShell(object, cmd.Cmd):
       return db_table_name
 
   def do_alter(self, args):
-    query = self.imp_client.create_beeswax_query("alter %s" % args,
-                                                 self.set_query_options)
+    query = self._create_beeswax_query(args)
     return self._execute_stmt(query)
 
   def do_create(self, args):
     # We want to print the webserver link only for CTAS queries.
     print_web_link = "select" in args
-    query = self.imp_client.create_beeswax_query("create %s" % args,
-                                                 self.set_query_options)
+    query = self._create_beeswax_query(args)
     return self._execute_stmt(query, print_web_link=print_web_link)
 
   def do_drop(self, args):
-    query = self.imp_client.create_beeswax_query("drop %s" % args,
-                                                 self.set_query_options)
+    query = self._create_beeswax_query(args)
     return self._execute_stmt(query)
 
   def do_load(self, args):
-    query = self.imp_client.create_beeswax_query("load %s" % args,
-                                                 self.set_query_options)
+    query = self._create_beeswax_query(args)
     return self._execute_stmt(query)
 
   def do_profile(self, args):
@@ -877,8 +900,7 @@ class ImpalaShell(object, cmd.Cmd):
 
   def do_select(self, args):
     """Executes a SELECT... query, fetching all rows"""
-    query = self.imp_client.create_beeswax_query("select %s" % args,
-                                                 self.set_query_options)
+    query = self._create_beeswax_query(args)
     return self._execute_stmt(query, print_web_link=True)
 
   def do_compute(self, args):
@@ -886,8 +908,7 @@ class ImpalaShell(object, cmd.Cmd):
     Impala shell cannot get child query handle so it cannot
     query live progress for COMPUTE STATS query. Disable live
     progress/summary callback for COMPUTE STATS query."""
-    query = self.imp_client.create_beeswax_query("compute %s" % args,
-                                                 self.set_query_options)
+    query = self._create_beeswax_query(args)
     (prev_print_progress, prev_print_summary) = self.print_progress, self.print_summary
     (self.print_progress, self.print_summary) = False, False;
     try:
@@ -1085,14 +1106,12 @@ class ImpalaShell(object, cmd.Cmd):
 
   def do_values(self, args):
     """Executes a VALUES(...) query, fetching all rows"""
-    query = self.imp_client.create_beeswax_query("values %s" % args,
-                                                 self.set_query_options)
+    query = self._create_beeswax_query(args)
     return self._execute_stmt(query)
 
   def do_with(self, args):
     """Executes a query with a WITH clause, fetching all rows"""
-    query = self.imp_client.create_beeswax_query("with %s" % args,
-                                                 self.set_query_options)
+    query = self._create_beeswax_query(args)
     # Set posix=True and add "'" to escaped quotes
     # to deal with escaped quotes in string literals
     lexer = shlex.shlex(query.query.lstrip(), posix=True)
@@ -1106,8 +1125,7 @@ class ImpalaShell(object, cmd.Cmd):
 
   def do_use(self, args):
     """Executes a USE... query"""
-    query = self.imp_client.create_beeswax_query("use %s" % args,
-                                                 self.set_query_options)
+    query = self._create_beeswax_query(args)
     if self._execute_stmt(query) is CmdStatus.SUCCESS:
       self.current_db = args
     else:
@@ -1115,41 +1133,41 @@ class ImpalaShell(object, cmd.Cmd):
 
   def do_show(self, args):
     """Executes a SHOW... query, fetching all rows"""
-    query = self.imp_client.create_beeswax_query("show %s" % args,
-                                                 self.set_query_options)
+    query = self._create_beeswax_query(args)
     return self._execute_stmt(query)
 
   def do_describe(self, args):
     """Executes a DESCRIBE... query, fetching all rows"""
-    query = self.imp_client.create_beeswax_query("describe %s" % args,
-                                                 self.set_query_options)
+    # original command should be overridden because the server cannot
+    # recognize "desc" as a keyword. Thus, given command should be
+    # replaced with "describe" here.
+    self.orig_cmd = "describe"
+    query = self._create_beeswax_query(args)
     return self._execute_stmt(query)
 
   def do_desc(self, args):
     return self.do_describe(args)
 
-  def __do_dml(self, stmt, args):
+  def __do_dml(self, args):
     """Executes a DML query"""
-    query = self.imp_client.create_beeswax_query("%s %s" % (stmt, args),
-                                                 self.set_query_options)
+    query = self._create_beeswax_query(args)
     return self._execute_stmt(query, is_dml=True, print_web_link=True)
 
   def do_upsert(self, args):
-    return self.__do_dml("upsert", args)
+    return self.__do_dml(args)
 
   def do_update(self, args):
-    return self.__do_dml("update", args)
+    return self.__do_dml(args)
 
   def do_delete(self, args):
-    return self.__do_dml("delete", args)
+    return self.__do_dml(args)
 
   def do_insert(self, args):
-    return self.__do_dml("insert", args)
+    return self.__do_dml(args)
 
   def do_explain(self, args):
     """Explain the query execution plan"""
-    query = self.imp_client.create_beeswax_query("explain %s" % args,
-                                                 self.set_query_options)
+    query = self._create_beeswax_query(args)
     return self._execute_stmt(query)
 
   def do_history(self, args):

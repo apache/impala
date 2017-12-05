@@ -308,11 +308,11 @@ class TestImpalaShellInteractive(object):
       os.chdir("%s/tests/shell/" % os.environ['IMPALA_HOME'])
       # IMPALA-5416: Test that a command following 'source' won't be run twice.
       result = run_impala_shell_interactive("source shell.cmds;select \"second command\";")
-      assert "Query: use FUNCTIONAL" in result.stderr
-      assert "Query: show TABLES" in result.stderr
+      assert "Query: USE FUNCTIONAL" in result.stderr
+      assert "Query: SHOW TABLES" in result.stderr
       assert "alltypes" in result.stdout
       # This is from shell2.cmds, the result of sourcing a file from a sourced file.
-      assert "select VERSION()" in result.stderr
+      assert "SELECT VERSION()" in result.stderr
       assert "version()" in result.stdout
       assert len(re.findall("'second command'", result.stdout)) == 1
       # IMPALA-5416: Test that two source commands on a line won't crash the shell.
@@ -325,13 +325,13 @@ class TestImpalaShellInteractive(object):
   def test_source_file_with_errors(self):
     full_path = "%s/tests/shell/shell_error.cmds" % os.environ['IMPALA_HOME']
     result = run_impala_shell_interactive("source %s;" % full_path)
-    assert "Could not execute command: use UNKNOWN_DATABASE" in result.stderr
-    assert "Query: use FUNCTIONAL" not in result.stderr
+    assert "Could not execute command: USE UNKNOWN_DATABASE" in result.stderr
+    assert "Query: USE FUNCTIONAL" not in result.stderr
 
     result = run_impala_shell_interactive("source %s;" % full_path, '-c')
-    assert "Could not execute command: use UNKNOWN_DATABASE" in result.stderr
-    assert "Query: use FUNCTIONAL" in result.stderr
-    assert "Query: show TABLES" in result.stderr
+    assert "Could not execute command: USE UNKNOWN_DATABASE" in result.stderr
+    assert "Query: USE FUNCTIONAL" in result.stderr
+    assert "Query: SHOW TABLES" in result.stderr
     assert "alltypes" in result.stdout
 
   @pytest.mark.execute_serially
@@ -389,6 +389,50 @@ class TestImpalaShellInteractive(object):
     assert "SUPPORT_START_OVER" in advanced_part
     assert "DEBUG_ACTION" in development_part
     assert "ABORT_ON_DEFAULT_LIMIT_EXCEEDED" in result.stdout[deprecated_part_start_idx:]
+
+  def check_command_case_sensitivity(self, command, expected):
+    shell = ImpalaShell()
+    shell.send_cmd(command)
+    assert expected in shell.get_result().stderr
+
+  @pytest.mark.execute_serially
+  def test_unexpected_conversion_for_literal_string_to_lowercase(self):
+    # IMPALA-4664: Impala shell can accidentally convert certain literal
+    # strings to lowercase. Impala shell splits each command into tokens
+    # and then converts the first token to lowercase to figure out how it
+    # should execute the command. The splitting is done by spaces only.
+    # Thus, if the user types a TAB after the SELECT, the first token after
+    # the split becomes the SELECT plus whatever comes after it.
+    result = run_impala_shell_interactive("select'MUST_HAVE_UPPER_STRING'")
+    assert re.search('MUST_HAVE_UPPER_STRING', result.stdout)
+    result = run_impala_shell_interactive("select\t'MUST_HAVE_UPPER_STRING'")
+    assert re.search('MUST_HAVE_UPPER_STRING', result.stdout)
+    result = run_impala_shell_interactive("select\n'MUST_HAVE_UPPER_STRING'")
+    assert re.search('MUST_HAVE_UPPER_STRING', result.stdout)
+
+  @pytest.mark.execute_serially
+  def test_case_sensitive_command(self):
+    # IMPALA-2640: Make a given command case-sensitive
+    cwd = os.getcwd()
+    try:
+      self.check_command_case_sensitivity("sElEcT VERSION()", "Query: sElEcT")
+      self.check_command_case_sensitivity("sEt VaR:FoO=bOo", "Variable FOO")
+      self.check_command_case_sensitivity("sHoW tables", "Query: sHoW")
+      # Change working dir so that SOURCE command in shell_case_sensitive.cmds can
+      # find shell_case_sensitive2.cmds.
+      os.chdir("%s/tests/shell/" % os.environ['IMPALA_HOME'])
+      result = run_impala_shell_interactive(
+        "sOuRcE shell_case_sensitive.cmds; SeLeCt 'second command'")
+      print result.stderr
+      assert "Query: uSe FUNCTIONAL" in result.stderr
+      assert "Query: ShOw TABLES" in result.stderr
+      assert "alltypes" in result.stdout
+      # This is from shell_case_sensitive2.cmds, the result of sourcing a file
+      # from a sourced file.
+      print result.stderr
+      assert "SeLeCt 'second command'" in result.stderr
+    finally:
+      os.chdir(cwd)
 
 def run_impala_shell_interactive(input_lines, shell_args=None):
   """Runs a command in the Impala shell interactively."""
