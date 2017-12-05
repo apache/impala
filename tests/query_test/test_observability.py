@@ -17,6 +17,9 @@
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
+from tests.common.impala_cluster import ImpalaCluster
+import logging
+import time
 
 class TestObservability(ImpalaTestSuite):
   @classmethod
@@ -128,3 +131,47 @@ class TestObservability(ImpalaTestSuite):
     assert results.runtime_profile.count("HASH_JOIN_NODE") == 2
     assert results.runtime_profile.count("AGGREGATION_NODE") == 2
     assert results.runtime_profile.count("PLAN_ROOT_SINK") == 2
+
+  def test_query_profile_thrift_timestamps(self):
+    """Test that the query profile start and end time date-time strings have
+    nanosecond precision. Nanosecond precision is expected by management API clients
+    that consume Impala debug webpages."""
+    query = "select sleep(1000)"
+    handle = self.client.execute_async(query)
+    query_id = handle.get_handle().id
+    results = self.client.fetch(query, handle)
+    self.client.close()
+
+    start_time_sub_sec_str = ""
+    end_time_sub_sec_str = ""
+    start_time = ""
+    end_time = ""
+
+    MAX_RETRIES = 60
+    for retries in xrange(MAX_RETRIES):
+      tree = self.impalad_test_service.get_thrift_profile(query_id)
+
+      if tree is None:
+        continue
+      # tree.nodes[1] corresponds to ClientRequestState::summary_profile_
+      # See be/src/service/client-request-state.[h|cc].
+      start_time = tree.nodes[1].info_strings["Start Time"]
+      end_time = tree.nodes[1].info_strings["End Time"]
+      # Start and End Times are of the form "2017-12-07 22:26:52.167711000"
+      start_time_sub_sec_str = start_time.split('.')[-1]
+      end_time_sub_sec_str = end_time.split('.')[-1]
+      if len(end_time_sub_sec_str) == 0:
+        logging.info('end_time_sub_sec_str hasn\'t shown up yet, retries=%d', retries)
+        time.sleep(1)
+        continue
+      assert len(end_time_sub_sec_str) == 9, end_time
+      assert len(start_time_sub_sec_str) == 9, start_time
+      return True
+
+    # If we're here, we didn't get the final thrift profile from the debug web page.
+    # This could happen due to heavy system load. The test is then inconclusive.
+    # Log a message and fail this run.
+    dbg_str = 'Debug thrift profile for query ' + str(query_id) + ' not available in '
+    dbg_str += str(MAX_RETRIES) + ' seconds, '
+    dbg_str += '(' + start_time + ', ' + end_time + ').'
+    assert False, dgb_str
