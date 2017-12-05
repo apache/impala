@@ -112,8 +112,7 @@ INT, INT, STRING
 ====
 ---- QUERY
 # LHS null, Predicate IN, RHS not-empty with match. Uncorrelated. Expect no results.
-SELECT count(*) FROM alltypessmall a
-WHERE NULL IN (SELECT d FROM nulltable);
+SELECT count(*) FROM alltypessmall a WHERE NULL IN (SELECT d FROM nulltable);
 ---- RESULTS
 0
 ---- TYPES
@@ -215,7 +214,7 @@ INT, INT, STRING
 ====
 ---- QUERY
 # LHS is non-null, Predicate is IN, RHS is an aggregate.
-SELECT count(*) FROM alltypessmall a WHERE 0 IN (SELECT MIN(int_col) from tinyinttable);
+SELECT count(*) FROM alltypessmall a WHERE 0 IN (SELECT MIN(int_col) from alltypestiny);
 ---- RESULTS
 100
 ---- TYPES
@@ -223,7 +222,7 @@ BIGINT
 ====
 ---- QUERY
 # LHS is non-null, Predicate is NOT IN, RHS is an aggregate.
-SELECT a.id FROM alltypessmall a WHERE 0 NOT IN (SELECT MIN(int_col) from tinyinttable);
+SELECT a.id FROM alltypessmall a WHERE 0 NOT IN (SELECT MIN(int_col) from alltypestiny);
 ---- RESULTS
 ---- TYPES
 INT
@@ -245,14 +244,18 @@ INT
 ====
 ---- QUERY
 # LHS is null, Predicate is NOT IN, RHS is group by without aggregation. Expect no results.
-SELECT a.id from alltypessmall a where NULL NOT IN (SELECT d from nulltable group by d);
+# Note: using functional.nulltable explicitly to avoid inconsistent results due to
+# different null handling across formats (specifically, hbase). See IMPALA-6276.
+SELECT a.id from alltypessmall a where
+NULL NOT IN (SELECT d from functional.nulltable group by d);
 ---- RESULTS
 ---- TYPES
 INT
 ====
 ---- QUERY
 # LHS is non-null, Predicate is IN, RHS is select list is "*".
-SELECT a.id FROM alltypessmall a WHERE 1 IN (SELECT * FROM tinyinttable) and a.id < 3;
+SELECT a.id FROM alltypessmall a WHERE
+1 IN (SELECT * FROM (select int_col from alltypestiny) tmp) and a.id < 3;
 ---- RESULTS
 0
 1
@@ -262,7 +265,8 @@ INT
 ====
 ---- QUERY
 # LHS is non-null, Predicate is NOT IN, RHS is select list is "*".
-SELECT a.id FROM alltypessmall a WHERE 1 NOT IN (SELECT * FROM tinyinttable);
+SELECT a.id FROM alltypessmall a WHERE
+1 NOT IN (SELECT * FROM (select int_col from alltypestiny) tmp);
 ---- RESULTS
 ---- TYPES
 INT
@@ -289,7 +293,8 @@ BIGINT
 ---- QUERY
 # LHS is non-null, Predicate is IN, RHS includes nested subqueries.
 SELECT a.id FROM alltypessmall a WHERE
-1 IN (SELECT int_col FROM alltypessmall WHERE -10000 IN (SELECT * FROM tinyinttable));
+1 IN (SELECT int_col FROM alltypessmall WHERE
+-10000 IN (SELECT * FROM (select int_col from alltypestiny) tmp));
 ---- RESULTS
 ---- TYPES
 INT
