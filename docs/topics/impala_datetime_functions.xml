@@ -389,6 +389,102 @@ select date_sub(cast('2016-05-31' as timestamp), interval 1 months) as 'april_31
 
       </dlentry>
 
+      <dlentry rev="2.11.0 IMPALA-5317" id="date_trunc">
+
+        <dt>
+          <codeph>date_trunc(string unit, timestamp)</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="hidden">date_trunc() function</indexterm>
+          <b>Purpose:</b> Truncates a <codeph>TIMESTAMP</codeph> value to the specified precision.
+          <p>
+            <b>Unit argument:</b> The <codeph>unit</codeph> argument value for truncating
+            <codeph>TIMESTAMP</codeph> values is not case-sensitive. This argument string
+            can be one of:
+          </p>
+          <ul>
+            <li>microseconds</li>
+            <li>milliseconds</li>
+            <li>second</li>
+            <li>minute</li>
+            <li>hour</li>
+            <li>day</li>
+            <li>week</li>
+            <li>month</li>
+            <li>year</li>
+            <li>decade</li>
+            <li>century</li>
+            <li>millennium</li>
+          </ul>
+          <p>
+            For example, calling <codeph>date_trunc('hour',ts)</codeph> truncates
+            <codeph>ts</codeph> to the beginning of the corresponding hour, with
+            all minutes, seconds, milliseconds, and so on set to zero. Calling
+            <codeph>date_trunc('milliseconds',ts)</codeph> truncates
+            <codeph>ts</codeph> to the beginning of the corresponding millisecond,
+            with all microseconds and nanoseconds set to zero.
+          </p>
+          <note>
+            The sub-second units are specified in plural form. All units representing
+            one second or more are specified in singular form.
+          </note>
+          <p conref="../shared/impala_common.xml#common/added_in_2110"/>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            Although this function is similar to calling <codeph>TRUNC()</codeph>
+            with a <codeph>TIMESTAMP</codeph> argument, the order of arguments
+            and the recognized units are different between <codeph>TRUNC()</codeph>
+            and <codeph>DATE_TRUNC()</codeph>. Therefore, these functions are not
+            interchangeable.
+          </p>
+          <p>
+            This function is typically used in <codeph>GROUP BY</codeph>
+            queries to aggregate results from the same hour, day, week, month, quarter, and so on.
+            You can also use this function in an <codeph>INSERT ... SELECT</codeph> into a
+            partitioned table to divide <codeph>TIMESTAMP</codeph> values into the correct partition.
+          </p>
+          <p>
+            Because the return value is a <codeph>TIMESTAMP</codeph>, if you cast the result of
+            <codeph>DATE_TRUNC()</codeph> to <codeph>STRING</codeph>, you will often see zeroed-out portions such as
+            <codeph>00:00:00</codeph> in the time field. If you only need the individual units such as hour, day,
+            month, or year, use the <codeph>EXTRACT()</codeph> function instead. If you need the individual units
+            from a truncated <codeph>TIMESTAMP</codeph> value, run the <codeph>TRUNCATE()</codeph> function on the
+            original value, then run <codeph>EXTRACT()</codeph> on the result.
+          </p>
+          <p>
+            <b>Return type:</b> <codeph>timestamp</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            The following examples show how to call <codeph>DATE_TRUNC()</codeph> with different unit values:
+          </p>
+<codeblock>
+select now(), date_trunc('second', now());
++-------------------------------+-----------------------------------+
+| now()                         | date_trunc('second', now())       |
++-------------------------------+-----------------------------------+
+| 2017-12-05 13:58:04.565403000 | 2017-12-05 13:58:04               |
++-------------------------------+-----------------------------------+
+
+select now(), date_trunc('hour', now());
++-------------------------------+---------------------------+
+| now()                         | date_trunc('hour', now()) |
++-------------------------------+---------------------------+
+| 2017-12-05 13:59:01.884459000 | 2017-12-05 13:00:00       |
++-------------------------------+---------------------------+
+
+select now(), date_trunc('millennium', now());
++-------------------------------+---------------------------------+
+| now()                         | date_trunc('millennium', now()) |
++-------------------------------+---------------------------------+
+| 2017-12-05 14:00:30.296812000 | 2000-01-01 00:00:00             |
++-------------------------------+---------------------------------+
+</codeblock>
+        </dd>
+
+      </dlentry>
+
       <dlentry id="datediff">
 
         <dt>

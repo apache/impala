@@ -2787,7 +2787,10 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
         each value.
       </p>
 
-      <p rev="2.9.0" id="added_in_2100">
+      <p rev="2.11.0" id="added_in_2110">
+        <b>Added in:</b> <keyword keyref="impala2_11_0"/>
+      </p>
+      <p rev="2.10.0" id="added_in_2100">
         <b>Added in:</b> <keyword keyref="impala2100"/>
       </p>
       <p rev="2.9.0" id="added_in_290">
