@@ -57,6 +57,28 @@ class TupleRow;
 ///      from processing the bytes. This is the consumer.
 ///   3. The scan node/main thread which calls into the context to trigger cancellation
 ///      or other end of stream conditions.
+///
+/// Memory management
+/// =================
+/// Pointers into memory returned from stream methods remain valid until either
+/// ReleaseCompletedResources() is called or an operation advances the stream's read
+/// offset past the end of the memory .
+/// E.g. if ReadBytes(peek=false) is called, the memory returned is invalidated when
+/// ReadBytes(), SkipBytes(), ReadVint(), etc is called. If the memory is obtained by
+/// a "peeking" operation, then the memory returned remains valid until the read offset
+/// in the stream is advanced past the end of the memory. E.g. if
+/// ReadBuffer(n, peek=true) is called, then the memory remains valid if SkipBytes(n)
+/// is called the first time, but not if SkipBytes() is called again to advance further.
+///
+/// Each stream only requires a single I/O buffer to make progress on reading through the
+/// stream. Additional I/O buffers allow the I/O manager to read ahead in the scan range.
+/// The scanner context also allocates memory from a MemPool for reads that straddle I/O
+/// buffers (e.g. a small read at the boundary of I/O buffers or a read larger than
+/// a single I/O buffer). The amount of memory allocated from the MemPool is determined
+/// by the maximum buffer size read from the stream, plus some overhead. E.g.
+/// ReadBytes(length=50KB) requires allocating a 50KB buffer from the MemPool if the
+/// read straddles a buffer boundary.
+///
 /// TODO: Some of the synchronization mechanisms such as cancelled() can be removed
 /// once the legacy hdfs scan node has been removed.
 class ScannerContext {
@@ -93,7 +115,7 @@ class ScannerContext {
     /// Note that this will return bytes past the end of the scan range until the end of
     /// the file.
     bool GetBytes(int64_t requested_len, uint8_t** buffer, int64_t* out_len,
-        Status* status, bool peek = false);
+        Status* status, bool peek = false) WARN_UNUSED_RESULT;
 
     /// Gets the bytes from the first available buffer within the scan range. This may be
     /// the boundary buffer used to stitch IO buffers together.
@@ -117,11 +139,13 @@ class ScannerContext {
     /// Return the number of bytes left in the range for this stream.
     int64_t bytes_left() { return scan_range_->len() - total_bytes_returned_; }
 
-    /// If true, all bytes in this scan range have been returned or we have reached eof
-    /// (the scan range could be longer than the file).
+    /// If true, all bytes in this scan range have been returned from this ScannerContext
+    /// to callers or we hit eof before reaching the end of the scan range. Callers can
+    /// continue to call Read*()/Get*()/Skip*() methods on the stream until eof() is true.
     bool eosr() const { return total_bytes_returned_ >= scan_range_->len() || eof(); }
 
-    /// If true, the stream has reached the end of the file.
+    /// If true, the stream has reached the end of the file. After this is true, any
+    /// Read*()/Get*()/Skip*() methods will not succeed.
     bool eof() const { return file_offset() == file_len_; }
 
     const char* filename() { return scan_range_->file(); }
@@ -134,43 +158,56 @@ class ScannerContext {
     /// Returns the total number of bytes returned
     int64_t total_bytes_returned() { return total_bytes_returned_; }
 
-    /// Read a Boolean primitive value written using Java serialization.
+    /// Read a Boolean primitive value written using Java serialization. Returns true
+    /// on success, otherwise returns false and sets 'status' to indicate the error.
     /// Equivalent to java.io.DataInput.readBoolean()
-    bool ReadBoolean(bool* boolean, Status*);
+    bool ReadBoolean(bool* boolean, Status* status) WARN_UNUSED_RESULT;
 
-    /// Read an Integer primitive value written using Java serialization.
+    /// Read an Integer primitive value written using Java serialization. Returns true
+    /// on success, otherwise returns false and sets 'status' to indicate the error.
     /// Equivalent to java.io.DataInput.readInt()
-    bool ReadInt(int32_t* val, Status*, bool peek = false);
+    bool ReadInt(int32_t* val, Status* status, bool peek = false) WARN_UNUSED_RESULT;
 
-    /// Read a variable-length Long value written using Writable serialization.
+    /// Read a variable-length Long value written using Writable serialization. Returns
+    /// true on success, otherwise returns false and sets 'status' to indicate the error.
     /// Ref: org.apache.hadoop.io.WritableUtils.readVLong()
-    bool ReadVLong(int64_t* val, Status*);
+    bool ReadVLong(int64_t* val, Status* status) WARN_UNUSED_RESULT;
 
-    /// Read a variable length Integer value written using Writable serialization.
+    /// Read a variable length Integer value written using Writable serialization. Returns
+    /// true on success, otherwise returns false and sets 'status' to indicate the error.
     /// Ref: org.apache.hadoop.io.WritableUtils.readVInt()
-    bool ReadVInt(int32_t* val, Status*);
+    bool ReadVInt(int32_t* val, Status* status) WARN_UNUSED_RESULT;
 
-    /// Read a zigzag encoded long
-    bool ReadZLong(int64_t* val, Status*);
+    /// Read a zigzag encoded long. Returns true on success, otherwise returns false and
+    /// sets 'status' to indicate the error.
+    bool ReadZLong(int64_t* val, Status* status) WARN_UNUSED_RESULT;
 
-    /// Skip over the next length bytes in the specified HDFS file.
-    bool SkipBytes(int64_t length, Status*);
+    /// Skip over the next length bytes in the specified HDFS file. Returns true on
+    /// success, otherwise returns false and sets 'status' to indicate the error.
+    bool SkipBytes(int64_t length, Status* status) WARN_UNUSED_RESULT;
 
     /// Read length bytes into the supplied buffer.  The returned buffer is owned
-    /// by this object.
-    bool ReadBytes(int64_t length, uint8_t** buf, Status*, bool peek = false);
+    /// by this object. Returns true on success, otherwise returns false and sets 'status'
+    /// to indicate the error.
+    bool ReadBytes(int64_t length, uint8_t** buf, Status* status, bool peek = false)
+        WARN_UNUSED_RESULT;
 
-    /// Read a Writable Text value from the supplied file.
+    /// Read a Writable Text value from the supplied file. Returns true on success,
+    /// otherwise returns false and sets 'status' to indicate the error.
     /// Ref: org.apache.hadoop.io.WritableUtils.readString()
     /// The returned buffer is owned by this object.
-    bool ReadText(uint8_t** buf, int64_t* length, Status*);
+    bool ReadText(uint8_t** buf, int64_t* length, Status* status) WARN_UNUSED_RESULT;
 
-    /// Skip this text object.
-    bool SkipText(Status*);
+    /// Skip this text object. Returns true on success, otherwise returns false and
+    /// sets 'status'
+    bool SkipText(Status* status) WARN_UNUSED_RESULT;
 
-    /// Release all completed resources in the context, i.e. I/O and boundary buffers
-    /// that the caller has finished reading. If 'done' is true all resources are
-    /// freed, even if the caller has not read that data yet.
+    /// Release completed resources, e.g. the last buffer if the current read position is
+    /// at the end of the buffer. If 'done' is true all resources are freed, even if the
+    /// caller has not read that data yet. After calling this function, any memory
+    /// returned from previous Read*()/Get*() functions is invalid to reference.
+    ///
+    /// Also see the ScannerContext::ReleaseCompletedResources() comment.
     void ReleaseCompletedResources(bool done);
 
    private:
@@ -180,7 +217,7 @@ class ScannerContext {
     const HdfsFileDesc* file_desc_;
 
     /// Total number of bytes returned from GetBytes()
-    int64_t total_bytes_returned_;
+    int64_t total_bytes_returned_ = 0;
 
     /// File length. Initialized with file_desc_->file_length but updated if eof is found
     /// earlier, i.e. the file was truncated.
@@ -194,14 +231,20 @@ class ScannerContext {
     /// doubling algorithm. Unused if 'read_past_size_cb_' is set.
     int64_t next_read_past_size_bytes_;
 
-    /// The current io buffer. This starts as NULL before we've read any bytes.
+    /// The current I/O buffer. NULL before we've read any bytes or if the last read
+    /// I/O buffer was released.
     std::unique_ptr<io::BufferDescriptor> io_buffer_;
 
+    /// True if 'scan_range_' returned eosr, which means that we read to the end of that
+    /// scan range. This is different from eosr() because it tracks whether the
+    /// scan range reached eosr, not whether eosr() was returned to the caller.
+    bool scan_range_eosr_ = false;
+
     /// Next byte to read in io_buffer_
-    uint8_t* io_buffer_pos_;
+    uint8_t* io_buffer_pos_ = nullptr;
 
     /// Bytes left in io_buffer_
-    int64_t io_buffer_bytes_left_;
+    int64_t io_buffer_bytes_left_ = 0;
 
     /// The boundary buffer is used to copy multiple IO buffers from the scan range into a
     /// single buffer to return to the scanner.  After copying all or part of an IO buffer
@@ -212,29 +255,54 @@ class ScannerContext {
     /// scanner, in the current IO buffer, or in the boundary buffer.
     boost::scoped_ptr<MemPool> boundary_pool_;
     boost::scoped_ptr<StringBuffer> boundary_buffer_;
-    uint8_t* boundary_buffer_pos_;
-    int64_t boundary_buffer_bytes_left_;
+    uint8_t* boundary_buffer_pos_ = nullptr;
+    int64_t boundary_buffer_bytes_left_ = 0;
 
     /// Points to either io_buffer_pos_ or boundary_buffer_pos_
     /// (initialized to NULL before calling GetBytes())
-    uint8_t** output_buffer_pos_;
+    uint8_t** output_buffer_pos_ = nullptr;
 
     /// Points to either io_buffer_bytes_left_ or boundary_buffer_bytes_left_
     /// (initialized to a static zero-value int before calling GetBytes())
-    int64_t* output_buffer_bytes_left_;
+    int64_t* output_buffer_bytes_left_ =
+        const_cast<int64_t*>(&OUTPUT_BUFFER_BYTES_LEFT_INIT);
 
-    /// List of buffers that are completed but still have bytes referenced by the caller.
-    /// On the next GetBytes() call, these buffers are released (the caller by calling
-    /// GetBytes() signals it is done with its previous bytes).  At this point the
-    /// buffers are returned to the I/O manager.
-    std::deque<std::unique_ptr<io::BufferDescriptor>> completed_io_buffers_;
+    /// We always want output_buffer_bytes_left_ to be non-NULL, so we can avoid a NULL
+    /// check in GetBytes(). We use this variable, which is set to 0, to initialize
+    /// output_buffer_bytes_left_. After the first successful call to GetBytes(),
+    /// output_buffer_bytes_left_ will be set to something else.
+    static const int64_t OUTPUT_BUFFER_BYTES_LEFT_INIT = 0;
 
-    Stream(ScannerContext* parent);
+    Stream(ScannerContext* parent, io::ScanRange* scan_range,
+        const HdfsFileDesc* file_desc);
 
     /// GetBytes helper to handle the slow path.
-    /// If peek is set then return the data but do not move the current offset.
+    /// If 'peek' is true then return the data but do not move the current offset.
+    /// If 'peek' is not true, the returned buffer memory remains valid until next
+    /// operation that reads from the stream.
     Status GetBytesInternal(int64_t requested_len, uint8_t** buffer, bool peek,
                             int64_t* out_len);
+
+    /// SkipBytes() helper to handle the slow path where we need to skip past the
+    /// current I/O buffer. Called when the current I/O and boundary buffers are
+    /// exhausted.  Skips 'bytes_left' bytes in subsequent I/O buffers. 'length' is the
+    /// argument to the SkipBytes() call, used for error reporting. Sets 'io_buffer_',
+    /// 'io_buffer_pos_', 'io_buffer_bytes_left_' and 'total_bytes_returned_'.
+    bool SkipBytesInternal(int64_t length, int64_t bytes_left, Status* status);
+
+    /// Copy 'num_bytes' bytes from the I/O buffer at 'io_buffer_pos_' to the
+    /// boundary buffer and set 'output_buffer_pos_' and 'output_buffer_bytes_left_'
+    /// to point at the boundary buffer variables. Advances 'io_buffer_pos_' and
+    /// 'io_buffer_bytes_left_' by 'num_bytes'. Returns an error if the boundary
+    /// buffer cannot be extended to fit the new data.
+    ///
+    /// Returns 'io_buffer_' to the I/O manager if all its data was copied to the
+    /// boundary buffer.
+    Status CopyIoToBoundary(int64_t num_bytes);
+
+    /// Returns 'io_buffer_' to the I/O manager, setting it to NULL in the process,
+    /// and resets 'io_buffer_bytes_left_' and 'io_buffer_pos_'.
+    void ReturnIoBuffer();
 
     /// Gets (and blocks) for the next io buffer. After fetching all buffers in the scan
     /// range, performs synchronous reads past the scan range until EOF.
@@ -251,6 +319,10 @@ class ScannerContext {
     /// never set to NULL, even if it contains 0 bytes.
     Status GetNextBuffer(int64_t read_past_size = 0);
 
+    /// Helper to advance position and bytes left for a buffer by 'bytes'.
+    void AdvanceBufferPos(
+        int64_t bytes, uint8_t** buffer_pos, int64_t* buffer_bytes_left);
+
     /// Validates that the output buffer pointers point to the correct buffer.
     bool ValidateBufferPointers() const;
 
@@ -266,23 +338,17 @@ class ScannerContext {
     return streams_[idx].get();
   }
 
-  /// Returns completed I/O buffers to the I/O manager. If 'done' is true, this is the
-  /// final call for the current streams and any pending resources in each stream are
-  /// also freed. Callers which want to clear the streams from the context should also
-  /// call ClearStreams().
+  /// Release completed resources for all streams, e.g. the last buffer in each stream if
+  /// the current read position is at the end of the buffer. If 'done' is true all
+  /// resources are freed, even if the caller has not read that data yet. After calling
+  /// this function, any memory returned from previous Read*()/Get*() functions is
+  /// invalid to reference. Callers which want to clear the streams from the context
+  /// should also call ClearStreams().
   ///
   /// This must be called with 'done' set when the scanner is complete and no longer needs
-  /// any resources (e.g. tuple memory, io buffers) returned from the current streams.
-  /// After calling with 'done' set, this should be called again if new streams are
-  /// created via AddStream().
+  /// any resources. After calling with 'done' set, this should be called again if new
+  /// streams are created via AddStream().
   void ReleaseCompletedResources(bool done);
-
-  /// Overload with the signature expected by Impala-lzo to enable easier staging of
-  /// the API change. TODO: remove this once Impala-lzo is updated to use the new
-  /// signature.
-  void ReleaseCompletedResources(RowBatch* batch, bool done) {
-    ReleaseCompletedResources(done);
-  }
 
   /// Releases all the Stream objects in the vector 'streams_' and reduces the vector's
   /// size to 0.
@@ -296,7 +362,6 @@ class ScannerContext {
   /// Always returns false if the scan_node_ is not multi-threaded.
   bool cancelled() const;
 
-  int num_completed_io_buffers() const { return num_completed_io_buffers_; }
   HdfsPartitionDescriptor* partition_descriptor() { return partition_desc_; }
   const std::vector<FilterContext>& filter_ctxs() const { return filter_ctxs_; }
   MemPool* expr_results_pool() const { return expr_results_pool_; }
@@ -310,9 +375,6 @@ class ScannerContext {
 
   /// Vector of streams. Non-columnar formats will always have one stream per context.
   std::vector<std::unique_ptr<Stream>> streams_;
-
-  /// Always equal to the sum of completed_io_buffers_.size() across all streams.
-  int num_completed_io_buffers_;
 
   /// Filter contexts for all filters applicable to this scan. Memory attached to the
   /// context is owned by the scan node.

@@ -279,7 +279,6 @@ void HdfsParquetScanner::Close(RowBatch* row_batch) {
   DCHECK_EQ(template_tuple_pool_->total_allocated_bytes(), 0);
   DCHECK_EQ(dictionary_pool_->total_allocated_bytes(), 0);
   DCHECK_EQ(scratch_batch_->total_allocated_bytes(), 0);
-  DCHECK_EQ(context_->num_completed_io_buffers(), 0);
 
   // Collect compression types for reporting completed ranges.
   vector<THdfsCompression::type> compression_types;

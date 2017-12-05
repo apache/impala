@@ -659,6 +659,7 @@ unique_ptr<BufferDescriptor> DiskIoMgr::GetFreeBuffer(
       buffer = free_buffers_[idx].front();
       free_buffers_[idx].pop_front();
       free_buffer_mem_tracker_->Release(buffer_size);
+      ASAN_UNPOISON_MEMORY_REGION(buffer, buffer_size);
     }
   }
 
@@ -682,6 +683,7 @@ void DiskIoMgr::GcIoBuffers(int64_t bytes_to_free) {
       uint8_t* buffer = free_buffers->front();
       free_buffers->pop_front();
       int64_t buffer_size = (1LL << idx) * min_buffer_size_;
+      ASAN_UNPOISON_MEMORY_REGION(buffer, buffer_size);
       delete[] buffer;
       free_buffer_mem_tracker_->Release(buffer_size);
       num_allocated_buffers_.Add(-1);
@@ -717,6 +719,8 @@ void DiskIoMgr::FreeBufferMemory(BufferDescriptor* desc) {
     unique_lock<mutex> lock(free_buffers_lock_);
     if (!FLAGS_disable_mem_pools &&
         free_buffers_[idx].size() < FLAGS_max_free_io_buffers) {
+      // Poison buffers stored in cache.
+      ASAN_POISON_MEMORY_REGION(buffer, buffer_size);
       free_buffers_[idx].push_back(buffer);
       if (ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS != nullptr) {
         ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS->Increment(1L);

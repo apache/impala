@@ -94,11 +94,10 @@ struct FieldLocation {
 ///    the codegen'd function to use.
 /// This way, we only codegen once per scanner type, rather than once per scanner object.
 //
-/// This class also encapsulates row batch management.  Subclasses should call CommitRows()
-/// after writing to the current row batch, which handles creating row batches, attaching
-/// resources (buffers and mem pools) to the current row batch, and passing row batches
-/// up to the scan node. Subclasses can also use GetMemory() to help with per-row memory
-/// management.
+/// This class also encapsulates row batch management. Subclasses should call
+/// CommitRows() after writing to the current row batch, which handles creating row
+/// batches, releasing per-batch resources, and passing row batches up to the scan node.
+/// Subclasses can also use GetMemory() to help with per-row memory management.
 /// TODO: Have a pass over all members and move them out of the base class if sensible
 /// to clarify which state each concrete scanner type actually has.
 class HdfsScanner {
@@ -316,7 +315,6 @@ class HdfsScanner {
       Tuple** tuple_mem, TupleRow** tuple_row_mem, int64_t* num_rows) WARN_UNUSED_RESULT;
 
   /// Commits 'num_rows' to 'row_batch'. Advances 'tuple_mem_' and 'tuple_' accordingly.
-  /// Attaches completed resources from 'context_' to 'row_batch' if necessary.
   /// Frees expr result allocations. Returns non-OK if 'context_' is cancelled or the
   /// query status in 'state_' is non-OK.
   Status CommitRows(int num_rows, RowBatch* row_batch) WARN_UNUSED_RESULT;

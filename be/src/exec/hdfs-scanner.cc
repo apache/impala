@@ -188,13 +188,6 @@ Status HdfsScanner::CommitRows(int num_rows, RowBatch* row_batch) {
   row_batch->CommitRows(num_rows);
   tuple_mem_ += static_cast<int64_t>(scan_node_->tuple_desc()->byte_size()) * num_rows;
   tuple_ = reinterpret_cast<Tuple*>(tuple_mem_);
-
-  // We need to pass the row batch to the scan node if there is too much memory attached,
-  // which can happen if the query is very selective. We need to release memory even
-  // if no rows passed predicates.
-  if (row_batch->AtCapacity() || context_->num_completed_io_buffers() > 0) {
-    context_->ReleaseCompletedResources(/* done */ false);
-  }
   if (context_->cancelled()) return Status::CANCELLED;
   // Check for UDF errors.
   RETURN_IF_ERROR(state_->GetQueryStatus());

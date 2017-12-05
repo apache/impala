@@ -27,6 +27,7 @@
 #include "exec/parquet-metadata-utils.h"
 #include "exec/parquet-scratch-tuple-batch.h"
 #include "exec/read-write-util.h"
+#include "exec/scanner-context.inline.h"
 #include "rpc/thrift-util.h"
 #include "runtime/collection-value-builder.h"
 #include "runtime/tuple-row.h"
@@ -1054,7 +1055,7 @@ Status BaseScalarColumnReader::ReadDataPage() {
     data_page_pool_->FreeAll();
   }
   // We don't hold any pointers to earlier pages in the stream - we can safely free
-  // any accumulated I/O or boundary buffers.
+  // any I/O or boundary buffer.
   stream_->ReleaseCompletedResources(false);
 
   // Read the next data page, skipping page types we don't care about.

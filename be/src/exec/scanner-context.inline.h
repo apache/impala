@@ -46,8 +46,7 @@ inline bool ScannerContext::Stream::GetBytes(int64_t requested_len, uint8_t** bu
     *buffer = *output_buffer_pos_;
     if (LIKELY(!peek)) {
       total_bytes_returned_ += *out_len;
-      *output_buffer_pos_ += *out_len;
-      *output_buffer_bytes_left_ -= *out_len;
+      AdvanceBufferPos(*out_len, output_buffer_pos_, output_buffer_bytes_left_);
     }
     return true;
   }
@@ -68,24 +67,43 @@ inline bool ScannerContext::Stream::ReadBytes(int64_t length, uint8_t** buf,
   return true;
 }
 
-/// TODO: consider implementing a Skip in the context/stream object that's more
-/// efficient than GetBytes.
 inline bool ScannerContext::Stream::SkipBytes(int64_t length, Status* status) {
-  uint8_t* dummy_buf;
-  int64_t bytes_read;
-  RETURN_IF_FALSE(GetBytes(length, &dummy_buf, &bytes_read, status));
-  if (UNLIKELY(length != bytes_read)) {
-    DCHECK_LT(bytes_read, length);
-    *status = ReportIncompleteRead(length, bytes_read);
-    return false;
+  int64_t bytes_left = length;
+  // Skip bytes from the boundary buffer first.
+  if (boundary_buffer_bytes_left_ > 0) {
+    DCHECK_EQ(output_buffer_pos_, &boundary_buffer_pos_);
+    DCHECK_EQ(output_buffer_bytes_left_, &boundary_buffer_bytes_left_);
+    int64_t boundary_buffer_bytes_to_skip =
+        std::min(bytes_left, boundary_buffer_bytes_left_);
+    AdvanceBufferPos(boundary_buffer_bytes_to_skip, &boundary_buffer_pos_,
+        &boundary_buffer_bytes_left_);
+    bytes_left -= boundary_buffer_bytes_to_skip;
+    total_bytes_returned_ += boundary_buffer_bytes_to_skip;
+    if (boundary_buffer_bytes_left_ == 0 && io_buffer_bytes_left_ > 0) {
+      output_buffer_pos_ = &io_buffer_pos_;
+      output_buffer_bytes_left_ = &io_buffer_bytes_left_;
+    }
+    if (bytes_left == 0) return true;
   }
-  return true;
+  // Skip bytes from the I/O buffer second.
+  if (io_buffer_bytes_left_ > 0) {
+    int64_t io_buffer_bytes_to_skip = std::min(bytes_left, io_buffer_bytes_left_);
+    AdvanceBufferPos(io_buffer_bytes_to_skip, &io_buffer_pos_, &io_buffer_bytes_left_);
+    bytes_left -= io_buffer_bytes_to_skip;
+    total_bytes_returned_ += io_buffer_bytes_to_skip;
+    if (bytes_left == 0) return true;
+  }
+  DCHECK(ValidateBufferPointers());
+  DCHECK_GT(bytes_left, 0);
+  // Slow path: need to skip data in subsequent buffers.
+  return SkipBytesInternal(length, bytes_left, status);
 }
 
 inline bool ScannerContext::Stream::SkipText(Status* status) {
-  uint8_t* dummy_buffer;
-  int64_t bytes_read;
-  return ReadText(&dummy_buffer, &bytes_read, status);
+  int64_t len;
+  RETURN_IF_FALSE(ReadVLong(&len, status));
+  RETURN_IF_FALSE(SkipBytes(len, status));
+  return true;
 }
 
 inline bool ScannerContext::Stream::ReadText(uint8_t** buf, int64_t* len,
@@ -164,6 +182,13 @@ inline bool ScannerContext::Stream::ReadZLong(int64_t* value, Status* status) {
   int64_t bytes_read = new_bytes - bytes;
   RETURN_IF_FALSE(SkipBytes(bytes_read, status));
   return true;
+}
+
+inline void ScannerContext::Stream::AdvanceBufferPos(int64_t bytes,
+    uint8_t** buffer_pos, int64_t* buffer_bytes_left) {
+  DCHECK_LE(bytes, *buffer_bytes_left);
+  *buffer_pos += bytes;
+  *buffer_bytes_left -= bytes;
 }
 
 #undef RETURN_IF_FALSE
