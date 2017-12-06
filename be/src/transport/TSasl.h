@@ -209,10 +209,12 @@ class TSaslServer : public sasl::TSasl {
               const std::string& userRealm, unsigned flags, sasl_callback_t* callbacks);
 
   /*
-   * This initializes the sasl server library and should be called onece per application
+   * This initializes the sasl server library and should be called onece per application.
+   * Note that the caller needs to ensure the life time of 'callbacks' and 'appname' is
+   * beyond that of this object.
    */
-  static void SaslInit(const sasl_callback_t* callbacks, const std::string& appname) {
-    int result = sasl_server_init(callbacks, appname.c_str());
+  static void SaslInit(const sasl_callback_t* callbacks, const char* appname) {
+    int result = sasl_server_init(callbacks, appname);
     if (result != SASL_OK) {
       throw SaslServerImplException(sasl_errstring(result, NULL, NULL));
     }

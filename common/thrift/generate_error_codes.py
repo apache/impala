@@ -344,6 +344,10 @@ error_codes = (
 
   ("LZ4_COMPRESSION_INPUT_TOO_LARGE", 113,
    "The input size is too large for LZ4 compression: $0"),
+
+  ("SASL_APP_NAME_MISMATCH", 114,
+   "InitAuth() called multiple times with different names. Was called with $0. "
+   "Now using $1.")
 )
 
 import sys

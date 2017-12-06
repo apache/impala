@@ -54,7 +54,7 @@ DECLARE_string(hostname);
 
 // The path of the current executable file that is required for passing into the SASL
 // library as the 'application name'.
-static string current_executable_path;
+static string CURRENT_EXECUTABLE_PATH;
 
 namespace impala {
 
@@ -127,7 +127,7 @@ class RpcMgrKerberizedTest :
     DCHECK(kdc_wrapper_.get() != nullptr);
 
     ASSERT_OK(kdc_wrapper_->SetupAndStartMiniKDC(GetParam()));
-    ASSERT_OK(InitAuth(current_executable_path));
+    ASSERT_OK(InitAuth(CURRENT_EXECUTABLE_PATH));
 
     RpcMgrTestBase::SetUp();
   }
@@ -311,6 +311,6 @@ int main(int argc, char** argv) {
   impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
 
   // Fill in the path of the current binary for use by the tests.
-  current_executable_path = argv[0];
+  CURRENT_EXECUTABLE_PATH = argv[0];
   return RUN_ALL_TESTS();
 }

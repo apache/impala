@@ -181,11 +181,10 @@ class NoAuthProvider : public AuthProvider {
 
 /// The first entry point to the authentication subsystem.  Performs initialization
 /// of Sasl, the global AuthManager, and the two authentication providers.  Appname
-/// should generally be argv[0].
-/// TODO: Calling InitAuth() more than once is not an issue, however, calling InitAuth()
-/// more than once with a different 'appname' can lead to undefined behavior. Also,
-/// 'appname' must live as long as the process does since the cyrus-sasl library holds a
-/// reference to it.
+/// should generally be argv[0]. Normally, InitAuth() should only be called once.
+/// In certain test cases, we may call it more than once. It's important that InitAuth()
+/// is called with the same 'appname' if it's called more than once. Otherwise, error
+/// status will be returned.
 Status InitAuth(const std::string& appname);
 
 }
