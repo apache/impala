@@ -336,6 +336,21 @@ Status ExecEnv::Init() {
   if (!aggressive_decommit_enabled) {
     return Status("TCMalloc aggressive decommit is required but is disabled.");
   }
+  // A MemTracker for TCMalloc overhead which is the difference between the physical bytes
+  // reserved (TcmallocMetric::PHYSICAL_BYTES_RESERVED) and the bytes in use
+  // (TcmallocMetrics::BYTES_IN_USE). This overhead accounts for all the cached freelists
+  // used by TCMalloc.
+  IntGauge* negated_bytes_in_use = obj_pool_->Add(new NegatedGauge<int64_t>(
+      MakeTMetricDef("negated_tcmalloc_bytes_in_use", TMetricKind::GAUGE, TUnit::BYTES),
+      TcmallocMetric::BYTES_IN_USE));
+  vector<IntGauge*> overhead_metrics;
+  overhead_metrics.push_back(negated_bytes_in_use);
+  overhead_metrics.push_back(TcmallocMetric::PHYSICAL_BYTES_RESERVED);
+  SumGauge<int64_t>* tcmalloc_overhead = obj_pool_->Add(new SumGauge<int64_t>(
+      MakeTMetricDef("tcmalloc_overhead", TMetricKind::GAUGE, TUnit::BYTES),
+      overhead_metrics));
+  obj_pool_->Add(
+      new MemTracker(tcmalloc_overhead, -1, "TCMalloc Overhead", mem_tracker_.get()));
 #endif
   mem_tracker_->RegisterMetrics(metrics_.get(), "mem-tracker.process");
 
