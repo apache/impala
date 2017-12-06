@@ -30,6 +30,7 @@ import org.apache.impala.analysis.BinaryPredicate.Operator;
 import org.apache.impala.analysis.CastExpr;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
+import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.Predicate;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
@@ -40,23 +41,21 @@ import org.apache.impala.analysis.TupleIsNullPredicate;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
-import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.IdGenerator;
+import org.apache.impala.common.InternalException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
-import org.apache.impala.planner.PlanNode;
 import org.apache.impala.thrift.TRuntimeFilterDesc;
 import org.apache.impala.thrift.TRuntimeFilterMode;
 import org.apache.impala.thrift.TRuntimeFilterTargetDesc;
 import org.apache.impala.thrift.TRuntimeFilterType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Class used for generating and assigning runtime filters to a query plan using
@@ -138,7 +137,7 @@ public final class RuntimeFilterGenerator {
     // Once set, it can't be unset.
     private boolean finalized_ = false;
     // The type of filter to build.
-    private TRuntimeFilterType type_;
+    private final TRuntimeFilterType type_;
 
     /**
      * Internal representation of a runtime filter target.
@@ -264,16 +263,16 @@ public final class RuntimeFilterGenerator {
               filterSrcNode.getChild(1).getTupleIds(), analyzer);
       if (normalizedJoinConjunct == null) return null;
 
-      Expr targetExpr = normalizedJoinConjunct.getChild(0);
+      // Ensure that the target expr does not contain TupleIsNull predicates as these
+      // can't be evaluated at a scan node.
+      Expr targetExpr =
+          TupleIsNullPredicate.unwrapExpr(normalizedJoinConjunct.getChild(0).clone());
       Expr srcExpr = normalizedJoinConjunct.getChild(1);
 
       Map<TupleId, List<SlotId>> targetSlots = getTargetSlots(analyzer, targetExpr);
       Preconditions.checkNotNull(targetSlots);
       if (targetSlots.isEmpty()) return null;
 
-      // Ensure that the targer expr does not contain TupleIsNull predicates as these
-      // can't be evaluated at a scan node.
-      targetExpr = TupleIsNullPredicate.unwrapExpr(targetExpr.clone());
       if (LOG.isTraceEnabled()) {
         LOG.trace("Generating runtime filter from predicate " + joinPredicate);
       }
@@ -285,7 +284,8 @@ public final class RuntimeFilterGenerator {
      * Returns the ids of base table tuple slots on which a runtime filter expr can be
      * applied. Due to the existence of equivalence classes, a filter expr may be
      * applicable at multiple scan nodes. The returned slot ids are grouped by tuple id.
-     * Returns an empty collection if the filter expr cannot be applied at a base table.
+     * Returns an empty collection if the filter expr cannot be applied at a base table
+     * or if applying the filter might lead to incorrect results.
      */
     private static Map<TupleId, List<SlotId>> getTargetSlots(Analyzer analyzer,
         Expr expr) {
@@ -293,6 +293,29 @@ public final class RuntimeFilterGenerator {
       List<TupleId> tids = Lists.newArrayList();
       List<SlotId> sids = Lists.newArrayList();
       expr.getIds(tids, sids);
+
+      // IMPALA-6286: If the target expression evaluates to a non-NULL value for
+      // outer-join non-matches, then assigning the filter below the nullable side of
+      // an outer join may produce incorrect query results.
+      // This check is conservative but correct to keep the code simple. In particular,
+      // it would otherwise be difficult to identify incorrect runtime filter assignments
+      // through outer-joined inline views because the 'expr' has already been fully
+      // resolved. We rely on the value-transfer graph to check whether 'expr' could
+      // potentially be assigned below an outer-joined inline view.
+      if (analyzer.hasOuterJoinedValueTransferTarget(sids)) {
+        Expr isNotNullPred = new IsNullPredicate(expr, true);
+        isNotNullPred.analyzeNoThrow(analyzer);
+        try {
+          if (analyzer.isTrueWithNullSlots(isNotNullPred)) return Collections.emptyMap();
+        } catch (InternalException e) {
+          // Expr evaluation failed in the backend. Skip this runtime filter since we
+          // cannot determine whether it is safe to assign it.
+          LOG.warn("Skipping runtime filter because backend evaluation failed: "
+              + isNotNullPred.toSql(), e);
+          return Collections.emptyMap();
+        }
+      }
+
       Map<TupleId, List<SlotId>> slotsByTid = Maps.newHashMap();
       // We need to iterate over all the slots of 'expr' and check if they have
       // equivalent slots that are bound by the same base table tuple(s).

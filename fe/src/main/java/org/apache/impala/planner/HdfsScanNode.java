@@ -57,6 +57,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
@@ -631,7 +632,15 @@ public class HdfsScanNode extends ScanNode {
       // contain an entry for NULL and do not provide an indication about
       // whether NULLs are present. A conjunct that evaluates to true on NULL
       // cannot be evaluated purely on the dictionary.
-      if (analyzer.isTrueWithNullSlots(conjunct)) continue;
+      try {
+        if (analyzer.isTrueWithNullSlots(conjunct)) continue;
+      } catch (InternalException e) {
+        // Expr evaluation failed in the backend. Skip this conjunct since we cannot
+        // determine whether it is safe to apply it against a dictionary.
+        LOG.warn("Skipping dictionary filter because backend evaluation failed: "
+            + conjunct.toSql(), e);
+        continue;
+      }
 
       // TODO: Should there be a limit on the cost/structure of the conjunct?
       Integer slotIdInt = slotIds.get(0).asInt();

@@ -1456,3 +1456,85 @@ PLAN-ROOT SINK
    partitions=1/1 files=1 size=6.23MB
    runtime filters: RF000 -> p_partkey, RF001 -> p_retailprice
 ====
+# IMPALA-6286: Runtime filter must not be assigned at scan 01 because that could
+# alter the query results due to the coalesce() in the join condition of join 04.
+select /* +straight_join */ 1 from functional.alltypestiny t1
+left outer join functional.alltypestiny t2
+  on t1.int_col = t2.int_col
+where coalesce(t2.id + 10, 100) in (select 100);
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: coalesce(t2.id + 10, 100) = `$a$1`.`$c$1`
+|
+|--02:UNION
+|     constant-operands=1
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.int_col = t2.int_col
+|
+|--01:SCAN HDFS [functional.alltypestiny t2]
+|     partitions=4/4 files=4 size=460B
+|
+00:SCAN HDFS [functional.alltypestiny t1]
+   partitions=4/4 files=4 size=460B
+====
+# IMPALA-6286: Same as above but with an inline view.
+select /* +straight_join */ 1 from functional.alltypestiny t1
+left outer join (select * from functional.alltypestiny t2) v
+  on t1.int_col = v.int_col
+where coalesce(v.id + 10, 100) in (select 100);
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: coalesce(t2.id + 10, 100) = `$a$1`.`$c$1`
+|
+|--02:UNION
+|     constant-operands=1
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.int_col = t2.int_col
+|
+|--01:SCAN HDFS [functional.alltypestiny t2]
+|     partitions=4/4 files=4 size=460B
+|
+00:SCAN HDFS [functional.alltypestiny t1]
+   partitions=4/4 files=4 size=460B
+====
+# IMPALA-6286: The runtime filter produced by inner join 05 can safely be assigned
+# at scan 01. It would also be safe to produce a runtime filter at join 06 and assign
+# it to scan 00, but our check is too conservative to recognize the opportunity.
+select /* +straight_join */ 1 from functional.alltypestiny t1
+left outer join functional.alltypestiny t2
+  on t1.int_col = t2.int_col
+inner join functional.alltypestiny t3
+  on t2.id = t3.id
+where coalesce(t2.id + 10, 100) in (select 100)
+---- PLAN
+PLAN-ROOT SINK
+|
+06:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: coalesce(t2.id + 10, 100) = `$a$1`.`$c$1`
+|
+|--03:UNION
+|     constant-operands=1
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: t2.id = t3.id
+|  runtime filters: RF000 <- t3.id
+|
+|--02:SCAN HDFS [functional.alltypestiny t3]
+|     partitions=4/4 files=4 size=460B
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.int_col = t2.int_col
+|
+|--01:SCAN HDFS [functional.alltypestiny t2]
+|     partitions=4/4 files=4 size=460B
+|     runtime filters: RF000 -> t2.id
+|
+00:SCAN HDFS [functional.alltypestiny t1]
+   partitions=4/4 files=4 size=460B
+====

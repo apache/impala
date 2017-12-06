@@ -18,7 +18,6 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,11 +53,9 @@ import org.apache.impala.common.IdGenerator;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
-import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
-import org.apache.impala.rewrite.SimplifyDistinctFromRule;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -68,6 +65,7 @@ import org.apache.impala.rewrite.NormalizeBinaryPredicatesRule;
 import org.apache.impala.rewrite.NormalizeCountStarRule;
 import org.apache.impala.rewrite.NormalizeExprsRule;
 import org.apache.impala.rewrite.SimplifyConditionalsRule;
+import org.apache.impala.rewrite.SimplifyDistinctFromRule;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -75,8 +73,13 @@ import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
-import org.apache.impala.util.*;
-import org.apache.impala.util.Graph.*;
+import org.apache.impala.util.DisjointSet;
+import org.apache.impala.util.Graph.RandomAccessibleGraph;
+import org.apache.impala.util.Graph.SccCondensedGraph;
+import org.apache.impala.util.Graph.WritableGraph;
+import org.apache.impala.util.IntIterator;
+import org.apache.impala.util.ListMap;
+import org.apache.impala.util.TSessionStateUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1477,17 +1480,20 @@ public class Analyzer {
   }
 
   /**
-   * Returns a list of predicates that are fully bound by destTid. Predicates are derived
-   * by replacing the slots of a source predicate with slots of the destTid, if every
-   * source slot has a value transfer to a slot in destTid.
+   * Returns a list of predicates that are fully bound by destTid. The generated
+   * predicates are for optimization purposes and not required for query correctness.
+   * It is up to the caller to decide if a bound predicate should actually be used.
+   * Predicates are derived by replacing the slots of a source predicate with slots of
+   * the destTid, if every source slot has a value transfer to a slot in destTid.
    * In particular, the returned list contains predicates that must be evaluated
    * at a join node (bound to outer-joined tuple) but can also be safely evaluated by a
    * plan node materializing destTid. Such predicates are not marked as assigned.
    * All other inferred predicates are marked as assigned if 'markAssigned'
    * is true. This function returns bound predicates regardless of whether the source
-   * predicated have been assigned. It is up to the caller to decide if a bound predicate
-   * should actually be used.
+   * predicates have been assigned.
    * Destination slots in destTid can be ignored by passing them in ignoreSlots.
+   * Some bound predicates may be missed due to errors in backend expr evaluation
+   * or expr substitution.
    * TODO: exclude UDFs from predicate propagation? their overloaded variants could
    * have very different semantics
    */
@@ -1511,16 +1517,7 @@ public class Analyzer {
 
       // Indicates whether there is value transfer from the source slots to slots that
       // belong to an outer-joined tuple.
-      boolean hasOuterJoinedTuple = false;
-      for (SlotId srcSid: srcSids) {
-        for (SlotId dst : getValueTransferTargets(srcSid)) {
-          if (isOuterJoined(getTupleId(dst))) {
-            hasOuterJoinedTuple = true;
-            break;
-          }
-        }
-        if (hasOuterJoinedTuple) break;
-      }
+      boolean hasOuterJoinedTuple = hasOuterJoinedValueTransferTarget(srcSids);
 
       // It is incorrect to propagate predicates into a plan subtree that is on the
       // nullable side of an outer join if the predicate evaluates to true when all
@@ -1535,7 +1532,15 @@ public class Analyzer {
       // TODO: Make the check precise by considering the blocks (analyzers) where the
       // outer-joined tuples in the dest slot's equivalence classes appear
       // relative to 'srcConjunct'.
-      if (hasOuterJoinedTuple && isTrueWithNullSlots(srcConjunct)) continue;
+      try {
+        if (hasOuterJoinedTuple && isTrueWithNullSlots(srcConjunct)) continue;
+      } catch (InternalException e) {
+        // Expr evaluation failed in the backend. Skip 'srcConjunct' since we cannot
+        // determine whether propagation is safe.
+        LOG.warn("Skipping propagation of conjunct because backend evaluation failed: "
+            + srcConjunct.toSql(), e);
+        continue;
+      }
 
       // if srcConjunct comes out of an OJ's On clause, we need to make sure it's the
       // same as the one that makes destTid nullable
@@ -1626,6 +1631,19 @@ public class Analyzer {
 
   public ArrayList<Expr> getBoundPredicates(TupleId destTid) {
     return getBoundPredicates(destTid, new HashSet<SlotId>(), true);
+  }
+
+  /**
+   * Returns true if any of the given slot ids or their value-transfer targets belong
+   * to an outer-joined tuple.
+   */
+  public boolean hasOuterJoinedValueTransferTarget(List<SlotId> sids) {
+    for (SlotId srcSid: sids) {
+      for (SlotId dstSid: getValueTransferTargets(srcSid)) {
+        if (isOuterJoined(getTupleId(dstSid))) return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -1891,10 +1909,9 @@ public class Analyzer {
 
   /**
    * Returns true if 'p' evaluates to true when all its referenced slots are NULL,
-   * false otherwise.
-   * TODO: Can we avoid dealing with the exceptions thrown by analysis and eval?
+   * returns false otherwise. Throws if backend expression evaluation fails.
    */
-  public boolean isTrueWithNullSlots(Expr p) {
+  public boolean isTrueWithNullSlots(Expr p) throws InternalException {
     // Construct predicate with all SlotRefs substituted by NullLiterals.
     List<SlotRef> slotRefs = Lists.newArrayList();
     p.collect(Predicates.instanceOf(SlotRef.class), slotRefs);
@@ -1908,13 +1925,7 @@ public class Analyzer {
         nullSmap.put(slotRef.clone(), NullLiteral.create(slotRef.getType()));
     }
     Expr nullTuplePred = p.substitute(nullSmap, this, false);
-    try {
-      return FeSupport.EvalPredicate(nullTuplePred, getQueryCtx());
-    } catch (InternalException e) {
-      Preconditions.checkState(false, "Failed to evaluate generated predicate: "
-          + nullTuplePred.toSql() + "." + e.getMessage());
-    }
-    return true;
+    return FeSupport.EvalPredicate(nullTuplePred, getQueryCtx());
   }
 
   public TupleId getTupleId(SlotId slotId) {
