@@ -114,7 +114,7 @@ error_codes = (
    "Verify that all your impalads are the same version."),
 
   ("RPC_GENERAL_ERROR", 30, "RPC Error: $0"),
-  ("RPC_RECV_TIMEOUT", 31, "RPC recv timed out: $0"),
+  ("RPC_RECV_TIMEOUT", 31, "RPC recv timed out: dest address: $0, rpc: $1"),
 
   ("UDF_VERIFY_FAILED", 32,
    "Failed to verify function $0 from LLVM module $1, see log for more details."),

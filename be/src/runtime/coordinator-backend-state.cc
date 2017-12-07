@@ -183,7 +183,7 @@ void Coordinator::BackendState::Exec(
     const string& err_msg =
         Substitute(ERR_TEMPLATE, PrintId(query_id_), rpc_status.msg().msg());
     VLOG_QUERY << err_msg;
-    status_ = Status(err_msg);
+    status_ = Status::Expected(err_msg);
     return;
   }
 
