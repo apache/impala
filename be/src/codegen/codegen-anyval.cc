@@ -676,7 +676,8 @@ llvm::Value* CodegenAnyVal::Eq(CodegenAnyVal* other) {
       return builder_->CreateICmpEQ(GetVal(), other->GetVal(), "eq");
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
-      return builder_->CreateFCmpUEQ(GetVal(), other->GetVal(), "eq");
+      // Use the ordering version "OEQ" to ensure that 'nan' != 'nan'.
+      return builder_->CreateFCmpOEQ(GetVal(), other->GetVal(), "eq");
     case TYPE_STRING:
     case TYPE_VARCHAR:
     case TYPE_FIXED_UDA_INTERMEDIATE: {
@@ -716,7 +717,8 @@ llvm::Value* CodegenAnyVal::EqToNativePtr(llvm::Value* native_ptr) {
       return builder_->CreateICmpEQ(GetVal(), val, "cmp_raw");
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
-      return builder_->CreateFCmpUEQ(GetVal(), val, "cmp_raw");
+      // Use the ordering version "OEQ" to ensure that 'nan' != 'nan'.
+      return builder_->CreateFCmpOEQ(GetVal(), val, "cmp_raw");
     case TYPE_STRING:
     case TYPE_VARCHAR:
     case TYPE_FIXED_UDA_INTERMEDIATE: {

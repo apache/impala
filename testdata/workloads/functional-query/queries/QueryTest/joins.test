@@ -771,3 +771,27 @@ select count(*) from (
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# Test that 'nan' != 'nan' when joining.
+with x as (select cast('nan' as double) n)
+select * from x a, x b where a.n = b.n
+---- RESULTS
+---- TYPES
+DOUBLE,DOUBLE
+====
+---- QUERY
+# Test that 'nan' != 'nan' when joining.
+select a.id from functional.alltypestiny a, functional.alltypestiny b
+where 1/a.double_col + -1/a.double_col = log10(-b.id)
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# Test that 'nan' != 'nan' when joining.
+select a.id from functional.alltypestiny a, functional.alltypestiny b
+where sqrt(-a.id) = b.float_col / b.double_col
+---- RESULTS
+---- TYPES
+INT
+====

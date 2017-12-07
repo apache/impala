@@ -2902,3 +2902,11 @@ where a.id = 100
 ---- TYPES
 INT,INT,INT
 ====
+---- QUERY
+select id from functional.alltypes
+where id = case cast('nan' as double) when cast('nan' as double) then 0 else 1 end
+---- RESULTS
+1
+---- TYPES
+INT
+====
