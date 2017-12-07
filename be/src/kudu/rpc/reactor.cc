@@ -70,11 +70,6 @@ using std::shared_ptr;
 using std::unique_ptr;
 using strings::Substitute;
 
-DEFINE_int64_hidden(rpc_negotiation_timeout_ms, 3000,
-             "Timeout for negotiating an RPC connection.");
-TAG_FLAG(rpc_negotiation_timeout_ms, advanced);
-TAG_FLAG(rpc_negotiation_timeout_ms, runtime);
-
 DEFINE_bool_hidden(rpc_reopen_outbound_connections, false,
             "Open a new connection to the server for every RPC call. "
             "If not enabled, an already existing connection to a "
@@ -474,7 +469,7 @@ Status ReactorThread::StartConnectionNegotiation(const scoped_refptr<Connection>
 
   // Set a limit on how long the server will negotiate with a new client.
   MonoTime deadline = MonoTime::Now() +
-      MonoDelta::FromMilliseconds(FLAGS_rpc_negotiation_timeout_ms);
+      MonoDelta::FromMilliseconds(reactor()->messenger()->rpc_negotiation_timeout_ms());
 
   scoped_refptr<Trace> trace(new Trace());
   ADOPT_TRACE(trace.get());

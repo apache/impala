@@ -369,8 +369,6 @@ Status ServerNegotiation::ValidateConnectionHeader(faststring* recv_buf) {
 
 // calls sasl_server_init() and sasl_server_new()
 Status ServerNegotiation::InitSaslServer() {
-  RETURN_NOT_OK(SaslInit());
-
   // TODO(unknown): Support security flags.
   unsigned secflags = 0;
 

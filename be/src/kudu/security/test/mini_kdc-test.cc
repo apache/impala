@@ -17,8 +17,7 @@
 
 #include <string>
 
-#include <boost/optional.hpp>
-#include <gflags/gflags.h>
+#include <boost/optional/optional.hpp>
 #include <gtest/gtest.h>
 
 #include "kudu/security/init.h"
@@ -27,9 +26,6 @@
 #include "kudu/util/test_util.h"
 
 using std::string;
-
-DECLARE_string(keytab_file);
-DECLARE_string(principal);
 
 namespace kudu {
 
@@ -75,8 +71,7 @@ TEST_F(MiniKdcTest, TestBasicOperation) {
 
   // Test programmatic keytab login.
   kdc.SetKrb5Environment();
-  FLAGS_keytab_file = kt_path;
-  ASSERT_OK(security::InitKerberosForServer(kSPN));
+  ASSERT_OK(security::InitKerberosForServer(kSPN, kt_path));
   ASSERT_EQ("kudu/foo.example.com@KRBTEST.COM", *security::GetLoggedInPrincipalFromKeytab());
 
   // Test principal canonicalization.

@@ -27,6 +27,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <gflags/gflags.h>
 #include <gperftools/heap-profiler.h>
 
@@ -547,6 +548,22 @@ GFlagsMap GetFlagsMap() {
     flags_by_name.emplace(flag.name, std::move(flag));
   }
   return flags_by_name;
+}
+
+Status ParseTriState(const char* flag_name, const std::string& flag_value,
+    TriStateFlag* tri_state) {
+  if (boost::iequals(flag_value, "required")) {
+    *tri_state = TriStateFlag::REQUIRED;
+  } else if (boost::iequals(flag_value, "optional")) {
+    *tri_state = TriStateFlag::OPTIONAL;
+  } else if (boost::iequals(flag_value, "disabled")) {
+    *tri_state = TriStateFlag::DISABLED;
+  } else {
+    return Status::InvalidArgument(strings::Substitute(
+          "$0 flag must be one of 'required', 'optional', or 'disabled'",
+          flag_name));
+  }
+  return Status::OK();
 }
 
 } // namespace kudu

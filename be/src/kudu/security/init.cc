@@ -40,9 +40,6 @@
 
 #include "common/config.h"
 
-DECLARE_string(keytab_file);
-TAG_FLAG(keytab_file, stable);
-
 #ifndef __APPLE__
 static constexpr bool kDefaultSystemAuthToLocal = true;
 #else
@@ -458,12 +455,12 @@ boost::optional<string> GetLoggedInUsernameFromKeytab() {
   return g_kinit_ctx->username_str();
 }
 
-Status InitKerberosForServer(const std::string& raw_principal, const std::string& krb5ccname,
-    bool disable_krb5_replay_cache) {
-  if (FLAGS_keytab_file.empty()) return Status::OK();
+Status InitKerberosForServer(const std::string& raw_principal, const std::string& keytab_file,
+    const std::string& krb5ccname, bool disable_krb5_replay_cache) {
+  if (keytab_file.empty()) return Status::OK();
 
   setenv("KRB5CCNAME", krb5ccname.c_str(), 1);
-  setenv("KRB5_KTNAME", FLAGS_keytab_file.c_str(), 1);
+  setenv("KRB5_KTNAME", keytab_file.c_str(), 1);
 
   if (disable_krb5_replay_cache) {
     // KUDU-1897: disable the Kerberos replay cache. The KRPC protocol includes a
@@ -477,7 +474,7 @@ Status InitKerberosForServer(const std::string& raw_principal, const std::string
   string configured_principal;
   RETURN_NOT_OK(GetConfiguredPrincipal(raw_principal, &configured_principal));
   RETURN_NOT_OK_PREPEND(g_kinit_ctx->Kinit(
-      FLAGS_keytab_file, configured_principal), "unable to kinit");
+      keytab_file, configured_principal), "unable to kinit");
 
   g_kerberos_reinit_lock = new RWMutex(RWMutex::Priority::PREFER_WRITING);
   scoped_refptr<Thread> reacquire_thread;

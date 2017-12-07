@@ -55,9 +55,6 @@ DEFINE_int32_hidden(rpc_negotiation_inject_delay_ms, 0,
              "the RPC negotiation process on the server side.");
 TAG_FLAG(rpc_negotiation_inject_delay_ms, unsafe);
 
-DECLARE_string(keytab_file);
-DECLARE_string(rpc_certificate_file);
-
 DEFINE_bool_hidden(rpc_encrypt_loopback_connections, false,
             "Whether to encrypt data transfer on RPC connections that stay within "
             "a single host. Encryption here is likely to offer no additional "
@@ -227,9 +224,10 @@ static Status DoServerNegotiation(Connection* conn,
                                   RpcAuthentication authentication,
                                   RpcEncryption encryption,
                                   const MonoTime& deadline) {
+  const auto* messenger = conn->reactor_thread()->reactor()->messenger();
   if (authentication == RpcAuthentication::REQUIRED &&
-      FLAGS_keytab_file.empty() &&
-      FLAGS_rpc_certificate_file.empty()) {
+      messenger->keytab_file().empty() &&
+      !messenger->tls_context().is_external_cert()) {
     return Status::InvalidArgument("RPC authentication (--rpc_authentication) may not be "
                                    "required unless Kerberos (--keytab_file) or external PKI "
                                    "(--rpc_certificate_file et al) are configured");
@@ -242,14 +240,13 @@ static Status DoServerNegotiation(Connection* conn,
   }
 
   // Create a new ServerNegotiation to handle the synchronous negotiation.
-  const auto* messenger = conn->reactor_thread()->reactor()->messenger();
   ServerNegotiation server_negotiation(conn->release_socket(),
                                        &messenger->tls_context(),
                                        &messenger->token_verifier(),
                                        encryption,
                                        messenger->sasl_proto_name());
 
-  if (authentication != RpcAuthentication::DISABLED && !FLAGS_keytab_file.empty()) {
+  if (authentication != RpcAuthentication::DISABLED && !messenger->keytab_file().empty()) {
     RETURN_NOT_OK(server_negotiation.EnableGSSAPI());
   }
   if (authentication != RpcAuthentication::REQUIRED) {
