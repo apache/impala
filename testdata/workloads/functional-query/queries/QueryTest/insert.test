@@ -945,3 +945,14 @@ RESET alltypesnopart_insert
 ---- RESULTS
 : 100
 ====
+---- QUERY
+# IMPALA-6280: clustered with outer join, inline view, and TupleisNullPredicate
+insert into table alltypesinsert (int_col)
+partition (year, month) /*+ clustered,shuffle */
+select v.id, t1.id, t1.month from
+(select coalesce(id, 10) id from functional.alltypessmall) v
+right outer join functional.alltypestiny t1 on t1.id = v.id
+where v.id = 0
+---- RESULTS
+year=0/month=1/: 1
+====

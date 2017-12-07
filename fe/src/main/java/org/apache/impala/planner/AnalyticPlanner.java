@@ -284,24 +284,17 @@ public class AnalyticPlanner {
     // by a SlotRef into the sort's tuple in ancestor nodes (IMPALA-1519).
     ExprSubstitutionMap inputSmap = input.getOutputSmap();
     if (inputSmap != null) {
-      List<Expr> tupleIsNullPredsToMaterialize = Lists.newArrayList();
+      List<Expr> relevantRhsExprs = Lists.newArrayList();
       for (int i = 0; i < inputSmap.size(); ++i) {
         Expr rhsExpr = inputSmap.getRhs().get(i);
         // Ignore substitutions that are irrelevant at this plan node and its ancestors.
-        if (!rhsExpr.isBoundByTupleIds(input.getTupleIds())) continue;
-        rhsExpr.collect(TupleIsNullPredicate.class, tupleIsNullPredsToMaterialize);
+        if (rhsExpr.isBoundByTupleIds(input.getTupleIds())) {
+          relevantRhsExprs.add(rhsExpr);
+        }
       }
-      Expr.removeDuplicates(tupleIsNullPredsToMaterialize);
 
-      // Materialize relevant unique TupleIsNullPredicates.
-      for (Expr tupleIsNullPred: tupleIsNullPredsToMaterialize) {
-        SlotDescriptor sortSlotDesc = analyzer_.addSlotDescriptor(sortTupleDesc);
-        sortSlotDesc.setType(tupleIsNullPred.getType());
-        sortSlotDesc.setIsMaterialized(true);
-        sortSlotDesc.setSourceExpr(tupleIsNullPred);
-        sortSlotDesc.setLabel(tupleIsNullPred.toSql());
-        sortSlotExprs.add(tupleIsNullPred.clone());
-      }
+      SortInfo.materializeTupleIsNullPredicates(sortTupleDesc, relevantRhsExprs,
+          sortSlotExprs, sortSmap, analyzer_);
     }
 
     SortInfo sortInfo = new SortInfo(sortExprs, isAsc, nullsFirst);

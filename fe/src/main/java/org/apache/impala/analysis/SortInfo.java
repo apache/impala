@@ -192,8 +192,9 @@ public class SortInfo {
     // materialized ordering exprs. Using a LinkedHashSet prevents the slots getting
     // reordered unnecessarily.
     Set<SlotRef> sourceSlots = Sets.newLinkedHashSet();
-    TreeNode.collect(Expr.substituteList(resultExprs, substOrderBy, analyzer, false),
-        Predicates.instanceOf(SlotRef.class), sourceSlots);
+    List<Expr> substResultExprs =
+        Expr.substituteList(resultExprs, substOrderBy, analyzer, false);
+    TreeNode.collect(substResultExprs, Predicates.instanceOf(SlotRef.class), sourceSlots);
     TreeNode.collect(Expr.substituteList(orderingExprs_, substOrderBy, analyzer, false),
         Predicates.instanceOf(SlotRef.class), sourceSlots);
     for (SlotRef origSlotRef: sourceSlots) {
@@ -207,6 +208,9 @@ public class SortInfo {
         sortTupleExprs.add(origSlotRef);
       }
     }
+
+    materializeTupleIsNullPredicates(
+        sortTupleDesc, substResultExprs, sortTupleExprs, substOrderBy, analyzer);
 
     // The ordering exprs are evaluated against the sort tuple, so they must reflect the
     // materialization decision above.
@@ -246,5 +250,32 @@ public class SortInfo {
       }
     }
     return substOrderBy;
+  }
+
+  /**
+   * Collects the unique TupleIsNullPredicates from 'exprs' and for each one:
+   * - Materializes it into a new slot in 'sortTupleDesc'
+   * - Adds it to 'sortSlotExprs'
+   * - Adds an entry in 'substOrderBy' mapping it to a SlotRef into the new slot
+   */
+  public static void materializeTupleIsNullPredicates(TupleDescriptor sortTupleDesc,
+      List<Expr> exprs, List<Expr> sortSlotExprs, ExprSubstitutionMap substOrderBy,
+      Analyzer analyzer) {
+    List<Expr> tupleIsNullPreds = Lists.newArrayList();
+    TreeNode.collect(
+        exprs, Predicates.instanceOf(TupleIsNullPredicate.class), tupleIsNullPreds);
+    Expr.removeDuplicates(tupleIsNullPreds);
+
+    // Materialize relevant unique TupleIsNullPredicates.
+    for (Expr tupleIsNullPred: tupleIsNullPreds) {
+      SlotDescriptor sortSlotDesc = analyzer.addSlotDescriptor(sortTupleDesc);
+      sortSlotDesc.setType(tupleIsNullPred.getType());
+      sortSlotDesc.setIsMaterialized(true);
+      sortSlotDesc.setSourceExpr(tupleIsNullPred);
+      sortSlotDesc.setLabel(tupleIsNullPred.toSql());
+      SlotRef cloneRef = new SlotRef(sortSlotDesc);
+      substOrderBy.put(tupleIsNullPred, cloneRef);
+      sortSlotExprs.add(tupleIsNullPred.clone());
+    }
   }
 }

@@ -388,6 +388,16 @@ NumRowErrors: 0
 ---- RESULTS
 ====
 ---- QUERY
+# IMPALA-6280: check that TupleIsNullPredicate is materialized correctly
+upsert into table tdata (id, vali)
+select t1.id, v.id from functional.alltypestiny t1
+left outer join (select ifnull(id, 10) id from functional.alltypessmall) v
+on t1.id = v.id limit 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+====
+---- QUERY
 create table multiple_key_cols
   (string_col string, bigint_col bigint, tinyint_col tinyint, smallint_col smallint,
    bool_col boolean null, int_col int null, double_col double null,
