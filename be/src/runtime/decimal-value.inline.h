@@ -267,12 +267,12 @@ inline int128_t SubtractLarge(int128_t x, int x_scale, int128_t y, int y_scale,
   int result_scale_decrease = max_scale - result_scale;
   DCHECK_GE(result_scale_decrease, 0);
 
-  right = x_right + y_right;
   left = x_left + y_left;
+  right = x_right + y_right;
   // Overflow is not possible because one number is positive and the other one is
   // negative.
-  DCHECK(abs(right) < DecimalUtil::MAX_UNSCALED_DECIMAL16);
-  DCHECK(abs(left) < DecimalUtil::MAX_UNSCALED_DECIMAL16);
+  DCHECK(abs(left) <= DecimalUtil::MAX_UNSCALED_DECIMAL16);
+  DCHECK(abs(right) <= DecimalUtil::MAX_UNSCALED_DECIMAL16);
   // If the whole and fractional parts have different signs, then we need to make the
   // fractional part have the same sign as the whole part. If either left or right is
   // zero, then nothing needs to be done.

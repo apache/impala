@@ -1611,7 +1611,7 @@ DecimalTestCase decimal_cases[] = {
     {{ false, false, StringToInt128("-85070591730234615865843651857942052863"), 38, 0 }}},
   { "cast(42535295865117307932921825928971026432 as decimal(38,0)) + "
     "cast(-42535295865117307932921825928971026431 as decimal(38,0))",
-    {{ false, false, StringToInt128("1"), 38, 0 }}},
+    {{ false, false, 1, 38, 0 }}},
   { "cast(99999999999999999999999999999999.999999 as decimal(38,6)) + "
     "cast(8899999999999999999999999999999.999999 as decimal(38,6))",
     {{ false, true, 0, 38, 6 },
@@ -1647,10 +1647,10 @@ DecimalTestCase decimal_cases[] = {
     {{ false, false, StringToInt128("22222222222222222222222222222223333332"), 38, 6 }}},
   { "cast(-11111111111111111111111111111111.777777 as decimal(38,6)) + "
     "cast(11111111111111111111111111111111.555555 as decimal(38,6))",
-    {{ false, false, StringToInt128("-222222"), 38, 6 }}},
+    {{ false, false, -222222, 38, 6 }}},
   { "cast(11111111111111111111111111111111.777777 as decimal(38,6)) + "
     "cast(-11111111111111111111111111111111.555555 as decimal(38,6))",
-    {{ false, false, StringToInt128("222222"), 38, 6 }}},
+    {{ false, false, 222222, 38, 6 }}},
   { "cast(-11111111111111111111111111111111.777777 as decimal(38,6)) + "
     "cast(-11111111111111111111111111111111.555555 as decimal(38,6))",
     {{ false, false, StringToInt128("-22222222222222222222222222222223333332"), 38, 6 }}},
@@ -1721,11 +1721,20 @@ DecimalTestCase decimal_cases[] = {
      { false, false, StringToInt128("20000000000000000000000000000000000000"), 38, 37 }}},
   { "cast(-0.99999999999999999999999999999999999999 as decimal(38,38)) + "
     "cast(0.99999999999999999999999999999999999999 as decimal(38,38))",
-    {{ false, false, StringToInt128("0"), 38, 38 },
-     { false, false, StringToInt128("0"), 38, 37 }}},
+    {{ false, false, 0, 38, 38 },
+     { false, false, 0, 38, 37 }}},
   { "cast(0 as decimal(38,38)) + cast(0 as decimal(38,38))",
-    {{ false, false, StringToInt128("0"), 38, 38 },
-     { false, false, StringToInt128("0"), 38, 37 }}},
+    {{ false, false, 0, 38, 38 },
+     { false, false, 0, 38, 37 }}},
+  // IMPALA-6292
+  { "cast(1 as decimal(13,12)) - "
+    "cast(0.99999999999999999999999999999999999999 as decimal(38,38))",
+     {{ false, false, 1, 38, 38 },
+      { false, false, 0, 38, 36 }}},
+  { "cast(0.1 as decimal(13,12)) - "
+    "cast(99999999999999999999999999999999999999 as decimal(38,0))",
+     {{ false, true, 0, 38, 12 },
+      { true, false, 0, 38, 6 }}},
   // Test multiply operator
   { "cast(1.23 as decimal(30,2)) * cast(1 as decimal(10,3))",
     {{ false, false, 123000, 38, 5 }}},
