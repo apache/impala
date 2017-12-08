@@ -485,6 +485,26 @@ TEST_F(LlvmCodeGenTest, HandleLinkageError) {
   codegen->Close();
 }
 
+// Test that the default whitelisting disables the expected attributes.
+TEST_F(LlvmCodeGenTest, CpuAttrWhitelist) {
+  // Non-existent attributes should be disabled regardless of initial states.
+  // Whitelisted attributes like sse2 and lzcnt should retain their initial
+  // state.
+  EXPECT_EQ(vector<string>(
+          {"-dummy1", "-dummy2", "-dummy3", "-dummy4", "+sse2", "-lzcnt"}),
+      LlvmCodeGen::ApplyCpuAttrWhitelist(
+          {"+dummy1", "+dummy2", "-dummy3", "+dummy4", "+sse2", "-lzcnt"}));
+
+  // IMPALA-6291: Test that all AVX512 attributes are disabled.
+  vector<string> avx512_attrs;
+  EXPECT_EQ(vector<string>(
+        {"-avx512ifma", "-avx512dqavx512er", "-avx512f", "-avx512bw", "-avx512vl",
+         "-avx512cd", "-avx512vbmi", "-avx512pf"}),
+      LlvmCodeGen::ApplyCpuAttrWhitelist(
+        {"+avx512ifma", "+avx512dqavx512er", "+avx512f", "+avx512bw", "+avx512vl",
+         "+avx512cd", "+avx512vbmi", "+avx512pf"}));
+}
+
 }
 
 int main(int argc, char **argv) {

@@ -540,6 +540,7 @@ class LlvmCodeGen {
  private:
   friend class ExprCodegenTest;
   friend class LlvmCodeGenTest;
+  friend class LlvmCodeGenTest_CpuAttrWhitelist_Test;
   friend class SubExprElimination;
 
   /// Top level codegen object. 'module_id' is used for debugging when outputting the IR.
@@ -658,6 +659,14 @@ class LlvmCodeGen {
   /// Destroy the IR module, freeing memory used by the IR. Any machine code that was
   /// generated is retained by the execution engine.
   void DestroyModule();
+
+  /// Disable CPU attributes in 'cpu_attrs' that are not present in
+  /// the '--llvm_cpu_attr_whitelist' flag. The same attributes in the input are
+  /// always present in the output, except "+" is flipped to "-" for the disabled
+  /// attributes. E.g. if 'cpu_attrs' is {"+x", "+y", "-z"} and the whitelist is
+  /// {"x", "z"}, returns {"+x", "-y", "-z"}.
+  static std::vector<std::string> ApplyCpuAttrWhitelist(
+      const std::vector<std::string>& cpu_attrs);
 
   /// Whether InitializeLlvm() has been called.
   static bool llvm_initialized_;

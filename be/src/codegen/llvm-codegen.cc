@@ -101,6 +101,19 @@ DEFINE_string(opt_module_dir, "",
 DEFINE_string(asm_module_dir, "",
     "if set, saves disassembly for generated IR modules to the specified directory.");
 DECLARE_string(local_library_dir);
+// IMPALA-6291: AVX-512 and other CPU attrs the community doesn't routinely test are
+// disabled. AVX-512 is affected by known bugs in LLVM 3.9.1. The following attrs that
+// exist in LLVM 3.9.1 are disabled: avx512bw,avx512cd,avx512dq,avx512er,avx512f,
+// avx512ifma,avx512pf,avx512vbmi,avx512vl,clflushopt,clwb,fma4,mwaitx.1.2,pcommit,pku,
+// prefetchwt1,sgx,sha,sse4a,tbm,xop,xsavec,xsaves. If new attrs are added to LLVM,
+// they will be disabled until added to this whitelist.
+DEFINE_string_hidden(llvm_cpu_attr_whitelist, "adx,aes,avx,avx2,bmi,bmi2,cmov,cx16,f16c,"
+    "fma,fsgsbase,hle,invpcid,lzcnt,mmx,movbe,pclmul,popcnt,prfchw,rdrnd,rdseed,rtm,smap,"
+    "sse,sse2,sse3,sse4.1,sse4.2,ssse3,xsave,xsaveopt",
+    "(Experimental) a comma-separated list of LLVM CPU attribute flags that are enabled "
+    "for runtime code generation. The default flags are a known-good set that are "
+    "routinely tested. This flag is provided to enable additional LLVM CPU attribute "
+    "flags for testing.");
 
 namespace impala {
 
@@ -138,8 +151,10 @@ Status LlvmCodeGen::InitializeLlvm(bool load_backend) {
   cpu_name_ = llvm::sys::getHostCPUName().str();
   LOG(INFO) << "CPU class for runtime code generation: " << cpu_name_;
   GetHostCPUAttrs(&cpu_attrs_);
-  target_features_attr_ = boost::algorithm::join(cpu_attrs_, ",");
-  LOG(INFO) << "CPU flags for runtime code generation: " << target_features_attr_;
+  LOG(INFO) << "Detected CPU flags: " << boost::join(cpu_attrs_, ",");
+  cpu_attrs_ = ApplyCpuAttrWhitelist(cpu_attrs_);
+  target_features_attr_ = boost::join(cpu_attrs_, ",");
+  LOG(INFO) << "CPU flags enabled for runtime code generation: " << target_features_attr_;
 
   // Write an empty map file for perf to find.
   if (FLAGS_perf_map) CodegenSymbolEmitter::WritePerfMap();
@@ -1635,6 +1650,31 @@ llvm::Constant* LlvmCodeGen::ConstantsToGVArrayPtr(llvm::Type* element_type,
   llvm::ArrayType* array_type = llvm::ArrayType::get(element_type, ir_constants.size());
   llvm::Constant* array_const = llvm::ConstantArray::get(array_type, ir_constants);
   return ConstantToGVPtr(array_type, array_const, name);
+}
+
+vector<string> LlvmCodeGen::ApplyCpuAttrWhitelist(const vector<string>& cpu_attrs) {
+  vector<string> result;
+  vector<string> attr_whitelist;
+  boost::split(attr_whitelist, FLAGS_llvm_cpu_attr_whitelist, boost::is_any_of(","));
+  for (const string& attr : cpu_attrs) {
+    DCHECK_GE(attr.size(), 1);
+    DCHECK(attr[0] == '-' || attr[0] == '+') << attr;
+    if (attr[0] == '-') {
+      // Already disabled - copy it over unmodified.
+      result.push_back(attr);
+      continue;
+    }
+    const string attr_name = attr.substr(1);
+    auto it = std::find(attr_whitelist.begin(), attr_whitelist.end(), attr_name);
+    if (it != attr_whitelist.end()) {
+      // In whitelist - copy it over unmodified.
+      result.push_back(attr);
+    } else {
+      // Not in whitelist - disable it.
+      result.push_back("-" + attr_name);
+    }
+  }
+  return result;
 }
 
 void LlvmCodeGen::DiagnosticHandler::DiagnosticHandlerFn(
