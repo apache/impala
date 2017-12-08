@@ -612,7 +612,11 @@ public class Planner {
 
     boolean partialSort = false;
     if (insertStmt.getTargetTable() instanceof KuduTable) {
-      if (!insertStmt.hasNoClusteredHint() && !ctx_.isSingleNodeExec()) {
+      // Always sort if the 'clustered' hint is present. Otherwise, don't sort if either
+      // the 'noclustered' hint is present, or this is a single node exec, or if the
+      // target table is unpartitioned.
+      if (insertStmt.hasClusteredHint() || (!insertStmt.hasNoClusteredHint()
+          && !ctx_.isSingleNodeExec() && !insertStmt.getPartitionKeyExprs().isEmpty())) {
         orderingExprs.add(
             KuduUtil.createPartitionExpr(insertStmt, ctx_.getRootAnalyzer()));
         orderingExprs.addAll(insertStmt.getPrimaryKeyExprs());

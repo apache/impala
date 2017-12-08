@@ -204,28 +204,36 @@ public class DistributedPlanner {
       return inputFragment;
     }
 
-    // Make a cost-based decision only if no user hint was supplied and this is not a Kudu
-    // table. TODO: consider making a cost based decision for Kudu tables.
-    if (!insertStmt.hasShuffleHint()
-        && !(insertStmt.getTargetTable() instanceof KuduTable)) {
-      // If the existing partition exprs are a subset of the table partition exprs, check
-      // if it is distributed across all nodes. If so, don't repartition.
-      if (Expr.isSubset(inputPartition.getPartitionExprs(), partitionExprs)) {
-        long numPartitions = getNumDistinctValues(inputPartition.getPartitionExprs());
-        if (numPartitions >= inputFragment.getNumNodes()) return inputFragment;
-      }
+    // Make a cost-based decision only if no user hint was supplied.
+    if (!insertStmt.hasShuffleHint()) {
+      if (insertStmt.getTargetTable() instanceof KuduTable) {
+        // If the table is unpartitioned or all of the partition exprs are constants,
+        // don't insert the exchange.
+        // TODO: make a more sophisticated decision here for partitioned tables and when
+        // we have info about tablet locations.
+        if (partitionExprs.isEmpty()) return inputFragment;
+      } else {
+        // If the existing partition exprs are a subset of the table partition exprs,
+        // check if it is distributed across all nodes. If so, don't repartition.
+        if (Expr.isSubset(inputPartition.getPartitionExprs(), partitionExprs)) {
+          long numPartitions = getNumDistinctValues(inputPartition.getPartitionExprs());
+          if (numPartitions >= inputFragment.getNumNodes()) {
+            return inputFragment;
+          }
+        }
 
-      // Don't repartition if we know we have fewer partitions than nodes
-      // (ie, default to repartitioning if col stats are missing).
-      // TODO: We want to repartition if the resulting files would otherwise
-      // be very small (less than some reasonable multiple of the recommended block size).
-      // In order to do that, we need to come up with an estimate of the avg row size
-      // in the particular file format of the output table/partition.
-      // We should always know on how many nodes our input is running.
-      long numPartitions = getNumDistinctValues(partitionExprs);
-      Preconditions.checkState(inputFragment.getNumNodes() != -1);
-      if (numPartitions > 0 && numPartitions <= inputFragment.getNumNodes()) {
-        return inputFragment;
+        // Don't repartition if we know we have fewer partitions than nodes
+        // (ie, default to repartitioning if col stats are missing).
+        // TODO: We want to repartition if the resulting files would otherwise
+        // be very small (less than some reasonable multiple of the recommended block
+        // size). In order to do that, we need to come up with an estimate of the avg row
+        // size in the particular file format of the output table/partition.
+        // We should always know on how many nodes our input is running.
+        long numPartitions = getNumDistinctValues(partitionExprs);
+        Preconditions.checkState(inputFragment.getNumNodes() != -1);
+        if (numPartitions > 0 && numPartitions <= inputFragment.getNumNodes()) {
+          return inputFragment;
+        }
       }
     }
 
