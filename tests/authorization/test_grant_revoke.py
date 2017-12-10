@@ -69,7 +69,7 @@ class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
     self.client.execute("create role grant_revoke_test_admin")
     try:
       self.client.execute("grant all on server to grant_revoke_test_admin")
-      self.client.execute("grant role grant_revoke_test_admin to group %s" % group_name)
+      self.client.execute("grant role grant_revoke_test_admin to group `%s`" % group_name)
       self.cleanup_db('grant_rev_db', sync_ddl=0)
     finally:
       self.client.execute("drop role grant_revoke_test_admin")
@@ -117,7 +117,7 @@ class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
       self.client.execute("create role {0}".format(role_name))
       self.client.execute("grant all on server to {0}".format(role_name))
       self.client.execute(
-          "grant role {0} to group {1}".format(
+          "grant role {0} to group `{1}`".format(
            role_name, grp.getgrnam(getuser()).gr_name))
 
       self.client.execute("create database " + db_name)
@@ -180,7 +180,7 @@ class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
       # Wait a few seconds to make sure the update propagates to the statestore.
       sleep(3)
       # Update the role, increasing its catalog verion.
-      self.client.execute("grant role {0} to group {1}".format(
+      self.client.execute("grant role {0} to group `{1}`".format(
           role_name, grp.getgrnam(getuser()).gr_name))
       result = self.client.execute("show tables in functional")
       assert 'alltypes' in result.data

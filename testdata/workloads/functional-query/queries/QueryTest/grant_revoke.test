@@ -37,7 +37,7 @@ grant all on server to grant_revoke_test_ALL_SERVER
 ---- QUERY
 # Group name will be replaced with the actual user's group in the test
 # framework.
-grant role grant_revoke_test_ALL_SERVER to group $GROUP_NAME
+grant role grant_revoke_test_ALL_SERVER to group `$GROUP_NAME`
 ====
 ---- QUERY
 show current roles
@@ -152,7 +152,7 @@ show create function grant_rev_db.fn
 STRING
 ====
 ---- QUERY
-revoke role grant_revoke_test_ALL_SERVER from group $GROUP_NAME
+revoke role grant_revoke_test_ALL_SERVER from group `$GROUP_NAME`
 ====
 ---- QUERY
 create database grant_rev_db location '$FILESYSTEM_PREFIX/test-warehouse/grant_rev_db.db'
@@ -186,7 +186,7 @@ show create function _impala_builtins.sin
 STRING
 ====
 ---- QUERY
-grant role grant_revoke_test_ALL_TEST_DB to group $GROUP_NAME
+grant role grant_revoke_test_ALL_TEST_DB to group `$GROUP_NAME`
 ====
 ---- QUERY
 # Should now have all privileges on the test db
@@ -207,7 +207,7 @@ create table grant_rev_db.test_tbl2(i int) location '$FILESYSTEM_PREFIX/test-war
 does not have privileges to access: $NAMENODE/test-warehouse/grant_rev_test_tbl2
 ====
 ---- QUERY
-grant role grant_revoke_test_ALL_URI to group $GROUP_NAME
+grant role grant_revoke_test_ALL_URI to group `$GROUP_NAME`
 ====
 ---- QUERY
 grant all on uri '$FILESYSTEM_PREFIX/test-warehouse/grant_rev_test_tbl2' to grant_revoke_test_ALL_URI
@@ -286,7 +286,7 @@ show tables in grant_rev_db
 does not have privileges to access: grant_rev_db.*
 ====
 ---- QUERY
-grant role grant_revoke_test_SELECT_INSERT_TEST_TBL to group $GROUP_NAME
+grant role grant_revoke_test_SELECT_INSERT_TEST_TBL to group `$GROUP_NAME`
 ====
 ---- QUERY
 GRANT SELECT ON TABLE grant_rev_db.test_tbl1 TO grant_revoke_test_SELECT_INSERT_TEST_TBL
@@ -349,14 +349,14 @@ User 'test_user' does not have privileges to execute: DROP_ROLE
 ---- USER
 test_user
 ---- QUERY
-grant role grant_revoke_test_ALL_SERVER to group $GROUP_NAME
+grant role grant_revoke_test_ALL_SERVER to group `$GROUP_NAME`
 ---- CATCH
 User 'test_user' does not have privileges to execute: GRANT_ROLE
 ====
 ---- USER
 test_user
 ---- QUERY
-revoke role grant_revoke_test_ALL_SERVER from group $GROUP_NAME
+revoke role grant_revoke_test_ALL_SERVER from group `$GROUP_NAME`
 ---- CATCH
 User 'test_user' does not have privileges to execute: REVOKE_ROLE
 ====
@@ -486,12 +486,12 @@ STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 root
 ====
 ---- QUERY
-REVOKE ROLE grant_revoke_test_ALL_URI FROM GROUP $GROUP_NAME;
-REVOKE ROLE grant_revoke_test_SELECT_INSERT_TEST_TBL FROM GROUP $GROUP_NAME;
+REVOKE ROLE grant_revoke_test_ALL_URI FROM GROUP `$GROUP_NAME`;
+REVOKE ROLE grant_revoke_test_SELECT_INSERT_TEST_TBL FROM GROUP `$GROUP_NAME`;
 ---- RESULTS
 ====
 ---- QUERY
-GRANT ROLE grant_revoke_test_ALL_SERVER TO GROUP $GROUP_NAME
+GRANT ROLE grant_revoke_test_ALL_SERVER TO GROUP `$GROUP_NAME`
 ---- RESULTS
 ====
 ---- QUERY
@@ -693,7 +693,7 @@ scope, database, table, column, uri, privilege, grant_option, create_time
 STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
-revoke role grant_revoke_test_ALL_SERVER from group $GROUP_NAME
+revoke role grant_revoke_test_ALL_SERVER from group `$GROUP_NAME`
 ====
 ---- QUERY
 # Test 'grant all on server' with explicit server name specified.
@@ -704,7 +704,7 @@ create role grant_revoke_test_ALL_SERVER1
 grant all on server server1 to grant_revoke_test_ALL_SERVER1
 ====
 ---- QUERY
-grant role grant_revoke_test_ALL_SERVER1 to group $GROUP_NAME
+grant role grant_revoke_test_ALL_SERVER1 to group `$GROUP_NAME`
 ====
 ---- QUERY
 drop database grant_rev_db cascade
@@ -713,7 +713,7 @@ drop database grant_rev_db cascade
 create database grant_rev_db location '$FILESYSTEM_PREFIX/test-warehouse/grant_rev_db.db'
 ====
 ---- QUERY
-revoke role grant_revoke_test_ALL_SERVER1 from group $GROUP_NAME
+revoke role grant_revoke_test_ALL_SERVER1 from group `$GROUP_NAME`
 ====
 ---- QUERY
 create database grant_rev_db location '$FILESYSTEM_PREFIX/test-warehouse/grant_rev_db.db'
@@ -743,14 +743,14 @@ STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ---- QUERY
 # IMPALA-4951: make sure database is visible to a user having only column level access
 # to a table in the database
-grant role grant_revoke_test_ALL_SERVER to group $GROUP_NAME
+grant role grant_revoke_test_ALL_SERVER to group `$GROUP_NAME`
 ---- RESULTS
 ====
 ---- QUERY
 create role grant_revoke_test_COLUMN_PRIV
 ====
 ---- QUERY
-grant role grant_revoke_test_COLUMN_PRIV to group $GROUP_NAME;
+grant role grant_revoke_test_COLUMN_PRIV to group `$GROUP_NAME`;
 ====
 ---- QUERY
 create database if not exists grant_rev_db;
@@ -759,7 +759,7 @@ create database if not exists grant_rev_db;
 create table grant_rev_db.test_tbl4 (col1 int, col2 int);
 ====
 ---- QUERY
-revoke role grant_revoke_test_ALL_SERVER from group $GROUP_NAME
+revoke role grant_revoke_test_ALL_SERVER from group `$GROUP_NAME`
 ====
 ---- QUERY
 show grant role grant_revoke_test_COLUMN_PRIV
@@ -798,17 +798,17 @@ show databases
 STRING,STRING
 ====
 ---- QUERY
-grant role grant_revoke_test_ALL_SERVER to group $GROUP_NAME
+grant role grant_revoke_test_ALL_SERVER to group `$GROUP_NAME`
 ---- RESULTS
 ====
 ---- QUERY
 drop database if exists grant_rev_db cascade
 ====
 ---- QUERY
-revoke role grant_revoke_test_ALL_SERVER from group $GROUP_NAME
+revoke role grant_revoke_test_ALL_SERVER from group `$GROUP_NAME`
 ====
 ---- QUERY
-revoke role grant_revoke_test_COLUMN_PRIV from group $GROUP_NAME
+revoke role grant_revoke_test_COLUMN_PRIV from group `$GROUP_NAME`
 ====
 ---- QUERY
 # Cleanup test roles

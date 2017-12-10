@@ -255,12 +255,12 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     try:
       for pool in ['', 'not_a_pool_name']:
         expected_error =\
-            "No mapping found for request from user '\w+' with requested pool '%s'"\
+            "No mapping found for request from user '\S+' with requested pool '%s'"\
             % (pool)
         self.__check_pool_rejected(client, pool, expected_error)
 
       # Check rejected if user does not have access.
-      expected_error = "Request from user '\w+' with requested pool 'root.queueC' "\
+      expected_error = "Request from user '\S+' with requested pool 'root.queueC' "\
           "denied access to assigned pool 'root.queueC'"
       self.__check_pool_rejected(client, 'root.queueC', expected_error)
 

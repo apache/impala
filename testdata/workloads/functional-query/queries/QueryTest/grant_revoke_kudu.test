@@ -16,7 +16,7 @@ show roles
 STRING
 ====
 ---- QUERY
-grant role grant_revoke_test_ALL_SERVER to group $GROUP_NAME
+grant role grant_revoke_test_ALL_SERVER to group `$GROUP_NAME`
 ====
 ---- QUERY
 grant all on server to grant_revoke_test_ALL_SERVER
@@ -25,14 +25,14 @@ grant all on server to grant_revoke_test_ALL_SERVER
 create database grant_rev_db
 ====
 ---- QUERY
-grant role grant_revoke_test_ALL_TEST_DB to group $GROUP_NAME
+grant role grant_revoke_test_ALL_TEST_DB to group `$GROUP_NAME`
 ====
 ---- QUERY
 # Should now have all privileges on the test db
 grant all on database grant_rev_db to grant_revoke_test_ALL_TEST_DB
 ====
 ---- QUERY
-revoke role grant_revoke_test_ALL_SERVER from group $GROUP_NAME
+revoke role grant_revoke_test_ALL_SERVER from group `$GROUP_NAME`
 ====
 ---- QUERY
 show current roles
@@ -88,7 +88,7 @@ alter table grant_rev_db.kudu_tbl set tblproperties('external'='true');
 does not have privileges to access:
 ====
 ---- QUERY
-grant role grant_revoke_test_ALL_SERVER to group $GROUP_NAME
+grant role grant_revoke_test_ALL_SERVER to group `$GROUP_NAME`
 ====
 ---- QUERY
 # Now the alter table succeeds
@@ -102,13 +102,13 @@ alter table grant_rev_db.kudu_tbl set tblproperties('EXTERNAL'='FALSE');
 create role grant_revoke_test_KUDU
 ====
 ---- QUERY
-grant role grant_revoke_test_KUDU to group $GROUP_NAME;
+grant role grant_revoke_test_KUDU to group `$GROUP_NAME`;
 ====
 ---- QUERY
-revoke role grant_revoke_test_ALL_SERVER from group $GROUP_NAME
+revoke role grant_revoke_test_ALL_SERVER from group `$GROUP_NAME`
 ====
 ---- QUERY
-revoke role grant_revoke_test_ALL_TEST_DB from group $GROUP_NAME
+revoke role grant_revoke_test_ALL_TEST_DB from group `$GROUP_NAME`
 ====
 ---- QUERY
 insert into grant_rev_db.kudu_tbl values (1, "foo");
