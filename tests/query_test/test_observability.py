@@ -109,6 +109,7 @@ class TestObservability(ImpalaTestSuite):
         "NUM_NODES=1,NUM_SCANNER_THREADS=1,RUNTIME_FILTER_MODE=0,MT_DOP=0\n" \
         in runtime_profile
 
+  @SkipIfLocal.multiple_impalad
   def test_profile_fragment_instances(self):
     """IMPALA-6081: Test that the expected number of fragment instances and their exec
     nodes appear in the runtime profile, even when fragments may be quickly cancelled when
