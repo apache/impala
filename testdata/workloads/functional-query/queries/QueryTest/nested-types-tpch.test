@@ -135,7 +135,7 @@ t1.c_orders t3,
 t3.item.o_lineitems t4
 WHERE t1.c_custkey < 100 AND t2.p_partkey < 100
 GROUP BY 1
-HAVING int_col <= 5
+HAVING COALESCE(t2.p_size, t4.pos, o_orderkey) <= 5
 ORDER BY 1
 ---- RESULTS
 1,177

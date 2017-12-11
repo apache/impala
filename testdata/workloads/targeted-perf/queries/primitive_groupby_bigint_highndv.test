@@ -6,7 +6,7 @@ SELECT l_orderkey,
        count(*) AS cnt
 FROM lineitem
 GROUP BY l_orderkey
-HAVING cnt > 9999999999999;
+HAVING count(*) > 9999999999999;
 ---- RESULTS
 ---- TYPES
 BIGINT,BIGINT

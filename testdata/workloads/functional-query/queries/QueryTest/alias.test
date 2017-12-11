@@ -1,0 +1,87 @@
+====
+---- QUERY
+# GROUP BY alias
+select int_col / 2 as x from alltypes group by x
+---- RESULTS
+1.5
+3.5
+4.5
+3
+1
+0.5
+4
+0
+2
+2.5
+---- TYPES
+double
+====
+---- QUERY
+# GROUP BY alias ORDER BY alias
+select int_col / 2 as x from alltypes group by x order by x
+---- RESULTS
+0
+0.5
+1
+1.5
+2
+2.5
+3
+3.5
+4
+4.5
+---- TYPES
+double
+====
+---- QUERY
+# HAVING with bool typed alias
+select int_col / 2 as x, not bool_col as nb
+from alltypes group by x, nb having nb
+---- RESULTS
+0.5,true
+3.5,true
+1.5,true
+4.5,true
+2.5,true
+---- TYPES
+double,boolean
+====
+---- QUERY
+# count(*) alias ORDER BY
+select count(*) a from alltypes order by a
+---- RESULTS
+7300
+---- TYPES
+bigint
+====
+---- QUERY
+# count(*) > 10 alias ORDER BY
+select count(*) > 10 a from alltypes order by a
+---- RESULTS
+true
+---- TYPES
+boolean
+====
+---- QUERY
+# count(*) > 10 alias HAVING
+select count(*) > 10 a from alltypes having a
+---- RESULTS
+true
+---- TYPES
+boolean
+====
+---- QUERY
+# sum(id) over(order by id) alias ORDER BY
+select sum(id) over(order by id) a from alltypestiny order by a
+---- RESULTS
+0
+1
+3
+6
+10
+15
+21
+28
+---- TYPES
+bigint
+====

@@ -98,12 +98,12 @@ predicates: float_col != 0
    tuple-ids=0 row-size=116B cardinality=500
 ====
 # Test aggregation.
-select sum(1 + 1 + id) sm
+select sum(1 + 1 + id)
 from functional.alltypes
 group by timestamp_col = cast('2015-11-15' as timestamp) + interval 1 year
 having 1024 * 1024 * count(*) % 2 = 0
-  and (sm > 1 or sm > 1)
-  and (sm between 5 and 10)
+  and (sum(1 + 1 + id) > 1 or sum(1 + 1 + id) > 1)
+  and (sum(1 + 1 + id) between 5 and 10)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=138.00MB mem-reservation=1.94MB

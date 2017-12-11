@@ -295,7 +295,7 @@ DECIMAL,DECIMAL,DECIMAL
 # Test AVG() with DECIMAL_V1
 set decimal_v2=false;
 select avg(l_extendedprice) as a from tpch_parquet.lineitem
-group by l_tax having a > 38247.190 order by 1;
+group by l_tax having avg(l_extendedprice) > 38247.190 order by 1;
 ---- RESULTS
 38250.48
 38251.62
@@ -309,7 +309,7 @@ DECIMAL
 # Test AVG() with DECIMAL_V2
 set decimal_v2=true;
 select avg(l_extendedprice) as a from tpch_parquet.lineitem
-group by l_tax having a > 38247.190 order by 1;
+group by l_tax having avg(l_extendedprice) > 38247.190 order by 1;
 ---- RESULTS
 38247.196745
 38250.487309

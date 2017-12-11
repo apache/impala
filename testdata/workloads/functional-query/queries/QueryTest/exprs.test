@@ -2622,7 +2622,8 @@ select count(now()) c, avg(cast('2016-11-22 16:40:00.00' as timestamp)) a,
 from functional_parquet.alltypes
 where timestamp_col < cast('2013-02-18 20:46:00.01' as timestamp)
 group by g
-having a = cast('2016-11-22 16:40:00.00' as timestamp)
+having avg(cast('2016-11-22 16:40:00.00' as timestamp)) =
+           cast('2016-11-22 16:40:00.00' as timestamp)
 order by c, cast('2016-11-22 16:40:00.00' as timestamp)
 ---- RESULTS
 7300,2016-11-22 16:40:00,2016-11-22 16:40:00
@@ -2651,8 +2652,8 @@ BIGINT
 select tinyint_col, count(*) cnt
 from functional_parquet.alltypesagg
 group by 1
-having cnt > 1000 or cnt > 1000
-  and cnt between 1500 and 2500
+having count(*) > 1000 or count(*) > 1000
+  and count(*) between 1500 and 2500
 ---- TYPES
 TINYINT, BIGINT
 ---- RESULTS

@@ -197,7 +197,7 @@ public abstract class QueryStmt extends StatementBase {
       isAscOrder.add(Boolean.valueOf(orderByElement.isAsc()));
       nullsFirstParams.add(orderByElement.getNullsFirstParam());
     }
-    substituteOrdinalsAliases(orderingExprs, "ORDER BY", analyzer);
+    substituteOrdinalsAndAliases(orderingExprs, "ORDER BY", analyzer);
 
     if (!analyzer.isRootAnalyzer() && hasOffset() && !hasLimit()) {
       throw new AnalysisException("Order-by with offset without limit not supported" +
@@ -268,41 +268,42 @@ public abstract class QueryStmt extends StatementBase {
   }
 
   /**
-   * Return the first expr in exprs that is a non-unique alias. Return null if none of
-   * exprs is an ambiguous alias.
+   * Substitutes an ordinal or an alias. An ordinal is an integer NumericLiteral
+   * that refers to a select-list expression by ordinal. An alias is a SlotRef
+   * that matches the alias of a select-list expression (tracked by 'aliasMap_').
+   * We should substitute by ordinal or alias but not both to avoid an incorrect
+   * double substitution.
+   * Returns clone() of 'expr' if it is not an ordinal, nor an alias.
+   * The returned expr is analyzed regardless of whether substitution was performed.
    */
-  protected Expr getFirstAmbiguousAlias(List<Expr> exprs) {
-    for (Expr exp: exprs) {
-      if (ambiguousAliasList_.contains(exp)) return exp;
+  protected Expr substituteOrdinalOrAlias(Expr expr, String errorPrefix,
+      Analyzer analyzer) throws AnalysisException {
+    Expr substituteExpr = trySubstituteOrdinal(expr, errorPrefix, analyzer);
+    if (substituteExpr != null) return substituteExpr;
+    if (ambiguousAliasList_.contains(expr)) {
+      throw new AnalysisException("Column '" + expr.toSql() +
+          "' in " + errorPrefix + " clause is ambiguous");
     }
-    return null;
+    if (expr instanceof SlotRef) {
+      substituteExpr = expr.trySubstitute(aliasSmap_, analyzer, false);
+    } else {
+      expr.analyze(analyzer);
+      substituteExpr = expr;
+    }
+    return substituteExpr;
   }
 
   /**
-   * Substitute exprs of the form "<number>"  with the corresponding
-   * expressions and any alias references in aliasSmap_.
-   * Modifies exprs list in-place.
+   * Substitutes top-level ordinals and aliases. Does not substitute ordinals and
+   * aliases in subexpressions.
+   * Modifies the 'exprs' list in-place.
+   * The 'exprs' are all analyzed after this function regardless of whether
+   * substitution was performed.
    */
-  protected void substituteOrdinalsAliases(List<Expr> exprs, String errorPrefix,
+  protected void substituteOrdinalsAndAliases(List<Expr> exprs, String errorPrefix,
       Analyzer analyzer) throws AnalysisException {
-    Expr ambiguousAlias = getFirstAmbiguousAlias(exprs);
-    if (ambiguousAlias != null) {
-      throw new AnalysisException("Column '" + ambiguousAlias.toSql() +
-          "' in " + errorPrefix + " clause is ambiguous");
-    }
-
-    ListIterator<Expr> i = exprs.listIterator();
-    while (i.hasNext()) {
-      Expr expr = i.next();
-      // We can substitute either by ordinal or by alias.
-      // If we substitute by ordinal, we should not replace any aliases, since
-      // the new expression was copied from the select clause context, where
-      // alias substitution is not performed in the same way.
-      Expr substituteExpr = trySubstituteOrdinal(expr, errorPrefix, analyzer);
-      if (substituteExpr == null) {
-        substituteExpr = expr.trySubstitute(aliasSmap_, analyzer, false);
-      }
-      i.set(substituteExpr);
+    for (int i = 0; i < exprs.size(); ++i) {
+      exprs.set(i, substituteOrdinalOrAlias(exprs.get(i), errorPrefix, analyzer));
     }
   }
 

@@ -1070,7 +1070,7 @@ inner join (select bigint_col, count(tinyint_col) x, max(smallint_col) y, min(in
             from functional.alltypessmall
             group by bigint_col
 # assigned in agg node and scan of t1
-            having x + y > 10) t2
+            having count(tinyint_col) + max(smallint_col) > 10) t2
   on (t1.id = t2.x and t1.tinyint_col = t2.y)
 inner join (select count(tinyint_col) x, max(smallint_col) y, min(int_col) z
             from functional.alltypestiny) t3

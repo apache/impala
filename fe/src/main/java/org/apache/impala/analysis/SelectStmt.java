@@ -541,13 +541,12 @@ public class SelectStmt extends QueryStmt {
     // Analyze the HAVING clause first so we can check if it contains aggregates.
     // We need to analyze/register it even if we are not computing aggregates.
     if (havingClause_ != null) {
-      if (havingClause_.contains(Predicates.instanceOf(Subquery.class))) {
+      havingPred_ = substituteOrdinalOrAlias(havingClause_, "HAVING", analyzer);
+      // can't contain subqueries
+      if (havingPred_.contains(Predicates.instanceOf(Subquery.class))) {
         throw new AnalysisException(
             "Subqueries are not supported in the HAVING clause.");
       }
-      // substitute aliases in place (ordinals not allowed in having clause)
-      havingPred_ = havingClause_.substitute(aliasSmap_, analyzer, false);
-      havingPred_.checkReturnsBool("HAVING clause", true);
       // can't contain analytic exprs
       Expr analyticExpr = havingPred_.findFirstOf(AnalyticExpr.class);
       if (analyticExpr != null) {
@@ -555,6 +554,7 @@ public class SelectStmt extends QueryStmt {
             "HAVING clause must not contain analytic expressions: "
                + analyticExpr.toSql());
       }
+      havingPred_.checkReturnsBool("HAVING clause", true);
     }
 
     if (groupingExprs_ == null && !selectList_.isDistinct()
@@ -615,7 +615,7 @@ public class SelectStmt extends QueryStmt {
       // exprs during analysis (in case we need to print them later)
       groupingExprsCopy = Expr.cloneList(groupingExprs_);
 
-      substituteOrdinalsAliases(groupingExprsCopy, "GROUP BY", analyzer);
+      substituteOrdinalsAndAliases(groupingExprsCopy, "GROUP BY", analyzer);
 
       for (int i = 0; i < groupingExprsCopy.size(); ++i) {
         groupingExprsCopy.get(i).analyze(analyzer);
@@ -887,6 +887,23 @@ public class SelectStmt extends QueryStmt {
     }
   }
 
+  /**
+   * If given expr is rewritten into an integer literal, then return the original expr,
+   * otherwise return the rewritten expr.
+   * Used for GROUP BY, ORDER BY, and HAVING where we don't want to create an ordinal
+   * from a constant arithmetic expr, e.g. 1 * 2 =/=> 2
+   */
+  private Expr rewriteCheckOrdinalResult(ExprRewriter rewriter, Expr expr)
+      throws AnalysisException {
+    Expr rewrittenExpr = rewriter.rewrite(expr, analyzer_);
+    if (rewrittenExpr.isLiteral() && rewrittenExpr.getType().isIntegerType()) {
+      return expr;
+    }
+    else {
+      return rewrittenExpr;
+    }
+  }
+
   @Override
   public void rewriteExprs(ExprRewriter rewriter) throws AnalysisException {
     Preconditions.checkState(isAnalyzed());
@@ -900,12 +917,17 @@ public class SelectStmt extends QueryStmt {
       for (Subquery s: subqueryExprs) s.getStatement().rewriteExprs(rewriter);
     }
     if (havingClause_ != null) {
-      havingClause_ = rewriter.rewrite(havingClause_, analyzer_);
+      havingClause_ = rewriteCheckOrdinalResult(rewriter, havingClause_);
     }
-    if (groupingExprs_ != null) rewriter.rewriteList(groupingExprs_, analyzer_);
+    if (groupingExprs_ != null) {
+      for (int i = 0; i < groupingExprs_.size(); ++i) {
+        groupingExprs_.set(i, rewriteCheckOrdinalResult(
+            rewriter, groupingExprs_.get(i)));
+      }
+    }
     if (orderByElements_ != null) {
       for (OrderByElement orderByElem: orderByElements_) {
-        orderByElem.setExpr(rewriter.rewrite(orderByElem.getExpr(), analyzer_));
+        orderByElem.setExpr(rewriteCheckOrdinalResult(rewriter, orderByElem.getExpr()));
       }
     }
   }

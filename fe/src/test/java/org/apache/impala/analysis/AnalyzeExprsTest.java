@@ -951,11 +951,6 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "select id, tinyint_col, sum(distinct tinyint_col) over(order by id) "
           + "from functional.alltypes",
         "DISTINCT not allowed in analytic function");
-    // select list alias needs to be ignored
-    AnalysisError(
-        "select min(id) over (order by tinyint_col) as X from functional.alltypes "
-          + "group by id, tinyint_col order by rank() over (order by X)",
-        "Nesting of analytic expressions is not allowed");
     // IGNORE NULLS may only be used with first_value/last_value
     AnalysisError(
         "select sum(id ignore nulls) over (order by id) from functional.alltypes",
@@ -1005,7 +1000,6 @@ public class AnalyzeExprsTest extends AnalyzerTest {
           + "order by rank() over (order by tinyint_col), int_col) "
           + "from functional.alltypes",
         "Nesting of analytic expressions is not allowed");
-
     // lead/lag variants
     AnalyzesOk(
         "select lag(int_col, 10, 5 + 1) over (partition by id, bool_col "
