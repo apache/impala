@@ -119,7 +119,7 @@ static bool AdjustToSameScale(const Decimal16Value& x, int x_scale,
 
 // Accelerate using lookup table.
 template <typename RESULT_T>
-static bool AdjustToSameScaleLookupTbl(const Decimal16Value& x, int x_scale,
+static void AdjustToSameScaleLookupTbl(const Decimal16Value& x, int x_scale,
     const Decimal16Value& y, int y_scale, int result_precision, RESULT_T* x_scaled,
     RESULT_T* y_scaled) {
   int delta_scale = x_scale - y_scale;
@@ -128,21 +128,12 @@ static bool AdjustToSameScaleLookupTbl(const Decimal16Value& x, int x_scale,
     *x_scaled = x.value();
     *y_scaled = y.value();
   } else if (delta_scale > 0) {
-    if (sizeof(RESULT_T) == 16 && result_precision == ColumnType::MAX_PRECISION &&
-        DecimalUtil::GetScaleQuotient(delta_scale) < abs(y.value())) {
-      return true;
-    }
     *x_scaled = x.value();
     *y_scaled = y.value() * scale_factor;
   } else {
-    if (sizeof(RESULT_T) == 16 && result_precision == ColumnType::MAX_PRECISION &&
-        DecimalUtil::GetScaleQuotient(-delta_scale) < abs(x.value())) {
-      return true;
-    }
     *x_scaled = x.value() * scale_factor;
     *y_scaled = y.value();
   }
-  return false;
 }
 
 #if 5 <= __GNUC__ || __has_builtin(__builtin_add_overflow)
@@ -175,7 +166,7 @@ DecimalValue<RESULT_T> AddLookupTbl(const Decimal16Value& val, int this_scale,
   DCHECK_EQ(result_scale, std::max(this_scale, other_scale));
   RESULT_T x = 0;
   RESULT_T y = 0;
-  *overflow |= AdjustToSameScaleLookupTbl(val, this_scale, other, other_scale,
+  AdjustToSameScaleLookupTbl(val, this_scale, other, other_scale,
       result_precision, &x, &y);
   if (sizeof(RESULT_T) == 16) {
     // Check overflow.

@@ -1570,19 +1570,28 @@ DecimalTestCase decimal_cases[] = {
   // Test add/subtract operators
   { "1.23 + cast(1 as decimal(4,3))", {{ false, false, 2230, 5, 3 }}},
   { "1.23 - cast(0.23 as decimal(10,3))", {{ false, false, 1000, 11, 3 }}},
-  { "cast(1.23 as decimal(8,2)) + cast(1 as decimal(20,3))", {{ false, false, 2230, 21, 3 }}},
-  { "cast(1.23 as decimal(30,2)) - cast(1 as decimal(4,3))", {{ false, false, 230, 32, 3 }}},
-  { "cast(1 as decimal(38,0)) + cast(0.2 as decimal(38,1))", {{ false, false, 12, 38, 1 }}},
-  { "cast(100000000000000000000000000000000 as decimal(38,0)) + cast(0 as decimal(38,38))",
+  { "cast(1.23 as decimal(8,2)) + cast(1 as decimal(20,3))",
+      {{ false, false, 2230, 21, 3 }}},
+  { "cast(1.23 as decimal(30,2)) - cast(1 as decimal(4,3))",
+      {{ false, false, 230, 32, 3 }}},
+  { "cast(1 as decimal(38,0)) + cast(0.2 as decimal(38,1))",
+      {{ false, false, 12, 38, 1 }}},
+  { "cast(88928 as decimal(11,2)) + cast(0 as decimal(9,1))",
+      {{ false, false, 8892800, 12, 2 }}},
+  { "cast(100000000000000000000000000000000 as decimal(38,0)) + "
+    "cast(0 as decimal(38,38))",
     {{ false, true, 0, 38, 38 },
      { true, false, 0, 38, 6 }}},
-  { "cast(-100000000000000000000000000000000 as decimal(38,0)) + cast(0 as decimal(38,38))",
+  { "cast(-100000000000000000000000000000000 as decimal(38,0)) + "
+    "cast(0 as decimal(38,38))",
     {{ false, true, 0, 38, 38 },
      { true, false, 0, 38, 6 }}},
-  { "cast(99999999999999999999999999999999 as decimal(38,0)) + cast(0 as decimal(38,38))",
+  { "cast(99999999999999999999999999999999 as decimal(38,0)) + "
+    "cast(0 as decimal(38,38))",
     {{ false, true, 0, 38, 38 },
      { false, false, StringToInt128("99999999999999999999999999999999000000"), 38, 6 }}},
-  { "cast(-99999999999999999999999999999999 as decimal(38,0)) + cast(0 as decimal(38,38))",
+  { "cast(-99999999999999999999999999999999 as decimal(38,0)) + "
+    "cast(0 as decimal(38,38))",
     {{ false, true, 0, 38, 38 },
      { false, false, StringToInt128("-99999999999999999999999999999999000000"), 38, 6 }}},
   { "cast(99999999999999999999999999.9999999999 as decimal(36,10)) + "
@@ -2468,6 +2477,13 @@ DecimalTestCase decimal_cases[] = {
   { "cast(5316911983139663491615228241121378304 as decimal(38,0)) % "
     "cast(8507059173023461586584365185794205286.3 as decimal(38,1))",
     {{ false, false, StringToInt128("53169119831396634916152282411213783040"), 38, 1 }}},
+  // IMPALA-6300: Incorrect results due to overflow when adjusting to the same scale
+  { "cast(11111 as decimal(6,1)) % cast(2 as decimal(8,6))",
+    {{ false, false, 1000000, 8, 6 }}},
+  { "cast(11111 as decimal(6,1)) % cast(2 as decimal(18,16))",
+    {{ false, false, StringToInt128("10000000000000000"), 18, 16 }}},
+  { "cast(11111 as decimal(6,1)) % cast(2 as decimal(37,35))",
+    {{ false, false, StringToInt128("100000000000000000000000000000000000"), 37, 35 }}},
   // Test MOD builtin
   { "mod(cast('1' as decimal(2,0)), cast('10' as decimal(2,0)))",
     {{ false, false, 1, 2, 0 }}},

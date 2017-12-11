@@ -140,25 +140,37 @@ inline DecimalValue<T> DecimalValue<T>::ScaleTo(int src_scale, int dst_scale,
 
 namespace detail {
 
+// Helper function that checks for multiplication overflow. We only check for overflow
+// if may_overflow is false.
+template <typename T>
+inline T SafeMultiply(T a, T b, bool may_overflow) {
+  T result = a * b;
+  DCHECK(may_overflow || a == 0 || result / a == b);
+  return result;
+}
+
 // If we have a number with 'num_lz' leading zeros, and we scale it up by 10^scale_diff,
 // this function returns the minimum number of leading zeros the result would have.
 inline int MinLeadingZerosAfterScaling(int num_lz, int scale_diff) {
   DCHECK_GE(scale_diff, 0);
+  DCHECK_LE(scale_diff, 38);
   // We will rely on the following formula to estimate the number of leading zeros after
   // scaling up: Lz(a*b) >= Lz(a) - floor(log2(b)) - 1
   // We precompute floor(log2(10^b)) for b = 0, 1, 2, 3...
   static const int floor_log2[] = {
-      0, 3, 6, 9, 13, 16, 19, 23, 26, 29, 33, 36, 39, 43, 46, 49, 53, 56, 59, 63, 66, 69,
-      73, 76, 79, 83, 86, 89, 93, 96, 99, 102, 106, 109, 112, 116, 119, 122, 126, 129 };
+      0,  3,   6,   9,   13,  16,  19,  23,  26,  29,
+      33, 36,  39,  43,  46,  49,  53,  56,  59,  63,
+      66, 69,  73,  76,  79,  83,  86,  89,  93,  96,
+      99, 102, 106, 109, 112, 116, 119, 122, 126 };
   return num_lz - floor_log2[scale_diff] - 1;
 }
 
 // Returns the minimum number of leading zero x or y would have after one of them gets
 // scaled up to match the scale of the other one.
-template<typename RESULT_T>
-inline int MinLeadingZeros(RESULT_T x, int x_scale, RESULT_T y, int y_scale) {
-  int x_lz = BitUtil::CountLeadingZeros(abs(x));
-  int y_lz = BitUtil::CountLeadingZeros(abs(y));
+template<typename T>
+inline int MinLeadingZeros(T x, int x_scale, T y, int y_scale) {
+  int x_lz = BitUtil::CountLeadingZeros<T>(abs(x));
+  int y_lz = BitUtil::CountLeadingZeros<T>(abs(y));
   if (x_scale < y_scale) {
     x_lz = detail::MinLeadingZerosAfterScaling(x_lz, y_scale - x_scale);
   } else if (x_scale > y_scale) {
@@ -229,7 +241,7 @@ inline int128_t AddLarge(int128_t x, int x_scale, int128_t y, int y_scale,
       left > (DecimalUtil::MAX_UNSCALED_DECIMAL16 - right) / mult)) {
     *overflow = true;
   }
-  return (left * mult) + right;
+  return SafeMultiply(left, mult, *overflow) + right;
 }
 
 // Subtracts numbers that are large enough so that we can't subtract directly. Neither
@@ -282,7 +294,7 @@ inline int128_t SubtractLarge(int128_t x, int x_scale, int128_t y, int y_scale,
   if (UNLIKELY(abs(left) > (DecimalUtil::MAX_UNSCALED_DECIMAL16 - abs(right)) / mult)) {
     *overflow = true;
   }
-  return (left * mult) + right;
+  return SafeMultiply(left, mult, *overflow) + right;
 }
 
 }
@@ -298,9 +310,7 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Add(int this_scale,
     DCHECK_EQ(result_scale, std::max(this_scale, other_scale));
     RESULT_T x = 0;
     RESULT_T y = 0;
-    *overflow |= AdjustToSameScale(*this, this_scale, other, other_scale,
-        result_precision, &x, &y);
-    DCHECK(!*overflow) << "Cannot overflow unless result is Decimal16Value";
+    AdjustToSameScale(*this, this_scale, other, other_scale, result_precision, &x, &y);
     return DecimalValue<RESULT_T>(x + y);
   }
 
@@ -322,9 +332,7 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Add(int this_scale,
     // leading zeros.
     RESULT_T x = 0;
     RESULT_T y = 0;
-    bool ovf = AdjustToSameScale(*this, this_scale, other, other_scale,
-        result_precision, &x, &y);
-    DCHECK(!ovf) << "Cannot overflow because the leading zero estimate passed";
+    AdjustToSameScale(*this, this_scale, other, other_scale, result_precision, &x, &y);
     DCHECK(abs(x) <= DecimalUtil::MAX_UNSCALED_DECIMAL16 - abs(y));
     x += y;
     if (result_scale_decrease > 0) {
@@ -404,7 +412,7 @@ DecimalValue<RESULT_T> DecimalValue<T>::Multiply(int this_scale,
     }
   } else {
     if (delta_scale == 0) {
-      result = x * y;
+      result = detail::SafeMultiply(x, y, false);
       if (UNLIKELY(result_precision == ColumnType::MAX_PRECISION &&
           abs(result) > DecimalUtil::MAX_UNSCALED_DECIMAL16)) {
         // An overflow is possible here, if, for example, x = (2^64 - 1) and
@@ -412,7 +420,7 @@ DecimalValue<RESULT_T> DecimalValue<T>::Multiply(int this_scale,
         *overflow = true;
       }
     } else if (LIKELY(delta_scale <= 38)) {
-      result = x * y;
+      result = detail::SafeMultiply(x, y, false);
       // The largest value that result can have here is (2^64 - 1) * (2^63 - 1), which is
       // greater than MAX_UNSCALED_DECIMAL16.
       result = DecimalUtil::ScaleDownAndRound<RESULT_T>(result, delta_scale, round);
@@ -515,40 +523,66 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Mod(int this_scale,
   if (UNLIKELY(*is_nan)) return DecimalValue<RESULT_T>();
 
   RESULT_T result;
-  bool ovf = false;
-  // We check if it is possible to compute the result without having to convert the two
-  // inputs to int256_t, which is very slow.
-  if (sizeof(RESULT_T) < 16 ||
-      result_precision < 38 ||
-      // If the scales are the same, there is no danger in overflowing due to scaling up.
-      this_scale == other_scale ||
-      detail::MinLeadingZeros(value(), this_scale, other.value(), other_scale) >= 2) {
-    RESULT_T x, y;
-    ovf = AdjustToSameScale(*this, this_scale, other, other_scale,
-        result_precision, &x, &y);
-    result = x % y;
-    DCHECK(abs(result) < abs(y));
-  } else {
-    int256_t x_256 = ConvertToInt256(value());
-    int256_t y_256 = ConvertToInt256(other.value());
-    if (this_scale < other_scale) {
-      x_256 *= DecimalUtil::GetScaleMultiplier<int256_t>(other_scale - this_scale);
-    } else {
-      y_256 *= DecimalUtil::GetScaleMultiplier<int256_t>(this_scale - other_scale);
+  switch (sizeof(RESULT_T)) {
+    case 4: {
+      int64_t x, y;
+      AdjustToSameScale(*this, this_scale, other, other_scale, result_precision, &x, &y);
+      DCHECK(abs(x % y) <= DecimalUtil::MAX_UNSCALED_DECIMAL4);
+      result = x % y;
+      break;
     }
-    int256_t intermediate_result = x_256 % y_256;
-    result = ConvertToInt128(intermediate_result,
-        DecimalUtil::MAX_UNSCALED_DECIMAL16, &ovf);
-    DCHECK(abs(result) <= abs(value()) || abs(result) < abs(other.value()));
+    case 8: {
+      if (detail::MinLeadingZeros<RESULT_T>(
+          value(), this_scale, other.value(), other_scale) >= 2) {
+        int64_t x, y;
+        AdjustToSameScale(*this, this_scale, other, other_scale,
+            result_precision, &x, &y);
+        DCHECK(abs(x % y) <= DecimalUtil::MAX_UNSCALED_DECIMAL8);
+        result = x % y;
+      } else {
+        int128_t x, y;
+        AdjustToSameScale(*this, this_scale, other, other_scale,
+            result_precision, &x, &y);
+        DCHECK(abs(x % y) <= DecimalUtil::MAX_UNSCALED_DECIMAL8);
+        result = x % y;
+      }
+      break;
+    }
+    case 16: {
+      if (detail::MinLeadingZeros<RESULT_T>(
+          value(), this_scale, other.value(), other_scale) >= 2) {
+        int128_t x, y;
+        AdjustToSameScale(*this, this_scale, other, other_scale,
+            result_precision, &x, &y);
+        DCHECK(abs(x % y) <= DecimalUtil::MAX_UNSCALED_DECIMAL16);
+        result = x % y;
+      } else {
+        int256_t x_256 = ConvertToInt256(value());
+        int256_t y_256 = ConvertToInt256(other.value());
+        if (this_scale < other_scale) {
+          x_256 *= DecimalUtil::GetScaleMultiplier<int256_t>(other_scale - this_scale);
+        } else {
+          y_256 *= DecimalUtil::GetScaleMultiplier<int256_t>(this_scale - other_scale);
+        }
+        int256_t intermediate_result = x_256 % y_256;
+        bool ovf;
+        result = ConvertToInt128(intermediate_result,
+            DecimalUtil::MAX_UNSCALED_DECIMAL16, &ovf);
+        DCHECK(!ovf);
+      }
+      break;
+    }
+    default: {
+      DCHECK(false);
+    }
   }
-  // An overflow should be impossible.
-  DCHECK(!ovf);
+  DCHECK(abs(result) <= abs(value()) || abs(result) < abs(other.value()));
   return DecimalValue<RESULT_T>(result);
 }
 
-template<typename T>
+template <typename T>
 template <typename RESULT_T>
-inline bool DecimalValue<T>::AdjustToSameScale(const DecimalValue<T>& x, int x_scale,
+inline void DecimalValue<T>::AdjustToSameScale(const DecimalValue<T>& x, int x_scale,
     const DecimalValue<T>& y, int y_scale, int result_precision, RESULT_T* x_scaled,
     RESULT_T* y_scaled) {
   int delta_scale = x_scale - y_scale;
@@ -557,21 +591,12 @@ inline bool DecimalValue<T>::AdjustToSameScale(const DecimalValue<T>& x, int x_s
     *x_scaled = x.value();
     *y_scaled = y.value();
   } else if (delta_scale > 0) {
-    if (sizeof(RESULT_T) == 16 && result_precision == ColumnType::MAX_PRECISION &&
-        DecimalUtil::GetScaleQuotient(delta_scale) < abs(y.value())) {
-      return true;
-    }
     *x_scaled = x.value();
-    *y_scaled = y.value() * scale_factor;
+    *y_scaled = detail::SafeMultiply<RESULT_T>(y.value(), scale_factor, false);
   } else {
-    if (sizeof(RESULT_T) == 16 && result_precision == ColumnType::MAX_PRECISION &&
-        DecimalUtil::GetScaleQuotient(-delta_scale) < abs(x.value())) {
-      return true;
-    }
-    *x_scaled = x.value() * scale_factor;
+    *x_scaled = detail::SafeMultiply<RESULT_T>(x.value(), scale_factor, false);
     *y_scaled = y.value();
   }
-  return false;
 }
 
 /// For comparisons, we need the intermediate to be at the next precision
@@ -581,8 +606,7 @@ template <>
 inline int Decimal4Value::Compare(int this_scale, const Decimal4Value& other,
     int other_scale) const {
   int64_t x, y;
-  bool overflow = AdjustToSameScale(*this, this_scale, other, other_scale, 0, &x, &y);
-  DCHECK(!overflow) << "Overflow cannot happen with Decimal4Value";
+  AdjustToSameScale(*this, this_scale, other, other_scale, 0, &x, &y);
   if (x == y) return 0;
   if (x < y) return -1;
   return 1;
@@ -592,8 +616,7 @@ template <>
 inline int Decimal8Value::Compare(int this_scale, const Decimal8Value& other,
     int other_scale) const {
   int128_t x = 0, y = 0;
-  bool overflow = AdjustToSameScale(*this, this_scale, other, other_scale, 0, &x, &y);
-  DCHECK(!overflow) << "Overflow cannot happen with Decimal8Value";
+  AdjustToSameScale(*this, this_scale, other, other_scale, 0, &x, &y);
   if (x == y) return 0;
   if (x < y) return -1;
   return 1;

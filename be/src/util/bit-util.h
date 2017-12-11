@@ -287,13 +287,25 @@ class BitUtil {
     return __builtin_ctzll(v);
   }
 
-  static inline int CountLeadingZeros(unsigned __int128 v) {
-    if (UNLIKELY(v == 0)) return 128;
-    unsigned __int128 shifted = v >> 64;
-    if (shifted != 0) {
-      return __builtin_clzll(shifted);
+  template<typename T>
+  static inline int CountLeadingZeros(T v) {
+    DCHECK(v >= 0);
+    if (sizeof(T) == 4) {
+      uint32_t orig = static_cast<uint32_t>(v);
+      return __builtin_clz(orig);
+    } else if (sizeof(T) == 8) {
+      uint64_t orig = static_cast<uint64_t>(v);
+      return __builtin_clzll(orig);
     } else {
-      return __builtin_clzll(v) + 64;
+      DCHECK(sizeof(T) == 16);
+      if (UNLIKELY(v == 0)) return 128;
+      unsigned __int128 orig = static_cast<unsigned __int128>(v);
+      unsigned __int128 shifted = orig >> 64;
+      if (shifted != 0) {
+        return __builtin_clzll(shifted);
+      } else {
+        return __builtin_clzll(orig) + 64;
+      }
     }
   }
 
