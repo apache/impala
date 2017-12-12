@@ -91,17 +91,7 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
           hive_metastoreConstants.META_TABLE_STORAGE));
     }
 
-    if (getTargetTable() instanceof KuduTable && analyzer.getAuthzConfig().isEnabled()) {
-      // Checking for 'EXTERNAL' is case-insensitive, see IMPALA-5637.
-      boolean setsExternal =
-          MetaStoreUtil.findTblPropKeyCaseInsensitive(tblProperties_, "EXTERNAL") != null;
-      if (setsExternal || tblProperties_.containsKey(KuduTable.KEY_MASTER_HOSTS)) {
-        String authzServer = analyzer.getAuthzConfig().getServerName();
-        Preconditions.checkNotNull(authzServer);
-        analyzer.registerPrivReq(new PrivilegeRequestBuilder().onServer(
-            authzServer).all().toRequest());
-      }
-    }
+    if (getTargetTable() instanceof KuduTable) analyzeKuduTable(analyzer);
 
     // Check avro schema when it is set in avro.schema.url or avro.schema.literal to
     // avoid potential metadata corruption (see IMPALA-2042).
@@ -119,6 +109,30 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
 
     // Analyze 'sort.columns' property.
     analyzeSortColumns(getTargetTable(), tblProperties_);
+  }
+
+  private void analyzeKuduTable(Analyzer analyzer) throws AnalysisException {
+    // Checking for 'EXTERNAL' is case-insensitive, see IMPALA-5637.
+    String keyForExternalProperty =
+        MetaStoreUtil.findTblPropKeyCaseInsensitive(tblProperties_, "EXTERNAL");
+
+    // Throw error if kudu.table_name is provided for managed Kudu tables
+    // TODO IMPALA-6375: Allow setting kudu.table_name for managed Kudu tables
+    // if the 'EXTERNAL' property is set to TRUE in the same step.
+    if (!Table.isExternalTable(table_.getMetaStoreTable())) {
+      AnalysisUtils.throwIfNotNull(tblProperties_.get(KuduTable.KEY_TABLE_NAME),
+          String.format("Not allowed to set '%s' manually for managed Kudu tables .",
+              KuduTable.KEY_TABLE_NAME));
+    }
+    if (analyzer.getAuthzConfig().isEnabled()) {
+      if (keyForExternalProperty != null ||
+          tblProperties_.containsKey(KuduTable.KEY_MASTER_HOSTS)) {
+        String authzServer = analyzer.getAuthzConfig().getServerName();
+        Preconditions.checkNotNull(authzServer);
+        analyzer.registerPrivReq(new PrivilegeRequestBuilder().onServer(
+            authzServer).all().toRequest());
+      }
+    }
   }
 
   /**

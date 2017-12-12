@@ -92,12 +92,12 @@ public class ToSqlTest extends FrontendTestBase {
   }
 
   private void testToSql(String query, String defaultDb, String expected,
-      boolean ignore_whitespace) {
+      boolean ignoreWhitespace) {
     String actual = null;
     try {
       ParseNode node = AnalyzesOk(query, createAnalyzer(defaultDb));
       actual = node.toSql();
-      if (ignore_whitespace) {
+      if (ignoreWhitespace) {
         // Transform whitespace to single space.
         actual = actual.replace('\n', ' ').replaceAll(" +", " ").trim();
       }
@@ -315,7 +315,6 @@ public class ToSqlTest extends FrontendTestBase {
         "CREATE TABLE default.p ( a BIGINT PRIMARY KEY, b TIMESTAMP " +
         "DEFAULT '1987-05-19' ) PARTITION BY HASH (a) PARTITIONS 3 " +
         "STORED AS KUDU TBLPROPERTIES ('kudu.master_addresses'='foo', " +
-        "'kudu.table_name'='impala::default.p', " +
         "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler')", true);
   }
 
@@ -348,7 +347,6 @@ public class ToSqlTest extends FrontendTestBase {
         "CREATE TABLE default.p PRIMARY KEY (a, b) PARTITION BY HASH (a) PARTITIONS 3, " +
         "RANGE (b) (PARTITION VALUE = 1) STORED AS KUDU TBLPROPERTIES " +
         "('kudu.master_addresses'='foo', " +
-        "'kudu.table_name'='impala::default.p', " +
         "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler') AS " +
         "SELECT int_col a, bigint_col b FROM functional.alltypes", true);
   }

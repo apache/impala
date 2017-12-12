@@ -41,6 +41,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Ints;
+import com.google.common.collect.Maps;
 
 /**
  * Represents a CREATE TABLE statement.
@@ -111,6 +112,12 @@ public class CreateTableStmt extends StatementBase {
   Map<String, String> getSerdeProperties() { return tableDef_.getSerdeProperties(); }
   public THdfsFileFormat getFileFormat() { return tableDef_.getFileFormat(); }
   RowFormat getRowFormat() { return tableDef_.getRowFormat(); }
+  private String getGeneratedKuduTableName() {
+    return tableDef_.getGeneratedKuduTableName();
+  }
+  private void setGeneratedKuduTableName(String tableName) {
+    tableDef_.setGeneratedKuduTableName(tableName);
+  }
 
   // Only exposed for ToSqlUtils. Returns the list of primary keys declared by the user
   // at the table level. Note that primary keys may also be declared in column
@@ -158,7 +165,11 @@ public class CreateTableStmt extends StatementBase {
     params.setFile_format(getFileFormat());
     params.setIf_not_exists(getIfNotExists());
     params.setSort_columns(getSortColumns());
-    params.setTable_properties(getTblProperties());
+    params.setTable_properties(Maps.newHashMap(getTblProperties()));
+    if (!getGeneratedKuduTableName().isEmpty()) {
+      params.getTable_properties().put(KuduTable.KEY_TABLE_NAME,
+          getGeneratedKuduTableName());
+    }
     params.setSerde_properties(getSerdeProperties());
     for (KuduPartitionParam d: getKuduPartitionParams()) {
       params.addToPartition_by(d.toThrift());
@@ -294,13 +305,8 @@ public class CreateTableStmt extends StatementBase {
    * Analyzes and checks parameters specified for managed Kudu tables.
    */
   private void analyzeManagedKuduTableParams(Analyzer analyzer) throws AnalysisException {
-    // If no Kudu table name is specified in tblproperties, generate one using the
-    // current database as a prefix to avoid conflicts in Kudu.
-    // TODO: Disallow setting this manually for managed tables (IMPALA-5654).
-    if (!getTblProperties().containsKey(KuduTable.KEY_TABLE_NAME)) {
-      getTblProperties().put(KuduTable.KEY_TABLE_NAME,
-          KuduUtil.getDefaultCreateKuduTableName(getDb(), getTbl()));
-    }
+    analyzeManagedKuduTableName();
+
     // Check column types are valid Kudu types
     for (ColumnDef col: getColumnDefs()) {
       try {
@@ -335,6 +341,18 @@ public class CreateTableStmt extends StatementBase {
       analyzer.addWarning(
           "Unpartitioned Kudu tables are inefficient for large data sizes.");
     }
+  }
+
+  /**
+   * Generates a Kudu table name based on the target database and table and stores
+   * it in TableDef.generatedKuduTableName_. Throws if the Kudu table
+   * name was given manually via TBLPROPERTIES.
+   */
+  private void analyzeManagedKuduTableName() throws AnalysisException {
+    AnalysisUtils.throwIfNotNull(getTblProperties().get(KuduTable.KEY_TABLE_NAME),
+        String.format("Not allowed to set '%s' manually for managed Kudu tables .",
+            KuduTable.KEY_TABLE_NAME));
+    setGeneratedKuduTableName(KuduUtil.getDefaultCreateKuduTableName(getDb(), getTbl()));
   }
 
   /**
