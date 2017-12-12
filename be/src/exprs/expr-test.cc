@@ -1339,6 +1339,42 @@ TEST_F(ExprTest, LiteralExprs) {
   TestIsNull("null", TYPE_NULL);
 }
 
+// IMPALA-3942: Test escaping string literal for single/double quotes
+TEST_F(ExprTest, EscapeStringLiteral) {
+  TestStringValue(R"('"')", R"(")");
+  TestStringValue(R"("'")", R"(')");
+  TestStringValue(R"("\"")", R"(")");
+  TestStringValue(R"('\'')", R"(')");
+  TestStringValue(R"('\\"')", R"(\")");
+  TestStringValue(R"("\\'")", R"(\')");
+  TestStringValue(R"("\\\"")", R"(\")");
+  TestStringValue(R"('\\\'')", R"(\')");
+  TestStringValue(R"("\\\"\\'\\\"")", R"(\"\'\")");
+  TestStringValue(R"('\\\'\\"\\\'')", R"(\'\"\')");
+  TestStringValue(R"("\\")", R"(\)");
+  TestStringValue(R"('\\')", R"(\)");
+  TestStringValue(R"("\\\\")", R"(\\)");
+  TestStringValue(R"('\\\\')", R"(\\)");
+  TestStringValue(R"('a"b')", R"(a"b)");
+  TestStringValue(R"("a'b")", R"(a'b)");
+  TestStringValue(R"('a\"b')", R"(a"b)");
+  TestStringValue(R"('a\'b')", R"(a'b)");
+  TestStringValue(R"("a\"b")", R"(a"b)");
+  TestStringValue(R"("a\'b")", R"(a'b)");
+  TestStringValue(R"('a\\"b')", R"(a\"b)");
+  TestStringValue(R"("a\\'b")", R"(a\'b)");
+  TestStringValue(R"('a\\\'b')", R"(a\'b)");
+  TestStringValue(R"("a\\\"b")", R"(a\"b)");
+  TestStringValue(R"(concat("a'b", "c'd"))", R"(a'bc'd)");
+  TestStringValue(R"(concat('a"b', 'c"d'))", R"(a"bc"d)");
+  TestStringValue(R"(concat("a'b", 'c"d'))", R"(a'bc"d)");
+  TestStringValue(R"(concat('a"b', "c'd"))", R"(a"bc'd)");
+  TestStringValue(R"(concat("a\"b", 'c\'d'))", R"(a"bc'd)");
+  TestStringValue(R"(concat('a\'b', "c\"d"))", R"(a'bc"d)");
+  TestStringValue(R"(concat("a\\\"b", 'c\\\'d'))", R"(a\"bc\'d)");
+  TestStringValue(R"(concat('a\\\'b', "c\\\"d"))", R"(a\'bc\"d)");
+}
+
 TEST_F(ExprTest, ArithmeticExprs) {
   // Test float ops.
   TestFixedResultTypeOps<float, float, double>(min_float_values_[TYPE_FLOAT],

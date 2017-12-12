@@ -462,6 +462,22 @@ public class ToSqlTest extends FrontendTestBase {
         "SELECT `1 + 10`, `trim('abc')` FROM (SELECT 1 + 10, trim('abc')) t");
   }
 
+  @Test
+  public void normalizeStringLiteralTest() {
+    testToSql("select \"'\"", "SELECT '\\''");
+    testToSql("select \"\\'\"", "SELECT '\\''");
+    testToSql("select \"\\\\'\"", "SELECT '\\\\\\''");
+    testToSql("select '\"'", "SELECT '\"'");
+    testToSql("select '\\\"'", "SELECT '\"'");
+    testToSql("select '\\''", "SELECT '\\''");
+    testToSql("select '\\\\\\''", "SELECT '\\\\\\''");
+    testToSql("select regexp_replace(string_col, \"\\\\'\", \"'\") from " +
+        "functional.alltypes", "SELECT regexp_replace(string_col, '\\\\\\'', '\\'') " +
+        "FROM functional.alltypes");
+    testToSql("select * from functional.alltypes where '123' = \"123\"",
+        "SELECT * FROM functional.alltypes WHERE '123' = '123'");
+  }
+
   // Test the toSql() output of the where clause.
   @Test
   public void whereTest() {

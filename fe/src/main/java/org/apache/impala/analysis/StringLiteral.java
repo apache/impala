@@ -70,7 +70,7 @@ public class StringLiteral extends LiteralExpr {
   public int hashCode() { return value_.hashCode(); }
 
   @Override
-  public String toSqlImpl() { return "'" + value_ + "'"; }
+  public String toSqlImpl() { return "'" + getNormalizedValue() + "'"; }
 
   @Override
   protected void toThrift(TExprNode msg) {
@@ -84,7 +84,44 @@ public class StringLiteral extends LiteralExpr {
   public String getUnescapedValue() {
     // Unescape string exactly like Hive does. Hive's method assumes
     // quotes so we add them here to reuse Hive's code.
-    return BaseSemanticAnalyzer.unescapeSQLString("'" + value_ + "'");
+    return BaseSemanticAnalyzer.unescapeSQLString("'" + getNormalizedValue()
+        + "'");
+  }
+
+  /**
+   *  String literals can come directly from the SQL of a query or from rewrites like
+   *  constant folding. So this value normalization to a single-quoted string is necessary
+   *  because we do not know whether single or double quotes are appropriate.
+   *
+   *  @return a normalized representation of the string value suitable for embedding in
+   *          SQL as a single-quoted string literal.
+   */
+  private String getNormalizedValue() {
+    final int len = value_.length();
+    final StringBuilder sb = new StringBuilder(len);
+    for (int i = 0; i < len; ++i) {
+      final char currentChar = value_.charAt(i);
+      if (currentChar == '\\' && (i + 1) < len) {
+        final char nextChar = value_.charAt(i + 1);
+        // unescape an escaped double quote: remove back-slash in front of the quote.
+        if (nextChar == '"' || nextChar == '\'' || nextChar == '\\') {
+          if (nextChar != '"') {
+            sb.append(currentChar);
+          }
+          sb.append(nextChar);
+          ++i;
+          continue;
+        }
+
+        sb.append(currentChar);
+      } else if (currentChar == '\'') {
+        // escape a single quote: add back-slash in front of the quote.
+        sb.append("\\\'");
+      } else {
+        sb.append(currentChar);
+      }
+    }
+    return sb.toString();
   }
 
   @Override
@@ -159,8 +196,8 @@ public class StringLiteral extends LiteralExpr {
       return new NumericLiteral(val);
     }
     // Symbol is not an integer or floating point literal.
-    throw new AnalysisException(
-        "Failed to convert string literal '" + value_ + "' to number.");
+    throw new AnalysisException("Failed to convert string literal '"
+        + value_ + "' to number.");
   }
 
   @Override
