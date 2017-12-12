@@ -318,18 +318,6 @@ class TestKuduOperations(KuduTestSuite):
     cursor.execute("SELECT * FROM %s.foo" % (unique_database))
     assert cursor.fetchall() == [(0, )]
 
-  def test_kudu_rename_table(self, cursor, kudu_client, unique_database):
-    """Test Kudu table rename"""
-    cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY) PARTITION BY HASH(a)
-        PARTITIONS 3 STORED AS KUDU""" % unique_database)
-    kudu_tbl_name = KuduTestSuite.to_kudu_table_name(unique_database, "foo")
-    assert kudu_client.table_exists(kudu_tbl_name)
-    new_kudu_tbl_name = "blah"
-    cursor.execute("ALTER TABLE %s.foo SET TBLPROPERTIES('kudu.table_name'='%s')" % (
-        unique_database, new_kudu_tbl_name))
-    assert kudu_client.table_exists(new_kudu_tbl_name)
-    assert not kudu_client.table_exists(kudu_tbl_name)
-
   def test_kudu_show_unbounded_range_partition(self, cursor, kudu_client,
                                                unique_database):
     """Check that a single unbounded range partition gets printed correctly."""
@@ -854,36 +842,48 @@ class TestShowCreateTable(KuduTestSuite):
       create_sql_fmt % ("2009-01-01 00:00:00.000000999"),
       show_create_sql_fmt % ("1230768000000001"))
 
-  def test_properties(self, cursor):
-    # If an explicit table name is used for the Kudu table and it differs from what
-    # would be the default Kudu table name, the name should be shown as a table property.
-    kudu_table = self.random_table_name()
-    props = "'kudu.table_name'='%s'" % kudu_table
-    self.assert_show_create_equals(cursor,
-        """
-        CREATE TABLE {{table}} (c INT PRIMARY KEY)
-        PARTITION BY HASH (c) PARTITIONS 3
-        STORED AS KUDU
-        TBLPROPERTIES ({props})""".format(props=props),
-        """
-        CREATE TABLE {db}.{{table}} (
-          c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
-          PRIMARY KEY (c)
-        )
-        PARTITION BY HASH (c) PARTITIONS 3
-        STORED AS KUDU
-        TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}', {props})""".format(
-            db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS, props=props))
+  def test_external_kudu_table_name_with_show_create(self, cursor, kudu_client,
+      unique_database):
+    """Check that the generated kudu.table_name tblproperty is present with
+       show create table with external Kudu tables.
+    """
+    schema_builder = SchemaBuilder()
+    column_spec = schema_builder.add_column("id", INT64)
+    column_spec.nullable(False)
+    schema_builder.set_primary_keys(["id"])
+    partitioning = Partitioning().set_range_partition_columns(["id"])
+    schema = schema_builder.build()
 
-    # If the name is explicitly given (or not given at all) so that the name is the same
-    # as the default name, the table name is not shown.
-    props = "'kudu.table_name'='impala::{db}.{table}'"
+    kudu_table_name = self.random_table_name()
+    try:
+      kudu_client.create_table(kudu_table_name, schema, partitioning)
+      kudu_table = kudu_client.table(kudu_table_name)
+
+      table_name_prop = "'kudu.table_name'='%s'" % kudu_table.name
+      self.assert_show_create_equals(cursor,
+          """
+          CREATE EXTERNAL TABLE {{table}} STORED AS KUDU
+          TBLPROPERTIES({props})""".format(
+              props=table_name_prop),
+          """
+          CREATE EXTERNAL TABLE {db}.{{table}}
+          STORED AS KUDU
+          TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}', {kudu_table})""".format(
+              db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS,
+              kudu_table=table_name_prop))
+    finally:
+      if kudu_client.table_exists(kudu_table_name):
+        kudu_client.delete_table(kudu_table_name)
+
+  def test_managed_kudu_table_name_with_show_create(self, cursor):
+    """Check that the generated kudu.table_name tblproperty is not present with
+       show create table with managed Kudu tables.
+    """
     self.assert_show_create_equals(cursor,
         """
-        CREATE TABLE {{table}} (c INT PRIMARY KEY)
+        CREATE TABLE {table} (c INT PRIMARY KEY)
         PARTITION BY HASH (c) PARTITIONS 3
-        STORED AS KUDU
-        TBLPROPERTIES ({props})""".format(props=props),
+        STORED AS KUDU""",
         """
         CREATE TABLE {db}.{{table}} (
           c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
@@ -893,7 +893,6 @@ class TestShowCreateTable(KuduTestSuite):
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
-
 
 class TestDropDb(KuduTestSuite):
 
@@ -932,9 +931,9 @@ class TestDropDb(KuduTestSuite):
       managed_table_name = self.random_table_name()
       unique_cursor.execute("""
           CREATE TABLE %s (a INT PRIMARY KEY) PARTITION BY HASH (a) PARTITIONS 3
-          STORED AS KUDU TBLPROPERTIES ('kudu.table_name' = '%s')"""
-          % (managed_table_name, managed_table_name))
-      assert kudu_client.table_exists(managed_table_name)
+          STORED AS KUDU""" % managed_table_name)
+      kudu_table_name = "impala::" + db_name + "." + managed_table_name
+      assert kudu_client.table_exists(kudu_table_name)
 
       # Create a table in HDFS
       hdfs_table_name = self.random_table_name()

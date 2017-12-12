@@ -2079,9 +2079,16 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Cannot change the type of a Kudu column using an ALTER TABLE CHANGE COLUMN " +
         "statement: (INT vs BIGINT)");
 
-    // Rename the underlying Kudu table
-    AnalyzesOk("ALTER TABLE functional_kudu.testtbl SET " +
-        "TBLPROPERTIES ('kudu.table_name' = 'Hans')");
+    // Rename the underlying Kudu table is not supported for managed Kudu tables
+    AnalysisError("ALTER TABLE functional_kudu.testtbl SET " +
+        "TBLPROPERTIES ('kudu.table_name' = 'Hans')",
+        "Not allowed to set 'kudu.table_name' manually for managed Kudu tables");
+
+    // TODO IMPALA-6375: Allow setting kudu.table_name for managed Kudu tables
+    // if the 'EXTERNAL' property is set to TRUE in the same step.
+    AnalysisError("ALTER TABLE functional_kudu.testtbl SET " +
+        "TBLPROPERTIES ('EXTERNAL' = 'TRUE','kudu.table_name' = 'Hans')",
+        "Not allowed to set 'kudu.table_name' manually for managed Kudu tables");
 
     // ALTER TABLE RENAME TO
     AnalyzesOk("ALTER TABLE functional_kudu.testtbl RENAME TO new_testtbl");
@@ -2242,11 +2249,14 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "partition by range(unknown_column) (partition value = 'abc') stored as kudu",
         "Column 'unknown_column' in 'RANGE (unknown_column) (PARTITION VALUE = 'abc')' " +
         "is not a key column. Only key columns can be used in PARTITION BY");
-    // Kudu table name is specified in tblproperties
+    // Kudu num_tablet_replicas is specified in tblproperties
     AnalyzesOk("create table tab (x int primary key) partition by hash (x) " +
-        "partitions 8 stored as kudu tblproperties ('kudu.table_name'='tab_1'," +
-        "'kudu.num_tablet_replicas'='1'," +
+        "partitions 8 stored as kudu tblproperties ('kudu.num_tablet_replicas'='1'," +
         "'kudu.master_addresses' = '127.0.0.1:8080, 127.0.0.1:8081')");
+    // Kudu table name is specified in tblproperties resulting in an error
+    AnalysisError("create table tab (x int primary key) partition by hash (x) " +
+        "partitions 8 stored as kudu tblproperties ('kudu.table_name'='tab')",
+        "Not allowed to set 'kudu.table_name' manually for managed Kudu tables");
     // No port is specified in kudu master address
     AnalyzesOk("create table tdata_no_port (id int primary key, name string, " +
         "valf float, vali bigint) partition by range(id) (partition values <= 10, " +

@@ -344,20 +344,6 @@ select id, last_name from tbl_to_alter
 INT,STRING
 ====
 ---- QUERY
-# Rename the underlying Kudu table
-alter table tbl_to_alter set tblproperties('kudu.table_name'='kudu_tbl_to_alter')
----- RESULTS
-'Updated table.'
-====
----- QUERY
-# Create a new table and try to rename to an existing kudu table
-create table copy_of_tbl (a int primary key) partition by hash (a) partitions 3
-  stored as kudu tblproperties('kudu.table_name'='copy_of_tbl');
-alter table copy_of_tbl set tblproperties('kudu.table_name'='kudu_tbl_to_alter')
----- CATCH
-ImpalaRuntimeException: Error renaming Kudu table copy_of_tbl to kudu_tbl_to_alter
-====
----- QUERY
 # Ensure the Kudu table is accessible
 select count(*) from tbl_to_alter
 ---- RESULTS
@@ -379,25 +365,9 @@ select count(*) from kudu_tbl_to_alter
 BIGINT
 ====
 ---- QUERY
-# Rename Kudu table and insert a number of rows
-alter table copy_of_tbl set tblproperties('kudu.table_name'='shared_kudu_tbl');
-insert into copy_of_tbl values (1), (2), (3)
----- RUNTIME_PROFILE
-NumModifiedRows: 3
-NumRowErrors: 0
----- LABELS
-A
----- DML_RESULTS: copy_of_tbl
-1
-2
-3
----- TYPES
-INT
-====
----- QUERY
-# Create an external table
+# Create an external Kudu table pointing to an existing Kudu table
 create external table external_tbl stored as kudu
-tblproperties('kudu.table_name'='kudu_tbl_to_alter');
+  tblproperties('kudu.table_name'='impala::$DATABASE.tbl_to_alter');
 select count(*) from external_tbl
 ---- RESULTS
 5
@@ -405,8 +375,39 @@ select count(*) from external_tbl
 BIGINT
 ====
 ---- QUERY
+# Insert an item into the table pointed by the external Kudu table
+insert into kudu_tbl_to_alter (id, name, new_col1, new_col2)
+  values (7, 'test', 4, 400)
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, NAME, NEW_COL1, NEW_COL2, LAST_NAME, NEW_COL4
+---- DML_RESULTS: kudu_tbl_to_alter
+2,'test',1,100,'NULL',-1
+3,'test',10,1000,'NULL',-1
+4,'test',1,100,'NULL',NULL
+5,'test',2,200,'names',1
+6,'test',3,300,'NULL',-1
+7,'test',4,400,'NULL',-1
+---- TYPES
+INT,STRING,INT,BIGINT,STRING,INT
+====
+---- QUERY
+# After an insert into the underlying table check if the row count of the
+# external table pointing to it also increased.
+select count(*) from external_tbl;
+---- RESULTS
+6
+---- TYPES
+BIGINT
+====
+---- QUERY
 # Change the external table to point to a different Kudu table
-alter table external_tbl set tblproperties('kudu.table_name'='shared_kudu_tbl');
+create table temp_kudu_table (i int primary key) stored as kudu;
+insert into temp_kudu_table values (1), (2), (3);
+alter table external_tbl set
+  tblproperties('kudu.table_name'='impala::$DATABASE.temp_kudu_table');
 select count(*) from external_tbl
 ---- RESULTS
 3
@@ -464,7 +465,7 @@ alter table kudu_tbl_to_alter alter column new_col1 set default 10 + 5;
 ---- QUERY
 # check that the above defaults are applied
 insert into kudu_tbl_to_alter (id, last_name, new_col4)
-values (7, 'test', 8)
+values (8, 'test', 8)
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
@@ -474,7 +475,8 @@ NumRowErrors: 0
 4,'test',1,100,'NULL',NULL
 5,'test',2,200,'names',1
 6,'test',3,300,'NULL',-1
-7,'name_default',15,1000,'test',8
+7,'test',4,400,'NULL',-1
+8,'name_default',15,1000,'test',8
 ---- LABELS
 ID,NAME,NEW_COL1,NEW_COL2,LAST_NAME,NEW_COL4
 ---- TYPES
@@ -530,7 +532,7 @@ STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ---- QUERY
 # check that we can insert and scan after the storage attribute changes
 insert into kudu_tbl_to_alter (id, name, new_col1, new_col2, last_name, new_col4)
-values (8, 'nine', 10, 11, 'twelve', 13)
+values (9, 'nine', 10, 11, 'twelve', 13)
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
@@ -540,8 +542,9 @@ NumRowErrors: 0
 4,'test',1,100,'NULL',NULL
 5,'test',2,200,'names',1
 6,'test',3,300,'NULL',-1
-7,'name_default',15,1000,'test',8
-8,'nine',10,11,'twelve',13
+7,'test',4,400,'NULL',-1
+8,'name_default',15,1000,'test',8
+9,'nine',10,11,'twelve',13
 ---- LABELS
 ID,NAME,NEW_COL1,NEW_COL2,LAST_NAME,NEW_COL4
 ---- TYPES

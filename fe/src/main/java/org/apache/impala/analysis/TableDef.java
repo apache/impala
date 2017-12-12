@@ -88,6 +88,9 @@ class TableDef {
   // True if analyze() has been called.
   private boolean isAnalyzed_ = false;
 
+  //Kudu table name generated during analysis for managed Kudu tables
+  private String generatedKuduTableName_ = "";
+
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
@@ -160,6 +163,7 @@ class TableDef {
     dataLayout_.reset();
     columnDefs_.clear();
     isAnalyzed_ = false;
+    generatedKuduTableName_ = "";
   }
 
   public TableName getTblName() {
@@ -183,6 +187,11 @@ class TableDef {
   List<ColumnDef> getPrimaryKeyColumnDefs() { return primaryKeyColDefs_; }
   boolean isExternal() { return isExternal_; }
   boolean getIfNotExists() { return ifNotExists_; }
+  String getGeneratedKuduTableName() { return generatedKuduTableName_; }
+  void setGeneratedKuduTableName(String tableName) {
+    Preconditions.checkNotNull(tableName);
+    generatedKuduTableName_ = tableName;
+  }
   List<KuduPartitionParam> getKuduPartitionParams() {
     return dataLayout_.getKuduPartitionParams();
   }
