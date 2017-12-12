@@ -312,9 +312,9 @@ Status DataStreamSender::Channel::FlushAndSendEos(RuntimeState* state) {
   VLOG_RPC << "calling TransmitData(eos=true) to terminate channel.";
   rpc_status_ = DoTransmitDataRpc(&client, params, &res);
   if (!rpc_status_.ok()) {
-    return Status(rpc_status_.code(),
-       Substitute("TransmitData(eos=true) to $0 failed:\n $1",
-        TNetworkAddressToString(address_), rpc_status_.msg().msg()));
+    LOG(ERROR) << "Failed to send EOS to " << TNetworkAddressToString(address_)
+               << " : " << rpc_status_.GetDetail();
+    return rpc_status_;
   }
   return Status(res.status);
 }
