@@ -34,6 +34,14 @@
 
 #ifndef PCG_EXTRAS_HPP_INCLUDED
 #define PCG_EXTRAS_HPP_INCLUDED 1
+// To avoid of warning: 'PCG_USE_ZEROCHECK_ROTATE_IDIOM' is not defined, evaluates to 0
+#ifndef PCG_USE_ZEROCHECK_ROTATE_IDIOM
+#define PCG_USE_ZEROCHECK_ROTATE_IDIOM 0
+#endif // PCG_USE_ZEROCHECK_ROTATE_IDIOM
+// To avoid of warning: 'PCG_USE_INLINE_ASM' is not defined, evaluates to 0
+#ifndef PCG_USE_INLINE_ASM
+#define PCG_USE_INLINE_ASM 0
+#endif // PCG_USE_INLINE_ASM
 
 #include <cinttypes>
 #include <cstddef>
@@ -591,6 +599,9 @@ public:
  * value.
  */
 
+/* Disable the struct because the non-reproducability makes bugs
+ * harder to diagnose.
+ * warning: expansion of date or time macro is not reproducible
 template <typename IntType>
 struct static_arbitrary_seed {
 private:
@@ -604,6 +615,7 @@ public:
     static constexpr IntType value = fnv(IntType(2166136261U ^ sizeof(IntType)),
                         __DATE__ __TIME__ __FILE__);
 };
+*/
 
 // Sometimes, when debugging or testing, it's handy to be able print the name
 // of a (in human-readable form).  This code allows the idiom:
