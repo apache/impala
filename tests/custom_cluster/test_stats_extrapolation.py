@@ -45,40 +45,93 @@ class TestStatsExtrapolation(CustomClusterTestSuite):
 
   @CustomClusterTestSuite.with_args(impalad_args=('--enable_stats_extrapolation=true'))
   def test_compute_stats_tablesample(self, vector, unique_database):
-    # Create a partitioned and unpartitioned text table. Use the existing files from
-    # functional.alltypes as data because those have a known, stable file size. This
-    # test is sensitive to changes in file sizes across test runs because the sampling
-    # is file based. Creating test tables with INSERT does not guarantee that the same
-    # file sample is selected across test runs, even with REPEATABLE.
+    """COMPUTE STATS TABLESAMPLE is inherently non-deterministic due to its use of
+    SAMPLED_NDV() so we test it specially. The goal of this test is to ensure that
+    COMPUTE STATS TABLESAMPLE computes in-the-right-ballpark stats and successfully
+    stores them in the HMS."""
 
-    # Create partitioned test table. External to avoid dropping files from alltypes.
+    # Test partitioned table.
     part_test_tbl = unique_database + ".alltypes"
-    self.client.execute(
-      "create external table %s like functional.alltypes" % part_test_tbl)
-    alltypes_loc = self._get_table_location("functional.alltypes", vector)
-    for m in xrange(1, 13):
-      part_loc = path.join(alltypes_loc, "year=2009/month=%s" % m)
-      self.client.execute(
-        "alter table %s add partition (year=2009,month=%s) location '%s'"
-        % (part_test_tbl, m, part_loc))
+    self.clone_table("functional.alltypes", part_test_tbl, True, vector)
+    self.__run_sampling_test(part_test_tbl, "functional.alltypes", 1, 3)
+    self.__run_sampling_test(part_test_tbl, "functional.alltypes", 10, 7)
+    self.__run_sampling_test(part_test_tbl, "functional.alltypes", 20, 13)
+    self.__run_sampling_test(part_test_tbl, "functional.alltypes", 100, 99)
 
-    # Create unpartitioned test table.
+    # Test unpartitioned table.
     nopart_test_tbl = unique_database + ".alltypesnopart"
-    self.client.execute("drop table if exists %s" % nopart_test_tbl)
-    self.client.execute(
-      "create table %s like functional.alltypesnopart" % nopart_test_tbl)
-    nopart_test_tbl_loc = self._get_table_location(nopart_test_tbl, vector)
-    # Remove NameNode prefix and first '/' because PyWebHdfs expects that
-    if nopart_test_tbl_loc.startswith(NAMENODE):
-      nopart_test_tbl_loc = nopart_test_tbl_loc[len(NAMENODE)+1:]
-    for m in xrange(1, 13):
-      src_part_loc = alltypes_loc + "/year=2009/month=%s" % m
-      # Remove NameNode prefix and first '/' because PyWebHdfs expects that
-      if src_part_loc.startswith(NAMENODE): src_part_loc = src_part_loc[len(NAMENODE)+1:]
-      file_names = self.filesystem_client.ls(src_part_loc)
-      for f in file_names:
-        self.filesystem_client.copy(path.join(src_part_loc, f),
-                                    path.join(nopart_test_tbl_loc, f))
-    self.client.execute("refresh %s" % nopart_test_tbl)
+    self.client.execute("create table {0} as select * from functional.alltypes"\
+      .format(nopart_test_tbl))
+    # Clone to use as a baseline. We run the regular COMPUTE STATS on this table.
+    nopart_test_tbl_exp = unique_database + ".alltypesnopart_exp"
+    self.clone_table(nopart_test_tbl, nopart_test_tbl_exp, False, vector)
+    self.client.execute("compute stats {0}".format(nopart_test_tbl_exp))
+    self.__run_sampling_test(nopart_test_tbl, nopart_test_tbl_exp, 1, 3)
+    self.__run_sampling_test(nopart_test_tbl, nopart_test_tbl_exp, 10, 7)
+    self.__run_sampling_test(nopart_test_tbl, nopart_test_tbl_exp, 20, 13)
+    self.__run_sampling_test(nopart_test_tbl, nopart_test_tbl_exp, 100, 99)
 
-    self.run_test_case('QueryTest/compute-stats-tablesample', vector, unique_database)
+    # Test empty table.
+    empty_test_tbl = unique_database + ".empty"
+    self.clone_table("functional.alltypes", empty_test_tbl, False, vector)
+    self.__run_sampling_test(empty_test_tbl, empty_test_tbl, 10, 7)
+
+    # Test wide table. Should not crash or error. This takes a few minutes so restrict
+    # to exhaustive.
+    if self.exploration_strategy() == "exhaustive":
+      wide_test_tbl = unique_database + ".wide"
+      self.clone_table("functional.widetable_1000_cols", wide_test_tbl, False, vector)
+      self.client.execute(
+        "compute stats {0} tablesample system(10)".format(wide_test_tbl))
+
+  def __run_sampling_test(self, tbl, expected_tbl, perc, seed):
+    """Drops stats on 'tbl' and then runs COMPUTE STATS TABLESAMPLE on 'tbl' with the
+    given sampling percent and random seed. Checks that the resulting table and column
+    stats are reasoanbly close to those of 'expected_tbl'."""
+    self.client.execute("drop stats {0}".format(tbl))
+    self.client.execute("compute stats {0} tablesample system ({1}) repeatable ({2})"\
+      .format(tbl, perc, seed))
+    self.__check_table_stats(tbl, expected_tbl)
+    self.__check_column_stats(tbl, expected_tbl)
+
+  def __check_table_stats(self, tbl, expected_tbl):
+    """Checks that the row counts reported in SHOW TABLE STATS on 'tbl' are within 2x
+    of those reported for 'expected_tbl'. Assumes that COMPUTE STATS was previously run
+    on 'expected_table' and that COMPUTE STATS TABLESAMPLE was run on 'tbl'."""
+    actual = self.client.execute("show table stats {0}".format(tbl))
+    expected = self.client.execute("show table stats {0}".format(expected_tbl))
+    assert len(actual.data) == len(expected.data)
+    assert len(actual.schema.fieldSchemas) == len(expected.schema.fieldSchemas)
+    col_names = [fs.name.upper() for fs in actual.schema.fieldSchemas]
+    rows_col_idx = col_names.index("#ROWS")
+    extrap_rows_col_idx = col_names.index("EXTRAP #ROWS")
+    for i in xrange(0, len(actual.data)):
+      act_cols = actual.data[i].split("\t")
+      exp_cols = expected.data[i].split("\t")
+      assert int(exp_cols[rows_col_idx]) >= 0
+      self.appx_equals(\
+        int(act_cols[extrap_rows_col_idx]), int(exp_cols[rows_col_idx]), 2)
+      # Only the table-level row count is stored. The partition row counts
+      # are extrapolated.
+      if act_cols[0] == "Total":
+        self.appx_equals(
+          int(act_cols[rows_col_idx]), int(exp_cols[rows_col_idx]), 2)
+      elif len(actual.data) > 1:
+        # Partition row count is expected to not be set.
+        assert int(act_cols[rows_col_idx]) == -1
+
+  def __check_column_stats(self, tbl, expected_tbl):
+    """Checks that the NDVs in SHOW COLUMNS STATS on 'tbl' are within 2x of those
+    reported for 'expected_tbl'. Assumes that COMPUTE STATS was previously run
+    on 'expected_table' and that COMPUTE STATS TABLESAMPLE was run on 'tbl'."""
+    actual = self.client.execute("show column stats {0}".format(tbl))
+    expected = self.client.execute("show column stats {0}".format(expected_tbl))
+    assert len(actual.data) == len(expected.data)
+    assert len(actual.schema.fieldSchemas) == len(expected.schema.fieldSchemas)
+    col_names = [fs.name.upper() for fs in actual.schema.fieldSchemas]
+    ndv_col_idx = col_names.index("#DISTINCT VALUES")
+    for i in xrange(0, len(actual.data)):
+      act_cols = actual.data[i].split("\t")
+      exp_cols = expected.data[i].split("\t")
+      assert int(exp_cols[ndv_col_idx]) >= 0
+      self.appx_equals(int(act_cols[ndv_col_idx]), int(exp_cols[ndv_col_idx]), 2)

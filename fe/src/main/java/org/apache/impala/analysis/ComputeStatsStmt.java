@@ -58,11 +58,11 @@ import com.google.common.collect.Sets;
  *   Computes and replaces the table-level row count and total file size, as well as all
  *   table-level column statistics. Existing partition-objects and their row count are
  *   not modified at all. The TABLESAMPLE clause can be used to limit the scanned data
- *   volume to a desired percentage. When sampling, the results of the COMPUTE STATS
- *   queries are sent to the CatalogServer. There, the stats are extrapolated before
- *   storing them into the HMS so as not to confuse other engines like Hive/SparkSQL
- *   which may rely on the shared HMS fields representing to the whole table and not
- *   a sample. See {@link CatalogOpExecutor#getExtrapolatedStatsVal}.
+ *   volume to a desired percentage. When sampling, the COMPUTE STATS queries directly
+ *   produce extrapolated stats which are then stored in the HMS via the CatalogServer.
+ *   We store extrapolated stats in the HMS so as not to confuse other engines like
+ *   Hive/SparkSQL which may rely on the shared HMS fields representing to the whole
+ *   table and not a sample. See {@link CatalogOpExecutor#getExtrapolatedStatsVal}.
  * - Stats extrapolation disabled:
  *   Computes and replaces the table-level row count and total file size, the row counts
  *   for all partitions (if applicable), as well as all table-level column statistics.
@@ -101,9 +101,9 @@ public class ComputeStatsStmt extends StatementBase {
   // Set during analysis.
   protected Table table_;
 
-  // Total number of bytes in the file sample of the target HDFS table. Set to -1 for
-  // non-HDFS tables or when TABLESAMPLE is not specified.
-  protected long sampleFileBytes_ = -1;
+  // Effective sampling percent based on the total number of bytes in the files sample.
+  // Set to -1 for non-HDFS tables or if TABLESAMPLE was not specified.
+  protected double effectiveSamplePerc_ = -1;
 
   // The Null count is not currently being used in optimization or run-time,
   // and compute stats runs 2x faster in many cases when not counting NULLs.
@@ -202,7 +202,11 @@ public class ComputeStatsStmt extends StatementBase {
       String colRefSql = ToSqlUtils.getIdentSql(c.getName());
       if (isIncremental_) {
         columnStatsSelectList.add("NDV_NO_FINALIZE(" + colRefSql + ") AS " + colRefSql);
+      } else if (effectiveSamplePerc_ > 0) {
+        columnStatsSelectList.add(String.format("SAMPLED_NDV(%s, %.10f) AS %s",
+            colRefSql, effectiveSamplePerc_, colRefSql));
       } else {
+        // Regular (non-incremental) compute stats without sampling.
         columnStatsSelectList.add("NDV(" + colRefSql + ") AS " + colRefSql);
       }
 
@@ -241,39 +245,58 @@ public class ComputeStatsStmt extends StatementBase {
   }
 
   /**
-   * Constructs two queries to compute statistics for 'tableName_', if that table exists
-   * (although if we can detect that no work needs to be done for either query, that query
-   * will be 'null' and not executed).
+   * Constructs two SQL queries for computing the row-count and column statistics and
+   * sets them in 'tableStatsQueryStr_' and 'columnStatsQueryStr_', respectively.
+   * The queries are generated as follows.
    *
-   * The first query computes the number of rows (on a per-partition basis if the table is
-   * partitioned) and has the form "SELECT COUNT(*) FROM tbl GROUP BY part_col1,
-   * part_col2...", with an optional WHERE clause for incremental computation (see below).
+   * 1. Regular COMPUTE STATS (not incremental and no sampling)
+   * 1.1 Row counts:
+   * SELECT COUNT(*) FROM tbl [GROUP BY part_col1, part_col2 ...]
+   * The GROUP BY clause is added if the target is a partitioned HDFS table and
+   * stats extrapolation is disabled. Otherwise, no GROUP BY is used.
    *
-   * The second query computes the NDV estimate, the average width, the maximum width and,
-   * optionally, the number of nulls for each column. For non-partitioned tables (or
-   * non-incremental computations), the query is simple:
+   * 1.2 Column stats:
+   * SELECT NDV(c1), CAST(-1 as typeof(c1)), MAX(length(c1)), AVG(length(c1)),
+   *        NDV(c2), CAST(-1 as typeof(c2)), MAX(length(c2)), AVG(length(c2)),
+   *        ...
+   * FROM tbl
    *
-   * SELECT NDV(col), COUNT(<nulls>), MAX(length(col)), AVG(length(col)) FROM tbl
+   * 2. COMPUTE STATS with TABLESAMPLE
+   * 2.1 Row counts:
+   * SELECT ROUND(COUNT(*) / <effective_sample_perc>)
+   * FROM tbl TABLESAMPLE SYSTEM(<sample_perc>) REPEATABLE (<random_seed>)
    *
-   * (For non-string columns, the widths are hard-coded as they are known at query
-   * construction time).
+   * 2.1 Column stats:
+   * SELECT SAMPLED_NDV(c1, p), CAST(-1 as typeof(c1)), MAX(length(c1)), AVG(length(c1)),
+   *        SAMPLED_NDV(c2, p), CAST(-1 as typeof(c2)), MAX(length(c2)), AVG(length(c2)),
+   *        ...
+   * FROM tbl TABLESAMPLE SYSTEM(<sample_perc>) REPEATABLE (<random_seed>)
+   * SAMPLED_NDV() is a specialized aggregation function that estimates the NDV based on
+   * a sample. The "p" passed to the SAMPLED_NDV() is the effective sampling rate.
    *
-   * If computation is incremental (i.e. the original statement was COMPUTE INCREMENTAL
-   * STATS.., and the underlying table is a partitioned HdfsTable), some modifications are
-   * made to the non-incremental per-column query. First, a different UDA,
-   * NDV_NO_FINALIZE() is used to retrieve and serialise the intermediate state from each
-   * column. Second, the results are grouped by partition, as with the row count query, so
-   * that the intermediate NDV computation state can be stored per-partition. The number
-   * of rows per-partition are also recorded.
+   * 3. COMPUTE INCREMENTAL STATS
+   * 3.1 Row counts:
+   * SELECT COUNT(*) FROM tbl GROUP BY part_col1, part_col2 ...
+   * [WHERE ((part_col1 = p1_val1) AND (part_col2 = p1_val2)) OR
+   *        ((part_col1 = p2_val1) AND (part_col2 = p2_val2)) OR ...]
+   * The WHERE clause is constructed to select the relevant partitions.
    *
-   * For both the row count query, and the column stats query, the query's WHERE clause is
-   * used to restrict execution only to partitions that actually require new statistics to
-   * be computed.
-   *
-   * SELECT NDV_NO_FINALIZE(col), <nulls, max, avg>, COUNT(col) FROM tbl
+   * 3.2 Column stats:
+   * SELECT NDV_NO_FINALIZE(c1), <nulls, max, avg>, COUNT(c1),
+   *        NDV_NO_FINALIZE(c2), <nulls, max, avg>, COUNT(c2),
+   *        ...
+   * FROM tbl
    * GROUP BY part_col1, part_col2, ...
-   * WHERE ((part_col1 = p1_val1) AND (part_col2 = p1_val2)) OR
-   *       ((part_col1 = p2_val1) AND (part_col2 = p2_val2)) OR ...
+   * [WHERE ((part_col1 = p1_val1) AND (part_col2 = p1_val2)) OR
+   *       ((part_col1 = p2_val1) AND (part_col2 = p2_val2)) OR ...]
+   * The WHERE clause is constructed to select the relevant partitions.
+   * NDV_NO_FINALIZE() produces a non-finalized HyperLogLog intermediate byte array.
+   *
+   * 4. For all COMPUTE STATS variants:
+   * - The MAX() and AVG() for the column stats queries are only relevant for var-len
+   *   columns like STRING. For fixed-len columns MAX() and AVG() are replaced with the
+   *   appropriate literals.
+   * - Queries will be set to null if we can detect that no work needs to be performed.
    */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
@@ -432,10 +455,17 @@ public class ComputeStatsStmt extends StatementBase {
       validPartStats_.clear();
     }
 
+    // Tablesample clause to be used for all child queries.
+    String tableSampleSql = analyzeTableSampleClause(analyzer);
 
     // Query for getting the per-partition row count and the total row count.
     StringBuilder tableStatsQueryBuilder = new StringBuilder("SELECT ");
-    List<String> tableStatsSelectList = Lists.newArrayList("COUNT(*)");
+    String countSql = "COUNT(*)";
+    if (effectiveSamplePerc_ > 0) {
+      // Extrapolate the count based on the effective sampling rate.
+      countSql = String.format("ROUND(COUNT(*) / %.10f)", effectiveSamplePerc_);
+    }
+    List<String> tableStatsSelectList = Lists.newArrayList(countSql);
     // Add group by columns for incremental stats or with extrapolation disabled.
     List<String> groupByCols = Lists.newArrayList();
     if (!updateTableStatsOnly()) {
@@ -445,8 +475,6 @@ public class ComputeStatsStmt extends StatementBase {
       tableStatsSelectList.addAll(groupByCols);
     }
     tableStatsQueryBuilder.append(Joiner.on(", ").join(tableStatsSelectList));
-    // Tablesample clause to be used for all child queries.
-    String tableSampleSql = analyzeTableSampleClause(analyzer);
     tableStatsQueryBuilder.append(" FROM " + tableName_.toSql() + tableSampleSql);
 
     // Query for getting the per-column NDVs and number of NULLs.
@@ -495,7 +523,8 @@ public class ComputeStatsStmt extends StatementBase {
   }
 
   /**
-   * Analyzes the TABLESAMPLE clause and computes the sample to set 'sampleFileBytes_'.
+   * Analyzes the TABLESAMPLE clause and computes the files sample to set
+   * 'effectiveSamplePerc_'.
    * Returns the TABLESAMPLE SQL to be used for all child queries or an empty string if
    * not sampling. If sampling, the returned SQL includes a fixed random seed so all
    * child queries generate a consistent sample, even if the user did not originally
@@ -524,10 +553,20 @@ public class ComputeStatsStmt extends StatementBase {
     HdfsTable hdfsTable = (HdfsTable) table_;
     Map<Long, List<FileDescriptor>> sample = hdfsTable.getFilesSample(
         hdfsTable.getPartitions(), sampleParams_.getPercentBytes(), sampleSeed);
-    sampleFileBytes_ = 0;
+    long sampleFileBytes = 0;
     for (List<FileDescriptor> fds: sample.values()) {
-      for (FileDescriptor fd: fds) sampleFileBytes_ += fd.getFileLength();
+      for (FileDescriptor fd: fds) sampleFileBytes += fd.getFileLength();
     }
+
+    // Compute effective sampling percent.
+    long totalFileBytes = ((HdfsTable)table_).getTotalHdfsBytes();
+    if (totalFileBytes > 0) {
+      effectiveSamplePerc_ = (double) sampleFileBytes / (double) totalFileBytes;
+    } else {
+      effectiveSamplePerc_ = 0;
+    }
+    Preconditions.checkState(effectiveSamplePerc_ >= 0.0 && effectiveSamplePerc_ <= 1.0);
+
     return " " + sampleParams_.toSql(sampleSeed);
   }
 
@@ -666,13 +705,8 @@ public class ComputeStatsStmt extends StatementBase {
     if (isIncremental_) {
       params.setNum_partition_cols(((HdfsTable)table_).getNumClusteringCols());
     }
-
     if (table_ instanceof HdfsTable) {
       params.setTotal_file_bytes(((HdfsTable)table_).getTotalHdfsBytes());
-      if (sampleParams_ != null) {
-        Preconditions.checkState(sampleFileBytes_ >= 0);
-        if (sampleFileBytes_ != -1) params.setSample_file_bytes(sampleFileBytes_);
-      }
     }
     return params;
   }

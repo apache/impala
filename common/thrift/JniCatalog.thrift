@@ -295,10 +295,6 @@ struct TAlterTableUpdateStatsParams {
 
   // If true, this is the result of an incremental stats computation
   6: optional bool is_incremental
-
-  // Sum of file sizes in the table sample. Only set when TABLESAMPLE was specified.
-  // Only set for tables of type HDFS_TABLE and if is_incremental is false.
-  7: optional i64 sample_file_bytes
 }
 
 // Parameters for ALTER TABLE SET [PARTITION partitionSet] CACHED|UNCACHED
@@ -505,10 +501,6 @@ struct TComputeStatsParams {
   // Sum of file sizes in the table. Only set for tables of type HDFS_TABLE and if
   // is_incremental is false.
   9: optional i64 total_file_bytes
-
-  // Sum of file sizes in the table sample. Only set when TABLESAMPLE was specified.
-  // Only set for tables of type HDFS_TABLE and if is_incremental is false.
-  10: optional i64 sample_file_bytes
 }
 
 // Parameters for CREATE/DROP ROLE

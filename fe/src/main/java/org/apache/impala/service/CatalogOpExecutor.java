@@ -801,12 +801,6 @@ public class CatalogOpExecutor {
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws ImpalaException {
     Preconditions.checkState(params.isSetTable_stats());
     long numRows = params.table_stats.num_rows;
-    // Extrapolate based on sampling (if applicable).
-    if (params.isSetSample_file_bytes() && params.table_stats.isSetTotal_file_bytes()) {
-      numRows = getExtrapolatedStatsVal(numRows, params.sample_file_bytes,
-          params.table_stats.total_file_bytes);
-    }
-
     // Update the table's ROW_COUNT and TOTAL_SIZE parameters.
     msTbl.putToParameters(StatsSetupConst.ROW_COUNT, String.valueOf(numRows));
     if (params.getTable_stats().isSetTotal_file_bytes()) {
@@ -852,33 +846,12 @@ public class CatalogOpExecutor {
     return colStats;
   }
 
-  /**
-   * Returns 'val' extrapolated based on the sampled and total file bytes. Uses a basic
-   * linear extrapolation. All parameters must be >= 0.
-   * The returned value is >= 'val' and >= 0. Returns Long.MAX_VALUE if a computation
-   * overflows.
-   */
-  private static long getExtrapolatedStatsVal(long val, long sampleFileBytes,
-      long totalFileBytes) {
-    Preconditions.checkArgument(val >= 0 && sampleFileBytes >= 0 && totalFileBytes >= 0);
-    double mult = 0.0;
-    if (sampleFileBytes > 0) mult = (double) totalFileBytes / sampleFileBytes;
-    // The round() caps the returned value at Long.MAX_VALUE.
-    return Math.round(val * mult);
-  }
-
   private static ColumnStatisticsData createHiveColStatsData(
       TAlterTableUpdateStatsParams params, TColumnStats colStats, Type colType) {
     ColumnStatisticsData colStatsData = new ColumnStatisticsData();
     long ndv = colStats.getNum_distinct_values();
     // Cap NDV at row count if available.
     if (params.isSetTable_stats()) ndv = Math.min(ndv, params.table_stats.num_rows);
-    // Extrapolate NDV based on sampling if applicable.
-    if (params.isSetSample_file_bytes() && params.isSetTable_stats()
-        && params.table_stats.isSetTotal_file_bytes()) {
-      ndv = getExtrapolatedStatsVal(ndv, params.sample_file_bytes,
-          params.table_stats.total_file_bytes);
-    }
 
     long numNulls = colStats.getNum_nulls();
     switch(colType.getPrimitiveType()) {

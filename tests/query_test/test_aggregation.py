@@ -329,7 +329,7 @@ class TestAggregationQueries(ImpalaTestSuite):
       # Low NDV columns. We expect a reasonaby accurate estimate regardless of the
       # sampling percent.
       for i in xrange(0, 14):
-        self.__appx_equals(int(sampled_ndv_vals[i]), int(ndv_vals[i]), 0.1)
+        self.appx_equals(int(sampled_ndv_vals[i]), int(ndv_vals[i]), 0.1)
       # High NDV columns. We expect the estimate to have high variance and error.
       # Since we give NDV() and SAMPLED_NDV() the same input data, i.e., we are not
       # actually sampling for SAMPLED_NDV(), we expect the result of SAMPLED_NDV() to
@@ -337,12 +337,7 @@ class TestAggregationQueries(ImpalaTestSuite):
       # For example, the column 'id' is a PK so we expect the result of SAMPLED_NDV()
       # with a sampling percent of 0.1 to be approximately 10x of the NDV().
       for i in xrange(14, 16):
-        self.__appx_equals(int(sampled_ndv_vals[i]) * sample_perc, int(ndv_vals[i]), 2.0)
-
-  def __appx_equals(self, a, b, diff_perc):
-    """Returns True if 'a' and 'b' are within 'diff_perc' percent of each other,
-    False otherwise. 'diff_perc' must be a float in [0,1]."""
-    assert abs(a - b) / float(max(a, b)) <= diff_perc
+        self.appx_equals(int(sampled_ndv_vals[i]) * sample_perc, int(ndv_vals[i]), 2.0)
 
 class TestWideAggregationQueries(ImpalaTestSuite):
   """Test that aggregations with many grouping columns work"""
