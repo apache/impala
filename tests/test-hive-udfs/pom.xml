@@ -36,8 +36,6 @@ under the License.
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <hadoop.version>${env.IMPALA_HADOOP_VERSION}</hadoop.version>
-    <hive.version>${env.IMPALA_HIVE_VERSION}</hive.version>
   </properties>
 
   <dependencies>
