@@ -36,11 +36,6 @@ under the License.
 
   <dependencies>
     <dependency>
-      <groupId>org.htrace</groupId>
-      <artifactId>htrace-core</artifactId>
-      <version>3.0.4</version>
-    </dependency>
-    <dependency>
       <groupId>org.apache.impala</groupId>
       <artifactId>impala-data-source-api</artifactId>
       <version>${impala.extdatasrc.api.version}</version>
@@ -72,12 +67,6 @@ under the License.
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-azure-datalake</artifactId>
-      <version>${hadoop.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-mapreduce-client-core</artifactId>
       <version>${hadoop.version}</version>
     </dependency>
 
@@ -190,7 +179,7 @@ under the License.
     <dependency>
       <groupId>org.apache.thrift</groupId>
       <artifactId>libthrift</artifactId>
-      <version>${env.IMPALA_THRIFT_JAVA_VERSION}</version>
+      <version>${thrift.version}</version>
       <!-- libthrift depends httpcore 4.1.3 which does not work with KMS. To workaround
            this problem the dependency is excluded here and we explicitly add a newer
            httpcore dependency version. See IMPALA-4210. TODO: Find a better fix. -->
@@ -205,13 +194,13 @@ under the License.
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpcore</artifactId>
-      <version>4.2.5</version>
+      <version>${httpcomponents.core.version}</version>
     </dependency>
 
     <dependency>
       <groupId>org.apache.thrift</groupId>
       <artifactId>libfb303</artifactId>
-      <version>${env.IMPALA_THRIFT_JAVA_VERSION}</version>
+      <version>${thrift.version}</version>
     </dependency>
 
     <dependency>
@@ -248,11 +237,6 @@ under the License.
     </dependency>
     <dependency>
       <groupId>org.apache.hive</groupId>
-      <artifactId>hive-shims</artifactId>
-      <version>${hive.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hive</groupId>
       <artifactId>hive-exec</artifactId>
       <version>${hive.version}</version>
     </dependency>
@@ -262,27 +246,12 @@ under the License.
       <artifactId>kudu-client</artifactId>
       <version>${kudu.version}</version>
     </dependency>
-    <dependency>
-      <groupId>com.stumbleupon</groupId>
-      <artifactId>async</artifactId>
-      <version>1.3.1</version>
-    </dependency>
 
     <!-- This driver supports PostgreSQL 7.2 and newer -->
     <dependency>
       <groupId>postgresql</groupId>
       <artifactId>postgresql</artifactId>
       <version>9.0-801.jdbc4</version>
-    </dependency>
-    <dependency>
-      <groupId>commons-dbcp</groupId>
-      <artifactId>commons-dbcp</artifactId>
-      <version>1.4</version>
-    </dependency>
-    <dependency>
-      <groupId>javax.jdo</groupId>
-      <artifactId>jdo-api</artifactId>
-      <version>3.0.1</version>
     </dependency>
     <dependency>
       <groupId>org.antlr</groupId>
@@ -305,24 +274,24 @@ under the License.
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
-      <version>1.7.5</version>
+      <version>${slf4j.version}</version>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-log4j12</artifactId>
-      <version>1.7.5</version>
+      <version>${slf4j.version}</version>
     </dependency>
 
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
-      <version>11.0.2</version>
+      <version>${guava.version}</version>
     </dependency>
 
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>4.12</version>
+      <version>${junit.version}</version>
       <scope>test</scope>
     </dependency>
 
