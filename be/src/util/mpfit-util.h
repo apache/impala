@@ -77,7 +77,7 @@ class ObjectiveFunction {
 
   /// Function parameters to be determined by fitting.
   const int num_params_;
-  std::unique_ptr<double> params_;
+  std::unique_ptr<double[]> params_;
 
   /// MPFit result structure. Populated by in LmsFit(). All pointers in this structure
   /// are optional and must be allocated and owned by the caller of mpfit(). Passing
