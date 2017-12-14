@@ -40,7 +40,7 @@ public class BuiltinsDb extends Db {
   private static final int AVG_INTERMEDIATE_SIZE = 16;
 
   // Size in bytes of DecimalAvgState used for decimal avg().
-  private static final int DECIMAL_AVG_INTERMEDIATE_SIZE = 32;
+  private static final int DECIMAL_AVG_INTERMEDIATE_SIZE = 24;
 
   // Size in bytes of KnuthVarianceState used for stddev(), variance(), etc.
   private static final int STDDEV_INTERMEDIATE_SIZE = 24;

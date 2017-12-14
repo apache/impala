@@ -372,7 +372,11 @@ TimestampVal AggregateFunctions::TimestampAvgFinalize(FunctionContext* ctx,
   return result;
 }
 
-struct DecimalAvgState {
+// We saw some failures on the release build because GCC was emitting an instruction
+// to operate on the int128_t that assumed the pointer was aligned (typically it isn't).
+// We mark the struct with a "packed" attribute, so that the compiler does not expect it
+// to be aligned. This should not have a negative performance impact on modern CPUs.
+struct __attribute__ ((__packed__)) DecimalAvgState {
   __int128_t sum_val16; // Always uses max precision decimal.
   int64_t count;
 };

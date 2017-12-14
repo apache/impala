@@ -121,7 +121,7 @@ show create aggregate function _impala_builtins.avg
  FINALIZE_FN='_ZN6impala18AggregateFunctions11AvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE'
 CREATE AGGREGATE FUNCTION _impala_builtins.avg(DECIMAL(*,*))
  RETURNS DECIMAL(*,*)
- INTERMEDIATE FIXED_UDA_INTERMEDIATE(32)
+ INTERMEDIATE FIXED_UDA_INTERMEDIATE(24)
  LOCATION 'null'
  UPDATE_FN='_ZN6impala18AggregateFunctions16DecimalAvgUpdateEPN10impala_udf15FunctionContextERKNS1_10DecimalValEPNS1_9StringValE'
  INIT_FN='_ZN6impala18AggregateFunctions14DecimalAvgInitEPN10impala_udf15FunctionContextEPNS1_9StringValE'
