@@ -373,7 +373,7 @@ class TestImpalaShell(ImpalaTestSuite):
     execution in fact starts and then cancels it. Expects the query
     cancellation to succeed."""
     args = "-q \"" + stmt + ";\""
-    p = ImpalaShell(args)
+    p = ImpalaShell(args, omit_stdout=True)
 
     self.wait_for_query_state(stmt, cancel_at_state)
 

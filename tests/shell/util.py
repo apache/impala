@@ -130,11 +130,14 @@ class ImpalaShellResult(object):
     self.stderr = str()
 
 class ImpalaShell(object):
-  """A single instance of the Impala shell. The proces is started when this object is
+  """A single instance of the Impala shell. The process is started when this object is
      constructed, and then users should repeatedly call send_cmd(), followed eventually by
      get_result() to retrieve the process output."""
-  def __init__(self, args=None, env=None):
-    self.shell_process = self._start_new_shell_process(args, env=env)
+  def __init__(self, args=None, env=None, omit_stdout=False):
+    self.args = args
+    self.env = env
+    self.omit_stdout = omit_stdout
+    self.shell_process = self._start_new_shell_process()
 
   def pid(self):
     return self.shell_process.pid
@@ -158,11 +161,12 @@ class ImpalaShell(object):
     result.rc = self.shell_process.returncode
     return result
 
-  def _start_new_shell_process(self, args=None, env=None):
+  def _start_new_shell_process(self):
     """Starts a shell process and returns the process handle"""
     shell_args = SHELL_CMD
-    if args is not None: shell_args = "%s %s" % (SHELL_CMD, args)
+    if self.args is not None: shell_args = "%s %s" % (SHELL_CMD, self.args)
     lex = shlex.split(shell_args)
-    if not env: env = os.environ
-    return Popen(lex, shell=False, stdout=PIPE, stdin=PIPE, stderr=PIPE,
-                 env=env)
+    if not self.env: self.env = os.environ
+    stdout = open(os.devnull, 'w') if self.omit_stdout else PIPE
+    return Popen(lex, shell=False, stdout=stdout, stdin=PIPE, stderr=PIPE,
+                 env=self.env)
