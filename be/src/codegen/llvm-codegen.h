@@ -508,8 +508,10 @@ class LlvmCodeGen {
   static Status GetSymbols(const string& file, const string& module_id,
       boost::unordered_set<std::string>* symbols);
 
-  /// Generates function to return min/max(v1, v2)
-  llvm::Function* CodegenMinMax(const ColumnType& type, bool min);
+  /// Codegen at the current builder location in function 'fn' to store the
+  /// max/min('src', value in 'dst_slot_ptr') in 'dst_slot_ptr'
+  void CodegenMinMax(LlvmBuilder* builder, const ColumnType& type,
+      llvm::Value* dst_slot_ptr, llvm::Value* src, bool min, llvm::Function* fn);
 
   /// Codegen to call llvm memcpy intrinsic at the current builder location
   /// dst & src must be pointer types. size is the number of bytes to copy.

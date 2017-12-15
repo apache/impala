@@ -602,6 +602,33 @@ void AggregateFunctions::InitNullString(FunctionContext* c, StringVal* dst) {
   dst->len = 0;
 }
 
+// For DoubleVal and FloatVal, we have to handle NaN specially.  If 'val' != 'val', then
+// 'val' must be NaN, and if any of the values that are inserted are NaN, then we return
+// NaN. So, if 'src.val != src.val', set 'dst' to it.
+template <>
+void AggregateFunctions::Min(FunctionContext*, const FloatVal& src, FloatVal* dst) {
+  if (src.is_null) return;
+  if (dst->is_null || src.val < dst->val || src.val != src.val) *dst = src;
+}
+
+template <>
+void AggregateFunctions::Max(FunctionContext*, const FloatVal& src, FloatVal* dst) {
+  if (src.is_null) return;
+  if (dst->is_null || src.val > dst->val || src.val != src.val) *dst = src;
+}
+
+template <>
+void AggregateFunctions::Min(FunctionContext*, const DoubleVal& src, DoubleVal* dst) {
+  if (src.is_null) return;
+  if (dst->is_null || src.val < dst->val || src.val != src.val) *dst = src;
+}
+
+template <>
+void AggregateFunctions::Max(FunctionContext*, const DoubleVal& src, DoubleVal* dst) {
+  if (src.is_null) return;
+  if (dst->is_null || src.val > dst->val || src.val != src.val) *dst = src;
+}
+
 template<>
 void AggregateFunctions::Min(FunctionContext* ctx, const StringVal& src, StringVal* dst) {
   if (src.is_null) return;

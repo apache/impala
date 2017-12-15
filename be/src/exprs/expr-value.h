@@ -139,10 +139,10 @@ struct ExprValue {
       case TYPE_FLOAT:
         // For floats and doubles, numeric_limits::min() is the smallest positive
         // representable value.
-        float_val = -std::numeric_limits<float>::max();
+        float_val = -std::numeric_limits<float>::infinity();
         return &float_val;
       case TYPE_DOUBLE:
-        double_val = -std::numeric_limits<double>::max();
+        double_val = -std::numeric_limits<double>::infinity();
         return &double_val;
       default:
         DCHECK(false);
@@ -183,10 +183,10 @@ struct ExprValue {
             return &decimal16_val;
         }
       case TYPE_FLOAT:
-        float_val = std::numeric_limits<float>::max();
+        float_val = std::numeric_limits<float>::infinity();
         return &float_val;
       case TYPE_DOUBLE:
-        double_val = std::numeric_limits<double>::max();
+        double_val = std::numeric_limits<double>::infinity();
         return &double_val;
       default:
         DCHECK(false);

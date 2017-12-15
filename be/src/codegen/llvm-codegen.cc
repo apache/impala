@@ -1334,14 +1334,9 @@ Status LlvmCodeGen::GetSymbols(const string& file, const string& module_id,
 // ret_v2:                                           ; preds = %entry
 //   ret i32 %v2
 // }
-llvm::Function* LlvmCodeGen::CodegenMinMax(const ColumnType& type, bool min) {
-  LlvmCodeGen::FnPrototype prototype(this, min ? "Min" : "Max", GetType(type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("v1", GetType(type)));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("v2", GetType(type)));
-
-  llvm::Value* params[2];
-  LlvmBuilder builder(context());
-  llvm::Function* fn = prototype.GeneratePrototype(&builder, &params[0]);
+void LlvmCodeGen::CodegenMinMax(LlvmBuilder* builder, const ColumnType& type,
+    llvm::Value* src, llvm::Value* dst_slot_ptr, bool min, llvm::Function* fn) {
+  llvm::Value* dst = builder->CreateLoad(dst_slot_ptr, "dst_val");
 
   llvm::Value* compare = NULL;
   switch (type.type) {
@@ -1351,10 +1346,10 @@ llvm::Function* LlvmCodeGen::CodegenMinMax(const ColumnType& type, bool min) {
     case TYPE_BOOLEAN:
       if (min) {
         // For min, return x && y
-        compare = builder.CreateAnd(params[0], params[1]);
+        compare = builder->CreateAnd(src, dst);
       } else {
         // For max, return x || y
-        compare = builder.CreateOr(params[0], params[1]);
+        compare = builder->CreateOr(src, dst);
       }
       break;
     case TYPE_TINYINT:
@@ -1363,38 +1358,40 @@ llvm::Function* LlvmCodeGen::CodegenMinMax(const ColumnType& type, bool min) {
     case TYPE_BIGINT:
     case TYPE_DECIMAL:
       if (min) {
-        compare = builder.CreateICmpSLT(params[0], params[1]);
+        compare = builder->CreateICmpSLT(src, dst);
       } else {
-        compare = builder.CreateICmpSGT(params[0], params[1]);
+        compare = builder->CreateICmpSGT(src, dst);
       }
       break;
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
       if (min) {
-        compare = builder.CreateFCmpULT(params[0], params[1]);
+        // OLT is true if 'src' < 'dst' and neither 'src' nor 'dst' is 'nan'.
+        compare = builder->CreateFCmpOLT(src, dst);
       } else {
-        compare = builder.CreateFCmpUGT(params[0], params[1]);
+        // OGT is true if 'src' > 'dst' and neither 'src' nor 'dst' is 'nan'.
+        compare = builder->CreateFCmpOGT(src, dst);
       }
+      // UNE is true if the operands are not equal or if either operand is a 'nan'. Since
+      // we're comparing 'src' to itself, the UNE will only be true if 'src' is 'nan'.
+      compare = builder->CreateOr(compare, builder->CreateFCmpUNE(src, src));
       break;
     default:
       DCHECK(false);
   }
 
   if (type.type == TYPE_BOOLEAN) {
-    builder.CreateRet(compare);
+    builder->CreateStore(compare, dst_slot_ptr);
   } else {
     llvm::BasicBlock *ret_v1, *ret_v2;
     CreateIfElseBlocks(fn, "ret_v1", "ret_v2", &ret_v1, &ret_v2);
 
-    builder.CreateCondBr(compare, ret_v1, ret_v2);
-    builder.SetInsertPoint(ret_v1);
-    builder.CreateRet(params[0]);
-    builder.SetInsertPoint(ret_v2);
-    builder.CreateRet(params[1]);
+    builder->CreateCondBr(compare, ret_v1, ret_v2);
+    builder->SetInsertPoint(ret_v1);
+    builder->CreateStore(src, dst_slot_ptr);
+    builder->CreateBr(ret_v2);
+    builder->SetInsertPoint(ret_v2);
   }
-
-  fn = FinalizeFunction(fn);
-  return fn;
 }
 
 // Intrinsics are loaded one by one.  Some are overloaded (e.g. memcpy) and the types must

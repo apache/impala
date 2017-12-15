@@ -1331,3 +1331,42 @@ select count(*) from (
 ---- TYPES
 bigint
 ====
+---- QUERY
+# IMPALA-6295: min/max where nan/inf/-inf are the only values
+with x as (select cast('nan' as float) a, cast('inf' as float) b, cast('-inf' as float) c)
+select min(a), min(b), min(c), max(a), max(b), max(c) from x
+---- RESULTS
+NaN,Infinity,-Infinity,NaN,Infinity,-Infinity
+---- TYPES
+FLOAT,FLOAT,FLOAT,FLOAT,FLOAT,FLOAT
+====
+---- QUERY
+# IMPALA-6295: min/max/sum/avg should return nan if any of the values is nan
+with x as (values (0), (1), (cast('nan' as double)), (cast('inf' as double)),
+  (cast('-inf' as double)))
+select min(`0`), max(`0`), sum(`0`), avg(`0`) from x
+---- RESULTS
+NaN,NaN,NaN,NaN
+---- TYPES
+DOUBLE,DOUBLE,DOUBLE,DOUBLE
+====
+---- QUERY
+# Test behavior of inf
+with x as (values (0), (cast('inf' as double)), (5.2))
+select min(`0`), max(`0`), sum(`0`), avg(`0`) from x
+---- RESULTS
+0,Infinity,Infinity,Infinity
+---- TYPES
+DOUBLE,DOUBLE,DOUBLE,DOUBLE
+====
+---- QUERY
+# Test behavior of -inf
+with x as (values (cast('-inf' as double)), (0), (-10))
+select min(`cast('-inf' as double)`), max(`cast('-inf' as double)`),
+  sum(`cast('-inf' as double)`), avg(`cast('-inf' as double)`)
+from x
+---- RESULTS
+-Infinity,0,-Infinity,-Infinity
+---- TYPES
+DOUBLE,DOUBLE,DOUBLE,DOUBLE
+====
