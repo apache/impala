@@ -60,7 +60,7 @@ row_regex: .*SpilledPartitions: 0 .*
 # Adding TPCH-Q21 in the spilling test to check for IMPALA-1471 (spilling left anti
 # and left outer joins were returning wrong results).
 # Q21 - Suppliers Who Kept Orders Waiting Query
-set buffer_pool_limit=20m;
+set buffer_pool_limit=23m;
 select
   s_name,
   count(*) as numwait
@@ -315,7 +315,7 @@ row_regex: .*NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
 #   where l1.l_quantity = 31.0 and l1.l_tax = 0.03 and l1.l_orderkey <= 100000
 # order by l_orderkey, l_partkey, l_suppkey, l_linenumber
 # limit 5
-set buffer_pool_limit=7m;
+set buffer_pool_limit=9m;
 set num_nodes=1;
 select straight_join l.*
 from

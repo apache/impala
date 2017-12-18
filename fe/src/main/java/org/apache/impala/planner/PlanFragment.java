@@ -17,6 +17,7 @@
 
 package org.apache.impala.planner;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -29,6 +30,7 @@ import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.planner.PlanNode.ExecPhaseResourceProfiles;
+import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPartitionType;
 import org.apache.impala.thrift.TPlanFragment;
@@ -112,6 +114,10 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   // The total of initial reservations (in bytes) that will be claimed over the lifetime
   // of this fragment. Computed in computeResourceProfile().
   private long initialReservationTotalClaims_ = -1;
+
+  // The total memory (in bytes) required for the runtime filters used by the plan nodes
+  // managed by this fragment.
+  private long runtimeFiltersReservationBytes_ = 0;
 
   /**
    * C'tor for fragment with specific partition; the output is by default broadcast.
@@ -219,13 +225,23 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   /**
    * Compute the peak resource profile for an instance of this fragment. Must
    * be called after all the plan nodes and sinks are added to the fragment and resource
-   * profiles of all children fragments are computed.
+   * profiles of all children fragments are computed. Also accounts for the memory used by
+   * runtime filters that are stored at the fragment level.
    */
   public void computeResourceProfile(Analyzer analyzer) {
     // Compute resource profiles for all plan nodes and sinks in the fragment.
     sink_.computeResourceProfile(analyzer.getQueryOptions());
+    HashSet<RuntimeFilterId> filterSet = Sets.newHashSet();
     for (PlanNode node: collectPlanNodes()) {
       node.computeNodeResourceProfile(analyzer.getQueryOptions());
+      for (RuntimeFilter filter: node.getRuntimeFilters()) {
+        // A filter can be a part of both produced and consumed filters in a fragment,
+        // so only add it once.
+        if (!filterSet.contains(filter.getFilterId())) {
+          filterSet.add(filter.getFilterId());
+          runtimeFiltersReservationBytes_ += filter.getFilterSize();
+        }
+      }
     }
 
     if (sink_ instanceof JoinBuildSink) {
@@ -241,10 +257,12 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     // The sink is opened after the plan tree.
     ResourceProfile fInstancePostOpenProfile =
         planTreeProfile.postOpenProfile.sum(sink_.getResourceProfile());
-    resourceProfile_ =
-        planTreeProfile.duringOpenProfile.max(fInstancePostOpenProfile);
-
-    initialReservationTotalClaims_ = sink_.getResourceProfile().getMinReservationBytes();
+    resourceProfile_ = new ResourceProfileBuilder()
+        .setMemEstimateBytes(runtimeFiltersReservationBytes_)
+        .setMinReservationBytes(runtimeFiltersReservationBytes_).build()
+        .sum(planTreeProfile.duringOpenProfile.max(fInstancePostOpenProfile));
+    initialReservationTotalClaims_ = sink_.getResourceProfile().getMinReservationBytes() +
+        runtimeFiltersReservationBytes_;
     for (PlanNode node: collectPlanNodes()) {
       initialReservationTotalClaims_ +=
           node.getNodeResourceProfile().getMinReservationBytes();
@@ -322,9 +340,11 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       Preconditions.checkArgument(initialReservationTotalClaims_ > -1);
       result.setMin_reservation_bytes(resourceProfile_.getMinReservationBytes());
       result.setInitial_reservation_total_claims(initialReservationTotalClaims_);
+      result.setRuntime_filters_reservation_bytes(runtimeFiltersReservationBytes_);
     } else {
       result.setMin_reservation_bytes(0);
       result.setInitial_reservation_total_claims(0);
+      result.setRuntime_filters_reservation_bytes(0);
     }
     return result;
   }
@@ -408,6 +428,10 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     } else {
       builder.append(resourceProfile_.multiply(getNumInstancesPerHost(mt_dop))
           .getExplainString());
+      if (resourceProfile_.isValid() && runtimeFiltersReservationBytes_ > 0) {
+        builder.append(" runtime-filters-memory=");
+        builder.append(PrintUtils.printBytes(runtimeFiltersReservationBytes_));
+      }
     }
     builder.append("\n");
     return builder.toString();

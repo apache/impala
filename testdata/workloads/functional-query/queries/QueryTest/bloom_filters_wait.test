@@ -2,21 +2,18 @@
 ---- QUERY
 ####################################################
 # Regression test for IMPALA-3141: Disabled filters should send dummy filters
-# to unblock waiters.
+# to unblock waiters. We limit the size of the filter to a much lower value than required
+# to achieve the desired FP rate so that it gets rejected/disabled during FP rate check.
 ####################################################
 
 SET RUNTIME_FILTER_WAIT_TIME_MS=600000;
 SET RUNTIME_FILTER_MODE=GLOBAL;
-SET RUNTIME_FILTER_MAX_SIZE=4096;
-select STRAIGHT_JOIN count(*) from alltypes a
-    join [BROADCAST]
-    # Build-side needs to be sufficiently large to trigger FP check.
-    (select id, int_col from alltypes UNION ALL select id, int_col from alltypes) b
-        on a.id = b.id
-        # Predicates that are always true (but planner thinks are selective)
-        where (b.id - b.id) < 1 AND (b.int_col - b.int_col) < 1;
+SET RUNTIME_FILTER_MAX_SIZE=64K;
+with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
+select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
+    join (select * from l LIMIT 500000) b on a.l_orderkey = -b.l_orderkey;
 ---- RESULTS
-14600
+0
 ---- RUNTIME_PROFILE
 row_regex: .*0 of 1 Runtime Filter Published, 1 Disabled.*
 ====

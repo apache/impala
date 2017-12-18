@@ -5,8 +5,8 @@ explain
 select *
 from tpch.lineitem join tpch.orders on l_orderkey = o_orderkey;
 ---- RESULTS: VERIFY_IS_EQUAL
-'Max Per-Host Resource Reservation: Memory=34.00MB'
-'Per-Host Resource Estimates: Memory=476.41MB'
+'Max Per-Host Resource Reservation: Memory=35.00MB'
+'Per-Host Resource Estimates: Memory=477.41MB'
 ''
 'F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 '|  Per-Host Resources: mem-estimate=0B mem-reservation=0B'
@@ -18,7 +18,7 @@ from tpch.lineitem join tpch.orders on l_orderkey = o_orderkey;
 '|  tuple-ids=0,1 row-size=454B cardinality=5757710'
 '|'
 'F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3'
-'Per-Host Resources: mem-estimate=388.41MB mem-reservation=34.00MB'
+'Per-Host Resources: mem-estimate=389.41MB mem-reservation=35.00MB runtime-filters-memory=1.00MB'
 '02:HASH JOIN [INNER JOIN, BROADCAST]'
 '|  hash predicates: l_orderkey = o_orderkey'
 '|  fk/pk conjuncts: l_orderkey = o_orderkey'

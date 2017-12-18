@@ -99,7 +99,7 @@ select count(*) from functional_kudu.alltypes a, functional_parquet.alltypes b,
 where a.int_col = b.int_col and a.int_col = c.int_col
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=2.02GB mem-reservation=35.94MB
+|  Per-Host Resources: mem-estimate=2.02GB mem-reservation=36.94MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -127,7 +127,7 @@ PLAN-ROOT SINK
 |  tuple-ids=0,1 row-size=8B cardinality=7300
 |
 |--01:SCAN HDFS [functional_parquet.alltypes b]
-|     partitions=24/24 files=24 size=179.19KB
+|     partitions=24/24 files=24 size=174.39KB
 |     runtime filters: RF000[bloom] -> b.int_col
 |     stored statistics:
 |       table: rows=unavailable size=unavailable

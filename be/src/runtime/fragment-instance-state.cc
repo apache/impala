@@ -135,7 +135,8 @@ Status FragmentInstanceState::Prepare() {
   event_sequence_->Start(query_state_->fragment_events_start_time());
   UpdateState(StateEvent::PREPARE_START);
 
-  runtime_state_->InitFilterBank();
+  RETURN_IF_ERROR(runtime_state_->InitFilterBank(
+      fragment_ctx_.fragment.runtime_filters_reservation_bytes));
 
   // Reserve one main thread from the pool
   runtime_state_->resource_pool()->AcquireThreadToken();

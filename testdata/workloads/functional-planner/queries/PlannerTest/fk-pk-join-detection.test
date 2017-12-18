@@ -5,7 +5,7 @@ on ss_customer_sk = c_customer_sk
 where c_salutation = 'Mrs.'
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=184.50MB mem-reservation=8.50MB
+|  Per-Host Resources: mem-estimate=185.50MB mem-reservation=9.50MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -86,7 +86,7 @@ on ss_customer_sk = c_customer_sk
 where c_salutation = 'Mrs.'
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=184.50MB mem-reservation=8.50MB
+|  Per-Host Resources: mem-estimate=185.50MB mem-reservation=9.50MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -126,7 +126,7 @@ on ss_item_sk = sr_item_sk and ss_ticket_number = sr_ticket_number
 where sr_return_quantity < 10
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=212.75MB mem-reservation=4.75MB
+|  Per-Host Resources: mem-estimate=214.75MB mem-reservation=6.75MB runtime-filters-memory=2.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -165,7 +165,7 @@ tpcds.store_sales inner join tpcds.web_sales
 on ss_sold_time_sk = ws_sold_time_sk
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=396.67MB mem-reservation=34.00MB
+|  Per-Host Resources: mem-estimate=397.67MB mem-reservation=35.00MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -203,7 +203,7 @@ on a.d_date_sk = b.d_date_sk
 where a.d_holiday = "Y"
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=113.00MB mem-reservation=17.00MB
+|  Per-Host Resources: mem-estimate=114.00MB mem-reservation=18.00MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -246,7 +246,7 @@ where ss_item_sk = sr_item_sk and ss_ticket_number = sr_ticket_number
   and d1.d_fy_week_seq = 1000
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=357.81MB mem-reservation=7.75MB
+|  Per-Host Resources: mem-estimate=362.81MB mem-reservation=12.75MB runtime-filters-memory=5.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -334,7 +334,7 @@ tpcds.store_sales inner join tpcds.customer
 on ss_customer_sk % 10 = c_customer_sk / 100
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=210.00MB mem-reservation=34.00MB
+|  Per-Host Resources: mem-estimate=211.00MB mem-reservation=35.00MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -372,7 +372,7 @@ tpcds.store_sales inner join tpcds_seq_snap.customer
 on ss_customer_sk = c_customer_sk
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=2.17GB mem-reservation=34.00MB
+|  Per-Host Resources: mem-estimate=2.17GB mem-reservation=35.00MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -409,7 +409,7 @@ tpcds_seq_snap.store_sales inner join tpcds.customer
 on ss_customer_sk = c_customer_sk
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=177.94MB mem-reservation=1.94MB
+|  Per-Host Resources: mem-estimate=178.94MB mem-reservation=2.94MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -448,7 +448,7 @@ tpcds.store_sales inner join
 on ss_sold_time_sk = ws_sold_time_sk
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=298.00MB mem-reservation=3.88MB
+|  Per-Host Resources: mem-estimate=299.00MB mem-reservation=4.88MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |

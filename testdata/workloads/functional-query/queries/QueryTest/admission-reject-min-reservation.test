@@ -29,7 +29,7 @@ from tpch_parquet.lineitem join tpch_parquet.orders on l_orderkey = o_orderkey
 ---- CATCH
 minimum memory reservation is greater than memory available to the
  query for buffer reservations. Memory reservation needed given the
- current plan: 4.75 MB. Set mem_limit to at least 79.75 MB.
+ current plan: 6.75 MB. Set mem_limit to at least 81.75 MB.
 ====
 ---- QUERY
 set mem_limit=80mb;
@@ -38,5 +38,5 @@ from tpch_parquet.lineitem join tpch_parquet.orders on l_orderkey = o_orderkey
 ---- CATCH
 minimum memory reservation is greater than memory available to the
  query for buffer reservations. Memory reservation needed given the
- current plan: 17.00 MB. Set mem_limit to at least 92.00 MB.
+ current plan: 18.00 MB. Set mem_limit to at least 93.00 MB.
 ====

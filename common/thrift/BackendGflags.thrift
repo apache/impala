@@ -69,4 +69,8 @@ struct TBackendGflags {
   21: required i32 max_nonhdfs_partitions_parallel_load
 
   22: required TReservedWordsVersion reserved_words_version
+
+  23: required double max_filter_error_rate
+
+  24: required i64 min_buffer_size
 }

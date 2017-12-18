@@ -44,10 +44,14 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
+import org.apache.impala.service.BackendConfig;
+import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TRuntimeFilterDesc;
 import org.apache.impala.thrift.TRuntimeFilterMode;
 import org.apache.impala.thrift.TRuntimeFilterTargetDesc;
 import org.apache.impala.thrift.TRuntimeFilterType;
+import org.apache.impala.util.BitUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,6 +70,13 @@ import com.google.common.collect.Sets;
  * Runtime filters are generated from equi-join predicates but they do not replace the
  * original predicates.
  *
+ * MinMax filters are of a fixed size (except for those used for string type) and
+ * therefore only sizes for bloom filters need to be calculated. These calculations are
+ * based on the NDV estimates of the associated table columns, the min buffer size that
+ * can be allocated by the bufferpool, and the query options. Moreover, it is also bound
+ * by the MIN/MAX_BLOOM_FILTER_SIZE limits which are enforced on the query options before
+ * this phase of planning.
+ *
  * Example: select * from T1, T2 where T1.a = T2.b and T2.c = '1';
  * Assuming that T1 is a fact table and T2 is a significantly smaller dimension table, a
  * runtime filter is constructed at the join node between tables T1 and T2 while building
@@ -81,6 +92,10 @@ public final class RuntimeFilterGenerator {
   private final static Logger LOG =
       LoggerFactory.getLogger(RuntimeFilterGenerator.class);
 
+  // Should be in sync with corresponding values in runtime-filter-bank.cc.
+  private static final long MIN_BLOOM_FILTER_SIZE = 4 * 1024;
+  private static final long MAX_BLOOM_FILTER_SIZE = 512 * 1024 * 1024;
+
   // Map of base table tuple ids to a list of runtime filters that
   // can be applied at the corresponding scan nodes.
   private final Map<TupleId, List<RuntimeFilter>> runtimeFiltersByTid_ =
@@ -90,7 +105,44 @@ public final class RuntimeFilterGenerator {
   private final IdGenerator<RuntimeFilterId> filterIdGenerator =
       RuntimeFilterId.createGenerator();
 
-  private RuntimeFilterGenerator() {};
+  /**
+   * Internal class that encapsulates the max, min and default sizes used for creating
+   * bloom filter objects.
+   */
+  private class FilterSizeLimits {
+    // Maximum filter size, in bytes, rounded up to a power of two.
+    public final long maxVal;
+
+    // Minimum filter size, in bytes, rounded up to a power of two.
+    public final long minVal;
+
+    // Pre-computed default filter size, in bytes, rounded up to a power of two.
+    public final long defaultVal;
+
+    public FilterSizeLimits(TQueryOptions tQueryOptions) {
+      // Round up all limits to a power of two and make sure filter size is more
+      // than the min buffer size that can be allocated by the buffer pool.
+      long maxLimit = tQueryOptions.getRuntime_filter_max_size();
+      long minBufferSize = BackendConfig.INSTANCE.getMinBufferSize();
+      maxVal = BitUtil.roundUpToPowerOf2(Math.max(maxLimit, minBufferSize));
+
+      long minLimit = tQueryOptions.getRuntime_filter_min_size();
+      minLimit = Math.max(minLimit, minBufferSize);
+      // Make sure minVal <= defaultVal <= maxVal
+      minVal = BitUtil.roundUpToPowerOf2(Math.min(minLimit, maxVal));
+
+      long defaultValue = tQueryOptions.getRuntime_bloom_filter_size();
+      defaultValue = Math.max(defaultValue, minVal);
+      defaultVal = BitUtil.roundUpToPowerOf2(Math.min(defaultValue, maxVal));
+    }
+  };
+
+  // Contains size limits for bloom filters.
+  private FilterSizeLimits bloomFilterSizeLimits_;
+
+  private RuntimeFilterGenerator(TQueryOptions tQueryOptions) {
+    bloomFilterSizeLimits_ = new FilterSizeLimits(tQueryOptions);
+  };
 
   /**
    * Internal representation of a runtime filter. A runtime filter is generated from
@@ -125,6 +177,8 @@ public final class RuntimeFilterGenerator {
     // for the filter. A value of -1 means no estimate is available, and default filter
     // parameters should be used.
     private long ndvEstimate_ = -1;
+    // Size of the filter (in Bytes). Should be greater than zero for bloom filters.
+    private long filterSizeBytes_ = 0;
     // If true, the filter is produced by a broadcast join and there is at least one
     // destination scan node which is in the same fragment as the join; set in
     // DistributedPlanner.createHashJoinFragment().
@@ -196,7 +250,7 @@ public final class RuntimeFilterGenerator {
 
     private RuntimeFilter(RuntimeFilterId filterId, JoinNode filterSrcNode, Expr srcExpr,
         Expr origTargetExpr, Operator exprCmpOp, Map<TupleId, List<SlotId>> targetSlots,
-        TRuntimeFilterType type) {
+        TRuntimeFilterType type, FilterSizeLimits filterSizeLimits) {
       id_ = filterId;
       src_ = filterSrcNode;
       srcExpr_ = srcExpr;
@@ -205,6 +259,7 @@ public final class RuntimeFilterGenerator {
       targetSlotsByTid_ = targetSlots;
       type_ = type;
       computeNdvEstimate();
+      calculateFilterSize(filterSizeLimits);
     }
 
     @Override
@@ -240,6 +295,7 @@ public final class RuntimeFilterGenerator {
       }
       tFilter.setApplied_on_partition_columns(appliedOnPartitionColumns);
       tFilter.setType(type_);
+      tFilter.setFilter_size_bytes(filterSizeBytes_);
       return tFilter;
     }
 
@@ -250,7 +306,7 @@ public final class RuntimeFilterGenerator {
      */
     public static RuntimeFilter create(IdGenerator<RuntimeFilterId> idGen,
         Analyzer analyzer, Expr joinPredicate, JoinNode filterSrcNode,
-        TRuntimeFilterType type) {
+        TRuntimeFilterType type, FilterSizeLimits filterSizeLimits) {
       Preconditions.checkNotNull(idGen);
       Preconditions.checkNotNull(joinPredicate);
       Preconditions.checkNotNull(filterSrcNode);
@@ -277,7 +333,7 @@ public final class RuntimeFilterGenerator {
         LOG.trace("Generating runtime filter from predicate " + joinPredicate);
       }
       return new RuntimeFilter(idGen.getNextId(), filterSrcNode, srcExpr, targetExpr,
-          normalizedJoinConjunct.getOp(), targetSlots, type);
+          normalizedJoinConjunct.getOp(), targetSlots, type, filterSizeLimits);
     }
 
     /**
@@ -383,6 +439,7 @@ public final class RuntimeFilterGenerator {
     public RuntimeFilterId getFilterId() { return id_; }
     public TRuntimeFilterType getType() { return type_; }
     public Operator getExprCompOp() { return exprCmpOp_; }
+    public long getFilterSize() { return filterSizeBytes_; }
 
     /**
      * Estimates the selectivity of a runtime filter as the cardinality of the
@@ -415,6 +472,25 @@ public final class RuntimeFilterGenerator {
     }
 
     /**
+     * Sets the filter size (in bytes) required for a bloom filter to achieve the
+     * configured maximum false-positive rate based on the expected NDV. Also bounds the
+     * filter size between the max and minimum filter sizes supplied to it by
+     * 'filterSizeLimits'.
+     */
+    private void calculateFilterSize(FilterSizeLimits filterSizeLimits) {
+      if (type_ == TRuntimeFilterType.MIN_MAX) return;
+      if (ndvEstimate_ == -1) {
+        filterSizeBytes_ = filterSizeLimits.defaultVal;
+        return;
+      }
+      double fpp = BackendConfig.INSTANCE.getMaxFilterErrorRate();
+      int logFilterSize = FeSupport.GetMinLogSpaceForBloomFilter(ndvEstimate_, fpp);
+      filterSizeBytes_ = 1L << logFilterSize;
+      filterSizeBytes_ = Math.max(filterSizeBytes_, filterSizeLimits.minVal);
+      filterSizeBytes_ = Math.min(filterSizeBytes_, filterSizeLimits.maxVal);
+    }
+
+    /**
      * Assigns this runtime filter to the corresponding plan nodes.
      */
     public void assignToPlanNodes() {
@@ -442,7 +518,8 @@ public final class RuntimeFilterGenerator {
     Preconditions.checkNotNull(ctx.getQueryOptions());
     int maxNumBloomFilters = ctx.getQueryOptions().getMax_num_runtime_filters();
     Preconditions.checkState(maxNumBloomFilters >= 0);
-    RuntimeFilterGenerator filterGenerator = new RuntimeFilterGenerator();
+    RuntimeFilterGenerator filterGenerator = new RuntimeFilterGenerator(
+        ctx.getQueryOptions());
     filterGenerator.generateFilters(ctx, plan);
     List<RuntimeFilter> filters = Lists.newArrayList(filterGenerator.getRuntimeFilters());
     if (filters.size() > maxNumBloomFilters) {
@@ -516,8 +593,8 @@ public final class RuntimeFilterGenerator {
       List<RuntimeFilter> filters = Lists.newArrayList();
       for (TRuntimeFilterType type : TRuntimeFilterType.values()) {
         for (Expr conjunct : joinConjuncts) {
-          RuntimeFilter filter = RuntimeFilter.create(
-              filterIdGenerator, ctx.getRootAnalyzer(), conjunct, joinNode, type);
+          RuntimeFilter filter = RuntimeFilter.create(filterIdGenerator,
+              ctx.getRootAnalyzer(), conjunct, joinNode, type, bloomFilterSizeLimits_);
           if (filter == null) continue;
           registerRuntimeFilter(filter);
           filters.add(filter);

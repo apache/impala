@@ -147,9 +147,10 @@ TEST(QueryOptions, SetByteOptions) {
       {MAKE_OPTIONDEF(runtime_filter_min_size),
           {RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE,
               RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE}},
+      // Lower limit for runtime_filter_max_size is FLAGS_min_buffer_size which has a
+      // default value of is 64KB.
       {MAKE_OPTIONDEF(runtime_filter_max_size),
-          {RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE,
-              RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE}},
+          {64 * 1024, RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE}},
       {MAKE_OPTIONDEF(runtime_bloom_filter_size),
           {RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE,
               RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE}}
@@ -308,6 +309,15 @@ TEST(QueryOptions, SetSpecialOptions) {
     TestError("-1");
     TestError("0");
     TestError(to_string(ROW_SIZE_LIMIT + 1).c_str());
+  }
+  // RUNTIME_FILTER_MAX_SIZE should not be less than FLAGS_min_buffer_size
+  {
+    OptionDef<int32_t> key_def = MAKE_OPTIONDEF(runtime_filter_max_size);
+    auto TestOk = MakeTestOkFn(options, key_def);
+    auto TestError = MakeTestErrFn(options, key_def);
+    TestOk("128KB", 128 * 1024);
+    TestError("65535"); // default value of FLAGS_min_buffer_size is 64KB
+    TestOk("64KB", 64 * 1024);
   }
 }
 

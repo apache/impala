@@ -17,6 +17,7 @@
 
 #include "util/bloom-filter.h"
 
+#include "runtime/exec-env.h"
 #include "runtime/runtime-state.h"
 
 using namespace std;
@@ -25,47 +26,55 @@ namespace impala {
 
 constexpr uint32_t BloomFilter::REHASH[8] __attribute__((aligned(32)));
 
-BloomFilter::BloomFilter(const int log_heap_space)
-  : always_false_(true),
-    // Since log_heap_space is in bytes, we need to convert it to the number of tiny Bloom
-    // filters we will use.
-    log_num_buckets_(std::max(1, log_heap_space - LOG_BUCKET_BYTE_SIZE)),
-    // Don't use log_num_buckets_ if it will lead to undefined behavior by a shift
-    // that is too large.
-    directory_mask_((1ull << std::min(63, log_num_buckets_)) - 1),
-    directory_(NULL) {
-  // Since we use 32 bits in the arguments of Insert() and Find(), log_num_buckets_
-  // must be limited.
-  DCHECK(log_num_buckets_ <= 32)
-      << "Bloom filter too large. log_heap_space: " << log_heap_space;
-  const size_t alloc_size = directory_size();
-  const int malloc_failed =
-      posix_memalign(reinterpret_cast<void**>(&directory_), 64, alloc_size);
-  DCHECK_EQ(malloc_failed, 0) << "Malloc failed. log_heap_space: " << log_heap_space
-                              << " log_num_buckets_: " << log_num_buckets_
-                              << " alloc_size: " << alloc_size;
-  DCHECK(directory_ != nullptr);
-  memset(directory_, 0, alloc_size);
+BloomFilter::BloomFilter(BufferPool::ClientHandle* client)
+  : buffer_pool_client_(client) {}
+
+BloomFilter::~BloomFilter() {
+  DCHECK(directory_ == nullptr)
+      << "Close() should have been called before the object is destroyed.";
 }
 
-BloomFilter::BloomFilter(const TBloomFilter& thrift)
-    : BloomFilter(thrift.log_heap_space) {
-  if (!thrift.always_false) {
+Status BloomFilter::Init(const int log_bufferpool_space) {
+  // Since log_bufferpool_space is in bytes, we need to convert it to the number of tiny
+  // Bloom filters we will use.
+  log_num_buckets_ = std::max(1, log_bufferpool_space - LOG_BUCKET_BYTE_SIZE);
+  // Don't use log_num_buckets_ if it will lead to undefined behavior by a shift
+  // that is too large.
+  directory_mask_ = (1ull << std::min(63, log_num_buckets_)) - 1;
+  // Since we use 32 bits in the arguments of Insert() and Find(), log_num_buckets_
+  // must be limited.
+  DCHECK(log_num_buckets_ <= 32) << "Bloom filter too large. log_bufferpool_space: "
+                                 << log_bufferpool_space;
+  const size_t alloc_size = directory_size();
+  BufferPool* buffer_pool_ = ExecEnv::GetInstance()->buffer_pool();
+  Close(); // Ensure that any previously allocated memory for directory_ is released.
+  RETURN_IF_ERROR(
+      buffer_pool_->AllocateBuffer(buffer_pool_client_, alloc_size, &buffer_handle_));
+  directory_ = reinterpret_cast<Bucket*>(buffer_handle_.data());
+  memset(directory_, 0, alloc_size);
+  return Status::OK();
+}
+
+Status BloomFilter::Init(const TBloomFilter& thrift) {
+  RETURN_IF_ERROR(Init(thrift.log_bufferpool_space));
+  if (directory_ != nullptr && !thrift.always_false) {
     always_false_ = false;
     DCHECK_EQ(thrift.directory.size(), directory_size());
     memcpy(directory_, &thrift.directory[0], thrift.directory.size());
   }
+  return Status::OK();
 }
 
-BloomFilter::~BloomFilter() {
-  if (directory_) {
-    free(directory_);
-    directory_ = NULL;
+void BloomFilter::Close() {
+  if (directory_ != nullptr) {
+    BufferPool* buffer_pool_ = ExecEnv::GetInstance()->buffer_pool();
+    buffer_pool_->FreeBuffer(buffer_pool_client_, &buffer_handle_);
+    directory_ = nullptr;
   }
 }
 
 void BloomFilter::ToThrift(TBloomFilter* thrift) const {
-  thrift->log_heap_space = log_num_buckets_ + LOG_BUCKET_BYTE_SIZE;
+  thrift->log_bufferpool_space = log_num_buckets_ + LOG_BUCKET_BYTE_SIZE;
   if (always_false_) {
     thrift->always_false = true;
     thrift->always_true = false;
@@ -184,9 +193,9 @@ void BloomFilter::Or(const TBloomFilter& in, TBloomFilter* out) {
   DCHECK(!out->always_true);
   DCHECK(!in.always_true);
   if (in.always_false) return;
-  DCHECK_EQ(in.log_heap_space, out->log_heap_space);
+  DCHECK_EQ(in.log_bufferpool_space, out->log_bufferpool_space);
   DCHECK_EQ(in.directory.size(), out->directory.size())
-      << "Equal log heap space " << in.log_heap_space
+      << "Equal log heap space " << in.log_bufferpool_space
       << ", but different directory sizes: " << in.directory.size() << ", "
       << out->directory.size();
   // The trivial loop out[i] |= in[i] should auto-vectorize with gcc at -O3, but it is not
@@ -220,11 +229,11 @@ void BloomFilter::Or(const TBloomFilter& in, TBloomFilter* out) {
 //
 // where space is in bits.
 
-size_t BloomFilter::MaxNdv(const int log_heap_space, const double fpp) {
-  DCHECK(log_heap_space > 0 && log_heap_space < 61);
+size_t BloomFilter::MaxNdv(const int log_bufferpool_space, const double fpp) {
+  DCHECK(log_bufferpool_space > 0 && log_bufferpool_space < 61);
   DCHECK(0 < fpp && fpp < 1);
   static const double ik = 1.0 / BUCKET_WORDS;
-  return -1 * ik * (1ull << (log_heap_space + 3)) * log(1 - pow(fpp, ik));
+  return -1 * ik * (1ull << (log_bufferpool_space + 3)) * log(1 - pow(fpp, ik));
 }
 
 int BloomFilter::MinLogSpace(const size_t ndv, const double fpp) {
@@ -237,9 +246,9 @@ int BloomFilter::MinLogSpace(const size_t ndv, const double fpp) {
   return max(0, static_cast<int>(ceil(log2(m / 8))));
 }
 
-double BloomFilter::FalsePositiveProb(const size_t ndv, const int log_heap_space) {
+double BloomFilter::FalsePositiveProb(const size_t ndv, const int log_bufferpool_space) {
   return pow(1 - exp((-1.0 * static_cast<double>(BUCKET_WORDS) * static_cast<double>(ndv))
-                     / static_cast<double>(1ull << (log_heap_space + 3))),
+                     / static_cast<double>(1ull << (log_bufferpool_space + 3))),
       BUCKET_WORDS);
 }
 

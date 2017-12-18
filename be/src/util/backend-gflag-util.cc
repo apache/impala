@@ -47,6 +47,8 @@ DECLARE_string(authorized_proxy_user_config_delimiter);
 DECLARE_string(kudu_master_hosts);
 DECLARE_string(reserved_words_version);
 DECLARE_string(sentry_config);
+DECLARE_double(max_filter_error_rate);
+DECLARE_int64(min_buffer_size);
 
 namespace impala {
 
@@ -84,7 +86,8 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
     DCHECK_EQ(FLAGS_reserved_words_version, "3.0.0");
     cfg.__set_reserved_words_version(TReservedWordsVersion::IMPALA_3_0);
   }
-
+  cfg.__set_max_filter_error_rate(FLAGS_max_filter_error_rate);
+  cfg.__set_min_buffer_size(FLAGS_min_buffer_size);
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &cfg, cfg_bytes));
   return Status::OK();
 }

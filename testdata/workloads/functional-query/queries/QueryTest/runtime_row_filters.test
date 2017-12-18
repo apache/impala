@@ -387,31 +387,25 @@ row_regex: .*Rows rejected: 2.43K \(2432\).*
 
 ---- QUERY
 ####################################################
-# Test case 18: Filters will not be used if they exceed
-# the configured memory limit on the coordinator.
-# To test this, we need to construct a query where memory
-# consumption on the coordinator exceeds MEM_LIMIT, but
-# not on the backends (because otherwise they will disable
-# the filters through another path). We set MEM_LIMIT to
-# the minimum possible then set filter size to be roughly
-# half that: since the coordinator must aggregate two of
-# these filters (and indeed must create one as well), it
-# will exceed the memory limit. This is checked for
-# indirectly by confirming that the filter had no effect
-# (when usually it would be selective).
+# Test case 18: Query is not admitted if it exceeds the
+# mem requirement after accounting for the memory
+# required by runtime filters.
 ####################################################
 SET RUNTIME_FILTER_MODE=GLOBAL;
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MIN_SIZE=128MB;
 SET RUNTIME_FILTER_MAX_SIZE=500MB;
-SET MEM_LIMIT=140MB;
+# Query would have been admitted if memory for runtime filters was not accounted for.
+SET BUFFER_POOL_LIMIT=140MB;
 select STRAIGHT_JOIN * from alltypes a join [SHUFFLE] alltypes b
     on a.month = b.id and b.int_col = -3
 ---- RESULTS
----- RUNTIME_PROFILE
-row_regex: .*Filter 0 \(128.00 MB\).*
-row_regex: .*Files processed: 8.*
-row_regex: .*Files rejected: 0.*
+---- CATCH
+ImpalaBeeswaxException: INNER EXCEPTION: <class 'beeswaxd.ttypes.BeeswaxException'>
+ MESSAGE: Rejected query from pool default-pool: minimum memory reservation is
+ greater than memory available to the query for buffer reservations. Increase
+ the buffer_pool_limit to 290.00 MB. See the query profile for more information
+ about the per-node memory requirements.
 ====
 ---- QUERY
 # Confirm that with broadcast join, memory limit is not hit.
@@ -419,9 +413,9 @@ SET RUNTIME_FILTER_MODE=GLOBAL;
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MIN_SIZE=128MB;
 SET RUNTIME_FILTER_MAX_SIZE=500MB;
-# Allocate enough memory for the join + filter + scan
-SET MEM_LIMIT=170MB;
-select STRAIGHT_JOIN * from alltypes a join [BROADCAST] alltypes b
+# This would run perfectly with just enough memory provided by the buffer pool.
+SET BUFFER_POOL_LIMIT=290MB;
+select STRAIGHT_JOIN * from alltypes a join [SHUFFLE] alltypes b
     on a.month = b.id and b.int_col = -3
 ---- RESULTS
 ---- RUNTIME_PROFILE

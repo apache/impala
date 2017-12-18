@@ -91,8 +91,9 @@ class RuntimeState {
   /// Empty d'tor to avoid issues with scoped_ptr.
   ~RuntimeState();
 
-  /// Initializes the runtime filter bank.
-  void InitFilterBank();
+  /// Initializes the runtime filter bank and claims the initial buffer reservation
+  /// for it.
+  Status InitFilterBank(long runtime_filters_reservation_bytes);
 
   QueryState* query_state() const { return query_state_; }
   /// Return the query's ObjectPool
