@@ -49,14 +49,64 @@ under the License.
       not with queries submitted through JDBC or ODBC.
     </p>
 
+    <note type="important" rev="2.11.0 IMPALA-2181">
+      <p>
+        In <keyword keyref="impala211_full"/> and higher, the output of the <codeph>SET</codeph>
+        statement changes in some important ways:
+      </p>
+      <ul>
+        <li>
+          <p>
+            The options are divided into groups: <codeph>Regular Query Options</codeph>,
+            <codeph>Advanced Query Options</codeph>, <codeph>Development Query Options</codeph>, and
+            <codeph>Deprecated Query Options</codeph>.
+          </p>
+        </li>
+        <li>
+          <p>
+            The advanced options are intended for use in specific
+            kinds of performance tuning and debugging scenarios. The development options are
+            related to internal development of Impala or features that are not yet finalized;
+            these options might be changed or removed without notice.
+            The deprecated options are related to features that are removed or changed so that
+            the options no longer have any purpose; these options might be removed in future
+            versions.
+          </p>
+        </li>
+        <li>
+          <p>
+            By default, only the first two groups (regular and advanced) are
+            displayed by the <codeph>SET</codeph> command. Use the syntax <codeph>SET ALL</codeph>
+            to see all groups of options.
+          </p>
+        </li>
+        <li>
+          <p>
+            <cmdname>impala-shell</cmdname> options and user-specified variables are always displayed
+            at the end of the list of query options, after all appropriate option groups.
+          </p>
+        </li>
+        <li>
+          <p>
+            When the <codeph>SET</codeph> command is run through the JDBC or ODBC interfaces,
+            the result set has a new third column, <codeph>level</codeph>, indicating which
+            group each option belongs to. The same distinction of <codeph>SET</codeph>
+            returning the regular and advanced options, and <codeph>SET ALL</codeph>
+            returning all option groups, applies to JDBC and ODBC also.
+          </p>
+        </li>
+      </ul>
+    </note>
+
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
 <codeblock>SET [<varname>query_option</varname>=<varname>option_value</varname>]
+<ph rev="2.11.0 IMPALA-2181">SET ALL</ph>
 </codeblock>
 
-    <p>
-      <codeph>SET</codeph> with no arguments returns a result set consisting of all available query options and
-      their current values.
+    <p rev="2.11.0 IMPALA-2181">
+      <codeph>SET</codeph> and <codeph>SET ALL</codeph> with no arguments return a
+      result set consisting of all the applicable query options and their current values.
     </p>
 
     <p>
@@ -131,17 +181,36 @@ Query: select s from production_table order by s limit 3
 </codeblock>
 
     <p rev="2.5.0 IMPALA-2180">
-      The following example shows how <codeph>SET</codeph> with no parameters displays
+      The following example shows how <codeph>SET ALL</codeph> with no parameters displays
       all user-specified substitution variables, and how <codeph>UNSET</codeph> removes
       the substitution variable entirely:
     </p>
 
-<codeblock rev="2.5.0 IMPALA-2180">
-[localhost:21000] > set;
+<codeblock rev="2.11.0 IMPALA-2181">
+[localhost:21000] > set all;
 Query options (defaults shown in []):
-  ABORT_ON_DEFAULT_LIMIT_EXCEEDED: [0]
-  ...
-  V_CPU_CORES: [0]
+ABORT_ON_ERROR: [0]
+COMPRESSION_CODEC: []
+DISABLE_CODEGEN: [0]
+...
+
+Advanced Query Options:
+APPX_COUNT_DISTINCT: [0]
+BUFFER_POOL_LIMIT: []
+DEFAULT_JOIN_DISTRIBUTION_MODE: [0]
+...
+
+Development Query Options:
+BATCH_SIZE: [0]
+DEBUG_ACTION: []
+DECIMAL_V2: [0]
+...
+
+Deprecated Query Options:
+ABORT_ON_DEFAULT_LIMIT_EXCEEDED: [0]
+ALLOW_UNSUPPORTED_FORMATS: [0]
+DEFAULT_ORDER_BY_LIMIT: [-1]
+...
 
 Shell Options
   LIVE_PROGRESS: False
