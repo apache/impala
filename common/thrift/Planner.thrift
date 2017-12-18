@@ -70,6 +70,10 @@ struct TPlanFragment {
   // sink) in a single instance of this fragment. This is used for an optimization in
   // InitialReservation. Measured in bytes. required in V1
   8: optional i64 initial_reservation_total_claims
+
+  // The total memory (in bytes) required for the runtime filters used by the plan nodes
+  // managed by this fragment. Is included in min_reservation_bytes.
+  9: optional i64 runtime_filters_reservation_bytes
 }
 
 // location information for a single scan range

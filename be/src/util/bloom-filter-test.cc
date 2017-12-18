@@ -21,6 +21,11 @@
 #include <unordered_set>
 #include <vector>
 
+#include "runtime/bufferpool/buffer-pool.h"
+#include "runtime/bufferpool/reservation-tracker.h"
+#include "runtime/mem-tracker.h"
+#include "runtime/test-env.h"
+#include "service/fe-support.h"
 #include "testutil/gtest-util.h"
 
 using namespace std;
@@ -83,100 +88,6 @@ TBloomFilter BfUnion(const BloomFilter& x, const BloomFilter& y, bool* success) 
 }  // namespace
 
 namespace impala {
-
-// We can construct (and destruct) Bloom filters with different spaces.
-TEST(BloomFilter, Constructor) {
-  for (int i = 0; i < 30; ++i) {
-    BloomFilter bf(i);
-  }
-}
-
-// We can Insert() hashes into a Bloom filter with different spaces.
-TEST(BloomFilter, Insert) {
-  srand(0);
-  for (int i = 13; i < 17; ++i) {
-    BloomFilter bf(i);
-    for (int k = 0; k < (1 << 15); ++k) {
-      BfInsert(bf, MakeRand());
-    }
-  }
-}
-
-// After Insert()ing something into a Bloom filter, it can be found again immediately.
-TEST(BloomFilter, Find) {
-  srand(0);
-  for (int i = 13; i < 17; ++i) {
-    BloomFilter bf(i);
-    for (int k = 0; k < (1 << 15); ++k) {
-      const uint64_t to_insert = MakeRand();
-      BfInsert(bf, to_insert);
-      EXPECT_TRUE(BfFind(bf, to_insert));
-    }
-  }
-}
-
-// After Insert()ing something into a Bloom filter, it can be found again much later.
-TEST(BloomFilter, CumulativeFind) {
-  srand(0);
-  for (int i = 5; i < 11; ++i) {
-    std::vector<uint32_t> inserted;
-    BloomFilter bf(i);
-    for (int k = 0; k < (1 << 10); ++k) {
-      const uint32_t to_insert = MakeRand();
-      inserted.push_back(to_insert);
-      BfInsert(bf, to_insert);
-      for (int n = 0; n < inserted.size(); ++n) {
-        EXPECT_TRUE(BfFind(bf, inserted[n]));
-      }
-    }
-  }
-}
-
-// The empirical false positives we find when looking for random items is with a constant
-// factor of the false positive probability the Bloom filter was constructed for.
-TEST(BloomFilter, FindInvalid) {
-  srand(0);
-  static const int find_limit = 1 << 20;
-  unordered_set<uint32_t> to_find;
-  while (to_find.size() < find_limit) {
-    to_find.insert(MakeRand());
-  }
-  static const int max_log_ndv = 19;
-  unordered_set<uint32_t> to_insert;
-  while (to_insert.size() < (1ull << max_log_ndv)) {
-    const auto candidate = MakeRand();
-    if (to_find.find(candidate) == to_find.end()) {
-      to_insert.insert(candidate);
-    }
-  }
-  vector<uint32_t> shuffled_insert(to_insert.begin(), to_insert.end());
-  for (int log_ndv = 12; log_ndv < max_log_ndv; ++log_ndv) {
-    for (int log_fpp = 4; log_fpp < 15; ++log_fpp) {
-      double fpp = 1.0 / (1 << log_fpp);
-      const size_t ndv = 1 << log_ndv;
-      const int log_heap_space = BloomFilter::MinLogSpace(ndv, fpp);
-      BloomFilter bf(log_heap_space);
-      // Fill up a BF with exactly as much ndv as we planned for it:
-      for (size_t i = 0; i < ndv; ++i) {
-        BfInsert(bf, shuffled_insert[i]);
-      }
-      int found = 0;
-      // Now we sample from the set of possible hashes, looking for hits.
-      for (const auto& i : to_find) {
-        found += BfFind(bf, i);
-      }
-      EXPECT_LE(found, find_limit * fpp * 2)
-          << "Too many false positives with -log2(fpp) = " << log_fpp;
-      // Because the space is rounded up to a power of 2, we might actually get a lower
-      // fpp than the one passed to MinLogSpace().
-      const double expected_fpp = BloomFilter::FalsePositiveProb(ndv, log_heap_space);
-      EXPECT_GE(found, find_limit * expected_fpp)
-          << "Too few false positives with -log2(fpp) = " << log_fpp;
-      EXPECT_LE(found, find_limit * expected_fpp * 8)
-          << "Too many false positives with -log2(fpp) = " << log_fpp;
-    }
-  }
-}
 
 // Test that MaxNdv() and MinLogSpace() are dual
 TEST(BloomFilter, MinSpaceMaxNdv) {
@@ -245,51 +156,211 @@ TEST(BloomFilter, MinSpaceForFpp) {
   }
 }
 
-TEST(BloomFilter, Thrift) {
-  BloomFilter bf(BloomFilter::MinLogSpace(100, 0.01));
-  for (int i = 0; i < 10; ++i) BfInsert(bf, i);
+class BloomFilterTest : public testing::Test {
+ protected:
+  /// Temporary runtime environment for the BloomFilters.
+  unique_ptr<TestEnv> test_env_;
+  RuntimeState* runtime_state_;
+
+  ObjectPool pool_;
+  unique_ptr<MemTracker> tracker_;
+  unique_ptr<BufferPool::ClientHandle> buffer_pool_client_;
+  vector<BloomFilter*> bloom_filters_;
+
+  virtual void SetUp() {
+    int64_t min_page_size = 64; // Min filter size that we allocate in our tests.
+    int64_t buffer_bytes_limit = 4L * 1024 * 1024 * 1024;
+    test_env_.reset(new TestEnv());
+    test_env_->SetBufferPoolArgs(min_page_size, buffer_bytes_limit);
+    ASSERT_OK(test_env_->Init());
+    ASSERT_OK(test_env_->CreateQueryState(0, nullptr, &runtime_state_));
+    buffer_pool_client_.reset(new BufferPool::ClientHandle);
+    tracker_.reset(new MemTracker(-1, "client", runtime_state_->instance_mem_tracker()));
+    BufferPool* buffer_pool = test_env_->exec_env()->buffer_pool();
+    ASSERT_OK(buffer_pool->RegisterClient("", nullptr,
+        runtime_state_->instance_buffer_reservation(), tracker_.get(),
+        std::numeric_limits<int64>::max(), runtime_state_->runtime_profile(),
+        buffer_pool_client_.get()));
+  }
+
+  virtual void TearDown() {
+    for (BloomFilter* filter : bloom_filters_) filter->Close();
+    bloom_filters_.clear();
+    runtime_state_ = nullptr;
+    pool_.Clear();
+    test_env_->exec_env()->buffer_pool()->DeregisterClient(buffer_pool_client_.get());
+    buffer_pool_client_.reset();
+    tracker_.reset();
+    test_env_.reset();
+  }
+
+  BloomFilter* CreateBloomFilter(int log_bufferpool_space) {
+    int64_t filter_size = BloomFilter::GetExpectedMemoryUsed(log_bufferpool_space);
+    EXPECT_TRUE(buffer_pool_client_->IncreaseReservation(filter_size));
+    BloomFilter* bloom_filter = pool_.Add(new BloomFilter(buffer_pool_client_.get()));
+    EXPECT_OK(bloom_filter->Init(log_bufferpool_space));
+    bloom_filters_.push_back(bloom_filter);
+    EXPECT_NE(bloom_filter->GetBufferPoolSpaceUsed(), -1);
+    return bloom_filter;
+  }
+
+  BloomFilter* CreateBloomFilter(TBloomFilter t_filter) {
+    int64_t filter_size =
+        BloomFilter::GetExpectedMemoryUsed(t_filter.log_bufferpool_space);
+    EXPECT_TRUE(buffer_pool_client_->IncreaseReservation(filter_size));
+    BloomFilter* bloom_filter = pool_.Add(new BloomFilter(buffer_pool_client_.get()));
+    EXPECT_OK(bloom_filter->Init(t_filter));
+    bloom_filters_.push_back(bloom_filter);
+    EXPECT_NE(bloom_filter->GetBufferPoolSpaceUsed(), -1);
+    return bloom_filter;
+  }
+};
+
+// We can construct (and destruct) Bloom filters with different spaces.
+TEST_F(BloomFilterTest, Constructor) {
+  for (int i = 1; i < 30; ++i) {
+    CreateBloomFilter(i);
+  }
+}
+
+// We can Insert() hashes into a Bloom filter with different spaces.
+TEST_F(BloomFilterTest, Insert) {
+  srand(0);
+  for (int i = 13; i < 17; ++i) {
+    BloomFilter* bf = CreateBloomFilter(i);
+    for (int k = 0; k < (1 << 15); ++k) {
+      BfInsert(*bf, MakeRand());
+    }
+  }
+}
+
+// After Insert()ing something into a Bloom filter, it can be found again immediately.
+TEST_F(BloomFilterTest, Find) {
+  srand(0);
+  for (int i = 13; i < 17; ++i) {
+    BloomFilter* bf = CreateBloomFilter(i);
+    for (int k = 0; k < (1 << 15); ++k) {
+      const uint64_t to_insert = MakeRand();
+      BfInsert(*bf, to_insert);
+      EXPECT_TRUE(BfFind(*bf, to_insert));
+    }
+  }
+}
+
+// After Insert()ing something into a Bloom filter, it can be found again much later.
+TEST_F(BloomFilterTest, CumulativeFind) {
+  srand(0);
+  for (int i = 5; i < 11; ++i) {
+    std::vector<uint32_t> inserted;
+    BloomFilter* bf = CreateBloomFilter(i);
+    for (int k = 0; k < (1 << 10); ++k) {
+      const uint32_t to_insert = MakeRand();
+      inserted.push_back(to_insert);
+      BfInsert(*bf, to_insert);
+      for (int n = 0; n < inserted.size(); ++n) {
+        EXPECT_TRUE(BfFind(*bf, inserted[n]));
+      }
+    }
+  }
+}
+
+// The empirical false positives we find when looking for random items is with a constant
+// factor of the false positive probability the Bloom filter was constructed for.
+TEST_F(BloomFilterTest, FindInvalid) {
+  srand(0);
+  static const int find_limit = 1 << 20;
+  unordered_set<uint32_t> to_find;
+  while (to_find.size() < find_limit) {
+    to_find.insert(MakeRand());
+  }
+  static const int max_log_ndv = 19;
+  unordered_set<uint32_t> to_insert;
+  while (to_insert.size() < (1ull << max_log_ndv)) {
+    const auto candidate = MakeRand();
+    if (to_find.find(candidate) == to_find.end()) {
+      to_insert.insert(candidate);
+    }
+  }
+  vector<uint32_t> shuffled_insert(to_insert.begin(), to_insert.end());
+  for (int log_ndv = 12; log_ndv < max_log_ndv; ++log_ndv) {
+    for (int log_fpp = 4; log_fpp < 15; ++log_fpp) {
+      double fpp = 1.0 / (1 << log_fpp);
+      const size_t ndv = 1 << log_ndv;
+      const int log_bufferpool_space = BloomFilter::MinLogSpace(ndv, fpp);
+      BloomFilter* bf = CreateBloomFilter(log_bufferpool_space);
+      // Fill up a BF with exactly as much ndv as we planned for it:
+      for (size_t i = 0; i < ndv; ++i) {
+        BfInsert(*bf, shuffled_insert[i]);
+      }
+      int found = 0;
+      // Now we sample from the set of possible hashes, looking for hits.
+      for (const auto& i : to_find) {
+        found += BfFind(*bf, i);
+      }
+      EXPECT_LE(found, find_limit * fpp * 2)
+          << "Too many false positives with -log2(fpp) = " << log_fpp;
+      // Because the space is rounded up to a power of 2, we might actually get a lower
+      // fpp than the one passed to MinLogSpace().
+      const double expected_fpp =
+          BloomFilter::FalsePositiveProb(ndv, log_bufferpool_space);
+      EXPECT_GE(found, find_limit * expected_fpp)
+          << "Too few false positives with -log2(fpp) = " << log_fpp;
+      EXPECT_LE(found, find_limit * expected_fpp * 8)
+          << "Too many false positives with -log2(fpp) = " << log_fpp;
+    }
+  }
+}
+
+TEST_F(BloomFilterTest, Thrift) {
+  BloomFilter* bf = CreateBloomFilter(BloomFilter::MinLogSpace(100, 0.01));
+  for (int i = 0; i < 10; ++i) BfInsert(*bf, i);
   // Check no unexpected new false positives.
   unordered_set<int> missing_ints;
   for (int i = 11; i < 100; ++i) {
-    if (!BfFind(bf, i)) missing_ints.insert(i);
+    if (!BfFind(*bf, i)) missing_ints.insert(i);
   }
 
   TBloomFilter to_thrift;
-  BloomFilter::ToThrift(&bf, &to_thrift);
+  BloomFilter::ToThrift(bf, &to_thrift);
   EXPECT_EQ(to_thrift.always_true, false);
 
-  BloomFilter from_thrift(to_thrift);
-  for (int i = 0; i < 10; ++i) ASSERT_TRUE(BfFind(from_thrift, i));
-  for (int missing: missing_ints) ASSERT_FALSE(BfFind(from_thrift, missing));
+  BloomFilter* from_thrift = CreateBloomFilter(to_thrift);
+  for (int i = 0; i < 10; ++i) ASSERT_TRUE(BfFind(*from_thrift, i));
+  for (int missing: missing_ints) ASSERT_FALSE(BfFind(*from_thrift, missing));
 
   BloomFilter::ToThrift(NULL, &to_thrift);
   EXPECT_EQ(to_thrift.always_true, true);
 }
 
-TEST(BloomFilter, ThriftOr) {
-  BloomFilter bf1(BloomFilter::MinLogSpace(100, 0.01));
-  BloomFilter bf2(BloomFilter::MinLogSpace(100, 0.01));
+TEST_F(BloomFilterTest, ThriftOr) {
+  BloomFilter* bf1 = CreateBloomFilter(BloomFilter::MinLogSpace(100, 0.01));
+  BloomFilter* bf2 = CreateBloomFilter(BloomFilter::MinLogSpace(100, 0.01));
 
-  for (int i = 60; i < 80; ++i) BfInsert(bf2, i);
-  for (int i = 0; i < 10; ++i) BfInsert(bf1, i);
+  for (int i = 60; i < 80; ++i) BfInsert(*bf2, i);
+  for (int i = 0; i < 10; ++i) BfInsert(*bf1, i);
 
   bool success;
-  BloomFilter bf3(BfUnion(bf1, bf2, &success));
+  BloomFilter *bf3 = CreateBloomFilter(BfUnion(*bf1, *bf2, &success));
   ASSERT_TRUE(success) << "SIMD BloomFilter::Union error";
-  for (int i = 0; i < 10; ++i) ASSERT_TRUE(BfFind(bf3, i)) << i;
-  for (int i = 60; i < 80; ++i) ASSERT_TRUE(BfFind(bf3, i)) << i;
+  for (int i = 0; i < 10; ++i) ASSERT_TRUE(BfFind(*bf3, i)) << i;
+  for (int i = 60; i < 80; ++i) ASSERT_TRUE(BfFind(*bf3, i)) << i;
 
   // Insert another value to aggregated BloomFilter.
-  for (int i = 11; i < 50; ++i) BfInsert(bf3, i);
+  for (int i = 11; i < 50; ++i) BfInsert(*bf3, i);
 
   // Apply TBloomFilter back to BloomFilter and verify if aggregation was correct.
-  BloomFilter bf4(BfUnion(bf1, bf3, &success));
+  BloomFilter *bf4 = CreateBloomFilter(BfUnion(*bf1, *bf3, &success));
   ASSERT_TRUE(success) << "SIMD BloomFilter::Union error";
-  for (int i = 11; i < 50; ++i) ASSERT_TRUE(BfFind(bf4, i)) << i;
-  for (int i = 60; i < 80; ++i) ASSERT_TRUE(BfFind(bf4, i)) << i;
-  ASSERT_FALSE(BfFind(bf4, 81));
+  for (int i = 11; i < 50; ++i) ASSERT_TRUE(BfFind(*bf4, i)) << i;
+  for (int i = 60; i < 80; ++i) ASSERT_TRUE(BfFind(*bf4, i)) << i;
+  ASSERT_FALSE(BfFind(*bf4, 81));
 }
 
 }  // namespace impala
 
-IMPALA_TEST_MAIN();
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  impala::InitFeSupport();
+  return RUN_ALL_TESTS();
+}

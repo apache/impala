@@ -46,7 +46,7 @@ class RuntimeFilter {
       : bloom_filter_(nullptr), min_max_filter_(nullptr), filter_desc_(filter),
         registration_time_(MonotonicMillis()), arrival_time_(0L),
         filter_size_(filter_size) {
-    DCHECK_GT(filter_size_, 0);
+    DCHECK(filter_desc_.type == TRuntimeFilterType::MIN_MAX || filter_size_ > 0);
   }
 
   /// Returns true if SetFilter() has been called.

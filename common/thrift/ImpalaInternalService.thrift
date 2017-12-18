@@ -785,17 +785,17 @@ struct TPoolConfig {
 }
 
 struct TBloomFilter {
-  // Log_2 of the heap space required for this filter. See BloomFilter::BloomFilter() for
-  // details.
-  1: required i32 log_heap_space
+  // Log_2 of the bufferpool space required for this filter.
+  // See BloomFilter::BloomFilter() for details.
+  1: required i32 log_bufferpool_space
 
   // List of buckets representing the Bloom Filter contents, laid out contiguously in one
   // string for efficiency of (de)serialisation. See BloomFilter::Bucket and
   // BloomFilter::directory_.
   2: binary directory
 
-  // If always_true or always_false is true, 'directory' and 'log_heap_space' are not
-  // meaningful.
+  // If always_true or always_false is true, 'directory' and 'log_bufferpool_space' are
+  // not meaningful.
   3: required bool always_true
   4: required bool always_false
 }

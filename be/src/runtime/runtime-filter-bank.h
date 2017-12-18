@@ -20,6 +20,7 @@
 
 #include "codegen/impala-ir.h"
 #include "common/object-pool.h"
+#include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/mem-pool.h"
 #include "runtime/types.h"
 #include "util/runtime-profile.h"
@@ -67,7 +68,17 @@ class TQueryCtx;
 /// coordinate in any way.
 class RuntimeFilterBank {
  public:
-  RuntimeFilterBank(const TQueryCtx& query_ctx, RuntimeState* state);
+  RuntimeFilterBank(const TQueryCtx& query_ctx, RuntimeState* state,
+      long total_filter_mem_required);
+
+  /// Initialize 'buffer_pool_client_' and claim the initial reservation. The client is
+  /// automatically cleaned up in Close(). Should not be called if the client is already
+  /// open.
+  ///
+  /// Must return the initial reservation to QueryState::initial_reservations(), which is
+  /// done automatically in Close() as long as the initial reservation is not released
+  /// before Close().
+  Status ClaimBufferReservation() WARN_UNUSED_RESULT;
 
   /// Registers a filter that will either be produced (is_producer == false) or consumed
   /// (is_producer == true) by fragments that share this RuntimeState. The filter
@@ -99,11 +110,12 @@ class RuntimeFilterBank {
 
   /// Returns a bloom_filter that can be used by an operator to produce a local filter,
   /// which may then be used in UpdateFilterFromLocal(). The memory returned is owned by
-  /// the RuntimeFilterBank (which may transfer it to a RuntimeFilter subsequently), and
-  /// should not be deleted by the caller. The filter identified by 'filter_id' must have
-  /// been previously registered as a 'producer' by RegisterFilter().
+  /// the RuntimeFilterBank and should not be deleted by the caller. The filter identified
+  /// by 'filter_id' must have been previously registered as a 'producer' by
+  /// RegisterFilter().
   ///
-  /// If there is not enough memory, or if Close() has been called first, returns NULL.
+  /// If memory allocation for the filter fails, or if Close() has been called first,
+  /// returns NULL.
   BloomFilter* AllocateScratchBloomFilter(int32_t filter_id);
 
   /// Returns a new MinMaxFilter. Handles memory the same as AllocateScratchBloomFilter().
@@ -119,11 +131,6 @@ class RuntimeFilterBank {
   static const int64_t MAX_BLOOM_FILTER_SIZE = 512 * 1024 * 1024;  // 512MB
 
  private:
-  /// Returns the the space (in bytes) required for a filter to achieve the configured
-  /// maximum false-positive rate based on the expected NDV. If 'ndv' is -1 (i.e. no
-  /// estimate is known), the default filter size is returned.
-  int64_t GetFilterSizeForNdv(int64_t ndv);
-
   /// Lock protecting produced_filters_ and consumed_filters_.
   boost::mutex runtime_filter_lock_;
 
@@ -155,14 +162,17 @@ class RuntimeFilterBank {
   /// Total amount of memory allocated to Bloom Filters
   RuntimeProfile::Counter* bloom_memory_allocated_;
 
-  /// Precomputed default BloomFilter size.
-  int64_t default_filter_size_;
+  /// Total amount of memory required by the bloom filters as calculated by the planner.
+  long total_bloom_filter_mem_required_;
 
-  /// Maximum filter size, in bytes, rounded up to a power of two.
-  int64_t max_filter_size_;
+  /// Contains references to all the bloom filters generated. Used in Close() to safely
+  /// release all memory allocated for Bloomfilters.
+  vector<BloomFilter*> bloom_filters_;
 
-  /// Minimum filter size, in bytes, rounded up to a power of two.
-  int64_t min_filter_size_;
+  /// Buffer pool client for the filter bank. Initialized with the required reservation
+  /// in ClaimBufferReservation(). Reservations are returned to the initial reservations
+  /// pool in Close().
+  BufferPool::ClientHandle buffer_pool_client_;
 };
 
 }

@@ -44,6 +44,7 @@
 #include "runtime/runtime-state.h"
 #include "service/impala-server.h"
 #include "service/query-options.h"
+#include "util/bloom-filter.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
@@ -537,6 +538,15 @@ Java_org_apache_impala_service_FeSupport_NativeParseQueryOptions(
   return result_bytes;
 }
 
+// Returns the log (base 2) of the minimum number of bytes we need for a Bloom filter
+// with 'ndv' unique elements and a false positive probability of less than 'fpp'.
+extern "C"
+JNIEXPORT jint JNICALL
+Java_org_apache_impala_service_FeSupport_MinLogSpaceForBloomFilter(
+    JNIEnv* env, jclass caller_class, jlong ndv, jdouble fpp) {
+  return BloomFilter::MinLogSpace(ndv, fpp);
+}
+
 namespace impala {
 
 static JNINativeMethod native_methods[] = {
@@ -580,6 +590,10 @@ static JNINativeMethod native_methods[] = {
   {
       (char*)"NativeLibCacheRemoveEntry", (char*)"(Ljava/lang/String;)Z",
       (void*)::Java_org_apache_impala_service_FeSupport_NativeLibCacheRemoveEntry
+  },
+  {
+    (char*)"MinLogSpaceForBloomFilter", (char*)"(JD)I",
+    (void*)::Java_org_apache_impala_service_FeSupport_MinLogSpaceForBloomFilter
   },
 };
 

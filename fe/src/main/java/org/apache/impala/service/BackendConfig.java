@@ -77,6 +77,10 @@ public class BackendConfig {
     return backendCfg_.max_nonhdfs_partitions_parallel_load;
   }
 
+  public double getMaxFilterErrorRate() { return backendCfg_.max_filter_error_rate; }
+
+  public long getMinBufferSize() { return backendCfg_.min_buffer_size; }
+
   // Inits the auth_to_local configuration in the static KerberosName class.
   private static void initAuthToLocal() {
     // If auth_to_local is enabled, we read the configuration hadoop.security.auth_to_local

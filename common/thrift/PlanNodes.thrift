@@ -145,6 +145,10 @@ struct TRuntimeFilterDesc {
 
   // The type of runtime filter to build.
   10: required TRuntimeFilterType type
+
+  // The size of the filter based on the ndv estimate and the min/max limit specified in
+  // the query options. Should be greater than zero for bloom filters, zero otherwise.
+  11: optional i64 filter_size_bytes
 }
 
 // The information contained in subclasses of ScanNode captured in two separate

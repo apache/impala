@@ -157,7 +157,7 @@ PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=3/24 files=3 size=22.67KB
+   partitions=3/24 files=3 size=22.07KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
@@ -172,7 +172,7 @@ select id from functional.alltypes t1 where exists (
   where t1.id = t2.id)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=161.94MB mem-reservation=1.94MB
+|  Per-Host Resources: mem-estimate=162.94MB mem-reservation=2.94MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |

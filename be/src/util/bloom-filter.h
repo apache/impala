@@ -28,6 +28,7 @@
 #include "common/compiler-util.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gutil/macros.h"
+#include "runtime/bufferpool/buffer-pool.h"
 #include "util/cpu-info.h"
 #include "util/hash-util.h"
 
@@ -41,7 +42,7 @@ namespace impala {
 /// When talking about Bloom filter size, rather than talking about 'size', which might be
 /// ambiguous, we distinguish two different quantities:
 ///
-/// 1. Space: the amount of heap memory used
+/// 1. Space: the amount of buffer pool memory used
 ///
 /// 2. NDV: the number of unique items that have been inserted
 ///
@@ -57,10 +58,18 @@ namespace impala {
 /// so LLVM will not generate exception related code at their call sites.
 class BloomFilter {
  public:
-  /// Consumes at most (1 << log_heap_space) bytes on the heap.
-  explicit BloomFilter(const int log_heap_space);
-  explicit BloomFilter(const TBloomFilter& thrift);
+  /// Consumes at most (1 << log_bufferpool_space) bytes from the buffer pool client.
+  /// 'client' should be a valid registered BufferPool Client and should have enough
+  /// reservation to fulfill allocation for 'directory_'.
+  explicit BloomFilter(BufferPool::ClientHandle* client);
   ~BloomFilter();
+
+  /// Reset the filter state, allocate/reallocate and initialize the 'directory_'. All
+  /// calls to Insert() and Find() should only be done between the calls to Init() and
+  /// Close().Init and Close are safe to call multiple times.
+  Status Init(const int log_bufferpool_space);
+  Status Init(const TBloomFilter& thrift);
+  void Close();
 
   /// Representation of a filter which allows all elements to pass.
   static constexpr BloomFilter* const ALWAYS_TRUE_FILTER = NULL;
@@ -87,29 +96,32 @@ class BloomFilter {
 
   /// As more distinct items are inserted into a BloomFilter, the false positive rate
   /// rises. MaxNdv() returns the NDV (number of distinct values) at which a BloomFilter
-  /// constructed with (1 << log_heap_space) bytes of heap space hits false positive
+  /// constructed with (1 << log_bufferpool_space) bytes of heap space hits false positive
   /// probabilty fpp.
-  static size_t MaxNdv(const int log_heap_space, const double fpp);
+  static size_t MaxNdv(const int log_bufferpool_space, const double fpp);
 
   /// If we expect to fill a Bloom filter with 'ndv' different unique elements and we
   /// want a false positive probabilty of less than 'fpp', then this is the log (base 2)
   /// of the minimum number of bytes we need.
   static int MinLogSpace(const size_t ndv, const double fpp);
 
-  /// Returns the expected false positive rate for the given ndv and log_heap_space
-  static double FalsePositiveProb(const size_t ndv, const int log_heap_space);
+  /// Returns the expected false positive rate for the given ndv and log_bufferpool_space
+  static double FalsePositiveProb(const size_t ndv, const int log_bufferpool_space);
 
-  /// Returns amount of heap space used, in bytes
-  int64_t GetHeapSpaceUsed() const { return sizeof(Bucket) * (1LL << log_num_buckets_); }
+  /// Returns the amount of buffer pool space used (in bytes). A value of -1 means that
+  /// 'directory_' has not been allocated which can happen if the object was just created
+  /// and Init() hasn't been called or Init() failed or Close() was called on the object.
+  int64_t GetBufferPoolSpaceUsed() const {
+    return directory_ == nullptr ? -1 : sizeof(Bucket) * (1LL << log_num_buckets_);
+  }
 
-  static int64_t GetExpectedHeapSpaceUsed(uint32_t log_heap_size) {
-    DCHECK_GE(log_heap_size, LOG_BUCKET_WORD_BITS);
-    return sizeof(Bucket) * (1LL << (log_heap_size - LOG_BUCKET_WORD_BITS));
+  static int64_t GetExpectedMemoryUsed(int log_heap_size) {
+    return sizeof(Bucket) * (1LL << std::max(1, log_heap_size - LOG_BUCKET_WORD_BITS));
   }
 
  private:
   // always_false_ is true when the bloom filter hasn't had any elements inserted.
-  bool always_false_;
+  bool always_false_ = true;
 
   /// The BloomFilter is divided up into Buckets
   static const uint64_t BUCKET_WORDS = 8;
@@ -128,13 +140,18 @@ class BloomFilter {
   typedef BucketWord Bucket[BUCKET_WORDS];
 
   /// log_num_buckets_ is the log (base 2) of the number of buckets in the directory.
-  const int log_num_buckets_;
+  int log_num_buckets_ = 0;
 
   /// directory_mask_ is (1 << log_num_buckets_) - 1. It is precomputed for
   /// efficiency reasons.
-  const uint32_t directory_mask_;
+  uint32_t directory_mask_ = 0;
 
-  Bucket* directory_;
+  Bucket* directory_ = nullptr;
+
+  /// Bufferpool client and handle used for allocating and freeing directory memory.
+  /// Client is not owned by the filter.
+  BufferPool::ClientHandle* buffer_pool_client_;
+  BufferPool::BufferHandle buffer_handle_;
 
   // Same as Insert(), but skips the CPU check and assumes that AVX is not available.
   void InsertNoAvx2(const uint32_t hash) noexcept;
@@ -168,7 +185,7 @@ class BloomFilter {
   /// Serializes this filter as Thrift.
   void ToThrift(TBloomFilter* thrift) const;
 
-  /// Some constants used in hashing. #defined for efficiency reasons.
+/// Some constants used in hashing. #defined for efficiency reasons.
 #define IMPALA_BLOOM_HASH_CONSTANTS                                             \
   0x47b6137bU, 0x44974d91U, 0x8824ad5bU, 0xa2b7289dU, 0x705495c7U, 0x2df1424bU, \
       0x9efc4947U, 0x5c6bfb31U
@@ -188,6 +205,7 @@ class BloomFilter {
 // a split Bloom filter, but log2(256) * 8 = 64 random bits for a standard Bloom filter.
 
 inline void ALWAYS_INLINE BloomFilter::Insert(const uint32_t hash) noexcept {
+  DCHECK(directory_ != nullptr);
   always_false_ = false;
   const uint32_t bucket_idx = HashUtil::Rehash32to32(hash) & directory_mask_;
   if (CpuInfo::IsSupported(CpuInfo::AVX2)) {
@@ -199,6 +217,7 @@ inline void ALWAYS_INLINE BloomFilter::Insert(const uint32_t hash) noexcept {
 
 inline bool ALWAYS_INLINE BloomFilter::Find(const uint32_t hash) const noexcept {
   if (always_false_) return false;
+  DCHECK(directory_ != nullptr);
   const uint32_t bucket_idx = HashUtil::Rehash32to32(hash) & directory_mask_;
   if (CpuInfo::IsSupported(CpuInfo::AVX2)) {
     return BucketFindAVX2(bucket_idx, hash);
@@ -207,6 +226,6 @@ inline bool ALWAYS_INLINE BloomFilter::Find(const uint32_t hash) const noexcept 
   }
 }
 
-}  // namespace impala
+} // namespace impala
 
-#endif  // IMPALA_UTIL_BLOOM_H
+#endif // IMPALA_UTIL_BLOOM_H

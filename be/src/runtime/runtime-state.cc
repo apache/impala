@@ -124,8 +124,10 @@ void RuntimeState::Init() {
   }
 }
 
-void RuntimeState::InitFilterBank() {
-  filter_bank_.reset(new RuntimeFilterBank(query_ctx(), this));
+Status RuntimeState::InitFilterBank(long runtime_filters_reservation_bytes) {
+  filter_bank_.reset(
+      new RuntimeFilterBank(query_ctx(), this, runtime_filters_reservation_bytes));
+  return filter_bank_->ClaimBufferReservation();
 }
 
 Status RuntimeState::CreateCodegen() {

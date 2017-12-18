@@ -21,9 +21,15 @@
 #include <iostream>
 #include <vector>
 
+#include "runtime/bufferpool/buffer-allocator.h"
+#include "runtime/bufferpool/reservation-tracker.h"
+#include "runtime/bufferpool/buffer-pool.h"
+#include "runtime/mem-tracker.h"
+#include "runtime/test-env.h"
+#include "service/fe-support.h"
 #include "util/benchmark.h"
-#include "util/cpu-info.h"
 #include "util/bloom-filter.h"
+#include "common/init.h"
 
 #include "common/names.h"
 
@@ -172,24 +178,39 @@ uint32_t MakeRand() {
 namespace initialize {
 
 void Benchmark(int batch_size, void* data) {
+  ObjectPool pool;
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "");
+  ExecEnv* env = ExecEnv::GetInstance();
+  BufferPool::ClientHandle client;
+  CHECK(env->buffer_pool()
+            ->RegisterClient("", nullptr, env->buffer_reservation(), nullptr,
+                std::numeric_limits<int64>::max(), profile, &client).ok());
   int* d = reinterpret_cast<int*>(data);
+  CHECK(client.IncreaseReservation(BloomFilter::GetExpectedMemoryUsed(*d)));
   for (int i = 0; i < batch_size; ++i) {
-    BloomFilter bf(*d);
+    BloomFilter bf(&client);
+    CHECK(bf.Init(*d).ok());
+    bf.Close();
   }
+  env->buffer_pool()->DeregisterClient(&client);
+  pool.Clear();
 }
 
 }  // namespace initialize
-
 
 // Benchmark insert
 namespace insert {
 
 struct TestData {
-  explicit TestData(int log_heap_size) : bf(log_heap_size), data(1ull << 20) {
+  explicit TestData(int log_bufferpool_size, BufferPool::ClientHandle* client)
+    : bf(client), data(1ull << 20) {
+    CHECK(bf.Init(log_bufferpool_size).ok());
     for (size_t i = 0; i < data.size(); ++i) {
       data[i] = MakeRand();
     }
   }
+
+  ~TestData() { bf.Close(); }
 
   BloomFilter bf;
   vector<uint32_t> data;
@@ -211,18 +232,21 @@ void Benchmark(int batch_size, void* data) {
 namespace find {
 
 struct TestData {
-  TestData(int log_heap_size, size_t size)
-      : bf(log_heap_size),
-        vec_mask((1ull << static_cast<int>(floor(log2(size))))-1),
-        present(size),
-        absent(size),
-        result(0) {
+  TestData(int log_bufferpool_size, BufferPool::ClientHandle* client, size_t size)
+    : bf(client),
+      vec_mask((1ull << static_cast<int>(floor(log2(size)))) - 1),
+      present(size),
+      absent(size),
+      result(0) {
+    CHECK(bf.Init(log_bufferpool_size).ok());
     for (size_t i = 0; i < size; ++i) {
       present[i] = MakeRand();
       absent[i] = MakeRand();
       bf.Insert(present[i]);
     }
   }
+
+  ~TestData() { bf.Close(); }
 
   BloomFilter bf;
   // A mask value such that i & vec_mask < present.size() (and absent.size()). This is
@@ -254,10 +278,12 @@ void Absent(int batch_size, void* data) {
 namespace either {
 
 struct TestData {
-  explicit TestData(int log_heap_size) {
-    BloomFilter bf(log_heap_size);
+  explicit TestData(int log_bufferpool_size, BufferPool::ClientHandle* client) {
+    BloomFilter bf(client);
+    CHECK(bf.Init(log_bufferpool_size).ok());
     BloomFilter::ToThrift(&bf, &tbf1);
     BloomFilter::ToThrift(&bf, &tbf2);
+    bf.Close();
   }
 
   TBloomFilter tbf1, tbf2;
@@ -273,7 +299,13 @@ void Benchmark(int batch_size, void* data) {
 } // namespace either
 
 void RunBenchmarks() {
-
+  ObjectPool pool;
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "");
+  ExecEnv* env = ExecEnv::GetInstance();
+  BufferPool::ClientHandle client;
+  CHECK(env->buffer_pool()
+            ->RegisterClient("", nullptr, env->buffer_reservation(), nullptr,
+                std::numeric_limits<int64>::max(), profile, &client).ok());
   char name[120];
 
   {
@@ -282,13 +314,18 @@ void RunBenchmarks() {
     for (int ndv = 10000; ndv <= 100 * 1000 * 1000; ndv *= 100) {
       for (int log10fpp = -1; log10fpp >= -3; --log10fpp) {
         const double fpp = pow(10, log10fpp);
-        testdata.emplace_back(new insert::TestData(BloomFilter::MinLogSpace(ndv, fpp)));
+        int log_required_size = BloomFilter::MinLogSpace(ndv, fpp);
+        CHECK(client.IncreaseReservation(
+            BloomFilter::GetExpectedMemoryUsed(log_required_size)));
+        testdata.emplace_back(
+            new insert::TestData(log_required_size, &client));
         snprintf(name, sizeof(name), "ndv %7dk fpp %6.1f%%", ndv/1000, fpp*100);
         suite.AddBenchmark(name, insert::Benchmark, testdata.back().get());
       }
     }
     cout << suite.Measure() << endl;
   }
+  CHECK(client.DecreaseReservationTo(0).ok());
 
   {
     Benchmark suite("find");
@@ -296,8 +333,11 @@ void RunBenchmarks() {
     for (int ndv = 10000; ndv <= 100 * 1000 * 1000; ndv *= 100) {
       for (int log10fpp = -1; log10fpp >= -3; --log10fpp) {
         const double fpp = pow(10, log10fpp);
+        int log_required_size = BloomFilter::MinLogSpace(ndv, fpp);
+        CHECK(client.IncreaseReservation(
+            BloomFilter::GetExpectedMemoryUsed(log_required_size)));
         testdata.emplace_back(
-            new find::TestData(BloomFilter::MinLogSpace(ndv, fpp), ndv));
+            new find::TestData(BloomFilter::MinLogSpace(ndv, fpp), &client , ndv));
         snprintf(name, sizeof(name), "present ndv %7dk fpp %6.1f%%", ndv/1000, fpp*100);
         suite.AddBenchmark(name, find::Present, testdata.back().get());
 
@@ -307,6 +347,7 @@ void RunBenchmarks() {
     }
     cout << suite.Measure() << endl;
   }
+  CHECK(client.DecreaseReservationTo(0).ok());
 
   {
     Benchmark suite("union", false /* micro_heuristics */);
@@ -314,18 +355,31 @@ void RunBenchmarks() {
     for (int ndv = 10000; ndv <= 100 * 1000 * 1000; ndv *= 100) {
       for (int log10fpp = -1; log10fpp >= -3; --log10fpp) {
         const double fpp = pow(10, log10fpp);
-        testdata.emplace_back(
-            new either::TestData(BloomFilter::MinLogSpace(ndv, fpp)));
+        int log_required_size = BloomFilter::MinLogSpace(ndv, fpp);
+        CHECK(client.IncreaseReservation(
+            BloomFilter::GetExpectedMemoryUsed(log_required_size)));
+        testdata.emplace_back(new either::TestData(
+            BloomFilter::MinLogSpace(ndv, fpp), &client));
         snprintf(name, sizeof(name), "ndv %7dk fpp %6.1f%%", ndv/1000, fpp*100);
         suite.AddBenchmark(name, either::Benchmark, testdata.back().get());
       }
     }
     cout << suite.Measure() << endl;
   }
+
+  CHECK(client.DecreaseReservationTo(0).ok());
+  env->buffer_pool()->DeregisterClient(&client);
+  pool.Clear();
 }
 
 int main(int argc, char **argv) {
-  CpuInfo::Init();
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  impala::InitFeSupport();
+  TestEnv test_env;
+  int64_t min_page_size = 8;
+  int64_t buffer_bytes_limit = 4L * 1024 * 1024 * 1024;
+  test_env.SetBufferPoolArgs(min_page_size, buffer_bytes_limit);
+  CHECK(test_env.Init().ok());
 
   cout << endl << Benchmark::GetMachineInfo() << endl << endl;
 
