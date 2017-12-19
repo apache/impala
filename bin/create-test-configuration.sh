@@ -191,4 +191,11 @@ function symlink_subdirs {
 echo "Searching for auxiliary tests, workloads, and datasets (if any exist)."
 symlink_subdirs ${IMPALA_AUX_WORKLOAD_DIR} ${IMPALA_WORKLOAD_DIR}
 symlink_subdirs ${IMPALA_AUX_DATASET_DIR} ${IMPALA_DATASET_DIR}
-symlink_subdirs ${IMPALA_AUX_TEST_HOME}/tests ${IMPALA_HOME}/tests
+
+if [ -d ${IMPALA_AUX_TEST_HOME}/tests/functional ]; then
+  symlink_subdirs ${IMPALA_AUX_TEST_HOME}/tests/functional ${IMPALA_HOME}/tests
+else
+  # For compatibility with older auxiliary tests, which aren't in the
+  # functional subdirectory.
+  symlink_subdirs ${IMPALA_AUX_TEST_HOME}/tests ${IMPALA_HOME}/tests
+fi
