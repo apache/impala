@@ -36,7 +36,6 @@
 
 using boost::algorithm::is_any_of;
 using boost::algorithm::split;
-using boost::algorithm::trim;
 using boost::algorithm::token_compress_on;
 
 namespace impala {
@@ -122,14 +121,16 @@ MappedMemInfo MemInfo::ParseSmaps() {
       ++result.num_maps;
       continue;
     }
-    // Line is in the form of <Name>: <value>, e.g.:
-    // Size: 1084 kB
+    // Line is in the form of <Name>:<spaces><value>, e.g.:
+    // Size:         1084 kB
     // VmFlags: rd ex mr mw me dw
     size_t colon_pos = line.find(':');
     if (colon_pos == string::npos) continue;
     string name = line.substr(0, colon_pos);
-    string value = line.substr(colon_pos + 1, string::npos);
-    trim(value);
+    size_t non_space_after_colon_pos = line.find_first_not_of(" ", colon_pos + 1);
+    if (non_space_after_colon_pos == string::npos) continue;
+    // From the first non-space after the colon through the end of the string.
+    string value = line.substr(non_space_after_colon_pos);
 
     // Use atol() to parse the value, ignoring " kB" suffix.
     if (name == "Size") {
