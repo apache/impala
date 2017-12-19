@@ -26,6 +26,7 @@
 
 #include "exprs/anyval-util.h"
 #include "exprs/scalar-expr.h"
+#include "gutil/strings/charset.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/tuple-row.h"
 #include "util/bit-util.h"
@@ -668,6 +669,28 @@ void StringFunctions::RegexpClose(
   re2::RE2* re = reinterpret_cast<re2::RE2*>(context->GetFunctionState(scope));
   delete re;
   context->SetFunctionState(scope, nullptr);
+}
+
+StringVal StringFunctions::RegexpEscape(FunctionContext* context, const StringVal& str) {
+  if (str.is_null) return StringVal::null();
+  if (str.len == 0) return str;
+
+  static const strings::CharSet REGEX_ESCAPE_CHARACTERS(".\\+*?[^]$(){}=!<>|:-");
+  const uint8_t* const start_ptr = str.ptr;
+  const uint8_t* const end_ptr = start_ptr + str.len;
+  StringVal result(context, str.len * 2);
+  if (UNLIKELY(result.is_null)) return StringVal::null();
+  uint8_t* dest_ptr = result.ptr;
+  for (const uint8_t* c = start_ptr; c < end_ptr; ++c) {
+    if (REGEX_ESCAPE_CHARACTERS.Test(*c)) {
+      *dest_ptr++ = '\\';
+    }
+    *dest_ptr++ = *c;
+  }
+  result.len = dest_ptr - result.ptr;
+  DCHECK_GE(result.len, str.len);
+
+  return result;
 }
 
 StringVal StringFunctions::RegexpExtract(FunctionContext* context, const StringVal& str,

@@ -4244,10 +4244,46 @@ TEST_F(ExprTest, StringRegexpFunctions) {
   TestIsNull("regexp_match_count(NULL, '.*')", TYPE_INT);
   TestIsNull("regexp_match_count('a123', NULL)", TYPE_INT);
   TestIsNull("regexp_match_count(NULL, NULL)", TYPE_INT);
+
+  TestIsNull("regexp_escape(NULL)", TYPE_STRING);
+  TestStringValue("regexp_escape('')", "");
+  // Test special character escape
+  // .\+*?[^]$(){}=!<>|:-
+  TestStringValue("regexp_escape('Hello.world')", R"(Hello\.world)");
+  TestStringValue(R"(regexp_escape('Hello\\world'))", R"(Hello\\world)");
+  TestStringValue("regexp_escape('Hello+world')", R"(Hello\+world)");
+  TestStringValue("regexp_escape('Hello*world')", R"(Hello\*world)");
+  TestStringValue("regexp_escape('Hello?world')", R"(Hello\?world)");
+  TestStringValue("regexp_escape('Hello[world')", R"(Hello\[world)");
+  TestStringValue("regexp_escape('Hello^world')", R"(Hello\^world)");
+  TestStringValue("regexp_escape('Hello]world')", R"(Hello\]world)");
+  TestStringValue("regexp_escape('Hello$world')", R"(Hello\$world)");
+  TestStringValue("regexp_escape('Hello(world')", R"(Hello\(world)");
+  TestStringValue("regexp_escape('Hello)world')", R"(Hello\)world)");
+  TestStringValue("regexp_escape('Hello{world')", R"(Hello\{world)");
+  TestStringValue("regexp_escape('Hello}world')", R"(Hello\}world)");
+  TestStringValue("regexp_escape('Hello=world')", R"(Hello\=world)");
+  TestStringValue("regexp_escape('Hello!world')", R"(Hello\!world)");
+  TestStringValue("regexp_escape('Hello<world')", R"(Hello\<world)");
+  TestStringValue("regexp_escape('Hello>world')", R"(Hello\>world)");
+  TestStringValue("regexp_escape('Hello|world')", R"(Hello\|world)");
+  TestStringValue("regexp_escape('Hello:world')", R"(Hello\:world)");
+  TestStringValue("regexp_escape('Hello-world')", R"(Hello\-world)");
+  // Mixed case
+  TestStringValue(R"(regexp_escape('a.b\\c+d*e?f[g]h$i(j)k{l}m=n!o<p>q|r:s-t'))",
+      R"(a\.b\\c\+d\*e\?f\[g\]h\$i\(j\)k\{l\}m\=n\!o\<p\>q\|r\:s\-t)");
+  // Mixed case with other regexp_* functions
+  TestStringValue(R"(regexp_extract(regexp_escape('Hello\\world'),)"
+      R"('([[:alpha:]]+)(\\\\\\\\)([[:alpha:]]+)', 0))", R"(Hello\\world)");
+  TestStringValue(R"(regexp_extract(regexp_escape('Hello\\world'),)"
+      R"('([[:alpha:]]+)(\\\\\\\\)([[:alpha:]]+)', 1))", "Hello");
+  TestStringValue(R"(regexp_extract(regexp_escape('Hello\\world'),)"
+      R"('([[:alpha:]]+)(\\\\\\\\)([[:alpha:]]+)', 2))", R"(\\)");
+  TestStringValue(R"(regexp_extract(regexp_escape('Hello\\world'),)"
+      R"('([[:alpha:]]+)(\\\\\\\\)([[:alpha:]]+)', 3))", "world");
 }
 
-TEST_F(ExprTest, StringParseUrlFunction) {
-  // TODO: For now, our parse_url my not behave exactly like Hive
+TEST_F(ExprTest, StringParseUrlFunction) { // TODO: For now, our parse_url my not behave exactly like Hive
   // when given malformed URLs.
   // If necessary, we can closely follow Java's URL implementation
   // to behave exactly like Hive.
