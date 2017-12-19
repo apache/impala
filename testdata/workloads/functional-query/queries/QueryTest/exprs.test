@@ -2451,6 +2451,34 @@ select regexp_match_count(tmp.str, tmp.pattern, tmp.start_pos, tmp.params) from 
 Illegal match parameter x
 ====
 ---- QUERY
+select regexp_escape(tmp.str) from (values
+('a.b\\c+d*e?f[g]h$i(j)k{l}m=n!o<p>q|r:s-t' as str)) as tmp
+---- RESULTS
+'a\\.b\\\\c\\+d\\*e\\?f\\[g\\]h\\$i\\(j\\)k\\{l\\}m\\=n\\!o\\<p\\>q\\|r\\:s\\-t'
+---- TYPES
+string
+====
+---- QUERY
+select regexp_extract(regexp_escape(tmp.str),
+tmp.pattern, tmp.index) from (values
+('Hello\\world' as str, '([[:alpha:]]+)(\\\\\\\\)([[:alpha:]]+)' as pattern, 2 as index)
+) as tmp
+---- RESULTS
+'\\\\'
+---- TYPES
+string
+====
+---- QUERY
+select regexp_extract(regexp_escape(tmp.str),
+tmp.pattern, tmp.index) from (values
+('Hello\\world' as str, '([[:alpha:]]+)(\\\\\\\\)([[:alpha:]]+)' as pattern, 3 as index)
+) as tmp
+---- RESULTS
+'world'
+---- TYPES
+string
+====
+---- QUERY
 # IMPALA-2147: IS [NOT] DISTINCT FROM and "<=>"
 select NULL <=> NULL
 ---- RESULTS

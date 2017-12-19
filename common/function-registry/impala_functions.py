@@ -462,6 +462,7 @@ visible_functions = [
   [['locate'], 'INT', ['STRING', 'STRING'], 'impala::StringFunctions::Locate'],
   [['locate'], 'INT', ['STRING', 'STRING', 'BIGINT'],
    'impala::StringFunctions::LocatePos'],
+  [['regexp_escape'], 'STRING', ['STRING'], 'impala::StringFunctions::RegexpEscape'],
   [['regexp_extract'], 'STRING', ['STRING', 'STRING', 'BIGINT'],
    'impala::StringFunctions::RegexpExtract',
    '_ZN6impala15StringFunctions13RegexpPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE',
