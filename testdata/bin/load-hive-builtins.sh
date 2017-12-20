@@ -23,41 +23,46 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
 
 # TODO: remove this once we understand why Hive looks in HDFS for many of its jars
-${HADOOP_HOME}/bin/hadoop fs -rm -r -f ${FILESYSTEM_PREFIX}${HIVE_HOME}/lib/
-${HADOOP_HOME}/bin/hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}${HIVE_HOME}/lib/
-${HADOOP_HOME}/bin/hadoop fs -put ${HIVE_HOME}/lib/*.jar ${FILESYSTEM_PREFIX}${HIVE_HOME}/lib/
 
-${HADOOP_HOME}/bin/hadoop fs -rm -r -f ${FILESYSTEM_PREFIX}${HBASE_HOME}/lib/
-${HADOOP_HOME}/bin/hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}${HBASE_HOME}/lib/
-${HADOOP_HOME}/bin/hadoop fs -put ${HBASE_HOME}/lib/*.jar ${FILESYSTEM_PREFIX}${HBASE_HOME}/lib/
+# Remove all directories in one command for efficiency
+${HADOOP_HOME}/bin/hadoop fs -rm -skipTrash -r -f ${FILESYSTEM_PREFIX}${HIVE_HOME}/lib/ \
+  ${FILESYSTEM_PREFIX}${HBASE_HOME}/lib/ \
+  ${FILESYSTEM_PREFIX}${HADOOP_HOME}/share/hadoop/common/ \
+  ${FILESYSTEM_PREFIX}${HADOOP_HOME}/share/hadoop/mapreduce/ \
+  ${FILESYSTEM_PREFIX}${HADOOP_HOME}/share/hadoop/tools/lib \
+  ${FILESYSTEM_PREFIX}${HADOOP_LZO}/build \
+  ${FILESYSTEM_PREFIX}${SENTRY_HOME}/lib/ \
+  ${FILESYSTEM_PREFIX}${IMPALA_HOME}/thirdparty/postgresql-jdbc/
 
-${HADOOP_HOME}/bin/hadoop fs -rm -r -f ${FILESYSTEM_PREFIX}${HADOOP_HOME}/share/hadoop/common/
-${HADOOP_HOME}/bin/hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}${HADOOP_HOME}/share/hadoop/common/
-${HADOOP_HOME}/bin/hadoop fs -put ${HADOOP_HOME}/share/hadoop/common/*.jar \
-    ${FILESYSTEM_PREFIX}${HADOOP_HOME}/share/hadoop/common/
-${HADOOP_HOME}/bin/hadoop fs -rm -r -f ${FILESYSTEM_PREFIX}${HADOOP_HOME}/share/hadoop/common/lib/
-${HADOOP_HOME}/bin/hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}${HADOOP_HOME}/share/hadoop/common/lib/
-${HADOOP_HOME}/bin/hadoop fs -put ${HADOOP_HOME}/share/hadoop/common/lib/*.jar \
-    ${FILESYSTEM_PREFIX}${HADOOP_HOME}/share/hadoop/common/lib/
-${HADOOP_HOME}/bin/hadoop fs -rm -r -f ${FILESYSTEM_PREFIX}${HADOOP_HOME}/share/hadoop/mapreduce/
-${HADOOP_HOME}/bin/hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}${HADOOP_HOME}/share/hadoop/mapreduce/
-${HADOOP_HOME}/bin/hadoop fs -put ${HADOOP_HOME}/share/hadoop/mapreduce/*.jar \
-    ${FILESYSTEM_PREFIX}${HADOOP_HOME}/share/hadoop/mapreduce/
-${HADOOP_HOME}/bin/hadoop fs -rm -r -f ${FILESYSTEM_PREFIX}${HADOOP_HOME}/share/hadoop/tools/lib
-${HADOOP_HOME}/bin/hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}${HADOOP_HOME}/share/hadoop/tools/lib
-${HADOOP_HOME}/bin/hadoop fs -put ${HADOOP_HOME}/share/hadoop/tools/lib/*.jar \
-    ${FILESYSTEM_PREFIX}${HADOOP_HOME}/share/hadoop/tools/lib/
+TMP_DIR=$(mktemp -d)
 
-${HADOOP_HOME}/bin/hadoop fs -rm -r -f ${FILESYSTEM_PREFIX}${HADOOP_LZO}/build
-${HADOOP_HOME}/bin/hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}${HADOOP_LZO}/build
-${HADOOP_HOME}/bin/hadoop fs -put ${HADOOP_LZO}/build/hadoop-lzo*.jar \
-    ${FILESYSTEM_PREFIX}${HADOOP_LZO}/build/
+# Create the directory structure to copy over
+mkdir -p ${TMP_DIR}/${HIVE_HOME}/lib \
+  ${TMP_DIR}/${HBASE_HOME}/lib \
+  ${TMP_DIR}/${HADOOP_HOME}/share/hadoop/common/lib \
+  ${TMP_DIR}/${HADOOP_HOME}/share/hadoop/mapreduce \
+  ${TMP_DIR}/${HADOOP_HOME}/share/hadoop/tools/lib \
+  ${TMP_DIR}/${HADOOP_LZO}/build \
+  ${TMP_DIR}/${SENTRY_HOME}/lib \
+  ${TMP_DIR}/${IMPALA_HOME}/thirdparty/postgresql-jdbc/
 
-${HADOOP_HOME}/bin/hadoop fs -rm -r -f ${FILESYSTEM_PREFIX}${SENTRY_HOME}/lib/
-${HADOOP_HOME}/bin/hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}${SENTRY_HOME}/lib/
-${HADOOP_HOME}/bin/hadoop fs -put ${SENTRY_HOME}/lib/*.jar ${FILESYSTEM_PREFIX}${SENTRY_HOME}/lib/
+# Add symbolic links to files in the appropriate places
+ln -s ${HIVE_HOME}/lib/*.jar ${TMP_DIR}/${HIVE_HOME}/lib
+ln -s ${HBASE_HOME}/lib/*.jar ${TMP_DIR}/${HBASE_HOME}/lib
+ln -s ${HADOOP_HOME}/share/hadoop/common/*.jar \
+  ${TMP_DIR}/${HADOOP_HOME}/share/hadoop/common
+ln -s ${HADOOP_HOME}/share/hadoop/common/lib/*.jar \
+  ${TMP_DIR}/${HADOOP_HOME}/share/hadoop/common/lib
+ln -s ${HADOOP_HOME}/share/hadoop/mapreduce/*.jar \
+  ${TMP_DIR}/${HADOOP_HOME}/share/hadoop/mapreduce
+ln -s ${HADOOP_HOME}/share/hadoop/tools/lib/*.jar \
+  ${TMP_DIR}/${HADOOP_HOME}/share/hadoop/tools/lib
+ln -s ${HADOOP_LZO}/build/hadoop-lzo*.jar ${TMP_DIR}/${HADOOP_LZO}/build
+ln -s ${SENTRY_HOME}/lib/*.jar ${TMP_DIR}/${SENTRY_HOME}/lib
+# This is the only item that uses a different path
+# TODO: why is this path different?
+ln -s ${POSTGRES_JDBC_DRIVER} ${TMP_DIR}/${IMPALA_HOME}/thirdparty/postgresql-jdbc
 
-${HADOOP_HOME}/bin/hadoop fs -rm -r -f ${FILESYSTEM_PREFIX}${IMPALA_HOME}/thirdparty/postgresql-jdbc/
-${HADOOP_HOME}/bin/hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}${IMPALA_HOME}/thirdparty/postgresql-jdbc/
-${HADOOP_HOME}/bin/hadoop fs -put ${POSTGRES_JDBC_DRIVER} \
-    ${FILESYSTEM_PREFIX}${IMPALA_HOME}/thirdparty/postgresql-jdbc/
+${HADOOP_HOME}/bin/hadoop fs -put ${TMP_DIR}/* ${FILESYSTEM_PREFIX}/
+
+rm -r ${TMP_DIR}
