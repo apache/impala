@@ -16,30 +16,84 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
-# This script generates the "CREATE TABLE", "INSERT", and "LOAD" statements for loading
-# test data and writes them to create-*-generated.sql and
-# load-*-generated.sql. These files are then executed by hive or impala, depending
-# on their contents. Additionally, for hbase, the file is of the form
-# create-*hbase*-generated.create.
 #
-# The statements that are generated are based on an input test vector
-# (read from a file) that describes the coverage desired. For example, currently
-# we want to run benchmarks with different data sets, across different file types, and
-# with different compression algorithms set. To improve data loading performance this
-# script will generate an INSERT INTO statement to generate the data if the file does
-# not already exist in HDFS. If the file does already exist in HDFS then we simply issue a
-# LOAD statement which is much faster.
+# This script generates statements to create and populate
+# tables in a variety of formats. The tables and formats are
+# defined through a combination of files:
+# 1. Workload format specifics specify for each workload
+#    which formats are part of core, exhaustive, etc.
+#    This operates via the normal test dimensions.
+#    (see tests/common/test_dimension.py and
+#     testdata/workloads/*/*.csv)
+# 2. Workload table availability constraints specify which
+#    tables exist for which formats.
+#    (see testdata/datasets/*/schema_constraints.csv)
+# The arguments to this script specify the workload and
+# exploration strategy and can optionally restrict it
+# further to individual tables.
 #
-# The input test vectors are generated via the generate_test_vectors.py so
-# ensure that script has been run (or the test vector files already exist) before
-# running this script.
+# This script is generating several SQL scripts to be
+# executed by bin/load-data.py. The two scripts are tightly
+# coupled and any change in files generated must be
+# reflected in bin/load-data.py. Currently, this script
+# generates three things:
+# 1. It creates the directory (destroying the existing
+#    directory if necessary)
+#    ${IMPALA_DATA_LOADING_SQL_DIR}/${workload}
+# 2. It creates and populates a subdirectory
+#    avro_schemas/${workload} with JSON files specifying
+#    the Avro schema for each table.
+# 3. It generates SQL files with the following naming schema:
 #
-# Note: This statement generation is assuming the following data loading workflow:
-# 1) Load all the data in the specified source table
-# 2) Create tables for the new file formats and compression types
-# 3) Run INSERT OVERWRITE TABLE SELECT * from the source table into the new tables
-#    or LOAD directly if the file already exists in HDFS.
+#    Using the following variables:
+#    workload_exploration = ${workload}-${exploration_strategy} and
+#    file_format_suffix = ${file_format}-${codec}-${compression_type}
+#
+#    A. Impala table creation scripts run in Impala to create tables, partitions,
+#       and views. There is one for each file format. They take the form:
+#       create-${workload_exploration}-impala-generated-${file_format_suffix}.sql
+#
+#    B. Hive creation/load scripts run in Hive to load data into tables and create
+#       tables or views that Impala does not support. There is one for each
+#       file format. They take the form:
+#       load-${workload_exploration}-hive-generated-${file_format_suffix}.sql
+#
+#    C. HBase creation script runs through the hbase commandline to create
+#       HBase tables. (Only generated if loading HBase table.) It takes the form:
+#       load-${workload_exploration}-hbase-generated.create
+#
+#    D. HBase postload script runs through the hbase commandline to flush
+#       HBase tables. (Only generated if loading HBase table.) It takes the form:
+#       post-load-${workload_exploration}-hbase-generated.sql
+#
+#    E. Impala load scripts run in Impala to load data. Only Parquet and Kudu
+#       are loaded through Impala. There is one for each of those formats loaded.
+#       They take the form:
+#       load-${workload_exploration}-impala-generated-${file_format_suffix}.sql
+#
+#    F. Invalidation script runs through Impala to invalidate/refresh metadata
+#       for tables. It takes the form:
+#       invalidate-${workload_exploration}-impala-generated.sql
+#
+# In summary, table "CREATE" statements are mostly done by Impala. Any "CREATE"
+# statements that Impala does not support are done through Hive. Loading data
+# into tables mostly runs in Hive except for Parquet and Kudu tables.
+# Loading proceeds in two parts: First, data is loaded into text tables.
+# Second, almost all other formats are populated by inserts from the text
+# table. Since data loaded in Hive may not be visible in Impala, all tables
+# need to have metadata refreshed or invalidated before access in Impala.
+# This means that loading Parquet or Kudu requires invalidating source
+# tables. It also means that invalidate needs to happen at the end of dataload.
+#
+# For tables requiring customized actions to create schemas or place data,
+# this script allows the table specification to include commands that
+# this will execute as part of generating the SQL for table. If the command
+# generates output, that output is used for that section. This is useful
+# for custom tables that rely on loading specific files into HDFS or
+# for tables where specifying the schema is tedious (e.g. wide tables).
+# This should be used sparingly, because these commands are executed
+# serially.
+#
 import collections
 import csv
 import glob
@@ -171,7 +225,7 @@ KNOWN_EXPLORATION_STRATEGIES = ['core', 'pairwise', 'exhaustive', 'lzo']
 def build_create_statement(table_template, table_name, db_name, db_suffix,
                            file_format, compression, hdfs_location,
                            force_reload):
-  create_stmt = 'CREATE DATABASE IF NOT EXISTS %s%s;\n' % (db_name, db_suffix)
+  create_stmt = ''
   if (force_reload):
     create_stmt += 'DROP TABLE IF EXISTS %s%s.%s;\n' % (db_name, db_suffix, table_name)
   if compression == 'lzo':
@@ -453,13 +507,13 @@ class Statements(object):
 
   def write_to_file(self, filename):
     # If there is no content to write, skip
-    if self.__is_empty(): return
+    if not self: return
     output = self.create + self.load_base + self.load
     with open(filename, 'w') as f:
       f.write('\n\n'.join(output))
 
-  def __is_empty(self):
-    return not (self.create or self.load or self.load_base)
+  def __nonzero__(self):
+    return bool(self.create or self.load or self.load_base)
 
 def eval_section(section_str):
   """section_str should be the contents of a section (i.e. a string). If section_str
@@ -481,7 +535,6 @@ def generate_statements(output_name, test_vectors, sections,
   # TODO: This method has become very unwieldy. It has to be re-factored sooner than
   # later.
   # Parquet statements to be executed separately by Impala
-  hive_output = Statements()
   hbase_output = Statements()
   hbase_post_load = Statements()
   impala_invalidate = Statements()
@@ -492,16 +545,18 @@ def generate_statements(output_name, test_vectors, sections,
   existing_tables = get_hdfs_subdirs_with_data(options.hive_warehouse_dir)
   for row in test_vectors:
     impala_create = Statements()
+    hive_output = Statements()
     impala_load = Statements()
     file_format, data_set, codec, compression_type =\
         [row.file_format, row.dataset, row.compression_codec, row.compression_type]
     table_format = '%s/%s/%s' % (file_format, codec, compression_type)
+    db_suffix = row.db_suffix()
+    db_name = '{0}{1}'.format(data_set, options.scale_factor)
+    db = '{0}{1}'.format(db_name, db_suffix)
+    create_db_stmt = 'CREATE DATABASE IF NOT EXISTS {0};\n'.format(db)
+    impala_create.create.append(create_db_stmt)
     for section in sections:
       table_name = section['BASE_TABLE_NAME'].strip()
-      db_suffix = row.db_suffix()
-      db_name = '{0}{1}'.format(data_set, options.scale_factor)
-      db = '{0}{1}'.format(db_name, db_suffix)
-
 
       if table_names and (table_name.lower() not in table_names):
         print 'Skipping table: %s.%s, table is not in specified table list' % (db, table_name)
@@ -640,8 +695,13 @@ def generate_statements(output_name, test_vectors, sections,
             column_families))
         hbase_post_load.load.append("flush '%s_hbase.%s'\n" % (db_name, table_name))
 
-      # Need to emit an "invalidate metadata" for each individual table
-      invalidate_table_stmt = "INVALIDATE METADATA {0}.{1};\n".format(db, table_name)
+      # Need to make sure that tables created and/or data loaded in Hive is seen
+      # in Impala. We only need to do a full invalidate if the table was created in Hive
+      # and Impala doesn't know about it. Otherwise, do a refresh.
+      if output == hive_output:
+        invalidate_table_stmt = "INVALIDATE METADATA {0}.{1};\n".format(db, table_name)
+      else:
+        invalidate_table_stmt = "REFRESH {0}.{1};\n".format(db, table_name)
       impala_invalidate.create.append(invalidate_table_stmt)
 
       # The ALTER statement in hive does not accept fully qualified table names so
@@ -701,16 +761,18 @@ def generate_statements(output_name, test_vectors, sections,
 
     impala_create.write_to_file("create-%s-impala-generated-%s-%s-%s.sql" %
         (output_name, file_format, codec, compression_type))
+    hive_output.write_to_file("load-%s-hive-generated-%s-%s-%s.sql" %
+        (output_name, file_format, codec, compression_type))
     impala_load.write_to_file("load-%s-impala-generated-%s-%s-%s.sql" %
         (output_name, file_format, codec, compression_type))
 
-
-  hive_output.write_to_file('load-' + output_name + '-hive-generated.sql')
-  hbase_output.create.append("exit")
-  hbase_output.write_to_file('load-' + output_name + '-hbase-generated.create')
-  hbase_post_load.load.append("exit")
-  hbase_post_load.write_to_file('post-load-' + output_name + '-hbase-generated.sql')
-  impala_invalidate.write_to_file('invalidate-' + output_name + '-impala-generated.sql')
+  if hbase_output:
+    hbase_output.create.append("exit")
+    hbase_output.write_to_file('load-' + output_name + '-hbase-generated.create')
+  if hbase_post_load:
+    hbase_post_load.load.append("exit")
+    hbase_post_load.write_to_file('post-load-' + output_name + '-hbase-generated.sql')
+  impala_invalidate.write_to_file("invalidate-" + output_name + "-impala-generated.sql")
 
 def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'COLUMNS', 'PARTITION_COLUMNS',
