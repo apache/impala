@@ -263,32 +263,43 @@ def load():
         TBLPROPERTIES('parquet.compression'='SNAPPY')
         AS SELECT * FROM tmp_customer;
 
-        DROP TABLE tmp_orders_string;
-        DROP TABLE tmp_customer_string;
-        DROP TABLE tmp_customer;
-
         CREATE TABLE region
         STORED AS PARQUET
         TBLPROPERTIES('parquet.compression'='SNAPPY')
         AS SELECT * FROM tmp_region;
 
-        DROP TABLE tmp_region_string;
-        DROP TABLE tmp_region;
-
         CREATE TABLE supplier
         STORED AS PARQUET
         TBLPROPERTIES('parquet.compression'='SNAPPY')
-        AS SELECT * FROM tmp_supplier;
-
-        DROP TABLE tmp_supplier;
-        DROP TABLE tmp_supplier_string;""".split(";"):
+        AS SELECT * FROM tmp_supplier;""".split(";"):
       if not stmt.strip():
         continue
       LOG.info("Executing: {0}".format(stmt))
       hive.execute(stmt)
 
   with cluster.impala.cursor(db_name=target_db) as impala:
-    impala.invalidate_metadata()
+    # Drop the temporary tables. These temporary tables were created
+    # in Impala, so they exist in Impala's metadata. This drop is executed by
+    # Impala so that the metadata is automatically updated.
+    for stmt in """
+        DROP TABLE tmp_orders_string;
+        DROP TABLE tmp_customer_string;
+        DROP TABLE tmp_customer;
+
+        DROP TABLE tmp_region_string;
+        DROP TABLE tmp_region;
+
+        DROP TABLE tmp_supplier;
+        DROP TABLE tmp_supplier_string;""".split(";"):
+      if not stmt.strip():
+        continue
+      LOG.info("Executing: {0}".format(stmt))
+      impala.execute(stmt)
+
+    impala.invalidate_metadata(table_name="customer")
+    impala.invalidate_metadata(table_name="part")
+    impala.invalidate_metadata(table_name="region")
+    impala.invalidate_metadata(table_name="supplier")
     impala.compute_stats()
 
   LOG.info("Done loading nested TPCH data")

@@ -242,16 +242,16 @@ functional
 ---- BASE_TABLE_NAME
 alltypesinsert
 ---- CREATE
-CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} LIKE {db_name}.alltypes
-STORED AS {file_format};
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+LIKE {db_name}{db_suffix}.alltypes STORED AS {file_format};
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
 alltypesnopart_insert
 ---- CREATE
-CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} like {db_name}.alltypesnopart
-STORED AS {file_format};
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+LIKE {db_name}{db_suffix}.alltypesnopart STORED AS {file_format};
 ====
 ---- DATASET
 functional
@@ -2009,7 +2009,7 @@ functional
 ---- BASE_TABLE_NAME
 avro_unicode_nulls
 ---- CREATE_HIVE
-create external table if not exists {db_name}{db_suffix}.{table_name} like {db_name}.liketbl stored as avro LOCATION '/test-warehouse/avro_null_char';
+create external table if not exists {db_name}{db_suffix}.{table_name} like {db_name}{db_suffix}.liketbl stored as avro LOCATION '/test-warehouse/avro_null_char';
 ---- LOAD
 `hdfs dfs -mkdir -p /test-warehouse/avro_null_char && \
 hdfs dfs -put -f ${IMPALA_HOME}/testdata/avro_null_char/000000_0 /test-warehouse/avro_null_char/
