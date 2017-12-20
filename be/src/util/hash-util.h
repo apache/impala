@@ -119,6 +119,7 @@ class HashUtil {
     return hash;
   }
 
+  static const uint64_t MURMUR_DEFAULT_SEED = 0x0;
   static const uint64_t MURMUR_PRIME = 0xc6a4a7935bd1e995;
   static const int MURMUR_R = 47;
 

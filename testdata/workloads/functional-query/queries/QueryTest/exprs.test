@@ -2919,3 +2919,15 @@ where cast(timestamp_col as string) = '2009-02-01 00:00:00'
 ---- TYPES
 int, timestamp
 ====
+---- QUERY
+select
+murmur_hash(bool_col), murmur_hash(tinyint_col), murmur_hash(smallint_col),
+murmur_hash(int_col), murmur_hash(bigint_col), murmur_hash(float_col),
+murmur_hash(double_col), murmur_hash(date_string_col), murmur_hash(string_col),
+murmur_hash(timestamp_col), murmur_hash(year), murmur_hash(month)
+from functional.alltypes where id = 7
+---- RESULTS
+6351753276682545529,-8688181892109895221,5243888771994935971,988560926123810380,7108101660231151623,-8653637999116590182,-6387622242983883150,3788918177590065252,-7446916648201533712,7077699884854357665,7331012058162401363,-780611581681153783
+---- TYPES
+BIGINT , BIGINT , BIGINT , BIGINT , BIGINT , BIGINT , BIGINT , BIGINT , BIGINT , BIGINT , BIGINT , BIGINT
+====

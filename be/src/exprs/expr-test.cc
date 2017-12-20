@@ -4578,6 +4578,52 @@ TEST_F(ExprTest, UtilityFunctions) {
   TestIsNull("fnv_hash(NULL)", TYPE_BIGINT);
 }
 
+TEST_F(ExprTest, MurmurHashFunction) {
+  string s("hello world");
+  int64_t expected = HashUtil::MurmurHash2_64(s.data(), s.size(),
+      HashUtil::MURMUR_DEFAULT_SEED);
+  // The comparison with the constant is to detect if MurmurHash2_64 accidentally
+  // changes behavior.
+  EXPECT_EQ(-3190198453633110066, expected);
+  TestValue("murmur_hash('hello world')", TYPE_BIGINT, expected);
+  s = string("");
+  expected = HashUtil::MurmurHash2_64(s.data(), s.size(), HashUtil::MURMUR_DEFAULT_SEED);
+  TestValue("murmur_hash('')", TYPE_BIGINT, expected);
+
+  IntValMap::iterator int_iter;
+  for(int_iter = min_int_values_.begin(); int_iter != min_int_values_.end();
+      ++int_iter) {
+    ColumnType t = ColumnType(static_cast<PrimitiveType>(int_iter->first));
+    expected = HashUtil::MurmurHash2_64(
+        &int_iter->second, t.GetByteSize(), HashUtil::MURMUR_DEFAULT_SEED);
+    string& val = default_type_strs_[int_iter->first];
+    TestValue("murmur_hash(" + val + ")", TYPE_BIGINT, expected);
+  }
+
+  // Don't use min_float_values_ for testing floats and doubles due to improper float
+  // and double literal handling, see IMPALA-669.
+  float float_val = 42;
+  expected = HashUtil::MurmurHash2_64(&float_val, sizeof(float),
+      HashUtil::MURMUR_DEFAULT_SEED);
+  TestValue("murmur_hash(CAST(42 as FLOAT))", TYPE_BIGINT, expected);
+
+  double double_val = 42;
+  expected = HashUtil::MurmurHash2_64(&double_val, sizeof(double),
+      HashUtil::MURMUR_DEFAULT_SEED);
+  TestValue("murmur_hash(CAST(42 as DOUBLE))", TYPE_BIGINT, expected);
+
+  expected = HashUtil::MurmurHash2_64(&default_timestamp_val_, 12,
+      HashUtil::MURMUR_DEFAULT_SEED);
+  TestValue("murmur_hash(" + default_timestamp_str_ + ")", TYPE_BIGINT, expected);
+
+  bool bool_val = false;
+  expected = HashUtil::MurmurHash2_64(&bool_val, 1, HashUtil::MURMUR_DEFAULT_SEED);
+  TestValue("murmur_hash(FALSE)", TYPE_BIGINT, expected);
+
+  // Test NULL input returns NULL
+  TestIsNull("murmur_hash(NULL)", TYPE_BIGINT);
+}
+
 TEST_F(ExprTest, SessionFunctions) {
   enum Session {S1, S2};
   enum Query {Q1, Q2};

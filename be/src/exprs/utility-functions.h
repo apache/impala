@@ -50,6 +50,14 @@ class UtilityFunctions {
   static BigIntVal FnvHashTimestamp(FunctionContext* ctx, const TimestampVal& input_val);
   static BigIntVal FnvHashDecimal(FunctionContext* ctx, const DecimalVal& input_val);
 
+  /// Implementations of the MurmurHash function. Returns the Murmur hash of the
+  /// input as an int64_t.
+  template <typename T> static BigIntVal MurmurHash(FunctionContext* ctx,
+      const T& input_val);
+  static BigIntVal MurmurHashString(FunctionContext* ctx, const StringVal& input_val);
+  static BigIntVal MurmurHashTimestamp(FunctionContext* ctx, const TimestampVal& input_val);
+  static BigIntVal MurmurHashDecimal(FunctionContext* ctx, const DecimalVal& input_val);
+
   /// Implementation of the user() function. Returns the username of the user who executed
   /// this function.
   static StringVal User(FunctionContext* ctx);

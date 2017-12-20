@@ -76,6 +76,55 @@ template BigIntVal UtilityFunctions::FnvHash(
 template BigIntVal UtilityFunctions::FnvHash(
     FunctionContext* ctx, const DoubleVal& input_val);
 
+BigIntVal UtilityFunctions::MurmurHashString(FunctionContext* ctx,
+    const StringVal& input_val) {
+  if (input_val.is_null) return BigIntVal::null();
+  return BigIntVal(HashUtil::MurmurHash2_64(input_val.ptr, input_val.len,
+        HashUtil::MURMUR_DEFAULT_SEED));
+}
+
+BigIntVal UtilityFunctions::MurmurHashTimestamp(FunctionContext* ctx,
+    const TimestampVal& input_val) {
+  if (input_val.is_null) return BigIntVal::null();
+  TimestampValue tv = TimestampValue::FromTimestampVal(input_val);
+  return BigIntVal(HashUtil::MurmurHash2_64(&tv, 12, HashUtil::MURMUR_DEFAULT_SEED));
+}
+
+template<typename T>
+BigIntVal UtilityFunctions::MurmurHash(FunctionContext* ctx, const T& input_val) {
+  if (input_val.is_null) return BigIntVal::null();
+  return BigIntVal(
+      HashUtil::MurmurHash2_64(&input_val.val, sizeof(input_val.val),
+        HashUtil::MURMUR_DEFAULT_SEED));
+}
+
+// Note that this only hashes the unscaled value and not the scale or precision, so this
+// function is only valid when used over a single decimal type.
+BigIntVal UtilityFunctions::MurmurHashDecimal(FunctionContext* ctx,
+    const DecimalVal& input_val) {
+  if (input_val.is_null) return BigIntVal::null();
+  const FunctionContext::TypeDesc& input_type = *ctx->GetArgType(0);
+  int byte_size = ColumnType::GetDecimalByteSize(input_type.precision);
+  // val4, val8 and val16 all start at the same memory address.
+  return BigIntVal(HashUtil::MurmurHash2_64(&input_val.val16, byte_size,
+        HashUtil::MURMUR_DEFAULT_SEED));
+}
+
+template BigIntVal UtilityFunctions::MurmurHash(
+    FunctionContext* ctx, const BooleanVal& input_val);
+template BigIntVal UtilityFunctions::MurmurHash(
+    FunctionContext* ctx, const TinyIntVal& input_val);
+template BigIntVal UtilityFunctions::MurmurHash(
+    FunctionContext* ctx, const SmallIntVal& input_val);
+template BigIntVal UtilityFunctions::MurmurHash(
+    FunctionContext* ctx, const IntVal& input_val);
+template BigIntVal UtilityFunctions::MurmurHash(
+    FunctionContext* ctx, const BigIntVal& input_val);
+template BigIntVal UtilityFunctions::MurmurHash(
+    FunctionContext* ctx, const FloatVal& input_val);
+template BigIntVal UtilityFunctions::MurmurHash(
+    FunctionContext* ctx, const DoubleVal& input_val);
+
 StringVal UtilityFunctions::User(FunctionContext* ctx) {
   StringVal user(ctx->user());
   // An empty string indicates the user wasn't set in the session or in the query request.
