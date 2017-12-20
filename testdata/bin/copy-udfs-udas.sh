@@ -77,27 +77,29 @@ fi
 #   impala-hive-udfs.jar
 #   test-udfs.ll
 #   udf/uda samples (.so/.ll)
-hadoop fs -put -f "${IMPALA_HOME}/be/build/latest/testutil/libTestUdas.so"\
-    "${FILESYSTEM_PREFIX}/test-warehouse"
-hadoop fs -put -f "${IMPALA_HOME}/be/build/latest/testutil/libTestUdfs.so"\
-    "${FILESYSTEM_PREFIX}/test-warehouse"
-hadoop fs -put -f "${IMPALA_HOME}/be/build/latest/testutil/libTestUdfs.so"\
-    "${FILESYSTEM_PREFIX}/test-warehouse/libTestUdfs.SO"
-hadoop fs -mkdir -p "${FILESYSTEM_PREFIX}/test-warehouse/udf_test"
-hadoop fs -put -f "${IMPALA_HOME}/be/build/latest/testutil/libTestUdfs.so"\
-    "${FILESYSTEM_PREFIX}/test-warehouse/udf_test/libTestUdfs.so"
-hadoop fs -put -f "${HIVE_HOME}/lib/hive-exec-${IMPALA_HIVE_VERSION}.jar"\
-  "${FILESYSTEM_PREFIX}/test-warehouse/hive-exec.jar"
-hadoop fs -put -f "${IMPALA_HOME}/tests/test-hive-udfs/target/test-hive-udfs-1.0.jar"\
-    "${FILESYSTEM_PREFIX}/test-warehouse/impala-hive-udfs.jar"
-hadoop fs -put -f "${IMPALA_HOME}/be/build/latest/testutil/test-udfs.ll"\
-    "${FILESYSTEM_PREFIX}/test-warehouse"
-hadoop fs -put -f "${IMPALA_HOME}/be/build/latest/udf_samples/libudfsample.so"\
-    "${FILESYSTEM_PREFIX}/test-warehouse"
-hadoop fs -put -f "${IMPALA_HOME}/be/build/latest/udf_samples/udf-sample.ll"\
-    "${FILESYSTEM_PREFIX}/test-warehouse"
-hadoop fs -put -f "${IMPALA_HOME}/be/build/latest/udf_samples/libudasample.so"\
-    "${FILESYSTEM_PREFIX}/test-warehouse"
-hadoop fs -put -f "${IMPALA_HOME}/be/build/latest/udf_samples/uda-sample.ll"\
-    "${FILESYSTEM_PREFIX}/test-warehouse"
+
+# Using a single HDFS command only works if the files already have the same names
+# and directory structure that we want in HDFS. Create directories and symbolic links
+# to make that possible.
+UDF_TMP_DIR=$(mktemp -d)
+
+ln -s "${IMPALA_HOME}/be/build/latest/testutil/libTestUdas.so" "${UDF_TMP_DIR}"
+ln -s "${IMPALA_HOME}/be/build/latest/testutil/libTestUdfs.so" "${UDF_TMP_DIR}"
+ln -s "${IMPALA_HOME}/be/build/latest/testutil/libTestUdfs.so" \
+  "${UDF_TMP_DIR}/libTestUdfs.SO"
+mkdir "${UDF_TMP_DIR}/udf_test"
+ln -s "${IMPALA_HOME}/be/build/latest/testutil/libTestUdfs.so" "${UDF_TMP_DIR}/udf_test"
+ln -s "${HIVE_HOME}/lib/hive-exec-${IMPALA_HIVE_VERSION}.jar" "${UDF_TMP_DIR}/hive-exec.jar"
+ln -s "${IMPALA_HOME}/tests/test-hive-udfs/target/test-hive-udfs-1.0.jar" \
+  "${UDF_TMP_DIR}/impala-hive-udfs.jar"
+ln -s "${IMPALA_HOME}/be/build/latest/testutil/test-udfs.ll" "${UDF_TMP_DIR}"
+ln -s "${IMPALA_HOME}/be/build/latest/udf_samples/libudfsample.so" "${UDF_TMP_DIR}"
+ln -s "${IMPALA_HOME}/be/build/latest/udf_samples/udf-sample.ll" "${UDF_TMP_DIR}"
+ln -s "${IMPALA_HOME}/be/build/latest/udf_samples/libudasample.so" "${UDF_TMP_DIR}"
+ln -s "${IMPALA_HOME}/be/build/latest/udf_samples/uda-sample.ll" "${UDF_TMP_DIR}"
+
+hadoop fs -put -f "${UDF_TMP_DIR}"/* "${FILESYSTEM_PREFIX}/test-warehouse"
+
+# Remove temporary directory
+rm -r ${UDF_TMP_DIR}
 echo "Done copying udf/uda libraries."

@@ -134,32 +134,39 @@ echo "CM_HOST=${CM_HOST:-}"
 echo "REMOTE_LOAD=${REMOTE_LOAD:-}"
 
 function load-custom-schemas {
+  # HDFS commandline calls are slow, so consolidate the manipulation into
+  # as few calls as possible by populating a temporary directory with the
+  # appropriate structure and copying it in a single call.
+  TMP_DIR=$(mktemp -d)
+
+  # Cleanup old schemas dir
+  hadoop fs -rm -r -f /test-warehouse/schemas
   SCHEMA_SRC_DIR=${IMPALA_HOME}/testdata/data/schemas
-  SCHEMA_DEST_DIR=/test-warehouse/schemas
-  # clean the old schemas directory.
-  hadoop fs -rm -r -f ${SCHEMA_DEST_DIR}
-  hadoop fs -mkdir ${SCHEMA_DEST_DIR}
-  hadoop fs -put $SCHEMA_SRC_DIR/zipcode_incomes.parquet ${SCHEMA_DEST_DIR}/
-  hadoop fs -put $SCHEMA_SRC_DIR/alltypestiny.parquet ${SCHEMA_DEST_DIR}/
-  hadoop fs -put $SCHEMA_SRC_DIR/enum ${SCHEMA_DEST_DIR}/
-  hadoop fs -put $SCHEMA_SRC_DIR/malformed_decimal_tiny.parquet ${SCHEMA_DEST_DIR}/
-  hadoop fs -put $SCHEMA_SRC_DIR/decimal.parquet ${SCHEMA_DEST_DIR}/
-  hadoop fs -put $SCHEMA_SRC_DIR/nested/modern_nested.parquet ${SCHEMA_DEST_DIR}/
-  hadoop fs -put $SCHEMA_SRC_DIR/nested/legacy_nested.parquet ${SCHEMA_DEST_DIR}/
+  SCHEMA_TMP_DIR="${TMP_DIR}/schemas"
+  mkdir ${SCHEMA_TMP_DIR}
+  mkdir ${SCHEMA_TMP_DIR}/enum
+  ln -s ${SCHEMA_SRC_DIR}/zipcode_incomes.parquet ${SCHEMA_TMP_DIR}
+  ln -s ${SCHEMA_SRC_DIR}/alltypestiny.parquet ${SCHEMA_TMP_DIR}
+  ln -s ${SCHEMA_SRC_DIR}/enum/* ${SCHEMA_TMP_DIR}/enum
+  ln -s ${SCHEMA_SRC_DIR}/malformed_decimal_tiny.parquet ${SCHEMA_TMP_DIR}
+  ln -s ${SCHEMA_SRC_DIR}/decimal.parquet ${SCHEMA_TMP_DIR}
+  ln -s ${SCHEMA_SRC_DIR}/nested/modern_nested.parquet ${SCHEMA_TMP_DIR}
+  ln -s ${SCHEMA_SRC_DIR}/nested/legacy_nested.parquet ${SCHEMA_TMP_DIR}
 
   # CHAR and VARCHAR tables written by Hive
-  hadoop fs -mkdir -p /test-warehouse/chars_formats_avro_snap/
-  hadoop fs -put -f ${IMPALA_HOME}/testdata/data/chars-formats.avro \
-    /test-warehouse/chars_formats_avro_snap
-  hadoop fs -mkdir -p /test-warehouse/chars_formats_parquet/
-  hadoop fs -put -f ${IMPALA_HOME}/testdata/data/chars-formats.parquet \
-    /test-warehouse/chars_formats_parquet
-  hadoop fs -mkdir -p /test-warehouse/chars_formats_orc_def/
-  hadoop fs -put -f ${IMPALA_HOME}/testdata/data/chars-formats.orc \
-    /test-warehouse/chars_formats_orc_def
-  hadoop fs -mkdir -p /test-warehouse/chars_formats_text/
-  hadoop fs -put -f ${IMPALA_HOME}/testdata/data/chars-formats.txt \
-    /test-warehouse/chars_formats_text
+  mkdir -p ${TMP_DIR}/chars_formats_avro_snap \
+   ${TMP_DIR}/chars_formats_parquet \
+   ${TMP_DIR}/chars_formats_text \
+   ${TMP_DIR}/chars_formats_orc_def
+
+  ln -s ${IMPALA_HOME}/testdata/data/chars-formats.avro ${TMP_DIR}/chars_formats_avro_snap
+  ln -s ${IMPALA_HOME}/testdata/data/chars-formats.parquet ${TMP_DIR}/chars_formats_parquet
+  ln -s ${IMPALA_HOME}/testdata/data/chars-formats.orc ${TMP_DIR}/chars_formats_orc_def
+  ln -s ${IMPALA_HOME}/testdata/data/chars-formats.txt ${TMP_DIR}/chars_formats_text
+
+  hadoop fs -put -f ${TMP_DIR}/* /test-warehouse
+
+  rm -r ${TMP_DIR}
 }
 
 function load-data {
@@ -257,8 +264,7 @@ function load-aux-workloads {
 
 function copy-auth-policy {
   echo COPYING AUTHORIZATION POLICY FILE
-  hadoop fs -rm -f ${FILESYSTEM_PREFIX}/test-warehouse/authz-policy.ini
-  hadoop fs -put ${IMPALA_HOME}/fe/src/test/resources/authz-policy.ini \
+  hadoop fs -put -f ${IMPALA_HOME}/fe/src/test/resources/authz-policy.ini \
       ${FILESYSTEM_PREFIX}/test-warehouse/
 }
 
@@ -267,20 +273,17 @@ function copy-and-load-dependent-tables {
   # TODO: The multi-format table will move these files. So we need to copy them to a
   # temporary location for that table to use. Should find a better way to handle this.
   echo COPYING AND LOADING DATA FOR DEPENDENT TABLES
-  hadoop fs -rm -r -f /test-warehouse/alltypesmixedformat
-  hadoop fs -rm -r -f /tmp/alltypes_rc
-  hadoop fs -rm -r -f /tmp/alltypes_seq
-  hadoop fs -mkdir -p /tmp/alltypes_seq/year=2009
-  hadoop fs -mkdir -p /tmp/alltypes_rc/year=2009
+  hadoop fs -rm -r -f /test-warehouse/alltypesmixedformat \
+    /tmp/alltypes_rc /tmp/alltypes_seq
+  hadoop fs -mkdir -p /tmp/alltypes_seq/year=2009 \
+    /tmp/alltypes_rc/year=2009
   hadoop fs -cp /test-warehouse/alltypes_seq/year=2009/month=2/ /tmp/alltypes_seq/year=2009
   hadoop fs -cp /test-warehouse/alltypes_rc/year=2009/month=3/ /tmp/alltypes_rc/year=2009
 
   # Create a hidden file in AllTypesSmall
-  hadoop fs -rm -f /test-warehouse/alltypessmall/year=2009/month=1/_hidden
-  hadoop fs -rm -f /test-warehouse/alltypessmall/year=2009/month=1/.hidden
-  hadoop fs -cp /test-warehouse/zipcode_incomes/DEC_00_SF3_P077_with_ann_noheader.csv \
+  hadoop fs -cp -f /test-warehouse/zipcode_incomes/DEC_00_SF3_P077_with_ann_noheader.csv \
    /test-warehouse/alltypessmall/year=2009/month=1/_hidden
-  hadoop fs -cp /test-warehouse/zipcode_incomes/DEC_00_SF3_P077_with_ann_noheader.csv \
+  hadoop fs -cp -f /test-warehouse/zipcode_incomes/DEC_00_SF3_P077_with_ann_noheader.csv \
    /test-warehouse/alltypessmall/year=2009/month=1/.hidden
 
   # In case the data is updated by a non-super user, make sure the user can write
@@ -299,8 +302,7 @@ function copy-and-load-dependent-tables {
   #
   # See: logs/data_loading/copy-and-load-dependent-tables.log)
   # See also: IMPALA-4345
-  hadoop fs -chmod -R 777 /tmp/alltypes_rc
-  hadoop fs -chmod -R 777 /tmp/alltypes_seq
+  hadoop fs -chmod -R 777 /tmp/alltypes_rc /tmp/alltypes_seq
 
   # For tables that rely on loading data from local fs test-wareload-house
   # TODO: Find a good way to integrate this with the normal data loading scripts
@@ -351,33 +353,31 @@ function load-custom-data {
 
   hadoop fs -mv /bad_text_lzo_text_lzo/ /test-warehouse/
 
-  # IMPALA-694: data file produced by parquet-mr version 1.2.5-cdh4.5.0
-  hadoop fs -put -f ${IMPALA_HOME}/testdata/data/bad_parquet_data.parquet \
-                    /test-warehouse/bad_parquet_parquet
-
-  # Data file produced by parquet-mr with repeated values (produces 0 bit width dictionary)
-  hadoop fs -put -f ${IMPALA_HOME}/testdata/data/repeated_values.parquet \
-                    /test-warehouse/bad_parquet_parquet
-
-  # IMPALA-720: data file produced by parquet-mr with multiple row groups
-  hadoop fs -put -f ${IMPALA_HOME}/testdata/data/multiple_rowgroups.parquet \
-                    /test-warehouse/bad_parquet_parquet
-
-  # IMPALA-1401: data file produced by Hive 13 containing page statistics with long min/max
-  # string values
-  hadoop fs -put -f ${IMPALA_HOME}/testdata/data/long_page_header.parquet \
-                    /test-warehouse/bad_parquet_parquet
+  # Load specialized parquet files into functional_parquet.bad_parquet
+  # bad_parquet_data.parquet   - IMPALA-694: data file produced by
+  #                              parquet-mr version 1.2.5-cdh4.5.0
+  # repeated_values.parquet    - Data file produced by parquet-mr with repeated values
+  #                              (produces 0 bit width dictionary)
+  # multiple_rowgroups.parquet - IMPALA-720: data file produced by parquet-mr
+  #                              with multiple row groups
+  # long_page_header.parquet   - IMPALA-1401: data file produced by Hive 13 containing
+  #                              page statistics with long min/max string values
+  hadoop fs -put -f \
+    ${IMPALA_HOME}/testdata/data/bad_parquet_data.parquet \
+    ${IMPALA_HOME}/testdata/data/repeated_values.parquet \
+    ${IMPALA_HOME}/testdata/data/multiple_rowgroups.parquet \
+    ${IMPALA_HOME}/testdata/data/long_page_header.parquet \
+    /test-warehouse/bad_parquet_parquet
 
   # IMPALA-3732: parquet files with corrupt strings
-  local parq_file
-  for parq_file in dict-encoded-negative-len.parq plain-encoded-negative-len.parq; do
-    hadoop fs -put -f ${IMPALA_HOME}/testdata/bad_parquet_data/$parq_file \
-                    /test-warehouse/bad_parquet_strings_negative_len_parquet
-  done
-  for parq_file in dict-encoded-out-of-bounds.parq plain-encoded-out-of-bounds.parq; do
-    hadoop fs -put -f ${IMPALA_HOME}/testdata/bad_parquet_data/$parq_file \
-                    /test-warehouse/bad_parquet_strings_out_of_bounds_parquet
-  done
+  hadoop fs -put -f \
+    ${IMPALA_HOME}/testdata/bad_parquet_data/dict-encoded-negative-len.parq \
+    ${IMPALA_HOME}/testdata/bad_parquet_data/plain-encoded-negative-len.parq \
+    /test-warehouse/bad_parquet_strings_negative_len_parquet
+  hadoop fs -put -f \
+    ${IMPALA_HOME}/testdata/bad_parquet_data/dict-encoded-out-of-bounds.parq \
+    ${IMPALA_HOME}/testdata/bad_parquet_data/plain-encoded-out-of-bounds.parq \
+    /test-warehouse/bad_parquet_strings_out_of_bounds_parquet
 
   # Remove all index files in this partition.
   hadoop fs -rm -f /test-warehouse/alltypes_text_lzo/year=2009/month=1/*.lzo.index
@@ -421,24 +421,26 @@ function custom-post-load-steps {
     # Set both read and execute permissions because accessing the contents of a directory on
     # the local filesystem requires the x permission (while on HDFS it requires the r
     # permission).
-    hadoop fs -chmod -R 555 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=1
-    hadoop fs -chmod -R 555 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=3
+    hadoop fs -chmod -R 555 \
+      ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=1 \
+      ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=3
   fi
 
+  hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_parquet \
+    ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_sixblocks_parquet \
+    ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_one_row_group_parquet
+
   #IMPALA-1881: data file produced by hive with multiple blocks.
-  hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_parquet
   hadoop fs -Ddfs.block.size=1048576 -put -f \
     ${IMPALA_HOME}/testdata/LineItemMultiBlock/000000_0 \
     ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_parquet
 
   # IMPALA-2466: Add more tests to the HDFS Parquet scanner (Added after IMPALA-1881)
-  hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_sixblocks_parquet && \
   hadoop fs -Ddfs.block.size=1048576 -put -f \
     ${IMPALA_HOME}/testdata/LineItemMultiBlock/lineitem_sixblocks.parquet \
     ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_sixblocks_parquet
 
   # IMPALA-2466: Add more tests to the HDFS Parquet scanner (this has only one row group)
-  hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_one_row_group_parquet && \
   hadoop fs -Ddfs.block.size=1048576 -put -f \
     ${IMPALA_HOME}/testdata/LineItemMultiBlock/lineitem_one_row_group.parquet \
     ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_one_row_group_parquet
