@@ -76,7 +76,11 @@ DEFINE_bool(enable_process_lifetime_heap_profiling, false, "(Advanced) Enables h
     "on-demand/remote server profile handlers.");
 
 DEFINE_string(heap_profile_dir, "", "Output directory to store heap profiles. If not set "
-    " profiles are stored in the current working directory.");
+    "profiles are stored in the current working directory.");
+
+DEFINE_int64(tcmalloc_max_total_thread_cache_bytes, 0, "(Advanced) Bound on the total "
+    "amount of bytes allocated to TCMalloc thread caches. If left at 0 (default), use "
+    "the default value in TCMalloc library.");
 
 DEFINE_bool(abort_on_config_error, true, "Abort Impala startup if there are improper "
     "configs or running on unsupported hardware.");

@@ -100,6 +100,7 @@ DECLARE_string(buffer_pool_clean_pages_limit);
 DECLARE_int64(min_buffer_size);
 DECLARE_bool(is_coordinator);
 DECLARE_int32(webserver_port);
+DECLARE_int64(tcmalloc_max_total_thread_cache_bytes);
 
 // TODO: Remove the following RM-related flags in Impala 3.0.
 DEFINE_bool_hidden(enable_rm, false, "Deprecated");
@@ -270,6 +271,16 @@ Status ExecEnv::Init() {
           "bytes value or percentage: $0", FLAGS_mem_limit));
   }
 
+#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
+  // Aggressive decommit is required so that unused pages in the TCMalloc page heap are
+  // not backed by physical pages and do not contribute towards memory consumption.
+  // Enable it in TCMalloc before InitBufferPool().
+  if (!MallocExtension::instance()->SetNumericProperty(
+          "tcmalloc.aggressive_memory_decommit", 1)) {
+    return Status("Failed to enable TCMalloc aggressive decommit.");
+  }
+#endif
+
   if (!BitUtil::IsPowerOf2(FLAGS_min_buffer_size)) {
     return Status(Substitute(
         "--min_buffer_size must be a power-of-two: $0", FLAGS_min_buffer_size));
@@ -328,13 +339,12 @@ Status ExecEnv::Init() {
   obj_pool_->Add(new MemTracker(negated_unused_reservation, -1,
       "Buffer Pool: Unused Reservation", mem_tracker_.get()));
 #if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
-  // Aggressive decommit is required so that unused pages in the TCMalloc page heap are
-  // not backed by physical pages and do not contribute towards memory consumption.
-  size_t aggressive_decommit_enabled = 0;
-  MallocExtension::instance()->GetNumericProperty(
-      "tcmalloc.aggressive_memory_decommit", &aggressive_decommit_enabled);
-  if (!aggressive_decommit_enabled) {
-    return Status("TCMalloc aggressive decommit is required but is disabled.");
+  // Change the total TCMalloc thread cache size if necessary.
+  if (FLAGS_tcmalloc_max_total_thread_cache_bytes > 0 &&
+      !MallocExtension::instance()->SetNumericProperty(
+          "tcmalloc.max_total_thread_cache_bytes",
+          FLAGS_tcmalloc_max_total_thread_cache_bytes)) {
+    return Status("Failed to change TCMalloc total thread cache size.");
   }
   // A MemTracker for TCMalloc overhead which is the difference between the physical bytes
   // reserved (TcmallocMetric::PHYSICAL_BYTES_RESERVED) and the bytes in use
