@@ -413,3 +413,44 @@ cast(42608445511 as decimal(18, 0)) % 3
 ---- TYPES
 DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
 ====
+---- QUERY
+# IMPALA-5014: Check that we round when converting a decimal to timestamp
+set decimal_v2=false;
+select
+cast(cast(12333333333.9999999994 as decimal(38, 10)) as timestamp),
+cast(cast(12333333333.9999999995 as decimal(38, 10)) as timestamp),
+cast(cast(333.9999999994 as decimal(13, 10)) as timestamp),
+cast(cast(333.9999999995 as decimal(13, 10)) as timestamp),
+cast(cast(12333333333.1111111114 as decimal(38, 10)) as timestamp),
+cast(cast(12333333333.1111111115 as decimal(38, 10)) as timestamp),
+cast(cast(12333333333.111111111411111 as decimal(38, 15)) as timestamp),
+cast(cast(12333333333.111111111511111 as decimal(38, 15)) as timestamp),
+cast(cast(12333333333.1111111114 as decimal(38, 27)) as timestamp),
+cast(cast(12333333333.1111111115 as decimal(38, 27)) as timestamp),
+cast(cast(12333333333.111 as decimal(38, 3)) as timestamp),
+cast(cast(12333333333 as decimal(38, 0)) as timestamp);
+---- RESULTS
+2360-10-29 21:55:33.999999999,2360-10-29 21:55:33.999999999,1970-01-01 00:05:33.999999999,1970-01-01 00:05:33.999999999,2360-10-29 21:55:33.111111111,2360-10-29 21:55:33.111111111,2360-10-29 21:55:33.111111111,2360-10-29 21:55:33.111111111,2360-10-29 21:55:33.111111111,2360-10-29 21:55:33.111111111,2360-10-29 21:55:33.111000000,2360-10-29 21:55:33
+---- TYPES
+TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP
+====
+---- QUERY
+set decimal_v2=true;
+select
+cast(cast(12333333333.9999999994 as decimal(38, 10)) as timestamp),
+cast(cast(12333333333.9999999995 as decimal(38, 10)) as timestamp),
+cast(cast(333.9999999994 as decimal(13, 10)) as timestamp),
+cast(cast(333.9999999995 as decimal(13, 10)) as timestamp),
+cast(cast(12333333333.1111111114 as decimal(38, 10)) as timestamp),
+cast(cast(12333333333.1111111115 as decimal(38, 10)) as timestamp),
+cast(cast(12333333333.111111111411111 as decimal(38, 15)) as timestamp),
+cast(cast(12333333333.111111111511111 as decimal(38, 15)) as timestamp),
+cast(cast(12333333333.1111111114 as decimal(38, 27)) as timestamp),
+cast(cast(12333333333.1111111115 as decimal(38, 27)) as timestamp),
+cast(cast(12333333333.111 as decimal(38, 3)) as timestamp),
+cast(cast(12333333333 as decimal(38, 0)) as timestamp);
+---- RESULTS
+2360-10-29 21:55:33.999999999,2360-10-29 21:55:34,1970-01-01 00:05:33.999999999,1970-01-01 00:05:34,2360-10-29 21:55:33.111111111,2360-10-29 21:55:33.111111112,2360-10-29 21:55:33.111111111,2360-10-29 21:55:33.111111112,2360-10-29 21:55:33.111111111,2360-10-29 21:55:33.111111112,2360-10-29 21:55:33.111000000,2360-10-29 21:55:33
+---- TYPES
+TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP
+====

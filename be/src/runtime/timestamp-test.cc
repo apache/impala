@@ -732,6 +732,22 @@ TEST(TimestampTest, Basic) {
   EXPECT_EQ("2038-01-19 03:14:09",
       TimestampValue::FromUnixTime(2147483649).ToString());
 
+  // Tests for the cases where abs(nanoseconds) >= 1e9.
+  EXPECT_EQ("2018-01-10 16:00:00",
+      TimestampValue::FromUnixTimeNanos(1515600000, 0).ToString());
+  EXPECT_EQ("2018-01-10 16:00:00.999999999",
+      TimestampValue::FromUnixTimeNanos(1515600000, 999999999).ToString());
+  EXPECT_EQ("2018-01-10 15:59:59.000000001",
+      TimestampValue::FromUnixTimeNanos(1515600000, -999999999).ToString());
+  EXPECT_EQ("2018-01-10 16:00:01",
+      TimestampValue::FromUnixTimeNanos(1515600000, 1000000000).ToString());
+  EXPECT_EQ("2018-01-10 15:59:59",
+      TimestampValue::FromUnixTimeNanos(1515600000, -1000000000).ToString());
+  EXPECT_EQ("2018-01-10 16:30:00",
+      TimestampValue::FromUnixTimeNanos(1515600000, 1800000000000).ToString());
+  EXPECT_EQ("2018-01-10 15:30:00",
+      TimestampValue::FromUnixTimeNanos(1515600000, -1800000000000).ToString());
+
   // Test FromUnixTime around the boundary of the values that are converted via boost via
   // gmtime (IMPALA-5357). Tests 1 second before and after the values supported by the
   // boost conversion logic.

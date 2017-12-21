@@ -596,7 +596,8 @@ StringVal DecimalOperators::CastToStringVal(
 }
 
 template <typename T>
-IR_ALWAYS_INLINE int32_t DecimalOperators::ConvertToNanoseconds(T val, int scale) {
+IR_ALWAYS_INLINE int32_t DecimalOperators::ConvertToNanoseconds(
+    T val, int scale, bool round) {
   // Nanosecond scale means there should be 9 decimal digits, which is representable
   // with int32_t.
   const int NANOSECOND_SCALE = 9;
@@ -605,10 +606,11 @@ IR_ALWAYS_INLINE int32_t DecimalOperators::ConvertToNanoseconds(T val, int scale
     nanoseconds = val * DecimalUtil::GetScaleMultiplier<T>(
         NANOSECOND_SCALE - scale);
   } else {
-    nanoseconds = val / DecimalUtil::GetScaleMultiplier<T>(
-        scale - NANOSECOND_SCALE);
+    nanoseconds = DecimalUtil::ScaleDownAndRound<T>(
+        val, scale - NANOSECOND_SCALE, round);
+    DCHECK(nanoseconds <= 1000000000);
+    DCHECK(nanoseconds != 1000000000 || round);
   }
-
   DCHECK(nanoseconds >= numeric_limits<int32_t>::min()
       && nanoseconds <= numeric_limits<int32_t>::max());
 
@@ -616,7 +618,8 @@ IR_ALWAYS_INLINE int32_t DecimalOperators::ConvertToNanoseconds(T val, int scale
 }
 
 template <typename T>
-TimestampVal DecimalOperators::ConvertToTimestampVal(const T& decimal_value, int scale) {
+TimestampVal DecimalOperators::ConvertToTimestampVal(
+    const T& decimal_value, int scale, bool round) {
   typename T::StorageType seconds = decimal_value.whole_part(scale);
   if (seconds < numeric_limits<int64_t>::min() ||
       seconds > numeric_limits<int64_t>::max()) {
@@ -624,8 +627,8 @@ TimestampVal DecimalOperators::ConvertToTimestampVal(const T& decimal_value, int
     return TimestampVal::null();
   }
   int32_t nanoseconds =
-      ConvertToNanoseconds(decimal_value.fractional_part(scale), scale);
-  if(decimal_value.is_negative()) nanoseconds *= -1;
+      ConvertToNanoseconds(decimal_value.fractional_part(scale), scale, round);
+  if (decimal_value.is_negative()) nanoseconds *= -1;
   TimestampVal result;
   TimestampValue::FromUnixTimeNanos(seconds, nanoseconds).ToTimestampVal(&result);
   return result;
@@ -637,11 +640,15 @@ TimestampVal DecimalOperators::CastToTimestampVal(
   if (val.is_null) return TimestampVal::null();
   int precision = ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_PRECISION, 0);
   int scale = ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_SCALE, 0);
+  bool is_decimal_v2 = ctx->impl()->GetConstFnAttr(FunctionContextImpl::DECIMAL_V2);
   TimestampVal result;
   switch (ColumnType::GetDecimalByteSize(precision)) {
-    case 4: return ConvertToTimestampVal(Decimal4Value(val.val4), scale);
-    case 8: return ConvertToTimestampVal(Decimal8Value(val.val8), scale);
-    case 16: return ConvertToTimestampVal(Decimal16Value(val.val16), scale);
+    case 4:
+      return ConvertToTimestampVal(Decimal4Value(val.val4), scale, is_decimal_v2);
+    case 8:
+      return ConvertToTimestampVal(Decimal8Value(val.val8), scale, is_decimal_v2);
+    case 16:
+      return ConvertToTimestampVal(Decimal16Value(val.val16), scale, is_decimal_v2);
     default:
       DCHECK(false);
       return TimestampVal::null();

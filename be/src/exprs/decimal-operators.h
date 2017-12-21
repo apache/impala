@@ -163,13 +163,16 @@ class DecimalOperators {
   static T RoundDelta(const DecimalValue<T>& v, int src_scale,
       int target_scale, const DecimalRoundOp& op);
 
-  /// Converts a decimal value (interpreted as unix time) to TimestampVal.
+  /// Converts a decimal value (interpreted as unix time) to TimestampVal. Rounds
+  /// instead of truncating if 'round' is true.
   template <typename T>
-  static TimestampVal ConvertToTimestampVal(const T& decimal_value, int scale);
+  static TimestampVal ConvertToTimestampVal(
+      const T& decimal_value, int scale, bool round);
 
-  /// Converts fractional 'val' with the given 'scale' to nanoseconds.
+  /// Converts fractional 'val' with the given 'scale' to nanoseconds. Rounds
+  /// instead of truncating if 'round' is true.
   template <typename T>
-  static int32_t ConvertToNanoseconds(T val, int scale);
+  static int32_t ConvertToNanoseconds(T val, int scale, bool round);
 };
 
 }
