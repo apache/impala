@@ -449,6 +449,23 @@ function copy-and-load-ext-data-source {
     ${IMPALA_HOME}/testdata/bin/create-data-source-table.sql
 }
 
+function wait-hdfs-replication {
+  FAIL_COUNT=0
+  while [[ "$FAIL_COUNT" -ne "6" ]] ; do
+    FSCK_OUTPUT="$(hdfs fsck /test-warehouse)"
+    echo "$FSCK_OUTPUT"
+    if grep "Under-replicated blocks:[[:space:]]*0" <<< "$FSCK_OUTPUT"; then
+      return
+    fi
+    let FAIL_COUNT="$FAIL_COUNT"+1
+    sleep 5
+  done
+  echo "Some HDFS blocks are still under replicated after 30s."
+  echo "Some tests cannot pass without fully replicated blocks (IMPALA-3887)."
+  echo "Failing the data loading."
+  exit 1
+}
+
 # For kerberized clusters, use kerberos
 if ${CLUSTER_DIR}/admin is_kerberized; then
   LOAD_DATA_ARGS="${LOAD_DATA_ARGS} --use_kerberos --principal=${MINIKDC_PRINC_HIVE}"
@@ -534,6 +551,8 @@ if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
 
   run-step "Creating internal HBase table" create-internal-hbase-table.log \
       create-internal-hbase-table
+
+  run-step "Waiting for HDFS replication" wait-hdfs-replication.log wait-hdfs-replication
 fi
 
 # TODO: Investigate why all stats are not preserved. Theoretically, we only need to
