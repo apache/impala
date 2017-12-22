@@ -22,6 +22,7 @@
 #include "kudu/rpc/rpc_controller.h"
 #include "kudu/rpc/rpc_introspection.pb.h"
 #include "kudu/rpc/service_if.h"
+#include "kudu/util/monotime.h"
 #include "kudu/util/net/net_util.h"
 #include "util/auth-util.h"
 #include "util/cpu-info.h"
@@ -31,6 +32,7 @@
 
 using kudu::HostPort;
 using kudu::MetricEntity;
+using kudu::MonoDelta;
 using kudu::rpc::AcceptorPool;
 using kudu::rpc::MessengerBuilder;
 using kudu::rpc::Messenger;
@@ -59,6 +61,12 @@ Status RpcMgr::Init() {
   int num_reactor_threads =
       FLAGS_num_reactor_threads > 0 ? FLAGS_num_reactor_threads : CpuInfo::num_cores();
   bld.set_num_reactors(num_reactor_threads).set_metric_entity(entity);
+
+  // Disable idle connection detection by setting keepalive_time to -1. Idle connections
+  // tend to be closed and re-opened around the same time, which may lead to negotiation
+  // timeout. Please see IMPALA-5557 for details. Until KUDU-279 is fixed, closing idle
+  // connections is also racy and leads to query failures.
+  bld.set_connection_keepalive_time(MonoDelta::FromMilliseconds(-1));
 
   if (IsKerberosEnabled()) {
     string internal_principal;
