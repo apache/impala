@@ -86,10 +86,12 @@ void CodegenSymbolEmitter::NotifyObjectEmitted(const llvm::object::ObjectFile& o
 }
 
 void CodegenSymbolEmitter::NotifyFreeingObject(const llvm::object::ObjectFile& obj) {
-  lock_guard<SpinLock> perf_map_lock(perf_map_lock_);
-  DCHECK(perf_map_.find(obj.getData().data()) != perf_map_.end());
-  perf_map_.erase(obj.getData().data());
-  WritePerfMapLocked();
+  if (emit_perf_map_) {
+    lock_guard<SpinLock> perf_map_lock(perf_map_lock_);
+    DCHECK(perf_map_.find(obj.getData().data()) != perf_map_.end());
+    perf_map_.erase(obj.getData().data());
+    WritePerfMapLocked();
+  }
 }
 
 void CodegenSymbolEmitter::ProcessSymbol(llvm::DIContext* debug_ctx,
