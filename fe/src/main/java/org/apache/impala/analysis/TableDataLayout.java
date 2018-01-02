@@ -52,4 +52,9 @@ class TableDataLayout {
 
   List<ColumnDef> getPartitionColumnDefs() { return partitionColDefs_; }
   List<KuduPartitionParam> getKuduPartitionParams() { return kuduPartitionParams_; }
+
+  public void reset() {
+    partitionColDefs_.clear();
+    kuduPartitionParams_.clear();
+  }
 }

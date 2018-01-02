@@ -35,7 +35,6 @@ import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.util.MetaStoreUtil;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -158,6 +157,8 @@ class TableDef {
 
   public void reset() {
     primaryKeyColDefs_.clear();
+    dataLayout_.reset();
+    columnDefs_.clear();
     isAnalyzed_ = false;
   }
 

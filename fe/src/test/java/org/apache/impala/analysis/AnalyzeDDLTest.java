@@ -1507,6 +1507,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "as select count(*) as CNT from functional.alltypes");
     AnalyzesOk("create table functional.tbl as select a.* from functional.alltypes a " +
         "join functional.alltypes b on (a.int_col=b.int_col) limit 1000");
+    // CTAS with a select query that requires expression rewrite (IMPALA-6307)
+    AnalyzesOk("create table functional.ctas_tbl partitioned by (year) as " +
+        "with tmp as (select a.timestamp_col, a.year from functional.alltypes a " +
+        "left join functional.alltypes b " +
+        "on b.timestamp_col between a.timestamp_col and a.timestamp_col) " +
+        "select a.timestamp_col, a.year from tmp a");
 
     // Caching operations
     AnalyzesOk("create table functional.newtbl cached in 'testPool'" +
@@ -1606,6 +1612,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // IMPALA-5796: CTAS into a Kudu table with expr rewriting.
     AnalyzesOk("create table t primary key(id) stored as kudu as select id, bool_col " +
         "from functional.alltypestiny where id between 0 and 10");
+    // CTAS with a select query that requires expression rewrite (IMPALA-6307)
+    AnalyzesOk("create table t primary key(year) stored as kudu as " +
+        "with tmp as (select a.timestamp_col, a.year from functional.alltypes a " +
+        "left join functional.alltypes b " +
+        "on b.timestamp_col between a.timestamp_col and a.timestamp_col) " +
+        "select a.timestamp_col, a.year from tmp a");
     // CTAS in an external Kudu table
     AnalysisError("create external table t stored as kudu " +
         "tblproperties('kudu.table_name'='t') as select id, int_col from " +

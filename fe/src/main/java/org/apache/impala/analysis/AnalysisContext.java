@@ -404,7 +404,8 @@ public class AnalysisContext {
       if (reAnalyze) {
         // The rewrites should have no user-visible effect. Remember the original result
         // types and column labels to restore them after the rewritten stmt has been
-        // reset() and re-analyzed.
+        // reset() and re-analyzed. For a CTAS statement, the types represent column types
+        // of the table that will be created, including the partition columns, if any.
         List<Type> origResultTypes = Lists.newArrayList();
         for (Expr e: analysisResult_.stmt_.getResultExprs()) {
           origResultTypes.add(e.getType());

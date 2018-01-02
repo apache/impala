@@ -158,7 +158,6 @@ public class CreateTableAsSelectStmt extends StatementBase {
 
     // Add the columns from the select statement to the create statement.
     int colCnt = tmpQueryStmt.getColLabels().size();
-    createStmt_.getColumnDefs().clear();
     for (int i = 0; i < colCnt; ++i) {
       ColumnDef colDef = new ColumnDef(tmpQueryStmt.getColLabels().get(i), null,
           Collections.<ColumnDef.Option, Object>emptyMap());
@@ -220,8 +219,12 @@ public class CreateTableAsSelectStmt extends StatementBase {
     super.castResultExprs(types);
     // Set types of column definitions.
     List<ColumnDef> colDefs = createStmt_.getColumnDefs();
-    Preconditions.checkState(colDefs.size() == types.size());
-    for (int i = 0; i < types.size(); ++i) colDefs.get(i).setType(types.get(i));
+    List<ColumnDef> partitionColDefs = createStmt_.getPartitionColumnDefs();
+    Preconditions.checkState(colDefs.size() + partitionColDefs.size() == types.size());
+    for (int i = 0; i < colDefs.size(); ++i) colDefs.get(i).setType(types.get(i));
+    for (int i = 0; i < partitionColDefs.size(); ++i) {
+      partitionColDefs.get(i).setType(types.get(i + colDefs.size()));
+    }
   }
 
   @Override
