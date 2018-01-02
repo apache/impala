@@ -431,7 +431,7 @@ nonterminal ArrayList<ColumnDef> column_def_list, partition_column_defs,
   view_column_def_list, view_column_defs;
 nonterminal ArrayList<StructField> struct_field_def_list;
 // Options for DDL commands - CREATE/DROP/ALTER
-nonterminal HdfsCachingOp cache_op_val;
+nonterminal HdfsCachingOp cache_op_val, opt_cache_op_val;
 nonterminal BigDecimal opt_cache_op_replication;
 nonterminal String comment_val, opt_comment_val;
 nonterminal Boolean external_val;
@@ -444,7 +444,7 @@ nonterminal Boolean if_not_exists_val;
 nonterminal Boolean is_primary_key_val;
 nonterminal Boolean replace_existing_cols_val;
 nonterminal HdfsUri location_val;
-nonterminal RowFormat row_format_val;
+nonterminal RowFormat row_format_val, opt_row_format_val;
 nonterminal String field_terminator_val;
 nonterminal String line_terminator_val;
 nonterminal String escaped_by_val;
@@ -975,7 +975,7 @@ opt_kw_role ::=
   ;
 
 partition_def ::=
-  partition_spec:partition location_val:location cache_op_val:cache_op
+  partition_spec:partition location_val:location opt_cache_op_val:cache_op
   {: RESULT = new PartitionDef(partition, location, cache_op); :}
   ;
 
@@ -1047,11 +1047,14 @@ alter_tbl_stmt ::=
     if (partition != null) parser.parseError("set", SqlParserSymbols.KW_SET);
     RESULT = new AlterTableSetColumnStats(table, col, map);
   :}
+  | KW_ALTER KW_TABLE table_name:table opt_partition_set:partition KW_SET
+    row_format_val:row_format
+  {:
+    RESULT = new AlterTableSetRowFormatStmt(table, partition, row_format);
+  :}
   | KW_ALTER KW_TABLE table_name:table opt_partition_set:partitions KW_SET
     cache_op_val:cache_op
   {:
-    // Ensure a parser error is thrown for ALTER statements if no cache op is specified.
-    if (cache_op == null) parser.parseError("set", SqlParserSymbols.KW_SET);
     RESULT = new AlterTableSetCachedStmt(table, partitions, cache_op);
   :}
   | KW_ALTER KW_TABLE table_name:table KW_RECOVER KW_PARTITIONS
@@ -1236,9 +1239,9 @@ primary_keys ::=
   ;
 
 tbl_options ::=
-  opt_sort_cols:sort_cols opt_comment_val:comment row_format_val:row_format
+  opt_sort_cols:sort_cols opt_comment_val:comment opt_row_format_val:row_format
   serde_properties:serde_props file_format_create_table_val:file_format
-  location_val:location cache_op_val:cache_op
+  location_val:location opt_cache_op_val:cache_op
   tbl_properties:tbl_props
   {:
     CreateTableStmt.unescapeProperties(serde_props);
@@ -1403,13 +1406,18 @@ create_uda_stmt ::=
   :}
   ;
 
+opt_cache_op_val ::=
+  cache_op_val:cache_op
+  {: RESULT = cache_op; :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+
 cache_op_val ::=
   KW_CACHED KW_IN STRING_LITERAL:pool_name opt_cache_op_replication:replication
   {: RESULT = new HdfsCachingOp(pool_name, replication); :}
   | KW_UNCACHED
   {: RESULT = new HdfsCachingOp(); :}
-  | /* empty */
-  {: RESULT = null; :}
   ;
 
 opt_cache_op_replication ::=
@@ -1466,12 +1474,17 @@ if_not_exists_val ::=
   {: RESULT = false; :}
   ;
 
+opt_row_format_val ::=
+  row_format_val:row_format
+  {: RESULT = row_format; :}
+  |/* empty */
+  {: RESULT = null; :}
+  ;
+
 row_format_val ::=
   KW_ROW KW_FORMAT KW_DELIMITED field_terminator_val:field_terminator
   escaped_by_val:escaped_by line_terminator_val:line_terminator
   {: RESULT = new RowFormat(field_terminator, line_terminator, escaped_by); :}
-  |/* empty */
-  {: RESULT = null; :}
   ;
 
 escaped_by_val ::=

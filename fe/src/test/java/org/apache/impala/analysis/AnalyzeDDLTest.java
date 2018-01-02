@@ -465,6 +465,34 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestAlterTableSetRowFormat() throws AnalysisException {
+    AnalyzesOk("alter table functional.alltypes set row format delimited " +
+        "fields terminated by ' '");
+    AnalyzesOk("alter table functional.alltypes partition (year=2010) set row format " +
+        "delimited fields terminated by ' '");
+    AnalyzesOk("alter table functional_seq.alltypes set row format delimited " +
+        "fields terminated by ' '");
+    AnalysisError("alter table functional.alltypesnopart PARTITION (month=1) " +
+        "set row format delimited fields terminated by ' '",
+        "Table is not partitioned: functional.alltypesnopart");
+    String [] unsupportedFileFormatDbs =
+      {"functional_parquet", "functional_rc", "functional_avro"};
+    for (String format: unsupportedFileFormatDbs) {
+      AnalysisError("alter table " + format + ".alltypes set row format delimited " +
+          "fields terminated by ' '", "ALTER TABLE SET ROW FORMAT is only supported " +
+          "on TEXT or SEQUENCE file formats");
+    }
+    AnalysisError("alter table functional_kudu.alltypes set row format delimited " +
+        "fields terminated by ' '", "ALTER TABLE SET ROW FORMAT is only supported " +
+        "on HDFS tables");
+    AnalysisError("alter table functional.alltypesmixedformat partition(year=2009) " +
+        "set row format delimited fields terminated by ' '",
+        "ALTER TABLE SET ROW FORMAT is only supported on TEXT or SEQUENCE file formats");
+    AnalyzesOk("alter table functional.alltypesmixedformat partition(year=2009,month=1) " +
+        "set row format delimited fields terminated by ' '");
+  }
+
+  @Test
   public void TestAlterTableSet() throws AnalysisException {
     AnalyzesOk("alter table functional.alltypes set fileformat sequencefile");
     AnalyzesOk("alter table functional.alltypes set location '/a/b'");

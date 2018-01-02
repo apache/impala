@@ -19,9 +19,10 @@ package org.apache.impala.catalog;
 
 import java.util.HashMap;
 
+import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-
 import org.apache.impala.thrift.THdfsFileFormat;
+
 import com.google.common.base.Preconditions;
 
 public class HiveStorageDescriptorFactory {
@@ -46,18 +47,26 @@ public class HiveStorageDescriptorFactory {
     sd.setInputFormat(hdfsFileFormat.inputFormat());
     sd.setOutputFormat(hdfsFileFormat.outputFormat());
     sd.getSerdeInfo().setSerializationLib(hdfsFileFormat.serializationLib());
+    setSerdeInfo(rowFormat, sd.getSerdeInfo());
+    return sd;
+  }
 
+  /**
+   * Updates the serde info with the specified RowFormat. This method is used when
+   * just updating the row format and not the entire storage descriptor.
+   */
+  public static void setSerdeInfo(RowFormat rowFormat, SerDeInfo serdeInfo) {
     if (rowFormat.getFieldDelimiter() != null) {
-      sd.getSerdeInfo().putToParameters(
+      serdeInfo.putToParameters(
           "serialization.format", rowFormat.getFieldDelimiter());
-      sd.getSerdeInfo().putToParameters("field.delim", rowFormat.getFieldDelimiter());
+      serdeInfo.putToParameters("field.delim", rowFormat.getFieldDelimiter());
     }
     if (rowFormat.getEscapeChar() != null) {
-      sd.getSerdeInfo().putToParameters("escape.delim", rowFormat.getEscapeChar());
+      serdeInfo.putToParameters("escape.delim", rowFormat.getEscapeChar());
     }
     if (rowFormat.getLineDelimiter() != null) {
-      sd.getSerdeInfo().putToParameters("line.delim", rowFormat.getLineDelimiter());
+      serdeInfo.putToParameters("line.delim", rowFormat.getLineDelimiter());
     }
-    return sd;
+
   }
 }

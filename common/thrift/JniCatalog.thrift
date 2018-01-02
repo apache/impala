@@ -71,6 +71,7 @@ enum TAlterTableType {
   UPDATE_STATS,
   SET_CACHED,
   RECOVER_PARTITIONS,
+  SET_ROW_FORMAT,
 }
 
 // Parameters of CREATE DATABASE commands
@@ -263,6 +264,15 @@ struct TAlterTableSetFileFormatParams {
   2: optional list<list<CatalogObjects.TPartitionKeyValue>> partition_set
 }
 
+// Parameters for ALTER TABLE SET [PARTITION partitionSet] ROW FORMAT commands.
+struct TAlterTableSetRowFormatParams {
+  // New row format.
+  1: required TTableRowFormat row_format
+
+  // An optional partition set, set if modifying the row format of the partitions.
+  2: optional list<list<CatalogObjects.TPartitionKeyValue>> partition_set
+}
+
 // Parameters for ALTER TABLE SET [PARTITION partitionSpec] location commands.
 struct TAlterTableSetLocationParams {
   // New HDFS storage location of the table.
@@ -349,6 +359,9 @@ struct TAlterTableParams {
 
   // Parameters for ALTER TABLE ADD/ADD RANGE PARTITION
   14: optional TAlterTableAddDropRangePartitionParams add_drop_range_partition_params
+
+  // Parameters for ALTER TABLE SET ROW FORMAT
+  15: optional TAlterTableSetRowFormatParams set_row_format_params
 }
 
 // Parameters of CREATE TABLE LIKE commands

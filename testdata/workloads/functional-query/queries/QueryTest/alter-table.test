@@ -1334,3 +1334,95 @@ select count(*) from insert_sorted_partitioned;
 ---- RESULTS
 6
 ====
+---- QUERY
+# IMPALA-4323: Test alter row format statement.  Ensure alter statement updates metadata.
+# Spaces after text will become field delimiters after the alter statement.
+# Tildes at the end of the line will become line delimiters after the second alter statement.
+create table del_table (c1 string, c2 string, c3 string)
+row format delimited fields terminated by '\002' lines terminated by '\001' stored as textfile;
+insert into del_table values ("the ", "quick ", "brown~"),
+("fox ","jumped ","over~");
+select * from del_table order by c3;
+---- RESULTS
+'the ','quick ','brown~'
+'fox ','jumped ','over~'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Test select after alter to ensure field delimiters change to spaces and
+# the line delimiters remain '\001'.
+alter table del_table set row format delimited fields terminated by ' ';
+select * from del_table order by c3;
+---- RESULTS
+'the','\x02quick','\x02brown~'
+'fox','\x02jumped','\x02over~'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Test select after alter to ensure line delimiters change.
+# We end up with an extra record because the new delimiter is
+# before the original delimiter which now becomes data.
+alter table del_table set row format delimited fields terminated by '\002'
+lines terminated by '~';
+select * from del_table order by c3;
+---- RESULTS
+'\x01','NULL',''
+'the ','quick ','brown'
+'\x01fox ','jumped ','over'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# IMPALA-4323: Test alter row format statement with partitions.
+# Ensure alter statement updates metadata.
+create table del_table_part (c1 string, c2 string, c3 string) partitioned by (c0 int)
+row format delimited fields terminated by '\002' lines terminated by '\001' stored as textfile;
+insert into del_table_part partition (c0=0) values
+("the ", "quick ", "brown");
+insert into del_table_part partition (c0=1) values
+("fox ","jumped ","over");
+select * from del_table_part order by c0;
+---- RESULTS
+'the ','quick ','brown',0
+'fox ','jumped ','over',1
+---- TYPES
+STRING,STRING,STRING,INT
+====
+---- QUERY
+# Test select after alter to ensure only one partition changes.
+alter table del_table_part partition (c0=1) set row format delimited fields terminated by ' ';
+select * from del_table_part order by c0;
+---- RESULTS
+'the ','quick ','brown',0
+'fox','\x02jumped','\x02over',1
+---- TYPES
+STRING,STRING,STRING,INT
+====
+---- QUERY
+# Test select after alter table to ensure no partition changes.
+alter table del_table_part set row format delimited fields terminated by '_';
+select * from del_table_part order by c0;
+---- RESULTS
+'the ','quick ','brown',0
+'fox','\x02jumped','\x02over',1
+---- TYPES
+STRING,STRING,STRING,INT
+====
+---- QUERY
+# Ensure new partitions use table-level format
+# First we set a terminator, insert some data in a new partition that should use it
+# then change the terminator so the original will show in the results.
+alter table del_table_part set row format delimited fields terminated by '_';
+insert into del_table_part partition (c0=2) values
+('the','\002lazy','\002dog');
+alter table del_table_part partition (c0=2) set row format delimited fields terminated by '\002';
+select * from del_table_part order by c0;
+---- RESULTS
+'the ','quick ','brown',0
+'fox','\x02jumped','\x02over',1
+'the_','lazy_','dog',2
+---- TYPES
+STRING,STRING,STRING,INT
+====

@@ -98,6 +98,7 @@ import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableSetCachedParams;
 import org.apache.impala.thrift.TAlterTableSetFileFormatParams;
 import org.apache.impala.thrift.TAlterTableSetLocationParams;
+import org.apache.impala.thrift.TAlterTableSetRowFormatParams;
 import org.apache.impala.thrift.TAlterTableSetTblPropertiesParams;
 import org.apache.impala.thrift.TAlterTableType;
 import org.apache.impala.thrift.TAlterTableUpdateStatsParams;
@@ -141,6 +142,7 @@ import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.thrift.TTableRowFormat;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.thrift.TTruncateParams;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
@@ -454,6 +456,20 @@ public class CatalogOpExecutor {
               fileFormatParams.getFile_format(), numUpdatedPartitions);
 
           if (fileFormatParams.isSetPartition_set()) {
+            resultColVal.setString_val(
+                "Updated " + numUpdatedPartitions.getRef() + " partition(s).");
+          } else {
+            resultColVal.setString_val("Updated table.");
+          }
+          setResultSet = true;
+          break;
+        case SET_ROW_FORMAT:
+          TAlterTableSetRowFormatParams rowFormatParams =
+              params.getSet_row_format_params();
+          reloadFileMetadata = alterTableSetRowFormat(tbl,
+              rowFormatParams.getPartition_set(), rowFormatParams.getRow_format(),
+              numUpdatedPartitions);
+          if (rowFormatParams.isSetPartition_set()) {
             resultColVal.setString_val(
                 "Updated " + numUpdatedPartitions.getRef() + " partition(s).");
           } else {
@@ -2212,9 +2228,8 @@ public class CatalogOpExecutor {
 
   /**
    * Changes the file format for the given table or partitions. This is a metadata only
-   * operation, existing table data will not be converted to the new format. After
-   * changing the file format the table metadata is marked as invalid and will be
-   * reloaded on the next access.
+   * operation, existing table data will not be converted to the new format. Returns
+   * true if the file metadata to be reloaded.
    */
   private boolean alterTableSetFileFormat(Table tbl,
       List<List<TPartitionKeyValue>> partitionSet, THdfsFileFormat fileFormat,
@@ -2239,6 +2254,45 @@ public class CatalogOpExecutor {
       List<HdfsPartition> modifiedParts = Lists.newArrayList();
       for(HdfsPartition partition: partitions) {
         partition.setFileFormat(HdfsFileFormat.fromThrift(fileFormat));
+        modifiedParts.add(partition);
+      }
+      TableName tableName = tbl.getTableName();
+      bulkAlterPartitions(tableName.getDb(), tableName.getTbl(), modifiedParts);
+      numUpdatedPartitions.setRef((long) modifiedParts.size());
+    }
+    return reloadFileMetadata;
+  }
+
+  /**
+   * Changes the row format for the given table or partitions. This is a metadata only
+   * operation, existing table data will not be converted to the new format. Returns
+   * true if the file metadata to be reloaded.
+   */
+  private boolean alterTableSetRowFormat(Table tbl,
+      List<List<TPartitionKeyValue>> partitionSet, TTableRowFormat tRowFormat,
+      Reference<Long> numUpdatedPartitions)
+      throws ImpalaException {
+    Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(partitionSet == null || !partitionSet.isEmpty());
+    Preconditions.checkArgument(tbl instanceof HdfsTable);
+    boolean reloadFileMetadata = false;
+    RowFormat rowFormat = RowFormat.fromThrift(tRowFormat);
+    if (partitionSet == null) {
+      org.apache.hadoop.hive.metastore.api.Table msTbl =
+          tbl.getMetaStoreTable().deepCopy();
+      StorageDescriptor sd = msTbl.getSd();
+      HiveStorageDescriptorFactory.setSerdeInfo(rowFormat, sd.getSerdeInfo());
+      // The default partition must be updated if the row format is changed so that new
+      // partitions are created with the new file format.
+      ((HdfsTable) tbl).addDefaultPartition(msTbl.getSd());
+      applyAlterTable(msTbl);
+      reloadFileMetadata = true;
+    } else {
+      List<HdfsPartition> partitions =
+          ((HdfsTable) tbl).getPartitionsFromPartitionSet(partitionSet);
+      List<HdfsPartition> modifiedParts = Lists.newArrayList();
+      for(HdfsPartition partition: partitions) {
+        HiveStorageDescriptorFactory.setSerdeInfo(rowFormat, partition.getSerdeInfo());
         modifiedParts.add(partition);
       }
       TableName tableName = tbl.getTableName();
