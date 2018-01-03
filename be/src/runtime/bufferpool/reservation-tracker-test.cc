@@ -26,6 +26,7 @@
 #include "common/init.h"
 #include "common/object-pool.h"
 #include "runtime/mem-tracker.h"
+#include "util/memory-metrics.h"
 #include "testutil/gtest-util.h"
 
 #include "common/names.h"
@@ -53,6 +54,12 @@ class ReservationTrackerTest : public ::testing::Test {
  protected:
   RuntimeProfile* NewProfile() {
     return RuntimeProfile::Create(&obj_pool_, "test profile");
+  }
+
+  BufferPoolMetric* CreateReservationMetric(ReservationTracker* tracker) {
+    return obj_pool_.Add(new BufferPoolMetric(MetricDefs::Get("buffer-pool.reserved"),
+          BufferPoolMetric::BufferPoolMetricType::RESERVED, tracker,
+          nullptr));
   }
 
   ObjectPool obj_pool_;
@@ -533,6 +540,43 @@ TEST_F(ReservationTrackerTest, ReservationUtil) {
       ReservationUtil::GetMinMemLimitFromReservation(4 * GIG)));
 }
 
+static void LogUsageThread(MemTracker* mem_tracker, AtomicInt32* done) {
+  while (done->Load() == 0) {
+    int64_t logged_consumption;
+    mem_tracker->LogUsage(10, "  ", &logged_consumption);
+  }
+}
+
+// IMPALA-6362: regression test for deadlock between ReservationTracker and MemTracker.
+TEST_F(ReservationTrackerTest, MemTrackerDeadlock) {
+  const int64_t RESERVATION_LIMIT = 1024;
+  root_.InitRootTracker(nullptr, numeric_limits<int64_t>::max());
+  MemTracker* mem_tracker = obj_pool_.Add(new MemTracker);
+  ReservationTracker* reservation = obj_pool_.Add(new ReservationTracker());
+  reservation->InitChildTracker(nullptr, &root_, mem_tracker, RESERVATION_LIMIT);
+
+  // Create a child MemTracker with a buffer pool consumption metric, that calls
+  // reservation->GetReservation() when its usage is logged.
+  obj_pool_.Add(new MemTracker(CreateReservationMetric(reservation),
+        -1, "Reservation", mem_tracker));
+  // Start background thread that repeatededly logs the 'mem_tracker' tree.
+  AtomicInt32 done(0);
+  thread log_usage_thread(&LogUsageThread, mem_tracker, &done);
+
+  // Retry enough times to reproduce the deadlock with LogUsageThread().
+  for (int i = 0; i < 100; ++i) {
+    // Fail to increase reservation, hitting limit of 'reservation'. This will try
+    // to log the 'mem_tracker' tree while holding reservation->lock_.
+    Status err;
+    ASSERT_FALSE(reservation->IncreaseReservation(RESERVATION_LIMIT + 1, &err));
+    ASSERT_FALSE(err.ok());
+  }
+
+  done.Store(1);
+  log_usage_thread.join();
+  reservation->Close();
+  mem_tracker->Close();
+}
 }
 
 int main(int argc, char **argv) {

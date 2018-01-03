@@ -154,18 +154,19 @@ class ReservationTracker {
   /// 'bytes' before calling this method.
   void ReleaseTo(int64_t bytes);
 
-  /// Returns the amount of the reservation in bytes.
+  /// Returns the amount of the reservation in bytes. Does not acquire the internal lock.
   int64_t GetReservation();
 
   /// Returns the current amount of the reservation used at this tracker, not including
-  /// reservations of children in bytes.
+  /// reservations of children in bytes. Does not acquire the internal lock.
   int64_t GetUsedReservation();
 
   /// Returns the amount of the reservation neither used nor given to childrens'
-  /// reservations at this tracker in bytes.
+  /// reservations at this tracker in bytes. Acquires the internal lock.
   int64_t GetUnusedReservation();
 
-  /// Returns the total reservations of children in bytes.
+  /// Returns the total reservations of children in bytes. Does not acquire the
+  /// internal lock.
   int64_t GetChildReservations();
 
   /// Support for debug actions: deny reservation increase with probability 'probability'.
@@ -292,18 +293,22 @@ class ReservationTracker {
   /// TODO: remove once all memory is accounted via ReservationTrackers.
   MemTracker* mem_tracker_ = nullptr;
 
-  /// The maximum reservation in bytes that this tracker can have.
+  /// The maximum reservation in bytes that this tracker can have. Can be read with an
+  /// atomic load without holding lock.
   int64_t reservation_limit_;
 
   /// This tracker's current reservation in bytes. 'reservation_' <= 'reservation_limit_'.
+  /// Can be read with an atomic load without holding lock.
   int64_t reservation_;
 
   /// Total reservation of children in bytes. This is included in 'reservation_'.
   /// 'used_reservation_' + 'child_reservations_' <= 'reservation_'.
+  /// Can be read with an atomic load without holding lock.
   int64_t child_reservations_;
 
   /// The amount of the reservation currently used by this tracker in bytes.
   /// 'used_reservation_' + 'child_reservations_' <= 'reservation_'.
+  /// Can be read with an atomic load without holding lock.
   int64_t used_reservation_;
 };
 }

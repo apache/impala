@@ -264,6 +264,10 @@ BufferPoolMetric::BufferPoolMetric(const TMetricDef& def, BufferPoolMetricType t
     buffer_pool_(buffer_pool) {}
 
 void BufferPoolMetric::CalculateValue() {
+  // IMPALA-6362: we have to be careful that none of the below calls to ReservationTracker
+  // methods acquire ReservationTracker::lock_ to avoid a potential circular dependency
+  // with MemTracker::child_trackers_lock_, which may be held when refreshing MemTracker
+  // consumption.
   switch (type_) {
     case BufferPoolMetricType::LIMIT:
       value_ = buffer_pool_->GetSystemBytesLimit();

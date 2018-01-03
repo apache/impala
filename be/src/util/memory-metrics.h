@@ -210,6 +210,8 @@ class BufferPoolMetric : public IntGauge {
   virtual void CalculateValue();
 
  private:
+  friend class ReservationTrackerTest;
+
   enum class BufferPoolMetricType {
     LIMIT, // Limit on memory allocated to buffers.
     // Total amount of buffer memory allocated from the system. Always <= LIMIT.

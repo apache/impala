@@ -21,6 +21,7 @@
 #include <cstdlib>
 
 #include "common/object-pool.h"
+#include "gutil/atomicops.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
@@ -189,10 +190,12 @@ bool ReservationTracker::IncreaseReservationInternalLocked(int64_t bytes,
       }
       *error_status = Status::Expected(error_msg);
     }
+  } else if (parent_ == nullptr) {
+    // No parent and no linked MemTracker - increase can be granted.
+    DCHECK(mem_tracker_ == nullptr) << "Root cannot have linked MemTracker";
+    granted = true;
   } else {
-    if (parent_ == nullptr) {
-      granted = true;
-    } else {
+    {
       lock_guard<SpinLock> l(parent_->lock_);
       granted = parent_->IncreaseReservationInternalLocked(
           reservation_increase, true, true, error_status);
@@ -208,7 +211,6 @@ bool ReservationTracker::IncreaseReservationInternalLocked(int64_t bytes,
       parent_->DecreaseReservation(reservation_increase, true);
     }
   }
-
   if (granted) {
     // The reservation was granted and state updated in all ancestors: we can modify
     // this tracker's state now.
@@ -374,15 +376,17 @@ void ReservationTracker::ReleaseTo(int64_t bytes) {
 }
 
 int64_t ReservationTracker::GetReservation() {
-  lock_guard<SpinLock> l(lock_);
+  // Don't acquire lock - there is no point in holding it for this function only since
+  // the value read can change as soon as we release it.
   DCHECK(initialized_);
-  return reservation_;
+  return base::subtle::Acquire_Load(&reservation_);
 }
 
 int64_t ReservationTracker::GetUsedReservation() {
-  lock_guard<SpinLock> l(lock_);
+  // Don't acquire lock - there is no point in holding it for this function only since
+  // the value read can change as soon as we release it.
   DCHECK(initialized_);
-  return used_reservation_;
+  return base::subtle::Acquire_Load(&used_reservation_);
 }
 
 int64_t ReservationTracker::GetUnusedReservation() {
@@ -392,9 +396,10 @@ int64_t ReservationTracker::GetUnusedReservation() {
 }
 
 int64_t ReservationTracker::GetChildReservations() {
-  lock_guard<SpinLock> l(lock_);
+  // Don't acquire lock - there is no point in holding it for this function only since
+  // the value read can change as soon as we release it.
   DCHECK(initialized_);
-  return child_reservations_;
+  return base::subtle::Acquire_Load(&child_reservations_);
 }
 
 void ReservationTracker::CheckConsistency() const {
