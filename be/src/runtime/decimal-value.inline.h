@@ -565,7 +565,7 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Mod(int this_scale,
           y_256 *= DecimalUtil::GetScaleMultiplier<int256_t>(this_scale - other_scale);
         }
         int256_t intermediate_result = x_256 % y_256;
-        bool ovf;
+        bool ovf = false;
         result = ConvertToInt128(intermediate_result,
             DecimalUtil::MAX_UNSCALED_DECIMAL16, &ovf);
         DCHECK(!ovf);
