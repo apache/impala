@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import getpass
 import logging
 import os
 import pytest
@@ -160,6 +161,14 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
       assert results, "Web page %s should contain '%s' but does not" \
           % (url, search)
 
+  def assert_query_profile_contains(self, query_id, search):
+    ''' Asserts that the query profile for 'query_id' contains 'search' string'''
+    impala_service = self.create_impala_service()
+    url = 'query_profile?query_id=%s' % query_id
+    results = self.grep_file(impala_service.open_debug_webpage(url), search)
+    assert results, "Query profile %s should contain '%s' but does not" \
+        % (url, search)
+
   def assert_file_in_dir_contains(self, dir, search):
     '''Asserts that at least one file in the 'dir' contains the 'search' term.'''
     results = self.grep_dir(dir,search)
@@ -271,6 +280,7 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
     '''Check that redaction rules prevent 'sensitive' data from leaking into the
        logs and web ui.
     '''
+    current_user = getpass.getuser()
     self.start_cluster_using_rules(r"""
       {
         "version": 1,
@@ -285,17 +295,26 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
             "description": "Don't show credit cards numbers",
             "search": "\\d{4}-\\d{4}-\\d{4}-\\d{4}",
             "replace": "*credit card*"
+          },
+          {
+            "description": "Don't show current username in queries",
+            "search": "%s",
+            "replace": "redacted user"
           }
         ]
-      }""")
+      }""" % current_user)
     email = 'FOO@bar.com'
     # GROUP BY an expr containing the email so the expr will also be shown in the exec
     # node summary, ie HASH(string_col = ...).
-    self.execute_query_expect_success(self.client,
-        "SELECT string_col = '%s', COUNT(*) FROM functional.alltypes GROUP BY 1" % email)
+    query_template =\
+        "SELECT string_col = '%s', COUNT(*) FROM functional.alltypes GROUP BY 1"
+    self.execute_query_expect_success(self.client, query_template % email)
 
+    user_profile_pattern = "User: %s" % current_user
     # The email should be replaced with '*email*'.
     self.assert_web_ui_redaction(self.find_last_query_id(), email, "*email*")
+    # User field should not be redacted from the query profile.
+    self.assert_query_profile_contains(self.find_last_query_id(), user_profile_pattern)
     # Wait for the logs to be written.
     sleep(5)
     self.assert_log_redaction(email, "*email*")
@@ -306,9 +325,16 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
     # This assertion below relies on the fact that there is a syntax error be near
     # the credit card number so the number would have appeared in the message.
     self.assert_web_ui_redaction(self.find_last_query_id(), credit_card, "*credit card*")
+    # User field should not be redacted from the query profile.
+    self.assert_query_profile_contains(self.find_last_query_id(), user_profile_pattern)
     sleep(5)
     # Apparently an invalid query doesn't generate an audit log entry.
     self.assert_log_redaction(credit_card, "*credit card*", expect_audit=False)
+
+    # Assert that the username in the query stmt is redacted but not from the user fields.
+    self.execute_query_expect_success(self.client, query_template % current_user)
+    self.assert_query_profile_contains(self.find_last_query_id(), user_profile_pattern)
+    self.assert_query_profile_contains(self.find_last_query_id(), "redacted user")
 
     # Since all the tests passed, the log dir shouldn't be of interest and can be
     # deleted.

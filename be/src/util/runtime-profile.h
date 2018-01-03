@@ -209,6 +209,10 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// the value will be updated.
   void AddInfoString(const std::string& key, const std::string& value);
 
+  /// Same as AddInfoString(), except that this method applies the redaction
+  /// rules on 'value' before adding it to the runtime profile.
+  void AddInfoStringRedacted(const std::string& key, const std::string& value);
+
   /// Adds a string to the runtime profile.  If a value already exists for 'key',
   /// 'value' will be appended to the previous value, with ", " separating them.
   void AppendInfoString(const std::string& key, const std::string& value);
@@ -473,8 +477,9 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
 
   /// Implementation of AddInfoString() and AppendInfoString(). If 'append' is false,
   /// implements AddInfoString(), otherwise implements AppendInfoString().
+  /// Redaction rules are applied on the info string if 'redact' is true.
   void AddInfoStringInternal(
-      const std::string& key, const std::string& value, bool append);
+      const std::string& key, const std::string& value, bool append, bool redact = false);
 
   /// Name of the counter maintaining the total time.
   static const std::string TOTAL_TIME_COUNTER_NAME;

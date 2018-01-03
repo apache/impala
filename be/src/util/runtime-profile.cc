@@ -466,14 +466,17 @@ void RuntimeProfile::AddInfoString(const string& key, const string& value) {
   return AddInfoStringInternal(key, value, false);
 }
 
+void RuntimeProfile::AddInfoStringRedacted(const string& key, const string& value) {
+  return AddInfoStringInternal(key, value, false, true);
+}
+
 void RuntimeProfile::AppendInfoString(const string& key, const string& value) {
   return AddInfoStringInternal(key, value, true);
 }
 
 void RuntimeProfile::AddInfoStringInternal(
-    const string& key, const string& value, bool append) {
-  // Values may contain sensitive data, such as a query.
-  const string& info = RedactCopy(value);
+    const string& key, const string& value, bool append, bool redact) {
+  const string& info = redact ? RedactCopy(value): value;
   lock_guard<SpinLock> l(info_strings_lock_);
   InfoStrings::iterator it = info_strings_.find(key);
   if (it == info_strings_.end()) {

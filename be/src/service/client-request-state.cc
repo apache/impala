@@ -124,7 +124,8 @@ ClientRequestState::ClientRequestState(
   summary_profile_->AddInfoString("Network Address",
       lexical_cast<string>(session_->network_address));
   summary_profile_->AddInfoString("Default Db", default_db());
-  summary_profile_->AddInfoString("Sql Statement", query_ctx_.client_request.stmt);
+  summary_profile_->AddInfoStringRedacted(
+      "Sql Statement", query_ctx_.client_request.stmt);
   summary_profile_->AddInfoString("Coordinator",
       TNetworkAddressToString(exec_env->backend_address()));
 }
@@ -419,7 +420,7 @@ Status ClientRequestState::ExecQueryOrDmlRequest(
     plan_ss << "\n----------------\n"
             << query_exec_request.query_plan
             << "----------------";
-    summary_profile_->AddInfoString("Plan", plan_ss.str());
+    summary_profile_->AddInfoStringRedacted("Plan", plan_ss.str());
   }
   // Add info strings consumed by CM: Estimated mem and tables missing stats.
   if (query_exec_request.__isset.per_host_mem_estimate) {
@@ -741,7 +742,7 @@ Status ClientRequestState::UpdateQueryStatus(const Status& status) {
   if (!status.ok() && query_status_.ok()) {
     UpdateQueryState(beeswax::QueryState::EXCEPTION);
     query_status_ = status;
-    summary_profile_->AddInfoString("Query Status", query_status_.GetDetail());
+    summary_profile_->AddInfoStringRedacted("Query Status", query_status_.GetDetail());
   }
 
   return status;

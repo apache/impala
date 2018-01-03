@@ -1030,8 +1030,8 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
     TExecSummary t_exec_summary;
     request_state->coord()->GetTExecSummary(&t_exec_summary);
     string exec_summary = PrintExecSummary(t_exec_summary);
-    request_state->summary_profile()->AddInfoString("ExecSummary", exec_summary);
-    request_state->summary_profile()->AddInfoString("Errors",
+    request_state->summary_profile()->AddInfoStringRedacted("ExecSummary", exec_summary);
+    request_state->summary_profile()->AddInfoStringRedacted("Errors",
         request_state->coord()->GetErrorLog());
 
     const PerBackendExecParams& per_backend_params =
