@@ -116,6 +116,14 @@ DEFINE_uint64(unused_file_handle_timeout_sec, 270, "Maximum time, in seconds, th
     "unused HDFS file handle will remain in the file handle cache. Disabled if set "
     "to 0.");
 
+// The file handle cache is split into multiple independent partitions, each with its
+// own lock and structures. A larger number of partitions reduces contention by
+// concurrent accesses, but it also reduces the efficiency of the cache due to
+// separate LRU lists.
+// TODO: Test different number of partitions to determine an appropriate default
+DEFINE_uint64(num_file_handle_cache_partitions, 16, "Number of partitions used by the "
+    "file handle cache.");
+
 // The IoMgr is able to run with a wide range of memory usage. If a query has memory
 // remaining less than this value, the IoMgr will stop all buffering regardless of the
 // current queue size.
@@ -224,6 +232,7 @@ DiskIoMgr::DiskIoMgr() :
     read_timer_(TUnit::TIME_NS),
     file_handle_cache_(min(FLAGS_max_cached_file_handles,
         FileSystemUtil::MaxNumFileHandles()),
+        FLAGS_num_file_handle_cache_partitions,
         FLAGS_unused_file_handle_timeout_sec) {
   DCHECK_LE(READ_SIZE_MIN_VALUE, FLAGS_read_size);
   int64_t max_buffer_size_scaled = BitUtil::Ceil(max_buffer_size_, min_buffer_size_);
@@ -251,6 +260,7 @@ DiskIoMgr::DiskIoMgr(int num_local_disks, int threads_per_rotational_disk,
     read_timer_(TUnit::TIME_NS),
     file_handle_cache_(min(FLAGS_max_cached_file_handles,
         FileSystemUtil::MaxNumFileHandles()),
+        FLAGS_num_file_handle_cache_partitions,
         FLAGS_unused_file_handle_timeout_sec) {
   int64_t max_buffer_size_scaled = BitUtil::Ceil(max_buffer_size_, min_buffer_size_);
   free_buffers_.resize(BitUtil::Log2Ceiling64(max_buffer_size_scaled) + 1);
@@ -1166,15 +1176,36 @@ int DiskIoMgr::AssignQueue(const char* file, int disk_id, bool expected_local) {
   return disk_id % num_local_disks();
 }
 
-HdfsFileHandle* DiskIoMgr::GetCachedHdfsFileHandle(const hdfsFS& fs,
-    std::string* fname, int64_t mtime, RequestContext *reader,
-    bool require_new) {
+ExclusiveHdfsFileHandle* DiskIoMgr::GetExclusiveHdfsFileHandle(const hdfsFS& fs,
+    std::string* fname, int64_t mtime, RequestContext *reader) {
+  ExclusiveHdfsFileHandle* fid = new ExclusiveHdfsFileHandle(fs, fname->data(), mtime);
+  if (!fid->ok()) {
+    VLOG_FILE << "Opening the file " << fname << " failed.";
+    delete fid;
+    return nullptr;
+  }
+  ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING->Increment(1L);
+  // Every exclusive file handle is considered a cache miss
+  ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO->Update(0L);
+  ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT->Increment(1L);
+  reader->cached_file_handles_miss_count_.Add(1L);
+  return fid;
+}
+
+void DiskIoMgr::ReleaseExclusiveHdfsFileHandle(ExclusiveHdfsFileHandle* fid) {
+  DCHECK(fid != nullptr);
+  ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING->Increment(-1L);
+  delete fid;
+}
+
+CachedHdfsFileHandle* DiskIoMgr::GetCachedHdfsFileHandle(const hdfsFS& fs,
+    std::string* fname, int64_t mtime, RequestContext *reader) {
   bool cache_hit;
-  HdfsFileHandle* fh = file_handle_cache_.GetFileHandle(fs, fname, mtime, require_new,
+  CachedHdfsFileHandle* fh = file_handle_cache_.GetFileHandle(fs, fname, mtime, false,
       &cache_hit);
   if (fh == nullptr) return nullptr;
+  ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING->Increment(1L);
   if (cache_hit) {
-    DCHECK(!require_new);
     ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO->Update(1L);
     ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT->Increment(1L);
     reader->cached_file_handles_hit_count_.Add(1L);
@@ -1186,19 +1217,21 @@ HdfsFileHandle* DiskIoMgr::GetCachedHdfsFileHandle(const hdfsFS& fs,
   return fh;
 }
 
-void DiskIoMgr::ReleaseCachedHdfsFileHandle(std::string* fname, HdfsFileHandle* fid,
-    bool destroy_handle) {
-  file_handle_cache_.ReleaseFileHandle(fname, fid, destroy_handle);
+void DiskIoMgr::ReleaseCachedHdfsFileHandle(std::string* fname,
+    CachedHdfsFileHandle* fid) {
+  file_handle_cache_.ReleaseFileHandle(fname, fid, false);
+  ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING->Increment(-1L);
 }
 
 Status DiskIoMgr::ReopenCachedHdfsFileHandle(const hdfsFS& fs, std::string* fname,
-    int64_t mtime, HdfsFileHandle** fid) {
+    int64_t mtime, CachedHdfsFileHandle** fid) {
   bool cache_hit;
   file_handle_cache_.ReleaseFileHandle(fname, *fid, true);
   // The old handle has been destroyed, so *fid must be overwritten before returning.
   *fid = file_handle_cache_.GetFileHandle(fs, fname, mtime, true,
       &cache_hit);
   if (*fid == nullptr) {
+    ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING->Increment(-1L);
     return Status(TErrorCode::DISK_IO_ERROR,
         GetHdfsErrorMsg("Failed to open HDFS file ", fname->data()));
   }

@@ -35,15 +35,14 @@
 namespace impala {
 namespace io {
 
-/// This class is a small wrapper around the hdfsFile handle and the file system
+/// This abstract class is a small wrapper around the hdfsFile handle and the file system
 /// instance which is needed to close the file handle. The handle incorporates
 /// the last modified time of the file when it was opened. This is used to distinguish
 /// between file handles for files that can be updated or overwritten.
+/// This is used only through its subclasses, CachedHdfsFileHandle and
+/// ExclusiveHdfsFileHandle.
 class HdfsFileHandle {
  public:
-
-  /// Constructor will open the file
-  HdfsFileHandle(const hdfsFS& fs, const char* fname, int64_t mtime);
 
   /// Destructor will close the file handle
   ~HdfsFileHandle();
@@ -52,10 +51,30 @@ class HdfsFileHandle {
   int64_t mtime() const { return mtime_; }
   bool ok() const { return hdfs_file_ != nullptr; }
 
+ protected:
+  /// Constructor will open the file
+  HdfsFileHandle(const hdfsFS& fs, const char* fname, int64_t mtime);
+
  private:
   hdfsFS fs_;
   hdfsFile hdfs_file_;
   int64_t mtime_;
+};
+
+/// CachedHdfsFileHandles are owned by the file handle cache and are used for no
+/// other purpose.
+class CachedHdfsFileHandle : public HdfsFileHandle {
+ public:
+  CachedHdfsFileHandle(const hdfsFS& fs, const char* fname, int64_t mtime);
+  ~CachedHdfsFileHandle();
+};
+
+/// ExclusiveHdfsFileHandles are used for all purposes where a CachedHdfsFileHandle
+/// is not appropriate.
+class ExclusiveHdfsFileHandle : public HdfsFileHandle {
+ public:
+  ExclusiveHdfsFileHandle(const hdfsFS& fs, const char* fname, int64_t mtime)
+    : HdfsFileHandle(fs, fname, mtime) {}
 };
 
 /// The FileHandleCache is a data structure that owns HdfsFileHandles to share between
@@ -84,14 +103,14 @@ class HdfsFileHandle {
 ///
 /// TODO: The cache should also evict file handles more aggressively if the file handle's
 /// mtime is older than the file's current mtime.
-template <size_t NUM_PARTITIONS>
 class FileHandleCache {
  public:
   /// Instantiates the cache with `capacity` split evenly across NUM_PARTITIONS
   /// partitions. If the capacity does not split evenly, then the capacity is rounded
   /// up. The cache will age out any file handle that is unused for
   /// `unused_handle_timeout_secs` seconds. Age out is disabled if this is set to zero.
-  FileHandleCache(size_t capacity, uint64_t unused_handle_timeout_secs);
+  FileHandleCache(size_t capacity, size_t num_partitions,
+      uint64_t unused_handle_timeout_secs);
 
   /// Destructor is only called for backend tests
   ~FileHandleCache();
@@ -113,14 +132,15 @@ class FileHandleCache {
   ///
   /// This obtains exclusive control over the returned file handle. It must be paired
   /// with a call to ReleaseFileHandle to release exclusive control.
-  HdfsFileHandle* GetFileHandle(const hdfsFS& fs, std::string* fname, int64_t mtime,
-      bool require_new_handle, bool* cache_hit);
+  CachedHdfsFileHandle* GetFileHandle(const hdfsFS& fs, std::string* fname,
+      int64_t mtime, bool require_new_handle, bool* cache_hit);
 
   /// Release the exclusive hold on the specified file handle (which was obtained
   /// by calling GetFileHandle). The cache may evict a file handle if the cache is
   /// above capacity. If 'destroy_handle' is true, immediately remove this handle
   /// from the cache.
-  void ReleaseFileHandle(std::string* fname, HdfsFileHandle* fh, bool destroy_handle);
+  void ReleaseFileHandle(std::string* fname, CachedHdfsFileHandle* fh,
+      bool destroy_handle);
 
  private:
   struct FileHandleEntry;
@@ -134,9 +154,9 @@ class FileHandleCache {
   typedef std::list<LruListEntry> LruListType;
 
   struct FileHandleEntry {
-    FileHandleEntry(HdfsFileHandle* fh_in, LruListType& lru_list)
+    FileHandleEntry(CachedHdfsFileHandle* fh_in, LruListType& lru_list)
     : fh(fh_in), lru_entry(lru_list.end()) {}
-    std::unique_ptr<HdfsFileHandle> fh;
+    std::unique_ptr<CachedHdfsFileHandle> fh;
 
     /// in_use is true for a file handle checked out via GetFileHandle() that has not
     /// been returned via ReleaseFileHandle().
@@ -180,7 +200,7 @@ class FileHandleCache {
   /// enforce the capacity.
   void EvictHandles(FileHandleCachePartition& p);
 
-  std::array<FileHandleCachePartition, NUM_PARTITIONS> cache_partitions_;
+  std::vector<FileHandleCachePartition> cache_partitions_;
 
   /// Maximum time before an unused file handle is aged out of the cache.
   /// Aging out is disabled if this is set to 0.

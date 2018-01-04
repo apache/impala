@@ -272,16 +272,16 @@ Status ScanRange::Open(bool use_file_handle_cache) {
     // for each scan range.
     if (use_file_handle_cache && expected_local_) return Status::OK();
     // Get a new exclusive file handle.
-    exclusive_hdfs_fh_ = io_mgr_->GetCachedHdfsFileHandle(fs_, file_string(),
-        mtime(), reader_, true);
+    exclusive_hdfs_fh_ = io_mgr_->GetExclusiveHdfsFileHandle(fs_, file_string(),
+        mtime(), reader_);
     if (exclusive_hdfs_fh_ == nullptr) {
       return Status(TErrorCode::DISK_IO_ERROR,
           GetHdfsErrorMsg("Failed to open HDFS file ", file_));
     }
 
     if (hdfsSeek(fs_, exclusive_hdfs_fh_->file(), offset_) != 0) {
-      // Destroy the file handle and remove it from the cache.
-      io_mgr_->ReleaseCachedHdfsFileHandle(file_string(), exclusive_hdfs_fh_, true);
+      // Destroy the file handle
+      io_mgr_->ReleaseExclusiveHdfsFileHandle(exclusive_hdfs_fh_);
       exclusive_hdfs_fh_ = nullptr;
       return Status(TErrorCode::DISK_IO_ERROR,
           Substitute("Error seeking to $0 in file: $1 $2", offset_, file_,
@@ -321,8 +321,8 @@ void ScanRange::Close() {
         external_buffer_tag_ = ExternalBufferTag::NO_BUFFER;
       }
 
-      // Destroy the file handle and remove it from the cache.
-      io_mgr_->ReleaseCachedHdfsFileHandle(file_string(), exclusive_hdfs_fh_, true);
+      // Destroy the file handle.
+      io_mgr_->ReleaseExclusiveHdfsFileHandle(exclusive_hdfs_fh_);
       exclusive_hdfs_fh_ = nullptr;
       closed_file = true;
     }
@@ -395,7 +395,7 @@ Status ScanRange::Read(
   DCHECK_GE(bytes_to_read, 0);
 
   if (fs_ != nullptr) {
-    HdfsFileHandle* borrowed_hdfs_fh = nullptr;
+    CachedHdfsFileHandle* borrowed_hdfs_fh = nullptr;
     hdfsFile hdfs_file;
 
     // If the scan range has an exclusive file handle, use it. Otherwise, borrow
@@ -404,7 +404,7 @@ Status ScanRange::Read(
       hdfs_file = exclusive_hdfs_fh_->file();
     } else {
       borrowed_hdfs_fh = io_mgr_->GetCachedHdfsFileHandle(fs_, file_string(),
-          mtime(), reader_, false);
+          mtime(), reader_);
       if (borrowed_hdfs_fh == nullptr) {
         return Status(TErrorCode::DISK_IO_ERROR,
             GetHdfsErrorMsg("Failed to open HDFS file ", file_));
@@ -484,7 +484,7 @@ Status ScanRange::Read(
     }
 
     if (borrowed_hdfs_fh != nullptr) {
-      io_mgr_->ReleaseCachedHdfsFileHandle(file_string(), borrowed_hdfs_fh, false);
+      io_mgr_->ReleaseCachedHdfsFileHandle(file_string(), borrowed_hdfs_fh);
     }
     if (!status.ok()) return status;
   } else {

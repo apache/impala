@@ -338,25 +338,28 @@ class DiskIoMgr : public CacheLineAligned {
   /// for debugging.
   bool Validate() const;
 
-  /// Given a FS handle, name and last modified time of the file, gets an HdfsFileHandle
-  /// from the file handle cache. If 'require_new_handle' is true, the cache will open
-  /// a fresh file handle. On success, records statistics about whether this was
-  /// a cache hit or miss in the 'reader' as well as at the system level. In case of an
-  /// error returns nullptr.
-  HdfsFileHandle* GetCachedHdfsFileHandle(const hdfsFS& fs,
-      std::string* fname, int64_t mtime, RequestContext *reader,
-      bool require_new_handle);
+  /// Given a FS handle, name and last modified time of the file, construct a new
+  /// ExclusiveHdfsFileHandle. In the case of an error, returns nullptr.
+  ExclusiveHdfsFileHandle* GetExclusiveHdfsFileHandle(const hdfsFS& fs,
+      std::string* fname, int64_t mtime, RequestContext* reader);
+
+  /// Releases an exclusive file handle, destroying it
+  void ReleaseExclusiveHdfsFileHandle(ExclusiveHdfsFileHandle* fid);
+
+  /// Given a FS handle, name and last modified time of the file, gets a
+  /// CachedHdfsFileHandle from the file handle cache. On success, records statistics
+  /// about whether this was a cache hit or miss in the 'reader' as well as at the
+  /// system level. In case of an error returns nullptr.
+  CachedHdfsFileHandle* GetCachedHdfsFileHandle(const hdfsFS& fs,
+      std::string* fname, int64_t mtime, RequestContext* reader);
 
   /// Releases a file handle back to the file handle cache when it is no longer in use.
-  /// If 'destroy_handle' is true, the file handle cache will close the file handle
-  /// immediately.
-  void ReleaseCachedHdfsFileHandle(std::string* fname, HdfsFileHandle* fid,
-      bool destroy_handle);
+  void ReleaseCachedHdfsFileHandle(std::string* fname, CachedHdfsFileHandle* fid);
 
   /// Reopens a file handle by destroying the file handle and getting a fresh
   /// file handle from the cache. Returns an error if the file could not be reopened.
   Status ReopenCachedHdfsFileHandle(const hdfsFS& fs, std::string* fname, int64_t mtime,
-      HdfsFileHandle** fid);
+      CachedHdfsFileHandle** fid);
 
   /// Garbage collect unused I/O buffers up to 'bytes_to_free', or all the buffers if
   /// 'bytes_to_free' is -1.
@@ -470,13 +473,10 @@ class DiskIoMgr : public CacheLineAligned {
   /// round-robin assignment for that case.
   static AtomicInt32 next_disk_id_;
 
-  // Number of file handle cache partitions to use
-  static const size_t NUM_FILE_HANDLE_CACHE_PARTITIONS = 16;
-
   // Caching structure that maps file names to cached file handles. The cache has an upper
   // limit of entries defined by FLAGS_max_cached_file_handles. Evicted cached file
   // handles are closed.
-  FileHandleCache<NUM_FILE_HANDLE_CACHE_PARTITIONS> file_handle_cache_;
+  FileHandleCache file_handle_cache_;
 
   /// Returns the index into free_buffers_ for a given buffer size
   int free_buffers_idx(int64_t buffer_size);

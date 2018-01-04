@@ -34,7 +34,7 @@ class MemTracker;
 namespace io {
 class DiskIoMgr;
 class RequestContext;
-class HdfsFileHandle;
+class ExclusiveHdfsFileHandle;
 class ScanRange;
 
 /// Buffer struct that is used by the caller and IoMgr to pass read buffers.
@@ -279,10 +279,9 @@ class ScanRange : public RequestRange {
   /// range will not maintain an exclusive file handle. It will borrow an hdfs file
   /// handle from the file handle cache for each Read(), so Open() does nothing.
   /// If 'use_file_handle_cache' is false or this is a remote hdfs file or this is
-  /// a local OS file, Open() will maintain a file handle on the scan range for
-  /// exclusive use by this scan range. An exclusive hdfs file handle still comes
-  /// from the cache, but it is a newly opened file handle that is held for the
-  /// entire duration of a scan range's lifetime and destroyed in Close().
+  /// a local OS file, Open() will open a file handle on the scan range for
+  /// exclusive use by this scan range. The scan range is the exclusive owner of the
+  /// file handle, and the file handle is destroyed in Close().
   /// All local OS files are opened using normal OS file APIs.
   Status Open(bool use_file_handle_cache) WARN_UNUSED_RESULT;
 
@@ -339,16 +338,16 @@ class ScanRange : public RequestRange {
   RequestContext* reader_ = nullptr;
 
   /// File handle either to hdfs or local fs (FILE*)
-  /// The hdfs file handle is only stored here in three cases:
+  /// The hdfs file handle is stored here in three cases:
   /// 1. The file handle cache is off (max_cached_file_handles == 0).
   /// 2. The scan range is using hdfs caching.
   /// -OR-
   /// 3. The hdfs file is expected to be remote (expected_local_ == false)
-  /// In each case, the scan range gets a new file handle from the file handle cache
-  /// at Open(), holds it exclusively, and destroys it in Close().
+  /// In each case, the scan range gets a new ExclusiveHdfsFileHandle at Open(),
+  /// owns it exclusively, and destroys it in Close().
   union {
     FILE* local_file_ = nullptr;
-    HdfsFileHandle* exclusive_hdfs_fh_;
+    ExclusiveHdfsFileHandle* exclusive_hdfs_fh_;
   };
 
   /// Tagged union that holds a buffer for the cases when there is a buffer allocated

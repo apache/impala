@@ -30,13 +30,11 @@ namespace io {
 HdfsFileHandle::HdfsFileHandle(const hdfsFS& fs, const char* fname,
     int64_t mtime)
     : fs_(fs), hdfs_file_(hdfsOpenFile(fs, fname, O_RDONLY, 0, 0, 0)), mtime_(mtime) {
-  ImpaladMetrics::IO_MGR_NUM_CACHED_FILE_HANDLES->Increment(1L);
   VLOG_FILE << "hdfsOpenFile() file=" << fname << " fid=" << hdfs_file_;
 }
 
 HdfsFileHandle::~HdfsFileHandle() {
   if (hdfs_file_ != nullptr && fs_ != nullptr) {
-    ImpaladMetrics::IO_MGR_NUM_CACHED_FILE_HANDLES->Increment(-1L);
     VLOG_FILE << "hdfsCloseFile() fid=" << hdfs_file_;
     hdfsCloseFile(fs_, hdfs_file_);
   }
@@ -44,13 +42,23 @@ HdfsFileHandle::~HdfsFileHandle() {
   hdfs_file_ = nullptr;
 }
 
-template <size_t NUM_PARTITIONS>
-  FileHandleCache<NUM_PARTITIONS>::FileHandleCache(size_t capacity,
-      uint64_t unused_handle_timeout_secs)
-  : unused_handle_timeout_secs_(unused_handle_timeout_secs) {
-  DCHECK_GT(NUM_PARTITIONS, 0);
-  size_t remainder = capacity % NUM_PARTITIONS;
-  size_t base_capacity = capacity / NUM_PARTITIONS;
+CachedHdfsFileHandle::CachedHdfsFileHandle(const hdfsFS& fs, const char* fname,
+    int64_t mtime)
+  : HdfsFileHandle(fs, fname, mtime) {
+  ImpaladMetrics::IO_MGR_NUM_CACHED_FILE_HANDLES->Increment(1L);
+}
+
+CachedHdfsFileHandle::~CachedHdfsFileHandle() {
+  ImpaladMetrics::IO_MGR_NUM_CACHED_FILE_HANDLES->Increment(-1L);
+}
+
+FileHandleCache::FileHandleCache(size_t capacity,
+      size_t num_partitions, uint64_t unused_handle_timeout_secs)
+  : cache_partitions_(num_partitions),
+  unused_handle_timeout_secs_(unused_handle_timeout_secs) {
+  DCHECK_GT(num_partitions, 0);
+  size_t remainder = capacity % num_partitions;
+  size_t base_capacity = capacity / num_partitions;
   size_t partition_capacity = (remainder > 0 ? base_capacity + 1 : base_capacity);
   for (FileHandleCachePartition& p : cache_partitions_) {
     p.size = 0;
@@ -58,29 +66,25 @@ template <size_t NUM_PARTITIONS>
   }
 }
 
-template <size_t NUM_PARTITIONS>
-FileHandleCache<NUM_PARTITIONS>::LruListEntry::LruListEntry(
+FileHandleCache::LruListEntry::LruListEntry(
     typename MapType::iterator map_entry_in)
      : map_entry(map_entry_in), timestamp_seconds(MonotonicSeconds()) {}
 
-template <size_t NUM_PARTITIONS>
-FileHandleCache<NUM_PARTITIONS>::~FileHandleCache() {
+FileHandleCache::~FileHandleCache() {
   shut_down_promise_.Set(true);
   if (eviction_thread_ != nullptr) eviction_thread_->Join();
 }
 
-template <size_t NUM_PARTITIONS>
-Status FileHandleCache<NUM_PARTITIONS>::Init() {
+Status FileHandleCache::Init() {
   return Thread::Create("disk-io-mgr-handle-cache", "File Handle Timeout",
-      &FileHandleCache<NUM_PARTITIONS>::EvictHandlesLoop, this, &eviction_thread_);
+      &FileHandleCache::EvictHandlesLoop, this, &eviction_thread_);
 }
 
-template <size_t NUM_PARTITIONS>
-HdfsFileHandle* FileHandleCache<NUM_PARTITIONS>::GetFileHandle(
+CachedHdfsFileHandle* FileHandleCache::GetFileHandle(
     const hdfsFS& fs, std::string* fname, int64_t mtime, bool require_new_handle,
     bool* cache_hit) {
   // Hash the key and get appropriate partition
-  int index = HashUtil::Hash(fname->data(), fname->size(), 0) % NUM_PARTITIONS;
+  int index = HashUtil::Hash(fname->data(), fname->size(), 0) % cache_partitions_.size();
   FileHandleCachePartition& p = cache_partitions_[index];
   boost::lock_guard<SpinLock> g(p.lock);
   pair<typename MapType::iterator, typename MapType::iterator> range =
@@ -112,7 +116,7 @@ HdfsFileHandle* FileHandleCache<NUM_PARTITIONS>::GetFileHandle(
   if (!ret_elem) {
     *cache_hit = false;
     // Create a new entry and move it into the map
-    HdfsFileHandle* new_fh = new HdfsFileHandle(fs, fname->data(), mtime);
+    CachedHdfsFileHandle* new_fh = new CachedHdfsFileHandle(fs, fname->data(), mtime);
     if (!new_fh->ok()) {
       delete new_fh;
       return nullptr;
@@ -128,16 +132,14 @@ HdfsFileHandle* FileHandleCache<NUM_PARTITIONS>::GetFileHandle(
   DCHECK(ret_elem->fh.get() != nullptr);
   DCHECK(!ret_elem->in_use);
   ret_elem->in_use = true;
-  ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING->Increment(1L);
   return ret_elem->fh.get();
 }
 
-template <size_t NUM_PARTITIONS>
-void FileHandleCache<NUM_PARTITIONS>::ReleaseFileHandle(std::string* fname,
-    HdfsFileHandle* fh, bool destroy_handle) {
+void FileHandleCache::ReleaseFileHandle(std::string* fname,
+    CachedHdfsFileHandle* fh, bool destroy_handle) {
   DCHECK(fh != nullptr);
   // Hash the key and get appropriate partition
-  int index = HashUtil::Hash(fname->data(), fname->size(), 0) % NUM_PARTITIONS;
+  int index = HashUtil::Hash(fname->data(), fname->size(), 0) % cache_partitions_.size();
   FileHandleCachePartition& p = cache_partitions_[index];
   boost::lock_guard<SpinLock> g(p.lock);
   pair<typename MapType::iterator, typename MapType::iterator> range =
@@ -157,7 +159,6 @@ void FileHandleCache<NUM_PARTITIONS>::ReleaseFileHandle(std::string* fname,
   FileHandleEntry* release_elem = &release_it->second;
   DCHECK(release_elem->in_use);
   release_elem->in_use = false;
-  ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING->Increment(-1L);
   if (destroy_handle) {
     --p.size;
     p.cache.erase(release_it);
@@ -186,8 +187,7 @@ void FileHandleCache<NUM_PARTITIONS>::ReleaseFileHandle(std::string* fname,
   }
 }
 
-template <size_t NUM_PARTITIONS>
-void FileHandleCache<NUM_PARTITIONS>::EvictHandlesLoop() {
+void FileHandleCache::EvictHandlesLoop() {
   while (true) {
     for (FileHandleCachePartition& p : cache_partitions_) {
       boost::lock_guard<SpinLock> g(p.lock);
@@ -203,9 +203,8 @@ void FileHandleCache<NUM_PARTITIONS>::EvictHandlesLoop() {
   DCHECK(shut_down_promise_.Get());
 }
 
-template <size_t NUM_PARTITIONS>
-void FileHandleCache<NUM_PARTITIONS>::EvictHandles(
-    FileHandleCache<NUM_PARTITIONS>::FileHandleCachePartition& p) {
+void FileHandleCache::EvictHandles(
+    FileHandleCache::FileHandleCachePartition& p) {
   uint64_t now = MonotonicSeconds();
   uint64_t oldest_allowed_timestamp =
       now > unused_handle_timeout_secs_ ? now - unused_handle_timeout_secs_ : 0;
