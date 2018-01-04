@@ -1194,18 +1194,31 @@ select
 
       <p>
         <indexterm audience="hidden">IS NULL operator</indexterm>
-
         <indexterm audience="hidden">IS NOT NULL operator</indexterm>
+        <indexterm audience="hidden">IS UNKNOWN operator</indexterm>
+        <indexterm audience="hidden">IS NOT UNKNOWN operator</indexterm>
+
         The <codeph>IS NULL</codeph> operator, and its converse the <codeph>IS NOT NULL</codeph> operator, test whether a specified value is
         <codeph><xref href="impala_literals.xml#null">NULL</xref></codeph>. Because using <codeph>NULL</codeph> with any of the other
         comparison operators such as <codeph>=</codeph> or <codeph>!=</codeph> also returns <codeph>NULL</codeph> rather than
         <codeph>TRUE</codeph> or <codeph>FALSE</codeph>, you use a special-purpose comparison operator to check for this special condition.
       </p>
 
+      <p rev="2.11.0 IMPALA-1767">
+        In <keyword keyref="impala211_full"/> and higher, you can use
+        the operators <codeph>IS UNKNOWN</codeph> and
+        <codeph>IS NOT UNKNOWN</codeph> as synonyms for
+        <codeph>IS NULL</codeph> and <codeph>IS NOT NULL</codeph>,
+        respectively.
+      </p>
+
       <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
 <codeblock><varname>expression</varname> IS NULL
 <varname>expression</varname> IS NOT NULL
+
+<ph rev="2.11.0 IMPALA-1767"><varname>expression</varname> IS UNKNOWN</ph>
+<ph rev="2.11.0 IMPALA-1767"><varname>expression</varname> IS NOT UNKNOWN</ph>
 </codeblock>
 
       <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
@@ -1231,9 +1244,10 @@ select
       <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
 
       <p rev="2.3.0">
-        This operator is not applicable to complex type columns (<codeph>STRUCT</codeph>,
-        <codeph>ARRAY</codeph>, or <codeph>MAP</codeph>). Using a complex type column
-        with <codeph>IS NULL</codeph> or <codeph>IS NOT NULL</codeph> causes a query error.
+        The <codeph>IS [NOT] UNKNOWN</codeph> operator, as with the <codeph>IS [NOT] NULL</codeph>
+        operator, is not applicable to complex type columns (<codeph>STRUCT</codeph>,
+        <codeph>ARRAY</codeph>, or <codeph>MAP</codeph>). Using a complex type column with this
+        operator causes a query error.
       </p>
 
       <p conref="../shared/impala_common.xml#common/example_blurb"/>
@@ -1248,6 +1262,81 @@ select count(*) from census where household_income is null;
 -- Sometimes we expect fields to be null, and followup action
 -- is needed when they are not.
 select count(*) from web_traffic where weird_http_code is not null;</codeblock>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="is_true" rev="2.11.0 IMPALA-1767">
+
+    <title>IS TRUE Operator</title>
+
+    <conbody>
+
+      <p>
+        <indexterm audience="hidden">IS TRUE operator</indexterm>
+        <indexterm audience="hidden">IS FALSE operator</indexterm>
+        <indexterm audience="hidden">IS NOT TRUE operator</indexterm>
+        <indexterm audience="hidden">IS NOT FALSE operator</indexterm>
+        This variation of the <codeph>IS</codeph> operator tests for truth
+        or falsity, with right-hand arguments <codeph>[NOT] TRUE</codeph>,
+        <codeph>[NOT] FALSE</codeph>, and <codeph>[NOT] UNKNOWN</codeph>.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock><varname>expression</varname> IS TRUE
+<varname>expression</varname> IS NOT TRUE
+
+<varname>expression</varname> IS FALSE
+<varname>expression</varname> IS NOT FALSE
+
+</codeblock>
+
+      <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+      <p>
+        This <codeph>IS TRUE</codeph> and <codeph>IS FALSE</codeph> forms are
+        similar to doing equality comparisons with the Boolean values
+        <codeph>TRUE</codeph> and <codeph>FALSE</codeph>, except that
+        <codeph>IS TRUE</codeph> and <codeph>IS FALSE</codeph>
+        always return either <codeph>TRUE</codeph> or <codeph>FALSE</codeph>,
+        even if the left-hand side expression returns <codeph>NULL</codeph>
+      </p>
+
+      <p rev="2.11.0 IMPALA-1767">
+        These operators let you simplify Boolean comparisons that must also
+        check for <codeph>NULL</codeph>, for example
+        <codeph>X != 10 AND X IS NOT NULL</codeph> is equivalent to
+        <codeph>(X != 10) IS TRUE</codeph>.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/boolean_functions_vs_expressions"/>
+
+      <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
+      <p rev="2.3.0">
+        The <codeph>IS [NOT] TRUE</codeph> and <codeph>IS [NOT] FALSE</codeph> operators are not
+        applicable to complex type columns (<codeph>STRUCT</codeph>, <codeph>ARRAY</codeph>, or
+        <codeph>MAP</codeph>). Using a complex type column with these operators causes a query error.
+      </p>
+
+      <p conref="../shared/impala_common.xml#common/added_in_2110"/>
+
+      <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock>
+select assertion, b, b is true, b is false, b is unknown
+  from boolean_test;
++-------------+-------+-----------+------------+-----------+
+| assertion   | b     | istrue(b) | isfalse(b) | b is null |
++-------------+-------+-----------+------------+-----------+
+| 2 + 2 = 4   | true  | true      | false      | false     |
+| 2 + 2 = 5   | false | false     | true       | false     |
+| 1 = null    | NULL  | false     | false      | true      |
+| null = null | NULL  | false     | false      | true      |
++-------------+-------+-----------+------------+-----------+
+</codeblock>
 
     </conbody>
 

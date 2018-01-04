@@ -773,6 +773,14 @@ select concat('abc','mno','xyz');</codeblock>
         HBase tables.
       </p>
 
+      <p id="boolean_functions_vs_expressions" rev="2.11.0 IMPALA-1767">
+        In <keyword keyref="impala211_full"/> and higher, you can use
+        the operators <codeph>IS [NOT] TRUE</codeph> and
+        <codeph>IS [NOT] FALSE</codeph> as equivalents for the built-in
+        functions <codeph>istrue()</codeph>, <codeph>isnottrue()</codeph>,
+        <codeph>isfalse()</codeph>, and <codeph>isnotfalse()</codeph>.
+      </p>
+
       <p id="base64_charset">
         The set of characters that can be generated as output
         from <codeph>base64encode()</codeph>, or specified in

@@ -240,6 +240,8 @@ under the License.
           Identical to <codeph>isnottrue()</codeph>, except it returns the opposite value for a <codeph>NULL</codeph> argument.
           <p conref="../shared/impala_common.xml#common/return_type_boolean"/>
           <p conref="../shared/impala_common.xml#common/added_in_220"/>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p conref="../shared/impala_common.xml#common/boolean_functions_vs_expressions"/>
         </dd>
 
       </dlentry>
@@ -259,6 +261,8 @@ under the License.
           <p conref="../shared/impala_common.xml#common/return_type_boolean"/>
           <p conref="../shared/impala_common.xml#common/for_compatibility_only"/>
           <p conref="../shared/impala_common.xml#common/added_in_220"/>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p conref="../shared/impala_common.xml#common/boolean_functions_vs_expressions"/>
         </dd>
 
       </dlentry>
@@ -277,6 +281,8 @@ under the License.
           Identical to <codeph>isfalse()</codeph>, except it returns the opposite value for a <codeph>NULL</codeph> argument.
           <p conref="../shared/impala_common.xml#common/return_type_boolean"/>
           <p conref="../shared/impala_common.xml#common/added_in_220"/>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p conref="../shared/impala_common.xml#common/boolean_functions_vs_expressions"/>
         </dd>
 
       </dlentry>
@@ -318,6 +324,8 @@ under the License.
           <p conref="../shared/impala_common.xml#common/return_type_boolean"/>
           <p conref="../shared/impala_common.xml#common/for_compatibility_only"/>
           <p conref="../shared/impala_common.xml#common/added_in_220"/>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p conref="../shared/impala_common.xml#common/boolean_functions_vs_expressions"/>
         </dd>
 
       </dlentry>
