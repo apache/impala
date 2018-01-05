@@ -428,7 +428,7 @@ class HdfsScanner {
   /// Initialize a tuple. Inlined into the convenience version below for codegen.
   void IR_ALWAYS_INLINE InitTuple(
       const TupleDescriptor* desc, Tuple* template_tuple, Tuple* tuple) {
-    if (has_template_tuple()) {
+    if (has_template_tuple(template_tuple)) {
       InitTupleFromTemplate(template_tuple, tuple, tuple_byte_size());
     } else {
       tuple->ClearNullBits(desc->null_bytes_offset(), desc->num_null_bytes());
@@ -481,9 +481,11 @@ class HdfsScanner {
   /// Not inlined in IR so it can be replaced with a constant.
   int IR_NO_INLINE tuple_byte_size() const { return tuple_byte_size_; }
 
-  /// Returns true iff there is a template tuple with partition key values.
+  /// Returns true iff 'template_tuple' is non-NULL.
   /// Not inlined in IR so it can be replaced with a constant.
-  bool IR_NO_INLINE has_template_tuple() const { return template_tuple_ != nullptr; }
+  static bool IR_NO_INLINE has_template_tuple(Tuple* template_tuple) {
+    return template_tuple != nullptr;
+  }
 
   inline Tuple* next_tuple(int tuple_byte_size, Tuple* t) const {
     uint8_t* mem = reinterpret_cast<uint8_t*>(t);

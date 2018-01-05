@@ -1,0 +1,351 @@
+====
+---- QUERY
+select part, id from complextypes_partitioned
+order by part, id
+---- RESULTS
+1,1
+1,2
+1,3
+1,4
+1,5
+1,6
+1,7
+1,8
+2,1
+2,2
+2,3
+2,4
+2,5
+2,6
+2,7
+2,8
+---- TYPES
+int,bigint
+====
+---- QUERY
+select part, count(*) from complextypes_partitioned group by part
+order by part
+---- RESULTS
+1,8
+2,8
+---- TYPES
+int,bigint
+====
+---- QUERY
+select part, id from complextypes_partitioned where id > 3
+order by part, id
+---- RESULTS
+1,4
+1,5
+1,6
+1,7
+1,8
+2,4
+2,5
+2,6
+2,7
+2,8
+---- TYPES
+int,bigint
+====
+---- QUERY
+select part, item from complextypes_partitioned t, t.int_array
+order by part, item
+---- RESULTS
+1,-1
+1,1
+1,1
+1,2
+1,2
+1,3
+1,3
+1,NULL
+1,NULL
+1,NULL
+2,-1
+2,1
+2,1
+2,2
+2,2
+2,3
+2,3
+2,NULL
+2,NULL
+2,NULL
+---- TYPES
+int,int
+====
+---- QUERY
+select item from complextypes_partitioned.int_array
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+-1
+1
+2
+3
+NULL
+1
+2
+NULL
+3
+NULL
+-1
+1
+2
+3
+NULL
+1
+2
+NULL
+3
+NULL
+---- TYPES
+int
+====
+---- QUERY
+select count(*) from complextypes_partitioned.int_array
+---- RESULTS
+20
+---- TYPES
+bigint
+====
+---- QUERY
+select count(item) from complextypes_partitioned.int_array
+---- RESULTS
+14
+---- TYPES
+bigint
+====
+---- QUERY
+select item from complextypes_partitioned.int_array_array.item
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+-1
+-2
+1
+2
+3
+4
+NULL
+1
+2
+NULL
+3
+NULL
+4
+5
+6
+-1
+-2
+1
+2
+3
+4
+NULL
+1
+2
+NULL
+3
+NULL
+4
+5
+6
+---- TYPES
+int
+====
+---- QUERY
+select item from complextypes_partitioned.int_array_array.item where item > 3
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+4
+4
+5
+6
+4
+4
+5
+6
+---- TYPES
+int
+====
+---- QUERY
+select count(*) from complextypes_partitioned.int_array_array.item
+---- RESULTS
+30
+---- TYPES
+bigint
+====
+---- QUERY
+select count(item) from complextypes_partitioned.int_array_array.item
+---- RESULTS
+24
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from complextypes_partitioned.int_array_array
+---- RESULTS
+22
+---- TYPES
+bigint
+====
+---- QUERY
+select nested_struct.a from complextypes_partitioned
+order by nested_struct.a
+---- RESULTS
+-1
+-1
+1
+1
+7
+7
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
+---- TYPES
+int
+====
+---- QUERY
+select count(nested_struct.a) from complextypes_partitioned
+---- RESULTS
+6
+---- TYPES
+bigint
+====
+---- QUERY
+select item from complextypes_partitioned.nested_struct.b
+---- RESULTS
+-1
+1
+NULL
+2
+3
+NULL
+-1
+1
+NULL
+2
+3
+NULL
+---- TYPES
+int
+====
+---- QUERY
+select count(*) from complextypes_partitioned.nested_struct.b
+---- RESULTS
+12
+---- TYPES
+bigint
+====
+---- QUERY
+select count(item) from complextypes_partitioned.nested_struct.b
+---- RESULTS
+8
+---- TYPES
+bigint
+====
+---- QUERY
+select item from complextypes_partitioned.nested_struct.b where item is null;
+---- RESULTS
+NULL
+NULL
+NULL
+NULL
+---- TYPES
+int
+====
+---- QUERY
+select inner_array.item.e from complextypes_partitioned.nested_struct.c.d.item inner_array
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+-1
+10
+-10
+11
+NULL
+10
+NULL
+-10
+NULL
+11
+NULL
+NULL
+-1
+10
+-10
+11
+NULL
+10
+NULL
+-10
+NULL
+11
+NULL
+NULL
+---- TYPES
+int
+====
+---- QUERY
+select count(inner_array.item.e) from complextypes_partitioned.nested_struct.c.d.item inner_array
+---- RESULTS
+14
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from complextypes_partitioned.nested_struct.c.d.item inner_array
+---- RESULTS
+24
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from complextypes_partitioned.nested_struct.c.d.item inner_array
+where inner_array.item.f = 'bbb'
+---- RESULTS
+4
+---- TYPES
+bigint
+====
+---- QUERY
+select inner_array.item.e, inner_array.item.f
+from complextypes_partitioned t, t.nested_struct.c.d.item inner_array
+order by t.part, 1, 2
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+-1,'nonnullable'
+10,'aaa'
+-10,'bbb'
+11,'c'
+NULL,'NULL'
+10,'aaa'
+NULL,'NULL'
+-10,'bbb'
+NULL,'NULL'
+11,'c'
+NULL,'NULL'
+NULL,'NULL'
+-1,'nonnullable'
+10,'aaa'
+-10,'bbb'
+11,'c'
+NULL,'NULL'
+10,'aaa'
+NULL,'NULL'
+-10,'bbb'
+NULL,'NULL'
+11,'c'
+NULL,'NULL'
+NULL,'NULL'
+---- TYPES
+int,string
+====
+---- QUERY
+select count(*) from complextypes_partitioned.nested_struct.c.d
+---- RESULTS
+20
+---- TYPES
+bigint
+====

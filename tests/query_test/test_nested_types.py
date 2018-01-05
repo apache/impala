@@ -97,6 +97,35 @@ class TestNestedTypes(ImpalaTestSuite):
     self.client.execute("select s.UppercasenamE from %s" % table_name)
     self.client.execute("select s.* from %s" % table_name)
 
+  def test_partitioned_table(self, vector, unique_database):
+    """IMPALA-6370: Test that a partitioned table with nested types can be scanned."""
+    table = "complextypes_partitioned"
+    db_table = "{0}.{1}".format(unique_database, table)
+    self.client.execute("""
+        CREATE EXTERNAL TABLE {0} (
+          id BIGINT,
+          int_array ARRAY<INT>,
+          int_array_array ARRAY<ARRAY<INT>>,
+          int_map MAP<STRING,INT>,
+          int_map_array ARRAY<MAP<STRING,INT>>,
+          nested_struct STRUCT<
+              a:INT,
+              b:ARRAY<INT>,
+              c:STRUCT<d:ARRAY<ARRAY<STRUCT<e:INT,f:STRING>>>>,
+              g:MAP<STRING,STRUCT<h:STRUCT<i:ARRAY<DOUBLE>>>>>
+        )
+        PARTITIONED BY (
+          part int
+        )
+        STORED AS PARQUET""".format(db_table))
+    # Add multiple partitions pointing to the complextypes_tbl data.
+    for partition in [1, 2]:
+      self.client.execute("ALTER TABLE {0} ADD PARTITION(part={1}) LOCATION '{2}'".format(
+          db_table, partition,
+          self._get_table_location("functional_parquet.complextypestbl", vector)))
+    self.run_test_case('QueryTest/nested-types-basic-partitioned', vector,
+        unique_database)
+
 class TestParquetArrayEncodings(ImpalaTestSuite):
   TESTFILE_DIR = os.path.join(os.environ['IMPALA_HOME'],
                               "testdata/parquet_nested_types_encodings")
