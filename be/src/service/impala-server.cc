@@ -1317,6 +1317,13 @@ Status ImpalaServer::AuthorizeProxyUser(const string& user, const string& do_as_
   return Status(error_msg.str());
 }
 
+void ImpalaServer::CatalogUpdateVersionInfo::UpdateCatalogVersionMetrics()
+{
+  ImpaladMetrics::CATALOG_VERSION->SetValue(catalog_version);
+  ImpaladMetrics::CATALOG_TOPIC_VERSION->SetValue(catalog_topic_version);
+  ImpaladMetrics::CATALOG_SERVICE_ID->SetValue(PrintId(catalog_service_id));
+}
+
 void ImpalaServer::CatalogUpdateCallback(
     const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
     vector<TTopicDelta>* subscriber_topic_updates) {
@@ -1352,6 +1359,7 @@ void ImpalaServer::CatalogUpdateCallback(
       LOG(INFO) << "Catalog topic update applied with version: " <<
           resp.new_catalog_version << " new min catalog object version: " <<
           resp.min_catalog_object_version;
+      catalog_update_info_.UpdateCatalogVersionMetrics();
     }
     ImpaladMetrics::CATALOG_READY->SetValue(resp.new_catalog_version > 0);
     // TODO: deal with an error status

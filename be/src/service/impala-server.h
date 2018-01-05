@@ -997,7 +997,9 @@ class ImpalaServer : public ImpalaServiceIf,
       catalog_topic_version(0L),
       min_catalog_object_version(0L) {
     }
-
+    /// Update the metrics to store the current version of catalog, current topic and
+    /// current service id used by impalad.
+    void  UpdateCatalogVersionMetrics();
     /// The last catalog version returned from UpdateCatalog()
     int64_t catalog_version;
     /// The CatalogService ID that this catalog version is from.

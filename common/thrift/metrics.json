@@ -230,6 +230,36 @@
     "key": "catalog.num-tables"
   },
   {
+    "description": "Catalog topic update version.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Catalog topic update version",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.curr-version"
+  },
+  {
+    "description": "Statestore topic update version.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Statestore topic update version",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.curr-topic"
+  },
+  {
+    "description": "Catalog service id.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Catalog service id",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "catalog.curr-serviceid"
+  },
+  {
     "description": "Indicates if the catalog is ready.",
     "contexts": [
       "IMPALAD"

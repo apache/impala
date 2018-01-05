@@ -109,6 +109,15 @@ class ImpaladMetricKeys {
   /// Number of DBs in the catalog
   static const char* CATALOG_NUM_DBS;
 
+  /// Current version of catalog with impalad.
+  static const char* CATALOG_VERSION;
+
+  /// Catalog topic version  with impalad.
+  static const char* CATALOG_TOPIC_VERSION;
+
+  /// ServiceID of Catalog with impalad.
+  static const char* CATALOG_SERVICE_ID;
+
   /// Number of tables in the catalog
   static const char* CATALOG_NUM_TABLES;
 
@@ -180,6 +189,8 @@ class ImpaladMetrics {
   // Gauges
   static IntGauge* CATALOG_NUM_DBS;
   static IntGauge* CATALOG_NUM_TABLES;
+  static IntGauge* CATALOG_VERSION;
+  static IntGauge* CATALOG_TOPIC_VERSION;
   static IntGauge* IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS;
   static IntGauge* IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS;
   static IntGauge* IO_MGR_NUM_BUFFERS;
@@ -199,6 +210,7 @@ class ImpaladMetrics {
   static BooleanProperty* CATALOG_READY;
   static BooleanProperty* IMPALA_SERVER_READY;
   static StringProperty* IMPALA_SERVER_VERSION;
+  static StringProperty* CATALOG_SERVICE_ID;
   // Histograms
   static HistogramMetric* QUERY_DURATIONS;
   static HistogramMetric* DDL_DURATIONS;

@@ -76,6 +76,9 @@ const char* ImpaladMetricKeys::CATALOG_NUM_DBS =
     "catalog.num-databases";
 const char* ImpaladMetricKeys::CATALOG_NUM_TABLES =
     "catalog.num-tables";
+const char* ImpaladMetricKeys::CATALOG_VERSION = "catalog.curr-version";
+const char* ImpaladMetricKeys::CATALOG_TOPIC_VERSION = "catalog.curr-topic";
+const char* ImpaladMetricKeys::CATALOG_SERVICE_ID = "catalog.curr-serviceid";
 const char* ImpaladMetricKeys::CATALOG_READY =
     "catalog.ready";
 const char* ImpaladMetricKeys::NUM_FILES_OPEN_FOR_INSERT =
@@ -126,6 +129,8 @@ IntCounter* ImpaladMetrics::HEDGED_READ_OPS_WIN = NULL;
 // Gauges
 IntGauge* ImpaladMetrics::CATALOG_NUM_DBS = NULL;
 IntGauge* ImpaladMetrics::CATALOG_NUM_TABLES = NULL;
+IntGauge* ImpaladMetrics::CATALOG_VERSION = NULL;
+IntGauge* ImpaladMetrics::CATALOG_TOPIC_VERSION = NULL;
 IntGauge* ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS = NULL;
 IntGauge* ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS = NULL;
 IntGauge* ImpaladMetrics::IO_MGR_NUM_BUFFERS = NULL;
@@ -146,6 +151,7 @@ IntGauge* ImpaladMetrics::RESULTSET_CACHE_TOTAL_BYTES = NULL;
 BooleanProperty* ImpaladMetrics::CATALOG_READY = NULL;
 BooleanProperty* ImpaladMetrics::IMPALA_SERVER_READY = NULL;
 StringProperty* ImpaladMetrics::IMPALA_SERVER_VERSION = NULL;
+StringProperty* ImpaladMetrics::CATALOG_SERVICE_ID = NULL;
 
 // Histograms
 HistogramMetric* ImpaladMetrics::QUERY_DURATIONS = NULL;
@@ -235,6 +241,9 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
   // Initialize catalog metrics
   CATALOG_NUM_DBS = m->AddGauge(ImpaladMetricKeys::CATALOG_NUM_DBS, 0);
   CATALOG_NUM_TABLES = m->AddGauge(ImpaladMetricKeys::CATALOG_NUM_TABLES, 0);
+  CATALOG_VERSION = m->AddGauge(ImpaladMetricKeys::CATALOG_VERSION, 0);
+  CATALOG_TOPIC_VERSION = m->AddGauge(ImpaladMetricKeys::CATALOG_TOPIC_VERSION, 0);
+  CATALOG_SERVICE_ID = m->AddProperty<string>(ImpaladMetricKeys::CATALOG_SERVICE_ID, "");
   CATALOG_READY = m->AddProperty<bool>(ImpaladMetricKeys::CATALOG_READY, false);
 
   // Maximum duration to be tracked by the query durations metric. No particular reasoning
