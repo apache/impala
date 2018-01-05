@@ -54,14 +54,17 @@ DECLARE_int32(datastream_sender_timeout_ms);
 DEFINE_int32(datastream_service_num_deserialization_threads, 16,
     "Number of threads for deserializing RPC requests deferred due to the receiver "
     "not ready or the soft limit of the receiver is reached.");
-
+DEFINE_int32(datastream_service_deserialization_queue_size, 10000,
+    "Number of deferred RPC requests that can be enqueued before being processed by a "
+    "deserialization thread.");
 using boost::mutex;
 
 namespace impala {
 
 KrpcDataStreamMgr::KrpcDataStreamMgr(MetricGroup* metrics)
   : deserialize_pool_("data-stream-mgr", "deserialize",
-      FLAGS_datastream_service_num_deserialization_threads, 10000,
+      FLAGS_datastream_service_num_deserialization_threads,
+      FLAGS_datastream_service_deserialization_queue_size,
       boost::bind(&KrpcDataStreamMgr::DeserializeThreadFn, this, _1, _2)) {
   MetricGroup* dsm_metrics = metrics->GetOrCreateChildGroup("datastream-manager");
   num_senders_waiting_ =
@@ -102,6 +105,7 @@ shared_ptr<DataStreamRecvrBase> KrpcDataStreamMgr::CreateRecvr(
       new KrpcDataStreamRecvr(this, state->instance_mem_tracker(), row_desc,
           finst_id, dest_node_id, num_senders, is_merging, buffer_size, profile));
   uint32_t hash_value = GetHashValue(finst_id, dest_node_id);
+  EarlySendersList early_senders_for_recvr;
   {
     RecvrId recvr_id = make_pair(finst_id, dest_node_id);
     lock_guard<mutex> l(lock_);
@@ -109,24 +113,30 @@ shared_ptr<DataStreamRecvrBase> KrpcDataStreamMgr::CreateRecvr(
     receiver_map_.insert(make_pair(hash_value, recvr));
 
     EarlySendersMap::iterator it = early_senders_map_.find(recvr_id);
+
     if (it != early_senders_map_.end()) {
-      EarlySendersList& early_senders = it->second;
-      // Let the receiver take over the RPC payloads of early senders and process them
-      // asynchronously.
-      for (unique_ptr<TransmitDataCtx>& ctx : early_senders.waiting_sender_ctxs) {
-        // Release memory. The receiver will track it in its instance tracker.
-        int64_t transfer_size = ctx->rpc_context->GetTransferSize();
-        recvr->TakeOverEarlySender(move(ctx));
-        mem_tracker_->Release(transfer_size);
-        num_senders_waiting_->Increment(-1);
-      }
-      for (const unique_ptr<EndDataStreamCtx>& ctx : early_senders.closed_sender_ctxs) {
-        recvr->RemoveSender(ctx->request->sender_id());
-        RespondAndReleaseRpc(Status::OK(), ctx->response, ctx->rpc_context, mem_tracker_);
-        num_senders_waiting_->Increment(-1);
-      }
+      // Move the early senders list here so that we can drop 'lock_'. We need to drop
+      // the lock before processing the early senders to avoid a deadlock.
+      // More details in IMPALA-6346.
+      early_senders_for_recvr = std::move(it->second);
       early_senders_map_.erase(it);
     }
+  }
+
+  // Let the receiver take over the RPC payloads of early senders and process them
+  // asynchronously.
+  for (unique_ptr<TransmitDataCtx>& ctx : early_senders_for_recvr.waiting_sender_ctxs) {
+    // Release memory. The receiver will track it in its instance tracker.
+    int64_t transfer_size = ctx->rpc_context->GetTransferSize();
+    recvr->TakeOverEarlySender(move(ctx));
+    mem_tracker_->Release(transfer_size);
+    num_senders_waiting_->Increment(-1);
+  }
+  for (const unique_ptr<EndDataStreamCtx>& ctx :
+      early_senders_for_recvr.closed_sender_ctxs) {
+    recvr->RemoveSender(ctx->request->sender_id());
+    RespondAndReleaseRpc(Status::OK(), ctx->response, ctx->rpc_context, mem_tracker_);
+    num_senders_waiting_->Increment(-1);
   }
   return recvr;
 }
