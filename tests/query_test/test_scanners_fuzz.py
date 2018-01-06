@@ -48,6 +48,12 @@ class TestScannersFuzzing(ImpalaTestSuite):
   # Test a range of batch sizes to exercise different corner cases.
   BATCH_SIZES = [0, 1, 16, 10000]
 
+  # Test with denial of reservations at varying frequency. This will affect the number
+  # of scanner threads that can be spun up.
+  DEBUG_ACTION_VALUES = [None,
+    '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@0.5',
+    '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0']
+
   @classmethod
   def get_workload(cls):
     return 'functional-query'
@@ -59,7 +65,8 @@ class TestScannersFuzzing(ImpalaTestSuite):
         create_exec_option_dimension_from_dict({
           'abort_on_error' : cls.ABORT_ON_ERROR_VALUES,
           'num_nodes' : cls.NUM_NODES_VALUES,
-          'mem_limit' : cls.MEM_LIMITS}))
+          'mem_limit' : cls.MEM_LIMITS,
+          'debug_action' : cls.DEBUG_ACTION_VALUES}))
     # TODO: enable for more table formats once they consistently pass the fuzz test.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ('avro', 'parquet') or

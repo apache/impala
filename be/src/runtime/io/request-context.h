@@ -158,12 +158,12 @@ class RequestContext {
     Inactive,
   };
 
-  RequestContext(DiskIoMgr* parent, int num_disks, MemTracker* tracker);
+  RequestContext(DiskIoMgr* parent, int num_disks);
 
-  /// Cleans up a buffer. If the buffer was allocated with AllocBuffer(), frees the buffer
-  /// memory and release the consumption to the client MemTracker. Otherwise (e.g. a
-  /// client or HDFS cache buffer), just prepares the descriptor to be destroyed.
-  /// After this is called, buffer->buffer() is NULL. Does not acquire 'lock_'.
+  /// Cleans up a buffer. If the buffer was allocated with AllocateBuffersForRange(),
+  /// frees the buffer. Otherwise (e.g. a client or HDFS cache buffer), just prepares the
+  /// descriptor to be destroyed. After this is called, buffer->buffer() is NULL.
+  /// Does not acquire 'lock_'.
   void FreeBuffer(BufferDescriptor* buffer);
 
   /// Decrements the number of active disks for this reader.  If the disk count
@@ -238,10 +238,6 @@ class RequestContext {
 
   /// Parent object
   DiskIoMgr* const parent_;
-
-  /// Memory used for this reader.  This is unowned by this object.
-  /// TODO: replace with bp client
-  MemTracker* const mem_tracker_;
 
   /// Total bytes read for this reader
   RuntimeProfile::Counter* bytes_read_counter_ = nullptr;

@@ -95,7 +95,7 @@ class TestExprMemUsage(ImpalaTestSuite):
 class TestLowMemoryLimits(ImpalaTestSuite):
   '''Super class for the memory limit tests with the TPC-H and TPC-DS queries'''
 
-  def low_memory_limit_test(self, vector, tpch_query, limit, xfail_mem_limit=None):
+  def low_memory_limit_test(self, vector, tpch_query, limit):
     mem = vector.get_value('mem_limit')
     # Mem consumption can be +-30MBs, depending on how many scanner threads are
     # running. Adding this extra mem in order to reduce false negatives in the tests.
@@ -112,13 +112,11 @@ class TestLowMemoryLimits(ImpalaTestSuite):
     try:
       self.run_test_case(tpch_query, new_vector)
     except ImpalaBeeswaxException as e:
-      if not expects_error and not xfail_mem_limit: raise
+      if not expects_error: raise
       found_expected_error = False
       for error_msg in MEM_LIMIT_ERROR_MSGS:
         if error_msg in str(e): found_expected_error = True
       assert found_expected_error, str(e)
-      if not expects_error and xfail_mem_limit:
-        pytest.xfail(xfail_mem_limit)
 
 
 class TestTpchMemLimitError(TestLowMemoryLimits):
@@ -132,7 +130,7 @@ class TestTpchMemLimitError(TestLowMemoryLimits):
                        'Q6' : 25, 'Q7' : 200, 'Q8' : 125, 'Q9' : 200, 'Q10' : 162,\
                        'Q11' : 112, 'Q12' : 150, 'Q13' : 125, 'Q14' : 125, 'Q15' : 125,\
                        'Q16' : 137, 'Q17' : 137, 'Q18' : 196, 'Q19' : 112, 'Q20' : 162,\
-                       'Q21' : 187, 'Q22' : 125}
+                       'Q21' : 230, 'Q22' : 125}
 
   @classmethod
   def get_workload(self):
@@ -175,8 +173,7 @@ class TestTpchMemLimitError(TestLowMemoryLimits):
     self.low_memory_limit_test(vector, 'tpch-q8', self.MIN_MEM_FOR_TPCH['Q8'])
 
   def test_low_mem_limit_q9(self, vector):
-    self.low_memory_limit_test(vector, 'tpch-q9', self.MIN_MEM_FOR_TPCH['Q9'],
-            xfail_mem_limit="IMPALA-3328: TPC-H Q9 memory limit test is flaky")
+    self.low_memory_limit_test(vector, 'tpch-q9', self.MIN_MEM_FOR_TPCH['Q9'])
 
   @SkipIfLocal.mem_usage_different
   def test_low_mem_limit_q10(self, vector):

@@ -86,17 +86,18 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
       StopAndFinalizeCounters();
       return Status::OK();
     }
+    int64_t scanner_reservation = buffer_pool_client_.GetReservation();
     if (needs_buffers) {
-      RETURN_IF_ERROR(io_mgr->AllocateBuffersForRange(reader_context_.get(), scan_range_,
-          3 * io_mgr->max_buffer_size()));
+      RETURN_IF_ERROR(io_mgr->AllocateBuffersForRange(reader_context_.get(),
+          &buffer_pool_client_, scan_range_, scanner_reservation));
     }
     ScanRangeMetadata* metadata =
         static_cast<ScanRangeMetadata*>(scan_range_->meta_data());
     int64_t partition_id = metadata->partition_id;
     HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(partition_id);
-    scanner_ctx_.reset(new ScannerContext(
-        runtime_state_, this, partition, scan_range_, filter_ctxs(),
-        expr_results_pool()));
+    scanner_ctx_.reset(new ScannerContext(runtime_state_, this, &buffer_pool_client_,
+        partition, filter_ctxs(), expr_results_pool()));
+    scanner_ctx_->AddStream(scan_range_, scanner_reservation);
     Status status = CreateAndOpenScanner(partition, scanner_ctx_.get(), &scanner_);
     if (!status.ok()) {
       DCHECK(scanner_ == NULL);

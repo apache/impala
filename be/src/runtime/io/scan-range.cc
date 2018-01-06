@@ -340,9 +340,6 @@ void ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
 void ScanRange::InitInternal(DiskIoMgr* io_mgr, RequestContext* reader) {
   DCHECK(exclusive_hdfs_fh_ == nullptr);
   DCHECK(local_file_ == nullptr);
-  // Reader must provide MemTracker or a buffer.
-  DCHECK(external_buffer_tag_ == ExternalBufferTag::CLIENT_BUFFER
-      || reader->mem_tracker_ != nullptr);
   io_mgr_ = io_mgr;
   reader_ = reader;
   local_file_ = nullptr;
@@ -650,8 +647,7 @@ Status ScanRange::ReadFromCache(
   }
 
   // Create a single buffer desc for the entire scan range and enqueue that.
-  // 'mem_tracker' is nullptr because the memory is owned by the HDFS java client,
-  // not the Impala backend.
+  // The memory is owned by the HDFS java client, not the Impala backend.
   unique_ptr<BufferDescriptor> desc = unique_ptr<BufferDescriptor>(new BufferDescriptor(
       io_mgr_, reader_, this, reinterpret_cast<uint8_t*>(buffer), 0));
   desc->len_ = bytes_read;

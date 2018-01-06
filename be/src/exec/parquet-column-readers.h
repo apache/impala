@@ -326,42 +326,29 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   BaseScalarColumnReader(HdfsParquetScanner* parent, const SchemaNode& node,
       const SlotDescriptor* slot_desc)
     : ParquetColumnReader(parent, node, slot_desc),
-      data_(NULL),
-      data_end_(NULL),
-      def_levels_(true),
-      rep_levels_(false),
-      page_encoding_(parquet::Encoding::PLAIN_DICTIONARY),
-      num_buffered_values_(0),
-      num_values_read_(0),
-      metadata_(NULL),
-      stream_(NULL),
       data_page_pool_(new MemPool(parent->scan_node_->mem_tracker())) {
     DCHECK_GE(node_.col_idx, 0) << node_.DebugString();
   }
 
   virtual ~BaseScalarColumnReader() { }
 
-  /// This is called once for each row group in the file.
-  Status Reset(const parquet::ColumnMetaData* metadata, ScannerContext::Stream* stream) {
-    DCHECK(stream != NULL);
-    DCHECK(metadata != NULL);
+  /// Resets the reader for each row group in the file and creates the scan
+  /// range for the column, but does not start it. To start scanning,
+  /// set_io_reservation() must be called to assign reservation to this
+  /// column, followed by StartScan().
+  Status Reset(const HdfsFileDesc& file_desc, const parquet::ColumnChunk& col_chunk,
+    int row_group_idx);
 
-    num_buffered_values_ = 0;
-    data_ = NULL;
-    data_end_ = NULL;
-    stream_ = stream;
-    metadata_ = metadata;
-    num_values_read_ = 0;
-    def_level_ = -1;
-    // See ColumnReader constructor.
-    rep_level_ = max_rep_level() == 0 ? 0 : -1;
-    pos_current_value_ = -1;
+  /// Starts the column scan range. The reader must be Reset() and have a
+  /// reservation assigned via set_io_reservation(). This must be called
+  /// before any of the column data can be read (including dictionary and
+  /// data pages). Returns an error status if there was an error starting the
+  /// scan or allocating buffers for it.
+  Status StartScan();
 
-    if (metadata_->codec != parquet::CompressionCodec::UNCOMPRESSED) {
-      RETURN_IF_ERROR(Codec::CreateDecompressor(
-          NULL, false, PARQUET_TO_IMPALA_CODEC[metadata_->codec], &decompressor_));
-    }
-    ClearDictionaryDecoder();
+  /// Helper to start scans for multiple columns at once.
+  static Status StartScans(const std::vector<BaseScalarColumnReader*> readers) {
+    for (BaseScalarColumnReader* reader : readers) RETURN_IF_ERROR(reader->StartScan());
     return Status::OK();
   }
 
@@ -376,21 +363,26 @@ class BaseScalarColumnReader : public ParquetColumnReader {
     if (dict_decoder != nullptr) dict_decoder->Close();
   }
 
+  io::ScanRange* scan_range() const { return scan_range_; }
   int64_t total_len() const { return metadata_->total_compressed_size; }
   int col_idx() const { return node_.col_idx; }
   THdfsCompression::type codec() const {
     if (metadata_ == NULL) return THdfsCompression::NONE;
     return PARQUET_TO_IMPALA_CODEC[metadata_->codec];
   }
+  void set_io_reservation(int bytes) { io_reservation_ = bytes; }
 
   /// Reads the next definition and repetition levels for this column. Initializes the
   /// next data page if necessary.
   virtual bool NextLevels() { return NextLevels<true>(); }
 
-  // Check the data stream to see if there is a dictionary page. If there is,
-  // use that page to initialize dict_decoder_ and advance the data stream
-  // past the dictionary page.
+  /// Check the data stream to see if there is a dictionary page. If there is,
+  /// use that page to initialize dict_decoder_ and advance the data stream
+  /// past the dictionary page.
   Status InitDictionary();
+
+  /// Convenience function to initialize multiple dictionaries.
+  static Status InitDictionaries(const std::vector<BaseScalarColumnReader*> readers);
 
   // Returns the dictionary or NULL if the dictionary doesn't exist
   virtual DictDecoderBase* GetDictionaryDecoder() { return nullptr; }
@@ -417,33 +409,45 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   // fit in as few cache lines as possible.
 
   /// Pointer to start of next value in data page
-  uint8_t* data_;
+  uint8_t* data_ = nullptr;
 
   /// End of the data page.
-  const uint8_t* data_end_;
+  const uint8_t* data_end_ = nullptr;
 
   /// Decoder for definition levels.
-  ParquetLevelDecoder def_levels_;
+  ParquetLevelDecoder def_levels_{true};
 
   /// Decoder for repetition levels.
-  ParquetLevelDecoder rep_levels_;
+  ParquetLevelDecoder rep_levels_{false};
 
   /// Page encoding for values of the current data page. Cached here for perf. Set in
   /// InitDataPage().
-  parquet::Encoding::type page_encoding_;
+  parquet::Encoding::type page_encoding_ = parquet::Encoding::PLAIN_DICTIONARY;
 
   /// Num values remaining in the current data page
-  int num_buffered_values_;
+  int num_buffered_values_ = 0;
 
   // Less frequently used members that are not accessed in inner loop should go below
   // here so they do not occupy precious cache line space.
 
   /// The number of values seen so far. Updated per data page.
-  int64_t num_values_read_;
+  int64_t num_values_read_ = 0;
 
-  const parquet::ColumnMetaData* metadata_;
+  /// Metadata for the column for the current row group.
+  const parquet::ColumnMetaData* metadata_ = nullptr;
+
   boost::scoped_ptr<Codec> decompressor_;
-  ScannerContext::Stream* stream_;
+
+  /// The scan range for the column's data. Initialized for each row group by Reset().
+  io::ScanRange* scan_range_ = nullptr;
+
+  // Stream used to read data from 'scan_range_'. Initialized by StartScan().
+  ScannerContext::Stream* stream_ = nullptr;
+
+  /// Reservation in bytes to use for I/O buffers in 'scan_range_'/'stream_'. Must be set
+  /// with set_io_reservation() before 'stream_' is initialized. Reset for each row group
+  /// by Reset().
+  int64_t io_reservation_ = 0;
 
   /// Pool to allocate storage for data pages from - either decompression buffers for
   /// compressed data pages or copies of the data page with var-len data to attach to

@@ -32,8 +32,6 @@
 #include "util/mem-range.h"
 
 namespace impala {
-class MemTracker;
-
 namespace io {
 class DiskIoMgr;
 class RequestContext;
@@ -63,10 +61,14 @@ class BufferDescriptor {
   friend class ScanRange;
   friend class RequestContext;
 
-  /// Create a buffer descriptor for a new reader, range and data buffer. The buffer
-  /// memory should already be accounted against 'mem_tracker'.
+  /// Create a buffer descriptor for a new reader, range and data buffer.
   BufferDescriptor(DiskIoMgr* io_mgr, RequestContext* reader,
       ScanRange* scan_range, uint8_t* buffer, int64_t buffer_len);
+
+  /// Create a buffer descriptor allocated from the buffer pool.
+  BufferDescriptor(DiskIoMgr* io_mgr, RequestContext* reader,
+      ScanRange* scan_range, BufferPool::ClientHandle* bp_client,
+      BufferPool::BufferHandle handle);
 
   /// Return true if this is a cached buffer owned by HDFS.
   bool is_cached() const;
@@ -97,6 +99,11 @@ class BufferDescriptor {
   bool eosr_ = false;
 
   int64_t scan_range_offset_ = 0;
+
+  // Handle to an allocated buffer and the client used to allocate it buffer. Only used
+  // for non-external buffers.
+  BufferPool::ClientHandle* bp_client_ = nullptr;
+  BufferPool::BufferHandle handle_;
 };
 
 /// The request type, read or write associated with a request range.

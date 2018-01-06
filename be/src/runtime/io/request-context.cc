@@ -17,6 +17,8 @@
 
 #include "runtime/io/disk-io-mgr-internal.h"
 
+#include "runtime/exec-env.h"
+
 #include "common/names.h"
 
 using namespace impala;
@@ -36,12 +38,28 @@ BufferDescriptor::BufferDescriptor(DiskIoMgr* io_mgr,
   DCHECK_GE(buffer_len, 0);
 }
 
+BufferDescriptor::BufferDescriptor(DiskIoMgr* io_mgr, RequestContext* reader,
+    ScanRange* scan_range, BufferPool::ClientHandle* bp_client,
+    BufferPool::BufferHandle handle) :
+  io_mgr_(io_mgr),
+  reader_(reader),
+  scan_range_(scan_range),
+  buffer_(handle.data()),
+  buffer_len_(handle.len()),
+  bp_client_(bp_client),
+  handle_(move(handle)) {
+  DCHECK(io_mgr != nullptr);
+  DCHECK(scan_range != nullptr);
+  DCHECK(bp_client_->is_registered());
+  DCHECK(handle_.is_open());
+}
+
 void RequestContext::FreeBuffer(BufferDescriptor* buffer) {
   DCHECK(buffer->buffer_ != nullptr);
   if (!buffer->is_cached() && !buffer->is_client_buffer()) {
-    // Only buffers that were not allocated by DiskIoMgr need to have memory freed.
-    free(buffer->buffer_);
-    mem_tracker_->Release(buffer->buffer_len_);
+    // Only buffers that were allocated by DiskIoMgr need to be freed.
+    ExecEnv::GetInstance()->buffer_pool()->FreeBuffer(
+        buffer->bp_client_, &buffer->handle_);
   }
   buffer->buffer_ = nullptr;
 }
@@ -200,9 +218,8 @@ void RequestContext::RemoveActiveScanRangeLocked(
   active_scan_ranges_.erase(range);
 }
 
-RequestContext::RequestContext(
-    DiskIoMgr* parent, int num_disks, MemTracker* tracker)
-  : parent_(parent), mem_tracker_(tracker), disk_states_(num_disks) {}
+RequestContext::RequestContext(DiskIoMgr* parent, int num_disks)
+  : parent_(parent), disk_states_(num_disks) {}
 
 // Dumps out request context information. Lock should be taken by caller
 string RequestContext::DebugString() const {

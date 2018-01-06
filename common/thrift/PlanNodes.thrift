@@ -239,6 +239,9 @@ struct THdfsScanNode {
   // The byte offset of the slot for Parquet metadata if Parquet count star optimization
   // is enabled.
   10: optional i32 parquet_count_star_slot_offset
+
+  // The ideal memory reservation in bytes to process an input split.
+  11: optional i64 ideal_scan_range_reservation
 }
 
 struct TDataSourceScanNode {
