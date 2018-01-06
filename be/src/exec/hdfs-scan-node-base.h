@@ -322,6 +322,9 @@ class HdfsScanNodeBase : public ScanNode {
   friend class ScannerContext;
   friend class HdfsScanner;
 
+  /// Ideal reservation to process each input split, computed by the planner.
+  const int64_t ideal_scan_range_reservation_;
+
   /// Tuple id of the tuple used to evaluate conjuncts on parquet::Statistics.
   const int min_max_tuple_id_;
 

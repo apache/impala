@@ -35,6 +35,7 @@
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-expr.h"
 #include "runtime/descriptors.h"
+#include "runtime/exec-env.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/io/request-context.h"
@@ -64,6 +65,7 @@ const int UNEXPECTED_REMOTE_BYTES_WARN_THRESHOLD = 64 * 1024 * 1024;
 HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
     : ScanNode(pool, tnode, descs),
+      ideal_scan_range_reservation_(tnode.hdfs_scan_node.ideal_scan_range_reservation),
       min_max_tuple_id_(tnode.hdfs_scan_node.__isset.min_max_tuple_id ?
           tnode.hdfs_scan_node.min_max_tuple_id : -1),
       skip_header_line_count_(tnode.hdfs_scan_node.__isset.skip_header_line_count ?
@@ -80,6 +82,7 @@ HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const TPlanNode& tnode,
           &tnode.hdfs_scan_node.dictionary_filter_conjuncts : nullptr),
       disks_accessed_bitmap_(TUnit::UNIT, 0),
       active_hdfs_read_thread_counter_(TUnit::UNIT, 0) {
+  DCHECK_GE(ideal_scan_range_reservation_, resource_profile_.min_reservation);
 }
 
 HdfsScanNodeBase::~HdfsScanNodeBase() {
@@ -109,7 +112,6 @@ Status HdfsScanNodeBase::Init(const TPlanNode& tnode, RuntimeState* state) {
     RETURN_IF_ERROR(ScalarExpr::Create(tnode.hdfs_scan_node.min_max_conjuncts,
         *min_max_row_desc, state, &min_max_conjuncts_));
   }
-
   return Status::OK();
 }
 
@@ -240,6 +242,16 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
   ImpaladMetrics::NUM_RANGES_PROCESSED->Increment(scan_range_params_->size());
   ImpaladMetrics::NUM_RANGES_MISSING_VOLUME_ID->Increment(num_ranges_missing_volume_id);
 
+  // Check if reservation was enough to allocate at least one buffer. The
+  // reservation calculation in HdfsScanNode.java should guarantee this.
+  // Hitting this error indicates a misconfiguration or bug.
+  int64_t min_buffer_size = ExecEnv::GetInstance()->disk_io_mgr()->min_buffer_size();
+  if (scan_range_params_->size() > 0
+      && resource_profile_.min_reservation < min_buffer_size) {
+    return Status(TErrorCode::INTERNAL_ERROR,
+      Substitute("HDFS scan min reservation $0 must be >= min buffer size $1",
+       resource_profile_.min_reservation, min_buffer_size));
+  }
   // Add per volume stats to the runtime profile
   PerVolumeStats per_volume_stats;
   stringstream str;
@@ -326,7 +338,18 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
         partition_desc->partition_key_value_evals(), scan_node_pool_.get(), state);
   }
 
-  reader_context_ = runtime_state_->io_mgr()->RegisterContext(mem_tracker());
+  RETURN_IF_ERROR(ClaimBufferReservation(state));
+  // We got the minimum reservation. Now try to get ideal reservation.
+  if (resource_profile_.min_reservation != ideal_scan_range_reservation_) {
+    bool increased = buffer_pool_client_.IncreaseReservation(
+        ideal_scan_range_reservation_ - resource_profile_.min_reservation);
+    VLOG_FILE << "Increasing reservation from minimum "
+              << resource_profile_.min_reservation << "B to ideal "
+              << ideal_scan_range_reservation_ << "B "
+              << (increased ? "succeeded" : "failed");
+  }
+
+  reader_context_ = runtime_state_->io_mgr()->RegisterContext();
 
   // Initialize HdfsScanNode specific counters
   // TODO: Revisit counters and move the counters specific to multi-threaded scans

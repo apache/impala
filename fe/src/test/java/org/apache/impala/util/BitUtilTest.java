@@ -46,4 +46,10 @@ public class BitUtilTest {
     assertEquals(0x8000000000000000L, BitUtil.roundUpToPowerOf2(0x8000000000000000L - 1));
   }
 
+  @Test
+  public void testPowerOf2Factor() {
+    assertEquals(BitUtil.roundUpToPowerOf2Factor(7, 8), 8);
+    assertEquals(BitUtil.roundUpToPowerOf2Factor(8, 8), 8);
+    assertEquals(BitUtil.roundUpToPowerOf2Factor(9, 8), 16);
+  }
 }

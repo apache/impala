@@ -243,7 +243,7 @@ TmpFileMgr::FileGroup::FileGroup(TmpFileMgr* tmp_file_mgr, DiskIoMgr* io_mgr,
     next_allocation_index_(0),
     free_ranges_(64) {
   DCHECK(tmp_file_mgr != nullptr);
-  io_ctx_ = io_mgr_->RegisterContext(nullptr);
+  io_ctx_ = io_mgr_->RegisterContext();
 }
 
 TmpFileMgr::FileGroup::~FileGroup() {

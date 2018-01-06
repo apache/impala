@@ -3,7 +3,7 @@
 # Test sort with small char column materialized by exprs.
 # Set low memory limit to force spilling.
 # IMPALA-3332: comparator makes local allocations that cause runaway memory consumption.
-set buffer_pool_limit=4m;
+set buffer_pool_limit=28m;
 set mem_limit=200m;
 set disable_outermost_topn=1;
 select cast(l_comment as char(50))
@@ -41,7 +41,7 @@ row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 ---- QUERY
 # Test sort with small input char column materialized before sort.
 set mem_limit=200m;
-set buffer_pool_limit=4m;
+set buffer_pool_limit=28m;
 set disable_outermost_topn=1;
 select char_col
 from (select cast(l_comment as char(50)) char_col
@@ -80,7 +80,7 @@ row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 # Test sort with large input char column materialized before sort.
 # Set low memory limit to force spilling.
 set mem_limit=200m;
-set buffer_pool_limit=4m;
+set buffer_pool_limit=28m;
 set disable_outermost_topn=1;
 select char_col
 from (select cast(l_comment as char(200)) char_col
@@ -118,7 +118,7 @@ row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 ---- QUERY
 # Test sort with varchar column materialized by exprs.
 # Set low memory limit to force spilling.
-set buffer_pool_limit=4m;
+set buffer_pool_limit=28m;
 # IMPALA-3332: comparator makes local allocations that cause runaway memory consumption.
 set mem_limit=200m;
 set disable_outermost_topn=1;
@@ -158,7 +158,7 @@ row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 # Test sort with input varchar column materialized before sort.
 # Set low memory limit to force spilling.
 set mem_limit=200m;
-set buffer_pool_limit=4m;
+set buffer_pool_limit=28m;
 set disable_outermost_topn=1;
 select char_col
 from (select cast(l_comment as varchar(50)) char_col

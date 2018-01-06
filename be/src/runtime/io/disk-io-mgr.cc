@@ -15,8 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "common/global-flags.h"
 #include "runtime/io/disk-io-mgr.h"
+
+#include "common/global-flags.h"
+#include "runtime/exec-env.h"
 #include "runtime/io/disk-io-mgr-internal.h"
 #include "runtime/io/handle-cache.inline.h"
 
@@ -51,6 +53,8 @@ DEFINE_int32(num_threads_per_disk, 0, "Number of I/O threads per disk");
 // don't have this penalty and benefit from multiple concurrent IO requests.
 static const int THREADS_PER_ROTATIONAL_DISK = 1;
 static const int THREADS_PER_SOLID_STATE_DISK = 8;
+
+const int64_t DiskIoMgr::IDEAL_MAX_SIZED_BUFFERS_PER_SCAN_RANGE;
 
 // The maximum number of the threads per rotational disk is also the max queue depth per
 // rotational disk.
@@ -309,9 +313,8 @@ Status DiskIoMgr::Init() {
   return Status::OK();
 }
 
-unique_ptr<RequestContext> DiskIoMgr::RegisterContext(MemTracker* mem_tracker) {
-  return unique_ptr<RequestContext>(
-      new RequestContext(this, num_total_disks(), mem_tracker));
+unique_ptr<RequestContext> DiskIoMgr::RegisterContext() {
+  return unique_ptr<RequestContext>(new RequestContext(this, num_total_disks()));
 }
 
 void DiskIoMgr::UnregisterContext(RequestContext* reader) {
@@ -455,28 +458,21 @@ Status DiskIoMgr::GetNextUnstartedRange(RequestContext* reader, ScanRange** rang
   }
 }
 
-Status DiskIoMgr::AllocateBuffersForRange(RequestContext* reader, ScanRange* range,
-    int64_t max_bytes) {
+Status DiskIoMgr::AllocateBuffersForRange(RequestContext* reader,
+    BufferPool::ClientHandle* bp_client, ScanRange* range, int64_t max_bytes) {
   DCHECK_GE(max_bytes, min_buffer_size_);
   DCHECK(range->external_buffer_tag_ == ScanRange::ExternalBufferTag::NO_BUFFER)
      << static_cast<int>(range->external_buffer_tag_) << " invalid to allocate buffers "
      << "when already reading into an external buffer";
-
+  BufferPool* bp = ExecEnv::GetInstance()->buffer_pool();
   Status status;
   vector<unique_ptr<BufferDescriptor>> buffers;
   for (int64_t buffer_size : ChooseBufferSizes(range->len(), max_bytes)) {
-    if (!reader->mem_tracker_->TryConsume(buffer_size)) {
-      status = reader->mem_tracker_->MemLimitExceeded(nullptr,
-          "Failed to allocate I/O buffer", buffer_size);
-      goto error;
-    }
-    uint8_t* buffer = reinterpret_cast<uint8_t*>(malloc(buffer_size));
-    if (buffer == nullptr) {
-      reader->mem_tracker_->Release(buffer_size);
-      status = Status(Substitute("Failed to malloc $0-byte I/O buffer", buffer_size));
-      goto error;
-    }
-    buffers.emplace_back(new BufferDescriptor(this, reader, range, buffer, buffer_size));
+    BufferPool::BufferHandle handle;
+    status = bp->AllocateBuffer(bp_client, buffer_size, &handle);
+    if (!status.ok()) goto error;
+    buffers.emplace_back(new BufferDescriptor(
+        this, reader, range, bp_client, move(handle)));
   }
   range->AddUnusedBuffers(move(buffers), false);
   return Status::OK();

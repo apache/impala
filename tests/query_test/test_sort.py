@@ -67,14 +67,23 @@ class TestQueryFullSort(ImpalaTestSuite):
       order by o_orderdate"""
     exec_option = copy(vector.get_value('exec_option'))
     table_format = vector.get_value('table_format')
+    exec_option['default_spillable_buffer_size'] = '8M'
+
+    # Minimum memory for different parts of the plan.
+    sort_reservation_mb = 48
+    if table_format.file_format == 'parquet':
+      scan_reservation_mb = 24
+    else:
+      scan_reservation_mb = 8
+    total_reservation_mb = sort_reservation_mb + scan_reservation_mb
 
     # The below memory value assume 8M pages.
-    exec_option['default_spillable_buffer_size'] = '8M'
-    buffer_pool_limit_values = ['-1', '48M'] # Unlimited and minimum memory.
+    # Test with unlimited and minimum memory for all file formats.
+    buffer_pool_limit_values = ['-1', '{0}M'.format(total_reservation_mb)]
     if self.exploration_strategy() == 'exhaustive' and \
         table_format.file_format == 'parquet':
       # Test some intermediate values for parquet on exhaustive.
-      buffer_pool_limit_values += ['64M', '128M', '256M']
+      buffer_pool_limit_values += ['128M', '256M']
     for buffer_pool_limit in buffer_pool_limit_values:
       exec_option['buffer_pool_limit'] = buffer_pool_limit
       result = transpose_results(self.execute_query(
@@ -83,7 +92,6 @@ class TestQueryFullSort(ImpalaTestSuite):
 
   def test_sort_join(self, vector):
     """With 200m memory limit this should be a 2-phase sort"""
-
     query = """select o1.o_orderdate, o2.o_custkey, o1.o_comment from orders o1 join
     orders o2 on (o1.o_orderkey = o2.o_orderkey) order by o1.o_orderdate limit 100000"""
 

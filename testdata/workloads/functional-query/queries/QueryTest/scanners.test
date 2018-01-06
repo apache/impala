@@ -110,3 +110,10 @@ on (v.x = t3.bool_col) where t3.bool_col = true
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# Scan an empty unpartitioned table.
+select * from emptytable;
+---- RESULTS
+---- TYPES
+STRING,INT
+====

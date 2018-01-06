@@ -30,6 +30,7 @@
 #include "common/hdfs.h"
 #include "common/object-pool.h"
 #include "common/status.h"
+#include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/io/handle-cache.h"
 #include "runtime/io/request-ranges.h"
 #include "runtime/thread-resource-mgr.h"
@@ -41,8 +42,6 @@
 #include "util/thread.h"
 
 namespace impala {
-
-class MemTracker;
 
 namespace io {
 /// Manager object that schedules IO for all queries on all disks and remote filesystems
@@ -163,6 +162,7 @@ namespace io {
 ///    buffer and one buffer is in the disk queue. The additional buffer can absorb
 ///    bursts where the producer runs faster than the consumer or the consumer runs
 ///    faster than the producer without blocking either the producer or consumer.
+/// See IDEAL_MAX_SIZED_BUFFERS_PER_SCAN_RANGE.
 ///
 /// Caching support:
 /// Scan ranges contain metadata on whether or not it is cached on the DN. In that
@@ -243,11 +243,7 @@ class DiskIoMgr : public CacheLineAligned {
   /// Allocates tracking structure for a request context.
   /// Register a new request context and return it to the caller. The caller must call
   /// UnregisterContext() for each context.
-  /// reader_mem_tracker: Is non-null only for readers. IO buffers
-  ///    used for this reader will be tracked by this. If the limit is exceeded
-  ///    the reader will be cancelled and MEM_LIMIT_EXCEEDED will be returned via
-  ///    GetNext().
-  std::unique_ptr<RequestContext> RegisterContext(MemTracker* reader_mem_tracker);
+  std::unique_ptr<RequestContext> RegisterContext();
 
   /// Unregisters context from the disk IoMgr by first cancelling it then blocking until
   /// all references to the context are removed from I/O manager internal data structures.
@@ -302,16 +298,15 @@ class DiskIoMgr : public CacheLineAligned {
   /// *needs_buffers=true.
   ///
   /// The buffer sizes are chosen based on range->len(). 'max_bytes' must be >=
-  /// min_read_buffer_size() so that at least one buffer can be allocated. Returns ok
-  /// if the buffers were successfully allocated and the range was scheduled. Fails with
-  /// MEM_LIMIT_EXCEEDED if the buffers could not be allocated. On failure, any allocated
-  /// buffers are freed and the state of 'range' is unmodified so that allocation can be
-  /// retried.  Setting 'max_bytes' to 3 * max_buffer_size() will typically maximize I/O
-  /// throughput. See Buffer management" section of the class comment for explanation.
-  /// TODO: error handling contract will change with reservations. The caller needs to
-  /// to guarantee that there is sufficient reservation.
-  Status AllocateBuffersForRange(RequestContext* reader, ScanRange* range,
-      int64_t max_bytes);
+  /// min_read_buffer_size() so that at least one buffer can be allocated. The caller
+  /// must ensure that 'bp_client' has at least 'max_bytes' unused reservation. Returns ok
+  /// if the buffers were successfully allocated and the range was scheduled.
+  ///
+  /// Setting 'max_bytes' to IDEAL_MAX_SIZED_BUFFERS_PER_SCAN_RANGE * max_buffer_size()
+  /// will typically maximize I/O throughput. See the "Buffer Management" section of
+  /// the class comment for explanation.
+  Status AllocateBuffersForRange(RequestContext* reader,
+      BufferPool::ClientHandle* bp_client, ScanRange* range, int64_t max_bytes);
 
   /// Determine which disk queue this file should be assigned to.  Returns an index into
   /// disk_queues_.  The disk_id is the volume ID for the local disk that holds the
@@ -379,6 +374,10 @@ class DiskIoMgr : public CacheLineAligned {
     REMOTE_NUM_DISKS
   };
 
+  /// The ideal number of max-sized buffers per scan range to maximise throughput.
+  /// See "Buffer Management" in the class comment for explanation.
+  static const int64_t IDEAL_MAX_SIZED_BUFFERS_PER_SCAN_RANGE = 3;
+
  private:
   friend class BufferDescriptor;
   friend class RequestContext;
@@ -401,7 +400,7 @@ class DiskIoMgr : public CacheLineAligned {
   /// Maximum read size. This is also the maximum size of each allocated buffer.
   const int64_t max_buffer_size_;
 
-  /// The minimum size of each read buffer.
+  /// The minimum size of each read buffer. Must be >= BufferPool::min_buffer_len().
   const int64_t min_buffer_size_;
 
   /// Thread group containing all the worker threads.

@@ -15,8 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "runtime/io/disk-io-mgr-stress.h"
+#include <gflags/gflags.h>
 
+#include "common/init.h"
+#include "runtime/io/disk-io-mgr-stress.h"
 #include "common/init.h"
 #include "runtime/test-env.h"
 #include "service/fe-support.h"
@@ -31,34 +33,32 @@ using namespace impala::io;
 // can be passed to control how long to run this test (0 for forever).
 
 // TODO: make these configurable once we decide how to run BE tests with args
-const int DEFAULT_DURATION_SEC = 1;
+constexpr int DEFAULT_DURATION_SEC = 1;
 const int NUM_DISKS = 5;
 const int NUM_THREADS_PER_DISK = 5;
 const int NUM_CLIENTS = 10;
 const bool TEST_CANCELLATION = true;
+const int64_t BUFFER_POOL_CAPACITY = 1024L * 1024L * 1024L * 4L;
+
+DEFINE_int64(duration_sec, DEFAULT_DURATION_SEC,
+    "Disk I/O Manager stress test duration in seconds. 0 means run indefinitely.");
 
 int main(int argc, char** argv) {
-  InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
-  InitFeSupport();
-  TestEnv test_env;
-  ABORT_IF_ERROR(test_env.Init());
-  int duration_sec = DEFAULT_DURATION_SEC;
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  impala::InitFeSupport();
 
-  if (argc == 2) {
-    StringParser::ParseResult status;
-    duration_sec = StringParser::StringToInt<int>(argv[1], strlen(argv[1]), &status);
-    if (status != StringParser::PARSE_SUCCESS) {
-      printf("Invalid arg: %s\n", argv[1]);
-      return 1;
-    }
-  }
-  if (duration_sec != 0) {
-    printf("Running stress test for %d seconds.\n", duration_sec);
+  if (FLAGS_duration_sec != 0) {
+    printf("Running stress test for %ld seconds.\n", FLAGS_duration_sec);
   } else {
     printf("Running stress test indefinitely.\n");
   }
-  DiskIoMgrStress test(NUM_DISKS, NUM_THREADS_PER_DISK, NUM_CLIENTS, TEST_CANCELLATION);
-  test.Run(duration_sec);
 
+  TestEnv test_env;
+  // Tests try to allocate arbitrarily small buffers. Ensure Buffer Pool allows it.
+  test_env.SetBufferPoolArgs(DiskIoMgrStress::MIN_READ_BUFFER_SIZE, BUFFER_POOL_CAPACITY);
+  Status status = test_env.Init();
+  CHECK(status.ok()) << status.GetDetail();
+  DiskIoMgrStress test(NUM_DISKS, NUM_THREADS_PER_DISK, NUM_CLIENTS, TEST_CANCELLATION);
+  test.Run(FLAGS_duration_sec);
   return 0;
 }
