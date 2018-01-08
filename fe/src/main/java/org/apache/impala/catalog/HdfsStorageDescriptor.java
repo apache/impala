@@ -140,7 +140,12 @@ public class HdfsStorageDescriptor {
       // need support from the Hive side.
       return Byte.parseByte(delimVal);
     } catch (NumberFormatException e) {
-      if (delimVal.length() == 1) return (byte) delimVal.charAt(0);
+      if (delimVal.length() == 1) {
+        // Adding additional check as Java chars are two bytes.
+        // e.g. \u1111 as delimVal will return a valid byte '11'
+        int cp = Character.codePointAt(delimVal, 0);
+        if (cp >= 0 && cp <= 255) return (byte) cp;
+      }
     }
     return null;
   }

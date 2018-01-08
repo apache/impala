@@ -157,5 +157,23 @@ public class HdfsStorageDescriptorTest {
           "single character or as a decimal value in the range [-128:127]",
           e.getMessage());
     }
+
+    // Test that a unicode character out of the valid range will not be accepted.
+    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().putToParameters(serdeConstants.LINE_DELIM, "\u1111");
+    try {
+      HdfsStorageDescriptor.fromStorageDescriptor("fake", sd);
+      fail();
+    } catch (HdfsStorageDescriptor.InvalidStorageDescriptorException e) {
+      assertEquals("Invalid delimiter: '\u1111'. Delimiter must be specified as a " +
+          "single character or as a decimal value in the range [-128:127]",
+          e.getMessage());
+    }
+
+    // Validate that unicode character in the valid range will be accepted.
+    sd.getSerdeInfo().setParameters(new HashMap<String,String>());
+    sd.getSerdeInfo().putToParameters(serdeConstants.FIELD_DELIM, "\u0001");
+    assertNotNull(HdfsStorageDescriptor.fromStorageDescriptor("fakeTbl", sd));
+
   }
 }
