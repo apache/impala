@@ -81,6 +81,12 @@ under the License.
 
     <p conref="../shared/impala_common.xml#common/added_in_290"/>
 
+    <p rev="2.12.0 IMPALA-5310">
+      See <keyword keyref="compute_stats"/> for the
+        <codeph>TABLESAMPLE</codeph> clause used in the <codeph>COMPUTE
+        STATS</codeph> statement.
+    </p>
+
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
     <p>
