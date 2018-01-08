@@ -39,18 +39,20 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="hidden">COMPUTE STATS statement</indexterm>
-      Gathers information about volume and distribution of data in a table and all associated columns and
-      partitions. The information is stored in the metastore database, and used by Impala to help optimize queries.
-      For example, if Impala can determine that a table is large or small, or has many or few distinct values it
-      can organize parallelize the work appropriately for a join query or insert operation. For details about the
-      kinds of information gathered by this statement, see <xref href="impala_perf_stats.xml#perf_stats"/>.
+      <indexterm audience="hidden">COMPUTE STATS statement</indexterm> The
+      COMPUTE STATS statement gathers information about volume and distribution
+      of data in a table and all associated columns and partitions. The
+      information is stored in the metastore database, and used by Impala to
+      help optimize queries. For example, if Impala can determine that a table
+      is large or small, or has many or few distinct values it can organize and
+      parallelize the work appropriately for a join query or insert operation.
+      For details about the kinds of information gathered by this statement, see
+        <xref href="impala_perf_stats.xml#perf_stats"/>.
     </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
-<codeblock rev="impala-3562">COMPUTE STATS
-  [<varname>db_name</varname>.]<varname>table_name</varname> [ ( <varname>column_list</varname> ) ]
+<codeblock rev="2.1.0"><ph rev="2.12.0 IMPALA-5310">COMPUTE STATS [<varname>db_name</varname>.]<varname>table_name</varname>  [ ( <varname>column_list</varname> ) ] [TABLESAMPLE SYSTEM(<varname>percentage</varname>) [REPEATABLE(<varname>seed</varname>)]]</ph>
 
 <varname>column_list</varname> ::= <varname>column_name</varname> [ , <varname>column_name</varname>, ... ]
 
@@ -102,6 +104,18 @@ COMPUTE INCREMENTAL STATS [<varname>db_name</varname>.]<varname>table_name</varn
     <p rev="impala-3562">
       If an empty column list is given, no column is analyzed by <codeph>COMPUTE
         STATS</codeph>.
+    </p>
+
+    <p rev="2.12.0 IMPALA-5310">
+      In <keyword keyref="impala212_full"/> and
+      higher, an optional <codeph>TABLESAMPLE</codeph> clause immediately after
+      a table reference specifies that the <codeph>COMPUTE STATS</codeph>
+      operation only processes a specified percentage of the table data. For
+      tables that are so large that a full <codeph>COMPUTE STATS</codeph>
+      operation is impractical, you can use <codeph>COMPUTE STATS</codeph> with
+      a <codeph>TABLESAMPLE</codeph> clause to extrapolate statistics from a
+      sample of the table data. See <keyword keyref="perf_stats"/>about the
+      experimental stats extrapolation and sampling features.
     </p>
 
     <p rev="2.1.0">
