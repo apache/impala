@@ -334,4 +334,18 @@ ARRAY<VARCHAR(10)>     becomes  ARRAY<VARCHAR(10)>
     </conbody>
   </concept>
 
+  <concept id="jdbc_kudu">
+    <title>Kudu Considerations for DML Statements</title>
+    <conbody>
+      <p>
+        Currently, Impala <codeph>INSERT</codeph>, <codeph>UPDATE</codeph>, or
+        other DML statements issued through the JDBC interface against a Kudu
+        table do not return JDBC error codes for conditions such as duplicate
+        primary key columns. Therefore, for applications that issue a high
+        volume of DML statements, prefer to use the Kudu Java API directly
+        rather than a JDBC application.
+      </p>
+    </conbody>
+  </concept>
+
 </concept>
