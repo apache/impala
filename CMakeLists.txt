@@ -307,6 +307,11 @@ IMPALA_ADD_THIRDPARTY_LIB(krb5 ${KERBEROS_INCLUDE_DIR} "" ${KERBEROS_LIBRARY})
 # testing.
 find_package(KerberosPrograms REQUIRED)
 
+# Tests that run any security related tests need to link this in to override the
+# krb5_realm_override() implementation in krb5.
+# See be/src/kudu/security/krb5_realm_override.cc for more information.
+set(KRB5_REALM_OVERRIDE -Wl,--undefined=krb5_realm_override_loaded krb5_realm_override)
+
 ###################################################################
 
 # System dependencies

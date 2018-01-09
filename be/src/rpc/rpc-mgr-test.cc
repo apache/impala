@@ -195,7 +195,9 @@ class ScanMemServiceImpl : public ScanMemServiceIf {
 // Reenable after fixing.
 INSTANTIATE_TEST_CASE_P(KerberosOnAndOff,
                         RpcMgrKerberizedTest,
-                        ::testing::Values(KERBEROS_OFF));
+                        ::testing::Values(KERBEROS_OFF,
+                                          USE_KUDU_KERBEROS,
+                                          USE_IMPALA_KERBEROS));
 
 TEST_P(RpcMgrKerberizedTest, MultipleServices) {
   // Test that a service can be started, and will respond to requests.
