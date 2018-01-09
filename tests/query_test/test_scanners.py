@@ -388,6 +388,19 @@ class TestParquet(ImpalaTestSuite):
     self.run_test_case('QueryTest/parquet-corrupt-rle-counts-abort',
                        vector, unique_database)
 
+  def test_bad_compressed_page_size(self, vector, unique_database):
+    """IMPALA-6353: Tests that a parquet dict page with 0 compressed_page_size is
+    gracefully handled. """
+    self.client.execute(
+        "create table %s.bad_compressed_dict_page_size (col string) stored as parquet"
+        % unique_database)
+    tbl_loc = get_fs_path("/test-warehouse/%s.db/%s" % (unique_database,
+        "bad_compressed_dict_page_size"))
+    check_call(['hdfs', 'dfs', '-copyFromLocal', os.environ['IMPALA_HOME'] +
+        "/testdata/data/bad_compressed_dict_page_size.parquet", tbl_loc])
+    self.run_test_case('QueryTest/parquet-bad-compressed-dict-page-size', vector,
+        unique_database)
+
   def test_bitpacked_def_levels(self, vector, unique_database):
     """Test that Impala can read a Parquet file with the deprecated bit-packed def
        level encoding."""

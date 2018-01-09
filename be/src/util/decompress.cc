@@ -524,6 +524,7 @@ SnappyDecompressor::SnappyDecompressor(MemPool* mem_pool, bool reuse_buffer)
 }
 
 int64_t SnappyDecompressor::MaxOutputLen(int64_t input_len, const uint8_t* input) {
+  if (input_len <= 0) return -1;
   DCHECK(input != nullptr);
   size_t result;
   if (!snappy::GetUncompressedLength(reinterpret_cast<const char*>(input),

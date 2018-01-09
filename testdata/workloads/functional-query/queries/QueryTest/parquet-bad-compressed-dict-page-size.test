@@ -1,0 +1,7 @@
+====
+---- QUERY
+# Parquet file with invalid (0) compressed_page_size in a dict page.
+select * from bad_compressed_dict_page_size;
+---- CATCH
+Snappy: GetUncompressedLength failed
+====
