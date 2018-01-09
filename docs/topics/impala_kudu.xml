@@ -1373,6 +1373,23 @@ kudu.table_name  | impala::some_database.table_name_demo
         parallelize the query very efficiently.
       </p>
 
+      <p rev="2.11.0 IMPALA-4252">
+        In <keyword keyref="impala211_full"/> and higher, Impala can push down additional
+        information to optimize join queries involving Kudu tables. If the join clause
+        contains predicates of the form
+        <codeph><varname>column</varname> = <varname>expression</varname></codeph>,
+        after Impala constructs a hash table of possible matching values for the
+        join columns from the bigger table (either an HDFS table or a Kudu table), Impala
+        can <q>push down</q> the minimum and maximum matching column values to Kudu,
+        so that Kudu can more efficiently locate matching rows in the second (smaller) table.
+        These min/max filters are affected by the <codeph>RUNTIME_FILTER_MODE</codeph>,
+        <codeph>RUNTIME_FILTER_WAIT_TIME_MS</codeph>, and <codeph>DISABLE_ROW_RUNTIME_FILTERING</codeph>
+        query options; the min/max filters are not affected by the
+        <codeph>RUNTIME_BLOOM_FILTER_SIZE</codeph>, <codeph>RUNTIME_FILTER_MIN_SIZE</codeph>,
+        <codeph>RUNTIME_FILTER_MAX_SIZE</codeph>, and <codeph>MAX_NUM_RUNTIME_FILTERS</codeph>
+        query options.
+      </p>
+
       <p>
         See <xref keyref="explain"/> for examples of evaluating the effectiveness of
         the predicate pushdown for a specific query against a Kudu table.

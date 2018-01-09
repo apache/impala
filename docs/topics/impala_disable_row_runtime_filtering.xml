@@ -72,6 +72,20 @@ under the License.
       unsetting it immediately afterward.
     </p>
 
+    <p conref="../shared/impala_common.xml#common/file_format_blurb"/>
+
+    <p rev="2.11.0 IMPALA-4252">
+      This query option only applies to queries against HDFS-based tables
+      using the Parquet file format.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+
+    <p rev="2.11.0 IMPALA-4252">
+      When applied to a query involving a Kudu table, this option turns off
+      all runtime filtering for the Kudu table.
+    </p>
+
     <p conref="../shared/impala_common.xml#common/related_info"/>
     <p>
       <xref href="impala_runtime_filtering.xml"/>,

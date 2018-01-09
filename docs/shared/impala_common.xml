@@ -1194,6 +1194,12 @@ drop database temp;
         <codeph>hadoop fs -cp</codeph>, or <codeph>INSERT</codeph> in Impala or Hive.
       </p>
 
+      <p rev="2.11.0 IMPALA-4252" id="filter_option_bloom_only">
+        This query option affects only Bloom filters, not the min/max filters
+        that are applied to Kudu tables. Therefore, it does not affect the
+        performance of queries against Kudu tables.
+      </p>
+
       <p rev="2.9.0 IMPALA-5333" id="adls_dml_performance">
         <draft-comment>
           Currently nothing to say on this subject. Leaving this placeholder

@@ -67,6 +67,10 @@ under the License.
 
     <p conref="../shared/impala_common.xml#common/runtime_filtering_option_caveat"/>
 
+    <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+
+    <p rev="2.11.0 IMPALA-4252" conref="../shared/impala_common.xml#common/filter_option_bloom_only"/>
+
     <p conref="../shared/impala_common.xml#common/related_info"/>
     <p>
       <xref href="impala_runtime_filtering.xml"/>,

@@ -169,16 +169,23 @@ under the License.
         of values for join key columns. When this list is values is transmitted in time to a scan node,
         Impala can filter out non-matching values immediately after reading them, rather than transmitting
         the raw data to another host to compare against the in-memory hash table on that host.
-        This data structure is implemented as a <term>Bloom filter</term>, which uses a probability-based
-        algorithm to determine all possible matching values. (The probability-based aspects means that the
-        filter might include some non-matching values, but if so, that does not cause any inaccuracy
+      </p>
+      <p>
+        For HDFS-based tables, this data structure is implemented as a <term>Bloom filter</term>, which uses
+        a probability-based algorithm to determine all possible matching values. (The probability-based aspects
+        means that the filter might include some non-matching values, but if so, that does not cause any inaccuracy
         in the final results.)
+      </p>
+      <p rev="2.11.0 IMPALA-4252">
+        Another kind of filter is the <q>min-max</q> filter. It currently only applies to Kudu tables. The
+        filter is a data structure representing a minimum and maximum value. These filters are passed to
+        Kudu to reduce the number of rows returned to Impala when scanning the probe side of the join.
       </p>
       <p>
         There are different kinds of filters to match the different kinds of joins (partitioned and broadcast).
-        A broadcast filter is a complete list of relevant values that can be immediately evaluated by a scan node.
-        A partitioned filter is a partial list of relevant values (based on the data processed by one host in the
-        cluster); all the partitioned filters must be combined into one (by the coordinator node) before the
+        A broadcast filter reflects the complete list of relevant values and can be immediately evaluated by a scan node.
+        A partitioned filter reflects only the values processed by one host in the
+        cluster; all the partitioned filters must be combined into one (by the coordinator node) before the
         scan nodes can use the results to accurately filter the data as it is read from storage.
       </p>
       <p>
@@ -331,6 +338,9 @@ under the License.
         <codeph>runtime filters: <varname>filter_id</varname> &lt;- <varname>table</varname>.<varname>column</varname></codeph>,
         while a plan fragment that consumes a filter includes an annotation such as
         <codeph>runtime filters: <varname>filter_id</varname> -&gt; <varname>table</varname>.<varname>column</varname></codeph>.
+        <ph rev="2.11.0 IMPALA-4252">Setting the query option <codeph>EXPLAIN_LEVEL=2</codeph> adds additional
+        annotations showing the type of the filter, either <codeph><varname>filter_id</varname>[bloom]</codeph>
+        (for HDFS-based tables) or <codeph><varname>filter_id</varname>[min_max]</codeph> (for Kudu tables).</ph>
       </p>
 
       <p>
@@ -507,6 +517,8 @@ select c1 from huge_t1 join [shuffle] huge_t2
         The runtime filtering feature is most effective for the Parquet file formats.
         For other file formats, filtering only applies for partitioned tables.
         See <xref href="impala_runtime_filtering.xml#runtime_filtering_file_formats"/>.
+        For the ways in which runtime filtering works for Kudu tables, see
+        <xref href="impala_kudu.xml#kudu_performance"/>.
       </p>
 
       <!-- To do: check if this restriction is lifted in 5.8 / 2.6. -->
