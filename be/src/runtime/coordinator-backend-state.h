@@ -219,7 +219,7 @@ class Coordinator::BackendState {
 
   /// If the status indicates an error status, execution has either been aborted by the
   /// executing impalad (which then reported the error) or cancellation has been
-  /// initiated; either way, execution must not be cancelled.
+  /// initiated by the coordinator.
   Status status_;
 
   /// Used to distinguish between errors reported by a specific fragment instance,
@@ -254,7 +254,9 @@ class Coordinator::BackendState {
       const FilterRoutingTable& filter_routing_table,
       TExecQueryFInstancesParams* rpc_params);
 
-  /// Return true if execution at this backend is done. Caller must hold lock_.
+  /// Return true if execution at this backend is done. The backend is considered done if
+  /// either all instances have completed, or an error (other than cancel) is encountered.
+  /// Caller must hold lock_.
   bool IsDone() const;
 };
 
