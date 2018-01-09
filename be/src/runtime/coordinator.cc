@@ -867,6 +867,9 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos) {
     ReleaseExecResources();
     // wait for all backends to complete before computing the summary
     // TODO: relocate this so GetNext() won't have to wait for backends to complete?
+    // Note that doing this here allows us to ensure that a query that completes
+    // successfully will have a full runtime profile by the time that Fetch() indicates
+    // all of the results have been returned.
     RETURN_IF_ERROR(WaitForBackendCompletion());
     // Release admission control resources after backends are finished.
     ReleaseAdmissionControlResources();
@@ -920,10 +923,8 @@ Status Coordinator::UpdateBackendExecStatus(const TReportExecStatusParams& param
         Substitute("Unknown backend index $0 (max known: $1)",
             params.coord_state_idx, backend_states_.size() - 1));
   }
-  BackendState* backend_state = backend_states_[params.coord_state_idx];
-  // TODO: return here if returned_all_results_?
-  // TODO: return CANCELLED in that case? Although that makes the cancellation propagation
-  // path more irregular.
+  // If the query was cancelled, don't process the update.
+  if (query_status_.IsCancelled()) return Status::OK();
 
   // TODO: only do this when the sink is done; probably missing a done field
   // in TReportExecStatus for that
@@ -931,6 +932,7 @@ Status Coordinator::UpdateBackendExecStatus(const TReportExecStatusParams& param
     UpdateInsertExecStatus(params.insert_exec_status);
   }
 
+  BackendState* backend_state = backend_states_[params.coord_state_idx];
   if (backend_state->ApplyExecStatusReport(params, &exec_summary_, &progress_)) {
     // This report made this backend done, so update the status and
     // num_remaining_backends_.
