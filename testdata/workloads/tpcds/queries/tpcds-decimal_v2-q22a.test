@@ -2,7 +2,6 @@
 ---- QUERY: TPCDS-Q22A
 -- RESULT MISMATCH FROM ORIGINAL in LSD of AVG() values
 -- FIXED, HAND_ROUNDED AVG() VALUES IN RESULT SET
-set decimal_v2=1;
 with results as
 (select  i_product_name
              ,i_brand

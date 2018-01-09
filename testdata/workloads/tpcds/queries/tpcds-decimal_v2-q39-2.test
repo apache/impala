@@ -1,0 +1,50 @@
+====
+---- QUERY: TPCDS-Q39.2
+-- RESULT MISMATCH FROM ORIGINAL
+-- ADDED ROUND()s TO 4th, 5th, 9th, 10th COLUMNS, TAKE ACTUAL RESULTS AS EXPECTED.
+with inv as
+(select w_warehouse_name,w_warehouse_sk,i_item_sk,d_moy
+       ,stdev,mean, case mean when 0 then null else stdev/mean end cov
+ from(select w_warehouse_name,w_warehouse_sk,i_item_sk,d_moy
+            ,stddev_samp(inv_quantity_on_hand) stdev,avg(inv_quantity_on_hand) mean
+      from inventory
+          ,item
+          ,warehouse
+          ,date_dim
+      where inv_item_sk = i_item_sk
+        and inv_warehouse_sk = w_warehouse_sk
+        and inv_date_sk = d_date_sk
+        and d_year =2001
+      group by w_warehouse_name,w_warehouse_sk,i_item_sk,d_moy) foo
+ where case mean when 0 then 0 else stdev/mean end > 1)
+select inv1.w_warehouse_sk,inv1.i_item_sk,inv1.d_moy
+        ,round(inv1.mean, 2), round(inv1.cov, 8)
+        ,inv2.w_warehouse_sk,inv2.i_item_sk,inv2.d_moy
+        ,round(inv2.mean, 2), round(inv2.cov, 8)
+from inv inv1,inv inv2
+where inv1.i_item_sk = inv2.i_item_sk
+  and inv1.w_warehouse_sk =  inv2.w_warehouse_sk
+  and inv1.d_moy=1
+  and inv2.d_moy=1+1
+  and inv1.cov > 1.5
+order by inv1.w_warehouse_sk,inv1.i_item_sk,inv1.d_moy,inv1.mean,inv1.cov
+        ,inv2.d_moy,inv2.mean, inv2.cov
+;
+---- RESULTS
+1,1569,1,212.00,1.63021352,1,1569,2,239.25,1.26415133
+1,5627,1,282.75,1.56570324,1,5627,2,297.50,1.20842868
+1,7999,1,166.25,1.79242317,1,7999,2,375.33,1.00809226
+1,8611,1,300.50,1.51915452,1,8611,2,243.75,1.23421228
+1,15345,1,148.50,1.52957840,1,15345,2,246.50,1.50879877
+2,71,1,221.50,1.56397411,2,71,2,309.00,1.49170579
+2,6103,1,194.33,1.51606702,2,6103,2,158.50,1.27436986
+2,6489,1,268.00,1.69563724,2,6489,2,389.00,1.41057805
+2,15839,1,353.00,1.50636844,2,15839,2,255.50,1.23623932
+3,7207,1,329.67,1.59544822,3,7207,2,414.50,1.01791971
+3,10547,1,182.33,1.53256415,3,10547,2,320.25,1.30244184
+3,12867,1,278.25,1.64038001,3,12867,2,350.75,1.20069333
+4,947,1,247.50,1.69331818,4,947,2,203.33,1.20543315
+5,3137,1,271.25,1.57545322,5,3137,2,380.00,1.08342034
+---- TYPES
+INT, BIGINT, INT, DOUBLE, DOUBLE, INT, BIGINT, INT, DOUBLE, DOUBLE
+====

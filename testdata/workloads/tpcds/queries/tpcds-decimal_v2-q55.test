@@ -1,0 +1,127 @@
+====
+---- QUERY: TPCDS-Q55
+select
+  i_brand_id brand_id,
+  i_brand brand,
+  sum(ss_ext_sales_price) ext_price
+from
+  date_dim,
+  store_sales,
+  item
+where
+  d_date_sk = ss_sold_date_sk
+  and ss_item_sk = i_item_sk
+  and i_manager_id = 28
+  and d_moy = 12
+  and d_year = 1999
+group by
+  i_brand,
+  i_brand_id
+order by
+  ext_price desc,
+  i_brand_id
+limit 100;
+---- RESULTS
+1001001,'amalgamalg #1',136722.83
+2001001,'amalgimporto #1',133391.08
+5001001,'amalgscholar #1',118347.84
+5003001,'exportischolar #1',109595.01
+1002001,'importoamalg #1',105226.72
+5003002,'exportischolar #2',95810.25
+5004001,'edu packscholar #1',90624.90
+4001001,'amalgedu pack #1',83730.42
+1001002,'amalgamalg #2',81937.80
+4001002,'amalgedu pack #2',78799.33
+2002001,'importoimporto #1',77701.54
+3003001,'exportiexporti #1',66809.69
+4002001,'importoedu pack #1',65056.38
+5001002,'amalgscholar #2',63100.23
+4003001,'exportiedu pack #1',61067.16
+3001001,'amalgexporti #1',58157.56
+5002001,'importoscholar #1',57895.73
+2003001,'exportiimporto #1',54996.70
+4004002,'edu packedu pack #2',54650.86
+6016005,'corpbrand #5',50955.77
+1004001,'edu packamalg #1',50844.36
+6002001,'importocorp #1',48122.46
+7015003,'scholarnameless #3',47531.49
+1004002,'edu packamalg #2',46925.04
+6006006,'corpcorp #6',44504.94
+3002001,'importoexporti #1',44449.84
+5002002,'importoscholar #2',43736.13
+9004008,'edu packmaxi #8',43124.13
+6011006,'amalgbrand #6',42516.13
+9016003,'corpunivamalg #3',41651.94
+8009007,'maxinameless #7',40216.48
+9008008,'namelessmaxi #8',37294.08
+10012012,'importoamalgamalg #12',36166.35
+2004001,'edu packimporto #1',36056.65
+10003013,'exportiunivamalg #13',32619.62
+1003001,'exportiamalg #1',28084.23
+8010006,'univmaxi #6',27531.46
+8006005,'corpnameless #5',26468.77
+2004002,'edu packimporto #2',26438.94
+6014007,'edu packbrand #7',25884.76
+6005001,'scholarcorp #1',25849.68
+9005002,'scholarmaxi #2',25116.15
+9011003,'amalgunivamalg #3',25085.52
+10006017,'corpunivamalg #17',25085.08
+6009008,'maxicorp #8',24934.96
+7011009,'amalgnameless #9',24823.19
+9011009,'amalgunivamalg #9',24802.03
+8013007,'exportimaxi #7',24582.70
+8012005,'importomaxi #5',24370.92
+6003006,'exporticorp #6',23710.13
+3004001,'edu packexporti #1',23358.51
+1003002,'exportiamalg #2',23154.78
+7002004,'importobrand #4',23003.13
+9005011,'scholarmaxi #11',22313.86
+9013009,'exportiunivamalg #9',22303.83
+9003003,'exportimaxi #3',21736.62
+2001002,'amalgimporto #2',21466.13
+6011001,'amalgbrand #1',21162.91
+6008008,'namelesscorp #8',20636.40
+9016009,'corpunivamalg #9',20465.89
+10013009,'exportiamalgamalg #9',19610.85
+10009006,'maxiunivamalg #6',19564.84
+4002002,'importoedu pack #2',19399.39
+3002002,'importoexporti #2',19272.70
+6002002,'importocorp #2',19147.26
+3001002,'amalgexporti #2',19008.57
+6014001,'edu packbrand #1',18807.55
+8002010,'importonameless #10',18591.58
+7003005,'exportibrand #5',18527.36
+2003002,'exportiimporto #2',18318.61
+6005003,'scholarcorp #3',18167.51
+8009003,'maxinameless #3',17115.53
+8001003,'amalgnameless #3',17068.61
+7015007,'scholarnameless #7',16069.97
+9011008,'amalgunivamalg #8',15861.18
+8011009,'amalgmaxi #9',15785.74
+6014008,'edu packbrand #8',15668.28
+10016003,'corpamalgamalg #3',15322.94
+6015003,'scholarbrand #3',14890.37
+8005010,'scholarnameless #10',14620.95
+8004009,'edu packnameless #9',14529.33
+10004001,'edu packunivamalg #1',14101.90
+8006008,'corpnameless #8',13159.42
+10015001,'scholaramalgamalg #1',13119.59
+9015009,'scholarunivamalg #9',12679.95
+7006010,'corpbrand #10',11490.56
+10005001,'scholarunivamalg #1',11299.62
+6015001,'scholarbrand #1',11242.40
+6013007,'exportibrand #7',11162.36
+6006002,'corpcorp #2',10986.40
+10015011,'scholaramalgamalg #11',10980.10
+8004003,'edu packnameless #3',10945.08
+6001005,'amalgcorp #5',10108.20
+10014016,'edu packamalgamalg #16',9656.21
+6008001,'namelesscorp #1',9546.46
+6009003,'maxicorp #3',8425.25
+10011013,'amalgamalgamalg #13',7914.33
+7009005,'maxibrand #5',7859.23
+10006001,'corpunivamalg #1',6901.74
+9009002,'maximaxi #2',4025.61
+---- TYPES
+INT, STRING, DECIMAL
+====

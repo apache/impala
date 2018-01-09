@@ -99,6 +99,10 @@ class ImpalaTestMatrix(object):
   def add_dimension(self, dimension):
     self.dimensions[dimension.name] = dimension
 
+  def add_mandatory_exec_option(self, exec_option_key, exec_option_value):
+    for vector in self.dimensions['exec_option']:
+      vector.value[exec_option_key] = exec_option_value
+
   def clear(self):
     self.dimensions.clear()
 
