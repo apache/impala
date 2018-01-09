@@ -98,6 +98,8 @@ public class AuthorizationTest {
   //   INSERT permissions on 'functional.alltypes' (no SELECT permissions)
   //   INSERT permissions on all tables in 'functional_parquet' database
   //   No permissions on database 'functional_rc'
+  //   Only column level permissions in 'functional_avro':
+  //     SELECT permissions on columns ('id') on 'functional_avro.alltypessmall'
   public final static String AUTHZ_POLICY_FILE = "/test-warehouse/authz-policy.ini";
   public final static User USER = new User(System.getProperty("user.name"));
 
@@ -388,6 +390,19 @@ public class AuthorizationTest {
       privileges.add(priv);
     }
     sentryService.grantRolePrivileges(USER, roleName, privileges);
+
+    // select_column_level_functional_avro
+    roleName = "select_column_level_functional_avro";
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+
+    privilege = new TPrivilege("", TPrivilegeLevel.SELECT,
+        TPrivilegeScope.COLUMN, false);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional_avro");
+    privilege.setTable_name("alltypessmall");
+    privilege.setColumn_name("id");
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
   }
 
   @Test
@@ -757,6 +772,7 @@ public class AuthorizationTest {
   public void TestUseDb() throws ImpalaException {
     // Positive cases (user has privileges on these tables).
     AuthzOk("use functional");
+    AuthzOk("use functional_avro"); // Database with only column privileges.
     AuthzOk("use tpcds");
     AuthzOk("use tpch");
 
@@ -1517,6 +1533,7 @@ public class AuthorizationTest {
   @Test
   public void TestShowPermissions() throws ImpalaException {
     AuthzOk("show tables in functional");
+    AuthzOk("show tables in functional_avro"); // Database with only column privileges.
     AuthzOk("show databases");
     AuthzOk("show tables in _impala_builtins");
     AuthzOk("show functions in _impala_builtins");
@@ -1579,7 +1596,7 @@ public class AuthorizationTest {
     // These are the only dbs that should show up because they are the only
     // dbs the user has any permissions on.
     List<String> expectedDbs = Lists.newArrayList("default", "functional",
-        "functional_parquet", "functional_seq_snap", "tpcds", "tpch");
+        "functional_avro", "functional_parquet", "functional_seq_snap", "tpcds", "tpch");
 
     List<Db> dbs = fe_.getDbs(PatternMatcher.createHivePatternMatcher("*"), USER);
     assertEquals(expectedDbs, extractDbNames(dbs));
@@ -1742,7 +1759,7 @@ public class AuthorizationTest {
     req.get_schemas_req.setSchemaName("%");
     TResultSet resp = fe_.execHiveServer2MetadataOp(req);
     List<String> expectedDbs = Lists.newArrayList("default", "functional",
-        "functional_parquet", "functional_seq_snap", "tpcds", "tpch");
+        "functional_avro", "functional_parquet", "functional_seq_snap", "tpcds", "tpch");
     assertEquals(expectedDbs.size(), resp.rows.size());
     for (int i = 0; i < resp.rows.size(); ++i) {
       assertEquals(expectedDbs.get(i),

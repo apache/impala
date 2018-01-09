@@ -31,6 +31,7 @@ import java.util.Set;
 
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizeableTable;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
@@ -2473,7 +2474,8 @@ public class Analyzer {
       throws AnalysisException {
     PrivilegeRequestBuilder pb = new PrivilegeRequestBuilder();
     if (privilege == Privilege.ANY) {
-      registerPrivReq(pb.any().onAnyTable(dbName).toRequest());
+      registerPrivReq(
+          pb.any().onAnyColumn(dbName, AuthorizeableTable.ANY_TABLE_NAME).toRequest());
     } else {
       registerPrivReq(pb.allOf(privilege).onDb(dbName).toRequest());
     }
