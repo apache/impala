@@ -17,6 +17,7 @@
 #ifndef KUDU_RPC_RPC_CONTEXT_H
 #define KUDU_RPC_RPC_CONTEXT_H
 
+#include <stddef.h>
 #include <string>
 
 #include "kudu/gutil/gscoped_ptr.h"
@@ -202,6 +203,11 @@ class RpcContext {
 
   // Returns this call's request id, if it is set.
   const rpc::RequestIdPB* request_id() const;
+
+  // Returns the size of the transfer buffer that backs 'call_'. If the
+  // transfer buffer no longer exists (e.g. GetTransferSize() is called after
+  // DiscardTransfer()), returns 0.
+  size_t GetTransferSize() const;
 
   // Panic the server. This logs a fatal error with the given message, and
   // also includes the current RPC request, requestor, trace information, etc,
