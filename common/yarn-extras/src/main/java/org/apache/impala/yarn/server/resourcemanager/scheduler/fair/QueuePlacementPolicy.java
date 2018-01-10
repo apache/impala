@@ -54,6 +54,7 @@ public class QueuePlacementPolicy {
     ruleClasses = Collections.unmodifiableMap(map);
   }
   
+  private final Configuration conf_; // Testing only.
   private final List<QueuePlacementRule> rules;
   private final Map<FSQueueType, Set<String>> configuredQueues;
   private final Groups groups;
@@ -73,6 +74,7 @@ public class QueuePlacementPolicy {
     }
     this.rules = rules;
     this.configuredQueues = configuredQueues;
+    this.conf_ = conf;
     groups = new Groups(conf);
   }
   
@@ -178,4 +180,6 @@ public class QueuePlacementPolicy {
   public List<QueuePlacementRule> getRules() {
     return rules;
   }
+
+  public Configuration getConf() { return conf_; }
 }

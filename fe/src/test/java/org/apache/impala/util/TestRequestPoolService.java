@@ -45,6 +45,7 @@ import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TPoolConfig;
 import org.apache.impala.thrift.TResolveRequestPoolParams;
 import org.apache.impala.thrift.TResolveRequestPoolResult;
+import org.apache.impala.yarn.server.resourcemanager.scheduler.fair.QueuePlacementPolicy;
 import com.google.common.collect.Iterables;
 import com.google.common.io.Files;
 
@@ -116,6 +117,11 @@ public class TestRequestPoolService {
       poolService_.llamaConfWatcher_.setCheckIntervalMs(CHECK_INTERVAL_MS);
     }
     poolService_.start();
+    // Make sure that the Hadoop configuration from classpath is used for the underlying
+    // QueuePlacementPolicy.
+    QueuePlacementPolicy policy = poolService_.getAllocationConfig().getPlacementPolicy();
+    Configuration conf = policy.getConf();
+    Assert.assertTrue(conf.getBoolean("impala.core-site.overridden", false));
   }
 
   @BeforeClass

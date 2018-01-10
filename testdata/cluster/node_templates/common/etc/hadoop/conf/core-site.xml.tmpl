@@ -110,4 +110,11 @@ DEFAULT</value>
     <value>https://login.windows.net/${azure_tenant_id}/oauth2/token</value>
   </property>
 
+  <!-- This property can be used in tests to ascertain that this core-site.xml from
+   the classpath has been loaded. (Ex: TestRequestPoolService) -->
+  <property>
+    <name>impala.core-site.overridden</name>
+    <value>true</value>
+  </property>
+
 </configuration>

@@ -39,6 +39,7 @@ import org.apache.impala.common.ByteUnits;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.JniUtil;
+import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TPoolConfigParams;
 import org.apache.impala.thrift.TPoolConfig;
@@ -170,7 +171,9 @@ public class RequestPoolService {
       throw new IllegalArgumentException(
           "Unable to find allocation configuration file: " + fsAllocationPath);
     }
-    Configuration allocConf = new Configuration(false);
+    // Load the default Hadoop configuration files for picking up overrides like custom
+    // group mapping plugins etc.
+    Configuration allocConf = new Configuration();
     allocConf.set(FairSchedulerConfiguration.ALLOCATION_FILE, fsAllocationURL.getPath());
     allocLoader_ = new AllocationFileLoaderService();
     allocLoader_.init(allocConf);
@@ -449,5 +452,15 @@ public class RequestPoolService {
     shortName = requestingUser.getShortName();
     UserGroupInformation ugi = UserGroupInformation.createRemoteUser(shortName);
     return allocationConf_.get().hasAccess(pool, QueueACL.SUBMIT_APPLICATIONS, ugi);
+  }
+
+  /**
+   * Returns the AllocationConfiguration corresponding to this instance of
+   * RequestPoolService.
+   */
+  @VisibleForTesting
+  AllocationConfiguration getAllocationConfig() {
+    Preconditions.checkState(RuntimeEnv.INSTANCE.isTestEnv());
+    return allocationConf_.get();
   }
 }
