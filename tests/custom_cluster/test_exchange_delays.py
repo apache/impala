@@ -19,9 +19,14 @@ import pytest
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import specific_build_type_timeout
 from tests.common.skip import SkipIfBuildType
+from tests.util.filesystem_utils import IS_ISILON
 
 # IMPALA-6100: add additional margin for error for slow build types.
-DELAY_MS = specific_build_type_timeout(10000, slow_build_timeout=20000)
+SLOW_BUILD_TIMEOUT=20000
+DELAY_MS = specific_build_type_timeout(10000, slow_build_timeout=SLOW_BUILD_TIMEOUT)
+# IMPALA-6381: Isilon can behave as a slow build.
+if IS_ISILON:
+  DELAY_MS = SLOW_BUILD_TIMEOUT
 
 @SkipIfBuildType.not_dev_build
 class TestExchangeDelays(CustomClusterTestSuite):
