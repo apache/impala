@@ -15,9 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.
 
-.PHONY: all
+.PHONY: all html pdf
 
-all: build/html/index.html build/impala.pdf
+all: html pdf
+
+html: build/html/index.html
+
+pdf: build/impala.pdf
 
 ALL_DEPS=Makefile impala.ditamap shared/*.xml images/* topics/*.xml
 
