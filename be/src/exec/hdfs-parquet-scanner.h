@@ -642,6 +642,11 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Should be called after completing a row group and when returning the last batch.
   void FlushRowGroupResources(RowBatch* row_batch);
 
+  /// Releases resources associated with a row group that was skipped and closes all
+  /// column readers. Should be called after skipping a row group from which no rows
+  /// were returned.
+  void ReleaseSkippedRowGroupResources();
+
   /// Evaluates whether the column reader is eligible for dictionary predicates
   bool IsDictFilterable(ParquetColumnReader* col_reader);
 
