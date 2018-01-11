@@ -162,70 +162,70 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
   IMPALA_SERVER_READY = m->AddProperty<bool>(
       ImpaladMetricKeys::IMPALA_SERVER_READY, false);
 
-  IMPALA_SERVER_NUM_QUERIES = m->AddCounter<int64_t>(
+  IMPALA_SERVER_NUM_QUERIES = m->AddCounter(
       ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES, 0);
-  NUM_QUERIES_REGISTERED = m->AddGauge<int64_t>(ImpaladMetricKeys::NUM_QUERIES_REGISTERED, 0);
-  NUM_QUERIES_EXPIRED = m->AddCounter<int64_t>(
+  NUM_QUERIES_REGISTERED = m->AddGauge(
+      ImpaladMetricKeys::NUM_QUERIES_REGISTERED, 0);
+  NUM_QUERIES_EXPIRED = m->AddCounter(
       ImpaladMetricKeys::NUM_QUERIES_EXPIRED, 0);
-  NUM_QUERIES_SPILLED = m->AddCounter<int64_t>(
+  NUM_QUERIES_SPILLED = m->AddCounter(
       ImpaladMetricKeys::NUM_QUERIES_SPILLED, 0);
-  IMPALA_SERVER_NUM_FRAGMENTS = m->AddCounter<int64_t>(
+  IMPALA_SERVER_NUM_FRAGMENTS = m->AddCounter(
       ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS, 0);
   IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT = m->AddGauge(
       ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT, 0L);
-  IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS = m->AddGauge<int64_t>(
+  IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS = m->AddGauge(
       ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS, 0);
-  IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS = m->AddGauge<int64_t>(
+  IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS = m->AddGauge(
       ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS, 0);
-  NUM_SESSIONS_EXPIRED = m->AddCounter<int64_t>(
+  NUM_SESSIONS_EXPIRED = m->AddCounter(
       ImpaladMetricKeys::NUM_SESSIONS_EXPIRED, 0);
-  RESULTSET_CACHE_TOTAL_NUM_ROWS = m->AddGauge<int64_t>(
+  RESULTSET_CACHE_TOTAL_NUM_ROWS = m->AddGauge(
       ImpaladMetricKeys::RESULTSET_CACHE_TOTAL_NUM_ROWS, 0);
-  RESULTSET_CACHE_TOTAL_BYTES = m->AddGauge<int64_t>(
+  RESULTSET_CACHE_TOTAL_BYTES = m->AddGauge(
       ImpaladMetricKeys::RESULTSET_CACHE_TOTAL_BYTES, 0);
 
   // Initialize scan node metrics
-  NUM_RANGES_PROCESSED = m->AddCounter<int64_t>(
+  NUM_RANGES_PROCESSED = m->AddCounter(
       ImpaladMetricKeys::TOTAL_SCAN_RANGES_PROCESSED, 0);
-  NUM_RANGES_MISSING_VOLUME_ID = m->AddCounter<int64_t>(
+  NUM_RANGES_MISSING_VOLUME_ID = m->AddCounter(
       ImpaladMetricKeys::NUM_SCAN_RANGES_MISSING_VOLUME_ID, 0);
 
   // Initialize memory usage metrics
-  MEM_POOL_TOTAL_BYTES = m->AddGauge<int64_t>(
+  MEM_POOL_TOTAL_BYTES = m->AddGauge(
       ImpaladMetricKeys::MEM_POOL_TOTAL_BYTES, 0);
-  HASH_TABLE_TOTAL_BYTES = m->AddGauge<int64_t>(
+  HASH_TABLE_TOTAL_BYTES = m->AddGauge(
       ImpaladMetricKeys::HASH_TABLE_TOTAL_BYTES, 0);
 
   // Initialize insert metrics
-  NUM_FILES_OPEN_FOR_INSERT = m->AddGauge<int64_t>(
+  NUM_FILES_OPEN_FOR_INSERT = m->AddGauge(
       ImpaladMetricKeys::NUM_FILES_OPEN_FOR_INSERT, 0);
 
   // Initialize IO mgr metrics
-  IO_MGR_NUM_OPEN_FILES = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES, 0);
-  IO_MGR_NUM_BUFFERS = m->AddGauge<int64_t>(ImpaladMetricKeys::IO_MGR_NUM_BUFFERS, 0);
-  IO_MGR_TOTAL_BYTES = m->AddGauge<int64_t>(ImpaladMetricKeys::IO_MGR_TOTAL_BYTES, 0);
-  IO_MGR_NUM_UNUSED_BUFFERS = m->AddGauge<int64_t>(
+  IO_MGR_NUM_OPEN_FILES = m->AddGauge(ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES, 0);
+  IO_MGR_NUM_BUFFERS = m->AddGauge(ImpaladMetricKeys::IO_MGR_NUM_BUFFERS, 0);
+  IO_MGR_TOTAL_BYTES = m->AddGauge(ImpaladMetricKeys::IO_MGR_TOTAL_BYTES, 0);
+  IO_MGR_NUM_UNUSED_BUFFERS = m->AddGauge(
       ImpaladMetricKeys::IO_MGR_NUM_UNUSED_BUFFERS, 0);
-  IO_MGR_NUM_CACHED_FILE_HANDLES = m->AddGauge<int64_t>(
+  IO_MGR_NUM_CACHED_FILE_HANDLES = m->AddGauge(
       ImpaladMetricKeys::IO_MGR_NUM_CACHED_FILE_HANDLES, 0);
-  IO_MGR_NUM_FILE_HANDLES_OUTSTANDING = m->AddGauge<int64_t>(
+  IO_MGR_NUM_FILE_HANDLES_OUTSTANDING = m->AddGauge(
       ImpaladMetricKeys::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING, 0);
 
-  IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT = m->AddGauge<int64_t>(
+  IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT = m->AddGauge(
       ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT, 0);
 
-  IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT = m->AddGauge<int64_t>(
+  IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT = m->AddGauge(
       ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT, 0);
 
-  IO_MGR_BYTES_READ = m->AddCounter<int64_t>(ImpaladMetricKeys::IO_MGR_BYTES_READ, 0);
-  IO_MGR_LOCAL_BYTES_READ = m->AddCounter<int64_t>(
+  IO_MGR_BYTES_READ = m->AddCounter(ImpaladMetricKeys::IO_MGR_BYTES_READ, 0);
+  IO_MGR_LOCAL_BYTES_READ = m->AddCounter(
       ImpaladMetricKeys::IO_MGR_LOCAL_BYTES_READ, 0);
-  IO_MGR_CACHED_BYTES_READ = m->AddCounter<int64_t>(
+  IO_MGR_CACHED_BYTES_READ = m->AddCounter(
       ImpaladMetricKeys::IO_MGR_CACHED_BYTES_READ, 0);
-  IO_MGR_SHORT_CIRCUIT_BYTES_READ = m->AddCounter<int64_t>(
+  IO_MGR_SHORT_CIRCUIT_BYTES_READ = m->AddCounter(
       ImpaladMetricKeys::IO_MGR_SHORT_CIRCUIT_BYTES_READ, 0);
-  IO_MGR_BYTES_WRITTEN = m->AddCounter<int64_t>(
+  IO_MGR_BYTES_WRITTEN = m->AddCounter(
       ImpaladMetricKeys::IO_MGR_BYTES_WRITTEN, 0);
 
   IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO =
@@ -233,8 +233,8 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
       ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO);
 
   // Initialize catalog metrics
-  CATALOG_NUM_DBS = m->AddGauge<int64_t>(ImpaladMetricKeys::CATALOG_NUM_DBS, 0);
-  CATALOG_NUM_TABLES = m->AddGauge<int64_t>(ImpaladMetricKeys::CATALOG_NUM_TABLES, 0);
+  CATALOG_NUM_DBS = m->AddGauge(ImpaladMetricKeys::CATALOG_NUM_DBS, 0);
+  CATALOG_NUM_TABLES = m->AddGauge(ImpaladMetricKeys::CATALOG_NUM_TABLES, 0);
   CATALOG_READY = m->AddProperty<bool>(ImpaladMetricKeys::CATALOG_READY, false);
 
   // Maximum duration to be tracked by the query durations metric. No particular reasoning
@@ -248,8 +248,8 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
       MetricDefs::Get(ImpaladMetricKeys::DDL_DURATIONS), FIVE_HOURS_IN_MS, 3));
 
   // Initialize Hedged read metrics
-  HEDGED_READ_OPS = m->AddCounter<int64_t>(ImpaladMetricKeys::HEDGED_READ_OPS, 0);
-  HEDGED_READ_OPS_WIN = m->AddCounter<int64_t>(ImpaladMetricKeys::HEDGED_READ_OPS_WIN, 0);
+  HEDGED_READ_OPS = m->AddCounter(ImpaladMetricKeys::HEDGED_READ_OPS, 0);
+  HEDGED_READ_OPS_WIN = m->AddCounter(ImpaladMetricKeys::HEDGED_READ_OPS_WIN, 0);
 
 }
 

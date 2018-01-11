@@ -286,7 +286,7 @@ void TAcceptQueueServer::InitMetrics(MetricGroup* metrics, const string& key_pre
   DCHECK(metrics != NULL);
   stringstream queue_size_ss;
   queue_size_ss << key_prefix << ".connection-setup-queue-size";
-  queue_size_metric_ = metrics->AddGauge<int64_t>(queue_size_ss.str(), 0);
+  queue_size_metric_ = metrics->AddGauge(queue_size_ss.str(), 0);
   metrics_enabled_ = true;
 }
 

@@ -97,11 +97,10 @@ Status Scheduler::Init(const TNetworkAddress& backend_address,
     // This is after registering with the statestored, so we already have to synchronize
     // access to the executors_config_ shared_ptr.
     int num_backends = GetExecutorsConfig()->NumBackends();
-    total_assignments_ = metrics_->AddCounter<int64_t>(ASSIGNMENTS_KEY, 0);
-    total_local_assignments_ = metrics_->AddCounter<int64_t>(LOCAL_ASSIGNMENTS_KEY, 0);
+    total_assignments_ = metrics_->AddCounter(ASSIGNMENTS_KEY, 0);
+    total_local_assignments_ = metrics_->AddCounter(LOCAL_ASSIGNMENTS_KEY, 0);
     initialized_ = metrics_->AddProperty(SCHEDULER_INIT_KEY, true);
-    num_fragment_instances_metric_ =
-        metrics_->AddGauge<int64_t>(NUM_BACKENDS_KEY, num_backends);
+    num_fragment_instances_metric_ = metrics_->AddGauge(NUM_BACKENDS_KEY, num_backends);
   }
 
   if (statestore_subscriber_ != nullptr) {
@@ -197,7 +196,7 @@ void Scheduler::UpdateMembership(
 
   if (metrics_ != nullptr) {
     /// TODO-MT: fix this (do we even need to report it?)
-    num_fragment_instances_metric_->set_value(current_executors_.size());
+    num_fragment_instances_metric_->SetValue(current_executors_.size());
   }
 }
 

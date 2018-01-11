@@ -113,7 +113,7 @@ StatestoreSubscriber::StatestoreSubscriber(const std::string& subscriber_id,
       metrics_(metrics->GetOrCreateChildGroup("statestore-subscriber")) {
   connected_to_statestore_metric_ =
       metrics_->AddProperty("statestore-subscriber.connected", false);
-  last_recovery_duration_metric_ = metrics_->AddGauge(
+  last_recovery_duration_metric_ = metrics_->AddDoubleGauge(
       "statestore-subscriber.last-recovery-duration", 0.0);
   last_recovery_time_metric_ = metrics_->AddProperty<string>(
       "statestore-subscriber.last-recovery-time", "N/A");
@@ -164,12 +164,12 @@ Status StatestoreSubscriber::Register() {
   RETURN_IF_ERROR(client.DoRpc(&StatestoreServiceClientWrapper::RegisterSubscriber,
       request, &response));
   Status status = Status(response.status);
-  if (status.ok()) connected_to_statestore_metric_->set_value(true);
+  if (status.ok()) connected_to_statestore_metric_->SetValue(true);
   if (response.__isset.registration_id) {
     lock_guard<mutex> l(registration_id_lock_);
     registration_id_ = response.registration_id;
     const string& registration_string = PrintId(registration_id_);
-    registration_id_metric_->set_value(registration_string);
+    registration_id_metric_->SetValue(registration_string);
     VLOG(1) << "Subscriber registration ID: " << registration_string;
   } else {
     VLOG(1) << "No subscriber registration ID received from statestore";
@@ -243,7 +243,7 @@ void StatestoreSubscriber::RecoveryModeChecker() {
       lock_guard<mutex> l(lock_);
       MonotonicStopWatch recovery_timer;
       recovery_timer.Start();
-      connected_to_statestore_metric_->set_value(false);
+      connected_to_statestore_metric_->SetValue(false);
       LOG(INFO) << subscriber_id_
                 << ": Connection with statestore lost, entering recovery mode";
       uint32_t attempt_count = 1;
@@ -265,7 +265,7 @@ void StatestoreSubscriber::RecoveryModeChecker() {
                        << status.GetDetail();
           SleepForMs(SLEEP_INTERVAL_MS);
         }
-        last_recovery_duration_metric_->set_value(
+        last_recovery_duration_metric_->SetValue(
             recovery_timer.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
       }
       // When we're successful in re-registering, we don't do anything
@@ -273,9 +273,9 @@ void StatestoreSubscriber::RecoveryModeChecker() {
       // responsibility of individual clients to post missing updates
       // back to the statestore. This saves a lot of complexity where
       // we would otherwise have to cache updates here.
-      last_recovery_duration_metric_->set_value(
+      last_recovery_duration_metric_->SetValue(
           recovery_timer.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
-      last_recovery_time_metric_->set_value(CurrentTimeString());
+      last_recovery_time_metric_->SetValue(CurrentTimeString());
     }
 
     SleepForMs(SLEEP_INTERVAL_MS);

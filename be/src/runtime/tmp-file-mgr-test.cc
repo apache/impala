@@ -78,7 +78,7 @@ class TmpFileMgrTest : public ::testing::Test {
     vector<TmpFileMgr::DeviceId> active = tmp_file_mgr->ActiveTmpDevices();
     IntGauge* active_metric =
         metrics_->FindMetricForTesting<IntGauge>("tmp-file-mgr.active-scratch-dirs");
-    EXPECT_EQ(active.size(), active_metric->value());
+    EXPECT_EQ(active.size(), active_metric->GetValue());
     SetMetric<string>* active_set_metric =
         metrics_->FindMetricForTesting<SetMetric<string>>(
         "tmp-file-mgr.active-scratch-dirs.list");

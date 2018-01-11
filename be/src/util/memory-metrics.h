@@ -44,7 +44,7 @@ class AggregateMemoryMetrics {
   /// including JVM memory), which is either in use by queries or cached by the BufferPool
   /// or the malloc implementation.
   /// TODO: IMPALA-691 - consider changing this to include JVM memory.
-  static SumGauge<int64_t>* TOTAL_USED;
+  static SumGauge* TOTAL_USED;
 
   /// The total number of virtual memory regions for the process.
   /// The value must be refreshed by calling Refresh().
@@ -106,9 +106,8 @@ class TcmallocMetric : public IntGauge {
    public:
     PhysicalBytesMetric(const TMetricDef& def) : IntGauge(def, 0) { }
 
-   private:
-    virtual void CalculateValue() {
-      value_ = TOTAL_BYTES_RESERVED->value() - PAGEHEAP_UNMAPPED_BYTES->value();
+    virtual int64_t GetValue() override {
+      return TOTAL_BYTES_RESERVED->GetValue() - PAGEHEAP_UNMAPPED_BYTES->GetValue();
     }
   };
 
@@ -117,20 +116,21 @@ class TcmallocMetric : public IntGauge {
   static TcmallocMetric* CreateAndRegister(MetricGroup* metrics, const std::string& key,
       const std::string& tcmalloc_var);
 
+  virtual int64_t GetValue() override {
+    int64_t retval = 0;
+#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
+    MallocExtension::instance()->GetNumericProperty(tcmalloc_var_.c_str(),
+        reinterpret_cast<size_t*>(&retval));
+#endif
+    return retval;
+  }
+
  private:
   /// Name of the tcmalloc property this metric should fetch.
   const std::string tcmalloc_var_;
 
   TcmallocMetric(const TMetricDef& def, const std::string& tcmalloc_var)
-      : IntGauge(def, 0), tcmalloc_var_(tcmalloc_var) { }
-
-  virtual void CalculateValue() {
-#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
-    DCHECK_EQ(sizeof(size_t), sizeof(value_));
-    MallocExtension::instance()->GetNumericProperty(tcmalloc_var_.c_str(),
-        reinterpret_cast<size_t*>(&value_));
-#endif
-  }
+    : IntGauge(def, 0), tcmalloc_var_(tcmalloc_var) { }
 };
 
 /// Alternative to TCMallocMetric if we're running under a sanitizer that replaces
@@ -138,12 +138,16 @@ class TcmallocMetric : public IntGauge {
 class SanitizerMallocMetric : public IntGauge {
  public:
   SanitizerMallocMetric(const TMetricDef& def) : IntGauge(def, 0) {}
+
   static SanitizerMallocMetric* BYTES_ALLOCATED;
- private:
-  virtual void CalculateValue() override {
+
+  virtual int64_t GetValue() override {
 #if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
-    value_ = __sanitizer_get_current_allocated_bytes();
+    return __sanitizer_get_current_allocated_bytes();
+#else
+    return 0;
 #endif
+
   }
 };
 
@@ -157,10 +161,9 @@ class JvmMetric : public IntGauge {
   /// pool (usually ~5 pools plus a synthetic 'total' pool).
   static Status InitMetrics(MetricGroup* metrics) WARN_UNUSED_RESULT;
 
- protected:
   /// Searches through jvm_metrics_response_ for a matching memory pool and pulls out the
   /// right value from that structure according to metric_type_.
-  virtual void CalculateValue();
+  virtual int64_t GetValue() override;
 
  private:
   /// Each names one of the fields in TJvmMemoryPool.
@@ -206,8 +209,7 @@ class BufferPoolMetric : public IntGauge {
   static BufferPoolMetric* NUM_CLEAN_PAGES;
   static BufferPoolMetric* CLEAN_PAGE_BYTES;
 
- protected:
-  virtual void CalculateValue();
+  virtual int64_t GetValue() override;
 
  private:
   friend class ReservationTrackerTest;

@@ -94,7 +94,7 @@ Status ClientCacheHelper::ReopenClient(ClientFactory factory_method,
     // CreateClient() will increment total_clients_metric_ if succeed.
     if (metrics_enabled_) {
       total_clients_metric_->Increment(-1);
-      DCHECK_GE(total_clients_metric_->value(), 0);
+      DCHECK_GE(total_clients_metric_->GetValue(), 0);
     }
     lock_guard<mutex> lock(client_map_lock_);
     client_map_.erase(client);
@@ -235,11 +235,11 @@ void ClientCacheHelper::InitMetrics(MetricGroup* metrics, const string& key_pref
   lock_guard<mutex> lock(cache_lock_);
   stringstream count_ss;
   count_ss << key_prefix << ".client-cache.clients-in-use";
-  clients_in_use_metric_ = metrics->AddGauge<int64_t>(count_ss.str(), 0);
+  clients_in_use_metric_ = metrics->AddGauge(count_ss.str(), 0);
 
   stringstream max_ss;
   max_ss << key_prefix << ".client-cache.total-clients";
-  total_clients_metric_ = metrics->AddGauge<int64_t>(max_ss.str(), 0);
+  total_clients_metric_ = metrics->AddGauge(max_ss.str(), 0);
   metrics_enabled_ = true;
 }
 

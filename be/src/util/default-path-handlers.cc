@@ -211,7 +211,7 @@ void RootHandler(const Webserver::ArgumentMap& args, Document* document) {
     document->GetAllocator());
 
   if (CommonMetrics::PROCESS_START_TIME != nullptr) {
-    Value process_start_time(CommonMetrics::PROCESS_START_TIME->value().c_str(),
+    Value process_start_time(CommonMetrics::PROCESS_START_TIME->GetValue().c_str(),
       document->GetAllocator());
     document->AddMember("process_start_time", process_start_time,
       document->GetAllocator());

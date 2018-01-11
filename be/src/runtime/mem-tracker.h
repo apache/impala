@@ -250,7 +250,7 @@ class MemTracker {
   bool LimitExceeded() {
     if (UNLIKELY(CheckLimitExceeded())) {
       if (bytes_over_limit_metric_ != NULL) {
-        bytes_over_limit_metric_->set_value(consumption() - limit_);
+        bytes_over_limit_metric_->SetValue(consumption() - limit_);
       }
       return GcMemory(limit_);
     }
@@ -274,7 +274,7 @@ class MemTracker {
   /// call if this tracker has a consumption metric.
   void RefreshConsumptionFromMetric() {
     DCHECK(consumption_metric_ != nullptr);
-    consumption_->Set(consumption_metric_->value());
+    consumption_->Set(consumption_metric_->GetValue());
   }
 
   int64_t limit() const { return limit_; }

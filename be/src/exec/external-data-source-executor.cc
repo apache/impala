@@ -76,9 +76,9 @@ class ExternalDataSourceExecutor::JniState {
         "getNumClassCacheMisses", "()J");
     RETURN_ERROR_IF_EXC(env);
 
-    num_class_cache_hits_ = metrics->AddCounter<int64_t>(
+    num_class_cache_hits_ = metrics->AddCounter(
         "external-data-source.class-cache.hits", 0);
-    num_class_cache_misses_ = metrics->AddCounter<int64_t>(
+    num_class_cache_misses_ = metrics->AddCounter(
         "external-data-source.class-cache.misses", 0);
     return Status::OK();
   }
@@ -92,11 +92,11 @@ class ExternalDataSourceExecutor::JniState {
     int64_t num_cache_hits = env->CallStaticLongMethod(executor_class_,
         get_num_cache_hits_id_);
     RETURN_ERROR_IF_EXC(env);
-    num_class_cache_hits_->set_value(num_cache_hits);
+    num_class_cache_hits_->SetValue(num_cache_hits);
     int64_t num_cache_misses = env->CallStaticLongMethod(executor_class_,
         get_num_cache_misses_id_);
     RETURN_ERROR_IF_EXC(env);
-    num_class_cache_misses_->set_value(num_cache_misses);
+    num_class_cache_misses_->SetValue(num_cache_misses);
     return Status::OK();
   }
 

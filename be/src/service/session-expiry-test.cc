@@ -58,8 +58,8 @@ TEST(SessionTest, TestExpiry) {
   IntGauge* hs2_session_metric =
       impala->metrics()->FindMetricForTesting<IntGauge>(
           ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS);
-  EXPECT_EQ(expired_metric->value(), 0L);
-  EXPECT_EQ(beeswax_session_metric->value(), 0L);
+  EXPECT_EQ(expired_metric->GetValue(), 0L);
+  EXPECT_EQ(beeswax_session_metric->GetValue(), 0L);
 
   {
     scoped_ptr<ThriftClient<ImpalaServiceClient>> beeswax_clients[NUM_SESSIONS];
@@ -80,16 +80,16 @@ TEST(SessionTest, TestExpiry) {
     }
 
     int64_t start = UnixMillis();
-    while (expired_metric->value() != NUM_SESSIONS * 2 &&
+    while (expired_metric->GetValue() != NUM_SESSIONS * 2 &&
       UnixMillis() - start < MAX_IDLE_TIMEOUT_MS) {
       SleepForMs(100);
     }
 
-    ASSERT_EQ(expired_metric->value(), NUM_SESSIONS * 2)
+    ASSERT_EQ(expired_metric->GetValue(), NUM_SESSIONS * 2)
         << "Sessions did not expire within "<< MAX_IDLE_TIMEOUT_MS / 1000 <<" secs";
-    ASSERT_EQ(beeswax_session_metric->value(), NUM_SESSIONS)
+    ASSERT_EQ(beeswax_session_metric->GetValue(), NUM_SESSIONS)
         << "Beeswax sessions unexpectedly closed after expiration";
-    ASSERT_EQ(hs2_session_metric->value(), NUM_SESSIONS)
+    ASSERT_EQ(hs2_session_metric->GetValue(), NUM_SESSIONS)
         << "HiveServer2 sessions unexpectedly closed after expiration";
 
     TPingImpalaServiceResp resp;

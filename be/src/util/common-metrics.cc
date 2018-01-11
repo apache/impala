@@ -33,7 +33,7 @@ void CommonMetrics::InitCommonMetrics(MetricGroup* metric_group) {
   KUDU_CLIENT_VERSION = metric_group->AddProperty<string>(
       KUDU_CLIENT_VERSION_METRIC_NAME, kudu::client::GetShortVersionString());
 
-  PROCESS_START_TIME->set_value(CurrentTimeString());
+  PROCESS_START_TIME->SetValue(CurrentTimeString());
 }
 
 }

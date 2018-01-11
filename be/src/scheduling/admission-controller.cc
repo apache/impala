@@ -482,9 +482,9 @@ bool AdmissionController::RejectImmediately(QuerySchedule* schedule,
 }
 
 void AdmissionController::PoolStats::UpdateConfigMetrics(const TPoolConfig& pool_cfg) {
-  metrics_.pool_max_mem_resources->set_value(pool_cfg.max_mem_resources);
-  metrics_.pool_max_requests->set_value(pool_cfg.max_requests);
-  metrics_.pool_max_queued->set_value(pool_cfg.max_queued);
+  metrics_.pool_max_mem_resources->SetValue(pool_cfg.max_mem_resources);
+  metrics_.pool_max_requests->SetValue(pool_cfg.max_requests);
+  metrics_.pool_max_queued->SetValue(pool_cfg.max_queued);
 }
 
 Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
@@ -734,18 +734,18 @@ void AdmissionController::PoolStats::UpdateAggregates(HostMemMap* host_mem_reser
 
   if (agg_num_running_ == num_running && agg_num_queued_ == num_queued &&
       agg_mem_reserved_ == mem_reserved) {
-    DCHECK_EQ(num_running, metrics_.agg_num_running->value());
-    DCHECK_EQ(num_queued, metrics_.agg_num_queued->value());
-    DCHECK_EQ(mem_reserved, metrics_.agg_mem_reserved->value());
+    DCHECK_EQ(num_running, metrics_.agg_num_running->GetValue());
+    DCHECK_EQ(num_queued, metrics_.agg_num_queued->GetValue());
+    DCHECK_EQ(mem_reserved, metrics_.agg_mem_reserved->GetValue());
     return;
   }
   VLOG_ROW << "Recomputed agg stats, previous: " << DebugString();
   agg_num_running_ = num_running;
   agg_num_queued_ = num_queued;
   agg_mem_reserved_ = mem_reserved;
-  metrics_.agg_num_running->set_value(num_running);
-  metrics_.agg_num_queued->set_value(num_queued);
-  metrics_.agg_mem_reserved->set_value(mem_reserved);
+  metrics_.agg_num_running->SetValue(num_running);
+  metrics_.agg_num_queued->SetValue(num_queued);
+  metrics_.agg_mem_reserved->SetValue(mem_reserved);
   VLOG_ROW << "Updated: " << DebugString();
 }
 
@@ -782,12 +782,12 @@ void AdmissionController::PoolStats::UpdateMemTrackerStats() {
   if (current_reserved != local_stats_.backend_mem_reserved) {
     parent_->pools_for_updates_.insert(name_);
     local_stats_.backend_mem_reserved = current_reserved;
-    metrics_.local_backend_mem_reserved->set_value(current_reserved);
+    metrics_.local_backend_mem_reserved->SetValue(current_reserved);
   }
 
   const int64_t current_usage =
       tracker == nullptr ? static_cast<int64_t>(0) : tracker->consumption();
-  metrics_.local_backend_mem_usage->set_value(current_usage);
+  metrics_.local_backend_mem_usage->SetValue(current_usage);
 }
 
 void AdmissionController::AddPoolUpdates(vector<TTopicDelta>* topic_updates) {
@@ -906,44 +906,44 @@ AdmissionController::GetPoolStats(const string& pool_name) {
 }
 
 void AdmissionController::PoolStats::InitMetrics() {
-  metrics_.total_admitted = parent_->metrics_group_->AddCounter<int64_t>(
+  metrics_.total_admitted = parent_->metrics_group_->AddCounter(
       TOTAL_ADMITTED_METRIC_KEY_FORMAT, 0, name_);
-  metrics_.total_queued = parent_->metrics_group_->AddCounter<int64_t>(
+  metrics_.total_queued = parent_->metrics_group_->AddCounter(
       TOTAL_QUEUED_METRIC_KEY_FORMAT, 0, name_);
-  metrics_.total_dequeued = parent_->metrics_group_->AddCounter<int64_t>(
+  metrics_.total_dequeued = parent_->metrics_group_->AddCounter(
       TOTAL_DEQUEUED_METRIC_KEY_FORMAT, 0, name_);
-  metrics_.total_rejected = parent_->metrics_group_->AddCounter<int64_t>(
+  metrics_.total_rejected = parent_->metrics_group_->AddCounter(
       TOTAL_REJECTED_METRIC_KEY_FORMAT, 0, name_);
-  metrics_.total_timed_out = parent_->metrics_group_->AddCounter<int64_t>(
+  metrics_.total_timed_out = parent_->metrics_group_->AddCounter(
       TOTAL_TIMED_OUT_METRIC_KEY_FORMAT, 0, name_);
-  metrics_.total_released = parent_->metrics_group_->AddCounter<int64_t>(
+  metrics_.total_released = parent_->metrics_group_->AddCounter(
       TOTAL_RELEASED_METRIC_KEY_FORMAT, 0, name_);
-  metrics_.time_in_queue_ms = parent_->metrics_group_->AddCounter<int64_t>(
+  metrics_.time_in_queue_ms = parent_->metrics_group_->AddCounter(
       TIME_IN_QUEUE_METRIC_KEY_FORMAT, 0, name_);
 
-  metrics_.agg_num_running = parent_->metrics_group_->AddGauge<int64_t>(
+  metrics_.agg_num_running = parent_->metrics_group_->AddGauge(
       AGG_NUM_RUNNING_METRIC_KEY_FORMAT, 0, name_);
-  metrics_.agg_num_queued = parent_->metrics_group_->AddGauge<int64_t>(
+  metrics_.agg_num_queued = parent_->metrics_group_->AddGauge(
       AGG_NUM_QUEUED_METRIC_KEY_FORMAT, 0, name_);
-  metrics_.agg_mem_reserved = parent_->metrics_group_->AddGauge<int64_t>(
+  metrics_.agg_mem_reserved = parent_->metrics_group_->AddGauge(
       AGG_MEM_RESERVED_METRIC_KEY_FORMAT, 0, name_);
 
-  metrics_.local_mem_admitted = parent_->metrics_group_->AddGauge<int64_t>(
+  metrics_.local_mem_admitted = parent_->metrics_group_->AddGauge(
       LOCAL_MEM_ADMITTED_METRIC_KEY_FORMAT, 0, name_);
-  metrics_.local_num_admitted_running = parent_->metrics_group_->AddGauge<int64_t>(
+  metrics_.local_num_admitted_running = parent_->metrics_group_->AddGauge(
       LOCAL_NUM_ADMITTED_RUNNING_METRIC_KEY_FORMAT, 0, name_);
-  metrics_.local_num_queued = parent_->metrics_group_->AddGauge<int64_t>(
+  metrics_.local_num_queued = parent_->metrics_group_->AddGauge(
       LOCAL_NUM_QUEUED_METRIC_KEY_FORMAT, 0, name_);
-  metrics_.local_backend_mem_usage = parent_->metrics_group_->AddGauge<int64_t>(
+  metrics_.local_backend_mem_usage = parent_->metrics_group_->AddGauge(
       LOCAL_BACKEND_MEM_USAGE_METRIC_KEY_FORMAT, 0, name_);
-  metrics_.local_backend_mem_reserved = parent_->metrics_group_->AddGauge<int64_t>(
+  metrics_.local_backend_mem_reserved = parent_->metrics_group_->AddGauge(
       LOCAL_BACKEND_MEM_RESERVED_METRIC_KEY_FORMAT, 0, name_);
 
-  metrics_.pool_max_mem_resources = parent_->metrics_group_->AddGauge<int64_t>(
+  metrics_.pool_max_mem_resources = parent_->metrics_group_->AddGauge(
       POOL_MAX_MEM_RESOURCES_METRIC_KEY_FORMAT, 0, name_);
-  metrics_.pool_max_requests = parent_->metrics_group_->AddGauge<int64_t>(
+  metrics_.pool_max_requests = parent_->metrics_group_->AddGauge(
       POOL_MAX_REQUESTS_METRIC_KEY_FORMAT, 0, name_);
-  metrics_.pool_max_queued = parent_->metrics_group_->AddGauge<int64_t>(
+  metrics_.pool_max_queued = parent_->metrics_group_->AddGauge(
       POOL_MAX_QUEUED_METRIC_KEY_FORMAT, 0, name_);
 }
 }

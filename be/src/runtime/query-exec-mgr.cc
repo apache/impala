@@ -123,7 +123,7 @@ void QueryExecMgr::StartQueryHelper(QueryState* qs) {
 #if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
   // tcmalloc and address or thread sanitizer cannot be used together
   if (FLAGS_log_mem_usage_interval > 0) {
-    uint64_t num_complete = ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS->value();
+    uint64_t num_complete = ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS->GetValue();
     if (num_complete % FLAGS_log_mem_usage_interval == 0) {
       char buf[2048];
       // This outputs how much memory is currently being used by this impalad

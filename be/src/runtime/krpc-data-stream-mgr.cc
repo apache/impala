@@ -63,10 +63,10 @@ KrpcDataStreamMgr::KrpcDataStreamMgr(MetricGroup* metrics)
       boost::bind(&KrpcDataStreamMgr::DeserializeThreadFn, this, _1, _2)) {
   MetricGroup* dsm_metrics = metrics->GetOrCreateChildGroup("datastream-manager");
   num_senders_waiting_ =
-      dsm_metrics->AddGauge<int64_t>("senders-blocked-on-recvr-creation", 0L);
+      dsm_metrics->AddGauge("senders-blocked-on-recvr-creation", 0L);
   total_senders_waited_ =
-      dsm_metrics->AddCounter<int64_t>("total-senders-blocked-on-recvr-creation", 0L);
-  num_senders_timedout_ = dsm_metrics->AddCounter<int64_t>(
+      dsm_metrics->AddCounter("total-senders-blocked-on-recvr-creation", 0L);
+  num_senders_timedout_ = dsm_metrics->AddCounter(
       "total-senders-timedout-waiting-for-recvr-creation", 0L);
 }
 

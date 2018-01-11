@@ -57,10 +57,10 @@ namespace impala {
 DataStreamMgr::DataStreamMgr(MetricGroup* metrics) {
   metrics_ = metrics->GetOrCreateChildGroup("datastream-manager");
   num_senders_waiting_ =
-      metrics_->AddGauge<int64_t>("senders-blocked-on-recvr-creation", 0L);
+      metrics_->AddGauge("senders-blocked-on-recvr-creation", 0L);
   total_senders_waited_ =
-      metrics_->AddCounter<int64_t>("total-senders-blocked-on-recvr-creation", 0L);
-  num_senders_timedout_ = metrics_->AddCounter<int64_t>(
+      metrics_->AddCounter("total-senders-blocked-on-recvr-creation", 0L);
+  num_senders_timedout_ = metrics_->AddCounter(
       "total-senders-timedout-waiting-for-recvr-creation", 0L);
 }
 

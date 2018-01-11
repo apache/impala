@@ -1059,8 +1059,8 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
 Status ImpalaServer::UpdateCatalogMetrics() {
   TGetDbsResult dbs;
   RETURN_IF_ERROR(exec_env_->frontend()->GetDbs(nullptr, nullptr, &dbs));
-  ImpaladMetrics::CATALOG_NUM_DBS->set_value(dbs.dbs.size());
-  ImpaladMetrics::CATALOG_NUM_TABLES->set_value(0L);
+  ImpaladMetrics::CATALOG_NUM_DBS->SetValue(dbs.dbs.size());
+  ImpaladMetrics::CATALOG_NUM_TABLES->SetValue(0L);
   for (const TDatabase& db: dbs.dbs) {
     TGetTablesResult table_names;
     RETURN_IF_ERROR(exec_env_->frontend()->GetTableNames(db.db_name, nullptr, nullptr,
@@ -1433,7 +1433,7 @@ void ImpalaServer::CatalogUpdateCallback(
       TTopicDelta& update = subscriber_topic_updates->back();
       update.topic_name = CatalogServer::IMPALA_CATALOG_TOPIC;
       update.__set_from_version(0L);
-      ImpaladMetrics::CATALOG_READY->set_value(false);
+      ImpaladMetrics::CATALOG_READY->SetValue(false);
       // Dropped all cached lib files (this behaves as if all functions and data
       // sources are dropped).
       LibCache::instance()->DropCache();
@@ -1447,7 +1447,7 @@ void ImpalaServer::CatalogUpdateCallback(
         LOG(INFO) << "Catalog topic update applied with version: " << new_catalog_version
             << " new min catalog object version: " << resp.min_catalog_object_version;
       }
-      ImpaladMetrics::CATALOG_READY->set_value(new_catalog_version > 0);
+      ImpaladMetrics::CATALOG_READY->SetValue(new_catalog_version > 0);
       // TODO: deal with an error status
       discard_result(UpdateCatalogMetrics());
       // Remove all dropped objects from the library cache.
@@ -2130,7 +2130,7 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port,
     LOG(INFO) << "Impala Beeswax Service listening on " << beeswax_server_->port();
   }
   services_started_ = true;
-  ImpaladMetrics::IMPALA_SERVER_READY->set_value(true);
+  ImpaladMetrics::IMPALA_SERVER_READY->SetValue(true);
   LOG(INFO) << "Impala has started.";
 
   return Status::OK();

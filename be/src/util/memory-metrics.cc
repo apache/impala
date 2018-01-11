@@ -32,7 +32,7 @@ using namespace strings;
 
 DECLARE_bool(mmap_buffers);
 
-SumGauge<int64_t>* AggregateMemoryMetrics::TOTAL_USED = nullptr;
+SumGauge* AggregateMemoryMetrics::TOTAL_USED = nullptr;
 IntGauge* AggregateMemoryMetrics::NUM_MAPS = nullptr;
 IntGauge* AggregateMemoryMetrics::MAPPED_BYTES = nullptr;
 IntGauge* AggregateMemoryMetrics::RSS = nullptr;
@@ -110,19 +110,19 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
 #endif
   MetricGroup* aggregate_metrics = metrics->GetOrCreateChildGroup("memory");
   AggregateMemoryMetrics::TOTAL_USED = aggregate_metrics->RegisterMetric(
-      new SumGauge<int64_t>(MetricDefs::Get("memory.total-used"), used_metrics));
+      new SumGauge(MetricDefs::Get("memory.total-used"), used_metrics));
   if (register_jvm_metrics) {
     RETURN_IF_ERROR(JvmMetric::InitMetrics(metrics->GetOrCreateChildGroup("jvm")));
   }
 
   if (MemInfo::HaveSmaps()) {
     AggregateMemoryMetrics::NUM_MAPS =
-        aggregate_metrics->AddGauge<int64_t>("memory.num-maps", 0U);
+        aggregate_metrics->AddGauge("memory.num-maps", 0U);
     AggregateMemoryMetrics::MAPPED_BYTES =
-        aggregate_metrics->AddGauge<int64_t>("memory.mapped-bytes", 0U);
-    AggregateMemoryMetrics::RSS = aggregate_metrics->AddGauge<int64_t>("memory.rss", 0U);
+        aggregate_metrics->AddGauge("memory.mapped-bytes", 0U);
+    AggregateMemoryMetrics::RSS = aggregate_metrics->AddGauge("memory.rss", 0U);
     AggregateMemoryMetrics::ANON_HUGE_PAGE_BYTES =
-        aggregate_metrics->AddGauge<int64_t>("memory.anon-huge-page-bytes", 0U);
+        aggregate_metrics->AddGauge("memory.anon-huge-page-bytes", 0U);
   }
   ThpConfig thp_config = MemInfo::ParseThpConfig();
   AggregateMemoryMetrics::THP_ENABLED =
@@ -139,16 +139,16 @@ void AggregateMemoryMetrics::Refresh() {
   if (NUM_MAPS != nullptr) {
     // Only call ParseSmaps() if the metrics were created.
     MappedMemInfo map_info = MemInfo::ParseSmaps();
-    NUM_MAPS->set_value(map_info.num_maps);
-    MAPPED_BYTES->set_value(map_info.size_kb * 1024);
-    RSS->set_value(map_info.rss_kb * 1024);
-    ANON_HUGE_PAGE_BYTES->set_value(map_info.anon_huge_pages_kb * 1024);
+    NUM_MAPS->SetValue(map_info.num_maps);
+    MAPPED_BYTES->SetValue(map_info.size_kb * 1024);
+    RSS->SetValue(map_info.rss_kb * 1024);
+    ANON_HUGE_PAGE_BYTES->SetValue(map_info.anon_huge_pages_kb * 1024);
   }
 
   ThpConfig thp_config = MemInfo::ParseThpConfig();
-  THP_ENABLED->set_value(thp_config.enabled);
-  THP_DEFRAG->set_value(thp_config.defrag);
-  THP_KHUGEPAGED_DEFRAG->set_value(thp_config.khugepaged_defrag);
+  THP_ENABLED->SetValue(thp_config.enabled);
+  THP_DEFRAG->SetValue(thp_config.defrag);
+  THP_KHUGEPAGED_DEFRAG->SetValue(thp_config.khugepaged_defrag);
 }
 
 JvmMetric* JvmMetric::CreateAndRegister(MetricGroup* metrics, const string& key,
@@ -192,35 +192,36 @@ Status JvmMetric::InitMetrics(MetricGroup* metrics) {
   return Status::OK();
 }
 
-void JvmMetric::CalculateValue() {
+int64_t JvmMetric::GetValue() {
   TGetJvmMetricsRequest request;
   request.get_all = false;
   request.__set_memory_pool(mempool_name_);
   TGetJvmMetricsResponse response;
-  if (!JniUtil::GetJvmMetrics(request, &response).ok()) return;
-  if (response.memory_pools.size() != 1) return;
+  if (!JniUtil::GetJvmMetrics(request, &response).ok()) return 0;
+  if (response.memory_pools.size() != 1) return 0;
   TJvmMemoryPool& pool = response.memory_pools[0];
   DCHECK(pool.name == mempool_name_);
   switch (metric_type_) {
-    case MAX: value_ = pool.max;
-      return;
-    case INIT: value_ = pool.init;
-      return;
-    case CURRENT: value_ = pool.used;
-      return;
-    case COMMITTED: value_ = pool.committed;
-      return;
-    case PEAK_MAX: value_ = pool.peak_max;
-      return;
-    case PEAK_INIT: value_ = pool.peak_init;
-      return;
-    case PEAK_CURRENT: value_ = pool.peak_used;
-      return;
-    case PEAK_COMMITTED: value_ = pool.peak_committed;
-      return;
+    case MAX:
+      return pool.max;
+    case INIT:
+      return pool.init;
+    case CURRENT:
+      return pool.used;
+    case COMMITTED:
+      return pool.committed;
+    case PEAK_MAX:
+      return pool.peak_max;
+    case PEAK_INIT:
+      return pool.peak_init;
+    case PEAK_CURRENT:
+      return pool.peak_used;
+    case PEAK_COMMITTED:
+      return pool.peak_committed;
     default:
       DCHECK(false) << "Unknown JvmMetricType: " << metric_type_;
   }
+  return 0;
 }
 
 Status BufferPoolMetric::InitMetrics(MetricGroup* metrics,
@@ -263,47 +264,39 @@ BufferPoolMetric::BufferPoolMetric(const TMetricDef& def, BufferPoolMetricType t
     global_reservations_(global_reservations),
     buffer_pool_(buffer_pool) {}
 
-void BufferPoolMetric::CalculateValue() {
+int64_t BufferPoolMetric::GetValue() {
   // IMPALA-6362: we have to be careful that none of the below calls to ReservationTracker
   // methods acquire ReservationTracker::lock_ to avoid a potential circular dependency
   // with MemTracker::child_trackers_lock_, which may be held when refreshing MemTracker
   // consumption.
   switch (type_) {
     case BufferPoolMetricType::LIMIT:
-      value_ = buffer_pool_->GetSystemBytesLimit();
-      break;
+      return buffer_pool_->GetSystemBytesLimit();
     case BufferPoolMetricType::SYSTEM_ALLOCATED:
-      value_ = buffer_pool_->GetSystemBytesAllocated();
-      break;
+      return buffer_pool_->GetSystemBytesAllocated();
     case BufferPoolMetricType::RESERVED:
-      value_ = global_reservations_->GetReservation();
-      break;
+      return global_reservations_->GetReservation();
     case BufferPoolMetricType::UNUSED_RESERVATION_BYTES: {
       // Estimate the unused reservation based on other aggregate values, defined as
       // the total bytes of reservation where there is no corresponding buffer in use
       // by a client. Buffers are either in-use, free buffers, or attached to clean pages.
       int64_t total_used_reservation = buffer_pool_->GetSystemBytesAllocated()
-        - buffer_pool_->GetFreeBufferBytes()
-        - buffer_pool_->GetCleanPageBytes();
-      value_ = global_reservations_->GetReservation() - total_used_reservation;
-      break;
+          - buffer_pool_->GetFreeBufferBytes()
+          - buffer_pool_->GetCleanPageBytes();
+      return global_reservations_->GetReservation() - total_used_reservation;
     }
     case BufferPoolMetricType::NUM_FREE_BUFFERS:
-      value_ = buffer_pool_->GetNumFreeBuffers();
-      break;
+      return buffer_pool_->GetNumFreeBuffers();
     case BufferPoolMetricType::FREE_BUFFER_BYTES:
-      value_ = buffer_pool_->GetFreeBufferBytes();
-      break;
+      return buffer_pool_->GetFreeBufferBytes();
     case BufferPoolMetricType::CLEAN_PAGES_LIMIT:
-      value_ = buffer_pool_->GetCleanPageBytesLimit();
-      break;
+      return buffer_pool_->GetCleanPageBytesLimit();
     case BufferPoolMetricType::NUM_CLEAN_PAGES:
-      value_ = buffer_pool_->GetNumCleanPages();
-      break;
+      return buffer_pool_->GetNumCleanPages();
     case BufferPoolMetricType::CLEAN_PAGE_BYTES:
-      value_ = buffer_pool_->GetCleanPageBytes();
-      break;
+      return buffer_pool_->GetCleanPageBytes();
     default:
       DCHECK(false) << "Unknown BufferPoolMetricType: " << static_cast<int>(type_);
   }
+  return 0;
 }
