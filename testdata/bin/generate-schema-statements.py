@@ -482,13 +482,14 @@ def generate_statements(output_name, test_vectors, sections,
   hive_output = Statements()
   hbase_output = Statements()
   hbase_post_load = Statements()
+  impala_invalidate = Statements()
 
   table_names = None
   if options.table_names:
     table_names = [name.lower() for name in options.table_names.split(',')]
   existing_tables = get_hdfs_subdirs_with_data(options.hive_warehouse_dir)
   for row in test_vectors:
-    impala_output = Statements()
+    impala_create = Statements()
     impala_load = Statements()
     file_format, data_set, codec, compression_type =\
         [row.file_format, row.dataset, row.compression_codec, row.compression_type]
@@ -581,7 +582,7 @@ def generate_statements(output_name, test_vectors, sections,
         if file_format not in IMPALA_SUPPORTED_INSERT_FORMATS:
           create_file_format = 'text'
 
-      output = impala_output
+      output = impala_create
       if create_hive or file_format == 'hbase':
         output = hive_output
       elif codec == 'lzo':
@@ -632,6 +633,10 @@ def generate_statements(output_name, test_vectors, sections,
         hbase_output.create.extend(build_hbase_create_stmt(db_name, table_name,
             column_families))
         hbase_post_load.load.append("flush '%s_hbase.%s'\n" % (db_name, table_name))
+
+      # Need to emit an "invalidate metadata" for each individual table
+      invalidate_table_stmt = "INVALIDATE METADATA {0}.{1};\n".format(db, table_name)
+      impala_invalidate.create.append(invalidate_table_stmt)
 
       # The ALTER statement in hive does not accept fully qualified table names so
       # insert a use statement. The ALTER statement is skipped for HBASE as it's
@@ -688,9 +693,9 @@ def generate_statements(output_name, test_vectors, sections,
           else:
             print 'Empty insert for table %s. Skipping insert generation' % table_name
 
-    impala_output.write_to_file("load-%s-impala-generated-%s-%s-%s.sql" %
+    impala_create.write_to_file("create-%s-impala-generated-%s-%s-%s.sql" %
         (output_name, file_format, codec, compression_type))
-    impala_load.write_to_file("load-%s-impala-load-generated-%s-%s-%s.sql" %
+    impala_load.write_to_file("load-%s-impala-generated-%s-%s-%s.sql" %
         (output_name, file_format, codec, compression_type))
 
 
@@ -699,6 +704,7 @@ def generate_statements(output_name, test_vectors, sections,
   hbase_output.write_to_file('load-' + output_name + '-hbase-generated.create')
   hbase_post_load.load.append("exit")
   hbase_post_load.write_to_file('post-load-' + output_name + '-hbase-generated.sql')
+  impala_invalidate.write_to_file('invalidate-' + output_name + '-impala-generated.sql')
 
 def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'COLUMNS', 'PARTITION_COLUMNS',

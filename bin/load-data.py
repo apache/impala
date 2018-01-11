@@ -278,15 +278,6 @@ def exec_impala_query_from_file_parallel(query_files):
   # finished putting their results in the queue.
   for thread in threads: thread.join()
 
-def invalidate_impala_metadata():
-  print "Invalidating Metadata"
-  impala_client = ImpalaBeeswaxClient(options.impalad, use_kerberos=options.use_kerberos)
-  impala_client.connect()
-  try:
-    impala_client.execute('invalidate metadata')
-  finally:
-    impala_client.close_connection()
-
 if __name__ == "__main__":
   # Having the actual command line at the top of each data-load-* log can help
   # when debugging dataload issues.
@@ -324,8 +315,8 @@ if __name__ == "__main__":
     load_file_substr = "%s-%s" % (workload, options.exploration_strategy)
     # Data loading with Impala is done in parallel, each file format has a separate query
     # file.
-    create_filename = '%s-impala-generated' % load_file_substr
-    load_filename = '%s-impala-load-generated' % load_file_substr
+    create_filename = 'create-%s-impala-generated' % load_file_substr
+    load_filename = 'load-%s-impala-generated' % load_file_substr
     impala_create_files = [f for f in dataset_dir_contents if create_filename in f]
     impala_load_files = [f for f in dataset_dir_contents if load_filename in f]
 
@@ -340,11 +331,15 @@ if __name__ == "__main__":
     exec_hive_query_from_file('load-%s-hive-generated.sql' % load_file_substr)
     exec_hbase_query_from_file('post-load-%s-hbase-generated.sql' % load_file_substr)
 
-    if impala_load_files: invalidate_impala_metadata()
+    # Invalidate so that Impala sees the loads done by Hive before loading Parquet/Kudu
+    # Note: This only invalidates tables for this workload.
+    invalidate_sql_file = 'invalidate-{0}-impala-generated.sql'.format(load_file_substr)
+    if impala_load_files: exec_impala_query_from_file(invalidate_sql_file)
     exec_impala_query_from_file_parallel(impala_load_files)
+    # Final invalidate for this workload
+    exec_impala_query_from_file(invalidate_sql_file)
     loading_time_map[workload] = time.time() - start_time
 
-  invalidate_impala_metadata()
   total_time = 0.0
   for workload, load_time in loading_time_map.iteritems():
     total_time += load_time
