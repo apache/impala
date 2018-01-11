@@ -107,7 +107,7 @@ class TestBreakpadBase(CustomClusterTestSuite):
       return self.cluster.statestored and 1 or 0
     raise RuntimeError("Unknown daemon name: %s" % daemon)
 
-  def wait_for_num_processes(self, daemon, num_expected, timeout=5):
+  def wait_for_num_processes(self, daemon, num_expected, timeout=30):
     end = time.time() + timeout
     self.cluster.refresh()
     num_processes = self.get_num_processes(daemon)
