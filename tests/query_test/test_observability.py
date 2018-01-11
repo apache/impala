@@ -174,4 +174,4 @@ class TestObservability(ImpalaTestSuite):
     dbg_str = 'Debug thrift profile for query ' + str(query_id) + ' not available in '
     dbg_str += str(MAX_RETRIES) + ' seconds, '
     dbg_str += '(' + start_time + ', ' + end_time + ').'
-    assert False, dgb_str
+    assert False, dbg_str
