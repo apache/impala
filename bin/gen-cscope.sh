@@ -22,7 +22,10 @@ bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 . "$bin"/impala-config.sh
 
-# Generate list of files for Cscope to index
+# Generate list of files for Cscope to index.
+# -ignore_readdir_race: this scripts runs in parallel with other build steps, so races
+# with unrelated directories being deleted are possible (IMPALA-6363).
 cd $IMPALA_HOME
-find . -regex '.*\.\(cc\|c\|hh\|h\|java\|thrift\|flex\|y\)$' > cscope.files
+find . -ignore_readdir_race -regex '.*\.\(cc\|c\|hh\|h\|java\|thrift\|flex\|y\)$' \
+    > cscope.files
 
