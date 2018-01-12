@@ -81,9 +81,7 @@ class TestDecimalCasting(ImpalaTestSuite):
         expected, actual)
 
   def _normalize_cast_expr(self, decimal_val, precision, cast_from):
-    # Due to IMPALA-4936, casts from double which overflows decimal type don't work
-    # reliably. So casting from string for now until IMPALA-4936 is fixed.
-    if precision > 38 or cast_from == 'string':
+    if cast_from == 'string':
       return "select cast('{0}' as Decimal({1},{2}))"
     else:
       return "select cast({0} as Decimal({1},{2}))"

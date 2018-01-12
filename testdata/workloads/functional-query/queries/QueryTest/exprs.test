@@ -72,7 +72,6 @@ bigint
 ====
 ---- QUERY
 # boolean test: IS [NOT] (TRUE | FALSE | UNKNOWN)
----- QUERY
 select count(*) from alltypesagg where (int_col < 100) is unknown;
 ---- RESULTS
 20
@@ -2236,7 +2235,7 @@ select tmp.str from (values
 ('multi\nfield\ntwo')) as tmp
 where regexp_like(tmp.str, '^multi.*$')
 ---- RESULTS
-----TYPES
+---- TYPES
 string
 ====
 ---- QUERY

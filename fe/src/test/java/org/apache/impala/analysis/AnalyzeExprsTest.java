@@ -2215,14 +2215,35 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testFuncExprDepthLimit("cast(", "1", " as int)");
   }
 
-  // Verifies the resulting expr decimal type is exptectedType
-  private void testDecimalExpr(String expr, Type expectedType) {
-    SelectStmt selectStmt = (SelectStmt) AnalyzesOk("select " + expr);
+  // Verifies the resulting expr decimal type is expectedType under decimal v1 and
+  // decimal v2.
+  private void testDecimalExpr(String expr,
+      Type decimalV1ExpectedType, Type decimalV2ExpectedType) {
+    TQueryOptions queryOpts = new TQueryOptions();
+
+    queryOpts.setDecimal_v2(false);
+    SelectStmt selectStmt =
+        (SelectStmt) AnalyzesOk("select " + expr, createAnalysisCtx(queryOpts));
     Expr root = selectStmt.resultExprs_.get(0);
     Type actualType = root.getType();
     Assert.assertTrue(
-        "Expr: " + expr + " Expected: " + expectedType + " Actual: " + actualType,
-        expectedType.equals(actualType));
+        "Expr: " + expr + " Decimal Version: 1" +
+        " Expected: " + decimalV1ExpectedType + " Actual: " + actualType,
+        decimalV1ExpectedType.equals(actualType));
+
+    queryOpts.setDecimal_v2(true);
+    selectStmt = (SelectStmt) AnalyzesOk("select " + expr, createAnalysisCtx(queryOpts));
+    root = selectStmt.resultExprs_.get(0);
+    actualType = root.getType();
+    Assert.assertTrue(
+        "Expr: " + expr + " Decimal Version: 2" +
+            " Expected: " + decimalV2ExpectedType + " Actual: " + actualType,
+        decimalV2ExpectedType.equals(actualType));
+  }
+
+  // Verifies the resulting expr decimal type is exptectedType
+  private void testDecimalExpr(String expr, Type expectedType) {
+    testDecimalExpr(expr, expectedType, expectedType);
   }
 
   @Test
@@ -2241,7 +2262,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testDecimalExpr(decimal_10_0 + " - " + decimal_10_0,
         ScalarType.createDecimalType(11, 0));
     testDecimalExpr(decimal_10_0 + " * " + decimal_10_0,
-        ScalarType.createDecimalType(20, 0));
+        ScalarType.createDecimalType(20, 0), ScalarType.createDecimalType(21, 0));
     testDecimalExpr(decimal_10_0 + " / " + decimal_10_0,
         ScalarType.createDecimalType(21, 11));
     testDecimalExpr(decimal_10_0 + " % " + decimal_10_0,
@@ -2252,7 +2273,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testDecimalExpr(decimal_10_0 + " - " + decimal_5_5,
         ScalarType.createDecimalType(16, 5));
     testDecimalExpr(decimal_10_0 + " * " + decimal_5_5,
-        ScalarType.createDecimalType(15, 5));
+        ScalarType.createDecimalType(15, 5), ScalarType.createDecimalType(16, 5));
     testDecimalExpr(decimal_10_0 + " / " + decimal_5_5,
         ScalarType.createDecimalType(21, 6));
     testDecimalExpr(decimal_10_0 + " % " + decimal_5_5,
@@ -2263,7 +2284,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testDecimalExpr(decimal_5_5 + " - " + decimal_10_0,
         ScalarType.createDecimalType(16, 5));
     testDecimalExpr(decimal_5_5 + " * " + decimal_10_0,
-        ScalarType.createDecimalType(15, 5));
+        ScalarType.createDecimalType(15, 5), ScalarType.createDecimalType(16, 5));
     testDecimalExpr(decimal_5_5 + " / " + decimal_10_0,
         ScalarType.createDecimalType(16, 16));
     testDecimalExpr(decimal_5_5 + " % " + decimal_10_0,
@@ -2271,31 +2292,31 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     // Test some overflow cases.
     testDecimalExpr(decimal_10_0 + " + " + decimal_38_34,
-        ScalarType.createDecimalType(38, 34));
+        ScalarType.createDecimalType(38, 34), ScalarType.createDecimalType(38, 27));
     testDecimalExpr(decimal_10_0 + " - " + decimal_38_34,
-        ScalarType.createDecimalType(38, 34));
+        ScalarType.createDecimalType(38, 34), ScalarType.createDecimalType(38, 27));
     testDecimalExpr(decimal_10_0 + " * " + decimal_38_34,
-        ScalarType.createDecimalType(38, 34));
+        ScalarType.createDecimalType(38, 34), ScalarType.createDecimalType(38, 23));
     testDecimalExpr(decimal_10_0 + " / " + decimal_38_34,
-        ScalarType.createDecimalType(38, 34));
+        ScalarType.createDecimalType(38, 34), ScalarType.createDecimalType(38, 6));
     testDecimalExpr(decimal_10_0 + " % " + decimal_38_34,
         ScalarType.createDecimalType(38, 34));
 
     testDecimalExpr(decimal_38_34 + " + " + decimal_5_5,
-        ScalarType.createDecimalType(38, 34));
+        ScalarType.createDecimalType(38, 34), ScalarType.createDecimalType(38, 33));
     testDecimalExpr(decimal_38_34 + " - " + decimal_5_5,
-        ScalarType.createDecimalType(38, 34));
+        ScalarType.createDecimalType(38, 34), ScalarType.createDecimalType(38, 33));
     testDecimalExpr(decimal_38_34 + " * " + decimal_5_5,
-        ScalarType.createDecimalType(38, 38));
+        ScalarType.createDecimalType(38, 38), ScalarType.createDecimalType(38, 33));
     testDecimalExpr(decimal_38_34 + " / " + decimal_5_5,
-        ScalarType.createDecimalType(38, 34));
+        ScalarType.createDecimalType(38, 34), ScalarType.createDecimalType(38, 29));
     testDecimalExpr(decimal_38_34 + " % " + decimal_5_5,
         ScalarType.createDecimalType(34, 34));
 
     testDecimalExpr(decimal_10_0 + " + " + decimal_10_0 + " + " + decimal_10_0,
         ScalarType.createDecimalType(12, 0));
     testDecimalExpr(decimal_10_0 + " - " + decimal_10_0 + " * " + decimal_10_0,
-        ScalarType.createDecimalType(21, 0));
+        ScalarType.createDecimalType(21, 0), ScalarType.createDecimalType(22, 0));
     testDecimalExpr(decimal_10_0 + " / " + decimal_10_0 + " / " + decimal_10_0,
         ScalarType.createDecimalType(32, 22));
     testDecimalExpr(decimal_10_0 + " % " + decimal_10_0 + " + " + decimal_10_0,
@@ -2312,22 +2333,22 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testDecimalExpr(decimal_10_0 + " + cast(1 as bigint)",
         ScalarType.createDecimalType(20, 0));
     testDecimalExpr(decimal_10_0 + " + cast(1 as float)",
-        ScalarType.createDecimalType(38, 9));
+        ScalarType.createDecimalType(38, 9), ScalarType.createDecimalType(38, 8));
     testDecimalExpr(decimal_10_0 + " + cast(1 as double)",
-        ScalarType.createDecimalType(38, 17));
+        ScalarType.createDecimalType(38, 17), ScalarType.createDecimalType(38, 16));
 
     testDecimalExpr(decimal_5_5 + " + cast(1 as tinyint)",
         ScalarType.createDecimalType(9, 5));
     testDecimalExpr(decimal_5_5 + " - cast(1 as smallint)",
         ScalarType.createDecimalType(11, 5));
     testDecimalExpr(decimal_5_5 + " * cast(1 as int)",
-        ScalarType.createDecimalType(15, 5));
+        ScalarType.createDecimalType(15, 5), ScalarType.createDecimalType(16, 5));
     testDecimalExpr(decimal_5_5 + " % cast(1 as bigint)",
         ScalarType.createDecimalType(5, 5));
     testDecimalExpr(decimal_5_5 + " / cast(1 as float)",
-        ScalarType.createDecimalType(38, 9));
+        ScalarType.createDecimalType(38, 9), ScalarType.createDecimalType(38, 29));
     testDecimalExpr(decimal_5_5 + " + cast(1 as double)",
-        ScalarType.createDecimalType(38, 17));
+        ScalarType.createDecimalType(38, 17), ScalarType.createDecimalType(38, 16));
 
     AnalyzesOk("select " + decimal_5_5 + " = cast(1 as tinyint)");
     AnalyzesOk("select " + decimal_5_5 + " != cast(1 as smallint)");

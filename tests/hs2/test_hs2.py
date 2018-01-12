@@ -439,9 +439,8 @@ class TestHS2(HS2TestSuite):
     log = self.get_log("select * from functional.alltypeserror")
     assert "Error converting column" in log
 
-    # Test overflow warning
-    log = self.get_log("select cast(1000 as decimal(2, 1))")
-    assert "Decimal expression overflowed, returning NULL" in log
+    log = self.get_log("select base64decode('foo')")
+    assert "Invalid base64 string; input length is 3, which is not a multiple of 4" in log
 
   @needs_session()
   def test_get_exec_summary(self):
