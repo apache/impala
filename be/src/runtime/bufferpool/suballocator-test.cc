@@ -27,6 +27,8 @@
 #include "common/object-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/bufferpool/suballocator.h"
+#include "runtime/test-env.h"
+#include "service/fe-support.h"
 #include "testutil/death-test-util.h"
 #include "testutil/gtest-util.h"
 #include "testutil/rand-util.h"
@@ -44,6 +46,8 @@ namespace impala {
 class SuballocatorTest : public ::testing::Test {
  public:
   virtual void SetUp() override {
+    test_env_.reset(new TestEnv);
+    ASSERT_OK(test_env_->Init());
     RandTestUtil::SeedRng("SUBALLOCATOR_TEST_SEED", &rng_);
     profile_ = RuntimeProfile::Create(&obj_pool_, "test profile");
   }
@@ -110,6 +114,8 @@ class SuballocatorTest : public ::testing::Test {
 
   /// Clients for the buffer pool. Deregistered and freed after every test.
   vector<unique_ptr<BufferPool::ClientHandle>> clients_;
+
+  boost::scoped_ptr<TestEnv> test_env_;
 
   /// Global profile - recreated for every test.
   RuntimeProfile* profile_;
@@ -362,4 +368,9 @@ void SuballocatorTest::AssertMemoryValid(
 }
 }
 
-IMPALA_TEST_MAIN();
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  impala::InitFeSupport();
+  return RUN_ALL_TESTS();
+}
