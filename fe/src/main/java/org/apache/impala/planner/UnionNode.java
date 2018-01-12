@@ -117,6 +117,7 @@ public class UnionNode extends PlanNode {
       if (child.cardinality_ > 0) {
         cardinality_ = checkedAdd(cardinality_, child.cardinality_);
       }
+      numNodes_ = Math.max(child.getNumNodes(), numNodes_);
     }
     // The number of nodes of a union node is -1 (invalid) if all the referenced tables
     // are inline views (e.g. select 1 FROM (VALUES(1 x, 1 y)) a FULL OUTER JOIN

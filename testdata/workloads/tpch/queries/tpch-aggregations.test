@@ -2,6 +2,8 @@
 ---- QUERY
 # Regression test for IMPALA-2352. Small buffers of streams get full and we
 # can switch to IO-buffers without spilling.
+# Large rows are possible in this query, so we bump up the max row size.
+set max_row_size=1048576;
 SELECT count(*) FROM
 (SELECT cast(l_orderkey as string) s FROM tpch.lineitem UNION
  SELECT group_concat(concat(s_name, s_address, s_phone)) FROM tpch.supplier) v
