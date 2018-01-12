@@ -36,6 +36,7 @@ class TestTpcdsQuery(ImpalaTestSuite):
         v.get_value('table_format').file_format not in ['rc', 'hbase', 'kudu'] and\
         v.get_value('table_format').compression_codec in ['none', 'snap'] and\
         v.get_value('table_format').compression_type != 'record')
+    cls.ImpalaTestMatrix.add_mandatory_exec_option('decimal_v2', 0)
 
     if cls.exploration_strategy() != 'exhaustive':
       # Cut down on the execution time for these tests in core by running only
@@ -277,7 +278,6 @@ class TestTpcdsDecimalV2Query(ImpalaTestSuite):
         v.get_value('table_format').file_format not in ['rc', 'hbase', 'kudu'] and\
         v.get_value('table_format').compression_codec in ['none', 'snap'] and\
         v.get_value('table_format').compression_type != 'record')
-    cls.ImpalaTestMatrix.add_mandatory_exec_option('decimal_v2', 1)
 
     if cls.exploration_strategy() != 'exhaustive':
       # Cut down on the execution time for these tests in core by running only

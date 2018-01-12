@@ -5093,7 +5093,8 @@ TEST_F(ExprTest, MathFunctions) {
   TestValue("cast(-12345.345 as float) % cast(-7 as float)",
       TYPE_FLOAT, fmodf(-12345.345f, -7.0f));
   TestValue("cast(12345.345 as double) % 7", TYPE_DOUBLE, fmod(12345.345, 7.0));
-  TestValue("-12345.345 % cast(7 as double)", TYPE_DOUBLE, fmod(-12345.345, 7.0));
+  TestValue("cast(-12345.345 as double) % cast(7 as double)",
+      TYPE_DOUBLE, fmod(-12345.345, 7.0));
   TestValue("cast(-12345.345 as double) % -7", TYPE_DOUBLE, fmod(-12345.345, -7.0));
   // Test floating-point modulo by zero.
   TestIsNull("fmod(cast(-12345.345 as float), cast(0 as float))", TYPE_FLOAT);
@@ -7693,7 +7694,9 @@ TEST_F(ExprTest, DecimalFunctions) {
 
 // Sanity check some overflow casting. We have a random test framework that covers
 // this more thoroughly.
-TEST_F(ExprTest, DecimalOverflowCasts) {
+TEST_F(ExprTest, DecimalOverflowCastsDecimalV1) {
+  executor_->PushExecOption("DECIMAL_V2=0");
+
   TestDecimalValue("cast(123.456 as decimal(6,3))",
       Decimal4Value(123456), ColumnType::CreateDecimalType(6, 3));
   TestDecimalValue("cast(-123.456 as decimal(6,1))",
@@ -7762,6 +7765,78 @@ TEST_F(ExprTest, DecimalOverflowCasts) {
   // Tests converting a non-trivial empty string to a decimal (IMPALA-1566).
   TestIsNull("cast(regexp_replace('','a','b') as decimal(15,2))",
       ColumnType::CreateDecimalType(15,2));
+
+  executor_->PopExecOption();
+}
+
+TEST_F(ExprTest, DecimalOverflowCastsDecimalV2) {
+  executor_->PushExecOption("DECIMAL_V2=1");
+
+  TestDecimalValue("cast(123.456 as decimal(6,3))",
+      Decimal4Value(123456), ColumnType::CreateDecimalType(6, 3));
+  TestDecimalValue("cast(-123.456 as decimal(6,1))",
+      Decimal4Value(-1235), ColumnType::CreateDecimalType(6, 1));
+  TestDecimalValue("cast(123.456 as decimal(6,0))",
+      Decimal4Value(123), ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("cast(-123.456 as decimal(3,0))",
+      Decimal4Value(-123), ColumnType::CreateDecimalType(3, 0));
+
+  TestDecimalValue("cast(123.4567890 as decimal(10,7))",
+      Decimal8Value(1234567890L), ColumnType::CreateDecimalType(10, 7));
+
+  TestDecimalValue("cast(cast(\"123.01234567890123456789\" as decimal(23,20))\
+      as decimal(12,9))", Decimal8Value(123012345679L),
+      ColumnType::CreateDecimalType(12, 9));
+  TestDecimalValue("cast(cast(\"123.01234567890123456789\" as decimal(23,20))\
+      as decimal(4,1))", Decimal4Value(1230), ColumnType::CreateDecimalType(4, 1));
+
+  TestDecimalValue("cast(cast(\"123.0123456789\" as decimal(13,10))\
+      as decimal(5,2))", Decimal4Value(12301), ColumnType::CreateDecimalType(5, 2));
+
+  // Overflow
+  TestError("cast(123.456 as decimal(2,0))");
+  TestError("cast(123.456 as decimal(2,1))");
+  TestError("cast(123.456 as decimal(2,2))");
+  TestError("cast(99.99 as decimal(2,2))");
+  TestError("cast(99.99 as decimal(2,0))");
+  TestError("cast(-99.99 as decimal(2,2))");
+  TestError("cast(-99.99 as decimal(3,1))");
+
+  TestDecimalValue("cast(999.99 as decimal(6,3))",
+      Decimal4Value(999990), ColumnType::CreateDecimalType(6, 3));
+  TestDecimalValue("cast(-999.99 as decimal(7,4))",
+      Decimal4Value(-9999900), ColumnType::CreateDecimalType(7, 4));
+  TestError("cast(9990.99 as decimal(6,3))");
+  TestError("cast(-9990.99 as decimal(7,4))");
+
+  TestDecimalValue("cast(123.4567890 as decimal(4, 1))",
+      Decimal4Value(1235), ColumnType::CreateDecimalType(4, 1));
+  TestDecimalValue("cast(-123.4567890 as decimal(5, 2))",
+      Decimal4Value(-12346), ColumnType::CreateDecimalType(5, 2));
+  TestError("cast(123.4567890 as decimal(2, 1))");
+  TestError("cast(123.4567890 as decimal(6, 5))");
+
+  TestDecimalValue("cast(pi() as decimal(1, 0))",
+      Decimal4Value(3), ColumnType::CreateDecimalType(1,0));
+  TestDecimalValue("cast(pi() as decimal(4, 1))",
+      Decimal4Value(31), ColumnType::CreateDecimalType(4,1));
+  TestDecimalValue("cast(pi() as decimal(30, 1))",
+      Decimal8Value(31), ColumnType::CreateDecimalType(30,1));
+  TestError("cast(pi() as decimal(4, 4))");
+  TestError("cast(pi() as decimal(11, 11))");
+  TestError("cast(pi() as decimal(31, 31))");
+
+  TestError("cast(140573315541874605.4665184383287 as decimal(17, 13))");
+  TestError("cast(140573315541874605.4665184383287 as decimal(9, 3))");
+
+  // value has 30 digits before the decimal, casting to 29 is an overflow.
+  TestError("cast(99999999999999999999999999999.9 as decimal(29, 1))");
+
+  // Tests converting a non-trivial empty string to a decimal (IMPALA-1566).
+  TestIsNull("cast(regexp_replace('','a','b') as decimal(15,2))",
+      ColumnType::CreateDecimalType(15,2));
+
+  executor_->PopExecOption();
 }
 
 TEST_F(ExprTest, NullValueFunction) {

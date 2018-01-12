@@ -39,8 +39,8 @@ group by
 order by
   o_year
 ---- RESULTS
-1995,0.0344
-1996,0.0414
+1995,0.034436
+1996,0.041486
 ---- TYPES
 int, decimal
 ====

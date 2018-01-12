@@ -2333,7 +2333,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select count(*) from functional.alltypes " +
         "group by bool_col having 5 + 10 * 5.6",
         "HAVING clause '5 + 10 * 5.6' requires return type 'BOOLEAN'. " +
-        "Actual type is 'DOUBLE'.");
+        "Actual type is 'DECIMAL(7,1)'.");
     AnalysisError("select count(*) from functional.alltypes " +
         "group by bool_col having int_col",
         "HAVING clause 'int_col' requires return type 'BOOLEAN'. Actual type is 'INT'.");

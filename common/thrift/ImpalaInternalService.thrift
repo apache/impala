@@ -247,7 +247,7 @@ struct TQueryOptions {
   51: optional bool enable_expr_rewrites = true
 
   // Indicates whether to use the new decimal semantics.
-  52: optional bool decimal_v2 = false
+  52: optional bool decimal_v2 = true
 
   // Indicates whether to use dictionary filtering for Parquet files
   53: optional bool parquet_dictionary_filtering = true

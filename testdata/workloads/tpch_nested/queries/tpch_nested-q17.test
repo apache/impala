@@ -19,7 +19,7 @@ where
       l_partkey = p_partkey
   )
 ---- RESULTS
-348406.05
+348406.054286
 ---- TYPES
 decimal
 ====

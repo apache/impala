@@ -81,9 +81,7 @@ class TestDecimalCasting(ImpalaTestSuite):
         expected, actual)
 
   def _normalize_cast_expr(self, decimal_val, precision, cast_from):
-    # Due to IMPALA-4936, casts from double which overflows decimal type don't work
-    # reliably. So casting from string for now until IMPALA-4936 is fixed.
-    if precision > 38 or cast_from == 'string':
+    if cast_from == 'string':
       return "select cast('{0}' as Decimal({1},{2}))"
     else:
       return "select cast({0} as Decimal({1},{2}))"
@@ -139,8 +137,12 @@ class TestDecimalCasting(ImpalaTestSuite):
       val = self._gen_decimal_val(from_precision, scale)
       cast = self._normalize_cast_expr(val, from_precision,\
           vector.get_value('cast_from')).format(val, precision, scale)
-      res = self.execute_scalar(cast)
-      self._assert_decimal_result(cast, res, 'NULL')
+      if vector.get_value('cast_from') == "string":
+        # TODO: This should be an error in both cases (IMPALA-6405).
+        res = self.execute_scalar(cast)
+        self._assert_decimal_result(cast, res, 'NULL')
+      else:
+        res = self.execute_query_expect_failure(self.client, cast)
 
   def test_underflow(self, vector):
     """Test to verify that we truncate when the scale of the number being cast is higher

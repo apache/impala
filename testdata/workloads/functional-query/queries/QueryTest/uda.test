@@ -82,10 +82,10 @@ bigint,bigint
 ---- QUERY
 # Test that all types are exposed via the FunctionContext correctly.
 # This relies on asserts in the UDA funciton
-select agg_decimal_intermediate(cast(d1 as decimal(2,1)), 2), count(*)
-from functional.decimal_tbl
+select agg_decimal_intermediate(cast(c3 as decimal(2,1)), 2), count(*)
+from functional.decimal_tiny
 ---- RESULTS
-NULL,5
+NULL,100
 ---- TYPES
 decimal,bigint
 ====
@@ -106,7 +106,7 @@ from
    functional.alltypesagg,
    functional.decimal_tiny
 ---- RESULTS
-100,NULL,NULL,160.49989,-10.0989,11.8989,999,499500
+100,NULL,NULL,160.499890,-10.0989,11.8989,999,499500
 ---- TYPES
 decimal,decimal,bigint,decimal,decimal,decimal,bigint,bigint
 ====
@@ -126,17 +126,17 @@ from
 group by
    year,month,day
 ---- RESULTS
-100,NULL,NULL,99,5.4994
-100,NULL,NULL,99,5.4994
-100,NULL,NULL,99,5.4994
-100,NULL,NULL,99,5.4994
-100,NULL,NULL,99,5.4994
-100,NULL,NULL,99,5.4994
-100,NULL,NULL,99,5.4994
-100,NULL,NULL,99,5.4994
-100,NULL,NULL,99,5.4994
-100,NULL,NULL,99,5.4994
-100,NULL,NULL,99,5.4994
+100,NULL,NULL,99,5.499450
+100,NULL,NULL,99,5.499450
+100,NULL,NULL,99,5.499450
+100,NULL,NULL,99,5.499450
+100,NULL,NULL,99,5.499450
+100,NULL,NULL,99,5.499450
+100,NULL,NULL,99,5.499450
+100,NULL,NULL,99,5.499450
+100,NULL,NULL,99,5.499450
+100,NULL,NULL,99,5.499450
+100,NULL,NULL,99,5.499450
 ---- TYPES
 decimal,decimal,bigint,bigint,decimal
 ====

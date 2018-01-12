@@ -289,4 +289,5 @@ class TestTpcdsMemLimitError(TestLowMemoryLimits):
         v.get_value('table_format').file_format in ['parquet'])
 
   def test_low_mem_limit_q53(self, vector):
-    self.low_memory_limit_test(vector, 'tpcds-q53', self.MIN_MEM_FOR_TPCDS['q53'])
+    self.low_memory_limit_test(
+        vector, 'tpcds-decimal_v2-q53', self.MIN_MEM_FOR_TPCDS['q53'])

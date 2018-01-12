@@ -72,7 +72,6 @@ bigint
 ====
 ---- QUERY
 # boolean test: IS [NOT] (TRUE | FALSE | UNKNOWN)
----- QUERY
 select count(*) from alltypesagg where (int_col < 100) is unknown;
 ---- RESULTS
 20
@@ -1879,9 +1878,9 @@ string
 ---- QUERY
 select 1.1 * 1.1 + cast(1.1 as float)
 ---- RESULTS
-2.310000023841858
+2.31000002
 ---- TYPES
-double
+DECIMAL
 ====
 ---- QUERY
 select 1.1 * 1.1 + cast(1.1 as decimal(2,1))
@@ -1900,10 +1899,10 @@ decimal
 ---- QUERY
 select 1.1 * 1.1 + float_col from functional.alltypestiny limit 2;
 ---- RESULTS
-1.21
-2.310000023841858
+1.21000000
+2.31000002
 ---- TYPES
-double
+DECIMAL
 ====
 ---- QUERY
 select 1.1 * 1.1 + c3 from functional.decimal_tiny limit 2;
@@ -2236,7 +2235,7 @@ select tmp.str from (values
 ('multi\nfield\ntwo')) as tmp
 where regexp_like(tmp.str, '^multi.*$')
 ---- RESULTS
-----TYPES
+---- TYPES
 string
 ====
 ---- QUERY
