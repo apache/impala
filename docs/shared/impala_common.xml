@@ -1706,6 +1706,33 @@ DROP VIEW db2.v1;
         <codeph>CHAR</codeph> or <codeph>VARCHAR</codeph> type with the appropriate length.
       </p>
 
+      <p id="length_demo" rev="IMPALA-6391 IMPALA-2172">
+        The following example demonstrates how <codeph>length()</codeph>
+        and <codeph>char_length()</codeph> sometimes produce the same result,
+        and sometimes produce different results depending on the type of the
+        argument and the presence of trailing spaces for <codeph>CHAR</codeph>
+        values. The <codeph>S</codeph> and <codeph>C</codeph> values are
+        displayed with enclosing quotation marks to show any trailing spaces.
+<codeblock id="length_demo_example">create table length_demo (s string, c char(5));
+insert into length_demo values
+  ('a',cast('a' as char(5))),
+  ('abc',cast('abc' as char(5))),
+  ('hello',cast('hello' as char(5)));
+
+select concat('"',s,'"') as s, concat('"',c,'"') as c,
+  length(s), length(c),
+  char_length(s), char_length(c)
+from length_demo;
++---------+---------+-----------+-----------+----------------+----------------+
+| s       | c       | length(s) | length(c) | char_length(s) | char_length(c) |
++---------+---------+-----------+-----------+----------------+----------------+
+| "a"     | "a    " | 1         | 1         | 1              | 5              |
+| "abc"   | "abc  " | 3         | 3         | 3              | 5              |
+| "hello" | "hello" | 5         | 5         | 5              | 5              |
++---------+---------+-----------+-----------+----------------+----------------+
+</codeblock>
+      </p>
+
       <p rev="2.0.0" id="subquery_no_limit">
         Correlated subqueries used in <codeph>EXISTS</codeph> and <codeph>IN</codeph> operators cannot include a
         <codeph>LIMIT</codeph> clause.

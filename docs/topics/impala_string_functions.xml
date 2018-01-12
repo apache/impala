@@ -203,14 +203,24 @@ select concat('[',btrim('xyhelxyzlozyzzxx','xyz'),']');
           <codeph>char_length(string a), <ph rev="1.3.0" id="character_length">character_length(string a)</ph></codeph>
         </dt>
 
-        <dd>
+        <dd rev="IMPALA-6391 IMPALA-2172">
           <indexterm audience="hidden">char_length() function</indexterm>
           <indexterm audience="hidden">character_length() function</indexterm>
-          <b>Purpose:</b> Returns the length in characters of the argument string. Aliases for the
-          <codeph>length()</codeph> function.
+          <b>Purpose:</b> Returns the length in characters of the argument string, including any
+          trailing spaces that pad a <codeph>CHAR</codeph> value.
           <p>
             <b>Return type:</b> <codeph>int</codeph>
           </p>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            When applied to a <codeph>STRING</codeph> value, it returns the
+            same result as the <codeph>length()</codeph> function. When applied
+            to a <codeph>CHAR</codeph> value, it might return a larger value
+            than <codeph>length()</codeph> does, to account for trailing spaces
+            in the <codeph>CHAR</codeph>.
+          </p>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p conref="../shared/impala_common.xml#common/length_demo"/>
         </dd>
 
       </dlentry>
@@ -547,12 +557,31 @@ select instr('foo bar bletch', 'b', 1, null);
           <codeph>length(string a)</codeph>
         </dt>
 
-        <dd>
+        <dd rev="IMPALA-6391 IMPALA-2172">
           <indexterm audience="hidden">length() function</indexterm>
-          <b>Purpose:</b> Returns the length in characters of the argument string.
+          <b>Purpose:</b> Returns the length in characters of the argument string,
+          ignoring any trailing spaces in <codeph>CHAR</codeph> values.
           <p>
             <b>Return type:</b> <codeph>int</codeph>
           </p>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p>
+            When applied to a <codeph>STRING</codeph> value, it returns the
+            same result as the <codeph>char_length()</codeph> function. When applied
+            to a <codeph>CHAR</codeph> value, it might return a smaller value
+            than <codeph>char_length()</codeph> does, because <codeph>length()</codeph>
+            ignores any trailing spaces in the <codeph>CHAR</codeph>.
+          </p>
+          <note>
+            Because the behavior of <codeph>length()</codeph> with <codeph>CHAR</codeph>
+            values containing trailing spaces is not standardized across the industry,
+            when porting code from other database systems, evaluate the behavior of
+            <codeph>length()</codeph> on the source system and switch to
+            <codeph>char_length()</codeph> for Impala if necessary.
+          </note>
+
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p conref="../shared/impala_common.xml#common/length_demo"/>
         </dd>
 
       </dlentry>
