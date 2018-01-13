@@ -132,6 +132,9 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
   QUERY_OPT_FN(idle_session_timeout, IDLE_SESSION_TIMEOUT, TQueryOptionLevel::REGULAR)\
   ;
 
+/// Enforce practical limits on some query options to avoid undesired query state.
+  static const int64_t SPILLABLE_BUFFER_LIMIT = 1LL << 40; // 1 TB
+  static const int64_t ROW_SIZE_LIMIT = 1LL << 40; // 1 TB
 
 /// Converts a TQueryOptions struct into a map of key, value pairs.  Options that
 /// aren't set and lack defaults in common/thrift/ImpalaInternalService.thrift are

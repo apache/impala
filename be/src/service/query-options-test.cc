@@ -140,7 +140,7 @@ TEST(QueryOptions, SetByteOptions) {
       {MAKE_OPTIONDEF(max_scan_range_length), {-1, I64_MAX}},
       {MAKE_OPTIONDEF(rm_initial_mem),        {-1, I64_MAX}},
       {MAKE_OPTIONDEF(buffer_pool_limit),     {-1, I64_MAX}},
-      {MAKE_OPTIONDEF(max_row_size),          {1, I64_MAX}},
+      {MAKE_OPTIONDEF(max_row_size),          {1, ROW_SIZE_LIMIT}},
       {MAKE_OPTIONDEF(parquet_file_size),     {-1, I32_MAX}}
   };
   vector<pair<OptionDef<int32_t>, Range<int32_t>>> case_set_i32 {
@@ -302,7 +302,17 @@ TEST(QueryOptions, SetSpecialOptions) {
       TestOk("2MB", 2 * 1024 * 1024);
       TestOk("32G", 32ll * 1024 * 1024 * 1024);
       TestError("10MB");
+      TestOk(to_string(SPILLABLE_BUFFER_LIMIT).c_str(), SPILLABLE_BUFFER_LIMIT);
+      TestError(to_string(2 * SPILLABLE_BUFFER_LIMIT).c_str());
     }
+  }
+  // MAX_ROW_SIZE should be between 1 and ROW_SIZE_LIMIT
+  {
+    OptionDef<int64_t> key_def = MAKE_OPTIONDEF(max_row_size);
+    auto TestError = MakeTestErrFn(options, key_def);
+    TestError("-1");
+    TestError("0");
+    TestError(to_string(ROW_SIZE_LIMIT + 1).c_str());
   }
 }
 

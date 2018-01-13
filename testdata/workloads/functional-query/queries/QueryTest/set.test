@@ -234,10 +234,10 @@ explain select count(distinct double_col) from functional.alltypesagg;
 ---- QUERY
 set max_row_size=-1;
 ---- CATCH
-Max row size must be a positive number of bytes: -1
+Invalid max row size of -1. Valid sizes are in [1, 1099511627776]
 ====
 ---- QUERY
 set max_row_size=0;
 ---- CATCH
-Max row size must be a positive number of bytes: 0
+Invalid max row size of 0. Valid sizes are in [1, 1099511627776]
 ====

@@ -552,7 +552,13 @@ Status impala::SetQueryOption(const string& key, const string& value,
             ParseMemValue(value, "Default spillable buffer size", &buffer_size_bytes));
         if (!BitUtil::IsPowerOf2(buffer_size_bytes)) {
           return Status(
-              Substitute("Buffer size must be a power of two: $0", buffer_size_bytes));
+              Substitute("Default spillable buffer size must be a power of two: $0",
+                  buffer_size_bytes));
+        }
+        if (buffer_size_bytes > SPILLABLE_BUFFER_LIMIT) {
+          return Status(Substitute(
+              "Default spillable buffer size must be less than or equal to: $0",
+              SPILLABLE_BUFFER_LIMIT));
         }
         query_options->__set_default_spillable_buffer_size(buffer_size_bytes);
         break;
@@ -563,7 +569,13 @@ Status impala::SetQueryOption(const string& key, const string& value,
             ParseMemValue(value, "Minimum spillable buffer size", &buffer_size_bytes));
         if (!BitUtil::IsPowerOf2(buffer_size_bytes)) {
           return Status(
-              Substitute("Buffer size must be a power of two: $0", buffer_size_bytes));
+              Substitute("Minimum spillable buffer size must be a power of two: $0",
+                  buffer_size_bytes));
+        }
+        if (buffer_size_bytes > SPILLABLE_BUFFER_LIMIT) {
+          return Status(Substitute(
+              "Minimum spillable buffer size must be less than or equal to: $0",
+              SPILLABLE_BUFFER_LIMIT));
         }
         query_options->__set_min_spillable_buffer_size(buffer_size_bytes);
         break;
@@ -571,9 +583,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
       case TImpalaQueryOptions::MAX_ROW_SIZE: {
         int64_t max_row_size_bytes;
         RETURN_IF_ERROR(ParseMemValue(value, "Max row size", &max_row_size_bytes));
-        if (max_row_size_bytes <= 0) {
-          return Status(Substitute(
-              "Max row size must be a positive number of bytes: $0", value));
+        if (max_row_size_bytes <= 0 || max_row_size_bytes > ROW_SIZE_LIMIT) {
+          return Status(
+              Substitute("Invalid max row size of $0. Valid sizes are in [$1, $2]", value,
+                  1, ROW_SIZE_LIMIT));
         }
         query_options->__set_max_row_size(max_row_size_bytes);
         break;
