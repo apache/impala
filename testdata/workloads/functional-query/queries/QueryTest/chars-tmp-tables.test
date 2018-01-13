@@ -1,0 +1,275 @@
+====
+---- QUERY
+create table test_char_tmp (c char(5))
+---- RESULTS
+====
+---- QUERY
+insert into test_char_tmp select cast("hello" as char(5))
+---- RESULTS
+: 1
+====
+---- QUERY
+select * from test_char_tmp
+---- TYPES
+char
+---- RESULTS
+'hello'
+====
+---- QUERY
+# Regression test for IMPALA-1248
+insert into test_char_tmp
+values (cast("hel" as char(5))),
+       (cast(cast("hello000" as VARCHAR(8)) as char(5)))
+====
+---- QUERY
+select * from test_char_tmp where c = cast('hel' as char(5))
+---- TYPES
+char
+---- RESULTS
+'hel  '
+====
+---- QUERY
+insert into test_char_tmp values (NULL)
+====
+---- QUERY
+select * from test_char_tmp as A CROSS JOIN test_char_tmp as B
+where B.c = cast('hel' as CHAR(5))
+ORDER BY A.c
+---- TYPES
+char, char
+---- RESULTS
+'hel  ','hel  '
+'hello','hel  '
+'hello','hel  '
+'NULL','hel  '
+====
+---- QUERY
+select * from test_char_tmp as A, test_char_tmp as B
+where A.c = B.c AND A.c != 'hello'
+---- TYPES
+char, char
+---- RESULTS
+'hel  ','hel  '
+====
+---- QUERY
+select lower(c) from test_char_tmp ORDER BY c
+---- TYPES
+string
+---- RESULTS
+'hel  '
+'hello'
+'hello'
+'NULL'
+====
+---- QUERY
+create table test_varchar_tmp (vc varchar(5))
+---- RESULTS
+====
+---- QUERY
+insert into test_varchar_tmp values (cast("hello" as varchar(5)))
+====
+---- QUERY
+select * from test_varchar_tmp
+---- TYPES
+string
+---- RESULTS
+'hello'
+====
+---- QUERY
+insert into test_varchar_tmp values (cast("xyzzzzz12" as varchar(7)))
+---- CATCH
+would need to be cast to VARCHAR(5)
+====
+---- QUERY
+select cast("xyzzzzz12" as varchar(-1))
+---- CATCH
+Syntax error
+====
+====
+---- QUERY
+insert into test_varchar_tmp values (cast("hel" as varchar(4)))
+====
+---- QUERY
+select * from test_varchar_tmp
+---- TYPES
+string
+---- RESULTS
+'hello'
+'hel'
+====
+---- QUERY
+create table allchars
+(cshort char(5), clong char(140), vc varchar(5))
+---- RESULTS
+====
+---- QUERY
+insert into allchars values (cast("123456" as char(5)), cast("123456" as char(140)),
+cast("123456" as varchar(5)))
+====
+---- QUERY
+select cshort, clong, vc from allchars
+---- TYPES
+char,char,string
+---- RESULTS
+'12345','123456                                                                                                                                      ','12345'
+====
+---- QUERY
+create table allchars_par
+(cshort char(5), clong char(140), vc varchar(5)) stored as parquet
+---- RESULTS
+====
+---- QUERY
+insert into allchars_par values (cast("123456" as char(5)), cast("123456" as char(140)),
+cast("123456" as varchar(5)))
+====
+---- QUERY
+select cshort, clong, vc from allchars_par
+---- TYPES
+char,char,string
+---- RESULTS
+'12345','123456                                                                                                                                      ','12345'
+====
+---- QUERY
+create table char_parts (vc varchar(32)) partitioned by
+(csp char(5), clp char(140), vcp varchar(32))
+====
+---- QUERY
+insert into char_parts (csp, clp, vcp, vc) select cs, cl, vc, vc from functional.chars_tiny
+====
+---- QUERY
+select csp, clp, vcp from char_parts where csp != cast('dne' as char(5)) order by csp
+---- TYPES
+char, char, string
+---- RESULTS
+'1aaaa','1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','1cccc'
+'2aaaa','2bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','2cccccc'
+'3aaa ','3bbbbb                                                                                                                                      ','3ccc'
+'4aa  ','4bbbb                                                                                                                                       ','4cc'
+'5a   ','5bbb                                                                                                                                        ','5c'
+'6a   ','6b                                                                                                                                          ','6c'
+'6a   ','6b                                                                                                                                          ','6c'
+'a    ','b                                                                                                                                           ','c'
+====
+---- QUERY
+insert into char_parts partition (csp=cast('foo' as char(5)),
+clp=cast('01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789xxxxxxx' as char(140)),
+vcp=cast('myvar' as varchar(32))) select cast('val' as varchar(32));
+====
+---- QUERY
+select csp, clp, vcp from char_parts where csp = cast('foo' as char(5))
+---- TYPES
+char, char, string
+---- RESULTS
+'foo  ','01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789','myvar'
+====
+---- QUERY
+# Regression test for IMPALA-1322
+create table t_1822 (c10 char(10), c100 char(100), v100 varchar(100), v200 varchar(200), s string);
+====
+---- QUERY
+# Regression test for IMPALA-1322
+insert into t_1822 values (cast('a' as char(1)), cast('a' as char(1)),
+cast('a' as varchar(1)), cast('a' as varchar(1)), 'a');
+====
+---- QUERY
+# Regression test for IMPALA-1316
+select count(*) from t_1822 as t join t_1822 as tt
+on cast(tt.s as char(129)) = t.c10 and
+cast(tt.s as char(129)) = t.c100 and tt.c10 = t.c100;
+---- TYPES
+bigint
+---- RESULTS
+1
+====
+---- QUERY
+create table
+test_char_nulls ( c20 char(20),
+                  c40 char(40),
+                  c60 char(60),
+                  c80 char(80),
+                  c81 char(81),
+                  c82 char(82),
+                  c100 char(100),
+                  c120 char(120),
+                  c140 char(140))
+---- RESULTS
+====
+---- QUERY
+insert into test_char_nulls
+values (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+       (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
+---- RESULTS
+: 2
+====
+---- QUERY
+# Regression test for IMPALA-1339
+select c20 from test_char_nulls group by c20;
+---- TYPES
+char
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Regression test for IMPALA-1339
+select c40 from test_char_nulls group by c40;
+---- TYPES
+char
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Regression test for IMPALA-1339
+select c60 from test_char_nulls group by c60;
+---- TYPES
+char
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Regression test for IMPALA-1339
+select c80 from test_char_nulls group by c80;
+---- TYPES
+char
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Regression test for IMPALA-1339
+select c81 from test_char_nulls group by c81;
+---- TYPES
+char
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Regression test for IMPALA-1339
+select c82 from test_char_nulls group by c82;
+---- TYPES
+char
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Regression test for IMPALA-1339
+select c100 from test_char_nulls group by c100;
+---- TYPES
+char
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Regression test for IMPALA-1339
+select c120 from test_char_nulls group by c120;
+---- TYPES
+char
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Regression test for IMPALA-1339
+select c140 from test_char_nulls group by c140;
+---- TYPES
+char
+---- RESULTS
+'NULL'
+====

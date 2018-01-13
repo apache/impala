@@ -1,120 +1,8 @@
 ====
 ---- QUERY
-# TODO: string literals should start as CHAR(N) and analysis
-# should promote as necessary
-insert into test_char_tmp select cast("hello" as char(5))
-====
----- QUERY
-select * from test_char_tmp
----- TYPES
-char
----- RESULTS
-'hello'
-====
----- QUERY
-# Regression test for IMPALA-1248
-insert into test_char_tmp values (cast("hel" as char(5)))
-====
----- QUERY
-insert into test_char_tmp select cast(cast("hello000" as VARCHAR(8)) as char(5))
-====
----- QUERY
-select * from test_char_tmp where c = cast('hel' as char(5))
----- TYPES
-char
----- RESULTS
-'hel  '
-====
----- QUERY
-insert into test_char_tmp values (NULL)
-====
----- QUERY
-select * from test_char_tmp as A CROSS JOIN test_char_tmp as B
-where B.c = cast('hel' as CHAR(5))
-ORDER BY A.c
----- TYPES
-char, char
----- RESULTS
-'hel  ','hel  '
-'hello','hel  '
-'hello','hel  '
-'NULL','hel  '
-====
----- QUERY
-select * from test_char_tmp as A, test_char_tmp as B
-where A.c = B.c AND A.c != 'hello'
----- TYPES
-char, char
----- RESULTS
-'hel  ','hel  '
-====
----- QUERY
-select lower(c) from test_char_tmp ORDER BY c
----- TYPES
-string
----- RESULTS
-'hel  '
-'hello'
-'hello'
-'NULL'
-====
----- QUERY
-insert into test_varchar_tmp values (cast("hello" as varchar(5)))
-====
----- QUERY
-select * from test_varchar_tmp
----- TYPES
-string
----- RESULTS
-'hello'
-====
----- QUERY
-insert into test_varchar_tmp values (cast("xyzzzzz12" as varchar(7)))
----- CATCH
-would need to be cast to VARCHAR(5)
-====
----- QUERY
-select cast("xyzzzzz12" as varchar(-1))
----- CATCH
-Syntax error
-====
----- QUERY
 select (cast("xyzzzzz12" as char(-1)))
 ---- CATCH
 Syntax error
-====
----- QUERY
-insert into test_varchar_tmp values (cast("hel" as varchar(4)))
-====
----- QUERY
-select * from test_varchar_tmp
----- TYPES
-string
----- RESULTS
-'hello'
-'hel'
-====
----- QUERY
-insert into allchars values (cast("123456" as char(5)), cast("123456" as char(140)),
-cast("123456" as varchar(5)))
-====
----- QUERY
-select cshort, clong, vc from allchars
----- TYPES
-char,char,string
----- RESULTS
-'12345','123456                                                                                                                                      ','12345'
-====
----- QUERY
-insert into allchars_par values (cast("123456" as char(5)), cast("123456" as char(140)),
-cast("123456" as varchar(5)))
-====
----- QUERY
-select cshort, clong, vc from allchars_par
----- TYPES
-char,char,string
----- RESULTS
-'12345','123456                                                                                                                                      ','12345'
 ====
 ---- QUERY
 select count(*), count(cs), count(cl), count(vc) from chars_tiny
@@ -160,14 +48,14 @@ bigint
 1
 ====
 ---- QUERY
-select cs, count(cl) from functional.chars_tiny group by cs having count(vc) > 1
+select cs, count(cl) from chars_tiny group by cs having count(vc) > 1
 ---- TYPES
 char, bigint
 ---- RESULTS
 '6a   ',2
 ====
 ---- QUERY
-select A.cs from functional.chars_tiny as A, functional.chars_tiny as B where
+select A.cs from chars_tiny as A, chars_tiny as B where
 cast(A.cs as char(1)) = cast(B.cl as char(1)) order by A.cs
 ---- TYPES
 char
@@ -183,47 +71,8 @@ char
 '6a   '
 ====
 ---- QUERY
-drop table if exists char_parts
-====
----- QUERY
-create table if not exists char_parts (vc varchar(32)) partitioned by
-(csp char(5), clp char(140), vcp varchar(32))
-====
----- QUERY
-insert into char_parts (csp, clp, vcp, vc) select cs, cl, vc, vc from chars_tiny
-====
----- QUERY
-select csp, clp, vcp from char_parts where csp != cast('dne' as char(5)) order by csp
----- TYPES
-char, char, string
----- RESULTS
-'1aaaa','1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','1cccc'
-'2aaaa','2bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','2cccccc'
-'3aaa ','3bbbbb                                                                                                                                      ','3ccc'
-'4aa  ','4bbbb                                                                                                                                       ','4cc'
-'5a   ','5bbb                                                                                                                                        ','5c'
-'6a   ','6b                                                                                                                                          ','6c'
-'6a   ','6b                                                                                                                                          ','6c'
-'a    ','b                                                                                                                                           ','c'
-====
----- QUERY
-insert into char_parts partition (csp=cast('foo' as char(5)),
-clp=cast('01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789xxxxxxx' as char(140)),
-vcp=cast('myvar' as varchar(32))) select cast('val' as varchar(32));
-====
----- QUERY
-select csp, clp, vcp from char_parts where csp = cast('foo' as char(5))
----- TYPES
-char, char, string
----- RESULTS
-'foo  ','01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789','myvar'
-====
----- QUERY
-drop table if exists char_parts
-====
----- QUERY
 # Regression test for IMPALA-1316
-select A.vc from functional.chars_tiny as A join functional.chars_tiny using (vc) order by A.vc
+select A.vc from chars_tiny as A join chars_tiny using (vc) order by A.vc
 ---- TYPES
 string
 ---- RESULTS
@@ -240,7 +89,7 @@ string
 ====
 ---- QUERY
 # Regression test for IMPALA-1322
-select count(*) from functional.chars_tiny as A, functional.chars_tiny as B
+select count(*) from chars_tiny as A, chars_tiny as B
 where cast(A.cs as CHAR(1)) = cast(B.vc as CHAR(1));
 ---- TYPES
 bigint
@@ -249,38 +98,11 @@ bigint
 ====
 ---- QUERY
 select min(cs), max(vc), ndv(cl), ndv(vc), appx_median(cs), appx_median(vc)
-from functional.chars_tiny
+from chars_tiny
 ---- TYPES
 string, string, bigint, bigint, string, string
 ---- RESULTS
 '1aaaa','c',7,7,'5a   ','5c'
-====
----- QUERY
-# Regression test for IMPALA-1322
-drop table if exists functional.t_1822;
-====
----- QUERY
-# Regression test for IMPALA-1322
-create table functional.t_1822 (c10 char(10), c100 char(100), v100 varchar(100), v200 varchar(200), s string);
-====
----- QUERY
-# Regression test for IMPALA-1322
-insert into functional.t_1822 values (cast('a' as char(1)), cast('a' as char(1)),
-cast('a' as varchar(1)), cast('a' as varchar(1)), 'a');
-====
----- QUERY
-# Regression test for IMPALA-1316
-select count(*) from functional.t_1822 as t join functional.t_1822 as tt
-on cast(tt.s as char(129)) = t.c10 and
-cast(tt.s as char(129)) = t.c100 and tt.c10 = t.c100;
----- TYPES
-bigint
----- RESULTS
-1
-====
----- QUERY
-# Regression test for IMPALA-1322
-drop table if exists functional.t_1822;
 ====
 ---- QUERY
 # Regression test for IMPALA-1316
@@ -313,81 +135,9 @@ char, bigint
 'NULL',1
 ====
 ---- QUERY
-# Regression test for IMPALA-1339
-select c20 from test_char_nulls group by c20;
----- TYPES
-char
----- RESULTS
-'NULL'
-====
----- QUERY
-# Regression test for IMPALA-1339
-select c40 from test_char_nulls group by c40;
----- TYPES
-char
----- RESULTS
-'NULL'
-====
----- QUERY
-# Regression test for IMPALA-1339
-select c60 from test_char_nulls group by c60;
----- TYPES
-char
----- RESULTS
-'NULL'
-====
----- QUERY
-# Regression test for IMPALA-1339
-select c80 from test_char_nulls group by c80;
----- TYPES
-char
----- RESULTS
-'NULL'
-====
----- QUERY
-# Regression test for IMPALA-1339
-select c81 from test_char_nulls group by c81;
----- TYPES
-char
----- RESULTS
-'NULL'
-====
----- QUERY
-# Regression test for IMPALA-1339
-select c82 from test_char_nulls group by c82;
----- TYPES
-char
----- RESULTS
-'NULL'
-====
----- QUERY
-# Regression test for IMPALA-1339
-select c100 from test_char_nulls group by c100;
----- TYPES
-char
----- RESULTS
-'NULL'
-====
----- QUERY
-# Regression test for IMPALA-1339
-select c120 from test_char_nulls group by c120;
----- TYPES
-char
----- RESULTS
-'NULL'
-====
----- QUERY
-# Regression test for IMPALA-1339
-select c140 from test_char_nulls group by c140;
----- TYPES
-char
----- RESULTS
-'NULL'
-====
----- QUERY
 # Regression test for IMPALA-1344
 select cs, LAST_VALUE(cs) OVER (ORDER BY cs rows between unbounded preceding and
-current row) FROM functional.chars_tiny;
+current row) FROM chars_tiny;
 ---- TYPES
 char, string
 ---- RESULTS
