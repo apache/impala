@@ -85,12 +85,13 @@ static struct {
   int64_t flag;
 } flag_mappings[] =
 {
-  { "ssse3",  CpuInfo::SSSE3 },
-  { "sse4_1", CpuInfo::SSE4_1 },
-  { "sse4_2", CpuInfo::SSE4_2 },
-  { "popcnt", CpuInfo::POPCNT },
-  { "avx",    CpuInfo::AVX },
-  { "avx2",   CpuInfo::AVX2 },
+  { "ssse3",     CpuInfo::SSSE3 },
+  { "sse4_1",    CpuInfo::SSE4_1 },
+  { "sse4_2",    CpuInfo::SSE4_2 },
+  { "popcnt",    CpuInfo::POPCNT },
+  { "avx",       CpuInfo::AVX },
+  { "avx2",      CpuInfo::AVX2 },
+  { "pclmuldqd", CpuInfo::PCLMULQDQ }
 };
 static const long num_flags = sizeof(flag_mappings) / sizeof(flag_mappings[0]);
 

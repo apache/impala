@@ -44,6 +44,41 @@ class OpenSSLUtilTest : public ::testing::Test {
     }
   }
 
+  /// Fill arbitrary-length buffer with random bytes
+  void GenerateRandomBytes(uint8_t* data, int64_t len) {
+    DCHECK_GE(len, 0);
+    for (int64_t i = 0; i < len; i++) {
+      data[i] = uniform_int_distribution<uint8_t>(0, UINT8_MAX)(rng_);
+    }
+  }
+
+  void TestEncryptionDecryption(const int64_t buffer_size) {
+    vector<uint8_t> original(buffer_size);
+    vector<uint8_t> scratch(buffer_size); // Scratch buffer for in-place encryption.
+    if (buffer_size % 8 == 0) {
+      GenerateRandomData(original.data(), buffer_size);
+    } else {
+      GenerateRandomBytes(original.data(), buffer_size);
+    }
+
+    // Check all the modes
+    AES_CIPHER_MODE modes[] = {AES_256_GCM, AES_256_CTR, AES_256_CFB};
+    for (auto m : modes) {
+      memcpy(scratch.data(), original.data(), buffer_size);
+
+      EncryptionKey key;
+      key.InitializeRandom();
+      key.SetCipherMode(m);
+
+      ASSERT_OK(key.Encrypt(scratch.data(), buffer_size, scratch.data()));
+      // Check that encryption did something
+      ASSERT_NE(0, memcmp(original.data(), scratch.data(), buffer_size));
+      ASSERT_OK(key.Decrypt(scratch.data(), buffer_size, scratch.data()));
+      // Check that we get the original data back.
+      ASSERT_EQ(0, memcmp(original.data(), scratch.data(), buffer_size));
+    }
+  }
+
   mt19937_64 rng_;
 };
 
@@ -57,7 +92,7 @@ TEST_F(OpenSSLUtilTest, Encryption) {
   GenerateRandomData(original.data(), buffer_size);
 
   // Check both CTR & CFB
-  AES_CIPHER_MODE modes[] = {AES_256_CTR, AES_256_CFB};
+  AES_CIPHER_MODE modes[] = {AES_256_GCM, AES_256_CTR, AES_256_CFB};
   for (auto m : modes) {
     // Iterate multiple times to ensure that key regeneration works correctly.
     EncryptionKey key;
@@ -85,44 +120,42 @@ TEST_F(OpenSSLUtilTest, Encryption) {
 /// Test that encryption and decryption work in-place.
 TEST_F(OpenSSLUtilTest, EncryptInPlace) {
   const int buffer_size = 1024 * 1024;
-  vector<uint8_t> original(buffer_size);
-  vector<uint8_t> scratch(buffer_size); // Scratch buffer for in-place encryption.
-
-  EncryptionKey key;
-  // Check both CTR & CFB
-  AES_CIPHER_MODE modes[] = {AES_256_CTR, AES_256_CFB};
-  for (auto m : modes) {
-    GenerateRandomData(original.data(), buffer_size);
-    memcpy(scratch.data(), original.data(), buffer_size);
-
-    key.InitializeRandom();
-    key.SetCipherMode(m);
-
-    ASSERT_OK(key.Encrypt(scratch.data(), buffer_size, scratch.data()));
-    // Check that encryption did something
-    ASSERT_NE(0, memcmp(original.data(), scratch.data(), buffer_size));
-    ASSERT_OK(key.Decrypt(scratch.data(), buffer_size, scratch.data()));
-    // Check that we get the original data back.
-    ASSERT_EQ(0, memcmp(original.data(), scratch.data(), buffer_size));
-  }
+  TestEncryptionDecryption(buffer_size);
 }
 
 /// Test that encryption works with buffer lengths that don't fit in a 32-bit integer.
 TEST_F(OpenSSLUtilTest, EncryptInPlaceHugeBuffer) {
   const int64_t buffer_size = 3 * 1024L * 1024L * 1024L;
-  vector<uint8_t> original(buffer_size);
-  vector<uint8_t> scratch(buffer_size); // Scratch buffer for in-place encryption.
-  GenerateRandomData(original.data(), buffer_size);
-  memcpy(scratch.data(), original.data(), buffer_size);
+  TestEncryptionDecryption(buffer_size);
+}
+
+/// Test that encryption works with arbitrary-length buffer
+TEST_F(OpenSSLUtilTest, EncryptArbitraryLength) {
+  std::uniform_int_distribution<uint64_t> dis(0, 1024 * 1024);
+  const int buffer_size = dis(rng_);
+  TestEncryptionDecryption(buffer_size);
+}
+
+/// Test integrity in GCM mode
+TEST_F(OpenSSLUtilTest, GcmIntegrity) {
+  const int buffer_size = 1024 * 1024;
+  vector<uint8_t> buffer(buffer_size);
 
   EncryptionKey key;
   key.InitializeRandom();
-  ASSERT_OK(key.Encrypt(scratch.data(), buffer_size, scratch.data()));
-  // Check that encryption did something
-  ASSERT_NE(0, memcmp(original.data(), scratch.data(), buffer_size));
-  ASSERT_OK(key.Decrypt(scratch.data(), buffer_size, scratch.data()));
-  // Check that we get the original data back.
-  ASSERT_EQ(0, memcmp(original.data(), scratch.data(), buffer_size));
+  key.SetCipherMode(AES_256_GCM);
+
+  // Even it has been set as GCM mode, it may fall back to other modes.
+  // Check if GCM mode is supported at runtime.
+  if (key.IsGcmMode()) {
+    GenerateRandomData(buffer.data(), buffer_size);
+    ASSERT_OK(key.Encrypt(buffer.data(), buffer_size, buffer.data()));
+
+    // tamper the data
+    ++buffer[0];
+    Status s = key.Decrypt(buffer.data(), buffer_size, buffer.data());
+    EXPECT_STR_CONTAINS(s.GetDetail(), "EVP_DecryptFinal");
+  }
 }
 
 /// Test basic integrity hash functionality.
