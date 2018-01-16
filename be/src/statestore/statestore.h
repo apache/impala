@@ -461,7 +461,7 @@ class Statestore : public CacheLineAligned {
   StatsMetric<double>* heartbeat_duration_metric_;
 
   /// Utility method to add an update to the given thread pool, and to fail if the thread
-  /// pool is already at capacity.
+  /// pool is already at capacity. Assumes that subscribers_lock_ is held by the caller.
   Status OfferUpdate(const ScheduledSubscriberUpdate& update,
       ThreadPool<ScheduledSubscriberUpdate>* thread_pool) WARN_UNUSED_RESULT;
 
