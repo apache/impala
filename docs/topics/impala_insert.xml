@@ -49,7 +49,7 @@ under the License.
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
 <codeblock>[<varname>with_clause</varname>]
-INSERT { INTO | OVERWRITE } [TABLE] <varname>table_name</varname>
+  INSERT <ph rev="2.12.0 IMPALA-4168">[<varname>hint_clause</varname>]</ph> { INTO | OVERWRITE } [TABLE] <varname>table_name</varname>
   [(<varname>column_list</varname>)]
   [ PARTITION (<varname>partition_clause</varname>)]
 {
@@ -204,9 +204,10 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
       </li>
 
       <li rev="1.2.2">
-        An optional hint clause immediately before the <codeph>SELECT</codeph> keyword, to fine-tune the behavior
-        when doing an <codeph>INSERT ... SELECT</codeph> operation into partitioned Parquet tables. The hint
-        keywords are <codeph>[SHUFFLE]</codeph> and <codeph>[NOSHUFFLE]</codeph>, including the square brackets.
+        An optional hint clause immediately either before the <codeph>SELECT</codeph> keyword or after the
+        <codeph>INSERT</codeph> keyword, to fine-tune the behavior when doing an <codeph>INSERT ... SELECT</codeph>
+        operation into partitioned Parquet tables. The hint clause cannot be specified in multiple places.
+        The hint keywords are <codeph>[SHUFFLE]</codeph> and <codeph>[NOSHUFFLE]</codeph>, including the square brackets.
         Inserting into partitioned Parquet tables can be a resource-intensive operation because it potentially
         involves many files being written to HDFS simultaneously, and separate
         <ph rev="parquet_block_size">large</ph> memory buffers being allocated to buffer the data for each
