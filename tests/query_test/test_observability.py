@@ -147,7 +147,7 @@ class TestObservability(ImpalaTestSuite):
     start_time = ""
     end_time = ""
 
-    MAX_RETRIES = 60
+    MAX_RETRIES = 300
     for retries in xrange(MAX_RETRIES):
       tree = self.impalad_test_service.get_thrift_profile(query_id)
 
