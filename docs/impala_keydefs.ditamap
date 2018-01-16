@@ -118,6 +118,10 @@ under the License.
 
   <keydef href="http://sentry.apache.org/" scope="external" format="html" keys="sentry"/>
 
+  <keydef href="https://www.strchr.com/hash_functions" scope="external" format="html" keys="hash_functions1"/>
+  <keydef href="https://aras-p.info/blog/2016/08/09/More-Hash-Function-Tests" scope="external" format="html" keys="hash_functions2"/>
+  <keydef href="https://softwareengineering.stackexchange.com/questions/49550/which-hashing-algorithm-is-best-for-uniqueness-and-speed" scope="external" format="html" keys="hash_functions3"/>
+
   <!-- Download page that leads to ODBC drivers. -->
   <keydef href="https://www.cloudera.com/downloads/connectors/impala/odbc.html" scope="external" format="html" keys="odbc_driver_download"/>
   <keydef href="http://www.cloudera.com/content/support/en/documentation/cloudera-connectors-documentation/connector-documentation-latest.html" scope="external" format="html" keys="connector-documentation-latest"/>
@@ -164,6 +168,7 @@ under the License.
   <keydef href="https://en.wikipedia.org/wiki/Single-precision_floating-point_format" scope="external" format="html" keys="Single-precision_floating-point_format"/>
   <keydef href="https://en.wikipedia.org/wiki/Two%27s_complement" scope="external" format="html" keys="Twos_complement"/>
   <keydef href="https://en.wikipedia.org/wiki/Universally_unique_identifier" scope="external" format="html" keys="Universally_unique_identifier"/>
+  <keydef href="https://en.wikipedia.org/wiki/MurmurHash" scope="external" format="html" keys="MurmurHash"/>
 
 <!-- Originally links to external doc pages, turned into plain text for Apache Impala docs. -->
   <keydef href="" scope="external" format="html" keys="admin_llama">
