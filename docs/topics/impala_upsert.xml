@@ -68,7 +68,7 @@ under the License.
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
 <codeblock>
-UPSERT INTO [TABLE] [<varname>db_name</varname>.]<varname>table_name</varname>
+UPSERT <ph rev="2.12.0 IMPALA-4168">[<varname>hint_clause</varname>]</ph> INTO [TABLE] [<varname>db_name</varname>.]<varname>table_name</varname>
   [(<varname>column_list</varname>)]
 {
     [<varname>hint_clause</varname>] <varname>select_statement</varname>

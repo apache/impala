@@ -77,6 +77,12 @@ INSERT <varname>insert_clauses</varname>
   [{ /* +SHUFFLE */ | /* +NOSHUFFLE */ }]
   [<ph rev="IMPALA-2522 2.8.0">/* +CLUSTERED */</ph>]
   SELECT <varname>remainder_of_query</varname>;
+
+<ph rev="2.12.0 IMPALA-4168">
+UPSERT [{ /* +SHUFFLE */ | /* +NOSHUFFLE */ }]
+  [<ph rev="IMPALA-2522 2.8.0">/* +CLUSTERED */</ph>]
+  <varname>upsert_clauses</varname>
+  SELECT <varname>remainder_of_query</varname>;</ph>
 </codeblock>
 
     <p rev="2.0.0">
@@ -112,6 +118,26 @@ INSERT <varname>insert_clauses</varname>
   -- +SHUFFLE|NOSHUFFLE
   SELECT <varname>remainder_of_query</varname>;
 
+<ph rev="2.12.0 IMPALA-4168">
+INSERT /* +SHUFFLE|NOSHUFFLE */
+  <varname>insert_clauses</varname>
+  SELECT <varname>remainder_of_query</varname>;</ph>
+
+<ph rev="2.12.0 IMPALA-4168">
+INSERT -- +SHUFFLE|NOSHUFFLE
+  <varname>insert_clauses</varname>
+  SELECT <varname>remainder_of_query</varname>;</ph>
+
+<ph rev="2.12.0 IMPALA-4168">
+UPSERT /* +SHUFFLE|NOSHUFFLE */
+  <varname>upsert_clauses</varname>
+  SELECT <varname>remainder_of_query</varname>;</ph>
+
+<ph rev="2.12.0 IMPALA-4168">
+UPSERT -- +SHUFFLE|NOSHUFFLE
+  <varname>upsert_clauses</varname>
+  SELECT <varname>remainder_of_query</varname>;</ph>
+
 <ph rev="IMPALA-2924">SELECT <varname>select_list</varname> FROM
 <varname>table_ref</varname>
   /* +{SCHEDULE_CACHE_LOCAL | SCHEDULE_DISK_LOCAL | SCHEDULE_REMOTE}
@@ -124,6 +150,22 @@ INSERT <varname>insert_clauses</varname>
 
 INSERT <varname>insert_clauses</varname>
   /* +CLUSTERED */
+  SELECT <varname>remainder_of_query</varname>;</ph>
+
+<ph rev="2.12.0 IMPALA-4168">INSERT -- +CLUSTERED
+  <varname>insert_clauses</varname>
+  SELECT <varname>remainder_of_query</varname>;
+
+INSERT /* +CLUSTERED */
+  <varname>insert_clauses</varname>
+  SELECT <varname>remainder_of_query</varname>;
+
+UPSERT -- +CLUSTERED
+  <varname>upsert_clauses</varname>
+  SELECT <varname>remainder_of_query</varname>;
+
+UPSERT /* +CLUSTERED */
+  <varname>upsert_clauses</varname>
   SELECT <varname>remainder_of_query</varname>;</ph>
 </codeblock>
 
