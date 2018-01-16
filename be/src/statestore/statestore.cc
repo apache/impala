@@ -62,6 +62,9 @@ DEFINE_int32(statestore_heartbeat_tcp_timeout_seconds, 3, "(Advanced) The time a
     "badly hung machines that are not able to respond to the heartbeat RPC in short "
     "order");
 
+DEFINE_int32(statestore_max_subscribers, 10000, "Used to control the maximum size "
+    "of the pending topic-update queue. There is at most one entry per subscriber.");
+
 // If this value is set too low, it's possible that UpdateState() might timeout during a
 // working invocation, and only a restart of the statestore with a change in value would
 // allow progress to be made. If set too high, a hung subscriber will waste an update
@@ -92,10 +95,6 @@ const string STATESTORE_HEARTBEAT_DURATION = "statestore.heartbeat-durations";
 // between the case where a Topic is empty and the case where the Topic only contains
 // an item with the initial version.
 const Statestore::TopicEntry::Version Statestore::Subscriber::TOPIC_INITIAL_VERSION = 0;
-
-// Used to control the maximum size of the pending topic-update queue, in which there is
-// at most one entry per subscriber.
-const int32_t STATESTORE_MAX_SUBSCRIBERS = 10000;
 
 // Updates or heartbeats that miss their deadline by this much are logged.
 const uint32_t DEADLINE_MISS_THRESHOLD_MS = 2000;
@@ -216,12 +215,12 @@ Statestore::Statestore(MetricGroup* metrics)
     subscriber_topic_update_threadpool_("statestore-update",
         "subscriber-update-worker",
         FLAGS_statestore_num_update_threads,
-        STATESTORE_MAX_SUBSCRIBERS,
+        FLAGS_statestore_max_subscribers,
         bind<void>(mem_fn(&Statestore::DoSubscriberUpdate), this, false, _1, _2)),
     subscriber_heartbeat_threadpool_("statestore-heartbeat",
         "subscriber-heartbeat-worker",
         FLAGS_statestore_num_heartbeat_threads,
-        STATESTORE_MAX_SUBSCRIBERS,
+        FLAGS_statestore_max_subscribers,
         bind<void>(mem_fn(&Statestore::DoSubscriberUpdate), this, true, _1, _2)),
     update_state_client_cache_(new StatestoreSubscriberClientCache(1, 0,
         FLAGS_statestore_update_tcp_timeout_seconds * 1000,
@@ -349,11 +348,17 @@ void Statestore::SubscribersHandler(const Webserver::ArgumentMap& args,
 
 Status Statestore::OfferUpdate(const ScheduledSubscriberUpdate& update,
     ThreadPool<ScheduledSubscriberUpdate>* threadpool) {
-  if (threadpool->GetQueueSize() >= STATESTORE_MAX_SUBSCRIBERS
+  // Somewhat confusingly, we're checking the number of entries in a particular
+  // threadpool's work queue to decide whether or not we have too many
+  // subscribers. The number of subscribers registered can be actually more
+  // than statestore_max_subscribers. This is because RegisterSubscriber() adds
+  // the new subscriber to subscribers_ first before scheduling its updates.
+  // Should we be stricter in enforcing this limit on subscribers_.size() itself?
+  if (threadpool->GetQueueSize() >= FLAGS_statestore_max_subscribers
       || !threadpool->Offer(update)) {
     stringstream ss;
-    ss << "Maximum subscriber limit reached: " << STATESTORE_MAX_SUBSCRIBERS;
-    lock_guard<mutex> l(subscribers_lock_);
+    ss << "Maximum subscriber limit reached: " << FLAGS_statestore_max_subscribers;
+    ss << ", subscribers_ size: " << subscribers_.size();
     SubscriberMap::iterator subscriber_it = subscribers_.find(update.subscriber_id);
     DCHECK(subscriber_it != subscribers_.end());
     subscribers_.erase(subscriber_it);
@@ -400,12 +405,12 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
         PrintId(current_registration->registration_id()), true);
     num_subscribers_metric_->SetValue(subscribers_.size());
     subscriber_set_metric_->Add(subscriber_id);
-  }
 
-  // Add the subscriber to the update queue, with an immediate schedule.
-  ScheduledSubscriberUpdate update(0, subscriber_id, *registration_id);
-  RETURN_IF_ERROR(OfferUpdate(update, &subscriber_topic_update_threadpool_));
-  RETURN_IF_ERROR(OfferUpdate(update, &subscriber_heartbeat_threadpool_));
+    // Add the subscriber to the update queue, with an immediate schedule.
+    ScheduledSubscriberUpdate update(0, subscriber_id, *registration_id);
+    RETURN_IF_ERROR(OfferUpdate(update, &subscriber_topic_update_threadpool_));
+    RETURN_IF_ERROR(OfferUpdate(update, &subscriber_heartbeat_threadpool_));
+  }
 
   LOG(INFO) << "Subscriber '" << subscriber_id << "' registered (registration id: "
             << PrintId(*registration_id) << ")";
