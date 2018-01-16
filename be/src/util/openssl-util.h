@@ -60,9 +60,9 @@ bool IsExternalTlsConfigured();
 void SeedOpenSSLRNG();
 
 enum AES_CIPHER_MODE {
-  AES_256_CTR,
   AES_256_CFB,
-  AES_256_GCM // not supported now.
+  AES_256_CTR,
+  AES_256_GCM
 };
 
 /// The hash of a data buffer used for checking integrity. A SHA256 hash is used
@@ -83,43 +83,56 @@ class IntegrityHash {
 /// The key and initialization vector (IV) required to encrypt and decrypt a buffer of
 /// data. This should be regenerated for each buffer of data.
 ///
-/// We use AES with a 256-bit key and CTR/CFB cipher block mode, which gives us a stream
-/// cipher that can support arbitrary-length ciphertexts. If OpenSSL version at runtime
-/// is 1.0.1 or above, CTR mode is used, otherwise CFB mode is used. The IV is used as
+/// We use AES with a 256-bit key and GCM/CTR/CFB cipher block mode, which gives us a
+/// stream cipher that can support arbitrary-length ciphertexts. The mode is chosen
+/// depends on the OpenSSL version & the hardware support at runtime. The IV is used as
 /// an input to the cipher as the "block to supply before the first block of plaintext".
 /// This is required because all ciphers (except the weak ECB) are built such that each
 /// block depends on the output from the previous block. Since the first block doesn't
 /// have a previous block, we supply this IV. Think of it  as starting off the chain of
 /// encryption.
+///
+/// Notes for GCM:
+/// (1) GCM mode was supported since OpenSSL 1.0.1, however the tag verification
+/// in decryption was only supported since OpenSSL 1.0.1d.
+/// (2) The plaintext and the Additional Authenticated Data(AAD) are the two
+/// categories of data that GCM protects. GCM protects the authenticity of the
+/// plaintext and the AAD, and GCM also protects the confidentiality of the
+/// plaintext. The AAD itself is not required or won't change the security.
+/// In our case(Spill to Disk), we just ignore the AAD.
+
 class EncryptionKey {
  public:
-  EncryptionKey() : initialized_(false) {
-    // If TLS1.2 is supported, then we're on a verison of OpenSSL that supports
-    // AES-256-CTR.
-    mode_ = MaxSupportedTlsVersion() < TLS1_2_VERSION ? AES_256_CFB : AES_256_CTR;
-  }
+  EncryptionKey() : initialized_(false) { mode_ = GetSupportedDefaultMode(); }
 
-  /// Initialize a key for temporary use with randomly generated data. Reinitializes with
-  /// new random values if the key was already initialized. We use AES-CTR/AES-CFB mode
-  /// so key/IV pairs should not be reused. This function automatically reseeds the RNG
-  /// periodically, so callers do not need to do it.
+  /// Initializes a key for temporary use with randomly generated data, and clears the
+  /// tag for GCM mode. Reinitializes with new random values if the key was already
+  /// initialized. We use AES-GCM/AES-CTR/AES-CFB mode so key/IV pairs should not be
+  /// reused. This function automatically reseeds the RNG periodically, so callers do
+  /// not need to do it.
   void InitializeRandom();
 
   /// Encrypts a buffer of input data 'data' of length 'len' into an output buffer 'out'.
   /// Exactly 'len' bytes will be written to 'out'. This key must be initialized before
   /// calling. Operates in-place if 'in' == 'out', otherwise the buffers must not overlap.
-  Status Encrypt(const uint8_t* data, int64_t len, uint8_t* out) const WARN_UNUSED_RESULT;
+  /// For GCM mode, the hash tag will be kept inside(gcm_tag_ variable).
+  Status Encrypt(const uint8_t* data, int64_t len, uint8_t* out) WARN_UNUSED_RESULT;
 
   /// Decrypts a buffer of input data 'data' of length 'len' that was encrypted with this
   /// key into an output buffer 'out'. Exactly 'len' bytes will be written to 'out'.
   /// This key must be initialized before calling. Operates in-place if 'in' == 'out',
-  /// otherwise the buffers must not overlap.
-  Status Decrypt(const uint8_t* data, int64_t len, uint8_t* out) const WARN_UNUSED_RESULT;
+  /// otherwise the buffers must not overlap. For GCM mode, the hash tag, which is
+  /// computed during encryption, will be used for intgerity verification.
+  Status Decrypt(const uint8_t* data, int64_t len, uint8_t* out) WARN_UNUSED_RESULT;
 
   /// Specify a cipher mode. Currently used only for testing but maybe in future we
   /// can provide a configuration option for the end user who can choose a preferred
   /// mode(GCM, CTR, CFB...) based on their software/hardware environment.
-  void SetCipherMode(AES_CIPHER_MODE m) { mode_ = m; }
+  /// If not supported, fall back to the supported mode at runtime.
+  void SetCipherMode(AES_CIPHER_MODE m);
+
+  /// If is GCM mode at runtime
+  bool IsGcmMode() const { return mode_ == AES_256_GCM; }
 
  private:
   /// Helper method that encrypts/decrypts if 'encrypt' is true/false respectively.
@@ -128,13 +141,25 @@ class EncryptionKey {
   /// This key must be initialized before calling. Operates in-place if 'in' == 'out',
   /// otherwise the buffers must not overlap.
   Status EncryptInternal(bool encrypt, const uint8_t* data, int64_t len,
-      uint8_t* out) const WARN_UNUSED_RESULT;
+      uint8_t* out) WARN_UNUSED_RESULT;
+
+  /// Check if mode m is supported at runtime
+  bool IsModeSupported(AES_CIPHER_MODE m) const;
+
+  /// Returns the a default mode which is supported at runtime. If GCM mode
+  /// is supported, return AES_256_GCM as the default. If GCM is not supported,
+  /// but CTR is still supported, return AES_256_CTR. When both GCM and
+  /// CTR modes are not supported, return AES_256_CFB.
+  AES_CIPHER_MODE GetSupportedDefaultMode() const;
+
+  /// Converts mode type to string.
+  const string ModeToString(AES_CIPHER_MODE m) const;
 
   /// Track whether this key has been initialized, to avoid accidentally using
   /// uninitialized keys.
   bool initialized_;
 
-  /// return a EVP_CIPHER according to cipher mode at runtime
+  /// Returns a EVP_CIPHER according to cipher mode at runtime
   const EVP_CIPHER* GetCipher() const;
 
   /// An AES 256-bit key.
@@ -142,6 +167,9 @@ class EncryptionKey {
 
   /// An initialization vector to feed as the first block to AES.
   uint8_t iv_[AES_BLOCK_SIZE];
+
+  /// Tag for GCM mode
+  uint8_t gcm_tag_[AES_BLOCK_SIZE];
 
   /// Cipher Mode
   AES_CIPHER_MODE mode_;
