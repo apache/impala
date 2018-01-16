@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_release_notes.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="known_issues"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Known Issues and Workarounds in Impala</title></head><body id="known_issues"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_release_notes.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="known_issues"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Known Issues and Workarounds in Impala</title></head><body id="known_issues"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1"><span class="ph">Known Issues and Workarounds in Impala</span></h1>
 
@@ -24,7 +24,7 @@
     <p class="p toc inpage"></p>
 
     <p class="p">
-      For issues fixed in various Impala releases, see <a class="xref" href="impala_fixed_issues.html#fixed_issues">Fixed Issues in Apache Impala (incubating)</a>.
+      For issues fixed in various Impala releases, see <a class="xref" href="impala_fixed_issues.html#fixed_issues">Fixed Issues in Apache Impala</a>.
     </p>
 
 
@@ -33,9 +33,56 @@
 
 
 
-  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_release_notes.html">Impala Release Notes</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="known_issues__known_issues_crash">
+  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_release_notes.html">Impala Release Notes</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="known_issues__known_issues_startup">
 
-    <h2 class="title topictitle2" id="ariaid-title2">Impala Known Issues: Crashes and Hangs</h2>
+    <h2 class="title topictitle2" id="ariaid-title2">Impala Known Issues: Startup</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        These issues can prevent one or more Impala-related daemons
+        from starting properly.
+      </p>
+
+    </div>
+
+    <article class="topic concept nested2" aria-labelledby="IMPALA-4978__IMPALA-5253" id="known_issues_startup__IMPALA-4978">
+      <h3 class="title topictitle3" id="IMPALA-4978__IMPALA-5253">Problem retrieving FQDN causes startup problem on kerberized clusters</h3>
+      <div class="body conbody">
+        <p class="p">
+          The method Impala uses to retrieve the host name while constructing the Kerberos
+          principal is the <code class="ph codeph">gethostname()</code> system call. This function might
+          not always return the fully qualified domain name, depending on the network
+          configuration. If the daemons cannot determine the FQDN, Impala does not start
+          on a kerberized cluster.
+        </p>
+        <p class="p">
+          This problem might occur immediately after an upgrade of a CDH cluster, due to changes
+          in Cloudera Manager that supplies the <code class="ph codeph">--hostname</code> flag automatically to
+          the Impala-related daemons. (See the issue <span class="q">"hostname parameter is not passed to Impala catalog role"</span>
+          at <a class="xref" href="https://www.cloudera.com/documentation/enterprise/release-notes/topics/cm_rn_known_issues.html" target="_blank">the Cloudera Manager Known Issues page</a>.)
+        </p>
+        <p class="p"><strong class="ph b">Bugs:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-4978" target="_blank">IMPALA-4978</a>, <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-5253" target="_blank">IMPALA-5253</a></p>
+        <p class="p"><strong class="ph b">Severity:</strong> High</p>
+        <p class="p"><strong class="ph b">Resolution:</strong> The issue is expected to occur less frequently on systems
+          with fixes for <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-4978" target="_blank">IMPALA-4978</a>, <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-5253" target="_blank">IMPALA-5253</a>,
+          or both. Even on systems with fixes for both of these issues, the workaround might still
+          be required in some cases.
+        </p>
+        <p class="p"><strong class="ph b">Workaround:</strong> Test if a host is affected by checking whether the output of the
+          <span class="keyword cmdname">hostname</span> command includes the FQDN. On hosts where <span class="keyword cmdname">hostname</span>
+          only returns the short name, pass the command-line flag
+          <code class="ph codeph">--hostname=<var class="keyword varname">fully_qualified_domain_name</var></code>
+          in the startup options of all Impala-related daemons.
+        </p>
+      </div>
+    </article>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="known_issues__known_issues_crash">
+
+    <h2 class="title topictitle2" id="ariaid-title4">Impala Known Issues: Crashes and Hangs</h2>
 
     <div class="body conbody">
 
@@ -45,8 +92,8 @@
 
     </div>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title3" id="known_issues_crash__IMPALA-4828">
-      <h3 class="title topictitle3" id="ariaid-title3">Altering Kudu table schema outside of Impala may result in crash on read</h3>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title5" id="known_issues_crash__IMPALA-4828">
+      <h3 class="title topictitle3" id="ariaid-title5">Altering Kudu table schema outside of Impala may result in crash on read</h3>
       <div class="body conbody">
         <p class="p">
           Creating a table in Impala, changing the column schema outside of Impala,
@@ -64,9 +111,9 @@
       </div>
     </article>
 
-    <article class="topic concept nested2" aria-labelledby="ariaid-title4" id="known_issues_crash__IMPALA-1972">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title6" id="known_issues_crash__IMPALA-1972">
 
-      <h3 class="title topictitle3" id="ariaid-title4">Queries that take a long time to plan can cause webserver to block other queries</h3>
+      <h3 class="title topictitle3" id="ariaid-title6">Queries that take a long time to plan can cause webserver to block other queries</h3>
 
       <div class="body conbody">
 
@@ -86,9 +133,10 @@
         </p>
 
       </div>
+    </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title5" id="IMPALA-1972__IMPALA-4595">
-      <h4 class="title topictitle4" id="ariaid-title5">Linking IR UDF module to main module crashes Impala</h4>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title7" id="known_issues_crash__IMPALA-4595">
+      <h3 class="title topictitle3" id="ariaid-title7">Linking IR UDF module to main module crashes Impala</h3>
       <div class="body conbody">
         <p class="p">
           A UDF compiled as an LLVM module (<code class="ph codeph">.ll</code>) could cause a crash
@@ -102,9 +150,9 @@
       </div>
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title6" id="IMPALA-1972__IMPALA-3069">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title8" id="known_issues_crash__IMPALA-3069">
 
-      <h4 class="title topictitle4" id="ariaid-title6">Setting BATCH_SIZE query option too large can cause a crash</h4>
+      <h3 class="title topictitle3" id="ariaid-title8">Setting BATCH_SIZE query option too large can cause a crash</h3>
 
       <div class="body conbody">
 
@@ -127,9 +175,9 @@
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title7" id="IMPALA-1972__IMPALA-3441">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title9" id="known_issues_crash__IMPALA-3441">
 
-      <h4 class="title topictitle4" id="ariaid-title7">Impala should not crash for invalid avro serialized data</h4>
+      <h3 class="title topictitle3" id="ariaid-title9">Impala should not crash for invalid avro serialized data</h3>
 
       <div class="body conbody">
 
@@ -151,9 +199,9 @@
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title8" id="IMPALA-1972__IMPALA-2592">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title10" id="known_issues_crash__IMPALA-2592">
 
-      <h4 class="title topictitle4" id="ariaid-title8">Queries may hang on server-to-server exchange errors</h4>
+      <h3 class="title topictitle3" id="ariaid-title10">Queries may hang on server-to-server exchange errors</h3>
 
       <div class="body conbody">
 
@@ -174,9 +222,9 @@
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title9" id="IMPALA-1972__IMPALA-2365">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title11" id="known_issues_crash__IMPALA-2365">
 
-      <h4 class="title topictitle4" id="ariaid-title9">Impalad is crashing if udf jar is not available in hdfs location for first time</h4>
+      <h3 class="title topictitle3" id="ariaid-title11">Impalad is crashing if udf jar is not available in hdfs location for first time</h3>
 
       <div class="body conbody">
 
@@ -197,9 +245,9 @@
 
   </article>
 
-  <article class="topic concept nested2" aria-labelledby="known_issues_performance__ki_performance" id="known_issues_crash__known_issues_performance">
+  <article class="topic concept nested1" aria-labelledby="known_issues_performance__ki_performance" id="known_issues__known_issues_performance">
 
-    <h3 class="title topictitle3" id="known_issues_performance__ki_performance">Impala Known Issues: Performance</h3>
+    <h2 class="title topictitle2" id="known_issues_performance__ki_performance">Impala Known Issues: Performance</h2>
 
     <div class="body conbody">
 
@@ -209,8 +257,8 @@
 
     </div>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title11" id="known_issues_performance__IMPALA-3316">
-      <h4 class="title topictitle4" id="ariaid-title11">Slow queries for Parquet tables with convert_legacy_hive_parquet_utc_timestamps=true</h4>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title13" id="known_issues_performance__IMPALA-3316">
+      <h3 class="title topictitle3" id="ariaid-title13">Slow queries for Parquet tables with convert_legacy_hive_parquet_utc_timestamps=true</h3>
       <div class="body conbody">
         <p class="p">
           The configuration setting <code class="ph codeph">convert_legacy_hive_parquet_utc_timestamps=true</code>
@@ -235,11 +283,11 @@
       </div>
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title12" id="known_issues_performance__IMPALA-1480">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title14" id="known_issues_performance__IMPALA-1480">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title12">Slow DDL statements for tables with large number of partitions</h4>
+      <h3 class="title topictitle3" id="ariaid-title14">Slow DDL statements for tables with large number of partitions</h3>
 
       <div class="body conbody">
 
@@ -261,8 +309,8 @@
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title13" id="known_issues_performance__ki_file_handle_cache">
-      <h4 class="title topictitle4" id="ariaid-title13">Interaction of File Handle Cache with HDFS Appends and Short-Circuit Reads</h4>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title15" id="known_issues_performance__ki_file_handle_cache">
+      <h3 class="title topictitle3" id="ariaid-title15">Interaction of File Handle Cache with HDFS Appends and Short-Circuit Reads</h3>
       <div class="body conbody">
         <p class="p">
           If a data file used by Impala is being continuously appended or overwritten in place by an
@@ -290,9 +338,9 @@
 
   </article>
 
-  <article class="topic concept nested2" aria-labelledby="known_issues_usability__ki_usability" id="known_issues_crash__known_issues_usability">
+  <article class="topic concept nested1" aria-labelledby="known_issues_usability__ki_usability" id="known_issues__known_issues_usability">
 
-    <h3 class="title topictitle3" id="known_issues_usability__ki_usability">Impala Known Issues: Usability</h3>
+    <h2 class="title topictitle2" id="known_issues_usability__ki_usability">Impala Known Issues: Usability</h2>
 
     <div class="body conbody">
 
@@ -302,8 +350,8 @@
 
     </div>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title15" id="known_issues_usability__IMPALA-4570">
-      <h4 class="title topictitle4" id="ariaid-title15">Impala shell tarball is not usable on systems with setuptools versions where '0.7' is a substring of the full version string</h4>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title17" id="known_issues_usability__IMPALA-4570">
+      <h3 class="title topictitle3" id="ariaid-title17">Impala shell tarball is not usable on systems with setuptools versions where '0.7' is a substring of the full version string</h3>
       <div class="body conbody">
         <p class="p">
           For example, this issue could occur on a system using setuptools version 20.7.0.
@@ -317,9 +365,9 @@
       </div>
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title16" id="known_issues_usability__IMPALA-3133">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title18" id="known_issues_usability__IMPALA-3133">
 
-      <h4 class="title topictitle4" id="ariaid-title16">Unexpected privileges in show output</h4>
+      <h3 class="title topictitle3" id="ariaid-title18">Unexpected privileges in show output</h3>
 
       <div class="body conbody">
 
@@ -347,9 +395,9 @@
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title17" id="known_issues_usability__IMPALA-1776">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title19" id="known_issues_usability__IMPALA-1776">
 
-      <h4 class="title topictitle4" id="ariaid-title17">Less than 100% progress on completed simple SELECT queries</h4>
+      <h3 class="title topictitle3" id="ariaid-title19">Less than 100% progress on completed simple SELECT queries</h3>
 
       <div class="body conbody">
 
@@ -365,9 +413,9 @@
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title18" id="known_issues_usability__concept_lmx_dk5_lx">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title20" id="known_issues_usability__concept_lmx_dk5_lx">
 
-      <h4 class="title topictitle4" id="ariaid-title18">Unexpected column overflow behavior with INT datatypes</h4>
+      <h3 class="title topictitle3" id="ariaid-title20">Unexpected column overflow behavior with INT datatypes</h3>
 
       <div class="body conbody">
 
@@ -391,9 +439,9 @@
 
   </article>
 
-  <article class="topic concept nested2" aria-labelledby="known_issues_drivers__ki_drivers" id="known_issues_crash__known_issues_drivers">
+  <article class="topic concept nested1" aria-labelledby="known_issues_drivers__ki_drivers" id="known_issues__known_issues_drivers">
 
-    <h3 class="title topictitle3" id="known_issues_drivers__ki_drivers">Impala Known Issues: JDBC and ODBC Drivers</h3>
+    <h2 class="title topictitle2" id="known_issues_drivers__ki_drivers">Impala Known Issues: JDBC and ODBC Drivers</h2>
 
     <div class="body conbody">
 
@@ -404,11 +452,11 @@
 
     </div>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title20" id="known_issues_drivers__IMPALA-1792">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title22" id="known_issues_drivers__IMPALA-1792">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title20">ImpalaODBC: Can not get the value in the SQLGetData(m-x th column) after the SQLBindCol(m th column)</h4>
+      <h3 class="title topictitle3" id="ariaid-title22">ImpalaODBC: Can not get the value in the SQLGetData(m-x th column) after the SQLBindCol(m th column)</h3>
 
       <div class="body conbody">
 
@@ -432,9 +480,9 @@
 
   </article>
 
-  <article class="topic concept nested2" aria-labelledby="known_issues_security__ki_security" id="known_issues_crash__known_issues_security">
+  <article class="topic concept nested1" aria-labelledby="known_issues_security__ki_security" id="known_issues__known_issues_security">
 
-    <h3 class="title topictitle3" id="known_issues_security__ki_security">Impala Known Issues: Security</h3>
+    <h2 class="title topictitle2" id="known_issues_security__ki_security">Impala Known Issues: Security</h2>
 
     <div class="body conbody">
 
@@ -445,8 +493,8 @@
 
     </div>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title22" id="known_issues_security__IMPALA-5638">
-      <h4 class="title topictitle4" id="ariaid-title22">Malicious user can gain unauthorized access to Kudu table data via Impala</h4>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title24" id="known_issues_security__IMPALA-5638">
+      <h3 class="title topictitle3" id="ariaid-title24">Malicious user can gain unauthorized access to Kudu table data via Impala</h3>
       <div class="body conbody">
         <p class="p">
           A malicious user with <code class="ph codeph">ALTER</code> permissions on an Impala table can access any
@@ -466,11 +514,11 @@
       </div>
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title23" id="known_issues_security__renewable_kerberos_tickets">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title25" id="known_issues_security__renewable_kerberos_tickets">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title23">Kerberos tickets must be renewable</h4>
+      <h3 class="title topictitle3" id="ariaid-title25">Kerberos tickets must be renewable</h3>
 
       <div class="body conbody">
 
@@ -493,9 +541,9 @@
 
 
 
-  <article class="topic concept nested2" aria-labelledby="known_issues_resources__ki_resources" id="known_issues_crash__known_issues_resources">
+  <article class="topic concept nested1" aria-labelledby="known_issues_resources__ki_resources" id="known_issues__known_issues_resources">
 
-    <h3 class="title topictitle3" id="known_issues_resources__ki_resources">Impala Known Issues: Resources</h3>
+    <h2 class="title topictitle2" id="known_issues_resources__ki_resources">Impala Known Issues: Resources</h2>
 
     <div class="body conbody">
 
@@ -506,8 +554,8 @@
 
     </div>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title25" id="known_issues_resources__IMPALA-5605">
-      <h4 class="title topictitle4" id="ariaid-title25">Configuration to prevent crashes caused by thread resource limits</h4>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title27" id="known_issues_resources__IMPALA-5605">
+      <h3 class="title topictitle3" id="ariaid-title27">Configuration to prevent crashes caused by thread resource limits</h3>
       <div class="body conbody">
         <p class="p">
           Impala could encounter a serious error due to resource usage under very high concurrency.
@@ -539,8 +587,8 @@ impala hard nproc 262144
       </div>
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title26" id="known_issues_resources__flatbuffers_mem_usage">
-      <h4 class="title topictitle4" id="ariaid-title26">Memory usage when compact_catalog_topic flag enabled</h4>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title28" id="known_issues_resources__flatbuffers_mem_usage">
+      <h3 class="title topictitle3" id="ariaid-title28">Memory usage when compact_catalog_topic flag enabled</h3>
       <div class="body conbody">
         <p class="p">
           The efficiency improvement from <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-4029" target="_blank">IMPALA-4029</a>
@@ -565,8 +613,8 @@ impala hard nproc 262144
       </div>
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title27" id="known_issues_resources__IMPALA-2294">
-      <h4 class="title topictitle4" id="ariaid-title27">Kerberos initialization errors due to high memory usage</h4>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title29" id="known_issues_resources__IMPALA-2294">
+      <h3 class="title topictitle3" id="ariaid-title29">Kerberos initialization errors due to high memory usage</h3>
       <div class="body conbody">
         <div class="p">
         On a kerberized cluster with high memory utilization, <span class="keyword cmdname">kinit</span> commands executed after
@@ -603,8 +651,8 @@ vm.overcommit_memory=1
       </div>
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title28" id="known_issues_resources__drop_table_purge_s3a">
-      <h4 class="title topictitle4" id="ariaid-title28">DROP TABLE PURGE on S3A table may not delete externally written files</h4>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title30" id="known_issues_resources__drop_table_purge_s3a">
+      <h3 class="title topictitle3" id="ariaid-title30">DROP TABLE PURGE on S3A table may not delete externally written files</h3>
       <div class="body conbody">
         <p class="p">
           A <code class="ph codeph">DROP TABLE PURGE</code> statement against an S3 table could leave the data files
@@ -617,9 +665,9 @@ vm.overcommit_memory=1
       </div>
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title29" id="known_issues_resources__catalogd_heap">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title31" id="known_issues_resources__catalogd_heap">
 
-      <h4 class="title topictitle4" id="ariaid-title29">Impala catalogd heap issues when upgrading to <span class="keyword">Impala 2.5</span></h4>
+      <h3 class="title topictitle3" id="ariaid-title31">Impala catalogd heap issues when upgrading to <span class="keyword">Impala 2.5</span></h3>
 
       <div class="body conbody">
 
@@ -702,9 +750,9 @@ vm.overcommit_memory=1
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title30" id="known_issues_resources__IMPALA-3509">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title32" id="known_issues_resources__IMPALA-3509">
 
-      <h4 class="title topictitle4" id="ariaid-title30">Breakpad minidumps can be very large when the thread count is high</h4>
+      <h3 class="title topictitle3" id="ariaid-title32">Breakpad minidumps can be very large when the thread count is high</h3>
 
       <div class="body conbody">
 
@@ -733,9 +781,9 @@ vm.overcommit_memory=1
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title31" id="known_issues_resources__IMPALA-3662">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title33" id="known_issues_resources__IMPALA-3662">
 
-      <h4 class="title topictitle4" id="ariaid-title31">Parquet scanner memory increase after IMPALA-2736</h4>
+      <h3 class="title topictitle3" id="ariaid-title33">Parquet scanner memory increase after IMPALA-2736</h3>
 
       <div class="body conbody">
 
@@ -799,9 +847,9 @@ vm.overcommit_memory=1
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title32" id="known_issues_resources__IMPALA-691">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title34" id="known_issues_resources__IMPALA-691">
 
-      <h4 class="title topictitle4" id="ariaid-title32">Process mem limit does not account for the JVM's memory usage</h4>
+      <h3 class="title topictitle3" id="ariaid-title34">Process mem limit does not account for the JVM's memory usage</h3>
 
 
 
@@ -825,11 +873,11 @@ vm.overcommit_memory=1
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title33" id="known_issues_resources__IMPALA-2375">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title35" id="known_issues_resources__IMPALA-2375">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title33">Fix issues with the legacy join and agg nodes using --enable_partitioned_hash_join=false and --enable_partitioned_aggregation=false</h4>
+      <h3 class="title topictitle3" id="ariaid-title35">Fix issues with the legacy join and agg nodes using --enable_partitioned_hash_join=false and --enable_partitioned_aggregation=false</h3>
 
       <div class="body conbody">
 
@@ -851,9 +899,9 @@ vm.overcommit_memory=1
 
   </article>
 
-  <article class="topic concept nested2" aria-labelledby="known_issues_correctness__ki_correctness" id="known_issues_crash__known_issues_correctness">
+  <article class="topic concept nested1" aria-labelledby="known_issues_correctness__ki_correctness" id="known_issues__known_issues_correctness">
 
-    <h3 class="title topictitle3" id="known_issues_correctness__ki_correctness">Impala Known Issues: Correctness</h3>
+    <h2 class="title topictitle2" id="known_issues_correctness__ki_correctness">Impala Known Issues: Correctness</h2>
 
     <div class="body conbody">
 
@@ -863,8 +911,53 @@ vm.overcommit_memory=1
 
     </div>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title35" id="known_issues_correctness__IMPALA-4513">
-      <h4 class="title topictitle4" id="ariaid-title35">ABS(n) where n is the lowest bound for the int types returns negative values</h4>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title37" id="known_issues_correctness__IMPALA-4539">
+      <h3 class="title topictitle3" id="ariaid-title37">Parquet scanner memory bug: I/O buffer is attached to output batch while scratch batch rows still reference it</h3>
+
+      <div class="body conbody">
+        <p class="p">
+          Impala queries may return incorrect results when scanning plain-encoded string
+          columns in uncompressed Parquet files. I/O buffers holding the string data are
+          prematurely freed, leading to invalid memory reads and possibly
+          non-deterministic results. This does not affect Parquet files that use a
+          compression codec such as Snappy. Snappy is both strongly recommended generally
+          and the default choice for Impala-written Parquet files.
+        </p>
+        <p class="p">
+          How to determine whether a query might be affected:
+        </p>
+        <ul class="ul">
+          <li class="li">
+            The query must reference <code class="ph codeph">STRING</code> columns from a Parquet table.
+          </li>
+          <li class="li">
+            A selective filter on the Parquet table makes this issue more likely.
+          </li>
+          <li class="li">
+            Identify any uncompressed Parquet files processed by the query.
+            Examine the <code class="ph codeph">HDFS_SCAN_NODE</code> portion of a query profile that scans the
+            suspected table. Use a query that performs a full table scan, and materializes the column
+            values. (For example, <code class="ph codeph">SELECT MIN(<var class="keyword varname">colname</var>) FROM <var class="keyword varname">tablename</var></code>.)
+            Look for <span class="q">"File Formats"</span>. A value containing <code class="ph codeph">PARQUET/NONE</code> means uncompressed Parquet.
+          </li>
+          <li class="li">
+            Identify any plain-encoded string columns in the associated table. Pay special attention to tables
+            containing Parquet files generated through Hive, Spark, or other mechanisms outside of Impala,
+            because Impala uses Snappy compression by default for Parquet files. Use <code class="ph codeph">parquet-tools</code>
+            to dump the file metadata. Note that a column could have several encodings within the same file (the column
+            data is stored in several column chunks). Look for <code class="ph codeph">VLE:PLAIN</code> in the output of
+            <code class="ph codeph">parquet-tools</code>, which means the values are plain encoded.
+          </li>
+        </ul>
+        <p class="p"><strong class="ph b">Bug:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-4539" target="_blank">IMPALA-4539</a></p>
+        <p class="p"><strong class="ph b">Severity:</strong> High</p>
+        <p class="p"><strong class="ph b">Resolution:</strong> Upgrade to a version of Impala containing the fix for <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-4539" target="_blank">IMPALA-4539</a>.</p>
+        <p class="p"><strong class="ph b">Workaround:</strong> Use Snappy or another compression codec for Parquet files.</p>
+      </div>
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title38" id="known_issues_correctness__IMPALA-4513">
+      <h3 class="title topictitle3" id="ariaid-title38">ABS(n) where n is the lowest bound for the int types returns negative values</h3>
       <div class="body conbody">
         <p class="p">
           If the <code class="ph codeph">abs()</code> function evaluates a number that is right at the lower bound for
@@ -880,8 +973,8 @@ vm.overcommit_memory=1
       </div>
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title36" id="known_issues_correctness__IMPALA-4266">
-      <h4 class="title topictitle4" id="ariaid-title36">Java udf expression returning string in group by can give incorrect results.</h4>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title39" id="known_issues_correctness__IMPALA-4266">
+      <h3 class="title topictitle3" id="ariaid-title39">Java udf expression returning string in group by can give incorrect results.</h3>
       <div class="body conbody">
         <p class="p">
           If the <code class="ph codeph">GROUP BY</code> clause included a call to a Java UDF that returned a string value,
@@ -897,9 +990,9 @@ vm.overcommit_memory=1
       </div>
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title37" id="known_issues_correctness__IMPALA-3084">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title40" id="known_issues_correctness__IMPALA-3084">
 
-      <h4 class="title topictitle4" id="ariaid-title37">Incorrect assignment of NULL checking predicate through an outer join of a nested collection.</h4>
+      <h3 class="title topictitle3" id="ariaid-title40">Incorrect assignment of NULL checking predicate through an outer join of a nested collection.</h3>
 
       <div class="body conbody">
 
@@ -923,9 +1016,9 @@ vm.overcommit_memory=1
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title38" id="known_issues_correctness__IMPALA-3094">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title41" id="known_issues_correctness__IMPALA-3094">
 
-      <h4 class="title topictitle4" id="ariaid-title38">Incorrect result due to constant evaluation in query with outer join</h4>
+      <h3 class="title topictitle3" id="ariaid-title41">Incorrect result due to constant evaluation in query with outer join</h3>
 
       <div class="body conbody">
 
@@ -968,9 +1061,9 @@ explain SELECT 1 FROM alltypestiny a1
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title39" id="known_issues_correctness__IMPALA-3126">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title42" id="known_issues_correctness__IMPALA-3126">
 
-      <h4 class="title topictitle4" id="ariaid-title39">Incorrect assignment of an inner join On-clause predicate through an outer join.</h4>
+      <h3 class="title topictitle3" id="ariaid-title42">Incorrect assignment of an inner join On-clause predicate through an outer join.</h3>
 
       <div class="body conbody">
 
@@ -1146,9 +1239,9 @@ where b.int_col = c.int_col
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title40" id="known_issues_correctness__IMPALA-3006">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title43" id="known_issues_correctness__IMPALA-3006">
 
-      <h4 class="title topictitle4" id="ariaid-title40">Impala may use incorrect bit order with BIT_PACKED encoding</h4>
+      <h3 class="title topictitle3" id="ariaid-title43">Impala may use incorrect bit order with BIT_PACKED encoding</h3>
 
       <div class="body conbody">
 
@@ -1169,9 +1262,9 @@ where b.int_col = c.int_col
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title41" id="known_issues_correctness__IMPALA-3082">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title44" id="known_issues_correctness__IMPALA-3082">
 
-      <h4 class="title topictitle4" id="ariaid-title41">BST between 1972 and 1995</h4>
+      <h3 class="title topictitle3" id="ariaid-title44">BST between 1972 and 1995</h3>
 
       <div class="body conbody">
 
@@ -1200,9 +1293,9 @@ select
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title42" id="known_issues_correctness__IMPALA-1170">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title45" id="known_issues_correctness__IMPALA-1170">
 
-      <h4 class="title topictitle4" id="ariaid-title42">parse_url() returns incorrect result if @ character in URL</h4>
+      <h3 class="title topictitle3" id="ariaid-title45">parse_url() returns incorrect result if @ character in URL</h3>
 
       <div class="body conbody">
 
@@ -1221,9 +1314,9 @@ select
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title43" id="known_issues_correctness__IMPALA-2422">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title46" id="known_issues_correctness__IMPALA-2422">
 
-      <h4 class="title topictitle4" id="ariaid-title43">% escaping does not work correctly when occurs at the end in a LIKE clause</h4>
+      <h3 class="title topictitle3" id="ariaid-title46">% escaping does not work correctly when occurs at the end in a LIKE clause</h3>
 
       <div class="body conbody">
 
@@ -1240,9 +1333,9 @@ select
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title44" id="known_issues_correctness__IMPALA-397">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title47" id="known_issues_correctness__IMPALA-397">
 
-      <h4 class="title topictitle4" id="ariaid-title44">ORDER BY rand() does not work.</h4>
+      <h3 class="title topictitle3" id="ariaid-title47">ORDER BY rand() does not work.</h3>
 
       <div class="body conbody">
 
@@ -1259,9 +1352,9 @@ select
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title45" id="known_issues_correctness__IMPALA-2643">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title48" id="known_issues_correctness__IMPALA-2643">
 
-      <h4 class="title topictitle4" id="ariaid-title45">Duplicated column in inline view causes dropping null slots during scan</h4>
+      <h3 class="title topictitle3" id="ariaid-title48">Duplicated column in inline view causes dropping null slots during scan</h3>
 
       <div class="body conbody">
 
@@ -1284,11 +1377,11 @@ select
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title46" id="known_issues_correctness__IMPALA-1459">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title49" id="known_issues_correctness__IMPALA-1459">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title46">Incorrect assignment of predicates through an outer join in an inline view.</h4>
+      <h3 class="title topictitle3" id="ariaid-title49">Incorrect assignment of predicates through an outer join in an inline view.</h3>
 
       <div class="body conbody">
 
@@ -1307,9 +1400,9 @@ select
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title47" id="known_issues_correctness__IMPALA-2603">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title50" id="known_issues_correctness__IMPALA-2603">
 
-      <h4 class="title topictitle4" id="ariaid-title47">Crash: impala::Coordinator::ValidateCollectionSlots</h4>
+      <h3 class="title topictitle3" id="ariaid-title50">Crash: impala::Coordinator::ValidateCollectionSlots</h3>
 
       <div class="body conbody">
 
@@ -1326,9 +1419,9 @@ select
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title48" id="known_issues_correctness__IMPALA-2665">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title51" id="known_issues_correctness__IMPALA-2665">
 
-      <h4 class="title topictitle4" id="ariaid-title48">Incorrect assignment of On-clause predicate inside inline view with an outer join.</h4>
+      <h3 class="title topictitle3" id="ariaid-title51">Incorrect assignment of On-clause predicate inside inline view with an outer join.</h3>
 
       <div class="body conbody">
 
@@ -1361,9 +1454,9 @@ select
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title49" id="known_issues_correctness__IMPALA-2144">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title52" id="known_issues_correctness__IMPALA-2144">
 
-      <h4 class="title topictitle4" id="ariaid-title49">Wrong assignment of having clause predicate across outer join</h4>
+      <h3 class="title topictitle3" id="ariaid-title52">Wrong assignment of having clause predicate across outer join</h3>
 
       <div class="body conbody">
 
@@ -1382,9 +1475,9 @@ select
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title50" id="known_issues_correctness__IMPALA-2093">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title53" id="known_issues_correctness__IMPALA-2093">
 
-      <h4 class="title topictitle4" id="ariaid-title50">Wrong plan of NOT IN aggregate subquery when a constant is used in subquery predicate</h4>
+      <h3 class="title topictitle3" id="ariaid-title53">Wrong plan of NOT IN aggregate subquery when a constant is used in subquery predicate</h3>
 
       <div class="body conbody">
 
@@ -1405,9 +1498,9 @@ select
 
   </article>
 
-  <article class="topic concept nested2" aria-labelledby="known_issues_metadata__ki_metadata" id="known_issues_crash__known_issues_metadata">
+  <article class="topic concept nested1" aria-labelledby="known_issues_metadata__ki_metadata" id="known_issues__known_issues_metadata">
 
-    <h3 class="title topictitle3" id="known_issues_metadata__ki_metadata">Impala Known Issues: Metadata</h3>
+    <h2 class="title topictitle2" id="known_issues_metadata__ki_metadata">Impala Known Issues: Metadata</h2>
 
     <div class="body conbody">
 
@@ -1418,9 +1511,9 @@ select
 
     </div>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title52" id="known_issues_metadata__IMPALA-2648">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title55" id="known_issues_metadata__IMPALA-2648">
 
-      <h4 class="title topictitle4" id="ariaid-title52">Catalogd may crash when loading metadata for tables with many partitions, many columns and with incremental stats</h4>
+      <h3 class="title topictitle3" id="ariaid-title55">Catalogd may crash when loading metadata for tables with many partitions, many columns and with incremental stats</h3>
 
       <div class="body conbody">
 
@@ -1445,11 +1538,11 @@ select
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title53" id="known_issues_metadata__IMPALA-1420">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title56" id="known_issues_metadata__IMPALA-1420">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title53">Can't update stats manually via alter table after upgrading to <span class="keyword">Impala 2.0</span></h4>
+      <h3 class="title topictitle3" id="ariaid-title56">Can't update stats manually via alter table after upgrading to <span class="keyword">Impala 2.0</span></h3>
 
       <div class="body conbody">
 
@@ -1479,9 +1572,9 @@ select
 
   </article>
 
-  <article class="topic concept nested2" aria-labelledby="known_issues_interop__ki_interop" id="known_issues_crash__known_issues_interop">
+  <article class="topic concept nested1" aria-labelledby="known_issues_interop__ki_interop" id="known_issues__known_issues_interop">
 
-    <h3 class="title topictitle3" id="known_issues_interop__ki_interop">Impala Known Issues: Interoperability</h3>
+    <h2 class="title topictitle2" id="known_issues_interop__ki_interop">Impala Known Issues: Interoperability</h2>
 
     <div class="body conbody">
 
@@ -1494,9 +1587,9 @@ select
 
 
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title55" id="known_issues_interop__describe_formatted_avro">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title58" id="known_issues_interop__describe_formatted_avro">
 
-      <h4 class="title topictitle4" id="ariaid-title55">DESCRIBE FORMATTED gives error on Avro table</h4>
+      <h3 class="title topictitle3" id="ariaid-title58">DESCRIBE FORMATTED gives error on Avro table</h3>
 
       <div class="body conbody">
 
@@ -1528,11 +1621,11 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title56" id="known_issues_interop__IMP-469">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title59" id="known_issues_interop__IMP-469">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title56">Deviation from Hive behavior: Impala does not do implicit casts between string and numeric and boolean types.</h4>
+      <h3 class="title topictitle3" id="ariaid-title59">Deviation from Hive behavior: Impala does not do implicit casts between string and numeric and boolean types.</h3>
 
       <div class="body conbody">
 
@@ -1548,11 +1641,11 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title57" id="known_issues_interop__IMP-175">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title60" id="known_issues_interop__IMP-175">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title57">Deviation from Hive behavior: Out of range values float/double values are returned as maximum allowed value of type (Hive returns NULL)</h4>
+      <h3 class="title topictitle3" id="ariaid-title60">Deviation from Hive behavior: Out of range values float/double values are returned as maximum allowed value of type (Hive returns NULL)</h3>
 
       <div class="body conbody">
 
@@ -1569,11 +1662,11 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title58" id="known_issues_interop__flume_writeformat_text">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title61" id="known_issues_interop__flume_writeformat_text">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title58">Configuration needed for Flume to be compatible with Impala</h4>
+      <h3 class="title topictitle3" id="ariaid-title61">Configuration needed for Flume to be compatible with Impala</h3>
 
       <div class="body conbody">
 
@@ -1592,11 +1685,11 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title59" id="known_issues_interop__IMPALA-635">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title62" id="known_issues_interop__IMPALA-635">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title59">Avro Scanner fails to parse some schemas</h4>
+      <h3 class="title topictitle3" id="ariaid-title62">Avro Scanner fails to parse some schemas</h3>
 
       <div class="body conbody">
 
@@ -1622,11 +1715,11 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title60" id="known_issues_interop__IMPALA-1024">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title63" id="known_issues_interop__IMPALA-1024">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title60">Impala BE cannot parse Avro schema that contains a trailing semi-colon</h4>
+      <h3 class="title topictitle3" id="ariaid-title63">Impala BE cannot parse Avro schema that contains a trailing semi-colon</h3>
 
       <div class="body conbody">
 
@@ -1646,11 +1739,11 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title61" id="known_issues_interop__IMPALA-2154">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title64" id="known_issues_interop__IMPALA-2154">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title61">Fix decompressor to allow parsing gzips with multiple streams</h4>
+      <h3 class="title topictitle3" id="ariaid-title64">Fix decompressor to allow parsing gzips with multiple streams</h3>
 
       <div class="body conbody">
 
@@ -1673,11 +1766,11 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title62" id="known_issues_interop__IMPALA-1578">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title65" id="known_issues_interop__IMPALA-1578">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title62">Impala incorrectly handles text data when the new line character \n\r is split between different HDFS block</h4>
+      <h3 class="title topictitle3" id="ariaid-title65">Impala incorrectly handles text data when the new line character \n\r is split between different HDFS block</h3>
 
       <div class="body conbody">
 
@@ -1700,11 +1793,11 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title63" id="known_issues_interop__IMPALA-1862">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title66" id="known_issues_interop__IMPALA-1862">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title63">Invalid bool value not reported as a scanner error</h4>
+      <h3 class="title topictitle3" id="ariaid-title66">Invalid bool value not reported as a scanner error</h3>
 
       <div class="body conbody">
 
@@ -1722,11 +1815,11 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title64" id="known_issues_interop__IMPALA-1652">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title67" id="known_issues_interop__IMPALA-1652">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title64">Incorrect results with basic predicate on CHAR typed column.</h4>
+      <h3 class="title topictitle3" id="ariaid-title67">Incorrect results with basic predicate on CHAR typed column.</h3>
 
       <div class="body conbody">
 
@@ -1750,9 +1843,9 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
   </article>
 
-  <article class="topic concept nested2" aria-labelledby="ariaid-title65" id="known_issues_crash__known_issues_limitations">
+  <article class="topic concept nested1" aria-labelledby="ariaid-title68" id="known_issues__known_issues_limitations">
 
-    <h3 class="title topictitle3" id="ariaid-title65">Impala Known Issues: Limitations</h3>
+    <h2 class="title topictitle2" id="ariaid-title68">Impala Known Issues: Limitations</h2>
 
     <div class="body conbody">
 
@@ -1763,8 +1856,8 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </div>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title66" id="known_issues_limitations__IMPALA-4551">
-      <h4 class="title topictitle4" id="ariaid-title66">Set limits on size of expression trees</h4>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title69" id="known_issues_limitations__IMPALA-4551">
+      <h3 class="title topictitle3" id="ariaid-title69">Set limits on size of expression trees</h3>
       <div class="body conbody">
         <p class="p">
           Very deeply nested expressions within queries can exceed internal Impala limits,
@@ -1778,11 +1871,11 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       </div>
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title67" id="known_issues_limitations__IMPALA-77">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title70" id="known_issues_limitations__IMPALA-77">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title67">Impala does not support running on clusters with federated namespaces</h4>
+      <h3 class="title topictitle3" id="ariaid-title70">Impala does not support running on clusters with federated namespaces</h3>
 
       <div class="body conbody">
 
@@ -1809,9 +1902,9 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
   </article>
 
-  <article class="topic concept nested2" aria-labelledby="ariaid-title68" id="known_issues_crash__known_issues_misc">
+  <article class="topic concept nested1" aria-labelledby="ariaid-title71" id="known_issues__known_issues_misc">
 
-    <h3 class="title topictitle3" id="ariaid-title68">Impala Known Issues: Miscellaneous / Older Issues</h3>
+    <h2 class="title topictitle2" id="ariaid-title71">Impala Known Issues: Miscellaneous / Older Issues</h2>
 
     <div class="body conbody">
 
@@ -1821,11 +1914,11 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </div>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title69" id="known_issues_misc__IMPALA-2005">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title72" id="known_issues_misc__IMPALA-2005">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title69">A failed CTAS does not drop the table if the insert fails.</h4>
+      <h3 class="title topictitle3" id="ariaid-title72">A failed CTAS does not drop the table if the insert fails.</h3>
 
       <div class="body conbody">
 
@@ -1846,11 +1939,11 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title70" id="known_issues_misc__IMPALA-1821">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title73" id="known_issues_misc__IMPALA-1821">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title70">Casting scenarios with invalid/inconsistent results</h4>
+      <h3 class="title topictitle3" id="ariaid-title73">Casting scenarios with invalid/inconsistent results</h3>
 
       <div class="body conbody">
 
@@ -1870,11 +1963,11 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title71" id="known_issues_misc__IMPALA-1619">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title74" id="known_issues_misc__IMPALA-1619">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title71">Support individual memory allocations larger than 1 GB</h4>
+      <h3 class="title topictitle3" id="ariaid-title74">Support individual memory allocations larger than 1 GB</h3>
 
       <div class="body conbody">
 
@@ -1894,11 +1987,11 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title72" id="known_issues_misc__IMPALA-941">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title75" id="known_issues_misc__IMPALA-941">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title72">Impala Parser issue when using fully qualified table names that start with a number.</h4>
+      <h3 class="title topictitle3" id="ariaid-title75">Impala Parser issue when using fully qualified table names that start with a number.</h3>
 
       <div class="body conbody">
 
@@ -1919,11 +2012,11 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title73" id="known_issues_misc__IMPALA-532">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title76" id="known_issues_misc__IMPALA-532">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title73">Impala should tolerate bad locale settings</h4>
+      <h3 class="title topictitle3" id="ariaid-title76">Impala should tolerate bad locale settings</h3>
 
       <div class="body conbody">
 
@@ -1948,11 +2041,11 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </article>
 
-    <article class="topic concept nested3" aria-labelledby="ariaid-title74" id="known_issues_misc__IMP-1203">
+    <article class="topic concept nested2" aria-labelledby="ariaid-title77" id="known_issues_misc__IMP-1203">
 
 
 
-      <h4 class="title topictitle4" id="ariaid-title74">Log Level 3 Not Recommended for Impala</h4>
+      <h3 class="title topictitle3" id="ariaid-title77">Log Level 3 Not Recommended for Impala</h3>
 
       <div class="body conbody">
 
@@ -1971,5 +2064,4 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
   </article>
 
-</article>
 </article></main></body></html>

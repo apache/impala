@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="set"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>SET Statement</title></head><body id="set"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="set"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>SET Statement</title></head><body id="set"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1">SET Statement</h1>
   
@@ -22,16 +22,66 @@
       not with queries submitted through JDBC or ODBC.
     </p>
 
+    <div class="note important note_important"><span class="note__title importanttitle">Important:</span> 
+      <p class="p">
+        In <span class="keyword">Impala 2.11</span> and higher, the output of the <code class="ph codeph">SET</code>
+        statement changes in some important ways:
+      </p>
+      <ul class="ul">
+        <li class="li">
+          <p class="p">
+            The options are divided into groups: <code class="ph codeph">Regular Query Options</code>,
+            <code class="ph codeph">Advanced Query Options</code>, <code class="ph codeph">Development Query Options</code>, and
+            <code class="ph codeph">Deprecated Query Options</code>.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            The advanced options are intended for use in specific
+            kinds of performance tuning and debugging scenarios. The development options are
+            related to internal development of Impala or features that are not yet finalized;
+            these options might be changed or removed without notice.
+            The deprecated options are related to features that are removed or changed so that
+            the options no longer have any purpose; these options might be removed in future
+            versions.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            By default, only the first two groups (regular and advanced) are
+            displayed by the <code class="ph codeph">SET</code> command. Use the syntax <code class="ph codeph">SET ALL</code>
+            to see all groups of options.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            <span class="keyword cmdname">impala-shell</span> options and user-specified variables are always displayed
+            at the end of the list of query options, after all appropriate option groups.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            When the <code class="ph codeph">SET</code> command is run through the JDBC or ODBC interfaces,
+            the result set has a new third column, <code class="ph codeph">level</code>, indicating which
+            group each option belongs to. The same distinction of <code class="ph codeph">SET</code>
+            returning the regular and advanced options, and <code class="ph codeph">SET ALL</code>
+            returning all option groups, applies to JDBC and ODBC also.
+          </p>
+        </li>
+      </ul>
+    </div>
+
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
 
 <pre class="pre codeblock"><code>SET [<var class="keyword varname">query_option</var>=<var class="keyword varname">option_value</var>]
+<span class="ph">SET ALL</span>
 </code></pre>
 
     <p class="p">
-      <code class="ph codeph">SET</code> with no arguments returns a result set consisting of all available query options and
-      their current values.
+      <code class="ph codeph">SET</code> and <code class="ph codeph">SET ALL</code> with no arguments return a
+      result set consisting of all the applicable query options and their current values.
     </p>
 
     <p class="p">
@@ -44,6 +94,17 @@
       <code class="ph codeph">1</code> and <code class="ph codeph">0</code>. Some numeric options accept a final character signifying the unit,
       such as <code class="ph codeph">2g</code> for 2 gigabytes or <code class="ph codeph">100m</code> for 100 megabytes. See
       <a class="xref" href="impala_query_options.html#query_options">Query Options for the SET Statement</a> for the details of each query option.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Setting query options during impala-shell invocation:</strong>
+    </p>
+
+    <p class="p">
+      In <span class="keyword">Impala 2.11</span> and higher, you can use one or more command-line options
+      of the form <code class="ph codeph">--query_option=<var class="keyword varname">option</var>=<var class="keyword varname">value</var></code>
+      when running the <span class="keyword cmdname">impala-shell</span> command. The corresponding query option settings
+      take effect for that <span class="keyword cmdname">impala-shell</span> session.
     </p>
 
     <p class="p">
@@ -106,17 +167,36 @@ Query: select s from production_table order by s limit 3
 </code></pre>
 
     <p class="p">
-      The following example shows how <code class="ph codeph">SET</code> with no parameters displays
+      The following example shows how <code class="ph codeph">SET ALL</code> with no parameters displays
       all user-specified substitution variables, and how <code class="ph codeph">UNSET</code> removes
       the substitution variable entirely:
     </p>
 
 <pre class="pre codeblock"><code>
-[localhost:21000] &gt; set;
+[localhost:21000] &gt; set all;
 Query options (defaults shown in []):
-  ABORT_ON_DEFAULT_LIMIT_EXCEEDED: [0]
-  ...
-  V_CPU_CORES: [0]
+ABORT_ON_ERROR: [0]
+COMPRESSION_CODEC: []
+DISABLE_CODEGEN: [0]
+...
+
+Advanced Query Options:
+APPX_COUNT_DISTINCT: [0]
+BUFFER_POOL_LIMIT: []
+DEFAULT_JOIN_DISTRIBUTION_MODE: [0]
+...
+
+Development Query Options:
+BATCH_SIZE: [0]
+DEBUG_ACTION: []
+DECIMAL_V2: [0]
+...
+
+Deprecated Query Options:
+ABORT_ON_DEFAULT_LIMIT_EXCEEDED: [0]
+ALLOW_UNSUPPORTED_FORMATS: [0]
+DEFAULT_ORDER_BY_LIMIT: [-1]
+...
 
 Shell Options
   LIVE_PROGRESS: False

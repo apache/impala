@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_config.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="impala_jdbc"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Configuring Impala to Work with JDBC</title></head><body id="impala_jdbc"><main role="main"><article role="article" aria-labelledby="impala_jdbc__jdbc">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_config.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="impala_jdbc"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Configuring Impala to Work with JDBC</title></head><body id="impala_jdbc"><main role="main"><article role="article" aria-labelledby="impala_jdbc__jdbc">
 
   <h1 class="title topictitle1" id="impala_jdbc__jdbc">Configuring Impala to Work with JDBC</h1>
   
@@ -320,6 +320,20 @@ ARRAY&lt;VARCHAR(10)&gt;     becomes  ARRAY&lt;VARCHAR(10)&gt;
         </ul>
         </li>
       </ul>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title7" id="impala_jdbc__jdbc_kudu">
+    <h2 class="title topictitle2" id="ariaid-title7">Kudu Considerations for DML Statements</h2>
+    <div class="body conbody">
+      <p class="p">
+        Currently, Impala <code class="ph codeph">INSERT</code>, <code class="ph codeph">UPDATE</code>, or
+        other DML statements issued through the JDBC interface against a Kudu
+        table do not return JDBC error codes for conditions such as duplicate
+        primary key columns. Therefore, for applications that issue a high
+        volume of DML statements, prefer to use the Kudu Java API directly
+        rather than a JDBC application.
+      </p>
     </div>
   </article>
 

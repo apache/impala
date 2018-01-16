@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2017"><meta name="DC.rights.owner" content="(C) Copyright 2017"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="string_functions"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala String Functions</title></head><body id="string_functions"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="string_functions"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala String Functions</title></head><body id="string_functions"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1">Impala String Functions</h1>
   
@@ -403,11 +403,50 @@ select concat('[',btrim('xyhelxyzlozyzzxx','xyz'),']');
         <dd class="dd">
           
           
-          <strong class="ph b">Purpose:</strong> Returns the length in characters of the argument string. Aliases for the
-          <code class="ph codeph">length()</code> function.
+          <strong class="ph b">Purpose:</strong> Returns the length in characters of the argument string, including any
+          trailing spaces that pad a <code class="ph codeph">CHAR</code> value.
           <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">int</code>
           </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+          <p class="p">
+            When applied to a <code class="ph codeph">STRING</code> value, it returns the
+            same result as the <code class="ph codeph">length()</code> function. When applied
+            to a <code class="ph codeph">CHAR</code> value, it might return a larger value
+            than <code class="ph codeph">length()</code> does, to account for trailing spaces
+            in the <code class="ph codeph">CHAR</code>.
+          </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+          <div class="p">
+        The following example demonstrates how <code class="ph codeph">length()</code>
+        and <code class="ph codeph">char_length()</code> sometimes produce the same result,
+        and sometimes produce different results depending on the type of the
+        argument and the presence of trailing spaces for <code class="ph codeph">CHAR</code>
+        values. The <code class="ph codeph">S</code> and <code class="ph codeph">C</code> values are
+        displayed with enclosing quotation marks to show any trailing spaces.
+<pre class="pre codeblock" id="string_functions__d6e2549"><code>create table length_demo (s string, c char(5));
+insert into length_demo values
+  ('a',cast('a' as char(5))),
+  ('abc',cast('abc' as char(5))),
+  ('hello',cast('hello' as char(5)));
+
+select concat('"',s,'"') as s, concat('"',c,'"') as c,
+  length(s), length(c),
+  char_length(s), char_length(c)
+from length_demo;
++---------+---------+-----------+-----------+----------------+----------------+
+| s       | c       | length(s) | length(c) | char_length(s) | char_length(c) |
++---------+---------+-----------+-----------+----------------+----------------+
+| "a"     | "a    " | 1         | 1         | 1              | 5              |
+| "abc"   | "abc  " | 3         | 3         | 3              | 5              |
+| "hello" | "hello" | 5         | 5         | 5              | 5              |
++---------+---------+-----------+-----------+----------------+----------------+
+</code></pre>
+      </div>
         </dd>
 
       
@@ -764,10 +803,58 @@ select instr('foo bar bletch', 'b', 1, null);
 
         <dd class="dd">
           
-          <strong class="ph b">Purpose:</strong> Returns the length in characters of the argument string.
+          <strong class="ph b">Purpose:</strong> Returns the length in characters of the argument string,
+          ignoring any trailing spaces in <code class="ph codeph">CHAR</code> values.
           <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">int</code>
           </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+          <p class="p">
+            When applied to a <code class="ph codeph">STRING</code> value, it returns the
+            same result as the <code class="ph codeph">char_length()</code> function. When applied
+            to a <code class="ph codeph">CHAR</code> value, it might return a smaller value
+            than <code class="ph codeph">char_length()</code> does, because <code class="ph codeph">length()</code>
+            ignores any trailing spaces in the <code class="ph codeph">CHAR</code>.
+          </p>
+          <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
+            Because the behavior of <code class="ph codeph">length()</code> with <code class="ph codeph">CHAR</code>
+            values containing trailing spaces is not standardized across the industry,
+            when porting code from other database systems, evaluate the behavior of
+            <code class="ph codeph">length()</code> on the source system and switch to
+            <code class="ph codeph">char_length()</code> for Impala if necessary.
+          </div>
+
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+          <div class="p">
+        The following example demonstrates how <code class="ph codeph">length()</code>
+        and <code class="ph codeph">char_length()</code> sometimes produce the same result,
+        and sometimes produce different results depending on the type of the
+        argument and the presence of trailing spaces for <code class="ph codeph">CHAR</code>
+        values. The <code class="ph codeph">S</code> and <code class="ph codeph">C</code> values are
+        displayed with enclosing quotation marks to show any trailing spaces.
+<pre class="pre codeblock" id="string_functions__d6e2549"><code>create table length_demo (s string, c char(5));
+insert into length_demo values
+  ('a',cast('a' as char(5))),
+  ('abc',cast('abc' as char(5))),
+  ('hello',cast('hello' as char(5)));
+
+select concat('"',s,'"') as s, concat('"',c,'"') as c,
+  length(s), length(c),
+  char_length(s), char_length(c)
+from length_demo;
++---------+---------+-----------+-----------+----------------+----------------+
+| s       | c       | length(s) | length(c) | char_length(s) | char_length(c) |
++---------+---------+-----------+-----------+----------------+----------------+
+| "a"     | "a    " | 1         | 1         | 1              | 5              |
+| "abc"   | "abc  " | 3         | 3         | 3              | 5              |
+| "hello" | "hello" | 5         | 5         | 5              | 5              |
++---------+---------+-----------+-----------+----------------+----------------+
+</code></pre>
+      </div>
         </dd>
 
       
