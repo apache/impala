@@ -24,6 +24,8 @@
 
 #include "kudu/rpc/rpc_context.h"
 
+#include "exec/kudu-util.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/krpc-data-stream-recvr.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/row-batch.h"
@@ -70,7 +72,10 @@ KrpcDataStreamMgr::KrpcDataStreamMgr(MetricGroup* metrics)
       "total-senders-timedout-waiting-for-recvr-creation", 0L);
 }
 
-Status KrpcDataStreamMgr::Init() {
+Status KrpcDataStreamMgr::Init(MemTracker* mem_tracker,
+    MemTracker* incoming_request_tracker) {
+  mem_tracker_ = mem_tracker;
+  incoming_request_tracker_ = incoming_request_tracker;
   RETURN_IF_ERROR(Thread::Create("krpc-data-stream-mgr", "maintenance",
       [this](){ this->Maintenance(); }, &maintenance_thread_));
   RETURN_IF_ERROR(deserialize_pool_.Init());
@@ -109,13 +114,15 @@ shared_ptr<DataStreamRecvrBase> KrpcDataStreamMgr::CreateRecvr(
       // Let the receiver take over the RPC payloads of early senders and process them
       // asynchronously.
       for (unique_ptr<TransmitDataCtx>& ctx : early_senders.waiting_sender_ctxs) {
+        // Release memory. The receiver will track it in its instance tracker.
+        int64_t transfer_size = ctx->rpc_context->GetTransferSize();
         recvr->TakeOverEarlySender(move(ctx));
+        mem_tracker_->Release(transfer_size);
         num_senders_waiting_->Increment(-1);
       }
       for (const unique_ptr<EndDataStreamCtx>& ctx : early_senders.closed_sender_ctxs) {
         recvr->RemoveSender(ctx->request->sender_id());
-        Status::OK().ToProto(ctx->response->mutable_status());
-        ctx->rpc_context->RespondSuccess();
+        RespondAndReleaseRpc(Status::OK(), ctx->response, ctx->rpc_context, mem_tracker_);
         num_senders_waiting_->Increment(-1);
       }
       early_senders_map_.erase(it);
@@ -150,6 +157,10 @@ shared_ptr<KrpcDataStreamRecvr> KrpcDataStreamMgr::FindRecvr(
 void KrpcDataStreamMgr::AddEarlySender(const TUniqueId& finst_id,
     const TransmitDataRequestPB* request, TransmitDataResponsePB* response,
     kudu::rpc::RpcContext* rpc_context) {
+  DCHECK_EQ(incoming_request_tracker_->parent(), mem_tracker_->parent());
+  incoming_request_tracker_->ReleaseLocal(
+      rpc_context->GetTransferSize(), mem_tracker_->parent());
+  mem_tracker_->ConsumeLocal(rpc_context->GetTransferSize(), mem_tracker_->parent());
   RecvrId recvr_id = make_pair(finst_id, request->dest_node_id());
   auto payload = make_unique<TransmitDataCtx>(request, response, rpc_context);
   early_senders_map_[recvr_id].waiting_sender_ctxs.emplace_back(move(payload));
@@ -160,6 +171,10 @@ void KrpcDataStreamMgr::AddEarlySender(const TUniqueId& finst_id,
 void KrpcDataStreamMgr::AddEarlyClosedSender(const TUniqueId& finst_id,
     const EndDataStreamRequestPB* request, EndDataStreamResponsePB* response,
     kudu::rpc::RpcContext* rpc_context) {
+  DCHECK_EQ(incoming_request_tracker_->parent(), mem_tracker_->parent());
+  incoming_request_tracker_->ReleaseLocal(
+      rpc_context->GetTransferSize(), mem_tracker_->parent());
+  mem_tracker_->ConsumeLocal(rpc_context->GetTransferSize(), mem_tracker_->parent());
   RecvrId recvr_id = make_pair(finst_id, request->dest_node_id());
   auto payload = make_unique<EndDataStreamCtx>(request, response, rpc_context);
   early_senders_map_[recvr_id].closed_sender_ctxs.emplace_back(move(payload));
@@ -199,12 +214,15 @@ void KrpcDataStreamMgr::AddData(const TransmitDataRequestPB* request,
     // detect this case by checking already_unregistered - if true then the receiver was
     // already closed deliberately, and there's no unexpected error here.
     ErrorMsg msg(TErrorCode::DATASTREAM_RECVR_CLOSED, PrintId(finst_id), dest_node_id);
-    Status::Expected(msg).ToProto(response->mutable_status());
-    rpc_context->RespondSuccess();
+    RespondAndReleaseRpc(Status::Expected(msg), response, rpc_context,
+        incoming_request_tracker_);
     return;
   }
   DCHECK(recvr != nullptr);
+  int64_t transfer_size = rpc_context->GetTransferSize();
   recvr->AddBatch(request, response, rpc_context);
+  // Release memory. The receiver already tracks it in its instance tracker.
+  incoming_request_tracker_->Release(transfer_size);
 }
 
 void KrpcDataStreamMgr::EnqueueDeserializeTask(const TUniqueId& finst_id,
@@ -252,8 +270,7 @@ void KrpcDataStreamMgr::CloseSender(const EndDataStreamRequestPB* request,
   // If we reach this point, either the receiver is found or it has been unregistered
   // already. In either cases, it's safe to just return an OK status.
   if (LIKELY(recvr != nullptr)) recvr->RemoveSender(request->sender_id());
-  Status::OK().ToProto(response->mutable_status());
-  rpc_context->RespondSuccess();
+  RespondAndReleaseRpc(Status::OK(), response, rpc_context, incoming_request_tracker_);
 
   {
     // TODO: Move this to maintenance thread.
@@ -338,10 +355,19 @@ void KrpcDataStreamMgr::RespondToTimedOutSender(const std::unique_ptr<ContextTyp
   ErrorMsg msg(TErrorCode::DATASTREAM_SENDER_TIMEOUT, remote_addr, PrintId(finst_id),
       ctx->request->dest_node_id());
   VLOG_QUERY << msg.msg();
-  Status::Expected(msg).ToProto(ctx->response->mutable_status());
-  ctx->rpc_context->RespondSuccess();
+  RespondAndReleaseRpc(Status::Expected(msg), ctx->response, ctx->rpc_context,
+      mem_tracker_);
   num_senders_waiting_->Increment(-1);
   num_senders_timedout_->Increment(1);
+}
+
+template<typename ResponsePBType>
+void KrpcDataStreamMgr::RespondAndReleaseRpc(const Status& status,
+    ResponsePBType* response, kudu::rpc::RpcContext* ctx, MemTracker* mem_tracker) {
+  status.ToProto(response->mutable_status());
+  int64_t transfer_size = ctx->GetTransferSize();
+  ctx->RespondSuccess();
+  mem_tracker->Release(transfer_size);
 }
 
 void KrpcDataStreamMgr::Maintenance() {

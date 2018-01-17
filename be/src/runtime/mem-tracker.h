@@ -55,8 +55,8 @@ class TQueryOptions;
 ///
 /// By default, memory consumption is tracked via calls to Consume()/Release(), either to
 /// the tracker itself or to one of its descendents. Alternatively, a consumption metric
-/// can specified, and then the metric's value is used as the consumption rather than the
-/// tally maintained by Consume() and Release(). A tcmalloc metric is used to track
+/// can be specified, and then the metric's value is used as the consumption rather than
+/// the tally maintained by Consume() and Release(). A tcmalloc metric is used to track
 /// process memory consumption, since the process memory usage may be higher than the
 /// computed total memory (tcmalloc does not release deallocated memory immediately).
 /// Other consumption metrics are used in trackers below the process level to account

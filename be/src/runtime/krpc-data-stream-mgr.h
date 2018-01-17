@@ -225,16 +225,13 @@ struct EndDataStreamCtx {
 ///  time.
 ///  'total-senders-timedout-waiting-for-recvr-creation' - total number of senders that
 ///  timed-out while waiting for a receiver.
-///
-/// TODO: The recv buffers used in KrpcDataStreamRecvr should count against
-/// per-query memory limits.
 class KrpcDataStreamMgr : public DataStreamMgrBase {
  public:
   KrpcDataStreamMgr(MetricGroup* metrics);
 
   /// Initialize the deserialization thread pool and create the maintenance thread.
   /// Return error status on failure. Return OK otherwise.
-  Status Init();
+  Status Init(MemTracker* mem_tracker, MemTracker* incoming_request_tracker);
 
   /// Create a receiver for a specific fragment_instance_id/dest_node_id.
   /// If is_merging is true, the receiver maintains a separate queue of incoming row
@@ -292,6 +289,18 @@ class KrpcDataStreamMgr : public DataStreamMgrBase {
 
  private:
   friend class KrpcDataStreamRecvr;
+
+  /// MemTracker for memory used for transmit data requests before we hand them over to a
+  /// specific receiver. Used only to track payloads of deferred RPCs (e.g. early
+  /// senders). Not owned.
+  MemTracker* mem_tracker_ = nullptr;
+
+  /// MemTracker which is used by the DataStreamService to track memory for incoming
+  /// requests. Memory for new incoming requests is initially tracked against this tracker
+  /// before the requests are handed over to the data stream manager. It is this class's
+  /// responsibility to release memory from this tracker and track it against its own
+  /// tracker (here: mem_tracker_). Not owned.
+  MemTracker* incoming_request_tracker_ = nullptr;
 
   /// A task for the deserialization threads to work on. The fields identify
   /// the target receiver's sender queue.
@@ -465,6 +474,12 @@ class KrpcDataStreamMgr : public DataStreamMgrBase {
   /// show up. 'ctx' is the encapsulated RPC request context (e.g. TransmitDataCtx).
   template<typename ContextType, typename RequestPBType>
   void RespondToTimedOutSender(const std::unique_ptr<ContextType>& ctx);
+
+  /// Respond to the RPC passed in 'response'/'ctx' with 'status' and release the payload
+  /// memory from 'mem_tracker'. Takes ownership of 'ctx'.
+  template<typename ResponsePBType>
+  void RespondAndReleaseRpc(const Status& status, ResponsePBType* response,
+      kudu::rpc::RpcContext* ctx, MemTracker* mem_tracker);
 
   /// Notifies any sender that has been waiting for its receiver for more than
   /// FLAGS_datastream_sender_timeout_ms.

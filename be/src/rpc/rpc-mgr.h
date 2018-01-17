@@ -124,7 +124,8 @@ class RpcMgr {
   ///
   /// It is an error to call this after StartServices() has been called.
   Status RegisterService(int32_t num_service_threads, int32_t service_queue_depth,
-      std::unique_ptr<kudu::rpc::ServiceIf> service_ptr) WARN_UNUSED_RESULT;
+      std::unique_ptr<kudu::rpc::ServiceIf> service_ptr, MemTracker* mem_tracker)
+      WARN_UNUSED_RESULT;
 
   /// Creates a new proxy for a remote service of type P at location 'address', and places
   /// it in 'proxy'. 'P' must descend from kudu::rpc::ServiceIf. Note that 'address' must

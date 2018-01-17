@@ -126,6 +126,10 @@ class KrpcDataStreamRecvr::SenderQueue {
       const kudu::Slice& tuple_offsets, const kudu::Slice& tuple_data,
       unique_lock<SpinLock>* lock);
 
+  // Respond to the TransmitData RPC passed in 'ctx' with 'status' and release the payload
+  // memory from the MemTracker associated with 'recvr_'.
+  void RespondAndReleaseRpc(const Status& status, const unique_ptr<TransmitDataCtx>& ctx);
+
   // Receiver of which this queue is a member.
   KrpcDataStreamRecvr* recvr_;
 
@@ -321,6 +325,14 @@ void KrpcDataStreamRecvr::SenderQueue::AddBatchWork(int64_t batch_size,
   data_arrival_cv_.notify_one();
 }
 
+void KrpcDataStreamRecvr::SenderQueue::RespondAndReleaseRpc(const Status& status,
+    const unique_ptr<TransmitDataCtx>& ctx) {
+  int64_t transfer_size = ctx->rpc_context->GetTransferSize();
+  status.ToProto(ctx->response->mutable_status());
+  ctx->rpc_context->RespondSuccess();
+  recvr_->mem_tracker()->Release(transfer_size);
+}
+
 void KrpcDataStreamRecvr::SenderQueue::AddBatch(const TransmitDataRequestPB* request,
     TransmitDataResponsePB* response, RpcContext* rpc_context) {
   // TODO: Add timers for time spent in this function and queue time in 'batch_queue_'.
@@ -349,13 +361,14 @@ void KrpcDataStreamRecvr::SenderQueue::AddBatch(const TransmitDataRequestPB* req
       return;
     }
 
-    // If there's something in the queue and this batch will push us over the buffer
+    // If there's something in the queue or this batch will push us over the buffer
     // limit we need to wait until the queue gets drained. We store the rpc context
     // so that we can signal it at a later time to resend the batch that we couldn't
     // process here. If there are already deferred RPCs waiting in queue, the new
     // batch needs to line up after the deferred RPCs to avoid starvation of senders
     // in the non-merging case.
     if (UNLIKELY(!deferred_rpcs_.empty() || !CanEnqueue(batch_size))) {
+      recvr_->mem_tracker()->Consume(rpc_context->GetTransferSize());
       auto payload = make_unique<TransmitDataCtx>(request, response, rpc_context);
       deferred_rpcs_.push(move(payload));
       COUNTER_ADD(recvr_->num_deferred_batches_, 1);
@@ -391,8 +404,7 @@ void KrpcDataStreamRecvr::SenderQueue::DequeueDeferredRpc() {
         &tuple_data, &batch_size);
     // Reply with error status if the entry cannot be unpacked.
     if (UNLIKELY(!status.ok())) {
-      status.ToProto(ctx->response->mutable_status());
-      ctx->rpc_context->RespondSuccess();
+      RespondAndReleaseRpc(status, ctx);
       deferred_rpcs_.pop();
       return;
     }
@@ -412,13 +424,13 @@ void KrpcDataStreamRecvr::SenderQueue::DequeueDeferredRpc() {
   }
 
   // Responds to the sender to ack the insertion of the row batches.
-  Status::OK().ToProto(ctx->response->mutable_status());
-  ctx->rpc_context->RespondSuccess();
+  RespondAndReleaseRpc(Status::OK(), ctx);
 }
 
 void KrpcDataStreamRecvr::SenderQueue::TakeOverEarlySender(
     unique_ptr<TransmitDataCtx> ctx) {
   int sender_id = ctx->request->sender_id();
+  recvr_->mem_tracker()->Consume(ctx->rpc_context->GetTransferSize());
   COUNTER_ADD(recvr_->num_deferred_batches_, 1);
   {
     lock_guard<SpinLock> l(lock_);
@@ -449,8 +461,7 @@ void KrpcDataStreamRecvr::SenderQueue::Cancel() {
     // Respond to deferred RPCs.
     while (!deferred_rpcs_.empty()) {
       const unique_ptr<TransmitDataCtx>& payload = deferred_rpcs_.front();
-      Status::OK().ToProto(payload->response->mutable_status());
-      payload->rpc_context->RespondSuccess();
+      RespondAndReleaseRpc(Status::OK(), payload);
       deferred_rpcs_.pop();
     }
   }

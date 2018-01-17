@@ -34,6 +34,7 @@
 #include "kudu/util/metrics.h"
 #include "kudu/util/status.h"
 #include "kudu/util/trace.h"
+#include "runtime/mem-tracker.h"
 
 #include "common/names.h"
 #include "common/status.h"
@@ -46,13 +47,15 @@ METRIC_DEFINE_histogram(server, impala_unused,
 
 namespace impala {
 
-ImpalaServicePool::ImpalaServicePool(std::unique_ptr<kudu::rpc::ServiceIf> service,
+ImpalaServicePool::ImpalaServicePool(MemTracker* mem_tracker,
+                         std::unique_ptr<kudu::rpc::ServiceIf> service,
                          const scoped_refptr<kudu::MetricEntity>& entity,
                          size_t service_queue_length)
-  : service_(std::move(service)),
+  : mem_tracker_(mem_tracker),
+    service_(std::move(service)),
     service_queue_(service_queue_length),
     unused_histogram_(METRIC_impala_unused.Instantiate(entity)) {
-
+  DCHECK(mem_tracker_ != nullptr);
 }
 
 ImpalaServicePool::~ImpalaServicePool() {
@@ -84,8 +87,8 @@ void ImpalaServicePool::Shutdown() {
   kudu::Status status = kudu::Status::ServiceUnavailable("Service is shutting down");
   std::unique_ptr<kudu::rpc::InboundCall> incoming;
   while (service_queue_.BlockingGet(&incoming)) {
-    incoming.release()->RespondFailure(
-        kudu::rpc::ErrorStatusPB::FATAL_SERVER_SHUTTING_DOWN, status);
+    FailAndReleaseRpc(kudu::rpc::ErrorStatusPB::FATAL_SERVER_SHUTTING_DOWN, status,
+        incoming.release());
   }
 
   service_->Shutdown();
@@ -100,10 +103,18 @@ void ImpalaServicePool::RejectTooBusy(kudu::rpc::InboundCall* c) {
                  c->remote_address().ToString(),
                  service_queue_.max_size());
   rpcs_queue_overflow_.Add(1);
-  c->RespondFailure(kudu::rpc::ErrorStatusPB::ERROR_SERVER_TOO_BUSY,
-                    kudu::Status::ServiceUnavailable(err_msg));
+  FailAndReleaseRpc(kudu::rpc::ErrorStatusPB::ERROR_SERVER_TOO_BUSY,
+                    kudu::Status::ServiceUnavailable(err_msg), c);
   VLOG(1) << err_msg << " Contents of service queue:\n"
           << service_queue_.ToString();
+}
+
+void ImpalaServicePool::FailAndReleaseRpc(
+    const kudu::rpc::ErrorStatusPB::RpcErrorCodePB& error_code,
+    const kudu::Status& status, kudu::rpc::InboundCall* call) {
+  int64_t transfer_size = call->GetTransferSize();
+  call->RespondFailure(error_code, status);
+  mem_tracker_->Release(transfer_size);
 }
 
 kudu::rpc::RpcMethodInfo* ImpalaServicePool::LookupMethod(
@@ -124,15 +135,16 @@ kudu::Status ImpalaServicePool::QueueInboundCall(
 
   if (!unsupported_features.empty()) {
     c->RespondUnsupportedFeature(unsupported_features);
-    return kudu::Status::NotSupported("call requires unsupported application feature flags",
-                                JoinMapped(unsupported_features,
-                                           [] (uint32_t flag) { return std::to_string(flag); },
-                                           ", "));
+    return kudu::Status::NotSupported(
+        "call requires unsupported application feature flags",
+        JoinMapped(unsupported_features,
+        [] (uint32_t flag) { return std::to_string(flag); }, ", "));
   }
 
   TRACE_TO(c->trace(), "Inserting onto call queue"); // NOLINT(*)
 
   // Queue message on service queue
+  mem_tracker_->Consume(c->GetTransferSize());
   boost::optional<kudu::rpc::InboundCall*> evicted;
   auto queue_status = service_queue_.Put(c, &evicted);
   if (queue_status == kudu::rpc::QueueStatus::QUEUE_FULL) {
@@ -154,11 +166,11 @@ kudu::Status ImpalaServicePool::QueueInboundCall(
   kudu::Status status = kudu::Status::OK();
   if (queue_status == kudu::rpc::QueueStatus::QUEUE_SHUTDOWN) {
     status = kudu::Status::ServiceUnavailable("Service is shutting down");
-    c->RespondFailure(kudu::rpc::ErrorStatusPB::FATAL_SERVER_SHUTTING_DOWN, status);
+    FailAndReleaseRpc(kudu::rpc::ErrorStatusPB::FATAL_SERVER_SHUTTING_DOWN, status, c);
   } else {
     status = kudu::Status::RuntimeError(
         Substitute("Unknown error from BlockingQueue: $0", queue_status));
-    c->RespondFailure(kudu::rpc::ErrorStatusPB::FATAL_UNKNOWN, status);
+    FailAndReleaseRpc(kudu::rpc::ErrorStatusPB::FATAL_UNKNOWN, status, c);
   }
   return status;
 }
@@ -181,13 +193,9 @@ void ImpalaServicePool::RunThread() {
 
       // Respond as a failure, even though the client will probably ignore
       // the response anyway.
-      incoming->RespondFailure(
-        kudu::rpc::ErrorStatusPB::ERROR_SERVER_TOO_BUSY,
-        kudu::Status::TimedOut("Call waited in the queue past client deadline"));
-
-      // Must release since RespondFailure above ends up taking ownership
-      // of the object.
-      ignore_result(incoming.release());
+      FailAndReleaseRpc(kudu::rpc::ErrorStatusPB::ERROR_SERVER_TOO_BUSY,
+          kudu::Status::TimedOut("Call waited in the queue past client deadline"),
+          incoming.release());
       continue;
     }
 

@@ -41,7 +41,7 @@ message TransmitDataRequestPB {
   optional int32 tuple_offsets_sidecar_idx = 5;
 
   // The sidecar index of the tuple's data which is a (compressed) row batch.
-  // The details  of the row batch (e.g. # of rows) is in 'row_batch_header' above.
+  // The details of the row batch (e.g. # of rows) is in 'row_batch_header' above.
   optional int32 tuple_data_sidecar_idx = 6;
 }
 

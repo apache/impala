@@ -31,14 +31,16 @@
 #include "util/thread.h"
 
 namespace impala {
+class MemTracker;
 
 // A pool of threads that handle new incoming RPC calls.
 // Also includes a queue that calls get pushed onto for handling by the pool.
 class ImpalaServicePool : public kudu::rpc::RpcService {
  public:
-  ImpalaServicePool(std::unique_ptr<kudu::rpc::ServiceIf> service,
-              const scoped_refptr<kudu::MetricEntity>& metric_entity,
-              size_t service_queue_length);
+  ImpalaServicePool(MemTracker* mem_tracker,
+      std::unique_ptr<kudu::rpc::ServiceIf> service,
+      const scoped_refptr<kudu::MetricEntity>& metric_entity,
+      size_t service_queue_length);
   virtual ~ImpalaServicePool();
 
   // Start up the thread pool.
@@ -57,6 +59,14 @@ class ImpalaServicePool : public kudu::rpc::RpcService {
  private:
   void RunThread();
   void RejectTooBusy(kudu::rpc::InboundCall* c);
+
+  // Respond with failure to the incoming call in 'call' with 'error_code' and 'status'
+  // and release the payload memory from 'mem_tracker_'. Takes ownership of 'call'.
+  void FailAndReleaseRpc(const kudu::rpc::ErrorStatusPB::RpcErrorCodePB& error_code,
+      const kudu::Status& status, kudu::rpc::InboundCall* call);
+
+  // Tracks memory of inbound calls in 'service_queue_'.
+  MemTracker* const mem_tracker_;
 
   std::unique_ptr<kudu::rpc::ServiceIf> service_;
   std::vector<std::unique_ptr<Thread> > threads_;
