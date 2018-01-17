@@ -114,11 +114,11 @@ Status RpcMgr::Init() {
 }
 
 Status RpcMgr::RegisterService(int32_t num_service_threads, int32_t service_queue_depth,
-    unique_ptr<ServiceIf> service_ptr) {
+    unique_ptr<ServiceIf> service_ptr, MemTracker* mem_tracker) {
   DCHECK(is_inited()) << "Must call Init() before RegisterService()";
   DCHECK(!services_started_) << "Cannot call RegisterService() after StartServices()";
   scoped_refptr<ImpalaServicePool> service_pool =
-      new ImpalaServicePool(std::move(service_ptr),
+      new ImpalaServicePool(mem_tracker, std::move(service_ptr),
           messenger_->metric_entity(), service_queue_depth);
   // Start the thread pool first before registering the service in case the startup fails.
   RETURN_IF_ERROR(service_pool->Init(num_service_threads));

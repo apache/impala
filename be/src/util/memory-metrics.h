@@ -198,7 +198,7 @@ class BufferPoolMetric : public IntGauge {
   static Status InitMetrics(MetricGroup* metrics, ReservationTracker* global_reservations,
       BufferPool* buffer_pool) WARN_UNUSED_RESULT;
 
-  /// Global metrics, initialized by CreateAndRegisterMetrics().
+  /// Global metrics, initialized by InitMetrics().
   static BufferPoolMetric* LIMIT;
   static BufferPoolMetric* SYSTEM_ALLOCATED;
   static BufferPoolMetric* RESERVED;
