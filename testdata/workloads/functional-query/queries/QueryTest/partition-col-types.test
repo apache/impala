@@ -220,7 +220,7 @@ DROP TABLE all_insert_partition_col_types;
 ---- QUERY
 # Regression test for IMPALA-1026
 drop table if exists test_dec_partition;
-create table test_dec_partition(id int, dec decimal(5,4))
+create table test_dec_partition(id int, `dec` decimal(5,4))
   partitioned by(decimal_col DECIMAL(5,4));
 alter table test_dec_partition drop if exists partition(decimal_col=4.34);
 insert into test_dec_partition partition(decimal_col=4.34) values (1, 3.14);

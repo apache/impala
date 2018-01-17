@@ -25,15 +25,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.fs.Path;
@@ -49,7 +48,6 @@ import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.hive.ql.exec.FunctionUtils;
 import org.apache.impala.authorization.SentryConfig;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import org.apache.impala.catalog.TopicUpdateLog.Entry;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -79,7 +77,6 @@ import org.apache.thrift.protocol.TCompactProtocol;
 import com.codahale.metrics.Timer;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -943,7 +940,7 @@ public class CatalogServiceCatalog extends Catalog {
       // Contains native functions in it's params map.
       org.apache.hadoop.hive.metastore.api.Database msDb =
           msClient.getHiveClient().getDatabase(dbName);
-      tmpDb = new Db(dbName, this, null);
+      tmpDb = new Db(dbName, null);
       // Load native UDFs into the temporary db.
       loadFunctionsFromDbParams(tmpDb, msDb);
       // Load Java UDFs from HMS into the temporary db.
@@ -1004,7 +1001,7 @@ public class CatalogServiceCatalog extends Catalog {
       }
       org.apache.hadoop.hive.metastore.api.Database msDb =
           msClient.getHiveClient().getDatabase(dbName);
-      Db newDb = new Db(dbName, this, msDb);
+      Db newDb = new Db(dbName, msDb);
       // existingDb is usually null when the Catalog loads for the first time.
       // In that case we needn't restore any transient functions.
       if (existingDb != null) {
@@ -1144,7 +1141,7 @@ public class CatalogServiceCatalog extends Catalog {
    * new Db object. Used by CREATE DATABASE statements.
    */
   public Db addDb(String dbName, org.apache.hadoop.hive.metastore.api.Database msDb) {
-    Db newDb = new Db(dbName, this, msDb);
+    Db newDb = new Db(dbName, msDb);
     versionLock_.writeLock().lock();
     try {
       newDb.setCatalogVersion(incrementAndGetCatalogVersion());

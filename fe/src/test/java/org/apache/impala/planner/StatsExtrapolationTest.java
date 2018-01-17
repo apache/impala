@@ -79,13 +79,11 @@ public class StatsExtrapolationTest extends FrontendTestBase {
     addTestDb("extrap_stats", null);
     Table tbl = addTestTable("create table extrap_stats.t (i int)");
 
-    // Replace/restore the static backend config for this test.
-    BackendConfig origInstance = BackendConfig.INSTANCE;
+    // Modify/restore the backend config for this test.
+    TBackendGflags gflags = BackendConfig.INSTANCE.getBackendCfg();
+    boolean origEnableStatsExtrapolation = gflags.isEnable_stats_extrapolation();
     try {
-      // Create a fake config with extrapolation enabled.
-      TBackendGflags testGflags = new TBackendGflags();
-      testGflags.setEnable_stats_extrapolation(true);
-      BackendConfig.create(testGflags);
+      gflags.setEnable_stats_extrapolation(true);
 
       // Both stats are set to a meaningful value.
       runTest(tbl, 100L, 1000L, 0, 0);
@@ -131,7 +129,7 @@ public class StatsExtrapolationTest extends FrontendTestBase {
       runTest(tbl, 100L, 1000L, -1, -1);
       runTest(tbl, 100L, 1000L, Long.MIN_VALUE, -1);
     } finally {
-      BackendConfig.INSTANCE = origInstance;
+      gflags.setEnable_stats_extrapolation(origEnableStatsExtrapolation);
     }
   }
 
@@ -140,13 +138,11 @@ public class StatsExtrapolationTest extends FrontendTestBase {
     addTestDb("extrap_stats", null);
     Table tbl = addTestTable("create table extrap_stats.t (i int)");
 
-    // Replace/restore the static backend config for this test.
-    BackendConfig origInstance = BackendConfig.INSTANCE;
+    // Modify/restore the backend config for this test.
+    TBackendGflags gflags = BackendConfig.INSTANCE.getBackendCfg();
+    boolean origEnableStatsExtrapolation = gflags.isEnable_stats_extrapolation();
     try {
-      // Create a fake config with extrapolation disabled.
-      TBackendGflags testGflags = new TBackendGflags();
-      testGflags.setEnable_stats_extrapolation(false);
-      BackendConfig.create(testGflags);
+      gflags.setEnable_stats_extrapolation(false);
 
       // Always expect -1 even with legitimate stats.
       runTest(tbl, 100L, 1000L, 0, -1);
@@ -155,7 +151,7 @@ public class StatsExtrapolationTest extends FrontendTestBase {
       runTest(tbl, 100L, 1000L, Long.MAX_VALUE, -1);
       runTest(tbl, 100L, 1000L, -100, -1);
     } finally {
-      BackendConfig.INSTANCE = origInstance;
+      gflags.setEnable_stats_extrapolation(origEnableStatsExtrapolation);
     }
   }
 }

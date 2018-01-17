@@ -24,23 +24,20 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.codec.binary.Base64;
-import org.apache.thrift.protocol.TCompactProtocol;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import org.apache.impala.catalog.Function;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
-import org.apache.impala.common.JniUtil;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDatabase;
-import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.apache.impala.util.PatternMatcher;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -62,7 +59,6 @@ import com.google.common.collect.Maps;
  */
 public class Db extends CatalogObjectImpl {
   private static final Logger LOG = LoggerFactory.getLogger(Db.class);
-  private final Catalog parentCatalog_;
   private final TDatabase thriftDb_;
 
   public static final String FUNCTION_INDEX_PREFIX = "impala_registered_function_";
@@ -87,10 +83,8 @@ public class Db extends CatalogObjectImpl {
   // (e.g. can't drop it, can't add tables to it, etc).
   private boolean isSystemDb_ = false;
 
-  public Db(String name, Catalog catalog,
-      org.apache.hadoop.hive.metastore.api.Database msDb) {
+  public Db(String name, org.apache.hadoop.hive.metastore.api.Database msDb) {
     thriftDb_ = new TDatabase(name.toLowerCase());
-    parentCatalog_ = catalog;
     thriftDb_.setMetastore_db(msDb);
     tableCache_ = new CatalogObjectCache<Table>();
     functions_ = new HashMap<String, List<Function>>();
@@ -101,8 +95,8 @@ public class Db extends CatalogObjectImpl {
   /**
    * Creates a Db object with no tables based on the given TDatabase thrift struct.
    */
-  public static Db fromTDatabase(TDatabase db, Catalog parentCatalog) {
-    return new Db(db.getDb_name(), parentCatalog, db.getMetastore_db());
+  public static Db fromTDatabase(TDatabase db) {
+    return new Db(db.getDb_name(), db.getMetastore_db());
   }
 
   /**
@@ -416,7 +410,7 @@ public class Db extends CatalogObjectImpl {
    * This is not thread safe so a higher level lock must be taken while iterating
    * over the returned functions.
    */
-  protected HashMap<String, List<Function>> getAllFunctions() {
+  public HashMap<String, List<Function>> getAllFunctions() {
     return functions_;
   }
 

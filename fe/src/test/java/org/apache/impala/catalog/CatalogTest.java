@@ -24,8 +24,8 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -33,15 +33,14 @@ import java.util.Set;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
-import org.junit.Test;
-
 import org.apache.impala.analysis.FunctionName;
-import org.apache.impala.analysis.HdfsUri;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.thrift.TFunctionBinaryType;
+import org.junit.Test;
+
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -623,9 +622,8 @@ public class CatalogTest {
     dbParams.put(badFnKey, badFnVal);
     Db db = catalog_.getDb(dbName);
     assertEquals(db, null);
-    db = new Db(dbName, catalog_,
-        new org.apache.hadoop.hive.metastore.api.Database(dbName,
-        "", "", dbParams));
+    db = new Db(dbName,
+        new org.apache.hadoop.hive.metastore.api.Database(dbName, "", "", dbParams));
     catalog_.addDb(db);
     db = catalog_.getDb(dbName);
     assertTrue(db != null);

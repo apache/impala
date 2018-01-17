@@ -39,7 +39,6 @@ import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.ql.parse.HiveLexer;
-
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.Function;
@@ -123,15 +122,15 @@ public class ToSqlUtils {
     } catch (Exception e) {
       // Ignore exception and just quote the identifier to be safe.
     }
-    boolean isImpalaKeyword = SqlScanner.isKeyword(ident.toUpperCase());
+    boolean isImpalaReserved = SqlScanner.isReserved(ident.toUpperCase());
     // Impala's scanner recognizes the ".123" portion of "db.123_tbl" as a decimal,
     // so while the quoting is not necessary for the given identifier itself, the quotes
     // are needed if this identifier will be preceded by a ".".
     boolean startsWithNumber = false;
-    if (!hiveNeedsQuotes && !isImpalaKeyword) {
+    if (!hiveNeedsQuotes && !isImpalaReserved) {
       startsWithNumber = Character.isDigit(ident.charAt(0));
     }
-    if (hiveNeedsQuotes || isImpalaKeyword || startsWithNumber) return "`" + ident + "`";
+    if (hiveNeedsQuotes || isImpalaReserved || startsWithNumber) return "`" + ident + "`";
     return ident;
   }
 

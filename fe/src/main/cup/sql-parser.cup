@@ -215,6 +215,9 @@ parser code {:
       SqlScanner.tokenIdMap.get(Integer.valueOf(errorToken_.sym));
     if (lastToken != null) {
       result.append(lastToken);
+    } else if (SqlScanner.isReserved((String)errorToken_.value)) {
+      result.append("A reserved word cannot be used as an identifier: ")
+          .append((String)errorToken_.value);
     } else {
       result.append("Unknown last token with id: " + errorToken_.sym);
     }
@@ -244,7 +247,7 @@ parser code {:
 :};
 
 // List of keywords. Please keep them sorted alphabetically.
-// ALL KEYWORDS ALSO NEED TO BE ADDED TO THE ident_or_keyword PRODUCTION.
+// ALL KEYWORDS ALSO NEED TO BE ADDED TO THE word PRODUCTION.
 terminal
   KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_ANALYTIC, KW_AND, KW_ANTI, KW_API_VERSION,
   KW_ARRAY, KW_AS, KW_ASC, KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BLOCKSIZE,
@@ -270,8 +273,10 @@ terminal
   KW_SHOW, KW_SMALLINT, KW_SORT, KW_STORED, KW_STRAIGHT_JOIN, KW_STRING, KW_STRUCT,
   KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TABLESAMPLE, KW_TBLPROPERTIES, KW_TERMINATED,
   KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TRUNCATE, KW_STATS, KW_TO, KW_TRUE,
-  KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UPDATE, KW_UPDATE_FN, KW_UPSERT, KW_USE,
-  KW_USING, KW_VALUES, KW_VARCHAR, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
+  KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UNKNOWN, KW_UPDATE, KW_UPDATE_FN, KW_UPSERT,
+  KW_USE, KW_USING, KW_VALUES, KW_VARCHAR, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
+
+terminal UNUSED_RESERVED_WORD;
 
 terminal COLON, SEMICOLON, COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET,
   RBRACKET, DIVIDE, MOD, ADD, SUBTRACT;
@@ -292,7 +297,11 @@ terminal String UNEXPECTED_CHAR;
 // IMPALA-3726 introduced the DEFAULT keyword which could break existing applications
 // that use the identifier "KEYWORD" as database, column or table names. To avoid that,
 // the ident_or_default non-terminal is introduced and should be used instead of IDENT.
-nonterminal String ident_or_keyword, ident_or_default;
+nonterminal String ident_or_default;
+// A word is an arbitrary token composed of digits and at least one letter. Reserved
+// words cannot be used as identifiers but they are words and can be used in query
+// options, column attributes, etc.
+nonterminal String word;
 nonterminal StatementBase stmt;
 // Single select statement.
 nonterminal SelectStmt select_stmt;
@@ -494,7 +503,6 @@ nonterminal Boolean server_ident;
 nonterminal Boolean source_ident;
 nonterminal Boolean sources_ident;
 nonterminal Boolean uri_ident;
-nonterminal Boolean unknown_ident;
 
 // For Create/Drop/Show function ddl
 nonterminal FunctionArgs function_def_args;
@@ -1633,13 +1641,13 @@ nullability_val ::=
   ;
 
 encoding_val ::=
-  KW_ENCODING ident_or_default:encoding_ident
-  {: RESULT = encoding_ident; :}
+  KW_ENCODING word:value
+  {: RESULT = value; :}
   ;
 
 compression_val ::=
-  KW_COMPRESSION ident_or_default:compression_ident
-  {: RESULT = compression_ident; :}
+  KW_COMPRESSION word:value
+  {: RESULT = value; :}
   ;
 
 default_val ::=
@@ -1735,16 +1743,6 @@ option_ident ::=
   {:
     if (!ident.toUpperCase().equals("OPTION")) {
       parser.parseError("identifier", SqlParserSymbols.IDENT, "OPTION");
-    }
-    RESULT = true;
-  :}
-  ;
-
-unknown_ident ::=
-  IDENT:ident
-  {:
-    if (!ident.toUpperCase().equals("UNKNOWN")) {
-      parser.parseError("identifier", SqlParserSymbols.IDENT, "UNKNOWN");
     }
     RESULT = true;
   :}
@@ -2361,14 +2359,16 @@ select_clause ::=
   ;
 
 set_stmt ::=
-  KW_SET ident_or_default:key EQUAL literal:l
+  KW_SET ident_or_default:key EQUAL numeric_literal:l
   {: RESULT = new SetStmt(key, l.getStringValue(), false); :}
+  | KW_SET ident_or_default:key EQUAL STRING_LITERAL:l
+  {: RESULT = new SetStmt(key, l, false); :}
   | KW_SET ident_or_default:key EQUAL SUBTRACT numeric_literal:l
   {:
     l.swapSign();
     RESULT = new SetStmt(key, l.getStringValue(), false); :}
-  | KW_SET ident_or_default:key EQUAL ident_or_default:ident
-  {: RESULT = new SetStmt(key, ident, false); :}
+  | KW_SET ident_or_default:key EQUAL word:value
+  {: RESULT = new SetStmt(key, value, false); :}
   | KW_SET KW_ALL
   {: RESULT = new SetStmt(null, null, true); :}
   | KW_SET
@@ -3106,9 +3106,9 @@ bool_test_expr ::=
   {: RESULT = new FunctionCallExpr("isfalse", Lists.newArrayList(e)); :}
   | expr:e KW_IS KW_NOT KW_FALSE
   {: RESULT = new FunctionCallExpr("isnotfalse", Lists.newArrayList(e)); :}
-  | expr:e KW_IS unknown_ident
+  | expr:e KW_IS KW_UNKNOWN
   {: RESULT = new IsNullPredicate(e, false); :}
-  | expr:e KW_IS KW_NOT unknown_ident
+  | expr:e KW_IS KW_NOT KW_UNKNOWN
   {: RESULT = new IsNullPredicate(e, true); :}
   ;
 
@@ -3203,7 +3203,7 @@ type ::=
 // that we can parse type strings from the Hive Metastore which
 // may have unquoted identifiers corresponding to keywords.
 struct_field_def ::=
-  ident_or_keyword:name COLON type:t opt_comment_val:comment
+  word:name COLON type:t opt_comment_val:comment
   {: RESULT = new StructField(name, t, comment); :}
   ;
 
@@ -3228,7 +3228,7 @@ ident_or_default ::=
   {: RESULT = name.toString(); :}
   ;
 
-ident_or_keyword ::=
+word ::=
   IDENT:r
   {: RESULT = r.toString(); :}
   | KW_ADD:r
@@ -3579,6 +3579,8 @@ ident_or_keyword ::=
   {: RESULT = r.toString(); :}
   | KW_UNION:r
   {: RESULT = r.toString(); :}
+  | KW_UNKNOWN:r
+  {: RESULT = r.toString(); :}
   | KW_UPDATE:r
   {: RESULT = r.toString(); :}
   | KW_UPDATE_FN:r
@@ -3600,5 +3602,7 @@ ident_or_keyword ::=
   | KW_WHERE:r
   {: RESULT = r.toString(); :}
   | KW_WITH:r
+  {: RESULT = r.toString(); :}
+  | UNUSED_RESERVED_WORD:r
   {: RESULT = r.toString(); :}
   ;

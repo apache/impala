@@ -63,9 +63,10 @@ DECLARE_string(heap_profile_dir);
 DECLARE_string(hostname);
 // TODO: rename this to be more generic when we have a good CM release to do so.
 DECLARE_int32(logbufsecs);
+DECLARE_int32(max_log_files);
 DECLARE_int32(max_minidumps);
 DECLARE_string(redaction_rules_file);
-DECLARE_int32(max_log_files);
+DECLARE_string(reserved_words_version);
 
 DEFINE_int32(max_audit_event_log_files, 0, "Maximum number of audit event log files "
     "to retain. The most recent audit event log files are retained. If set to 0, "
@@ -198,6 +199,12 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   if (FLAGS_read_size < READ_SIZE_MIN_VALUE) {
     CLEAN_EXIT_WITH_ERROR(Substitute("read_size can not be lower than $0",
         READ_SIZE_MIN_VALUE));
+  }
+  if (FLAGS_reserved_words_version != "2.11.0" && FLAGS_reserved_words_version != "3.0.0")
+  {
+    CLEAN_EXIT_WITH_ERROR(Substitute("Invalid flag reserved_words_version. The value must"
+        " be one of [\"2.11.0\", \"3.0.0\"], while the provided value is $0.",
+        FLAGS_reserved_words_version));
   }
   impala::InitGoogleLoggingSafe(argv[0]);
   // Breakpad needs flags and logging to initialize.

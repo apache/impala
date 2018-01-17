@@ -1048,11 +1048,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select sum(id) over(order by id) from functional.alltypes having 1",
         "HAVING clause must not contain analytic expressions: " +
         "sum(id) OVER (ORDER BY id ASC)");
-    AnalyzesOk("with w_test as (select '1' as one, 2 as two, '3' as three) " +
-        "select one as one, substring(cast(two as string), 1, 1) as two, " +
+    AnalyzesOk("with w_test as (select '1' as `one`, 2 as two, '3' as three) " +
+        "select `one` as `one`, substring(cast(two as string), 1, 1) as two, " +
         "three as three, count(1) as cnt " +
         "from w_test " +
-        "group by one, substring(cast(two as string), 1, 1), three");
+        "group by `one`, substring(cast(two as string), 1, 1), three");
     // Constant exprs should not be interpreted as ordinals
     AnalyzesOk("select int_col, count(*) from functional.alltypes group by 1, 1 * 2");
     AnalyzesOk("select int_col, bigint_col from functional.alltypes order by 1 + 4");

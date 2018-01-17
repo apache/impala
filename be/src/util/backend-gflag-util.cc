@@ -16,13 +16,12 @@
 // under the License.
 
 #include "common/global-flags.h"
-#include "util/backend-gflag-util.h"
 
 #include "gen-cpp/BackendGflags_types.h"
 #include "rpc/jni-thrift-util.h"
+#include "util/backend-gflag-util.h"
 #include "util/logging-support.h"
 
-#include <gflags/gflags.h>
 
 // Configs for the Frontend and the Catalog.
 DECLARE_bool(load_catalog_in_background);
@@ -46,6 +45,7 @@ DECLARE_string(authorization_policy_provider_class);
 DECLARE_string(authorized_proxy_user_config);
 DECLARE_string(authorized_proxy_user_config_delimiter);
 DECLARE_string(kudu_master_hosts);
+DECLARE_string(reserved_words_version);
 DECLARE_string(sentry_config);
 
 namespace impala {
@@ -78,6 +78,13 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_local_library_path(FLAGS_local_library_dir);
   cfg.__set_kudu_operation_timeout_ms(FLAGS_kudu_operation_timeout_ms);
   cfg.__set_sentry_catalog_polling_frequency_s(FLAGS_sentry_catalog_polling_frequency_s);
+  if (FLAGS_reserved_words_version == "2.11.0") {
+    cfg.__set_reserved_words_version(TReservedWordsVersion::IMPALA_2_11);
+  } else {
+    DCHECK_EQ(FLAGS_reserved_words_version, "3.0.0");
+    cfg.__set_reserved_words_version(TReservedWordsVersion::IMPALA_3_0);
+  }
+
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &cfg, cfg_bytes));
   return Status::OK();
 }

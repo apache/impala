@@ -173,9 +173,9 @@ INT,INT
 ====
 ---- QUERY
 # Right non-equi-join with empty build.
-select straight_join at.id
-from alltypes at
-  right join functional.alltypestiny att on at.id < att.id
+select straight_join atp.id
+from alltypes atp
+  right join functional.alltypestiny att on atp.id < att.id
 where att.int_col = 999
 ---- RESULTS
 ---- TYPES
@@ -183,11 +183,11 @@ INT
 ====
 ---- QUERY
 # Full outer non-equi-join with empty build.
-select straight_join at.id
-from alltypes at
+select straight_join atp.id
+from alltypes atp
   full outer join (
-    select * from functional.alltypestiny where int_col = 999) att on at.id < att.id
-order by at.id desc
+    select * from functional.alltypestiny where int_col = 999) att on atp.id < att.id
+order by atp.id desc
 limit 5
 ---- RESULTS
 7299
@@ -200,19 +200,19 @@ INT
 ====
 ---- QUERY
 # Right semi non-equi-join with empty build.
-select straight_join at.id
+select straight_join atp.id
 from (select * from functional.alltypestiny att where int_col = 999) att
-  right semi join alltypes at on at.id < att.id
+  right semi join alltypes atp on atp.id < att.id
 ---- RESULTS
 ---- TYPES
 INT
 ====
 ---- QUERY
 # Right anti non-equi-join with empty build.
-select straight_join at.id
+select straight_join atp.id
 from (select * from functional.alltypestiny att where int_col = 999) att
-  right anti join alltypes at on at.id < att.id
-order by at.id desc
+  right anti join alltypes atp on atp.id < att.id
+order by atp.id desc
 limit 5
 ---- RESULTS
 7299

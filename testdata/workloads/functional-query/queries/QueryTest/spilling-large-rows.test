@@ -55,20 +55,20 @@ int,bigint
 ====
 ---- QUERY
 # Row is too big to process in right side of hash join.
-select straight_join at.id, bs.id, at.string_col
-from functional.alltypes at
-  join bigstrs bs on repeat(at.string_col, 10000) = substring(bs.bigstr, 5000000, 10000) and at.id = bs.id
-where at.id < 100
+select straight_join atp.id, bs.id, atp.string_col
+from functional.alltypes atp
+  join bigstrs bs on repeat(atp.string_col, 10000) = substring(bs.bigstr, 5000000, 10000) and atp.id = bs.id
+where atp.id < 100
 ---- CATCH
 Row of size 9.54 MB could not be materialized in plan node with id 2. Increase the max_row_size query option (currently 512.00 KB) to process larger rows.
 ====
 ---- QUERY
 # Row is too big to process in right side of hash join.
 set max_row_size=18m;
-select straight_join at.id, bs.id, at.string_col
-from functional.alltypes at
-  join bigstrs bs on repeat(at.string_col, 10000) = substring(bs.bigstr, 5000000, 10000) and at.id = bs.id
-where at.id < 100
+select straight_join atp.id, bs.id, atp.string_col
+from functional.alltypes atp
+  join bigstrs bs on repeat(atp.string_col, 10000) = substring(bs.bigstr, 5000000, 10000) and atp.id = bs.id
+where atp.id < 100
 ---- TYPES
 int,int,string
 ---- RESULTS

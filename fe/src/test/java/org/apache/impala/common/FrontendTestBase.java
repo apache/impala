@@ -153,7 +153,7 @@ public class FrontendTestBase {
   protected Db addTestDb(String dbName, String comment) {
     Db db = catalog_.getDb(dbName);
     Preconditions.checkState(db == null, "Test db must not already exist.");
-    db = new Db(dbName, catalog_, new org.apache.hadoop.hive.metastore.api.Database(
+    db = new Db(dbName, new org.apache.hadoop.hive.metastore.api.Database(
         dbName, comment, "", Collections.<String, String>emptyMap()));
     catalog_.addDb(db);
     testDbs_.add(db);

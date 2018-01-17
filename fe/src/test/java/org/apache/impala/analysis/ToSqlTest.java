@@ -19,13 +19,13 @@ package org.apache.impala.analysis;
 
 import static org.junit.Assert.fail;
 
-import org.junit.Ignore;
-import org.junit.Test;
-
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.testutil.TestUtils;
+import org.junit.Ignore;
+import org.junit.Test;
+
 import com.google.common.base.Preconditions;
 
 // TODO: Expand this test, in particular, because view creation relies
@@ -584,9 +584,9 @@ public class ToSqlTest extends FrontendTestBase {
 
       // Table hint
       testToSql(String.format(
-          "select * from functional.alltypes at %sschedule_random_replica%s", prefix,
+          "select * from functional.alltypes atp %sschedule_random_replica%s", prefix,
           suffix),
-          "SELECT * FROM functional.alltypes at\n-- +schedule_random_replica\n");
+          "SELECT * FROM functional.alltypes atp\n-- +schedule_random_replica\n");
       testToSql(String.format(
           "select * from functional.alltypes %sschedule_random_replica%s", prefix,
           suffix),
@@ -597,9 +597,9 @@ public class ToSqlTest extends FrontendTestBase {
           "SELECT * FROM functional.alltypes\n-- +schedule_random_replica," +
           "schedule_disk_local\n");
       testToSql(String.format(
-          "select c1 from (select at.tinyint_col as c1 from functional.alltypes at " +
+          "select c1 from (select atp.tinyint_col as c1 from functional.alltypes atp " +
           "%sschedule_random_replica%s) s1", prefix, suffix),
-          "SELECT c1 FROM (SELECT at.tinyint_col c1 FROM functional.alltypes at\n-- +" +
+          "SELECT c1 FROM (SELECT atp.tinyint_col c1 FROM functional.alltypes atp\n-- +" +
           "schedule_random_replica\n) s1");
 
       // Select-list hint. The legacy-style hint has no prefix and suffix.

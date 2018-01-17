@@ -17,13 +17,16 @@
 
 package org.apache.impala.service;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
+    .HADOOP_SECURITY_AUTH_TO_LOCAL;
 
 import org.apache.hadoop.conf.Configuration;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTH_TO_LOCAL;
 import org.apache.hadoop.security.authentication.util.KerberosName;
+import org.apache.impala.analysis.SqlScanner;
 import org.apache.impala.thrift.TBackendGflags;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 
 /**
  * This class is meant to provide the FE with impalad backend configuration parameters,
@@ -41,9 +44,11 @@ public class BackendConfig {
   public static void create(TBackendGflags cfg) {
     Preconditions.checkNotNull(cfg);
     INSTANCE = new BackendConfig(cfg);
+    SqlScanner.init(cfg.getReserved_words_version());
     initAuthToLocal();
   }
 
+  public TBackendGflags getBackendCfg() { return backendCfg_; }
   public long getReadSize() { return backendCfg_.read_size; }
   public boolean getComputeLineage() {
     return !Strings.isNullOrEmpty(backendCfg_.lineage_event_log_dir);
@@ -71,6 +76,7 @@ public class BackendConfig {
   public int maxNonHdfsPartsParallelLoad() {
     return backendCfg_.max_nonhdfs_partitions_parallel_load;
   }
+
   // Inits the auth_to_local configuration in the static KerberosName class.
   private static void initAuthToLocal() {
     // If auth_to_local is enabled, we read the configuration hadoop.security.auth_to_local

@@ -17,10 +17,6 @@
 
 package org.apache.impala.catalog;
 
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -36,7 +32,9 @@ import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.PatternMatcher;
 
-import org.apache.log4j.Logger;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * Thread safe interface for reading and updating metadata stored in the Hive MetaStore.
@@ -89,7 +87,7 @@ public abstract class Catalog {
 
   public Catalog() {
     dataSources_ = new CatalogObjectCache<DataSource>();
-    builtinsDb_ = new BuiltinsDb(BUILTINS_DB, this);
+    builtinsDb_ = new BuiltinsDb(BUILTINS_DB);
     addDb(builtinsDb_);
   }
 
