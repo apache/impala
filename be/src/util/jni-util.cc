@@ -30,7 +30,8 @@ namespace impala {
 Status JniUtfCharGuard::create(JNIEnv* env, jstring jstr, JniUtfCharGuard* out) {
   DCHECK(jstr != nullptr);
   DCHECK(!env->ExceptionCheck());
-  const char* utf_chars = env->GetStringUTFChars(jstr, nullptr);
+  jboolean is_copy;
+  const char* utf_chars = env->GetStringUTFChars(jstr, &is_copy);
   bool exception_check = static_cast<bool>(env->ExceptionCheck());
   if (utf_chars == nullptr || exception_check) {
     if (exception_check) env->ExceptionClear();
@@ -43,6 +44,24 @@ Status JniUtfCharGuard::create(JNIEnv* env, jstring jstr, JniUtfCharGuard* out) 
   out->jstr = jstr;
   out->utf_chars = utf_chars;
   return Status::OK();
+}
+
+bool JniScopedArrayCritical::Create(JNIEnv* env, jbyteArray jarr,
+    JniScopedArrayCritical* out) {
+  DCHECK(env != nullptr);
+  DCHECK(out != nullptr);
+  DCHECK(!env->ExceptionCheck());
+  int size = env->GetArrayLength(jarr);
+  void* pac = env->GetPrimitiveArrayCritical(jarr, nullptr);
+  if (pac == nullptr) {
+    LOG(ERROR) << "GetPrimitiveArrayCritical() failed. Probable OOM on JVM side";
+    return false;
+  }
+  out->env_ = env;
+  out->jarr_ = jarr;
+  out->arr_ = static_cast<uint8_t*>(pac);
+  out->size_ = size;
+  return true;
 }
 
 jclass JniUtil::jni_util_cl_ = NULL;

@@ -655,20 +655,25 @@ struct TSymbolLookupResult {
 }
 
 // Sent from the impalad BE to FE with the results of each CatalogUpdate heartbeat.
-// Contains details on all catalog objects that need to be updated.
+// The catalog object updates are passed separately via NativeGetCatalogUpdate() callback.
 struct TUpdateCatalogCacheRequest {
   // True if update only contains entries changed from the previous update. Otherwise,
   // contains the entire topic.
   1: required bool is_delta
 
-  // The Catalog Service ID this update came from.
-  2: required Types.TUniqueId catalog_service_id
+  // The Catalog Service ID this update came from. A request should has either this field
+  // set or a Catalog typed catalog object in the update list.
+  2: optional Types.TUniqueId catalog_service_id
 
-  // New or modified items. Empty list if no items were updated.
-  3: required list<CatalogObjects.TCatalogObject> updated_objects
+  // New or modified items. Empty list if no items were updated. Deprecated after
+  // IMPALA-5990.
+  3: optional list<CatalogObjects.TCatalogObject> updated_objects_deprecated
 
-  // Empty if no items were removed or is_delta is false.
-  4: required list<CatalogObjects.TCatalogObject> removed_objects
+  // Empty if no items were removed or is_delta is false. Deprecated after IMPALA-5990.
+  4: optional list<CatalogObjects.TCatalogObject> removed_objects_deprecated
+
+  // The native ptr for calling back NativeGetCatalogUpdate().
+  5: required i64 native_iterator_ptr
 }
 
 // Response from a TUpdateCatalogCacheRequest.
@@ -678,6 +683,9 @@ struct TUpdateCatalogCacheResponse {
 
   // The minimum catalog object version after CatalogUpdate() was processed.
   2: required i64 min_catalog_object_version
+
+  // The updated catalog version needed by the backend.
+  3: required i64 new_catalog_version
 }
 
 // Sent from the impalad BE to FE with the latest cluster membership snapshot resulting

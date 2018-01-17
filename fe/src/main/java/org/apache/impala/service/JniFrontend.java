@@ -168,30 +168,11 @@ public class JniFrontend {
   }
 
   // Deserialize and merge each thrift catalog update into a single merged update
-  public byte[] updateCatalogCache(byte[][] thriftCatalogUpdates) throws ImpalaException {
-    TUniqueId defaultCatalogServiceId = new TUniqueId(0L, 0L);
-    TUpdateCatalogCacheRequest mergedUpdateRequest = new TUpdateCatalogCacheRequest(
-        false, defaultCatalogServiceId, new ArrayList<TCatalogObject>(),
-        new ArrayList<TCatalogObject>());
-    for (byte[] catalogUpdate: thriftCatalogUpdates) {
-      TUpdateCatalogCacheRequest incrementalRequest = new TUpdateCatalogCacheRequest();
-      JniUtil.deserializeThrift(protocolFactory_, incrementalRequest, catalogUpdate);
-      mergedUpdateRequest.is_delta |= incrementalRequest.is_delta;
-      if (!incrementalRequest.getCatalog_service_id().equals(defaultCatalogServiceId)) {
-        mergedUpdateRequest.setCatalog_service_id(
-            incrementalRequest.getCatalog_service_id());
-      }
-      mergedUpdateRequest.getUpdated_objects().addAll(
-          incrementalRequest.getUpdated_objects());
-      mergedUpdateRequest.getRemoved_objects().addAll(
-          incrementalRequest.getRemoved_objects());
-    }
-    TSerializer serializer = new TSerializer(protocolFactory_);
-    try {
-      return serializer.serialize(frontend_.updateCatalogCache(mergedUpdateRequest));
-    } catch (TException e) {
-      throw new InternalException(e.getMessage());
-    }
+  public byte[] updateCatalogCache(byte[] req) throws ImpalaException, TException {
+    TUpdateCatalogCacheRequest request = new TUpdateCatalogCacheRequest();
+    JniUtil.deserializeThrift(protocolFactory_, request, req);
+    return new TSerializer(protocolFactory_).serialize(
+        frontend_.updateCatalogCache(request));
   }
 
   /**

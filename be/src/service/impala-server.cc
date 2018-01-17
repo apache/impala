@@ -228,9 +228,6 @@ const string ImpalaServer::AUDIT_EVENT_LOG_FILE_PREFIX = "impala_audit_event_log
 const string LINEAGE_LOG_FILE_PREFIX = "impala_lineage_log_1.0-";
 
 const uint32_t MAX_CANCELLATION_QUEUE_SIZE = 65536;
-// Max size for multiple update in a single split. JNI is not able to write java byte
-// array more than 2GB. A single topic update is not restricted by this.
-const uint64_t MAX_CATALOG_UPDATE_BATCH_SIZE_BYTES = 500 * 1024 * 1024;
 
 const string BEESWAX_SERVER_NAME = "beeswax-frontend";
 const string HS2_SERVER_NAME = "hiveserver2-frontend";
@@ -1327,144 +1324,39 @@ void ImpalaServer::CatalogUpdateCallback(
       incoming_topic_deltas.find(CatalogServer::IMPALA_CATALOG_TOPIC);
   if (topic == incoming_topic_deltas.end()) return;
   const TTopicDelta& delta = topic->second;
+  TopicItemSpanIterator callback_ctx (delta.topic_entries, FLAGS_compact_catalog_topic);
 
-  // Update catalog cache in frontend. An update is split into batches of size
-  // MAX_CATALOG_UPDATE_BATCH_SIZE_BYTES each for multiple updates. IMPALA-3499
-  if (delta.topic_entries.size() != 0)  {
-    vector<TCatalogObject> dropped_objects;
-    vector<TUpdateCatalogCacheRequest> update_reqs;
-    update_reqs.push_back(TUpdateCatalogCacheRequest());
-    TUpdateCatalogCacheRequest* incremental_request = &update_reqs.back();
-    incremental_request->__set_is_delta(delta.is_delta);
-    // Process all Catalog updates (new and modified objects) and determine what the
-    // new catalog version will be.
-    int64_t new_catalog_version = catalog_update_info_.catalog_version;
-    uint64_t batch_size_bytes = 0;
-    for (const TTopicItem& item: delta.topic_entries) {
-      Status status;
-      vector<uint8_t> data_buffer;
-      const uint8_t* data_buffer_ptr = nullptr;
-      uint32_t len = 0;
-      if (FLAGS_compact_catalog_topic) {
-        status = DecompressCatalogObject(item.value, &data_buffer);
-        if (!status.ok()) {
-          LOG(ERROR) << "Error decompressing catalog object " << item.key
-                     << ": " << status.GetDetail();
-          continue;
-        }
-        data_buffer_ptr = data_buffer.data();
-        len = data_buffer.size();
-      } else {
-        data_buffer_ptr = reinterpret_cast<const uint8_t*>(item.value.data());
-        len = item.value.size();
-      }
-      if (len > 100 * 1024 * 1024 /* 100MB */) {
-        LOG(INFO) << "Received large catalog object(>100mb): "
-            << item.key << " is "
-            << PrettyPrinter::Print(len, TUnit::BYTES);
-      }
-      TCatalogObject catalog_object;
-      status = DeserializeThriftMsg(data_buffer_ptr, &len, FLAGS_compact_catalog_topic,
-          &catalog_object);
-      if (!status.ok()) {
-        LOG(ERROR) << "Error deserializing item " << item.key
-            << ": " << status.GetDetail();
-        continue;
-      }
-
-      if (batch_size_bytes + len > MAX_CATALOG_UPDATE_BATCH_SIZE_BYTES) {
-        // Initialize a new batch of catalog updates.
-        update_reqs.push_back(TUpdateCatalogCacheRequest());
-        incremental_request = &update_reqs.back();
-        batch_size_bytes = 0;
-      }
-
-      if (catalog_object.type == TCatalogObjectType::CATALOG) {
-        incremental_request->__set_catalog_service_id(
-            catalog_object.catalog.catalog_service_id);
-        new_catalog_version = catalog_object.catalog_version;
-      }
-      VLOG(3) << (item.deleted ? "Deleted " : "Added ") << "item: " << item.key
-          << " version: " << catalog_object.catalog_version << " of size: " << len;
-
-      if (!item.deleted) {
-        // Refresh the lib cache entries of any added functions and data sources
-        // TODO: if frontend returns the list of functions and data sources, we do not
-        // need to deserialize these in backend.
-        if (catalog_object.type == TCatalogObjectType::FUNCTION) {
-          DCHECK(catalog_object.__isset.fn);
-          LibCache::instance()->SetNeedsRefresh(catalog_object.fn.hdfs_location);
-        }
-        if (catalog_object.type == TCatalogObjectType::DATA_SOURCE) {
-          DCHECK(catalog_object.__isset.data_source);
-          LibCache::instance()->SetNeedsRefresh(catalog_object.data_source.hdfs_location);
-        }
-        incremental_request->updated_objects.push_back(catalog_object);
-      } else {
-        // We need to look up any dropped functions and data sources and remove
-        // them from the library cache.
-        if (catalog_object.type == TCatalogObjectType::FUNCTION ||
-            catalog_object.type == TCatalogObjectType::DATA_SOURCE) {
-          TCatalogObject existing_object;
-          if (exec_env_->frontend()->GetCatalogObject(
-              catalog_object, &existing_object).ok()) {
-            // If the object exists in the catalog it may have been dropped and
-            // re-created. To avoid removing the re-created object's entry from
-            // the cache verify that the existing object's version <= the
-            // version of the dropped object included in this statestore
-            // heartbeat.
-            DCHECK_NE(existing_object.catalog_version, catalog_object.catalog_version);
-            if (existing_object.catalog_version < catalog_object.catalog_version) {
-              dropped_objects.push_back(existing_object);
-            }
-          }
-        }
-        incremental_request->removed_objects.push_back(catalog_object);
-      }
-      batch_size_bytes += len;
+  TUpdateCatalogCacheRequest req;
+  req.__set_is_delta(delta.is_delta);
+  req.__set_native_iterator_ptr(reinterpret_cast<int64_t>(&callback_ctx));
+  TUpdateCatalogCacheResponse resp;
+  Status s = exec_env_->frontend()->UpdateCatalogCache(req, &resp);
+  if (!s.ok()) {
+    LOG(ERROR) << "There was an error processing the impalad catalog update. Requesting"
+               << " a full topic update to recover: " << s.GetDetail();
+    subscriber_topic_updates->emplace_back();
+    TTopicDelta& update = subscriber_topic_updates->back();
+    update.topic_name = CatalogServer::IMPALA_CATALOG_TOPIC;
+    update.__set_from_version(0L);
+    ImpaladMetrics::CATALOG_READY->SetValue(false);
+    // Dropped all cached lib files (this behaves as if all functions and data
+    // sources are dropped).
+    LibCache::instance()->DropCache();
+  } else {
+    {
+      unique_lock<mutex> unique_lock(catalog_version_lock_);
+      catalog_update_info_.catalog_version = resp.new_catalog_version;
+      catalog_update_info_.catalog_topic_version = delta.to_version;
+      catalog_update_info_.catalog_service_id = resp.catalog_service_id;
+      catalog_update_info_.min_catalog_object_version = resp.min_catalog_object_version;
+      LOG(INFO) << "Catalog topic update applied with version: " <<
+          resp.new_catalog_version << " new min catalog object version: " <<
+          resp.min_catalog_object_version;
     }
-
-    // Call the FE to apply the changes to the Impalad Catalog.
-    TUpdateCatalogCacheResponse resp;
-    Status s = exec_env_->frontend()->UpdateCatalogCache(update_reqs, &resp);
-    if (!s.ok()) {
-      LOG(ERROR) << "There was an error processing the impalad catalog update. Requesting"
-                 << " a full topic update to recover: " << s.GetDetail();
-      subscriber_topic_updates->push_back(TTopicDelta());
-      TTopicDelta& update = subscriber_topic_updates->back();
-      update.topic_name = CatalogServer::IMPALA_CATALOG_TOPIC;
-      update.__set_from_version(0L);
-      ImpaladMetrics::CATALOG_READY->SetValue(false);
-      // Dropped all cached lib files (this behaves as if all functions and data
-      // sources are dropped).
-      LibCache::instance()->DropCache();
-    } else {
-      {
-        unique_lock<mutex> unique_lock(catalog_version_lock_);
-        catalog_update_info_.catalog_version = new_catalog_version;
-        catalog_update_info_.catalog_topic_version = delta.to_version;
-        catalog_update_info_.catalog_service_id = resp.catalog_service_id;
-        catalog_update_info_.min_catalog_object_version = resp.min_catalog_object_version;
-        LOG(INFO) << "Catalog topic update applied with version: " << new_catalog_version
-            << " new min catalog object version: " << resp.min_catalog_object_version;
-      }
-      ImpaladMetrics::CATALOG_READY->SetValue(new_catalog_version > 0);
-      // TODO: deal with an error status
-      discard_result(UpdateCatalogMetrics());
-      // Remove all dropped objects from the library cache.
-      // TODO: is this expensive? We'd like to process heartbeats promptly.
-      for (TCatalogObject& object: dropped_objects) {
-        if (object.type == TCatalogObjectType::FUNCTION) {
-          LibCache::instance()->RemoveEntry(object.fn.hdfs_location);
-        } else if (object.type == TCatalogObjectType::DATA_SOURCE) {
-          LibCache::instance()->RemoveEntry(object.data_source.hdfs_location);
-        } else {
-          DCHECK(false);
-        }
-      }
-    }
+    ImpaladMetrics::CATALOG_READY->SetValue(resp.new_catalog_version > 0);
+    // TODO: deal with an error status
+    discard_result(UpdateCatalogMetrics());
   }
-
   // Always update the minimum subscriber version for the catalog topic.
   {
     unique_lock<mutex> unique_lock(catalog_version_lock_);
@@ -1555,20 +1447,17 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
       WaitForCatalogUpdateTopicPropagation(catalog_service_id);
     }
   } else {
-    // Operation with a result set.
+    CatalogUpdateResultIterator callback_ctx(catalog_update_result);
     TUpdateCatalogCacheRequest update_req;
     update_req.__set_is_delta(true);
+    update_req.__set_native_iterator_ptr(reinterpret_cast<int64_t>(&callback_ctx));
+    // The catalog version is updated in WaitForCatalogUpdate below. So we need a
+    // standalone field in the request to update the service ID without touching the
+    // catalog version.
     update_req.__set_catalog_service_id(catalog_update_result.catalog_service_id);
-    if (catalog_update_result.__isset.updated_catalog_objects) {
-      update_req.__set_updated_objects(catalog_update_result.updated_catalog_objects);
-    }
-    if (catalog_update_result.__isset.removed_catalog_objects) {
-      update_req.__set_removed_objects(catalog_update_result.removed_catalog_objects);
-    }
     // Apply the changes to the local catalog cache.
     TUpdateCatalogCacheResponse resp;
-    Status status = exec_env_->frontend()->UpdateCatalogCache(
-        vector<TUpdateCatalogCacheRequest>{update_req}, &resp);
+    Status status = exec_env_->frontend()->UpdateCatalogCache(update_req, &resp);
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     RETURN_IF_ERROR(status);
     if (!wait_for_all_subscribers) return Status::OK();

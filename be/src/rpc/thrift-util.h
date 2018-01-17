@@ -49,12 +49,11 @@ class ThriftSerializer {
 
   /// Serializes obj into result.  Result will contain a copy of the memory.
   template <class T>
-  Status Serialize(T* obj, std::vector<uint8_t>* result) {
-    uint32_t len = 0;
-    uint8_t* buffer = NULL;
-    RETURN_IF_ERROR(Serialize<T>(obj, &len, &buffer));
-    result->resize(len);
-    memcpy(&((*result)[0]), buffer, len);
+  Status Serialize(const T* obj, std::vector<uint8_t>* result) {
+    uint32_t len;
+    uint8_t* buffer;
+    RETURN_IF_ERROR(Serialize(obj, &len, &buffer));
+    result->assign(buffer, buffer + len);
     return Status::OK();
   }
 
@@ -62,7 +61,7 @@ class ThriftSerializer {
   /// memory returned is owned by this object and will be invalid when another object
   /// is serialized.
   template <class T>
-  Status Serialize(T* obj, uint32_t* len, uint8_t** buffer) {
+  Status Serialize(const T* obj, uint32_t* len, uint8_t** buffer) {
     try {
       mem_buffer_->resetBuffer();
       obj->write(protocol_.get());
@@ -76,7 +75,7 @@ class ThriftSerializer {
   }
 
   template <class T>
-  Status Serialize(T* obj, std::string* result) {
+  Status Serialize(const T* obj, std::string* result) {
     try {
       mem_buffer_->resetBuffer();
       obj->write(protocol_.get());
@@ -92,15 +91,6 @@ class ThriftSerializer {
  private:
   boost::shared_ptr<apache::thrift::transport::TMemoryBuffer> mem_buffer_;
   boost::shared_ptr<apache::thrift::protocol::TProtocol> protocol_;
-};
-
-class ThriftDeserializer {
- public:
-  ThriftDeserializer(bool compact);
-
- private:
-  boost::shared_ptr<apache::thrift::protocol::TProtocolFactory> factory_;
-  boost::shared_ptr<apache::thrift::protocol::TProtocol> tproto_;
 };
 
 /// Utility to create a protocol (deserialization) object for 'mem'.

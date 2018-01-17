@@ -20,9 +20,9 @@
 #include <sstream>
 
 #include "catalog/catalog-util.h"
-#include "common/status.h"
 #include "exec/read-write-util.h"
 #include "util/compress.h"
+#include "util/jni-util.h"
 #include "util/debug-util.h"
 
 #include "common/names.h"
@@ -30,6 +30,94 @@
 using boost::algorithm::to_upper_copy;
 
 namespace impala {
+
+jclass JniCatalogCacheUpdateIterator::pair_cl;
+jmethodID JniCatalogCacheUpdateIterator::pair_ctor;
+jclass JniCatalogCacheUpdateIterator::boolean_cl;
+jmethodID JniCatalogCacheUpdateIterator::boolean_ctor;
+
+Status JniCatalogCacheUpdateIterator::InitJNI() {
+  JNIEnv* env = getJNIEnv();
+  if (env == nullptr) return Status("Failed to get/create JVM");
+  RETURN_IF_ERROR(
+      JniUtil::GetGlobalClassRef(env, "Lorg/apache/impala/common/Pair;", &pair_cl));
+  pair_ctor = env->GetMethodID(pair_cl, "<init>",
+      "(Ljava/lang/Object;Ljava/lang/Object;)V");
+  RETURN_ERROR_IF_EXC(env);
+  RETURN_IF_ERROR(
+      JniUtil::GetGlobalClassRef(env, "Ljava/lang/Boolean;", &boolean_cl));
+  boolean_ctor = env->GetMethodID(boolean_cl, "<init>", "(Z)V");
+  RETURN_ERROR_IF_EXC(env);
+  return Status::OK();
+}
+
+Status JniCatalogCacheUpdateIterator::createPair(JNIEnv* env, bool deleted,
+    const uint8_t* buffer, long size, jobject* out) {
+  jobject deleted_obj = env->NewObject(boolean_cl, boolean_ctor,
+      static_cast<jboolean>(deleted));
+  RETURN_ERROR_IF_EXC(env);
+  jobject byte_buffer = env->NewDirectByteBuffer(const_cast<uint8_t*>(buffer), size);
+  RETURN_ERROR_IF_EXC(env);
+  *out = env->NewObject(pair_cl, pair_ctor, deleted_obj, byte_buffer);
+  RETURN_ERROR_IF_EXC(env);
+  return Status::OK();
+}
+
+jobject TopicItemSpanIterator::next(JNIEnv* env) {
+  while (begin_ != end_) {
+    jobject result;
+    Status s;
+    const TTopicItem* current = begin_++;
+    if (decompress_) {
+      s = DecompressCatalogObject(
+          reinterpret_cast<const uint8_t*>(current->value.data()),
+          static_cast<uint32_t>(current->value.size()), &decompressed_buffer_);
+      if (!s.ok()) {
+        LOG(ERROR) << "Error decompressing catalog object: " << s.GetDetail();
+        continue;
+      }
+      s = createPair(env, current->deleted,
+          reinterpret_cast<const uint8_t*>(decompressed_buffer_.data()),
+          static_cast<long>(decompressed_buffer_.size()), &result);
+    } else {
+      s = createPair(env, current->deleted,
+          reinterpret_cast<const uint8_t*>(current->value.data()),
+          static_cast<long>(current->value.size()), &result);
+    }
+    if (s.ok()) return result;
+    LOG(ERROR) << "Error creating return value: " << s.GetDetail();
+  }
+  return nullptr;
+}
+
+jobject CatalogUpdateResultIterator::next(JNIEnv* env) {
+  const vector<TCatalogObject>& removed = result_.removed_catalog_objects;
+  const vector<TCatalogObject>& updated = result_.updated_catalog_objects;
+  while (pos_ != removed.size() + updated.size()) {
+    bool deleted;
+    const TCatalogObject* current_obj;
+    if (pos_ < removed.size()) {
+      current_obj = &removed[pos_];
+      deleted = true;
+    } else {
+      current_obj = &updated[pos_ - removed.size()];
+      deleted = false;
+    }
+    ++pos_;
+    uint8_t* buf;
+    uint32_t buf_size;
+    Status s = serializer_.Serialize(current_obj, &buf_size, &buf);
+    if (!s.ok()) {
+      LOG(ERROR) << "Error serializing catalog object: " << s.GetDetail();
+      continue;
+    }
+    jobject result = nullptr;
+    s = createPair(env, deleted, buf, buf_size, &result);
+    if (s.ok()) return result;
+    LOG(ERROR) << "Error creating jobject." << s.GetDetail();
+  }
+  return nullptr;
+}
 
 TCatalogObjectType::type TCatalogObjectTypeFromName(const string& name) {
   const string& upper = to_upper_copy(name);
@@ -136,79 +224,31 @@ Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
   return Status::OK();
 }
 
-string TCatalogObjectToEntryKey(const TCatalogObject& catalog_object) {
-  // The key format is: "TCatalogObjectType:<fully qualified object name>"
-  stringstream entry_key;
-  entry_key << PrintTCatalogObjectType(catalog_object.type) << ":";
-  switch (catalog_object.type) {
-    case TCatalogObjectType::DATABASE:
-      entry_key << catalog_object.db.db_name;
-      break;
-    case TCatalogObjectType::TABLE:
-    case TCatalogObjectType::VIEW:
-      entry_key << catalog_object.table.db_name << "." << catalog_object.table.tbl_name;
-      break;
-    case TCatalogObjectType::FUNCTION:
-      entry_key << catalog_object.fn.name.db_name << "."
-                << catalog_object.fn.signature;
-      break;
-    case TCatalogObjectType::CATALOG:
-      entry_key << catalog_object.catalog.catalog_service_id;
-      break;
-    case TCatalogObjectType::DATA_SOURCE:
-      entry_key << catalog_object.data_source.name;
-      break;
-    case TCatalogObjectType::HDFS_CACHE_POOL:
-      entry_key << catalog_object.cache_pool.pool_name;
-      break;
-    case TCatalogObjectType::ROLE:
-      entry_key << catalog_object.role.role_name;
-      break;
-    case TCatalogObjectType::PRIVILEGE:
-      entry_key << catalog_object.privilege.role_id << "."
-                << catalog_object.privilege.privilege_name;
-      break;
-    default:
-      break;
-  }
-  return entry_key.str();
-}
-
-Status CompressCatalogObject(string* catalog_object) {
+Status CompressCatalogObject(const uint8_t* src, uint32_t size, string* dst) {
   scoped_ptr<Codec> compressor;
   RETURN_IF_ERROR(Codec::CreateCompressor(nullptr, false, THdfsCompression::LZ4,
       &compressor));
-  string output_buffer;
-  int64_t compressed_data_len = compressor->MaxOutputLen(catalog_object->size());
-  DCHECK_GT(compressed_data_len, 0);
+  int64_t compressed_data_len = compressor->MaxOutputLen(size);
   int64_t output_buffer_len = compressed_data_len + sizeof(uint32_t);
-  output_buffer.resize(output_buffer_len);
-  uint8_t* output_buffer_ptr =
-      const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(output_buffer.data()));
-  ReadWriteUtil::PutInt(output_buffer_ptr, static_cast<uint32_t>(catalog_object->size()));
+  dst->resize(static_cast<size_t>(output_buffer_len));
+  uint8_t* output_buffer_ptr = reinterpret_cast<uint8_t*>(&((*dst)[0]));
+  ReadWriteUtil::PutInt(output_buffer_ptr, size);
   output_buffer_ptr += sizeof(uint32_t);
-  RETURN_IF_ERROR(compressor->ProcessBlock(true, catalog_object->size(),
-      reinterpret_cast<const uint8_t*>(catalog_object->data()), &compressed_data_len,
+  RETURN_IF_ERROR(compressor->ProcessBlock(true, size, src, &compressed_data_len,
       &output_buffer_ptr));
-  output_buffer.resize(compressed_data_len + sizeof(uint32_t));
-  *catalog_object = move(output_buffer);
+  dst->resize(compressed_data_len + sizeof(uint32_t));
   return Status::OK();
 }
 
-Status DecompressCatalogObject(const string& compressed_catalog_object,
-    vector<uint8_t>* output_buffer) {
+Status DecompressCatalogObject(const uint8_t* src, uint32_t size, string* dst) {
   scoped_ptr<Codec> decompressor;
   RETURN_IF_ERROR(Codec::CreateDecompressor(nullptr, false, THdfsCompression::LZ4,
       &decompressor));
-  const uint8_t* input_data_ptr =
-      reinterpret_cast<const uint8_t*>(compressed_catalog_object.data());
-  int64_t decompressed_len = ReadWriteUtil::GetInt<uint32_t>(input_data_ptr);
-  output_buffer->resize(decompressed_len);
-  input_data_ptr += sizeof(uint32_t);
-  uint8_t* decompressed_data_ptr = output_buffer->data();
-  int64_t compressed_data_len = compressed_catalog_object.size() - sizeof(uint32_t);
-  RETURN_IF_ERROR(decompressor->ProcessBlock(true, compressed_data_len,
-      input_data_ptr, &decompressed_len, &decompressed_data_ptr));
+  int64_t decompressed_len = ReadWriteUtil::GetInt<uint32_t>(src);
+  dst->resize(static_cast<size_t>(decompressed_len));
+  uint8_t* decompressed_data_ptr = reinterpret_cast<uint8_t*>(&((*dst)[0]));
+  RETURN_IF_ERROR(decompressor->ProcessBlock(true, size - sizeof(uint32_t),
+      src + sizeof(uint32_t), &decompressed_len, &decompressed_data_ptr));
   return Status::OK();
 }
 

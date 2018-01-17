@@ -74,6 +74,11 @@ class CatalogServer {
   }
   Catalog* catalog() const { return catalog_.get(); }
 
+  /// Add a topic item to pending_topic_updates_. Caller must hold catalog_lock_.
+  /// The return value is true if the operation succeeds and false otherwise.
+  bool AddPendingTopicItem(std::string key, const uint8_t* item_data, uint32_t size,
+      bool deleted);
+
  private:
   /// Thrift API implementation which proxies requests onto this CatalogService.
   boost::shared_ptr<CatalogServiceIf> thrift_iface_;
@@ -142,20 +147,6 @@ class CatalogServer {
   /// each object. The results are stored in the shared catalog_objects_ data structure.
   /// Also, explicitly releases free memory back to the OS after each complete iteration.
   [[noreturn]] void GatherCatalogUpdatesThread();
-
-  /// Builds the next topic update to send based on what items
-  /// have been added/changed/removed from the catalog since the last hearbeat. To do
-  /// this, it enumerates the given catalog objects returned looking for the objects that
-  /// have a catalog version that is > the catalog version sent with the last heartbeat.
-  /// 'topic_deletions' is true if 'catalog_objects' contain deleted catalog
-  /// objects.
-  ///
-  /// The key for each entry is a string composed of:
-  /// "TCatalogObjectType:<unique object name>". So for table foo.bar, the key would be
-  /// "TABLE:foo.bar". Encoding the object type information in the key ensures the keys
-  /// are unique. Must hold catalog_lock_ when calling this function.
-  void BuildTopicUpdates(const std::vector<TCatalogObject>& catalog_objects,
-      bool topic_deletions);
 
   /// Example output:
   /// "databases": [

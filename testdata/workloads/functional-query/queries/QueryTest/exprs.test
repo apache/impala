@@ -2460,8 +2460,8 @@ string
 ====
 ---- QUERY
 select regexp_extract(regexp_escape(tmp.str),
-tmp.pattern, tmp.index) from (values
-('Hello\\world' as str, '([[:alpha:]]+)(\\\\\\\\)([[:alpha:]]+)' as pattern, 2 as index)
+tmp.`pattern`, tmp.index) from (values
+('Hello\\world' as str, '([[:alpha:]]+)(\\\\\\\\)([[:alpha:]]+)' as `pattern`, 2 as index)
 ) as tmp
 ---- RESULTS
 '\\\\'
@@ -2470,8 +2470,8 @@ string
 ====
 ---- QUERY
 select regexp_extract(regexp_escape(tmp.str),
-tmp.pattern, tmp.index) from (values
-('Hello\\world' as str, '([[:alpha:]]+)(\\\\\\\\)([[:alpha:]]+)' as pattern, 3 as index)
+tmp.`pattern`, tmp.index) from (values
+('Hello\\world' as str, '([[:alpha:]]+)(\\\\\\\\)([[:alpha:]]+)' as `pattern`, 3 as index)
 ) as tmp
 ---- RESULTS
 'world'

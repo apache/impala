@@ -17,13 +17,15 @@
 
 package org.apache.impala.catalog;
 
+import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.metastore.api.MetaException;
-import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.Pair;
+import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDataSource;
@@ -36,8 +38,10 @@ import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
 import org.apache.impala.util.PatternMatcher;
+import org.apache.impala.util.TByteBuffer;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
+import org.apache.thrift.protocol.TBinaryProtocol;
 
 import com.google.common.base.Preconditions;
 
@@ -114,12 +118,29 @@ public class ImpaladCatalog extends Catalog {
   }
 
   /**
+   * Update the catalog service Id. Trigger a full update if the service ID changes.
+   */
+  private void setCatalogServiceId(TUniqueId catalog_service_id) throws CatalogException {
+    // Check for changes in the catalog service ID.
+    if (!catalogServiceId_.equals(catalog_service_id)) {
+      boolean firstRun = catalogServiceId_.equals(INITIAL_CATALOG_SERVICE_ID);
+      catalogServiceId_ = catalog_service_id;
+      if (!firstRun) {
+        // Throw an exception which will trigger a full topic update request.
+        throw new CatalogException("Detected catalog service ID change. Aborting " +
+            "updateCatalog()");
+      }
+    }
+  }
+
+  /**
    * Updates the internal Catalog based on the given TCatalogUpdateReq.
    * This method:
-   * 1) Updates all top level objects (such as databases and roles).
-   * 2) Updates all objects that depend on top level objects (such as functions, tables,
+   * 1) Calls NativeGetNextCatalogObjectUpdate() to get all the updates from the backend.
+   * 2) Updates all top level objects (such as databases and roles).
+   * 3) Updates all objects that depend on top level objects (such as functions, tables,
    *    privileges).
-   * 3) Removes all dropped catalog objects.
+   * 4) Removes all dropped catalog objects.
    *
    * This method is called once per statestore heartbeat and is guaranteed the same
    * object will not be in both the "updated" list and the "removed" list (it is
@@ -132,60 +153,58 @@ public class ImpaladCatalog extends Catalog {
    * protected.
    */
   public synchronized TUpdateCatalogCacheResponse updateCatalog(
-    TUpdateCatalogCacheRequest req) throws CatalogException {
-    // Check for changes in the catalog service ID.
-    if (!catalogServiceId_.equals(req.getCatalog_service_id())) {
-      boolean firstRun = catalogServiceId_.equals(INITIAL_CATALOG_SERVICE_ID);
-      catalogServiceId_ = req.getCatalog_service_id();
-      if (!firstRun) {
-        // Throw an exception which will trigger a full topic update request.
-        throw new CatalogException("Detected catalog service ID change. Aborting " +
-            "updateCatalog()");
-      }
-    }
-
-    // Process updates to top level objects first because they don't depend on any other
-    // objects already existing in the catalog.
-    for (TCatalogObject catalogObject: req.getUpdated_objects()) {
-      if (isTopLevelCatalogObject(catalogObject)) {
-        Preconditions.checkState(catalogObject.getType() != TCatalogObjectType.CATALOG);
-        try {
-          addCatalogObject(catalogObject);
-        } catch (Exception e) {
-          LOG.error("Error adding catalog object: " + e.getMessage(), e);
-        }
-      }
-    }
-
-    // Process updates to dependent objects next. Since the top level objects were already
-    // processed, we are guaranteed that the top level objects that the dependent objects
-    // depend on exist in the catalog.
+    TUpdateCatalogCacheRequest req) throws CatalogException, TException {
+    // For updates from catalog op results, the service ID is set in the request.
+    if (req.isSetCatalog_service_id()) setCatalogServiceId(req.catalog_service_id);
+    ArrayDeque<TCatalogObject> updatedObjects = new ArrayDeque<>();
+    ArrayDeque<TCatalogObject> deletedObjects = new ArrayDeque<>();
     long newCatalogVersion = lastSyncedCatalogVersion_;
-    for (TCatalogObject catalogObject: req.getUpdated_objects()) {
-      if (catalogObject.getType() == TCatalogObjectType.CATALOG) {
-        newCatalogVersion = catalogObject.getCatalog_version();
-      } else if (!isTopLevelCatalogObject(catalogObject)) {
-        try {
-          addCatalogObject(catalogObject);
-        } catch (Exception e) {
-          LOG.error("Error adding catalog object: " + e.getMessage(), e);
+    Pair<Boolean, ByteBuffer> update;
+    while ((update = FeSupport.NativeGetNextCatalogObjectUpdate(req.native_iterator_ptr))
+        != null) {
+      TCatalogObject obj = new TCatalogObject();
+      obj.read(new TBinaryProtocol(new TByteBuffer(update.second)));
+      String key = Catalog.toCatalogObjectKey(obj);
+      int len = update.second.capacity();
+      if (len > 100 * 1024 * 1024 /* 100MB */) {
+        LOG.info("Received large catalog object(>100mb): " + key + " is " + len +
+            "bytes");
+      }
+      if (LOG.isTraceEnabled()) {
+        LOG.trace((update.first ? "Deleting " : "Adding ") + "item: " + key + " version: "
+            + obj.catalog_version + " of size: " + len);
+      }
+      // For statestore updates, the service ID and updated version is wrapped in a
+      // CATALOG catalog object.
+      if (obj.type == TCatalogObjectType.CATALOG) {
+        setCatalogServiceId(obj.catalog.catalog_service_id);
+        newCatalogVersion = obj.catalog_version;
+      } else if (!update.first) {
+        // Update top-level objects first.
+        if (isTopLevelCatalogObject(obj)) {
+          updatedObjects.addFirst(obj);
+        } else {
+          updatedObjects.addLast(obj);
+        }
+      } else {
+        // Remove low-level objects first.
+        if (isTopLevelCatalogObject(obj)) {
+          deletedObjects.addLast(obj);
+        } else {
+          deletedObjects.addFirst(obj);
         }
       }
     }
 
-    // Now remove all objects from the catalog. First remove low-level objects (tables,
-    // functions and privileges) and then the top-level objects (databases and roles).
-    for (TCatalogObject catalogObject: req.getRemoved_objects()) {
-      if (!isTopLevelCatalogObject(catalogObject)) {
-        removeCatalogObject(catalogObject);
-      }
-    }
-    for (TCatalogObject catalogObject: req.getRemoved_objects()) {
-      if (isTopLevelCatalogObject(catalogObject)) {
-        removeCatalogObject(catalogObject);
+    for (TCatalogObject catalogObject: updatedObjects) {
+      try {
+        addCatalogObject(catalogObject);
+      } catch (Exception e) {
+        LOG.error("Error adding catalog object: " + e.getMessage(), e);
       }
     }
 
+    for (TCatalogObject catalogObject: deletedObjects) removeCatalogObject(catalogObject);
 
     lastSyncedCatalogVersion_ = newCatalogVersion;
     // Cleanup old entries in the log.
@@ -195,10 +214,10 @@ public class ImpaladCatalog extends Catalog {
     synchronized (catalogUpdateEventNotifier_) {
       catalogUpdateEventNotifier_.notifyAll();
     }
-
     return new TUpdateCatalogCacheResponse(catalogServiceId_,
-        CatalogObjectVersionQueue.INSTANCE.getMinimumVersion());
+        CatalogObjectVersionQueue.INSTANCE.getMinimumVersion(), newCatalogVersion);
   }
+
 
   /**
    * Causes the calling thread to wait until a catalog update notification has been sent
@@ -248,7 +267,7 @@ public class ImpaladCatalog extends Catalog {
    * This method handles both of these cases.
    */
   public Path getTablePath(org.apache.hadoop.hive.metastore.api.Table msTbl)
-      throws NoSuchObjectException, MetaException, TException {
+      throws TException {
     try (MetaStoreClient msClient = getMetaStoreClient()) {
       // If the table did not have its path set, build the path based on the the
       // location property of the parent database.
@@ -271,7 +290,7 @@ public class ImpaladCatalog extends Catalog {
    *     > than the given TCatalogObject's version.
    */
   private void addCatalogObject(TCatalogObject catalogObject)
-      throws TableLoadingException, DatabaseNotFoundException {
+      throws TableLoadingException {
     // This item is out of date and should not be applied to the catalog.
     if (catalogDeltaLog_.wasObjectRemovedAfter(catalogObject)) {
       if (LOG.isTraceEnabled()) {
@@ -404,6 +423,7 @@ public class ImpaladCatalog extends Catalog {
   }
 
   private void addFunction(TFunction fn, long catalogVersion) {
+    LibCacheSetNeedsRefresh(fn.hdfs_location);
     Function function = Function.fromThrift(fn);
     function.setCatalogVersion(catalogVersion);
     Db db = getDb(function.getFunctionName().getDb());
@@ -427,12 +447,17 @@ public class ImpaladCatalog extends Catalog {
   }
 
   private void addDataSource(TDataSource thrift, long catalogVersion) {
+    LibCacheSetNeedsRefresh(thrift.hdfs_location);
     DataSource dataSource = DataSource.fromThrift(thrift);
     dataSource.setCatalogVersion(catalogVersion);
     addDataSource(dataSource);
   }
 
   private void removeDataSource(TDataSource thrift, long dropCatalogVersion) {
+    DataSource src = dataSources_.get(thrift.name);
+    if (src != null && src.getCatalogVersion() < dropCatalogVersion) {
+      LibCacheRemoveEntry(src.getLocation());
+    }
     removeDataSource(thrift.getName());
   }
 
@@ -468,6 +493,7 @@ public class ImpaladCatalog extends Catalog {
     // version of the drop, remove the function.
     Function fn = db.getFunction(thriftFn.getSignature());
     if (fn != null && fn.getCatalogVersion() < dropCatalogVersion) {
+      LibCacheRemoveEntry(fn.getLocation().getLocation());
       db.removeFunction(thriftFn.getSignature());
       CatalogObjectVersionQueue.INSTANCE.removeVersion(
           fn.getCatalogVersion());
@@ -506,4 +532,15 @@ public class ImpaladCatalog extends Catalog {
   public void setIsReady(boolean isReady) { isReady_.set(isReady); }
   public AuthorizationPolicy getAuthPolicy() { return authPolicy_; }
   public String getDefaultKuduMasterHosts() { return defaultKuduMasterHosts_; }
+
+  private void LibCacheSetNeedsRefresh(String hdfsLocation) {
+    if (!FeSupport.NativeLibCacheSetNeedsRefresh(hdfsLocation)) {
+      LOG.error("NativeLibCacheSetNeedsRefresh(" + hdfsLocation + ") failed.");
+    }
+  }
+  private void LibCacheRemoveEntry(String hdfsLibFile) {
+    if (!FeSupport.NativeLibCacheRemoveEntry(hdfsLibFile)) {
+      LOG.error("LibCacheRemoveEntry(" + hdfsLibFile + ") failed.");
+    }
+  }
 }

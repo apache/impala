@@ -567,6 +567,8 @@ public abstract class Catalog {
             catalogObject.getCache_pool().getPool_name().toLowerCase();
       case DATA_SOURCE:
         return "DATA_SOURCE:" + catalogObject.getData_source().getName().toLowerCase();
+      case CATALOG:
+        return "CATALOG:" + catalogObject.getCatalog().catalog_service_id;
       default:
         throw new IllegalStateException(
             "Unsupported catalog object type: " + catalogObject.getType());
