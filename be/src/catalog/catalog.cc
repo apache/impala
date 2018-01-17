@@ -99,8 +99,10 @@ Status Catalog::GetCatalogVersion(long* version) {
   return Status::OK();
 }
 
-Status Catalog::GetCatalogDelta(long from_version, TGetCatalogDeltaResponse* resp) {
+Status Catalog::GetCatalogDelta(CatalogServer* caller, int64_t from_version,
+    TGetCatalogDeltaResponse* resp) {
   TGetCatalogDeltaRequest request;
+  request.__set_native_catalog_server_ptr(reinterpret_cast<int64_t>(caller));
   request.__set_from_version(from_version);
   return JniUtil::CallJniMethod(catalog_, get_catalog_delta_id_, request, resp);
 }

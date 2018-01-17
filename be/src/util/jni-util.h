@@ -168,6 +168,36 @@ class JniUtfCharGuard {
   DISALLOW_COPY_AND_ASSIGN(JniUtfCharGuard);
 };
 
+class JniScopedArrayCritical {
+ public:
+  /// Construct a JniScopedArrayCritical holding nothing.
+  JniScopedArrayCritical():  env_(nullptr), jarr_(nullptr), arr_(nullptr), size_(0) {}
+
+  /// Release the held byte[] contents if necessary.
+  ~JniScopedArrayCritical() {
+    if (env_ != nullptr && jarr_ != nullptr && arr_ != nullptr) {
+      env_->ReleasePrimitiveArrayCritical(jarr_, arr_, JNI_ABORT);
+    }
+  }
+
+  /// Try to get the contents of 'jarr' via JNIEnv::GetPrimitiveArrayCritical() and set
+  /// the results in 'out'. Returns true upon success and false otherwise. If false is
+  /// returned 'out' is not modified.
+  static bool Create(JNIEnv* env, jbyteArray jarr, JniScopedArrayCritical* out)
+      WARN_UNUSED_RESULT;
+
+  uint8_t* get() const { return arr_; }
+
+  int size() const { return size_; }
+ private:
+  JNIEnv* env_;
+  jbyteArray jarr_;
+  uint8_t* arr_;
+  int size_;
+  DISALLOW_COPY_AND_ASSIGN(JniScopedArrayCritical);
+};
+
+
 /// Utility class for JNI-related functionality.
 /// Init() should be called as soon as the native library is loaded.
 /// Creates global class references, and promotes local references to global references.
@@ -311,30 +341,6 @@ class JniUtil {
     RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &arg, &request_bytes));
     jbyteArray result_bytes = static_cast<jbyteArray>(
         jni_env->CallObjectMethod(obj, method, request_bytes));
-    RETURN_ERROR_IF_EXC(jni_env);
-    RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, response));
-    return Status::OK();
-  }
-
-  template <typename T, typename R>
-  static Status CallJniMethod(const jobject& obj, const jmethodID& method,
-      const vector<T>& args, R* response) {
-    JNIEnv* jni_env = getJNIEnv();
-    JniLocalFrame jni_frame;
-    RETURN_IF_ERROR(jni_frame.push(jni_env));
-    jclass jByteArray_class = jni_env->FindClass("[B");
-    jobjectArray array_of_jByteArray =
-        jni_env->NewObjectArray(args.size(), jByteArray_class, NULL);
-    RETURN_ERROR_IF_EXC(jni_env);
-    jbyteArray request_bytes;
-    for (int i = 0; i < args.size(); i++) {
-      RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &args[i], &request_bytes));
-      jni_env->SetObjectArrayElement(array_of_jByteArray, i, request_bytes);
-      RETURN_ERROR_IF_EXC(jni_env);
-      jni_env->DeleteLocalRef(request_bytes);
-    }
-    jbyteArray result_bytes = static_cast<jbyteArray>(
-        jni_env->CallObjectMethod(obj, method, array_of_jByteArray));
     RETURN_ERROR_IF_EXC(jni_env);
     RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, response));
     return Status::OK();

@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <jni.h>
 
+#include "catalog/catalog-util.h"
 #include "common/logging.h"
 #include "common/init.h"
 #include "exec/hbase-table-scanner.h"
@@ -66,6 +67,7 @@ int ImpaladMain(int argc, char** argv) {
   ABORT_IF_ERROR(HBaseTable::InitJNI());
   ABORT_IF_ERROR(HBaseTableWriter::InitJNI());
   ABORT_IF_ERROR(HiveUdfCall::InitEnv());
+  ABORT_IF_ERROR(JniCatalogCacheUpdateIterator::InitJNI());
   InitFeSupport();
 
   if (FLAGS_enable_rm) {

@@ -23,6 +23,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -55,12 +56,12 @@ import org.apache.impala.common.JniUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
 import org.apache.impala.hive.executor.UdfExecutor;
+import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TCatalog;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCatalogUpdateResult;
 import org.apache.impala.thrift.TFunction;
-import org.apache.impala.thrift.TGetCatalogDeltaResponse;
 import org.apache.impala.thrift.TGetCatalogUsageResponse;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPrivilege;
@@ -72,6 +73,8 @@ import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.SentryProxy;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
+import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TCompactProtocol;
 
 import com.codahale.metrics.Timer;
@@ -387,54 +390,85 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Identifies and returns the catalog objects that were added/modified/deleted in the
-   * catalog with versions > 'fromVersion'. It operates on a snaphsot of the catalog
-   * without holding the catalog lock which means that other concurrent metadata
-   * operations can still make progress while the catalog delta is computed. An entry in
-   * the topic update log is added for every catalog object that is included in the
-   * catalog delta. The log is examined by operations using SYNC_DDL to determine which
-   * topic update covers the result set of metadata operation. Once the catalog delta is
-   * computed, the entries in the delete log with versions less than 'fromVersion' are
-   * garbage collected.
+   * The context for add*ToCatalogDelta(), called by getCatalogDelta. It contains
+   * callback information, version range and collected topics.
    */
-  public TGetCatalogDeltaResponse getCatalogDelta(long fromVersion) {
-    // Maximum catalog version (inclusive) to be included in the catalog delta.
-    long toVersion = getCatalogVersion();
-    TGetCatalogDeltaResponse resp = new TGetCatalogDeltaResponse();
-    resp.setUpdated_objects(new ArrayList<TCatalogObject>());
-    resp.setDeleted_objects(new ArrayList<TCatalogObject>());
-    resp.setMax_catalog_version(toVersion);
+  class GetCatalogDeltaContext {
+    // The CatalogServer pointer for NativeAddPendingTopicItem() callback.
+    long nativeCatalogServerPtr;
+    // The from and to version of this delta.
+    long fromVersion;
+    long toVersion;
+    // The keys of the updated topics.
+    Set<String> updatedCatalogObjects;
+    TSerializer serializer;
 
+    GetCatalogDeltaContext(long nativeCatalogServerPtr, long fromVersion, long toVersion)
+    {
+      this.nativeCatalogServerPtr = nativeCatalogServerPtr;
+      this.fromVersion = fromVersion;
+      this.toVersion = toVersion;
+      updatedCatalogObjects = new HashSet<>();
+      serializer = new TSerializer(new TBinaryProtocol.Factory());
+    }
+
+    void addCatalogObject(TCatalogObject obj, boolean delete) throws TException {
+      String key = Catalog.toCatalogObjectKey(obj);
+      if (obj.type != TCatalogObjectType.CATALOG) {
+        topicUpdateLog_.add(key,
+            new TopicUpdateLog.Entry(0, obj.getCatalog_version(), toVersion));
+        if (!delete) updatedCatalogObjects.add(key);
+      }
+      // TODO: TSerializer.serialize() returns a copy of the internal byte array, which
+      // could be elided.
+      byte[] data = serializer.serialize(obj);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Collected catalog " + (delete ? "deletion: " : "update: ") + key +
+            " version: " + obj.catalog_version);
+      }
+      if (!FeSupport.NativeAddPendingTopicItem(nativeCatalogServerPtr, key, data, delete))
+      {
+        LOG.error("NativeAddPendingTopicItem failed in BE. key=" + key + ", delete="
+            + delete + ", data_size=" + data.length);
+      }
+    }
+  }
+
+  /**
+   * Identifies the catalog objects that were added/modified/deleted in the catalog with
+   * versions > 'fromVersion'. It operates on a snaphsot of the catalog without holding
+   * the catalog lock which means that other concurrent metadata operations can still make
+   * progress while the catalog delta is computed. An entry in the topic update log is
+   * added for every catalog object that is included in the catalog delta. The log is
+   * examined by operations using SYNC_DDL to determine which topic update covers the
+   * result set of metadata operation. Once the catalog delta is computed, the entries in
+   * the delete log with versions less than 'fromVersion' are garbage collected.
+   * The catalog delta is passed to the backend by calling NativeAddPendingTopicItem().
+   */
+  public long getCatalogDelta(long nativeCatalogServerPtr, long fromVersion) throws
+      TException {
+    GetCatalogDeltaContext ctx = new GetCatalogDeltaContext(nativeCatalogServerPtr,
+        fromVersion, getCatalogVersion());
     for (Db db: getAllDbs()) {
-      addDatabaseToCatalogDelta(db, fromVersion, toVersion, resp);
+      addDatabaseToCatalogDelta(db, ctx);
     }
     for (DataSource dataSource: getAllDataSources()) {
-      addDataSourceToCatalogDelta(dataSource, fromVersion, toVersion, resp);
+      addDataSourceToCatalogDelta(dataSource, ctx);
     }
     for (HdfsCachePool cachePool: getAllHdfsCachePools()) {
-      addHdfsCachePoolToCatalogDelta(cachePool, fromVersion, toVersion, resp);
+      addHdfsCachePoolToCatalogDelta(cachePool, ctx);
     }
     for (Role role: getAllRoles()) {
-      addRoleToCatalogDelta(role, fromVersion, toVersion, resp);
+      addRoleToCatalogDelta(role, ctx);
     }
-    Set<String> updatedCatalogObjects = Sets.newHashSet();
-    for (TCatalogObject catalogObj: resp.updated_objects) {
-      topicUpdateLog_.add(Catalog.toCatalogObjectKey(catalogObj),
-          new TopicUpdateLog.Entry(0, catalogObj.getCatalog_version(),
-              toVersion));
-      updatedCatalogObjects.add(Catalog.toCatalogObjectKey(catalogObj));
-    }
-
     // Identify the catalog objects that were removed from the catalog for which their
-    // versions are in range ('fromVersion', 'toVersion']. We need to make sure
+    // versions are in range ('ctx.fromVersion', 'ctx.toVersion']. We need to make sure
     // that we don't include "deleted" objects that were re-added to the catalog.
-    for (TCatalogObject removedObject: getDeletedObjects(fromVersion, toVersion)) {
-      if (!updatedCatalogObjects.contains(
+    for (TCatalogObject removedObject:
+        getDeletedObjects(ctx.fromVersion, ctx.toVersion)) {
+      if (!ctx.updatedCatalogObjects.contains(
           Catalog.toCatalogObjectKey(removedObject))) {
-        topicUpdateLog_.add(Catalog.toCatalogObjectKey(removedObject),
-            new TopicUpdateLog.Entry(0, removedObject.getCatalog_version(),
-                toVersion));
-        resp.addToDeleted_objects(removedObject);
+        ctx.addCatalogObject(removedObject, true);
       }
     }
     // Each topic update should contain a single "TCatalog" object which is used to
@@ -443,19 +477,20 @@ public class CatalogServiceCatalog extends Catalog {
     // version at this point, it ensures impalads will always bump their versions,
     // even in the case where an object has been dropped.
     TCatalogObject catalog =
-        new TCatalogObject(TCatalogObjectType.CATALOG, toVersion);
+        new TCatalogObject(TCatalogObjectType.CATALOG, ctx.toVersion);
     catalog.setCatalog(new TCatalog(catalogServiceId_));
-    resp.addToUpdated_objects(catalog);
+    ctx.addCatalogObject(catalog, false);
     // Garbage collect the delete and topic update log.
-    deleteLog_.garbageCollect(toVersion);
-    topicUpdateLog_.garbageCollectUpdateLogEntries(toVersion);
-    lastSentTopicUpdate_.set(toVersion);
+    deleteLog_.garbageCollect(ctx.toVersion);
+    topicUpdateLog_.garbageCollectUpdateLogEntries(ctx.toVersion);
+    lastSentTopicUpdate_.set(ctx.toVersion);
     // Notify any operation that is waiting on the next topic update.
     synchronized (topicUpdateLog_) {
       topicUpdateLog_.notifyAll();
     }
-    return resp;
+    return ctx.toVersion;
   }
+
 
   /**
    * Get a snapshot view of all the catalog objects that were deleted between versions
@@ -520,23 +555,23 @@ public class CatalogServiceCatalog extends Catalog {
 
   /**
    * Adds a database in the topic update if its version is in the range
-   * ('fromVersion', 'toVersion']. It iterates through all the tables and functions of
-   * this database to determine if they can be included in the topic update.
+   * ('ctx.fromVersion', 'ctx.toVersion']. It iterates through all the tables and
+   * functions of this database to determine if they can be included in the topic update.
    */
-  private void addDatabaseToCatalogDelta(Db db, long fromVersion, long toVersion,
-      TGetCatalogDeltaResponse resp) {
+  private void addDatabaseToCatalogDelta(Db db, GetCatalogDeltaContext ctx)
+      throws TException {
     long dbVersion = db.getCatalogVersion();
-    if (dbVersion > fromVersion && dbVersion <= toVersion) {
+    if (dbVersion > ctx.fromVersion && dbVersion <= ctx.toVersion) {
       TCatalogObject catalogDb =
           new TCatalogObject(TCatalogObjectType.DATABASE, dbVersion);
       catalogDb.setDb(db.toThrift());
-      resp.addToUpdated_objects(catalogDb);
+      ctx.addCatalogObject(catalogDb, false);
     }
     for (Table tbl: getAllTables(db)) {
-      addTableToCatalogDelta(tbl, fromVersion, toVersion, resp);
+      addTableToCatalogDelta(tbl, ctx);
     }
     for (Function fn: getAllFunctions(db)) {
-      addFunctionToCatalogDelta(fn, fromVersion, toVersion, resp);
+      addFunctionToCatalogDelta(fn, ctx);
     }
   }
 
@@ -568,25 +603,25 @@ public class CatalogServiceCatalog extends Catalog {
 
   /**
    * Adds a table in the topic update if its version is in the range
-   * ('fromVersion', 'toVersion']. If the table's version is larger than 'toVersion' and
-   * the table has skipped a topic update 'MAX_NUM_SKIPPED_TOPIC_UPDATES' times, it is
-   * included in the topic update. This prevents tables that are updated frequently from
-   * skipping topic updates indefinitely, which would also violate the semantics of
-   * SYNC_DDL.
+   * ('ctx.fromVersion', 'ctx.toVersion']. If the table's version is larger than
+   * 'ctx.toVersion' and the table has skipped a topic update
+   * 'MAX_NUM_SKIPPED_TOPIC_UPDATES' times, it is included in the topic update. This
+   * prevents tables that are updated frequently from skipping topic updates indefinitely,
+   * which would also violate the semantics of SYNC_DDL.
    */
-  private void addTableToCatalogDelta(Table tbl, long fromVersion, long toVersion,
-      TGetCatalogDeltaResponse resp) {
-    if (tbl.getCatalogVersion() <= toVersion) {
-      addTableToCatalogDeltaHelper(tbl, fromVersion, toVersion, resp);
+  private void addTableToCatalogDelta(Table tbl, GetCatalogDeltaContext ctx)
+      throws TException  {
+    if (tbl.getCatalogVersion() <= ctx.toVersion) {
+      addTableToCatalogDeltaHelper(tbl, ctx);
     } else {
       TopicUpdateLog.Entry topicUpdateEntry =
           topicUpdateLog_.getOrCreateLogEntry(tbl.getUniqueName());
       Preconditions.checkNotNull(topicUpdateEntry);
-      if (topicUpdateEntry.getNumSkippedTopicUpdates() >= MAX_NUM_SKIPPED_TOPIC_UPDATES) {
-        addTableToCatalogDeltaHelper(tbl, fromVersion, toVersion, resp);
+      if (topicUpdateEntry.getNumSkippedTopicUpdates() == MAX_NUM_SKIPPED_TOPIC_UPDATES) {
+        addTableToCatalogDeltaHelper(tbl, ctx);
       } else {
         LOG.info("Table " + tbl.getFullName() + " is skipping topic update " +
-            toVersion);
+            ctx.toVersion);
         topicUpdateLog_.add(tbl.getUniqueName(),
             new TopicUpdateLog.Entry(
                 topicUpdateEntry.getNumSkippedTopicUpdates() + 1,
@@ -598,23 +633,23 @@ public class CatalogServiceCatalog extends Catalog {
 
   /**
    * Helper function that tries to add a table in a topic update. It acquires table's
-   * lock and checks if its version is in the ('fromVersion', 'toVersion'] range and how
-   * many consecutive times (if any) has the table skipped a topic update.
+   * lock and checks if its version is in the ('ctx.fromVersion', 'ctx.toVersion'] range
+   * and how many consecutive times (if any) has the table skipped a topic update.
    */
-  private void addTableToCatalogDeltaHelper(Table tbl, long fromVersion, long toVersion,
-      TGetCatalogDeltaResponse resp) {
+  private void addTableToCatalogDeltaHelper(Table tbl, GetCatalogDeltaContext ctx)
+      throws TException {
     TCatalogObject catalogTbl =
         new TCatalogObject(TCatalogObjectType.TABLE, Catalog.INITIAL_CATALOG_VERSION);
     tbl.getLock().lock();
     try {
       long tblVersion = tbl.getCatalogVersion();
-      if (tblVersion <= fromVersion) return;
+      if (tblVersion <= ctx.fromVersion) return;
       TopicUpdateLog.Entry topicUpdateEntry =
           topicUpdateLog_.getOrCreateLogEntry(tbl.getUniqueName());
-      if (tblVersion > toVersion &&
+      if (tblVersion > ctx.toVersion &&
           topicUpdateEntry.getNumSkippedTopicUpdates() < MAX_NUM_SKIPPED_TOPIC_UPDATES) {
         LOG.info("Table " + tbl.getFullName() + " is skipping topic update " +
-            toVersion);
+            ctx.toVersion);
         topicUpdateLog_.add(tbl.getUniqueName(),
             new TopicUpdateLog.Entry(
                 topicUpdateEntry.getNumSkippedTopicUpdates() + 1,
@@ -630,7 +665,7 @@ public class CatalogServiceCatalog extends Catalog {
         return;
       }
       catalogTbl.setCatalog_version(tbl.getCatalogVersion());
-      resp.addToUpdated_objects(catalogTbl);
+      ctx.addCatalogObject(catalogTbl, false);
     } finally {
       tbl.getLock().unlock();
     }
@@ -638,65 +673,65 @@ public class CatalogServiceCatalog extends Catalog {
 
   /**
    * Adds a function to the topic update if its version is in the range
-   * ('fromVersion', 'toVersion'].
+   * ('ctx.fromVersion', 'ctx.toVersion'].
    */
-  private void addFunctionToCatalogDelta(Function fn, long fromVersion, long toVersion,
-      TGetCatalogDeltaResponse resp) {
+  private void addFunctionToCatalogDelta(Function fn, GetCatalogDeltaContext ctx)
+      throws TException {
     long fnVersion = fn.getCatalogVersion();
-    if (fnVersion <= fromVersion || fnVersion > toVersion) return;
+    if (fnVersion <= ctx.fromVersion || fnVersion > ctx.toVersion) return;
     TCatalogObject function =
         new TCatalogObject(TCatalogObjectType.FUNCTION, fnVersion);
     function.setFn(fn.toThrift());
-    resp.addToUpdated_objects(function);
+    ctx.addCatalogObject(function, false);
   }
 
   /**
    * Adds a data source to the topic update if its version is in the range
-   * ('fromVersion', 'toVersion'].
+   * ('ctx.fromVersion', 'ctx.toVersion'].
    */
-  private void addDataSourceToCatalogDelta(DataSource dataSource, long fromVersion,
-      long toVersion, TGetCatalogDeltaResponse resp) {
+  private void addDataSourceToCatalogDelta(DataSource dataSource,
+      GetCatalogDeltaContext ctx) throws TException  {
     long dsVersion = dataSource.getCatalogVersion();
-    if (dsVersion <= fromVersion || dsVersion > toVersion) return;
+    if (dsVersion <= ctx.fromVersion || dsVersion > ctx.toVersion) return;
     TCatalogObject catalogObj =
         new TCatalogObject(TCatalogObjectType.DATA_SOURCE, dsVersion);
     catalogObj.setData_source(dataSource.toThrift());
-    resp.addToUpdated_objects(catalogObj);
+    ctx.addCatalogObject(catalogObj, false);
   }
 
   /**
    * Adds a HDFS cache pool to the topic update if its version is in the range
-   * ('fromVersion', 'toVersion'].
+   * ('ctx.fromVersion', 'ctx.toVersion'].
    */
-  private void addHdfsCachePoolToCatalogDelta(HdfsCachePool cachePool, long fromVersion,
-      long toVersion, TGetCatalogDeltaResponse resp) {
+  private void addHdfsCachePoolToCatalogDelta(HdfsCachePool cachePool,
+      GetCatalogDeltaContext ctx) throws TException  {
     long cpVersion = cachePool.getCatalogVersion();
-    if (cpVersion <= fromVersion || cpVersion > toVersion) {
+    if (cpVersion <= ctx.fromVersion || cpVersion > ctx.toVersion) {
       return;
     }
     TCatalogObject pool =
         new TCatalogObject(TCatalogObjectType.HDFS_CACHE_POOL, cpVersion);
     pool.setCache_pool(cachePool.toThrift());
-    resp.addToUpdated_objects(pool);
+    ctx.addCatalogObject(pool, false);
   }
 
 
   /**
    * Adds a role to the topic update if its version is in the range
-   * ('fromVersion', 'toVersion']. It iterates through all the privileges of this role to
-   * determine if they can be inserted in the topic update.
+   * ('ctx.fromVersion', 'ctx.toVersion']. It iterates through all the privileges of
+   * this role to determine if they can be inserted in the topic update.
    */
-  private void addRoleToCatalogDelta(Role role, long fromVersion, long toVersion,
-      TGetCatalogDeltaResponse resp) {
+  private void addRoleToCatalogDelta(Role role, GetCatalogDeltaContext ctx)
+      throws TException  {
     long roleVersion = role.getCatalogVersion();
-    if (roleVersion > fromVersion && roleVersion <= toVersion) {
+    if (roleVersion > ctx.fromVersion && roleVersion <= ctx.toVersion) {
       TCatalogObject thriftRole =
           new TCatalogObject(TCatalogObjectType.ROLE, roleVersion);
       thriftRole.setRole(role.toThrift());
-      resp.addToUpdated_objects(thriftRole);
+      ctx.addCatalogObject(thriftRole, false);
     }
     for (RolePrivilege p: getAllPrivileges(role)) {
-      addRolePrivilegeToCatalogDelta(p, fromVersion, toVersion, resp);
+      addRolePrivilegeToCatalogDelta(p, ctx);
     }
   }
 
@@ -715,16 +750,16 @@ public class CatalogServiceCatalog extends Catalog {
 
   /**
    * Adds a role privilege to the topic update if its version is in the range
-   * ('fromVersion', 'toVersion'].
+   * ('ctx.fromVersion', 'ctx.toVersion'].
    */
-  private void addRolePrivilegeToCatalogDelta(RolePrivilege priv, long fromVersion,
-      long toVersion, TGetCatalogDeltaResponse resp) {
+  private void addRolePrivilegeToCatalogDelta(RolePrivilege priv,
+      GetCatalogDeltaContext ctx) throws TException  {
     long privVersion = priv.getCatalogVersion();
-    if (privVersion <= fromVersion || privVersion > toVersion) return;
+    if (privVersion <= ctx.fromVersion || privVersion > ctx.toVersion) return;
     TCatalogObject privilege =
         new TCatalogObject(TCatalogObjectType.PRIVILEGE, privVersion);
     privilege.setPrivilege(priv.toThrift());
-    resp.addToUpdated_objects(privilege);
+    ctx.addCatalogObject(privilege, false);
   }
 
   /**

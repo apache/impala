@@ -238,14 +238,10 @@ void CatalogServer::UpdateCatalogTopicCallback(
     LOG_EVERY_N(INFO, 300) << "Catalog Version: " << catalog_objects_max_version_
                            << " Last Catalog Version: " << last_sent_catalog_version_;
 
-    for (const TTopicItem& catalog_object: pending_topic_updates_) {
-      if (subscriber_topic_updates->size() == 0) {
-        subscriber_topic_updates->push_back(TTopicDelta());
-        subscriber_topic_updates->back().topic_name = IMPALA_CATALOG_TOPIC;
-      }
-      TTopicDelta& update = subscriber_topic_updates->back();
-      update.topic_entries.push_back(catalog_object);
-    }
+    subscriber_topic_updates->emplace_back();
+    TTopicDelta& update = subscriber_topic_updates->back();
+    update.topic_name = IMPALA_CATALOG_TOPIC;
+    update.topic_entries = std::move(pending_topic_updates_);
 
     // Update the new catalog version and the set of known catalog objects.
     last_sent_catalog_version_ = catalog_objects_max_version_;
@@ -281,55 +277,18 @@ void CatalogServer::UpdateCatalogTopicCallback(
     } else if (current_catalog_version != last_sent_catalog_version_) {
       // If there has been a change since the last time the catalog was queried,
       // call into the Catalog to find out what has changed.
-      TGetCatalogDeltaResponse catalog_objects;
-      status = catalog_->GetCatalogDelta(last_sent_catalog_version_, &catalog_objects);
+      TGetCatalogDeltaResponse resp;
+      status = catalog_->GetCatalogDelta(this, last_sent_catalog_version_, &resp);
       if (!status.ok()) {
         LOG(ERROR) << status.GetDetail();
       } else {
-        // Use the catalog objects to build a topic update list. These include
-        // objects added to the catalog, 'updated_objects', and objects deleted
-        // from the catalog, 'deleted_objects'. The order in which we process
-        // these two disjoint sets of catalog objects does not matter.
-        BuildTopicUpdates(catalog_objects.updated_objects, false);
-        BuildTopicUpdates(catalog_objects.deleted_objects, true);
         catalog_objects_min_version_ = last_sent_catalog_version_;
-        catalog_objects_max_version_ = catalog_objects.max_catalog_version;
+        catalog_objects_max_version_ = resp.max_catalog_version;
       }
     }
 
     topic_processing_time_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
     topic_updates_ready_ = true;
-  }
-}
-
-void CatalogServer::BuildTopicUpdates(const vector<TCatalogObject>& catalog_objects,
-    bool topic_deletions) {
-  for (const TCatalogObject& catalog_object: catalog_objects) {
-    DCHECK_GT(catalog_object.catalog_version, last_sent_catalog_version_);
-    const string& entry_key = TCatalogObjectToEntryKey(catalog_object);
-    if (entry_key.empty()) {
-      LOG_EVERY_N(WARNING, 60) << "Unable to build topic entry key for TCatalogObject: "
-                               << ThriftDebugString(catalog_object);
-    }
-    pending_topic_updates_.push_back(TTopicItem());
-    TTopicItem& item = pending_topic_updates_.back();
-    item.key = entry_key;
-    item.deleted = topic_deletions;
-    Status status = thrift_serializer_.Serialize(&catalog_object, &item.value);
-    if (!status.ok()) {
-      LOG(ERROR) << "Error serializing topic value: " << status.GetDetail();
-      pending_topic_updates_.pop_back();
-      continue;
-    }
-    if (FLAGS_compact_catalog_topic) {
-      status = CompressCatalogObject(&item.value);
-      if (!status.ok()) {
-        LOG(ERROR) << "Error compressing catalog object: " << status.GetDetail();
-        pending_topic_updates_.pop_back();
-      }
-    }
-    VLOG(1) << "Publishing " << (topic_deletions ? "deletion " : "update ")
-        << ": " << entry_key << "@" << catalog_object.catalog_version;
   }
 }
 
@@ -496,4 +455,27 @@ void CatalogServer::TableMetricsUrlCallback(const Webserver::ArgumentMap& args,
         document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
   }
+}
+
+bool CatalogServer::AddPendingTopicItem(std::string key, const uint8_t* item_data,
+    uint32_t size, bool deleted) {
+  pending_topic_updates_.emplace_back();
+  TTopicItem& item = pending_topic_updates_.back();
+  if (FLAGS_compact_catalog_topic) {
+    Status status = CompressCatalogObject(item_data, size, &item.value);
+    if (!status.ok()) {
+      pending_topic_updates_.pop_back();
+      LOG(ERROR) << "Error compressing topic item: " << status.GetDetail();
+      return false;
+    }
+  } else {
+    item.value.assign(reinterpret_cast<const char*>(item_data),
+        static_cast<size_t>(size));
+  }
+  item.key = std::move(key);
+  item.deleted = deleted;
+  VLOG(1) << "Publishing " << (deleted ? "deletion: " : "update: ") << item.key <<
+      " original size: " << size << (FLAGS_compact_catalog_topic ?
+      Substitute(" compressed size: $0", item.value.size()) : string());
+  return true;
 }

@@ -17,16 +17,10 @@
 
 package org.apache.impala.service;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-
-import org.apache.thrift.TDeserializer;
-import org.apache.thrift.TException;
-import org.apache.thrift.TSerializer;
-import org.apache.thrift.protocol.TBinaryProtocol;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.Expr;
@@ -34,6 +28,7 @@ import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TCacheJarParams;
 import org.apache.impala.thrift.TCacheJarResult;
 import org.apache.impala.thrift.TCatalogObject;
@@ -51,6 +46,13 @@ import org.apache.impala.thrift.TSymbolLookupParams;
 import org.apache.impala.thrift.TSymbolLookupResult;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.util.NativeLibUtil;
+import org.apache.thrift.TDeserializer;
+import org.apache.thrift.TException;
+import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 
 /**
@@ -78,6 +80,21 @@ public class FeSupport {
 
   // Returns a serialized TCacheJarResult
   public native static byte[] NativeCacheJar(byte[] thriftCacheJar);
+
+  // Adds a topic item to the backend's pending metadata-topic update.
+  // 'serializationBuffer' is a serialized TCatalogObject.
+  // The return value is true if the operation succeeds and false otherwise.
+  public native static boolean NativeAddPendingTopicItem(long nativeCatalogServerPtr,
+      String key, byte[] serializationBuffer, boolean deleted);
+
+  // Get a catalog object update from the backend. A pair of isDeletion flag and
+  // serialized TCatalogObject is returned.
+  public native static Pair<Boolean, ByteBuffer> NativeGetNextCatalogObjectUpdate(
+      long nativeIteratorPtr);
+
+  // The return value is true if the operation succeeds and false otherwise.
+  public native static boolean NativeLibCacheSetNeedsRefresh(String hdfsLocation);
+  public native static boolean NativeLibCacheRemoveEntry(String hdfsLibFile);
 
   // Does an RPCs to the Catalog Server to prioritize the metadata loading of a
   // one or more catalog objects. To keep our kerberos configuration consolidated,

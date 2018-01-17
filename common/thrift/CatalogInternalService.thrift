@@ -26,21 +26,23 @@ include "CatalogObjects.thrift"
 struct TGetCatalogDeltaRequest {
   // The base catalog version from which the delta is computed.
   1: required i64 from_version
+
+  // The native caller ptr for calling back NativeAddPendingTopicItem().
+  2: required i64 native_catalog_server_ptr
 }
 
-// Response from a call to GetCatalogDelta. Contains a delta of catalog objects
-// (databases, tables/views, and functions) from the CatalogService's cache relative (>)
-// to the catalog version specified in TGetCatalogDelta.from_version.
+// Response from a call to GetCatalogDelta. The catalog object updates are passed
+// separately via NativeAddPendingTopicItem() callback.
 struct TGetCatalogDeltaResponse {
   // The maximum catalog version of all objects in this response or 0 if the Catalog
   // contained no objects.
   1: required i64 max_catalog_version
 
   // List of updated (new and modified) catalog objects whose catalog verion is
-  // larger than TGetCatalotDeltaRequest.from_version.
-  2: required list<CatalogObjects.TCatalogObject> updated_objects
+  // larger than TGetCatalotDeltaRequest.from_version. Deprecated after IMPALA-5990.
+  2: optional list<CatalogObjects.TCatalogObject> updated_objects_deprecated
 
   // List of deleted catalog objects whose catalog version is larger than
-  // TGetCatalogDelta.from_version.
-  3: required list<CatalogObjects.TCatalogObject> deleted_objects
+  // TGetCatalogDelta.from_version. Deprecated after IMPALA-5990.
+  3: optional list<CatalogObjects.TCatalogObject> deleted_objects_deprecated
 }

@@ -27,6 +27,8 @@
 
 namespace impala {
 
+class CatalogServer;
+
 /// The Catalog is a proxy for the Java-side JniCatalog class. The interface is a set of
 /// wrapper functions for methods called over JNI.
 class Catalog {
@@ -58,8 +60,11 @@ class Catalog {
 
   /// Retrieves the catalog objects that were added/modified/deleted since version
   /// 'from_version'. Returns OK if the operation was successful, otherwise a Status
-  /// object with information on the error will be returned.
-  Status GetCatalogDelta(long from_version, TGetCatalogDeltaResponse* resp);
+  /// object with information on the error will be returned. 'caller' is a pointer to
+  /// the caller CatalogServer object. caller->AddTopicUpdate() will be repeatedly
+  /// called by the frontend.
+  Status GetCatalogDelta(CatalogServer* caller, int64_t from_version,
+      TGetCatalogDeltaResponse* resp);
 
   /// Gets the Thrift representation of a Catalog object. The request is a TCatalogObject
   /// which has the desired TCatalogObjectType and name properly set.

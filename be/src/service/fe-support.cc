@@ -20,7 +20,9 @@
 #include "service/fe-support.h"
 
 #include <boost/scoped_ptr.hpp>
+#include <catalog/catalog-util.h>
 
+#include "catalog/catalog-server.h"
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
 #include "common/logging.h"
@@ -424,6 +426,65 @@ Java_org_apache_impala_service_FeSupport_NativeLookupSymbol(
   return result_bytes;
 }
 
+// Add a catalog update to pending_topic_updates_.
+extern "C"
+JNIEXPORT void JNICALL
+Java_org_apache_impala_service_FeSupport_NativeAddPendingTopicItem(JNIEnv* env,
+    jclass caller_class, jlong native_catalog_server_ptr, jstring key,
+    jbyteArray serialized_object, jboolean deleted) {
+  std::string key_string;
+  {
+    JniUtfCharGuard key_str;
+    if (!JniUtfCharGuard::create(env, key, &key_str).ok()) return;
+    key_string.assign(key_str.get());
+  }
+  JniScopedArrayCritical obj_buf;
+  if (!JniScopedArrayCritical::Create(env, serialized_object, &obj_buf)) return;
+  reinterpret_cast<CatalogServer*>(native_catalog_server_ptr)->AddPendingTopicItem(
+      std::move(key_string), obj_buf.get(), static_cast<uint32_t>(obj_buf.size()),
+      deleted);
+}
+
+// Get the next catalog update pointed by 'callback_ctx'.
+extern "C"
+JNIEXPORT jobject JNICALL
+Java_org_apache_impala_service_FeSupport_NativeGetNextCatalogObjectUpdate(JNIEnv* env,
+    jclass caller_class, jlong native_iterator_ptr) {
+  return reinterpret_cast<JniCatalogCacheUpdateIterator*>(native_iterator_ptr)->next(env);
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_org_apache_impala_service_FeSupport_NativeLibCacheSetNeedsRefresh(JNIEnv* env,
+    jclass caller_class, jstring hdfs_location) {
+  string str;
+  {
+    JniUtfCharGuard hdfs_location_data;
+    if (!JniUtfCharGuard::create(env, hdfs_location, &hdfs_location_data).ok()) {
+      return static_cast<jboolean>(false);
+    }
+    str.assign(hdfs_location_data.get());
+  }
+  LibCache::instance()->SetNeedsRefresh(str);
+  return static_cast<jboolean>(false);
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_org_apache_impala_service_FeSupport_NativeLibCacheRemoveEntry(JNIEnv* env,
+    jclass caller_class, jstring hdfs_lib_file) {
+  string str;
+  {
+    JniUtfCharGuard hdfs_lib_file_data;
+    if (!JniUtfCharGuard::create(env, hdfs_lib_file, &hdfs_lib_file_data).ok()) {
+      return static_cast<jboolean>(false);
+    }
+    str.assign(hdfs_lib_file_data.get());
+  }
+  LibCache::instance()->RemoveEntry(str);
+  return static_cast<jboolean>(true);
+}
+
 // Calls in to the catalog server to request prioritizing the loading of metadata for
 // specific catalog objects.
 extern "C"
@@ -478,28 +539,45 @@ namespace impala {
 
 static JNINativeMethod native_methods[] = {
   {
-    (char*)"NativeFeTestInit", (char*)"()V",
-    (void*)::Java_org_apache_impala_service_FeSupport_NativeFeTestInit
+      (char*)"NativeFeTestInit", (char*)"()V",
+      (void*)::Java_org_apache_impala_service_FeSupport_NativeFeTestInit
   },
   {
-    (char*)"NativeEvalExprsWithoutRow", (char*)"([B[B)[B",
-    (void*)::Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow
+      (char*)"NativeEvalExprsWithoutRow", (char*)"([B[B)[B",
+      (void*)::Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow
   },
   {
-    (char*)"NativeCacheJar", (char*)"([B)[B",
-    (void*)::Java_org_apache_impala_service_FeSupport_NativeCacheJar
+      (char*)"NativeCacheJar", (char*)"([B)[B",
+      (void*)::Java_org_apache_impala_service_FeSupport_NativeCacheJar
   },
   {
-    (char*)"NativeLookupSymbol", (char*)"([B)[B",
-    (void*)::Java_org_apache_impala_service_FeSupport_NativeLookupSymbol
+      (char*)"NativeLookupSymbol", (char*)"([B)[B",
+      (void*)::Java_org_apache_impala_service_FeSupport_NativeLookupSymbol
   },
   {
-    (char*)"NativePrioritizeLoad", (char*)"([B)[B",
-    (void*)::Java_org_apache_impala_service_FeSupport_NativePrioritizeLoad
+      (char*)"NativePrioritizeLoad", (char*)"([B)[B",
+      (void*)::Java_org_apache_impala_service_FeSupport_NativePrioritizeLoad
   },
   {
-    (char*)"NativeParseQueryOptions", (char*)"(Ljava/lang/String;[B)[B",
-    (void*)::Java_org_apache_impala_service_FeSupport_NativeParseQueryOptions
+      (char*)"NativeParseQueryOptions", (char*)"(Ljava/lang/String;[B)[B",
+      (void*)::Java_org_apache_impala_service_FeSupport_NativeParseQueryOptions
+  },
+  {
+      (char*)"NativeAddPendingTopicItem", (char*)"(JLjava/lang/String;[BZ)Z",
+      (void*)::Java_org_apache_impala_service_FeSupport_NativeAddPendingTopicItem
+  },
+  {
+      (char*)"NativeGetNextCatalogObjectUpdate",
+      (char*)"(J)Lorg/apache/impala/common/Pair;",
+      (void*)::Java_org_apache_impala_service_FeSupport_NativeGetNextCatalogObjectUpdate
+  },
+  {
+      (char*)"NativeLibCacheSetNeedsRefresh", (char*)"(Ljava/lang/String;)Z",
+      (void*)::Java_org_apache_impala_service_FeSupport_NativeLibCacheSetNeedsRefresh
+  },
+  {
+      (char*)"NativeLibCacheRemoveEntry", (char*)"(Ljava/lang/String;)Z",
+      (void*)::Java_org_apache_impala_service_FeSupport_NativeLibCacheRemoveEntry
   },
 };
 

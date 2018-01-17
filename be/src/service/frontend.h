@@ -38,10 +38,11 @@ class Frontend {
   /// or if there is any further exception, the constructor will terminate the process.
   Frontend();
 
-  /// Request to update the Impalad catalog cache. The req argument contains a vector of
-  /// updates that each contain objects that should be added/removed from the Catalog.
-  /// Returns a response that contains details such as the new max catalog version.
-  Status UpdateCatalogCache(const vector<TUpdateCatalogCacheRequest>& req,
+  /// Request to update the Impalad catalog cache. The 'req' argument contains a pointer
+  /// to a CatalogServer used for the FE to call NativeGetNextCatalogTopicItem() back to
+  /// get the catalog objects iteratively. Returns a response that contains details such
+  /// as the new max catalog version.
+  Status UpdateCatalogCache(const TUpdateCatalogCacheRequest& req,
       TUpdateCatalogCacheResponse *resp);
 
   /// Request to update the Impalad frontend cluster membership snapshot.  The

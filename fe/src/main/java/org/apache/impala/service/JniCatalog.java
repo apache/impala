@@ -56,6 +56,7 @@ import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.util.GlogAppender;
 import org.apache.impala.util.PatternMatcher;
+import org.apache.sentry.hdfs.ThriftSerializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
@@ -118,16 +119,13 @@ public class JniCatalog {
 
   public static TUniqueId getServiceId() { return catalogServiceId_; }
 
-  /**
-   * Gets all catalog objects
-   */
-  public byte[] getCatalogDelta(byte[] thriftGetCatalogDeltaReq)
-      throws ImpalaException, TException {
+  public byte[] getCatalogDelta(byte[] thriftGetCatalogDeltaReq) throws
+      ImpalaException, TException {
     TGetCatalogDeltaRequest params = new TGetCatalogDeltaRequest();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftGetCatalogDeltaReq);
-    TGetCatalogDeltaResponse resp = catalog_.getCatalogDelta(params.getFrom_version());
-    TSerializer serializer = new TSerializer(protocolFactory_);
-    return serializer.serialize(resp);
+    return new TSerializer(protocolFactory_).serialize(new TGetCatalogDeltaResponse(
+        catalog_.getCatalogDelta(params.getNative_catalog_server_ptr(),
+        params.getFrom_version())));
   }
 
   /**

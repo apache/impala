@@ -25,3 +25,5 @@ add_library(Catalog
   catalogd-main.cc
 )
 add_dependencies(Catalog gen-deps)
+
+ADD_BE_TEST(catalog-util-test)
