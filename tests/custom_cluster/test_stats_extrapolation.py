@@ -76,7 +76,7 @@ class TestStatsExtrapolation(CustomClusterTestSuite):
     self.__run_sampling_test(nopart_test_tbl, "", nopart_test_tbl_exp, 100, 99)
 
     # Test empty table.
-    empty_test_tbl = unique_database + ".empty"
+    empty_test_tbl = unique_database + ".empty_tbl"
     self.clone_table("functional.alltypes", empty_test_tbl, False, vector)
     self.__run_sampling_test(empty_test_tbl, "", empty_test_tbl, 10, 7)
 

@@ -17,20 +17,13 @@
 
 package org.apache.impala.catalog;
 
-import com.google.common.base.Preconditions;
-
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
-import org.apache.log4j.Logger;
-import org.apache.thrift.TException;
-
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDataSource;
@@ -42,6 +35,11 @@ import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
+import org.apache.impala.util.PatternMatcher;
+import org.apache.log4j.Logger;
+import org.apache.thrift.TException;
+
+import com.google.common.base.Preconditions;
 
 /**
  * Thread safe Catalog for an Impalad.  The Impalad catalog can be updated either via
@@ -374,7 +372,7 @@ public class ImpaladCatalog extends Catalog {
     Db existingDb = getDb(thriftDb.getDb_name());
     if (existingDb == null ||
         existingDb.getCatalogVersion() < catalogVersion) {
-      Db newDb = Db.fromTDatabase(thriftDb, this);
+      Db newDb = Db.fromTDatabase(thriftDb);
       newDb.setCatalogVersion(catalogVersion);
       addDb(newDb);
       if (existingDb != null) {

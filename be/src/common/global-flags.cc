@@ -182,10 +182,15 @@ DEFINE_int32(max_log_files, 10, "Maximum number of log files to retain per sever
     "retained.");
 
 // The read size is the preferred size of the reads issued to HDFS or the local FS.
-// There is a trade off of latency and throughout, trying to keep disks busy but
+// There is a trade off of latency and throughput, trying to keep disks busy but
 // not introduce seeks.  The literature seems to agree that with 8 MB reads, random
 // io and sequential io perform similarly.
 DEFINE_int32(read_size, 8 * 1024 * 1024, "(Advanced) The preferred I/O request size in "
     "bytes to issue to HDFS or the local filesystem. Increasing the read size will "
     "increase memory requirements. Decreasing the read size may decrease I/O "
     "throughput.");
+
+DEFINE_string(reserved_words_version, "3.0.0", "Reserved words compatibility version. "
+    "Reserved words cannot be used as identifiers in SQL. This flag determines the impala"
+    " version from which the reserved word list is taken. The value must be one of "
+    "[\"2.11.0\", \"3.0.0\"].");

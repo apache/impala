@@ -142,10 +142,10 @@ class TestQueryFullSort(ImpalaTestSuite):
     has to be handled differently because there are no var len blocks to point into."""
 
     query = """
-    select empty, l_orderkey, l_partkey, l_suppkey,
+    select empty_str, l_orderkey, l_partkey, l_suppkey,
         l_linenumber, l_quantity, l_extendedprice, l_discount, l_tax
-    from (select substr(l_comment, 1000, 0) empty, * from lineitem) t
-    order by empty, l_orderkey, l_partkey, l_suppkey, l_linenumber
+    from (select substr(l_comment, 1000, 0) empty_str, * from lineitem) t
+    order by empty_str, l_orderkey, l_partkey, l_suppkey, l_linenumber
     limit 100000
     """
 

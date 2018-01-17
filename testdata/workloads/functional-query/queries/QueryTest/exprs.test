@@ -2356,8 +2356,8 @@ select dayofyear(trunc('2014-11-11', string_col)) from functional.alltypestiny l
 Invalid Truncate Unit: 0
 ====
 ---- QUERY
-select regexp_match_count(tmp.str, tmp.pattern) from (values
-('aaa' as str, 'a' as pattern),
+select regexp_match_count(tmp.str, tmp.`pattern`) from (values
+('aaa' as str, 'a' as `pattern`),
 ('aaa', 'aa'),
 ('aaaa', 'aa'),
 ('', ''),
@@ -2402,8 +2402,8 @@ select regexp_match_count(tmp.str, tmp.pattern) from (values
 int
 ====
 ---- QUERY
-select regexp_match_count(tmp.str, tmp.pattern, tmp.start_pos, tmp.params) from (values
-('aaa' as str, 'A' as pattern, 1 as start_pos, 'i' as params),
+select regexp_match_count(tmp.str, tmp.`pattern`, tmp.start_pos, tmp.params) from (values
+('aaa' as str, 'A' as `pattern`, 1 as start_pos, 'i' as params),
 ('aaa', 'A', 1, 'c'),
 ('this\nis\nnewline', '.*', 1, ''),
 ('this\nis\nnewline', '.*', 1, 'n'),
@@ -2436,16 +2436,16 @@ select regexp_match_count(tmp.str, tmp.pattern, tmp.start_pos, tmp.params) from 
 int
 ====
 ---- QUERY
-select regexp_match_count(tmp.str, tmp.pattern, tmp.start_pos, tmp.params) from (values
-('a' as str, 'a' as pattern, -1 as start_pos, '' as params),
+select regexp_match_count(tmp.str, tmp.`pattern`, tmp.start_pos, tmp.params) from (values
+('a' as str, 'a' as `pattern`, -1 as start_pos, '' as params),
 ('foobar', 'foobar', 1, 'i'),
 ('iPhone\niPad\niPod', '^I.*$', 1, 'imn')) as tmp
 ---- CATCH
 Illegal starting position -1
 ====
 ---- QUERY
-select regexp_match_count(tmp.str, tmp.pattern, tmp.start_pos, tmp.params) from (values
-('a' as str, 'a' as pattern, 1 as start_pos, 'xyz' as params),
+select regexp_match_count(tmp.str, tmp.`pattern`, tmp.start_pos, tmp.params) from (values
+('a' as str, 'a' as `pattern`, 1 as start_pos, 'xyz' as params),
 ('foobar', 'foobar', 1, 'i'),
 ('iPhone\niPad\niPod', '^I.*$', 1, 'imn')) as tmp
 ---- CATCH
@@ -2461,8 +2461,8 @@ string
 ====
 ---- QUERY
 select regexp_extract(regexp_escape(tmp.str),
-tmp.pattern, tmp.index) from (values
-('Hello\\world' as str, '([[:alpha:]]+)(\\\\\\\\)([[:alpha:]]+)' as pattern, 2 as index)
+tmp.`pattern`, tmp.index) from (values
+('Hello\\world' as str, '([[:alpha:]]+)(\\\\\\\\)([[:alpha:]]+)' as `pattern`, 2 as index)
 ) as tmp
 ---- RESULTS
 '\\\\'
@@ -2471,8 +2471,8 @@ string
 ====
 ---- QUERY
 select regexp_extract(regexp_escape(tmp.str),
-tmp.pattern, tmp.index) from (values
-('Hello\\world' as str, '([[:alpha:]]+)(\\\\\\\\)([[:alpha:]]+)' as pattern, 3 as index)
+tmp.`pattern`, tmp.index) from (values
+('Hello\\world' as str, '([[:alpha:]]+)(\\\\\\\\)([[:alpha:]]+)' as `pattern`, 3 as index)
 ) as tmp
 ---- RESULTS
 'world'

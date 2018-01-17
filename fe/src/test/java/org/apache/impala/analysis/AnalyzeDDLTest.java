@@ -1276,12 +1276,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // Test tablesample clause with extrapolation enabled/disabled. Replace/restore the
     // static backend config for this test to control stats extrapolation.
-    BackendConfig origInstance = BackendConfig.INSTANCE;
+    TBackendGflags gflags = BackendConfig.INSTANCE.getBackendCfg();
+    boolean origEnableStatsExtrapolation = gflags.isEnable_stats_extrapolation();
     try {
-      TBackendGflags testGflags = new TBackendGflags();
-      testGflags.setEnable_stats_extrapolation(true);
-      BackendConfig.create(testGflags);
-
+      gflags.setEnable_stats_extrapolation(true);
       // Test different COMPUTE_STATS_MIN_SAMPLE_BYTES.
       TQueryOptions queryOpts = new TQueryOptions();
 
@@ -1346,13 +1344,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           "compute stats functional.alltypes_datasource tablesample system (3)",
           "TABLESAMPLE is only supported on HDFS tables.");
 
-      testGflags.setEnable_stats_extrapolation(false);
-      BackendConfig.create(testGflags);
+      gflags.setEnable_stats_extrapolation(false);
       AnalysisError("compute stats functional.alltypes tablesample system (10)",
           "COMPUTE STATS TABLESAMPLE requires --enable_stats_extrapolation=true. " +
           "Stats extrapolation is currently disabled.");
     } finally {
-      BackendConfig.INSTANCE = origInstance;
+      gflags.setEnable_stats_extrapolation(origEnableStatsExtrapolation);
     }
   }
 

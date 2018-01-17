@@ -20,15 +20,19 @@ package org.apache.impala.analysis;
 import java_cup.runtime.Symbol;
 import java.lang.Integer;
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.Iterator;
-import java.util.List;
-import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 
 import org.apache.impala.analysis.SqlParserSymbols;
+import org.apache.impala.catalog.BuiltinsDb;
+import static org.apache.impala.catalog.Catalog.BUILTINS_DB;
+import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TReservedWordsVersion;
 
 %%
 
@@ -49,253 +53,328 @@ import org.apache.impala.analysis.SqlParserSymbols;
   // uses "and" as a display name and not "&&".
   // Please keep the puts sorted alphabetically by keyword (where the order
   // does not affect the desired error reporting)
-  public static final Map<String, Integer> keywordMap =
-      new LinkedHashMap<String, Integer>();
-  static {
-    keywordMap.put("&&", new Integer(SqlParserSymbols.KW_AND));
-    keywordMap.put("add", new Integer(SqlParserSymbols.KW_ADD));
-    keywordMap.put("aggregate", new Integer(SqlParserSymbols.KW_AGGREGATE));
-    keywordMap.put("all", new Integer(SqlParserSymbols.KW_ALL));
-    keywordMap.put("alter", new Integer(SqlParserSymbols.KW_ALTER));
-    keywordMap.put("analytic", new Integer(SqlParserSymbols.KW_ANALYTIC));
-    keywordMap.put("and", new Integer(SqlParserSymbols.KW_AND));
-    keywordMap.put("anti", new Integer(SqlParserSymbols.KW_ANTI));
-    keywordMap.put("api_version", new Integer(SqlParserSymbols.KW_API_VERSION));
-    keywordMap.put("array", new Integer(SqlParserSymbols.KW_ARRAY));
-    keywordMap.put("as", new Integer(SqlParserSymbols.KW_AS));
-    keywordMap.put("asc", new Integer(SqlParserSymbols.KW_ASC));
-    keywordMap.put("avro", new Integer(SqlParserSymbols.KW_AVRO));
-    keywordMap.put("between", new Integer(SqlParserSymbols.KW_BETWEEN));
-    keywordMap.put("bigint", new Integer(SqlParserSymbols.KW_BIGINT));
-    keywordMap.put("binary", new Integer(SqlParserSymbols.KW_BINARY));
-    keywordMap.put("block_size", new Integer(SqlParserSymbols.KW_BLOCKSIZE));
-    keywordMap.put("boolean", new Integer(SqlParserSymbols.KW_BOOLEAN));
-    keywordMap.put("by", new Integer(SqlParserSymbols.KW_BY));
-    keywordMap.put("cached", new Integer(SqlParserSymbols.KW_CACHED));
-    keywordMap.put("case", new Integer(SqlParserSymbols.KW_CASE));
-    keywordMap.put("cascade", new Integer(SqlParserSymbols.KW_CASCADE));
-    keywordMap.put("cast", new Integer(SqlParserSymbols.KW_CAST));
-    keywordMap.put("change", new Integer(SqlParserSymbols.KW_CHANGE));
-    keywordMap.put("char", new Integer(SqlParserSymbols.KW_CHAR));
-    keywordMap.put("class", new Integer(SqlParserSymbols.KW_CLASS));
-    keywordMap.put("close_fn", new Integer(SqlParserSymbols.KW_CLOSE_FN));
-    keywordMap.put("column", new Integer(SqlParserSymbols.KW_COLUMN));
-    keywordMap.put("columns", new Integer(SqlParserSymbols.KW_COLUMNS));
-    keywordMap.put("comment", new Integer(SqlParserSymbols.KW_COMMENT));
-    keywordMap.put("compression", new Integer(SqlParserSymbols.KW_COMPRESSION));
-    keywordMap.put("compute", new Integer(SqlParserSymbols.KW_COMPUTE));
-    keywordMap.put("create", new Integer(SqlParserSymbols.KW_CREATE));
-    keywordMap.put("cross", new Integer(SqlParserSymbols.KW_CROSS));
-    keywordMap.put("current", new Integer(SqlParserSymbols.KW_CURRENT));
-    keywordMap.put("data", new Integer(SqlParserSymbols.KW_DATA));
-    keywordMap.put("database", new Integer(SqlParserSymbols.KW_DATABASE));
-    keywordMap.put("databases", new Integer(SqlParserSymbols.KW_DATABASES));
-    keywordMap.put("date", new Integer(SqlParserSymbols.KW_DATE));
-    keywordMap.put("datetime", new Integer(SqlParserSymbols.KW_DATETIME));
-    keywordMap.put("decimal", new Integer(SqlParserSymbols.KW_DECIMAL));
-    keywordMap.put("default", new Integer(SqlParserSymbols.KW_DEFAULT));
-    keywordMap.put("delete", new Integer(SqlParserSymbols.KW_DELETE));
-    keywordMap.put("delimited", new Integer(SqlParserSymbols.KW_DELIMITED));
-    keywordMap.put("desc", new Integer(SqlParserSymbols.KW_DESC));
-    keywordMap.put("describe", new Integer(SqlParserSymbols.KW_DESCRIBE));
-    keywordMap.put("distinct", new Integer(SqlParserSymbols.KW_DISTINCT));
-    keywordMap.put("div", new Integer(SqlParserSymbols.KW_DIV));
-    keywordMap.put("double", new Integer(SqlParserSymbols.KW_DOUBLE));
-    keywordMap.put("drop", new Integer(SqlParserSymbols.KW_DROP));
-    keywordMap.put("else", new Integer(SqlParserSymbols.KW_ELSE));
-    keywordMap.put("encoding", new Integer(SqlParserSymbols.KW_ENCODING));
-    keywordMap.put("end", new Integer(SqlParserSymbols.KW_END));
-    keywordMap.put("escaped", new Integer(SqlParserSymbols.KW_ESCAPED));
-    keywordMap.put("exists", new Integer(SqlParserSymbols.KW_EXISTS));
-    keywordMap.put("explain", new Integer(SqlParserSymbols.KW_EXPLAIN));
-    keywordMap.put("extended", new Integer(SqlParserSymbols.KW_EXTENDED));
-    keywordMap.put("external", new Integer(SqlParserSymbols.KW_EXTERNAL));
-    keywordMap.put("false", new Integer(SqlParserSymbols.KW_FALSE));
-    keywordMap.put("fields", new Integer(SqlParserSymbols.KW_FIELDS));
-    keywordMap.put("fileformat", new Integer(SqlParserSymbols.KW_FILEFORMAT));
-    keywordMap.put("files", new Integer(SqlParserSymbols.KW_FILES));
-    keywordMap.put("finalize_fn", new Integer(SqlParserSymbols.KW_FINALIZE_FN));
-    keywordMap.put("first", new Integer(SqlParserSymbols.KW_FIRST));
-    keywordMap.put("float", new Integer(SqlParserSymbols.KW_FLOAT));
-    keywordMap.put("following", new Integer(SqlParserSymbols.KW_FOLLOWING));
-    keywordMap.put("for", new Integer(SqlParserSymbols.KW_FOR));
-    keywordMap.put("format", new Integer(SqlParserSymbols.KW_FORMAT));
-    keywordMap.put("formatted", new Integer(SqlParserSymbols.KW_FORMATTED));
-    keywordMap.put("from", new Integer(SqlParserSymbols.KW_FROM));
-    keywordMap.put("full", new Integer(SqlParserSymbols.KW_FULL));
-    keywordMap.put("function", new Integer(SqlParserSymbols.KW_FUNCTION));
-    keywordMap.put("functions", new Integer(SqlParserSymbols.KW_FUNCTIONS));
-    keywordMap.put("grant", new Integer(SqlParserSymbols.KW_GRANT));
-    keywordMap.put("group", new Integer(SqlParserSymbols.KW_GROUP));
-    keywordMap.put("hash", new Integer(SqlParserSymbols.KW_HASH));
-    keywordMap.put("having", new Integer(SqlParserSymbols.KW_HAVING));
-    keywordMap.put("if", new Integer(SqlParserSymbols.KW_IF));
-    keywordMap.put("ilike", new Integer(SqlParserSymbols.KW_ILIKE));
-    keywordMap.put("ignore", new Integer(SqlParserSymbols.KW_IGNORE));
-    keywordMap.put("in", new Integer(SqlParserSymbols.KW_IN));
-    keywordMap.put("incremental", new Integer(SqlParserSymbols.KW_INCREMENTAL));
-    keywordMap.put("init_fn", new Integer(SqlParserSymbols.KW_INIT_FN));
-    keywordMap.put("inner", new Integer(SqlParserSymbols.KW_INNER));
-    keywordMap.put("inpath", new Integer(SqlParserSymbols.KW_INPATH));
-    keywordMap.put("insert", new Integer(SqlParserSymbols.KW_INSERT));
-    keywordMap.put("int", new Integer(SqlParserSymbols.KW_INT));
-    keywordMap.put("integer", new Integer(SqlParserSymbols.KW_INT));
-    keywordMap.put("intermediate", new Integer(SqlParserSymbols.KW_INTERMEDIATE));
-    keywordMap.put("interval", new Integer(SqlParserSymbols.KW_INTERVAL));
-    keywordMap.put("into", new Integer(SqlParserSymbols.KW_INTO));
-    keywordMap.put("invalidate", new Integer(SqlParserSymbols.KW_INVALIDATE));
-    keywordMap.put("iregexp", new Integer(SqlParserSymbols.KW_IREGEXP));
-    keywordMap.put("is", new Integer(SqlParserSymbols.KW_IS));
-    keywordMap.put("join", new Integer(SqlParserSymbols.KW_JOIN));
-    keywordMap.put("kudu", new Integer(SqlParserSymbols.KW_KUDU));
-    keywordMap.put("last", new Integer(SqlParserSymbols.KW_LAST));
-    keywordMap.put("left", new Integer(SqlParserSymbols.KW_LEFT));
-    keywordMap.put("like", new Integer(SqlParserSymbols.KW_LIKE));
-    keywordMap.put("limit", new Integer(SqlParserSymbols.KW_LIMIT));
-    keywordMap.put("lines", new Integer(SqlParserSymbols.KW_LINES));
-    keywordMap.put("load", new Integer(SqlParserSymbols.KW_LOAD));
-    keywordMap.put("location", new Integer(SqlParserSymbols.KW_LOCATION));
-    keywordMap.put("map", new Integer(SqlParserSymbols.KW_MAP));
-    keywordMap.put("merge_fn", new Integer(SqlParserSymbols.KW_MERGE_FN));
-    keywordMap.put("metadata", new Integer(SqlParserSymbols.KW_METADATA));
-    keywordMap.put("not", new Integer(SqlParserSymbols.KW_NOT));
-    keywordMap.put("null", new Integer(SqlParserSymbols.KW_NULL));
-    keywordMap.put("nulls", new Integer(SqlParserSymbols.KW_NULLS));
-    keywordMap.put("offset", new Integer(SqlParserSymbols.KW_OFFSET));
-    keywordMap.put("on", new Integer(SqlParserSymbols.KW_ON));
-    keywordMap.put("||", new Integer(SqlParserSymbols.KW_OR));
-    keywordMap.put("or", new Integer(SqlParserSymbols.KW_OR));
-    keywordMap.put("order", new Integer(SqlParserSymbols.KW_ORDER));
-    keywordMap.put("outer", new Integer(SqlParserSymbols.KW_OUTER));
-    keywordMap.put("over", new Integer(SqlParserSymbols.KW_OVER));
-    keywordMap.put("overwrite", new Integer(SqlParserSymbols.KW_OVERWRITE));
-    keywordMap.put("parquet", new Integer(SqlParserSymbols.KW_PARQUET));
-    keywordMap.put("parquetfile", new Integer(SqlParserSymbols.KW_PARQUETFILE));
-    keywordMap.put("partition", new Integer(SqlParserSymbols.KW_PARTITION));
-    keywordMap.put("partitioned", new Integer(SqlParserSymbols.KW_PARTITIONED));
-    keywordMap.put("partitions", new Integer(SqlParserSymbols.KW_PARTITIONS));
-    keywordMap.put("preceding", new Integer(SqlParserSymbols.KW_PRECEDING));
-    keywordMap.put("prepare_fn", new Integer(SqlParserSymbols.KW_PREPARE_FN));
-    keywordMap.put("primary", new Integer(SqlParserSymbols.KW_PRIMARY));
-    keywordMap.put("produced", new Integer(SqlParserSymbols.KW_PRODUCED));
-    keywordMap.put("purge", new Integer(SqlParserSymbols.KW_PURGE));
-    keywordMap.put("range", new Integer(SqlParserSymbols.KW_RANGE));
-    keywordMap.put("rcfile", new Integer(SqlParserSymbols.KW_RCFILE));
-    keywordMap.put("real", new Integer(SqlParserSymbols.KW_DOUBLE));
-    keywordMap.put("recover", new Integer(SqlParserSymbols.KW_RECOVER));
-    keywordMap.put("refresh", new Integer(SqlParserSymbols.KW_REFRESH));
-    keywordMap.put("regexp", new Integer(SqlParserSymbols.KW_REGEXP));
-    keywordMap.put("rename", new Integer(SqlParserSymbols.KW_RENAME));
-    keywordMap.put("repeatable", new Integer(SqlParserSymbols.KW_REPEATABLE));
-    keywordMap.put("replace", new Integer(SqlParserSymbols.KW_REPLACE));
-    keywordMap.put("replication", new Integer(SqlParserSymbols.KW_REPLICATION));
-    keywordMap.put("restrict", new Integer(SqlParserSymbols.KW_RESTRICT));
-    keywordMap.put("returns", new Integer(SqlParserSymbols.KW_RETURNS));
-    keywordMap.put("revoke", new Integer(SqlParserSymbols.KW_REVOKE));
-    keywordMap.put("right", new Integer(SqlParserSymbols.KW_RIGHT));
-    keywordMap.put("rlike", new Integer(SqlParserSymbols.KW_RLIKE));
-    keywordMap.put("role", new Integer(SqlParserSymbols.KW_ROLE));
-    keywordMap.put("roles", new Integer(SqlParserSymbols.KW_ROLES));
-    keywordMap.put("row", new Integer(SqlParserSymbols.KW_ROW));
-    keywordMap.put("rows", new Integer(SqlParserSymbols.KW_ROWS));
-    keywordMap.put("schema", new Integer(SqlParserSymbols.KW_SCHEMA));
-    keywordMap.put("schemas", new Integer(SqlParserSymbols.KW_SCHEMAS));
-    keywordMap.put("select", new Integer(SqlParserSymbols.KW_SELECT));
-    keywordMap.put("semi", new Integer(SqlParserSymbols.KW_SEMI));
-    keywordMap.put("sequencefile", new Integer(SqlParserSymbols.KW_SEQUENCEFILE));
-    keywordMap.put("serdeproperties", new Integer(SqlParserSymbols.KW_SERDEPROPERTIES));
-    keywordMap.put("serialize_fn", new Integer(SqlParserSymbols.KW_SERIALIZE_FN));
-    keywordMap.put("set", new Integer(SqlParserSymbols.KW_SET));
-    keywordMap.put("show", new Integer(SqlParserSymbols.KW_SHOW));
-    keywordMap.put("smallint", new Integer(SqlParserSymbols.KW_SMALLINT));
-    keywordMap.put("sort", new Integer(SqlParserSymbols.KW_SORT));
-    keywordMap.put("stats", new Integer(SqlParserSymbols.KW_STATS));
-    keywordMap.put("stored", new Integer(SqlParserSymbols.KW_STORED));
-    keywordMap.put("straight_join", new Integer(SqlParserSymbols.KW_STRAIGHT_JOIN));
-    keywordMap.put("string", new Integer(SqlParserSymbols.KW_STRING));
-    keywordMap.put("struct", new Integer(SqlParserSymbols.KW_STRUCT));
-    keywordMap.put("symbol", new Integer(SqlParserSymbols.KW_SYMBOL));
-    keywordMap.put("table", new Integer(SqlParserSymbols.KW_TABLE));
-    keywordMap.put("tables", new Integer(SqlParserSymbols.KW_TABLES));
-    keywordMap.put("tablesample", new Integer(SqlParserSymbols.KW_TABLESAMPLE));
-    keywordMap.put("tblproperties", new Integer(SqlParserSymbols.KW_TBLPROPERTIES));
-    keywordMap.put("terminated", new Integer(SqlParserSymbols.KW_TERMINATED));
-    keywordMap.put("textfile", new Integer(SqlParserSymbols.KW_TEXTFILE));
-    keywordMap.put("then", new Integer(SqlParserSymbols.KW_THEN));
-    keywordMap.put("timestamp", new Integer(SqlParserSymbols.KW_TIMESTAMP));
-    keywordMap.put("tinyint", new Integer(SqlParserSymbols.KW_TINYINT));
-    keywordMap.put("to", new Integer(SqlParserSymbols.KW_TO));
-    keywordMap.put("true", new Integer(SqlParserSymbols.KW_TRUE));
-    keywordMap.put("truncate", new Integer(SqlParserSymbols.KW_TRUNCATE));
-    keywordMap.put("unbounded", new Integer(SqlParserSymbols.KW_UNBOUNDED));
-    keywordMap.put("uncached", new Integer(SqlParserSymbols.KW_UNCACHED));
-    keywordMap.put("union", new Integer(SqlParserSymbols.KW_UNION));
-    keywordMap.put("update", new Integer(SqlParserSymbols.KW_UPDATE));
-    keywordMap.put("update_fn", new Integer(SqlParserSymbols.KW_UPDATE_FN));
-    keywordMap.put("upsert", new Integer(SqlParserSymbols.KW_UPSERT));
-    keywordMap.put("use", new Integer(SqlParserSymbols.KW_USE));
-    keywordMap.put("using", new Integer(SqlParserSymbols.KW_USING));
-    keywordMap.put("values", new Integer(SqlParserSymbols.KW_VALUES));
-    keywordMap.put("varchar", new Integer(SqlParserSymbols.KW_VARCHAR));
-    keywordMap.put("view", new Integer(SqlParserSymbols.KW_VIEW));
-    keywordMap.put("when", new Integer(SqlParserSymbols.KW_WHEN));
-    keywordMap.put("where", new Integer(SqlParserSymbols.KW_WHERE));
-    keywordMap.put("with", new Integer(SqlParserSymbols.KW_WITH));
-  }
-
+  static Map<String, Integer> keywordMap;
+  // Reserved words are words that cannot be used as identifiers. It is a superset of
+  // keywords.
+  static Set<String> reservedWords;
   // map from token id to token description
-  public static final Map<Integer, String> tokenIdMap =
-      new HashMap<Integer, String>();
-  static {
-    Iterator<Map.Entry<String, Integer>> it = keywordMap.entrySet().iterator();
-    while (it.hasNext()) {
-      Map.Entry<String, Integer> pairs = (Map.Entry<String, Integer>) it.next();
-      tokenIdMap.put(pairs.getValue(), pairs.getKey().toUpperCase());
+  static HashMap<Integer, String> tokenIdMap;
+
+  public static void init(TReservedWordsVersion reservedWordsVersion) {
+    // initilize keywords
+    keywordMap = new LinkedHashMap<>();
+    keywordMap.put("&&", SqlParserSymbols.KW_AND);
+    keywordMap.put("add", SqlParserSymbols.KW_ADD);
+    keywordMap.put("aggregate", SqlParserSymbols.KW_AGGREGATE);
+    keywordMap.put("all", SqlParserSymbols.KW_ALL);
+    keywordMap.put("alter", SqlParserSymbols.KW_ALTER);
+    keywordMap.put("analytic", SqlParserSymbols.KW_ANALYTIC);
+    keywordMap.put("and", SqlParserSymbols.KW_AND);
+    keywordMap.put("anti", SqlParserSymbols.KW_ANTI);
+    keywordMap.put("api_version", SqlParserSymbols.KW_API_VERSION);
+    keywordMap.put("array", SqlParserSymbols.KW_ARRAY);
+    keywordMap.put("as", SqlParserSymbols.KW_AS);
+    keywordMap.put("asc", SqlParserSymbols.KW_ASC);
+    keywordMap.put("avro", SqlParserSymbols.KW_AVRO);
+    keywordMap.put("between", SqlParserSymbols.KW_BETWEEN);
+    keywordMap.put("bigint", SqlParserSymbols.KW_BIGINT);
+    keywordMap.put("binary", SqlParserSymbols.KW_BINARY);
+    keywordMap.put("block_size", SqlParserSymbols.KW_BLOCKSIZE);
+    keywordMap.put("boolean", SqlParserSymbols.KW_BOOLEAN);
+    keywordMap.put("by", SqlParserSymbols.KW_BY);
+    keywordMap.put("cached", SqlParserSymbols.KW_CACHED);
+    keywordMap.put("case", SqlParserSymbols.KW_CASE);
+    keywordMap.put("cascade", SqlParserSymbols.KW_CASCADE);
+    keywordMap.put("cast", SqlParserSymbols.KW_CAST);
+    keywordMap.put("change", SqlParserSymbols.KW_CHANGE);
+    keywordMap.put("char", SqlParserSymbols.KW_CHAR);
+    keywordMap.put("class", SqlParserSymbols.KW_CLASS);
+    keywordMap.put("close_fn", SqlParserSymbols.KW_CLOSE_FN);
+    keywordMap.put("column", SqlParserSymbols.KW_COLUMN);
+    keywordMap.put("columns", SqlParserSymbols.KW_COLUMNS);
+    keywordMap.put("comment", SqlParserSymbols.KW_COMMENT);
+    keywordMap.put("compression", SqlParserSymbols.KW_COMPRESSION);
+    keywordMap.put("compute", SqlParserSymbols.KW_COMPUTE);
+    keywordMap.put("create", SqlParserSymbols.KW_CREATE);
+    keywordMap.put("cross", SqlParserSymbols.KW_CROSS);
+    keywordMap.put("current", SqlParserSymbols.KW_CURRENT);
+    keywordMap.put("data", SqlParserSymbols.KW_DATA);
+    keywordMap.put("database", SqlParserSymbols.KW_DATABASE);
+    keywordMap.put("databases", SqlParserSymbols.KW_DATABASES);
+    keywordMap.put("date", SqlParserSymbols.KW_DATE);
+    keywordMap.put("datetime", SqlParserSymbols.KW_DATETIME);
+    keywordMap.put("decimal", SqlParserSymbols.KW_DECIMAL);
+    keywordMap.put("default", SqlParserSymbols.KW_DEFAULT);
+    keywordMap.put("delete", SqlParserSymbols.KW_DELETE);
+    keywordMap.put("delimited", SqlParserSymbols.KW_DELIMITED);
+    keywordMap.put("desc", SqlParserSymbols.KW_DESC);
+    keywordMap.put("describe", SqlParserSymbols.KW_DESCRIBE);
+    keywordMap.put("distinct", SqlParserSymbols.KW_DISTINCT);
+    keywordMap.put("div", SqlParserSymbols.KW_DIV);
+    keywordMap.put("double", SqlParserSymbols.KW_DOUBLE);
+    keywordMap.put("drop", SqlParserSymbols.KW_DROP);
+    keywordMap.put("else", SqlParserSymbols.KW_ELSE);
+    keywordMap.put("encoding", SqlParserSymbols.KW_ENCODING);
+    keywordMap.put("end", SqlParserSymbols.KW_END);
+    keywordMap.put("escaped", SqlParserSymbols.KW_ESCAPED);
+    keywordMap.put("exists", SqlParserSymbols.KW_EXISTS);
+    keywordMap.put("explain", SqlParserSymbols.KW_EXPLAIN);
+    keywordMap.put("extended", SqlParserSymbols.KW_EXTENDED);
+    keywordMap.put("external", SqlParserSymbols.KW_EXTERNAL);
+    keywordMap.put("false", SqlParserSymbols.KW_FALSE);
+    keywordMap.put("fields", SqlParserSymbols.KW_FIELDS);
+    keywordMap.put("fileformat", SqlParserSymbols.KW_FILEFORMAT);
+    keywordMap.put("files", SqlParserSymbols.KW_FILES);
+    keywordMap.put("finalize_fn", SqlParserSymbols.KW_FINALIZE_FN);
+    keywordMap.put("first", SqlParserSymbols.KW_FIRST);
+    keywordMap.put("float", SqlParserSymbols.KW_FLOAT);
+    keywordMap.put("following", SqlParserSymbols.KW_FOLLOWING);
+    keywordMap.put("for", SqlParserSymbols.KW_FOR);
+    keywordMap.put("format", SqlParserSymbols.KW_FORMAT);
+    keywordMap.put("formatted", SqlParserSymbols.KW_FORMATTED);
+    keywordMap.put("from", SqlParserSymbols.KW_FROM);
+    keywordMap.put("full", SqlParserSymbols.KW_FULL);
+    keywordMap.put("function", SqlParserSymbols.KW_FUNCTION);
+    keywordMap.put("functions", SqlParserSymbols.KW_FUNCTIONS);
+    keywordMap.put("grant", SqlParserSymbols.KW_GRANT);
+    keywordMap.put("group", SqlParserSymbols.KW_GROUP);
+    keywordMap.put("hash", SqlParserSymbols.KW_HASH);
+    keywordMap.put("having", SqlParserSymbols.KW_HAVING);
+    keywordMap.put("if", SqlParserSymbols.KW_IF);
+    keywordMap.put("ilike", SqlParserSymbols.KW_ILIKE);
+    keywordMap.put("ignore", SqlParserSymbols.KW_IGNORE);
+    keywordMap.put("in", SqlParserSymbols.KW_IN);
+    keywordMap.put("incremental", SqlParserSymbols.KW_INCREMENTAL);
+    keywordMap.put("init_fn", SqlParserSymbols.KW_INIT_FN);
+    keywordMap.put("inner", SqlParserSymbols.KW_INNER);
+    keywordMap.put("inpath", SqlParserSymbols.KW_INPATH);
+    keywordMap.put("insert", SqlParserSymbols.KW_INSERT);
+    keywordMap.put("int", SqlParserSymbols.KW_INT);
+    keywordMap.put("integer", SqlParserSymbols.KW_INT);
+    keywordMap.put("intermediate", SqlParserSymbols.KW_INTERMEDIATE);
+    keywordMap.put("interval", SqlParserSymbols.KW_INTERVAL);
+    keywordMap.put("into", SqlParserSymbols.KW_INTO);
+    keywordMap.put("invalidate", SqlParserSymbols.KW_INVALIDATE);
+    keywordMap.put("iregexp", SqlParserSymbols.KW_IREGEXP);
+    keywordMap.put("is", SqlParserSymbols.KW_IS);
+    keywordMap.put("join", SqlParserSymbols.KW_JOIN);
+    keywordMap.put("kudu", SqlParserSymbols.KW_KUDU);
+    keywordMap.put("last", SqlParserSymbols.KW_LAST);
+    keywordMap.put("left", SqlParserSymbols.KW_LEFT);
+    keywordMap.put("like", SqlParserSymbols.KW_LIKE);
+    keywordMap.put("limit", SqlParserSymbols.KW_LIMIT);
+    keywordMap.put("lines", SqlParserSymbols.KW_LINES);
+    keywordMap.put("load", SqlParserSymbols.KW_LOAD);
+    keywordMap.put("location", SqlParserSymbols.KW_LOCATION);
+    keywordMap.put("map", SqlParserSymbols.KW_MAP);
+    keywordMap.put("merge_fn", SqlParserSymbols.KW_MERGE_FN);
+    keywordMap.put("metadata", SqlParserSymbols.KW_METADATA);
+    keywordMap.put("not", SqlParserSymbols.KW_NOT);
+    keywordMap.put("null", SqlParserSymbols.KW_NULL);
+    keywordMap.put("nulls", SqlParserSymbols.KW_NULLS);
+    keywordMap.put("offset", SqlParserSymbols.KW_OFFSET);
+    keywordMap.put("on", SqlParserSymbols.KW_ON);
+    keywordMap.put("||", SqlParserSymbols.KW_OR);
+    keywordMap.put("or", SqlParserSymbols.KW_OR);
+    keywordMap.put("order", SqlParserSymbols.KW_ORDER);
+    keywordMap.put("outer", SqlParserSymbols.KW_OUTER);
+    keywordMap.put("over", SqlParserSymbols.KW_OVER);
+    keywordMap.put("overwrite", SqlParserSymbols.KW_OVERWRITE);
+    keywordMap.put("parquet", SqlParserSymbols.KW_PARQUET);
+    keywordMap.put("parquetfile", SqlParserSymbols.KW_PARQUETFILE);
+    keywordMap.put("partition", SqlParserSymbols.KW_PARTITION);
+    keywordMap.put("partitioned", SqlParserSymbols.KW_PARTITIONED);
+    keywordMap.put("partitions", SqlParserSymbols.KW_PARTITIONS);
+    keywordMap.put("preceding", SqlParserSymbols.KW_PRECEDING);
+    keywordMap.put("prepare_fn", SqlParserSymbols.KW_PREPARE_FN);
+    keywordMap.put("primary", SqlParserSymbols.KW_PRIMARY);
+    keywordMap.put("produced", SqlParserSymbols.KW_PRODUCED);
+    keywordMap.put("purge", SqlParserSymbols.KW_PURGE);
+    keywordMap.put("range", SqlParserSymbols.KW_RANGE);
+    keywordMap.put("rcfile", SqlParserSymbols.KW_RCFILE);
+    keywordMap.put("real", SqlParserSymbols.KW_DOUBLE);
+    keywordMap.put("recover", SqlParserSymbols.KW_RECOVER);
+    keywordMap.put("refresh", SqlParserSymbols.KW_REFRESH);
+    keywordMap.put("regexp", SqlParserSymbols.KW_REGEXP);
+    keywordMap.put("rename", SqlParserSymbols.KW_RENAME);
+    keywordMap.put("repeatable", SqlParserSymbols.KW_REPEATABLE);
+    keywordMap.put("replace", SqlParserSymbols.KW_REPLACE);
+    keywordMap.put("replication", SqlParserSymbols.KW_REPLICATION);
+    keywordMap.put("restrict", SqlParserSymbols.KW_RESTRICT);
+    keywordMap.put("returns", SqlParserSymbols.KW_RETURNS);
+    keywordMap.put("revoke", SqlParserSymbols.KW_REVOKE);
+    keywordMap.put("right", SqlParserSymbols.KW_RIGHT);
+    keywordMap.put("rlike", SqlParserSymbols.KW_RLIKE);
+    keywordMap.put("role", SqlParserSymbols.KW_ROLE);
+    keywordMap.put("roles", SqlParserSymbols.KW_ROLES);
+    keywordMap.put("row", SqlParserSymbols.KW_ROW);
+    keywordMap.put("rows", SqlParserSymbols.KW_ROWS);
+    keywordMap.put("schema", SqlParserSymbols.KW_SCHEMA);
+    keywordMap.put("schemas", SqlParserSymbols.KW_SCHEMAS);
+    keywordMap.put("select", SqlParserSymbols.KW_SELECT);
+    keywordMap.put("semi", SqlParserSymbols.KW_SEMI);
+    keywordMap.put("sequencefile", SqlParserSymbols.KW_SEQUENCEFILE);
+    keywordMap.put("serdeproperties", SqlParserSymbols.KW_SERDEPROPERTIES);
+    keywordMap.put("serialize_fn", SqlParserSymbols.KW_SERIALIZE_FN);
+    keywordMap.put("set", SqlParserSymbols.KW_SET);
+    keywordMap.put("show", SqlParserSymbols.KW_SHOW);
+    keywordMap.put("smallint", SqlParserSymbols.KW_SMALLINT);
+    keywordMap.put("sort", SqlParserSymbols.KW_SORT);
+    keywordMap.put("stats", SqlParserSymbols.KW_STATS);
+    keywordMap.put("stored", SqlParserSymbols.KW_STORED);
+    keywordMap.put("straight_join", SqlParserSymbols.KW_STRAIGHT_JOIN);
+    keywordMap.put("string", SqlParserSymbols.KW_STRING);
+    keywordMap.put("struct", SqlParserSymbols.KW_STRUCT);
+    keywordMap.put("symbol", SqlParserSymbols.KW_SYMBOL);
+    keywordMap.put("table", SqlParserSymbols.KW_TABLE);
+    keywordMap.put("tables", SqlParserSymbols.KW_TABLES);
+    keywordMap.put("tablesample", SqlParserSymbols.KW_TABLESAMPLE);
+    keywordMap.put("tblproperties", SqlParserSymbols.KW_TBLPROPERTIES);
+    keywordMap.put("terminated", SqlParserSymbols.KW_TERMINATED);
+    keywordMap.put("textfile", SqlParserSymbols.KW_TEXTFILE);
+    keywordMap.put("then", SqlParserSymbols.KW_THEN);
+    keywordMap.put("timestamp", SqlParserSymbols.KW_TIMESTAMP);
+    keywordMap.put("tinyint", SqlParserSymbols.KW_TINYINT);
+    keywordMap.put("to", SqlParserSymbols.KW_TO);
+    keywordMap.put("true", SqlParserSymbols.KW_TRUE);
+    keywordMap.put("truncate", SqlParserSymbols.KW_TRUNCATE);
+    keywordMap.put("unbounded", SqlParserSymbols.KW_UNBOUNDED);
+    keywordMap.put("uncached", SqlParserSymbols.KW_UNCACHED);
+    keywordMap.put("union", SqlParserSymbols.KW_UNION);
+    keywordMap.put("unknown", SqlParserSymbols.KW_UNKNOWN);
+    keywordMap.put("update", SqlParserSymbols.KW_UPDATE);
+    keywordMap.put("update_fn", SqlParserSymbols.KW_UPDATE_FN);
+    keywordMap.put("upsert", SqlParserSymbols.KW_UPSERT);
+    keywordMap.put("use", SqlParserSymbols.KW_USE);
+    keywordMap.put("using", SqlParserSymbols.KW_USING);
+    keywordMap.put("values", SqlParserSymbols.KW_VALUES);
+    keywordMap.put("varchar", SqlParserSymbols.KW_VARCHAR);
+    keywordMap.put("view", SqlParserSymbols.KW_VIEW);
+    keywordMap.put("when", SqlParserSymbols.KW_WHEN);
+    keywordMap.put("where", SqlParserSymbols.KW_WHERE);
+    keywordMap.put("with", SqlParserSymbols.KW_WITH);
+
+    // Initilize tokenIdMap for error reporting
+    tokenIdMap = new HashMap<>();
+    for (Map.Entry<String, Integer> entry : keywordMap.entrySet()) {
+      tokenIdMap.put(entry.getValue(), entry.getKey().toUpperCase());
     }
-
     // add non-keyword tokens
-    tokenIdMap.put(new Integer(SqlParserSymbols.IDENT), "IDENTIFIER");
-    tokenIdMap.put(new Integer(SqlParserSymbols.COLON), ":");
-    tokenIdMap.put(new Integer(SqlParserSymbols.SEMICOLON), ";");
-    tokenIdMap.put(new Integer(SqlParserSymbols.COMMA), "COMMA");
-    tokenIdMap.put(new Integer(SqlParserSymbols.BITNOT), "~");
-    tokenIdMap.put(new Integer(SqlParserSymbols.LPAREN), "(");
-    tokenIdMap.put(new Integer(SqlParserSymbols.RPAREN), ")");
-    tokenIdMap.put(new Integer(SqlParserSymbols.LBRACKET), "[");
-    tokenIdMap.put(new Integer(SqlParserSymbols.RBRACKET), "]");
-    tokenIdMap.put(new Integer(SqlParserSymbols.DECIMAL_LITERAL), "DECIMAL LITERAL");
-    tokenIdMap.put(new Integer(SqlParserSymbols.INTEGER_LITERAL), "INTEGER LITERAL");
-    tokenIdMap.put(new Integer(SqlParserSymbols.NOT), "!");
-    tokenIdMap.put(new Integer(SqlParserSymbols.LESSTHAN), "<");
-    tokenIdMap.put(new Integer(SqlParserSymbols.GREATERTHAN), ">");
-    tokenIdMap.put(new Integer(SqlParserSymbols.UNMATCHED_STRING_LITERAL),
-        "UNMATCHED STRING LITERAL");
-    tokenIdMap.put(new Integer(SqlParserSymbols.MOD), "%");
-    tokenIdMap.put(new Integer(SqlParserSymbols.ADD), "+");
-    tokenIdMap.put(new Integer(SqlParserSymbols.DIVIDE), "/");
-    tokenIdMap.put(new Integer(SqlParserSymbols.EQUAL), "=");
-    tokenIdMap.put(new Integer(SqlParserSymbols.STAR), "*");
-    tokenIdMap.put(new Integer(SqlParserSymbols.BITOR), "|");
-    tokenIdMap.put(new Integer(SqlParserSymbols.DOT), ".");
-    tokenIdMap.put(new Integer(SqlParserSymbols.DOTDOTDOT), "...");
-    tokenIdMap.put(new Integer(SqlParserSymbols.STRING_LITERAL), "STRING LITERAL");
-    tokenIdMap.put(new Integer(SqlParserSymbols.EOF), "EOF");
-    tokenIdMap.put(new Integer(SqlParserSymbols.SUBTRACT), "-");
-    tokenIdMap.put(new Integer(SqlParserSymbols.BITAND), "&");
-    tokenIdMap.put(new Integer(SqlParserSymbols.UNEXPECTED_CHAR), "Unexpected character");
-    tokenIdMap.put(new Integer(SqlParserSymbols.BITXOR), "^");
-    tokenIdMap.put(new Integer(SqlParserSymbols.NUMERIC_OVERFLOW), "NUMERIC OVERFLOW");
-    tokenIdMap.put(new Integer(SqlParserSymbols.EMPTY_IDENT), "EMPTY IDENTIFIER");
+    tokenIdMap.put(SqlParserSymbols.IDENT, "IDENTIFIER");
+    tokenIdMap.put(SqlParserSymbols.COLON, ":");
+    tokenIdMap.put(SqlParserSymbols.SEMICOLON, ";");
+    tokenIdMap.put(SqlParserSymbols.COMMA, "COMMA");
+    tokenIdMap.put(SqlParserSymbols.BITNOT, "~");
+    tokenIdMap.put(SqlParserSymbols.LPAREN, "(");
+    tokenIdMap.put(SqlParserSymbols.RPAREN, ")");
+    tokenIdMap.put(SqlParserSymbols.LBRACKET, "[");
+    tokenIdMap.put(SqlParserSymbols.RBRACKET, "]");
+    tokenIdMap.put(SqlParserSymbols.DECIMAL_LITERAL, "DECIMAL LITERAL");
+    tokenIdMap.put(SqlParserSymbols.INTEGER_LITERAL, "INTEGER LITERAL");
+    tokenIdMap.put(SqlParserSymbols.NOT, "!");
+    tokenIdMap.put(SqlParserSymbols.LESSTHAN, "<");
+    tokenIdMap.put(SqlParserSymbols.GREATERTHAN, ">");
+    tokenIdMap.put(SqlParserSymbols.UNMATCHED_STRING_LITERAL, "UNMATCHED STRING LITERAL");
+    tokenIdMap.put(SqlParserSymbols.MOD, "%");
+    tokenIdMap.put(SqlParserSymbols.ADD, "+");
+    tokenIdMap.put(SqlParserSymbols.DIVIDE, "/");
+    tokenIdMap.put(SqlParserSymbols.EQUAL, "=");
+    tokenIdMap.put(SqlParserSymbols.STAR, "*");
+    tokenIdMap.put(SqlParserSymbols.BITOR, "|");
+    tokenIdMap.put(SqlParserSymbols.DOT, ".");
+    tokenIdMap.put(SqlParserSymbols.DOTDOTDOT, "...");
+    tokenIdMap.put(SqlParserSymbols.STRING_LITERAL, "STRING LITERAL");
+    tokenIdMap.put(SqlParserSymbols.EOF, "EOF");
+    tokenIdMap.put(SqlParserSymbols.SUBTRACT, "-");
+    tokenIdMap.put(SqlParserSymbols.BITAND, "&");
+    tokenIdMap.put(SqlParserSymbols.UNEXPECTED_CHAR, "Unexpected character");
+    tokenIdMap.put(SqlParserSymbols.BITXOR, "^");
+    tokenIdMap.put(SqlParserSymbols.NUMERIC_OVERFLOW, "NUMERIC OVERFLOW");
+    tokenIdMap.put(SqlParserSymbols.EMPTY_IDENT, "EMPTY IDENTIFIER");
+
+    // Initilize reservedWords. For impala 2.11, reserved words = keywords.
+    if (reservedWordsVersion == TReservedWordsVersion.IMPALA_2_11) {
+      reservedWords = keywordMap.keySet();
+      return;
+    }
+    // For impala 3.0, reserved words = keywords + sql16ReservedWords - builtinFunctions
+    // - whitelist
+    // unused reserved words = reserved words - keywords. These words are reserved for
+    // forward compatibility purposes.
+    reservedWords = new HashSet<>(keywordMap.keySet());
+    // Add SQL:2016 reserved words
+    reservedWords.addAll(Arrays.asList(new String[] {
+        "abs", "acos", "allocate", "any", "are", "array_agg", "array_max_cardinality",
+        "asensitive", "asin", "asymmetric", "at", "atan", "atomic", "authorization",
+        "avg", "begin", "begin_frame", "begin_partition", "blob", "both", "call",
+        "called", "cardinality", "cascaded", "ceil", "ceiling", "char_length",
+        "character", "character_length", "check", "classifier", "clob", "close",
+        "coalesce", "collate", "collect", "commit", "condition", "connect", "constraint",
+        "contains", "convert", "copy", "corr", "corresponding", "cos", "cosh", "count",
+        "covar_pop", "covar_samp", "cube", "cume_dist", "current_catalog", "current_date",
+        "current_default_transform_group", "current_path", "current_path", "current_role",
+        "current_role", "current_row", "current_schema", "current_time",
+        "current_timestamp", "current_transform_group_for_type", "current_user", "cursor",
+        "cycle", "day", "deallocate", "dec", "decfloat", "declare", "define",
+        "dense_rank", "deref", "deterministic", "disconnect", "dynamic", "each",
+        "element", "empty", "end-exec", "end_frame", "end_partition", "equals", "escape",
+        "every", "except", "exec", "execute", "exp", "extract", "fetch", "filter",
+        "first_value", "floor", "foreign", "frame_row", "free", "fusion", "get", "global",
+        "grouping", "groups", "hold", "hour", "identity", "indicator", "initial", "inout",
+        "insensitive", "integer", "intersect", "intersection", "json_array",
+        "json_arrayagg", "json_exists", "json_object", "json_objectagg", "json_query",
+        "json_table", "json_table_primitive", "json_value", "lag", "language", "large",
+        "last_value", "lateral", "lead", "leading", "like_regex", "listagg", "ln",
+        "local", "localtime", "localtimestamp", "log", "log10 ", "lower", "match",
+        "match_number", "match_recognize", "matches", "max", "member", "merge", "method",
+        "min", "minute", "mod", "modifies", "module", "month", "multiset", "national",
+        "natural", "nchar", "nclob", "new", "no", "none", "normalize", "nth_value",
+        "ntile", "nullif", "numeric", "occurrences_regex", "octet_length", "of", "old",
+        "omit", "one", "only", "open", "out", "overlaps", "overlay", "parameter",
+        "pattern", "per", "percent", "percent_rank", "percentile_cont", "percentile_disc",
+        "period", "portion", "position", "position_regex", "power", "precedes",
+        "precision", "prepare", "procedure", "ptf", "rank", "reads", "real", "recursive",
+        "ref", "references", "referencing", "regr_avgx", "regr_avgy", "regr_count",
+        "regr_intercept", "regr_r2", "regr_slope", "regr_sxx", "regr_sxy", "regr_syy",
+        "release", "result", "return", "rollback", "rollup", "row_number", "running",
+        "savepoint", "scope", "scroll", "search", "second", "seek", "sensitive",
+        "session_user", "similar", "sin", "sinh", "skip", "some", "specific",
+        "specifictype", "sql", "sqlexception", "sqlstate", "sqlwarning", "sqrt", "start",
+        "static", "stddev_pop", "stddev_samp", "submultiset", "subset", "substring",
+        "substring_regex", "succeeds", "sum", "symmetric", "system", "system_time",
+        "system_user", "tan", "tanh", "time", "timezone_hour", "timezone_minute",
+        "trailing", "translate", "translate_regex", "translation", "treat", "trigger",
+        "trim", "trim_array", "uescape", "unique", "unknown", "unnest", "update  ",
+        "upper", "user", "value", "value_of", "var_pop", "var_samp", "varbinary",
+        "varying", "versioning", "whenever", "width_bucket", "window", "within",
+        "without", "year"}));
+    // Remove impala builtin function names
+    reservedWords.removeAll(new BuiltinsDb(BUILTINS_DB).getAllFunctions().keySet());
+    // Remove whitelist words. These words might be heavily used in production, and
+    // impala is unlikely to implement SQL features around these words in the near future.
+    reservedWords.removeAll(Arrays.asList(new String[] {
+        // time units
+        "year", "month", "day", "hour", "minute", "second",
+        "begin", "call", "check", "classifier", "close", "identity", "language",
+        "localtime", "member", "module", "new", "nullif", "old", "open", "parameter",
+        "period", "result", "return", "sql", "start", "system", "time", "user", "value"
+    }));
   }
 
-  public static boolean isKeyword(Integer tokenId) {
+  static {
+    // Default-initilize the static members for FE tests. Outside of FE tests, init() is
+    // called again in BackendConfig.create() once the backend configuration is passed to
+    // the FE, overwriting this initilization.
+    init(TReservedWordsVersion.IMPALA_3_0);
+  }
+
+  static boolean isReserved(String token) {
+    return reservedWords.contains(token.toLowerCase());
+  }
+
+  static boolean isKeyword(Integer tokenId) {
     String token = tokenIdMap.get(tokenId);
-    if (token == null) return false;
-    return keywordMap.containsKey(token.toLowerCase());
-  }
-
-  public static boolean isKeyword(String ident) {
-    return keywordMap.containsKey(ident.toLowerCase());
+    return token != null && keywordMap.containsKey(token.toLowerCase());
   }
 
   private Symbol newToken(int id, Object value) {
@@ -384,23 +463,19 @@ EndOfLineComment = "--" !({HintContent}|{ContainsLineTerminator}) {LineTerminato
 // The rules for IntegerLiteral and DecimalLiteral are the same, but it is useful
 // to distinguish them, e.g., so the Parser can use integer literals without analysis.
 {IntegerLiteral} {
-  BigDecimal val = null;
   try {
-    val = new BigDecimal(yytext());
+    return newToken(SqlParserSymbols.INTEGER_LITERAL, new BigDecimal(yytext()));
   } catch (NumberFormatException e) {
     return newToken(SqlParserSymbols.NUMERIC_OVERFLOW, yytext());
   }
-  return newToken(SqlParserSymbols.INTEGER_LITERAL, val);
 }
 
 {DecimalLiteral} {
-  BigDecimal val = null;
   try {
-    val = new BigDecimal(yytext());
+    return newToken(SqlParserSymbols.DECIMAL_LITERAL, new BigDecimal(yytext()));
   } catch (NumberFormatException e) {
     return newToken(SqlParserSymbols.NUMERIC_OVERFLOW, yytext());
   }
-  return newToken(SqlParserSymbols.DECIMAL_LITERAL, val);
 }
 
 {QuotedIdentifier} {
@@ -416,7 +491,9 @@ EndOfLineComment = "--" !({HintContent}|{ContainsLineTerminator}) {LineTerminato
   String text = yytext();
   Integer kw_id = keywordMap.get(text.toLowerCase());
   if (kw_id != null) {
-    return newToken(kw_id.intValue(), text);
+    return newToken(kw_id, text);
+  } else if (isReserved(text)) {
+    return newToken(SqlParserSymbols.UNUSED_RESERVED_WORD, text);
   } else {
     return newToken(SqlParserSymbols.IDENT, text);
   }

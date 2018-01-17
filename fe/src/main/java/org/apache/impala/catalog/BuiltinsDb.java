@@ -56,8 +56,8 @@ public class BuiltinsDb extends Db {
   // Size in bytes of RankState used for rank() and dense_rank().
   private static final int RANK_INTERMEDIATE_SIZE = 16;
 
-  public BuiltinsDb(String name, Catalog catalog) {
-    super(name, catalog, createMetastoreDb(name));
+  public BuiltinsDb(String name) {
+    super(name, createMetastoreDb(name));
     setIsSystemDb(true);
     initBuiltins();
   }
