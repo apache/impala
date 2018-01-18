@@ -36,6 +36,7 @@ import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.impala.analysis.ColumnLineageGraph;
 import org.apache.impala.analysis.DescriptorTable;
+import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
@@ -659,6 +660,45 @@ public class PlannerTestBase extends FrontendTestBase {
                 "In node id "
                 + node.node_id + "\n");
             errorLog.append(limitCardinalityError.toString());
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * This function plans the given query and fails if the estimated cardinalities are
+   * not within the specified bounds [min, max].
+   */
+  protected void checkCardinality(String query, long min, long max)
+        throws ImpalaException {
+    TQueryCtx queryCtx = TestUtils.createQueryContext(Catalog.DEFAULT_DB,
+        System.getProperty("user.name"));
+    queryCtx.client_request.setStmt(query);
+    StringBuilder explainBuilder = new StringBuilder();
+    TExecRequest execRequest = frontend_.createExecRequest(queryCtx, explainBuilder);
+
+    if (!execRequest.isSetQuery_exec_request()
+        || execRequest.query_exec_request == null
+        || execRequest.query_exec_request.plan_exec_info == null) {
+      return;
+    }
+    for (TPlanExecInfo execInfo : execRequest.query_exec_request.plan_exec_info) {
+      for (TPlanFragment planFragment : execInfo.fragments) {
+        if (!planFragment.isSetPlan() || planFragment.plan == null) continue;
+        for (TPlanNode node : planFragment.plan.nodes) {
+          if (node.estimated_stats == null) {
+            fail("Query: " + query + " has no estimated statistics");
+          }
+          long cardinality = node.estimated_stats.cardinality;
+          if (cardinality < min || cardinality > max) {
+            StringBuilder errorLog = new StringBuilder();
+            errorLog.append("Query: " + query + "\n");
+            errorLog.append(
+                "Expected cardinality estimate between " + min + " and " + max + "\n");
+            errorLog.append("Actual cardinality estimate: " + cardinality + "\n");
+            errorLog.append("In node id " + node.node_id + "\n");
+            fail(errorLog.toString());
           }
         }
       }

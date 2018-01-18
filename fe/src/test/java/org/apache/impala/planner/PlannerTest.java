@@ -504,4 +504,81 @@ public class PlannerTest extends PlannerTestBase {
     options.setExplain_level(TExplainLevel.EXTENDED);
     runPlannerTestFile("min-max-runtime-filters", options);
   }
+
+  @Test
+  public void testCardinalityOverflow() throws ImpalaException {
+    String tblName = "tpch.cardinality_overflow";
+    String colDefs = "("
+        + "l_orderkey BIGINT, "
+        + "l_partkey BIGINT, "
+        + "l_suppkey BIGINT, "
+        + "l_linenumber INT, "
+        + "l_shipmode STRING, "
+        + "l_comment STRING"
+        + ")";
+    String tblLocation = "LOCATION "
+        + "'hdfs://localhost:20500/test-warehouse/tpch.lineitem'";
+    String tblPropsTemplate = "TBLPROPERTIES('numRows'='%s')";
+    String tblProps = String.format(tblPropsTemplate, Long.toString(Long.MAX_VALUE));
+
+    addTestTable(String.format("CREATE EXTERNAL TABLE %s %s %s %s;",
+        tblName, colDefs, tblLocation, tblProps));
+
+    // CROSS JOIN query: tests that multiplying the input cardinalities does not overflow
+    // the cross-join's estimated cardinality
+    String query = "select * from tpch.cardinality_overflow a,"
+        + "tpch.cardinality_overflow b, tpch.cardinality_overflow c";
+    checkCardinality(query, 0, Long.MAX_VALUE);
+
+    // FULL OUTER JOIN query: tests that adding the input cardinalities does not overflow
+    // the full outer join's estimated cardinality
+    query = "select a.l_comment from tpch.cardinality_overflow a full outer join "
+        + "tpch.cardinality_overflow b on a.l_orderkey = b.l_partkey";
+    checkCardinality(query, 0, Long.MAX_VALUE);
+
+    // UNION query: tests that adding the input cardinalities does not overflow
+    // the union's estimated cardinality
+    query = "select l_shipmode from tpch.cardinality_overflow "
+        + "union select l_comment from tpch.cardinality_overflow";
+    checkCardinality(query, 0, Long.MAX_VALUE);
+
+    // JOIN query: tests that multiplying the input cardinalities does not overflow
+    // the join's estimated cardinality
+    query = "select a.l_comment from tpch.cardinality_overflow a inner join "
+        + "tpch.cardinality_overflow b on a.l_linenumber < b.l_orderkey";
+    checkCardinality(query, 0, Long.MAX_VALUE);
+
+    // creates an empty table and tests that the cardinality is 0
+    tblName = "tpch.ex_customer_cardinality_zero";
+    tblProps = String.format(tblPropsTemplate, 0);
+    addTestTable(String.format("CREATE EXTERNAL TABLE  %s %s %s %s;",
+        tblName, colDefs, tblLocation, tblProps));
+    query = "select * from tpch.ex_customer_cardinality_zero";
+    checkCardinality(query, 0, 0);
+
+    // creates a table with negative row count and
+    // tests that the cardinality is not negative
+    tblName = "tpch.ex_customer_cardinality_neg";
+    tblProps = String.format(tblPropsTemplate, -1);
+    addTestTable(String.format("CREATE EXTERNAL TABLE  %s %s %s %s;",
+        tblName, colDefs, tblLocation, tblProps));
+    query = "select * from tpch.ex_customer_cardinality_neg";
+    checkCardinality(query, -1, Long.MAX_VALUE);
+
+    // SUBPLAN query: tests that adding the input cardinalities does not overflow
+    // the SUBPLAN's estimated cardinality
+    tblName = "functional_parquet.cardinality_overflow";
+    colDefs = "("
+        + "id BIGINT, "
+        + "int_array ARRAY<INT>"
+        + ")";
+    String storedAs = "STORED AS PARQUET";
+    tblLocation = "LOCATION "
+        + "'hdfs://localhost:20500/test-warehouse/complextypestbl_parquet'";
+    tblProps = String.format(tblPropsTemplate, Long.toString(Long.MAX_VALUE));
+    addTestTable(String.format("CREATE EXTERNAL TABLE  %s %s %s %s %s;",
+        tblName, colDefs, storedAs, tblLocation, tblProps));
+    query = "select id from functional_parquet.cardinality_overflow t, t.int_array";
+    checkCardinality(query, 0, Long.MAX_VALUE);
+  }
 }
