@@ -454,3 +454,36 @@ cast(cast(12333333333 as decimal(38, 0)) as timestamp);
 ---- TYPES
 TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP
 ====
+---- QUERY
+# IMPALA-6405: String to Decimal conversion errors
+set decimal_v2=false;
+select cast("abc" as decimal(5, 2));
+---- RESULTS
+NULL
+---- TYPES
+DECIMAL
+---- ERRORS
+UDF WARNING: String to Decimal parse failed
+====
+---- QUERY
+set decimal_v2=true;
+select cast("abc" as decimal(5, 2));
+---- CATCH
+UDF ERROR: String to Decimal parse failed
+====
+---- QUERY
+set decimal_v2=false;
+select cast("1234.5" as decimal(5, 2));
+---- RESULTS
+NULL
+---- TYPES
+DECIMAL
+---- ERRORS
+UDF WARNING: String to Decimal cast overflowed
+====
+---- QUERY
+set decimal_v2=true;
+select cast("1234.5" as decimal(5, 2));
+---- CATCH
+UDF ERROR: String to Decimal cast overflowed
+====

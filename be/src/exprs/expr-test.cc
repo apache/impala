@@ -7973,8 +7973,7 @@ TEST_F(ExprTest, DecimalOverflowCastsDecimalV2) {
   TestError("cast(99999999999999999999999999999.9 as decimal(29, 1))");
 
   // Tests converting a non-trivial empty string to a decimal (IMPALA-1566).
-  TestIsNull("cast(regexp_replace('','a','b') as decimal(15,2))",
-      ColumnType::CreateDecimalType(15,2));
+  TestError("cast(regexp_replace('','a','b') as decimal(15,2))");
 
   executor_->PopExecOption();
 }

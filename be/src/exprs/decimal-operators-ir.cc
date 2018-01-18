@@ -561,13 +561,27 @@ IR_ALWAYS_INLINE DecimalVal DecimalOperators::CastToDecimalVal(
       DCHECK(false);
       return DecimalVal::null();
   }
-  // Like all the cast functions, we return the truncated value on underflow and NULL
-  // on overflow.
-  // TODO: log warning on underflow.
-  if (result == StringParser::PARSE_SUCCESS || result == StringParser::PARSE_UNDERFLOW) {
-    return dv;
+
+  if (UNLIKELY(result == StringParser::PARSE_FAILURE)) {
+    if (is_decimal_v2) {
+      ctx->SetError("String to Decimal parse failed");
+    } else {
+      ctx->AddWarning("String to Decimal parse failed");
+    }
+    return DecimalVal::null();
   }
-  return DecimalVal::null();
+
+  if (UNLIKELY(result == StringParser::PARSE_OVERFLOW)) {
+    if (is_decimal_v2) {
+      ctx->SetError("String to Decimal cast overflowed");
+    } else {
+      ctx->AddWarning("String to Decimal cast overflowed");
+    }
+    return DecimalVal::null();
+  }
+
+  DCHECK(result == StringParser::PARSE_SUCCESS || StringParser::PARSE_UNDERFLOW);
+  return dv;
 }
 
 StringVal DecimalOperators::CastToStringVal(
