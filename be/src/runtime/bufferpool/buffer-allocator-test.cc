@@ -22,6 +22,8 @@
 #include "runtime/bufferpool/buffer-pool-internal.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/system-allocator.h"
+#include "runtime/test-env.h"
+#include "service/fe-support.h"
 #include "testutil/cpu-util.h"
 #include "testutil/gtest-util.h"
 #include "util/cpu-info.h"
@@ -39,6 +41,8 @@ using BufferHandle = BufferPool::BufferHandle;
 class BufferAllocatorTest : public ::testing::Test {
  public:
   virtual void SetUp() {
+    test_env_.reset(new TestEnv);
+    ASSERT_OK(test_env_->Init());
     dummy_pool_ = obj_pool_.Add(new BufferPool(1, 0, 0));
     dummy_reservation_.InitRootTracker(nullptr, 0);
     ASSERT_OK(dummy_pool_->RegisterClient("", nullptr, &dummy_reservation_, nullptr, 0,
@@ -58,6 +62,8 @@ class BufferAllocatorTest : public ::testing::Test {
 
   /// The minimum buffer size used in most tests.
   const static int64_t TEST_BUFFER_LEN = 1024;
+
+  boost::scoped_ptr<TestEnv> test_env_;
 
   ObjectPool obj_pool_;
 
@@ -200,6 +206,7 @@ TEST_F(SystemAllocatorTest, LargeAllocFailure) {
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  impala::InitFeSupport();
   int result = 0;
   for (bool mmap : {false, true}) {
     for (bool madvise : {false, true}) {
