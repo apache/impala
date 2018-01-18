@@ -145,8 +145,7 @@ def impalad_admission_ctrl_flags(max_requests, max_queued, pool_max_mem,
   if queue_wait_timeout_ms is not None:
     extra_flags += " -queue_wait_timeout_ms={0}".format(queue_wait_timeout_ms)
   return ("-vmodule admission-controller=3 -default_pool_max_requests {0} "
-      "-default_pool_max_queued {1} -default_pool_mem_limit {2} "
-      "-disable_admission_control=false {3}".format(
+      "-default_pool_max_queued {1} -default_pool_mem_limit {2} {3}".format(
       max_requests, max_queued, pool_max_mem, extra_flags))
 
 
@@ -156,8 +155,7 @@ def impalad_admission_ctrl_config_args(additional_args=""):
   fs_allocation_path = os.path.join(resources_dir, "fair-scheduler-test2.xml")
   llama_site_path = os.path.join(resources_dir, "llama-site-test2.xml")
   return ("-vmodule admission-controller=3 -fair_scheduler_allocation_path %s "
-        "-llama_site_path %s -disable_admission_control=false %s" %\
-        (fs_allocation_path, llama_site_path, additional_args))
+        "-llama_site_path %s %s" % (fs_allocation_path, llama_site_path, additional_args))
 
 def log_metrics(log_prefix, metrics):
   LOG.info("%sadmitted=%s, queued=%s, dequeued=%s, rejected=%s, "\

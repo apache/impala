@@ -74,7 +74,6 @@ CONFIG_FILE = '''-beeswax_port=21000
 -catalog_service_host=host2.example.com
 -catalog_service_port=26000
 -local_library_dir=/var/lib/impala/udfs
--disable_admission_control=true
 -disk_spill_encryption=false
 -abort_on_config_error=true'''
 

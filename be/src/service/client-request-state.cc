@@ -469,12 +469,11 @@ Status ClientRequestState::ExecQueryOrDmlRequest(
     RETURN_IF_ERROR(UpdateQueryStatus(status));
   }
 
-  if (exec_env_->admission_controller() != nullptr) {
-    status = exec_env_->admission_controller()->AdmitQuery(schedule_.get());
-    {
-      lock_guard<mutex> l(lock_);
-      RETURN_IF_ERROR(UpdateQueryStatus(status));
-    }
+  DCHECK(exec_env_->admission_controller() != nullptr);
+  status = exec_env_->admission_controller()->AdmitQuery(schedule_.get());
+  {
+    lock_guard<mutex> l(lock_);
+    RETURN_IF_ERROR(UpdateQueryStatus(status));
   }
 
   coord_.reset(new Coordinator(*schedule_, query_events_));

@@ -784,7 +784,8 @@ void Coordinator::ReleaseAdmissionControlResourcesLocked() {
             << PrintId(query_ctx().query_id);
   AdmissionController* admission_controller =
       ExecEnv::GetInstance()->admission_controller();
-  if (admission_controller != nullptr) admission_controller->ReleaseQuery(schedule_);
+  DCHECK(admission_controller != nullptr);
+  admission_controller->ReleaseQuery(schedule_);
   released_admission_control_resources_ = true;
   query_events_->MarkEvent("Released admission control resources");
 }

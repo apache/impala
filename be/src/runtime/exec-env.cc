@@ -79,7 +79,6 @@ DEFINE_int32(state_store_subscriber_port, 23000,
     "port where StatestoreSubscriberService should be exported");
 DEFINE_int32(num_hdfs_worker_threads, 16,
     "(Advanced) The number of threads in the global HDFS operation pool");
-DEFINE_bool(disable_admission_control, false, "Disables admission control.");
 DEFINE_bool(use_krpc, true, "If true, use KRPC for the DataStream subsystem. "
     "Otherwise use Thrift RPC.");
 
@@ -185,12 +184,8 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int krpc_port,
         request_pool_service_.get()));
   }
 
-  if (FLAGS_disable_admission_control) {
-    LOG(INFO) << "Admission control is disabled.";
-  } else {
-    admission_controller_.reset(new AdmissionController(statestore_subscriber_.get(),
-        request_pool_service_.get(), metrics_.get(), backend_address_));
-  }
+  admission_controller_.reset(new AdmissionController(statestore_subscriber_.get(),
+      request_pool_service_.get(), metrics_.get(), backend_address_));
   exec_env_ = this;
 }
 
@@ -365,7 +360,7 @@ Status ExecEnv::Init() {
   if (scheduler_ != nullptr) {
     RETURN_IF_ERROR(scheduler_->Init(backend_address_, krpc_address_, ip_address_));
   }
-  if (admission_controller_ != nullptr) RETURN_IF_ERROR(admission_controller_->Init());
+  RETURN_IF_ERROR(admission_controller_->Init());
 
   // Get the fs.defaultFS value set in core-site.xml and assign it to configured_defaultFs
   TGetHadoopConfigRequest config_request;
