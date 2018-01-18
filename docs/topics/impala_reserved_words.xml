@@ -196,6 +196,7 @@ real
 refresh
 regexp
 rename
+<ph rev="IMPALA-5309">repeatable</ph>
 replace
 <ph rev="2.3.0">restrict</ph>
 returns
