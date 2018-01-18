@@ -24,6 +24,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "util/network-util.h"
+#include "util/openssl-util.h"
 #include "util/time.h"
 
 #include "common/names.h"
@@ -46,8 +47,8 @@ ThriftClientImpl::ThriftClientImpl(const std::string& ipaddress, int port, bool 
         SSLProtoVersions::StringToProtocol(FLAGS_ssl_minimum_version, &version);
     if (init_status_.ok() && !SSLProtoVersions::IsSupported(version)) {
       string err =
-          Substitute("TLS ($0) version not supported (linked OpenSSL version is $1)",
-              version, SSLeay());
+          Substitute("TLS ($0) version not supported (maximum supported version is $1)",
+              version, MaxSupportedTlsVersion());
       init_status_ = Status(err);
     }
     if (!init_status_.ok()) return;

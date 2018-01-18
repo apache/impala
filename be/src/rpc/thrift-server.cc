@@ -40,6 +40,7 @@
 #include "util/debug-util.h"
 #include "util/metrics.h"
 #include "util/network-util.h"
+#include "util/openssl-util.h"
 #include "util/os-util.h"
 #include "util/uid-util.h"
 
@@ -86,14 +87,20 @@ Status SSLProtoVersions::StringToProtocol(const string& in, SSLProtocol* protoco
   return Status(Substitute("Unknown TLS version: '$0'", in));
 }
 
-#define OPENSSL_MIN_VERSION_WITH_TLS_1_1 0x10001000L
-
 bool SSLProtoVersions::IsSupported(const SSLProtocol& protocol) {
-  bool is_openssl_1_0_0_or_lower = (SSLeay() < OPENSSL_MIN_VERSION_WITH_TLS_1_1);
-  if (is_openssl_1_0_0_or_lower) return (protocol == TLSv1_0_plus);
+  DCHECK_LE(protocol, TLSv1_2_plus);
+  int max_supported_tls_version = MaxSupportedTlsVersion();
+  DCHECK_GE(max_supported_tls_version, TLS1_VERSION);
 
-  // All other versions supported by OpenSSL 1.0.1 and later.
-  return true;
+  switch (max_supported_tls_version) {
+    case TLS1_VERSION:
+      return protocol == TLSv1_0_plus || protocol == TLSv1_0;
+    case TLS1_1_VERSION:
+      return protocol != TLSv1_2_plus && protocol != TLSv1_2;
+    default:
+      DCHECK_GE(max_supported_tls_version, TLS1_2_VERSION);
+      return true;
+  }
 }
 
 bool EnableInternalSslConnections() {
@@ -376,8 +383,8 @@ Status ThriftServer::CreateSocket(boost::shared_ptr<TServerTransport>* socket) {
   if (ssl_enabled()) {
     if (!SSLProtoVersions::IsSupported(version_)) {
       return Status(TErrorCode::SSL_SOCKET_CREATION_FAILED,
-          Substitute("TLS ($0) version not supported (linked OpenSSL version is $1)",
-                        version_, SSLeay()));
+          Substitute("TLS ($0) version not supported (maximum supported version is $1)",
+                        version_, MaxSupportedTlsVersion()));
     }
     try {
       // This 'factory' is only called once, since CreateSocket() is only called from
