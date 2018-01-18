@@ -67,7 +67,7 @@ all results from both queries, even if there are duplicates.
     <p conref="../shared/impala_common.xml#common/example_blurb"/>
 
     <p>
-      First, we set up some sample data, including duplicate <codeph>1</codeph> values.
+      First, set up some sample data, including duplicate <codeph>1</codeph> values:
     </p>
 
 <codeblock rev="obwl">[localhost:21000] &gt; create table few_ints (x int);
