@@ -311,7 +311,7 @@ Status Thread::StartThread(const std::string& category, const std::string& name,
   try {
     t->thread_.reset(
         new boost::thread(&Thread::SuperviseThread, t->name_, t->category_, functor,
-            &thread_started));
+            GetThreadDebugInfo(), &thread_started));
   } catch (boost::thread_resource_error& e) {
     return Status(TErrorCode::THREAD_CREATION_FAILED, name, category, e.what());
   }
@@ -327,7 +327,8 @@ Status Thread::StartThread(const std::string& category, const std::string& name,
 }
 
 void Thread::SuperviseThread(const string& name, const string& category,
-    Thread::ThreadFunctor functor, Promise<int64_t>* thread_started) {
+    Thread::ThreadFunctor functor, const ThreadDebugInfo* parent_thread_info,
+    Promise<int64_t>* thread_started) {
   int64_t system_tid = syscall(SYS_gettid);
   if (system_tid == -1) {
     string error_msg = GetStrErrMsg();
@@ -340,12 +341,13 @@ void Thread::SuperviseThread(const string& name, const string& category,
 
   // Use boost's get_id rather than the system thread ID as the unique key for this thread
   // since the latter is more prone to being recycled.
-
   thread_mgr_ref->AddThread(this_thread::get_id(), name_copy, category_copy, system_tid);
-  thread_started->Set(system_tid);
 
   ThreadDebugInfo thread_debug_info;
   thread_debug_info.SetThreadName(name_copy);
+  thread_debug_info.SetParentInfo(parent_thread_info);
+
+  thread_started->Set(system_tid);
 
   // Any reference to any parameter not copied in by value may no longer be valid after
   // this point, since the caller that is waiting on *tid != 0 may wake, take the lock and

@@ -19,12 +19,13 @@
 #define IMPALA_COMMON_THREAD_DEBUG_INFO_H
 
 #include <string>
+#include <sys/syscall.h>
+#include <unistd.h>
 
 #include "glog/logging.h"
 #include "gutil/macros.h"
+#include "gutil/strings/util.h"
 #include "util/debug-util.h"
-
-#include "common/names.h"
 
 namespace impala {
 
@@ -39,6 +40,8 @@ public:
   /// Only one ThreadDebugInfo object can be alive per thread at a time.
   /// This object is not copyable, nor movable
   ThreadDebugInfo() {
+    system_thread_id_ = syscall(SYS_gettid);
+
     // This call makes the global (thread local) pointer point to this object.
     InitializeThreadDebugInfo(this);
   }
@@ -50,10 +53,13 @@ public:
 
   const char* GetInstanceId() const { return instance_id_; }
   const char* GetThreadName() const { return thread_name_; }
+  int64_t GetSystemThreadId() const { return system_thread_id_; }
+  int64_t GetParentSystemThreadId() const { return parent_.system_thread_id_; }
+  const char* GetParentThreadName() const { return parent_.thread_name_; }
 
   /// Saves the string representation of param 'instance_id' to member 'instance_id_'
   void SetInstanceId(const TUniqueId& instance_id) {
-    string id_str = PrintId(instance_id);
+    std::string id_str = PrintId(instance_id);
     DCHECK_LT(id_str.length(), TUNIQUE_ID_STRING_SIZE);
     id_str.copy(instance_id_, id_str.length());
   }
@@ -62,7 +68,7 @@ public:
   /// If the length of param 'thread_name' is larger than THREAD_NAME_SIZE,
   /// we store the front of 'thread_name' + '...' + the last few bytes
   /// of thread name, e.g.: "Long Threadname with more te...001afec4)"
-  void SetThreadName(const string& thread_name) {
+  void SetThreadName(const std::string& thread_name) {
     const int64_t length = thread_name.length();
 
     if (length < THREAD_NAME_SIZE) {
@@ -81,6 +87,13 @@ public:
     }
   }
 
+  void SetParentInfo(const ThreadDebugInfo* parent) {
+    if (parent == nullptr) return;
+    parent_.system_thread_id_ = parent->system_thread_id_;
+    strings::strlcpy(instance_id_, parent->instance_id_, TUNIQUE_ID_STRING_SIZE);
+    strings::strlcpy(parent_.thread_name_, parent->thread_name_, THREAD_NAME_SIZE);
+  }
+
 private:
   /// Initializes a thread local pointer with thread_debug_info.
   static void InitializeThreadDebugInfo(ThreadDebugInfo* thread_debug_info);
@@ -91,14 +104,22 @@ private:
   static constexpr int64_t THREAD_NAME_SIZE = 256;
   static constexpr int64_t THREAD_NAME_TAIL_LENGTH = 8;
 
-  char instance_id_[TUNIQUE_ID_STRING_SIZE] = {};
+  /// This struct contains information we want to store about the parent.
+  struct ParentInfo {
+    int64_t system_thread_id_ = 0;
+    char thread_name_[THREAD_NAME_SIZE] = {};
+  };
+
+  ParentInfo parent_;
+  int64_t system_thread_id_ = 0;
   char thread_name_[THREAD_NAME_SIZE] = {};
+  char instance_id_[TUNIQUE_ID_STRING_SIZE] = {};
 
   DISALLOW_COPY_AND_ASSIGN(ThreadDebugInfo);
 };
 
 /// Returns a pointer to the ThreadDebugInfo object for this thread.
-/// The ThreadDebugInfo object needs to be created before this function is called.
+/// Returns nullptr if there is no ThreadDebugInfo object for the current thread.
 ThreadDebugInfo* GetThreadDebugInfo();
 
 }

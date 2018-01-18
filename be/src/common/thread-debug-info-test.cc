@@ -19,6 +19,7 @@
 
 #include "common/thread-debug-info.h"
 #include "testutil/gtest-util.h"
+#include "util/thread.h"
 
 #include "common/names.h"
 
@@ -64,6 +65,36 @@ TEST(ThreadDebugInfo, Global) {
   ThreadDebugInfo* global_thread_debug_info = GetThreadDebugInfo();
 
   EXPECT_EQ(&thread_debug_info, global_thread_debug_info);
+}
+
+TEST(ThreadDebugInfo, ThreadCreateRelationships) {
+  // Checks if child thread extracts debug info from parent automatically.
+  // Child's thread name is given in Thread::Create
+  // Child's instance_id_ should be the same as parent's instance_id_
+  // Child should store a copy of its parent's thread name.
+  // Child should store its parent's system thread id.
+  string parent_name = "Parent";
+  string child_name = "Child";
+
+  ThreadDebugInfo parent_tdi;
+  parent_tdi.SetThreadName(parent_name);
+  TUniqueId uid;
+  uid.hi = 123;
+  uid.lo = 456;
+  parent_tdi.SetInstanceId(uid);
+
+  std::unique_ptr<Thread> child_thread;
+  auto f = [uid, child_name, parent_name, &parent_tdi]() {
+    // In child's thread the global ThreadDebugInfo object points to the child's own
+    // ThreadDebugInfo object which was automatically created in Thread::SuperviseThread
+    ThreadDebugInfo* child_tdi = GetThreadDebugInfo();
+    EXPECT_EQ(child_name, child_tdi->GetThreadName());
+    EXPECT_EQ(PrintId(uid), child_tdi->GetInstanceId());
+    EXPECT_EQ(parent_name, child_tdi->GetParentThreadName());
+    EXPECT_EQ(parent_tdi.GetSystemThreadId(), child_tdi->GetParentSystemThreadId());
+  };
+  ASSERT_OK(Thread::Create("Test", child_name, f, &child_thread));
+  child_thread->Join();
 }
 
 }
