@@ -82,7 +82,8 @@ public class RemoveRedundantStringCast implements ExprRewriteRule {
         analyzer.getQueryCtx());
     // Need to trim() while comparing char(n) types as conversion might add trailing
     // spaces to the 'resultOfReverseCast'.
-    if (!resultOfReverseCast.isNullLiteral() &&
+    if (resultOfReverseCast != null &&
+        !resultOfReverseCast.isNullLiteral() &&
         resultOfReverseCast.getStringValue().trim()
             .equals(literalExpr.getStringValue().trim())) {
       return new BinaryPredicate(op, castExprChild,
