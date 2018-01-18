@@ -21,8 +21,6 @@
 #include "common/object-pool.h"
 #include "runtime/bufferpool/free-list.h"
 #include "runtime/bufferpool/system-allocator.h"
-#include "runtime/test-env.h"
-#include "service/fe-support.h"
 #include "testutil/gtest-util.h"
 #include "testutil/rand-util.h"
 
@@ -33,8 +31,6 @@ namespace impala {
 class FreeListTest : public ::testing::Test {
  protected:
   virtual void SetUp() override {
-    test_env_.reset(new TestEnv);
-    ASSERT_OK(test_env_->Init());
     allocator_ = obj_pool_.Add(new SystemAllocator(MIN_BUFFER_LEN));
     RandTestUtil::SeedRng("FREE_LIST_TEST_SEED", &rng_);
   }
@@ -74,8 +70,6 @@ class FreeListTest : public ::testing::Test {
   }
 
   const static int MIN_BUFFER_LEN = 1024;
-
-  boost::scoped_ptr<TestEnv> test_env_;
 
   /// Per-test random number generator. Seeded before every test.
   std::mt19937 rng_;
@@ -163,9 +157,4 @@ TEST_F(FreeListTest, ReturnOrder) {
 }
 }
 
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
-  impala::InitFeSupport();
-  return RUN_ALL_TESTS();
-}
+IMPALA_TEST_MAIN();
