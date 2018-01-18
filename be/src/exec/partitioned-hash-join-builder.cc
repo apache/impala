@@ -820,8 +820,7 @@ Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen, llvm::Function
 
   llvm::Value* is_null_aware_arg = codegen->GetArgument(process_build_batch_fn, 5);
   is_null_aware_arg->replaceAllUsesWith(
-      llvm::ConstantInt::get(llvm::Type::getInt1Ty(codegen->context()),
-          join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN));
+      codegen->GetBoolConstant(join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN));
 
   llvm::Function* process_build_batch_fn_level0 =
       codegen->CloneFunction(process_build_batch_fn);
@@ -830,8 +829,8 @@ Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen, llvm::Function
   // Note that the first argument of this function is the return value.
   llvm::Value* build_filter_l0_arg =
       codegen->GetArgument(process_build_batch_fn_level0, 4);
-  build_filter_l0_arg->replaceAllUsesWith(llvm::ConstantInt::get(
-      llvm::Type::getInt1Ty(codegen->context()), filter_ctxs_.size() > 0));
+  build_filter_l0_arg->replaceAllUsesWith(
+      codegen->GetBoolConstant(filter_ctxs_.size() > 0));
 
   // process_build_batch_fn_level0 uses CRC hash if available,
   replaced =
@@ -847,8 +846,7 @@ Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen, llvm::Function
   // filters during the level0 build. Note that the first argument of this function is the
   // return value.
   llvm::Value* build_filter_arg = codegen->GetArgument(process_build_batch_fn, 4);
-  build_filter_arg->replaceAllUsesWith(
-      llvm::ConstantInt::get(llvm::Type::getInt1Ty(codegen->context()), false));
+  build_filter_arg->replaceAllUsesWith(codegen->false_value());
 
   // Finalize ProcessBuildBatch functions
   process_build_batch_fn = codegen->FinalizeFunction(process_build_batch_fn);
@@ -885,8 +883,7 @@ Status PhjBuilder::CodegenInsertBatch(LlvmCodeGen* codegen, llvm::Function* hash
   llvm::Value* prefetch_mode_arg = codegen->GetArgument(insert_batch_fn, 1);
   DCHECK_GE(prefetch_mode, TPrefetchMode::NONE);
   DCHECK_LE(prefetch_mode, TPrefetchMode::HT_BUCKET);
-  prefetch_mode_arg->replaceAllUsesWith(
-      llvm::ConstantInt::get(llvm::Type::getInt32Ty(codegen->context()), prefetch_mode));
+  prefetch_mode_arg->replaceAllUsesWith(codegen->GetI32Constant(prefetch_mode));
 
   // Use codegen'd EvalBuildRow() function
   int replaced = codegen->ReplaceCallSites(insert_batch_fn, eval_row_fn, "EvalBuildRow");
@@ -955,8 +952,8 @@ Status PhjBuilder::CodegenInsertRuntimeFilters(
   LlvmBuilder builder(context);
 
   *fn = nullptr;
-  llvm::Type* this_type = codegen->GetPtrType(PhjBuilder::LLVM_CLASS_NAME);
-  llvm::PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
+  llvm::Type* this_type = codegen->GetStructPtrType<PhjBuilder>();
+  llvm::PointerType* tuple_row_ptr_type = codegen->GetStructPtrType<TupleRow>();
   LlvmCodeGen::FnPrototype prototype(
       codegen, "InsertRuntimeFilters", codegen->void_type());
   prototype.AddArgument(LlvmCodeGen::NamedVariable("this", this_type));
@@ -971,8 +968,7 @@ Status PhjBuilder::CodegenInsertRuntimeFilters(
     llvm::Function* insert_fn;
     RETURN_IF_ERROR(FilterContext::CodegenInsert(
         codegen, filter_exprs_[i], &filter_ctxs_[i], &insert_fn));
-    llvm::PointerType* filter_context_type =
-        codegen->GetPtrType(FilterContext::LLVM_CLASS_NAME);
+    llvm::PointerType* filter_context_type = codegen->GetStructPtrType<FilterContext>();
     llvm::Value* filter_context_ptr =
         codegen->CastPtrToLlvmPtr(filter_context_type, &filter_ctxs_[i]);
 

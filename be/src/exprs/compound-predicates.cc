@@ -213,7 +213,7 @@ Status CompoundPredicate::CodegenComputeFn(
 
   // not-NULL block
   builder.SetInsertPoint(not_null_block);
-  llvm::PHINode* not_null_phi = builder.CreatePHI(codegen->GetType(TYPE_BOOLEAN), 3);
+  llvm::PHINode* not_null_phi = builder.CreatePHI(codegen->bool_type(), 3);
   if (and_fn) {
     not_null_phi->addIncoming(codegen->false_value(), lhs_null_rhs_not_null_block);
     not_null_phi->addIncoming(codegen->false_value(), lhs_not_null_rhs_null_block);
@@ -227,11 +227,11 @@ Status CompoundPredicate::CodegenComputeFn(
 
   // Ret/merge block
   builder.SetInsertPoint(ret_block);
-  llvm::PHINode* is_null_phi = builder.CreatePHI(codegen->boolean_type(), 2, "is_null");
+  llvm::PHINode* is_null_phi = builder.CreatePHI(codegen->bool_type(), 2, "is_null");
   is_null_phi->addIncoming(codegen->true_value(), null_block);
   is_null_phi->addIncoming(codegen->false_value(), not_null_block);
 
-  llvm::PHINode* val_phi = builder.CreatePHI(codegen->boolean_type(), 2, "val");
+  llvm::PHINode* val_phi = builder.CreatePHI(codegen->bool_type(), 2, "val");
   val_phi->addIncoming(codegen->false_value(), null_block);
   val_phi->addIncoming(not_null_phi, not_null_block);
 

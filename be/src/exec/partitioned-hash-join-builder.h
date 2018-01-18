@@ -270,6 +270,9 @@ class PhjBuilder : public DataSink {
     return spillable_buffer_size_ * (num_reserved_buffers - 2) + max_row_buffer_size_ * 2;
   }
 
+  /// Class name in LLVM IR.
+  static const char* LLVM_CLASS_NAME;
+
  private:
   /// Create and initialize a set of hash partitions for partitioning level 'level'.
   /// The previous hash partitions must have been cleared with ClearHashPartitions().
@@ -503,9 +506,6 @@ class PhjBuilder : public DataSink {
   /// Jitted Partition::InsertBatch() function pointers. NULL if codegen is disabled.
   InsertBatchFn insert_batch_fn_;
   InsertBatchFn insert_batch_fn_level0_;
-
-  /// Class name in LLVM IR.
-  static const char* LLVM_CLASS_NAME;
 };
 }
 

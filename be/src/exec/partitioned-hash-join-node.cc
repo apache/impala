@@ -1293,18 +1293,13 @@ string PartitionedHashJoinNode::NodeDebugString() const {
 // }
 Status PartitionedHashJoinNode::CodegenCreateOutputRow(
     LlvmCodeGen* codegen, llvm::Function** fn) {
-  llvm::Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
-  DCHECK(tuple_row_type != NULL);
-  llvm::PointerType* tuple_row_ptr_type = llvm::PointerType::get(tuple_row_type, 0);
+  llvm::PointerType* tuple_row_ptr_type = codegen->GetStructPtrType<TupleRow>();
 
-  llvm::Type* this_type = codegen->GetType(BlockingJoinNode::LLVM_CLASS_NAME);
-  DCHECK(this_type != NULL);
-  llvm::PointerType* this_ptr_type = llvm::PointerType::get(this_type, 0);
+  llvm::PointerType* this_ptr_type = codegen->GetStructPtrType<BlockingJoinNode>();
 
   // TupleRows are really just an array of pointers.  Easier to work with them
   // this way.
-  llvm::PointerType* tuple_row_working_type =
-      llvm::PointerType::get(codegen->ptr_type(), 0);
+  llvm::PointerType* tuple_row_working_type = codegen->ptr_ptr_type();
 
   // Construct function signature to match CreateOutputRow()
   LlvmCodeGen::FnPrototype prototype(codegen, "CreateOutputRow", codegen->void_type());
@@ -1329,7 +1324,7 @@ Status PartitionedHashJoinNode::CodegenCreateOutputRow(
 
   // Copy probe row
   codegen->CodegenMemcpy(&builder, out_row_arg, probe_row_arg, probe_tuple_row_size_);
-  llvm::Value* build_row_idx[] = {codegen->GetIntConstant(TYPE_INT, num_probe_tuples)};
+  llvm::Value* build_row_idx[] = {codegen->GetI32Constant(num_probe_tuples)};
   llvm::Value* build_row_dst =
       builder.CreateInBoundsGEP(out_row_arg, build_row_idx, "build_dst_ptr");
 
@@ -1352,7 +1347,7 @@ Status PartitionedHashJoinNode::CodegenCreateOutputRow(
     builder.SetInsertPoint(build_null_block);
     for (int i = 0; i < num_build_tuples; ++i) {
       llvm::Value* array_idx[] = {
-          codegen->GetIntConstant(TYPE_INT, i + num_probe_tuples)};
+          codegen->GetI32Constant(i + num_probe_tuples)};
       llvm::Value* dst =
           builder.CreateInBoundsGEP(out_row_arg, array_idx, "dst_tuple_ptr");
       builder.CreateStore(codegen->null_ptr_value(), dst);
@@ -1430,8 +1425,7 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
   llvm::Value* prefetch_mode_arg = codegen->GetArgument(process_probe_batch_fn, 1);
   DCHECK_GE(prefetch_mode, TPrefetchMode::NONE);
   DCHECK_LE(prefetch_mode, TPrefetchMode::HT_BUCKET);
-  prefetch_mode_arg->replaceAllUsesWith(
-      llvm::ConstantInt::get(llvm::Type::getInt32Ty(codegen->context()), prefetch_mode));
+  prefetch_mode_arg->replaceAllUsesWith(codegen->GetI32Constant(prefetch_mode));
 
   // Codegen HashTable::Equals
   llvm::Function* probe_equals_fn;

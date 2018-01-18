@@ -1477,15 +1477,14 @@ void PartitionedAggregationNode::ClosePartitions() {
 //
 Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen, int agg_fn_idx,
     SlotDescriptor* slot_desc, llvm::Function** fn) {
-  llvm::PointerType* agg_fn_eval_type =
-      codegen->GetPtrType(AggFnEvaluator::LLVM_CLASS_NAME);
+  llvm::PointerType* agg_fn_eval_type = codegen->GetStructPtrType<AggFnEvaluator>();
   llvm::StructType* tuple_struct = intermediate_tuple_desc_->GetLlvmStruct(codegen);
   if (tuple_struct == NULL) {
     return Status("PartitionedAggregationNode::CodegenUpdateSlot(): failed to generate "
                   "intermediate tuple desc");
   }
   llvm::PointerType* tuple_ptr_type = codegen->GetPtrType(tuple_struct);
-  llvm::PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
+  llvm::PointerType* tuple_row_ptr_type = codegen->GetStructPtrType<TupleRow>();
 
   LlvmCodeGen::FnPrototype prototype(codegen, "UpdateSlot", codegen->void_type());
   prototype.AddArgument(
@@ -1548,7 +1547,7 @@ Status PartitionedAggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen, int a
     llvm::Value* result = agg_fn->is_merge() ?
         builder.CreateAdd(dst_value, src.GetVal(), "count_sum") :
         builder.CreateAdd(
-            dst_value, codegen->GetIntConstant(TYPE_BIGINT, 1), "count_inc");
+            dst_value, codegen->GetI64Constant(1), "count_inc");
     builder.CreateStore(result, dst_slot_ptr);
     DCHECK(!slot_desc->is_nullable());
   } else if ((agg_op == AggFn::MIN || agg_op == AggFn::MAX) && dst_is_numeric_or_bool) {
@@ -1737,15 +1736,11 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(
   }
 
   // Get the types to match the UpdateTuple signature
-  llvm::Type* agg_node_type =
-      codegen->GetType(PartitionedAggregationNode::LLVM_CLASS_NAME);
-  llvm::Type* tuple_type = codegen->GetType(Tuple::LLVM_CLASS_NAME);
-  llvm::Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
-
-  llvm::PointerType* agg_node_ptr_type = codegen->GetPtrType(agg_node_type);
-  llvm::PointerType* evals_type = codegen->GetPtrPtrType(AggFnEvaluator::LLVM_CLASS_NAME);
-  llvm::PointerType* tuple_ptr_type = codegen->GetPtrType(tuple_type);
-  llvm::PointerType* tuple_row_ptr_type = codegen->GetPtrType(tuple_row_type);
+  llvm::PointerType* agg_node_ptr_type =
+      codegen->GetStructPtrType<PartitionedAggregationNode>();
+  llvm::PointerType* evals_type = codegen->GetStructPtrPtrType<AggFnEvaluator>();
+  llvm::PointerType* tuple_ptr_type = codegen->GetStructPtrType<Tuple>();
+  llvm::PointerType* tuple_row_ptr_type = codegen->GetStructPtrType<TupleRow>();
 
   llvm::StructType* tuple_struct = intermediate_tuple_desc_->GetLlvmStruct(codegen);
   llvm::PointerType* tuple_ptr = codegen->GetPtrType(tuple_struct);
@@ -1754,7 +1749,7 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(
   prototype.AddArgument(LlvmCodeGen::NamedVariable("agg_fn_evals", evals_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple", tuple_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("is_merge", codegen->boolean_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("is_merge", codegen->bool_type()));
 
   LlvmBuilder builder(codegen->context());
   llvm::Value* args[5];
@@ -1777,7 +1772,7 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(
       // TODO: we should be able to hoist this up to the loop over the batch and just
       // increment the slot by the number of rows in the batch.
       int field_idx = slot_desc->llvm_field_idx();
-      llvm::Value* const_one = codegen->GetIntConstant(TYPE_BIGINT, 1);
+      llvm::Value* const_one = codegen->GetI64Constant(1);
       llvm::Value* slot_ptr =
           builder.CreateStructGEP(NULL, tuple_arg, field_idx, "src_slot");
       llvm::Value* slot_loaded = builder.CreateLoad(slot_ptr, "count_star_val");
@@ -1834,8 +1829,7 @@ Status PartitionedAggregationNode::CodegenProcessBatch(LlvmCodeGen* codegen,
 
     // Replace prefetch_mode with constant so branches can be optimised out.
     llvm::Value* prefetch_mode_arg = codegen->GetArgument(process_batch_fn, 3);
-    prefetch_mode_arg->replaceAllUsesWith(llvm::ConstantInt::get(
-        llvm::Type::getInt32Ty(codegen->context()), prefetch_mode));
+    prefetch_mode_arg->replaceAllUsesWith(codegen->GetI32Constant(prefetch_mode));
 
     // The codegen'd ProcessBatch function is only used in Open() with level_ = 0,
     // so don't use murmur hash
@@ -1898,13 +1892,11 @@ Status PartitionedAggregationNode::CodegenProcessBatchStreaming(
 
   // Make needs_serialize arg constant so dead code can be optimised out.
   llvm::Value* needs_serialize_arg = codegen->GetArgument(process_batch_streaming_fn, 2);
-  needs_serialize_arg->replaceAllUsesWith(llvm::ConstantInt::get(
-      llvm::Type::getInt1Ty(codegen->context()), needs_serialize_));
+  needs_serialize_arg->replaceAllUsesWith(codegen->GetBoolConstant(needs_serialize_));
 
   // Replace prefetch_mode with constant so branches can be optimised out.
   llvm::Value* prefetch_mode_arg = codegen->GetArgument(process_batch_streaming_fn, 3);
-  prefetch_mode_arg->replaceAllUsesWith(
-      llvm::ConstantInt::get(llvm::Type::getInt32Ty(codegen->context()), prefetch_mode));
+  prefetch_mode_arg->replaceAllUsesWith(codegen->GetI32Constant(prefetch_mode));
 
   llvm::Function* update_tuple_fn;
   RETURN_IF_ERROR(CodegenUpdateTuple(codegen, &update_tuple_fn));

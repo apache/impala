@@ -221,9 +221,9 @@ Status TupleRowComparator::CodegenCompare(LlvmCodeGen* codegen, llvm::Function**
   //     ScalarExprEvaluator** ordering_expr_evals_rhs,
   //     TupleRow* lhs, TupleRow* rhs)
   llvm::PointerType* expr_evals_type =
-      codegen->GetPtrPtrType(ScalarExprEvaluator::LLVM_CLASS_NAME);
-  llvm::PointerType* tuple_row_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
-  LlvmCodeGen::FnPrototype prototype(codegen, "Compare", codegen->int_type());
+      codegen->GetStructPtrPtrType<ScalarExprEvaluator>();
+  llvm::PointerType* tuple_row_type = codegen->GetStructPtrType<TupleRow>();
+  LlvmCodeGen::FnPrototype prototype(codegen, "Compare", codegen->i32_type());
   prototype.AddArgument("ordering_expr_evals_lhs", expr_evals_type);
   prototype.AddArgument("ordering_expr_evals_rhs", expr_evals_type);
   prototype.AddArgument("lhs", tuple_row_type);
