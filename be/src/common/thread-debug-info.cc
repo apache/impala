@@ -33,7 +33,6 @@ void ThreadDebugInfo::CloseThreadDebugInfo() {
 }
 
 ThreadDebugInfo* GetThreadDebugInfo() {
-  DCHECK(thread_debug_info != nullptr);
   return thread_debug_info;
 }
 

@@ -32,6 +32,7 @@
 namespace impala {
 
 class MetricGroup;
+class ThreadDebugInfo;
 class Webserver;
 
 /// Thin wrapper around boost::thread that can register itself with the singleton
@@ -179,8 +180,15 @@ class Thread {
   /// As a result, the 'functor' parameter is deliberately copied into this method, since
   /// it is used after the notification completes.h The tid parameter is written to
   /// exactly once before SuperviseThread() notifies the caller.
+  ///
+  /// parent_thread_info points to the parent thread's ThreadDebugInfo object if the
+  /// parent has one, otherwise it's a nullptr. As part of the initialisation
+  /// SuperviseThread() copies the useful information from the parent's ThreadDebugInfo
+  /// info object to its own TDI object. This way the TDI objects can preserve the thread
+  /// creation graph.
   static void SuperviseThread(const std::string& name, const std::string& category,
-      ThreadFunctor functor, Promise<int64_t>* thread_started);
+      Thread::ThreadFunctor functor, const ThreadDebugInfo* parent_thread_info,
+      Promise<int64_t>* thread_started);
 };
 
 /// Utility class to group together a set of threads. A replacement for
