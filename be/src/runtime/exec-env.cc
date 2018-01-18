@@ -271,16 +271,6 @@ Status ExecEnv::Init() {
           "bytes value or percentage: $0", FLAGS_mem_limit));
   }
 
-#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
-  // Aggressive decommit is required so that unused pages in the TCMalloc page heap are
-  // not backed by physical pages and do not contribute towards memory consumption.
-  // Enable it in TCMalloc before InitBufferPool().
-  if (!MallocExtension::instance()->SetNumericProperty(
-          "tcmalloc.aggressive_memory_decommit", 1)) {
-    return Status("Failed to enable TCMalloc aggressive decommit.");
-  }
-#endif
-
   if (!BitUtil::IsPowerOf2(FLAGS_min_buffer_size)) {
     return Status(Substitute(
         "--min_buffer_size must be a power-of-two: $0", FLAGS_min_buffer_size));
@@ -320,6 +310,11 @@ Status ExecEnv::Init() {
         FLAGS_datastream_service_num_svc_threads : CpuInfo::num_cores();
     RETURN_IF_ERROR(rpc_mgr_->RegisterService(num_svc_threads,
         FLAGS_datastream_service_queue_depth, move(data_svc)));
+    // Bump thread cache to 1GB to reduce contention for TCMalloc central
+    // list's spinlock.
+    if (FLAGS_tcmalloc_max_total_thread_cache_bytes == 0) {
+      FLAGS_tcmalloc_max_total_thread_cache_bytes = 1 << 30;
+    }
   }
 
   mem_tracker_.reset(
@@ -432,6 +427,13 @@ Status ExecEnv::StartKrpcService() {
 
 void ExecEnv::InitBufferPool(int64_t min_buffer_size, int64_t capacity,
     int64_t clean_pages_limit) {
+#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
+  // Aggressive decommit is required so that unused pages in the TCMalloc page heap are
+  // not backed by physical pages and do not contribute towards memory consumption.
+  // Enable it in TCMalloc before InitBufferPool().
+  MallocExtension::instance()->SetNumericProperty(
+      "tcmalloc.aggressive_memory_decommit", 1);
+#endif
   buffer_pool_.reset(new BufferPool(min_buffer_size, capacity, clean_pages_limit));
   buffer_reservation_.reset(new ReservationTracker());
   buffer_reservation_->InitRootTracker(nullptr, capacity);
