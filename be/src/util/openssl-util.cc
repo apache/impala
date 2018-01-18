@@ -43,6 +43,10 @@ static const int RNG_RESEED_INTERVAL = 128;
 // Number of bytes of entropy to add at RNG_RESEED_INTERVAL.
 static const int RNG_RESEED_BYTES = 512;
 
+int MaxSupportedTlsVersion() {
+  return SSLv23_method()->version;
+}
+
 // Callback used by OpenSSLErr() - write the error given to us through buf to the
 // stringstream that's passed in through ctx.
 static int OpenSSLErrCallback(const char* buf, size_t len, void* ctx) {
