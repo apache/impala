@@ -228,7 +228,6 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
   // Release I/O buffers immediately to make sure they are cleaned up
   // in case we return a non-OK status anywhere below.
   context_->ReleaseCompletedResources(true);
-  context_->ClearStreams();
   RETURN_IF_ERROR(footer_status);
 
   // Parse the file schema into an internal representation for schema resolution.
@@ -264,7 +263,7 @@ void HdfsParquetScanner::Close(RowBatch* row_batch) {
     }
   } else {
     template_tuple_pool_->FreeAll();
-    dictionary_pool_->FreeAll();
+    dictionary_pool_.get()->FreeAll();
     context_->ReleaseCompletedResources(true);
     for (ParquetColumnReader* col_reader : column_readers_) col_reader->Close(nullptr);
     // The scratch batch may still contain tuple data. We can get into this case if
@@ -479,6 +478,7 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
     // Transfer resources and clear streams if there is any leftover from the previous
     // row group. We will create new streams for the next row group.
     FlushRowGroupResources(row_batch);
+    context_->ClearStreams();
     if (!advance_row_group_) {
       Status status =
           ValidateEndOfRowGroup(column_readers_, row_group_idx_, row_group_rows_read_);
@@ -619,9 +619,6 @@ Status HdfsParquetScanner::NextRowGroup() {
   while (true) {
     // Reset the parse status for the next row group.
     parse_status_ = Status::OK();
-    // Make sure that we don't have leftover resources from the file metadata scan range
-    // or previous row groups.
-    DCHECK_EQ(0, context_->NumStreams());
 
     ++row_group_idx_;
     if (row_group_idx_ >= file_metadata_.row_groups.size()) {
@@ -672,9 +669,6 @@ Status HdfsParquetScanner::NextRowGroup() {
     // of the column.
     RETURN_IF_ERROR(InitColumns(row_group_idx_, dict_filterable_readers_));
 
-    // InitColumns() may have allocated resources to scan columns. If we skip this row
-    // group below, we must call ReleaseSkippedRowGroupResources() before continuing.
-
     // If there is a dictionary-encoded column where every value is eliminated
     // by a conjunct, the row group can be eliminated. This initializes dictionaries
     // for all columns visited.
@@ -683,12 +677,10 @@ Status HdfsParquetScanner::NextRowGroup() {
     if (!status.ok()) {
       // Either return an error or skip this row group if it is ok to ignore errors
       RETURN_IF_ERROR(state_->LogOrReturnError(status.msg()));
-      ReleaseSkippedRowGroupResources();
       continue;
     }
     if (skip_row_group_on_dict_filters) {
       COUNTER_ADD(num_dict_filtered_row_groups_counter_, 1);
-      ReleaseSkippedRowGroupResources();
       continue;
     }
 
@@ -700,7 +692,6 @@ Status HdfsParquetScanner::NextRowGroup() {
     if (!status.ok()) {
       // Either return an error or skip this row group if it is ok to ignore errors
       RETURN_IF_ERROR(state_->LogOrReturnError(status.msg()));
-      ReleaseSkippedRowGroupResources();
       continue;
     }
 
@@ -739,16 +730,9 @@ void HdfsParquetScanner::FlushRowGroupResources(RowBatch* row_batch) {
   row_batch->tuple_data_pool()->AcquireData(dictionary_pool_.get(), false);
   scratch_batch_->ReleaseResources(row_batch->tuple_data_pool());
   context_->ReleaseCompletedResources(true);
-  for (ParquetColumnReader* col_reader : column_readers_) col_reader->Close(row_batch);
-  context_->ClearStreams();
-}
-
-void HdfsParquetScanner::ReleaseSkippedRowGroupResources() {
-  dictionary_pool_->FreeAll();
-  scratch_batch_->ReleaseResources(nullptr);
-  context_->ReleaseCompletedResources(true);
-  for (ParquetColumnReader* col_reader : column_readers_) col_reader->Close(nullptr);
-  context_->ClearStreams();
+  for (ParquetColumnReader* col_reader : column_readers_) {
+    col_reader->Close(row_batch);
+  }
 }
 
 bool HdfsParquetScanner::IsDictFilterable(ParquetColumnReader* col_reader) {

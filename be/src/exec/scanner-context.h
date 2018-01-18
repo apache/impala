@@ -89,6 +89,7 @@ class ScannerContext {
   ScannerContext(RuntimeState*, HdfsScanNodeBase*, HdfsPartitionDescriptor*,
       io::ScanRange* scan_range, const std::vector<FilterContext>& filter_ctxs,
       MemPool* expr_results_pool);
+
   /// Destructor verifies that all stream objects have been released.
   ~ScannerContext();
 
@@ -337,8 +338,6 @@ class ScannerContext {
     return streams_[idx].get();
   }
 
-  int NumStreams() const { return streams_.size(); }
-
   /// Release completed resources for all streams, e.g. the last buffer in each stream if
   /// the current read position is at the end of the buffer. If 'done' is true all
   /// resources are freed, even if the caller has not read that data yet. After calling
@@ -355,8 +354,8 @@ class ScannerContext {
   /// size to 0.
   void ClearStreams();
 
-  /// Add a stream to this ScannerContext for 'range'. The stream is owned by this
-  /// context.
+  /// Add a stream to this ScannerContext for 'range'. Returns the added stream.
+  /// The stream is created in the runtime state's object pool
   Stream* AddStream(io::ScanRange* range);
 
   /// Returns false if scan_node_ is multi-threaded and has been cancelled.
@@ -371,6 +370,7 @@ class ScannerContext {
 
   RuntimeState* state_;
   HdfsScanNodeBase* scan_node_;
+
   HdfsPartitionDescriptor* partition_desc_;
 
   /// Vector of streams. Non-columnar formats will always have one stream per context.
