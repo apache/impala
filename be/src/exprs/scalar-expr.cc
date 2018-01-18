@@ -367,9 +367,9 @@ llvm::Function* ScalarExpr::CreateIrFunctionPrototype(
   LlvmCodeGen::FnPrototype prototype(codegen, name, return_type);
   prototype.AddArgument(
       LlvmCodeGen::NamedVariable(
-          "eval", codegen->GetPtrType(ScalarExprEvaluator::LLVM_CLASS_NAME)));
-  prototype.AddArgument(
-      LlvmCodeGen::NamedVariable("row", codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME)));
+          "eval", codegen->GetStructPtrType<ScalarExprEvaluator>()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable(
+      "row", codegen->GetStructPtrType<TupleRow>()));
   llvm::Function* function = prototype.GeneratePrototype(NULL, args[0]);
   DCHECK(function != NULL);
   return function;
@@ -389,8 +389,8 @@ Status ScalarExpr::GetCodegendComputeFnWrapper(
   llvm::BasicBlock* entry_block =
       llvm::BasicBlock::Create(codegen->context(), "entry", ir_compute_fn_);
   LlvmBuilder builder(entry_block);
-  llvm::Value* this_ptr =
-      codegen->CastPtrToLlvmPtr(codegen->GetPtrType(ScalarExpr::LLVM_CLASS_NAME), this);
+  llvm::Value* this_ptr = codegen->CastPtrToLlvmPtr(
+      codegen->GetStructPtrType<ScalarExpr>(), this);
   llvm::Value* compute_fn_args[] = {this_ptr, args[0], args[1]};
   llvm::Value* ret = CodegenAnyVal::CreateCall(
       codegen, &builder, static_getval_fn, compute_fn_args, "ret");

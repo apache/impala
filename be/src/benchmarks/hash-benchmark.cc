@@ -384,11 +384,11 @@ llvm::Function* CodegenCrcHash(LlvmCodeGen* codegen, bool mixed) {
   string name = mixed ? "HashMixed" : "HashInt";
   LlvmCodeGen::FnPrototype prototype(codegen, name, codegen->void_type());
   prototype.AddArgument(
-      LlvmCodeGen::NamedVariable("rows", codegen->GetType(TYPE_INT)));
+      LlvmCodeGen::NamedVariable("rows", codegen->i32_type()));
   prototype.AddArgument(
       LlvmCodeGen::NamedVariable("data", codegen->ptr_type()));
   prototype.AddArgument(
-      LlvmCodeGen::NamedVariable("results", codegen->GetPtrType(TYPE_INT)));
+      LlvmCodeGen::NamedVariable("results", codegen->i32_ptr_type()));
 
   LlvmBuilder builder(codegen->context());
   llvm::Value* args[3];
@@ -406,41 +406,41 @@ llvm::Function* CodegenCrcHash(LlvmCodeGen* codegen, bool mixed) {
 
   llvm::Value* row_size = NULL;
   if (mixed) {
-    row_size = codegen->GetIntConstant(TYPE_INT,
-      sizeof(int8_t) + sizeof(int32_t) + sizeof(int64_t) + sizeof(StringValue));
+    row_size = codegen->GetI32Constant(
+        sizeof(int8_t) + sizeof(int32_t) + sizeof(int64_t) + sizeof(StringValue));
   } else {
-    row_size = codegen->GetIntConstant(TYPE_INT, fixed_byte_size);
+    row_size = codegen->GetI32Constant(fixed_byte_size);
   }
-  llvm::Value* dummy_len = codegen->GetIntConstant(TYPE_INT, 0);
+  llvm::Value* dummy_len = codegen->GetI32Constant(0);
 
   // Check loop counter
   llvm::Value* counter_check =
-      builder.CreateICmpSGT(args[0], codegen->GetIntConstant(TYPE_INT, 0));
+      builder.CreateICmpSGT(args[0], codegen->GetI32Constant(0));
   builder.CreateCondBr(counter_check, loop_body, loop_exit);
 
   // Loop body
   builder.SetInsertPoint(loop_body);
-  llvm::PHINode* counter = builder.CreatePHI(codegen->GetType(TYPE_INT), 2, "counter");
-  counter->addIncoming(codegen->GetIntConstant(TYPE_INT, 0), loop_start);
+  llvm::PHINode* counter = builder.CreatePHI(codegen->i32_type(), 2, "counter");
+  counter->addIncoming(codegen->GetI32Constant(0), loop_start);
 
   llvm::Value* next_counter =
-      builder.CreateAdd(counter, codegen->GetIntConstant(TYPE_INT, 1));
+      builder.CreateAdd(counter, codegen->GetI32Constant(1));
   counter->addIncoming(next_counter, loop_body);
 
   // Hash the current data
   llvm::Value* offset = builder.CreateMul(counter, row_size);
   llvm::Value* data = builder.CreateGEP(args[1], offset);
 
-  llvm::Value* seed = codegen->GetIntConstant(TYPE_INT, HashUtil::FNV_SEED);
+  llvm::Value* seed = codegen->GetI32Constant(HashUtil::FNV_SEED);
   seed =
       builder.CreateCall(fixed_fn, llvm::ArrayRef<llvm::Value*>({data, dummy_len, seed}));
 
   // Get the string data
   if (mixed) {
     llvm::Value* string_data =
-        builder.CreateGEP(data, codegen->GetIntConstant(TYPE_INT, fixed_byte_size));
-    llvm::Value* string_val =
-        builder.CreateBitCast(string_data, codegen->GetPtrType(TYPE_STRING));
+        builder.CreateGEP(data, codegen->GetI32Constant(fixed_byte_size));
+    llvm::Value* string_val = builder.CreateBitCast(string_data,
+            codegen->GetSlotPtrType(TYPE_STRING));
     llvm::Value* str_ptr = builder.CreateStructGEP(NULL, string_val, 0);
     llvm::Value* str_len = builder.CreateStructGEP(NULL, string_val, 1);
     str_ptr = builder.CreateLoad(str_ptr);

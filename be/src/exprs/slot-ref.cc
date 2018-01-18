@@ -188,10 +188,10 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   *fn = CreateIrFunctionPrototype("GetSlotRef", codegen, &args);
   llvm::Value* row_ptr = args[1];
 
-  llvm::Value* tuple_offset = llvm::ConstantInt::get(codegen->int_type(), tuple_idx_);
-  llvm::Value* slot_offset = llvm::ConstantInt::get(codegen->int_type(), slot_offset_);
-  llvm::Value* zero = llvm::ConstantInt::get(codegen->GetType(TYPE_TINYINT), 0);
-  llvm::Value* one = llvm::ConstantInt::get(codegen->GetType(TYPE_TINYINT), 1);
+  llvm::Value* tuple_offset = codegen->GetI32Constant(tuple_idx_);
+  llvm::Value* slot_offset = codegen->GetI32Constant(slot_offset_);
+  llvm::Value* zero = codegen->GetI8Constant(0);
+  llvm::Value* one = codegen->GetI8Constant(1);
 
   llvm::BasicBlock* entry_block = llvm::BasicBlock::Create(context, "entry", *fn);
   bool slot_is_nullable = null_indicator_offset_.bit_mask != 0;
@@ -206,7 +206,7 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   LlvmBuilder builder(entry_block);
   // Get the tuple offset addr from the row
   llvm::Value* cast_row_ptr = builder.CreateBitCast(
-      row_ptr, llvm::PointerType::get(codegen->ptr_type(), 0), "cast_row_ptr");
+      row_ptr, codegen->ptr_ptr_type(), "cast_row_ptr");
   llvm::Value* tuple_addr =
       builder.CreateInBoundsGEP(cast_row_ptr, tuple_offset, "tuple_addr");
   // Load the tuple*
@@ -240,8 +240,8 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   // Branch for slot != NULL
   builder.SetInsertPoint(get_slot_block);
   llvm::Value* slot_ptr = builder.CreateInBoundsGEP(tuple_ptr, slot_offset, "slot_addr");
-  llvm::Value* val_ptr =
-      builder.CreateBitCast(slot_ptr, codegen->GetPtrType(type_), "val_ptr");
+  llvm::Value* val_ptr = builder.CreateBitCast(slot_ptr,
+      codegen->GetSlotPtrType(type_), "val_ptr");
   // Depending on the type, load the values we need
   llvm::Value* val = NULL;
   llvm::Value* ptr = NULL;
@@ -256,18 +256,18 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   } else if (type_.type == TYPE_FIXED_UDA_INTERMEDIATE) {
     // ptr and len are the slot and its fixed length.
     ptr = builder.CreateBitCast(val_ptr, codegen->ptr_type());
-    len = codegen->GetIntConstant(TYPE_INT, type_.len);
+    len = codegen->GetI32Constant(type_.len);
   } else if (type_.type == TYPE_TIMESTAMP) {
     llvm::Value* time_of_day_ptr =
         builder.CreateStructGEP(NULL, val_ptr, 0, "time_of_day_ptr");
     // Cast boost::posix_time::time_duration to i64
     llvm::Value* time_of_day_cast =
-        builder.CreateBitCast(time_of_day_ptr, codegen->GetPtrType(TYPE_BIGINT));
+        builder.CreateBitCast(time_of_day_ptr, codegen->i64_ptr_type());
     time_of_day = builder.CreateLoad(time_of_day_cast, "time_of_day");
     llvm::Value* date_ptr = builder.CreateStructGEP(NULL, val_ptr, 1, "date_ptr");
     // Cast boost::gregorian::date to i32
     llvm::Value* date_cast =
-        builder.CreateBitCast(date_ptr, codegen->GetPtrType(TYPE_INT));
+        builder.CreateBitCast(date_ptr, codegen->i32_ptr_type());
     date = builder.CreateLoad(date_cast, "date");
   } else {
     // val_ptr is a native type
@@ -278,7 +278,7 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   // Return block
   builder.SetInsertPoint(ret_block);
   llvm::PHINode* is_null_phi =
-      builder.CreatePHI(codegen->tinyint_type(), 2, "is_null_phi");
+      builder.CreatePHI(codegen->i8_type(), 2, "is_null_phi");
   if (tuple_is_nullable_) is_null_phi->addIncoming(one, entry_block);
   if (check_slot_null_indicator_block != NULL) {
     is_null_phi->addIncoming(one, check_slot_null_indicator_block);

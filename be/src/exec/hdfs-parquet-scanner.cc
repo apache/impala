@@ -1183,10 +1183,10 @@ Status HdfsParquetScanner::CodegenEvalRuntimeFilters(
   LlvmBuilder builder(context);
 
   *fn = nullptr;
-  llvm::Type* this_type = codegen->GetPtrType(HdfsParquetScanner::LLVM_CLASS_NAME);
-  llvm::PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
+  llvm::Type* this_type = codegen->GetStructPtrType<HdfsParquetScanner>();
+  llvm::PointerType* tuple_row_ptr_type = codegen->GetStructPtrType<TupleRow>();
   LlvmCodeGen::FnPrototype prototype(codegen, "EvalRuntimeFilters",
-      codegen->GetType(TYPE_BOOLEAN));
+      codegen->bool_type());
   prototype.AddArgument(LlvmCodeGen::NamedVariable("this", this_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
 
@@ -1221,7 +1221,7 @@ Status HdfsParquetScanner::CodegenEvalRuntimeFilters(
           "FilterContext4Eval");
       DCHECK_EQ(replaced, 1);
 
-      llvm::Value* idx = codegen->GetIntConstant(TYPE_INT, i);
+      llvm::Value* idx = codegen->GetI32Constant(i);
       llvm::Value* passed_filter = builder.CreateCall(
           eval_runtime_filter_fn, llvm::ArrayRef<llvm::Value*>({this_arg, idx, row_arg}));
 

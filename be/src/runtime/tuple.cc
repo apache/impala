@@ -330,15 +330,14 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_
   // void MaterializeExprs(Tuple* tuple, TupleRow* row, TupleDescriptor* desc,
   //     ScalarExprEvaluator** slot_materialize_exprs, MemPool* pool,
   //     StringValue** non_null_string_values, int* total_string_lengths)
-  llvm::PointerType* opaque_tuple_type = codegen->GetPtrType(Tuple::LLVM_CLASS_NAME);
-  llvm::PointerType* row_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
-  llvm::PointerType* desc_type = codegen->GetPtrType(TupleDescriptor::LLVM_CLASS_NAME);
+  llvm::PointerType* opaque_tuple_type = codegen->GetStructPtrType<Tuple>();
+  llvm::PointerType* row_type = codegen->GetStructPtrType<TupleRow>();
+  llvm::PointerType* desc_type = codegen->GetStructPtrType<TupleDescriptor>();
   llvm::PointerType* expr_evals_type =
-      codegen->GetPtrType(codegen->GetPtrType(ScalarExprEvaluator::LLVM_CLASS_NAME));
-  llvm::PointerType* pool_type = codegen->GetPtrType(MemPool::LLVM_CLASS_NAME);
-  llvm::PointerType* string_values_type =
-      codegen->GetPtrType(codegen->GetPtrType(StringValue::LLVM_CLASS_NAME));
-  llvm::PointerType* int_ptr_type = codegen->GetPtrType(TYPE_INT);
+      codegen->GetStructPtrPtrType<ScalarExprEvaluator>();
+  llvm::PointerType* pool_type = codegen->GetStructPtrType<MemPool>();
+  llvm::PointerType* string_values_type = codegen->GetStructPtrPtrType<StringValue>();
+  llvm::PointerType* int_ptr_type = codegen->i32_ptr_type();
   LlvmCodeGen::FnPrototype prototype(codegen, "MaterializeExprs", codegen->void_type());
   prototype.AddArgument("opaque_tuple", opaque_tuple_type);
   prototype.AddArgument("row", row_type);
@@ -401,20 +400,18 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_
 
 Status Tuple::CodegenCopyStrings(
     LlvmCodeGen* codegen, const TupleDescriptor& desc, llvm::Function** copy_strings_fn) {
-  llvm::PointerType* opaque_tuple_type = codegen->GetPtrType(Tuple::LLVM_CLASS_NAME);
-  llvm::PointerType* runtime_state_type =
-      codegen->GetPtrType(RuntimeState::LLVM_CLASS_NAME);
-  llvm::StructType* slot_offsets_type =
-      static_cast<llvm::StructType*>(codegen->GetType(SlotOffsets::LLVM_CLASS_NAME));
-  llvm::PointerType* pool_type = codegen->GetPtrType(MemPool::LLVM_CLASS_NAME);
-  llvm::PointerType* status_type = codegen->GetPtrType(Status::LLVM_CLASS_NAME);
+  llvm::PointerType* opaque_tuple_type = codegen->GetStructPtrType<Tuple>();
+  llvm::PointerType* runtime_state_type = codegen->GetStructPtrType<RuntimeState>();
+  llvm::StructType* slot_offsets_type = codegen->GetStructType<SlotOffsets>();
+  llvm::PointerType* pool_type = codegen->GetStructPtrType<MemPool>();
+  llvm::PointerType* status_type = codegen->GetStructPtrType<Status>();
   LlvmCodeGen::FnPrototype prototype(
-      codegen, "CopyStringsWrapper", codegen->boolean_type());
+      codegen, "CopyStringsWrapper", codegen->bool_type());
   prototype.AddArgument("opaque_tuple", opaque_tuple_type);
   prototype.AddArgument("err_ctx", codegen->ptr_type());
   prototype.AddArgument("state", runtime_state_type);
   prototype.AddArgument("slot_offsets", codegen->GetPtrType(slot_offsets_type));
-  prototype.AddArgument("num_string_slots", codegen->int_type());
+  prototype.AddArgument("num_string_slots", codegen->i32_type());
   prototype.AddArgument("pool", pool_type);
   prototype.AddArgument("status", status_type);
 
@@ -440,8 +437,7 @@ Status Tuple::CodegenCopyStrings(
   }
   llvm::Constant* constant_slot_offsets = codegen->ConstantsToGVArrayPtr(
       slot_offsets_type, slot_offset_ir_constants, "slot_offsets");
-  llvm::Constant* num_string_slots =
-      llvm::ConstantInt::get(codegen->int_type(), desc.string_slots().size());
+  llvm::Constant* num_string_slots = codegen->GetI32Constant(desc.string_slots().size());
   // Get SlotOffsets* pointer to the first element of the constant array.
   llvm::Value* constant_slot_offsets_first_element_ptr =
       builder.CreateConstGEP2_64(constant_slot_offsets, 0, 0);
@@ -460,9 +456,9 @@ Status Tuple::CodegenCopyStrings(
 
 llvm::Constant* SlotOffsets::ToIR(LlvmCodeGen* codegen) const {
   return llvm::ConstantStruct::get(
-      static_cast<llvm::StructType*>(codegen->GetType(LLVM_CLASS_NAME)),
+      codegen->GetStructType<SlotOffsets>(),
       {null_indicator_offset.ToIR(codegen),
-          llvm::ConstantInt::get(codegen->int_type(), tuple_offset)});
+          codegen->GetI32Constant(tuple_offset)});
 }
 
 template void Tuple::MaterializeExprs<false, false>(TupleRow*, const TupleDescriptor&,

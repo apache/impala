@@ -76,13 +76,13 @@ string NullIndicatorOffset::DebugString() const {
 
 llvm::Constant* NullIndicatorOffset::ToIR(LlvmCodeGen* codegen) const {
   llvm::StructType* null_indicator_offset_type =
-      static_cast<llvm::StructType*>(codegen->GetType(LLVM_CLASS_NAME));
+      codegen->GetStructType<NullIndicatorOffset>();
   // Populate padding at end of struct with zeroes.
   llvm::ConstantAggregateZero* zeroes =
       llvm::ConstantAggregateZero::get(null_indicator_offset_type);
   return llvm::ConstantStruct::get(null_indicator_offset_type,
-      {llvm::ConstantInt::get(codegen->int_type(), byte_offset),
-          llvm::ConstantInt::get(codegen->tinyint_type(), bit_mask),
+      {codegen->GetI32Constant(byte_offset),
+          codegen->GetI8Constant(bit_mask),
           zeroes->getStructElement(2)});
 }
 
@@ -634,10 +634,9 @@ llvm::Value* SlotDescriptor::CodegenIsNull(LlvmCodeGen* codegen, LlvmBuilder* bu
     const NullIndicatorOffset& null_indicator_offset, llvm::Value* tuple) {
   llvm::Value* null_byte =
       CodegenGetNullByte(codegen, builder, null_indicator_offset, tuple, nullptr);
-  llvm::Constant* mask =
-      llvm::ConstantInt::get(codegen->tinyint_type(), null_indicator_offset.bit_mask);
+  llvm::Constant* mask = codegen->GetI8Constant(null_indicator_offset.bit_mask);
   llvm::Value* null_mask = builder->CreateAnd(null_byte, mask, "null_mask");
-  llvm::Constant* zero = llvm::ConstantInt::get(codegen->tinyint_type(), 0);
+  llvm::Constant* zero = codegen->GetI8Constant(0);
   return builder->CreateICmpNE(null_mask, zero, "is_null");
 }
 
@@ -653,14 +652,12 @@ llvm::Value* SlotDescriptor::CodegenIsNull(LlvmCodeGen* codegen, LlvmBuilder* bu
 void SlotDescriptor::CodegenSetNullIndicator(
     LlvmCodeGen* codegen, LlvmBuilder* builder, llvm::Value* tuple, llvm::Value* is_null)
     const {
-  DCHECK_EQ(is_null->getType(), codegen->boolean_type());
+  DCHECK_EQ(is_null->getType(), codegen->bool_type());
   llvm::Value* null_byte_ptr;
   llvm::Value* null_byte =
       CodegenGetNullByte(codegen, builder, null_indicator_offset_, tuple, &null_byte_ptr);
-  llvm::Constant* mask =
-      llvm::ConstantInt::get(codegen->tinyint_type(), null_indicator_offset_.bit_mask);
-  llvm::Constant* not_mask =
-      llvm::ConstantInt::get(codegen->tinyint_type(), ~null_indicator_offset_.bit_mask);
+  llvm::Constant* mask = codegen->GetI8Constant(null_indicator_offset_.bit_mask);
+  llvm::Constant* not_mask = codegen->GetI8Constant(~null_indicator_offset_.bit_mask);
 
   llvm::ConstantInt* constant_is_null = llvm::dyn_cast<llvm::ConstantInt>(is_null);
   llvm::Value* result = nullptr;
@@ -677,7 +674,7 @@ void SlotDescriptor::CodegenSetNullIndicator(
     llvm::Value* byte_with_cleared_bit =
         builder->CreateAnd(null_byte, not_mask, "null_bit_cleared");
     llvm::Value* sign_extended_null =
-        builder->CreateSExt(is_null, codegen->tinyint_type());
+        builder->CreateSExt(is_null, codegen->i8_type());
     llvm::Value* bit_only = builder->CreateAnd(sign_extended_null, mask, "null_bit");
     result = builder->CreateOr(byte_with_cleared_bit, bit_only, "null_bit_set");
   }
@@ -690,7 +687,7 @@ llvm::Value* SlotDescriptor::CodegenGetNullByte(
     const NullIndicatorOffset& null_indicator_offset, llvm::Value* tuple,
     llvm::Value** null_byte_ptr) {
   llvm::Constant* byte_offset =
-      llvm::ConstantInt::get(codegen->int_type(), null_indicator_offset.byte_offset);
+      codegen->GetI32Constant(null_indicator_offset.byte_offset);
   llvm::Value* tuple_bytes = builder->CreateBitCast(tuple, codegen->ptr_type());
   llvm::Value* byte_ptr =
       builder->CreateInBoundsGEP(tuple_bytes, byte_offset, "null_byte_ptr");
@@ -716,18 +713,18 @@ llvm::StructType* TupleDescriptor::GetLlvmStruct(LlvmCodeGen* codegen) const {
     if (slot->type().type == TYPE_CHAR) return nullptr;
     DCHECK_EQ(curr_struct_offset, slot->tuple_offset());
     slot->llvm_field_idx_ = struct_fields.size();
-    struct_fields.push_back(codegen->GetType(slot->type()));
+    struct_fields.push_back(codegen->GetSlotType(slot->type()));
     curr_struct_offset = slot->tuple_offset() + slot->slot_size();
   }
   // For each null byte, add a byte to the struct
   for (int i = 0; i < num_null_bytes_; ++i) {
-    struct_fields.push_back(codegen->GetType(TYPE_TINYINT));
+    struct_fields.push_back(codegen->i8_type());
     ++curr_struct_offset;
   }
 
   DCHECK_LE(curr_struct_offset, byte_size_);
   if (curr_struct_offset < byte_size_) {
-    struct_fields.push_back(llvm::ArrayType::get(codegen->GetType(TYPE_TINYINT),
+    struct_fields.push_back(llvm::ArrayType::get(codegen->i8_type(),
         byte_size_ - curr_struct_offset));
   }
 

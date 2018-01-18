@@ -367,7 +367,7 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function**
       // Set 'child_fn' to the interpreted function
       child_fn = GetStaticGetValWrapper(children_[i]->type(), codegen);
       // First argument to interpreted function is children_[i]
-      llvm::Type* expr_ptr_type = codegen->GetPtrType(ScalarExpr::LLVM_CLASS_NAME);
+      llvm::Type* expr_ptr_type = codegen->GetStructPtrType<ScalarExpr>();
       child_fn_args.push_back(codegen->CastPtrToLlvmPtr(expr_ptr_type, children_[i]));
     }
     child_fn_args.push_back(eval);
@@ -400,7 +400,7 @@ Status ScalarFnCall::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function**
     DCHECK_EQ(udf_args.size(), vararg_start_idx_ + 1);
     DCHECK_GE(GetNumChildren(), 1);
     // Add the number of varargs
-    udf_args.push_back(codegen->GetIntConstant(TYPE_INT, NumVarArgs()));
+    udf_args.push_back(codegen->GetI32Constant(NumVarArgs()));
     // Add all the accumulated vararg inputs as one input argument.
     llvm::PointerType* vararg_type =
         CodegenAnyVal::GetUnloweredPtrType(codegen, VarArgsType());

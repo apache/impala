@@ -351,6 +351,9 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Indicates an invalid position value.
   static const int16_t INVALID_POS = -1;
 
+  /// Class name in LLVM IR.
+  static const char* LLVM_CLASS_NAME;
+
  private:
   friend class ParquetColumnReader;
   friend class CollectionColumnReader;
@@ -366,9 +369,6 @@ class HdfsParquetScanner : public HdfsScanner {
       "FOOTER_SIZE can not be greater than READ_SIZE_MIN_VALUE.\n"
       "You can increase FOOTER_SIZE if you want, "
       "just don't forget to increase READ_SIZE_MIN_VALUE as well.");
-
-  /// Class name in LLVM IR.
-  static const char* LLVM_CLASS_NAME;
 
   /// Index of the current row group being processed. Initialized to -1 which indicates
   /// that we have not started processing the first row group yet (GetNext() has not yet
