@@ -1467,10 +1467,8 @@ void AggregateFunctions::HllMerge(
   }
 }
 
-uint64_t AggregateFunctions::HllFinalEstimate(const uint8_t* buckets,
-    int32_t num_buckets) {
+uint64_t AggregateFunctions::HllFinalEstimate(const uint8_t* buckets) {
   DCHECK(buckets != NULL);
-  DCHECK_EQ(num_buckets, HLL_LEN);
 
   // Empirical constants for the algorithm.
   float alpha = 0;
@@ -1486,9 +1484,8 @@ uint64_t AggregateFunctions::HllFinalEstimate(const uint8_t* buckets,
 
   float harmonic_mean = 0;
   int num_zero_registers = 0;
-  // TODO: Consider improving this loop (e.g. replacing 'if' with arithmetic op).
-  for (int i = 0; i < num_buckets; ++i) {
-    harmonic_mean += powf(2.0f, -buckets[i]);
+  for (int i = 0; i < HLL_LEN; ++i) {
+    harmonic_mean += ldexp(1.0f, -buckets[i]);
     if (buckets[i] == 0) ++num_zero_registers;
   }
   harmonic_mean = 1.0f / harmonic_mean;
@@ -1509,7 +1506,7 @@ uint64_t AggregateFunctions::HllFinalEstimate(const uint8_t* buckets,
 
 BigIntVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal& src) {
   if (UNLIKELY(src.is_null)) return BigIntVal::null();
-  uint64_t estimate = HllFinalEstimate(src.ptr, src.len);
+  uint64_t estimate = HllFinalEstimate(src.ptr);
   return estimate;
 }
 
@@ -1620,7 +1617,7 @@ BigIntVal AggregateFunctions::SampledNdvFinalize(FunctionContext* ctx,
       counts[pidx] = merged_count;
       StringVal hll = StringVal(state->buckets[bucket_idx].hll, HLL_LEN);
       HllMerge(ctx, hll, &merged_hll);
-      ndvs[pidx] = HllFinalEstimate(merged_hll.ptr, HLL_LEN);
+      ndvs[pidx] = HllFinalEstimate(merged_hll.ptr);
       ++pidx;
     }
     min_count = std::min(min_count, state->buckets[i].row_count);
