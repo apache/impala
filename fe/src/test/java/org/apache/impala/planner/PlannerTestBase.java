@@ -19,7 +19,6 @@ package org.apache.impala.planner;
 
 import static org.junit.Assert.fail;
 
-import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -745,6 +744,13 @@ public class PlannerTestBase extends FrontendTestBase {
     for (TestCase testCase : queryFileParser.getTestCases()) {
       actualOutput.append(testCase.getSectionAsString(Section.QUERY, true, "\n"));
       actualOutput.append("\n");
+      String queryOptionsSection = testCase.getSectionAsString(
+          Section.QUERYOPTIONS, true, "\n");
+      if (queryOptionsSection != null && !queryOptionsSection.isEmpty()) {
+        actualOutput.append("---- QUERYOPTIONS\n");
+        actualOutput.append(queryOptionsSection);
+        actualOutput.append("\n");
+      }
       try {
         runTestCase(testCase, errorLog, actualOutput, dbName, ignoreExplainHeader);
       } catch (CatalogException e) {
