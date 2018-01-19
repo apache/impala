@@ -121,13 +121,6 @@ class TestImpalaShell(ImpalaTestSuite):
     result = run_impala_shell_cmd(args)
     assert "Query: use `parquet`" in result.stderr, result.stderr
 
-  @pytest.mark.execute_serially  # This tests invalidates metadata, and must run serially
-  def test_refresh_on_connect(self):
-    """Confirm that the -r option refreshes the catalog."""
-    args = '-r -q "%s"' % DEFAULT_QUERY
-    result = run_impala_shell_cmd(args)
-    assert 'Invalidating Metadata' in result.stderr, result.stderr
-
   def test_unsecure_message(self):
     results = run_impala_shell_cmd("")
     assert "Starting Impala Shell without Kerberos authentication" in results.stderr
@@ -420,7 +413,6 @@ class TestImpalaShell(ImpalaTestSuite):
     args = '--config_file=%s/good_impalarc' % QUERY_FILE_PATH
     result = run_impala_shell_cmd(args)
     assert 'Query: select 1' in result.stderr
-    assert 'Invalidating Metadata' in result.stderr
 
     # override option in config file through command line
     args = '--config_file=%s/good_impalarc --query="select 2"' % QUERY_FILE_PATH

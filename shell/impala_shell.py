@@ -151,7 +151,6 @@ class ImpalaShell(object, cmd.Cmd):
     self.server_version = ImpalaShell.UNKNOWN_SERVER_VERSION
     self.webserver_address = ImpalaShell.UNKNOWN_WEBSERVER
 
-    self.refresh_after_connect = options.refresh_after_connect
     self.current_db = options.default_db
     self.history_file = os.path.expanduser("~/.impalahistory")
     # Stores the state of user input until a delimiter is seen.
@@ -763,9 +762,6 @@ class ImpalaShell(object, cmd.Cmd):
       self._print_if_verbose('Connected to %s:%s' % self.impalad)
       self._print_if_verbose('Server version: %s' % self.server_version)
       self.prompt = "[%s:%s] > " % self.impalad
-      if self.refresh_after_connect:
-        self.cmdqueue.append('invalidate metadata' + ImpalaShell.CMD_DELIM)
-        print_to_stderr("Invalidating Metadata")
       self._validate_database()
     try:
       self.imp_client.build_default_query_options_dict()
@@ -1364,13 +1360,6 @@ Welcome to the Impala shell.
 """ \
   % (VERSION_STRING, _format_tip(random.choice(TIPS)))
 
-REFRESH_AFTER_CONNECT_DEPRECATION_WARNING = """
-+==========================================================================+
-| DEPRECATION WARNING:                                                     |
-| -r/--refresh_after_connect is deprecated and will be removed in a future |
-| version of Impala shell.                                                 |
-+==========================================================================+"""
-
 def print_to_stderr(message):
   print >> sys.stderr, message
 
@@ -1445,9 +1434,6 @@ def get_intro(options):
   if not options.ssl and options.creds_ok_in_clear and options.use_ldap:
     intro += ("\n\nLDAP authentication is enabled, but the connection to Impala is "
               "not secured by TLS.\nALL PASSWORDS WILL BE SENT IN THE CLEAR TO IMPALA.")
-
-  if options.refresh_after_connect:
-    intro += '\n'.join(REFRESH_AFTER_CONNECT_DEPRECATION_WARNING)
   return intro
 
 if __name__ == "__main__":

@@ -22,7 +22,6 @@
 # [impala]
 # impalad=localhost:21002
 # verbose=false
-# refresh_after_connect=true
 #
 # [impala.query_options]
 # EXPLAIN_LEVEL=2
@@ -164,9 +163,6 @@ def get_option_parser(defaults):
                     help="Print version information")
   parser.add_option("-c", "--ignore_query_failure", dest="ignore_query_failure",
                     action="store_true", help="Continue on query failure")
-  parser.add_option("-r", "--refresh_after_connect", dest="refresh_after_connect",
-                    action="store_true",
-                    help="Refresh Impala catalog after connecting \t")
   parser.add_option("-d", "--database", dest="default_db",
                     help="Issues a use database command on startup \t")
   parser.add_option("-l", "--ldap", dest="use_ldap",

@@ -38,7 +38,6 @@ impala_shell_defaults = {
             'print_summary' : False,
             'query': None,
             'query_file': None,
-            'refresh_after_connect': False,
             'show_profiles': False,
             'ssl': False,
             'use_kerberos': False,
