@@ -2526,9 +2526,12 @@ select now() + interval 2 weeks as 2_weeks_from_now,
 
         <dd>
           <indexterm audience="hidden">unix_timestamp() function</indexterm>
-          <b>Purpose:</b> Returns an integer value representing the current date and time as a delta from the Unix
-          epoch, or converts from a specified date and time value represented as a <codeph>TIMESTAMP</codeph> or
-          <codeph>STRING</codeph>.
+          <b>Purpose:</b> Returns a Unix time, which is a number of seconds
+          elapsed since '1970-01-01 00:00:00' UTC. If called with no
+          argument, the current date and time is converted to its Unix time. If
+          called with arguments, the first argument represented as the
+          <codeph>TIMESTAMP</codeph> or <codeph>STRING</codeph> is converted to
+          its Unix time.
           <p>
             <b>Return type:</b> <codeph rev="2.2.0">bigint</codeph>
           </p>
