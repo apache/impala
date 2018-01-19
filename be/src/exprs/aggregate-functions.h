@@ -200,9 +200,9 @@ class AggregateFunctions {
   static void HllMerge(FunctionContext*, const StringVal& src, StringVal* dst);
   static BigIntVal HllFinalize(FunctionContext*, const StringVal& src);
 
-  /// Utility method to compute the final result of an HLL estimation from num_buckets
-  /// estimates.
-  static uint64_t HllFinalEstimate(const uint8_t* buckets, int32_t num_buckets);
+  /// Utility method to compute the final result of an HLL estimation.
+  /// Assumes HLL_LEN number of buckets.
+  static uint64_t HllFinalEstimate(const uint8_t* buckets);
 
   /// Estimates the number of distinct values (NDV) based on a sample of data and the
   /// corresponding sampling rate. The main idea of this function is to collect several
