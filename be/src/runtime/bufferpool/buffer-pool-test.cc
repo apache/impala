@@ -40,7 +40,9 @@
 #include "testutil/death-test-util.h"
 #include "testutil/gtest-util.h"
 #include "testutil/rand-util.h"
+#include "util/blocking-queue.h"
 #include "util/filesystem-util.h"
+#include "util/spinlock.h"
 #include "util/metrics.h"
 
 #include "common/names.h"
@@ -746,6 +748,78 @@ TEST_F(BufferPoolTest, BufferTransfer) {
   }
 
   pool.FreeBuffer(&clients[0], &handles[0]);
+  for (BufferPool::ClientHandle& client : clients) pool.DeregisterClient(&client);
+  ASSERT_EQ(global_reservations_.GetReservation(), 0);
+  global_reservations_.Close();
+}
+
+TEST_F(BufferPoolTest, BufferTransferConcurrent) {
+  // Transfer buffers between threads in a circular fashion. Each client needs to have
+  // enough reservation for two buffers, since it may receive a buffer before handing
+  // off the next one.
+  const int NUM_CLIENTS = 5;
+  const int64_t TOTAL_MEM = NUM_CLIENTS * TEST_BUFFER_LEN * 2;
+  global_reservations_.InitRootTracker(NULL, TOTAL_MEM);
+  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
+
+  BufferPool::ClientHandle clients[NUM_CLIENTS];
+  BufferPool::BufferHandle handles[NUM_CLIENTS];
+  SpinLock locks[NUM_CLIENTS]; // Each lock protects the corresponding BufferHandle.
+  for (int i = 0; i < NUM_CLIENTS; ++i) {
+    ASSERT_OK(pool.RegisterClient("test client", NULL, &global_reservations_, NULL,
+        TOTAL_MEM, NewProfile(), &clients[i]));
+    ASSERT_TRUE(clients[i].IncreaseReservationToFit(2 * TEST_BUFFER_LEN));
+  }
+
+  thread_group workers;
+
+  for (int thread_idx = 0; thread_idx < NUM_CLIENTS; ++thread_idx) {
+    workers.add_thread(new thread([&pool, &clients, &handles, &locks, thread_idx] {
+      // Transfer buffers around between the clients repeatedly in a circle.
+      BufferHandle handle;
+      {
+        lock_guard<SpinLock> l(locks[thread_idx]);
+        LOG(INFO) << "Allocate from " << (void*)&clients[thread_idx];
+        ASSERT_OK(pool.AllocateBuffer(
+              &clients[thread_idx], TEST_BUFFER_LEN, &handle));
+      }
+      for (int iter = 0; iter < 100; ++iter) {
+        int next_thread_idx = (thread_idx + 1) % NUM_CLIENTS;
+        // Transfer our buffer to the next thread.
+        {
+          unique_lock<SpinLock> l(locks[next_thread_idx]);
+          // Spin until we can add the handle.
+          while (true) {
+            if (!handles[next_thread_idx].is_open()) break;
+            l.unlock();
+            sched_yield();
+            l.lock();
+          }
+          ASSERT_TRUE(handle.is_open());
+          ASSERT_OK(pool.TransferBuffer(&clients[thread_idx], &handle,
+              &clients[next_thread_idx], &handles[next_thread_idx]));
+          // Check that the transfer left things in a consistent state.
+          ASSERT_TRUE(handles[next_thread_idx].is_open());
+          ASSERT_FALSE(handle.is_open());
+          ASSERT_GE(clients[next_thread_idx].GetUsedReservation(), TEST_BUFFER_LEN);
+        }
+        // Get a new buffer from the previous thread.
+        {
+          unique_lock<SpinLock> l(locks[thread_idx]);
+          // Spin until we receive a handle from the previous thread.
+          while (true) {
+            if (handles[thread_idx].is_open()) break;
+            l.unlock();
+            sched_yield();
+            l.lock();
+          }
+          handle = move(handles[thread_idx]);
+        }
+      }
+      pool.FreeBuffer(&clients[thread_idx], &handle);
+      }));
+  }
+  workers.join_all();
   for (BufferPool::ClientHandle& client : clients) pool.DeregisterClient(&client);
   ASSERT_EQ(global_reservations_.GetReservation(), 0);
   global_reservations_.Close();
@@ -2044,6 +2118,68 @@ TEST_F(BufferPoolTest, DecreaseReservation) {
   EXPECT_EQ(0, client.GetReservation());
 
   DestroyAll(&pool, &client, &pages);
+  pool.DeregisterClient(&client);
+  global_reservations_.Close();
+}
+
+// Test concurrent operations using the same client and different buffers.
+TEST_F(BufferPoolTest, ConcurrentBufferOperations) {
+  const int DELETE_THREADS = 2;
+  const int ALLOCATE_THREADS = 2;
+  const int NUM_ALLOCATIONS_PER_THREAD = 128;
+  const int MAX_NUM_BUFFERS = 16;
+  const int64_t TOTAL_MEM = MAX_NUM_BUFFERS * TEST_BUFFER_LEN;
+  global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
+  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
+  BufferPool::ClientHandle client;
+  ASSERT_OK(pool.RegisterClient("test client", nullptr, &global_reservations_, nullptr,
+      TOTAL_MEM, NewProfile(), &client));
+  ASSERT_TRUE(client.IncreaseReservationToFit(TOTAL_MEM));
+
+  thread_group allocate_threads;
+  thread_group delete_threads;
+  AtomicInt64 available_reservation(TOTAL_MEM);
+
+  // Queue of buffers to be deleted, along with the first byte of the data in
+  // the buffer, for validation purposes.
+  BlockingQueue<pair<uint8_t, BufferHandle>> delete_queue(MAX_NUM_BUFFERS);
+
+  // Allocate threads allocate buffers whenever able and enqueue them.
+  for (int i = 0; i < ALLOCATE_THREADS; ++i) {
+    allocate_threads.add_thread(new thread([&] {
+        for (int i = 0; i < NUM_ALLOCATIONS_PER_THREAD; ++i) {
+          // Try to deduct reservation.
+          while (true) {
+            int64_t val = available_reservation.Load();
+            if (val >= TEST_BUFFER_LEN
+                && available_reservation.CompareAndSwap(val, val - TEST_BUFFER_LEN)) {
+              break;
+            }
+          }
+          BufferHandle buffer;
+          ASSERT_OK(pool.AllocateBuffer(&client, TEST_BUFFER_LEN, &buffer));
+          uint8_t first_byte = static_cast<uint8_t>(i % 256);
+          buffer.data()[0] = first_byte;
+          delete_queue.BlockingPut(pair<uint8_t, BufferHandle>(first_byte, move(buffer)));
+        }
+        }));
+  }
+
+  // Delete threads pull buffers off the queue and free them.
+  for (int i = 0; i < DELETE_THREADS; ++i) {
+    delete_threads.add_thread(new thread([&] {
+          pair<uint8_t, BufferHandle> item;
+          while (delete_queue.BlockingGet(&item)) {
+            ASSERT_EQ(item.first, item.second.data()[0]);
+            pool.FreeBuffer(&client, &item.second);
+            available_reservation.Add(TEST_BUFFER_LEN);
+          }
+        }));
+
+  }
+  allocate_threads.join_all();
+  delete_queue.Shutdown();
+  delete_threads.join_all();
   pool.DeregisterClient(&client);
   global_reservations_.Close();
 }
