@@ -329,6 +329,8 @@ class TestImpalaShell(ImpalaTestSuite):
   def test_query_cancellation_during_fetch(self):
     """IMPALA-1144: Test cancellation (CTRL+C) while results are being
     fetched"""
+    pytest.skip("""Skipping as it occasionally gets stuck in Jenkins builds
+                resulting the build to timeout.""")
     # A select query where fetch takes several seconds
     stmt = "with v as (values (1 as x), (2), (3), (4)) " + \
         "select * from v, v v2, v v3, v v4, v v5, v v6, v v7, v v8, " + \
@@ -373,7 +375,7 @@ class TestImpalaShell(ImpalaTestSuite):
     execution in fact starts and then cancels it. Expects the query
     cancellation to succeed."""
     args = "-q \"" + stmt + ";\""
-    p = ImpalaShell(args, omit_stdout=True)
+    p = ImpalaShell(args)
 
     self.wait_for_query_state(stmt, cancel_at_state)
 
