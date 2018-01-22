@@ -227,19 +227,21 @@ class BufferPool : public CacheLineAligned {
   /// pinned multiple times via 'page_handle'. May return an error if 'page_handle' was
   /// unpinned earlier with no subsequent GetBuffer() call and a read error is
   /// encountered while bringing the page back into memory.
-  Status ExtractBuffer(
-      ClientHandle* client, PageHandle* page_handle, BufferHandle* buffer_handle) WARN_UNUSED_RESULT;
+  Status ExtractBuffer(ClientHandle* client, PageHandle* page_handle,
+      BufferHandle* buffer_handle) WARN_UNUSED_RESULT;
 
   /// Allocates a new buffer of 'len' bytes. Uses reservation from 'client'. The caller
   /// is responsible for ensuring it has enough unused reservation before calling
   /// AllocateBuffer() (otherwise it will DCHECK). AllocateBuffer() only fails when
   /// a system error prevents the buffer pool from fulfilling the reservation.
+  /// Safe to call concurrently with any other operations for 'client', except for
+  /// operations on the same 'handle'.
   Status AllocateBuffer(
       ClientHandle* client, int64_t len, BufferHandle* handle) WARN_UNUSED_RESULT;
 
   /// If 'handle' is open, close 'handle', free the buffer and decrease the reservation
-  /// usage from 'client'. Idempotent. Safe to call concurrently with any other
-  /// operations for 'client'.
+  /// usage from 'client'. Idempotent. Safe to call concurrently with other operations
+  /// for 'client', except for operations on the same 'handle'.
   void FreeBuffer(ClientHandle* client, BufferHandle* handle);
 
   /// Transfer ownership of buffer from 'src_client' to 'dst_client' and move the
@@ -247,7 +249,8 @@ class BufferPool : public CacheLineAligned {
   /// decreases reservation usage in 'src_client'. 'src' must be open and 'dst' must be
   /// closed before calling. 'src'/'dst' and 'src_client'/'dst_client' must be different.
   /// After a successful call, 'src' is closed and 'dst' is open. Safe to call
-  /// concurrently with any other operations for 'src_client'.
+  /// concurrently with any other operations for 'src_client', except for operations
+  /// on the same handles.
   Status TransferBuffer(ClientHandle* src_client, BufferHandle* src,
       ClientHandle* dst_client, BufferHandle* dst) WARN_UNUSED_RESULT;
 
@@ -507,7 +510,7 @@ class BufferPool::PageHandle {
   DISALLOW_COPY_AND_ASSIGN(PageHandle);
   friend class BufferPool;
   friend class BufferPoolTest;
-  friend class Page;
+  friend struct Page;
 
   /// Internal helper to open the handle for the given page.
   void Open(Page* page, ClientHandle* client);
