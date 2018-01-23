@@ -42,16 +42,20 @@ class DecimalUtil {
       (MAX_UNSCALED_DECIMAL8 + (1 + MAX_UNSCALED_DECIMAL8) *
        static_cast<int128_t>(MAX_UNSCALED_DECIMAL8));
 
-  /// TODO: do we need to handle overflow here or at a higher abstraction.
-  template<typename T>
-  static T MultiplyByScale(const T& v, const ColumnType& t) {
-    DCHECK(t.type == TYPE_DECIMAL);
-    return MultiplyByScale(v, t.scale);
+  // Helper function that checks for multiplication overflow. We only check for overflow
+  // if may_overflow is false.
+  template <typename T>
+  static T SafeMultiply(T a, T b, bool may_overflow) {
+    T result = a * b;
+    DCHECK(may_overflow || a == 0 || result / a == b);
+    return result;
   }
 
   template<typename T>
-  static T MultiplyByScale(const T& v, int scale) {
-    return v * GetScaleMultiplier<T>(scale);
+  static T MultiplyByScale(const T& v, int scale, bool may_overflow) {
+    T multiplier = GetScaleMultiplier<T>(scale);
+    DCHECK(multiplier > 0);
+    return SafeMultiply(v, multiplier, may_overflow);
   }
 
   template<typename T>

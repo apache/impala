@@ -2419,6 +2419,25 @@ DecimalTestCase decimal_cases[] = {
   { "18014118346046923173168730371588410/-340282366920938463463374607431768200",
     {{ false, false, 0, 38, 0 },
      { false, false, -52939, 38, 6 }}},
+  // IMPALA-6429: Test overflow detection when scaling up the dividend by more than 38.
+  // The bug can be trigerred only by these specific values. These values were generated
+  // by the fuzz test.
+  { "cast(70685438201098443655665080810945040.194 as decimal(38,3)) / "
+    "cast(0.85070591730234615865843651857942052863 as decimal(38,38))",
+    {{ false, true, 0, 38, 38 },
+     { true, false, 0, 38, 6 }}},
+  { "cast(9269574547799442144750864826042582 as decimal(38,2)) / "
+    "cast(0.2475880078570760549798248447 as decimal(38,38))",
+    {{ false, true, 0, 38, 38 },
+     { true, false, 0, 38, 6 }}},
+  { "cast(19770219132749848273961352693131418.9 as decimal(36,1)) / "
+    "cast(0.973940341920032002 as decimal(38,38))",
+    {{ false, true, 0, 38, 38 },
+     { true, false, 0, 38, 6 }}},
+  { "cast(100000000000000000000000000000000 as decimal(36,3)) / "
+    "cast(1 as decimal(1,0))",
+    {{ false, false, StringToInt128("10000000000000000000000000000000000000"), 38, 5 },
+     { true, false, 0, 38, 6 }}},
   // Test modulo operator
   { "cast(1.23 as decimal(8,2)) % cast(1 as decimal(10,3))",
     {{ false, false, 230, 9, 3 }}},
@@ -2821,6 +2840,48 @@ DecimalTestCase decimal_cases[] = {
      { true, false, 0, 38, 0 }}},
 };
 
+void TestScaleBy() {
+  // IMPALA-6429: There is a shortcut in the decimal division. If we estimate that the
+  // dividend requires more than 255 bits after scaling up, we overflow right away. This
+  // test proves that it is correct to do this and no other checks are needed.
+  for (int scale_by = 0; scale_by < 38 * 2 + 1; ++scale_by) {
+    for (int num_bits = 1; num_bits < 128; ++num_bits) {
+      // We set the dividend to be the smallest number that requires a certain number of
+      // bits.
+      int128_t dividend = 1;
+      dividend <<= num_bits - 1;
+      int256_t scaled_up_dividend = DecimalUtil::MultiplyByScale<int256_t>(
+          ConvertToInt256(dividend), scale_by, true);
+      int256_t scale_multiplier = DecimalUtil::GetScaleMultiplier<int256_t>(scale_by);
+      if (detail::MaxBitsRequiredAfterScaling(dividend, scale_by) <= 255) {
+        // If we estimate that the scaled up dividend requires 255 bits or less, verify
+        // that we do not overflow when scaling up.
+        EXPECT_TRUE(scaled_up_dividend / scale_multiplier == ConvertToInt256(dividend));
+        EXPECT_TRUE(
+            (-scaled_up_dividend) / scale_multiplier == ConvertToInt256(-dividend));
+      } else {
+        // If we estimate that scaled up dividend requres more than 255 bits, we want to
+        // verify that it is safe to set the result of the division to overflow.
+        if (scaled_up_dividend / scale_multiplier == ConvertToInt256(dividend)) {
+          // In this case, scaling up did not overflow. Verify that the scaled up
+          // dividend is too large. Even if we divide it by the largest possible divisor
+          // the result is larger than MAX_UNSCALED_DECIMAL16, which means the division
+          // overflows in all cases.
+          EXPECT_TRUE((-scaled_up_dividend) / scale_multiplier ==
+              ConvertToInt256(-dividend));
+          int256_t max_divisor = ConvertToInt256(DecimalUtil::MAX_UNSCALED_DECIMAL16);
+          EXPECT_TRUE(scaled_up_dividend / max_divisor > max_divisor);
+          EXPECT_TRUE((-scaled_up_dividend) / max_divisor < -max_divisor);
+        } else {
+          // There was an overflow when scaling up.
+          EXPECT_TRUE((-scaled_up_dividend) / scale_multiplier !=
+              ConvertToInt256(-dividend));
+        }
+      }
+    }
+  }
+}
+
 TEST_F(ExprTest, DecimalArithmeticExprs) {
   // Test with both decimal_v2={false, true}
   for (int v2: { 0, 1 }) {
@@ -2853,6 +2914,7 @@ TEST_F(ExprTest, DecimalArithmeticExprs) {
     }
     executor_->PopExecOption();
   }
+  TestScaleBy();
 }
 
 // Tests for expressions that mix decimal and non-decimal arguments with DECIMAL_V2=false.
