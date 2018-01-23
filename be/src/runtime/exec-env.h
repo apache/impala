@@ -83,7 +83,7 @@ class ExecEnv {
       int subscriber_port, int webserver_port, const std::string& statestore_host,
       int statestore_port);
 
-  /// Returns the first created exec env instance. In a normal impalad, this is
+  /// Returns the most recently created exec env instance. In a normal impalad, this is
   /// the only instance. In test setups with multiple ExecEnv's per process,
   /// we return the most recently created instance.
   static ExecEnv* GetInstance() { return exec_env_; }
@@ -123,6 +123,7 @@ class ExecEnv {
   io::DiskIoMgr* disk_io_mgr() { return disk_io_mgr_.get(); }
   Webserver* webserver() { return webserver_.get(); }
   MetricGroup* metrics() { return metrics_.get(); }
+  MetricGroup* rpc_metrics() { return rpc_metrics_; }
   MemTracker* process_mem_tracker() { return mem_tracker_.get(); }
   ThreadResourceMgr* thread_mgr() { return thread_mgr_.get(); }
   HdfsOpThreadPool* hdfs_op_thread_pool() { return hdfs_op_thread_pool_.get(); }
@@ -210,6 +211,7 @@ class ExecEnv {
 
   /// Not owned by this class
   ImpalaServer* impala_server_ = nullptr;
+  MetricGroup* rpc_metrics_ = nullptr;
 
   bool enable_webserver_;
 

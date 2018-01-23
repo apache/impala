@@ -39,7 +39,7 @@ class HistogramMetric : public Metric {
     DCHECK_EQ(TMetricKind::HISTOGRAM, def.kind);
   }
 
-  virtual void ToJson(rapidjson::Document* document, rapidjson::Value* value) {
+  virtual void ToJson(rapidjson::Document* document, rapidjson::Value* value) override {
     rapidjson::Value container(rapidjson::kObjectType);
     AddStandardFields(document, &container);
 
@@ -84,36 +84,47 @@ class HistogramMetric : public Metric {
     histogram_.reset(new HdrHistogram(highest, digits));
   }
 
-  virtual void ToLegacyJson(rapidjson::Document*) { }
+  virtual void ToLegacyJson(rapidjson::Document*) override {}
 
   const TUnit::type& unit() const { return unit_; }
 
-  virtual std::string ToHumanReadable() {
+  virtual std::string ToHumanReadable() override {
     boost::lock_guard<SpinLock> l(lock_);
+    return HistogramToHumanReadable(histogram_.get(), unit_);
+  }
+
+  /// Render a HdrHistogram into a human readable string representation. The histogram
+  /// type is a template parameter so that it accepts both Impala's and Kudu's
+  /// HdrHistogram classes.
+  template <class T>
+  static std::string HistogramToHumanReadable(T* histogram, TUnit::type unit) {
+    DCHECK(histogram != nullptr);
     std::stringstream out;
-    out << "Count: " << histogram_->TotalCount() << ", "
-        << "min / max: " << PrettyPrinter::Print(histogram_->MinValue(), unit_)
-        << " / " << PrettyPrinter::Print(histogram_->MaxValue(), unit_) << ", "
+    out << "Count: " << histogram->TotalCount() << ", "
+        << "min / max: " << PrettyPrinter::Print(histogram->MinValue(), unit)
+        << " / " << PrettyPrinter::Print(histogram->MaxValue(), unit) << ", "
         << "25th %-ile: "
-        << PrettyPrinter::Print(histogram_->ValueAtPercentile(25), unit_) << ", "
+        << PrettyPrinter::Print(histogram->ValueAtPercentile(25), unit) << ", "
         << "50th %-ile: "
-        << PrettyPrinter::Print(histogram_->ValueAtPercentile(50), unit_) << ", "
+        << PrettyPrinter::Print(histogram->ValueAtPercentile(50), unit) << ", "
         << "75th %-ile: "
-        << PrettyPrinter::Print(histogram_->ValueAtPercentile(75), unit_) << ", "
+        << PrettyPrinter::Print(histogram->ValueAtPercentile(75), unit) << ", "
         << "90th %-ile: "
-        << PrettyPrinter::Print(histogram_->ValueAtPercentile(90), unit_) << ", "
+        << PrettyPrinter::Print(histogram->ValueAtPercentile(90), unit) << ", "
         << "95th %-ile: "
-        << PrettyPrinter::Print(histogram_->ValueAtPercentile(95), unit_) << ", "
+        << PrettyPrinter::Print(histogram->ValueAtPercentile(95), unit) << ", "
         << "99.9th %-ile: "
-        << PrettyPrinter::Print(histogram_->ValueAtPercentile(99.9), unit_);
+        << PrettyPrinter::Print(histogram->ValueAtPercentile(99.9), unit);
     return out.str();
   }
 
  private:
-  // Protects histogram_ pointer itself.
+  /// Protects histogram_ pointer itself.
   SpinLock lock_;
   boost::scoped_ptr<HdrHistogram> histogram_;
   const TUnit::type unit_;
+
+  DISALLOW_COPY_AND_ASSIGN(HistogramMetric);
 };
 
 }

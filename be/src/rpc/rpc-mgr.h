@@ -29,7 +29,7 @@
 namespace kudu {
 namespace rpc {
 class RpcController;
-class ServiceIf;
+class GeneratedServiceIf;
 } // rpc
 } // kudu
 
@@ -95,6 +95,9 @@ namespace impala {
 /// Inbound connection set-up is handled by a small fixed-size pool of 'acceptor'
 /// threads. The number of threads that accept new TCP connection requests to the service
 /// port is configurable via FLAGS_acceptor_threads.
+///
+/// If 'use_tls' is true, then the underlying messenger is configured with the required
+/// certificates, and encryption is enabled and marked as required.
 class RpcMgr {
  public:
   RpcMgr(bool use_tls = false) : use_tls_(use_tls) {}
@@ -127,7 +130,7 @@ class RpcMgr {
   ///
   /// It is an error to call this after StartServices() has been called.
   Status RegisterService(int32_t num_service_threads, int32_t service_queue_depth,
-      kudu::rpc::ServiceIf* service_ptr, MemTracker* service_mem_tracker)
+      kudu::rpc::GeneratedServiceIf* service_ptr, MemTracker* service_mem_tracker)
       WARN_UNUSED_RESULT;
 
   /// Creates a new proxy for a remote service of type P at location 'address', and places
@@ -157,6 +160,11 @@ class RpcMgr {
 
   std::shared_ptr<kudu::rpc::Messenger> messenger() { return messenger_; }
 
+  /// Writes a JSON representation of the RpcMgr's metrics to a value named 'services' in
+  /// 'document'. It will include the number of RPCs accepted so far, the number of calls
+  /// in flight, and metrics and histograms for each service and their methods.
+  void ToJson(rapidjson::Document* document);
+
   ~RpcMgr() {
     DCHECK_EQ(service_pools_.size(), 0)
         << "Must call Shutdown() before destroying RpcMgr";
@@ -174,6 +182,9 @@ class RpcMgr {
   /// Used when creating a new service. Shared across all services which don't really
   /// track results for idempotent RPC calls.
   const scoped_refptr<kudu::rpc::ResultTracker> tracker_;
+
+  /// Holds a reference to the acceptor pool. Shared ownership with messenger_.
+  std::shared_ptr<kudu::rpc::AcceptorPool> acceptor_pool_;
 
   /// Container for reactor threads which run event loops for RPC services, plus acceptor
   /// threads which manage connection setup. Has to be a shared_ptr as required by

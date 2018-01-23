@@ -16,8 +16,9 @@
 // under the License.
 
 #include "rpc/rpc-mgr-test-base.h"
+#include "service/fe-support.h"
 
-using kudu::rpc::ServiceIf;
+using kudu::rpc::GeneratedServiceIf;
 using kudu::rpc::RpcController;
 using kudu::rpc::RpcContext;
 using kudu::MonoDelta;
@@ -31,11 +32,11 @@ namespace impala {
 
 // For tests that do not require kerberized testing, we use RpcTest.
 class RpcMgrTest : public RpcMgrTestBase<testing::Test> {
-  virtual void SetUp() {
+  virtual void SetUp() override {
     RpcMgrTestBase::SetUp();
   }
 
-  virtual void TearDown() {
+  virtual void TearDown() override {
     RpcMgrTestBase::TearDown();
   }
 };
@@ -178,7 +179,7 @@ TEST_F(RpcMgrTest, SlowCallback) {
   // Test a service which is slow to respond and has a short queue.
   // Set a timeout on the client side. Expect either a client timeout
   // or the service queue filling up.
-  ServiceIf* ping_impl = TakeOverService(make_unique<PingServiceImpl>(
+  GeneratedServiceIf* ping_impl = TakeOverService(make_unique<PingServiceImpl>(
       rpc_mgr_.metric_entity(), rpc_mgr_.result_tracker(), slow_cb));
   const int num_service_threads = 1;
   const int queue_size = 3;
@@ -204,7 +205,7 @@ TEST_F(RpcMgrTest, SlowCallback) {
 }
 
 TEST_F(RpcMgrTest, AsyncCall) {
-  ServiceIf* scan_mem_impl = TakeOverService(make_unique<ScanMemServiceImpl>(
+  GeneratedServiceIf* scan_mem_impl = TakeOverService(make_unique<ScanMemServiceImpl>(
       rpc_mgr_.metric_entity(), rpc_mgr_.result_tracker()));
   ASSERT_OK(rpc_mgr_.RegisterService(10, 10, scan_mem_impl,
       static_cast<ScanMemServiceImpl*>(scan_mem_impl)->mem_tracker()));
@@ -257,7 +258,8 @@ TEST_F(RpcMgrTest, NegotiationTimeout) {
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  impala::InitFeSupport();
 
   // Fill in the path of the current binary for use by the tests.
   CURRENT_EXECUTABLE_PATH = argv[0];

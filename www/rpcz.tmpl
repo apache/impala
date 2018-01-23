@@ -18,11 +18,7 @@ under the License.
 -->
 {{> www/common-header.tmpl }}
 
-<h2>RPC durations
-  <button class="btn btn-warning btn-xs" onClick="reset_all();">
-    Reset all
-  </button>
-</h2>
+<h2>RPC durations</h2>
 
 <p class="lead">This page shows the durations of all RPCs served by this
  <samp>{{__common__.process-name}}</samp> process.
@@ -33,6 +29,70 @@ under the License.
   <span id="refresh_on">Auto-refresh on</span>
 </label>  Last updated: <span id="last-updated"></span>
 
+{{?services}}
+<h2>KRPC Services</h2>
+{{/services}}
+{{#services}}
+<h3><samp>{{service_name}}</samp></h3>
+<table class="table table-hover table-bordered" id="{{service_name}}_metrics">
+  <tbody>
+  <tr>
+    <td>
+      <table class="table table-hover">
+        <tr>
+          <th>Queue Size</th>
+          <th>Idle Threads</th>
+          <th>Current Memory Usage</th>
+          <th>Peak Memory Usage</th>
+          <th>RPCs Rejected due to Queue Overflow</th>
+        </tr>
+        <tr>
+          <td id="{{service_name}}_queue_size">{{queue_size}}</td>
+          <td id="{{service_name}}_idle_threads">{{idle_threads}}</td>
+          <td id="{{service_name}}_mem_usage">{{mem_usage}}</td>
+          <td id="{{service_name}}_mem_peak">{{mem_peak}}</td>
+          <td id="{{service_name}}_rpcs_queue_overflow">{{rpcs_queue_overflow}}</td>
+        </tr>
+      </table>
+      <table class="table table-hover">
+        <tr>
+          <th>Incoming Queueing Time</th>
+          <td id="{{service_name}}_incoming_queue_time" colspan=2>{{incoming_queue_time}}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td>
+    {{#rpc_method_metrics}}
+      <table class="table table-bordered table-hover">
+        <tr><td colspan=2>
+          <strong>Method: <i>{{method_name}}</i></strong>
+        </td></tr>
+        <tr>
+          <td>Handler Latency</td>
+          <td class="{{method_name}}_handler_latency">{{handler_latency}}</td>
+        </tr>
+        <tr>
+          <td>Payload Size</td>
+          <td class="{{method_name}}_payload_size">{{payload_size}}</td>
+        </tr>
+      </table>
+    {{/rpc_method_metrics}}
+    </td>
+  </tr>
+  </tbody>
+</table>
+{{/services}}
+
+{{?servers}}
+<h2>Impala RPC Services
+  <button class="btn btn-warning btn-xs" onClick="reset_all();">
+    Reset all
+  </button>
+</h2>
+{{/servers}}
 {{#servers}}
 
 <h3><samp>{{name}} </samp>
@@ -83,44 +143,84 @@ function reset_server(server) {
   xhr.send();
 }
 
+// Update all metrics for services in "servers", which use Impala's old RPC layer.
+function update_impala_services(json) {
+  for (var i = 0; i < json["servers"].length; ++i) {
+    var tbl_json = json["servers"][i];
+    var table = document.getElementById(tbl_json["name"]);
+    if (!table) continue;
+    // Delete all existing rows, stopping at 1 to save the header
+    for (var j = table.rows.length - 1; j >= 1; --j) table.deleteRow(j);
+    tbl_json["methods"].forEach(function(method) {
+      var row = table.insertRow();
+      row.insertCell().innerHTML = "<samp>" + method.name + "</samp>";
+      row.insertCell().innerHTML = method.summary;
+      row.insertCell().innerHTML = method.in_flight;
+      var reset_cell = row.insertCell();
+      reset_cell.align = "center";
+      var button = document.createElement("button");
+      button.className = "btn btn-warning btn-xs";
+      button.appendChild(document.createTextNode("Reset"));
+      button.onclick = function() { reset_method(method.server_name, method.name); }
+      reset_cell.appendChild(button);
+    });
+  }
+}
+
+// Update all krpc metrics from the "services" member of "json".
+function update_krpc_services(json) {
+  // Update each service
+  for (var i = 0; i < json["services"].length; ++i) {
+    var svc_json = json["services"][i];
+    var svc_name = svc_json["service_name"];
+    var table = document.getElementById(svc_name + "_metrics");
+
+    // Skip updates for unknown services.
+    if (!table) continue;
+
+    // Update service metrics
+    var keys = ["queue_size", "idle_threads", "mem_usage", "mem_peak",
+        "rpcs_queue_overflow", "incoming_queue_time"];
+    for (var j = 0; j < keys.length; ++j) {
+      var key = keys[j];
+      var cell = document.getElementById(svc_name + "_" + key);
+      // Skip update for unknown values.
+      if (!cell) continue;
+      cell.innerHTML = svc_json[key];
+    }
+
+    // Update metrics for individual methods.
+    var num_methods = svc_json["rpc_method_metrics"].length;
+    for (var j = 0; j < num_methods; ++j) {
+      var method_json = svc_json["rpc_method_metrics"][j];
+      var method_name = method_json["method_name"];
+      // Update all metrics for this method.
+      var keys = ["handler_latency", "payload_size"];
+      for (var l = 0; l < keys.length; ++l) {
+        var key = keys[l];
+        var cell = $(table).find("." + method_name + "_" + key)[0];
+        // Skip update for unknown values.
+        if (!cell) continue;
+        cell.innerHTML = method_json[key];
+      }
+    }
+  }
+}
+
 function refresh() {
   var xhr = new XMLHttpRequest();
   xhr.responseType = 'text';
   xhr.timeout = 60000;
   xhr.onload = function(ignored_arg) {
-    if (xhr.status != 200) {
-      return;
-    }
+    if (xhr.status != 200) return;
     var blob = xhr.response;
     json = JSON.parse(blob);
-    for (var i = 0; i < json["servers"].length; ++i) {
-      var tbl_json = json["servers"][i];
-      var table = document.getElementById(tbl_json["name"]);
-      if (!table) continue;
-      // Delete all existing rows, stopping at 1 to save the header
-      for (var j = table.rows.length - 1; j >= 1; --j) {
-        table.deleteRow(j);
-      }
-      tbl_json["methods"].forEach(function(method) {
-        var row = table.insertRow();
-        row.insertCell().innerHTML = "<samp>" + method.name + "</samp>";
-        row.insertCell().innerHTML = method.summary;
-        row.insertCell().innerHTML = method.in_flight;
-        var reset_cell = row.insertCell();
-        reset_cell.align = "center";
-        var button = document.createElement("button");
-        button.className = "btn btn-warning btn-xs";
-        button.appendChild(document.createTextNode("Reset"));
-        button.onclick = function() { reset_method(method.server_name, method.name); }
-
-        reset_cell.appendChild(button);
-      });
-    }
-
+    update_impala_services(json);
+    update_krpc_services(json);
     document.getElementById("last-updated").textContent = new Date();
   }
 
-  xhr.ontimeout = function(){ }
+  xhr.ontimeout = function() {}
   xhr.open('GET', "/rpcz?json", true);
   xhr.send();
 }
