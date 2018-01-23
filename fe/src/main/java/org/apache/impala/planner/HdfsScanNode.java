@@ -201,7 +201,7 @@ public class HdfsScanNode extends ScanNode {
   // the TupleDescriptor of this scan node map to indices into PlanNodes.conjuncts_ and
   // slots in the TupleDescriptors of nested types map to indices into
   // collectionConjuncts_.
-  private Map<SlotDescriptor, List<Integer>> dictionaryFilterConjuncts_ =
+  private final Map<SlotDescriptor, List<Integer>> dictionaryFilterConjuncts_ =
       Maps.newLinkedHashMap();
 
   // Number of partitions that have the row count statistic.
@@ -702,7 +702,10 @@ public class HdfsScanNode extends ScanNode {
       } else {
         randomSeed = System.currentTimeMillis();
       }
-      sampledFiles = tbl_.getFilesSample(partitions_, percentBytes, randomSeed);
+      // Pass a minimum sample size of 0 because users cannot set a minimum sample size
+      // for scans directly. For compute stats, a minimum sample size can be set, and
+      // the sampling percent is adjusted to reflect it.
+      sampledFiles = tbl_.getFilesSample(partitions_, percentBytes, 0, randomSeed);
     }
 
     long maxScanRangeLength = analyzer.getQueryCtx().client_request.getQuery_options()

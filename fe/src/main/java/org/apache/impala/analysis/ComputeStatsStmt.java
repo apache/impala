@@ -103,6 +103,7 @@ public class ComputeStatsStmt extends StatementBase {
 
   // Effective sampling percent based on the total number of bytes in the files sample.
   // Set to -1 for non-HDFS tables or if TABLESAMPLE was not specified.
+  // We run the regular COMPUTE STATS for 0.0 and 1.0 where sampling has no benefit.
   protected double effectiveSamplePerc_ = -1;
 
   // The Null count is not currently being used in optimization or run-time,
@@ -202,7 +203,7 @@ public class ComputeStatsStmt extends StatementBase {
       String colRefSql = ToSqlUtils.getIdentSql(c.getName());
       if (isIncremental_) {
         columnStatsSelectList.add("NDV_NO_FINALIZE(" + colRefSql + ") AS " + colRefSql);
-      } else if (effectiveSamplePerc_ > 0) {
+      } else if (isSampling()) {
         columnStatsSelectList.add(String.format("SAMPLED_NDV(%s, %.10f) AS %s",
             colRefSql, effectiveSamplePerc_, colRefSql));
       } else {
@@ -461,7 +462,7 @@ public class ComputeStatsStmt extends StatementBase {
     // Query for getting the per-partition row count and the total row count.
     StringBuilder tableStatsQueryBuilder = new StringBuilder("SELECT ");
     String countSql = "COUNT(*)";
-    if (effectiveSamplePerc_ > 0) {
+    if (isSampling()) {
       // Extrapolate the count based on the effective sampling rate.
       countSql = String.format("ROUND(COUNT(*) / %.10f)", effectiveSamplePerc_);
     }
@@ -529,7 +530,8 @@ public class ComputeStatsStmt extends StatementBase {
    * not sampling. If sampling, the returned SQL includes a fixed random seed so all
    * child queries generate a consistent sample, even if the user did not originally
    * specify REPEATABLE.
-   * No-op if this statement has no TABLESAMPLE clause.
+   * Returns the empty string if this statement has no TABLESAMPLE clause or if
+   * the effective sampling rate is 0.0 or 1.0 (see isSampling()).
    */
   private String analyzeTableSampleClause(Analyzer analyzer) throws AnalysisException {
     if (sampleParams_ == null) return "";
@@ -550,9 +552,11 @@ public class ComputeStatsStmt extends StatementBase {
     }
 
     // Compute the sample of files and set 'sampleFileBytes_'.
+    long minSampleBytes = analyzer.getQueryOptions().compute_stats_min_sample_size;
+    long samplePerc = sampleParams_.getPercentBytes();
     HdfsTable hdfsTable = (HdfsTable) table_;
     Map<Long, List<FileDescriptor>> sample = hdfsTable.getFilesSample(
-        hdfsTable.getPartitions(), sampleParams_.getPercentBytes(), sampleSeed);
+        hdfsTable.getPartitions(), samplePerc, minSampleBytes, sampleSeed);
     long sampleFileBytes = 0;
     for (List<FileDescriptor> fds: sample.values()) {
       for (FileDescriptor fd: fds) sampleFileBytes += fd.getFileLength();
@@ -566,6 +570,17 @@ public class ComputeStatsStmt extends StatementBase {
       effectiveSamplePerc_ = 0;
     }
     Preconditions.checkState(effectiveSamplePerc_ >= 0.0 && effectiveSamplePerc_ <= 1.0);
+
+    // Warn if we will ignore TABLESAMPLE and run the regular COMPUTE STATS.
+    if (effectiveSamplePerc_ == 1.0) {
+      Preconditions.checkState(!isSampling());
+      analyzer.addWarning(String.format(
+          "Ignoring TABLESAMPLE because the effective sampling rate is 100%%.\n" +
+          "The minimum sample size is COMPUTE_STATS_MIN_SAMPLE_SIZE=%s " +
+          "and the table size %s",
+          PrintUtils.printBytes(minSampleBytes), PrintUtils.printBytes(totalFileBytes)));
+    }
+    if (!isSampling()) return "";
 
     return " " + sampleParams_.toSql(sampleSeed);
   }
@@ -647,6 +662,17 @@ public class ComputeStatsStmt extends StatementBase {
   }
 
   /**
+   * Returns true if this COMPUTE STATS statement should perform sampling.
+   * Returns false if TABLESAMPLE was not specified (effectiveSamplePerc_ == -1)
+   * or if the effective sampling percent is 0% or 100% where sampling has no benefit.
+   */
+  private boolean isSampling() {
+    Preconditions.checkState(effectiveSamplePerc_ == -1
+        || effectiveSamplePerc_ >= 0.0 || effectiveSamplePerc_ <= 1.0);
+    return effectiveSamplePerc_ > 0.0 && effectiveSamplePerc_ < 1.0;
+  }
+
+  /**
    * Returns true if the given column should be ignored for the purpose of computing
    * column stats. Columns with an invalid/unsupported/complex type are ignored.
    * For example, complex types in an HBase-backed table will appear as invalid types.
@@ -656,6 +682,7 @@ public class ComputeStatsStmt extends StatementBase {
     return !t.isValid() || !t.isSupported() || t.isComplexType();
   }
 
+  public double getEffectiveSamplingPerc() { return effectiveSamplePerc_; }
   public String getTblStatsQuery() { return tableStatsQueryStr_; }
   public String getColStatsQuery() { return columnStatsQueryStr_; }
 
