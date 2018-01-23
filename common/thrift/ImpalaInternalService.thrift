@@ -292,6 +292,10 @@ struct TQueryOptions {
   // running queries cancelled) by Impala. If 0, idle sessions never expire.
   // The default session timeout is set by the command line flag of the same name.
   61: optional i32 idle_session_timeout;
+
+  // Minimum number of bytes that will be scanned in COMPUTE STATS TABLESAMPLE,
+  // regardless of the user-supplied sampling percent. Default value: 1GB
+  62: optional i64 compute_stats_min_sample_size = 1073741824;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

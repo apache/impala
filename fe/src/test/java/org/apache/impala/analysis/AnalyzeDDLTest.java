@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.impala.catalog.ArrayType;
+import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.DataSource;
@@ -48,6 +49,7 @@ import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TDescribeTableParams;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.kudu.ColumnSchema.CompressionAlgorithm;
 import org.apache.kudu.ColumnSchema.Encoding;
@@ -1169,12 +1171,23 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Unsupported column option for non-Kudu table: DROP DEFAULT");
   }
 
-  void checkComputeStatsStmt(String stmt) throws AnalysisException {
-    ParseNode parseNode = AnalyzesOk(stmt);
+  ComputeStatsStmt checkComputeStatsStmt(String stmt) throws AnalysisException {
+    return checkComputeStatsStmt(stmt, createAnalyzer(Catalog.DEFAULT_DB));
+  }
+
+  ComputeStatsStmt checkComputeStatsStmt(String stmt, Analyzer analyzer)
+      throws AnalysisException {
+    return checkComputeStatsStmt(stmt, analyzer, null);
+  }
+
+  ComputeStatsStmt checkComputeStatsStmt(String stmt, Analyzer analyzer,
+      String expectedWarning) throws AnalysisException {
+    ParseNode parseNode = AnalyzesOk(stmt, analyzer, expectedWarning);
     assertTrue(parseNode instanceof ComputeStatsStmt);
     ComputeStatsStmt parsedStmt = (ComputeStatsStmt)parseNode;
     AnalyzesOk(parsedStmt.getTblStatsQuery());
     AnalyzesOk(parsedStmt.getColStatsQuery());
+    return parsedStmt;
   }
 
   @Test
@@ -1222,9 +1235,55 @@ public class AnalyzeDDLTest extends FrontendTestBase {
       testGflags.setEnable_stats_extrapolation(true);
       BackendConfig.create(testGflags);
 
-      checkComputeStatsStmt("compute stats functional.alltypes tablesample system (10)");
+      // Test different COMPUTE_STATS_MIN_SAMPLE_BYTES.
+      TQueryOptions queryOpts = new TQueryOptions();
+
+      // The default minimum sample size is greater than 'functional.alltypes'.
+      // We expect TABLESAMPLE to be ignored.
+      Preconditions.checkState(
+          queryOpts.compute_stats_min_sample_size == 1024 * 1024 * 1024);
+      ComputeStatsStmt noSamplingStmt = checkComputeStatsStmt(
+          "compute stats functional.alltypes tablesample system (10) repeatable(1)",
+          createAnalyzer(queryOpts),
+          "Ignoring TABLESAMPLE because the effective sampling rate is 100%");
+      Assert.assertTrue(noSamplingStmt.getEffectiveSamplingPerc() == 1.0);
+      String tblStatsQuery = noSamplingStmt.getTblStatsQuery().toUpperCase();
+      Assert.assertTrue(!tblStatsQuery.contains("TABLESAMPLE"));
+      Assert.assertTrue(!tblStatsQuery.contains("SAMPLED_NDV"));
+      String colStatsQuery = noSamplingStmt.getColStatsQuery().toUpperCase();
+      Assert.assertTrue(!colStatsQuery.contains("TABLESAMPLE"));
+      Assert.assertTrue(!colStatsQuery.contains("SAMPLED_NDV"));
+
+      // No minimum sample bytes.
+      queryOpts.setCompute_stats_min_sample_size(0);
+      checkComputeStatsStmt("compute stats functional.alltypes tablesample system (10)",
+          createAnalyzer(queryOpts));
       checkComputeStatsStmt(
-          "compute stats functional.alltypes tablesample system (55) repeatable(1)");
+          "compute stats functional.alltypes tablesample system (55) repeatable(1)",
+          createAnalyzer(queryOpts));
+
+      // Sample is adjusted based on the minimum sample bytes.
+      // Assumes that functional.alltypes has 24 files of roughly 20KB each.
+      // The baseline statement with no sampling minimum should select exactly one file
+      // and have an effective sampling rate of ~0.04 (1/24).
+      queryOpts.setCompute_stats_min_sample_size(0);
+      ComputeStatsStmt baselineStmt = checkComputeStatsStmt(
+          "compute stats functional.alltypes tablesample system (1) repeatable(1)",
+          createAnalyzer(queryOpts));
+      // Approximate validation of effective sampling rate.
+      Assert.assertTrue(baselineStmt.getEffectiveSamplingPerc() > 0.03);
+      Assert.assertTrue(baselineStmt.getEffectiveSamplingPerc() < 0.05);
+      // The adjusted statement with a 100KB minimum should select ~5 files and have
+      // an effective sampling rate of ~0.21 (5/24).
+      queryOpts.setCompute_stats_min_sample_size(100 * 1024);
+      ComputeStatsStmt adjustedStmt = checkComputeStatsStmt(
+          "compute stats functional.alltypes tablesample system (1) repeatable(1)",
+          createAnalyzer(queryOpts));
+      // Approximate validation to avoid flakiness due to sampling and file size
+      // changes. Expect a sample between 4 and 6 of the 24 total files.
+      Assert.assertTrue(adjustedStmt.getEffectiveSamplingPerc() >= 4.0 / 24);
+      Assert.assertTrue(adjustedStmt.getEffectiveSamplingPerc() <= 6.0 / 24);
+
       AnalysisError("compute stats functional.alltypes tablesample system (101)",
           "Invalid percent of bytes value '101'. " +
           "The percent of bytes to sample must be between 0 and 100.");

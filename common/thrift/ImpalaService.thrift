@@ -292,6 +292,10 @@ enum TImpalaQueryOptions {
   // The time, in seconds, that a session may be idle for before it is closed (and all
   // running queries cancelled) by Impala. If 0, idle sessions never expire.
   IDLE_SESSION_TIMEOUT,
+
+  // Minimum number of bytes that will be scanned in COMPUTE STATS TABLESAMPLE,
+  // regardless of the user-supplied sampling percent.
+  COMPUTE_STATS_MIN_SAMPLE_SIZE,
 }
 
 // The summary of a DML statement.

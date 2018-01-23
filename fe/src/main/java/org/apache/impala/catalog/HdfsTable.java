@@ -88,15 +88,14 @@ import org.apache.impala.util.TResultRowBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.codahale.metrics.Gauge;
+import com.codahale.metrics.Timer;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-
-import com.codahale.metrics.Gauge;
-import com.codahale.metrics.Timer;
 
 /**
  * Internal representation of table-related metadata of a file-resident table on a
@@ -258,7 +257,7 @@ public class HdfsTable extends Table {
   //   - Used for reporting through catalog web UI.
   //   - Stats are reset whenever the table is loaded (due to a metadata operation) and
   //   are set when the table is serialized to Thrift.
-  private FileMetadataStats fileMetadataStats_ = new FileMetadataStats();
+  private final FileMetadataStats fileMetadataStats_ = new FileMetadataStats();
 
   private final static Logger LOG = LoggerFactory.getLogger(HdfsTable.class);
 
@@ -2149,16 +2148,18 @@ public class HdfsTable extends Table {
   /**
    * Selects a random sample of files from the given list of partitions such that the sum
    * of file sizes is at least 'percentBytes' percent of the total number of bytes in
-   * those partitions. The sample is returned as a map from partition id to a list of
-   * file descriptors selected from that partition.
+   * those partitions and at least 'minSampleBytes'. The sample is returned as a map from
+   * partition id to a list of file descriptors selected from that partition.
    * This function allocates memory proportional to the number of files in 'inputParts'.
    * Its implementation tries to minimize the constant factor and object generation.
    * The given 'randomSeed' is used for random number generation.
    * The 'percentBytes' parameter must be between 0 and 100.
    */
   public Map<Long, List<FileDescriptor>> getFilesSample(
-      Collection<HdfsPartition> inputParts, long percentBytes, long randomSeed) {
+      Collection<HdfsPartition> inputParts, long percentBytes, long minSampleBytes,
+      long randomSeed) {
     Preconditions.checkState(percentBytes >= 0 && percentBytes <= 100);
+    Preconditions.checkState(minSampleBytes >= 0);
 
     // Conservative max size for Java arrays. The actual maximum varies
     // from JVM version and sometimes between configurations.
@@ -2200,6 +2201,7 @@ public class HdfsTable extends Table {
     int numFilesRemaining = idx;
     double fracPercentBytes = (double) percentBytes / 100;
     long targetBytes = (long) Math.round(totalBytes * fracPercentBytes);
+    targetBytes = Math.max(targetBytes, minSampleBytes);
 
     // Randomly select files until targetBytes has been reached or all files have been
     // selected.

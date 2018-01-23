@@ -603,6 +603,16 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_idle_session_timeout(requested_timeout);
         break;
       }
+      case TImpalaQueryOptions::COMPUTE_STATS_MIN_SAMPLE_SIZE: {
+        int64_t min_sample_size;
+        RETURN_IF_ERROR(ParseMemValue(value, "Min sample size", &min_sample_size));
+        if (min_sample_size < 0) {
+          return Status(
+              Substitute("Min sample size must be greater or equal to zero: $0", value));
+        }
+        query_options->__set_compute_stats_min_sample_size(min_sample_size);
+        break;
+      }
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.

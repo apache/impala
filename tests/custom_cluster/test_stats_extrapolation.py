@@ -50,6 +50,10 @@ class TestStatsExtrapolation(CustomClusterTestSuite):
     COMPUTE STATS TABLESAMPLE computes in-the-right-ballpark stats and successfully
     stores them in the HMS."""
 
+    # Since our test tables are small, set the minimum sample size to 0 to make sure
+    # we exercise the sampling code paths.
+    self.client.execute("set compute_stats_min_sample_size=0")
+
     # Test partitioned table.
     part_test_tbl = unique_database + ".alltypes"
     self.clone_table("functional.alltypes", part_test_tbl, True, vector)
