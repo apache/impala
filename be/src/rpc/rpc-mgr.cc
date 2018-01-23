@@ -31,14 +31,19 @@
 
 #include "common/names.h"
 
+using namespace rapidjson;
+
 using kudu::HostPort;
 using kudu::MetricEntity;
 using kudu::MonoDelta;
 using kudu::rpc::AcceptorPool;
+using kudu::rpc::DumpRunningRpcsRequestPB;
+using kudu::rpc::DumpRunningRpcsResponsePB;
 using kudu::rpc::MessengerBuilder;
 using kudu::rpc::Messenger;
+using kudu::rpc::RpcConnectionPB;
 using kudu::rpc::RpcController;
-using kudu::rpc::ServiceIf;
+using kudu::rpc::GeneratedServiceIf;
 using kudu::Sockaddr;
 
 DECLARE_string(hostname);
@@ -127,7 +132,7 @@ Status RpcMgr::Init() {
 }
 
 Status RpcMgr::RegisterService(int32_t num_service_threads, int32_t service_queue_depth,
-    ServiceIf* service_ptr, MemTracker* service_mem_tracker) {
+    GeneratedServiceIf* service_ptr, MemTracker* service_mem_tracker) {
   DCHECK(is_inited()) << "Must call Init() before RegisterService()";
   DCHECK(!services_started_) << "Cannot call RegisterService() after StartServices()";
   scoped_refptr<ImpalaServicePool> service_pool = new ImpalaServicePool(
@@ -154,10 +159,9 @@ Status RpcMgr::StartServices(const TNetworkAddress& address) {
   RETURN_IF_ERROR(TNetworkAddressToSockaddr(address, &sockaddr));
 
   // Call the messenger to create an AcceptorPool for us.
-  shared_ptr<AcceptorPool> acceptor_pool;
-  KUDU_RETURN_IF_ERROR(messenger_->AddAcceptorPool(sockaddr, &acceptor_pool),
+  KUDU_RETURN_IF_ERROR(messenger_->AddAcceptorPool(sockaddr, &acceptor_pool_),
       "Failed to add acceptor pool");
-  KUDU_RETURN_IF_ERROR(acceptor_pool->Start(FLAGS_num_acceptor_threads),
+  KUDU_RETURN_IF_ERROR(acceptor_pool_->Start(FLAGS_num_acceptor_threads),
       "Acceptor pool failed to start");
   VLOG_QUERY << "Started " << FLAGS_num_acceptor_threads << " acceptor threads";
   services_started_ = true;
@@ -167,6 +171,7 @@ Status RpcMgr::StartServices(const TNetworkAddress& address) {
 void RpcMgr::Shutdown() {
   if (messenger_.get() == nullptr) return;
   for (auto service_pool : service_pools_) service_pool->Shutdown();
+  acceptor_pool_.reset();
 
   messenger_->UnregisterAllServices();
   messenger_->Shutdown();
@@ -178,6 +183,43 @@ bool RpcMgr::IsServerTooBusy(const RpcController& rpc_controller) {
   const kudu::rpc::ErrorStatusPB* err = rpc_controller.error_response();
   return status.IsRemoteError() && err != nullptr && err->has_code() &&
       err->code() == kudu::rpc::ErrorStatusPB::ERROR_SERVER_TOO_BUSY;
+}
+
+void RpcMgr::ToJson(Document* document) {
+  if (messenger_.get() == nullptr) return;
+  // Add acceptor metrics.
+  int64_t num_accepted = 0;
+  if (acceptor_pool_.get() != nullptr) {
+    num_accepted = acceptor_pool_->num_rpc_connections_accepted();
+  }
+  document->AddMember("rpc_connections_accepted", num_accepted, document->GetAllocator());
+
+  // Add messenger metrics.
+  DumpRunningRpcsResponsePB response;
+  messenger_->DumpRunningRpcs(DumpRunningRpcsRequestPB(), &response);
+
+  int64_t num_inbound_calls_in_flight = 0;
+  for (const RpcConnectionPB& conn : response.inbound_connections()) {
+    num_inbound_calls_in_flight += conn.calls_in_flight().size();
+  }
+  document->AddMember("num_inbound_calls_in_flight", num_inbound_calls_in_flight,
+      document->GetAllocator());
+
+  int64_t num_outbound_calls_in_flight = 0;
+  for (const RpcConnectionPB& conn : response.outbound_connections()) {
+    num_outbound_calls_in_flight += conn.calls_in_flight().size();
+  }
+  document->AddMember("num_outbound_calls_in_flight", num_outbound_calls_in_flight,
+      document->GetAllocator());
+
+  // Add service pool metrics
+  Value services(kArrayType);
+  for (auto service_pool : service_pools_) {
+    Value service_entry(kObjectType);
+    service_pool->ToJson(&service_entry, document);
+    services.PushBack(service_entry, document->GetAllocator());
+  }
+  document->AddMember("services", services, document->GetAllocator());
 }
 
 } // namespace impala

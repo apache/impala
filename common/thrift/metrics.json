@@ -1635,5 +1635,15 @@
     "units": "NONE",
     "kind": "PROPERTY",
     "key": "kudu-client.version"
+  },
+  {
+    "description": "Service $0: Total number of incoming RPCs that were rejected due to overflow of the service queue.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Service $0 Incoming RPC Queue Overflows",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "rpc.$0.rpcs_queue_overflow"
   }
 ]

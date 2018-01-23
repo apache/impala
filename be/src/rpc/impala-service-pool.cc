@@ -31,30 +31,49 @@
 #include "kudu/rpc/messenger.h"
 #include "kudu/rpc/service_if.h"
 #include "kudu/rpc/service_queue.h"
+#include "kudu/util/hdr_histogram.h"
 #include "kudu/util/metrics.h"
 #include "kudu/util/status.h"
 #include "kudu/util/trace.h"
+#include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 
 #include "common/names.h"
 #include "common/status.h"
 
-METRIC_DEFINE_histogram(server, impala_unused,
+METRIC_DEFINE_histogram(server, impala_incoming_queue_time,
     "RPC Queue Time",
     kudu::MetricUnit::kMicroseconds,
     "Number of microseconds incoming RPC requests spend in the worker queue",
     60000000LU, 3);
 
+using namespace rapidjson;
+
 namespace impala {
+// Metric key format for rpc call duration metrics.
+const string RPC_QUEUE_OVERFLOW_METRIC_KEY = "rpc.$0.rpcs_queue_overflow";
 
 ImpalaServicePool::ImpalaServicePool(const scoped_refptr<kudu::MetricEntity>& entity,
-    size_t service_queue_length, kudu::rpc::ServiceIf* service,
+    size_t service_queue_length, kudu::rpc::GeneratedServiceIf* service,
     MemTracker* service_mem_tracker)
   : service_mem_tracker_(service_mem_tracker),
     service_(service),
     service_queue_(service_queue_length),
-    unused_histogram_(METRIC_impala_unused.Instantiate(entity)) {
+    incoming_queue_time_(METRIC_impala_incoming_queue_time.Instantiate(entity)) {
   DCHECK(service_mem_tracker_ != nullptr);
+  const TMetricDef& overflow_metric_def =
+      MetricDefs::Get(RPC_QUEUE_OVERFLOW_METRIC_KEY, service_->service_name());
+  rpcs_queue_overflow_ = ExecEnv::GetInstance()->rpc_metrics()->RegisterMetric(
+      new IntCounter(overflow_metric_def, 0L));
+  // Initialize additional histograms for each method of the service.
+  // TODO: Retrieve these from KRPC once KUDU-2313 has been implemented.
+  for (const auto& method : service_->methods_by_name()) {
+    const string& method_name = method.first;
+    string payload_size_name = Substitute("$0-payload-size", method_name);
+    payload_size_histograms_[method_name].reset(new HistogramMetric(
+        MakeTMetricDef(method_name, TMetricKind::HISTOGRAM, TUnit::BYTES),
+        1024 * 1024 * 1024, 3));
+  }
 }
 
 ImpalaServicePool::~ImpalaServicePool() {
@@ -101,7 +120,7 @@ void ImpalaServicePool::RejectTooBusy(kudu::rpc::InboundCall* c) {
                  service_->service_name(),
                  c->remote_address().ToString(),
                  service_queue_.max_size());
-  rpcs_queue_overflow_.Add(1);
+  rpcs_queue_overflow_->Increment(1);
   FailAndReleaseRpc(kudu::rpc::ErrorStatusPB::ERROR_SERVER_TOO_BUSY,
                     kudu::Status::ServiceUnavailable(err_msg), c);
   VLOG(1) << err_msg << " Contents of service queue:\n"
@@ -202,12 +221,11 @@ void ImpalaServicePool::RunThread() {
     }
 
     // We need to call RecordHandlingStarted() to update the InboundCall timing.
-    incoming->RecordHandlingStarted(unused_histogram_);
+    incoming->RecordHandlingStarted(incoming_queue_time_);
     ADOPT_TRACE(incoming->trace());
 
     if (UNLIKELY(incoming->ClientTimedOut())) {
       TRACE_TO(incoming->trace(), "Skipping call since client already timed out"); // NOLINT(*)
-      rpcs_timed_out_in_queue_.Add(1);
 
       // Respond as a failure, even though the client will probably ignore
       // the response anyway.
@@ -217,10 +235,13 @@ void ImpalaServicePool::RunThread() {
       continue;
     }
 
-    TRACE_TO(incoming->trace(), "Handling call"); // NOLINT(*)
+    const string& method_name = incoming->remote_method().method_name();
+    int64_t transfer_size = incoming->GetTransferSize();
+    payload_size_histograms_[method_name]->Update(transfer_size);
 
-    // Release the InboundCall pointer -- when the call is responded to,
-    // it will get deleted at that point.
+    TRACE_TO(incoming->trace(), "Handling call"); // NOLINT(*)
+    // Release the InboundCall pointer -- when the call is responded to, it will get
+    // deleted at that point.
     service_->Handle(incoming.release());
   }
 }
@@ -228,5 +249,69 @@ void ImpalaServicePool::RunThread() {
 const string ImpalaServicePool::service_name() const {
   return service_->service_name();
 }
+
+// Render a kudu::Histogram into a human readable string representation.
+// TODO: Switch to structured JSON (IMPALA-6545).
+const string KrpcHistogramToString(const kudu::Histogram* histogram) {
+  DCHECK(histogram != nullptr);
+  DCHECK_EQ(histogram->prototype()->unit(), kudu::MetricUnit::kMicroseconds);
+  kudu::HdrHistogram snapshot(*histogram->histogram());
+  return HistogramMetric::HistogramToHumanReadable(&snapshot, TUnit::TIME_US);
+}
+
+// Expose the service pool metrics by storing them as JSON in 'value'.
+void ImpalaServicePool::ToJson(rapidjson::Value* value, rapidjson::Document* document) {
+  // Add pool metrics.
+  Value service_name_val(service_name().c_str(), document->GetAllocator());
+  value->AddMember("service_name", service_name_val, document->GetAllocator());
+  value->AddMember("queue_size", service_queue_.estimated_queue_length(),
+      document->GetAllocator());
+  value->AddMember("idle_threads", service_queue_.estimated_idle_worker_count(),
+      document->GetAllocator());
+  value->AddMember("rpcs_queue_overflow", rpcs_queue_overflow_->GetValue(),
+      document->GetAllocator());
+
+  Value mem_usage(PrettyPrinter::Print(service_mem_tracker_->consumption(),
+      TUnit::BYTES).c_str(), document->GetAllocator());
+  value->AddMember("mem_usage", mem_usage, document->GetAllocator());
+
+  Value mem_peak(PrettyPrinter::Print(service_mem_tracker_->peak_consumption(),
+      TUnit::BYTES).c_str(), document->GetAllocator());
+  value->AddMember("mem_peak", mem_peak, document->GetAllocator());
+
+  Value incoming_queue_time(KrpcHistogramToString(incoming_queue_time_.get()).c_str(),
+      document->GetAllocator());
+  value->AddMember("incoming_queue_time", incoming_queue_time,
+      document->GetAllocator());
+
+  // Add method specific metrics.
+  const kudu::rpc::GeneratedServiceIf::MethodInfoMap& method_infos =
+      service_->methods_by_name();
+  Value rpc_method_metrics(kArrayType);
+  for (const auto& method : method_infos) {
+    Value method_entry(kObjectType);
+
+    const string& method_name = method.first;
+    Value method_name_val(method_name.c_str(), document->GetAllocator());
+    method_entry.AddMember("method_name", method_name_val, document->GetAllocator());
+
+    kudu::rpc::RpcMethodInfo* method_info = method.second.get();
+    kudu::Histogram* handler_latency = method_info->handler_latency_histogram.get();
+    Value handler_latency_val(KrpcHistogramToString(handler_latency).c_str(),
+        document->GetAllocator());
+    method_entry.AddMember("handler_latency", handler_latency_val,
+        document->GetAllocator());
+
+    HistogramMetric* payload_size = payload_size_histograms_[method_name].get();
+    DCHECK(payload_size != nullptr);
+    Value payload_size_val(payload_size->ToHumanReadable().c_str(),
+        document->GetAllocator());
+    method_entry.AddMember("payload_size", payload_size_val, document->GetAllocator());
+
+    rpc_method_metrics.PushBack(method_entry, document->GetAllocator());
+  }
+  value->AddMember("rpc_method_metrics", rpc_method_metrics, document->GetAllocator());
+}
+
 
 } // namespace impala

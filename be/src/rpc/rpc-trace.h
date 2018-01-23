@@ -31,6 +31,7 @@
 namespace impala {
 
 class MetricGroup;
+class RpcMgr;
 class Webserver;
 
 /// An RpcEventHandler is called every time an Rpc is started and completed. There is at
@@ -126,7 +127,7 @@ class RpcEventHandler : public apache::thrift::TProcessorEventHandler {
 };
 
 /// Initialises rpc event tracing, must be called before any RpcEventHandlers are created.
-void InitRpcEventTracing(Webserver* webserver);
+void InitRpcEventTracing(Webserver* webserver, RpcMgr* = nullptr);
 
 }
 

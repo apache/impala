@@ -26,6 +26,7 @@
 #include "kudu/util/monotime.h"
 #include "kudu/util/status.h"
 #include "rpc/auth-provider.h"
+#include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "testutil/gtest-util.h"
 #include "testutil/mini-kdc-wrapper.h"
@@ -40,7 +41,7 @@
 
 #include "common/names.h"
 
-using kudu::rpc::ServiceIf;
+using kudu::rpc::GeneratedServiceIf;
 using kudu::rpc::RpcController;
 using kudu::rpc::RpcContext;
 using kudu::rpc::RpcSidecar;
@@ -132,7 +133,7 @@ template <class T> class RpcMgrTestBase : public T {
 
   // Takes over ownership of the newly created 'service' which needs to have a lifetime
   // as long as 'rpc_mgr_' as RpcMgr::Shutdown() will call Shutdown() of 'service'.
-  ServiceIf* TakeOverService(std::unique_ptr<ServiceIf> service) {
+  GeneratedServiceIf* TakeOverService(std::unique_ptr<GeneratedServiceIf> service) {
     services_.emplace_back(move(service));
     return services_.back().get();
   }
@@ -141,14 +142,15 @@ template <class T> class RpcMgrTestBase : public T {
   TNetworkAddress krpc_address_;
   RpcMgr rpc_mgr_;
 
-  virtual void SetUp() {
+  virtual void SetUp() override {
     IpAddr ip;
     ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
     krpc_address_ = MakeNetworkAddress(ip, SERVICE_PORT);
+    exec_env_.reset(new ExecEnv());
     ASSERT_OK(rpc_mgr_.Init());
   }
 
-  virtual void TearDown() {
+  virtual void TearDown() override {
     rpc_mgr_.Shutdown();
   }
 
@@ -156,7 +158,10 @@ template <class T> class RpcMgrTestBase : public T {
   int32_t payload_[PAYLOAD_SIZE];
 
   // Own all the services used by the test.
-  std::vector<std::unique_ptr<ServiceIf>> services_;
+  std::vector<std::unique_ptr<GeneratedServiceIf>> services_;
+
+  // Required to set up the RPC metric groups used by the service pool.
+  std::unique_ptr<ExecEnv> exec_env_;
 };
 
 typedef std::function<void(RpcContext*)> ServiceCB;
@@ -169,8 +174,8 @@ class PingServiceImpl : public PingServiceIf {
       ServiceCB cb = [](RpcContext* ctx) { ctx->RespondSuccess(); })
     : PingServiceIf(entity, tracker), mem_tracker_(-1, "Ping Service"), cb_(cb) {}
 
-  virtual void Ping(
-      const PingRequestPB* request, PingResponsePB* response, RpcContext* context) {
+  virtual void Ping(const PingRequestPB* request, PingResponsePB* response, RpcContext*
+      context) override {
     response->set_int_response(42);
     // Incoming requests will already be tracked and we need to release the memory.
     mem_tracker_.Release(context->GetTransferSize());
@@ -194,7 +199,7 @@ class ScanMemServiceImpl : public ScanMemServiceIf {
   // The request comes with an int 'pattern' and a payload of int array sent with
   // sidecar. Scan the array to make sure every element matches 'pattern'.
   virtual void ScanMem(const ScanMemRequestPB* request, ScanMemResponsePB* response,
-      RpcContext* context) {
+      RpcContext* context) override {
     int32_t pattern = request->pattern();
     Slice payload;
     ASSERT_OK(
@@ -228,15 +233,16 @@ template <class T>
 Status RunMultipleServicesTestTemplate(RpcMgrTestBase<T>* test_base,
     RpcMgr* rpc_mgr, const TNetworkAddress& krpc_address) {
   // Test that a service can be started, and will respond to requests.
-  ServiceIf* ping_impl = test_base->TakeOverService(make_unique<PingServiceImpl>(
+  GeneratedServiceIf* ping_impl = test_base->TakeOverService(make_unique<PingServiceImpl>(
       rpc_mgr->metric_entity(), rpc_mgr->result_tracker()));
   RETURN_IF_ERROR(rpc_mgr->RegisterService(10, 10, ping_impl,
       static_cast<PingServiceImpl*>(ping_impl)->mem_tracker()));
 
   // Test that a second service, that verifies the RPC payload is not corrupted,
   // can be started.
-  ServiceIf* scan_mem_impl = test_base->TakeOverService(make_unique<ScanMemServiceImpl>(
-      rpc_mgr->metric_entity(), rpc_mgr->result_tracker()));
+  GeneratedServiceIf* scan_mem_impl = test_base->TakeOverService(
+      make_unique<ScanMemServiceImpl>(rpc_mgr->metric_entity(),
+      rpc_mgr->result_tracker()));
   RETURN_IF_ERROR(rpc_mgr->RegisterService(10, 10, scan_mem_impl,
       static_cast<ScanMemServiceImpl*>(scan_mem_impl)->mem_tracker()));
 

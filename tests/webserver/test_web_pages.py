@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from tests.common.skip import SkipIf
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 import json
@@ -32,6 +33,7 @@ class TestWebPage(ImpalaTestSuite):
   TABLE_METRICS_URL = "http://localhost:{0}/table_metrics"
   QUERY_BACKENDS_URL = "http://localhost:{0}/query_backends"
   QUERY_FINSTANCES_URL = "http://localhost:{0}/query_finstances"
+  RPCZ_URL = "http://localhost:{0}/rpcz"
   THREAD_GROUP_URL = "http://localhost:{0}/thread-group"
   # log4j changes do not apply to the statestore since it doesn't
   # have an embedded JVM. So we make two sets of ports to test the
@@ -71,6 +73,11 @@ class TestWebPage(ImpalaTestSuite):
       assert response.status_code == requests.codes.ok\
           and string_to_search in response.text, "Offending url: " + input_url
     return response.text
+
+  def get_debug_page(self, page_url):
+    """Returns the content of the debug page 'page_url' as json."""
+    response = self.get_and_check_status(page_url + "?json", ports_to_test=[25000])
+    return json.loads(response)
 
   def get_and_check_status_jvm(self, url, string_to_search = ""):
     """Calls get_and_check_status() for impalad and catalogd only"""
@@ -229,3 +236,26 @@ class TestWebPage(ImpalaTestSuite):
     for pattern in expected_name_patterns:
       assert any(pattern in t for t in thread_names), \
            "Could not find thread matching '%s'" % pattern
+
+  @SkipIf.not_krpc
+  def test_krpc_rpcz(self):
+    """Test that KRPC metrics are exposed in /rpcz and that they are updated when
+    executing a query."""
+    TEST_QUERY = "select count(c2.string_col) from \
+        functional.alltypestiny join functional.alltypessmall c2"
+    SVC_NAME = 'impala.DataStreamService'
+
+    def get_svc_metrics(svc_name):
+      rpcz = self.get_debug_page(self.RPCZ_URL)
+      assert len(rpcz['services']) > 0
+      for s in rpcz['services']:
+        if s['service_name'] == svc_name:
+          assert len(s['rpc_method_metrics']) > 0, '%s metrics are empty' % svc_name
+          return sorted(s['rpc_method_metrics'], key=lambda m: m['method_name'])
+      assert False, 'Could not find metrics for %s' % svc_name
+
+    before = get_svc_metrics(SVC_NAME)
+    self.client.execute(TEST_QUERY)
+    after = get_svc_metrics(SVC_NAME)
+
+    assert before != after
