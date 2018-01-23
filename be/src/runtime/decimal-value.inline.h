@@ -67,7 +67,7 @@ inline DecimalValue<T> DecimalValue<T>::FromInt(int precision, int scale, int64_
     *overflow = true;
     return DecimalValue();
   }
-  return DecimalValue(DecimalUtil::MultiplyByScale<T>(d, scale));
+  return DecimalValue(DecimalUtil::MultiplyByScale<T>(d, scale, false));
 }
 
 template<typename T>
@@ -140,29 +140,45 @@ inline DecimalValue<T> DecimalValue<T>::ScaleTo(int src_scale, int dst_scale,
 
 namespace detail {
 
-// Helper function that checks for multiplication overflow. We only check for overflow
-// if may_overflow is false.
-template <typename T>
-inline T SafeMultiply(T a, T b, bool may_overflow) {
-  T result = a * b;
-  DCHECK(may_overflow || a == 0 || result / a == b);
+// Suppose we have a number that requires x bits to be represented and we scale it up by
+// 10^scale_by. Let's say now y bits are required to represent it. This function returns
+// the maximum possible y - x for a given 'scale_by'.
+inline int MaxBitsRequiredIncreaseAfterScaling(int scale_by) {
+  // We rely on the following formula:
+  // bits_required(x * 10^y) <= bits_required(x) + floor(log2(10^y)) + 1
+  // We precompute floor(log2(10^x)) + 1 for x = 0, 1, 2...75, 76
+  DCHECK_GE(scale_by, 0);
+  DCHECK_LE(scale_by, 76);
+  static const int floor_log2_plus_one[] = {
+      0,   4,   7,   10,  14,  17,  20,  24,  27,  30,
+      34,  37,  40,  44,  47,  50,  54,  57,  60,  64,
+      67,  70,  74,  77,  80,  84,  87,  90,  94,  97,
+      100, 103, 107, 110, 113, 117, 120, 123, 127, 130,
+      133, 137, 140, 143, 147, 150, 153, 157, 160, 163,
+      167, 170, 173, 177, 180, 183, 187, 190, 193, 196,
+      200, 203, 206, 210, 213, 216, 220, 223, 226, 230,
+      233, 236, 240, 243, 246, 250, 253 };
+  return floor_log2_plus_one[scale_by];
+}
+
+// If we have a number with 'num_lz' leading zeros, and we scale it up by 10^scale_by,
+// this function returns the minimum number of leading zeros the result can have.
+inline int MinLeadingZerosAfterScaling(int num_lz, int scale_by) {
+  DCHECK_GE(scale_by, 0);
+  DCHECK_LE(scale_by, 76);
+  int result = num_lz - MaxBitsRequiredIncreaseAfterScaling(scale_by);
   return result;
 }
 
-// If we have a number with 'num_lz' leading zeros, and we scale it up by 10^scale_diff,
-// this function returns the minimum number of leading zeros the result would have.
-inline int MinLeadingZerosAfterScaling(int num_lz, int scale_diff) {
-  DCHECK_GE(scale_diff, 0);
-  DCHECK_LE(scale_diff, 38);
-  // We will rely on the following formula to estimate the number of leading zeros after
-  // scaling up: Lz(a*b) >= Lz(a) - floor(log2(b)) - 1
-  // We precompute floor(log2(10^b)) for b = 0, 1, 2, 3...
-  static const int floor_log2[] = {
-      0,  3,   6,   9,   13,  16,  19,  23,  26,  29,
-      33, 36,  39,  43,  46,  49,  53,  56,  59,  63,
-      66, 69,  73,  76,  79,  83,  86,  89,  93,  96,
-      99, 102, 106, 109, 112, 116, 119, 122, 126 };
-  return num_lz - floor_log2[scale_diff] - 1;
+// Returns the maximum possible number of bits required to represent num * 10^scale_by.
+inline int MaxBitsRequiredAfterScaling(int128_t num, int scale_by) {
+  // TODO: We are doing a lot of these abs() operations on int128_t in many places in our
+  // decimal math code. It might make sense to do this upfront, then do the calculations
+  // in unsigned math and adjust the sign at the end.
+  int num_occupied = 128 - BitUtil::CountLeadingZeros<int128_t>(abs(num));
+  DCHECK_GE(scale_by, 0);
+  DCHECK_LE(scale_by, 76);
+  return num_occupied + MaxBitsRequiredIncreaseAfterScaling(scale_by);
 }
 
 // Returns the minimum number of leading zero x or y would have after one of them gets
@@ -241,7 +257,7 @@ inline int128_t AddLarge(int128_t x, int x_scale, int128_t y, int y_scale,
       left > (DecimalUtil::MAX_UNSCALED_DECIMAL16 - right) / mult)) {
     *overflow = true;
   }
-  return SafeMultiply(left, mult, *overflow) + right;
+  return DecimalUtil::SafeMultiply(left, mult, *overflow) + right;
 }
 
 // Subtracts numbers that are large enough so that we can't subtract directly. Neither
@@ -294,7 +310,7 @@ inline int128_t SubtractLarge(int128_t x, int x_scale, int128_t y, int y_scale,
   if (UNLIKELY(abs(left) > (DecimalUtil::MAX_UNSCALED_DECIMAL16 - abs(right)) / mult)) {
     *overflow = true;
   }
-  return SafeMultiply(left, mult, *overflow) + right;
+  return DecimalUtil::SafeMultiply(left, mult, *overflow) + right;
 }
 
 }
@@ -412,7 +428,7 @@ DecimalValue<RESULT_T> DecimalValue<T>::Multiply(int this_scale,
     }
   } else {
     if (delta_scale == 0) {
-      result = detail::SafeMultiply(x, y, false);
+      result = DecimalUtil::SafeMultiply(x, y, false);
       if (UNLIKELY(result_precision == ColumnType::MAX_PRECISION &&
           abs(result) > DecimalUtil::MAX_UNSCALED_DECIMAL16)) {
         // An overflow is possible here, if, for example, x = (2^64 - 1) and
@@ -420,7 +436,7 @@ DecimalValue<RESULT_T> DecimalValue<T>::Multiply(int this_scale,
         *overflow = true;
       }
     } else if (LIKELY(delta_scale <= 38)) {
-      result = detail::SafeMultiply(x, y, false);
+      result = DecimalUtil::SafeMultiply(x, y, false);
       // The largest value that result can have here is (2^64 - 1) * (2^63 - 1), which is
       // greater than MAX_UNSCALED_DECIMAL16.
       result = DecimalUtil::ScaleDownAndRound<RESULT_T>(result, delta_scale, round);
@@ -451,7 +467,7 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Divide(int this_scale,
     const DecimalValue& other, int other_scale, int result_precision, int result_scale,
     bool round, bool* is_nan, bool* overflow) const {
   DCHECK_GE(result_scale + other_scale, this_scale);
-  if (other.value() == 0) {
+  if (UNLIKELY(other.value() == 0)) {
     // Divide by 0.
     *is_nan = true;
     return DecimalValue<RESULT_T>();
@@ -459,11 +475,17 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Divide(int this_scale,
   // We need to scale x up by the result scale and then do an integer divide.
   // This truncates the result to the output scale.
   int scale_by = result_scale + other_scale - this_scale;
+  DCHECK_GE(scale_by, 0);
   // Use higher precision ints for intermediates to avoid overflows. Divides lead to
   // large numbers very quickly (and get eliminated by the int divide).
   if (sizeof(T) == 16) {
     int128_t x_sp = value();
-    int256_t x = DecimalUtil::MultiplyByScale<int256_t>(ConvertToInt256(x_sp), scale_by);
+    // There is a test in expr-test.cc that shows that it OK to check for overflow this
+    // way (and that no additional checks are required).
+    bool ovf = scale_by > 38 && detail::MaxBitsRequiredAfterScaling(x_sp, scale_by) > 255;
+    int256_t x = DecimalUtil::MultiplyByScale<int256_t>(
+        ConvertToInt256(x_sp), scale_by, ovf);
+    *overflow |= ovf;
     int128_t y_sp = other.value();
     int256_t y = ConvertToInt256(y_sp);
     int128_t r = ConvertToInt128(x / y, DecimalUtil::MAX_UNSCALED_DECIMAL16, overflow);
@@ -487,8 +509,7 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Divide(int this_scale,
     }
     return DecimalValue<RESULT_T>(r);
   } else {
-    DCHECK(DecimalUtil::GetScaleMultiplier<RESULT_T>(scale_by) > 0);
-    int128_t x = DecimalUtil::MultiplyByScale<RESULT_T>(value(), scale_by);
+    int128_t x = DecimalUtil::MultiplyByScale<RESULT_T>(value(), scale_by, false);
     int128_t y = other.value();
     int128_t r = x / y;
     if (round) {
@@ -592,9 +613,9 @@ inline void DecimalValue<T>::AdjustToSameScale(const DecimalValue<T>& x, int x_s
     *y_scaled = y.value();
   } else if (delta_scale > 0) {
     *x_scaled = x.value();
-    *y_scaled = detail::SafeMultiply<RESULT_T>(y.value(), scale_factor, false);
+    *y_scaled = DecimalUtil::SafeMultiply<RESULT_T>(y.value(), scale_factor, false);
   } else {
-    *x_scaled = detail::SafeMultiply<RESULT_T>(x.value(), scale_factor, false);
+    *x_scaled = DecimalUtil::SafeMultiply<RESULT_T>(x.value(), scale_factor, false);
     *y_scaled = y.value();
   }
 }
@@ -629,9 +650,9 @@ inline int Decimal16Value::Compare(int this_scale, const Decimal16Value& other,
   int256_t y = ConvertToInt256(other.value());
   int delta_scale = this_scale - other_scale;
   if (delta_scale > 0) {
-    y = DecimalUtil::MultiplyByScale<int256_t>(y, delta_scale);
+    y = DecimalUtil::MultiplyByScale<int256_t>(y, delta_scale, false);
   } else if (delta_scale < 0) {
-    x = DecimalUtil::MultiplyByScale<int256_t>(x, -delta_scale);
+    x = DecimalUtil::MultiplyByScale<int256_t>(x, -delta_scale, false);
   }
   if (x == y) return 0;
   if (x < y) return -1;
