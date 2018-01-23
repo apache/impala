@@ -28,3 +28,19 @@ bigint
 # Verify that codegen was disabled
 row_regex: .*Codegen Disabled: disabled due to optimization hints.*
 ====
+---- QUERY
+# IMPALA-6435: We do not codegen char columns. This fix checks for a
+# CHAR type literal in the expr and disables codegen. This query will crash
+# impala without the fix.
+select count(*) from (
+  select cast('a' as char(4)) as s from functional.alltypestiny
+  union all
+  select cast('a' as char(4)) as s from functional.alltypestiny
+  union all
+  select cast(NULL as char(4)) as s from functional.alltypestiny
+) t
+---- RESULTS
+24
+---- TYPES
+bigint
+====
