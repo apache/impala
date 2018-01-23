@@ -42,16 +42,14 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
 #define QUERY_OPTS_TABLE\
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),\
       TImpalaQueryOptions::COMPUTE_STATS_MIN_SAMPLE_SIZE + 1);\
-  QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED,\
-      TQueryOptionLevel::DEPRECATED)\
+  REMOVED_QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED)\
   QUERY_OPT_FN(abort_on_error, ABORT_ON_ERROR, TQueryOptionLevel::REGULAR)\
   QUERY_OPT_FN(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS,\
       TQueryOptionLevel::DEPRECATED)\
   QUERY_OPT_FN(batch_size, BATCH_SIZE, TQueryOptionLevel::DEVELOPMENT)\
   QUERY_OPT_FN(debug_action, DEBUG_ACTION, TQueryOptionLevel::DEVELOPMENT)\
-  QUERY_OPT_FN(default_order_by_limit, DEFAULT_ORDER_BY_LIMIT,\
-      TQueryOptionLevel::DEPRECATED)\
-  QUERY_OPT_FN(disable_cached_reads, DISABLE_CACHED_READS, TQueryOptionLevel::DEPRECATED)\
+  REMOVED_QUERY_OPT_FN(default_order_by_limit, DEFAULT_ORDER_BY_LIMIT)\
+  REMOVED_QUERY_OPT_FN(disable_cached_reads, DISABLE_CACHED_READS)\
   QUERY_OPT_FN(disable_outermost_topn, DISABLE_OUTERMOST_TOPN,\
       TQueryOptionLevel::DEVELOPMENT)\
   QUERY_OPT_FN(disable_codegen, DISABLE_CODEGEN, TQueryOptionLevel::REGULAR)\
@@ -59,7 +57,7 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
   QUERY_OPT_FN(hbase_cache_blocks, HBASE_CACHE_BLOCKS, TQueryOptionLevel::ADVANCED)\
   QUERY_OPT_FN(hbase_caching, HBASE_CACHING, TQueryOptionLevel::ADVANCED)\
   QUERY_OPT_FN(max_errors, MAX_ERRORS, TQueryOptionLevel::ADVANCED)\
-  QUERY_OPT_FN(max_io_buffers, MAX_IO_BUFFERS, TQueryOptionLevel::DEPRECATED)\
+  REMOVED_QUERY_OPT_FN(max_io_buffers, MAX_IO_BUFFERS)\
   QUERY_OPT_FN(max_scan_range_length, MAX_SCAN_RANGE_LENGTH,\
       TQueryOptionLevel::DEVELOPMENT)\
   QUERY_OPT_FN(mem_limit, MEM_LIMIT, TQueryOptionLevel::REGULAR)\
@@ -68,11 +66,10 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
   QUERY_OPT_FN(compression_codec, COMPRESSION_CODEC, TQueryOptionLevel::REGULAR)\
   QUERY_OPT_FN(parquet_file_size, PARQUET_FILE_SIZE, TQueryOptionLevel::ADVANCED)\
   QUERY_OPT_FN(request_pool, REQUEST_POOL, TQueryOptionLevel::REGULAR)\
-  QUERY_OPT_FN(reservation_request_timeout, RESERVATION_REQUEST_TIMEOUT,\
-      TQueryOptionLevel::DEPRECATED)\
+  REMOVED_QUERY_OPT_FN(reservation_request_timeout, RESERVATION_REQUEST_TIMEOUT)\
   QUERY_OPT_FN(sync_ddl, SYNC_DDL, TQueryOptionLevel::REGULAR)\
-  QUERY_OPT_FN(v_cpu_cores, V_CPU_CORES, TQueryOptionLevel::DEPRECATED)\
-  QUERY_OPT_FN(rm_initial_mem, RM_INITIAL_MEM, TQueryOptionLevel::DEPRECATED)\
+  REMOVED_QUERY_OPT_FN(v_cpu_cores, V_CPU_CORES)\
+  REMOVED_QUERY_OPT_FN(rm_initial_mem, RM_INITIAL_MEM)\
   QUERY_OPT_FN(query_timeout_s, QUERY_TIMEOUT_S, TQueryOptionLevel::REGULAR)\
   QUERY_OPT_FN(buffer_pool_limit, BUFFER_POOL_LIMIT, TQueryOptionLevel::ADVANCED)\
   QUERY_OPT_FN(appx_count_distinct, APPX_COUNT_DISTINCT, TQueryOptionLevel::ADVANCED)\
@@ -85,8 +82,7 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
   QUERY_OPT_FN(replica_preference, REPLICA_PREFERENCE, TQueryOptionLevel::ADVANCED)\
   QUERY_OPT_FN(schedule_random_replica, SCHEDULE_RANDOM_REPLICA,\
       TQueryOptionLevel::ADVANCED)\
-  QUERY_OPT_FN(scan_node_codegen_threshold, SCAN_NODE_CODEGEN_THRESHOLD,\
-      TQueryOptionLevel::DEPRECATED)\
+  REMOVED_QUERY_OPT_FN(scan_node_codegen_threshold, SCAN_NODE_CODEGEN_THRESHOLD)\
   QUERY_OPT_FN(disable_streaming_preaggregations, DISABLE_STREAMING_PREAGGREGATIONS,\
       TQueryOptionLevel::REGULAR)\
   QUERY_OPT_FN(runtime_filter_mode, RUNTIME_FILTER_MODE, TQueryOptionLevel::REGULAR)\

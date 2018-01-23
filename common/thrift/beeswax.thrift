@@ -96,12 +96,14 @@ exception QueryNotFoundException {
 }
 
 // Impala extension:
-// Levels to use when displaying query options from Impala shell
+// Levels to use when displaying query options from Impala shell. REMOVED options should
+// not be displayed in the shell, but setting them is a warning rather than an error.
 enum TQueryOptionLevel {
   REGULAR,
   ADVANCED,
   DEVELOPMENT,
-  DEPRECATED
+  DEPRECATED,
+  REMOVED
 }
 
 /** Represents a Hadoop-style configuration variable. */

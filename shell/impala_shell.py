@@ -86,6 +86,7 @@ class QueryOptionLevels:
   ADVANCED = 1
   DEVELOPMENT = 2
   DEPRECATED = 3
+  REMOVED = 4
 
 class QueryOptionDisplayModes:
   REGULAR_OPTIONS_ONLY = 1
@@ -237,8 +238,8 @@ class ImpalaShell(object, cmd.Cmd):
     if not self.imp_client.default_query_options and not self.set_query_options:
       print '\tNo options available.'
     else:
-      (regular_options, advanced_options, development_options, deprecated_options) = \
-          self._get_query_option_grouping()
+      (regular_options, advanced_options, development_options, deprecated_options,
+          removed_options) = self._get_query_option_grouping()
       self._print_option_group(regular_options)
       # If the shell is connected to an Impala that predates IMPALA-2181 then
       # the advanced_options would be empty and only the regular options would
@@ -260,8 +261,8 @@ class ImpalaShell(object, cmd.Cmd):
     query option level for display purposes using the received query_option_levels
     parameters.
     If the option level can't be determined then it defaults to 'REGULAR'"""
-    regular_options, advanced_options, development_options, deprecated_options = \
-        {}, {}, {}, {}
+    (regular_options, advanced_options, development_options, deprecated_options,
+        removed_options) = {}, {}, {}, {}, {}
     for option_name, option_value in self.imp_client.default_query_options.iteritems():
       level = self.imp_client.query_option_levels.get(option_name,
                                                       QueryOptionLevels.REGULAR)
@@ -271,9 +272,12 @@ class ImpalaShell(object, cmd.Cmd):
         development_options[option_name] = option_value
       elif level == QueryOptionLevels.DEPRECATED:
         deprecated_options[option_name] = option_value
+      elif level == QueryOptionLevels.REMOVED:
+        removed_options[option_name] = option_value
       else:
         advanced_options[option_name] = option_value
-    return (regular_options, advanced_options, development_options, deprecated_options)
+    return (regular_options, advanced_options, development_options, deprecated_options,
+        removed_options)
 
   def _print_option_group(self, query_options):
     """Gets query options and prints them. Value is inside [] for the ones having
@@ -683,6 +687,9 @@ class ImpalaShell(object, cmd.Cmd):
         print "Available query options, with their values (defaults shown in []):"
         self._print_options(QueryOptionDisplayModes.REGULAR_OPTIONS_ONLY)
         return CmdStatus.ERROR
+      if self.imp_client.query_option_levels[option_upper] == QueryOptionLevels.REMOVED:
+        self._print_if_verbose("Ignoring removed query option: '{0}'".format(tokens[0]))
+        return CmdStatus.SUCCESS
       self.set_query_options[option_upper] = tokens[1]
       self._print_if_verbose('%s set to %s' % (option_upper, tokens[1]))
 

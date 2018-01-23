@@ -367,10 +367,12 @@ class TestImpalaShellInteractive(object):
     assert "Advanced Query Options:" in result.stdout
     assert "APPX_COUNT_DISTINCT" in result.stdout
     assert "SUPPORT_START_OVER" in result.stdout
+    # Development, deprecated and removed options should not be shown.
     assert "Development Query Options:" not in result.stdout
     assert "DEBUG_ACTION" not in result.stdout
     assert "Deprecated Query Options:" not in result.stdout
-    assert "ABORT_ON_DEFAULT_LIMIT_EXCEEDED" not in result.stdout
+    assert "ALLOW_UNSUPPORTED_FORMATS" not in result.stdout
+    assert "MAX_IO_BUFFERS" not in result.stdout
 
     shell2 = ImpalaShell()
     shell2.send_cmd("set all")
@@ -388,7 +390,9 @@ class TestImpalaShellInteractive(object):
     assert "APPX_COUNT_DISTINCT" in advanced_part
     assert "SUPPORT_START_OVER" in advanced_part
     assert "DEBUG_ACTION" in development_part
-    assert "ABORT_ON_DEFAULT_LIMIT_EXCEEDED" in result.stdout[deprecated_part_start_idx:]
+    assert "ALLOW_UNSUPPORTED_FORMATS" in result.stdout[deprecated_part_start_idx:]
+    # Removed options should not be shown.
+    assert "MAX_IO_BUFFERS" not in result.stdout
 
   def check_command_case_sensitivity(self, command, expected):
     shell = ImpalaShell()

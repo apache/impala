@@ -97,16 +97,9 @@ struct TQueryOptions {
   5: optional i32 num_nodes = NUM_NODES_ALL
   6: optional i64 max_scan_range_length = 0
   7: optional i32 num_scanner_threads = 0
-
-  // TODO: IMPALA-4306: retire at compatibility-breaking version
-  8: optional i32 max_io_buffers = 0              // Deprecated in 1.1
   9: optional bool allow_unsupported_formats = 0
-  // TODO: IMPALA-4306: retire at compatibility-breaking version
-  10: optional i64 default_order_by_limit = -1    // Deprecated in 1.4
   11: optional string debug_action = ""
   12: optional i64 mem_limit = 0
-  // TODO: IMPALA-4306: retire at compatibility-breaking version
-  13: optional bool abort_on_default_limit_exceeded = 0 // Deprecated in 1.4
   14: optional CatalogObjects.THdfsCompression compression_codec
   15: optional i32 hbase_caching = 0
   16: optional bool hbase_cache_blocks = 0
@@ -118,26 +111,8 @@ struct TQueryOptions {
   // the pool is determined based on the user.
   20: optional string request_pool
 
-  // Per-host virtual CPU cores required for query (only relevant with RM).
-  // TODO: IMPALA-3271: retire at compatibility-breaking version
-  21: optional i16 v_cpu_cores
-
-  // Max time in milliseconds the resource broker should wait for
-  // a resource request to be granted by Llama/Yarn (only relevant with RM).
-  // TODO: IMPALA-3271: retire at compatibility-breaking version
-  22: optional i64 reservation_request_timeout
-
-  // Disables taking advantage of HDFS caching. This has two parts:
-  // 1. disable preferring to schedule to cached replicas
-  // 2. disable the cached read path.
-  23: optional bool disable_cached_reads = 0
-
   // test hook to disable topn on the outermost select block.
   24: optional bool disable_outermost_topn = 0
-
-  // Override for initial memory reservation size if RM is enabled.
-  // TODO: IMPALA-3271: retire at compatibility-breaking version
-  25: optional i64 rm_initial_mem = 0
 
   // Time, in s, before a query will be timed out if it is inactive. May not exceed
   // --idle_query_timeout if that flag > 0.
@@ -177,10 +152,6 @@ struct TQueryOptions {
   // the same replica for every query or by starting with a new, pseudo-random replica for
   // subsequent queries. The default is to start with the same replica for every query.
   34: optional bool schedule_random_replica = 0
-
-  // For scan nodes with any conjuncts, use codegen to evaluate the conjuncts if
-  // the number of rows * number of operators in the conjuncts exceeds this threshold.
-  35: optional i64 scan_node_codegen_threshold = 1800000
 
   // If true, the planner will not generate plans with streaming preaggregations.
   36: optional bool disable_streaming_preaggregations = 0

@@ -93,7 +93,10 @@ class TestHS2(HS2TestSuite):
     assert "MAX_ERRORS" in vals2
     assert levels["MAX_ERRORS"] == "ADVANCED"
     assert "DEBUG_ACTION" not in vals2
-    assert "SCAN_NODE_CODEGEN_THRESHOLD" not in vals2
+    assert "ALLOW_UNSUPPORTED_FORMATS" not in vals2
+
+    # Removed options should not be returned.
+    assert "MAX_IO_BUFFERS" not in vals2
 
   @needs_session()
   def test_session_option_levels_via_set_all(self):
@@ -106,12 +109,15 @@ class TestHS2(HS2TestSuite):
     assert "SYNC_DDL" in vals
     assert "MAX_ERRORS" in vals
     assert "DEBUG_ACTION" in vals
-    assert "SCAN_NODE_CODEGEN_THRESHOLD" in vals
+    assert "ALLOW_UNSUPPORTED_FORMATS" in vals
     assert levels["COMPRESSION_CODEC"] == "REGULAR"
     assert levels["SYNC_DDL"] == "REGULAR"
     assert levels["MAX_ERRORS"] == "ADVANCED"
     assert levels["DEBUG_ACTION"] == "DEVELOPMENT"
-    assert levels["SCAN_NODE_CODEGEN_THRESHOLD"] == "DEPRECATED"
+    assert levels["ALLOW_UNSUPPORTED_FORMATS"] == "DEPRECATED"
+
+    # Removed options should not be returned.
+    assert "MAX_IO_BUFFERS" not in vals
 
   def test_open_session_http_addr(self):
     """Check that OpenSession returns the coordinator's http address."""

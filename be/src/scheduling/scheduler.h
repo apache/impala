@@ -58,8 +58,6 @@ class SchedulerWrapper;
 /// TODO: Notice when there are duplicate statestore registrations (IMPALA-23)
 /// TODO: Track assignments (assignment_ctx in ComputeScanRangeAssignment) per query
 ///       instead of per plan node?
-/// TODO: Remove disable_cached_reads query option in the next compatibility-breaking
-///       release (IMPALA-2963)
 /// TODO: Replace the usage of shared_ptr with atomic_shared_ptr once compilers support
 ///       it. Alternatively consider using Kudu's rw locks.
 /// TODO: Inject global dependencies into the class (for example ExecEnv::GetInstance(),
@@ -375,11 +373,6 @@ class Scheduler {
   ///   not cached, but local disk replicas. This can help prevent hot-spots by spreading
   ///   the assignments over more replicas. Allowed values are CACHE_LOCAL (default),
   ///   DISK_LOCAL and REMOTE.
-  ///
-  /// disable_cached_reads:
-  ///   Setting this value to true is equivalent to setting replica_preference to
-  ///   DISK_LOCAL and takes precedence over replica_preference. The default setting is
-  ///   false.
   ///
   /// schedule_random_replica:
   ///   When equivalent executors with a memory distance of DISK_LOCAL are found for a

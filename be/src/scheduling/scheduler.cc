@@ -510,13 +510,6 @@ Status Scheduler::ComputeScanRangeAssignment(const BackendConfig& executor_confi
   // of memory distance classes see TReplicaPreference in PlanNodes.thrift.
   TReplicaPreference::type base_distance = query_options.replica_preference;
 
-  // The query option to disable cached reads adjusts the memory base distance to view
-  // all replicas as having a distance disk_local or worse.
-  if (query_options.disable_cached_reads
-      && base_distance == TReplicaPreference::CACHE_LOCAL) {
-    base_distance = TReplicaPreference::DISK_LOCAL;
-  }
-
   // A preference attached to the plan node takes precedence.
   if (node_replica_preference) base_distance = *node_replica_preference;
 

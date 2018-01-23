@@ -62,8 +62,10 @@ void impala::OverlayQueryOptions(const TQueryOptions& src, const QueryOptionsMas
       "Size of QueryOptionsMask must be increased.";
 #define QUERY_OPT_FN(NAME, ENUM, LEVEL)\
   if (src.__isset.NAME && mask[TImpalaQueryOptions::ENUM]) dst->__set_##NAME(src.NAME);
+#define REMOVED_QUERY_OPT_FN(NAME, ENUM)
   QUERY_OPTS_TABLE
 #undef QUERY_OPT_FN
+#undef REMOVED_QUERY_OPT_FN
 }
 
 void impala::TQueryOptionsToMap(const TQueryOptions& query_options,
@@ -78,8 +80,10 @@ void impala::TQueryOptionsToMap(const TQueryOptions& query_options,
       (*configuration)[#ENUM] = ""; \
     }\
   }
+#define REMOVED_QUERY_OPT_FN(NAME, ENUM) (*configuration)[#ENUM] = "";
   QUERY_OPTS_TABLE
 #undef QUERY_OPT_FN
+#undef REMOVED_QUERY_OPT_FN
 }
 
 // Resets query_options->option to its default value.
@@ -91,8 +95,10 @@ static void ResetQueryOption(const int option, TQueryOptions* query_options) {
       query_options->__isset.NAME = defaults.__isset.NAME;\
       query_options->NAME = defaults.NAME;\
       break;
+#define REMOVED_QUERY_OPT_FN(NAME, ENUM)
   QUERY_OPTS_TABLE
 #undef QUERY_OPT_FN
+#undef REMOVED_QUERY_OPT_FN
   }
 }
 
@@ -113,8 +119,10 @@ string impala::DebugQueryOptions(const TQueryOptions& query_options) {
     if (i++ > 0) ss << ",";\
     ss << #ENUM << "=" << query_options.NAME;\
   }
+#define REMOVED_QUERY_OPT_FN(NAME, ENUM)
   QUERY_OPTS_TABLE
 #undef QUERY_OPT_FN
+#undef REMOVED_QUERY_OPT_FN
   return ss.str();
 }
 
@@ -129,6 +137,19 @@ static int GetQueryOptionForKey(const string& key) {
     }
   }
   return -1;
+}
+
+// Return true if we can ignore a reference to this removed query option.
+static bool IsRemovedQueryOption(const string& key) {
+#define QUERY_OPT_FN(NAME, ENUM, LEVEL)
+#define REMOVED_QUERY_OPT_FN(NAME, ENUM) \
+  if (iequals(key, #NAME)) { \
+    return true; \
+  }
+  QUERY_OPTS_TABLE
+#undef QUERY_OPT_FN
+#undef REMOVED_QUERY_OPT_FN
+  return false;
 }
 
 // Note that we allow numerical values for boolean and enum options. This is because
@@ -185,18 +206,12 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_max_scan_range_length(scan_length);
         break;
       }
-      case TImpalaQueryOptions::MAX_IO_BUFFERS:
-        query_options->__set_max_io_buffers(atoi(value.c_str()));
-        break;
       case TImpalaQueryOptions::NUM_SCANNER_THREADS:
         query_options->__set_num_scanner_threads(atoi(value.c_str()));
         break;
       case TImpalaQueryOptions::ALLOW_UNSUPPORTED_FORMATS:
         query_options->__set_allow_unsupported_formats(
             iequals(value, "true") || iequals(value, "1"));
-        break;
-      case TImpalaQueryOptions::DEFAULT_ORDER_BY_LIMIT:
-        query_options->__set_default_order_by_limit(atoi(value.c_str()));
         break;
       case TImpalaQueryOptions::DEBUG_ACTION:
         query_options->__set_debug_action(value.c_str());
@@ -233,10 +248,6 @@ Status impala::SetQueryOption(const string& key, const string& value,
         }
         break;
       }
-      case TImpalaQueryOptions::ABORT_ON_DEFAULT_LIMIT_EXCEEDED:
-        query_options->__set_abort_on_default_limit_exceeded(
-            iequals(value, "true") || iequals(value, "1"));
-        break;
       case TImpalaQueryOptions::HBASE_CACHING:
         query_options->__set_hbase_caching(atoi(value.c_str()));
         break;
@@ -278,27 +289,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
       case TImpalaQueryOptions::REQUEST_POOL:
         query_options->__set_request_pool(value);
         break;
-      case TImpalaQueryOptions::V_CPU_CORES:
-        query_options->__set_v_cpu_cores(atoi(value.c_str()));
-        break;
-      case TImpalaQueryOptions::RESERVATION_REQUEST_TIMEOUT:
-        query_options->__set_reservation_request_timeout(atoi(value.c_str()));
-        break;
-      case TImpalaQueryOptions::DISABLE_CACHED_READS:
-        if (iequals(value, "true") || iequals(value, "1")) {
-          query_options->__set_disable_cached_reads(true);
-        }
-        break;
       case TImpalaQueryOptions::DISABLE_OUTERMOST_TOPN:
         query_options->__set_disable_outermost_topn(
             iequals(value, "true") || iequals(value, "1"));
         break;
-      case TImpalaQueryOptions::RM_INITIAL_MEM: {
-        int64_t reservation_size;
-        RETURN_IF_ERROR(ParseMemValue(value, "RM memory limit", &reservation_size));
-        query_options->__set_rm_initial_mem(reservation_size);
-        break;
-      }
       case TImpalaQueryOptions::QUERY_TIMEOUT_S:
         query_options->__set_query_timeout_s(atoi(value.c_str()));
         break;
@@ -327,10 +321,6 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       case TImpalaQueryOptions::REPLICA_PREFERENCE:
         if (iequals(value, "cache_local") || iequals(value, "0")) {
-          if (query_options->disable_cached_reads) {
-            return Status("Conflicting settings: DISABLE_CACHED_READS = true and"
-                " REPLICA_PREFERENCE = CACHE_LOCAL");
-          }
           query_options->__set_replica_preference(TReplicaPreference::CACHE_LOCAL);
         } else if (iequals(value, "disk_local") || iequals(value, "2")) {
           query_options->__set_replica_preference(TReplicaPreference::DISK_LOCAL);
@@ -344,10 +334,6 @@ Status impala::SetQueryOption(const string& key, const string& value,
       case TImpalaQueryOptions::SCHEDULE_RANDOM_REPLICA:
         query_options->__set_schedule_random_replica(
             iequals(value, "true") || iequals(value, "1"));
-        break;
-      // TODO: remove this query option (IMPALA-4319).
-      case TImpalaQueryOptions::SCAN_NODE_CODEGEN_THRESHOLD:
-        query_options->__set_scan_node_codegen_threshold(atol(value.c_str()));
         break;
       case TImpalaQueryOptions::DISABLE_STREAMING_PREAGGREGATIONS:
         query_options->__set_disable_streaming_preaggregations(
@@ -614,6 +600,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       }
       default:
+        if (IsRemovedQueryOption(key)) {
+          LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";
+          return Status::OK();
+        }
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
         LOG(ERROR) << "Missing exec option implementation: " << key;
@@ -659,7 +649,12 @@ void impala::PopulateQueryOptionLevels(QueryOptionLevels* query_option_levels)
   {\
     (*query_option_levels)[#ENUM] = LEVEL;\
   }
+#define REMOVED_QUERY_OPT_FN(NAME, ENUM)\
+  {\
+    (*query_option_levels)[#ENUM] = TQueryOptionLevel::REMOVED;\
+  }
   QUERY_OPTS_TABLE
   QUERY_OPT_FN(support_start_over, SUPPORT_START_OVER, TQueryOptionLevel::ADVANCED)
 #undef QUERY_OPT_FN
+#undef REMOVED_QUERY_OPT_FN
 }

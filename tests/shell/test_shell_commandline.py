@@ -200,6 +200,12 @@ class TestImpalaShell(ImpalaTestSuite):
     result = run_impala_shell_cmd(args)
     assert 'WARNINGS:' not in result.stderr
 
+  def test_removed_query_option(self):
+    """Test that removed query options produce warning."""
+    result = run_impala_shell_cmd("-q 'set disable_cached_reads=true'",
+        expect_success=True)
+    assert "Ignoring removed query option: 'disable_cached_reads'" in result.stderr
+
   def test_output_format(self):
     expected_output = ['1'] * 3
     args = '-q "select 1,1,1" -B --quiet'
@@ -230,10 +236,10 @@ class TestImpalaShell(ImpalaTestSuite):
     run_impala_shell_cmd(args)
     # set
     # spaces around the = sign
-    args = '-q "set default_order_by_limit  =   10"'
+    args = '-q "set batch_size  =   10"'
     run_impala_shell_cmd(args)
     # no spaces around the = sign
-    args = '-q "set default_order_by_limit=10"'
+    args = '-q "set batch_size=10"'
     run_impala_shell_cmd(args)
     # test query options displayed
     args = '-q "set"'
@@ -251,10 +257,10 @@ class TestImpalaShell(ImpalaTestSuite):
     assert 'MEM_LIMIT: [0]' not in result_set.stdout
     # Negative tests for set
     # use : instead of =
-    args = '-q "set default_order_by_limit:10"'
+    args = '-q "set batch_size:10"'
     run_impala_shell_cmd(args, expect_success=False)
     # use 2 = signs
-    args = '-q "set default_order_by_limit=10=50"'
+    args = '-q "set batch_size=10=50"'
     run_impala_shell_cmd(args, expect_success=False)
     # describe and desc should return the same result.
     args = '-q "describe %s" -B' % empty_table

@@ -232,9 +232,6 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
     if (expected_local && params.volume_id == -1) ++num_ranges_missing_volume_id;
 
     bool try_cache = params.is_cached;
-    if (runtime_state_->query_options().disable_cached_reads) {
-      DCHECK(!try_cache) << "Params should not have had this set.";
-    }
     file_desc->splits.push_back(
         AllocateScanRange(file_desc->fs, file_desc->filename.c_str(), split.length,
             split.offset, split.partition_id, params.volume_id, expected_local,

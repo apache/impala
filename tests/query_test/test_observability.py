@@ -104,7 +104,7 @@ class TestObservability(ImpalaTestSuite):
     # Set a query option explicitly through client
     self.execute_query("set MEM_LIMIT = 8589934592")
     # Make sure explicitly set default values are not shown in the profile
-    self.execute_query("set MAX_IO_BUFFERS = 0")
+    self.execute_query("set runtime_filter_wait_time_ms = 0")
     runtime_profile = self.execute_query("select 1").runtime_profile
     assert "Query Options (set by configuration): MEM_LIMIT=8589934592" in runtime_profile
     # For this query, the planner sets NUM_NODES=1, NUM_SCANNER_THREADS=1,

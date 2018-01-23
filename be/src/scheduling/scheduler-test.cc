@@ -281,33 +281,6 @@ TEST_F(SchedulerTest, TestCachedReadPreferred) {
   EXPECT_EQ(0, result.NumRemoteAssignedBytes());
 }
 
-/// Verify that disable_cached_reads is effective.
-TEST_F(SchedulerTest, TestDisableCachedReads) {
-  Cluster cluster;
-  cluster.AddHosts(3, true, true);
-
-  Schema schema(cluster);
-  schema.AddSingleBlockTable("T1", {0, 2}, {1});
-
-  Plan plan(schema);
-  // 1 of the 3 replicas is cached.
-  plan.AddTableScan("T1");
-  plan.SetDisableCachedReads(true);
-
-  Result result(plan);
-  SchedulerWrapper scheduler(plan);
-  ASSERT_OK(scheduler.Compute(&result));
-  EXPECT_EQ(0, result.NumCachedAssignedBytes());
-  EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumDiskAssignedBytes());
-  EXPECT_EQ(0, result.NumRemoteAssignedBytes());
-
-  // Compute additional assignments.
-  for (int i = 0; i < 8; ++i) ASSERT_OK(scheduler.Compute(&result));
-  EXPECT_EQ(0, result.NumCachedAssignedBytes());
-  EXPECT_EQ(9 * Block::DEFAULT_BLOCK_SIZE, result.NumDiskAssignedBytes());
-  EXPECT_EQ(0, result.NumRemoteAssignedBytes());
-}
-
 /// IMPALA-3019: Test for round robin reset problem. We schedule the same plan twice but
 /// send an empty statestored message in between.
 /// TODO: This problem cannot occur anymore and the test is merely green for random

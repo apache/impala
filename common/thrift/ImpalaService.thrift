@@ -67,8 +67,7 @@ enum TImpalaQueryOptions {
   // a length of 0 indicates backend default;
   MAX_SCAN_RANGE_LENGTH,
 
-  // Maximum number of io buffers (per disk)
-  MAX_IO_BUFFERS,
+  MAX_IO_BUFFERS, // Removed
 
   // Number of scanner threads.
   NUM_SCANNER_THREADS,
@@ -76,10 +75,7 @@ enum TImpalaQueryOptions {
   // If true, Impala will try to execute on file formats that are not fully supported yet
   ALLOW_UNSUPPORTED_FORMATS,
 
-  // if set and > -1, specifies the default limit applied to a top-level SELECT statement
-  // with an ORDER BY but without a LIMIT clause (ie, if the SELECT statement also has
-  // a LIMIT clause, this default is ignored)
-  DEFAULT_ORDER_BY_LIMIT,
+  DEFAULT_ORDER_BY_LIMIT, // Removed
 
   // DEBUG ONLY:
   // If set to
@@ -92,8 +88,7 @@ enum TImpalaQueryOptions {
   // invalid, the option is ignored.
   DEBUG_ACTION,
 
-  // If true, raise an error when the DEFAULT_ORDER_BY_LIMIT has been reached.
-  ABORT_ON_DEFAULT_LIMIT_EXCEEDED,
+  ABORT_ON_DEFAULT_LIMIT_EXCEEDED, // Removed
 
   // Compression codec when inserting into tables.
   // Valid values are "snappy", "gzip", "bzip2" and "none"
@@ -133,14 +128,9 @@ enum TImpalaQueryOptions {
   // the pool is determined based on the user.
   REQUEST_POOL,
 
-  // Per-host virtual CPU cores required for query (only relevant with RM).
-  // TODO: IMPALA-3271: retire at compatibility-breaking version
-  V_CPU_CORES,
+  V_CPU_CORES, // Removed
 
-  // Max time in milliseconds the resource broker should wait for
-  // a resource request to be granted by Llama/Yarn (only relevant with RM).
-  // TODO: IMPALA-3271: retire at compatibility-breaking version
-  RESERVATION_REQUEST_TIMEOUT,
+  RESERVATION_REQUEST_TIMEOUT, // Removed
 
   // if true, disables cached reads. This option has no effect if REPLICA_PREFERENCE is
   // configured.
@@ -150,9 +140,7 @@ enum TImpalaQueryOptions {
   // Temporary testing flag
   DISABLE_OUTERMOST_TOPN,
 
-  // Size of initial memory reservation when RM is enabled
-  // TODO: IMPALA-3271: retire at compatibility-breaking version
-  RM_INITIAL_MEM,
+  RM_INITIAL_MEM, // Removed
 
   // Time, in s, before a query will be timed out if it is inactive. May not exceed
   // --idle_query_timeout if that flag > 0.
@@ -186,9 +174,7 @@ enum TImpalaQueryOptions {
   // Enables random backend selection during scheduling.
   SCHEDULE_RANDOM_REPLICA,
 
-  // For scan nodes with any conjuncts, use codegen to evaluate the conjuncts if
-  // the number of rows * number of operators in the conjuncts exceeds this threshold.
-  SCAN_NODE_CODEGEN_THRESHOLD,
+  SCAN_NODE_CODEGEN_THRESHOLD, // Removed
 
   // If true, the planner will not generate plans with streaming preaggregations.
   DISABLE_STREAMING_PREAGGREGATIONS,

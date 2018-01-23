@@ -138,7 +138,6 @@ TEST(QueryOptions, SetByteOptions) {
   vector<pair<OptionDef<int64_t>, Range<int64_t>>> case_set_i64 {
       {MAKE_OPTIONDEF(mem_limit),             {-1, I64_MAX}},
       {MAKE_OPTIONDEF(max_scan_range_length), {-1, I64_MAX}},
-      {MAKE_OPTIONDEF(rm_initial_mem),        {-1, I64_MAX}},
       {MAKE_OPTIONDEF(buffer_pool_limit),     {-1, I64_MAX}},
       {MAKE_OPTIONDEF(max_row_size),          {1, ROW_SIZE_LIMIT}},
       {MAKE_OPTIONDEF(parquet_file_size),     {-1, I32_MAX}},
@@ -244,19 +243,14 @@ TEST(QueryOptions, SetIntOptions) {
 
 // Test options with non regular validation rule
 TEST(QueryOptions, SetSpecialOptions) {
-  // REPLICA_PREFERENCE cannot be set to 0 if DISABLE_CACHED_READS is true
-  // It also has unsettable enum values: cache_rack(1) & disk_rack(3)
+  // REPLICA_PREFERENCE has unsettable enum values: cache_rack(1) & disk_rack(3)
   TQueryOptions options;
   {
     OptionDef<TReplicaPreference::type> key_def = MAKE_OPTIONDEF(replica_preference);
     auto TestOk = MakeTestOkFn(options, key_def);
     auto TestError = MakeTestErrFn(options, key_def);
-    EXPECT_OK(SetQueryOption("DISABLE_CACHED_READS", "false", &options, nullptr));
     TestOk("cache_local", TReplicaPreference::CACHE_LOCAL);
     TestOk("0", TReplicaPreference::CACHE_LOCAL);
-    EXPECT_OK(SetQueryOption("DISABLE_CACHED_READS", "true", &options, nullptr));
-    TestError("cache_local");
-    TestError("0");
     TestError("cache_rack");
     TestError("1");
     TestOk("disk_local", TReplicaPreference::DISK_LOCAL);

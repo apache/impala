@@ -112,8 +112,10 @@ void ChildQuery::SetQueryOptions(const TQueryOptions& parent_options,
     val << parent_options.NAME;\
     conf[#ENUM] = val.str();\
   }
+#define REMOVED_QUERY_OPT_FN(NAME, ENUM)
   QUERY_OPTS_TABLE
 #undef QUERY_OPT_FN
+#undef REMOVED_QUERY_OPT_FN
   // Ignore debug actions on child queries because they may cause deadlock.
   map<string, string>::iterator it = conf.find("DEBUG_ACTION");
   if (it != conf.end()) conf.erase(it);

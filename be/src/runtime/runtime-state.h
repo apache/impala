@@ -102,9 +102,6 @@ class RuntimeState {
   int batch_size() const { return query_options().batch_size; }
   bool abort_on_error() const { return query_options().abort_on_error; }
   bool strict_mode() const { return query_options().strict_mode; }
-  bool abort_on_default_limit_exceeded() const {
-    return query_options().abort_on_default_limit_exceeded;
-  }
   bool decimal_v2() const { return query_options().decimal_v2; }
   const TQueryCtx& query_ctx() const;
   const TPlanFragmentInstanceCtx& instance_ctx() const { return *instance_ctx_; }

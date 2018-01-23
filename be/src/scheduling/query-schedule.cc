@@ -193,11 +193,7 @@ int64_t QuerySchedule::GetPerHostMemoryEstimate() const {
   }
 
   int64_t per_host_mem = 0L;
-  // TODO: Remove rm_initial_mem and associated logic when we're sure that clients won't
-  // be affected.
-  if (query_options_.__isset.rm_initial_mem && query_options_.rm_initial_mem > 0) {
-    per_host_mem = query_options_.rm_initial_mem;
-  } else if (has_query_option) {
+  if (has_query_option) {
     per_host_mem = query_option_memory_limit;
   } else {
     DCHECK(request_.__isset.per_host_mem_estimate);

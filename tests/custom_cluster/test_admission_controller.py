@@ -298,12 +298,11 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       # Should be able to set query options (overriding defaults if applicable) with the
       # config overlay sent with the query RPC. mem_limit is a pool-level override and
       # max_io_buffers has no proc/pool default.
-      client.set_configuration({'request_pool': 'root.queueA', 'mem_limit': '12345',
-                                'max_io_buffers': '100'})
+      client.set_configuration({'request_pool': 'root.queueA', 'mem_limit': '12345'})
       result = client.execute("select 1")
       self.__check_query_options(result.runtime_profile,\
           ['MEM_LIMIT=12345', 'QUERY_TIMEOUT_S=5', 'REQUEST_POOL=root.queueA',\
-           'ABORT_ON_ERROR=1', 'MAX_IO_BUFFERS=100'])
+           'ABORT_ON_ERROR=1'])
 
       # Once options are reset to their defaults, the queue
       # configuration should kick back in. We'll see the
