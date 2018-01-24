@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.authorization.Privilege;
@@ -53,7 +54,7 @@ import com.google.common.collect.Sets;
  * clauses used (sampling, partition spec), as well as whether stats extrapolation
  * is enabled or not (--enable_stats_extrapolation).
  *
- * 1. COMPUTE STATS <table> [TABLESAMPLE SYSTEM(<perc>) [REPEATABLE(<seed>)]]
+ * 1. COMPUTE STATS <table> [(col_list)] [TABLESAMPLE SYSTEM(<perc>) [REPEATABLE(<seed>)]]
  * - Stats extrapolation enabled:
  *   Computes and replaces the table-level row count and total file size, as well as all
  *   table-level column statistics. Existing partition-objects and their row count are
@@ -71,6 +72,9 @@ import com.google.common.collect.Sets;
  *   partitions to set the extrapolated numRows statistic. Altering many partitions is
  *   expensive and so should be avoided in favor of enabling extrapolation.
  *
+ *   By default, statistics are computed for all columns. To control which columns are
+ *   analyzed, a whitelist of columns names can be optionally specified.
+ *
  * 2. COMPUTE INCREMENTAL STATS <table> [PARTITION <part_spec>]
  * - Stats extrapolation enabled:
  *   Not supported for now to keep the logic/code simple.
@@ -84,7 +88,7 @@ import com.google.common.collect.Sets;
  *   If a set of partitions is specified, then the incremental statistics for those
  *   partitions are recomputed (then merged into the table-level statistics).
  *
- * TODO: Allow more coarse/fine grained (db, column)
+ * TODO: Allow more coarse (db)
  * TODO: Compute stats on complex types.
  */
 public class ComputeStatsStmt extends StatementBase {
@@ -143,6 +147,15 @@ public class ComputeStatsStmt extends StatementBase {
   // null if this is a non-incremental computation.
   private PartitionSet partitionSet_ = null;
 
+  // If non-null, represents the user-specified list of columns for computing statistics.
+  // Not supported for incremental statistics.
+  private List<String> columnWhitelist_ = null;
+
+  // The set of columns to be analyzed. Each column is valid: it must exist in the table
+  // schema, it must be of a type that can be analyzed, and cannot refer to a partitioning
+  // column for HDFS tables. If the set is null, no columns are restricted.
+  private Set<Column> validatedColumnWhitelist_ = null;
+
   // The maximum number of partitions that may be explicitly selected by filter
   // predicates. Any query that selects more than this automatically drops back to a full
   // incremental stats recomputation.
@@ -154,15 +167,17 @@ public class ComputeStatsStmt extends StatementBase {
    * Should only be constructed via static creation functions.
    */
   private ComputeStatsStmt(TableName tableName, TableSampleClause sampleParams,
-      boolean isIncremental, PartitionSet partitionSet) {
+      boolean isIncremental, PartitionSet partitionSet, List<String> columns) {
     Preconditions.checkState(tableName != null && !tableName.isEmpty());
     Preconditions.checkState(isIncremental || partitionSet == null);
     Preconditions.checkState(!isIncremental || sampleParams == null);
+    Preconditions.checkState(!isIncremental || columns == null);
     tableName_ = tableName;
     sampleParams_ = sampleParams;
     table_ = null;
     isIncremental_ = isIncremental;
     partitionSet_ = partitionSet;
+    columnWhitelist_ = columns;
     if (partitionSet_ != null) {
       partitionSet_.setTableName(tableName);
       partitionSet_.setPrivilegeRequirement(Privilege.ALTER);
@@ -174,17 +189,17 @@ public class ComputeStatsStmt extends StatementBase {
    * stats should be computed with table sampling.
    */
   public static ComputeStatsStmt createStatsStmt(TableName tableName,
-      TableSampleClause sampleParams) {
-    return new ComputeStatsStmt(tableName, sampleParams, false, null);
+      TableSampleClause sampleParams, List<String> columns) {
+    return new ComputeStatsStmt(tableName, sampleParams, false, null, columns);
   }
 
   /**
-   * Returns a stmt for COMPUTE INCREMENTAL STATS. The optional 'partitioSet' specifies a
+   * Returns a stmt for COMPUTE INCREMENTAL STATS. The optional 'partitionSet' specifies a
    * set of partitions whose stats should be computed.
    */
   public static ComputeStatsStmt createIncrementalStatsStmt(TableName tableName,
       PartitionSet partitionSet) {
-    return new ComputeStatsStmt(tableName, null, true, partitionSet);
+    return new ComputeStatsStmt(tableName, null, true, partitionSet, null);
   }
 
   private List<String> getBaseColumnStatsQuerySelectList(Analyzer analyzer) {
@@ -196,6 +211,9 @@ public class ComputeStatsStmt extends StatementBase {
 
     for (int i = startColIdx; i < table_.getColumns().size(); ++i) {
       Column c = table_.getColumns().get(i);
+      if (validatedColumnWhitelist_ != null && !validatedColumnWhitelist_.contains(c)) {
+        continue;
+      }
       if (ignoreColumn(c)) continue;
 
       // NDV approximation function. Add explicit alias for later identification when
@@ -322,6 +340,26 @@ public class ComputeStatsStmt extends StatementBase {
             "for non-HDFS table " + tableName_);
       }
       isIncremental_ = false;
+    }
+
+    if (columnWhitelist_ != null) {
+      validatedColumnWhitelist_ = Sets.newHashSet();
+      for (String colName : columnWhitelist_) {
+        Column col = table_.getColumn(colName);
+        if (col == null) {
+          throw new AnalysisException(colName + " not found in table: " +
+              table_.getName());
+        }
+        if (table_ instanceof HdfsTable && table_.isClusteringColumn(col)) {
+          throw new AnalysisException("COMPUTE STATS not supported for partitioning " +
+              "column " + col.getName() + " of HDFS table.");
+        }
+        if (ignoreColumn(col)) {
+          throw new AnalysisException("COMPUTE STATS not supported for column " +
+              col.getName() + " of complex type:" + col.getType().toSql());
+        }
+        validatedColumnWhitelist_.add(col);
+      }
     }
 
     HdfsTable hdfsTable = null;
@@ -683,8 +721,13 @@ public class ComputeStatsStmt extends StatementBase {
   }
 
   public double getEffectiveSamplingPerc() { return effectiveSamplePerc_; }
+
+  /**
+   * For testing.
+   */
   public String getTblStatsQuery() { return tableStatsQueryStr_; }
   public String getColStatsQuery() { return columnStatsQueryStr_; }
+  public Set<Column> getValidatedColumnWhitelist() { return validatedColumnWhitelist_; }
 
   /**
    * Returns true if this statement computes stats on Parquet partitions only,
@@ -707,9 +750,15 @@ public class ComputeStatsStmt extends StatementBase {
   @Override
   public String toSql() {
     if (!isIncremental_) {
+      StringBuilder columnList = new StringBuilder();
+      if (columnWhitelist_ != null) {
+        columnList.append("(");
+        columnList.append(Joiner.on(", ").join(columnWhitelist_));
+        columnList.append(")");
+      }
       String tblsmpl = "";
       if (sampleParams_ != null) tblsmpl = " " + sampleParams_.toSql();
-      return "COMPUTE STATS " + tableName_.toSql() + tblsmpl;
+      return "COMPUTE STATS " + tableName_.toSql() + columnList.toString() + tblsmpl;
     } else {
       return "COMPUTE INCREMENTAL STATS " + tableName_.toSql() +
           partitionSet_ == null ? "" : partitionSet_.toSql();

@@ -3165,21 +3165,32 @@ public class ParserTest extends FrontendTestBase {
   @Test
   public void TestComputeDropStats() {
     String[] prefixes = {"compute", "drop"};
+    String[] okSuffixes = {"stats bar", "stats `bar`", "stats foo.bar",
+        "stats `foo`.`bar`"};
+    String[] okComputeSuffixes = {"(ab)", "(ab, bc)", "()"};
+    String[] errorSuffixes = {
+     // Missing table name.
+     "stats",
+     // Missing 'stats' keyword.
+     "`bar`",
+     // Cannot use string literal as table name.
+     "stats 'foo'",
+     // Cannot analyze multiple tables in one stmt.
+     "stats foo bar"
+    };
 
     for (String prefix: prefixes) {
-      ParsesOk(prefix + " stats bar");
-      ParsesOk(prefix + " stats `bar`");
-      ParsesOk(prefix + " stats foo.bar");
-      ParsesOk(prefix + " stats `foo`.`bar`");
-
-      // Missing table name.
-      ParserError(prefix + " stats");
-      // Missing 'stats' keyword.
-      ParserError(prefix + " foo");
-      // Cannot use string literal as table name.
-      ParserError(prefix + " stats 'foo'");
-      // Cannot analyze multiple tables in one stmt.
-      ParserError(prefix + " stats foo bar");
+      for (String suffix: okSuffixes) {
+        ParsesOk(prefix + " " + suffix);
+      }
+      for (String suffix: errorSuffixes) {
+        ParserError(prefix + " " + suffix);
+      }
+    }
+    for (String suffix: okSuffixes) {
+      for (String computeSuffix: okComputeSuffixes) {
+        ParsesOk("compute" + " " + suffix + " " + computeSuffix);
+      }
     }
   }
 
