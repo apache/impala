@@ -17,12 +17,14 @@
 
 package org.apache.impala.analysis;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.apache.commons.lang3.StringUtils;
@@ -34,6 +36,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.DataSourceTable;
@@ -60,6 +63,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 public class AnalyzeDDLTest extends FrontendTestBase {
 
@@ -1180,14 +1184,35 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     return checkComputeStatsStmt(stmt, analyzer, null);
   }
 
+  /**
+   * Analyzes 'stmt' and checks that the table-level and column-level SQL that is used
+   * to compute the stats is valid. Returns the analyzed statement.
+   */
   ComputeStatsStmt checkComputeStatsStmt(String stmt, Analyzer analyzer,
       String expectedWarning) throws AnalysisException {
     ParseNode parseNode = AnalyzesOk(stmt, analyzer, expectedWarning);
     assertTrue(parseNode instanceof ComputeStatsStmt);
     ComputeStatsStmt parsedStmt = (ComputeStatsStmt)parseNode;
     AnalyzesOk(parsedStmt.getTblStatsQuery());
-    AnalyzesOk(parsedStmt.getColStatsQuery());
+    String colsQuery = parsedStmt.getColStatsQuery();
+    if (colsQuery != null) AnalyzesOk(colsQuery);
     return parsedStmt;
+  }
+
+  /**
+   * In addition to the validation for checkComputeStatsStmt(String), checks that the
+   * whitelisted columns match 'expColNames'.
+   */
+  void checkComputeStatsStmt(String stmt, List<String> expColNames)
+      throws AnalysisException {
+    ComputeStatsStmt parsedStmt = checkComputeStatsStmt(stmt);
+    Set<Column> actCols = parsedStmt.getValidatedColumnWhitelist();
+    if (expColNames == null) assertTrue("Expected no whitelist.", actCols == null);
+    assertTrue("Expected whitelist.", actCols != null);
+    Set<String> actColSet = Sets.newHashSet();
+    for (Column col: actCols) actColSet.add(col.getName());
+    Set<String> expColSet = Sets.newHashSet(expColNames);
+    assertEquals(actColSet, expColSet);
   }
 
   @Test
@@ -1197,6 +1222,28 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     checkComputeStatsStmt("compute stats functional_hbase.alltypes");
     // Test that complex-typed columns are ignored.
     checkComputeStatsStmt("compute stats functional.allcomplextypes");
+    // Test legal column restriction.
+    checkComputeStatsStmt("compute stats functional.alltypes (int_col, double_col)",
+        Lists.newArrayList("int_col", "double_col"));
+    // Test legal column restriction with duplicate columns specified.
+    checkComputeStatsStmt(
+        "compute stats functional.alltypes (int_col, double_col, int_col)",
+        Lists.newArrayList("int_col", "double_col"));
+    // Test empty column restriction.
+    checkComputeStatsStmt("compute stats functional.alltypes ()",
+        new ArrayList<String>());
+    // Test column restriction of a column that does not exist.
+    AnalysisError("compute stats functional.alltypes(int_col, bogus_col, double_col)",
+        "bogus_col not found in table:");
+    // Test column restriction of a column with an unsupported type.
+    AnalysisError("compute stats functional.allcomplextypes(id, map_map_col)",
+        "COMPUTE STATS not supported for column");
+    // Test column restriction of an Hdfs table partitioning column.
+    AnalysisError("compute stats functional.stringpartitionkey(string_col)",
+        "COMPUTE STATS not supported for partitioning");
+    // Test column restriction of an HBase key column.
+    checkComputeStatsStmt("compute stats functional_hbase.testtbl(id)",
+        Lists.newArrayList("id"));
 
     // Cannot compute stats on a database.
     AnalysisError("compute stats tbl_does_not_exist",
@@ -1283,7 +1330,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
       // changes. Expect a sample between 4 and 6 of the 24 total files.
       Assert.assertTrue(adjustedStmt.getEffectiveSamplingPerc() >= 4.0 / 24);
       Assert.assertTrue(adjustedStmt.getEffectiveSamplingPerc() <= 6.0 / 24);
-
+      // Checks that whitelisted columns works with tablesample.
+      checkComputeStatsStmt(
+          "compute stats functional.alltypes (int_col, double_col) tablesample " +
+          "system (55) repeatable(1)",
+          Lists.newArrayList("int_col", "double_col"));
       AnalysisError("compute stats functional.alltypes tablesample system (101)",
           "Invalid percent of bytes value '101'. " +
           "The percent of bytes to sample must be between 0 and 100.");

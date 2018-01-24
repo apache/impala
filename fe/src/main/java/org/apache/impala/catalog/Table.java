@@ -508,7 +508,7 @@ public abstract class Table extends CatalogObjectImpl {
   }
 
   /**
-   * Case-insensitive lookup.
+   * Case-insensitive lookup. Returns null if the column with 'name' is not found.
    */
   public Column getColumn(String name) { return colsByName_.get(name.toLowerCase()); }
 

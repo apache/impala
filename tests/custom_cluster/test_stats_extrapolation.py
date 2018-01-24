@@ -57,10 +57,10 @@ class TestStatsExtrapolation(CustomClusterTestSuite):
     # Test partitioned table.
     part_test_tbl = unique_database + ".alltypes"
     self.clone_table("functional.alltypes", part_test_tbl, True, vector)
-    self.__run_sampling_test(part_test_tbl, "functional.alltypes", 1, 3)
-    self.__run_sampling_test(part_test_tbl, "functional.alltypes", 10, 7)
-    self.__run_sampling_test(part_test_tbl, "functional.alltypes", 20, 13)
-    self.__run_sampling_test(part_test_tbl, "functional.alltypes", 100, 99)
+    self.__run_sampling_test(part_test_tbl, "", "functional.alltypes", 1, 3)
+    self.__run_sampling_test(part_test_tbl, "", "functional.alltypes", 10, 7)
+    self.__run_sampling_test(part_test_tbl, "", "functional.alltypes", 20, 13)
+    self.__run_sampling_test(part_test_tbl, "", "functional.alltypes", 100, 99)
 
     # Test unpartitioned table.
     nopart_test_tbl = unique_database + ".alltypesnopart"
@@ -70,15 +70,15 @@ class TestStatsExtrapolation(CustomClusterTestSuite):
     nopart_test_tbl_exp = unique_database + ".alltypesnopart_exp"
     self.clone_table(nopart_test_tbl, nopart_test_tbl_exp, False, vector)
     self.client.execute("compute stats {0}".format(nopart_test_tbl_exp))
-    self.__run_sampling_test(nopart_test_tbl, nopart_test_tbl_exp, 1, 3)
-    self.__run_sampling_test(nopart_test_tbl, nopart_test_tbl_exp, 10, 7)
-    self.__run_sampling_test(nopart_test_tbl, nopart_test_tbl_exp, 20, 13)
-    self.__run_sampling_test(nopart_test_tbl, nopart_test_tbl_exp, 100, 99)
+    self.__run_sampling_test(nopart_test_tbl, "", nopart_test_tbl_exp, 1, 3)
+    self.__run_sampling_test(nopart_test_tbl, "", nopart_test_tbl_exp, 10, 7)
+    self.__run_sampling_test(nopart_test_tbl, "", nopart_test_tbl_exp, 20, 13)
+    self.__run_sampling_test(nopart_test_tbl, "", nopart_test_tbl_exp, 100, 99)
 
     # Test empty table.
     empty_test_tbl = unique_database + ".empty"
     self.clone_table("functional.alltypes", empty_test_tbl, False, vector)
-    self.__run_sampling_test(empty_test_tbl, empty_test_tbl, 10, 7)
+    self.__run_sampling_test(empty_test_tbl, "", empty_test_tbl, 10, 7)
 
     # Test wide table. Should not crash or error. This takes a few minutes so restrict
     # to exhaustive.
@@ -88,13 +88,29 @@ class TestStatsExtrapolation(CustomClusterTestSuite):
       self.client.execute(
         "compute stats {0} tablesample system(10)".format(wide_test_tbl))
 
-  def __run_sampling_test(self, tbl, expected_tbl, perc, seed):
+    # Test column subset.
+    column_subset_tbl = unique_database + ".column_subset"
+    columns = "(int_col, string_col)"
+    self.clone_table("functional.alltypes", column_subset_tbl, True, vector)
+    self.__run_sampling_test(column_subset_tbl, columns, "functional.alltypes", 1, 3)
+    self.__run_sampling_test(column_subset_tbl, columns, "functional.alltypes", 10, 7)
+    self.__run_sampling_test(column_subset_tbl, columns, "functional.alltypes", 20, 13)
+    self.__run_sampling_test(column_subset_tbl, columns, "functional.alltypes", 100, 99)
+
+    # Test no columns.
+    no_column_tbl = unique_database + ".no_columns"
+    columns = "()"
+    self.clone_table("functional.alltypes", no_column_tbl, True, vector)
+    self.__run_sampling_test(no_column_tbl, columns, "functional.alltypes", 10, 7)
+
+  def __run_sampling_test(self, tbl, cols, expected_tbl, perc, seed):
     """Drops stats on 'tbl' and then runs COMPUTE STATS TABLESAMPLE on 'tbl' with the
-    given sampling percent and random seed. Checks that the resulting table and column
-    stats are reasoanbly close to those of 'expected_tbl'."""
+    given column restriction clause, sampling percent and random seed. Checks that
+    the resulting table and column stats are reasoanbly close to those of
+    'expected_tbl'."""
     self.client.execute("drop stats {0}".format(tbl))
-    self.client.execute("compute stats {0} tablesample system ({1}) repeatable ({2})"\
-      .format(tbl, perc, seed))
+    self.client.execute("compute stats {0}{1} tablesample system ({2}) repeatable ({3})"\
+      .format(tbl, cols, perc, seed))
     self.__check_table_stats(tbl, expected_tbl)
     self.__check_column_stats(tbl, expected_tbl)
 
