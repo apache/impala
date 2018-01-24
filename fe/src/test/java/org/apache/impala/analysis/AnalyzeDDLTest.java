@@ -1279,7 +1279,67 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     TBackendGflags gflags = BackendConfig.INSTANCE.getBackendCfg();
     boolean origEnableStatsExtrapolation = gflags.isEnable_stats_extrapolation();
     try {
+      // Setup for testing combinations of extrapolation config options.
+      addTestDb("extrap_config", null);
+      addTestTable("create table extrap_config.tbl_prop_unset (i int)");
+      addTestTable("create table extrap_config.tbl_prop_false (i int) " +
+          "tblproperties('impala.enable.stats.extrapolation'='false')");
+      addTestTable("create table extrap_config.tbl_prop_true (i int) " +
+          "tblproperties('impala.enable.stats.extrapolation'='true')");
+      String stmt = "compute stats %s tablesample system (10)";
+      String err = "COMPUTE STATS TABLESAMPLE requires stats extrapolation";
+
+      // Test --enable_stats_extrapolation=false
+      gflags.setEnable_stats_extrapolation(false);
+      // Table property unset --> Extrapolation disabled
+      AnalysisError(String.format(stmt, "extrap_config.tbl_prop_unset"), err);
+      // Table property false --> Extrapolation disabled
+      AnalysisError(String.format(stmt, "extrap_config.tbl_prop_false"), err);
+      // Table property true --> Extrapolation enabled
+      AnalyzesOk(String.format(stmt, "extrap_config.tbl_prop_true"));
+
+      // Test --enable_stats_extrapolation=true
       gflags.setEnable_stats_extrapolation(true);
+      // Table property unset --> Extrapolation enabled
+      AnalyzesOk(String.format(stmt, "extrap_config.tbl_prop_unset"));
+      // Table property false --> Extrapolation disabled
+      AnalysisError(String.format(stmt, "extrap_config.tbl_prop_false"), err);
+      // Table property true --> Extrapolation enabled
+      AnalyzesOk(String.format(stmt, "extrap_config.tbl_prop_true"));
+
+      // Test file formats.
+      gflags.setEnable_stats_extrapolation(true);
+      checkComputeStatsStmt("compute stats functional.alltypes tablesample system (10)");
+      checkComputeStatsStmt(
+          "compute stats functional.alltypes tablesample system (55) repeatable(1)");
+      AnalysisError("compute stats functional.alltypes tablesample system (101)",
+          "Invalid percent of bytes value '101'. " +
+          "The percent of bytes to sample must be between 0 and 100.");
+      AnalysisError("compute stats functional_kudu.alltypes tablesample system (1)",
+          "TABLESAMPLE is only supported on HDFS tables.");
+      AnalysisError("compute stats functional_hbase.alltypes tablesample system (2)",
+          "TABLESAMPLE is only supported on HDFS tables.");
+      AnalysisError(
+          "compute stats functional.alltypes_datasource tablesample system (3)",
+          "TABLESAMPLE is only supported on HDFS tables.");
+
+      // Test file formats with columns whitelist.
+      gflags.setEnable_stats_extrapolation(true);
+      checkComputeStatsStmt(
+          "compute stats functional.alltypes (int_col, double_col) tablesample " +
+          "system (55) repeatable(1)",
+          Lists.newArrayList("int_col", "double_col"));
+      AnalysisError("compute stats functional.alltypes tablesample system (101)",
+          "Invalid percent of bytes value '101'. " +
+          "The percent of bytes to sample must be between 0 and 100.");
+      AnalysisError("compute stats functional_kudu.alltypes tablesample system (1)",
+          "TABLESAMPLE is only supported on HDFS tables.");
+      AnalysisError("compute stats functional_hbase.alltypes tablesample system (2)",
+          "TABLESAMPLE is only supported on HDFS tables.");
+      AnalysisError(
+          "compute stats functional.alltypes_datasource tablesample system (3)",
+          "TABLESAMPLE is only supported on HDFS tables.");
+
       // Test different COMPUTE_STATS_MIN_SAMPLE_BYTES.
       TQueryOptions queryOpts = new TQueryOptions();
 
@@ -1328,26 +1388,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
       // changes. Expect a sample between 4 and 6 of the 24 total files.
       Assert.assertTrue(adjustedStmt.getEffectiveSamplingPerc() >= 4.0 / 24);
       Assert.assertTrue(adjustedStmt.getEffectiveSamplingPerc() <= 6.0 / 24);
-      // Checks that whitelisted columns works with tablesample.
-      checkComputeStatsStmt(
-          "compute stats functional.alltypes (int_col, double_col) tablesample " +
-          "system (55) repeatable(1)",
-          Lists.newArrayList("int_col", "double_col"));
-      AnalysisError("compute stats functional.alltypes tablesample system (101)",
-          "Invalid percent of bytes value '101'. " +
-          "The percent of bytes to sample must be between 0 and 100.");
-      AnalysisError("compute stats functional_kudu.alltypes tablesample system (1)",
-          "TABLESAMPLE is only supported on HDFS tables.");
-      AnalysisError("compute stats functional_hbase.alltypes tablesample system (2)",
-          "TABLESAMPLE is only supported on HDFS tables.");
-      AnalysisError(
-          "compute stats functional.alltypes_datasource tablesample system (3)",
-          "TABLESAMPLE is only supported on HDFS tables.");
-
-      gflags.setEnable_stats_extrapolation(false);
-      AnalysisError("compute stats functional.alltypes tablesample system (10)",
-          "COMPUTE STATS TABLESAMPLE requires --enable_stats_extrapolation=true. " +
-          "Stats extrapolation is currently disabled.");
     } finally {
       gflags.setEnable_stats_extrapolation(origEnableStatsExtrapolation);
     }

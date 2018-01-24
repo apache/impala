@@ -126,6 +126,12 @@ public class HdfsTable extends Table {
   // Table property key for skip.header.line.count
   public static final String TBL_PROP_SKIP_HEADER_LINE_COUNT = "skip.header.line.count";
 
+  // Table property key for overriding the Impalad-wide --enable_stats_extrapolation
+  // setting for a specific table. By default, tables do not have the property set and
+  // rely on the Impalad-wide --enable_stats_extrapolation flag.
+  public static final String TBL_PROP_ENABLE_STATS_EXTRAPOLATION =
+      "impala.enable.stats.extrapolation";
+
   // Average memory requirements (in bytes) for storing the metadata of a partition.
   private static final long PER_PARTITION_MEM_USAGE_BYTES = 2048;
 
@@ -1951,7 +1957,7 @@ public class HdfsTable extends Table {
    * Otherwise, returns a value >= 1.
    */
   public long getExtrapolatedNumRows(long fileBytes) {
-    if (!BackendConfig.INSTANCE.enableStatsExtrapolation()) return -1;
+    if (!isStatsExtrapolationEnabled()) return -1;
     if (fileBytes == 0) return 0;
     if (fileBytes < 0) return -1;
     if (tableStats_.num_rows < 0 || tableStats_.total_file_bytes <= 0) return -1;
@@ -1959,6 +1965,18 @@ public class HdfsTable extends Table {
     double rowsPerByte = tableStats_.num_rows / (double) tableStats_.total_file_bytes;
     double extrapolatedNumRows = fileBytes * rowsPerByte;
     return (long) Math.max(1, Math.round(extrapolatedNumRows));
+  }
+
+  /**
+   * Returns true if stats extrapolation is enabled for this table, false otherwise.
+   * Reconciles the Impalad-wide --enable_stats_extrapolation flag and the
+   * TBL_PROP_ENABLE_STATS_EXTRAPOLATION table property
+   */
+  public boolean isStatsExtrapolationEnabled() {
+    org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
+    String propVal = msTbl.getParameters().get(TBL_PROP_ENABLE_STATS_EXTRAPOLATION);
+    if (propVal == null) return BackendConfig.INSTANCE.isStatsExtrapolationEnabled();
+    return Boolean.parseBoolean(propVal);
   }
 
   /**
@@ -1978,7 +1996,7 @@ public class HdfsTable extends Table {
       resultSchema.addToColumns(colDesc);
     }
 
-    boolean statsExtrap = BackendConfig.INSTANCE.enableStatsExtrapolation();
+    boolean statsExtrap = isStatsExtrapolationEnabled();
 
     resultSchema.addToColumns(new TColumn("#Rows", Type.BIGINT.toThrift()));
     if (statsExtrap) {
