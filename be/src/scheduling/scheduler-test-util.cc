@@ -467,7 +467,7 @@ Status SchedulerWrapper::Compute(bool exec_at_coord, Result* result) {
 void SchedulerWrapper::AddBackend(const Host& host) {
   // Add to topic delta
   TTopicDelta delta;
-  delta.topic_name = Scheduler::IMPALA_MEMBERSHIP_TOPIC;
+  delta.topic_name = Statestore::IMPALA_MEMBERSHIP_TOPIC;
   delta.is_delta = true;
   AddHostToTopicDelta(host, &delta);
   SendTopicDelta(delta);
@@ -476,7 +476,7 @@ void SchedulerWrapper::AddBackend(const Host& host) {
 void SchedulerWrapper::RemoveBackend(const Host& host) {
   // Add deletion to topic delta
   TTopicDelta delta;
-  delta.topic_name = Scheduler::IMPALA_MEMBERSHIP_TOPIC;
+  delta.topic_name = Statestore::IMPALA_MEMBERSHIP_TOPIC;
   delta.is_delta = true;
   TTopicItem item;
   item.__set_deleted(true);
@@ -487,7 +487,7 @@ void SchedulerWrapper::RemoveBackend(const Host& host) {
 
 void SchedulerWrapper::SendFullMembershipMap() {
   TTopicDelta delta;
-  delta.topic_name = Scheduler::IMPALA_MEMBERSHIP_TOPIC;
+  delta.topic_name = Statestore::IMPALA_MEMBERSHIP_TOPIC;
   delta.is_delta = false;
   for (const Host& host : plan_.cluster().hosts()) {
     if (host.be_port >= 0) AddHostToTopicDelta(host, &delta);
@@ -497,7 +497,7 @@ void SchedulerWrapper::SendFullMembershipMap() {
 
 void SchedulerWrapper::SendEmptyUpdate() {
   TTopicDelta delta;
-  delta.topic_name = Scheduler::IMPALA_MEMBERSHIP_TOPIC;
+  delta.topic_name = Statestore::IMPALA_MEMBERSHIP_TOPIC;
   delta.is_delta = true;
   SendTopicDelta(delta);
 }
@@ -547,7 +547,7 @@ void SchedulerWrapper::SendTopicDelta(const TTopicDelta& delta) {
   DCHECK(scheduler_ != nullptr);
   // Wrap in topic delta map.
   StatestoreSubscriber::TopicDeltaMap delta_map;
-  delta_map.emplace(Scheduler::IMPALA_MEMBERSHIP_TOPIC, delta);
+  delta_map.emplace(Statestore::IMPALA_MEMBERSHIP_TOPIC, delta);
 
   // Send to the scheduler.
   vector<TTopicDelta> dummy_result;

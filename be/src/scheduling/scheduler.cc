@@ -52,8 +52,6 @@ static const string ASSIGNMENTS_KEY("simple-scheduler.assignments.total");
 static const string SCHEDULER_INIT_KEY("simple-scheduler.initialized");
 static const string NUM_BACKENDS_KEY("simple-scheduler.num-backends");
 
-const string Scheduler::IMPALA_MEMBERSHIP_TOPIC("impala-membership");
-
 Scheduler::Scheduler(StatestoreSubscriber* subscriber, const string& backend_id,
     MetricGroup* metrics, Webserver* webserver, RequestPoolService* request_pool_service)
   : executors_config_(std::make_shared<const BackendConfig>()),
@@ -86,7 +84,8 @@ Status Scheduler::Init(const TNetworkAddress& backend_address,
   if (statestore_subscriber_ != nullptr) {
     StatestoreSubscriber::UpdateCallback cb =
         bind<void>(mem_fn(&Scheduler::UpdateMembership), this, _1, _2);
-    Status status = statestore_subscriber_->AddTopic(IMPALA_MEMBERSHIP_TOPIC, true, cb);
+    Status status = statestore_subscriber_->AddTopic(
+        Statestore::IMPALA_MEMBERSHIP_TOPIC, true, cb);
     if (!status.ok()) {
       status.AddDetail("Scheduler failed to register membership topic");
       return status;
@@ -123,7 +122,7 @@ void Scheduler::UpdateMembership(
     vector<TTopicDelta>* subscriber_topic_updates) {
   // First look to see if the topic(s) we're interested in have an update
   StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
-      incoming_topic_deltas.find(IMPALA_MEMBERSHIP_TOPIC);
+      incoming_topic_deltas.find(Statestore::IMPALA_MEMBERSHIP_TOPIC);
 
   if (topic == incoming_topic_deltas.end()) return;
   const TTopicDelta& delta = topic->second;

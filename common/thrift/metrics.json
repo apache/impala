@@ -972,7 +972,18 @@
     "key": "statestore-subscriber.topic-$0.processing-time-s"
   },
   {
-    "description": "The time (sec) taken to process Statestore subcriber topic updates.",
+    "description": "Interval between topic updates for Topic $0",
+    "contexts": [
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Statestore Subscriber Topic $0 Update Interval",
+    "units": "TIME_S",
+    "kind": "STATS",
+    "key": "statestore-subscriber.topic-$0.update-interval"
+  },
+  {
+    "description": "The time (sec) taken to process Statestore subscriber topic updates.",
     "contexts": [
       "CATALOGSERVER",
       "IMPALAD"
@@ -1024,7 +1035,7 @@
     "key": "statestore.live-backends.list"
   },
   {
-    "description": "The time (sec) spent sending topic update RPCs. Includes subscriber-side processing time and network transmission time.",
+    "description": "The time (sec) spent sending non-priority topic update RPCs. Includes subscriber-side processing time and network transmission time.",
     "contexts": [
       "STATESTORE"
     ],
@@ -1032,6 +1043,16 @@
     "units": "TIME_S",
     "kind": "STATS",
     "key": "statestore.topic-update-durations"
+  },
+  {
+    "description": "The time (sec) spent sending priority topic update RPCs. Includes subscriber-side processing time and network transmission time.",
+    "contexts": [
+      "STATESTORE"
+    ],
+    "label": "Statestore Priority Topic Update Durations",
+    "units": "TIME_S",
+    "kind": "STATS",
+    "key": "statestore.priority-topic-update-durations"
   },
   {
     "description": "The sum of the size of all keys for all topics tracked by the StateStore.",

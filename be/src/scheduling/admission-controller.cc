@@ -50,8 +50,6 @@ int64_t GetProcMemLimit() {
   return ExecEnv::GetInstance()->process_mem_tracker()->limit();
 }
 
-const string AdmissionController::IMPALA_REQUEST_QUEUE_TOPIC("impala-request-queue");
-
 // Delimiter used for topic keys of the form "<pool_name><delimiter><backend_id>".
 // "!" is used because the backend id contains a colon, but it should not contain "!".
 // When parsing the topic key we need to be careful to find the last instance in
@@ -243,7 +241,7 @@ Status AdmissionController::Init() {
       &AdmissionController::DequeueLoop, this, &dequeue_thread_));
   StatestoreSubscriber::UpdateCallback cb =
     bind<void>(mem_fn(&AdmissionController::UpdatePoolStats), this, _1, _2);
-  Status status = subscriber_->AddTopic(IMPALA_REQUEST_QUEUE_TOPIC, true, cb);
+  Status status = subscriber_->AddTopic(Statestore::IMPALA_REQUEST_QUEUE_TOPIC, true, cb);
   if (!status.ok()) {
     status.AddDetail("AdmissionController failed to register request queue topic");
   }
@@ -632,7 +630,7 @@ void AdmissionController::UpdatePoolStats(
     AddPoolUpdates(subscriber_topic_updates);
 
     StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
-        incoming_topic_deltas.find(IMPALA_REQUEST_QUEUE_TOPIC);
+        incoming_topic_deltas.find(Statestore::IMPALA_REQUEST_QUEUE_TOPIC);
     if (topic != incoming_topic_deltas.end()) {
       const TTopicDelta& delta = topic->second;
       // Delta and non-delta updates are handled the same way, except for a full update
@@ -799,7 +797,7 @@ void AdmissionController::AddPoolUpdates(vector<TTopicDelta>* topic_updates) {
   if (pools_for_updates_.empty()) return;
   topic_updates->push_back(TTopicDelta());
   TTopicDelta& topic_delta = topic_updates->back();
-  topic_delta.topic_name = IMPALA_REQUEST_QUEUE_TOPIC;
+  topic_delta.topic_name = Statestore::IMPALA_REQUEST_QUEUE_TOPIC;
   for (const string& pool_name: pools_for_updates_) {
     DCHECK(pool_stats_.find(pool_name) != pool_stats_.end());
     PoolStats* stats = GetPoolStats(pool_name);
