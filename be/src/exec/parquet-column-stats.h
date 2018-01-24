@@ -73,6 +73,12 @@ class ColumnStatsBase {
       const ColumnType& col_type, const parquet::ColumnOrder* col_order,
       StatsField stats_field, void* slot);
 
+  // Gets the null_count statistics from the given column chunk's metadata and returns
+  // it via an output parameter.
+  // Returns true if the null_count stats were read successfully, false otherwise.
+  static bool ReadNullCountStat(const parquet::ColumnChunk& col_chunk,
+      int64_t* null_count);
+
   /// Merges this statistics object with values from 'other'. If other has not been
   /// initialized, then this object will not be changed.
   virtual void Merge(const ColumnStatsBase& other) = 0;
