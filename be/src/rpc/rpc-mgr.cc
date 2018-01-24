@@ -44,6 +44,9 @@ DECLARE_string(hostname);
 DECLARE_string(principal);
 DECLARE_string(be_principal);
 
+// Defined in kudu/rpc/rpcz_store.cc
+DECLARE_int32(rpc_duration_too_long_ms);
+
 DEFINE_int32(num_acceptor_threads, 2,
     "Number of threads dedicated to accepting connection requests for RPC services");
 DEFINE_int32(num_reactor_threads, 0,
@@ -55,6 +58,9 @@ DEFINE_int32(rpc_retry_interval_ms, 5,
 namespace impala {
 
 Status RpcMgr::Init() {
+  // Log any RPCs which take longer than 2 minutes.
+  FLAGS_rpc_duration_too_long_ms = 2 * 60 * 1000;
+
   MessengerBuilder bld("impala-server");
   const scoped_refptr<MetricEntity> entity(
       METRIC_ENTITY_server.Instantiate(&registry_, "krpc-metrics"));
