@@ -357,7 +357,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       this->MembershipCallback(state, topic_updates);
     };
     ABORT_IF_ERROR(
-        exec_env->subscriber()->AddTopic(Scheduler::IMPALA_MEMBERSHIP_TOPIC, true, cb));
+        exec_env->subscriber()->AddTopic(Statestore::IMPALA_MEMBERSHIP_TOPIC, true, cb));
 
     if (FLAGS_is_coordinator) {
       auto catalog_cb = [this] (const StatestoreSubscriber::TopicDeltaMap& state,
@@ -1482,7 +1482,7 @@ void ImpalaServer::MembershipCallback(
   // TODO: Consider rate-limiting this. In the short term, best to have
   // statestore heartbeat less frequently.
   StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
-      incoming_topic_deltas.find(Scheduler::IMPALA_MEMBERSHIP_TOPIC);
+      incoming_topic_deltas.find(Statestore::IMPALA_MEMBERSHIP_TOPIC);
 
   if (topic != incoming_topic_deltas.end()) {
     const TTopicDelta& delta = topic->second;
@@ -1607,7 +1607,7 @@ void ImpalaServer::AddLocalBackendToStatestore(
   }
   subscriber_topic_updates->emplace_back(TTopicDelta());
   TTopicDelta& update = subscriber_topic_updates->back();
-  update.topic_name = Scheduler::IMPALA_MEMBERSHIP_TOPIC;
+  update.topic_name = Statestore::IMPALA_MEMBERSHIP_TOPIC;
   update.topic_entries.emplace_back(TTopicItem());
 
   TTopicItem& item = update.topic_entries.back();

@@ -22,6 +22,7 @@
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/thread/lock_options.hpp>
 #include <boost/thread/shared_mutex.hpp>
 #include <gutil/strings/substitute.h>
 
@@ -39,6 +40,9 @@
 #include "common/names.h"
 
 using boost::posix_time::seconds;
+using boost::shared_lock;
+using boost::shared_mutex;
+using boost::try_to_lock;
 using namespace apache::thrift;
 using namespace apache::thrift::transport;
 using namespace strings;
@@ -64,6 +68,9 @@ const string STATESTORE_ID = "STATESTORE";
 
 // Template for metrics that measure the processing time for individual topics.
 const string CALLBACK_METRIC_PATTERN = "statestore-subscriber.topic-$0.processing-time-s";
+
+// Template for metrics that measure the interval between updates for individual topics.
+const string UPDATE_INTERVAL_METRIC_PATTERN = "statestore-subscriber.topic-$0.update-interval";
 
 // Duration, in ms, to sleep between attempts to reconnect to the
 // statestore after a failure.
@@ -107,41 +114,42 @@ StatestoreSubscriber::StatestoreSubscriber(const std::string& subscriber_id,
       failure_detector_(new TimeoutFailureDetector(
           seconds(FLAGS_statestore_subscriber_timeout_seconds),
           seconds(FLAGS_statestore_subscriber_timeout_seconds / 2))),
-      is_registered_(false),
       client_cache_(new StatestoreClientCache(FLAGS_statestore_subscriber_cnxn_attempts,
-          FLAGS_statestore_subscriber_cnxn_retry_interval_ms, 0, 0, "",
-          !FLAGS_ssl_client_ca_certificate.empty())),
-      metrics_(metrics->GetOrCreateChildGroup("statestore-subscriber")) {
+                FLAGS_statestore_subscriber_cnxn_retry_interval_ms, 0, 0, "",
+                !FLAGS_ssl_client_ca_certificate.empty())),
+      metrics_(metrics->GetOrCreateChildGroup("statestore-subscriber")),
+      is_registered_(false) {
   connected_to_statestore_metric_ =
       metrics_->AddProperty("statestore-subscriber.connected", false);
   last_recovery_duration_metric_ = metrics_->AddDoubleGauge(
       "statestore-subscriber.last-recovery-duration", 0.0);
   last_recovery_time_metric_ = metrics_->AddProperty<string>(
       "statestore-subscriber.last-recovery-time", "N/A");
-  topic_update_interval_metric_ = StatsMetric<double>::CreateAndRegister(metrics,
+  topic_update_interval_metric_ = StatsMetric<double>::CreateAndRegister(metrics_,
       "statestore-subscriber.topic-update-interval-time");
-  topic_update_duration_metric_ = StatsMetric<double>::CreateAndRegister(metrics,
+  topic_update_duration_metric_ = StatsMetric<double>::CreateAndRegister(metrics_,
       "statestore-subscriber.topic-update-duration");
-  heartbeat_interval_metric_ = StatsMetric<double>::CreateAndRegister(metrics,
+  heartbeat_interval_metric_ = StatsMetric<double>::CreateAndRegister(metrics_,
       "statestore-subscriber.heartbeat-interval-time");
-
   registration_id_metric_ = metrics->AddProperty<string>(
       "statestore-subscriber.registration-id", "N/A");
-
   client_cache_->InitMetrics(metrics, "statestore-subscriber.statestore");
 }
 
 Status StatestoreSubscriber::AddTopic(const Statestore::TopicId& topic_id,
     bool is_transient, const UpdateCallback& callback) {
-  lock_guard<mutex> l(lock_);
+  lock_guard<shared_mutex> exclusive_lock(lock_);
   if (is_registered_) return Status("Subscriber already started, can't add new topic");
-  Callbacks* cb = &(update_callbacks_[topic_id]);
-  cb->callbacks.push_back(callback);
-  if (cb->processing_time_metric == NULL) {
-    cb->processing_time_metric = StatsMetric<double>::CreateAndRegister(metrics_,
+  TopicRegistration& registration = topic_registrations_[topic_id];
+  registration.callbacks.push_back(callback);
+  if (registration.processing_time_metric == nullptr) {
+    registration.processing_time_metric = StatsMetric<double>::CreateAndRegister(metrics_,
         CALLBACK_METRIC_PATTERN, topic_id);
+    registration.update_interval_metric = StatsMetric<double>::CreateAndRegister(metrics_,
+        UPDATE_INTERVAL_METRIC_PATTERN, topic_id);
+    registration.update_interval_timer.Start();
   }
-  topic_registrations_[topic_id] = is_transient;
+  registration.is_transient = is_transient;
   return Status::OK();
 }
 
@@ -151,11 +159,10 @@ Status StatestoreSubscriber::Register() {
   RETURN_IF_ERROR(client_status);
 
   TRegisterSubscriberRequest request;
-  request.topic_registrations.reserve(update_callbacks_.size());
-  for (const UpdateCallbacks::value_type& topic: update_callbacks_) {
+  for (const auto& registration : topic_registrations_) {
     TTopicRegistration thrift_topic;
-    thrift_topic.topic_name = topic.first;
-    thrift_topic.is_transient = topic_registrations_[topic.first];
+    thrift_topic.topic_name = registration.first;
+    thrift_topic.is_transient = registration.second.is_transient;
     request.topic_registrations.push_back(thrift_topic);
   }
 
@@ -175,7 +182,6 @@ Status StatestoreSubscriber::Register() {
   } else {
     VLOG(1) << "No subscriber registration ID received from statestore";
   }
-  topic_update_interval_timer_.Start();
   heartbeat_interval_timer_.Start();
   return status;
 }
@@ -186,7 +192,7 @@ Status StatestoreSubscriber::Start() {
     // Take the lock to ensure that, if a topic-update is received during registration
     // (perhaps because Register() has succeeded, but we haven't finished setting up state
     // on the client side), UpdateState() will reject the message.
-    lock_guard<mutex> l(lock_);
+    lock_guard<shared_mutex> exclusive_lock(lock_);
     LOG(INFO) << "Starting statestore subscriber";
 
     // Backend must be started before registration
@@ -241,7 +247,7 @@ void StatestoreSubscriber::RecoveryModeChecker() {
     if (failure_detector_->GetPeerState(STATESTORE_ID) == FailureDetector::FAILED) {
       // When entering recovery mode, the class-wide lock_ is taken to
       // ensure mutual exclusion with any operations in flight.
-      lock_guard<mutex> l(lock_);
+      lock_guard<shared_mutex> exclusive_lock(lock_);
       MonotonicStopWatch recovery_timer;
       recovery_timer.Start();
       connected_to_statestore_metric_->SetValue(false);
@@ -313,74 +319,127 @@ void StatestoreSubscriber::Heartbeat(const RegistrationId& registration_id) {
 Status StatestoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_deltas,
     const RegistrationId& registration_id, vector<TTopicDelta>* subscriber_topic_updates,
     bool* skipped) {
+  RETURN_IF_ERROR(CheckRegistrationId(registration_id));
+
+  // Put the updates into ascending order of topic name to match the lock acquisition
+  // order of TopicRegistration::update_lock.
+  vector<const TTopicDelta*> deltas_to_process;
+  for (auto& delta : incoming_topic_deltas) deltas_to_process.push_back(&delta.second);
+  sort(deltas_to_process.begin(), deltas_to_process.end(),
+      [](const TTopicDelta* left, const TTopicDelta* right) {
+        return left->topic_name < right->topic_name;
+      });
+  // Unique locks to hold the 'update_lock' for each entry in 'deltas_to_process'. Locks
+  // are held until we finish processing the update to prevent any races with concurrent
+  // updates for the same topic.
+  vector<unique_lock<mutex>> topic_update_locks(deltas_to_process.size());
+
   // We don't want to block here because this is an RPC, and delaying the return causes
   // the statestore to delay sending further messages. The only time that lock_ might be
-  // taken concurrently is if:
+  // taken exclusively is if the subscriber is recovering, and has the lock held during
+  // RecoveryModeChecker(). In this case we skip all topics and don't update any metrics.
   //
-  // a) another update is still being processed (i.e. is still in UpdateState()). This
-  // could happen only when the subscriber has re-registered, and the statestore is still
-  // sending an update for the previous registration. In this case, return OK but set
-  // *skipped = true to tell the statestore to retry this update in the future.
+  // UpdateState() may run concurrently with itself in two cases:
+  // a) disjoint sets of topics are being updated. In that case the updates can proceed
+  // concurrently.
+  // b) another update for the same topics is still being processed (i.e. is still in
+  // UpdateState()). This could happen only when the subscriber has re-registered, and
+  // the statestore is still sending an update for the previous registration. In this
+  // case, we notices that the per-topic 'update_lock' is held, skip processing all
+  // of the topic updates and set *skipped = true so that the statestore will retry this
+  // update in the future.
   //
-  // b) the subscriber is recovering, and has the lock held during
-  // RecoveryModeChecker(). Similarly, we set *skipped = true.
   // TODO: Consider returning an error in this case so that the statestore will eventually
   // stop sending updates even if re-registration fails.
-  try_mutex::scoped_try_lock l(lock_);
-  if (l) {
-    *skipped = false;
-    RETURN_IF_ERROR(CheckRegistrationId(registration_id));
-
-    // Only record updates received when not in recovery mode
-    topic_update_interval_metric_->Update(
-        topic_update_interval_timer_.Reset() / (1000.0 * 1000.0 * 1000.0));
-    MonotonicStopWatch sw;
-    sw.Start();
-
-    // Check the version ranges of all delta updates to ensure they can be applied
-    // to this subscriber. If any invalid ranges are found, request new update(s) with
-    // version ranges applicable to this subscriber.
-    bool found_unexpected_delta = false;
-    for (const TopicDeltaMap::value_type& delta: incoming_topic_deltas) {
-      TopicVersionMap::const_iterator itr = current_topic_versions_.find(delta.first);
-      if (itr != current_topic_versions_.end()) {
-        if (delta.second.is_delta && delta.second.from_version != itr->second) {
-          LOG(ERROR) << "Unexpected delta update to topic '" << delta.first << "' of "
-                     << "version range (" << delta.second.from_version << ":"
-                     << delta.second.to_version << "]. Expected delta start version: "
-                     << itr->second;
-
-          subscriber_topic_updates->push_back(TTopicDelta());
-          TTopicDelta& update = subscriber_topic_updates->back();
-          update.topic_name = delta.second.topic_name;
-          update.__set_from_version(itr->second);
-          found_unexpected_delta = true;
-        } else {
-          // Update the current topic version
-          current_topic_versions_[delta.first] = delta.second.to_version;
-        }
-      }
-    }
-
-    // Skip calling the callbacks when an unexpected delta update is found.
-    if (!found_unexpected_delta) {
-      for (const UpdateCallbacks::value_type& callbacks: update_callbacks_) {
-        MonotonicStopWatch sw;
-        sw.Start();
-        for (const UpdateCallback& callback: callbacks.second.callbacks) {
-          // TODO: Consider filtering the topics to only send registered topics to
-          // callbacks
-          callback(incoming_topic_deltas, subscriber_topic_updates);
-        }
-        callbacks.second.processing_time_metric->Update(
-            sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
-      }
-    }
-    sw.Stop();
-    topic_update_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
-  } else {
+  shared_lock<shared_mutex> l(lock_, try_to_lock);
+  if (!l.owns_lock()) {
     *skipped = true;
+    return Status::OK();
   }
+
+  // First, acquire all the topic locks and update the interval metrics
+  // Record the time we received the update before doing any processing to avoid including
+  // processing time in the interval metrics.
+  for (int i = 0; i < deltas_to_process.size(); ++i) {
+    const TTopicDelta& delta = *deltas_to_process[i];
+    auto it = topic_registrations_.find(delta.topic_name);
+    // Skip updates to unregistered topics.
+    if (it == topic_registrations_.end()) {
+      LOG(ERROR) << "Unexpected delta update for unregistered topic: "
+                 << delta.topic_name;
+      continue;
+    }
+    TopicRegistration& registration = it->second;
+    unique_lock<mutex> ul(registration.update_lock, try_to_lock);
+    if (!ul.owns_lock()) {
+      // Statestore sent out concurrent topic updates. Avoid blocking the RPC by skipping
+      // the topic.
+      LOG(ERROR) << "Could not acquire lock for topic " << delta.topic_name << ". "
+                 << "Skipping update.";
+      *skipped = true;
+      return Status::OK();
+    }
+    double interval =
+        registration.update_interval_timer.ElapsedTime() / (1000.0 * 1000.0 * 1000.0);
+    registration.update_interval_metric->Update(interval);
+    topic_update_interval_metric_->Update(interval);
+
+    // Hold onto lock until we've finished processing the update.
+    topic_update_locks[i].swap(ul);
+  }
+
+  MonotonicStopWatch sw;
+  sw.Start();
+  // Second, do the actual processing of topic updates that we validated and acquired
+  // locks for above.
+  for (int i = 0; i < deltas_to_process.size(); ++i) {
+    if (!topic_update_locks[i].owns_lock()) continue;
+
+    const TTopicDelta& delta = *deltas_to_process[i];
+    auto it = topic_registrations_.find(delta.topic_name);
+    DCHECK(it != topic_registrations_.end());
+    TopicRegistration& registration = it->second;
+    if (delta.is_delta && registration.current_topic_version != -1
+      && delta.from_version != registration.current_topic_version) {
+      // Received a delta update for the wrong version. Log an error and send back the
+      // expected version to the statestore to request a new update with the correct
+      // version range.
+      LOG(ERROR) << "Unexpected delta update to topic '" << delta.topic_name << "' of "
+                 << "version range (" << delta.from_version << ":"
+                 << delta.to_version << "]. Expected delta start version: "
+                 << registration.current_topic_version;
+
+      subscriber_topic_updates->push_back(TTopicDelta());
+      TTopicDelta& update = subscriber_topic_updates->back();
+      update.topic_name = delta.topic_name;
+      update.__set_from_version(registration.current_topic_version);
+      continue;
+    }
+    // The topic version in the update is valid, process the update.
+    MonotonicStopWatch update_callback_sw;
+    update_callback_sw.Start();
+    for (const UpdateCallback& callback : registration.callbacks) {
+      callback(incoming_topic_deltas, subscriber_topic_updates);
+    }
+    update_callback_sw.Stop();
+    registration.current_topic_version = delta.to_version;
+    registration.processing_time_metric->Update(
+        sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
+  }
+
+  // Third and finally, reset the interval timers so they correctly measure the
+  // time between RPCs, excluding processing time.
+  for (int i = 0; i < deltas_to_process.size(); ++i) {
+    if (!topic_update_locks[i].owns_lock()) continue;
+
+    const TTopicDelta& delta = *deltas_to_process[i];
+    auto it = topic_registrations_.find(delta.topic_name);
+    DCHECK(it != topic_registrations_.end());
+    TopicRegistration& registration = it->second;
+    registration.update_interval_timer.Reset();
+  }
+  sw.Stop();
+  topic_update_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
   return Status::OK();
 }
 

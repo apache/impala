@@ -24,6 +24,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/thread/shared_mutex.hpp>
 
 #include "statestore/statestore.h"
 #include "util/stopwatch.h"
@@ -84,9 +85,9 @@ class StatestoreSubscriber {
   /// Function called to update a service with new state. Called in a
   /// separate thread to the one in which it is registered.
   //
-  /// Every UpdateCallback is invoked every time that an update is
-  /// received from the statestore. Therefore the callback should not
-  /// assume that the TopicDeltaMap contains an entry for their
+  /// Every UpdateCallback is invoked every time that an update for the
+  /// topic is received from the statestore. Therefore the callback should
+  /// not assume that the TopicDeltaMap contains an entry for their
   /// particular topic of interest.
   //
   /// If a delta for a particular topic does not have the 'is_delta'
@@ -145,9 +146,46 @@ class StatestoreSubscriber {
   /// Thread in which RecoveryModeChecker runs.
   std::unique_ptr<Thread> recovery_mode_thread_;
 
-  /// Class-wide lock. Protects all subsequent members. Most private methods must
-  /// be called holding this lock; this is noted in the method comments.
-  boost::mutex lock_;
+  /// statestore client cache - only one client is ever used. Initialized in constructor.
+  boost::scoped_ptr<StatestoreClientCache> client_cache_;
+
+  /// MetricGroup instance that all metrics are registered in. Not owned by this class.
+  MetricGroup* metrics_;
+
+  /// Metric to indicate if we are successfully registered with the statestore
+  BooleanProperty* connected_to_statestore_metric_;
+
+  /// Amount of time last spent in recovery mode
+  DoubleGauge* last_recovery_duration_metric_;
+
+  /// When the last recovery happened.
+  StringProperty* last_recovery_time_metric_;
+
+  /// Accumulated statistics on the frequency of topic-update messages, including samples
+  /// from all topics.
+  StatsMetric<double>* topic_update_interval_metric_;
+
+  /// Accumulated statistics on the time taken to process each topic-update message from
+  /// the statestore (that is, to call all callbacks)
+  StatsMetric<double>* topic_update_duration_metric_;
+
+  /// Accumulated statistics on the frequency of heartbeat messages
+  StatsMetric<double>* heartbeat_interval_metric_;
+
+  /// Tracks the time between heartbeat messages. Only updated by Heartbeat(), which
+  /// should not run concurrently with itself.
+  MonotonicStopWatch heartbeat_interval_timer_;
+
+  /// Current registration ID, in string form.
+  StringProperty* registration_id_metric_;
+
+  /// Object-wide lock that protects the below members. Must be held exclusively when
+  /// modifying the members, except when modifying TopicRegistrations - see
+  /// TopicRegistration::update_lock for details of locking there. Held in shared mode
+  /// when processing topic updates to prevent concurrent updates to other state. Most
+  /// private methods must be called holding this lock; this is noted in the method
+  /// comments.
+  boost::shared_mutex lock_;
 
   /// Set to true after Register(...) is successful, after which no
   /// more topics may be subscribed to.
@@ -164,68 +202,40 @@ class StatestoreSubscriber {
   /// registration.
   RegistrationId registration_id_;
 
-  struct Callbacks {
+  struct TopicRegistration {
+    /// Held when processing a topic update. 'StatestoreSubscriber::lock_' must be held in
+    /// shared mode before acquiring this lock. If taking multiple update locks, they must
+    /// be acquired in ascending order of topic name.
+    boost::mutex update_lock;
+
+    /// Whether the subscriber considers this topic to be "transient", that is any updates
+    /// it makes will be deleted upon failure or disconnection.
+    bool is_transient = false;
+
+    /// The last version of the topic this subscriber processed.
+    /// -1 if no updates have been processed yet.
+    int64_t current_topic_version = -1;
+
     /// Owned by the MetricGroup instance. Tracks how long callbacks took to process this
     /// topic.
-    StatsMetric<double>* processing_time_metric;
+    StatsMetric<double>* processing_time_metric = nullptr;
 
-    /// List of callbacks to invoke for this topic.
+    /// Tracks the time between topic-update messages to update 'update_interval_metric'.
+    MonotonicStopWatch update_interval_timer;
+
+    /// Owned by the MetricGroup instances. Tracks the time between the end of the last
+    /// update RPC for this topic and the start of the next.
+    StatsMetric<double>* update_interval_metric = nullptr;
+
+    /// Callback for all services that have registered for updates.
     std::vector<UpdateCallback> callbacks;
   };
 
-  /// Mapping of topic ids to their associated callbacks. Because this mapping
-  /// stores a pointer to an UpdateCallback, memory errors will occur if an UpdateCallback
-  /// is deleted before being unregistered. The UpdateCallback destructor checks for
-  /// such problems, so that we will have an assertion failure rather than a memory error.
-  typedef boost::unordered_map<Statestore::TopicId, Callbacks> UpdateCallbacks;
-
-  /// Callback for all services that have registered for updates (indexed by the associated
-  /// SubscriptionId), and associated lock.
-  UpdateCallbacks update_callbacks_;
-
-  /// One entry for every topic subscribed to. The value is whether this subscriber
-  /// considers this topic to be 'transient', that is any updates it makes will be deleted
-  /// upon failure or disconnection.
-  std::map<Statestore::TopicId, bool> topic_registrations_;
-
-  /// Mapping of TopicId to the last version of the topic this subscriber successfully
-  /// processed.
-  typedef boost::unordered_map<Statestore::TopicId, int64_t> TopicVersionMap;
-  TopicVersionMap current_topic_versions_;
-
-  /// statestore client cache - only one client is ever used.
-  boost::scoped_ptr<StatestoreClientCache> client_cache_;
-
-  /// MetricGroup instance that all metrics are registered in. Not owned by this class.
-  MetricGroup* metrics_;
-
-  /// Metric to indicate if we are successfully registered with the statestore
-  BooleanProperty* connected_to_statestore_metric_;
-
-  /// Amount of time last spent in recovery mode
-  DoubleGauge* last_recovery_duration_metric_;
-
-  /// When the last recovery happened.
-  StringProperty* last_recovery_time_metric_;
-
-  /// Accumulated statistics on the frequency of topic-update messages
-  StatsMetric<double>* topic_update_interval_metric_;
-
-  /// Tracks the time between topic-update mesages
-  MonotonicStopWatch topic_update_interval_timer_;
-
-  /// Accumulated statistics on the time taken to process each topic-update message from
-  /// the statestore (that is, to call all callbacks)
-  StatsMetric<double>* topic_update_duration_metric_;
-
-  /// Tracks the time between heartbeat mesages
-  MonotonicStopWatch heartbeat_interval_timer_;
-
-  /// Accumulated statistics on the frequency of heartbeat messages
-  StatsMetric<double>* heartbeat_interval_metric_;
-
-  /// Current registration ID, in string form.
-  StringProperty* registration_id_metric_;
+  /// One entry for every topic subscribed to. 'lock_' must be held exclusively to add or
+  /// remove entries from the map or held as a shared lock to lookup entries in the map.
+  /// Modifications to the contents of each TopicRegistration is protected by
+  /// TopicRegistration::update_lock.
+  boost::unordered_map<Statestore::TopicId, TopicRegistration> topic_registrations_;
 
   /// Subscriber thrift implementation, needs to access UpdateState
   friend class StatestoreSubscriberThriftIf;

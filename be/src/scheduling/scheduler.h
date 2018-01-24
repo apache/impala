@@ -68,8 +68,6 @@ class SchedulerWrapper;
 ///           configuration.
 class Scheduler {
  public:
-  static const std::string IMPALA_MEMBERSHIP_TOPIC;
-
   /// List of server descriptors.
   typedef std::vector<TBackendDescriptor> BackendList;
 

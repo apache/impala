@@ -15,9 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from collections import defaultdict
 import json
 import socket
 import threading
+import traceback
 import time
 import urllib2
 import uuid
@@ -167,7 +169,10 @@ class StatestoreSubscriber(object):
   more readable."""
   def __init__(self, heartbeat_cb=None, update_cb=None):
     self.heartbeat_event, self.heartbeat_count = threading.Condition(), 0
-    self.update_event, self.update_count = threading.Condition(), 0
+    # Track the number of updates received per topic.
+    self.update_counts = defaultdict(lambda : 0)
+    # Variables to notify for updates on each topic.
+    self.update_event = threading.Condition()
     self.heartbeat_cb, self.update_cb = heartbeat_cb, update_cb
     self.exception = None
 
@@ -191,12 +196,14 @@ class StatestoreSubscriber(object):
     """UpdateState RPC handler. Calls update callback if one exists."""
     self.update_event.acquire()
     try:
-      self.update_count += 1
+      for topic_name in args.topic_deltas: self.update_counts[topic_name] += 1
       response = DEFAULT_UPDATE_STATE_RESPONSE
       if self.update_cb is not None and self.exception is None:
         try:
           response = self.update_cb(self, args)
         except Exception, e:
+          # Print the original backtrace so it doesn't get lost.
+          traceback.print_exc()
           self.exception = e
       self.update_event.notify()
     finally:
@@ -278,21 +285,23 @@ class StatestoreSubscriber(object):
     finally:
       self.heartbeat_event.release()
 
-  def wait_for_update(self, count=None):
-    """Waits for some number of updates. If 'count' is provided, waits until the number
-    of updates seen by this subscriber exceeds count, otherwise waits for one further
-    update."""
+  def wait_for_update(self, topic_name, count=None):
+    """Waits for some number of updates of 'topic_name'. If 'count' is provided, waits
+    until the number updates seen by this subscriber exceeds count, otherwise waits
+    for one further update."""
     self.update_event.acquire()
+    start_time = time.time()
     try:
-      if count is not None and self.update_count >= count: return self
-      if count is None: count = self.update_count + 1
-      while count > self.update_count:
+      if count is not None and self.update_counts[topic_name] >= count: return self
+      if count is None: count = self.update_counts[topic_name] + 1
+      while count > self.update_counts[topic_name]:
         self.check_thread_exceptions()
-        last_count = self.update_count
+        last_count = self.update_counts[topic_name]
         self.update_event.wait(10)
-        if last_count == self.update_count:
-          raise Exception("Update not received within 10s (update count: %s)" %
-                          self.update_count)
+        if (time.time() > start_time + 10 and
+            last_count == self.update_counts[topic_name]):
+          raise Exception("Update not received for %s within 10s (update count: %s)" %
+                          (topic_name, last_count))
       self.check_thread_exceptions()
       return self
     finally:
@@ -340,14 +349,18 @@ class TestStatestore():
 
     def topic_update_correct(sub, args):
       delta = self.make_topic_update(topic_name)
-      if sub.update_count == 1:
+      update_count = sub.update_counts[topic_name]
+      if topic_name not in args.topic_deltas:
+        # The update doesn't contain our topic.
+        pass
+      elif update_count == 1:
         return TUpdateStateResponse(status=STATUS_OK, topic_updates=[delta],
                                     skipped=False)
-      elif sub.update_count == 2:
-        assert len(args.topic_deltas) == 1
+      elif update_count == 2:
+        assert len(args.topic_deltas) == 1, args.topic_deltas
         assert args.topic_deltas[topic_name].topic_entries == delta.topic_entries
         assert args.topic_deltas[topic_name].topic_name == delta.topic_name
-      elif sub.update_count == 3:
+      elif update_count == 3:
         # After the content-bearing update was processed, the next delta should be empty
         assert len(args.topic_deltas[topic_name].topic_entries) == 0
 
@@ -358,7 +371,7 @@ class TestStatestore():
     (
       sub.start()
          .register(topics=[reg])
-         .wait_for_update(3)
+         .wait_for_update(topic_name, 3)
     )
 
   def test_update_is_delta(self):
@@ -368,14 +381,18 @@ class TestStatestore():
     topic_name = "test_update_is_delta_%s" % uuid.uuid1()
 
     def check_delta(sub, args):
-      if sub.update_count == 1:
+      update_count = sub.update_counts[topic_name]
+      if topic_name not in args.topic_deltas:
+        # The update doesn't contain our topic.
+        pass
+      elif update_count == 1:
         assert args.topic_deltas[topic_name].is_delta == False
         delta = self.make_topic_update(topic_name)
         return TUpdateStateResponse(status=STATUS_OK, topic_updates=[delta],
                                     skipped=False)
-      elif sub.update_count == 2:
+      elif update_count == 2:
         assert args.topic_deltas[topic_name].is_delta == False
-      elif sub.update_count == 3:
+      elif update_count == 3:
         assert args.topic_deltas[topic_name].is_delta == True
         assert len(args.topic_deltas[topic_name].topic_entries) == 0
         assert args.topic_deltas[topic_name].to_version == 1
@@ -387,7 +404,7 @@ class TestStatestore():
     (
       sub.start()
          .register(topics=[reg])
-         .wait_for_update(3)
+         .wait_for_update(topic_name, 3)
     )
 
   def test_skipped(self):
@@ -395,7 +412,10 @@ class TestStatestore():
     topic_name = "test_skipped_%s" % uuid.uuid1()
 
     def check_skipped(sub, args):
-      if sub.update_count == 1:
+      # Ignore responses that don't contain our topic.
+      if topic_name not in args.topic_deltas: return DEFAULT_UPDATE_STATE_RESPONSE
+      update_count = sub.update_counts[topic_name]
+      if update_count == 1:
         update = self.make_topic_update(topic_name)
         return TUpdateStateResponse(status=STATUS_OK, topic_updates=[update],
                                     skipped=False)
@@ -410,15 +430,17 @@ class TestStatestore():
     (
       sub.start()
          .register(topics=[reg])
-         .wait_for_update(3)
+         .wait_for_update(topic_name, 3)
     )
 
   def test_failure_detected(self):
     sub = StatestoreSubscriber()
+    topic_name = "test_failure_detected"
+    reg = TTopicRegistration(topic_name=topic_name, is_transient=True)
     (
       sub.start()
-         .register()
-         .wait_for_update(1)
+         .register(topics=[reg])
+         .wait_for_update(topic_name, 1)
          .kill()
          .wait_for_failure()
     )
@@ -428,10 +450,12 @@ class TestStatestore():
     minutes) the statestore should time them out every 3s and then eventually fail after
     40s (10 times (3 + 1), where the 1 is the inter-heartbeat delay)"""
     sub = StatestoreSubscriber(heartbeat_cb=lambda sub, args: time.sleep(300))
+    topic_name = "test_hung_heartbeat"
+    reg = TTopicRegistration(topic_name=topic_name, is_transient=True)
     (
       sub.start()
-         .register()
-         .wait_for_update(1)
+         .register(topics=[reg])
+         .wait_for_update(topic_name, 1)
          .wait_for_failure(timeout=60)
     )
 
@@ -443,21 +467,32 @@ class TestStatestore():
     transient_topic_name = "test_topic_persistence_transient_%s" % topic_id
 
     def add_entries(sub, args):
-      if sub.update_count == 1:
-        updates = [self.make_topic_update(persistent_topic_name),
-                   self.make_topic_update(transient_topic_name)]
+      # None of, one or both of the topics may be in the update.
+      updates = []
+      if (persistent_topic_name in args.topic_deltas and
+          sub.update_counts[persistent_topic_name] == 1):
+        updates.append(self.make_topic_update(persistent_topic_name))
+
+      if (transient_topic_name in args.topic_deltas and
+          sub.update_counts[transient_topic_name] == 1):
+        updates.append(self.make_topic_update(transient_topic_name))
+
+      if len(updates) > 0:
         return TUpdateStateResponse(status=STATUS_OK, topic_updates=updates,
                                     skipped=False)
-
       return DEFAULT_UPDATE_STATE_RESPONSE
 
     def check_entries(sub, args):
-      if sub.update_count == 1:
-        assert len(args.topic_deltas[transient_topic_name].topic_entries) == 0
+      # None of, one or both of the topics may be in the update.
+      if (persistent_topic_name in args.topic_deltas and
+          sub.update_counts[persistent_topic_name] == 1):
         assert len(args.topic_deltas[persistent_topic_name].topic_entries) == 1
         # Statestore should not send deletions when the update is not a delta, see
         # IMPALA-1891
         assert args.topic_deltas[persistent_topic_name].topic_entries[0].deleted == False
+      if (transient_topic_name in args.topic_deltas and
+          sub.update_counts[persistent_topic_name] == 1):
+        assert len(args.topic_deltas[transient_topic_name].topic_entries) == 0
       return DEFAULT_UPDATE_STATE_RESPONSE
 
     reg = [TTopicRegistration(topic_name=persistent_topic_name, is_transient=False),
@@ -467,7 +502,8 @@ class TestStatestore():
     (
       sub.start()
          .register(topics=reg)
-         .wait_for_update(2)
+         .wait_for_update(persistent_topic_name, 2)
+         .wait_for_update(transient_topic_name, 2)
          .kill()
          .wait_for_failure()
     )
@@ -476,5 +512,6 @@ class TestStatestore():
     (
       sub2.start()
           .register(topics=reg)
-          .wait_for_update(1)
+          .wait_for_update(persistent_topic_name, 1)
+          .wait_for_update(transient_topic_name, 1)
     )

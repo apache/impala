@@ -206,9 +206,6 @@ class AdmissionController {
   class PoolStats;
   friend class PoolStats;
 
-  /// Statestore topic name.
-  static const std::string IMPALA_REQUEST_QUEUE_TOPIC;
-
   /// Subscription manager used to handle admission control updates. This is not
   /// owned by this class.
   StatestoreSubscriber* subscriber_;

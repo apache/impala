@@ -120,9 +120,13 @@ MAX_NUM_QUEUED_QUERIES = 10
 # Mem limit (bytes) used in the mem limit test
 MEM_TEST_LIMIT = 12 * 1024 * 1024 * 1024
 
-_STATESTORED_ARGS = "-statestore_heartbeat_frequency_ms=%s "\
-                    "-statestore_update_frequency_ms=%s" %\
-                    (STATESTORE_RPC_FREQUENCY_MS, STATESTORE_RPC_FREQUENCY_MS)
+_STATESTORED_ARGS = ("-statestore_heartbeat_frequency_ms={freq_ms} "
+                     "-statestore_priority_update_frequency_ms={freq_ms}").format(
+                    freq_ms=STATESTORE_RPC_FREQUENCY_MS)
+
+# Name of the subscriber metric tracking the admission control update interval.
+REQUEST_QUEUE_UPDATE_INTERVAL =\
+    'statestore-subscriber.topic-impala-request-queue.update-interval'
 
 # Key in the query profile for the query options.
 PROFILE_QUERY_OPTIONS_KEY = "Query Options (set by configuration): "
@@ -551,14 +555,14 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       sleep(1)
 
   def wait_for_statestore_updates(self, heartbeats):
-    """Waits for a number of statestore heartbeats from all impalads."""
+    """Waits for a number of admission control statestore updates from all impalads."""
     start_time = time()
     num_impalads = len(self.impalads)
     init = dict()
     curr = dict()
     for impalad in self.impalads:
-      init[impalad] = impalad.service.get_metric_value(\
-          'statestore-subscriber.topic-update-interval-time')['count']
+      init[impalad] = impalad.service.get_metric_value(
+          REQUEST_QUEUE_UPDATE_INTERVAL)['count']
       curr[impalad] = init[impalad]
 
     while True:
@@ -566,8 +570,8 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
           init.values(), [curr[i] - init[i] for i in self.impalads])
       if all([curr[i] - init[i] >= heartbeats for i in self.impalads]): break
       for impalad in self.impalads:
-        curr[impalad] = impalad.service.get_metric_value(\
-            'statestore-subscriber.topic-update-interval-time')['count']
+        curr[impalad] = impalad.service.get_metric_value(
+            REQUEST_QUEUE_UPDATE_INTERVAL)['count']
       assert (time() - start_time < STRESS_TIMEOUT),\
           "Timed out waiting %s seconds for heartbeats" % (STRESS_TIMEOUT,)
       sleep(STATESTORE_RPC_FREQUENCY_MS / float(1000))
