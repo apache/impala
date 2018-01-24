@@ -52,7 +52,10 @@ import com.google.common.collect.Sets;
  * Represents the following statements for statistics collection. Which statistics
  * are computed and stored depends on the statement type (incremental or not), the
  * clauses used (sampling, partition spec), as well as whether stats extrapolation
- * is enabled or not (--enable_stats_extrapolation).
+ * is enabled or not.
+ * Stats extrapolation can be configured:
+ * - at the impalad level with --enable_stats_extrapolation
+ * - at the table level HdfsTable.TBL_PROP_ENABLE_STATS_EXTRAPOLATION
  *
  * 1. COMPUTE STATS <table> [(col_list)] [TABLESAMPLE SYSTEM(<perc>) [REPEATABLE(<seed>)]]
  * - Stats extrapolation enabled:
@@ -481,8 +484,10 @@ public class ComputeStatsStmt extends StatementBase {
       }
     } else {
       // Not computing incremental stats.
-      expectAllPartitions_ = !(table_ instanceof HdfsTable) ||
-          !BackendConfig.INSTANCE.enableStatsExtrapolation();
+      expectAllPartitions_ = true;
+      if (table_ instanceof HdfsTable) {
+        expectAllPartitions_ = !((HdfsTable) table_).isStatsExtrapolationEnabled();
+      }
     }
 
     if (filterPreds.size() > MAX_INCREMENTAL_PARTITIONS) {
@@ -576,10 +581,14 @@ public class ComputeStatsStmt extends StatementBase {
     if (!(table_ instanceof HdfsTable)) {
       throw new AnalysisException("TABLESAMPLE is only supported on HDFS tables.");
     }
-    if (!BackendConfig.INSTANCE.enableStatsExtrapolation()) {
-      throw new AnalysisException(
-          "COMPUTE STATS TABLESAMPLE requires --enable_stats_extrapolation=true. " +
-          "Stats extrapolation is currently disabled.");
+    HdfsTable hdfsTable = (HdfsTable) table_;
+    if (!hdfsTable.isStatsExtrapolationEnabled()) {
+      throw new AnalysisException(String.format(
+          "COMPUTE STATS TABLESAMPLE requires stats extrapolation which is disabled.\n" +
+          "Stats extrapolation can be enabled service-wide with %s=true or by altering " +
+          "the table to have tblproperty %s=true",
+          "--enable_stats_extrapolation",
+          HdfsTable.TBL_PROP_ENABLE_STATS_EXTRAPOLATION));
     }
     sampleParams_.analyze(analyzer);
     long sampleSeed;
@@ -592,7 +601,6 @@ public class ComputeStatsStmt extends StatementBase {
     // Compute the sample of files and set 'sampleFileBytes_'.
     long minSampleBytes = analyzer.getQueryOptions().compute_stats_min_sample_size;
     long samplePerc = sampleParams_.getPercentBytes();
-    HdfsTable hdfsTable = (HdfsTable) table_;
     Map<Long, List<FileDescriptor>> sample = hdfsTable.getFilesSample(
         hdfsTable.getPartitions(), samplePerc, minSampleBytes, sampleSeed);
     long sampleFileBytes = 0;
@@ -696,7 +704,7 @@ public class ComputeStatsStmt extends StatementBase {
    */
   private boolean updateTableStatsOnly() {
     if (!(table_ instanceof HdfsTable)) return true;
-    return !isIncremental_ && BackendConfig.INSTANCE.enableStatsExtrapolation();
+    return !isIncremental_ && ((HdfsTable) table_).isStatsExtrapolationEnabled();
   }
 
   /**

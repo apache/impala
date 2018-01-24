@@ -1067,7 +1067,7 @@ public class HdfsScanNode extends ScanNode {
       output.append(getStatsExplainString(detailPrefix));
       output.append("\n");
       String extrapRows = String.valueOf(extrapolatedNumRows_);
-      if (!BackendConfig.INSTANCE.enableStatsExtrapolation()) {
+      if (!tbl_.isStatsExtrapolationEnabled()) {
         extrapRows = "disabled";
       } else if (extrapolatedNumRows_ == -1) {
         extrapRows = "unavailable";

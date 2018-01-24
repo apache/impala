@@ -20,6 +20,7 @@ package org.apache.impala.planner;
 import static org.junit.Assert.assertEquals;
 
 import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.impala.catalog.HdfsTable;
@@ -32,28 +33,36 @@ import org.junit.Test;
 import com.google.common.base.Preconditions;
 
 /**
- * Tests the behavior of stats extrapolation with valid, invalid, and unset stats,
- * as well as extreme values and other edge cases.
+ * Tests the configuration options and behavior of stats extrapolation with valid,
+ * invalid, and unset stats, as well as extreme values and other edge cases.
  */
 public class StatsExtrapolationTest extends FrontendTestBase {
 
   /**
    * Sets the row count and total file size stats in the given table.
    * Unsets the corresponding statistic if a null value is passed.
+   * Preserves existing table properties.
    */
   private void setStats(Table tbl, Long rowCount, Long totalSize) {
-    org.apache.hadoop.hive.metastore.api.Table msTbl =
-        new org.apache.hadoop.hive.metastore.api.Table();
-    msTbl.setParameters(new HashMap<String, String>());
+    org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable();
+    if (msTbl == null) {
+      msTbl = new org.apache.hadoop.hive.metastore.api.Table();
+      msTbl.setParameters(new HashMap<String, String>());
+    }
+    if (msTbl.getParameters() == null) {
+      msTbl.setParameters(new HashMap<String, String>());
+    }
+    Map<String, String> params = msTbl.getParameters();
     if (rowCount != null) {
-      msTbl.getParameters().put(StatsSetupConst.ROW_COUNT,
-          String.valueOf(rowCount));
+      params.put(StatsSetupConst.ROW_COUNT, String.valueOf(rowCount));
+    } else {
+      params.remove(StatsSetupConst.ROW_COUNT);
     }
     if (totalSize != null) {
-      msTbl.getParameters().put(StatsSetupConst.TOTAL_SIZE,
-          String.valueOf(totalSize));
+      params.put(StatsSetupConst.TOTAL_SIZE, String.valueOf(totalSize));
+    } else {
+      params.remove(StatsSetupConst.TOTAL_SIZE);
     }
-    tbl.setMetaStoreTable(msTbl);
     tbl.setTableStats(msTbl);
   }
 
@@ -61,8 +70,8 @@ public class StatsExtrapolationTest extends FrontendTestBase {
       long fileBytes, long expectedExtrapNumRows) {
     Preconditions.checkState(tbl instanceof HdfsTable);
     setStats(tbl, rowCount, totalSize);
-    long actualExrtapNumRows = ((HdfsTable)tbl).getExtrapolatedNumRows(fileBytes);
-    assertEquals(expectedExtrapNumRows, actualExrtapNumRows);
+    long actualExtrapNumRows = ((HdfsTable)tbl).getExtrapolatedNumRows(fileBytes);
+    assertEquals(expectedExtrapNumRows, actualExtrapNumRows);
   }
 
   private void testInvalidStats(Table tbl, Long rowCount, Long totalSize) {
@@ -79,7 +88,7 @@ public class StatsExtrapolationTest extends FrontendTestBase {
     addTestDb("extrap_stats", null);
     Table tbl = addTestTable("create table extrap_stats.t (i int)");
 
-    // Modify/restore the backend config for this test.
+    // Replace/restore the static backend config for this test.
     TBackendGflags gflags = BackendConfig.INSTANCE.getBackendCfg();
     boolean origEnableStatsExtrapolation = gflags.isEnable_stats_extrapolation();
     try {
@@ -134,24 +143,56 @@ public class StatsExtrapolationTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestStatsExtrapolationDisabled() {
-    addTestDb("extrap_stats", null);
-    Table tbl = addTestTable("create table extrap_stats.t (i int)");
+  public void TestStatsExtrapolationConfig() {
+    addTestDb("extrap_config", null);
+    Table propUnsetTbl =
+        addTestTable("create table extrap_config.tbl_prop_unset (i int)");
+    Table propFalseTbl =
+        addTestTable("create table extrap_config.tbl_prop_false (i int) " +
+        "tblproperties('impala.enable.stats.extrapolation'='false')");
+    Table propTrueTbl =
+        addTestTable("create table extrap_config.tbl_prop_true (i int) " +
+        "tblproperties('impala.enable.stats.extrapolation'='true')");
 
-    // Modify/restore the backend config for this test.
+    // Replace/restore the static backend config for this test.
     TBackendGflags gflags = BackendConfig.INSTANCE.getBackendCfg();
     boolean origEnableStatsExtrapolation = gflags.isEnable_stats_extrapolation();
     try {
+      // Test --enable_stats_extrapolation=false
       gflags.setEnable_stats_extrapolation(false);
+      // Table property unset --> Extrapolation disabled
+      configTestExtrapolationDisabled(propUnsetTbl);
+      // Table property false --> Extrapolation disabled
+      configTestExtrapolationDisabled(propFalseTbl);
+      // Table property true --> Extrapolation enabled
+      configTestExtrapolationEnabled(propTrueTbl);
 
-      // Always expect -1 even with legitimate stats.
-      runTest(tbl, 100L, 1000L, 0, -1);
-      runTest(tbl, 100L, 1000L, 100, -1);
-      runTest(tbl, 100L, 1000L, 1000000000, -1);
-      runTest(tbl, 100L, 1000L, Long.MAX_VALUE, -1);
-      runTest(tbl, 100L, 1000L, -100, -1);
+      // Test --enable_stats_extrapolation=true
+      gflags.setEnable_stats_extrapolation(true);
+      // Table property unset --> Extrapolation enabled
+      configTestExtrapolationEnabled(propUnsetTbl);
+      // Table property false --> Extrapolation disabled
+      configTestExtrapolationDisabled(propFalseTbl);
+      // Table property true --> Extrapolation enabled
+      configTestExtrapolationEnabled(propTrueTbl);
     } finally {
       gflags.setEnable_stats_extrapolation(origEnableStatsExtrapolation);
     }
+  }
+
+  private void configTestExtrapolationDisabled(Table tbl) {
+    runTest(tbl, 100L, 1000L, 0, -1);
+    runTest(tbl, 100L, 1000L, 100, -1);
+    runTest(tbl, 100L, 1000L, 1000000000, -1);
+    runTest(tbl, 100L, 1000L, Long.MAX_VALUE, -1);
+    runTest(tbl, 100L, 1000L, -100, -1);
+  }
+
+  private void configTestExtrapolationEnabled(Table tbl) {
+    runTest(tbl, 100L, 1000L, 0, 0);
+    runTest(tbl, 100L, 1000L, 100, 10);
+    runTest(tbl, 100L, 1000L, 1000000000, 100000000);
+    runTest(tbl, 100L, 1000L, Long.MAX_VALUE, 922337203685477632L);
+    runTest(tbl, 100L, 1000L, -100, -1);
   }
 }

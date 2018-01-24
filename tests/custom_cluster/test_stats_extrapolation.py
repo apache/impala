@@ -15,16 +15,17 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from os import path
+import pytest
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
-from tests.util.hdfs_util import NAMENODE
-
 
 class TestStatsExtrapolation(CustomClusterTestSuite):
+  """Minimal end-to-end test for the --enable_stats_extrapolation impalad flag. This test
+  primarly checks that the flag is propagated to the FE. More testing is done in FE unit
+  tests and metadata/test_stats_extrapolation.py."""
 
   @classmethod
   def get_workload(self):
@@ -37,121 +38,21 @@ class TestStatsExtrapolation(CustomClusterTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
 
-  @CustomClusterTestSuite.with_args(impalad_args=('--enable_stats_extrapolation=true'))
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(impalad_args="--enable_stats_extrapolation=true")
   def test_stats_extrapolation(self, vector, unique_database):
-    vector.get_value('exec_option')['num_nodes'] = 1
-    vector.get_value('exec_option')['explain_level'] = 2
-    self.run_test_case('QueryTest/stats-extrapolation', vector, unique_database)
-
-  @CustomClusterTestSuite.with_args(impalad_args=('--enable_stats_extrapolation=true'))
-  def test_compute_stats_tablesample(self, vector, unique_database):
-    """COMPUTE STATS TABLESAMPLE is inherently non-deterministic due to its use of
-    SAMPLED_NDV() so we test it specially. The goal of this test is to ensure that
-    COMPUTE STATS TABLESAMPLE computes in-the-right-ballpark stats and successfully
-    stores them in the HMS."""
-
-    # Since our test tables are small, set the minimum sample size to 0 to make sure
-    # we exercise the sampling code paths.
-    self.client.execute("set compute_stats_min_sample_size=0")
-
-    # Test partitioned table.
+    # Test row count extrapolation
+    self.client.execute("set explain_level=2")
+    explain_result = self.client.execute("explain select * from functional.alltypes")
+    assert "extrapolated-rows=7300" in " ".join(explain_result.data)
+    # Test COMPUTE STATS TABLESAMPLE
     part_test_tbl = unique_database + ".alltypes"
     self.clone_table("functional.alltypes", part_test_tbl, True, vector)
-    self.__run_sampling_test(part_test_tbl, "", "functional.alltypes", 1, 3)
-    self.__run_sampling_test(part_test_tbl, "", "functional.alltypes", 10, 7)
-    self.__run_sampling_test(part_test_tbl, "", "functional.alltypes", 20, 13)
-    self.__run_sampling_test(part_test_tbl, "", "functional.alltypes", 100, 99)
-
-    # Test unpartitioned table.
-    nopart_test_tbl = unique_database + ".alltypesnopart"
-    self.client.execute("create table {0} as select * from functional.alltypes"\
-      .format(nopart_test_tbl))
-    # Clone to use as a baseline. We run the regular COMPUTE STATS on this table.
-    nopart_test_tbl_exp = unique_database + ".alltypesnopart_exp"
-    self.clone_table(nopart_test_tbl, nopart_test_tbl_exp, False, vector)
-    self.client.execute("compute stats {0}".format(nopart_test_tbl_exp))
-    self.__run_sampling_test(nopart_test_tbl, "", nopart_test_tbl_exp, 1, 3)
-    self.__run_sampling_test(nopart_test_tbl, "", nopart_test_tbl_exp, 10, 7)
-    self.__run_sampling_test(nopart_test_tbl, "", nopart_test_tbl_exp, 20, 13)
-    self.__run_sampling_test(nopart_test_tbl, "", nopart_test_tbl_exp, 100, 99)
-
-    # Test empty table.
-    empty_test_tbl = unique_database + ".empty_tbl"
-    self.clone_table("functional.alltypes", empty_test_tbl, False, vector)
-    self.__run_sampling_test(empty_test_tbl, "", empty_test_tbl, 10, 7)
-
-    # Test wide table. Should not crash or error. This takes a few minutes so restrict
-    # to exhaustive.
-    if self.exploration_strategy() == "exhaustive":
-      wide_test_tbl = unique_database + ".wide"
-      self.clone_table("functional.widetable_1000_cols", wide_test_tbl, False, vector)
-      self.client.execute(
-        "compute stats {0} tablesample system(10)".format(wide_test_tbl))
-
-    # Test column subset.
-    column_subset_tbl = unique_database + ".column_subset"
-    columns = "(int_col, string_col)"
-    self.clone_table("functional.alltypes", column_subset_tbl, True, vector)
-    self.__run_sampling_test(column_subset_tbl, columns, "functional.alltypes", 1, 3)
-    self.__run_sampling_test(column_subset_tbl, columns, "functional.alltypes", 10, 7)
-    self.__run_sampling_test(column_subset_tbl, columns, "functional.alltypes", 20, 13)
-    self.__run_sampling_test(column_subset_tbl, columns, "functional.alltypes", 100, 99)
-
-    # Test no columns.
-    no_column_tbl = unique_database + ".no_columns"
-    columns = "()"
-    self.clone_table("functional.alltypes", no_column_tbl, True, vector)
-    self.__run_sampling_test(no_column_tbl, columns, "functional.alltypes", 10, 7)
-
-  def __run_sampling_test(self, tbl, cols, expected_tbl, perc, seed):
-    """Drops stats on 'tbl' and then runs COMPUTE STATS TABLESAMPLE on 'tbl' with the
-    given column restriction clause, sampling percent and random seed. Checks that
-    the resulting table and column stats are reasoanbly close to those of
-    'expected_tbl'."""
-    self.client.execute("drop stats {0}".format(tbl))
-    self.client.execute("compute stats {0}{1} tablesample system ({2}) repeatable ({3})"\
-      .format(tbl, cols, perc, seed))
-    self.__check_table_stats(tbl, expected_tbl)
-    self.__check_column_stats(tbl, expected_tbl)
-
-  def __check_table_stats(self, tbl, expected_tbl):
-    """Checks that the row counts reported in SHOW TABLE STATS on 'tbl' are within 2x
-    of those reported for 'expected_tbl'. Assumes that COMPUTE STATS was previously run
-    on 'expected_table' and that COMPUTE STATS TABLESAMPLE was run on 'tbl'."""
-    actual = self.client.execute("show table stats {0}".format(tbl))
-    expected = self.client.execute("show table stats {0}".format(expected_tbl))
-    assert len(actual.data) == len(expected.data)
-    assert len(actual.schema.fieldSchemas) == len(expected.schema.fieldSchemas)
-    col_names = [fs.name.upper() for fs in actual.schema.fieldSchemas]
-    rows_col_idx = col_names.index("#ROWS")
-    extrap_rows_col_idx = col_names.index("EXTRAP #ROWS")
-    for i in xrange(0, len(actual.data)):
-      act_cols = actual.data[i].split("\t")
-      exp_cols = expected.data[i].split("\t")
-      assert int(exp_cols[rows_col_idx]) >= 0
-      self.appx_equals(\
-        int(act_cols[extrap_rows_col_idx]), int(exp_cols[rows_col_idx]), 2)
-      # Only the table-level row count is stored. The partition row counts
-      # are extrapolated.
-      if act_cols[0] == "Total":
-        self.appx_equals(
-          int(act_cols[rows_col_idx]), int(exp_cols[rows_col_idx]), 2)
-      elif len(actual.data) > 1:
-        # Partition row count is expected to not be set.
-        assert int(act_cols[rows_col_idx]) == -1
-
-  def __check_column_stats(self, tbl, expected_tbl):
-    """Checks that the NDVs in SHOW COLUMNS STATS on 'tbl' are within 2x of those
-    reported for 'expected_tbl'. Assumes that COMPUTE STATS was previously run
-    on 'expected_table' and that COMPUTE STATS TABLESAMPLE was run on 'tbl'."""
-    actual = self.client.execute("show column stats {0}".format(tbl))
-    expected = self.client.execute("show column stats {0}".format(expected_tbl))
-    assert len(actual.data) == len(expected.data)
-    assert len(actual.schema.fieldSchemas) == len(expected.schema.fieldSchemas)
-    col_names = [fs.name.upper() for fs in actual.schema.fieldSchemas]
+    self.client.execute(
+        "compute stats {0} tablesample system (13)".format(part_test_tbl))
+    # Check that column stats were set.
+    col_stats = self.client.execute("show column stats {0}".format(part_test_tbl))
+    col_names = [fs.name.upper() for fs in col_stats.schema.fieldSchemas]
     ndv_col_idx = col_names.index("#DISTINCT VALUES")
-    for i in xrange(0, len(actual.data)):
-      act_cols = actual.data[i].split("\t")
-      exp_cols = expected.data[i].split("\t")
-      assert int(exp_cols[ndv_col_idx]) >= 0
-      self.appx_equals(int(act_cols[ndv_col_idx]), int(exp_cols[ndv_col_idx]), 2)
+    for row in col_stats.data:
+      assert int(row.split("\t")[ndv_col_idx]) >= 0
