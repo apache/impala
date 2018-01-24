@@ -584,6 +584,13 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
       DCHECK(false) << "Unsupported function name for statistics evaluation: " << fn_name;
     }
 
+    int64_t null_count = 0;
+    bool null_count_result = ColumnStatsBase::ReadNullCountStat(col_chunk, &null_count);
+    if (null_count_result && null_count == col_chunk.meta_data.num_values) {
+      *skip_row_group = true;
+      break;
+    }
+
     if (stats_read) {
       TupleRow row;
       row.SetTuple(0, min_max_tuple_);

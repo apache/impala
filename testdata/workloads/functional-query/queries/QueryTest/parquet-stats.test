@@ -458,3 +458,36 @@ select count(*) from functional_parquet.alltypes where id < 0;
 aggregation(SUM, NumRowGroups): 24
 aggregation(SUM, NumStatsFilteredRowGroups): 0
 ====
+---- QUERY
+# Check that all the row groups are skipped using null_count stat
+create table table_for_null_count_test (i int, j int) stored as parquet;
+insert into table_for_null_count_test values (1, NULL), (2, NULL), (3, NULL);
+select count(*) from table_for_null_count_test where j < 3;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+# Insert another row group where not all the 'j' values are NULL
+insert into table_for_null_count_test values (4, 1), (5, NULL);
+select i from table_for_null_count_test where j < 3;
+---- RESULTS
+4
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+# Turning off parquet stats and verifying that no row groups are skipped
+set PARQUET_READ_STATISTICS=0;
+create table table_for_null_count_test2 (i int, j int) stored as parquet;
+insert into table_for_null_count_test2 values (1, NULL), (2, NULL), (3, NULL);
+select count(*) from table_for_null_count_test2 where j < 3;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+====

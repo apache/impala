@@ -129,6 +129,19 @@ bool ColumnStatsBase::ReadFromThrift(const parquet::ColumnChunk& col_chunk,
   return false;
 }
 
+bool ColumnStatsBase::ReadNullCountStat(const parquet::ColumnChunk& col_chunk,
+    int64_t* null_count) {
+  if (!(col_chunk.__isset.meta_data && col_chunk.meta_data.__isset.statistics)) {
+    return false;
+  }
+  const parquet::Statistics& stats = col_chunk.meta_data.statistics;
+  if (stats.__isset.null_count) {
+    *null_count = stats.null_count;
+    return true;
+  }
+  return false;
+}
+
 Status ColumnStatsBase::CopyToBuffer(StringBuffer* buffer, StringValue* value) {
   if (value->ptr == buffer->buffer()) return Status::OK();
   buffer->Clear();
