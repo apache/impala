@@ -64,7 +64,7 @@ import json
 import logging
 import os
 import re
-import sh
+import subprocess
 import sys
 
 from collections import defaultdict
@@ -136,8 +136,8 @@ def build_commit_map(branch, merge_base):
   fields = ['%H', '%s', '%an', '%cd', '%b']
   pretty_format = '\x1f'.join(fields) + '\x1e'
   result = OrderedDict()
-  for line in sh.git.log(
-      branch, "^" + merge_base, pretty=pretty_format, color='never').split('\x1e'):
+  for line in subprocess.check_output(["git", "log", branch, "^" + merge_base,
+    "--pretty=" + pretty_format, "--color=never"]).split('\x1e'):
     if line == "":
       # if no changes are identified by the git log, we get an empty string
       continue
@@ -174,8 +174,9 @@ def cherrypick(cherry_pick_hashes, full_target_branch_name):
     return
 
   # Cherrypicking only makes sense if we're on the equivalent of the target branch.
-  head_sha = sh.git('rev-parse', 'HEAD').strip()
-  target_branch_sha = sh.git('rev-parse', full_target_branch_name).strip()
+  head_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
+  target_branch_sha = subprocess.check_output(
+      ['git', 'rev-parse', full_target_branch_name]).strip()
   if head_sha != target_branch_sha:
     print "Cannot cherrypick because %s (%s) and HEAD (%s) are divergent." % (
         full_target_branch_name, target_branch_sha, head_sha)
@@ -183,7 +184,8 @@ def cherrypick(cherry_pick_hashes, full_target_branch_name):
 
   cherry_pick_hashes.reverse()
   for cherry_pick_hash in cherry_pick_hashes:
-    sh.git('cherry-pick', '--keep-redundant-commits', cherry_pick_hash)
+    subprocess.check_call(
+        ['git', 'cherry-pick', '--keep-redundant-commits', cherry_pick_hash])
 
 
 def main():
@@ -202,19 +204,19 @@ def main():
   # Ensure all branches are up to date, unless remotes are disabled
   # by specifying them with an empty string.
   if options.source_remote_name != "":
-    sh.git.fetch(options.source_remote_name)
+    subprocess.check_call(['git', 'fetch', options.source_remote_name])
     full_source_branch_name = options.source_remote_name + '/' + options.source_branch
   else:
     full_source_branch_name = options.source_branch
   if options.target_remote_name != "":
     if options.source_remote_name != options.target_remote_name:
-      sh.git.fetch(options.target_remote_name)
+      subprocess.check_call(['git', 'fetch', options.target_remote_name])
     full_target_branch_name = options.target_remote_name + '/' + options.target_branch
   else:
     full_target_branch_name = options.target_branch
 
-  merge_base = sh.git("merge-base",
-      full_source_branch_name, full_target_branch_name).strip()
+  merge_base = subprocess.check_output(["git", "merge-base",
+      full_source_branch_name, full_target_branch_name]).strip()
   source_commits = build_commit_map(full_source_branch_name, merge_base)
   target_commits = build_commit_map(full_target_branch_name, merge_base)
 
