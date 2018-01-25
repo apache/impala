@@ -90,7 +90,8 @@ MEM_LIMIT_EQ_THRESHOLD_PC = 0.975
 MEM_LIMIT_EQ_THRESHOLD_MB = 50
 
 # Regex to extract the estimated memory from an explain plan.
-MEM_ESTIMATE_PATTERN = re.compile(r"Estimated.*Memory=(\d+.?\d*)(T|G|M|K)?B")
+MEM_ESTIMATE_PATTERN = re.compile(
+    r"Per-Host Resource Estimates: Memory=(\d+.?\d*)(T|G|M|K)?B")
 
 PROFILES_DIR = "profiles"
 RESULT_HASHES_DIR = "result_hashes"
@@ -1342,6 +1343,34 @@ def populate_runtime_info(
   LOG.debug("Query after populating runtime info: %s", query)
 
 
+def match_memory_estimate(explain_lines):
+  """
+  Given a list of strings from EXPLAIN output, find the estimated memory needed. This is
+  used as a binary search start point.
+
+  Params:
+    explain_lines: list of str
+
+  Returns:
+    2-tuple str of memory limit in decimal string and units (one of 'T', 'G', 'M', 'K',
+    '' bytes)
+
+  Raises:
+    Exception if no match found
+  """
+  # IMPALA-6441: This method is a public, first class method so it can be importable and
+  # tested with actual EXPLAIN output to make sure we always find the start point.
+  mem_limit, units = None, None
+  for line in explain_lines:
+    regex_result = MEM_ESTIMATE_PATTERN.search(line)
+    if regex_result:
+      mem_limit, units = regex_result.groups()
+      break
+  if None in (mem_limit, units):
+    raise Exception('could not parse explain string:\n' + '\n'.join(explain_lines))
+  return mem_limit, units
+
+
 def estimate_query_mem_mb_usage(query, query_runner):
   """Runs an explain plan then extracts and returns the estimated memory needed to run
   the query.
@@ -1355,11 +1384,8 @@ def estimate_query_mem_mb_usage(query, query_runner):
       return
     LOG.debug("Explaining query\n%s", query.sql)
     cursor.execute('EXPLAIN ' + query.sql)
-    first_val = cursor.fetchone()[0]
-    regex_result = MEM_ESTIMATE_PATTERN.search(first_val)
-    if not regex_result:
-      return
-    mem_limit, units = regex_result.groups()
+    explain_lines = cursor.fetchall()
+    mem_limit, units = match_memory_estimate(explain_lines)
     return parse_mem_to_mb(mem_limit, units)
 
 
