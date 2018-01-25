@@ -103,8 +103,9 @@ def create_parser():
       os.path.dirname(os.path.abspath(__file__)), 'ignored_commits.json')
   parser.add_argument('--ignored_commits_file', default=default_ignored_commits_path,
       help='JSON File that contains ignored commits as specified in the help')
-  parser.add_argument('--skip_commits_matching', default="Cherry-picks: not for {branch}",
-      help='String in commit messages that causes the commit to be ignored. ' +
+  parser.add_argument('--skip_commits_matching',
+      default="Cherry-pick.?:.?not (for|to) {branch}",
+      help='Regex searched for in commit messages that causes the commit to be ignored.' +
            ' {branch} is replaced with target branch; the search is case-insensitive')
   parser.add_argument('--verbose', '-v', action='store_true', default=False,
       help='Turn on DEBUG and INFO logging')
@@ -232,14 +233,14 @@ def main():
   print '-' * 80
   jira_keys = []
   jira_key_pat = re.compile(r'(IMPALA-\d+)')
-  skip_commits_matching = options.skip_commits_matching.replace(
-      "{branch}", options.target_branch)
+  skip_commits_matching = options.skip_commits_matching.format(
+      branch=options.target_branch)
   for change_id, (commit_hash, msg, author, date, body) in source_commits.iteritems():
     change_in_target = change_id in target_commits
     ignore_by_config = commit_hash in ignored_commits[
         (options.source_branch, options.target_branch)]
-    ignore_by_commit_message = skip_commits_matching.lower() in msg.lower() \
-        or skip_commits_matching.lower() in body.lower()
+    ignore_by_commit_message = re.search(skip_commits_matching, "\n".join([msg, body]),
+        re.IGNORECASE)
     # This conditional block just for debug logging of ignored commits
     if ignore_by_config or ignore_by_commit_message:
       if change_in_target:
