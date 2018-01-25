@@ -17,11 +17,13 @@
 
 # Functional tests running EXPLAIN statements.
 #
-import pytest
 import re
+
+from decimal import Decimal
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal, SkipIfNotHdfsMinicluster
+from tests.stress.concurrent_select import match_memory_estimate
 from tests.util.filesystem_utils import WAREHOUSE
 
 # Tests the different explain levels [0-3] on a few queries.
@@ -176,3 +178,22 @@ class TestExplainEmptyPartition(ImpalaTestSuite):
     assert "missing relevant table and/or column statistics" in explain_result
     # Also test IMPALA-1530 - adding the number of partitions missing stats
     assert "partitions: 1/2 " in explain_result
+
+
+class TestInfraIntegration(ImpalaTestSuite):
+  """
+  This is a test suite to ensure separate test tooling in Python is compatible with the
+  product.
+  """
+  def test_stress_binary_search_start_point(self):
+    """
+    Test that the stress test can use EXPLAIN to find the start point for its binary
+    search.
+    """
+    result = self.client.execute("explain select 1")
+    mem_limit, units = match_memory_estimate(result.data)
+    assert isinstance(units, str) and units.upper() in ('T', 'G', 'M', 'K', ''), (
+        'unexpected units {u} from explain memory estimation\n{output}:'.format(
+            u=units, output='\n'.join(result.data)))
+    assert Decimal(mem_limit) >= 0, (
+        'unexpected value from explain\n:' + '\n'.join(result.data))
