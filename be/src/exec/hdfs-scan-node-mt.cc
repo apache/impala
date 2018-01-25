@@ -46,6 +46,7 @@ Status HdfsScanNodeMt::Prepare(RuntimeState* state) {
   // because the scanner of the corresponding file format does implement GetNext().
   for (const auto& files: per_type_files_) {
     if (!files.second.empty() && files.first != THdfsFileFormat::PARQUET
+        && files.first != THdfsFileFormat::ORC
         && files.first != THdfsFileFormat::TEXT) {
       stringstream msg;
       msg << "Unsupported file format with HdfsScanNodeMt: " << files.first;

@@ -76,6 +76,7 @@ endfunction()
 # set_dep_root(PACKAGE) ->
 #   PACKAGE_ROOT set to $ENV{IMPALA_TOOLCHAIN}/PACKAGE-$ENV{IMPALA_PACKAGE_VERSION}
 set_dep_root(AVRO)
+set_dep_root(ORC)
 set_dep_root(BOOST)
 set_dep_root(BREAKPAD)
 set_dep_root(BZIP2)
@@ -271,6 +272,10 @@ message(STATUS "RapidJson include dir: " ${RAPIDJSON_INCLUDE_DIR})
 # find Avro headers and libs
 find_package(Avro REQUIRED)
 IMPALA_ADD_THIRDPARTY_LIB(avro ${AVRO_INCLUDE_DIR} ${AVRO_STATIC_LIB} "")
+
+# find ORC headers and libs
+find_package(Orc REQUIRED)
+IMPALA_ADD_THIRDPARTY_LIB(orc ${ORC_INCLUDE_DIR} ${ORC_STATIC_LIB} "")
 
 # find protobuf headers, libs and compiler
 find_package(Protobuf REQUIRED)

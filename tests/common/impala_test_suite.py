@@ -503,7 +503,7 @@ class ImpalaTestSuite(BaseTestSuite):
 
     Database names are dependent on the input format for table, which the table names
     remaining the same. A use database is issued before query execution. As such,
-    dabase names need to be build pre execution, this method wraps around the different
+    database names need to be build pre execution, this method wraps around the different
     execute methods and provides a common interface to issue the proper use command.
     """
     @wraps(function)

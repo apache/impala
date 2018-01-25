@@ -59,6 +59,7 @@ add_library(Exec
   hdfs-parquet-scanner.cc
   hdfs-parquet-scanner-ir.cc
   hdfs-parquet-table-writer.cc
+  hdfs-orc-scanner.cc
   hbase-scan-node.cc
   hbase-table-scanner.cc
   incr-stats-util.cc

@@ -66,6 +66,7 @@ table_name:complextypes_fileformat, constraint:restrict_to, table_format:parquet
 table_name:complextypes_fileformat, constraint:restrict_to, table_format:avro/snap/block
 table_name:complextypes_fileformat, constraint:restrict_to, table_format:rc/snap/block
 table_name:complextypes_fileformat, constraint:restrict_to, table_format:seq/snap/block
+table_name:complextypes_fileformat, constraint:restrict_to, table_format:orc/def/block
 table_name:complextypes_multifileformat, constraint:restrict_to, table_format:text/none/none
 
 # TODO: Avro
@@ -134,6 +135,8 @@ table_name:decimal_tbl, constraint:restrict_to, table_format:parquet/none/none
 table_name:decimal_tiny, constraint:restrict_to, table_format:parquet/none/none
 table_name:decimal_tbl, constraint:restrict_to, table_format:kudu/none/none
 table_name:decimal_tiny, constraint:restrict_to, table_format:kudu/none/none
+table_name:decimal_tbl, constraint:restrict_to, table_format:orc/def/block
+table_name:decimal_tiny, constraint:restrict_to, table_format:orc/def/block
 
 table_name:avro_decimal_tbl, constraint:restrict_to, table_format:avro/snap/block
 

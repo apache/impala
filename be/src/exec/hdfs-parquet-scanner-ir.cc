@@ -65,17 +65,3 @@ int HdfsParquetScanner::ProcessScratchBatch(RowBatch* dst_batch) {
   scratch_batch_->tuple_idx += (scratch_tuple - scratch_tuple_start) / tuple_size;
   return output_row - output_row_start;
 }
-
-bool HdfsParquetScanner::EvalRuntimeFilter(int i, TupleRow* row) {
-  LocalFilterStats* stats = &filter_stats_[i];
-  const FilterContext* ctx = filter_ctxs_[i];
-  ++stats->total_possible;
-  if (stats->enabled && ctx->filter->HasFilter()) {
-    ++stats->considered;
-    if (!ctx->Eval(row)) {
-      ++stats->rejected;
-      return false;
-    }
-  }
-  return true;
-}

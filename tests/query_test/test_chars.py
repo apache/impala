@@ -57,6 +57,11 @@ class TestCharFormats(ImpalaTestSuite):
         STORED AS PARQUET
         LOCATION "{0}"'''.format(get_fs_path("/test-warehouse/chars_formats_parquet")))
     self.client.execute('''create external table if not exists
+        functional_orc_def.chars_formats
+        (cs CHAR(5), cl CHAR(140), vc VARCHAR(32))
+        STORED AS ORC
+        LOCATION "{0}"'''.format(get_fs_path("/test-warehouse/chars_formats_orc_def")))
+    self.client.execute('''create external table if not exists
         functional.chars_formats
         (cs CHAR(5), cl CHAR(140), vc VARCHAR(32))
         ROW FORMAT delimited fields terminated by ','  escaped by '\\\\'
@@ -84,6 +89,7 @@ class TestCharFormats(ImpalaTestSuite):
         (v.get_value('table_format').file_format in ['avro'] and
         v.get_value('table_format').compression_codec in ['snap']) or
         v.get_value('table_format').file_format in ['parquet'] or
+        v.get_value('table_format').file_format in ['orc'] or
         (v.get_value('table_format').file_format in ['text'] and
         v.get_value('table_format').compression_codec in ['none']))
 

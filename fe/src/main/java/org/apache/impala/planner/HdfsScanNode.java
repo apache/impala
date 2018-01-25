@@ -332,11 +332,12 @@ public class HdfsScanNode extends ScanNode {
     Set<HdfsFileFormat> fileFormats = computeScanRangeLocations(analyzer);
 
     // Determine backend scan node implementation to use. The optimized MT implementation
-    // is currently only supported for Parquet.
+    // is currently supported for Parquet, ORC and Text.
     if (analyzer.getQueryOptions().isSetMt_dop() &&
         analyzer.getQueryOptions().mt_dop > 0 &&
         fileFormats.size() == 1 &&
         (fileFormats.contains(HdfsFileFormat.PARQUET)
+          || fileFormats.contains(HdfsFileFormat.ORC)
           || fileFormats.contains(HdfsFileFormat.TEXT))) {
       useMtScanNode_ = true;
     } else {
@@ -1191,9 +1192,10 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkNotNull(desc_.getTable() instanceof HdfsTable);
     HdfsTable table = (HdfsTable) desc_.getTable();
     int perHostScanRanges;
-    if (table.getMajorityFormat() == HdfsFileFormat.PARQUET) {
+    if (table.getMajorityFormat() == HdfsFileFormat.PARQUET
+        || table.getMajorityFormat() == HdfsFileFormat.ORC) {
       // For the purpose of this estimation, the number of per-host scan ranges for
-      // Parquet files are equal to the number of columns read from the file. I.e.
+      // Parquet/ORC files are equal to the number of columns read from the file. I.e.
       // excluding partition columns and columns that are populated from file metadata.
       perHostScanRanges = 0;
       for (SlotDescriptor slot: desc_.getSlots()) {

@@ -73,4 +73,6 @@ struct TBackendGflags {
   23: required double max_filter_error_rate
 
   24: required i64 min_buffer_size
+
+  25: required bool enable_orc_scanner
 }

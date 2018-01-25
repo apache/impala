@@ -15,6 +15,38 @@ PLAN-ROOT SINK
    partitions=1/1 files=1 size=227B
    predicates: !empty(t.a)
 ====
+# Complex types are not supported on ORC.
+select 1 from functional_orc_def.complextypes_fileformat t, t.a
+---- PLAN
+not implemented: Scan of table 't' in format 'ORC' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
+Complex types are supported for these file formats: PARQUET.
+====
+select s.f1 from functional_orc_def.complextypes_fileformat t, t.m
+---- PLAN
+not implemented: Scan of table 't' in format 'ORC' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
+Complex types are supported for these file formats: PARQUET.
+====
+# Complex types are not supported on ORC, however queries materializing
+# only scalar type columns are allowed.
+select id from functional_orc_def.complextypes_fileformat
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_orc_def.complextypes_fileformat]
+   partitions=1/1 files=1 size=624B
+====
+# Complex types are not supported on ORC but count(*) and similar
+# queries should work.
+select count(*) from functional_orc_def.complextypes_fileformat
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:SCAN HDFS [functional_orc_def.complextypes_fileformat]
+   partitions=1/1 files=1 size=624B
+====
 # Complex types are not supported on Avro.
 select s.f1 from functional_avro_snap.complextypes_fileformat t, t.a
 ---- PLAN
@@ -111,11 +143,12 @@ select complex_struct_col.f1 from functional_hbase.allcomplextypes
 not implemented: Scan of table 'functional_hbase.allcomplextypes.complex_struct_col.f1' is not supported because 'functional_hbase.allcomplextypes' references a nested field/collection.
 Complex types are supported for these file formats: PARQUET.
 ====
-# The complextypes_multifileformat has three partitions with different file formats:
+# The complextypes_multifileformat has five partitions with different file formats:
 # p=1 text
 # p=2 parquet
 # p=3 avro
 # p=4 rc
+# p=5 orc
 # Scanning a text partition of a multi-format table with complex types fails.
 select 1 from functional.complextypes_multifileformat where p = 1
 ---- PLAN
@@ -136,7 +169,7 @@ PLAN-ROOT SINK
 |  03:UNNEST [t.a]
 |
 00:SCAN HDFS [functional.complextypes_multifileformat t]
-   partitions=1/4 files=1 size=128B
+   partitions=1/5 files=1 size=128B
    predicates: !empty(t.a)
 ====
 # Scanning an Avro partition of a multi-format table with complex types fails.
@@ -161,5 +194,23 @@ PLAN-ROOT SINK
 |  output: count(*)
 |
 00:SCAN HDFS [functional.complextypes_multifileformat]
-   partitions=1/4 files=1 size=128B
+   partitions=1/5 files=1 size=128B
+====
+# Scanning an ORC file partition of a multi-format table with complex types fails.
+select id from functional.complextypes_multifileformat t, t.a where p = 5
+---- PLAN
+not implemented: Scan of partition 'p=5' in format 'ORC' of table 't' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
+Complex types are supported for these file formats: PARQUET.
+====
+# Complex types are not supported on ORC files but count(*) and similar
+# queries should work.
+select count(*) from functional.complextypes_multifileformat where p = 5
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+00:SCAN HDFS [functional.complextypes_multifileformat]
+   partitions=1/5 files=1 size=128B
 ====
