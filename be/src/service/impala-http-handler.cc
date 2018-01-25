@@ -268,12 +268,12 @@ void ImpalaHttpHandler::QueryMemoryHandler(const Webserver::ArgumentMap& args,
   }
   QueryState::ScopedRef qs(unique_id);
   string mem_usage_text;
-  // Only in-flight queries have a MemTracker to get usage from.
+  // Only queries that have started execution have a MemTracker to get usage from.
   if (qs.get() != nullptr) {
     mem_usage_text = qs->query_mem_tracker()->LogUsage(MemTracker::UNLIMITED_DEPTH);
   } else {
-    mem_usage_text =
-        "The query is finished, current memory consumption is not available.";
+    mem_usage_text = "The query has either finished or has not started execution yet, "
+                     "current memory consumption is not available.";
   }
 
   Value mem_usage(mem_usage_text.c_str(), document->GetAllocator());
@@ -705,9 +705,11 @@ void ImpalaHttpHandler::QueryBackendsHandler(
   }
 
   shared_ptr<ClientRequestState> request_state = server_->GetClientRequestState(query_id);
-  if (request_state.get() == nullptr || request_state->coord() == nullptr) return;
+  if (request_state.get() == nullptr || request_state->GetCoordinator() == nullptr) {
+    return;
+  }
 
-  request_state->coord()->BackendsToJson(document);
+  request_state->GetCoordinator()->BackendsToJson(document);
 }
 
 void ImpalaHttpHandler::QueryFInstancesHandler(
@@ -724,9 +726,11 @@ void ImpalaHttpHandler::QueryFInstancesHandler(
   }
 
   shared_ptr<ClientRequestState> request_state = server_->GetClientRequestState(query_id);
-  if (request_state.get() == nullptr || request_state->coord() == nullptr) return;
+  if (request_state.get() == nullptr || request_state->GetCoordinator() == nullptr) {
+    return;
+  }
 
-  request_state->coord()->FInstanceStatsToJson(document);
+  request_state->GetCoordinator()->FInstanceStatsToJson(document);
 }
 
 void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include_summary,
@@ -753,7 +757,7 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
   {
     shared_ptr<ClientRequestState> request_state =
         server_->GetClientRequestState(query_id);
-    if (request_state != NULL) {
+    if (request_state != nullptr) {
       found = true;
       // If the query plan isn't generated, avoid waiting for the request
       // state lock to be acquired, since it could potentially be an expensive
@@ -765,17 +769,12 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
         return;
       }
       lock_guard<mutex> l(*request_state->lock());
-      if (request_state->coord() == NULL) {
-        const string& err = Substitute("Invalid query id: $0", PrintId(query_id));
-        Value json_error(err.c_str(), document->GetAllocator());
-        document->AddMember("error", json_error, document->GetAllocator());
-        return;
-      }
       query_status = request_state->query_status();
       stmt = request_state->sql_stmt();
       plan = request_state->exec_request().query_exec_request.query_plan;
-      if (include_json_plan || include_summary) {
-        request_state->coord()->GetTExecSummary(&summary);
+      if ((include_json_plan || include_summary)
+          && request_state->GetCoordinator() != nullptr) {
+        request_state->GetCoordinator()->GetTExecSummary(&summary);
       }
       if (include_json_plan) {
         for (const TPlanExecInfo& plan_exec_info:

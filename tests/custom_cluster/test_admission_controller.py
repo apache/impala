@@ -27,6 +27,7 @@ import threading
 from copy import copy
 from time import sleep, time
 
+from beeswaxd.BeeswaxService import QueryState
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import specific_build_type_timeout, IMPALAD_BUILD
@@ -41,6 +42,7 @@ from tests.common.test_vector import ImpalaTestDimension
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 from ImpalaService import ImpalaHiveServer2Service
 from TCLIService import TCLIService
+from tests.verifiers.metric_verifier import MetricVerifier
 
 LOG = logging.getLogger('admission_test')
 
@@ -482,6 +484,82 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       if impalad_with_2g_mem is not None:
         impalad_with_2g_mem.close()
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args= "--logbuflevel=-1 " + impalad_admission_ctrl_flags(max_requests=1,
+        max_queued=1, pool_max_mem=PROC_MEM_TEST_LIMIT),
+    statestored_args=_STATESTORED_ARGS)
+  def test_cancellation(self):
+    """ Test to confirm that all Async cancellation windows are hit and are able to
+    succesfully cancel the query"""
+    impalad = self.cluster.impalads[0]
+    client = impalad.service.create_beeswax_client()
+    try:
+      client.set_configuration_option("debug_action", "SLEEP_BEFORE_ADMISSION_MS:2000")
+      client.set_configuration_option("mem_limit", self.PROC_MEM_TEST_LIMIT + 1 )
+      handle = client.execute_async("select 1")
+      sleep(1)
+      client.close_query(handle)
+      self.assert_impalad_log_contains('INFO',
+          "Ready to be Rejected but already cancelled, query id=")
+      client.clear_configuration()
+
+      client.set_configuration_option("debug_action", "SLEEP_BEFORE_ADMISSION_MS:2000")
+      handle = client.execute_async("select 1")
+      sleep(1)
+      client.close_query(handle)
+      self.assert_impalad_log_contains('INFO',
+          "Ready to be Admitted immediately but already cancelled, query id=")
+
+      client.set_configuration_option("debug_action",
+          "SLEEP_AFTER_COORDINATOR_STARTS_MS:2000")
+      handle = client.execute_async("select 1")
+      sleep(1)
+      client.close_query(handle)
+      self.assert_impalad_log_contains('INFO',
+          "Cancelled right after starting the coordinator query id=")
+
+      client.clear_configuration()
+      handle = client.execute_async("select sleep(10000)")
+      client.set_configuration_option("debug_action",
+          "SLEEP_AFTER_ADMISSION_OUTCOME_MS:2000")
+      queued_query_handle = client.execute_async("select 1")
+      sleep(1)
+      assert client.get_state(queued_query_handle) == QueryState.COMPILED
+      assert "Admission result: Queued" in client.get_runtime_profile(queued_query_handle)
+      # Only cancel the queued query, because close will wait till it unregisters, this
+      # gives us a chance to close the running query and allow the dequeue thread to
+      # dequeue the queue query
+      client.cancel(queued_query_handle)
+      client.close_query(handle)
+      client.close_query(queued_query_handle)
+      queued_profile = client.get_runtime_profile(queued_query_handle)
+      assert "Admission result: Cancelled (queued)" in queued_profile
+      self.assert_impalad_log_contains('INFO', "Dequeued cancelled query=")
+      client.clear_configuration()
+
+      handle = client.execute_async("select sleep(10000)")
+      queued_query_handle = client.execute_async("select 1")
+      sleep(1)
+      assert client.get_state(queued_query_handle) == QueryState.COMPILED
+      assert "Admission result: Queued" in client.get_runtime_profile(queued_query_handle)
+      client.close_query(queued_query_handle)
+      client.close_query(handle)
+      queued_profile = client.get_runtime_profile(queued_query_handle)
+      assert "Admission result: Cancelled (queued)" in queued_profile
+    except Exception as e:
+      print e.args
+    finally:
+      client.close()
+      for i in self.cluster.impalads:
+        i.service.wait_for_metric_value("impala-server.num-fragments-in-flight", 0)
+      assert self.cluster.impalads[0].service.get_metric_value(
+        "admission-controller.agg-num-running.default-pool") == 0
+      assert self.cluster.impalads[0].service.get_metric_value(
+        "admission-controller.total-admitted.default-pool") == 3
+      assert self.cluster.impalads[0].service.get_metric_value(
+        "admission-controller.total-queued.default-pool") == 2
+
 class TestAdmissionControllerStress(TestAdmissionControllerBase):
   """Submits a number of queries (parameterized) with some delay between submissions
   (parameterized) and the ability to submit to one impalad or many in a round-robin
@@ -760,16 +838,20 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
 
           LOG.info("Submitting query %s", self.query_num)
           self.query_handle = client.execute_async(query)
-        except ImpalaBeeswaxException as e:
-          if re.search("Rejected.*queue full", str(e)):
+          client.wait_for_admission_control(self.query_handle)
+          admission_result = client.get_admission_result(self.query_handle)
+          assert len(admission_result) > 0
+          if "Rejected" in admission_result:
             LOG.info("Rejected query %s", self.query_num)
             self.query_state = 'REJECTED'
+            self.query_handle = None
             return
-          elif "exceeded timeout" in str(e):
+          elif "timeout" in admission_result:
             LOG.info("Query %s timed out", self.query_num)
             self.query_state = 'TIMED OUT'
+            self.query_handle = None
             return
-          else:
+        except ImpalaBeeswaxException as e:
             raise e
         finally:
           self.lock.release()

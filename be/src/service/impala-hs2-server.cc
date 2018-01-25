@@ -447,6 +447,10 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
   status = Execute(&query_ctx, session, &request_state);
   HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
 
+  // Start thread to wait for results to become available.
+  status = request_state->WaitAsync();
+  if (!status.ok()) goto return_error;
+
   // Optionally enable result caching on the ClientRequestState.
   if (cache_num_rows > 0) {
     status = request_state->SetResultCache(
@@ -455,10 +459,6 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
         cache_num_rows);
     if (!status.ok()) goto return_error;
   }
-  request_state->UpdateNonErrorOperationState(TOperationState::RUNNING_STATE);
-  // Start thread to wait for results to become available.
-  status = request_state->WaitAsync();
-  if (!status.ok()) goto return_error;
   // Once the query is running do a final check for session closure and add it to the
   // set of in-flight queries.
   status = SetQueryInflight(session, request_state);
@@ -802,15 +802,16 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
                       SQLSTATE_GENERAL_ERROR);
 
   stringstream ss;
-  if (request_state->coord() != NULL) {
+  Coordinator* coord = request_state->GetCoordinator();
+  if (coord != nullptr) {
     // Report progress
-    ss << request_state->coord()->progress().ToString() << "\n";
+    ss << coord->progress().ToString() << "\n";
   }
   // Report analysis errors
   ss << join(request_state->GetAnalysisWarnings(), "\n");
-  if (request_state->coord() != NULL) {
+  if (coord != nullptr) {
     // Report execution errors
-    ss << request_state->coord()->GetErrorLog();
+    ss << coord->GetErrorLog();
   }
   return_val.log = ss.str();
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);

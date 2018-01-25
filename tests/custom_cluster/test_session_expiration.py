@@ -89,3 +89,23 @@ class TestSessionExpiration(CustomClusterTestSuite):
     # now client should have expired
     assert num_expired + 1 == impalad.service.get_metric_value(
       "impala-server.num-sessions-expired")
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("-default_pool_max_requests 1")
+  def test_session_expiration_with_queued_query(self, vector):
+    """Ensure that a query waiting in queue gets cancelled if the session expires."""
+    impalad = self.cluster.get_any_impalad()
+    client = impalad.service.create_beeswax_client()
+    client.execute("SET IDLE_SESSION_TIMEOUT=3")
+    client.execute_async("select sleep(10000)")
+    queued_handle = client.execute_async("select 1")
+    impalad.service.wait_for_metric_value(
+      "admission-controller.local-num-queued.default-pool", 1)
+    sleep(3)
+    impalad.service.wait_for_metric_value(
+      "admission-controller.local-num-queued.default-pool", 0)
+    impalad.service.wait_for_metric_value(
+      "admission-controller.agg-num-running.default-pool", 0)
+    queued_query_profile = impalad.service.create_beeswax_client().get_runtime_profile(
+      queued_handle)
+    assert "Admission result: Cancelled (queued)" in queued_query_profile

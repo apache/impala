@@ -40,14 +40,10 @@ class TestUdfBase(ImpalaTestSuite):
   """
   Base class with utility functions for testing UDFs.
   """
-  def _check_exception(self, e):
-    # The interesting exception message may be in 'e' or in its inner_exception
-    # depending on the point of query failure.
-    if 'Memory limit exceeded' in str(e) or 'Cancelled' in str(e):
-      return
-    if e.inner_exception is not None\
-       and ('Memory limit exceeded' in e.inner_exception.message
-            or 'Cancelled' not in e.inner_exception.message):
+  def _check_mem_limit_exception(self, e):
+    """Return without error if the exception is MEM_LIMIT_EXCEEDED, re-raise 'e'
+    in all other cases."""
+    if 'Memory limit exceeded' in str(e):
       return
     raise e
 
@@ -427,21 +423,22 @@ class TestUdfExecution(TestUdfBase):
   # queries to fail
   @pytest.mark.execute_serially
   def test_mem_limits(self, vector, unique_database):
-    # Set the mem limit high enough that a simple scan can run
-    mem_limit = 1024 * 1024
+    # Set the mem_limit and buffer_pool_limit high enough that the query makes it through
+    # admission control and a simple scan can run.
     vector = copy(vector)
-    vector.get_value('exec_option')['mem_limit'] = mem_limit
+    vector.get_value('exec_option')['mem_limit'] = '1mb'
+    vector.get_value('exec_option')['buffer_pool_limit'] = '32kb'
     try:
       self.run_test_case('QueryTest/udf-mem-limit', vector, use_db=unique_database)
       assert False, "Query was expected to fail"
     except ImpalaBeeswaxException, e:
-      self._check_exception(e)
+      self._check_mem_limit_exception(e)
 
     try:
       self.run_test_case('QueryTest/uda-mem-limit', vector, use_db=unique_database)
       assert False, "Query was expected to fail"
     except ImpalaBeeswaxException, e:
-      self._check_exception(e)
+      self._check_mem_limit_exception(e)
 
     # It takes a long time for Impala to free up memory after this test, especially if
     # ASAN is enabled. Verify that all fragments finish executing before moving on to the

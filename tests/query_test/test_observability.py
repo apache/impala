@@ -89,10 +89,16 @@ class TestObservability(ImpalaTestSuite):
   def test_query_states(self):
     """Tests that the query profile shows expected query states."""
     query = "select count(*) from functional.alltypes"
-    handle = self.execute_query_async(query, dict())
+    handle = self.execute_query_async(query,
+        {"debug_action": "SLEEP_BEFORE_ADMISSION_MS:1000"})
+    # If ExecuteStatement() has completed and the query is paused in the admission control
+    # phase, then the query must be in COMPILED state.
     profile = self.client.get_runtime_profile(handle)
-    # If ExecuteStatement() has completed but the results haven't been fetched yet, the
-    # query must have at least reached RUNNING.
+    assert "Query State: COMPILED" in profile
+    # After completion of the admission control phase, the query must have at least
+    # reached RUNNING state.
+    self.client.wait_for_admission_control(handle)
+    profile = self.client.get_runtime_profile(handle)
     assert "Query State: RUNNING" in profile or \
       "Query State: FINISHED" in profile, profile
 
@@ -104,17 +110,37 @@ class TestObservability(ImpalaTestSuite):
   def test_query_options(self):
     """Test that the query profile shows expected non-default query options, both set
     explicitly through client and those set by planner"""
-    # Set a query option explicitly through client
-    self.execute_query("set MEM_LIMIT = 8589934592")
-    # Make sure explicitly set default values are not shown in the profile
-    self.execute_query("set MAX_IO_BUFFERS = 0")
-    runtime_profile = self.execute_query("select 1").runtime_profile
-    assert "Query Options (set by configuration): MEM_LIMIT=8589934592" in runtime_profile
+    # Set mem_limit and runtime_filter_wait_time_ms to non-default and default value.
+    query_opts = {'mem_limit': 8589934592, 'runtime_filter_wait_time_ms': 0}
+    profile = self.execute_query("select 1", query_opts).runtime_profile
+    assert "Query Options (set by configuration): MEM_LIMIT=8589934592" in profile,\
+        profile
     # For this query, the planner sets NUM_NODES=1, NUM_SCANNER_THREADS=1,
     # RUNTIME_FILTER_MODE=0 and MT_DOP=0
     assert "Query Options (set by configuration and planner): MEM_LIMIT=8589934592," \
         "NUM_NODES=1,NUM_SCANNER_THREADS=1,RUNTIME_FILTER_MODE=0,MT_DOP=0\n" \
-        in runtime_profile
+        in profile
+
+  def test_exec_summary(self):
+    """Test that the exec summary is populated correctly in every query state"""
+    query = "select count(*) from functional.alltypes"
+    handle = self.execute_query_async(query,
+        {"debug_action": "SLEEP_BEFORE_ADMISSION_MS:1000"})
+    # If ExecuteStatement() has completed and the query is paused in the admission control
+    # phase, then the coordinator has not started yet and exec_summary should be empty.
+    exec_summary = self.client.get_exec_summary(handle)
+    assert exec_summary is not None and exec_summary.nodes is None
+    # After completion of the admission control phase, the coordinator would have started
+    # and we should get a populated exec_summary.
+    self.client.wait_for_admission_control(handle)
+    exec_summary = self.client.get_exec_summary(handle)
+    assert exec_summary is not None and exec_summary.nodes is not None
+
+    self.client.fetch(query, handle)
+    exec_summary = self.client.get_exec_summary(handle)
+    # After fetching the results and reaching finished state, we should still be able to
+    # fetch an exec_summary.
+    assert exec_summary is not None and exec_summary.nodes is not None
 
   @SkipIfLocal.multiple_impalad
   @pytest.mark.xfail(reason="IMPALA-6338")

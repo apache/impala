@@ -212,8 +212,6 @@ class QuerySchedule {
 
   const FInstanceExecParams& GetCoordInstanceExecParams() const;
 
-  bool is_admitted() const { return is_admitted_; }
-  void set_is_admitted(bool is_admitted) { is_admitted_ = is_admitted; }
   RuntimeProfile* summary_profile() { return summary_profile_; }
   RuntimeProfile::EventSequence* query_events() { return query_events_; }
 
@@ -254,9 +252,6 @@ class QuerySchedule {
 
   /// Used to generate consecutive fragment instance ids.
   TUniqueId next_instance_id_;
-
-  /// Indicates if the query has been admitted for execution.
-  bool is_admitted_;
 
   /// Populate fragment_exec_params_ from request_.plan_exec_info.
   /// Sets is_coord_fragment and input_fragments.

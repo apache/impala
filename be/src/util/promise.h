@@ -28,21 +28,40 @@
 
 namespace impala {
 
+/// Is used as a template parameter for Promise class and represents the mode that a
+/// Promise object works in. The values SINGLE_PRODUCER and MULTIPLE_PRODUCER are used
+/// based on whether multiple calls to Promise::Set() should be invalid or not
+/// respectively.
+enum class PromiseMode { SINGLE_PRODUCER, MULTIPLE_PRODUCER };
+
 /// A stripped-down replacement for boost::promise which, to the best of our knowledge,
-/// actually works. A single producer provides a single value by calling Set(..), which
-/// one or more consumers retrieve through calling Get(..).  Consumers must be consistent
-/// in their use of Get(), i.e., for a particular promise all consumers should either
-/// have a timeout or not.
-template <typename T>
+/// actually works. Provides single assignment semantics for storing a value that can be
+/// later retrieved asynchronously. Common usage pattern for different PromiseMode modes:
+/// SINGLE_PRODUCER: A single producer provides a single value by calling Set(..)
+/// MULTIPLE_PRODUCER: Multiple producers call Set(..) and can check if it was
+/// successfully set or was already set by another producer by looking at the returned
+/// value.
+///
+/// One or more consumers can retrieve the value through calling Get(..). They must be
+/// consistent in their use of Get(), i.e., for a particular promise all consumers should
+/// either have a timeout or not.
+
+template <typename T, PromiseMode mode = PromiseMode::SINGLE_PRODUCER>
 class Promise {
  public:
   Promise() : val_is_set_(false) { }
 
-  /// Copies val into this promise, and notifies any consumers blocked in Get().
-  /// It is invalid to call Set() twice.
-  void Set(const T& val) {
+  /// Copies val into this promise if the val has not already been set, and notifies any
+  /// consumers blocked in Get(). Returns the val that is set or the val that was already
+  /// set before this call.
+  /// It is invalid to call Set() twice if the PromiseMode is SINGLE_PRODUCER.
+  T Set(const T& val) {
     boost::unique_lock<boost::mutex> l(val_lock_);
-    DCHECK(!val_is_set_) << "Called Set(..) twice on the same Promise";
+    if (val_is_set_) {
+      DCHECK_ENUM_EQ(mode, PromiseMode::MULTIPLE_PRODUCER)
+          << "Called Set(..) twice on the same Promise in SINGLE_PRODUCER mode";
+      return val_;
+    }
     val_ = val;
     val_is_set_ = true;
 
@@ -57,6 +76,7 @@ class Promise {
     /// Calling NotifyAll() with the val_lock_ guarantees that the thread calling
     /// Set() is done and the promise is safe to delete.
     val_set_cond_.NotifyAll();
+    return val_;
   }
 
   /// Blocks until a value is set, and then returns a reference to that value. Once Get()

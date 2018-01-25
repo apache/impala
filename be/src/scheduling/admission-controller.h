@@ -40,6 +40,15 @@ namespace impala {
 class QuerySchedule;
 class ExecEnv;
 
+/// Represents the admission outcome of a query. It is stored in the 'admit_outcome'
+/// input variable passed to AdmissionController::AdmitQuery() if an admission decision
+/// has been made or the caller has initiated a cancellation.
+enum class AdmissionOutcome {
+  ADMITTED,
+  REJECTED_OR_TIMED_OUT,
+  CANCELLED,
+};
+
 /// The AdmissionController is used to throttle requests (e.g. queries, DML) based
 /// on available cluster resources, which are configured in one or more resource pools. A
 /// request will either be admitted for immediate execution, queued for later execution,
@@ -171,6 +180,12 @@ class ExecEnv;
 /// queues at the beginning. Requests across queues may be competing for the same
 /// resources on particular hosts, i.e. #2 in the description of memory-based admission
 /// above. Note the pool's max_mem_resources (#1) is not contented.
+///
+/// Cancellation Behavior:
+/// An admission request<schedule, admit_outcome> submitted using AdmitQuery() can be
+/// proactively cancelled by setting the 'admit_outcome' to AdmissionOutcome::CANCELLED.
+/// This is handled asynchronously by AdmitQuery() and DequeueLoop().
+///
 /// TODO: Improve the dequeuing policy. IMPALA-2968.
 ///
 /// TODO: Remove less important debug logging after more cluster testing. Should have a
@@ -182,17 +197,21 @@ class AdmissionController {
       const TNetworkAddress& host_addr);
   ~AdmissionController();
 
-  /// Submits the request for admission. Returns immediately if rejected, but
-  /// otherwise blocks until the request is admitted. When this method returns,
-  /// schedule->is_admitted() is true if and only if the request was admitted.
-  /// For all calls to AdmitQuery(), ReleaseQuery() should also be called after
-  /// the query completes to ensure that the pool statistics are updated.
-  Status AdmitQuery(QuerySchedule* schedule);
+  /// Submits the request for admission. Returns immediately if rejected, but otherwise
+  /// blocks until the request is either admitted, times out or cancelled by the client
+  /// (by setting 'admit_outcome' to CANCELLED). When this method returns the following
+  /// <admit_outcome, Return Status> pairs are possible:
+  /// - Admitted: <ADMITTED, Status::OK>
+  /// - Rejected or timed out: <REJECTED_OR_TIMED_OUT, Status(msg: reason for the same)>
+  /// - Cancelled: <CANCELLED, Status::CANCELLED>
+  /// If admitted, ReleaseQuery() should also be called after the query completes or gets
+  /// cancelled to ensure that the pool statistics are updated.
+  Status AdmitQuery(QuerySchedule* schedule,
+      Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER>* admit_outcome);
 
   /// Updates the pool statistics when a query completes (either successfully,
   /// is cancelled or failed). This should be called for all requests that have
-  /// been submitted via AdmitQuery(). (If the request was not admitted, this is
-  /// a no-op.)
+  /// been submitted via AdmitQuery().
   /// This does not block.
   void ReleaseQuery(const QuerySchedule& schedule);
 
@@ -224,8 +243,6 @@ class AdmissionController {
   ThriftSerializer thrift_serializer_;
 
   /// Protects all access to all variables below.
-  /// Coordinates access to the results of the promise QueueNode::is_admitted,
-  /// but the lock is not required to wait on the promise.
   boost::mutex admission_ctrl_lock_;
 
   /// Maps from host id to memory reserved and memory admitted, both aggregates over all
@@ -370,21 +387,18 @@ class AdmissionController {
   PoolSet pools_for_updates_;
 
   /// Structure stored in a QueryQueue representing a request. This struct lives only
-  /// during the call to AdmitQuery().
+  /// during the call to AdmitQuery() but its members live past that and are owned by the
+  /// ClientRequestState object associated with them.
   struct QueueNode : public InternalQueue<QueueNode>::Node {
-    QueueNode(const QuerySchedule& query_schedule) : schedule(query_schedule) { }
+    QueueNode(const QuerySchedule& query_schedule,
+        Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER>* admission_outcome)
+      : schedule(query_schedule), admit_outcome(admission_outcome) {}
 
-    /// Set when the request is admitted or rejected by the dequeuing thread. Used
-    /// by AdmitQuery() to wait for admission or until the timeout is reached.
-    /// The admission_ctrl_lock_ is not held while waiting on this promise, but
-    /// the lock should be held when checking the result because the dequeuing
-    /// thread holds it to Set().
-    Promise<bool> is_admitted;
-
-    /// The query schedule of the queued request. The schedule lives longer than the
-    /// duration of the QueueNode, which only lives the duration of the call to
-    /// AdmitQuery.
+    /// The query schedule of the queued request.
     const QuerySchedule& schedule;
+
+    /// The Admission outcome of the queued request.
+    Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER>* admit_outcome;
   };
 
   /// Queue for the queries waiting to be admitted for execution. Once the
@@ -432,7 +446,8 @@ class AdmissionController {
   /// Must hold admission_ctrl_lock_.
   void UpdateClusterAggregates();
 
-  /// Dequeues and admits queued queries when notified by dequeue_cv_.
+  /// Dequeues the queued queries when notified by dequeue_cv_ and admits them if they
+  /// have not been cancelled yet.
   void DequeueLoop();
 
   /// Returns true if schedule can be admitted to the pool with pool_cfg.
@@ -457,7 +472,7 @@ class AdmissionController {
   /// memory than possible to reserve or the queue is already full. If true,
   /// rejection_reason is set to a explanation of why the request was rejected.
   /// Must hold admission_ctrl_lock_.
-  bool RejectImmediately(QuerySchedule* schedule, const TPoolConfig& pool_cfg,
+  bool RejectImmediately(const QuerySchedule& schedule, const TPoolConfig& pool_cfg,
       std::string* rejection_reason);
 
   /// Gets or creates the PoolStats for pool_name. Must hold admission_ctrl_lock_.

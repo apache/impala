@@ -228,6 +228,22 @@ class HS2TestSuite(ImpalaTestSuite):
     assert False, 'Did not reach expected operation state %s in time, actual state was ' \
         '%s' % (expected_state, get_operation_status_resp.operationState)
 
+  def wait_for_admission_control(self, operation_handle, timeout = 10):
+    """Waits for the admission control processing of the query to complete by polling
+      GetOperationStatus every interval seconds, returning the TGetOperationStatusResp,
+      or raising an assertion after timeout seconds."""
+    start_time = time()
+    while (time() - start_time < timeout):
+      get_operation_status_resp = self.get_operation_status(operation_handle)
+      HS2TestSuite.check_response(get_operation_status_resp)
+      if TCLIService.TOperationState.INITIALIZED_STATE < \
+          get_operation_status_resp.operationState < \
+          TCLIService.TOperationState.PENDING_STATE:
+        return get_operation_status_resp
+      sleep(0.05)
+    assert False, 'Did not complete admission control processing in time, current ' \
+        'operation state of query: %s' % (get_operation_status_resp.operationState)
+
   def execute_statement(self, statement, conf_overlay=None,
                         expected_status_code=TCLIService.TStatusCode.SUCCESS_STATUS,
                         expected_error_prefix=None):

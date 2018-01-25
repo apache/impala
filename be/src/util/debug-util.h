@@ -107,6 +107,16 @@ std::string GetStackTrace();
 /// Returns the backend name in "host:port" form suitable for human consumption.
 std::string GetBackendString();
 
+#ifndef NDEBUG
+/// If sleep time is specified in the debug_action query option in the format
+/// <sleep_label>:<sleep_time_ms>, where <sleep_label> is a string and <sleep_time_ms>
+/// is an integer, and 'sleep_label' matches the one specified in the query option, then
+/// this methods extracts the corresponding <sleep_time_ms> and initiates a sleep for that
+/// many milliseconds.
+void SleepIfSetInDebugOptions(
+    const TQueryOptions& query_options, const string& sleep_label);
+#endif
+
 // FILE_CHECKs are conditions that we expect to be true but could fail due to a malformed
 // input file. They differentiate these cases from DCHECKs, which indicate conditions that
 // are true unless there's a bug in Impala. We would ideally always return a bad Status

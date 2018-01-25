@@ -18,6 +18,7 @@
 #ifndef IMPALA_SERVICE_CLIENT_REQUEST_STATE_H
 #define IMPALA_SERVICE_CLIENT_REQUEST_STATE_H
 
+#include "common/atomic.h"
 #include "common/status.h"
 #include "exec/catalog-op-executor.h"
 #include "runtime/timestamp-value.h"
@@ -45,6 +46,7 @@ class Expr;
 class TupleRow;
 class Frontend;
 class ClientRequestStateCleaner;
+enum class AdmissionOutcome;
 
 /// Execution state of the client-facing side a query. This captures everything
 /// necessary to convert row batches received by the coordinator into results
@@ -64,7 +66,9 @@ class ClientRequestState {
 
   ~ClientRequestState();
 
-  /// Initiates execution of a exec_request.
+  /// Based on query type, this either initiates execution of a exec_request or submits
+  /// the query to the Admission controller for asynchronous admission control. When this
+  /// returns the operation state is either RUNNING_STATE or PENDING_STATE.
   /// Non-blocking.
   /// Must *not* be called with lock_ held.
   Status Exec(TExecRequest* exec_request) WARN_UNUSED_RESULT;
@@ -108,9 +112,9 @@ class ClientRequestState {
   Status RestartFetch() WARN_UNUSED_RESULT;
 
   /// Update operation state if the requested state isn't already obsolete. This is
-  /// only for non-error states - if the query encounters an error the query status
-  /// needs to be set with information about the error so UpdateQueryStatus() must be
-  /// used instead. Takes lock_.
+  /// only for non-error states (PENDING_STATE, RUNNING_STATE and FINISHED_STATE) - if the
+  /// query encounters an error the query status needs to be set with information about
+  /// the error so UpdateQueryStatus() must be used instead. Takes lock_.
   void UpdateNonErrorOperationState(
       apache::hive::service::cli::thrift::TOperationState::type operation_state);
 
@@ -125,9 +129,9 @@ class ClientRequestState {
   Status UpdateQueryStatus(const Status& status) WARN_UNUSED_RESULT;
 
   /// Cancels the child queries and the coordinator with the given cause.
-  /// If cause is NULL, assume this was deliberately cancelled by the user.
-  /// Otherwise, sets state to ERROR_STATE (TODO: use CANCELED_STATE).
-  /// Does nothing if the query has reached EOS or already cancelled.
+  /// If cause is NULL, it assume this was deliberately cancelled by the user while in
+  /// FINISHED operation state. Otherwise, sets state to ERROR_STATE (TODO: IMPALA-1262:
+  /// use CANCELED_STATE). Does nothing if the query has reached EOS or already cancelled.
   ///
   /// Only returns an error if 'check_inflight' is true and the query is not yet
   /// in-flight. Otherwise, proceed and return Status::OK() even if the query isn't
@@ -143,6 +147,15 @@ class ClientRequestState {
   /// Returns a non-ok status if max_size exceeds the per-impalad allowed maximum.
   Status SetResultCache(QueryResultSet* cache, int64_t max_size) WARN_UNUSED_RESULT;
 
+  /// Wrappers around Coordinator::UpdateBackendExecStatus() and
+  /// Coordinator::UpdateFilter() respectively for the coordinator object associated with
+  /// 'this' ClientRequestState object. It ensures that these updates are applied to the
+  /// coordinator even before it becomes accessible through GetCoordinator(). These
+  /// methods should be used instead of calling them directly using the coordinator
+  /// object.
+  Status UpdateBackendExecStatus(const TReportExecStatusParams& params);
+  void UpdateFilter(const TUpdateFilterParams& params);
+
   ImpalaServer::SessionState* session() const { return session_.get(); }
 
   /// Queries are run and authorized on behalf of the effective_user.
@@ -156,9 +169,17 @@ class ClientRequestState {
   const TUniqueId& session_id() const { return query_ctx_.session.session_id; }
   const std::string& default_db() const { return query_ctx_.session.database; }
   bool eos() const { return eos_; }
-  Coordinator* coord() const { return coord_.get(); }
   QuerySchedule* schedule() { return schedule_.get(); }
 
+  /// Returns the Coordinator for 'QUERY' and 'DML' requests once Coordinator::Exec()
+  /// completes successfully. Otherwise returns null.
+  Coordinator* GetCoordinator() const {
+    return coord_exec_called_.Load() ? coord_.get() : nullptr;
+  }
+
+  /// Resource pool associated with this query, or an empty string if the schedule has not
+  /// been created and had the pool set yet, or this StmtType doesn't go through admission
+  /// control.
   /// Admission control resource pool associated with this query.
   std::string request_pool() const {
     return query_ctx_.__isset.request_pool ? query_ctx_.request_pool : "";
@@ -258,6 +279,12 @@ class ClientRequestState {
   /// Executor for any child queries (e.g. compute stats subqueries). Always non-NULL.
   const boost::scoped_ptr<ChildQueryExecutor> child_query_executor_;
 
+  /// Promise used by the admission controller. AdmissionController:AdmitQuery() will
+  /// block on this promise until the query is either rejected, admitted, times out, or is
+  /// cancelled. Can be set to CANCELLED by the ClientRequestState in order to cancel, but
+  /// otherwise is set by AdmissionController with the admission decision.
+  Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER> admit_outcome_;
+
   /// Protects all following fields. Acquirers should be careful not to hold it for too
   /// long, e.g. during RPCs because this lock is required to make progress on various
   /// ImpalaServer requests. If held for too long it can block progress of client
@@ -285,8 +312,23 @@ class ClientRequestState {
   /// Resource assignment determined by scheduler. Owned by obj_pool_.
   boost::scoped_ptr<QuerySchedule> schedule_;
 
-  /// Not set for ddl queries.
+  /// Thread for asynchronously running the admission control code-path and starting
+  /// execution in the following cases:
+  /// 1. exec_request().stmt_type == QUERY or DML.
+  /// 2. CTAS query for creating a table that does not exist.
+  std::unique_ptr<Thread> async_exec_thread_;
+
+  /// Set by the async-exec-thread after successful admission. Accessed through
+  /// GetCoordinator() since most Coordinator methods can be called only after
+  /// Coordinator::Exec() returns success. The only exceptions to this are
+  /// FinishExecQueryOrDmlRequest(), which initializes it, calls Exec() on it and sets
+  /// 'coord_exec_called_' to true, and UpdateBackendExecStatus() and UpdateFilter(),
+  /// which can be called before Coordinator::Exec() returns.
   boost::scoped_ptr<Coordinator> coord_;
+
+  /// Used by GetCoordinator() to check if 'coord_' can be made accessible. Set to true by
+  /// the async-exec-thread only after Exec() has been successfully called on 'coord_'.
+  AtomicBool coord_exec_called_;
 
   /// Runs statements that query or modify the catalog via the CatalogService.
   boost::scoped_ptr<CatalogOpExecutor> catalog_op_executor_;
@@ -389,15 +431,18 @@ class ClientRequestState {
   /// actively processed. Takes expiration_data_lock_.
   void MarkActive();
 
-  /// Core logic of initiating a query or dml execution request.
-  /// Initiates execution of plan fragments, if there are any, and sets
-  /// up the output exprs for subsequent calls to FetchRows().
-  /// 'coord_' is only valid after this method is called, and may be invalid if it
-  /// returns an error.
-  /// Also sets up profile and pre-execution counters.
+  /// Sets up profile and pre-execution counters, creates the query schedule, and spawns
+  /// a thread that calls FinishExecQueryOrDmlRequest() which contains the core logic of
+  /// executing a QUERY or DML execution request.
   /// Non-blocking.
-  Status ExecQueryOrDmlRequest(const TQueryExecRequest& query_exec_request)
+  Status ExecAsyncQueryOrDmlRequest(const TQueryExecRequest& query_exec_request)
       WARN_UNUSED_RESULT;
+
+  /// Submits the QuerySchedule to the admission controller and on successful admission,
+  /// starts up the coordinator execution, makes it accessible by setting
+  /// 'coord_exec_called_' to true and advances operation_state_ to RUNNING. Handles
+  /// async cancellation of queries and cleans up state if needed.
+  void FinishExecQueryOrDmlRequest();
 
   /// Core logic of executing a ddl statement. May internally initiate execution of
   /// queries (e.g., compute stats) or dml (e.g., create table as select)
@@ -431,7 +476,7 @@ class ClientRequestState {
 
   /// Sets the result set for a CREATE TABLE AS SELECT statement. The results will not be
   /// ready until all BEs complete execution. This can be called as part of Wait(),
-  /// at which point results will be avilable.
+  /// at which point results will be available.
   void SetCreateTableAsSelectResultSet();
 
   /// Updates the metastore's table and column statistics based on the child-query results

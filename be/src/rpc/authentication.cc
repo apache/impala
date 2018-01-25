@@ -524,14 +524,14 @@ void SaslAuthProvider::RunKinit(Promise<Status>* first_kinit) {
           "Failed to obtain Kerberos ticket for principal: $0. $1", principal_,
           kinit_output);
       if (first_time) {
-        first_kinit->Set(Status(err_msg));
+        discard_result(first_kinit->Set(Status(err_msg)));
         return;
       } else {
         LOG(ERROR) << err_msg;
       }
     } else if (first_time) {
       first_time = false;
-      first_kinit->Set(Status::OK());
+      discard_result(first_kinit->Set(Status::OK()));
     }
 
     // Sleep for the renewal interval, minus a random time between 0-5 minutes to help

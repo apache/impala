@@ -67,7 +67,6 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
   RAISE_IF_ERROR(Execute(&query_ctx, session, &request_state),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
-  request_state->UpdateNonErrorOperationState(TOperationState::RUNNING_STATE);
   // start thread to wait for results to become available, which will allow
   // us to advance query state to FINISHED or EXCEPTION
   Status status = request_state->WaitAsync();
@@ -112,7 +111,6 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
   RAISE_IF_ERROR(Execute(&query_ctx, session, &request_state),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
-  request_state->UpdateNonErrorOperationState(TOperationState::RUNNING_STATE);
   // Once the query is running do a final check for session closure and add it to the
   // set of in-flight queries.
   Status status = SetQueryInflight(session, request_state);
@@ -310,8 +308,8 @@ void ImpalaServer::get_log(string& log, const LogContextId& context) {
   }
 
   // Add warnings from execution
-  if (request_state->coord() != nullptr) {
-    const std::string coord_errors = request_state->coord()->GetErrorLog();
+  if (request_state->GetCoordinator() != nullptr) {
+    const std::string coord_errors = request_state->GetCoordinator()->GetErrorLog();
     if (!coord_errors.empty()) error_log_ss << coord_errors << "\n";
   }
   log = error_log_ss.str();
@@ -565,8 +563,8 @@ Status ImpalaServer::CloseInsertInternal(const TUniqueId& query_id,
       // Note that when IMPALA-87 is fixed (INSERT without FROM clause) we might
       // need to revisit this, since that might lead us to insert a row without a
       // coordinator, depending on how we choose to drive the table sink.
-      if (request_state->coord() != nullptr) {
-        request_state->coord()->dml_exec_state()->ToTInsertResult(insert_result);
+      if (request_state->GetCoordinator() != nullptr) {
+        request_state->GetCoordinator()->dml_exec_state()->ToTInsertResult(insert_result);
       }
     }
   }
