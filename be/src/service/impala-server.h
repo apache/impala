@@ -69,6 +69,7 @@ class TQueryOptions;
 class TGetExecSummaryResp;
 class TGetExecSummaryReq;
 class ClientRequestState;
+class QuerySchedule;
 
 /// An ImpalaServer contains both frontend and backend functionality;
 /// it implements ImpalaService (Beeswax), ImpalaHiveServer2Service (HiveServer2)
@@ -420,7 +421,9 @@ class ImpalaServer : public ImpalaServiceIf,
     /// For HS2 only, the protocol version this session is expecting.
     apache::hive::service::cli::thrift::TProtocolVersion::type hs2_version;
 
-    /// Inflight queries belonging to this session
+    /// Inflight queries belonging to this session. It represents the set of queries that
+    /// are either queued or have started executing. Used primarily to identify queries
+    /// that need to be closed if the session closes or expires.
     boost::unordered_set<TUniqueId> inflight_queries;
 
     /// Total number of queries run as part of this session.
@@ -479,16 +482,14 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Updates the number of databases / tables metrics from the FE catalog
   Status UpdateCatalogMetrics() WARN_UNUSED_RESULT;
 
-  /// Starts asynchronous execution of query. Creates ClientRequestState (returned
-  /// in exec_state), registers it and calls Coordinator::Execute().
-  /// If it returns with an error status, exec_state will be NULL and nothing
-  /// will have been registered in client_request_state_map_.
-  /// session_state is a ptr to the session running this query and must have
-  /// been checked out.
-  /// query_session_state is a snapshot of session state that changes when the
-  /// query was run. (e.g. default database).
-  Status Execute(TQueryCtx* query_ctx,
-      std::shared_ptr<SessionState> session_state,
+  /// Depending on the query type, this either submits the query to the admission
+  /// controller for performing async admission control or starts asynchronous execution
+  /// of query. Creates ClientRequestState (returned in exec_state), registers it and
+  /// calls ClientRequestState::Execute(). If it returns with an error status, exec_state
+  /// will be NULL and nothing will have been registered in client_request_state_map_.
+  /// session_state is a ptr to the session running this query and must have been checked
+  /// out.
+  Status Execute(TQueryCtx* query_ctx, std::shared_ptr<SessionState> session_state,
       std::shared_ptr<ClientRequestState>* exec_state) WARN_UNUSED_RESULT;
 
   /// Implements Execute() logic, but doesn't unregister query on error.
@@ -952,7 +953,8 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Protects query_locations_. Not held in conjunction with other locks.
   boost::mutex query_locations_lock_;
 
-  /// A map from backend to the list of queries currently running there.
+  /// A map from backend to the list of queries currently running or scheduled to run
+  /// there.
   typedef boost::unordered_map<TNetworkAddress, boost::unordered_set<TUniqueId>>
       QueryLocations;
   QueryLocations query_locations_;

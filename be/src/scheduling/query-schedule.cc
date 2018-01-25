@@ -46,8 +46,7 @@ QuerySchedule::QuerySchedule(const TUniqueId& query_id,
     summary_profile_(summary_profile),
     query_events_(query_events),
     num_scan_ranges_(0),
-    next_instance_id_(query_id),
-    is_admitted_(false) {
+    next_instance_id_(query_id) {
   Init();
 }
 

@@ -178,7 +178,7 @@ class ImpalaBeeswaxClient(object):
       # fetch_results() will close the query after which there is no guarantee that
       # profile and log will be available so fetch them first.
       runtime_profile = self.get_runtime_profile(handle)
-      exec_summary = self.get_exec_summary(handle)
+      exec_summary = self.get_exec_summary_and_parse(handle)
       log = self.get_log(handle.log_context)
 
       result = self.fetch_results(query_string, handle)
@@ -191,16 +191,20 @@ class ImpalaBeeswaxClient(object):
       result = self.fetch_results(query_string, handle)
       result.time_taken = time.time() - start
       result.start_time = start_time
-      result.exec_summary = self.get_exec_summary(handle)
+      result.exec_summary = self.get_exec_summary_and_parse(handle)
       result.log = self.get_log(handle.log_context)
       result.runtime_profile = self.get_runtime_profile(handle)
       self.close_query(handle)
     return result
 
   def get_exec_summary(self, handle):
-    """Calls GetExecSummary() for the last query handle"""
+    return self.__do_rpc(lambda: self.imp_service.GetExecSummary(handle))
+
+  def get_exec_summary_and_parse(self, handle):
+    """Calls GetExecSummary() for the last query handle, parses it and returns a summary
+    table. Returns None in case of an error or an empty result"""
     try:
-      summary = self.__do_rpc(lambda: self.imp_service.GetExecSummary(handle))
+      summary = self.get_exec_summary(handle)
     except ImpalaBeeswaxException:
       summary = None
 
@@ -362,6 +366,25 @@ class ImpalaBeeswaxClient(object):
         finally:
           self.close_query(query_handle)
       time.sleep(0.05)
+
+  def wait_for_admission_control(self, query_handle):
+    """Given a query handle, polls the coordinator waiting for it to complete
+      admission control processing of the query"""
+    while True:
+      query_state = self.get_state(query_handle)
+      if query_state > self.query_states["COMPILED"]:
+        break
+      time.sleep(0.05)
+
+  def get_admission_result(self, query_handle):
+    """Given a query handle, returns the admission result from the query profile"""
+    query_state = self.get_state(query_handle)
+    if query_state > self.query_states["COMPILED"]:
+      query_profile = self.get_runtime_profile(query_handle)
+      admit_result = re.search(r"Admission result: (.*)", query_profile)
+      if admit_result:
+        return admit_result.group(1)
+    return ""
 
   def get_default_configuration(self):
     return self.__do_rpc(lambda: self.imp_service.get_default_configuration(False))

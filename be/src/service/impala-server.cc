@@ -660,12 +660,15 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
       lock_guard<mutex> l(*request_state->lock());
       RETURN_IF_ERROR(CheckProfileAccess(user, request_state->effective_user(),
           request_state->user_has_profile_access()));
-      if (request_state->coord() != nullptr) {
-        request_state->coord()->GetTExecSummary(result);
+      if (request_state->operation_state() == TOperationState::PENDING_STATE) {
+        return Status::OK();
+      } else if (request_state->GetCoordinator() != nullptr) {
+        request_state->GetCoordinator()->GetTExecSummary(result);
         TExecProgress progress;
         progress.__set_num_completed_scan_ranges(
-            request_state->coord()->progress().num_complete());
-        progress.__set_total_scan_ranges(request_state->coord()->progress().total());
+            request_state->GetCoordinator()->progress().num_complete());
+        progress.__set_total_scan_ranges(
+            request_state->GetCoordinator()->progress().total());
         // TODO: does this not need to be synchronized?
         result->__set_progress(progress);
         return Status::OK();
@@ -767,7 +770,8 @@ void ImpalaServer::ArchiveQuery(const ClientRequestState& query) {
 
   if (FLAGS_query_log_size == 0) return;
   QueryStateRecord record(query, true, encoded_profile_str);
-  if (query.coord() != nullptr) query.coord()->GetTExecSummary(&record.exec_summary);
+  if (query.GetCoordinator() != nullptr)
+    query.GetCoordinator()->GetTExecSummary(&record.exec_summary);
   {
     lock_guard<mutex> l(query_log_lock_);
     // Add record to the beginning of the log, and to the lookup index.
@@ -899,7 +903,7 @@ Status ImpalaServer::ExecuteInternal(
     }
   }
 
-  if ((*request_state)->coord() != nullptr) {
+  if ((*request_state)->schedule() != nullptr) {
     const PerBackendExecParams& per_backend_params =
         (*request_state)->schedule()->per_backend_exec_params();
     if (!per_backend_params.empty()) {
@@ -910,6 +914,7 @@ Status ImpalaServer::ExecuteInternal(
       }
     }
   }
+
   return Status::OK();
 }
 
@@ -1050,13 +1055,13 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
     request_state->session()->inflight_queries.erase(query_id);
   }
 
-  if (request_state->coord() != nullptr) {
+  if (request_state->GetCoordinator() != nullptr) {
     TExecSummary t_exec_summary;
-    request_state->coord()->GetTExecSummary(&t_exec_summary);
+    request_state->GetCoordinator()->GetTExecSummary(&t_exec_summary);
     string exec_summary = PrintExecSummary(t_exec_summary);
     request_state->summary_profile()->AddInfoStringRedacted("ExecSummary", exec_summary);
     request_state->summary_profile()->AddInfoStringRedacted("Errors",
-        request_state->coord()->GetErrorLog());
+        request_state->GetCoordinator()->GetErrorLog());
 
     const PerBackendExecParams& per_backend_params =
         request_state->schedule()->per_backend_exec_params();
@@ -1199,7 +1204,7 @@ void ImpalaServer::ReportExecStatus(
     Status::Expected(err).SetTStatus(&return_val);
     return;
   }
-  request_state->coord()->UpdateBackendExecStatus(params).SetTStatus(&return_val);
+  request_state->UpdateBackendExecStatus(params).SetTStatus(&return_val);
 }
 
 void ImpalaServer::TransmitData(
@@ -1691,7 +1696,7 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const ClientRequestState& reque
   end_time_us = request_state.end_time_us();
   has_coord = false;
 
-  Coordinator* coord = request_state.coord();
+  Coordinator* coord = request_state.GetCoordinator();
   if (coord != nullptr) {
     num_complete_fragments = coord->progress().num_complete();
     total_fragments = coord->progress().total();
@@ -2150,7 +2155,6 @@ void ImpalaServer::UpdateFilter(TUpdateFilterResult& result,
     LOG(INFO) << "Could not find client request state: " << PrintId(params.query_id);
     return;
   }
-  client_request_state->coord()->UpdateFilter(params);
+  client_request_state->UpdateFilter(params);
 }
-
 }

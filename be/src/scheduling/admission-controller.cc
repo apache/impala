@@ -41,6 +41,11 @@ DEFINE_int64(queue_wait_timeout_ms, 60 * 1000, "Maximum amount of time (in "
 
 namespace impala {
 
+#ifndef NDEBUG
+// Available 'sleep_label' string that can be used in the debug_action query option.
+static const string SLEEP_AFTER_ADMISSION_OUTCOME_MS = "SLEEP_AFTER_ADMISSION_OUTCOME_MS";
+#endif
+
 /// Convenience method.
 std::string PrintBytes(int64_t value) {
   return PrettyPrinter::Print(value, TUnit::BYTES);
@@ -100,6 +105,7 @@ const string QUERY_EVENT_COMPLETED_ADMISSION = "Completed admission";
 const string PROFILE_INFO_KEY_ADMISSION_RESULT = "Admission result";
 const string PROFILE_INFO_VAL_ADMIT_IMMEDIATELY = "Admitted immediately";
 const string PROFILE_INFO_VAL_QUEUED = "Queued";
+const string PROFILE_INFO_VAL_CANCELLED_IN_QUEUE= "Cancelled (queued)";
 const string PROFILE_INFO_VAL_ADMIT_QUEUED = "Admitted (queued)";
 const string PROFILE_INFO_VAL_REJECTED = "Rejected";
 const string PROFILE_INFO_VAL_TIME_OUT = "Timed out (queued)";
@@ -392,7 +398,7 @@ bool AdmissionController::CanAdmitRequest(const QuerySchedule& schedule,
   return true;
 }
 
-bool AdmissionController::RejectImmediately(QuerySchedule* schedule,
+bool AdmissionController::RejectImmediately(const QuerySchedule& schedule,
     const TPoolConfig& pool_cfg, string* rejection_reason) {
   DCHECK(rejection_reason != nullptr && rejection_reason->empty());
   // This function checks for a number of cases where the query can be rejected
@@ -407,7 +413,7 @@ bool AdmissionController::RejectImmediately(QuerySchedule* schedule,
   int64_t cluster_min_mem_reservation_bytes = 0;
   pair<const TNetworkAddress*, int64_t> min_proc_mem_limit(
       nullptr, std::numeric_limits<int64_t>::max());
-  for (const auto& e : schedule->per_backend_exec_params()) {
+  for (const auto& e : schedule.per_backend_exec_params()) {
     cluster_min_mem_reservation_bytes += e.second.min_mem_reservation_bytes;
     if (e.second.min_mem_reservation_bytes > max_min_mem_reservation_bytes) {
       max_min_mem_reservation_bytes = e.second.min_mem_reservation_bytes;
@@ -419,16 +425,16 @@ bool AdmissionController::RejectImmediately(QuerySchedule* schedule,
   }
 
   // Checks related to the min buffer reservation against configured query memory limits:
-  if (schedule->query_options().__isset.buffer_pool_limit
-      && schedule->query_options().buffer_pool_limit > 0) {
-    if (max_min_mem_reservation_bytes > schedule->query_options().buffer_pool_limit) {
+  if (schedule.query_options().__isset.buffer_pool_limit
+      && schedule.query_options().buffer_pool_limit > 0) {
+    if (max_min_mem_reservation_bytes > schedule.query_options().buffer_pool_limit) {
       *rejection_reason = Substitute(REASON_BUFFER_LIMIT_TOO_LOW_FOR_RESERVATION,
           PrintBytes(max_min_mem_reservation_bytes));
       return true;
     }
-  } else if (schedule->query_options().__isset.mem_limit
-      && schedule->query_options().mem_limit > 0) {
-    const int64_t mem_limit = schedule->query_options().mem_limit;
+  } else if (schedule.query_options().__isset.mem_limit
+      && schedule.query_options().mem_limit > 0) {
+    const int64_t mem_limit = schedule.query_options().mem_limit;
     const int64_t max_reservation =
         ReservationUtil::GetReservationLimitFromMemLimit(mem_limit);
     if (max_min_mem_reservation_bytes > max_reservation) {
@@ -458,13 +464,13 @@ bool AdmissionController::RejectImmediately(QuerySchedule* schedule,
           PrintBytes(cluster_min_mem_reservation_bytes));
       return true;
     }
-    if (schedule->GetClusterMemoryEstimate() > pool_cfg.max_mem_resources) {
+    if (schedule.GetClusterMemoryEstimate() > pool_cfg.max_mem_resources) {
       *rejection_reason = Substitute(REASON_REQ_OVER_POOL_MEM,
-          PrintBytes(schedule->GetClusterMemoryEstimate()),
+          PrintBytes(schedule.GetClusterMemoryEstimate()),
           PrintBytes(pool_cfg.max_mem_resources));
       return true;
     }
-    int64_t perHostMemoryEstimate = schedule->GetPerHostMemoryEstimate();
+    int64_t perHostMemoryEstimate = schedule.GetPerHostMemoryEstimate();
     if (perHostMemoryEstimate > min_proc_mem_limit.second) {
       *rejection_reason = Substitute(REASON_REQ_OVER_NODE_MEM,
           PrintBytes(perHostMemoryEstimate), PrintBytes(min_proc_mem_limit.second),
@@ -474,7 +480,7 @@ bool AdmissionController::RejectImmediately(QuerySchedule* schedule,
   }
 
   // Checks related to the pool queue size:
-  PoolStats* stats = GetPoolStats(schedule->request_pool());
+  PoolStats* stats = GetPoolStats(schedule.request_pool());
   if (stats->agg_num_queued() >= pool_cfg.max_queued) {
     *rejection_reason = Substitute(REASON_QUEUE_FULL, pool_cfg.max_queued,
         stats->agg_num_queued());
@@ -490,7 +496,8 @@ void AdmissionController::PoolStats::UpdateConfigMetrics(const TPoolConfig& pool
   metrics_.pool_max_queued->SetValue(pool_cfg.max_queued);
 }
 
-Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
+Status AdmissionController::AdmitQuery(QuerySchedule* schedule,
+    Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER>* admit_outcome) {
   const string& pool_name = schedule->request_pool();
   TPoolConfig pool_cfg;
   RETURN_IF_ERROR(request_pool_service_->GetPoolConfig(pool_name, &pool_cfg));
@@ -499,12 +506,13 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
   const int64_t max_mem = pool_cfg.max_mem_resources;
 
   // Note the queue_node will not exist in the queue when this method returns.
-  QueueNode queue_node(*schedule);
+  QueueNode queue_node(*schedule, admit_outcome);
   string not_admitted_reason;
 
   schedule->query_events()->MarkEvent(QUERY_EVENT_SUBMIT_FOR_ADMISSION);
   ScopedEvent completedEvent(schedule->query_events(), QUERY_EVENT_COMPLETED_ADMISSION);
   {
+    // Take lock to ensure the Dequeue thread does not modify the request queue.
     lock_guard<mutex> lock(admission_ctrl_lock_);
     RequestQueue* queue = &request_queue_map_[pool_name];
     pool_config_map_[pool_name] = pool_cfg;
@@ -517,8 +525,15 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
                << max_queued << " max_mem=" << PrintBytes(max_mem);
     VLOG_QUERY << "Stats: " << stats->DebugString();
     string rejection_reason;
-    if (RejectImmediately(schedule, pool_cfg, &rejection_reason)) {
-      schedule->set_is_admitted(false);
+    if (RejectImmediately(*schedule, pool_cfg, &rejection_reason)) {
+      AdmissionOutcome outcome =
+          admit_outcome->Set(AdmissionOutcome::REJECTED_OR_TIMED_OUT);
+      if (outcome != AdmissionOutcome::REJECTED_OR_TIMED_OUT) {
+        DCHECK_ENUM_EQ(outcome, AdmissionOutcome::CANCELLED);
+        VLOG_QUERY << "Ready to be " << PROFILE_INFO_VAL_REJECTED
+                   << " but already cancelled, query id=" << schedule->query_id();
+        return Status::CANCELLED;
+      }
       schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_ADMISSION_RESULT,
           PROFILE_INFO_VAL_REJECTED);
       stats->metrics()->total_rejected->Increment(1);
@@ -531,10 +546,16 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
 
     if (CanAdmitRequest(*schedule, pool_cfg, false, &not_admitted_reason)) {
       DCHECK_EQ(stats->local_stats().num_queued, 0);
+      AdmissionOutcome outcome = admit_outcome->Set(AdmissionOutcome::ADMITTED);
+      if (outcome != AdmissionOutcome::ADMITTED) {
+        DCHECK_ENUM_EQ(outcome, AdmissionOutcome::CANCELLED);
+        VLOG_QUERY << "Ready to be " << PROFILE_INFO_VAL_ADMIT_IMMEDIATELY
+                   << " but already cancelled, query id=" << schedule->query_id();
+        return Status::CANCELLED;
+      }
       VLOG_QUERY << "Admitted query id=" << PrintId(schedule->query_id());
       stats->Admit(*schedule);
       UpdateHostMemAdmitted(*schedule, schedule->GetPerHostMemoryEstimate());
-      schedule->set_is_admitted(true);
       schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_ADMISSION_RESULT,
           PROFILE_INFO_VAL_ADMIT_IMMEDIATELY);
       VLOG_RPC << "Final: " << stats->DebugString();
@@ -563,47 +584,51 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
   queue_wait_timeout_ms = max<int64_t>(0, queue_wait_timeout_ms);
   int64_t wait_start_ms = MonotonicMillis();
 
-  // We just call Get() to block until the result is set or it times out. Note that we
-  // don't hold the admission_ctrl_lock_ while we wait on this promise so we need to
-  // check the state after acquiring the lock in order to avoid any races because it is
-  // Set() by the dequeuing thread while holding admission_ctrl_lock_.
-  // TODO: handle cancellation
+  // Block in Get() up to the time out, waiting for the promise to be set when the query
+  // is admitted or cancelled.
   bool timed_out;
-  queue_node.is_admitted.Get(queue_wait_timeout_ms, &timed_out);
+  admit_outcome->Get(queue_wait_timeout_ms, &timed_out);
   int64_t wait_time_ms = MonotonicMillis() - wait_start_ms;
   schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_QUEUE_DETAIL,
       Substitute(PROFILE_INFO_VAL_QUEUE_DETAIL, wait_time_ms, not_admitted_reason));
 
-  // Take the lock in order to check the result of is_admitted as there could be a race
-  // with the timeout. If the Get() timed out, then we need to dequeue the request.
-  // Otherwise, the request was admitted and we update the number of running queries
-  // stats.
+#ifndef NDEBUG
+  SleepIfSetInDebugOptions(schedule->query_options(), SLEEP_AFTER_ADMISSION_OUTCOME_MS);
+#endif
+
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
+    // If the query has not been admitted or cancelled up till now, it will be considered
+    // to be timed out.
+    AdmissionOutcome outcome =
+        admit_outcome->Set(AdmissionOutcome::REJECTED_OR_TIMED_OUT);
     RequestQueue* queue = &request_queue_map_[pool_name];
     pools_for_updates_.insert(pool_name);
     PoolStats* stats = GetPoolStats(pool_name);
     stats->metrics()->time_in_queue_ms->Increment(wait_time_ms);
-    // Now that we have the lock, check again if the query was actually admitted (i.e.
-    // if the promise still hasn't been set), in which case we just admit the query.
-    timed_out = !queue_node.is_admitted.IsSet();
-    if (timed_out) {
+    if (outcome == AdmissionOutcome::REJECTED_OR_TIMED_OUT) {
       queue->Remove(&queue_node);
-      queue_node.is_admitted.Set(false);
-      schedule->set_is_admitted(false);
-      schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_ADMISSION_RESULT,
-          PROFILE_INFO_VAL_TIME_OUT);
       stats->Dequeue(*schedule, true);
+      schedule->summary_profile()->AddInfoString(
+          PROFILE_INFO_KEY_ADMISSION_RESULT, PROFILE_INFO_VAL_TIME_OUT);
       const ErrorMsg& rejected_msg = ErrorMsg(TErrorCode::ADMISSION_TIMED_OUT,
           queue_wait_timeout_ms, pool_name, not_admitted_reason);
       VLOG_QUERY << rejected_msg.msg();
       return Status::Expected(rejected_msg);
+    } else if (outcome == AdmissionOutcome::CANCELLED) {
+      // Only update stats if it has not already been removed and updated by the Dequeue
+      // thread.
+      if (queue->Remove(&queue_node)) stats->Dequeue(*schedule, false);
+      schedule->summary_profile()->AddInfoString(
+          PROFILE_INFO_KEY_ADMISSION_RESULT, PROFILE_INFO_VAL_CANCELLED_IN_QUEUE);
+      VLOG_QUERY << PROFILE_INFO_VAL_CANCELLED_IN_QUEUE
+                 << ", query id=" << schedule->query_id();
+      return Status::CANCELLED;
     }
     // The dequeue thread updates the stats (to avoid a race condition) so we do
     // not change them here.
-    DCHECK(queue_node.is_admitted.Get());
+    DCHECK_ENUM_EQ(outcome, AdmissionOutcome::ADMITTED);
     DCHECK(!queue->Contains(&queue_node));
-    schedule->set_is_admitted(true);
     schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_ADMISSION_RESULT,
         PROFILE_INFO_VAL_ADMIT_QUEUED);
     VLOG_QUERY << "Admitted queued query id=" << PrintId(schedule->query_id());
@@ -613,7 +638,6 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
 }
 
 void AdmissionController::ReleaseQuery(const QuerySchedule& schedule) {
-  if (!schedule.is_admitted()) return; // No-op if query was not admitted
   const string& pool_name = schedule.request_pool();
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
@@ -875,23 +899,32 @@ void AdmissionController::DequeueLoop() {
       while (max_to_dequeue > 0 && !queue.empty()) {
         QueueNode* queue_node = queue.head();
         DCHECK(queue_node != nullptr);
-        DCHECK(!queue_node->is_admitted.IsSet());
         const QuerySchedule& schedule = queue_node->schedule;
+        bool is_cancelled = queue_node->admit_outcome->IsSet()
+            && queue_node->admit_outcome->Get() == AdmissionOutcome::CANCELLED;
         string not_admitted_reason;
         // TODO: Requests further in the queue may be blocked unnecessarily. Consider a
         // better policy once we have better test scenarios.
-        if (!CanAdmitRequest(schedule, pool_config, true, &not_admitted_reason)) {
+        if (!is_cancelled
+            && !CanAdmitRequest(schedule, pool_config, true, &not_admitted_reason)) {
           VLOG_QUERY << "Could not dequeue query id=" << PrintId(schedule.query_id())
                      << " reason: " << not_admitted_reason;
           break;
         }
         VLOG_RPC << "Dequeuing query=" << PrintId(schedule.query_id());
         queue.Dequeue();
+        --max_to_dequeue;
         stats->Dequeue(schedule, false);
+        // If query is already cancelled, just dequeue and continue.
+        AdmissionOutcome outcome =
+            queue_node->admit_outcome->Set(AdmissionOutcome::ADMITTED);
+        if (outcome == AdmissionOutcome::CANCELLED) {
+          VLOG_QUERY << "Dequeued cancelled query=" << schedule.query_id();
+          continue;
+        }
+        DCHECK_ENUM_EQ(outcome, AdmissionOutcome::ADMITTED);
         stats->Admit(schedule);
         UpdateHostMemAdmitted(schedule, schedule.GetPerHostMemoryEstimate());
-        queue_node->is_admitted.Set(true);
-        --max_to_dequeue;
       }
       pools_for_updates_.insert(pool_name);
     }

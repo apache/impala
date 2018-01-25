@@ -68,6 +68,18 @@ TEST(PromiseDeathTest, RepeatedSetTest) {
       promise.Set(150), "Called Set\\(\\.\\.\\) twice on the same Promise");
 }
 
+TEST(PromiseTest, RepeatedTestInMultipleProducerMode) {
+  Promise<int64_t, PromiseMode::MULTIPLE_PRODUCER> promise;
+  ASSERT_EQ(promise.Set(100), 100);
+  ASSERT_EQ(promise.Set(200), 100);
+  ASSERT_EQ(promise.Get(), 100);
+}
+
+TEST(PromiseTest, BasicTestInMultipleProducerMode) {
+  Promise<int64_t, PromiseMode::MULTIPLE_PRODUCER> promise;
+  thread promise_setter([&promise]() { promise.Set(100); });
+  ASSERT_EQ(promise.Get(), 100);
+}
 }
 
 int main(int argc, char **argv) {

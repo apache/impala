@@ -93,6 +93,7 @@ class TestKrpcMemUsage(CustomClusterTestSuite):
     self.client.execute(query)
     # Execute and cancel query
     handle = self.client.execute_async(query)
+    self.client.wait_for_admission_control(handle)
     # Sleep to allow RPCs to arrive.
     time.sleep(0.5)
     self.client.cancel(handle)

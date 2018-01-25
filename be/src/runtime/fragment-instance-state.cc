@@ -73,13 +73,13 @@ FragmentInstanceState::FragmentInstanceState(
 Status FragmentInstanceState::Exec() {
   Status status = Prepare();
   DCHECK(runtime_state_ != nullptr);  // we need to guarantee at least that
-  prepared_promise_.Set(status);
+  discard_result(prepared_promise_.Set(status));
   if (!status.ok()) {
-    opened_promise_.Set(status);
+    discard_result(opened_promise_.Set(status));
     goto done;
   }
   status = Open();
-  opened_promise_.Set(status);
+  discard_result(opened_promise_.Set(status));
   if (!status.ok()) goto done;
 
   {

@@ -171,9 +171,22 @@ class BeeswaxConnection(ImpalaConnection):
     LOG.info("-- getting state for operation: %s" % operation_handle)
     return self.__beeswax_client.get_state(operation_handle.get_handle())
 
+  def get_exec_summary(self, operation_handle):
+    LOG.info("-- getting exec summary operation: %s" % operation_handle)
+    return self.__beeswax_client.get_exec_summary(operation_handle.get_handle())
+
   def get_runtime_profile(self, operation_handle):
     LOG.info("-- getting runtime profile operation: %s" % operation_handle)
     return self.__beeswax_client.get_runtime_profile(operation_handle.get_handle())
+
+  def wait_for_admission_control(self, operation_handle):
+    LOG.info("-- waiting for completion of the admission control processing of the "
+        "query: %s" % operation_handle)
+    return self.__beeswax_client.wait_for_admission_control(operation_handle.get_handle())
+
+  def get_admission_result(self, operation_handle):
+    LOG.info("-- getting the admission result: %s" % operation_handle)
+    return self.__beeswax_client.get_admission_result(operation_handle.get_handle())
 
   def get_log(self, operation_handle):
     LOG.info("-- getting log for operation: %s" % operation_handle)

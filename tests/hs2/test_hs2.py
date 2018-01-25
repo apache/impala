@@ -253,9 +253,10 @@ class TestHS2(HS2TestSuite):
         self.get_operation_status(execute_statement_resp.operationHandle)
     TestHS2.check_response(get_operation_status_resp)
     # If ExecuteStatement() has completed but the results haven't been fetched yet, the
-    # query must have at least reached RUNNING.
+    # query must have reached either PENDING or RUNNING or FINISHED.
     assert get_operation_status_resp.operationState in \
-        [TCLIService.TOperationState.RUNNING_STATE,
+        [TCLIService.TOperationState.PENDING_STATE,
+         TCLIService.TOperationState.RUNNING_STATE,
          TCLIService.TOperationState.FINISHED_STATE]
 
     fetch_results_req = TCLIService.TFetchResultsReq()
@@ -463,6 +464,13 @@ class TestHS2(HS2TestSuite):
     # should work.
     TestHS2.check_response(exec_summary_resp)
 
+    # Wait for query to start running so we can get a non-empty ExecSummary.
+    self.wait_for_admission_control(execute_statement_resp.operationHandle)
+    exec_summary_resp = self.hs2_client.GetExecSummary(exec_summary_req)
+    TestHS2.check_response(exec_summary_resp)
+    assert len(exec_summary_resp.summary.nodes) > 0
+
+    # Now close the query and verify the exec summary is available.
     close_operation_req = TCLIService.TCloseOperationReq()
     close_operation_req.operationHandle = execute_statement_resp.operationHandle
     TestHS2.check_response(self.hs2_client.CloseOperation(close_operation_req))
@@ -483,8 +491,9 @@ class TestHS2(HS2TestSuite):
     TestHS2.check_response(get_profile_resp)
     assert statement in get_profile_resp.profile
     # If ExecuteStatement() has completed but the results haven't been fetched yet, the
-    # query must have at least reached RUNNING.
-    assert "Query State: RUNNING" in get_profile_resp.profile or \
+    # query must have reached either COMPILED or RUNNING or FINISHED.
+    assert "Query State: COMPILED" in get_profile_resp.profile or \
+        "Query State: RUNNING" in get_profile_resp.profile or \
         "Query State: FINISHED" in get_profile_resp.profile, get_profile_resp.profile
 
     fetch_results_req = TCLIService.TFetchResultsReq()

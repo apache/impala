@@ -30,6 +30,7 @@
 #include "util/cpu-info.h"
 #include "util/string-parser.h"
 #include "util/uid-util.h"
+#include "util/time.h"
 
 // / WARNING this uses a private API of GLog: DumpStackTraceToString().
 namespace google {
@@ -283,5 +284,16 @@ string GetStackTrace() {
 string GetBackendString() {
   return Substitute("$0:$1", FLAGS_hostname, FLAGS_be_port);
 }
+
+#ifndef NDEBUG
+void SleepIfSetInDebugOptions(
+    const TQueryOptions& query_options, const string& sleep_label) {
+  vector<string> components;
+  boost::split(components, query_options.debug_action, boost::is_any_of(":"));
+  if (components.size() == 2 && components[0].compare(sleep_label) == 0) {
+    SleepForMs(atoi(components[1].c_str()));
+  }
+}
+#endif
 
 }

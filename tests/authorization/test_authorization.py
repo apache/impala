@@ -321,7 +321,6 @@ class TestAuthorization(CustomClusterTestSuite):
 
     if has_access:
       TestHS2.check_response(exec_summary_resp)
-      assert exec_summary_resp.summary.nodes is not None
     else:
       assert "User %s is not authorized to access the runtime profile or "\
           "execution summary." % (getuser()) in str(exec_summary_resp)

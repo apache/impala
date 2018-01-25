@@ -306,7 +306,7 @@ void QueryState::StartFInstances() {
   DCHECK(query_ctx().__isset.desc_tbl);
   Status status = DescriptorTbl::Create(&obj_pool_, query_ctx().desc_tbl, &desc_tbl_);
   if (!status.ok()) {
-    instances_prepared_promise_.Set(status);
+    discard_result(instances_prepared_promise_.Set(status));
     ReportExecStatusAux(true, status, nullptr, false);
     return;
   }
@@ -367,7 +367,7 @@ void QueryState::StartFInstances() {
       prepare_status = instance_status;
     }
   }
-  instances_prepared_promise_.Set(prepare_status);
+  discard_result(instances_prepared_promise_.Set(prepare_status));
   // If this is aborting due to failure in thread creation, report status to the
   // coordinator to start query cancellation. (Other errors are reported by the
   // fragment instance itself.)
