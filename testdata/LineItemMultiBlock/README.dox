@@ -1,6 +1,7 @@
 This file was created for:
 IMPALA-1881: Maximize data locality when scanning Parquet files with multiple row groups.
 IMPALA-2466: Add more tests to the HDFS parquet scanner.
+IMPALA-5717: Add tests for HDFS orc scanner.
 
 The table lineitem_multiblock is a single parquet file with:
  - A row group size of approximately 12 KB each.
@@ -31,3 +32,21 @@ blocks.
 
 'lineitem_multiblock_one_row_group' was created similarly but with a much higher
 'parquet.block.size' so that everything fit in one row group.
+
+----
+
+The orc files are created by the following hive queries:
+
+use functional_orc_def;
+
+set orc.stripe.size=1024;
+set orc.compress=ZLIB;
+create table lineitem_threeblocks like tpch.lineitem stored as orc;
+create table lineitem_sixblocks like tpch.lineitem stored as orc;
+insert overwrite table lineitem_threeblocks select * from tpch.lineitem limit 16000;
+insert overwrite table lineitem_sixblocks select * from tpch.lineitem limit 30000;
+
+set orc.stripe.size=67108864;
+create table lineitem_orc_multiblock_one_stripe like tpch.lineitem stored as orc;
+insert overwrite table lineitem_orc_multiblock_one_stripe select * from
+tpch.lineitem limit 16000;

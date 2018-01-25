@@ -61,6 +61,8 @@ class TestScannersFuzzing(ImpalaTestSuite):
           'num_nodes' : cls.NUM_NODES_VALUES,
           'mem_limit' : cls.MEM_LIMITS}))
     # TODO: enable for more table formats once they consistently pass the fuzz test.
+    # TODO(IMPALA-6772): enable for ORC formats once a new version after release-1.4.3
+    # of ORC library is released.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ('avro', 'parquet') or
         (v.get_value('table_format').file_format == 'text' and

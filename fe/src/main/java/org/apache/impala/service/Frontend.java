@@ -1014,11 +1014,11 @@ public class Frontend {
       if (thriftLineageGraph != null && thriftLineageGraph.isSetQuery_text()) {
         result.catalog_op_request.setLineage_graph(thriftLineageGraph);
       }
-      // Set MT_DOP=4 for COMPUTE STATS on Parquet tables, unless the user has already
+      // Set MT_DOP=4 for COMPUTE STATS on Parquet/ORC tables, unless the user has already
       // provided another value for MT_DOP.
       if (!queryOptions.isSetMt_dop() &&
           analysisResult.isComputeStatsStmt() &&
-          analysisResult.getComputeStatsStmt().isParquetOnly()) {
+          analysisResult.getComputeStatsStmt().isColumnar()) {
         queryOptions.setMt_dop(4);
       }
       // If unset, set MT_DOP to 0 to simplify the rest of the code.

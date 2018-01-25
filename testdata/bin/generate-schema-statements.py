@@ -128,6 +128,7 @@ FILE_FORMAT_MAP = {
   'text': 'TEXTFILE',
   'seq': 'SEQUENCEFILE',
   'rc': 'RCFILE',
+  'orc': 'ORC',
   'parquet': 'PARQUET',
   'text_lzo':
     "\nINPUTFORMAT 'com.hadoop.mapred.DeprecatedLzoTextInputFormat'" +
@@ -219,7 +220,7 @@ def build_table_template(file_format, columns, partition_columns, row_format,
     else:
       tblproperties["avro.schema.url"] = "hdfs://%s/%s/%s/{table_name}.json" \
         % (options.hdfs_namenode, options.hive_warehouse_dir, avro_schema_dir)
-  elif file_format in 'parquet':
+  elif file_format in ['parquet', 'orc']:  # columnar formats don't need row format
     row_format_stmt = str()
   elif file_format == 'kudu':
     # Use partitioned_by to set a trivial hash distribution
@@ -243,7 +244,7 @@ def build_table_template(file_format, columns, partition_columns, row_format,
     for table_property in table_properties.split("\n"):
       format_prop = table_property.split(":")
       if format_prop[0] == file_format:
-        key_val = format_prop[1].split("=");
+        key_val = format_prop[1].split("=")
         tblproperties[key_val[0]] = key_val[1]
 
   all_tblproperties = []
@@ -658,7 +659,7 @@ def generate_statements(output_name, test_vectors, sections,
             # that weren't already added to the table. So, for force reload, manually
             # delete the partition directories.
             output.create.append(("DFS -rm -R {data_path};").format(
-              data_path=data_path));
+              data_path=data_path))
           else:
             # If this is not a force reload use msck repair to add the partitions
             # into the table.

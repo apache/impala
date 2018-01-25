@@ -1,4 +1,4 @@
-file_format: text,seq,rc,avro,parquet
+file_format: text,seq,rc,avro,parquet,orc
 dataset: tpcds
 compression_codec: none,def,gzip,bzip,snap,lzo
 compression_type: none,block,record

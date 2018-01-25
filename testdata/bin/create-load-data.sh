@@ -154,6 +154,9 @@ function load-custom-schemas {
   hadoop fs -mkdir -p /test-warehouse/chars_formats_parquet/
   hadoop fs -put -f ${IMPALA_HOME}/testdata/data/chars-formats.parquet \
     /test-warehouse/chars_formats_parquet
+  hadoop fs -mkdir -p /test-warehouse/chars_formats_orc_def/
+  hadoop fs -put -f ${IMPALA_HOME}/testdata/data/chars-formats.orc \
+    /test-warehouse/chars_formats_orc_def
   hadoop fs -mkdir -p /test-warehouse/chars_formats_text/
   hadoop fs -put -f ${IMPALA_HOME}/testdata/data/chars-formats.txt \
     /test-warehouse/chars_formats_text

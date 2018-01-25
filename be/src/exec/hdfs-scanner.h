@@ -25,6 +25,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "codegen/impala-ir.h"
+#include "common/global-flags.h"
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exec/hdfs-scan-node-base.h"
@@ -43,6 +44,12 @@ class MemPool;
 class TextConverter;
 class TupleDescriptor;
 class SlotDescriptor;
+
+// The number of row batches between checks to see if a filter is effective, and
+// should be disabled. Must be a power of two.
+constexpr int BATCHES_PER_FILTER_SELECTIVITY_CHECK = 16;
+static_assert(BitUtil::IsPowerOf2(BATCHES_PER_FILTER_SELECTIVITY_CHECK),
+              "BATCHES_PER_FILTER_SELECTIVITY_CHECK must be a power of two");
 
 /// Intermediate structure used for two pass parsing approach. In the first pass,
 /// the FieldLocation structs are filled out and contain where all the fields start and
@@ -287,6 +294,67 @@ class HdfsScanner {
   /// Jitted write tuples function pointer.  Null if codegen is disabled.
   WriteTuplesFn write_tuples_fn_ = nullptr;
 
+  struct LocalFilterStats {
+    /// Total number of rows to which each filter was applied
+    int64_t considered;
+
+    /// Total number of rows that each filter rejected.
+    int64_t rejected;
+
+    /// Total number of rows that each filter could have been applied to (if it were
+    /// available from row 0).
+    int64_t total_possible;
+
+    /// Use known-width type to act as logical boolean.  Set to 1 if corresponding filter
+    /// in filter_ctxs_ should be applied, 0 if it was ineffective and was disabled.
+    uint8_t enabled;
+
+    /// Padding to ensure structs do not straddle cache-line boundary.
+    uint8_t padding[7];
+
+    LocalFilterStats() : considered(0), rejected(0), total_possible(0), enabled(1) { }
+  };
+
+  /// Cached runtime filter contexts, one for each filter that applies to this column.
+  vector<const FilterContext *> filter_ctxs_;
+
+  /// Track statistics of each filter (one for each filter in filter_ctxs_) per scanner
+  /// so that expensive aggregation up to the scan node can be performed once, during
+  /// Close().
+  vector<LocalFilterStats> filter_stats_;
+
+  /// Size of the file footer for ORC and Parquet. This is a guess. If this value is too
+  /// little, we will need to issue another read.
+  static const int64_t FOOTER_SIZE = 1024 * 100;
+  static_assert(FOOTER_SIZE <= READ_SIZE_MIN_VALUE,
+      "FOOTER_SIZE can not be greater than READ_SIZE_MIN_VALUE.\n"
+      "You can increase FOOTER_SIZE if you want, "
+      "just don't forget to increase READ_SIZE_MIN_VALUE as well.");
+
+  /// Check runtime filters' effectiveness every BATCHES_PER_FILTER_SELECTIVITY_CHECK
+  /// row batches. Will update 'filter_stats_'.
+  void CheckFiltersEffectiveness();
+
+  /// Evaluates 'row' against the i-th runtime filter for this scan node and returns
+  /// true if 'row' finds a match in the filter. Returns false otherwise.
+  bool EvalRuntimeFilter(int i, TupleRow* row);
+
+  /// Evaluates runtime filters (if any) against the given row. Returns true if
+  /// they passed, false otherwise. Maintains the runtime filter stats, determines
+  /// whether the filters are effective, and disables them if they are not. This is
+  /// replaced by generated code at runtime.
+  bool EvalRuntimeFilters(TupleRow* row);
+
+  /// Find and return the last split in the file if it is assigned to this scan node.
+  /// Returns NULL otherwise.
+  static io::ScanRange* FindFooterSplit(HdfsFileDesc* file);
+
+  /// Issue just the footer range for each file. This function is only used in parquet
+  /// and orc scanners. We'll then parse the footer and pick out the columns we want.
+  static Status IssueFooterRanges(HdfsScanNodeBase* scan_node,
+      const THdfsFileFormat::type& file_type, const std::vector<HdfsFileDesc*>& files)
+      WARN_UNUSED_RESULT;
+
   /// Implements GetNext(). Should be overridden by subclasses.
   /// Only valid to call if the parent scan node is multi-threaded.
   virtual Status GetNextInternal(RowBatch* row_batch) WARN_UNUSED_RESULT {
@@ -419,6 +487,14 @@ class HdfsScanner {
   /// of InitTuple() is stored in 'init_tuple_fn' if codegen was successful.
   static Status CodegenInitTuple(
       const HdfsScanNodeBase* node, LlvmCodeGen* codegen, llvm::Function** init_tuple_fn);
+
+  /// Codegen EvalRuntimeFilters() by unrolling the loop in the interpreted version
+  /// and emitting a customized version of EvalRuntimeFilter() for each filter in
+  /// 'filter_ctxs'. Return error status on failure. The generated function is returned
+  /// via 'fn'.
+  static Status CodegenEvalRuntimeFilters(LlvmCodeGen* codegen,
+      const std::vector<ScalarExpr*>& filter_exprs, llvm::Function** fn)
+      WARN_UNUSED_RESULT;
 
   /// Report parse error for column @ desc.   If abort_on_error is true, sets
   /// parse_status_ to the error message.

@@ -743,10 +743,10 @@ public class ComputeStatsStmt extends StatementBase {
   public Set<Column> getValidatedColumnWhitelist() { return validatedColumnWhitelist_; }
 
   /**
-   * Returns true if this statement computes stats on Parquet partitions only,
+   * Returns true if this statement computes stats on Parquet/ORC partitions only,
    * false otherwise.
    */
-  public boolean isParquetOnly() {
+  public boolean isColumnar() {
     if (!(table_ instanceof HdfsTable)) return false;
     Collection<HdfsPartition> affectedPartitions = null;
     if (partitionSet_ != null) {
@@ -755,7 +755,9 @@ public class ComputeStatsStmt extends StatementBase {
       affectedPartitions = ((HdfsTable) table_).getPartitions();
     }
     for (HdfsPartition partition: affectedPartitions) {
-      if (partition.getFileFormat() != HdfsFileFormat.PARQUET) return false;
+      if (partition.getFileFormat() != HdfsFileFormat.PARQUET
+          && partition.getFileFormat() != HdfsFileFormat.ORC)
+        return false;
     }
     return true;
   }

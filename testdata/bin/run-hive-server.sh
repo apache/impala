@@ -73,9 +73,10 @@ ${CLUSTER_BIN}/wait-for-metastore.py --transport=${METASTORE_TRANSPORT}
 
 if [ ${ONLY_METASTORE} -eq 0 ]; then
   # Starts a HiveServer2 instance on the port specified by the HIVE_SERVER2_THRIFT_PORT
-  # environment variable.
+  # environment variable. HADOOP_HEAPSIZE should be set to at least 2048 to avoid OOM
+  # when loading ORC tables like widerow.
   if [[ $IMPALA_MINICLUSTER_PROFILE == 2 ]]; then
-    HADOOP_HEAPSIZE="512" hive --service hiveserver2 > ${LOGDIR}/hive-server2.out 2>&1 &
+    HADOOP_HEAPSIZE="2048" hive --service hiveserver2 > ${LOGDIR}/hive-server2.out 2>&1 &
   elif [[ $IMPALA_MINICLUSTER_PROFILE == 3 ]]; then
     HADOOP_CLIENT_OPTS="-Xmx2048m -Dhive.log.file=hive-server2.log" hive \
       --service hiveserver2 > ${LOGDIR}/hive-server2.out 2>&1 &

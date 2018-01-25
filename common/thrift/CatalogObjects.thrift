@@ -58,7 +58,8 @@ enum THdfsFileFormat {
   SEQUENCE_FILE,
   AVRO,
   PARQUET,
-  KUDU
+  KUDU,
+  ORC
 }
 
 // TODO: Since compression is also enabled for Kudu columns, we should
@@ -73,7 +74,8 @@ enum THdfsCompression {
   SNAPPY_BLOCKED,
   LZO,
   LZ4,
-  ZLIB
+  ZLIB,
+  ZSTD
 }
 
 enum TColumnEncoding {

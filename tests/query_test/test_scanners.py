@@ -105,7 +105,7 @@ class TestScannersAllTableFormatsWithLimit(ImpalaTestSuite):
     query_template = "select * from alltypes limit %s"
     for i in range(1, iterations):
       # Vary the limit to vary the timing of cancellation
-      limit = (iterations * 100) % 1000 + 1
+      limit = (i * 100) % 1001 + 1
       query = query_template % limit
       result = self.execute_query(query, vector.get_value('exec_option'),
           table_format=vector.get_value('table_format'))
@@ -837,7 +837,7 @@ class TestTextScanRangeLengths(ImpalaTestSuite):
 @SkipIfLocal.hive
 class TestScanTruncatedFiles(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
+  def get_workload(cls):
     return 'functional-query'
 
   @classmethod
@@ -900,3 +900,101 @@ class TestUncompressedText(ImpalaTestSuite):
     check_call(['hdfs', 'dfs', '-copyFromLocal', os.environ['IMPALA_HOME'] +
           "/testdata/data/lazy_timestamp.csv", tbl_loc])
     self.run_test_case('QueryTest/select-lazy-timestamp', vector, unique_database)
+
+class TestOrc(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestOrc, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'orc')
+
+  def test_misaligned_orc_stripes(self, vector, unique_database):
+    self._build_lineitem_table_helper(unique_database, 'lineitem_threeblocks',
+        'lineitem_threeblocks.orc')
+    self._build_lineitem_table_helper(unique_database, 'lineitem_sixblocks',
+        'lineitem_sixblocks.orc')
+    self._build_lineitem_table_helper(unique_database,
+        'lineitem_orc_multiblock_one_stripe',
+        'lineitem_orc_multiblock_one_stripe.orc')
+
+    # functional_orc.alltypes is well-formatted. 'NumScannersWithNoReads' counters are
+    # set to 0.
+    table_name = 'functional_orc_def.alltypes'
+    self._misaligned_orc_stripes_helper(table_name, 7300)
+    # lineitem_threeblock.orc is ill-formatted but every scanner reads some stripes.
+    # 'NumScannersWithNoReads' counters are set to 0.
+    table_name = unique_database + '.lineitem_threeblocks'
+    self._misaligned_orc_stripes_helper(table_name, 16000)
+    # lineitem_sixblocks.orc is ill-formatted but every scanner reads some stripes.
+    # 'NumScannersWithNoReads' counters are set to 0.
+    table_name = unique_database + '.lineitem_sixblocks'
+    self._misaligned_orc_stripes_helper(table_name, 30000)
+    # Scanning lineitem_orc_multiblock_one_stripe.orc finds two scan ranges that end up
+    # doing no reads because the file is poorly formatted.
+    table_name = unique_database + '.lineitem_orc_multiblock_one_stripe'
+    self._misaligned_orc_stripes_helper(
+      table_name, 16000, num_scanners_with_no_reads=2)
+
+  def _build_lineitem_table_helper(self, db, tbl, file):
+    self.client.execute("create table %s.%s like tpch.lineitem stored as orc" % (db, tbl))
+    tbl_loc = get_fs_path("/test-warehouse/%s.db/%s" % (db, tbl))
+    # set block size to 156672 so lineitem_threeblocks.orc occupies 3 blocks,
+    # lineitem_sixblocks.orc occupies 6 blocks.
+    check_call(['hdfs', 'dfs', '-Ddfs.block.size=156672', '-copyFromLocal',
+        os.environ['IMPALA_HOME'] + "/testdata/LineItemMultiBlock/" + file, tbl_loc])
+
+  def _misaligned_orc_stripes_helper(
+          self, table_name, rows_in_table, num_scanners_with_no_reads=0):
+    """Checks if 'num_scanners_with_no_reads' indicates the expected number of scanners
+    that don't read anything because the underlying file is poorly formatted
+    """
+    query = 'select * from %s' % table_name
+    result = self.client.execute(query)
+    assert len(result.data) == rows_in_table
+
+    runtime_profile = str(result.runtime_profile)
+    num_scanners_with_no_reads_list = re.findall(
+      'NumScannersWithNoReads: ([0-9]*)', runtime_profile)
+
+    # This will fail if the number of impalads != 3
+    # The fourth fragment is the "Averaged Fragment"
+    assert len(num_scanners_with_no_reads_list) == 4
+
+    # Calculate the total number of scan ranges that ended up not reading anything because
+    # an underlying file was poorly formatted.
+    # Skip the Averaged Fragment; it comes first in the runtime profile.
+    total = 0
+    for n in num_scanners_with_no_reads_list[1:]:
+      total += int(n)
+    assert total == num_scanners_with_no_reads
+
+  def test_type_conversions(self, vector, unique_database):
+    # Create an "illtypes" table whose columns can't match the underlining ORC file's.
+    # Create an "safetypes" table likes above but ORC columns can still fit into it.
+    # Reuse the data files of functional_orc_def.alltypestiny
+    tbl_loc = get_fs_path("/test-warehouse/alltypestiny_orc_def")
+    self.client.execute("""create external table %s.illtypes (c1 boolean, c2 float,
+        c3 boolean, c4 tinyint, c5 smallint, c6 int, c7 boolean, c8 string, c9 int,
+        c10 float, c11 bigint) partitioned by (year int, month int) stored as ORC
+        location '%s';""" % (unique_database, tbl_loc))
+    self.client.execute("""create external table %s.safetypes (c1 bigint, c2 boolean,
+        c3 smallint, c4 int, c5 bigint, c6 bigint, c7 double, c8 double, c9 char(3),
+        c10 varchar(3), c11 timestamp) partitioned by (year int, month int) stored as ORC
+        location '%s';""" % (unique_database, tbl_loc))
+    self.client.execute("alter table %s.illtypes recover partitions" % unique_database)
+    self.client.execute("alter table %s.safetypes recover partitions" % unique_database)
+
+    # Create a decimal table whose precisions don't match the underlining orc files.
+    # Reuse the data files of functional_orc_def.decimal_tbl.
+    decimal_loc = get_fs_path("/test-warehouse/decimal_tbl_orc_def")
+    self.client.execute("""create external table %s.mismatch_decimals (d1 decimal(8,0),
+        d2 decimal(8,0), d3 decimal(19,10), d4 decimal(20,20), d5 decimal(2,0))
+        partitioned by (d6 decimal(9,0)) stored as orc location '%s'"""
+        % (unique_database, decimal_loc))
+    self.client.execute("alter table %s.mismatch_decimals recover partitions" % unique_database)
+
+    self.run_test_case('DataErrorsTest/orc-type-checks', vector, unique_database)

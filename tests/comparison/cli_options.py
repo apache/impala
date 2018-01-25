@@ -221,7 +221,7 @@ def create_cluster(args):
 
 
 def add_storage_format_options(parser):
-  storage_formats = ['avro', 'parquet', 'rcfile', 'sequencefile', 'textfile']
+  storage_formats = ['avro', 'parquet', 'orc', 'rcfile', 'sequencefile', 'textfile']
   parser.add_argument(
       '--storage-file-formats', default=','.join(storage_formats),
       help='A comma separated list of storage formats to use.')

@@ -739,6 +739,7 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION(p=1) SELECT i
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION(p=2) SELECT id, named_struct("f1",string_col,"f2",int_col), array(1, 2, 3), map("k", cast(0 as bigint)) FROM functional.alltypestiny;
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION(p=3) SELECT id, named_struct("f1",string_col,"f2",int_col), array(1, 2, 3), map("k", cast(0 as bigint)) FROM functional.alltypestiny;
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION(p=4) SELECT id, named_struct("f1",string_col,"f2",int_col), array(1, 2, 3), map("k", cast(0 as bigint)) FROM functional.alltypestiny;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION(p=5) SELECT id, named_struct("f1",string_col,"f2",int_col), array(1, 2, 3), map("k", cast(0 as bigint)) FROM functional.alltypestiny;
 -- The order of insertions and alterations is deliberately chose to work around a Hive
 -- bug where the format of an altered partition is reverted back to the original format after
 -- an insert. So we first do the insert, and then alter the format.
@@ -746,6 +747,7 @@ USE {db_name}{db_suffix};
 ALTER TABLE {table_name} PARTITION (p=2) SET FILEFORMAT PARQUET;
 ALTER TABLE {table_name} PARTITION (p=3) SET FILEFORMAT AVRO;
 ALTER TABLE {table_name} PARTITION (p=4) SET FILEFORMAT RCFILE;
+ALTER TABLE {table_name} PARTITION (p=5) SET FILEFORMAT ORC;
 USE default;
 ====
 ---- DATASET

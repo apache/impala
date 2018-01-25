@@ -176,6 +176,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("on", SqlParserSymbols.KW_ON);
     keywordMap.put("||", SqlParserSymbols.KW_OR);
     keywordMap.put("or", SqlParserSymbols.KW_OR);
+    keywordMap.put("orc", SqlParserSymbols.KW_ORC);
     keywordMap.put("order", SqlParserSymbols.KW_ORDER);
     keywordMap.put("outer", SqlParserSymbols.KW_OUTER);
     keywordMap.put("over", SqlParserSymbols.KW_OVER);

@@ -43,7 +43,7 @@ class TestDecimalQueries(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(lambda v:\
         (v.get_value('table_format').file_format == 'text' and
          v.get_value('table_format').compression_codec == 'none') or
-         v.get_value('table_format').file_format in ['parquet', 'kudu'])
+         v.get_value('table_format').file_format in ['parquet', 'orc', 'kudu'])
 
   def test_queries(self, vector):
     self.run_test_case('QueryTest/decimal', vector)
