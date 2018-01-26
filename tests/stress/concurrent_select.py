@@ -1384,7 +1384,8 @@ def estimate_query_mem_mb_usage(query, query_runner):
       return
     LOG.debug("Explaining query\n%s", query.sql)
     cursor.execute('EXPLAIN ' + query.sql)
-    explain_lines = cursor.fetchall()
+    explain_rows = cursor.fetchall()
+    explain_lines = [row[0] for row in explain_rows]
     mem_limit, units = match_memory_estimate(explain_lines)
     return parse_mem_to_mb(mem_limit, units)
 
