@@ -94,7 +94,7 @@ public class CreateTableStmt extends StatementBase {
     getColumnDefs().clear();
     getColumnDefs().addAll(colDefs);
   }
-  private List<ColumnDef> getPrimaryKeyColumnDefs() {
+  public List<ColumnDef> getPrimaryKeyColumnDefs() {
     return tableDef_.getPrimaryKeyColumnDefs();
   }
   public boolean isExternal() { return tableDef_.isExternal(); }
