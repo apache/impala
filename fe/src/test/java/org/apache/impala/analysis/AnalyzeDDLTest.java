@@ -1733,6 +1733,13 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         " stored as kudu as select id, a from functional.complextypes_fileformat",
         "Expr 'a' in select list returns a complex type 'ARRAY<INT>'.\n" +
         "Only scalar types are allowed in the select list.");
+
+    // IMPALA-6454: CTAS into Kudu tables with primary key specified in upper case.
+    AnalyzesOk("create table part_kudu_tbl primary key(INT_COL, SMALLINT_COL, ID)" +
+        " partition by hash(INT_COL, SMALLINT_COL, ID) PARTITIONS 2" +
+        " stored as kudu as SELECT INT_COL, SMALLINT_COL, ID, BIGINT_COL," +
+        " DATE_STRING_COL, STRING_COL, TIMESTAMP_COL, YEAR, MONTH FROM " +
+        " functional.alltypes");
   }
 
   @Test

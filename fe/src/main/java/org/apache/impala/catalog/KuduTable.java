@@ -107,7 +107,7 @@ public class KuduTable extends Table {
   // Comma separated list of Kudu master hosts with optional ports.
   private String kuduMasters_;
 
-  // Primary key column names.
+  // Primary key column names, the column names are all in lower case.
   private final List<String> primaryKeyColumnNames_ = Lists.newArrayList();
 
   // Partitioning schemes of this Kudu table. Both range and hash-based partitioning are
@@ -318,13 +318,15 @@ public class KuduTable extends Table {
    */
   public static KuduTable createCtasTarget(Db db,
       org.apache.hadoop.hive.metastore.api.Table msTbl, List<ColumnDef> columnDefs,
-      List<String> primaryKeyColumnNames, List<KuduPartitionParam> partitionParams) {
+      List<ColumnDef> primaryKeyColumnDefs, List<KuduPartitionParam> partitionParams) {
     KuduTable tmpTable = new KuduTable(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     int pos = 0;
     for (ColumnDef colDef: columnDefs) {
       tmpTable.addColumn(new Column(colDef.getColName(), colDef.getType(), pos++));
     }
-    tmpTable.primaryKeyColumnNames_.addAll(primaryKeyColumnNames);
+    for (ColumnDef pkColDef: primaryKeyColumnDefs) {
+      tmpTable.primaryKeyColumnNames_.add(pkColDef.getColName());
+    }
     tmpTable.partitionBy_.addAll(partitionParams);
     return tmpTable;
   }
