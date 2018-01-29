@@ -1,6 +1,7 @@
 ====
 ---- QUERY
-create table alltypes like functional_parquet.alltypes;
+# This test relies on a deterministic row order so we use "sort by (id)".
+create table alltypes sort by (id) like functional_parquet.alltypes;
 insert into alltypes partition(year, month)
 select * from functional_parquet.alltypes where year = 2009;
 ====

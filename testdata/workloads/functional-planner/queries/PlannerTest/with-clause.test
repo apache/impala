@@ -490,14 +490,20 @@ PLAN-ROOT SINK
 with t1 as (select * from functional.alltypestiny)
 insert into functional.alltypesinsert partition(year, month) select * from t1
 ---- PLAN
-WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(functional.alltypestiny.year,functional.alltypestiny.month)]
+WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=4
+|
+01:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
 ---- DISTRIBUTEDPLAN
-WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(functional.alltypestiny.year,functional.alltypestiny.month)]
+WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=4
+|
+02:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
 |
 01:EXCHANGE [HASH(functional.alltypestiny.year,functional.alltypestiny.month)]
 |
@@ -507,6 +513,43 @@ WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(funct
 # Test with clause in an insert statement and in its query statement.
 with t1 as (select * from functional.alltypestiny)
 insert into functional.alltypesinsert partition(year, month)
+with t2 as (select * from functional.alltypestiny)
+select * from t1 union all select * from t2
+---- PLAN
+WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=16
+|
+03:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|
+00:UNION
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 files=4 size=460B
+|
+01:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=16
+|
+04:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|
+03:EXCHANGE [HASH(year,month)]
+|
+00:UNION
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 files=4 size=460B
+|
+01:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+====
+# IMPALA-5293: Test with clause in an insert statement and in its query statement. Make
+# sure that noclustered hint prevents addition of a sort node before writing to HDFS.
+with t1 as (select * from functional.alltypestiny)
+insert into functional.alltypesinsert partition(year, month) /* +noclustered */
 with t2 as (select * from functional.alltypestiny)
 select * from t1 union all select * from t2
 ---- PLAN

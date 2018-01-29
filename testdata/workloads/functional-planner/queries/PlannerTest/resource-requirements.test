@@ -2408,14 +2408,19 @@ create table dummy_insert
 partitioned by (l_partkey) as
 select l_comment, l_partkey from tpch.lineitem
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=0B
-Per-Host Resource Estimates: Memory=376.99MB
+Max Per-Host Resource Reservation: Memory=12.00MB
+Per-Host Resource Estimates: Memory=306.99MB
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=376.99MB mem-reservation=0B
+|  Per-Host Resources: mem-estimate=306.99MB mem-reservation=12.00MB
 WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)]
 |  partitions=200516
 |  mem-estimate=288.99MB mem-reservation=0B
+|
+01:SORT
+|  order by: l_partkey ASC NULLS LAST
+|  mem-estimate=18.00MB mem-reservation=12.00MB spill-buffer=2.00MB
+|  tuple-ids=1 row-size=50B cardinality=6001215
 |
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
@@ -2426,14 +2431,19 @@ WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=50B cardinality=6001215
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=0B
-Per-Host Resource Estimates: Memory=184.33MB
+Max Per-Host Resource Reservation: Memory=12.00MB
+Per-Host Resource Estimates: Memory=202.33MB
 
 F01:PLAN FRAGMENT [HASH(l_partkey)] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=96.33MB mem-reservation=0B
+|  Per-Host Resources: mem-estimate=114.33MB mem-reservation=12.00MB
 WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)]
 |  partitions=200516
 |  mem-estimate=96.33MB mem-reservation=0B
+|
+02:SORT
+|  order by: l_partkey ASC NULLS LAST
+|  mem-estimate=18.00MB mem-reservation=12.00MB spill-buffer=2.00MB
+|  tuple-ids=1 row-size=50B cardinality=6001215
 |
 01:EXCHANGE [HASH(l_partkey)]
 |  mem-estimate=0B mem-reservation=0B
@@ -2450,14 +2460,19 @@ Per-Host Resources: mem-estimate=88.00MB mem-reservation=0B
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=50B cardinality=6001215
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=0B
-Per-Host Resource Estimates: Memory=272.33MB
+Max Per-Host Resource Reservation: Memory=24.00MB
+Per-Host Resource Estimates: Memory=308.33MB
 
 F01:PLAN FRAGMENT [HASH(l_partkey)] hosts=3 instances=6
-|  Per-Host Resources: mem-estimate=96.33MB mem-reservation=0B
+|  Per-Host Resources: mem-estimate=132.33MB mem-reservation=24.00MB
 WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)]
 |  partitions=200516
 |  mem-estimate=48.16MB mem-reservation=0B
+|
+02:SORT
+|  order by: l_partkey ASC NULLS LAST
+|  mem-estimate=18.00MB mem-reservation=12.00MB spill-buffer=2.00MB
+|  tuple-ids=1 row-size=50B cardinality=6001215
 |
 01:EXCHANGE [HASH(l_partkey)]
 |  mem-estimate=0B mem-reservation=0B

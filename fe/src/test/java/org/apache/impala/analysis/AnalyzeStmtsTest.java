@@ -1897,6 +1897,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       AnalyzesOk(String.format(
           "insert into table functional.alltypesnopart %sclustered%s " +
           "select * from functional.alltypesnopart", prefix, suffix));
+      // Test that noclustered is accepted.
       AnalyzesOk(String.format(
           "insert into table functional.alltypesnopart %snoclustered%s " +
           "select * from functional.alltypesnopart", prefix, suffix));

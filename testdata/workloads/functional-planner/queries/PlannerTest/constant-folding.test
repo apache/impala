@@ -341,10 +341,15 @@ select id, int_col, cast(1 + 1 + 1 + year as int), cast(month - (1 - 1 - 1) as i
 from functional.alltypessmall
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=0B
+|  Per-Host Resources: mem-estimate=38.00MB mem-reservation=6.00MB
 WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(CAST(3 + year AS INT),CAST(month - -1 AS INT))]
 |  partitions=4
 |  mem-estimate=1.56KB mem-reservation=0B
+|
+01:SORT
+|  order by: CAST(3 + year AS INT) ASC NULLS LAST, CAST(month - -1 AS INT) ASC NULLS LAST
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB
+|  tuple-ids=1 row-size=16B cardinality=100
 |
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB

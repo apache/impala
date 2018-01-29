@@ -930,6 +930,31 @@ PLAN-ROOT SINK
 insert into functional.alltypes partition(year, month)
 select * from functional.alltypes order by int_col
 ---- PLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|
+01:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|
+02:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|
+01:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# IMPALA-5293: test that noclustered hint prevents sort node when order by is used without
+# limit in insert.
+insert into functional.alltypes partition(year, month) /* +noclustered */
+select * from functional.alltypes order by int_col
+---- PLAN
 WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
 |  partitions=24
 |

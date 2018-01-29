@@ -622,10 +622,7 @@ public class Planner {
         orderingExprs.addAll(insertStmt.getPrimaryKeyExprs());
         partialSort = true;
       }
-    } else if (insertStmt.hasClusteredHint() || !insertStmt.getSortExprs().isEmpty()) {
-      // NOTE: If the table has a 'sort.columns' property and the query has a
-      // 'noclustered' hint, we issue a warning during analysis and ignore the
-      // 'noclustered' hint.
+    } else if (insertStmt.requiresClustering()) {
       orderingExprs.addAll(insertStmt.getPartitionKeyExprs());
     }
     orderingExprs.addAll(insertStmt.getSortExprs());

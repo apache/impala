@@ -141,9 +141,8 @@ public class InsertStmt extends StatementBase {
   // Indicates whether this insert stmt has a clustered or noclustered hint. Only one of
   // them may be true, not both. If clustering is requested, we add a clustering phase
   // before the data sink, so that partitions can be written sequentially. The default
-  // behavior is to not perform an additional clustering step.
-  // TODO: hasClusteredHint_ can be removed once we enable clustering by default
-  // (IMPALA-5293).
+  // behavior is to not perform an additional clustering step. Both are required to detect
+  // conflicting hints.
   private boolean hasClusteredHint_ = false;
   private boolean hasNoClusteredHint_ = false;
 
@@ -877,6 +876,13 @@ public class InsertStmt extends StatementBase {
   public ArrayList<Expr> getPrimaryKeyExprs() { return primaryKeyExprs_; }
   public List<Expr> getSortExprs() { return sortExprs_; }
 
+  // Clustering is enabled by default. If the table has a 'sort.columns' property and the
+  // query has a 'noclustered' hint, we issue a warning during analysis and ignore the
+  // 'noclustered' hint.
+  public boolean requiresClustering() {
+    return !hasNoClusteredHint_ || !sortExprs_.isEmpty();
+  }
+
   public List<String> getMentionedColumns() {
     List<String> result = Lists.newArrayList();
     List<Column> columns = table_.getColumns();
@@ -888,7 +894,7 @@ public class InsertStmt extends StatementBase {
     // analyze() must have been called before.
     Preconditions.checkState(table_ != null);
     return TableSink.create(table_, isUpsert_ ? TableSink.Op.UPSERT : TableSink.Op.INSERT,
-        partitionKeyExprs_, mentionedColumns_, overwrite_, hasClusteredHint_,
+        partitionKeyExprs_, mentionedColumns_, overwrite_, requiresClustering(),
         sortColumns_);
   }
 

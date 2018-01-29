@@ -302,8 +302,11 @@ PLAN-ROOT SINK
 insert into functional.alltypes partition(year, month)
 select * from functional.alltypes where 1 = 0
 ---- PLAN
-WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=24
+|
+01:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
 |
 00:EMPTYSET
 ====
@@ -312,8 +315,11 @@ with t as (select * from functional.alltypes where coalesce(NULL) > 10)
 insert into functional.alltypes partition(year, month)
 select * from t
 ---- PLAN
-WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 |  partitions=24
+|
+01:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
 |
 00:EMPTYSET
 ====
@@ -499,7 +505,7 @@ PLAN-ROOT SINK
 |  03:EMPTYSET
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=577.87MB
+   partitions=1/1 files=4 size=292.36MB
    predicates: c_custkey < 10
 ====
 # IMPALA-2539: Test empty union operands containing relative table refs.
@@ -533,7 +539,7 @@ PLAN-ROOT SINK
 |  04:UNNEST [c.c_orders o1]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=577.87MB
+   partitions=1/1 files=4 size=292.36MB
    predicates: c_custkey = 1
 ====
 # IMPALA-2215: Having clause without aggregation.
@@ -550,7 +556,6 @@ PLAN-ROOT SINK
 |
 00:EMPTYSET
 ====
----- QUERY
 # IMPALA-5812: Test that a cross join with a constant select that returns an empty result
 # set translates into an EMPTYSET in the final plan
 select count(*) from functional.alltypes x cross join (select 1 as j) y where j is null

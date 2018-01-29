@@ -473,7 +473,7 @@ INSERT INTO KUDU [tpch_kudu.nation]
 00:SCAN HDFS [tpch_parquet.nation]
    partitions=1/1 files=1 size=2.74KB
 ====
-# Unpartitioned table, still has a sort due to clustered hint.
+# Unpartitioned table, clustered hint forces sort node.
 insert into tpch_kudu.nation /* +clustered */
 select * from tpch_parquet.nation
 ---- DISTRIBUTEDPLAN
@@ -483,21 +483,16 @@ INSERT INTO KUDU [tpch_kudu.nation]
 |  order by: n_nationkey ASC NULLS LAST
 |
 00:SCAN HDFS [tpch_parquet.nation]
-   partitions=1/1 files=1 size=2.74KB
+   partitions=1/1 files=1 size=2.75KB
 ====
-# Unpartitioned table, both hints.
-insert into tpch_kudu.nation /* +shuffle,clustered */
+# Unpartitioned table, no sort node without clustered hint.
+insert into tpch_kudu.nation
 select * from tpch_parquet.nation
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [tpch_kudu.nation]
 |
-02:PARTIAL SORT
-|  order by: n_nationkey ASC NULLS LAST
-|
-01:EXCHANGE [UNPARTITIONED]
-|
 00:SCAN HDFS [tpch_parquet.nation]
-   partitions=1/1 files=1 size=2.74KB
+   partitions=1/1 files=1 size=2.75KB
 ====
 # Partition and primary key exprs are all constant, so don't partition/sort.
 insert into functional_kudu.alltypes (id)

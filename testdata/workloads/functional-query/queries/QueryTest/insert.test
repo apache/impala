@@ -848,7 +848,7 @@ bigint
 # Check that hdfs writers respects mem_limit.
 set mem_limit=64m;
 insert into table alltypesinsert
-partition (year, month)
+partition (year, month) /* +noclustered */
 select at1.id, at1.bool_col, at1.tinyint_col, at1.smallint_col, at1.int_col, at1.bigint_col,
   at1.float_col, at1.double_col, at1.date_string_col, at1.string_col, at1.timestamp_col,
   at1.year, at2.id as month
@@ -859,9 +859,9 @@ DROP PARTITIONS alltypesinsert
 Memory limit exceeded
 ====
 ---- QUERY
-# IMPALA-2521: clustered insert into table
+# IMPALA-5293: noclustered insert into table
 insert into table alltypesinsert
-partition (year, month) /*+ clustered,shuffle */
+partition (year, month) /*+ noclustered,shuffle */
 select * from alltypes;
 ---- SETUP
 DROP PARTITIONS alltypesinsert
@@ -893,9 +893,9 @@ year=2010/month=8/: 310
 year=2010/month=9/: 300
 ====
 ---- QUERY
-# IMPALA-2521: clustered insert into table
+# IMPALA-5293: noclustered insert into table
 insert into table alltypesinsert
-partition (year, month) /*+ clustered,shuffle */
+partition (year, month) /*+ noclustered,shuffle */
 select * from alltypestiny;
 ---- SETUP
 DROP PARTITIONS alltypesinsert
@@ -907,9 +907,9 @@ year=2009/month=3/: 2
 year=2009/month=4/: 2
 ====
 ---- QUERY
-# IMPALA-2521: clustered insert into table
+# IMPALA-5293: noclustered insert into table
 insert into table alltypesinsert
-partition (year, month) /*+ clustered,noshuffle */
+partition (year, month) /*+ noclustered,noshuffle */
 select * from alltypestiny;
 ---- SETUP
 DROP PARTITIONS alltypesinsert
@@ -921,9 +921,9 @@ year=2009/month=3/: 2
 year=2009/month=4/: 2
 ====
 ---- QUERY
-# IMPALA-2521: clustered insert into table
+# IMPALA-5293: noclustered insert into table
 insert into table alltypesinsert
-partition (year, month) /*+ clustered,shuffle */
+partition (year, month) /*+ noclustered,shuffle */
 select * from alltypestiny where int_col = 0;
 ---- SETUP
 DROP PARTITIONS alltypesinsert
@@ -935,9 +935,9 @@ year=2009/month=3/: 1
 year=2009/month=4/: 1
 ====
 ---- QUERY
-# IMPALA-2521: clustered, unpartitioned insert into table
+# IMPALA-5293: noclustered, unpartitioned insert into table
 insert into table alltypesnopart_insert
- /*+ clustered,shuffle */
+ /*+ noclustered,shuffle */
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col, timestamp_col from alltypessmall;
 ---- SETUP
@@ -946,9 +946,9 @@ RESET alltypesnopart_insert
 : 100
 ====
 ---- QUERY
-# IMPALA-6280: clustered with outer join, inline view, and TupleisNullPredicate
+# IMPALA-6280: clustered (default) with outer join, inline view, and TupleisNullPredicate
 insert into table alltypesinsert (int_col)
-partition (year, month) /*+ clustered,shuffle */
+partition (year, month) /*+ shuffle */
 select v.id, t1.id, t1.month from
 (select coalesce(id, 10) id from functional.alltypessmall) v
 right outer join functional.alltypestiny t1 on t1.id = v.id
