@@ -514,7 +514,8 @@ class DefaultProfile(object):
     func_weights = _func_weights
     if func_weights:
       distinct_funcs_in_signatures = set([s.func for s in signatures])
-      pruned_func_weights = {f: func_weights[f] for f in distinct_funcs_in_signatures}
+      pruned_func_weights = dict(
+          (f, func_weights[f]) for f in distinct_funcs_in_signatures)
       func_weights = pruned_func_weights
     else:
       # First a function will be chosen then a signature. This is done so that the number
