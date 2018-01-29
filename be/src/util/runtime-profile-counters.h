@@ -302,14 +302,17 @@ class RuntimeProfile::EventSequence {
   /// 'start_time_ns', which must have been obtained by calling MonotonicStopWatch::Now().
   void Start(int64_t start_time_ns) {
     offset_ = MonotonicStopWatch::Now() - start_time_ns;
-    DCHECK_GE(offset_, 0);
+    // TODO: IMPALA-4631: Occasionally we see MonotonicStopWatch::Now() return
+    // (start_time_ns - 1), even though 'start_time_ns' was obtained using
+    // MonotonicStopWatch::Now().
+    DCHECK_GE(offset_, -1);
     sw_.Start();
   }
 
   /// Stores an event in sequence with the given label and the current time
   /// (relative to the first time Start() was called) as the timestamp.
   void MarkEvent(std::string label) {
-    Event event = make_pair(move(label), sw_.ElapsedTime());
+    Event event = make_pair(move(label), sw_.ElapsedTime() + offset_);
     boost::lock_guard<SpinLock> event_lock(lock_);
     events_.emplace_back(move(event));
   }
@@ -334,7 +337,8 @@ class RuntimeProfile::EventSequence {
   }
 
   /// Adds all events from the input parameters that are newer than the last member of
-  /// 'events_'. The caller must make sure that 'timestamps' is sorted.
+  /// 'events_'. The caller must make sure that 'timestamps' is sorted. Does not adjust
+  /// added timestamps by 'offset_'.
   void AddNewerEvents(
       const std::vector<int64_t>& timestamps, const std::vector<std::string>& labels) {
     DCHECK_EQ(timestamps.size(), labels.size());
