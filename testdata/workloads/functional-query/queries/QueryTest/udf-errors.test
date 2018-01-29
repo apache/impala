@@ -20,6 +20,12 @@ symbol='FnDoesNotExist';
 Could not load binary: $FILESYSTEM_PREFIX/test-warehouse/not-a-real-file.so
 ====
 ---- QUERY
+create function if not exists foo (string, string) returns string location
+'$FILESYSTEM_PREFIX/test-warehouse/$DATABASE_bad_udf.ll' symbol='MyAwesomeUdf';
+---- CATCH
+Could not load binary: $FILESYSTEM_PREFIX/test-warehouse/$DATABASE_bad_udf.ll
+====
+---- QUERY
 # This test is run with codegen disabled. Interpretation only handles up to 20 arguments.
 create function if not exists twenty_args(int, int, int, int, int, int,
     int, int, int, int, int, int, int, int, int, int, int, int, int, int) returns int

@@ -18,7 +18,11 @@
 from copy import copy
 import os
 import pytest
-from subprocess import check_call
+import random
+import threading
+import time
+import tempfile
+from subprocess import call, check_call
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_cluster import ImpalaCluster
@@ -327,8 +331,20 @@ class TestUdfExecution(TestUdfBase):
     # Aim to exercise two failure cases:
     # 1. too many arguments
     # 2. IR UDF
-    if vector.get_value('exec_option')['disable_codegen']:
-      self.run_test_case('QueryTest/udf-errors', vector, use_db=unique_database)
+    fd, dir_name = tempfile.mkstemp()
+    try:
+      with open(dir_name, "w") as f:
+        f.write("Hello World")
+      check_call(["hadoop", "fs", "-put", "-f", f.name, "/test-warehouse/" +
+                unique_database + "_bad_udf.ll"])
+      if vector.get_value('exec_option')['disable_codegen']:
+        self.run_test_case('QueryTest/udf-errors', vector, use_db=unique_database)
+    finally:
+      if os.path.exists(f.name):
+        os.remove(f.name)
+      call(["hadoop", "fs", "-rm", "-f", "/test-warehouse/" +
+                  unique_database + "_bad_udf.ll"])
+      os.close(fd)
 
   # Run serially because this will blow the process limit, potentially causing other
   # queries to fail

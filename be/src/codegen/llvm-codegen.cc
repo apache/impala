@@ -215,9 +215,14 @@ Status LlvmCodeGen::CreateFromFile(RuntimeState* state, ObjectPool* pool,
   SCOPED_TIMER((*codegen)->profile_->total_time_counter());
 
   unique_ptr<llvm::Module> loaded_module;
-  RETURN_IF_ERROR((*codegen)->LoadModuleFromFile(file, &loaded_module));
-
-  return (*codegen)->Init(std::move(loaded_module));
+  Status status = (*codegen)->LoadModuleFromFile(file, &loaded_module);
+  if (!status.ok()) goto error;
+  status = (*codegen)->Init(std::move(loaded_module));
+  if (!status.ok()) goto error;
+  return Status::OK();
+error:
+  (*codegen)->Close();
+  return status;
 }
 
 Status LlvmCodeGen::CreateFromMemory(RuntimeState* state, ObjectPool* pool,
@@ -242,9 +247,15 @@ Status LlvmCodeGen::CreateFromMemory(RuntimeState* state, ObjectPool* pool,
   unique_ptr<llvm::MemoryBuffer> module_ir_buf(
       llvm::MemoryBuffer::getMemBuffer(module_ir, "", false));
   unique_ptr<llvm::Module> loaded_module;
-  RETURN_IF_ERROR((*codegen)->LoadModuleFromMemory(std::move(module_ir_buf),
-      module_name, &loaded_module));
-  return (*codegen)->Init(std::move(loaded_module));
+  Status status = (*codegen)->LoadModuleFromMemory(std::move(module_ir_buf),
+      module_name, &loaded_module);
+  if (!status.ok()) goto error;
+  status = (*codegen)->Init(std::move(loaded_module));
+  if (!status.ok()) goto error;
+  return Status::OK();
+error:
+  (*codegen)->Close();
+  return status;
 }
 
 Status LlvmCodeGen::LoadModuleFromFile(
@@ -276,9 +287,8 @@ Status LlvmCodeGen::LoadModuleFromMemory(unique_ptr<llvm::MemoryBuffer> module_i
   llvm::ErrorOr<unique_ptr<llvm::Module>> tmp_module =
       getLazyBitcodeModule(std::move(module_ir_buf), context(), false);
   if (!tmp_module) {
-    stringstream ss;
-    ss << "Could not parse module " << module_name << ": " << tmp_module.getError();
-    return Status(ss.str());
+    string diagnostic_err = diagnostic_handler_.GetErrorString();
+    return Status(diagnostic_err);
   }
 
   *module = std::move(tmp_module.get());
@@ -1690,8 +1700,10 @@ void LlvmCodeGen::DiagnosticHandler::DiagnosticHandlerFn(
     diagnostic_printer << "LLVM diagnostic error: ";
     info.print(diagnostic_printer);
     error_msg.flush();
-    LOG(INFO) << "Query " << codegen->state_->query_id() << " encountered a "
-        << codegen->diagnostic_handler_.error_str_;
+    if (codegen->state_) {
+      LOG(INFO) << "Query " << codegen->state_->query_id() << " encountered a "
+          << codegen->diagnostic_handler_.error_str_;
+    }
   }
 }
 
