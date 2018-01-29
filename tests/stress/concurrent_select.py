@@ -1641,7 +1641,7 @@ def prepare_database(cursor):
   Note: At this time we only support Kudu tables with a simple hash partitioning based on
   the primary key. (SHOW CREATE TABLE would not work otherwise.)
   """
-  tables = {t: cursor.describe_table(t) for t in cursor.list_table_names()}
+  tables = dict((t, cursor.describe_table(t)) for t in cursor.list_table_names())
   for table_name in tables:
     if not table_name.endswith("_original") and table_name + "_original" not in tables:
       LOG.debug("Creating original table: {0}".format(table_name))
@@ -1665,7 +1665,7 @@ def reset_databases(cursor):
   the primary key. (SHOW CREATE TABLE would not work otherwise.)
   """
   LOG.info("Resetting {0} database".format(cursor.db_name))
-  tables = {t: cursor.describe_table(t) for t in cursor.list_table_names()}
+  tables = dict((t, cursor.describe_table(t)) for t in cursor.list_table_names())
   for table_name in tables:
     if not table_name.endswith("_original"):
       if table_name + "_original" in tables:
