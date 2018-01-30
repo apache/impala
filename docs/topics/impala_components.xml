@@ -137,7 +137,7 @@ under the License.
 
       <p>
         The Impala component known as the <term>catalog service</term> relays the metadata changes from Impala SQL
-        statements to all the DataNodes in a cluster. It is physically represented by a daemon process named
+        statements to all the Impala daemons in a cluster. It is physically represented by a daemon process named
         <codeph>catalogd</codeph>; you only need such a process on one host in the cluster. Because the requests
         are passed through the statestore daemon, it makes sense to run the <cmdname>statestored</cmdname> and
         <cmdname>catalogd</cmdname> services on the same host.
