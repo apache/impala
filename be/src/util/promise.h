@@ -77,17 +77,15 @@ class Promise {
   /// timed_out: Indicates whether Get() returned due to timeout. Must be non-NULL.
   const T& Get(int64_t timeout_millis, bool* timed_out) {
     DCHECK_GT(timeout_millis, 0);
-    int64_t timeout_micros = timeout_millis * 1000;
+    int64_t timeout_micros = timeout_millis * MICROS_PER_MILLI;
     DCHECK(timed_out != NULL);
     boost::unique_lock<boost::mutex> l(val_lock_);
     int64_t start;
     int64_t now;
     now = start = MonotonicMicros();
     while (!val_is_set_ && (now - start) < timeout_micros) {
-      boost::posix_time::microseconds wait_time =
-          boost::posix_time::microseconds(std::max<int64_t>(
-              1, timeout_micros - (now - start)));
-      val_set_cond_.WaitFor(l, wait_time);
+      int64_t wait_time_micros = std::max<int64_t>(1, timeout_micros - (now - start));
+      val_set_cond_.WaitFor(l, wait_time_micros);
       now = MonotonicMicros();
     }
     *timed_out = !val_is_set_;

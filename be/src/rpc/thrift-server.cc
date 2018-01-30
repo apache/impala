@@ -165,8 +165,8 @@ Status ThriftServer::ThriftServerEventProcessor::StartAndWaitForServer() {
       &ThriftServer::ThriftServerEventProcessor::Supervise, this,
       &thrift_server_->server_thread_));
 
-  system_time deadline = get_system_time() +
-      posix_time::milliseconds(ThriftServer::ThriftServerEventProcessor::TIMEOUT_MS);
+  timespec deadline;
+  TimeFromNowMillis(ThriftServer::ThriftServerEventProcessor::TIMEOUT_MS, &deadline);
 
   // Loop protects against spurious wakeup. Locks provide necessary fences to ensure
   // visibility.
