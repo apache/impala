@@ -1772,7 +1772,7 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
         session_timeout_cv_.Wait(timeout_lock);
       } else {
         // Sleep for a second before checking whether an active session can be expired.
-        session_timeout_cv_.WaitFor(timeout_lock, seconds(1));
+        session_timeout_cv_.WaitFor(timeout_lock, MICROS_PER_SEC);
       }
     }
 

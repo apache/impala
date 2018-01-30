@@ -341,19 +341,16 @@ void FragmentInstanceState::ReportProfileThread() {
   // updates at once so its better for contention as well as smoother progress
   // reporting.
   int report_fragment_offset = rand() % FLAGS_status_report_interval;
-  boost::posix_time::seconds wait_duration(report_fragment_offset);
   // We don't want to wait longer than it takes to run the entire fragment.
-  stop_report_thread_cv_.WaitFor(l, wait_duration);
+  stop_report_thread_cv_.WaitFor(l, report_fragment_offset * MICROS_PER_SEC);
 
   while (report_thread_active_) {
-    boost::posix_time::seconds loop_wait_duration(FLAGS_status_report_interval);
-
     // timed_wait can return because the timeout occurred or the condition variable
     // was signaled.  We can't rely on its return value to distinguish between the
     // two cases (e.g. there is a race here where the wait timed out but before grabbing
     // the lock, the condition variable was signaled).  Instead, we will use an external
     // flag, report_thread_active_, to coordinate this.
-    stop_report_thread_cv_.WaitFor(l, loop_wait_duration);
+    stop_report_thread_cv_.WaitFor(l, FLAGS_status_report_interval * MICROS_PER_SEC);
 
     if (!report_thread_active_) break;
     SendReport(false, Status::OK());

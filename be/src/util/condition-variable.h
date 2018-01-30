@@ -24,13 +24,23 @@
 #include <pthread.h>
 #include <unistd.h>
 
+#include "util/time.h"
+
 namespace impala {
 
 /// Simple wrapper around POSIX pthread condition variable. This has lower overhead than
 /// boost's implementation as it doesn't implement boost thread interruption.
 class ConditionVariable {
  public:
-  ConditionVariable() { pthread_cond_init(&cv_, NULL); }
+  ConditionVariable() {
+    pthread_condattr_t attrs;
+    int retval = pthread_condattr_init(&attrs);
+    DCHECK_EQ(0, retval);
+    pthread_condattr_setclock(&attrs, CLOCK_MONOTONIC);
+    retval = pthread_cond_init(&cv_, &attrs);
+    DCHECK_EQ(0, retval);
+    pthread_condattr_destroy(&attrs);
+  }
 
   ~ConditionVariable() { pthread_cond_destroy(&cv_); }
 
@@ -41,32 +51,22 @@ class ConditionVariable {
     pthread_cond_wait(&cv_, mutex);
   }
 
-  /// Wait until the condition variable is notified or 'timeout' has passed.
+  /// Wait until the condition variable is notified or 'abs_time' has passed.
   /// Returns true if the condition variable is notified before the absolute timeout
-  /// specified in 'timeout' has passed. Returns false otherwise.
-  bool WaitUntil(boost::unique_lock<boost::mutex>& lock,
-      const timespec& abs_time) {
+  /// specified in 'abs_time' has passed. Returns false otherwise.
+  bool WaitUntil(boost::unique_lock<boost::mutex>& lock, const timespec& abs_time) {
     DCHECK(lock.owns_lock());
     pthread_mutex_t* mutex = lock.mutex()->native_handle();
     return pthread_cond_timedwait(&cv_, mutex, &abs_time) == 0;
   }
 
-  /// Wait until the condition variable is notified or 'abs_time' has passed.
-  /// Returns true if the condition variable is notified before the absolute timeout
-  /// specified in 'abs_time' has passed. Returns false otherwise.
-  bool WaitUntil(boost::unique_lock<boost::mutex>& lock,
-      const boost::system_time& abs_time) {
-    return WaitUntil(lock, to_timespec(abs_time));
-  }
-
-  /// Wait until the condition variable is notified or have waited for the time
-  /// specified in 'wait_duration'.
-  /// Returns true if the condition variable is notified in time.
+  /// Wait until the condition variable is notified or 'duration_us' microseconds
+  /// have passed. Returns true if the condition variable is notified in time.
   /// Returns false otherwise.
-  template <typename duration_type>
-  bool WaitFor(boost::unique_lock<boost::mutex>& lock,
-      const duration_type& wait_duration) {
-    return WaitUntil(lock, to_timespec(boost::get_system_time() + wait_duration));
+  bool WaitFor(boost::unique_lock<boost::mutex>& lock, int64_t duration_us) {
+    timespec deadline;
+    TimeFromNowMicros(duration_us, &deadline);
+    return WaitUntil(lock, deadline);
   }
 
   /// Notify a single waiter on this condition variable.
