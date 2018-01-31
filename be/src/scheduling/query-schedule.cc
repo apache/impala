@@ -35,11 +35,6 @@ using boost::uuids::random_generator;
 using boost::uuids::uuid;
 using namespace impala;
 
-// TODO: Remove for Impala 3.0.
-DEFINE_bool_hidden(rm_always_use_defaults, false, "Deprecated");
-DEFINE_string_hidden(rm_default_memory, "4G", "Deprecated");
-DEFINE_int32_hidden(rm_default_cpu_vcores, 2, "Deprecated");
-
 namespace impala {
 
 QuerySchedule::QuerySchedule(const TUniqueId& query_id,

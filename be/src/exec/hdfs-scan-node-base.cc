@@ -46,9 +46,6 @@
 
 #include "common/names.h"
 
-// TODO: Remove this flag in a compatibility-breaking release.
-DEFINE_bool(suppress_unknown_disk_id_warnings, false, "Deprecated.");
-
 #ifndef NDEBUG
 DECLARE_bool(skip_file_runtime_filtering);
 #endif

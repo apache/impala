@@ -160,8 +160,6 @@ DEFINE_int32(kudu_operation_timeout_ms, 3 * 60 * 1000, "Timeout (milliseconds) s
     "all Kudu operations. This must be a positive value, and there is no way to disable "
     "timeouts.");
 
-DEFINE_bool_hidden(enable_accept_queue_server, true, "Deprecated");
-
 DEFINE_int64(inc_stats_size_limit_bytes, 200 * (1LL<<20), "Maximum size of "
     "incremental stats the catalog is allowed to serialize per table. "
     "This limit is set as a safety check, to prevent the JVM from "
@@ -194,3 +192,57 @@ DEFINE_string(reserved_words_version, "3.0.0", "Reserved words compatibility ver
     "Reserved words cannot be used as identifiers in SQL. This flag determines the impala"
     " version from which the reserved word list is taken. The value must be one of "
     "[\"2.11.0\", \"3.0.0\"].");
+
+// ++========================++
+// || Startup flag graveyard ||
+// ++========================++
+//
+//                       -----------
+//           -----------/   R I P   ╲
+//          /   R I P   ╲ -----------|-----------
+//          |-----------|           |/   R I P   ╲
+//          |           |   LLAMA   ||-----------|
+//          | Old Aggs  |           ||           |
+//          |           |    --     || Old Joins |
+//          |    --     |           ||           |
+//          |           |           ||    --     |
+//          |           |~.~~.~~.~~~~|           |
+//          ~~.~~.~~.~~~~            |           |
+//                                   ~~.~~.~~.~~~~
+// The flags have no effect but we don't want to prevent Impala from starting when they
+// are provided on the command line after an upgrade. We issue a warning if the flag is
+// set from the command line.
+#define REMOVED_FLAG(flagname) \
+  DEFINE_string_hidden(flagname, "__UNSET__", "Removed"); \
+  DEFINE_validator(flagname, [](const char* name, const string& val) { \
+      if (val != "__UNSET__") LOG(WARNING) << "Ignoring removed flag " << name; \
+      return true; \
+    });
+
+REMOVED_FLAG(be_service_threads);
+REMOVED_FLAG(cgroup_hierarchy_path);
+REMOVED_FLAG(enable_accept_queue_server);
+REMOVED_FLAG(enable_partitioned_aggregation);
+REMOVED_FLAG(enable_partitioned_hash_join);
+REMOVED_FLAG(enable_phj_probe_side_filtering);
+REMOVED_FLAG(enable_rm);
+REMOVED_FLAG(llama_addresses);
+REMOVED_FLAG(llama_callback_port);
+REMOVED_FLAG(llama_host);
+REMOVED_FLAG(llama_max_request_attempts);
+REMOVED_FLAG(llama_port);
+REMOVED_FLAG(llama_registration_timeout_secs);
+REMOVED_FLAG(llama_registration_wait_secs);
+REMOVED_FLAG(local_nodemanager_url);
+REMOVED_FLAG(resource_broker_cnxn_attempts);
+REMOVED_FLAG(resource_broker_cnxn_retry_interval_ms);
+REMOVED_FLAG(resource_broker_recv_timeout);
+REMOVED_FLAG(resource_broker_send_timeout);
+REMOVED_FLAG(rm_always_use_defaults);
+REMOVED_FLAG(rm_default_cpu_vcores);
+REMOVED_FLAG(rm_default_memory);
+REMOVED_FLAG(rpc_cnxn_attempts);
+REMOVED_FLAG(rpc_cnxn_retry_interval_ms);
+REMOVED_FLAG(staging_cgroup);
+REMOVED_FLAG(suppress_unknown_disk_id_warnings);
+REMOVED_FLAG(use_statestore);

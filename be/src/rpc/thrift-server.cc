@@ -58,9 +58,6 @@ using namespace apache::thrift::server;
 using namespace apache::thrift::transport;
 using namespace apache::thrift;
 
-DEFINE_int32_hidden(rpc_cnxn_attempts, 10, "Deprecated");
-DEFINE_int32_hidden(rpc_cnxn_retry_interval_ms, 2000, "Deprecated");
-
 DECLARE_string(principal);
 DECLARE_string(keytab_file);
 

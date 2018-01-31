@@ -118,8 +118,6 @@ DEFINE_int32(hs2_port, 21050, "port on which HiveServer2 client requests are ser
 
 DEFINE_int32(fe_service_threads, 64,
     "number of threads available to serve client requests");
-DEFINE_int32_hidden(be_service_threads, 64,
-    "Deprecated, no longer has any effect. Will be removed in Impala 3.0.");
 DEFINE_string(default_query_options, "", "key=value pair of default query options for"
     " impalad, separated by ','");
 DEFINE_int32(query_log_size, 25, "Number of queries to retain in the query log. If -1, "
@@ -207,9 +205,6 @@ DEFINE_bool(is_executor, true, "If true, this Impala daemon will execute query "
       "for a given query by injecting a sleep equivalent to this configuration in "
       "milliseconds. Only used for testing.");
 #endif
-
-// TODO: Remove for Impala 3.0.
-DEFINE_string_hidden(local_nodemanager_url, "", "Deprecated");
 
 DECLARE_bool(compact_catalog_topic);
 

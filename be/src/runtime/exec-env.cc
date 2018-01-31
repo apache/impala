@@ -70,7 +70,6 @@ using boost::algorithm::join;
 using kudu::rpc::ServiceIf;
 using namespace strings;
 
-DEFINE_bool_hidden(use_statestore, true, "Deprecated, do not use");
 DEFINE_string(catalog_service_host, "localhost",
     "hostname where CatalogService is running");
 DEFINE_bool(enable_webserver, true, "If true, debug webserver is enabled");
@@ -102,22 +101,6 @@ DECLARE_int64(min_buffer_size);
 DECLARE_bool(is_coordinator);
 DECLARE_int32(webserver_port);
 DECLARE_int64(tcmalloc_max_total_thread_cache_bytes);
-
-// TODO: Remove the following RM-related flags in Impala 3.0.
-DEFINE_bool_hidden(enable_rm, false, "Deprecated");
-DEFINE_int32_hidden(llama_callback_port, 28000, "Deprecated");
-DEFINE_string_hidden(llama_host, "", "Deprecated");
-DEFINE_int32_hidden(llama_port, 15000, "Deprecated");
-DEFINE_string_hidden(llama_addresses, "", "Deprecated");
-DEFINE_int64_hidden(llama_registration_timeout_secs, 30, "Deprecated");
-DEFINE_int64_hidden(llama_registration_wait_secs, 3, "Deprecated");
-DEFINE_int64_hidden(llama_max_request_attempts, 5, "Deprecated");
-DEFINE_string_hidden(cgroup_hierarchy_path, "", "Deprecated");
-DEFINE_string_hidden(staging_cgroup, "impala_staging", "Deprecated");
-DEFINE_int32_hidden(resource_broker_cnxn_attempts, 1, "Deprecated");
-DEFINE_int32_hidden(resource_broker_cnxn_retry_interval_ms, 3000, "Deprecated");
-DEFINE_int32_hidden(resource_broker_send_timeout, 0, "Deprecated");
-DEFINE_int32_hidden(resource_broker_recv_timeout, 0, "Deprecated");
 
 // TODO-MT: rename or retire
 DEFINE_int32(coordinator_rpc_threads, 12, "(Advanced) Number of threads available to "

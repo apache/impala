@@ -54,7 +54,6 @@ using namespace impala;
 DECLARE_int32(beeswax_port);
 DECLARE_int32(hs2_port);
 DECLARE_int32(be_port);
-DECLARE_bool(enable_rm);
 DECLARE_bool(is_coordinator);
 
 int ImpaladMain(int argc, char** argv) {
@@ -69,13 +68,6 @@ int ImpaladMain(int argc, char** argv) {
   ABORT_IF_ERROR(HiveUdfCall::InitEnv());
   ABORT_IF_ERROR(JniCatalogCacheUpdateIterator::InitJNI());
   InitFeSupport();
-
-  if (FLAGS_enable_rm) {
-    // TODO: Remove in Impala 3.0.
-    LOG(WARNING) << "*****************************************************************";
-    LOG(WARNING) << "Llama support has been deprecated. FLAGS_enable_rm has no effect.";
-    LOG(WARNING) << "*****************************************************************";
-  }
 
   ExecEnv exec_env;
   ABORT_IF_ERROR(exec_env.Init());
