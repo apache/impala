@@ -16,7 +16,6 @@
 // under the License.
 
 #include <stdlib.h>
-#include <stdio.h>
 #include <iostream>
 #include <boost/bind.hpp>
 
@@ -24,9 +23,7 @@
 #include "testutil/gtest-util.h"
 #include "util/periodic-counter-updater.h"
 #include "util/runtime-profile-counters.h"
-#include "util/streaming-sampler.h"
 #include "util/thread.h"
-#include "util/time.h"
 
 #include "common/names.h"
 
@@ -668,7 +665,7 @@ class TimerCounterTest {
 };
 
 void ValidateTimerValue(const TimerCounterTest& timer, int64_t start) {
-  int64_t expected_value = MonotonicNanos() - start;
+  int64_t expected_value = MonotonicStopWatch::Now() - start;
   int64_t stopwatch_value = timer.csw_.TotalRunningTime();
   EXPECT_GE(stopwatch_value, expected_value - TimerCounterTest::MAX_TIMER_ERROR_NS);
   EXPECT_LE(stopwatch_value, expected_value + TimerCounterTest::MAX_TIMER_ERROR_NS);
@@ -690,7 +687,7 @@ void ValidateLapTime(TimerCounterTest* timer, int64_t expected_value) {
 
 TEST(TimerCounterTest, CountersTestOneThread) {
   TimerCounterTest tester;
-  uint64_t start = MonotonicNanos();
+  int64_t start = MonotonicStopWatch::Now();
   tester.StartWorkers(1, 0);
   SleepForMs(500);
   ValidateTimerValue(tester, start);
@@ -700,7 +697,7 @@ TEST(TimerCounterTest, CountersTestOneThread) {
 
 TEST(TimerCounterTest, CountersTestTwoThreads) {
   TimerCounterTest tester;
-  uint64_t start = MonotonicNanos();
+  int64_t start = MonotonicStopWatch::Now();
   tester.StartWorkers(2, 10);
   SleepForMs(500);
   ValidateTimerValue(tester, start);
@@ -710,7 +707,7 @@ TEST(TimerCounterTest, CountersTestTwoThreads) {
 
 TEST(TimerCounterTest, CountersTestRandom) {
   TimerCounterTest tester;
-  uint64_t start = MonotonicNanos();
+  int64_t start = MonotonicStopWatch::Now();
   ValidateTimerValue(tester, start);
   // First working period
   tester.StartWorkers(5, 10);
@@ -726,23 +723,23 @@ TEST(TimerCounterTest, CountersTestRandom) {
   ValidateTimerValue(tester, start);
   tester.Reset();
 
-  ValidateLapTime(&tester, MonotonicNanos() - start);
-  uint64_t first_run_end = MonotonicNanos();
+  ValidateLapTime(&tester, MonotonicStopWatch::Now() - start);
+  int64_t first_run_end = MonotonicStopWatch::Now();
   // Adding some idle time. concurrent stopwatch and timer should not count the idle time.
   SleepForMs(200);
-  start += MonotonicNanos() - first_run_end;
+  start += MonotonicStopWatch::Now() - first_run_end;
 
   // Second working period
   tester.StartWorkers(2, 0);
   // We just get lap time after first run finish. so at start of second run, expect lap time == 0
   ValidateLapTime(&tester, 0);
-  uint64_t lap_time_start = MonotonicNanos();
+  int64_t lap_time_start = MonotonicStopWatch::Now();
   SleepForMs(200);
   ValidateTimerValue(tester, start);
   SleepForMs(200);
   tester.StopWorkers(-1);
   ValidateTimerValue(tester, start);
-  ValidateLapTime(&tester, MonotonicNanos() - lap_time_start);
+  ValidateLapTime(&tester, MonotonicStopWatch::Now() - lap_time_start);
 }
 
 }
