@@ -1258,7 +1258,7 @@ where day = 1 and id < 3 and decode(tinyint_col, null, 4) is not null
 INT
 ====
 ---- QUERY
-select distinct decode(id, tinyint_col, round(float_col)) from alltypestiny
+select distinct decode(id, tinyint_col, cast(round(float_col) as bigint)) from alltypestiny
 ---- RESULTS
 NULL
 0

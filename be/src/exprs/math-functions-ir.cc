@@ -61,11 +61,6 @@ DoubleVal MathFunctions::E(FunctionContext* ctx) {
     return RET_TYPE(FN(v1.val, v2.val)); \
   }
 
-// N.B. - for integer math, we have to promote ABS() to the next highest integer type
-// because in two's complement arithmetic, the largest negative value for any bit width
-// is not representable as a positive value within the same width.  For the largest width,
-// we simply overflow.  In the unlikely event a workaround is needed, one can simply
-// cast to a higher precision decimal type.
 BigIntVal MathFunctions::Abs(FunctionContext* ctx, const BigIntVal& v) {
   if (v.is_null) return BigIntVal::null();
   if (UNLIKELY(v.val == std::numeric_limits<BigIntVal::underlying_type_t>::min())) {
@@ -90,9 +85,9 @@ ONE_ARG_MATH_FN(Cosh, DoubleVal, DoubleVal, cosh);
 ONE_ARG_MATH_FN(Tanh, DoubleVal, DoubleVal, tanh);
 ONE_ARG_MATH_FN(Sinh, DoubleVal, DoubleVal, sinh);
 ONE_ARG_MATH_FN(Sqrt, DoubleVal, DoubleVal, sqrt);
-ONE_ARG_MATH_FN(Ceil, BigIntVal, DoubleVal, ceil);
-ONE_ARG_MATH_FN(Floor, BigIntVal, DoubleVal, floor);
-ONE_ARG_MATH_FN(Truncate, BigIntVal, DoubleVal, trunc);
+ONE_ARG_MATH_FN(Ceil, DoubleVal, DoubleVal, ceil);
+ONE_ARG_MATH_FN(Floor, DoubleVal, DoubleVal, floor);
+ONE_ARG_MATH_FN(Truncate, DoubleVal, DoubleVal, trunc);
 ONE_ARG_MATH_FN(Ln, DoubleVal, DoubleVal, log);
 ONE_ARG_MATH_FN(Log10, DoubleVal, DoubleVal, log10);
 ONE_ARG_MATH_FN(Exp, DoubleVal, DoubleVal, exp);
@@ -104,9 +99,9 @@ DoubleVal MathFunctions::Cot(FunctionContext* ctx, const DoubleVal& v) {
   return DoubleVal(tan(M_PI_2 - v.val));
 }
 
-FloatVal MathFunctions::Sign(FunctionContext* ctx, const DoubleVal& v) {
-  if (v.is_null) return FloatVal::null();
-  return FloatVal((v.val > 0) ? 1.0f : ((v.val < 0) ? -1.0f : 0.0f));
+DoubleVal MathFunctions::Sign(FunctionContext* ctx, const DoubleVal& v) {
+  if (v.is_null) return DoubleVal::null();
+  return DoubleVal((v.val > 0) ? 1 : ((v.val < 0) ? -1 : 0));
 }
 
 DoubleVal MathFunctions::Radians(FunctionContext* ctx, const DoubleVal& v) {
@@ -119,15 +114,43 @@ DoubleVal MathFunctions::Degrees(FunctionContext* ctx, const DoubleVal& v) {
   return DoubleVal(v.val * 180.0 / M_PI);
 }
 
-BigIntVal MathFunctions::Round(FunctionContext* ctx, const DoubleVal& v) {
-  if (v.is_null) return BigIntVal::null();
-  return BigIntVal(static_cast<int64_t>(v.val + ((v.val < 0) ? -0.5 : 0.5)));
+DoubleVal MathFunctions::Round(FunctionContext* ctx, const DoubleVal& v) {
+  if (v.is_null) return DoubleVal::null();
+  return DoubleVal(trunc(v.val + ((v.val < 0) ? -0.5 : 0.5)));
+}
+
+static double GetScaleMultiplier(int64_t scale) {
+  static const double values[] = {
+      1.0,
+      10.0,
+      100.0,
+      1000.0,
+      10000.0,
+      100000.0,
+      1000000.0,
+      10000000.0,
+      100000000.0,
+      1000000000.0,
+      10000000000.0,
+      100000000000.0,
+      1000000000000.0,
+      10000000000000.0,
+      100000000000000.0,
+      1000000000000000.0,
+      10000000000000000.0,
+      100000000000000000.0,
+      1000000000000000000.0,
+      10000000000000000000.0};
+  if (LIKELY(0 <= scale && scale < 20)) return values[scale];
+  return pow(10.0, scale);
 }
 
 DoubleVal MathFunctions::RoundUpTo(FunctionContext* ctx, const DoubleVal& v,
-    const IntVal& scale) {
+    const BigIntVal& scale) {
   if (v.is_null || scale.is_null) return DoubleVal::null();
-  return DoubleVal(floor(v.val * pow(10.0, scale.val) + 0.5) / pow(10.0, scale.val));
+  return DoubleVal(trunc(
+      v.val * GetScaleMultiplier(scale.val) + ((v.val < 0) ? -0.5 : 0.5)) /
+      GetScaleMultiplier(scale.val));
 }
 
 DoubleVal MathFunctions::Log2(FunctionContext* ctx, const DoubleVal& v) {

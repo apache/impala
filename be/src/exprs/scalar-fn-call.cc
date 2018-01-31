@@ -182,13 +182,13 @@ Status ScalarFnCall::OpenEvaluator(FunctionContext::FunctionStateScope scope,
 
     // If we're calling MathFunctions::RoundUpTo(), we need to set output_scale_
     // which determines how many decimal places are printed.
-    // TODO: Move this to Expr initialization.
-    if (this == &eval->root()) {
-      if (fn_.name.function_name == "round" && type_.type == TYPE_DOUBLE) {
-        DCHECK_EQ(children_.size(), 2);
-        IntVal* scale_arg = reinterpret_cast<IntVal*>(constant_args[1]);
-        if (scale_arg != nullptr) eval->output_scale_ = scale_arg->val;
-      }
+    // TODO: Move this to Expr initialization when IMPALA-4743 is fixed.
+    if (this == &eval->root() &&
+        fn_.name.function_name == "round" &&
+        type_.type == TYPE_DOUBLE &&
+        children_.size() == 2) {
+      BigIntVal* scale_arg = reinterpret_cast<BigIntVal*>(constant_args[1]);
+      if (scale_arg != nullptr) eval->output_scale_ = scale_arg->val;
     }
   }
 

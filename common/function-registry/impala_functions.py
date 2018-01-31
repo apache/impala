@@ -265,7 +265,7 @@ visible_functions = [
   [['abs'], 'BIGINT', ['INT'], 'impala::MathFunctions::Abs'],
   [['abs'], 'INT', ['SMALLINT'], 'impala::MathFunctions::Abs'],
   [['abs'], 'SMALLINT', ['TINYINT'], 'impala::MathFunctions::Abs'],
-  [['sign'], 'FLOAT', ['DOUBLE'], 'impala::MathFunctions::Sign'],
+  [['sign'], 'DOUBLE', ['DOUBLE'], 'impala::MathFunctions::Sign'],
   [['sin'], 'DOUBLE', ['DOUBLE'], 'impala::MathFunctions::Sin'],
   [['asin'], 'DOUBLE', ['DOUBLE'], 'impala::MathFunctions::Asin'],
   [['cos'], 'DOUBLE', ['DOUBLE'], 'impala::MathFunctions::Cos'],
@@ -279,11 +279,11 @@ visible_functions = [
   [['cot'], 'DOUBLE', ['DOUBLE'], 'impala::MathFunctions::Cot'],
   [['radians'], 'DOUBLE', ['DOUBLE'], 'impala::MathFunctions::Radians'],
   [['degrees'], 'DOUBLE', ['DOUBLE'], 'impala::MathFunctions::Degrees'],
-  [['ceil', 'ceiling', 'dceil'], 'BIGINT', ['DOUBLE'], 'impala::MathFunctions::Ceil'],
-  [['floor', 'dfloor'], 'BIGINT', ['DOUBLE'], 'impala::MathFunctions::Floor'],
-  [['truncate','dtrunc','trunc'], 'BIGINT', ['DOUBLE'], 'impala::MathFunctions::Truncate'],
-  [['round','dround'], 'BIGINT', ['DOUBLE'], 'impala::MathFunctions::Round'],
-  [['round','dround'], 'DOUBLE', ['DOUBLE', 'INT'], 'impala::MathFunctions::RoundUpTo'],
+  [['ceil', 'ceiling', 'dceil'], 'DOUBLE', ['DOUBLE'], 'impala::MathFunctions::Ceil'],
+  [['floor', 'dfloor'], 'DOUBLE', ['DOUBLE'], 'impala::MathFunctions::Floor'],
+  [['truncate','dtrunc','trunc'], 'DOUBLE', ['DOUBLE'], 'impala::MathFunctions::Truncate'],
+  [['round','dround'], 'DOUBLE', ['DOUBLE'], 'impala::MathFunctions::Round'],
+  [['round','dround'], 'DOUBLE', ['DOUBLE', 'BIGINT'], 'impala::MathFunctions::RoundUpTo'],
   [['exp', 'dexp'], 'DOUBLE', ['DOUBLE'], 'impala::MathFunctions::Exp'],
   [['ln','dlog1'], 'DOUBLE', ['DOUBLE'], 'impala::MathFunctions::Ln'],
   [['log10','dlog10'], 'DOUBLE', ['DOUBLE'], 'impala::MathFunctions::Log10'],
@@ -398,6 +398,10 @@ visible_functions = [
   [['ceil', 'ceiling'], 'DECIMAL', ['DECIMAL'], 'impala::DecimalFunctions::Ceil'],
   [['floor','dfloor'], 'DECIMAL', ['DECIMAL'], 'impala::DecimalFunctions::Floor'],
   [['round','dround'], 'DECIMAL', ['DECIMAL'], 'impala::DecimalFunctions::Round'],
+  # The reason why we declare the following function several times (instead of simply
+  # setting the second argument to BIGINT and relying on implicit casting is because
+  # we don't know if the first Decimal argument needs to be cast to double, or the second
+  # argument needs to be cast to a BIGINT.
   [['round','dround'], 'DECIMAL', ['DECIMAL', 'TINYINT'], 'impala::DecimalFunctions::RoundTo'],
   [['round','dround'], 'DECIMAL', ['DECIMAL', 'SMALLINT'], 'impala::DecimalFunctions::RoundTo'],
   [['round','dround'], 'DECIMAL', ['DECIMAL', 'INT'], 'impala::DecimalFunctions::RoundTo'],

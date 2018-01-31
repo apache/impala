@@ -1425,7 +1425,7 @@ order by t.year, t.month, t.id;
 2010,2,4200,3,3
 2010,2,4201,3,3
 ---- TYPES
-INT, INT, INT, BIGINT, BIGINT
+INT, INT, INT, BIGINT, DOUBLE
 ====
 ---- QUERY
 # Test for ntile when the argument is larger than number of rows

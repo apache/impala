@@ -45,9 +45,14 @@ class MathFunctions {
  public:
   static DoubleVal Pi(FunctionContext*);
   static DoubleVal E(FunctionContext*);
-  static BigIntVal Abs(FunctionContext*, const BigIntVal&);
   static DoubleVal Abs(FunctionContext*, const DoubleVal&);
   static FloatVal Abs(FunctionContext*, const FloatVal&);
+  // For integer math, we have to promote ABS() to the next highest integer type because
+  // in two's complement arithmetic, the largest negative value for any bit width is not
+  // representable as a positive value within the same width.  For the largest width, we
+  // simply overflow.  In the unlikely event a workaround is needed, one can simply cast
+  // to a higher precision decimal type.
+  static BigIntVal Abs(FunctionContext*, const BigIntVal&);
   static BigIntVal Abs(FunctionContext*, const IntVal&);
   static IntVal Abs(FunctionContext*, const SmallIntVal&);
   static SmallIntVal Abs(FunctionContext*, const TinyIntVal&);
@@ -64,16 +69,16 @@ class MathFunctions {
   static DoubleVal Sinh(FunctionContext*, const DoubleVal&);
   static DoubleVal Sqrt(FunctionContext*, const DoubleVal&);
   static DoubleVal Exp(FunctionContext*, const DoubleVal&);
-  static BigIntVal Ceil(FunctionContext*, const DoubleVal&);
-  static BigIntVal Floor(FunctionContext*, const DoubleVal&);
-  static BigIntVal Truncate(FunctionContext*, const DoubleVal&);
+  static DoubleVal Ceil(FunctionContext*, const DoubleVal&);
+  static DoubleVal Floor(FunctionContext*, const DoubleVal&);
+  static DoubleVal Truncate(FunctionContext*, const DoubleVal&);
   static DoubleVal Ln(FunctionContext*, const DoubleVal&);
   static DoubleVal Log10(FunctionContext*, const DoubleVal&);
-  static FloatVal Sign(FunctionContext*, const DoubleVal&);
+  static DoubleVal Sign(FunctionContext*, const DoubleVal&);
   static DoubleVal Radians(FunctionContext*, const DoubleVal&);
   static DoubleVal Degrees(FunctionContext*, const DoubleVal&);
-  static BigIntVal Round(FunctionContext*, const DoubleVal&);
-  static DoubleVal RoundUpTo(FunctionContext*, const DoubleVal&, const IntVal&);
+  static DoubleVal Round(FunctionContext*, const DoubleVal&);
+  static DoubleVal RoundUpTo(FunctionContext*, const DoubleVal&, const BigIntVal&);
   static DoubleVal Log2(FunctionContext*, const DoubleVal&);
   static DoubleVal Log(FunctionContext*, const DoubleVal& base, const DoubleVal& val);
   static DoubleVal Pow(FunctionContext*, const DoubleVal& base, const DoubleVal& val);
