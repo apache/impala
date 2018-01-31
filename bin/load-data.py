@@ -121,6 +121,7 @@ HIVE_ARGS = '-n %s -u "jdbc:hive2://%s/default;%s" --verbose=true'\
 # running MR jobs locally), we move the temporary directory into a unique
 # directory via configuration. This block can be removed when
 # https://issues.apache.org/jira/browse/MAPREDUCE-6441 is resolved.
+# A similar workaround is used in tests/common/impala_test_suite.py.
 if options.hive_hs2_hostport.startswith("localhost:"):
   HIVE_ARGS += ' --hiveconf "mapreduce.cluster.local.dir=%s"' % (tempfile.mkdtemp(
     prefix="impala-data-load-"))

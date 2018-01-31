@@ -24,7 +24,9 @@ import pprint
 import pwd
 import pytest
 import re
+import shutil
 import subprocess
+import tempfile
 import time
 from functools import wraps
 from getpass import getuser
@@ -651,19 +653,38 @@ class ImpalaTestSuite(BaseTestSuite):
     Run a statement in Hive, returning stdout if successful and throwing
     RuntimeError(stderr) if not.
     """
-    call = subprocess.Popen(
-        ['beeline',
-         '--outputformat=csv2',
-         '-u', 'jdbc:hive2://' + pytest.config.option.hive_server2,
-         '-n', username,
-         '-e', stmt],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE)
-    (stdout, stderr) = call.communicate()
-    call.wait()
-    if call.returncode != 0:
-      raise RuntimeError(stderr)
-    return stdout
+    # When HiveServer2 is configured to use "local" mode (i.e., MR jobs are run
+    # in-process rather than on YARN), Hadoop's LocalDistributedCacheManager has a
+    # race, wherein it tires to localize jars into
+    # /tmp/hadoop-$USER/mapred/local/<millis>. Two simultaneous Hive queries
+    # against HS2 can conflict here. Weirdly LocalJobRunner handles a similar issue
+    # (with the staging directory) by appending a random number. To overcome this,
+    # in the case that HS2 is on the local machine (which we conflate with also
+    # running MR jobs locally), we move the temporary directory into a unique
+    # directory via configuration. This workaround can be removed when
+    # https://issues.apache.org/jira/browse/MAPREDUCE-6441 is resolved.
+    # A similar workaround is used in bin/load-data.py.
+    tmpdir = None
+    beeline_opts = []
+    if pytest.config.option.hive_server2.startswith("localhost:"):
+      tmpdir = tempfile.mkdtemp(prefix="impala-tests-")
+      beeline_opts += ['--hiveconf', 'mapreduce.cluster.local.dir={0}'.format(tmpdir)]
+    try:
+      call = subprocess.Popen(
+          ['beeline',
+           '--outputformat=csv2',
+           '-u', 'jdbc:hive2://' + pytest.config.option.hive_server2,
+           '-n', username,
+           '-e', stmt] + beeline_opts,
+          stdout=subprocess.PIPE,
+          stderr=subprocess.PIPE)
+      (stdout, stderr) = call.communicate()
+      call.wait()
+      if call.returncode != 0:
+        raise RuntimeError(stderr)
+      return stdout
+    finally:
+      if tmpdir is not None: shutil.rmtree(tmpdir)
 
   def hive_partition_names(self, table_name):
     """Find the names of the partitions of a table, as Hive sees them.
