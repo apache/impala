@@ -75,17 +75,16 @@ inline uint32_t DataStreamMgr::GetHashValue(
   return value;
 }
 
-shared_ptr<DataStreamRecvrBase> DataStreamMgr::CreateRecvr(RuntimeState* state,
-    const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
-    PlanNodeId dest_node_id, int num_senders, int64_t buffer_size,
-    RuntimeProfile* profile, bool is_merging) {
-  DCHECK(profile != NULL);
+shared_ptr<DataStreamRecvrBase> DataStreamMgr::CreateRecvr(const RowDescriptor* row_desc,
+    const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id, int num_senders,
+    int64_t buffer_size, bool is_merging, RuntimeProfile* profile,
+    MemTracker* parent_tracker) {
+  DCHECK(profile != nullptr);
+  DCHECK(parent_tracker != nullptr);
   VLOG_FILE << "creating receiver for fragment="
             << fragment_instance_id << ", node=" << dest_node_id;
-  shared_ptr<DataStreamRecvr> recvr(
-      new DataStreamRecvr(this, state->instance_mem_tracker(), row_desc,
-          fragment_instance_id, dest_node_id, num_senders, is_merging, buffer_size,
-          profile));
+  shared_ptr<DataStreamRecvr> recvr(new DataStreamRecvr(this, parent_tracker, row_desc,
+      fragment_instance_id, dest_node_id, num_senders, is_merging, buffer_size, profile));
   size_t hash_value = GetHashValue(fragment_instance_id, dest_node_id);
   lock_guard<mutex> l(lock_);
   fragment_recvr_set_.insert(make_pair(fragment_instance_id, dest_node_id));

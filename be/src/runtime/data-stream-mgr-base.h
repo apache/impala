@@ -26,6 +26,7 @@
 namespace impala {
 
 class DataStreamRecvrBase;
+class MemTracker;
 class RuntimeProfile;
 class RuntimeState;
 class TRowBatch;
@@ -43,10 +44,10 @@ class DataStreamMgrBase : public CacheLineAligned {
   virtual ~DataStreamMgrBase() { }
 
   /// Create a receiver for a specific fragment_instance_id/node_id destination;
-  virtual std::shared_ptr<DataStreamRecvrBase> CreateRecvr(RuntimeState* state,
-      const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
-      PlanNodeId dest_node_id, int num_senders, int64_t buffer_size,
-      RuntimeProfile* profile, bool is_merging) = 0;
+  virtual std::shared_ptr<DataStreamRecvrBase> CreateRecvr(const RowDescriptor* row_desc,
+      const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id, int num_senders,
+      int64_t buffer_size, bool is_merging, RuntimeProfile* profile,
+      MemTracker* parent_tracker) = 0;
 
   /// Closes all receivers registered for fragment_instance_id immediately.
   virtual void Cancel(const TUniqueId& fragment_instance_id) = 0;

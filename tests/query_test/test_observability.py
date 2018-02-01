@@ -38,6 +38,7 @@ class TestObservability(ImpalaTestSuite):
     assert result.exec_summary[0]['operator'] == '05:MERGING-EXCHANGE'
     assert result.exec_summary[0]['num_rows'] == 5
     assert result.exec_summary[0]['est_num_rows'] == 5
+    assert result.exec_summary[0]['peak_mem'] > 0
 
     for line in result.runtime_profile.split('\n'):
       # The first 'RowsProduced' we find is for the coordinator fragment.
@@ -55,6 +56,7 @@ class TestObservability(ImpalaTestSuite):
     assert result.exec_summary[5]['operator'] == '04:EXCHANGE'
     assert result.exec_summary[5]['num_rows'] == 25
     assert result.exec_summary[5]['est_num_rows'] == 25
+    assert result.exec_summary[5]['peak_mem'] > 0
 
   @SkipIfS3.hbase
   @SkipIfLocal.hbase
