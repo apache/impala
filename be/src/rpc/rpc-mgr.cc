@@ -64,6 +64,10 @@ DEFINE_int32(num_reactor_threads, 0,
     "default value 0, it will be set to number of CPU cores.");
 DEFINE_int32(rpc_retry_interval_ms, 5,
     "Time in millisecond of waiting before retrying an RPC when remote is busy");
+DEFINE_int32(rpc_negotiation_timeout_ms, 60000,
+    "Time in milliseconds of waiting for a negotiation to complete before timing out.");
+DEFINE_int32(rpc_negotiation_thread_count, 4,
+    "Maximum number of threads dedicated to handling RPC connection negotiations.");
 
 namespace impala {
 
@@ -77,6 +81,8 @@ Status RpcMgr::Init() {
   int num_reactor_threads =
       FLAGS_num_reactor_threads > 0 ? FLAGS_num_reactor_threads : CpuInfo::num_cores();
   bld.set_num_reactors(num_reactor_threads).set_metric_entity(entity);
+  bld.set_rpc_negotiation_timeout_ms(FLAGS_rpc_negotiation_timeout_ms);
+  bld.set_max_negotiation_threads(max(1, FLAGS_rpc_negotiation_thread_count));
 
   // Disable idle connection detection by setting keepalive_time to -1. Idle connections
   // tend to be closed and re-opened around the same time, which may lead to negotiation
