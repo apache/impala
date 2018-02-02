@@ -405,8 +405,8 @@ class TmpFileMgr {
   /// directory on the specified device id. The caller owns the returned handle and is
   /// responsible for deleting it. The file is not created - creation is deferred until
   /// the file is written.
-  Status NewFile(FileGroup* file_group, DeviceId device_id,
-      std::unique_ptr<File>* new_file) WARN_UNUSED_RESULT;
+  void NewFile(FileGroup* file_group, DeviceId device_id,
+    std::unique_ptr<File>* new_file);
 
   bool initialized_;
 

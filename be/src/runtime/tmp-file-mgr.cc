@@ -150,7 +150,7 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dirs, bool one_dir_per_d
   return Status::OK();
 }
 
-Status TmpFileMgr::NewFile(
+void TmpFileMgr::NewFile(
     FileGroup* file_group, DeviceId device_id, unique_ptr<File>* new_file) {
   DCHECK(initialized_);
   DCHECK_GE(device_id, 0);
@@ -164,7 +164,6 @@ Status TmpFileMgr::NewFile(
   new_file_path /= file_name.str();
 
   new_file->reset(new File(file_group, device_id, new_file_path.string()));
-  return Status::OK();
 }
 
 string TmpFileMgr::GetTmpDirPath(DeviceId device_id) const {
@@ -197,11 +196,10 @@ TmpFileMgr::File::File(FileGroup* file_group, DeviceId device_id, const string& 
   DCHECK(file_group != nullptr);
 }
 
-Status TmpFileMgr::File::AllocateSpace(int64_t num_bytes, int64_t* offset) {
+void TmpFileMgr::File::AllocateSpace(int64_t num_bytes, int64_t* offset) {
   DCHECK_GT(num_bytes, 0);
   *offset = bytes_allocated_;
   bytes_allocated_ += num_bytes;
-  return Status::OK();
 }
 
 int TmpFileMgr::File::AssignDiskQueue() const {
@@ -258,17 +256,10 @@ Status TmpFileMgr::FileGroup::CreateFiles() {
   // Initialize the tmp files and the initial file to use.
   for (int i = 0; i < tmp_devices.size(); ++i) {
     TmpFileMgr::DeviceId device_id = tmp_devices[i];
-    // It is possible for a device to be blacklisted after it was returned by
-    // ActiveTmpDevices(), handle this gracefully by skipping devices if NewFile()
-    // fails.
     unique_ptr<TmpFileMgr::File> tmp_file;
-    Status status = tmp_file_mgr_->NewFile(this, device_id, &tmp_file);
-    if (status.ok()) {
-      tmp_files_.emplace_back(std::move(tmp_file));
-      ++files_allocated;
-    } else {
-      scratch_errors_.push_back(std::move(status));
-    }
+    tmp_file_mgr_->NewFile(this, device_id, &tmp_file);
+    tmp_files_.emplace_back(std::move(tmp_file));
+    ++files_allocated;
   }
   DCHECK_EQ(tmp_files_.size(), files_allocated);
   if (tmp_files_.size() == 0) {
@@ -321,18 +312,10 @@ Status TmpFileMgr::FileGroup::AllocateSpace(
     *tmp_file = tmp_files_[next_allocation_index_].get();
     next_allocation_index_ = (next_allocation_index_ + 1) % tmp_files_.size();
     if ((*tmp_file)->is_blacklisted()) continue;
-    Status status = (*tmp_file)->AllocateSpace(scratch_range_bytes, file_offset);
-    if (status.ok()) {
-      scratch_space_bytes_used_counter_->Add(scratch_range_bytes);
-      current_bytes_allocated_ += num_bytes;
-      return Status::OK();
-    }
-    // Log error and try other files if there was a problem. Problematic files will be
-    // blacklisted so we will not repeatedly log the same error.
-    LOG(WARNING) << "Error while allocating range in scratch file '"
-                 << (*tmp_file)->path() << "': " << status.msg().msg()
-                 << ". Will try another scratch file.";
-    scratch_errors_.push_back(status);
+    (*tmp_file)->AllocateSpace(scratch_range_bytes, file_offset);
+    scratch_space_bytes_used_counter_->Add(scratch_range_bytes);
+    current_bytes_allocated_ += num_bytes;
+    return Status::OK();
   }
   Status err_status(TErrorCode::SCRATCH_ALLOCATION_FAILED,
       join(tmp_file_mgr_->tmp_dirs_, ","), GetBackendString());

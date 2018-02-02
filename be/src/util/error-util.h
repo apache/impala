@@ -36,6 +36,10 @@ namespace impala {
 /// Returns empty string if errno is 0.
 std::string GetStrErrMsg();
 
+// This version of the function receives errno as a parameter instead of reading it
+// itself.
+std::string GetStrErrMsg(int err_no);
+
 /// Returns an error message warning that the given table names are missing relevant
 /// table/and or column statistics.
 std::string GetTablesMissingStatsWarning(

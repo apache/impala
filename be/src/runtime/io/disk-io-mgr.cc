@@ -19,6 +19,7 @@
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/io/disk-io-mgr-internal.h"
 #include "runtime/io/handle-cache.inline.h"
+#include "runtime/io/error-converter.h"
 
 #include <boost/algorithm/string.hpp>
 
@@ -245,6 +246,7 @@ DiskIoMgr::DiskIoMgr() :
   }
   disk_queues_.resize(num_local_disks + REMOTE_NUM_DISKS);
   CheckSseSupport();
+  local_file_system_.reset(new LocalFileSystem());
 }
 
 DiskIoMgr::DiskIoMgr(int num_local_disks, int threads_per_rotational_disk,
@@ -265,6 +267,7 @@ DiskIoMgr::DiskIoMgr(int num_local_disks, int threads_per_rotational_disk,
   if (num_local_disks == 0) num_local_disks = DiskInfo::num_disks();
   disk_queues_.resize(num_local_disks + REMOTE_NUM_DISKS);
   CheckSseSupport();
+  local_file_system_.reset(new LocalFileSystem());
 }
 
 DiskIoMgr::~DiskIoMgr() {
@@ -1084,54 +1087,32 @@ unique_ptr<BufferDescriptor> DiskIoMgr::TryAllocateNextBufferForRange(
 void DiskIoMgr::Write(RequestContext* writer_context, WriteRange* write_range) {
   Status ret_status = Status::OK();
   FILE* file_handle = nullptr;
-  // Raw open() syscall will create file if not present when passed these flags.
-  int fd = open(write_range->file(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-  if (fd < 0) {
-    ret_status = Status(ErrorMsg(TErrorCode::DISK_IO_ERROR,
-        Substitute("Opening '$0' for write failed with errno=$1 description=$2",
-                                     write_range->file_, errno, GetStrErrMsg())));
-  } else {
-    file_handle = fdopen(fd, "wb");
-    if (file_handle == nullptr) {
-      ret_status = Status(ErrorMsg(TErrorCode::DISK_IO_ERROR,
-          Substitute("fdopen($0, \"wb\") failed with errno=$1 description=$2", fd, errno,
-                                       GetStrErrMsg())));
-    }
-  }
+  Status close_status = Status::OK();
+  ret_status = local_file_system_->OpenForWrite(write_range->file(), O_RDWR | O_CREAT,
+      S_IRUSR | S_IWUSR, &file_handle);
+  if (!ret_status.ok()) goto end;
 
-  if (file_handle != nullptr) {
-    ret_status = WriteRangeHelper(file_handle, write_range);
+  ret_status = WriteRangeHelper(file_handle, write_range);
 
-    int success = fclose(file_handle);
-    if (ret_status.ok() && success != 0) {
-      ret_status = Status(ErrorMsg(TErrorCode::DISK_IO_ERROR,
-          Substitute("fclose($0) failed", write_range->file_)));
-    }
-  }
+  close_status = local_file_system_->Fclose(file_handle, write_range);
+  if (ret_status.ok() && !close_status.ok()) ret_status = close_status;
 
+end:
   HandleWriteFinished(writer_context, write_range, ret_status);
 }
 
 Status DiskIoMgr::WriteRangeHelper(FILE* file_handle, WriteRange* write_range) {
   // Seek to the correct offset and perform the write.
-  int success = fseek(file_handle, write_range->offset(), SEEK_SET);
-  if (success != 0) {
-    return Status(ErrorMsg(TErrorCode::DISK_IO_ERROR,
-        Substitute("fseek($0, $1, SEEK_SET) failed with errno=$2 description=$3",
-        write_range->file_, write_range->offset(), errno, GetStrErrMsg())));
-  }
+  RETURN_IF_ERROR(local_file_system_->Fseek(file_handle, write_range->offset(), SEEK_SET,
+      write_range));
 
 #ifndef NDEBUG
   if (FLAGS_stress_scratch_write_delay_ms > 0) {
     SleepForMs(FLAGS_stress_scratch_write_delay_ms);
   }
 #endif
-  int64_t bytes_written = fwrite(write_range->data_, 1, write_range->len_, file_handle);
-  if (bytes_written < write_range->len_) {
-    return Status(ErrorMsg(TErrorCode::DISK_IO_ERROR,
-        Substitute("fwrite(buffer, 1, $0, $1) failed with errno=$2 description=$3",
-        write_range->len_, write_range->file_, errno, GetStrErrMsg())));
-  }
+  RETURN_IF_ERROR(local_file_system_->Fwrite(file_handle, write_range));
+
   if (ImpaladMetrics::IO_MGR_BYTES_WRITTEN != nullptr) {
     ImpaladMetrics::IO_MGR_BYTES_WRITTEN->Increment(write_range->len_);
   }

@@ -31,6 +31,7 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "runtime/io/handle-cache.h"
+#include "runtime/io/local-file-system.h"
 #include "runtime/io/request-ranges.h"
 #include "runtime/thread-resource-mgr.h"
 #include "util/aligned-new.h"
@@ -214,7 +215,7 @@ class DiskIoMgr : public CacheLineAligned {
 
   /// Clean up all threads and resources. This is mostly useful for testing since
   /// for impalad, this object is never destroyed.
-  ~DiskIoMgr();
+  virtual ~DiskIoMgr();
 
   /// Initialize the IoMgr. Must be called once before any of the other APIs.
   Status Init(MemTracker* process_mem_tracker) WARN_UNUSED_RESULT;
@@ -369,6 +370,13 @@ class DiskIoMgr : public CacheLineAligned {
   /// 'bytes_to_free' is -1.
   void GcIoBuffers(int64_t bytes_to_free = -1);
 
+  // Function to change the underlying LocalFileSystem object used for disk I/O.
+  // DiskIoMgr will also take responsibility of the received LocalFileSystem pointer.
+  // It is only for testing purposes to use a fault injected version of LocalFileSystem.
+  void SetLocalFileSystem(std::unique_ptr<LocalFileSystem> fs) {
+    local_file_system_ = std::move(fs);
+  }
+
   /// The maximum number of ready buffers that can be queued in a scan range. Having two
   /// queued buffers (plus the buffer that is returned to the client) gives good
   /// performance in most scenarios:
@@ -414,6 +422,9 @@ class DiskIoMgr : public CacheLineAligned {
   /// TODO: once IMPALA-3200 is fixed, there should be no more cases where readers don't
   /// provide a MemTracker.
   boost::scoped_ptr<MemTracker> unowned_buffer_mem_tracker_;
+
+  // Handles the low level I/O functionality.
+  std::unique_ptr<LocalFileSystem> local_file_system_;
 
   /// Number of worker(read) threads per rotational disk. Also the max depth of queued
   /// work to the disk.
