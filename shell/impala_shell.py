@@ -388,6 +388,10 @@ class ImpalaShell(object, cmd.Cmd):
     not considered terminated. If no open quotation is found, it's considered
     terminated.
     """
+    # Strip any comments to make a statement such as the following be considered as
+    # ending with a delimiter:
+    # select 1 + 1; -- this is a comment
+    line = sqlparse.format(line, strip_comments=True).rstrip()
     if line.endswith(ImpalaShell.CMD_DELIM):
       try:
         # Look for an open quotation in the entire command, and not just the
