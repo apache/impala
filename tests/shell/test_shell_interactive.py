@@ -434,6 +434,45 @@ class TestImpalaShellInteractive(object):
     finally:
       os.chdir(cwd)
 
+  @pytest.mark.execute_serially
+  def test_line_ends_with_comment(self):
+    # IMPALA-5269: Test lines that end with a comment.
+    queries = ['select 1 + 1; --comment',
+               'select 1 + 1 --comment\n;']
+    for query in queries:
+      result = run_impala_shell_interactive(query)
+      assert '| 1 + 1 |' in result.stdout
+      assert '| 2     |' in result.stdout
+
+    queries = ['select \'some string\'; --comment',
+               'select \'some string\' --comment\n;']
+    for query in queries:
+      result = run_impala_shell_interactive(query)
+      assert '| \'some string\' |' in result.stdout
+      assert '| some string   |' in result.stdout
+
+    queries = ['select "--"; -- "--"',
+               'select \'--\'; -- "--"',
+               'select "--" -- "--"\n;',
+               'select \'--\' -- "--"\n;']
+    for query in queries:
+      result = run_impala_shell_interactive(query)
+      assert '| \'--\' |' in result.stdout
+      assert '| --   |' in result.stdout
+
+    query = ('select * from (\n' +
+             'select count(*) from functional.alltypes\n' +
+             ') v; -- Incomplete SQL statement in this line')
+    result = run_impala_shell_interactive(query)
+    assert '| count(*) |' in result.stdout
+
+    query = ('select id from functional.alltypes\n' +
+             'order by id; /*\n' +
+             '* Multi-line comment\n' +
+             '*/')
+    result = run_impala_shell_interactive(query)
+    assert '| id   |' in result.stdout
+
 def run_impala_shell_interactive(input_lines, shell_args=None):
   """Runs a command in the Impala shell interactively."""
   # if argument "input_lines" is a string, makes it into a list
