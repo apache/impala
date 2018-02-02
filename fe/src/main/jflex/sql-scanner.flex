@@ -365,7 +365,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     // Default-initilize the static members for FE tests. Outside of FE tests, init() is
     // called again in BackendConfig.create() once the backend configuration is passed to
     // the FE, overwriting this initilization.
-    init(TReservedWordsVersion.IMPALA_3_0);
+    init(TReservedWordsVersion.IMPALA_2_11);
   }
 
   static boolean isReserved(String token) {
