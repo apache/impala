@@ -76,7 +76,7 @@ ALTER TABLE <varname>name</varname> ALTER [COLUMN] <varname>column_name</varname
 ALTER TABLE <varname>name</varname> ADD [IF NOT EXISTS] PARTITION (<varname>partition_spec</varname>)
   <ph rev="IMPALA-4390">[<varname>location_spec</varname>]</ph>
   <ph rev="IMPALA-4390">[<varname>cache_spec</varname>]</ph>
-<ph rev="kudu">ALTER TABLE <varname>name</varname> ADD [IF NOT EXISTS] RANGE PARTITION (<varname>kudu_partition_spec</varname>)</ph>
+<ph rev="kudu">ALTER TABLE <varname>name</varname> ADD [IF NOT EXISTS] RANGE PARTITION <varname>kudu_partition_spec</varname></ph>
 
 ALTER TABLE <varname>name</varname> DROP [IF EXISTS] PARTITION (<varname>partition_spec</varname>)
   <ph rev="2.3.0">[PURGE]</ph>
