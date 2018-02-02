@@ -24,6 +24,7 @@ using kudu::MonoDelta;
 
 DECLARE_int32(num_reactor_threads);
 DECLARE_int32(num_acceptor_threads);
+DECLARE_int32(rpc_negotiation_timeout_ms);
 DECLARE_string(hostname);
 
 namespace impala {
@@ -228,6 +229,27 @@ TEST_F(RpcMgrTest, AsyncCall) {
     barrier.Wait();
     ASSERT_TRUE(controller.status().ok()) << controller.status().ToString();
   }
+}
+
+// Run a test with the negotiation timeout as 0 ms and ensure that connection
+// establishment fails.
+// This is to verify that FLAGS_rpc_negotiation_timeout_ms is actually effective.
+TEST_F(RpcMgrTest, NegotiationTimeout) {
+  // Set negotiation timeout to 0 milliseconds.
+  auto s = ScopedFlagSetter<int32_t>::Make(&FLAGS_rpc_negotiation_timeout_ms, 0);
+
+  RpcMgr secondary_rpc_mgr(IsInternalTlsConfigured());
+  TNetworkAddress secondary_krpc_address;
+  IpAddr ip;
+  ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
+
+  int32_t secondary_service_port = FindUnusedEphemeralPort(nullptr);
+  secondary_krpc_address = MakeNetworkAddress(ip, secondary_service_port);
+
+  ASSERT_OK(secondary_rpc_mgr.Init());
+  ASSERT_FALSE(RunMultipleServicesTestTemplate(
+      this, &secondary_rpc_mgr, secondary_krpc_address).ok());
+  secondary_rpc_mgr.Shutdown();
 }
 
 } // namespace impala
