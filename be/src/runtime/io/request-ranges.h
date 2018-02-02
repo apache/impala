@@ -446,6 +446,7 @@ class WriteRange : public RequestRange {
   friend class DiskIoMgr;
   friend class RequestContext;
   friend class ScanRange;
+  friend class LocalFileSystem;
 
   /// Data to be written. RequestRange::len_ contains the length of data
   /// to be written.

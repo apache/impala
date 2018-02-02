@@ -29,10 +29,14 @@ namespace impala {
 string GetStrErrMsg() {
   // Save errno. "<<" could reset it.
   int e = errno;
-  if (e == 0) return "";
+  return GetStrErrMsg(e);
+}
+
+string GetStrErrMsg(int err_no) {
+  if (err_no == 0) return "";
   stringstream ss;
   char buf[1024];
-  ss << "Error(" << e << "): " << strerror_r(e, buf, 1024);
+  ss << "Error(" << err_no << "): " << strerror_r(err_no, buf, 1024);
   return ss.str();
 }
 

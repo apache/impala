@@ -110,15 +110,15 @@ class TmpFileMgrTest : public ::testing::Test {
   }
 
   /// Helper to call the private TmpFileMgr::NewFile() method.
-  static Status NewFile(TmpFileMgr* mgr, TmpFileMgr::FileGroup* group,
+  static void NewFile(TmpFileMgr* mgr, TmpFileMgr::FileGroup* group,
       TmpFileMgr::DeviceId device_id, unique_ptr<TmpFileMgr::File>* new_file) {
-    return mgr->NewFile(group, device_id, new_file);
+    mgr->NewFile(group, device_id, new_file);
   }
 
   /// Helper to call the private File::AllocateSpace() method.
-  static Status FileAllocateSpace(
+  static void FileAllocateSpace(
       TmpFileMgr::File* file, int64_t num_bytes, int64_t* offset) {
-    return file->AllocateSpace(num_bytes, offset);
+    file->AllocateSpace(num_bytes, offset);
   }
 
   /// Helper to call the private FileGroup::AllocateSpace() method.
@@ -206,7 +206,7 @@ TEST_F(TmpFileMgrTest, TestFileAllocation) {
   int64_t next_offset = 0;
   for (int i = 0; i < num_write_sizes; ++i) {
     int64_t offset;
-    ASSERT_OK(FileAllocateSpace(file, write_sizes[i], &offset));
+    FileAllocateSpace(file, write_sizes[i], &offset);
     EXPECT_EQ(next_offset, offset);
     next_offset = offset + write_sizes[i];
   }
@@ -309,12 +309,12 @@ TEST_F(TmpFileMgrTest, TestReportError) {
 
   // Attempts to expand bad file should succeed.
   int64_t offset;
-  ASSERT_OK(FileAllocateSpace(bad_file, 128, &offset));
+  FileAllocateSpace(bad_file, 128, &offset);
   // The good device should still be usable.
-  ASSERT_OK(FileAllocateSpace(good_file, 128, &offset));
+  FileAllocateSpace(good_file, 128, &offset);
   // Attempts to allocate new files on bad device should succeed.
   unique_ptr<TmpFileMgr::File> bad_file2;
-  ASSERT_OK(NewFile(&tmp_file_mgr, &file_group, bad_device, &bad_file2));
+  NewFile(&tmp_file_mgr, &file_group, bad_device, &bad_file2);
   ASSERT_OK(FileSystemUtil::RemovePaths(tmp_dirs));
   file_group.Close();
   CheckMetrics(&tmp_file_mgr);
@@ -336,14 +336,14 @@ TEST_F(TmpFileMgrTest, TestAllocateNonWritable) {
   vector<TmpFileMgr::File*> allocated_files;
   ASSERT_OK(CreateFiles(&file_group, &allocated_files));
   int64_t offset;
-  ASSERT_OK(FileAllocateSpace(allocated_files[0], 1, &offset));
+  FileAllocateSpace(allocated_files[0], 1, &offset);
 
   // Make scratch non-writable and test allocation at different stages:
   // new file creation, files with no allocated blocks. files with allocated space.
   // No errors should be encountered during allocation since allocation is purely logical.
   chmod(scratch_subdirs[0].c_str(), 0);
-  ASSERT_OK(FileAllocateSpace(allocated_files[0], 1, &offset));
-  ASSERT_OK(FileAllocateSpace(allocated_files[1], 1, &offset));
+  FileAllocateSpace(allocated_files[0], 1, &offset);
+  FileAllocateSpace(allocated_files[1], 1, &offset);
 
   chmod(scratch_subdirs[0].c_str(), S_IRWXU);
   ASSERT_OK(FileSystemUtil::RemovePaths(tmp_dirs));

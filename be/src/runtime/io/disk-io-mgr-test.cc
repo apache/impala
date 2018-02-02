@@ -22,6 +22,7 @@
 
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
+#include "runtime/io/local-file-system-with-fault-injection.h"
 #include "runtime/io/request-context.h"
 #include "runtime/io/disk-io-mgr-stress.h"
 #include "runtime/io/disk-io-mgr.h"
@@ -68,6 +69,10 @@ class DiskIoMgrTest : public testing::Test {
           (*written_range)->offset(), 0, false, BufferOpts::Uncached());
       ValidateSyncRead(io_mgr, reader, scan_range, reinterpret_cast<const char*>(data),
           sizeof(int32_t));
+    }
+
+    if (!status.ok()) {
+      EXPECT_EQ(expected_status.GetDetail(), status.GetDetail());
     }
 
     {
@@ -177,6 +182,20 @@ class DiskIoMgrTest : public testing::Test {
     return range;
   }
 
+  // Function to trigger Write() on DiskIoMgr with the purpose of deliberately making it
+  // fail through a failure injection interface. The purpose is to test the error outputs
+  // in the cases when open(), fdopen(), fseek(), fwrite() and fclose() fail.
+  // 'function_name' specifies the name of the function where the failure is injected.
+  //  e.g. "fdopen"
+  void ExecuteWriteFailureTest(DiskIoMgr* io_mgr, const string& file_name,
+      const string& function_name, int err_no, const string& expected_error);
+
+  // Auxiliary function to ExecuteWriteFailureTest(). Handles the
+  // DiskIoMgr::AddWriteRange() call.
+  void AddWriteRange(DiskIoMgr* io_mgr, int num_of_writes, int32_t* data,
+      const string& tmp_file, int offset, RequestContext* writer,
+      const string& expected_output);
+
   ObjectPool pool_;
 
   mutex written_mutex_;
@@ -244,6 +263,7 @@ TEST_F(DiskIoMgrTest, SingleWriter) {
 // validate that an error status is returned via the write callback.
 TEST_F(DiskIoMgrTest, InvalidWrite) {
   MemTracker mem_tracker(LARGE_MEM_LIMIT);
+  int num_of_writes = 2;
   num_ranges_written_ = 0;
   string tmp_file = "/non-existent/file.txt";
   DiskIoMgr io_mgr(1, 1, 1, 1, 10);
@@ -255,9 +275,10 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
   // Write to file in non-existent directory.
   WriteRange** new_range = pool_.Add(new WriteRange*);
   WriteRange::WriteDoneCallback callback =
-      bind(mem_fn(&DiskIoMgrTest::WriteValidateCallback), this, 2, new_range,
-          (DiskIoMgr*)nullptr, (RequestContext*)nullptr, data,
-          Status(TErrorCode::DISK_IO_ERROR, "Test Failure"), _1);
+      bind(mem_fn(&DiskIoMgrTest::WriteValidateCallback), this, num_of_writes, new_range,
+          nullptr, nullptr, data,
+          Status(TErrorCode::DISK_IO_ERROR, "open() failed for /non-existent/file.txt. "
+              "The given path doesn't exist. errno=2"), _1);
   *new_range = pool_.Add(new WriteRange(tmp_file, rand(), 0, callback));
 
   (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
@@ -272,9 +293,10 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
   }
 
   new_range = pool_.Add(new WriteRange*);
-  callback = bind(mem_fn(&DiskIoMgrTest::WriteValidateCallback), this, 2,
-      new_range, (DiskIoMgr*)nullptr, (RequestContext*)nullptr,
-      data, Status(TErrorCode::DISK_IO_ERROR, "Test Failure"), _1);
+  callback = bind(mem_fn(&DiskIoMgrTest::WriteValidateCallback), this, num_of_writes,
+      new_range, nullptr, nullptr, data,
+      Status(TErrorCode::DISK_IO_ERROR, "fseek() failed for /tmp/disk_io_mgr_test.txt. "
+          "Invalid inputs. errno=22, offset=-1"), _1);
 
   *new_range = pool_.Add(new WriteRange(tmp_file, -1, 0, callback));
   (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
@@ -282,10 +304,90 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
 
   {
     unique_lock<mutex> lock(written_mutex_);
-    while (num_ranges_written_ < 2) writes_done_.Wait(lock);
+    while (num_ranges_written_ < num_of_writes) writes_done_.Wait(lock);
   }
   num_ranges_written_ = 0;
   io_mgr.UnregisterContext(writer.get());
+}
+
+// Tests the error messages when some of the disk I/O related low level function fails in
+// DiskIoMgr::Write()
+TEST_F(DiskIoMgrTest, WriteErrors) {
+  MemTracker mem_tracker(LARGE_MEM_LIMIT);
+  DiskIoMgr io_mgr(1, 1, 1, 1, 10);
+  ASSERT_OK(io_mgr.Init(&mem_tracker));
+  string file_name = "/tmp/disk_io_mgr_test.txt";
+
+  // Fail open()
+  string expected_error = Substitute("open() failed for $0. Either the path length or a "
+      "path component exceeds the maximum length. errno=36", file_name);
+  ExecuteWriteFailureTest(&io_mgr, file_name, "open", ENAMETOOLONG, expected_error);
+
+  // Fail fdopen()
+  expected_error = Substitute("fdopen() failed for $0. Not enough memory. errno=12",
+      file_name);
+  ExecuteWriteFailureTest(&io_mgr, file_name, "fdopen", ENOMEM, expected_error);
+
+  // Fail fseek()
+  expected_error = Substitute("fseek() failed for $0. Maximum file size reached. "
+      "errno=27, offset=0", file_name);
+  ExecuteWriteFailureTest(&io_mgr, file_name, "fseek", EFBIG, expected_error);
+
+  // Fail fwrite()
+  expected_error = Substitute("fwrite() failed for $0. Disk level I/O error occured. "
+      "errno=5, range_length=4", file_name);
+  ExecuteWriteFailureTest(&io_mgr, file_name, "fwrite", EIO, expected_error);
+
+  // Fail fclose()
+  expected_error = Substitute("fclose() failed for $0. Device doesn't exist. errno=6",
+      file_name);
+  ExecuteWriteFailureTest(&io_mgr, file_name, "fclose", ENXIO, expected_error);
+
+  // Fail open() with unknown error code to the ErrorConverter. This results falling back
+  // to the GetStrErrMsg() logic.
+  expected_error = Substitute("open() failed for $0. errno=49, description=Error(49): "
+                              "Protocol driver not attached", file_name);
+  ExecuteWriteFailureTest(&io_mgr, file_name, "open", EUNATCH, expected_error);
+}
+
+void DiskIoMgrTest::ExecuteWriteFailureTest(DiskIoMgr* io_mgr, const string& file_name,
+    const string& function_name, int err_no, const string& expected_error) {
+  int num_of_writes = 1;
+  num_ranges_written_ = 0;
+  unique_ptr<RequestContext> writer = io_mgr->RegisterContext(nullptr);
+  int32_t data = rand();
+  int success = CreateTempFile(file_name.c_str(), 100);
+  if (success != 0) {
+    LOG(ERROR) << "Error creating temp file " << file_name << " of size 100";
+    EXPECT_TRUE(false);
+  }
+
+  std::unique_ptr<LocalFileSystemWithFaultInjection> fs(
+      new LocalFileSystemWithFaultInjection());
+  fs->SetWriteFaultInjection(function_name, err_no);
+  // DiskIoMgr takes responsibility of fs from this point.
+  io_mgr->SetLocalFileSystem(std::move(fs));
+  AddWriteRange(io_mgr, num_of_writes, &data, file_name, 0, writer.get(),
+      expected_error);
+
+  {
+    unique_lock<mutex> lock(written_mutex_);
+    while (num_ranges_written_ < num_of_writes) writes_done_.Wait(lock);
+  }
+  num_ranges_written_ = 0;
+  io_mgr->UnregisterContext(writer.get());
+}
+
+void DiskIoMgrTest::AddWriteRange(DiskIoMgr* io_mgr, int num_of_writes, int32_t* data,
+    const string& file_name, int offset, RequestContext* writer,
+    const string& expected_output) {
+  WriteRange::WriteDoneCallback callback =
+      bind(mem_fn(&DiskIoMgrTest::WriteValidateCallback), this, num_of_writes,
+          nullptr, nullptr, nullptr, data,
+          Status(TErrorCode::DISK_IO_ERROR, expected_output), _1);
+  WriteRange* write_range = pool_.Add(new WriteRange(file_name, offset, 0, callback));
+  write_range->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
+  EXPECT_OK(io_mgr->AddWriteRange(writer, write_range));
 }
 
 // Issue a number of writes, cancel the writer context and issue more writes.

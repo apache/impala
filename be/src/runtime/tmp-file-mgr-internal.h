@@ -38,11 +38,9 @@ class TmpFileMgr::File {
 
   /// Allocates 'num_bytes' bytes in this file for a new block of data.
   /// The file size is increased by a call to truncate() if necessary.
-  /// Returns Status::OK() and sets 'offset' to the file offset of the first
-  /// byte in the allocated range on success.
-  /// Returns an error status if an unexpected error occurs, e.g. the file could not
-  /// be created.
-  Status AllocateSpace(int64_t num_bytes, int64_t* offset);
+  /// Sets 'offset' to the file offset of the first byte in the allocated
+  /// range on success.
+  void AllocateSpace(int64_t num_bytes, int64_t* offset);
 
   /// Called when an IO error is encountered for this file. Logs the error and blacklists
   /// the file.

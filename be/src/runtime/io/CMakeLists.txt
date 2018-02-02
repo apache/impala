@@ -24,6 +24,9 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/io")
 add_library(Io
   disk-io-mgr.cc
   disk-io-mgr-stress.cc
+  local-file-system.cc
+  local-file-system-with-fault-injection.cc
+  error-converter.cc
   request-context.cc
   scan-range.cc
 )
