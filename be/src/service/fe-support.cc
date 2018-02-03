@@ -425,21 +425,26 @@ Java_org_apache_impala_service_FeSupport_NativeLookupSymbol(
 
 // Add a catalog update to pending_topic_updates_.
 extern "C"
-JNIEXPORT void JNICALL
+JNIEXPORT jboolean JNICALL
 Java_org_apache_impala_service_FeSupport_NativeAddPendingTopicItem(JNIEnv* env,
     jclass caller_class, jlong native_catalog_server_ptr, jstring key,
     jbyteArray serialized_object, jboolean deleted) {
   std::string key_string;
   {
     JniUtfCharGuard key_str;
-    if (!JniUtfCharGuard::create(env, key, &key_str).ok()) return;
+    if (!JniUtfCharGuard::create(env, key, &key_str).ok()) {
+      return static_cast<jboolean>(false);
+    }
     key_string.assign(key_str.get());
   }
   JniScopedArrayCritical obj_buf;
-  if (!JniScopedArrayCritical::Create(env, serialized_object, &obj_buf)) return;
+  if (!JniScopedArrayCritical::Create(env, serialized_object, &obj_buf)) {
+    return static_cast<jboolean>(false);
+  }
   reinterpret_cast<CatalogServer*>(native_catalog_server_ptr)->AddPendingTopicItem(
       std::move(key_string), obj_buf.get(), static_cast<uint32_t>(obj_buf.size()),
       deleted);
+  return static_cast<jboolean>(true);
 }
 
 // Get the next catalog update pointed by 'callback_ctx'.
