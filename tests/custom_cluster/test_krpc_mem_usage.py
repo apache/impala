@@ -71,6 +71,7 @@ class TestKrpcMemUsage(CustomClusterTestSuite):
     # show up in time.
     self.execute_query_verify_mem_usage(self.TEST_QUERY, [DATA_STREAM_SVC_METRIC])
 
+  @SkipIfBuildType.not_dev_build
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--use_krpc --stress_datastream_recvr_delay_ms=1000")
   def test_krpc_deferred_memory_usage(self, vector):
@@ -79,6 +80,7 @@ class TestKrpcMemUsage(CustomClusterTestSuite):
     """
     self.execute_query_verify_mem_usage(self.TEST_QUERY, ALL_METRICS)
 
+  @SkipIfBuildType.not_dev_build
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--use_krpc --stress_datastream_recvr_delay_ms=1000")
   def test_krpc_deferred_memory_cancellation(self, vector):
