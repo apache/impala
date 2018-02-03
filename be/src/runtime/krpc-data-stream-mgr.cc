@@ -25,11 +25,13 @@
 #include "kudu/rpc/rpc_context.h"
 
 #include "exec/kudu-util.h"
+#include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/krpc-data-stream-recvr.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "service/data-stream-service.h"
 #include "util/debug-util.h"
 #include "util/periodic-counter-updater.h"
 #include "util/runtime-profile-counters.h"
@@ -75,10 +77,12 @@ KrpcDataStreamMgr::KrpcDataStreamMgr(MetricGroup* metrics)
       "total-senders-timedout-waiting-for-recvr-creation", 0L);
 }
 
-Status KrpcDataStreamMgr::Init(MemTracker* mem_tracker,
-    MemTracker* incoming_request_tracker) {
-  mem_tracker_ = mem_tracker;
-  incoming_request_tracker_ = incoming_request_tracker;
+Status KrpcDataStreamMgr::Init(MemTracker* service_mem_tracker) {
+  // MemTracker for tracking memory used for buffering deferred RPC calls which
+  // arrive before the receiver is ready.
+  mem_tracker_.reset(new MemTracker(-1, "Data Stream Manager Deferred RPCs",
+      ExecEnv::GetInstance()->process_mem_tracker()));
+  service_mem_tracker_ = service_mem_tracker;
   RETURN_IF_ERROR(Thread::Create("krpc-data-stream-mgr", "maintenance",
       [this](){ this->Maintenance(); }, &maintenance_thread_));
   RETURN_IF_ERROR(deserialize_pool_.Init());
@@ -134,7 +138,8 @@ shared_ptr<DataStreamRecvrBase> KrpcDataStreamMgr::CreateRecvr(
   for (const unique_ptr<EndDataStreamCtx>& ctx :
       early_senders_for_recvr.closed_sender_ctxs) {
     recvr->RemoveSender(ctx->request->sender_id());
-    RespondAndReleaseRpc(Status::OK(), ctx->response, ctx->rpc_context, mem_tracker_);
+    RespondAndReleaseRpc(Status::OK(), ctx->response, ctx->rpc_context,
+        mem_tracker_.get());
     num_senders_waiting_->Increment(-1);
   }
   return recvr;
@@ -166,10 +171,9 @@ shared_ptr<KrpcDataStreamRecvr> KrpcDataStreamMgr::FindRecvr(
 void KrpcDataStreamMgr::AddEarlySender(const TUniqueId& finst_id,
     const TransmitDataRequestPB* request, TransmitDataResponsePB* response,
     kudu::rpc::RpcContext* rpc_context) {
-  DCHECK_EQ(incoming_request_tracker_->parent(), mem_tracker_->parent());
-  incoming_request_tracker_->ReleaseLocal(
-      rpc_context->GetTransferSize(), mem_tracker_->parent());
-  mem_tracker_->ConsumeLocal(rpc_context->GetTransferSize(), mem_tracker_->parent());
+  const int64_t transfer_size = rpc_context->GetTransferSize();
+  mem_tracker_->Consume(transfer_size);
+  service_mem_tracker_->Release(transfer_size);
   RecvrId recvr_id = make_pair(finst_id, request->dest_node_id());
   auto payload = make_unique<TransmitDataCtx>(request, response, rpc_context);
   early_senders_map_[recvr_id].waiting_sender_ctxs.emplace_back(move(payload));
@@ -180,10 +184,9 @@ void KrpcDataStreamMgr::AddEarlySender(const TUniqueId& finst_id,
 void KrpcDataStreamMgr::AddEarlyClosedSender(const TUniqueId& finst_id,
     const EndDataStreamRequestPB* request, EndDataStreamResponsePB* response,
     kudu::rpc::RpcContext* rpc_context) {
-  DCHECK_EQ(incoming_request_tracker_->parent(), mem_tracker_->parent());
-  incoming_request_tracker_->ReleaseLocal(
-      rpc_context->GetTransferSize(), mem_tracker_->parent());
-  mem_tracker_->ConsumeLocal(rpc_context->GetTransferSize(), mem_tracker_->parent());
+  const int64_t transfer_size = rpc_context->GetTransferSize();
+  mem_tracker_->Consume(transfer_size);
+  service_mem_tracker_->Release(transfer_size);
   RecvrId recvr_id = make_pair(finst_id, request->dest_node_id());
   auto payload = make_unique<EndDataStreamCtx>(request, response, rpc_context);
   early_senders_map_[recvr_id].closed_sender_ctxs.emplace_back(move(payload));
@@ -224,14 +227,14 @@ void KrpcDataStreamMgr::AddData(const TransmitDataRequestPB* request,
     // already closed deliberately, and there's no unexpected error here.
     ErrorMsg msg(TErrorCode::DATASTREAM_RECVR_CLOSED, PrintId(finst_id), dest_node_id);
     RespondAndReleaseRpc(Status::Expected(msg), response, rpc_context,
-        incoming_request_tracker_);
+        service_mem_tracker_);
     return;
   }
   DCHECK(recvr != nullptr);
   int64_t transfer_size = rpc_context->GetTransferSize();
   recvr->AddBatch(request, response, rpc_context);
   // Release memory. The receiver already tracks it in its instance tracker.
-  incoming_request_tracker_->Release(transfer_size);
+  service_mem_tracker_->Release(transfer_size);
 }
 
 void KrpcDataStreamMgr::EnqueueDeserializeTask(const TUniqueId& finst_id,
@@ -279,7 +282,7 @@ void KrpcDataStreamMgr::CloseSender(const EndDataStreamRequestPB* request,
   // If we reach this point, either the receiver is found or it has been unregistered
   // already. In either cases, it's safe to just return an OK status.
   if (LIKELY(recvr != nullptr)) recvr->RemoveSender(request->sender_id());
-  RespondAndReleaseRpc(Status::OK(), response, rpc_context, incoming_request_tracker_);
+  RespondAndReleaseRpc(Status::OK(), response, rpc_context, service_mem_tracker_);
 
   {
     // TODO: Move this to maintenance thread.
@@ -365,7 +368,7 @@ void KrpcDataStreamMgr::RespondToTimedOutSender(const std::unique_ptr<ContextTyp
       ctx->request->dest_node_id());
   VLOG_QUERY << msg.msg();
   RespondAndReleaseRpc(Status::Expected(msg), ctx->response, ctx->rpc_context,
-      mem_tracker_);
+      mem_tracker_.get());
   num_senders_waiting_->Increment(-1);
   num_senders_timedout_->Increment(1);
 }

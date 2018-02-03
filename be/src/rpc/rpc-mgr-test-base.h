@@ -130,7 +130,12 @@ template <class T> class RpcMgrTestBase : public T {
     request->set_sidecar_idx(idx);
   }
 
-  MemTracker* service_tracker() { return &service_tracker_; }
+  // Takes over ownership of the newly created 'service' which needs to have a lifetime
+  // as long as 'rpc_mgr_' as RpcMgr::Shutdown() will call Shutdown() of 'service'.
+  ServiceIf* TakeOverService(std::unique_ptr<ServiceIf> service) {
+    services_.emplace_back(move(service));
+    return services_.back().get();
+  }
 
  protected:
   TNetworkAddress krpc_address_;
@@ -149,7 +154,9 @@ template <class T> class RpcMgrTestBase : public T {
 
  private:
   int32_t payload_[PAYLOAD_SIZE];
-  MemTracker service_tracker_;
+
+  // Own all the services used by the test.
+  std::vector<std::unique_ptr<ServiceIf>> services_;
 };
 
 typedef std::function<void(RpcContext*)> ServiceCB;
@@ -158,28 +165,30 @@ class PingServiceImpl : public PingServiceIf {
  public:
   // 'cb' is a callback used by tests to inject custom behaviour into the RPC handler.
   PingServiceImpl(const scoped_refptr<kudu::MetricEntity>& entity,
-      const scoped_refptr<kudu::rpc::ResultTracker> tracker, MemTracker* mem_tracker,
+      const scoped_refptr<kudu::rpc::ResultTracker> tracker,
       ServiceCB cb = [](RpcContext* ctx) { ctx->RespondSuccess(); })
-    : PingServiceIf(entity, tracker), mem_tracker_(mem_tracker), cb_(cb) {}
+    : PingServiceIf(entity, tracker), mem_tracker_(-1, "Ping Service"), cb_(cb) {}
 
   virtual void Ping(
       const PingRequestPB* request, PingResponsePB* response, RpcContext* context) {
     response->set_int_response(42);
     // Incoming requests will already be tracked and we need to release the memory.
-    mem_tracker_->Release(context->GetTransferSize());
+    mem_tracker_.Release(context->GetTransferSize());
     cb_(context);
   }
 
+  MemTracker* mem_tracker() { return &mem_tracker_; }
+
  private:
-  MemTracker* mem_tracker_;
+  MemTracker mem_tracker_;
   ServiceCB cb_;
 };
 
 class ScanMemServiceImpl : public ScanMemServiceIf {
  public:
   ScanMemServiceImpl(const scoped_refptr<kudu::MetricEntity>& entity,
-      const scoped_refptr<kudu::rpc::ResultTracker> tracker, MemTracker* mem_tracker)
-    : ScanMemServiceIf(entity, tracker), mem_tracker_(mem_tracker) {
+      const scoped_refptr<kudu::rpc::ResultTracker> tracker)
+    : ScanMemServiceIf(entity, tracker), mem_tracker_(-1, "ScanMem Service") {
   }
 
   // The request comes with an int 'pattern' and a payload of int array sent with
@@ -197,36 +206,39 @@ class ScanMemServiceImpl : public ScanMemServiceIf {
       int32_t val = v[i];
       if (val != pattern) {
         // Incoming requests will already be tracked and we need to release the memory.
-        mem_tracker_->Release(context->GetTransferSize());
+        mem_tracker_.Release(context->GetTransferSize());
         context->RespondFailure(kudu::Status::Corruption(
             Substitute("Expecting $1; Found $2", pattern, val)));
         return;
       }
     }
     // Incoming requests will already be tracked and we need to release the memory.
-    mem_tracker_->Release(context->GetTransferSize());
+    mem_tracker_.Release(context->GetTransferSize());
     context->RespondSuccess();
   }
 
+  MemTracker* mem_tracker() { return &mem_tracker_; }
+
  private:
-  MemTracker* mem_tracker_;
+  MemTracker mem_tracker_;
 
 };
 
 template <class T>
 Status RunMultipleServicesTestTemplate(RpcMgrTestBase<T>* test_base,
     RpcMgr* rpc_mgr, const TNetworkAddress& krpc_address) {
-  MemTracker* mem_tracker = test_base->service_tracker();
   // Test that a service can be started, and will respond to requests.
-  unique_ptr<ServiceIf> ping_impl(new PingServiceImpl(rpc_mgr->metric_entity(),
-      rpc_mgr->result_tracker(), mem_tracker));
-  RETURN_IF_ERROR(rpc_mgr->RegisterService(10, 10, move(ping_impl), mem_tracker));
+  ServiceIf* ping_impl = test_base->TakeOverService(make_unique<PingServiceImpl>(
+      rpc_mgr->metric_entity(), rpc_mgr->result_tracker()));
+  RETURN_IF_ERROR(rpc_mgr->RegisterService(10, 10, ping_impl,
+      static_cast<PingServiceImpl*>(ping_impl)->mem_tracker()));
 
   // Test that a second service, that verifies the RPC payload is not corrupted,
   // can be started.
-  unique_ptr<ServiceIf> scan_mem_impl(new ScanMemServiceImpl(rpc_mgr->metric_entity(),
-      rpc_mgr->result_tracker(), mem_tracker));
-  RETURN_IF_ERROR(rpc_mgr->RegisterService(10, 10, move(scan_mem_impl), mem_tracker));
+  ServiceIf* scan_mem_impl = test_base->TakeOverService(make_unique<ScanMemServiceImpl>(
+      rpc_mgr->metric_entity(), rpc_mgr->result_tracker()));
+  RETURN_IF_ERROR(rpc_mgr->RegisterService(10, 10, scan_mem_impl,
+      static_cast<ScanMemServiceImpl*>(scan_mem_impl)->mem_tracker()));
 
   FLAGS_num_acceptor_threads = 2;
   FLAGS_num_reactor_threads = 10;

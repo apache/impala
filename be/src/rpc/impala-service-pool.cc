@@ -47,15 +47,14 @@ METRIC_DEFINE_histogram(server, impala_unused,
 
 namespace impala {
 
-ImpalaServicePool::ImpalaServicePool(MemTracker* mem_tracker,
-                         std::unique_ptr<kudu::rpc::ServiceIf> service,
-                         const scoped_refptr<kudu::MetricEntity>& entity,
-                         size_t service_queue_length)
-  : mem_tracker_(mem_tracker),
-    service_(std::move(service)),
+ImpalaServicePool::ImpalaServicePool(const scoped_refptr<kudu::MetricEntity>& entity,
+    size_t service_queue_length, kudu::rpc::ServiceIf* service,
+    MemTracker* service_mem_tracker)
+  : service_mem_tracker_(service_mem_tracker),
+    service_(service),
     service_queue_(service_queue_length),
     unused_histogram_(METRIC_impala_unused.Instantiate(entity)) {
-  DCHECK(mem_tracker_ != nullptr);
+  DCHECK(service_mem_tracker_ != nullptr);
 }
 
 ImpalaServicePool::~ImpalaServicePool() {
@@ -114,7 +113,7 @@ void ImpalaServicePool::FailAndReleaseRpc(
     const kudu::Status& status, kudu::rpc::InboundCall* call) {
   int64_t transfer_size = call->GetTransferSize();
   call->RespondFailure(error_code, status);
-  mem_tracker_->Release(transfer_size);
+  service_mem_tracker_->Release(transfer_size);
 }
 
 kudu::rpc::RpcMethodInfo* ImpalaServicePool::LookupMethod(
@@ -143,20 +142,39 @@ kudu::Status ImpalaServicePool::QueueInboundCall(
 
   TRACE_TO(c->trace(), "Inserting onto call queue"); // NOLINT(*)
 
-  // Queue message on service queue
-  mem_tracker_->Consume(c->GetTransferSize());
+  // Queue message on service queue.
+  const int64_t transfer_size = c->GetTransferSize();
+  {
+    // Drops an incoming request if consumption already exceeded the limit. Note that
+    // the current inbound call isn't counted towards the limit yet so adding this call
+    // may cause the MemTracker's limit to be exceeded. This is done to ensure fairness
+    // among all inbound calls, otherwise calls with larger payloads are more likely to
+    // fail. The check and the consumption need to be atomic so as to bound the memory
+    // usage.
+    unique_lock<SpinLock> mem_tracker_lock(mem_tracker_lock_);
+    if (UNLIKELY(service_mem_tracker_->AnyLimitExceeded())) {
+      // Discards the transfer early so the transfer size drops to 0. This is to ensure
+      // the MemTracker::Release() call in FailAndReleaseRpc() is correct as we haven't
+      // called MemTracker::Consume() at this point.
+      mem_tracker_lock.unlock();
+      c->DiscardTransfer();
+      RejectTooBusy(c);
+      return kudu::Status::OK();
+    }
+    service_mem_tracker_->Consume(transfer_size);
+  }
+
   boost::optional<kudu::rpc::InboundCall*> evicted;
   auto queue_status = service_queue_.Put(c, &evicted);
-  if (queue_status == kudu::rpc::QueueStatus::QUEUE_FULL) {
+  if (UNLIKELY(queue_status == kudu::rpc::QueueStatus::QUEUE_FULL)) {
     RejectTooBusy(c);
     return kudu::Status::OK();
   }
-
-  if (PREDICT_FALSE(evicted != boost::none)) {
+  if (UNLIKELY(evicted != boost::none)) {
     RejectTooBusy(*evicted);
   }
 
-  if (PREDICT_TRUE(queue_status == kudu::rpc::QueueStatus::QUEUE_SUCCESS)) {
+  if (LIKELY(queue_status == kudu::rpc::QueueStatus::QUEUE_SUCCESS)) {
     // NB: do not do anything with 'c' after it is successfully queued --
     // a service thread may have already dequeued it, processed it, and
     // responded by this point, in which case the pointer would be invalid.
@@ -187,7 +205,7 @@ void ImpalaServicePool::RunThread() {
     incoming->RecordHandlingStarted(unused_histogram_);
     ADOPT_TRACE(incoming->trace());
 
-    if (PREDICT_FALSE(incoming->ClientTimedOut())) {
+    if (UNLIKELY(incoming->ClientTimedOut())) {
       TRACE_TO(incoming->trace(), "Skipping call since client already timed out"); // NOLINT(*)
       rpcs_timed_out_in_queue_.Add(1);
 
