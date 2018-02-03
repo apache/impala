@@ -229,9 +229,11 @@ class KrpcDataStreamMgr : public DataStreamMgrBase {
  public:
   KrpcDataStreamMgr(MetricGroup* metrics);
 
-  /// Initialize the deserialization thread pool and create the maintenance thread.
+  /// Initializes the deserialization thread pool and creates the maintenance thread.
+  /// 'service_mem_tracker' is the DataStreamService's MemTracker for tracking memory
+  /// used for RPC payloads before being handed over to data stream manager / receiver.
   /// Return error status on failure. Return OK otherwise.
-  Status Init(MemTracker* mem_tracker, MemTracker* incoming_request_tracker);
+  Status Init(MemTracker* service_mem_tracker);
 
   /// Create a receiver for a specific fragment_instance_id/dest_node_id.
   /// If is_merging is true, the receiver maintains a separate queue of incoming row
@@ -290,18 +292,19 @@ class KrpcDataStreamMgr : public DataStreamMgrBase {
 
  private:
   friend class KrpcDataStreamRecvr;
+  friend class DataStreamTest;
 
   /// MemTracker for memory used for transmit data requests before we hand them over to a
   /// specific receiver. Used only to track payloads of deferred RPCs (e.g. early
-  /// senders). Not owned.
-  MemTracker* mem_tracker_ = nullptr;
+  /// senders).
+  std::unique_ptr<MemTracker> mem_tracker_;
 
-  /// MemTracker which is used by the DataStreamService to track memory for incoming
-  /// requests. Memory for new incoming requests is initially tracked against this tracker
-  /// before the requests are handed over to the data stream manager. It is this class's
-  /// responsibility to release memory from this tracker and track it against its own
-  /// tracker (here: mem_tracker_). Not owned.
-  MemTracker* incoming_request_tracker_ = nullptr;
+  /// MemTracker used by the DataStreamService to track memory for incoming requests.
+  /// Memory for new incoming requests is initially tracked against this tracker before
+  /// the requests are handed over to the data stream manager / receiver. It is the
+  /// responsibility of data stream manager or receiver to release memory from the
+  /// service's tracker and track it in their own trackers. Not owned.
+  MemTracker* service_mem_tracker_ = nullptr;
 
   /// A task for the deserialization threads to work on. The fields identify
   /// the target receiver's sender queue.

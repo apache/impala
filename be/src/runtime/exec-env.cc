@@ -84,11 +84,6 @@ DEFINE_bool_hidden(use_krpc, false, "Used to indicate whether to use KRPC for th
     "DataStream subsystem, or the Thrift RPC layer instead. Defaults to false. "
     "KRPC not yet supported");
 
-DEFINE_int32(datastream_service_queue_depth, 1024, "Size of datastream service queue");
-DEFINE_int32(datastream_service_num_svc_threads, 0, "Number of datastream service "
-    "processing threads. If left at default value 0, it will be set to number of CPU "
-    "cores.");
-
 DECLARE_int32(state_store_port);
 DECLARE_int32(num_threads_per_core);
 DECLARE_int32(num_cores);
@@ -162,7 +157,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int krpc_port,
 
   if (FLAGS_use_krpc) {
     VLOG_QUERY << "Using KRPC.";
-    // KRPC relies on resolved IP address. It's set in StartServices().
+    // KRPC relies on resolved IP address. It's set in Init().
     krpc_address_.__set_port(krpc_port);
     rpc_mgr_.reset(new RpcMgr(IsInternalTlsConfigured()));
     stream_mgr_.reset(new KrpcDataStreamMgr(metrics_.get()));
@@ -301,27 +296,15 @@ Status ExecEnv::Init() {
   obj_pool_->Add(new MemTracker(negated_unused_reservation, -1,
       "Buffer Pool: Unused Reservation", mem_tracker_.get()));
 
-  // Initialize the RPCMgr before allowing services registration.
+  // Initializes the RPCMgr and DataStreamServices.
   if (FLAGS_use_krpc) {
     krpc_address_.__set_hostname(ip_address_);
+    // Initialization needs to happen in the following order due to dependencies:
+    // - RPC manager, DataStreamService and DataStreamManager.
     RETURN_IF_ERROR(rpc_mgr_->Init());
-
-    // Add a MemTracker for memory used to store incoming calls before they handed over to
-    // the data stream manager.
-    MemTracker* data_svc_tracker = obj_pool_->Add(
-        new MemTracker(-1, "Data Stream Service", mem_tracker_.get()));
-
-    // Add a MemTracker for the data stream manager, which uses it to track memory used by
-    // deferred RPC calls while they are buffered in the data stream manager.
-    MemTracker* stream_mgr_tracker = obj_pool_->Add(
-        new MemTracker(-1, "Data Stream Queued RPC Calls", mem_tracker_.get()));
-    RETURN_IF_ERROR(KrpcStreamMgr()->Init(stream_mgr_tracker, data_svc_tracker));
-
-    unique_ptr<ServiceIf> data_svc(new DataStreamService(rpc_mgr_.get()));
-    int num_svc_threads = FLAGS_datastream_service_num_svc_threads > 0 ?
-        FLAGS_datastream_service_num_svc_threads : CpuInfo::num_cores();
-    RETURN_IF_ERROR(rpc_mgr_->RegisterService(num_svc_threads,
-        FLAGS_datastream_service_queue_depth, move(data_svc), data_svc_tracker));
+    data_svc_.reset(new DataStreamService());
+    RETURN_IF_ERROR(data_svc_->Init());
+    RETURN_IF_ERROR(KrpcStreamMgr()->Init(data_svc_->mem_tracker()));
     // Bump thread cache to 1GB to reduce contention for TCMalloc central
     // list's spinlock.
     if (FLAGS_tcmalloc_max_total_thread_cache_bytes == 0) {

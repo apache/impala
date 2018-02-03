@@ -367,6 +367,7 @@ class MemTracker {
  private:
   friend class PoolMemTrackerRegistry;
 
+  /// Returns true if the current memory tracker's limit is exceeded.
   bool CheckLimitExceeded() const { return limit_ >= 0 && limit_ < consumption(); }
 
   /// If consumption is higher than max_consumption, attempts to free memory by calling

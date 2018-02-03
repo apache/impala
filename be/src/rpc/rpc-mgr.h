@@ -122,9 +122,12 @@ class RpcMgr {
   /// the service name has to be unique within an Impala instance or the registration will
   /// fail.
   ///
+  /// 'service_mem_tracker' is the MemTracker for tracking the memory usage of RPC
+  /// payloads in the service queue.
+  ///
   /// It is an error to call this after StartServices() has been called.
   Status RegisterService(int32_t num_service_threads, int32_t service_queue_depth,
-      std::unique_ptr<kudu::rpc::ServiceIf> service_ptr, MemTracker* mem_tracker)
+      kudu::rpc::ServiceIf* service_ptr, MemTracker* service_mem_tracker)
       WARN_UNUSED_RESULT;
 
   /// Creates a new proxy for a remote service of type P at location 'address', and places

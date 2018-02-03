@@ -22,8 +22,8 @@ from tests.common.impala_cluster import ImpalaCluster
 from tests.common.skip import SkipIf, SkipIfBuildType
 from tests.verifiers.mem_usage_verifier import MemUsageVerifier
 
-DATA_STREAM_MGR_METRIC = "Data Stream Queued RPC Calls"
-DATA_STREAM_SVC_METRIC = "Data Stream Service"
+DATA_STREAM_MGR_METRIC = "Data Stream Manager Deferred RPCs"
+DATA_STREAM_SVC_METRIC = "Data Stream Service Queue"
 ALL_METRICS = [ DATA_STREAM_MGR_METRIC, DATA_STREAM_SVC_METRIC ]
 
 @SkipIf.not_krpc
