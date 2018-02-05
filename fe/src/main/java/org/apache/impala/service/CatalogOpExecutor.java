@@ -3095,12 +3095,30 @@ public class CatalogOpExecutor {
       TCatalogObject updatedThriftTable = null;
       if (req.isIs_refresh()) {
         TableName tblName = TableName.fromThrift(req.getTable_name());
-        Table tbl = getExistingTable(tblName.getDb(), tblName.getTbl());
+        // Quick check to see if the table exists in the catalog without triggering
+        // a table load.
+        Table tbl = catalog_.getTable(tblName.getDb(), tblName.getTbl());
         if (tbl != null) {
-          if (req.isSetPartition_spec()) {
-            updatedThriftTable = catalog_.reloadPartition(tbl, req.getPartition_spec());
-          } else {
-            updatedThriftTable = catalog_.reloadTable(tbl);
+          // If the table is not loaded, no need to perform refresh after the initial
+          // metadata load.
+          boolean needsRefresh = tbl.isLoaded();
+          tbl = getExistingTable(tblName.getDb(), tblName.getTbl());
+          if (tbl != null) {
+            if (needsRefresh) {
+              if (req.isSetPartition_spec()) {
+                updatedThriftTable = catalog_.reloadPartition(tbl, req.getPartition_spec());
+              } else {
+                updatedThriftTable = catalog_.reloadTable(tbl);
+              }
+            } else {
+              // Table was loaded from scratch, so it's already "refreshed".
+              tbl.getLock().lock();
+              try {
+                updatedThriftTable = tbl.toTCatalogObject();
+              } finally {
+                tbl.getLock().unlock();
+              }
+            }
           }
         }
       } else {
