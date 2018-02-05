@@ -10806,7 +10806,6 @@ under the License.
   <keydef href="topics/impala_schedule_random_replica.xml" keys="schedule_random_replica"/>
   <keydef href="topics/impala_replica_preference.xml" keys="replica_preference"/>
   <keydef href="topics/impala_rm_initial_mem.xml" keys="rm_initial_mem"/>
-  <keydef href="topics/impala_reservation_request_timeout.xml" keys="reservation_request_timeout"/>
   <keydef href="topics/impala_runtime_bloom_filter_size.xml" keys="runtime_bloom_filter_size"/>
   <keydef href="topics/impala_runtime_filter_max_size.xml" keys="runtime_filter_max_size"/>
   <keydef href="topics/impala_runtime_filter_min_size.xml" keys="runtime_filter_min_size"/>
@@ -10817,7 +10816,6 @@ under the License.
   <keydef href="topics/impala_scratch_limit.xml" keys="scratch_limit"/>
   <keydef href="topics/impala_support_start_over.xml" keys="support_start_over"/>
   <keydef href="topics/impala_sync_ddl.xml" keys="sync_ddl"/>
-  <keydef href="topics/impala_v_cpu_cores.xml" keys="v_cpu_cores"/>
 
   <keydef href="topics/impala_show.xml" keys="show"/>
   <keydef href="topics/impala_show.xml#show_files" keys="show_files"/>

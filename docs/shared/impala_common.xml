@@ -3593,15 +3593,6 @@ sudo pip-python install ssl</codeblock>
         path during query execution, which might cause some performance overhead.
       </p>
 
-      <note id="llama_query_options_obsolete">
-        <p>
-          This query option no longer has any effect.
-          The use of the Llama component for integrated resource management within YARN is no
-          longer supported with <keyword keyref="impala23_full"/> and higher, and the Llama
-          support code is removed entirely in <keyword keyref="impala28_full"/> and higher.
-        </p>
-      </note>
-
       <note id="impala_llama_obsolete" rev="IMPALA-4160">
         <p>
           The use of the Llama component for integrated resource management within YARN

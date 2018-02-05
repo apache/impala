@@ -214,7 +214,6 @@ under the License.
           <topicref href="topics/impala_request_pool.xml"/>
           <topicref rev="2.7.0" href="topics/impala_replica_preference.xml"/>
           <topicref audience="hidden" href="topics/impala_rm_initial_mem.xml"/>
-          <topicref href="topics/impala_reservation_request_timeout.xml"/>
           <topicref rev="2.5.0" href="topics/impala_runtime_bloom_filter_size.xml"/>
           <topicref rev="2.6.0" href="topics/impala_runtime_filter_max_size.xml"/>
           <topicref rev="2.6.0" href="topics/impala_runtime_filter_min_size.xml"/>
@@ -228,7 +227,6 @@ under the License.
           <!-- <topicref href="topics/impala_seq_compression_mode.xml"/> -->
           <topicref href="topics/impala_support_start_over.xml"/>
           <topicref href="topics/impala_sync_ddl.xml"/>
-          <topicref href="topics/impala_v_cpu_cores.xml"/>
         </topicref>
       </topicref>
       <topicref href="topics/impala_show.xml"/>
