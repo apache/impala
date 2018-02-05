@@ -339,9 +339,13 @@ public class AnalyticPlanner {
 
       // then sort on orderByExprs
       for (OrderByElement orderByElement: sortGroup.orderByElements) {
-        sortExprs.add(orderByElement.getExpr());
-        isAsc.add(orderByElement.isAsc());
-        nullsFirst.add(orderByElement.getNullsFirstParam());
+        // If the expr is in the PARTITION BY and already in 'sortExprs', but also in
+        // the ORDER BY, its unnecessary to add it to 'sortExprs' again.
+        if (!sortExprs.contains(orderByElement.getExpr())) {
+          sortExprs.add(orderByElement.getExpr());
+          isAsc.add(orderByElement.isAsc());
+          nullsFirst.add(orderByElement.getNullsFirstParam());
+        }
       }
 
       SortInfo sortInfo = createSortInfo(root, sortExprs, isAsc, nullsFirst);
