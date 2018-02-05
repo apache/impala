@@ -72,6 +72,11 @@ SELECT t1.column_n c1, t2.column_n c2 FROM table1 t1, table2 t2
   WHERE c1 = c2;
 </codeblock>
 
+    <p rev="IMPALA-6415 IMPALA-5191">
+      From Impala 3.0, the alias substitution logic has changed.
+      <ph conref="../shared/impala_common.xml#common/column_aliases"/>
+    </p>
+
     <p>
       To use an alias name that matches one of the Impala reserved keywords (listed in
       <xref href="impala_reserved_words.xml#reserved_words"/>), surround the identifier with either single or
