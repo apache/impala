@@ -158,7 +158,8 @@ class BloomFilter {
 
   /// A helper function for the AVX2 methods. Turns a 32-bit hash into a 256-bit Bucket
   /// with 1 single 1-bit set in each 32-bit lane.
-  static __m256i MakeMask(const uint32_t hash) __attribute__((__target__("avx2")));
+  static inline ALWAYS_INLINE __m256i MakeMask(const uint32_t hash)
+      __attribute__((__target__("avx2")));
 
   int64_t directory_size() const {
     return 1uLL << (log_num_buckets_ + LOG_BUCKET_BYTE_SIZE);
