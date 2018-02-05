@@ -612,7 +612,7 @@ WRITE TO HDFS [functional.alltypestiny, OVERWRITE=false, PARTITION-KEYS=(2009,1)
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
 |
 01:SORT
-|  order by: id ASC NULLS FIRST, id ASC
+|  order by: id ASC NULLS FIRST
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B

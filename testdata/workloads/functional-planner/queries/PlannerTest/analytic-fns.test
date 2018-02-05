@@ -285,7 +285,7 @@ PLAN-ROOT SINK
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 01:SORT
-|  order by: int_col ASC NULLS FIRST, smallint_col ASC NULLS FIRST, int_col ASC
+|  order by: int_col ASC NULLS FIRST, smallint_col ASC NULLS FIRST
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
@@ -342,7 +342,7 @@ PLAN-ROOT SINK
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 01:SORT
-|  order by: int_col ASC NULLS FIRST, smallint_col ASC NULLS FIRST, int_col ASC
+|  order by: int_col ASC NULLS FIRST, smallint_col ASC NULLS FIRST
 |
 12:EXCHANGE [HASH(int_col,smallint_col)]
 |
@@ -2433,4 +2433,27 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
+====
+# IMPALA-6473: analytic fn where the same expr is in the 'partition by' and the 'order by'
+select last_value(int_col)
+   over (partition by abs(int_col), string_col order by id, abs(int_col))
+from functional.alltypestiny
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:ANALYTIC
+|  functions: last_value(int_col)
+|  partition by: abs(int_col), string_col
+|  order by: id ASC, abs(int_col) ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+01:SORT
+|  order by: abs(int_col) ASC NULLS FIRST, string_col ASC NULLS FIRST, id ASC
+|
+03:EXCHANGE [HASH(abs(int_col),string_col)]
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
 ====
