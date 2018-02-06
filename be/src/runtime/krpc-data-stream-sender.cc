@@ -129,7 +129,7 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   // it reaches capacity. This call may block if the row batch's capacity is reached
   // and the preceding RPC is still in progress. Returns error status if serialization
   // failed or if the preceding RPC failed. Return OK otherwise.
-  Status AddRow(TupleRow* row);
+  Status ALWAYS_INLINE AddRow(TupleRow* row);
 
   // Shutdowns the channel and frees the row batch allocation. Any in-flight RPC will
   // be cancelled. It's expected that clients normally call FlushAndSendEos() before
@@ -474,7 +474,7 @@ Status KrpcDataStreamSender::Channel::SendCurrentBatch() {
   return Status::OK();
 }
 
-Status KrpcDataStreamSender::Channel::AddRow(TupleRow* row) {
+inline Status KrpcDataStreamSender::Channel::AddRow(TupleRow* row) {
   if (batch_->AtCapacity()) {
     // batch_ is full, let's send it.
     RETURN_IF_ERROR(SendCurrentBatch());
@@ -660,16 +660,29 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
   } else if (partition_type_ == TPartitionType::KUDU) {
     DCHECK_EQ(partition_expr_evals_.size(), 1);
     int num_channels = channels_.size();
-    for (int i = 0; i < batch->num_rows(); ++i) {
-      TupleRow* row = batch->GetRow(i);
-      int32_t partition =
-          *reinterpret_cast<int32_t*>(partition_expr_evals_[0]->GetValue(row));
-      if (partition < 0) {
-        // This row doesn't correspond to a partition, e.g. it's outside the given ranges.
-        partition = next_unknown_partition_;
-        ++next_unknown_partition_;
+    const int num_rows = batch->num_rows();
+    const int hash_batch_size = RowBatch::HASH_BATCH_SIZE;
+    int channel_ids[hash_batch_size];
+
+    for (int batch_start = 0; batch_start < num_rows; batch_start += hash_batch_size) {
+      int batch_window_size = min(num_rows - batch_start, hash_batch_size);
+      for (int i = 0; i < batch_window_size; ++i) {
+        TupleRow* row = batch->GetRow(i + batch_start);
+        int32_t partition =
+            *reinterpret_cast<int32_t*>(partition_expr_evals_[0]->GetValue(row));
+        if (partition < 0) {
+          // This row doesn't correspond to a partition,
+          // e.g. it's outside the given ranges.
+          partition = next_unknown_partition_;
+          ++next_unknown_partition_;
+        }
+        channel_ids[i] = partition % num_channels;
       }
-      RETURN_IF_ERROR(channels_[partition % num_channels]->AddRow(row));
+
+      for (int i = 0; i < batch_window_size; ++i) {
+        TupleRow* row = batch->GetRow(i + batch_start);
+        RETURN_IF_ERROR(channels_[channel_ids[i]]->AddRow(row));
+      }
     }
   } else {
     DCHECK_EQ(partition_type_, TPartitionType::HASH_PARTITIONED);
@@ -677,20 +690,36 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
     // TODO: encapsulate this in an Expr as we've done for Kudu above and remove this case
     // once we have codegen here.
     int num_channels = channels_.size();
-    for (int i = 0; i < batch->num_rows(); ++i) {
-      TupleRow* row = batch->GetRow(i);
-      uint64_t hash_val = EXCHANGE_HASH_SEED;
-      for (int j = 0; j < partition_exprs_.size(); ++j) {
-        ScalarExprEvaluator* eval = partition_expr_evals_[j];
-        void* partition_val = eval->GetValue(row);
-        // We can't use the crc hash function here because it does not result in
-        // uncorrelated hashes with different seeds. Instead we use FastHash.
-        // TODO: fix crc hash/GetHashValue()
-        DCHECK(&(eval->root()) == partition_exprs_[j]);
-        hash_val = RawValue::GetHashValueFastHash(
-            partition_val, partition_exprs_[j]->type(), hash_val);
+    const int num_partition_exprs = partition_exprs_.size();
+    const int num_rows = batch->num_rows();
+    const int hash_batch_size = RowBatch::HASH_BATCH_SIZE;
+    int channel_ids[hash_batch_size];
+
+    // Break the loop into two parts break the data dependency between computing
+    // the hash and calling AddRow()
+    // To keep stack allocation small a RowBatch::HASH_BATCH is used
+    for (int batch_start = 0; batch_start < num_rows; batch_start += hash_batch_size) {
+      int batch_window_size = min(num_rows - batch_start, hash_batch_size);
+      for (int i = 0; i < batch_window_size; ++i) {
+        TupleRow* row = batch->GetRow(i + batch_start);
+        uint64_t hash_val = EXCHANGE_HASH_SEED;
+        for (int j = 0; j < num_partition_exprs; ++j) {
+          ScalarExprEvaluator* eval = partition_expr_evals_[j];
+          void* partition_val = eval->GetValue(row);
+          // We can't use the crc hash function here because it does not result in
+          // uncorrelated hashes with different seeds. Instead we use FastHash.
+          // TODO: fix crc hash/GetHashValue()
+          DCHECK(&(eval->root()) == partition_exprs_[j]);
+          hash_val = RawValue::GetHashValueFastHash(
+              partition_val, partition_exprs_[j]->type(), hash_val);
+        }
+        channel_ids[i] = hash_val % num_channels;
       }
-      RETURN_IF_ERROR(channels_[hash_val % num_channels]->AddRow(row));
+
+      for (int i = 0; i < batch_window_size; ++i) {
+        TupleRow* row = batch->GetRow(i + batch_start);
+        RETURN_IF_ERROR(channels_[channel_ids[i]]->AddRow(row));
+      }
     }
   }
   COUNTER_ADD(total_sent_rows_counter_, batch->num_rows());

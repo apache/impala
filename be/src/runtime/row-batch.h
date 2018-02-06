@@ -385,6 +385,10 @@ class RowBatch {
   // in order to leave room for variable-length data.
   static const int FIXED_LEN_BUFFER_LIMIT = AT_CAPACITY_MEM_USAGE / 2;
 
+  // Batch size to compute hash, keep it small to avoid large stack allocations.
+  // 16 provided the same speedup compared to operating over a full batch.
+  static const int HASH_BATCH_SIZE = 16;
+
   /// Allocates a buffer large enough for the fixed-length portion of 'capacity_' rows in
   /// this batch from 'tuple_data_pool_'. 'capacity_' is reduced if the allocation would
   /// exceed FIXED_LEN_BUFFER_LIMIT. Always returns enough space for at least one row.
