@@ -251,7 +251,9 @@ PLAN-ROOT SINK
      table: rows=150000 size=292.36MB
      columns missing stats: c_orders
    extrapolated-rows=disabled
-   parquet statistics predicates: c_custkey < 10, o_orderkey < 5, l_linenumber < 3
+   parquet statistics predicates: c_custkey < 10
+   parquet statistics predicates on o: o_orderkey < 5
+   parquet statistics predicates on o_lineitems: l_linenumber < 3
    parquet dictionary predicates: c_custkey < 10
    parquet dictionary predicates on o: o_orderkey < 5
    parquet dictionary predicates on o_lineitems: l_linenumber < 3
@@ -314,7 +316,9 @@ Per-Host Resources: mem-estimate=264.00MB mem-reservation=0B
      table: rows=150000 size=292.36MB
      columns missing stats: c_orders
    extrapolated-rows=disabled
-   parquet statistics predicates: c_custkey < 10, o_orderkey < 5, l_linenumber < 3
+   parquet statistics predicates: c_custkey < 10
+   parquet statistics predicates on o: o_orderkey < 5
+   parquet statistics predicates on o_lineitems: l_linenumber < 3
    parquet dictionary predicates: c_custkey < 10
    parquet dictionary predicates on o: o_orderkey < 5
    parquet dictionary predicates on o_lineitems: l_linenumber < 3
@@ -368,7 +372,7 @@ PLAN-ROOT SINK
      table: rows=150000 size=292.36MB
      columns missing stats: c_orders, c_orders
    extrapolated-rows=disabled
-   parquet statistics predicates: o1.o_orderkey < 5
+   parquet statistics predicates on o1: o1.o_orderkey < 5
    parquet dictionary predicates on o1: o1.o_orderkey < 5
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=270B cardinality=150000
@@ -421,7 +425,7 @@ Per-Host Resources: mem-estimate=269.81MB mem-reservation=5.81MB
      table: rows=150000 size=292.36MB
      columns missing stats: c_orders, c_orders
    extrapolated-rows=disabled
-   parquet statistics predicates: o1.o_orderkey < 5
+   parquet statistics predicates on o1: o1.o_orderkey < 5
    parquet dictionary predicates on o1: o1.o_orderkey < 5
    mem-estimate=88.00MB mem-reservation=0B
    tuple-ids=0 row-size=270B cardinality=150000

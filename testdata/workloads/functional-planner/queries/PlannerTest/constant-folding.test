@@ -54,7 +54,8 @@ PLAN-ROOT SINK
      table: rows=150000 size=292.36MB
      columns missing stats: c_orders
    extrapolated-rows=disabled
-   parquet statistics predicates: c_custkey > 10, o_orderkey = 4
+   parquet statistics predicates: c_custkey > 10
+   parquet statistics predicates on o: o_orderkey = 4
    parquet dictionary predicates: c_custkey > 10
    parquet dictionary predicates on o: o_orderkey = 4
    parquet dictionary predicates on o_lineitems: 20 + l_linenumber < 0
