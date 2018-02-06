@@ -612,26 +612,19 @@ void TmpFileMgr::WriteHandle::WaitForWrite() {
 Status TmpFileMgr::WriteHandle::EncryptAndHash(MemRange buffer) {
   DCHECK(FLAGS_disk_spill_encryption);
   SCOPED_TIMER(encryption_timer_);
-  // Since we're using GCM/CTR/CFB mode, we must take care not to reuse a
+  // Since we're using AES-CTR/AES-CFB mode, we must take care not to reuse a
   // key/IV pair. Regenerate a new key and IV for every data buffer we write.
   key_.InitializeRandom();
   RETURN_IF_ERROR(key_.Encrypt(buffer.data(), buffer.len(), buffer.data()));
-
-  if (!key_.IsGcmMode()) {
-    hash_.Compute(buffer.data(), buffer.len());
-  }
+  hash_.Compute(buffer.data(), buffer.len());
   return Status::OK();
 }
 
 Status TmpFileMgr::WriteHandle::CheckHashAndDecrypt(MemRange buffer) {
   DCHECK(FLAGS_disk_spill_encryption);
   SCOPED_TIMER(encryption_timer_);
-
-  // GCM mode will verify the integrity by itself
-  if (!key_.IsGcmMode()) {
-    if (!hash_.Verify(buffer.data(), buffer.len())) {
-      return Status("Block verification failure");
-    }
+  if (!hash_.Verify(buffer.data(), buffer.len())) {
+    return Status("Block verification failure");
   }
   return key_.Decrypt(buffer.data(), buffer.len(), buffer.data());
 }
