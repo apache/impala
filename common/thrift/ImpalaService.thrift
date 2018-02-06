@@ -143,7 +143,7 @@ enum TImpalaQueryOptions {
   RM_INITIAL_MEM, // Removed
 
   // Time, in s, before a query will be timed out if it is inactive. May not exceed
-  // --idle_query_timeout if that flag > 0.
+  // --idle_query_timeout if that flag > 0. If 0, falls back to --idle_query_timeout.
   QUERY_TIMEOUT_S,
 
   // Test hook for spill to disk operators
@@ -278,6 +278,11 @@ enum TImpalaQueryOptions {
   // Minimum number of bytes that will be scanned in COMPUTE STATS TABLESAMPLE,
   // regardless of the user-supplied sampling percent.
   COMPUTE_STATS_MIN_SAMPLE_SIZE,
+
+  // Time limit, in s, before a query will be timed out after it starts executing. Does
+  // not include time spent in planning, scheduling or admission control. A value of 0
+  // means no time limit.
+  EXEC_TIME_LIMIT_S,
 }
 
 // The summary of a DML statement.
