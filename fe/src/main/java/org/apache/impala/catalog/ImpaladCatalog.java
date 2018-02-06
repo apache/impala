@@ -97,13 +97,12 @@ public class ImpaladCatalog extends Catalog {
   // Used during table creation.
   private final String defaultKuduMasterHosts_;
 
-  /**
-   * C'tor used by tests that need to validate the ImpaladCatalog outside of the
-   * CatalogServer.
-   */
   public ImpaladCatalog(String defaultKuduMasterHosts) {
     super();
     defaultKuduMasterHosts_ = defaultKuduMasterHosts;
+    // Ensure the contents of the CatalogObjectVersionQueue instance are cleared when a
+    // new instance of ImpaladCatalog is created (see IMPALA-6486).
+    CatalogObjectVersionQueue.INSTANCE.clear();
   }
 
   /**

@@ -70,4 +70,6 @@ public class CatalogObjectVersionQueue {
       removeVersion(catalogObject.getCatalogVersion());
     }
   }
+
+  public void clear() { objectVersions_.clear(); }
 }
