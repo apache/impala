@@ -150,7 +150,7 @@ PLAN-ROOT SINK
      table: rows=unavailable size=unavailable
      columns missing stats: id
    extrapolated-rows=disabled
-   parquet statistics predicates: a.item.e < -10
+   parquet statistics predicates on a: a.item.e < -10
    parquet dictionary predicates on a: a.item.e < -10
    mem-estimate=32.00MB mem-reservation=0B
    tuple-ids=0 row-size=24B cardinality=unavailable
@@ -327,7 +327,9 @@ PLAN-ROOT SINK
      table: rows=150000 size=292.36MB
      columns missing stats: c_orders
    extrapolated-rows=disabled
-   parquet statistics predicates: c_custkey > 0, o.o_orderkey > 0, l.l_partkey > 0
+   parquet statistics predicates: c_custkey > 0
+   parquet statistics predicates on o: o.o_orderkey > 0
+   parquet statistics predicates on l: l.l_partkey > 0
    parquet dictionary predicates: c_custkey > 0
    parquet dictionary predicates on o: o.o_orderkey > 0
    parquet dictionary predicates on l: l.l_partkey > 0
@@ -435,7 +437,7 @@ PLAN-ROOT SINK
      table: rows=150000 size=292.36MB
      columns missing stats: c_orders
    extrapolated-rows=disabled
-   parquet statistics predicates: l.l_shipdate = '1994-08-19', l.l_receiptdate = '1994-08-24', l.l_shipmode = 'RAIL', l.l_returnflag = 'R'
+   parquet statistics predicates on l: l.l_shipdate = '1994-08-19', l.l_receiptdate = '1994-08-24', l.l_shipmode = 'RAIL', l.l_returnflag = 'R'
    parquet dictionary predicates on l: l.l_shipdate = '1994-08-19', l.l_receiptdate = '1994-08-24', l.l_shipmode = 'RAIL', l.l_returnflag = 'R'
    mem-estimate=176.00MB mem-reservation=0B
    tuple-ids=0 row-size=50B cardinality=150000

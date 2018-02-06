@@ -225,9 +225,10 @@ public class HdfsScanNode extends ScanNode {
   // data when scanning Parquet files.
   private final List<Expr> minMaxConjuncts_ = Lists.newArrayList();
 
-  // List of PlanNode conjuncts that have been transformed into conjuncts in
-  // 'minMaxConjuncts_'.
-  private final List<Expr> minMaxOriginalConjuncts_ = Lists.newArrayList();
+  // Map from TupleDescriptor to list of PlanNode conjuncts that have been transformed
+  // into conjuncts in 'minMaxConjuncts_'.
+  private final Map<TupleDescriptor, List<Expr>> minMaxOriginalConjuncts_ =
+      Maps.newLinkedHashMap();
 
   // Tuple that is used to materialize statistics when scanning Parquet files. For each
   // column it can contain 0, 1, or 2 slots, depending on whether the column needs to be
@@ -470,10 +471,10 @@ public class HdfsScanNode extends ScanNode {
     BinaryPredicate.Operator op = binaryPred.getOp();
     if (op == BinaryPredicate.Operator.LT || op == BinaryPredicate.Operator.LE ||
         op == BinaryPredicate.Operator.GE || op == BinaryPredicate.Operator.GT) {
-      minMaxOriginalConjuncts_.add(binaryPred);
+      addMinMaxOriginalConjunct(slotRef.getDesc().getParent(), binaryPred);
       buildStatsPredicate(analyzer, slotRef, binaryPred, op);
     } else if (op == BinaryPredicate.Operator.EQ) {
-      minMaxOriginalConjuncts_.add(binaryPred);
+      addMinMaxOriginalConjunct(slotRef.getDesc().getParent(), binaryPred);
       // TODO: this could be optimized for boolean columns.
       buildStatsPredicate(analyzer, slotRef, binaryPred, BinaryPredicate.Operator.LE);
       buildStatsPredicate(analyzer, slotRef, binaryPred, BinaryPredicate.Operator.GE);
@@ -513,9 +514,18 @@ public class HdfsScanNode extends ScanNode {
     BinaryPredicate maxBound = new BinaryPredicate(BinaryPredicate.Operator.LE,
         children.get(0).clone(), max.clone());
 
-    minMaxOriginalConjuncts_.add(inPred);
+    addMinMaxOriginalConjunct(slotRef.getDesc().getParent(), inPred);
     buildStatsPredicate(analyzer, slotRef, minBound, minBound.getOp());
     buildStatsPredicate(analyzer, slotRef, maxBound, maxBound.getOp());
+  }
+
+  private void addMinMaxOriginalConjunct(TupleDescriptor tupleDesc, Expr expr) {
+    List<Expr> exprs = minMaxOriginalConjuncts_.get(tupleDesc);
+    if (exprs == null) {
+      exprs = new ArrayList<Expr>();
+      minMaxOriginalConjuncts_.put(tupleDesc, exprs);
+    }
+    exprs.add(expr);
   }
 
   private void tryComputeMinMaxPredicate(Analyzer analyzer, Expr pred) {
@@ -1080,12 +1090,28 @@ public class HdfsScanNode extends ScanNode {
             numPartitionsNoDiskIds_, numPartitions_, numFilesNoDiskIds_,
             totalFiles_, numScanRangesNoDiskIds_, scanRanges_.size()));
       }
-      if (!minMaxOriginalConjuncts_.isEmpty()) {
-        output.append(String.format("%sparquet statistics predicates: %s\n",
-            detailPrefix, getExplainString(minMaxOriginalConjuncts_)));
-      }
+      // Groups the min max original conjuncts by tuple descriptor.
+      output.append(getMinMaxOriginalConjunctsExplainString(detailPrefix));
       // Groups the dictionary filterable conjuncts by tuple descriptor.
       output.append(getDictionaryConjunctsExplainString(detailPrefix));
+    }
+    return output.toString();
+  }
+
+  // Helper method that prints min max original conjuncts by tuple descriptor.
+  private String getMinMaxOriginalConjunctsExplainString(String prefix) {
+    StringBuilder output = new StringBuilder();
+    for (Map.Entry<TupleDescriptor, List<Expr>> entry :
+        minMaxOriginalConjuncts_.entrySet()) {
+      TupleDescriptor tupleDesc = entry.getKey();
+      List<Expr> exprs = entry.getValue();
+      if (tupleDesc == getTupleDesc()) {
+        output.append(String.format("%sparquet statistics predicates: %s\n", prefix,
+            getExplainString(exprs)));
+      } else {
+        output.append(String.format("%sparquet statistics predicates on %s: %s\n",
+            prefix, tupleDesc.getAlias(), getExplainString(exprs)));
+      }
     }
     return output.toString();
   }
