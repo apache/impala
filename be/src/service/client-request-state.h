@@ -211,6 +211,16 @@ class ClientRequestState {
     return ref_count_ > 0;
   }
 
+  bool is_expired() const {
+    boost::lock_guard<boost::mutex> l(expiration_data_lock_);
+    return is_expired_;
+  }
+
+  void set_expired() {
+    boost::lock_guard<boost::mutex> l(expiration_data_lock_);
+    is_expired_ = true;
+  }
+
   RuntimeProfile::EventSequence* query_events() const { return query_events_; }
   RuntimeProfile* summary_profile() { return summary_profile_; }
 
@@ -224,8 +234,8 @@ class ClientRequestState {
   /// See "Locking" in the class comment for lock acquisition order.
   boost::mutex fetch_rows_lock_;
 
-  /// Protects last_active_time_ms_ and ref_count_. Only held during short function calls
-  /// - no other locks should be acquired while holding this lock.
+  /// Protects last_active_time_ms_, ref_count_ and is_expired_. Only held during short
+  /// function calls - no other locks should be acquired while holding this lock.
   mutable boost::mutex expiration_data_lock_;
 
   /// Stores the last time that the query was actively doing work, in Unix milliseconds.
@@ -234,7 +244,10 @@ class ClientRequestState {
   /// ref_count_ > 0 if Impala is currently performing work on this query's behalf. Every
   /// time a client instructs Impala to do work on behalf of this query, the ref count is
   /// increased, and decreased once that work is completed.
-  uint32_t ref_count_;
+  uint32_t ref_count_ = 0;
+
+  /// True if the query expired by timing out.
+  bool is_expired_ = false;
 
   /// Executor for any child queries (e.g. compute stats subqueries). Always non-NULL.
   const boost::scoped_ptr<ChildQueryExecutor> child_query_executor_;
@@ -258,7 +271,7 @@ class ClientRequestState {
   ConditionVariable block_on_wait_cv_;
 
   /// Used in conjunction with block_on_wait_cv_ to make BlockOnWait() thread-safe.
-  bool is_block_on_wait_joining_;
+  bool is_block_on_wait_joining_ = false;
 
   /// Session that this query is from
   std::shared_ptr<ImpalaServer::SessionState> session_;
@@ -284,7 +297,7 @@ class ClientRequestState {
   boost::scoped_ptr<QueryResultSet> result_cache_;
 
   /// Max size of the result_cache_ in number of rows. A value <= 0 means no caching.
-  int64_t result_cache_max_size_;
+  int64_t result_cache_max_size_ = -1;
 
   ObjectPool profile_pool_;
 
@@ -320,25 +333,25 @@ class ClientRequestState {
 
   RuntimeProfile::EventSequence* query_events_;
 
-  bool is_cancelled_; // if true, Cancel() was called.
-  bool eos_;  // if true, there are no more rows to return
+  bool is_cancelled_ = false; // if true, Cancel() was called.
+  bool eos_ = false;  // if true, there are no more rows to return
   /// We enforce the invariant that query_status_ is not OK iff query_state_ is EXCEPTION,
   /// given that lock_ is held. query_state_ should only be updated using
   /// UpdateQueryState(), to ensure that the query profile is also updated.
-  beeswax::QueryState::type query_state_;
+  beeswax::QueryState::type query_state_ = beeswax::QueryState::CREATED;
   Status query_status_;
   TExecRequest exec_request_;
   /// If true, effective_user() has access to the runtime profile and execution
   /// summary.
-  bool user_has_profile_access_;
+  bool user_has_profile_access_ = true;
   TResultSetMetadata result_metadata_; // metadata for select query
-  RowBatch* current_batch_; // the current row batch; only applicable if coord is set
-  int current_batch_row_; // number of rows fetched within the current batch
-  int num_rows_fetched_; // number of rows fetched by client for the entire query
+  RowBatch* current_batch_ = nullptr; // the current row batch; only applicable if coord is set
+  int current_batch_row_ = 0 ; // number of rows fetched within the current batch
+  int num_rows_fetched_ = 0; // number of rows fetched by client for the entire query
 
   /// True if a fetch was attempted by a client, regardless of whether a result set
   /// (or error) was returned to the client.
-  bool fetched_rows_;
+  bool fetched_rows_ = false;
 
   /// To get access to UpdateCatalog, LOAD, and DDL methods. Not owned.
   Frontend* frontend_;
@@ -348,10 +361,10 @@ class ClientRequestState {
   ImpalaServer* parent_server_;
 
   /// Start/end time of the query, in Unix microseconds.
-  /// end_time_us_ is initialized to 0 in the constructor, which is used to indicate
-  /// that the query is not yet done. It is assinged the final value in
+  /// end_time_us_ is initialized to 0, which is used to indicate that the query is not
+  /// yet done. It is assinged the final value in
   /// ClientRequestState::Done().
-  int64_t start_time_us_, end_time_us_;
+  int64_t start_time_us_, end_time_us_ = 0;
 
   /// Executes a local catalog operation (an operation that does not need to execute
   /// against the catalog service). Includes USE, SHOW, DESCRIBE, and EXPLAIN statements.

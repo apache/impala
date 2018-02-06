@@ -68,30 +68,16 @@ ClientRequestState::ClientRequestState(
     ImpalaServer* server, shared_ptr<ImpalaServer::SessionState> session)
   : query_ctx_(query_ctx),
     last_active_time_ms_(numeric_limits<int64_t>::max()),
-    ref_count_(0L),
     child_query_executor_(new ChildQueryExecutor),
     exec_env_(exec_env),
-    is_block_on_wait_joining_(false),
     session_(session),
-    schedule_(NULL),
-    coord_(NULL),
-    result_cache_max_size_(-1),
     // Profile is assigned name w/ id after planning
     profile_(RuntimeProfile::Create(&profile_pool_, "Query")),
     server_profile_(RuntimeProfile::Create(&profile_pool_, "ImpalaServer")),
     summary_profile_(RuntimeProfile::Create(&profile_pool_, "Summary")),
-    is_cancelled_(false),
-    eos_(false),
-    query_state_(beeswax::QueryState::CREATED),
-    user_has_profile_access_(true),
-    current_batch_(NULL),
-    current_batch_row_(0),
-    num_rows_fetched_(0),
-    fetched_rows_(false),
     frontend_(frontend),
     parent_server_(server),
-    start_time_us_(UnixMicros()),
-    end_time_us_(0LL) {
+    start_time_us_(UnixMicros()) {
 #ifndef NDEBUG
   profile_->AddInfoString("DEBUG MODE WARNING", "Query profile created while running a "
       "DEBUG build of Impala. Use RELEASE builds to measure query performance.");

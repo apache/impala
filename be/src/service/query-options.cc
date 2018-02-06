@@ -301,9 +301,18 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_rm_initial_mem(reservation_size);
         break;
       }
-      case TImpalaQueryOptions::QUERY_TIMEOUT_S:
-        query_options->__set_query_timeout_s(atoi(value.c_str()));
+      case TImpalaQueryOptions::QUERY_TIMEOUT_S: {
+        StringParser::ParseResult result;
+        const int32_t timeout_s =
+            StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS || timeout_s < 0) {
+          return Status(
+              Substitute("Invalid query timeout: '$0'. "
+                         "Only non-negative numbers are allowed.", value));
+        }
+        query_options->__set_query_timeout_s(timeout_s);
         break;
+      }
       case TImpalaQueryOptions::BUFFER_POOL_LIMIT: {
         int64_t mem;
         RETURN_IF_ERROR(ParseMemValue(value, "buffer pool limit", &mem));
@@ -610,7 +619,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
         if (result != StringParser::PARSE_SUCCESS || requested_timeout < 0) {
           return Status(
               Substitute("Invalid idle session timeout: '$0'. "
-                         "Only positive numbers are allowed.", value));
+                         "Only non-negative numbers are allowed.", value));
         }
         query_options->__set_idle_session_timeout(requested_timeout);
         break;
@@ -623,6 +632,18 @@ Status impala::SetQueryOption(const string& key, const string& value,
               Substitute("Min sample size must be greater or equal to zero: $0", value));
         }
         query_options->__set_compute_stats_min_sample_size(min_sample_size);
+        break;
+      }
+      case TImpalaQueryOptions::EXEC_TIME_LIMIT_S: {
+        StringParser::ParseResult result;
+        const int32_t time_limit =
+            StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS || time_limit < 0) {
+          return Status(
+              Substitute("Invalid query time limit: '$0'. "
+                         "Only non-negative numbers are allowed.", value));
+        }
+        query_options->__set_exec_time_limit_s(time_limit);
         break;
       }
       default:

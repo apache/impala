@@ -467,9 +467,10 @@ class ImpalaServer : public ImpalaServiceIf,
   };
 
  private:
+  struct ExpirationEvent;
   friend class ChildQuery;
   friend class ImpalaHttpHandler;
-  friend class SessionState;
+  friend struct SessionState;
 
   boost::scoped_ptr<ImpalaHttpHandler> http_handler_;
 
@@ -816,6 +817,9 @@ class ImpalaServer : public ImpalaServiceIf,
   /// FLAGS_idle_query_timeout seconds.
   [[noreturn]] void ExpireQueries();
 
+  /// Expire 'crs' and cancel it with status 'status'.
+  void ExpireQuery(ClientRequestState* crs, const Status& status);
+
   /// Guards query_log_ and query_log_index_
   boost::mutex query_log_lock_;
 
@@ -1026,16 +1030,31 @@ class ImpalaServer : public ImpalaServiceIf,
   /// acquisition order.
   boost::mutex query_expiration_lock_;
 
-  /// Describes a query expiration event (t, q) where t is the expiration deadline in
-  /// seconds, and q is the query ID.
-  typedef std::pair<int64_t, TUniqueId> ExpirationEvent;
+  enum class ExpirationKind {
+    // The query is cancelled if the query has been inactive this long. The event may
+    // cancel the query after checking the last active time.
+    IDLE_TIMEOUT,
+    // A hard time limit on query execution. The query is cancelled if this event occurs
+    // before the query finishes.
+    EXEC_TIME_LIMIT
+  };
+
+  // Describes a query expiration event where the query identified by 'query_id' is
+  // checked for expiration when UnixMillis() exceeds 'deadline'.
+  struct ExpirationEvent {
+    int64_t deadline;
+    TUniqueId query_id;
+    ExpirationKind kind;
+  };
 
   /// Comparator that breaks ties when two queries have identical expiration deadlines.
   struct ExpirationEventComparator {
     bool operator()(const ExpirationEvent& t1, const ExpirationEvent& t2) {
-      if (t1.first < t2.first) return true;
-      if (t2.first < t1.first) return false;
-      return t1.second < t2.second;
+      if (t1.deadline < t2.deadline) return true;
+      if (t2.deadline < t1.deadline) return false;
+      if (t1.query_id < t2.query_id) return true;
+      if (t2.query_id < t1.query_id) return false;
+      return t1.kind < t2.kind;
     }
   };
 
