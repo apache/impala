@@ -49,16 +49,11 @@ class RuntimeState;
 /// using the library. When the caller requests a ptr into the library, they
 /// are given the entry handle and must decrement the ref count when they
 /// are done.
-/// Note: Explicitly managing this reference count at the client is error-prone. See the
-/// api for accessing a path, GetLocalPath(), that uses the handle's scope to manage the
-/// reference count.
 //
 /// TODO:
 /// - refresh libraries
-/// - better cached module management
-/// - improve the api to be less error-prone (IMPALA-6439)
+/// - better cached module management.
 struct LibCacheEntry;
-class LibCacheEntryHandle;
 
 class LibCache {
  public:
@@ -76,16 +71,11 @@ class LibCache {
   /// Initializes the libcache. Must be called before any other APIs.
   static Status Init();
 
-  /// Gets the local 'path' used to cache the file stored at the global 'hdfs_lib_file'.
-  /// If the referenced global file has not been copied locally, it copies it and
-  /// caches the result.
-  ///
-  /// 'handle' must remain in scope while 'path' is used. The reference count to the
-  /// underlying cache entry is decremented when 'handle' goes out-of-scope.
-  ///
-  /// Returns an error if 'hdfs_lib_file' cannot be copied to the local fs.
-  Status GetLocalPath(const std::string& hdfs_lib_file, LibType type,
-      LibCacheEntryHandle* handle, string* path);
+  /// Gets the local file system path for the library at 'hdfs_lib_file'. If
+  /// this file is not already on the local fs, it copies it and caches the
+  /// result. Returns an error if 'hdfs_lib_file' cannot be copied to the local fs.
+  Status GetLocalLibPath(const std::string& hdfs_lib_file, LibType type,
+                         std::string* local_path);
 
   /// Returns status.ok() if the symbol exists in 'hdfs_lib_file', non-ok otherwise.
   /// If 'quiet' is true, the error status for non-Java unfound symbols will not be logged.
@@ -104,7 +94,6 @@ class LibCache {
   /// using fn_ptr and it is no longer valid to use fn_ptr.
   //
   /// If 'quiet' is true, returned error statuses will not be logged.
-  /// TODO: api is error-prone. upgrade to LibCacheEntryHandle (see IMPALA-6439).
   Status GetSoFunctionPtr(const std::string& hdfs_lib_file, const std::string& symbol,
       void** fn_ptr, LibCacheEntry** entry, bool quiet = false);
 
@@ -173,27 +162,6 @@ class LibCache {
   /// lock_ must be held. The entry's lock should not be held.
   void RemoveEntryInternal(const std::string& hdfs_lib_file,
                            const LibMap::iterator& entry_iterator);
-};
-
-/// Handle for a LibCacheEntry that decrements its reference count when the handle is
-/// destroyed or re-used for another entry.
-class LibCacheEntryHandle {
- public:
-  LibCacheEntryHandle() {}
-  ~LibCacheEntryHandle();
-
- private:
-  friend class LibCache;
-
-  LibCacheEntry* entry() const { return entry_; }
-  void SetEntry(LibCacheEntry* entry) {
-    if (entry_ != nullptr) LibCache::instance()->DecrementUseCount(entry);
-    entry_ = entry;
-  }
-
-  LibCacheEntry* entry_ = nullptr;
-
-  DISALLOW_COPY_AND_ASSIGN(LibCacheEntryHandle);
 };
 
 }
