@@ -290,9 +290,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   boost::mutex lock_;
 
   /// Overall status of the entire query; set to the first reported fragment error
-  /// status or to CANCELLED, if Cancel() is called. Note that some fragments may have
-  /// status CANCELLED even if this is not CANCELLED if cancellation is initiated because
-  /// returned_all_results_ is true or an error is encountered.
+  /// status or to CANCELLED, if Cancel() is called.
   Status query_status_;
 
   /// If true, the query is done returning all results.  It is possible that the

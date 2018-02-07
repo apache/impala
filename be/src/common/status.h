@@ -95,13 +95,7 @@ class NODISCARD Status {
   static Status MemLimitExceeded();
   static Status MemLimitExceeded(const std::string& details);
 
-  /// Indicates a 'cancelled' status. CANCELLED should not be reported by a fragment
-  /// instance that encounters a problem - instances should return a specific error,
-  /// and then the coordinator will initiate cancellation.
-  /// TODO: we use this in some places to indicate things other than query cancellation,
-  /// which can be confusing.
   static const Status CANCELLED;
-
   static const Status DEPRECATED_RPC;
 
   /// Copy c'tor makes copy of error detail so Status can be returned by value.

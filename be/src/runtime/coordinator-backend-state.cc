@@ -234,7 +234,7 @@ void Coordinator::BackendState::LogFirstInProgress(
 }
 
 inline bool Coordinator::BackendState::IsDone() const {
-  return num_remaining_instances_ == 0 || (!status_.ok() && !status_.IsCancelled());
+  return num_remaining_instances_ == 0 || !status_.ok();
 }
 
 bool Coordinator::BackendState::ApplyExecStatusReport(
@@ -338,8 +338,8 @@ bool Coordinator::BackendState::Cancel() {
   // Nothing to cancel if the exec rpc was not sent
   if (!rpc_sent_) return false;
 
-  // don't cancel if it already finished (for any reason) or cancelled
-  if (IsDone() || status_.IsCancelled()) return false;
+  // don't cancel if it already finished (for any reason)
+  if (IsDone()) return false;
 
   /// If the status is not OK, we still try to cancel - !OK status might mean
   /// communication failure between backend and coordinator, but fragment
@@ -391,10 +391,10 @@ bool Coordinator::BackendState::Cancel() {
 void Coordinator::BackendState::PublishFilter(const TPublishFilterParams& rpc_params) {
   DCHECK_EQ(rpc_params.dst_query_id, query_id_);
   {
-    // If the backend is already done or cancelled, it's not waiting for this filter, so
-    // we skip sending it in this case.
+    // If the backend is already done, it's not waiting for this filter, so we skip
+    // sending it in this case.
     lock_guard<mutex> l(lock_);
-    if (IsDone() || status_.IsCancelled()) return;
+    if (IsDone()) return;
   }
 
   if (fragments_.count(rpc_params.dst_fragment_idx) == 0) return;
