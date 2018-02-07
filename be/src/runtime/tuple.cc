@@ -46,6 +46,8 @@ const char* SlotOffsets::LLVM_CLASS_NAME = "struct.impala::SlotOffsets";
 const char* Tuple::MATERIALIZE_EXPRS_SYMBOL = "MaterializeExprsILb0ELb0";
 const char* Tuple::MATERIALIZE_EXPRS_NULL_POOL_SYMBOL = "MaterializeExprsILb0ELb1";
 
+Tuple* const Tuple::POISON = reinterpret_cast<Tuple*>(42L);
+
 int64_t Tuple::TotalByteSize(const TupleDescriptor& desc) const {
   int64_t result = desc.byte_size();
   if (!desc.HasVarlenSlots()) return result;

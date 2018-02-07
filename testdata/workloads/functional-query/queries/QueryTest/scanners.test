@@ -98,3 +98,15 @@ select count(*) from alltypes where rand() - year > month;
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# IMPALA-6258: Uninitialized tuple pointers in row batch for empty rows
+# The following query was non-deterministic because of this bug
+select count(v.x) from alltypestiny t3 left outer join (
+  select true as x from alltypestiny t1 left outer join
+  alltypestiny t2 on (true)) v
+on (v.x = t3.bool_col) where t3.bool_col = true
+---- RESULTS
+256
+---- TYPES
+BIGINT
+====

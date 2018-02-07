@@ -255,8 +255,13 @@ Status KuduScanner::HandleEmptyProjection(RowBatch* row_batch) {
       }
     }
   }
+  for (int i = 0; i < num_to_commit; ++i) {
+    // IMPALA-6258: Initialize tuple ptrs to non-null value
+    TupleRow* row = row_batch->GetRow(row_batch->AddRow());
+    row->SetTuple(0, Tuple::POISON);
+    row_batch->CommitLastRow();
+  }
   cur_kudu_batch_num_read_ += rows_to_add;
-  row_batch->CommitRows(num_to_commit);
   return Status::OK();
 }
 
