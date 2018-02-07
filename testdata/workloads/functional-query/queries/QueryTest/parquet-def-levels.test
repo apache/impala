@@ -1,19 +1,20 @@
 ====
 ---- QUERY
+# Test the default encoding - RLE.
 # Verify that total counts of non-null values are correct.
 select count(id), count(tinyint_col), count(smallint_col), count(int_col),
   count(bigint_col), count(float_col), count(double_col), count(date_string_col),
   count(string_col), count(timestamp_col), count(year), count(month), count(day)
-from alltypesagg
+from functional_parquet.alltypesagg
 ---- TYPES
 BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
 ---- RESULTS
 11000,9000,10800,10980,10980,10980,10980,11000,11000,11000,11000,11000,10000
 ====
 ---- QUERY
-# Spot-check a subset of values.
+# Test the default encoding - RLE. Spot-check a subset of values.
 select *
-from alltypesagg
+from functional_parquet.alltypesagg
 where year = 2010 and month = 1 and int_col is null or int_col % 1000 = 77
 order by id, year, month, day
 ---- TYPES
@@ -49,4 +50,38 @@ INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT
 9000,true,NULL,NULL,NULL,NULL,NULL,NULL,'01/10/10','0',2010-01-10 00:00:00,2010,1,10
 9000,true,NULL,NULL,NULL,NULL,NULL,NULL,'01/10/10','0',2010-01-10 00:00:00,2010,1,NULL
 9077,false,7,77,77,770,84.69999694824219,777.6999999999999,'01/10/10','77',2010-01-10 01:17:29.260000000,2010,1,10
+====
+---- QUERY
+# IMPALA-6077: unsupported BIT_PACKED encoding fails when materializing columns.
+select id
+from alltypesagg_bitpacked
+---- CATCH
+deprecated BIT_PACKED encoding for rep or def levels.
+====
+---- QUERY
+# IMPALA-6077: do not need to decode BIT_PACKED encoding when not materializing columns.
+select count(*)
+from alltypesagg_bitpacked
+---- RESULTS
+11000
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-6077: in future we could return results for this query from metadata, in which
+# case it should either work or fail gracefully. For now it still requires materialising
+# levels.
+select count(id)
+from alltypesagg_bitpacked
+---- CATCH
+deprecated BIT_PACKED encoding for rep or def levels.
+====
+---- QUERY
+# IMPALA-6077: in future we could return results for this query from metadata, in which
+# case it should either work or fail gracefully. For now it still requires materialising
+# levels.
+select min(int_col)
+from alltypesagg_bitpacked
+---- CATCH
+deprecated BIT_PACKED encoding for rep or def levels.
 ====

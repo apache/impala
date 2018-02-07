@@ -47,9 +47,6 @@ DEFINE_bool(convert_legacy_hive_parquet_utc_timestamps, false,
     "When true, TIMESTAMPs read from files written by Parquet-MR (used by Hive) will "
     "be converted from UTC to local time. Writes are unaffected.");
 
-// Throttle deprecation warnings to - only print warning with this frequency.
-static const int BITPACKED_DEPRECATION_WARNING_FREQUENCY = 100;
-
 // Max data page header size in bytes. This is an estimate and only needs to be an upper
 // bound. It is theoretically possible to have a page header of any size due to string
 // value statistics, but in practice we'll have trouble reading string values this large.
@@ -104,13 +101,7 @@ Status ParquetLevelDecoder::Init(const string& filename,
       break;
     }
     case parquet::Encoding::BIT_PACKED:
-      num_bytes = BitUtil::Ceil(num_buffered_values, 8);
-      bit_reader_.Reset(*data, num_bytes);
-      LOG_EVERY_N(WARNING, BITPACKED_DEPRECATION_WARNING_FREQUENCY)
-          << filename << " uses deprecated Parquet BIT_PACKED encoding for rep or def "
-          << "levels. This will be removed in the future - see IMPALA-6077. Warning "
-          << "every " << BITPACKED_DEPRECATION_WARNING_FREQUENCY << " occurrences.";
-      break;
+      return Status(TErrorCode::PARQUET_BIT_PACKED_LEVELS, filename);
     default: {
       stringstream ss;
       ss << "Unsupported encoding: " << encoding;
@@ -189,13 +180,8 @@ bool ParquetLevelDecoder::FillCache(int batch_size, int* num_cached_levels) {
     *num_cached_levels = batch_size;
     return true;
   }
-  if (encoding_ == parquet::Encoding::RLE) {
-    return FillCacheRle(batch_size, num_cached_levels);
-  } else {
-    DCHECK_EQ(encoding_, parquet::Encoding::BIT_PACKED);
-    *num_cached_levels = bit_reader_.UnpackBatch(1, batch_size, cached_levels_);
-    return true;
-  }
+  DCHECK_EQ(encoding_, parquet::Encoding::RLE);
+  return FillCacheRle(batch_size, num_cached_levels);
 }
 
 bool ParquetLevelDecoder::FillCacheRle(int batch_size, int* num_cached_levels) {

@@ -99,9 +99,6 @@ class ParquetLevelDecoder {
   /// RLE decoder, used if 'encoding_' is RLE.
   RleBatchDecoder<uint8_t> rle_decoder_;
 
-  /// Bit unpacker, used if 'encoding_' is BIT_PACKED.
-  BatchedBitReader bit_reader_;
-
   /// Buffer for a batch of levels. The memory is allocated and owned by a pool passed
   /// in Init().
   uint8_t* cached_levels_ = nullptr;
@@ -112,8 +109,7 @@ class ParquetLevelDecoder {
   /// Current index into cached_levels_.
   int cached_level_idx_ = 0;
 
-  /// The parquet encoding used for the levels. Usually RLE but the deprecated BIT_PACKED
-  /// encoding is also allowed.
+  /// The parquet encoding used for the levels. Only RLE is supported for now.
   parquet::Encoding::type encoding_ = parquet::Encoding::PLAIN;
 
   /// For error checking and reporting.

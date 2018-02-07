@@ -401,19 +401,19 @@ class TestParquet(ImpalaTestSuite):
     self.run_test_case('QueryTest/parquet-bad-compressed-dict-page-size', vector,
         unique_database)
 
-  def test_bitpacked_def_levels(self, vector, unique_database):
-    """Test that Impala can read a Parquet file with the deprecated bit-packed def
-       level encoding."""
-    self.client.execute(("""CREATE TABLE {0}.alltypesagg (
+  def test_def_levels(self, vector, unique_database):
+    """Test that Impala behaves as expected when decoding def levels with different
+       encodings - RLE, BIT_PACKED, etc."""
+    self.client.execute(("""CREATE TABLE {0}.alltypesagg_bitpacked (
           id INT, bool_col BOOLEAN, tinyint_col TINYINT, smallint_col SMALLINT,
           int_col INT, bigint_col BIGINT, float_col FLOAT, double_col DOUBLE,
           date_string_col STRING, string_col STRING, timestamp_col TIMESTAMP,
           year INT, month INT, day INT) STORED AS PARQUET""").format(unique_database))
     alltypesagg_loc = get_fs_path(
-        "/test-warehouse/{0}.db/{1}".format(unique_database, "alltypesagg"))
+        "/test-warehouse/{0}.db/{1}".format(unique_database, "alltypesagg_bitpacked"))
     check_call(['hdfs', 'dfs', '-copyFromLocal', os.environ['IMPALA_HOME'] +
         "/testdata/data/alltypes_agg_bitpacked_def_levels.parquet", alltypesagg_loc])
-    self.client.execute("refresh {0}.alltypesagg".format(unique_database));
+    self.client.execute("refresh {0}.alltypesagg_bitpacked".format(unique_database));
 
     self.run_test_case('QueryTest/parquet-def-levels', vector, unique_database)
 
