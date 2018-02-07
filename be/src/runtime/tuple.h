@@ -84,6 +84,10 @@ class Tuple {
     return result;
   }
 
+  /// Pointer that marks an invalid Tuple address. Rather than leaving Tuple
+  /// pointers uninitialized, they should point to the value of POISON.
+  static Tuple* const POISON;
+
   void Init(int size) { memset(this, 0, size); }
 
   void ClearNullBits(const TupleDescriptor& tuple_desc) {

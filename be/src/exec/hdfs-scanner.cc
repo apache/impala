@@ -220,11 +220,13 @@ int HdfsScanner::WriteTemplateTuples(TupleRow* row, int num_tuples) {
       if (EvalConjuncts(&template_tuple_row)) ++num_to_commit;
     }
   }
+  Tuple** row_tuple = reinterpret_cast<Tuple**>(row);
   if (template_tuple_ != nullptr) {
-    Tuple** row_tuple = reinterpret_cast<Tuple**>(row);
     for (int i = 0; i < num_to_commit; ++i) row_tuple[i] = template_tuple_;
   } else {
     DCHECK_EQ(scan_node_->tuple_desc()->byte_size(), 0);
+    // IMPALA-6258: Initialize tuple ptrs to non-null value
+    for (int i = 0; i < num_to_commit; ++i) row_tuple[i] = Tuple::POISON;
   }
   return num_to_commit;
 }
