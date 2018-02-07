@@ -20,7 +20,7 @@ FROM (
     GROUP BY l_orderkey
     ) a
 GROUP BY l_orderkey
-HAVING ROWCOUNT = 99999999;
+HAVING count(*) = 99999999;
 ---- RESULTS
 ---- TYPES
 ====
