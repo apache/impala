@@ -50,6 +50,7 @@ ADD_BE_TEST(rpc-mgr-test)
 add_dependencies(rpc-mgr-test rpc_test_proto)
 target_link_libraries(rpc-mgr-test rpc_test_proto)
 target_link_libraries(rpc-mgr-test security-test-for-impala)
+target_link_libraries(rpc-mgr-test ${KRB5_REALM_OVERRIDE})
 
 ADD_BE_TEST(rpc-mgr-kerberized-test)
 add_dependencies(rpc-mgr-kerberized-test rpc_test_proto)
