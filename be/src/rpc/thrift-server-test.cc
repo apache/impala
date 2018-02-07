@@ -172,8 +172,14 @@ TEST_P(ThriftKerberizedParamsTest, SslConnectivity) {
     // When Kerberos is ON, the SASL negotiation happens inside Open(). We expect that to
     // fail beacuse the server expects the client to negotiate over an encrypted
     // connection.
-    EXPECT_STR_CONTAINS(non_ssl_client.Open().GetDetail(),
-        "No more data to read");
+    // The expected error message can either state "No more data to read" or
+    // "Couldn't open transport".
+    const std::string& status = non_ssl_client.Open().GetDetail();
+    size_t found_substr = status.find("No more data to read");
+    if (found_substr == string::npos) {
+      EXPECT_STR_CONTAINS(non_ssl_client.Open().GetDetail(),
+          "Couldn't open transport");
+    }
   }
 
 }
