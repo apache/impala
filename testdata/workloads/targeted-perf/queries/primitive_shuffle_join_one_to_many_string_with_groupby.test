@@ -11,7 +11,7 @@ JOIN /* +shuffle */
   ( SELECT upper(concat(cast(o_orderkey AS string),'bla')) o_orderkey_string
    FROM orders) o ON l.l_orderkey_string = o.o_orderkey_string
 GROUP BY o.o_orderkey_string
-HAVING cnt = 999999;
+HAVING count(*) = 999999;
 ---- RESULTS
 ---- TYPES
 ====
