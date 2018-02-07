@@ -124,14 +124,14 @@ class TestObservability(ImpalaTestSuite):
         join (select * from l LIMIT 2000000) b on a.l_orderkey = -b.l_orderkey;""")
     # There are 3 scan nodes and each appears in the profile 4 times (for 3 fragment
     # instances + the averaged fragment).
-    assert results.runtime_profile.count("HDFS_SCAN_NODE") == 12, results.runtime_profile
+    assert results.runtime_profile.count("HDFS_SCAN_NODE") == 12
     # There are 3 exchange nodes and each appears in the profile 2 times (for 1 fragment
     # instance + the averaged fragment).
-    assert results.runtime_profile.count("EXCHANGE_NODE") == 6, results.runtime_profile
+    assert results.runtime_profile.count("EXCHANGE_NODE") == 6
     # The following appear only in the root fragment which has 1 instance.
-    assert results.runtime_profile.count("HASH_JOIN_NODE") == 2, results.runtime_profile
-    assert results.runtime_profile.count("AGGREGATION_NODE") == 2, results.runtime_profile
-    assert results.runtime_profile.count("PLAN_ROOT_SINK") == 2, results.runtime_profile
+    assert results.runtime_profile.count("HASH_JOIN_NODE") == 2
+    assert results.runtime_profile.count("AGGREGATION_NODE") == 2
+    assert results.runtime_profile.count("PLAN_ROOT_SINK") == 2
 
   # IMPALA-6399: Run this test serially to avoid a delay over the wait time in fetching
   # the profile.
