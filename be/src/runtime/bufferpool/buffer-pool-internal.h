@@ -238,11 +238,19 @@ class BufferPool::Client {
   /// page->pin_in_flight was set to true by StartMoveToPinned().
   Status FinishMoveEvictedToPinned(Page* page) WARN_UNUSED_RESULT;
 
-  /// Must be called once before allocating a buffer of 'len' via the AllocateBuffer()
-  /// API to deduct from the client's reservation and update internal accounting. Cleans
-  /// dirty pages if needed to satisfy the buffer pool's internal invariants. No page or
-  /// client locks should be held by the caller.
-  Status PrepareToAllocateBuffer(int64_t len) WARN_UNUSED_RESULT;
+  /// Must be called once before allocating a buffer of 'len' via the AllocateBuffer() or
+  /// AllocateUnreservedBuffer() APIs. Deducts from the client's reservation and updates
+  /// internal accounting. Cleans dirty pages if needed to satisfy the buffer pool's
+  /// internal invariants. No page or client locks should be held by the caller.
+  /// If 'reserved' is true, we assume that the memory is already reserved. If it is
+  /// false, tries to increase the reservation if needed.
+  ///
+  /// On success, returns OK and sets 'success' to true if non-NULL. If an error is
+  /// encountered, e.g. while cleaning pages, returns an error status. If the reservation
+  /// could not be increased for an unreserved allocation, returns OK and sets 'success'
+  /// to false (for unreserved allocations, 'success' must be non-NULL).
+  Status PrepareToAllocateBuffer(
+      int64_t len, bool reserved, bool* success) WARN_UNUSED_RESULT;
 
   /// Implementation of ClientHandle::DecreaseReservationTo().
   Status DecreaseReservationTo(int64_t target_bytes) WARN_UNUSED_RESULT;

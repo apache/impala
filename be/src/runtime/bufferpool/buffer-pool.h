@@ -239,6 +239,21 @@ class BufferPool : public CacheLineAligned {
   Status AllocateBuffer(
       ClientHandle* client, int64_t len, BufferHandle* handle) WARN_UNUSED_RESULT;
 
+  /// Like AllocateBuffer(), except used when the client may not have the reservation
+  /// to allocate the buffer. Tries to increase reservation on the behalf of the client
+  /// if needed to allocate the buffer. If the reservation isn't available, 'handle'
+  /// isn't opened and OK is returned. If an unexpected error occurs, an error is
+  /// returned and any reservation increase remains in effect. Safe to call concurrently
+  /// with any other operations for 'client', except for operations on the same 'handle'.
+  ///
+  /// This function is a transitional mechanism for components to allocate memory from
+  /// the buffer pool without implementing the reservation accounting required to operate
+  /// within a predetermined memory constraint. Wherever possible, clients should reserve
+  /// memory ahead of time and allocate out of that instead of relying on this "best
+  /// effort" interface.
+  Status AllocateUnreservedBuffer(
+      ClientHandle* client, int64_t len, BufferHandle* handle) WARN_UNUSED_RESULT;
+
   /// If 'handle' is open, close 'handle', free the buffer and decrease the reservation
   /// usage from 'client'. Idempotent. Safe to call concurrently with other operations
   /// for 'client', except for operations on the same 'handle'.

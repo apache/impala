@@ -129,8 +129,13 @@ class ReservationTracker {
   /// Returns true if the reservation increase was successful or not necessary. Otherwise
   /// returns false and if 'error_status' is non-null, it returns an appropriate status
   /// message in it.
-  bool IncreaseReservationToFit(int64_t bytes, Status* error_status = nullptr)
-      WARN_UNUSED_RESULT;
+  bool IncreaseReservationToFit(
+      int64_t bytes, Status* error_status = nullptr) WARN_UNUSED_RESULT;
+
+  /// Like IncreaseReservationToFit(), except 'bytes' is also allocated from
+  /// the reservation on success.
+  bool IncreaseReservationToFitAndAllocate(
+      int64_t bytes, Status* error_status = nullptr) WARN_UNUSED_RESULT;
 
   /// Decrease reservation by 'bytes' on this tracker and all ancestors. This tracker's
   /// reservation must be at least 'bytes' before calling this method.
@@ -246,6 +251,9 @@ class ReservationTracker {
   /// inconsistent state.
   /// 'lock_' must be held by caller.
   void CheckConsistency() const;
+
+  /// Same as AllocateFrom() except 'lock_' must be held by caller.
+  void AllocateFromLocked(int64_t bytes);
 
   /// Increase or decrease 'used_reservation_' and update profile counters accordingly.
   /// 'lock_' must be held by caller.
