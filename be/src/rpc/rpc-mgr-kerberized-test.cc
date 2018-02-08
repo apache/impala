@@ -51,10 +51,11 @@ class RpcMgrKerberizedTest :
   boost::scoped_ptr<MiniKdcWrapper> kdc_wrapper_;
 };
 
-INSTANTIATE_TEST_CASE_P(KerberosOnAndOff,
+// TODO: IMPALA-6477: This test breaks on CentOS 6.4. Re-enable after a fix.
+/*INSTANTIATE_TEST_CASE_P(KerberosOnAndOff,
                         RpcMgrKerberizedTest,
                         ::testing::Values(USE_KUDU_KERBEROS,
-                                          USE_IMPALA_KERBEROS));
+                                          USE_IMPALA_KERBEROS));*/
 
 TEST_P(RpcMgrKerberizedTest, MultipleServicesTls) {
   // TODO: We're starting a seperate RpcMgr here instead of configuring
