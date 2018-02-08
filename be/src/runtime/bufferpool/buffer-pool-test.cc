@@ -367,6 +367,7 @@ class BufferPoolTest : public ::testing::Test {
   }
 
   /// Parameterised test implementations.
+  void TestBufferAllocation(bool reserved);
   void TestMemoryReclamation(BufferPool* pool, int src_core, int dst_core);
   void TestEvictionPolicy(int64_t page_size);
   void TestCleanPageLimit(int max_clean_pages, bool randomize_core);
@@ -550,27 +551,43 @@ TEST_F(BufferPoolTest, PageCreation) {
   global_reservations_.Close();
 }
 
-TEST_F(BufferPoolTest, BufferAllocation) {
+TEST_F(BufferPoolTest, ReservedBufferAllocation) {
+  TestBufferAllocation(true);
+}
+
+TEST_F(BufferPoolTest, UnreservedBufferAllocation) {
+  TestBufferAllocation(false);
+}
+
+void BufferPoolTest::TestBufferAllocation(bool reserved) {
   // Allocate many buffers, each a power-of-two multiple of the minimum buffer length.
-  int num_buffers = 16;
-  int64_t max_buffer_len = TEST_BUFFER_LEN << (num_buffers - 1);
-  int64_t total_mem = 2 * 2 * max_buffer_len;
-  global_reservations_.InitRootTracker(NULL, total_mem);
-  BufferPool pool(TEST_BUFFER_LEN, total_mem, total_mem);
+  const int NUM_BUFFERS = 16;
+  const int64_t MAX_BUFFER_LEN = TEST_BUFFER_LEN << (NUM_BUFFERS - 1);
+
+  // Total memory required to allocate TEST_BUFFER_LEN, 2*TEST_BUFFER_LEN, ...,
+  // MAX_BUFFER_LEN.
+  const int64_t TOTAL_MEM = 2 * MAX_BUFFER_LEN - TEST_BUFFER_LEN;
+  global_reservations_.InitRootTracker(NULL, TOTAL_MEM);
+  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
   BufferPool::ClientHandle client;
   ASSERT_OK(pool.RegisterClient("test client", NULL, &global_reservations_, NULL,
-      total_mem, NewProfile(), &client));
-  ASSERT_TRUE(client.IncreaseReservationToFit(total_mem));
+      TOTAL_MEM, NewProfile(), &client));
+  if (reserved) ASSERT_TRUE(client.IncreaseReservationToFit(TOTAL_MEM));
 
-  vector<BufferPool::BufferHandle> handles(num_buffers);
+  vector<BufferPool::BufferHandle> handles(NUM_BUFFERS);
 
   // Create buffers of various valid sizes.
   int64_t total_allocated = 0;
-  for (int i = 0; i < num_buffers; ++i) {
+  for (int i = 0; i < NUM_BUFFERS; ++i) {
     int size_multiple = 1 << i;
     int64_t buffer_len = TEST_BUFFER_LEN * size_multiple;
     int64_t used_before = client.GetUsedReservation();
-    ASSERT_OK(pool.AllocateBuffer(&client, buffer_len, &handles[i]));
+    if (reserved) {
+      ASSERT_OK(pool.AllocateBuffer(&client, buffer_len, &handles[i]));
+    } else {
+      // Reservation should be automatically increased.
+      ASSERT_OK(pool.AllocateUnreservedBuffer(&client, buffer_len, &handles[i]));
+    }
     total_allocated += buffer_len;
     ASSERT_TRUE(handles[i].is_open());
     ASSERT_TRUE(handles[i].data() != NULL);
@@ -583,8 +600,15 @@ TEST_F(BufferPoolTest, BufferAllocation) {
     EXPECT_EQ(0, pool.GetFreeBufferBytes());
   }
 
+  if (!reserved) {
+    // Allocate all of the memory and test the failure path for unreserved allocations.
+    BufferPool::BufferHandle tmp_handle;
+    ASSERT_OK(pool.AllocateUnreservedBuffer(&client, TEST_BUFFER_LEN, &tmp_handle));
+    ASSERT_FALSE(tmp_handle.is_open()) << "No reservation for buffer";
+  }
+
   // Close the handles and check memory consumption.
-  for (int i = 0; i < num_buffers; ++i) {
+  for (int i = 0; i < NUM_BUFFERS; ++i) {
     int64_t used_before = client.GetUsedReservation();
     int buffer_len = handles[i].len();
     pool.FreeBuffer(&client, &handles[i]);
@@ -597,7 +621,7 @@ TEST_F(BufferPoolTest, BufferAllocation) {
   ASSERT_EQ(global_reservations_.GetReservation(), 0);
   // But freed memory is not released to the system immediately.
   EXPECT_EQ(total_allocated, pool.GetSystemBytesAllocated());
-  EXPECT_EQ(num_buffers, pool.GetNumFreeBuffers());
+  EXPECT_EQ(NUM_BUFFERS, pool.GetNumFreeBuffers());
   EXPECT_EQ(total_allocated, pool.GetFreeBufferBytes());
   global_reservations_.Close();
 }

@@ -141,6 +141,14 @@ bool ReservationTracker::IncreaseReservationToFit(int64_t bytes, Status* error_s
   return IncreaseReservationInternalLocked(bytes, true, false, error_status);
 }
 
+bool ReservationTracker::IncreaseReservationToFitAndAllocate(
+    int64_t bytes, Status* error_status) {
+  lock_guard<SpinLock> l(lock_);
+  if (!IncreaseReservationInternalLocked(bytes, true, false, error_status)) return false;
+  AllocateFromLocked(bytes);
+  return true;
+}
+
 bool ReservationTracker::IncreaseReservationInternalLocked(int64_t bytes,
     bool use_existing_reservation, bool is_child_reservation, Status* error_status) {
   DCHECK(initialized_);
@@ -359,6 +367,10 @@ vector<ReservationTracker*> ReservationTracker::FindPathToRoot() {
 
 void ReservationTracker::AllocateFrom(int64_t bytes) {
   lock_guard<SpinLock> l(lock_);
+  AllocateFromLocked(bytes);
+}
+
+void ReservationTracker::AllocateFromLocked(int64_t bytes) {
   DCHECK(initialized_);
   DCHECK_GE(bytes, 0);
   DCHECK_LE(bytes, unused_reservation());
