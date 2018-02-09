@@ -108,10 +108,10 @@ where
     select
       min(ps_supplycost)
     from
-      tpch.partsupp,
-      tpch.supplier,
-      tpch.nation,
-      tpch.region
+      partsupp,
+      supplier,
+      nation,
+      region
     where
       p_partkey = ps_partkey
       and s_suppkey = ps_suppkey
@@ -2460,7 +2460,7 @@ from (
     c_custkey,
     count(o_orderkey) as c_count
   from
-    customer left outer join tpch.orders on (
+    customer left outer join orders on (
       c_custkey = o_custkey
       and o_comment not like '%special%requests%'
     )
@@ -3749,7 +3749,7 @@ from
   supplier,
   lineitem l1,
   orders,
-  tpch.nation
+  nation
 where
   s_suppkey = l1.l_suppkey
   and o_orderkey = l1.l_orderkey
