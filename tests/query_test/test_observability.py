@@ -20,6 +20,7 @@ from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.impala_cluster import ImpalaCluster
 import logging
 import pytest
+import re
 import time
 
 class TestObservability(ImpalaTestSuite):
@@ -184,16 +185,53 @@ class TestObservability(ImpalaTestSuite):
       query_id, MAX_WAIT)
     assert False, dbg_str
 
-  def test_query_profile_contains_instance_events(self, unique_database):
+  def test_query_profile_contains_query_events(self):
+    """Test that the expected events show up in a query profile."""
+    event_regexes = [r'Query Timeline:',
+        r'Query submitted:',
+        r'Planning finished:',
+        r'Submit for admission:',
+        r'Completed admission:',
+        r'Ready to start on .* backends:',
+        r'All .* execution backends \(.* fragment instances\) started:',
+        r'Rows available:',
+        r'First row fetched:',
+        r'Last row fetched:',
+        r'Released admission control resources:']
+    query = "select * from functional.alltypes"
+    runtime_profile = self.execute_query(query).runtime_profile
+    self.__verify_profile_event_sequence(event_regexes, runtime_profile)
+
+  def test_query_profile_contains_instance_events(self):
     """Test that /query_profile_encoded contains an event timeline for fragment
     instances, even when there are errors."""
-    events = ["Fragment Instance Lifecycle Event Timeline",
-              "Prepare Finished",
-              "Open Finished",
-              "First Batch Produced",
-              "First Batch Sent",
-              "ExecInternal Finished"]
+    event_regexes = [r'Fragment Instance Lifecycle Event Timeline',
+                     r'Prepare Finished',
+                     r'Open Finished',
+                     r'First Batch Produced',
+                     r'First Batch Sent',
+                     r'ExecInternal Finished']
     query = "select count(*) from functional.alltypes"
     runtime_profile = self.execute_query(query).runtime_profile
-    for event in events:
-      assert event in runtime_profile
+    self.__verify_profile_event_sequence(event_regexes, runtime_profile)
+
+  def __verify_profile_event_sequence(self, event_regexes, runtime_profile):
+    """Check that 'event_regexes' appear in a consecutive series of lines in
+       'runtime_profile'"""
+    lines = runtime_profile.splitlines()
+    event_regex_index = 0
+
+    # Check that the strings appear in the above order with no gaps in the profile.
+    for line in runtime_profile.splitlines():
+      match = re.search(event_regexes[event_regex_index], line)
+      if match is not None:
+        event_regex_index += 1
+        if event_regex_index == len(event_regexes):
+          # Found all the lines - we're done.
+          return
+      else:
+        # Haven't found the first regex yet.
+        assert event_regex_index == 0, \
+            event_regexes[event_regex_index] + " not in " + line + "\n" + runtime_profile
+    assert event_regex_index == len(event_regexes), \
+        "Didn't find all events in profile: \n" + runtime_profile
