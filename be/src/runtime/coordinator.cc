@@ -863,6 +863,7 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos) {
 
   if (*eos) {
     returned_all_results_ = true;
+    query_events_->MarkEvent("Last row fetched");
     // release query execution resources here, since we won't be fetching more result rows
     ReleaseExecResources();
     // wait for all backends to complete before computing the summary
@@ -1087,12 +1088,13 @@ void Coordinator::ReleaseAdmissionControlResources() {
 
 void Coordinator::ReleaseAdmissionControlResourcesLocked() {
   if (released_admission_control_resources_) return;
-  LOG(INFO) << "Release admssion control resources for query "
+  LOG(INFO) << "Release admission control resources for query "
             << PrintId(query_ctx_.query_id);
   AdmissionController* admission_controller =
       ExecEnv::GetInstance()->admission_controller();
   if (admission_controller != nullptr) admission_controller->ReleaseQuery(schedule_);
   released_admission_control_resources_ = true;
+  query_events_->MarkEvent("Released admission control resources");
 }
 
 void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
