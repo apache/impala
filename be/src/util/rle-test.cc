@@ -145,7 +145,7 @@ TEST(BitArray, TestValues) {
   }
 }
 
-/// Get many values from a batch RLE decoder.
+/// Get many values from a batch RLE decoder using its low level functions.
 template <typename T>
 static bool GetRleValues(RleBatchDecoder<T>* decoder, int num_vals, T* vals) {
   int decoded = 0;
@@ -173,6 +173,12 @@ static bool GetRleValues(RleBatchDecoder<T>* decoder, int num_vals, T* vals) {
   return true;
 }
 
+/// Get many values from a batch RLE decoder using its GetValues() function.
+template <typename T>
+static bool GetRleValuesBatched(RleBatchDecoder<T>* decoder, int num_vals, T* vals) {
+  return num_vals == decoder->GetValues(num_vals, vals);
+}
+
 // Validates encoding of values by encoding and decoding them.  If
 // expected_encoding != NULL, also validates that the encoded buffer is
 // exactly 'expected_encoding'.
@@ -198,23 +204,30 @@ void ValidateRle(const vector<int>& values, int bit_width,
   }
 
   // Verify read
-  RleBatchDecoder<uint64_t> decoder(buffer, len, bit_width);
-  RleBatchDecoder<uint64_t> decoder2(buffer, len, bit_width);
+  RleBatchDecoder<uint64_t> per_value_decoder(buffer, len, bit_width);
+  RleBatchDecoder<uint64_t> per_run_decoder(buffer, len, bit_width);
+  RleBatchDecoder<uint64_t> batch_decoder(buffer, len, bit_width);
   // Ensure it returns the same results after Reset().
   for (int trial = 0; trial < 2; ++trial) {
     for (int i = 0; i < values.size(); ++i) {
       uint64_t val;
-      EXPECT_TRUE(decoder.GetSingleValue(&val));
+      EXPECT_TRUE(per_value_decoder.GetSingleValue(&val));
       EXPECT_EQ(values[i], val) << i;
     }
-    // Unpack everything at once from the second batch decoder.
-    vector<uint64_t> decoded_values(values.size());
-    EXPECT_TRUE(GetRleValues(&decoder2, values.size(), decoded_values.data()));
+    // Unpack everything at once from the other decoders.
+    vector<uint64_t> decoded_values1(values.size());
+    vector<uint64_t> decoded_values2(values.size());
+    EXPECT_TRUE(GetRleValues(
+        &per_run_decoder, decoded_values1.size(), decoded_values1.data()));
+    EXPECT_TRUE(GetRleValuesBatched(
+        &batch_decoder, decoded_values2.size(), decoded_values2.data()));
     for (int i = 0; i < values.size(); ++i) {
-      EXPECT_EQ(values[i], decoded_values[i]) << i;
+      EXPECT_EQ(values[i], decoded_values1[i]) << i;
+      EXPECT_EQ(values[i], decoded_values2[i]) << i;
     }
-    decoder.Reset(buffer, len, bit_width);
-    decoder2.Reset(buffer, len, bit_width);
+    per_value_decoder.Reset(buffer, len, bit_width);
+    per_run_decoder.Reset(buffer, len, bit_width);
+    batch_decoder.Reset(buffer, len, bit_width);
   }
 }
 

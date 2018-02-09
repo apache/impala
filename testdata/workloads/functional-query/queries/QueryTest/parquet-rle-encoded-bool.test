@@ -1,0 +1,17 @@
+====
+---- QUERY
+# Verify that the total number of True values is correct.
+select count(*) from rle_encoded_bool where b;
+---- TYPES
+BIGINT
+---- RESULTS
+140
+====
+---- QUERY
+# Verify that the bool and int values match.
+select count(*) from rle_encoded_bool where (b and i = 1) or (not b and i = 0);
+---- TYPES
+BIGINT
+---- RESULTS
+279
+====

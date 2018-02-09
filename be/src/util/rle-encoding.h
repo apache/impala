@@ -134,6 +134,10 @@ class RleBatchDecoder {
   /// decoding the values.
   bool GetSingleValue(T* val) WARN_UNUSED_RESULT;
 
+  /// Consume 'num_values_to_consume' values and copy them to 'values'.
+  /// Returns the number of consumed values or 0 if an error occurred.
+  int32_t GetValues(int32_t num_values_to_consume, T* values);
+
  private:
   BatchedBitReader bit_reader_;
 
@@ -652,6 +656,39 @@ inline int32_t RleBatchDecoder<T>::DecodeBufferedLiterals(
   literal_buffer_pos_ += num_to_output;
   literal_count_ -= num_to_output;
   return num_to_output;
+}
+
+template <typename T>
+inline int32_t RleBatchDecoder<T>::GetValues(int32_t num_values_to_consume, T* values) {
+  DCHECK_GT(num_values_to_consume, 0);
+  DCHECK(values != nullptr);
+
+  int32_t num_consumed = 0;
+  while (num_consumed < num_values_to_consume) {
+    // Add RLE encoded values by repeating the current value this number of times.
+    uint32_t num_repeats = NextNumRepeats();
+    if (num_repeats > 0) {
+       uint32_t num_repeats_to_set =
+           std::min<uint32_t>(num_repeats, num_values_to_consume - num_consumed);
+       T repeated_value = GetRepeatedValue(num_repeats_to_set);
+       for (int i = 0; i < num_repeats_to_set; ++i) {
+         values[num_consumed + i] = repeated_value;
+       }
+       num_consumed += num_repeats_to_set;
+       continue;
+    }
+
+    // Add remaining literal values, if any.
+    uint32_t num_literals = NextNumLiterals();
+    if (num_literals == 0) break;
+    uint32_t num_literals_to_set =
+        std::min<uint32_t>(num_literals, num_values_to_consume - num_consumed);
+    if (!GetLiteralValues(num_literals_to_set, values + num_consumed)) {
+      return 0;
+    }
+    num_consumed += num_literals_to_set;
+  }
+  return num_consumed;
 }
 
 template <typename T>
