@@ -93,9 +93,6 @@ class ParquetLevelDecoder {
   /// CacheHasNext() is false.
   bool FillCache(int batch_size, int* num_cached_levels);
 
-  /// Implementation of FillCache() for RLE encoding.
-  bool FillCacheRle(int batch_size, int* num_cached_levels);
-
   /// RLE decoder, used if 'encoding_' is RLE.
   RleBatchDecoder<uint8_t> rle_decoder_;
 
@@ -513,6 +510,9 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// ParquetLevelDecoder::ReadLevel() and 'max_level' is the maximum allowed value.
   void __attribute__((noinline)) SetLevelDecodeError(const char* level_name,
       int decoded_level, int max_level);
+
+  // Returns a detailed error message about unsupported encoding.
+  Status GetUnsupportedDecodingError();
 };
 
 /// Collections are not materialized directly in parquet files; only scalar values appear

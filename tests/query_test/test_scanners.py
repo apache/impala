@@ -660,6 +660,18 @@ class TestParquet(ImpalaTestSuite):
 
     self.run_test_case('QueryTest/parquet-decimal-formats', vector, unique_database)
 
+  def test_rle_encoded_bools(self, vector, unique_database):
+    """IMPALA-6324: Test that Impala decodes RLE encoded booleans correctly."""
+    self.client.execute(("""CREATE TABLE {0}.rle_encoded_bool (b boolean, i int)
+        STORED AS PARQUET""").format(unique_database))
+    table_loc = get_fs_path(
+        "/test-warehouse/{0}.db/{1}".format(unique_database, "rle_encoded_bool"))
+    check_call(['hdfs', 'dfs', '-copyFromLocal', os.environ['IMPALA_HOME'] +
+        "/testdata/data/rle_encoded_bool.parquet", table_loc])
+
+    self.run_test_case(
+        'QueryTest/parquet-rle-encoded-bool', vector, unique_database)
+
 # We use various scan range lengths to exercise corner cases in the HDFS scanner more
 # thoroughly. In particular, it will exercise:
 # 1. default scan range

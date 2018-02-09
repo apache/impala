@@ -189,39 +189,13 @@ bool ParquetLevelDecoder::FillCache(int batch_size, int* num_cached_levels) {
     return true;
   }
   if (encoding_ == parquet::Encoding::RLE) {
-    return FillCacheRle(batch_size, num_cached_levels);
+    *num_cached_levels = rle_decoder_.GetValues(batch_size, cached_levels_);
+    return *num_cached_levels > 0;
   } else {
     DCHECK_EQ(encoding_, parquet::Encoding::BIT_PACKED);
     *num_cached_levels = bit_reader_.UnpackBatch(1, batch_size, cached_levels_);
     return true;
   }
-}
-
-bool ParquetLevelDecoder::FillCacheRle(int batch_size, int* num_cached_levels) {
-  int num_values = 0;
-  while (num_values < batch_size) {
-    // Add RLE encoded values by repeating the current value this number of times.
-    uint32_t num_repeats = rle_decoder_.NextNumRepeats();
-    if (num_repeats > 0) {
-      uint32_t num_repeats_to_set = min<uint32_t>(num_repeats, batch_size - num_values);
-      uint8_t repeated_value = rle_decoder_.GetRepeatedValue(num_repeats_to_set);
-      memset(cached_levels_ + num_values, repeated_value, num_repeats_to_set);
-      num_values += num_repeats_to_set;
-      continue;
-    }
-
-    // Add remaining literal values, if any.
-    uint32_t num_literals = rle_decoder_.NextNumLiterals();
-    if (num_literals == 0) break;
-    uint32_t num_literals_to_set = min<uint32_t>(num_literals, batch_size - num_values);
-    if (!rle_decoder_.GetLiteralValues(
-          num_literals_to_set, &cached_levels_[num_values])) {
-      return false;
-    }
-    num_values += num_literals_to_set;
-  }
-  *num_cached_levels = num_values;
-  return true;
 }
 
 /// Per column type reader. InternalType is the datatype that Impala uses internally to
@@ -494,11 +468,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
     page_encoding_ = current_page_header_.data_page_header.encoding;
     if (page_encoding_ != parquet::Encoding::PLAIN_DICTIONARY &&
         page_encoding_ != parquet::Encoding::PLAIN) {
-      stringstream ss;
-      ss << "File '" << filename() << "' is corrupt: unexpected encoding: "
-         << PrintEncoding(page_encoding_) << " for data page of column '"
-         << schema_element().name << "'.";
-      return Status(ss.str());
+      return GetUnsupportedDecodingError();
     }
 
     // If slot_desc_ is NULL, dict_decoder_ is uninitialized
@@ -703,8 +673,21 @@ class BoolColumnReader : public BaseScalarColumnReader {
   virtual void ClearDictionaryDecoder() { }
 
   virtual Status InitDataPage(uint8_t* data, int size) {
-    // Initialize bool decoder
-    bool_values_.Reset(data, size);
+    page_encoding_ = current_page_header_.data_page_header.encoding;
+    // Only the relevant decoder is initialized for a given data page.
+    switch (page_encoding_) {
+      case parquet::Encoding::PLAIN:
+        bool_values_.Reset(data, size);
+        break;
+      case parquet::Encoding::RLE:
+        // The first 4 bytes contain the size of the encoded data. This information is
+        // redundant, as this is the last part of the data page, and the number of
+        // remaining bytes is already known.
+        rle_decoder_.Reset(data + 4, size - 4, 1);
+        break;
+      default:
+        return GetUnsupportedDecodingError();
+    }
     num_unpacked_values_ = 0;
     unpacked_value_idx_ = 0;
     return Status::OK();
@@ -739,19 +722,24 @@ class BoolColumnReader : public BaseScalarColumnReader {
   inline bool ReadSlot(Tuple* tuple, MemPool* pool)  {
     void* slot = tuple->GetSlot(tuple_offset_);
     bool val;
-    if (unpacked_value_idx_ < num_unpacked_values_) {
+    if (LIKELY(unpacked_value_idx_ < num_unpacked_values_)) {
       val = unpacked_values_[unpacked_value_idx_++];
     } else {
       // Unpack as many values as we can into the buffer. We expect to read at least one
       // value.
-      int num_unpacked =
-          bool_values_.UnpackBatch(1, UNPACKED_BUFFER_LEN, &unpacked_values_[0]);
-      if (UNLIKELY(num_unpacked == 0)) {
+      if (page_encoding_ == parquet::Encoding::PLAIN) {
+        num_unpacked_values_ =
+            bool_values_.UnpackBatch(1, UNPACKED_BUFFER_LEN, &unpacked_values_[0]);
+      } else {
+        num_unpacked_values_ =
+            rle_decoder_.GetValues(UNPACKED_BUFFER_LEN, &unpacked_values_[0]);
+      }
+
+      if (UNLIKELY(num_unpacked_values_ == 0)) {
         parent_->parse_status_ = Status("Invalid bool column.");
         return false;
       }
       val = unpacked_values_[0];
-      num_unpacked_values_ = num_unpacked;
       unpacked_value_idx_ = 1;
     }
     *reinterpret_cast<bool*>(slot) = val;
@@ -769,7 +757,11 @@ class BoolColumnReader : public BaseScalarColumnReader {
   /// The next value to return from 'unpacked_values_'.
   int unpacked_value_idx_ = 0;
 
+  /// Bit packed decoder, used if 'encoding_' is PLAIN.
   BatchedBitReader bool_values_;
+
+  /// RLE decoder, used if 'encoding_' is RLE.
+  RleBatchDecoder<bool> rle_decoder_;
 };
 
 // Change 'val_count' to zero to exercise IMPALA-5197. This verifies the error handling
@@ -1227,6 +1219,12 @@ bool BaseScalarColumnReader::NextLevels() {
   }
 
   return parent_->parse_status_.ok();
+}
+
+Status BaseScalarColumnReader::GetUnsupportedDecodingError() {
+  return Status(Substitute(
+      "File '$0' is corrupt: unexpected encoding: $1 for data page of column '$2'.",
+      filename(), PrintEncoding(page_encoding_), schema_element().name));
 }
 
 bool BaseScalarColumnReader::NextPage() {
