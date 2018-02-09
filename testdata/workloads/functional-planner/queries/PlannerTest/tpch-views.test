@@ -64,10 +64,10 @@ where
     select
       min(ps_supplycost)
     from
-      tpch.partsupp,
-      tpch.supplier,
-      tpch.nation,
-      tpch.region
+      partsupp,
+      supplier,
+      nation,
+      region
     where
       p_partkey = ps_partkey
       and s_suppkey = ps_suppkey
@@ -128,36 +128,36 @@ PLAN-ROOT SINK
 |     runtime filters: RF012 -> tpch.supplier.s_nationkey, RF014 -> tpch.supplier.s_suppkey
 |
 12:AGGREGATE [FINALIZE]
-|  output: min(ps_supplycost)
-|  group by: ps_partkey
+|  output: min(tpch.partsupp.ps_supplycost)
+|  group by: tpch.partsupp.ps_partkey
 |
 11:HASH JOIN [INNER JOIN]
-|  hash predicates: n_regionkey = r_regionkey
-|  runtime filters: RF004 <- r_regionkey
+|  hash predicates: tpch.nation.n_regionkey = tpch.region.r_regionkey
+|  runtime filters: RF004 <- tpch.region.r_regionkey
 |
 |--08:SCAN HDFS [tpch.region]
 |     partitions=1/1 files=1 size=384B
-|     predicates: r_name = 'EUROPE'
+|     predicates: tpch.region.r_name = 'EUROPE'
 |
 10:HASH JOIN [INNER JOIN]
-|  hash predicates: s_nationkey = n_nationkey
-|  runtime filters: RF006 <- n_nationkey
+|  hash predicates: tpch.supplier.s_nationkey = tpch.nation.n_nationkey
+|  runtime filters: RF006 <- tpch.nation.n_nationkey
 |
 |--07:SCAN HDFS [tpch.nation]
 |     partitions=1/1 files=1 size=2.15KB
-|     runtime filters: RF004 -> n_regionkey
+|     runtime filters: RF004 -> tpch.nation.n_regionkey
 |
 09:HASH JOIN [INNER JOIN]
-|  hash predicates: ps_suppkey = s_suppkey
-|  runtime filters: RF008 <- s_suppkey
+|  hash predicates: tpch.partsupp.ps_suppkey = tpch.supplier.s_suppkey
+|  runtime filters: RF008 <- tpch.supplier.s_suppkey
 |
 |--06:SCAN HDFS [tpch.supplier]
 |     partitions=1/1 files=1 size=1.33MB
-|     runtime filters: RF006 -> s_nationkey
+|     runtime filters: RF006 -> tpch.supplier.s_nationkey
 |
 05:SCAN HDFS [tpch.partsupp]
    partitions=1/1 files=1 size=112.71MB
-   runtime filters: RF000 -> tpch.partsupp.ps_partkey, RF008 -> ps_suppkey
+   runtime filters: RF000 -> tpch.partsupp.ps_partkey, RF008 -> tpch.partsupp.ps_suppkey
 ====
 # TPCH-Q3
 # Q3 - Shipping Priority Query
@@ -878,7 +878,7 @@ from (
     c_custkey,
     count(o_orderkey) as c_count
   from
-    customer left outer join tpch.orders on (
+    customer left outer join orders on (
       c_custkey = o_custkey
       and o_comment not like '%special%requests%'
     )
@@ -901,11 +901,11 @@ PLAN-ROOT SINK
 |  group by: count(o_orderkey)
 |
 03:AGGREGATE [FINALIZE]
-|  output: count(o_orderkey)
+|  output: count(tpch.orders.o_orderkey)
 |  group by: tpch.customer.c_custkey
 |
 02:HASH JOIN [RIGHT OUTER JOIN]
-|  hash predicates: o_custkey = tpch.customer.c_custkey
+|  hash predicates: tpch.orders.o_custkey = tpch.customer.c_custkey
 |  runtime filters: RF000 <- tpch.customer.c_custkey
 |
 |--00:SCAN HDFS [tpch.customer]
@@ -913,8 +913,8 @@ PLAN-ROOT SINK
 |
 01:SCAN HDFS [tpch.orders]
    partitions=1/1 files=1 size=162.56MB
-   predicates: NOT o_comment LIKE '%special%requests%'
-   runtime filters: RF000 -> o_custkey
+   predicates: NOT tpch.orders.o_comment LIKE '%special%requests%'
+   runtime filters: RF000 -> tpch.orders.o_custkey
 ====
 # TPCH-Q14
 # Q14 - Promotion Effect
@@ -1361,7 +1361,7 @@ from
   supplier,
   lineitem l1,
   orders,
-  tpch.nation
+  nation
 where
   s_suppkey = l1.l_suppkey
   and o_orderkey = l1.l_orderkey
@@ -1414,12 +1414,12 @@ PLAN-ROOT SINK
 |  |  runtime filters: RF000 <- tpch.lineitem.l_orderkey
 |  |
 |  |--08:HASH JOIN [INNER JOIN]
-|  |  |  hash predicates: tpch.supplier.s_nationkey = n_nationkey
-|  |  |  runtime filters: RF002 <- n_nationkey
+|  |  |  hash predicates: tpch.supplier.s_nationkey = tpch.nation.n_nationkey
+|  |  |  runtime filters: RF002 <- tpch.nation.n_nationkey
 |  |  |
 |  |  |--03:SCAN HDFS [tpch.nation]
 |  |  |     partitions=1/1 files=1 size=2.15KB
-|  |  |     predicates: n_name = 'SAUDI ARABIA'
+|  |  |     predicates: tpch.nation.n_name = 'SAUDI ARABIA'
 |  |  |
 |  |  07:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: tpch.lineitem.l_suppkey = tpch.supplier.s_suppkey
