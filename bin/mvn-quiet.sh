@@ -19,14 +19,20 @@
 
 # Utility script that invokes maven but filters out noisy info logging
 set -euo pipefail
-echo "========================================================================"
-echo "Running mvn $IMPALA_MAVEN_OPTIONS $@"
-echo "Directory: $(pwd)"
-echo "========================================================================"
+
+LOG_FILE="${IMPALA_MVN_LOGS_DIR}/mvn.log"
+
+mkdir -p "$IMPALA_MVN_LOGS_DIR"
+
+cat << EOF | tee -a "$LOG_FILE"
+========================================================================
+Running mvn $IMPALA_MAVEN_OPTIONS $@
+Directory $(pwd)
+========================================================================
+EOF
+
 if ! mvn $IMPALA_MAVEN_OPTIONS "$@" | \
-    grep -E -e WARNING -e ERROR -e SUCCESS -e FAILURE -e Test; then
+  tee -a "$LOG_FILE" | grep -E -e WARNING -e ERROR -e SUCCESS -e FAILURE -e Test; then
   echo "mvn $IMPALA_MAVEN_OPTIONS $@ exited with code $?"
   exit 1
 fi
-echo "------------------------------------------------------------------------"
-echo
