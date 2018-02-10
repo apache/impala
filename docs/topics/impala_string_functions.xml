@@ -1061,11 +1061,10 @@ select replace('hello world','xyz','abc');
 
         <dd>
           <indexterm audience="hidden">split_part() function</indexterm>
-          <b>Purpose:</b> Returns the nth field within a delimited string.
-          The fields are numbered starting from 1.
-          The delimiter can consist of multiple characters, not just a
-          single character. All matching of the delimiter is done exactly, not using any
-          regular expression patterns.
+          <b>Purpose:</b> Returns the nth field within a delimited string. The
+          fields are numbered starting from 1. The delimiter can consist of
+          multiple characters, not just a single character. All matching of the
+          delimiter is done exactly, not using any regular expression patterns.
           <p>
             <b>Return type:</b> <codeph>string</codeph>
           </p>
@@ -1074,7 +1073,8 @@ select replace('hello world','xyz','abc');
           <p conref="../shared/impala_common.xml#common/regexp_escapes"/>
           <p conref="../shared/impala_common.xml#common/example_blurb"/>
           <p>
-            These examples show how to retrieve the nth field from a delimited string:
+            These examples show how to retrieve the nth field from a delimited
+            string:
           </p>
 <codeblock><![CDATA[
 select split_part('x,y,z',',',1);
@@ -1097,8 +1097,8 @@ select split_part('x,y,z',',',3);
 +-----------------------------+
 | z                           |
 +-----------------------------+
+]]>
 </codeblock>
-
           <p>
             These examples show what happens for out-of-range field positions.
             Specifying a value less than 1 produces an error. Specifying a value
@@ -1120,8 +1120,8 @@ from t1
 +-------------------+-------------------------------------+---------------------------+
 |                   | []                                  | 0                         |
 +-------------------+-------------------------------------+---------------------------+
+]]>
 </codeblock>
-
           <p>
             These examples show how the delimiter can be a multi-character value:
           </p>
@@ -1158,8 +1158,8 @@ select split_part('one\|/two\|/three','\|/',3);
           <p>
             <b>Return type:</b> <codeph>string</codeph>
           </p>
-        </dd>
 
+        </dd>
       </dlentry>
 
       <dlentry id="strright">
