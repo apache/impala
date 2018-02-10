@@ -414,12 +414,13 @@ export IMPALA_FE_TEST_COVERAGE_DIR="${IMPALA_FE_TEST_LOGS_DIR}/coverage"
 export IMPALA_BE_TEST_LOGS_DIR="${IMPALA_LOGS_DIR}/be_tests"
 export IMPALA_EE_TEST_LOGS_DIR="${IMPALA_LOGS_DIR}/ee_tests"
 export IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR="${IMPALA_LOGS_DIR}/custom_cluster_tests"
+export IMPALA_MVN_LOGS_DIR="${IMPALA_LOGS_DIR}/mvn"
 # List of all Impala log dirs so they can be created by buildall.sh
 export IMPALA_ALL_LOGS_DIRS="${IMPALA_CLUSTER_LOGS_DIR}
   ${IMPALA_DATA_LOADING_LOGS_DIR} ${IMPALA_DATA_LOADING_SQL_DIR}
   ${IMPALA_FE_TEST_LOGS_DIR} ${IMPALA_FE_TEST_COVERAGE_DIR}
   ${IMPALA_BE_TEST_LOGS_DIR} ${IMPALA_EE_TEST_LOGS_DIR}
-  ${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR}"
+  ${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR} ${IMPALA_MVN_LOGS_DIR}"
 
 # Reduce the concurrency for local tests to half the number of cores in the system.
 CORES=$(($(getconf _NPROCESSORS_ONLN) / 2))
