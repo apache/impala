@@ -333,7 +333,7 @@ Status KrpcDataStreamSender::Channel::WaitForRpc(std::unique_lock<SpinLock>* loc
   DCHECK(!rpc_in_flight_);
   if (UNLIKELY(!rpc_status_.ok())) {
     LOG(ERROR) << "channel send to " << TNetworkAddressToString(address_) << " failed: "
-               << "(fragment_instance_id=" << fragment_instance_id_ << "): "
+               << "(fragment_instance_id=" << PrintId(fragment_instance_id_) << "): "
                << rpc_status_.GetDetail();
     return rpc_status_;
   }
@@ -449,8 +449,8 @@ Status KrpcDataStreamSender::Channel::DoTransmitDataRpc() {
 
 Status KrpcDataStreamSender::Channel::TransmitData(
     const OutboundRowBatch* outbound_batch) {
-  VLOG_ROW << "Channel::TransmitData() fragment_instance_id=" << fragment_instance_id_
-           << " dest_node=" << dest_node_id_
+  VLOG_ROW << "Channel::TransmitData() fragment_instance_id="
+           << PrintId(fragment_instance_id_) << " dest_node=" << dest_node_id_
            << " #rows=" << outbound_batch->header()->num_rows();
   std::unique_lock<SpinLock> l(lock_);
   RETURN_IF_ERROR(WaitForRpc(&l));
@@ -529,8 +529,8 @@ Status KrpcDataStreamSender::Channel::DoEndDataStreamRpc() {
 }
 
 Status KrpcDataStreamSender::Channel::FlushAndSendEos(RuntimeState* state) {
-  VLOG_RPC << "Channel::FlushAndSendEos() fragment_instance_id=" << fragment_instance_id_
-           << " dest_node=" << dest_node_id_
+  VLOG_RPC << "Channel::FlushAndSendEos() fragment_instance_id="
+           << PrintId(fragment_instance_id_) << " dest_node=" << dest_node_id_
            << " #rows= " << batch_->num_rows();
 
   // We can return an error here and not go on to send the EOS RPC because the error that
@@ -544,7 +544,7 @@ Status KrpcDataStreamSender::Channel::FlushAndSendEos(RuntimeState* state) {
     DCHECK(rpc_status_.ok());
     if (UNLIKELY(remote_recvr_closed_)) return Status::OK();
     VLOG_RPC << "calling EndDataStream() to terminate channel. fragment_instance_id="
-             << fragment_instance_id_;
+             << PrintId(fragment_instance_id_);
     rpc_in_flight_ = true;
     COUNTER_ADD(parent_->eos_sent_counter_, 1);
     RETURN_IF_ERROR(DoEndDataStreamRpc());

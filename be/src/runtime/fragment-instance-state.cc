@@ -361,7 +361,7 @@ void FragmentInstanceState::ReportProfileThread() {
     SendReport(false, Status::OK());
   }
 
-  VLOG_FILE << "exiting reporting thread: instance_id=" << instance_id();
+  VLOG_FILE << "exiting reporting thread: instance_id=" << PrintId(instance_id());
 }
 
 void FragmentInstanceState::SendReport(bool done, const Status& status) {
@@ -370,7 +370,7 @@ void FragmentInstanceState::SendReport(bool done, const Status& status) {
 
   if (VLOG_FILE_IS_ON) {
     VLOG_FILE << "Reporting " << (done ? "final " : "") << "profile for instance "
-        << runtime_state_->fragment_instance_id();
+        << PrintId(runtime_state_->fragment_instance_id());
     stringstream ss;
     profile()->PrettyPrint(&ss);
     VLOG_FILE << ss.str();
@@ -554,5 +554,5 @@ void FragmentInstanceState::PrintVolumeIds() {
   profile()->AddInfoString(HdfsScanNodeBase::HDFS_SPLIT_STATS_DESC, str.str());
   VLOG_FILE
       << "Hdfs split stats (<volume id>:<# splits>/<split lengths>) for query="
-      << query_id() << ":\n" << str.str();
+      << PrintId(query_id()) << ":\n" << str.str();
 }

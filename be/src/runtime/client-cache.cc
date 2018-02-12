@@ -43,7 +43,7 @@ Status ClientCacheHelper::GetClient(const TNetworkAddress& address,
   shared_ptr<PerHostCache> host_cache;
   {
     lock_guard<mutex> lock(cache_lock_);
-    VLOG(2) << "GetClient(" << address << ")";
+    VLOG(2) << "GetClient(" << TNetworkAddressToString(address) << ")";
     shared_ptr<PerHostCache>* ptr = &per_host_caches_[address];
     if (ptr->get() == NULL) ptr->reset(new PerHostCache());
     host_cache = *ptr;
@@ -53,7 +53,8 @@ Status ClientCacheHelper::GetClient(const TNetworkAddress& address,
     lock_guard<mutex> lock(host_cache->lock);
     if (!host_cache->clients.empty()) {
       *client_key = host_cache->clients.front();
-      VLOG(2) << "GetClient(): returning cached client for " << address;
+      VLOG(2) << "GetClient(): returning cached client for " <<
+          TNetworkAddressToString(address);
       host_cache->clients.pop_front();
       if (metrics_enabled_) clients_in_use_metric_->Increment(1);
       return Status::OK();
@@ -78,7 +79,8 @@ Status ClientCacheHelper::ReopenClient(ClientFactory factory_method,
     DCHECK(client != client_map_.end());
     client_impl = client->second;
   }
-  VLOG(1) << "ReopenClient(): re-creating client for " << client_impl->address();
+  VLOG(1) << "ReopenClient(): re-creating client for " <<
+      TNetworkAddressToString(client_impl->address());
 
   client_impl->Close();
 
@@ -109,7 +111,8 @@ Status ClientCacheHelper::ReopenClient(ClientFactory factory_method,
 Status ClientCacheHelper::CreateClient(const TNetworkAddress& address,
     ClientFactory factory_method, ClientKey* client_key) {
   shared_ptr<ThriftClientImpl> client_impl(factory_method(address, client_key));
-  VLOG(2) << "CreateClient(): creating new client for " << client_impl->address();
+  VLOG(2) << "CreateClient(): creating new client for " <<
+      TNetworkAddressToString(client_impl->address());
 
   if (!client_impl->init_status().ok()) {
     *client_key = nullptr;
@@ -145,7 +148,8 @@ void ClientCacheHelper::ReleaseClient(ClientKey* client_key) {
     DCHECK(client != client_map_.end());
     client_impl = client->second;
   }
-  VLOG(2) << "Releasing client for " << client_impl->address() << " back to cache";
+  VLOG(2) << "Releasing client for " << TNetworkAddressToString(client_impl->address())
+      << " back to cache";
   {
     lock_guard<mutex> lock(cache_lock_);
     PerHostCacheMap::iterator cache = per_host_caches_.find(client_impl->address());
@@ -167,7 +171,8 @@ void ClientCacheHelper::DestroyClient(ClientKey* client_key) {
     DCHECK(client != client_map_.end());
     client_impl = client->second;
   }
-  VLOG(1) << "Broken Connection, destroy client for " << client_impl->address();
+  VLOG(1) << "Broken Connection, destroy client for " <<
+      TNetworkAddressToString(client_impl->address());
 
   client_impl->Close();
   if (metrics_enabled_) total_clients_metric_->Increment(-1);
@@ -188,7 +193,7 @@ void ClientCacheHelper::CloseConnections(const TNetworkAddress& address) {
 
   {
     VLOG(2) << "Invalidating all " << cache->clients.size() << " clients for: "
-            << address;
+            << TNetworkAddressToString(address);
     lock_guard<mutex> entry_lock(cache->lock);
     lock_guard<mutex> map_lock(client_map_lock_);
     for (ClientKey client_key: cache->clients) {
@@ -208,7 +213,7 @@ string ClientCacheHelper::DebugString() {
   for (const PerHostCacheMap::value_type& cache: per_host_caches_) {
     lock_guard<mutex> host_cache_lock(cache.second->lock);
     if (!first) out << " ";
-    out << cache.first << ":" << cache.second->clients.size();
+    out << TNetworkAddressToString(cache.first) << ":" << cache.second->clients.size();
     first = false;
   }
   out << "])";

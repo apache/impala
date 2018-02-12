@@ -172,7 +172,7 @@ void Scheduler::UpdateMembership(
       // adds the IP address to local_backend_descriptor_. If it is empty, then either
       // that code has been changed, or someone else is sending malformed packets.
       VLOG(1) << "Ignoring subscription request with empty IP address from subscriber: "
-              << be_desc.address;
+              << TNetworkAddressToString(be_desc.address);
       continue;
     }
     if (item.key == local_backend_id_
@@ -181,9 +181,8 @@ void Scheduler::UpdateMembership(
       // will try to re-register (i.e. overwrite their subscription), but there is
       // likely a configuration problem.
       LOG_EVERY_N(WARNING, 30) << "Duplicate subscriber registration from address: "
-                               << be_desc.address
-                               << " (we are: " << local_backend_descriptor_.address
-                               << ")";
+           << TNetworkAddressToString(be_desc.address) << " (we are: "
+           << TNetworkAddressToString(local_backend_descriptor_.address) << ")";
       continue;
     }
     if (be_desc.is_executor) {
@@ -216,7 +215,7 @@ const TBackendDescriptor& Scheduler::LookUpBackendDesc(
   const TBackendDescriptor* desc = executor_config.LookUpBackendDesc(host);
   if (desc == nullptr) {
     // Local host may not be in executor_config if it's a dedicated coordinator.
-    DCHECK_EQ(host, local_backend_descriptor_.address);
+    DCHECK(host == local_backend_descriptor_.address);
     DCHECK(!local_backend_descriptor_.is_executor);
     desc = &local_backend_descriptor_;
   }
@@ -731,7 +730,7 @@ void Scheduler::ComputeBackendExecParams(QuerySchedule* schedule) {
 
   stringstream min_reservation_ss;
   for (const auto& e: per_backend_params) {
-    min_reservation_ss << e.first << "("
+    min_reservation_ss << TNetworkAddressToString(e.first) << "("
          << PrettyPrinter::Print(e.second.min_reservation_bytes, TUnit::BYTES)
          << ") ";
   }
@@ -907,7 +906,8 @@ void Scheduler::AssignmentCtx::RecordScanRangeAssignment(
   scan_range_params_list->push_back(scan_range_params);
 
   if (VLOG_FILE_IS_ON) {
-    VLOG_FILE << "Scheduler assignment to executor: " << executor.address << "("
+    VLOG_FILE << "Scheduler assignment to executor: "
+              << TNetworkAddressToString(executor.address) << "("
               << (remote_read ? "remote" : "local") << " selection)";
   }
 }

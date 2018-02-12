@@ -492,16 +492,16 @@ Status ImpalaServer::LogAuditRecord(const ClientRequestState& request_state,
   if (request.stmt_type == TStmtType::DDL) {
     if (request.catalog_op_request.op_type == TCatalogOpType::DDL) {
       writer.String(
-          PrintTDdlType(request.catalog_op_request.ddl_params.ddl_type).c_str());
+          PrintThriftEnum(request.catalog_op_request.ddl_params.ddl_type).c_str());
     } else {
-      writer.String(PrintTCatalogOpType(request.catalog_op_request.op_type).c_str());
+      writer.String(PrintThriftEnum(request.catalog_op_request.op_type).c_str());
     }
   } else {
-    writer.String(PrintTStmtType(request.stmt_type).c_str());
+    writer.String(PrintThriftEnum(request.stmt_type).c_str());
   }
   writer.String("network_address");
-  writer.String(
-      lexical_cast<string>(request_state.session()->network_address).c_str());
+  writer.String(TNetworkAddressToString(
+      request_state.session()->network_address).c_str());
   writer.String("sql_statement");
   string stmt = replace_all_copy(request_state.sql_stmt(), "\n", " ");
   Redact(&stmt);
@@ -513,7 +513,7 @@ Status ImpalaServer::LogAuditRecord(const ClientRequestState& request_state,
     writer.String("name");
     writer.String(event.name.c_str());
     writer.String("object_type");
-    writer.String(PrintTCatalogObjectType(event.object_type).c_str());
+    writer.String(PrintThriftEnum(event.object_type).c_str());
     writer.String("privilege");
     writer.String(event.privilege.c_str());
     writer.EndObject();
@@ -758,7 +758,7 @@ void ImpalaServer::ArchiveQuery(const ClientRequestState& query) {
   // FLAGS_log_query_to_file will have been set to false
   if (FLAGS_log_query_to_file) {
     stringstream ss;
-    ss << UnixMillis() << " " << query.query_id() << " " << encoded_profile_str;
+    ss << UnixMillis() << " " << PrintId(query.query_id()) << " " << encoded_profile_str;
     status = profile_logger_->AppendEntry(ss.str());
     if (!status.ok()) {
       LOG_EVERY_N(WARNING, 1000) << "Could not write to profile log file file ("
@@ -797,7 +797,7 @@ void ImpalaServer::AddPoolConfiguration(TQueryCtx* ctx,
   Status status = exec_env_->request_pool_service()->ResolveRequestPool(*ctx,
       &resolved_pool);
   if (!status.ok()) {
-    VLOG_RPC << "Not adding pool query options for query=" << ctx->query_id
+    VLOG_RPC << "Not adding pool query options for query=" << PrintId(ctx->query_id)
              << " ResolveRequestPool status: " << status.GetDetail();
     return;
   }
@@ -806,7 +806,7 @@ void ImpalaServer::AddPoolConfiguration(TQueryCtx* ctx,
   TPoolConfig config;
   status = exec_env_->request_pool_service()->GetPoolConfig(resolved_pool, &config);
   if (!status.ok()) {
-    VLOG_RPC << "Not adding pool query options for query=" << ctx->query_id
+    VLOG_RPC << "Not adding pool query options for query=" << PrintId(ctx->query_id)
              << " GetConfigPool status: " << status.GetDetail();
     return;
   }
@@ -1012,7 +1012,7 @@ Status ImpalaServer::SetQueryInflight(shared_ptr<SessionState> session_state,
 
 Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_inflight,
     const Status* cause) {
-  VLOG_QUERY << "UnregisterQuery(): query_id=" << query_id;
+  VLOG_QUERY << "UnregisterQuery(): query_id=" << PrintId(query_id);
 
   RETURN_IF_ERROR(CancelInternal(query_id, check_inflight, cause));
 
@@ -1206,7 +1206,7 @@ void ImpalaServer::ReportExecStatus(
 
 void ImpalaServer::TransmitData(
     TTransmitDataResult& return_val, const TTransmitDataParams& params) {
-  VLOG_ROW << "TransmitData(): instance_id=" << params.dest_fragment_instance_id
+  VLOG_ROW << "TransmitData(): instance_id=" << PrintId(params.dest_fragment_instance_id)
            << " node_id=" << params.dest_node_id
            << " #rows=" << params.row_batch.num_rows
            << " sender_id=" << params.sender_id
@@ -1306,14 +1306,14 @@ void ImpalaServer::CancelFromThreadPool(uint32_t thread_id,
     Status status = UnregisterQuery(cancellation_work.query_id(), true,
         &cancellation_work.cause());
     if (!status.ok()) {
-      VLOG_QUERY << "Query de-registration (" << cancellation_work.query_id()
+      VLOG_QUERY << "Query de-registration (" << PrintId(cancellation_work.query_id())
                  << ") failed";
     }
   } else {
     Status status = CancelInternal(cancellation_work.query_id(), true,
         &cancellation_work.cause());
     if (!status.ok()) {
-      VLOG_QUERY << "Query cancellation (" << cancellation_work.query_id()
+      VLOG_QUERY << "Query cancellation (" << PrintId(cancellation_work.query_id())
                  << ") did not succeed: " << status.GetDetail();
     }
   }
@@ -1628,7 +1628,7 @@ void ImpalaServer::MembershipCallback(
         stringstream cause_msg;
         cause_msg << "Cancelled due to unreachable impalad(s): ";
         for (int i = 0; i < cancellation_entry->second.size(); ++i) {
-          cause_msg << cancellation_entry->second[i];
+          cause_msg << TNetworkAddressToString(cancellation_entry->second[i]);
           if (i + 1 != cancellation_entry->second.size()) cause_msg << ", ";
         }
         string cause_str = cause_msg.str();
@@ -1793,13 +1793,15 @@ void ImpalaServer::ConnectionEnd(
     connection_to_sessions_map_.erase(it);
   }
 
-  LOG(INFO) << "Connection from client " << connection_context.network_address
-            << " closed, closing " << sessions_to_close.size() << " associated session(s)";
+  LOG(INFO) << "Connection from client "
+            << TNetworkAddressToString(connection_context.network_address)
+            << " closed, closing " << sessions_to_close.size()
+            << " associated session(s)";
 
   for (const TUniqueId& session_id: sessions_to_close) {
     Status status = CloseSessionInternal(session_id, true);
     if (!status.ok()) {
-      LOG(WARNING) << "Error closing session " << session_id << ": "
+      LOG(WARNING) << "Error closing session " << PrintId(session_id) << ": "
                    << status.GetDetail();
     }
   }
@@ -1853,7 +1855,7 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
         int64_t last_accessed_ms = session_state.second->last_accessed_ms;
         int64_t session_timeout_ms = session_state.second->session_timeout * 1000;
         if (now - last_accessed_ms <= session_timeout_ms) continue;
-        LOG(INFO) << "Expiring session: " << session_state.first << ", user:"
+        LOG(INFO) << "Expiring session: " << PrintId(session_state.first) << ", user:"
                   << session_state.second->connected_user << ", last active: "
                   << ToStringFromUnixMillis(last_accessed_ms);
         session_state.second->expired = true;
@@ -1908,7 +1910,7 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
         // If the query time limit expired, we must cancel the query.
         if (expiration_event->kind == ExpirationKind::EXEC_TIME_LIMIT) {
           int32_t exec_time_limit_s = query_state->query_options().exec_time_limit_s;
-          VLOG_QUERY << "Expiring query " << expiration_event->query_id
+          VLOG_QUERY << "Expiring query " << PrintId(expiration_event->query_id)
                      << " due to execution time limit of " << exec_time_limit_s << "s.";
           const string& err_msg = Substitute(
               "Query $0 expired due to execution time limit of $1",
@@ -1951,7 +1953,7 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
           // Otherwise time to expire this query
           VLOG_QUERY
               << "Expiring query due to client inactivity: "
-              << expiration_event->query_id << ", last activity was at: "
+              << PrintId(expiration_event->query_id) << ", last activity was at: "
               << ToStringFromUnixMillis(query_state->last_active_ms());
           const string& err_msg = Substitute(
               "Query $0 expired due to client inactivity (timeout is $1)",
@@ -2026,7 +2028,7 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port,
 
   if (!FLAGS_is_coordinator) {
     LOG(INFO) << "Initialized executor Impala server on "
-              << ExecEnv::GetInstance()->backend_address();
+              << TNetworkAddressToString(ExecEnv::GetInstance()->backend_address());
   } else {
     // Initialize the client servers.
     boost::shared_ptr<ImpalaServer> handler = shared_from_this();
@@ -2084,7 +2086,7 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port,
     }
   }
   LOG(INFO) << "Initialized coordinator/executor Impala server on "
-      << ExecEnv::GetInstance()->backend_address();
+      << TNetworkAddressToString(ExecEnv::GetInstance()->backend_address());
 
   // Start the RPC services.
   RETURN_IF_ERROR(exec_env_->StartKrpcService());
@@ -2141,7 +2143,7 @@ void ImpalaServer::UpdateFilter(TUpdateFilterResult& result,
   shared_ptr<ClientRequestState> client_request_state =
       GetClientRequestState(params.query_id);
   if (client_request_state.get() == nullptr) {
-    LOG(INFO) << "Could not find client request state: " << params.query_id;
+    LOG(INFO) << "Could not find client request state: " << PrintId(params.query_id);
     return;
   }
   client_request_state->coord()->UpdateFilter(params);

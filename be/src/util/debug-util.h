@@ -44,34 +44,34 @@ class Tuple;
 class TupleRow;
 class RowBatch;
 
-std::ostream& operator<<(std::ostream& os, const TFunctionBinaryType::type& op);
-std::ostream& operator<<(std::ostream& os, const TUniqueId& id);
-std::ostream& operator<<(std::ostream& os, const THdfsFileFormat::type& type);
-std::ostream& operator<<(std::ostream& os, const THdfsCompression::type& type);
-std::ostream& operator<<(std::ostream& os, const TStmtType::type& type);
-std::ostream& operator<<(std::ostream& os, const TUnit::type& type);
-std::ostream& operator<<(std::ostream& os, const TMetricKind::type& type);
-std::ostream& operator<<(std::ostream& os, const beeswax::QueryState::type& type);
-std::ostream& operator<<(std::ostream& os, const parquet::Encoding::type& type);
-std::ostream& operator<<(std::ostream& os, const parquet::CompressionCodec::type& type);
-std::ostream& operator<<(std::ostream& os, const parquet::Type::type& type);
+// TODO: remove these functions and use operator << after upgrading to Thrift 0.11.0 or
+// higher.
+std::string PrintThriftEnum(const beeswax::QueryState::type& value);
+std::string PrintThriftEnum(const parquet::Encoding::type& value);
+std::string PrintThriftEnum(const TCatalogObjectType::type& value);
+std::string PrintThriftEnum(const TCatalogOpType::type& value);
+std::string PrintThriftEnum(const TDdlType::type& value);
+std::string PrintThriftEnum(const TExplainLevel::type& value);
+std::string PrintThriftEnum(const THdfsCompression::type& value);
+std::string PrintThriftEnum(const THdfsFileFormat::type& value);
+std::string PrintThriftEnum(const THdfsSeqCompressionMode::type& value);
+std::string PrintThriftEnum(const TImpalaQueryOptions::type& value);
+std::string PrintThriftEnum(const TJoinDistributionMode::type& value);
+std::string PrintThriftEnum(const TMetricKind::type& value);
+std::string PrintThriftEnum(const TParquetArrayResolution::type& value);
+std::string PrintThriftEnum(const TParquetFallbackSchemaResolution::type& value);
+std::string PrintThriftEnum(const TPlanNodeType::type& value);
+std::string PrintThriftEnum(const TPrefetchMode::type& value);
+std::string PrintThriftEnum(const TReplicaPreference::type& value);
+std::string PrintThriftEnum(const TRuntimeFilterMode::type& value);
+std::string PrintThriftEnum(const TSessionType::type& value);
+std::string PrintThriftEnum(const TStmtType::type& value);
+std::string PrintThriftEnum(const TUnit::type& value);
 
 std::string PrintTuple(const Tuple* t, const TupleDescriptor& d);
 std::string PrintRow(TupleRow* row, const RowDescriptor& d);
 std::string PrintBatch(RowBatch* batch);
 std::string PrintId(const TUniqueId& id, const std::string& separator = ":");
-std::string PrintPlanNodeType(const TPlanNodeType::type& type);
-std::string PrintTCatalogObjectType(const TCatalogObjectType::type& type);
-std::string PrintTDdlType(const TDdlType::type& type);
-std::string PrintTCatalogOpType(const TCatalogOpType::type& type);
-std::string PrintTReplicaPreference(const TReplicaPreference::type& type);
-std::string PrintTSessionType(const TSessionType::type& type);
-std::string PrintTStmtType(const TStmtType::type& type);
-std::string PrintQueryState(const beeswax::QueryState::type& type);
-std::string PrintEncoding(const parquet::Encoding::type& type);
-std::string PrintTMetricKind(const TMetricKind::type& type);
-std::string PrintTUnit(const TUnit::type& type);
-std::string PrintTImpalaQueryOptions(const TImpalaQueryOptions::type& type);
 
 /// Returns the fully qualified path, e.g. "database.table.array_col.item.field"
 std::string PrintPath(const TableDescriptor& tbl_desc, const SchemaPath& path);

@@ -67,14 +67,14 @@ Status ThriftClientImpl::Open() {
     try {
       transport_->close();
     } catch (const TException& e) {
-      VLOG(1) << "Error closing socket to: " << address_ << ", ignoring (" << e.what()
-                << ")";
+      VLOG(1) << "Error closing socket to: " << TNetworkAddressToString(address_)
+              << ", ignoring (" << e.what() << ")";
     }
     // In certain cases in which the remote host is overloaded, this failure can
     // happen quite frequently. Let's print this error message without the stack
     // trace as there aren't many callers of this function.
     const string& err_msg = Substitute("Couldn't open transport for $0 ($1)",
-        lexical_cast<string>(address_), e.what());
+        TNetworkAddressToString(address_), e.what());
     VLOG(1) << err_msg;
     return Status::Expected(err_msg);
   }
@@ -91,7 +91,7 @@ Status ThriftClientImpl::OpenWithRetry(uint32_t num_tries, uint64_t wait_ms) {
     Status status = Open();
     if (status.ok()) return status;
 
-    LOG(INFO) << "Unable to connect to " << address_;
+    LOG(INFO) << "Unable to connect to " << TNetworkAddressToString(address_);
     if (num_tries == 0) {
       LOG(INFO) << "(Attempt " << try_count << ", will retry indefinitely)";
     } else {
@@ -109,15 +109,15 @@ void ThriftClientImpl::Close() {
   try {
     if (transport_.get() != NULL && transport_->isOpen()) transport_->close();
   } catch (const TException& e) {
-    LOG(INFO) << "Error closing connection to: " << address_ << ", ignoring (" << e.what()
-              << ")";
+    LOG(INFO) << "Error closing connection to: " << TNetworkAddressToString(address_)
+              << ", ignoring (" << e.what() << ")";
     // Forcibly close the socket (since the transport may have failed to get that far
     // during close())
     try {
       if (socket_.get() != NULL) socket_->close();
     } catch (const TException& e) {
-      LOG(INFO) << "Error closing socket to: " << address_ << ", ignoring (" << e.what()
-                << ")";
+      LOG(INFO) << "Error closing socket to: " << TNetworkAddressToString(address_)
+                << ", ignoring (" << e.what() << ")";
     }
   }
 }

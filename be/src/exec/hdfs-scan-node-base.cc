@@ -799,23 +799,26 @@ void HdfsScanNodeBase::StopAndFinalizeCounters() {
           if (file_format == THdfsFileFormat::PARQUET) {
             // If a scan range stored as parquet is skipped, its compression type
             // cannot be figured out without reading the data.
-            ss << file_format << "/" << "Unknown" << "(Skipped):" << file_cnt << " ";
+            ss << PrintThriftEnum(file_format) << "/" << "Unknown" << "(Skipped):"
+               << file_cnt << " ";
           } else {
-            ss << file_format << "/" << compressions_set.GetFirstType() << "(Skipped):"
+            ss << PrintThriftEnum(file_format) << "/"
+               << PrintThriftEnum(compressions_set.GetFirstType()) << "(Skipped):"
                << file_cnt << " ";
           }
         } else if (compressions_set.Size() == 1) {
-          ss << file_format << "/" << compressions_set.GetFirstType() << ":" << file_cnt
+          ss << PrintThriftEnum(file_format) << "/"
+             << PrintThriftEnum(compressions_set.GetFirstType()) << ":" << file_cnt
              << " ";
         } else {
-          ss << file_format << "/" << "(";
+          ss << PrintThriftEnum(file_format) << "/" << "(";
           bool first = true;
           for (auto& elem : _THdfsCompression_VALUES_TO_NAMES) {
             THdfsCompression::type type = static_cast<THdfsCompression::type>(
                 elem.first);
             if (!compressions_set.HasType(type)) continue;
             if (!first) ss << ",";
-            ss << type;
+            ss << PrintThriftEnum(type);
             first = false;
           }
           ss << "):" << file_cnt << " ";

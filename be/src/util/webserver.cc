@@ -220,10 +220,10 @@ string Webserver::Url() {
 }
 
 Status Webserver::Start() {
-  LOG(INFO) << "Starting webserver on " << http_address_;
+  LOG(INFO) << "Starting webserver on " << TNetworkAddressToString(http_address_);
 
   stringstream listening_spec;
-  listening_spec << http_address_;
+  listening_spec << TNetworkAddressToString(http_address_);
 
   if (IsSecure()) {
     LOG(INFO) << "Webserver: Enabling HTTPS support";
@@ -320,7 +320,8 @@ Status Webserver::Start() {
 
   if (context_ == nullptr) {
     stringstream error_msg;
-    error_msg << "Webserver: Could not start on address " << http_address_;
+    error_msg << "Webserver: Could not start on address "
+              << TNetworkAddressToString(http_address_);
     return Status(error_msg.str());
   }
 

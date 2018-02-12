@@ -158,7 +158,7 @@ Status HdfsScanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
     max_materialized_row_batches_ = default_max_row_batches;
   }
   VLOG_QUERY << "Max row batch queue size for scan node '" << id_
-      << "' in fragment instance '" << state->fragment_instance_id()
+      << "' in fragment instance '" << PrintId(state->fragment_instance_id())
       << "': " << max_materialized_row_batches_;
   materialized_row_batches_.reset(new RowBatchQueue(max_materialized_row_batches_));
   return HdfsScanNodeBase::Init(tnode, state);

@@ -82,7 +82,7 @@ shared_ptr<DataStreamRecvrBase> DataStreamMgr::CreateRecvr(const RowDescriptor* 
   DCHECK(profile != nullptr);
   DCHECK(parent_tracker != nullptr);
   VLOG_FILE << "creating receiver for fragment_instance_id="
-            << fragment_instance_id << ", node=" << dest_node_id;
+            << PrintId(fragment_instance_id) << ", node=" << dest_node_id;
   shared_ptr<DataStreamRecvr> recvr(new DataStreamRecvr(this, parent_tracker, row_desc,
       fragment_instance_id, dest_node_id, num_senders, is_merging, buffer_size, profile));
   size_t hash_value = GetHashValue(fragment_instance_id, dest_node_id);
@@ -127,9 +127,9 @@ shared_ptr<DataStreamRecvr> DataStreamMgr::FindRecvrOrWait(
   const string& time_taken = PrettyPrinter::Print(sw.ElapsedTime(), TUnit::TIME_NS);
   if (timed_out) {
     LOG(INFO) << "Datastream sender timed-out waiting for recvr for fragment_instance_id="
-              << fragment_instance_id << " (time-out was: " << time_taken << "). "
-              << "Increase --datastream_sender_timeout_ms if you see this message "
-              << "frequently.";
+              << PrintId(fragment_instance_id) << " (time-out was: " << time_taken <<
+              "). Increase --datastream_sender_timeout_ms if you see this message "
+              "frequently.";
   } else {
     VLOG_RPC << "Datastream sender waited for " << time_taken
              << ", and did not time-out.";
@@ -148,7 +148,7 @@ shared_ptr<DataStreamRecvr> DataStreamMgr::FindRecvrOrWait(
 
 shared_ptr<DataStreamRecvr> DataStreamMgr::FindRecvr(
     const TUniqueId& fragment_instance_id, PlanNodeId node_id, bool acquire_lock) {
-  VLOG_ROW << "looking up fragment_instance_id=" << fragment_instance_id
+  VLOG_ROW << "looking up fragment_instance_id=" << PrintId(fragment_instance_id)
            << ", node=" << node_id;
   size_t hash_value = GetHashValue(fragment_instance_id, node_id);
   if (acquire_lock) lock_.lock();
@@ -169,7 +169,7 @@ shared_ptr<DataStreamRecvr> DataStreamMgr::FindRecvr(
 
 Status DataStreamMgr::AddData(const TUniqueId& fragment_instance_id,
     PlanNodeId dest_node_id, const TRowBatch& thrift_batch, int sender_id) {
-  VLOG_ROW << "AddData(): fragment_instance_id=" << fragment_instance_id
+  VLOG_ROW << "AddData(): fragment_instance_id=" << PrintId(fragment_instance_id)
            << " node=" << dest_node_id
            << " size=" << RowBatch::GetDeserializedSize(thrift_batch);
   bool already_unregistered;
@@ -197,7 +197,7 @@ Status DataStreamMgr::AddData(const TUniqueId& fragment_instance_id,
 
 Status DataStreamMgr::CloseSender(const TUniqueId& fragment_instance_id,
     PlanNodeId dest_node_id, int sender_id) {
-  VLOG_FILE << "CloseSender(): fragment_instance_id=" << fragment_instance_id
+  VLOG_FILE << "CloseSender(): fragment_instance_id=" << PrintId(fragment_instance_id)
             << ", node=" << dest_node_id;
   Status status;
   bool already_unregistered;
@@ -243,7 +243,7 @@ Status DataStreamMgr::CloseSender(const TUniqueId& fragment_instance_id,
 
 Status DataStreamMgr::DeregisterRecvr(
     const TUniqueId& fragment_instance_id, PlanNodeId node_id) {
-  VLOG_QUERY << "DeregisterRecvr(): fragment_instance_id=" << fragment_instance_id
+  VLOG_QUERY << "DeregisterRecvr(): fragment_instance_id=" << PrintId(fragment_instance_id)
              << ", node=" << node_id;
   size_t hash_value = GetHashValue(fragment_instance_id, node_id);
   lock_guard<mutex> l(lock_);
@@ -268,7 +268,7 @@ Status DataStreamMgr::DeregisterRecvr(
   }
 
   stringstream err;
-  err << "unknown row receiver id: fragment_instance_id=" << fragment_instance_id
+  err << "unknown row receiver id: fragment_instance_id=" << PrintId(fragment_instance_id)
       << " node_id=" << node_id;
   LOG(ERROR) << err.str();
   return Status(err.str());
@@ -276,7 +276,7 @@ Status DataStreamMgr::DeregisterRecvr(
 
 void DataStreamMgr::Cancel(const TUniqueId& fragment_instance_id) {
   VLOG_QUERY << "cancelling all streams for fragment_instance_id="
-             << fragment_instance_id;
+             << PrintId(fragment_instance_id);
   lock_guard<mutex> l(lock_);
   FragmentRecvrSet::iterator i =
       fragment_recvr_set_.lower_bound(make_pair(fragment_instance_id, 0));
@@ -285,7 +285,7 @@ void DataStreamMgr::Cancel(const TUniqueId& fragment_instance_id) {
     if (recvr.get() == NULL) {
       // keep going but at least log it
       stringstream err;
-      err << "Cancel(): missing in stream_map: fragment_instance_id=" << i->first
+      err << "Cancel(): missing in stream_map: fragment_instance_id=" << PrintId(i->first)
           << " node=" << i->second;
       LOG(ERROR) << err.str();
     } else {

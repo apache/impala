@@ -174,13 +174,8 @@ bool IsWildcardAddress(const string& ipaddress) {
 
 string TNetworkAddressToString(const TNetworkAddress& address) {
   stringstream ss;
-  ss << address;
+  ss << address.hostname << ":" << dec << address.port;
   return ss.str();
-}
-
-ostream& operator<<(ostream& out, const TNetworkAddress& hostport) {
-  out << hostport.hostname << ":" << dec << hostport.port;
-  return out;
 }
 
 /// Pick a random port in the range of ephemeral ports

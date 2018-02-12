@@ -134,7 +134,8 @@ void ChildQuery::Cancel() {
   Status status = ImpalaServer::THandleIdentifierToTUniqueId(hs2_handle_.operationId,
       &session_id, &secret_unused);
   if (status.ok()) {
-    VLOG_QUERY << "Cancelling and closing child query with operation id: " << session_id;
+    VLOG_QUERY << "Cancelling and closing child query with operation id: " <<
+        PrintId(session_id);
   } else {
     VLOG_QUERY << "Cancelling and closing child query. Failed to get query id: " <<
         status;

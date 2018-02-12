@@ -1088,7 +1088,7 @@ Status LlvmCodeGen::FinalizeModule() {
   }
   string non_finalized_fns_str = ss.str();
   if (!non_finalized_fns_str.empty()) {
-    LOG(INFO) << "For query " << state_->query_id()
+    LOG(INFO) << "For query " << PrintId(state_->query_id())
               << " the following functions were not finalized and have been removed from "
                  "the module:\n"
               << non_finalized_fns_str;
@@ -1710,7 +1710,7 @@ void LlvmCodeGen::DiagnosticHandler::DiagnosticHandlerFn(
     info.print(diagnostic_printer);
     error_msg.flush();
     if (codegen->state_) {
-      LOG(INFO) << "Query " << codegen->state_->query_id() << " encountered a "
+      LOG(INFO) << "Query " << PrintId(codegen->state_->query_id()) << " encountered a "
           << codegen->diagnostic_handler_.error_str_;
     }
   }

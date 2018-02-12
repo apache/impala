@@ -182,8 +182,8 @@ Status AsciiQueryResultSet::AddOneRow(const TResultRow& row) {
   out_stream.precision(ASCII_PRECISION);
   for (int i = 0; i < num_col; ++i) {
     // ODBC-187 - ODBC can only take "\t" as the delimiter
-    out_stream << (i > 0 ? "\t" : "");
-    out_stream << row.colVals[i];
+    if (i > 0) out_stream << '\t';
+    PrintTColumnValue(out_stream, row.colVals[i]);
   }
   result_set_->push_back(out_stream.str());
   return Status::OK();

@@ -196,7 +196,7 @@ MemTracker* MemTracker::CreateQueryMemTracker(const TUniqueId& id,
       ExecEnv::GetInstance()->pool_mem_trackers()->GetRequestPoolMemTracker(
           pool_name, true);
   MemTracker* tracker = obj_pool->Add(new MemTracker(
-      byte_limit, Substitute("Query($0)", lexical_cast<string>(id)), pool_tracker));
+      byte_limit, Substitute("Query($0)", PrintId(id)), pool_tracker));
   tracker->is_query_mem_tracker_ = true;
   tracker->query_id_ = id;
   return tracker;
@@ -370,7 +370,7 @@ Status MemTracker::MemLimitExceeded(RuntimeState* state, const std::string& deta
        << " without exceeding limit." << endl;
   }
   ss << "Error occurred on backend " << GetBackendString();
-  if (state != nullptr) ss << " by fragment " << state->fragment_instance_id();
+  if (state != nullptr) ss << " by fragment " << PrintId(state->fragment_instance_id());
   ss << endl;
   ExecEnv* exec_env = ExecEnv::GetInstance();
   MemTracker* process_tracker = exec_env->process_mem_tracker();

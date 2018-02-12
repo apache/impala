@@ -460,7 +460,7 @@ void Statestore::SubscribersHandler(const Webserver::ArgumentMap& args,
     Value subscriber_id(subscriber.second->id().c_str(), document->GetAllocator());
     sub_json.AddMember("id", subscriber_id, document->GetAllocator());
 
-    Value address(lexical_cast<string>(subscriber.second->network_address()).c_str(),
+    Value address(TNetworkAddressToString(subscriber.second->network_address()).c_str(),
         document->GetAllocator());
     sub_json.AddMember("address", address, document->GetAllocator());
 
@@ -875,7 +875,7 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
         // TODO: Consider if a metric to track the number of failures would be useful.
         LOG(INFO) << "Subscriber '" << subscriber->id() << "' has failed, disconnected "
                   << "or re-registered (last known registration ID: "
-                  << update.registration_id << ")";
+                  << PrintId(update.registration_id) << ")";
         UnregisterSubscriber(subscriber.get());
       } else {
         LOG(INFO) << "Failure was already detected for subscriber '" << subscriber->id()

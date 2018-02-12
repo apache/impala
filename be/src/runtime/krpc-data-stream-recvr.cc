@@ -232,7 +232,8 @@ Status KrpcDataStreamRecvr::SenderQueue::GetBatch(RowBatch** next_batch) {
       // is pending insertion so this thread is guaranteed to wake up at some point.
       DCHECK(deferred_rpcs_.empty() ||
           (num_deserialize_tasks_pending_ + num_pending_enqueue_) > 0);
-      VLOG_ROW << "wait arrival fragment_instance_id=" << recvr_->fragment_instance_id()
+      VLOG_ROW << "wait arrival fragment_instance_id="
+               << PrintId(recvr_->fragment_instance_id())
                << " node=" << recvr_->dest_node_id();
       // Don't count time spent waiting on the sender as active time.
       CANCEL_SAFE_SCOPED_TIMER(recvr_->data_wait_timer_, &is_cancelled_);
@@ -534,7 +535,7 @@ void KrpcDataStreamRecvr::SenderQueue::DecrementSenders() {
   DCHECK_GT(num_remaining_senders_, 0);
   num_remaining_senders_ = max(0, num_remaining_senders_ - 1);
   VLOG_FILE << "decremented senders: fragment_instance_id="
-            << recvr_->fragment_instance_id()
+            << PrintId(recvr_->fragment_instance_id())
             << " node_id=" << recvr_->dest_node_id()
             << " #senders=" << num_remaining_senders_;
   if (num_remaining_senders_ == 0) data_arrival_cv_.notify_one();
@@ -555,7 +556,7 @@ void KrpcDataStreamRecvr::SenderQueue::Cancel() {
     }
   }
   VLOG_QUERY << "cancelled stream: fragment_instance_id="
-             << recvr_->fragment_instance_id()
+             << PrintId(recvr_->fragment_instance_id())
              << " node_id=" << recvr_->dest_node_id();
   // Wake up all threads waiting to produce/consume batches. They will all
   // notice that the stream is cancelled and handle it.

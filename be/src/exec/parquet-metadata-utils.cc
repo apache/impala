@@ -154,7 +154,7 @@ Status ParquetMetadataUtils::ValidateRowGroupColumn(
   for (int i = 0; i < encodings.size(); ++i) {
     if (!IsEncodingSupported(encodings[i])) {
       return Status(Substitute("File '$0' uses an unsupported encoding: $1 for column "
-          "'$2'.", filename, PrintEncoding(encodings[i]), schema_element.name));
+          "'$2'.", filename, PrintThriftEnum(encodings[i]), schema_element.name));
     }
   }
 

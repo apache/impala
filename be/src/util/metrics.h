@@ -152,10 +152,9 @@ class ScalarMetric: public Metric {
     ToJsonValue(GetValue(), TUnit::NONE, document, &metric_value);
     container.AddMember("value", metric_value, document->GetAllocator());
 
-    rapidjson::Value type_value(PrintTMetricKind(kind()).c_str(),
-        document->GetAllocator());
+    rapidjson::Value type_value(PrintThriftEnum(kind()).c_str(), document->GetAllocator());
     container.AddMember("kind", type_value, document->GetAllocator());
-    rapidjson::Value units(PrintTUnit(unit()).c_str(), document->GetAllocator());
+    rapidjson::Value units(PrintThriftEnum(unit()).c_str(), document->GetAllocator());
     container.AddMember("units", units, document->GetAllocator());
     *val = container;
   }

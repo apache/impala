@@ -286,7 +286,7 @@ void ImpalaServer::get_log(string& log, const LogContextId& context) {
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (request_state.get() == nullptr) {
     stringstream str;
-    str << "unknown query id: " << query_id;
+    str << "unknown query id: " << PrintId(query_id);
     LOG(ERROR) << str.str();
     return;
   }
