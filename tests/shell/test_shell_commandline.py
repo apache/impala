@@ -247,8 +247,8 @@ class TestImpalaShell(ImpalaTestSuite):
     args = '-q "set"'
     result_set = run_impala_shell_cmd(args)
     assert 'MEM_LIMIT: [0]' in result_set.stdout
-    # test to check that explain_level is 1
-    assert 'EXPLAIN_LEVEL: [1]' in result_set.stdout
+    # test to check that explain_level is STANDARD
+    assert 'EXPLAIN_LEVEL: [STANDARD]' in result_set.stdout
     # test to check that configs without defaults show up as []
     assert 'COMPRESSION_CODEC: []' in result_set.stdout
     # test values displayed after setting value

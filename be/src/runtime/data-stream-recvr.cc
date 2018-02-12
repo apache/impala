@@ -112,7 +112,8 @@ Status DataStreamRecvr::SenderQueue::GetBatch(RowBatch** next_batch) {
   unique_lock<mutex> l(lock_);
   // wait until something shows up or we know we're done
   while (!is_cancelled_ && batch_queue_.empty() && num_remaining_senders_ > 0) {
-    VLOG_ROW << "wait arrival fragment_instance_id=" << recvr_->fragment_instance_id()
+    VLOG_ROW << "wait arrival fragment_instance_id="
+             << PrintId(recvr_->fragment_instance_id())
              << " node=" << recvr_->dest_node_id();
     // Don't count time spent waiting on the sender as active time.
     CANCEL_SAFE_SCOPED_TIMER(recvr_->data_arrival_timer_, &is_cancelled_);
@@ -221,7 +222,7 @@ void DataStreamRecvr::SenderQueue::DecrementSenders() {
   DCHECK_GT(num_remaining_senders_, 0);
   num_remaining_senders_ = max(0, num_remaining_senders_ - 1);
   VLOG_FILE << "decremented senders: fragment_instance_id="
-            << recvr_->fragment_instance_id()
+            << PrintId(recvr_->fragment_instance_id())
             << " node_id=" << recvr_->dest_node_id()
             << " #senders=" << num_remaining_senders_;
   if (num_remaining_senders_ == 0) data_arrival_cv_.NotifyOne();
@@ -233,7 +234,7 @@ void DataStreamRecvr::SenderQueue::Cancel() {
     if (is_cancelled_) return;
     is_cancelled_ = true;
     VLOG_QUERY << "cancelled stream: fragment_instance_id_="
-               << recvr_->fragment_instance_id()
+               << PrintId(recvr_->fragment_instance_id())
                << " node_id=" << recvr_->dest_node_id();
   }
   // Wake up all threads waiting to produce/consume batches.  They will all

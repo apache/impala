@@ -263,7 +263,8 @@ void RuntimeFilterBank::Close() {
   obj_pool_.Clear();
   mem_pool_.FreeAll();
   if (buffer_pool_client_.is_registered()) {
-    VLOG_FILE << "RuntimeFilterBank (Fragment Id: " << state_->fragment_instance_id()
+    VLOG_FILE << "RuntimeFilterBank (Fragment Id: "
+              << PrintId(state_->fragment_instance_id())
               << ") returning reservation " << total_bloom_filter_mem_required_;
     state_->query_state()->initial_reservations()->Return(
         &buffer_pool_client_, total_bloom_filter_mem_required_);

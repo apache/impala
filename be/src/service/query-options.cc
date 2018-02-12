@@ -70,14 +70,29 @@ void impala::OverlayQueryOptions(const TQueryOptions& src, const QueryOptionsMas
 #undef REMOVED_QUERY_OPT_FN
 }
 
+// Choose different print function based on the type.
+// TODO: In thrift 0.11.0 operator << is implemented for enums and this indirection can be
+// removed.
+template<typename T, typename std::enable_if_t<std::is_enum<T>::value>* = nullptr>
+string PrintQueryOptionValue(const T& option) {
+  return PrintThriftEnum(option);
+}
+
+template<typename T, typename std::enable_if_t<std::is_integral<T>::value>* = nullptr>
+string PrintQueryOptionValue(const T& option)  {
+  return std::to_string(option);
+}
+
+const string& PrintQueryOptionValue(const std::string& option)  {
+  return option;
+}
+
 void impala::TQueryOptionsToMap(const TQueryOptions& query_options,
     map<string, string>* configuration) {
 #define QUERY_OPT_FN(NAME, ENUM, LEVEL)\
   {\
     if (query_options.__isset.NAME) { \
-      stringstream val;\
-      val << query_options.NAME;\
-      (*configuration)[#ENUM] = val.str();\
+      (*configuration)[#ENUM] = PrintQueryOptionValue(query_options.NAME); \
     } else { \
       (*configuration)[#ENUM] = ""; \
     }\
@@ -370,7 +385,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
         if (size < RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE ||
             size > RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE) {
           return Status(Substitute("$0 is not a valid Bloom filter size for $1. "
-                  "Valid sizes are in [$2, $3].", value, PrintTImpalaQueryOptions(
+                  "Valid sizes are in [$2, $3].", value, PrintThriftEnum(
                       static_cast<TImpalaQueryOptions::type>(option)),
                   RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE,
                   RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE));
@@ -382,7 +397,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
             && FLAGS_min_buffer_size <= RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE) {
           return Status(Substitute("$0 should not be less than $1 which is the minimum "
               "buffer size that can be allocated by the buffer pool",
-              PrintTImpalaQueryOptions(static_cast<TImpalaQueryOptions::type>(option)),
+              PrintThriftEnum(static_cast<TImpalaQueryOptions::type>(option)),
               FLAGS_min_buffer_size));
         }
         if (option == TImpalaQueryOptions::RUNTIME_BLOOM_FILTER_SIZE) {

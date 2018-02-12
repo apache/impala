@@ -44,7 +44,7 @@ DEFINE_int32(log_mem_usage_interval, 0, "If non-zero, impalad will output memory
 Status QueryExecMgr::StartQuery(const TExecQueryFInstancesParams& params) {
   TUniqueId query_id = params.query_ctx.query_id;
   VLOG_QUERY << "StartQueryFInstances() query_id=" << PrintId(query_id)
-             << " coord=" << params.query_ctx.coord_address;
+             << " coord=" << TNetworkAddressToString(params.query_ctx.coord_address);
 
   bool dummy;
   QueryState* qs = GetOrCreateQueryState(params.query_ctx, &dummy);
@@ -92,7 +92,7 @@ QueryState* QueryExecMgr::GetQueryState(const TUniqueId& query_id) {
     refcnt = qs->refcnt_.Add(1);
   }
   DCHECK(qs != nullptr && refcnt > 0);
-  VLOG_QUERY << "QueryState: query_id=" << query_id << " refcnt=" << refcnt;
+  VLOG_QUERY << "QueryState: query_id=" << PrintId(query_id) << " refcnt=" << refcnt;
   return qs;
 }
 
@@ -167,7 +167,7 @@ void QueryExecMgr::ReleaseQueryState(QueryState* qs) {
     // someone else might have gc'd the entry
     if (it == map_ref->end()) return;
     qs_from_map = it->second;
-    DCHECK_EQ(qs_from_map->query_ctx().query_id, query_id);
+    DCHECK(qs_from_map->query_ctx().query_id == query_id);
     int32_t cnt = qs_from_map->refcnt_.Load();
     DCHECK_GE(cnt, 0);
     // someone else might have increased the refcnt in the meantime

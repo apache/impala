@@ -167,7 +167,7 @@ bool RuntimeState::LogError(const ErrorMsg& message, int vlog_level) {
   // All errors go to the log, unreported_error_count_ is counted independently of the
   // size of the error_log to account for errors that were already reported to the
   // coordinator
-  VLOG(vlog_level) << "Error from query " << query_id() << ": " << message.msg();
+  VLOG(vlog_level) << "Error from query " << PrintId(query_id()) << ": " << message.msg();
   if (ErrorCount(error_log_) < query_options().max_errors) {
     AppendError(&error_log_, message);
     return true;
@@ -239,7 +239,7 @@ void RuntimeState::ReleaseResources() {
 
   // No more memory should be tracked for this instance at this point.
   if (instance_mem_tracker_->consumption() != 0) {
-    LOG(WARNING) << "Query " << query_id() << " may have leaked memory." << endl
+    LOG(WARNING) << "Query " << PrintId(query_id()) << " may have leaked memory." << endl
                  << instance_mem_tracker_->LogUsage(MemTracker::UNLIMITED_DEPTH);
   }
   instance_mem_tracker_->Close();

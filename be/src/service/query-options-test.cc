@@ -360,7 +360,7 @@ TEST(QueryOptions, MapOptionalDefaultlessToEmptyString) {
   EXPECT_EQ(map["COMPRESSION_CODEC"], "");
   EXPECT_EQ(map["MT_DOP"], "");
   // Has defaults
-  EXPECT_EQ(map["EXPLAIN_LEVEL"], "1");
+  EXPECT_EQ(map["EXPLAIN_LEVEL"], "STANDARD");
 }
 
 /// Overlay a with b. batch_size is set in both places.

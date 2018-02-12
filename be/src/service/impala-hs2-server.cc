@@ -338,8 +338,8 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   TQueryOptionsToMap(state->QueryOptions(), &return_val.configuration);
 
   // OpenSession() should return the coordinator's HTTP server address.
-  const string& http_addr = lexical_cast<string>(
-      MakeNetworkAddress(FLAGS_hostname, FLAGS_webserver_port));
+  const string& http_addr = TNetworkAddressToString(MakeNetworkAddress(
+      FLAGS_hostname, FLAGS_webserver_port));
   return_val.configuration.insert(make_pair("http_addr", http_addr));
 
   // Put the session state in session_state_map_

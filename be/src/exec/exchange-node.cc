@@ -150,7 +150,7 @@ Status ExchangeNode::FillInputRowBatch(RuntimeState* state) {
   VLOG_FILE << "exch: has batch=" << (input_batch_ == NULL ? "false" : "true")
             << " #rows=" << (input_batch_ != NULL ? input_batch_->num_rows() : 0)
             << " is_cancelled=" << (ret_status.IsCancelled() ? "true" : "false")
-            << " instance_id=" << state->fragment_instance_id();
+            << " instance_id=" << PrintId(state->fragment_instance_id());
   return ret_status;
 }
 

@@ -121,7 +121,7 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
     limit_(tnode.limit),
     num_rows_returned_(0),
     runtime_profile_(RuntimeProfile::Create(pool_,
-        Substitute("$0 (id=$1)", PrintPlanNodeType(tnode.node_type), id_))),
+        Substitute("$0 (id=$1)", PrintThriftEnum(tnode.node_type), id_))),
     rows_returned_counter_(NULL),
     rows_returned_rate_(NULL),
     containing_subplan_(NULL),
@@ -207,8 +207,8 @@ void ExecNode::Close(RuntimeState* state) {
   if (expr_mem_tracker_ != nullptr) expr_mem_tracker_->Close();
   if (mem_tracker_ != nullptr) {
     if (mem_tracker()->consumption() != 0) {
-      LOG(WARNING) << "Query " << state->query_id() << " may have leaked memory." << endl
-          << state->instance_mem_tracker()->LogUsage(MemTracker::UNLIMITED_DEPTH);
+      LOG(WARNING) << "Query " << PrintId(state->query_id()) << " may have leaked memory."
+          << endl << state->instance_mem_tracker()->LogUsage(MemTracker::UNLIMITED_DEPTH);
       DCHECK_EQ(mem_tracker()->consumption(), 0)
           << "Leaked memory." << endl
           << state->instance_mem_tracker()->LogUsage(MemTracker::UNLIMITED_DEPTH);
@@ -230,7 +230,7 @@ Status ExecNode::ClaimBufferReservation(RuntimeState* state) {
   }
 
   RETURN_IF_ERROR(buffer_pool->RegisterClient(
-      Substitute("$0 id=$1 ptr=$2", PrintPlanNodeType(type_), id_, this),
+      Substitute("$0 id=$1 ptr=$2", PrintThriftEnum(type_), id_, this),
       state->query_state()->file_group(), state->instance_buffer_reservation(),
       mem_tracker(), resource_profile_.max_reservation, runtime_profile(),
       &buffer_pool_client_));

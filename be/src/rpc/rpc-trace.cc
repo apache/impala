@@ -197,7 +197,7 @@ void* RpcEventHandler::getContext(const char* fn_name, void* server_context) {
   InvocationContext* ctxt_ptr =
       new InvocationContext(MonotonicMillis(), cnxn_ctx, it->second);
   VLOG_RPC << "RPC call: " << string(fn_name) << "(from "
-           << ctxt_ptr->cnxn_ctx->network_address << ")";
+           << TNetworkAddressToString(ctxt_ptr->cnxn_ctx->network_address) << ")";
   return reinterpret_cast<void*>(ctxt_ptr);
 }
 
@@ -207,7 +207,7 @@ void RpcEventHandler::postWrite(void* ctx, const char* fn_name, uint32_t bytes) 
   const string& call_name = string(fn_name);
   // TODO: bytes is always 0, how come?
   VLOG_RPC << "RPC call: " << server_name_ << ":" << call_name << " from "
-           << rpc_ctx->cnxn_ctx->network_address << " took "
+           << TNetworkAddressToString(rpc_ctx->cnxn_ctx->network_address) << " took "
            << PrettyPrinter::Print(elapsed_time * 1000L * 1000L, TUnit::TIME_NS);
   MethodDescriptor* descriptor = rpc_ctx->method_descriptor;
   delete rpc_ctx;

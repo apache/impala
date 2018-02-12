@@ -50,62 +50,33 @@ DECLARE_string(hostname);
 
 namespace impala {
 
-#define THRIFT_ENUM_OUTPUT_FN_IMPL(E, MAP) \
-  ostream& operator<<(ostream& os, const E::type& e) {\
-    map<int, const char*>::const_iterator i;\
-    i = MAP.find(e);\
-    if (i != MAP.end()) {\
-      os << i->second;\
-    }\
-    return os;\
+#define PRINT_THRIFT_ENUM_IMPL(T) \
+  string PrintThriftEnum(const T::type& value) { \
+    map<int, const char*>::const_iterator it = _##T##_VALUES_TO_NAMES.find(value); \
+    return it == _##T##_VALUES_TO_NAMES.end() ? std::to_string(value) : it->second; \
   }
 
-// Macro to stamp out operator<< for thrift enums.  Why doesn't thrift do this?
-#define THRIFT_ENUM_OUTPUT_FN(E) THRIFT_ENUM_OUTPUT_FN_IMPL(E , _##E##_VALUES_TO_NAMES)
-
-// Macro to implement Print function that returns string for thrift enums. Make sure you
-// define a corresponding THRIFT_ENUM_OUTPUT_FN.
-#define THRIFT_ENUM_PRINT_FN(E) \
-  string Print##E(const E::type& e) {\
-    stringstream ss;\
-    ss << e;\
-    return ss.str();\
-  }
-
-THRIFT_ENUM_OUTPUT_FN(TFunctionBinaryType);
-THRIFT_ENUM_OUTPUT_FN(TCatalogObjectType);
-THRIFT_ENUM_OUTPUT_FN(TDdlType);
-THRIFT_ENUM_OUTPUT_FN(TCatalogOpType);
-THRIFT_ENUM_OUTPUT_FN(THdfsFileFormat);
-THRIFT_ENUM_OUTPUT_FN(THdfsCompression);
-THRIFT_ENUM_OUTPUT_FN(TReplicaPreference);
-THRIFT_ENUM_OUTPUT_FN(TSessionType);
-THRIFT_ENUM_OUTPUT_FN(TStmtType);
-THRIFT_ENUM_OUTPUT_FN(QueryState);
-THRIFT_ENUM_OUTPUT_FN(Encoding);
-THRIFT_ENUM_OUTPUT_FN(CompressionCodec);
-THRIFT_ENUM_OUTPUT_FN(Type);
-THRIFT_ENUM_OUTPUT_FN(TMetricKind);
-THRIFT_ENUM_OUTPUT_FN(TUnit);
-THRIFT_ENUM_OUTPUT_FN(TImpalaQueryOptions);
-
-THRIFT_ENUM_PRINT_FN(TCatalogObjectType);
-THRIFT_ENUM_PRINT_FN(TDdlType);
-THRIFT_ENUM_PRINT_FN(TCatalogOpType);
-THRIFT_ENUM_PRINT_FN(TReplicaPreference);
-THRIFT_ENUM_PRINT_FN(TSessionType);
-THRIFT_ENUM_PRINT_FN(TStmtType);
-THRIFT_ENUM_PRINT_FN(QueryState);
-THRIFT_ENUM_PRINT_FN(Encoding);
-THRIFT_ENUM_PRINT_FN(TMetricKind);
-THRIFT_ENUM_PRINT_FN(TUnit);
-THRIFT_ENUM_PRINT_FN(TImpalaQueryOptions);
-
-
-ostream& operator<<(ostream& os, const TUniqueId& id) {
-  os << PrintId(id);
-  return os;
-}
+PRINT_THRIFT_ENUM_IMPL(QueryState)
+PRINT_THRIFT_ENUM_IMPL(Encoding)
+PRINT_THRIFT_ENUM_IMPL(TCatalogObjectType)
+PRINT_THRIFT_ENUM_IMPL(TCatalogOpType)
+PRINT_THRIFT_ENUM_IMPL(TDdlType)
+PRINT_THRIFT_ENUM_IMPL(TExplainLevel)
+PRINT_THRIFT_ENUM_IMPL(THdfsCompression)
+PRINT_THRIFT_ENUM_IMPL(THdfsFileFormat)
+PRINT_THRIFT_ENUM_IMPL(THdfsSeqCompressionMode)
+PRINT_THRIFT_ENUM_IMPL(TImpalaQueryOptions)
+PRINT_THRIFT_ENUM_IMPL(TJoinDistributionMode)
+PRINT_THRIFT_ENUM_IMPL(TMetricKind)
+PRINT_THRIFT_ENUM_IMPL(TParquetArrayResolution)
+PRINT_THRIFT_ENUM_IMPL(TParquetFallbackSchemaResolution)
+PRINT_THRIFT_ENUM_IMPL(TPlanNodeType)
+PRINT_THRIFT_ENUM_IMPL(TPrefetchMode)
+PRINT_THRIFT_ENUM_IMPL(TReplicaPreference)
+PRINT_THRIFT_ENUM_IMPL(TRuntimeFilterMode)
+PRINT_THRIFT_ENUM_IMPL(TSessionType)
+PRINT_THRIFT_ENUM_IMPL(TStmtType)
+PRINT_THRIFT_ENUM_IMPL(TUnit)
 
 string PrintId(const TUniqueId& id, const string& separator) {
   stringstream out;
@@ -156,15 +127,6 @@ bool ParseId(const string& s, TUniqueId* id) {
   bool valid = *error_hi == '\0' && *error_lo == '\0';
   *separator = ':';
   return valid;
-}
-
-string PrintPlanNodeType(const TPlanNodeType::type& type) {
-  map<int, const char*>::const_iterator i;
-  i = _TPlanNodeType_VALUES_TO_NAMES.find(type);
-  if (i != _TPlanNodeType_VALUES_TO_NAMES.end()) {
-    return i->second;
-  }
-  return "Invalid plan node type";
 }
 
 string PrintTuple(const Tuple* t, const TupleDescriptor& d) {

@@ -160,7 +160,7 @@ class StatsMetric : public Metric {
     boost::lock_guard<boost::mutex> l(lock_);
     rapidjson::Value container(rapidjson::kObjectType);
     AddStandardFields(document, &container);
-    rapidjson::Value units(PrintTUnit(unit_).c_str(), document->GetAllocator());
+    rapidjson::Value units(PrintThriftEnum(unit_).c_str(), document->GetAllocator());
     container.AddMember("units", units, document->GetAllocator());
 
     if (StatsSelection & StatsType::COUNT) {

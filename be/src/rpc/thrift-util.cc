@@ -156,7 +156,7 @@ Status WaitForServer(const string& host, int port, int num_retries,
   return Status("Server did not come up");
 }
 
-std::ostream& operator<<(std::ostream& out, const TColumnValue& colval) {
+void PrintTColumnValue(std::ostream& out, const TColumnValue& colval) {
   if (colval.__isset.bool_val) {
     out << ((colval.bool_val) ? "true" : "false");
   } else if (colval.__isset.double_val) {
@@ -176,7 +176,6 @@ std::ostream& operator<<(std::ostream& out, const TColumnValue& colval) {
   } else {
     out << "NULL";
   }
-  return out;
 }
 
 bool TNetworkAddressComparator(const TNetworkAddress& a, const TNetworkAddress& b) {

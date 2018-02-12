@@ -1211,7 +1211,7 @@ bool BaseScalarColumnReader::NextLevels() {
 Status BaseScalarColumnReader::GetUnsupportedDecodingError() {
   return Status(Substitute(
       "File '$0' is corrupt: unexpected encoding: $1 for data page of column '$2'.",
-      filename(), PrintEncoding(page_encoding_), schema_element().name));
+      filename(), PrintThriftEnum(page_encoding_), schema_element().name));
 }
 
 bool BaseScalarColumnReader::NextPage() {

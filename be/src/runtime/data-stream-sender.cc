@@ -165,8 +165,9 @@ Status DataStreamSender::Channel::Init(RuntimeState* state) {
 }
 
 Status DataStreamSender::Channel::SendBatch(TRowBatch* batch) {
-  VLOG_ROW << "Channel::SendBatch() fragment_instance_id=" << fragment_instance_id_
-           << " dest_node=" << dest_node_id_ << " #rows=" << batch->num_rows;
+  VLOG_ROW << "Channel::SendBatch() fragment_instance_id="
+           << PrintId(fragment_instance_id_) << " dest_node=" << dest_node_id_
+           << " #rows=" << batch->num_rows;
   // return if the previous batch saw an error
   RETURN_IF_ERROR(GetSendStatus());
   {
@@ -193,8 +194,8 @@ void DataStreamSender::Channel::TransmitData(int thread_id, const TRowBatch* bat
 
 void DataStreamSender::Channel::TransmitDataHelper(const TRowBatch* batch) {
   DCHECK(batch != NULL);
-  VLOG_ROW << "Channel::TransmitData() fragment_instance_id=" << fragment_instance_id_
-           << " dest_node=" << dest_node_id_
+  VLOG_ROW << "Channel::TransmitData() fragment_instance_id="
+           << PrintId(fragment_instance_id_) << " dest_node=" << dest_node_id_
            << " #rows=" << batch->num_rows;
   TTransmitDataParams params;
   params.protocol_version = ImpalaInternalServiceVersion::V1;
@@ -276,15 +277,15 @@ Status DataStreamSender::Channel::GetSendStatus() {
   WaitForRpc();
   if (!rpc_status_.ok()) {
     LOG(ERROR) << "channel send to " << TNetworkAddressToString(address_) << " failed "
-               << "(fragment_instance_id=" << fragment_instance_id_ << "): "
+               << "(fragment_instance_id=" << PrintId(fragment_instance_id_) << "): "
                << rpc_status_.GetDetail();
   }
   return rpc_status_;
 }
 
 Status DataStreamSender::Channel::FlushAndSendEos(RuntimeState* state) {
-  VLOG_RPC << "Channel::FlushAndSendEos() fragment_instance_id=" << fragment_instance_id_
-           << " dest_node=" << dest_node_id_
+  VLOG_RPC << "Channel::FlushAndSendEos() fragment_instance_id="
+           << PrintId(fragment_instance_id_) << " dest_node=" << dest_node_id_
            << " #rows= " << batch_->num_rows();
 
   // We can return an error here and not go on to send the EOS RPC because the error that
@@ -314,7 +315,7 @@ Status DataStreamSender::Channel::FlushAndSendEos(RuntimeState* state) {
   rpc_status_ = DoTransmitDataRpc(&client, params, &res);
   if (!rpc_status_.ok()) {
     LOG(ERROR) << "Failed to send EOS to " << TNetworkAddressToString(address_)
-               << " (fragment_instance_id=" << fragment_instance_id_ << "): "
+               << " (fragment_instance_id=" << PrintId(fragment_instance_id_) << "): "
                << rpc_status_.GetDetail();
     return rpc_status_;
   }

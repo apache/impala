@@ -198,7 +198,7 @@ void ImpalaHttpHandler::CloseSessionHandler(const Webserver::ArgumentMap& args,
     return;
   }
   stringstream ss;
-  ss << "Session " << unique_id << " closed successfully";
+  ss << "Session " << PrintId(unique_id) << " closed successfully";
   Value message(ss.str().c_str(), document->GetAllocator());
   document->AddMember("contents", message, document->GetAllocator());
 }
@@ -250,7 +250,7 @@ void ImpalaHttpHandler::InflightQueryIdsHandler(const Webserver::ArgumentMap& ar
   stringstream ss;
   server_->client_request_state_map_.DoFuncForAllEntries(
       [&](const std::shared_ptr<ClientRequestState>& request_state) {
-          ss << request_state->query_id() << "\n";
+          ss << PrintId(request_state->query_id()) << "\n";
       });
   document->AddMember(Webserver::ENABLE_RAW_JSON_KEY, true, document->GetAllocator());
   Value query_ids(ss.str().c_str(), document->GetAllocator());
@@ -419,7 +419,7 @@ void ImpalaHttpHandler::QueryStateHandler(const Webserver::ArgumentMap& args,
     for (const ImpalaServer::QueryLocations::value_type& location:
          server_->query_locations_) {
       Value location_json(kObjectType);
-      Value location_name(lexical_cast<string>(location.first).c_str(),
+      Value location_name(TNetworkAddressToString(location.first).c_str(),
           document->GetAllocator());
       location_json.AddMember("location", location_name, document->GetAllocator());
       location_json.AddMember("count", static_cast<uint64_t>(location.second.size()),
@@ -440,8 +440,7 @@ void ImpalaHttpHandler::SessionsHandler(const Webserver::ArgumentMap& args,
            server_->session_state_map_) {
     shared_ptr<ImpalaServer::SessionState> state = session.second;
     Value session_json(kObjectType);
-    Value type(PrintTSessionType(state->session_type).c_str(),
-        document->GetAllocator());
+    Value type(PrintThriftEnum(state->session_type).c_str(), document->GetAllocator());
     session_json.AddMember("type", type, document->GetAllocator());
 
     session_json.AddMember("inflight_queries",
@@ -459,7 +458,7 @@ void ImpalaHttpHandler::SessionsHandler(const Webserver::ArgumentMap& args,
     Value session_id(PrintId(session.first).c_str(), document->GetAllocator());
     session_json.AddMember("session_id", session_id, document->GetAllocator());
 
-    Value network_address(lexical_cast<string>(state->network_address).c_str(),
+    Value network_address(TNetworkAddressToString(state->network_address).c_str(),
         document->GetAllocator());
     session_json.AddMember("network_address", network_address, document->GetAllocator());
 

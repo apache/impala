@@ -41,7 +41,8 @@ ImpalaInternalService::ImpalaInternalService() {
 
 void ImpalaInternalService::ExecQueryFInstances(TExecQueryFInstancesResult& return_val,
     const TExecQueryFInstancesParams& params) {
-  VLOG_QUERY << "ExecQueryFInstances():" << " query_id=" << params.query_ctx.query_id;
+  VLOG_QUERY << "ExecQueryFInstances():" << " query_id=" <<
+      PrintId(params.query_ctx.query_id);
   FAULT_INJECTION_RPC_DELAY(RPC_EXECQUERYFINSTANCES);
   DCHECK(params.__isset.coord_state_idx);
   DCHECK(params.__isset.query_ctx);
@@ -53,14 +54,14 @@ void ImpalaInternalService::ExecQueryFInstances(TExecQueryFInstancesResult& retu
 template <typename T> void SetUnknownIdError(
     const string& id_type, const TUniqueId& id, T* status_container) {
   Status status(ErrorMsg(TErrorCode::INTERNAL_ERROR,
-      Substitute("Unknown $0 id: $1", id_type, lexical_cast<string>(id))));
+      Substitute("Unknown $0 id: $1", id_type, PrintId(id))));
   status.SetTStatus(status_container);
 }
 
 void ImpalaInternalService::CancelQueryFInstances(
     TCancelQueryFInstancesResult& return_val,
     const TCancelQueryFInstancesParams& params) {
-  VLOG_QUERY << "CancelQueryFInstances(): query_id=" << params.query_id;
+  VLOG_QUERY << "CancelQueryFInstances(): query_id=" << PrintId(params.query_id);
   FAULT_INJECTION_RPC_DELAY(RPC_CANCELQUERYFINSTANCES);
   DCHECK(params.__isset.query_id);
   QueryState::ScopedRef qs(params.query_id);

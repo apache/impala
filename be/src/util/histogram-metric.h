@@ -62,10 +62,10 @@ class HistogramMetric : public Metric {
       container.AddMember("min", histogram_->MinValue(), document->GetAllocator());
       container.AddMember("count", histogram_->TotalCount(), document->GetAllocator());
     }
-    rapidjson::Value type_value(PrintTMetricKind(TMetricKind::HISTOGRAM).c_str(),
+    rapidjson::Value type_value(PrintThriftEnum(TMetricKind::HISTOGRAM).c_str(),
         document->GetAllocator());
     container.AddMember("kind", type_value, document->GetAllocator());
-    rapidjson::Value units(PrintTUnit(unit()).c_str(), document->GetAllocator());
+    rapidjson::Value units(PrintThriftEnum(unit()).c_str(), document->GetAllocator());
     container.AddMember("units", units, document->GetAllocator());
 
     *value = container;

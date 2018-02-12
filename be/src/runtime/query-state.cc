@@ -413,7 +413,7 @@ void QueryState::ExecFInstance(FragmentInstanceState* fis) {
 }
 
 void QueryState::Cancel() {
-  VLOG_QUERY << "Cancel: query_id=" << query_id();
+  VLOG_QUERY << "Cancel: query_id=" << PrintId(query_id());
   (void) instances_prepared_promise_.Get();
   if (!is_cancelled_.CompareAndSwap(0, 1)) return;
   for (auto entry: fis_map_) entry.second->Cancel();

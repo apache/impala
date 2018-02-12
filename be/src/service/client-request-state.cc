@@ -91,7 +91,7 @@ ClientRequestState::ClientRequestState(
 
   profile_->set_name("Query (id=" + PrintId(query_id()) + ")");
   summary_profile_->AddInfoString("Session ID", PrintId(session_id()));
-  summary_profile_->AddInfoString("Session Type", PrintTSessionType(session_type()));
+  summary_profile_->AddInfoString("Session Type", PrintThriftEnum(session_type()));
   if (session_type() == TSessionType::HIVESERVER2) {
     summary_profile_->AddInfoString("HiveServer2 Protocol Version",
         Substitute("V$0", 1 + session->hs2_version));
@@ -102,14 +102,14 @@ ClientRequestState::ClientRequestState(
       TimePrecision::Nanosecond));
   summary_profile_->AddInfoString("End Time", "");
   summary_profile_->AddInfoString("Query Type", "N/A");
-  summary_profile_->AddInfoString("Query State", PrintQueryState(BeeswaxQueryState()));
+  summary_profile_->AddInfoString("Query State", PrintThriftEnum(BeeswaxQueryState()));
   summary_profile_->AddInfoString("Query Status", "OK");
   summary_profile_->AddInfoString("Impala Version", GetVersionString(/* compact */ true));
   summary_profile_->AddInfoString("User", effective_user());
   summary_profile_->AddInfoString("Connected User", connected_user());
   summary_profile_->AddInfoString("Delegated User", do_as_user());
   summary_profile_->AddInfoString("Network Address",
-      lexical_cast<string>(session_->network_address));
+      TNetworkAddressToString(session_->network_address));
   summary_profile_->AddInfoString("Default Db", default_db());
   summary_profile_->AddInfoStringRedacted(
       "Sql Statement", query_ctx_.client_request.stmt);
@@ -140,7 +140,7 @@ Status ClientRequestState::Exec(TExecRequest* exec_request) {
   exec_request_ = *exec_request;
 
   profile_->AddChild(server_profile_);
-  summary_profile_->AddInfoString("Query Type", PrintTStmtType(stmt_type()));
+  summary_profile_->AddInfoString("Query Type", PrintThriftEnum(stmt_type()));
   summary_profile_->AddInfoString("Query Options (set by configuration)",
       DebugQueryOptions(query_ctx_.client_request.query_options));
   summary_profile_->AddInfoString("Query Options (set by configuration and planner)",
@@ -489,7 +489,7 @@ Status ClientRequestState::ExecQueryOrDmlRequest(
 
 Status ClientRequestState::ExecDdlRequest() {
   string op_type = catalog_op_type() == TCatalogOpType::DDL ?
-      PrintTDdlType(ddl_type()) : PrintTCatalogOpType(catalog_op_type());
+      PrintThriftEnum(ddl_type()) : PrintThriftEnum(catalog_op_type());
   summary_profile_->AddInfoString("DDL Type", op_type);
 
   if (catalog_op_type() != TCatalogOpType::DDL &&
@@ -575,7 +575,7 @@ void ClientRequestState::Done() {
     uint64_t latest_kudu_ts =
         coord_->dml_exec_state()->GetKuduLatestObservedTimestamp();
     if (latest_kudu_ts > 0) {
-      VLOG_RPC << "Updating session (id=" << session_id()  << ") with latest "
+      VLOG_RPC << "Updating session (id=" << PrintId(session_id())  << ") with latest "
                << "observed Kudu timestamp: " << latest_kudu_ts;
       lock_guard<mutex> session_lock(session_->lock);
       session_->kudu_latest_observed_ts = std::max<uint64_t>(
@@ -599,7 +599,7 @@ void ClientRequestState::Done() {
 Status ClientRequestState::Exec(const TMetadataOpRequest& exec_request) {
   TResultSet metadata_op_result;
   // Like the other Exec(), fill out as much profile information as we're able to.
-  summary_profile_->AddInfoString("Query Type", PrintTStmtType(TStmtType::DDL));
+  summary_profile_->AddInfoString("Query Type", PrintThriftEnum(TStmtType::DDL));
   RETURN_IF_ERROR(frontend_->ExecHiveServer2MetadataOp(exec_request,
       &metadata_op_result));
   result_metadata_ = metadata_op_result.schema;
@@ -926,7 +926,7 @@ Status ClientRequestState::UpdateCatalog() {
     catalog_update.header.__set_requesting_user(effective_user());
     if (!coord()->dml_exec_state()->PrepareCatalogUpdate(&catalog_update)) {
       VLOG_QUERY << "No partitions altered, not updating metastore (query id: "
-                 << query_id() << ")";
+                 << PrintId(query_id()) << ")";
     } else {
       // TODO: We track partitions written to, not created, which means
       // that we do more work than is necessary, because written-to
@@ -1110,7 +1110,7 @@ void ClientRequestState::ClearResultCache() {
 void ClientRequestState::UpdateOperationState(
     TOperationState::type operation_state) {
   operation_state_ = operation_state;
-  summary_profile_->AddInfoString("Query State", PrintQueryState(BeeswaxQueryState()));
+  summary_profile_->AddInfoString("Query State", PrintThriftEnum(BeeswaxQueryState()));
 }
 
 beeswax::QueryState::type ClientRequestState::BeeswaxQueryState() const {

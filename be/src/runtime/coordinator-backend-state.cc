@@ -58,7 +58,7 @@ void Coordinator::BackendState::Init(
   int prev_fragment_idx = -1;
   for (const FInstanceExecParams* instance_params:
        backend_exec_params_->instance_params) {
-    DCHECK_EQ(host_, instance_params->host);  // all hosts must be the same
+    DCHECK(host_ == instance_params->host);  // all hosts must be the same
     int fragment_idx = instance_params->fragment().idx;
     DCHECK_LT(fragment_idx, fragment_stats.size());
     if (prev_fragment_idx != -1 && fragment_idx != prev_fragment_idx) {
@@ -157,7 +157,8 @@ void Coordinator::BackendState::Exec(
   rpc_params.__set_query_ctx(query_ctx);
   SetRpcParams(debug_options, filter_routing_table, &rpc_params);
   VLOG_FILE << "making rpc: ExecQueryFInstances"
-      << " host=" << impalad_address() << " query_id=" << PrintId(query_id_);
+      << " host=" << TNetworkAddressToString(impalad_address()) << " query_id="
+      << PrintId(query_id_);
 
   // guard against concurrent UpdateBackendExecStatus() that may arrive after RPC returns
   lock_guard<mutex> l(lock_);
@@ -223,8 +224,9 @@ void Coordinator::BackendState::LogFirstInProgress(
   for (Coordinator::BackendState* backend_state : backend_states) {
     lock_guard<mutex> l(backend_state->lock_);
     if (!backend_state->IsDone()) {
-      VLOG_QUERY << "query_id=" << backend_state->query_id_
-                 << ": first in-progress backend: " << backend_state->impalad_address();
+      VLOG_QUERY << "query_id=" << PrintId(backend_state->query_id_)
+                 << ": first in-progress backend: "
+                 << TNetworkAddressToString(backend_state->impalad_address());
       break;
     }
   }
@@ -249,7 +251,7 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
     int instance_idx = GetInstanceIdx(instance_exec_status.fragment_instance_id);
     DCHECK_EQ(instance_stats_map_.count(instance_idx), 1);
     InstanceStats* instance_stats = instance_stats_map_[instance_idx];
-    DCHECK_EQ(instance_stats->exec_params_.instance_id,
+    DCHECK(instance_stats->exec_params_.instance_id ==
         instance_exec_status.fragment_instance_id);
     // Ignore duplicate or out-of-order messages.
     if (instance_stats->done_) continue;
@@ -304,7 +306,8 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
     // Append the log messages from each update with the global state of the query
     // execution
     MergeErrorMaps(backend_exec_status.error_log, &error_log_);
-    VLOG_FILE << "host=" << host_ << " error log: " << PrintErrorMapToString(error_log_);
+    VLOG_FILE << "host=" << TNetworkAddressToString(host_) << " error log: " <<
+        PrintErrorMapToString(error_log_);
   }
 
   // TODO: keep backend-wide stopwatch?
@@ -349,8 +352,8 @@ bool Coordinator::BackendState::Cancel() {
   params.protocol_version = ImpalaInternalServiceVersion::V1;
   params.__set_query_id(query_id_);
   TCancelQueryFInstancesResult dummy;
-  VLOG_QUERY << "sending CancelQueryFInstances rpc for query_id="
-             << query_id_ << " backend=" << TNetworkAddressToString(impalad_address());
+  VLOG_QUERY << "sending CancelQueryFInstances rpc for query_id=" << PrintId(query_id_) <<
+      " backend=" << TNetworkAddressToString(impalad_address());
 
   Status rpc_status;
   Status client_status;
@@ -370,14 +373,14 @@ bool Coordinator::BackendState::Cancel() {
   }
   if (!client_status.ok()) {
     status_.MergeStatus(client_status);
-    VLOG_QUERY << "CancelQueryFInstances query_id= " << query_id_
+    VLOG_QUERY << "CancelQueryFInstances query_id= " << PrintId(query_id_)
                << " failed to connect to " << TNetworkAddressToString(impalad_address())
                << " :" << client_status.msg().msg();
     return true;
   }
   if (!rpc_status.ok()) {
     status_.MergeStatus(rpc_status);
-    VLOG_QUERY << "CancelQueryFInstances query_id= " << query_id_
+    VLOG_QUERY << "CancelQueryFInstances query_id= " << PrintId(query_id_)
                << " rpc to " << TNetworkAddressToString(impalad_address())
                << " failed: " << rpc_status.msg().msg();
     return true;
@@ -386,7 +389,7 @@ bool Coordinator::BackendState::Cancel() {
 }
 
 void Coordinator::BackendState::PublishFilter(const TPublishFilterParams& rpc_params) {
-  DCHECK_EQ(rpc_params.dst_query_id, query_id_);
+  DCHECK(rpc_params.dst_query_id == query_id_);
   {
     // If the backend is already done, it's not waiting for this filter, so we skip
     // sending it in this case.
@@ -412,7 +415,7 @@ Coordinator::BackendState::InstanceStats::InstanceStats(
   : exec_params_(exec_params),
     profile_(nullptr) {
   const string& profile_name = Substitute("Instance $0 (host=$1)",
-      PrintId(exec_params.instance_id), lexical_cast<string>(exec_params.host));
+      PrintId(exec_params.instance_id), TNetworkAddressToString(exec_params.host));
   profile_ = RuntimeProfile::Create(obj_pool, profile_name);
   fragment_stats->root_profile()->AddChild(profile_);
 

@@ -505,7 +505,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
     pool_config_map_[pool_name] = pool_cfg;
     PoolStats* stats = GetPoolStats(pool_name);
     stats->UpdateConfigMetrics(pool_cfg);
-    VLOG_QUERY << "Schedule for id=" << schedule->query_id() << " in pool_name="
+    VLOG_QUERY << "Schedule for id=" << PrintId(schedule->query_id()) << " in pool_name="
                << pool_name << " cluster_mem_needed="
                << PrintBytes(schedule->GetClusterMemoryEstimate())
                << " PoolConfig: max_requests=" << max_requests << " max_queued="
@@ -526,7 +526,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
 
     if (CanAdmitRequest(*schedule, pool_cfg, false, &not_admitted_reason)) {
       DCHECK_EQ(stats->local_stats().num_queued, 0);
-      VLOG_QUERY << "Admitted query id=" << schedule->query_id();
+      VLOG_QUERY << "Admitted query id=" << PrintId(schedule->query_id());
       stats->Admit(*schedule);
       UpdateHostMemAdmitted(*schedule, schedule->GetPerHostMemoryEstimate());
       schedule->set_is_admitted(true);
@@ -537,7 +537,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
     }
 
     // We cannot immediately admit but do not need to reject, so queue the request
-    VLOG_QUERY << "Queuing, query id=" << schedule->query_id();
+    VLOG_QUERY << "Queuing, query id=" << PrintId(schedule->query_id());
     stats->Queue(*schedule);
     queue->Enqueue(&queue_node);
   }
@@ -600,7 +600,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
     schedule->set_is_admitted(true);
     schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_ADMISSION_RESULT,
         PROFILE_INFO_VAL_ADMIT_QUEUED);
-    VLOG_QUERY << "Admitted queued query id=" << schedule->query_id();
+    VLOG_QUERY << "Admitted queued query id=" << PrintId(schedule->query_id());
     VLOG_RPC << "Final: " << stats->DebugString();
     return Status::OK();
   }
@@ -615,7 +615,7 @@ void AdmissionController::ReleaseQuery(const QuerySchedule& schedule) {
     stats->Release(schedule);
     UpdateHostMemAdmitted(schedule, -schedule.GetPerHostMemoryEstimate());
     pools_for_updates_.insert(pool_name);
-    VLOG_RPC << "Released query id=" << schedule.query_id() << " "
+    VLOG_RPC << "Released query id=" << PrintId(schedule.query_id()) << " "
              << stats->DebugString();
   }
   dequeue_cv_.NotifyOne();
@@ -875,11 +875,11 @@ void AdmissionController::DequeueLoop() {
         // TODO: Requests further in the queue may be blocked unnecessarily. Consider a
         // better policy once we have better test scenarios.
         if (!CanAdmitRequest(schedule, pool_config, true, &not_admitted_reason)) {
-          VLOG_RPC << "Could not dequeue query id=" << schedule.query_id()
+          VLOG_RPC << "Could not dequeue query id=" << PrintId(schedule.query_id())
                    << " reason: " << not_admitted_reason;
           break;
         }
-        VLOG_RPC << "Dequeuing query=" << schedule.query_id();
+        VLOG_RPC << "Dequeuing query=" << PrintId(schedule.query_id());
         queue.Dequeue();
         stats->Dequeue(schedule, false);
         stats->Admit(schedule);

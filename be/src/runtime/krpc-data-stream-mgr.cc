@@ -104,7 +104,7 @@ shared_ptr<DataStreamRecvrBase> KrpcDataStreamMgr::CreateRecvr(
   DCHECK(profile != nullptr);
   DCHECK(parent_tracker != nullptr);
   DCHECK(client != nullptr);
-  VLOG_FILE << "creating receiver for fragment_instance_id="<< finst_id
+  VLOG_FILE << "creating receiver for fragment_instance_id="<< PrintId(finst_id)
             << ", node=" << dest_node_id;
   shared_ptr<KrpcDataStreamRecvr> recvr(new KrpcDataStreamRecvr(
       this, parent_tracker, row_desc, finst_id, dest_node_id, num_senders, is_merging,
@@ -149,7 +149,7 @@ shared_ptr<DataStreamRecvrBase> KrpcDataStreamMgr::CreateRecvr(
 
 shared_ptr<KrpcDataStreamRecvr> KrpcDataStreamMgr::FindRecvr(
     const TUniqueId& finst_id, PlanNodeId dest_node_id, bool* already_unregistered) {
-  VLOG_ROW << "looking up fragment_instance_id=" << finst_id
+  VLOG_ROW << "looking up fragment_instance_id=" << PrintId(finst_id)
            << ", node=" << dest_node_id;
   *already_unregistered = false;
   uint32_t hash_value = GetHashValue(finst_id, dest_node_id);
@@ -290,7 +290,7 @@ void KrpcDataStreamMgr::CloseSender(const EndDataStreamRequestPB* request,
 
 Status KrpcDataStreamMgr::DeregisterRecvr(
     const TUniqueId& finst_id, PlanNodeId dest_node_id) {
-  VLOG_QUERY << "DeregisterRecvr(): fragment_instance_id=" << finst_id
+  VLOG_QUERY << "DeregisterRecvr(): fragment_instance_id=" << PrintId(finst_id)
              << ", node=" << dest_node_id;
   uint32_t hash_value = GetHashValue(finst_id, dest_node_id);
   lock_guard<mutex> l(lock_);
@@ -321,7 +321,7 @@ Status KrpcDataStreamMgr::DeregisterRecvr(
 }
 
 void KrpcDataStreamMgr::Cancel(const TUniqueId& finst_id) {
-  VLOG_QUERY << "cancelling all streams for fragment_instance_id=" << finst_id;
+  VLOG_QUERY << "cancelling all streams for fragment_instance_id=" << PrintId(finst_id);
   lock_guard<mutex> l(lock_);
   FragmentRecvrSet::iterator iter =
       fragment_recvr_set_.lower_bound(make_pair(finst_id, 0));
