@@ -237,10 +237,18 @@ under the License.
     <conbody>
 
       <p>
-        In a cluster using Kerberos, applications check host credentials to verify that the host they are
-        connecting to is the same one that is actually processing the request, to prevent man-in-the-middle
-        attacks. To clarify that the load-balancing proxy server is legitimate, perform these extra Kerberos setup
-        steps:
+        In a cluster using Kerberos, applications check host credentials to
+        verify that the host they are connecting to is the same one that is
+        actually processing the request, to prevent man-in-the-middle attacks.
+      </p>
+      <note>
+          Once you enable a proxy server in a Kerberized cluster, users will not
+          be able to connect to individual impala daemons directly from impala
+          shell.
+      </note>
+      <p>
+        To clarify that the load-balancing proxy server is legitimate, perform
+        these extra Kerberos setup steps:
       </p>
 
       <ol>
