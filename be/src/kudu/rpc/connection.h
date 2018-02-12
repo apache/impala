@@ -18,6 +18,7 @@
 #ifndef KUDU_RPC_CONNECTION_H
 #define KUDU_RPC_CONNECTION_H
 
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -218,6 +219,10 @@ class Connection : public RefCountedThreadSafe<Connection> {
   void set_scheduled_for_shutdown() {
     DCHECK_EQ(direction_, CLIENT);
     scheduled_for_shutdown_ = true;
+  }
+
+  size_t num_queued_outbound_transfers() const {
+    return outbound_transfers_.size();
   }
 
  private:
