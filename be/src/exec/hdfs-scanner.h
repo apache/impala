@@ -428,7 +428,7 @@ class HdfsScanner {
   void IR_ALWAYS_INLINE InitTuple(
       const TupleDescriptor* desc, Tuple* template_tuple, Tuple* tuple) {
     if (has_template_tuple(template_tuple)) {
-      InitTupleFromTemplate(template_tuple, tuple, tuple_byte_size());
+      InitTupleFromTemplate(template_tuple, tuple, tuple_byte_size(*desc));
     } else {
       tuple->ClearNullBits(desc->null_bytes_offset(), desc->num_null_bytes());
     }
@@ -479,6 +479,9 @@ class HdfsScanner {
 
   /// Not inlined in IR so it can be replaced with a constant.
   int IR_NO_INLINE tuple_byte_size() const { return tuple_byte_size_; }
+  int IR_NO_INLINE tuple_byte_size(const TupleDescriptor& desc) const {
+    return desc.byte_size();
+  }
 
   /// Returns true iff 'template_tuple' is non-NULL.
   /// Not inlined in IR so it can be replaced with a constant.
