@@ -116,6 +116,10 @@ def pytest_addoption(parser):
                    help=("Indicates that tests are being run against a remote cluster. "
                          "Some tests may be marked to skip or xfail on remote clusters."))
 
+  parser.addoption("--test_krpc", dest="test_krpc", action="store_true", default=False,
+                   help="Run all tests with KRPC enabled. This assumes that the test "
+                        "cluster has been started with --use-krpc.")
+
 
 def pytest_assertrepr_compare(op, left, right):
   """

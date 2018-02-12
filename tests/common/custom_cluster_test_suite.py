@@ -125,12 +125,21 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       cluster_size=CLUSTER_SIZE, num_coordinators=NUM_COORDINATORS,
       use_exclusive_coordinators=False, log_level=1, expected_num_executors=CLUSTER_SIZE):
     cls.impala_log_dir = log_dir
+    # We ignore TEST_START_CLUSTER_ARGS here. Custom cluster tests specifically test that
+    # certain custom startup arguments work and we want to keep them independent of dev
+    # environments.
     cmd = [os.path.join(IMPALA_HOME, 'bin/start-impala-cluster.py'),
            '--cluster_size=%d' % cluster_size,
            '--num_coordinators=%d' % num_coordinators,
            '--log_dir=%s' % log_dir,
            '--log_level=%s' % log_level]
-    if use_exclusive_coordinators: cmd.append("--use_exclusive_coordinators")
+
+    if use_exclusive_coordinators:
+      cmd.append("--use_exclusive_coordinators")
+
+    if pytest.config.option.test_krpc:
+      cmd.append("--use_krpc")
+
     try:
       check_call(cmd + options, close_fds=True)
     finally:

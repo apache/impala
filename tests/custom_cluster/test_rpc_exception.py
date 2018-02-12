@@ -18,7 +18,7 @@
 import pytest
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfBuildType
+from tests.common.skip import SkipIf, SkipIfBuildType
 
 @SkipIfBuildType.not_dev_build
 class TestRPCException(CustomClusterTestSuite):
@@ -68,6 +68,7 @@ class TestRPCException(CustomClusterTestSuite):
   def test_rpc_send_timed_out(self, vector):
     self.execute_test_query(None)
 
+  @SkipIf.not_thrift
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=4")
   def test_rpc_recv_closed_connection(self, vector):
@@ -93,6 +94,7 @@ class TestRPCException(CustomClusterTestSuite):
   def test_rpc_secure_send_timed_out(self, vector):
     self.execute_test_query(None)
 
+  @SkipIf.not_thrift
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=9")
   def test_rpc_secure_recv_closed_connection(self, vector):

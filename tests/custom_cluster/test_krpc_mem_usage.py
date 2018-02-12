@@ -19,13 +19,14 @@ import pytest
 import time
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_cluster import ImpalaCluster
-from tests.common.skip import SkipIfBuildType
+from tests.common.skip import SkipIf, SkipIfBuildType
 from tests.verifiers.mem_usage_verifier import MemUsageVerifier
 
 DATA_STREAM_MGR_METRIC = "Data Stream Queued RPC Calls"
 DATA_STREAM_SVC_METRIC = "Data Stream Service"
 ALL_METRICS = [ DATA_STREAM_MGR_METRIC, DATA_STREAM_SVC_METRIC ]
 
+@SkipIf.not_krpc
 class TestKrpcMemUsage(CustomClusterTestSuite):
   """Test for memory usage tracking when using KRPC."""
   TEST_QUERY = "select count(c2.string_col) from \
@@ -62,7 +63,6 @@ class TestKrpcMemUsage(CustomClusterTestSuite):
           assert usage["peak"] > 0, metric_name
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--use_krpc")
   def test_krpc_unqueued_memory_usage(self, vector):
     """Executes a simple query and checks that the data stream service consumed some
     memory.
@@ -73,7 +73,7 @@ class TestKrpcMemUsage(CustomClusterTestSuite):
 
   @SkipIfBuildType.not_dev_build
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--use_krpc --stress_datastream_recvr_delay_ms=1000")
+  @CustomClusterTestSuite.with_args("--stress_datastream_recvr_delay_ms=1000")
   def test_krpc_deferred_memory_usage(self, vector):
     """Executes a simple query. The cluster is started with delayed receiver creation to
     trigger RPC queueing.
@@ -82,7 +82,7 @@ class TestKrpcMemUsage(CustomClusterTestSuite):
 
   @SkipIfBuildType.not_dev_build
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--use_krpc --stress_datastream_recvr_delay_ms=1000")
+  @CustomClusterTestSuite.with_args("--stress_datastream_recvr_delay_ms=1000")
   def test_krpc_deferred_memory_cancellation(self, vector):
     """Executes a query and cancels it while RPCs are still queued up. This exercises the
     code to flush the deferred RPC queue in the receiver.
