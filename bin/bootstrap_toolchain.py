@@ -51,6 +51,9 @@ OS_MAPPING = {
   "centos6" : "ec2-package-centos-6",
   "centos5" : "ec2-package-centos-5",
   "centos7" : "ec2-package-centos-7",
+  "redhatenterpriseserver5" :  "ec2-package-centos-5",
+  "redhatenterpriseserver6" :  "ec2-package-centos-6",
+  "redhatenterpriseserver7" :  "ec2-package-centos-7",
   "debian6" : "ec2-package-debian-6",
   "debian7" : "ec2-package-debian-7",
   "debian8" : "ec2-package-debian-8",
@@ -107,6 +110,11 @@ def get_platform_release_label(release=None):
       release = lsb_release_cache
     else:
       release = "".join(map(lambda x: x.lower(), sh.lsb_release("-irs").split()))
+      # Only need to check against the major release if RHEL or CentOS
+      for platform in ['centos', 'redhatenterpriseserver']:
+        if platform in release:
+          release = release.split('.')[0]
+          break
       lsb_release_cache = release
   for k, v in OS_MAPPING.iteritems():
     if re.search(k, release):
