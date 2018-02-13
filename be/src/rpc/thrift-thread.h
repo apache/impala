@@ -18,13 +18,6 @@
 #ifndef IMPALA_RPC_THRIFT_THREAD_H
 #define IMPALA_RPC_THRIFT_THREAD_H
 
-/// This is required for thrift's Thread.h to compile. Thrift also includes an experimental
-/// Boost-based thread implementation that is enabled by #define USE_BOOST_THREAD. It is
-/// important that USE_BOOST_THREAD is defined if and only if it was defined when compiling
-/// Thrift itself, as it causes the size of id_t to change, which will cause crashes if
-/// it's different sizes in Impala and in Thrift.
-#define HAVE_PTHREAD_H
-
 #include <thrift/concurrency/Thread.h>
 
 #include "common/logging.h"

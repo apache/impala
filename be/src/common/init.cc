@@ -17,6 +17,7 @@
 
 #include "common/init.h"
 
+#include <csignal>
 #include <gperftools/heap-profiler.h>
 #include <gperftools/malloc_extension.h>
 
@@ -232,6 +233,11 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   LOG(INFO) << "Using hostname: " << FLAGS_hostname;
   impala::LogCommandLineFlags();
 
+  // When a process calls send(2) on a socket closed on the other end, linux generates
+  // SIGPIPE. MSG_NOSIGNAL can be passed to send(2) to disable it, which thrift does. But
+  // OpenSSL doesn't have place for this parameter so the signal must be disabled
+  // manually.
+  signal(SIGPIPE, SIG_IGN);
   InitThriftLogging();
 
   LOG(INFO) << CpuInfo::DebugString();

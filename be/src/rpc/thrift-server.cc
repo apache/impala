@@ -65,10 +65,11 @@ namespace impala {
 
 // Specifies the allowed set of values for --ssl_minimum_version. To keep consistent with
 // Apache Kudu, specifying a single version enables all versions including and succeeding
-// that one (e.g. TLSv1.1 enables v1.1 and v1.2). Specifying TLSv1.1_only enables only
-// v1.1.
+// that one (e.g. TLSv1.1 enables v1.1 and v1.2).
 map<string, SSLProtocol> SSLProtoVersions::PROTO_MAP = {
-    {"tlsv1.2", TLSv1_2_plus}, {"tlsv1.1", TLSv1_1_plus}, {"tlsv1", TLSv1_0_plus}};
+    {"tlsv1.2", TLSv1_2},
+    {"tlsv1.1", TLSv1_1},
+    {"tlsv1", TLSv1_0}};
 
 Status SSLProtoVersions::StringToProtocol(const string& in, SSLProtocol* protocol) {
   for (const auto& proto : SSLProtoVersions::PROTO_MAP) {
@@ -82,15 +83,15 @@ Status SSLProtoVersions::StringToProtocol(const string& in, SSLProtocol* protoco
 }
 
 bool SSLProtoVersions::IsSupported(const SSLProtocol& protocol) {
-  DCHECK_LE(protocol, TLSv1_2_plus);
+  DCHECK_LE(protocol, TLSv1_2);
   int max_supported_tls_version = MaxSupportedTlsVersion();
   DCHECK_GE(max_supported_tls_version, TLS1_VERSION);
 
   switch (max_supported_tls_version) {
     case TLS1_VERSION:
-      return protocol == TLSv1_0_plus || protocol == TLSv1_0;
+      return protocol == TLSv1_0;
     case TLS1_1_VERSION:
-      return protocol != TLSv1_2_plus && protocol != TLSv1_2;
+      return protocol == TLSv1_0 || protocol == TLSv1_1;
     default:
       DCHECK_GE(max_supported_tls_version, TLS1_2_VERSION);
       return true;
@@ -437,7 +438,7 @@ Status ThriftServer::Start() {
   RETURN_IF_ERROR(CreateSocket(&server_socket));
   RETURN_IF_ERROR(auth_provider_->GetServerTransportFactory(&transport_factory));
   server_.reset(new TAcceptQueueServer(processor_, server_socket, transport_factory,
-        protocol_factory, thread_factory, max_concurrent_connections_));
+      protocol_factory, thread_factory, max_concurrent_connections_));
   if (metrics_ != NULL) {
     (static_cast<TAcceptQueueServer*>(server_.get()))->InitMetrics(metrics_,
         Substitute("impala.thrift-server.$0", name_));

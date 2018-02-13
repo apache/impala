@@ -156,7 +156,7 @@ message(STATUS "Boost libraries: " ${Boost_LIBRARIES})
 # platform that this build might ultimately be deployed on. If no suitable OpenSSL is
 # found, use the toolchain version - but beware that Impala will then fail to start if
 # deployed on a system with a lower version.
-find_package(OpenSSL 1.0.0 QUIET)
+find_package(OpenSSL 1.0.1 QUIET)
 if (NOT ${OPENSSL_FOUND})
   set_dep_root(OPENSSL)
   set(OPENSSL_FOUND ON)

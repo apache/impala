@@ -58,14 +58,18 @@ function(THRIFT_GEN VAR)
     # It depends on hive_meta_store, which in turn depends on fb303.
     # The java dependency is handled by maven.
     # We need to generate C++ src file for the parent dependencies using the "-r" option.
-    set(CPP_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen cpp -o ${BE_OUTPUT_DIR})
+    set(CPP_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen cpp:moveable_types -o
+        ${BE_OUTPUT_DIR})
     IF (FIL STREQUAL "beeswax.thrift")
-      set(CPP_ARGS -r ${THRIFT_INCLUDE_DIR_OPTION} --gen cpp -o ${BE_OUTPUT_DIR})
+      set(CPP_ARGS -r ${CPP_ARGS})
     ENDIF(FIL STREQUAL "beeswax.thrift")
 
-    IF (FIL STREQUAL ${TCLI_SERVICE_THRIFT} OR FIL STREQUAL "parquet.thrift")
-      # HiveServer2 and Parquet thrift generation
-      # Do not generate Java source because we should use the jar from Hive or Parquet
+    IF (FIL STREQUAL ${TCLI_SERVICE_THRIFT} OR FIL STREQUAL "parquet.thrift" OR
+        FIL STREQUAL "ImpalaService.thrift")
+      # Do not generate Java HiveServer2 and Parquet files because we should use the jar
+      # from Hive or Parquet.
+      # Also do not generate ImpalaService.thrift because the generated code doesn't
+      # compile with hive if the thrift version in hive is 0.9.0
       add_custom_command(
         OUTPUT ${OUTPUT_BE_FILE}
         COMMAND ${THRIFT_COMPILER} ${CPP_ARGS} ${FIL}
@@ -74,7 +78,8 @@ function(THRIFT_GEN VAR)
         COMMENT "Running thrift compiler on ${FIL}"
         VERBATIM
       )
-    ELSE (FIL STREQUAL ${TCLI_SERVICE_THRIFT} OR FIL STREQUAL "parquet.thrift")
+    ELSE (FIL STREQUAL ${TCLI_SERVICE_THRIFT} OR FIL STREQUAL "parquet.thrift" OR
+        FIL STREQUAL "ImpalaService.thrift")
       add_custom_command(
         OUTPUT ${OUTPUT_BE_FILE}
         COMMAND ${THRIFT_COMPILER} ${CPP_ARGS} ${FIL}
@@ -84,7 +89,8 @@ function(THRIFT_GEN VAR)
         COMMENT "Running thrift compiler on ${FIL}"
         VERBATIM
     )
-    ENDIF(FIL STREQUAL ${TCLI_SERVICE_THRIFT} OR FIL STREQUAL "parquet.thrift")
+    ENDIF (FIL STREQUAL ${TCLI_SERVICE_THRIFT} OR FIL STREQUAL "parquet.thrift" OR
+        FIL STREQUAL "ImpalaService.thrift")
   endforeach(FIL)
 
   set(${VAR} ${${VAR}} PARENT_SCOPE)
@@ -134,8 +140,8 @@ file(MAKE_DIRECTORY ${PYTHON_OUTPUT_DIR})
 file(MAKE_DIRECTORY ${HIVE_THRIFT_SOURCE_DIR})
 
 # Args passed to thrift for Java gen
-set(JAVA_FE_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen java:hashcode -o ${FE_OUTPUT_DIR})
-set(JAVA_EXT_DS_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen java:hashcode -o ${EXT_DS_OUTPUT_DIR})
+set(JAVA_FE_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen java -o ${FE_OUTPUT_DIR})
+set(JAVA_EXT_DS_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen java -o ${EXT_DS_OUTPUT_DIR})
 set(PYTHON_ARGS ${THRIFT_INCLUDE_DIR_OPTION} -r --gen py -o ${PYTHON_OUTPUT_DIR})
 
 set (EXT_DATA_SRC_FILES

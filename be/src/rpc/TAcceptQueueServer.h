@@ -52,47 +52,18 @@ using apache::thrift::concurrency::ThreadFactory;
 class TAcceptQueueServer : public TServer {
  public:
   class Task;
-
-  // TODO: Determine which c'tors are used and remove unused ones.
-  template <typename ProcessorFactory>
-  TAcceptQueueServer(const boost::shared_ptr<ProcessorFactory>& processorFactory,
-      const boost::shared_ptr<TServerTransport>& serverTransport,
-      const boost::shared_ptr<TTransportFactory>& transportFactory,
-      const boost::shared_ptr<TProtocolFactory>& protocolFactory,
-      int32_t maxTasks = 0,
-      THRIFT_OVERLOAD_IF(ProcessorFactory, TProcessorFactory));
-
-  template <typename ProcessorFactory>
-  TAcceptQueueServer(const boost::shared_ptr<ProcessorFactory>& processorFactory,
+  TAcceptQueueServer(const boost::shared_ptr<TProcessor>& processor,
       const boost::shared_ptr<TServerTransport>& serverTransport,
       const boost::shared_ptr<TTransportFactory>& transportFactory,
       const boost::shared_ptr<TProtocolFactory>& protocolFactory,
       const boost::shared_ptr<ThreadFactory>& threadFactory,
-      int32_t maxTasks = 0,
-      THRIFT_OVERLOAD_IF(ProcessorFactory, TProcessorFactory));
+      int32_t maxTasks = 0);
 
-  template <typename Processor>
-  TAcceptQueueServer(const boost::shared_ptr<Processor>& processor,
-      const boost::shared_ptr<TServerTransport>& serverTransport,
-      const boost::shared_ptr<TTransportFactory>& transportFactory,
-      const boost::shared_ptr<TProtocolFactory>& protocolFactory,
-      int32_t maxTasks = 0,
-      THRIFT_OVERLOAD_IF(Processor, TProcessor));
+  ~TAcceptQueueServer() override = default;
 
-  template <typename Processor>
-  TAcceptQueueServer(const boost::shared_ptr<Processor>& processor,
-      const boost::shared_ptr<TServerTransport>& serverTransport,
-      const boost::shared_ptr<TTransportFactory>& transportFactory,
-      const boost::shared_ptr<TProtocolFactory>& protocolFactory,
-      const boost::shared_ptr<ThreadFactory>& threadFactory,
-      int32_t maxTasks = 0,
-      THRIFT_OVERLOAD_IF(Processor, TProcessor));
+  void serve() override;
 
-  virtual ~TAcceptQueueServer();
-
-  virtual void serve();
-
-  void stop() {
+  void stop() override {
     stop_ = true;
     serverTransport_->interrupt();
   }
@@ -126,57 +97,6 @@ class TAcceptQueueServer : public TServer {
   impala::IntGauge* queue_size_metric_;
 };
 
-template <typename ProcessorFactory>
-TAcceptQueueServer::TAcceptQueueServer(
-    const boost::shared_ptr<ProcessorFactory>& processorFactory,
-    const boost::shared_ptr<TServerTransport>& serverTransport,
-    const boost::shared_ptr<TTransportFactory>& transportFactory,
-    const boost::shared_ptr<TProtocolFactory>& protocolFactory,
-    int32_t maxTasks,
-    THRIFT_OVERLOAD_IF_DEFN(ProcessorFactory, TProcessorFactory))
-  : TServer(processorFactory, serverTransport, transportFactory, protocolFactory),
-    maxTasks_(maxTasks) {
-  init();
-}
-
-template <typename ProcessorFactory>
-TAcceptQueueServer::TAcceptQueueServer(
-    const boost::shared_ptr<ProcessorFactory>& processorFactory,
-    const boost::shared_ptr<TServerTransport>& serverTransport,
-    const boost::shared_ptr<TTransportFactory>& transportFactory,
-    const boost::shared_ptr<TProtocolFactory>& protocolFactory,
-    const boost::shared_ptr<ThreadFactory>& threadFactory,
-    int32_t maxTasks,
-    THRIFT_OVERLOAD_IF_DEFN(ProcessorFactory, TProcessorFactory))
-  : TServer(processorFactory, serverTransport, transportFactory, protocolFactory),
-    threadFactory_(threadFactory), maxTasks_(maxTasks) {
-  init();
-}
-
-template <typename Processor>
-TAcceptQueueServer::TAcceptQueueServer(const boost::shared_ptr<Processor>& processor,
-    const boost::shared_ptr<TServerTransport>& serverTransport,
-    const boost::shared_ptr<TTransportFactory>& transportFactory,
-    const boost::shared_ptr<TProtocolFactory>& protocolFactory,
-    int32_t maxTasks,
-    THRIFT_OVERLOAD_IF_DEFN(Processor, TProcessor))
-  : TServer(processor, serverTransport, transportFactory, protocolFactory),
-    maxTasks_(maxTasks) {
-  init();
-}
-
-template <typename Processor>
-TAcceptQueueServer::TAcceptQueueServer(const boost::shared_ptr<Processor>& processor,
-    const boost::shared_ptr<TServerTransport>& serverTransport,
-    const boost::shared_ptr<TTransportFactory>& transportFactory,
-    const boost::shared_ptr<TProtocolFactory>& protocolFactory,
-    const boost::shared_ptr<ThreadFactory>& threadFactory,
-    int32_t maxTasks,
-    THRIFT_OVERLOAD_IF_DEFN(Processor, TProcessor))
-  : TServer(processor, serverTransport, transportFactory, protocolFactory),
-    threadFactory_(threadFactory), maxTasks_(maxTasks) {
-  init();
-}
 } // namespace server
 } // namespace thrift
 } // namespace apache

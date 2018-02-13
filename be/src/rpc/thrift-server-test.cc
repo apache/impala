@@ -331,7 +331,7 @@ TEST(SslTest, MismatchedCiphers) {
 TEST(SslTest, StringToProtocol) {
   SSLProtocol version;
   map<string, SSLProtocol> TEST_CASES = {
-      {"tlsv1", TLSv1_0_plus}, {"tlsv1.1", TLSv1_1_plus}, {"tlsv1.2", TLSv1_2_plus}};
+      {"tlsv1", TLSv1_0}, {"tlsv1.1", TLSv1_1}, {"tlsv1.2", TLSv1_2}};
   for (auto p : TEST_CASES) {
     EXPECT_OK(SSLProtoVersions::StringToProtocol(p.first, &version));
     EXPECT_EQ(p.second, version) << "TLS version: " << p.first;
@@ -351,16 +351,12 @@ TEST(SslTest, TLSVersionControl) {
     set<SSLProtocol> whitelist;
   };
 
-  // Test all configurations supported by Thrift, even if some won't work with the linked
-  // OpenSSL(). We catch those by checking IsSupported() for both the client and ther
-  // server.
-  vector<Config> configs = {{TLSv1_0, {TLSv1_0, TLSv1_0_plus}},
-      {TLSv1_0_plus,
-          {TLSv1_0, TLSv1_1, TLSv1_2, TLSv1_0_plus, TLSv1_1_plus, TLSv1_2_plus}},
-      {TLSv1_1, {TLSv1_1_plus, TLSv1_1, TLSv1_0_plus}},
-      {TLSv1_1_plus, {TLSv1_1, TLSv1_2, TLSv1_0_plus, TLSv1_1_plus, TLSv1_2_plus}},
-      {TLSv1_2, {TLSv1_2, TLSv1_0_plus, TLSv1_1_plus, TLSv1_2_plus}},
-      {TLSv1_2_plus, {TLSv1_2, TLSv1_0_plus, TLSv1_1_plus, TLSv1_2_plus}}};
+  // All configurations supported by linked OpenSSL should work. We catch unsupported
+  // protocols by checking IsSupported() for both the client and the server.
+  vector<Config> configs = {
+      {TLSv1_0, {TLSv1_0, TLSv1_1, TLSv1_2}},
+      {TLSv1_1, {TLSv1_0, TLSv1_1, TLSv1_2}},
+      {TLSv1_2, {TLSv1_0, TLSv1_1, TLSv1_2}}};
 
   for (const auto& config : configs) {
     // For each config, start a server with the requested protocol spec, and then try to

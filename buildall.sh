@@ -347,6 +347,9 @@ bootstrap_dependencies() {
     echo ">>> Downloading and extracting toolchain dependencies."
     "$IMPALA_HOME/bin/bootstrap_toolchain.py"
     echo "Toolchain bootstrap complete."
+
+    # Reset python path to include thrift
+    . "$IMPALA_HOME/bin/set-pythonpath.sh"
   fi
 }
 

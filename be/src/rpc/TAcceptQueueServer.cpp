@@ -22,16 +22,7 @@
 #include "rpc/TAcceptQueueServer.h"
 
 #include <thrift/concurrency/PlatformThreadFactory.h>
-#include <thrift/transport/TTransportException.h>
 
-#include <iostream>
-#include <string>
-
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-
-#include "common/status.h"
 #include "util/thread-pool.h"
 
 DEFINE_int32(accepted_cnxn_queue_depth, 10000,
@@ -56,22 +47,22 @@ class TAcceptQueueServer::Task : public Runnable {
       shared_ptr<TProtocol> input, shared_ptr<TProtocol> output,
       shared_ptr<TTransport> transport)
     : server_(server),
-      processor_(processor),
-      input_(input),
-      output_(output),
-      transport_(transport) {}
+      processor_(std::move(processor)),
+      input_(std::move(input)),
+      output_(std::move(output)),
+      transport_(std::move(transport)) {}
 
-  ~Task() {}
+  ~Task() override = default;
 
-  void run() {
+  void run() override {
     boost::shared_ptr<TServerEventHandler> eventHandler = server_.getEventHandler();
-    void* connectionContext = NULL;
-    if (eventHandler != NULL) {
+    void* connectionContext = nullptr;
+    if (eventHandler != nullptr) {
       connectionContext = eventHandler->createContext(input_, output_);
     }
     try {
       for (;;) {
-        if (eventHandler != NULL) {
+        if (eventHandler != nullptr) {
           eventHandler->processContext(connectionContext, transport_);
         }
         if (!processor_->process(input_, output_, connectionContext)
@@ -90,7 +81,7 @@ class TAcceptQueueServer::Task : public Runnable {
     } catch (...) {
       GlobalOutput("TAcceptQueueServer uncaught exception.");
     }
-    if (eventHandler != NULL) {
+    if (eventHandler != nullptr) {
       eventHandler->deleteContext(connectionContext, input_, output_);
     }
 
@@ -125,17 +116,26 @@ class TAcceptQueueServer::Task : public Runnable {
   shared_ptr<TTransport> transport_;
 };
 
+TAcceptQueueServer::TAcceptQueueServer(const boost::shared_ptr<TProcessor>& processor,
+    const boost::shared_ptr<TServerTransport>& serverTransport,
+    const boost::shared_ptr<TTransportFactory>& transportFactory,
+    const boost::shared_ptr<TProtocolFactory>& protocolFactory,
+    const boost::shared_ptr<ThreadFactory>& threadFactory,
+    int32_t maxTasks)
+    : TServer(processor, serverTransport, transportFactory, protocolFactory),
+      threadFactory_(threadFactory), maxTasks_(maxTasks) {
+  init();
+}
+
 void TAcceptQueueServer::init() {
   stop_ = false;
   metrics_enabled_ = false;
-  queue_size_metric_ = NULL;
+  queue_size_metric_ = nullptr;
 
   if (!threadFactory_) {
     threadFactory_.reset(new PlatformThreadFactory);
   }
 }
-
-TAcceptQueueServer::~TAcceptQueueServer() {}
 
 // New.
 void TAcceptQueueServer::SetupConnection(boost::shared_ptr<TTransport> client) {
@@ -174,25 +174,25 @@ void TAcceptQueueServer::SetupConnection(boost::shared_ptr<TTransport> client) {
     // Start the thread!
     thread->start();
   } catch (TException& tx) {
-    if (inputTransport != NULL) {
+    if (inputTransport != nullptr) {
       inputTransport->close();
     }
-    if (outputTransport != NULL) {
+    if (outputTransport != nullptr) {
       outputTransport->close();
     }
-    if (client != NULL) {
+    if (client != nullptr) {
       client->close();
     }
     string errStr = string("TAcceptQueueServer: Caught TException: ") + tx.what();
     GlobalOutput(errStr.c_str());
   } catch (string s) {
-    if (inputTransport != NULL) {
+    if (inputTransport != nullptr) {
       inputTransport->close();
     }
-    if (outputTransport != NULL) {
+    if (outputTransport != nullptr) {
       outputTransport->close();
     }
-    if (client != NULL) {
+    if (client != nullptr) {
       client->close();
     }
     string errStr = "TAcceptQueueServer: Unknown exception: " + s;
@@ -205,7 +205,7 @@ void TAcceptQueueServer::serve() {
   serverTransport_->listen();
 
   // Run the preServe event
-  if (eventHandler_ != NULL) {
+  if (eventHandler_ != nullptr) {
     eventHandler_->preServe();
   }
 
@@ -283,7 +283,7 @@ void TAcceptQueueServer::serve() {
 }
 
 void TAcceptQueueServer::InitMetrics(MetricGroup* metrics, const string& key_prefix) {
-  DCHECK(metrics != NULL);
+  DCHECK(metrics != nullptr);
   stringstream queue_size_ss;
   queue_size_ss << key_prefix << ".connection-setup-queue-size";
   queue_size_metric_ = metrics->AddGauge(queue_size_ss.str(), 0);
