@@ -1347,13 +1347,15 @@ void ImpalaServer::CatalogUpdateCallback(
   } else {
     {
       unique_lock<mutex> unique_lock(catalog_version_lock_);
+      if (catalog_update_info_.catalog_version != resp.new_catalog_version) {
+        LOG(INFO) << "Catalog topic update applied with version: " <<
+            resp.new_catalog_version << " new min catalog object version: " <<
+            resp.min_catalog_object_version;
+      }
       catalog_update_info_.catalog_version = resp.new_catalog_version;
       catalog_update_info_.catalog_topic_version = delta.to_version;
       catalog_update_info_.catalog_service_id = resp.catalog_service_id;
       catalog_update_info_.min_catalog_object_version = resp.min_catalog_object_version;
-      LOG(INFO) << "Catalog topic update applied with version: " <<
-          resp.new_catalog_version << " new min catalog object version: " <<
-          resp.min_catalog_object_version;
       catalog_update_info_.UpdateCatalogVersionMetrics();
     }
     ImpaladMetrics::CATALOG_READY->SetValue(resp.new_catalog_version > 0);
