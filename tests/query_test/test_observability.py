@@ -189,6 +189,7 @@ class TestObservability(ImpalaTestSuite):
     instances, even when there are errors."""
     events = ["Fragment Instance Lifecycle Event Timeline",
               "Prepare Finished",
+              "Open Finished",
               "First Batch Produced",
               "First Batch Sent",
               "ExecInternal Finished"]

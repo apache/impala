@@ -407,6 +407,7 @@ void FragmentInstanceState::UpdateState(const StateEvent event)
 
     case StateEvent::WAITING_FOR_FIRST_BATCH:
       DCHECK_EQ(current_state, TFInstanceExecState::WAITING_FOR_OPEN);
+      event_sequence_->MarkEvent("Open Finished");
       next_state = TFInstanceExecState::WAITING_FOR_FIRST_BATCH;
       break;
 
@@ -429,11 +430,7 @@ void FragmentInstanceState::UpdateState(const StateEvent event)
       break;
 
     case StateEvent::LAST_BATCH_SENT:
-      if (UNLIKELY(current_state == TFInstanceExecState::WAITING_FOR_OPEN)) {
-        event_sequence_->MarkEvent("Open Finished");
-      } else {
-        DCHECK_EQ(current_state, TFInstanceExecState::PRODUCING_DATA);
-      }
+      DCHECK_EQ(current_state, TFInstanceExecState::PRODUCING_DATA);
       next_state = TFInstanceExecState::LAST_BATCH_SENT;
       break;
 
