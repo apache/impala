@@ -489,11 +489,18 @@ listen impalajdbc :21051
     mode tcp
     option tcplog
     balance source
-    server <varname>symbolic_name_5</varname> impala-host-1.example.com:21050
-    server <varname>symbolic_name_6</varname> impala-host-2.example.com:21050
-    server <varname>symbolic_name_7</varname> impala-host-3.example.com:21050
-    server <varname>symbolic_name_8</varname> impala-host-4.example.com:21050
+    server <varname>symbolic_name_5</varname> impala-host-1.example.com:21050 check
+    server <varname>symbolic_name_6</varname> impala-host-2.example.com:21050 check
+    server <varname>symbolic_name_7</varname> impala-host-3.example.com:21050 check
+    server <varname>symbolic_name_8</varname> impala-host-4.example.com:21050 check
 </codeblock>
+      <note type="important">
+        Hue requires the <codeph>check</codeph> option at end of each line in
+        the above file to ensure HAProxy can detect any unreachable Impalad
+        server, and failover can be successful. Without the TCP check, you may hit
+        an error when the <cmdname>impalad</cmdname> daemon to which Hue tries to
+        connect is down.
+      </note>
 
       <note conref="../shared/impala_common.xml#common/proxy_jdbc_caveat"/>
 
