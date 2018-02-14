@@ -359,8 +359,9 @@ class ScannerContext {
   /// context.
   Stream* AddStream(io::ScanRange* range);
 
-  /// Returns false if scan_node_ is multi-threaded and has been cancelled.
-  /// Always returns false if the scan_node_ is not multi-threaded.
+  /// Returns true if RuntimeState::is_cancelled() is true, or if scan node is not
+  /// multi-threaded and is done (finished, cancelled or reached it's limit).
+  /// In all other cases returns false.
   bool cancelled() const;
 
   HdfsPartitionDescriptor* partition_descriptor() { return partition_desc_; }

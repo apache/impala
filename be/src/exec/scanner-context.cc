@@ -330,6 +330,7 @@ void ScannerContext::Stream::ReturnIoBuffer() {
 }
 
 bool ScannerContext::cancelled() const {
+  if (state_->is_cancelled()) return true;
   if (!scan_node_->HasRowBatchQueue()) return false;
   return static_cast<HdfsScanNode*>(scan_node_)->done();
 }
