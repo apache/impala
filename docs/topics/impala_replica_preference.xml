@@ -45,7 +45,7 @@ under the License.
     </p>
 
     <p>
-      <b>Type:</b> numeric (0, 3, 5)
+      <b>Type:</b> numeric (0, 2, 4)
       or corresponding mnemonic strings (<codeph>CACHE_LOCAL</codeph>, <codeph>DISK_LOCAL</codeph>, <codeph>REMOTE</codeph>).
       The gaps in the numeric sequence are to accomodate other intermediate
       values that might be added in the future.
