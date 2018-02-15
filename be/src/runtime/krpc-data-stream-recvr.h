@@ -26,6 +26,7 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "gen-cpp/Types_types.h"   // for TUniqueId
+#include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/descriptors.h"
 #include "util/tuple-row-compare.h"
 
@@ -102,6 +103,7 @@ class KrpcDataStreamRecvr : public DataStreamRecvrBase {
   PlanNodeId dest_node_id() const { return dest_node_id_; }
   const RowDescriptor* row_desc() const { return row_desc_; }
   MemTracker* mem_tracker() const { return mem_tracker_.get(); }
+  BufferPool::ClientHandle* client() const { return client_; }
 
  private:
   friend class KrpcDataStreamMgr;
@@ -110,7 +112,8 @@ class KrpcDataStreamRecvr : public DataStreamRecvrBase {
   KrpcDataStreamRecvr(KrpcDataStreamMgr* stream_mgr, MemTracker* parent_tracker,
       const RowDescriptor* row_desc, const TUniqueId& fragment_instance_id,
       PlanNodeId dest_node_id, int num_senders, bool is_merging,
-      int64_t total_buffer_limit, RuntimeProfile* profile);
+      int64_t total_buffer_limit, RuntimeProfile* profile,
+      BufferPool::ClientHandle* client);
 
   /// Adds a new row batch to the appropriate sender queue. If the row batch can be
   /// inserted, the RPC will be responded to before this function returns. If the batch
@@ -168,6 +171,9 @@ class KrpcDataStreamRecvr : public DataStreamRecvrBase {
 
   /// Memtracker for batches in the sender queue(s).
   boost::scoped_ptr<MemTracker> mem_tracker_;
+
+  /// The buffer pool client for allocating buffers of incoming row batches. Not owned.
+  BufferPool::ClientHandle* client_;
 
   /// One or more queues of row batches received from senders. If is_merging_ is true,
   /// there is one SenderQueue for each sender. Otherwise, row batches from all senders

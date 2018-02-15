@@ -143,13 +143,16 @@ class RowBatch {
   RowBatch(const RowDescriptor* row_desc, const TRowBatch& input_batch,
       MemTracker* tracker);
 
-  /// Populate a row batch from the serialized row batch header, decompress / copy
-  /// the tuple's data into a buffer and convert all offsets in 'tuple_offsets' back
-  /// into pointers into the tuple data's buffer. The tuple data's buffer is allocated
-  /// from the row batch's MemPool tracked by 'mem_tracker'.
-  RowBatch(const RowDescriptor* row_desc, const RowBatchHeaderPB& header,
-      const kudu::Slice& input_tuple_data, const kudu::Slice& input_tuple_offsets,
-      MemTracker* mem_tracker);
+  /// Creates a row batch from the protobuf row batch header, decompress / copy
+  /// 'input_tuple_data' into a buffer and convert all offsets in 'input_tuple_offsets'
+  /// back into pointers. The tuple pointers and data's buffers are allocated from the
+  /// buffer pool with 'client' as client handle. The newly created row batch is
+  /// stored in 'row_batch_ptr'. Returns error status on failure. Returns ok otherwise.
+  static Status FromProtobuf(const RowDescriptor* row_desc,
+      const RowBatchHeaderPB& header, const kudu::Slice& input_tuple_data,
+      const kudu::Slice& input_tuple_offsets, MemTracker* mem_tracker,
+      BufferPool::ClientHandle* client, std::unique_ptr<RowBatch>* row_batch_ptr)
+      WARN_UNUSED_RESULT;
 
   /// Releases all resources accumulated at this row batch.  This includes
   ///  - tuple_ptrs
@@ -405,6 +408,22 @@ class RowBatch {
   friend class RowBatchSerializeBenchmark;
   friend class RowBatchSerializeTest;
 
+  /// Creates an empty row batch based on the serialized row batch header. Called from
+  /// FromProtobuf() above before desrialization of a protobuf row batch.
+  RowBatch(const RowDescriptor* row_desc, const RowBatchHeaderPB& header,
+      MemTracker* mem_tracker);
+
+  /// Allocate from buffer pool a buffer of 'len' using the client handle 'client'.
+  /// The actual buffer size is 'len' rounded up to power of 2 or minimum buffer size,
+  /// whichever is larger. The reservation of 'client' may be increased. On success,
+  /// the newly allocated buffer is returned in 'buffer_handle'. Return error status
+  /// if allocation failed. In which case, 'buffer_handle' is not opened.
+  Status AllocateBuffer(BufferPool::ClientHandle* client, int64_t len,
+      BufferPool::BufferHandle* buffer_handle);
+
+  /// Free all BufferInfo and the associated buffers in 'buffers_'.
+  void FreeBuffers();
+
   /// Decide whether to do full tuple deduplication based on row composition. Full
   /// deduplication is enabled only when there is risk of the serialized size being
   /// much larger than in-memory size due to non-adjacent duplicate tuples.
@@ -441,9 +460,12 @@ class RowBatch {
   ///
   /// 'is_compressed': True if 'input_tuple_data' is compressed.
   ///
+  /// 'tuple_data': buffer of 'uncompressed_size' bytes for holding tuple data.
+  ///
   /// TODO: clean this up once the thrift RPC implementation is removed.
   void Deserialize(const kudu::Slice& input_tuple_offsets,
-      const kudu::Slice& input_tuple_data, int64_t uncompressed_size, bool is_compressed);
+      const kudu::Slice& input_tuple_data, int64_t uncompressed_size, bool is_compressed,
+      uint8_t* tuple_data);
 
   typedef FixedSizeHashTable<Tuple*, int> DedupMap;
 
@@ -484,8 +506,8 @@ class RowBatch {
   /// more performant that allocating the pointers from 'tuple_data_pool_' especially
   /// with SubplanNodes in the ExecNode tree because the tuple pointers are not
   /// transferred and do not have to be re-created in every Reset().
-  int tuple_ptrs_size_;
-  Tuple** tuple_ptrs_;
+  const int tuple_ptrs_size_;
+  Tuple** tuple_ptrs_ = nullptr;
 
   /// Total bytes of BufferPool buffers attached to this batch.
   int64_t attached_buffer_bytes_;
@@ -503,12 +525,15 @@ class RowBatch {
   MemTracker* mem_tracker_;  // not owned
 
   struct BufferInfo {
-    BufferPool::ClientHandle* client;
+    BufferPool::ClientHandle* client = nullptr;
     BufferPool::BufferHandle buffer;
   };
 
   /// Pages attached to this row batch. See AddBuffer() for ownership semantics.
   std::vector<BufferInfo> buffers_;
+
+  /// The BufferInfo for the 'tuple_ptrs_' which are allocated from the buffer pool.
+  std::unique_ptr<BufferInfo> tuple_ptrs_info_;
 
   /// String to write compressed tuple data to in Serialize().
   /// This is a string so we can swap() with the string in the serialized row batch
