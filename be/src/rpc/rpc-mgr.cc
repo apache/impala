@@ -57,6 +57,9 @@ DECLARE_string(ssl_minimum_version);
 // Defined in kudu/rpc/rpcz_store.cc
 DECLARE_int32(rpc_duration_too_long_ms);
 
+// Defined in kudu/rpc/transfer.cc
+DECLARE_int32(rpc_max_message_size);
+
 DEFINE_int32(num_acceptor_threads, 2,
     "Number of threads dedicated to accepting connection requests for RPC services");
 DEFINE_int32(num_reactor_threads, 0,
@@ -74,6 +77,10 @@ namespace impala {
 Status RpcMgr::Init() {
   // Log any RPCs which take longer than 2 minutes.
   FLAGS_rpc_duration_too_long_ms = 2 * 60 * 1000;
+
+  // IMPALA-4874: Impala requires support for messages up to 2GB. Override KRPC's default
+  //              maximum of 50MB.
+  FLAGS_rpc_max_message_size = numeric_limits<int32_t>::max();
 
   MessengerBuilder bld("impala-server");
   const scoped_refptr<MetricEntity> entity(
