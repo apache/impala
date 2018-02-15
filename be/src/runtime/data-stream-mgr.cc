@@ -78,7 +78,7 @@ inline uint32_t DataStreamMgr::GetHashValue(
 shared_ptr<DataStreamRecvrBase> DataStreamMgr::CreateRecvr(const RowDescriptor* row_desc,
     const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id, int num_senders,
     int64_t buffer_size, bool is_merging, RuntimeProfile* profile,
-    MemTracker* parent_tracker) {
+    MemTracker* parent_tracker, BufferPool::ClientHandle* client) {
   DCHECK(profile != nullptr);
   DCHECK(parent_tracker != nullptr);
   VLOG_FILE << "creating receiver for fragment="

@@ -215,6 +215,7 @@ class ExecEnv {
 
  private:
   friend class TestEnv;
+  friend class DataStreamTest;
 
   static ExecEnv* exec_env_;
   bool is_fe_tests_ = false;

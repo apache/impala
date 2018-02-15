@@ -74,11 +74,12 @@ class DataStreamMgr : public DataStreamMgrBase {
   /// single stream. 'parent_tracker' is the MemTracker of the exchange node which owns
   /// this receiver. It's the parent of the MemTracker of the newly created receiver.
   /// Ownership of the receiver is shared between this DataStream mgr instance and the
-  /// caller.
+  /// caller. 'client' is the BufferPool's client handle for allocating buffers.
+  /// It's owned by the parent exchange node.
   std::shared_ptr<DataStreamRecvrBase> CreateRecvr(const RowDescriptor* row_desc,
       const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id, int num_senders,
       int64_t buffer_size, bool is_merging, RuntimeProfile* profile,
-      MemTracker* parent_tracker) override;
+      MemTracker* parent_tracker, BufferPool::ClientHandle* client) override;
 
   /// Adds a row batch to the recvr identified by fragment_instance_id/dest_node_id
   /// if the recvr has not been cancelled. sender_id identifies the sender instance

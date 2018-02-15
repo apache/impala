@@ -158,7 +158,13 @@ void BlockingJoinNode::ProcessBuildInputAsync(
   // is safe to do because while the build may have partially completed, it will not be
   // probed. BlockingJoinNode::Open() will return failure as soon as child(0)->Open()
   // completes.
-  if (CanCloseBuildEarly() || !status->ok()) child(1)->Close(state);
+  if (CanCloseBuildEarly() || !status->ok()) {
+    // Release resources in 'build_batch_' before closing the children as some of the
+    // resources are still accounted towards the children node.
+    build_batch_.reset();
+    child(1)->Close(state);
+  }
+
   // Release the thread token as soon as possible (before the main thread joins
   // on it).  This way, if we had a chain of 10 joins using 1 additional thread,
   // we'd keep the additional thread busy the whole time.
@@ -233,7 +239,12 @@ Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
     RETURN_IF_ERROR(child(1)->Open(state));
     RETURN_IF_ERROR(AcquireResourcesForBuild(state));
     RETURN_IF_ERROR(SendBuildInputToSink<false>(state, build_sink));
-    if (CanCloseBuildEarly()) child(1)->Close(state);
+    if (CanCloseBuildEarly()) {
+      // Release resources in 'build_batch_' before closing the children as some of the
+      // resources are still accounted towards the children node.
+      build_batch_.reset();
+      child(1)->Close(state);
+    }
     RETURN_IF_ERROR(child(0)->Open(state));
   }
   return Status::OK();

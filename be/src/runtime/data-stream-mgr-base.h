@@ -20,6 +20,7 @@
 #define IMPALA_RUNTIME_DATA_STREAM_MGR_BASE_H
 
 #include "common/status.h"
+#include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/descriptors.h"  // for PlanNodeId
 #include "util/aligned-new.h"
 
@@ -47,7 +48,7 @@ class DataStreamMgrBase : public CacheLineAligned {
   virtual std::shared_ptr<DataStreamRecvrBase> CreateRecvr(const RowDescriptor* row_desc,
       const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id, int num_senders,
       int64_t buffer_size, bool is_merging, RuntimeProfile* profile,
-      MemTracker* parent_tracker) = 0;
+      MemTracker* parent_tracker, BufferPool::ClientHandle* client = nullptr) = 0;
 
   /// Closes all receivers registered for fragment_instance_id immediately.
   virtual void Cancel(const TUniqueId& fragment_instance_id) = 0;

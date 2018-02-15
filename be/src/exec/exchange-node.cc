@@ -79,11 +79,18 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
   }
 #endif
 
+  RETURN_IF_ERROR(ExecEnv::GetInstance()->buffer_pool()->RegisterClient(
+      Substitute("Exchg Recvr (id=$0)", id_), nullptr,
+      ExecEnv::GetInstance()->buffer_reservation(), mem_tracker(),
+      numeric_limits<int64_t>::max(), runtime_profile(), &recvr_buffer_pool_client_));
+
   // TODO: figure out appropriate buffer size
   DCHECK_GT(num_senders_, 0);
-  stream_recvr_ = ExecEnv::GetInstance()->stream_mgr()->CreateRecvr(&input_row_desc_,
-      state->fragment_instance_id(), id_, num_senders_,
-      FLAGS_exchg_node_buffer_size_bytes, is_merging_, runtime_profile(), mem_tracker());
+  stream_recvr_ = ExecEnv::GetInstance()->stream_mgr()->CreateRecvr(
+      &input_row_desc_, state->fragment_instance_id(), id_, num_senders_,
+      FLAGS_exchg_node_buffer_size_bytes, is_merging_, runtime_profile(), mem_tracker(),
+      &recvr_buffer_pool_client_);
+
   if (is_merging_) {
     less_than_.reset(
         new TupleRowComparator(ordering_exprs_, is_asc_order_, nulls_first_));
@@ -128,6 +135,7 @@ void ExchangeNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (less_than_.get() != nullptr) less_than_->Close(state);
   if (stream_recvr_ != nullptr) stream_recvr_->Close();
+  ExecEnv::GetInstance()->buffer_pool()->DeregisterClient(&recvr_buffer_pool_client_);
   ScalarExpr::Close(ordering_exprs_);
   ExecNode::Close(state);
 }

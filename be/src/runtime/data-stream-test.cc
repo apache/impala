@@ -134,11 +134,11 @@ class ImpalaThriftTestBackend : public ImpalaInternalServiceIf {
 // this test file.
 class ImpalaKRPCTestBackend : public DataStreamServiceIf {
  public:
-  ImpalaKRPCTestBackend(RpcMgr* rpc_mgr, KrpcDataStreamMgr* stream_mgr)
+  ImpalaKRPCTestBackend(RpcMgr* rpc_mgr, KrpcDataStreamMgr* stream_mgr,
+      MemTracker* process_mem_tracker)
     : DataStreamServiceIf(rpc_mgr->metric_entity(), rpc_mgr->result_tracker()),
       rpc_mgr_(rpc_mgr),
       stream_mgr_(stream_mgr) {
-    MemTracker* process_mem_tracker = ExecEnv::GetInstance()->process_mem_tracker();
     bool is_percent;
     int64_t bytes_limit = ParseUtil::ParseMemSpec(FLAGS_datastream_service_queue_mem_limit,
         &is_percent, process_mem_tracker->limit());
@@ -184,7 +184,6 @@ enum KrpcSwitch {
 class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwitch>> {
  protected:
   DataStreamTest() : next_val_(0) {
-
     // Stop tests that rely on mismatched sender / receiver pairs timing out from failing.
     FLAGS_datastream_sender_timeout_ms = 250;
   }
@@ -196,8 +195,15 @@ class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwit
 
     exec_env_.reset(new ExecEnv());
     ABORT_IF_ERROR(exec_env_->InitForFeTests());
+    exec_env_->InitBufferPool(32 * 1024, 1024 * 1024 * 1024, 32 * 1024);
     runtime_state_.reset(new RuntimeState(TQueryCtx(), exec_env_.get()));
     mem_pool_.reset(new MemPool(&tracker_));
+
+    // Register a BufferPool client for allocating buffers for row batches.
+    ABORT_IF_ERROR(exec_env_->buffer_pool()->RegisterClient(
+        "DataStream Test Recvr", nullptr, exec_env_->buffer_reservation(), &tracker_,
+        numeric_limits<int64_t>::max(), runtime_state_->runtime_profile(),
+        &buffer_pool_client_));
 
     CreateRowDesc();
 
@@ -207,7 +213,7 @@ class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwit
 
     next_instance_id_.lo = 0;
     next_instance_id_.hi = 0;
-    stream_mgr_ = ExecEnv::GetInstance()->stream_mgr();
+    stream_mgr_ = exec_env_->stream_mgr();
 
     broadcast_sink_.dest_node_id = DEST_NODE_ID;
     broadcast_sink_.output_partition.type = TPartitionType::UNPARTITIONED;
@@ -274,6 +280,7 @@ class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwit
     } else {
       StopKrpcBackend();
     }
+    exec_env_->buffer_pool()->DeregisterClient(&buffer_pool_client_);
   }
 
   void Reset() {
@@ -296,6 +303,9 @@ class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwit
   string stmt_;
   // The sorting expression for the single BIGINT column.
   vector<ScalarExpr*> ordering_exprs_;
+
+  // Client for allocating buffers for row batches.
+  BufferPool::ClientHandle buffer_pool_client_;
 
   // RowBatch generation
   scoped_ptr<RowBatch> batch_;
@@ -440,7 +450,7 @@ class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwit
     receiver_info_.push_back(ReceiverInfo(stream_type, num_senders, receiver_num));
     ReceiverInfo& info = receiver_info_.back();
     info.stream_recvr = stream_mgr_->CreateRecvr(row_desc_, instance_id, DEST_NODE_ID,
-        num_senders, buffer_size, is_merging, profile, &tracker_);
+        num_senders, buffer_size, is_merging, profile, &tracker_, &buffer_pool_client_);
     if (!is_merging) {
       info.thread_handle = new thread(&DataStreamTest::ReadStream, this, &info);
     } else {
@@ -553,7 +563,7 @@ class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwit
     // Dynamic cast stream_mgr_ which is of type DataStreamMgrBase to derived type
     // DataStreamMgr, since ImpalaThriftTestBackend() accepts only DataStreamMgr*.
     boost::shared_ptr<ImpalaThriftTestBackend> handler(
-        new ImpalaThriftTestBackend(ExecEnv::GetInstance()->ThriftStreamMgr()));
+        new ImpalaThriftTestBackend(exec_env_->ThriftStreamMgr()));
     boost::shared_ptr<TProcessor> processor(new ImpalaInternalServiceProcessor(handler));
     ThriftServerBuilder builder("DataStreamTest backend", processor, FLAGS_port);
     ASSERT_OK(builder.Build(&server_));
@@ -561,10 +571,11 @@ class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwit
   }
 
   void StartKrpcBackend() {
-    RpcMgr* rpc_mgr = ExecEnv::GetInstance()->rpc_mgr();
-    KrpcDataStreamMgr* krpc_stream_mgr = ExecEnv::GetInstance()->KrpcStreamMgr();
+    RpcMgr* rpc_mgr = exec_env_->rpc_mgr();
+    KrpcDataStreamMgr* krpc_stream_mgr = exec_env_->KrpcStreamMgr();
     ASSERT_OK(rpc_mgr->Init());
-    test_service_.reset(new ImpalaKRPCTestBackend(rpc_mgr, krpc_stream_mgr));
+    test_service_.reset(new ImpalaKRPCTestBackend(rpc_mgr, krpc_stream_mgr,
+        exec_env_->process_mem_tracker()));
     ASSERT_OK(test_service_->Init());
     ASSERT_OK(krpc_stream_mgr->Init(test_service_->mem_tracker()));
     ASSERT_OK(rpc_mgr->StartServices(krpc_address_));
@@ -577,7 +588,7 @@ class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwit
   }
 
   void StopKrpcBackend() {
-    ExecEnv::GetInstance()->rpc_mgr()->Shutdown();
+    exec_env_->rpc_mgr()->Shutdown();
   }
 
   void StartSender(TPartitionType::type partition_type = TPartitionType::UNPARTITIONED,
@@ -714,7 +725,7 @@ class DataStreamTestShortServiceQueue : public DataStreamTest {
 };
 
 INSTANTIATE_TEST_CASE_P(ThriftOrKrpc, DataStreamTest,
-    ::testing::Values(USE_THRIFT, USE_KRPC));
+    ::testing::Values(USE_KRPC, USE_THRIFT));
 
 INSTANTIATE_TEST_CASE_P(ThriftOnly, DataStreamTestThriftOnly,
     ::testing::Values(USE_THRIFT));
@@ -796,7 +807,7 @@ TEST_P(DataStreamTestThriftOnly, CloseRecvrWhileReferencesRemain) {
   TUniqueId instance_id;
   GetNextInstanceId(&instance_id);
   shared_ptr<DataStreamRecvrBase> stream_recvr = stream_mgr_->CreateRecvr(row_desc_,
-      instance_id, DEST_NODE_ID, 1, 1, false, profile, &tracker_);
+      instance_id, DEST_NODE_ID, 1, 1, false, profile, &tracker_, nullptr);
 
   // Perform tear down, but keep a reference to the receiver so that it is deleted last
   // (to confirm that the destructor does not access invalid state after tear-down).
@@ -860,7 +871,7 @@ TEST_P(DataStreamTestShortDeserQueue, TestNoDeadlock) {
   receiver_info_.push_back(ReceiverInfo(TPartitionType::UNPARTITIONED, 4, 1));
   ReceiverInfo& info = receiver_info_.back();
   info.stream_recvr = stream_mgr_->CreateRecvr(row_desc_, instance_id, DEST_NODE_ID,
-      4, 1024 * 1024, false, profile, &tracker_);
+      4, 1024 * 1024, false, profile, &tracker_, &buffer_pool_client_);
   info.thread_handle = new thread(
       &DataStreamTestShortDeserQueue_TestNoDeadlock_Test::ReadStream, this, &info);
 
