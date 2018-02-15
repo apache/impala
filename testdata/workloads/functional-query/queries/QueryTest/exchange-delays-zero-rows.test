@@ -7,5 +7,5 @@ where l_linenumber = -1
 group by l_orderkey
 ---- RESULTS
 ---- CATCH
-Sender timed out waiting for receiver fragment instance
+timed out waiting for receiver fragment instance
 ====

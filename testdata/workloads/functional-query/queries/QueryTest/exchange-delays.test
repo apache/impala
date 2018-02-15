@@ -6,5 +6,5 @@ from tpch.lineitem
 ---- RESULTS
 6001215
 ---- CATCH
-Sender timed out waiting for receiver fragment instance
+timed out waiting for receiver fragment instance
 ====
