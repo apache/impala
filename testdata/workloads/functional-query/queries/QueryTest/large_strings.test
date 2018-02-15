@@ -209,3 +209,20 @@ select length(madlib_decode_vector(concat_ws(',', s, s, s, s))) from (
 ---- CATCH
 String length larger than allowed limit of 1 GB character data
 =====
+---- QUERY
+# IMPALA-4874: Generate a large row made up of multiple large strings to test RPC
+#              transmission. This uses hashing to make this difficult to compress,
+#              which results in a larger row batch.
+select length(group_concat(h, "!")),
+       length(group_concat(h, "-"))
+from (
+select cast(fnv_hash(concat(l_comment, 'a')) as string) as h from tpch_parquet.lineitem union all
+select cast(fnv_hash(concat(l_comment, 'b')) as string) as h from tpch_parquet.lineitem union all
+select cast(fnv_hash(concat(l_comment, 'c')) as string) as h from tpch_parquet.lineitem union all
+select cast(fnv_hash(concat(l_comment, 'd')) as string) as h from tpch_parquet.lineitem union all
+select cast(fnv_hash(concat(l_comment, 'e')) as string) as h from tpch_parquet.lineitem) a;
+---- TYPES
+INT,INT
+---- RESULTS
+611468161,611468161
+=====
