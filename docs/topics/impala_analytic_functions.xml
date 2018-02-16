@@ -781,7 +781,7 @@ order by kind, ordering desc, name;
 
       <p>
         Partitioning by the <codeph>X</codeph> column groups all the duplicate numbers together and returns the
-        place each each value within the group; because each value occurs only 1 or 2 times,
+        place each value within the group; because each value occurs only 1 or 2 times,
         <codeph>DENSE_RANK()</codeph> designates each <codeph>X</codeph> value as either first or second within its
         group.
       </p>
@@ -1569,7 +1569,7 @@ insert into animals values ('Fire-breathing dragon', 'Mythical', NULL);
 
       <p>
         Partitioning by the <codeph>X</codeph> column groups all the duplicate numbers together and returns the
-        place each each value within the group; because each value occurs only 1 or 2 times,
+        place each value within the group; because each value occurs only 1 or 2 times,
         <codeph>RANK()</codeph> designates each <codeph>X</codeph> value as either first or second within its
         group.
       </p>
