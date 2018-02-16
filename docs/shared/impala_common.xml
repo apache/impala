@@ -2602,7 +2602,7 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
       <p rev="" id="analytic_partition_pruning_caveat">
         In queries involving both analytic functions and partitioned tables, partition pruning only occurs for columns named in the <codeph>PARTITION BY</codeph>
         clause of the analytic function call. For example, if an analytic function query has a clause such as <codeph>WHERE year=2016</codeph>,
-        the way to make the query prune all other <codeph>YEAR</codeph> partitions is to include <codeph>PARTITION BY year</codeph>in the analytic function call;
+        the way to make the query prune all other <codeph>YEAR</codeph> partitions is to include <codeph>PARTITION BY year</codeph> in the analytic function call;
         for example, <codeph>OVER (PARTITION BY year,<varname>other_columns</varname> <varname>other_analytic_clauses</varname>)</codeph>.
 <!--
         These examples illustrate the technique:
