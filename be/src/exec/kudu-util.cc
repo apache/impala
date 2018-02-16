@@ -193,6 +193,9 @@ ColumnType KuduDataTypeToColumnType(DataType type) {
     case DataType::DOUBLE: return ColumnType(PrimitiveType::TYPE_DOUBLE);
     case DataType::BINARY: return ColumnType(PrimitiveType::TYPE_BINARY);
     case DataType::UNIXTIME_MICROS: return ColumnType(PrimitiveType::TYPE_TIMESTAMP);
+    case DataType::DECIMAL:
+      DCHECK(false) << "DECIMAL is not supported on Kudu.";
+      return ColumnType(PrimitiveType::INVALID_TYPE);
   }
   return ColumnType(PrimitiveType::INVALID_TYPE);
 }
