@@ -38,6 +38,7 @@ const string ScanNode::BYTES_READ_COUNTER = "BytesRead";
 const string ScanNode::ROWS_READ_COUNTER = "RowsRead";
 const string ScanNode::COLLECTION_ITEMS_READ_COUNTER = "CollectionItemsRead";
 const string ScanNode::TOTAL_HDFS_READ_TIMER = "TotalRawHdfsReadTime(*)";
+const string ScanNode::TOTAL_HDFS_OPEN_FILE_TIMER = "TotalRawHdfsOpenFileTime(*)";
 const string ScanNode::TOTAL_HBASE_READ_TIMER = "TotalRawHBaseReadTime(*)";
 const string ScanNode::TOTAL_THROUGHPUT_COUNTER = "TotalReadThroughput";
 const string ScanNode::MATERIALIZE_TUPLE_TIMER = "MaterializeTupleTime(*)";

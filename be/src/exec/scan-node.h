@@ -108,6 +108,7 @@ class ScanNode : public ExecNode {
     return collection_items_read_counter_;
   }
   RuntimeProfile::Counter* read_timer() const { return read_timer_; }
+  RuntimeProfile::Counter* open_file_timer() const { return open_file_timer_; }
   RuntimeProfile::Counter* total_throughput_counter() const {
     return total_throughput_counter_;
   }
@@ -135,6 +136,7 @@ class ScanNode : public ExecNode {
   static const std::string ROWS_READ_COUNTER;
   static const std::string COLLECTION_ITEMS_READ_COUNTER;
   static const std::string TOTAL_HDFS_READ_TIMER;
+  static const std::string TOTAL_HDFS_OPEN_FILE_TIMER;
   static const std::string TOTAL_HBASE_READ_TIMER;
   static const std::string TOTAL_THROUGHPUT_COUNTER;
   static const std::string PER_READ_THREAD_THROUGHPUT_COUNTER;
@@ -168,6 +170,7 @@ class ScanNode : public ExecNode {
   /// [(2, [(3)]), (4, [])] this counter will be 3: (2, [(3)]), (3) and (4, [])
   RuntimeProfile::Counter* collection_items_read_counter_;
   RuntimeProfile::Counter* read_timer_; // total read time
+  RuntimeProfile::Counter* open_file_timer_; // total time spent opening file handles
   /// Wall based aggregate read throughput [bytes/sec]
   RuntimeProfile::Counter* total_throughput_counter_;
   /// Per thread read throughput [bytes/sec]

@@ -343,7 +343,8 @@ class DiskIoMgr : public CacheLineAligned {
   bool Validate() const;
 
   /// Given a FS handle, name and last modified time of the file, construct a new
-  /// ExclusiveHdfsFileHandle. In the case of an error, returns nullptr.
+  /// ExclusiveHdfsFileHandle. This records the time spent opening the handle in
+  /// 'reader' and counts this as a cache miss. In the case of an error, returns nullptr.
   ExclusiveHdfsFileHandle* GetExclusiveHdfsFileHandle(const hdfsFS& fs,
       std::string* fname, int64_t mtime, RequestContext* reader);
 
@@ -351,7 +352,8 @@ class DiskIoMgr : public CacheLineAligned {
   void ReleaseExclusiveHdfsFileHandle(ExclusiveHdfsFileHandle* fid);
 
   /// Given a FS handle, name and last modified time of the file, gets a
-  /// CachedHdfsFileHandle from the file handle cache. On success, records statistics
+  /// CachedHdfsFileHandle from the file handle cache. Records the time spent
+  /// opening the handle in 'reader'. On success, records statistics
   /// about whether this was a cache hit or miss in the 'reader' as well as at the
   /// system level. In case of an error returns nullptr.
   CachedHdfsFileHandle* GetCachedHdfsFileHandle(const hdfsFS& fs,
@@ -361,9 +363,10 @@ class DiskIoMgr : public CacheLineAligned {
   void ReleaseCachedHdfsFileHandle(std::string* fname, CachedHdfsFileHandle* fid);
 
   /// Reopens a file handle by destroying the file handle and getting a fresh
-  /// file handle from the cache. Returns an error if the file could not be reopened.
+  /// file handle from the cache. Records the time spent reopening the handle
+  /// in 'reader'. Returns an error if the file could not be reopened.
   Status ReopenCachedHdfsFileHandle(const hdfsFS& fs, std::string* fname, int64_t mtime,
-      CachedHdfsFileHandle** fid);
+      RequestContext* reader, CachedHdfsFileHandle** fid);
 
   /// "Disk" queue offsets for remote accesses.  Offset 0 corresponds to
   /// disk ID (i.e. disk_queue_ index) of num_local_disks().

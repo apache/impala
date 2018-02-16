@@ -128,6 +128,10 @@ class RequestContext {
 
   void set_read_timer(RuntimeProfile::Counter* read_timer) { read_timer_ = read_timer; }
 
+  void set_open_file_timer(RuntimeProfile::Counter* open_file_timer) {
+    open_file_timer_ = open_file_timer;
+  }
+
   void set_active_read_thread_counter(
       RuntimeProfile::Counter* active_read_thread_counter) {
    active_read_thread_counter_ = active_read_thread_counter;
@@ -244,6 +248,9 @@ class RequestContext {
 
   /// Total time spent in hdfs reading
   RuntimeProfile::Counter* read_timer_ = nullptr;
+
+  /// Total time spent open hdfs file handles
+  RuntimeProfile::Counter* open_file_timer_ = nullptr;
 
   /// Number of active read threads
   RuntimeProfile::Counter* active_read_thread_counter_ = nullptr;

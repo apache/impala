@@ -66,6 +66,8 @@ const char* ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT =
     "impala-server.io.mgr.cached-file-handles-hit-count";
 const char* ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT =
     "impala-server.io.mgr.cached-file-handles-miss-count";
+const char* ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_REOPENED =
+    "impala-server.io.mgr.cached-file-handles-reopened";
 const char* ImpaladMetricKeys::CATALOG_NUM_DBS =
     "catalog.num-databases";
 const char* ImpaladMetricKeys::CATALOG_NUM_TABLES =
@@ -117,6 +119,7 @@ IntCounter* ImpaladMetrics::IO_MGR_LOCAL_BYTES_READ = NULL;
 IntCounter* ImpaladMetrics::IO_MGR_SHORT_CIRCUIT_BYTES_READ = NULL;
 IntCounter* ImpaladMetrics::IO_MGR_CACHED_BYTES_READ = NULL;
 IntCounter* ImpaladMetrics::IO_MGR_BYTES_WRITTEN = NULL;
+IntCounter* ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_REOPENED = NULL;
 IntCounter* ImpaladMetrics::HEDGED_READ_OPS = NULL;
 IntCounter* ImpaladMetrics::HEDGED_READ_OPS_WIN = NULL;
 
@@ -214,6 +217,9 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
 
   IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT = m->AddGauge(
       ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT, 0);
+
+  IO_MGR_CACHED_FILE_HANDLES_REOPENED = m->AddCounter(
+      ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_REOPENED, 0);
 
   IO_MGR_BYTES_READ = m->AddCounter(ImpaladMetricKeys::IO_MGR_BYTES_READ, 0);
   IO_MGR_LOCAL_BYTES_READ = m->AddCounter(

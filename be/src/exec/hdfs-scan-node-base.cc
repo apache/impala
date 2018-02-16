@@ -355,6 +355,7 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
   // TODO: Revisit counters and move the counters specific to multi-threaded scans
   // into HdfsScanNode.
   read_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HDFS_READ_TIMER);
+  open_file_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HDFS_OPEN_FILE_TIMER);
   per_read_thread_throughput_counter_ = runtime_profile()->AddDerivedCounter(
       PER_READ_THREAD_THROUGHPUT_COUNTER, TUnit::BYTES_PER_SECOND,
       bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_read_counter_, read_timer_));
@@ -371,6 +372,7 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
 
   reader_context_->set_bytes_read_counter(bytes_read_counter());
   reader_context_->set_read_timer(read_timer());
+  reader_context_->set_open_file_timer(open_file_timer());
   reader_context_->set_active_read_thread_counter(&active_hdfs_read_thread_counter_);
   reader_context_->set_disks_accessed_bitmap(&disks_accessed_bitmap_);
 
