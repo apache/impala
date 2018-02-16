@@ -1575,6 +1575,16 @@
     "key": "impala-server.io.mgr.cached-file-handles-miss-count"
   },
   {
+    "description": "Number of cached HDFS file handles reopened",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HDFS cached file handles reopened",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala-server.io.mgr.cached-file-handles-reopened"
+  },
+  {
     "description": "The number of active scratch directories for spilling to disk.",
     "contexts": [
       "IMPALAD"

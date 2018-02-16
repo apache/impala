@@ -740,8 +740,6 @@ void DiskIoMgr::ReadRange(
     // Update counters.
     COUNTER_ADD_IF_NOT_NULL(reader->active_read_thread_counter_, 1L);
     COUNTER_BITOR_IF_NOT_NULL(reader->disks_accessed_bitmap_, 1LL << disk_queue->disk_id);
-    SCOPED_TIMER(&read_timer_);
-    SCOPED_TIMER(reader->read_timer_);
 
     read_status = range->Read(buffer_desc->buffer_, buffer_desc->buffer_len_,
         &buffer_desc->len_, &buffer_desc->eosr_);
@@ -841,6 +839,7 @@ int DiskIoMgr::AssignQueue(const char* file, int disk_id, bool expected_local) {
 
 ExclusiveHdfsFileHandle* DiskIoMgr::GetExclusiveHdfsFileHandle(const hdfsFS& fs,
     std::string* fname, int64_t mtime, RequestContext *reader) {
+  SCOPED_TIMER(reader->open_file_timer_);
   ExclusiveHdfsFileHandle* fid = new ExclusiveHdfsFileHandle(fs, fname->data(), mtime);
   if (!fid->ok()) {
     VLOG_FILE << "Opening the file " << fname << " failed.";
@@ -864,6 +863,7 @@ void DiskIoMgr::ReleaseExclusiveHdfsFileHandle(ExclusiveHdfsFileHandle* fid) {
 CachedHdfsFileHandle* DiskIoMgr::GetCachedHdfsFileHandle(const hdfsFS& fs,
     std::string* fname, int64_t mtime, RequestContext *reader) {
   bool cache_hit;
+  SCOPED_TIMER(reader->open_file_timer_);
   CachedHdfsFileHandle* fh = file_handle_cache_.GetFileHandle(fs, fname, mtime, false,
       &cache_hit);
   if (fh == nullptr) return nullptr;
@@ -887,8 +887,10 @@ void DiskIoMgr::ReleaseCachedHdfsFileHandle(std::string* fname,
 }
 
 Status DiskIoMgr::ReopenCachedHdfsFileHandle(const hdfsFS& fs, std::string* fname,
-    int64_t mtime, CachedHdfsFileHandle** fid) {
+    int64_t mtime, RequestContext* reader, CachedHdfsFileHandle** fid) {
   bool cache_hit;
+  SCOPED_TIMER(reader->open_file_timer_);
+  ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_REOPENED->Increment(1L);
   file_handle_cache_.ReleaseFileHandle(fname, *fid, true);
   // The old handle has been destroyed, so *fid must be overwritten before returning.
   *fid = file_handle_cache_.GetFileHandle(fs, fname, mtime, true,

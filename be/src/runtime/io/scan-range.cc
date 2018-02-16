@@ -503,73 +503,83 @@ Status ScanRange::Read(
 
     int64_t max_chunk_size = MaxReadChunkSize();
     Status status = Status::OK();
-    while (*bytes_read < bytes_to_read) {
-      int chunk_size = min(bytes_to_read - *bytes_read, max_chunk_size);
-      DCHECK_GE(chunk_size, 0);
-      // The hdfsRead() length argument is an int.
-      DCHECK_LE(chunk_size, numeric_limits<int>::max());
-      int current_bytes_read = -1;
-      // bytes_read_ is only updated after the while loop
-      int64_t position_in_file = offset_ + bytes_read_ + *bytes_read;
-      int num_retries = 0;
-      while (true) {
-        status = Status::OK();
-        // For file handles from the cache, any of the below file operations may fail
-        // due to a bad file handle. In each case, record the error, but allow for a
-        // retry to fix it.
-        if (FLAGS_use_hdfs_pread) {
-          current_bytes_read = hdfsPread(fs_, hdfs_file, position_in_file,
-              buffer + *bytes_read, chunk_size);
-          if (current_bytes_read == -1) {
-            status = Status(TErrorCode::DISK_IO_ERROR,
-                GetHdfsErrorMsg("Error reading from HDFS file: ", file_));
-          }
-        } else {
-          // If the file handle is borrowed, it may not be at the appropriate
-          // location. Seek to the appropriate location.
-          bool seek_failed = false;
-          if (borrowed_hdfs_fh != nullptr) {
-            if (hdfsSeek(fs_, hdfs_file, position_in_file) != 0) {
-              status = Status(TErrorCode::DISK_IO_ERROR, Substitute("Error seeking to $0 "
-                  " in file: $1: $2", position_in_file, file_, GetHdfsErrorMsg("")));
-              seek_failed = true;
-            }
-          }
-          if (!seek_failed) {
-            current_bytes_read = hdfsRead(fs_, hdfs_file, buffer + *bytes_read,
-                chunk_size);
+    {
+      ScopedTimer<MonotonicStopWatch> io_mgr_read_timer(&io_mgr_->read_timer_);
+      ScopedTimer<MonotonicStopWatch> req_context_read_timer(reader_->read_timer_);
+      while (*bytes_read < bytes_to_read) {
+        int chunk_size = min(bytes_to_read - *bytes_read, max_chunk_size);
+        DCHECK_GE(chunk_size, 0);
+        // The hdfsRead() length argument is an int.
+        DCHECK_LE(chunk_size, numeric_limits<int>::max());
+        int current_bytes_read = -1;
+        // bytes_read_ is only updated after the while loop
+        int64_t position_in_file = offset_ + bytes_read_ + *bytes_read;
+        int num_retries = 0;
+        while (true) {
+          status = Status::OK();
+          // For file handles from the cache, any of the below file operations may fail
+          // due to a bad file handle. In each case, record the error, but allow for a
+          // retry to fix it.
+          if (FLAGS_use_hdfs_pread) {
+            current_bytes_read = hdfsPread(fs_, hdfs_file, position_in_file,
+                buffer + *bytes_read, chunk_size);
             if (current_bytes_read == -1) {
               status = Status(TErrorCode::DISK_IO_ERROR,
                   GetHdfsErrorMsg("Error reading from HDFS file: ", file_));
             }
+          } else {
+            // If the file handle is borrowed, it may not be at the appropriate
+            // location. Seek to the appropriate location.
+            bool seek_failed = false;
+            if (borrowed_hdfs_fh != nullptr) {
+              if (hdfsSeek(fs_, hdfs_file, position_in_file) != 0) {
+                status = Status(TErrorCode::DISK_IO_ERROR,
+                  Substitute("Error seeking to $0 in file: $1: $2", position_in_file,
+                      file_, GetHdfsErrorMsg("")));
+                seek_failed = true;
+              }
+            }
+            if (!seek_failed) {
+              current_bytes_read = hdfsRead(fs_, hdfs_file, buffer + *bytes_read,
+                  chunk_size);
+              if (current_bytes_read == -1) {
+                status = Status(TErrorCode::DISK_IO_ERROR,
+                    GetHdfsErrorMsg("Error reading from HDFS file: ", file_));
+              }
+            }
           }
-        }
 
-        // Do not retry:
-        // - if read was successful (current_bytes_read != -1)
-        // - or if already retried once
-        // - or if this not using a borrowed file handle
-        DCHECK_LE(num_retries, 1);
-        if (current_bytes_read != -1 || borrowed_hdfs_fh == nullptr ||
-            num_retries == 1) {
+          // Do not retry:
+          // - if read was successful (current_bytes_read != -1)
+          // - or if already retried once
+          // - or if this not using a borrowed file handle
+          DCHECK_LE(num_retries, 1);
+          if (current_bytes_read != -1 || borrowed_hdfs_fh == nullptr ||
+              num_retries == 1) {
+            break;
+          }
+          // The error may be due to a bad file handle. Reopen the file handle and retry.
+          // Exclude this time from the read timers.
+          io_mgr_read_timer.Stop();
+          req_context_read_timer.Stop();
+          ++num_retries;
+          RETURN_IF_ERROR(io_mgr_->ReopenCachedHdfsFileHandle(fs_, file_string(),
+              mtime(), reader_, &borrowed_hdfs_fh));
+          hdfs_file = borrowed_hdfs_fh->file();
+          io_mgr_read_timer.Start();
+          req_context_read_timer.Start();
+        }
+        if (!status.ok()) break;
+        if (current_bytes_read == 0) {
+          // No more bytes in the file. The scan range went past the end.
+          *eosr = true;
           break;
         }
-        // The error may be due to a bad file handle. Reopen the file handle and retry.
-        ++num_retries;
-        RETURN_IF_ERROR(io_mgr_->ReopenCachedHdfsFileHandle(fs_, file_string(),
-            mtime(), &borrowed_hdfs_fh));
-        hdfs_file = borrowed_hdfs_fh->file();
-      }
-      if (!status.ok()) break;
-      if (current_bytes_read == 0) {
-        // No more bytes in the file. The scan range went past the end.
-        *eosr = true;
-        break;
-      }
-      *bytes_read += current_bytes_read;
+        *bytes_read += current_bytes_read;
 
-      // Collect and accumulate statistics
-      GetHdfsStatistics(hdfs_file);
+        // Collect and accumulate statistics
+        GetHdfsStatistics(hdfs_file);
+      }
     }
 
     if (borrowed_hdfs_fh != nullptr) {

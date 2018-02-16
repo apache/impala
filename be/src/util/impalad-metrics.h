@@ -97,6 +97,9 @@ class ImpaladMetricKeys {
   /// Number of cache misses for cached HDFS file handles
   static const char* IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT;
 
+  /// Number of cached file handles that hit an error and were reopened
+  static const char* IO_MGR_CACHED_FILE_HANDLES_REOPENED;
+
   /// Number of DBs in the catalog
   static const char* CATALOG_NUM_DBS;
 
@@ -174,6 +177,7 @@ class ImpaladMetrics {
   static IntCounter* IO_MGR_CACHED_BYTES_READ;
   static IntCounter* IO_MGR_SHORT_CIRCUIT_BYTES_READ;
   static IntCounter* IO_MGR_BYTES_WRITTEN;
+  static IntCounter* IO_MGR_CACHED_FILE_HANDLES_REOPENED;
   static IntCounter* HEDGED_READ_OPS;
   static IntCounter* HEDGED_READ_OPS_WIN;
 
