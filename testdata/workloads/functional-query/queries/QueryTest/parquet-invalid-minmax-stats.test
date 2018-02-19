@@ -1,0 +1,32 @@
+====
+---- QUERY
+# IMPALA-6527, IMPALA-6538: NaN values lead to incorrect filtering.
+# When the first value is NaN in a column chunk, Impala might choose it as min_value and
+# max_value for statistics. In this case the min/max filter should be ignored.
+# 'min_max_is_nan' is written by an old writer, therefore it contains invalid statistics.
+select * from min_max_is_nan where val > 0
+---- RESULTS
+42
+====
+---- QUERY
+# IMPALA-6527, IMPALA-6538: NaN values lead to incorrect filtering
+# test equality predicate
+select * from min_max_is_nan where val = 42
+---- RESULTS
+42
+====
+---- QUERY
+# IMPALA-6527: NaN values lead to incorrect filtering
+# test predicate that is true for NaN
+select * from min_max_is_nan where not val >= 0
+---- RESULTS
+NaN
+====
+---- QUERY
+# IMPALA-6527: NaN values lead to incorrect filtering
+# test predicate that is true for NaN
+select * from min_max_is_nan where val != 0
+---- RESULTS
+NaN
+42
+====

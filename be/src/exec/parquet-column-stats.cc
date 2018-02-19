@@ -18,6 +18,7 @@
 #include "parquet-column-stats.inline.h"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 
 #include "common/names.h"
@@ -94,11 +95,13 @@ bool ColumnStatsBase::ReadFromThrift(const parquet::ColumnChunk& col_chunk,
       return ColumnStats<int64_t>::DecodePlainValue(*stat_value, slot,
           col_chunk.meta_data.type);
     case TYPE_FLOAT:
+      // IMPALA-6527, IMPALA-6538: ignore min/max stats if NaN
       return ColumnStats<float>::DecodePlainValue(*stat_value, slot,
-          col_chunk.meta_data.type);
+          col_chunk.meta_data.type) && !std::isnan(*reinterpret_cast<float*>(slot));
     case TYPE_DOUBLE:
+      // IMPALA-6527, IMPALA-6538: ignore min/max stats if NaN
       return ColumnStats<double>::DecodePlainValue(*stat_value, slot,
-          col_chunk.meta_data.type);
+          col_chunk.meta_data.type) && !std::isnan(*reinterpret_cast<double*>(slot));
     case TYPE_TIMESTAMP:
       return ColumnStats<TimestampValue>::DecodePlainValue(*stat_value, slot,
           col_chunk.meta_data.type);

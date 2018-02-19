@@ -69,3 +69,19 @@ class TestParquetStats(ImpalaTestSuite):
     # skipped inside a fragment, so we ensure that the tests run in a single fragment.
     vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/parquet-deprecated-stats', vector, unique_database)
+
+  def test_invalid_stats(self, vector, unique_database):
+    """IMPALA-6538" Test that reading parquet files with statistics with invalid
+    'min_value'/'max_value' fields works correctly. 'min_value' and 'max_value' are both
+    NaNs, therefore we need to ignore them"""
+    table_name = 'min_max_is_nan'
+    self.client.execute('create table %s.%s (val double) stored as parquet' %
+                       (unique_database, table_name))
+    table_location = get_fs_path('/test-warehouse/%s.db/%s' %
+                                 (unique_database, table_name))
+    local_file = os.path.join(os.environ['IMPALA_HOME'],
+                              'testdata/data/min_max_is_nan.parquet')
+    assert os.path.isfile(local_file)
+    check_call(['hdfs', 'dfs', '-copyFromLocal', local_file, table_location])
+    self.client.execute('invalidate metadata %s.%s' % (unique_database, table_name))
+    self.run_test_case('QueryTest/parquet-invalid-minmax-stats', vector, unique_database)
