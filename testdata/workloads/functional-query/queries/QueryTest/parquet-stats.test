@@ -491,3 +491,80 @@ select count(*) from table_for_null_count_test2 where j < 3;
 aggregation(SUM, NumRowGroups): 1
 aggregation(SUM, NumStatsFilteredRowGroups): 0
 ====
+---- QUERY
+# IMPALA-6527, IMPALA-6538: NaN values lead to incorrect filtering.
+# When the first value is NaN in a column chunk, Impala chooses it as min_value and
+# max_value for statistics. In this case the min/max filter should be ignored.
+create table test_nan(val double) stored as parquet;
+insert into test_nan values (cast('NaN' as double)), (42);
+select * from test_nan where val > 0
+---- RESULTS
+42
+====
+---- QUERY
+# IMPALA-6527, IMPALA-6538: NaN values lead to incorrect filtering
+# test equality predicate
+select * from test_nan where val = 42
+---- RESULTS
+42
+====
+---- QUERY
+# IMPALA-6527: NaN values lead to incorrect filtering
+# test predicate that is true for NaN
+select * from test_nan where not val >= 0
+---- RESULTS
+NaN
+====
+---- QUERY
+# IMPALA-6527: NaN values lead to incorrect filtering
+# test predicate that is true for NaN
+select * from test_nan where val != 0
+---- RESULTS
+NaN
+42
+====
+---- QUERY
+# Statistics filtering must not filter out row groups if predicate can be true for NaN
+create table test_nan_true_predicate(val double) stored as parquet;
+insert into test_nan_true_predicate values (10), (20), (cast('NaN' as double));
+select * from test_nan_true_predicate where not val >= 0
+---- RESULTS
+NaN
+====
+---- QUERY
+# NaN is the last element, predicate is true for NaN and value
+select * from test_nan_true_predicate where not val >= 20
+---- RESULTS
+10
+NaN
+====
+---- QUERY
+# NaN is the last element, predicate is true for NaN and value
+select * from test_nan_true_predicate where val != 10
+---- RESULTS
+20
+NaN
+====
+---- QUERY
+# Test the case when NaN is inserted between two values
+# Test predicate true for NaN and false for the values
+create table test_nan_in_the_middle(val double) stored as parquet;
+insert into test_nan_in_the_middle values (10), (cast('NaN' as double)), (20);
+select * from test_nan_in_the_middle where not val >= 0
+---- RESULTS
+NaN
+====
+---- QUERY
+# NaN in the middle, predicate true for NaN and value
+select * from test_nan_in_the_middle where not val >= 20
+---- RESULTS
+10
+NaN
+====
+---- QUERY
+# NaN in the middle, '!=' should return NaN and value
+select * from test_nan_in_the_middle where val != 10
+---- RESULTS
+NaN
+20
+====
