@@ -137,8 +137,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if use_exclusive_coordinators:
       cmd.append("--use_exclusive_coordinators")
 
-    if pytest.config.option.test_krpc:
-      cmd.append("--use_krpc")
+    if pytest.config.option.test_no_krpc:
+      cmd.append("--disable_krpc")
 
     try:
       check_call(cmd + options, close_fds=True)

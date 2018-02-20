@@ -85,9 +85,9 @@ class SkipIf:
   not_hdfs = pytest.mark.skipif(not IS_HDFS, reason="HDFS Filesystem needed")
   no_secondary_fs = pytest.mark.skipif(not SECONDARY_FILESYSTEM,
       reason="Secondary filesystem needed")
-  not_krpc = pytest.mark.skipif(not pytest.config.option.test_krpc,
+  not_krpc = pytest.mark.skipif(pytest.config.option.test_no_krpc,
       reason="Test is only supported when using KRPC.")
-  not_thrift = pytest.mark.skipif(pytest.config.option.test_krpc,
+  not_thrift = pytest.mark.skipif(not pytest.config.option.test_no_krpc,
       reason="Test is only supported when using Thrift RPC.")
 
 class SkipIfIsilon:
