@@ -32,8 +32,8 @@ class TestSkipIf(ImpalaTestSuite):
 
   @SkipIf.not_krpc
   def test_skip_if_not_krpc(self):
-    assert pytest.config.option.test_krpc
+    assert not pytest.config.option.test_no_krpc
 
   @SkipIf.not_thrift
   def test_skip_if_not_thrift(self):
-    assert not pytest.config.option.test_krpc
+    assert pytest.config.option.test_no_krpc
