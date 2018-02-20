@@ -3,18 +3,19 @@
 create table tdata
   (id int primary key, name string null, valf float null, vali bigint null,
    valv string null, valb boolean null, valt tinyint null, vals smallint null,
-   vald double null)
+   vald double null, valdec4 decimal(9,9) null, valdec8 decimal(18,2) null,
+   valdec16 decimal(38, 0) null)
   PARTITION BY RANGE (PARTITION VALUES < 10, PARTITION 10 <= VALUES < 30,
   PARTITION 30 <= VALUES <= 10000) STORED AS KUDU
 ---- RESULTS
 ====
 ---- QUERY
 insert into tdata values
-(1, "martin", 1.0, 232232323, cast('a' as string), true, 1, 2, 3),
-(2, "david", cast(1.0 as float), 99398493939, cast('b' as string), false, 4, 5, 6),
-(3, "todd", cast(1.0 as float), 993393939, "c", true, 7, 8, 9),
-(40, "he", cast(0.0 as float), 43, cast('e' as string), false, 50, 60, 70),
-(120, "she", cast(0.0 as float), 99, cast('f' as string), true, -1, 0, 1)
+(1, "martin", 1.0, 232232323, cast('a' as string), true, 1, 2, 3, 0.000000001, 2.22, 3),
+(2, "david", cast(1.0 as float), 99398493939, cast('b' as string), false, 4, 5, 6, 0.000000004, 5.55, 6),
+(3, "todd", cast(1.0 as float), 993393939, "c", true, 7, 8, 9, 0.000000007, 8.88, 9),
+(40, "he", cast(0.0 as float), 43, cast('e' as string), false, 50, 60, 70, 0.000000050, 66.60, 70),
+(120, "she", cast(0.0 as float), 99, cast('f' as string), true, -1, 0, 1, -0.000000001, 0.00, 1)
 ---- RESULTS
 : 5
 ---- RUNTIME_PROFILE
@@ -30,15 +31,15 @@ update tdata set vali=43 where id = 1
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-1,'martin',1.0,43,'a',true,1,2,3
-2,'david',1.0,99398493939,'b',false,4,5,6
-3,'todd',1.0,993393939,'c',true,7,8,9
-40,'he',0.0,43,'e',false,50,60,70
-120,'she',0.0,99,'f',true,-1,0,1
+1,'martin',1.0,43,'a',true,1,2,3,0.000000001,2.22,3
+2,'david',1.0,99398493939,'b',false,4,5,6,0.000000004,5.55,6
+3,'todd',1.0,993393939,'c',true,7,8,9,0.000000007,8.88,9
+40,'he',0.0,43,'e',false,50,60,70,0.000000050,66.60,70
+120,'she',0.0,99,'f',true,-1,0,1,-0.000000001,0.00,1
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # single row, equality on key, string
@@ -49,15 +50,15 @@ update tdata set valv=cast('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as varchar(20)) wh
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',true,1,2,3
-2,'david',1.0,99398493939,'b',false,4,5,6
-3,'todd',1.0,993393939,'c',true,7,8,9
-40,'he',0.0,43,'e',false,50,60,70
-120,'she',0.0,99,'f',true,-1,0,1
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',true,1,2,3,0.000000001,2.22,3
+2,'david',1.0,99398493939,'b',false,4,5,6,0.000000004,5.55,6
+3,'todd',1.0,993393939,'c',true,7,8,9,0.000000007,8.88,9
+40,'he',0.0,43,'e',false,50,60,70,0.000000050,66.60,70
+120,'she',0.0,99,'f',true,-1,0,1,-0.000000001,0.00,1
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # single row, equality on key, boolean
@@ -66,15 +67,15 @@ update tdata set valb=false where id = 1
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
-2,'david',1.0,99398493939,'b',false,4,5,6
-3,'todd',1.0,993393939,'c',true,7,8,9
-40,'he',0.0,43,'e',false,50,60,70
-120,'she',0.0,99,'f',true,-1,0,1
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3,0.000000001,2.22,3
+2,'david',1.0,99398493939,'b',false,4,5,6,0.000000004,5.55,6
+3,'todd',1.0,993393939,'c',true,7,8,9,0.000000007,8.88,9
+40,'he',0.0,43,'e',false,50,60,70,0.000000050,66.60,70
+120,'she',0.0,99,'f',true,-1,0,1,-0.000000001,0.00,1
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # single row, equality on key, set to NULL
@@ -83,15 +84,15 @@ update tdata set name=null where id = 40
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
-2,'david',1.0,99398493939,'b',false,4,5,6
-3,'todd',1.0,993393939,'c',true,7,8,9
-40,'NULL',0.0,43,'e',false,50,60,70
-120,'she',0.0,99,'f',true,-1,0,1
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3,0.000000001,2.22,3
+2,'david',1.0,99398493939,'b',false,4,5,6,0.000000004,5.55,6
+3,'todd',1.0,993393939,'c',true,7,8,9,0.000000007,8.88,9
+40,'NULL',0.0,43,'e',false,50,60,70,0.000000050,66.60,70
+120,'she',0.0,99,'f',true,-1,0,1,-0.000000001,0.00,1
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # single row, equlity on key, set from NULL
@@ -100,15 +101,15 @@ update tdata set name='he' where id = 40
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
-2,'david',1.0,99398493939,'b',false,4,5,6
-3,'todd',1.0,993393939,'c',true,7,8,9
-40,'he',0.0,43,'e',false,50,60,70
-120,'she',0.0,99,'f',true,-1,0,1
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3,0.000000001,2.22,3
+2,'david',1.0,99398493939,'b',false,4,5,6,0.000000004,5.55,6
+3,'todd',1.0,993393939,'c',true,7,8,9,0.000000007,8.88,9
+40,'he',0.0,43,'e',false,50,60,70,0.000000050,66.60,70
+120,'she',0.0,99,'f',true,-1,0,1,-0.000000001,0.00,1
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # single row, equality on key, boundary value
@@ -117,15 +118,15 @@ update tdata set vali = max_bigint() where id = 120
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
-2,'david',1.0,99398493939,'b',false,4,5,6
-3,'todd',1.0,993393939,'c',true,7,8,9
-40,'he',0.0,43,'e',false,50,60,70
-120,'she',0.0,9223372036854775807,'f',true,-1,0,1
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3,0.000000001,2.22,3
+2,'david',1.0,99398493939,'b',false,4,5,6,0.000000004,5.55,6
+3,'todd',1.0,993393939,'c',true,7,8,9,0.000000007,8.88,9
+40,'he',0.0,43,'e',false,50,60,70,0.000000050,66.60,70
+120,'she',0.0,9223372036854775807,'f',true,-1,0,1,-0.000000001,0.00,1
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # single row, inequality on key, float
@@ -134,15 +135,15 @@ update tdata set valf = -1 where id > 2 and id < 4
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
-2,'david',1.0,99398493939,'b',false,4,5,6
-3,'todd',-1.0,993393939,'c',true,7,8,9
-40,'he',0.0,43,'e',false,50,60,70
-120,'she',0.0,9223372036854775807,'f',true,-1,0,1
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3,0.000000001,2.22,3
+2,'david',1.0,99398493939,'b',false,4,5,6,0.000000004,5.55,6
+3,'todd',-1.0,993393939,'c',true,7,8,9,0.000000007,8.88,9
+40,'he',0.0,43,'e',false,50,60,70,0.000000050,66.60,70
+120,'she',0.0,9223372036854775807,'f',true,-1,0,1,-0.000000001,0.00,1
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # single row, inequality on key, tinyint
@@ -151,15 +152,15 @@ update tdata set valt = 10 where id > 100
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
-2,'david',1.0,99398493939,'b',false,4,5,6
-3,'todd',-1.0,993393939,'c',true,7,8,9
-40,'he',0.0,43,'e',false,50,60,70
-120,'she',0.0,9223372036854775807,'f',true,10,0,1
+1,'martin',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3,0.000000001,2.22,3
+2,'david',1.0,99398493939,'b',false,4,5,6,0.000000004,5.55,6
+3,'todd',-1.0,993393939,'c',true,7,8,9,0.000000007,8.88,9
+40,'he',0.0,43,'e',false,50,60,70,0.000000050,66.60,70
+120,'she',0.0,9223372036854775807,'f',true,10,0,1,-0.000000001,0.00,1
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # single row, equality on non-key, string
@@ -168,15 +169,15 @@ update tdata set name='unknown' where name = 'martin'
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
-2,'david',1.0,99398493939,'b',false,4,5,6
-3,'todd',-1.0,993393939,'c',true,7,8,9
-40,'he',0.0,43,'e',false,50,60,70
-120,'she',0.0,9223372036854775807,'f',true,10,0,1
+1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3,0.000000001,2.22,3
+2,'david',1.0,99398493939,'b',false,4,5,6,0.000000004,5.55,6
+3,'todd',-1.0,993393939,'c',true,7,8,9,0.000000007,8.88,9
+40,'he',0.0,43,'e',false,50,60,70,0.000000050,66.60,70
+120,'she',0.0,9223372036854775807,'f',true,10,0,1,-0.000000001,0.00,1
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # single row, inequality on non-key, double
@@ -185,15 +186,32 @@ update tdata set vald = 0 where valf < 0
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
-2,'david',1.0,99398493939,'b',false,4,5,6
-3,'todd',-1.0,993393939,'c',true,7,8,0
-40,'he',0.0,43,'e',false,50,60,70
-120,'she',0.0,9223372036854775807,'f',true,10,0,1
+1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3,0.000000001,2.22,3
+2,'david',1.0,99398493939,'b',false,4,5,6,0.000000004,5.55,6
+3,'todd',-1.0,993393939,'c',true,7,8,0,0.000000007,8.88,9
+40,'he',0.0,43,'e',false,50,60,70,0.000000050,66.60,70
+120,'she',0.0,9223372036854775807,'f',true,10,0,1,-0.000000001,0.00,1
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+# single row, inequality on non-key, decimal
+update tdata set valdec4 = 0.000000001, valdec16 = -1 where valdec4 < 0
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
+---- DML_RESULTS: tdata
+1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3,0.000000001,2.22,3
+2,'david',1.0,99398493939,'b',false,4,5,6,0.000000004,5.55,6
+3,'todd',-1.0,993393939,'c',true,7,8,0,0.000000007,8.88,9
+40,'he',0.0,43,'e',false,50,60,70,0.000000050,66.60,70
+120,'she',0.0,9223372036854775807,'f',true,10,0,1,0.000000001,0.00,-1
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # multiple rows, predicate on key
@@ -202,15 +220,15 @@ update tdata set vali=43 where id > 1 and id < 10
 NumModifiedRows: 2
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
-2,'david',1.0,43,'b',false,4,5,6
-3,'todd',-1.0,43,'c',true,7,8,0
-40,'he',0.0,43,'e',false,50,60,70
-120,'she',0.0,9223372036854775807,'f',true,10,0,1
+1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3,0.000000001,2.22,3
+2,'david',1.0,43,'b',false,4,5,6,0.000000004,5.55,6
+3,'todd',-1.0,43,'c',true,7,8,0,0.000000007,8.88,9
+40,'he',0.0,43,'e',false,50,60,70,0.000000050,66.60,70
+120,'she',0.0,9223372036854775807,'f',true,10,0,1,0.000000001,0.00,-1
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # multiple rows, predicate on non-key
@@ -219,15 +237,15 @@ update tdata set valb=false where name LIKE '%he'
 NumModifiedRows: 2
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
-2,'david',1.0,43,'b',false,4,5,6
-3,'todd',-1.0,43,'c',true,7,8,0
-40,'he',0.0,43,'e',false,50,60,70
-120,'she',0.0,9223372036854775807,'f',false,10,0,1
+1,'unknown',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3,0.000000001,2.22,3
+2,'david',1.0,43,'b',false,4,5,6,0.000000004,5.55,6
+3,'todd',-1.0,43,'c',true,7,8,0,0.000000007,8.88,9
+40,'he',0.0,43,'e',false,50,60,70,0.000000050,66.60,70
+120,'she',0.0,9223372036854775807,'f',false,10,0,1,0.000000001,0.00,-1
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # update the same row multiple times: cross join produces 5 identical updates
@@ -236,15 +254,15 @@ update a set a.name='they' from tdata a, tdata b where a.id = 1
 NumModifiedRows: 5
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-1,'they',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
-2,'david',1.0,43,'b',false,4,5,6
-3,'todd',-1.0,43,'c',true,7,8,0
-40,'he',0.0,43,'e',false,50,60,70
-120,'she',0.0,9223372036854775807,'f',false,10,0,1
+1,'they',1.0,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3,0.000000001,2.22,3
+2,'david',1.0,43,'b',false,4,5,6,0.000000004,5.55,6
+3,'todd',-1.0,43,'c',true,7,8,0,0.000000007,8.88,9
+40,'he',0.0,43,'e',false,50,60,70,0.000000050,66.60,70
+120,'she',0.0,9223372036854775807,'f',false,10,0,1,0.000000001,0.00,-1
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # value of update is a constant expression
@@ -253,15 +271,15 @@ update tdata set valf = 1 + 2 where id = 1
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-1,'they',3,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
-2,'david',1.0,43,'b',false,4,5,6
-3,'todd',-1.0,43,'c',true,7,8,0
-40,'he',0.0,43,'e',false,50,60,70
-120,'she',0.0,9223372036854775807,'f',false,10,0,1
+1,'they',3,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3,0.000000001,2.22,3
+2,'david',1.0,43,'b',false,4,5,6,0.000000004,5.55,6
+3,'todd',-1.0,43,'c',true,7,8,0,0.000000007,8.88,9
+40,'he',0.0,43,'e',false,50,60,70,0.000000050,66.60,70
+120,'she',0.0,9223372036854775807,'f',false,10,0,1,0.000000001,0.00,-1
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # value of update is a non-constant expression
@@ -270,15 +288,15 @@ update tdata set name = concat(name, name) where id % 2 = 1
 NumModifiedRows: 2
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-1,'theythey',3,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
-2,'david',1.0,43,'b',false,4,5,6
-3,'toddtodd',-1.0,43,'c',true,7,8,0
-40,'he',0.0,43,'e',false,50,60,70
-120,'she',0.0,9223372036854775807,'f',false,10,0,1
+1,'theythey',3,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3,0.000000001,2.22,3
+2,'david',1.0,43,'b',false,4,5,6,0.000000004,5.55,6
+3,'toddtodd',-1.0,43,'c',true,7,8,0,0.000000007,8.88,9
+40,'he',0.0,43,'e',false,50,60,70,0.000000050,66.60,70
+120,'she',0.0,9223372036854775807,'f',false,10,0,1,0.000000001,0.00,-1
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # error - update key column
@@ -293,15 +311,15 @@ update tdata set name = 'none' where id = 10
 NumModifiedRows: 0
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-1,'theythey',3,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
-2,'david',1.0,43,'b',false,4,5,6
-3,'toddtodd',-1.0,43,'c',true,7,8,0
-40,'he',0.0,43,'e',false,50,60,70
-120,'she',0.0,9223372036854775807,'f',false,10,0,1
+1,'theythey',3,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3,0.000000001,2.22,3
+2,'david',1.0,43,'b',false,4,5,6,0.000000004,5.55,6
+3,'toddtodd',-1.0,43,'c',true,7,8,0,0.000000007,8.88,9
+40,'he',0.0,43,'e',false,50,60,70,0.000000050,66.60,70
+120,'she',0.0,9223372036854775807,'f',false,10,0,1,0.000000001,0.00,-1
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # Try to update a row with a primary key value that is not covered by the existing range
@@ -311,20 +329,20 @@ update tdata set vali = 10 where id = 10001
 NumModifiedRows: 0
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-1,'theythey',3,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3
-2,'david',1.0,43,'b',false,4,5,6
-3,'toddtodd',-1.0,43,'c',true,7,8,0
-40,'he',0.0,43,'e',false,50,60,70
-120,'she',0.0,9223372036854775807,'f',false,10,0,1
+1,'theythey',3,43,'aaaaaaaaaaaaaaaaaaaa',false,1,2,3,0.000000001,2.22,3
+2,'david',1.0,43,'b',false,4,5,6,0.000000004,5.55,6
+3,'toddtodd',-1.0,43,'c',true,7,8,0,0.000000007,8.88,9
+40,'he',0.0,43,'e',false,50,60,70,0.000000050,66.60,70
+120,'she',0.0,9223372036854775807,'f',false,10,0,1,0.000000001,0.00,-1
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 insert into tdata
 select id, string_col, float_col, bigint_col, string_col, bool_col, tinyint_col,
-smallint_col, double_col from functional_kudu.alltypes
+smallint_col, double_col, NULL, NULL, NULL from functional_kudu.alltypes
 ---- RESULTS
 : 7295
 ---- RUNTIME_PROFILE

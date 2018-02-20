@@ -28,6 +28,7 @@
 #include "common/logging.h"
 #include "common/names.h"
 #include "common/status.h"
+#include "runtime/decimal-value.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 
@@ -35,6 +36,7 @@ using kudu::client::KuduSchema;
 using kudu::client::KuduClient;
 using kudu::client::KuduClientBuilder;
 using kudu::client::KuduColumnSchema;
+using kudu::client::KuduColumnTypeAttributes;
 using kudu::client::KuduValue;
 using DataType = kudu::client::KuduColumnSchema::DataType;
 
@@ -69,15 +71,6 @@ Status CreateKuduClient(const vector<string>& master_addrs,
   for (const string& address: master_addrs) b.add_master_server_addr(address);
   KUDU_RETURN_IF_ERROR(b.Build(client), "Unable to create Kudu client");
   return Status::OK();
-}
-
-string KuduSchemaDebugString(const KuduSchema& schema) {
-  stringstream ss;
-  for (int i = 0; i < schema.num_columns(); ++i) {
-    const KuduColumnSchema& col = schema.Column(i);
-    ss << col.name() << " " << KuduColumnSchema::DataTypeToString(col.type()) << "\n";
-  }
-  return ss.str();
 }
 
 void LogKuduMessage(void* unused, kudu::client::KuduLogSeverity severity,
@@ -123,9 +116,10 @@ static Status ConvertTimestampValue(const TimestampValue* tv, int64_t* ts_micros
   return Status::OK();
 }
 
-Status WriteKuduValue(int col, PrimitiveType type, const void* value,
+Status WriteKuduValue(int col, const ColumnType& col_type, const void* value,
     bool copy_strings, kudu::KuduPartialRow* row) {
-  // TODO: codegen this to eliminate braching on type.
+  // TODO: codegen this to eliminate branching on type.
+  PrimitiveType type = col_type.type;
   switch (type) {
     case TYPE_VARCHAR:
     case TYPE_STRING: {
@@ -172,7 +166,31 @@ Status WriteKuduValue(int col, PrimitiveType type, const void* value,
       RETURN_IF_ERROR(ConvertTimestampValue(
           reinterpret_cast<const TimestampValue*>(value), &ts_micros));
       KUDU_RETURN_IF_ERROR(
-          row->SetUnixTimeMicros(col, ts_micros), "Could not add Kudu WriteOp.");
+          row->SetUnixTimeMicros(col, ts_micros), "Could not set Kudu row value.");
+      break;
+    case TYPE_DECIMAL:
+      switch (col_type.GetByteSize()) {
+        case 4:
+          KUDU_RETURN_IF_ERROR(
+              row->SetUnscaledDecimal(
+                  col, reinterpret_cast<const Decimal4Value*>(value)->value()),
+              "Could not set Kudu row value.");
+          break;
+        case 8:
+          KUDU_RETURN_IF_ERROR(
+              row->SetUnscaledDecimal(
+                  col, reinterpret_cast<const Decimal8Value*>(value)->value()),
+              "Could not set Kudu row value.");
+          break;
+        case 16:
+          KUDU_RETURN_IF_ERROR(
+              row->SetUnscaledDecimal(
+                  col, reinterpret_cast<const Decimal16Value*>(value)->value()),
+              "Could not set Kudu row value.");
+          break;
+        default:
+          DCHECK(false) << "Unknown decimal byte size: " << col_type.GetByteSize();
+      }
       break;
     default:
       return Status(TErrorCode::IMPALA_KUDU_TYPE_MISSING, TypeToString(type));
@@ -181,7 +199,8 @@ Status WriteKuduValue(int col, PrimitiveType type, const void* value,
   return Status::OK();
 }
 
-ColumnType KuduDataTypeToColumnType(DataType type) {
+ColumnType KuduDataTypeToColumnType(
+    DataType type, const KuduColumnTypeAttributes& type_attributes) {
   switch (type) {
     case DataType::INT8: return ColumnType(PrimitiveType::TYPE_TINYINT);
     case DataType::INT16: return ColumnType(PrimitiveType::TYPE_SMALLINT);
@@ -194,13 +213,14 @@ ColumnType KuduDataTypeToColumnType(DataType type) {
     case DataType::BINARY: return ColumnType(PrimitiveType::TYPE_BINARY);
     case DataType::UNIXTIME_MICROS: return ColumnType(PrimitiveType::TYPE_TIMESTAMP);
     case DataType::DECIMAL:
-      DCHECK(false) << "DECIMAL is not supported on Kudu.";
-      return ColumnType(PrimitiveType::INVALID_TYPE);
+      return ColumnType::CreateDecimalType(
+          type_attributes.precision(), type_attributes.scale());
   }
   return ColumnType(PrimitiveType::INVALID_TYPE);
 }
 
-Status CreateKuduValue(PrimitiveType type, void* value, KuduValue** out) {
+Status CreateKuduValue(const ColumnType& col_type, void* value, KuduValue** out) {
+  PrimitiveType type = col_type.type;
   switch (type) {
     case TYPE_VARCHAR:
     case TYPE_STRING: {
@@ -235,6 +255,25 @@ Status CreateKuduValue(PrimitiveType type, void* value, KuduValue** out) {
       RETURN_IF_ERROR(ConvertTimestampValue(
           reinterpret_cast<const TimestampValue*>(value), &ts_micros));
       *out = KuduValue::FromInt(ts_micros);
+      break;
+    }
+    case TYPE_DECIMAL: {
+      switch (col_type.GetByteSize()) {
+        case 4:
+          *out = KuduValue::FromDecimal(
+              reinterpret_cast<const Decimal4Value*>(value)->value(), col_type.scale);
+          break;
+        case 8:
+          *out = KuduValue::FromDecimal(
+              reinterpret_cast<const Decimal8Value*>(value)->value(), col_type.scale);
+          break;
+        case 16:
+          *out = KuduValue::FromDecimal(
+              reinterpret_cast<const Decimal16Value*>(value)->value(), col_type.scale);
+          break;
+        default:
+          DCHECK(false) << "Unknown decimal byte size: " << col_type.GetByteSize();
+      }
       break;
     }
     default:
