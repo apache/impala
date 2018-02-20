@@ -352,6 +352,9 @@ error_codes = (
   ("PARQUET_BIT_PACKED_LEVELS", 115,
       "Can not read Parquet file $0 with deprecated BIT_PACKED encoding for rep or "
       "def levels. Support was removed in Impala 3.0 - see IMPALA-6077."),
+
+  ("ROW_BATCH_TOO_LARGE", 116,
+   "Row batch cannot be serialized: size of $0 bytes exceeds supported limit of $1"),
 )
 
 import sys

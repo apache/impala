@@ -284,10 +284,10 @@ Status RowBatch::Serialize(bool full_dedup, vector<int32_t>* tuple_offsets,
     RETURN_IF_ERROR(distinct_tuples.Init(num_rows_ * num_tuples_per_row_ * 2, 0));
     size = TotalByteSize(&distinct_tuples);
     distinct_tuples.Clear(); // Reuse allocated hash table.
-    SerializeInternal(size, &distinct_tuples, tuple_offsets, tuple_data);
+    RETURN_IF_ERROR(SerializeInternal(size, &distinct_tuples, tuple_offsets, tuple_data));
   } else {
     size = TotalByteSize(nullptr);
-    SerializeInternal(size, nullptr, tuple_offsets, tuple_data);
+    RETURN_IF_ERROR(SerializeInternal(size, nullptr, tuple_offsets, tuple_data));
   }
   *uncompressed_size = size;
   *is_compressed = false;
@@ -300,7 +300,11 @@ Status RowBatch::Serialize(bool full_dedup, vector<int32_t>* tuple_offsets,
     auto compressor_cleanup =
         MakeScopeExitTrigger([&compressor]() { compressor.Close(); });
 
+    // If the input size is too large for LZ4 to compress, MaxOutputLen() will return 0.
     int64_t compressed_size = compressor.MaxOutputLen(size);
+    if (compressed_size == 0) {
+      return Status(TErrorCode::LZ4_COMPRESSION_INPUT_TOO_LARGE, size);
+    }
     DCHECK_GT(compressed_size, 0);
     if (compression_scratch_.size() < compressed_size) {
       compression_scratch_.resize(compressed_size);
@@ -333,12 +337,15 @@ bool RowBatch::UseFullDedup() {
   return false;
 }
 
-void RowBatch::SerializeInternal(int64_t size, DedupMap* distinct_tuples,
+Status RowBatch::SerializeInternal(int64_t size, DedupMap* distinct_tuples,
     vector<int32_t>* tuple_offsets, string* tuple_data_str) {
   DCHECK(distinct_tuples == nullptr || distinct_tuples->size() == 0);
-  // TODO: max_size() is much larger than the amount of memory we could feasibly
-  // allocate. Need better way to detect problem.
-  DCHECK_LE(size, tuple_data_str->max_size());
+
+  // The maximum uncompressed RowBatch size that can be serialized is INT_MAX. This
+  // is because the tuple offsets are int32s and will overflow for a larger size.
+  if (size > numeric_limits<int32_t>::max()) {
+    return Status(TErrorCode::ROW_BATCH_TOO_LARGE, size, numeric_limits<int32_t>::max());
+  }
 
   // TODO: track memory usage
   // TODO: detect if serialized size is too large to allocate and return proper error.
@@ -385,6 +392,7 @@ void RowBatch::SerializeInternal(int64_t size, DedupMap* distinct_tuples,
     }
   }
   DCHECK_EQ(offset, size);
+  return Status::OK();
 }
 
 Status RowBatch::AllocateBuffer(BufferPool::ClientHandle* client, int64_t len,

@@ -480,7 +480,7 @@ class RowBatch {
   /// enabled. The distinct_tuples map must be empty.
   int64_t TotalByteSize(DedupMap* distinct_tuples);
 
-  void SerializeInternal(int64_t size, DedupMap* distinct_tuples,
+  Status SerializeInternal(int64_t size, DedupMap* distinct_tuples,
       vector<int32_t>* tuple_offsets, string* tuple_data);
 
   /// All members below need to be handled in RowBatch::AcquireState()
