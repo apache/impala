@@ -65,9 +65,6 @@ bool KuduIsAvailable();
 Status CreateKuduClient(const std::vector<std::string>& master_addrs,
     kudu::client::sp::shared_ptr<kudu::client::KuduClient>* client) WARN_UNUSED_RESULT;
 
-/// Returns a debug string for the KuduSchema.
-std::string KuduSchemaDebugString(const kudu::client::KuduSchema& schema);
-
 /// Initializes Kudu's logging by binding a callback that logs back to Impala's glog. This
 /// also sets Kudu's verbose logging to whatever level is set in Impala.
 void InitKuduLogging();
@@ -78,20 +75,22 @@ void InitKuduLogging();
 void LogKuduMessage(kudu::client::KuduLogSeverity severity, const char* filename,
     int line_number, const struct ::tm* time, const char* message, size_t message_len);
 
-/// Casts 'value' according to 'type' and writes it into 'row' at position 'col'.
-/// If 'type' is STRING or VARCHAR, 'copy_strings' determines if 'value' will be copied
-/// into memory owned by the row. If false, string data must remain valid while the row
-/// is being used.
-Status WriteKuduValue(int col, PrimitiveType type, const void* value,
+/// Casts 'value' according to the column type in 'col_type' and writes it into 'row'
+/// at position 'col'. If the column type's primitive type is STRING or VARCHAR,
+/// 'copy_strings' determines if 'value' will be copied into memory owned by the row.
+/// If false, string data must remain valid while the row is being used.
+Status WriteKuduValue(int col, const ColumnType& col_type, const void* value,
     bool copy_strings, kudu::KuduPartialRow* row) WARN_UNUSED_RESULT;
 
-/// Casts 'value' according to 'type' and create a new KuduValue containing 'value' which
-/// is returned in 'out'.
-Status CreateKuduValue(
-    PrimitiveType type, void* value, kudu::client::KuduValue** out) WARN_UNUSED_RESULT;
+/// Casts 'value' according to the column type in 'col_type' and create a
+/// new KuduValue containing 'value' which is returned in 'out'.
+Status CreateKuduValue(const ColumnType& col_type, void* value,
+    kudu::client::KuduValue** out) WARN_UNUSED_RESULT;
 
-/// Takes a Kudu client DataType and returns the corresponding Impala ColumnType.
-ColumnType KuduDataTypeToColumnType(kudu::client::KuduColumnSchema::DataType type);
+/// Takes a Kudu client DataType and KuduColumnTypeAttributes and
+/// returns the corresponding Impala ColumnType.
+ColumnType KuduDataTypeToColumnType(kudu::client::KuduColumnSchema::DataType type,
+    const kudu::client::KuduColumnTypeAttributes& type_attributes);
 
 /// Utility function for creating an Impala Status object based on a kudu::Status object.
 /// 'k_status' is the kudu::Status object.

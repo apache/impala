@@ -145,7 +145,9 @@ Status KuduTableSink::Open(RuntimeState* state) {
       return Status(strings::Substitute(
           "Table $0 has fewer columns than expected.", table_desc_->name()));
     }
-    ColumnType type = KuduDataTypeToColumnType(table_->schema().Column(col_idx).type());
+    const KuduColumnSchema& kudu_col = table_->schema().Column(col_idx);
+    const ColumnType& type =
+        KuduDataTypeToColumnType(kudu_col.type(), kudu_col.type_attributes());
     if (type != output_expr_evals_[i]->root().type()) {
       return Status(strings::Substitute("Column $0 has unexpected type. ($1 vs. $2)",
           table_->schema().Column(col_idx).name(), type.DebugString(),
@@ -256,13 +258,13 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
         }
       }
 
-      PrimitiveType type = output_expr_evals_[j]->root().type().type;
+      const ColumnType& type = output_expr_evals_[j]->root().type();
       Status s = WriteKuduValue(col, type, value, true, write->mutable_row());
       // This can only fail if we set a col to an incorrect type, which would be a bug in
       // planning, so we can DCHECK.
       DCHECK(s.ok()) << "WriteKuduValue failed for col = "
-                     << table_schema.Column(col).name() << " and type = "
-                     << output_expr_evals_[j]->root().type() << ": " << s.GetDetail();
+                     << table_schema.Column(col).name() << " and type = " << type << ": "
+                     << s.GetDetail();
       RETURN_IF_ERROR(s);
     }
     if (add_row) write_ops.push_back(move(write));

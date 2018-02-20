@@ -132,6 +132,8 @@ table_name:decimal_tbl, constraint:restrict_to, table_format:text/none/none
 table_name:decimal_tiny, constraint:restrict_to, table_format:text/none/none
 table_name:decimal_tbl, constraint:restrict_to, table_format:parquet/none/none
 table_name:decimal_tiny, constraint:restrict_to, table_format:parquet/none/none
+table_name:decimal_tbl, constraint:restrict_to, table_format:kudu/none/none
+table_name:decimal_tiny, constraint:restrict_to, table_format:kudu/none/none
 
 table_name:avro_decimal_tbl, constraint:restrict_to, table_format:avro/snap/block
 
@@ -186,6 +188,8 @@ table_name:tinyinttable, constraint:only, table_format:kudu/none/none
 table_name:zipcode_incomes, constraint:only, table_format:kudu/none/none
 table_name:nulltable, constraint:only, table_format:kudu/none/none
 table_name:nullescapedtable, constraint:only, table_format:kudu/none/none
+table_name:decimal_tbl, constraint:only, table_format:kudu/none/none
+table_name:decimal_tiny, constraint:only, table_format:kudu/none/none
 
 # Skipping header lines is only effective with text tables
 table_name:table_with_header, constraint:restrict_to, table_format:text/none/none

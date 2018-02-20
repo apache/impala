@@ -70,8 +70,8 @@ IntVal KuduPartitionExpr::GetIntVal(ScalarExprEvaluator* eval,
     }
     int col = tkudu_partition_expr_.referenced_columns[i];
     const ColumnDescriptor& col_desc = table_desc_->col_descs()[col];
-    PrimitiveType type = col_desc.type().type;
-    DCHECK_EQ(GetChild(i)->type().type, type);
+    const ColumnType& type = col_desc.type();
+    DCHECK_EQ(GetChild(i)->type().type, type.type);
     Status s = WriteKuduValue(col, type, val, false, row_.get());
     // This can only fail if we set a col to an incorect type, which would be a bug in
     // planning, so we can DCHECK.

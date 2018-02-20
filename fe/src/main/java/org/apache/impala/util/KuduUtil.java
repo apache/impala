@@ -19,6 +19,8 @@ package org.apache.impala.util;
 
 import static java.lang.String.format;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
 
@@ -48,6 +50,7 @@ import org.apache.impala.thrift.THdfsCompression;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.ColumnSchema.CompressionAlgorithm;
 import org.apache.kudu.ColumnSchema.Encoding;
+import org.apache.kudu.ColumnTypeAttributes;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduClient.KuduClientBuilder;
@@ -104,8 +107,7 @@ public class KuduUtil {
       String colName = rangePartitionColumns.get(i);
       ColumnSchema col = schema.getColumn(colName);
       Preconditions.checkNotNull(col);
-      setKey(col.getType(), boundaryValues.get(i), schema.getColumnIndex(colName),
-          colName, bound);
+      setKey(col, boundaryValues.get(i), schema.getColumnIndex(colName), bound);
     }
     return bound;
   }
@@ -140,10 +142,12 @@ public class KuduUtil {
    * Sets the value 'boundaryVal' in 'key' at 'pos'. Checks if 'boundaryVal' has the
    * expected data type.
    */
-  private static void setKey(org.apache.kudu.Type type, TExpr boundaryVal, int pos,
-      String colName, PartialRow key) throws ImpalaRuntimeException {
+  private static void setKey(ColumnSchema col, TExpr boundaryVal, int pos, PartialRow key)
+      throws ImpalaRuntimeException {
     Preconditions.checkState(boundaryVal.getNodes().size() == 1);
     TExprNode literal = boundaryVal.getNodes().get(0);
+    String colName = col.getName();
+    org.apache.kudu.Type type = col.getType();
     switch (type) {
       case INT8:
         checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
@@ -169,6 +173,12 @@ public class KuduUtil {
         checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
         key.addLong(pos, literal.getInt_literal().getValue());
         break;
+      case DECIMAL:
+        checkCorrectType(literal.isSetDecimal_literal(), type, colName, literal);
+        BigInteger unscaledVal = new BigInteger(literal.getDecimal_literal().getValue());
+        int scale = col.getTypeAttributes().getScale();
+        key.addDecimal(pos, new BigDecimal(unscaledVal, scale));
+        break;
       default:
         throw new ImpalaRuntimeException("Key columns not supported for type: "
             + type.toString());
@@ -177,15 +187,17 @@ public class KuduUtil {
 
   /**
    * Returns the actual value of the specified defaultValue literal. The returned type is
-   * the value type stored by Kudu for the column. E.g. if 'type' is 'INT8', the returned
-   * value is a Java byte, and if 'type' is 'UNIXTIME_MICROS', the returned value is
+   * the value type stored by Kudu for the column. For example, The `impalaType` is
+   * translated to a Kudu Type 'type' and if 'type' is 'INT8', the returned
+   * value is a Java byte, or if 'type' is 'UNIXTIME_MICROS', the returned value is
    * a Java long.
    */
-  public static Object getKuduDefaultValue(TExpr defaultValue,
-      org.apache.kudu.Type type, String colName) throws ImpalaRuntimeException {
+  public static Object getKuduDefaultValue(
+      TExpr defaultValue, Type impalaType, String colName) throws ImpalaRuntimeException {
     Preconditions.checkState(defaultValue.getNodes().size() == 1);
     TExprNode literal = defaultValue.getNodes().get(0);
     if (literal.getNode_type() == TExprNodeType.NULL_LITERAL) return null;
+    org.apache.kudu.Type type = KuduUtil.fromImpalaType(impalaType);
     switch (type) {
       case INT8:
         checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
@@ -214,6 +226,10 @@ public class KuduUtil {
       case UNIXTIME_MICROS:
         checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
         return literal.getInt_literal().getValue();
+      case DECIMAL:
+        checkCorrectType(literal.isSetDecimal_literal(), type, colName, literal);
+        BigInteger unscaledVal = new BigInteger(literal.getDecimal_literal().getValue());
+        return new BigDecimal(unscaledVal, impalaType.getDecimalDigits());
       default:
         throw new ImpalaRuntimeException("Unsupported value for column type: " +
             type.toString());
@@ -392,13 +408,13 @@ public class KuduUtil {
       case DOUBLE: return org.apache.kudu.Type.DOUBLE;
       case FLOAT: return org.apache.kudu.Type.FLOAT;
       case TIMESTAMP: return org.apache.kudu.Type.UNIXTIME_MICROS;
-        /* Fall through below */
+      case DECIMAL: return org.apache.kudu.Type.DECIMAL;
+      /* Fall through below */
       case INVALID_TYPE:
       case NULL_TYPE:
       case BINARY:
       case DATE:
       case DATETIME:
-      case DECIMAL:
       case CHAR:
       case VARCHAR:
       default:
@@ -407,8 +423,8 @@ public class KuduUtil {
     }
   }
 
-  public static Type toImpalaType(org.apache.kudu.Type t)
-      throws ImpalaRuntimeException {
+  public static Type toImpalaType(org.apache.kudu.Type t,
+      ColumnTypeAttributes typeAttributes) throws ImpalaRuntimeException {
     switch (t) {
       case BOOL: return Type.BOOLEAN;
       case DOUBLE: return Type.DOUBLE;
@@ -419,6 +435,9 @@ public class KuduUtil {
       case INT64: return Type.BIGINT;
       case STRING: return Type.STRING;
       case UNIXTIME_MICROS: return Type.TIMESTAMP;
+      case DECIMAL:
+        return ScalarType.createDecimalType(
+            typeAttributes.getPrecision(), typeAttributes.getScale());
       default:
         throw new ImpalaRuntimeException(String.format(
             "Kudu type '%s' is not supported in Impala", t.getName()));

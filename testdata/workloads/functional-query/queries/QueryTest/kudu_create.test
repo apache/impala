@@ -129,7 +129,9 @@ INT,STRING,FLOAT,BIGINT
 create table tbl_with_null_defaults (x int primary key, i1 tinyint default null,
   i2 smallint default null, i3 int default null, i4 bigint default null,
   vals string default null, valf float default null, vald double default null,
-  valb boolean default null) partition by hash (x) partitions 3 stored as kudu
+  valb boolean default null, valdec4 decimal(9) default null,
+  valdec8 decimal(18) default null, valdec16 decimal(38) default null)
+  partition by hash (x) partitions 3 stored as kudu
 ---- RESULTS
 ====
 ---- QUERY
@@ -138,11 +140,11 @@ insert into tbl_with_null_defaults (x) values (1);
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-X, I1, I2, I3, I4, VALS, VALF, VALD, VALB
+X, I1, I2, I3, I4, VALS, VALF, VALD, VALB, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tbl_with_null_defaults
-1,NULL,NULL,NULL,NULL,'NULL',NULL,NULL,NULL
+1,NULL,NULL,NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL
 ---- TYPES
-INT,TINYINT,SMALLINT,INT,BIGINT,STRING,FLOAT,DOUBLE,BOOLEAN
+INT,TINYINT,SMALLINT,INT,BIGINT,STRING,FLOAT,DOUBLE,BOOLEAN,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # Overlapping ranges are rejected by the Kudu client
@@ -287,4 +289,30 @@ select * from unpartitioned_kudu_table2
 ID
 ---- TYPES
 INT
+====
+---- QUERY
+# Creates a Kudu table with decimal columns and primary key
+create table create_decimal
+(
+ decimal_4 decimal(9, 9),
+ decimal_8 decimal(18, 2) not null default 100.00,
+ decimal_16 decimal(38, 0) null,
+ primary key (decimal_4))
+stored as kudu;
+---- RESULTS
+====
+---- QUERY
+# Create as select table with decimal columns and primary key
+create table ctas_decimal primary key (d1,d2,d3)
+stored as kudu
+as select * from functional.decimal_tbl;
+select * from ctas_decimal;
+---- RESULTS
+1234,2222,1.2345678900,0.12345678900000000000000000000000000000,12345.78900,1
+2345,111,12.3456789000,0.12345678900000000000000000000000000000,3.14100,1
+12345,333,123.4567890000,0.12345678900000000000000000000000000000,11.22000,1
+12345,333,1234.5678900000,0.12345678900000000000000000000000000000,0.10000,1
+132842,333,12345.6789000000,0.12345678900000000000000000000000000000,0.77889,1
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
 ====

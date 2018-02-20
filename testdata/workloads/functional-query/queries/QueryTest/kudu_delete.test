@@ -2,23 +2,25 @@
 ---- QUERY
 create table tdata
   (id int primary key, valf float null, vali bigint null, valv string null,
-   valb boolean null, valt tinyint null, vals smallint null, vald double null)
+   valb boolean null, valt tinyint null, vals smallint null, vald double null,
+   valdec4 decimal(9,9) null, valdec8 decimal(18,2) null,
+   valdec16 decimal(38, 0) null)
   PARTITION BY RANGE (PARTITION VALUES < 100, PARTITION 100 <= VALUES < 1000,
   PARTITION 1000 <= VALUES <= 10000) STORED AS KUDU
 ---- RESULTS
 ====
 ---- QUERY
 insert into table tdata values
-(1, 1.0, 1, 'one', true, 1, 1, 1),
-(2, -2, 20, 'two', false, 0, 1, NULL),
-(3, 0, NULL, 'three', false, 10, 20, 30),
-(4, 5, 6, 'four', true, 7, 8, 9),
-(5, 0, 10, 'five', NULL, 15, 20, 25),
-(6, 9, 12, 'six', true, -1, -2, cast('inf' as double)),
-(7, NULL, 7, 'seven', false, 77, 777, NULL),
-(8, 0, 80, NULL, true, 10, 11, 12),
-(9, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(127, 1, 2, '127', false, 3, 4, 5)
+(1, 1.0, 1, 'one', true, 1, 1, 1, 0.000000001, 1.11, 1),
+(2, -2, 20, 'two', false, 0, 1, NULL, 0.000000002, 2.22, 2),
+(3, 0, NULL, 'three', false, 10, 20, 30, 0.000000040, 50.00, 60),
+(4, 5, 6, 'four', true, 7, 8, 9, 0.000000010, 11.11, 12),
+(5, 0, 10, 'five', NULL, 15, 20, 25, 0.000000030, 35.35, 40),
+(6, 9, 12, 'six', true, -1, -2, cast('inf' as double), -0.000000001, -1.11, -1),
+(7, NULL, 7, 'seven', false, 77, 777, NULL, NULL, NULL, NULL),
+(8, 0, 80, NULL, true, 10, 11, 12, 0.000000013, 0.14, 15),
+(9, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(127, 1, 2, '127', false, 3, 4, 5, 0.000000000, 0.00, 0)
 ---- RESULTS
 : 10
 ====
@@ -29,19 +31,19 @@ delete from tdata where id = 1
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-2,-2,20,'two',false,0,1,NULL
-3,0,NULL,'three',false,10,20,30
-4,5,6,'four',true,7,8,9
-5,0,10,'five',NULL,15,20,25
-6,9,12,'six',true,-1,-2,Infinity
-7,NULL,7,'seven',false,77,777,NULL
-8,0,80,'NULL',true,10,11,12
-9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL
-127,1,2,'127',false,3,4,5
+2,-2,20,'two',false,0,1,NULL,0.000000002,2.22,2
+3,0,NULL,'three',false,10,20,30,0.000000040,50.00,60
+4,5,6,'four',true,7,8,9,0.000000010,11.11,12
+5,0,10,'five',NULL,15,20,25,0.000000030,35.35,40
+6,9,12,'six',true,-1,-2,Infinity,-0.000000001,-1.11,-1
+7,NULL,7,'seven',false,77,777,NULL,NULL,NULL,NULL
+8,0,80,'NULL',true,10,11,12,0.000000013,0.14,15
+9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,NULL
+127,1,2,'127',false,3,4,5,0.000000000,0.00,0
 ---- TYPES
-INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # predicate on key, NULL
@@ -50,19 +52,19 @@ delete from tdata where id is NULL
 NumModifiedRows: 0
 NumRowErrors: 0
 ---- LABELS
-ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-2,-2,20,'two',false,0,1,NULL
-3,0,NULL,'three',false,10,20,30
-4,5,6,'four',true,7,8,9
-5,0,10,'five',NULL,15,20,25
-6,9,12,'six',true,-1,-2,Infinity
-7,NULL,7,'seven',false,77,777,NULL
-8,0,80,'NULL',true,10,11,12
-9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL
-127,1,2,'127',false,3,4,5
+2,-2,20,'two',false,0,1,NULL,0.000000002,2.22,2
+3,0,NULL,'three',false,10,20,30,0.000000040,50.00,60
+4,5,6,'four',true,7,8,9,0.000000010,11.11,12
+5,0,10,'five',NULL,15,20,25,0.000000030,35.35,40
+6,9,12,'six',true,-1,-2,Infinity,-0.000000001,-1.11,-1
+7,NULL,7,'seven',false,77,777,NULL,NULL,NULL,NULL
+8,0,80,'NULL',true,10,11,12,0.000000013,0.14,15
+9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,NULL
+127,1,2,'127',false,3,4,5,0.000000000,0.00,0
 ---- TYPES
-INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # predicate on key, nothing is deleted
@@ -71,19 +73,19 @@ delete from tdata where id = 10
 NumModifiedRows: 0
 NumRowErrors: 0
 ---- LABELS
-ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-2,-2,20,'two',false,0,1,NULL
-3,0,NULL,'three',false,10,20,30
-4,5,6,'four',true,7,8,9
-5,0,10,'five',NULL,15,20,25
-6,9,12,'six',true,-1,-2,Infinity
-7,NULL,7,'seven',false,77,777,NULL
-8,0,80,'NULL',true,10,11,12
-9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL
-127,1,2,'127',false,3,4,5
+2,-2,20,'two',false,0,1,NULL,0.000000002,2.22,2
+3,0,NULL,'three',false,10,20,30,0.000000040,50.00,60
+4,5,6,'four',true,7,8,9,0.000000010,11.11,12
+5,0,10,'five',NULL,15,20,25,0.000000030,35.35,40
+6,9,12,'six',true,-1,-2,Infinity,-0.000000001,-1.11,-1
+7,NULL,7,'seven',false,77,777,NULL,NULL,NULL,NULL
+8,0,80,'NULL',true,10,11,12,0.000000013,0.14,15
+9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,NULL
+127,1,2,'127',false,3,4,5,0.000000000,0.00,0
 ---- TYPES
-INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # predicate on key, boundary value
@@ -92,18 +94,18 @@ delete from tdata where id = max_tinyint()
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-2,-2,20,'two',false,0,1,NULL
-3,0,NULL,'three',false,10,20,30
-4,5,6,'four',true,7,8,9
-5,0,10,'five',NULL,15,20,25
-6,9,12,'six',true,-1,-2,Infinity
-7,NULL,7,'seven',false,77,777,NULL
-8,0,80,'NULL',true,10,11,12
-9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL
+2,-2,20,'two',false,0,1,NULL,0.000000002,2.22,2
+3,0,NULL,'three',false,10,20,30,0.000000040,50.00,60
+4,5,6,'four',true,7,8,9,0.000000010,11.11,12
+5,0,10,'five',NULL,15,20,25,0.000000030,35.35,40
+6,9,12,'six',true,-1,-2,Infinity,-0.000000001,-1.11,-1
+7,NULL,7,'seven',false,77,777,NULL,NULL,NULL,NULL
+8,0,80,'NULL',true,10,11,12,0.000000013,0.14,15
+9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,NULL
 ---- TYPES
-INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # compound predicate on key
@@ -112,17 +114,17 @@ delete from tdata where id > 6 and id < 8
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-2,-2,20,'two',false,0,1,NULL
-3,0,NULL,'three',false,10,20,30
-4,5,6,'four',true,7,8,9
-5,0,10,'five',NULL,15,20,25
-6,9,12,'six',true,-1,-2,Infinity
-8,0,80,'NULL',true,10,11,12
-9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL
+2,-2,20,'two',false,0,1,NULL,0.000000002,2.22,2
+3,0,NULL,'three',false,10,20,30,0.000000040,50.00,60
+4,5,6,'four',true,7,8,9,0.000000010,11.11,12
+5,0,10,'five',NULL,15,20,25,0.000000030,35.35,40
+6,9,12,'six',true,-1,-2,Infinity,-0.000000001,-1.11,-1
+8,0,80,'NULL',true,10,11,12,0.000000013,0.14,15
+9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,NULL
 ---- TYPES
-INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # predicate on key, multiple rows
@@ -131,23 +133,23 @@ delete from tdata where id % 4 = 0
 NumModifiedRows: 2
 NumRowErrors: 0
 ---- LABELS
-ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-2,-2,20,'two',false,0,1,NULL
-3,0,NULL,'three',false,10,20,30
-5,0,10,'five',NULL,15,20,25
-6,9,12,'six',true,-1,-2,Infinity
-9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL
+2,-2,20,'two',false,0,1,NULL,0.000000002,2.22,2
+3,0,NULL,'three',false,10,20,30,0.000000040,50.00,60
+5,0,10,'five',NULL,15,20,25,0.000000030,35.35,40
+6,9,12,'six',true,-1,-2,Infinity,-0.000000001,-1.11,-1
+9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,NULL
 ---- TYPES
-INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # insert new values, including some that were previously deleted
 insert into table tdata values
-(10, 20, 30, 'ten', true, 40, 50, 60),
-(1, 1.0, 1, 'one', true, 1, 1, 1),
-(11, -11, 11, 'eleven', false, 1, 11, 111),
-(8, 0, 80, NULL, true, 10, 11, 12)
+(10, 20, 30, 'ten', true, 40, 50, 60, 0.000000070, 80.80, 90),
+(1, 1.0, 1, 'one', true, 1, 1, 1, 0.000000001, 1.11, 1),
+(11, -11, 11, 'eleven', false, 1, 11, 111, 0.000000011, 11.00, 11),
+(8, 0, 80, NULL, true, 10, 11, 12, 0.000000013, 0.14, 15)
 ====
 ---- QUERY
 # single row, predicate on non-key
@@ -156,18 +158,18 @@ delete from tdata where valv = 'five'
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-2,-2,20,'two',false,0,1,NULL
-3,0,NULL,'three',false,10,20,30
-6,9,12,'six',true,-1,-2,Infinity
-9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL
-10,20,30,'ten',true,40,50,60
-1,1.0,1,'one',true,1,1,1
-11,-11,11,'eleven',false,1,11,111
-8,0,80,'NULL',true,10,11,12
+2,-2,20,'two',false,0,1,NULL,0.000000002,2.22,2
+3,0,NULL,'three',false,10,20,30,0.000000040,50.00,60
+6,9,12,'six',true,-1,-2,Infinity,-0.000000001,-1.11,-1
+9,NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,NULL
+10,20,30,'ten',true,40,50,60,0.000000070,80.80,90
+1,1.0,1,'one',true,1,1,1,0.000000001,1.11,1
+11,-11,11,'eleven',false,1,11,111,0.000000011,11.00,11
+8,0,80,'NULL',true,10,11,12,0.000000013,0.14,15
 ---- TYPES
-INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # predicate on non-key, NULL
@@ -176,17 +178,17 @@ delete from tdata where valb is NULL
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-2,-2,20,'two',false,0,1,NULL
-3,0,NULL,'three',false,10,20,30
-6,9,12,'six',true,-1,-2,Infinity
-10,20,30,'ten',true,40,50,60
-1,1.0,1,'one',true,1,1,1
-11,-11,11,'eleven',false,1,11,111
-8,0,80,'NULL',true,10,11,12
+2,-2,20,'two',false,0,1,NULL,0.000000002,2.22,2
+3,0,NULL,'three',false,10,20,30,0.000000040,50.00,60
+6,9,12,'six',true,-1,-2,Infinity,-0.000000001,-1.11,-1
+10,20,30,'ten',true,40,50,60,0.000000070,80.80,90
+1,1.0,1,'one',true,1,1,1,0.000000001,1.11,1
+11,-11,11,'eleven',false,1,11,111,0.000000011,11.00,11
+8,0,80,'NULL',true,10,11,12,0.000000013,0.14,15
 ---- TYPES
-INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # predicate on non-key, nothing is deleted
@@ -195,17 +197,17 @@ delete from tdata where vals = -100
 NumModifiedRows: 0
 NumRowErrors: 0
 ---- LABELS
-ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-2,-2,20,'two',false,0,1,NULL
-3,0,NULL,'three',false,10,20,30
-6,9,12,'six',true,-1,-2,Infinity
-10,20,30,'ten',true,40,50,60
-1,1.0,1,'one',true,1,1,1
-11,-11,11,'eleven',false,1,11,111
-8,0,80,'NULL',true,10,11,12
+2,-2,20,'two',false,0,1,NULL,0.000000002,2.22,2
+3,0,NULL,'three',false,10,20,30,0.000000040,50.00,60
+6,9,12,'six',true,-1,-2,Infinity,-0.000000001,-1.11,-1
+10,20,30,'ten',true,40,50,60,0.000000070,80.80,90
+1,1.0,1,'one',true,1,1,1,0.000000001,1.11,1
+11,-11,11,'eleven',false,1,11,111,0.000000011,11.00,11
+8,0,80,'NULL',true,10,11,12,0.000000013,0.14,15
 ---- TYPES
-INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # predicate on non-key, compound predicate
@@ -214,16 +216,16 @@ delete from tdata where valf = 0 and vali = 80
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-2,-2,20,'two',false,0,1,NULL
-3,0,NULL,'three',false,10,20,30
-6,9,12,'six',true,-1,-2,Infinity
-10,20,30,'ten',true,40,50,60
-1,1.0,1,'one',true,1,1,1
-11,-11,11,'eleven',false,1,11,111
+2,-2,20,'two',false,0,1,NULL,0.000000002,2.22,2
+3,0,NULL,'three',false,10,20,30,0.000000040,50.00,60
+6,9,12,'six',true,-1,-2,Infinity,-0.000000001,-1.11,-1
+10,20,30,'ten',true,40,50,60,0.000000070,80.80,90
+1,1.0,1,'one',true,1,1,1,0.000000001,1.11,1
+11,-11,11,'eleven',false,1,11,111,0.000000011,11.00,11
 ---- TYPES
-INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # predicate on non-key, multiple rows
@@ -232,14 +234,14 @@ delete from tdata where vals % 10 = 0
 NumModifiedRows: 2
 NumRowErrors: 0
 ---- LABELS
-ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-2,-2,20,'two',false,0,1,NULL
-6,9,12,'six',true,-1,-2,Infinity
-1,1.0,1,'one',true,1,1,1
-11,-11,11,'eleven',false,1,11,111
+2,-2,20,'two',false,0,1,NULL,0.000000002,2.22,2
+6,9,12,'six',true,-1,-2,Infinity,-0.000000001,-1.11,-1
+1,1.0,1,'one',true,1,1,1,0.000000001,1.11,1
+11,-11,11,'eleven',false,1,11,111,0.000000011,11.00,11
 ---- TYPES
-INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # 'from' syntax - the join results in four deletes, 3 of which fail
@@ -248,13 +250,13 @@ delete a from tdata a, tdata b where a.id = 11
 NumModifiedRows: 1
 NumRowErrors: 3
 ---- LABELS
-ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-2,-2,20,'two',false,0,1,NULL
-6,9,12,'six',true,-1,-2,Infinity
-1,1.0,1,'one',true,1,1,1
+2,-2,20,'two',false,0,1,NULL,0.000000002,2.22,2
+6,9,12,'six',true,-1,-2,Infinity,-0.000000001,-1.11,-1
+1,1.0,1,'one',true,1,1,1,0.000000001,1.11,1
 ---- TYPES
-INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 # Try to delete a row with a primary key value that is not covered by the existing range
@@ -264,18 +266,56 @@ delete from tdata where id = 10001
 NumModifiedRows: 0
 NumRowErrors: 0
 ---- LABELS
-ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
-2,-2,20,'two',false,0,1,NULL
-6,9,12,'six',true,-1,-2,Infinity
-1,1.0,1,'one',true,1,1,1
+2,-2,20,'two',false,0,1,NULL,0.000000002,2.22,2
+6,9,12,'six',true,-1,-2,Infinity,-0.000000001,-1.11,-1
+1,1.0,1,'one',true,1,1,1,0.000000001,1.11,1
 ---- TYPES
-INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+# Add a couple more rows back
+insert into table tdata values
+(3, 0, NULL, 'three', false, 10, 20, 30, 0.000000040, 50.00, 60),
+(4, 5, 6, 'four', true, 7, 8, 9, 0.000000010, 11.11, 12),
+(5, 0, 10, 'five', NULL, 15, 20, 25, 0.000000030, 35.35, 40)
+---- RESULTS
+: 3
+====
+---- QUERY
+# predicate on decimal, multiple rows
+delete from tdata where valdec8 < 11.11
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumRowErrors: 0
+---- LABELS
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
+---- DML_RESULTS: tdata
+3,0,NULL,'three',false,10,20,30,0.000000040,50.00,60
+4,5,6,'four',true,7,8,9,0.000000010,11.11,12
+5,0,10,'five',NULL,15,20,25,0.000000030,35.35,40
+---- TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+# predicate on decimal, single row
+delete from tdata where valdec4 = 0.000000030
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumRowErrors: 0
+---- LABELS
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
+---- DML_RESULTS: tdata
+3,0,NULL,'three',false,10,20,30,0.000000040,50.00,60
+4,5,6,'four',true,7,8,9,0.000000010,11.11,12
+---- TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 insert into tdata
 select cast(id + 100 as int), float_col, bigint_col, string_col, bool_col, tinyint_col,
-smallint_col, double_col
+smallint_col, double_col, NULL, NULL, NULL
 from functional_kudu.alltypes
 ---- RESULTS
 : 7300
@@ -287,13 +327,13 @@ NumRowErrors: 0
 # Test a larger DELETE
 delete from tdata where id > -1
 ---- RUNTIME_PROFILE
-NumModifiedRows: 7303
+NumModifiedRows: 7302
 NumRowErrors: 0
 ---- LABELS
-ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD
+ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16
 ---- DML_RESULTS: tdata
 ---- TYPES
-INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
 create table multiple_key_cols

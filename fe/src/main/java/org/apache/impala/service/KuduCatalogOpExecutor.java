@@ -48,6 +48,7 @@ import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduException;
 import org.apache.kudu.client.PartialRow;
 import org.apache.kudu.client.RangePartitionBound;
+import org.apache.kudu.util.DecimalUtil;
 import org.apache.log4j.Logger;
 
 import com.google.common.base.Preconditions;
@@ -113,8 +114,8 @@ public class KuduCatalogOpExecutor {
       csb.nullable(!isKey);
     }
     if (column.isSetDefault_value()) {
-      csb.defaultValue(KuduUtil.getKuduDefaultValue(column.getDefault_value(), kuduType,
-            column.getColumnName()));
+      csb.defaultValue(KuduUtil.getKuduDefaultValue(
+          column.getDefault_value(), type, column.getColumnName()));
     }
     if (column.isSetBlock_size()) csb.desiredBlockSize(column.getBlock_size());
     if (column.isSetEncoding()) {
@@ -122,6 +123,10 @@ public class KuduCatalogOpExecutor {
     }
     if (column.isSetCompression()) {
       csb.compressionAlgorithm(KuduUtil.fromThrift(column.getCompression()));
+    }
+    if (type.isDecimal()) {
+      csb.typeAttributes(
+          DecimalUtil.typeAttributes(type.getPrecision(), type.getDecimalDigits()));
     }
     return csb.build();
   }
@@ -267,7 +272,8 @@ public class KuduCatalogOpExecutor {
               "Error loading Kudu table: Impala does not support column names that " +
               "differ only in casing '%s'", colSchema.getName()));
         }
-        Type type = KuduUtil.toImpalaType(colSchema.getType());
+        Type type =
+            KuduUtil.toImpalaType(colSchema.getType(), colSchema.getTypeAttributes());
         cols.add(new FieldSchema(colSchema.getName(), type.toSql().toLowerCase(), null));
       }
     } catch (Exception e) {
@@ -446,10 +452,9 @@ public class KuduCatalogOpExecutor {
     AlterTableOptions alterTableOptions = new AlterTableOptions();
 
     if (newCol.isSetDefault_value()) {
-      org.apache.kudu.Type kuduType =
-          KuduUtil.fromImpalaType(Type.fromThrift(newCol.getColumnType()));
+      Type type = Type.fromThrift(newCol.getColumnType());
       Object defaultValue = KuduUtil.getKuduDefaultValue(
-          newCol.getDefault_value(), kuduType, newCol.getColumnName());
+          newCol.getDefault_value(), type, newCol.getColumnName());
       if (defaultValue == null) {
         alterTableOptions.removeDefault(kuduColName);
       } else {

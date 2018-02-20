@@ -72,7 +72,7 @@ public class KuduColumn extends Column {
 
   public static KuduColumn fromColumnSchema(ColumnSchema colSchema, int position)
       throws ImpalaRuntimeException {
-    Type type = KuduUtil.toImpalaType(colSchema.getType());
+    Type type = KuduUtil.toImpalaType(colSchema.getType(), colSchema.getTypeAttributes());
     Object defaultValue = colSchema.getDefaultValue();
     LiteralExpr defaultValueExpr = null;
     if (defaultValue != null) {

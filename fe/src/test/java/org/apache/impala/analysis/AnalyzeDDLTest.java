@@ -1792,6 +1792,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "left join functional.alltypes b " +
         "on b.timestamp_col between a.timestamp_col and a.timestamp_col) " +
         "select a.timestamp_col, a.year from tmp a");
+    // CTAS into Kudu with decimal type
+    AnalyzesOk("create table t primary key (id) partition by hash partitions 3" +
+        " stored as kudu as select c1 as id from functional.decimal_tiny");
+
     // CTAS in an external Kudu table
     AnalysisError("create external table t stored as kudu " +
         "tblproperties('kudu.table_name'='t') as select id, int_col from " +
@@ -1805,9 +1809,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table t primary key (vc) partition by hash partitions 3" +
         " stored as kudu as select vc from functional.chars_tiny",
         "Cannot create table 't': Type VARCHAR(32) is not supported in Kudu");
-    AnalysisError("create table t primary key (id) partition by hash partitions 3" +
-        " stored as kudu as select c1 as id from functional.decimal_tiny",
-        "Cannot create table 't': Type DECIMAL(10,4) is not supported in Kudu");
     AnalysisError("create table t primary key (id) partition by hash partitions 3" +
         " stored as kudu as select id, s from functional.complextypes_fileformat",
         "Expr 's' in select list returns a complex type 'STRUCT<f1:STRING,f2:INT>'.\n" +
@@ -2212,6 +2213,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("alter table functional_kudu.testtbl add columns (a1 tinyint null, a2 " +
         "smallint null, a3 int null, a4 bigint null, a5 string null, a6 float null, " +
         "a7 double null, a8 boolean null comment 'boolean')");
+    // Decimal types
+    AnalyzesOk("alter table functional_kudu.testtbl add columns (d1 decimal null, d2 " +
+        "decimal(9, 2) null, d3 decimal(15, 15) null, d4 decimal(38, 0) null)");
     // Complex types
     AnalysisError("alter table functional_kudu.testtbl add columns ( "+
         "a struct<f1:int>)", "Kudu tables do not support complex types: " +
@@ -2225,6 +2229,8 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "default 10)");
     AnalyzesOk("alter table functional_kudu.testtbl add columns (a1 int null " +
         "default 10)");
+    AnalyzesOk("alter table functional_kudu.testtbl add columns (d1 decimal(9, 2) null " +
+        "default 99.99)");
     // Other Kudu column options
     AnalyzesOk("alter table functional_kudu.testtbl add columns (a int encoding rle)");
     AnalyzesOk("alter table functional_kudu.testtbl add columns (a int compression lz4)");
@@ -2477,8 +2483,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "in Kudu tables.");
 
     // Test unsupported Kudu types
-    List<String> unsupportedTypes = Lists.newArrayList(
-        "DECIMAL(9,0)", "VARCHAR(20)", "CHAR(20)",
+    List<String> unsupportedTypes = Lists.newArrayList("VARCHAR(20)", "CHAR(20)",
         "STRUCT<f1:INT,f2:STRING>", "ARRAY<INT>", "MAP<STRING,STRING>");
     for (String t: unsupportedTypes) {
       String expectedError = String.format(
@@ -2529,7 +2534,8 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("create table tab (x int primary key, i1 tinyint default null, " +
         "i2 smallint default null, i3 int default null, i4 bigint default null, " +
         "vals string default null, valf float default null, vald double default null, " +
-        "valb boolean default null) partition by hash (x) partitions 3 stored as kudu");
+        "valb boolean default null, valdec decimal(10, 5) default null) " +
+        "partition by hash (x) partitions 3 stored as kudu");
     // Use NULL as a default value on a non-nullable column
     AnalysisError("create table tab (x int primary key, y int not null default null) " +
         "partition by hash (x) partitions 3 stored as kudu", "Default value of NULL " +
@@ -2561,6 +2567,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "i3 int default 100, i4 bigint default 1000, vals string default 'test', " +
         "valf float default cast(1.2 as float), vald double default " +
         "cast(3.1452 as double), valb boolean default true, " +
+        "valdec decimal(10, 5) default 3.14159, " +
         "primary key (i1, i2, i3, i4, vals)) partition by hash (i1) partitions 3 " +
         "stored as kudu");
     AnalyzesOk("create table tab (i int primary key default 1+1+1) " +

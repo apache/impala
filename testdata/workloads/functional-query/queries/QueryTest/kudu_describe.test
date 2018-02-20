@@ -45,3 +45,23 @@ NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_
 ---- TYPES
 STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====
+---- QUERY
+# Test decimal columns and primary key
+create table describe_decimal_test
+(
+ decimal_default decimal PRIMARY KEY,
+ decimal_4 decimal(9, 9) not null,
+ decimal_8 decimal(18, 2) not null default 100.00,
+ decimal_16 decimal(38, 0) null)
+stored as kudu;
+describe describe_decimal_test;
+---- LABELS
+NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+---- RESULTS
+'decimal_default','decimal(9,0)','','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'decimal_4','decimal(9,9)','','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'decimal_8','decimal(18,2)','','false','false','100.00','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'decimal_16','decimal(38,0)','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+---- TYPES
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====

@@ -357,7 +357,7 @@ class TestKuduOperations(KuduTestSuite):
       pytest.skip("Only runs in exhaustive to reduce core time.")
     table_name = "%s.storage_attrs" % unique_database
     types = ['boolean', 'tinyint', 'smallint', 'int', 'bigint', 'float', 'double', \
-        'string', 'timestamp']
+        'string', 'timestamp', 'decimal(9, 2)', 'decimal(18)', 'decimal(38, 38)']
 
     create_query = "create table %s (id int primary key" % table_name
     for t in types:
@@ -485,6 +485,7 @@ class TestCreateExternalTable(KuduTestSuite):
 
   def test_col_types(self, cursor, kudu_client):
     """Check that a table can be created using all available column types."""
+    # TODO: Add DECIMAL when the Kudu python client supports decimal
     kudu_types = [STRING, BOOL, DOUBLE, FLOAT, INT16, INT32, INT64, INT8]
     with self.temp_kudu_table(kudu_client, kudu_types) as kudu_table:
       impala_table_name = self.get_kudu_table_base_name(kudu_table.name)
