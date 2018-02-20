@@ -347,7 +347,14 @@ error_codes = (
 
   ("SASL_APP_NAME_MISMATCH", 114,
    "InitAuth() called multiple times with different names. Was called with $0. "
-   "Now using $1.")
+   "Now using $1."),
+
+  ("PARQUET_BIT_PACKED_LEVELS", 115,
+      "Can not read Parquet file $0 with deprecated BIT_PACKED encoding for rep or "
+      "def levels. Support was removed in Impala 3.0 - see IMPALA-6077."),
+
+  ("ROW_BATCH_TOO_LARGE", 116,
+   "Row batch cannot be serialized: size of $0 bytes exceeds supported limit of $1"),
 )
 
 import sys
