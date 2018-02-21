@@ -205,10 +205,22 @@ void RpcMgr::ToJson(Document* document) {
   document->AddMember("num_inbound_calls_in_flight", num_inbound_calls_in_flight,
       document->GetAllocator());
 
+  // Add per connection metrics.
+  Value per_conn_metrics(kArrayType);
   int64_t num_outbound_calls_in_flight = 0;
   for (const RpcConnectionPB& conn : response.outbound_connections()) {
     num_outbound_calls_in_flight += conn.calls_in_flight().size();
+
+    // Add per connection metrics to an array.
+    Value per_conn_metrics_entry(kObjectType);
+    Value remote_ip_str(conn.remote_ip().c_str(), document->GetAllocator());
+    per_conn_metrics_entry.AddMember(
+        "remote_ip", remote_ip_str, document->GetAllocator());
+    per_conn_metrics_entry.AddMember(
+        "outbound_queue_size", conn.outbound_queue_size(), document->GetAllocator());
+    per_conn_metrics.PushBack(per_conn_metrics_entry, document->GetAllocator());
   }
+  document->AddMember("per_conn_metrics", per_conn_metrics, document->GetAllocator());
   document->AddMember("num_outbound_calls_in_flight", num_outbound_calls_in_flight,
       document->GetAllocator());
 
