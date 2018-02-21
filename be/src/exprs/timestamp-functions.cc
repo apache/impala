@@ -42,19 +42,15 @@ typedef boost::gregorian::date Date;
 
 namespace impala {
 
-// Constant strings used for DayName function.
-const char* TimestampFunctions::SUNDAY = "Sunday";
-const char* TimestampFunctions::MONDAY = "Monday";
-const char* TimestampFunctions::TUESDAY = "Tuesday";
-const char* TimestampFunctions::WEDNESDAY = "Wednesday";
-const char* TimestampFunctions::THURSDAY = "Thursday";
-const char* TimestampFunctions::FRIDAY = "Friday";
-const char* TimestampFunctions::SATURDAY = "Saturday";
-
 const string TimestampFunctions::DAY_ARRAY[7] = {"Sun", "Mon", "Tue", "Wed", "Thu",
     "Fri", "Sat"};
+const string TimestampFunctions::DAYNAME_ARRAY[7] = {"Sunday", "Monday", "Tuesday",
+    "Wednesday", "Thursday", "Friday", "Saturday"};
 const string TimestampFunctions::MONTH_ARRAY[12] = {"Jan", "Feb", "Mar", "Apr", "May",
     "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+const string TimestampFunctions::MONTHNAME_ARRAY[12] = {"January", "February", "March",
+    "April", "May", "June", "July", "August", "September", "October", "November",
+    "December"};
 
 namespace {
 /// Uses Boost's internal checking to throw an exception if 'date' is out of the

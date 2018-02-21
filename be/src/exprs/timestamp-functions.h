@@ -123,11 +123,9 @@ class TimestampFunctions {
   static TimestampVal ToUtc(FunctionContext* context,
       const TimestampVal& ts_val, const StringVal& tz_string_val);
 
-  /// Returns the day's name as a string (e.g. 'Saturday').
-  static StringVal DayName(FunctionContext* context, const TimestampVal& dow);
-
   /// Functions to extract parts of the timestamp, return integers.
   static IntVal Year(FunctionContext* context, const TimestampVal& ts_val);
+  static IntVal Quarter(FunctionContext* context, const TimestampVal& ts_val);
   static IntVal Month(FunctionContext* context, const TimestampVal& ts_val);
   static IntVal DayOfWeek(FunctionContext* context, const TimestampVal& ts_val);
   static IntVal DayOfMonth(FunctionContext* context, const TimestampVal& ts_val);
@@ -145,7 +143,9 @@ class TimestampFunctions {
   static IntVal DateDiff(FunctionContext* context, const TimestampVal& ts_val1,
       const TimestampVal& ts_val2);
   static std::string ShortDayName(FunctionContext* context, const TimestampVal& ts);
+  static StringVal LongDayName(FunctionContext* context, const TimestampVal& ts);
   static std::string ShortMonthName(FunctionContext* context, const TimestampVal& ts);
+  static StringVal LongMonthName(FunctionContext* context, const TimestampVal& ts);
 
   /// Return verbose string version of current time of day
   /// e.g. Mon Dec 01 16:25:05 2003 EST.
@@ -229,18 +229,13 @@ class TimestampFunctions {
       const StringVal& format, bool is_error);
 
  private:
-  /// Static result values for DayName() function.
-  static const char* MONDAY;
-  static const char* TUESDAY;
-  static const char* WEDNESDAY;
-  static const char* THURSDAY;
-  static const char* FRIDAY;
-  static const char* SATURDAY;
-  static const char* SUNDAY;
 
-  /// Static result values for ShortDayName() and ShortMonthName() functions.
+  /// Static result values for DayName(), ShortDayName(), ShortMonthName() and
+  /// LongMonthName functions.
   static const std::string DAY_ARRAY[7];
+  static const std::string DAYNAME_ARRAY[7];
   static const std::string MONTH_ARRAY[12];
+  static const std::string MONTHNAME_ARRAY[12];
 };
 
 } // namespace impala

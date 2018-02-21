@@ -119,6 +119,7 @@ TExtractField::type StrToExtractField(FunctionContext* ctx, const StringVal& uni
   StringVal unit = UdfBuiltins::Lower(ctx, unit_str);
   if (UNLIKELY(unit.is_null)) return TExtractField::INVALID_FIELD;
   if (unit == "year") return TExtractField::YEAR;
+  if (unit == "quarter") return TExtractField::QUARTER;
   if (unit == "month") return TExtractField::MONTH;
   if (unit == "day") return TExtractField::DAY;
   if (unit == "hour") return TExtractField::HOUR;
@@ -153,6 +154,7 @@ IntVal UdfBuiltins::Extract(FunctionContext* context, const StringVal& unit_str,
 
   switch (field) {
     case TExtractField::YEAR:
+    case TExtractField::QUARTER:
     case TExtractField::MONTH:
     case TExtractField::DAY:
       if (orig_date.is_special()) return IntVal::null();
@@ -173,6 +175,10 @@ IntVal UdfBuiltins::Extract(FunctionContext* context, const StringVal& unit_str,
   switch (field) {
     case TExtractField::YEAR: {
       return IntVal(orig_date.year());
+    }
+    case TExtractField::QUARTER: {
+      int m = orig_date.month();
+      return IntVal((m - 1) / 3 + 1);
     }
     case TExtractField::MONTH: {
       return IntVal(orig_date.month());

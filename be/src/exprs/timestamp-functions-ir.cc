@@ -204,28 +204,12 @@ void TimestampFunctions::ReportBadFormat(FunctionContext* context,
   }
 }
 
-StringVal TimestampFunctions::DayName(FunctionContext* context, const TimestampVal& ts) {
-  if (ts.is_null) return StringVal::null();
-  IntVal dow = DayOfWeek(context, ts);
-  switch(dow.val) {
-    case 1: return StringVal(SUNDAY);
-    case 2: return StringVal(MONDAY);
-    case 3: return StringVal(TUESDAY);
-    case 4: return StringVal(WEDNESDAY);
-    case 5: return StringVal(THURSDAY);
-    case 6: return StringVal(FRIDAY);
-    case 7: return StringVal(SATURDAY);
-    default: return StringVal::null();
-   }
-}
-
 IntVal TimestampFunctions::Year(FunctionContext* context, const TimestampVal& ts_val) {
   if (ts_val.is_null) return IntVal::null();
   const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
   if (!ts_value.HasDate()) return IntVal::null();
   return IntVal(ts_value.date().year());
 }
-
 
 IntVal TimestampFunctions::Month(FunctionContext* context, const TimestampVal& ts_val) {
   if (ts_val.is_null) return IntVal::null();
@@ -234,6 +218,13 @@ IntVal TimestampFunctions::Month(FunctionContext* context, const TimestampVal& t
   return IntVal(ts_value.date().month());
 }
 
+IntVal TimestampFunctions::Quarter(FunctionContext* context, const TimestampVal& ts_val) {
+  if (ts_val.is_null) return IntVal::null();
+  const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
+  if (!ts_value.HasDate()) return IntVal::null();
+  int m = ts_value.date().month();
+  return IntVal((m - 1) / 3 + 1);
+}
 
 IntVal TimestampFunctions::DayOfWeek(FunctionContext* context,
     const TimestampVal& ts_val) {
@@ -473,6 +464,16 @@ string TimestampFunctions::ShortDayName(FunctionContext* context,
   return DAY_ARRAY[dow.val - 1];
 }
 
+StringVal TimestampFunctions::LongDayName(FunctionContext* context,
+    const TimestampVal& ts) {
+  if (ts.is_null) return StringVal::null();
+  IntVal dow = DayOfWeek(context, ts);
+  DCHECK_GT(dow.val, 0);
+  DCHECK_LT(dow.val, 8);
+  const string& day_name = DAYNAME_ARRAY[dow.val - 1];
+  return StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>(day_name.data())), day_name.size());
+}
+
 string TimestampFunctions::ShortMonthName(FunctionContext* context,
     const TimestampVal& ts) {
   if (ts.is_null) return NULL;
@@ -480,6 +481,16 @@ string TimestampFunctions::ShortMonthName(FunctionContext* context,
   DCHECK_GT(mth.val, 0);
   DCHECK_LT(mth.val, 13);
   return MONTH_ARRAY[mth.val - 1];
+}
+
+StringVal TimestampFunctions::LongMonthName(FunctionContext* context,
+    const TimestampVal& ts) {
+  if (ts.is_null) return StringVal::null();
+  IntVal mth = Month(context, ts);
+  DCHECK_GT(mth.val, 0);
+  DCHECK_LT(mth.val, 13);
+  const string& mn = MONTHNAME_ARRAY[mth.val - 1];
+  return StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>(mn.data())), mn.size());
 }
 
 StringVal TimestampFunctions::TimeOfDay(FunctionContext* context) {
