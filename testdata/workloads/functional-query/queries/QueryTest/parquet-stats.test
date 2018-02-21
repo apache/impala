@@ -492,9 +492,9 @@ aggregation(SUM, NumRowGroups): 1
 aggregation(SUM, NumStatsFilteredRowGroups): 0
 ====
 ---- QUERY
-# IMPALA-6527, IMPALA-6538: NaN values lead to incorrect filtering.
-# When the first value is NaN in a column chunk, Impala chooses it as min_value and
-# max_value for statistics. In this case the min/max filter should be ignored.
+# IMPALA-6527: NaN values lead to incorrect filtering.
+# When the first value is NaN in a column chunk, Impala chose it as min_value and
+# max_value for statistics. Test if it is no longer the case.
 create table test_nan(val double) stored as parquet;
 insert into test_nan values (cast('NaN' as double)), (42);
 select * from test_nan where val > 0
@@ -502,29 +502,39 @@ select * from test_nan where val > 0
 42
 ====
 ---- QUERY
-# IMPALA-6527, IMPALA-6538: NaN values lead to incorrect filtering
-# test equality predicate
-select * from test_nan where val = 42
+# IMPALA-6527: NaN values lead to incorrect filtering
+# Test if '<' predicate produces expected results as well.
+select * from test_nan where val < 100
 ---- RESULTS
 42
 ====
 ---- QUERY
 # IMPALA-6527: NaN values lead to incorrect filtering
-# test predicate that is true for NaN
+# Test if valid statistics are written. The column chunk should be filtered out by
+# the min filter.
+select * from test_nan where val < 10
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+# IMPALA-6527: NaN values lead to incorrect filtering
+# Test predicate that is true for NaN.
 select * from test_nan where not val >= 0
 ---- RESULTS
 NaN
 ====
 ---- QUERY
 # IMPALA-6527: NaN values lead to incorrect filtering
-# test predicate that is true for NaN
+# Test predicate that is true for NaN.
 select * from test_nan where val != 0
 ---- RESULTS
 NaN
 42
 ====
 ---- QUERY
-# Statistics filtering must not filter out row groups if predicate can be true for NaN
+# Statistics filtering must not filter out row groups if predicate can be true for NaN.
 create table test_nan_true_predicate(val double) stored as parquet;
 insert into test_nan_true_predicate values (10), (20), (cast('NaN' as double));
 select * from test_nan_true_predicate where not val >= 0
@@ -532,22 +542,22 @@ select * from test_nan_true_predicate where not val >= 0
 NaN
 ====
 ---- QUERY
-# NaN is the last element, predicate is true for NaN and value
+# NaN is the last element, predicate is true for NaN and value.
 select * from test_nan_true_predicate where not val >= 20
 ---- RESULTS
 10
 NaN
 ====
 ---- QUERY
-# NaN is the last element, predicate is true for NaN and value
+# NaN is the last element, predicate is true for NaN and value.
 select * from test_nan_true_predicate where val != 10
 ---- RESULTS
 20
 NaN
 ====
 ---- QUERY
-# Test the case when NaN is inserted between two values
-# Test predicate true for NaN and false for the values
+# Test the case when NaN is inserted between two values.
+# Test predicate true for NaN and false for the values.
 create table test_nan_in_the_middle(val double) stored as parquet;
 insert into test_nan_in_the_middle values (10), (cast('NaN' as double)), (20);
 select * from test_nan_in_the_middle where not val >= 0
@@ -555,16 +565,65 @@ select * from test_nan_in_the_middle where not val >= 0
 NaN
 ====
 ---- QUERY
-# NaN in the middle, predicate true for NaN and value
+# NaN in the middle, predicate true for NaN and value.
 select * from test_nan_in_the_middle where not val >= 20
 ---- RESULTS
 10
 NaN
 ====
 ---- QUERY
-# NaN in the middle, '!=' should return NaN and value
+# NaN in the middle, '!=' should return NaN and value.
 select * from test_nan_in_the_middle where val != 10
 ---- RESULTS
 NaN
 20
+====
+---- QUERY
+# Test the case when there are only NaNs in the column chunk.
+# Test predicate true for NaN
+create table test_nan_only(val double) stored as parquet;
+insert into test_nan_only values (cast('NaN' as double)), (cast('NaN' as double)),
+    (cast('NaN' as double));
+select * from test_nan_only where not val >= 0
+---- RESULTS
+NaN
+NaN
+NaN
+====
+---- QUERY
+# There are only NaN values, predicate is false for NaN
+select * from test_nan_only where val >= 20
+---- RESULTS
+====
+---- QUERY
+# Test the case when a number is following multiple NaNs.
+# Test predicate true for NaN, false for the inserted number
+create table test_multiple_nans(val double) stored as parquet;
+insert into test_multiple_nans values (cast('NaN' as double)), (cast('NaN' as double)),
+    (cast('NaN' as double)), (20);
+select * from test_multiple_nans where not val >= 0
+---- RESULTS
+NaN
+NaN
+NaN
+====
+---- QUERY
+# Multiple NaNs followed by a number, predicate is false for NaN and true for the number
+select * from test_multiple_nans where val >= 20
+---- RESULTS
+20
+====
+---- QUERY
+# Multiple NaNs followed by a number, predicate is true for NaN and true for the number
+select * from test_multiple_nans where not val > 20
+---- RESULTS
+NaN
+NaN
+NaN
+20
+====
+---- QUERY
+# Multiple NaNs followed by a number, predicate is false for NaN and false for the number
+select * from test_multiple_nans where val > 20
+---- RESULTS
 ====
