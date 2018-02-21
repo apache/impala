@@ -2799,13 +2799,17 @@ non_pred_expr ::=
   {: RESULT = e; :}
   | analytic_expr:e
   {: RESULT = e; :}
-  /* Since "IF", "REPLACE", "TRUNCATE" are keywords, need to special case these functions */
+  /* Additional rules for function names that are also keywords */
   | KW_IF LPAREN expr_list:exprs RPAREN
   {: RESULT = new FunctionCallExpr("if", exprs); :}
   | KW_REPLACE LPAREN expr_list:exprs RPAREN
   {: RESULT = new FunctionCallExpr("replace", exprs); :}
   | KW_TRUNCATE LPAREN expr_list:exprs RPAREN
   {: RESULT = new FunctionCallExpr("truncate", exprs); :}
+  | KW_LEFT LPAREN expr_list:exprs RPAREN
+  {: RESULT = new FunctionCallExpr("left", exprs); :}
+  | KW_RIGHT LPAREN expr_list:exprs RPAREN
+  {: RESULT = new FunctionCallExpr("right", exprs); :}
   | cast_expr:c
   {: RESULT = c; :}
   | case_expr:c

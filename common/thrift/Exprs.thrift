@@ -79,6 +79,7 @@ struct TTimestampLiteral {
 enum TExtractField {
   INVALID_FIELD,
   YEAR,
+  QUARTER,
   MONTH,
   DAY,
   HOUR,
