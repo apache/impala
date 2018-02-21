@@ -18,12 +18,18 @@
 # under the License.
 
 set -euo pipefail
-trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
 # run buildall.sh -help to see options
-
 ROOT=`dirname "$0"`
 ROOT=`cd "$ROOT" >/dev/null; pwd`
+
+if [[ "'$ROOT'" =~ [[:blank:]] ]]
+then
+   echo "IMPALA_HOME cannot have spaces in the path"
+   exit 1
+fi
+
+trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
 # Grab this *before* we source impala-config.sh to see if the caller has
 # kerberized environment variables already or not.

@@ -45,12 +45,19 @@ if [[ ! -e "$JAVA" ]]; then
   return 1
 fi
 
-if [ -z "$IMPALA_HOME" ]; then
-  if [[ ! -z "$ZSH_NAME" ]]; then
-    export IMPALA_HOME=$(dirname "$(cd $(dirname ${(%):-%x}) >/dev/null && pwd)")
-  else
-    export IMPALA_HOME=$(dirname "$(cd $(dirname "${BASH_SOURCE[0]}") >/dev/null && pwd)")
+if ! [[ "'$IMPALA_HOME'" =~ [[:blank:]] ]]; then
+  if [ -z "$IMPALA_HOME" ]; then
+    if [[ ! -z "$ZSH_NAME" ]]; then
+      export IMPALA_HOME=$(dirname "$(cd $(dirname ${(%):-%x}) >/dev/null && pwd)")
+    else
+      export IMPALA_HOME=$(dirname "$(cd $(dirname "${BASH_SOURCE[0]}") >/dev/null && pwd)")
+    fi
   fi
+fi
+
+if [[ "'$IMPALA_HOME'" =~ [[:blank:]] ]]; then
+  echo "IMPALA_HOME cannot have spaces in the path"
+  exit 1
 fi
 
 export IMPALA_TOOLCHAIN=${IMPALA_TOOLCHAIN-"$IMPALA_HOME/toolchain"}
