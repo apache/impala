@@ -239,6 +239,8 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   LOG(INFO) << MemInfo::DebugString();
   LOG(INFO) << OsInfo::DebugString();
   LOG(INFO) << "Process ID: " << getpid();
+  LOG(INFO) << "Default AES cipher mode for spill-to-disk: "
+            << EncryptionKey::ModeToString(EncryptionKey::GetSupportedDefaultMode());
 
   // Required for the FE's Catalog
   ABORT_IF_ERROR(impala::LibCache::Init());

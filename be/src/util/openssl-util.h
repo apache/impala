@@ -134,6 +134,15 @@ class EncryptionKey {
   /// If is GCM mode at runtime
   bool IsGcmMode() const { return mode_ == AES_256_GCM; }
 
+  /// Returns the a default mode which is supported at runtime. If GCM mode
+  /// is supported, return AES_256_GCM as the default. If GCM is not supported,
+  /// but CTR is still supported, return AES_256_CTR. When both GCM and
+  /// CTR modes are not supported, return AES_256_CFB.
+  static AES_CIPHER_MODE GetSupportedDefaultMode();
+
+  /// Converts mode type to string.
+  static const std::string ModeToString(AES_CIPHER_MODE m);
+
  private:
   /// Helper method that encrypts/decrypts if 'encrypt' is true/false respectively.
   /// A buffer of input data 'data' of length 'len' is encrypted/decrypted with this
@@ -144,16 +153,7 @@ class EncryptionKey {
       uint8_t* out) WARN_UNUSED_RESULT;
 
   /// Check if mode m is supported at runtime
-  bool IsModeSupported(AES_CIPHER_MODE m) const;
-
-  /// Returns the a default mode which is supported at runtime. If GCM mode
-  /// is supported, return AES_256_GCM as the default. If GCM is not supported,
-  /// but CTR is still supported, return AES_256_CTR. When both GCM and
-  /// CTR modes are not supported, return AES_256_CFB.
-  AES_CIPHER_MODE GetSupportedDefaultMode() const;
-
-  /// Converts mode type to string.
-  const string ModeToString(AES_CIPHER_MODE m) const;
+  static bool IsModeSupported(AES_CIPHER_MODE m);
 
   /// Track whether this key has been initialized, to avoid accidentally using
   /// uninitialized keys.

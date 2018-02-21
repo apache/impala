@@ -223,7 +223,7 @@ void EncryptionKey::SetCipherMode(AES_CIPHER_MODE m) {
   }
 }
 
-bool EncryptionKey::IsModeSupported(AES_CIPHER_MODE m) const {
+bool EncryptionKey::IsModeSupported(AES_CIPHER_MODE m) {
   switch (m) {
     case AES_256_GCM:
       // It becomes a bit tricky for GCM mode, because GCM mode is enabled since
@@ -251,13 +251,13 @@ bool EncryptionKey::IsModeSupported(AES_CIPHER_MODE m) const {
   }
 }
 
-AES_CIPHER_MODE EncryptionKey::GetSupportedDefaultMode() const {
+AES_CIPHER_MODE EncryptionKey::GetSupportedDefaultMode() {
   if (IsModeSupported(AES_256_GCM)) return AES_256_GCM;
   if (IsModeSupported(AES_256_CTR)) return AES_256_CTR;
   return AES_256_CFB;
 }
 
-const string EncryptionKey::ModeToString(AES_CIPHER_MODE m) const {
+const string EncryptionKey::ModeToString(AES_CIPHER_MODE m) {
   switch(m) {
     case AES_256_GCM: return "AES-GCM";
     case AES_256_CTR: return "AES-CTR";
