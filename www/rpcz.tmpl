@@ -86,8 +86,26 @@ under the License.
 </table>
 {{/services}}
 
+<h3>Per connection metrics for KRPC</h3>
+<table class="table table-bordered table-hover" id="per_conn_metrics">
+  <thead>
+    <tr>
+      <th>Remote IP</th>
+      <th>Outbound Queue Size (count)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#per_conn_metrics}}
+    <tr>
+      <td>{{remote_ip}}</td>
+      <td>{{outbound_queue_size}}</td>
+    </tr>
+    {{/per_conn_metrics}}
+  </tbody>
+</table>
+
 {{?servers}}
-<h2>Impala RPC Services
+<h2>Impala Thrift RPC Services
   <button class="btn btn-warning btn-xs" onClick="reset_all();">
     Reset all
   </button>
@@ -207,6 +225,22 @@ function update_krpc_services(json) {
   }
 }
 
+function update_krpc_conn_metrics_datatable(json) {
+  var table = $('#per_conn_metrics').DataTable();
+  var rows = $.map(json["per_conn_metrics"], function(row) {
+    return [[row["remote_ip"], row["outbound_queue_size"]]];
+  });
+
+  table.clear().rows.add(rows).draw();
+}
+
+$(document).ready(function() {
+  table = $('#per_conn_metrics').DataTable({
+    "order": [[ 0, "asc" ]],
+    "pageLength": 50
+  });
+});
+
 function refresh() {
   var xhr = new XMLHttpRequest();
   xhr.responseType = 'text';
@@ -217,6 +251,7 @@ function refresh() {
     json = JSON.parse(blob);
     update_impala_services(json);
     update_krpc_services(json);
+    update_krpc_conn_metrics_datatable(json);
     document.getElementById("last-updated").textContent = new Date();
   }
 
