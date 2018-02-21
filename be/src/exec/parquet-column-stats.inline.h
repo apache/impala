@@ -37,8 +37,8 @@ inline void ColumnStats<T>::Update(const T& min_value, const T& max_value) {
     min_value_ = min_value;
     max_value_ = max_value;
   } else {
-    min_value_ = std::min(min_value_, min_value);
-    max_value_ = std::max(max_value_, max_value);
+    min_value_ = MinMaxTrait<T>::MinValue(min_value_, min_value);
+    max_value_ = MinMaxTrait<T>::MaxValue(max_value_, max_value);
   }
 }
 

@@ -62,6 +62,20 @@ class ColumnStatsBase {
   /// the minimum or maximum value.
   enum class StatsField { MIN, MAX };
 
+  /// min and max functions for types that are not floating point numbers
+  template <typename T, typename Enable = void>
+  struct MinMaxTrait {
+    static decltype(auto) MinValue(const T& a, const T& b) { return std::min(a, b); }
+    static decltype(auto) MaxValue(const T& a, const T& b) { return std::max(a, b); }
+  };
+
+  /// min and max functions for floating point types
+  template <typename T>
+  struct MinMaxTrait<T, std::enable_if_t<std::is_floating_point<T>::value>> {
+    static decltype(auto) MinValue(const T& a, const T& b) { return std::fmin(a, b); }
+    static decltype(auto) MaxValue(const T& a, const T& b) { return std::fmax(a, b); }
+  };
+
   ColumnStatsBase() : has_min_max_values_(false), null_count_(0) {}
   virtual ~ColumnStatsBase() {}
 
