@@ -507,8 +507,7 @@ CREATE TABLE default_vals
             Each column in a Kudu table can optionally use an encoding, a low-overhead form of
             compression that reduces the size on disk, then requires additional CPU cycles to
             reconstruct the original values during queries. Typically, highly compressible data
-            benefits from the reduced I/O to read the data back from disk. By default, each
-            column uses the <q>plain</q> encoding where the data is stored unchanged.
+            benefits from the reduced I/O to read the data back from disk.
           </p>
 
           <p>
@@ -517,9 +516,9 @@ CREATE TABLE default_vals
             <ul>
               <li>
                 <p>
-                  <codeph>AUTO_ENCODING</codeph>: use the default encoding based on the column
-                  type; currently always the same as <codeph>PLAIN_ENCODING</codeph>, but subject to
-                  change in the future.
+                  <codeph>AUTO_ENCODING</codeph>: use the default encoding based
+                  on the column type, which are bitshuffle for the numeric type
+                  columns and dictionary for the string type columns.
                 </p>
               </li>
               <li>
