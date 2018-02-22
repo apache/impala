@@ -192,11 +192,11 @@ under the License.
       By default, the <codeph>INVALIDATE METADATA</codeph> command checks HDFS permissions of the underlying data
       files and directories, caching this information so that a statement can be cancelled immediately if for
       example the <codeph>impala</codeph> user does not have permission to write to the data directory for the
-      table. (This checking does not apply if you have set the <cmdname>catalogd</cmdname> configuration option
-      <codeph>--load_catalog_in_background=false</codeph>.) Impala reports any lack of write permissions as an
-      <codeph>INFO</codeph> message in the log file, in case that represents an oversight. If you change HDFS
-      permissions to make data readable or writeable by the Impala user, issue another <codeph>INVALIDATE
-      METADATA</codeph> to make Impala aware of the change.
+      table. (This checking does not apply when the <cmdname>catalogd</cmdname> configuration option
+      <codeph>--load_catalog_in_background</codeph> is set to <codeph>false</codeph>, which it is by default.)
+      Impala reports any lack of write permissions as an <codeph>INFO</codeph> message in the log file, in case
+      that represents an oversight. If you change HDFS permissions to make data readable or writeable by the Impala
+      user, issue another <codeph>INVALIDATE METADATA</codeph> to make Impala aware of the change.
     </p>
 
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
