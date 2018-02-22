@@ -23,6 +23,7 @@ import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
@@ -211,11 +212,8 @@ public class CreateTableAsSelectStmt extends StatementBase {
         tmpTable = KuduTable.createCtasTarget(db, msTbl, createStmt_.getColumnDefs(),
             createStmt_.getPrimaryKeyColumnDefs(),
             createStmt_.getKuduPartitionParams());
-      } else {
-        // TODO: Creating a tmp table using load() is confusing.
-        // Refactor it to use a 'createCtasTarget()' function similar to Kudu table.
-        tmpTable = Table.fromMetastoreTable(db, msTbl);
-        tmpTable.load(true, client.getHiveClient(), msTbl);
+      } else if (HdfsFileFormat.isHdfsInputFormatClass(msTbl.getSd().getInputFormat())) {
+        tmpTable = HdfsTable.createCtasTarget(db, msTbl);
       }
       Preconditions.checkState(tmpTable != null &&
           (tmpTable instanceof HdfsTable || tmpTable instanceof KuduTable));

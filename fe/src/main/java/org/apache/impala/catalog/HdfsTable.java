@@ -43,6 +43,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
@@ -1246,13 +1247,12 @@ public class HdfsTable extends Table {
       // turn all exceptions into TableLoadingException
       msTable_ = msTbl;
       try {
-        if (loadTableSchema) loadSchema(client, msTbl);
-        if (reuseMetadata && getCatalogVersion() == Catalog.INITIAL_CATALOG_VERSION) {
-          // This is the special case of CTAS that creates a 'temp' table that does not
-          // actually exist in the Hive Metastore.
-          initializePartitionMetadata(msTbl);
-          setTableStats(msTbl);
-          return;
+        if (loadTableSchema) {
+            // set nullPartitionKeyValue from the hive conf.
+            nullPartitionKeyValue_ = client.getConfigValue(
+                "hive.exec.default.partition.name", "__HIVE_DEFAULT_PARTITION__");
+            loadSchema(msTbl);
+            loadAllColumnStats(client);
         }
         // Load partition and file metadata
         if (reuseMetadata) {
@@ -1568,15 +1568,11 @@ public class HdfsTable extends Table {
   }
 
   /**
-   * Loads table schema and column stats from Hive Metastore.
+   * Loads table schema.
    */
-  private void loadSchema(IMetaStoreClient client,
-      org.apache.hadoop.hive.metastore.api.Table msTbl) throws Exception {
+  private void loadSchema(org.apache.hadoop.hive.metastore.api.Table msTbl)
+      throws TableLoadingException {
     nonPartFieldSchemas_.clear();
-    // set nullPartitionKeyValue from the hive conf.
-    nullPartitionKeyValue_ = client.getConfigValue(
-        "hive.exec.default.partition.name", "__HIVE_DEFAULT_PARTITION__");
-
     // set NULL indicator string from table properties
     nullColumnValue_ =
         msTbl.getParameters().get(serdeConstants.SERIALIZATION_NULL_FORMAT);
@@ -1593,7 +1589,6 @@ public class HdfsTable extends Table {
     // then all other columns.
     addColumnsFromFieldSchemas(msTbl.getPartitionKeys());
     addColumnsFromFieldSchemas(nonPartFieldSchemas_);
-    loadAllColumnStats(client);
     isSchemaLoaded_ = true;
   }
 
@@ -2277,5 +2272,22 @@ public class HdfsTable extends Table {
       public Boolean getValue() { return hasIncrementalStats_; }
     });
     metrics_.addTimer(CATALOG_UPDATE_DURATION_METRIC);
+  }
+
+  /**
+   * Creates a temporary HdfsTable object populated with the specified properties.
+   * This is used for CTAS statements.
+   */
+  public static HdfsTable createCtasTarget(Db db,
+      org.apache.hadoop.hive.metastore.api.Table msTbl) throws CatalogException {
+    HdfsTable tmpTable = new HdfsTable(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
+    HiveConf hiveConf = new HiveConf(HdfsTable.class);
+    // set nullPartitionKeyValue from the hive conf.
+    tmpTable.nullPartitionKeyValue_ = hiveConf.get(
+        "hive.exec.default.partition.name", "__HIVE_DEFAULT_PARTITION__");
+    tmpTable.loadSchema(msTbl);
+    tmpTable.initializePartitionMetadata(msTbl);
+    tmpTable.setTableStats(msTbl);
+    return tmpTable;
   }
 }
