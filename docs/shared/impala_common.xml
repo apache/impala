@@ -3443,10 +3443,39 @@ select * from header_line limit 10;
       </p>
 
       <p id="load_catalog_in_background">
-        By default, the metadata loading and caching on startup happens asynchronously, so Impala can begin
-        accepting requests promptly. To enable the original behavior, where Impala waited until all metadata was
-        loaded before accepting any requests, set the <cmdname>catalogd</cmdname> configuration option
-        <codeph>--load_catalog_in_background=false</codeph>.
+        Use <codeph>--load_catalog_in_background</codeph> option to control when
+        the metadata of a table is loaded.
+        <ul>
+          <li>
+            If set to <codeph>false</codeph>, the metadata of a table is
+            loaded when it is referenced for the first time. This means that the
+            first run of a particular query can be slower than subsequent runs.
+            Starting in Impala 2.2, the default for
+            <codeph>load_catalog_in_background</codeph> is
+            <codeph>false</codeph>.
+          </li>
+          <li>
+            If set to <codeph>true</codeph>, the catalog service attempts to
+            load metadata for a table even if no query needed that metadata. So
+            metadata will possibly be already loaded when the first query that
+            would need it is run. However, for the following reasons, we
+            recommend not to set the option to <codeph>true</codeph>.
+            <ul>
+              <li>
+                Background load can interfere with query-specific metadata
+                loading. This can happen on startup or after invalidating
+                metadata, with a duration depending on the amount of metadata,
+                and can lead to a seemingly random long running queries that are
+                difficult to diagnose.
+              </li>
+              <li>
+                Impala may load metadata for tables that are possibly never
+                used, potentially increasing catalog size and consequently memory
+                usage for both catalog service and Impala Daemon.
+              </li>
+            </ul>
+          </li>
+        </ul>
       </p>
 
       <ul id="catalogd_xrefs">
@@ -3458,7 +3487,6 @@ select * from header_line limit 10;
             <cmdname>catalogd</cmdname> daemon.
           </p>
         </li>
-
         <li>
           <p>
             The <codeph>REFRESH</codeph> and <codeph>INVALIDATE METADATA</codeph> statements are no longer needed
