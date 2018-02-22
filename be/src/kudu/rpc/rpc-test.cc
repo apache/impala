@@ -17,6 +17,7 @@
 
 #include "kudu/rpc/rpc-test-base.h"
 
+#include <limits.h>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -613,7 +614,10 @@ TEST_P(TestRpc, TestRpcSidecarLimits) {
             GenericCalculatorService::static_service_name());
 
     RpcController controller;
-    string s(FLAGS_rpc_max_message_size + 1, 'a');
+    // KUDU-2305: Test with a maximal payload to verify that the implementation
+    // can handle the limits.
+    string s;
+    s.resize(INT_MAX, 'a');
     int idx;
     CHECK_OK(controller.AddOutboundSidecar(RpcSidecar::FromSlice(Slice(s)), &idx));
 
