@@ -47,6 +47,13 @@ public class StmtMetadataLoaderTest {
     validateCached(stmt, fe, expectedDbs, expectedTables);
   }
 
+  private void testNoLoad(String stmtStr) throws ImpalaException {
+    ImpaladTestCatalog catalog = new ImpaladTestCatalog();
+    Frontend fe = new Frontend(AuthorizationConfig.createAuthDisabledConfig(), catalog);
+    StatementBase stmt = fe.parse(stmtStr);
+    validateCached(stmt, fe, new String[]{}, new String[]{});
+  }
+
   private void validateDbs(StmtTableCache stmtTableCache, String[] expectedDbs) {
     String[] actualDbs = new String[stmtTableCache.dbs.size()];
     actualDbs = stmtTableCache.dbs.toArray(actualDbs);
@@ -176,5 +183,18 @@ public class StmtMetadataLoaderTest {
         new String[] {"default", "functional"},
         new String[] {"functional.view_view", "functional.alltypes_view",
             "functional.alltypes"});
+  }
+
+  @Test
+  public void testResetMetadataStmts() throws ImpalaException {
+    // These stmts should not request any table loads.
+    testNoLoad("invalidate metadata");
+    testNoLoad("invalidate metadata functional.alltypes");
+    testNoLoad("refresh functional.alltypes");
+    testNoLoad("refresh functions functional");
+
+    // This stmt requires the table to be loaded.
+    testLoadTables("refresh functional.alltypes partition (year=2009, month=1)", 1, 1,
+        new String[] {"default", "functional"}, new String[] {"functional.alltypes"});
   }
 }

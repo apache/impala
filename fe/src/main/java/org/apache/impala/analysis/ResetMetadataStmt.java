@@ -81,7 +81,10 @@ public class ResetMetadataStmt extends StatementBase {
 
   @Override
   public void collectTableRefs(List<TableRef> tblRefs) {
-    if (tableName_ != null) tblRefs.add(new TableRef(tableName_.toPath(), null));
+    // Only need table metadata for REFRESH <tbl> PARTITION (<partition>)
+    if (tableName_ != null && partitionSpec_ != null) {
+      tblRefs.add(new TableRef(tableName_.toPath(), null));
+    }
   }
 
   @Override
