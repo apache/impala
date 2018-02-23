@@ -195,7 +195,7 @@ class KrpcDataStreamRecvr : public DataStreamRecvrBase {
   RuntimeProfile* recvr_side_profile_;
   RuntimeProfile* sender_side_profile_;
 
-  /// Number of bytes received.
+  /// Number of bytes received but not necessarily enqueued.
   RuntimeProfile::Counter* bytes_received_counter_;
 
   /// Time series of number of bytes received, samples bytes_received_counter_
@@ -211,11 +211,22 @@ class KrpcDataStreamRecvr : public DataStreamRecvrBase {
   /// TODO: Turn this into a wall-clock timer.
   RuntimeProfile::Counter* first_batch_wait_total_timer_;
 
-  /// Total number of batches received and deferred as sender queue is full.
+  /// Total number of batches which arrived at this receiver but not necessarily received
+  /// or enqueued. An arrived row batch will eventually be received if there is no error
+  /// unpacking the RPC payload and the receiving stream is not cancelled.
+  RuntimeProfile::Counter* num_arrived_batches_;
+
+  /// Total number of batches received but not necessarily enqueued.
+  RuntimeProfile::Counter* num_received_batches_;
+
+  /// Total number of batches received and enqueued into the row batch queue.
+  RuntimeProfile::Counter* num_enqueued_batches_;
+
+  /// Total number of batches deferred because of early senders or full row batch queue.
   RuntimeProfile::Counter* num_deferred_batches_;
 
-  /// Total number of batches received and accepted into the sender queue.
-  RuntimeProfile::Counter* num_accepted_batches_;
+  /// Total number of EOS received.
+  RuntimeProfile::Counter* num_eos_received_;
 
   /// Total wall-clock time spent waiting for data to arrive in the recv buffer.
   RuntimeProfile::Counter* data_arrival_timer_;
