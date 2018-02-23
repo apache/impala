@@ -832,7 +832,6 @@ Status AuthManager::InitKerberosEnv() {
                 << FLAGS_krb5_debug_file;
     }
   }
-
   return Status::OK();
 }
 

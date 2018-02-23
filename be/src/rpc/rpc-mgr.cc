@@ -72,9 +72,9 @@ DEFINE_int32(num_reactor_threads, 0,
     "default value 0, it will be set to number of CPU cores.");
 DEFINE_int32(rpc_retry_interval_ms, 5,
     "Time in millisecond of waiting before retrying an RPC when remote is busy");
-DEFINE_int32(rpc_negotiation_timeout_ms, 60000,
+DEFINE_int32(rpc_negotiation_timeout_ms, 300000,
     "Time in milliseconds of waiting for a negotiation to complete before timing out.");
-DEFINE_int32(rpc_negotiation_thread_count, 4,
+DEFINE_int32(rpc_negotiation_thread_count, 64,
     "Maximum number of threads dedicated to handling RPC connection negotiations.");
 
 namespace impala {
