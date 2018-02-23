@@ -157,8 +157,14 @@ class KrpcDataStreamSender : public DataSink {
   /// Number of TransmitData() RPC retries due to remote service being busy.
   RuntimeProfile::Counter* rpc_retry_counter_ = nullptr;
 
+  /// Total number of times RPC fails or the remote responds with a non-retryable error.
+  RuntimeProfile::Counter* rpc_failure_counter_ = nullptr;
+
   /// Total number of bytes sent.
   RuntimeProfile::Counter* bytes_sent_counter_ = nullptr;
+
+  /// Total number of EOS sent.
+  RuntimeProfile::Counter* eos_sent_counter_ = nullptr;
 
   /// Total number of bytes of the row batches before compression.
   RuntimeProfile::Counter* uncompressed_bytes_counter_ = nullptr;
