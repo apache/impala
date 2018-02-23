@@ -274,8 +274,13 @@ void QueryState::ReportExecStatusAux(bool done, const Status& status,
     // report, following this Cancel(), may not succeed anyway.)
     // TODO: not keeping an error status here means that all instances might
     // abort with CANCELLED status, despite there being an error
-    // TODO: Fix IMPALA-2990. Cancelling fragment instances here may cause query to
-    // hang as the coordinator may not be aware of the cancellation.
+    if (!rpc_status.ok()) {
+      // TODO: Fix IMPALA-2990. Cancelling fragment instances here may cause query to
+      // hang as the coordinator may not be aware of the cancellation. Remove the log
+      // statement once IMPALA-2990 is fixed.
+      LOG(ERROR) << "Cancelling fragment instances due to failure to report status. "
+                 << "Query " << PrintId(query_id()) << " may hang. See IMPALA-2990.";
+    }
     Cancel();
   }
 }
