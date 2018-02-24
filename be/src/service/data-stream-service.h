@@ -56,6 +56,12 @@ class DataStreamService : public DataStreamServiceIf {
   virtual void TransmitData(const TransmitDataRequestPB* request,
       TransmitDataResponsePB* response, kudu::rpc::RpcContext* context);
 
+  /// Respond to a RPC passed in 'response'/'ctx' with 'status' and release
+  /// the payload memory from 'mem_tracker'. Takes ownership of 'ctx'.
+  template<typename ResponsePBType>
+  static void RespondAndReleaseRpc(const Status& status, ResponsePBType* response,
+      kudu::rpc::RpcContext* ctx, MemTracker* mem_tracker);
+
   MemTracker* mem_tracker() { return mem_tracker_.get(); }
 
  private:

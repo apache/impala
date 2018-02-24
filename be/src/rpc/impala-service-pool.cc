@@ -130,9 +130,8 @@ void ImpalaServicePool::RejectTooBusy(kudu::rpc::InboundCall* c) {
 void ImpalaServicePool::FailAndReleaseRpc(
     const kudu::rpc::ErrorStatusPB::RpcErrorCodePB& error_code,
     const kudu::Status& status, kudu::rpc::InboundCall* call) {
-  int64_t transfer_size = call->GetTransferSize();
+  service_mem_tracker_->Release(call->GetTransferSize());
   call->RespondFailure(error_code, status);
-  service_mem_tracker_->Release(transfer_size);
 }
 
 kudu::rpc::RpcMethodInfo* ImpalaServicePool::LookupMethod(
