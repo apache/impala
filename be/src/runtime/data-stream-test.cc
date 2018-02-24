@@ -699,6 +699,7 @@ class DataStreamTestThriftOnly : public DataStreamTest {
 class DataStreamTestShortDeserQueue : public DataStreamTest {
  protected:
   virtual void SetUp() {
+    FLAGS_datastream_sender_timeout_ms = 10000;
     FLAGS_datastream_service_num_deserialization_threads = 1;
     FLAGS_datastream_service_deserialization_queue_size = 1;
     DataStreamTest::SetUp();

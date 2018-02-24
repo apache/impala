@@ -285,27 +285,6 @@ void KrpcDataStreamMgr::CloseSender(const EndDataStreamRequestPB* request,
   // already. In either cases, it's safe to just return an OK status.
   if (LIKELY(recvr != nullptr)) recvr->RemoveSender(request->sender_id());
   RespondAndReleaseRpc(Status::OK(), response, rpc_context, service_mem_tracker_);
-
-  {
-    // TODO: Move this to maintenance thread.
-    // Remove any closed streams that have been in the cache for more than
-    // STREAM_EXPIRATION_TIME_MS.
-    lock_guard<mutex> l(lock_);
-    ClosedStreamMap::iterator it = closed_stream_expirations_.begin();
-    int64_t now = MonotonicMillis();
-    int32_t before = closed_stream_cache_.size();
-    while (it != closed_stream_expirations_.end() && it->first < now) {
-      closed_stream_cache_.erase(it->second);
-      closed_stream_expirations_.erase(it++);
-    }
-    DCHECK_EQ(closed_stream_cache_.size(), closed_stream_expirations_.size());
-    int32_t after = closed_stream_cache_.size();
-    if (before != after) {
-      VLOG_QUERY << "Reduced stream ID cache from " << before << " items, to " << after
-                 << ", eviction took: "
-                 << PrettyPrinter::Print(MonotonicMillis() - now, TUnit::TIME_MS);
-    }
-  }
 }
 
 Status KrpcDataStreamMgr::DeregisterRecvr(
@@ -385,12 +364,15 @@ void KrpcDataStreamMgr::RespondAndReleaseRpc(const Status& status,
 }
 
 void KrpcDataStreamMgr::Maintenance() {
+  const int32_t sleep_time_ms =
+      min(max(1, FLAGS_datastream_sender_timeout_ms / 2), 10000);
   while (true) {
+    const int64_t now = MonotonicMillis();
+
     // Notify any senders that have been waiting too long for their receiver to
     // appear. Keep lock_ held for only a short amount of time.
     vector<EarlySendersList> timed_out_senders;
     {
-      int64_t now = MonotonicMillis();
       lock_guard<mutex> l(lock_);
       auto it = early_senders_map_.begin();
       while (it != early_senders_map_.end()) {
@@ -415,9 +397,27 @@ void KrpcDataStreamMgr::Maintenance() {
         RespondToTimedOutSender<EndDataStreamCtx, EndDataStreamRequestPB>(ctx);
       }
     }
+
+    // Remove any closed streams that have been in the cache for more than
+    // STREAM_EXPIRATION_TIME_MS.
+    {
+      lock_guard<mutex> l(lock_);
+      ClosedStreamMap::iterator it = closed_stream_expirations_.begin();
+      int32_t before = closed_stream_cache_.size();
+      while (it != closed_stream_expirations_.end() && it->first < now) {
+        closed_stream_cache_.erase(it->second);
+        closed_stream_expirations_.erase(it++);
+      }
+      DCHECK_EQ(closed_stream_cache_.size(), closed_stream_expirations_.size());
+      int32_t after = closed_stream_cache_.size();
+      if (before != after) {
+        VLOG_QUERY << "Reduced stream ID cache from " << before << " items, to " << after
+                   << ", eviction took: "
+                   << PrettyPrinter::Print(MonotonicMillis() - now, TUnit::TIME_MS);
+      }
+    }
     bool timed_out = false;
-    // Wait for 10s
-    shutdown_promise_.Get(10000, &timed_out);
+    shutdown_promise_.Get(sleep_time_ms, &timed_out);
     if (!timed_out) return;
   }
 }
