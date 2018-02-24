@@ -30,6 +30,7 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/sorted-run-merger.h"
+#include "service/data-stream-service.h"
 #include "util/runtime-profile-counters.h"
 #include "util/periodic-counter-updater.h"
 
@@ -126,10 +127,6 @@ class KrpcDataStreamRecvr::SenderQueue {
   Status AddBatchWork(int64_t batch_size, const RowBatchHeaderPB& header,
       const kudu::Slice& tuple_offsets, const kudu::Slice& tuple_data,
       unique_lock<SpinLock>* lock) WARN_UNUSED_RESULT;
-
-  // Respond to the TransmitData RPC passed in 'ctx' with 'status' and release the payload
-  // memory from the MemTracker associated with 'recvr_'.
-  void RespondAndReleaseRpc(const Status& status, const unique_ptr<TransmitDataCtx>& ctx);
 
   // Receiver of which this queue is a member.
   KrpcDataStreamRecvr* recvr_;
@@ -297,11 +294,13 @@ Status KrpcDataStreamRecvr::SenderQueue::AddBatchWork(int64_t batch_size,
     const kudu::Slice& tuple_data, unique_lock<SpinLock>* lock) {
   DCHECK(lock != nullptr);
   DCHECK(lock->owns_lock());
+  DCHECK(!is_cancelled_);
 
   COUNTER_ADD(recvr_->num_received_batches_, 1);
   COUNTER_ADD(recvr_->bytes_received_counter_, batch_size);
   // Reserve queue space before dropping the lock below.
   recvr_->num_buffered_bytes_.Add(batch_size);
+  // Bump 'num_pending_enqueue_' to avoid race with Close() when lock is dropped below.
   DCHECK_GE(num_pending_enqueue_, 0);
   ++num_pending_enqueue_;
 
@@ -316,7 +315,7 @@ Status KrpcDataStreamRecvr::SenderQueue::AddBatchWork(int64_t batch_size,
     // handle deleting any unconsumed batches from batch_queue_. Close() cannot proceed
     // until there are no pending insertion to batch_queue_.
     status = RowBatch::FromProtobuf(recvr_->row_desc(), header, tuple_offsets, tuple_data,
-        recvr_->mem_tracker(), recvr_->client(), &batch);
+        recvr_->parent_tracker(), recvr_->client(), &batch);
   }
   lock->lock();
 
@@ -332,14 +331,6 @@ Status KrpcDataStreamRecvr::SenderQueue::AddBatchWork(int64_t batch_size,
   batch_queue_.emplace_back(batch_size, move(batch));
   data_arrival_cv_.notify_one();
   return Status::OK();
-}
-
-void KrpcDataStreamRecvr::SenderQueue::RespondAndReleaseRpc(const Status& status,
-    const unique_ptr<TransmitDataCtx>& ctx) {
-  int64_t transfer_size = ctx->rpc_context->GetTransferSize();
-  status.ToProto(ctx->response->mutable_status());
-  ctx->rpc_context->RespondSuccess();
-  recvr_->mem_tracker()->Release(transfer_size);
 }
 
 void KrpcDataStreamRecvr::SenderQueue::AddBatch(const TransmitDataRequestPB* request,
@@ -378,7 +369,7 @@ void KrpcDataStreamRecvr::SenderQueue::AddBatch(const TransmitDataRequestPB* req
     // batch needs to line up after the deferred RPCs to avoid starvation of senders
     // in the non-merging case.
     if (UNLIKELY(!deferred_rpcs_.empty() || !CanEnqueue(batch_size))) {
-      recvr_->mem_tracker()->Consume(rpc_context->GetTransferSize());
+      recvr_->deferred_rpc_tracker()->Consume(rpc_context->GetTransferSize());
       auto payload = make_unique<TransmitDataCtx>(request, response, rpc_context);
       deferred_rpcs_.push(move(payload));
       COUNTER_ADD(recvr_->num_deferred_batches_, 1);
@@ -416,7 +407,8 @@ void KrpcDataStreamRecvr::SenderQueue::DequeueDeferredRpc() {
         &tuple_data, &batch_size);
     // Reply with error status if the entry cannot be unpacked.
     if (UNLIKELY(!status.ok())) {
-      RespondAndReleaseRpc(status, ctx);
+      DataStreamService::RespondAndReleaseRpc(status, ctx->response, ctx->rpc_context,
+          recvr_->deferred_rpc_tracker());
       deferred_rpcs_.pop();
       return;
     }
@@ -434,21 +426,27 @@ void KrpcDataStreamRecvr::SenderQueue::DequeueDeferredRpc() {
     const RowBatchHeaderPB& header = ctx->request->row_batch_header();
     status = AddBatchWork(batch_size, header, tuple_offsets, tuple_data, &l);
     DCHECK(!status.ok() || !batch_queue_.empty());
+
+    // Release to MemTracker while still holding the lock to prevent race with Close().
+    recvr_->deferred_rpc_tracker()->Release(ctx->rpc_context->GetTransferSize());
   }
 
   // Responds to the sender to ack the insertion of the row batches.
-  RespondAndReleaseRpc(status, ctx);
+  // No need to hold lock when enqueuing the response.
+  status.ToProto(ctx->response->mutable_status());
+  ctx->rpc_context->RespondSuccess();
 }
 
 void KrpcDataStreamRecvr::SenderQueue::TakeOverEarlySender(
     unique_ptr<TransmitDataCtx> ctx) {
   int sender_id = ctx->request->sender_id();
-  recvr_->mem_tracker()->Consume(ctx->rpc_context->GetTransferSize());
+  recvr_->deferred_rpc_tracker()->Consume(ctx->rpc_context->GetTransferSize());
   COUNTER_ADD(recvr_->num_arrived_batches_, 1);
   {
     lock_guard<SpinLock> l(lock_);
     if (UNLIKELY(is_cancelled_)) {
-      RespondAndReleaseRpc(Status::OK(), ctx);
+      DataStreamService::RespondAndReleaseRpc(Status::OK(), ctx->response,
+          ctx->rpc_context, recvr_->deferred_rpc_tracker());
       return;
     }
     deferred_rpcs_.push(move(ctx));
@@ -478,8 +476,9 @@ void KrpcDataStreamRecvr::SenderQueue::Cancel() {
 
     // Respond to deferred RPCs.
     while (!deferred_rpcs_.empty()) {
-      const unique_ptr<TransmitDataCtx>& payload = deferred_rpcs_.front();
-      RespondAndReleaseRpc(Status::OK(), payload);
+      const unique_ptr<TransmitDataCtx>& ctx = deferred_rpcs_.front();
+      DataStreamService::RespondAndReleaseRpc(Status::OK(), ctx->response,
+          ctx->rpc_context, recvr_->deferred_rpc_tracker());
       deferred_rpcs_.pop();
     }
   }
@@ -549,11 +548,12 @@ KrpcDataStreamRecvr::KrpcDataStreamRecvr(KrpcDataStreamMgr* stream_mgr,
     row_desc_(row_desc),
     is_merging_(is_merging),
     num_buffered_bytes_(0),
+    deferred_rpc_tracker_(new MemTracker(-1, "KrpcDeferredRpcs", parent_tracker)),
+    parent_tracker_(parent_tracker),
     client_(client),
     profile_(profile),
     recvr_side_profile_(profile_->CreateChild("RecvrSide")),
     sender_side_profile_(profile_->CreateChild("SenderSide")) {
-  mem_tracker_.reset(new MemTracker(-1, "KrpcDataStreamRecvr", parent_tracker));
   // Create one queue per sender if is_merging is true.
   int num_queues = is_merging ? num_senders : 1;
   sender_queues_.reserve(num_queues);
@@ -636,7 +636,7 @@ void KrpcDataStreamRecvr::Close() {
   mgr_ = nullptr;
   for (auto& queue: sender_queues_) queue->Close();
   merger_.reset();
-  mem_tracker_->Close();
+  deferred_rpc_tracker_->Close();
   recvr_side_profile_->StopPeriodicCounters();
 }
 

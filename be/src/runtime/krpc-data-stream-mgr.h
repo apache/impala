@@ -480,12 +480,6 @@ class KrpcDataStreamMgr : public DataStreamMgrBase {
   template<typename ContextType, typename RequestPBType>
   void RespondToTimedOutSender(const std::unique_ptr<ContextType>& ctx);
 
-  /// Respond to the RPC passed in 'response'/'ctx' with 'status' and release the payload
-  /// memory from 'mem_tracker'. Takes ownership of 'ctx'.
-  template<typename ResponsePBType>
-  void RespondAndReleaseRpc(const Status& status, ResponsePBType* response,
-      kudu::rpc::RpcContext* ctx, MemTracker* mem_tracker);
-
   /// Notifies any sender that has been waiting for its receiver for more than
   /// FLAGS_datastream_sender_timeout_ms.
   ///

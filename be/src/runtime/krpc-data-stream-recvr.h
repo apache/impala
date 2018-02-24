@@ -102,7 +102,8 @@ class KrpcDataStreamRecvr : public DataStreamRecvrBase {
   const TUniqueId& fragment_instance_id() const { return fragment_instance_id_; }
   PlanNodeId dest_node_id() const { return dest_node_id_; }
   const RowDescriptor* row_desc() const { return row_desc_; }
-  MemTracker* mem_tracker() const { return mem_tracker_.get(); }
+  MemTracker* deferred_rpc_tracker() const { return deferred_rpc_tracker_.get(); }
+  MemTracker* parent_tracker() const { return parent_tracker_; }
   BufferPool::ClientHandle* client() const { return client_; }
 
  private:
@@ -169,8 +170,13 @@ class KrpcDataStreamRecvr : public DataStreamRecvrBase {
   /// total number of bytes held across all sender queues.
   AtomicInt32 num_buffered_bytes_;
 
-  /// Memtracker for batches in the sender queue(s).
-  boost::scoped_ptr<MemTracker> mem_tracker_;
+  /// Memtracker for payloads of deferred Rpcs in the sender queue(s).
+  /// This must be accessed with 'lock_' held to avoid race with Close().
+  boost::scoped_ptr<MemTracker> deferred_rpc_tracker_;
+
+  /// The MemTracker of the exchange node which owns this receiver. Not owned.
+  /// This is the MemTracker which 'client_' below internally references.
+  MemTracker* parent_tracker_;
 
   /// The buffer pool client for allocating buffers of incoming row batches. Not owned.
   BufferPool::ClientHandle* client_;
