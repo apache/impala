@@ -1721,8 +1721,8 @@ ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(d6=1);
 ---- ROW_FORMAT
 delimited fields terminated by ','
 ---- LOAD
-`hadoop fs -mkdir -p /test-warehouse/decimal_tbl/d6=1 && hadoop fs -put -f \
-${IMPALA_HOME}/testdata/data/decimal_tbl.txt /test-warehouse/decimal_tbl/d6=1/
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/decimal_tbl.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(d6=1);
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(d6)
 select * from functional.{table_name};
@@ -1755,8 +1755,8 @@ c3 DECIMAL(1,1)
 ---- ROW_FORMAT
 delimited fields terminated by ','
 ---- LOAD
-`hadoop fs -mkdir -p /test-warehouse/decimal_tiny && hadoop fs -put -f \
-${IMPALA_HOME}/testdata/data/decimal-tiny.txt /test-warehouse/decimal_tiny/
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/decimal-tiny.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 select * from functional.{table_name};
