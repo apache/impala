@@ -485,7 +485,9 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id,
     const bool start_over, const int32_t fetch_size, beeswax::Results* query_results) {
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state == nullptr)) {
-    return Status(Substitute("Invalid query handle: $0", PrintId(query_id)));
+    string err_msg = Substitute("Invalid query handle: $0", PrintId(query_id));
+    VLOG(1) << err_msg;
+    return Status::Expected(err_msg);
   }
 
   // Make sure ClientRequestState::Wait() has completed before fetching rows. Wait()
@@ -546,7 +548,9 @@ Status ImpalaServer::CloseInsertInternal(const TUniqueId& query_id,
     TInsertResult* insert_result) {
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state == nullptr)) {
-    return Status(Substitute("Invalid query handle: $0", PrintId(query_id)));
+    string err_msg = Substitute("Invalid query handle: $0", PrintId(query_id));
+    VLOG(1) << err_msg;
+    return Status::Expected(err_msg);
   }
 
   Status query_status;

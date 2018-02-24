@@ -182,7 +182,9 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size
     bool fetch_first, TFetchResultsResp* fetch_results) {
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state == nullptr)) {
-    return Status(Substitute("Invalid query handle: $0", PrintId(query_id)));
+    string err_msg = Substitute("Invalid query handle: $0", PrintId(query_id));
+    VLOG(1) << err_msg;
+    return Status::Expected(err_msg);
   }
 
   // FetchResults doesn't have an associated session handle, so we presume that this
@@ -430,9 +432,9 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
   HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id, &session),
       SQLSTATE_GENERAL_ERROR);
   if (session == NULL) {
-    HS2_RETURN_IF_ERROR(
-        return_val, Status(Substitute("Invalid session id: $0",
-            PrintId(session_id))), SQLSTATE_GENERAL_ERROR);
+    string err_msg = Substitute("Invalid session id: $0", PrintId(session_id));
+    VLOG(1) << err_msg;
+    HS2_RETURN_IF_ERROR(return_val, Status::Expected(err_msg), SQLSTATE_GENERAL_ERROR);
   }
 
   // Optionally enable result caching to allow restarting fetches.
@@ -446,7 +448,7 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
           iter->second.c_str(), iter->second.size(), &parse_result);
       if (parse_result != StringParser::PARSE_SUCCESS) {
         HS2_RETURN_IF_ERROR(
-            return_val, Status(Substitute("Invalid value '$0' for '$1' option.",
+            return_val, Status::Expected(Substitute("Invalid value '$0' for '$1' option.",
                 iter->second, IMPALA_RESULT_CACHING_OPT)), SQLSTATE_GENERAL_ERROR);
       }
     }
