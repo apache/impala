@@ -168,9 +168,10 @@ WITH SERDEPROPERTIES (
 KNOWN_EXPLORATION_STRATEGIES = ['core', 'pairwise', 'exhaustive', 'lzo']
 
 def build_create_statement(table_template, table_name, db_name, db_suffix,
-                           file_format, compression, hdfs_location):
+                           file_format, compression, hdfs_location,
+                           force_reload):
   create_stmt = 'CREATE DATABASE IF NOT EXISTS %s%s;\n' % (db_name, db_suffix)
-  if (options.force_reload):
+  if (force_reload):
     create_stmt += 'DROP TABLE IF EXISTS %s%s.%s;\n' % (db_name, db_suffix, table_name)
   if compression == 'lzo':
     file_format = '%s_%s' % (file_format, compression)
@@ -555,8 +556,12 @@ def generate_statements(output_name, test_vectors, sections,
       # ensure the partition metadata is always properly created. The ALTER section is
       # used to create partitions, so if that section exists there is no need to force
       # reload.
+      # IMPALA-6579: Also force reload all Kudu tables. The Kudu entity referenced
+      # by the table may or may not exist, so requiring a force reload guarantees
+      # that the Kudu entity is always created correctly.
       # TODO: Rename the ALTER section to ALTER_TABLE_ADD_PARTITION
-      force_reload = options.force_reload or (partition_columns and not alter)
+      force_reload = options.force_reload or (partition_columns and not alter) or \
+          file_format == 'kudu'
 
       hdfs_location = '{0}.{1}{2}'.format(db_name, table_name, db_suffix)
       # hdfs file names for hive-benchmark and functional datasets are stored
@@ -625,7 +630,7 @@ def generate_statements(output_name, test_vectors, sections,
 
       if table_template:
         output.create.append(build_create_statement(table_template, table_name, db_name,
-            db_suffix, create_file_format, create_codec, data_path))
+            db_suffix, create_file_format, create_codec, data_path, force_reload))
       # HBASE create table
       if file_format == 'hbase':
         # If the HBASE_COLUMN_FAMILIES section does not exist, default to 'd'
