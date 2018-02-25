@@ -132,7 +132,7 @@ class TestTpchMemLimitError(TestLowMemoryLimits):
                        'Q6' : 25, 'Q7' : 200, 'Q8' : 125, 'Q9' : 200, 'Q10' : 162,\
                        'Q11' : 112, 'Q12' : 150, 'Q13' : 125, 'Q14' : 125, 'Q15' : 125,\
                        'Q16' : 137, 'Q17' : 137, 'Q18' : 196, 'Q19' : 112, 'Q20' : 162,\
-                       'Q21' : 230, 'Q22' : 125}
+                       'Q21' : 300, 'Q22' : 125}
 
   @classmethod
   def get_workload(self):
