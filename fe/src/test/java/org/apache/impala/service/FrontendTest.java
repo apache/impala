@@ -104,6 +104,12 @@ public class FrontendTest extends FrontendTestBase {
 
   @Test
   public void TestGetTablesTypeTable() throws ImpalaException {
+    // Make sure these views are loaded so they can be distinguished from tables.
+    AnalyzesOk("select * from functional.alltypes_hive_view");
+    AnalyzesOk("select * from functional.alltypes_parens");
+    AnalyzesOk("select * from functional.alltypes_view");
+    AnalyzesOk("select * from functional.alltypes_view_sub");
+
     TMetadataOpRequest req = new TMetadataOpRequest();
     req.opcode = TMetadataOpcode.GET_TABLES;
     req.get_tables_req = new TGetTablesReq();
@@ -115,12 +121,13 @@ public class FrontendTest extends FrontendTestBase {
     assertEquals(5, resp.schema.columns.size());
     assertEquals(5, resp.rows.get(0).colVals.size());
     assertEquals(1, resp.rows.size());
-    assertEquals("alltypes_datasource", resp.rows.get(0).colVals.get(2).string_val.toLowerCase());
+    assertEquals("alltypes_datasource",
+        resp.rows.get(0).colVals.get(2).string_val.toLowerCase());
   }
 
   @Test
   public void TestGetTablesTypeView() throws ImpalaException {
-    // Issue the statements to make sure all the views are loaded
+    // Make sure these views are loaded so they can be distinguished from tables.
     AnalyzesOk("select * from functional.alltypes_hive_view");
     AnalyzesOk("select * from functional.alltypes_parens");
     AnalyzesOk("select * from functional.alltypes_view");
@@ -137,10 +144,14 @@ public class FrontendTest extends FrontendTestBase {
     assertEquals(5, resp.schema.columns.size());
     assertEquals(5, resp.rows.get(0).colVals.size());
     assertEquals(4, resp.rows.size());
-    assertEquals("alltypes_hive_view", resp.rows.get(0).colVals.get(2).string_val.toLowerCase());
-    assertEquals("alltypes_parens", resp.rows.get(1).colVals.get(2).string_val.toLowerCase());
-    assertEquals("alltypes_view", resp.rows.get(2).colVals.get(2).string_val.toLowerCase());
-    assertEquals("alltypes_view_sub", resp.rows.get(3).colVals.get(2).string_val.toLowerCase());
+    assertEquals("alltypes_hive_view",
+        resp.rows.get(0).colVals.get(2).string_val.toLowerCase());
+    assertEquals("alltypes_parens",
+        resp.rows.get(1).colVals.get(2).string_val.toLowerCase());
+    assertEquals("alltypes_view",
+        resp.rows.get(2).colVals.get(2).string_val.toLowerCase());
+    assertEquals("alltypes_view_sub",
+        resp.rows.get(3).colVals.get(2).string_val.toLowerCase());
   }
 
   @Test
