@@ -1120,6 +1120,10 @@ public class CatalogServiceCatalog extends Catalog {
     reader.run();
 
     versionLock_.writeLock().lock();
+    // In case of an empty new catalog, the version should still change to reflect the
+    // reset operation itself and to unblock impalads by making the catalog version >
+    // INITIAL_CATALOG_VERSION. See Frontend.waitForCatalog()
+    ++catalogVersion_;
     // Assign new versions to all the loaded data sources.
     for (DataSource dataSource: getDataSources()) {
       dataSource.setCatalogVersion(incrementAndGetCatalogVersion());

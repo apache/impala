@@ -21,6 +21,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.impala.analysis.TableName;
@@ -84,10 +85,8 @@ public class ImpaladCatalog extends Catalog {
   // all objects in the catalog have at a minimum, this version. Because updates may
   // be applied out of band of a StateStore heartbeat, it is possible the catalog
   // contains some objects > than this version.
-  private long lastSyncedCatalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
-
-  // Flag to determine if the Catalog is ready to accept user requests. See isReady().
-  private final AtomicBoolean isReady_ = new AtomicBoolean(false);
+  private AtomicLong lastSyncedCatalogVersion_ =
+      new AtomicLong(Catalog.INITIAL_CATALOG_VERSION);
 
   // Tracks modifications to this Impalad's catalog from direct updates to the cache.
   private final CatalogDeltaLog catalogDeltaLog_ = new CatalogDeltaLog();
@@ -159,7 +158,7 @@ public class ImpaladCatalog extends Catalog {
     if (req.isSetCatalog_service_id()) setCatalogServiceId(req.catalog_service_id);
     ArrayDeque<TCatalogObject> updatedObjects = new ArrayDeque<>();
     ArrayDeque<TCatalogObject> deletedObjects = new ArrayDeque<>();
-    long newCatalogVersion = lastSyncedCatalogVersion_;
+    long newCatalogVersion = lastSyncedCatalogVersion_.get();
     Pair<Boolean, ByteBuffer> update;
     while ((update = FeSupport.NativeGetNextCatalogObjectUpdate(req.native_iterator_ptr))
         != null) {
@@ -207,10 +206,9 @@ public class ImpaladCatalog extends Catalog {
 
     for (TCatalogObject catalogObject: deletedObjects) removeCatalogObject(catalogObject);
 
-    lastSyncedCatalogVersion_ = newCatalogVersion;
+    lastSyncedCatalogVersion_.set(newCatalogVersion);
     // Cleanup old entries in the log.
-    catalogDeltaLog_.garbageCollect(lastSyncedCatalogVersion_);
-    isReady_.set(true);
+    catalogDeltaLog_.garbageCollect(newCatalogVersion);
     // Notify all the threads waiting on a catalog update.
     synchronized (catalogUpdateEventNotifier_) {
       catalogUpdateEventNotifier_.notifyAll();
@@ -369,7 +367,7 @@ public class ImpaladCatalog extends Catalog {
             "Unexpected TCatalogObjectType: " + catalogObject.getType());
     }
 
-    if (catalogObject.getCatalog_version() > lastSyncedCatalogVersion_) {
+    if (catalogObject.getCatalog_version() > lastSyncedCatalogVersion_.get()) {
       catalogDeltaLog_.addRemovedObject(catalogObject);
     }
   }
@@ -513,10 +511,17 @@ public class ImpaladCatalog extends Catalog {
    * received and processed a valid catalog topic update from the StateStore),
    * false otherwise.
    */
-  public boolean isReady() { return isReady_.get(); }
+  public boolean isReady() {
+    return lastSyncedCatalogVersion_.get() > INITIAL_CATALOG_VERSION;
+  }
 
   // Only used for testing.
-  public void setIsReady(boolean isReady) { isReady_.set(isReady); }
+  public void setIsReady(boolean isReady) {
+    lastSyncedCatalogVersion_.incrementAndGet();
+    synchronized (catalogUpdateEventNotifier_) {
+      catalogUpdateEventNotifier_.notifyAll();
+    }
+  }
   public AuthorizationPolicy getAuthPolicy() { return authPolicy_; }
   public String getDefaultKuduMasterHosts() { return defaultKuduMasterHosts_; }
 
