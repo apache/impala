@@ -338,6 +338,7 @@ Status DiskIoMgr::ValidateScanRange(ScanRange* range) {
 
 Status DiskIoMgr::AddScanRanges(
     RequestContext* reader, const vector<ScanRange*>& ranges) {
+  DCHECK_GT(ranges.size(), 0);
   // Validate and initialize all ranges
   for (int i = 0; i < ranges.size(); ++i) {
     RETURN_IF_ERROR(ValidateScanRange(ranges[i]));

@@ -256,7 +256,7 @@ class DiskIoMgr : public CacheLineAligned {
   /// Adds the scan ranges to reader's queues, but does not start scheduling it. The range
   /// can be scheduled by a thread calling GetNextUnstartedRange(). This call is
   /// non-blocking. The caller must not deallocate the scan range pointers before
-  /// UnregisterContext().
+  /// UnregisterContext(). 'ranges' must not be empty.
   Status AddScanRanges(
       RequestContext* reader, const std::vector<ScanRange*>& ranges) WARN_UNUSED_RESULT;
 

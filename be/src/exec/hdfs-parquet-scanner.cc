@@ -121,9 +121,13 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
       }
     }
   }
-  // The threads that process the footer will also do the scan, so we mark all the files
-  // as complete here.
-  RETURN_IF_ERROR(scan_node->AddDiskIoRanges(footer_ranges, files.size()));
+  // We may not have any scan ranges if this scan node does not have the footer split for
+  // any Parquet file.
+  if (footer_ranges.size() > 0) {
+    // The threads that process the footer will also do the scan, so we mark all the files
+    // as complete here.
+    RETURN_IF_ERROR(scan_node->AddDiskIoRanges(footer_ranges, files.size()));
+  }
   return Status::OK();
 }
 
