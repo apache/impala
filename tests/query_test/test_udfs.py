@@ -332,18 +332,17 @@ class TestUdfExecution(TestUdfBase):
     # 1. too many arguments
     # 2. IR UDF
     fd, dir_name = tempfile.mkstemp()
+    hdfs_path = get_fs_path("/test-warehouse/{0}_bad_udf.ll".format(unique_database))
     try:
       with open(dir_name, "w") as f:
         f.write("Hello World")
-      check_call(["hadoop", "fs", "-put", "-f", f.name, "/test-warehouse/" +
-                unique_database + "_bad_udf.ll"])
+      check_call(["hadoop", "fs", "-put", "-f", f.name, hdfs_path])
       if vector.get_value('exec_option')['disable_codegen']:
         self.run_test_case('QueryTest/udf-errors', vector, use_db=unique_database)
     finally:
       if os.path.exists(f.name):
         os.remove(f.name)
-      call(["hadoop", "fs", "-rm", "-f", "/test-warehouse/" +
-                  unique_database + "_bad_udf.ll"])
+      call(["hadoop", "fs", "-rm", "-f", hdfs_path])
       os.close(fd)
 
   # Run serially because this will blow the process limit, potentially causing other
