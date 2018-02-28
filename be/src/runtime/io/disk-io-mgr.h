@@ -44,6 +44,8 @@
 namespace impala {
 
 namespace io {
+
+struct DiskQueue;
 /// Manager object that schedules IO for all queries on all disks and remote filesystems
 /// (such as S3). Each query maps to one or more RequestContext objects, each of which
 /// has its own queue of scan ranges and/or write ranges.
@@ -393,7 +395,6 @@ class DiskIoMgr : public CacheLineAligned {
   friend class RequestContext;
   // TODO: remove io:: prefix - it is required for the "using ScanRange" workaround above.
   friend class io::ScanRange;
-  struct DiskQueue;
 
   friend class DiskIoMgrTest_Buffers_Test;
   friend class DiskIoMgrTest_BufferSizeSelection_Test;
@@ -448,8 +449,8 @@ class DiskIoMgr : public CacheLineAligned {
   FileHandleCache file_handle_cache_;
 
   /// Disk worker thread loop. This function retrieves the next range to process on
-  /// the disk queue and invokes ReadRange() or Write() depending on the type of Range().
-  /// There can be multiple threads per disk running this loop.
+  /// the disk queue and invokes ScanRange::DoRead() or Write() depending on the type
+  /// of Range. There can be multiple threads per disk running this loop.
   void WorkLoop(DiskQueue* queue);
 
   /// This is called from the disk thread to get the next range to process. It will
@@ -459,13 +460,6 @@ class DiskIoMgr : public CacheLineAligned {
   /// No locks should be taken before this function call and none are left taken after.
   bool GetNextRequestRange(DiskQueue* disk_queue, RequestRange** range,
       RequestContext** request_context);
-
-  /// Updates disk queue and reader state after a read is complete. If the read
-  /// was successful, 'read_status' is ok and 'buffer' contains the result of the
-  /// read. If the read failed with an error, 'read_status' contains the error and
-  /// 'buffer' has the buffer that was meant to hold the result of the read.
-  void HandleReadFinished(DiskQueue* disk_queue, RequestContext* reader,
-      Status read_status, std::unique_ptr<BufferDescriptor> buffer);
 
   /// Invokes write_range->callback_  after the range has been written and
   /// updates per-disk state and handle state. The status of the write OK/RUNTIME_ERROR
@@ -487,11 +481,6 @@ class DiskIoMgr : public CacheLineAligned {
   /// if the write succeeded, or a RUNTIME_ERROR with an appropriate message otherwise.
   /// Does not open or close the file that is written.
   Status WriteRangeHelper(FILE* file_handle, WriteRange* write_range) WARN_UNUSED_RESULT;
-
-  /// Reads the specified scan range and calls HandleReadFinished() when done. If no
-  /// buffer is available to read the range's data into, the read cannot proceed, the
-  /// range becomes blocked and this function returns without doing I/O.
-  void ReadRange(DiskQueue* disk_queue, RequestContext* reader, ScanRange* range);
 
   /// Helper for AllocateBuffersForRange() to compute the buffer sizes for a scan range
   /// with length 'scan_range_len', given that 'max_bytes' of memory should be allocated.

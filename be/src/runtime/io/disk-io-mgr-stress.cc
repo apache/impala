@@ -247,6 +247,8 @@ void DiskIoMgrStress::NewClient(int i) {
   // Clean up leftover state from the previous client (if any).
   client.scan_ranges.clear();
   ExecEnv* exec_env = ExecEnv::GetInstance();
+  if (client.reader != nullptr) io_mgr_->UnregisterContext(client.reader.get());
+
   exec_env->buffer_pool()->DeregisterClient(&buffer_pool_clients_[i]);
   if (client_mem_trackers_[i] != nullptr) client_mem_trackers_[i]->Close();
   client.obj_pool.Clear();

@@ -34,8 +34,9 @@
 namespace impala {
 namespace io {
 class DiskIoMgr;
-class RequestContext;
+struct DiskQueue;
 class ExclusiveHdfsFileHandle;
+class RequestContext;
 class ScanRange;
 
 /// Buffer struct that is used by the caller and IoMgr to pass read buffers.
@@ -112,6 +113,20 @@ struct RequestType {
     READ,
     WRITE,
   };
+};
+
+/// ReadOutput describes the possible outcomes of the DoRead() function.
+enum class ReadOutcome {
+  // The last (eosr) buffer was successfully enqueued.
+  SUCCESS_EOSR,
+  // The buffer was successfully enqueued but we are not at eosr and can schedule
+  // the next read.
+  SUCCESS_NO_EOSR,
+  // The scan range is blocked waiting for the next buffer.
+  BLOCKED_ON_BUFFER,
+  // The scan range is cancelled (either by caller or because of an error). No more
+  // reads will be scheduled.
+  CANCELLED
 };
 
 /// Represents a contiguous sequence of bytes in a single file.
@@ -236,12 +251,12 @@ class ScanRange : public RequestRange {
   /// and cannot be accessed.
   void ReturnBuffer(std::unique_ptr<BufferDescriptor> buffer);
 
-  /// Cancel this scan range. This cleans up all queued buffers and wakes up any threads
-  /// blocked on GetNext(). Status is a non-ok status with the reason the range was
-  /// cancelled, e.g. CANCELLED if the range was cancelled because it was not needed, or
-  /// another error if an error was encountered while scanning the range. Status is
-  /// returned to the any callers of GetNext(). If a thread is currently blocked in
-  /// GetNext(), it is woken up.
+  /// Cancel this scan range. This waits for any in-flight read operations to complete,
+  /// cleans up all buffers owned by the scan range (i.e. queued or unused buffers)
+  /// and wakes up any threads blocked on GetNext(). Status is a non-ok status with the
+  /// reason the range was cancelled, e.g. CANCELLED if the range was cancelled because
+  /// it was not needed, or another error if an error was encountered while scanning the
+  /// range. Status is returned to the any callers of GetNext().
   void Cancel(const Status& status);
 
   /// return a descriptive string for debug.
@@ -259,10 +274,9 @@ class ScanRange : public RequestRange {
 
   /// Enqueues a ready buffer with valid data for this range. This does not block.
   /// The caller passes ownership of buffer to the scan range and it is not
-  /// valid to access buffer after this call. The reader lock must be held by the
-  /// caller. Returns false if the scan range was cancelled.
-  bool EnqueueReadyBuffer(const boost::unique_lock<boost::mutex>& reader_lock,
-      std::unique_ptr<BufferDescriptor> buffer);
+  /// valid to access buffer after this call. Returns false if the scan range was
+  /// cancelled.
+  bool EnqueueReadyBuffer(std::unique_ptr<BufferDescriptor> buffer);
 
   /// Validates the internal state of this range. lock_ must be taken
   /// before calling this.
@@ -324,10 +338,10 @@ class ScanRange : public RequestRange {
   std::unique_ptr<BufferDescriptor> GetUnusedBuffer(
       const boost::unique_lock<boost::mutex>& scan_range_lock);
 
-  /// Get the next buffer for this scan range for a disk thread to read into. Returns
-  /// the new buffer if successful.  If no buffers are available, marks the range
-  /// as blocked and returns nullptr. Called must not hold 'lock_'.
-  std::unique_ptr<BufferDescriptor> GetNextUnusedBufferForRange();
+  /// Called from a disk I/O thread to read the next buffer of data for this range. The
+  /// returned ReadOutcome describes what the result of the read was. 'disk_id' is the
+  /// ID of the disk queue. Caller must not hold 'lock_'.
+  ReadOutcome DoRead(int disk_id);
 
   /// Cleans up a buffer that was not returned to the client.
   /// Either ReturnBuffer() or CleanUpBuffer() is called for every BufferDescriptor.
@@ -344,15 +358,18 @@ class ScanRange : public RequestRange {
   /// range is cancelled or at eos. The caller must hold 'lock_' via 'scan_range_lock'.
   void CleanUpUnusedBuffers(const boost::unique_lock<boost::mutex>& scan_range_lock);
 
-  /// Same as Cancel() except reader_->lock must be held by the caller.
-  void CancelFromReader(const boost::unique_lock<boost::mutex>& reader_lock,
-      const Status& status);
-
   /// Same as Cancel() except doesn't remove the scan range from
-  /// reader_->active_scan_ranges_. This is invoked by RequestContext::Cancel(),
-  /// which removes the range itself to avoid invalidating its active_scan_ranges_
-  /// iterator.
-  void CancelInternal(const Status& status);
+  /// reader_->active_scan_ranges_ or wait for in-flight reads to finish.
+  /// This is invoked by RequestContext::Cancel(), which removes the range itself
+  /// to avoid invalidating its active_scan_ranges_ iterator. If 'read_error' is
+  /// true, this is being called from a disk thread to propagate a read error, so
+  /// 'read_in_flight_' is set to false and threads in WaitForInFlightRead() are
+  /// woken up.
+  void CancelInternal(const Status& status, bool read_error);
+
+  /// Waits for any in-flight read to complete. Called after CancelInternal() to ensure
+  /// no more reads will occur for the scan range.
+  void WaitForInFlightRead();
 
   /// Marks the scan range as blocked waiting for a buffer. Caller must not hold 'lock_'.
   void SetBlockedOnBuffer();
@@ -451,10 +468,15 @@ class ScanRange : public RequestRange {
   /// Total number of bytes of buffers in 'unused_iomgr_buffers_'.
   int64_t unused_iomgr_buffer_bytes_ = 0;
 
-  /// Number of bytes of buffers returned from GetNextUnusedBufferForRange(). Used to
-  /// infer how many bytes of buffers need to be held onto to read the rest of the scan
-  /// range.
-  int64_t iomgr_buffer_bytes_returned_ = 0;
+  /// Cumulative bytes of I/O mgr buffers taken from 'unused_iomgr_buffers_' by DoRead().
+  /// Used to infer how many bytes of buffers need to be held onto to read the rest of
+  /// the scan range.
+  int64_t iomgr_buffer_cumulative_bytes_used_ = 0;
+
+  /// True if a disk thread is currently doing a read for this scan range. Set to true in
+  /// DoRead() and set to false in EnqueueReadyBuffer() or CancelInternal() when the
+  /// read completes and any buffer used for the read is either enqueued or freed.
+  bool read_in_flight_ = false;
 
   /// If true, the last buffer for this scan range has been queued.
   /// If this is true and 'ready_buffers_' is empty, then no more buffers will be
@@ -472,7 +494,8 @@ class ScanRange : public RequestRange {
   /// 'cancel_status_' is not OK.
   std::deque<std::unique_ptr<BufferDescriptor>> ready_buffers_;
 
-  /// Condition variable for threads in GetNext() that are waiting for the next buffer.
+  /// Condition variable for threads in GetNext() that are waiting for the next buffer
+  /// and threads in WaitForInFlightRead() that are waiting for a read to finish.
   /// Signalled when a buffer is enqueued in 'ready_buffers_' or the scan range is
   /// cancelled.
   ConditionVariable buffer_ready_cv_;

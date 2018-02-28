@@ -64,6 +64,34 @@ void RequestContext::FreeBuffer(BufferDescriptor* buffer) {
   buffer->buffer_ = nullptr;
 }
 
+void RequestContext::ReadDone(int disk_id, ReadOutcome outcome, ScanRange* range) {
+  // TODO: IMPALA-4249: it is safe to touch 'range' until DecrementDiskThread() is
+  // called because all clients of DiskIoMgr keep ScanRange objects alive until they
+  // unregister their RequestContext.
+  unique_lock<mutex> lock(lock_);
+  RequestContext::PerDiskState* disk_state = &disk_states_[disk_id];
+  DCHECK_GT(disk_state->num_threads_in_op(), 0);
+  if (outcome == ReadOutcome::SUCCESS_EOSR) {
+    // No more reads to do.
+    --disk_state->num_remaining_ranges();
+  } else if (outcome == ReadOutcome::SUCCESS_NO_EOSR) {
+    // Schedule the next read.
+    if (state_ != RequestContext::Cancelled) {
+      ScheduleScanRange(lock, range);
+    }
+  } else if (outcome == ReadOutcome::BLOCKED_ON_BUFFER) {
+    // Do nothing - the caller must add a buffer to the range or cancel it.
+  } else {
+    DCHECK(outcome == ReadOutcome::CANCELLED) << static_cast<int>(outcome);
+    // No more reads - clean up the scan range.
+    --disk_state->num_remaining_ranges();
+    RemoveActiveScanRangeLocked(lock, range);
+  }
+  // Release refcount that was taken in IncrementDiskThreadAfterDequeue().
+  disk_state->DecrementDiskThread(lock, this);
+  DCHECK(Validate()) << endl << DebugString();
+}
+
 // Cancellation of a RequestContext requires coordination from multiple threads that may
 // hold references to the context:
 //  1. Disk threads that are currently processing a range for this context.
@@ -104,7 +132,9 @@ void RequestContext::Cancel() {
 
     // Clear out all request ranges from queues for this reader. Cancel the scan
     // ranges and invoke the write range callbacks to propagate the cancellation.
-    for (ScanRange* range : active_scan_ranges_) range->CancelInternal(Status::CANCELLED);
+    for (ScanRange* range : active_scan_ranges_) {
+      range->CancelInternal(Status::CANCELLED, false);
+    }
     active_scan_ranges_.clear();
     for (PerDiskState& disk_state : disk_states_) {
       RequestRange* range;

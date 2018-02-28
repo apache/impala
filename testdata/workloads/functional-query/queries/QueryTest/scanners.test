@@ -117,3 +117,14 @@ select * from emptytable;
 ---- TYPES
 STRING,INT
 ====
+---- QUERY
+# IMPALA-6587: regression test for reservation not being managed correctly. Should be
+# able to execute this query reliably with the minimum reservation, even with tiny
+# scan ranges. This reliably reproduced the issue when run against text/lzo.
+set max_scan_range_length=1;
+select count(*) from alltypessmall
+---- RESULTS
+100
+---- TYPES
+BIGINT
+====
