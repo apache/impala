@@ -148,6 +148,8 @@ DEFINE_bool(thread_creation_fault_injection, false, "A fault injection option th
 DEFINE_int32(stress_catalog_init_delay_ms, 0, "A stress option that injects extra delay"
     " in milliseconds when initializing an impalad's local catalog replica. Delay <= 0"
     " inject no delay.");
+DEFINE_int32(stress_disk_read_delay_ms, 0, "A stress option that injects extra delay"
+    " in milliseconds when the I/O manager is reading from disk.");
 #endif
 
 // Used for testing the path where the Kudu client is stubbed.

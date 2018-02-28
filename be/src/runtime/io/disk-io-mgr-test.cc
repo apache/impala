@@ -33,10 +33,12 @@
 #include "service/fe-support.h"
 #include "testutil/gtest-util.h"
 #include "testutil/rand-util.h"
+#include "testutil/scoped-flag-setter.h"
 #include "util/condition-variable.h"
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
 #include "util/thread.h"
+#include "util/time.h"
 
 #include "common/names.h"
 
@@ -48,6 +50,9 @@ DECLARE_int64(min_buffer_size);
 DECLARE_int32(num_remote_hdfs_io_threads);
 DECLARE_int32(num_s3_io_threads);
 DECLARE_int32(num_adls_io_threads);
+#ifndef NDEBUG
+DECLARE_int32(stress_disk_read_delay_ms);
+#endif
 
 const int MIN_BUFFER_SIZE = 128;
 const int MAX_BUFFER_SIZE = 1024;
@@ -1257,6 +1262,50 @@ TEST_F(DiskIoMgrTest, SkipAllocateBuffers) {
   ranges[2]->Cancel(Status::CANCELLED);
   reader->Cancel();
 
+  io_mgr.UnregisterContext(reader.get());
+}
+
+// Regression test for IMPALA-6587 - all buffers should be released after Cancel().
+TEST_F(DiskIoMgrTest, CancelReleasesResources) {
+  InitRootReservation(LARGE_RESERVATION_LIMIT);
+  const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
+  const char* data = "the quick brown fox jumped over the lazy dog";
+  int len = strlen(data);
+  const int64_t MIN_BUFFER_SIZE = 2;
+  const int64_t MAX_BUFFER_SIZE = 1024;
+  CreateTempFile(tmp_file, data);
+
+  // Get mtime for file
+  struct stat stat_val;
+  stat(tmp_file, &stat_val);
+
+  const int NUM_DISK_THREADS = 20;
+  DiskIoMgr io_mgr(
+      1, NUM_DISK_THREADS, NUM_DISK_THREADS, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
+#ifndef NDEBUG
+  auto s = ScopedFlagSetter<int32_t>::Make(&FLAGS_stress_disk_read_delay_ms, 5);
+#endif
+
+  ASSERT_OK(io_mgr.Init());
+  unique_ptr<RequestContext> reader = io_mgr.RegisterContext();
+  BufferPool::ClientHandle read_client;
+  RegisterBufferPoolClient(
+      LARGE_RESERVATION_LIMIT, LARGE_INITIAL_RESERVATION, &read_client);
+
+  for (int i = 0; i < 10; ++i) {
+    ScanRange* range = InitRange(&pool_, tmp_file, 0, len, 0, stat_val.st_mtime);
+    bool needs_buffers;
+    ASSERT_OK(io_mgr.StartScanRange(reader.get(), range, &needs_buffers));
+    EXPECT_TRUE(needs_buffers);
+    ASSERT_OK(io_mgr.AllocateBuffersForRange(reader.get(), &read_client, range, MAX_BUFFER_SIZE));
+    // Give disk I/O thread a chance to start read.
+    SleepForMs(1);
+
+    range->Cancel(Status::CANCELLED);
+    // Resources should be released immediately once Cancel() returns.
+    EXPECT_EQ(0, read_client.GetUsedReservation()) << " iter " << i;
+  }
+  buffer_pool()->DeregisterClient(&read_client);
   io_mgr.UnregisterContext(reader.get());
 }
 

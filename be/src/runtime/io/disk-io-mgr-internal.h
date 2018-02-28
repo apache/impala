@@ -39,6 +39,8 @@
 /// This file contains internal structures shared between submodules of the IoMgr. Users
 /// of the IoMgr do not need to include this file.
 
+DECLARE_uint64(max_cached_file_handles);
+
 // Macros to work around counters sometimes not being provided.
 // TODO: fix things so that counters are always non-NULL.
 #define COUNTER_ADD_IF_NOT_NULL(c, v) \
@@ -56,8 +58,13 @@
 namespace impala {
 namespace io {
 
+// Indicates if file handle caching should be used
+static inline bool is_file_handle_caching_enabled() {
+  return FLAGS_max_cached_file_handles > 0;
+}
+
 /// Per disk state
-struct DiskIoMgr::DiskQueue {
+struct DiskQueue {
   /// Disk id (0-based)
   int disk_id;
 

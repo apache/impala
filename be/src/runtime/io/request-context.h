@@ -201,6 +201,11 @@ class RequestContext {
     state.ScheduleContext(lock, this, range->disk_id());
   }
 
+  /// Called from a disk thread when a read completes. Decrements the disk thread count
+  /// and other bookkeeping and re-schedules 'range' if there are more reads to do.
+  /// Caller must not hold 'lock_'.
+  void ReadDone(int disk_id, ReadOutcome outcome, ScanRange* range);
+
   /// Cancel the context if not already cancelled, wait for all scan ranges to finish
   /// and mark the context as inactive, after which it cannot be used.
   void CancelAndMarkInactive();
@@ -367,13 +372,14 @@ class RequestContext {
     void ScheduleContext(const boost::unique_lock<boost::mutex>& context_lock,
         RequestContext* context, int disk_id);
 
-    /// Increment the count of disk threads that have a reference to this context. These
-    /// threads do not hold any locks while reading from HDFS, so we need to prevent the
-    /// RequestContext from being destroyed underneath them.
+    /// Called when dequeueing this RequestContext from the disk queue to increment the
+    /// count of disk threads with a reference to this context. These threads do not hold
+    /// any locks while reading from HDFS, so we need to prevent the RequestContext from
+    /// being destroyed underneath them.
     ///
     /// The caller does not need to hold 'lock_', so this can execute concurrently with
     /// itself and DecrementDiskThread().
-    void IncrementDiskThreadAndDequeue() {
+    void IncrementDiskThreadAfterDequeue() {
       /// Incrementing 'num_threads_in_op_' first so that there is no window when other
       /// threads see 'is_on_queue_ == num_threads_in_op_ == 0' and think there are no
       /// references left to this context.
@@ -395,7 +401,7 @@ class RequestContext {
       }
       // The state is cancelled, check to see if we're the last thread to touch the
       // context on this disk. We need to load 'is_on_queue_' and 'num_threads_in_op_'
-      // in this order to avoid a race with IncrementDiskThreadAndDequeue().
+      // in this order to avoid a race with IncrementDiskThreadAfterDequeue().
       if (is_on_queue_.Load() == 0 && num_threads_in_op_.Load() == 0 && !done_) {
         context->DecrementDiskRefCount(context_lock);
         done_ = true;
