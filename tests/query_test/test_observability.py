@@ -117,6 +117,7 @@ class TestObservability(ImpalaTestSuite):
         in runtime_profile
 
   @SkipIfLocal.multiple_impalad
+  @pytest.mark.xfail(reason="IMPALA-6338")
   def test_profile_fragment_instances(self):
     """IMPALA-6081: Test that the expected number of fragment instances and their exec
     nodes appear in the runtime profile, even when fragments may be quickly cancelled when
