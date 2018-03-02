@@ -450,20 +450,26 @@ function copy-and-load-ext-data-source {
 }
 
 function wait-hdfs-replication {
-  FAIL_COUNT=0
-  while [[ "$FAIL_COUNT" -ne "6" ]] ; do
+  MAX_RETRIES=6
+  for ((RESTART_COUNT = 0; RESTART_COUNT <= MAX_RETRIES; ++RESTART_COUNT)); do
+    sleep "$((RESTART_COUNT * 10))"
     FSCK_OUTPUT="$(hdfs fsck /test-warehouse)"
     echo "$FSCK_OUTPUT"
     if grep "Under-replicated blocks:[[:space:]]*0" <<< "$FSCK_OUTPUT"; then
+      # All the blocks are fully-replicated. The data loading can continue.
       return
     fi
-    let FAIL_COUNT="$FAIL_COUNT"+1
-    sleep 5
+    if [[ "$RESTART_COUNT" -eq "$MAX_RETRIES" ]] ; then
+      echo "Some HDFS blocks are still under-replicated after restarting HDFS"\
+          "$MAX_RETRIES times."
+      echo "Some tests cannot pass without fully-replicated blocks (IMPALA-3887)."
+      echo "Failing the data loading."
+      exit 1
+    fi
+    echo "There are under-replicated blocks in HDFS. Attempting to restart HDFS to"\
+        "resolve this issue."
+    ${IMPALA_HOME}/testdata/bin/run-mini-dfs.sh
   done
-  echo "Some HDFS blocks are still under replicated after 30s."
-  echo "Some tests cannot pass without fully replicated blocks (IMPALA-3887)."
-  echo "Failing the data loading."
-  exit 1
 }
 
 # For kerberized clusters, use kerberos
