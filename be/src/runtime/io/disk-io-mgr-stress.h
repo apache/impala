@@ -22,11 +22,8 @@
 #include <memory>
 #include <vector>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/condition_variable.hpp>
 #include <boost/thread/thread.hpp>
 
-#include "common/object-pool.h"
-#include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/thread-resource-mgr.h"
@@ -46,28 +43,14 @@ class DiskIoMgrStress {
   /// Run the test for 'sec'.  If 0, run forever
   void Run(int sec);
 
-  static constexpr float ABORT_CHANCE = .10f;
-  static const int MIN_READ_LEN = 1;
-  static const int MAX_READ_LEN = 20;
-
-  static const int MIN_FILE_LEN = 10;
-  static const int MAX_FILE_LEN = 1024;
-
-  // Make sure this is between MIN/MAX FILE_LEN to test more cases
-  static const int MIN_READ_BUFFER_SIZE = 64;
-  static const int MAX_READ_BUFFER_SIZE = 128;
-
-  // Maximum bytes to allocate per scan range.
-  static const int MAX_BUFFER_BYTES_PER_SCAN_RANGE = MAX_READ_BUFFER_SIZE * 3;
-
-  static const int CANCEL_READER_PERIOD_MS = 20;
  private:
   struct Client;
 
   struct File {
     std::string filename;
-    std::string data; // the data in the file, used to validate
+    std::string data;  // the data in the file, used to validate
   };
+
 
   /// Files used for testing.  These are created at startup and recycled
   /// during the test
@@ -89,9 +72,6 @@ class DiskIoMgrStress {
   /// Client MemTrackers, one per client.
   std::vector<std::unique_ptr<MemTracker>> client_mem_trackers_;
 
-  /// Buffer pool clients, one per client.
-  std::unique_ptr<BufferPool::ClientHandle[]> buffer_pool_clients_;
-
   /// If true, tests cancelling readers
   bool includes_cancellation_;
 
@@ -108,8 +88,6 @@ class DiskIoMgrStress {
 
   /// Possibly cancels a random reader.
   void CancelRandomReader();
-
-  static std::string GenerateRandomData();
 };
 }
 }

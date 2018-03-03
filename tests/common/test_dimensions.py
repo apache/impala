@@ -131,13 +131,13 @@ SINGLE_NODE_ONLY = [1]
 ALL_NODES_ONLY = [0]
 ALL_DISABLE_CODEGEN_OPTIONS = [True, False]
 
-def create_single_exec_option_dimension(num_nodes=0, disable_codegen_rows_threshold=5000):
+def create_single_exec_option_dimension():
   """Creates an exec_option dimension that will produce a single test vector"""
-  return create_exec_option_dimension(cluster_sizes=[num_nodes],
-      disable_codegen_options=[False],
-      # Make sure codegen kicks in for functional.alltypes.
-      disable_codegen_rows_threshold_options=[disable_codegen_rows_threshold],
-      batch_sizes=[0])
+  return create_exec_option_dimension(cluster_sizes=ALL_NODES_ONLY,
+                                      disable_codegen_options=[False],
+                                      # Make sure codegen kicks in for functional.alltypes.
+                                      disable_codegen_rows_threshold_options=[5000],
+                                      batch_sizes=[0])
 
 def create_exec_option_dimension(cluster_sizes=ALL_CLUSTER_SIZES,
                                  disable_codegen_options=ALL_DISABLE_CODEGEN_OPTIONS,
@@ -145,15 +145,13 @@ def create_exec_option_dimension(cluster_sizes=ALL_CLUSTER_SIZES,
                                  sync_ddl=None, exec_single_node_option=[0],
                                  # We already run with codegen on and off explicitly -
                                  # don't need automatic toggling.
-                                 disable_codegen_rows_threshold_options=[0],
-                                 debug_action_options=[None]):
+                                 disable_codegen_rows_threshold_options=[0]):
   exec_option_dimensions = {
       'abort_on_error': [1],
       'exec_single_node_rows_threshold': exec_single_node_option,
       'batch_size': batch_sizes,
       'disable_codegen': disable_codegen_options,
       'disable_codegen_rows_threshold': disable_codegen_rows_threshold_options,
-      'debug_action': debug_action_options,
       'num_nodes': cluster_sizes}
 
   if sync_ddl is not None:

@@ -39,7 +39,7 @@ class TestScratchDir(CustomClusterTestSuite):
       """
   # Buffer pool limit that is low enough to force Impala to spill to disk when executing
   # spill_query.
-  buffer_pool_limit = "45m"
+  buffer_pool_limit = "32m"
 
   def count_nonempty_dirs(self, dirs):
     count = 0

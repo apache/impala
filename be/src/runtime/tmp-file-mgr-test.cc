@@ -25,7 +25,6 @@
 #include <gtest/gtest.h>
 
 #include "common/init.h"
-#include "runtime/io/request-context.h"
 #include "runtime/test-env.h"
 #include "runtime/tmp-file-mgr-internal.h"
 #include "runtime/tmp-file-mgr.h"
@@ -135,7 +134,7 @@ class TmpFileMgrTest : public ::testing::Test {
 
   /// Helper to cancel the FileGroup RequestContext.
   static void CancelIoContext(TmpFileMgr::FileGroup* group) {
-    group->io_ctx_->Cancel();
+    group->io_mgr_->CancelContext(group->io_ctx_.get());
   }
 
   /// Helper to get the # of bytes allocated by the group. Validates that the sum across

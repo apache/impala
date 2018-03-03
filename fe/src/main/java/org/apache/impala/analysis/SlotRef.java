@@ -153,6 +153,26 @@ public class SlotRef extends Expr {
     return "<slot " + Integer.toString(desc_.getId().asInt()) + ">";
   }
 
+  /**
+   * Checks if this slotRef refers to an array "pos" pseudo-column.
+   *
+   * Note: checking whether the column is null distinguishes between top-level columns
+   * and nested types. This check more specifically looks just for a reference to the
+   * "pos" field of an array type.
+   */
+  public boolean isArrayPosRef() {
+    TupleDescriptor parent = getDesc().getParent();
+    if (parent == null) return false;
+    Type parentType = parent.getType();
+    if (parentType instanceof CollectionStructType) {
+      if (((CollectionStructType)parentType).isArrayStruct() &&
+          getDesc().getLabel().equals(Path.ARRAY_POS_FIELD_NAME)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.SLOT_REF;

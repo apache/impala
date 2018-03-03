@@ -46,6 +46,12 @@ const char* ImpaladMetricKeys::HASH_TABLE_TOTAL_BYTES =
     "impala-server.hash-table.total-bytes";
 const char* ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES =
     "impala-server.io-mgr.num-open-files";
+const char* ImpaladMetricKeys::IO_MGR_NUM_BUFFERS =
+    "impala-server.io-mgr.num-buffers";
+const char* ImpaladMetricKeys::IO_MGR_TOTAL_BYTES =
+    "impala-server.io-mgr.total-bytes";
+const char* ImpaladMetricKeys::IO_MGR_NUM_UNUSED_BUFFERS =
+    "impala-server.io-mgr.num-unused-buffers";
 const char* ImpaladMetricKeys::IO_MGR_BYTES_READ =
     "impala-server.io-mgr.bytes-read";
 const char* ImpaladMetricKeys::IO_MGR_LOCAL_BYTES_READ =
@@ -205,8 +211,11 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
       ImpaladMetricKeys::NUM_FILES_OPEN_FOR_INSERT, 0);
 
   // Initialize IO mgr metrics
-  IO_MGR_NUM_OPEN_FILES = m->AddGauge(
-      ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES, 0);
+  IO_MGR_NUM_OPEN_FILES = m->AddGauge(ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES, 0);
+  IO_MGR_NUM_BUFFERS = m->AddGauge(ImpaladMetricKeys::IO_MGR_NUM_BUFFERS, 0);
+  IO_MGR_TOTAL_BYTES = m->AddGauge(ImpaladMetricKeys::IO_MGR_TOTAL_BYTES, 0);
+  IO_MGR_NUM_UNUSED_BUFFERS = m->AddGauge(
+      ImpaladMetricKeys::IO_MGR_NUM_UNUSED_BUFFERS, 0);
   IO_MGR_NUM_CACHED_FILE_HANDLES = m->AddGauge(
       ImpaladMetricKeys::IO_MGR_NUM_CACHED_FILE_HANDLES, 0);
   IO_MGR_NUM_FILE_HANDLES_OUTSTANDING = m->AddGauge(

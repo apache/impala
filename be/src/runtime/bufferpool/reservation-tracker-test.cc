@@ -522,15 +522,15 @@ TEST_F(ReservationTrackerTest, TransferReservation) {
 TEST_F(ReservationTrackerTest, ReservationUtil) {
   const int64_t MEG = 1024 * 1024;
   const int64_t GIG = 1024 * 1024 * 1024;
-  EXPECT_EQ(32 * MEG, ReservationUtil::RESERVATION_MEM_MIN_REMAINING);
+  EXPECT_EQ(75 * MEG, ReservationUtil::RESERVATION_MEM_MIN_REMAINING);
 
   EXPECT_EQ(0, ReservationUtil::GetReservationLimitFromMemLimit(0));
   EXPECT_EQ(0, ReservationUtil::GetReservationLimitFromMemLimit(-1));
-  EXPECT_EQ(0, ReservationUtil::GetReservationLimitFromMemLimit(32 * MEG));
+  EXPECT_EQ(0, ReservationUtil::GetReservationLimitFromMemLimit(75 * MEG));
   EXPECT_EQ(8 * GIG, ReservationUtil::GetReservationLimitFromMemLimit(10 * GIG));
 
-  EXPECT_EQ(32 * MEG, ReservationUtil::GetMinMemLimitFromReservation(0));
-  EXPECT_EQ(32 * MEG, ReservationUtil::GetMinMemLimitFromReservation(-1));
+  EXPECT_EQ(75 * MEG, ReservationUtil::GetMinMemLimitFromReservation(0));
+  EXPECT_EQ(75 * MEG, ReservationUtil::GetMinMemLimitFromReservation(-1));
   EXPECT_EQ(500 * MEG, ReservationUtil::GetMinMemLimitFromReservation(400 * MEG));
   EXPECT_EQ(5 * GIG, ReservationUtil::GetMinMemLimitFromReservation(4 * GIG));
 

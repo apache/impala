@@ -345,7 +345,7 @@ where l_orderkey = 965 and l_extendedprice * l_tax = p_retailprice;
 # consumption / spilling behaviour.
 ####################################################
 
-SET BUFFER_POOL_LIMIT=80m;
+SET BUFFER_POOL_LIMIT=40m;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_BLOOM_FILTER_SIZE=16M;
@@ -396,14 +396,15 @@ SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MIN_SIZE=128MB;
 SET RUNTIME_FILTER_MAX_SIZE=500MB;
 # Query would have been admitted if memory for runtime filters was not accounted for.
-SET BUFFER_POOL_LIMIT=290MB;
+SET BUFFER_POOL_LIMIT=140MB;
 select STRAIGHT_JOIN * from alltypes a join [SHUFFLE] alltypes b
     on a.month = b.id and b.int_col = -3
 ---- RESULTS
 ---- CATCH
-Rejected query from pool default-pool: minimum memory reservation is
+ImpalaBeeswaxException: INNER EXCEPTION: <class 'beeswaxd.ttypes.BeeswaxException'>
+ MESSAGE: Rejected query from pool default-pool: minimum memory reservation is
  greater than memory available to the query for buffer reservations. Increase
- the buffer_pool_limit to 290.17 MB. See the query profile for more information
+ the buffer_pool_limit to 290.00 MB. See the query profile for more information
  about the per-node memory requirements.
 ====
 ---- QUERY
@@ -413,7 +414,7 @@ SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MIN_SIZE=128MB;
 SET RUNTIME_FILTER_MAX_SIZE=500MB;
 # This would run perfectly with just enough memory provided by the buffer pool.
-SET BUFFER_POOL_LIMIT=295MB;
+SET BUFFER_POOL_LIMIT=290MB;
 select STRAIGHT_JOIN * from alltypes a join [SHUFFLE] alltypes b
     on a.month = b.id and b.int_col = -3
 ---- RESULTS

@@ -35,7 +35,6 @@
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-expr.h"
 #include "runtime/descriptors.h"
-#include "runtime/exec-env.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/io/request-context.h"
@@ -65,7 +64,6 @@ const int UNEXPECTED_REMOTE_BYTES_WARN_THRESHOLD = 64 * 1024 * 1024;
 HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
     : ScanNode(pool, tnode, descs),
-      ideal_scan_range_reservation_(tnode.hdfs_scan_node.ideal_scan_range_reservation),
       min_max_tuple_id_(tnode.hdfs_scan_node.__isset.min_max_tuple_id ?
           tnode.hdfs_scan_node.min_max_tuple_id : -1),
       skip_header_line_count_(tnode.hdfs_scan_node.__isset.skip_header_line_count ?
@@ -82,7 +80,6 @@ HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const TPlanNode& tnode,
           &tnode.hdfs_scan_node.dictionary_filter_conjuncts : nullptr),
       disks_accessed_bitmap_(TUnit::UNIT, 0),
       active_hdfs_read_thread_counter_(TUnit::UNIT, 0) {
-  DCHECK_GE(ideal_scan_range_reservation_, resource_profile_.min_reservation);
 }
 
 HdfsScanNodeBase::~HdfsScanNodeBase() {
@@ -112,6 +109,7 @@ Status HdfsScanNodeBase::Init(const TPlanNode& tnode, RuntimeState* state) {
     RETURN_IF_ERROR(ScalarExpr::Create(tnode.hdfs_scan_node.min_max_conjuncts,
         *min_max_row_desc, state, &min_max_conjuncts_));
   }
+
   return Status::OK();
 }
 
@@ -242,16 +240,6 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
   ImpaladMetrics::NUM_RANGES_PROCESSED->Increment(scan_range_params_->size());
   ImpaladMetrics::NUM_RANGES_MISSING_VOLUME_ID->Increment(num_ranges_missing_volume_id);
 
-  // Check if reservation was enough to allocate at least one buffer. The
-  // reservation calculation in HdfsScanNode.java should guarantee this.
-  // Hitting this error indicates a misconfiguration or bug.
-  int64_t min_buffer_size = ExecEnv::GetInstance()->disk_io_mgr()->min_buffer_size();
-  if (scan_range_params_->size() > 0
-      && resource_profile_.min_reservation < min_buffer_size) {
-    return Status(TErrorCode::INTERNAL_ERROR,
-      Substitute("HDFS scan min reservation $0 must be >= min buffer size $1",
-       resource_profile_.min_reservation, min_buffer_size));
-  }
   // Add per volume stats to the runtime profile
   PerVolumeStats per_volume_stats;
   stringstream str;
@@ -338,18 +326,7 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
         partition_desc->partition_key_value_evals(), scan_node_pool_.get(), state);
   }
 
-  RETURN_IF_ERROR(ClaimBufferReservation(state));
-  // We got the minimum reservation. Now try to get ideal reservation.
-  if (resource_profile_.min_reservation != ideal_scan_range_reservation_) {
-    bool increased = buffer_pool_client_.IncreaseReservation(
-        ideal_scan_range_reservation_ - resource_profile_.min_reservation);
-    VLOG_FILE << "Increasing reservation from minimum "
-              << resource_profile_.min_reservation << "B to ideal "
-              << ideal_scan_range_reservation_ << "B "
-              << (increased ? "succeeded" : "failed");
-  }
-
-  reader_context_ = runtime_state_->io_mgr()->RegisterContext();
+  reader_context_ = runtime_state_->io_mgr()->RegisterContext(mem_tracker());
 
   // Initialize HdfsScanNode specific counters
   // TODO: Revisit counters and move the counters specific to multi-threaded scans
@@ -370,11 +347,14 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
   num_scanner_threads_started_counter_ =
       ADD_COUNTER(runtime_profile(), NUM_SCANNER_THREADS_STARTED, TUnit::UNIT);
 
-  reader_context_->set_bytes_read_counter(bytes_read_counter());
-  reader_context_->set_read_timer(read_timer());
-  reader_context_->set_open_file_timer(open_file_timer());
-  reader_context_->set_active_read_thread_counter(&active_hdfs_read_thread_counter_);
-  reader_context_->set_disks_accessed_bitmap(&disks_accessed_bitmap_);
+  runtime_state_->io_mgr()->set_bytes_read_counter(
+      reader_context_.get(), bytes_read_counter());
+  runtime_state_->io_mgr()->set_read_timer(reader_context_.get(), read_timer());
+  runtime_state_->io_mgr()->set_open_file_timer(reader_context_.get(), open_file_timer());
+  runtime_state_->io_mgr()->set_active_read_thread_counter(
+      reader_context_.get(), &active_hdfs_read_thread_counter_);
+  runtime_state_->io_mgr()->set_disks_access_bitmap(
+      reader_context_.get(), &disks_accessed_bitmap_);
 
   average_scanner_thread_concurrency_ = runtime_profile()->AddSamplingCounter(
       AVERAGE_SCANNER_THREAD_CONCURRENCY, &active_scanner_thread_counter_);
@@ -468,27 +448,18 @@ Status HdfsScanNodeBase::IssueInitialScanRanges(RuntimeState* state) {
     }
   }
 
-  // Issue initial ranges for all file types. Only call functions for file types that
-  // actually exist - trying to add empty lists of ranges can result in spurious
-  // CANCELLED errors - see IMPALA-6564.
-  for (const auto& entry : matching_per_type_files) {
-    if (entry.second.empty()) continue;
-    switch (entry.first) {
-      case THdfsFileFormat::PARQUET:
-        RETURN_IF_ERROR(HdfsParquetScanner::IssueInitialRanges(this, entry.second));
-        break;
-      case THdfsFileFormat::TEXT:
-        RETURN_IF_ERROR(HdfsTextScanner::IssueInitialRanges(this, entry.second));
-        break;
-      case THdfsFileFormat::SEQUENCE_FILE:
-      case THdfsFileFormat::RC_FILE:
-      case THdfsFileFormat::AVRO:
-        RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this, entry.second));
-        break;
-      default:
-        DCHECK(false) << "Unexpected file type " << entry.first;
-    }
-  }
+  // Issue initial ranges for all file types.
+  RETURN_IF_ERROR(HdfsParquetScanner::IssueInitialRanges(this,
+      matching_per_type_files[THdfsFileFormat::PARQUET]));
+  RETURN_IF_ERROR(HdfsTextScanner::IssueInitialRanges(this,
+      matching_per_type_files[THdfsFileFormat::TEXT]));
+  RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
+      matching_per_type_files[THdfsFileFormat::SEQUENCE_FILE]));
+  RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
+      matching_per_type_files[THdfsFileFormat::RC_FILE]));
+  RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
+      matching_per_type_files[THdfsFileFormat::AVRO]));
+
   return Status::OK();
 }
 
@@ -547,8 +518,6 @@ ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
 
 Status HdfsScanNodeBase::AddDiskIoRanges(
     const vector<ScanRange*>& ranges, int num_files_queued) {
-  DCHECK(!progress_.done()) << "Don't call AddScanRanges() after all ranges finished.";
-  DCHECK_GT(ranges.size(), 0);
   RETURN_IF_ERROR(runtime_state_->io_mgr()->AddScanRanges(reader_context_.get(), ranges));
   num_unqueued_files_.Add(-num_files_queued);
   DCHECK_GE(num_unqueued_files_.Load(), 0);
@@ -851,14 +820,20 @@ void HdfsScanNodeBase::StopAndFinalizeCounters() {
       Substitute("Codegen enabled: $0 out of $1", num_enabled, total));
 
   if (reader_context_ != nullptr) {
-    bytes_read_local_->Set(reader_context_->bytes_read_local());
-    bytes_read_short_circuit_->Set(reader_context_->bytes_read_short_circuit());
-    bytes_read_dn_cache_->Set(reader_context_->bytes_read_dn_cache());
-    num_remote_ranges_->Set(reader_context_->num_remote_ranges());
-    unexpected_remote_bytes_->Set(reader_context_->unexpected_remote_bytes());
-    cached_file_handles_hit_count_->Set(reader_context_->cached_file_handles_hit_count());
+    bytes_read_local_->Set(
+        runtime_state_->io_mgr()->bytes_read_local(reader_context_.get()));
+    bytes_read_short_circuit_->Set(
+        runtime_state_->io_mgr()->bytes_read_short_circuit(reader_context_.get()));
+    bytes_read_dn_cache_->Set(
+        runtime_state_->io_mgr()->bytes_read_dn_cache(reader_context_.get()));
+    num_remote_ranges_->Set(static_cast<int64_t>(
+        runtime_state_->io_mgr()->num_remote_ranges(reader_context_.get())));
+    unexpected_remote_bytes_->Set(
+        runtime_state_->io_mgr()->unexpected_remote_bytes(reader_context_.get()));
+    cached_file_handles_hit_count_->Set(
+        runtime_state_->io_mgr()->cached_file_handles_hit_count(reader_context_.get()));
     cached_file_handles_miss_count_->Set(
-        reader_context_->cached_file_handles_miss_count());
+        runtime_state_->io_mgr()->cached_file_handles_miss_count(reader_context_.get()));
 
     if (unexpected_remote_bytes_->value() >= UNEXPECTED_REMOTE_BYTES_WARN_THRESHOLD) {
       runtime_state_->LogError(ErrorMsg(TErrorCode::GENERAL, Substitute(

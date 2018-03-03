@@ -118,9 +118,7 @@ class TestCodegenMemLimit(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestCodegenMemLimit, cls).add_test_dimensions()
-    # Run with num_nodes=1 to avoid races between fragments allocating memory.
-    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension(
-        num_nodes=1, disable_codegen_rows_threshold=0))
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
     # Only run the query for parquet
     cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format == 'parquet')
