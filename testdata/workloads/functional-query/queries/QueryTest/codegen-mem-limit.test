@@ -1,8 +1,9 @@
 =====
 ---- QUERY
-set exec_single_node_rows_threshold=0;
 set mem_limit=100k;
-with t as (values(1), (2), (3), (4)) select min(t1.`1` + t2.`1`) from t t1 join t t2;
+select *
+from alltypes
+where substr(string_col, 1) = "";
 ---- CATCH
 Codegen failed to reserve
 =====

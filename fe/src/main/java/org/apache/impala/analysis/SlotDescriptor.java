@@ -163,25 +163,6 @@ public class SlotDescriptor {
   }
 
   /**
-   * Checks if this descriptor describes  an array "pos" pseudo-column.
-   *
-   * Note: checking whether the column is null distinguishes between top-level columns
-   * and nested types. This check more specifically looks just for a reference to the
-   * "pos" field of an array type.
-   */
-  public boolean isArrayPosRef() {
-    if (parent_ == null) return false;
-    Type parentType = parent_.getType();
-    if (parentType instanceof CollectionStructType) {
-      if (((CollectionStructType)parentType).isArrayStruct() &&
-          label_.equals(Path.ARRAY_POS_FIELD_NAME)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
    * Assembles the absolute materialized path to this slot starting from the schema
    * root. The materialized path points to the first non-struct schema element along the
    * path starting from the parent's tuple path to this slot's path.

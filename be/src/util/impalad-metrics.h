@@ -67,6 +67,15 @@ class ImpaladMetricKeys {
   /// Number of files currently opened by the io mgr
   static const char* IO_MGR_NUM_OPEN_FILES;
 
+  /// Number of IO buffers allocated by the io mgr
+  static const char* IO_MGR_NUM_BUFFERS;
+
+  /// Number of bytes used by IO buffers (used and unused).
+  static const char* IO_MGR_TOTAL_BYTES;
+
+  /// Number of IO buffers that are currently unused (and can be GC'ed)
+  static const char* IO_MGR_NUM_UNUSED_BUFFERS;
+
   /// Total number of bytes read by the io mgr
   static const char* IO_MGR_BYTES_READ;
 

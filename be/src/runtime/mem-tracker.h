@@ -107,6 +107,7 @@ class MemTracker {
   /// destruction to prevent other threads from getting a reference to the MemTracker
   /// via its parent. Only used to deregister the query-level MemTracker from the
   /// global hierarchy.
+  /// TODO: IMPALA-3200: this is also used by BufferedBlockMgr, which will be deleted.
   void CloseAndUnregisterFromParent();
 
   /// Include counters from a ReservationTracker in logs and other diagnostics.

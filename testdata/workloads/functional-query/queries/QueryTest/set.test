@@ -129,7 +129,7 @@ select 1
 set mem_limit=1;
 select count(string_col) from functional.alltypestiny
 ---- CATCH
-Rejected query from pool default-pool: minimum memory reservation
+Memory limit exceeded
 ====
 ---- QUERY
 # Set mem_limit back to unlimited and query should succeed again.

@@ -37,7 +37,6 @@
 
 namespace impala {
 
-class MemTracker;
 class ReservationTracker;
 class RuntimeProfile;
 class SystemAllocator;

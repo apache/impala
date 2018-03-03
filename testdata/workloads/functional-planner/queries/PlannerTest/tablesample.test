@@ -2,7 +2,7 @@
 select * from functional.alltypes tablesample system(10) repeatable(1234)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=32.00KB
+|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -13,14 +13,14 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=32.00MB mem-reservation=32.00KB
+   mem-estimate=32.00MB mem-reservation=0B
    tuple-ids=0 row-size=97B cardinality=730
 ====
 # Sample 50%
 select * from functional.alltypes tablesample system(50) repeatable(1234)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=80.00MB mem-reservation=32.00KB
+|  Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -31,7 +31,7 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=80.00MB mem-reservation=32.00KB
+   mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=97B cardinality=3650
 ====
 # Sampling and scan predicates. Scan predicates are evaluated after sampling and
@@ -40,7 +40,7 @@ select * from functional.alltypes tablesample system(50) repeatable(1234)
 where id < 10
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=80.00MB mem-reservation=32.00KB
+|  Per-Host Resources: mem-estimate=80.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -53,7 +53,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled
    parquet dictionary predicates: id < 10
-   mem-estimate=80.00MB mem-reservation=32.00KB
+   mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=0 row-size=97B cardinality=365
 ====
 # Partition pruning + sampling. Partition pruning happens before sampling.
@@ -61,7 +61,7 @@ select * from functional.alltypes tablesample system(50) repeatable(1234)
 where year = 2009
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=48.00MB mem-reservation=32.00KB
+|  Per-Host Resources: mem-estimate=48.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -72,7 +72,7 @@ PLAN-ROOT SINK
      partitions: 12/12 rows=3650
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=48.00MB mem-reservation=32.00KB
+   mem-estimate=48.00MB mem-reservation=0B
    tuple-ids=0 row-size=97B cardinality=1825
 ====
 # Edge case: sample 0%, no files should be selected
@@ -97,7 +97,7 @@ PLAN-ROOT SINK
 select * from functional.alltypes tablesample system(1) repeatable(1234)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=32.00KB
+|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -108,7 +108,7 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=32.00MB mem-reservation=32.00KB
+   mem-estimate=32.00MB mem-reservation=0B
    tuple-ids=0 row-size=97B cardinality=73
 ====
 # Edge case: sample 1% and prune partitions, at least one file should be selected
@@ -116,7 +116,7 @@ select * from functional.alltypes tablesample system(1) repeatable(1234)
 where year = 2010
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=32.00KB
+|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -127,14 +127,14 @@ PLAN-ROOT SINK
      partitions: 12/12 rows=3650
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=32.00MB mem-reservation=32.00KB
+   mem-estimate=32.00MB mem-reservation=0B
    tuple-ids=0 row-size=97B cardinality=37
 ====
 # Edge case: sample 100%, all files should be selected
 select * from functional.alltypes tablesample system (100)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB
+|  Per-Host Resources: mem-estimate=128.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -145,25 +145,25 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=32.00KB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=97B cardinality=7300
 ====
 # Table that has no stats.
 select id from functional_parquet.alltypes tablesample system(10) repeatable(1234)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.00MB mem-reservation=8.00KB
+|  Per-Host Resources: mem-estimate=16.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=3/24 files=3 size=22.10KB
+   partitions=3/24 files=3 size=22.07KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
      columns: unavailable
    extrapolated-rows=disabled
-   mem-estimate=16.00MB mem-reservation=8.00KB
+   mem-estimate=16.00MB mem-reservation=0B
    tuple-ids=0 row-size=4B cardinality=unavailable
 ====
 # Sampling in a subquery.
@@ -172,7 +172,7 @@ select id from functional.alltypes t1 where exists (
   where t1.id = t2.id)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=162.94MB mem-reservation=2.98MB runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=162.94MB mem-reservation=2.94MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -189,7 +189,7 @@ PLAN-ROOT SINK
 |       partitions: 4/4 rows=100
 |       columns: all
 |     extrapolated-rows=disabled
-|     mem-estimate=32.00MB mem-reservation=8.00KB
+|     mem-estimate=32.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=4B cardinality=10
 |
 00:SCAN HDFS [functional.alltypes t1]
@@ -200,7 +200,7 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=32.00KB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=4B cardinality=7300
 ====
 # Sampling in WITH-clause view.
@@ -208,7 +208,7 @@ with t as (select * from functional.alltypes tablesample system(10) repeatable(1
 select id from t
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=32.00KB
+|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -219,6 +219,6 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=32.00MB mem-reservation=32.00KB
+   mem-estimate=32.00MB mem-reservation=0B
    tuple-ids=0 row-size=4B cardinality=730
 ====

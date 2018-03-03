@@ -5,7 +5,7 @@ where 5 + 5 < c_custkey and o_orderkey = (2 + 2)
   and (coalesce(2, 3, 4) * 10) + l_linenumber < (0 * 1)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=264.00MB mem-reservation=24.00MB
+|  Per-Host Resources: mem-estimate=176.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -59,7 +59,7 @@ PLAN-ROOT SINK
    parquet dictionary predicates: c_custkey > 10
    parquet dictionary predicates on o: o_orderkey = 4
    parquet dictionary predicates on o_lineitems: 20 + l_linenumber < 0
-   mem-estimate=264.00MB mem-reservation=24.00MB
+   mem-estimate=176.00MB mem-reservation=0B
    tuple-ids=0 row-size=24B cardinality=15000
 ====
 # Test HBase scan node.
@@ -107,7 +107,7 @@ having 1024 * 1024 * count(*) % 2 = 0
   and (sm between 5 and 10)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=1.97MB
+|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=1.94MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -125,7 +125,7 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=32.00KB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=20B cardinality=7300
 ====
 # Test hash join.
@@ -136,7 +136,7 @@ left outer join functional.alltypes b
 where round(1.11 + 2.22 + 3.33 + 4.44, 1) < cast(b.double_col as decimal(3, 2))
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=257.94MB mem-reservation=2.00MB
+|  Per-Host Resources: mem-estimate=257.94MB mem-reservation=1.94MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -157,7 +157,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled
 |     parquet dictionary predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
-|     mem-estimate=128.00MB mem-reservation=32.00KB
+|     mem-estimate=128.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=20B cardinality=730
 |
 00:SCAN HDFS [functional.alltypes a]
@@ -167,7 +167,7 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=32.00KB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=8B cardinality=7300
 ====
 # Test nested-loop join. Same as above but and with a disjunction in the On clause.
@@ -179,7 +179,7 @@ left outer join functional.alltypes b
 where cast(b.double_col as decimal(3, 2)) > round(1.11 + 2.22 + 3.33 + 4.44, 1)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=256.01MB mem-reservation=64.00KB
+|  Per-Host Resources: mem-estimate=256.01MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -198,7 +198,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled
 |     parquet dictionary predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
-|     mem-estimate=128.00MB mem-reservation=32.00KB
+|     mem-estimate=128.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=20B cardinality=730
 |
 00:SCAN HDFS [functional.alltypes a]
@@ -208,7 +208,7 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=32.00KB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=8B cardinality=7300
 ====
 # Test distinct aggregation with grouping.
@@ -242,7 +242,7 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=32.00KB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=20B cardinality=7300
 ====
 # Test non-grouping distinct aggregation.
@@ -251,7 +251,7 @@ from functional.alltypes
 having 1024 * 1024 * count(*) % 2 = 0
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=1.97MB
+|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=1.94MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -274,7 +274,7 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=32.00KB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=4B cardinality=7300
 ====
 # Test analytic eval node.
@@ -284,7 +284,7 @@ select first_value(1 + 1 + int_col - (1 - 1)) over
 from functional.alltypes
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=16.03MB
+|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=16.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -309,7 +309,7 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=32.00KB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=29B cardinality=7300
 ====
 # Test sort node.
@@ -317,7 +317,7 @@ select int_col from functional.alltypes
 order by id * abs((factorial(5) / power(2, 4)))
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=134.00MB mem-reservation=6.03MB
+|  Per-Host Resources: mem-estimate=134.00MB mem-reservation=6.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -333,7 +333,7 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=32.00KB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=8B cardinality=7300
 ====
 # Test HDFS table sink.
@@ -342,7 +342,7 @@ select id, int_col, cast(1 + 1 + 1 + year as int), cast(month - (1 - 1 - 1) as i
 from functional.alltypessmall
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=8.00KB
+|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=0B
 WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(CAST(3 + year AS INT),CAST(month - -1 AS INT))]
 |  partitions=4
 |  mem-estimate=1.56KB mem-reservation=0B
@@ -354,7 +354,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(CAST(3 + ye
      partitions: 4/4 rows=100
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=32.00MB mem-reservation=8.00KB
+   mem-estimate=32.00MB mem-reservation=0B
    tuple-ids=0 row-size=16B cardinality=100
 ====
 # Constant folding does not work across query blocks.
@@ -366,7 +366,7 @@ select sum(id + c3) from
   ) v3
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=32.00KB
+|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=0B
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -383,6 +383,6 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled
    limit: 2
-   mem-estimate=128.00MB mem-reservation=32.00KB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=4B cardinality=2
 ====

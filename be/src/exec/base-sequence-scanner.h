@@ -47,8 +47,7 @@ class ScannerContext;
 /// situation, causing the block to be incorrectly skipped.
 class BaseSequenceScanner : public HdfsScanner {
  public:
-  /// Issue the initial ranges for all sequence container files. 'files' must not be
-  /// empty.
+  /// Issue the initial ranges for all sequence container files.
   static Status IssueInitialRanges(HdfsScanNodeBase* scan_node,
                                    const std::vector<HdfsFileDesc*>& files)
                                    WARN_UNUSED_RESULT;

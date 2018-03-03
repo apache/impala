@@ -95,8 +95,3 @@ class TestSpillingNoDebugActionDimensions(ImpalaTestSuite):
       setting debug_action to alternative values via query options."""
     self.run_test_case('QueryTest/spilling-query-options', vector)
 
-  def test_spilling_no_debug_action(self, vector):
-    """Spilling tests that will not succeed if run with an arbitrary debug action.
-       These tests either run with no debug action set or set their own debug action."""
-    self.run_test_case('QueryTest/spilling-no-debug-action', vector)
-

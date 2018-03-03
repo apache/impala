@@ -59,7 +59,6 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
-import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.fb.FbFileBlock;
@@ -77,7 +76,6 @@ import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
 import org.apache.impala.thrift.TScanRangeLocationList;
 import org.apache.impala.thrift.TTableStats;
-import org.apache.impala.util.BitUtil;
 import org.apache.impala.util.MembershipSnapshot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -145,7 +143,7 @@ public class HdfsScanNode extends ScanNode {
   // derived experimentally: running metadata-only Parquet count(*) scans on TPC-H
   // lineitem and TPC-DS store_sales of different sizes resulted in memory consumption
   // between 128kb and 1.1mb.
-  private static final long MIN_MEMORY_ESTIMATE = 1L * 1024L * 1024L;
+  private final static long MIN_MEMORY_ESTIMATE = 1 * 1024 * 1024;
 
   private final HdfsTable tbl_;
 
@@ -167,18 +165,6 @@ public class HdfsScanNode extends ScanNode {
   private int numPartitions_ = 0;
   private long totalFiles_ = 0;
   private long totalBytes_ = 0;
-
-  // File formats scanned. Set in computeScanRangeLocations().
-  private Set<HdfsFileFormat> fileFormats_;
-
-  // Number of bytes in the largest scan range (i.e. hdfs split). Set in
-  // computeScanRangeLocations().
-  private long maxScanRangeBytes_ = 0;
-
-  // The ideal reservation to process a single scan range (i.e. hdfs split), >= the
-  // minimum reservation. Generally provides enough memory to overlap CPU and I/O and
-  // maximize throughput. Set in computeResourceProfile().
-  private long idealScanRangeReservation_ = -1;
 
   // Input cardinality based on the partition row counts or extrapolation. -1 if invalid.
   // Both values can be valid to report them in the explain plan, but only one of them is
@@ -343,25 +329,25 @@ public class HdfsScanNode extends ScanNode {
     computeDictionaryFilterConjuncts(analyzer);
 
     // compute scan range locations with optional sampling
-    computeScanRangeLocations(analyzer);
+    Set<HdfsFileFormat> fileFormats = computeScanRangeLocations(analyzer);
 
     // Determine backend scan node implementation to use. The optimized MT implementation
     // is currently only supported for Parquet.
     if (analyzer.getQueryOptions().isSetMt_dop() &&
         analyzer.getQueryOptions().mt_dop > 0 &&
-        fileFormats_.size() == 1 &&
-        (fileFormats_.contains(HdfsFileFormat.PARQUET)
-          || fileFormats_.contains(HdfsFileFormat.TEXT))) {
+        fileFormats.size() == 1 &&
+        (fileFormats.contains(HdfsFileFormat.PARQUET)
+          || fileFormats.contains(HdfsFileFormat.TEXT))) {
       useMtScanNode_ = true;
     } else {
       useMtScanNode_ = false;
     }
 
-    if (fileFormats_.contains(HdfsFileFormat.PARQUET)) {
+    if (fileFormats.contains(HdfsFileFormat.PARQUET)) {
       computeMinMaxTupleAndConjuncts(analyzer);
     }
 
-    if (canApplyParquetCountStarOptimization(analyzer, fileFormats_)) {
+    if (canApplyParquetCountStarOptimization(analyzer, fileFormats)) {
       Preconditions.checkState(desc_.getPath().destTable() != null);
       Preconditions.checkState(collectionConjuncts_.isEmpty());
       countStarSlot_ = applyParquetCountStartOptimization(analyzer);
@@ -474,7 +460,7 @@ public class HdfsScanNode extends ScanNode {
     // This node is a table scan, so this must be a scanning slot.
     Preconditions.checkState(slotRef.getDesc().isScanSlot());
     // Skip the slot ref if it refers to an array's "pos" field.
-    if (slotRef.getDesc().isArrayPosRef()) return;
+    if (slotRef.isArrayPosRef()) return;
 
     Expr constExpr = binaryPred.getChild(1);
     // Only constant exprs can be evaluated against parquet::Statistics. This includes
@@ -502,7 +488,7 @@ public class HdfsScanNode extends ScanNode {
     // This node is a table scan, so this must be a scanning slot.
     Preconditions.checkState(slotRef.getDesc().isScanSlot());
     // Skip the slot ref if it refers to an array's "pos" field.
-    if (slotRef.getDesc().isArrayPosRef()) return;
+    if (slotRef.isArrayPosRef()) return;
     if (inPred.isNotIn()) return;
 
     ArrayList<Expr> children = inPred.getChildren();
@@ -709,15 +695,13 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Computes scan ranges (i.e. hdfs splits) plus their storage locations, including
-   * volume ids, based on the given maximum number of bytes each scan range should scan.
+   * Computes scan ranges (hdfs splits) plus their storage locations, including volume
+   * ids, based on the given maximum number of bytes each scan range should scan.
    * If 'sampleParams_' is not null, generates a sample and computes the scan ranges
    * based on the sample.
-   *
-   * Initializes members with information about files and scan ranges, e.g. totalFiles_,
-   * fileFormats_, etc.
+   * Returns the set of file formats being scanned.
    */
-  private void computeScanRangeLocations(Analyzer analyzer)
+  private Set<HdfsFileFormat> computeScanRangeLocations(Analyzer analyzer)
       throws ImpalaRuntimeException {
     Map<Long, List<FileDescriptor>> sampledFiles = null;
     if (sampleParams_ != null) {
@@ -740,8 +724,7 @@ public class HdfsScanNode extends ScanNode {
     numPartitions_ = (sampledFiles != null) ? sampledFiles.size() : partitions_.size();
     totalFiles_ = 0;
     totalBytes_ = 0;
-    maxScanRangeBytes_ = 0;
-    fileFormats_ = Sets.newHashSet();
+    Set<HdfsFileFormat> fileFormats = Sets.newHashSet();
     for (HdfsPartition partition: partitions_) {
       List<FileDescriptor> fileDescs = partition.getFileDescriptors();
       if (sampledFiles != null) {
@@ -751,7 +734,7 @@ public class HdfsScanNode extends ScanNode {
       }
 
       analyzer.getDescTbl().addReferencedPartition(tbl_, partition.getId());
-      fileFormats_.add(partition.getFileFormat());
+      fileFormats.add(partition.getFileFormat());
       Preconditions.checkState(partition.getId() >= 0);
       // Missing disk id accounting is only done for file systems that support the notion
       // of disk/storage ids.
@@ -814,7 +797,6 @@ public class HdfsScanNode extends ScanNode {
             scanRangeLocations.scan_range = scanRange;
             scanRangeLocations.locations = locations;
             scanRanges_.add(scanRangeLocations);
-            maxScanRangeBytes_ = Math.max(maxScanRangeBytes_, currentLength);
             remainingLength -= currentLength;
             currentOffset += currentLength;
           }
@@ -829,58 +811,7 @@ public class HdfsScanNode extends ScanNode {
       }
       if (partitionMissingDiskIds) ++numPartitionsNoDiskIds_;
     }
-  }
-
-  /**
-   * Compute the number of columns that are read from the file, as opposed to
-   * materialised based on metadata. If there are nested collections, counts the
-   * number of leaf scalar slots per collection. This matches Parquet's "shredded"
-   * approach to nested collections, where each nested field is stored as a separate
-   * column. We may need to adjust this logic for non-shredded columnar formats if added.
-   */
-  private int computeNumColumnsReadFromFile() {
-    HdfsTable table = (HdfsTable) desc_.getTable();
-    int numColumns = 0;
-    boolean havePosSlot = false;
-    for (SlotDescriptor slot: desc_.getSlots()) {
-      if (!slot.isMaterialized() || slot == countStarSlot_) continue;
-      if (slot.getColumn() == null ||
-          slot.getColumn().getPosition() >= table.getNumClusteringCols()) {
-        if (slot.isArrayPosRef()) {
-          // Position virtual slots can be materialized by piggybacking on another slot.
-          havePosSlot = true;
-        } else if (slot.getType().isScalarType()) {
-          ++numColumns;
-        } else {
-          numColumns += computeNumColumnsReadForCollection(slot);
-        }
-      }
-    }
-    // Must scan something to materialize a position slot.
-    if (havePosSlot) numColumns = Math.max(numColumns, 1);
-    return numColumns;
-  }
-
-  /**
-   * Compute the number of columns read from disk for materialized scalar slots in
-   * the provided tuple.
-   */
-  private int computeNumColumnsReadForCollection(SlotDescriptor collectionSlot) {
-    Preconditions.checkState(collectionSlot.getType().isCollectionType());
-    int numColumns = 0;
-    for (SlotDescriptor nestedSlot: collectionSlot.getItemTupleDesc().getSlots()) {
-      // Position virtual slots can be materialized by piggybacking on another slot.
-      if (!nestedSlot.isMaterialized() || nestedSlot.isArrayPosRef()) continue;
-      if (nestedSlot.getType().isScalarType()) {
-        ++numColumns;
-      } else {
-        numColumns += computeNumColumnsReadForCollection(nestedSlot);
-      }
-    }
-    // Need to scan at least one column to materialize the pos virtual slot and/or
-    // determine the size of the nested array.
-    numColumns = Math.max(numColumns, 1);
-    return numColumns;
+    return fileFormats;
   }
 
   /**
@@ -1075,8 +1006,6 @@ public class HdfsScanNode extends ScanNode {
     }
     msg.hdfs_scan_node.setRandom_replica(randomReplica_);
     msg.node_type = TPlanNodeType.HDFS_SCAN_NODE;
-    Preconditions.checkState(idealScanRangeReservation_ >= 0, idealScanRangeReservation_);
-    msg.hdfs_scan_node.setIdeal_scan_range_reservation(idealScanRangeReservation_);
     if (!collectionConjuncts_.isEmpty()) {
       Map<Integer, List<TExpr>> tcollectionConjuncts = Maps.newLinkedHashMap();
       for (Map.Entry<TupleDescriptor, List<Expr>> entry:
@@ -1255,20 +1184,25 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkNotNull(scanRanges_, "Cost estimation requires scan ranges.");
     if (scanRanges_.isEmpty()) {
       nodeResourceProfile_ = ResourceProfile.noReservation(0);
-      idealScanRangeReservation_ = 0;
       return;
     }
     Preconditions.checkState(0 < numNodes_ && numNodes_ <= scanRanges_.size());
     Preconditions.checkNotNull(desc_);
     Preconditions.checkNotNull(desc_.getTable() instanceof HdfsTable);
     HdfsTable table = (HdfsTable) desc_.getTable();
-    int numColumnsReadFromFile = computeNumColumnsReadFromFile();
     int perHostScanRanges;
     if (table.getMajorityFormat() == HdfsFileFormat.PARQUET) {
       // For the purpose of this estimation, the number of per-host scan ranges for
       // Parquet files are equal to the number of columns read from the file. I.e.
       // excluding partition columns and columns that are populated from file metadata.
-      perHostScanRanges = numColumnsReadFromFile;
+      perHostScanRanges = 0;
+      for (SlotDescriptor slot: desc_.getSlots()) {
+        if (!slot.isMaterialized() || slot == countStarSlot_) continue;
+        if (slot.getColumn() == null ||
+            slot.getColumn().getPosition() >= table.getNumClusteringCols()) {
+          ++perHostScanRanges;
+        }
+      }
     } else {
       perHostScanRanges = (int) Math.ceil((
           (double) scanRanges_.size() / (double) numNodes_) * SCAN_RANGE_SKEW_FACTOR);
@@ -1290,13 +1224,12 @@ public class HdfsScanNode extends ScanNode {
     long avgScanRangeBytes = (long) Math.ceil(totalBytes_ / (double) scanRanges_.size());
     // The +1 accounts for an extra I/O buffer to read past the scan range due to a
     // trailing record spanning Hdfs blocks.
-    long maxIoBufferSize =
-        BitUtil.roundUpToPowerOf2(BackendConfig.INSTANCE.getReadSize());
+    long readSize = BackendConfig.INSTANCE.getReadSize();
     long perThreadIoBuffers =
-        Math.min((long) Math.ceil(avgScanRangeBytes / (double) maxIoBufferSize),
+        Math.min((long) Math.ceil(avgScanRangeBytes / (double) readSize),
             MAX_IO_BUFFERS_PER_THREAD) + 1;
     long perInstanceMemEstimate = checkedMultiply(
-        checkedMultiply(maxScannerThreads, perThreadIoBuffers), maxIoBufferSize);
+        checkedMultiply(maxScannerThreads, perThreadIoBuffers), readSize);
 
     // Sanity check: the tighter estimation should not exceed the per-host maximum.
     long perHostUpperBound = getPerHostMemUpperBound();
@@ -1307,51 +1240,7 @@ public class HdfsScanNode extends ScanNode {
       perInstanceMemEstimate = perHostUpperBound;
     }
     perInstanceMemEstimate = Math.max(perInstanceMemEstimate, MIN_MEMORY_ESTIMATE);
-
-    Pair<Long, Long> reservation = computeReservation(numColumnsReadFromFile);
-    nodeResourceProfile_ = new ResourceProfileBuilder()
-        .setMemEstimateBytes(perInstanceMemEstimate)
-        .setMinReservationBytes(reservation.first).build();
-    idealScanRangeReservation_ = reservation.second;
-  }
-
-  /*
-   *  Compute the minimum and ideal memory reservation to process a single scan range
-   *  (i.e. hdfs split). Bound the reservation based on:
-   * - One minimum-sized buffer per IoMgr scan range, which is the absolute minimum
-   *   required to scan the data.
-   * - A maximum of either 1 or 3 max-sized I/O buffers per IoMgr scan range for
-   *   the minimum and ideal reservation respectively. 1 max-sized I/O buffer avoids
-   *   issuing small I/O unnecessarily while 3 max-sized I/O buffers guarantees higher
-   *   throughput by overlapping compute and I/O efficiently.
-   * - A maximum reservation of the hdfs split size, to avoid reserving excessive
-   *   memory for small files or ranges, e.g. small dimension tables with very few
-   *   rows.
-   */
-  private Pair<Long, Long> computeReservation(int numColumnsReadFromFile) {
-    Preconditions.checkState(maxScanRangeBytes_ >= 0);
-    long maxIoBufferSize =
-        BitUtil.roundUpToPowerOf2(BackendConfig.INSTANCE.getReadSize());
-    // Scanners for columnar formats issue one IoMgr scan range for metadata, followed by
-    // one IoMgr scan range per column in parallel. Scanners for row-oriented formats
-    // issue only one IoMgr scan range at a time.
-    int iomgrScanRangesPerSplit = fileFormats_.contains(HdfsFileFormat.PARQUET) ?
-        Math.max(1, numColumnsReadFromFile) : 1;
-    // Need one buffer per IoMgr scan range to execute the scan.
-    long minReservationToExecute =
-        iomgrScanRangesPerSplit * BackendConfig.INSTANCE.getMinBufferSize();
-
-    // Quantize the max scan range (i.e. hdfs split) size to an I/O buffer size.
-    long quantizedMaxScanRangeBytes = maxScanRangeBytes_ < maxIoBufferSize ?
-        BitUtil.roundUpToPowerOf2(maxScanRangeBytes_) :
-        BitUtil.roundUpToPowerOf2Factor(maxScanRangeBytes_, maxIoBufferSize);
-    long minReservationBytes = Math.max(minReservationToExecute,
-        Math.min(iomgrScanRangesPerSplit * maxIoBufferSize,
-            quantizedMaxScanRangeBytes));
-    long idealReservationBytes = Math.max(minReservationToExecute,
-        Math.min(iomgrScanRangesPerSplit * maxIoBufferSize * 3,
-            quantizedMaxScanRangeBytes));
-    return Pair.create(minReservationBytes, idealReservationBytes);
+    nodeResourceProfile_ = ResourceProfile.noReservation(perInstanceMemEstimate);
   }
 
   /**

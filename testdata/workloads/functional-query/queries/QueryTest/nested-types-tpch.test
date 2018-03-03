@@ -162,7 +162,7 @@ BIGINT,BIGINT
 ---- QUERY
 # IMPALA-2376
 # Set memory limit low enough to get the below query to consistently fail.
-# This was originally a regression test that hit an error like:
+# TODO: change query and/or table so we can consistently check for the following error:
 # Failed to allocate buffer for collection '...'.
 set mem_limit=4m;
 select max(cnt) from customer c,
@@ -170,7 +170,7 @@ select max(cnt) from customer c,
 ---- TYPES
 BIGINT
 ---- CATCH
-Rejected query from pool default-pool: minimum memory reservation is greater than memory available to the query for buffer reservations.
+Memory limit exceeded
 ====
 ---- QUERY
 # IMPALA-2473: Scan query with large row size leading to oversized batches.
@@ -237,7 +237,7 @@ bigint, bigint
 # This was originally a regression test for IMPALA-5446: dropped status from
 # Sorter::Reset() when sort cannot get reserved buffer. However with the
 # IMPALA-3200 changes it now succeeds.
-set buffer_pool_limit=180m;
+set buffer_pool_limit=100m;
 select c_custkey, c_name, c_address, c_phone, c_acctbal, c_mktsegment, c_comment,
        o_orderdate, sum(o_totalprice), min(rnum)
 from customer c,

@@ -27,7 +27,6 @@
 #include "common/compiler-util.h"
 #include "common/status.h"
 #include "exec/filter-context.h"
-#include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/io/request-ranges.h"
 
 namespace impala {
@@ -85,12 +84,10 @@ class TupleRow;
 class ScannerContext {
  public:
   /// Create a scanner context with the parent scan_node (where materialized row batches
-  /// get pushed to) and the scan range to process. Buffers are allocated using
-  /// 'bp_client'.
-  ScannerContext(RuntimeState* state, HdfsScanNodeBase* scan_node,
-      BufferPool::ClientHandle* bp_client,
-      HdfsPartitionDescriptor* partition_desc,
-      const std::vector<FilterContext>& filter_ctxs,
+  /// get pushed to) and the scan range to process.
+  /// This context starts with 1 stream.
+  ScannerContext(RuntimeState*, HdfsScanNodeBase*, HdfsPartitionDescriptor*,
+      io::ScanRange* scan_range, const std::vector<FilterContext>& filter_ctxs,
       MemPool* expr_results_pool);
   /// Destructor verifies that all stream objects have been released.
   ~ScannerContext();
@@ -153,7 +150,6 @@ class ScannerContext {
     const char* filename() { return scan_range_->file(); }
     const io::ScanRange* scan_range() { return scan_range_; }
     const HdfsFileDesc* file_desc() { return file_desc_; }
-    int64_t reservation() const { return reservation_; }
 
     /// Returns the buffer's current offset in the file.
     int64_t file_offset() const { return scan_range_->offset() + total_bytes_returned_; }
@@ -215,15 +211,9 @@ class ScannerContext {
 
    private:
     friend class ScannerContext;
-    ScannerContext* const parent_;
-    io::ScanRange* const scan_range_;
-    const HdfsFileDesc* const file_desc_;
-
-    /// Reservation given to this stream for allocating I/O buffers. The reservation is
-    /// shared with 'scan_range_', so the context must be careful not to use this until
-    /// all of 'scan_ranges_'s buffers have been freed. Must be >= the minimum IoMgr
-    /// buffer size to allow reading past the end of 'scan_range_'.
-    const int64_t reservation_;
+    ScannerContext* parent_;
+    io::ScanRange* scan_range_;
+    const HdfsFileDesc* file_desc_;
 
     /// Total number of bytes returned from GetBytes()
     int64_t total_bytes_returned_ = 0;
@@ -282,8 +272,7 @@ class ScannerContext {
     /// output_buffer_bytes_left_ will be set to something else.
     static const int64_t OUTPUT_BUFFER_BYTES_LEFT_INIT = 0;
 
-    /// Private constructor. See AddStream() for public API.
-    Stream(ScannerContext* parent, io::ScanRange* scan_range, int64_t reservation,
+    Stream(ScannerContext* parent, io::ScanRange* scan_range,
         const HdfsFileDesc* file_desc);
 
     /// GetBytes helper to handle the slow path.
@@ -366,37 +355,24 @@ class ScannerContext {
   /// size to 0.
   void ClearStreams();
 
-  /// Add a stream to this ScannerContext for 'range'. 'range' must already have any
-  /// buffers that it needs allocated. 'reservation' is the amount of reservation that
-  /// is given to this stream for allocating I/O buffers. The reservation is shared with
-  /// 'range', so the context must be careful not to use this until all of 'range's
-  /// buffers have been freed. Must be >= the minimum IoMgr buffer size o allow reading
-  /// past the end of 'range'.
-  ///
-  /// Returns the added stream. The returned stream is owned by this context.
-  Stream* AddStream(io::ScanRange* range, int64_t reservation);
+  /// Add a stream to this ScannerContext for 'range'. The stream is owned by this
+  /// context.
+  Stream* AddStream(io::ScanRange* range);
 
   /// Returns true if RuntimeState::is_cancelled() is true, or if scan node is not
   /// multi-threaded and is done (finished, cancelled or reached it's limit).
   /// In all other cases returns false.
   bool cancelled() const;
 
-  BufferPool::ClientHandle* bp_client() const { return bp_client_; }
-  HdfsPartitionDescriptor* partition_descriptor() const { return partition_desc_; }
+  HdfsPartitionDescriptor* partition_descriptor() { return partition_desc_; }
   const std::vector<FilterContext>& filter_ctxs() const { return filter_ctxs_; }
   MemPool* expr_results_pool() const { return expr_results_pool_; }
  private:
   friend class Stream;
 
-  RuntimeState* const state_;
-  HdfsScanNodeBase* const scan_node_;
-
-  /// Buffer pool client used to allocate I/O buffers. This is accessed by multiple
-  /// threads in the multi-threaded scan node, so those threads must take care to only
-  /// call thread-safe BufferPool methods with this client.
-  BufferPool::ClientHandle* const bp_client_;
-
-  HdfsPartitionDescriptor* const partition_desc_;
+  RuntimeState* state_;
+  HdfsScanNodeBase* scan_node_;
+  HdfsPartitionDescriptor* partition_desc_;
 
   /// Vector of streams. Non-columnar formats will always have one stream per context.
   std::vector<std::unique_ptr<Stream>> streams_;

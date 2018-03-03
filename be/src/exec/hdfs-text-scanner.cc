@@ -144,10 +144,8 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
         DCHECK(false);
     }
   }
-  if (compressed_text_scan_ranges.size() > 0) {
-    RETURN_IF_ERROR(scan_node->AddDiskIoRanges(compressed_text_scan_ranges,
-        compressed_text_files));
-  }
+  RETURN_IF_ERROR(scan_node->AddDiskIoRanges(compressed_text_scan_ranges,
+          compressed_text_files));
   if (lzo_text_files.size() > 0) {
     // This will dlopen the lzo binary and can fail if the lzo binary is not present.
     RETURN_IF_ERROR(HdfsLzoTextScanner::IssueInitialRanges(scan_node, lzo_text_files));

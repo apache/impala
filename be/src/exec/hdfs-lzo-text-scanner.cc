@@ -62,7 +62,6 @@ HdfsScanner* HdfsLzoTextScanner::GetHdfsLzoTextScanner(
 
 Status HdfsLzoTextScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const vector<HdfsFileDesc*>& files) {
-  DCHECK(!files.empty());
   if (LzoIssueInitialRanges == NULL) {
     lock_guard<SpinLock> l(lzo_load_lock_);
     if (library_load_status_.ok()) {

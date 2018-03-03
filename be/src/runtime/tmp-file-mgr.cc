@@ -243,7 +243,7 @@ TmpFileMgr::FileGroup::FileGroup(TmpFileMgr* tmp_file_mgr, DiskIoMgr* io_mgr,
     next_allocation_index_(0),
     free_ranges_(64) {
   DCHECK(tmp_file_mgr != nullptr);
-  io_ctx_ = io_mgr_->RegisterContext();
+  io_ctx_ = io_mgr_->RegisterContext(nullptr);
 }
 
 TmpFileMgr::FileGroup::~FileGroup() {
@@ -396,10 +396,7 @@ Status TmpFileMgr::FileGroup::ReadAsync(WriteHandle* handle, MemRange buffer) {
       BufferOpts::ReadInto(buffer.data(), buffer.len()));
   read_counter_->Add(1);
   bytes_read_counter_->Add(buffer.len());
-  bool needs_buffers;
-  RETURN_IF_ERROR(io_mgr_->StartScanRange(
-      io_ctx_.get(), handle->read_range_, &needs_buffers));
-  DCHECK(!needs_buffers) << "Already provided a buffer";
+  RETURN_IF_ERROR(io_mgr_->AddScanRange(io_ctx_.get(), handle->read_range_, true));
   return Status::OK();
 }
 
@@ -429,7 +426,7 @@ Status TmpFileMgr::FileGroup::WaitForAsyncRead(WriteHandle* handle, MemRange buf
   }
 exit:
   // Always return the buffer before exiting to avoid leaking it.
-  if (io_mgr_buffer != nullptr) handle->read_range_->ReturnBuffer(move(io_mgr_buffer));
+  if (io_mgr_buffer != nullptr) io_mgr_->ReturnBuffer(move(io_mgr_buffer));
   handle->read_range_ = nullptr;
   return status;
 }
@@ -525,18 +522,9 @@ TmpFileMgr::WriteHandle::WriteHandle(
     is_cancelled_(false),
     write_in_flight_(false) {}
 
-TmpFileMgr::WriteHandle::~WriteHandle() {
-  DCHECK(!write_in_flight_);
-  DCHECK(read_range_ == nullptr);
-}
-
 string TmpFileMgr::WriteHandle::TmpFilePath() const {
   if (file_ == nullptr) return "";
   return file_->path();
-}
-
-int64_t TmpFileMgr::WriteHandle::len() const {
-  return write_range_->len();
 }
 
 Status TmpFileMgr::WriteHandle::Write(DiskIoMgr* io_mgr, RequestContext* io_ctx,

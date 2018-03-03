@@ -5,7 +5,7 @@ on ss_customer_sk = c_customer_sk
 where c_salutation = 'Mrs.'
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=185.50MB mem-reservation=25.50MB runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=185.50MB mem-reservation=9.50MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -24,7 +24,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled
 |     parquet dictionary predicates: c_salutation = 'Mrs.'
-|     mem-estimate=48.00MB mem-reservation=8.00MB
+|     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=255B cardinality=16667
 |
 00:SCAN HDFS [tpcds.store_sales]
@@ -35,7 +35,7 @@ PLAN-ROOT SINK
      partitions: 1824/1824 rows=2880404
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=8.00MB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=100B cardinality=2880404
 ====
 # Single-column FK/PK join detection on left outer join. The join cardinality
@@ -46,7 +46,7 @@ on ss_customer_sk = c_customer_sk
 where c_salutation = 'Mrs.'
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=184.50MB mem-reservation=24.50MB
+|  Per-Host Resources: mem-estimate=184.50MB mem-reservation=8.50MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -65,7 +65,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled
 |     parquet dictionary predicates: c_salutation = 'Mrs.'
-|     mem-estimate=48.00MB mem-reservation=8.00MB
+|     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=255B cardinality=16667
 |
 00:SCAN HDFS [tpcds.store_sales]
@@ -75,7 +75,7 @@ PLAN-ROOT SINK
      partitions: 1824/1824 rows=2880404
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=8.00MB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=100B cardinality=2880404
 ====
 # Single-column FK/PK join detection on right outer join. The join cardinality
@@ -86,7 +86,7 @@ on ss_customer_sk = c_customer_sk
 where c_salutation = 'Mrs.'
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=185.50MB mem-reservation=25.50MB runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=185.50MB mem-reservation=9.50MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -105,7 +105,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled
 |     parquet dictionary predicates: c_salutation = 'Mrs.'
-|     mem-estimate=48.00MB mem-reservation=8.00MB
+|     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=255B cardinality=16667
 |
 00:SCAN HDFS [tpcds.store_sales]
@@ -116,7 +116,7 @@ PLAN-ROOT SINK
      partitions: 1824/1824 rows=2880404
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=8.00MB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=100B cardinality=2880404
 ====
 # Multi-column FK/PK join detection
@@ -126,7 +126,7 @@ on ss_item_sk = sr_item_sk and ss_ticket_number = sr_ticket_number
 where sr_return_quantity < 10
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=214.75MB mem-reservation=22.75MB runtime-filters-memory=2.00MB
+|  Per-Host Resources: mem-estimate=214.75MB mem-reservation=6.75MB runtime-filters-memory=2.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -145,7 +145,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled
 |     parquet dictionary predicates: sr_return_quantity < 10
-|     mem-estimate=80.00MB mem-reservation=8.00MB
+|     mem-estimate=80.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=88B cardinality=28751
 |
 00:SCAN HDFS [tpcds.store_sales]
@@ -156,7 +156,7 @@ PLAN-ROOT SINK
      partitions: 1824/1824 rows=2880404
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=8.00MB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=100B cardinality=2880404
 ====
 # Many-to-many join detection.
@@ -165,7 +165,7 @@ tpcds.store_sales inner join tpcds.web_sales
 on ss_sold_time_sk = ws_sold_time_sk
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=397.67MB mem-reservation=51.00MB runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=397.67MB mem-reservation=35.00MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -182,7 +182,7 @@ PLAN-ROOT SINK
 |       table: rows=719384 size=140.07MB
 |       columns: all
 |     extrapolated-rows=disabled
-|     mem-estimate=160.00MB mem-reservation=8.00MB
+|     mem-estimate=160.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=144B cardinality=719384
 |
 00:SCAN HDFS [tpcds.store_sales]
@@ -193,7 +193,7 @@ PLAN-ROOT SINK
      partitions: 1824/1824 rows=2880404
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=8.00MB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=100B cardinality=2880404
 ====
 # PK/PK join is detected as FK/PK.
@@ -203,7 +203,7 @@ on a.d_date_sk = b.d_date_sk
 where a.d_holiday = "Y"
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=114.00MB mem-reservation=34.00MB runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=114.00MB mem-reservation=18.00MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -222,7 +222,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled
 |     parquet dictionary predicates: a.d_holiday = 'Y'
-|     mem-estimate=48.00MB mem-reservation=8.00MB
+|     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=0 row-size=303B cardinality=36525
 |
 01:SCAN HDFS [tpcds.date_dim b]
@@ -232,7 +232,7 @@ PLAN-ROOT SINK
      table: rows=73049 size=9.84MB
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=48.00MB mem-reservation=8.00MB
+   mem-estimate=48.00MB mem-reservation=0B
    tuple-ids=1 row-size=303B cardinality=73049
 ====
 # Single query with various join types combined.
@@ -246,7 +246,7 @@ where ss_item_sk = sr_item_sk and ss_ticket_number = sr_ticket_number
   and d1.d_fy_week_seq = 1000
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=362.81MB mem-reservation=50.81MB runtime-filters-memory=5.00MB
+|  Per-Host Resources: mem-estimate=362.81MB mem-reservation=12.75MB runtime-filters-memory=5.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -263,7 +263,7 @@ PLAN-ROOT SINK
 |       table: rows=100000 size=12.60MB
 |       columns: all
 |     extrapolated-rows=disabled
-|     mem-estimate=48.00MB mem-reservation=8.00MB
+|     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=2 row-size=4B cardinality=100000
 |
 07:HASH JOIN [INNER JOIN]
@@ -279,7 +279,7 @@ PLAN-ROOT SINK
 |       table: rows=73049 size=9.84MB
 |       columns: all
 |     extrapolated-rows=disabled
-|     mem-estimate=48.00MB mem-reservation=8.00MB
+|     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=4 row-size=4B cardinality=73049
 |
 06:HASH JOIN [INNER JOIN]
@@ -304,7 +304,7 @@ PLAN-ROOT SINK
 |  |       columns: all
 |  |     extrapolated-rows=disabled
 |  |     parquet dictionary predicates: d1.d_fy_week_seq = 1000
-|  |     mem-estimate=48.00MB mem-reservation=8.00MB
+|  |     mem-estimate=48.00MB mem-reservation=0B
 |  |     tuple-ids=3 row-size=8B cardinality=7
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
@@ -315,7 +315,7 @@ PLAN-ROOT SINK
 |       partitions: 1824/1824 rows=2880404
 |       columns: all
 |     extrapolated-rows=disabled
-|     mem-estimate=128.00MB mem-reservation=8.00MB
+|     mem-estimate=128.00MB mem-reservation=0B
 |     tuple-ids=0 row-size=24B cardinality=2880404
 |
 01:SCAN HDFS [tpcds.store_returns]
@@ -325,7 +325,7 @@ PLAN-ROOT SINK
      table: rows=287514 size=31.19MB
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=80.00MB mem-reservation=8.00MB
+   mem-estimate=80.00MB mem-reservation=0B
    tuple-ids=1 row-size=20B cardinality=287514
 ====
 # Assumed FK/PK join becasue of non-trivial equi-join exprs.
@@ -334,7 +334,7 @@ tpcds.store_sales inner join tpcds.customer
 on ss_customer_sk % 10 = c_customer_sk / 100
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=211.00MB mem-reservation=51.00MB runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=211.00MB mem-reservation=35.00MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -351,7 +351,7 @@ PLAN-ROOT SINK
 |       table: rows=100000 size=12.60MB
 |       columns: all
 |     extrapolated-rows=disabled
-|     mem-estimate=48.00MB mem-reservation=8.00MB
+|     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=255B cardinality=100000
 |
 00:SCAN HDFS [tpcds.store_sales]
@@ -362,7 +362,7 @@ PLAN-ROOT SINK
      partitions: 1824/1824 rows=2880404
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=8.00MB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=100B cardinality=2880404
 ====
 # Assumed FK/PK join due to missing stats on the rhs. Join cardinality is equal to
@@ -372,7 +372,7 @@ tpcds.store_sales inner join tpcds_seq_snap.customer
 on ss_customer_sk = c_customer_sk
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=2.17GB mem-reservation=51.00MB runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=2.17GB mem-reservation=35.00MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -384,12 +384,12 @@ PLAN-ROOT SINK
 |  tuple-ids=0,1 row-size=8B cardinality=2880404
 |
 |--01:SCAN HDFS [tpcds_seq_snap.customer]
-|     partitions=1/1 files=1 size=8.58MB
+|     partitions=1/1 files=1 size=8.59MB
 |     stored statistics:
-|       table: rows=unavailable size=8.58MB
+|       table: rows=unavailable size=8.59MB
 |       columns: unavailable
 |     extrapolated-rows=disabled
-|     mem-estimate=48.00MB mem-reservation=8.00MB
+|     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=4B cardinality=unavailable
 |
 00:SCAN HDFS [tpcds.store_sales]
@@ -400,7 +400,7 @@ PLAN-ROOT SINK
      partitions: 1824/1824 rows=2880404
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=8.00MB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=4B cardinality=2880404
 ====
 # Assumed FK/PK join due to missing stats on the lhs. Join cardinality is unknown.
@@ -409,7 +409,7 @@ tpcds_seq_snap.store_sales inner join tpcds.customer
 on ss_customer_sk = c_customer_sk
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=178.94MB mem-reservation=18.94MB runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=178.94MB mem-reservation=2.94MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -426,18 +426,18 @@ PLAN-ROOT SINK
 |       table: rows=100000 size=12.60MB
 |       columns: all
 |     extrapolated-rows=disabled
-|     mem-estimate=48.00MB mem-reservation=8.00MB
+|     mem-estimate=48.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=4B cardinality=100000
 |
 00:SCAN HDFS [tpcds_seq_snap.store_sales]
-   partitions=1824/1824 files=1824 size=207.85MB
+   partitions=1824/1824 files=1824 size=207.90MB
    runtime filters: RF000[bloom] -> ss_customer_sk
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/1824 rows=unavailable
      columns: unavailable
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=8.00MB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=4B cardinality=unavailable
 ====
 # Join is detected as many-to-many even though the rhs join columns
@@ -448,7 +448,7 @@ tpcds.store_sales inner join
 on ss_sold_time_sk = ws_sold_time_sk
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=299.00MB mem-reservation=18.94MB runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=299.00MB mem-reservation=4.88MB runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -470,7 +470,7 @@ PLAN-ROOT SINK
 |       table: rows=719384 size=140.07MB
 |       columns: all
 |     extrapolated-rows=disabled
-|     mem-estimate=160.00MB mem-reservation=8.00MB
+|     mem-estimate=160.00MB mem-reservation=0B
 |     tuple-ids=1 row-size=4B cardinality=719384
 |
 00:SCAN HDFS [tpcds.store_sales]
@@ -481,6 +481,6 @@ PLAN-ROOT SINK
      partitions: 1824/1824 rows=2880404
      columns: all
    extrapolated-rows=disabled
-   mem-estimate=128.00MB mem-reservation=8.00MB
+   mem-estimate=128.00MB mem-reservation=0B
    tuple-ids=0 row-size=100B cardinality=2880404
 ====

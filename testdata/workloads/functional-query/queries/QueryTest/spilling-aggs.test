@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-set buffer_pool_limit=34m;
+set buffer_pool_limit=10m;
 select l_orderkey, count(*)
 from lineitem
 group by 1
@@ -25,7 +25,7 @@ row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test query with string grouping column and string agg columns
-set buffer_pool_limit=82m;
+set buffer_pool_limit=10m;
 set num_nodes=1;
 select l_returnflag, l_orderkey, avg(l_tax), min(l_shipmode)
 from lineitem
@@ -39,9 +39,10 @@ order by 1,2 limit 3
 STRING, BIGINT, DECIMAL, STRING
 ---- RUNTIME_PROFILE
 row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
-set buffer_pool_limit=34m;
+set buffer_pool_limit=10m;
 select l_orderkey, count(*)
 from lineitem
 group by 1
@@ -65,7 +66,7 @@ row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test query with string grouping column
-set buffer_pool_limit=34m;
+set buffer_pool_limit=10m;
 set num_nodes=1;
 select l_comment, count(*)
 from lineitem
@@ -81,10 +82,11 @@ order by count(*) desc limit 5
 STRING, BIGINT
 ---- RUNTIME_PROFILE
 row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test query with string grouping column and string agg columns
-set buffer_pool_limit=82m;
+set buffer_pool_limit=10m;
 set num_nodes=1;
 select l_returnflag, l_orderkey, round(avg(l_tax),2), min(l_shipmode)
 from lineitem
@@ -99,10 +101,11 @@ STRING, BIGINT, DECIMAL, STRING
 ---- RUNTIME_PROFILE
 # Verify that spilling happened in the agg.
 row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test with non-scalar intermediate state (avg() uses fixed intermediate value).
-set buffer_pool_limit=34m;
+set buffer_pool_limit=10m;
 select l_orderkey, avg(l_orderkey)
 from lineitem
 group by 1
@@ -122,7 +125,7 @@ row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test aggregation spill with group_concat distinct
-set buffer_pool_limit=78m;
+set buffer_pool_limit=30m;
 select l_orderkey, count(*), group_concat(distinct l_linestatus, '|')
 from lineitem
 group by 1
@@ -168,7 +171,7 @@ row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 # Merge aggregation requires 17 buffers and preaggregation requires 16 buffers
 # plus 1mb of hash tables. The buffer size is 256k for this test.
 set max_row_size=256k;
-set buffer_pool_limit="57.25M";
+set buffer_pool_limit=9472k;
 select count(*)
 from (select distinct * from orders) t
 ---- TYPES

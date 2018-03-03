@@ -98,12 +98,6 @@ class BitUtil {
     return v;
   }
 
-  /// Returns the largest power of two <= v.
-  static inline int64_t RoundDownToPowerOfTwo(int64_t v) {
-    int64_t v_rounded_up = RoundUpToPowerOfTwo(v);
-    return v_rounded_up == v ? v : v_rounded_up / 2;
-  }
-
   /// Returns 'value' rounded up to the nearest multiple of 'factor' when factor is
   /// a power of two
   static inline int64_t RoundUpToPowerOf2(int64_t value, int64_t factor) {
@@ -111,7 +105,7 @@ class BitUtil {
     return (value + (factor - 1)) & ~(factor - 1);
   }
 
-  static inline int64_t RoundDownToPowerOf2(int64_t value, int64_t factor) {
+  static inline int RoundDownToPowerOf2(int value, int factor) {
     DCHECK((factor > 0) && ((factor & (factor - 1)) == 0));
     return value & ~(factor - 1);
   }

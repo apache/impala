@@ -29,10 +29,4 @@ public class BitUtil {
   public static long roundUpToPowerOf2(long val) {
     return 1L << log2Ceiling(val);
   }
-
-  // Round up 'val' to the nearest multiple of a power-of-two 'factor'.
-  // 'val' must be > 0.
-  public static long roundUpToPowerOf2Factor(long val, long factor) {
-    return (val + (factor - 1)) & ~(factor - 1);
-  }
 }
