@@ -19,8 +19,6 @@ package org.apache.impala.util;
 
 import java.util.List;
 
-import org.apache.sentry.provider.db.SentryAccessDeniedException;
-import org.apache.sentry.provider.db.SentryAlreadyExistsException;
 import org.apache.sentry.provider.db.service.thrift.SentryPolicyServiceClient;
 import org.apache.sentry.provider.db.service.thrift.TSentryGrantOption;
 import org.apache.sentry.provider.db.service.thrift.TSentryPrivilege;
@@ -124,10 +122,11 @@ public class SentryPolicyService {
       } else {
         client.get().dropRole(requestingUser.getShortName(), roleName);
       }
-    } catch (SentryAccessDeniedException e) {
-      throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,
-          requestingUser.getName(), "DROP_ROLE"));
     } catch (Exception e) {
+      if (SentryUtil.isSentryAccessDenied(e)) {
+        throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,
+          requestingUser.getName(), "DROP_ROLE"));
+      }
       throw new InternalException("Error dropping role: ", e);
     } finally {
       client.close();
@@ -151,14 +150,16 @@ public class SentryPolicyService {
     SentryServiceClient client = new SentryServiceClient();
     try {
       client.get().createRole(requestingUser.getShortName(), roleName);
-    } catch (SentryAccessDeniedException e) {
-      throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,
-          requestingUser.getName(), "CREATE_ROLE"));
-    } catch (SentryAlreadyExistsException e) {
-      if (ifNotExists) return;
-      throw new InternalException("Error creating role: ", e);
     } catch (Exception e) {
-      throw new InternalException("Error creating role: ", e);
+      if (SentryUtil.isSentryAccessDenied(e)) {
+        throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,
+              requestingUser.getName(), "CREATE_ROLE"));
+      }
+      if (SentryUtil.isSentryAlreadyExists(e)) {
+        if (ifNotExists) return;
+        throw new InternalException("Error creating role: " + e.getMessage(), e);
+      }
+      throw new InternalException("Error creating role: " + e.getMessage(), e);
     } finally {
       client.close();
     }
@@ -181,10 +182,11 @@ public class SentryPolicyService {
     SentryServiceClient client = new SentryServiceClient();
     try {
       client.get().grantRoleToGroup(requestingUser.getShortName(), groupName, roleName);
-    } catch (SentryAccessDeniedException e) {
-      throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,
-          requestingUser.getName(), "GRANT_ROLE"));
     } catch (Exception e) {
+      if (SentryUtil.isSentryAccessDenied(e)) {
+        throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,
+              requestingUser.getName(), "GRANT_ROLE"));
+      }
       throw new InternalException(
           "Error making 'grantRoleToGroup' RPC to Sentry Service: ", e);
     } finally {
@@ -210,10 +212,11 @@ public class SentryPolicyService {
     try {
       client.get().revokeRoleFromGroup(requestingUser.getShortName(),
           groupName, roleName);
-    } catch (SentryAccessDeniedException e) {
-      throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,
-          requestingUser.getName(), "REVOKE_ROLE"));
     } catch (Exception e) {
+      if (SentryUtil.isSentryAccessDenied(e)) {
+        throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,
+              requestingUser.getName(), "REVOKE_ROLE"));
+      }
       throw new InternalException(
           "Error making 'revokeRoleFromGroup' RPC to Sentry Service: ", e);
     } finally {
@@ -288,10 +291,11 @@ public class SentryPolicyService {
               privilege.isHas_grant_opt());
           break;
       }
-    } catch (SentryAccessDeniedException e) {
-      throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,
-          requestingUser.getName(), "GRANT_PRIVILEGE"));
     } catch (Exception e) {
+      if (SentryUtil.isSentryAccessDenied(e)) {
+        throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,
+            requestingUser.getName(), "GRANT_PRIVILEGE"));
+      }
       throw new InternalException(
           "Error making 'grantPrivilege*' RPC to Sentry Service: ", e);
     } finally {
@@ -355,10 +359,11 @@ public class SentryPolicyService {
               null);
           break;
       }
-    } catch (SentryAccessDeniedException e) {
-      throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,
-          requestingUser.getName(), "REVOKE_PRIVILEGE"));
     } catch (Exception e) {
+      if (SentryUtil.isSentryAccessDenied(e)) {
+        throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,
+            requestingUser.getName(), "REVOKE_PRIVILEGE"));
+      }
       throw new InternalException(
           "Error making 'revokePrivilege*' RPC to Sentry Service: ", e);
     } finally {
@@ -390,11 +395,13 @@ public class SentryPolicyService {
   public List<TSentryRole> listAllRoles(User requestingUser) throws ImpalaException {
     SentryServiceClient client = new SentryServiceClient();
     try {
-      return Lists.newArrayList(client.get().listRoles(requestingUser.getShortName()));
-    } catch (SentryAccessDeniedException e) {
-      throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,
-          requestingUser.getName(), "LIST_ROLES"));
+      return Lists.newArrayList(SentryUtil.listRoles(client.get(),
+            requestingUser.getShortName()));
     } catch (Exception e) {
+      if (SentryUtil.isSentryAccessDenied(e)) {
+        throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,
+            requestingUser.getName(), "LIST_ROLES"));
+      }
       throw new InternalException("Error making 'listRoles' RPC to Sentry Service: ", e);
     } finally {
       client.close();
@@ -410,10 +417,11 @@ public class SentryPolicyService {
     try {
       return Lists.newArrayList(client.get().listAllPrivilegesByRoleName(
           requestingUser.getShortName(), roleName));
-    } catch (SentryAccessDeniedException e) {
-      throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,
-          requestingUser.getName(), "LIST_ROLE_PRIVILEGES"));
     } catch (Exception e) {
+      if (SentryUtil.isSentryAccessDenied(e)) {
+        throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,
+            requestingUser.getName(), "LIST_ROLE_PRIVILEGES"));
+      }
       throw new InternalException("Error making 'listAllPrivilegesByRoleName' RPC to " +
           "Sentry Service: ", e);
     } finally {

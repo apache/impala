@@ -166,19 +166,63 @@ export KUDU_JAVA_VERSION=1.7.0-cdh5.15.0-SNAPSHOT
 
 # Versions of Hadoop ecosystem dependencies.
 # ------------------------------------------
-export CDH_MAJOR_VERSION=5
-export IMPALA_HADOOP_VERSION=2.6.0-cdh5.15.0-SNAPSHOT
+# IMPALA_MINICLUSTER_PROFILE can have two values:
+# 2 represents:
+#    Hadoop 2.6
+#    HBase 1.2
+#    Hive 1.1
+#    Sentry 1.5
+#    Parquet 1.5
+#    Llama (used for Mini KDC) 1.0
+# 3 represents:
+#    Hadoop 3.0
+#    HBase 2.0
+#    Hive 2.1
+#    Sentry 2.0
+#    Parquet 1.9
+#
+# Impala 3.x should default to profile 3 and mark profile 2 deprecated,
+# so that it may be removed in the 3.x line.
+# Currently, as the profile 3 is still being developed, we retain
+# profile 2 as the default.
+
+DEFAULT_MINICLUSTER_PROFILE=2
+: ${IMPALA_MINICLUSTER_PROFILE_OVERRIDE:=$DEFAULT_MINICLUSTER_PROFILE}
+
+if [[ $IMPALA_MINICLUSTER_PROFILE_OVERRIDE == 2 ]]; then
+  echo "IMPALA_MINICLUSTER_PROFILE=2 is deprecated and may be removed in Impala 3.x"
+
+  export IMPALA_MINICLUSTER_PROFILE=2
+  export CDH_MAJOR_VERSION=5
+  export IMPALA_HADOOP_VERSION=2.6.0-cdh5.15.0-SNAPSHOT
+  export IMPALA_HBASE_VERSION=1.2.0-cdh5.15.0-SNAPSHOT
+  export IMPALA_HIVE_VERSION=1.1.0-cdh5.15.0-SNAPSHOT
+  export IMPALA_SENTRY_VERSION=1.5.1-cdh5.15.0-SNAPSHOT
+  export IMPALA_PARQUET_VERSION=1.5.0-cdh5.15.0-SNAPSHOT
+  export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
+  export IMPALA_KITE_VERSION=1.0.0-cdh5.15.0-SNAPSHOT
+
+elif [[ $IMPALA_MINICLUSTER_PROFILE_OVERRIDE == 3 ]]; then
+  export IMPALA_MINICLUSTER_PROFILE=3
+  export CDH_MAJOR_VERSION=6
+  export IMPALA_HADOOP_VERSION=3.0.0-cdh6.x-SNAPSHOT
+  export IMPALA_HBASE_VERSION=2.0.0-cdh6.x-SNAPSHOT
+  export IMPALA_HIVE_VERSION=2.1.1-cdh6.x-SNAPSHOT
+  export IMPALA_SENTRY_VERSION=2.0.0-cdh6.x-SNAPSHOT
+  export IMPALA_PARQUET_VERSION=1.9.0-cdh6.x-SNAPSHOT
+  export IMPALA_AVRO_JAVA_VERSION=1.8.2-cdh6.x-SNAPSHOT
+  export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
+  export IMPALA_KITE_VERSION=1.0.0-cdh6.x-SNAPSHOT
+  # We continue using an older version of KUDU_JAVA_VERSION,
+  # as it includes support for DECIMAL.
+  # TODO: Jump to newer Kudu when it's published in Maven.
+fi
+
 unset IMPALA_HADOOP_URL
-export IMPALA_HBASE_VERSION=1.2.0-cdh5.15.0-SNAPSHOT
 unset IMPALA_HBASE_URL
-export IMPALA_HIVE_VERSION=1.1.0-cdh5.15.0-SNAPSHOT
 unset IMPALA_HIVE_URL
-export IMPALA_SENTRY_VERSION=1.5.1-cdh5.15.0-SNAPSHOT
 unset IMPALA_SENTRY_URL
-export IMPALA_PARQUET_VERSION=1.5.0-cdh5.15.0-SNAPSHOT
-export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
 unset IMPALA_LLAMA_MINIKDC_URL
-export IMPALA_KITE_VERSION=1.0.0-cdh5.15.0-SNAPSHOT
 
 # Source the branch and local config override files here to override any
 # variables above or any variables below that allow overriding via environment
@@ -461,6 +505,12 @@ export HADOOP_CLASSPATH="${HADOOP_CLASSPATH-}:${HADOOP_HOME}/share/hadoop/tools/
 export LZO_JAR_PATH="$HADOOP_LZO/build/hadoop-lzo-0.4.15.jar"
 HADOOP_CLASSPATH+=":$LZO_JAR_PATH"
 
+if [[ $IMPALA_MINICLUSTER_PROFILE == 3 ]]; then
+  # Beware of adding entries from $HADOOP_HOME here, because they can change
+  # the order of the classpath, leading to configuration not showing up first.
+  HADOOP_CLASSPATH="$LZO_JAR_PATH"
+fi
+
 export MINI_DFS_BASE_DATA_DIR="$IMPALA_HOME/cdh-${CDH_MAJOR_VERSION}-hdfs-data"
 export PATH="$HADOOP_HOME/bin:$PATH"
 
@@ -475,7 +525,21 @@ export PATH="$HIVE_HOME/bin:$PATH"
 # Allow overriding of Hive source location in case we want to build Impala without
 # a complete Hive build.
 export HIVE_SRC_DIR=${HIVE_SRC_DIR_OVERRIDE:-"${HIVE_HOME}/src"}
-export HIVE_CONF_DIR="$IMPALA_FE_DIR/src/test/resources"
+# To configure Hive logging, there's a hive-log4j2.properties[.template]
+# file in fe/src/test/resources. To get it into the classpath earlier
+# than the hive-log4j2.properties file included in some Hive jars,
+# we must set HIVE_CONF_DIR. Additionally, on Hadoop 3, because of
+# https://issues.apache.org/jira/browse/HADOOP-15019, when HIVE_CONF_DIR happens to equal
+# HADOOP_CONF_DIR, it gets de-duped out of its pole position in the CLASSPATH variable,
+# so we add an extra "./" into the path to avoid that. Use HADOOP_SHELL_SCRIPT_DEBUG=true
+# to debug issues like this. Hive may log something like:
+#       Logging initialized using configuration in file:.../fe/src/test/resources/hive-log4j2.properties
+#
+# To debug log4j2 loading issues, add to HADOOP_CLIENT_OPTS:
+#   -Dorg.apache.logging.log4j.simplelog.StatusLogger.level=TRACE
+#
+# We use a unique -Dhive.log.file to distinguish the HiveMetaStore and HiveServer2 logs.
+export HIVE_CONF_DIR="$IMPALA_FE_DIR/./src/test/resources"
 
 # Hive looks for jar files in a single directory from HIVE_AUX_JARS_PATH plus
 # any jars in AUX_CLASSPATH. (Or a list of jars in HIVE_AUX_JARS_PATH.)
@@ -498,7 +562,7 @@ export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-server-${IMPALA_HBASE
 export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-protocol-${IMPALA_HBASE_VERSION}.jar"
 export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-hadoop-compat-${IMPALA_HBASE_VERSION}.jar"
 
-export HBASE_CONF_DIR="$HIVE_CONF_DIR"
+export HBASE_CONF_DIR="$IMPALA_FE_DIR/src/test/resources"
 
 # Set $THRIFT_HOME to the Thrift directory in toolchain.
 export THRIFT_HOME="${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_VERSION}"

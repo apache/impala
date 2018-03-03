@@ -494,10 +494,10 @@ public class InsertStmt extends StatementBase {
       }
       for (int colIdx = 0; colIdx < numClusteringCols; ++colIdx) {
         Column col = hdfsTable.getColumns().get(colIdx);
-        // Hive has a number of issues handling BOOLEAN partition columns (see HIVE-6590).
+        // Hive 1.x has a number of issues handling BOOLEAN partition columns (see HIVE-6590).
         // Instead of working around the Hive bugs, INSERT is disabled for BOOLEAN
-        // partitions in Impala. Once the Hive JIRA is resolved, we can remove this
-        // analysis check.
+        // partitions in Impala when built against Hive 1. HIVE-6590 is currently resolved,
+        // but not in Hive 2.3.2, the latest release as of 3/17/2018.
         if (col.getType() == Type.BOOLEAN) {
           throw new AnalysisException(String.format("INSERT into table with BOOLEAN " +
               "partition column (%s) is not supported: %s", col.getName(),

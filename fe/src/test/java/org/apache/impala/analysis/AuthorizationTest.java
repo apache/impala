@@ -46,6 +46,7 @@ import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.compat.MiniclusterProfile;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.thrift.TColumnValue;
@@ -76,6 +77,7 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -1603,7 +1605,7 @@ public class AuthorizationTest extends FrontendTestBase {
   // Expected output of DESCRIBE for a functional table.
   // "*" is used when the output is variable such as time or user.
   private static final List<String> EXPECTED_DESCRIBE_EXTENDED_ALLTYPESAGG =
-      Lists.newArrayList(
+      ImmutableList.<String>builder().add(
       "# col_name","data_type","comment",
       "","NULL","NULL",
       "id","int","NULL",
@@ -1629,15 +1631,22 @@ public class AuthorizationTest extends FrontendTestBase {
       "Database:","functional","NULL",
       "Owner:","*","NULL",
       "CreateTime:","*","NULL",
-      "LastAccessTime:","UNKNOWN","NULL",
-      "Protect Mode:","None","NULL",
+      "LastAccessTime:","UNKNOWN","NULL")
+      // Account for minor differences between Hive 1 and Hive 2
+      .addAll(MiniclusterProfile.MINICLUSTER_PROFILE == 2
+          ? ImmutableList.<String>of("Protect Mode:", "None", "NULL")
+          : ImmutableList.<String>of())
+      .add(
       "Retention:","0","NULL",
       "Location:","hdfs://localhost:20500/test-warehouse/alltypesagg","NULL",
       "Table Type:","EXTERNAL_TABLE","NULL",
       "Table Parameters:","NULL","NULL",
       "","DO_NOT_UPDATE_STATS","true",
-      "","EXTERNAL","TRUE",
-      "","STATS_GENERATED_VIA_STATS_TASK","true",
+      "","EXTERNAL","TRUE")
+      .addAll(MiniclusterProfile.MINICLUSTER_PROFILE == 2
+          ? ImmutableList.of("", "STATS_GENERATED_VIA_STATS_TASK", "true")
+          : ImmutableList.of("", "STATS_GENERATED", "TASK"))
+      .add(
       "","numRows","11000",
       "","totalSize","834279",
       "","transient_lastDdlTime","*",
@@ -1654,12 +1663,12 @@ public class AuthorizationTest extends FrontendTestBase {
       "","escape.delim","\\\\",
       "","field.delim",",",
       "","serialization.format",","
-      );
+      ).build();
 
   // Expected output of DESCRIBE for a functional table.
   // "*" is used when the output is variable such as time or user.
   private static final List<String> EXPECTED_DESCRIBE_EXTENDED_ALLTYPESSMALL =
-      Lists.newArrayList(
+      ImmutableList.<String>builder().add(
       "# col_name","data_type","comment",
       "","NULL","NULL",
       "id","int","NULL",
@@ -1674,14 +1683,20 @@ public class AuthorizationTest extends FrontendTestBase {
       "Database:","functional","NULL",
       "Owner:","*","NULL",
       "CreateTime:","*","NULL",
-      "LastAccessTime:","UNKNOWN","NULL",
-      "Protect Mode:","None","NULL",
+      "LastAccessTime:","UNKNOWN","NULL")
+      .addAll(MiniclusterProfile.MINICLUSTER_PROFILE == 2
+          ? ImmutableList.<String>of("Protect Mode:", "None", "NULL")
+          : ImmutableList.<String>of())
+      .add(
       "Retention:","0","NULL",
       "Table Type:","EXTERNAL_TABLE","NULL",
       "Table Parameters:","NULL","NULL",
       "","DO_NOT_UPDATE_STATS","true",
-      "","EXTERNAL","TRUE",
-      "","STATS_GENERATED_VIA_STATS_TASK","true",
+      "","EXTERNAL","TRUE")
+      .addAll(MiniclusterProfile.MINICLUSTER_PROFILE == 2
+          ? ImmutableList.of("", "STATS_GENERATED_VIA_STATS_TASK", "true")
+          : ImmutableList.of("", "STATS_GENERATED", "TASK"))
+      .add(
       "","numRows","100",
       "","totalSize","6472",
       "","transient_lastDdlTime","*",
@@ -1698,7 +1713,7 @@ public class AuthorizationTest extends FrontendTestBase {
       "","escape.delim","\\\\",
       "","field.delim",",",
       "","serialization.format",","
-      );
+      ).build();
 
   @Test
   public void TestDescribeTableResults() throws ImpalaException {
@@ -1735,7 +1750,8 @@ public class AuthorizationTest extends FrontendTestBase {
   // Compares two arrays but skips an expected value that contains '*' since we need to
   // compare output but some values change based on builds, environments, etc.
   private void verifyOutputWithOptionalData(List<String> expected, List<String> actual) {
-    Assert.assertEquals(expected.size(), actual.size());
+    Assert.assertEquals("Size difference. Expected: " + expected + " Actual: " + actual,
+        expected.size(), actual.size());
     for (int idx = 0; idx < expected.size(); idx++) {
       if (!expected.get(idx).equals("*")) {
         Assert.assertEquals(expected.get(idx), actual.get(idx));
@@ -2135,7 +2151,13 @@ public class AuthorizationTest extends FrontendTestBase {
   public void TestShortUsernameUsed() throws Exception {
     // Different long variations of the same username.
     List<User> users = Lists.newArrayList(
-        new User(USER.getName() + "/abc.host.com@"),
+        // Hadoop 2 accepts kerberos names missing a realm, but insists
+        // on having a terminating '@' even when the default realm
+        // is intended.  Hadoop 3 now has more normal name convetions,
+        // where to specify the default realm, everything after and
+        // including the '@' character is omitted.
+        new User(USER.getName() + "/abc.host.com" +
+          (MiniclusterProfile.MINICLUSTER_PROFILE == 3 ? "" : "@")),
         new User(USER.getName() + "/abc.host.com@REAL.COM"),
         new User(USER.getName() + "@REAL.COM"));
     for (User user: users) {

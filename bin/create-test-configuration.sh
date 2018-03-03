@@ -89,13 +89,17 @@ rm -f authz-provider.ini
 
 if [ $CREATE_METASTORE -eq 1 ]; then
   echo "Creating postgresql database for Hive metastore"
-  dropdb -U hiveuser ${METASTORE_DB} 2> /dev/null || true
+  dropdb -U hiveuser ${METASTORE_DB} || true
   createdb -U hiveuser ${METASTORE_DB}
 
   # Hive schema SQL scripts include other scripts using \i, which expects absolute paths.
   # Switch to the scripts directory to make this work.
   pushd ${HIVE_HOME}/scripts/metastore/upgrade/postgres
-  psql -q -U hiveuser -d ${METASTORE_DB} -f hive-schema-1.1.0.postgres.sql
+  if [[ $IMPALA_MINICLUSTER_PROFILE == 2 ]]; then
+    psql -q -U hiveuser -d ${METASTORE_DB} -f hive-schema-1.1.0.postgres.sql
+  elif [[ $IMPALA_MINICLUSTER_PROFILE == 3 ]]; then
+    psql -q -U hiveuser -d ${METASTORE_DB} -f hive-schema-2.1.1.postgres.sql
+  fi
   popd
   # Increase the size limit of PARAM_VALUE from SERDE_PARAMS table to be able to create
   # HBase tables with large number of columns.
@@ -160,7 +164,11 @@ fi
 
 generate_config postgresql-hive-site.xml.template hive-site.xml
 generate_config log4j.properties.template log4j.properties
-generate_config hive-log4j.properties.template hive-log4j.properties
+if [[ $IMPALA_MINICLUSTER_PROFILE == 3 ]]; then
+  generate_config hive-log4j2.properties.template hive-log4j2.properties
+else
+  generate_config hive-log4j.properties.template hive-log4j.properties
+fi
 generate_config hbase-site.xml.template hbase-site.xml
 generate_config authz-policy.ini.template authz-policy.ini
 generate_config sentry-site.xml.template sentry-site.xml

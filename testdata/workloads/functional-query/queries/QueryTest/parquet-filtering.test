@@ -178,8 +178,7 @@ select count(*) from functional_parquet.alltypes where date_string_col = '01/01/
 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 24
-aggregation(SUM, NumDictFilteredRowGroups): 2
-aggregation(SUM, NumStatsFilteredRowGroups): 22
+aggregation(SUM, NumDictFilteredRowGroups): 24
 ====
 ---- QUERY
 # string_col: All values pass

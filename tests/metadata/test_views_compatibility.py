@@ -15,12 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import os
 import pprint
 import pytest
 import shlex
 from subprocess import call
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.environ import is_hive_2
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import create_uncompressed_text_dimension
@@ -249,10 +251,15 @@ class ViewCompatTestCase(object):
     exp_res = dict()
     for line in lines:
       components = line.partition("=")
-      if (components[2].lower() == 'SUCCESS'.lower()):
+      component_value = components[2].upper()
+      if component_value == 'SUCCESS':
         exp_res[components[0]] = True
-      else:
+      elif component_value == 'SUCCESS_PROFILE_3_ONLY':
+        exp_res[components[0]] = is_hive_2()
+      elif component_value == 'FAILURE':
         exp_res[components[0]] = False
+      else:
+        raise Exception("Unexpected result declared: " + line)
 
     # check that the results section contains at least one entry
     if not (lambda a, b: any(i in b for i in a)):

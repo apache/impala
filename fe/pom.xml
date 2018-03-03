@@ -114,12 +114,6 @@ under the License.
 
     <dependency>
       <groupId>org.apache.sentry</groupId>
-      <artifactId>sentry-policy-db</artifactId>
-      <version>${sentry.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.sentry</groupId>
       <artifactId>sentry-binding-hive</artifactId>
       <version>${sentry.version}</version>
       <exclusions>
@@ -135,12 +129,6 @@ under the License.
       <artifactId>sentry-provider-db</artifactId>
       <version>${sentry.version}</version>
       <classifier>sh</classifier>
-    </dependency>
-
-    <dependency>
-      <groupId>com.twitter</groupId>
-      <artifactId>parquet-hadoop-bundle</artifactId>
-      <version>${parquet.version}</version>
     </dependency>
 
     <dependency>
@@ -205,39 +193,12 @@ under the License.
 
     <dependency>
       <groupId>org.apache.hive</groupId>
-      <artifactId>hive-hbase-handler</artifactId>
-      <version>${hive.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hive</groupId>
       <artifactId>hive-service</artifactId>
       <version>${hive.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hive</groupId>
-      <artifactId>hive-jdbc</artifactId>
-      <version>${hive.version}</version>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hive</groupId>
-      <artifactId>hive-metastore</artifactId>
-      <version>${hive.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hive</groupId>
-      <artifactId>hive-common</artifactId>
-      <version>${hive.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hive</groupId>
       <artifactId>hive-serde</artifactId>
-      <version>${hive.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hive</groupId>
-      <artifactId>hive-exec</artifactId>
       <version>${hive.version}</version>
     </dependency>
 
@@ -460,7 +421,7 @@ under the License.
                         -->
                 <source>${project.basedir}/generated-sources/gen-java</source>
                 <source>${project.build.directory}/generated-sources/cup</source>
-                <source>${project.basedir}/src/compat-hive-${hive.major.version}/java</source>
+                <source>${project.basedir}/src/compat-minicluster-profile-${env.IMPALA_MINICLUSTER_PROFILE}/java</source>
               </sources>
             </configuration>
           </execution>
@@ -651,6 +612,207 @@ under the License.
              to ignore test failures. -->
         <maven.test.failure.ignore>true</maven.test.failure.ignore>
       </properties>
+    </profile>
+
+    <profile>
+      <id>impala-minicluster-profile-2</id>
+      <activation>
+        <property>
+          <name>env.IMPALA_MINICLUSTER_PROFILE</name>
+          <value>2</value>
+        </property>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>org.apache.sentry</groupId>
+          <artifactId>sentry-policy-db</artifactId>
+          <version>${sentry.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>com.twitter</groupId>
+          <artifactId>parquet-hadoop-bundle</artifactId>
+          <version>${parquet.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-exec</artifactId>
+          <version>${hive.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-common</artifactId>
+          <version>${hive.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-jdbc</artifactId>
+          <version>${hive.version}</version>
+          <scope>test</scope>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-hbase-handler</artifactId>
+          <version>${hive.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-metastore</artifactId>
+          <version>${hive.version}</version>
+        </dependency>
+      </dependencies>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <version>1.8</version>
+            <executions>
+              <execution>
+                <id>generate-minicluster-profile-2-compat-shims</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <configuration>
+                  <!-- Generates ParquetHelper for minicluster profile 2. -->
+                  <target>
+                    <echo file="${project.build.directory}/gen-compat-shims.sh">
+                      echo Generating shims for Minicluster Profile 2
+                      mkdir -p generated-sources/gen-java/org/apache/impala/analysis
+                      sed -e s,org.apache.parquet,parquet,g src/compat-minicluster-profile-3/java/org/apache/impala/analysis/ParquetHelper.java > generated-sources/gen-java/org/apache/impala/analysis/ParquetHelper.java
+                    </echo>
+                    <exec executable="bash" dir="${project.basedir}" failonerror="true">
+                      <arg line="-ex ${project.build.directory}/gen-compat-shims.sh" />
+                    </exec>
+                  </target>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+
+    </profile>
+    <profile>
+      <id>impala-minicluster-profile-3</id>
+      <activation>
+        <property>
+          <name>env.IMPALA_MINICLUSTER_PROFILE</name>
+          <value>3</value>
+        </property>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>org.apache.sentry</groupId>
+          <artifactId>sentry-policy-engine</artifactId>
+          <version>${sentry.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.parquet</groupId>
+          <artifactId>parquet-hadoop-bundle</artifactId>
+          <version>${parquet.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-exec</artifactId>
+          <version>${hive.version}</version>
+          <exclusions>
+            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-slf4j-impl</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-common</artifactId>
+          <version>${hive.version}</version>
+          <exclusions>
+            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-slf4j-impl</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-jdbc</artifactId>
+          <version>${hive.version}</version>
+          <scope>test</scope>
+          <exclusions>
+            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-slf4j-impl</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-hbase-handler</artifactId>
+          <version>${hive.version}</version>
+          <exclusions>
+            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-slf4j-impl</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-metastore</artifactId>
+          <version>${hive.version}</version>
+          <exclusions>
+            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-slf4j-impl</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.hive.shims</groupId>
+          <artifactId>hive-shims-common</artifactId>
+          <version>${hive.version}</version>
+          <exclusions>
+            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+            <exclusion>
+              <groupId>org.apache.logging.log4j</groupId>
+              <artifactId>log4j-slf4j-impl</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+      </dependencies>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-enforcer-plugin</artifactId>
+            <version>3.0.0-M1</version>
+            <executions>
+              <execution>
+                <id>enforce-banned-dependencies</id>
+                <goals>
+                  <goal>enforce</goal>
+                </goals>
+                <configuration>
+                  <rules>
+                    <bannedDependencies>
+                      <excludes>
+                        <exclude>org.apache.logging.log4j:log4j-slf4j-impl</exclude>
+                      </excludes>
+                    </bannedDependencies>
+                  </rules>
+                  <fail>true</fail>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
   </profiles>
 </project>

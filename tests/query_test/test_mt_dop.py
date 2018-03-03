@@ -100,6 +100,8 @@ class TestMtDopParquet(ImpalaTestSuite):
   def test_parquet_filtering(self, vector):
     """IMPALA-4624: Test that dictionary filtering eliminates row groups correctly."""
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
+    # Disable min-max stats to prevent interference with directionary filtering.
+    vector.get_value('exec_option')['parquet_read_statistics'] = '0'
     self.run_test_case('QueryTest/parquet-filtering', vector)
 
 class TestMtDopKudu(KuduTestSuite):

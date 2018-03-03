@@ -15,12 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import os
 import pytest
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
+from tests.common.environ import is_hive_2
 
 # Tests to validate HDFS partitioning.
 class TestPartitioning(ImpalaTestSuite):
@@ -59,9 +61,11 @@ class TestPartitioning(ImpalaTestSuite):
 
     self.execute_query("create table %s (i int) partitioned by (b boolean)" % full_name)
 
-    # Insert some data using Hive. Due to HIVE-6590, Hive may create multiple
+    # Insert some data using Hive. Due to HIVE-6590, Hive 1 may create multiple
     # partitions, mapping to the same boolean literal value.
-    # For example, Hive may create partitions: /b=FALSE and /b=false, etc
+    # For example, Hive may create partitions: /b=FALSE and /b=false, etc.
+    # This particular issue was fixed in Hive 2 though HIVE-6590 has not
+    # been resolved as of release 2.3.1, though it has been resolved in Hive master.
     self.run_stmt_in_hive("INSERT INTO TABLE %s PARTITION(b=false) SELECT 1 from "\
         "functional.alltypes limit 1" % full_name)
     self.run_stmt_in_hive("INSERT INTO TABLE %s PARTITION(b=FALSE) SELECT 2 from "\
@@ -75,9 +79,13 @@ class TestPartitioning(ImpalaTestSuite):
     # List the partitions. Show table stats returns 1 row for each partition + 1 summary
     # row
     result = self.execute_query("show table stats %s" % full_name)
-    assert len(result.data) == 3 + 1
+    if is_hive_2():
+      assert len(result.data) == 2 + 1
+    else:
+      assert len(result.data) == 3 + 1
 
-    # Verify Impala properly merges the results of the bad Hive metadata.
+    # Verify Impala properly merges the results of the Hive metadata,
+    # whether it be good (Hive 2) or bad (Hive 1).
     assert '13' == self.execute_scalar("select sum(i) from %s" % full_name);
     assert '10' == self.execute_scalar("select sum(i) from %s where b=true" % full_name)
     assert '3' == self.execute_scalar("select sum(i) from %s where b=false" % full_name)

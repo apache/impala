@@ -671,6 +671,14 @@ class ImpalaTestSuite(BaseTestSuite):
       tmpdir = tempfile.mkdtemp(prefix="impala-tests-")
       beeline_opts += ['--hiveconf', 'mapreduce.cluster.local.dir={0}'.format(tmpdir)]
     try:
+      # Remove HADOOP_CLASSPATH from environment. Beeline doesn't need it,
+      # and doing so avoids Hadoop 3's classpath de-duplication code from
+      # placing $HADOOP_CONF_DIR too late in the classpath to get the right
+      # log4j configuration file picked up. Some log4j configuration files
+      # in Hadoop's jars send logging to stdout, confusing Impala's test
+      # framework.
+      env = os.environ.copy()
+      env.pop("HADOOP_CLASSPATH", None)
       call = subprocess.Popen(
           ['beeline',
            '--outputformat=csv2',
@@ -678,7 +686,13 @@ class ImpalaTestSuite(BaseTestSuite):
            '-n', username,
            '-e', stmt] + beeline_opts,
           stdout=subprocess.PIPE,
-          stderr=subprocess.PIPE)
+          stderr=subprocess.PIPE,
+          # Beeline in Hive 2.1 will read from stdin even when "-e"
+          # is specified; explicitly make sure there's nothing to
+          # read to avoid hanging, especially when running interactively
+          # with py.test.
+          stdin=file("/dev/null"),
+          env=env)
       (stdout, stderr) = call.communicate()
       call.wait()
       if call.returncode != 0:

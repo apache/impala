@@ -46,7 +46,7 @@ import com.google.common.collect.Maps;
 
 /**
  * Splits HBase tables into regions and deterministically assigns regions to region
- * servers. 
+ * servers.
  */
 class HBaseTestDataRegionAssigment {
   public class TableNotFoundException extends Exception {
@@ -87,7 +87,7 @@ class HBaseTestDataRegionAssigment {
    * will be on the same server.
    * The table must have data loaded and only a single region.
    */
-  public void performAssigment(String tableName) throws IOException, 
+  public void performAssigment(String tableName) throws IOException,
     InterruptedException, TableNotFoundException {
     HTableDescriptor[] desc = hbaseAdmin.listTables(tableName);
     if (desc == null || desc.length == 0) {
@@ -97,7 +97,7 @@ class HBaseTestDataRegionAssigment {
     if (hbaseAdmin.getTableRegions(tableName.getBytes()).size() == 1) {
       // Split into regions
       // The table has one region only to begin with. The logic of
-      // blockUntilRegionSplit requires that the input regionName has performed a split. 
+      // blockUntilRegionSplit requires that the input regionName has performed a split.
       // If the table has already been split (i.e. regions count > 1), the same split
       // call will be a no-op and this will cause blockUntilRegionSplit to break.
       for (int i = 0; i < splitPoints.length; ++i) {
@@ -124,13 +124,13 @@ class HBaseTestDataRegionAssigment {
             splitRegion.getRegionNameAsString(), attempt));
       }
     }
-    
+
     // Sort the region by start key
     List<HRegionInfo> regions = hbaseAdmin.getTableRegions(tableName.getBytes());
     Preconditions.checkArgument(regions.size() == splitPoints.length + 1);
     Collections.sort(regions);
-    
-    // Pair up two adjacent regions to the same region server. That is, 
+
+    // Pair up two adjacent regions to the same region server. That is,
     // region server 1 <- regions (unbound:1), (1:3)
     // region server 2 <- regions (3:5), (5:7)
     // region server 3 <- regions (7:9), (9:unbound)
@@ -143,7 +143,7 @@ class HBaseTestDataRegionAssigment {
           regionServerName.getServerName().getBytes());
       expectedLocs.put(regionInfo, regionServerName);
     }
-    
+
     // hbaseAdmin.move() is an asynchronous operation. HBase tests use sleep to wait for
     // the move to complete. It should be done in 10sec.
     int sleepCnt = 0;
@@ -188,16 +188,16 @@ class HBaseTestDataRegionAssigment {
     }
     return result.toString();
   }
-  
-  /** 
+
+  /**
    * The following static methods blockUntilRegionSplit, getRegionRow,
-   * blockUntilRegionIsOpened and blockUntilRegionIsInMeta are copied from 
+   * blockUntilRegionIsOpened and blockUntilRegionIsInMeta are copied from
    * org.apache.hadoop.hbase.regionserver.TestEndToEndSplitTransaction
    * to help block until a region split is completed.
-   * 
+   *
    * The original code was modified to return a true/false in case of success/failure.
    *
-   * Blocks until the region split is complete in META and region server opens the 
+   * Blocks until the region split is complete in META and region server opens the
    * daughters
    */
   private static boolean blockUntilRegionSplit(Configuration conf, long timeout,

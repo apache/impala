@@ -17,6 +17,7 @@
 
 package org.apache.impala.authorization;
 
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -29,7 +30,6 @@ import org.apache.impala.common.InternalException;
 import org.apache.sentry.core.common.ActiveRoleSet;
 import org.apache.sentry.core.common.Subject;
 import org.apache.sentry.core.model.db.DBModelAuthorizable;
-import org.apache.sentry.policy.db.SimpleDBPolicyEngine;
 import org.apache.sentry.provider.cache.SimpleCacheProviderBackend;
 import org.apache.sentry.provider.common.ProviderBackend;
 import org.apache.sentry.provider.common.ProviderBackendContext;
@@ -38,6 +38,8 @@ import org.apache.sentry.provider.file.SimpleFileProviderBackend;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+
+import org.apache.impala.util.SentryUtil;
 
 /**
  * Class used to check whether a user has access to a given resource.
@@ -68,38 +70,7 @@ public class AuthorizationChecker {
    */
   private static ResourceAuthorizationProvider createProvider(AuthorizationConfig config,
       AuthorizationPolicy policy) {
-    try {
-      ProviderBackend providerBe;
-      // Create the appropriate backend provider.
-      if (config.isFileBasedPolicy()) {
-        providerBe = new SimpleFileProviderBackend(config.getSentryConfig().getConfig(),
-            config.getPolicyFile());
-      } else {
-        // Note: The second parameter to the ProviderBackend is a "resourceFile" path
-        // which is not used by Impala. We cannot pass 'null' so instead pass an empty
-        // string.
-        providerBe = new SimpleCacheProviderBackend(config.getSentryConfig().getConfig(),
-            "");
-        Preconditions.checkNotNull(policy);
-        ProviderBackendContext context = new ProviderBackendContext();
-        context.setBindingHandle(policy);
-        providerBe.initialize(context);
-      }
-
-      SimpleDBPolicyEngine engine =
-          new SimpleDBPolicyEngine(config.getServerName(), providerBe);
-
-      // Try to create an instance of the specified policy provider class.
-      // Re-throw any exceptions that are encountered.
-      String policyFile = config.getPolicyFile() == null ? "" : config.getPolicyFile();
-      return (ResourceAuthorizationProvider) ConstructorUtils.invokeConstructor(
-          Class.forName(config.getPolicyProviderClassName()),
-          new Object[] {policyFile, engine});
-    } catch (Exception e) {
-      // Re-throw as unchecked exception.
-      throw new IllegalStateException(
-          "Error creating ResourceAuthorizationProvider: ", e);
-    }
+    return SentryAuthProvider.createProvider(config, policy);
   }
 
   /*
@@ -113,7 +84,16 @@ public class AuthorizationChecker {
    * local group mappings.
    */
   public Set<String> getUserGroups(User user) throws InternalException {
-    return provider_.getGroupMapping().getGroups(user.getShortName());
+    try {
+      return provider_.getGroupMapping().getGroups(user.getShortName());
+    } catch (Exception e) {
+      if (SentryUtil.isSentryGroupNotFound(e)) {
+        // Sentry 2.1+ throws exceptions when user does not exist; swallow the
+        // exception and just return an empty set for this case.
+        return Collections.emptySet();
+      }
+      throw new RuntimeException(e);
+    }
   }
 
   /**

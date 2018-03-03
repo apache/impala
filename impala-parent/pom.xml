@@ -51,7 +51,7 @@ under the License.
     <junit.version>4.12</junit.version>
     <!-- Beware compatibility requirements with Thrift and
          KMS; see IMPALA-4210. -->
-    <httpcomponents.core.version>4.2.5</httpcomponents.core.version>
+    <httpcomponents.core.version>4.4.9</httpcomponents.core.version>
     <yarn-extras.version>${project.version}</yarn-extras.version>
     <eclipse.output.directory>eclipse-classes</eclipse.output.directory>
     <guava.version>11.0.2</guava.version>
