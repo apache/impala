@@ -6,7 +6,7 @@ select straight_join * from (values(1 id), (2), (3)) v1,
 (select *, count(*) over() from tpch.lineitem where l_orderkey < 100000) v2
 order by id, l_orderkey, l_partkey, l_suppkey, l_linenumber
 limit 5
-----RESULTS
+---- RESULTS
 1,1,2132,4633,4,28.00,28955.64,0.09,0.06,'N','O','1996-04-21','1996-03-30','1996-05-16','NONE','AIR','lites. fluffily even de',100382
 1,1,15635,638,6,32.00,49620.16,0.07,0.02,'N','O','1996-01-30','1996-02-07','1996-02-03','DELIVER IN PERSON','MAIL','arefully slyly ex',100382
 1,1,24027,1534,5,24.00,22824.48,0.10,0.04,'N','O','1996-03-30','1996-03-14','1996-04-01','NONE','FOB',' pending foxes. slyly re',100382
@@ -14,4 +14,17 @@ limit 5
 1,1,67310,7311,2,36.00,45983.16,0.09,0.06,'N','O','1996-04-12','1996-02-28','1996-04-20','TAKE BACK RETURN','MAIL','ly final dependencies: slyly bold ',100382
 ---- TYPES
 tinyint,bigint,bigint,bigint,int,decimal,decimal,decimal,decimal,string,string,string,string,string,string,string,string,bigint
+====
+---- QUERY
+# IMPALA-6595: same query as above, but tuned to trigger a different bug where we hit
+# "Memory Limit Exceeded" when adding a batch to NljBuilder.
+# TODO: after IMPALA-4835 goes in, retune this query.
+set buffer_pool_limit=50m;
+set mem_limit=70m;
+select straight_join * from (values(1 id), (2), (3)) v1,
+(select *, count(*) over() from tpch.lineitem where l_orderkey < 100000) v2
+order by id, l_orderkey, l_partkey, l_suppkey, l_linenumber
+limit 5
+---- CATCH
+Memory limit exceeded
 ====

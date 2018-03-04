@@ -138,7 +138,11 @@ void NestedLoopJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   ScalarExprEvaluator::Close(join_conjunct_evals_, state);
   ScalarExpr::Close(join_conjuncts_);
-  if (builder_ != NULL) builder_->Close(state);
+  if (builder_ != NULL) {
+    // IMPALA-6595: builder must be closed before child.
+    DCHECK(builder_->is_closed() || !children_[1]->is_closed());
+    builder_->Close(state);
+  }
   build_batches_ = NULL;
   if (matching_build_rows_ != NULL) {
     mem_tracker()->Release(matching_build_rows_->MemUsage());
