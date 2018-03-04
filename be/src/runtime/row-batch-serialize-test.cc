@@ -141,17 +141,20 @@ class RowBatchSerializeTest : public testing::Test {
 
     // Write string #1
     SlotDescriptor* string1_desc = tuple_desc->slots()[1];
-    StringValue sv1(string(string1_size, 'a'));
+    string string1(string1_size, 'a');
+    StringValue sv1(string1);
     RawValue::Write(&sv1, tuple, string1_desc, batch->tuple_data_pool());
 
     // Write string #2
     SlotDescriptor* string2_desc = tuple_desc->slots()[2];
-    StringValue sv2(string(string2_size, 'a'));
+    string string2(string2_size, 'a');
+    StringValue sv2(string2);
     RawValue::Write(&sv2, tuple, string2_desc, batch->tuple_data_pool());
 
     // Write string #3
     SlotDescriptor* string3_desc = tuple_desc->slots()[3];
-    StringValue sv3(string(string3_size, 'a'));
+    string string3(string3_size, 'a');
+    StringValue sv3(string3);
     RawValue::Write(&sv3, tuple, string3_desc, batch->tuple_data_pool());
 
     // Done with this row
