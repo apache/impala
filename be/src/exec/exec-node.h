@@ -210,6 +210,7 @@ class ExecNode {
   MemTracker* expr_mem_tracker() { return expr_mem_tracker_.get(); }
   MemPool* expr_perm_pool() { return expr_perm_pool_.get(); }
   MemPool* expr_results_pool() { return expr_results_pool_.get(); }
+  bool is_closed() const { return is_closed_; }
 
   /// Return true if codegen was disabled by the planner for this ExecNode. Does not
   /// check to see if codegen was enabled for the enclosing fragment.
@@ -334,8 +335,6 @@ class ExecNode {
   /// least the minimum reservation so that it can be returned to the initial
   /// reservations pool in Close().
   BufferPool::ClientHandle buffer_pool_client_;
-
-  bool is_closed() const { return is_closed_; }
 
   /// Pointer to the containing SubplanNode or NULL if not inside a subplan.
   /// Set by SubplanNode::Init(). Not owned.
