@@ -417,6 +417,19 @@ class TestParquet(ImpalaTestSuite):
 
     self.run_test_case('QueryTest/parquet-def-levels', vector, unique_database)
 
+  def test_bad_compression_codec(self, vector, unique_database):
+    """IMPALA-6593: test the bad compression codec is handled gracefully. """
+    self.client.execute(("""CREATE TABLE {0}.bad_codec (
+          id INT, bool_col BOOLEAN, tinyint_col TINYINT, smallint_col SMALLINT,
+          int_col INT, bigint_col BIGINT, float_col FLOAT, double_col DOUBLE,
+          date_string_col STRING, string_col STRING, timestamp_col TIMESTAMP,
+          year INT, month INT) STORED AS PARQUET""").format(unique_database))
+    tbl_loc = get_fs_path("/test-warehouse/%s.db/%s" % (unique_database,
+        "bad_codec"))
+    check_call(['hdfs', 'dfs', '-copyFromLocal', os.environ['IMPALA_HOME'] +
+        "/testdata/data/bad_codec.parquet", tbl_loc])
+    self.run_test_case('QueryTest/parquet-bad-codec', vector, unique_database)
+
   @SkipIfS3.hdfs_block_size
   @SkipIfADLS.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size

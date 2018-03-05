@@ -137,7 +137,7 @@ int CheckDataPage(const ColumnChunk& col, const PageHeader& header, const uint8_
 
     boost::scoped_ptr<impala::Codec> decompressor;
     ABORT_IF_ERROR(impala::Codec::CreateDecompressor(NULL, false,
-        impala::PARQUET_TO_IMPALA_CODEC[col.meta_data.codec], &decompressor));
+        impala::ConvertParquetToImpalaCodec(col.meta_data.codec), &decompressor));
 
     uint8_t* buffer_ptr = decompressed_buffer.data();
     int uncompressed_page_size = header.uncompressed_page_size;

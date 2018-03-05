@@ -1,0 +1,6 @@
+====
+---- QUERY
+select * from bad_codec
+---- CATCH
+uses an unsupported compression: 5000 for column
+====
