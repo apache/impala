@@ -35,46 +35,18 @@ class TimestampValue;
 const uint8_t PARQUET_VERSION_NUMBER[4] = {'P', 'A', 'R', '1'};
 const uint32_t PARQUET_CURRENT_VERSION = 1;
 
-/// Mapping of impala's internal types to parquet storage types. This is indexed by
-/// PrimitiveType enum
-const parquet::Type::type INTERNAL_TO_PARQUET_TYPES[] = {
-  parquet::Type::BOOLEAN,     // Invalid
-  parquet::Type::BOOLEAN,     // NULL type
-  parquet::Type::BOOLEAN,
-  parquet::Type::INT32,
-  parquet::Type::INT32,
-  parquet::Type::INT32,
-  parquet::Type::INT64,
-  parquet::Type::FLOAT,
-  parquet::Type::DOUBLE,
-  parquet::Type::INT96,       // Timestamp
-  parquet::Type::BYTE_ARRAY,  // String
-  parquet::Type::BYTE_ARRAY,  // Date, NYI
-  parquet::Type::BYTE_ARRAY,  // DateTime, NYI
-  parquet::Type::BYTE_ARRAY,  // Binary NYI
-  parquet::Type::FIXED_LEN_BYTE_ARRAY, // Decimal
-  parquet::Type::BYTE_ARRAY,  // VARCHAR(N)
-  parquet::Type::BYTE_ARRAY,  // CHAR(N)
-};
+/// Return the Parquet type corresponding to Impala's internal type. The caller must
+/// validate that the type is valid, otherwise this will DCHECK.
+parquet::Type::type ConvertInternalToParquetType(PrimitiveType type);
 
-/// Mapping of Parquet codec enums to Impala enums
-const THdfsCompression::type PARQUET_TO_IMPALA_CODEC[] = {
-  THdfsCompression::NONE,
-  THdfsCompression::SNAPPY,
-  THdfsCompression::GZIP,
-  THdfsCompression::LZO
-};
+/// Return the Impala compression type for the given Parquet codec. The caller must
+/// validate that the codec is a supported one, otherwise this will DCHECK.
+THdfsCompression::type ConvertParquetToImpalaCodec(parquet::CompressionCodec::type codec);
 
-/// Mapping of Impala codec enums to Parquet enums
-const parquet::CompressionCodec::type IMPALA_TO_PARQUET_CODEC[] = {
-  parquet::CompressionCodec::UNCOMPRESSED,
-  parquet::CompressionCodec::SNAPPY,  // DEFAULT
-  parquet::CompressionCodec::GZIP,    // GZIP
-  parquet::CompressionCodec::GZIP,    // DEFLATE
-  parquet::CompressionCodec::SNAPPY,
-  parquet::CompressionCodec::SNAPPY,  // SNAPPY_BLOCKED
-  parquet::CompressionCodec::LZO,
-};
+/// Return the Parquet code for the given Impala compression type. The caller must
+/// validate that the codec is a supported one, otherwise this will DCHECK.
+parquet::CompressionCodec::type ConvertImpalaToParquetCodec(
+    THdfsCompression::type codec);
 
 /// The plain encoding does not maintain any state so all these functions
 /// are static helpers.

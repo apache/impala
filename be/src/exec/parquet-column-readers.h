@@ -359,7 +359,7 @@ class BaseScalarColumnReader : public ParquetColumnReader {
 
     if (metadata_->codec != parquet::CompressionCodec::UNCOMPRESSED) {
       RETURN_IF_ERROR(Codec::CreateDecompressor(
-          NULL, false, PARQUET_TO_IMPALA_CODEC[metadata_->codec], &decompressor_));
+          NULL, false, ConvertParquetToImpalaCodec(metadata_->codec), &decompressor_));
     }
     ClearDictionaryDecoder();
     return Status::OK();
@@ -380,7 +380,7 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   int col_idx() const { return node_.col_idx; }
   THdfsCompression::type codec() const {
     if (metadata_ == NULL) return THdfsCompression::NONE;
-    return PARQUET_TO_IMPALA_CODEC[metadata_->codec];
+    return ConvertParquetToImpalaCodec(metadata_->codec);
   }
 
   /// Reads the next definition and repetition levels for this column. Initializes the

@@ -81,6 +81,7 @@ add_library(Exec
   kudu-scan-node-mt.cc
   kudu-table-sink.cc
   kudu-util.cc
+  parquet-common.cc
   read-write-util.cc
   scan-node.cc
   scanner-context.cc
