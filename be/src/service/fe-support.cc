@@ -469,7 +469,7 @@ Java_org_apache_impala_service_FeSupport_NativeLibCacheSetNeedsRefresh(JNIEnv* e
     str.assign(hdfs_location_data.get());
   }
   LibCache::instance()->SetNeedsRefresh(str);
-  return static_cast<jboolean>(false);
+  return static_cast<jboolean>(true);
 }
 
 extern "C"
