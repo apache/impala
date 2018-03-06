@@ -815,6 +815,11 @@ class ImpalaShell(object, cmd.Cmd):
         print_to_stderr("Socket error %s: %s" % (code, e))
         self.prompt = self.DISCONNECTED_PROMPT
     except Exception, e:
+      if options.ldap_password_cmd and \
+          options.ldap_password and \
+          options.ldap_password.endswith('\n'):
+        print_to_stderr("Warning: LDAP password contains a trailing newline. "
+                      "Did you use 'echo' instead of 'echo -n'?")
       print_to_stderr("Error connecting: %s, %s" % (type(e).__name__, e))
       # A secure connection may still be open. So we explicitly close it.
       self.imp_client.close_connection()
