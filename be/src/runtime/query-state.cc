@@ -326,8 +326,9 @@ void QueryState::StartFInstances() {
     // start new thread to execute instance
     refcnt_.Add(1); // decremented in ExecFInstance()
     AcquireExecResourceRefcount(); // decremented in ExecFInstance()
-    string thread_name = Substitute(
-        "exec-finstance (finst:$0)", PrintId(instance_ctx.fragment_instance_id));
+    string thread_name = Substitute("$0 (finst:$1)",
+        FragmentInstanceState::FINST_THREAD_NAME_PREFIX,
+        PrintId(instance_ctx.fragment_instance_id));
     unique_ptr<Thread> t;
     thread_create_status = Thread::Create(FragmentInstanceState::FINST_THREAD_GROUP_NAME,
         thread_name, [this, fis]() { this->ExecFInstance(fis); }, &t, true);

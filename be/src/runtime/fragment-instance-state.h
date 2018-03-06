@@ -25,6 +25,7 @@
 
 #include "common/atomic.h"
 #include "common/status.h"
+#include "common/thread-debug-info.h"
 #include "util/promise.h"
 
 #include "gen-cpp/ImpalaInternalService_types.h"
@@ -127,7 +128,19 @@ class FragmentInstanceState {
   const TNetworkAddress& coord_address() const { return query_ctx().coord_address; }
   ObjectPool* obj_pool();
 
+  /// Returns true if the current thread is a thread executing the whole or part of
+  /// a fragment instance.
+  static bool IsFragmentExecThread() {
+    const static size_t name_len =
+        strlen(FragmentInstanceState::FINST_THREAD_NAME_PREFIX.c_str());
+    const char* name = GetThreadDebugInfo()->GetThreadName();
+    return name != nullptr &&
+        (strncmp(name, FINST_THREAD_NAME_PREFIX.c_str(), name_len) == 0 ||
+         strncmp(name, "join-build-thread", 17) == 0);
+  }
+
   static const std::string FINST_THREAD_GROUP_NAME;
+  static const std::string FINST_THREAD_NAME_PREFIX;
 
  private:
   QueryState* query_state_;
