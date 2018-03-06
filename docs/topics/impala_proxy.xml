@@ -111,10 +111,14 @@ under the License.
             </li>
             <li>
               <p rev="DOCS-690">
-                Consider enabling <q>sticky sessions</q>. Where practical, enable this setting
-                so that stateless client applications such as <cmdname>impalad</cmdname> and Hue
-                are not disconnected from long-running queries. Evaluate whether this setting is
-                appropriate for your combination of workload and client applications.
+                Consider using the <i>source affinity</i>
+                algorithm to ensure the sticky sessions. Where practical, enable
+                this setting so that stateless client applications such as
+                  <cmdname>impalad</cmdname> and Hue are not disconnected from
+                long-running queries. Evaluate whether this setting is
+                appropriate for your combination of workload and client
+                applications. See <xref href="#proxy_balancing" format="dita"/>
+                for
               </p>
             </li>
             <li>
@@ -159,7 +163,7 @@ under the License.
 
   </concept>
 
-  <concept id="proxy_balancing" rev="" audience="hidden">
+  <concept id="proxy_balancing" rev="">
     <title>Choosing the Load-Balancing Algorithm</title>
     <conbody>
       <p>
@@ -172,10 +176,12 @@ under the License.
         <dlentry>
           <dt>leastconn</dt>
           <dd>
-            Connects sessions to the coordinator with the fewest connections, to balance the load evenly.
-            Typically used for workloads consisting of many independent, short-running queries.
-            In configurations with only a few client machines, this setting can avoid having all
-            requests go to only a small set of coordinators.
+            Connects sessions to the coordinator with the fewest connections,
+            to balance the load evenly. Typically used for workloads consisting
+            of many independent, short-running queries. In configurations with
+            only a few client machines, this setting can avoid having all
+            requests go to only a small set of coordinators. Recommended for
+            Impala with F5.
           </dd>
         </dlentry>
         <dlentry>
@@ -192,15 +198,9 @@ under the License.
             An alternative is to set the query option <codeph>SYNC_DDL=1</codeph>
             to hold back subsequent queries until the results of a DDL operation have propagated
             throughout the cluster, but that is a relatively expensive setting.
-            Recommended for use with Hue.
           </dd>
-        </dlentry>
-        <dlentry>
-          <dt>sticky</dt>
           <dd>
-            Similar to source affinity. Sessions from the same IP address always go to the same coordinator.
-            The maintenance overhead for the <q>stick tables</q> can cause long-running Hue sessions
-            to disconnect, therefore source affinity is often a better choice.
+            Recommended for use with Hue.
           </dd>
         </dlentry>
         <dlentry>
