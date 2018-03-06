@@ -361,8 +361,8 @@ Status ClientRequestState::ExecLocalCatalogOp(
     }
     case TCatalogOpType::DESCRIBE_TABLE: {
       TDescribeResult response;
-      RETURN_IF_ERROR(frontend_->DescribeTable(catalog_op.describe_table_params,
-          &response));
+      const TDescribeTableParams& params = catalog_op.describe_table_params;
+      RETURN_IF_ERROR(frontend_->DescribeTable(params, query_ctx_.session, &response));
       // Set the result set
       request_result_set_.reset(new vector<TResultRow>(response.results));
       return Status::OK();

@@ -48,6 +48,9 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
+import org.apache.impala.thrift.TColumnValue;
+import org.apache.impala.thrift.TDescribeOutputStyle;
+import org.apache.impala.thrift.TDescribeResult;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TMetadataOpcode;
@@ -55,8 +58,10 @@ import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TPrivilegeScope;
+import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TSessionState;
+import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.SentryPolicyService;
 import org.apache.sentry.provider.common.ResourceAuthorizationProvider;
@@ -1459,13 +1464,15 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthzOk("describe functional.alltypessmall");
     // User has column level privileges on described column.
     AuthzOk("describe functional.allcomplextypes.int_struct_col");
-    // User has column level privileges on another column in table.
-    AuthzOk("describe functional.allcomplextypes.complex_struct_col");
+    // User has column level privileges on another column in table but not this one.
+    AuthzError("describe functional.allcomplextypes.complex_struct_col",
+        "User '%s' does not have privileges to access: functional.allcomplextypes");
     // User has table level privileges without column level.
     AuthzOk("describe functional_parquet.allcomplextypes.complex_struct_col");
-    // Insufficient privileges on table.
-    AuthzError("describe formatted functional.alltypestiny",
-        "User '%s' does not have privileges to access: functional.alltypestiny");
+    // Column level privileges will allow describe but with reduced data.
+    AuthzOk("describe formatted functional.alltypestiny");
+    // Column level privileges will allow describe but with reduced data.
+    AuthzOk("describe formatted functional.alltypessmall");
     // Insufficient privileges on table for nested column.
     AuthzError("describe functional.complextypestbl.nested_struct",
         "User '%s' does not have privileges to access: functional.complextypestbl");
@@ -1475,6 +1482,193 @@ public class AuthorizationTest extends FrontendTestBase {
     // Insufficient privileges on db.
     AuthzError("describe functional_rc.alltypes",
         "User '%s' does not have privileges to access: functional_rc.alltypes");
+    // Insufficient privileges on column that is a complex type, trying to access member.
+    AuthzError("describe functional.allcomplextypes.complex_struct_col.f2",
+        "User '%s' does not have privileges to access: functional.allcomplextypes");
+    // Insufficient privileges on column that is not a complex type, trying to access member.
+    AuthzError("describe functional.allcomplextypes.nested_struct_col.f1",
+        "User '%s' does not have privileges to access: functional.allcomplextypes");
+  }
+
+  // Expected output of DESCRIBE for a functional table.
+  private static final List<String> EXPECTED_DESCRIBE_ALLTYPESSMALL =
+      Lists.newArrayList(
+      "id","int","",
+      "int_col","int", "",
+      "year","int", ""
+      );
+
+  // Expected output of DESCRIBE for a functional table.
+  private static final List<String> EXPECTED_DESCRIBE_ALLTYPESAGG =
+      Lists.newArrayList(
+      "id","int","",
+      "bool_col","boolean","",
+      "tinyint_col","tinyint","",
+      "smallint_col","smallint", "",
+      "int_col","int", "",
+      "bigint_col","bigint", "",
+      "float_col","float", "",
+      "double_col","double", "",
+      "date_string_col","string", "",
+      "string_col","string", "",
+      "timestamp_col","timestamp", "",
+      "year","int", "",
+      "month","int", "",
+      "day","int", ""
+      );
+
+  // Expected output of DESCRIBE for a functional table.
+  // "*" is used when the output is variable such as time or user.
+  private static final List<String> EXPECTED_DESCRIBE_EXTENDED_ALLTYPESAGG =
+      Lists.newArrayList(
+      "# col_name","data_type","comment",
+      "","NULL","NULL",
+      "id","int","NULL",
+      "bool_col","boolean","NULL",
+      "tinyint_col","tinyint","NULL",
+      "smallint_col","smallint","NULL",
+      "int_col","int","NULL",
+      "bigint_col","bigint","NULL",
+      "float_col","float","NULL",
+      "double_col","double","NULL",
+      "date_string_col","string","NULL",
+      "string_col","string","NULL",
+      "timestamp_col","timestamp","NULL",
+      "","NULL","NULL",
+      "# Partition Information","NULL","NULL",
+      "# col_name","data_type","comment",
+      "","NULL","NULL",
+      "year","int","NULL",
+      "month","int","NULL",
+      "day","int","NULL",
+      "","NULL","NULL",
+      "# Detailed Table Information","NULL","NULL",
+      "Database:","functional","NULL",
+      "Owner:","*","NULL",
+      "CreateTime:","*","NULL",
+      "LastAccessTime:","UNKNOWN","NULL",
+      "Protect Mode:","None","NULL",
+      "Retention:","0","NULL",
+      "Location:","hdfs://localhost:20500/test-warehouse/alltypesagg","NULL",
+      "Table Type:","EXTERNAL_TABLE","NULL",
+      "Table Parameters:","NULL","NULL",
+      "","DO_NOT_UPDATE_STATS","true",
+      "","EXTERNAL","TRUE",
+      "","STATS_GENERATED_VIA_STATS_TASK","true",
+      "","numRows","11000",
+      "","totalSize","834279",
+      "","transient_lastDdlTime","*",
+      "","NULL","NULL",
+      "# Storage Information","NULL","NULL",
+      "SerDe Library:","org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe","NULL",
+      "InputFormat:","org.apache.hadoop.mapred.TextInputFormat","NULL",
+      "OutputFormat:","org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat","NULL",
+      "Compressed:","No","NULL",
+      "Num Buckets:","0","NULL",
+      "Bucket Columns:","[]","NULL",
+      "Sort Columns:","[]","NULL",
+      "Storage Desc Params:","NULL","NULL",
+      "","escape.delim","\\\\",
+      "","field.delim",",",
+      "","serialization.format",","
+      );
+
+  // Expected output of DESCRIBE for a functional table.
+  // "*" is used when the output is variable such as time or user.
+  private static final List<String> EXPECTED_DESCRIBE_EXTENDED_ALLTYPESSMALL =
+      Lists.newArrayList(
+      "# col_name","data_type","comment",
+      "","NULL","NULL",
+      "id","int","NULL",
+      "int_col","int","NULL",
+      "","NULL","NULL",
+      "# Partition Information","NULL","NULL",
+      "# col_name","data_type","comment",
+      "","NULL","NULL",
+      "year","int","NULL",
+      "","NULL","NULL",
+      "# Detailed Table Information","NULL","NULL",
+      "Database:","functional","NULL",
+      "Owner:","*","NULL",
+      "CreateTime:","*","NULL",
+      "LastAccessTime:","UNKNOWN","NULL",
+      "Protect Mode:","None","NULL",
+      "Retention:","0","NULL",
+      "Table Type:","EXTERNAL_TABLE","NULL",
+      "Table Parameters:","NULL","NULL",
+      "","DO_NOT_UPDATE_STATS","true",
+      "","EXTERNAL","TRUE",
+      "","STATS_GENERATED_VIA_STATS_TASK","true",
+      "","numRows","100",
+      "","totalSize","6472",
+      "","transient_lastDdlTime","*",
+      "","NULL","NULL",
+      "# Storage Information","NULL","NULL",
+      "SerDe Library:","org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe","NULL",
+      "InputFormat:","org.apache.hadoop.mapred.TextInputFormat","NULL",
+      "OutputFormat:","org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat","NULL",
+      "Compressed:","No","NULL",
+      "Num Buckets:","0","NULL",
+      "Bucket Columns:","[]","NULL",
+      "Sort Columns:","[]","NULL",
+      "Storage Desc Params:","NULL","NULL",
+      "","escape.delim","\\\\",
+      "","field.delim",",",
+      "","serialization.format",","
+      );
+
+  @Test
+  public void TestDescribeTableResults() throws ImpalaException {
+    // Verify MINIMAL describe contains all columns
+    TDescribeResult result = fe_.describeTable(new TTableName("functional","alltypesagg"),
+        TDescribeOutputStyle.MINIMAL, USER);
+    Assert.assertEquals(EXPECTED_DESCRIBE_ALLTYPESAGG, resultToStringList(result));
+
+    // Verify EXTENDED output contains all columns and data
+    result = fe_.describeTable(new TTableName("functional","alltypesagg"),
+        TDescribeOutputStyle.EXTENDED, USER);
+    verifyOutputWithOptionalData(EXPECTED_DESCRIBE_EXTENDED_ALLTYPESAGG,
+        resultToStringList(result));
+
+    // Verify FORMATTED output contains all columns and data
+    result = fe_.describeTable(new TTableName("functional","alltypesagg"),
+        TDescribeOutputStyle.FORMATTED, USER);
+    verifyOutputWithOptionalData(EXPECTED_DESCRIBE_EXTENDED_ALLTYPESAGG,
+        resultToStringList(result));
+
+    // Verify MINIMAL describe on restricted table shows limited columns.
+    result = fe_.describeTable(new TTableName("functional","alltypessmall"),
+        TDescribeOutputStyle.MINIMAL, USER);
+    Assert.assertEquals(EXPECTED_DESCRIBE_ALLTYPESSMALL,
+        resultToStringList(result));
+
+    // Verify FORMATTED output contains all columns and data
+    result = fe_.describeTable(new TTableName("functional","alltypessmall"),
+        TDescribeOutputStyle.FORMATTED, USER);
+    verifyOutputWithOptionalData(EXPECTED_DESCRIBE_EXTENDED_ALLTYPESSMALL,
+        resultToStringList(result));
+  }
+
+  // Compares two arrays but skips an expected value that contains '*' since we need to
+  // compare output but some values change based on builds, environments, etc.
+  private void verifyOutputWithOptionalData(List<String> expected, List<String> actual) {
+    Assert.assertEquals(expected.size(), actual.size());
+    for (int idx = 0; idx < expected.size(); idx++) {
+      if (!expected.get(idx).equals("*")) {
+        Assert.assertEquals(expected.get(idx), actual.get(idx));
+      }
+    }
+  }
+
+  // Convert TDescribeResult to ArrayList of strings.
+  private static List<String> resultToStringList(TDescribeResult result) {
+    List<String> strarr = new ArrayList<String>();
+    for (TResultRow row: result.getResults()) {
+      for (TColumnValue col: row.getColVals()) {
+        strarr.add(col.getString_val() == null ? "NULL": col.getString_val().trim());
+      }
+    }
+    return strarr;
   }
 
   @Test

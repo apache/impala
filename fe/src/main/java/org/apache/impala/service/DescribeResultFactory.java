@@ -17,6 +17,7 @@
 
 package org.apache.impala.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -28,7 +29,6 @@ import org.apache.hadoop.hive.ql.metadata.formatting.MetaDataFormatUtils;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.KuduColumn;
-import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Table;
@@ -181,9 +181,11 @@ public class DescribeResultFactory {
    * Builds a TDescribeResult that contains the result of a DESCRIBE FORMATTED|EXTENDED
    * <table> command. For the formatted describe output the goal is to be exactly the
    * same as what Hive (via HiveServer2) outputs, for compatibility reasons. To do this,
-   * Hive's MetadataFormatUtils class is used to build the results.
+   * Hive's MetadataFormatUtils class is used to build the results.  filteredColumns is a
+   * list of columns the user is authorized to view.
    */
-  public static TDescribeResult buildDescribeFormattedResult(Table table) {
+  public static TDescribeResult buildDescribeFormattedResult(Table table,
+      List<Column> filteredColumns) {
     TDescribeResult result = new TDescribeResult();
     result.results = Lists.newArrayList();
 
@@ -192,8 +194,19 @@ public class DescribeResultFactory {
     // For some table formats (e.g. Avro) the column list in the table can differ from the
     // one returned by the Hive metastore. To handle this we use the column list from the
     // table which has already reconciled those differences.
-    msTable.getSd().setCols(Column.toFieldSchemas(table.getNonClusteringColumns()));
-    msTable.setPartitionKeys(Column.toFieldSchemas(table.getClusteringColumns()));
+    // Need to create a new list since if the columns are filtered, this will
+    // affect the original list.
+    List<Column> nonClustered = new ArrayList<Column>();
+    List<Column> clustered = new ArrayList<Column>();
+    for (Column col: filteredColumns) {
+      if (table.isClusteringColumn(col)) {
+        clustered.add(col);
+      } else {
+        nonClustered.add(col);
+      }
+    }
+    msTable.getSd().setCols(Column.toFieldSchemas(nonClustered));
+    msTable.setPartitionKeys(Column.toFieldSchemas(clustered));
 
     // To avoid initializing any of the SerDe classes in the metastore table Thrift
     // struct, create the ql.metadata.Table object by calling the empty c'tor and
@@ -248,16 +261,12 @@ public class DescribeResultFactory {
   }
 
   /**
-   * Builds a TDescribeResult for a table.
+   * Builds a TDescribeResult for a kudu table from a list of columns.
    */
-  public static TDescribeResult buildDescribeMinimalResult(Table table) {
-    if (!(table instanceof KuduTable)) {
-      return buildDescribeMinimalResult(table.getHiveColumnsAsStruct());
-    }
-
+  public static TDescribeResult buildKuduDescribeMinimalResult(List<Column> columns) {
     TDescribeResult descResult = new TDescribeResult();
     descResult.results = Lists.newArrayList();
-    for (Column c: table.getColumnsInHiveOrder()) {
+    for (Column c: columns) {
       Preconditions.checkState(c instanceof KuduColumn);
       KuduColumn kuduColumn = (KuduColumn) c;
       // General describe info.

@@ -724,7 +724,7 @@ public class InsertStmt extends StatementBase {
 
     // Finally, 'undo' the permutation so that the selectListExprs are in Hive column
     // order, and add NULL expressions to all missing columns, unless this is an UPSERT.
-    ArrayList<Column> columns = table_.getColumnsInHiveOrder();
+    List<Column> columns = table_.getColumnsInHiveOrder();
     for (int col = 0; col < columns.size(); ++col) {
       Column tblColumn = columns.get(col);
       boolean matchFound = false;

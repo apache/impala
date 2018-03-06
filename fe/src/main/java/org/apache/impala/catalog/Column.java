@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
@@ -136,4 +137,15 @@ public class Column {
     for (Column col: columns) colNames.add(col.getName());
     return colNames;
   }
+  /**
+   * Returns a struct type from the table columns passed in as a parameter.
+   */
+  public static StructType columnsToStruct(List<Column> columns) {
+    ArrayList<StructField> fields = Lists.newArrayListWithCapacity(columns.size());
+    for (Column col: columns) {
+      fields.add(new StructField(col.getName(), col.getType(), col.getComment()));
+    }
+    return new StructType(fields);
+  }
+
 }

@@ -431,9 +431,10 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, params, thriftDescribeTableParams);
 
     Preconditions.checkState(params.isSetTable_name() ^ params.isSetResult_struct());
+    User user = new User(TSessionStateUtil.getEffectiveUser(params.getSession()));
     TDescribeResult result = null;
     if (params.isSetTable_name()) {
-      result = frontend_.describeTable(params.getTable_name(), params.output_style);
+      result = frontend_.describeTable(params.getTable_name(), params.output_style, user);
     } else {
       Preconditions.checkState(params.output_style == TDescribeOutputStyle.MINIMAL);
       StructType structType = (StructType)Type.fromThrift(params.result_struct);
