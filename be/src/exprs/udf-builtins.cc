@@ -140,22 +140,27 @@ TruncUnit StrToTruncUnit(FunctionContext* ctx, const StringVal& unit_str) {
   }
 }
 
-// Truncate to first day of Milllenium
-TimestampValue TruncMillenium(const date& orig_date) {
-  date new_date(orig_date.year() / 1000 * 1000, 1, 1);
+// Truncate to first day of millennium
+TimestampValue TruncMillennium(const date& orig_date) {
+  DCHECK_GT(orig_date.year(), 2000);
+  // First year of current millennium is 2001
+  date new_date((orig_date.year() - 1) / 1000 * 1000 + 1, 1, 1);
   time_duration new_time(0, 0, 0, 0);
   return TimestampValue(new_date, new_time);
 }
 
 // Truncate to first day of century
 TimestampValue TruncCentury(const date& orig_date) {
-  date new_date(orig_date.year() / 100 * 100, 1, 1);
+  DCHECK_GT(orig_date.year(), 1400);
+  // First year of current century is 2001
+  date new_date((orig_date.year() - 1) / 100 * 100 + 1, 1, 1);
   time_duration new_time(0, 0, 0, 0);
   return TimestampValue(new_date, new_time);
 }
 
 // Truncate to first day of decade
 TimestampValue TruncDecade(const date& orig_date) {
+  // Decades start with years ending in '0'.
   date new_date(orig_date.year() / 10 * 10, 1, 1);
   time_duration new_time(0, 0, 0, 0);
   return TimestampValue(new_date, new_time);
@@ -270,9 +275,14 @@ TimestampVal DoTrunc(
   // check for invalid or malformed timestamps
   switch (trunc_unit) {
     case TruncUnit::MILLENNIUM:
-      // for millenium < 2000 year value goes to 1000 (outside the supported range)
+      // for millenium <= 2000 year value goes to 1001 (outside the supported range)
       if (orig_date.is_special()) return TimestampVal::null();
-      if (orig_date.year() < 2000) return TimestampVal::null();
+      if (orig_date.year() <= 2000) return TimestampVal::null();
+      break;
+    case TruncUnit::CENTURY:
+      // for century <= 1400 year value goes to 1301 (outside the supported range)
+      if (orig_date.is_special()) return TimestampVal::null();
+      if (orig_date.year() <= 1400) return TimestampVal::null();
       break;
     case TruncUnit::WEEK:
       // anything less than 1400-1-6 we have to move to year 1399
@@ -286,7 +296,6 @@ TimestampVal DoTrunc(
     case TruncUnit::W:
     case TruncUnit::DAY:
     case TruncUnit::DAY_OF_WEEK:
-    case TruncUnit::CENTURY:
     case TruncUnit::DECADE:
       if (orig_date.is_special()) return TimestampVal::null();
       break;
@@ -330,7 +339,7 @@ TimestampVal DoTrunc(
       ret = TruncMinute(orig_date, orig_time);
       break;
     case TruncUnit::MILLENNIUM:
-      ret = TruncMillenium(orig_date);
+      ret = TruncMillennium(orig_date);
       break;
     case TruncUnit::CENTURY:
       ret = TruncCentury(orig_date);
