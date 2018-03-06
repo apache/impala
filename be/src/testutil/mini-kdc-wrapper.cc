@@ -66,6 +66,9 @@ Status MiniKdcWrapper::CreateServiceKeytab(const string& spn, string* kt_path) {
 
 Status MiniKdcWrapper::SetupAndStartMiniKDC(KerberosSwitch k) {
   if (k != KERBEROS_OFF) {
+    // Enable the workaround for MIT krb5 1.10 bugs from krb5_realm_override.cc.
+    setenv("KUDU_ENABLE_KRB5_REALM_FIX", "true", 0);
+
     FLAGS_use_kudu_kinit = k == USE_KUDU_KERBEROS;
 
     // Check if the unique directory already exists, and create it if it doesn't.
