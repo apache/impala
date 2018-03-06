@@ -66,6 +66,7 @@ import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizeableTable;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
+import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.authorization.User;
@@ -786,14 +787,65 @@ public class Frontend {
    * the table metadata.
    */
   public TDescribeResult describeTable(TTableName tableName,
-      TDescribeOutputStyle outputStyle) throws ImpalaException {
+      TDescribeOutputStyle outputStyle, User user) throws ImpalaException {
     Table table = impaladCatalog_.get().getTable(tableName.db_name, tableName.table_name);
+    List<Column> filteredColumns;
+    if (authzConfig_.isEnabled()) {
+      // First run a table check
+      PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder()
+          .allOf(Privilege.SELECT).onTable(table.getDb().getName(), table.getName())
+          .toRequest();
+      if (!authzChecker_.get().hasAccess(user, privilegeRequest)) {
+        // Filter out columns that the user is not authorized to see.
+        filteredColumns = new ArrayList<Column>();
+        for (Column col: table.getColumnsInHiveOrder()) {
+          String colName = col.getName();
+          privilegeRequest = new PrivilegeRequestBuilder()
+              .allOf(Privilege.SELECT)
+              .onColumn(table.getDb().getName(), table.getName(), colName)
+              .toRequest();
+          if (authzChecker_.get().hasAccess(user, privilegeRequest)) {
+            filteredColumns.add(col);
+          }
+        }
+      } else {
+        // User has table-level access
+        filteredColumns = table.getColumnsInHiveOrder();
+      }
+    } else {
+      // Authorization is disabled
+      filteredColumns = table.getColumnsInHiveOrder();
+    }
     if (outputStyle == TDescribeOutputStyle.MINIMAL) {
-      return DescribeResultFactory.buildDescribeMinimalResult(table);
+      if (!(table instanceof KuduTable)) {
+        return DescribeResultFactory.buildDescribeMinimalResult(
+            Column.columnsToStruct(filteredColumns));
+      }
+      return DescribeResultFactory.buildKuduDescribeMinimalResult(filteredColumns);
     } else {
       Preconditions.checkArgument(outputStyle == TDescribeOutputStyle.FORMATTED ||
           outputStyle == TDescribeOutputStyle.EXTENDED);
-      return DescribeResultFactory.buildDescribeFormattedResult(table);
+      TDescribeResult result = DescribeResultFactory.buildDescribeFormattedResult(table,
+          filteredColumns);
+      // Filter out LOCATION text
+      if (authzConfig_.isEnabled()) {
+        PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder()
+            .allOf(Privilege.VIEW_METADATA)
+            .onTable(table.getDb().getName(),table.getName())
+            .toRequest();
+        // Only filter if the user doesn't have table access.
+        if (!authzChecker_.get().hasAccess(user, privilegeRequest)) {
+          List<TResultRow> results = new ArrayList<TResultRow>();
+          for(TResultRow row: result.getResults()) {
+            String stringVal = row.getColVals().get(0).getString_val();
+            if (!stringVal.contains("Location")) {
+              results.add(row);
+            }
+          }
+          result.setResults(results);
+        }
+      }
+      return result;
     }
   }
 
