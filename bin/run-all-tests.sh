@@ -38,10 +38,9 @@ if "${CLUSTER_DIR}/admin" is_kerberized; then
   KERB_ARGS="--use_kerberos"
 fi
 
-# Enable KRPC during tests (default: true).
-: ${TEST_KRPC:=true}
-
 # Parametrized Test Options
+# Disable KRPC for test cluster and test execution
+: ${DISABLE_KRPC:=false}
 # Run FE Tests
 : ${FE_TEST:=true}
 # Run Backend Tests
@@ -67,7 +66,7 @@ else
 fi
 
 # If KRPC tests are disabled, pass the flag to disable KRPC during cluster start.
-if [[ "${TEST_KRPC}" == "false" ]]; then
+if [[ "${DISABLE_KRPC}" == "true" ]]; then
   TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} --disable_krpc"
 fi
 
@@ -121,7 +120,7 @@ fi
 
 # If KRPC tests are disabled, pass test_no_krpc flag to pytest.
 # This includes the end-to-end tests and the custom cluster tests.
-if [[ "${TEST_KRPC}" == "false" ]]; then
+if [[ "${DISABLE_KRPC}" == "true" ]]; then
   COMMON_PYTEST_ARGS+=" --test_no_krpc"
 fi
 
