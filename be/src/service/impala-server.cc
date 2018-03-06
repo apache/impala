@@ -98,10 +98,11 @@ using boost::get_system_time;
 using boost::system_time;
 using boost::uuids::random_generator;
 using boost::uuids::uuid;
+using namespace apache::hive::service::cli::thrift;
 using namespace apache::thrift;
 using namespace apache::thrift::transport;
-using namespace boost::posix_time;
 using namespace beeswax;
+using namespace boost::posix_time;
 using namespace rapidjson;
 using namespace strings;
 
@@ -615,8 +616,8 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
   {
     shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
     if (request_state.get() != nullptr) {
-      // For queries in CREATED state, the profile information isn't populated yet.
-      if (request_state->query_state() == beeswax::QueryState::CREATED) {
+      // For queries in INITIALIZED_STATE, the profile information isn't populated yet.
+      if (request_state->operation_state() == TOperationState::INITIALIZED_STATE) {
         return Status::Expected("Query plan is not ready.");
       }
       lock_guard<mutex> l(*request_state->lock());
@@ -1689,7 +1690,7 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const ClientRequestState& reque
     total_fragments = coord->progress().total();
     has_coord = true;
   }
-  query_state = request_state.query_state();
+  query_state = request_state.BeeswaxQueryState();
   num_rows_fetched = request_state.num_rows_fetched();
   query_status = request_state.query_status();
 

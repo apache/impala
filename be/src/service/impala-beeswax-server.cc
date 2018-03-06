@@ -65,7 +65,7 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
   RAISE_IF_ERROR(Execute(&query_ctx, session, &request_state),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
-  request_state->UpdateNonErrorQueryState(beeswax::QueryState::RUNNING);
+  request_state->UpdateNonErrorOperationState(TOperationState::RUNNING_STATE);
   // start thread to wait for results to become available, which will allow
   // us to advance query state to FINISHED or EXCEPTION
   Status status = request_state->WaitAsync();
@@ -110,7 +110,7 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
   RAISE_IF_ERROR(Execute(&query_ctx, session, &request_state),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
-  request_state->UpdateNonErrorQueryState(beeswax::QueryState::RUNNING);
+  request_state->UpdateNonErrorOperationState(TOperationState::RUNNING_STATE);
   // Once the query is running do a final check for session closure and add it to the
   // set of in-flight queries.
   Status status = SetQueryInflight(session, request_state);
@@ -255,9 +255,10 @@ beeswax::QueryState::type ImpalaServer::get_state(const QueryHandle& handle) {
   // Take the lock to ensure that if the client sees a query_state == EXCEPTION, it is
   // guaranteed to see the error query_status.
   lock_guard<mutex> l(*request_state->lock());
-  DCHECK_EQ(request_state->query_state() == beeswax::QueryState::EXCEPTION,
+  beeswax::QueryState::type query_state = request_state->BeeswaxQueryState();
+  DCHECK_EQ(query_state == beeswax::QueryState::EXCEPTION,
       !request_state->query_status().ok());
-  return request_state->query_state();
+  return query_state;
 }
 
 void ImpalaServer::echo(string& echo_string, const string& input_string) {
@@ -293,7 +294,7 @@ void ImpalaServer::get_log(string& log, const LogContextId& context) {
     // Take the lock to ensure that if the client sees a query_state == EXCEPTION, it is
     // guaranteed to see the error query_status.
     lock_guard<mutex> l(*request_state->lock());
-    DCHECK_EQ(request_state->query_state() == beeswax::QueryState::EXCEPTION,
+    DCHECK_EQ(request_state->BeeswaxQueryState() == beeswax::QueryState::EXCEPTION,
         !request_state->query_status().ok());
     // If the query status is !ok, include the status error message at the top of the log.
     if (!request_state->query_status().ok()) {
