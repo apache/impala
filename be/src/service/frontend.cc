@@ -124,8 +124,13 @@ Status Frontend::DescribeDb(const TDescribeDbParams& params,
 }
 
 Status Frontend::DescribeTable(const TDescribeTableParams& params,
-    TDescribeResult* response) {
-  return JniUtil::CallJniMethod(fe_, describe_table_id_, params, response);
+    const TSessionState& session, TDescribeResult* response) {
+  TDescribeTableParams tparams;
+  tparams.__set_output_style(params.output_style);
+  if (params.__isset.table_name) tparams.__set_table_name(params.table_name);
+  if (params.__isset.result_struct) tparams.__set_result_struct(params.result_struct);
+  tparams.__set_session(session);
+  return JniUtil::CallJniMethod(fe_, describe_table_id_, tparams, response);
 }
 
 Status Frontend::ShowCreateTable(const TTableName& table_name, string* response) {
