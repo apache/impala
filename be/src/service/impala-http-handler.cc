@@ -42,6 +42,7 @@
 
 #include "common/names.h"
 
+using namespace apache::hive::service::cli::thrift;
 using namespace apache::thrift;
 using namespace beeswax;
 using namespace impala;
@@ -757,7 +758,7 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
       // state lock to be acquired, since it could potentially be an expensive
       // call, if the table Catalog metadata loading is in progress. Instead
       // update the caller that the plan information is unavailable.
-      if (request_state->query_state() == beeswax::QueryState::CREATED) {
+      if (request_state->operation_state() == TOperationState::INITIALIZED_STATE) {
         document->AddMember(
             "plan_metadata_unavailable", "true", document->GetAllocator());
         return;

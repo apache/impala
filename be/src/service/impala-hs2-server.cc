@@ -86,18 +86,6 @@ namespace impala {
 
 const string IMPALA_RESULT_CACHING_OPT = "impala.resultset.cache.size";
 
-// Helper function to translate between Beeswax and HiveServer2 type
-static TOperationState::type QueryStateToTOperationState(
-    const beeswax::QueryState::type& query_state) {
-  switch (query_state) {
-    case beeswax::QueryState::CREATED: return TOperationState::INITIALIZED_STATE;
-    case beeswax::QueryState::RUNNING: return TOperationState::RUNNING_STATE;
-    case beeswax::QueryState::FINISHED: return TOperationState::FINISHED_STATE;
-    case beeswax::QueryState::EXCEPTION: return TOperationState::ERROR_STATE;
-    default: return TOperationState::UKNOWN_STATE;
-  }
-}
-
 void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
     TMetadataOpRequest* request, TOperationHandle* handle, thrift::TStatus* status) {
   TUniqueId session_id;
@@ -161,7 +149,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
     return;
   }
 
-  request_state->UpdateNonErrorQueryState(beeswax::QueryState::FINISHED);
+  request_state->UpdateNonErrorOperationState(TOperationState::FINISHED_STATE);
 
   Status inflight_status = SetQueryInflight(session, request_state);
   if (!inflight_status.ok()) {
@@ -466,7 +454,7 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
         cache_num_rows);
     if (!status.ok()) goto return_error;
   }
-  request_state->UpdateNonErrorQueryState(beeswax::QueryState::RUNNING);
+  request_state->UpdateNonErrorOperationState(TOperationState::RUNNING_STATE);
   // Start thread to wait for results to become available.
   status = request_state->WaitAsync();
   if (!status.ok()) goto return_error;
@@ -651,8 +639,7 @@ void ImpalaServer::GetOperationStatus(TGetOperationStatusResp& return_val,
 
   {
     lock_guard<mutex> l(*request_state->lock());
-    TOperationState::type operation_state = QueryStateToTOperationState(
-        request_state->query_state());
+    TOperationState::type operation_state = request_state->operation_state();
     return_val.__set_operationState(operation_state);
     if (operation_state == TOperationState::ERROR_STATE) {
       DCHECK(!request_state->query_status().ok());

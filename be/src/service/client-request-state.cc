@@ -101,7 +101,7 @@ ClientRequestState::ClientRequestState(
       TimePrecision::Nanosecond));
   summary_profile_->AddInfoString("End Time", "");
   summary_profile_->AddInfoString("Query Type", "N/A");
-  summary_profile_->AddInfoString("Query State", PrintQueryState(query_state_));
+  summary_profile_->AddInfoString("Query State", PrintQueryState(BeeswaxQueryState()));
   summary_profile_->AddInfoString("Query Status", "OK");
   summary_profile_->AddInfoString("Impala Version", GetVersionString(/* compact */ true));
   summary_profile_->AddInfoString("User", effective_user());
@@ -214,7 +214,7 @@ Status ClientRequestState::Exec(TExecRequest* exec_request) {
     }
     default:
       stringstream errmsg;
-      errmsg << "Unknown  exec request stmt type: " << exec_request_.stmt_type;
+      errmsg << "Unknown exec request stmt type: " << exec_request_.stmt_type;
       return Status(errmsg.str());
   }
 }
@@ -644,8 +644,11 @@ void ClientRequestState::Wait() {
     discard_result(UpdateQueryStatus(status));
   }
   if (status.ok()) {
-    UpdateNonErrorQueryState(beeswax::QueryState::FINISHED);
+    UpdateNonErrorOperationState(TOperationState::FINISHED_STATE);
   }
+  // UpdateQueryStatus() or UpdateNonErrorOperationState() have updated operation_state_.
+  DCHECK(operation_state_ == TOperationState::FINISHED_STATE ||
+      operation_state_ == TOperationState::ERROR_STATE);
 }
 
 Status ClientRequestState::WaitInternal() {
@@ -720,17 +723,18 @@ Status ClientRequestState::RestartFetch() {
   return Status::OK();
 }
 
-void ClientRequestState::UpdateNonErrorQueryState(
-    beeswax::QueryState::type query_state) {
+void ClientRequestState::UpdateNonErrorOperationState(
+    TOperationState::type operation_state) {
   lock_guard<mutex> l(lock_);
-  DCHECK(query_state != beeswax::QueryState::EXCEPTION);
-  if (query_state_ < query_state) UpdateQueryState(query_state);
+  DCHECK(operation_state == TOperationState::RUNNING_STATE
+      || operation_state == TOperationState::FINISHED_STATE);
+  if (operation_state_ < operation_state) UpdateOperationState(operation_state);
 }
 
 Status ClientRequestState::UpdateQueryStatus(const Status& status) {
   // Preserve the first non-ok status
   if (!status.ok() && query_status_.ok()) {
-    UpdateQueryState(beeswax::QueryState::EXCEPTION);
+    UpdateOperationState(TOperationState::ERROR_STATE);
     query_status_ = status;
     summary_profile_->AddInfoStringRedacted("Query Status", query_status_.GetDetail());
   }
@@ -740,12 +744,13 @@ Status ClientRequestState::UpdateQueryStatus(const Status& status) {
 
 Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
     QueryResultSet* fetched_rows) {
-  DCHECK(query_state_ != beeswax::QueryState::EXCEPTION);
+  // Wait() guarantees that we've transitioned at least to FINISHED_STATE (and any
+  // state beyond that should have a non-OK query_status_ set).
+  DCHECK(operation_state_ == TOperationState::FINISHED_STATE);
 
   if (eos_) return Status::OK();
 
   if (request_result_set_ != NULL) {
-    UpdateQueryState(beeswax::QueryState::FINISHED);
     int num_rows = 0;
     const vector<TResultRow>& all_rows = (*(request_result_set_.get()));
     // max_rows <= 0 means no limit
@@ -772,9 +777,6 @@ Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
     num_rows_fetched_ += num_rows_fetched_from_cache;
     if (num_rows_fetched_from_cache >= max_rows) return Status::OK();
   }
-
-  // results will be ready after this call
-  UpdateQueryState(beeswax::QueryState::FINISHED);
 
   // Maximum number of rows to be fetched from the coord.
   int32_t max_coord_rows = max_rows;
@@ -876,13 +878,13 @@ Status ClientRequestState::Cancel(bool check_inflight, const Status* cause) {
   Coordinator* coord;
   {
     lock_guard<mutex> lock(lock_);
-    // If the query is completed or cancelled, no need to update state.
-    bool already_done = eos_ || query_state_ == beeswax::QueryState::EXCEPTION;
+    // If the query has reached a terminal state, no need to update the state.
+    bool already_done = eos_ || operation_state_ == TOperationState::ERROR_STATE;
     if (!already_done && cause != NULL) {
       DCHECK(!cause->ok());
       discard_result(UpdateQueryStatus(*cause));
       query_events_->MarkEvent("Cancelled");
-      DCHECK_EQ(query_state_, beeswax::QueryState::EXCEPTION);
+      DCHECK_EQ(operation_state_, TOperationState::ERROR_STATE);
     }
     // Get a copy of the coordinator pointer while holding 'lock_'.
     coord = coord_.get();
@@ -1101,10 +1103,23 @@ void ClientRequestState::ClearResultCache() {
   result_cache_.reset(NULL);
 }
 
-void ClientRequestState::UpdateQueryState(
-    beeswax::QueryState::type query_state) {
-  query_state_ = query_state;
-  summary_profile_->AddInfoString("Query State", PrintQueryState(query_state_));
+void ClientRequestState::UpdateOperationState(
+    TOperationState::type operation_state) {
+  operation_state_ = operation_state;
+  summary_profile_->AddInfoString("Query State", PrintQueryState(BeeswaxQueryState()));
+}
+
+beeswax::QueryState::type ClientRequestState::BeeswaxQueryState() const {
+  switch (operation_state_) {
+    case TOperationState::INITIALIZED_STATE: return beeswax::QueryState::CREATED;
+    case TOperationState::RUNNING_STATE: return beeswax::QueryState::RUNNING;
+    case TOperationState::FINISHED_STATE: return beeswax::QueryState::FINISHED;
+    case TOperationState::ERROR_STATE: return beeswax::QueryState::EXCEPTION;
+    default: {
+      DCHECK(false) << "Add explicit translation for all used TOperationState values";
+      return beeswax::QueryState::EXCEPTION;
+    }
+  }
 }
 
 }

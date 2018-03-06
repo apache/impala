@@ -28,7 +28,7 @@
 #include "util/condition-variable.h"
 #include "util/runtime-profile.h"
 #include "gen-cpp/Frontend_types.h"
-#include "gen-cpp/Frontend_types.h"
+#include "gen-cpp/ImpalaHiveServer2Service.h"
 
 #include <boost/thread.hpp>
 #include <boost/unordered_set.hpp>
@@ -74,8 +74,8 @@ class ClientRequestState {
   Status Exec(const TMetadataOpRequest& exec_request) WARN_UNUSED_RESULT;
 
   /// Call this to ensure that rows are ready when calling FetchRows(). Updates the
-  /// query_status_, and advances query_state_ to FINISHED or EXCEPTION. Must be preceded
-  /// by call to Exec(). Waits for all child queries to complete. Takes lock_.
+  /// query_status_, and advances operation_state_ to FINISHED or EXCEPTION. Must be
+  /// preceded by call to Exec(). Waits for all child queries to complete. Takes lock_.
   void Wait();
 
   /// Calls Wait() asynchronously in a thread and returns immediately.
@@ -93,7 +93,7 @@ class ClientRequestState {
   /// Caller needs to hold fetch_rows_lock_ and lock_.
   /// Caller should verify that EOS has not be reached before calling.
   /// Must be preceeded by call to Wait() (or WaitAsync()/BlockOnWait()).
-  /// Also updates query_state_/status_ in case of error.
+  /// Also updates operation_state_/query_status_ in case of error.
   Status FetchRows(const int32_t max_rows, QueryResultSet* fetched_rows)
       WARN_UNUSED_RESULT;
 
@@ -106,11 +106,12 @@ class ClientRequestState {
   /// The caller must hold fetch_rows_lock_ and lock_.
   Status RestartFetch() WARN_UNUSED_RESULT;
 
-  /// Update query state if the requested state isn't already obsolete. This is only for
-  /// non-error states - if the query encounters an error the query status needs to be set
-  /// with information about the error so UpdateQueryStatus must be used instead.
-  /// Takes lock_.
-  void UpdateNonErrorQueryState(beeswax::QueryState::type query_state);
+  /// Update operation state if the requested state isn't already obsolete. This is
+  /// only for non-error states - if the query encounters an error the query status
+  /// needs to be set with information about the error so UpdateQueryStatus() must be
+  /// used instead. Takes lock_.
+  void UpdateNonErrorOperationState(
+      apache::hive::service::cli::thrift::TOperationState::type operation_state);
 
   /// Update the query status and the "Query Status" summary profile string.
   /// If current status is already != ok, no update is made (we preserve the first error)
@@ -124,7 +125,7 @@ class ClientRequestState {
 
   /// Cancels the child queries and the coordinator with the given cause.
   /// If cause is NULL, assume this was deliberately cancelled by the user.
-  /// Otherwise, sets state to EXCEPTION.
+  /// Otherwise, sets state to ERROR_STATE (TODO: use CANCELED_STATE).
   /// Does nothing if the query has reached EOS or already cancelled.
   ///
   /// Only returns an error if 'check_inflight' is true and the query is not yet
@@ -137,7 +138,7 @@ class ClientRequestState {
   void Done();
 
   /// Sets the API-specific (Beeswax, HS2) result cache and its size bound.
-  /// The given cache is owned by this query exec state, even if an error is returned.
+  /// The given cache is owned by this client request state, even if an error is returned.
   /// Returns a non-ok status if max_size exceeds the per-impalad allowed maximum.
   Status SetResultCache(QueryResultSet* cache, int64_t max_size) WARN_UNUSED_RESULT;
 
@@ -179,7 +180,12 @@ class ClientRequestState {
   }
   boost::mutex* lock() { return &lock_; }
   boost::mutex* fetch_rows_lock() { return &fetch_rows_lock_; }
-  beeswax::QueryState::type query_state() const { return query_state_; }
+  apache::hive::service::cli::thrift::TOperationState::type operation_state() const {
+    return operation_state_;
+  }
+  // Translate operation_state() to a beeswax::QueryState. TODO: remove calls to this
+  // and replace with uses of operation_state() directly.
+  beeswax::QueryState::type BeeswaxQueryState() const;
   const Status& query_status() const { return query_status_; }
   void set_result_metadata(const TResultSetMetadata& md) { result_metadata_ = md; }
   void set_user_profile_access(bool user_has_profile_access) {
@@ -335,15 +341,20 @@ class ClientRequestState {
 
   bool is_cancelled_ = false; // if true, Cancel() was called.
   bool eos_ = false;  // if true, there are no more rows to return
-  /// We enforce the invariant that query_status_ is not OK iff query_state_ is EXCEPTION,
-  /// given that lock_ is held. query_state_ should only be updated using
-  /// UpdateQueryState(), to ensure that the query profile is also updated.
-  beeswax::QueryState::type query_state_ = beeswax::QueryState::CREATED;
+
+  /// We enforce the invariant that query_status_ is not OK iff operation_state_ is
+  /// ERROR_STATE, given that lock_ is held. operation_state_ should only be updated
+  /// using UpdateOperationState(), to ensure that the query profile is also updated.
+  apache::hive::service::cli::thrift::TOperationState::type operation_state_ =
+      apache::hive::service::cli::thrift::TOperationState::INITIALIZED_STATE;
+
   Status query_status_;
   TExecRequest exec_request_;
+
   /// If true, effective_user() has access to the runtime profile and execution
   /// summary.
   bool user_has_profile_access_ = true;
+
   TResultSetMetadata result_metadata_; // metadata for select query
   RowBatch* current_batch_ = nullptr; // the current row batch; only applicable if coord is set
   int current_batch_row_ = 0 ; // number of rows fetched within the current batch
@@ -395,10 +406,10 @@ class ClientRequestState {
   /// Executes a LOAD DATA
   Status ExecLoadDataRequest() WARN_UNUSED_RESULT;
 
-  /// Core logic of Wait(). Does not update query_state_/status_.
+  /// Core logic of Wait(). Does not update operation_state_/query_status_.
   Status WaitInternal() WARN_UNUSED_RESULT;
 
-  /// Core logic of FetchRows(). Does not update query_state_/status_.
+  /// Core logic of FetchRows(). Does not update operation_state_/query_status_.
   /// Caller needs to hold fetch_rows_lock_ and lock_.
   Status FetchRowsInternal(const int32_t max_rows, QueryResultSet* fetched_rows)
       WARN_UNUSED_RESULT;
@@ -436,10 +447,11 @@ class ClientRequestState {
   /// This function is a no-op if the cache has already been cleared.
   void ClearResultCache();
 
-  /// Update the query state and the "Query State" summary profile string.
+  /// Update the operation state and the "Query State" summary profile string.
   /// Does not take lock_, but requires it: caller must ensure lock_
-  /// is taken before calling UpdateQueryState.
-  void UpdateQueryState(beeswax::QueryState::type query_state);
+  /// is taken before calling UpdateOperationState.
+  void UpdateOperationState(
+      apache::hive::service::cli::thrift::TOperationState::type operation_state);
 
   /// Gets the query options, their values and levels and populates the result set
   /// with them. It covers the subset of options for 'SET' and all of them for
