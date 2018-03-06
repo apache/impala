@@ -25,6 +25,7 @@
 
 #include "exec/kudu-util.h"
 #include "kudu/rpc/rpc_context.h"
+#include "runtime/fragment-instance-state.h"
 #include "runtime/krpc-data-stream-recvr.h"
 #include "runtime/krpc-data-stream-mgr.h"
 #include "runtime/mem-tracker.h"
@@ -33,6 +34,7 @@
 #include "service/data-stream-service.h"
 #include "util/runtime-profile-counters.h"
 #include "util/periodic-counter-updater.h"
+#include "util/test-info.h"
 
 #include "gen-cpp/data_stream_service.pb.h"
 
@@ -189,6 +191,8 @@ KrpcDataStreamRecvr::SenderQueue::SenderQueue(
 
 Status KrpcDataStreamRecvr::SenderQueue::GetBatch(RowBatch** next_batch) {
   SCOPED_TIMER(recvr_->queue_get_batch_time_);
+  DCHECK(TestInfo::is_test() || FragmentInstanceState::IsFragmentExecThread());
+  DCHECK(!recvr_->closed_);
   int num_to_dequeue = 0;
   // The sender id is set below when we decide to dequeue entries from 'deferred_rpcs_'.
   int sender_id = -1;
@@ -315,7 +319,7 @@ Status KrpcDataStreamRecvr::SenderQueue::AddBatchWork(int64_t batch_size,
     // handle deleting any unconsumed batches from batch_queue_. Close() cannot proceed
     // until there are no pending insertion to batch_queue_.
     status = RowBatch::FromProtobuf(recvr_->row_desc(), header, tuple_offsets, tuple_data,
-        recvr_->parent_tracker(), recvr_->client(), &batch);
+        recvr_->parent_tracker(), recvr_->buffer_pool_client(), &batch);
   }
   lock->lock();
 
@@ -394,8 +398,8 @@ void KrpcDataStreamRecvr::SenderQueue::DequeueDeferredRpc() {
     DCHECK_GT(num_deserialize_tasks_pending_, 0);
     --num_deserialize_tasks_pending_;
 
-    // Returns if the queue is empty. The queue may be drained in Cancel().
     if (deferred_rpcs_.empty()) return;
+    // A sender queue cannot be cancelled if there is any deferred RPC.
     DCHECK(!is_cancelled_);
 
     // Try enqueuing the first entry into 'batch_queue_'.
@@ -439,16 +443,22 @@ void KrpcDataStreamRecvr::SenderQueue::DequeueDeferredRpc() {
 
 void KrpcDataStreamRecvr::SenderQueue::TakeOverEarlySender(
     unique_ptr<TransmitDataCtx> ctx) {
+  // TakeOverEarlySender() is called by the same thread which calls Close().
+  // The receiver cannot be closed while this function is in progress so
+  // 'recvr_->mgr_' shouldn't be NULL.
+  DCHECK(TestInfo::is_test() || FragmentInstanceState::IsFragmentExecThread());
+  DCHECK(!recvr_->closed_ && recvr_->mgr_ != nullptr);
   int sender_id = ctx->request->sender_id();
-  recvr_->deferred_rpc_tracker()->Consume(ctx->rpc_context->GetTransferSize());
   COUNTER_ADD(recvr_->num_arrived_batches_, 1);
   {
     lock_guard<SpinLock> l(lock_);
     if (UNLIKELY(is_cancelled_)) {
-      DataStreamService::RespondAndReleaseRpc(Status::OK(), ctx->response,
-          ctx->rpc_context, recvr_->deferred_rpc_tracker());
+      Status::OK().ToProto(ctx->response->mutable_status());
+      ctx->rpc_context->RespondSuccess();
       return;
     }
+    // Only enqueue a deferred RPC if the sender queue is not yet cancelled.
+    recvr_->deferred_rpc_tracker()->Consume(ctx->rpc_context->GetTransferSize());
     deferred_rpcs_.push(move(ctx));
     ++num_deserialize_tasks_pending_;
   }
@@ -511,6 +521,7 @@ void KrpcDataStreamRecvr::SenderQueue::Close() {
 
 Status KrpcDataStreamRecvr::CreateMerger(const TupleRowComparator& less_than) {
   DCHECK(is_merging_);
+  DCHECK(TestInfo::is_test() || FragmentInstanceState::IsFragmentExecThread());
   vector<SortedRunMerger::RunBatchSupplierFn> input_batch_suppliers;
   input_batch_suppliers.reserve(sender_queues_.size());
 
@@ -529,6 +540,7 @@ Status KrpcDataStreamRecvr::CreateMerger(const TupleRowComparator& less_than) {
 }
 
 void KrpcDataStreamRecvr::TransferAllResources(RowBatch* transfer_batch) {
+  DCHECK(TestInfo::is_test() || FragmentInstanceState::IsFragmentExecThread());
   for (SenderQueue* sender_queue: sender_queues_) {
     if (sender_queue->current_batch() != nullptr) {
       sender_queue->current_batch()->TransferResourceOwnership(transfer_batch);
@@ -547,22 +559,27 @@ KrpcDataStreamRecvr::KrpcDataStreamRecvr(KrpcDataStreamMgr* stream_mgr,
     total_buffer_limit_(total_buffer_limit),
     row_desc_(row_desc),
     is_merging_(is_merging),
+    closed_(false),
     num_buffered_bytes_(0),
     deferred_rpc_tracker_(new MemTracker(-1, "KrpcDeferredRpcs", parent_tracker)),
     parent_tracker_(parent_tracker),
-    client_(client),
+    buffer_pool_client_(client),
     profile_(profile),
-    recvr_side_profile_(profile_->CreateChild("RecvrSide")),
-    sender_side_profile_(profile_->CreateChild("SenderSide")) {
+    recvr_side_profile_(RuntimeProfile::Create(&pool_, "RecvrSide")),
+    sender_side_profile_(RuntimeProfile::Create(&pool_, "SenderSide")) {
   // Create one queue per sender if is_merging is true.
   int num_queues = is_merging ? num_senders : 1;
   sender_queues_.reserve(num_queues);
   int num_sender_per_queue = is_merging ? 1 : num_senders;
   for (int i = 0; i < num_queues; ++i) {
-    SenderQueue* queue =
-        sender_queue_pool_.Add(new SenderQueue(this, num_sender_per_queue));
+    SenderQueue* queue = pool_.Add(new SenderQueue(this, num_sender_per_queue));
     sender_queues_.push_back(queue);
   }
+
+  // Add the receiver and sender sides' profiles as children of the owning exchange
+  // node's profile.
+  profile_->AddChild(recvr_side_profile_);
+  profile_->AddChild(sender_side_profile_);
 
   // Initialize the counters
   bytes_received_counter_ =
@@ -572,11 +589,11 @@ KrpcDataStreamRecvr::KrpcDataStreamRecvr(KrpcDataStreamMgr* stream_mgr,
   queue_get_batch_time_ = ADD_TIMER(recvr_side_profile_, "TotalGetBatchTime");
   data_arrival_timer_ =
       ADD_CHILD_TIMER(recvr_side_profile_, "DataArrivalTimer", "TotalGetBatchTime");
+  inactive_timer_ = profile_->inactive_timer();
   first_batch_wait_total_timer_ =
       ADD_TIMER(recvr_side_profile_, "FirstBatchArrivalWaitTime");
   deserialize_row_batch_timer_ =
       ADD_TIMER(sender_side_profile_, "DeserializeRowBatchTime");
-  inactive_timer_ = profile_->inactive_timer();
   num_early_senders_ =
       ADD_COUNTER(sender_side_profile_, "NumEarlySenders", TUnit::UNIT);
   num_arrived_batches_ =
@@ -592,6 +609,7 @@ KrpcDataStreamRecvr::KrpcDataStreamRecvr(KrpcDataStreamMgr* stream_mgr,
 }
 
 Status KrpcDataStreamRecvr::GetNext(RowBatch* output_batch, bool* eos) {
+  DCHECK(TestInfo::is_test() || FragmentInstanceState::IsFragmentExecThread());
   DCHECK(merger_.get() != nullptr);
   return merger_->GetNext(output_batch, eos);
 }
@@ -627,17 +645,29 @@ void KrpcDataStreamRecvr::CancelStream() {
 }
 
 void KrpcDataStreamRecvr::Close() {
+  DCHECK(TestInfo::is_test() || FragmentInstanceState::IsFragmentExecThread());
+  DCHECK(!closed_);
+  closed_ = true;
   // Remove this receiver from the KrpcDataStreamMgr that created it.
   // All the sender queues will be cancelled after this call returns.
   const Status status = mgr_->DeregisterRecvr(fragment_instance_id(), dest_node_id());
   if (!status.ok()) {
     LOG(ERROR) << "Error deregistering receiver: " << status.GetDetail();
   }
-  mgr_ = nullptr;
   for (auto& queue: sender_queues_) queue->Close();
   merger_.reset();
+
+  // Given all queues have been cancelled and closed already at this point, it's safe to
+  // call Close() on 'deferred_rpc_tracker_' without holding any lock here.
   deferred_rpc_tracker_->Close();
   recvr_side_profile_->StopPeriodicCounters();
+
+  // Remove reference to the unowned resources which may be freed after Close().
+  mgr_ = nullptr;
+  row_desc_ = nullptr;
+  parent_tracker_ = nullptr;
+  buffer_pool_client_ = nullptr;
+  profile_ = nullptr;
 }
 
 KrpcDataStreamRecvr::~KrpcDataStreamRecvr() {

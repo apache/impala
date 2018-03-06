@@ -55,6 +55,7 @@ using namespace apache::thrift;
 
 const string FragmentInstanceState::PER_HOST_PEAK_MEM_COUNTER = "PerHostPeakMemUsage";
 const string FragmentInstanceState::FINST_THREAD_GROUP_NAME = "fragment-execution";
+const string FragmentInstanceState::FINST_THREAD_NAME_PREFIX = "exec-finstance";
 
 static const string OPEN_TIMER_NAME = "OpenTime";
 static const string PREPARE_TIMER_NAME = "PrepareTime";

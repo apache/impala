@@ -71,6 +71,19 @@ class TransmitDataResponsePB;
 ///
 /// KrpcDataStreamRecvr::Close() must be called by the caller of CreateRecvr() to remove
 /// the recvr instance from the tracking structure of its KrpcDataStreamMgr in all cases.
+///
+/// Unless otherwise stated, class members belong to KrpcDataStreamRecvr. They are safe to
+/// access from any threads as long as the caller obtained a shared_ptr to keep the
+/// receiver alive. For class members not owned by the receiver, they must stay valid till
+/// after Close() is called. Since a receiver is co-owned by an exchange node and the
+/// singleton KrpcDataStreamMgr, it's possible that certain threads may race with Close()
+/// called from the fragment execution thread. A receiver may also be cancelled at any
+/// time due to query cancellation. To avoid resource leak, the following protocol is
+/// followed:
+/// - callers must obtain the target sender queue's lock and check if it's cancelled
+/// - no new row batch or deferred RPCs should be added to a cancelled sender queue
+/// - Cancel() will drain the deferred RPCs queue and the row batch queue
+///
 class KrpcDataStreamRecvr : public DataStreamRecvrBase {
  public:
   ~KrpcDataStreamRecvr();
@@ -79,24 +92,28 @@ class KrpcDataStreamRecvr : public DataStreamRecvrBase {
   /// Retains ownership of the returned batch. The caller must call TransferAllResources()
   /// to acquire the resources from the returned batch before the next call to GetBatch().
   /// A NULL returned batch indicated eos. Must only be called if is_merging_ is false.
+  /// Called from fragment instance execution threads only.
   /// TODO: This is currently only exposed to the non-merging version of the exchange.
   /// Refactor so both merging and non-merging exchange use GetNext(RowBatch*, bool* eos).
   Status GetBatch(RowBatch** next_batch);
 
   /// Deregister from KrpcDataStreamMgr instance, which shares ownership of this instance.
+  /// Called from fragment instance execution threads only.
   void Close();
 
   /// Create a SortedRunMerger instance to merge rows from multiple sender according to
   /// the specified row comparator. Fetches the first batches from the individual sender
   /// queues. The exprs used in less_than must have already been prepared and opened.
+  /// Called from fragment instance execution threads only.
   Status CreateMerger(const TupleRowComparator& less_than);
 
   /// Fill output_batch with the next batch of rows obtained by merging the per-sender
-  /// input streams. Must only be called if is_merging_ is true.
+  /// input streams. Must only be called if is_merging_ is true. Called from fragment
+  /// instance execution threads only.
   Status GetNext(RowBatch* output_batch, bool* eos);
 
   /// Transfer all resources from the current batches being processed from each sender
-  /// queue to the specified batch.
+  /// queue to the specified batch. Called from fragment instance execution threads only.
   void TransferAllResources(RowBatch* transfer_batch);
 
   const TUniqueId& fragment_instance_id() const { return fragment_instance_id_; }
@@ -104,7 +121,7 @@ class KrpcDataStreamRecvr : public DataStreamRecvrBase {
   const RowDescriptor* row_desc() const { return row_desc_; }
   MemTracker* deferred_rpc_tracker() const { return deferred_rpc_tracker_.get(); }
   MemTracker* parent_tracker() const { return parent_tracker_; }
-  BufferPool::ClientHandle* client() const { return client_; }
+  BufferPool::ClientHandle* buffer_pool_client() const { return buffer_pool_client_; }
 
  private:
   friend class KrpcDataStreamMgr;
@@ -127,11 +144,13 @@ class KrpcDataStreamRecvr : public DataStreamRecvrBase {
   /// Tries adding the first entry of 'deferred_rpcs_' queue for the sender queue
   /// identified by 'sender_id'. If is_merging_ is false, it always defaults to
   /// queue 0; If is_merging_ is true, the sender queue is identified by 'sender_id_'.
+  /// Called from KrpcDataStreamMgr's deserialization threads only.
   void DequeueDeferredRpc(int sender_id);
 
   /// Takes over the RPC state 'ctx' of an early sender for deferred processing and
   /// kicks off a deserialization task to process it asynchronously. This makes sure
   /// new incoming RPCs won't pass the early senders, leading to starvation.
+  /// Called from fragment instance execution threads only.
   void TakeOverEarlySender(std::unique_ptr<TransmitDataCtx> ctx);
 
   /// Indicate that a particular sender is done. Delegated to the appropriate
@@ -148,7 +167,7 @@ class KrpcDataStreamRecvr : public DataStreamRecvrBase {
     return num_buffered_bytes_.Load() + batch_size > total_buffer_limit_;
   }
 
-  /// KrpcDataStreamMgr instance used to create this recvr. (Not owned)
+  /// KrpcDataStreamMgr instance used to create this recvr. Not owned.
   KrpcDataStreamMgr* mgr_;
 
   /// Fragment and node id of the destination exchange node this receiver is used by.
@@ -160,18 +179,22 @@ class KrpcDataStreamRecvr : public DataStreamRecvrBase {
   /// buffered data exceeds this value.
   const int64_t total_buffer_limit_;
 
-  /// Row schema.
+  /// Row schema. Not owned.
   const RowDescriptor* row_desc_;
 
   /// True if this reciver merges incoming rows from different senders. Per-sender
   /// row batch queues are maintained in this case.
-  bool is_merging_;
+  const bool is_merging_;
+
+  /// True if Close() has been called on this receiver already. Should only be accessed
+  /// from the fragment execution thread.
+  bool closed_;
 
   /// total number of bytes held across all sender queues.
   AtomicInt32 num_buffered_bytes_;
 
-  /// Memtracker for payloads of deferred Rpcs in the sender queue(s).
-  /// This must be accessed with 'lock_' held to avoid race with Close().
+  /// Memtracker for payloads of deferred Rpcs in the sender queue(s). This must be
+  /// accessed with a sender queue's lock held to avoid race with Close() of the queue.
   boost::scoped_ptr<MemTracker> deferred_rpc_tracker_;
 
   /// The MemTracker of the exchange node which owns this receiver. Not owned.
@@ -179,32 +202,38 @@ class KrpcDataStreamRecvr : public DataStreamRecvrBase {
   MemTracker* parent_tracker_;
 
   /// The buffer pool client for allocating buffers of incoming row batches. Not owned.
-  BufferPool::ClientHandle* client_;
+  BufferPool::ClientHandle* buffer_pool_client_;
 
   /// One or more queues of row batches received from senders. If is_merging_ is true,
   /// there is one SenderQueue for each sender. Otherwise, row batches from all senders
   /// are placed in the same SenderQueue. The SenderQueue instances are owned by the
-  /// receiver and placed in sender_queue_pool_.
+  /// receiver and placed in 'pool_'.
   std::vector<SenderQueue*> sender_queues_;
 
   /// SortedRunMerger used to merge rows from different senders.
   boost::scoped_ptr<SortedRunMerger> merger_;
 
-  /// Pool of sender queues.
-  ObjectPool sender_queue_pool_;
+  /// Pool which owns sender queues and the runtime profiles.
+  ObjectPool pool_;
 
-  /// Runtime profile storing the counters below.
+  /// Runtime profile of the owning exchange node. It's the parent of
+  /// 'recvr_side_profile_' and 'sender_side_profile_'. Not owned.
   RuntimeProfile* profile_;
 
   /// Maintain two child profiles - receiver side measurements (from the GetBatch() path),
-  /// and sender side measurements (from AddBatch()).
+  /// and sender side measurements (from AddBatch()). These two profiles own all counters
+  /// below unless otherwise noted. These profiles are owned by the receiver and placed
+  /// in 'pool_'. 'recvr_side_profile_' and 'sender_side_profile_' must outlive 'profile_'
+  /// to prevent accessing freed memory during top-down traversal of 'profile_'. The
+  /// receiver is co-owned by the exchange node and the data stream manager so these two
+  /// profiles should outlive the exchange node which owns 'profile_'.
   RuntimeProfile* recvr_side_profile_;
   RuntimeProfile* sender_side_profile_;
 
   /// Number of bytes received but not necessarily enqueued.
   RuntimeProfile::Counter* bytes_received_counter_;
 
-  /// Time series of number of bytes received, samples bytes_received_counter_
+  /// Time series of number of bytes received, samples bytes_received_counter_.
   RuntimeProfile::TimeSeriesCounter* bytes_received_time_series_counter_;
 
   /// Total wall-clock time spent deserializing row batches.
@@ -237,7 +266,7 @@ class KrpcDataStreamRecvr : public DataStreamRecvrBase {
   /// Total wall-clock time spent waiting for data to arrive in the recv buffer.
   RuntimeProfile::Counter* data_arrival_timer_;
 
-  /// Pointer to profile's inactive timer.
+  /// Pointer to profile's inactive timer. Not owned.
   RuntimeProfile::Counter* inactive_timer_;
 
   /// Total time spent in SenderQueue::GetBatch().
