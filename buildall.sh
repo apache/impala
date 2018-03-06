@@ -183,6 +183,9 @@ do
       LZO_CMAKE_ARGS+=" -GNinja"
       MAKE_CMD=ninja
       ;;
+    -cmake_only)
+      MAKE_IMPALA_ARGS+=" -cmake_only"
+      ;;
     -help|*)
       echo "buildall.sh - Builds Impala and runs all tests."
       echo "[-noclean] : Omits cleaning all packages before building. Will not kill"\
@@ -217,6 +220,8 @@ do
       echo "[-so|-build_shared_libs] : Dynamically link executables (default is static)"
       echo "[-kerberize] : Enable kerberos on the cluster"
       echo "[-fe_only] : Build just the frontend"
+      echo "[-ninja] : Use ninja instead of make"
+      echo "[-cmake_only] : Generate makefiles only, instead of doing a full build"
       echo "-----------------------------------------------------------------------------
 Examples of common tasks:
 
