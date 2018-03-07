@@ -515,7 +515,7 @@ class TestImpalaShell(ImpalaTestSuite):
         unique_database)
     self._validate_shell_messages(results.stderr, shell_messages, should_exist=False)
 
-    # SELECT, INSERT and CTAS queries should print the query time message and webserver
+    # SELECT, INSERT, CTAS, CTE queries should print the query time message and webserver
     # address.
     results = run_impala_shell_cmd('--query="insert into %s.shell_msg_test values (1)"' %
         unique_database)
@@ -525,6 +525,12 @@ class TestImpalaShell(ImpalaTestSuite):
     self._validate_shell_messages(results.stderr, shell_messages, should_exist=True)
     results = run_impala_shell_cmd('--query="create table %s.shell_msg_ctas_test as \
         select * from %s.shell_msg_test"' % (unique_database, unique_database))
+    self._validate_shell_messages(results.stderr, shell_messages, should_exist=True)
+    results = run_impala_shell_cmd('--query="create table %s.shell_msg_cte_test(i int); '
+                                   'with abc as (select 1) '
+                                   'insert overwrite %s.shell_msg_cte_test '
+                                   'select * from %s.shell_msg_cte_test;"' %
+                                   (unique_database, unique_database, unique_database))
     self._validate_shell_messages(results.stderr, shell_messages, should_exist=True)
 
     # DROP statements should not print query time and webserver address.

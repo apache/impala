@@ -1128,7 +1128,7 @@ class ImpalaShell(object, cmd.Cmd):
     is_dml = False
     tokens = list(lexer)
     if filter(self.DML_REGEX.match, tokens): is_dml = True
-    return self._execute_stmt(query, is_dml=is_dml)
+    return self._execute_stmt(query, is_dml=is_dml, print_web_link=True)
 
   def do_use(self, args):
     """Executes a USE... query"""
