@@ -290,7 +290,22 @@ int CpuInfo::GetCurrentCore() {
 #ifdef HAVE_SCHED_GETCPU
   int cpu = sched_getcpu();
   // The syscall may not be supported even if the function exists.
-  return cpu == -1 ? 0 : cpu;
+  if (UNLIKELY(cpu < 0)) return 0;
+  if (UNLIKELY(cpu >= max_num_cores_)) {
+    // IMPALA-6595: on some systems it appears that sched_getcpu() can return
+    // out-of-range CPU ids. We need to avoid returning bogus values from this function,
+    // but should warn the user that something weird is happening.
+    const int MAX_WARNINGS = 20;
+    LOG_FIRST_N(WARNING, MAX_WARNINGS)
+      << "sched_getcpu() returned an out-of-range CPU identifier '" << cpu << "'. "
+      << "The OS originally reported a maximum of " << max_num_cores_ << " online cores. "
+      << "Performance may be negatively affected. This may happen if virtualization "
+      << "software incorrectly virtualizes certain instructions. See IMPALA-6595 for "
+      << "more information. These warnings will stop after " << MAX_WARNINGS << " "
+      << "occurrences.";
+    return cpu % max_num_cores_;
+  }
+  return cpu;
 #else
   return 0;
 #endif

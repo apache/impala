@@ -30,14 +30,15 @@ namespace impala {
 class CpuTestUtil {
  public:
   /// Set the thread affinity so that it always runs on 'core'. Fail the test if
-  /// unsuccessful.
-  static void PinToCore(int core) {
+  /// unsuccessful. If 'validate_current_cpu' is true, checks that
+  /// CpuInfo::GetCurrentCore() returns 'core'.
+  static void PinToCore(int core, bool validate_current_cpu = true) {
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
     CPU_SET(core, &cpuset);
     ASSERT_EQ(0, pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset))
         << core;
-    ASSERT_EQ(core, CpuInfo::GetCurrentCore());
+    if (validate_current_cpu) ASSERT_EQ(core, CpuInfo::GetCurrentCore());
   }
 
   /// Reset the thread affinity of the current thread to all cores.
@@ -67,6 +68,12 @@ class CpuTestUtil {
     for (int i = 0; i < core_to_node.size(); ++i) core_to_node[i] = i % num_nodes;
     CpuInfo::InitFakeNumaForTest(num_nodes, core_to_node);
     LOG(INFO) << CpuInfo::DebugString();
+  }
+
+  /// Set CpuInfo::max_num_cores_ to 'max_num_cores'. The caller is responsible for
+  /// resetting it to its original value.
+  static void SetMaxNumCores(int max_num_cores) {
+    CpuInfo::max_num_cores_ = max_num_cores;
   }
 };
 }
