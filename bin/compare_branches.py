@@ -33,7 +33,7 @@ form. Note that commits are the full 20-byte git hashes.
     "source": "master",
     "target": "2.x",
     "commits": [
-      { "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "comment": "...",
+      { "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "comment": "..."},
       { "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "comment": "..."}
     ]
   }
