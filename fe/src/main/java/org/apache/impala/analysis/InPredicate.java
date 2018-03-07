@@ -151,7 +151,7 @@ public class InPredicate extends Predicate {
       }
       boolean useSetLookup = allConstant;
       // Threshold based on InPredicateBenchmark results
-      int setLookupThreshold = children_.get(0).getType().isStringType() ? 6 : 2;
+      int setLookupThreshold = children_.get(0).getType().isStringType() ? 2 : 6;
       if (children_.size() - 1 < setLookupThreshold) useSetLookup = false;
 
       // Only lookup fn_ if all subqueries have been rewritten. If the second child is a

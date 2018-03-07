@@ -20,9 +20,11 @@
 #define IMPALA_EXPRS_IN_PREDICATE_H_
 
 #include <string>
+#include <boost/container/flat_set.hpp>
+#include <boost/unordered_set.hpp>
 #include "exprs/predicate.h"
 #include "exprs/anyval-util.h"
-#include "runtime/decimal-value.h"
+#include "runtime/decimal-value.inline.h"
 #include "runtime/string-value.inline.h"
 #include "udf/udf.h"
 
@@ -283,9 +285,7 @@ class InPredicate {
     bool contains_null;
 
     /// The set of all non-NULL constant values in the IN list.
-    /// Note: boost::unordered_set and std::binary_search performed worse based on the
-    /// in-predicate-benchmark
-    std::set<SetType> val_set;
+    boost::unordered_set<SetType> val_set;
 
     /// The type of the arguments
     const FunctionContext::TypeDesc* type;
@@ -348,15 +348,19 @@ void InPredicate::SetLookupPrepare(
   SetLookupState<SetType>* state = new SetLookupState<SetType>;
   state->type = ctx->GetArgType(0);
   state->contains_null = false;
+  // Collect all values in a vector to use the bulk insert API to avoid N^2 behavior
+  // with flat_set.
+  vector<SetType> element_list(ctx->GetNumArgs());
   for (int i = 1; i < ctx->GetNumArgs(); ++i) {
     DCHECK(ctx->IsArgConstant(i));
     T* arg = reinterpret_cast<T*>(ctx->GetConstantArg(i));
     if (arg->is_null) {
       state->contains_null = true;
     } else {
-      state->val_set.insert(GetVal<T, SetType>(state->type, *arg));
+      element_list.push_back(GetVal<T, SetType>(state->type, *arg));
     }
   }
+  state->val_set.insert(element_list.begin(), element_list.end());
   ctx->SetFunctionState(scope, state);
 }
 
@@ -425,6 +429,29 @@ inline Decimal16Value InPredicate::GetVal(
     return Decimal16Value(x.val16);
   }
 }
+
+// IMPALA-6621: Due to an implementation detail in boost, these 3 types are slower when
+// using unordered_map as compared to flat_set.
+template <>
+struct InPredicate::SetLookupState<int32_t> {
+  bool contains_null;
+  boost::container::flat_set<int32_t> val_set;
+  const FunctionContext::TypeDesc* type;
+};
+
+template <>
+struct InPredicate::SetLookupState<int64_t> {
+  bool contains_null;
+  boost::container::flat_set<int64_t> val_set;
+  const FunctionContext::TypeDesc* type;
+};
+
+template <>
+struct InPredicate::SetLookupState<float> {
+  bool contains_null;
+  boost::container::flat_set<float> val_set;
+  const FunctionContext::TypeDesc* type;
+};
 }
 
 #endif
