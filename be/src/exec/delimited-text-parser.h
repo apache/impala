@@ -25,22 +25,27 @@
 
 namespace impala {
 
+template <bool DELIMITED_TUPLES>
 class DelimitedTextParser {
  public:
 
   /// The Delimited Text Parser parses text rows that are delimited by specific
   /// characters:
-  ///   tuple_delim: delimits tuples
+  ///   tuple_delim: delimits tuples.  Only used if DELIMITED_TUPLES is true.
   ///   field_delim: delimits fields
   ///   collection_item_delim: delimits collection items
   ///   escape_char: escape delimiters, make them part of the data.
-  //
+  ///
+  /// If the template parameter DELIMITED_TUPLES is false there is no support
+  /// for tuple delimiters and we do not need to search for them.  Any value
+  /// may be passed for tuple_delim, as it is ignored.
+  ///
   /// 'num_cols' is the total number of columns including partition keys.
-  //
+  ///
   /// 'is_materialized_col' should be initialized to an array of length 'num_cols', with
   /// is_materialized_col[i] = <true if column i should be materialized, false otherwise>
   /// Owned by caller.
-  //
+  ///
   /// The main method is ParseData which fills in a vector of pointers and lengths to the
   /// fields.  It also can handle an escape character which masks a tuple or field
   /// delimiter that occurs in the data.
@@ -91,14 +96,14 @@ class DelimitedTextParser {
   /// This function is used to parse sequence file records which do not need to
   /// parse for tuple delimiters. Returns an error status if any column exceeds the
   /// size limit. See AddColumn() for details.
-  template <bool process_escapes>
+  /// This function is disabled for non-sequence file parsing.
+  template <bool PROCESS_ESCAPES>
   Status ParseSingleTuple(int64_t len, char* buffer, FieldLocation* field_locations,
       int* num_fields);
 
   /// FindFirstInstance returns the position after the first non-escaped tuple
   /// delimiter from the starting offset.
   /// Used to find the start of a tuple if jumping into the middle of a text file.
-  /// Also used to find the sync marker for Sequenced and RC files.
   /// If no tuple delimiter is found within the buffer, return -1;
   int64_t FindFirstInstance(const char* buffer, int64_t len);
 
@@ -119,13 +124,16 @@ class DelimitedTextParser {
   /// by the number fields added.
   /// 'field_locations' will be updated with the start and length of the fields.
   /// Returns an error status if 'len' exceeds the size limit specified in AddColumn().
-  template <bool process_escapes>
+  template <bool PROCESS_ESCAPES>
   Status FillColumns(int64_t len, char** last_column, int* num_fields,
       impala::FieldLocation* field_locations);
 
   /// Return true if we have not seen a tuple delimiter for the current tuple being
   /// parsed (i.e., the last byte read was not a tuple delimiter).
-  bool HasUnfinishedTuple() { return unfinished_tuple_; }
+  bool HasUnfinishedTuple() {
+    DCHECK(DELIMITED_TUPLES);
+    return unfinished_tuple_;
+  }
 
  private:
   /// Initialize the parser state.
@@ -133,7 +141,7 @@ class DelimitedTextParser {
 
   /// Helper routine to add a column to the field_locations vector.
   /// Template parameter:
-  ///   process_escapes -- if true the the column may have escape characters
+  ///   PROCESS_ESCAPES -- if true the the column may have escape characters
   ///                      and the negative of the len will be stored.
   ///   len: length of the current column. The length of a column must fit in a 32-bit
   ///        signed integer (i.e. <= 2147483647 bytes). If a column is larger than that,
@@ -144,22 +152,28 @@ class DelimitedTextParser {
   /// Output:
   ///   field_locations: updated with start and length of current field.
   /// Return an error status if 'len' exceeds the size limit specified above.
-  template <bool process_escapes>
+  template <bool PROCESS_ESCAPES>
   Status AddColumn(int64_t len, char** next_column_start, int* num_fields,
       FieldLocation* field_locations);
 
   /// Helper routine to parse delimited text using SSE instructions.
   /// Identical arguments as ParseFieldLocations.
-  /// If the template argument, 'process_escapes' is true, this function will handle
+  /// If the template argument, 'PROCESS_ESCAPES' is true, this function will handle
   /// escapes, otherwise, it will assume the text is unescaped.  By using templates,
   /// we can special case the un-escaped path for better performance.  The unescaped
   /// path is optimized away by the compiler. Returns an error status if the length
   /// of any column exceeds the size limit. See AddColumn() for details.
-  template <bool process_escapes>
+  template <bool PROCESS_ESCAPES>
   Status ParseSse(int max_tuples, int64_t* remaining_len,
       char** byte_buffer_ptr, char** row_end_locations_,
       FieldLocation* field_locations,
       int* num_tuples, int* num_fields, char** next_column_start);
+
+  bool IsFieldOrCollectionItemDelimiter(char c) {
+    return (!DELIMITED_TUPLES && c == field_delim_) ||
+      (DELIMITED_TUPLES && field_delim_ != tuple_delim_ && c == field_delim_) ||
+      (collection_item_delim_ != '\0' && c == collection_item_delim_);
+  }
 
   /// SSE(xmm) register containing the tuple search character(s).
   __m128i xmm_tuple_search_;
@@ -214,7 +228,7 @@ class DelimitedTextParser {
   /// Character delimiting collection items (to become slots).
   char collection_item_delim_;
 
-  /// Character delimiting tuples.
+  /// Character delimiting tuples.  Only used if DELIMITED_TUPLES is true.
   char tuple_delim_;
 
   /// Whether or not the current column has an escape character in it
@@ -227,6 +241,9 @@ class DelimitedTextParser {
   /// True if the last tuple is unfinished (not ended with tuple delimiter).
   bool unfinished_tuple_;
 };
+
+using TupleDelimitedTextParser = DelimitedTextParser<true>;
+using SequenceDelimitedTextParser = DelimitedTextParser<false>;
 
 }// namespace impala
 #endif// IMPALA_EXEC_DELIMITED_TEXT_PARSER_H

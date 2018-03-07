@@ -24,7 +24,8 @@
 
 using namespace impala;
 
-DelimitedTextParser::DelimitedTextParser(
+template<bool DELIMITED_TUPLES>
+DelimitedTextParser<DELIMITED_TUPLES>::DelimitedTextParser(
     int num_cols, int num_partition_keys, const bool* is_materialized_col,
     char tuple_delim, char field_delim, char collection_item_delim, char escape_char)
     : is_materialized_col_(is_materialized_col),
@@ -72,7 +73,7 @@ DelimitedTextParser::DelimitedTextParser(
     memset(low_mask_, 0, sizeof(low_mask_));
   }
 
-  if (tuple_delim != '\0') {
+  if (DELIMITED_TUPLES) {
     search_chars[num_delims_++] = tuple_delim_;
     ++num_tuple_delims_;
     // Hive will treats \r (^M) as an alternate tuple delimiter, but \r\n is a
@@ -82,12 +83,12 @@ DelimitedTextParser::DelimitedTextParser(
       ++num_tuple_delims_;
     }
     xmm_tuple_search_ = _mm_loadu_si128(reinterpret_cast<__m128i*>(search_chars));
+    if (field_delim_ != tuple_delim_) search_chars[num_delims_++] = field_delim_;
+  } else {
+    search_chars[num_delims_++] = field_delim_;
   }
 
-  if (field_delim != '\0' || collection_item_delim != '\0') {
-    search_chars[num_delims_++] = field_delim_;
-    search_chars[num_delims_++] = collection_item_delim_;
-  }
+  if (collection_item_delim != '\0') search_chars[num_delims_++] = collection_item_delim_;
 
   DCHECK_GT(num_delims_, 0);
   xmm_delim_search_ = _mm_loadu_si128(reinterpret_cast<__m128i*>(search_chars));
@@ -95,16 +96,30 @@ DelimitedTextParser::DelimitedTextParser(
   ParserReset();
 }
 
-void DelimitedTextParser::ParserReset() {
+template
+DelimitedTextParser<true>::DelimitedTextParser(
+    int num_cols, int num_partition_keys, const bool* is_materialized_col,
+    char tuple_delim, char field_delim, char collection_item_delim, char escape_char);
+
+template
+DelimitedTextParser<false>::DelimitedTextParser(
+    int num_cols, int num_partition_keys, const bool* is_materialized_col,
+    char tuple_delim, char field_delim, char collection_item_delim, char escape_char);
+
+template<bool DELIMITED_TUPLES>
+void DelimitedTextParser<DELIMITED_TUPLES>::ParserReset() {
   current_column_has_escape_ = false;
   last_char_is_escape_ = false;
   last_row_delim_offset_ = -1;
   column_idx_ = num_partition_keys_;
 }
 
+template void DelimitedTextParser<true>::ParserReset();
+
 // Parsing raw csv data into FieldLocation descriptors.
-Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remaining_len,
-    char** byte_buffer_ptr, char** row_end_locations,
+template<bool DELIMITED_TUPLES>
+Status DelimitedTextParser<DELIMITED_TUPLES>::ParseFieldLocations(int max_tuples,
+    int64_t remaining_len, char** byte_buffer_ptr, char** row_end_locations,
     FieldLocation* field_locations,
     int* num_tuples, int* num_fields, char** next_column_start) {
   // Start of this batch.
@@ -133,10 +148,10 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
   while (remaining_len > 0) {
     bool new_tuple = false;
     bool new_col = false;
-    unfinished_tuple_ = true;
+    if (DELIMITED_TUPLES) unfinished_tuple_ = true;
 
     if (!last_char_is_escape_) {
-      if (tuple_delim_ != '\0' && (**byte_buffer_ptr == tuple_delim_ ||
+      if (DELIMITED_TUPLES && (**byte_buffer_ptr == tuple_delim_ ||
            (tuple_delim_ == '\n' && **byte_buffer_ptr == '\r'))) {
         new_tuple = true;
         new_col = true;
@@ -166,6 +181,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
         row_end_locations[*num_tuples] = *byte_buffer_ptr;
         ++(*num_tuples);
       }
+      DCHECK(DELIMITED_TUPLES);
       unfinished_tuple_ = false;
       last_row_delim_offset_ = **byte_buffer_ptr == '\r' ? remaining_len - 1 : -1;
       if (*num_tuples == max_tuples) {
@@ -185,7 +201,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
 
   // For formats that store the length of the row, the row is not delimited:
   // e.g. Sequence files.
-  if (tuple_delim_ == '\0') {
+  if (!DELIMITED_TUPLES) {
     DCHECK_EQ(remaining_len, 0);
     RETURN_IF_ERROR(AddColumn<true>(*byte_buffer_ptr - *next_column_start,
         next_column_start, num_fields, field_locations));
@@ -193,18 +209,30 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
     DCHECK(status.ok());
     column_idx_ = num_partition_keys_;
     ++(*num_tuples);
-    unfinished_tuple_ = false;
   }
   return Status::OK();
 }
 
-// Find the first instance of the tuple delimiter. This will find the start of the first
-// full tuple in buffer by looking for the end of the previous tuple.
-int64_t DelimitedTextParser::FindFirstInstance(const char* buffer, int64_t len) {
+template
+Status DelimitedTextParser<true>::ParseFieldLocations(int max_tuples,
+    int64_t remaining_len, char** byte_buffer_ptr, char** row_end_locations,
+    FieldLocation* field_locations,
+    int* num_tuples, int* num_fields, char** next_column_start);
+
+template
+Status DelimitedTextParser<false>::ParseFieldLocations(int max_tuples,
+    int64_t remaining_len, char** byte_buffer_ptr, char** row_end_locations,
+    FieldLocation* field_locations,
+    int* num_tuples, int* num_fields, char** next_column_start);
+
+template<bool DELIMITED_TUPLES>
+int64_t DelimitedTextParser<DELIMITED_TUPLES>::FindFirstInstance(const char* buffer,
+    int64_t len) {
   int64_t tuple_start = 0;
   const char* buffer_start = buffer;
   bool found = false;
 
+  DCHECK(DELIMITED_TUPLES);
   // If the last char in the previous buffer was \r then either return the start of
   // this buffer or skip a \n at the beginning of the buffer.
   if (last_row_delim_offset_ != -1) {
@@ -226,13 +254,10 @@ restart:
       int tuple_mask = _mm_extract_epi16(xmm_tuple_mask, 0);
       if (tuple_mask != 0) {
         found = true;
-        for (int i = 0; i < SSEUtil::CHARS_PER_128_BIT_REGISTER; ++i) {
-          if ((tuple_mask & SSEUtil::SSE_BITMASK[i]) != 0) {
-            tuple_start += i + 1;
-            buffer += i + 1;
-            break;
-          }
-        }
+        // Find first set bit (1-based)
+        int i = ffs(tuple_mask);
+        tuple_start += i;
+        buffer += i;
         break;
       }
       tuple_start += SSEUtil::CHARS_PER_128_BIT_REGISTER;
@@ -295,3 +320,6 @@ restart:
   }
   return tuple_start;
 }
+
+template
+int64_t DelimitedTextParser<true>::FindFirstInstance(const char* buffer, int64_t len);
