@@ -19,38 +19,41 @@
 #include <stdio.h>
 #include <iostream>
 
+#include "testutil/cpu-util.h"
 #include "testutil/gtest-util.h"
 #include "util/disk-info.h"
-#include "util/perf-counters.h"
+#include "util/scope-exit-trigger.h"
 
 #include "common/names.h"
 
 namespace impala {
 
-TEST(PerfCounterTest, Basic) {
-  PerfCounters counters;
-  EXPECT_TRUE(counters.AddDefaultCounters());
-
-  counters.Snapshot("Before");
-  double result = 0;
-  for (int i = 0; i < 1000000; i++) {
-    double d1 = rand() / (double) RAND_MAX;
-    double d2 = rand() / (double) RAND_MAX;
-    result = d1*d1 + d2*d2;
-  }
-  counters.Snapshot("After");
-
-  for (int i = 0; i < 1000000; i++) {
-    double d1 = rand() / (double) RAND_MAX;
-    double d2 = rand() / (double) RAND_MAX;
-    result = d1*d1 + d2*d2;
-  }
-  counters.Snapshot("After2");
-  counters.PrettyPrint(&cout);
-}
-
 TEST(CpuInfoTest, Basic) {
   cout << CpuInfo::DebugString();
+}
+
+// Regression test for IMPALA-6500: make sure we map bad return values from
+// sched_getcpu() into the expected range.
+TEST(CpuInfoTest, InvalidSchedGetCpuValue) {
+  cout << CpuInfo::DebugString();
+  int real_max_num_cores = CpuInfo::GetMaxNumCores();
+  const auto reset_state = MakeScopeExitTrigger([real_max_num_cores]() {
+    CpuTestUtil::SetMaxNumCores(real_max_num_cores);
+    CpuTestUtil::ResetAffinity();
+  });
+
+  // Pretend that we only have two cores. If this test is running on a system
+  // with > 2 cores, sched_getcpu() will return out-of-range values..
+  const int FAKE_NUM_CORES = 2;
+  CpuTestUtil::SetMaxNumCores(FAKE_NUM_CORES);
+  for (int core = 0; core < CpuInfo::num_cores(); ++core) {
+    CpuTestUtil::PinToCore(core, false);
+    int reported_core = CpuInfo::GetCurrentCore();
+    // Check that the reported core is within the expected bounds.
+    ASSERT_GE(reported_core, 0);
+    ASSERT_LT(reported_core, FAKE_NUM_CORES);
+  }
+
 }
 
 TEST(DiskInfoTest, Basic) {
@@ -60,7 +63,6 @@ TEST(DiskInfoTest, Basic) {
   int disk_id_home_dir = DiskInfo::disk_id("/home");
   cout << "Device name for '/home': " << DiskInfo::device_name(disk_id_home_dir) << endl;
 }
-
 }
 
 IMPALA_TEST_MAIN();

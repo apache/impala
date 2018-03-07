@@ -68,8 +68,6 @@ add_library(Util
   path-builder.cc
   periodic-counter-updater
   pprof-path-handlers.cc
-# TODO: not supported on RHEL 5
-#  perf-counters.cc
   progress-updater.cc
   process-state-info.cc
   redactor.cc
@@ -128,7 +126,6 @@ ADD_BE_TEST(metrics-test)
 ADD_BE_TEST(min-max-filter-test)
 ADD_BE_TEST(openssl-util-test)
 ADD_BE_TEST(parse-util-test)
-#ADD_BE_TEST(perf-counters-test)
 ADD_BE_TEST(pretty-printer-test)
 ADD_BE_TEST(proc-info-test)
 ADD_BE_TEST(promise-test)
@@ -139,6 +136,7 @@ ADD_BE_TEST(rle-test)
 ADD_BE_TEST(runtime-profile-test)
 ADD_BE_TEST(string-parser-test)
 ADD_BE_TEST(symbols-util-test)
+ADD_BE_TEST(sys-info-test)
 ADD_BE_TEST(thread-pool-test)
 ADD_BE_TEST(time-test)
 ADD_BE_TEST(uid-util-test)
