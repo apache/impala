@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="parquet_array_resolution" rev="2.9.0 IMPALA-4725">
+
+  <title>
+    PARQUET_ARRAY_RESOLUTION Query Option (<keyword keyref="impala29"/> or higher only)
+  </title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>PARQUET_ARRAY_RESOLUTION</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Parquet"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="parquet_array_resolution">
+      The <codeph>PARQUET_ARRAY_RESOLUTION</codeph> query option controls the
+      behavior of the indexed-based resolution for nested arrays in Parquet.
+    </p>
+
+    <p>
+      In Parquet, you can represent an array using a 2-level or 3-level
+      representation. The modern, standard representation is 3-level. The legacy
+      2-level scheme is supported for compatibility with older Parquet files.
+      However, there is no reliable metadata within Parquet files to indicate
+      which encoding was used. It is even possible to have mixed encodings within
+      the same file if there are multiple arrays. The
+      <codeph>PARQUET_ARRAY_RESOLTUTION</codeph> option controls the process of
+      resolution that is to match every column/field reference from a query to a
+      column in the Parquet file.</p>
+
+    <p>
+      The supported values for the query option are:
+    </p>
+
+    <ul>
+      <li>
+        <codeph>THREE_LEVEL</codeph>: Assumes arrays are encoded with the 3-level
+        representation, and does not attempt the 2-level resolution.
+      </li>
+
+      <li>
+        <codeph>TWO_LEVEL</codeph>: Assumes arrays are encoded with the 2-level
+        representation, and does not attempt the 3-level resolution.
+      </li>
+
+      <li>
+        <codeph>TWO_LEVEL_THEN_THREE_LEVEL</codeph>: First tries to resolve
+        assuming a 2-level representation, and if unsuccessful, tries a 3-level
+        representation.
+      </li>
+    </ul>
+
+    <p>
+      All of the above options resolve arrays encoded with a single level.
+    </p>
+
+    <p>
+      A failure to resolve a column/field reference in a query with a given array
+      resolution policy does not necessarily result in a warning or error returned
+      by the query. A mismatch might be treated like a missing column (returns
+      NULL values), and it is not possible to reliably distinguish the 'bad
+      resolution' and 'legitimately missing column' cases.
+    </p>
+
+    <p>
+      The name-based policy generally does not have the problem of ambiguous
+      array representations. You specify to use the name-based policy by setting
+      the <codeph>PARQUET_FALLBACK_SCHEMA_RESOLUTION</codeph> query option to
+      <codeph>NAME</codeph>.
+    </p>
+
+    <p>
+      <b>Type:</b> Enum of <codeph>TWO_LEVEL</codeph>,
+        <codeph>TWO_LEVEL_THEN_THREE_LEVEL</codeph>, and
+        <codeph>THREE_LEVEL</codeph>
+    </p>
+
+    <p>
+      <b>Default:</b> <codeph>TWO_LEVEL_THEN_THREE_LEVEL</codeph>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/added_in_290"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      EXAMPLE A: The following Parquet schema of a file can be interpreted as a
+      2-level or 3-level:
+    </p>
+
+<codeblock>
+ParquetSchemaExampleA {
+  optional group single_element_groups (LIST) {
+    repeated group single_element_group {
+      required int64 count;
+    }
+  }
+}
+</codeblock>
+
+    <p>
+      The following table schema corresponds to a 2-level interpretation:
+    </p>
+
+<codeblock>
+CREATE TABLE t (col1 array&lt;struct&lt;f1: bigint>>) STORED AS PARQUET;
+</codeblock>
+
+    <p>
+      Successful query with a 2-level interpretation:
+    </p>
+
+<codeblock>
+SET PARQUET_ARRAY_RESOLUTION=TWO_LEVEL;
+SELECT ITEM.f1 FROM t.col1;
+</codeblock>
+
+    <p>
+      The following table schema corresponds to a 3-level interpretation:
+    </p>
+
+<codeblock>
+CREATE TABLE t (col1 array&lt;bigint>) STORED AS PARQUET;
+</codeblock>
+
+    <p>
+      Successful query with a 3-level interpretation:
+    </p>
+
+<codeblock>
+SET PARQUET_ARRAY_RESOLUTION=THREE_LEVEL;
+SELECT ITEM FROM t.col1
+</codeblock>
+
+    <p>
+      EXAMPLE B: The following Parquet schema of a file can be only be successfully
+      interpreted as a 2-level:
+    </p>
+
+<codeblock>
+ParquetSchemaExampleB {
+  required group list_of_ints (LIST) {
+    repeated int32 list_of_ints_tuple;
+  }
+}
+</codeblock>
+
+    <p>
+      The following table schema corresponds to a 2-level interpretation:
+    </p>
+
+<codeblock>
+CREATE TABLE t (col1 array&lt;int>) STORED AS PARQUET;
+</codeblock>
+
+    <p>
+      Successful query with a 2-level interpretation:
+    </p>
+
+<codeblock>
+SET PARQUET_ARRAY_RESOLUTION=TWO_LEVEL;
+SELECT ITEM FROM t.col1
+</codeblock>
+
+    <p>
+      Unsuccessful query with a 3-level interpretation. The query returns
+      <codeph>NULL</codeph>s as if the column was missing in the file:
+    </p>
+
+<codeblock>
+SET PARQUET_ARRAY_RESOLUTION=THREE_LEVEL;
+SELECT ITEM FROM t.col1
+</codeblock>
+
+  </conbody>
+
+</concept>

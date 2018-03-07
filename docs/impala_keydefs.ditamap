@@ -10809,6 +10809,7 @@ under the License.
   <keydef href="topics/impala_optimize_partition_key_scans.xml" keys="optimize_partition_key_scans"/>
   <keydef href="topics/impala_parquet_compression_codec.xml" keys="parquet_compression_codec"/>
   <keydef href="topics/impala_parquet_annotate_strings_utf8.xml" keys="parquet_annotate_strings_utf8"/>
+  <keydef href="topics/impala_parquet_array_resolution.xml" keys="parquet_array_resolution"/>
   <keydef href="topics/impala_parquet_fallback_schema_resolution.xml" keys="parquet_fallback_schema_resolution"/>
   <keydef href="topics/impala_parquet_file_size.xml" keys="parquet_file_size"/>
   <keydef href="topics/impala_prefetch_mode.xml" keys="prefetch_mode"/>
