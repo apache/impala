@@ -63,6 +63,10 @@ class DataSink {
   /// initializes their evaluators. Subclasses must call DataSink::Prepare().
   virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker);
 
+  /// Codegen expressions in the sink. Overridden by sink type which supports codegen.
+  /// No-op by default.
+  virtual void Codegen(LlvmCodeGen* codegen);
+
   /// Call before Send() to open the sink and initialize output expression evaluators.
   virtual Status Open(RuntimeState* state);
 

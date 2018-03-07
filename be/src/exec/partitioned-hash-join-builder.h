@@ -91,7 +91,7 @@ class PhjBuilder : public DataSink {
   /// Does all codegen for the builder (if codegen is enabled).
   /// Updates the the builder's runtime profile with info about whether any errors
   /// occured during codegen.
-  void Codegen(LlvmCodeGen* codegen);
+  virtual void Codegen(LlvmCodeGen* codegen) override;
 
   /////////////////////////////////////////
   // The following functions are used only by PartitionedHashJoinNode.

@@ -47,6 +47,7 @@ add_library(Runtime
   krpc-data-stream-mgr.cc
   krpc-data-stream-recvr.cc
   krpc-data-stream-sender.cc
+  krpc-data-stream-sender-ir.cc
   lib-cache.cc
   mem-tracker.cc
   mem-pool.cc

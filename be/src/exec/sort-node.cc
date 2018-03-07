@@ -58,7 +58,7 @@ Status SortNode::Prepare(RuntimeState* state) {
           resource_profile_.spillable_buffer_size, runtime_profile(), state, id(), true));
   RETURN_IF_ERROR(sorter_->Prepare(pool_));
   DCHECK_GE(resource_profile_.min_reservation, sorter_->ComputeMinReservation());
-  AddCodegenDisabledMessage(state);
+  state->CheckAndAddCodegenDisabledMessage(runtime_profile());
   return Status::OK();
 }
 

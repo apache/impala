@@ -134,7 +134,7 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
       ADD_COUNTER(runtime_profile(), "ProbeRowsPartitioned", TUnit::UNIT);
   num_hash_table_builds_skipped_ =
       ADD_COUNTER(runtime_profile(), "NumHashTableBuildsSkipped", TUnit::UNIT);
-  AddCodegenDisabledMessage(state);
+  state->CheckAndAddCodegenDisabledMessage(runtime_profile());
   return Status::OK();
 }
 

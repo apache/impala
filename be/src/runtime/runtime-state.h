@@ -149,6 +149,15 @@ class RuntimeState {
   /// expressions' Prepare() are invoked.
   bool ScalarFnNeedsCodegen() const { return !scalar_fns_to_codegen_.empty(); }
 
+  /// Check if codegen was disabled and if so, add a message to the runtime profile.
+  void CheckAndAddCodegenDisabledMessage(RuntimeProfile* profile) {
+    if (CodegenDisabledByQueryOption()) {
+      profile->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
+    } else if (CodegenDisabledByHint()) {
+      profile->AddCodegenMsg(false, "disabled due to optimization hints");
+    }
+  }
+
   /// Returns true if there is a hint to disable codegen. This can be true for single node
   /// optimization or expression evaluation request from FE to BE (see fe-support.cc).
   /// Note that this internal flag is advisory and it may be ignored if the fragment has

@@ -137,11 +137,7 @@ Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) 
   partition_build_rows_timer_ = ADD_TIMER(profile(), "BuildRowsPartitionTime");
   build_hash_table_timer_ = ADD_TIMER(profile(), "HashTablesBuildTime");
   repartition_timer_ = ADD_TIMER(profile(), "RepartitionTime");
-  if (state->CodegenDisabledByQueryOption()) {
-    profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
-  } else if (state->CodegenDisabledByHint()) {
-    profile()->AddCodegenMsg(false, "disabled due to optimization hints");
-  }
+  state->CheckAndAddCodegenDisabledMessage(profile());
   return Status::OK();
 }
 

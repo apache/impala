@@ -498,14 +498,6 @@ Status ExecNode::QueryMaintenance(RuntimeState* state) {
   return state->CheckQueryState();
 }
 
-void ExecNode::AddCodegenDisabledMessage(RuntimeState* state) {
-  if (state->CodegenDisabledByQueryOption()) {
-    runtime_profile()->AddCodegenMsg(false, "disabled by query option DISABLE_CODEGEN");
-  } else if (state->CodegenDisabledByHint()) {
-    runtime_profile()->AddCodegenMsg(false, "disabled due to optimization hints");
-  }
-}
-
 bool ExecNode::IsNodeCodegenDisabled() const {
   return disable_codegen_;
 }

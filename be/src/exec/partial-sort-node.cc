@@ -62,7 +62,7 @@ Status PartialSortNode::Prepare(RuntimeState* state) {
       resource_profile_.spillable_buffer_size, runtime_profile(), state, id(), false));
   RETURN_IF_ERROR(sorter_->Prepare(pool_));
   DCHECK_GE(resource_profile_.min_reservation, sorter_->ComputeMinReservation());
-  AddCodegenDisabledMessage(state);
+  state->CheckAndAddCodegenDisabledMessage(runtime_profile());
   input_batch_.reset(
       new RowBatch(child(0)->row_desc(), state->batch_size(), mem_tracker()));
   return Status::OK();

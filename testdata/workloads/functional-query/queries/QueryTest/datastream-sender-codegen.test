@@ -1,0 +1,41 @@
+====
+---- QUERY
+set disable_codegen_rows_threshold=0;
+select count(*) from alltypes t1
+  join /* +SHUFFLE */ alltypes t2
+    on t1.int_col= t2.int_col and
+       t1.string_col = t2.string_col
+---- RESULTS
+5329000
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+# Verify that codegen was enabled
+row_regex: .*Hash Partitioned Sender Codegen Enabled.*
+====
+---- QUERY
+set disable_codegen_rows_threshold=0;
+select count(*) from alltypes t1
+  join /* +BROADCAST */ alltypes t2
+    on t1.int_col= t2.int_col and
+       t1.string_col = t2.string_col
+---- RESULTS
+5329000
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+# Verify that codegen was enabled
+row_regex: .*Unpartitioned Sender Codegen Disabled: not needed.*
+====
+---- QUERY
+set disable_codegen_rows_threshold=0;
+select count(*) from chars_tiny t1
+  join /* +SHUFFLE */ chars_tiny t2 on t1.cs=t2.cs;
+---- RESULTS
+10
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+# Verify that codegen was disabled
+row_regex: .*Hash Partitioned Sender Codegen Disabled: Codegen for Char not supported.*
+====
