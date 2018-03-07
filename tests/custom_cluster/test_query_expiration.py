@@ -99,10 +99,13 @@ class TestQueryExpiration(CustomClusterTestSuite):
     # expirations but only one should be counted.
     impalad.service.wait_for_metric_value('impala-server.num-queries-expired',
                                           num_expired + len(handles))
-    assert (client.get_state(default_timeout_expire_handle) ==
-            client.QUERY_STATES['EXCEPTION'])
-    assert (client.get_state(default_timeout_expire_handle2) ==
-            client.QUERY_STATES['EXCEPTION'])
+    # The metric and client state are not atomically maintained. Since the
+    # expiration metric has just been reached, accessing the client state
+    # is guarded in a loop to avoid flaky false negatives.
+    self.__expect_client_state(client, default_timeout_expire_handle,
+                               client.QUERY_STATES['EXCEPTION'])
+    self.__expect_client_state(client, default_timeout_expire_handle2,
+                               client.QUERY_STATES['EXCEPTION'])
 
     # Check that we didn't wait too long to be expired (double the timeout is sufficiently
     # large to avoid most noise in measurement)
@@ -124,7 +127,6 @@ class TestQueryExpiration(CustomClusterTestSuite):
       except Exception, e:
         # We fetched from some cancelled handles above, which unregistered the queries.
         assert 'Invalid or unknown query handle' in str(e)
-
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--idle_query_timeout=0")
@@ -169,6 +171,17 @@ class TestQueryExpiration(CustomClusterTestSuite):
       assert False
     except Exception, e:
       assert re.search(exception_regex, str(e))
+
+  def __expect_client_state(self, client, handle, expected_state, timeout=0.1):
+    """Try to fetch 'expected_state' from 'client' within 'timeout' seconds.
+    Fail if unable."""
+    start_time = time()
+    actual_state = None
+    while (time() - start_time < timeout):
+      actual_state = client.get_state(handle)
+      if actual_state == expected_state:
+        break
+    assert expected_state == actual_state
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--idle_query_timeout=1")
@@ -250,7 +263,7 @@ class TestQueryExpiration(CustomClusterTestSuite):
     for t in non_expiring_threads:
       assert t.success
     for t in expiring_threads:
-      assert client.get_state(t.handle) == client.QUERY_STATES['EXCEPTION']
+      self.__expect_client_state(client, t.handle, client.QUERY_STATES['EXCEPTION'])
     for t in time_limit_threads:
       assert re.search(
           "Query [0-9a-f]+:[0-9a-f]+ expired due to execution time limit of 1s000ms",
