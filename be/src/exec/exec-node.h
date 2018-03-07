@@ -216,9 +216,6 @@ class ExecNode {
   /// check to see if codegen was enabled for the enclosing fragment.
   bool IsNodeCodegenDisabled() const;
 
-  /// Add codegen disabled message if codegen is disabled for this ExecNode.
-  void AddCodegenDisabledMessage(RuntimeState* state);
-
   /// Extract node id from p->name().
   static int GetNodeIdFromProfile(RuntimeProfile* p);
 

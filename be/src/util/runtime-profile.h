@@ -234,7 +234,8 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// then no error occurred).
   void AddCodegenMsg(bool codegen_enabled, const Status& codegen_status,
       const std::string& extra_label = "") {
-    AddCodegenMsg(codegen_enabled, codegen_status.GetDetail(), extra_label);
+    const string& err_msg = codegen_status.ok() ? "" : codegen_status.msg().msg();
+    AddCodegenMsg(codegen_enabled, err_msg, extra_label);
   }
 
   /// Creates and returns a new EventSequence (owned by the runtime

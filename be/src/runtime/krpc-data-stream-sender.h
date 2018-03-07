@@ -23,9 +23,11 @@
 #include <string>
 
 #include "exec/data-sink.h"
+#include "codegen/impala-ir.h"
 #include "common/global-types.h"
 #include "common/object-pool.h"
 #include "common/status.h"
+#include "exprs/scalar-expr.h"
 #include "runtime/row-batch.h"
 #include "util/runtime-profile.h"
 
@@ -48,7 +50,7 @@ class TPlanFragmentDestination;
 /// TODO: create a PlanNode equivalent class for DataSink.
 class KrpcDataStreamSender : public DataSink {
  public:
-  /// Construct a sender according to the output specification (tsink), sending to the
+  /// Constructs a sender according to the output specification (tsink), sending to the
   /// given destinations:
   /// 'sender_id' identifies this sender instance, and is unique within a fragment.
   /// 'row_desc' is the descriptor of the tuple row. It must out-live the sink.
@@ -65,40 +67,44 @@ class KrpcDataStreamSender : public DataSink {
 
   virtual ~KrpcDataStreamSender();
 
-  /// Initialize the sender by initializing all the channels and allocates all
+  /// Initializes the sender by initializing all the channels and allocates all
   /// the stat counters. Return error status if any channels failed to initialize.
-  virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker);
+  virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) override;
 
-  /// Initialize the evaluator of the partitioning expressions. Return error status
+  /// Codegen HashAndAddRows() if partitioning type is HASH_PARTITIONED.
+  /// Replaces HashRow() and GetNumChannels() based on runtime information.
+  virtual void Codegen(LlvmCodeGen* codegen) override;
+
+  /// Initializes the evaluator of the partitioning expressions. Return error status
   /// if initialization failed.
-  virtual Status Open(RuntimeState* state);
+  virtual Status Open(RuntimeState* state) override;
 
-  /// Flush all buffered data and close all existing channels to destination hosts.
+  /// Flushes all buffered data and close all existing channels to destination hosts.
   /// Further Send() calls are illegal after calling FlushFinal(). It is legal to call
   /// FlushFinal() no more than once. Return error status if Send() failed or the end
   /// of stream call failed.
-  virtual Status FlushFinal(RuntimeState* state);
+  virtual Status FlushFinal(RuntimeState* state) override;
 
-  /// Send data in 'batch' to destination nodes according to partitioning
+  /// Sends data in 'batch' to destination nodes according to partitioning
   /// specification provided in c'tor.
   /// Blocks until all rows in batch are placed in their appropriate outgoing
   /// buffers (ie, blocks if there are still in-flight rpcs from the last
   /// Send() call).
-  virtual Status Send(RuntimeState* state, RowBatch* batch);
+  virtual Status Send(RuntimeState* state, RowBatch* batch) override;
 
   /// Shutdown all existing channels to destination hosts. Further FlushFinal() calls are
   /// illegal after calling Close().
-  virtual void Close(RuntimeState* state);
+  virtual void Close(RuntimeState* state) override;
 
  protected:
   friend class DataStreamTest;
 
-  /// Initialize any partitioning expressions based on 'thrift_output_exprs' and stores
+  /// Initializes any partitioning expressions based on 'thrift_output_exprs' and stores
   /// them in 'partition_exprs_'. Returns error status if the initialization failed.
   virtual Status Init(const std::vector<TExpr>& thrift_output_exprs,
-      const TDataSink& tsink, RuntimeState* state);
+      const TDataSink& tsink, RuntimeState* state) override;
 
-  /// Return total number of bytes sent. If batches are broadcast to multiple receivers,
+  /// Returns total number of bytes sent. If batches are broadcast to multiple receivers,
   /// they are counted once per receiver.
   int64_t GetNumDataBytesSent() const;
 
@@ -110,6 +116,35 @@ class KrpcDataStreamSender : public DataSink {
   /// 'num_receivers' is the number of receivers this batch will be sent to. Used for
   /// updating the stat counters.
   Status SerializeBatch(RowBatch* src, OutboundRowBatch* dest, int num_receivers = 1);
+
+  /// Returns 'partition_expr_evals_[i]'. Used by the codegen'd HashRow() IR function.
+  ScalarExprEvaluator* GetPartitionExprEvaluator(int i);
+
+  /// Returns the number of channels in this data stream sender. Not inlined for the
+  /// cross-compiled code as it's to be replaced with a constant during codegen.
+  int IR_NO_INLINE GetNumChannels() const { return channels_.size(); }
+
+  /// Evaluates the input row against partition expressions and hashes the expression
+  /// values. Returns the final hash value.
+  uint64_t HashRow(TupleRow* row);
+
+  /// Used when 'partition_type_' is HASH_PARTITIONED. Call HashRow() against each row
+  /// in the input batch and adds it to the corresponding channel based on the hash value.
+  /// Cross-compiled to be patched by Codegen() at runtime. Returns error status if
+  /// insertion into the channel fails. Returns OK status otherwise.
+  Status HashAndAddRows(RowBatch* batch);
+
+  /// Adds the given row to 'channels_[channel_id]'.
+  Status AddRowToChannel(const int channel_id, TupleRow* row);
+
+  /// Codegen the HashRow() function and returns the codegen'd function in 'fn'.
+  /// This involves unrolling the loop in HashRow(), codegens each of the partition
+  /// expressions and replaces the column type argument to the hash function with
+  /// constants to eliminate some branches. Returns error status on failure.
+  Status CodegenHashRow(LlvmCodeGen* codegen, llvm::Function** fn);
+
+  /// Returns the name of the partitioning type of this data stream sender.
+  string PartitionTypeName() const;
 
   /// Sender instance id, unique within a fragment.
   const int sender_id_;
@@ -187,8 +222,18 @@ class KrpcDataStreamSender : public DataSink {
   /// or when errors are encountered.
   int next_unknown_partition_;
 
+  /// Types and pointers for the codegen'd HashAndAddRows() functions.
+  /// NULL if codegen is disabled or failed.
+  typedef Status (*HashAndAddRowsFn)(KrpcDataStreamSender*, RowBatch* row);
+  HashAndAddRowsFn hash_and_add_rows_fn_ = nullptr;
+
+  /// KrpcDataStreamSender::HashRow() symbol. Used for call-site replacement.
+  static const char* HASH_ROW_SYMBOL;
+
   /// An arbitrary hash seed used for exchanges.
   static constexpr uint64_t EXCHANGE_HASH_SEED = 0x66bd68df22c3ef37;
+
+  static const char* LLVM_CLASS_NAME;
 };
 
 } // namespace impala

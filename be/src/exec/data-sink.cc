@@ -134,6 +134,10 @@ Status DataSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   return Status::OK();
 }
 
+void DataSink::Codegen(LlvmCodeGen* codegen) {
+  return;
+}
+
 Status DataSink::Open(RuntimeState* state) {
   DCHECK_EQ(output_exprs_.size(), output_expr_evals_.size());
   return ScalarExprEvaluator::Open(output_expr_evals_, state);

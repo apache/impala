@@ -94,7 +94,7 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
   if (is_merging_) {
     less_than_.reset(
         new TupleRowComparator(ordering_exprs_, is_asc_order_, nulls_first_));
-    AddCodegenDisabledMessage(state);
+    state->CheckAndAddCodegenDisabledMessage(runtime_profile());
   }
   return Status::OK();
 }

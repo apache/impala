@@ -25,6 +25,8 @@
 #include <thrift/protocol/TDebugProtocol.h>
 
 #include "common/logging.h"
+#include "codegen/codegen-anyval.h"
+#include "codegen/llvm-codegen.h"
 #include "exec/kudu-util.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
@@ -60,6 +62,10 @@ using kudu::MonoDelta;
 DECLARE_int32(rpc_retry_interval_ms);
 
 namespace impala {
+
+const char* KrpcDataStreamSender::HASH_ROW_SYMBOL =
+    "KrpcDataStreamSender7HashRowEPNS_8TupleRowE";
+const char* KrpcDataStreamSender::LLVM_CLASS_NAME = "class.impala::KrpcDataStreamSender";
 
 // A datastream sender may send row batches to multiple destinations. There is one
 // channel for each destination.
@@ -645,12 +651,205 @@ Status KrpcDataStreamSender::Prepare(
   for (int i = 0; i < channels_.size(); ++i) {
     RETURN_IF_ERROR(channels_[i]->Init(state));
   }
+  state->CheckAndAddCodegenDisabledMessage(profile());
   return Status::OK();
 }
 
 Status KrpcDataStreamSender::Open(RuntimeState* state) {
   SCOPED_TIMER(profile_->total_time_counter());
   return ScalarExprEvaluator::Open(partition_expr_evals_, state);
+}
+
+//
+// An example of generated code with int type.
+//
+// define i64 @KrpcDataStreamSenderHashRow(%"class.impala::KrpcDataStreamSender"* %this,
+//                                         %"class.impala::TupleRow"* %row) #46 {
+// entry:
+//   %0 = alloca i32
+//   %1 = call %"class.impala::ScalarExprEvaluator"*
+//       @_ZN6impala20KrpcDataStreamSender25GetPartitionExprEvaluatorEi(
+//           %"class.impala::KrpcDataStreamSender"* %this, i32 0)
+//   %partition_val = call i64 @GetSlotRef(
+//       %"class.impala::ScalarExprEvaluator"* %1, %"class.impala::TupleRow"* %row)
+//   %is_null = trunc i64 %partition_val to i1
+//   br i1 %is_null, label %is_null_block, label %not_null_block
+//
+// is_null_block:                                ; preds = %entry
+//   br label %hash_val_block
+//
+// not_null_block:                               ; preds = %entry
+//   %2 = ashr i64 %partition_val, 32
+//   %3 = trunc i64 %2 to i32
+//   store i32 %3, i32* %0
+//   %native_ptr = bitcast i32* %0 to i8*
+//   br label %hash_val_block
+//
+// hash_val_block:                               ; preds = %not_null_block, %is_null_block
+//   %val_ptr_phi = phi i8* [ %native_ptr, %not_null_block ], [ null, %is_null_block ]
+//   %hash_val = call i64
+//       @_ZN6impala8RawValue20GetHashValueFastHashEPKvRKNS_10ColumnTypeEm(
+//           i8* %val_ptr_phi, %"struct.impala::ColumnType"* @expr_type_arg,
+//               i64 7403188670037225271)
+//   ret i64 %hash_val
+// }
+Status KrpcDataStreamSender::CodegenHashRow(LlvmCodeGen* codegen, llvm::Function** fn) {
+  llvm::LLVMContext& context = codegen->context();
+  LlvmBuilder builder(context);
+
+  LlvmCodeGen::FnPrototype prototype(
+      codegen, "KrpcDataStreamSenderHashRow", codegen->i64_type());
+  prototype.AddArgument(
+      LlvmCodeGen::NamedVariable("this", codegen->GetNamedPtrType(LLVM_CLASS_NAME)));
+  prototype.AddArgument(
+      LlvmCodeGen::NamedVariable("row", codegen->GetStructPtrType<TupleRow>()));
+
+  llvm::Value* args[2];
+  llvm::Function* hash_row_fn = prototype.GeneratePrototype(&builder, args);
+  llvm::Value* this_arg = args[0];
+  llvm::Value* row_arg = args[1];
+
+  // Store the initial seed to hash_val
+  llvm::Value* hash_val = codegen->GetI64Constant(EXCHANGE_HASH_SEED);
+
+  // Unroll the loop and codegen each of the partition expressions
+  for (int i = 0; i < partition_exprs_.size(); ++i) {
+    llvm::Function* compute_fn;
+    RETURN_IF_ERROR(partition_exprs_[i]->GetCodegendComputeFn(codegen, &compute_fn));
+
+    // Load the expression evaluator for the i-th partition expression
+    llvm::Function* get_expr_eval_fn =
+        codegen->GetFunction(IRFunction::KRPC_DSS_GET_PART_EXPR_EVAL, false);
+    DCHECK(get_expr_eval_fn != nullptr);
+    llvm::Value* expr_eval_arg =
+        builder.CreateCall(get_expr_eval_fn, {this_arg, codegen->GetI32Constant(i)});
+
+    // Compute the value against the i-th partition expression
+    llvm::Value* compute_fn_args[] = {expr_eval_arg, row_arg};
+    CodegenAnyVal partition_val = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
+        partition_exprs_[i]->type(), compute_fn, compute_fn_args, "partition_val");
+
+    llvm::BasicBlock* is_null_block =
+        llvm::BasicBlock::Create(context, "is_null_block", hash_row_fn);
+    llvm::BasicBlock* not_null_block =
+        llvm::BasicBlock::Create(context, "not_null_block", hash_row_fn);
+    llvm::BasicBlock* hash_val_block =
+        llvm::BasicBlock::Create(context, "hash_val_block", hash_row_fn);
+
+    // Check if 'partition_val' is NULL
+    llvm::Value* val_is_null = partition_val.GetIsNull();
+    builder.CreateCondBr(val_is_null, is_null_block, not_null_block);
+
+    // Set the pointer to NULL in case 'partition_val' evaluates to NULL
+    builder.SetInsertPoint(is_null_block);
+    llvm::Value* null_ptr = codegen->null_ptr_value();
+    builder.CreateBr(hash_val_block);
+
+    // Saves 'partition_val' on the stack and passes a pointer to it to the hash function
+    builder.SetInsertPoint(not_null_block);
+    llvm::Value* native_ptr = partition_val.ToNativePtr();
+    native_ptr = builder.CreatePointerCast(native_ptr, codegen->ptr_type(), "native_ptr");
+    builder.CreateBr(hash_val_block);
+
+    // Picks the input value to hash function
+    builder.SetInsertPoint(hash_val_block);
+    llvm::PHINode* val_ptr_phi = builder.CreatePHI(codegen->ptr_type(), 2, "val_ptr_phi");
+    val_ptr_phi->addIncoming(native_ptr, not_null_block);
+    val_ptr_phi->addIncoming(null_ptr, is_null_block);
+
+    // Creates a global constant of the partition expression's ColumnType. It has to be a
+    // constant for constant propagation and dead code elimination in 'get_hash_value_fn'
+    llvm::Type* col_type = codegen->GetStructType<ColumnType>();
+    llvm::Constant* expr_type_arg = codegen->ConstantToGVPtr(
+        col_type, partition_exprs_[i]->type().ToIR(codegen), "expr_type_arg");
+
+    // Update 'hash_val' with the new 'partition-val'
+    llvm::Value* get_hash_value_args[] = {val_ptr_phi, expr_type_arg, hash_val};
+    llvm::Function* get_hash_value_fn =
+        codegen->GetFunction(IRFunction::RAW_VALUE_GET_HASH_VALUE_FAST_HASH, false);
+    DCHECK(get_hash_value_fn != nullptr);
+    hash_val = builder.CreateCall(get_hash_value_fn, get_hash_value_args, "hash_val");
+  }
+
+  builder.CreateRet(hash_val);
+  *fn = codegen->FinalizeFunction(hash_row_fn);
+  if (*fn == nullptr) {
+    return Status("Codegen'd KrpcDataStreamSenderHashRow() fails verification. See log");
+  }
+
+  return Status::OK();
+}
+
+string KrpcDataStreamSender::PartitionTypeName() const {
+  switch (partition_type_) {
+  case TPartitionType::UNPARTITIONED:
+    return "Unpartitioned";
+  case TPartitionType::HASH_PARTITIONED:
+    return "Hash Partitioned";
+  case TPartitionType::RANDOM:
+    return "Random Partitioned";
+  case TPartitionType::KUDU:
+    return "Kudu Partitioned";
+  default:
+    DCHECK(false) << partition_type_;
+    return "";
+  }
+}
+
+void KrpcDataStreamSender::Codegen(LlvmCodeGen* codegen) {
+  const string sender_name = PartitionTypeName() + " Sender";
+  if (partition_type_ != TPartitionType::HASH_PARTITIONED) {
+    const string& msg = Substitute("not $0",
+        partition_type_ == TPartitionType::KUDU ? "supported" : "needed");
+    profile()->AddCodegenMsg(false, msg, sender_name);
+    return;
+  }
+
+  llvm::Function* hash_row_fn;
+  Status codegen_status = CodegenHashRow(codegen, &hash_row_fn);
+  if (codegen_status.ok()) {
+    llvm::Function* hash_and_add_rows_fn =
+        codegen->GetFunction(IRFunction::KRPC_DSS_HASH_AND_ADD_ROWS, true);
+    DCHECK(hash_and_add_rows_fn != nullptr);
+
+    int num_replaced;
+    // Replace GetNumChannels() with a constant.
+    num_replaced = codegen->ReplaceCallSitesWithValue(hash_and_add_rows_fn,
+        codegen->GetI32Constant(GetNumChannels()), "GetNumChannels");
+    DCHECK_EQ(num_replaced, 1);
+
+    // Replace HashRow() with the handcrafted IR function.
+    num_replaced = codegen->ReplaceCallSites(hash_and_add_rows_fn,
+        hash_row_fn, HASH_ROW_SYMBOL);
+    DCHECK_EQ(num_replaced, 1);
+
+    hash_and_add_rows_fn = codegen->FinalizeFunction(hash_and_add_rows_fn);
+    if (hash_and_add_rows_fn == nullptr) {
+      codegen_status =
+          Status("Codegen'd HashAndAddRows() failed verification. See log");
+    } else {
+      codegen->AddFunctionToJit(hash_and_add_rows_fn,
+          reinterpret_cast<void**>(&hash_and_add_rows_fn_));
+    }
+  }
+  profile()->AddCodegenMsg(codegen_status.ok(), codegen_status, sender_name);
+}
+
+Status KrpcDataStreamSender::AddRowToChannel(const int channel_id, TupleRow* row) {
+  return channels_[channel_id]->AddRow(row);
+}
+
+uint64_t KrpcDataStreamSender::HashRow(TupleRow* row) {
+  uint64_t hash_val = EXCHANGE_HASH_SEED;
+  for (ScalarExprEvaluator* eval : partition_expr_evals_) {
+    void* partition_val = eval->GetValue(row);
+    // We can't use the crc hash function here because it does not result in
+    // uncorrelated hashes with different seeds. Instead we use FastHash.
+    // TODO: fix crc hash/GetHashValue()
+    hash_val = RawValue::GetHashValueFastHash(
+        partition_val, eval->root().type(), hash_val);
+  }
+  return hash_val;
 }
 
 Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
@@ -703,40 +902,10 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
     }
   } else {
     DCHECK_EQ(partition_type_, TPartitionType::HASH_PARTITIONED);
-    // hash-partition batch's rows across channels
-    // TODO: encapsulate this in an Expr as we've done for Kudu above and remove this case
-    // once we have codegen here.
-    int num_channels = channels_.size();
-    const int num_partition_exprs = partition_exprs_.size();
-    const int num_rows = batch->num_rows();
-    const int hash_batch_size = RowBatch::HASH_BATCH_SIZE;
-    int channel_ids[hash_batch_size];
-
-    // Break the loop into two parts break the data dependency between computing
-    // the hash and calling AddRow()
-    // To keep stack allocation small a RowBatch::HASH_BATCH is used
-    for (int batch_start = 0; batch_start < num_rows; batch_start += hash_batch_size) {
-      int batch_window_size = min(num_rows - batch_start, hash_batch_size);
-      for (int i = 0; i < batch_window_size; ++i) {
-        TupleRow* row = batch->GetRow(i + batch_start);
-        uint64_t hash_val = EXCHANGE_HASH_SEED;
-        for (int j = 0; j < num_partition_exprs; ++j) {
-          ScalarExprEvaluator* eval = partition_expr_evals_[j];
-          void* partition_val = eval->GetValue(row);
-          // We can't use the crc hash function here because it does not result in
-          // uncorrelated hashes with different seeds. Instead we use FastHash.
-          // TODO: fix crc hash/GetHashValue()
-          DCHECK(&(eval->root()) == partition_exprs_[j]);
-          hash_val = RawValue::GetHashValueFastHash(
-              partition_val, partition_exprs_[j]->type(), hash_val);
-        }
-        channel_ids[i] = hash_val % num_channels;
-      }
-
-      for (int i = 0; i < batch_window_size; ++i) {
-        TupleRow* row = batch->GetRow(i + batch_start);
-        RETURN_IF_ERROR(channels_[channel_ids[i]]->AddRow(row));
-      }
+    if (hash_and_add_rows_fn_ != nullptr) {
+      RETURN_IF_ERROR(hash_and_add_rows_fn_(this, batch));
+    } else {
+      RETURN_IF_ERROR(HashAndAddRows(batch));
     }
   }
   COUNTER_ADD(total_sent_rows_counter_, batch->num_rows());

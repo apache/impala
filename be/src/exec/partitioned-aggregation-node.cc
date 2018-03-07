@@ -225,7 +225,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
         state->fragment_hash_seed(), MAX_PARTITION_DEPTH, 1, expr_perm_pool(),
         expr_results_pool(), expr_results_pool(), &ht_ctx_));
   }
-  AddCodegenDisabledMessage(state);
+  state->CheckAndAddCodegenDisabledMessage(runtime_profile());
   return Status::OK();
 }
 

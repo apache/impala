@@ -193,33 +193,6 @@ void RawValue::Write(const void* value, Tuple* tuple, const SlotDescriptor* slot
   }
 }
 
-uint64_t RawValue::GetHashValueFastHash(const void* v, const ColumnType& type,
-    uint64_t seed) {
-  // Hash with an arbitrary constant to ensure we don't return seed.
-  if (v == nullptr) {
-    return HashUtil::FastHash64(&HASH_VAL_NULL, sizeof(HASH_VAL_NULL), seed);
-  }
-  switch (type.type) {
-    case TYPE_STRING:
-    case TYPE_VARCHAR: {
-      const StringValue* string_value = reinterpret_cast<const StringValue*>(v);
-      return HashUtil::FastHash64(string_value->ptr,
-          static_cast<size_t>(string_value->len), seed);
-    }
-    case TYPE_BOOLEAN: return HashUtil::FastHash64(v, 1, seed);
-    case TYPE_TINYINT: return HashUtil::FastHash64(v, 1, seed);
-    case TYPE_SMALLINT: return HashUtil::FastHash64(v, 2, seed);
-    case TYPE_INT: return HashUtil::FastHash64(v, 4, seed);
-    case TYPE_BIGINT: return HashUtil::FastHash64(v, 8, seed);
-    case TYPE_FLOAT: return HashUtil::FastHash64(v, 4, seed);
-    case TYPE_DOUBLE: return HashUtil::FastHash64(v, 8, seed);
-    case TYPE_TIMESTAMP: return HashUtil::FastHash64(v, 12, seed);
-    case TYPE_CHAR: return HashUtil::FastHash64(v, type.len, seed);
-    case TYPE_DECIMAL: return HashUtil::FastHash64(v, type.GetByteSize(), seed);
-    default: DCHECK(false); return 0;
-  }
-}
-
 void RawValue::PrintValue(
     const void* value, const ColumnType& type, int scale, std::stringstream* stream) {
   if (value == NULL) {

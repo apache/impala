@@ -54,6 +54,7 @@
 #include "exprs/timestamp-functions-ir.cc"
 #include "exprs/udf-builtins-ir.cc"
 #include "exprs/utility-functions-ir.cc"
+#include "runtime/krpc-data-stream-sender-ir.cc"
 #include "runtime/mem-pool.h"
 #include "runtime/raw-value-ir.cc"
 #include "runtime/runtime-filter-ir.cc"

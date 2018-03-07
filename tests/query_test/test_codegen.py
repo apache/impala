@@ -18,6 +18,7 @@
 # Tests end-to-end codegen behaviour.
 
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIf
 from tests.common.test_dimensions import create_exec_option_dimension_from_dict
 from tests.common.test_result_verifier import get_node_exec_options,\
     assert_codegen_enabled
@@ -50,3 +51,8 @@ class TestCodegen(ImpalaTestSuite):
     # Make sure test fails if there are no exec options in the profile for the node
     assert len(exec_options) > 0
     assert_codegen_enabled(result.runtime_profile, [1])
+
+  @SkipIf.not_krpc
+  def test_datastream_sender_codegen(self, vector):
+    """Test the KrpcDataStreamSender's codegen logic"""
+    self.run_test_case('QueryTest/datastream-sender-codegen', vector)
