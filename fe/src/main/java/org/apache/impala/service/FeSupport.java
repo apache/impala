@@ -166,7 +166,10 @@ public class FeSupport {
       TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
       TResultRow val = new TResultRow();
       deserializer.deserialize(val, result);
-      Preconditions.checkState(val.getColValsSize() == 1);
+      if (val.getColValsSize() != 1) {
+        throw new IllegalStateException(String.format("Illegal expr eval result. " +
+            "Expr=%s\nTExpBatch=%s\nResult=%s", expr.toSql(), exprBatch, val));
+      }
       return val.getColVals().get(0);
     } catch (TException e) {
       // this should never happen
