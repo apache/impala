@@ -207,6 +207,7 @@ under the License.
           <topicref rev="2.5.0" href="topics/impala_optimize_partition_key_scans.xml"/>
           <topicref href="topics/impala_parquet_compression_codec.xml"/>
           <topicref rev="2.6.0 IMPALA-2069" href="topics/impala_parquet_annotate_strings_utf8.xml"/>
+          <topicref rev="2.9.0 IMPALA-4725" href="topics/impala_parquet_array_resolution.xml"/>
           <topicref rev="2.6.0 IMPALA-2835" href="topics/impala_parquet_fallback_schema_resolution.xml"/>
           <topicref href="topics/impala_parquet_file_size.xml"/>
           <topicref rev="2.6.0 IMPALA-3286" href="topics/impala_prefetch_mode.xml"/>
