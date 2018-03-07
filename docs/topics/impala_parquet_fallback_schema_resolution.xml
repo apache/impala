@@ -37,23 +37,32 @@ under the License.
 
     <p rev="2.6.0 IMPALA-2835">
       <indexterm audience="hidden">PARQUET_FALLBACK_SCHEMA_RESOLUTION query option</indexterm>
-      Allows Impala to look up columns within Parquet files by column name, rather than column order,
+      The <codeph>PARQUET_FALLBACK_SCHEMA_RESOLUTION</codeph> query option allows Impala to look
+      up columns within Parquet files by column name, rather than column order,
       when necessary.
+      The allowed values are:
+      <ul>
+        <li>
+          POSITION (0)
+        </li>
+        <li>
+          NAME (1)
+        </li>
+      </ul>
     </p>
 
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
     <p>
       By default, Impala looks up columns within a Parquet file based on
       the order of columns in the table.
-      The <codeph>name</codeph> setting for this option enables behavior for Impala queries
-      similar to the Hive setting <codeph>parquet.column.index.access=false</codeph>.
+      The <codeph>name</codeph> setting for this option enables behavior for
+      Impala queries similar to the Hive setting <codeph>parquet.column.index access=false</codeph>.
       It also allows Impala to query Parquet files created by Hive with the
       <codeph>parquet.column.index.access=false</codeph> setting in effect.
     </p>
 
     <p>
-      <b>Type:</b> integer or string.
-      Allowed values are 0 or <codeph>position</codeph> (default), 1 or <codeph>name</codeph>.
+      <b>Type:</b> integer or string
     </p>
 
     <p conref="../shared/impala_common.xml#common/added_in_260"/>
