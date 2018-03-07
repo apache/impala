@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "source": "master",
+    "target": "2.x",
+    "commits": [
+      { "hash": "b0027575cbce7002ff867750e955ff3ecd3b1bcd",
+        "comment": "IMPALA-6405, change required manual cherry pick." }
+    ]
+  }
+]
