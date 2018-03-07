@@ -104,7 +104,7 @@ shared_ptr<DataStreamRecvrBase> KrpcDataStreamMgr::CreateRecvr(
   DCHECK(profile != nullptr);
   DCHECK(parent_tracker != nullptr);
   DCHECK(client != nullptr);
-  VLOG_FILE << "creating receiver for fragment="<< finst_id
+  VLOG_FILE << "creating receiver for fragment_instance_id="<< finst_id
             << ", node=" << dest_node_id;
   shared_ptr<KrpcDataStreamRecvr> recvr(new KrpcDataStreamRecvr(
       this, parent_tracker, row_desc, finst_id, dest_node_id, num_senders, is_merging,
@@ -202,7 +202,7 @@ void KrpcDataStreamMgr::AddData(const TransmitDataRequestPB* request,
   finst_id.__set_lo(request->dest_fragment_instance_id().lo());
   finst_id.__set_hi(request->dest_fragment_instance_id().hi());
   TPlanNodeId dest_node_id = request->dest_node_id();
-  VLOG_ROW << "AddData(): finst_id=" << PrintId(finst_id)
+  VLOG_ROW << "AddData(): fragment_instance_id=" << PrintId(finst_id)
            << " node_id=" << request->dest_node_id()
            << " #rows=" << request->row_batch_header().num_rows()
            << " sender_id=" << request->sender_id();
@@ -263,7 +263,7 @@ void KrpcDataStreamMgr::CloseSender(const EndDataStreamRequestPB* request,
   TUniqueId finst_id;
   finst_id.__set_lo(request->dest_fragment_instance_id().lo());
   finst_id.__set_hi(request->dest_fragment_instance_id().hi());
-  VLOG_ROW << "CloseSender(): instance_id=" << PrintId(finst_id)
+  VLOG_ROW << "CloseSender(): fragment_instance_id=" << PrintId(finst_id)
            << " node_id=" << request->dest_node_id()
            << " sender_id=" << request->sender_id();
   shared_ptr<KrpcDataStreamRecvr> recvr;
@@ -321,7 +321,7 @@ Status KrpcDataStreamMgr::DeregisterRecvr(
 }
 
 void KrpcDataStreamMgr::Cancel(const TUniqueId& finst_id) {
-  VLOG_QUERY << "cancelling all streams for fragment=" << finst_id;
+  VLOG_QUERY << "cancelling all streams for fragment_instance_id=" << finst_id;
   lock_guard<mutex> l(lock_);
   FragmentRecvrSet::iterator iter =
       fragment_recvr_set_.lower_bound(make_pair(finst_id, 0));
@@ -332,8 +332,9 @@ void KrpcDataStreamMgr::Cancel(const TUniqueId& finst_id) {
       recvr->CancelStream();
     } else {
       // keep going but at least log it
-      LOG(ERROR) << Substitute("Cancel(): missing in stream_map: fragment=$0 node=$1",
-          PrintId(iter->first), iter->second);
+      LOG(ERROR) << Substitute(
+          "Cancel(): missing in stream_map: fragment_instance_id=$0 node=$1",
+              PrintId(iter->first), iter->second);
     }
     ++iter;
   }

@@ -81,7 +81,7 @@ shared_ptr<DataStreamRecvrBase> DataStreamMgr::CreateRecvr(const RowDescriptor* 
     MemTracker* parent_tracker, BufferPool::ClientHandle* client) {
   DCHECK(profile != nullptr);
   DCHECK(parent_tracker != nullptr);
-  VLOG_FILE << "creating receiver for fragment="
+  VLOG_FILE << "creating receiver for fragment_instance_id="
             << fragment_instance_id << ", node=" << dest_node_id;
   shared_ptr<DataStreamRecvr> recvr(new DataStreamRecvr(this, parent_tracker, row_desc,
       fragment_instance_id, dest_node_id, num_senders, is_merging, buffer_size, profile));
@@ -126,7 +126,7 @@ shared_ptr<DataStreamRecvr> DataStreamMgr::FindRecvrOrWait(
   num_senders_waiting_->Increment(-1L);
   const string& time_taken = PrettyPrinter::Print(sw.ElapsedTime(), TUnit::TIME_NS);
   if (timed_out) {
-    LOG(INFO) << "Datastream sender timed-out waiting for recvr for fragment instance: "
+    LOG(INFO) << "Datastream sender timed-out waiting for recvr for fragment_instance_id="
               << fragment_instance_id << " (time-out was: " << time_taken << "). "
               << "Increase --datastream_sender_timeout_ms if you see this message "
               << "frequently.";
@@ -275,7 +275,8 @@ Status DataStreamMgr::DeregisterRecvr(
 }
 
 void DataStreamMgr::Cancel(const TUniqueId& fragment_instance_id) {
-  VLOG_QUERY << "cancelling all streams for fragment=" << fragment_instance_id;
+  VLOG_QUERY << "cancelling all streams for fragment_instance_id="
+             << fragment_instance_id;
   lock_guard<mutex> l(lock_);
   FragmentRecvrSet::iterator i =
       fragment_recvr_set_.lower_bound(make_pair(fragment_instance_id, 0));
@@ -284,7 +285,7 @@ void DataStreamMgr::Cancel(const TUniqueId& fragment_instance_id) {
     if (recvr.get() == NULL) {
       // keep going but at least log it
       stringstream err;
-      err << "Cancel(): missing in stream_map: fragment=" << i->first
+      err << "Cancel(): missing in stream_map: fragment_instance_id=" << i->first
           << " node=" << i->second;
       LOG(ERROR) << err.str();
     } else {

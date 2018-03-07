@@ -482,7 +482,7 @@ void KrpcDataStreamRecvr::SenderQueue::Cancel() {
       deferred_rpcs_.pop();
     }
   }
-  VLOG_QUERY << "cancelled stream: fragment_instance_id_="
+  VLOG_QUERY << "cancelled stream: fragment_instance_id="
              << recvr_->fragment_instance_id()
              << " node_id=" << recvr_->dest_node_id();
   // Wake up all threads waiting to produce/consume batches. They will all

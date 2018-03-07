@@ -354,7 +354,7 @@ void Coordinator::StartBackendExec() {
 
   DebugOptions debug_options(schedule_.query_options());
 
-  VLOG_QUERY << "starting execution on " << num_backends << " backends for query "
+  VLOG_QUERY << "starting execution on " << num_backends << " backends for query_id="
              << query_id();
   query_events_->MarkEvent(Substitute("Ready to start on $0 backends", num_backends));
 
@@ -367,7 +367,7 @@ void Coordinator::StartBackendExec() {
   }
 
   exec_complete_barrier_->Wait();
-  VLOG_QUERY << "started execution on " << num_backends << " backends for query "
+  VLOG_QUERY << "started execution on " << num_backends << " backends for query_id="
              << query_id();
   query_events_->MarkEvent(
       Substitute("All $0 execution backends ($1 fragment instances) started",
@@ -480,10 +480,10 @@ Status Coordinator::UpdateStatus(const Status& status, const string& backend_hos
 
   if (is_fragment_failure) {
     // Log the id of the fragment that first failed so we can track it down more easily.
-    VLOG_QUERY << "Query id=" << query_id() << " failed because instance id="
+    VLOG_QUERY << "query_id=" << query_id() << " failed because fragment_instance_id="
                << instance_id << " on host=" << backend_hostname << " failed.";
   } else {
-    VLOG_QUERY << "Query id=" << query_id() << " failed due to error on host="
+    VLOG_QUERY << "query_id=" << query_id() << " failed due to error on host="
                << backend_hostname;
   }
   return query_status_;
@@ -787,14 +787,14 @@ Status Coordinator::WaitForBackendCompletion() {
   unique_lock<mutex> l(lock_);
   while (num_remaining_backends_ > 0 && query_status_.ok()) {
     VLOG_QUERY << "Coordinator waiting for backends to finish, "
-               << num_remaining_backends_ << " remaining";
+               << num_remaining_backends_ << " remaining. query_id=" << query_id();
     backend_completion_cv_.Wait(l);
   }
   if (query_status_.ok()) {
-    VLOG_QUERY << "All backends finished successfully.";
+    VLOG_QUERY << "All backends finished successfully. query_id=" << query_id();
   } else {
-    VLOG_QUERY << "All backends finished due to one or more errors. "
-               << query_status_.GetDetail();
+    VLOG_QUERY << "All backends finished due to one or more errors. query_id="
+               << query_id() << ". " << query_status_.GetDetail();
   }
 
   return query_status_;
@@ -955,7 +955,8 @@ Status Coordinator::UpdateBackendExecStatus(const TReportExecStatusParams& param
     if (VLOG_QUERY_IS_ON && num_remaining_backends_ > 1) {
       VLOG_QUERY << "Backend completed: "
           << " host=" << backend_state->impalad_address()
-          << " remaining=" << num_remaining_backends_ - 1;
+          << " remaining=" << num_remaining_backends_ - 1
+          << " query_id=" << query_id();
       BackendState::LogFirstInProgress(backend_states_);
     }
     if (--num_remaining_backends_ == 0 || !status.ok()) {
@@ -1088,7 +1089,7 @@ void Coordinator::ReleaseAdmissionControlResources() {
 
 void Coordinator::ReleaseAdmissionControlResourcesLocked() {
   if (released_admission_control_resources_) return;
-  LOG(INFO) << "Release admission control resources for query "
+  LOG(INFO) << "Release admission control resources for query_id="
             << PrintId(query_ctx_.query_id);
   AdmissionController* admission_controller =
       ExecEnv::GetInstance()->admission_controller();
@@ -1200,7 +1201,7 @@ void Coordinator::FilterState::ApplyUpdate(const TUpdateFilterParams& params,
       if (!coord->filter_mem_tracker_->TryConsume(heap_space)) {
         VLOG_QUERY << "Not enough memory to allocate filter: "
                    << PrettyPrinter::Print(heap_space, TUnit::BYTES)
-                   << " (query: " << coord->query_id() << ")";
+                   << " (query_id=" << coord->query_id() << ")";
         // Disable, as one missing update means a correct filter cannot be produced.
         Disable(coord->filter_mem_tracker_);
       } else {
