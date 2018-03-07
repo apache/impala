@@ -25,6 +25,7 @@
 
 namespace impala {
 
+template<bool>
 class DelimitedTextParser;
 class ScannerContext;
 struct HdfsFileDesc;
@@ -237,7 +238,7 @@ class HdfsTextScanner : public HdfsScanner {
   int slot_idx_;
 
   /// Helper class for picking fields and rows from delimited text.
-  boost::scoped_ptr<DelimitedTextParser> delimited_text_parser_;
+  boost::scoped_ptr<DelimitedTextParser<true>> delimited_text_parser_;
 
   /// Return field locations from the Delimited Text Parser.
   std::vector<FieldLocation> field_locations_;
