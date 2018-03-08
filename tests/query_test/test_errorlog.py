@@ -20,7 +20,9 @@
 #
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_exec_option_dimension
+from tests.common.test_dimensions import (
+    create_single_exec_option_dimension,
+    create_uncompressed_text_dimension)
 from time import sleep
 
 # Test injecting error logs in prepare phase and status::OK(). This tests one of race
@@ -33,10 +35,9 @@ class TestErrorLogs(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestErrorLogs, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text')
-    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
-        cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0]))
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_errorlog(self, vector):
     query = 'select count(*) from tpch.lineitem;'
