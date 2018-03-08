@@ -506,6 +506,12 @@ class BaseScalarColumnReader : public ParquetColumnReader {
     return page_encoding != parquet::Encoding::PLAIN_DICTIONARY
         && slot_desc_ != nullptr && slot_desc_->type().IsVarLenStringType();
   }
+
+  /// Slow-path status construction code for def/rep decoding errors. 'level_name' is
+  /// either "rep" or "def", 'decoded_level' is the value returned from
+  /// ParquetLevelDecoder::ReadLevel() and 'max_level' is the maximum allowed value.
+  void __attribute__((noinline)) SetLevelDecodeError(const char* level_name,
+      int decoded_level, int max_level);
 };
 
 /// Collections are not materialized directly in parquet files; only scalar values appear

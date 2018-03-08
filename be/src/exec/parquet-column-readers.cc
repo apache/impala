@@ -180,7 +180,7 @@ bool ParquetLevelDecoder::FillCache(int batch_size, int* num_cached_levels) {
   DCHECK(!CacheHasNext());
   DCHECK(num_cached_levels != nullptr);
   DCHECK_GE(max_level_, 0);
-  DCHECK_EQ(num_cached_levels_ % 32, 0) << "Last batch was not a multiple of 32";
+  DCHECK_GE(*num_cached_levels, 0);
   cached_level_idx_ = 0;
   if (max_level_ == 0) {
     // No levels to read, e.g., because the field is required. The cache was
@@ -593,6 +593,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
     parent_->parse_status_ = Status(TErrorCode::PARQUET_DICT_DECODE_FAILURE, filename(),
         slot_desc_->type().DebugString(), stream_->file_offset());
   }
+
   void __attribute__((noinline)) SetPlainDecodeError() {
     parent_->parse_status_ = Status(TErrorCode::PARQUET_CORRUPT_PLAIN_VALUE, filename(),
         slot_desc_->type().DebugString(), stream_->file_offset());
@@ -1202,15 +1203,17 @@ bool BaseScalarColumnReader::NextLevels() {
   // The compiler can optimize these two conditions into a single branch by treating
   // def_level_ as unsigned.
   if (UNLIKELY(def_level_ < 0 || def_level_ > max_def_level())) {
-    parent_->parse_status_.MergeStatus(Status(Substitute("Corrupt Parquet file '$0': "
-        "invalid def level $1 > max def level $2 for column '$3'", filename(),
-        def_level_, max_def_level(), schema_element().name)));
+    SetLevelDecodeError("def", def_level_, max_def_level());
     return false;
   }
 
   if (ADVANCE_REP_LEVEL && max_rep_level() > 0) {
     // Repetition level is only present if this column is nested in any collection type.
     rep_level_ = rep_levels_.ReadLevel();
+    if (UNLIKELY(rep_level_ < 0 || rep_level_ > max_rep_level())) {
+      SetLevelDecodeError("rep", rep_level_, max_rep_level());
+      return false;
+    }
     // Reset position counter if we are at the start of a new parent collection.
     if (rep_level_ <= max_rep_level() - 1) pos_current_value_ = 0;
   }
@@ -1230,6 +1233,20 @@ bool BaseScalarColumnReader::NextPage() {
   }
   parent_->assemble_rows_timer_.Start();
   return true;
+}
+
+void BaseScalarColumnReader::SetLevelDecodeError(const char* level_name,
+    int decoded_level, int max_level) {
+  if (decoded_level < 0) {
+    DCHECK_EQ(decoded_level, HdfsParquetScanner::INVALID_LEVEL);
+    parent_->parse_status_.MergeStatus(Status(Substitute("Corrupt Parquet file '$0': "
+        "could not read all $1 levels for column '$2'", filename(),
+        level_name, schema_element().name)));
+  } else {
+    parent_->parse_status_.MergeStatus(Status(Substitute("Corrupt Parquet file '$0': "
+        "invalid $1 level $2 > max $1 level $3 for column '$4'", filename(),
+        level_name, decoded_level, max_level, schema_element().name)));
+  }
 }
 
 bool CollectionColumnReader::NextLevels() {
