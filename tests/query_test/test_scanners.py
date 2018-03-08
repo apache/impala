@@ -430,6 +430,17 @@ class TestParquet(ImpalaTestSuite):
         "/testdata/data/bad_codec.parquet", tbl_loc])
     self.run_test_case('QueryTest/parquet-bad-codec', vector, unique_database)
 
+  def test_num_values_def_levels_mismatch(self, vector, unique_database):
+    """IMPALA-6589: test the bad num_values handled correctly. """
+    self.client.execute(("""CREATE TABLE {0}.num_values_def_levels_mismatch (_c0 BOOLEAN)
+        STORED AS PARQUET""").format(unique_database))
+    tbl_loc = get_fs_path("/test-warehouse/%s.db/%s" % (unique_database,
+        "num_values_def_levels_mismatch"))
+    check_call(['hdfs', 'dfs', '-copyFromLocal', os.environ['IMPALA_HOME'] +
+        "/testdata/data/num_values_def_levels_mismatch.parquet", tbl_loc])
+    self.run_test_case('QueryTest/parquet-num-values-def-levels-mismatch',
+        vector, unique_database)
+
   @SkipIfS3.hdfs_block_size
   @SkipIfADLS.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size

@@ -1,0 +1,6 @@
+====
+---- QUERY
+select * from num_values_def_levels_mismatch
+---- CATCH
+could not read all def levels for column '_c0'
+====
