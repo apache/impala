@@ -69,12 +69,8 @@ class TestKrpcMetrics(CustomClusterTestSuite):
 
     assert before < after
 
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args('-datastream_service_queue_mem_limit=1B \
-                                     -datastream_service_num_svc_threads=1')
-  def test_krpc_queue_overflow_metrics(self, vector):
-    """Test that rejected RPCs show up on the /metrics debug web page.
-    """
+  def get_metric(self, name):
+    """Finds the metric with name 'name' and returns its value as an int."""
     def iter_metrics(group):
       for m in group['metrics']:
         yield m
@@ -82,16 +78,31 @@ class TestKrpcMetrics(CustomClusterTestSuite):
         for m in iter_metrics(c):
           yield m
 
-    def get_metric(name):
-      metrics = self.get_debug_page(self.METRICS_URL)['metric_group']
-      for m in iter_metrics(metrics):
-        if m['name'] == name:
-          return int(m['value'])
+    metrics = self.get_debug_page(self.METRICS_URL)['metric_group']
+    for m in iter_metrics(metrics):
+      if m['name'] == name:
+        return int(m['value'])
+    assert False, "Could not find metric: %s" % name
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args('-datastream_service_queue_mem_limit=1B \
+                                     -datastream_service_num_svc_threads=1')
+  def test_krpc_queue_overflow_metrics(self, vector):
+    """Test that rejected RPCs show up on the /metrics debug web page.
+    """
     metric_name = 'rpc.impala.DataStreamService.rpcs_queue_overflow'
-    before = get_metric(metric_name)
+    before = self.get_metric(metric_name)
     assert before == 0
 
     self.client.execute(self.TEST_QUERY)
-    after = get_metric(metric_name)
+    after = self.get_metric(metric_name)
     assert before < after
+
+  @pytest.mark.execute_serially
+  def test_krpc_service_queue_metrics(self, vector):
+    """Test that memory usage metrics for the data stream service queue show up on the
+    /metrics debug web page.
+    """
+    self.client.execute(self.TEST_QUERY)
+    assert self.get_metric('mem-tracker.DataStreamService.current_usage_bytes') >= 0
+    assert self.get_metric('mem-tracker.DataStreamService.peak_usage_bytes') > 0

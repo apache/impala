@@ -33,6 +33,7 @@
 namespace impala {
 
 class BufferPool;
+class MemTracker;
 class ReservationTracker;
 class Thread;
 
@@ -238,6 +239,30 @@ class BufferPoolMetric : public IntGauge {
   BufferPoolMetricType type_;
   ReservationTracker* global_reservations_;
   BufferPool* buffer_pool_;
+};
+
+/// Metric that reports information about a MemTracker.
+class MemTrackerMetric : public IntGauge {
+ public:
+  // Creates two new metrics tracking the current and peak usages of 'mem_tracker' in
+  // the metrics group 'metrics'. The caller must make sure that 'mem_tracker' is not
+  // destructed before 'metrics'.
+  static void CreateMetrics(MetricGroup* metrics, MemTracker* mem_tracker,
+      const std::string& name);
+
+  virtual int64_t GetValue() override;
+
+ private:
+  enum class MemTrackerMetricType {
+    CURRENT, // Current usage of the MemTracker
+    PEAK, // Peak usage of the MemTracker
+  };
+
+  MemTrackerMetric(const TMetricDef& def, MemTrackerMetricType type,
+      MemTracker* mem_tracker);
+
+  const MemTrackerMetricType type_;
+  const MemTracker* mem_tracker_;
 };
 
 /// Registers common tcmalloc memory metrics. If 'register_jvm_metrics' is true, the JVM
