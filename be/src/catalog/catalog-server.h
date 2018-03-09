@@ -76,8 +76,8 @@ class CatalogServer {
 
   /// Add a topic item to pending_topic_updates_. Caller must hold catalog_lock_.
   /// The return value is true if the operation succeeds and false otherwise.
-  bool AddPendingTopicItem(std::string key, const uint8_t* item_data, uint32_t size,
-      bool deleted);
+  bool AddPendingTopicItem(std::string key, int64_t version, const uint8_t* item_data,
+      uint32_t size, bool deleted);
 
  private:
   /// Thrift API implementation which proxies requests onto this CatalogService.

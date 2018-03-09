@@ -422,12 +422,8 @@ public class CatalogServiceCatalog extends Catalog {
       // TODO: TSerializer.serialize() returns a copy of the internal byte array, which
       // could be elided.
       byte[] data = serializer.serialize(obj);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Collected catalog " + (delete ? "deletion: " : "update: ") + key +
-            " version: " + obj.catalog_version);
-      }
-      if (!FeSupport.NativeAddPendingTopicItem(nativeCatalogServerPtr, key, data, delete))
-      {
+      if (!FeSupport.NativeAddPendingTopicItem(nativeCatalogServerPtr, key,
+          obj.catalog_version, data, delete)) {
         LOG.error("NativeAddPendingTopicItem failed in BE. key=" + key + ", delete="
             + delete + ", data_size=" + data.length);
       }

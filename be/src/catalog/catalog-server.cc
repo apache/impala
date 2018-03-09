@@ -233,15 +233,17 @@ void CatalogServer::UpdateCatalogTopicCallback(
   // to reload the full catalog.
   if (delta.from_version == 0 && catalog_objects_min_version_ != 0) {
     last_sent_catalog_version_ = 0L;
-  } else {
+  } else if (!pending_topic_updates_.empty()) {
     // Process the pending topic update.
-    LOG_EVERY_N(INFO, 300) << "Catalog Version: " << catalog_objects_max_version_
-                           << " Last Catalog Version: " << last_sent_catalog_version_;
-
     subscriber_topic_updates->emplace_back();
     TTopicDelta& update = subscriber_topic_updates->back();
     update.topic_name = IMPALA_CATALOG_TOPIC;
     update.topic_entries = std::move(pending_topic_updates_);
+
+    VLOG(1) << "A catalog update with " << update.topic_entries.size()
+            << " entries is assembled. Catalog version: "
+            << catalog_objects_max_version_ << " Last sent catalog version: "
+            << last_sent_catalog_version_;
 
     // Update the new catalog version and the set of known catalog objects.
     last_sent_catalog_version_ = catalog_objects_max_version_;
@@ -457,8 +459,8 @@ void CatalogServer::TableMetricsUrlCallback(const Webserver::ArgumentMap& args,
   }
 }
 
-bool CatalogServer::AddPendingTopicItem(std::string key, const uint8_t* item_data,
-    uint32_t size, bool deleted) {
+bool CatalogServer::AddPendingTopicItem(std::string key, int64_t version,
+    const uint8_t* item_data, uint32_t size, bool deleted) {
   pending_topic_updates_.emplace_back();
   TTopicItem& item = pending_topic_updates_.back();
   if (FLAGS_compact_catalog_topic) {
@@ -474,8 +476,9 @@ bool CatalogServer::AddPendingTopicItem(std::string key, const uint8_t* item_dat
   }
   item.key = std::move(key);
   item.deleted = deleted;
-  VLOG(1) << "Publishing " << (deleted ? "deletion: " : "update: ") << item.key <<
-      " original size: " << size << (FLAGS_compact_catalog_topic ?
-      Substitute(" compressed size: $0", item.value.size()) : string());
+  VLOG(1) << "Collected " << (deleted ? "deletion: " : "update: ") << item.key
+          << ", version=" << version << ", original size=" << size
+          << (FLAGS_compact_catalog_topic ?
+              Substitute(", compressed size=$0", item.value.size()) : string());
   return true;
 }
