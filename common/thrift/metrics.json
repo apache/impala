@@ -1655,5 +1655,25 @@
     "units": "UNIT",
     "kind": "COUNTER",
     "key": "rpc.$0.rpcs_queue_overflow"
+  },
+  {
+    "description": "Memtracker $0 Current Usage Bytes",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Memtracker $0 Current Usage Bytes",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "mem-tracker.$0.current_usage_bytes"
+  },
+  {
+    "description": "Memtracker $0 Peak Usage Bytes",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Memtracker $0 Peak Max Bytes",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "mem-tracker.$0.peak_usage_bytes"
   }
 ]

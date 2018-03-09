@@ -37,10 +37,10 @@ class RpcMgr;
 /// instances. The client for this service is implemented in KrpcDataStreamSender.
 /// The processing of incoming requests is implemented in KrpcDataStreamRecvr.
 /// KrpcDataStreamMgr is responsible for routing the incoming requests to the
-/// appropriate receivers.
+/// appropriate receivers. Metrics exposed by the service will be added to 'metric_group'.
 class DataStreamService : public DataStreamServiceIf {
  public:
-  DataStreamService();
+  DataStreamService(MetricGroup* metric_group);
 
   /// Initializes the service by registering it with the singleton RPC manager.
   /// This mustn't be called until RPC manager has been initialized.

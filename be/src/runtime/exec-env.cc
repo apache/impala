@@ -319,7 +319,7 @@ Status ExecEnv::Init() {
     // Initialization needs to happen in the following order due to dependencies:
     // - RPC manager, DataStreamService and DataStreamManager.
     RETURN_IF_ERROR(rpc_mgr_->Init());
-    data_svc_.reset(new DataStreamService());
+    data_svc_.reset(new DataStreamService(rpc_metrics_));
     RETURN_IF_ERROR(data_svc_->Init());
     RETURN_IF_ERROR(KrpcStreamMgr()->Init(data_svc_->mem_tracker()));
     // Bump thread cache to 1GB to reduce contention for TCMalloc central

@@ -22,6 +22,7 @@
 
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
+#include "runtime/mem-tracker.h"
 #include "util/jni-util.h"
 #include "util/mem-info.h"
 #include "util/time.h"
@@ -297,6 +298,34 @@ int64_t BufferPoolMetric::GetValue() {
       return buffer_pool_->GetCleanPageBytes();
     default:
       DCHECK(false) << "Unknown BufferPoolMetricType: " << static_cast<int>(type_);
+  }
+  return 0;
+}
+
+void MemTrackerMetric::CreateMetrics(MetricGroup* metrics, MemTracker* mem_tracker,
+    const string& name) {
+  metrics->RegisterMetric(
+      new MemTrackerMetric(MetricDefs::Get("mem-tracker.$0.current_usage_bytes", name),
+      MemTrackerMetricType::CURRENT, mem_tracker));
+  metrics->RegisterMetric(
+      new MemTrackerMetric(MetricDefs::Get("mem-tracker.$0.peak_usage_bytes", name),
+      MemTrackerMetricType::PEAK, mem_tracker));
+}
+
+MemTrackerMetric::MemTrackerMetric(const TMetricDef& def, MemTrackerMetricType type,
+    MemTracker* mem_tracker)
+  : IntGauge(def, 0),
+    type_(type),
+    mem_tracker_(mem_tracker) {}
+
+int64_t MemTrackerMetric::GetValue() {
+  switch (type_) {
+    case MemTrackerMetricType::CURRENT:
+      return mem_tracker_->consumption();
+    case MemTrackerMetricType::PEAK:
+      return mem_tracker_->peak_consumption();
+    default:
+      DCHECK(false) << "Unknown MemTrackerMetricType: " << static_cast<int>(type_);
   }
   return 0;
 }
