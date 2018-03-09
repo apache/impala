@@ -340,6 +340,32 @@ class TestRecoverPartitions(ImpalaTestSuite):
     self.check_invalid_partition_values(FQ_TBL_NAME, TBL_LOCATION,
         normal_values, overflow_values)
 
+  @SkipIfLocal.hdfs_client
+  def test_encoded_partition(self, vector, unique_database):
+    """IMPALA-6619: Test that RECOVER PARTITIONS does not create unnecessary partitions
+       when dealing with URL encoded partition value."""
+    TBL_NAME = "test_encoded_partition"
+    FQ_TBL_NAME = unique_database + "." + TBL_NAME
+
+    self.execute_query_expect_success(
+      self.client, "CREATE TABLE %s (s string) PARTITIONED BY (p string)" % FQ_TBL_NAME)
+    self.execute_query_expect_success(
+      self.client, "ALTER TABLE %s ADD PARTITION (p='100%%')" % FQ_TBL_NAME)
+
+    # Running ALTER TABLE RECOVER PARTITIONS multiple times should only produce
+    # a single partition when adding a single partition.
+    for i in xrange(3):
+      self.execute_query_expect_success(
+        self.client, "ALTER TABLE %s RECOVER PARTITIONS" % FQ_TBL_NAME)
+      result = self.execute_query_expect_success(
+        self.client, "SHOW PARTITIONS %s" % FQ_TBL_NAME)
+      assert (self.count_partition(result.data) == 1,
+        "ALTER TABLE %s RECOVER PARTITIONS produced more than 1 partitions" %
+        FQ_TBL_NAME)
+      assert (self.count_value('p=100%25', result.data) == 1,
+        "ALTER TABLE %s RECOVER PARTITIONS failed to handle encoded partitioned value" %
+        FQ_TBL_NAME)
+
   def check_invalid_partition_values(self, fq_tbl_name, tbl_location,
     normal_values, invalid_values):
     """"Check that RECOVER PARTITIONS ignores partitions with invalid partition values."""
@@ -367,3 +393,11 @@ class TestRecoverPartitions(ImpalaTestSuite):
   def has_value(self, value, lines):
     """Check if lines contain value."""
     return any([line.find(value) != -1 for line in lines])
+
+  def count_partition(self, lines):
+    """Count the number of partitions in the lines."""
+    return self.count_value(WAREHOUSE, lines)
+
+  def count_value(self, value, lines):
+    """Count the number of lines that contain value."""
+    return len(filter(lambda line: line.find(value) != -1, lines))
