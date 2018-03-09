@@ -121,6 +121,7 @@ Per-Host Resources: mem-estimate=0B mem-reservation=0B
      mem-estimate=0B mem-reservation=0B
      tuple-ids=0 row-size=124B cardinality=3
 ====
+# Test alltypes in-list predicates.
 select * from functional_kudu.alltypes where
 -- predicates that can be pushed
 tinyint_col in (1, 2) and
@@ -155,6 +156,19 @@ Per-Host Resources: mem-estimate=0B mem-reservation=0B
      kudu predicates: double_col IN (0.0), float_col IN (0.0), bigint_col IN (1, 2), int_col IN (1, 2), smallint_col IN (0, 2), string_col IN ('foo', 'foo       '), tinyint_col IN (1, 2), bool_col IN (TRUE)
      mem-estimate=0B mem-reservation=0B
      tuple-ids=0 row-size=97B cardinality=5
+====
+# Test decimal in-list predicates.
+select * from functional_kudu.decimal_tbl where d1 in (1234, 12345);
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+Per-Host Resources: mem-estimate=0B mem-reservation=0B
+  PLAN-ROOT SINK
+  |  mem-estimate=0B mem-reservation=0B
+  |
+  00:SCAN KUDU [functional_kudu.decimal_tbl]
+     kudu predicates: d1 IN (1234, 12345)
+     mem-estimate=0B mem-reservation=0B
+     tuple-ids=0 row-size=56B cardinality=2
 ====
 select * from functional_kudu.alltypes where
 tinyint_col is not null and
