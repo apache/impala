@@ -428,7 +428,7 @@ Java_org_apache_impala_service_FeSupport_NativeLookupSymbol(
 extern "C"
 JNIEXPORT jboolean JNICALL
 Java_org_apache_impala_service_FeSupport_NativeAddPendingTopicItem(JNIEnv* env,
-    jclass caller_class, jlong native_catalog_server_ptr, jstring key,
+    jclass caller_class, jlong native_catalog_server_ptr, jstring key, jlong version,
     jbyteArray serialized_object, jboolean deleted) {
   std::string key_string;
   {
@@ -442,9 +442,9 @@ Java_org_apache_impala_service_FeSupport_NativeAddPendingTopicItem(JNIEnv* env,
   if (!JniScopedArrayCritical::Create(env, serialized_object, &obj_buf)) {
     return static_cast<jboolean>(false);
   }
-  reinterpret_cast<CatalogServer*>(native_catalog_server_ptr)->AddPendingTopicItem(
-      std::move(key_string), obj_buf.get(), static_cast<uint32_t>(obj_buf.size()),
-      deleted);
+  reinterpret_cast<CatalogServer*>(native_catalog_server_ptr)->
+      AddPendingTopicItem(std::move(key_string), version, obj_buf.get(),
+      static_cast<uint32_t>(obj_buf.size()), deleted);
   return static_cast<jboolean>(true);
 }
 
@@ -575,7 +575,7 @@ static JNINativeMethod native_methods[] = {
       (void*)::Java_org_apache_impala_service_FeSupport_NativeParseQueryOptions
   },
   {
-      (char*)"NativeAddPendingTopicItem", (char*)"(JLjava/lang/String;[BZ)Z",
+      (char*)"NativeAddPendingTopicItem", (char*)"(JLjava/lang/String;J[BZ)Z",
       (void*)::Java_org_apache_impala_service_FeSupport_NativeAddPendingTopicItem
   },
   {

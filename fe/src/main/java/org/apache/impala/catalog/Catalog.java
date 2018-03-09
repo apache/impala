@@ -35,6 +35,7 @@ import org.apache.impala.util.PatternMatcher;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import org.apache.impala.util.TUniqueIdUtil;
 
 /**
  * Thread safe interface for reading and updating metadata stored in the Hive MetaStore.
@@ -574,7 +575,8 @@ public abstract class Catalog {
       case DATA_SOURCE:
         return "DATA_SOURCE:" + catalogObject.getData_source().getName().toLowerCase();
       case CATALOG:
-        return "CATALOG:" + catalogObject.getCatalog().catalog_service_id;
+        return "CATALOG:" +
+            TUniqueIdUtil.PrintId(catalogObject.getCatalog().catalog_service_id);
       default:
         throw new IllegalStateException(
             "Unsupported catalog object type: " + catalogObject.getType());

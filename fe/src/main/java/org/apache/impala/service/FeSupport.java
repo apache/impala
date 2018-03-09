@@ -86,7 +86,7 @@ public class FeSupport {
   // 'serializationBuffer' is a serialized TCatalogObject.
   // The return value is true if the operation succeeds and false otherwise.
   public native static boolean NativeAddPendingTopicItem(long nativeCatalogServerPtr,
-      String key, byte[] serializationBuffer, boolean deleted);
+      String key, long version, byte[] serializationBuffer, boolean deleted);
 
   // Get a catalog object update from the backend. A pair of isDeletion flag and
   // serialized TCatalogObject is returned.
