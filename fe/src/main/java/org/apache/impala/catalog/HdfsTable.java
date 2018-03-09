@@ -19,6 +19,9 @@ package org.apache.impala.catalog;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -1906,7 +1909,7 @@ public class HdfsTable extends Table {
    * value.
    */
   private Pair<String, LiteralExpr> getTypeCompatibleValue(Path path,
-      String partitionKey) {
+      String partitionKey) throws UnsupportedEncodingException {
     String partName[] = path.getName().split("=");
     if (partName.length != 2 || !partName[0].equals(partitionKey)) return null;
 
@@ -1915,28 +1918,30 @@ public class HdfsTable extends Table {
     Preconditions.checkNotNull(column);
     Type type = column.getType();
     LiteralExpr expr = null;
-    if (!partName[1].equals(getNullPartitionKeyValue())) {
+    // URL decode the partition value since it may contain encoded URL.
+    String value = URLDecoder.decode(partName[1], StandardCharsets.UTF_8.name());
+    if (!value.equals(getNullPartitionKeyValue())) {
       try {
-        expr = LiteralExpr.create(partName[1], type);
+        expr = LiteralExpr.create(value, type);
         // Skip large value which exceeds the MAX VALUE of specified Type.
         if (expr instanceof NumericLiteral) {
           if (NumericLiteral.isOverflow(((NumericLiteral)expr).getValue(), type)) {
             LOG.warn(String.format("Skip the overflow value (%s) for Type (%s).",
-                partName[1], type.toSql()));
+                value, type.toSql()));
             return null;
           }
         }
       } catch (Exception ex) {
         if (LOG.isTraceEnabled()) {
           LOG.trace(String.format("Invalid partition value (%s) for Type (%s).",
-              partName[1], type.toSql()));
+              value, type.toSql()));
         }
         return null;
       }
     } else {
       expr = new NullLiteral();
     }
-    return new Pair<String, LiteralExpr>(partName[1], expr);
+    return new Pair<String, LiteralExpr>(value, expr);
   }
 
   /**
