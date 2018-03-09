@@ -540,3 +540,18 @@ INSERT INTO KUDU [functional_kudu.jointbl]
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ====
+# Decimal predicate.
+select * from functional_kudu.decimal_tbl where d4 = 0.123456789;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN KUDU [functional_kudu.decimal_tbl]
+   kudu predicates: d4 = 0.123456789
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN KUDU [functional_kudu.decimal_tbl]
+   kudu predicates: d4 = 0.123456789
+====

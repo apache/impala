@@ -406,6 +406,11 @@ public class KuduScanNode extends ScanNode {
         }
         break;
       }
+      case DECIMAL: {
+        kuduPredicate = KuduPredicate.newComparisonPredicate(column, op,
+            ((NumericLiteral)literal).getValue());
+        break;
+      }
       default: break;
     }
     if (kuduPredicate == null) return false;
@@ -505,6 +510,7 @@ public class KuduScanNode extends ScanNode {
         }
         break;
       }
+      case DECIMAL: return ((NumericLiteral) e).getValue();
       default:
         Preconditions.checkState(false,
             "Unsupported Kudu type considered for predicate: %s", e.getType().toSql());
