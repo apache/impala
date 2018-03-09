@@ -185,6 +185,14 @@ under the License.
           with an Impala table.
         </li>
       </ul>
+      <p>
+        Impala respects the <codeph>serialization.null.format</codeph> table
+        property only for TEXT tables and ignores the property for Parquet and
+        other formats. Hive respects the <codeph>serialization.null.format</codeph>
+        property for Parquet and other formats and converts matching values
+        to NULL during the scan. See <xref keyref="text_data_files"/> for
+        using the table property in Impala.
+      </p>
     </conbody>
   </concept>
 
