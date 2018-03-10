@@ -302,6 +302,79 @@ class TestUdfExecution(TestUdfBase):
       self.run_test_case('QueryTest/udf-non-deterministic', vector,
           use_db=unique_database)
 
+  def test_native_functions_race(self, vector, unique_database):
+    """ IMPALA-6488: stress concurrent adds, uses, and deletes of native functions.
+        Exposes a crash caused by use-after-free in lib-cache."""
+
+    # Native function used by a query. Stresses lib-cache during analysis and
+    # backend expressions.
+    create_fn_to_use = """create function {0}.use_it(string) returns string
+                          LOCATION '{1}'
+                          SYMBOL='_Z8IdentityPN10impala_udf15FunctionContextERKNS_9StringValE'"""
+    use_fn = """select * from (select max(int_col) from functional.alltypesagg
+                where {0}.use_it(string_col) = 'blah' union all
+                (select max(int_col) from functional.alltypesagg
+                 where {0}.use_it(String_col) > '1' union all
+                (select max(int_col) from functional.alltypesagg
+                 where {0}.use_it(string_col) > '1'))) v"""
+    # Reference to another native function from the same 'so' file. Creating/dropping
+    # stresses lib-cache lookup, add, and refresh.
+    create_another_fn = """create function if not exists {0}.other(float)
+                           returns float location '{1}' symbol='Identity'"""
+    drop_another_fn = """drop function if exists {0}.other(float)"""
+
+    setup_client = self.create_impala_client()
+    setup_query = create_fn_to_use.format(unique_database, '/test-warehouse/libTestUdfs.so')
+    try:
+      setup_client.execute(setup_query)
+    except Exception as e:
+      print "Unable to create initial function: {0}".format(setup_query)
+      raise
+
+    errors = []
+    def use_fn_method():
+      time.sleep(1 + random.random())
+      client = self.create_impala_client()
+      query = use_fn.format(unique_database)
+      try:
+        client.execute(query)
+      except Exception as e:
+        errors.append(e)
+
+    def load_fn_method():
+      time.sleep(1 + random.random())
+      client = self.create_impala_client()
+      drop = drop_another_fn.format(unique_database)
+      create = create_another_fn.format(unique_database, '/test-warehouse/libTestUdfs.so')
+      try:
+        client.execute(drop)
+        client.execute(create)
+      except Exception as e:
+        errors.append(e)
+
+    # number of uses/loads needed to reliably reproduce the bug.
+    num_uses = 200
+    num_loads = 200
+
+    # create threads to use native function.
+    runner_threads = []
+    for i in xrange(num_uses):
+      runner_threads.append(threading.Thread(target=use_fn_method))
+
+    # create threads to drop/create native functions.
+    for i in xrange(num_loads):
+      runner_threads.append(threading.Thread(target=load_fn_method))
+
+    # launch all runner threads.
+    for t in runner_threads: t.start()
+
+    # join all threads.
+    for t in runner_threads: t.join();
+
+    # Check for any errors.
+    for e in errors: print e
+    assert len(errors) == 0
+
   def test_ir_functions(self, vector, unique_database):
     if vector.get_value('exec_option')['disable_codegen']:
       # IR functions require codegen to be enabled.
