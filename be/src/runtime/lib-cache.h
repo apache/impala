@@ -151,6 +151,21 @@ class LibCache {
   Status GetCacheEntryInternal(const std::string& hdfs_lib_file, LibType type,
       boost::unique_lock<boost::mutex>* entry_lock, LibCacheEntry** entry);
 
+  /// Returns iter's cache entry in 'entry' with 'entry_lock' held if entry does not
+  /// need to be refreshed.
+  /// If entry needs to be refreshed, then it is removed and '*entry' is set to nullptr.
+  /// The cache lock must be held prior to calling this method. On return the entry's
+  /// lock is taken and returned in '*entry_lock' if entry does not need to be refreshed.
+  /// TODO: cleanup this method's interface and how the outputs are used.
+  Status RefreshCacheEntry(const std::string& hdfs_lib_file, LibType type,
+      const LibMap::iterator& iter, boost::unique_lock<boost::mutex>* entry_lock,
+      LibCacheEntry** entry);
+
+  /// 'hdfs_lib_file' is copied locally and 'entry' is initialized with its contents.
+  /// No locks are assumed held; 'entry' should be visible only to a single thread.
+  Status LoadCacheEntry(
+      const std::string& hdfs_lib_file, LibType type, LibCacheEntry* entry);
+
   /// Utility function for generating a filename unique to this process and
   /// 'hdfs_path'. This is to prevent multiple impalad processes or different library files
   /// with the same name from clobbering each other. 'hdfs_path' should be the full path
@@ -160,8 +175,8 @@ class LibCache {
 
   /// Implementation to remove an entry from the cache.
   /// lock_ must be held. The entry's lock should not be held.
-  void RemoveEntryInternal(const std::string& hdfs_lib_file,
-                           const LibMap::iterator& entry_iterator);
+  void RemoveEntryInternal(
+      const std::string& hdfs_lib_file, const LibMap::iterator& entry_iterator);
 };
 
 }
