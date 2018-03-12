@@ -24,7 +24,7 @@ from subprocess import check_call
 
 from tests.common.environ import specific_build_type_timeout
 from tests.common.impala_cluster import ImpalaCluster
-from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import get_fs_path
@@ -319,10 +319,14 @@ def get_num_cache_requests():
   max_num_stabilization_attempts = 10
   new_requests = None
   num_requests = None
+  LOG.info("{0} Entered get_num_cache_requests()".format(time.time()))
   while num_stabilization_attempts < max_num_stabilization_attempts:
     new_requests = get_num_cache_requests_util()
     if new_requests == num_requests: break
+    LOG.info("{0} Waiting to stabilise: num_requests={1} new_requests={2}".format(
+        time.time(), num_requests, new_requests))
     num_requests = new_requests
     num_stabilization_attempts = num_stabilization_attempts + 1
     time.sleep(wait_time_in_sec)
+  LOG.info("{0} Final num requests: {1}".format(time.time(), num_requests))
   return num_requests
