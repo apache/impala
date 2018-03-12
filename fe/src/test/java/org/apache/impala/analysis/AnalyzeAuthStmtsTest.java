@@ -165,7 +165,8 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
       AnalyzesOk(String.format("%s INSERT ON DATABASE functional %s myrole",
           formatArgs));
       AnalysisError(String.format("%s INSERT ON SERVER %s myrole", formatArgs),
-          "Only 'ALL' privilege may be applied at SERVER scope in privilege spec.");
+          "Only 'ALL' or 'REFRESH' privilege may be applied at SERVER scope " +
+          "in privilege spec.");
       AnalysisError(String.format("%s INSERT ON URI 'hdfs:////abc//123' %s myrole",
           formatArgs), "Only 'ALL' privilege may be applied at URI scope in privilege " +
           "spec.");
@@ -180,7 +181,8 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
       AnalyzesOk(String.format("%s SELECT ON DATABASE functional %s myrole",
           formatArgs));
       AnalysisError(String.format("%s SELECT ON SERVER %s myrole", formatArgs),
-          "Only 'ALL' privilege may be applied at SERVER scope in privilege spec.");
+          "Only 'ALL' or 'REFRESH' privilege may be applied at SERVER scope " +
+          "in privilege spec.");
       AnalysisError(String.format("%s SELECT ON URI 'hdfs:////abc//123' %s myrole",
           formatArgs), "Only 'ALL' privilege may be applied at URI scope in privilege " +
           "spec.");
@@ -219,6 +221,18 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
           "functional.does_not_exist %s myrole", formatArgs), "Error setting " +
           "privileges for table 'functional.does_not_exist'. Verify that the table " +
           "exists and that you have permissions to issue a GRANT/REVOKE statement.");
+
+      // REFRESH privilege
+      AnalyzesOk(String.format(
+          "%s REFRESH ON TABLE functional.alltypes %s myrole", formatArgs));
+      AnalyzesOk(String.format(
+          "%s REFRESH ON DATABASE functional %s myrole", formatArgs));
+      AnalyzesOk(String.format("%s REFRESH ON SERVER %s myrole", formatArgs));
+      AnalyzesOk(String.format("%s REFRESH ON SERVER server1 %s myrole",
+          formatArgs));
+      AnalysisError(String.format(
+          "%s REFRESH ON URI 'hdfs:////abc//123' %s myrole", formatArgs),
+          "Only 'ALL' privilege may be applied at URI scope in privilege spec.");
     }
 
     AnalysisContext authDisabledCtx = createAuthDisabledAnalysisCtx();

@@ -22,12 +22,12 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.lang.reflect.ConstructorUtils;
+import org.apache.impala.authorization.Privilege.SentryAction;
 import org.apache.impala.catalog.AuthorizationException;
 import org.apache.impala.catalog.AuthorizationPolicy;
 import org.apache.impala.common.InternalException;
 import org.apache.sentry.core.common.ActiveRoleSet;
 import org.apache.sentry.core.common.Subject;
-import org.apache.sentry.core.model.db.DBModelAction;
 import org.apache.sentry.core.model.db.DBModelAuthorizable;
 import org.apache.sentry.policy.db.SimpleDBPolicyEngine;
 import org.apache.sentry.provider.cache.SimpleCacheProviderBackend;
@@ -137,6 +137,11 @@ public class AuthorizationChecker {
         throw new AuthorizationException(String.format(
             "User '%s' does not have privileges to access: %s",
             user.getName(), privilegeRequest.getName()));
+      } else if (privilege == Privilege.REFRESH) {
+          throw new AuthorizationException(String.format(
+              "User '%s' does not have privileges to execute " +
+              "'INVALIDATE METADATA/REFRESH' on: %s", user.getName(),
+              privilegeRequest.getName()));
       } else {
         throw new AuthorizationException(String.format(
             "User '%s' does not have privileges to execute '%s' on: %s",
@@ -160,7 +165,7 @@ public class AuthorizationChecker {
       return true;
     }
 
-    EnumSet<DBModelAction> actions = request.getPrivilege().getHiveActions();
+    EnumSet<SentryAction> actions = request.getPrivilege().getSentryActions();
 
     List<DBModelAuthorizable> authorizeables = Lists.newArrayList(
         server_.getHiveAuthorizeableHierarchy());
@@ -172,7 +177,7 @@ public class AuthorizationChecker {
     // The Hive Access API does not currently provide a way to check if the user
     // has any privileges on a given resource.
     if (request.getPrivilege().getAnyOf()) {
-      for (DBModelAction action: actions) {
+      for (SentryAction action: actions) {
         if (provider_.hasAccess(new Subject(user.getShortName()), authorizeables,
             EnumSet.of(action), ActiveRoleSet.ALL)) {
           return true;

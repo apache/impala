@@ -3575,6 +3575,12 @@ public class ParserTest extends FrontendTestBase {
           formatStr));
       ParserError(String.format("%s SELECT (a, b) ON URI 'foo' %s myRole", formatStr));
 
+      // REFRESH privilege.
+      ParsesOk(String.format("%s REFRESH ON SERVER %s myRole", formatStr));
+      ParsesOk(String.format("%s REFRESH ON SERVER foo %s myRole", formatStr));
+      ParsesOk(String.format("%s REFRESH ON DATABASE foo %s myRole", formatStr));
+      ParsesOk(String.format("%s REFRESH ON TABLE foo %s myRole", formatStr));
+
       // Server scope does not accept a name.
       ParsesOk(String.format("%s ALL ON SERVER %s myRole", formatStr));
       ParsesOk(String.format("%s INSERT ON SERVER %s myRole", formatStr));

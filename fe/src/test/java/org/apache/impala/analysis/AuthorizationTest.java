@@ -85,9 +85,9 @@ public class AuthorizationTest extends FrontendTestBase {
   //   ALL permission on 'tpch' database and 'newdb' database
   //   ALL permission on 'functional_seq_snap' database
   //   SELECT permissions on all tables in 'tpcds' database
-  //   SELECT permissions on 'functional.alltypesagg' (no INSERT permissions)
+  //   SELECT, REFRESH permissions on 'functional.alltypesagg' (no INSERT permissions)
   //   SELECT permissions on 'functional.complex_view' (no INSERT permissions)
-  //   SELECT permissions on 'functional.view_view' (no INSERT permissions)
+  //   SELECT, REFRESH permissions on 'functional.view_view' (no INSERT permissions)
   //   SELECT permissions on columns ('id', 'int_col', and 'year') on
   //   'functional.alltypessmall' (no SELECT permissions on 'functional.alltypessmall')
   //   SELECT permissions on columns ('id', 'int_struct_col', 'struct_array_col',
@@ -101,6 +101,7 @@ public class AuthorizationTest extends FrontendTestBase {
   //   No permissions on database 'functional_rc'
   //   Only column level permissions in 'functional_avro':
   //     SELECT permissions on columns ('id') on 'functional_avro.alltypessmall'
+  //   REFRESH permissions on 'functional_text_lzo' database
   public final static String AUTHZ_POLICY_FILE = "/test-warehouse/authz-policy.ini";
   public final static User USER = new User(System.getProperty("user.name"));
 
@@ -236,6 +237,42 @@ public class AuthorizationTest extends FrontendTestBase {
     privilege.setServer_name("server1");
     privilege.setDb_name("functional_parquet");
     privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
+
+    // refresh_functional_text_lzo
+    roleName = "refresh_functional_text_lzo";
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+
+    privilege = new TPrivilege("", TPrivilegeLevel.REFRESH,
+        TPrivilegeScope.DATABASE, false);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional_text_lzo");
+    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
+
+    // refresh_functional_alltypesagg
+    roleName = "refresh_functional_alltypesagg";
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+
+    privilege = new TPrivilege("", TPrivilegeLevel.REFRESH,
+        TPrivilegeScope.TABLE, false);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional");
+    privilege.setTable_name("alltypesagg");
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
+
+    // refresh_functional_view_view
+    roleName = "refresh_functional_view_view";
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+
+    privilege = new TPrivilege("", TPrivilegeLevel.REFRESH,
+        TPrivilegeScope.TABLE, false);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional");
+    privilege.setTable_name("view_view");
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     // all newdb w/ all on URI
@@ -800,45 +837,64 @@ public class AuthorizationTest extends FrontendTestBase {
 
   @Test
   public void TestResetMetadata() throws ImpalaException {
-    // Positive cases (user has privileges on these tables/views).
+    // Positive cases (user has REFRESH privilege on these tables/views).
     AuthzOk("invalidate metadata functional.alltypesagg");
     AuthzOk("refresh functional.alltypesagg");
     AuthzOk("invalidate metadata functional.view_view");
     AuthzOk("refresh functional.view_view");
     // Positive cases for checking refresh partition
     AuthzOk("refresh functional.alltypesagg partition (year=2010, month=1, day=1)");
-    AuthzOk("refresh functional.alltypes partition (year=2009, month=1)");
     AuthzOk("refresh functional_seq_snap.alltypes partition (year=2009, month=1)");
+    // User has REFRESH privilege on functional_text_lzo database, =
+    // but no privilege at the table level.
+    AuthzOk("invalidate metadata functional_text_lzo.alltypes");
+    AuthzOk("refresh functional_text_lzo.alltypes");
+    AuthzOk("refresh functions functional_text_lzo");
 
     AuthzError("invalidate metadata unknown_db.alltypessmall",
-        "User '%s' does not have privileges to access: unknown_db.alltypessmall");
+        "User '%s' does not have privileges to execute 'INVALIDATE METADATA/REFRESH' " +
+        "on: unknown_db.alltypessmall");
     AuthzError("invalidate metadata functional_seq.alltypessmall",
-        "User '%s' does not have privileges to access: functional_seq.alltypessmall");
+        "User '%s' does not have privileges to execute 'INVALIDATE METADATA/REFRESH' " +
+        "on: functional_seq.alltypessmall");
     AuthzError("invalidate metadata functional.alltypes_view",
-        "User '%s' does not have privileges to access: functional.alltypes_view");
+        "User '%s' does not have privileges to execute 'INVALIDATE METADATA/REFRESH' " +
+        "on: functional.alltypes_view");
     AuthzError("invalidate metadata functional.unknown_table",
-        "User '%s' does not have privileges to access: functional.unknown_table");
+        "User '%s' does not have privileges to execute 'INVALIDATE METADATA/REFRESH' " +
+        "on: functional.unknown_table");
     AuthzError("invalidate metadata functional.alltypessmall",
-        "User '%s' does not have privileges to access: functional.alltypessmall");
+        "User '%s' does not have privileges to execute 'INVALIDATE METADATA/REFRESH' " +
+        "on: functional.alltypessmall");
     AuthzError("refresh functional.alltypessmall",
-        "User '%s' does not have privileges to access: functional.alltypessmall");
+        "User '%s' does not have privileges to execute 'INVALIDATE METADATA/REFRESH' " +
+        "on: functional.alltypessmall");
     AuthzError("refresh functional.alltypes_view",
-        "User '%s' does not have privileges to access: functional.alltypes_view");
+        "User '%s' does not have privileges to execute 'INVALIDATE METADATA/REFRESH' " +
+        "on: functional.alltypes_view");
     // Only column-level privileges on the table
-    AuthzError("invalidate metadata functional.alltypestiny", "User '%s' does not " +
-        "have privileges to access: functional.alltypestiny");
+    AuthzError("invalidate metadata functional.alltypestiny",
+        "User '%s' does not have privileges to execute 'INVALIDATE METADATA/REFRESH' " +
+        "on: functional.alltypestiny");
     // Only column-level privileges on the table
-    AuthzError("refresh functional.alltypestiny", "User '%s' does not have " +
-        "privileges to access: functional.alltypestiny");
+    AuthzError("refresh functional.alltypestiny",
+        "User '%s' does not have privileges to execute 'INVALIDATE METADATA/REFRESH' " +
+        "on: functional.alltypestiny");
 
     AuthzError("invalidate metadata",
-        "User '%s' does not have privileges to access: server");
+        "User '%s' does not have privileges to execute 'INVALIDATE METADATA/REFRESH' " +
+        "on: server");
     AuthzError(
         "refresh functional_rc.alltypesagg partition (year=2010, month=1, day=1)",
-        "User '%s' does not have privileges to access: functional_rc.alltypesagg");
+        "User '%s' does not have privileges to execute 'INVALIDATE METADATA/REFRESH' " +
+        "on: functional_rc.alltypesagg");
     AuthzError(
         "refresh functional_rc.alltypesagg partition (year=2010, month=1, day=9999)",
-        "User '%s' does not have privileges to access: functional_rc.alltypesagg");
+        "User '%s' does not have privileges to execute 'INVALIDATE METADATA/REFRESH' " +
+        "on: functional_rc.alltypesagg");
+    AuthzError("refresh functions functional_rc",
+        "User '%s' does not have privileges to execute 'INVALIDATE METADATA/REFRESH' " +
+        "on: functional_rc");
 
     // TODO: Add test support for dynamically changing privileges for
     // file-based policy.
@@ -847,11 +903,35 @@ public class AuthorizationTest extends FrontendTestBase {
 
     try {
       sentryService.grantRoleToGroup(USER, "admin", USER.getName());
-      ((ImpaladTestCatalog) ctx_.catalog).reset();
+      ctx_.catalog.reset();
       AuthzOk("invalidate metadata");
+      AuthzOk("invalidate metadata functional.testtbl");
+      AuthzOk("refresh functional.testtbl");
+      AuthzOk("refresh functional.alltypesagg partition (year=2010, month=1, day=1)");
+      AuthzOk("refresh functions functional");
     } finally {
       sentryService.revokeRoleFromGroup(USER, "admin", USER.getName());
-      ((ImpaladTestCatalog) ctx_.catalog).reset();
+      ctx_.catalog.reset();
+    }
+
+    // User has REFRESH privilege on server.
+    String roleName = "refresh_role";
+    try {
+      sentryService.createRole(USER, roleName, true);
+      TPrivilege privilege = new TPrivilege("", TPrivilegeLevel.REFRESH,
+          TPrivilegeScope.SERVER, false);
+      privilege.setServer_name("server1");
+      sentryService.grantRolePrivilege(USER, roleName, privilege);
+      sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+      ctx_.catalog.reset();
+      AuthzOk("invalidate metadata");
+      AuthzOk("invalidate metadata functional.testtbl");
+      AuthzOk("refresh functional.testtbl");
+      AuthzOk("refresh functional.alltypesagg partition (year=2010, month=1, day=1)");
+      AuthzOk("refresh functions functional");
+    } finally {
+      sentryService.dropRole(USER, roleName, true);
+      ctx_.catalog.reset();
     }
   }
 
@@ -1437,6 +1517,8 @@ public class AuthorizationTest extends FrontendTestBase {
   @Test
   public void TestDescribeDb() throws ImpalaException {
     AuthzOk("describe database functional_seq_snap");
+    // User has REFRESH privilege on functional_text_lzo database.
+    AuthzOk("describe database functional_text_lzo");
 
     // Database doesn't exist.
     AuthzError("describe database nodb",
@@ -1448,6 +1530,7 @@ public class AuthorizationTest extends FrontendTestBase {
 
   @Test
   public void TestDescribe() throws ImpalaException {
+    // User has SELECT and REFRESH privileges on functional.alltypesagg table.
     AuthzOk("describe functional.alltypesagg");
     AuthzOk("describe functional.alltypes");
     AuthzOk("describe functional.complex_view");
@@ -1725,6 +1808,9 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthzOk("show databases");
     AuthzOk("show tables in _impala_builtins");
     AuthzOk("show functions in _impala_builtins");
+    // User has REFRESH privilege on functional_text_lzo database.
+    AuthzOk("show tables in functional_text_lzo");
+    AuthzOk("show functions in functional_text_lzo");
 
     // Database exists, user does not have access.
     AuthzError("show tables in functional_rc",
@@ -1748,6 +1834,7 @@ public class AuthorizationTest extends FrontendTestBase {
     // Show partitions and show table/column stats.
     String[] statsQuals = new String[] { "partitions", "table stats", "column stats" };
     for (String qual: statsQuals) {
+      // User has SELECT and REFRESH privileges on functional.alltypesagg table.
       AuthzOk(String.format("show %s functional.alltypesagg", qual));
       AuthzOk(String.format("show %s functional.alltypes", qual));
       // User does not have access to db/table.
@@ -1765,6 +1852,8 @@ public class AuthorizationTest extends FrontendTestBase {
     // Show files
     String[] partitions = new String[] { "", "partition(month=10, year=2010)" };
     for (String partition: partitions) {
+      // User has SELECT and REFRESH privileges on functional.alltypesagg table.
+      AuthzOk(String.format("show files in functional.alltypesagg %s", partition));
       AuthzOk(String.format("show files in functional.alltypes %s", partition));
       // User does not have access to db/table.
       AuthzError(String.format("show files in nodb.tbl %s", partition),
@@ -1784,7 +1873,8 @@ public class AuthorizationTest extends FrontendTestBase {
     // These are the only dbs that should show up because they are the only
     // dbs the user has any permissions on.
     List<String> expectedDbs = Lists.newArrayList("default", "functional",
-        "functional_avro", "functional_parquet", "functional_seq_snap", "tpcds", "tpch");
+        "functional_avro", "functional_parquet", "functional_seq_snap",
+        "functional_text_lzo", "tpcds", "tpch");
 
     List<Db> dbs = fe_.getDbs(PatternMatcher.createHivePatternMatcher("*"), USER);
     assertEquals(expectedDbs, extractDbNames(dbs));
@@ -1846,11 +1936,11 @@ public class AuthorizationTest extends FrontendTestBase {
 
   @Test
   public void TestShowCreateTable() throws ImpalaException {
+    // User has SELECT and REFRESH privileges functional.alltypesagg table.
     AuthzOk("show create table functional.alltypesagg");
     AuthzOk("show create table functional.alltypes");
     // Have permissions on view and underlying table.
     AuthzOk("show create table functional_seq_snap.alltypes_view");
-
     // Unqualified table name.
     AuthzError("show create table alltypes",
         "User '%s' does not have privileges to access: default.alltypes");
@@ -1947,7 +2037,8 @@ public class AuthorizationTest extends FrontendTestBase {
     req.get_schemas_req.setSchemaName("%");
     TResultSet resp = fe_.execHiveServer2MetadataOp(req);
     List<String> expectedDbs = Lists.newArrayList("default", "functional",
-        "functional_avro", "functional_parquet", "functional_seq_snap", "tpcds", "tpch");
+        "functional_avro", "functional_parquet", "functional_seq_snap",
+        "functional_text_lzo", "tpcds", "tpch");
     assertEquals(expectedDbs.size(), resp.rows.size());
     for (int i = 0; i < resp.rows.size(); ++i) {
       assertEquals(expectedDbs.get(i),

@@ -24,7 +24,9 @@ ${USER} = all_tpch, all_newdb, all_functional_seq_snap, select_tpcds,\
           select_functional_alltypesagg, insert_functional_alltypes,\
           select_functional_complex_view, select_functional_view_view,\
           insert_parquet, new_table_uri, tpch_data_uri, select_column_level_functional,\
-          select_column_level_functional_avro, upper_case_uri
+          select_column_level_functional_avro, upper_case_uri,\
+          refresh_functional_text_lzo, refresh_functional_alltypesagg,\
+          refresh_functional_view_view
 auth_to_local_group = test_role
 server_admin = all_server
 
@@ -47,6 +49,11 @@ select_functional_complex_view =\
 select_functional_view_view =\
     server=server1->db=functional->table=view_view->action=select
 insert_parquet = server=server1->db=functional_parquet->table=*->action=insert
+refresh_functional_text_lzo = server=server1->db=functional_text_lzo->action=refresh
+refresh_functional_alltypesagg =\
+    server=server1->db=functional->table=alltypesagg->action=refresh
+refresh_functional_view_view =\
+    server=server1->db=functional->table=view_view->action=refresh
 select_column_level_functional =\
     server=server1->db=functional->table=alltypessmall->column=id->action=select,\
     server=server1->db=functional->table=alltypessmall->column=int_col->action=select,\
