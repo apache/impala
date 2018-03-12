@@ -1059,17 +1059,13 @@ class QueryRunner(object):
     return hash_thread.result
 
 
-def load_tpc_queries(workload, load_in_kudu=False):
-  """Returns a list of TPC queries. 'workload' should either be 'tpch' or 'tpcds'.
-  If 'load_in_kudu' is True, it loads only queries specified for the Kudu storage
-  engine.
-  """
+def load_tpc_queries(workload):
+  """Returns a list of TPC queries. 'workload' should either be 'tpch' or 'tpcds'."""
   LOG.info("Loading %s queries", workload)
   queries = list()
   query_dir = os.path.join(
       os.path.dirname(__file__), "..", "..", "testdata", "workloads", workload, "queries")
-  engine = 'kudu-' if load_in_kudu else ''
-  file_name_pattern = re.compile(r"%s-%s(q\d+).test$" % (workload, engine))
+  file_name_pattern = re.compile(r"-(q\d+).test$")
   for query_file in os.listdir(query_dir):
     match = file_name_pattern.search(query_file)
     if not match:
@@ -1983,7 +1979,7 @@ def main():
       with impala.cursor(db_name=args.tpch_nested_db) as cursor:
         queries.extend(generate_compute_stats_queries(cursor))
   if args.tpch_kudu_db:
-    tpch_kudu_queries = load_tpc_queries("tpch", load_in_kudu=True)
+    tpch_kudu_queries = load_tpc_queries("tpch")
     for query in tpch_kudu_queries:
       query.db_name = args.tpch_kudu_db
     queries.extend(tpch_kudu_queries)
@@ -1995,7 +1991,7 @@ def main():
         prepare_database(cursor)
         queries.extend(generate_DML_queries(cursor, args.dml_mod_values))
   if args.tpcds_kudu_db:
-    tpcds_kudu_queries = load_tpc_queries("tpcds", load_in_kudu=True)
+    tpcds_kudu_queries = load_tpc_queries("tpcds")
     for query in tpcds_kudu_queries:
       query.db_name = args.tpcds_kudu_db
     queries.extend(tpcds_kudu_queries)

@@ -38,17 +38,10 @@ class TestTpchQuery(ImpalaTestSuite):
       cls.ImpalaTestMatrix.add_constraint(lambda v:\
           v.get_value('table_format').file_format in ['text', 'parquet', 'kudu'])
 
-  def get_test_file_prefix(self, vector):
-    if vector.get_value('table_format').file_format in ['kudu']:
-      return 'tpch-kudu-q'
-    else:
-      return 'tpch-q'
-
   def idfn(val):
     return "TPC-H: Q{0}".format(val)
 
   @pytest.mark.parametrize("query", xrange(1, 23), ids=idfn)
   def test_tpch(self, vector, query):
-    self.run_test_case('{0}{1}'.format(self.get_test_file_prefix(vector), query),
-        vector)
+    self.run_test_case('tpch-q{0}'.format(query), vector)
 

@@ -46,10 +46,10 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   L_PARTKEY BIGINT,
   L_SUPPKEY BIGINT,
   L_LINENUMBER INT,
-  L_QUANTITY DOUBLE,
-  L_EXTENDEDPRICE DOUBLE,
-  L_DISCOUNT DOUBLE,
-  L_TAX DOUBLE,
+  L_QUANTITY DECIMAL(12,2),
+  L_EXTENDEDPRICE DECIMAL(12,2),
+  L_DISCOUNT DECIMAL(12,2),
+  L_TAX DECIMAL(12,2),
   L_RETURNFLAG STRING,
   L_LINESTATUS STRING,
   L_SHIPDATE STRING,
@@ -92,7 +92,7 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   P_TYPE STRING,
   P_SIZE INT,
   P_CONTAINER STRING,
-  P_RETAILPRICE DOUBLE,
+  P_RETAILPRICE DECIMAL(12,2),
   P_COMMENT STRING
 )
 partition by hash (p_partkey) partitions 9 stored as kudu;
@@ -119,7 +119,7 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   PS_PARTKEY BIGINT,
   PS_SUPPKEY BIGINT,
   PS_AVAILQTY BIGINT,
-  PS_SUPPLYCOST DOUBLE,
+  PS_SUPPLYCOST DECIMAL(12,2),
   PS_COMMENT STRING,
   PRIMARY KEY(PS_PARTKEY, PS_SUPPKEY)
 )
@@ -151,7 +151,7 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   S_ADDRESS STRING,
   S_NATIONKEY SMALLINT,
   S_PHONE STRING,
-  S_ACCTBAL DOUBLE,
+  S_ACCTBAL DECIMAL(12,2),
   S_COMMENT STRING
 )
 partition by hash (s_suppkey) partitions 9 stored as kudu;
@@ -230,7 +230,7 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   O_ORDERKEY BIGINT PRIMARY KEY,
   O_CUSTKEY BIGINT,
   O_ORDERSTATUS STRING,
-  O_TOTALPRICE DOUBLE,
+  O_TOTALPRICE DECIMAL(12,2),
   O_ORDERDATE STRING,
   O_ORDERPRIORITY STRING,
   O_CLERK STRING,
@@ -266,7 +266,7 @@ create table if not exists {db_name}{db_suffix}.{table_name} (
   C_ADDRESS STRING,
   C_NATIONKEY SMALLINT,
   C_PHONE STRING,
-  C_ACCTBAL DOUBLE,
+  C_ACCTBAL DECIMAL(12,2),
   C_MKTSEGMENT STRING,
   C_COMMENT STRING
 )
