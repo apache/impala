@@ -35,18 +35,18 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.store_sales (
   ss_store_sk BIGINT,
   ss_promo_sk BIGINT,
   ss_quantity BIGINT,
-  ss_wholesale_cost DOUBLE,
-  ss_list_price DOUBLE,
-  ss_sales_price DOUBLE,
-  ss_ext_discount_amt DOUBLE,
-  ss_ext_sales_price DOUBLE,
-  ss_ext_wholesale_cost DOUBLE,
-  ss_ext_list_price DOUBLE,
-  ss_ext_tax DOUBLE,
-  ss_coupon_amt DOUBLE,
-  ss_net_paid DOUBLE,
-  ss_net_paid_inc_tax DOUBLE,
-  ss_net_profit DOUBLE,
+  ss_wholesale_cost DECIMAL(7,2),
+  ss_list_price DECIMAL(7,2),
+  ss_sales_price DECIMAL(7,2),
+  ss_ext_discount_amt DECIMAL(7,2),
+  ss_ext_sales_price DECIMAL(7,2),
+  ss_ext_wholesale_cost DECIMAL(7,2),
+  ss_ext_list_price DECIMAL(7,2),
+  ss_ext_tax DECIMAL(7,2),
+  ss_coupon_amt DECIMAL(7,2),
+  ss_net_paid DECIMAL(7,2),
+  ss_net_paid_inc_tax DECIMAL(7,2),
+  ss_net_profit DECIMAL(7,2),
   PRIMARY KEY (ss_ticket_number, ss_item_sk)
 )
 PARTITION BY HASH (ss_ticket_number,ss_item_sk) PARTITIONS {buckets}
@@ -100,21 +100,21 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.web_sales (
   ws_warehouse_sk BIGINT,
   ws_promo_sk BIGINT,
   ws_quantity BIGINT,
-  ws_wholesale_cost DOUBLE,
-  ws_list_price DOUBLE,
-  ws_sales_price DOUBLE,
-  ws_ext_discount_amt DOUBLE,
-  ws_ext_sales_price DOUBLE,
-  ws_ext_wholesale_cost DOUBLE,
-  ws_ext_list_price DOUBLE,
-  ws_ext_tax DOUBLE,
-  ws_coupon_amt DOUBLE,
-  ws_ext_ship_cost DOUBLE,
-  ws_net_paid DOUBLE,
-  ws_net_paid_inc_tax DOUBLE,
-  ws_net_paid_inc_ship DOUBLE,
-  ws_net_paid_inc_ship_tax DOUBLE,
-  ws_net_profit DOUBLE,
+  ws_wholesale_cost DECIMAL(7,2),
+  ws_list_price DECIMAL(7,2),
+  ws_sales_price DECIMAL(7,2),
+  ws_ext_discount_amt DECIMAL(7,2),
+  ws_ext_sales_price DECIMAL(7,2),
+  ws_ext_wholesale_cost DECIMAL(7,2),
+  ws_ext_list_price DECIMAL(7,2),
+  ws_ext_tax DECIMAL(7,2),
+  ws_coupon_amt DECIMAL(7,2),
+  ws_ext_ship_cost DECIMAL(7,2),
+  ws_net_paid DECIMAL(7,2),
+  ws_net_paid_inc_tax DECIMAL(7,2),
+  ws_net_paid_inc_ship DECIMAL(7,2),
+  ws_net_paid_inc_ship_tax DECIMAL(7,2),
+  ws_net_profit DECIMAL(7,2),
   PRIMARY KEY (ws_order_number, ws_item_sk)
 )
 PARTITION BY HASH (ws_order_number,ws_item_sk) PARTITIONS {buckets}
@@ -180,21 +180,21 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.catalog_sales (
   cs_warehouse_sk BIGINT,
   cs_promo_sk BIGINT,
   cs_quantity BIGINT,
-  cs_wholesale_cost DOUBLE,
-  cs_list_price DOUBLE,
-  cs_sales_price DOUBLE,
-  cs_ext_discount_amt DOUBLE,
-  cs_ext_sales_price DOUBLE,
-  cs_ext_wholesale_cost DOUBLE,
-  cs_ext_list_price DOUBLE,
-  cs_ext_tax DOUBLE,
-  cs_coupon_amt DOUBLE,
-  cs_ext_ship_cost DOUBLE,
-  cs_net_paid DOUBLE,
-  cs_net_paid_inc_tax DOUBLE,
-  cs_net_paid_inc_ship DOUBLE,
-  cs_net_paid_inc_ship_tax DOUBLE,
-  cs_net_profit DOUBLE,
+  cs_wholesale_cost DECIMAL(7,2),
+  cs_list_price DECIMAL(7,2),
+  cs_sales_price DECIMAL(7,2),
+  cs_ext_discount_amt DECIMAL(7,2),
+  cs_ext_sales_price DECIMAL(7,2),
+  cs_ext_wholesale_cost DECIMAL(7,2),
+  cs_ext_list_price DECIMAL(7,2),
+  cs_ext_tax DECIMAL(7,2),
+  cs_coupon_amt DECIMAL(7,2),
+  cs_ext_ship_cost DECIMAL(7,2),
+  cs_net_paid DECIMAL(7,2),
+  cs_net_paid_inc_tax DECIMAL(7,2),
+  cs_net_paid_inc_ship DECIMAL(7,2),
+  cs_net_paid_inc_ship_tax DECIMAL(7,2),
+  cs_net_profit DECIMAL(7,2),
   PRIMARY KEY (cs_order_number, cs_item_sk)
 )
 PARTITION BY HASH (cs_order_number,cs_item_sk) PARTITIONS {buckets}
@@ -252,15 +252,15 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.store_returns (
   sr_store_sk BIGINT,
   sr_reason_sk BIGINT,
   sr_return_quantity BIGINT,
-  sr_return_amt DOUBLE,
-  sr_return_tax DOUBLE,
-  sr_return_amt_inc_tax DOUBLE,
-  sr_fee DOUBLE,
-  sr_return_ship_cost DOUBLE,
-  sr_refunded_cash DOUBLE,
-  sr_reversed_charge DOUBLE,
-  sr_store_credit DOUBLE,
-  sr_net_loss DOUBLE,
+  sr_return_amt DECIMAL(7,2),
+  sr_return_tax DECIMAL(7,2),
+  sr_return_amt_inc_tax DECIMAL(7,2),
+  sr_fee DECIMAL(7,2),
+  sr_return_ship_cost DECIMAL(7,2),
+  sr_refunded_cash DECIMAL(7,2),
+  sr_reversed_charge DECIMAL(7,2),
+  sr_store_credit DECIMAL(7,2),
+  sr_net_loss DECIMAL(7,2),
   PRIMARY KEY (sr_ticket_number, sr_item_sk)
 )
 PARTITION BY HASH (sr_ticket_number,sr_item_sk) PARTITIONS {buckets}
@@ -308,15 +308,15 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.web_returns (
   wr_web_page_sk BIGINT,
   wr_reason_sk BIGINT,
   wr_return_quantity BIGINT,
-  wr_return_amt DOUBLE,
-  wr_return_tax DOUBLE,
-  wr_return_amt_inc_tax DOUBLE,
-  wr_fee DOUBLE,
-  wr_return_ship_cost DOUBLE,
-  wr_refunded_cash DOUBLE,
-  wr_reversed_charge DOUBLE,
-  wr_account_credit DOUBLE,
-  wr_net_loss DOUBLE,
+  wr_return_amt DECIMAL(7,2),
+  wr_return_tax DECIMAL(7,2),
+  wr_return_amt_inc_tax DECIMAL(7,2),
+  wr_fee DECIMAL(7,2),
+  wr_return_ship_cost DECIMAL(7,2),
+  wr_refunded_cash DECIMAL(7,2),
+  wr_reversed_charge DECIMAL(7,2),
+  wr_account_credit DECIMAL(7,2),
+  wr_net_loss DECIMAL(7,2),
   PRIMARY KEY (wr_order_number, wr_item_sk)
 )
 PARTITION BY HASH (wr_order_number,wr_item_sk) PARTITIONS {buckets}
@@ -371,15 +371,15 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.catalog_returns (
   cr_warehouse_sk BIGINT,
   cr_reason_sk BIGINT,
   cr_return_quantity BIGINT,
-  cr_return_amount DOUBLE,
-  cr_return_tax DOUBLE,
-  cr_return_amt_inc_tax DOUBLE,
-  cr_fee DOUBLE,
-  cr_return_ship_cost DOUBLE,
-  cr_refunded_cash DOUBLE,
-  cr_reversed_charge DOUBLE,
-  cr_store_credit DOUBLE,
-  cr_net_loss DOUBLE,
+  cr_return_amount DECIMAL(7,2),
+  cr_return_tax DECIMAL(7,2),
+  cr_return_amt_inc_tax DECIMAL(7,2),
+  cr_fee DECIMAL(7,2),
+  cr_return_ship_cost DECIMAL(7,2),
+  cr_refunded_cash DECIMAL(7,2),
+  cr_reversed_charge DECIMAL(7,2),
+  cr_store_credit DECIMAL(7,2),
+  cr_net_loss DECIMAL(7,2),
   PRIMARY KEY (cr_order_number, cr_item_sk)
 )
 PARTITION BY HASH (cr_order_number,cr_item_sk) PARTITIONS {buckets}
@@ -451,7 +451,7 @@ CREATE TABLE {target_db_name}.customer (
   c_birth_country STRING,
   c_login STRING,
   c_email_address STRING,
-  c_last_review_date BIGINT
+  c_last_review_date STRING
 )
 PARTITION BY HASH (c_customer_sk) PARTITIONS {buckets}
 STORED AS KUDU
@@ -472,7 +472,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.customer_address (
   ca_state STRING,
   ca_zip STRING,
   ca_country STRING,
-  ca_gmt_offset DOUBLE,
+  ca_gmt_offset DECIMAL(5,2),
   ca_location_type STRING
 )
 PARTITION BY HASH (ca_address_sk) PARTITIONS {buckets}
@@ -560,8 +560,8 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.item (
   i_rec_start_date STRING,
   i_rec_end_date STRING,
   i_item_desc STRING,
-  i_current_price DOUBLE,
-  i_wholesale_cost DOUBLE,
+  i_current_price DECIMAL(7,2),
+  i_wholesale_cost DECIMAL(7,2),
   i_brand_id BIGINT,
   i_brand STRING,
   i_class_id BIGINT,
@@ -591,7 +591,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.promotion (
   p_start_date_sk BIGINT,
   p_end_date_sk BIGINT,
   p_promo_id STRING,
-  p_cost DOUBLE,
+  p_cost DECIMAL(15,2),
   p_response_target BIGINT,
   p_promo_name STRING,
   p_channel_dmail STRING,
@@ -662,8 +662,8 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.store (
   s_state STRING,
   s_zip STRING,
   s_country STRING,
-  s_gmt_offset DOUBLE,
-  s_tax_precentage DOUBLE
+  s_gmt_offset DECIMAL(5,2),
+  s_tax_precentage DECIMAL(5,2)
 )
 PARTITION BY HASH (s_store_sk) PARTITIONS {buckets}
 STORED AS KUDU
@@ -721,8 +721,8 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.call_center (
   cc_state STRING,
   cc_zip STRING,
   cc_country STRING,
-  cc_gmt_offset DOUBLE,
-  cc_tax_percentage DOUBLE
+  cc_gmt_offset DECIMAL(5,2),
+  cc_tax_percentage DECIMAL(5,2)
 )
 PARTITION BY HASH (cc_call_center_sk) PARTITIONS {buckets}
 STORED AS KUDU
@@ -760,18 +760,6 @@ TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.income_band SELECT * FROM {source_db_name}.income_band;
 
----- REASON
-CREATE TABLE IF NOT EXISTS {target_db_name}.reason (
-  r_reason_sk BIGINT PRIMARY KEY,
-  r_reason_id STRING,
-  r_reason_desc STRING
-)
-PARTITION BY HASH (r_reason_sk) PARTITIONS {buckets}
-STORED AS KUDU
-TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
-
-INSERT INTO {target_db_name}.reason SELECT * FROM {source_db_name}.reason;
-
 ---- SHIP_MODE
 CREATE TABLE IF NOT EXISTS {target_db_name}.ship_mode (
   sm_ship_mode_sk BIGINT PRIMARY KEY,
@@ -802,7 +790,7 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.warehouse (
   w_state STRING,
   w_zip STRING,
   w_country STRING,
-  w_gmt_offset DOUBLE
+  w_gmt_offset DECIMAL(5,2)
 )
 PARTITION BY HASH (w_warehouse_sk) PARTITIONS {buckets}
 STORED AS KUDU
@@ -859,8 +847,8 @@ CREATE TABLE IF NOT EXISTS {target_db_name}.web_site (
   web_state STRING,
   web_zip STRING,
   web_country STRING,
-  web_gmt_offset DOUBLE,
-  web_tax_percentage DOUBLE
+  web_gmt_offset DECIMAL(5,2),
+  web_tax_percentage DECIMAL(5,2)
 )
 PARTITION BY HASH (web_site_sk) PARTITIONS {buckets}
 STORED AS KUDU
