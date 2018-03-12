@@ -188,9 +188,10 @@ public class PrivilegeSpec implements ParseNode {
 
     switch (scope_) {
       case SERVER:
-        if (privilegeLevel_ != TPrivilegeLevel.ALL) {
-          throw new AnalysisException("Only 'ALL' privilege may be applied at " +
-              "SERVER scope in privilege spec.");
+        if (privilegeLevel_ != TPrivilegeLevel.ALL &&
+            privilegeLevel_ != TPrivilegeLevel.REFRESH) {
+          throw new AnalysisException("Only 'ALL' or 'REFRESH' privilege " +
+              "may be applied at SERVER scope in privilege spec.");
         }
         break;
       case DATABASE:

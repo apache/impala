@@ -469,7 +469,8 @@ enum TPrivilegeScope {
 enum TPrivilegeLevel {
   ALL,
   INSERT,
-  SELECT
+  SELECT,
+  REFRESH
 }
 
 // Represents a privilege in an authorization policy. Privileges contain the level
