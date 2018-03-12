@@ -137,55 +137,6 @@ class TestObservability(ImpalaTestSuite):
     assert results.runtime_profile.count("AGGREGATION_NODE") == 2
     assert results.runtime_profile.count("PLAN_ROOT_SINK") == 2
 
-  # IMPALA-6399: Run this test serially to avoid a delay over the wait time in fetching
-  # the profile.
-  @pytest.mark.execute_serially
-  def test_query_profile_thrift_timestamps(self):
-    """Test that the query profile start and end time date-time strings have
-    nanosecond precision. Nanosecond precision is expected by management API clients
-    that consume Impala debug webpages."""
-    query = "select sleep(1000)"
-    handle = self.client.execute_async(query)
-    query_id = handle.get_handle().id
-    results = self.client.fetch(query, handle)
-    self.client.close()
-
-    MAX_WAIT = 300
-    start = time.time()
-    end = start + MAX_WAIT
-    while time.time() <= end:
-      # Sleep before trying to fetch the profile. This helps to prevent a warning when the
-      # profile is not yet available immediately. It also makes it less likely to
-      # introduce an error below in future changes by forgetting to sleep.
-      time.sleep(1)
-      tree = self.impalad_test_service.get_thrift_profile(query_id)
-      if not tree:
-        continue
-
-      # tree.nodes[1] corresponds to ClientRequestState::summary_profile_
-      # See be/src/service/client-request-state.[h|cc].
-      start_time = tree.nodes[1].info_strings["Start Time"]
-      end_time = tree.nodes[1].info_strings["End Time"]
-      # Start and End Times are of the form "2017-12-07 22:26:52.167711000"
-      start_time_sub_sec_str = start_time.split('.')[-1]
-      end_time_sub_sec_str = end_time.split('.')[-1]
-      if len(end_time_sub_sec_str) == 0:
-        elapsed = time.time() - start
-        logging.info("end_time_sub_sec_str hasn't shown up yet, elapsed=%d", elapsed)
-        continue
-
-      assert len(end_time_sub_sec_str) == 9, end_time
-      assert len(start_time_sub_sec_str) == 9, start_time
-      return True
-
-    # If we're here, we didn't get the final thrift profile from the debug web page.
-    # This could happen due to heavy system load. The test is then inconclusive.
-    # Log a message and fail this run.
-
-    dbg_str = "Debug thrift profile for query {0} not available in {1} seconds".format(
-      query_id, MAX_WAIT)
-    assert False, dbg_str
-
   def test_query_profile_contains_query_events(self):
     """Test that the expected events show up in a query profile."""
     event_regexes = [r'Query Timeline:',
@@ -236,3 +187,59 @@ class TestObservability(ImpalaTestSuite):
             event_regexes[event_regex_index] + " not in " + line + "\n" + runtime_profile
     assert event_regex_index == len(event_regexes), \
         "Didn't find all events in profile: \n" + runtime_profile
+
+class TestThriftProfile(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  # IMPALA-6399: Run this test serially to avoid a delay over the wait time in fetching
+  # the profile.
+  # This test needs to call self.client.close() to force computation of query end time,
+  # so it has to be in its own suite (IMPALA-6498).
+  @pytest.mark.execute_serially
+  def test_query_profile_thrift_timestamps(self):
+    """Test that the query profile start and end time date-time strings have
+    nanosecond precision. Nanosecond precision is expected by management API clients
+    that consume Impala debug webpages."""
+    query = "select sleep(5)"
+    handle = self.client.execute_async(query)
+    query_id = handle.get_handle().id
+    results = self.client.fetch(query, handle)
+    self.client.close()
+
+    MAX_WAIT = 300
+    start = time.time()
+    end = start + MAX_WAIT
+    while time.time() <= end:
+      # Sleep before trying to fetch the profile. This helps to prevent a warning when the
+      # profile is not yet available immediately. It also makes it less likely to
+      # introduce an error below in future changes by forgetting to sleep.
+      time.sleep(1)
+      tree = self.impalad_test_service.get_thrift_profile(query_id)
+      if not tree:
+        continue
+
+      # tree.nodes[1] corresponds to ClientRequestState::summary_profile_
+      # See be/src/service/client-request-state.[h|cc].
+      start_time = tree.nodes[1].info_strings["Start Time"]
+      end_time = tree.nodes[1].info_strings["End Time"]
+      # Start and End Times are of the form "2017-12-07 22:26:52.167711000"
+      start_time_sub_sec_str = start_time.split('.')[-1]
+      end_time_sub_sec_str = end_time.split('.')[-1]
+      if len(end_time_sub_sec_str) == 0:
+        elapsed = time.time() - start
+        logging.info("end_time_sub_sec_str hasn't shown up yet, elapsed=%d", elapsed)
+        continue
+
+      assert len(end_time_sub_sec_str) == 9, end_time
+      assert len(start_time_sub_sec_str) == 9, start_time
+      return True
+
+    # If we're here, we didn't get the final thrift profile from the debug web page.
+    # This could happen due to heavy system load. The test is then inconclusive.
+    # Log a message and fail this run.
+
+    dbg_str = "Debug thrift profile for query {0} not available in {1} seconds".format(
+      query_id, MAX_WAIT)
+    assert False, dbg_str
