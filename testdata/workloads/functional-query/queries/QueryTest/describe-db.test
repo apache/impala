@@ -31,6 +31,8 @@ string, string, string
 ---- QUERY
 describe database extended impala_test_desc_db1
 ---- RESULTS
+'','$USER','USER'
+'Owner: ','',''
 'impala_test_desc_db1','$NAMENODE/test-warehouse/impala_test_desc_db1.db',''
 ---- TYPES
 string, string, string
@@ -38,6 +40,8 @@ string, string, string
 ---- QUERY
 describe database extended impala_test_desc_db2
 ---- RESULTS
+'','$USER','USER'
+'Owner: ','',''
 'impala_test_desc_db2','$NAMENODE/test-warehouse/impala_test_desc_db2.db','test comment'
 ---- TYPES
 string, string, string
@@ -45,6 +49,8 @@ string, string, string
 ---- QUERY
 describe database extended impala_test_desc_db3
 ---- RESULTS
+'','$USER','USER'
+'Owner: ','',''
 'impala_test_desc_db3','$NAMENODE/testdb',''
 ---- TYPES
 string, string, string
@@ -52,6 +58,8 @@ string, string, string
 ---- QUERY
 describe database extended impala_test_desc_db4
 ---- RESULTS
+'','$USER','USER'
+'Owner: ','',''
 'impala_test_desc_db4','$NAMENODE/test2.db','test comment'
 ---- TYPES
 string, string, string
@@ -59,6 +67,8 @@ string, string, string
 ---- QUERY
 describe database formatted impala_test_desc_db4
 ---- RESULTS
+'','$USER','USER'
+'Owner: ','',''
 'impala_test_desc_db4','$NAMENODE/test2.db','test comment'
 ---- TYPES
 string, string, string
