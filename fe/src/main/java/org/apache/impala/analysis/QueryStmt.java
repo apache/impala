@@ -265,17 +265,16 @@ public abstract class QueryStmt extends StatementBase {
    */
   protected void createSortTupleInfo(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(evaluateOrderBy_);
-
-    for (Expr orderingExpr: sortInfo_.getOrderingExprs()) {
+    for (Expr orderingExpr: sortInfo_.getSortExprs()) {
       if (orderingExpr.getType().isComplexType()) {
         throw new AnalysisException(String.format("ORDER BY expression '%s' with " +
             "complex type '%s' is not supported.", orderingExpr.toSql(),
             orderingExpr.getType().toSql()));
       }
     }
+    sortInfo_.createSortTupleInfo(resultExprs_, analyzer);
 
-    ExprSubstitutionMap smap = sortInfo_.createSortTupleInfo(resultExprs_, analyzer);
-
+    ExprSubstitutionMap smap = sortInfo_.getOutputSmap();
     for (int i = 0; i < smap.size(); ++i) {
       if (!(smap.getLhs().get(i) instanceof SlotRef)
           || !(smap.getRhs().get(i) instanceof SlotRef)) {

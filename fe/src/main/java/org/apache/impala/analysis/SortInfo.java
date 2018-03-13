@@ -16,12 +16,11 @@
 // under the License.
 
 package org.apache.impala.analysis;
-import org.apache.impala.common.TreeNode;
-
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Set;
+
+import org.apache.impala.common.TreeNode;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
@@ -36,7 +35,7 @@ import com.google.common.collect.Sets;
  * particular input row (materialize all row slots)
  */
 public class SortInfo {
-  // All ordering exprs with cost greater than this will be materialized. Since we don't
+  // All sort exprs with cost greater than this will be materialized. Since we don't
   // currently have any information about actual function costs, this value is intended to
   // ensure that all expensive functions will be materialized while still leaving simple
   // operations unmaterialized, for example 'SlotRef + SlotRef' should have a cost below
@@ -45,74 +44,56 @@ public class SortInfo {
   private static final float SORT_MATERIALIZATION_COST_THRESHOLD =
       Expr.FUNCTION_CALL_COST;
 
-  private List<Expr> orderingExprs_;
+  private List<Expr> sortExprs_;
   private final List<Boolean> isAscOrder_;
   // True if "NULLS FIRST", false if "NULLS LAST", null if not specified.
   private final List<Boolean> nullsFirstParams_;
-  // Subset of ordering exprs that are materialized. Populated in
-  // createMaterializedOrderExprs(), used for EXPLAIN output.
-  private List<Expr> materializedOrderingExprs_;
-  // The single tuple that is materialized, sorted, and output by a sort operator
-  // (i.e. SortNode or TopNNode)
+  // Descriptor of tuples materialized, sorted, and output by a SortNode/TopNNode.
   private TupleDescriptor sortTupleDesc_;
-  // Input expressions materialized into sortTupleDesc_. One expr per slot in
-  // sortTupleDesc_.
-  private List<Expr> sortTupleSlotExprs_;
+  // List of exprs evaluated against the sort input and materialized into the sort tuple.
+  // One expr per slot in 'sortTupleDesc_'.
+  private final List<Expr> materializedExprs_;
+  // Maps from exprs materialized into the sort tuple to their corresponding SlotRefs.
+  private final ExprSubstitutionMap outputSmap_;
 
-  public SortInfo(List<Expr> orderingExprs, List<Boolean> isAscOrder,
+  public SortInfo(List<Expr> sortExprs, List<Boolean> isAscOrder,
       List<Boolean> nullsFirstParams) {
-    Preconditions.checkArgument(orderingExprs.size() == isAscOrder.size());
-    Preconditions.checkArgument(orderingExprs.size() == nullsFirstParams.size());
-    orderingExprs_ = orderingExprs;
+    Preconditions.checkArgument(sortExprs.size() == isAscOrder.size());
+    Preconditions.checkArgument(sortExprs.size() == nullsFirstParams.size());
+    sortExprs_ = sortExprs;
     isAscOrder_ = isAscOrder;
     nullsFirstParams_ = nullsFirstParams;
-    materializedOrderingExprs_ = Lists.newArrayList();
+    materializedExprs_ = Lists.newArrayList();
+    outputSmap_ = new ExprSubstitutionMap();
   }
 
   /**
    * C'tor for cloning.
    */
   private SortInfo(SortInfo other) {
-    orderingExprs_ = Expr.cloneList(other.orderingExprs_);
+    sortExprs_ = Expr.cloneList(other.sortExprs_);
     isAscOrder_ = Lists.newArrayList(other.isAscOrder_);
     nullsFirstParams_ = Lists.newArrayList(other.nullsFirstParams_);
-    materializedOrderingExprs_ = Expr.cloneList(other.materializedOrderingExprs_);
+    materializedExprs_ = Expr.cloneList(other.materializedExprs_);
     sortTupleDesc_ = other.sortTupleDesc_;
-    if (other.sortTupleSlotExprs_ != null) {
-      sortTupleSlotExprs_ = Expr.cloneList(other.sortTupleSlotExprs_);
-    }
+    outputSmap_ = other.outputSmap_.clone();
   }
 
-  /**
-   * Sets sortTupleDesc_, which is the internal row representation to be materialized and
-   * sorted. The source exprs of the slots in sortTupleDesc_ are changed to those in
-   * tupleSlotExprs.
-   */
-  public void setMaterializedTupleInfo(
-      TupleDescriptor tupleDesc, List<Expr> tupleSlotExprs) {
-    Preconditions.checkState(tupleDesc.getSlots().size() == tupleSlotExprs.size());
-    sortTupleDesc_ = tupleDesc;
-    sortTupleSlotExprs_ = tupleSlotExprs;
-    for (int i = 0; i < sortTupleDesc_.getSlots().size(); ++i) {
-      SlotDescriptor slotDesc = sortTupleDesc_.getSlots().get(i);
-      slotDesc.setSourceExpr(sortTupleSlotExprs_.get(i));
-    }
-  }
-  public List<Expr> getOrderingExprs() { return orderingExprs_; }
+  public List<Expr> getSortExprs() { return sortExprs_; }
   public List<Boolean> getIsAscOrder() { return isAscOrder_; }
   public List<Boolean> getNullsFirstParams() { return nullsFirstParams_; }
-  public List<Expr> getMaterializedOrderingExprs() { return materializedOrderingExprs_; }
-  public List<Expr> getSortTupleSlotExprs() { return sortTupleSlotExprs_; }
+  public List<Expr> getMaterializedExprs() { return materializedExprs_; }
   public TupleDescriptor getSortTupleDescriptor() { return sortTupleDesc_; }
+  public ExprSubstitutionMap getOutputSmap() { return outputSmap_; }
 
   /**
    * Gets the list of booleans indicating whether nulls come first or last, independent
    * of asc/desc.
    */
   public List<Boolean> getNullsFirst() {
-    Preconditions.checkState(orderingExprs_.size() == nullsFirstParams_.size());
+    Preconditions.checkState(sortExprs_.size() == nullsFirstParams_.size());
     List<Boolean> nullsFirst = Lists.newArrayList();
-    for (int i = 0; i < orderingExprs_.size(); ++i) {
+    for (int i = 0; i < sortExprs_.size(); ++i) {
       nullsFirst.add(OrderByElement.nullsFirst(nullsFirstParams_.get(i),
           isAscOrder_.get(i)));
     }
@@ -120,20 +101,19 @@ public class SortInfo {
   }
 
   /**
-   * Materializes the slots in sortTupleDesc_ referenced in the ordering exprs.
-   * Materializes the slots referenced by the corresponding sortTupleSlotExpr after
-   * applying the 'smap'.
+   * Materializes the slots in 'sortTupleDesc_' referenced in the sort exprs.
+   * Materializes the slots referenced by the corresponding materialized expr after
+   * applying the 'smap'. Valid to call after createSortTupleInfo().
    */
   public void materializeRequiredSlots(Analyzer analyzer, ExprSubstitutionMap smap) {
     Preconditions.checkNotNull(sortTupleDesc_);
-    Preconditions.checkNotNull(sortTupleSlotExprs_);
     Preconditions.checkState(sortTupleDesc_.isMaterialized());
-    analyzer.materializeSlots(orderingExprs_);
+    analyzer.materializeSlots(sortExprs_);
     List<SlotDescriptor> sortTupleSlotDescs = sortTupleDesc_.getSlots();
     List<Expr> materializedExprs = Lists.newArrayList();
     for (int i = 0; i < sortTupleSlotDescs.size(); ++i) {
       if (sortTupleSlotDescs.get(i).isMaterialized()) {
-        materializedExprs.add(sortTupleSlotExprs_.get(i));
+        materializedExprs.add(materializedExprs_.get(i));
       }
     }
     List<Expr> substMaterializedExprs =
@@ -142,20 +122,22 @@ public class SortInfo {
   }
 
   /**
-   * Replaces orderingExprs_ according to smap. This needs to be called to make sure that
-   * the ordering exprs refer to the new tuple materialized by this sort instead of the
+   * Replaces 'sortExprs_' according to smap. This needs to be called to make sure that
+   * the sort exprs refer to the new tuple materialized by this sort instead of the
    * original input.
    */
-  public void substituteOrderingExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
-    orderingExprs_ = Expr.substituteList(orderingExprs_, smap, analyzer, false);
+  public void substituteSortExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
+    sortExprs_ = Expr.substituteList(sortExprs_, smap, analyzer, false);
   }
 
   /**
-   * Asserts that all ordering exprs are bound by the sort tuple.
+   * Validates internal state. Asserts that all sort exprs are bound by the sort tuple.
    */
   public void checkConsistency() {
-    for (Expr orderingExpr: orderingExprs_) {
-      Preconditions.checkState(orderingExpr.isBound(sortTupleDesc_.getId()));
+    Preconditions.checkState(
+        materializedExprs_.size() == sortTupleDesc_.getSlots().size());
+    for (Expr sortExpr: sortExprs_) {
+      Preconditions.checkState(sortExpr.isBound(sortTupleDesc_.getId()));
     }
   }
 
@@ -163,119 +145,111 @@ public class SortInfo {
   public SortInfo clone() { return new SortInfo(this); }
 
   /**
+   * Matches SlotRef expressions that do not reference the sort tuple.
+   */
+  private class IsInputSlotRefPred implements com.google.common.base.Predicate<Expr> {
+    private final TupleId sortTid_;
+    public IsInputSlotRefPred(TupleId sortTid) {
+      sortTid_ = sortTid;
+    }
+
+    @Override
+    public boolean apply(Expr e) {
+      return e instanceof SlotRef && !e.isBound(sortTid_);
+    }
+  }
+
+  /**
    * Create a tuple descriptor for the single tuple that is materialized, sorted, and
    * output by the sort node. Materializes slots required by 'resultExprs' as well as
    * non-deterministic and expensive order by exprs. The materialized exprs are
    * substituted with slot refs into the new tuple. This simplifies the sorting logic for
-   * total and top-n sorts. The substitution map is returned.
+   * total and top-n sorts.
    */
-  public ExprSubstitutionMap createSortTupleInfo(
-      List<Expr> resultExprs, Analyzer analyzer) {
+  public void createSortTupleInfo(List<Expr> resultExprs, Analyzer analyzer) {
+    Preconditions.checkState(sortTupleDesc_ == null);
+    Preconditions.checkState(outputSmap_.size() == 0);
+
     // The descriptor for the tuples on which the sort operates.
-    TupleDescriptor sortTupleDesc = analyzer.getDescTbl().createTupleDescriptor("sort");
-    sortTupleDesc.setIsMaterialized(true);
-    List<Expr> sortTupleExprs = Lists.newArrayList();
+    sortTupleDesc_ = analyzer.getDescTbl().createTupleDescriptor("sort");
+    sortTupleDesc_.setIsMaterialized(true);
 
-    // substOrderBy is a mapping from exprs evaluated on the sort input that get
-    // materialized into the sort tuple to their corresponding SlotRefs in the sort tuple.
     // The following exprs are materialized:
-    // 1. Ordering exprs that we chose to materialize
-    // 2. SlotRefs against the sort input contained in the result and ordering exprs after
-    // substituting the materialized ordering exprs.
+    // 1. Sort exprs that we chose to materialize
+    // 2. SlotRefs against the sort input contained in the result and sort exprs
+    //    after substituting the materialized sort exprs.
+    // 3. TupleIsNullPredicates from 'resultExprs' which are not legal to evaluate after
+    //    the sort because the tuples referenced by it are gone after the sort.
 
-    // Case 1:
-    ExprSubstitutionMap substOrderBy =
-        createMaterializedOrderExprs(sortTupleDesc, analyzer);
-    sortTupleExprs.addAll(substOrderBy.getLhs());
+    // Case 1: Materialize chosen sort exprs.
+    addMaterializedExprs(getMaterializedSortExprs(), analyzer);
 
-    // Case 2: SlotRefs in the result and ordering exprs after substituting the
-    // materialized ordering exprs. Using a LinkedHashSet prevents the slots getting
-    // reordered unnecessarily.
-    Set<SlotRef> sourceSlots = Sets.newLinkedHashSet();
-    List<Expr> substResultExprs =
-        Expr.substituteList(resultExprs, substOrderBy, analyzer, false);
-    TreeNode.collect(substResultExprs, Predicates.instanceOf(SlotRef.class), sourceSlots);
-    TreeNode.collect(Expr.substituteList(orderingExprs_, substOrderBy, analyzer, false),
-        Predicates.instanceOf(SlotRef.class), sourceSlots);
-    for (SlotRef origSlotRef: sourceSlots) {
-      // Don't rematerialize slots that are already in the sort tuple.
-      if (origSlotRef.getDesc().getParent().getId() != sortTupleDesc.getId()) {
-        SlotDescriptor origSlotDesc = origSlotRef.getDesc();
-        SlotDescriptor materializedDesc =
-            analyzer.copySlotDescriptor(origSlotDesc, sortTupleDesc);
-        SlotRef cloneRef = new SlotRef(materializedDesc);
-        substOrderBy.put(origSlotRef, cloneRef);
-        sortTupleExprs.add(origSlotRef);
-      }
-    }
+    // Case 2: Materialize required input slots. Using a LinkedHashSet prevents the
+    // slots getting reordered unnecessarily.
+    Set<SlotRef> inputSlotRefs = Sets.newLinkedHashSet();
+    IsInputSlotRefPred pred = new IsInputSlotRefPred(sortTupleDesc_.getId());
+    TreeNode.collect(Expr.substituteList(resultExprs, outputSmap_, analyzer, false),
+        pred, inputSlotRefs);
+    TreeNode.collect(Expr.substituteList(sortExprs_, outputSmap_, analyzer, false),
+        pred, inputSlotRefs);
+    addMaterializedExprs(inputSlotRefs, analyzer);
 
-    materializeTupleIsNullPredicates(
-        sortTupleDesc, substResultExprs, sortTupleExprs, substOrderBy, analyzer);
-
-    // The ordering exprs are evaluated against the sort tuple, so they must reflect the
-    // materialization decision above.
-    substituteOrderingExprs(substOrderBy, analyzer);
-
-    // Update the tuple descriptor used to materialize the input of the sort.
-    setMaterializedTupleInfo(sortTupleDesc, sortTupleExprs);
-
-    return substOrderBy;
-  }
-
-  /**
-   * Materialize ordering exprs by creating slots for them in 'sortTupleDesc' if they:
-   * - contain a non-deterministic expr
-   * - contain a UDF (since we don't know if they're deterministic)
-   * - are more expensive than a cost threshold
-   * - don't have a cost set
-   *
-   * Populates 'materializedOrderingExprs_' and returns a mapping from the original
-   * ordering exprs to the new SlotRefs. It is expected that this smap will be passed into
-   * substituteOrderingExprs() by the caller.
-   */
-  public ExprSubstitutionMap createMaterializedOrderExprs(
-      TupleDescriptor sortTupleDesc, Analyzer analyzer) {
-    ExprSubstitutionMap substOrderBy = new ExprSubstitutionMap();
-    for (Expr origOrderingExpr : orderingExprs_) {
-      if (!origOrderingExpr.hasCost()
-          || origOrderingExpr.getCost() > SORT_MATERIALIZATION_COST_THRESHOLD
-          || origOrderingExpr.contains(Expr.IS_NONDETERMINISTIC_BUILTIN_FN_PREDICATE)
-          || origOrderingExpr.contains(Expr.IS_UDF_PREDICATE)) {
-        SlotDescriptor materializedDesc = analyzer.addSlotDescriptor(sortTupleDesc);
-        materializedDesc.initFromExpr(origOrderingExpr);
-        materializedDesc.setIsMaterialized(true);
-        SlotRef materializedRef = new SlotRef(materializedDesc);
-        substOrderBy.put(origOrderingExpr, materializedRef);
-        materializedOrderingExprs_.add(origOrderingExpr);
-      }
-    }
-    return substOrderBy;
-  }
-
-  /**
-   * Collects the unique TupleIsNullPredicates from 'exprs' and for each one:
-   * - Materializes it into a new slot in 'sortTupleDesc'
-   * - Adds it to 'sortSlotExprs'
-   * - Adds an entry in 'substOrderBy' mapping it to a SlotRef into the new slot
-   */
-  public static void materializeTupleIsNullPredicates(TupleDescriptor sortTupleDesc,
-      List<Expr> exprs, List<Expr> sortSlotExprs, ExprSubstitutionMap substOrderBy,
-      Analyzer analyzer) {
+    // Case 3: Materialize TupleIsNullPredicates.
     List<Expr> tupleIsNullPreds = Lists.newArrayList();
-    TreeNode.collect(
-        exprs, Predicates.instanceOf(TupleIsNullPredicate.class), tupleIsNullPreds);
+    TreeNode.collect(resultExprs, Predicates.instanceOf(TupleIsNullPredicate.class),
+        tupleIsNullPreds);
     Expr.removeDuplicates(tupleIsNullPreds);
+    addMaterializedExprs(tupleIsNullPreds, analyzer);
 
-    // Materialize relevant unique TupleIsNullPredicates.
-    for (Expr tupleIsNullPred: tupleIsNullPreds) {
-      SlotDescriptor sortSlotDesc = analyzer.addSlotDescriptor(sortTupleDesc);
-      sortSlotDesc.setType(tupleIsNullPred.getType());
-      sortSlotDesc.setIsMaterialized(true);
-      sortSlotDesc.setSourceExpr(tupleIsNullPred);
-      sortSlotDesc.setLabel(tupleIsNullPred.toSql());
-      SlotRef cloneRef = new SlotRef(sortSlotDesc);
-      substOrderBy.put(tupleIsNullPred, cloneRef);
-      sortSlotExprs.add(tupleIsNullPred.clone());
+    // The sort exprs are evaluated against the sort tuple, so they must reflect the
+    // materialization decision above.
+    substituteSortExprs(outputSmap_, analyzer);
+    checkConsistency();
+  }
+
+  /**
+   * Materializes each of the given exprs into 'sortTupleDesc' as follows:
+   * - Adds a new slot in 'sortTupleDesc_'
+   * - Adds an entry in 'outputSmap_' mapping from the expr to a SlotRef on the new slot
+   * - Adds an entry in 'materializedExprs_'
+   * Valid to call after createSortTupleInfo().
+   */
+  public <T extends Expr> void addMaterializedExprs(Collection<T> exprs,
+      Analyzer analyzer) {
+    Preconditions.checkNotNull(sortTupleDesc_);
+    for (Expr srcExpr : exprs) {
+      SlotDescriptor dstSlotDesc;
+      if (srcExpr instanceof SlotRef) {
+        SlotDescriptor srcSlotDesc = ((SlotRef) srcExpr).getDesc();
+        dstSlotDesc = analyzer.copySlotDescriptor(srcSlotDesc, sortTupleDesc_);
+      } else {
+        dstSlotDesc = analyzer.addSlotDescriptor(sortTupleDesc_);
+        dstSlotDesc.initFromExpr(srcExpr);
+      }
+      dstSlotDesc.setSourceExpr(srcExpr);
+      outputSmap_.put(srcExpr.clone(), new SlotRef(dstSlotDesc));
+      materializedExprs_.add(srcExpr);
     }
+  }
+
+  /**
+   * Returns the subset of 'sortExprs_' that should be materialized. A sort expr is
+   * is materialized if it:
+   * - contains a non-deterministic expr
+   * - contains a UDF (since we don't know if they're deterministic)
+   * - is more expensive than a cost threshold
+   * - does not have a cost set
+   */
+  private List<Expr> getMaterializedSortExprs() {
+    List<Expr> result = Lists.newArrayList();
+    for (Expr sortExpr : sortExprs_) {
+      if (!sortExpr.hasCost()
+          || sortExpr.getCost() > SORT_MATERIALIZATION_COST_THRESHOLD
+          || sortExpr.contains(Expr.IS_NONDETERMINISTIC_BUILTIN_FN_PREDICATE)
+          || sortExpr.contains(Expr.IS_UDF_PREDICATE)) {
+        result.add(sortExpr);
+      }
+    }
+    return result;
   }
 }
