@@ -291,7 +291,8 @@ class ImpalaTestSuite(BaseTestSuite):
           replace_filenames_with_placeholder = False
         test_section[section_name] = test_section[section_name] \
                                      .replace('$NAMENODE', NAMENODE) \
-                                     .replace('$IMPALA_HOME', IMPALA_HOME)
+                                     .replace('$IMPALA_HOME', IMPALA_HOME) \
+                                     .replace('$USER', getuser())
         if use_db:
           test_section[section_name] = test_section[section_name].replace('$DATABASE', use_db)
     verify_raw_results(test_section, result, vector.get_value('table_format').file_format,

@@ -88,6 +88,9 @@ struct TCreateDbParams {
 
   // Do not throw an error if a database of the same name already exists.
   4: optional bool if_not_exists
+
+  // Owner of the database
+  5: required string owner
 }
 
 // Parameters of CREATE DATA SOURCE commands
