@@ -638,12 +638,9 @@ public class Planner {
     List<Boolean> isAscOrder = Collections.nCopies(orderingExprs.size(), true);
     List<Boolean> nullsFirstParams = Collections.nCopies(orderingExprs.size(), false);
     SortInfo sortInfo = new SortInfo(orderingExprs, isAscOrder, nullsFirstParams);
-
-    ExprSubstitutionMap smap = sortInfo.createSortTupleInfo(
-        insertStmt.getResultExprs(), analyzer);
+    sortInfo.createSortTupleInfo(insertStmt.getResultExprs(), analyzer);
     sortInfo.getSortTupleDescriptor().materializeSlots();
-
-    insertStmt.substituteResultExprs(smap, analyzer);
+    insertStmt.substituteResultExprs(sortInfo.getOutputSmap(), analyzer);
 
     PlanNode node = null;
     if (partialSort) {

@@ -270,7 +270,7 @@ public class SelectStmt extends QueryStmt {
     if (sortInfo_ != null && hasLimit()) {
       // When there is a LIMIT clause in conjunction with an ORDER BY, the ordering exprs
       // must be added in the column lineage graph.
-      graph.addDependencyPredicates(sortInfo_.getOrderingExprs());
+      graph.addDependencyPredicates(sortInfo_.getSortExprs());
     }
 
     if (aggInfo_ != null) {
@@ -563,7 +563,7 @@ public class SelectStmt extends QueryStmt {
         && (havingPred_ == null
             || !havingPred_.contains(Expr.isAggregatePredicate()))
         && (sortInfo_ == null
-            || !TreeNode.contains(sortInfo_.getOrderingExprs(),
+            || !TreeNode.contains(sortInfo_.getSortExprs(),
                                   Expr.isAggregatePredicate()))) {
       // We're not computing aggregates but we still need to register the HAVING
       // clause which could, e.g., contain a constant expression evaluating to false.
@@ -644,7 +644,7 @@ public class SelectStmt extends QueryStmt {
     }
     if (sortInfo_ != null) {
       // TODO: Avoid evaluating aggs in ignored order-bys
-      TreeNode.collect(sortInfo_.getOrderingExprs(), Expr.isAggregatePredicate(),
+      TreeNode.collect(sortInfo_.getSortExprs(), Expr.isAggregatePredicate(),
           aggExprs);
     }
 
@@ -723,10 +723,10 @@ public class SelectStmt extends QueryStmt {
       }
     }
     if (sortInfo_ != null) {
-      sortInfo_.substituteOrderingExprs(combinedSmap, analyzer);
+      sortInfo_.substituteSortExprs(combinedSmap, analyzer);
       if (LOG.isTraceEnabled()) {
         LOG.trace("post-agg orderingExprs: " +
-            Expr.debugString(sortInfo_.getOrderingExprs()));
+            Expr.debugString(sortInfo_.getSortExprs()));
       }
     }
 
@@ -742,7 +742,7 @@ public class SelectStmt extends QueryStmt {
     }
     if (orderByElements_ != null) {
       for (int i = 0; i < orderByElements_.size(); ++i) {
-        if (!sortInfo_.getOrderingExprs().get(i).isBound(
+        if (!sortInfo_.getSortExprs().get(i).isBound(
             finalAggInfo.getOutputTupleId())) {
           throw new AnalysisException(
               "ORDER BY expression not produced by aggregation output "
@@ -840,7 +840,7 @@ public class SelectStmt extends QueryStmt {
     ArrayList<Expr> analyticExprs = Lists.newArrayList();
     TreeNode.collect(resultExprs_, AnalyticExpr.class, analyticExprs);
     if (sortInfo_ != null) {
-      TreeNode.collect(sortInfo_.getOrderingExprs(), AnalyticExpr.class,
+      TreeNode.collect(sortInfo_.getSortExprs(), AnalyticExpr.class,
           analyticExprs);
     }
     if (analyticExprs.isEmpty()) return;
@@ -880,10 +880,10 @@ public class SelectStmt extends QueryStmt {
       LOG.trace("post-analytic selectListExprs: " + Expr.debugString(resultExprs_));
     }
     if (sortInfo_ != null) {
-      sortInfo_.substituteOrderingExprs(smap, analyzer);
+      sortInfo_.substituteSortExprs(smap, analyzer);
       if (LOG.isTraceEnabled()) {
         LOG.trace("post-analytic orderingExprs: " +
-            Expr.debugString(sortInfo_.getOrderingExprs()));
+            Expr.debugString(sortInfo_.getSortExprs()));
       }
     }
   }

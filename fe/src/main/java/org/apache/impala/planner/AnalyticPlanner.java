@@ -21,9 +21,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.AggregateInfoBase;
 import org.apache.impala.analysis.AnalyticExpr;
 import org.apache.impala.analysis.AnalyticInfo;
@@ -44,7 +41,9 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.TupleIsNullPredicate;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.thrift.TPartitionType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -256,24 +255,22 @@ public class AnalyticPlanner {
   private SortInfo createSortInfo(
       PlanNode input, List<Expr> sortExprs, List<Boolean> isAsc,
       List<Boolean> nullsFirst) {
-    // create tuple for sort output = the entire materialized input in a single tuple
-    TupleDescriptor sortTupleDesc =
-        analyzer_.getDescTbl().createTupleDescriptor("sort-tuple");
-    ExprSubstitutionMap sortSmap = new ExprSubstitutionMap();
-    List<Expr> sortSlotExprs = Lists.newArrayList();
-    sortTupleDesc.setIsMaterialized(true);
+    List<Expr> inputSlotRefs = Lists.newArrayList();
     for (TupleId tid: input.getTupleIds()) {
       TupleDescriptor tupleDesc = analyzer_.getTupleDesc(tid);
       for (SlotDescriptor inputSlotDesc: tupleDesc.getSlots()) {
         if (!inputSlotDesc.isMaterialized()) continue;
-        SlotDescriptor sortSlotDesc =
-            analyzer_.copySlotDescriptor(inputSlotDesc, sortTupleDesc);
-        // all output slots need to be materialized
-        sortSlotDesc.setIsMaterialized(true);
-        sortSmap.put(new SlotRef(inputSlotDesc), new SlotRef(sortSlotDesc));
-        sortSlotExprs.add(new SlotRef(inputSlotDesc));
+        inputSlotRefs.add(new SlotRef(inputSlotDesc));
       }
     }
+
+    // The decision to materialize ordering exprs should be based on exprs that are
+    // fully resolved against our input (IMPALA-5270).
+    ExprSubstitutionMap inputSmap = input.getOutputSmap();
+    List<Expr> resolvedSortExprs =
+        Expr.substituteList(sortExprs, inputSmap, analyzer_, true);
+    SortInfo sortInfo = new SortInfo(resolvedSortExprs, isAsc, nullsFirst);
+    sortInfo.createSortTupleInfo(inputSlotRefs, analyzer_);
 
     // Lhs exprs to be substituted in ancestor plan nodes could have a rhs that contains
     // TupleIsNullPredicates. TupleIsNullPredicates require specific tuple ids for
@@ -282,31 +279,17 @@ public class AnalyticPlanner {
     // To preserve the information whether an input tuple was null or not this sort node,
     // we materialize those rhs TupleIsNullPredicates, which are then substituted
     // by a SlotRef into the sort's tuple in ancestor nodes (IMPALA-1519).
-    ExprSubstitutionMap inputSmap = input.getOutputSmap();
     if (inputSmap != null) {
-      List<Expr> relevantRhsExprs = Lists.newArrayList();
-      for (int i = 0; i < inputSmap.size(); ++i) {
-        Expr rhsExpr = inputSmap.getRhs().get(i);
+      List<Expr> tupleIsNullPreds = Lists.newArrayList();
+      for (Expr rhsExpr: inputSmap.getRhs()) {
         // Ignore substitutions that are irrelevant at this plan node and its ancestors.
-        if (rhsExpr.isBoundByTupleIds(input.getTupleIds())) {
-          relevantRhsExprs.add(rhsExpr);
-        }
+        if (!rhsExpr.isBoundByTupleIds(input.getTupleIds())) continue;
+        rhsExpr.collect(TupleIsNullPredicate.class, tupleIsNullPreds);
       }
-
-      SortInfo.materializeTupleIsNullPredicates(sortTupleDesc, relevantRhsExprs,
-          sortSlotExprs, sortSmap, analyzer_);
+      Expr.removeDuplicates(tupleIsNullPreds);
+      sortInfo.addMaterializedExprs(tupleIsNullPreds, analyzer_);
     }
-
-    SortInfo sortInfo = new SortInfo(sortExprs, isAsc, nullsFirst);
-    ExprSubstitutionMap smap =
-        sortInfo.createMaterializedOrderExprs(sortTupleDesc, analyzer_);
-    sortSlotExprs.addAll(smap.getLhs());
-    sortSmap = ExprSubstitutionMap.combine(sortSmap, smap);
-    sortInfo.substituteOrderingExprs(sortSmap, analyzer_);
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("sortinfo exprs: " + Expr.debugString(sortInfo.getOrderingExprs()));
-    }
-    sortInfo.setMaterializedTupleInfo(sortTupleDesc, sortSlotExprs);
+    sortInfo.getSortTupleDescriptor().materializeSlots();
     return sortInfo;
   }
 

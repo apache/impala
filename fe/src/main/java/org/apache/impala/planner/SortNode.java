@@ -19,9 +19,6 @@ package org.apache.impala.planner;
 
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
@@ -36,6 +33,9 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSortInfo;
 import org.apache.impala.thrift.TSortNode;
 import org.apache.impala.thrift.TSortType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -72,7 +72,7 @@ public class SortNode extends PlanNode {
   protected long offset_;
 
   // The type of sort. Determines the exec node used in the BE.
-  private TSortType type_;
+  private final TSortType type_;
 
   /**
    * Creates a new SortNode that implements a partial sort.
@@ -133,8 +133,7 @@ public class SortNode extends PlanNode {
 
     // populate resolvedTupleExprs_ and outputSmap_
     List<SlotDescriptor> sortTupleSlots = info_.getSortTupleDescriptor().getSlots();
-    List<Expr> slotExprs = info_.getSortTupleSlotExprs();
-    Preconditions.checkState(sortTupleSlots.size() == slotExprs.size());
+    List<Expr> slotExprs = info_.getMaterializedExprs();
     resolvedTupleExprs_ = Lists.newArrayList();
     outputSmap_ = new ExprSubstitutionMap();
     for (int i = 0; i < slotExprs.size(); ++i) {
@@ -152,7 +151,7 @@ public class SortNode extends PlanNode {
     // Parent nodes have have to do the same so set the composition as the outputSmap_.
     outputSmap_ = ExprSubstitutionMap.compose(childSmap, outputSmap_, analyzer);
 
-    info_.substituteOrderingExprs(outputSmap_, analyzer);
+    info_.substituteSortExprs(outputSmap_, analyzer);
     info_.checkConsistency();
 
     if (LOG.isTraceEnabled()) {
@@ -179,7 +178,7 @@ public class SortNode extends PlanNode {
     }
     return Objects.toStringHelper(this)
         .add("type_", type_)
-        .add("ordering_exprs", Expr.debugString(info_.getOrderingExprs()))
+        .add("ordering_exprs", Expr.debugString(info_.getSortExprs()))
         .add("is_asc", "[" + Joiner.on(" ").join(strings) + "]")
         .add("nulls_first", "[" + Joiner.on(" ").join(info_.getNullsFirst()) + "]")
         .add("offset_", offset_)
@@ -190,7 +189,7 @@ public class SortNode extends PlanNode {
   @Override
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.SORT_NODE;
-    TSortInfo sort_info = new TSortInfo(Expr.treesToThrift(info_.getOrderingExprs()),
+    TSortInfo sort_info = new TSortInfo(Expr.treesToThrift(info_.getSortExprs()),
         info_.getIsAscOrder(), info_.getNullsFirst());
     Preconditions.checkState(tupleIds_.size() == 1,
         "Incorrect size for tupleIds_ in SortNode");
@@ -208,9 +207,9 @@ public class SortNode extends PlanNode {
         displayName_, getNodeExplainDetail(detailLevel)));
     if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
       output.append(detailPrefix + "order by: ");
-      for (int i = 0; i < info_.getOrderingExprs().size(); ++i) {
+      for (int i = 0; i < info_.getSortExprs().size(); ++i) {
         if (i > 0) output.append(", ");
-        output.append(info_.getOrderingExprs().get(i).toSql() + " ");
+        output.append(info_.getSortExprs().get(i).toSql() + " ");
         output.append(info_.getIsAscOrder().get(i) ? "ASC" : "DESC");
 
         Boolean nullsFirstParam = info_.getNullsFirstParams().get(i);
@@ -221,14 +220,20 @@ public class SortNode extends PlanNode {
       output.append("\n");
     }
 
-    if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()
-        && info_.getMaterializedOrderingExprs().size() > 0) {
-      output.append(detailPrefix + "materialized: ");
-      for (int i = 0; i < info_.getMaterializedOrderingExprs().size(); ++i) {
-        if (i > 0) output.append(", ");
-        output.append(info_.getMaterializedOrderingExprs().get(i).toSql());
+    if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+      List<Expr> nonSlotRefExprs = Lists.newArrayList();
+      for (Expr e: info_.getMaterializedExprs()) {
+        if (e instanceof SlotRef) continue;
+        nonSlotRefExprs.add(e);
       }
-      output.append("\n");
+      if (!nonSlotRefExprs.isEmpty()) {
+        output.append(detailPrefix + "materialized: ");
+        for (int i = 0; i < nonSlotRefExprs.size(); ++i) {
+          if (i > 0) output.append(", ");
+          output.append(nonSlotRefExprs.get(i).toSql());
+        }
+        output.append("\n");
+      }
     }
 
     return output.toString();
