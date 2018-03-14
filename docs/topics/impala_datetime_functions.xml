@@ -52,7 +52,7 @@ under the License.
 
     <p rev="2.2.0">
       Some of these functions are affected by the setting of the
-      <codeph>-use_local_tz_for_unix_timestamp_conversions</codeph> startup flag for the
+      <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> startup flag for the
       <cmdname>impalad</cmdname> daemon. This setting is off by default, meaning that
       functions such as <codeph>from_unixtime()</codeph> and <codeph>unix_timestamp()</codeph>
       consider the input values to always represent the UTC time zone.

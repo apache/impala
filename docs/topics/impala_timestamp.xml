@@ -163,21 +163,21 @@ insert into auction_details
       If you have data files written by Hive, those <codeph>TIMESTAMP</codeph> values represent the local timezone
       of the host where the data was written, potentially leading to inconsistent results when processed by Impala.
       To avoid compatibility problems or having to code workarounds, you can specify one or both of these
-      <cmdname>impalad</cmdname> startup flags: <codeph>-use_local_tz_for_unix_timestamp_conversions=true</codeph>
+      <cmdname>impalad</cmdname> startup flags: <codeph>--use_local_tz_for_unix_timestamp_conversions=true</codeph>
       <codeph>-convert_legacy_hive_parquet_utc_timestamps=true</codeph>. Although
       <codeph>-convert_legacy_hive_parquet_utc_timestamps</codeph> is turned off by default to avoid performance overhead, where practical
       turn it on when processing <codeph>TIMESTAMP</codeph> columns in Parquet files written by Hive, to avoid unexpected behavior.
     </p>
 
     <p rev="2.2.0">
-      The <codeph>-use_local_tz_for_unix_timestamp_conversions</codeph> setting affects conversions from
+      The <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> setting affects conversions from
       <codeph>TIMESTAMP</codeph> to <codeph>BIGINT</codeph>, or from <codeph>BIGINT</codeph>
       to <codeph>TIMESTAMP</codeph>. By default, Impala treats all <codeph>TIMESTAMP</codeph> values as UTC,
       to simplify analysis of time-series data from different geographic regions. When you enable the
-      <codeph>-use_local_tz_for_unix_timestamp_conversions</codeph> setting, these operations
+      <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> setting, these operations
       treat the input values as if they are in the local tie zone of the host doing the processing.
       See <xref href="impala_datetime_functions.xml#datetime_functions"/> for the list of functions
-      affected by the <codeph>-use_local_tz_for_unix_timestamp_conversions</codeph> setting.
+      affected by the <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> setting.
     </p>
 
     <p>
