@@ -22,7 +22,7 @@ from tests.common.impala_cluster import ImpalaCluster
 from tests.common.skip import SkipIf, SkipIfBuildType
 from tests.verifiers.mem_usage_verifier import MemUsageVerifier
 
-DATA_STREAM_MGR_METRIC = "Data Stream Manager Deferred RPCs"
+DATA_STREAM_MGR_METRIC = "Data Stream Manager Early RPCs"
 DATA_STREAM_SVC_METRIC = "Data Stream Service Queue"
 ALL_METRICS = [ DATA_STREAM_MGR_METRIC, DATA_STREAM_SVC_METRIC ]
 
@@ -74,7 +74,7 @@ class TestKrpcMemUsage(CustomClusterTestSuite):
   @SkipIfBuildType.not_dev_build
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--stress_datastream_recvr_delay_ms=1000")
-  def test_krpc_deferred_memory_usage(self, vector):
+  def test_krpc_early_sender_memory_usage(self, vector):
     """Executes a simple query. The cluster is started with delayed receiver creation to
     trigger RPC queueing.
     """
@@ -83,9 +83,9 @@ class TestKrpcMemUsage(CustomClusterTestSuite):
   @SkipIfBuildType.not_dev_build
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--stress_datastream_recvr_delay_ms=1000")
-  def test_krpc_deferred_memory_cancellation(self, vector):
+  def test_krpc_early_sender_memory_cancellation(self, vector):
     """Executes a query and cancels it while RPCs are still queued up. This exercises the
-    code to flush the deferred RPC queue in the receiver.
+    code to flush the early sender RPC queue in the receiver.
     """
     query = "select count(*) from tpch_parquet.lineitem l1 join tpch_parquet.lineitem l2 \
             where l1.l_orderkey = l2.l_orderkey"
