@@ -201,18 +201,14 @@ class ParquetColumnReader {
   /// not in collections.
   virtual bool ReadNonRepeatedValue(MemPool* pool, Tuple* tuple) = 0;
 
-  /// Returns true if this reader needs to be seeded with NextLevels() before
-  /// calling ReadValueBatch() or ReadNonRepeatedValueBatch().
-  /// Note that all readers need to be seeded before calling the non-batched ReadValue().
-  virtual bool NeedsSeedingForBatchedReading() const { return true; }
-
   /// Batched version of ReadValue() that reads up to max_values at once and materializes
   /// them into tuples in tuple_mem. Returns the number of values actually materialized
   /// in *num_values. The return value, error behavior and state changes are generally
   /// the same as in ReadValue(). For example, if an error occurs in the middle of
   /// materializing a batch then false is returned, and num_values, tuple_mem, as well as
   /// this column reader are left in an undefined state, assuming that the caller will
-  /// immediately abort execution.
+  /// immediately abort execution. NextLevels() does *not* need to be called before
+  /// ReadValueBatch(), unlike ReadValue().
   virtual bool ReadValueBatch(MemPool* pool, int max_values, int tuple_size,
       uint8_t* tuple_mem, int* num_values);
 
@@ -241,7 +237,11 @@ class ParquetColumnReader {
   void ReadPosition(Tuple* tuple);
 
   /// Returns true if this column reader has reached the end of the row group.
-  inline bool RowGroupAtEnd() { return rep_level_ == HdfsParquetScanner::ROW_GROUP_END; }
+  inline bool RowGroupAtEnd() {
+    DCHECK_EQ(rep_level_ == HdfsParquetScanner::ROW_GROUP_END,
+              def_level_ == HdfsParquetScanner::ROW_GROUP_END);
+    return rep_level_ == HdfsParquetScanner::ROW_GROUP_END;
+  }
 
   /// If 'row_batch' is non-NULL, transfers the remaining resources backing tuples to it,
   /// and frees up other resources. If 'row_batch' is NULL frees all resources instead.
@@ -257,18 +257,19 @@ class ParquetColumnReader {
   const SlotDescriptor* pos_slot_desc_;
 
   /// The next value to write into the position slot, if there is one. 64-bit int because
-  /// the pos slot is always a BIGINT Set to -1 when this column reader does not have a
-  /// current rep and def level (i.e. before the first NextLevels() call or after the last
-  /// value in the column has been read).
+  /// the pos slot is always a BIGINT Set to INVALID_POS when this column reader does not
+  /// have a current rep and def level (i.e. before the first NextLevels() call or after
+  /// the last value in the column has been read).
   int64_t pos_current_value_;
 
   /// The current repetition and definition levels of this reader. Advanced via
-  /// ReadValue() and NextLevels(). Set to -1 when this column reader does not have a
-  /// current rep and def level (i.e. before the first NextLevels() call or after the last
-  /// value in the column has been read). If this is not inside a collection, rep_level_ is
-  /// always 0.
-  /// int16_t is large enough to hold the valid levels 0-255 and sentinel value -1.
-  /// The maximum values are cached here because they are accessed in inner loops.
+  /// ReadValue() and NextLevels(). Set to INVALID_LEVEL before the first NextLevels()
+  /// call for a row group or if an error is encountered decoding a level. Set to
+  /// ROW_GROUP_END after the last value in the column has been read). If this is not
+  /// inside a collection, rep_level_ is always 0, INVALID_LEVEL or ROW_GROUP_END.
+  /// int16_t is large enough to hold the valid levels 0-255 and negative sentinel values
+  /// INVALID_LEVEL and ROW_GROUP_END. The maximum values are cached here because they
+  /// are accessed in inner loops.
   int16_t rep_level_;
   int16_t max_rep_level_;
   int16_t def_level_;
@@ -348,10 +349,10 @@ class BaseScalarColumnReader : public ParquetColumnReader {
     stream_ = stream;
     metadata_ = metadata;
     num_values_read_ = 0;
-    def_level_ = -1;
+    def_level_ = HdfsParquetScanner::INVALID_LEVEL;
     // See ColumnReader constructor.
-    rep_level_ = max_rep_level() == 0 ? 0 : -1;
-    pos_current_value_ = -1;
+    rep_level_ = max_rep_level() == 0 ? 0 : HdfsParquetScanner::INVALID_LEVEL;
+    pos_current_value_ = HdfsParquetScanner::INVALID_POS;
 
     if (metadata_->codec != parquet::CompressionCodec::UNCOMPRESSED) {
       RETURN_IF_ERROR(Codec::CreateDecompressor(
@@ -547,9 +548,9 @@ class CollectionColumnReader : public ParquetColumnReader {
 
   /// This is called once for each row group in the file.
   void Reset() {
-    def_level_ = -1;
-    rep_level_ = -1;
-    pos_current_value_ = -1;
+    def_level_ = HdfsParquetScanner::INVALID_LEVEL;
+    rep_level_ = HdfsParquetScanner::INVALID_LEVEL;
+    pos_current_value_ = HdfsParquetScanner::INVALID_POS;
   }
 
   virtual void Close(RowBatch* row_batch) {

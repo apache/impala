@@ -261,8 +261,6 @@ class ScalarColumnReader : public BaseScalarColumnReader {
     return ReadValue<false>(pool, tuple);
   }
 
-  virtual bool NeedsSeedingForBatchedReading() const { return false; }
-
   virtual bool ReadValueBatch(MemPool* pool, int max_values, int tuple_size,
       uint8_t* tuple_mem, int* num_values) {
     return ReadValueBatch<true>(pool, max_values, tuple_size, tuple_mem, num_values);
@@ -777,6 +775,11 @@ bool ParquetColumnReader::ColReaderDebugAction(int* val_count) {
 
 bool ParquetColumnReader::ReadValueBatch(MemPool* pool, int max_values,
     int tuple_size, uint8_t* tuple_mem, int* num_values) {
+  // The below loop requires that NextLevels() was called previously to populate
+  // 'def_level_' and 'rep_level_'. Ensure it is called at the start of each
+  // row group.
+  if (def_level_ == HdfsParquetScanner::INVALID_LEVEL && !NextLevels()) return false;
+
   int val_count = 0;
   bool continue_execution = true;
   while (val_count < max_values && !RowGroupAtEnd() && continue_execution) {
@@ -800,6 +803,11 @@ bool ParquetColumnReader::ReadValueBatch(MemPool* pool, int max_values,
 
 bool ParquetColumnReader::ReadNonRepeatedValueBatch(MemPool* pool,
     int max_values, int tuple_size, uint8_t* tuple_mem, int* num_values) {
+  // The below loop requires that NextLevels() was called previously to populate
+  // 'def_level_' and 'rep_level_'. Ensure it is called at the start of each
+  // row group.
+  if (def_level_ == HdfsParquetScanner::INVALID_LEVEL && !NextLevels()) return false;
+
   int val_count = 0;
   bool continue_execution = true;
   while (val_count < max_values && !RowGroupAtEnd() && continue_execution) {
@@ -1214,7 +1222,7 @@ bool BaseScalarColumnReader::NextPage() {
   if (UNLIKELY(!parent_->parse_status_.ok())) return false;
   if (num_buffered_values_ == 0) {
     rep_level_ = HdfsParquetScanner::ROW_GROUP_END;
-    def_level_ = HdfsParquetScanner::INVALID_LEVEL;
+    def_level_ = HdfsParquetScanner::ROW_GROUP_END;
     pos_current_value_ = HdfsParquetScanner::INVALID_POS;
     return false;
   }

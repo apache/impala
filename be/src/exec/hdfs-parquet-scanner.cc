@@ -713,33 +713,8 @@ Status HdfsParquetScanner::NextRowGroup() {
       ReleaseSkippedRowGroupResources();
       continue;
     }
-
-    bool seeding_failed = false;
-    for (ParquetColumnReader* col_reader: column_readers_) {
-      // Seed collection and boolean column readers with NextLevel().
-      // The ScalarColumnReaders use an optimized ReadValueBatch() that
-      // should not be seeded.
-      // TODO: Refactor the column readers to look more like the optimized
-      // ScalarColumnReader::ReadValueBatch() which does not need seeding. This
-      // will allow better sharing of code between the row-wise and column-wise
-      // materialization strategies.
-      if (col_reader->NeedsSeedingForBatchedReading()
-          && !col_reader->NextLevels()) {
-        seeding_failed = true;
-        break;
-      }
-    }
-    if (seeding_failed) {
-      if (!parse_status_.ok()) {
-        RETURN_IF_ERROR(state_->LogOrReturnError(parse_status_.msg()));
-      }
-      ReleaseSkippedRowGroupResources();
-      continue;
-    } else {
-      // Seeding succeeded - we're ready to read the row group.
-      DCHECK(parse_status_.ok()) << "Invalid parse_status_" << parse_status_.GetDetail();
-      break;
-    }
+    DCHECK(parse_status_.ok()) << "Invalid parse_status_" << parse_status_.GetDetail();
+    break;
   }
 
   DCHECK(parse_status_.ok());
