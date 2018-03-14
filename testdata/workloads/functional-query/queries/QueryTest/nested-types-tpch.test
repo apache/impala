@@ -160,17 +160,22 @@ ORDER BY o_orderkey LIMIT 1
 BIGINT,BIGINT
 ====
 ---- QUERY
-# IMPALA-2376
-# Set memory limit low enough to get the below query to consistently fail.
-# This was originally a regression test that hit an error like:
-# Failed to allocate buffer for collection '...'.
-set mem_limit=4m;
-select max(cnt) from customer c,
-(select count(l_returnflag) cnt from c.c_orders.o_lineitems) v;
+# IMPALA-2376: run scan that constructs large collection and set memory limit low enough
+# to get the below query to consistently fail when allocating a large collection. Set
+# num_nodes and mt_dop to 1 in order to make the query as deterministic as possible.
+set buffer_pool_limit=40m;
+set mem_limit=50m;
+set num_nodes=1;
+set mt_dop=1;
+select max(cnt1), max(cnt2), max(cnt3), max(cnt4), max(cnt5)
+from customer c,
+  (select count(l_returnflag) cnt1, count(l_partkey) cnt2, count(l_suppkey) cnt3,
+          count(l_linenumber) cnt4, count(l_quantity) cnt5
+   from c.c_orders.o_lineitems) v;
 ---- TYPES
 BIGINT
 ---- CATCH
-Rejected query from pool default-pool: minimum memory reservation is greater than memory available to the query for buffer reservations.
+row_regex: .*Memory limit exceeded: Failed to allocate [0-9]+ bytes for collection 'tpch_nested_parquet.customer.c_orders.item.o_lineitems'.*
 ====
 ---- QUERY
 # IMPALA-2473: Scan query with large row size leading to oversized batches.

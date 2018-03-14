@@ -47,6 +47,7 @@ from tests.common.test_dimensions import (
     load_table_info_dimension)
 from tests.common.test_result_verifier import (
     apply_error_match_filter,
+    try_compile_regex,
     verify_raw_results,
     verify_runtime_profile)
 from tests.common.test_vector import ImpalaTestDimension
@@ -260,8 +261,9 @@ class ImpalaTestSuite(BaseTestSuite):
 
   def __verify_exceptions(self, expected_strs, actual_str, use_db):
     """
-    Verifies that at least one of the strings in 'expected_str' is a substring of the
-    actual exception string 'actual_str'.
+    Verifies that at least one of the strings in 'expected_str' is either:
+    * A row_regex: line that matches the actual exception string 'actual_str'
+    * A substring of the actual exception string 'actual_str'.
     """
     actual_str = actual_str.replace('\n', '')
     for expected_str in expected_strs:
@@ -274,7 +276,12 @@ class ImpalaTestSuite(BaseTestSuite):
       if use_db: expected_str = expected_str.replace('$DATABASE', use_db)
       # Strip newlines so we can split error message into multiple lines
       expected_str = expected_str.replace('\n', '')
-      if expected_str in actual_str: return
+      expected_regex = try_compile_regex(expected_str)
+      if expected_regex:
+        if expected_regex.match(actual_str): return
+      else:
+        # Not a regex - check if expected substring is present in actual.
+        if expected_str in actual_str: return
     assert False, 'Unexpected exception string. Expected: %s\nNot found in actual: %s' % \
       (expected_str, actual_str)
 
