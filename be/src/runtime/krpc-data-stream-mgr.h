@@ -295,10 +295,10 @@ class KrpcDataStreamMgr : public DataStreamMgrBase {
   friend class KrpcDataStreamRecvr;
   friend class DataStreamTest;
 
-  /// MemTracker for memory used for transmit data requests before we hand them over to a
-  /// specific receiver. Used only to track payloads of deferred RPCs (e.g. early
-  /// senders).
-  std::unique_ptr<MemTracker> mem_tracker_;
+  /// MemTracker for memory used for early transmit data RPCs which arrive before the
+  /// receiver is created. The memory of the RPC payload is transferred to the receiver
+  /// once it's created.
+  std::unique_ptr<MemTracker> early_rpcs_tracker_;
 
   /// MemTracker used by the DataStreamService to track memory for incoming requests.
   /// Memory for new incoming requests is initially tracked against this tracker before

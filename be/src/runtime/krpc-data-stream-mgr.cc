@@ -78,9 +78,9 @@ KrpcDataStreamMgr::KrpcDataStreamMgr(MetricGroup* metrics)
 }
 
 Status KrpcDataStreamMgr::Init(MemTracker* service_mem_tracker) {
-  // MemTracker for tracking memory used for buffering deferred RPC calls which
+  // MemTracker for tracking memory used for buffering early RPC calls which
   // arrive before the receiver is ready.
-  mem_tracker_.reset(new MemTracker(-1, "Data Stream Manager Deferred RPCs",
+  early_rpcs_tracker_.reset(new MemTracker(-1, "Data Stream Manager Early RPCs",
       ExecEnv::GetInstance()->process_mem_tracker()));
   service_mem_tracker_ = service_mem_tracker;
   RETURN_IF_ERROR(Thread::Create("krpc-data-stream-mgr", "maintenance",
@@ -134,14 +134,14 @@ shared_ptr<DataStreamRecvrBase> KrpcDataStreamMgr::CreateRecvr(
     // Release memory. The receiver will track it in its instance tracker.
     int64_t transfer_size = ctx->rpc_context->GetTransferSize();
     recvr->TakeOverEarlySender(move(ctx));
-    mem_tracker_->Release(transfer_size);
+    early_rpcs_tracker_->Release(transfer_size);
     num_senders_waiting_->Increment(-1);
   }
   for (const unique_ptr<EndDataStreamCtx>& ctx :
       early_senders_for_recvr.closed_sender_ctxs) {
     recvr->RemoveSender(ctx->request->sender_id());
     DataStreamService::RespondAndReleaseRpc(Status::OK(), ctx->response, ctx->rpc_context,
-        mem_tracker_.get());
+        early_rpcs_tracker_.get());
     num_senders_waiting_->Increment(-1);
   }
   return recvr;
@@ -174,7 +174,7 @@ void KrpcDataStreamMgr::AddEarlySender(const TUniqueId& finst_id,
     const TransmitDataRequestPB* request, TransmitDataResponsePB* response,
     kudu::rpc::RpcContext* rpc_context) {
   const int64_t transfer_size = rpc_context->GetTransferSize();
-  mem_tracker_->Consume(transfer_size);
+  early_rpcs_tracker_->Consume(transfer_size);
   service_mem_tracker_->Release(transfer_size);
   RecvrId recvr_id = make_pair(finst_id, request->dest_node_id());
   auto payload = make_unique<TransmitDataCtx>(request, response, rpc_context);
@@ -187,7 +187,7 @@ void KrpcDataStreamMgr::AddEarlyClosedSender(const TUniqueId& finst_id,
     const EndDataStreamRequestPB* request, EndDataStreamResponsePB* response,
     kudu::rpc::RpcContext* rpc_context) {
   const int64_t transfer_size = rpc_context->GetTransferSize();
-  mem_tracker_->Consume(transfer_size);
+  early_rpcs_tracker_->Consume(transfer_size);
   service_mem_tracker_->Release(transfer_size);
   RecvrId recvr_id = make_pair(finst_id, request->dest_node_id());
   auto payload = make_unique<EndDataStreamCtx>(request, response, rpc_context);
@@ -351,7 +351,7 @@ void KrpcDataStreamMgr::RespondToTimedOutSender(const std::unique_ptr<ContextTyp
       ctx->request->dest_node_id());
   VLOG_QUERY << msg.msg();
   DataStreamService::RespondAndReleaseRpc(Status::Expected(msg), ctx->response,
-      ctx->rpc_context, mem_tracker_.get());
+      ctx->rpc_context, early_rpcs_tracker_.get());
   num_senders_waiting_->Increment(-1);
   num_senders_timedout_->Increment(1);
 }
