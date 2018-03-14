@@ -3972,11 +3972,33 @@ CREATE EXTERNAL TABLE impala_name STORED AS KUDU
       </p>
 
       <p id="kudu_sentry_limitations" rev="IMPALA-4000">
-        Access to Kudu tables must be granted to and revoked from roles as usual.
-        Only users with <codeph>ALL</codeph> privileges on <codeph>SERVER</codeph> can create external Kudu tables.
-        Currently, access to a Kudu table is <q>all or nothing</q>:
-        enforced at the table level rather than the column level, and applying to all
-        SQL operations rather than individual statements such as <codeph>INSERT</codeph>.
+        Access to Kudu tables must be granted to and revoked from roles with the
+        following considerations:
+        <ul>
+          <li>
+            Only users with the <codeph>ALL</codeph> privilege on
+              <codeph>SERVER</codeph> can create external Kudu tables.
+          </li>
+          <li>
+            The <codeph>ALL</codeph> privileges on <codeph>SERVER</codeph> is
+            required to specify the <codeph>kudu.master_addresses</codeph>
+            property in the <codeph>CREATE TABLE</codeph> statements for managed
+            tables as well as external tables.
+          </li>
+          <li>
+            Access to Kudu tables is enforced at the table level and at the
+            column level.
+          </li>
+          <li>
+            The <codeph>SELECT</codeph>- and <codeph>INSERT</codeph>-specific
+            permissions are supported.
+          </li>
+          <li>
+            The <codeph>DELETE</codeph>, <codeph>UPDATE</codeph>, and
+            <codeph>UPSERT</codeph> operations require the <codeph>ALL</codeph>
+            privilege.
+          </li>
+        </ul>
         Because non-SQL APIs can access Kudu data without going through Sentry
         authorization, currently the Sentry support is considered preliminary
         and subject to change.
