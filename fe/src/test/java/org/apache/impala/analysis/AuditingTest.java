@@ -313,7 +313,7 @@ public class AuditingTest extends FrontendTestBase {
 
     accessEvents = AnalyzeAccessEvents("describe formatted functional.alltypesagg");
     Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
-        "functional.alltypesagg", TCatalogObjectType.TABLE, "ANY")));
+        "functional.alltypesagg", TCatalogObjectType.TABLE, "VIEW_METADATA")));
 
     accessEvents = AnalyzeAccessEvents("describe functional.complex_view");
     Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
@@ -453,7 +453,7 @@ public class AuditingTest extends FrontendTestBase {
     // Describe formatted
     accessEvents = AnalyzeAccessEvents("describe formatted functional_kudu.testtbl");
     Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
-        "functional_kudu.testtbl", TCatalogObjectType.TABLE, "ANY")));
+        "functional_kudu.testtbl", TCatalogObjectType.TABLE, "VIEW_METADATA")));
   }
 
   /**

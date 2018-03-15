@@ -18,7 +18,6 @@
 package org.apache.impala.catalog;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -473,30 +472,39 @@ public abstract class Table extends CatalogObjectImpl {
   public String getStorageHandlerClassName() { return null; }
 
   /**
-   * Returns an unmodifiable list of all columns, but with partition columns at the end of
+   * Returns the list of all columns, but with partition columns at the end of
    * the list rather than the beginning. This is equivalent to the order in
    * which Hive enumerates columns.
    */
-  public List<Column> getColumnsInHiveOrder() {
+  public ArrayList<Column> getColumnsInHiveOrder() {
     ArrayList<Column> columns = Lists.newArrayList(getNonClusteringColumns());
     columns.addAll(getClusteringColumns());
-    return Collections.unmodifiableList(columns);
+    return columns;
   }
 
+  /**
+   * Returns a struct type with the columns in the same order as getColumnsInHiveOrder().
+   */
+  public StructType getHiveColumnsAsStruct() {
+    ArrayList<StructField> fields = Lists.newArrayListWithCapacity(colsByPos_.size());
+    for (Column col: getColumnsInHiveOrder()) {
+      fields.add(new StructField(col.getName(), col.getType(), col.getComment()));
+    }
+    return new StructType(fields);
+  }
 
   /**
-   * Returns an unmodifiable list of all partition columns.
+   * Returns the list of all partition columns.
    */
   public List<Column> getClusteringColumns() {
-    return Collections.unmodifiableList(colsByPos_.subList(0, numClusteringCols_));
+    return colsByPos_.subList(0, numClusteringCols_);
   }
 
   /**
-   * Returns an unmodifiable list of all columns excluding any partition columns.
+   * Returns the list of all columns excluding any partition columns.
    */
   public List<Column> getNonClusteringColumns() {
-    return Collections.unmodifiableList(colsByPos_.subList(numClusteringCols_,
-        colsByPos_.size()));
+    return colsByPos_.subList(numClusteringCols_, colsByPos_.size());
   }
 
   /**

@@ -125,9 +125,8 @@ class Frontend {
   /// field is set to MINIMAL, only the column definitions are returned. If set to
   /// FORMATTED|EXTENDED, extended metadata is returned (in addition to the column defs).
   /// This includes info about the table properties, SerDe properties, StorageDescriptor
-  /// properties, and more.  The current user session is needed for privileges checks.
-  Status DescribeTable(const TDescribeTableParams& params, const TSessionState& session,
-      TDescribeResult* response);
+  /// properties, and more.
+  Status DescribeTable(const TDescribeTableParams& params, TDescribeResult* response);
 
   /// Returns (in the output parameter) a string containing the CREATE TABLE command that
   /// creates the table specified in the params.

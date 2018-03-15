@@ -23,7 +23,6 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Table;
@@ -87,6 +86,21 @@ public class DescribeTableStmt extends StatementBase {
   public Table getTable() { return table_; }
   public TDescribeOutputStyle getOutputStyle() { return outputStyle_; }
 
+  /**
+   * Get the privilege requirement, which depends on the output style.
+   */
+  private Privilege getPrivilegeRequirement() {
+    switch (outputStyle_) {
+      case MINIMAL: return Privilege.ANY;
+      case FORMATTED:
+      case EXTENDED:
+        return Privilege.VIEW_METADATA;
+      default:
+        Preconditions.checkArgument(false);
+        return null;
+    }
+  }
+
   @Override
   public void collectTableRefs(List<TableRef> tblRefs) {
     tblRefs.add(new TableRef(rawPath_, null));
@@ -102,10 +116,12 @@ public class DescribeTableStmt extends StatementBase {
       // table/database if the user is not authorized.
       if (rawPath_.size() > 1) {
         analyzer.registerPrivReq(new PrivilegeRequestBuilder()
-            .onTable(rawPath_.get(0), rawPath_.get(1)).any().toRequest());
+            .onTable(rawPath_.get(0), rawPath_.get(1))
+            .allOf(getPrivilegeRequirement()).toRequest());
       }
       analyzer.registerPrivReq(new PrivilegeRequestBuilder()
-          .onTable(analyzer.getDefaultDb(), rawPath_.get(0)).any().toRequest());
+          .onTable(analyzer.getDefaultDb(), rawPath_.get(0))
+          .allOf(getPrivilegeRequirement()).toRequest());
       throw ae;
     } catch (TableLoadingException tle) {
       throw new AnalysisException(tle.getMessage(), tle);
@@ -113,14 +129,10 @@ public class DescribeTableStmt extends StatementBase {
 
     table_ = path_.getRootTable();
     // Register authorization and audit events.
-    analyzer.getTable(table_.getTableName(), Privilege.ANY);
+    analyzer.getTable(table_.getTableName(), getPrivilegeRequirement());
 
     // Describing a table.
     if (path_.destTable() != null) return;
-
-    analyzer.registerPrivReq(new PrivilegeRequestBuilder()
-        .onColumn(path_.getRootTable().getDb().getName(), path_.getRootTable().getName(),
-        path_.getRawPath().get(0)).any().toRequest());
 
     if (path_.destType().isComplexType()) {
       if (outputStyle_ == TDescribeOutputStyle.FORMATTED ||

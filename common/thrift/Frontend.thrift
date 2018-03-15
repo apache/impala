@@ -166,9 +166,6 @@ struct TDescribeTableParams {
 
   // Set when describing a path to a nested collection.
   3: optional Types.TColumnType result_struct
-
-  // Session state for the user who initiated this request.
-  4: optional ImpalaInternalService.TSessionState session
 }
 
 // Results of a call to describeDb() and describeTable()
