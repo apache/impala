@@ -450,25 +450,34 @@ function copy-and-load-ext-data-source {
 }
 
 function wait-hdfs-replication {
-  MAX_RETRIES=6
-  for ((RESTART_COUNT = 0; RESTART_COUNT <= MAX_RETRIES; ++RESTART_COUNT)); do
-    sleep "$((RESTART_COUNT * 10))"
+  MAX_FSCK=30
+  SLEEP_SEC=120
+  LAST_NUMBER_UNDER_REPLICATED=-1
+  for ((FSCK_COUNT = 0; FSCK_COUNT <= MAX_FSCK; FSCK_COUNT++)); do
     FSCK_OUTPUT="$(hdfs fsck /test-warehouse)"
     echo "$FSCK_OUTPUT"
-    if grep "Under-replicated blocks:[[:space:]]*0" <<< "$FSCK_OUTPUT"; then
+    NUMBER_UNDER_REPLICATED=$(
+        grep -oP "Under-replicated blocks:[[:space:]]*\K[[:digit:]]*" <<< "$FSCK_OUTPUT")
+    if [[ "$NUMBER_UNDER_REPLICATED" -eq 0 ]] ; then
       # All the blocks are fully-replicated. The data loading can continue.
       return
     fi
-    if [[ "$RESTART_COUNT" -eq "$MAX_RETRIES" ]] ; then
-      echo "Some HDFS blocks are still under-replicated after restarting HDFS"\
-          "$MAX_RETRIES times."
+    if [[ $(($FSCK_COUNT + 1)) -eq "$MAX_FSCK" ]] ; then
+      echo "Some HDFS blocks are still under-replicated after running HDFS fsck"\
+          "$MAX_FSCK times."
       echo "Some tests cannot pass without fully-replicated blocks (IMPALA-3887)."
       echo "Failing the data loading."
       exit 1
     fi
-    echo "There are under-replicated blocks in HDFS. Attempting to restart HDFS to"\
-        "resolve this issue."
-    ${IMPALA_HOME}/testdata/bin/run-mini-dfs.sh
+    if [[ "$NUMBER_UNDER_REPLICATED" -eq "$LAST_NUMBER_UNDER_REPLICATED" ]] ; then
+      echo "There are under-replicated blocks in HDFS and HDFS is not making progress"\
+          "in $SLEEP_SEC seconds. Attempting to restart HDFS to resolve this issue."
+      ${IMPALA_HOME}/testdata/bin/run-mini-dfs.sh
+    fi
+    LAST_NUMBER_UNDER_REPLICATED="$NUMBER_UNDER_REPLICATED"
+    echo "$NUMBER_UNDER_REPLICATED under replicated blocks remaining."
+    echo "Sleeping for $SLEEP_SEC seconds before rechecking."
+    sleep "$SLEEP_SEC"
   done
 }
 
