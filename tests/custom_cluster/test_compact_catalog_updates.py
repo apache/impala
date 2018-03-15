@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-# Test Catalog behavior when --compact_catalog_topic is true.
+# Test Catalog behavior when --compact_catalog_topic is false.
 
 import pytest
 
@@ -23,10 +23,10 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 class TestCompactCatalogUpdates(CustomClusterTestSuite):
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(impalad_args="--compact_catalog_topic=true",
-      catalogd_args="--compact_catalog_topic=true")
-  def test_compact_catalog_topic_updates(self):
-    """Start Impala cluster with compact catalog update topics enabled and run a set
+  @CustomClusterTestSuite.with_args(impalad_args="--compact_catalog_topic=false",
+      catalogd_args="--compact_catalog_topic=false")
+  def test_non_compact_catalog_topic_updates(self):
+    """Start Impala cluster with compact catalog update topics disabled and run a set
     of smoke tests to verify that catalog updates are received properly."""
 
     try:
