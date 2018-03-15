@@ -21,12 +21,11 @@
 # over which archive type is downloaded and what post-download steps are executed.
 # This script requires Python 2.6+.
 
-import json
+import hashlib
 import os
 import os.path
 import re
 import sys
-from hashlib import md5
 from random import randint
 from time import sleep
 from urllib import urlopen, URLopener
@@ -39,9 +38,21 @@ PYPI_MIRROR = os.environ.get('PYPI_MIRROR', 'https://pypi.python.org')
 REQUIREMENTS_FILES = ['requirements.txt', 'compiled-requirements.txt',
                       'kudu-requirements.txt', 'adls-requirements.txt']
 
-def check_md5sum(filename, expected_md5):
-  actual_md5 = md5(open(filename).read()).hexdigest()
-  return actual_md5 == expected_md5
+
+def check_digest(filename, algorithm, expected_digest):
+  try:
+    supported_algorithms = hashlib.algorithms_available
+  except AttributeError:
+    # Fallback to hardcoded set if hashlib.algorithms_available doesn't exist.
+    supported_algorithms = {'md5', 'sha1', 'sha224', 'sha256', 'sha384', 'sha512'}
+  if algorithm not in supported_algorithms:
+    print 'Hash algorithm {0} is not supported by hashlib'.format(algorithm)
+    return False
+  h = hashlib.new(algorithm)
+  h.update(open(filename).read())
+  actual_digest = h.hexdigest()
+  return actual_digest == expected_digest
+
 
 def retry(func):
   '''Retry decorator.'''
@@ -64,7 +75,7 @@ def retry(func):
   return wrapper
 
 def get_package_info(pkg_name, pkg_version):
-  '''Returns the file name, path and md5 digest of the package.'''
+  '''Returns the file name, path, hash algorithm and digest of the package.'''
   # We store the matching result in the candidates list instead of returning right away
   # to sort them and return the first value in alphabetical order. This ensures that the
   # same result is always returned even if the ordering changed on the server.
@@ -76,39 +87,40 @@ def get_package_info(pkg_name, pkg_version):
   # downloading an extra package before running this script. Since the HTML is guaranteed
   # to be formatted according to PEP 503, this is acceptable.
   pkg_info = urlopen(url).read()
-  # We assume that the URL includes a hash and the hash function is md5. This not strictly
-  # required by PEP 503.
-  regex = r'<a href=\".*?packages/(.*?)#md5=(.*?)\".*?>(.*?)<\/a>'
+  regex = r'<a href=\".*?packages/(.*?)#(.*?)=(.*?)\".*?>(.*?)<\/a>'
   for match in re.finditer(regex, pkg_info):
     path = match.group(1)
-    md5_digest = match.group(2)
-    file_name = match.group(3)
+    hash_algorithm = match.group(2)
+    digest = match.group(3)
+    file_name = match.group(4)
     # Make sure that we consider only non Wheel archives, because those are not supported.
     if (file_name.endswith('-{0}.tar.gz'.format(pkg_version)) or
         file_name.endswith('-{0}.tar.bz2'.format(pkg_version)) or
         file_name.endswith('-{0}.zip'.format(pkg_version))):
-      candidates.append((file_name, path, md5_digest))
+      candidates.append((file_name, path, hash_algorithm, digest))
   if not candidates:
     print 'Could not find archive to download for {0} {1}'.format(pkg_name, pkg_version)
-    return (None, None, None)
+    return (None, None, None, None)
   return sorted(candidates)[0]
 
 @retry
 def download_package(pkg_name, pkg_version):
-  file_name, path, expected_md5 = get_package_info(pkg_name, pkg_version)
+  file_name, path, hash_algorithm, expected_digest = get_package_info(pkg_name,
+      pkg_version)
   if not file_name:
     return False
-  if os.path.isfile(file_name) and check_md5sum(file_name, expected_md5):
-    print 'File with matching md5sum already exists, skipping {0}'.format(file_name)
+  if os.path.isfile(file_name) and check_digest(file_name, hash_algorithm,
+      expected_digest):
+    print 'File with matching digest already exists, skipping {0}'.format(file_name)
     return True
   downloader = URLopener()
   pkg_url = '{0}/packages/{1}'.format(PYPI_MIRROR, path)
   print 'Downloading {0} from {1}'.format(file_name, pkg_url)
   downloader.retrieve(pkg_url, file_name)
-  if check_md5sum(file_name, expected_md5):
+  if check_digest(file_name, hash_algorithm, expected_digest):
     return True
   else:
-    print 'MD5 mismatch in file {0}.'.format(file_name)
+    print 'Hash digest check failed in file {0}.'.format(file_name)
     return False
 
 def main():
