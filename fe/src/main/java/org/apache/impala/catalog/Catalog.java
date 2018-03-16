@@ -575,8 +575,7 @@ public abstract class Catalog {
       case DATA_SOURCE:
         return "DATA_SOURCE:" + catalogObject.getData_source().getName().toLowerCase();
       case CATALOG:
-        return "CATALOG:" +
-            TUniqueIdUtil.PrintId(catalogObject.getCatalog().catalog_service_id);
+        return "CATALOG_SERVICE_ID";
       default:
         throw new IllegalStateException(
             "Unsupported catalog object type: " + catalogObject.getType());
