@@ -386,6 +386,10 @@ class DiskIoMgr : public CacheLineAligned {
     REMOTE_NUM_DISKS
   };
 
+  /// Compute the ideal reservation for processing a scan range of 'scan_range_len' bytes.
+  /// See "Buffer Management" in the class comment for explanation.
+  int64_t ComputeIdealBufferReservation(int64_t scan_range_len);
+
   /// The ideal number of max-sized buffers per scan range to maximise throughput.
   /// See "Buffer Management" in the class comment for explanation.
   static const int64_t IDEAL_MAX_SIZED_BUFFERS_PER_SCAN_RANGE = 3;

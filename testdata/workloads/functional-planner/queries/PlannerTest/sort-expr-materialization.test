@@ -18,7 +18,7 @@ PLAN-ROOT SINK
      table: rows=7300 size=478.45KB
      partitions: 24/24 rows=7300
      columns: all
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=97B cardinality=7300
 ====
@@ -42,7 +42,7 @@ PLAN-ROOT SINK
      table: rows=7300 size=478.45KB
      partitions: 24/24 rows=7300
      columns: all
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=97B cardinality=7300
 ====
@@ -65,7 +65,7 @@ PLAN-ROOT SINK
      table: rows=7300 size=478.45KB
      partitions: 24/24 rows=7300
      columns: all
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=97B cardinality=7300
 ====
@@ -90,7 +90,7 @@ PLAN-ROOT SINK
      table: rows=7300 size=478.45KB
      partitions: 24/24 rows=7300
      columns: all
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=97B cardinality=7300
 ====
@@ -122,7 +122,7 @@ PLAN-ROOT SINK
      table: rows=7300 size=478.45KB
      partitions: 24/24 rows=7300
      columns: all
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=21B cardinality=7300
 ====
@@ -147,7 +147,7 @@ PLAN-ROOT SINK
      table: rows=7300 size=478.45KB
      partitions: 24/24 rows=7300
      columns: all
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=29B cardinality=7300
 ====
@@ -171,7 +171,7 @@ PLAN-ROOT SINK
      table: rows=7300 size=478.45KB
      partitions: 24/24 rows=7300
      columns: all
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=97B cardinality=7300
 ====
@@ -195,7 +195,7 @@ PLAN-ROOT SINK
      table: rows=7300 size=478.45KB
      partitions: 24/24 rows=7300
      columns: all
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=41B cardinality=7300
 ====
@@ -236,7 +236,7 @@ PLAN-ROOT SINK
      table: rows=8 size=460B
      partitions: 4/4 rows=8
      columns: all
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=2
    mem-estimate=32.00MB mem-reservation=8.00KB
    tuple-ids=0 row-size=12B cardinality=8
 ====

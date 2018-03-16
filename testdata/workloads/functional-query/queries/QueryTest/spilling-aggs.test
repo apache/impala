@@ -122,7 +122,7 @@ row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test aggregation spill with group_concat distinct
-set buffer_pool_limit=78m;
+set buffer_pool_limit=50m;
 select l_orderkey, count(*), group_concat(distinct l_linestatus, '|')
 from lineitem
 group by 1
@@ -166,9 +166,9 @@ row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 ---- QUERY
 # Test aggregation with minimum required reservation to exercise IMPALA-2708.
 # Merge aggregation requires 17 buffers and preaggregation requires 16 buffers
-# plus 1mb of hash tables. The buffer size is 256k for this test.
+# plus 1mb of hash tables. The buffer size is 256k for this test. The scan needs 24MB.
 set max_row_size=256k;
-set buffer_pool_limit="57.25M";
+set buffer_pool_limit="33.25M";
 select count(*)
 from (select distinct * from orders) t
 ---- TYPES
@@ -182,7 +182,7 @@ row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 # IMPALA-3304: test that avg() can spill with a query mem limit.
 # This test only covers that use FIXED_UDA_INTERMEDIATE, not functions that allocate
 # strings for intermediate values.
-set mem_limit=150m;
+set mem_limit=100m;
 select l_orderkey, avg(l_tax), avg(l_quantity), avg(l_discount), avg(l_extendedprice)
 from tpch_parquet.lineitem
 group by 1

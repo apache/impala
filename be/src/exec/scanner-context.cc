@@ -41,12 +41,14 @@ static const int64_t INIT_READ_PAST_SIZE_BYTES = 64 * 1024;
 const int64_t ScannerContext::Stream::OUTPUT_BUFFER_BYTES_LEFT_INIT;
 
 ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNodeBase* scan_node,
-    BufferPool::ClientHandle* bp_client, HdfsPartitionDescriptor* partition_desc,
+    BufferPool::ClientHandle* bp_client, int64_t total_reservation,
+    HdfsPartitionDescriptor* partition_desc,
     const vector<FilterContext>& filter_ctxs,
     MemPool* expr_results_pool)
   : state_(state),
     scan_node_(scan_node),
     bp_client_(bp_client),
+    total_reservation_(total_reservation),
     partition_desc_(partition_desc),
     filter_ctxs_(filter_ctxs),
     expr_results_pool_(expr_results_pool) {
@@ -54,6 +56,11 @@ ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNodeBase* scan_node,
 
 ScannerContext::~ScannerContext() {
   DCHECK(streams_.empty());
+}
+
+void ScannerContext::TryIncreaseReservation(int64_t ideal_reservation) {
+  total_reservation_ = scan_node_->IncreaseReservationIncrementally(
+      total_reservation_, ideal_reservation);
 }
 
 void ScannerContext::ReleaseCompletedResources(bool done) {

@@ -2,52 +2,66 @@
 ---- QUERY
 # Small query where estimate exceeds available memory but the query can execute with a
 # low mem_limit.
-select min(n_name) from tpch_parquet.nation
+select min(c_name), min(n_name)
+from tpch_parquet.customer
+  join tpch_parquet.nation on c_nationkey = n_nationkey
 ---- CATCH
-Rejected query from pool default-pool: request memory needed 26.00 MB is greater than pool max mem resources 10.00 MB
+Rejected query from pool default-pool: request memory needed 82.94 MB is greater than pool max mem resources 40.00 MB
 ====
 ---- QUERY
 # Overriding the memory estimate should allow the query to execute.
-set max_mem_estimate_for_admission=10m;
-select min(n_name) from tpch_parquet.nation
+set max_mem_estimate_for_admission=30m;
+select min(c_name), min(n_name)
+from tpch_parquet.customer
+  join tpch_parquet.nation on c_nationkey = n_nationkey
 ---- RESULTS
-'ALGERIA'
+'Customer#000000001','ALGERIA'
+---- TYPES
+STRING,STRING
 ---- RUNTIME_PROFILE
-row_regex: .*Query Options \(set by configuration\).*MAX_MEM_ESTIMATE_FOR_ADMISSION=10485760.*
+row_regex: .*Query Options \(set by configuration\).*MAX_MEM_ESTIMATE_FOR_ADMISSION=31457280.*
 # Memory estimate sent to backend is overridden, but the explain plan shows the planner output.
-row_regex: .*Estimated Per-Host Mem: 10485760.*
-row_regex: .*Per-Host Resource Estimates: Memory=26.00MB.*
+row_regex: .*Estimated Per-Host Mem: 31457280.*
+row_regex: .*Per-Host Resource Estimates: Memory=82.94MB.*
 ====
 ---- QUERY
 # If the estimate is set to a higher value that is still > the max mem resources for
 # the pool, the query still can't execute.
-set max_mem_estimate_for_admission=20m;
-select min(n_name) from tpch_parquet.nation
+set max_mem_estimate_for_admission=45m;
+select min(c_name), min(n_name)
+from tpch_parquet.customer
+  join tpch_parquet.nation on c_nationkey = n_nationkey
 ---- CATCH
-Rejected query from pool default-pool: request memory needed 20.00 MB is greater than pool max mem resources 10.00 MB
+Rejected query from pool default-pool: request memory needed 45.00 MB is greater than pool max mem resources 40.00 MB
 ====
 ---- QUERY
 # MEM_LIMIT takes precedence over MAX_MEM_ESTIMATE_FOR_ADMISSION, so the query is
 # rejected if MEM_LIMIT is higher.
-set mem_limit=20m;
-set max_mem_estimate_for_admission=10m;
-select min(n_name) from tpch_parquet.nation
+set mem_limit=45m;
+set max_mem_estimate_for_admission=30m;
+select min(c_name), min(n_name)
+from tpch_parquet.customer
+  join tpch_parquet.nation on c_nationkey = n_nationkey
 ---- CATCH
-Rejected query from pool default-pool: request memory needed 20.00 MB is greater than pool max mem resources 10.00 MB
+Rejected query from pool default-pool: request memory needed 45.00 MB is greater than pool max mem resources 40.00 MB
 ====
 ---- QUERY
 # MEM_LIMIT takes precedence over MAX_MEM_ESTIMATE_FOR_ADMISSION, so the query is
 # admitted if MEM_LIMIT is lower.
-set mem_limit=10m;
-set max_mem_estimate_for_admission=20m;
-select min(n_name) from tpch_parquet.nation
+set mem_limit=40m;
+set max_mem_estimate_for_admission=45m;
+select min(c_name), min(n_name)
+from tpch_parquet.customer
+  join tpch_parquet.nation on c_nationkey = n_nationkey
 ---- RESULTS
-'ALGERIA'
+'Customer#000000001','ALGERIA'
+---- TYPES
+STRING,STRING
 ---- RUNTIME_PROFILE
-row_regex: .*Query Options \(set by configuration\).*MEM_LIMIT=10485760.*MAX_MEM_ESTIMATE_FOR_ADMISSION=20971520.*
+row_regex: .*Query Options \(set by configuration\).*MEM_LIMIT=41943040.*MAX_MEM_ESTIMATE_FOR_ADMISSION=47185920.*
 # Memory estimate sent to backend is overridden, but the explain plan shows the planner output.
-row_regex: .*Estimated Per-Host Mem: 20971520.*
-row_regex: .*Per-Host Resource Estimates: Memory=26.00MB.*
+row_regex: .*Estimated Per-Host Mem: 47185920.*
+row_regex: .*Per-Host Resource Estimates: Memory=82.94MB.*
 ====
 ---- QUERY
 # Larger queries that use more memory than the estimate can still run because no mem_limit is set.
@@ -55,6 +69,8 @@ set max_mem_estimate_for_admission=10m;
 select min(l_comment) from tpch_parquet.lineitem
 ---- RESULTS
 ' Tiresias '
+---- TYPES
+STRING
 ---- RUNTIME_PROFILE
 row_regex: .*Query Options \(set by configuration\).*MAX_MEM_ESTIMATE_FOR_ADMISSION=10485760.*
 # Memory estimate sent to backend is overridden, but the explain plan shows the planner output.
@@ -64,14 +80,15 @@ row_regex: .*Per-Host Resource Estimates: Memory=90.00MB.*
 ---- QUERY
 # If the memory estimate is less than max_mem_estimate_for_admission, then the estimate
 # is used for admission. This query's memory estimate is 10MB, and it would be rejected
-# if the memory estimate was > 10MB.
-set max_mem_estimate_for_admission=20m;
+# if the memory estimate was > 40MB.
+set max_mem_estimate_for_admission=50m;
 select 'foo'
 ---- RESULTS
 'foo'
+---- TYPES
+STRING
 ---- RUNTIME_PROFILE
-row_regex: .*Query Options \(set by configuration\).*MAX_MEM_ESTIMATE_FOR_ADMISSION=20971520.*
-# Memory estimate sent to backend is overridden, but the explain plan shows the planner output.
+row_regex: .*Query Options \(set by configuration\).*MAX_MEM_ESTIMATE_FOR_ADMISSION=52428800.*
 row_regex: .*Estimated Per-Host Mem: 10485760.*
 row_regex: .*Per-Host Resource Estimates: Memory=10.00MB.*
 ====

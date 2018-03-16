@@ -38,7 +38,7 @@ row_regex:.*partitions=1/1 files=1 size=.*
 '     stored statistics:'
 row_regex:.*table: rows=6001215 size=.*
 '       columns: all'
-'     extrapolated-rows=disabled'
+row_regex:.*|     extrapolated-rows=disabled max-scan-range-rows=[0-9]*.*
 row_regex:.*     mem-estimate=[0-9.]*MB mem-reservation=[0-9.]*MB.*
 '     tuple-ids=0 row-size=263B cardinality=6001215'
 ''
@@ -51,7 +51,7 @@ row_regex:.*partitions=1/1 files=1 size=.*
 '     stored statistics:'
 row_regex:.*table: rows=1500000 size=.*
 '       columns: all'
-'     extrapolated-rows=disabled'
+row_regex:.*   extrapolated-rows=disabled max-scan-range-rows=[0-9]*.*
 row_regex:.*     mem-estimate=[0-9.]*MB mem-reservation=[0-9.]*MB.*
 '     tuple-ids=1 row-size=191B cardinality=1500000'
 ====

@@ -3213,7 +3213,7 @@ PLAN-ROOT SINK
 |  04:UNNEST [c.c_orders]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
 ====
 # IMPALA-6388: Verify that the order of the union operands does not impact the
 # number of hosts computation
@@ -3245,7 +3245,7 @@ Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB
 |       table: rows=7300 size=478.45KB
 |       partitions: 24/24 rows=7300
 |       columns: all
-|     extrapolated-rows=disabled
+|     extrapolated-rows=disabled max-scan-range-rows=310
 |     mem-estimate=128.00MB mem-reservation=32.00KB
 |     tuple-ids=1 row-size=4B cardinality=7300
 |
@@ -3255,7 +3255,7 @@ Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB
      table: rows=unavailable size=unavailable
      partitions: 0/0 rows=unavailable
      columns: all
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=0
    mem-estimate=0B mem-reservation=0B
    tuple-ids=0 row-size=4B cardinality=0
 ====
@@ -3289,7 +3289,7 @@ Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB
 |       table: rows=unavailable size=unavailable
 |       partitions: 0/0 rows=unavailable
 |       columns: all
-|     extrapolated-rows=disabled
+|     extrapolated-rows=disabled max-scan-range-rows=0
 |     mem-estimate=0B mem-reservation=0B
 |     tuple-ids=1 row-size=4B cardinality=0
 |
@@ -3299,7 +3299,7 @@ Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB
      table: rows=7300 size=478.45KB
      partitions: 24/24 rows=7300
      columns: all
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=4B cardinality=7300
 ====

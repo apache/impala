@@ -127,13 +127,13 @@ PLAN-ROOT SINK
 |  tuple-ids=0,1 row-size=8B cardinality=7300
 |
 |--01:SCAN HDFS [functional_parquet.alltypes b]
-|     partitions=24/24 files=24 size=189.70KB
+|     partitions=24/24 files=24 size=188.29KB
 |     runtime filters: RF000[bloom] -> b.int_col
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
 |       partitions: 0/24 rows=unavailable
 |       columns: unavailable
-|     extrapolated-rows=disabled
+|     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |     mem-estimate=16.00MB mem-reservation=16.00KB
 |     tuple-ids=1 row-size=4B cardinality=unavailable
 |

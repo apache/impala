@@ -621,6 +621,15 @@ RuntimeProfile::Counter* RuntimeProfile::GetCounter(const string& name) {
   return NULL;
 }
 
+RuntimeProfile::SummaryStatsCounter* RuntimeProfile::GetSummaryStatsCounter(
+    const string& name) {
+  lock_guard<SpinLock> l(summary_stats_map_lock_);
+  if (summary_stats_map_.find(name) != summary_stats_map_.end()) {
+    return summary_stats_map_[name];
+  }
+  return nullptr;
+}
+
 void RuntimeProfile::GetCounters(const string& name, vector<Counter*>* counters) {
   Counter* c = GetCounter(name);
   if (c != NULL) counters->push_back(c);

@@ -172,9 +172,6 @@ class TestQueriesTextTables(ImpalaTestSuite):
     vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/random', vector)
 
-  def test_mixed_format(self, vector):
-    self.run_test_case('QueryTest/mixed-format', vector)
-
   def test_values(self, vector):
     self.run_test_case('QueryTest/values', vector)
 

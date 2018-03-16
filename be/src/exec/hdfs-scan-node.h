@@ -64,9 +64,11 @@ class TPlanNode;
 /// ------------------
 /// The different scanner threads all allocate I/O buffers from the node's Buffer Pool
 /// client. The scan node ensures that enough reservation is available to start a
-/// scanner thread before launching each one with (see
-/// EnoughReservationForExtraThread()), after which the scanner thread is responsible
-/// for staying within the reservation handed off to it.
+/// scanner thread before launching each one with, after which the scanner thread must
+/// stay within the reservation handed off to it. Scanner threads can try to increase
+/// their reservation if desired (e.g. for scanning columnar formats like Parquet), but
+/// must be able to make progress within the initial reservation handed off from the scan
+/// node.
 ///
 /// TODO: Remove this class once the fragment-based multi-threaded execution is
 /// fully functional.
@@ -150,19 +152,15 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// the number of cores.
   int max_num_scanner_threads_;
 
-  /// Amount of the 'buffer_pool_client_' reservation that is not allocated to scanner
-  /// threads. Doled out to scanner threads when they are started and returned when
-  /// those threads no longer need it. Can be atomically incremented without holding
-  /// 'lock_' but 'lock_' is held when decrementing to ensure that the check for
-  /// reservation and the actual deduction are atomic with respect to other threads
-  /// trying to claim reservation.
-  AtomicInt64 spare_reservation_{0};
+  // Number of times scanner threads were not created because of reservation increase
+  // being denied.
+  RuntimeProfile::Counter* scanner_thread_reservations_denied_counter_ = nullptr;
 
   /// The wait time for fetching a row batch from the row batch queue.
-  RuntimeProfile::Counter* row_batches_get_timer_;
+  RuntimeProfile::Counter* row_batches_get_timer_ = nullptr;
 
   /// The wait time for enqueuing a row batch into the row batch queue.
-  RuntimeProfile::Counter* row_batches_put_timer_;
+  RuntimeProfile::Counter* row_batches_put_timer_ = nullptr;
 
   /// Tries to spin up as many scanner threads as the quota allows. Called explicitly
   /// (e.g., when adding new ranges) or when threads are available for this scan node.
@@ -174,34 +172,24 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// 'first_thread' is true if this was the first scanner thread to start and
   /// it acquired a "required" thread token from ThreadResourceMgr.
   /// The caller must have reserved 'scanner_thread_reservation' bytes of memory for
-  /// this thread with DeductReservationForScannerThread().
+  /// this thread. Before returning, this function releases the reservation with
+  /// ReturnReservationFromScannerThread().
   void ScannerThread(bool first_thread, int64_t scanner_thread_reservation);
 
   /// Process the entire scan range with a new scanner object. Executed in scanner
   /// thread. 'filter_ctxs' is a clone of the class-wide filter_ctxs_, used to filter rows
-  /// in this split.
+  /// in this split. 'scanner_thread_reservation' is an in/out argument that tracks the
+  /// total reservation from 'buffer_pool_client_' that is allotted for this thread's
+  /// use.
   Status ProcessSplit(const std::vector<FilterContext>& filter_ctxs,
       MemPool* expr_results_pool, io::ScanRange* scan_range,
-      int64_t scanner_thread_reservation) WARN_UNUSED_RESULT;
+      int64_t* scanner_thread_reservation) WARN_UNUSED_RESULT;
 
-  /// Return true if there is enough reservation to start an extra scanner thread.
-  /// Tries to increase reservation if enough is not already available in
-  /// 'spare_reservation_'. 'lock_' must be held via 'lock'
-  bool EnoughReservationForExtraThread(const boost::unique_lock<boost::mutex>& lock);
-
-  /// Deduct reservation to start a new scanner thread from 'spare_reservation_'. If
-  /// 'first_thread' is true, this is the first thread to be started and only the
-  /// minimum reservation is required to be available. Otherwise
-  /// EnoughReservationForExtra() thread must have returned true in the current
-  /// critical section so that 'ideal_scan_range_bytes_' is available for the extra
-  /// thread. Returns the amount deducted. 'lock_' must be held via 'lock'.
-  int64_t DeductReservationForScannerThread(const boost::unique_lock<boost::mutex>& lock,
-      bool first_thread);
-
-  /// Called by scanner thread to return or all of its reservation that is not needed.
-  void ReturnReservationFromScannerThread(int64_t bytes) {
-    spare_reservation_.Add(bytes);
-  }
+  /// Called by scanner thread to return some or all of its reservation that is not
+  /// needed. Always holds onto at least the minimum reservation to avoid violating the
+  /// invariants of ExecNode::buffer_pool_client_. 'lock_' must be held via 'lock'.
+  void ReturnReservationFromScannerThread(const boost::unique_lock<boost::mutex>& lock,
+      int64_t bytes);
 
   /// Checks for eos conditions and returns batches from materialized_row_batches_.
   Status GetNextInternal(RuntimeState* state, RowBatch* row_batch, bool* eos)

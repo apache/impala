@@ -118,6 +118,7 @@ void HdfsOrcScanner::ScanRangeInputStream::read(void* buf, uint64_t length,
     status = ExecEnv::GetInstance()->disk_io_mgr()->StartScanRange(
           scanner_->scan_node_->reader_context(), range, &needs_buffers);
     DCHECK(!status.ok() || !needs_buffers) << "Already provided a buffer";
+    if (status.ok()) status = range->GetNext(&io_buffer);
   }
   if (io_buffer != nullptr) range->ReturnBuffer(move(io_buffer));
   if (!status.ok()) throw ResourceError(status);

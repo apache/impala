@@ -123,16 +123,17 @@ class TestLowMemoryLimits(ImpalaTestSuite):
 @SkipIfLocal.mem_usage_different
 class TestTpchMemLimitError(TestLowMemoryLimits):
   # The mem limits that will be used.
-  MEM_IN_MB = [20, 140, 180, 220, 275, 450, 700]
+  MEM_IN_MB = [20, 50, 80, 130, 160, 200, 400]
 
   # Different values of mem limits and minimum mem limit (in MBs) each query is expected
   # to run without problem. These were determined using the query_runtime_info.json file
-  # produced by the stress test (i.e. concurrent_select.py).
-  MIN_MEM_FOR_TPCH = { 'Q1' : 125, 'Q2' : 125, 'Q3' : 112, 'Q4' : 137, 'Q5' : 137,\
-                       'Q6' : 25, 'Q7' : 200, 'Q8' : 125, 'Q9' : 200, 'Q10' : 162,\
-                       'Q11' : 112, 'Q12' : 150, 'Q13' : 125, 'Q14' : 125, 'Q15' : 125,\
-                       'Q16' : 137, 'Q17' : 137, 'Q18' : 196, 'Q19' : 112, 'Q20' : 162,\
-                       'Q21' : 300, 'Q22' : 125}
+  # produced by the stress test (i.e. concurrent_select.py) and extracted with
+  # tests/stress/extract_min_mem.py
+  MIN_MEM_FOR_TPCH = {'Q1': 55, 'Q2': 89, 'Q3': 80, 'Q4': 70, 'Q5': 99,
+                      'Q6': 48, 'Q7': 127, 'Q8': 111, 'Q9': 189, 'Q10': 108,
+                      'Q11': 76, 'Q12': 70, 'Q13': 71, 'Q14': 57, 'Q15': 83,
+                      'Q16': 71, 'Q17': 73, 'Q18': 153, 'Q19': 54, 'Q20': 128,
+                      'Q21': 147, 'Q22': 57}
 
   @classmethod
   def get_workload(self):

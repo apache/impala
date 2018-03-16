@@ -201,6 +201,10 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// that name.
   Counter* GetCounter(const std::string& name);
 
+  /// Gets the summary stats counter with 'name'. Returns NULL if there is no summary
+  /// stats counter with that name.
+  SummaryStatsCounter* GetSummaryStatsCounter(const std::string& name);
+
   /// Adds all counters with 'name' that are registered either in this or
   /// in any of the child profiles to 'counters'.
   void GetCounters(const std::string& name, std::vector<Counter*>* counters);

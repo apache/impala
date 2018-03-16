@@ -32,11 +32,11 @@ Per-Host Resources: mem-estimate=41.94MB mem-reservation=33.94MB runtime-filters
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=16.00MB mem-reservation=32.00KB
 |  01:SCAN HDFS [tpch_parquet.nation, RANDOM]
-|     partitions=1/1 files=1 size=2.74KB
+|     partitions=1/1 files=1 size=2.75KB
 |     stored statistics:
-|       table: rows=25 size=2.74KB
+|       table: rows=25 size=2.75KB
 |       columns: all
-|     extrapolated-rows=disabled
+|     extrapolated-rows=disabled max-scan-range-rows=25
 |     mem-estimate=16.00MB mem-reservation=32.00KB
 |     tuple-ids=1 row-size=117B cardinality=25
 |
@@ -46,7 +46,7 @@ Per-Host Resources: mem-estimate=41.94MB mem-reservation=33.94MB runtime-filters
    stored statistics:
      table: rows=150000 size=12.31MB
      columns: all
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=150000
    mem-estimate=24.00MB mem-reservation=16.00MB
    tuple-ids=0 row-size=238B cardinality=150000
 ====
@@ -56,8 +56,8 @@ select straight_join *
 from tpch_parquet.lineitem
     left join tpch_parquet.orders on l_orderkey = o_orderkey
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=166.00MB
-Per-Host Resource Estimates: Memory=428.41MB
+Max Per-Host Resource Reservation: Memory=110.00MB
+Per-Host Resource Estimates: Memory=420.41MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B
@@ -69,7 +69,7 @@ PLAN-ROOT SINK
 |  tuple-ids=0,1N row-size=454B cardinality=6001215
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=380.41MB mem-reservation=118.00MB
+Per-Host Resources: mem-estimate=380.41MB mem-reservation=86.00MB
 02:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
 |  hash predicates: l_orderkey = o_orderkey
 |  fk/pk conjuncts: l_orderkey = o_orderkey
@@ -81,23 +81,23 @@ Per-Host Resources: mem-estimate=380.41MB mem-reservation=118.00MB
 |  |  tuple-ids=1 row-size=191B cardinality=1500000
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-|  Per-Host Resources: mem-estimate=48.00MB mem-reservation=48.00MB
+|  Per-Host Resources: mem-estimate=40.00MB mem-reservation=24.00MB
 |  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
 |     partitions=1/1 files=2 size=54.07MB
 |     stored statistics:
 |       table: rows=1500000 size=54.07MB
 |       columns: all
-|     extrapolated-rows=disabled
-|     mem-estimate=48.00MB mem-reservation=48.00MB
+|     extrapolated-rows=disabled max-scan-range-rows=1177135
+|     mem-estimate=40.00MB mem-reservation=24.00MB
 |     tuple-ids=1 row-size=191B cardinality=1500000
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   partitions=1/1 files=3 size=193.72MB
+   partitions=1/1 files=3 size=193.71MB
    stored statistics:
-     table: rows=6001215 size=193.72MB
+     table: rows=6001215 size=193.71MB
      columns: all
-   extrapolated-rows=disabled
-   mem-estimate=80.00MB mem-reservation=72.00MB
+   extrapolated-rows=disabled max-scan-range-rows=2141802
+   mem-estimate=80.00MB mem-reservation=40.00MB
    tuple-ids=0 row-size=263B cardinality=6001215
 ====
 # Null-aware anti-join with medium build side.
@@ -105,7 +105,7 @@ Per-Host Resources: mem-estimate=380.41MB mem-reservation=118.00MB
 select * from tpch_parquet.lineitem
 where l_orderkey not in (select o_orderkey from tpch_parquet.orders)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=114.00MB
+Max Per-Host Resource Reservation: Memory=78.00MB
 Per-Host Resource Estimates: Memory=154.00MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -118,7 +118,7 @@ PLAN-ROOT SINK
 |  tuple-ids=0 row-size=263B cardinality=6001215
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=114.00MB mem-reservation=106.00MB
+Per-Host Resources: mem-estimate=114.00MB mem-reservation=74.00MB
 02:HASH JOIN [NULL AWARE LEFT ANTI JOIN, BROADCAST]
 |  hash predicates: l_orderkey = o_orderkey
 |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=1.00MB
@@ -129,23 +129,23 @@ Per-Host Resources: mem-estimate=114.00MB mem-reservation=106.00MB
 |  |  tuple-ids=1 row-size=8B cardinality=1500000
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-|  Per-Host Resources: mem-estimate=40.00MB mem-reservation=8.00MB
+|  Per-Host Resources: mem-estimate=40.00MB mem-reservation=4.00MB
 |  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
 |     partitions=1/1 files=2 size=54.07MB
 |     stored statistics:
 |       table: rows=1500000 size=54.07MB
 |       columns: all
-|     extrapolated-rows=disabled
-|     mem-estimate=40.00MB mem-reservation=8.00MB
+|     extrapolated-rows=disabled max-scan-range-rows=1177135
+|     mem-estimate=40.00MB mem-reservation=4.00MB
 |     tuple-ids=1 row-size=8B cardinality=1500000
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   partitions=1/1 files=3 size=193.72MB
+   partitions=1/1 files=3 size=193.71MB
    stored statistics:
-     table: rows=6001215 size=193.72MB
+     table: rows=6001215 size=193.71MB
      columns: all
-   extrapolated-rows=disabled
-   mem-estimate=80.00MB mem-reservation=72.00MB
+   extrapolated-rows=disabled max-scan-range-rows=2141802
+   mem-estimate=80.00MB mem-reservation=40.00MB
    tuple-ids=0 row-size=263B cardinality=6001215
 ====
 # Mid NDV aggregation.
@@ -156,7 +156,7 @@ from tpch_parquet.lineitem
 group by 1, 2
 having count(*) = 1
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=137.00MB
+Max Per-Host Resource Reservation: Memory=125.00MB
 Per-Host Resource Estimates: Memory=253.12MB
 
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -201,14 +201,14 @@ Per-Host Resources: mem-estimate=86.12MB mem-reservation=66.00MB runtime-filters
 |  |  tuple-ids=1 row-size=25B cardinality=1500000
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-|  Per-Host Resources: mem-estimate=40.00MB mem-reservation=16.00MB
+|  Per-Host Resources: mem-estimate=40.00MB mem-reservation=8.00MB
 |  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
 |     partitions=1/1 files=2 size=54.07MB
 |     stored statistics:
 |       table: rows=1500000 size=54.07MB
 |       columns: all
-|     extrapolated-rows=disabled
-|     mem-estimate=40.00MB mem-reservation=16.00MB
+|     extrapolated-rows=disabled max-scan-range-rows=1177135
+|     mem-estimate=40.00MB mem-reservation=8.00MB
 |     tuple-ids=1 row-size=25B cardinality=1500000
 |
 04:EXCHANGE [HASH(l_orderkey)]
@@ -216,15 +216,15 @@ Per-Host Resources: mem-estimate=86.12MB mem-reservation=66.00MB runtime-filters
 |  tuple-ids=0 row-size=8B cardinality=6001215
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=81.00MB mem-reservation=9.00MB runtime-filters-memory=1.00MB
+Per-Host Resources: mem-estimate=81.00MB mem-reservation=5.00MB runtime-filters-memory=1.00MB
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   partitions=1/1 files=3 size=193.72MB
+   partitions=1/1 files=3 size=193.71MB
    runtime filters: RF000[bloom] -> l_orderkey
    stored statistics:
-     table: rows=6001215 size=193.72MB
+     table: rows=6001215 size=193.71MB
      columns: all
-   extrapolated-rows=disabled
-   mem-estimate=80.00MB mem-reservation=8.00MB
+   extrapolated-rows=disabled max-scan-range-rows=2141802
+   mem-estimate=80.00MB mem-reservation=4.00MB
    tuple-ids=0 row-size=8B cardinality=6001215
 ====
 # High NDV aggregation.
@@ -232,7 +232,7 @@ Per-Host Resources: mem-estimate=81.00MB mem-reservation=9.00MB runtime-filters-
 select distinct *
 from tpch_parquet.lineitem
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=152.00MB
+Max Per-Host Resource Reservation: Memory=120.00MB
 Per-Host Resource Estimates: Memory=3.31GB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -256,19 +256,19 @@ Per-Host Resources: mem-estimate=1.62GB mem-reservation=46.00MB
 |  tuple-ids=1 row-size=263B cardinality=6001215
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=1.69GB mem-reservation=106.00MB
+Per-Host Resources: mem-estimate=1.69GB mem-reservation=74.00MB
 01:AGGREGATE [STREAMING]
 |  group by: tpch_parquet.lineitem.l_orderkey, tpch_parquet.lineitem.l_partkey, tpch_parquet.lineitem.l_suppkey, tpch_parquet.lineitem.l_linenumber, tpch_parquet.lineitem.l_quantity, tpch_parquet.lineitem.l_extendedprice, tpch_parquet.lineitem.l_discount, tpch_parquet.lineitem.l_tax, tpch_parquet.lineitem.l_returnflag, tpch_parquet.lineitem.l_linestatus, tpch_parquet.lineitem.l_shipdate, tpch_parquet.lineitem.l_commitdate, tpch_parquet.lineitem.l_receiptdate, tpch_parquet.lineitem.l_shipinstruct, tpch_parquet.lineitem.l_shipmode, tpch_parquet.lineitem.l_comment
 |  mem-estimate=1.62GB mem-reservation=34.00MB spill-buffer=2.00MB
 |  tuple-ids=1 row-size=263B cardinality=6001215
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   partitions=1/1 files=3 size=193.72MB
+   partitions=1/1 files=3 size=193.71MB
    stored statistics:
-     table: rows=6001215 size=193.72MB
+     table: rows=6001215 size=193.71MB
      columns: all
-   extrapolated-rows=disabled
-   mem-estimate=80.00MB mem-reservation=72.00MB
+   extrapolated-rows=disabled max-scan-range-rows=2141802
+   mem-estimate=80.00MB mem-reservation=40.00MB
    tuple-ids=0 row-size=263B cardinality=6001215
 ====
 # High NDV aggregation with string aggregation function.
@@ -277,7 +277,7 @@ select l_orderkey, l_partkey, group_concat(l_linestatus, ",")
 from tpch_parquet.lineitem
 group by 1, 2
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=106.00MB
+Max Per-Host Resource Reservation: Memory=98.00MB
 Per-Host Resource Estimates: Memory=482.91MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -302,7 +302,7 @@ Per-Host Resources: mem-estimate=201.46MB mem-reservation=48.00MB
 |  tuple-ids=1 row-size=32B cardinality=6001215
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=281.46MB mem-reservation=58.00MB
+Per-Host Resources: mem-estimate=281.46MB mem-reservation=50.00MB
 01:AGGREGATE [STREAMING]
 |  output: group_concat(l_linestatus, ',')
 |  group by: l_orderkey, l_partkey
@@ -310,12 +310,12 @@ Per-Host Resources: mem-estimate=281.46MB mem-reservation=58.00MB
 |  tuple-ids=1 row-size=32B cardinality=6001215
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   partitions=1/1 files=3 size=193.72MB
+   partitions=1/1 files=3 size=193.71MB
    stored statistics:
-     table: rows=6001215 size=193.72MB
+     table: rows=6001215 size=193.71MB
      columns: all
-   extrapolated-rows=disabled
-   mem-estimate=80.00MB mem-reservation=24.00MB
+   extrapolated-rows=disabled max-scan-range-rows=2141802
+   mem-estimate=80.00MB mem-reservation=16.00MB
    tuple-ids=0 row-size=33B cardinality=6001215
 ====
 # Sort + Analytic.
@@ -361,7 +361,7 @@ Per-Host Resources: mem-estimate=16.00MB mem-reservation=32.00KB
      table: rows=7300 size=478.45KB
      partitions: 24/24 rows=7300
      columns: all
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=16.00MB mem-reservation=32.00KB
    tuple-ids=0 row-size=5B cardinality=7300
 ====

@@ -407,9 +407,6 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Scan range for the metadata.
   const io::ScanRange* metadata_range_;
 
-  /// Reservation available for scanning columns, in bytes.
-  int64_t total_col_reservation_ = 0;
-
   /// Pool to copy dictionary page buffer into. This pool is shared across all the
   /// pages in a column chunk.
   boost::scoped_ptr<MemPool> dictionary_pool_;
@@ -573,13 +570,19 @@ class HdfsParquetScanner : public HdfsScanner {
   /// does not start any scan ranges.
   Status InitScalarColumns() WARN_UNUSED_RESULT;
 
-  /// Decides how to divide 'reservation_to_distribute' bytes of reservation between the
-  /// columns. Sets the reservation on each corresponding reader in 'column_readers'.
+  /// Decides how to divide stream_->reservation() between the columns. May increase
+  /// the reservation if more reservation would enable more efficient I/O for the
+  /// current columns being scanned. Sets the reservation on each corresponding reader
+  /// in 'column_readers'.
   Status DivideReservationBetweenColumns(
-      const std::vector<BaseScalarColumnReader*>& column_readers,
-      int64_t reservation_to_distribute);
+      const std::vector<BaseScalarColumnReader*>& column_readers);
 
-  /// Helper for DivideReservationBetweenColumns. Implements the core algorithm for
+  /// Compute the ideal reservation to scan a file with scan range lengths
+  /// 'col_range_lengths' given the min and max buffer size of the singleton DiskIoMgr
+  /// in ExecEnv.
+  static int64_t ComputeIdealReservation(const std::vector<int64_t>& col_range_lengths);
+
+  /// Helper for DivideReservationBetweenColumns(). Implements the core algorithm for
   /// dividing a reservation of 'reservation_to_distribute' bytes between columns with
   /// scan range lengths 'col_range_lengths' given a min and max buffer size. Returns
   /// a vector with an entry per column with the index into 'col_range_lengths' and the

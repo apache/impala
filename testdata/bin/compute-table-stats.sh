@@ -39,7 +39,7 @@ if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
   ${COMPUTE_STATS_SCRIPT} --db_name=functional_hbase\
     --table_names="alltypessmall,stringids"
 fi
-${COMPUTE_STATS_SCRIPT} --db_names=tpch,tpch_parquet \
+${COMPUTE_STATS_SCRIPT} --db_names=tpch,tpch_parquet,tpch_orc_def \
     --table_names=customer,lineitem,nation,orders,part,partsupp,region,supplier
 ${COMPUTE_STATS_SCRIPT} --db_names=tpch_nested_parquet,tpcds,tpcds_parquet
 

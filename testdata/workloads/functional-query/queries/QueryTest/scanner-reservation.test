@@ -1,0 +1,55 @@
+====
+---- QUERY
+# Scan moderately large file - scanner should try to increase reservation and succeed.
+select count(*)
+from tpch.customer
+---- TYPES
+BIGINT
+---- RESULTS
+150000
+---- RUNTIME_PROFILE
+row_regex:.*InitialRangeIdealReservation.*Avg: 24.00 MB.*Number of samples: 1.*
+row_regex:.*InitialRangeActualReservation.*Avg: 24.00 MB.*Number of samples: 1.*
+====
+---- QUERY
+# Scan moderately large file - scanner should try to increase reservation and fail.
+set debug_action="-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0";
+select count(*)
+from tpch.customer
+---- TYPES
+BIGINT
+---- RESULTS
+150000
+---- RUNTIME_PROFILE
+row_regex:.*InitialRangeIdealReservation.*Avg: 24.00 MB.*Number of samples: 1.*
+row_regex:.*InitialRangeActualReservation.*Avg: 8.00 MB.*Number of samples: 1.*
+====
+---- QUERY
+# Scan large Parquet column - scanner should try to increase reservation and succeed.
+select min(l_comment)
+from tpch_parquet.lineitem
+---- TYPES
+STRING
+---- RESULTS
+' Tiresias '
+---- RUNTIME_PROFILE
+row_regex:.*InitialRangeIdealReservation.*Avg: 128.00 KB.*
+row_regex:.*InitialRangeActualReservation.*Avg: 4.00 MB.*
+row_regex:.*ParquetRowGroupIdealReservation.*Avg: 24.00 MB.*
+row_regex:.*ParquetRowGroupActualReservation.*Avg: 24.00 MB.*
+====
+---- QUERY
+# Scan moderately large file - scanner should try to increase reservation and fail.
+set debug_action="-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0";
+select min(l_comment)
+from tpch_parquet.lineitem
+---- TYPES
+STRING
+---- RESULTS
+' Tiresias '
+---- RUNTIME_PROFILE
+row_regex:.*InitialRangeIdealReservation.*Avg: 128.00 KB.*
+row_regex:.*InitialRangeActualReservation.*Avg: 4.00 MB.*
+row_regex:.*ParquetRowGroupIdealReservation.*Avg: 24.00 MB.*
+row_regex:.*ParquetRowGroupActualReservation.*Avg: 4.00 MB.*
+====

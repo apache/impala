@@ -39,7 +39,8 @@ from tests.common.skip import (
     SkipIfLocal)
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
-    create_exec_option_dimension)
+    create_exec_option_dimension,
+    create_uncompressed_text_dimension)
 from tests.common.test_result_verifier import (
     parse_column_types,
     parse_column_labels,
@@ -121,6 +122,30 @@ class TestScannersAllTableFormatsWithLimit(ImpalaTestSuite):
       assert len(result.data) == limit
       # IMPALA-3337: The error log should be empty.
       assert not result.log
+
+class TestScannersMixedTableFormats(ImpalaTestSuite):
+  BATCH_SIZES = [0, 1, 16]
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestScannersMixedTableFormats, cls).add_test_dimensions()
+    # Only run with a single dimension format, since the table includes mixed formats.
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('batch_size', *TestScannersAllTableFormats.BATCH_SIZES))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('debug_action', *DEBUG_ACTION_DIMS))
+
+  def test_mixed_format(self, vector):
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
+    new_vector.get_value('exec_option')['debug_action'] = vector.get_value('debug_action')
+    self.run_test_case('QueryTest/mixed-format', new_vector)
 
 # Test case to verify the scanners work properly when the table metadata (specifically the
 # number of columns in the table) does not match the number of columns in the data file.
@@ -1017,3 +1042,20 @@ class TestOrc(ImpalaTestSuite):
     self.client.execute("alter table %s.mismatch_decimals recover partitions" % unique_database)
 
     self.run_test_case('DataErrorsTest/orc-type-checks', vector, unique_database)
+
+class TestScannerReservation(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestScannerReservation, cls).add_test_dimensions()
+    # Only run with a single dimension - all queries are format-specific and
+    # reference tpch or tpch_parquet directly.
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
+
+  def test_scanners(self, vector):
+    self.run_test_case('QueryTest/scanner-reservation', vector)
+

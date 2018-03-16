@@ -66,7 +66,6 @@ const int UNEXPECTED_REMOTE_BYTES_WARN_THRESHOLD = 64 * 1024 * 1024;
 HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
     : ScanNode(pool, tnode, descs),
-      ideal_scan_range_reservation_(tnode.hdfs_scan_node.ideal_scan_range_reservation),
       min_max_tuple_id_(tnode.hdfs_scan_node.__isset.min_max_tuple_id ?
           tnode.hdfs_scan_node.min_max_tuple_id : -1),
       skip_header_line_count_(tnode.hdfs_scan_node.__isset.skip_header_line_count ?
@@ -83,7 +82,6 @@ HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const TPlanNode& tnode,
           &tnode.hdfs_scan_node.dictionary_filter_conjuncts : nullptr),
       disks_accessed_bitmap_(TUnit::UNIT, 0),
       active_hdfs_read_thread_counter_(TUnit::UNIT, 0) {
-  DCHECK_GE(ideal_scan_range_reservation_, resource_profile_.min_reservation);
 }
 
 HdfsScanNodeBase::~HdfsScanNodeBase() {
@@ -340,16 +338,6 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
   }
 
   RETURN_IF_ERROR(ClaimBufferReservation(state));
-  // We got the minimum reservation. Now try to get ideal reservation.
-  if (resource_profile_.min_reservation != ideal_scan_range_reservation_) {
-    bool increased = buffer_pool_client_.IncreaseReservation(
-        ideal_scan_range_reservation_ - resource_profile_.min_reservation);
-    VLOG_FILE << "Increasing reservation from minimum "
-              << resource_profile_.min_reservation << "B to ideal "
-              << ideal_scan_range_reservation_ << "B "
-              << (increased ? "succeeded" : "failed");
-  }
-
   reader_context_ = runtime_state_->io_mgr()->RegisterContext();
 
   // Initialize HdfsScanNode specific counters
@@ -381,6 +369,11 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
       AVERAGE_SCANNER_THREAD_CONCURRENCY, &active_scanner_thread_counter_);
   average_hdfs_read_thread_concurrency_ = runtime_profile()->AddSamplingCounter(
       AVERAGE_HDFS_READ_THREAD_CONCURRENCY, &active_hdfs_read_thread_counter_);
+
+  initial_range_ideal_reservation_stats_ = ADD_SUMMARY_STATS_COUNTER(runtime_profile(),
+      "InitialRangeIdealReservation", TUnit::BYTES);
+  initial_range_actual_reservation_stats_ = ADD_SUMMARY_STATS_COUNTER(runtime_profile(),
+      "InitialRangeActualReservation", TUnit::BYTES);
 
   bytes_read_local_ = ADD_COUNTER(runtime_profile(), "BytesReadLocal",
       TUnit::BYTES);
@@ -488,6 +481,7 @@ Status HdfsScanNodeBase::IssueInitialScanRanges(RuntimeState* state) {
         break;
       case THdfsFileFormat::ORC:
         RETURN_IF_ERROR(HdfsOrcScanner::IssueInitialRanges(this, entry.second));
+        break;
       default:
         DCHECK(false) << "Unexpected file type " << entry.first;
     }
@@ -510,6 +504,51 @@ bool HdfsScanNodeBase::FilePassesFilterPredicates(
     return false;
   }
   return true;
+}
+
+Status HdfsScanNodeBase::StartNextScanRange(int64_t* reservation,
+    ScanRange** scan_range) {
+  DiskIoMgr* io_mgr = ExecEnv::GetInstance()->disk_io_mgr();
+  bool needs_buffers;
+  RETURN_IF_ERROR(io_mgr->GetNextUnstartedRange(
+        reader_context_.get(), scan_range, &needs_buffers));
+  if (*scan_range == nullptr) return Status::OK();
+  if (needs_buffers) {
+    // Check if we should increase our reservation to read this range more efficiently.
+    // E.g. if we are scanning a large text file, we might want extra I/O buffers to
+    // improve throughput. Note that if this is a columnar format like Parquet,
+    // '*scan_range' is the small footer range only so we won't request an increase.
+    int64_t ideal_scan_range_reservation =
+        io_mgr->ComputeIdealBufferReservation((*scan_range)->len());
+    *reservation = IncreaseReservationIncrementally(*reservation, ideal_scan_range_reservation);
+    initial_range_ideal_reservation_stats_->UpdateCounter(ideal_scan_range_reservation);
+    initial_range_actual_reservation_stats_->UpdateCounter(*reservation);
+    RETURN_IF_ERROR(io_mgr->AllocateBuffersForRange(
+        reader_context_.get(), &buffer_pool_client_, *scan_range, *reservation));
+  }
+  return Status::OK();
+}
+
+int64_t HdfsScanNodeBase::IncreaseReservationIncrementally(int64_t curr_reservation,
+      int64_t ideal_reservation) {
+  DiskIoMgr* io_mgr = ExecEnv::GetInstance()->disk_io_mgr();
+  // Check if we could use at least one more max-sized I/O buffer for this range. Don't
+  // increase in smaller increments since we may not be able to use additional smaller
+  // buffers.
+  while (curr_reservation < ideal_reservation) {
+    // Increase to the next I/O buffer multiple or to the ideal reservation.
+    int64_t target = min(ideal_reservation,
+        BitUtil::RoundUpToPowerOf2(curr_reservation + 1, io_mgr->max_buffer_size()));
+    DCHECK_LT(curr_reservation, target);
+    bool increased = buffer_pool_client_.IncreaseReservation(target - curr_reservation);
+    VLOG_FILE << "Increasing reservation from "
+              << PrettyPrinter::PrintBytes(curr_reservation) << " to "
+              << PrettyPrinter::PrintBytes(target) << " "
+              << (increased ? "succeeded" : "failed");
+    if (!increased) break;
+    curr_reservation = target;
+  }
+  return curr_reservation;
 }
 
 ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,

@@ -505,6 +505,20 @@ vector<int64_t> DiskIoMgr::ChooseBufferSizes(int64_t scan_range_len, int64_t max
   return buffer_sizes;
 }
 
+int64_t DiskIoMgr::ComputeIdealBufferReservation(int64_t scan_range_len) {
+  if (scan_range_len < max_buffer_size_) {
+    // Round up to nearest power-of-two buffer size - ideally we should do a single read
+    // I/O for this range.
+    return max(min_buffer_size_, BitUtil::RoundUpToPowerOfTwo(scan_range_len));
+  } else {
+    // Round up to the nearest max-sized I/O buffer, capped by
+    // IDEAL_MAX_SIZED_BUFFERS_PER_SCAN_RANGE - we should do one or more max-sized read
+    // I/Os for this range.
+    return min(IDEAL_MAX_SIZED_BUFFERS_PER_SCAN_RANGE * max_buffer_size_,
+            BitUtil::RoundUpToPowerOf2(scan_range_len, max_buffer_size_));
+  }
+}
+
 // This function gets the next RequestRange to work on for this disk. It checks for
 // cancellation and
 // a) Updates ready_to_start_ranges if there are no scan ranges queued for this disk.
