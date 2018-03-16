@@ -337,6 +337,10 @@ CHECK_LIBRARY_EXISTS("krb5" krb5_is_config_principal
 CHECK_LIBRARY_EXISTS("krb5" krb5_get_init_creds_opt_set_out_ccache
   ${KERBEROS_LIBRARY} HAVE_KRB5_GET_INIT_CREDS_OPT_SET_OUT_CCACHE)
 
+# Used to check if we're using krb-1.6 or lower.
+CHECK_LIBRARY_EXISTS("krb5" krb5_get_init_creds_opt_set_fast_ccache_name
+  ${KERBEROS_LIBRARY} HAVE_KRB5_GET_INIT_CREDS_OPT_SET_FAST_CCACHE_NAME)
+
 # This is a list of impala library dependencies. Individual libraries
 # must not specify library dependencies in their own CMakeLists.txt file.
 # Enclose the impala libraries in -Wl,--start-group and -Wl,--end-group

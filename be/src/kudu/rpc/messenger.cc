@@ -54,6 +54,8 @@
 #include "kudu/util/threadpool.h"
 #include "kudu/util/trace.h"
 
+#include "common/config.h"
+
 using std::string;
 using std::shared_ptr;
 using std::make_shared;
@@ -274,9 +276,20 @@ Status Messenger::AddAcceptorPool(const Sockaddr &accept_addr,
   // Before listening, if we expect to require Kerberos, we want to verify
   // that everything is set up correctly. This way we'll generate errors on
   // startup rather than later on when we first receive a client connection.
+  // We omit calling PreflightCheckGSSAPI() if we detect a kerberos version < krb-1.7,
+  // since SLES11 has krb-1.6, which has a bug that returns an error for empty
+  // 'clientin' buffers to sasl_server_start(). Also, since this is only done to fail
+  // fast, we're not losing functionality or security by omitting this. We'll fail in
+  // the negotiation phase instead.
+  // TODO: Remove ifdef in Impala 3.0 when we'll stop supporting older OSes.
   if (!keytab_file_.empty()) {
+#ifdef HAVE_KRB5_GET_INIT_CREDS_OPT_SET_FAST_CCACHE_NAME
     RETURN_NOT_OK_PREPEND(ServerNegotiation::PreflightCheckGSSAPI(sasl_proto_name()),
                           "GSSAPI/Kerberos not properly configured");
+#else
+    LOG(WARNING) << "Omitting Kerberos pre-flight check. Connection negotiations may fail"
+                 << " if there is a kerberos misconfiguration.";
+#endif
   }
 
   Socket sock;
