@@ -255,7 +255,7 @@ void KrpcDataStreamMgr::DeserializeThreadFn(int thread_id, const DeserializeTask
     recvr = FindRecvr(task.finst_id, task.dest_node_id, &already_unregistered);
     DCHECK(recvr != nullptr || already_unregistered);
   }
-  if (recvr != nullptr) recvr->DequeueDeferredRpc(task.sender_id);
+  if (recvr != nullptr) recvr->ProcessDeferredRpc(task.sender_id);
 }
 
 void KrpcDataStreamMgr::CloseSender(const EndDataStreamRequestPB* request,

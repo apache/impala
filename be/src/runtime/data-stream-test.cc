@@ -746,7 +746,6 @@ TEST_P(DataStreamTest, UnknownSenderSmallResult) {
   StartSender(TPartitionType::UNPARTITIONED, TOTAL_DATA_SIZE + 1024);
   JoinSenders();
   EXPECT_EQ(sender_info_[0].status.code(), TErrorCode::DATASTREAM_SENDER_TIMEOUT);
-  EXPECT_EQ(sender_info_[0].num_bytes_sent, 0);
 }
 
 TEST_P(DataStreamTest, UnknownSenderLargeResult) {
@@ -756,7 +755,6 @@ TEST_P(DataStreamTest, UnknownSenderLargeResult) {
   StartSender();
   JoinSenders();
   EXPECT_EQ(sender_info_[0].status.code(), TErrorCode::DATASTREAM_SENDER_TIMEOUT);
-  EXPECT_EQ(sender_info_[0].num_bytes_sent, 0);
 }
 
 TEST_P(DataStreamTest, Cancel) {

@@ -62,6 +62,11 @@ class DataStreamService : public DataStreamServiceIf {
   static void RespondAndReleaseRpc(const Status& status, ResponsePBType* response,
       kudu::rpc::RpcContext* ctx, MemTracker* mem_tracker);
 
+  /// Respond to a RPC passed in 'response'/'ctx' with 'status'. Takes ownership of 'ctx'.
+  template<typename ResponsePBType>
+  static void RespondRpc(const Status& status, ResponsePBType* response,
+      kudu::rpc::RpcContext* ctx);
+
   MemTracker* mem_tracker() { return mem_tracker_.get(); }
 
  private:

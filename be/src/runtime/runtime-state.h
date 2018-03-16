@@ -353,7 +353,11 @@ class RuntimeState {
   /// Total time waiting in storage (across all threads)
   RuntimeProfile::Counter* total_storage_wait_timer_;
 
-  /// Total time spent sending over the network (across all threads)
+  /// Total time spent waiting for RPCs to complete. This time is a combination of:
+  /// - network time of sending the RPC payload to the destination
+  /// - processing and queuing time in the destination
+  /// - network time of sending the RPC response to the originating node
+  /// TODO: rename this counter and account for the 3 components above. IMPALA-6705.
   RuntimeProfile::Counter* total_network_send_timer_;
 
   /// Total time spent receiving over the network (across all threads)

@@ -49,6 +49,9 @@ message TransmitDataRequestPB {
 message TransmitDataResponsePB {
   // Status::OK() on success; Error status on failure.
   optional StatusPB status = 1;
+
+  // Latency for response in the receiving daemon in nanoseconds.
+  optional int64 receiver_latency_ns = 2;
 }
 
 // All fields are required in V1.
@@ -66,6 +69,9 @@ message EndDataStreamRequestPB {
 // All fields are required in V1.
 message EndDataStreamResponsePB {
   optional StatusPB status = 1;
+
+  // Latency for response in the receiving daemon in nanoseconds.
+  optional int64 receiver_latency_ns = 2;
 }
 
 // Handles data transmission between fragment instances.
