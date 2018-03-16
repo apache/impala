@@ -157,20 +157,28 @@ class KrpcDataStreamSender : public DataSink {
   /// Total number of times RPC fails or the remote responds with a non-retryable error.
   RuntimeProfile::Counter* rpc_failure_counter_ = nullptr;
 
-  /// Total number of bytes sent.
+  /// Total number of bytes sent. Updated on RPC completion.
   RuntimeProfile::Counter* bytes_sent_counter_ = nullptr;
+
+  /// Time series of number of bytes sent, samples bytes_sent_counter_.
+  RuntimeProfile::TimeSeriesCounter* bytes_sent_time_series_counter_ = nullptr;
 
   /// Total number of EOS sent.
   RuntimeProfile::Counter* eos_sent_counter_ = nullptr;
 
-  /// Total number of bytes of the row batches before compression.
+  /// Total number of bytes of row batches before compression.
   RuntimeProfile::Counter* uncompressed_bytes_counter_ = nullptr;
 
   /// Total number of rows sent.
   RuntimeProfile::Counter* total_sent_rows_counter_ = nullptr;
 
-  /// Throughput per total time spent in sender
-  RuntimeProfile::Counter* overall_throughput_ = nullptr;
+  /// Approximate network throughput for sending row batches.
+  RuntimeProfile::Counter* network_throughput_counter_ = nullptr;
+
+  /// Aggregated time spent in network (including queuing time in KRPC transfer queue)
+  /// for transmitting the RPC requests and receiving the responses. Used for computing
+  /// 'network_throughput_'. Not too meaningful by itself so not shown in profile.
+  RuntimeProfile::Counter total_network_timer_;
 
   /// Identifier of the destination plan node.
   PlanNodeId dest_node_id_;

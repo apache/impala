@@ -142,8 +142,6 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   // This function blocks until the EOS RPC is complete.
   Status FlushAndSendEos(RuntimeState* state);
 
-  int64_t num_data_bytes_sent() const { return num_data_bytes_sent_; }
-
   // The type for a RPC worker function.
   typedef boost::function<Status()> DoRpcFn;
 
@@ -159,9 +157,6 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   const TNetworkAddress address_;
   const TUniqueId fragment_instance_id_;
   const PlanNodeId dest_node_id_;
-
-  // Number of bytes of all serialized row batches sent successfully.
-  int64_t num_data_bytes_sent_ = 0;
 
   // The row batch for accumulating rows copied from AddRow().
   // Only used if the partitioning scheme is "KUDU" or "HASH_PARTITIONED".
@@ -210,6 +205,9 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
 
   // The pointer to the current serialized row batch being sent.
   const OutboundRowBatch* rpc_in_flight_batch_ = nullptr;
+
+  // The monotonic time in nanoseconds of when current RPC started.
+  int64_t rpc_start_time_ns_ = 0;
 
   // True if there is an in-flight RPC.
   bool rpc_in_flight_ = false;
@@ -311,12 +309,14 @@ void KrpcDataStreamSender::Channel::MarkDone(const Status& status) {
   rpc_in_flight_ = false;
   rpc_in_flight_batch_ = nullptr;
   rpc_done_cv_.notify_one();
+  rpc_start_time_ns_ = 0;
 }
 
 Status KrpcDataStreamSender::Channel::WaitForRpc(std::unique_lock<SpinLock>* lock) {
   DCHECK(lock != nullptr);
   DCHECK(lock->owns_lock());
 
+  SCOPED_TIMER(parent_->profile()->inactive_timer());
   SCOPED_TIMER(parent_->state_->total_network_send_timer());
 
   // Wait for in-flight RPCs to complete unless the parent sender is closed or cancelled.
@@ -379,17 +379,20 @@ void KrpcDataStreamSender::Channel::HandleFailedRPC(const DoRpcFn& rpc_fn,
 }
 
 void KrpcDataStreamSender::Channel::TransmitDataCompleteCb() {
+  DCHECK_NE(rpc_start_time_ns_, 0);
+  int64_t total_time = MonotonicNanos() - rpc_start_time_ns_;
   std::unique_lock<SpinLock> l(lock_);
   DCHECK(rpc_in_flight_);
   const kudu::Status controller_status = rpc_controller_.status();
   if (LIKELY(controller_status.ok())) {
+    DCHECK(rpc_in_flight_batch_ != nullptr);
+    COUNTER_ADD(parent_->bytes_sent_counter_,
+        RowBatch::GetSerializedSize(*rpc_in_flight_batch_));
+    int64_t network_time = total_time - resp_.receiver_latency_ns();
+    COUNTER_ADD(&parent_->total_network_timer_, network_time);
     Status rpc_status = Status::OK();
     int32_t status_code = resp_.status().status_code();
-    if (LIKELY(status_code == TErrorCode::OK)) {
-      DCHECK(rpc_in_flight_batch_ != nullptr);
-      num_data_bytes_sent_ += RowBatch::GetSerializedSize(*rpc_in_flight_batch_);
-      VLOG_ROW << "incremented #data_bytes_sent=" << num_data_bytes_sent_;
-    } else if (status_code == TErrorCode::DATASTREAM_RECVR_CLOSED) {
+    if (status_code == TErrorCode::DATASTREAM_RECVR_CLOSED) {
       remote_recvr_closed_ = true;
     } else {
       rpc_status = Status(resp_.status());
@@ -429,6 +432,7 @@ Status KrpcDataStreamSender::Channel::DoTransmitDataRpc() {
   req.set_tuple_offsets_sidecar_idx(sidecar_idx);
 
   // Add 'tuple_data_' as sidecar.
+  rpc_start_time_ns_ = MonotonicNanos();
   KUDU_RETURN_IF_ERROR(rpc_controller_.AddOutboundSidecar(
       RpcSidecar::FromSlice(rpc_in_flight_batch_->TupleDataAsSlice()), &sidecar_idx),
       "Unable to add tuple data to sidecar");
@@ -572,6 +576,7 @@ KrpcDataStreamSender::KrpcDataStreamSender(int sender_id, const RowDescriptor* r
     sender_id_(sender_id),
     partition_type_(sink.output_partition.type),
     per_channel_buffer_size_(per_channel_buffer_size),
+    total_network_timer_(TUnit::TIME_NS, 0),
     dest_node_id_(sink.dest_node_id),
     next_unknown_partition_(0) {
   DCHECK_GT(destinations.size(), 0);
@@ -605,6 +610,7 @@ KrpcDataStreamSender::~KrpcDataStreamSender() {
 
 Status KrpcDataStreamSender::Init(const vector<TExpr>& thrift_output_exprs,
     const TDataSink& tsink, RuntimeState* state) {
+  SCOPED_TIMER(profile_->total_time_counter());
   DCHECK(tsink.__isset.stream_sink);
   if (partition_type_ == TPartitionType::HASH_PARTITIONED ||
       partition_type_ == TPartitionType::KUDU) {
@@ -625,15 +631,17 @@ Status KrpcDataStreamSender::Prepare(
   serialize_batch_timer_ = ADD_TIMER(profile(), "SerializeBatchTime");
   rpc_retry_counter_ = ADD_COUNTER(profile(), "RpcRetry", TUnit::UNIT);
   rpc_failure_counter_ = ADD_COUNTER(profile(), "RpcFailure", TUnit::UNIT);
-  bytes_sent_counter_ = ADD_COUNTER(profile(), "BytesSent", TUnit::BYTES);
+  bytes_sent_counter_ = ADD_COUNTER(profile(), "TotalBytesSent", TUnit::BYTES);
+  bytes_sent_time_series_counter_ =
+      ADD_TIME_SERIES_COUNTER(profile(), "BytesSent", bytes_sent_counter_);
+  network_throughput_counter_ =
+      profile()->AddDerivedCounter("NetworkThroughput", TUnit::BYTES_PER_SECOND,
+          bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_sent_counter_,
+              &total_network_timer_));
   eos_sent_counter_ = ADD_COUNTER(profile(), "EosSent", TUnit::UNIT);
   uncompressed_bytes_counter_ =
       ADD_COUNTER(profile(), "UncompressedRowBatchSize", TUnit::BYTES);
-  total_sent_rows_counter_= ADD_COUNTER(profile(), "RowsReturned", TUnit::UNIT);
-  overall_throughput_ =
-      profile()->AddDerivedCounter("OverallThroughput", TUnit::BYTES_PER_SECOND,
-           bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_sent_counter_,
-                         profile()->total_time_counter()));
+  total_sent_rows_counter_= ADD_COUNTER(profile(), "RowsSent", TUnit::UNIT);
   for (int i = 0; i < channels_.size(); ++i) {
     RETURN_IF_ERROR(channels_[i]->Init(state));
   }
@@ -641,17 +649,19 @@ Status KrpcDataStreamSender::Prepare(
 }
 
 Status KrpcDataStreamSender::Open(RuntimeState* state) {
+  SCOPED_TIMER(profile_->total_time_counter());
   return ScalarExprEvaluator::Open(partition_expr_evals_, state);
 }
 
 Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
+  SCOPED_TIMER(profile()->total_time_counter());
   DCHECK(!closed_);
   DCHECK(!flushed_);
 
   if (batch->num_rows() == 0) return Status::OK();
   if (partition_type_ == TPartitionType::UNPARTITIONED) {
     OutboundRowBatch* outbound_batch = &outbound_batches_[next_batch_idx_];
-    RETURN_IF_ERROR(SerializeBatch(batch, outbound_batch));
+    RETURN_IF_ERROR(SerializeBatch(batch, outbound_batch, channels_.size()));
     // TransmitData() will block if there are still in-flight rpcs (and those will
     // reference the previously written serialized batch).
     for (int i = 0; i < channels_.size(); ++i) {
@@ -736,6 +746,7 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
 }
 
 Status KrpcDataStreamSender::FlushFinal(RuntimeState* state) {
+  SCOPED_TIMER(profile()->total_time_counter());
   DCHECK(!flushed_);
   DCHECK(!closed_);
   flushed_ = true;
@@ -749,12 +760,14 @@ Status KrpcDataStreamSender::FlushFinal(RuntimeState* state) {
 }
 
 void KrpcDataStreamSender::Close(RuntimeState* state) {
+  SCOPED_TIMER(profile()->total_time_counter());
   if (closed_) return;
   for (int i = 0; i < channels_.size(); ++i) {
     channels_[i]->Teardown(state);
   }
   ScalarExprEvaluator::Close(partition_expr_evals_, state);
   ScalarExpr::Close(partition_exprs_);
+  profile()->StopPeriodicCounters();
   DataSink::Close(state);
 }
 
@@ -762,25 +775,16 @@ Status KrpcDataStreamSender::SerializeBatch(
     RowBatch* src, OutboundRowBatch* dest, int num_receivers) {
   VLOG_ROW << "serializing " << src->num_rows() << " rows";
   {
-    SCOPED_TIMER(profile_->total_time_counter());
     SCOPED_TIMER(serialize_batch_timer_);
     RETURN_IF_ERROR(src->Serialize(dest));
-    int64_t bytes = RowBatch::GetSerializedSize(*dest);
     int64_t uncompressed_bytes = RowBatch::GetDeserializedSize(*dest);
-    COUNTER_ADD(bytes_sent_counter_, bytes * num_receivers);
     COUNTER_ADD(uncompressed_bytes_counter_, uncompressed_bytes * num_receivers);
   }
   return Status::OK();
 }
 
 int64_t KrpcDataStreamSender::GetNumDataBytesSent() const {
-  // TODO: do we need synchronization here or are reads & writes to 8-byte ints
-  // atomic?
-  int64_t result = 0;
-  for (int i = 0; i < channels_.size(); ++i) {
-    result += channels_[i]->num_data_bytes_sent();
-  }
-  return result;
+  return bytes_sent_counter_->value();
 }
 
 } // namespace impala

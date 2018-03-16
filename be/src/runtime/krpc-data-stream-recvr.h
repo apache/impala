@@ -145,7 +145,7 @@ class KrpcDataStreamRecvr : public DataStreamRecvrBase {
   /// identified by 'sender_id'. If is_merging_ is false, it always defaults to
   /// queue 0; If is_merging_ is true, the sender queue is identified by 'sender_id_'.
   /// Called from KrpcDataStreamMgr's deserialization threads only.
-  void DequeueDeferredRpc(int sender_id);
+  void ProcessDeferredRpc(int sender_id);
 
   /// Takes over the RPC state 'ctx' of an early sender for deferred processing and
   /// kicks off a deserialization task to process it asynchronously. This makes sure
@@ -166,6 +166,9 @@ class KrpcDataStreamRecvr : public DataStreamRecvrBase {
   bool ExceedsLimit(int64_t batch_size) {
     return num_buffered_bytes_.Load() + batch_size > total_buffer_limit_;
   }
+
+  /// Return the current number of deferred RPCs.
+  int64_t num_deferred_rpcs() const { return num_deferred_rpcs_.Load(); }
 
   /// KrpcDataStreamMgr instance used to create this recvr. Not owned.
   KrpcDataStreamMgr* mgr_;
@@ -190,8 +193,11 @@ class KrpcDataStreamRecvr : public DataStreamRecvrBase {
   /// from the fragment execution thread.
   bool closed_;
 
-  /// total number of bytes held across all sender queues.
+  /// Current number of bytes held across all sender queues.
   AtomicInt32 num_buffered_bytes_;
+
+  /// Current number of outstanding deferred RPCs across all sender queues.
+  AtomicInt64 num_deferred_rpcs_;
 
   /// Memtracker for payloads of deferred Rpcs in the sender queue(s). This must be
   /// accessed with a sender queue's lock held to avoid race with Close() of the queue.
@@ -217,60 +223,79 @@ class KrpcDataStreamRecvr : public DataStreamRecvrBase {
   ObjectPool pool_;
 
   /// Runtime profile of the owning exchange node. It's the parent of
-  /// 'recvr_side_profile_' and 'sender_side_profile_'. Not owned.
+  /// 'dequeue_profile_' and 'enqueue_profile_'. Not owned.
   RuntimeProfile* profile_;
 
   /// Maintain two child profiles - receiver side measurements (from the GetBatch() path),
   /// and sender side measurements (from AddBatch()). These two profiles own all counters
   /// below unless otherwise noted. These profiles are owned by the receiver and placed
-  /// in 'pool_'. 'recvr_side_profile_' and 'sender_side_profile_' must outlive 'profile_'
+  /// in 'pool_'. 'dequeue_profile_' and 'enqueue_profile_' must outlive 'profile_'
   /// to prevent accessing freed memory during top-down traversal of 'profile_'. The
   /// receiver is co-owned by the exchange node and the data stream manager so these two
   /// profiles should outlive the exchange node which owns 'profile_'.
-  RuntimeProfile* recvr_side_profile_;
-  RuntimeProfile* sender_side_profile_;
+  RuntimeProfile* dequeue_profile_;
+  RuntimeProfile* enqueue_profile_;
 
-  /// Number of bytes received but not necessarily enqueued.
+  /// Pointer to profile's inactive timer. Not owned.
+  /// Not directly shown in the profile and thus data_wait_time_ below. Used for
+  /// subtracting the wait time from the total time spent in exchange node.
+  RuntimeProfile::Counter* inactive_timer_;
+
+  /// ------------------------------------------------------------------------------------
+  /// Following counters belong to 'dequeue_profile_'.
+
+  /// Number of bytes of deserialized row batches dequeued.
+  RuntimeProfile::Counter* bytes_dequeued_counter_;
+
+  /// Time series of bytes of deserialized row batches, samples 'bytes_dequeued_counter_'.
+  RuntimeProfile::TimeSeriesCounter* bytes_dequeued_time_series_counter_;
+
+  /// Total wall-clock time spent in SenderQueue::GetBatch().
+  RuntimeProfile::Counter* queue_get_batch_timer_;
+
+  /// Total wall-clock time spent waiting for data to be available in queues.
+  RuntimeProfile::Counter* data_wait_timer_;
+
+  /// Wall-clock time spent waiting for the first batch arrival across all queues.
+  RuntimeProfile::Counter* first_batch_wait_total_timer_;
+
+  /// ------------------------------------------------------------------------------------
+  /// Following counters belong to 'enqueue_profile_'.
+
+  /// Total number of bytes of serialized row batches received.
   RuntimeProfile::Counter* bytes_received_counter_;
 
-  /// Time series of number of bytes received, samples bytes_received_counter_.
+  /// Time series of number of bytes received, samples 'bytes_received_counter_'.
   RuntimeProfile::TimeSeriesCounter* bytes_received_time_series_counter_;
 
   /// Total wall-clock time spent deserializing row batches.
   RuntimeProfile::Counter* deserialize_row_batch_timer_;
 
-  /// Number of senders which arrive before the receiver is ready.
-  RuntimeProfile::Counter* num_early_senders_;
-
-  /// Time spent waiting until the first batch arrives across all queues.
-  /// TODO: Turn this into a wall-clock timer.
-  RuntimeProfile::Counter* first_batch_wait_total_timer_;
-
-  /// Total number of batches which arrived at this receiver but not necessarily received
-  /// or enqueued. An arrived row batch will eventually be received if there is no error
-  /// unpacking the RPC payload and the receiving stream is not cancelled.
-  RuntimeProfile::Counter* num_arrived_batches_;
-
-  /// Total number of batches received but not necessarily enqueued.
-  RuntimeProfile::Counter* num_received_batches_;
-
-  /// Total number of batches received and enqueued into the row batch queue.
-  RuntimeProfile::Counter* num_enqueued_batches_;
-
-  /// Total number of batches deferred because of early senders or full row batch queue.
-  RuntimeProfile::Counter* num_deferred_batches_;
-
   /// Total number of EOS received.
-  RuntimeProfile::Counter* num_eos_received_;
+  RuntimeProfile::Counter* total_eos_received_counter_;
 
-  /// Total wall-clock time spent waiting for data to arrive in the recv buffer.
-  RuntimeProfile::Counter* data_arrival_timer_;
+  /// Total number of senders which arrive before the receiver is ready.
+  RuntimeProfile::Counter* total_early_senders_counter_;
 
-  /// Pointer to profile's inactive timer. Not owned.
-  RuntimeProfile::Counter* inactive_timer_;
+  /// Total number of serialized row batches received.
+  RuntimeProfile::Counter* total_received_batches_counter_;
 
-  /// Total time spent in SenderQueue::GetBatch().
-  RuntimeProfile::Counter* queue_get_batch_time_;
+  /// Total number of deserialized row batches enqueued into the row batch queues.
+  RuntimeProfile::Counter* total_enqueued_batches_counter_;
+
+  /// Total number of RPCs whose responses are deferred because of early senders or
+  /// full row batch queue.
+  RuntimeProfile::Counter* total_deferred_rpcs_counter_;
+
+  /// Time series of number of deferred row batches, samples 'num_deferred_rpcs_'.
+  RuntimeProfile::TimeSeriesCounter* deferred_rpcs_time_series_counter_;
+
+  /// Total wall-clock time in which the 'deferred_rpcs_' queues are not empty.
+  RuntimeProfile::Counter* total_has_deferred_rpcs_timer_;
+
+  /// Summary stats of time which RPCs spent in KRPC service queue before
+  /// being dispatched to the RPC handlers.
+  RuntimeProfile::SummaryStatsCounter* dispatch_timer_;
 };
 
 } // namespace impala
