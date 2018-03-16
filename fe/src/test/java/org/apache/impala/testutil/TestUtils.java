@@ -104,6 +104,20 @@ public class TestUtils {
 
   static FileSizeFilter fileSizeFilter_ = new FileSizeFilter();
 
+  // Ignore the exact estimated row count, which depends on the file sizes.
+  static class ScanRangeRowCountFilter implements ResultFilter {
+    private final static String NUMBER_FILTER = "\\d+(\\.\\d+)?";
+    private final static String FILTER_KEY = " max-scan-range-rows=";
+
+    public boolean matches(String input) { return input.contains(FILTER_KEY); }
+
+    public String transform(String input) {
+      return input.replaceAll(FILTER_KEY + NUMBER_FILTER, FILTER_KEY);
+    }
+  }
+
+  static ScanRangeRowCountFilter scanRangeRowCountFilter_ = new ScanRangeRowCountFilter();
+
   /**
    * Do a line-by-line comparison of actual and expected output.
    * Comparison of the individual lines ignores whitespace.
@@ -141,6 +155,11 @@ public class TestUtils {
         containsPrefix = true;
         expectedStr = fileSizeFilter_.transform(expectedStr);
         actualStr = fileSizeFilter_.transform(actualStr);
+      }
+      if (scanRangeRowCountFilter_.matches(expectedStr)) {
+        containsPrefix = true;
+        expectedStr = scanRangeRowCountFilter_.transform(expectedStr);
+        actualStr = scanRangeRowCountFilter_.transform(actualStr);
       }
 
       boolean ignoreAfter = false;

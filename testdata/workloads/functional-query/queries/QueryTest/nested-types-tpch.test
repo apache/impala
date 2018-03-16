@@ -163,8 +163,8 @@ BIGINT,BIGINT
 # IMPALA-2376: run scan that constructs large collection and set memory limit low enough
 # to get the below query to consistently fail when allocating a large collection. Set
 # num_nodes and mt_dop to 1 in order to make the query as deterministic as possible.
-set buffer_pool_limit=40m;
-set mem_limit=50m;
+set buffer_pool_limit=24m;
+set mem_limit=35m;
 set num_nodes=1;
 set mt_dop=1;
 select max(cnt1), max(cnt2), max(cnt3), max(cnt4), max(cnt5)

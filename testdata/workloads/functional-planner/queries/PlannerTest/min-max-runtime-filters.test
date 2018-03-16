@@ -133,7 +133,7 @@ PLAN-ROOT SINK
 |       table: rows=unavailable size=unavailable
 |       partitions: 0/24 rows=unavailable
 |       columns: unavailable
-|     extrapolated-rows=disabled
+|     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |     mem-estimate=16.00MB mem-reservation=8.00KB
 |     tuple-ids=1 row-size=4B cardinality=unavailable
 |

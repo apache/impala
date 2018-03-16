@@ -56,13 +56,13 @@ PLAN-ROOT SINK
 |  tuple-ids=1 row-size=16B cardinality=unavailable
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=24/24 files=24 size=174.39KB
+   partitions=24/24 files=24 size=188.29KB
    predicates: id < 10
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
      columns: unavailable
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
    parquet statistics predicates: id < 10
    parquet dictionary predicates: id < 10
    mem-estimate=16.00MB mem-reservation=24.00KB
@@ -105,13 +105,13 @@ Per-Host Resources: mem-estimate=432.00MB mem-reservation=102.07MB
 |  tuple-ids=1 row-size=16B cardinality=unavailable
 |
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   partitions=24/24 files=24 size=174.39KB
+   partitions=24/24 files=24 size=188.29KB
    predicates: id < 10
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
      columns: unavailable
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
    parquet statistics predicates: id < 10
    parquet dictionary predicates: id < 10
    mem-estimate=16.00MB mem-reservation=24.00KB
@@ -141,13 +141,13 @@ PLAN-ROOT SINK
 |  tuple-ids=4 row-size=8B cardinality=unavailable
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=24/24 files=24 size=174.39KB
+   partitions=24/24 files=24 size=188.29KB
    predicates: id < 10
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
      columns: unavailable
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
    parquet statistics predicates: id < 10
    parquet dictionary predicates: id < 10
    mem-estimate=16.00MB mem-reservation=16.00KB
@@ -184,13 +184,13 @@ Per-Host Resources: mem-estimate=30.00MB mem-reservation=30.00MB
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
 Per-Host Resources: mem-estimate=48.00MB mem-reservation=48.00KB
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   partitions=24/24 files=24 size=174.39KB
+   partitions=24/24 files=24 size=188.29KB
    predicates: id < 10
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
      columns: unavailable
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
    parquet statistics predicates: id < 10
    parquet dictionary predicates: id < 10
    mem-estimate=16.00MB mem-reservation=16.00KB
@@ -243,14 +243,14 @@ PLAN-ROOT SINK
 |     tuple-ids=1 row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: c_custkey < 10, !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey < 5
    predicates on o_lineitems: l_linenumber < 3
    stored statistics:
-     table: rows=150000 size=292.36MB
+     table: rows=150000 size=288.98MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=44229
    parquet statistics predicates: c_custkey < 10
    parquet statistics predicates on o: o_orderkey < 5
    parquet statistics predicates on o_lineitems: l_linenumber < 3
@@ -308,14 +308,14 @@ Per-Host Resources: mem-estimate=264.00MB mem-reservation=264.00MB
 |     tuple-ids=1 row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: c_custkey < 10, !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey < 5
    predicates on o_lineitems: l_linenumber < 3
    stored statistics:
-     table: rows=150000 size=292.36MB
+     table: rows=150000 size=288.98MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=44229
    parquet statistics predicates: c_custkey < 10
    parquet statistics predicates on o: o_orderkey < 5
    parquet statistics predicates on o_lineitems: l_linenumber < 3
@@ -331,7 +331,7 @@ from tpch_nested_parquet.customer c, c.c_orders o1, c.c_orders o2
 where o1.o_orderkey = o2.o_orderkey + 2 and o1.o_orderkey < 5
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=89.94MB mem-reservation=81.94MB
+|  Per-Host Resources: mem-estimate=89.94MB mem-reservation=17.94MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B
 |
@@ -365,16 +365,16 @@ PLAN-ROOT SINK
 |     tuple-ids=1 row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(c.c_orders), !empty(c.c_orders)
    predicates on o1: o1.o_orderkey < 5
    stored statistics:
-     table: rows=150000 size=292.36MB
+     table: rows=150000 size=288.98MB
      columns missing stats: c_orders, c_orders
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=44229
    parquet statistics predicates on o1: o1.o_orderkey < 5
    parquet dictionary predicates on o1: o1.o_orderkey < 5
-   mem-estimate=88.00MB mem-reservation=80.00MB
+   mem-estimate=88.00MB mem-reservation=16.00MB
    tuple-ids=0 row-size=270B cardinality=150000
 ---- PARALLELPLANS
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -387,7 +387,7 @@ PLAN-ROOT SINK
 |  tuple-ids=1,0,2 row-size=286B cardinality=1500000
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
-Per-Host Resources: mem-estimate=269.81MB mem-reservation=245.81MB
+Per-Host Resources: mem-estimate=269.81MB mem-reservation=53.81MB
 01:SUBPLAN
 |  mem-estimate=0B mem-reservation=0B
 |  tuple-ids=1,0,2 row-size=286B cardinality=1500000
@@ -418,15 +418,15 @@ Per-Host Resources: mem-estimate=269.81MB mem-reservation=245.81MB
 |     tuple-ids=1 row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(c.c_orders), !empty(c.c_orders)
    predicates on o1: o1.o_orderkey < 5
    stored statistics:
-     table: rows=150000 size=292.36MB
+     table: rows=150000 size=288.98MB
      columns missing stats: c_orders, c_orders
-   extrapolated-rows=disabled
+   extrapolated-rows=disabled max-scan-range-rows=44229
    parquet statistics predicates on o1: o1.o_orderkey < 5
    parquet dictionary predicates on o1: o1.o_orderkey < 5
-   mem-estimate=88.00MB mem-reservation=80.00MB
+   mem-estimate=88.00MB mem-reservation=16.00MB
    tuple-ids=0 row-size=270B cardinality=150000
 ====

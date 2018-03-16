@@ -86,9 +86,10 @@ class ScannerContext {
  public:
   /// Create a scanner context with the parent scan_node (where materialized row batches
   /// get pushed to) and the scan range to process. Buffers are allocated using
-  /// 'bp_client'.
+  /// 'bp_client'. 'total_reservation' bytes of 'bp_client''s reservation has been
+  /// initally allotted for use by this scanner.
   ScannerContext(RuntimeState* state, HdfsScanNodeBase* scan_node,
-      BufferPool::ClientHandle* bp_client,
+      BufferPool::ClientHandle* bp_client, int64_t total_reservation,
       HdfsPartitionDescriptor* partition_desc,
       const std::vector<FilterContext>& filter_ctxs,
       MemPool* expr_results_pool);
@@ -350,6 +351,13 @@ class ScannerContext {
 
   int NumStreams() const { return streams_.size(); }
 
+  /// Tries to increase 'total_reservation()' to 'ideal_reservation'. May get
+  /// none, part or all of the requested increase. total_reservation() can be
+  /// checked by the caller to find out the new total reservation. When this
+  /// ScannerContext is destroyed, the scan node takes back ownership of
+  /// total_reservation().
+  void TryIncreaseReservation(int64_t ideal_reservation);
+
   /// Release completed resources for all streams, e.g. the last buffer in each stream if
   /// the current read position is at the end of the buffer. If 'done' is true all
   /// resources are freed, even if the caller has not read that data yet. After calling
@@ -370,8 +378,9 @@ class ScannerContext {
   /// buffers that it needs allocated. 'reservation' is the amount of reservation that
   /// is given to this stream for allocating I/O buffers. The reservation is shared with
   /// 'range', so the context must be careful not to use this until all of 'range's
-  /// buffers have been freed. Must be >= the minimum IoMgr buffer size o allow reading
-  /// past the end of 'range'.
+  /// buffers have been freed. Must be >= the minimum IoMgr buffer size to allow reading
+  /// past the end of 'range'. 'reservation' must be <=
+  /// ScannerContext::total_reservation(), i.e. this reservation is included in the total.
   ///
   /// Returns the added stream. The returned stream is owned by this context.
   Stream* AddStream(io::ScanRange* range, int64_t reservation);
@@ -382,6 +391,7 @@ class ScannerContext {
   bool cancelled() const;
 
   BufferPool::ClientHandle* bp_client() const { return bp_client_; }
+  int64_t total_reservation() const { return total_reservation_; }
   HdfsPartitionDescriptor* partition_descriptor() const { return partition_desc_; }
   const std::vector<FilterContext>& filter_ctxs() const { return filter_ctxs_; }
   MemPool* expr_results_pool() const { return expr_results_pool_; }
@@ -395,6 +405,11 @@ class ScannerContext {
   /// threads in the multi-threaded scan node, so those threads must take care to only
   /// call thread-safe BufferPool methods with this client.
   BufferPool::ClientHandle* const bp_client_;
+
+  /// Total reservation from 'bp_client_' that this scanner is allowed to use.
+  /// TODO: when we remove the multi-threaded scan node, we may be able to just use
+  /// bp_client_->Reservation()
+  int64_t total_reservation_;
 
   HdfsPartitionDescriptor* const partition_desc_;
 

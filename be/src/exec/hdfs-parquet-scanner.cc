@@ -53,14 +53,23 @@ const int16_t HdfsParquetScanner::INVALID_POS;
 
 const char* HdfsParquetScanner::LLVM_CLASS_NAME = "class.impala::HdfsParquetScanner";
 
-const string PARQUET_MEM_LIMIT_EXCEEDED =
+static const string PARQUET_MEM_LIMIT_EXCEEDED =
     "HdfsParquetScanner::$0() failed to allocate $1 bytes for $2.";
 
 namespace impala {
 
+static const string IDEAL_RESERVATION_COUNTER_NAME = "ParquetRowGroupIdealReservation";
+static const string ACTUAL_RESERVATION_COUNTER_NAME = "ParquetRowGroupActualReservation";
+
 Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const vector<HdfsFileDesc*>& files) {
   DCHECK(!files.empty());
+  // Add Parquet-specific counters.
+  ADD_SUMMARY_STATS_COUNTER(
+      scan_node->runtime_profile(), IDEAL_RESERVATION_COUNTER_NAME, TUnit::BYTES);
+  ADD_SUMMARY_STATS_COUNTER(
+      scan_node->runtime_profile(), ACTUAL_RESERVATION_COUNTER_NAME, TUnit::BYTES);
+
   for (HdfsFileDesc* file : files) {
     // If the file size is less than 12 bytes, it is an invalid Parquet file.
     if (file->file_length < 12) {
@@ -161,14 +170,10 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
 
   // Release I/O buffers immediately to make sure they are cleaned up
   // in case we return a non-OK status anywhere below.
-  int64_t stream_reservation = stream_->reservation();
   stream_ = nullptr;
   context_->ReleaseCompletedResources(true);
   context_->ClearStreams();
   RETURN_IF_ERROR(footer_status);
-  // The scanner-wide stream was used only to read the file footer.  Each column has added
-  // its own stream. We can use the reservation from 'stream_' for the columns now.
-  total_col_reservation_ = stream_reservation;
 
   // Parse the file schema into an internal representation for schema resolution.
   schema_resolver_.reset(new ParquetSchemaResolver(*scan_node_->hdfs_table(),
@@ -1469,37 +1474,59 @@ Status HdfsParquetScanner::InitScalarColumns() {
     }
     RETURN_IF_ERROR(scalar_reader->Reset(*file_desc, col_chunk, row_group_idx_));
   }
-  RETURN_IF_ERROR(
-      DivideReservationBetweenColumns(scalar_readers_, total_col_reservation_));
+  RETURN_IF_ERROR(DivideReservationBetweenColumns(scalar_readers_));
   return Status::OK();
 }
 
 Status HdfsParquetScanner::DivideReservationBetweenColumns(
-    const vector<BaseScalarColumnReader*>& column_readers,
-    int64_t reservation_to_distribute) {
+    const vector<BaseScalarColumnReader*>& column_readers) {
   DiskIoMgr* io_mgr = ExecEnv::GetInstance()->disk_io_mgr();
   const int64_t min_buffer_size = io_mgr->min_buffer_size();
   const int64_t max_buffer_size = io_mgr->max_buffer_size();
   // The HdfsScanNode reservation calculation in the planner ensures that we have
   // reservation for at least one buffer per column.
-  if (reservation_to_distribute < min_buffer_size * column_readers.size()) {
+  if (context_->total_reservation() < min_buffer_size * column_readers.size()) {
     return Status(TErrorCode::INTERNAL_ERROR,
         Substitute("Not enough reservation in Parquet scanner for file '$0'. Need at "
                    "least $1 bytes per column for $2 columns but had $3 bytes",
             filename(), min_buffer_size, column_readers.size(),
-            reservation_to_distribute));
+            context_->total_reservation()));
   }
 
   vector<int64_t> col_range_lengths(column_readers.size());
   for (int i = 0; i < column_readers.size(); ++i) {
     col_range_lengths[i] = column_readers[i]->scan_range()->len();
   }
+
+  // The scanner-wide stream was used only to read the file footer.  Each column has added
+  // its own stream. We can use the total reservation now that 'stream_''s resources have
+  // been released. We may benefit from increasing reservation further, so let's compute
+  // the ideal reservation to scan all the columns.
+  int64_t ideal_reservation = ComputeIdealReservation(col_range_lengths);
+  if (ideal_reservation > context_->total_reservation()) {
+    context_->TryIncreaseReservation(ideal_reservation);
+  }
+  scan_node_->runtime_profile()->GetSummaryStatsCounter(ACTUAL_RESERVATION_COUNTER_NAME)->
+      UpdateCounter(context_->total_reservation());
+  scan_node_->runtime_profile()->GetSummaryStatsCounter(IDEAL_RESERVATION_COUNTER_NAME)->
+      UpdateCounter(ideal_reservation);
+
   vector<pair<int, int64_t>> tmp_reservations = DivideReservationBetweenColumnsHelper(
-      min_buffer_size, max_buffer_size, col_range_lengths, reservation_to_distribute);
+      min_buffer_size, max_buffer_size, col_range_lengths, context_->total_reservation());
   for (auto& tmp_reservation : tmp_reservations) {
     column_readers[tmp_reservation.first]->set_io_reservation(tmp_reservation.second);
   }
   return Status::OK();
+}
+
+int64_t HdfsParquetScanner::ComputeIdealReservation(
+    const vector<int64_t>& col_range_lengths) {
+  DiskIoMgr* io_mgr = ExecEnv::GetInstance()->disk_io_mgr();
+  int64_t ideal_reservation = 0;
+  for (int64_t len : col_range_lengths) {
+    ideal_reservation += io_mgr->ComputeIdealBufferReservation(len);
+  }
+  return ideal_reservation;
 }
 
 vector<pair<int, int64_t>> HdfsParquetScanner::DivideReservationBetweenColumnsHelper(

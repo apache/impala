@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from copy import copy
+from copy import copy, deepcopy
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
@@ -171,7 +171,10 @@ class TestQueryFullSort(ImpalaTestSuite):
   @SkipIfLocal.mem_usage_different
   def test_sort_reservation_usage(self, vector):
     """Tests for sorter reservation usage."""
-    self.run_test_case('sort-reservation-usage', vector)
+    new_vector = deepcopy(vector)
+    # Run with num_nodes=1 to make execution more deterministic.
+    new_vector.get_value('exec_option')['num_nodes'] = 1
+    self.run_test_case('sort-reservation-usage', new_vector)
 
 class TestRandomSort(ImpalaTestSuite):
   @classmethod

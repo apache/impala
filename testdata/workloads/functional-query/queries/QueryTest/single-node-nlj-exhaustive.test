@@ -18,9 +18,8 @@ tinyint,bigint,bigint,bigint,int,decimal,decimal,decimal,decimal,string,string,s
 ---- QUERY
 # IMPALA-6595: same query as above, but tuned to trigger a different bug where we hit
 # "Memory Limit Exceeded" when adding a batch to NljBuilder.
-# TODO: after IMPALA-4835 goes in, retune this query.
-set buffer_pool_limit=50m;
-set mem_limit=70m;
+set buffer_pool_limit=20m;
+set mem_limit=30m;
 select straight_join * from (values(1 id), (2), (3)) v1,
 (select *, count(*) over() from tpch.lineitem where l_orderkey < 100000) v2
 order by id, l_orderkey, l_partkey, l_suppkey, l_linenumber

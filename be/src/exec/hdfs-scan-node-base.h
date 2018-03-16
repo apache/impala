@@ -318,12 +318,18 @@ class HdfsScanNodeBase : public ScanNode {
   bool PartitionPassesFilters(int32_t partition_id, const std::string& stats_name,
       const std::vector<FilterContext>& filter_ctxs);
 
+  /// Helper to increase reservation from 'curr_reservation' up to 'ideal_reservation'
+  /// that may succeed in getting a partial increase if the full increase is not
+  /// possible. First increases to an I/O buffer multiple then increases in I/O buffer
+  /// sized increments. 'curr_reservation' can refer to a "share' of the total
+  /// reservation of the buffer pool client, e.g. the 'share" belonging to a single
+  /// scanner thread. Returns the new reservation after increases.
+  int64_t IncreaseReservationIncrementally(int64_t curr_reservation,
+      int64_t ideal_reservation);
+
  protected:
   friend class ScannerContext;
   friend class HdfsScanner;
-
-  /// Ideal reservation to process each input split, computed by the planner.
-  const int64_t ideal_scan_range_reservation_;
 
   /// Tuple id of the tuple used to evaluate conjuncts on parquet::Statistics.
   const int min_max_tuple_id_;
@@ -481,6 +487,13 @@ class HdfsScanNodeBase : public ScanNode {
   /// taken where there are i concurrent hdfs read thread running. Created in Open().
   std::vector<RuntimeProfile::Counter*>* hdfs_read_thread_concurrency_bucket_ = nullptr;
 
+  /// Track stats about ideal/actual reservation for initial scan ranges so we can
+  /// determine if the scan got all of the reservation it wanted. Does not include
+  /// subsequent reservation increases done by scanner implementation (e.g. for Parquet
+  /// columns).
+  RuntimeProfile::SummaryStatsCounter* initial_range_ideal_reservation_stats_ = nullptr;
+  RuntimeProfile::SummaryStatsCounter* initial_range_actual_reservation_stats_ = nullptr;
+
   /// Pool for allocating some amounts of memory that is shared between scanners.
   /// e.g. partition key tuple and their string buffers
   boost::scoped_ptr<MemPool> scan_node_pool_;
@@ -494,6 +507,17 @@ class HdfsScanNodeBase : public ScanNode {
   /// issues initial ranges for all file types. Waits for runtime filters if necessary.
   /// Only valid to call if !initial_ranges_issued_. Sets initial_ranges_issued_ to true.
   Status IssueInitialScanRanges(RuntimeState* state) WARN_UNUSED_RESULT;
+
+  /// Gets the next scan range to process and allocates buffer for it. 'reservation' is
+  /// an in/out argument with the current reservation available for this range. It may
+  /// be increased by this function up to a computed "ideal" reservation, in which case
+  /// *reservation is increased to reflect the new reservation.
+  ///
+  /// Returns Status::OK() and sets 'scan_range' if it gets a range to process. Returns
+  /// Status::OK() and sets 'scan_range' to NULL when no more ranges are left to process.
+  /// Returns an error status if there was an error getting the range or allocating
+  /// buffers.
+  Status StartNextScanRange(int64_t* reservation, io::ScanRange** scan_range);
 
   /// Create and open new scanner for this partition type.
   /// If the scanner is successfully created and opened, it is returned in 'scanner'.

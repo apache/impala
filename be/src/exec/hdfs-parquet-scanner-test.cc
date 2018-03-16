@@ -16,6 +16,8 @@
 // under the License.
 
 #include "exec/hdfs-parquet-scanner.h"
+#include "runtime/test-env.h"
+#include "service/fe-support.h"
 #include "testutil/gtest-util.h"
 
 #include "common/names.h"
@@ -23,13 +25,86 @@
 static const int64_t MIN_BUFFER_SIZE = 64 * 1024;
 static const int64_t MAX_BUFFER_SIZE = 8 * 1024 * 1024;
 
+DECLARE_int64(min_buffer_size);
+DECLARE_int32(read_size);
+
 namespace impala {
 
 class HdfsParquetScannerTest : public testing::Test {
+ public:
+  virtual void SetUp() {
+    // Override min/max buffer sizes picked up by DiskIoMgr.
+    FLAGS_min_buffer_size = MIN_BUFFER_SIZE;
+    FLAGS_read_size = MAX_BUFFER_SIZE;
+
+    test_env_.reset(new TestEnv);
+    ASSERT_OK(test_env_->Init());
+  }
+
+  virtual void TearDown() {
+    test_env_.reset();
+  }
+
  protected:
+  void TestComputeIdealReservation(const vector<int64_t>& col_range_lengths,
+      int64_t expected_ideal_reservation);
   void TestDivideReservation(const vector<int64_t>& col_range_lengths,
       int64_t total_col_reservation, const vector<int64_t>& expected_reservations);
+
+  boost::scoped_ptr<TestEnv> test_env_;
 };
+
+/// Test the ComputeIdealReservation returns 'expected_ideal_reservation' for a list
+/// of columns with 'col_range_lengths'.
+void HdfsParquetScannerTest::TestComputeIdealReservation(
+    const vector<int64_t>& col_range_lengths, int64_t expected_ideal_reservation) {
+  EXPECT_EQ(expected_ideal_reservation,
+      HdfsParquetScanner::ComputeIdealReservation(col_range_lengths));
+}
+
+TEST_F(HdfsParquetScannerTest, ComputeIdealReservation) {
+  // Should round up to nearest power-of-two buffer size if < max scan range buffer.
+  TestComputeIdealReservation({0}, MIN_BUFFER_SIZE);
+  TestComputeIdealReservation({1}, MIN_BUFFER_SIZE);
+  TestComputeIdealReservation({MIN_BUFFER_SIZE - 1}, MIN_BUFFER_SIZE);
+  TestComputeIdealReservation({MIN_BUFFER_SIZE}, MIN_BUFFER_SIZE);
+  TestComputeIdealReservation({MIN_BUFFER_SIZE + 2}, 2 * MIN_BUFFER_SIZE);
+  TestComputeIdealReservation({4 * MIN_BUFFER_SIZE + 1234}, 8 * MIN_BUFFER_SIZE);
+  TestComputeIdealReservation({MAX_BUFFER_SIZE - 10}, MAX_BUFFER_SIZE);
+  TestComputeIdealReservation({MAX_BUFFER_SIZE}, MAX_BUFFER_SIZE);
+
+  // Should round to nearest max I/O buffer size if >= max scan range buffer, up to 3
+  // buffers.
+  TestComputeIdealReservation({MAX_BUFFER_SIZE + 1}, 2 * MAX_BUFFER_SIZE);
+  TestComputeIdealReservation({MAX_BUFFER_SIZE * 2 - 1}, 2 * MAX_BUFFER_SIZE);
+  TestComputeIdealReservation({MAX_BUFFER_SIZE * 2}, 2 * MAX_BUFFER_SIZE);
+  TestComputeIdealReservation({MAX_BUFFER_SIZE * 2 + 1}, 3 * MAX_BUFFER_SIZE);
+  TestComputeIdealReservation({MAX_BUFFER_SIZE * 3 + 1}, 3 * MAX_BUFFER_SIZE);
+  TestComputeIdealReservation({MAX_BUFFER_SIZE * 100 + 27}, 3 * MAX_BUFFER_SIZE);
+
+  // Ideal reservations from multiple ranges are simply added together.
+  TestComputeIdealReservation({1, 2}, 2 * MIN_BUFFER_SIZE);
+  TestComputeIdealReservation(
+      {MAX_BUFFER_SIZE, MAX_BUFFER_SIZE - 1}, 2 * MAX_BUFFER_SIZE);
+  TestComputeIdealReservation(
+      {MAX_BUFFER_SIZE, MIN_BUFFER_SIZE + 1}, MAX_BUFFER_SIZE + 2 * MIN_BUFFER_SIZE);
+  TestComputeIdealReservation(
+      {MAX_BUFFER_SIZE, MAX_BUFFER_SIZE * 128}, 4 * MAX_BUFFER_SIZE);
+  TestComputeIdealReservation(
+      {MAX_BUFFER_SIZE * 7, MAX_BUFFER_SIZE * 128, MAX_BUFFER_SIZE * 1000},
+      3L * 3L * MAX_BUFFER_SIZE);
+
+  // Test col size that doesn't fit in int32.
+  TestComputeIdealReservation({MAX_BUFFER_SIZE * 1024L}, 3L * MAX_BUFFER_SIZE);
+
+  // Test sum of reservations that doesn't fit in int32.
+  vector<int64_t> col_range_lengths;
+  const int64_t LARGE_NUM_RANGES = 10000;
+  for (int i = 0; i < LARGE_NUM_RANGES; ++i) {
+    col_range_lengths.push_back(4 * MAX_BUFFER_SIZE);
+  }
+  TestComputeIdealReservation(col_range_lengths, LARGE_NUM_RANGES * 3L * MAX_BUFFER_SIZE);
+}
 
 /// Test that DivideReservationBetweenColumns() returns 'expected_reservations' for
 /// inputs 'col_range_lengths' and 'total_col_reservation'.
@@ -93,4 +168,9 @@ TEST_F(HdfsParquetScannerTest, DivideReservation) {
 
 }
 
-IMPALA_TEST_MAIN();
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  impala::InitFeSupport();
+  return RUN_ALL_TESTS();
+}
