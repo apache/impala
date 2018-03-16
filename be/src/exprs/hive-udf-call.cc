@@ -176,7 +176,7 @@ Status HiveUdfCall::Init(const RowDescriptor& row_desc, RuntimeState* state) {
 
   // Copy the Hive Jar from hdfs to local file system.
   RETURN_IF_ERROR(LibCache::instance()->GetLocalLibPath(
-      fn_.hdfs_location, LibCache::TYPE_JAR, &local_location_));
+      fn_.hdfs_location, LibCache::TYPE_JAR, fn_.last_modified_time, &local_location_));
 
   // Initialize input_byte_offsets_ and input_buffer_size_
   for (int i = 0; i < GetNumChildren(); ++i) {

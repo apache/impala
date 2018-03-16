@@ -227,4 +227,11 @@ struct TFunction {
 
   // True for builtins or user-defined functions persisted by the catalog
   11: optional bool is_persistent
+
+  // Last modified time of the 'hdfs_location'. Set by the coordinator to record
+  // the mtime its aware of for the lib. Executors expect that the lib they use
+  // has the same mtime as the coordinator's. An mtime of -1 makes the mtime check
+  // a no-op.
+  // Not set when stored in the catalog.
+  12: optional i64 last_modified_time
 }

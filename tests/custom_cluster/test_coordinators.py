@@ -18,7 +18,10 @@
 # The base class that should be used for almost all Impala tests
 
 import pytest
-
+import os
+import time
+from subprocess import check_call
+from tests.util.filesystem_utils import get_fs_path
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 class TestCoordinators(CustomClusterTestSuite):
@@ -120,3 +123,125 @@ class TestCoordinators(CustomClusterTestSuite):
     self._start_impala_cluster([], cluster_size=3, num_coordinators=1,
         use_exclusive_coordinators=True)
     exec_and_verify_num_executors(2)
+
+  @pytest.mark.execute_serially
+  def test_executor_only_lib_cache(self):
+    """IMPALA-6670: checks that the lib-cache gets refreshed on executor-only nodes"""
+
+    self._start_impala_cluster([], cluster_size=3, num_coordinators=1,
+                               use_exclusive_coordinators=True)
+
+    db_name = 'TEST_EXEC_ONLY_CACHE'
+
+    # jar src/tgt paths
+    old_src_path = os.path.join(
+        os.environ['IMPALA_HOME'], 'testdata/udfs/impala-hive-udfs.jar')
+    new_src_path = os.path.join(
+        os.environ['IMPALA_HOME'], 'tests/test-hive-udfs/target/test-hive-udfs-1.0.jar')
+    tgt_dir = get_fs_path('/test-warehouse/{0}.db'.format(db_name))
+    tgt_path = tgt_dir + "/tmp.jar"
+
+    try:
+      # copy jar with TestUpdateUdf (old) to tmp.jar
+      check_call(["hadoop", "fs", "-mkdir", "-p", tgt_dir])
+      check_call(["hadoop", "fs", "-put", "-f", old_src_path, tgt_path])
+
+      coordinator = self.cluster.impalads[0]
+      client = coordinator.service.create_beeswax_client()
+
+      # create the database
+      self.execute_query_expect_success(client,
+          "create database if not exists %s" % db_name)
+
+      # create a function for TestUpdateUdf (old)
+      create_old_fn = (
+          "create function `{0}`.`old_fn`(string) returns string LOCATION '{1}' "
+          "SYMBOL='org.apache.impala.TestUpdateUdf'".format(db_name, tgt_path))
+      self.execute_query_expect_success(client, create_old_fn);
+
+      # run the query for TestUpdateUdf (old) and expect it to work
+      old_query = (
+          "select count(*) from functional.alltypes where "
+          "`{0}`.old_fn(string_col) = 'Old UDF'".format(db_name));
+      result = self.execute_query_expect_success(client, old_query)
+      assert result.data == ['7300']
+
+      # copy a new jar with TestUpdateUdf (new) and NewReplaceStringUdf to tmp.jar.
+      check_call(["hadoop", "fs", "-put", "-f", new_src_path, tgt_path])
+
+      # create a function for the updated TestUpdateUdf.
+      create_new_fn = (
+          "create function `{0}`.`new_fn`(string) returns string LOCATION '{1}' "
+          "SYMBOL='org.apache.impala.TestUpdateUdf'".format(db_name, tgt_path))
+      self.execute_query_expect_success(client, create_new_fn);
+
+      # run the query for TestUdf (new) and expect the updated version to work.
+      # the udf argument prevents constant expression optimizations, which can mask
+      # incorrect lib-cache state/handling.
+      # (bug behavior was to get the old version, so number of results would be = 0)
+      # Note: if old_fn is run in the same way now, it will pick up the new
+      #       implementation. that is current system behavior, so expected.
+      new_query = (
+          "select count(*) from functional.alltypes where "
+          "`{0}`.new_fn(string_col) = 'New UDF'".format(db_name));
+      result = self.execute_query_expect_success(client, new_query)
+      assert result.data == ['7300']
+
+      # create a function for NewReplaceStringUdf which does not exist in the previous
+      # version of the jar.
+      create_add_fn = (
+          "create function `{0}`.`add_fn`(string) returns string LOCATION '{1}' "
+          "SYMBOL='org.apache.impala.NewReplaceStringUdf'".format(db_name, tgt_path))
+      self.execute_query_expect_success(client, create_add_fn);
+
+      # run the query for ReplaceString and expect the query to run.
+      # (bug behavior is to not find the class)
+      add_query = (
+          "select count(*) from functional.alltypes where "
+          "`{0}`.add_fn(string_col) = 'not here'".format(db_name));
+      result = self.execute_query_expect_success(client, add_query)
+      assert result.data == ['0']
+
+      # Copy jar to a new path.
+      tgt_path_2 = tgt_dir + "/tmp2.jar"
+      check_call(["hadoop", "fs", "-put", "-f", old_src_path, tgt_path_2])
+
+      # Add the function.
+      create_mismatch_fn = (
+          "create function `{0}`.`mismatch_fn`(string) returns string LOCATION '{1}' "
+          "SYMBOL='org.apache.impala.TestUpdateUdf'".format(db_name, tgt_path_2))
+      self.execute_query_expect_success(client, create_mismatch_fn);
+
+      # Run a query that'll run on only one executor.
+      small_query = (
+          "select count(*) from functional.tinytable where "
+          "`{0}`.mismatch_fn(a) = 'x'").format(db_name)
+      self.execute_query_expect_success(client, small_query)
+
+      # Overwrite the jar, giving it a new mtime. The sleep prevents the write to
+      # happen too quickly so that its within mtime granularity (1 second).
+      time.sleep(2)
+      check_call(["hadoop", "fs", "-put", "-f", new_src_path, tgt_path_2])
+
+      # Run the query. Expect the query fails due to mismatched libs at the
+      # coordinator and one of the executors.
+      mismatch_query = (
+          "select count(*) from functional.alltypes where "
+          "`{0}`.mismatch_fn(string_col) = 'Old UDF'".format(db_name));
+      result = self.execute_query_expect_failure(client, mismatch_query)
+      assert "does not match the expected last modified time" in str(result)
+
+      # Refresh, as suggested by the error message.
+      # IMPALA-6719: workaround lower-cases db_name.
+      self.execute_query_expect_success(client, "refresh functions " + db_name.lower())
+
+      # The coordinator should have picked up the new lib, so retry the query.
+      self.execute_query_expect_success(client, mismatch_query)
+
+    # cleanup
+    finally:
+      self.execute_query_expect_success(client,
+          "drop database if exists %s cascade" % db_name)
+      if client is not None:
+        client.close()
+      self._stop_impala_cluster()

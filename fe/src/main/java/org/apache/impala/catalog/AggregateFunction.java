@@ -25,6 +25,9 @@ import org.apache.impala.analysis.HdfsUri;
 import org.apache.impala.thrift.TAggregateFunction;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.thrift.TSymbolLookupParams;
+import org.apache.impala.thrift.TSymbolType;
+
 import com.google.common.base.Preconditions;
 
 /**
@@ -193,6 +196,12 @@ public class AggregateFunction extends Function {
   public void setMergeFnSymbol(String fn) { mergeFnSymbol_ = fn; }
   public void setFinalizeFnSymbol(String fn) { finalizeFnSymbol_ = fn; }
   public void setIntermediateType(Type t) { intermediateType_ = t; }
+
+  @Override
+  protected TSymbolLookupParams getLookupParams() {
+    return buildLookupParams(getUpdateFnSymbol(), TSymbolType.UDF_EVALUATE,
+        intermediateType_, hasVarArgs(), false, getArgs());
+  }
 
   @Override
   public String toSql(boolean ifNotExists) {

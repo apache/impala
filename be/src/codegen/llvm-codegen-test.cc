@@ -104,7 +104,7 @@ class LlvmCodeGenTest : public testing:: Test {
   }
 
   static Status LinkModuleFromHdfs(LlvmCodeGen* codegen, const string& hdfs_file) {
-    return codegen->LinkModuleFromHdfs(hdfs_file);
+    return codegen->LinkModuleFromHdfs(hdfs_file, -1);
   }
 
   static bool ContainsHandcraftedFn(LlvmCodeGen* codegen, llvm::Function* function) {

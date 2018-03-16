@@ -295,11 +295,14 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
 
   // Builtin functions are loaded directly from the running process
   if (params.fn_binary_type != TFunctionBinaryType::BUILTIN) {
-    // Refresh the library if necessary since we're creating a new function
-    LibCache::instance()->SetNeedsRefresh(params.location);
+    // Use the latest version of the file from the file system if specified.
+    if (params.needs_refresh) {
+      // Refresh the library if necessary.
+      LibCache::instance()->SetNeedsRefresh(params.location);
+    }
     string dummy_local_path;
     Status status = LibCache::instance()->GetLocalLibPath(
-        params.location, type, &dummy_local_path);
+        params.location, type, -1, &dummy_local_path);
     if (!status.ok()) {
       result->__set_result_code(TSymbolLookupResultCode::BINARY_NOT_FOUND);
       result->__set_error_msg(status.GetDetail());
@@ -310,11 +313,13 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
   // Check if the FE-specified symbol exists as-is.
   // Set 'quiet' to true so we don't flood the log with unfound builtin symbols on
   // startup.
-  Status status =
-      LibCache::instance()->CheckSymbolExists(params.location, type, params.symbol, true);
+  time_t mtime = -1;
+  Status status = LibCache::instance()->CheckSymbolExists(
+      params.location, type, params.symbol, true, &mtime);
   if (status.ok()) {
     result->__set_result_code(TSymbolLookupResultCode::SYMBOL_FOUND);
     result->__set_symbol(params.symbol);
+    result->__set_last_modified_time(mtime);
     return;
   }
 
@@ -348,7 +353,8 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
   }
 
   // Look up the mangled symbol
-  status = LibCache::instance()->CheckSymbolExists(params.location, type, symbol);
+  status = LibCache::instance()->CheckSymbolExists(
+      params.location, type, symbol, false, &mtime);
   if (!status.ok()) {
     result->__set_result_code(TSymbolLookupResultCode::SYMBOL_NOT_FOUND);
     stringstream ss;
@@ -379,6 +385,7 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
   // We were able to resolve the symbol.
   result->__set_result_code(TSymbolLookupResultCode::SYMBOL_FOUND);
   result->__set_symbol(symbol);
+  result->__set_last_modified_time(mtime);
 }
 
 extern "C"
@@ -391,8 +398,9 @@ Java_org_apache_impala_service_FeSupport_NativeCacheJar(
 
   TCacheJarResult result;
   string local_path;
-  Status status = LibCache::instance()->GetLocalLibPath(params.hdfs_location,
-      LibCache::TYPE_JAR, &local_path);
+  // TODO(IMPALA-6727): used for external data sources; add proper mtime.
+  Status status = LibCache::instance()->GetLocalLibPath(
+      params.hdfs_location, LibCache::TYPE_JAR, -1, &local_path);
   status.ToThrift(&result.status);
   if (status.ok()) result.__set_local_path(local_path);
 

@@ -124,8 +124,8 @@ Status ScalarFnCall::Init(const RowDescriptor& desc, RuntimeState* state) {
           fn_.name.function_name, MAX_INTERP_ARGS));
     }
 
-    Status status = LibCache::instance()->GetSoFunctionPtr(
-        fn_.hdfs_location, fn_.scalar_fn.symbol, &scalar_fn_, &cache_entry_);
+    Status status = LibCache::instance()->GetSoFunctionPtr(fn_.hdfs_location,
+        fn_.scalar_fn.symbol, fn_.last_modified_time, &scalar_fn_, &cache_entry_);
     if (!status.ok()) {
       if (fn_.binary_type == TFunctionBinaryType::BUILTIN) {
         // Builtins symbols should exist unless there is a version mismatch.
@@ -427,7 +427,7 @@ Status ScalarFnCall::GetFunction(LlvmCodeGen* codegen, const string& symbol, voi
   if (fn_.binary_type == TFunctionBinaryType::NATIVE
       || fn_.binary_type == TFunctionBinaryType::BUILTIN) {
     return LibCache::instance()->GetSoFunctionPtr(
-        fn_.hdfs_location, symbol, fn, &cache_entry_);
+        fn_.hdfs_location, symbol, fn_.last_modified_time, fn, &cache_entry_);
   } else {
     DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::IR);
     DCHECK(codegen != NULL);

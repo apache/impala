@@ -19,6 +19,7 @@ package org.apache.impala.catalog;
 
 import java.util.List;
 
+import org.apache.commons.lang.NotImplementedException;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.HdfsUri;
 import org.apache.impala.common.AnalysisException;
@@ -35,6 +36,7 @@ import org.apache.impala.thrift.TScalarFunction;
 import org.apache.impala.thrift.TSymbolLookupParams;
 import org.apache.impala.thrift.TSymbolLookupResult;
 import org.apache.impala.thrift.TSymbolType;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -368,6 +370,49 @@ public class Function extends CatalogObjectImpl {
     return function;
   }
 
+  protected final TSymbolLookupParams buildLookupParams(String symbol,
+      TSymbolType symbolType, Type retArgType, boolean hasVarArgs, boolean needsRefresh,
+      Type... argTypes) {
+    TSymbolLookupParams lookup = new TSymbolLookupParams();
+    // Builtin functions do not have an external library, they are loaded directly from
+    // the running process
+    lookup.location =
+        binaryType_ != TFunctionBinaryType.BUILTIN ? location_.toString() : "";
+    lookup.symbol = symbol;
+    lookup.symbol_type = symbolType;
+    lookup.fn_binary_type = binaryType_;
+    lookup.arg_types = Type.toThrift(argTypes);
+    lookup.has_var_args = hasVarArgs;
+    lookup.needs_refresh = needsRefresh;
+    if (retArgType != null) lookup.setRet_arg_type(retArgType.toThrift());
+    return lookup;
+  }
+
+  protected TSymbolLookupParams getLookupParams() {
+    throw new NotImplementedException(
+        "getLookupParams not implemented for " + getClass().getSimpleName());
+  }
+
+  // Looks up the last time the function's source file was updated as recorded in its
+  // backend lib-cache entry. Returns -1 if a modified time is not applicable.
+  // If an error occurs and the mtime cannot be retrieved, an IllegalStateException is
+  // thrown.
+  public final long getLastModifiedTime() {
+    if (getBinaryType() != TFunctionBinaryType.BUILTIN && getLocation() != null) {
+      Preconditions.checkState(!getLocation().toString().isEmpty());
+      TSymbolLookupParams lookup = Preconditions.checkNotNull(getLookupParams());
+      try {
+        TSymbolLookupResult result = FeSupport.LookupSymbol(lookup);
+        return result.last_modified_time;
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            "Unable to get last modified time for lib file: " + getLocation().toString(),
+            e);
+      }
+    }
+    return -1;
+  }
+
   // Returns the resolved symbol in the binary. The BE will do a lookup of 'symbol'
   // in the binary and try to resolve unmangled names.
   // If this function is expecting a return argument, retArgType is that type. It should
@@ -383,17 +428,8 @@ public class Function extends CatalogObjectImpl {
       throw new AnalysisException("Could not find symbol ''");
     }
 
-    TSymbolLookupParams lookup = new TSymbolLookupParams();
-    // Builtin functions do not have an external library, they are loaded directly from
-    // the running process
-    lookup.location =  binaryType_ != TFunctionBinaryType.BUILTIN ?
-        location_.toString() : "";
-    lookup.symbol = symbol;
-    lookup.symbol_type = symbolType;
-    lookup.fn_binary_type = binaryType_;
-    lookup.arg_types = Type.toThrift(argTypes);
-    lookup.has_var_args = hasVarArgs;
-    if (retArgType != null) lookup.setRet_arg_type(retArgType.toThrift());
+    TSymbolLookupParams lookup =
+        buildLookupParams(symbol, symbolType, retArgType, hasVarArgs, true, argTypes);
 
     try {
       TSymbolLookupResult result = FeSupport.LookupSymbol(lookup);

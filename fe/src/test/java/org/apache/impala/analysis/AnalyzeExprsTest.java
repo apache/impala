@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.apache.impala.analysis.TimestampArithmeticExpr.TimeUnit;
+import org.apache.impala.catalog.AggregateFunction;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
@@ -41,6 +42,7 @@ import org.apache.impala.catalog.TestSchemaUtils;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExpr;
+import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.junit.Assert;
@@ -2147,6 +2149,81 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select udf(1, 2)",
          "No matching function with signature: default.udf(TINYINT, TINYINT).");
     catalog_.removeFunction(udf);
+  }
+
+  // Serializes to thrift and checks the mtime setting.
+  private void checkSerializedMTime(Expr expr, boolean expectMTime) {
+    Preconditions.checkNotNull(expr.getFn());
+    TExpr thriftExpr = expr.treeToThrift();
+    Preconditions.checkState(thriftExpr.getNodesSize() > 0);
+    Preconditions.checkState(thriftExpr.getNodes().get(0).isSetFn());
+    TFunction thriftFn = thriftExpr.getNodes().get(0).getFn();
+    if (expectMTime) {
+      assertTrue(thriftFn.getLast_modified_time() >= 0);
+    } else {
+      assertEquals(thriftFn.getLast_modified_time(), -1);
+    }
+  }
+
+  // Checks that 'expr', when serialized to thrift, has mtime
+  // set as expected. 'expr' must be a single function call.
+  private void testMTime(String expr, boolean expectMTime) {
+    SelectStmt stmt =
+        (SelectStmt) AnalyzesOk("select " + expr + " from functional.alltypes");
+    Preconditions.checkState(stmt.getSelectList().getItems().size() == 1);
+    TupleDescriptor tblRefDesc = stmt.fromClause_.get(0).getDesc();
+    tblRefDesc.materializeSlots();
+    tblRefDesc.computeMemLayout();
+    if (stmt.hasAggInfo()) {
+      TupleDescriptor intDesc = stmt.getAggInfo().intermediateTupleDesc_;
+      intDesc.materializeSlots();
+      intDesc.computeMemLayout();
+      checkSerializedMTime(stmt.getAggInfo().getAggregateExprs().get(0), expectMTime);
+      checkSerializedMTime(
+          stmt.getAggInfo().getMergeAggInfo().getAggregateExprs().get(0), expectMTime);
+    } else {
+      checkSerializedMTime(stmt.getSelectList().getItems().get(0).getExpr(), expectMTime);
+    }
+  }
+
+  @Test
+  public void TestFunctionMTime() {
+    // Expect unset mtime for builtin.
+    testMTime("sleep(1)", false);
+    testMTime("concat('a', 'b')", false);
+    testMTime("3 is null", false);
+    testMTime("1 < 3", false);
+    testMTime("1 + 1", false);
+    testMTime("avg(int_col)", false);
+
+    final String nativeSymbol =
+        "'_Z8IdentityPN10impala_udf15FunctionContextERKNS_10BooleanValE'";
+    final String nativeUdfPath = "/test-warehouse/libTestUdfs.so";
+    final String javaSymbol = "SYMBOL='org.apache.impala.TestUdf";
+    final String javaPath = "/test-warehouse/impala-hive-udfs.jar";
+    final String nativeUdaPath = "hdfs://localhost:20500/test-warehouse/libTestUdas.so";
+
+    // Spec for a bogus builtin that specifies a bogus path.
+    catalog_.addFunction(ScalarFunction.createForTesting("default", "udf_builtin_bug",
+        new ArrayList<Type>(), Type.INT, "/dummy", "dummy.class", null, null,
+        TFunctionBinaryType.BUILTIN));
+    // Valid specs for native and java udf/uda's.
+    catalog_.addFunction(ScalarFunction.createForTesting("default", "udf_jar",
+        Lists.<Type>newArrayList(Type.INT), Type.INT, javaPath, javaSymbol, null, null,
+        TFunctionBinaryType.JAVA));
+    catalog_.addFunction(ScalarFunction.createForTesting("default", "udf_native",
+        new ArrayList<Type>(), Type.INT, nativeUdfPath, nativeSymbol, null, null,
+        TFunctionBinaryType.NATIVE));
+    catalog_.addFunction(AggregateFunction.createForTesting(
+        new FunctionName("default", "uda"), Lists.<Type>newArrayList(Type.INT), Type.INT,
+        Type.INT, new HdfsUri(nativeUdaPath), "init_fn_symbol", "update_fn_symbol", null,
+        null, null, null, null, TFunctionBinaryType.NATIVE));
+
+    // Expect these to have mtime set.
+    testMTime("udf_builtin_bug()", false);
+    testMTime("udf_jar(3)", true);
+    testMTime("udf_native()", true);
+    testMTime("uda(int_col)", true);
   }
 
   @Test

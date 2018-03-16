@@ -57,9 +57,15 @@ then
   # back
   find . -type f -name 'TestUpdateUdf.java' -execdir \
        bash -c "sed -i s/'Text(\"Old UDF\")'/'Text(\"New UDF\")'/g '{}'" \;
+  # Create a new Java function by copying and renaming an existing Java file for testing
+  # purposes. Then remove it.
+  find . -type f -name 'ReplaceStringUdf.java' -execdir \
+       bash -c "sed s/'ReplaceStringUdf'/'NewReplaceStringUdf'/g '{}'" \; \
+       > src/main/java/org/apache/impala/NewReplaceStringUdf.java
   "${IMPALA_HOME}/bin/mvn-quiet.sh" package
   find . -type f -name 'TestUpdateUdf.java' -execdir \
        bash -c "sed -i s/'Text(\"New UDF\")'/'Text(\"Old UDF\")'/g '{}'" \;
+  rm src/main/java/org/apache/impala/NewReplaceStringUdf.java
   popd
 fi
 

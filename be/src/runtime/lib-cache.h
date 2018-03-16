@@ -72,15 +72,23 @@ class LibCache {
   static Status Init();
 
   /// Gets the local file system path for the library at 'hdfs_lib_file'. If
-  /// this file is not already on the local fs, it copies it and caches the
-  /// result. Returns an error if 'hdfs_lib_file' cannot be copied to the local fs.
-  Status GetLocalLibPath(const std::string& hdfs_lib_file, LibType type,
-                         std::string* local_path);
+  /// this file is not already on the local fs, or if the cached entry's last modified
+  /// is older than expected mtime, 'exp_mtime', it copies it and caches the result.
+  /// An 'exp_mtime' of -1 makes the mtime check a no-op.
+  /// Returns an error if 'hdfs_lib_file' cannot be copied to the local fs or if
+  /// exp_mtime differs from the mtime on the file system.
+  /// If error is due to refresh, then the entry will be removed from the cache.
+  Status GetLocalLibPath(const std::string& hdfs_lib_file, LibType type, time_t exp_mtime,
+      std::string* local_path);
 
   /// Returns status.ok() if the symbol exists in 'hdfs_lib_file', non-ok otherwise.
-  /// If 'quiet' is true, the error status for non-Java unfound symbols will not be logged.
+  /// If status.ok() is true, 'mtime' is set to the cache entry's last modified time.
+  /// If an mtime is not applicable, for example, if lookup is for a builtin, then
+  /// a default mtime of -1 is set.
+  /// If 'quiet' is true, the error status for non-Java unfound symbols will not be
+  /// logged.
   Status CheckSymbolExists(const std::string& hdfs_lib_file, LibType type,
-      const std::string& symbol, bool quiet = false);
+      const std::string& symbol, bool quiet, time_t* mtime);
 
   /// Returns a pointer to the function for the given library and symbol.
   /// If 'hdfs_lib_file' is empty, the symbol is looked up in the impalad process.
@@ -94,8 +102,13 @@ class LibCache {
   /// using fn_ptr and it is no longer valid to use fn_ptr.
   //
   /// If 'quiet' is true, returned error statuses will not be logged.
+  /// If the entry is already cached, if its last modified time is older than
+  /// expected mtime, 'exp_mtime', the entry is refreshed.
+  /// An 'exp_mtime' of -1 makes the mtime check a no-op.
+  /// An error is returned if exp_mtime differs from the mtime on the file system.
+  /// If error is due to refresh, then the entry will be removed from the cache.
   Status GetSoFunctionPtr(const std::string& hdfs_lib_file, const std::string& symbol,
-      void** fn_ptr, LibCacheEntry** entry, bool quiet = false);
+      time_t exp_mtime, void** fn_ptr, LibCacheEntry** entry, bool quiet = false);
 
   /// Marks the entry for 'hdfs_lib_file' as needing to be refreshed if the file in HDFS is
   /// newer than the local cached copied. The refresh will occur the next time the entry is
@@ -139,32 +152,44 @@ class LibCache {
 
   /// Returns the cache entry for 'hdfs_lib_file'. If this library has not been
   /// copied locally, it will copy it and add a new LibCacheEntry to 'lib_cache_'.
-  /// Result is returned in *entry.
+  /// If the entry is already cached, if its last modified time is older than
+  /// expected mtime, 'exp_mtime', the entry is refreshed. Result is returned in *entry.
+  /// An 'exp_mtime' of -1 makes the mtime check a no-op.
+  /// An error is returned if exp_mtime differs from the mtime on the file system.
   /// No locks should be taken before calling this. On return the entry's lock is
   /// taken and returned in *entry_lock.
   /// If an error is returned, there will be no entry in lib_cache_ and *entry is NULL.
-  Status GetCacheEntry(const std::string& hdfs_lib_file, LibType type,
+  Status GetCacheEntry(const std::string& hdfs_lib_file, LibType type, time_t exp_mtime,
       boost::unique_lock<boost::mutex>* entry_lock, LibCacheEntry** entry);
 
   /// Implementation to get the cache entry for 'hdfs_lib_file'. Errors are returned
   /// without evicting the cache entry if the status is not OK and *entry is not NULL.
   Status GetCacheEntryInternal(const std::string& hdfs_lib_file, LibType type,
-      boost::unique_lock<boost::mutex>* entry_lock, LibCacheEntry** entry);
+      time_t exp_mtime, boost::unique_lock<boost::mutex>* entry_lock,
+      LibCacheEntry** entry);
 
   /// Returns iter's cache entry in 'entry' with 'entry_lock' held if entry does not
   /// need to be refreshed.
   /// If entry needs to be refreshed, then it is removed and '*entry' is set to nullptr.
+  /// The entry is refreshed if needs_refresh is set and its mtime is
+  /// older than the file on the fs OR its mtime is older than the
+  /// 'exp_mtime' argument.
+  /// An 'exp_mtime' of -1 makes the mtime check a no-op.
+  /// An error is returned if exp_mtime differs from the mtime on the file system.
+  /// If an error occurs when refreshing the entry, the entry is removed.
   /// The cache lock must be held prior to calling this method. On return the entry's
   /// lock is taken and returned in '*entry_lock' if entry does not need to be refreshed.
   /// TODO: cleanup this method's interface and how the outputs are used.
   Status RefreshCacheEntry(const std::string& hdfs_lib_file, LibType type,
-      const LibMap::iterator& iter, boost::unique_lock<boost::mutex>* entry_lock,
-      LibCacheEntry** entry);
+      time_t exp_mtime, const LibMap::iterator& iter,
+      boost::unique_lock<boost::mutex>* entry_lock, LibCacheEntry** entry);
 
   /// 'hdfs_lib_file' is copied locally and 'entry' is initialized with its contents.
+  /// An error is returned if exp_mtime differs from the mtime on the file system.
+  /// An 'exp_mtime' of -1 makes the mtime check a no-op.
   /// No locks are assumed held; 'entry' should be visible only to a single thread.
-  Status LoadCacheEntry(
-      const std::string& hdfs_lib_file, LibType type, LibCacheEntry* entry);
+  Status LoadCacheEntry(const std::string& hdfs_lib_file, time_t exp_mtime, LibType type,
+      LibCacheEntry* entry);
 
   /// Utility function for generating a filename unique to this process and
   /// 'hdfs_path'. This is to prevent multiple impalad processes or different library files

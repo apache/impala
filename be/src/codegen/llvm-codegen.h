@@ -636,8 +636,9 @@ class LlvmCodeGen {
   Status LinkModuleFromLocalFs(const std::string& file);
 
   /// Same as 'LinkModuleFromLocalFs', but takes an hdfs file location instead and makes
-  /// sure that the same hdfs file is not linked twice.
-  Status LinkModuleFromHdfs(const std::string& hdfs_file);
+  /// sure that the same hdfs file is not linked twice. The mtime is used ensure that the
+  /// cached hdfs_file that's used is the most recent.
+  Status LinkModuleFromHdfs(const std::string& hdfs_file, const time_t mtime);
 
   /// Strip global constructors and destructors from an LLVM module. We never run them
   /// anyway (they must be explicitly invoked) so it is dead code.

@@ -35,4 +35,8 @@ public class TestUpdateUdf extends UDF {
   public Text evaluate() {
     return new Text("Old UDF");
   }
+
+  public Text evaluate(Text arg) {
+    return new Text("Old UDF");
+  }
 }
