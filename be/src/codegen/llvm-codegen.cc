@@ -335,11 +335,11 @@ Status LlvmCodeGen::LinkModuleFromLocalFs(const string& file) {
   return Status::OK();
 }
 
-Status LlvmCodeGen::LinkModuleFromHdfs(const string& hdfs_location) {
+Status LlvmCodeGen::LinkModuleFromHdfs(const string& hdfs_location, const time_t mtime) {
   if (linked_modules_.find(hdfs_location) != linked_modules_.end()) return Status::OK();
   string local_path;
-  RETURN_IF_ERROR(LibCache::instance()->GetLocalLibPath(hdfs_location, LibCache::TYPE_IR,
-      &local_path));
+  RETURN_IF_ERROR(LibCache::instance()->GetLocalLibPath(
+      hdfs_location, LibCache::TYPE_IR, mtime, &local_path));
   RETURN_IF_ERROR(LinkModuleFromLocalFs(local_path));
   linked_modules_.insert(hdfs_location);
   return Status::OK();
@@ -803,7 +803,7 @@ Status LlvmCodeGen::LoadFunction(const TFunction& fn, const std::string& symbol,
     // in a .so or a builtin using the UDF interface.
     void* fn_ptr;
     Status status = LibCache::instance()->GetSoFunctionPtr(
-        fn.hdfs_location, symbol, &fn_ptr, cache_entry);
+        fn.hdfs_location, symbol, fn.last_modified_time, &fn_ptr, cache_entry);
     if (!status.ok() && fn.binary_type == TFunctionBinaryType::BUILTIN) {
       // Builtins symbols should exist unless there is a version mismatch.
       status.AddDetail(
@@ -874,7 +874,7 @@ Status LlvmCodeGen::LoadFunction(const TFunction& fn, const std::string& symbol,
 
     // Link the UDF module into this query's main module so the UDF's functions are
     // available in the main module.
-    RETURN_IF_ERROR(LinkModuleFromHdfs(fn.hdfs_location));
+    RETURN_IF_ERROR(LinkModuleFromHdfs(fn.hdfs_location, fn.last_modified_time));
 
     *llvm_fn = GetFunction(symbol, true);
     if (*llvm_fn == NULL) {

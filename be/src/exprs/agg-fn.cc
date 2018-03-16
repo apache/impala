@@ -72,6 +72,7 @@ Status AggFn::Init(const RowDescriptor& row_desc, RuntimeState* state) {
       ColumnType::FromThrift(aggregate_fn.intermediate_type).type);
   DCHECK_EQ(output_slot_desc_.type().type, ColumnType::FromThrift(fn_.ret_type).type);
 
+  time_t mtime = fn_.last_modified_time;
   // Load the function pointers. Must have init() and update().
   if (aggregate_fn.init_fn_symbol.empty() ||
       aggregate_fn.update_fn_symbol.empty() ||
@@ -83,32 +84,32 @@ Status AggFn::Init(const RowDescriptor& row_desc, RuntimeState* state) {
     return Status(ss.str());
   }
 
+  RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
+      fn_.hdfs_location, aggregate_fn.init_fn_symbol, mtime, &init_fn_, &cache_entry_));
   RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(fn_.hdfs_location,
-      aggregate_fn.init_fn_symbol, &init_fn_, &cache_entry_));
-  RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(fn_.hdfs_location,
-      aggregate_fn.update_fn_symbol, &update_fn_, &cache_entry_));
+      aggregate_fn.update_fn_symbol, mtime, &update_fn_, &cache_entry_));
 
   // Merge() is not defined for purely analytic function.
   if (!aggregate_fn.is_analytic_only_fn) {
     RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(fn_.hdfs_location,
-        aggregate_fn.merge_fn_symbol, &merge_fn_, &cache_entry_));
+        aggregate_fn.merge_fn_symbol, mtime, &merge_fn_, &cache_entry_));
   }
   // Serialize(), GetValue(), Remove() and Finalize() are optional
   if (!aggregate_fn.serialize_fn_symbol.empty()) {
     RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(fn_.hdfs_location,
-        aggregate_fn.serialize_fn_symbol, &serialize_fn_, &cache_entry_));
+        aggregate_fn.serialize_fn_symbol, mtime, &serialize_fn_, &cache_entry_));
   }
   if (!aggregate_fn.get_value_fn_symbol.empty()) {
     RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(fn_.hdfs_location,
-        aggregate_fn.get_value_fn_symbol, &get_value_fn_, &cache_entry_));
+        aggregate_fn.get_value_fn_symbol, mtime, &get_value_fn_, &cache_entry_));
   }
   if (!aggregate_fn.remove_fn_symbol.empty()) {
     RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(fn_.hdfs_location,
-        aggregate_fn.remove_fn_symbol, &remove_fn_, &cache_entry_));
+        aggregate_fn.remove_fn_symbol, mtime, &remove_fn_, &cache_entry_));
   }
   if (!aggregate_fn.finalize_fn_symbol.empty()) {
     RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(fn_.hdfs_location,
-        fn_.aggregate_fn.finalize_fn_symbol, &finalize_fn_, &cache_entry_));
+        fn_.aggregate_fn.finalize_fn_symbol, mtime, &finalize_fn_, &cache_entry_));
   }
   return Status::OK();
 }

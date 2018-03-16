@@ -31,8 +31,9 @@ namespace impala {
 
 bool CodegenCallGraph::IsDefinedInImpalad(const string& fn_name) {
   void* fn_ptr = nullptr;
+  // Looking up fn in process so mtime is set to -1 (no versioning issue).
   Status status =
-      LibCache::instance()->GetSoFunctionPtr("", fn_name, &fn_ptr, nullptr, true);
+      LibCache::instance()->GetSoFunctionPtr("", fn_name, -1, &fn_ptr, nullptr, true);
   return status.ok();
 }
 

@@ -32,7 +32,9 @@ import org.apache.impala.hive.executor.UdfExecutor.JavaUdfDataType;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TScalarFunction;
+import org.apache.impala.thrift.TSymbolLookupParams;
 import org.apache.impala.thrift.TSymbolType;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -255,6 +257,12 @@ public class ScalarFunction extends Function {
   public void setCloseFnSymbol(String s) { closeFnSymbol_ = s; }
 
   public String getSymbolName() { return symbolName_; }
+
+  @Override
+  protected TSymbolLookupParams getLookupParams() {
+    return buildLookupParams(
+        getSymbolName(), TSymbolType.UDF_EVALUATE, null, hasVarArgs(), false, getArgs());
+  }
 
   @Override
   public String toSql(boolean ifNotExists) {

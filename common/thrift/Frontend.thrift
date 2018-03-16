@@ -634,7 +634,13 @@ struct TSymbolLookupParams {
   6: optional Types.TColumnType ret_arg_type
 
   // Determines the signature of the mangled symbol
-  7: required TSymbolType symbol_type;
+  7: required TSymbolType symbol_type
+
+  // Does the lookup require the backend lib-cache entry be refreshed?
+  // If so, the file system is checked for a newer version of the file
+  // referenced by 'location'. If not, the entry in the lib-cache is used
+  // if present, otherwise the file is read from file-system.
+  8: required bool needs_refresh
 }
 
 enum TSymbolLookupResultCode {
@@ -652,6 +658,9 @@ struct TSymbolLookupResult {
 
   // The error message if the symbol found not be found.
   3: optional string error_msg
+
+  // Last modified time in backend lib-cache entry for the file referenced by 'location'.
+  4: optional i64 last_modified_time
 }
 
 // Sent from the impalad BE to FE with the results of each CatalogUpdate heartbeat.

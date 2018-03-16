@@ -137,8 +137,10 @@ Status ExternalDataSourceExecutor::Init(const string& jar_path,
     const string& class_name, const string& api_version, const string& init_string) {
   DCHECK(!is_initialized_);
   string local_jar_path;
+  // TODO(IMPALA-6727): pass the mtime from the coordinator. for now, skip the mtime
+  // check (-1).
   RETURN_IF_ERROR(LibCache::instance()->GetLocalLibPath(
-      jar_path, LibCache::TYPE_JAR, &local_jar_path));
+      jar_path, LibCache::TYPE_JAR, -1, &local_jar_path));
 
   JNIEnv* jni_env = getJNIEnv();
 

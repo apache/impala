@@ -37,6 +37,7 @@ import org.apache.impala.common.TreeNode;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TExprNode;
+import org.apache.impala.thrift.TFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -610,7 +611,9 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     msg.is_constant = isConstant_;
     msg.num_children = children_.size();
     if (fn_ != null) {
-      msg.setFn(fn_.toThrift());
+      TFunction thriftFn = fn_.toThrift();
+      thriftFn.setLast_modified_time(fn_.getLastModifiedTime());
+      msg.setFn(thriftFn);
       if (fn_.hasVarArgs()) msg.setVararg_start_idx(fn_.getNumArgs() - 1);
     }
     toThrift(msg);
