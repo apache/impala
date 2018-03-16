@@ -44,7 +44,7 @@ def check_digest(filename, algorithm, expected_digest):
     supported_algorithms = hashlib.algorithms_available
   except AttributeError:
     # Fallback to hardcoded set if hashlib.algorithms_available doesn't exist.
-    supported_algorithms = {'md5', 'sha1', 'sha224', 'sha256', 'sha384', 'sha512'}
+    supported_algorithms = set(['md5', 'sha1', 'sha224', 'sha256', 'sha384', 'sha512'])
   if algorithm not in supported_algorithms:
     print 'Hash algorithm {0} is not supported by hashlib'.format(algorithm)
     return False
