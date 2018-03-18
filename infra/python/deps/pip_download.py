@@ -87,7 +87,7 @@ def get_package_info(pkg_name, pkg_version):
   # downloading an extra package before running this script. Since the HTML is guaranteed
   # to be formatted according to PEP 503, this is acceptable.
   pkg_info = urlopen(url).read()
-  regex = r'<a href=\".*?packages/(.*?)#(.*?)=(.*?)\".*?>(.*?)<\/a>'
+  regex = r'<a .*?href=\".*?packages/(.*?)#(.*?)=(.*?)\".*?>(.*?)<\/a>'
   for match in re.finditer(regex, pkg_info):
     path = match.group(1)
     hash_algorithm = match.group(2)
