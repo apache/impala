@@ -44,7 +44,7 @@ const time_zone_ptr TimezoneDatabase::TIMEZONE_MSK_PRE_2014(time_zone_ptr(
 
 const char* TimezoneDatabase::TIMEZONE_DATABASE_STR = "\"ID\",\"STD ABBR\",\"STD NAME\",\"DST ABBR\",\"DST NAME\",\"GMT offset\",\"DST adjustment\",\"DST Start Date rule\",\"Start time\",\"DST End date rule\",\"End time\"\n\
 \"ACT\",\"ACST\",\"Australian Central Standard Time (Northern Territory)\",\"\",\"\",\"+09:30:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
-\"AET\",\"AEST\",\"Australian Eastern Standard Time (New South Wales)\",\"AEDT\",\"Australian Eastern Daylight Time (New South Wales)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+02:00:00\"\n\
+\"AET\",\"AEST\",\"Australian Eastern Standard Time (New South Wales)\",\"AEDT\",\"Australian Eastern Daylight Time (New South Wales)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+03:00:00\"\n\
 \"AGT\",\"ART\",\"Argentine Time\",\"\",\"\",\"-03:00:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
 \"ART\",\"EET\",\"Eastern European Time\",\"EEST\",\"Eastern European Summer Time\",\"+02:00:00\",\"+01:00:00\",\"-1;4;4\",\"+00:00:00\",\"-1;4;9\",\"+24:00:00\"\n\
 \"AST\",\"AKST\",\"Alaska Standard Time\",\"AKDT\",\"Alaska Daylight Time\",\"-09:00:00\",\"+01:00:00\",\"2;0;3\",\"+02:00:00\",\"1;0;11\",\"+02:00:00\"\n\
@@ -387,29 +387,29 @@ const char* TimezoneDatabase::TIMEZONE_DATABASE_STR = "\"ID\",\"STD ABBR\",\"STD
 \"Atlantic/South_Georgia\",\"GST\",\"South Georgia Standard Time\",\"\",\"\",\"-02:00:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
 \"Atlantic/St_Helena\",\"GMT\",\"Greenwich Mean Time\",\"\",\"\",\"+00:00:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
 \"Atlantic/Stanley\",\"FKT\",\"Falkland Is. Time\",\"\",\"\",\"-03:00:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
-\"Australia/ACT\",\"AEST\",\"Australian Eastern Standard Time (New South Wales)\",\"AEDT\",\"Australian Eastern Daylight Time (New South Wales)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+02:00:00\"\n\
-\"Australia/Adelaide\",\"ACST\",\"Australian Central Standard Time (South Australia)\",\"ACDT\",\"Australian Central Daylight Time (South Australia)\",\"+09:30:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+02:00:00\"\n\
+\"Australia/ACT\",\"AEST\",\"Australian Eastern Standard Time (New South Wales)\",\"AEDT\",\"Australian Eastern Daylight Time (New South Wales)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+03:00:00\"\n\
+\"Australia/Adelaide\",\"ACST\",\"Australian Central Standard Time (South Australia)\",\"ACDT\",\"Australian Central Daylight Time (South Australia)\",\"+09:30:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+03:00:00\"\n\
 \"Australia/Brisbane\",\"AEST\",\"Australian Eastern Standard Time (Queensland)\",\"\",\"\",\"+10:00:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
-\"Australia/Broken_Hill\",\"ACST\",\"Australian Central Standard Time (South Australia/New South Wales)\",\"ACDT\",\"Australian Central Daylight Time (South Australia/New South Wales)\",\"+09:30:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+02:00:00\"\n\
-\"Australia/Canberra\",\"AEST\",\"Australian Eastern Standard Time (New South Wales)\",\"AEDT\",\"Australian Eastern Daylight Time (New South Wales)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+02:00:00\"\n\
-\"Australia/Currie\",\"AEST\",\"Australian Eastern Standard Time (New South Wales)\",\"AEDT\",\"Australian Eastern Daylight Time (New South Wales)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+02:00:00\"\n\
+\"Australia/Broken_Hill\",\"ACST\",\"Australian Central Standard Time (South Australia/New South Wales)\",\"ACDT\",\"Australian Central Daylight Time (South Australia/New South Wales)\",\"+09:30:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+03:00:00\"\n\
+\"Australia/Canberra\",\"AEST\",\"Australian Eastern Standard Time (New South Wales)\",\"AEDT\",\"Australian Eastern Daylight Time (New South Wales)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+03:00:00\"\n\
+\"Australia/Currie\",\"AEST\",\"Australian Eastern Standard Time (New South Wales)\",\"AEDT\",\"Australian Eastern Daylight Time (New South Wales)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+03:00:00\"\n\
 \"Australia/Darwin\",\"ACST\",\"Australian Central Standard Time (Northern Territory)\",\"\",\"\",\"+09:30:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
 \"Australia/Eucla\",\"ACWST\",\"Australian Central Western Standard Time\",\"\",\"\",\"+08:45:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
-\"Australia/Hobart\",\"AEST\",\"Australian Eastern Standard Time (Tasmania)\",\"AEDT\",\"Australian Eastern Daylight Time (Tasmania)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+02:00:00\"\n\
+\"Australia/Hobart\",\"AEST\",\"Australian Eastern Standard Time (Tasmania)\",\"AEDT\",\"Australian Eastern Daylight Time (Tasmania)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+03:00:00\"\n\
 \"Australia/LHI\",\"LHST\",\"Lord Howe Standard Time\",\"LHDT\",\"Lord Howe Daylight Time\",\"+10:30:00\",\"+00:30:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+02:00:00\"\n\
 \"Australia/Lindeman\",\"AEST\",\"Australian Eastern Standard Time (Queensland)\",\"\",\"\",\"+10:00:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
 \"Australia/Lord_Howe\",\"LHST\",\"Lord Howe Standard Time\",\"LHDT\",\"Lord Howe Daylight Time\",\"+10:30:00\",\"+00:30:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+02:00:00\"\n\
-\"Australia/Melbourne\",\"AEST\",\"Australian Eastern Standard Time (Victoria)\",\"AEDT\",\"Australian Eastern Daylight Time (Victoria)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+02:00:00\"\n\
-\"Australia/NSW\",\"AEST\",\"Australian Eastern Standard Time (New South Wales)\",\"AEDT\",\"Australian Eastern Daylight Time (New South Wales)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+02:00:00\"\n\
+\"Australia/Melbourne\",\"AEST\",\"Australian Eastern Standard Time (Victoria)\",\"AEDT\",\"Australian Eastern Daylight Time (Victoria)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+03:00:00\"\n\
+\"Australia/NSW\",\"AEST\",\"Australian Eastern Standard Time (New South Wales)\",\"AEDT\",\"Australian Eastern Daylight Time (New South Wales)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+03:00:00\"\n\
 \"Australia/North\",\"ACST\",\"Australian Central Standard Time (Northern Territory)\",\"\",\"\",\"+09:30:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
 \"Australia/Perth\",\"AWST\",\"Australian Western Standard Time\",\"\",\"\",\"+08:00:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
 \"Australia/Queensland\",\"AEST\",\"Australian Eastern Standard Time (Queensland)\",\"\",\"\",\"+10:00:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
-\"Australia/South\",\"ACST\",\"Australian Central Standard Time (South Australia)\",\"ACDT\",\"Australian Central Daylight Time (South Australia)\",\"+09:30:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+02:00:00\"\n\
-\"Australia/Sydney\",\"AEST\",\"Australian Eastern Standard Time (New South Wales)\",\"AEDT\",\"Australian Eastern Daylight Time (New South Wales)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+02:00:00\"\n\
-\"Australia/Tasmania\",\"AEST\",\"Australian Eastern Standard Time (Tasmania)\",\"AEDT\",\"Australian Eastern Daylight Time (Tasmania)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+02:00:00\"\n\
-\"Australia/Victoria\",\"AEST\",\"Australian Eastern Standard Time (Victoria)\",\"AEDT\",\"Australian Eastern Daylight Time (Victoria)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+02:00:00\"\n\
+\"Australia/South\",\"ACST\",\"Australian Central Standard Time (South Australia)\",\"ACDT\",\"Australian Central Daylight Time (South Australia)\",\"+09:30:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+03:00:00\"\n\
+\"Australia/Sydney\",\"AEST\",\"Australian Eastern Standard Time (New South Wales)\",\"AEDT\",\"Australian Eastern Daylight Time (New South Wales)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+03:00:00\"\n\
+\"Australia/Tasmania\",\"AEST\",\"Australian Eastern Standard Time (Tasmania)\",\"AEDT\",\"Australian Eastern Daylight Time (Tasmania)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+03:00:00\"\n\
+\"Australia/Victoria\",\"AEST\",\"Australian Eastern Standard Time (Victoria)\",\"AEDT\",\"Australian Eastern Daylight Time (Victoria)\",\"+10:00:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+03:00:00\"\n\
 \"Australia/West\",\"AWST\",\"Australian Western Standard Time\",\"\",\"\",\"+08:00:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
-\"Australia/Yancowinna\",\"ACST\",\"Australian Central Standard Time (South Australia/New South Wales)\",\"ACDT\",\"Australian Central Daylight Time (South Australia/New South Wales)\",\"+09:30:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+02:00:00\"\n\
+\"Australia/Yancowinna\",\"ACST\",\"Australian Central Standard Time (South Australia/New South Wales)\",\"ACDT\",\"Australian Central Daylight Time (South Australia/New South Wales)\",\"+09:30:00\",\"+01:00:00\",\"1;0;10\",\"+02:00:00\",\"1;0;4\",\"+03:00:00\"\n\
 \"BET\",\"BRT\",\"Brasilia Time\",\"BRST\",\"Brasilia Summer Time\",\"-03:00:00\",\"+01:00:00\",\"3;0;10\",\"+00:00:00\",\"3;0;2\",\"+00:00:00\"\n\
 \"BST\",\"BDT\",\"Bangladesh Time\",\"\",\"\",\"+06:00:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
 \"Brazil/Acre\",\"ACT\",\"Acre Time\",\"\",\"\",\"-05:00:00\",\"+00:00:00\",\"\",\"\",\"\",\"\"\n\
