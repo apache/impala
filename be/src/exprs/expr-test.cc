@@ -265,6 +265,10 @@ class ExprTest : public testing::Test {
     EXPECT_EQ(expected_result, GetValue(expr, TYPE_STRING)) << expr;
   }
 
+  // Tests that DST of the given timezone ends at 3am
+  void TestAusDSTEndingForEastTimeZone(const string& time_zone);
+  void TestAusDSTEndingForCentralTimeZone(const string& time_zone);
+
   void TestCharValue(const string& expr, const string& expected_result,
                      const ColumnType& type) {
     EXPECT_EQ(expected_result, GetValue(expr, type)) << expr;
@@ -5702,6 +5706,49 @@ TEST_F(ExprTest, MoscowTimezoneConversion) {
 
 #pragma pop_macro("MSC_TO_UTC")
 #pragma pop_macro("UTC_TO_MSC")
+}
+
+void ExprTest::TestAusDSTEndingForEastTimeZone(const string& time_zone) {
+  // Timestamps between 02:00:00 and 02:59:59 inclusive on the ending day of DST are
+  // ambiguous, hence excpecting NULL for timestamps in that range. Expect a UTC adjusted
+  // timestamp otherwise.
+  TestStringValue("cast(to_utc_timestamp('2018-04-01 01:59:59', '" + time_zone + "') "
+      "as string)", "2018-03-31 14:59:59");
+  TestStringValue("cast(to_utc_timestamp('2018-04-01 02:00:00', '" + time_zone + "') "
+      "as string)", "NULL");
+  TestStringValue("cast(to_utc_timestamp('2018-04-01 02:59:59', '" + time_zone + "') "
+      "as string)", "NULL");
+  TestStringValue("cast(to_utc_timestamp('2018-04-01 03:00:00', '" + time_zone + "') "
+      "as string)", "2018-03-31 17:00:00");
+}
+
+void ExprTest::TestAusDSTEndingForCentralTimeZone(const string& time_zone) {
+  TestStringValue("cast(to_utc_timestamp('2018-04-01 01:59:59', '" + time_zone + "') "
+      "as string)", "2018-03-31 15:29:59");
+  TestStringValue("cast(to_utc_timestamp('2018-04-01 02:00:00', '" + time_zone + "') "
+      "as string)", "NULL");
+  TestStringValue("cast(to_utc_timestamp('2018-04-01 02:59:59', '" + time_zone + "') "
+      "as string)", "NULL");
+  TestStringValue("cast(to_utc_timestamp('2018-04-01 03:00:00', '" + time_zone + "') "
+      "as string)", "2018-03-31 17:30:00");
+}
+
+// IMPALA-6699: Fix DST end time for Australian time-zones
+TEST_F(ExprTest, AusDSTEndingTests) {
+  TestAusDSTEndingForEastTimeZone("AET");
+  TestAusDSTEndingForEastTimeZone("Australia/ACT");
+  TestAusDSTEndingForCentralTimeZone("Australia/Adelaide");
+  TestAusDSTEndingForCentralTimeZone("Australia/Broken_Hill");
+  TestAusDSTEndingForEastTimeZone("Australia/Canberra");
+  TestAusDSTEndingForEastTimeZone("Australia/Currie");
+  TestAusDSTEndingForEastTimeZone("Australia/Hobart");
+  TestAusDSTEndingForEastTimeZone("Australia/Melbourne");
+  TestAusDSTEndingForEastTimeZone("Australia/NSW");
+  TestAusDSTEndingForCentralTimeZone("Australia/South");
+  TestAusDSTEndingForEastTimeZone("Australia/Sydney");
+  TestAusDSTEndingForEastTimeZone("Australia/Tasmania");
+  TestAusDSTEndingForEastTimeZone("Australia/Victoria");
+  TestAusDSTEndingForCentralTimeZone("Australia/Yancowinna");
 }
 
 TEST_F(ExprTest, TimestampFunctions) {
