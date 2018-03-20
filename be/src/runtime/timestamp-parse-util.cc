@@ -285,8 +285,12 @@ bool TimestampParser::ParseFormatTokensByStr(DateTimeFormatContext* dt_ctx) {
     if (str == str_end) return true;
 
     // Check for the space between date and time component
-    tok_end = ParseSeparatorToken(str, str_end, ' ');
-    if (tok_end - str != 1) return false;
+    if (*str != ' ' && *str != 'T') return false;
+    char sep = *str;
+    tok_end = ParseSeparatorToken(str, str_end, sep);
+    if (tok_end - str < 1) return false;
+    // IMPALA-6641: Multiple spaces are okay, 'T' separator must be single
+    if (sep == 'T' && tok_end - str > 1) return false;
     dt_ctx->toks.push_back(
         DateTimeFormatToken(SEPARATOR, str - str_begin, tok_end - str, str));
     str = tok_end;
@@ -399,23 +403,35 @@ bool TimestampParser::Parse(const char* str, int len, boost::gregorian::date* d,
   DateTimeFormatContext* dt_ctx = NULL;
   if (LIKELY(len >= DEFAULT_TIME_FMT_LEN)) {
     // This string starts with a date component
-    if (str[4] == '-') {
+    if (str[4] == '-' && str[7] == '-') {
       switch (len) {
         case DEFAULT_DATE_FMT_LEN: {
           dt_ctx = &DEFAULT_DATE_CTX;
           break;
         }
-        case DEFAULT_SHORT_DATE_TIME_FMT_LEN:  {
-          switch (str[10]) {
-            case ' ': dt_ctx = &DEFAULT_SHORT_DATE_TIME_CTX; break;
-            case 'T': dt_ctx = &DEFAULT_SHORT_ISO_DATE_TIME_CTX; break;
+        case DEFAULT_SHORT_DATE_TIME_FMT_LEN: {
+          if (LIKELY(str[13] == ':')) {
+            switch (str[10]) {
+              case ' ':
+                dt_ctx = &DEFAULT_SHORT_DATE_TIME_CTX;
+                break;
+              case 'T':
+                dt_ctx = &DEFAULT_SHORT_ISO_DATE_TIME_CTX;
+                break;
+            }
           }
           break;
         }
         case DEFAULT_DATE_TIME_FMT_LEN: {
-          switch (str[10]) {
-            case ' ': dt_ctx = &DEFAULT_DATE_TIME_CTX[9]; break;
-            case 'T': dt_ctx = &DEFAULT_ISO_DATE_TIME_CTX[9]; break;
+          if (LIKELY(str[13] == ':')) {
+            switch (str[10]) {
+              case ' ':
+                dt_ctx = &DEFAULT_DATE_TIME_CTX[9];
+                break;
+              case 'T':
+                dt_ctx = &DEFAULT_ISO_DATE_TIME_CTX[9];
+                break;
+            }
           }
           break;
         }
@@ -423,7 +439,8 @@ bool TimestampParser::Parse(const char* str, int len, boost::gregorian::date* d,
           // There is likely a fractional component that's below the expected 9 chars.
           // We will need to work out which default context to use that corresponds to
           // the fractional length in the string.
-          if (LIKELY(len > DEFAULT_SHORT_DATE_TIME_FMT_LEN) && LIKELY(str[19] == '.')) {
+          if (LIKELY(len > DEFAULT_SHORT_DATE_TIME_FMT_LEN) && LIKELY(str[19] == '.')
+              && LIKELY(str[13] == ':')) {
             switch (str[10]) {
               case ' ': {
                 dt_ctx =
