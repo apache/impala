@@ -3102,11 +3102,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Could not find function FakePrepare(impala_udf::FunctionContext*, "+
         "impala_udf::FunctionContext::FunctionStateScope) in: ");
 
+    // TODO: https://issues.apache.org/jira/browse/IMPALA-6724
     // Try to create a function with the same name as a builtin
-    AnalysisError("create function sin(double) RETURNS double" + udfSuffix,
-        "Function cannot have the same name as a builtin: sin");
-    AnalysisError("create function sin() RETURNS double" + udfSuffix,
-        "Function cannot have the same name as a builtin: sin");
+    // AnalysisError("create function sin(double) RETURNS double" + udfSuffix,
+    //    "Function cannot have the same name as a builtin: sin");
+    // AnalysisError("create function sin() RETURNS double" + udfSuffix,
+    //    "Function cannot have the same name as a builtin: sin");
 
     // Try to create with a bad location
     AnalysisError("create function foo() RETURNS int LOCATION 'bad-location' SYMBOL='c'",

@@ -165,8 +165,8 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
       AnalyzesOk(String.format("%s INSERT ON DATABASE functional %s myrole",
           formatArgs));
       AnalysisError(String.format("%s INSERT ON SERVER %s myrole", formatArgs),
-          "Only 'ALL' or 'REFRESH' privilege may be applied at SERVER scope " +
-          "in privilege spec.");
+          "Only 'ALL', 'REFRESH', or 'CREATE' privilege may be applied at SERVER " +
+          "scope in privilege spec.");
       AnalysisError(String.format("%s INSERT ON URI 'hdfs:////abc//123' %s myrole",
           formatArgs), "Only 'ALL' privilege may be applied at URI scope in privilege " +
           "spec.");
@@ -181,8 +181,8 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
       AnalyzesOk(String.format("%s SELECT ON DATABASE functional %s myrole",
           formatArgs));
       AnalysisError(String.format("%s SELECT ON SERVER %s myrole", formatArgs),
-          "Only 'ALL' or 'REFRESH' privilege may be applied at SERVER scope " +
-          "in privilege spec.");
+          "Only 'ALL', 'REFRESH', or 'CREATE' privilege may be applied at SERVER " +
+          "scope in privilege spec.");
       AnalysisError(String.format("%s SELECT ON URI 'hdfs:////abc//123' %s myrole",
           formatArgs), "Only 'ALL' privilege may be applied at URI scope in privilege " +
           "spec.");
@@ -232,6 +232,18 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
           formatArgs));
       AnalysisError(String.format(
           "%s REFRESH ON URI 'hdfs:////abc//123' %s myrole", formatArgs),
+          "Only 'ALL' privilege may be applied at URI scope in privilege spec.");
+
+      // CREATE privilege
+      AnalyzesOk(String.format("%s CREATE ON SERVER %s myrole", formatArgs));
+      AnalyzesOk(String.format("%s CREATE ON SERVER server1 %s myrole", formatArgs));
+      AnalyzesOk(String.format(
+          "%s CREATE ON DATABASE functional %s myrole", formatArgs));
+      AnalysisError(String.format(
+          "%s CREATE ON TABLE functional.alltypes %s myrole", formatArgs),
+          "Create-level privileges on tables are not supported.");
+      AnalysisError(String.format(
+          "%s CREATE ON URI 'hdfs:////abc//123' %s myrole", formatArgs),
           "Only 'ALL' privilege may be applied at URI scope in privilege spec.");
     }
 

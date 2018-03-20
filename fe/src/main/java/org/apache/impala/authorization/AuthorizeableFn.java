@@ -19,6 +19,7 @@ package org.apache.impala.authorization;
 
 import java.util.List;
 
+import com.google.common.base.Strings;
 import org.apache.sentry.core.model.db.DBModelAuthorizable;
 
 import com.google.common.base.Preconditions;
@@ -29,17 +30,25 @@ import com.google.common.collect.Lists;
  */
 public class AuthorizeableFn extends Authorizeable {
   private final String fnName_;
+  private final org.apache.sentry.core.model.db.Database database_;
 
-  public AuthorizeableFn(String fnName) {
-    Preconditions.checkState(fnName != null && !fnName.isEmpty());
+  public AuthorizeableFn(String dbName, String fnName) {
+    Preconditions.checkState(!Strings.isNullOrEmpty(dbName));
+    Preconditions.checkState(!Strings.isNullOrEmpty(fnName));
+    database_ = new org.apache.sentry.core.model.db.Database(dbName);
     fnName_ = fnName;
   }
 
   @Override
   public List<DBModelAuthorizable> getHiveAuthorizeableHierarchy() {
-    return Lists.newArrayList();
+    return Lists.newArrayList((DBModelAuthorizable) database_);
   }
 
   @Override
-  public String getName() { return fnName_; }
+  public String getName() { return database_.getName() + "." + fnName_; }
+
+  @Override
+  public String getDbName() { return database_.getName(); }
+
+  public String getFnName() { return fnName_; };
 }

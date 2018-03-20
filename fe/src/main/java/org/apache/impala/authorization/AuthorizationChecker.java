@@ -107,8 +107,8 @@ public class AuthorizationChecker {
     if (!hasAccess(user, privilegeRequest)) {
       if (privilegeRequest.getAuthorizeable() instanceof AuthorizeableFn) {
         throw new AuthorizationException(String.format(
-            "User '%s' does not have privileges to CREATE/DROP functions.",
-            user.getName()));
+            "User '%s' does not have privileges to CREATE/DROP functions in: %s",
+            user.getName(), privilegeRequest.getName()));
       }
 
       Privilege privilege = privilegeRequest.getPrivilege();
@@ -164,7 +164,12 @@ public class AuthorizationChecker {
         }
       }
       return false;
-    } else if (request.getPrivilege() == Privilege.CREATE && authorizeables.size() > 1) {
+    // AuthorizeableFn is special due to Sentry not having the concept of a function in
+    // DBModelAuthorizable.AuthorizableType. As a result, the list of authorizables for
+    // an AuthorizeableFn only contains the server and database, but not the function
+    // itself. So there is no need to remove the last authorizeable here.
+    } else if (request.getPrivilege() == Privilege.CREATE && authorizeables.size() > 1 &&
+        !(request.getAuthorizeable() instanceof AuthorizeableFn)) {
       // CREATE on an object requires CREATE on the parent,
       // so don't check access on the object we're creating.
       authorizeables.remove(authorizeables.size() - 1);
