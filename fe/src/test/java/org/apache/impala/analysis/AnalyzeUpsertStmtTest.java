@@ -62,6 +62,8 @@ public class AnalyzeUpsertStmtTest extends AnalyzerTest {
     // Hint
     AnalyzesOk("upsert into table functional_kudu.testtbl [clustered] select * from " +
         "functional_kudu.testtbl");
+    // Mixed column name case on both primary key and non-primary key cols.
+    AnalyzesOk("upsert into functional_kudu.testtbl (ID, ZIP) values (0, 0)");
 
     // Key columns missing from permutation
     AnalysisError("upsert into functional_kudu.testtbl(zip) values(1)",
