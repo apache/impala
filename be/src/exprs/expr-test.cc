@@ -3073,7 +3073,6 @@ TEST_F(ExprTest, CastExprs) {
   TestTimestampValue("cast('1:05:1' as timestamp)", TimestampValue::Parse("01:05:01"));
   TestTimestampValue("cast('        2001-01-9 1:05:1        ' as timestamp)",
       TimestampValue::Parse("2001-01-09 01:05:01"));
-  TestIsNull("cast('2001-1-21     11:2:3' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('2001-6' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('01-1-21' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('2001-1-21 12:5:3 AM' as timestamp)", TYPE_TIMESTAMP);
@@ -3154,14 +3153,35 @@ TEST_F(ExprTest, CastExprs) {
   TestTimestampValue("cast('  \t\r\n      2001-1-9    \t\r\n    ' as timestamp)",
       TimestampValue::Parse("2001-01-09"));
 
+  // Test valid multi-space and 'T' separators between date and time
+  // components
+  TestTimestampValue("cast('2001-01-09   01:05:01' as timestamp)",
+      TimestampValue::Parse("2001-01-09 01:05:01"));
+  TestTimestampValue("cast('2001-01-09T01:05:01' as timestamp)",
+      TimestampValue::Parse("2001-01-09 01:05:01"));
+  TestTimestampValue("cast('2001-01-09   01:05:01.123456789101112' as timestamp)",
+      TimestampValue::Parse("2001-01-09 01:05:01.123456789"));
+  TestTimestampValue("cast('2001-01-09T01:05:01.123456789101112' as timestamp)",
+      TimestampValue::Parse("2001-01-09 01:05:01.123456789"));
+  TestTimestampValue("cast('  \t\r\n 2001-01-09   01:05:01   \t\r\n ' as timestamp)",
+      TimestampValue::Parse("2001-01-09 01:05:01"));
+  TestTimestampValue("cast('  \t\r\n 2001-01-09T01:05:01   \t\r\n ' as timestamp)",
+      TimestampValue::Parse("2001-01-09 01:05:01"));
+  TestTimestampValue(
+      "cast('  \t\r\n 2001-01-09   01:05:01.12345678910   \t\r\n ' as timestamp)",
+      TimestampValue::Parse("2001-01-09 01:05:01.123456789"));
+  TestTimestampValue(
+      "cast('  \t\r\n 2001-01-09T01:05:01.12345678910   \t\r\n ' as timestamp)",
+      TimestampValue::Parse("2001-01-09 01:05:01.123456789"));
+
+  // Test invalid variations of the 'T' separator
+  TestIsNull("cast('2001-01-09TTTTT01:05:01' as timestamp)", TYPE_TIMESTAMP);
+  TestIsNull("cast('2001-01-09t01:05:01' as timestamp)", TYPE_TIMESTAMP);
+
   // Test invalid whitespace locations in strings to be casted to timestamp
-  TestIsNull(
-      "cast(' \t\r\n  2001-01-09      01:05:01  \t\r\n ' as timestamp)", TYPE_TIMESTAMP);
-  TestIsNull("cast('2001-01-09   01:05:01' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('2001-01-09\t01:05:01' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('2001-01-09\r01:05:01' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('2001-01-09\n01:05:01' as timestamp)", TYPE_TIMESTAMP);
-  TestIsNull("cast('2001-1-9    1:5:1' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('2001-1-9\t1:5:1' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('2001-1-9\r1:5:1' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('2001-1-9\n1:5:1' as timestamp)", TYPE_TIMESTAMP);
