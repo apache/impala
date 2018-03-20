@@ -3198,6 +3198,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       AnalysisError("insert into functional_kudu.testtbl(zip) values(1)",
           "All primary key columns must be specified for INSERTing into Kudu tables. " +
           "Missing columns are: id");
+      // Mixed column name case, on both primary key and non-primary key cols.
+      AnalyzesOk("insert into functional_kudu.alltypes (ID, BOOL_COL) values (0, true)");
     }
   }
 
@@ -3322,6 +3324,13 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "select * from functional.alltypes",
         "Target table 'functional.alltypessmall' has fewer columns (13) than the " +
         "SELECT / VALUES clause and PARTITION clause return (15)");
+
+    // Mixed column name case in the partition clause.
+    AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
+        "partition (YEAR, month)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col, year, " +
+        "month from functional.alltypes");
   }
 
   /**
@@ -3510,6 +3519,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "from functional.alltypes",
         "Non-constant expressions are not supported as static partition-key values " +
         "in 'month=int_col'.");
+    // Mixed column case in the partition clause.
+    AnalyzesOk("insert " + qualifier + " table functional.alltypessmall " +
+        "partition (year=2009, MONTH=4)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col " +
+        "from functional.alltypes");
 
     if (qualifier.contains("OVERWRITE")) {
       AnalysisError("insert " + qualifier + " table functional_hbase.alltypessmall " +
@@ -3640,6 +3655,10 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("insert " + qualifier + " table functional.alltypes() " +
         "partition(year, month) select 1,2 from functional.alltypes");
 
+    // Mixed column case in permutation, both partition and non-partition cols.
+    AnalyzesOk("insert " + qualifier + " table functional.alltypes (ID, YEAR, month)" +
+        "values (0, 0, 0)");
+
     if (!qualifier.contains("OVERWRITE")) {
       // Simple permutation
       AnalyzesOk("insert " + qualifier + " table functional_hbase.alltypesagg" +
@@ -3661,6 +3680,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "float_col, double_col, date_string_col, string_col, timestamp_col from " +
           "functional.alltypesnopart",
           "Row-key column 'id' must be explicitly mentioned in column permutation.");
+      // Mixed column case on both row-key and non-row-key cols.
+      AnalyzesOk("insert " + qualifier + " table functional_hbase.alltypesagg" +
+          "(ID, bool_col, tinyint_col, smallint_col, INT_COL, bigint_col, " +
+          "float_col, double_col, date_string_col, string_col, timestamp_col) " +
+          "select * from functional.alltypesnopart");
     }
   }
 
