@@ -1232,12 +1232,10 @@ public class HdfsTable extends Table {
    *
    * If 'loadTableSchema' is true, the table schema is loaded from the Hive Metastore.
    *
-   * There are several cases where existing file descriptors might be reused incorrectly:
-   * 1. an ALTER TABLE ADD PARTITION or dynamic partition insert is executed through
-   *    Hive. This does not update the lastDdlTime.
-   * 2. Hdfs rebalancer is executed. This changes the block locations but doesn't update
-   *    the mtime (file modification time).
-   * If any of these occur, user has to execute "invalidate metadata" to invalidate the
+   * Existing file descriptors might be reused incorrectly if Hdfs rebalancer was
+   * executed, as it changes the block locations but doesn't update the mtime (file
+   * modification time).
+   * If this occurs, user has to execute "invalidate metadata" to invalidate the
    * metadata cache of the table and trigger a fresh load.
    */
   public void load(boolean reuseMetadata, IMetaStoreClient client,
@@ -1339,13 +1337,13 @@ public class HdfsTable extends Table {
    * any, or for all the table partitions if 'partitionsToUpdate' is null.
    */
   private void updatePartitionsFromHms(IMetaStoreClient client,
-      Set<String> partitionsToUpdate, boolean loadParitionFileMetadata)
+      Set<String> partitionsToUpdate, boolean loadPartitionFileMetadata)
       throws Exception {
     if (LOG.isTraceEnabled()) LOG.trace("Sync table partitions: " + getFullName());
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
     Preconditions.checkNotNull(msTbl);
     Preconditions.checkState(msTbl.getPartitionKeysSize() != 0);
-    Preconditions.checkState(loadParitionFileMetadata || partitionsToUpdate == null);
+    Preconditions.checkState(loadPartitionFileMetadata || partitionsToUpdate == null);
 
     // Retrieve all the partition names from the Hive Metastore. We need this to
     // identify the delta between partitions of the local HdfsTable and the table entry
@@ -1378,7 +1376,7 @@ public class HdfsTable extends Table {
         // list and loading them from the Hive Metastore.
         dirtyPartitions.add(partition);
       } else {
-        if (partitionsToUpdate == null && loadParitionFileMetadata) {
+        if (partitionsToUpdate == null && loadPartitionFileMetadata) {
           Path partitionPath = partition.getLocationPath();
           List<HdfsPartition> partitions =
             partitionsToUpdateFileMdByPath.get(partitionPath);
@@ -1412,7 +1410,7 @@ public class HdfsTable extends Table {
     // Load file metadata. Until we have a notification mechanism for when a
     // file changes in hdfs, it is sometimes required to reload all the file
     // descriptors and block metadata of a table (e.g. REFRESH statement).
-    if (loadParitionFileMetadata) {
+    if (loadPartitionFileMetadata) {
       if (partitionsToUpdate != null) {
         // Only reload file metadata of partitions specified in 'partitionsToUpdate'
         Preconditions.checkState(partitionsToUpdateFileMdByPath.isEmpty());

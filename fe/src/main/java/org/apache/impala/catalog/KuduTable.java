@@ -219,7 +219,8 @@ public class KuduTable extends Table {
     final Timer.Context context =
         getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time();
     try {
-      msTable_ = msTbl;
+      // Copy the table to check later if anything has changed.
+      msTable_ = msTbl.deepCopy();
       kuduTableName_ = msTable_.getParameters().get(KuduTable.KEY_TABLE_NAME);
       Preconditions.checkNotNull(kuduTableName_);
       kuduMasters_ = msTable_.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
@@ -234,10 +235,15 @@ public class KuduTable extends Table {
             kuduTableName_, e);
       }
 
+      // Avoid updating HMS if the schema didn't change.
+      if (msTable_.equals(msTbl)) return;
+
       // Update the table schema in HMS.
       try {
-        long lastDdlTime = CatalogOpExecutor.calculateDdlTime(msTable_);
-        msTable_.putToParameters("transient_lastDdlTime", Long.toString(lastDdlTime));
+        // HMS would fill this table property if it was not set, but as metadata written
+        // with alter_table is not read back in case of Kudu tables, it has to be set here
+        // to ensure that HMS and catalogd have the same timestamp.
+        updateTimestampProperty(msTable_, TBL_PROP_LAST_DDL_TIME);
         msTable_.putToParameters(StatsSetupConst.DO_NOT_UPDATE_STATS,
             StatsSetupConst.TRUE);
         msClient.alter_table(msTable_.getDbName(), msTable_.getTableName(), msTable_);
