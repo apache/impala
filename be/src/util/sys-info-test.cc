@@ -61,7 +61,13 @@ TEST(DiskInfoTest, Basic) {
   cout << "Device name for disk 0: " << DiskInfo::device_name(0) << endl;
 
   int disk_id_home_dir = DiskInfo::disk_id("/home");
-  cout << "Device name for '/home': " << DiskInfo::device_name(disk_id_home_dir) << endl;
+  if (disk_id_home_dir != -1) {
+    cout << "Device name for '/home': "
+        << DiskInfo::device_name(disk_id_home_dir) << endl;
+  } else {
+    // Often happens in Docker containers.
+    cout << "No device name for /home";
+  }
 }
 }
 
