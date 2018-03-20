@@ -98,9 +98,6 @@ public abstract class Table extends CatalogObjectImpl {
   // Type of this table (array of struct) that mirrors the columns. Useful for analysis.
   protected final ArrayType type_ = new ArrayType(new StructType());
 
-  // The lastDdlTime for this table; -1 if not set
-  protected long lastDdlTime_;
-
   // True if this object is stored in an Impalad catalog cache.
   protected boolean storedInImpaladCatalogCache_ = false;
 
@@ -110,14 +107,19 @@ public abstract class Table extends CatalogObjectImpl {
   public static final String ALTER_DURATION_METRIC = "alter-duration";
   public static final String LOAD_DURATION_METRIC = "load-duration";
 
+  // Table property key for storing the time of the last DDL operation.
+  public static final String TBL_PROP_LAST_DDL_TIME = "transient_lastDdlTime";
+
+  // Table property key for storing the last time when Impala executed COMPUTE STATS.
+  public static final String TBL_PROP_LAST_COMPUTE_STATS_TIME =
+      "impala.lastComputeStatsTime";
+
   protected Table(org.apache.hadoop.hive.metastore.api.Table msTable, Db db,
       String name, String owner) {
     msTable_ = msTable;
     db_ = db;
     name_ = name.toLowerCase();
     owner_ = owner;
-    lastDdlTime_ = (msTable_ != null) ?
-        CatalogServiceCatalog.getLastDdlTime(msTable_) : -1;
     tableStats_ = new TTableStats(-1);
     tableStats_.setTotal_file_bytes(-1);
     initMetrics();
@@ -184,16 +186,6 @@ public abstract class Table extends CatalogObjectImpl {
     colsByPos_.clear();
     colsByName_.clear();
     ((StructType) type_.getItemType()).clearFields();
-  }
-
-  /**
-   * Updates the lastDdlTime for this Table, if the new value is greater
-   * than the existing value. Does nothing if the new value is less than
-   * or equal to the existing value.
-   */
-  public void updateLastDdlTime(long ddlTime) {
-    // Ensure the lastDdlTime never goes backwards.
-    if (ddlTime > lastDdlTime_) lastDdlTime_ = ddlTime;
   }
 
   // Returns a list of all column names for this table which we expect to have column
@@ -577,5 +569,13 @@ public abstract class Table extends CatalogObjectImpl {
     if (obj == null) return false;
     if (!(obj instanceof Table)) return false;
     return getFullName().equals(((Table) obj).getFullName());
+  }
+
+  /**
+   *  Updates a table property with the current system time in seconds precision.
+   */
+  public static void updateTimestampProperty(
+      org.apache.hadoop.hive.metastore.api.Table msTbl, String propertyKey) {
+    msTbl.putToParameters(propertyKey, Long.toString(System.currentTimeMillis() / 1000));
   }
 }

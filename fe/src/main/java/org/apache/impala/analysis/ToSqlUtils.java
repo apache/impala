@@ -224,8 +224,8 @@ public class ToSqlUtils {
     org.apache.hadoop.hive.metastore.api.Table msTable = table.getMetaStoreTable();
     // Use a LinkedHashMap to preserve the ordering of the table properties.
     LinkedHashMap<String, String> properties = Maps.newLinkedHashMap(msTable.getParameters());
-    if (properties.containsKey("transient_lastDdlTime")) {
-      properties.remove("transient_lastDdlTime");
+    if (properties.containsKey(Table.TBL_PROP_LAST_DDL_TIME)) {
+      properties.remove(Table.TBL_PROP_LAST_DDL_TIME);
     }
     boolean isExternal = msTable.getTableType() != null &&
         msTable.getTableType().equals(TableType.EXTERNAL_TABLE.toString());

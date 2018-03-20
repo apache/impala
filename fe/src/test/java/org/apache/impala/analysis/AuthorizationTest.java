@@ -1880,6 +1880,7 @@ public class AuthorizationTest extends FrontendTestBase {
           ? ImmutableList.of("", "STATS_GENERATED_VIA_STATS_TASK", "true")
           : ImmutableList.of("", "STATS_GENERATED", "TASK"))
       .add(
+      "","impala.lastComputeStatsTime","*",
       "","numRows","11000",
       "","totalSize","834279",
       "","transient_lastDdlTime","*",
@@ -1930,6 +1931,7 @@ public class AuthorizationTest extends FrontendTestBase {
           ? ImmutableList.of("", "STATS_GENERATED_VIA_STATS_TASK", "true")
           : ImmutableList.of("", "STATS_GENERATED", "TASK"))
       .add(
+      "","impala.lastComputeStatsTime","*",
       "","numRows","100",
       "","totalSize","6472",
       "","transient_lastDdlTime","*",

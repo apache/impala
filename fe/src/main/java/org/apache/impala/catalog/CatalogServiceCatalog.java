@@ -1401,35 +1401,6 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Returns the table parameter 'transient_lastDdlTime', or -1 if it's not set.
-   * TODO: move this to a metastore helper class.
-   */
-  public static long getLastDdlTime(org.apache.hadoop.hive.metastore.api.Table msTbl) {
-    Preconditions.checkNotNull(msTbl);
-    Map<String, String> params = msTbl.getParameters();
-    String lastDdlTimeStr = params.get("transient_lastDdlTime");
-    if (lastDdlTimeStr != null) {
-      try {
-        return Long.parseLong(lastDdlTimeStr);
-      } catch (NumberFormatException e) {}
-    }
-    return -1;
-  }
-
-  /**
-   * Updates the cached lastDdlTime for the given table. The lastDdlTime is used during
-   * the metadata refresh() operations to determine if there have been any external
-   * (outside of Impala) modifications to the table.
-   */
-  public void updateLastDdlTime(TTableName tblName, long ddlTime) {
-    Db db = getDb(tblName.getDb_name());
-    if (db == null) return;
-    Table tbl = db.getTable(tblName.getTable_name());
-    if (tbl == null) return;
-    tbl.updateLastDdlTime(ddlTime);
-  }
-
-  /**
    * Renames a table. Equivalent to an atomic drop + add of the table. Returns
    * a pair of tables containing the removed table (or null if the table drop was not
    * successful) and the new table (or null if either the drop of the old one or the

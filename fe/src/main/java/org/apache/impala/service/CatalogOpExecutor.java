@@ -711,7 +711,7 @@ public class CatalogOpExecutor {
       if (LOG.isTraceEnabled()) {
         LOG.trace(String.format("Altering view %s", tableName));
       }
-      applyAlterTable(msTbl);
+      applyAlterTable(msTbl, true);
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
         tbl.load(true, msClient.getHiveClient(), msTbl);
       }
@@ -729,6 +729,8 @@ public class CatalogOpExecutor {
    * in batches of size 'MAX_PARTITION_UPDATES_PER_RPC'.
    * This function is used by COMPUTE STATS, COMPUTE INCREMENTAL STATS and
    * ALTER TABLE SET COLUMN STATS.
+   * Updates table property 'impala.lastComputeStatsTime' for COMPUTE (INCREMENTAL) STATS,
+   * but not for ALTER TABLE SET COLUMN STATS.
    * Returns the number of updated partitions and columns in 'numUpdatedPartitions'
    * and 'numUpdatedColumns', respectively.
    */
@@ -780,10 +782,15 @@ public class CatalogOpExecutor {
       bulkAlterPartitions(table.getDb().getName(), table.getName(), modifiedParts);
     }
 
-    // Update table row count and total file bytes. Apply table alteration to HMS last to
-    // ensure the lastDdlTime is as accurate as possible.
-    if (params.isSetTable_stats()) updateTableStats(params, msTbl);
-    applyAlterTable(msTbl);
+    if (params.isSetTable_stats()) {
+      // Update table row count and total file bytes.
+      updateTableStats(params, msTbl);
+      // Set impala.lastComputeStatsTime just before alter_table to ensure that it is as
+      // accurate as possible.
+      Table.updateTimestampProperty(msTbl, HdfsTable.TBL_PROP_LAST_COMPUTE_STATS_TIME);
+    }
+
+    applyAlterTable(msTbl, false);
 
     numUpdatedPartitions.setRef(Long.valueOf(0));
     if (modifiedParts != null) {
@@ -1232,7 +1239,7 @@ public class CatalogOpExecutor {
     boolean droppedTotalSize =
         msTbl.getParameters().remove(StatsSetupConst.TOTAL_SIZE) != null;
     if (droppedRowCount || droppedTotalSize) {
-      applyAlterTable(msTbl);
+      applyAlterTable(msTbl, false);
       ++numTargetedPartitions;
     }
 
@@ -1778,7 +1785,7 @@ public class CatalogOpExecutor {
             cacheOp.getCache_pool_name(), replication);
         catalog_.watchCacheDirs(Lists.<Long>newArrayList(id),
             new TTableName(newTable.getDbName(), newTable.getTableName()));
-        applyAlterTable(newTable);
+        applyAlterTable(newTable, true);
       }
       Table newTbl = catalog_.addTable(newTable.getDbName(), newTable.getTableName());
       addTableToCatalogUpdate(newTbl, response.result);
@@ -1968,7 +1975,7 @@ public class CatalogOpExecutor {
         msTbl.getSd().addToCols(fs);
       }
     }
-    applyAlterTable(msTbl);
+    applyAlterTable(msTbl, true);
   }
 
   /**
@@ -2005,7 +2012,7 @@ public class CatalogOpExecutor {
             "Column name %s not found in table %s.", colName, tbl.getFullName()));
       }
     }
-    applyAlterTable(msTbl);
+    applyAlterTable(msTbl, true);
   }
 
   /**
@@ -2276,7 +2283,7 @@ public class CatalogOpExecutor {
       String alteredColumns = MetaStoreUtil.removeValueFromCsvList(oldColumns, colName);
       msTbl.getParameters().put(sortByKey, alteredColumns);
     }
-    applyAlterTable(msTbl);
+    applyAlterTable(msTbl, true);
   }
 
   /**
@@ -2337,7 +2344,7 @@ public class CatalogOpExecutor {
       // The default partition must be updated if the file format is changed so that new
       // partitions are created with the new file format.
       if (tbl instanceof HdfsTable) ((HdfsTable) tbl).addDefaultPartition(msTbl.getSd());
-      applyAlterTable(msTbl);
+      applyAlterTable(msTbl, true);
       reloadFileMetadata = true;
     } else {
       Preconditions.checkArgument(tbl instanceof HdfsTable);
@@ -2376,7 +2383,7 @@ public class CatalogOpExecutor {
       // The default partition must be updated if the row format is changed so that new
       // partitions are created with the new file format.
       ((HdfsTable) tbl).addDefaultPartition(msTbl.getSd());
-      applyAlterTable(msTbl);
+      applyAlterTable(msTbl, true);
       reloadFileMetadata = true;
     } else {
       List<HdfsPartition> partitions =
@@ -2418,7 +2425,7 @@ public class CatalogOpExecutor {
           tbl.getMetaStoreTable().deepCopy();
       if (msTbl.getPartitionKeysSize() == 0) reloadFileMetadata = true;
       msTbl.getSd().setLocation(location);
-      applyAlterTable(msTbl);
+      applyAlterTable(msTbl, true);
     } else {
       TableName tableName = tbl.getTableName();
       HdfsPartition partition = catalog_.getHdfsPartition(
@@ -2503,7 +2510,7 @@ public class CatalogOpExecutor {
           throw new UnsupportedOperationException(
               "Unknown target TTablePropertyType: " + params.getTarget());
       }
-      applyAlterTable(msTbl);
+      applyAlterTable(msTbl, true);
     }
   }
 
@@ -2630,7 +2637,7 @@ public class CatalogOpExecutor {
     }
 
     // Update the table metadata.
-    applyAlterTable(msTbl);
+    applyAlterTable(msTbl, true);
     return loadFileMetadata;
   }
 
@@ -2869,13 +2876,19 @@ public class CatalogOpExecutor {
    * command if the metadata is not completely in-sync. This affects both Hive and
    * Impala, but is more important in Impala because the metadata is cached for a
    * longer period of time.
+   * If 'setLastDdlTime' is true, then table property 'transient_lastDdlTime' is updated
+   * to the current time.
    */
-  private void applyAlterTable(org.apache.hadoop.hive.metastore.api.Table msTbl)
+  private void applyAlterTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
+      boolean setLastDdlTime)
       throws ImpalaRuntimeException {
-    long lastDdlTime = -1;
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-      lastDdlTime = calculateDdlTime(msTbl);
-      msTbl.putToParameters("transient_lastDdlTime", Long.toString(lastDdlTime));
+      if (setLastDdlTime) {
+        // It would be enough to remove this table property, as HMS would fill it, but
+        // this would make it necessary to reload the table after alter_table in order to
+        // remain consistent with HMS.
+        Table.updateTimestampProperty(msTbl, Table.TBL_PROP_LAST_DDL_TIME);
+      }
       // Avoid computing/setting stats on the HMS side because that may reset the
       // 'numRows' table property (see HIVE-15653). The DO_NOT_UPDATE_STATS flag
       // tells the HMS not to recompute/reset any statistics on its own. Any
@@ -2886,9 +2899,6 @@ public class CatalogOpExecutor {
     } catch (TException e) {
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_table"), e);
-    } finally {
-      catalog_.updateLastDdlTime(
-          new TTableName(msTbl.getDbName(), msTbl.getTableName()), lastDdlTime);
     }
   }
 
@@ -2906,7 +2916,6 @@ public class CatalogOpExecutor {
     try {
       MetastoreShim.alterPartitions(
           msClient.getHiveClient(), tableName.getDb(), tableName.getTbl(), hmsPartitions);
-      updateLastDdlTime(msTbl, msClient);
     } catch (TException e) {
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_partitions"), e);
@@ -3111,42 +3120,6 @@ public class CatalogOpExecutor {
     return fsList;
   }
 
-   /**
-   * Sets the table parameter 'transient_lastDdlTime' to System.currentTimeMillis()/1000
-   * in the given msTbl. 'transient_lastDdlTime' is guaranteed to be changed.
-   * If msClient is not null then this method applies alter_table() to update the
-   * Metastore. Otherwise, the caller is responsible for the final update.
-   */
-  private long updateLastDdlTime(org.apache.hadoop.hive.metastore.api.Table msTbl,
-      MetaStoreClient msClient) throws MetaException, NoSuchObjectException, TException {
-    Preconditions.checkNotNull(msTbl);
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("Updating lastDdlTime for table: " + msTbl.getTableName());
-    }
-    Map<String, String> params = msTbl.getParameters();
-    long lastDdlTime = calculateDdlTime(msTbl);
-    params.put("transient_lastDdlTime", Long.toString(lastDdlTime));
-    msTbl.setParameters(params);
-    if (msClient != null) {
-      msClient.getHiveClient().alter_table(
-          msTbl.getDbName(), msTbl.getTableName(), msTbl);
-    }
-    catalog_.updateLastDdlTime(
-        new TTableName(msTbl.getDbName(), msTbl.getTableName()), lastDdlTime);
-    return lastDdlTime;
-  }
-
-  /**
-   * Calculates the next transient_lastDdlTime value.
-   */
-  public static long calculateDdlTime(
-      org.apache.hadoop.hive.metastore.api.Table msTbl) {
-    long existingLastDdlTime = CatalogServiceCatalog.getLastDdlTime(msTbl);
-    long currentTime = System.currentTimeMillis() / 1000;
-    if (existingLastDdlTime == currentTime) ++currentTime;
-    return currentTime;
-  }
-
   /**
    * Executes a TResetMetadataRequest and returns the result as a
    * TResetMetadataResponse. Based on the request parameters, this operation
@@ -3269,7 +3242,6 @@ public class CatalogOpExecutor {
    * If the insert touched any pre-existing partitions that were cached, a request to
    * watch the associated cache directives will be submitted. This will result in an
    * async table refresh once the cache request completes.
-   * Updates the lastDdlTime of the table if new partitions were created.
    */
   public TUpdateCatalogResponse updateCatalog(TUpdateCatalogRequest update)
       throws ImpalaException {
